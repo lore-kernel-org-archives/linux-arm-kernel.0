@@ -1,1110 +1,186 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 25 Jan 2013 05:32:29 +0000
-Subject: [RFC V2 PATCH 8/8] ARM: kirkwood: mv643xx_eth dt conversion
+Date: Fri, 25 Jan 2013 05:32:23 +0000
+Subject: [RFC V2 PATCH 2/8] ARM: kirkwood: topkick: convert to pinctrl
 In-Reply-To: <cover.1359091286.git.jason@lakedaemon.net>
 References: <cover.1358983578.git.jason@lakedaemon.net>
  <cover.1359091286.git.jason@lakedaemon.net>
-Message-ID: <036123a707fc45ea18de81282fca95d218ddcc2a.1359091286.git.jason@lakedaemon.net>
+Message-ID: <f6d483f3fb83826bce16f956afa013f0bcf11f52.1359091286.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on the dreamplug:
-
-mv643xx_eth: MV-643xx 10/100/1000 ethernet driver version 1.4
-libphy: mv643xx_eth smi: probed
-libphy: mv643xx_eth smi: probed
-mv643xx_eth_port f1072000.egiga0 eth0: port 0 with MAC address XX:XX:XX:XX:XX:XX
-mv643xx_eth_port f1076000.egiga1 eth1: port 0 with MAC address XX:XX:XX:XX:XX:XX
-
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/boot/dts/kirkwood-dnskw.dtsi        |   9 +++
- arch/arm/boot/dts/kirkwood-dockstar.dts      |   8 +++
- arch/arm/boot/dts/kirkwood-dreamplug.dts     |  16 +++++
- arch/arm/boot/dts/kirkwood-goflexnet.dts     |   7 ++
- arch/arm/boot/dts/kirkwood-ib62x0.dts        |   9 +++
- arch/arm/boot/dts/kirkwood-iconnect.dts      |   9 +++
- arch/arm/boot/dts/kirkwood-lsxl.dtsi         |  18 +++++
- arch/arm/boot/dts/kirkwood-mplcec4.dts       |  18 +++++
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi   |   9 +++
- arch/arm/boot/dts/kirkwood-ns2lite.dts       |   5 ++
- arch/arm/boot/dts/kirkwood-ns2mini.dts       |   5 ++
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts |   8 +++
- arch/arm/boot/dts/kirkwood-topkick.dts       |   8 +++
- arch/arm/boot/dts/kirkwood.dtsi              |  38 ++++++++++
- arch/arm/mach-kirkwood/Kconfig               | 101 ---------------------------
- arch/arm/mach-kirkwood/Makefile              |  14 ----
- arch/arm/mach-kirkwood/board-dnskw.c         |   7 --
- arch/arm/mach-kirkwood/board-dockstar.c      |  32 ---------
- arch/arm/mach-kirkwood/board-dreamplug.c     |  35 ----------
- arch/arm/mach-kirkwood/board-dt.c            |  42 -----------
- arch/arm/mach-kirkwood/board-goflexnet.c     |  34 ---------
- arch/arm/mach-kirkwood/board-ib62x0.c        |  29 --------
- arch/arm/mach-kirkwood/board-iconnect.c      |  23 ------
- arch/arm/mach-kirkwood/board-lsxl.c          |  36 ----------
- arch/arm/mach-kirkwood/board-mplcec4.c       |  35 ----------
- arch/arm/mach-kirkwood/board-ns2.c           |  34 ---------
- arch/arm/mach-kirkwood/board-openblocks_a6.c |  26 -------
- arch/arm/mach-kirkwood/board-usi_topkick.c   |  29 --------
- arch/arm/mach-kirkwood/common.h              |  63 -----------------
- 29 files changed, 167 insertions(+), 540 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/board-dockstar.c
- delete mode 100644 arch/arm/mach-kirkwood/board-dreamplug.c
- delete mode 100644 arch/arm/mach-kirkwood/board-goflexnet.c
- delete mode 100644 arch/arm/mach-kirkwood/board-ib62x0.c
- delete mode 100644 arch/arm/mach-kirkwood/board-iconnect.c
- delete mode 100644 arch/arm/mach-kirkwood/board-lsxl.c
- delete mode 100644 arch/arm/mach-kirkwood/board-mplcec4.c
- delete mode 100644 arch/arm/mach-kirkwood/board-ns2.c
- delete mode 100644 arch/arm/mach-kirkwood/board-openblocks_a6.c
- delete mode 100644 arch/arm/mach-kirkwood/board-usi_topkick.c
+ arch/arm/boot/dts/kirkwood-topkick.dts     | 88 ++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-usi_topkick.c | 42 --------------
+ 2 files changed, 88 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-index 6875ac0..9e2132a 100644
---- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-@@ -186,6 +186,15 @@
- 				reg = <0x7b00000 0x500000>;
- 			};
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			phy_addr = <0x88>;
-+			status = "ok";
-+		};
- 	};
- 
- 	regulators {
-diff --git a/arch/arm/boot/dts/kirkwood-dockstar.dts b/arch/arm/boot/dts/kirkwood-dockstar.dts
-index 2e3dd34..ec09085 100644
---- a/arch/arm/boot/dts/kirkwood-dockstar.dts
-+++ b/arch/arm/boot/dts/kirkwood-dockstar.dts
-@@ -60,6 +60,14 @@
- 				reg = <0x0500000 0xfb00000>;
- 			};
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			status = "ok";
-+		};
- 	};
- 	gpio-leds {
- 		compatible = "gpio-leds";
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index ef2d8c7..ae130a5 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -81,6 +81,22 @@
- 			status = "okay";
- 			/* No CD or WP GPIOs */
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		smi1: mdio at 76000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			status = "ok";
-+		};
-+
-+		egiga1 {
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio-leds {
-diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-index 1b133e0..98513ee 100644
---- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
-+++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-@@ -106,6 +106,13 @@
- 			nr-ports = <2>;
- 		};
- 
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			status = "ok";
-+		};
- 	};
- 	gpio-leds {
- 		compatible = "gpio-leds";
-diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-index 71902da..e77b06d 100644
---- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
-+++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-@@ -79,6 +79,15 @@
- 			};
- 
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			phy_addr = <0x88>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio_keys {
-diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
-index 504f16b..5b89685 100644
---- a/arch/arm/boot/dts/kirkwood-iconnect.dts
-+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
-@@ -110,6 +110,15 @@
- 				reg = <0x980000 0x1f400000>;
- 			};
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			phy_addr = <0x91>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio-leds {
-diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-index 996c7fe..16199bf 100644
---- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-@@ -106,6 +106,24 @@
- 				};
- 			};
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		smi1: mdio at 76000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			phy_addr = <0x80>;
-+			status = "ok";
-+		};
-+
-+		egiga1 {
-+			phy_addr = <0x88>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio_keys {
-diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-index 662dfd8..33130d1 100644
---- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
-+++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-@@ -140,6 +140,24 @@
- 			cd-gpios = <&gpio1 15 0>;
- 			/* No WP GPIO */
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		smi1: mdio at 76000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			phy_addr = <0x81>;
-+			status = "ok";
-+		};
-+
-+		egiga1 {
-+			phy_addr = <0x82>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio-leds {
-diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-index e8e7ece..0c54321 100644
---- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-@@ -54,6 +54,15 @@
- 				reg = <0x50>;
- 			};
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			phy_addr = <0x88>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio_keys {
-diff --git a/arch/arm/boot/dts/kirkwood-ns2lite.dts b/arch/arm/boot/dts/kirkwood-ns2lite.dts
-index b02eb4e..e7cd611 100644
---- a/arch/arm/boot/dts/kirkwood-ns2lite.dts
-+++ b/arch/arm/boot/dts/kirkwood-ns2lite.dts
-@@ -16,6 +16,11 @@
- 			status = "okay";
- 			nr-ports = <1>;
- 		};
-+
-+		egiga0 {
-+			phy_addr = <0x80>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio-leds {
-diff --git a/arch/arm/boot/dts/kirkwood-ns2mini.dts b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-index b79f5eb..700d308 100644
---- a/arch/arm/boot/dts/kirkwood-ns2mini.dts
-+++ b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-@@ -16,6 +16,11 @@
- 			status = "okay";
- 			nr-ports = <1>;
- 		};
-+
-+		egiga0 {
-+			phy_addr = <0x80>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio_fan {
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-index ede7fe0d..b179d43 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-@@ -191,6 +191,14 @@
- 				marvell,function = "gpio";
- 			};
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio-leds {
 diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-index d959873..edefbb5 100644
+index 23c2ddc..d959873 100644
 --- a/arch/arm/boot/dts/kirkwood-topkick.dts
 +++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-@@ -149,6 +149,14 @@
- 			status = "okay";
- 			/* No CD or WP GPIOs */
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			status = "ok";
-+		};
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ 
+ /include/ "kirkwood.dtsi"
++/include/ "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "Univeral Scientific Industrial Co. Topkick-1281P2";
+@@ -16,6 +17,93 @@
  	};
  
- 	gpio-leds {
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 2c738d9..b13a405 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -201,5 +201,43 @@
- 			clocks = <&gate_clk 4>;
- 			status = "disabled";
- 		};
+ 	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++			/*
++			 * GPIO LED layout
++			 *
++			 *       /-SYS_LED(2)
++			 *       |
++			 *       |   /-DISK_LED
++			 *       |   |
++			 *       |   |   /-WLAN_LED(2)
++			 *       |   |   |
++			 * [SW] [*] [*] [*]
++			 */
 +
-+		smi0: mdio at 72000 {
-+			compatible = "marvell,mdio-mv643xx";
-+			reg = <0x72000 0x4000>;
-+			interrupts = <46>;
-+			tx_csum_limit = <1600>;
-+			status = "disabled";
++			/*
++			 * Switch positions
++			 *
++			 *     /-SW_LEFT(2)
++			 *     |
++			 *     |   /-SW_IDLE
++			 *     |   |
++			 *     |   |   /-SW_RIGHT
++			 *     |   |   |
++			 * PS [L] [I] [R] LEDS
++			 */
++			pinctrl-0 = < &pmx_led_disk_yellow
++				      &pmx_sata0_pwr_enable
++				      &pmx_led_sys_red
++				      &pmx_led_sys_blue
++				      &pmx_led_wifi_green
++				      &pmx_sw_left
++				      &pmx_sw_right
++				      &pmx_sw_idle
++				      &pmx_sw_left2
++				      &pmx_led_wifi_yellow >;
++			pinctrl-names = "default";
++
++			pmx_led_disk_yellow: pmx-led-disk-yellow {
++				marvell,pins = "mpp21";
++				marvell,function = "gpio";
++			};
++
++			pmx_sata0_pwr_enable: pmx-sata0-pwr-enable {
++				marvell,pins = "mpp36";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_sys_red: pmx-led-sys-red {
++				marvell,pins = "mpp37";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_sys_blue: pmx-led-sys-blue {
++				marvell,pins = "mpp38";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_wifi_green: pmx-led-wifi-green {
++				marvell,pins = "mpp39";
++				marvell,function = "gpio";
++			};
++
++			pmx_sw_left: pmx-sw-left {
++				marvell,pins = "mpp43";
++				marvell,function = "gpio";
++			};
++
++			pmx_sw_right: pmx-sw-right {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++
++			pmx_sw_idle: pmx-sw-idle {
++				marvell,pins = "mpp45";
++				marvell,function = "gpio";
++			};
++
++			pmx_sw_left2: pmx-sw-left2 {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_wifi_yellow: pmx-led-wifi-yellow {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
 +		};
 +
-+		smi1: mdio at 76000 {
-+			compatible = "marvell,mdio-mv643xx";
-+			reg = <0x76000 0x4000>;
-+			interrupts = <47>;
-+			tx_csum_limit = <1600>;
-+			status = "disabled";
-+		};
-+
-+		egiga0 {
-+			compatible = "marvell,mv643xx-eth";
-+			reg = <0x72000 0x4000>;
-+			mdio = <&smi0>;
-+			port_number = <0>;
-+			phy_addr = <0x80>;
-+			interrupts = <11>;
-+			clocks = <&gate_clk 0>;
-+			status = "disabled";
-+		};
-+
-+		egiga1 {
-+			compatible = "marvell,mv643xx-eth";
-+			reg = <0x76000 0x4000>;
-+			mdio = <&smi1>;
-+			port_number = <0>;
-+			phy_addr = <0x81>;
-+			interrupts = <15>;
-+			clocks = <&gate_clk 19>;
-+			status = "disabled";
-+		};
- 	};
- };
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 432bee0..188651b 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -58,19 +58,6 @@ config ARCH_KIRKWOOD_DT
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell Kirkwood using flattened device tree.
- 
--config MACH_DREAMPLUG_DT
--	bool "Marvell DreamPlug (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Marvell DreamPlug (Flattened Device Tree).
--
--config MACH_ICONNECT_DT
--	bool "Iomega Iconnect (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here to enable Iomega Iconnect support.
--
- config MACH_DLINK_KIRKWOOD_DT
- 	bool "D-Link Kirkwood-based NAS (Flattened Device Tree)"
- 	select ARCH_KIRKWOOD_DT
-@@ -79,14 +66,6 @@ config MACH_DLINK_KIRKWOOD_DT
- 	  Kirkwood-based D-Link NASes such as DNS-320 & DNS-325,
- 	  using Flattened Device Tree.
- 
--config MACH_IB62X0_DT
--	bool "RaidSonic IB-NAS6210, IB-NAS6220 (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  RaidSonic IB-NAS6210 & IB-NAS6220 devices, using
--	  Flattened Device Tree.
--
- config MACH_TS219_DT
- 	bool "Device Tree for QNAP TS-11X, TS-21X NAS"
- 	select ARCH_KIRKWOOD_DT
-@@ -102,29 +81,6 @@ config MACH_TS219_DT
- 	  or MV6282. If you have the wrong one, the buttons will not
- 	  work.
- 
--config MACH_DOCKSTAR_DT
--	bool "Seagate FreeAgent Dockstar (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Seagate FreeAgent Dockstar (Flattened Device Tree).
--
--config MACH_GOFLEXNET_DT
--	bool "Seagate GoFlex Net (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Seagate GoFlex Net (Flattened Device Tree).
--
--config MACH_LSXL_DT
--	bool "Buffalo Linkstation LS-XHL, LS-CHLv2 (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	select POWER_RESET_RESTART
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Buffalo Linkstation LS-XHL & LS-CHLv2 devices, using
--	  Flattened Device Tree.
--
- config MACH_IOMEGA_IX2_200_DT
- 	bool "Iomega StorCenter ix2-200 (Flattened Device Tree)"
- 	select ARCH_KIRKWOOD_DT
-@@ -139,63 +95,6 @@ config MACH_KM_KIRKWOOD_DT
- 	  Say 'Y' here if you want your kernel to support the
- 	  Keymile Kirkwood Reference Desgin, using Flattened Device Tree.
- 
--config MACH_INETSPACE_V2_DT
--	bool "LaCie Internet Space v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Internet Space v2 NAS, using Flattened Device Tree.
--
--config MACH_MPLCEC4_DT
--	bool "MPL CEC4 (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  MPL CEC4 (Flattened Device Tree).
--
--config MACH_NETSPACE_V2_DT
--	bool "LaCie Network Space v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Network Space v2 NAS, using Flattened Device Tree.
--
--config MACH_NETSPACE_MAX_V2_DT
--	bool "LaCie Network Space Max v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Network Space Max v2 NAS, using Flattened Device Tree.
--
--config MACH_NETSPACE_LITE_V2_DT
--	bool "LaCie Network Space Lite v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Network Space Lite v2 NAS, using Flattened Device Tree.
--
--config MACH_NETSPACE_MINI_V2_DT
--	bool "LaCie Network Space Mini v2 NAS (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the LaCie
--	  Network Space Mini v2 NAS (aka SafeBox), using Flattened
--	  Device Tree.
--
--config MACH_OPENBLOCKS_A6_DT
--	bool "Plat'Home OpenBlocks A6 (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Plat'Home OpenBlocks A6 (Flattened Device Tree).
--
--config MACH_TOPKICK_DT
--	bool "USI Topkick (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  USI Topkick, using Flattened Device Tree
--
- config MACH_TS219
- 	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
- 	help
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index ee3aa77..ab739b0 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -20,21 +20,7 @@ obj-$(CONFIG_MACH_NET5BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
- obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
- 
- obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
--obj-$(CONFIG_MACH_DREAMPLUG_DT)		+= board-dreamplug.o
--obj-$(CONFIG_MACH_ICONNECT_DT)		+= board-iconnect.o
- obj-$(CONFIG_MACH_DLINK_KIRKWOOD_DT)	+= board-dnskw.o
--obj-$(CONFIG_MACH_IB62X0_DT)		+= board-ib62x0.o
- obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
--obj-$(CONFIG_MACH_DOCKSTAR_DT)		+= board-dockstar.o
--obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
--obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
- obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
- obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
--obj-$(CONFIG_MACH_INETSPACE_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_MPLCEC4_DT)		+= board-mplcec4.o
--obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_NETSPACE_LITE_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_NETSPACE_MINI_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_OPENBLOCKS_A6_DT)	+= board-openblocks_a6.o
--obj-$(CONFIG_MACH_TOPKICK_DT)		+= board-usi_topkick.o
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index a1aa87f..2af7a95 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -14,14 +14,9 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
--#include <linux/mv643xx_eth.h>
+ 		serial at 12000 {
+ 			clock-frequency = <200000000>;
+ 			status = "ok";
+diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
+index 95f0711..1cc04ec 100644
+--- a/arch/arm/mach-kirkwood/board-usi_topkick.c
++++ b/arch/arm/mach-kirkwood/board-usi_topkick.c
+@@ -15,57 +15,15 @@
+ #include <linux/mv643xx_eth.h>
  #include <linux/gpio.h>
  #include "common.h"
+-#include "mpp.h"
  
--static struct mv643xx_eth_platform_data dnskw_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+ static struct mv643xx_eth_platform_data topkick_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+ };
+ 
+-/*
+- * GPIO LED layout
+- *
+- *       /-SYS_LED(2)
+- *       |
+- *       |   /-DISK_LED
+- *       |   |
+- *       |   |   /-WLAN_LED(2)
+- *       |   |   |
+- * [SW] [*] [*] [*]
+- */
+-
+-/*
+- * Switch positions
+- *
+- *     /-SW_LEFT
+- *     |
+- *     |   /-SW_IDLE
+- *     |   |
+- *     |   |   /-SW_RIGHT
+- *     |   |   |
+- * PS [L] [I] [R] LEDS
+- */
+-
+-static unsigned int topkick_mpp_config[] __initdata = {
+-	MPP21_GPIO,	/* DISK_LED           (low active) - yellow */
+-	MPP36_GPIO,	/* SATA0 power enable (high active) */
+-	MPP37_GPIO,	/* SYS_LED2           (low active) - red */
+-	MPP38_GPIO,	/* SYS_LED            (low active) - blue */
+-	MPP39_GPIO,	/* WLAN_LED           (low active) - green */
+-	MPP43_GPIO,	/* SW_LEFT            (low active) */
+-	MPP44_GPIO,     /* SW_RIGHT           (low active) */
+-	MPP45_GPIO,	/* SW_IDLE            (low active) */
+-	MPP46_GPIO,     /* SW_LEFT            (low active) */
+-	MPP48_GPIO,	/* WLAN_LED2          (low active) - yellow */
+-	0
 -};
 -
- /* Register any GPIO for output and set the value */
- static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
+ void __init usi_topkick_init(void)
  {
-@@ -36,8 +31,6 @@ static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
- 
- void __init dnskw_init(void)
- {
--	kirkwood_ge00_init(&dnskw_ge00_data);
+ 	/*
+ 	 * Basic setup. Needs to be called early.
+ 	 */
+-	kirkwood_mpp_conf(topkick_mpp_config);
 -
- 	/* Set NAS to turn back on after a power failure */
- 	dnskw_gpio_register(37, "dnskw:power:recover", 1);
+-
+ 	kirkwood_ge00_init(&topkick_ge00_data);
  }
-diff --git a/arch/arm/mach-kirkwood/board-dockstar.c b/arch/arm/mach-kirkwood/board-dockstar.c
-deleted file mode 100644
-index d7196db..0000000
---- a/arch/arm/mach-kirkwood/board-dockstar.c
-+++ /dev/null
-@@ -1,32 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/board-dockstar.c
-- *
-- * Seagate FreeAgent Dockstar Board Init for drivers not converted to
-- * flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- *
-- * Copied and modified for Seagate GoFlex Net support by
-- * Joshua Coombs <josh.coombs@gmail.com> based on ArchLinux ARM's
-- * GoFlex kernel patches.
-- *
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data dockstar_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--void __init dockstar_dt_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&dockstar_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
-deleted file mode 100644
-index 0903242..0000000
---- a/arch/arm/mach-kirkwood/board-dreamplug.c
-+++ /dev/null
-@@ -1,35 +0,0 @@
--/*
-- * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
-- *
-- * arch/arm/mach-kirkwood/board-dreamplug.c
-- *
-- * Marvell DreamPlug Reference Board Init for drivers not converted to
-- * flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include <linux/gpio.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--static struct mv643xx_eth_platform_data dreamplug_ge01_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
--};
--
--void __init dreamplug_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&dreamplug_ge00_data);
--	kirkwood_ge01_init(&dreamplug_ge01_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 73b76e4..620c99f 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -47,10 +47,6 @@ static void __init kirkwood_legacy_clk_init(void)
- 	clkspec.np = np;
- 	clkspec.args_count = 1;
- 
--	clkspec.args[0] = CGC_BIT_GE0;
--	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
--			 of_clk_get_from_provider(&clkspec));
--
- 	clkspec.args[0] = CGC_BIT_PEX0;
- 	orion_clkdev_add("0", "pcie",
- 			 of_clk_get_from_provider(&clkspec));
-@@ -58,10 +54,6 @@ static void __init kirkwood_legacy_clk_init(void)
- 	clkspec.args[0] = CGC_BIT_PEX1;
- 	orion_clkdev_add("1", "pcie",
- 			 of_clk_get_from_provider(&clkspec));
--
--	clkspec.args[0] = CGC_BIT_GE1;
--	orion_clkdev_add(NULL, "mv643xx_eth_port.1",
--			 of_clk_get_from_provider(&clkspec));
- }
- 
- static void __init kirkwood_of_clk_init(void)
-@@ -118,52 +110,18 @@ static void __init kirkwood_dt_init(void)
- 	kexec_reinit = kirkwood_enable_pcie;
- #endif
- 
--	if (of_machine_is_compatible("globalscale,dreamplug"))
--		dreamplug_init();
--
- 	if (of_machine_is_compatible("dlink,dns-kirkwood"))
- 		dnskw_init();
- 
--	if (of_machine_is_compatible("iom,iconnect"))
--		iconnect_init();
--
--	if (of_machine_is_compatible("raidsonic,ib-nas62x0"))
--		ib62x0_init();
--
- 	if (of_machine_is_compatible("qnap,ts219"))
- 		qnap_dt_ts219_init();
- 
--	if (of_machine_is_compatible("seagate,dockstar"))
--		dockstar_dt_init();
--
--	if (of_machine_is_compatible("seagate,goflexnet"))
--		goflexnet_init();
--
--	if (of_machine_is_compatible("buffalo,lsxl"))
--		lsxl_init();
--
- 	if (of_machine_is_compatible("iom,ix2-200"))
- 		iomega_ix2_200_init();
- 
- 	if (of_machine_is_compatible("keymile,km_kirkwood"))
- 		km_kirkwood_init();
- 
--	if (of_machine_is_compatible("lacie,inetspace_v2") ||
--	    of_machine_is_compatible("lacie,netspace_v2") ||
--	    of_machine_is_compatible("lacie,netspace_max_v2") ||
--	    of_machine_is_compatible("lacie,netspace_lite_v2") ||
--	    of_machine_is_compatible("lacie,netspace_mini_v2"))
--		ns2_init();
--
--	if (of_machine_is_compatible("mpl,cec4"))
--		mplcec4_init();
--
--	if (of_machine_is_compatible("plathome,openblocks-a6"))
--		openblocks_a6_init();
--
--	if (of_machine_is_compatible("usi,topkick"))
--		usi_topkick_init();
--
- 	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
- }
- 
-diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
-deleted file mode 100644
-index 9db979a..0000000
---- a/arch/arm/mach-kirkwood/board-goflexnet.c
-+++ /dev/null
-@@ -1,34 +0,0 @@
--/*
-- * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
-- *
-- * arch/arm/mach-kirkwood/board-goflexnet.c
-- *
-- * Seagate GoFlext Net Board Init for drivers not converted to
-- * flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- *
-- * Copied and modified for Seagate GoFlex Net support by
-- * Joshua Coombs <josh.coombs@gmail.com> based on ArchLinux ARM's
-- * GoFlex kernel patches.
-- *
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data goflexnet_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--void __init goflexnet_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&goflexnet_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
-deleted file mode 100644
-index 9a857ae..0000000
---- a/arch/arm/mach-kirkwood/board-ib62x0.c
-+++ /dev/null
-@@ -1,29 +0,0 @@
--/*
-- * Copyright 2012 (C), Simon Baatz <gmbnomis@gmail.com>
-- *
-- * arch/arm/mach-kirkwood/board-ib62x0.c
-- *
-- * RaidSonic ICY BOX IB-NAS6210 & IB-NAS6220 init for drivers not
-- * converted to flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data ib62x0_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
--void __init ib62x0_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&ib62x0_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
-deleted file mode 100644
-index ff042dc..0000000
---- a/arch/arm/mach-kirkwood/board-iconnect.c
-+++ /dev/null
-@@ -1,23 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/board-iconnect.c
-- *
-- * Iomega i-connect Board Setup
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data iconnect_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(11),
--};
--
--void __init iconnect_init(void)
--{
--	kirkwood_ge00_init(&iconnect_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
-deleted file mode 100644
-index 3483952..0000000
---- a/arch/arm/mach-kirkwood/board-lsxl.c
-+++ /dev/null
-@@ -1,36 +0,0 @@
--/*
-- * Copyright 2012 (C), Michael Walle <michael@walle.cc>
-- *
-- * arch/arm/mach-kirkwood/board-lsxl.c
-- *
-- * Buffalo Linkstation LS-XHL and LS-CHLv2 init for drivers not
-- * converted to flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data lsxl_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--static struct mv643xx_eth_platform_data lsxl_ge01_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
--void __init lsxl_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--
--	kirkwood_ge00_init(&lsxl_ge00_data);
--	kirkwood_ge01_init(&lsxl_ge01_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
-deleted file mode 100644
-index 938712e..0000000
---- a/arch/arm/mach-kirkwood/board-mplcec4.c
-+++ /dev/null
-@@ -1,35 +0,0 @@
--/*
-- * Copyright (C) 2012 MPL AG, Switzerland
-- * Stefan Peter <s.peter@mpl.ch>
-- *
-- * arch/arm/mach-kirkwood/board-mplcec4.c
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data mplcec4_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
--};
--
--static struct mv643xx_eth_platform_data mplcec4_ge01_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(2),
--};
--
--void __init mplcec4_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&mplcec4_ge00_data);
--	kirkwood_ge01_init(&mplcec4_ge01_data);
--}
--
--
--
-diff --git a/arch/arm/mach-kirkwood/board-ns2.c b/arch/arm/mach-kirkwood/board-ns2.c
-deleted file mode 100644
-index f2ea3b7..0000000
---- a/arch/arm/mach-kirkwood/board-ns2.c
-+++ /dev/null
-@@ -1,34 +0,0 @@
--/*
-- * Copyright 2012 (C), Simon Guinot <simon.guinot@sequanux.org>
-- *
-- * arch/arm/mach-kirkwood/board-ns2.c
-- *
-- * LaCie Network Space v2 board (and parents) initialization for drivers
-- * not converted to flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/mv643xx_eth.h>
--#include <linux/of.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data ns2_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
--void __init ns2_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	if (of_machine_is_compatible("lacie,netspace_lite_v2") ||
--	    of_machine_is_compatible("lacie,netspace_mini_v2"))
--		ns2_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
--	kirkwood_ge00_init(&ns2_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-openblocks_a6.c b/arch/arm/mach-kirkwood/board-openblocks_a6.c
-deleted file mode 100644
-index b11d8fd..0000000
---- a/arch/arm/mach-kirkwood/board-openblocks_a6.c
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/*
-- * Copyright 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-- *
-- * arch/arm/mach-kirkwood/board-openblocks_a6.c
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data openblocks_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--void __init openblocks_a6_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&openblocks_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
-deleted file mode 100644
-index 1cc04ec..0000000
---- a/arch/arm/mach-kirkwood/board-usi_topkick.c
-+++ /dev/null
-@@ -1,29 +0,0 @@
--/*
-- * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
-- *
-- * arch/arm/mach-kirkwood/board-usi_topkick.c
-- *
-- * USI Topkick Init for drivers not converted to flattened device tree yet.
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include <linux/gpio.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data topkick_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
--};
--
--void __init usi_topkick_init(void)
--{
--	/*
--	 * Basic setup. Needs to be called early.
--	 */
--	kirkwood_ge00_init(&topkick_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 1c42cb8..ba6eb9c 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -55,11 +55,6 @@ void kirkwood_restart(char, const char *);
- void kirkwood_clk_init(void);
- 
- /* board init functions for boards not fully converted to fdt */
--#ifdef CONFIG_MACH_DREAMPLUG_DT
--void dreamplug_init(void);
--#else
--static inline void dreamplug_init(void) {};
--#endif
- #ifdef CONFIG_MACH_TS219_DT
- void qnap_dt_ts219_init(void);
- #else
-@@ -72,36 +67,6 @@ void dnskw_init(void);
- static inline void dnskw_init(void) {};
- #endif
- 
--#ifdef CONFIG_MACH_ICONNECT_DT
--void iconnect_init(void);
--#else
--static inline void iconnect_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_IB62X0_DT
--void ib62x0_init(void);
--#else
--static inline void ib62x0_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_DOCKSTAR_DT
--void dockstar_dt_init(void);
--#else
--static inline void dockstar_dt_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_GOFLEXNET_DT
--void goflexnet_init(void);
--#else
--static inline void goflexnet_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_LSXL_DT
--void lsxl_init(void);
--#else
--static inline void lsxl_init(void) {};
--#endif
--
- #ifdef CONFIG_MACH_IOMEGA_IX2_200_DT
- void iomega_ix2_200_init(void);
- #else
-@@ -114,34 +79,6 @@ void km_kirkwood_init(void);
- static inline void km_kirkwood_init(void) {};
- #endif
- 
--#ifdef CONFIG_MACH_MPLCEC4_DT
--void mplcec4_init(void);
--#else
--static inline void mplcec4_init(void) {};
--#endif
--
--#if defined(CONFIG_MACH_INETSPACE_V2_DT) || \
--	defined(CONFIG_MACH_NETSPACE_V2_DT) || \
--	defined(CONFIG_MACH_NETSPACE_MAX_V2_DT) || \
--	defined(CONFIG_MACH_NETSPACE_LITE_V2_DT) || \
--	defined(CONFIG_MACH_NETSPACE_MINI_V2_DT)
--void ns2_init(void);
--#else
--static inline void ns2_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_OPENBLOCKS_A6_DT
--void openblocks_a6_init(void);
--#else
--static inline void openblocks_a6_init(void) {};
--#endif
--
--#ifdef CONFIG_MACH_TOPKICK_DT
--void usi_topkick_init(void);
--#else
--static inline void usi_topkick_init(void) {};
--#endif
--
- /* early init functions not converted to fdt yet */
- char *kirkwood_id(void);
- void kirkwood_l2_init(void);
 -- 
 1.8.1.1
