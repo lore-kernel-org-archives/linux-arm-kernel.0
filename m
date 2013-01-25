@@ -1,30 +1,54 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Fri, 25 Jan 2013 06:29:49 +0000
-Subject: [PATCH 5/6] ARM: regulator: add tps6507x device tree data
-In-Reply-To: <20130124120050.GP4955@opensource.wolfsonmicro.com>
-References: <1359024920-32190-1-git-send-email-manishv.b@ti.com>
- <1359024920-32190-6-git-send-email-manishv.b@ti.com>
- <20130124120050.GP4955@opensource.wolfsonmicro.com>
-Message-ID: <A4887BF146CD57468F700B415D2F4701581621@DBDE01.ent.ti.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri, 25 Jan 2013 12:03:26 +0530
+Subject: [PATCH V2] ARM: DTS: exynos5250-arndale: Add initial board support
+ file
+In-Reply-To: <CAGOxZ50LiupEj0s2scMYZQiCA2V4GNT6zoUVYR7TMyEsX3sf-Q@mail.gmail.com>
+References: <1359090411-26159-1-git-send-email-tushar.behera@linaro.org>
+ <CAGOxZ50LiupEj0s2scMYZQiCA2V4GNT6zoUVYR7TMyEsX3sf-Q@mail.gmail.com>
+Message-ID: <51022736.5030007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 01/25/2013 10:59 AM, Alim Akhtar wrote:
 
-On Thu, Jan 24, 2013 at 17:30:51, Mark Brown wrote:
-> On Thu, Jan 24, 2013 at 04:25:19PM +0530, Vishwanathrao Badarkhe, Manish wrote:
+[ ... ]
+
+>> +
+>> +       dwmmc_2: dwmmc2 at 12220000 {
+>> +               num-slots = <1>;
+>> +               supports-highspeed;
+>> +               fifo-depth = <0x80>;
+>> +               card-detect-delay = <200>;
+>> +               samsung,dw-mshc-ciu-div = <3>;
+>> +               samsung,dw-mshc-sdr-timing = <2 3>;
+>> +               samsung,dw-mshc-ddr-timing = <1 2>;
+>> +
+>> +               slot at 0 {
+>> +                       reg = <0>;
+>> +                       bus-width = <4>;
+>> +                       samsung,cd-pinmux-gpio = <&gpc3 2 2 3 3>;
+>> +                       gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
+>> +                               <&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
+>> +                               <&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
+>> +                               <&gpc4 3 3 3 3>, <&gpc4 4 3 3 3>,
+>> +                               <&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
+> bus-width property is assigned as 4 (see above bus-width = <4>;) but
+> here you are configuring 8 __data line__ . Any reason?
+> I am not sure if Arndale board supports 8 bit bus-width, in any case
+> either change the bus-width or gpios properties accordingly.
+
+Right. As per the schematics, Arndale supports 4-bit bus-width. I will
+remove the extra GPIO lines.
+
+[ ... ]
+
 > 
-> > ---
-> >  arch/arm/boot/dts/tps6507x.dtsi |   47 +++++++++++++++++++++++++++++++++++++++
+> with the above fix fill free to add
+>    Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
 > 
-> Why are you putting this in arch/arm?
 > 
 
-I too doubt that whether it should be in architecture specific folder,
-My code is in reference to below patch:
-arm/dts: regulator: Add tps65910 device tree data(d5d08e2e1672da627d7c9d34a9dc1089c653e23a)
+Thanks for reviewing. I will re-submit the patch with your ack.
 
-Could you please suggest me if it can be moved somewhere else?
-
-Regards, 
-Manish
+-- 
+Tushar Behera
