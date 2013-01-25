@@ -1,186 +1,198 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 25 Jan 2013 05:32:23 +0000
-Subject: [RFC V2 PATCH 2/8] ARM: kirkwood: topkick: convert to pinctrl
+Date: Fri, 25 Jan 2013 05:32:25 +0000
+Subject: [RFC V2 PATCH 4/8] ARM: kirkwood: nsa310: convert to pinctrl
 In-Reply-To: <cover.1359091286.git.jason@lakedaemon.net>
 References: <cover.1358983578.git.jason@lakedaemon.net>
  <cover.1359091286.git.jason@lakedaemon.net>
-Message-ID: <f6d483f3fb83826bce16f956afa013f0bcf11f52.1359091286.git.jason@lakedaemon.net>
+Message-ID: <9369c78737e0ba4d43f1cab8a34efb48a24921ea.1359091286.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/boot/dts/kirkwood-topkick.dts     | 88 ++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-usi_topkick.c | 42 --------------
- 2 files changed, 88 insertions(+), 42 deletions(-)
+ arch/arm/boot/dts/kirkwood-nsa310.dts | 99 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c     |  3 --
+ arch/arm/mach-kirkwood/board-nsa310.c | 26 ---------
+ arch/arm/mach-kirkwood/common.h       |  6 ---
+ 4 files changed, 99 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-index 23c2ddc..d959873 100644
---- a/arch/arm/boot/dts/kirkwood-topkick.dts
-+++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- 
- /include/ "kirkwood.dtsi"
-+/include/ "kirkwood-6281.dtsi"
- 
- / {
- 	model = "Univeral Scientific Industrial Co. Topkick-1281P2";
-@@ -16,6 +17,93 @@
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+index dbb3551..3a178cf 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+@@ -16,6 +16,105 @@
  	};
  
  	ocp at f1000000 {
 +		pinctrl: pinctrl at 10000 {
-+			/*
-+			 * GPIO LED layout
-+			 *
-+			 *       /-SYS_LED(2)
-+			 *       |
-+			 *       |   /-DISK_LED
-+			 *       |   |
-+			 *       |   |   /-WLAN_LED(2)
-+			 *       |   |   |
-+			 * [SW] [*] [*] [*]
-+			 */
-+
-+			/*
-+			 * Switch positions
-+			 *
-+			 *     /-SW_LEFT(2)
-+			 *     |
-+			 *     |   /-SW_IDLE
-+			 *     |   |
-+			 *     |   |   /-SW_RIGHT
-+			 *     |   |   |
-+			 * PS [L] [I] [R] LEDS
-+			 */
-+			pinctrl-0 = < &pmx_led_disk_yellow
-+				      &pmx_sata0_pwr_enable
++			pinctrl-0 = < &pmx_led_esata_green
++				      &pmx_led_esata_red
++				      &pmx_led_usb_green
++				      &pmx_led_usb_red
++				      &pmx_usb_power_off
++				      &pmx_led_sys_green
 +				      &pmx_led_sys_red
-+				      &pmx_led_sys_blue
-+				      &pmx_led_wifi_green
-+				      &pmx_sw_left
-+				      &pmx_sw_right
-+				      &pmx_sw_idle
-+				      &pmx_sw_left2
-+				      &pmx_led_wifi_yellow >;
++				      &pmx_btn_reset
++				      &pmx_btn_copy
++				      &pmx_led_copy_green
++				      &pmx_led_copy_red
++				      &pmx_led_hdd_green
++				      &pmx_led_hdd_red
++				      &pmx_unknown
++				      &pmx_btn_power
++				      &pmx_pwr_off >;
 +			pinctrl-names = "default";
 +
-+			pmx_led_disk_yellow: pmx-led-disk-yellow {
++			pmx_led_esata_green: pmx-led-esata-green {
++				marvell,pins = "mpp12";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_esata_red: pmx-led-esata-red {
++				marvell,pins = "mpp13";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_usb_green: pmx-led-usb-green {
++				marvell,pins = "mpp15";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_usb_red: pmx-led-usb-red {
++				marvell,pins = "mpp16";
++				marvell,function = "gpio";
++			};
++
++			pmx_usb_power_off: pmx-usb-power-off {
 +				marvell,pins = "mpp21";
 +				marvell,function = "gpio";
 +			};
 +
-+			pmx_sata0_pwr_enable: pmx-sata0-pwr-enable {
-+				marvell,pins = "mpp36";
++			pmx_led_sys_green: pmx-led-sys-green {
++				marvell,pins = "mpp28";
 +				marvell,function = "gpio";
 +			};
 +
 +			pmx_led_sys_red: pmx-led-sys-red {
++				marvell,pins = "mpp29";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_reset: pmx-btn-reset {
++				marvell,pins = "mpp36";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_copy: pmx-btn-copy {
 +				marvell,pins = "mpp37";
 +				marvell,function = "gpio";
 +			};
 +
-+			pmx_led_sys_blue: pmx-led-sys-blue {
-+				marvell,pins = "mpp38";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_wifi_green: pmx-led-wifi-green {
++			pmx_led_copy_green: pmx-led-copy-green {
 +				marvell,pins = "mpp39";
 +				marvell,function = "gpio";
 +			};
 +
-+			pmx_sw_left: pmx-sw-left {
-+				marvell,pins = "mpp43";
++			pmx_led_copy_red: pmx-led-copy-red {
++				marvell,pins = "mpp40";
 +				marvell,function = "gpio";
 +			};
 +
-+			pmx_sw_right: pmx-sw-right {
++			pmx_led_hdd_green: pmx-led-hdd-green {
++				marvell,pins = "mpp41";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_hdd_red: pmx-led-hdd-red {
++				marvell,pins = "mpp42";
++				marvell,function = "gpio";
++			};
++
++			pmx_unknown: pmx-unknown {
 +				marvell,pins = "mpp44";
 +				marvell,function = "gpio";
 +			};
 +
-+			pmx_sw_idle: pmx-sw-idle {
-+				marvell,pins = "mpp45";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_sw_left2: pmx-sw-left2 {
++			pmx_btn_power: pmx-btn-power {
 +				marvell,pins = "mpp46";
 +				marvell,function = "gpio";
 +			};
 +
-+			pmx_led_wifi_yellow: pmx-led-wifi-yellow {
++			pmx_pwr_off: pmx-pwr-off {
 +				marvell,pins = "mpp48";
 +				marvell,function = "gpio";
 +			};
 +		};
-+
+ 
  		serial at 12000 {
  			clock-frequency = <200000000>;
- 			status = "ok";
-diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
-index 95f0711..1cc04ec 100644
---- a/arch/arm/mach-kirkwood/board-usi_topkick.c
-+++ b/arch/arm/mach-kirkwood/board-usi_topkick.c
-@@ -15,57 +15,15 @@
- #include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 8eac548..8b35157 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -141,9 +141,6 @@ static void __init kirkwood_dt_init(void)
+ 	if (of_machine_is_compatible("usi,topkick"))
+ 		usi_topkick_init();
+ 
+-	if (of_machine_is_compatible("zyxel,nsa310"))
+-		nsa310_init();
+-
+ 	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
+ }
+ 
+diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
+index 0b99533..55ade93 100644
+--- a/arch/arm/mach-kirkwood/board-nsa310.c
++++ b/arch/arm/mach-kirkwood/board-nsa310.c
+@@ -13,32 +13,6 @@
+ #include <mach/kirkwood.h>
+ #include <linux/of.h>
  #include "common.h"
 -#include "mpp.h"
- 
- static struct mv643xx_eth_platform_data topkick_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
- };
- 
--/*
-- * GPIO LED layout
-- *
-- *       /-SYS_LED(2)
-- *       |
-- *       |   /-DISK_LED
-- *       |   |
-- *       |   |   /-WLAN_LED(2)
-- *       |   |   |
-- * [SW] [*] [*] [*]
-- */
 -
--/*
-- * Switch positions
-- *
-- *     /-SW_LEFT
-- *     |
-- *     |   /-SW_IDLE
-- *     |   |
-- *     |   |   /-SW_RIGHT
-- *     |   |   |
-- * PS [L] [I] [R] LEDS
-- */
--
--static unsigned int topkick_mpp_config[] __initdata = {
--	MPP21_GPIO,	/* DISK_LED           (low active) - yellow */
--	MPP36_GPIO,	/* SATA0 power enable (high active) */
--	MPP37_GPIO,	/* SYS_LED2           (low active) - red */
--	MPP38_GPIO,	/* SYS_LED            (low active) - blue */
--	MPP39_GPIO,	/* WLAN_LED           (low active) - green */
--	MPP43_GPIO,	/* SW_LEFT            (low active) */
--	MPP44_GPIO,     /* SW_RIGHT           (low active) */
--	MPP45_GPIO,	/* SW_IDLE            (low active) */
--	MPP46_GPIO,     /* SW_LEFT            (low active) */
--	MPP48_GPIO,	/* WLAN_LED2          (low active) - yellow */
+-static unsigned int nsa310_mpp_config[] __initdata = {
+-	MPP12_GPIO, /* led esata green */
+-	MPP13_GPIO, /* led esata red */
+-	MPP15_GPIO, /* led usb green */
+-	MPP16_GPIO, /* led usb red */
+-	MPP21_GPIO, /* control usb power off */
+-	MPP28_GPIO, /* led sys green */
+-	MPP29_GPIO, /* led sys red */
+-	MPP36_GPIO, /* key reset */
+-	MPP37_GPIO, /* key copy */
+-	MPP39_GPIO, /* led copy green */
+-	MPP40_GPIO, /* led copy red */
+-	MPP41_GPIO, /* led hdd green */
+-	MPP42_GPIO, /* led hdd red */
+-	MPP44_GPIO, /* ?? */
+-	MPP46_GPIO, /* key power */
+-	MPP48_GPIO, /* control power off */
 -	0
 -};
 -
- void __init usi_topkick_init(void)
+-void __init nsa310_init(void)
+-{
+-	kirkwood_mpp_conf(nsa310_mpp_config);
+-}
+ 
+ static int __init nsa310_pci_init(void)
  {
- 	/*
- 	 * Basic setup. Needs to be called early.
- 	 */
--	kirkwood_mpp_conf(topkick_mpp_config);
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index e956d02..1c42cb8 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -130,12 +130,6 @@ void ns2_init(void);
+ static inline void ns2_init(void) {};
+ #endif
+ 
+-#ifdef CONFIG_MACH_NSA310_DT
+-void nsa310_init(void);
+-#else
+-static inline void nsa310_init(void) {};
+-#endif
 -
--
- 	kirkwood_ge00_init(&topkick_ge00_data);
- }
+ #ifdef CONFIG_MACH_OPENBLOCKS_A6_DT
+ void openblocks_a6_init(void);
+ #else
 -- 
 1.8.1.1
