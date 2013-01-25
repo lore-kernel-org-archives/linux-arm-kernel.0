@@ -1,87 +1,55 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 25 Jan 2013 11:06:49 +0100
-Subject: [RFC PATCH 4/4] net: mvmdio: add getter and setter for PHY addresses
-In-Reply-To: <1359108409-4378-1-git-send-email-florian@openwrt.org>
-References: <1359108409-4378-1-git-send-email-florian@openwrt.org>
-Message-ID: <1359108409-4378-5-git-send-email-florian@openwrt.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 25 Jan 2013 11:15:10 +0100
+Subject: [GIT PULL] i.MX SoC updates for v3.9
+Message-ID: <20130125101510.GK1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds orion_mdio_{set,get}_phy_addr(.., port_number, phy_addr)
-which is a feature available in this MDIO driver to monitor a particular
-PHY address. This brings mvmdio one step closer to what is used in
-mv643x_eth.
+Hi Arnd, Olof,
 
-Signed-off-by: Florian Fainelli <florian@openwrt.org>
----
- drivers/net/ethernet/marvell/mvmdio.c |   29 +++++++++++++++++++++++++++++
- include/linux/marvell_mvmdio.h        |   10 ++++++++++
- 2 files changed, 39 insertions(+)
- create mode 100644 include/linux/marvell_mvmdio.h
+Please pull the following (mostly clock relates) updates for v3.9.
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index bdd9047..09e2470 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -32,7 +32,9 @@
- #include <linux/delay.h>
- #include <linux/sched.h>
- #include <linux/wait.h>
-+#include <linux/marvell_mvmdio.h>
- 
-+#define MVMDIO_PHY_ADDR			   0x0000
- #define MVMDIO_SMI_REG			   0x0004
- #define MVMDIO_SMI_DATA_SHIFT              0
- #define MVMDIO_SMI_PHY_ADDR_SHIFT          16
-@@ -188,6 +190,33 @@ static irqreturn_t orion_mdio_err_irq(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
-+void orion_mdio_phy_addr_set(struct platform_device *pdev,
-+				int port_num, int phy_addr)
-+{
-+	struct orion_mdio_dev *dev =
-+		platform_get_drvdata(pdev);
-+	int addr_shift = 5 * port_num;
-+	u32 data;
-+
-+	data = readl(dev->regs + MVMDIO_PHY_ADDR);
-+	data &= ~(0x1f << addr_shift);
-+	data |= (phy_addr & 0x1f) << addr_shift;
-+	writel(data, dev->regs + MVMDIO_PHY_ADDR);
-+}
-+EXPORT_SYMBOL(orion_mdio_phy_addr_set);
-+
-+int orion_mdio_phy_addr_get(struct platform_device *pdev, int port_num)
-+{
-+	struct orion_mdio_dev *dev =
-+		platform_get_drvdata(pdev);
-+	unsigned int data;
-+
-+	data = readl(dev->regs + MVMDIO_PHY_ADDR);
-+
-+	return (data >> (5 * port_num)) & 0x1f;
-+}
-+EXPORT_SYMBOL(orion_mdio_phy_addr_get);
-+
- static int orion_mdio_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-diff --git a/include/linux/marvell_mvmdio.h b/include/linux/marvell_mvmdio.h
-new file mode 100644
-index 0000000..c2dfec4
---- /dev/null
-+++ b/include/linux/marvell_mvmdio.h
-@@ -0,0 +1,10 @@
-+#ifndef _MARVELL_MVMDIO_H
-+#define _MARVELL_MVMDIO_H
-+
-+#include <linux/platform_device.h>
-+
-+void orion_mdio_phy_addr_set(struct platform_device *pdev,
-+				int port_num, int phy_addr);
-+int orion_mdio_phy_addr_get(struct platform_device *pdev, int port_num);
-+
-+#endif /* _MARVELL_MVMDIO_H */
+Sascha
+
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-soc
+
+for you to fetch changes up to 3ea8098572280d16163a429e0f8dfd90492a5934:
+
+  ARM: clk-imx35: Fix build warnings with W=1 (2013-01-25 11:12:38 +0100)
+
+----------------------------------------------------------------
+ARM i.MX SoC updates for next
+
+Mostly clock related updates, most notably the conversion of
+i.MX31 to a DT based lookup.
+
+----------------------------------------------------------------
+Fabio Estevam (4):
+      ARM: Let CONFIG_MACH_IMX31_DT be built by default
+      ARM: clk-imx31: Add dummy clock
+      ARM: mx31: Replace clk_register_clkdev with clock DT lookup
+      ARM: clk-imx35: Fix build warnings with W=1
+
+Gwenhael Goavec-Merou (1):
+      ARM: imx27: add a clock gate to activate SPLL clock
+
+ .../devicetree/bindings/clock/imx31-clock.txt      |   91 ++++++++++++++++++++
+ arch/arm/boot/dts/imx31.dtsi                       |   17 ++++
+ arch/arm/configs/imx_v6_v7_defconfig               |    1 +
+ arch/arm/mach-imx/clk-imx27.c                      |    7 +-
+ arch/arm/mach-imx/clk-imx31.c                      |   15 +++-
+ arch/arm/mach-imx/clk-imx35.c                      |    4 +-
+ arch/arm/mach-imx/imx31-dt.c                       |   17 +---
+ 7 files changed, 129 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx31-clock.txt
 -- 
-1.7.10.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
