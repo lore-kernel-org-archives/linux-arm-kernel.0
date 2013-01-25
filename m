@@ -1,60 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 15:28:27 +0000
-Subject: [PATCH 1/5] samples/seccomp: be less stupid about cross compiling
+Date: Fri, 25 Jan 2013 15:28:30 +0000
+Subject: [PATCH 4/5] ARM: w90x900: fix legacy assembly syntax
 In-Reply-To: <1359127711-19070-1-git-send-email-arnd@arndb.de>
 References: <1359127711-19070-1-git-send-email-arnd@arndb.de>
-Message-ID: <1359127711-19070-2-git-send-email-arnd@arndb.de>
+Message-ID: <1359127711-19070-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The seccomp filters are currently built for the build
-host, not for the machine that they are going to run
-on, but they are also built for with the -m32 flag
-if the kernel is built for a 32 bit machine, both
-of which seems rather odd.
+New ARM binutils don't allow extraneous whitespace inside
+of brackets, which causes this error on all mach-w90x900
+defconfigs:
 
-It broke allyesconfig on my machine, which is x86-64, but
-building for 32 bit ARM, with this error message:
+arch/arm/kernel/entry-armv.S: Assembler messages:
+arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r0,[ r6,#(0x10C)]'
+arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r0,[ r6,#(0x110)]'
+arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r0,[ r6,#(0x10C)]'
+arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r0,[ r6,#(0x110)]'
 
-In file included from /usr/include/stdio.h:28:0,
-                 from samples/seccomp/bpf-fancy.c:15:
-/usr/include/features.h:324:26: fatal error: bits/predefs.h: No such file or directory
-
-because there are no 32 bit libc headers installed on
-this machine. We should really be building all the
-samples for the target machine rather than the build
-host, but since the infrastructure for that appears
-to be missing right now, let's be a little bit smarter
-and not pass the '-m32' flag to the HOSTCC when cross-
-compiling.
+This removes the whitespace in order to build the kernel
+again.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Kees Cook <keescook@chromium.org>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: James Morris <james.l.morris@oracle.com>
+Cc: Wan ZongShun <mcuos.com@gmail.com>
 ---
- samples/seccomp/Makefile | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-w90x900/include/mach/entry-macro.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/samples/seccomp/Makefile b/samples/seccomp/Makefile
-index bbbd276..7203e66 100644
---- a/samples/seccomp/Makefile
-+++ b/samples/seccomp/Makefile
-@@ -19,6 +19,7 @@ bpf-direct-objs := bpf-direct.o
+diff --git a/arch/arm/mach-w90x900/include/mach/entry-macro.S b/arch/arm/mach-w90x900/include/mach/entry-macro.S
+index e286dac..0ff612a 100644
+--- a/arch/arm/mach-w90x900/include/mach/entry-macro.S
++++ b/arch/arm/mach-w90x900/include/mach/entry-macro.S
+@@ -19,8 +19,8 @@
  
- # Try to match the kernel target.
- ifndef CONFIG_64BIT
-+ifndef CROSS_COMPILE
+ 		mov	\base, #AIC_BA
  
- # s390 has -m31 flag to build 31 bit binaries
- ifndef CONFIG_S390
-@@ -35,6 +36,7 @@ HOSTLOADLIBES_bpf-direct += $(MFLAG)
- HOSTLOADLIBES_bpf-fancy += $(MFLAG)
- HOSTLOADLIBES_dropper += $(MFLAG)
- endif
-+endif
+-		ldr	\irqnr, [ \base, #AIC_IPER]
+-		ldr	\irqnr, [ \base, #AIC_ISNR]
++		ldr	\irqnr, [\base, #AIC_IPER]
++		ldr	\irqnr, [\base, #AIC_ISNR]
+ 		cmp	\irqnr, #0
  
- # Tell kbuild to always build the programs
- always := $(hostprogs-y)
+ 	.endm
 -- 
 1.8.0
