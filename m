@@ -1,38 +1,36 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 25 Jan 2013 15:56:54 +0530
-Subject: [PATCH v3 2/3] ARM: dts: omap: Add omap-usb2 dt data
-In-Reply-To: <1359109615-2410-1-git-send-email-kishon@ti.com>
-References: <1359109615-2410-1-git-send-email-kishon@ti.com>
-Message-ID: <1359109615-2410-3-git-send-email-kishon@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 25 Jan 2013 12:27:00 +0200
+Subject: [PATCH v4 4/4] drivers: usb: start using the control module driver
+In-Reply-To: <1359109440-2195-5-git-send-email-kishon@ti.com>
+References: <1359109440-2195-1-git-send-email-kishon@ti.com>
+ <1359109440-2195-5-git-send-email-kishon@ti.com>
+Message-ID: <20130125102700.GO15886@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap-usb2 data node in omap4 device tree file. Since omap-usb2 is
-connected to ocp2scp, omap-usb2 dt data is added as a child node
-of ocp2scp. The information about this data node is availabe @
-Documentation/devicetree/bindings/usb/usb-phy.txt
+Hi,
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/omap4.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
+On Fri, Jan 25, 2013 at 03:54:00PM +0530, Kishon Vijay Abraham I wrote:
+> Start using the control module driver for powering on the PHY and for
+> writing to the mailbox instead of writing to the control module
+> registers on their own.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  Documentation/devicetree/bindings/usb/omap-usb.txt |    4 ++
+>  Documentation/devicetree/bindings/usb/usb-phy.txt  |    7 +-
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   13 ----
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index ffc7352..c829d7e 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -438,6 +438,11 @@
- 			#size-cells = <1>;
- 			ranges;
- 			ti,hwmods = "ocp2scp_usb_phy";
-+			usb2_phy: usb2phy at 4a0ad080 {
-+				compatible = "ti,omap-usb2";
-+				reg = <0x4a0ad080 0x58>;
-+				ctrl-module = <&omap_control_usb>;
-+			};
- 		};
- 
- 		timer1: timer at 4a318000 {
+I'm taking this patch but I'm leaving out the omap_hwmod_44xx_data.c
+change just to kill dependency. Can you send that single change as a
+separate patch which Tony can queue ?
+
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130125/f9714c65/attachment.sig>
