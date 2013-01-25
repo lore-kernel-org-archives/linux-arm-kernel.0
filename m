@@ -1,131 +1,79 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 25 Jan 2013 14:52:10 +0100
-Subject: [PATCH v2 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can
- sleep
-In-Reply-To: <1359121471-21457-4-git-send-email-florian.vaussard@epfl.ch>
-References: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
- <1359121471-21457-4-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <51028E0A.5000009@ti.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Fri, 25 Jan 2013 07:59:40 -0600
+Subject: [PATCH 1/4] drm/tilcdc: add TI LCD Controller DRM driver (v3)
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA939BB@DBDE01.ent.ti.com>
+References: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
+ <1358894185-21617-2-git-send-email-robdclark@gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA939BB@DBDE01.ent.ti.com>
+Message-ID: <CAF6AEGsqkUr0R3eYa4P371tUPq_NLSJLhH=N_MkyJF31s068+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2013 02:44 PM, Florian Vaussard wrote:
-> Call to led_pwm_set() can happen inside atomic context, like triggers.
-> If the PWM call can sleep, defer using a worker.
-> 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+On Fri, Jan 25, 2013 at 7:19 AM, Mohammed, Afzal <afzal@ti.com> wrote:
+> Hi Rob,
+>
+> On Wed, Jan 23, 2013 at 04:06:22, Rob Clark wrote:
+>
+>> A simple DRM/KMS driver for the TI LCD Controller found in various
+>> smaller TI parts (AM33xx, OMAPL138, etc).  This driver uses the
+>
+>> +void tilcdc_crtc_update_clk(struct drm_crtc *crtc)
+>
+>> +     /* in raster mode, minimum divisor is 2: */
+>> +     ret = clk_set_rate(priv->disp_clk, crtc->mode.clock * 1000 * 2);
+>
+> These things can better be handled with divider clock having a
+> minimum value (being discussed with Mike on how exactly it should
+> be) and instead of setting rate over a platform specific clock,
+> you can set rate over lcd clock using SET_RATE_PARENT at platform
+> level, more below,
 
-Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+I looked at that patch you were proposing for da8xx-fb..  to be
+honest, it did not seem simpler to me, so I was sort of failing to see
+the benefit..
 
-> ---
->  drivers/leds/leds-pwm.c |   50 +++++++++++++++++++++++++++++++++++++++-------
->  1 files changed, 42 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-> index a1ea5f6..70effa7 100644
-> --- a/drivers/leds/leds-pwm.c
-> +++ b/drivers/leds/leds-pwm.c
-> @@ -23,12 +23,16 @@
->  #include <linux/pwm.h>
->  #include <linux/leds_pwm.h>
->  #include <linux/slab.h>
-> +#include <linux/workqueue.h>
->  
->  struct led_pwm_data {
->  	struct led_classdev	cdev;
->  	struct pwm_device	*pwm;
-> +	struct work_struct	work;
->  	unsigned int		active_low;
->  	unsigned int		period;
-> +	int			duty;
-> +	unsigned		can_sleep:1;
->  };
->  
->  struct led_pwm_priv {
-> @@ -36,6 +40,26 @@ struct led_pwm_priv {
->  	struct led_pwm_data leds[0];
->  };
->  
-> +static void __led_pwm_set(struct led_pwm_data *led_dat)
-> +{
-> +	int new_duty = led_dat->duty;
-> +
-> +	pwm_config(led_dat->pwm, new_duty, led_dat->period);
-> +
-> +	if (new_duty == 0)
-> +		pwm_disable(led_dat->pwm);
-> +	else
-> +		pwm_enable(led_dat->pwm);
-> +}
-> +
-> +static void led_pwm_work(struct work_struct *work)
-> +{
-> +	struct led_pwm_data *led_dat =
-> +		container_of(work, struct led_pwm_data, work);
-> +
-> +	__led_pwm_set(led_dat);
-> +}
-> +
->  static void led_pwm_set(struct led_classdev *led_cdev,
->  	enum led_brightness brightness)
->  {
-> @@ -44,13 +68,12 @@ static void led_pwm_set(struct led_classdev *led_cdev,
->  	unsigned int max = led_dat->cdev.max_brightness;
->  	unsigned int period =  led_dat->period;
->  
-> -	if (brightness == 0) {
-> -		pwm_config(led_dat->pwm, 0, period);
-> -		pwm_disable(led_dat->pwm);
-> -	} else {
-> -		pwm_config(led_dat->pwm, brightness * period / max, period);
-> -		pwm_enable(led_dat->pwm);
-> -	}
-> +	led_dat->duty = brightness * period / max;
-> +
-> +	if (led_dat->can_sleep)
-> +		schedule_work(&led_dat->work);
-> +	else
-> +		__led_pwm_set(led_dat);
->  }
->  
->  static inline size_t sizeof_pwm_leds_priv(int num_leds)
-> @@ -100,6 +123,10 @@ static struct led_pwm_priv *led_pwm_create_of(struct platform_device *pdev)
->  		led_dat->cdev.brightness = LED_OFF;
->  		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
->  
-> +		led_dat->can_sleep = pwm_cansleep(led_dat->pwm);
-> +		if (led_dat->can_sleep)
-> +			INIT_WORK(&led_dat->work, led_pwm_work);
-> +
->  		ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
->  		if (ret < 0) {
->  			dev_err(&pdev->dev, "failed to register for %s\n",
-> @@ -153,6 +180,10 @@ static int led_pwm_probe(struct platform_device *pdev)
->  			led_dat->cdev.max_brightness = cur_led->max_brightness;
->  			led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
->  
-> +			led_dat->can_sleep = pwm_cansleep(led_dat->pwm);
-> +			if (led_dat->can_sleep)
-> +				INIT_WORK(&led_dat->work, led_pwm_work);
-> +
->  			ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
->  			if (ret < 0)
->  				goto err;
-> @@ -180,8 +211,11 @@ static int led_pwm_remove(struct platform_device *pdev)
->  	struct led_pwm_priv *priv = platform_get_drvdata(pdev);
->  	int i;
->  
-> -	for (i = 0; i < priv->num_leds; i++)
-> +	for (i = 0; i < priv->num_leds; i++) {
->  		led_classdev_unregister(&priv->leds[i].cdev);
-> +		if (priv->leds[i].can_sleep)
-> +			cancel_work_sync(&priv->leds[i].work);
-> +	}
->  
->  	return 0;
->  }
-> 
+>> +     /* Configure the LCD clock divisor. */
+>> +     tilcdc_write(dev, LCDC_CTRL_REG, LCDC_CLK_DIVISOR(div) |
+>> +                     LCDC_RASTER_MODE);
+>> +
+>> +     if (priv->rev == 2)
+>> +             tilcdc_set(dev, LCDC_CLK_ENABLE_REG,
+>> +                             LCDC_V2_DMA_CLK_EN | LCDC_V2_LIDD_CLK_EN |
+>> +                             LCDC_V2_CORE_CLK_EN);
+>
+> Mike was suggesting to model the above using gate/divider/composite
+> clocks of CCF in the FB driver.
+>
+>> +     priv->clk = clk_get(dev->dev, "fck");
+>> +     if (IS_ERR(priv->clk)) {
+>> +             dev_err(dev->dev, "failed to get functional clock\n");
+>> +             ret = -ENODEV;
+>> +             goto fail;
+>> +     }
+>> +
+>> +     priv->disp_clk = clk_get(dev->dev, "dpll_disp_ck");
+>> +     if (IS_ERR(priv->clk)) {
+>> +             dev_err(dev->dev, "failed to get display clock\n");
+>> +             ret = -ENODEV;
+>> +             goto fail;
+>> +     }
+>
+> "dpll_disp_ck" is a platform specific matter, driver should not
+> be handling platform specifics. And this won't work on DaVinci,
+> you can probably make use of
 
+meaning the clock has a different name on davinci, or?  Presumably
+there must be some clock generating the pixel clock for the display,
+but I confess to not being too familiar with the details on davinci..
 
--- 
-P?ter
+BR,
+-R
+
+> my series "[PATCH v2 0/4] ARM: AM335x: LCDC platform support"
+>
+> or something similar to overcome this.
+>
+> Regards
+> Afzal
+>
+>
