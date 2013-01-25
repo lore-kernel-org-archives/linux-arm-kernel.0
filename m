@@ -1,123 +1,54 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Jan 2013 17:59:28 +0100
-Subject: [PATCH 2/2] gpio: pca953x: use managed resources
-In-Reply-To: <1359133168-14879-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1359133168-14879-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1359133168-14879-3-git-send-email-gregory.clement@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 25 Jan 2013 08:59:43 -0800
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECF6261@DBDE01.ent.ti.com>
+References: <20130121164510.GA18905@kahuna>
+ <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+ <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
+ <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+ <50FE66AC.2090306@mimc.co.uk>
+ <B5906170F1614E41A8A28DE3B8D121433ECF3DD3@DBDE01.ent.ti.com>
+ <50FE9692.2090001@mimc.co.uk> <20130122182331.GO22517@atomide.com>
+ <B5906170F1614E41A8A28DE3B8D121433ECF6261@DBDE01.ent.ti.com>
+Message-ID: <20130125165942.GY22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+* Bedia, Vaibhav <vaibhav.bedia@ti.com> [130123 06:35]:
+> Hi Tony,
+> 
+> On Tue, Jan 22, 2013 at 23:53:32, Tony Lindgren wrote:
+> [...]
+> > > 
+> > > But I should get *something* from the kernel before it starts trying to access the rootfs ?
+> > 
+> > Here's something Kevin fixed but did not send it out before going to
+> > a vacation. Can you give it a try with earlyprintk enabled?
+> > 
+> > Note that this does not help with no output early on, that sounds
+> > like a bug configuring the DEBUG_LL port somewhere.
+> > 
+> 
+> I think earlyprintk on AM335x has not been functional for a while [1].
+> Will the latest patches from you to enable multiplatform debug-ll be sufficient
+> to test this out? I am trying to track down the boot issues reported and just
+> want to be sure of the dependencies. 
 
-Using the devm_* managed resources the pca driver can be simplified
-and cut down on boilerplate code.
+Yes you should check with current linux next and select the DEBUG_LL
+port manually.
+ 
+> [1] http://marc.info/?l=linux-omap&m=134642491119235&w=2
 
-[gcl: fixed a inccorect reference to a removed label, "goto fail_out"
-became "return ret"]
+This one should no longer be needed as we now use the machine_id
+for board-generic.c for DT boot.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/gpio/gpio-pca953x.c |   32 ++++++++------------------------
- 1 file changed, 8 insertions(+), 24 deletions(-)
+> [2] https://patchwork.kernel.org/patch/1896851/
 
-diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
-index 1dc9906..2405946 100644
---- a/drivers/gpio/gpio-pca953x.c
-+++ b/drivers/gpio/gpio-pca953x.c
-@@ -560,7 +560,7 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
- 		}
- 		ret = pca953x_read_regs(chip, offset, chip->irq_stat);
- 		if (ret)
--			goto out_failed;
-+			return ret;
- 
- 		/*
- 		 * There is no way to know which GPIO line generated the
-@@ -579,7 +579,8 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
- 		if (!chip->domain)
- 			return -ENODEV;
- 
--		ret = request_threaded_irq(client->irq,
-+		ret = devm_request_threaded_irq(&client->dev,
-+					client->irq,
- 					   NULL,
- 					   pca953x_irq_handler,
- 					   IRQF_TRIGGER_LOW | IRQF_ONESHOT,
-@@ -596,12 +597,6 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
- 	return 0;
- }
- 
--static void pca953x_irq_teardown(struct pca953x_chip *chip)
--{
--	if (chip->irq_base != -1) {
--		free_irq(chip->client->irq, chip);
--	}
--}
- #else /* CONFIG_GPIO_PCA953X_IRQ */
- static int pca953x_irq_setup(struct pca953x_chip *chip,
- 			     const struct i2c_device_id *id,
-@@ -614,10 +609,6 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
- 
- 	return 0;
- }
--
--static void pca953x_irq_teardown(struct pca953x_chip *chip)
--{
--}
- #endif
- 
- /*
-@@ -736,7 +727,8 @@ static int pca953x_probe(struct i2c_client *client,
- 	int ret;
- 	u32 invert = 0;
- 
--	chip = kzalloc(sizeof(struct pca953x_chip), GFP_KERNEL);
-+	chip = devm_kzalloc(&client->dev,
-+			sizeof(struct pca953x_chip), GFP_KERNEL);
- 	if (chip == NULL)
- 		return -ENOMEM;
- 
-@@ -771,15 +763,15 @@ static int pca953x_probe(struct i2c_client *client,
- 	else
- 		ret = device_pca957x_init(chip, invert);
- 	if (ret)
--		goto out_failed;
-+		return ret;
- 
- 	ret = pca953x_irq_setup(chip, id, irq_base);
- 	if (ret)
--		goto out_failed;
-+		return ret;
- 
- 	ret = gpiochip_add(&chip->gpio_chip);
- 	if (ret)
--		goto out_failed_irq;
-+		return ret;
- 
- 	if (pdata && pdata->setup) {
- 		ret = pdata->setup(client, chip->gpio_chip.base,
-@@ -790,12 +782,6 @@ static int pca953x_probe(struct i2c_client *client,
- 
- 	i2c_set_clientdata(client, chip);
- 	return 0;
--
--out_failed_irq:
--	pca953x_irq_teardown(chip);
--out_failed:
--	kfree(chip);
--	return ret;
- }
- 
- static int pca953x_remove(struct i2c_client *client)
-@@ -821,8 +807,6 @@ static int pca953x_remove(struct i2c_client *client)
- 		return ret;
- 	}
- 
--	pca953x_irq_teardown(chip);
--	kfree(chip);
- 	return 0;
- }
- 
--- 
-1.7.9.5
+This alone won't work without multiplatform support. At least modifying
+the Kconfig to use the new settings for OMAP2PLUS is needed.
+
+Probably easiest to make sure it works in linux next first.
+
+Regards,
+
+Tony
