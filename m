@@ -1,69 +1,36 @@
-From: peter.p.waskiewicz.jr@intel.com (Waskiewicz Jr, Peter P)
-Date: Thu, 24 Jan 2013 20:33:13 -0800
-Subject: [PATCH v3 1/1 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <1359077343-8271-1-git-send-email-Frank.Li@freescale.com>
-References: <1359077343-8271-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20130125043311.GA4141@ppwaskie-mobl2.amr.corp.intel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 25 Jan 2013 13:35:39 +0900
+Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
+In-Reply-To: <20130125041503.GL13691@verge.net.au>
+References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
+ <1359075633-13502-5-git-send-email-dinguyen@altera.com>
+ <20130125041503.GL13691@verge.net.au>
+Message-ID: <20130125043538.GC8930@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 09:29:03AM +0800, Frank Li wrote:
+On Fri, Jan 25, 2013 at 01:15:03PM +0900, Simon Horman wrote:
+> On Thu, Jan 24, 2013 at 07:00:32PM -0600, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > mach-socfpga is another platform that needs to use
+> > v7_invalidate_l1 to bringup additional cores. There was a comment that
+> > the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
+> > 
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Simon Horman <horms@verge.net.au>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > Cc: Pavel Machek <pavel@denx.de>
+> 
+> mach-shmobile portion:
+> 
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-[...]
-
->  static void
-> +fec_enet_rx_int_enable(struct net_device *ndev, bool enabled)
-> +{
-> +	struct fec_enet_private *fep = netdev_priv(ndev);
-> +	uint    int_events;
-> +
-> +	int_events = readl(fep->hwp + FEC_IMASK);
-> +	if (enabled)
-> +		int_events |= FEC_ENET_RXF;
-> +	else
-> +		int_events &= ~FEC_ENET_RXF;
-> +	writel(int_events, fep->hwp + FEC_IMASK);
-> +}
-
-You hold your hw_lock when this is called to disable the interrupt, but
-not when you re-enable it.  See below.
-
-[...]
-
-> @@ -813,7 +831,14 @@ fec_enet_interrupt(int irq, void *dev_id)
->  
->  		if (int_events & FEC_ENET_RXF) {
->  			ret = IRQ_HANDLED;
-> -			fec_enet_rx(ndev);
-> +
-> +			spin_lock(&fep->hw_lock);
-> +			/* Disable the RX interrupt */
-> +			if (napi_schedule_prep(&fep->napi)) {
-> +				fec_enet_rx_int_enable(ndev, false);
-> +				__napi_schedule(&fep->napi);
-> +			}
-> +			spin_unlock(&fep->hw_lock);
->  		}
->  
->  		/* Transmit OK, or non-fatal error. Update the buffer
-> @@ -834,7 +859,16 @@ fec_enet_interrupt(int irq, void *dev_id)
->  	return ret;
->  }
->  
-> -
-> +static int fec_enet_rx_napi(struct napi_struct *napi, int budget)
-> +{
-> +	struct net_device *ndev = napi->dev;
-> +	int pkgs = fec_enet_rx(ndev, budget);
-> +	if (pkgs < budget) {
-> +		napi_complete(napi);
-> +		fec_enet_rx_int_enable(ndev, true);
-
-Here you're not locking when re-enabling, but you do in the disable path.
-
-Also, when you're disabling interrupts above, you're doing that in your
-HW interrupt handler, you should be using spin_lock_irqsave()/irq_restore().
-
-Cheers,
--PJ
+For the record, I tested this on the kzm9g, kzm9d and marzen boards.
