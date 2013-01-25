@@ -1,46 +1,33 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 25 Jan 2013 10:42:11 -0800
-Subject: [PATCH] ARM: EXYNOS: Fix crash on soft reset
-Message-ID: <1359139331-25220-1-git-send-email-kgene.kim@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Jan 2013 18:53:52 +0000
+Subject: [PATCH] mfd/vexpress: vexpress_sysreg_setup must not be __init
+Message-ID: <1359140032-6039-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
+The patch 52666298a 'mfd: vexpress-sysreg: Don't skip initialization
+on probe' adds a call to vexpress_sysreg_setup from a non-__init
+function, so this also has to lose its __init annotation.
 
-The soft-reset control register is located in the XMU controller space.
-Map this controller space before writing to the soft-reset controller
-register.
-
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Girish K S <ks.giri@samsung.com>
-Signed-off-by: Kukjin <kgene.kim@samsung.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: arm at kernel.org
 ---
- arch/arm/mach-exynos/common.c |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/mfd/vexpress-sysreg.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index ed53a4f..b4d3188 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -294,6 +294,7 @@ void exynos4_restart(char mode, const char *cmd)
+diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+index 77048b1..558c292 100644
+--- a/drivers/mfd/vexpress-sysreg.c
++++ b/drivers/mfd/vexpress-sysreg.c
+@@ -313,7 +313,7 @@ static void vexpress_sysreg_config_complete(unsigned long data)
+ }
  
- void exynos5_restart(char mode, const char *cmd)
+ 
+-void __init vexpress_sysreg_setup(struct device_node *node)
++void vexpress_sysreg_setup(struct device_node *node)
  {
-+	struct device_node *np;
- 	u32 val;
- 	void __iomem *addr;
- 
-@@ -301,8 +302,9 @@ void exynos5_restart(char mode, const char *cmd)
- 		val = 0x1;
- 		addr = EXYNOS_SWRESET;
- 	} else if (of_machine_is_compatible("samsung,exynos5440")) {
--		val = (0x10 << 20) | (0x1 << 16);
--		addr = EXYNOS5440_SWRESET;
-+		np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-clock");
-+		addr = of_iomap(np, 0) + 0xcc;
-+		val = (0xfff << 20) | (0x1 << 16);
- 	} else {
- 		pr_err("%s: cannot support non-DT\n", __func__);
+ 	if (WARN_ON(!vexpress_sysreg_base))
  		return;
 -- 
-1.7.10.4
+1.8.0
