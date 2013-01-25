@@ -1,55 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 12:55:21 +0900
-Subject: [PATCH 03/15] ARM: shmobile: sh73a0: fixup div4_clks bitmap
-In-Reply-To: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
-References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359086133-23357-4-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 25 Jan 2013 12:55:18 +0900
+Subject: [GIT PULL v2] Renesas ARM-based SoC for v3.9
+Message-ID: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-div4_clks's bitmap of sh73a0 was wrong.
-This patch is based on v2.0 datasheet.
+please consider the following soc enhancements for 3.9.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-sh73a0.c |   22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+This series is based on a merge of the irqchip/gic-vic-move and
+timer/cleanup branches in the arm-soc tree. There were a number of
+conflicts in this merge, as indicated by the merge commit
+6265b0f325eed54558b35769aecb1d79423295c7. In each case I took care to
+match the merge made in the arm-soc tree which is evident in the for-next
+branch.
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 516ff7f..5f57701 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -264,17 +264,17 @@ enum { DIV4_I, DIV4_ZG, DIV4_M3, DIV4_B, DIV4_M1, DIV4_M2,
- 	SH_CLK_DIV4(&pll1_clk, _reg, _bit, _mask, _flags)
- 
- static struct clk div4_clks[DIV4_NR] = {
--	[DIV4_I] = DIV4(FRQCRA, 20, 0xfff, CLK_ENABLE_ON_INIT),
--	[DIV4_ZG] = DIV4(FRQCRA, 16, 0xbff, CLK_ENABLE_ON_INIT),
--	[DIV4_M3] = DIV4(FRQCRA, 12, 0xfff, CLK_ENABLE_ON_INIT),
--	[DIV4_B] = DIV4(FRQCRA, 8, 0xfff, CLK_ENABLE_ON_INIT),
--	[DIV4_M1] = DIV4(FRQCRA, 4, 0xfff, 0),
--	[DIV4_M2] = DIV4(FRQCRA, 0, 0xfff, 0),
--	[DIV4_Z] = DIV4(FRQCRB, 24, 0xbff, 0),
--	[DIV4_ZTR] = DIV4(FRQCRB, 20, 0xfff, 0),
--	[DIV4_ZT] = DIV4(FRQCRB, 16, 0xfff, 0),
--	[DIV4_ZX] = DIV4(FRQCRB, 12, 0xfff, 0),
--	[DIV4_HP] = DIV4(FRQCRB, 4, 0xfff, 0),
-+	[DIV4_I] = DIV4(FRQCRA, 20, 0xdff, CLK_ENABLE_ON_INIT),
-+	[DIV4_ZG] = DIV4(FRQCRA, 16, 0xd7f, CLK_ENABLE_ON_INIT),
-+	[DIV4_M3] = DIV4(FRQCRA, 12, 0x1dff, CLK_ENABLE_ON_INIT),
-+	[DIV4_B] = DIV4(FRQCRA, 8, 0xdff, CLK_ENABLE_ON_INIT),
-+	[DIV4_M1] = DIV4(FRQCRA, 4, 0x1dff, 0),
-+	[DIV4_M2] = DIV4(FRQCRA, 0, 0x1dff, 0),
-+	[DIV4_Z] = DIV4(FRQCRB, 24, 0x97f, 0),
-+	[DIV4_ZTR] = DIV4(FRQCRB, 20, 0xdff, 0),
-+	[DIV4_ZT] = DIV4(FRQCRB, 16, 0xdff, 0),
-+	[DIV4_ZX] = DIV4(FRQCRB, 12, 0xdff, 0),
-+	[DIV4_HP] = DIV4(FRQCRB, 4, 0xdff, 0),
- };
- 
- enum { DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_ZB1,
--- 
-1.7.10.4
+----------------------------------------------------------------
+The following changes since commit 6265b0f325eed54558b35769aecb1d79423295c7:
+
+  Merge remote-tracking branches 'arm-soc/irqchip/gic-vic-move' and 'arm-soc/timer/cleanup' into soc (2013-01-24 17:57:20 +0900)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
+
+for you to fetch changes up to ff8de98d50e551057978ea90d09255c528fde1ac:
+
+  ARM: shmobile: r8a7779: scif .irqs used SCIx_IRQ_MUXED() (2013-01-25 12:43:50 +0900)
+
+----------------------------------------------------------------
+Bastian Hecht (4):
+      ARM: shmobile: sh73a0: Add CPU sleep suspend
+      ARM: shmobile: r8a7740: Add CPU sleep suspend
+      ARM: SH-Mobile: sh73a0: Secondary CPUs handle own SCU flags
+      ARM: SH-Mobile: sh73a0: Add CPU Hotplug
+
+Guennadi Liakhovetski (3):
+      ARM: sh7372: add clock lookup entries for DT-based devices
+      ARM: sh7372: fix cache clean / invalidate order
+      ARM: shmobile: add function declarations for sh7372 DT helper functions
+
+Kuninori Morimoto (3):
+      ARM: shmobile: r8a7740: add TMU timer support
+      ARM: shmobile: sh73a0: fixup div4_clks bitmap
+      ARM: shmobile: r8a7779: scif .irqs used SCIx_IRQ_MUXED()
+
+Magnus Damm (1):
+      ARM: mach-shmobile: sh73a0 external IRQ wake update
+
+Sachin Kamat (1):
+      ARM: shmobile: Remove duplicate inclusion of dma-mapping.h in setup-r8a7740.c
+
+Simon Horman (3):
+      ARM: mach-shmobile: sh73a0: Allow initialisation of GIC by DT
+      ARM: mach-shmobile: sh73a0: Minimal setup using DT
+      ARM: mach-shmobile: sh73a0: Initialise MMCIF using DT
+
+ arch/arm/boot/dts/sh73a0-reference.dtsi        |   24 ++++++
+ arch/arm/boot/dts/sh73a0.dtsi                  |   93 +++++++++++++++++++++++
+ arch/arm/mach-shmobile/Makefile                |    3 +-
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +
+ arch/arm/mach-shmobile/board-kzm9g.c           |    2 +
+ arch/arm/mach-shmobile/clock-r8a7740.c         |    6 +-
+ arch/arm/mach-shmobile/clock-sh7372.c          |    9 +++
+ arch/arm/mach-shmobile/clock-sh73a0.c          |   35 ++++++---
+ arch/arm/mach-shmobile/headsmp-sh73a0.S        |   50 +++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h   |    8 ++
+ arch/arm/mach-shmobile/intc-sh73a0.c           |   16 ++--
+ arch/arm/mach-shmobile/pm-r8a7740.c            |   22 ++++++
+ arch/arm/mach-shmobile/pm-sh73a0.c             |   32 ++++++++
+ arch/arm/mach-shmobile/setup-r8a7740.c         |   95 +++++++++++++++++++++++-
+ arch/arm/mach-shmobile/setup-r8a7779.c         |   18 ++---
+ arch/arm/mach-shmobile/setup-sh73a0.c          |   62 +++++++++++++++-
+ arch/arm/mach-shmobile/sleep-sh7372.S          |   12 +--
+ arch/arm/mach-shmobile/smp-sh73a0.c            |   66 ++++++++--------
+ 18 files changed, 485 insertions(+), 70 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sh73a0-reference.dtsi
+ create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
+ create mode 100644 arch/arm/mach-shmobile/headsmp-sh73a0.S
+ create mode 100644 arch/arm/mach-shmobile/pm-sh73a0.c
