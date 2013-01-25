@@ -1,85 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 25 Jan 2013 16:52:18 +0530
-Subject: [PATCH] ARM: davinci: da850: add RTC driver DT entries
-In-Reply-To: <4232EB8829679242B82E712C3DB3149D4233E9@DBDE01.ent.ti.com>
-References: <1359094430-14724-1-git-send-email-mrugesh.mk@ti.com>
- <51025FAE.3060503@ti.com>
- <4232EB8829679242B82E712C3DB3149D4233E9@DBDE01.ent.ti.com>
-Message-ID: <51026AEA.5050503@ti.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Fri, 25 Jan 2013 16:55:57 +0530
+Subject: [PATCH 4/4] irqchip: gic: Perform the gic_secondary_init()
+ call via CPU notifier
+In-Reply-To: <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
+References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
+ <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20130125112556.GA4073@bnru09>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/25/2013 4:34 PM, Katepallewar, Mrugesh wrote:
-> On Fri, Jan 25, 2013 at 16:04:22, Nori, Sekhar wrote:
->> On 1/25/2013 11:43 AM, Mrugesh Katepallewar wrote:
->>> Add RTC DT entries in da850 dts file.
->>>
->>> Signed-off-by: Mrugesh Katepallewar <mrugesh.mk@ti.com>
->>> ---
->>> Applies on top of v3.8-rc4 of linus tree.
->>>
->>> Tested on da850-evm device.
->>>
->>> Test Procedure:
->>> date [YYYY.]MM.DD-hh:mm[:ss]
->>> hwclock -w
->>> reset board and check system time.
->>>
->>> :100644 100644 37dc5a3... b16efd4... M	arch/arm/boot/dts/da850-evm.dts
->>> :100644 100644 640ab75... a8eb1b1... M	arch/arm/boot/dts/da850.dtsi
->>>  arch/arm/boot/dts/da850-evm.dts |    3 +++
->>>  arch/arm/boot/dts/da850.dtsi    |    8 ++++++++
->>>  2 files changed, 11 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/da850-evm.dts 
->>> b/arch/arm/boot/dts/da850-evm.dts index 37dc5a3..b16efd4 100644
->>> --- a/arch/arm/boot/dts/da850-evm.dts
->>> +++ b/arch/arm/boot/dts/da850-evm.dts
->>> @@ -24,5 +24,8 @@
->>>  		serial2: serial at 1d0d000 {
->>>  			status = "okay";
->>>  		};
->>> +		rtc at 1c23000 {
+On Wed, Jan 23, 2013 at 18:59:34 +0100, Catalin Marinas wrote:
+> All the calls to gic_secondary_init() pass 0 as the first argument.
+> Since this function is called on each CPU when starting, it can be done
+> in a platform-independent way via a CPU notifier registered by the GIC
+> code.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> Cc: Shiraz Hashim <shiraz.hashim@st.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-I did not mention this last time, but this should be:
+For ux500, it is
 
-		rtc0: rtc at 1c23000 {
+Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-to be consistent with rest of the file.
-
->>> +			status = "okay";
->>> +		};
->>>  	};
->>>  };
->>> diff --git a/arch/arm/boot/dts/da850.dtsi 
->>> b/arch/arm/boot/dts/da850.dtsi index 640ab75..a8eb1b1 100644
->>> --- a/arch/arm/boot/dts/da850.dtsi
->>> +++ b/arch/arm/boot/dts/da850.dtsi
->>> @@ -56,5 +56,13 @@
->>>  			interrupt-parent = <&intc>;
->>>  			status = "disabled";
->>>  		};
->>> +		rtc at 1c23000 {
-
-Here too.
-
->>> +			compatible = "ti,da830-rtc";
->>> +			reg = <0x23000 0x1000>;
->>> +			interrupts = <19
->>> +				      19>;
->>
->> Why two interrupts of the same number? If there is only one interrupt line then only one should be specified, no?
-> We are using common OMAP RTC driver for da850 and other ti SoC's (e.g.am33xx). I have seen in am33xx.dtsi rtc timer
-> and alarm interrupts are different. So, two interrupt numbers are expected from RTC DT node.
-
-Okay. Looking at the OMAP-L138 TRM, I see that the IP on that SoC
-supports both alarm and timer events and both arrive on the same
-interrupt number (as opposed to am335x where they supposedly arrive on
-different interrupt lines). What you have looks fine to me considering
-this.
-
-Also, the interrupt-parent setting needs to be removed. See the patch
-Prabhakar just submitted.
-
-Thanks,
-Sekhar
+thanks,
+srinidhi
