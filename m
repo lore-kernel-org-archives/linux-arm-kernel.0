@@ -1,105 +1,78 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 12:55:29 +0900
-Subject: [PATCH 11/15] ARM: SH-Mobile: sh73a0: Add CPU Hotplug
+Date: Fri, 25 Jan 2013 12:55:32 +0900
+Subject: [PATCH 14/15] ARM: mach-shmobile: sh73a0: Initialise MMCIF using DT
 In-Reply-To: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359086133-23357-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359086133-23357-15-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bastian Hecht <hechtb@gmail.com>
+This device also requires a voltage regulator which
+should be defined in a board-specific maner. An example
+dts snipped follows.
 
-Add the capability to add and remove CPUs on the fly.
-The Cortex-A9 offers the possibility to take single cores out of the
-MP Core. We add this capabilty taking care that caches are kept
-coherent. For verifying the shutdown we rely on the internal SH73A0
-Power Status Register PSTR.
+/ {
+	fixedregulator1v8: fixedregulator at 0 {
+		compatible = "regulator-fixed";
+		regulator-name = "fixed-1.8V";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+};
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+&mmcif {
+	vmmc-supply = <&fixedregulator1v8>;
+	vqmmc-supply = <&fixedregulator1v8>;
+};
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-sh73a0.c |   36 +++++++++++++++++++++++++++++------
- 1 file changed, 30 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/sh73a0-reference.dtsi |   24 ++++++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-sh73a0.c   |    1 +
+ 2 files changed, 25 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sh73a0-reference.dtsi
 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 430b44e..9812ea3 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -25,6 +25,7 @@
- #include <linux/delay.h>
- #include <linux/irqchip/arm-gic.h>
- #include <mach/common.h>
-+#include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- #include <mach/sh73a0.h>
- #include <asm/smp_scu.h>
-@@ -36,6 +37,8 @@
- #define SBAR		IOMEM(0xe6180020)
- #define APARMBAREA	IOMEM(0xe6f10020)
- 
-+#define PSTR_SHUTDOWN_MODE	3
+diff --git a/arch/arm/boot/dts/sh73a0-reference.dtsi b/arch/arm/boot/dts/sh73a0-reference.dtsi
+new file mode 100644
+index 0000000..d4bb012
+--- /dev/null
++++ b/arch/arm/boot/dts/sh73a0-reference.dtsi
+@@ -0,0 +1,24 @@
++/*
++ * Device Tree Source for the SH73A0 SoC
++ *
++ * Copyright (C) 2012 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
- static void __iomem *scu_base_addr(void)
- {
- 	return (void __iomem *)0xf0000000;
-@@ -92,16 +95,20 @@ static void __init sh73a0_smp_init_cpus(void)
- 	shmobile_smp_init_cpus(ncores);
- }
- 
--static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int sh73a0_cpu_kill(unsigned int cpu)
- {
++/include/ "sh73a0.dtsi"
 +
- 	int k;
-+	u32 pstr;
- 
--	/* this function is running on another CPU than the offline target,
--	 * here we need wait for shutdown code in platform_cpu_die() to
--	 * finish before asking SoC-specific code to power off the CPU core.
-+	/*
-+	 * wait until the power status register confirms the shutdown of the
-+	 * offline target
- 	 */
- 	for (k = 0; k < 1000; k++) {
--		if (shmobile_cpu_is_dead(cpu))
-+		pstr = (__raw_readl(PSTR) >> (4 * cpu)) & 3;
-+		if (pstr == PSTR_SHUTDOWN_MODE)
- 			return 1;
- 
- 		mdelay(1);
-@@ -110,6 +117,23 @@ static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
- 	return 0;
- }
- 
-+static void sh73a0_cpu_die(unsigned int cpu)
-+{
-+	/*
-+	 * The ARM MPcore does not issue a cache coherency request for the L1
-+	 * cache when powering off single CPUs. We must take care of this and
-+	 * further caches.
-+	 */
-+	dsb();
-+	flush_cache_all();
++/ {
++	compatible = "renesas,sh73a0";
 +
-+	/* Set power off mode. This takes the CPU out of the MP cluster */
-+	scu_power_mode(scu_base_addr(), SCU_PM_POWEROFF);
-+
-+	/* Enter shutdown mode */
-+	cpu_do_idle();
-+}
-+#endif /* CONFIG_HOTPLUG_CPU */
- 
- struct smp_operations sh73a0_smp_ops __initdata = {
- 	.smp_init_cpus		= sh73a0_smp_init_cpus,
-@@ -118,7 +142,7 @@ struct smp_operations sh73a0_smp_ops __initdata = {
- 	.smp_boot_secondary	= sh73a0_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_kill		= sh73a0_cpu_kill,
--	.cpu_die		= shmobile_cpu_die,
-+	.cpu_die		= sh73a0_cpu_die,
- 	.cpu_disable		= shmobile_cpu_disable,
- #endif
- };
++	mmcif: mmcif at 0x10010000 {
++		compatible = "renesas,sh-mmcif";
++		reg = <0xe6bd0000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 140 0x4
++			      0 141 0x4>;
++		reg-io-width = <4>;
++	};
++};
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index eab2667..afa5423 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -583,6 +583,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMCIF0 */
++	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMCIF0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]), /* SDHI2 */
+ 	CLKDEV_DEV_ID("leds-renesas-tpu.12", &mstp_clks[MSTP303]), /* TPU1 */
+ 	CLKDEV_DEV_ID("leds-renesas-tpu.21", &mstp_clks[MSTP302]), /* TPU2 */
 -- 
 1.7.10.4
