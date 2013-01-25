@@ -1,32 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 Jan 2013 08:55:14 -0800
-Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
- hwmod data
-In-Reply-To: <510103F9.4080601@ti.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
- <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
- <20130118171500.GC15361@atomide.com> <50FCF838.6000105@ti.com>
- <50FD5993.5010008@ti.com> <20130121180113.GA22517@atomide.com>
- <50FE909B.1020001@ti.com> <20130122183942.GO15361@atomide.com>
- <510103F9.4080601@ti.com>
-Message-ID: <20130125165513.GX22517@atomide.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 25 Jan 2013 17:59:26 +0100
+Subject: [PATCH 0/2] Improvement for pca953x drivers
+Message-ID: <1359133168-14879-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [130124 01:54]:
-> On Wednesday 23 January 2013 12:09 AM, Tony Lindgren wrote:
-> >It seems that we should have the iospace available in the driver
-> >at that point. And it should be also available to the runtime PM
-> >code in hwmod in the device somewhere?
-> 
-> I couldn't find anything as part of the device. Definitely not the
-> ioremaped address. There's a device_private->driver_data which the
-> drivers can use to populate the ioremaped address but I am sure thats
-> not whats its meant for.
+Hi Linus,
 
-I guess we could have runtime PM init function to pass the driver
-region to the low level bus code if needed. Anybody got better ideas?
+those two patches are the begining of the improvement work we have
+spoken about earlier. I started with the two patches you sent.
 
-Regards,
+I've just made a small fix to make it build on the 2nd patch so I keep
+your autorship and signed-off.
 
-Tony
+For the second one, it didn't build too, but I made a more substantial
+change on it by moving the setting of the irq to the map function. So
+for this one, I took the authorship and remove your signed-off to not
+make you responsible of my possible bug! :)
+
+I've compiled and run it, but as I don't have support for the pca905
+interrupt on my board, I can't say it didn't break anything. Maybe
+this time again Maxime will be willing to test it.
+
+For the remaining improvement related to the PWA and MMP #ifdef, I
+hope to be able to work on it this week-end.
+
+Regards
+
+Gregory CLEMENT (1):
+  gpio: pca953x: use simple irqdomain
+
+Linus Walleij (1):
+  gpio: pca953x: use managed resources
+
+ drivers/gpio/gpio-pca953x.c |   97 ++++++++++++++++---------------------------
+ 1 file changed, 36 insertions(+), 61 deletions(-)
+
+-- 
+1.7.9.5
