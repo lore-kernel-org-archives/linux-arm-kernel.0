@@ -1,32 +1,52 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 25 Jan 2013 08:50:11 -0500
-Subject: [BUG] panda board locks up on boot
-In-Reply-To: <20130125085234.GY23505@n2100.arm.linux.org.uk>
-References: <1359082886.21576.199.camel@gandalf.local.home>
- <20130125085234.GY23505@n2100.arm.linux.org.uk>
-Message-ID: <1359121811.21576.217.camel@gandalf.local.home>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 25 Jan 2013 14:51:30 +0100
+Subject: [PATCH v2 2/3] pwm: Add can_sleep property to drivers
+In-Reply-To: <1359121471-21457-3-git-send-email-florian.vaussard@epfl.ch>
+References: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359121471-21457-3-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <51028DE2.1050904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-01-25 at 08:52 +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 24, 2013 at 10:01:26PM -0500, Steven Rostedt wrote:
-> > I've recently started testing my work on arm boards and have found that
-> > they both don't boot under the latest kernel anymore. I already posted
-> > about my snowball board, but my panda board also locks up.
+On 01/25/2013 02:44 PM, Florian Vaussard wrote:
+> Calls to PWM drivers connected through I2C can sleep.
+> Use the new can_sleep property.
 > 
-> You need to enable DMA engine and the OMAP DMA engine driver.  I believe
-> someone was going to work on adding PIO-mode support to the driver but
-> I suspect as TI's OMAP division is being reorganized, all that is now
-> uncertain.
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 
-Well, I be darn...
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+> ---
+>  drivers/pwm/pwm-twl-led.c |    1 +
+>  drivers/pwm/pwm-twl.c     |    1 +
+>  2 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-twl-led.c b/drivers/pwm/pwm-twl-led.c
+> index 9dfa0f3..6261193 100644
+> --- a/drivers/pwm/pwm-twl-led.c
+> +++ b/drivers/pwm/pwm-twl-led.c
+> @@ -300,6 +300,7 @@ static int twl_pwmled_probe(struct platform_device *pdev)
+>  
+>  	twl->chip.dev = &pdev->dev;
+>  	twl->chip.base = -1;
+> +	twl->chip.can_sleep = 1;
+>  
+>  	mutex_init(&twl->mutex);
+>  
+> diff --git a/drivers/pwm/pwm-twl.c b/drivers/pwm/pwm-twl.c
+> index e65db95..4e56cd8 100644
+> --- a/drivers/pwm/pwm-twl.c
+> +++ b/drivers/pwm/pwm-twl.c
+> @@ -315,6 +315,7 @@ static int twl_pwm_probe(struct platform_device *pdev)
+>  	twl->chip.dev = &pdev->dev;
+>  	twl->chip.base = -1;
+>  	twl->chip.npwm = 2;
+> +	twl->chip.can_sleep = 1;
+>  
+>  	mutex_init(&twl->mutex);
+>  
+> 
 
 
-Yep, selecting DMA_OMAP which selects DMA_ENGINE makes everything
-better. Who'da thunk?
-
-Now only if there was a config option missing for my snowball?
-
-Thanks!
-
--- Steve
+-- 
+P?ter
