@@ -1,34 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:02:52 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC defconfig for v3.9 #2
-Message-ID: <1359079374-25032-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 25 Jan 2013 11:02:54 +0900
+Subject: [PATCH 2/2] ARM: mach-shmobile: mackerel:  enable VFP in defconfig
+In-Reply-To: <1359079374-25032-1-git-send-email-horms+renesas@verge.net.au>
+References: <1359079374-25032-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359079374-25032-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+CONFIG_VFP appears to be required to use the
+Debian armhf userspace. Enabling this is consistent
+with many other shmobile boards.
 
-please consider the following defconfig enhancements for 3.9.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/mackerel_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-This series is based on the renesas/defconfig branch in the arm-soc tree.
-
-----------------------------------------------------------------
-The following changes since commit 8098df15c26b2bf16924df5a134d1a649692ab62:
-
-  ARM: mach-shmobile: kzm9d: update defconfig (2013-01-15 08:57:09 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git defconfig2
-
-for you to fetch changes up to 46bbd43fa44fe083188f3e4846ba5b8d3c89bae6:
-
-  ARM: mach-shmobile: mackerel:  enable VFP in defconfig (2013-01-23 14:59:37 +0900)
-
-----------------------------------------------------------------
-Simon Horman (2):
-      ARM: mach-shmobile: armadillo: defconfig: Enable CEU
-      ARM: mach-shmobile: mackerel:  enable VFP in defconfig
-
- arch/arm/configs/armadillo800eva_defconfig |    5 +----
- arch/arm/configs/mackerel_defconfig        |    1 +
- 2 files changed, 2 insertions(+), 4 deletions(-)
+diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
+index e6881ac..7594b3a 100644
+--- a/arch/arm/configs/mackerel_defconfig
++++ b/arch/arm/configs/mackerel_defconfig
+@@ -25,6 +25,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_KEXEC=y
++CONFIG_VFP=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_PM=y
+ CONFIG_PM_RUNTIME=y
+-- 
+1.7.10.4
