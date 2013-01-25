@@ -1,62 +1,85 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 25 Jan 2013 16:48:44 +0530
-Subject: [PATCH] ARM: davinci: da850: add interrupt-parent property in soc node
-Message-ID: <1359112724-1217-1-git-send-email-prabhakar.lad@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 25 Jan 2013 16:52:18 +0530
+Subject: [PATCH] ARM: davinci: da850: add RTC driver DT entries
+In-Reply-To: <4232EB8829679242B82E712C3DB3149D4233E9@DBDE01.ent.ti.com>
+References: <1359094430-14724-1-git-send-email-mrugesh.mk@ti.com>
+ <51025FAE.3060503@ti.com>
+ <4232EB8829679242B82E712C3DB3149D4233E9@DBDE01.ent.ti.com>
+Message-ID: <51026AEA.5050503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.lad@ti.com>
+On 1/25/2013 4:34 PM, Katepallewar, Mrugesh wrote:
+> On Fri, Jan 25, 2013 at 16:04:22, Nori, Sekhar wrote:
+>> On 1/25/2013 11:43 AM, Mrugesh Katepallewar wrote:
+>>> Add RTC DT entries in da850 dts file.
+>>>
+>>> Signed-off-by: Mrugesh Katepallewar <mrugesh.mk@ti.com>
+>>> ---
+>>> Applies on top of v3.8-rc4 of linus tree.
+>>>
+>>> Tested on da850-evm device.
+>>>
+>>> Test Procedure:
+>>> date [YYYY.]MM.DD-hh:mm[:ss]
+>>> hwclock -w
+>>> reset board and check system time.
+>>>
+>>> :100644 100644 37dc5a3... b16efd4... M	arch/arm/boot/dts/da850-evm.dts
+>>> :100644 100644 640ab75... a8eb1b1... M	arch/arm/boot/dts/da850.dtsi
+>>>  arch/arm/boot/dts/da850-evm.dts |    3 +++
+>>>  arch/arm/boot/dts/da850.dtsi    |    8 ++++++++
+>>>  2 files changed, 11 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/da850-evm.dts 
+>>> b/arch/arm/boot/dts/da850-evm.dts index 37dc5a3..b16efd4 100644
+>>> --- a/arch/arm/boot/dts/da850-evm.dts
+>>> +++ b/arch/arm/boot/dts/da850-evm.dts
+>>> @@ -24,5 +24,8 @@
+>>>  		serial2: serial at 1d0d000 {
+>>>  			status = "okay";
+>>>  		};
+>>> +		rtc at 1c23000 {
 
-This patch adds 'interrupt-parent' property in soc node, so that
-the child inherits this property, this avoids adding 'interrupt-parent'
-to each node.
+I did not mention this last time, but this should be:
 
-Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Heiko Schocher <hs@denx.de>
----
- arch/arm/boot/dts/da850.dtsi |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+		rtc0: rtc at 1c23000 {
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 2551098..7c84822 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -28,6 +28,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges = <0x0 0x01c00000 0x400000>;
-+		interrupt-parent = <&intc>;
- 
- 		pmx_core: pinmux at 1c14120 {
- 			compatible = "pinctrl-single";
-@@ -62,7 +63,6 @@
- 			clock-frequency = <150000000>;
- 			reg-shift = <2>;
- 			interrupts = <25>;
--			interrupt-parent = <&intc>;
- 			status = "disabled";
- 		};
- 		serial1: serial at 1d0c000 {
-@@ -71,7 +71,6 @@
- 			clock-frequency = <150000000>;
- 			reg-shift = <2>;
- 			interrupts = <53>;
--			interrupt-parent = <&intc>;
- 			status = "disabled";
- 		};
- 		serial2: serial at 1d0d000 {
-@@ -80,7 +79,6 @@
- 			clock-frequency = <150000000>;
- 			reg-shift = <2>;
- 			interrupts = <61>;
--			interrupt-parent = <&intc>;
- 			status = "disabled";
- 		};
- 	};
--- 
-1.7.4.1
+to be consistent with rest of the file.
+
+>>> +			status = "okay";
+>>> +		};
+>>>  	};
+>>>  };
+>>> diff --git a/arch/arm/boot/dts/da850.dtsi 
+>>> b/arch/arm/boot/dts/da850.dtsi index 640ab75..a8eb1b1 100644
+>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>> @@ -56,5 +56,13 @@
+>>>  			interrupt-parent = <&intc>;
+>>>  			status = "disabled";
+>>>  		};
+>>> +		rtc at 1c23000 {
+
+Here too.
+
+>>> +			compatible = "ti,da830-rtc";
+>>> +			reg = <0x23000 0x1000>;
+>>> +			interrupts = <19
+>>> +				      19>;
+>>
+>> Why two interrupts of the same number? If there is only one interrupt line then only one should be specified, no?
+> We are using common OMAP RTC driver for da850 and other ti SoC's (e.g.am33xx). I have seen in am33xx.dtsi rtc timer
+> and alarm interrupts are different. So, two interrupt numbers are expected from RTC DT node.
+
+Okay. Looking at the OMAP-L138 TRM, I see that the IP on that SoC
+supports both alarm and timer events and both arrive on the same
+interrupt number (as opposed to am335x where they supposedly arrive on
+different interrupt lines). What you have looks fine to me considering
+this.
+
+Also, the interrupt-parent setting needs to be removed. See the patch
+Prabhakar just submitted.
+
+Thanks,
+Sekhar
