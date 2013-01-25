@@ -1,88 +1,96 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 25 Jan 2013 11:06:46 +0100
-Subject: [RFC PATCH 1/4] net: mvmdio: rename base register cookie from smireg
- to regs
+Date: Fri, 25 Jan 2013 11:06:47 +0100
+Subject: [RFC PATCH 2/4] net: mvmdio: do not assume SMI reg is at offset 0 of
+ the resource
 In-Reply-To: <1359108409-4378-1-git-send-email-florian@openwrt.org>
 References: <1359108409-4378-1-git-send-email-florian@openwrt.org>
-Message-ID: <1359108409-4378-2-git-send-email-florian@openwrt.org>
+Message-ID: <1359108409-4378-3-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames the base register cookie in the mvmdio drive from
-"smireg" to "regs" since a subsequent patch is going to use an ioremap()
-cookie whose size is larger than a single register of 4 bytes. No
-functionnal code change introduced.
+This patch changes the mvmdio driver not to assume that the
+MVMDIO_SMI_REG is at offset 0 of the resource we are being passed via
+Device Tree. This is actually required to reduce the differences between
+the mv643xx_eth SMI driver and mvmdio. The only user of the "orion-mdio"
+binding is updated accordingly.
 
 Signed-off-by: Florian Fainelli <florian@openwrt.org>
 ---
- drivers/net/ethernet/marvell/mvmdio.c |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ Documentation/devicetree/bindings/net/marvell-orion-mdio.txt |    2 +-
+ arch/arm/boot/dts/armada-370-xp.dtsi                         |    2 +-
+ drivers/net/ethernet/marvell/mvmdio.c                        |    9 +++++----
+ 3 files changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 74f1c15..e4a89b2 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -39,7 +39,7 @@
- 
- struct orion_mdio_dev {
- 	struct mutex lock;
--	void __iomem *smireg;
-+	void __iomem *regs;
+diff --git a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+index 34e7aaf..3320d5c 100644
+--- a/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
++++ b/Documentation/devicetree/bindings/net/marvell-orion-mdio.txt
+@@ -19,7 +19,7 @@ mdio {
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+ 	compatible = "marvell,orion-mdio";
+-	reg = <0xd0072004 0x4>;
++	reg = <0xd0072000 0x8>;
  };
  
- /* Wait for the SMI unit to be ready for another operation
-@@ -52,7 +52,7 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
+ And at the board level:
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 4c0abe8..0e7d880 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -91,7 +91,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "marvell,orion-mdio";
+-			reg = <0xd0072004 0x4>;
++			reg = <0xd0072000 0x8>;
+ 		};
+ 
+ 		ethernet at d0070000 {
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index e4a89b2..16be140 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -29,6 +29,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ 
++#define MVMDIO_SMI_REG			   0x0004
+ #define MVMDIO_SMI_DATA_SHIFT              0
+ #define MVMDIO_SMI_PHY_ADDR_SHIFT          16
+ #define MVMDIO_SMI_PHY_REG_SHIFT           21
+@@ -52,7 +53,7 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
  
  	count = 0;
  	while (1) {
--		val = readl(dev->smireg);
-+		val = readl(dev->regs);
+-		val = readl(dev->regs);
++		val = readl(dev->regs + MVMDIO_SMI_REG);
  		if (!(val & MVMDIO_SMI_BUSY))
  			break;
  
-@@ -87,12 +87,12 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+@@ -87,12 +88,12 @@ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
  	writel(((mii_id << MVMDIO_SMI_PHY_ADDR_SHIFT) |
  		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
  		MVMDIO_SMI_READ_OPERATION),
--	       dev->smireg);
-+	       dev->regs);
+-	       dev->regs);
++	       dev->regs + MVMDIO_SMI_REG);
  
  	/* Wait for the value to become available */
  	count = 0;
  	while (1) {
--		val = readl(dev->smireg);
-+		val = readl(dev->regs);
+-		val = readl(dev->regs);
++		val = readl(dev->regs + MVMDIO_SMI_REG);
  		if (val & MVMDIO_SMI_READ_VALID)
  			break;
  
-@@ -129,7 +129,7 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+@@ -129,7 +130,7 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
  		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
  		MVMDIO_SMI_WRITE_OPERATION            |
  		(value << MVMDIO_SMI_DATA_SHIFT)),
--	       dev->smireg);
-+	       dev->regs);
+-	       dev->regs);
++	       dev->regs + MVMDIO_SMI_REG);
  
  	mutex_unlock(&dev->lock);
  
-@@ -173,8 +173,8 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 		bus->irq[i] = PHY_POLL;
- 
- 	dev = bus->priv;
--	dev->smireg = of_iomap(pdev->dev.of_node, 0);
--	if (!dev->smireg) {
-+	dev->regs = of_iomap(pdev->dev.of_node, 0);
-+	if (!dev->regs) {
- 		dev_err(&pdev->dev, "No SMI register address given in DT\n");
- 		kfree(bus->irq);
- 		mdiobus_free(bus);
-@@ -186,7 +186,7 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 	ret = of_mdiobus_register(bus, np);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "Cannot register MDIO bus (%d)\n", ret);
--		iounmap(dev->smireg);
-+		iounmap(dev->regs);
- 		kfree(bus->irq);
- 		mdiobus_free(bus);
- 		return ret;
 -- 
 1.7.10.4
