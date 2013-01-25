@@ -1,44 +1,50 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri, 25 Jan 2013 14:44:30 +0100
-Subject: [PATCH v2 2/3] pwm: Add can_sleep property to drivers
-In-Reply-To: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1359121471-21457-3-git-send-email-florian.vaussard@epfl.ch>
+Date: Fri, 25 Jan 2013 14:44:28 +0100
+Subject: [PATCH v2 0/3] leds-pwm: Defer PWM calls if PWM can sleep
+Message-ID: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calls to PWM drivers connected through I2C can sleep.
-Use the new can_sleep property.
+Hello,
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
+When using the leds-pwm module with external PWM chips connected through
+I2C, the kernel will panic when settings a trigger. In this case, PWM
+calls can sleep, and should be deferred.
+
+Patch 1 and 2 add the necessary API to the PWM subsystem, and update
+matching drivers. Patch 3 updates leds-pwm to use a worker if the PWM
+chip can sleep, or performs direct calls otherwise.
+
+This patchset is based on the for-next branch of the led subsystem [1],
+as patch 3 depends on the recent work of Peter for DT bindings in leds-pwm.
+The pwm patches should probably follow the same path.
+
+Tested on Overo (OMAP3 + TWL4030) with device tree.
+
+Best regards,
+
+Florian
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
+
+
+Changes from v1:
+* pwm_can_sleep -> pwm_cansleep
+* avoid duplicated code between the worker and the direct call
+* cache the value of pwm_cansleep inside leds-pwm to avoid API calls
+
+
+Florian Vaussard (3):
+  pwm: Add pwm_cansleep() as exported API to users
+  pwm: Add can_sleep property to drivers
+  leds: leds-pwm: Defer led_pwm_set() if PWM can sleep
+
+ drivers/leds/leds-pwm.c   |   50 +++++++++++++++++++++++++++++++++++++-------
+ drivers/pwm/core.c        |   12 ++++++++++
  drivers/pwm/pwm-twl-led.c |    1 +
  drivers/pwm/pwm-twl.c     |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ include/linux/pwm.h       |   10 +++++++++
+ 5 files changed, 66 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/pwm/pwm-twl-led.c b/drivers/pwm/pwm-twl-led.c
-index 9dfa0f3..6261193 100644
---- a/drivers/pwm/pwm-twl-led.c
-+++ b/drivers/pwm/pwm-twl-led.c
-@@ -300,6 +300,7 @@ static int twl_pwmled_probe(struct platform_device *pdev)
- 
- 	twl->chip.dev = &pdev->dev;
- 	twl->chip.base = -1;
-+	twl->chip.can_sleep = 1;
- 
- 	mutex_init(&twl->mutex);
- 
-diff --git a/drivers/pwm/pwm-twl.c b/drivers/pwm/pwm-twl.c
-index e65db95..4e56cd8 100644
---- a/drivers/pwm/pwm-twl.c
-+++ b/drivers/pwm/pwm-twl.c
-@@ -315,6 +315,7 @@ static int twl_pwm_probe(struct platform_device *pdev)
- 	twl->chip.dev = &pdev->dev;
- 	twl->chip.base = -1;
- 	twl->chip.npwm = 2;
-+	twl->chip.can_sleep = 1;
- 
- 	mutex_init(&twl->mutex);
- 
 -- 
 1.7.5.4
