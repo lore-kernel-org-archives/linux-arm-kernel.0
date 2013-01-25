@@ -1,44 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 22:44:09 +0000
-Subject: [PATCH 10/19] watchdog: at91sam9: at91_wdt_dt_ids cannot be __init
+Date: Fri, 25 Jan 2013 22:44:15 +0000
+Subject: [PATCH 16/19] ARM: sa1100: don't warn about mach/ide.h
 In-Reply-To: <1359153858-31992-1-git-send-email-arnd@arndb.de>
 References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
  <1359153858-31992-1-git-send-email-arnd@arndb.de>
-Message-ID: <1359153858-31992-11-git-send-email-arnd@arndb.de>
+Message-ID: <1359153858-31992-17-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device IDs are referenced by the driver and potentially
-used beyond the init time, as kbuild correctly warns
-about. Remove the __initconst annotation.
-
-Without this patch, building at91_dt_defconfig results in:
-
-WARNING: drivers/watchdog/built-in.o(.data+0x28): Section mismatch in reference from the variable at91wdt_driver to the (unknown reference) .init.rodata:(unknown)
-The variable at91wdt_driver references
-the (unknown reference) __initconst (unknown)
+This warning has existed since before the start of (git) history.
+Apparently nobody has bothered to fix it in a long time, and
+this is unlikely to change. Note that the file that the warning
+refers to has moved to a different location and was subsequently
+deleted in 2008.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: linux-watchdog at vger.kernel.org
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- drivers/watchdog/at91sam9_wdt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-sa1100/lart.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index dc42e44..6dad954 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -304,7 +304,7 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
- }
+diff --git a/arch/arm/mach-sa1100/lart.c b/arch/arm/mach-sa1100/lart.c
+index f69f78f..bca7e60 100644
+--- a/arch/arm/mach-sa1100/lart.c
++++ b/arch/arm/mach-sa1100/lart.c
+@@ -24,9 +24,6 @@
  
- #if defined(CONFIG_OF)
--static const struct of_device_id at91_wdt_dt_ids[] __initconst = {
-+static const struct of_device_id at91_wdt_dt_ids[] = {
- 	{ .compatible = "atmel,at91sam9260-wdt" },
- 	{ /* sentinel */ }
- };
+ #include "generic.h"
+ 
+-
+-#warning "include/asm/arch-sa1100/ide.h needs fixing for lart"
+-
+ static struct mcp_plat_data lart_mcp_data = {
+ 	.mccr0		= MCCR0_ADM,
+ 	.sclk_rate	= 11981000,
 -- 
 1.8.0
