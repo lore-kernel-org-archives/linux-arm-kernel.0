@@ -1,16 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 12:43:56 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC for v3.9
-In-Reply-To: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 25 Jan 2013 09:14:15 +0530
+Subject: [PATCH 01/15] ARM: shmobile: Remove duplicate inclusion of
+ dma-mapping.h in setup-r8a7740.c
+In-Reply-To: <20130125033841.GE620@verge.net.au>
 References: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130125034356.GA14025@verge.net.au>
+ <1359080013-29189-2-git-send-email-horms+renesas@verge.net.au>
+ <CAK9yfHzCywTj10sURg6z6fuVp=PtgXTyQD9evzrVVDV5a6FSdQ@mail.gmail.com>
+ <20130125033841.GE620@verge.net.au>
+Message-ID: <CAK9yfHw6hoi=54WjBkjDwt0kvuSPVbd6BdYLsqP_954YBP_Hgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 11:13:18AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
-> 
-> please consider the following soc enhancements for 3.9.
+On 25 January 2013 09:08, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Jan 25, 2013 at 08:25:27AM +0530, Sachin Kamat wrote:
+>> Hi Simon,
+>>
+>> You seem to have changed the authorship of this patch.
+>
+> Sorry about that, I'll fix that up.
 
-It seems that this pull request includes a patch with the incorrect
-author. I will fix that and send a fresh pull request ASAP.
+Thanks Simon :)
+
+
+>
+>> Original one at:
+>> https://patchwork.kernel.org/patch/1771091/
+>>
+>> Regards
+>> Sachin
+>>
+>> On 25 January 2013 07:43, Simon Horman <horms+renesas@verge.net.au> wrote:
+>> > linux/dma-mapping.h was included twice.
+>> >
+>> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> > ---
+>> >  arch/arm/mach-shmobile/setup-r8a7740.c |    1 -
+>> >  1 file changed, 1 deletion(-)
+
+
+
+-- 
+With warm regards,
+Sachin
