@@ -1,36 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 14:34:59 +0000
-Subject: [PATCH 09/19] mfd/twl4030: don't warn about uninitialized return
- code
-In-Reply-To: <510295BF.80709@ti.com>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <1359123276-15833-10-git-send-email-arnd@arndb.de> <510295BF.80709@ti.com>
-Message-ID: <1459407.9ptS1zguY5@wuerfel>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Fri, 25 Jan 2013 14:46:09 +0000
+Subject: [PATCH v1 0/6] USB: Add support for multiple PHYs of same type
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA92B0B@DBDE01.ent.ti.com>
+References: <1358848694-20145-1-git-send-email-kishon@ti.com>
+ <2D906ABA-71F2-4843-9DBE-F82527A1240A@dominion.thruhere.net>
+ <50FEB3FD.3050001@ti.com> <50FEBB61.9000707@ti.com>
+ <B9531499-0746-44DA-BDBB-999D4CA31E63@dominion.thruhere.net>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA922F5@DBDE01.ent.ti.com>
+ <50FFF31D.2070908@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA92B0B@DBDE01.ent.ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA93ACE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 January 2013 15:25:03 Peter Ujfalusi wrote:
-> On 01/25/2013 03:14 PM, Arnd Bergmann wrote:
-> > If the twl4030_write_script function gets called with
-> > a zero length argument, its return value does not
-> > get set. We know that all scripts have a nonzero
-> > length, but returning an error in case they ever
-> > do is probably appropriate.
-> > 
-> > Without this patch, building omap2plus_defconfig results in:
-> > 
-> > drivers/mfd/twl4030-power.c: In function 'load_twl4030_script':
-> > drivers/mfd/twl4030-power.c:414:5: error: 'err' may be used uninitialized in this function
+Hi Kishon,
+
+On Thu, Jan 24, 2013 at 17:21:45, Mohammed, Afzal wrote:
+> On Wed, Jan 23, 2013 at 19:56:37, ABRAHAM, KISHON VIJAY wrote:
+> > On Wednesday 23 January 2013 07:28 PM, Mohammed, Afzal wrote:
+
+> > > USB first instance of am335x works in mainline as of now.
 > 
-> I've fixed up Kevin's email since he is no longer with TI and added Tero to
-> the CC list since this is *something*-power on OMAP platforms 
+> > Can you check if this series indeed breaks am335x?
+> > 
+> > Thanks for your help.
 > 
-> Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Do you have a tree having these changes, it would be easier for me.
 
-Thanks!
+I tried with your "omap5-with-palmas" branch that was mentioned in
+the cover letter of your latest series (but couldn't find the commit
+that you mentioned in the cover letter, HEAD of that branch that I
+tested was "2c29519 ARM: dts: palmas: update dt data for palmas-usb")
 
-I also got the mailing list address wrong on all mails, so I'll
-retransmit the whole series in a bit, just waiting for other
-quick comments to come in.
+usb first instance of am335x works as earlier.
 
-	Arnd
+Regards
+Afzal
