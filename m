@@ -1,104 +1,78 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:13:26 +0900
-Subject: [PATCH 08/15] ARM: shmobile: sh73a0: Add CPU sleep suspend
+Date: Fri, 25 Jan 2013 11:13:32 +0900
+Subject: [PATCH 14/15] ARM: mach-shmobile: sh73a0: Initialise MMCIF using DT
 In-Reply-To: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080013-29189-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080013-29189-15-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bastian Hecht <hechtb@gmail.com>
+This device also requires a voltage regulator which
+should be defined in a board-specific maner. An example
+dts snipped follows.
 
-Add the lighest possible sleep mode on Cortex-A9 cores: CPU sleep. It is
-entered by a simple dsb and wfi instruction via cpu_do_idle(). As just
-clocks are stopped there is no need to save or restore any state of the
-system.
+/ {
+	fixedregulator1v8: fixedregulator at 0 {
+		compatible = "regulator-fixed";
+		regulator-name = "fixed-1.8V";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+};
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+&mmcif {
+	vmmc-supply = <&fixedregulator1v8>;
+	vqmmc-supply = <&fixedregulator1v8>;
+};
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile              |    1 +
- arch/arm/mach-shmobile/board-kzm9g.c         |    2 ++
- arch/arm/mach-shmobile/include/mach/common.h |    1 +
- arch/arm/mach-shmobile/pm-sh73a0.c           |   32 ++++++++++++++++++++++++++
- 4 files changed, 36 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/pm-sh73a0.c
+ arch/arm/boot/dts/sh73a0-reference.dtsi |   24 ++++++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-sh73a0.c   |    1 +
+ 2 files changed, 25 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sh73a0-reference.dtsi
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 0b71479..f6aba6d 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -37,6 +37,7 @@ obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
- obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
- obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
-+obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
- 
- # Board objects
- obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index ac94285..363c6ed 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -772,6 +772,8 @@ static void __init kzm_init(void)
- 
- 	sh73a0_add_standard_devices();
- 	platform_add_devices(kzm_devices, ARRAY_SIZE(kzm_devices));
-+
-+	sh73a0_pm_init();
- }
- 
- static void kzm9g_restart(char mode, const char *cmd)
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 2d1686b..f221c11 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -40,6 +40,7 @@ extern void sh73a0_add_early_devices(void);
- extern void sh73a0_add_standard_devices(void);
- extern void sh73a0_clock_init(void);
- extern void sh73a0_pinmux_init(void);
-+extern void sh73a0_pm_init(void);
- extern struct clk sh73a0_extal1_clk;
- extern struct clk sh73a0_extal2_clk;
- extern struct clk sh73a0_extcki_clk;
-diff --git a/arch/arm/mach-shmobile/pm-sh73a0.c b/arch/arm/mach-shmobile/pm-sh73a0.c
+diff --git a/arch/arm/boot/dts/sh73a0-reference.dtsi b/arch/arm/boot/dts/sh73a0-reference.dtsi
 new file mode 100644
-index 0000000..99086e9
+index 0000000..d4bb012
 --- /dev/null
-+++ b/arch/arm/mach-shmobile/pm-sh73a0.c
-@@ -0,0 +1,32 @@
++++ b/arch/arm/boot/dts/sh73a0-reference.dtsi
+@@ -0,0 +1,24 @@
 +/*
-+ * sh73a0 Power management support
++ * Device Tree Source for the SH73A0 SoC
 + *
-+ *  Copyright (C) 2012 Bastian Hecht <hechtb+renesas@gmail.com>
++ * Copyright (C) 2012 Renesas Solutions Corp.
 + *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
 + */
 +
-+#include <linux/suspend.h>
-+#include <mach/common.h>
++/include/ "sh73a0.dtsi"
 +
-+#ifdef CONFIG_SUSPEND
-+static int sh73a0_enter_suspend(suspend_state_t suspend_state)
-+{
-+	cpu_do_idle();
-+	return 0;
-+}
++/ {
++	compatible = "renesas,sh73a0";
 +
-+static void sh73a0_suspend_init(void)
-+{
-+	shmobile_suspend_ops.enter = sh73a0_enter_suspend;
-+}
-+#else
-+static void sh73a0_suspend_init(void) {}
-+#endif
-+
-+void __init sh73a0_pm_init(void)
-+{
-+	sh73a0_suspend_init();
-+}
++	mmcif: mmcif at 0x10010000 {
++		compatible = "renesas,sh-mmcif";
++		reg = <0xe6bd0000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 140 0x4
++			      0 141 0x4>;
++		reg-io-width = <4>;
++	};
++};
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index eab2667..afa5423 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -583,6 +583,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMCIF0 */
++	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMCIF0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]), /* SDHI2 */
+ 	CLKDEV_DEV_ID("leds-renesas-tpu.12", &mstp_clks[MSTP303]), /* TPU1 */
+ 	CLKDEV_DEV_ID("leds-renesas-tpu.21", &mstp_clks[MSTP302]), /* TPU2 */
 -- 
 1.7.10.4
