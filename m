@@ -1,119 +1,193 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri, 25 Jan 2013 11:01:54 +0100
-Subject: [PATCH 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can sleep
-In-Reply-To: <1359108114-16998-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1359108114-16998-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1359108114-16998-4-git-send-email-florian.vaussard@epfl.ch>
+From: coelho@ti.com (Luciano Coelho)
+Date: Fri, 25 Jan 2013 12:05:34 +0200
+Subject: [PATCH v2 5/5] wlcore: move wl12xx_platform_data up and make it truly
+ optional
+In-Reply-To: <1358952038-5982-6-git-send-email-coelho@ti.com>
+References: <1358952038-5982-6-git-send-email-coelho@ti.com>
+Message-ID: <1359108334-18459-1-git-send-email-coelho@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call to led_pwm_set() can happen inside atomic context, like triggers.
-If the PWM call can sleep, defer using a worker.
+The platform data is used not only by wlcore-based drivers, but also
+by wl1251.  Move it up in the directory hierarchy to reflect this.
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+Additionally, make it truly optional.  At the moment, disabling
+platform data while wl1251_sdio or wlcore_sdio are enabled doesn't
+work, but it will be necessary when device tree support is
+implemented.
+
+Signed-off-by: Luciano Coelho <coelho@ti.com>
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/leds/leds-pwm.c |   45 +++++++++++++++++++++++++++++++++++++++------
- 1 files changed, 39 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-index a1ea5f6..1ffb6ba 100644
---- a/drivers/leds/leds-pwm.c
-+++ b/drivers/leds/leds-pwm.c
-@@ -23,12 +23,15 @@
- #include <linux/pwm.h>
- #include <linux/leds_pwm.h>
- #include <linux/slab.h>
-+#include <linux/workqueue.h>
- 
- struct led_pwm_data {
- 	struct led_classdev	cdev;
- 	struct pwm_device	*pwm;
-+	struct work_struct	work;
- 	unsigned int		active_low;
- 	unsigned int		period;
-+	int			duty;
+In v2:
+   * Fix ti/Makefile
+   * Modify board_omap3evm.c which was still using the old Kconfig define
+
+Tony, is it okay if I add this change in the omap3evm board in this
+patch and queue it via wireless so that the whole thing is in sync?
+
+
+ arch/arm/mach-omap2/board-omap3evm.c                     |   10 +++++-----
+ drivers/net/wireless/ti/Kconfig                          |    9 +++++++++
+ drivers/net/wireless/ti/Makefile                         |    4 +++-
+ .../wl12xx_platform_data.c => wilink_platform_data.c}    |    0
+ drivers/net/wireless/ti/wlcore/Kconfig                   |    5 -----
+ drivers/net/wireless/ti/wlcore/Makefile                  |    3 ---
+ include/linux/wl12xx.h                                   |   14 +++++++++++---
+ 7 files changed, 28 insertions(+), 17 deletions(-)
+ rename drivers/net/wireless/ti/{wlcore/wl12xx_platform_data.c => wilink_platform_data.c} (100%)
+
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index 3985f35..a4ca63b 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -309,7 +309,7 @@ static struct omap2_hsmmc_info mmc[] = {
+ 		.gpio_wp	= 63,
+ 		.deferred	= true,
+ 	},
+-#ifdef CONFIG_WL12XX_PLATFORM_DATA
++#ifdef CONFIG_WILINK_PLATFORM_DATA
+ 	{
+ 		.name		= "wl1271",
+ 		.mmc		= 2,
+@@ -450,7 +450,7 @@ static struct regulator_init_data omap3evm_vio = {
+ 	.consumer_supplies	= omap3evm_vio_supply,
  };
  
- struct led_pwm_priv {
-@@ -36,6 +39,20 @@ struct led_pwm_priv {
- 	struct led_pwm_data leds[0];
- };
+-#ifdef CONFIG_WL12XX_PLATFORM_DATA
++#ifdef CONFIG_WILINK_PLATFORM_DATA
  
-+static void led_pwm_work(struct work_struct *work)
-+{
-+	struct led_pwm_data *led_dat =
-+		container_of(work, struct led_pwm_data, work);
-+	int new_duty = led_dat->duty;
-+
-+	pwm_config(led_dat->pwm, new_duty, led_dat->period);
-+
-+	if (new_duty == 0)
-+		pwm_disable(led_dat->pwm);
-+	else
-+		pwm_enable(led_dat->pwm);
-+}
-+
- static void led_pwm_set(struct led_classdev *led_cdev,
- 	enum led_brightness brightness)
+ #define OMAP3EVM_WLAN_PMENA_GPIO	(150)
+ #define OMAP3EVM_WLAN_IRQ_GPIO		(149)
+@@ -563,7 +563,7 @@ static struct omap_board_mux omap35x_board_mux[] __initdata = {
+ 				OMAP_PIN_OFF_NONE),
+ 	OMAP3_MUX(GPMC_WAIT2, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+ 				OMAP_PIN_OFF_NONE),
+-#ifdef CONFIG_WL12XX_PLATFORM_DATA
++#ifdef CONFIG_WILINK_PLATFORM_DATA
+ 	/* WLAN IRQ - GPIO 149 */
+ 	OMAP3_MUX(UART1_RTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),
+ 
+@@ -601,7 +601,7 @@ static struct omap_board_mux omap36x_board_mux[] __initdata = {
+ 	OMAP3_MUX(SYS_BOOT4, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
+ 	OMAP3_MUX(SYS_BOOT5, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
+ 	OMAP3_MUX(SYS_BOOT6, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
+-#ifdef CONFIG_WL12XX_PLATFORM_DATA
++#ifdef CONFIG_WILINK_PLATFORM_DATA
+ 	/* WLAN IRQ - GPIO 149 */
+ 	OMAP3_MUX(UART1_RTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),
+ 
+@@ -637,7 +637,7 @@ static struct gpio omap3_evm_ehci_gpios[] __initdata = {
+ 
+ static void __init omap3_evm_wl12xx_init(void)
  {
-@@ -43,13 +60,23 @@ static void led_pwm_set(struct led_classdev *led_cdev,
- 		container_of(led_cdev, struct led_pwm_data, cdev);
- 	unsigned int max = led_dat->cdev.max_brightness;
- 	unsigned int period =  led_dat->period;
-+	int duty;
+-#ifdef CONFIG_WL12XX_PLATFORM_DATA
++#ifdef CONFIG_WILINK_PLATFORM_DATA
+ 	int ret;
  
--	if (brightness == 0) {
--		pwm_config(led_dat->pwm, 0, period);
--		pwm_disable(led_dat->pwm);
-+	if (brightness == 0)
-+		duty = 0;
-+	else
-+		duty = brightness * period / max;
+ 	/* WL12xx WLAN Init */
+diff --git a/drivers/net/wireless/ti/Kconfig b/drivers/net/wireless/ti/Kconfig
+index be80011..cbe1e7f 100644
+--- a/drivers/net/wireless/ti/Kconfig
++++ b/drivers/net/wireless/ti/Kconfig
+@@ -12,4 +12,13 @@ source "drivers/net/wireless/ti/wl18xx/Kconfig"
+ 
+ # keep last for automatic dependencies
+ source "drivers/net/wireless/ti/wlcore/Kconfig"
 +
-+	if (pwm_can_sleep(led_dat->pwm)) {
-+		led_dat->duty = duty;
-+		schedule_work(&led_dat->work);
- 	} else {
--		pwm_config(led_dat->pwm, brightness * period / max, period);
--		pwm_enable(led_dat->pwm);
-+		pwm_config(led_dat->pwm, duty, period);
++config WILINK_PLATFORM_DATA
++	bool "TI WiLink platform data"
++	depends on WLCORE_SDIO || WL1251_SDIO
++	default y
++	---help---
++	Small platform data bit needed to pass data to the sdio modules.
 +
-+		if (duty == 0)
-+			pwm_disable(led_dat->pwm);
-+		else
-+			pwm_enable(led_dat->pwm);
- 	}
++
+ endif # WL_TI
+diff --git a/drivers/net/wireless/ti/Makefile b/drivers/net/wireless/ti/Makefile
+index 4d68239..af14231 100644
+--- a/drivers/net/wireless/ti/Makefile
++++ b/drivers/net/wireless/ti/Makefile
+@@ -1,5 +1,7 @@
+ obj-$(CONFIG_WLCORE)			+= wlcore/
+ obj-$(CONFIG_WL12XX)			+= wl12xx/
+-obj-$(CONFIG_WL12XX_PLATFORM_DATA)	+= wlcore/
+ obj-$(CONFIG_WL1251)			+= wl1251/
+ obj-$(CONFIG_WL18XX)			+= wl18xx/
++
++# small builtin driver bit
++obj-$(CONFIG_WILINK_PLATFORM_DATA)	+= wilink_platform_data.o
+diff --git a/drivers/net/wireless/ti/wlcore/wl12xx_platform_data.c b/drivers/net/wireless/ti/wilink_platform_data.c
+similarity index 100%
+rename from drivers/net/wireless/ti/wlcore/wl12xx_platform_data.c
+rename to drivers/net/wireless/ti/wilink_platform_data.c
+diff --git a/drivers/net/wireless/ti/wlcore/Kconfig b/drivers/net/wireless/ti/wlcore/Kconfig
+index d7b907e..2b83282 100644
+--- a/drivers/net/wireless/ti/wlcore/Kconfig
++++ b/drivers/net/wireless/ti/wlcore/Kconfig
+@@ -33,8 +33,3 @@ config WLCORE_SDIO
+ 
+ 	  If you choose to build a module, it'll be called wlcore_sdio.
+ 	  Say N if unsure.
+-
+-config WL12XX_PLATFORM_DATA
+-	bool
+-	depends on WLCORE_SDIO != n || WL1251_SDIO != n
+-	default y
+diff --git a/drivers/net/wireless/ti/wlcore/Makefile b/drivers/net/wireless/ti/wlcore/Makefile
+index d9fba9e..b21398f 100644
+--- a/drivers/net/wireless/ti/wlcore/Makefile
++++ b/drivers/net/wireless/ti/wlcore/Makefile
+@@ -9,7 +9,4 @@ obj-$(CONFIG_WLCORE)			+= wlcore.o
+ obj-$(CONFIG_WLCORE_SPI)		+= wlcore_spi.o
+ obj-$(CONFIG_WLCORE_SDIO)		+= wlcore_sdio.o
+ 
+-# small builtin driver bit
+-obj-$(CONFIG_WL12XX_PLATFORM_DATA)	+= wl12xx_platform_data.o
+-
+ ccflags-y += -D__CHECK_ENDIAN__
+diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
+index 360c9bc..a54fe82 100644
+--- a/include/linux/wl12xx.h
++++ b/include/linux/wl12xx.h
+@@ -24,6 +24,8 @@
+ #ifndef _LINUX_WL12XX_H
+ #define _LINUX_WL12XX_H
+ 
++#include <linux/err.h>
++
+ /* Reference clock values */
+ enum {
+ 	WL12XX_REFCLOCK_19	= 0, /* 19.2 MHz */
+@@ -60,10 +62,12 @@ struct wl12xx_platform_data {
+ /* Platform does not support level trigger interrupts */
+ #define WL12XX_PLATFORM_QUIRK_EDGE_IRQ	BIT(0)
+ 
+-#ifdef CONFIG_WL12XX_PLATFORM_DATA
++#ifdef CONFIG_WILINK_PLATFORM_DATA
+ 
+ int wl12xx_set_platform_data(const struct wl12xx_platform_data *data);
+ 
++struct wl12xx_platform_data *wl12xx_get_platform_data(void);
++
+ #else
+ 
+ static inline
+@@ -72,8 +76,12 @@ int wl12xx_set_platform_data(const struct wl12xx_platform_data *data)
+ 	return -ENOSYS;
  }
  
-@@ -100,6 +127,8 @@ static struct led_pwm_priv *led_pwm_create_of(struct platform_device *pdev)
- 		led_dat->cdev.brightness = LED_OFF;
- 		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+-#endif
++static inline
++struct wl12xx_platform_data *wl12xx_get_platform_data(void)
++{
++	return ERR_PTR(-ENODATA);
++}
  
-+		INIT_WORK(&led_dat->work, led_pwm_work);
-+
- 		ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
- 		if (ret < 0) {
- 			dev_err(&pdev->dev, "failed to register for %s\n",
-@@ -153,6 +182,8 @@ static int led_pwm_probe(struct platform_device *pdev)
- 			led_dat->cdev.max_brightness = cur_led->max_brightness;
- 			led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+-struct wl12xx_platform_data *wl12xx_get_platform_data(void);
++#endif
  
-+			INIT_WORK(&led_dat->work, led_pwm_work);
-+
- 			ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
- 			if (ret < 0)
- 				goto err;
-@@ -180,8 +211,10 @@ static int led_pwm_remove(struct platform_device *pdev)
- 	struct led_pwm_priv *priv = platform_get_drvdata(pdev);
- 	int i;
- 
--	for (i = 0; i < priv->num_leds; i++)
-+	for (i = 0; i < priv->num_leds; i++) {
- 		led_classdev_unregister(&priv->leds[i].cdev);
-+		cancel_work_sync(&priv->leds[i].work);
-+	}
- 
- 	return 0;
- }
+ #endif
 -- 
-1.7.5.4
+1.7.10.4
