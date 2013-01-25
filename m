@@ -1,73 +1,41 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Fri, 25 Jan 2013 09:50:24 +0800
-Subject: [PATCH v3 1/1 net-next] net: fec: enable pause frame to improve
- rx prefomance for 1G network
-In-Reply-To: <1359046173.2736.2.camel@bwh-desktop.uk.solarflarecom.com>
-References: <1358391358-27977-1-git-send-email-Frank.Li@freescale.com>
- <1358973584.2658.14.camel@bwh-desktop.uk.solarflarecom.com>
- <CAHrpEqSzu97X2PUgUEh30EqkbjLUYyhCN28AEzJ6eLPXx0Qg1Q@mail.gmail.com>
- <1359046173.2736.2.camel@bwh-desktop.uk.solarflarecom.com>
-Message-ID: <CAHrpEqRKhXRg-SsigWdnfV-RBWSc=OH9ECqQnKHDvmbn8e4a2A@mail.gmail.com>
+From: xiechao.linux@gmail.com (chao xie)
+Date: Fri, 25 Jan 2013 09:57:52 +0800
+Subject: [V5 PATCH 07/26] usb: gadget: mv_udc: make mv_udc depends on
+ ARCH_MMP or ARCH_PXA
+In-Reply-To: <20130124090849.GE27304@arwen.pp.htv.fi>
+References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
+ <1359009530-28182-8-git-send-email-chao.xie@marvell.com>
+ <20130124090849.GE27304@arwen.pp.htv.fi>
+Message-ID: <CAK9wHMR4OH9hxfE31XHZvPVh+wfK7eDTqS-mL7Gmye1hzo5ScQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/25 Ben Hutchings <bhutchings@solarflare.com>:
-> On Thu, 2013-01-24 at 10:16 +0800, Frank Li wrote:
->> 2013/1/24 Ben Hutchings <bhutchings@solarflare.com>:
->> > On Thu, 2013-01-17 at 10:55 +0800, Frank Li wrote:
->> >> The limition of imx6 internal bus cause fec can't achieve 1G perfomance.
->> >> There will be many packages lost because FIFO over run.
->> >>
->> >> This patch enable pause frame flow control.
->> > [...]
->> >> --- a/drivers/net/ethernet/freescale/fec.c
->> >> +++ b/drivers/net/ethernet/freescale/fec.c
->> > [...]
->> >> +static int fec_enet_set_pauseparam(struct net_device *ndev,
->> >> +                                struct ethtool_pauseparam *pause)
->> >> +{
->> >> +     struct fec_enet_private *fep = netdev_priv(ndev);
->> >> +
->> >> +     if (pause->tx_pause != pause->rx_pause) {
->> >> +             netdev_info(ndev,
->> >> +                     "hardware only support enable/disable both tx and rx");
->> >> +             return -EINVAL;
->> >> +     }
->> >> +
->> >> +     fep->pause_flag = 0;
->> >> +
->> >> +     /* tx pause must be same as rx pause */
->> >> +     fep->pause_flag |= pause->rx_pause ? FEC_PAUSE_FLAG_ENABLE : 0;
->> >> +     fep->pause_flag |= pause->autoneg ? FEC_PAUSE_FLAG_AUTONEG : 0;
->> >> +
->> >> +     if (pause->rx_pause || pause->autoneg) {
->> >> +             fep->phy_dev->supported |= ADVERTISED_Pause;
->> >> +             fep->phy_dev->advertising |= ADVERTISED_Pause;
->> >> +     } else {
->> >> +             fep->phy_dev->supported &= ~ADVERTISED_Pause;
->> >> +             fep->phy_dev->advertising &= ~ADVERTISED_Pause;
->> >> +     }
->> > [...]
->> >
->> > Why is this changing the supported flags, i.e. device capabilities?  You
->> > need to leave those flags alone and reject an attempt to enable pause
->> > frames on a device that doesn't support them.
+2013/1/24 Felipe Balbi <balbi@ti.com>:
+> Hi,
+>
+> On Thu, Jan 24, 2013 at 01:38:31AM -0500, Chao Xie wrote:
+>> Only ARCH_PXA and ARCH_MMP will use mv_udc.
 >>
->> I go through phylib, I have not found good place set ADVERTISED_Pause
->> capabilities.
->> genphy_config_init never check Pause capabilities.
+>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
 >
-> I agree that phylib can't initialise pause capabilities because those
-> depend on the MAC.  But look at which function I'm quoting: this is the
-> ethtool operation, which shouldn't change capabilities.
-
-Where is good place do you think? in probe function?
-
+> NAK, you should fix your transceiver dependency. I want these gadget
+> drivers to compile cleanly on all arches so we make proper use of
+> linux-next. I have applied up to previous patch in this series and I
+> won't go any further. The rest will be delayed for v3.10
 >
-> Ben.
+> sorry
 >
 > --
-> Ben Hutchings, Staff Engineer, Solarflare
-> Not speaking for my employer; that's the marketing department's job.
-> They asked us to note that Solarflare product names are trademarked.
->
+> balbi
+
+I see. I will remove this patch. In fact, I have modified the dependency, so
+without this patch, the reset of patches can still be compiled successully.
+So when is the next merge? Need i re-send the rest of patches?
+There are some feedbacks about device tree, and I will seperate the
+device tree part from the
+patche series. i do not want to post a big set of patches only with
+modification to device tree part.
+
+Thanks.
+
+Chao
