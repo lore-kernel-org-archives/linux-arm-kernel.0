@@ -1,78 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:13:32 +0900
-Subject: [PATCH 14/15] ARM: mach-shmobile: sh73a0: Initialise MMCIF using DT
+Date: Fri, 25 Jan 2013 11:13:23 +0900
+Subject: [PATCH 05/15] ARM: sh7372: add clock lookup entries for DT-based
+ devices
 In-Reply-To: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080013-29189-15-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080013-29189-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This device also requires a voltage regulator which
-should be defined in a board-specific maner. An example
-dts snipped follows.
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-/ {
-	fixedregulator1v8: fixedregulator at 0 {
-		compatible = "regulator-fixed";
-		regulator-name = "fixed-1.8V";
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-	};
-};
+When booting with DT, devices are named differently. To get their clocks
+additional entries have to be added to the lookup table.
 
-&mmcif {
-	vmmc-supply = <&fixedregulator1v8>;
-	vqmmc-supply = <&fixedregulator1v8>;
-};
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-reference.dtsi |   24 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-sh73a0.c   |    1 +
- 2 files changed, 25 insertions(+)
- create mode 100644 arch/arm/boot/dts/sh73a0-reference.dtsi
+ arch/arm/mach-shmobile/clock-sh7372.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0-reference.dtsi b/arch/arm/boot/dts/sh73a0-reference.dtsi
-new file mode 100644
-index 0000000..d4bb012
---- /dev/null
-+++ b/arch/arm/boot/dts/sh73a0-reference.dtsi
-@@ -0,0 +1,24 @@
-+/*
-+ * Device Tree Source for the SH73A0 SoC
-+ *
-+ * Copyright (C) 2012 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/include/ "sh73a0.dtsi"
-+
-+/ {
-+	compatible = "renesas,sh73a0";
-+
-+	mmcif: mmcif at 0x10010000 {
-+		compatible = "renesas,sh-mmcif";
-+		reg = <0xe6bd0000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 140 0x4
-+			      0 141 0x4>;
-+		reg-io-width = <4>;
-+	};
-+};
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index eab2667..afa5423 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -583,6 +583,7 @@ static struct clk_lookup lookups[] = {
+diff --git a/arch/arm/mach-shmobile/clock-sh7372.c b/arch/arm/mach-shmobile/clock-sh7372.c
+index 3ca6757b..45d21fe 100644
+--- a/arch/arm/mach-shmobile/clock-sh7372.c
++++ b/arch/arm/mach-shmobile/clock-sh7372.c
+@@ -544,6 +544,7 @@ static struct clk_lookup lookups[] = {
+ 
+ 	/* MSTP32 clocks */
+ 	CLKDEV_DEV_ID("i2c-sh_mobile.2", &mstp_clks[MSTP001]), /* IIC2 */
++	CLKDEV_DEV_ID("fff30000.i2c", &mstp_clks[MSTP001]), /* IIC2 */
+ 	CLKDEV_DEV_ID("spi_sh_msiof.0", &mstp_clks[MSTP000]), /* MSIOF0 */
+ 	CLKDEV_DEV_ID("uio_pdrv_genirq.4", &mstp_clks[MSTP131]), /* VEU3 */
+ 	CLKDEV_DEV_ID("uio_pdrv_genirq.3", &mstp_clks[MSTP130]), /* VEU2 */
+@@ -556,6 +557,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-mipi-dsi.0", &mstp_clks[MSTP118]), /* DSITX0 */
+ 	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.1", &mstp_clks[MSTP117]), /* LCDC1 */
+ 	CLKDEV_DEV_ID("i2c-sh_mobile.0", &mstp_clks[MSTP116]), /* IIC0 */
++	CLKDEV_DEV_ID("fff20000.i2c", &mstp_clks[MSTP116]), /* IIC0 */
+ 	CLKDEV_DEV_ID("sh_mobile_meram.0", &mstp_clks[MSTP113]), /* MERAM */
+ 	CLKDEV_DEV_ID("uio_pdrv_genirq.5", &mstp_clks[MSTP106]), /* JPU */
+ 	CLKDEV_DEV_ID("uio_pdrv_genirq.0", &mstp_clks[MSTP101]), /* VPU */
+@@ -577,18 +579,25 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP200]), /* SCIFA4 */
+ 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI2 */
+ 	CLKDEV_DEV_ID("i2c-sh_mobile.1", &mstp_clks[MSTP323]), /* IIC1 */
++	CLKDEV_DEV_ID("e6c20000.i2c", &mstp_clks[MSTP323]), /* IIC1 */
+ 	CLKDEV_DEV_ID("r8a66597_hcd.0", &mstp_clks[MSTP322]), /* USB0 */
+ 	CLKDEV_DEV_ID("r8a66597_udc.0", &mstp_clks[MSTP322]), /* USB0 */
+ 	CLKDEV_DEV_ID("renesas_usbhs.0", &mstp_clks[MSTP322]), /* USB0 */
+ 	CLKDEV_DEV_ID("sh_flctl.0", &mstp_clks[MSTP315]), /* FLCTL */
  	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
++	CLKDEV_DEV_ID("e6850000.sdhi", &mstp_clks[MSTP314]), /* SDHI0 */
  	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMCIF0 */
-+	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMCIF0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]), /* SDHI2 */
- 	CLKDEV_DEV_ID("leds-renesas-tpu.12", &mstp_clks[MSTP303]), /* TPU1 */
- 	CLKDEV_DEV_ID("leds-renesas-tpu.21", &mstp_clks[MSTP302]), /* TPU2 */
++	CLKDEV_DEV_ID("e6860000.sdhi", &mstp_clks[MSTP313]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMC */
++	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMC */
+ 	CLKDEV_DEV_ID("sh-mipi-dsi.1", &mstp_clks[MSTP423]), /* DSITX1 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP415]), /* SDHI2 */
++	CLKDEV_DEV_ID("e6870000.sdhi", &mstp_clks[MSTP415]), /* SDHI2 */
+ 	CLKDEV_DEV_ID("sh-mobile-hdmi", &mstp_clks[MSTP413]), /* HDMI */
+ 	CLKDEV_DEV_ID("i2c-sh_mobile.3", &mstp_clks[MSTP411]), /* IIC3 */
++	CLKDEV_DEV_ID("e6d20000.i2c", &mstp_clks[MSTP411]), /* IIC3 */
+ 	CLKDEV_DEV_ID("i2c-sh_mobile.4", &mstp_clks[MSTP410]), /* IIC4 */
++	CLKDEV_DEV_ID("e6d30000.i2c", &mstp_clks[MSTP410]), /* IIC4 */
+ 	CLKDEV_DEV_ID("sh-dma-engine.4", &mstp_clks[MSTP407]), /* USB-DMAC1 */
+ 	CLKDEV_DEV_ID("r8a66597_hcd.1", &mstp_clks[MSTP406]), /* USB1 */
+ 	CLKDEV_DEV_ID("r8a66597_udc.1", &mstp_clks[MSTP406]), /* USB1 */
 -- 
 1.7.10.4
