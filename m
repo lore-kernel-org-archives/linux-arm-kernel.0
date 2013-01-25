@@ -1,42 +1,29 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Fri, 25 Jan 2013 16:55:57 +0530
-Subject: [PATCH 4/4] irqchip: gic: Perform the gic_secondary_init()
- call via CPU notifier
-In-Reply-To: <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
-References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
- <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20130125112556.GA4073@bnru09>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Fri, 25 Jan 2013 12:40:54 +0100
+Subject: [PATCH 0/3] Fixup issues for clk_set_parent
+Message-ID: <1359114057-11681-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 18:59:34 +0100, Catalin Marinas wrote:
-> All the calls to gic_secondary_init() pass 0 as the first argument.
-> Since this function is called on each CPU when starting, it can be done
-> in a platform-independent way via a CPU notifier registered by the GIC
-> code.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Dinh Nguyen <dinguyen@altera.com>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-For ux500, it is
+Issues with racing for fetching spinlocks is present in the
+clk_set_parent API. This patchset is trying to fixup these issues.
 
-Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+In short, while updating the clock tree toplogy the spinlock must be held
+to prevent enable_count from being messed up.
 
-thanks,
-srinidhi
+Patch 1 and 2 prepares for patch 3, which is where the real issue are
+resolved.
+
+Ulf Hansson (3):
+  clk: Remove _clk_reparent from API and restructure code
+  clk: Improve errorhandling for clk_set_parent
+  clk: Fixup locking issues for clk_set_parent
+
+ drivers/clk/clk.c            |  192 +++++++++++++++++++++++++++---------------
+ include/linux/clk-provider.h |    1 -
+ 2 files changed, 125 insertions(+), 68 deletions(-)
+
+-- 
+1.7.10
