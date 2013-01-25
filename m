@@ -1,47 +1,56 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 25 Jan 2013 12:18:22 +0000
-Subject: [PATCH v2 1/4] ARM: OMAP2+: dpll: round rate to closest value
-In-Reply-To: <alpine.DEB.2.00.1301250816010.471@utopia.booyaka.com>
-References: <cover.1358937533.git.afzal@ti.com>
- <871e6890897534b6c3669e252f23bef5ff1247b6.1358937533.git.afzal@ti.com>
- <alpine.DEB.2.00.1301250816010.471@utopia.booyaka.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA9388C@DBDE01.ent.ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 25 Jan 2013 14:18:38 +0200
+Subject: [PATCH v2 0/6] ARM: dts: omap: add dt data for dwc3
+In-Reply-To: <1359112312-6918-1-git-send-email-kishon@ti.com>
+References: <1359112312-6918-1-git-send-email-kishon@ti.com>
+Message-ID: <20130125121838.GC27148@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi,
 
-On Fri, Jan 25, 2013 at 13:48:11, Paul Walmsley wrote:
-> On Wed, 23 Jan 2013, Afzal Mohammed wrote:
-
-> > Currently round rate function would return proper rate iff requested
-> > rate exactly matches the PLL lockable rate. This causes set_rate to
-> > fail if exact rate could not be set. Instead round rate may return
-> > closest rate possible (less than the requested). And if any user is
-> > badly in need of exact rate, then return value of round rate could
-> > be used to decide whether to invoke set rate or not.
-> > 
-> > Modify round rate so that it return closest possible rate.
+On Fri, Jan 25, 2013 at 04:41:46PM +0530, Kishon Vijay Abraham I wrote:
+> This patch series adds dt data to get dwc3 working in omap5.
 > 
-> This doesn't look like the right approach to me.  For some PLLs, an exact 
-> rate is desired.
+> Changes from v1:
+> * rename "ctrl_module" to "ctrl-module" and "usb_phy" to "usb-phy"
+> 
+> This patch series is developed on
+> git://github.com/rrnayak/linux.git omap5-3.8-rc4-base-palmas
+> 
+> This is the last series of the series of patches.
+> I've kept everything in a single branch
+> git://gitorious.org/linux-usb/linux-usb.git omap5-with-palmas
+> (changes up to 23b4dfa2ab7052569cd88acc6383c4b1a8e8a482)
+> 
+> Did enumeration testing on omap5 evm.
 
-If exact rate is required, there is a way to achieve it as mentioned
-in the commit message, i.e. by first invoking round rate over reqd. rate
-and if it doesn't match, bail out w/o invoking set_rate.
+I have gone quickly through this series and it looks already to me:
 
-And it seems requirement of CCF w.r.t to round rate is to return closest
-possible rate.
+Reviewied-by: Felipe Balbi <balbi@ti.com>
 
-> We removed the rate tolerance code in commit 
-> 241d3a8dca239610d3d991bf58d4fe38c2d86fd5, but that was probably premature.  
-> We've encountered several situations now where we could really use it, 
-> like MPU CPUFreq.  I'd suggest reverting 
-> 241d3a8dca239610d3d991bf58d4fe38c2d86fd5 or using a similar approach.
+> Kishon Vijay Abraham I (6):
+>   ARM: dts: omap5: Add omap control usb data
+>   ARM: dts: omap5: Add ocp2scp data
+>   ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
+>   ARM: dts: omap5: add dwc3 omap dt data
+>   ARM: dts: omap5: add dwc3 core dt data
+>   ARM: dts: palmas: update dt data for palmas-usb
+> 
+>  arch/arm/boot/dts/omap5.dtsi  |   48 +++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/palmas.dtsi |    4 ++--
+>  2 files changed, 50 insertions(+), 2 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
 
-As you prefer reverting the above commit, I will proceed so, hmm.. got
-not so simple merge conflict, wish there was a command,
-git revert logical ..
-
-Regards
-Afzal
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130125/31536255/attachment.sig>
