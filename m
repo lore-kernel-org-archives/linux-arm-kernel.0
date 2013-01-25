@@ -1,54 +1,39 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 25 Jan 2013 12:03:26 +0530
-Subject: [PATCH V2] ARM: DTS: exynos5250-arndale: Add initial board support
- file
-In-Reply-To: <CAGOxZ50LiupEj0s2scMYZQiCA2V4GNT6zoUVYR7TMyEsX3sf-Q@mail.gmail.com>
-References: <1359090411-26159-1-git-send-email-tushar.behera@linaro.org>
- <CAGOxZ50LiupEj0s2scMYZQiCA2V4GNT6zoUVYR7TMyEsX3sf-Q@mail.gmail.com>
-Message-ID: <51022736.5030007@linaro.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 25 Jan 2013 12:06:35 +0530
+Subject: [PATCH] ARM: omap4: clock data: Add missing clkdm association for
+ dpll_usb
+Message-ID: <1359095795-9538-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2013 10:59 AM, Alim Akhtar wrote:
+dpll_usb needs the clkdm association so the clkdm can be
+turned on before a relock. All other dplls for omap4 belong
+to the ALWON (always on) domain.
 
-[ ... ]
+The association was present as part of the older data file
+(clock44xx_data.c) but looks like was accidently dropped with
+the common clk convertion.
 
->> +
->> +       dwmmc_2: dwmmc2 at 12220000 {
->> +               num-slots = <1>;
->> +               supports-highspeed;
->> +               fifo-depth = <0x80>;
->> +               card-detect-delay = <200>;
->> +               samsung,dw-mshc-ciu-div = <3>;
->> +               samsung,dw-mshc-sdr-timing = <2 3>;
->> +               samsung,dw-mshc-ddr-timing = <1 2>;
->> +
->> +               slot at 0 {
->> +                       reg = <0>;
->> +                       bus-width = <4>;
->> +                       samsung,cd-pinmux-gpio = <&gpc3 2 2 3 3>;
->> +                       gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
->> +                               <&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
->> +                               <&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
->> +                               <&gpc4 3 3 3 3>, <&gpc4 4 3 3 3>,
->> +                               <&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
-> bus-width property is assigned as 4 (see above bus-width = <4>;) but
-> here you are configuring 8 __data line__ . Any reason?
-> I am not sure if Arndale board supports 8 bit bus-width, in any case
-> either change the bus-width or gpios properties accordingly.
+More details of the patch which fixed this up in the older
+data file can be dound here..
+http://www.spinics.net/lists/linux-omap/msg63076.html
 
-Right. As per the schematics, Arndale supports 4-bit bus-width. I will
-remove the extra GPIO lines.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/cclock44xx_data.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-[ ... ]
-
-> 
-> with the above fix fill free to add
->    Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-> 
-> 
-
-Thanks for reviewing. I will re-submit the patch with your ack.
-
+diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+index 5789a5e..fdea8da 100644
+--- a/arch/arm/mach-omap2/cclock44xx_data.c
++++ b/arch/arm/mach-omap2/cclock44xx_data.c
+@@ -601,6 +601,7 @@ static struct clk_hw_omap dpll_usb_ck_hw = {
+ 	},
+ 	.dpll_data	= &dpll_usb_dd,
+ 	.ops		= &clkhwops_omap3_dpll,
++	.clkdm_name	= "l3_init_clkdm",
+ };
+ 
+ DEFINE_STRUCT_CLK(dpll_usb_ck, dpll_usb_ck_parents, dpll_ck_ops);
 -- 
-Tushar Behera
+1.7.9.5
