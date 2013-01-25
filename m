@@ -1,89 +1,54 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 25 Jan 2013 11:30:15 +0800
-Subject: [RESEND PATCH v5 4/7] usb: chipidea: consolidate
- ci_role_driver's API for both roles
-In-Reply-To: <8738xqodhp.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1358733418-17969-1-git-send-email-peter.chen@freescale.com>
- <1358733418-17969-5-git-send-email-peter.chen@freescale.com>
- <8738xqodhp.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20130125033013.GB29795@nchen-desktop>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 25 Jan 2013 12:38:43 +0900
+Subject: [PATCH 01/15] ARM: shmobile: Remove duplicate inclusion of
+ dma-mapping.h in setup-r8a7740.c
+In-Reply-To: <CAK9yfHzCywTj10sURg6z6fuVp=PtgXTyQD9evzrVVDV5a6FSdQ@mail.gmail.com>
+References: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
+ <1359080013-29189-2-git-send-email-horms+renesas@verge.net.au>
+ <CAK9yfHzCywTj10sURg6z6fuVp=PtgXTyQD9evzrVVDV5a6FSdQ@mail.gmail.com>
+Message-ID: <20130125033841.GE620@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 04:35:30PM +0200, Alexander Shishkin wrote:
-> Peter Chen <peter.chen@freescale.com> writes:
+On Fri, Jan 25, 2013 at 08:25:27AM +0530, Sachin Kamat wrote:
+> Hi Simon,
 > 
-> > - Create init/destroy API for probe and remove
-> > - start/stop API are only used otg id switch process
-> > - Create the gadget at ci_hdrc_probe if the gadget is supported
-> > at that port, the main purpose for this is to avoid gadget module
-> > load fail at init.rc
-> 
-> I don't think it's necessary to mention android-specific init scripts
-> here in our patches.
+> You seem to have changed the authorship of this patch.
 
-Ok, will just mention init script.
-> 
-> >  
-> > +static inline void ci_role_destroy(struct ci13xxx *ci)
-> > +{
-> > +	enum ci_role role = ci->role;
-> > +
-> > +	if (role == CI_ROLE_END)
-> > +		return;
-> > +
-> > +	ci->role = CI_ROLE_END;
-> > +
-> > +	ci->roles[role]->destroy(ci);
-> > +}
-> 
-> What does this do? It should take role an a parameter, at least. Or it
-> can be called ci_roles_destroy() and, well, destroy all the roles. Now
-> we're in a situation where we destroy one.
-Yes, this function has some problems, I suggest just call two lines at
-ci_role_destory, do you think so?
+Sorry about that, I'll fix that up.
 
-	ci->roles[role]->destroy(ci);
-	ci->role = CI_ROLE_END;
+> Original one at:
+> https://patchwork.kernel.org/patch/1771091/
 > 
-> The idea is that, with this api, we can (and should) have both roles
-> allocated all the time, but only one role start()'ed.
+> Regards
+> Sachin
 > 
-> What we can do here is move the udc's .init() code to
-> ci_hdrc_gadget_init() and add a complementary ci_hdrc_gadget_destroy(),
-> which we call in ci_hdrc_remove() and probe's error path. And we can
-> probably do something similar for the host, or just leave it as it is
-> now. Seems simpler to me.
-Yes, current code has bug that it should call ci_role_destroy at probe's
-error path.
-For your comments, it still needs to add destory function for udc which will
-be called at core.c. I still prefer current way due to below reasons:
-
-- It can keep ci_hdrc_gadget_init() clean
-- .init and .remove are different logical function with .start and .stop.
-The .init and .remove are used for create and destroy, .start and .stop
-are used at id role switch.
-
-> >  }
-> > diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-> > index caecad9..6024a4f 100644
-> > --- a/drivers/usb/chipidea/host.c
-> > +++ b/drivers/usb/chipidea/host.c
-> > @@ -92,8 +92,10 @@ int ci_hdrc_host_init(struct ci13xxx *ci)
-> >  	if (!rdrv)
-> >  		return -ENOMEM;
-> >  
-> > +	rdrv->init	= host_start;
-> >  	rdrv->start	= host_start;
-> >  	rdrv->stop	= host_stop;
-> > +	rdrv->destroy	= host_stop;
+> On 25 January 2013 07:43, Simon Horman <horms+renesas@verge.net.au> wrote:
+> > linux/dma-mapping.h was included twice.
+> >
+> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/mach-shmobile/setup-r8a7740.c |    1 -
+> >  1 file changed, 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+> > index 03c69f9..9ef397d 100644
+> > --- a/arch/arm/mach-shmobile/setup-r8a7740.c
+> > +++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+> > @@ -27,7 +27,6 @@
+> >  #include <linux/serial_sci.h>
+> >  #include <linux/sh_dma.h>
+> >  #include <linux/sh_timer.h>
+> > -#include <linux/dma-mapping.h>
+> >  #include <mach/dma-register.h>
+> >  #include <mach/r8a7740.h>
+> >  #include <mach/pm-rmobile.h>
+> > --
+> > 1.7.10.4
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Will this allocate the hcd twice if we start in host role? Looks like that.
-No, if we start host role, the host will be allocated once at probe.
-host_start is only called when the id value from 1 to 0.
-> 
-
--- 
-
-Best Regards,
-Peter Chen
