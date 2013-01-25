@@ -1,29 +1,36 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 25 Jan 2013 15:08:06 +0000
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: add ARCH_ZYNQ
-In-Reply-To: <20130124201709.GB1036@beefymiracle.amer.corp.natinst.com>
-References: <bb37ce3392153c4cae3a2bc642f831683620473a.1359057921.git.josh.cartwright@ni.com>
- <621fb4946273492b88fe9a903118047f497e00ee.1359057921.git.josh.cartwright@ni.com>
- <20130124201709.GB1036@beefymiracle.amer.corp.natinst.com>
-Message-ID: <7b635cbd-4c77-41c7-9b69-c1b9ef92353c@CH1EHSMHS019.ehs.local>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 25 Jan 2013 16:13:58 +0100
+Subject: [PATCHv1 for soc 3/5] arm: socfpga: Add entries to enable make
+ dtbs socfpga
+In-Reply-To: <1359075633-13502-4-git-send-email-dinguyen@altera.com>
+References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
+ <1359075633-13502-4-git-send-email-dinguyen@altera.com>
+Message-ID: <20130125151357.GC10055@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -124,6 +124,8 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+>  	r8a7740-armadillo800eva.dtb \
+>  	sh73a0-kzm9g.dtb \
+>  	sh7372-mackerel.dtb
+> +dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
+> +	socfpga_vt.dtb
+>  dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+>  	spear1340-evb.dtb
+>  dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
 
-> -----Original Message-----
-> From: Josh Cartwright [mailto:josh.cartwright at ni.com]
-> Sent: Thursday, January 24, 2013 9:17 PM
-> To: arm at kernel.org; Rob Herring
-> Cc: linux-arm-kernel at lists.infradead.org; Michal Simek
-> Subject: Re: [PATCH 2/2] ARM: multi_v7_defconfig: add ARCH_ZYNQ
-> 
-> On Thu, Jan 24, 2013 at 01:33:25PM -0600, Josh Cartwright wrote:
-> > Cc: Michal Simek <michal.simek@ni.com>
-> 
-> Ugh, my fingers typed '@ni.com' out of habit.  Corrected patch below (and
-> correct Cc added).
+This allows me to remove manual dtb invocation from the build
+scripts. Good.
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+For 2,3/5:
 
-M
+Tested-by: Pavel Machek <pavel@denx.de>
+Reviewed-by: Pavel Machek <pavel@denx.de>
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
