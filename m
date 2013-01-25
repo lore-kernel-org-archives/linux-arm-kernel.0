@@ -1,105 +1,86 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:13:29 +0900
-Subject: [PATCH 11/15] ARM: SH-Mobile: sh73a0: Add CPU Hotplug
+Date: Fri, 25 Jan 2013 11:13:33 +0900
+Subject: [PATCH 15/15] ARM: shmobile: r8a7779: scif .irqs used SCIx_IRQ_MUXED()
 In-Reply-To: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080013-29189-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080013-29189-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080013-29189-16-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bastian Hecht <hechtb@gmail.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add the capability to add and remove CPUs on the fly.
-The Cortex-A9 offers the possibility to take single cores out of the
-MP Core. We add this capabilty taking care that caches are kept
-coherent. For verifying the shutdown we rely on the internal SH73A0
-Power Status Register PSTR.
+This patch tidyup scif .irqs settings by using
+SCIx_IRQ_MUXED() macro.
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-sh73a0.c |   36 +++++++++++++++++++++++++++++------
- 1 file changed, 30 insertions(+), 6 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7779.c |   18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 430b44e..9812ea3 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -25,6 +25,7 @@
- #include <linux/delay.h>
- #include <linux/irqchip/arm-gic.h>
- #include <mach/common.h>
-+#include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- #include <mach/sh73a0.h>
- #include <asm/smp_scu.h>
-@@ -36,6 +37,8 @@
- #define SBAR		IOMEM(0xe6180020)
- #define APARMBAREA	IOMEM(0xe6f10020)
- 
-+#define PSTR_SHUTDOWN_MODE	3
-+
- static void __iomem *scu_base_addr(void)
- {
- 	return (void __iomem *)0xf0000000;
-@@ -92,16 +95,20 @@ static void __init sh73a0_smp_init_cpus(void)
- 	shmobile_smp_init_cpus(ncores);
- }
- 
--static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int sh73a0_cpu_kill(unsigned int cpu)
- {
-+
- 	int k;
-+	u32 pstr;
- 
--	/* this function is running on another CPU than the offline target,
--	 * here we need wait for shutdown code in platform_cpu_die() to
--	 * finish before asking SoC-specific code to power off the CPU core.
-+	/*
-+	 * wait until the power status register confirms the shutdown of the
-+	 * offline target
- 	 */
- 	for (k = 0; k < 1000; k++) {
--		if (shmobile_cpu_is_dead(cpu))
-+		pstr = (__raw_readl(PSTR) >> (4 * cpu)) & 3;
-+		if (pstr == PSTR_SHUTDOWN_MODE)
- 			return 1;
- 
- 		mdelay(1);
-@@ -110,6 +117,23 @@ static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
- 	return 0;
- }
- 
-+static void sh73a0_cpu_die(unsigned int cpu)
-+{
-+	/*
-+	 * The ARM MPcore does not issue a cache coherency request for the L1
-+	 * cache when powering off single CPUs. We must take care of this and
-+	 * further caches.
-+	 */
-+	dsb();
-+	flush_cache_all();
-+
-+	/* Set power off mode. This takes the CPU out of the MP cluster */
-+	scu_power_mode(scu_base_addr(), SCU_PM_POWEROFF);
-+
-+	/* Enter shutdown mode */
-+	cpu_do_idle();
-+}
-+#endif /* CONFIG_HOTPLUG_CPU */
- 
- struct smp_operations sh73a0_smp_ops __initdata = {
- 	.smp_init_cpus		= sh73a0_smp_init_cpus,
-@@ -118,7 +142,7 @@ struct smp_operations sh73a0_smp_ops __initdata = {
- 	.smp_boot_secondary	= sh73a0_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_kill		= sh73a0_cpu_kill,
--	.cpu_die		= shmobile_cpu_die,
-+	.cpu_die		= sh73a0_cpu_die,
- 	.cpu_disable		= shmobile_cpu_disable,
- #endif
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index a181ced..7e87ab3 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -66,8 +66,7 @@ static struct plat_sci_port scif0_platform_data = {
+ 	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,
+ 	.scbrr_algo_id	= SCBRR_ALGO_2,
+ 	.type		= PORT_SCIF,
+-	.irqs		= { gic_spi(88), gic_spi(88),
+-			    gic_spi(88), gic_spi(88) },
++	.irqs		= SCIx_IRQ_MUXED(gic_spi(88)),
  };
+ 
+ static struct platform_device scif0_device = {
+@@ -84,8 +83,7 @@ static struct plat_sci_port scif1_platform_data = {
+ 	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,
+ 	.scbrr_algo_id	= SCBRR_ALGO_2,
+ 	.type		= PORT_SCIF,
+-	.irqs		= { gic_spi(89), gic_spi(89),
+-			    gic_spi(89), gic_spi(89) },
++	.irqs		= SCIx_IRQ_MUXED(gic_spi(89)),
+ };
+ 
+ static struct platform_device scif1_device = {
+@@ -102,8 +100,7 @@ static struct plat_sci_port scif2_platform_data = {
+ 	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,
+ 	.scbrr_algo_id	= SCBRR_ALGO_2,
+ 	.type		= PORT_SCIF,
+-	.irqs		= { gic_spi(90), gic_spi(90),
+-			    gic_spi(90), gic_spi(90) },
++	.irqs		= SCIx_IRQ_MUXED(gic_spi(90)),
+ };
+ 
+ static struct platform_device scif2_device = {
+@@ -120,8 +117,7 @@ static struct plat_sci_port scif3_platform_data = {
+ 	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,
+ 	.scbrr_algo_id	= SCBRR_ALGO_2,
+ 	.type		= PORT_SCIF,
+-	.irqs		= { gic_spi(91), gic_spi(91),
+-			    gic_spi(91), gic_spi(91) },
++	.irqs		= SCIx_IRQ_MUXED(gic_spi(91)),
+ };
+ 
+ static struct platform_device scif3_device = {
+@@ -138,8 +134,7 @@ static struct plat_sci_port scif4_platform_data = {
+ 	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,
+ 	.scbrr_algo_id	= SCBRR_ALGO_2,
+ 	.type		= PORT_SCIF,
+-	.irqs		= { gic_spi(92), gic_spi(92),
+-			    gic_spi(92), gic_spi(92) },
++	.irqs		= SCIx_IRQ_MUXED(gic_spi(92)),
+ };
+ 
+ static struct platform_device scif4_device = {
+@@ -156,8 +151,7 @@ static struct plat_sci_port scif5_platform_data = {
+ 	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,
+ 	.scbrr_algo_id	= SCBRR_ALGO_2,
+ 	.type		= PORT_SCIF,
+-	.irqs		= { gic_spi(93), gic_spi(93),
+-			    gic_spi(93), gic_spi(93) },
++	.irqs		= SCIx_IRQ_MUXED(gic_spi(93)),
+ };
+ 
+ static struct platform_device scif5_device = {
 -- 
 1.7.10.4
