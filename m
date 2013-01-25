@@ -1,104 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 25 Jan 2013 11:21:12 +0100
-Subject: [PATCH/RFC 2/3] ethernet: add a PHY reset GPIO DT binding to
- sh_eth
-In-Reply-To: <1359043653-11374-3-git-send-email-g.liakhovetski@gmx.de>
-References: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
- <1359043653-11374-3-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <7921225.sfO3PIeLVS@avalon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 25 Jan 2013 10:22:10 +0000
+Subject: [PATCH 12/15] ARM: mach-shmobile: sh73a0: Allow initialisation
+ of GIC by DT
+In-Reply-To: <1359086133-23357-13-git-send-email-horms+renesas@verge.net.au>
+References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
+ <1359086133-23357-13-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130125102210.GJ3075@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
-
-On Thursday 24 January 2013 17:07:32 Guennadi Liakhovetski wrote:
-> If an ethernet PHY can be reset by a GPIO, it can be specified in DT. Add
-> a binding and code to parse it, request the GPIO and take the PHY out of
-> reset.
+On Fri, Jan 25, 2013 at 03:55:30AM +0000, Simon Horman wrote:
+> This allows the GIC interrupt controller of the sh73a0 SoC to be
+> initialised using a flattened device tree blob.
 > 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: netdev at vger.kernel.org
+> It does not allow the INTC interrupt controller which is also present on
+> the sh73a0 SoC to be enabled via device tree.  Nor does it handle sharing
+> of interrupts between the GIC and INTC interrupt controllers.
+> 
+> This limits the usefulness of this code to applications which only wish to
+> access devices which use interrupts that can be handled by the GIC
+> interrupt controller. Other applications should, for now, continue using
+> non-device tree initialisation of the sh72a0 interrupt controllers.
+> 
+> Includes update to use irqchip_init() by Thierry Reding
+> 
+> Cc: Thierry Reding <thierry.reding@avionic-design.de>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->  Documentation/devicetree/bindings/net/sh_ether.txt |    2 ++
->  drivers/net/ethernet/renesas/sh_eth.c              |    9 ++++++++-
->  2 files changed, 10 insertions(+), 1 deletions(-)
+>  arch/arm/boot/dts/sh73a0.dtsi                |   33 ++++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/include/mach/common.h |    1 +
+>  arch/arm/mach-shmobile/intc-sh73a0.c         |    9 +++++++
+>  3 files changed, 43 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
 > 
-> diff --git a/Documentation/devicetree/bindings/net/sh_ether.txt
-> b/Documentation/devicetree/bindings/net/sh_ether.txt index c11e45d..edaf683
-> 100644
-> --- a/Documentation/devicetree/bindings/net/sh_ether.txt
-> +++ b/Documentation/devicetree/bindings/net/sh_ether.txt
-> @@ -12,6 +12,7 @@ Required properties:
->  - interrupts:                   Interrupt mapping for the sh_eth interrupt
->                                  sources (vector id).
->  - phy-mode:              String, operation mode of the PHY interface.
-> +- phy-reset-gpios:              PHY reset GPIO tuple
-
-If you can't have more than one GPIO here, what about calling it phy-reset-
-gpio ?
-
->  - sh-eth,edmac-endian:          String, endian of sh_eth dmac.
->  - sh-eth,register-type:         String, register type of sh_eth.
->                                  Please select "gigabit", "fast-sh4" or
-> @@ -37,6 +38,7 @@ Example (armadillo800eva):
->  		reg = <0xe9a00000 0x800>, <0xe9a01800 0x800>;
->  		interrupts = <0x500>;
->  		phy-mode = "mii";
-> +		phy-reset-gpios = <&gpio 18 0>;
->  		sh-eth,edmac-endian = "little";
->  		sh-eth,register-type = "gigabit";
->  		sh-eth,phy-id = <0>;
-> diff --git a/drivers/net/ethernet/renesas/sh_eth.c
-> b/drivers/net/ethernet/renesas/sh_eth.c index 1f64848..06035a2 100644
-> --- a/drivers/net/ethernet/renesas/sh_eth.c
-> +++ b/drivers/net/ethernet/renesas/sh_eth.c
-> @@ -20,6 +20,7 @@
->   *  the file called "COPYING".
->   */
-> 
-> +#include <linux/gpio.h>
->  #include <linux/init.h>
->  #include <linux/module.h>
->  #include <linux/kernel.h>
-> @@ -33,6 +34,7 @@
->  #include <linux/netdevice.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/of_platform.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
-> @@ -2376,10 +2378,11 @@ sh_eth_of_get_register_type(struct device_node *np)
->  static struct sh_eth_plat_data *
->  sh_eth_parse_dt(struct device *dev, struct net_device *ndev)
->  {
-> -	int ret;
-> +	int ret, gpio;
->  	const char *of_str;
->  	struct device_node *np = dev->of_node;
->  	struct sh_eth_plat_data *pdata;
-> +	enum of_gpio_flags flags;
-> 
->  	pdata = devm_kzalloc(dev, sizeof(struct sh_eth_plat_data),
->  					GFP_KERNEL);
-> @@ -2420,6 +2423,10 @@ sh_eth_parse_dt(struct device *dev, struct net_device
-> *ndev) else
->  		pdata->needs_init = 0;
-> 
-> +	gpio = of_get_named_gpio_flags(np, "phy-reset-gpios", 0, &flags);
-> +	if (gpio_is_valid(gpio) && !devm_gpio_request(dev, gpio, NULL))
-> +		gpio_direction_output(gpio, !!(flags & OF_GPIO_ACTIVE_LOW));
-
-You could use devm_gpio_request_one() here.
-
-Is there no need to reset the phy at runtime ?
-
+> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+> new file mode 100644
+> index 0000000..7dae1f4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> @@ -0,0 +1,33 @@
+> +/*
+> + * Device Tree Source for the SH73A0 SoC
+> + *
+> + * Copyright (C) 2012 Renesas Solutions Corp.
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
 > +
->  #ifdef CONFIG_OF_NET
->  	if (!is_valid_ether_addr(ndev->dev_addr)) {
->  		const char *macaddr = of_get_mac_address(np);
--- 
-Regards,
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "renesas,sh73a0";
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a9";
+> +		};
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a9";
+> +		};
 
-Laurent Pinchart
+I replied to v1, not realising you'd posted a v2:
+
+It would be good to have the reg and device_type properties set here for the
+logical map.
+
+[...]
+
+Thanks,
+Mark.
