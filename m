@@ -1,49 +1,122 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 25 Jan 2013 09:25:28 +0000
-Subject: [PATCH 4/4] irqchip: gic: Perform the gic_secondary_init()
- call via CPU notifier
-In-Reply-To: <20130125043039.GN13691@verge.net.au>
-References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
- <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
- <20130125043039.GN13691@verge.net.au>
-Message-ID: <20130125092527.GA6619@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 25 Jan 2013 09:32:53 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2xxx: clock data: clean up unused null clocks
+Message-ID: <alpine.DEB.2.00.1301250932040.12241@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 04:30:39AM +0000, Simon Horman wrote:
-> On Wed, Jan 23, 2013 at 05:59:34PM +0000, Catalin Marinas wrote:
-> > All the calls to gic_secondary_init() pass 0 as the first argument.
-> > Since this function is called on each CPU when starting, it can be done
-> > in a platform-independent way via a CPU notifier registered by the GIC
-> > code.
-> >
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: David Brown <davidb@codeaurora.org>
-> > Cc: Daniel Walker <dwalker@fifo99.com>
-> > Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Simon Horman <horms@verge.net.au>
-> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > Cc: Dinh Nguyen <dinguyen@altera.com>
-> > Cc: Viresh Kumar <viresh.linux@gmail.com>
-> > Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> 
-> mach-shmobile portion:
-> 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> For the record, I tested this on the kzm9g, kzm9d and marzen boards
-> which use the r8a7779, EMEV2 and r8a7779 SoCs respectively.
 
-Thanks. Can I add a Tested-by as well?
+Remove some clocks that don't appear to be used by anything
+and which are not associated with any hardware registers.
 
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/cclock2420_data.c |   16 +---------------
+ arch/arm/mach-omap2/cclock2430_data.c |   16 +---------------
+ 2 files changed, 2 insertions(+), 30 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cclock2420_data.c b/arch/arm/mach-omap2/cclock2420_data.c
+index 7e5febe..c3acd2d 100644
+--- a/arch/arm/mach-omap2/cclock2420_data.c
++++ b/arch/arm/mach-omap2/cclock2420_data.c
+@@ -622,15 +622,10 @@ static struct clk_hw_omap gpios_fck_hw = {
+ 
+ DEFINE_STRUCT_CLK(gpios_fck, gpios_fck_parent_names, aes_ick_ops);
+ 
+-static struct clk wu_l4_ick;
+-
+-DEFINE_STRUCT_CLK_HW_OMAP(wu_l4_ick, "wkup_clkdm");
+-DEFINE_STRUCT_CLK(wu_l4_ick, dpll_ck_parent_names, core_ck_ops);
+-
+ static struct clk gpios_ick;
+ 
+ static const char *gpios_ick_parent_names[] = {
+-	"wu_l4_ick",
++	"sys_ck",
+ };
+ 
+ static struct clk_hw_omap gpios_ick_hw = {
+@@ -1682,13 +1677,6 @@ static struct clk_hw_omap wdt1_ick_hw = {
+ 
+ DEFINE_STRUCT_CLK(wdt1_ick, gpios_ick_parent_names, aes_ick_ops);
+ 
+-static struct clk wdt1_osc_ck;
+-
+-static const struct clk_ops wdt1_osc_ck_ops = {};
+-
+-DEFINE_STRUCT_CLK_HW_OMAP(wdt1_osc_ck, NULL);
+-DEFINE_STRUCT_CLK(wdt1_osc_ck, sys_ck_parent_names, wdt1_osc_ck_ops);
+-
+ static struct clk wdt3_fck;
+ 
+ static struct clk_hw_omap wdt3_fck_hw = {
+@@ -1767,7 +1755,6 @@ static struct omap_clk omap2420_clks[] = {
+ 	CLK(NULL,	"func_96m_ck",	&func_96m_ck,	CK_242X),
+ 	CLK(NULL,	"func_48m_ck",	&func_48m_ck,	CK_242X),
+ 	CLK(NULL,	"func_12m_ck",	&func_12m_ck,	CK_242X),
+-	CLK(NULL,	"ck_wdt1_osc",	&wdt1_osc_ck,	CK_242X),
+ 	CLK(NULL,	"sys_clkout_src", &sys_clkout_src, CK_242X),
+ 	CLK(NULL,	"sys_clkout",	&sys_clkout,	CK_242X),
+ 	CLK(NULL,	"sys_clkout2_src", &sys_clkout2_src, CK_242X),
+@@ -1797,7 +1784,6 @@ static struct omap_clk omap2420_clks[] = {
+ 	/* L4 domain clocks */
+ 	CLK(NULL,	"l4_ck",	&l4_ck,		CK_242X),
+ 	CLK(NULL,	"ssi_l4_ick",	&ssi_l4_ick,	CK_242X),
+-	CLK(NULL,	"wu_l4_ick",	&wu_l4_ick,	CK_242X),
+ 	/* virtual meta-group clock */
+ 	CLK(NULL,	"virt_prcm_set", &virt_prcm_set, CK_242X),
+ 	/* general l4 interface ck, multi-parent functional clk */
+diff --git a/arch/arm/mach-omap2/cclock2430_data.c b/arch/arm/mach-omap2/cclock2430_data.c
+index eda079b..7560ec9 100644
+--- a/arch/arm/mach-omap2/cclock2430_data.c
++++ b/arch/arm/mach-omap2/cclock2430_data.c
+@@ -601,15 +601,10 @@ static struct clk_hw_omap gpios_fck_hw = {
+ 
+ DEFINE_STRUCT_CLK(gpios_fck, gpio5_fck_parent_names, aes_ick_ops);
+ 
+-static struct clk wu_l4_ick;
+-
+-DEFINE_STRUCT_CLK_HW_OMAP(wu_l4_ick, "wkup_clkdm");
+-DEFINE_STRUCT_CLK(wu_l4_ick, dpll_ck_parent_names, core_ck_ops);
+-
+ static struct clk gpios_ick;
+ 
+ static const char *gpios_ick_parent_names[] = {
+-	"wu_l4_ick",
++	"sys_ck",
+ };
+ 
+ static struct clk_hw_omap gpios_ick_hw = {
+@@ -1811,13 +1806,6 @@ static struct clk_hw_omap wdt1_ick_hw = {
+ 
+ DEFINE_STRUCT_CLK(wdt1_ick, gpios_ick_parent_names, aes_ick_ops);
+ 
+-static struct clk wdt1_osc_ck;
+-
+-static const struct clk_ops wdt1_osc_ck_ops = {};
+-
+-DEFINE_STRUCT_CLK_HW_OMAP(wdt1_osc_ck, NULL);
+-DEFINE_STRUCT_CLK(wdt1_osc_ck, sys_ck_parent_names, wdt1_osc_ck_ops);
+-
+ static struct clk wdt4_fck;
+ 
+ static struct clk_hw_omap wdt4_fck_hw = {
+@@ -1869,7 +1857,6 @@ static struct omap_clk omap2430_clks[] = {
+ 	CLK(NULL,	"func_96m_ck",	&func_96m_ck,	CK_243X),
+ 	CLK(NULL,	"func_48m_ck",	&func_48m_ck,	CK_243X),
+ 	CLK(NULL,	"func_12m_ck",	&func_12m_ck,	CK_243X),
+-	CLK(NULL,	"ck_wdt1_osc",	&wdt1_osc_ck,	CK_243X),
+ 	CLK(NULL,	"sys_clkout_src", &sys_clkout_src, CK_243X),
+ 	CLK(NULL,	"sys_clkout",	&sys_clkout,	CK_243X),
+ 	CLK(NULL,	"emul_ck",	&emul_ck,	CK_243X),
+@@ -1898,7 +1885,6 @@ static struct omap_clk omap2430_clks[] = {
+ 	/* L4 domain clocks */
+ 	CLK(NULL,	"l4_ck",	&l4_ck,		CK_243X),
+ 	CLK(NULL,	"ssi_l4_ick",	&ssi_l4_ick,	CK_243X),
+-	CLK(NULL,	"wu_l4_ick",	&wu_l4_ick,	CK_243X),
+ 	/* virtual meta-group clock */
+ 	CLK(NULL,	"virt_prcm_set", &virt_prcm_set, CK_243X),
+ 	/* general l4 interface ck, multi-parent functional clk */
 -- 
-Catalin
+1.7.10.4
