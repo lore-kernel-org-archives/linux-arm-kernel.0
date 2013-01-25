@@ -1,54 +1,60 @@
-From: Trond.Myklebust@netapp.com (Myklebust, Trond)
-Date: Fri, 25 Jan 2013 23:04:28 +0000
-Subject: [PATCH 15/19] sunrpc: don't warn for unused variable 'buf'
-In-Reply-To: <1359153858-31992-16-git-send-email-arnd@arndb.de>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <1359153858-31992-1-git-send-email-arnd@arndb.de>
- <1359153858-31992-16-git-send-email-arnd@arndb.de>
-Message-ID: <4FA345DA4F4AE44899BD2B03EEEC2FA91833C205@sacexcmbx05-prd.hq.netapp.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Jan 2013 23:35:44 +0000
+Subject: [PATCH 01/13] ARM: spear13xx: make mach/dma.h local
+In-Reply-To: <1359156956-32404-1-git-send-email-arnd@arndb.de>
+References: <1359156956-32404-1-git-send-email-arnd@arndb.de>
+Message-ID: <1359156956-32404-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Friday, January 25, 2013 5:44 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org; Arnd Bergmann; J. Bruce Fields;
-> Myklebust, Trond; linux-nfs at vger.kernel.org; netdev at vger.kernel.org
-> Subject: [PATCH 15/19] sunrpc: don't warn for unused variable 'buf'
-> 
-> When RPC_DEBUG is unset, the dprintk() macro does nothing, causing the
-> 'buf' variable in svc_printk to become unused.
-> Marking it as __maybe_unused avoids a harmless gcc warning.
-> 
-> Without this patch, building at91_dt_defconfig results in:
-> 
-> net/sunrpc/svc.c: In function 'svc_printk':
-> net/sunrpc/svc.c:1051:7: warning: unused variable 'buf' [-Wunused-variable]
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: "J. Bruce Fields" <bfields@redhat.com>
-> Cc: Trond Myklebust <Trond.Myklebust@netapp.com>
-> Cc: linux-nfs at vger.kernel.org
-> Cc: netdev at vger.kernel.org
-> ---
->  net/sunrpc/svc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/net/sunrpc/svc.c b/net/sunrpc/svc.c index dbf12ac..b1f5223
-> 100644
-> --- a/net/sunrpc/svc.c
-> +++ b/net/sunrpc/svc.c
-> @@ -1047,7 +1047,7 @@ void svc_printk(struct svc_rqst *rqstp, const char
-> *fmt, ...)  {
->  	struct va_format vaf;
->  	va_list args;
-> -	char 	buf[RPC_MAX_ADDRBUFLEN];
-> +	char buf[RPC_MAX_ADDRBUFLEN] __maybe_unused;
-> 
->  	va_start(args, fmt);
+There is no reason for this header file to be globally visible, so
+let's just move it into the mach directory.
 
-Alternatively, just declare it using the RPC_IFDEBUG() macro.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-spear13xx/spear1340.c                             | 3 ++-
+ arch/arm/mach-spear13xx/{include/mach/dma.h => spear13xx-dma.h} | 0
+ arch/arm/mach-spear13xx/spear13xx.c                             | 3 ++-
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+ rename arch/arm/mach-spear13xx/{include/mach/dma.h => spear13xx-dma.h} (100%)
 
-Cheers
-  Trond
+diff --git a/arch/arm/mach-spear13xx/spear1340.c b/arch/arm/mach-spear13xx/spear1340.c
+index 081014f..7a183c3 100644
+--- a/arch/arm/mach-spear13xx/spear1340.c
++++ b/arch/arm/mach-spear13xx/spear1340.c
+@@ -20,10 +20,11 @@
+ #include <linux/of_platform.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+-#include <mach/dma.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ 
++#include "spear13xx-dma.h"
++
+ /* Base addresses */
+ #define SPEAR1340_SATA_BASE			UL(0xB1000000)
+ #define SPEAR1340_UART1_BASE			UL(0xB4100000)
+diff --git a/arch/arm/mach-spear13xx/include/mach/dma.h b/arch/arm/mach-spear13xx/spear13xx-dma.h
+similarity index 100%
+rename from arch/arm/mach-spear13xx/include/mach/dma.h
+rename to arch/arm/mach-spear13xx/spear13xx-dma.h
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index c4af775..fcf5cc2 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -22,10 +22,11 @@
+ #include <asm/hardware/gic.h>
+ #include <asm/mach/map.h>
+ #include <asm/smp_twd.h>
+-#include <mach/dma.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ 
++#include "spear13xx-dma.h"
++
+ /* common dw_dma filter routine to be used by peripherals */
+ bool dw_dma_filter(struct dma_chan *chan, void *slave)
+ {
+-- 
+1.8.0
