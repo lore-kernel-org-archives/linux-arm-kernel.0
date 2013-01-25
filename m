@@ -1,27 +1,40 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 25 Jan 2013 11:21:37 -0700
-Subject: [PATCH/RFC 2/3] ethernet: add a PHY reset GPIO DT binding to
- sh_eth
-In-Reply-To: <Pine.LNX.4.64.1301251127460.17518@axis700.grange>
-References: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
- <1359043653-11374-3-git-send-email-g.liakhovetski@gmx.de>
- <7921225.sfO3PIeLVS@avalon>
- <Pine.LNX.4.64.1301251127460.17518@axis700.grange>
-Message-ID: <20130125182137.GB7393@obsidianresearch.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 25 Jan 2013 10:29:42 -0800
+Subject: [PATCH v2] ARM: plat-samsung: using vsnprintf instead of vsprintf
+ for the limit buffer length 256
+In-Reply-To: <50FE0D8B.7010908@asianux.com>
+References: <50FE0D8B.7010908@asianux.com>
+Message-ID: <013d01cdfb29$f3595000$da0bf000$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 11:34:55AM +0100, Guennadi Liakhovetski wrote:
-
-> > Is there no need to reset the phy at runtime ?
+Chen Gang wrote:
 > 
-> No idea, I'm not developing the driver, I'm just porting one specific 
-> feature from one API to another with no functional changes (apart from 
-> postponing setting the GPIO).
+> 
+>   the buff is 256 limited, so need use vsnprintf instead of vsprintf
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> Cc: Ben Dooks <ben@fluff.org>
+> ---
+>  arch/arm/plat-samsung/pm.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+> index 1507028..d896add 100644
+> --- a/arch/arm/plat-samsung/pm.c
+> +++ b/arch/arm/plat-samsung/pm.c
+> @@ -51,7 +51,7 @@ void s3c_pm_dbg(const char *fmt, ...)
+>  	char buff[256];
+> 
+>  	va_start(va, fmt);
+> -	vsprintf(buff, fmt, va);
+> +	vsnprintf(buff, sizeof(buff), fmt, va);
+>  	va_end(va);
+> 
+>  	printascii(buff);
+> --
+> 1.7.10.4
 
-Generally Linux relies on resetting the phy via the inband MDIO method,
-which is what Linux does. It is pretty much never required to reset
-via the hard pin - but you do need to generate a robust reset edge on
-the reset pin once after power up.
+Applied, thanks.
 
-Jason
+- Kukjin
