@@ -1,82 +1,49 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 25 Jan 2013 08:21:49 +0530
-Subject: [PATCH v3 2/2] usb: phy: omap-usb2: enable 960Mhz clock for omap5
-In-Reply-To: <1359082309-7158-1-git-send-email-kishon@ti.com>
-References: <1359082309-7158-1-git-send-email-kishon@ti.com>
-Message-ID: <1359082309-7158-3-git-send-email-kishon@ti.com>
+Date: Fri, 25 Jan 2013 08:21:47 +0530
+Subject: [PATCH v3 0/2] usb: phy: add usb3 phy driver
+Message-ID: <1359082309-7158-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"usb_otg_ss_refclk960m" is needed for usb2 phy present in omap5. For
-omap4, the clk_get of this clock will fail since it does not have this
-clock.
+Apologies for the delay in sending this version.
+ 
+Added a driver for usb3 phy that handles the interaction between usb phy
+device and dwc3 controller.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/usb/phy/omap-usb2.c |   28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+Changes from v2:
+* used control module driver APIs to write to control module register.
+* Added pm_runtime_put and pm_runtime_disable in the usb3 phy driver.
+* Added checks for enabling and disabling "usb_otg_ss_refclk960m" so that
+  it doesn't break omap4.
 
-diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
-index 0cd88ac..844ab68 100644
---- a/drivers/usb/phy/omap-usb2.c
-+++ b/drivers/usb/phy/omap-usb2.c
-@@ -166,6 +166,12 @@ static int omap_usb2_probe(struct platform_device *pdev)
- 	}
- 	clk_prepare(phy->wkupclk);
- 
-+	phy->optclk = devm_clk_get(phy->dev, "usb_otg_ss_refclk960m");
-+	if (IS_ERR(phy->optclk))
-+		dev_vdbg(&pdev->dev, "unable to get refclk960m\n");
-+	else
-+		clk_prepare(phy->optclk);
-+
- 	usb_add_phy_dev(&phy->phy);
- 
- 	platform_set_drvdata(pdev, phy);
-@@ -180,6 +186,8 @@ static int omap_usb2_remove(struct platform_device *pdev)
- 	struct omap_usb	*phy = platform_get_drvdata(pdev);
- 
- 	clk_unprepare(phy->wkupclk);
-+	if (!IS_ERR(phy->optclk))
-+		clk_unprepare(phy->optclk);
- 	usb_remove_phy(&phy->phy);
- 
- 	return 0;
-@@ -193,6 +201,8 @@ static int omap_usb2_runtime_suspend(struct device *dev)
- 	struct omap_usb	*phy = platform_get_drvdata(pdev);
- 
- 	clk_disable(phy->wkupclk);
-+	if (!IS_ERR(phy->optclk))
-+		clk_disable(phy->optclk);
- 
- 	return 0;
- }
-@@ -204,9 +214,25 @@ static int omap_usb2_runtime_resume(struct device *dev)
- 	struct omap_usb	*phy = platform_get_drvdata(pdev);
- 
- 	ret = clk_enable(phy->wkupclk);
--	if (ret < 0)
-+	if (ret < 0) {
- 		dev_err(phy->dev, "Failed to enable wkupclk %d\n", ret);
-+		goto err0;
-+	}
-+
-+	if (!IS_ERR(phy->optclk)) {
-+		ret = clk_enable(phy->optclk);
-+		if (ret < 0) {
-+			dev_err(phy->dev, "Failed to enable optclk %d\n", ret);
-+			goto err1;
-+		}
-+	}
-+
-+	return 0;
-+
-+err1:
-+	clk_disable(phy->wkupclk);
- 
-+err0:
- 	return ret;
- }
- 
+Changes from v1:
+* Added missing clk_put()
+* Remove the patches usb: dwc3: Fix gadget pullup in SS mode and
+usb: phy: omap-usb3: Decrease the number of transitions to recovery. Those
+are actually WA for hw issues which will be fixed in ES2.
+* Removed the *has960mhzclk* property
+
+This patch series is developed on
+git://github.com/rrnayak/linux.git omap5-3.8-rc4-base-palmas
+
+I've kept this patch series and all the patch series to follow in a single branch
+git://gitorious.org/linux-usb/linux-usb.git omap5-with-palmas
+(changes up to 23b4dfa2ab7052569cd88acc6383c4b1a8e8a482)
+
+Did enumeration testing on omap4 panda and omap5 evm.
+
+Kishon Vijay Abraham I (2):
+  usb: phy: add a new driver for usb3 phy
+  usb: phy: omap-usb2: enable 960Mhz clock for omap5
+
+ Documentation/devicetree/bindings/usb/usb-phy.txt |   23 ++
+ drivers/usb/phy/Kconfig                           |   10 +
+ drivers/usb/phy/Makefile                          |    1 +
+ drivers/usb/phy/omap-usb2.c                       |   28 +-
+ drivers/usb/phy/omap-usb3.c                       |  355 +++++++++++++++++++++
+ include/linux/usb/omap_usb.h                      |   23 ++
+ 6 files changed, 439 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/usb/phy/omap-usb3.c
+
 -- 
 1.7.9.5
