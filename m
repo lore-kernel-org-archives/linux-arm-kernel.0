@@ -1,99 +1,101 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 22:43:59 +0000
-Subject: [PATCHv2 00/19] ARM: common warning fixes
-In-Reply-To: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+Date: Fri, 25 Jan 2013 22:44:01 +0000
+Subject: [PATCH 02/19] ARM: disable virt_to_bus/virt_to_bus almost everywhere
+In-Reply-To: <1359153858-31992-1-git-send-email-arnd@arndb.de>
 References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
-Message-ID: <1359153858-31992-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-1-git-send-email-arnd@arndb.de>
+Message-ID: <1359153858-31992-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+We are getting a number of warnings about the use of the deprecated
+bus_to_virt function in drivers using the ARM ISA DMA API:
 
-[fixing an embarrasing typo in the linux-arm-kernel
- mailing list address, sorry about the re-send]
+drivers/parport/parport_pc.c: In function 'parport_pc_fifo_write_block_dma':
+drivers/parport/parport_pc.c:622:3: warning: 'bus_to_virt' is deprecated
+(declared at arch/arm/include/asm/memory.h:253) [-Wdeprecated-declarations]
 
-This series fixes all the known build warnings on
-ARM with any of the defconfig files. Most of these
-patches are regressions and warn about code that
-changed in linux-3.8, so it would be nice to
-fix those before the release.
+This is only because that function gets used by the inline
+set_dma_addr() helper. We know that any driver for the ISA DMA API
+is correctly using the DMA addresses, so we can change this
+to use the __bus_to_virt() function instead, which does not warn.
 
-The patch for the ARM_UNWIND warning is added
-here for completeness: The warning is old and
-particularly annoying, but the patch is not ready
-for inclusion.
+After this, there are no remaining drivers that are used on
+any defconfigs on ARM using virt_to_bus or bus_to_virt, with
+the exception of the OSS sound driver. That driver is only used
+on RiscPC, NetWinder and Shark, so we can set ARCH_NO_VIRT_TO_BUS
+on all other platforms and hide the deprecated functions, which
+is far more effective than marking them as deprecated, in order
+to avoid any new users of that code.
 
-I have more patches like these for less important
-issues, in four classes:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+ arch/arm/Kconfig                 | 4 ++++
+ arch/arm/configs/shark_defconfig | 1 -
+ arch/arm/include/asm/dma.h       | 2 +-
+ arch/arm/include/asm/memory.h    | 2 ++
+ 4 files changed, 7 insertions(+), 2 deletions(-)
 
-1. warnings and errors that are only present in linux-next
-2. warnings about allyesconfig/allnoconfig/allmodconfig
-   builds.
-3. warnings and errors for various randconfig combinations
-4. 'maybe-uninitialized' gcc warnings that only appear
-   with gcc-3.7 or 3.8. There are quite a lot of them.
-
-I will get to those once this series is sorted out.
-Since there are no interdepencies between the patches,
-my preference is to have them applied by the individual
-subsystem maintainers. Anything that has not at
-least made it into linux-next by the next merge window
-and has not received a 'NAK' or been obsoleted by
-another patch, I plan to submit as part of an arm-soc
-branch for 3.9.
-
-Arnd Bergmann (18):
-  ARM: shmobile: fix defconfig warning on CONFIG_USB
-  ARM: disable virt_to_bus/virt_to_bus almost everywhere
-  ARM: msm: proc_comm_boot_wait should not be __init
-  oss/dmabuf: use dma_map_single
-  sched: warnings in kernel/sched/fair.c
-  sched/debug: fix format string for 32 bit platforms
-  scripts/sortextable: silence script output
-  lockdep: avoid warning about unused variables
-  mfd/twl4030: don't warn about uninitialized return code
-  watchdog: at91sam9: at91_wdt_dt_ids cannot be __init
-  regmap: avoid undefined return from regmap_read_debugfs
-  pinctrl: exynos: don't mark probing functions as __init
-  pinctrl: nomadik: nmk_prcm_gpiocr_get_mode may be unused
-  spi/atmel: remove incorrect __exit_p()
-  sunrpc: don't warn for unused variable 'buf'
-  ARM: sa1100: don't warn about mach/ide.h
-  input/joystick: use get_cycles on ARM
-  ARM: at91: suspend both memory controllers on at91sam9263
-
-sahara (1):
-  [INCOMPLETE] ARM: make return_address available for ARM_UNWIND
-
- arch/arm/Kconfig                     |  4 ++++
- arch/arm/configs/marzen_defconfig    |  1 -
- arch/arm/configs/shark_defconfig     |  1 -
- arch/arm/include/asm/dma.h           |  2 +-
- arch/arm/include/asm/ftrace.h        |  6 ++----
- arch/arm/include/asm/memory.h        |  2 ++
- arch/arm/kernel/Makefile             | 12 +++++-------
- arch/arm/kernel/return_address.c     | 10 +++-------
- arch/arm/kernel/stacktrace.c         |  3 +++
- arch/arm/mach-at91/cpuidle.c         |  2 ++
- arch/arm/mach-at91/pm.c              |  2 ++
- arch/arm/mach-at91/pm.h              | 30 ++++++++++++++++++++++++------
- arch/arm/mach-msm/proc_comm.h        |  2 +-
- arch/arm/mach-sa1100/lart.c          |  3 ---
- drivers/base/regmap/regmap-debugfs.c |  2 +-
- drivers/input/joystick/analog.c      |  8 ++------
- drivers/mfd/twl4030-power.c          |  2 +-
- drivers/pinctrl/pinctrl-exynos5440.c | 10 +++++-----
- drivers/pinctrl/pinctrl-nomadik.c    |  2 +-
- drivers/spi/spi-atmel.c              |  2 +-
- drivers/watchdog/at91sam9_wdt.c      |  2 +-
- include/linux/lockdep.h              |  2 +-
- kernel/sched/debug.c                 |  4 ++--
- kernel/sched/fair.c                  |  2 +-
- kernel/trace/trace_irqsoff.c         | 26 ++++++++++++--------------
- net/sunrpc/svc.c                     |  2 +-
- scripts/sortextable.h                |  2 +-
- sound/oss/dmabuf.c                   |  3 ++-
- 28 files changed, 81 insertions(+), 68 deletions(-)
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 67874b8..91d4aea 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1450,6 +1450,10 @@ config ISA_DMA
+ 	bool
+ 	select ISA_DMA_API
+ 
++config ARCH_NO_VIRT_TO_BUS
++	def_bool y
++	depends on !ARCH_RPC && !ARCH_NETWINDER && !ARCH_SHARK
++
+ # Select ISA DMA interface
+ config ISA_DMA_API
+ 	bool
+diff --git a/arch/arm/configs/shark_defconfig b/arch/arm/configs/shark_defconfig
+index caa07db..e319b2c 100644
+--- a/arch/arm/configs/shark_defconfig
++++ b/arch/arm/configs/shark_defconfig
+@@ -73,7 +73,6 @@ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_NLS_CODEPAGE_437=m
+ CONFIG_NLS_CODEPAGE_850=m
+ CONFIG_NLS_ISO8859_1=m
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_SCHED_DEBUG is not set
+diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
+index 5694a0d..58b8c6a 100644
+--- a/arch/arm/include/asm/dma.h
++++ b/arch/arm/include/asm/dma.h
+@@ -105,7 +105,7 @@ extern void set_dma_sg(unsigned int chan, struct scatterlist *sg, int nr_sg);
+  */
+ extern void __set_dma_addr(unsigned int chan, void *addr);
+ #define set_dma_addr(chan, addr)				\
+-	__set_dma_addr(chan, bus_to_virt(addr))
++	__set_dma_addr(chan, (void *)__bus_to_virt(addr))
+ 
+ /* Set the DMA byte count for this channel
+  *
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 73cf03a..b11105c 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -245,6 +245,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define __bus_to_pfn(x)	__phys_to_pfn(x)
+ #endif
+ 
++#ifdef CONFIG_VIRT_TO_BUS
+ static inline __deprecated unsigned long virt_to_bus(void *x)
+ {
+ 	return __virt_to_bus((unsigned long)x);
+@@ -254,6 +255,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+ {
+ 	return (void *)__bus_to_virt(x);
+ }
++#endif
+ 
+ /*
+  * Conversion between a struct page and a physical address.
 -- 
 1.8.0
