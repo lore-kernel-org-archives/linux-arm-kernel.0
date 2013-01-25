@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:24:13 +0900
-Subject: [PATCH 37/80] sh: sh7734: Register PFC platform device
+Date: Fri, 25 Jan 2013 11:24:15 +0900
+Subject: [PATCH 39/80] sh: sh7785: Register PFC platform device
 In-Reply-To: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080696-31489-38-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080696-31489-40-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,52 +18,41 @@ Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
  arch/sh/Kconfig                         |    1 +
- arch/sh/kernel/cpu/sh4a/pinmux-sh7734.c |    8 ++++----
- 2 files changed, 5 insertions(+), 4 deletions(-)
+ arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c |    3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index 1885213..7a7d2ec 100644
+index c99193f..7d5bc1d 100644
 --- a/arch/sh/Kconfig
 +++ b/arch/sh/Kconfig
-@@ -456,6 +456,7 @@ config CPU_SUBTYPE_SH7734
+@@ -494,6 +494,7 @@ config CPU_SUBTYPE_SH7785
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select SYS_SUPPORTS_NUMA
  	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select USB_ARCH_HAS_OHCI
- 	select USB_ARCH_HAS_EHCI
 +	select PINCTRL
- 	help
- 	  Select SH7734 if you have a SH4A SH7734 CPU.
  
-diff --git a/arch/sh/kernel/cpu/sh4a/pinmux-sh7734.c b/arch/sh/kernel/cpu/sh4a/pinmux-sh7734.c
-index eed3b9d..fa33583 100644
---- a/arch/sh/kernel/cpu/sh4a/pinmux-sh7734.c
-+++ b/arch/sh/kernel/cpu/sh4a/pinmux-sh7734.c
-@@ -12,6 +12,7 @@
+ config CPU_SUBTYPE_SH7786
+ 	bool "Support SH7786 processor"
+diff --git a/arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c b/arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c
+index 5ebc25f..da0bd79 100644
+--- a/arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c
++++ b/arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c
+@@ -11,6 +11,7 @@
+ #include <linux/init.h>
  #include <linux/kernel.h>
  #include <linux/gpio.h>
- #include <linux/ioport.h>
 +#include <cpu/pfc.h>
- #include <cpu/sh7734.h>
+ #include <cpu/sh7785.h>
  
- #define CPU_32_PORT(fn, pfx, sfx)				\
-@@ -2467,9 +2468,6 @@ static struct resource sh7734_pfc_resources[] = {
- static struct pinmux_info sh7734_pinmux_info = {
- 	.name = "sh7734_pfc",
- 
--	.resource = sh7734_pfc_resources,
--	.num_resources = ARRAY_SIZE(sh7734_pfc_resources),
--
- 	.unlock_reg = 0xFFFC0000,
- 
- 	.reserved_id = PINMUX_RESERVED,
-@@ -2492,6 +2490,8 @@ static struct pinmux_info sh7734_pinmux_info = {
+ enum {
+@@ -1304,7 +1305,7 @@ static struct pinmux_info sh7785_pinmux_info = {
  
  static int __init plat_pinmux_setup(void)
  {
--	return register_pinmux(&sh7734_pinmux_info);
-+	return sh_pfc_register_info(NULL, sh7734_pfc_resources,
-+				    ARRAY_SIZE(sh7734_pfc_resources),
-+				    &sh7734_pinmux_info);
+-	return register_pinmux(&sh7785_pinmux_info);
++	return sh_pfc_register_info(NULL, NULL, 0, &sh7785_pinmux_info);
  }
+ 
  arch_initcall(plat_pinmux_setup);
 -- 
 1.7.10.4
