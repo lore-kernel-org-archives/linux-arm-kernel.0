@@ -1,58 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 25 Jan 2013 16:14:02 +0000
-Subject: [PATCH v4 1/4] drivers: usb: phy: add a new driver for usb
- part of control module
-In-Reply-To: <20130125145928.GC28379@arwen.pp.htv.fi>
-References: <1359109440-2195-1-git-send-email-kishon@ti.com>
- <1359109440-2195-2-git-send-email-kishon@ti.com>
- <20130125110141.GK3075@e106331-lin.cambridge.arm.com>
- <20130125111120.GP15886@arwen.pp.htv.fi>
- <20130125122943.GB16795@e106331-lin.cambridge.arm.com>
- <20130125145928.GC28379@arwen.pp.htv.fi>
-Message-ID: <20130125161401.GD16795@e106331-lin.cambridge.arm.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Fri, 25 Jan 2013 10:16:18 -0600
+Subject: [PATCH 4/4] irqchip: gic: Perform the gic_secondary_init() call
+ via CPU notifier
+In-Reply-To: <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
+References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
+ <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1359130578.32148.1.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 02:59:28PM +0000, Felipe Balbi wrote:
-> Hi,
+Hi Catalin,
+
+On Wed, 2013-01-23 at 17:59 +0000, Catalin Marinas wrote:
+> All the calls to gic_secondary_init() pass 0 as the first argument.
+> Since this function is called on each CPU when starting, it can be done
+> in a platform-independent way via a CPU notifier registered by the GIC
+> code.
 > 
-> On Fri, Jan 25, 2013 at 12:29:43PM +0000, Mark Rutland wrote:
-> > > > > +   depending upon omap4 or omap5.
-> > > > > + - reg-names: The names of the register addresses corresponding to the registers
-> > > > > +   filled in "reg".
-> > > > > + - ti,type: This is used to differentiate whether the control module has
-> > > > > +   usb mailbox or usb3 phy power. omap4 has usb mailbox in control module to
-> > > > > +   notify events to the musb core and omap5 has usb3 phy power register to
-> > > > > +   power on usb3 phy. Should be "1" if it has mailbox and "2" if it has usb3
-> > > > > +   phy power.
-> > > > 
-> > > > Why not make this a string property, perhaps values "mailbox" or "register"?
-> > > 
-> > > NAK.
-> > 
-> > Can I ask what your objection to using a string property is?
-> > 
-> > As far as I can see, "ti,type" is only used by this driver, so there's no
-> > common convention to stick to. Using a string makes the binding easier for
-> > humans to read, and thus harder to mess up in a dts, and it decouples the
-> > binding from kernel-side constants.
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> Cc: Shiraz Hashim <shiraz.hashim@st.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> ---
 > 
-> IIRC there is some work going on to add #define-like support for DT,
-> which would allow us to match against integers while still having
-> meaningful symbolic representations.
+> Randomly chosen CPU notifier priority. I can add a definition somewhere
+> though they don't seem to be used much and cause conflicts.
+> 
+>  arch/arm/mach-exynos/platsmp.c       |  8 --------
+>  arch/arm/mach-highbank/platsmp.c     |  7 -------
+>  arch/arm/mach-imx/platsmp.c          | 12 ------------
+>  arch/arm/mach-msm/platsmp.c          |  8 --------
+>  arch/arm/mach-omap2/omap-smp.c       |  7 -------
+>  arch/arm/mach-shmobile/smp-emev2.c   |  7 -------
+>  arch/arm/mach-shmobile/smp-r8a7779.c |  7 -------
+>  arch/arm/mach-shmobile/smp-sh73a0.c  |  7 -------
+>  arch/arm/mach-socfpga/platsmp.c      | 12 ------------
 
-I was under the impression that the motivation for using the preprocessor on
-the DT was to allow symbolic names for device/soc-specific values like
-addresses, rather than what amounts to ABI values for the binding.
+For socfpga, I get this error when I build for sofpga_defconfig:
 
-I don't see the point in building a binding that depends on future
-functionality to be legible, especially as we can make it more readable,
-robust, and just as extensible today, with a simple change to the proposed
-binding.
+drivers/gpio/gpio-pl061.c: In function ?pl061_irq_handler?:
+drivers/gpio/gpio-pl061.c:183:2: error: implicit declaration of function
+?chained_irq_enter? [-Werror=implicit-function-declaration]
+drivers/gpio/gpio-pl061.c:192:2: error: implicit declaration of function
+?chained_irq_exit? [-Werror=implicit-function-declaration]
 
-Even ignoring the above, the driver isn't doing appropriate sanity checking.
-If you use a string property, this sanity check is implicit in the parsing --
-you've either matched a value you can handle or you haven't.
-
-Thanks,
-Mark.
+Dinh
