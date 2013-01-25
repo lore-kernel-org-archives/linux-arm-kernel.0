@@ -1,33 +1,40 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 25 Jan 2013 07:46:59 -0500
-Subject: [PATCH v3 3/3] arm: mvebu: enable gpio expander over i2c on
- Mirabox platform
-In-Reply-To: <CACRpkdbBOQ_KE001kfORapo9=WiJYn04MmRhxnn-5v8ki-EeyA@mail.gmail.com>
-References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
- <1358889025-8530-4-git-send-email-gregory.clement@free-electrons.com>
- <CACRpkdbBOQ_KE001kfORapo9=WiJYn04MmRhxnn-5v8ki-EeyA@mail.gmail.com>
-Message-ID: <20130125124659.GH1758@titan.lakedaemon.net>
+Date: Fri, 25 Jan 2013 07:52:14 -0500
+Subject: [RFC V2 PATCH 0/8] ARM: kirkwood: cleanup DT conversion
+In-Reply-To: <201301251115.47480.arnd@arndb.de>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <cover.1359091286.git.jason@lakedaemon.net>
+ <201301251115.47480.arnd@arndb.de>
+Message-ID: <20130125125214.GI1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
-
-On Fri, Jan 25, 2013 at 09:17:57AM +0100, Linus Walleij wrote:
-> On Tue, Jan 22, 2013 at 10:10 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
+On Fri, Jan 25, 2013 at 11:15:47AM +0000, Arnd Bergmann wrote:
+> On Friday 25 January 2013, Jason Cooper wrote:
+> > This is a second cut at cleaning up mach-kirkwood/.  There are a few DT
+> > conversions (topkick -> mvsdio, pinctrl) which, once reviewed, I'll put in the
+> > normal pull request cycle.
+> > 
+> > The others which remove board-*.c files, I'll keep updating against
+> > mvebu/for-next, and then apply at the end of the merge window.
+> > 
+> > Please test as you are able.
 > 
-> > The Globalscale Mirabox platform can be connected to the JTAG/GPIO box
-> > through the Multi-IO port. The GPIO box use the NXP PCA9505 I/O port
-> > expansion IC to provide 40-bit parallel input/output GPIOs. This patch
-> > enable the use of this expander on the Mirabox.
-> >
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Great work, it's really nice to see where things are going now!
 > 
-> So as requested I leave this patch for now, tell me if you want it
-> applied through pinctrl.
+> In patch 7, the changeset text seems to be indented wrong, but the
+> patch is still good.
+> 
+> I wonder if it makes sense to collapse the few remaining DT based
+> board files now and move their entire contents back into board-dt.c.
+> Of course, if you think they will all be gone soon anyway, there
+> is no point.
 
-Which branch did you put the first two on?  I'm not seeing them.
+Once I have the mv643xx_eth binding working reliably, preferably with
+mvmdio, I'll take a look at removing the last board-*.c files.  If the
+stars align, we'll get it all done for v3.9.
+
+The only big thing left will be pcie.
 
 thx,
 
