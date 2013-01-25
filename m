@@ -1,124 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 15:57:29 +0000
-Subject: [PATCH 18/19] ARM: at91: suspend both memory controllers on
- at91sam9263
-In-Reply-To: <20130125154219.GM7360@game.jcrosoft.org>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <1359123276-15833-19-git-send-email-arnd@arndb.de>
- <20130125154219.GM7360@game.jcrosoft.org>
-Message-ID: <32362906.GDijhnXAWC@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 25 Jan 2013 16:14:02 +0000
+Subject: [PATCH v4 1/4] drivers: usb: phy: add a new driver for usb
+ part of control module
+In-Reply-To: <20130125145928.GC28379@arwen.pp.htv.fi>
+References: <1359109440-2195-1-git-send-email-kishon@ti.com>
+ <1359109440-2195-2-git-send-email-kishon@ti.com>
+ <20130125110141.GK3075@e106331-lin.cambridge.arm.com>
+ <20130125111120.GP15886@arwen.pp.htv.fi>
+ <20130125122943.GB16795@e106331-lin.cambridge.arm.com>
+ <20130125145928.GC28379@arwen.pp.htv.fi>
+Message-ID: <20130125161401.GD16795@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 January 2013 16:42:19 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 14:14 Fri 25 Jan     , Arnd Bergmann wrote:
-> > For the past three years, we have had a #warning in
-> > mach-at91 about the sdram_selfrefresh_enable or
-> > at91sam9_standby functions possibly not working on
-> > at91sam9263. In the meantime a function was added
-> > to do the right thing on at91sam9g45, which looks like
-> > it should also work on '9263.
+On Fri, Jan 25, 2013 at 02:59:28PM +0000, Felipe Balbi wrote:
+> Hi,
+> 
+> On Fri, Jan 25, 2013 at 12:29:43PM +0000, Mark Rutland wrote:
+> > > > > +   depending upon omap4 or omap5.
+> > > > > + - reg-names: The names of the register addresses corresponding to the registers
+> > > > > +   filled in "reg".
+> > > > > + - ti,type: This is used to differentiate whether the control module has
+> > > > > +   usb mailbox or usb3 phy power. omap4 has usb mailbox in control module to
+> > > > > +   notify events to the musb core and omap5 has usb3 phy power register to
+> > > > > +   power on usb3 phy. Should be "1" if it has mailbox and "2" if it has usb3
+> > > > > +   phy power.
+> > > > 
+> > > > Why not make this a string property, perhaps values "mailbox" or "register"?
+> > > 
+> > > NAK.
 > > 
-> > This patch blindly removes the warning and changes the
-> > at91sam9263 to use the same code at at91sam9g45, which
-> > may or may not be the right solution. If it is not,
-> > maybe someone could provide a better fix.
-> it's not
+> > Can I ask what your objection to using a string property is?
+> > 
+> > As far as I can see, "ti,type" is only used by this driver, so there's no
+> > common convention to stick to. Using a string makes the binding easier for
+> > humans to read, and thus harder to mess up in a dts, and it decouples the
+> > binding from kernel-side constants.
 > 
-> the 9g45 use DDR Controler where the 9263 use a SDRAM controler
-> 
+> IIRC there is some work going on to add #define-like support for DT,
+> which would allow us to match against integers while still having
+> meaningful symbolic representations.
 
-Ah, right. What about this one then?
+I was under the impression that the motivation for using the preprocessor on
+the DT was to allow symbolic names for device/soc-specific values like
+addresses, rather than what amounts to ABI values for the binding.
 
-	Arnd
-	
-8<-----
-Subject: [PATCH] ARM: at91: suspend both memory controllers on at91sam9263
+I don't see the point in building a binding that depends on future
+functionality to be legible, especially as we can make it more readable,
+robust, and just as extensible today, with a simple change to the proposed
+binding.
 
-For the past three years, we have had a #warning in
-mach-at91 about the sdram_selfrefresh_enable or
-at91sam9_standby functions possibly not working on
-at91sam9263. In the meantime a function was added
-to do the right thing on at91sam9g45, which looks like
-it should also work on '9263.
+Even ignoring the above, the driver isn't doing appropriate sanity checking.
+If you use a string property, this sanity check is implicit in the parsing --
+you've either matched a value you can handle or you haven't.
 
-This patch blindly removes the warning and changes the
-at91sam9263 to use the same code at at91sam9g45, which
-may or may not be the right solution. If it is not,
-maybe someone could provide a better fix.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Andrew Victor <linux@maxim.org.za>
-Cc: Albin Tonnerre <albin.tonnerre@free-electrons.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
-index 0c63815..4c67946 100644
---- a/arch/arm/mach-at91/cpuidle.c
-+++ b/arch/arm/mach-at91/cpuidle.c
-@@ -38,6 +38,8 @@ static int at91_enter_idle(struct cpuidle_device *dev,
- 		at91rm9200_standby();
- 	else if (cpu_is_at91sam9g45())
- 		at91sam9g45_standby();
-+	else if (cpu_is_at91sam9263())
-+		at91sam9263_standby();
- 	else
- 		at91sam9_standby();
- 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index adb6db8..b8017c1 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -267,6 +267,8 @@ static int at91_pm_enter(suspend_state_t state)
- 				at91rm9200_standby();
- 			else if (cpu_is_at91sam9g45())
- 				at91sam9g45_standby();
-+			else if (cpu_is_at91sam9263())
-+				at91sam9263_standby();
- 			else
- 				at91sam9_standby();
- 			break;
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 38f467c..2f5908f 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -70,13 +70,31 @@ static inline void at91sam9g45_standby(void)
- 	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
- }
- 
--#ifdef CONFIG_SOC_AT91SAM9263
--/*
-- * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
-- * handle those cases both here and in the Suspend-To-RAM support.
-+/* We manage both DDRAM/SDRAM controllers, we need more than one value to
-+ * remember.
-  */
--#warning Assuming EB1 SDRAM controller is *NOT* used
--#endif
-+static inline void at91sam9263_standby(void)
-+{
-+	u32 lpr0, lpr1;
-+	u32 saved_lpr0, saved_lpr1;
-+
-+	saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
-+	lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
-+	lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
-+
-+	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
-+	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
-+	lpr0 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
-+
-+	/* self-refresh mode now */
-+	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
-+	at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
-+
-+	cpu_do_idle();
-+
-+	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
-+	at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
-+}
- 
- static inline void at91sam9_standby(void)
- {
+Thanks,
+Mark.
