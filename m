@@ -1,47 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 25 Jan 2013 13:40:34 +0100
-Subject: [GIT PULL] ux500 fixes for the v3.8 series
-Message-ID: <CACRpkdYhVbu2S6iD=SRnU1gMRNfau25ihOqoDoXvCrH71seREQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 25 Jan 2013 07:46:59 -0500
+Subject: [PATCH v3 3/3] arm: mvebu: enable gpio expander over i2c on
+ Mirabox platform
+In-Reply-To: <CACRpkdbBOQ_KE001kfORapo9=WiJYn04MmRhxnn-5v8ki-EeyA@mail.gmail.com>
+References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
+ <1358889025-8530-4-git-send-email-gregory.clement@free-electrons.com>
+ <CACRpkdbBOQ_KE001kfORapo9=WiJYn04MmRhxnn-5v8ki-EeyA@mail.gmail.com>
+Message-ID: <20130125124659.GH1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+Linus,
 
-here are three fixes for the Ux500 that need to go to the -rc:s.
+On Fri, Jan 25, 2013 at 09:17:57AM +0100, Linus Walleij wrote:
+> On Tue, Jan 22, 2013 at 10:10 PM, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+> 
+> > The Globalscale Mirabox platform can be connected to the JTAG/GPIO box
+> > through the Multi-IO port. The GPIO box use the NXP PCA9505 I/O port
+> > expansion IC to provide 40-bit parallel input/output GPIOs. This patch
+> > enable the use of this expander on the Mirabox.
+> >
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> So as requested I leave this patch for now, tell me if you want it
+> applied through pinctrl.
 
-Please pull them in!
+Which branch did you put the first two on?  I'm not seeing them.
 
-Yours,
-Linus Walleij
+thx,
 
-
-The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
-
-  Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
-
-are available in the git repository at:
-
-  http://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-fixes-for-v3.8
-
-for you to fetch changes up to 579400166a744890b2a67ca21765b5b6dc649441:
-
-  ARM: ux500: Fix u9540 booting issues (2013-01-24 17:05:21 +0100)
-
-----------------------------------------------------------------
-- U9540 boot regression fix due to new clock framework
-- Configure out the yet instable battery management driver
-- Adjust cache initilization per SoC family
-
-----------------------------------------------------------------
-Lee Jones (2):
-      ARM: ux500: Disable Power Supply and Battery Management by default
-      ARM: ux500: Fix u9540 booting issues
-
-Steve Zhan (1):
-      ARM: ux500: add spin_unlock(&master_lock).
-
- arch/arm/configs/u8500_defconfig | 6 +++---
- arch/arm/mach-ux500/cpu.c        | 6 ++----
- arch/arm/mach-ux500/cpuidle.c    | 4 +++-
- 3 files changed, 8 insertions(+), 8 deletions(-)
+Jason.
