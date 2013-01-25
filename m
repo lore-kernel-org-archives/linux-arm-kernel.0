@@ -1,61 +1,136 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 25 Jan 2013 16:04:22 +0530
-Subject: [PATCH] ARM: davinci: da850: add RTC driver DT entries
-In-Reply-To: <1359094430-14724-1-git-send-email-mrugesh.mk@ti.com>
-References: <1359094430-14724-1-git-send-email-mrugesh.mk@ti.com>
-Message-ID: <51025FAE.3060503@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 25 Jan 2013 11:34:55 +0100 (CET)
+Subject: [PATCH/RFC 2/3] ethernet: add a PHY reset GPIO DT binding to
+ sh_eth
+In-Reply-To: <7921225.sfO3PIeLVS@avalon>
+References: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
+ <1359043653-11374-3-git-send-email-g.liakhovetski@gmx.de>
+ <7921225.sfO3PIeLVS@avalon>
+Message-ID: <Pine.LNX.4.64.1301251127460.17518@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/25/2013 11:43 AM, Mrugesh Katepallewar wrote:
-> Add RTC DT entries in da850 dts file.
-> 
-> Signed-off-by: Mrugesh Katepallewar <mrugesh.mk@ti.com>
-> ---
-> Applies on top of v3.8-rc4 of linus tree.
-> 
-> Tested on da850-evm device.
-> 
-> Test Procedure:
-> date [YYYY.]MM.DD-hh:mm[:ss]
-> hwclock -w
-> reset board and check system time.
-> 
-> :100644 100644 37dc5a3... b16efd4... M	arch/arm/boot/dts/da850-evm.dts
-> :100644 100644 640ab75... a8eb1b1... M	arch/arm/boot/dts/da850.dtsi
->  arch/arm/boot/dts/da850-evm.dts |    3 +++
->  arch/arm/boot/dts/da850.dtsi    |    8 ++++++++
->  2 files changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index 37dc5a3..b16efd4 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -24,5 +24,8 @@
->  		serial2: serial at 1d0d000 {
->  			status = "okay";
->  		};
-> +		rtc at 1c23000 {
-> +			status = "okay";
-> +		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 640ab75..a8eb1b1 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -56,5 +56,13 @@
->  			interrupt-parent = <&intc>;
->  			status = "disabled";
->  		};
-> +		rtc at 1c23000 {
-> +			compatible = "ti,da830-rtc";
-> +			reg = <0x23000 0x1000>;
-> +			interrupts = <19
-> +				      19>;
+Hi Laurent
 
-Why two interrupts of the same number? If there is only one interrupt
-line then only one should be specified, no?
+On Fri, 25 Jan 2013, Laurent Pinchart wrote:
 
-Thanks,
-Sekhar
+> Hi Guennadi,
+> 
+> On Thursday 24 January 2013 17:07:32 Guennadi Liakhovetski wrote:
+> > If an ethernet PHY can be reset by a GPIO, it can be specified in DT. Add
+> > a binding and code to parse it, request the GPIO and take the PHY out of
+> > reset.
+> > 
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > Cc: devicetree-discuss at lists.ozlabs.org
+> > Cc: netdev at vger.kernel.org
+> > ---
+> >  Documentation/devicetree/bindings/net/sh_ether.txt |    2 ++
+> >  drivers/net/ethernet/renesas/sh_eth.c              |    9 ++++++++-
+> >  2 files changed, 10 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/sh_ether.txt
+> > b/Documentation/devicetree/bindings/net/sh_ether.txt index c11e45d..edaf683
+> > 100644
+> > --- a/Documentation/devicetree/bindings/net/sh_ether.txt
+> > +++ b/Documentation/devicetree/bindings/net/sh_ether.txt
+> > @@ -12,6 +12,7 @@ Required properties:
+> >  - interrupts:                   Interrupt mapping for the sh_eth interrupt
+> >                                  sources (vector id).
+> >  - phy-mode:              String, operation mode of the PHY interface.
+> > +- phy-reset-gpios:              PHY reset GPIO tuple
+> 
+> If you can't have more than one GPIO here, what about calling it phy-reset-
+> gpio ?
+
+>From Documentation/devicetree/bindings/gpio/gpio.txt:
+
+<quote>
+GPIO properties should be named "[<name>-]gpios".
+</quote>
+
+> >  - sh-eth,edmac-endian:          String, endian of sh_eth dmac.
+> >  - sh-eth,register-type:         String, register type of sh_eth.
+> >                                  Please select "gigabit", "fast-sh4" or
+> > @@ -37,6 +38,7 @@ Example (armadillo800eva):
+> >  		reg = <0xe9a00000 0x800>, <0xe9a01800 0x800>;
+> >  		interrupts = <0x500>;
+> >  		phy-mode = "mii";
+> > +		phy-reset-gpios = <&gpio 18 0>;
+> >  		sh-eth,edmac-endian = "little";
+> >  		sh-eth,register-type = "gigabit";
+> >  		sh-eth,phy-id = <0>;
+> > diff --git a/drivers/net/ethernet/renesas/sh_eth.c
+> > b/drivers/net/ethernet/renesas/sh_eth.c index 1f64848..06035a2 100644
+> > --- a/drivers/net/ethernet/renesas/sh_eth.c
+> > +++ b/drivers/net/ethernet/renesas/sh_eth.c
+> > @@ -20,6 +20,7 @@
+> >   *  the file called "COPYING".
+> >   */
+> > 
+> > +#include <linux/gpio.h>
+> >  #include <linux/init.h>
+> >  #include <linux/module.h>
+> >  #include <linux/kernel.h>
+> > @@ -33,6 +34,7 @@
+> >  #include <linux/netdevice.h>
+> >  #include <linux/of.h>
+> >  #include <linux/of_device.h>
+> > +#include <linux/of_gpio.h>
+> >  #include <linux/of_platform.h>
+> >  #include <linux/of_address.h>
+> >  #include <linux/of_irq.h>
+> > @@ -2376,10 +2378,11 @@ sh_eth_of_get_register_type(struct device_node *np)
+> >  static struct sh_eth_plat_data *
+> >  sh_eth_parse_dt(struct device *dev, struct net_device *ndev)
+> >  {
+> > -	int ret;
+> > +	int ret, gpio;
+> >  	const char *of_str;
+> >  	struct device_node *np = dev->of_node;
+> >  	struct sh_eth_plat_data *pdata;
+> > +	enum of_gpio_flags flags;
+> > 
+> >  	pdata = devm_kzalloc(dev, sizeof(struct sh_eth_plat_data),
+> >  					GFP_KERNEL);
+> > @@ -2420,6 +2423,10 @@ sh_eth_parse_dt(struct device *dev, struct net_device
+> > *ndev) else
+> >  		pdata->needs_init = 0;
+> > 
+> > +	gpio = of_get_named_gpio_flags(np, "phy-reset-gpios", 0, &flags);
+> > +	if (gpio_is_valid(gpio) && !devm_gpio_request(dev, gpio, NULL))
+> > +		gpio_direction_output(gpio, !!(flags & OF_GPIO_ACTIVE_LOW));
+> 
+> You could use devm_gpio_request_one() here.
+
+Yes, but then the flag would look uglier, something like
+
+		devm_gpio_request_one(dev, gpio, flags & 
+			OF_GPIO_ACTIVE_LOW ? GPIOF_OUT_INIT_HIGH : 
+			GPIOF_OUT_INIT_LOW);
+
+Does it really look like an improvement? :)
+
+> Is there no need to reset the phy at runtime ?
+
+No idea, I'm not developing the driver, I'm just porting one specific 
+feature from one API to another with no functional changes (apart from 
+postponing setting the GPIO).
+
+Thanks
+Guennadi
+
+> > +
+> >  #ifdef CONFIG_OF_NET
+> >  	if (!is_valid_ether_addr(ndev->dev_addr)) {
+> >  		const char *macaddr = of_get_mac_address(np);
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
