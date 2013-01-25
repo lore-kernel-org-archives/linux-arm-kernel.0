@@ -1,61 +1,44 @@
 From: dinguyen@altera.com (Dinh Nguyen)
-Date: Fri, 25 Jan 2013 10:16:18 -0600
-Subject: [PATCH 4/4] irqchip: gic: Perform the gic_secondary_init() call
- via CPU notifier
-In-Reply-To: <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
-References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
- <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1359130578.32148.1.camel@linux-builds1>
+Date: Fri, 25 Jan 2013 10:18:00 -0600
+Subject: [PATCHv1 for soc 1/5] arm: socfpga: Add new device tree source
+ for actual socfpga HW
+In-Reply-To: <20130125142240.GB10055@amd.pavel.ucw.cz>
+References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
+ <1359075633-13502-2-git-send-email-dinguyen@altera.com>
+ <20130125142240.GB10055@amd.pavel.ucw.cz>
+Message-ID: <1359130680.32148.2.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hi Pavel,
 
-On Wed, 2013-01-23 at 17:59 +0000, Catalin Marinas wrote:
-> All the calls to gic_secondary_init() pass 0 as the first argument.
-> Since this function is called on each CPU when starting, it can be done
-> in a platform-independent way via a CPU notifier registered by the GIC
-> code.
+On Fri, 2013-01-25 at 15:22 +0100, Pavel Machek wrote:
+> Hi!
 > 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Dinh Nguyen <dinguyen@altera.com>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> ---
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Up to this point, support for socfpga has only been on a virtual
+> > platform. Now that actual hardware is available, we add the appropriate
+> > device tree source files.
 > 
-> Randomly chosen CPU notifier priority. I can add a definition somewhere
-> though they don't seem to be used much and cause conflicts.
+> Wow, actual hardware :-). Can I get one?
+
+Ramping up production now...
 > 
->  arch/arm/mach-exynos/platsmp.c       |  8 --------
->  arch/arm/mach-highbank/platsmp.c     |  7 -------
->  arch/arm/mach-imx/platsmp.c          | 12 ------------
->  arch/arm/mach-msm/platsmp.c          |  8 --------
->  arch/arm/mach-omap2/omap-smp.c       |  7 -------
->  arch/arm/mach-shmobile/smp-emev2.c   |  7 -------
->  arch/arm/mach-shmobile/smp-r8a7779.c |  7 -------
->  arch/arm/mach-shmobile/smp-sh73a0.c  |  7 -------
->  arch/arm/mach-socfpga/platsmp.c      | 12 ------------
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Cc: Pavel Machek <pavel@denx.de>
+> 
+> I tested it on 3.7-rc2-based tree, as it is newest I have around. It
+> seems to work ok. [Do you have newer git tree somewhere?]
+> 
+> Tested-by: Pavel Machek <pavel@denx.de>
+> Reviewed-by: Pavel Machek <pavel@denx.de>
 
-For socfpga, I get this error when I build for sofpga_defconfig:
-
-drivers/gpio/gpio-pl061.c: In function ?pl061_irq_handler?:
-drivers/gpio/gpio-pl061.c:183:2: error: implicit declaration of function
-?chained_irq_enter? [-Werror=implicit-function-declaration]
-drivers/gpio/gpio-pl061.c:192:2: error: implicit declaration of function
-?chained_irq_exit? [-Werror=implicit-function-declaration]
-
+Thanks,
 Dinh
+> 
+> 									Pavel
+> 
