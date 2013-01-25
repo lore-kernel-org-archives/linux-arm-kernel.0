@@ -1,34 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 Jan 2013 09:09:03 -0800
-Subject: [PATCH v2 5/5] wlcore: move wl12xx_platform_data up and make
- it truly optional
-In-Reply-To: <1359108334-18459-1-git-send-email-coelho@ti.com>
-References: <1358952038-5982-6-git-send-email-coelho@ti.com>
- <1359108334-18459-1-git-send-email-coelho@ti.com>
-Message-ID: <20130125170903.GZ22517@atomide.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 25 Jan 2013 17:22:24 +0000
+Subject: [PATCH 19/19] [INCOMPLETE] ARM: make return_address available
+ for ARM_UNWIND
+In-Reply-To: <1359133703.21576.233.camel@gandalf.local.home>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <1359123276-15833-20-git-send-email-arnd@arndb.de>
+ <20130125162608.GD2069@linaro.org>
+ <1359132254.21576.230.camel@gandalf.local.home>
+ <20130125165934.GE2069@linaro.org>
+ <1359133703.21576.233.camel@gandalf.local.home>
+Message-ID: <20130125172224.GA1961@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Luciano Coelho <coelho@ti.com> [130125 02:09]:
-> The platform data is used not only by wlcore-based drivers, but also
-> by wl1251.  Move it up in the directory hierarchy to reflect this.
+On Fri, Jan 25, 2013 at 12:08:23PM -0500, Steven Rostedt wrote:
+> On Fri, 2013-01-25 at 16:59 +0000, Dave Martin wrote:
 > 
-> Additionally, make it truly optional.  At the moment, disabling
-> platform data while wl1251_sdio or wlcore_sdio are enabled doesn't
-> work, but it will be necessary when device tree support is
-> implemented.
+> > Cool.  Are you aware of return_address being used elsewhere?  Currently
+> > I'm not aware of anything else which uses it, and grep is not finding
+> > any calls outside ftrace.h that I can see.
 > 
-> Signed-off-by: Luciano Coelho <coelho@ti.com>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> ---
+> softirq.c has a trace_preempt_off() use of CALLER_ADDR1.
 > 
-> In v2:
->    * Fix ti/Makefile
->    * Modify board_omap3evm.c which was still using the old Kconfig define
-> 
-> Tony, is it okay if I add this change in the omap3evm board in this
-> patch and queue it via wireless so that the whole thing is in sync?
+> kernel/sched/core.c has CALLER_ADDR1, 2 an 3.
 
-OK, this should not cause additional merge conflicts:
+These cases look safe to me ... sched/core.c:get_parent_ip() looks like
+it uses notrace purely to avoid the spurious extra frame which it would
+otherwise insert, and the code in softirq.c doesn't appear to be in a
+notrace context.
 
-Acked-by: Tony Lindgren <tony@atomide.com> 
+Am I being too optimistic, or does that match your understanding?
+
+Cheers
+---Dave
