@@ -1,44 +1,43 @@
 From: dinguyen@altera.com (Dinh Nguyen)
-Date: Fri, 25 Jan 2013 10:18:00 -0600
-Subject: [PATCHv1 for soc 1/5] arm: socfpga: Add new device tree source
- for actual socfpga HW
-In-Reply-To: <20130125142240.GB10055@amd.pavel.ucw.cz>
+Date: Fri, 25 Jan 2013 10:18:36 -0600
+Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
+In-Reply-To: <20130125043538.GC8930@verge.net.au>
 References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-2-git-send-email-dinguyen@altera.com>
- <20130125142240.GB10055@amd.pavel.ucw.cz>
-Message-ID: <1359130680.32148.2.camel@linux-builds1>
+ <1359075633-13502-5-git-send-email-dinguyen@altera.com>
+ <20130125041503.GL13691@verge.net.au> <20130125043538.GC8930@verge.net.au>
+Message-ID: <1359130716.32148.3.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Hi Simon,
 
-On Fri, 2013-01-25 at 15:22 +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > From: Dinh Nguyen <dinguyen@altera.com>
+On Fri, 2013-01-25 at 13:35 +0900, Simon Horman wrote:
+> On Fri, Jan 25, 2013 at 01:15:03PM +0900, Simon Horman wrote:
+> > On Thu, Jan 24, 2013 at 07:00:32PM -0600, dinguyen at altera.com wrote:
+> > > From: Dinh Nguyen <dinguyen@altera.com>
+> > > 
+> > > mach-socfpga is another platform that needs to use
+> > > v7_invalidate_l1 to bringup additional cores. There was a comment that
+> > > the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
+> > > 
+> > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Cc: Olof Johansson <olof@lixom.net>
+> > > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > > Cc: Rob Herring <rob.herring@calxeda.com>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Simon Horman <horms@verge.net.au>
+> > > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > > Cc: Pavel Machek <pavel@denx.de>
 > > 
-> > Up to this point, support for socfpga has only been on a virtual
-> > platform. Now that actual hardware is available, we add the appropriate
-> > device tree source files.
+> > mach-shmobile portion:
+> > 
+> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Wow, actual hardware :-). Can I get one?
-
-Ramping up production now...
-> 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > Cc: Pavel Machek <pavel@denx.de>
-> 
-> I tested it on 3.7-rc2-based tree, as it is newest I have around. It
-> seems to work ok. [Do you have newer git tree somewhere?]
-> 
-> Tested-by: Pavel Machek <pavel@denx.de>
-> Reviewed-by: Pavel Machek <pavel@denx.de>
+> For the record, I tested this on the kzm9g, kzm9d and marzen boards.
 
 Thanks,
 Dinh
-> 
-> 									Pavel
 > 
