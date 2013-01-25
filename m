@@ -1,88 +1,125 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:23:50 +0900
-Subject: [PATCH 14/80] sh-pfc: Use devm_ioremap_nocache()
+Date: Fri, 25 Jan 2013 11:23:46 +0900
+Subject: [PATCH 10/80] sh-pfc: Merge PFC core and pinctrl
 In-Reply-To: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080696-31489-15-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080696-31489-11-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace probe-time ioremap_nocache() call with devm_ioremap_nocache()
-and get rid of the corresponding iounmap() call.
+The PFC core is only used by the pinctrl and gpio modules. As the gpio
+module depends on the pinctrl module, the pinctrl module will always be
+present if the core gets used. There is thus no point in keeping core
+and pinctrl in two seperate modules. Merge them.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Paul Mundt <lethal@linux-sh.org>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/sh/pfc/core.c |   25 ++++---------------------
- 1 file changed, 4 insertions(+), 21 deletions(-)
+ drivers/sh/pfc/Kconfig   |   10 +---------
+ drivers/sh/pfc/Makefile  |    4 ++--
+ drivers/sh/pfc/core.c    |   15 +++------------
+ drivers/sh/pfc/pinctrl.c |    3 +--
+ 4 files changed, 7 insertions(+), 25 deletions(-)
 
+diff --git a/drivers/sh/pfc/Kconfig b/drivers/sh/pfc/Kconfig
+index 804f9ad..f33d82a 100644
+--- a/drivers/sh/pfc/Kconfig
++++ b/drivers/sh/pfc/Kconfig
+@@ -5,18 +5,10 @@ config SH_PFC
+ 	depends on GENERIC_GPIO
+ 	select GPIO_SH_PFC if ARCH_REQUIRE_GPIOLIB
+ 	select PINCTRL_SH_PFC
+-	def_bool y
+-
+-#
+-# Placeholder for now, rehome to drivers/pinctrl once the PFC APIs
+-# have settled.
+-#
+-config PINCTRL_SH_PFC
+-	tristate "SuperH PFC pin controller driver"
+-	depends on SH_PFC
+ 	select PINCTRL
+ 	select PINMUX
+ 	select PINCONF
++	def_bool y
+ 
+ config GPIO_SH_PFC
+ 	tristate "SuperH PFC GPIO support"
+diff --git a/drivers/sh/pfc/Makefile b/drivers/sh/pfc/Makefile
+index 7916027..ce6fae3 100644
+--- a/drivers/sh/pfc/Makefile
++++ b/drivers/sh/pfc/Makefile
+@@ -1,3 +1,3 @@
+-obj-y				+= core.o
+-obj-$(CONFIG_PINCTRL_SH_PFC)	+= pinctrl.o
++sh-pfc-objs			= core.o pinctrl.o
++obj-y				+= sh-pfc.o
+ obj-$(CONFIG_GPIO_SH_PFC)	+= gpio.o
 diff --git a/drivers/sh/pfc/core.c b/drivers/sh/pfc/core.c
-index 5491902..8ec57bd 100644
+index 72421a4..30e33db 100644
 --- a/drivers/sh/pfc/core.c
 +++ b/drivers/sh/pfc/core.c
-@@ -26,15 +26,6 @@
+@@ -8,7 +8,7 @@
+  * License.  See the file "COPYING" in the main directory of this archive
+  * for more details.
+  */
+-#define pr_fmt(fmt) "sh_pfc " KBUILD_MODNAME ": " fmt
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
  
- #include "core.h"
- 
--static void pfc_iounmap(struct sh_pfc *pfc)
--{
--	int k;
--
--	for (k = 0; k < pfc->pdata->num_resources; k++)
--		if (pfc->window[k].virt)
--			iounmap(pfc->window[k].virt);
--}
--
- static int pfc_ioremap(struct sh_pfc *pfc)
- {
- 	struct resource *res;
-@@ -53,12 +44,10 @@ static int pfc_ioremap(struct sh_pfc *pfc)
- 		WARN_ON(resource_type(res) != IORESOURCE_MEM);
- 		pfc->window[k].phys = res->start;
- 		pfc->window[k].size = resource_size(res);
--		pfc->window[k].virt = ioremap_nocache(res->start,
--							 resource_size(res));
--		if (!pfc->window[k].virt) {
--			pfc_iounmap(pfc);
-+		pfc->window[k].virt = devm_ioremap_nocache(pfc->dev, res->start,
-+							   resource_size(res));
-+		if (!pfc->window[k].virt)
- 			return -ENOMEM;
--		}
- 	}
- 
- 	return 0;
-@@ -524,7 +513,7 @@ static int sh_pfc_probe(struct platform_device *pdev)
- 	 */
- 	ret = sh_pfc_register_pinctrl(pfc);
- 	if (unlikely(ret != 0))
--		goto err;
-+		return ret;
- 
- #ifdef CONFIG_GPIO_SH_PFC
- 	/*
-@@ -546,10 +535,6 @@ static int sh_pfc_probe(struct platform_device *pdev)
- 	pr_info("%s support registered\n", pdata->name);
- 
- 	return 0;
--
--err:
--	pfc_iounmap(pfc);
--	return ret;
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
+@@ -497,7 +497,6 @@ int sh_pfc_config_gpio(struct sh_pfc *pfc, unsigned gpio, int pinmux_type,
+  out_err:
+ 	return -1;
  }
+-EXPORT_SYMBOL_GPL(sh_pfc_config_gpio);
  
- static int sh_pfc_remove(struct platform_device *pdev)
-@@ -561,8 +546,6 @@ static int sh_pfc_remove(struct platform_device *pdev)
- #endif
- 	sh_pfc_unregister_pinctrl(pfc);
- 
--	pfc_iounmap(pfc);
+ int register_sh_pfc(struct sh_pfc_platform_data *pdata)
+ {
+@@ -528,17 +527,9 @@ int register_sh_pfc(struct sh_pfc_platform_data *pdata)
+ 	/*
+ 	 * Initialize pinctrl bindings first
+ 	 */
+-	initroutine = symbol_request(sh_pfc_register_pinctrl);
+-	if (initroutine) {
+-		ret = (*initroutine)(&sh_pfc);
+-		symbol_put_addr(initroutine);
 -
- 	platform_set_drvdata(pdev, NULL);
+-		if (unlikely(ret != 0))
+-			goto err;
+-	} else {
+-		pr_err("failed to initialize pinctrl bindings\n");
++	ret = sh_pfc_register_pinctrl(&sh_pfc);
++	if (unlikely(ret != 0))
+ 		goto err;
+-	}
  
- 	return 0;
+ 	/*
+ 	 * Then the GPIO chip
+diff --git a/drivers/sh/pfc/pinctrl.c b/drivers/sh/pfc/pinctrl.c
+index 5801a56..6f0f58b 100644
+--- a/drivers/sh/pfc/pinctrl.c
++++ b/drivers/sh/pfc/pinctrl.c
+@@ -9,7 +9,7 @@
+  */
+ #define DRV_NAME "pinctrl-sh_pfc"
+ 
+-#define pr_fmt(fmt) DRV_NAME " " KBUILD_MODNAME ": " fmt
++#define pr_fmt(fmt) KBUILD_MODNAME " pinctrl: " fmt
+ 
+ #include <linux/init.h>
+ #include <linux/module.h>
+@@ -521,7 +521,6 @@ int sh_pfc_register_pinctrl(struct sh_pfc *pfc)
+ 
+ 	return sh_pfc_pinctrl_init();
+ }
+-EXPORT_SYMBOL_GPL(sh_pfc_register_pinctrl);
+ 
+ static void __exit sh_pfc_pinctrl_exit(void)
+ {
 -- 
 1.7.10.4
