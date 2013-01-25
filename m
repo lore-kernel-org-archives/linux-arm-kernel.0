@@ -1,140 +1,124 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 25 Jan 2013 15:56:33 +0000
-Subject: [PATCH v3 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
-In-Reply-To: <1359116591-32730-3-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1359116591-32730-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1359116591-32730-3-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130125155633.GC16795@e106331-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Jan 2013 15:57:29 +0000
+Subject: [PATCH 18/19] ARM: at91: suspend both memory controllers on
+ at91sam9263
+In-Reply-To: <20130125154219.GM7360@game.jcrosoft.org>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <1359123276-15833-19-git-send-email-arnd@arndb.de>
+ <20130125154219.GM7360@game.jcrosoft.org>
+Message-ID: <32362906.GDijhnXAWC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I have a couple more comments after looking though this a bit more thoroughly.
-
-On Fri, Jan 25, 2013 at 12:23:11PM +0000, Ezequiel Garcia wrote:
-> This patch adds device tree bindings for OMAP OneNAND devices.
-> Tested on an OMAP3 3430 IGEPv2 board.
+On Friday 25 January 2013 16:42:19 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 14:14 Fri 25 Jan     , Arnd Bergmann wrote:
+> > For the past three years, we have had a #warning in
+> > mach-at91 about the sdram_selfrefresh_enable or
+> > at91sam9_standby functions possibly not working on
+> > at91sam9263. In the meantime a function was added
+> > to do the right thing on at91sam9g45, which looks like
+> > it should also work on '9263.
+> > 
+> > This patch blindly removes the warning and changes the
+> > at91sam9263 to use the same code at at91sam9g45, which
+> > may or may not be the right solution. If it is not,
+> > maybe someone could provide a better fix.
+> it's not
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
-> Changes from v2:
->  * Remove unneeded of_node_put() as reported by Mark Rutland
+> the 9g45 use DDR Controler where the 9263 use a SDRAM controler
 > 
-> Changes from v1:
->  * Fix typo in Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-> 
->  .../devicetree/bindings/mtd/gpmc-onenand.txt       |   43 +++++++++++++++++++
->  arch/arm/mach-omap2/gpmc.c                         |   45 ++++++++++++++++++++
->  2 files changed, 88 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-> new file mode 100644
-> index 0000000..deec9da
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-> @@ -0,0 +1,43 @@
-> +Device tree bindings for GPMC connected OneNANDs
-> +
-> +GPMC connected OneNAND (found on OMAP boards) are represented as child nodes of
-> +the GPMC controller with a name of "onenand".
-> +
-> +All timing relevant properties as well as generic gpmc child properties are
-> +explained in a separate documents - please refer to
-> +Documentation/devicetree/bindings/bus/ti-gpmc.txt
 
-Which tree can I find this in?
+Ah, right. What about this one then?
 
-> +
-> +Required properties:
-> +
-> + - reg:			The CS line the peripheral is connected to
-> +
-> +Optional properties:
-> +
-> + - dma-channel:		DMA Channel index
-> +
-> +For inline partiton table parsing (optional):
-> +
-> + - #address-cells: should be set to 1
-> + - #size-cells: should be set to 1
-> +
-> +Example for an OMAP3430 board:
-> +
-> +	gpmc: gpmc at 6e000000 {
-> +		compatible = "ti,omap3430-gpmc";
-> +		ti,hwmods = "gpmc";
-> +		reg = <0x6e000000 0x1000000>;
-> +		interrupts = <20>;
-> +		gpmc,num-cs = <8>;
-> +		gpmc,num-waitpins = <4>;
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +
-> +		onenand at 0 {
-> +			reg = <0 0 0>; /* CS0, offset 0 */
-> +
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			/* partitions go here */
-> +		};
-> +	};
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index c6255f7..0636d0a 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -39,6 +39,7 @@
->  #include "omap_device.h"
->  #include "gpmc.h"
->  #include "gpmc-nand.h"
-> +#include "gpmc-onenand.h"
->  
->  #define	DEVICE_NAME		"omap-gpmc"
->  
-> @@ -1259,6 +1260,43 @@ static int gpmc_probe_nand_child(struct platform_device *pdev,
->  }
->  #endif
->  
-> +#ifdef CONFIG_MTD_ONENAND
-> +static int gpmc_probe_onenand_child(struct platform_device *pdev,
-> +				 struct device_node *child)
-> +{
-> +	u32 val;
-> +	struct omap_onenand_platform_data *gpmc_onenand_data;
-> +
-> +	if (of_property_read_u32(child, "reg", &val) < 0) {
-> +		dev_err(&pdev->dev, "%s has no 'reg' property\n",
-> +			child->full_name);
-> +		return -ENODEV;
-> +	}
+	Arnd
+	
+8<-----
+Subject: [PATCH] ARM: at91: suspend both memory controllers on at91sam9263
 
-I don't understand the format of the reg property, but it seems odd that you
-only need to read one cell from it. Are the remaining address cell and size
-cell used anywhere?
+For the past three years, we have had a #warning in
+mach-at91 about the sdram_selfrefresh_enable or
+at91sam9_standby functions possibly not working on
+at91sam9263. In the meantime a function was added
+to do the right thing on at91sam9g45, which looks like
+it should also work on '9263.
 
-> +
-> +	gpmc_onenand_data = devm_kzalloc(&pdev->dev, sizeof(*gpmc_onenand_data),
-> +					 GFP_KERNEL);
-> +	if (!gpmc_onenand_data)
-> +		return -ENOMEM;
-> +
-> +	gpmc_onenand_data->cs = val;
-> +	gpmc_onenand_data->of_node = child;
-> +	gpmc_onenand_data->dma_channel = -1;
-> +
-> +	if (!of_property_read_u32(child, "dma-channel", &val))
-> +		gpmc_onenand_data->dma_channel = val;
-> +
-> +	gpmc_onenand_init(gpmc_onenand_data);
-> +
-> +	return 0;
-> +}
+This patch blindly removes the warning and changes the
+at91sam9263 to use the same code at at91sam9g45, which
+may or may not be the right solution. If it is not,
+maybe someone could provide a better fix.
 
-[...]
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Albin Tonnerre <albin.tonnerre@free-electrons.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Otherwise looks good.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+index 0c63815..4c67946 100644
+--- a/arch/arm/mach-at91/cpuidle.c
++++ b/arch/arm/mach-at91/cpuidle.c
+@@ -38,6 +38,8 @@ static int at91_enter_idle(struct cpuidle_device *dev,
+ 		at91rm9200_standby();
+ 	else if (cpu_is_at91sam9g45())
+ 		at91sam9g45_standby();
++	else if (cpu_is_at91sam9263())
++		at91sam9263_standby();
+ 	else
+ 		at91sam9_standby();
+ 
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index adb6db8..b8017c1 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -267,6 +267,8 @@ static int at91_pm_enter(suspend_state_t state)
+ 				at91rm9200_standby();
+ 			else if (cpu_is_at91sam9g45())
+ 				at91sam9g45_standby();
++			else if (cpu_is_at91sam9263())
++				at91sam9263_standby();
+ 			else
+ 				at91sam9_standby();
+ 			break;
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index 38f467c..2f5908f 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -70,13 +70,31 @@ static inline void at91sam9g45_standby(void)
+ 	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+ }
+ 
+-#ifdef CONFIG_SOC_AT91SAM9263
+-/*
+- * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
+- * handle those cases both here and in the Suspend-To-RAM support.
++/* We manage both DDRAM/SDRAM controllers, we need more than one value to
++ * remember.
+  */
+-#warning Assuming EB1 SDRAM controller is *NOT* used
+-#endif
++static inline void at91sam9263_standby(void)
++{
++	u32 lpr0, lpr1;
++	u32 saved_lpr0, saved_lpr1;
++
++	saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
++	lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
++	lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
++
++	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
++	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
++	lpr0 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
++
++	/* self-refresh mode now */
++	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
++	at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
++
++	cpu_do_idle();
++
++	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
++	at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
++}
+ 
+ static inline void at91sam9_standby(void)
+ {
