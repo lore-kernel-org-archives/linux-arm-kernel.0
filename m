@@ -1,44 +1,191 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 22:44:07 +0000
-Subject: [PATCH 08/19] lockdep: avoid warning about unused variables
+Date: Fri, 25 Jan 2013 22:44:18 +0000
+Subject: [PATCH 19/19] [INCOMPLETE] ARM: make return_address available for
+ ARM_UNWIND
 In-Reply-To: <1359153858-31992-1-git-send-email-arnd@arndb.de>
 References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
  <1359153858-31992-1-git-send-email-arnd@arndb.de>
-Message-ID: <1359153858-31992-9-git-send-email-arnd@arndb.de>
+Message-ID: <1359153858-31992-20-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When lockdep is disabled, a call to lockdep_assert_held
-does not use its argument, which results in a compiler
-warning if nothing else in the same function uses
-that variable. An instance of this was introduced
-by c9a49628819 "nfsd: make client_lock per net".
+From: sahara <keun-o.park@windriver.com>
 
-Without this patch, building ARM cerfcube_defconfig results in:
+This is a reminder that we still need to fix the return_address
+function to work correctly with the unwinder. Keun-O Park has
+made this attempt in the past, which is still under discussion[1],
+and Dave Martin has also mentioned that he would provide a
+solution for this problem.
 
-fs/nfsd/nfs4state.c: In function 'free_client':
-fs/nfsd/nfs4state.c:1047:19: error: unused variable 'nn' [-Wunused-variable]
+Right now, this patch makes the warning go away and provides
+an implementation of return_address for the arm unwinder, but
+causes other problems, so we should *not* apply it. I will
+keep sending this patch until we have a better solution.
 
+[1] http://lkml.org/lkml/2013/1/11/493
+
+Original changelog:
+
+This fixes a warning saying:
+
+    warning: #warning "TODO: return_address should use unwind tables"
+
+And, this enables return_address using unwind information. If ARM_UNWIND is
+selected, unwind_frame in unwind.c will be called in walk_stackframe.
+
+Signed-off-by: sahara <keun-o.park@windriver.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Stanislav Kinsbursky <skinsbursky@parallels.com>
+Cc: Dave Martin <dave.martin@linaro.org>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- include/linux/lockdep.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/ftrace.h    |  6 ++----
+ arch/arm/kernel/Makefile         | 12 +++++-------
+ arch/arm/kernel/return_address.c | 10 +++-------
+ arch/arm/kernel/stacktrace.c     |  3 +++
+ kernel/trace/trace_irqsoff.c     | 26 ++++++++++++--------------
+ 5 files changed, 25 insertions(+), 32 deletions(-)
 
-diff --git a/include/linux/lockdep.h b/include/linux/lockdep.h
-index 2bca44b..f05631e 100644
---- a/include/linux/lockdep.h
-+++ b/include/linux/lockdep.h
-@@ -410,7 +410,7 @@ struct lock_class_key { };
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index f89515a..3552ad9 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -32,13 +32,11 @@ extern void ftrace_call_old(void);
  
- #define lockdep_depth(tsk)	(0)
+ #ifndef __ASSEMBLY__
  
--#define lockdep_assert_held(l)			do { } while (0)
-+#define lockdep_assert_held(l)			do { (void)(l); } while (0)
+-#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
++#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
+ /*
+  * return_address uses walk_stackframe to do it's work.  If both
+  * CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses unwind
+- * information.  For this to work in the function tracer many functions would
+- * have to be marked with __notrace.  So for now just depend on
+- * !CONFIG_ARM_UNWIND.
++ * information.
+  */
  
- #define lockdep_recursing(tsk)			(0)
+ void *return_address(unsigned int);
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 5bbec7b..09a0d64 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -5,13 +5,11 @@
+ CPPFLAGS_vmlinux.lds := -DTEXT_OFFSET=$(TEXT_OFFSET)
+ AFLAGS_head.o        := -DTEXT_OFFSET=$(TEXT_OFFSET)
+ 
+-ifdef CONFIG_FUNCTION_TRACER
+-CFLAGS_REMOVE_ftrace.o = -pg
+-CFLAGS_REMOVE_insn.o = -pg
+-CFLAGS_REMOVE_patch.o = -pg
+-endif
+-
+-CFLAGS_REMOVE_return_address.o = -pg
++CFLAGS_REMOVE_ftrace.o		= -pg
++CFLAGS_REMOVE_insn.o		= -pg
++CFLAGS_REMOVE_patch.o		= -pg
++CFLAGS_REMOVE_unwind.o		= -pg
++CFLAGS_REMOVE_return_address.o	= -pg
+ 
+ # Object file lists.
+ 
+diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+index 8085417..ccb5e37 100644
+--- a/arch/arm/kernel/return_address.c
++++ b/arch/arm/kernel/return_address.c
+@@ -11,7 +11,7 @@
+ #include <linux/export.h>
+ #include <linux/ftrace.h>
+ 
+-#if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
++#if defined(CONFIG_FRAME_POINTER) || defined(CONFIG_ARM_UNWIND)
+ #include <linux/sched.h>
+ 
+ #include <asm/stacktrace.h>
+@@ -56,17 +56,13 @@ void *return_address(unsigned int level)
+ 		return NULL;
+ }
+ 
+-#else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
+-
+-#if defined(CONFIG_ARM_UNWIND)
+-#warning "TODO: return_address should use unwind tables"
+-#endif
++#else /* CONFIG_FRAME_POINTER || CONFIG_ARM_UNWIND */
+ 
+ void *return_address(unsigned int level)
+ {
+ 	return NULL;
+ }
+ 
+-#endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) / else */
++#endif /* CONFIG_FRAME_POINTER || CONFIG_ARM_UNWIND */
+ 
+ EXPORT_SYMBOL_GPL(return_address);
+diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+index 00f79e5..aab144b 100644
+--- a/arch/arm/kernel/stacktrace.c
++++ b/arch/arm/kernel/stacktrace.c
+@@ -6,6 +6,9 @@
+ 
+ #if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
+ /*
++ * If both CONFIG_FRAME_POINTER=y and CONFIG_ARM_UNWIND=y walk_stackframe uses
++ * unwind information. So for now just depend on !CONFIG_ARM_UNWIND.
++ *
+  * Unwind the current stack frame and store the new register values in the
+  * structure passed as argument. Unwinding is equivalent to a function return,
+  * hence the new PC value rather than LR should be used for backtrace.
+diff --git a/kernel/trace/trace_irqsoff.c b/kernel/trace/trace_irqsoff.c
+index 713a2ca..6f207ed 100644
+--- a/kernel/trace/trace_irqsoff.c
++++ b/kernel/trace/trace_irqsoff.c
+@@ -483,20 +483,6 @@ inline void print_irqtrace_events(struct task_struct *curr)
+ /*
+  * We are only interested in hardirq on/off events:
+  */
+-void trace_hardirqs_on(void)
+-{
+-	if (!preempt_trace() && irq_trace())
+-		stop_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
+-}
+-EXPORT_SYMBOL(trace_hardirqs_on);
+-
+-void trace_hardirqs_off(void)
+-{
+-	if (!preempt_trace() && irq_trace())
+-		start_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
+-}
+-EXPORT_SYMBOL(trace_hardirqs_off);
+-
+ void trace_hardirqs_on_caller(unsigned long caller_addr)
+ {
+ 	if (!preempt_trace() && irq_trace())
+@@ -504,6 +490,12 @@ void trace_hardirqs_on_caller(unsigned long caller_addr)
+ }
+ EXPORT_SYMBOL(trace_hardirqs_on_caller);
+ 
++void trace_hardirqs_on(void)
++{
++	trace_hardirqs_on_caller(CALLER_ADDR0);
++}
++EXPORT_SYMBOL(trace_hardirqs_on);
++
+ void trace_hardirqs_off_caller(unsigned long caller_addr)
+ {
+ 	if (!preempt_trace() && irq_trace())
+@@ -511,6 +503,12 @@ void trace_hardirqs_off_caller(unsigned long caller_addr)
+ }
+ EXPORT_SYMBOL(trace_hardirqs_off_caller);
+ 
++void trace_hardirqs_off(void)
++{
++	trace_hardirqs_off_caller(CALLER_ADDR0);
++}
++EXPORT_SYMBOL(trace_hardirqs_off);
++
+ #endif /* CONFIG_PROVE_LOCKING */
+ #endif /*  CONFIG_IRQSOFF_TRACER */
  
 -- 
 1.8.0
