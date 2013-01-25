@@ -1,65 +1,77 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Jan 2013 18:32:45 +0100
-Subject: [PATCH v2 5/5] clocksource: update and move armada-370-xp-timer
- documentation to timer directory
-In-Reply-To: <1359135165-32108-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1359135165-32108-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1359135165-32108-6-git-send-email-gregory.clement@free-electrons.com>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Fri, 25 Jan 2013 17:33:42 +0000
+Subject: [PATCH v3 1/1 net-next] net: fec: enable pause frame to improve
+ rx prefomance for 1G network
+In-Reply-To: <CAHrpEqRKhXRg-SsigWdnfV-RBWSc=OH9ECqQnKHDvmbn8e4a2A@mail.gmail.com>
+References: <1358391358-27977-1-git-send-email-Frank.Li@freescale.com>
+ <1358973584.2658.14.camel@bwh-desktop.uk.solarflarecom.com>
+ <CAHrpEqSzu97X2PUgUEh30EqkbjLUYyhCN28AEzJ6eLPXx0Qg1Q@mail.gmail.com>
+ <1359046173.2736.2.camel@bwh-desktop.uk.solarflarecom.com>
+ <CAHrpEqRKhXRg-SsigWdnfV-RBWSc=OH9ECqQnKHDvmbn8e4a2A@mail.gmail.com>
+Message-ID: <1359135222.2644.2.camel@bwh-desktop.uk.solarflarecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Timer driver for Armada 370 and Armada XP have gained local timers
-support. So it needs new resources information regarding the IRQs
-and the registers.
+On Fri, 2013-01-25 at 09:50 +0800, Frank Li wrote:
+> 2013/1/25 Ben Hutchings <bhutchings@solarflare.com>:
+> > On Thu, 2013-01-24 at 10:16 +0800, Frank Li wrote:
+> >> 2013/1/24 Ben Hutchings <bhutchings@solarflare.com>:
+> >> > On Thu, 2013-01-17 at 10:55 +0800, Frank Li wrote:
+> >> >> The limition of imx6 internal bus cause fec can't achieve 1G perfomance.
+> >> >> There will be many packages lost because FIFO over run.
+> >> >>
+> >> >> This patch enable pause frame flow control.
+> >> > [...]
+> >> >> --- a/drivers/net/ethernet/freescale/fec.c
+> >> >> +++ b/drivers/net/ethernet/freescale/fec.c
+> >> > [...]
+> >> >> +static int fec_enet_set_pauseparam(struct net_device *ndev,
+> >> >> +                                struct ethtool_pauseparam *pause)
+> >> >> +{
+> >> >> +     struct fec_enet_private *fep = netdev_priv(ndev);
+> >> >> +
+> >> >> +     if (pause->tx_pause != pause->rx_pause) {
+> >> >> +             netdev_info(ndev,
+> >> >> +                     "hardware only support enable/disable both tx and rx");
+> >> >> +             return -EINVAL;
+> >> >> +     }
+> >> >> +
+> >> >> +     fep->pause_flag = 0;
+> >> >> +
+> >> >> +     /* tx pause must be same as rx pause */
+> >> >> +     fep->pause_flag |= pause->rx_pause ? FEC_PAUSE_FLAG_ENABLE : 0;
+> >> >> +     fep->pause_flag |= pause->autoneg ? FEC_PAUSE_FLAG_AUTONEG : 0;
+> >> >> +
+> >> >> +     if (pause->rx_pause || pause->autoneg) {
+> >> >> +             fep->phy_dev->supported |= ADVERTISED_Pause;
+> >> >> +             fep->phy_dev->advertising |= ADVERTISED_Pause;
+> >> >> +     } else {
+> >> >> +             fep->phy_dev->supported &= ~ADVERTISED_Pause;
+> >> >> +             fep->phy_dev->advertising &= ~ADVERTISED_Pause;
+> >> >> +     }
+> >> > [...]
+> >> >
+> >> > Why is this changing the supported flags, i.e. device capabilities?  You
+> >> > need to leave those flags alone and reject an attempt to enable pause
+> >> > frames on a device that doesn't support them.
+> >>
+> >> I go through phylib, I have not found good place set ADVERTISED_Pause
+> >> capabilities.
+> >> genphy_config_init never check Pause capabilities.
+> >
+> > I agree that phylib can't initialise pause capabilities because those
+> > depend on the MAC.  But look at which function I'm quoting: this is the
+> > ethtool operation, which shouldn't change capabilities.
+> 
+> Where is good place do you think? in probe function?
 
-Also move the documentation in the new and more accurate directory
+You're already setting the supported flag in fec_enet_mii_probe().  I
+assume (without great familiarity with phylib) that that's the right
+place to do it.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- .../bindings/arm/armada-370-xp-timer.txt           |   12 ------------
- .../bindings/timer/marvell,armada-370-xp-timer.txt |   15 +++++++++++++++
- 2 files changed, 15 insertions(+), 12 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
- create mode 100644 Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+Ben.
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
-deleted file mode 100644
-index 6483011..0000000
---- a/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
-+++ /dev/null
-@@ -1,12 +0,0 @@
--Marvell Armada 370 and Armada XP Global Timers
------------------------------------------------
--
--Required properties:
--- compatible: Should be "marvell,armada-370-xp-timer"
--- interrupts: Should contain the list of Global Timer interrupts
--- reg: Should contain the base address of the Global Timer registers
--- clocks: clock driving the timer hardware
--
--Optional properties:
--- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
--  Mhz fixed mode (available on Armada XP and not on Armada 370)
-diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-new file mode 100644
-index 0000000..3638112
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-@@ -0,0 +1,15 @@
-+Marvell Armada 370 and Armada XP Timers
-+---------------------------------------
-+
-+Required properties:
-+- compatible: Should be "marvell,armada-370-xp-timer"
-+- interrupts: Should contain the list of Global Timer interrupts and
-+  then local timer interrupts
-+- reg: Should contain location and length for timers register. First
-+  pair for the Global Timer registers, second pair for the
-+  local/private timers.
-+- clocks: clock driving the timer hardware
-+
-+Optional properties:
-+- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
-+  Mhz fixed mode (available on Armada XP and not on Armada 370)
 -- 
-1.7.9.5
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
