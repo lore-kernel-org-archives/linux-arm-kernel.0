@@ -1,91 +1,110 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 12:55:27 +0900
-Subject: [PATCH 09/15] ARM: shmobile: r8a7740: Add CPU sleep suspend
+Date: Fri, 25 Jan 2013 12:55:30 +0900
+Subject: [PATCH 12/15] ARM: mach-shmobile: sh73a0: Allow initialisation of GIC
+ by DT
 In-Reply-To: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359086133-23357-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359086133-23357-13-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bastian Hecht <hechtb@gmail.com>
+This allows the GIC interrupt controller of the sh73a0 SoC to be
+initialised using a flattened device tree blob.
 
-Add the lighest possible sleep mode on Cortex-A9 cores: CPU sleep.
-It is entered by a simple dsb and wfi instruction via cpu_do_idle(). As
-just clocks are stopped there is no need to save or restore any state of
-the system.
+It does not allow the INTC interrupt controller which is also present on
+the sh73a0 SoC to be enabled via device tree.  Nor does it handle sharing
+of interrupts between the GIC and INTC interrupt controllers.
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-Acked-by: Magnus Damm <damm@opensource.se>
-[ horms at verge.net.au: Added missing includes ]
+This limits the usefulness of this code to applications which only wish to
+access devices which use interrupts that can be handled by the GIC
+interrupt controller. Other applications should, for now, continue using
+non-device tree initialisation of the sh72a0 interrupt controllers.
+
+Includes update to use irqchip_init() by Thierry Reding
+
+Cc: Thierry Reding <thierry.reding@avionic-design.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c |    2 ++
- arch/arm/mach-shmobile/include/mach/common.h   |    1 +
- arch/arm/mach-shmobile/pm-r8a7740.c            |   22 ++++++++++++++++++++++
- 3 files changed, 25 insertions(+)
+ arch/arm/boot/dts/sh73a0.dtsi                |   33 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/intc-sh73a0.c         |    9 +++++++
+ 3 files changed, 43 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index e791244..6573137 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -1181,6 +1181,8 @@ static void __init eva_init(void)
- 	rmobile_add_device_to_domain("A4LC", &hdmi_lcdc_device);
- 	if (usb)
- 		rmobile_add_device_to_domain("A3SP", usb);
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+new file mode 100644
+index 0000000..7dae1f4
+--- /dev/null
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -0,0 +1,33 @@
++/*
++ * Device Tree Source for the SH73A0 SoC
++ *
++ * Copyright (C) 2012 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+	r8a7740_pm_init();
- }
- 
- static void __init eva_earlytimer_init(void)
++/include/ "skeleton.dtsi"
++
++/ {
++	compatible = "renesas,sh73a0";
++
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-a9";
++		};
++		cpu at 1 {
++			compatible = "arm,cortex-a9";
++		};
++	};
++
++	gic: interrupt-controller at f0001000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <1>;
++		interrupt-controller;
++		reg = <0xf0001000 0x1000>,
++		      <0xf0000100 0x100>;
++	};
++};
 diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index f221c11..c0ab595 100644
+index 4b1af93..e2ba16b 100644
 --- a/arch/arm/mach-shmobile/include/mach/common.h
 +++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -52,6 +52,7 @@ extern void r8a7740_add_early_devices(void);
- extern void r8a7740_add_standard_devices(void);
- extern void r8a7740_clock_init(u8 md_ck);
- extern void r8a7740_pinmux_init(void);
-+extern void r8a7740_pm_init(void);
+@@ -34,6 +34,7 @@ extern struct clk sh7372_extal1_clk;
+ extern struct clk sh7372_extal2_clk;
  
- extern void r8a7779_init_irq(void);
- extern void r8a7779_map_io(void);
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index 21e5316d..40b87aa 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -9,7 +9,9 @@
-  * for more details.
-  */
- #include <linux/console.h>
-+#include <linux/suspend.h>
- #include <mach/pm-rmobile.h>
-+#include <mach/common.h>
- 
- #ifdef CONFIG_PM
- static int r8a7740_pd_a4s_suspend(void)
-@@ -58,3 +60,23 @@ void __init r8a7740_init_pm_domains(void)
+ extern void sh73a0_init_irq(void);
++extern void sh73a0_init_irq_dt(void);
+ extern void sh73a0_map_io(void);
+ extern void sh73a0_earlytimer_init(void);
+ extern void sh73a0_add_early_devices(void);
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index 45973b5..91faba6 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -23,6 +23,7 @@
+ #include <linux/irq.h>
+ #include <linux/io.h>
+ #include <linux/sh_intc.h>
++#include <linux/irqchip.h>
+ #include <linux/irqchip/arm-gic.h>
+ #include <mach/intc.h>
+ #include <mach/irqs.h>
+@@ -459,3 +460,11 @@ void __init sh73a0_init_irq(void)
+ 	sh73a0_pint1_cascade.handler = sh73a0_pint1_demux;
+ 	setup_irq(gic_spi(34), &sh73a0_pint1_cascade);
  }
- 
- #endif /* CONFIG_PM */
 +
-+#ifdef CONFIG_SUSPEND
-+static int r8a7740_enter_suspend(suspend_state_t suspend_state)
++#ifdef CONFIG_OF
++void __init sh73a0_init_irq_dt(void)
 +{
-+	cpu_do_idle();
-+	return 0;
++	irqchip_init();
++	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
 +}
-+
-+static void r8a7740_suspend_init(void)
-+{
-+	shmobile_suspend_ops.enter = r8a7740_enter_suspend;
-+}
-+#else
-+static void r8a7740_suspend_init(void) {}
 +#endif
-+
-+void __init r8a7740_pm_init(void)
-+{
-+	r8a7740_suspend_init();
-+}
 -- 
 1.7.10.4
