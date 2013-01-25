@@ -1,164 +1,306 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 25 Jan 2013 20:53:57 +0000
-Subject: [PATCH V3 5/8] ARM: kirkwood: consolidate DT init of pcie
+Date: Fri, 25 Jan 2013 20:53:59 +0000
+Subject: [PATCH V3 7/8] mv643xx.c: Add basic device tree support.
 In-Reply-To: <cover.1359146831.git.jason@lakedaemon.net>
 References: <cover.1358983578.git.jason@lakedaemon.net>
  <cover.1359146831.git.jason@lakedaemon.net>
-Message-ID: <c5667ac692651a3b488bfea874688de06dcdf340.1359146831.git.jason@lakedaemon.net>
+Message-ID: <d2db6ddfddf90dd79c6c6c90a6006887076dea1a.1359146831.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ian Molton <ian.molton@codethink.co.uk>
+
+    This patch adds basic device tree support to the mv643xx ethernet driver.
+
+    It should be enough for most current users of the device, and should allow
+    a painless migration.
+
+    Signed-off-by: Ian Molton <ian.molton@codethink.co.uk>
+
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/mach-kirkwood/Makefile         |  1 -
- arch/arm/mach-kirkwood/board-dt.c       | 23 +++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-iconnect.c |  9 ---------
- arch/arm/mach-kirkwood/board-mplcec4.c  |  1 -
- arch/arm/mach-kirkwood/board-nsa310.c   | 25 -------------------------
- arch/arm/mach-kirkwood/board-ts219.c    | 13 -------------
- 6 files changed, 23 insertions(+), 49 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
+ Documentation/devicetree/bindings/net/mv643xx.txt | 75 ++++++++++++++++++
+ drivers/net/ethernet/marvell/mv643xx_eth.c        | 93 +++++++++++++++++++++--
+ 2 files changed, 161 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/mv643xx.txt
 
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index d665309..ee3aa77 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -36,6 +36,5 @@ obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_LITE_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_MINI_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_NSA310_DT)		+= board-nsa310.o
- obj-$(CONFIG_MACH_OPENBLOCKS_A6_DT)	+= board-openblocks_a6.o
- obj-$(CONFIG_MACH_TOPKICK_DT)		+= board-usi_topkick.o
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 8b35157..73b76e4 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -70,6 +70,29 @@ static void __init kirkwood_of_clk_init(void)
- 	kirkwood_legacy_clk_init();
- }
- 
-+static const char * const kirkwood_dt_pcie0_compat[] = {
-+	"iom,iconnect",
-+	"mpl,cec4",
-+	"qnap,ts219",
-+	"zyxel,nsa310",
-+	NULL
+diff --git a/Documentation/devicetree/bindings/net/mv643xx.txt b/Documentation/devicetree/bindings/net/mv643xx.txt
+new file mode 100644
+index 0000000..2727f798
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/mv643xx.txt
+@@ -0,0 +1,75 @@
++mv643xx related nodes.
++
++marvell,mdio-mv643xx:
++
++Required properties:
++
++ - interrupts : <a> where a is the SMI interrupt number.
++ - reg : the base address and size of the controllers register space.
++
++Optional properties:
++ - shared_smi : on some chips, the second PHY is "shared", meaning it is
++	really accessed via the first SMI controller. It is passed in this
++	way due to the present structure of the driver, which requires the
++	base address for the MAC to be passed in via the SMI controllers
++	platform data.
++ - tx_csum_limit : on some devices, this option is required for proper
++	operation wrt. jumbo frames.
++
++
++Example:
++
++smi0: mdio at 72000 {
++	compatible = "marvell,mdio-mv643xx";
++	reg = <0x72000 0x4000>;
++	interrupts = <46>;
++	tx_csum_limit = <1600>;
++	status = "disabled";
 +};
 +
-+static int __init kirkwood_pcie_dt_init(void)
-+{
-+	int i;
++smi1: mdio at 76000 {
++	compatible = "marvell,mdio-mv643xx";
++	reg = <0x76000 0x4000>;
++	interrupts = <47>;
++	shared_smi = <&smi0>;
++	tx_csum_limit = <1600>;
++	status = "disabled";
++};
 +
-+	for (i = 0; kirkwood_dt_pcie0_compat[i] != NULL; i++) {
-+		if (of_machine_is_compatible(kirkwood_dt_pcie0_compat[i])) {
-+			kirkwood_pcie_init(KW_PCIE0);
-+			break;
++
++
++marvell,mv643xx-eth:
++
++Required properties:
++ - interrupts : the port interrupt number.
++ - mdio : phandle of the smi device as drescribed above
++
++Optional properties:
++ - port_number : the port number on this bus.
++ - phy_addr : the PHY address.
++ - reg : should match the mdio reg this device is attached to.
++	this is a required hack for now due to the way the
++	driver is constructed. This allows the device clock to be
++	kept running so that the MAC is not lost after boot.
++
++
++Example:
++
++egiga0 {
++	compatible = "marvell,mv643xx-eth";
++	reg = <0x72000 0x4000>;
++	mdio = <&smi0>;
++	port_number = <0>;
++	phy_addr = <0x80>;
++	interrupts = <11>;
++};
++
++egiga1 {
++	compatible = "marvell,mv643xx-eth";
++	reg = <0x76000 0x4000>;
++	mdio = <&smi1>;
++	port_number = <0>;
++	phy_addr = <0x81>;
++	interrupts = <15>;
++};
++
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 84c1326..7048d7c 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -48,6 +48,9 @@
+ #include <linux/ethtool.h>
+ #include <linux/platform_device.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/of_irq.h>
+ #include <linux/kernel.h>
+ #include <linux/spinlock.h>
+ #include <linux/workqueue.h>
+@@ -2586,7 +2589,7 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
+ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ {
+ 	static int mv643xx_eth_version_printed;
+-	struct mv643xx_eth_shared_platform_data *pd = pdev->dev.platform_data;
++	struct mv643xx_eth_shared_platform_data *pd;
+ 	struct mv643xx_eth_shared_private *msp;
+ 	const struct mbus_dram_target_info *dram;
+ 	struct resource *res;
+@@ -2610,6 +2613,26 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ 	if (msp->base == NULL)
+ 		goto out_free;
+ 
++	if (pdev->dev.of_node) {
++		struct device_node *np = NULL;
++
++		/* when all users of this driver use FDT, we can remove this */
++		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
++		if (!pd) {
++			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
++			goto out_free;
 +		}
++
++		of_property_read_u32(pdev->dev.of_node,
++			"tx_csum_limit", &pd->tx_csum_limit);
++
++		np = of_parse_phandle(pdev->dev.of_node, "shared_smi", 0);
++		if (np)
++			pd->shared_smi = of_find_device_by_node(np);
++
++	} else {
++		pd = pdev->dev.platform_data;
++	}
+ 	/*
+ 	 * Set up and register SMI bus.
+ 	 */
+@@ -2642,7 +2665,6 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+ 	if (res != NULL) {
+ 		int err;
+-
+ 		err = request_irq(res->start, mv643xx_eth_err_irq,
+ 				  IRQF_SHARED, "mv643xx_eth", msp);
+ 		if (!err) {
+@@ -2660,6 +2682,10 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ 
+ 	msp->tx_csum_limit = (pd != NULL && pd->tx_csum_limit) ?
+ 					pd->tx_csum_limit : 9 * 1024;
++
++	if (pdev->dev.of_node)
++		kfree(pd);  /* If we created a fake pd, free it now */
++
+ 	infer_hw_params(msp);
+ 
+ 	platform_set_drvdata(pdev, msp);
+@@ -2693,12 +2719,21 @@ static int mv643xx_eth_shared_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id mv_mdio_dt_ids[] __devinitdata = {
++	{ .compatible = "marvell,mdio-mv643xx", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, mv_mdio_dt_ids);
++#endif
++
+ static struct platform_driver mv643xx_eth_shared_driver = {
+ 	.probe		= mv643xx_eth_shared_probe,
+ 	.remove		= mv643xx_eth_shared_remove,
+ 	.driver = {
+ 		.name	= MV643XX_ETH_SHARED_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(mv_mdio_dt_ids),
+ 	},
+ };
+ 
+@@ -2858,7 +2893,36 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	int err;
+ 
+-	pd = pdev->dev.platform_data;
++	if (pdev->dev.of_node) {
++		struct device_node *np = NULL;
++
++		/* when all users of this driver use FDT, we can remove this */
++		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
++		if (!pd) {
++			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
++			return -ENOMEM;
++		}
++
++		of_property_read_u32(pdev->dev.of_node,
++			"port_number", &pd->port_number);
++
++		if (!of_property_read_u32(pdev->dev.of_node,
++				"phy_addr", &pd->phy_addr))
++			pd->phy_addr = MV643XX_ETH_PHY_ADDR(pd->phy_addr);
++		else
++			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
++
++		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
++		if (np) {
++			pd->shared = of_find_device_by_node(np);
++		} else {
++			kfree(pd);
++			return -ENODEV;
++		}
++	} else {
++		pd = pdev->dev.platform_data;
 +	}
 +
-+	return 0;
-+}
-+subsys_initcall(kirkwood_pcie_dt_init);
+ 	if (pd == NULL) {
+ 		dev_err(&pdev->dev, "no mv643xx_eth_platform_data\n");
+ 		return -ENODEV;
+@@ -2866,12 +2930,15 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 
+ 	if (pd->shared == NULL) {
+ 		dev_err(&pdev->dev, "no mv643xx_eth_platform_data->shared\n");
+-		return -ENODEV;
++		err = -ENODEV;
++		goto out_free_pd;
+ 	}
+ 
+ 	dev = alloc_etherdev_mq(sizeof(struct mv643xx_eth_private), 8);
+-	if (!dev)
+-		return -ENOMEM;
++	if (!dev) {
++		err = -ENOMEM;
++		goto out_free_pd;
++	}
+ 
+ 	mp = netdev_priv(dev);
+ 	platform_set_drvdata(pdev, mp);
+@@ -2908,6 +2975,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 
+ 	init_pscr(mp, pd->speed, pd->duplex);
+ 
++	if (pdev->dev.of_node)
++		kfree(pd); /* If we created a fake pd, free it now */
+ 
+ 	mib_counters_clear(mp);
+ 
+@@ -2927,7 +2996,6 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 	mp->rx_oom.data = (unsigned long)mp;
+ 	mp->rx_oom.function = oom_timer_wrapper;
+ 
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+ 	BUG_ON(!res);
+ 	dev->irq = res->start;
+@@ -2976,6 +3044,8 @@ out:
+ 	}
+ #endif
+ 	free_netdev(dev);
++out_free_pd:
++	kfree(pd);
+ 
+ 	return err;
+ }
+@@ -3015,6 +3085,14 @@ static void mv643xx_eth_shutdown(struct platform_device *pdev)
+ 		port_reset(mp);
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id mv_eth_dt_ids[] __devinitdata = {
++	{ .compatible = "marvell,mv643xx-eth", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, mv_eth_dt_ids);
++#endif
 +
- static void __init kirkwood_dt_init(void)
- {
- 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
-index c8ebde4..ff042dc 100644
---- a/arch/arm/mach-kirkwood/board-iconnect.c
-+++ b/arch/arm/mach-kirkwood/board-iconnect.c
-@@ -10,7 +10,6 @@
+ static struct platform_driver mv643xx_eth_driver = {
+ 	.probe		= mv643xx_eth_probe,
+ 	.remove		= mv643xx_eth_remove,
+@@ -3022,6 +3100,7 @@ static struct platform_driver mv643xx_eth_driver = {
+ 	.driver = {
+ 		.name	= MV643XX_ETH_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(mv_eth_dt_ids),
+ 	},
+ };
  
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/of.h>
- #include <linux/mv643xx_eth.h>
- #include "common.h"
- 
-@@ -22,11 +21,3 @@ void __init iconnect_init(void)
- {
- 	kirkwood_ge00_init(&iconnect_ge00_data);
- }
--
--static int __init iconnect_pci_init(void)
--{
--	if (of_machine_is_compatible("iom,iconnect"))
--		kirkwood_pcie_init(KW_PCIE0);
--	return 0;
--}
--subsys_initcall(iconnect_pci_init);
-diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
-index 7d6dc66..938712e 100644
---- a/arch/arm/mach-kirkwood/board-mplcec4.c
-+++ b/arch/arm/mach-kirkwood/board-mplcec4.c
-@@ -29,7 +29,6 @@ void __init mplcec4_init(void)
- 	 */
- 	kirkwood_ge00_init(&mplcec4_ge00_data);
- 	kirkwood_ge01_init(&mplcec4_ge01_data);
--	kirkwood_pcie_init(KW_PCIE0);
- }
- 
- 
-diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-deleted file mode 100644
-index 55ade93..0000000
---- a/arch/arm/mach-kirkwood/board-nsa310.c
-+++ /dev/null
-@@ -1,25 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/nsa-310-setup.c
-- *
-- * ZyXEL NSA-310 Setup
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <mach/kirkwood.h>
--#include <linux/of.h>
--#include "common.h"
--
--static int __init nsa310_pci_init(void)
--{
--	if (of_machine_is_compatible("zyxel,nsa310"))
--		kirkwood_pcie_init(KW_PCIE0);
--
--	return 0;
--}
--
--subsys_initcall(nsa310_pci_init);
-diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
-index 10fb397..f00c0a9 100644
---- a/arch/arm/mach-kirkwood/board-ts219.c
-+++ b/arch/arm/mach-kirkwood/board-ts219.c
-@@ -17,10 +17,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
- #include <linux/mv643xx_eth.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
- #include <mach/kirkwood.h>
- #include "common.h"
- 
-@@ -38,13 +35,3 @@ void __init qnap_dt_ts219_init(void)
- 
- 	kirkwood_ge00_init(&qnap_ts219_ge00_data);
- }
--
--/* FIXME: Will not work with DT. Maybe use MPP40_GPIO? */
--static int __init ts219_pci_init(void)
--{
--	if (machine_is_ts219())
--		kirkwood_pcie_init(KW_PCIE0);
--
--	return 0;
--}
--subsys_initcall(ts219_pci_init);
 -- 
 1.8.1.1
