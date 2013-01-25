@@ -1,37 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:17:29 +0900
-Subject: [PATCH 3/7] ARM: shmobile: add sample amixer settings for ap4evb
+Date: Fri, 25 Jan 2013 11:17:28 +0900
+Subject: [PATCH 2/7] ARM: shmobile: fix sample amixer settings for mackerel
 In-Reply-To: <1359080253-30995-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080253-30995-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080253-30995-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080253-30995-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-FSI2A-AK4643 needs amixer setting to use it.
-This patch adds quick setting guide
+This patch updates FSI-AK4643 amixer setting
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-ap4evb.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-shmobile/board-mackerel.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index 99ef190..70d287c 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -143,6 +143,10 @@
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 2fed62f..002eaf6 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -202,9 +202,7 @@
   *
-  * SW41	:  ON : SH-Mobile AP4 Audio Mode
-  *	: OFF : Bluetooth Audio Mode
-+ *
-+ * it needs amixer settings for playing
-+ *
+  * it needs amixer settings for playing
+  *
+- * amixer set "Headphone" on
+- * amixer set "HPOUTL Mixer DACH" on
+- * amixer set "HPOUTR Mixer DACH" on
 + * amixer set "Headphone Enable" on
   */
  
- /*
+ /* Fixed 3.3V and 1.8V regulators to be used by multiple devices */
 -- 
 1.7.10.4
