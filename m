@@ -1,34 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 12:55:19 +0900
-Subject: [PATCH 01/15] ARM: shmobile: Remove duplicate inclusion of
- dma-mapping.h in setup-r8a7740.c
+Date: Fri, 25 Jan 2013 12:55:22 +0900
+Subject: [PATCH 04/15] ARM: mach-shmobile: sh73a0 external IRQ wake update
 In-Reply-To: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359086133-23357-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359086133-23357-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sachin Kamat <sachin.kamat@linaro.org>
+From: Magnus Damm <damm@opensource.se>
 
-linux/dma-mapping.h was included twice.
+Use sh73a0_set_wake() for external IRQ signals on sh73a0.
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+The sh73a0 IRQ hardware for external IRQ pins consists of
+the INTCA interrupt controller and the GIC together doing
+their best to limp along. These external IRQ pins are
+treated as a special case where interrupts need to be
+managed in both interrupt controllers in parallel.
+
+The ->irq_set_wake() callback for the external IRQ pins
+can be dealt with in the same way as INTCA-only without
+involving the GIC. So this patch updates the external
+IRQ pin code for sh73a0 to no longer involve the GIC.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-shmobile/intc-sh73a0.c |    7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 03c69f9..9ef397d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -27,7 +27,6 @@
- #include <linux/serial_sci.h>
- #include <linux/sh_dma.h>
- #include <linux/sh_timer.h>
--#include <linux/dma-mapping.h>
- #include <mach/dma-register.h>
- #include <mach/r8a7740.h>
- #include <mach/pm-rmobile.h>
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index 9783699..45973b5 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -315,11 +315,6 @@ static int intca_gic_set_type(struct irq_data *data, unsigned int type)
+ 	return irq_cbp(irq_set_type, to_intca_reloc_irq(data), type);
+ }
+ 
+-static int intca_gic_set_wake(struct irq_data *data, unsigned int on)
+-{
+-	return irq_cbp(irq_set_wake, to_intca_reloc_irq(data), on);
+-}
+-
+ #ifdef CONFIG_SMP
+ static int intca_gic_set_affinity(struct irq_data *data,
+ 				  const struct cpumask *cpumask,
+@@ -339,7 +334,7 @@ struct irq_chip intca_gic_irq_chip = {
+ 	.irq_disable		= intca_gic_disable,
+ 	.irq_shutdown		= intca_gic_disable,
+ 	.irq_set_type		= intca_gic_set_type,
+-	.irq_set_wake		= intca_gic_set_wake,
++	.irq_set_wake		= sh73a0_set_wake,
+ #ifdef CONFIG_SMP
+ 	.irq_set_affinity	= intca_gic_set_affinity,
+ #endif
 -- 
 1.7.10.4
