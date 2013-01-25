@@ -1,42 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 25 Jan 2013 13:43:13 +0530
-Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <1359075633-13502-5-git-send-email-dinguyen@altera.com>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-5-git-send-email-dinguyen@altera.com>
-Message-ID: <51023E99.7040802@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 25 Jan 2013 08:18:11 +0000 (UTC)
+Subject: [PATCH v2 1/4] ARM: OMAP2+: dpll: round rate to closest value
+In-Reply-To: <871e6890897534b6c3669e252f23bef5ff1247b6.1358937533.git.afzal@ti.com>
+References: <cover.1358937533.git.afzal@ti.com>
+ <871e6890897534b6c3669e252f23bef5ff1247b6.1358937533.git.afzal@ti.com>
+Message-ID: <alpine.DEB.2.00.1301250816010.471@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 January 2013 06:30 AM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
->
-> mach-socfpga is another platform that needs to use
-> v7_invalidate_l1 to bringup additional cores. There was a comment that
-> the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
->
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Pavel Machek <pavel@denx.de>
-> ---
->   arch/arm/mach-imx/headsmp.S      |   47 -------------------------------------
->   arch/arm/mach-shmobile/headsmp.S |   48 --------------------------------------
->   arch/arm/mach-tegra/headsmp.S    |   43 ----------------------------------
->   arch/arm/mm/cache-v7.S           |   47 +++++++++++++++++++++++++++++++++++++
->   4 files changed, 47 insertions(+), 138 deletions(-)
->
-Does yor kernel skips the decompresser. Am just curious about
-what you describe above since you should see the issue already
-at decompresser. Your boot loader is expected to clean and
-invalidating the caches before jumping into the kernel.
+Hi
 
-Regards,
-Santosh
+On Wed, 23 Jan 2013, Afzal Mohammed wrote:
+
+> Currently round rate function would return proper rate iff requested
+> rate exactly matches the PLL lockable rate. This causes set_rate to
+> fail if exact rate could not be set. Instead round rate may return
+> closest rate possible (less than the requested). And if any user is
+> badly in need of exact rate, then return value of round rate could
+> be used to decide whether to invoke set rate or not.
+> 
+> Modify round rate so that it return closest possible rate.
+
+This doesn't look like the right approach to me.  For some PLLs, an exact 
+rate is desired.
+
+We removed the rate tolerance code in commit 
+241d3a8dca239610d3d991bf58d4fe38c2d86fd5, but that was probably premature.  
+We've encountered several situations now where we could really use it, 
+like MPU CPUFreq.  I'd suggest reverting 
+241d3a8dca239610d3d991bf58d4fe38c2d86fd5 or using a similar approach.
+
+
+- Paul
