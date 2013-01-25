@@ -1,220 +1,177 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 25 Jan 2013 08:03:22 +0530
-Subject: [PATCH v2 2/6] usb: otg: utils: add facilities in phy lib to support
- multiple PHYs of same type
-In-Reply-To: <1359081206-5602-1-git-send-email-kishon@ti.com>
-References: <1359081206-5602-1-git-send-email-kishon@ti.com>
-Message-ID: <1359081206-5602-3-git-send-email-kishon@ti.com>
+From: xiechao.linux@gmail.com (chao xie)
+Date: Fri, 25 Jan 2013 10:27:15 +0800
+Subject: [V5 PATCH 26/26] usb: ehci: ehci-mv: add device tree support
+In-Reply-To: <20130124111603.GM32237@e106331-lin.cambridge.arm.com>
+References: <1359009530-28182-1-git-send-email-chao.xie@marvell.com>
+ <1359009530-28182-27-git-send-email-chao.xie@marvell.com>
+ <20130124111603.GM32237@e106331-lin.cambridge.arm.com>
+Message-ID: <CAK9wHMQF6UYpc-TVxh1ot9hgmErFfvhFGuPLNQn1CfaMcsnD-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to add support for multipe PHY's of the same type, new API's
-for adding PHY and getting PHY has been added. Now the binding
-information for the PHY and controller should be done in platform file
-using usb_bind_phy API. And for getting a PHY, the device pointer of the
-USB controller and an index should be passed. Based on the binding
-information that is added in the platform file, usb_get_phy_dev will return the
-appropriate PHY.
-Already existing API's to add and get phy by type is not removed. These
-API's are deprecated and will be removed once all the platforms start to
-use the new API.
+2013/1/24 Mark Rutland <mark.rutland@arm.com>:
+> On Thu, Jan 24, 2013 at 06:38:50AM +0000, Chao Xie wrote:
+>> All blocks are removed. Add the device tree support for ehci.
+>
+> Similarly to the last two patches, could you please add a binding document?
+>
+>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+>> ---
+>>  drivers/usb/host/ehci-mv.c |  105 +++++++++++++++++++++++++++++++++----------
+>>  1 files changed, 80 insertions(+), 25 deletions(-)
+>>
+>> diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+>> index 171e145..79eca0c 100644
+>> --- a/drivers/usb/host/ehci-mv.c
+>> +++ b/drivers/usb/host/ehci-mv.c
+>> @@ -13,6 +13,7 @@
+>>  #include <linux/module.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/clk.h>
+>> +#include <linux/of.h>
+>>  #include <linux/err.h>
+>>  #include <linux/usb/otg.h>
+>>  #include <linux/usb/mv_usb2.h>
+>> @@ -32,11 +33,9 @@ struct ehci_hcd_mv {
+>>
+>>       struct usb_phy *otg;
+>>
+>> -     struct mv_usb_platform_data *pdata;
+>> -
+>>       /* clock source and total clock number */
+>>       unsigned int clknum;
+>> -     struct clk *clk[0];
+>> +     struct clk **clk;
+>>  };
+>>
+>>  static void ehci_clock_enable(struct ehci_hcd_mv *ehci_mv)
+>> @@ -138,22 +137,55 @@ static const struct hc_driver mv_ehci_hc_driver = {
+>>       .bus_resume = ehci_bus_resume,
+>>  };
+>>
+>> +static int mv_ehci_parse_dt(struct platform_device *pdev,
+>> +                             struct ehci_hcd_mv *ehci_mv)
+>> +{
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +     unsigned int clks_num;
+>> +     int i, ret;
+>> +     const char *clk_name;
+>> +
+>> +     if (!np)
+>> +             return 1;
+>
+> Perhaps -ENODEV?
+>
+>> +
+>> +     clks_num = of_property_count_strings(np, "clocks");
+>> +     if (clks_num < 0)
+>> +             return clks_num;
+>> +
+>> +     ehci_mv->clk = devm_kzalloc(&pdev->dev,
+>> +             sizeof(struct clk *) * clks_num, GFP_KERNEL);
+>> +     if (ehci_mv->clk == NULL)
+>> +             return -ENOMEM;
+>> +
+>> +     for (i = 0; i < clks_num; i++) {
+>> +             ret = of_property_read_string_index(np, "clocks", i,
+>> +                     &clk_name);
+>> +             if (ret)
+>> +                     return ret;
+>> +             ehci_mv->clk[i] = clk_get(NULL, clk_name);
+>> +             if (IS_ERR(ehci_mv->clk[i]))
+>> +                     return PTR_ERR(ehci_mv->clk[i]);
+>> +     }
+>> +
+>> +     ehci_mv->clknum = clks_num;
+>> +
+>> +     ret = of_property_read_u32(np, "mode", &ehci_mv->mode);
+>> +     if (ret)
+>> +             return ret;
+>
+> Again, this is a bad idea.
+>
+>> +
+>> +     return 0;
+>> +}
+>> +
+>>  static int mv_ehci_probe(struct platform_device *pdev)
+>>  {
+>> -     struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
+>>       struct usb_hcd *hcd;
+>>       struct ehci_hcd *ehci;
+>>       struct ehci_hcd_mv *ehci_mv;
+>>       struct resource *r;
+>> -     int clk_i, retval = -ENODEV;
+>> +     int retval = -ENODEV;
+>>       u32 offset;
+>>       size_t size;
+>>
+>> -     if (!pdata) {
+>> -             dev_err(&pdev->dev, "missing platform_data\n");
+>> -             return -ENODEV;
+>> -     }
+>> -
+>>       if (usb_disabled())
+>>               return -ENODEV;
+>>
+>> @@ -161,7 +193,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
+>>       if (!hcd)
+>>               return -ENOMEM;
+>>
+>> -     size = sizeof(*ehci_mv) + sizeof(struct clk *) * pdata->clknum;
+>> +     size = sizeof(*ehci_mv);
+>>       ehci_mv = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+>>       if (ehci_mv == NULL) {
+>>               dev_err(&pdev->dev, "cannot allocate ehci_hcd_mv\n");
+>> @@ -170,19 +202,36 @@ static int mv_ehci_probe(struct platform_device *pdev)
+>>       }
+>>
+>>       platform_set_drvdata(pdev, ehci_mv);
+>> -     ehci_mv->pdata = pdata;
+>>       ehci_mv->hcd = hcd;
+>>
+>> -     ehci_mv->clknum = pdata->clknum;
+>> -     for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
+>> -             ehci_mv->clk[clk_i] =
+>> -                 devm_clk_get(&pdev->dev, pdata->clkname[clk_i]);
+>> -             if (IS_ERR(ehci_mv->clk[clk_i])) {
+>> -                     dev_err(&pdev->dev, "error get clck \"%s\"\n",
+>> -                             pdata->clkname[clk_i]);
+>> -                     retval = PTR_ERR(ehci_mv->clk[clk_i]);
+>> -                     goto err_clear_drvdata;
+>> +     retval = mv_ehci_parse_dt(pdev, ehci_mv);
+>> +     if (retval > 0) {
+>
+> Is this why you returned 1 from mv_ehci_parse_dt? So you only do this if you
+> don't have a dt node?
+>
+> If so, why not rip the check (and positive error code) out of mv_ehci_parse_dt,
+> and then here:
+>
+> if (pdev->dev.of_node) {
+>         retval = mv_ehci_parse_dt(pdev, ehci_mv);
+> } else
+>         fall back to mv_usb_platform_data ...
+> }
+>
+> That makes it obvious that one side depends on dt and the other's a fallback,
+> and doesn't rely on nonstandard return code behaviour.
+>
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/usb/otg/otg.c   |  118 ++++++++++++++++++++++++++++++++++++++++++++++-
- include/linux/usb/phy.h |   13 ++++++
- 2 files changed, 130 insertions(+), 1 deletion(-)
+I will change it.
 
-diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
-index 8e756d9..4bb4333 100644
---- a/drivers/usb/otg/otg.c
-+++ b/drivers/usb/otg/otg.c
-@@ -36,6 +36,24 @@ static struct usb_phy *__usb_find_phy(struct list_head *list,
- 	return ERR_PTR(-ENODEV);
- }
- 
-+static struct usb_phy *__usb_find_phy_dev(struct device *dev,
-+	struct list_head *list, u8 index)
-+{
-+	struct usb_phy_bind *phy_bind = NULL;
-+
-+	list_for_each_entry(phy_bind, list, list) {
-+		if (!(strcmp(phy_bind->dev_name, dev_name(dev))) &&
-+				phy_bind->index == index) {
-+			if (phy_bind->phy)
-+				return phy_bind->phy;
-+			else
-+				return ERR_PTR(-EPROBE_DEFER);
-+		}
-+	}
-+
-+	return ERR_PTR(-ENODEV);
-+}
-+
- static void devm_usb_phy_release(struct device *dev, void *res)
- {
- 	struct usb_phy *phy = *(struct usb_phy **)res;
-@@ -112,6 +130,69 @@ err0:
- EXPORT_SYMBOL(usb_get_phy);
- 
- /**
-+ * usb_get_phy_dev - find the USB PHY
-+ * @dev - device that requests this phy
-+ * @index - the index of the phy
-+ *
-+ * Returns the phy driver, after getting a refcount to it; or
-+ * -ENODEV if there is no such phy.  The caller is responsible for
-+ * calling usb_put_phy() to release that count.
-+ *
-+ * For use by USB host and peripheral drivers.
-+ */
-+struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
-+{
-+	struct usb_phy	*phy = NULL;
-+	unsigned long	flags;
-+
-+	spin_lock_irqsave(&phy_lock, flags);
-+
-+	phy = __usb_find_phy_dev(dev, &phy_bind_list, index);
-+	if (IS_ERR(phy)) {
-+		pr_err("unable to find transceiver\n");
-+		goto err0;
-+	}
-+
-+	get_device(phy->dev);
-+
-+err0:
-+	spin_unlock_irqrestore(&phy_lock, flags);
-+
-+	return phy;
-+}
-+EXPORT_SYMBOL(usb_get_phy_dev);
-+
-+/**
-+ * devm_usb_get_phy_dev - find the USB PHY using device ptr and index
-+ * @dev - device that requests this phy
-+ * @index - the index of the phy
-+ *
-+ * Gets the phy using usb_get_phy_dev(), and associates a device with it using
-+ * devres. On driver detach, release function is invoked on the devres data,
-+ * then, devres data is freed.
-+ *
-+ * For use by USB host and peripheral drivers.
-+ */
-+struct usb_phy *devm_usb_get_phy_dev(struct device *dev, u8 index)
-+{
-+	struct usb_phy **ptr, *phy;
-+
-+	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return NULL;
-+
-+	phy = usb_get_phy_dev(dev, index);
-+	if (!IS_ERR(phy)) {
-+		*ptr = phy;
-+		devres_add(dev, ptr);
-+	} else
-+		devres_free(ptr);
-+
-+	return phy;
-+}
-+EXPORT_SYMBOL(devm_usb_get_phy_dev);
-+
-+/**
-  * devm_usb_put_phy - release the USB PHY
-  * @dev - device that wants to release this phy
-  * @phy - the phy returned by devm_usb_get_phy()
-@@ -186,6 +267,36 @@ out:
- EXPORT_SYMBOL(usb_add_phy);
- 
- /**
-+ * usb_add_phy_dev - declare the USB PHY
-+ * @x: the USB phy to be used; or NULL
-+ *
-+ * This call is exclusively for use by phy drivers, which
-+ * coordinate the activities of drivers for host and peripheral
-+ * controllers, and in some cases for VBUS current regulation.
-+ */
-+int usb_add_phy_dev(struct usb_phy *x)
-+{
-+	struct usb_phy_bind *phy_bind;
-+	unsigned long flags;
-+
-+	if (!x->dev) {
-+		dev_err(x->dev, "no device provided for PHY\n");
-+		return -EINVAL;
-+	}
-+
-+	spin_lock_irqsave(&phy_lock, flags);
-+	list_for_each_entry(phy_bind, &phy_bind_list, list)
-+		if (!(strcmp(phy_bind->phy_dev_name, dev_name(x->dev))))
-+			phy_bind->phy = x;
-+
-+	list_add_tail(&x->head, &phy_list);
-+
-+	spin_unlock_irqrestore(&phy_lock, flags);
-+	return 0;
-+}
-+EXPORT_SYMBOL(usb_add_phy_dev);
-+
-+/**
-  * usb_remove_phy - remove the OTG PHY
-  * @x: the USB OTG PHY to be removed;
-  *
-@@ -194,10 +305,15 @@ EXPORT_SYMBOL(usb_add_phy);
- void usb_remove_phy(struct usb_phy *x)
- {
- 	unsigned long	flags;
-+	struct usb_phy_bind *phy_bind;
- 
- 	spin_lock_irqsave(&phy_lock, flags);
--	if (x)
-+	if (x) {
-+		list_for_each_entry(phy_bind, &phy_bind_list, list)
-+			if (phy_bind->phy == x)
-+				phy_bind->phy = NULL;
- 		list_del(&x->head);
-+	}
- 	spin_unlock_irqrestore(&phy_lock, flags);
- }
- EXPORT_SYMBOL(usb_remove_phy);
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index e7eb429..d1675e8 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -124,6 +124,7 @@ struct usb_phy_bind {
- 
- /* for board-specific init logic */
- extern int usb_add_phy(struct usb_phy *, enum usb_phy_type type);
-+extern int usb_add_phy_dev(struct usb_phy *);
- extern void usb_remove_phy(struct usb_phy *);
- 
- /* helpers for direct access thru low-level io interface */
-@@ -164,6 +165,8 @@ usb_phy_shutdown(struct usb_phy *x)
- extern struct usb_phy *usb_get_phy(enum usb_phy_type type);
- extern struct usb_phy *devm_usb_get_phy(struct device *dev,
- 	enum usb_phy_type type);
-+extern struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index);
-+extern struct usb_phy *devm_usb_get_phy_dev(struct device *dev, u8 index);
- extern void usb_put_phy(struct usb_phy *);
- extern void devm_usb_put_phy(struct device *dev, struct usb_phy *x);
- extern int usb_bind_phy(const char *dev_name, u8 index,
-@@ -180,6 +183,16 @@ static inline struct usb_phy *devm_usb_get_phy(struct device *dev,
- 	return NULL;
- }
- 
-+static inline struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
-+{
-+	return NULL;
-+}
-+
-+static inline struct usb_phy *devm_usb_get_phy_dev(struct device *dev, u8 index)
-+{
-+	return NULL;
-+}
-+
- static inline void usb_put_phy(struct usb_phy *x)
- {
- }
--- 
-1.7.9.5
+> Also, why not return immediately if mv_ehci_parse_dt fails?
+>
+I do not understand. if mv_ehci_parse_dt returns negative value, the
+probe will be finished immediately.
+
+> [...]
+>
+> Thanks,
+> Mark.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
