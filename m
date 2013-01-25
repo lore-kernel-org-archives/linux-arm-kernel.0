@@ -1,77 +1,53 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Fri, 25 Jan 2013 17:33:42 +0000
-Subject: [PATCH v3 1/1 net-next] net: fec: enable pause frame to improve
- rx prefomance for 1G network
-In-Reply-To: <CAHrpEqRKhXRg-SsigWdnfV-RBWSc=OH9ECqQnKHDvmbn8e4a2A@mail.gmail.com>
-References: <1358391358-27977-1-git-send-email-Frank.Li@freescale.com>
- <1358973584.2658.14.camel@bwh-desktop.uk.solarflarecom.com>
- <CAHrpEqSzu97X2PUgUEh30EqkbjLUYyhCN28AEzJ6eLPXx0Qg1Q@mail.gmail.com>
- <1359046173.2736.2.camel@bwh-desktop.uk.solarflarecom.com>
- <CAHrpEqRKhXRg-SsigWdnfV-RBWSc=OH9ECqQnKHDvmbn8e4a2A@mail.gmail.com>
-Message-ID: <1359135222.2644.2.camel@bwh-desktop.uk.solarflarecom.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 25 Jan 2013 23:17:48 +0530
+Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
+In-Reply-To: <1359130838.32148.5.camel@linux-builds1>
+References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
+ <1359075633-13502-5-git-send-email-dinguyen@altera.com>
+ <51023E99.7040802@ti.com> <1359130838.32148.5.camel@linux-builds1>
+Message-ID: <5102C544.6010600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-01-25 at 09:50 +0800, Frank Li wrote:
-> 2013/1/25 Ben Hutchings <bhutchings@solarflare.com>:
-> > On Thu, 2013-01-24 at 10:16 +0800, Frank Li wrote:
-> >> 2013/1/24 Ben Hutchings <bhutchings@solarflare.com>:
-> >> > On Thu, 2013-01-17 at 10:55 +0800, Frank Li wrote:
-> >> >> The limition of imx6 internal bus cause fec can't achieve 1G perfomance.
-> >> >> There will be many packages lost because FIFO over run.
-> >> >>
-> >> >> This patch enable pause frame flow control.
-> >> > [...]
-> >> >> --- a/drivers/net/ethernet/freescale/fec.c
-> >> >> +++ b/drivers/net/ethernet/freescale/fec.c
-> >> > [...]
-> >> >> +static int fec_enet_set_pauseparam(struct net_device *ndev,
-> >> >> +                                struct ethtool_pauseparam *pause)
-> >> >> +{
-> >> >> +     struct fec_enet_private *fep = netdev_priv(ndev);
-> >> >> +
-> >> >> +     if (pause->tx_pause != pause->rx_pause) {
-> >> >> +             netdev_info(ndev,
-> >> >> +                     "hardware only support enable/disable both tx and rx");
-> >> >> +             return -EINVAL;
-> >> >> +     }
-> >> >> +
-> >> >> +     fep->pause_flag = 0;
-> >> >> +
-> >> >> +     /* tx pause must be same as rx pause */
-> >> >> +     fep->pause_flag |= pause->rx_pause ? FEC_PAUSE_FLAG_ENABLE : 0;
-> >> >> +     fep->pause_flag |= pause->autoneg ? FEC_PAUSE_FLAG_AUTONEG : 0;
-> >> >> +
-> >> >> +     if (pause->rx_pause || pause->autoneg) {
-> >> >> +             fep->phy_dev->supported |= ADVERTISED_Pause;
-> >> >> +             fep->phy_dev->advertising |= ADVERTISED_Pause;
-> >> >> +     } else {
-> >> >> +             fep->phy_dev->supported &= ~ADVERTISED_Pause;
-> >> >> +             fep->phy_dev->advertising &= ~ADVERTISED_Pause;
-> >> >> +     }
-> >> > [...]
-> >> >
-> >> > Why is this changing the supported flags, i.e. device capabilities?  You
-> >> > need to leave those flags alone and reject an attempt to enable pause
-> >> > frames on a device that doesn't support them.
-> >>
-> >> I go through phylib, I have not found good place set ADVERTISED_Pause
-> >> capabilities.
-> >> genphy_config_init never check Pause capabilities.
-> >
-> > I agree that phylib can't initialise pause capabilities because those
-> > depend on the MAC.  But look at which function I'm quoting: this is the
-> > ethtool operation, which shouldn't change capabilities.
-> 
-> Where is good place do you think? in probe function?
+On Friday 25 January 2013 09:50 PM, Dinh Nguyen wrote:
+> Hi Santosh,
+>
+> On Fri, 2013-01-25 at 13:43 +0530, Santosh Shilimkar wrote:
+>> On Friday 25 January 2013 06:30 AM, dinguyen at altera.com wrote:
+>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>
+>>> mach-socfpga is another platform that needs to use
+>>> v7_invalidate_l1 to bringup additional cores. There was a comment that
+>>> the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
+>>>
+>>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Olof Johansson <olof@lixom.net>
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>>> Cc: Simon Horman <horms@verge.net.au>
+>>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+>>> Cc: Pavel Machek <pavel@denx.de>
+>>> ---
+>>>    arch/arm/mach-imx/headsmp.S      |   47 -------------------------------------
+>>>    arch/arm/mach-shmobile/headsmp.S |   48 --------------------------------------
+>>>    arch/arm/mach-tegra/headsmp.S    |   43 ----------------------------------
+>>>    arch/arm/mm/cache-v7.S           |   47 +++++++++++++++++++++++++++++++++++++
+>>>    4 files changed, 47 insertions(+), 138 deletions(-)
+>>>
+>> Does yor kernel skips the decompresser. Am just curious about
+>> what you describe above since you should see the issue already
+>> at decompresser. Your boot loader is expected to clean and
+>> invalidating the caches before jumping into the kernel.
+>
+> This is for bringing up the 2nd core after the main CPU is already
+> alive. Indeed, I did see this issue when the main CPU was coming up and
+> have changed the bootloader to clean and invalidate the caches.
+>
+Ahh. I understand it now.
 
-You're already setting the supported flag in fec_enet_mii_probe().  I
-assume (without great familiarity with phylib) that that's the right
-place to do it.
-
-Ben.
-
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+Regards
+Santosh
