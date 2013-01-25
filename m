@@ -1,47 +1,38 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 25 Jan 2013 15:56:52 +0530
-Subject: [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB
-Message-ID: <1359109615-2410-1-git-send-email-kishon@ti.com>
+Date: Fri, 25 Jan 2013 15:56:54 +0530
+Subject: [PATCH v3 2/3] ARM: dts: omap: Add omap-usb2 dt data
+In-Reply-To: <1359109615-2410-1-git-send-email-kishon@ti.com>
+References: <1359109615-2410-1-git-send-email-kishon@ti.com>
+Message-ID: <1359109615-2410-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds dt data to get MUSB working in omap4 and omap3.
-Long time back a patch series with the same title was sent but only
-a part of it got merged. The rest of it wasn't merged because of
-adding omap control usb data to glue and usb phy.
+Add omap-usb2 data node in omap4 device tree file. Since omap-usb2 is
+connected to ocp2scp, omap-usb2 dt data is added as a child node
+of ocp2scp. The information about this data node is availabe @
+Documentation/devicetree/bindings/usb/usb-phy.txt
 
-Now there exists a separate driver for control usb and hence added a
-separate dt node for control usb.
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-Changes from v2:
-* Changed property names from "ti,has_mailbox" to "ti,has-mailbox",
-  "ctrl_module" to "ctrl-module", "usb_phy" to "usb-phy"
-
-Changes from v1:
-* "ti,has_mailbox" property is removed and "ti,type" property is added
-  and filled with value "1" to specify it has a mailbox
-
-This series was developed on
-git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
-+ "usb: musb: add driver for control module" patch series
-
-Did basic enumeration testing in omap4 panda, omap4 sdp and omap3 beagle.
-
-Kishon Vijay Abraham I (3):
-  ARM: dts: omap: Add omap control usb data
-  ARM: dts: omap: Add omap-usb2 dt data
-  ARM: dts: omap: Add usb_otg and glue data
-
- Documentation/devicetree/bindings/usb/omap-usb.txt |    2 ++
- arch/arm/boot/dts/omap3-beagle-xm.dts              |    6 +++++
- arch/arm/boot/dts/omap3-evm.dts                    |    6 +++++
- arch/arm/boot/dts/omap3-overo.dtsi                 |    6 +++++
- arch/arm/boot/dts/omap3.dtsi                       |   12 +++++++++
- arch/arm/boot/dts/omap4-panda.dts                  |    6 +++++
- arch/arm/boot/dts/omap4-sdp.dts                    |    6 +++++
- arch/arm/boot/dts/omap4.dtsi                       |   26 ++++++++++++++++++++
- arch/arm/boot/dts/twl4030.dtsi                     |    2 +-
- 9 files changed, 71 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index ffc7352..c829d7e 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -438,6 +438,11 @@
+ 			#size-cells = <1>;
+ 			ranges;
+ 			ti,hwmods = "ocp2scp_usb_phy";
++			usb2_phy: usb2phy at 4a0ad080 {
++				compatible = "ti,omap-usb2";
++				reg = <0x4a0ad080 0x58>;
++				ctrl-module = <&omap_control_usb>;
++			};
+ 		};
+ 
+ 		timer1: timer at 4a318000 {
 -- 
 1.7.9.5
