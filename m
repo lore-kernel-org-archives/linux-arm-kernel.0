@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 25 Jan 2013 11:24:15 +0900
-Subject: [PATCH 39/80] sh: sh7785: Register PFC platform device
+Date: Fri, 25 Jan 2013 11:24:16 +0900
+Subject: [PATCH 40/80] sh: sh7786: Register PFC platform device
 In-Reply-To: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359080696-31489-40-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359080696-31489-41-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,39 +18,39 @@ Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
  arch/sh/Kconfig                         |    1 +
- arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c |    3 ++-
+ arch/sh/kernel/cpu/sh4a/pinmux-sh7786.c |    3 ++-
  2 files changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index c99193f..7d5bc1d 100644
+index 7d5bc1d..27f0b73 100644
 --- a/arch/sh/Kconfig
 +++ b/arch/sh/Kconfig
-@@ -494,6 +494,7 @@ config CPU_SUBTYPE_SH7785
- 	select ARCH_SPARSEMEM_ENABLE
- 	select SYS_SUPPORTS_NUMA
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
+@@ -507,6 +507,7 @@ config CPU_SUBTYPE_SH7786
+ 	select USB_OHCI_SH if USB_OHCI_HCD
+ 	select USB_ARCH_HAS_EHCI
+ 	select USB_EHCI_SH if USB_EHCI_HCD
 +	select PINCTRL
  
- config CPU_SUBTYPE_SH7786
- 	bool "Support SH7786 processor"
-diff --git a/arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c b/arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c
-index 5ebc25f..da0bd79 100644
---- a/arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c
-+++ b/arch/sh/kernel/cpu/sh4a/pinmux-sh7785.c
-@@ -11,6 +11,7 @@
+ config CPU_SUBTYPE_SHX3
+ 	bool "Support SH-X3 processor"
+diff --git a/arch/sh/kernel/cpu/sh4a/pinmux-sh7786.c b/arch/sh/kernel/cpu/sh4a/pinmux-sh7786.c
+index 60df99c..be876b0 100644
+--- a/arch/sh/kernel/cpu/sh4a/pinmux-sh7786.c
++++ b/arch/sh/kernel/cpu/sh4a/pinmux-sh7786.c
+@@ -16,6 +16,7 @@
  #include <linux/init.h>
  #include <linux/kernel.h>
  #include <linux/gpio.h>
 +#include <cpu/pfc.h>
- #include <cpu/sh7785.h>
+ #include <cpu/sh7786.h>
  
  enum {
-@@ -1304,7 +1305,7 @@ static struct pinmux_info sh7785_pinmux_info = {
+@@ -837,7 +838,7 @@ static struct pinmux_info sh7786_pinmux_info = {
  
  static int __init plat_pinmux_setup(void)
  {
--	return register_pinmux(&sh7785_pinmux_info);
-+	return sh_pfc_register_info(NULL, NULL, 0, &sh7785_pinmux_info);
+-	return register_pinmux(&sh7786_pinmux_info);
++	return sh_pfc_register_info(NULL, NULL, 0, &sh7786_pinmux_info);
  }
  
  arch_initcall(plat_pinmux_setup);
