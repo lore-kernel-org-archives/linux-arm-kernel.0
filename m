@@ -1,23 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 25 Jan 2013 08:10:23 +0000 (UTC)
-Subject: [PATCH] ARM: omap4: clock data: Add missing clkdm association
- for dpll_usb
-In-Reply-To: <1359095795-9538-1-git-send-email-rnayak@ti.com>
-References: <1359095795-9538-1-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.00.1301250810090.471@utopia.booyaka.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 25 Jan 2013 13:43:13 +0530
+Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
+In-Reply-To: <1359075633-13502-5-git-send-email-dinguyen@altera.com>
+References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
+ <1359075633-13502-5-git-send-email-dinguyen@altera.com>
+Message-ID: <51023E99.7040802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Jan 2013, Rajendra Nayak wrote:
+On Friday 25 January 2013 06:30 AM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+>
+> mach-socfpga is another platform that needs to use
+> v7_invalidate_l1 to bringup additional cores. There was a comment that
+> the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
+>
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Pavel Machek <pavel@denx.de>
+> ---
+>   arch/arm/mach-imx/headsmp.S      |   47 -------------------------------------
+>   arch/arm/mach-shmobile/headsmp.S |   48 --------------------------------------
+>   arch/arm/mach-tegra/headsmp.S    |   43 ----------------------------------
+>   arch/arm/mm/cache-v7.S           |   47 +++++++++++++++++++++++++++++++++++++
+>   4 files changed, 47 insertions(+), 138 deletions(-)
+>
+Does yor kernel skips the decompresser. Am just curious about
+what you describe above since you should see the issue already
+at decompresser. Your boot loader is expected to clean and
+invalidating the caches before jumping into the kernel.
 
-> dpll_usb needs the clkdm association so the clkdm can be
-> turned on before a relock. All other dplls for omap4 belong
-> to the ALWON (always on) domain.
-> 
-> The association was present as part of the older data file
-> (clock44xx_data.c) but looks like was accidently dropped with
-> the common clk convertion.
-
-Thanks, queued for v3.8-rc fixes.
-
-- Paul
+Regards,
+Santosh
