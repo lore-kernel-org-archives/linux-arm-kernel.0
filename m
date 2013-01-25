@@ -1,26 +1,129 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 25 Jan 2013 08:23:02 +0000 (UTC)
-Subject: OMAP baseline test results for v3.8-rc4
-In-Reply-To: <1358846666.3996.3.camel@coredoba.hi.pengutronix.de>
-References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
- <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
- <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
- <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
- <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
- <1358846666.3996.3.camel@coredoba.hi.pengutronix.de>
-Message-ID: <alpine.DEB.2.00.1301250822270.471@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 25 Jan 2013 09:16:27 +0100
+Subject: [PATCH v3 2/3] gpio: pca953x: add support for pca9505
+In-Reply-To: <1358889025-8530-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
+ <1358889025-8530-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <CACRpkda-N0GrKOeaz4Hji0ef9pSRNPCxW_jLGR28iX-sk0-=tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jan,
+On Tue, Jan 22, 2013 at 10:10 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 
-On Tue, 22 Jan 2013, Jan L?bbe wrote:
+> Now that pca953x driver can handle GPIO expanders with more than 32
+> bits this patch adds the support for the pca9505 which cam with 40
+> GPIOs.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-> Just a guess, but there can be problems when the appended DTB crosses an
-> 1MB boundary. See this mail for details and a patch:
-> http://www.spinics.net/lists/arm-kernel/msg216898.html
+Patch applied, thanks.
 
-Thanks for the suggestion.  That patch didn't fix it for me.
+But guys, this driver contains some horrific stuff, look at this:
+
+static int pxa_gpio_nums(void)
+{
+        int count = 0;
+
+#ifdef CONFIG_ARCH_PXA
+        if (cpu_is_pxa25x()) {
+#ifdef CONFIG_CPU_PXA26x
+                count = 89;
+                gpio_type = PXA26X_GPIO;
+#elif defined(CONFIG_PXA25x)
+                count = 84;
+                gpio_type = PXA26X_GPIO;
+#endif /* CONFIG_CPU_PXA26x */
+        } else if (cpu_is_pxa27x()) {
+                count = 120;
+                gpio_type = PXA27X_GPIO;
+        } else if (cpu_is_pxa93x()) {
+                count = 191;
+                gpio_type = PXA93X_GPIO;
+        } else if (cpu_is_pxa3xx()) {
+                count = 127;
+                gpio_type = PXA3XX_GPIO;
+        }
+#endif /* CONFIG_ARCH_PXA */
+
+#ifdef CONFIG_ARCH_MMP
+        if (cpu_is_pxa168() || cpu_is_pxa910()) {
+                count = 127;
+                gpio_type = MMP_GPIO;
+        } else if (cpu_is_mmp2()) {
+                count = 191;
+                gpio_type = MMP_GPIO;
+        }
+#endif /* CONFIG_ARCH_MMP */
+        return count;
+}
+
+This is totally killing all attempts at a single kernel for multiple
+machines in this family. The above should not be #ifdef's but instead
+use either platform data or the compatible property to figure out which
+one to use.
+
+It's fine to introduce new compatible= strings or device names to
+distinguish between these.
+
+As an example, in pinctrl-nomadik.c we have this:
+
+static const struct of_device_id nmk_pinctrl_match[] = {
+        {
+                .compatible = "stericsson,nmk_pinctrl",
+                .data = (void *)PINCTRL_NMK_DB8500,
+        },
+        {},
+};
+
+static const struct platform_device_id nmk_pinctrl_id[] = {
+        { "pinctrl-stn8815", PINCTRL_NMK_STN8815 },
+        { "pinctrl-db8500", PINCTRL_NMK_DB8500 },
+        { "pinctrl-db8540", PINCTRL_NMK_DB8540 },
+        { }
+};
+
+static struct platform_driver nmk_pinctrl_driver = {
+        .driver = {
+                .owner = THIS_MODULE,
+                .name = "pinctrl-nomadik",
+                .of_match_table = nmk_pinctrl_match,
+        },
+        .probe = nmk_pinctrl_probe,
+        .id_table = nmk_pinctrl_id,
+};
 
 
-- Paul
+The first match is for DT boot the latter for using the platform
+device name directly.
+
+Then in the probefunction we do:
+
+static int nmk_pinctrl_probe(struct platform_device *pdev)
+{
+        const struct platform_device_id *platid = platform_get_device_id(pdev);
+(...)
+        if (platid)
+                version = platid->driver_data;
+        else if (np) {
+                const struct of_device_id *match;
+
+                match = of_match_device(nmk_pinctrl_match, &pdev->dev);
+                if (!match)
+                        return -ENODEV;
+                version = (unsigned int) match->data;
+        }
+(...)
+        if (version == PINCTRL_NMK_STN8815)
+                nmk_pinctrl_stn8815_init(&npct->soc);
+        if (version == PINCTRL_NMK_DB8500)
+                nmk_pinctrl_db8500_init(&npct->soc);
+        if (version == PINCTRL_NMK_DB8540)
+                nmk_pinctrl_db8540_init(&npct->soc);
+}
+
+Surely a scheme like this must be possible to use to distinguish between
+the different versions at runtime rather than using these #ifdefs?
+
+Yours,
+Linus Walleij
