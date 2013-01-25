@@ -1,32 +1,97 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 25 Jan 2013 13:30:09 +0100
-Subject: [PATCH 1/2] ARM: dts: omap3-overo: Add support for pwm-leds
-In-Reply-To: <510278B8.40809@epfl.ch>
-References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
- <1358963812-19947-2-git-send-email-florian.vaussard@epfl.ch>
- <5101510C.9050407@ti.com> <51015663.8080109@epfl.ch>
- <5101570A.1030303@ti.com> <5101663C.7020301@epfl.ch> <51016A84.20703@ti.com>
- <5101A43D.7080108@epfl.ch> <51024254.40208@ti.com> <5102756A.9040901@ti.com>
- <510278B8.40809@epfl.ch>
-Message-ID: <51027AD1.60107@ti.com>
+Date: Fri, 25 Jan 2013 13:32:03 +0100
+Subject: [PATCH 1/3] pwm: Add pwm_cansleep() as exported API to users
+In-Reply-To: <1359108114-16998-2-git-send-email-florian.vaussard@epfl.ch>
+References: <1359108114-16998-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359108114-16998-2-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <51027B43.1080504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2013 01:21 PM, Florian Vaussard wrote:
->>>
->>> We have two drivers at the moment: pwm-twl and pwm-twl-led. However new out of
->>> SoC PWM drivers might come (for example for palmas). So it worth take a look
->>> at some generic implementation.
->>
->> OK. So I have the series. I need to add few more things but pwm-leds on
->> BeagleBoard works fine when I put the default_trigger for the pmustat LED to
->> be mmc0. It is blinking happily ;)
->> I'll CC you with the patches when I send them.
->>
+On 01/25/2013 11:01 AM, Florian Vaussard wrote:
+> Calls to some external PWM chips can sleep. To help users,
+> add pwm_cansleep() API.
 > 
-> I sent a patchset 2 hours ago with you in CC, you haven't received them?
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> ---
+>  drivers/pwm/core.c  |   12 ++++++++++++
+>  include/linux/pwm.h |   10 ++++++++++
+>  2 files changed, 22 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> index 4a13da4..f49bfa6 100644
+> --- a/drivers/pwm/core.c
+> +++ b/drivers/pwm/core.c
+> @@ -763,6 +763,18 @@ void devm_pwm_put(struct device *dev, struct pwm_device *pwm)
+>  }
+>  EXPORT_SYMBOL_GPL(devm_pwm_put);
+>  
+> +/**
+> +  * pwm_can_sleep() - report whether pwm access will sleep
+> +  * @pwm: PWM device
+> +  *
+> +  * It returns nonzero if accessing the PWM can sleep.
+> +  */
+> +int pwm_can_sleep(struct pwm_device *pwm)
+> +{
+> +	return pwm->chip->can_sleep;
+> +}
+> +EXPORT_SYMBOL_GPL(pwm_can_sleep);
 
-I have not noticed them. Going through them right now.
+Can we name this as pwm_cansleep() to be more alligned with the
+gpio_cansleep() API?
+
+> +
+>  #ifdef CONFIG_DEBUG_FS
+>  static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
+>  {
+> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> index 70655a2..2aee75d 100644
+> --- a/include/linux/pwm.h
+> +++ b/include/linux/pwm.h
+> @@ -146,6 +146,8 @@ struct pwm_ops {
+>   * @base: number of first PWM controlled by this chip
+>   * @npwm: number of PWMs controlled by this chip
+>   * @pwms: array of PWM devices allocated by the framework
+> + * @can_sleep: flag must be set iff config()/enable()/disable() methods sleep,
+> + *      as they must while accessing PWM chips over I2C or SPI
+>   */
+>  struct pwm_chip {
+>  	struct device		*dev;
+> @@ -159,6 +161,7 @@ struct pwm_chip {
+>  	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
+>  					    const struct of_phandle_args *args);
+>  	unsigned int		of_pwm_n_cells;
+> +	unsigned int		can_sleep:1;
+>  };
+>  
+>  #if IS_ENABLED(CONFIG_PWM)
+> @@ -182,6 +185,8 @@ struct pwm_device *devm_pwm_get(struct device *dev, const char *con_id);
+>  struct pwm_device *devm_of_pwm_get(struct device *dev, struct device_node *np,
+>  				   const char *con_id);
+>  void devm_pwm_put(struct device *dev, struct pwm_device *pwm);
+> +
+> +int pwm_can_sleep(struct pwm_device *pwm);
+>  #else
+>  static inline int pwm_set_chip_data(struct pwm_device *pwm, void *data)
+>  {
+> @@ -242,6 +247,11 @@ static inline struct pwm_device *devm_of_pwm_get(struct device *dev,
+>  static inline void devm_pwm_put(struct device *dev, struct pwm_device *pwm)
+>  {
+>  }
+> +
+> +static inline int pwm_can_sleep(struct pwm_device *pwm)
+> +{
+> +	return -EINVAL;
+
+I think we should return 0 here instead an error.
+
+> +}
+>  #endif
+>  
+>  struct pwm_lookup {
+> 
+
 
 -- 
 P?ter
