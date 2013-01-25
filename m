@@ -1,32 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 25 Jan 2013 11:01:25 +0100
-Subject: [PATCH 05/10] gpio: pxa: remove gpio_type
-In-Reply-To: <1358929554-32265-6-git-send-email-haojian.zhuang@linaro.org>
-References: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
- <1358929554-32265-6-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdYj3Bm0GKhdvcmvwu4mz3YLTnyaOWjGT7qt2atbZ_x2EA@mail.gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Fri, 25 Jan 2013 11:01:51 +0100
+Subject: [PATCH 0/3] leds-pwm: Defer PWM calls if PWM can sleep
+Message-ID: <1359108114-16998-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 9:25 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+Hello,
 
-> Since gpio_type is used to check whether gafr register is valid. So
-> move it into platform data.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+When using the leds-pwm module with external PWM chips connected through
+I2C, the kernel will panic when settings a trigger. In this case, PWM
+calls can sleep, and should be deferred.
 
-(...)
+Patch 1 and 2 add the necessary API to the PWM subsystem, and update
+matching drivers.
 
-> +++ b/drivers/gpio/gpio-pxa.c
-> @@ -72,6 +72,7 @@ struct pxa_gpio_chip {
->         void __iomem    *regbase;
->         unsigned int    irq_base;
->         unsigned int    inverted;
-> +       unsigned int    gafr;
->         char label[10];
+Patch 3 updates leds-pwm to use a worker if the PWM chip can sleep, or performs
+direct calls otherwise.
 
-Also looks like some kind of a bool.
+This patchset is based on the for-next branch of the led subsystem [1],
+as patch 3 depends on the recent work of Peter for DT bindings in leds-pwm.
+The pwm patches should probably follow the same path.
 
-Yours,
-Linus Walleij
+Tested on Overo (OMAP3 + TWL4030) with device tree.
+
+Best regards,
+
+Florian
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
+
+
+Florian Vaussard (3):
+  pwm: Add pwm_cansleep() as exported API to users
+  pwm: Add can_sleep property to drivers
+  leds: leds-pwm: Defer led_pwm_set() if PWM can sleep
+
+ drivers/leds/leds-pwm.c   |   45 +++++++++++++++++++++++++++++++++++++++------
+ drivers/pwm/core.c        |   12 ++++++++++++
+ drivers/pwm/pwm-twl-led.c |    1 +
+ drivers/pwm/pwm-twl.c     |    1 +
+ include/linux/pwm.h       |   10 ++++++++++
+ 5 files changed, 63 insertions(+), 6 deletions(-)
+
+-- 
+1.7.5.4
