@@ -1,32 +1,27 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 25 Jan 2013 11:16:29 -0700
-Subject: [RFC PATCH 4/4] net: mvmdio: add getter and setter for PHY
- addresses
-In-Reply-To: <1359108409-4378-5-git-send-email-florian@openwrt.org>
-References: <1359108409-4378-1-git-send-email-florian@openwrt.org>
- <1359108409-4378-5-git-send-email-florian@openwrt.org>
-Message-ID: <20130125181629.GA7393@obsidianresearch.com>
+Date: Fri, 25 Jan 2013 11:21:37 -0700
+Subject: [PATCH/RFC 2/3] ethernet: add a PHY reset GPIO DT binding to
+ sh_eth
+In-Reply-To: <Pine.LNX.4.64.1301251127460.17518@axis700.grange>
+References: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
+ <1359043653-11374-3-git-send-email-g.liakhovetski@gmx.de>
+ <7921225.sfO3PIeLVS@avalon>
+ <Pine.LNX.4.64.1301251127460.17518@axis700.grange>
+Message-ID: <20130125182137.GB7393@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 11:06:49AM +0100, Florian Fainelli wrote:
-> This patch adds orion_mdio_{set,get}_phy_addr(.., port_number, phy_addr)
-> which is a feature available in this MDIO driver to monitor a particular
-> PHY address. This brings mvmdio one step closer to what is used in
-> mv643x_eth.
+On Fri, Jan 25, 2013 at 11:34:55AM +0100, Guennadi Liakhovetski wrote:
 
-This seems really strange.
+> > Is there no need to reset the phy at runtime ?
+> 
+> No idea, I'm not developing the driver, I'm just porting one specific 
+> feature from one API to another with no functional changes (apart from 
+> postponing setting the GPIO).
 
-Are you sure this should be part of the MDIO driver? Based on my docs,
-this register is part of the ethernet controller HW, which
-autonomously reads from the phy via MDIO.
-
-It seems cleaner to set this register from the ethernet controller
-based on the phy it is using and keep the MDIO driver purely for MDIO
-bus access.
-
-It is acceptable to overlap the device address ranges, start the
-ethernet controller at 72000 and start the MDIO at 72004, the platform
-bus code automatically nests them.
+Generally Linux relies on resetting the phy via the inband MDIO method,
+which is what Linux does. It is pretty much never required to reset
+via the hard pin - but you do need to generate a robust reset edge on
+the reset pin once after power up.
 
 Jason
