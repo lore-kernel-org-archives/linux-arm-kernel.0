@@ -1,99 +1,116 @@
-From: blauwirbel@gmail.com (Blue Swirl)
-Date: Fri, 25 Jan 2013 19:04:11 +0000
-Subject: [Qemu-devel] [RFC] Virtio-desktop: Virtio-based virtual desktop
-In-Reply-To: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
-References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
-Message-ID: <CAAu8pHve_E-jtQAXidxroWHRVi_QKaYs6YeQhHqEap2bd7RMEQ@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 25 Jan 2013 11:08:01 -0800 (PST)
+Subject: [PATCH 5/6] ARM: dts: Add basic dts include files for Samsung
+ S3C64xx SoCs
+In-Reply-To: <20130116105957.GA1963@linaro.org>
+References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
+ <20130114150531.GE21142@e102568-lin.cambridge.arm.com>
+ <20130116105957.GA1963@linaro.org>
+Message-ID: <3747315.IyCCRDXgbD@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 6:10 AM, Anup Patel <anup.patel@linaro.org> wrote:
-> Hi All,
->
-> How about having a generic Virtio-based machine for emulating a virtual
-> desktop ?
+Hi,
 
-I have also thought about this, current virtio design is not very
-clean. On the downside, pure no-legacy approach might not work well if
-you want the host to give control of a host device to guest (VFIO like
-pass through using IOMMUs).
+On Wednesday 16 of January 2013 10:59:57 Dave Martin wrote:
+> On Mon, Jan 14, 2013 at 03:05:32PM +0000, Lorenzo Pieralisi wrote:
+> > On Mon, Jan 14, 2013 at 02:48:41PM +0000, Mark Rutland wrote:
+> > > Hello,
+> > > 
+> > > This all looks good. I just have a couple of comments about the cpus
+> > > node.> > 
+> > > On Sun, Jan 13, 2013 at 01:10:57AM +0000, Tomasz Figa wrote:
+> > > > This patch adds basic device tree definitions for Samsung S3C64xx
+> > > > SoCs.
+> > > > 
+> > > > Since all the SoCs in the series are very similar, the files are
+> > > > created hierarchically - one file for the whole series and then
+> > > > separate files for particular SoCs including the common one.
+> > > > 
+> > > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > > 
+> > > [...]
+> > > 
+> > > > diff --git a/arch/arm/boot/dts/s3c64xx.dtsi
+> > > > b/arch/arm/boot/dts/s3c64xx.dtsi new file mode 100644
+> > > > index 0000000..55d6e08
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/boot/dts/s3c64xx.dtsi
+> > > > @@ -0,0 +1,97 @@
+> > > > +/*
+> > > > + * Samsung's S3C64xx SoC series common device tree source
+> > > > + *
+> > > > + * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
+> > > > + *
+> > > > + * Samsung's S3C64xx SoC series device nodes are listed in this
+> > > > file.
+> > > > + * Particular SoCs from S3C64xx series can include this file and
+> > > > provide + * values for SoCs specfic bindings.
+> > > > + *
+> > > > + * Note: This file does not include device nodes for all the
+> > > > controllers in + * S3C64xx SoCs. As device tree coverage for
+> > > > S3C64xx increases, additional + * nodes can be added to this
+> > > > file.
+> > > > + *
+> > > > + * This program is free software; you can redistribute it and/or
+> > > > modify + * it under the terms of the GNU General Public License
+> > > > version 2 as + * published by the Free Software Foundation.
+> > > > + */
+> > > > +
+> > > > +/include/ "skeleton.dtsi"
+> > > > +
+> > > > +/ {
+> > > > +	cpus {
+> > > > +		cpu at 0 {
+> > > > +			compatible = "arm,arm1176jzf-s";
+> > > > +		};
+> > > > +	};
+> > > 
+> > > You can drop the unit address from the cpu node - it's meant to be
+> > > there to differentiate multiple nodes (and is supposed to match the
+> > > reg property, which the 1176jzf-s can't have, as it doesn't have an
+> > > MPIDR).
+> > 
+> > Well, this is a point that I should consider since the kernel docs I
+> > wrote are misleading, they require the reg property that can not be
+> > there on UP. True, MPIDR does not exist in this case, but I have to
+> > document this in the bindings since it is unclear.
+> > 
+> > > Also, "arm,arm1176jzf-s" isn't listed in the binding doc. There was
+> > > a question about how to maintain this list [1], but I can't seem to
+> > > find a conclusion, if any were reached.  It might be worth
+> > > appending "arm,arm1176" to the compatible list for the cpu node in
+> > > case we want to enable something via dt for all 1176 variations.
+> > > 
+> > > Dave, Lorenzo, any thoughts?
+> > 
+> > Eh, frankly I do not know how to handle this. Either we add a
+> > compatible string to the bindings anytime a DT gets merged in the
+> > kernel but how to maintain it, it has to be defined. Happy to hear
+> > some feedback on this.
+> 
+> Well, the number of CPU types does not grow rapidly.  It will be much
+> less than one per SoC -- so keeping the list up to date shouldn't be
+> that much effort.
+> 
+> For ARM1176JZF-S, it could make sense for the comatible list to be
+> 
+> 	"arm,arm1176jzf-s", "arm,arm1176"
+> 
+> ...since the differences between 1176 variants are software probeable
+> (i.e., whether there is an FPU or not).  AFAIK the J, Z apply to all
+> ARM1176, and the -S (synthesisable RTL) is nothing to do with software.
+> The kernel probably only really needs to know "arm,arm1176".
 
-> I know folks have already thought about this and probably also tried
-> something or other on this front but, it will be good to know the downsides.
->
-> Virtio-desktop can be a separate specification describing a virtual desktop.
-> Of-course we cannot avoid few architecture dependent virtual devices in but
-> the Virtio-desktop specification will try to keep minimum possible
-> architecture dependent devices.
->
-> As per our thoughts, a Virtio-desktop will have two kinds of devices:
-> 1. Architecture dependent devices: This devices will be emulated in-kernel
-> by architecture specific code of KVM or Xen or Some other hypervisor.
->    a) Virtualized CPU
->    b) Virtualized PIC (i.e. in-kernel architecture specific emulation of
-> irqchip)
->    c) Virtualized Timer (i.e. in-kernel architecture specific emulation of
-> timer chip)
+OK. So the conclusion is that I should change the cpus node to following:
 
-I think reusing PIC and timer design is not the most optimal. What a
-PV aware OS really wants is to wake up because of an external event or
-at some specific point of time (or after a specific delay) and easy
-way to manage the VM clock without timer tick counting. With a
-tickless approach, it would need the timer events as rarely as
-possible.
+       cpus {
+               cpu {
+                       compatible = "arm,arm1176jzf-s", "arm,arm1176";
+               };
+       };
 
-Perhaps a better approach would be to introduce a way for the guest to
-subscribe to a list of external events (including time), which would
-be fed to it via something like reverse hypercall (or just use legacy
-interrupts). Preferably it should be possible to pass any events
-through a stack of guests to the end consumer guest and even
-applications in a guest.
+Am I right?
 
-> 2. Architecture independent devices: This are Virtio-based devices which are
-> usually required by a desktop virtual machine.
->    a) Virtio-blk (storage)
->       - Already available
->    b) Virtio-net (network)
->      - Already available
->    c) Virtio-fb (display)
->      - It seems some work has been already done for Virtio frame buffer but
-> I did not find drivers/fb/virtio-fb.c in latest kernel
->        (http://thread.gmane.org/gmane.comp.emulators.kvm.devel/42720)
->      - Is Virtio-fb work still in-progress ??
->    d) Virtio-input (keyboard/mouse/multi-touch)
->      - Currently not available
->      - It will provide keyboard input events
->      - It will provide mouse input events
->      - It will provide multi-touch input events
->    e) Virtio-power (reset/shutdown/enumeration)
->      - It can provides info about the entire virtual machine including CPU,
-> PIC, Timer, available Virtio devices, etc.
->      - It can also provide CPU and Virtio-device hot-plugging
->      - Its primary purpose would be to provide reset and shutdown of CPU and
-> Virtio devices.
->      - There will be only one instance of this device and its location will
-> be fixed for each architecture.
-
-d) and e) would be also covered by the PV event device. Perhaps also a) and b).
-
-I'm not sure how c) would be different from X11 (the original network
-protocol using version, not Wayland).
-
->
-> The Virtio-desktop specification may also describe a recommended memory map
-> of for each architecture.
-
-Memory management (ballooning and page faults) could also use the
-event device. The use of events could also avoid memory to memory
-copies (zero copy) by letting the host manage the buffer memory.
-
->
-> Right now, only missing devices seems to be Virtio-fb, Virtio-input, and
-> Virtio-power, which some of us are willing to take-up.
->
-> IMHO, If we have something like Virtio-desktop specification then all
-> possible guest OSes can have support for it and different hypervisor can
-> emulate it without worrying about guest support.
->
-> Best Regards,
-> Anup
+Best regards,
+Tomasz
