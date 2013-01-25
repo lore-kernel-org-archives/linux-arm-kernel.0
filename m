@@ -1,47 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 22:44:05 +0000
-Subject: [PATCH 06/19] sched/debug: fix format string for 32 bit platforms
+Date: Fri, 25 Jan 2013 22:44:08 +0000
+Subject: [PATCH 09/19] mfd/twl4030: don't warn about uninitialized return code
 In-Reply-To: <1359153858-31992-1-git-send-email-arnd@arndb.de>
 References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
  <1359153858-31992-1-git-send-email-arnd@arndb.de>
-Message-ID: <1359153858-31992-7-git-send-email-arnd@arndb.de>
+Message-ID: <1359153858-31992-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The type returned from atomic64_t can be either unsigned
-long or unsigned long long, depending on the architecture.
-Using a cast to unsigned long long lets us use the same
-format string for all architectures.
+If the twl4030_write_script function gets called with
+a zero length argument, its return value does not
+get set. We know that all scripts have a nonzero
+length, but returning an error in case they ever
+do is probably appropriate.
 
-Without this patch, building with scheduler debugging
-enabled results in:
+Without this patch, building omap2plus_defconfig results in:
 
-kernel/sched/debug.c: In function 'print_cfs_rq':
-kernel/sched/debug.c:225:2: warning: format '%ld' expects argument of type 'long int', but argument 4 has type 'long long int' [-Wformat]
-kernel/sched/debug.c:225:2: warning: format '%ld' expects argument of type 'long int', but argument 3 has type 'long long int' [-Wformat]
+drivers/mfd/twl4030-power.c: In function 'load_twl4030_script':
+drivers/mfd/twl4030-power.c:414:5: error: 'err' may be used uninitialized in this function
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Paul Turner <pjt@google.com>
+Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: "Kristo, Tero" <t-kristo@ti.com>
 ---
- kernel/sched/debug.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/mfd/twl4030-power.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
-index 2cd3c1b..7ae4c4c 100644
---- a/kernel/sched/debug.c
-+++ b/kernel/sched/debug.c
-@@ -222,8 +222,8 @@ void print_cfs_rq(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
- 			cfs_rq->runnable_load_avg);
- 	SEQ_printf(m, "  .%-30s: %lld\n", "blocked_load_avg",
- 			cfs_rq->blocked_load_avg);
--	SEQ_printf(m, "  .%-30s: %ld\n", "tg_load_avg",
--			atomic64_read(&cfs_rq->tg->load_avg));
-+	SEQ_printf(m, "  .%-30s: %lld\n", "tg_load_avg",
-+			(unsigned long long)atomic64_read(&cfs_rq->tg->load_avg));
- 	SEQ_printf(m, "  .%-30s: %lld\n", "tg_load_contrib",
- 			cfs_rq->tg_load_contrib);
- 	SEQ_printf(m, "  .%-30s: %d\n", "tg_runnable_contrib",
+diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
+index 4dae241..dd362c1 100644
+--- a/drivers/mfd/twl4030-power.c
++++ b/drivers/mfd/twl4030-power.c
+@@ -159,7 +159,7 @@ out:
+ static int twl4030_write_script(u8 address, struct twl4030_ins *script,
+ 				       int len)
+ {
+-	int err;
++	int err = -EINVAL;
+ 
+ 	for (; len; len--, address++, script++) {
+ 		if (len == 1) {
 -- 
 1.8.0
