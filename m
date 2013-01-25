@@ -1,56 +1,64 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 25 Jan 2013 14:07:20 +0100
-Subject: [PATCH 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can sleep
-In-Reply-To: <510282C9.5020509@epfl.ch>
-References: <1359108114-16998-1-git-send-email-florian.vaussard@epfl.ch>
- <1359108114-16998-4-git-send-email-florian.vaussard@epfl.ch>
- <51028041.2060504@ti.com> <510282C9.5020509@epfl.ch>
-Message-ID: <51028388.3050903@ti.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Fri, 25 Jan 2013 13:19:08 +0000
+Subject: [PATCH 1/4] drm/tilcdc: add TI LCD Controller DRM driver (v3)
+In-Reply-To: <1358894185-21617-2-git-send-email-robdclark@gmail.com>
+References: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
+ <1358894185-21617-2-git-send-email-robdclark@gmail.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA939BB@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2013 02:04 PM, Florian Vaussard wrote:
+Hi Rob,
 
->>> @@ -153,6 +182,8 @@ static int led_pwm_probe(struct platform_device *pdev)
->>>               led_dat->cdev.max_brightness = cur_led->max_brightness;
->>>               led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
->>>
->>> +            INIT_WORK(&led_dat->work, led_pwm_work);
->>
->> If we query the can_sleep before we can skip the INIT_WORK() when it is not
->> set.
->>
-> 
-> I will do like this.
+On Wed, Jan 23, 2013 at 04:06:22, Rob Clark wrote:
 
-On the other hand you should also check at remove time that you are not going
-to cancel a work on a non initialized one.
+> A simple DRM/KMS driver for the TI LCD Controller found in various
+> smaller TI parts (AM33xx, OMAPL138, etc).  This driver uses the
 
-> 
->>> +
->>>               ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
->>>               if (ret < 0)
->>>                   goto err;
->>> @@ -180,8 +211,10 @@ static int led_pwm_remove(struct platform_device *pdev)
->>>       struct led_pwm_priv *priv = platform_get_drvdata(pdev);
->>>       int i;
->>>
->>> -    for (i = 0; i < priv->num_leds; i++)
->>> +    for (i = 0; i < priv->num_leds; i++) {
->>>           led_classdev_unregister(&priv->leds[i].cdev);
->>> +        cancel_work_sync(&priv->leds[i].work);
->>> +    }
->>>
->>>       return 0;
->>>   }
->>>
->>
->>
-> 
-> Thank you,
-> 
-> Florian
+> +void tilcdc_crtc_update_clk(struct drm_crtc *crtc)
 
+> +	/* in raster mode, minimum divisor is 2: */
+> +	ret = clk_set_rate(priv->disp_clk, crtc->mode.clock * 1000 * 2);
 
--- 
-P?ter
+These things can better be handled with divider clock having a
+minimum value (being discussed with Mike on how exactly it should
+be) and instead of setting rate over a platform specific clock,
+you can set rate over lcd clock using SET_RATE_PARENT at platform
+level, more below,
+
+> +	/* Configure the LCD clock divisor. */
+> +	tilcdc_write(dev, LCDC_CTRL_REG, LCDC_CLK_DIVISOR(div) |
+> +			LCDC_RASTER_MODE);
+> +
+> +	if (priv->rev == 2)
+> +		tilcdc_set(dev, LCDC_CLK_ENABLE_REG,
+> +				LCDC_V2_DMA_CLK_EN | LCDC_V2_LIDD_CLK_EN |
+> +				LCDC_V2_CORE_CLK_EN);
+
+Mike was suggesting to model the above using gate/divider/composite
+clocks of CCF in the FB driver.
+
+> +	priv->clk = clk_get(dev->dev, "fck");
+> +	if (IS_ERR(priv->clk)) {
+> +		dev_err(dev->dev, "failed to get functional clock\n");
+> +		ret = -ENODEV;
+> +		goto fail;
+> +	}
+> +
+> +	priv->disp_clk = clk_get(dev->dev, "dpll_disp_ck");
+> +	if (IS_ERR(priv->clk)) {
+> +		dev_err(dev->dev, "failed to get display clock\n");
+> +		ret = -ENODEV;
+> +		goto fail;
+> +	}
+
+"dpll_disp_ck" is a platform specific matter, driver should not
+be handling platform specifics. And this won't work on DaVinci,
+you can probably make use of
+
+my series "[PATCH v2 0/4] ARM: AM335x: LCDC platform support"
+
+or something similar to overcome this.
+
+Regards
+Afzal
