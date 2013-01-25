@@ -1,39 +1,47 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 25 Jan 2013 15:56:53 +0530
-Subject: [PATCH v3 1/3] ARM: dts: omap: Add omap control usb data
-In-Reply-To: <1359109615-2410-1-git-send-email-kishon@ti.com>
-References: <1359109615-2410-1-git-send-email-kishon@ti.com>
-Message-ID: <1359109615-2410-2-git-send-email-kishon@ti.com>
+Date: Fri, 25 Jan 2013 15:56:52 +0530
+Subject: [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB
+Message-ID: <1359109615-2410-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap control usb data in omap4 device tree file. This will have the
-register address of registers to power on the PHY and to write to
-mailbox. The information about this data node is available @
-Documentation/devicetree/bindings/usb/omap-usb.txt
+This patch series adds dt data to get MUSB working in omap4 and omap3.
+Long time back a patch series with the same title was sent but only
+a part of it got merged. The rest of it wasn't merged because of
+adding omap control usb data to glue and usb phy.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/omap4.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Now there exists a separate driver for control usb and hence added a
+separate dt node for control usb.
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 739bb79..ffc7352 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -529,5 +529,13 @@
- 			ti,hwmods = "timer11";
- 			ti,timer-pwm;
- 		};
-+
-+		omap_control_usb: omap-control-usb at 4a002300 {
-+			compatible = "ti,omap-control-usb";
-+			reg = <0x4a002300 0x4>,
-+			      <0x4a00233c 0x4>;
-+			reg-names = "control_dev_conf", "otghs_control";
-+			ti,type = <1>;
-+		};
- 	};
- };
+Changes from v2:
+* Changed property names from "ti,has_mailbox" to "ti,has-mailbox",
+  "ctrl_module" to "ctrl-module", "usb_phy" to "usb-phy"
+
+Changes from v1:
+* "ti,has_mailbox" property is removed and "ti,type" property is added
+  and filled with value "1" to specify it has a mailbox
+
+This series was developed on
+git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
++ "usb: musb: add driver for control module" patch series
+
+Did basic enumeration testing in omap4 panda, omap4 sdp and omap3 beagle.
+
+Kishon Vijay Abraham I (3):
+  ARM: dts: omap: Add omap control usb data
+  ARM: dts: omap: Add omap-usb2 dt data
+  ARM: dts: omap: Add usb_otg and glue data
+
+ Documentation/devicetree/bindings/usb/omap-usb.txt |    2 ++
+ arch/arm/boot/dts/omap3-beagle-xm.dts              |    6 +++++
+ arch/arm/boot/dts/omap3-evm.dts                    |    6 +++++
+ arch/arm/boot/dts/omap3-overo.dtsi                 |    6 +++++
+ arch/arm/boot/dts/omap3.dtsi                       |   12 +++++++++
+ arch/arm/boot/dts/omap4-panda.dts                  |    6 +++++
+ arch/arm/boot/dts/omap4-sdp.dts                    |    6 +++++
+ arch/arm/boot/dts/omap4.dtsi                       |   26 ++++++++++++++++++++
+ arch/arm/boot/dts/twl4030.dtsi                     |    2 +-
+ 9 files changed, 71 insertions(+), 1 deletion(-)
+
 -- 
 1.7.9.5
