@@ -1,38 +1,56 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Jan 2013 22:44:06 +0000
-Subject: [PATCH 07/19] scripts/sortextable: silence script output
+Date: Fri, 25 Jan 2013 22:44:16 +0000
+Subject: [PATCH 17/19] input/joystick: use get_cycles on ARM
 In-Reply-To: <1359153858-31992-1-git-send-email-arnd@arndb.de>
 References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
  <1359153858-31992-1-git-send-email-arnd@arndb.de>
-Message-ID: <1359153858-31992-8-git-send-email-arnd@arndb.de>
+Message-ID: <1359153858-31992-18-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exception table sorter outputs one line every time
-it gets called, e.g. 'sort done marker at 66dc00', which
-is slightly annoying when doing 'make -s' which is otherwise
-completely silent. Since that output is not helpful to
-most people building the kernel, turn it off by default.
+ARM normally has an accurate clock source, so
+we can theoretically use analog joysticks more
+accurately and at the same time avoid the
+build warning
+
+ #warning Precise timer not defined for this architecture.
+
+from the joystick driver.
+
+Now, why anybody would use that driver no ARM I have no
+idea, but Ben Dooks enabled it in the s3c2410_defconfig
+along with a bunch of other drivers, even though that
+platform has neither ISA nor PCI support. It still
+seems to be the right thing to fix this quirk.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: David Daney <david.daney@cavium.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: Vojtech Pavlik <vojtech@suse.cz>
+Cc: Ben Dooks <ben-linux@fluff.org>
 ---
- scripts/sortextable.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/input/joystick/analog.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/scripts/sortextable.h b/scripts/sortextable.h
-index e4fd45b..f5eb43d 100644
---- a/scripts/sortextable.h
-+++ b/scripts/sortextable.h
-@@ -182,7 +182,7 @@ do_func(Elf_Ehdr *ehdr, char const *const fname, table_sort_t custom_sort)
- 		_r(&sort_needed_sym->st_value) -
- 		_r(&sort_needed_sec->sh_addr);
- 
--#if 1
-+#if 0
- 	printf("sort done marker at %lx\n",
- 	       (unsigned long)((char *)sort_done_location - (char *)ehdr));
- #endif
+diff --git a/drivers/input/joystick/analog.c b/drivers/input/joystick/analog.c
+index 358cd7e..9c3e3c1 100644
+--- a/drivers/input/joystick/analog.c
++++ b/drivers/input/joystick/analog.c
+@@ -158,14 +158,10 @@ static unsigned int get_time_pit(void)
+ #define GET_TIME(x)	rdtscl(x)
+ #define DELTA(x,y)	((y)-(x))
+ #define TIME_NAME	"TSC"
+-#elif defined(__alpha__)
++#elif defined(__alpha__) || defined(CONFIG_MN10300) || defined(CONFIG_ARM)
+ #define GET_TIME(x)	do { x = get_cycles(); } while (0)
+ #define DELTA(x,y)	((y)-(x))
+-#define TIME_NAME	"PCC"
+-#elif defined(CONFIG_MN10300)
+-#define GET_TIME(x)	do { x = get_cycles(); } while (0)
+-#define DELTA(x, y)	((x) - (y))
+-#define TIME_NAME	"TSC"
++#define TIME_NAME	"get_cycles"
+ #else
+ #define FAKE_TIME
+ static unsigned long analog_faketime = 0;
 -- 
 1.8.0
