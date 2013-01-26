@@ -1,68 +1,150 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 26 Jan 2013 23:02:09 +0100
-Subject: [PATCH v3 2/3] gpio: pca953x: add support for pca9505
-In-Reply-To: <CACRpkdbe1fGVLNyJ+U+ozE32p+_fc-eQ4W1F8OeYC+fryu_dQQ@mail.gmail.com>
-References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
- <1358889025-8530-3-git-send-email-gregory.clement@free-electrons.com>
- <CACRpkda-N0GrKOeaz4Hji0ef9pSRNPCxW_jLGR28iX-sk0-=tg@mail.gmail.com>
- <51024422.2060503@free-electrons.com>
- <CACRpkdbe1fGVLNyJ+U+ozE32p+_fc-eQ4W1F8OeYC+fryu_dQQ@mail.gmail.com>
-Message-ID: <51045261.5020709@free-electrons.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sat, 26 Jan 2013 23:21:27 +0100
+Subject: [PATCH] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+In-Reply-To: <1359208550-16402-1-git-send-email-shawn.guo@linaro.org>
+References: <1359208550-16402-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <7196597.b9sJl95POM@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2013 09:51 AM, Linus Walleij wrote:
-> On Fri, Jan 25, 2013 at 9:36 AM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
+On Saturday, January 26, 2013 09:55:50 PM Shawn Guo wrote:
+> As multiplatform build is being adopted by more and more ARM platforms,
+> initcall function should be used very carefully.  For example, when
+> GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
+> will be called on all the platforms to initialize cpufreq-cpu0 driver.
 > 
->> Well, at the beginning I thought adding support for pca9505 was just a matter
->> of a couple of lines to add. Then I realized that I need to handle the 40 bits
->> case, and I ended up refactoring all access to the registers. So now I am on it,
->> it seems I am volunteer to continue to improve this driver.
+> To eliminate this undesired the effect, the patch changes cpufreq-cpu0
+> driver to have it instantiated as a platform_driver.  Then it will only
+> run on platforms that create the platform_device "cpufreq-cpu0".
 > 
-> I like the sound of this ;-)
+> Along with the change, it also changes cpu_dev to be &pdev->dev,
+> so that managed functions can start working, and module build gets
+> supported too.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> Rafael,
+> 
+> The patch depends patch "power: export opp cpufreq functions".
+> https://patchwork.kernel.org/patch/1847261/
 
-I was about to fix the issues you have pointed but I didn't find anything like
+That one should use EXPORT_SYMBOL_GPL() for exporting symbols, though.
 
-#ifdef CONFIG_ARCH_PXA
-        if (cpu_is_pxa25x()) {
-#ifdef CONFIG_CPU_PXA26x
-                count = 89;
-                gpio_type = PXA26X_GPIO;
-#elif defined(CONFIG_PXA25x)
+Care to add a fixed version to the patch set along with the $subject one?
 
+> AnilKumar,
+> 
+> Unfortunately, the change will require some platform level adoption
+> to have cpufreq-cpu0 driver continue working for am33xx.  But it should
+> be as simple as something like below.
+> 
+> 	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
+> 	platform_device_register_full(&devinfo);
 
-in the pca953x driver! I think you messed up with another patch set!
+That should be included in your patch, then.
 
-I saw that Haojian Zhuang have sent a patch set for gpio-pxa and
-among this set the patch "[PATCH 06/10] gpio: pxa: define nr gpios
-in platform data" seemed to exactly what you've expected.
-
-> 
-> To get you started I just sent out two other patches you can consider
-> as RFC, they're regrettably not even compile-tested. I mainly wanted
-> to indicate what needs to be done so we can throw them away, just
-> wanted to give a hint.
-> 
->> However I won't be able to test it, the only PXA based platform I have is a
->> Zaurus SL-C3100 which embeds a PXA270 if I remember well, but I doubt it come
->> with gpio expander on i2c.
-> 
-> Well I guess if there is nobody testing it, then nobody cares.
-> The world must be full of people with PXA platforms doing nothing
-> but regression testing...
-> 
-> Actually just days ago I asked Haoijan to help me testing a set of
-> patches for the PXA SPI controller, and he kindly helped out, so there
-> are some people booting these platforms, sometimes :-)
-> 
-> Yours,
-> Linus Walleij
-> 
+Thanks,
+Rafael
 
 
+>  drivers/cpufreq/Kconfig        |    2 +-
+>  drivers/cpufreq/cpufreq-cpu0.c |   35 +++++++++++++++++++++++------------
+>  2 files changed, 24 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+> index ea512f4..774dc1c 100644
+> --- a/drivers/cpufreq/Kconfig
+> +++ b/drivers/cpufreq/Kconfig
+> @@ -180,7 +180,7 @@ config CPU_FREQ_GOV_CONSERVATIVE
+>  	  If in doubt, say N.
+>  
+>  config GENERIC_CPUFREQ_CPU0
+> -	bool "Generic CPU0 cpufreq driver"
+> +	tristate "Generic CPU0 cpufreq driver"
+>  	depends on HAVE_CLK && REGULATOR && PM_OPP && OF
+>  	select CPU_FREQ_TABLE
+>  	help
+> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+> index debc5a7..dae0667 100644
+> --- a/drivers/cpufreq/cpufreq-cpu0.c
+> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+> @@ -12,12 +12,12 @@
+>  #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
+>  
+>  #include <linux/clk.h>
+> -#include <linux/cpu.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/err.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/opp.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/slab.h>
+>  
+> @@ -177,7 +177,7 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
+>  	.attr = cpu0_cpufreq_attr,
+>  };
+>  
+> -static int cpu0_cpufreq_driver_init(void)
+> +static int cpu0_cpufreq_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *np;
+>  	int ret;
+> @@ -188,23 +188,17 @@ static int cpu0_cpufreq_driver_init(void)
+>  		return -ENOENT;
+>  	}
+>  
+> -	cpu_dev = get_cpu_device(0);
+> -	if (!cpu_dev) {
+> -		pr_err("failed to get cpu0 device\n");
+> -		ret = -ENODEV;
+> -		goto out_put_node;
+> -	}
+> -
+> +	cpu_dev = &pdev->dev;
+>  	cpu_dev->of_node = np;
+>  
+> -	cpu_clk = clk_get(cpu_dev, NULL);
+> +	cpu_clk = devm_clk_get(cpu_dev, NULL);
+>  	if (IS_ERR(cpu_clk)) {
+>  		ret = PTR_ERR(cpu_clk);
+>  		pr_err("failed to get cpu0 clock: %d\n", ret);
+>  		goto out_put_node;
+>  	}
+>  
+> -	cpu_reg = regulator_get(cpu_dev, "cpu0");
+> +	cpu_reg = devm_regulator_get(cpu_dev, "cpu0");
+>  	if (IS_ERR(cpu_reg)) {
+>  		pr_warn("failed to get cpu0 regulator\n");
+>  		cpu_reg = NULL;
+> @@ -267,7 +261,24 @@ out_put_node:
+>  	of_node_put(np);
+>  	return ret;
+>  }
+> -late_initcall(cpu0_cpufreq_driver_init);
+> +
+> +static int cpu0_cpufreq_remove(struct platform_device *pdev)
+> +{
+> +	cpufreq_unregister_driver(&cpu0_cpufreq_driver);
+> +	opp_free_cpufreq_table(cpu_dev, &freq_table);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver cpu0_cpufreq_platdrv = {
+> +	.driver = {
+> +		.name	= "cpufreq-cpu0",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe		= cpu0_cpufreq_probe,
+> +	.remove		= cpu0_cpufreq_remove,
+> +};
+> +module_platform_driver(cpu0_cpufreq_platdrv);
+>  
+>  MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
+>  MODULE_DESCRIPTION("Generic CPU0 cpufreq driver");
+> 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
