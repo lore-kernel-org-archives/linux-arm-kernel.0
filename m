@@ -1,26 +1,91 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Jan 2013 16:12:56 +0100
-Subject: [PATCH V3 8/8] ARM: kirkwood: mv643xx_eth dt conversion
-In-Reply-To: <20130126150611.GL1758@titan.lakedaemon.net>
-References: <cover.1359146831.git.jason@lakedaemon.net>
- <a4805edf01c39a374d71fbf4a6b6207dedf6b2bf.1359146831.git.jason@lakedaemon.net>
- <20130126123827.GA5786@lunn.ch>
- <20130126150611.GL1758@titan.lakedaemon.net>
-Message-ID: <20130126151256.GF29973@lunn.ch>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sat, 26 Jan 2013 16:16:45 +0100
+Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
+In-Reply-To: <50C8AC3C.9020908@ti.com>
+References: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
+ <50C8AC3C.9020908@ti.com>
+Message-ID: <CABuKBeJsHCq98Pe-BwPajbQ+2OLQpwrbtVTJe=j9thPDQCCBrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Something is not right here, or i'm not understanding something. DT
-> > devices should not need code like this, only devices not yet using
-> > DT....
-> 
-> Yes, hence my frustration yesterday.  I posted this so everyone could
-> see exactly what I was working with, and perhaps spot something I had
-> missed.  Looks like you did in your followup to Sebastian.
+Hi Benoit,
 
-Hi Jason
+2012/12/12 Benoit Cousson <b-cousson@ti.com>:
+> Hi Matthias,
+>
+> On 12/12/2012 04:33 PM, Matthias Brugger wrote:
+>> This patch is a follow-up patch for Javier Martinez effort adding initial
+>> device tree support to IGEP technology devices. [1]
+>>
+>> It adds uart1 and uart2 bindings to the generic dtsi for the IGEP boards.
+>>
+>> [1] http://www.spinics.net/lists/linux-omap/msg83409.html
+>>
+>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+>> index 125fe00..c02e3c0 100644
+>> --- a/arch/arm/boot/dts/omap3-igep.dtsi
+>> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
+>> @@ -27,6 +27,20 @@
+>>  };
+>>
+>>  &omap3_pmx_core {
+>> +     uart1_pins: pinmux_uart1_pins {
+>> +             pinctrl-single,pins = <
+>> +                     0x152 0x100     /* uart1_rx.uart1_rx INPUT | MODE0 */
+>> +                     0x14c 0         /* uart1_tx.uart1_tx OUTPUT | MODE0 */
+>> +             >;
+>> +     };
+>> +
+>> +     uart2_pins: pinmux_uart2_pins {
+>> +             pinctrl-single,pins = <
+>> +                     0x14a 0x100     /* uart2_rx.uart2_rx INPUT | MODE0 */
+>> +                     0x148 0         /* uart2_tx.uart2_tx OUTPUT | MODE0 */
+>> +             >;
+>> +     };
+>> +
+>>       uart3_pins: pinmux_uart3_pins {
+>>               pinctrl-single,pins = <
+>>                       0x16e 0x100     /* uart3_rx.uart3_rx INPUT | MODE0 */
+>> @@ -77,6 +91,16 @@
+>>       status = "disabled";
+>>  };
+>>
+>> +&uart1 {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&uart1_pins>;
+>> +};
+>> +
+>> +&uart2 {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&uart2_pins>;
+>> +};
+>> +
+>>  &uart3 {
+>>         pinctrl-names = "default";
+>>         pinctrl-0 = <&uart3_pins>;
+>>
+>
+> That looks good to me. I'll apply it on top of javier's series for 3.9.
 
-I have it fixed now. I just sent some patches, which you can insert or
-squash as appropriate.
+Can you pin-point me to the repository where this patches are in right
+now? I tried to figure it out these days, but didn't found where to
+clone the repository from.
 
-       Andrew
+Thanks,
+Matthias
+
+>
+> Thanks,
+> Benoit
+>
+
+
+
+-- 
+---
+motzblog.wordpress.com
