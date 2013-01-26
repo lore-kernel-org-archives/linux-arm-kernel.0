@@ -1,54 +1,26 @@
-From: chris@cloudcar.com (Christoffer Dall)
-Date: Sat, 26 Jan 2013 01:15:02 -0500
-Subject: [RFC PATCH] ARM: mm: Fix alloc_init_section bug on LPAE
-In-Reply-To: <51036083.4040407@ti.com>
-References: <1359160318-27068-1-git-send-email-chris@cloudcar.com>
- <51036083.4040407@ti.com>
-Message-ID: <CANOGCgPSPN9L=Ct2cgaVh+kt5uOx5bQdhV725BTy=hyaHuByhQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 26 Jan 2013 15:25:33 +0800
+Subject: [PATCH] Asoc: Samsung: Add I2S S/W RST in startup function
+In-Reply-To: <1359030931-27354-2-git-send-email-rcsekar@samsung.com>
+References: <1359030931-27354-1-git-send-email-rcsekar@samsung.com>
+ <1359030931-27354-2-git-send-email-rcsekar@samsung.com>
+Message-ID: <20130126072531.GM10580@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 11:50 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Hi Christoffer,
->
->
-> On Saturday 26 January 2013 06:01 AM, Christoffer Dall wrote:
->>
->> When using LPAE the call to alloc_init_pte is passed then end address
->> for the entire 1st level page table region, and the code unluckily ends
->> up going over the bounds of the single allocated PTE, which is sad.
->>
->> This caused LPAE boot on omap5 to crash.
->>
->> There may be some hidden mystery in the boot code that I'm unaware of
->> or it may be assumed that all mappings are always mappable as sections
->> on LPAE and therefore omap5 just does something bad, in which case this
->> patch isn't the right fix, but I'd be happy to be told the reason.
->>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Jeremy C. Andrus <jeremya@cs.columbia.edu>
->> Signed-off-by: Christoffer Dall <chris@cloudcar.com>
->> ---
->
->
-> I was about to reply on the LPAE boot issue you mentioned in other
-> email. We have seen couple of issues with LPAE on OMAP5 and sent the
-> fixes.
->
-> [1] ARM: LPAE: Fix alloc_init_section to flush all the pmd entries
-> [2] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned addresses
->
-> Both needs ack from Catalin and RMK's ok to get into the patch system.
->
-> Can you please check if they work for you ?  I expect the [1] should
-> make your board boot on OMAP5.
->
+On Thu, Jan 24, 2013 at 06:05:31PM +0530, R. Chandrasekar wrote:
+> From: Padmavathi Venna <padma.v@samsung.com>
+> 
+> I2S module need to be reset after S2R. Keeping the S/W rst
+> control part in resume didn't help in playing audio after resume.
+> So this patch adds S/W RST control part in startup function which
+> gets triggered for every new audio stream playback.
 
-yeah, that patch had the same effect as my patch (with the extra waste
-of memory for the ptes as Russell pointed out).
-
-My googling of fixes for this completely failed somehow.
-
-Thanks for pointing it out.
--Christoffer
+Applied, thanks.  Please use subject lines matching the subsystem.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130126/dcf6e4df/attachment.sig>
