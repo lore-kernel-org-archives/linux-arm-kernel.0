@@ -1,46 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 26 Jan 2013 10:20:11 +0530
-Subject: [RFC PATCH] ARM: mm: Fix alloc_init_section bug on LPAE
-In-Reply-To: <1359160318-27068-1-git-send-email-chris@cloudcar.com>
-References: <1359160318-27068-1-git-send-email-chris@cloudcar.com>
-Message-ID: <51036083.4040407@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 26 Jan 2013 12:52:09 +0800
+Subject: [PATCH 11/19] regmap: avoid undefined return from
+ regmap_read_debugfs
+In-Reply-To: <20130126044219.GA10580@opensource.wolfsonmicro.com>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <1359123276-15833-12-git-send-email-arnd@arndb.de>
+ <20130126044219.GA10580@opensource.wolfsonmicro.com>
+Message-ID: <20130126045206.GB10580@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Sat, Jan 26, 2013 at 12:42:26PM +0800, Mark Brown wrote:
+> On Fri, Jan 25, 2013 at 02:14:28PM +0000, Arnd Bergmann wrote:
+> > Gcc warns about the case where regmap_read_debugfs tries
 
-On Saturday 26 January 2013 06:01 AM, Christoffer Dall wrote:
-> When using LPAE the call to alloc_init_pte is passed then end address
-> for the entire 1st level page table region, and the code unluckily ends
-> up going over the bounds of the single allocated PTE, which is sad.
->
-> This caused LPAE boot on omap5 to crash.
->
-> There may be some hidden mystery in the boot code that I'm unaware of
-> or it may be assumed that all mappings are always mappable as sections
-> on LPAE and therefore omap5 just does something bad, in which case this
-> patch isn't the right fix, but I'd be happy to be told the reason.
->
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Jeremy C. Andrus <jeremya@cs.columbia.edu>
-> Signed-off-by: Christoffer Dall <chris@cloudcar.com>
-> ---
+> Are you sure about that function name?
 
-I was about to reply on the LPAE boot issue you mentioned in other
-email. We have seen couple of issues with LPAE on OMAP5 and sent the
-fixes.
+> > to walk an empty map->debugfs_off_cache list, which results
+> > in uninitialized variable getting returned.
 
-[1] ARM: LPAE: Fix alloc_init_section to flush all the pmd entries
-[2] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned addresses
+> > Setting this variable to 0 first avoids the warning and
+> > the potentially undefined value.
 
-Both needs ack from Catalin and RMK's ok to get into the patch system.
+> This probably won't apply against current code as there's already a
+> better fix there, in general just picking a value to initialise masks
+> errors.
 
-Can you please check if they work for you ?  I expect the [1] should
-make your board boot on OMAP5.
-
-Regards
-Santosh
-
-[1] https://patchwork.kernel.org/patch/1278031/
-
-[2] https://patchwork.kernel.org/patch/1472031/
+Resending with corrected list address; to be clear please don't send
+this.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130126/27ae051d/attachment.sig>
