@@ -1,196 +1,306 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 26 Jan 2013 20:50:20 +0000
-Subject: [PATCH V4 11/11] ARM: Kirkwood: Convert QNAP TS219 Ethernet to DT.
+Date: Sat, 26 Jan 2013 20:50:17 +0000
+Subject: [PATCH V4 08/11] mv643xx.c: Add basic device tree support.
 In-Reply-To: <cover.1359232975.git.jason@lakedaemon.net>
 References: <cover.1358983578.git.jason@lakedaemon.net>
  <cover.1359232975.git.jason@lakedaemon.net>
-Message-ID: <f2d2ca7fbc759b412b30f1e7b9c7059ab5a7f00f.1359232975.git.jason@lakedaemon.net>
+Message-ID: <ae234445a8e7da81922be524f6eadce51b7f29db.1359232975.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
+From: Ian Molton <ian.molton@codethink.co.uk>
 
-Add DT nodes for the Ethernet ports and remove the C code. The PHY
-addresses depends on which SoC is used, so place the nodes into the
-SoC specific DTS files.
+    This patch adds basic device tree support to the mv643xx ethernet driver.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+    It should be enough for most current users of the device, and should allow
+    a painless migration.
+
+    Signed-off-by: Ian Molton <ian.molton@codethink.co.uk>
+
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/boot/dts/kirkwood-ts219-6281.dts |  9 ++++++++
- arch/arm/boot/dts/kirkwood-ts219-6282.dts | 10 +++++++++
- arch/arm/mach-kirkwood/Kconfig            | 17 ++------------
- arch/arm/mach-kirkwood/Makefile           |  1 -
- arch/arm/mach-kirkwood/board-dt.c         |  3 ---
- arch/arm/mach-kirkwood/board-ts219.c      | 37 -------------------------------
- arch/arm/mach-kirkwood/common.h           |  6 -----
- 7 files changed, 21 insertions(+), 62 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/board-ts219.c
+ Documentation/devicetree/bindings/net/mv643xx.txt | 75 ++++++++++++++++++
+ drivers/net/ethernet/marvell/mv643xx_eth.c        | 93 +++++++++++++++++++++--
+ 2 files changed, 161 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/mv643xx.txt
 
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6281.dts b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-index 8295c83..00b2c7f 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-@@ -32,6 +32,15 @@
- 				marvell,function = "gpio";
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/net/mv643xx.txt b/Documentation/devicetree/bindings/net/mv643xx.txt
+new file mode 100644
+index 0000000..2727f798
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/mv643xx.txt
+@@ -0,0 +1,75 @@
++mv643xx related nodes.
 +
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
++marvell,mdio-mv643xx:
 +
-+		egiga0 {
-+			phy_addr = <0x88>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio_keys {
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6282.dts b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-index df3f95d..61d69f5 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-@@ -32,6 +32,16 @@
- 				marvell,function = "gpio";
- 			};
- 		};
++Required properties:
 +
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
++ - interrupts : <a> where a is the SMI interrupt number.
++ - reg : the base address and size of the controllers register space.
 +
-+		egiga0 {
-+			phy_addr = <0x80>;
-+			status = "ok";
-+		};
++Optional properties:
++ - shared_smi : on some chips, the second PHY is "shared", meaning it is
++	really accessed via the first SMI controller. It is passed in this
++	way due to the present structure of the driver, which requires the
++	base address for the MAC to be passed in via the SMI controllers
++	platform data.
++ - tx_csum_limit : on some devices, this option is required for proper
++	operation wrt. jumbo frames.
 +
- 	};
++
++Example:
++
++smi0: mdio at 72000 {
++	compatible = "marvell,mdio-mv643xx";
++	reg = <0x72000 0x4000>;
++	interrupts = <46>;
++	tx_csum_limit = <1600>;
++	status = "disabled";
++};
++
++smi1: mdio at 76000 {
++	compatible = "marvell,mdio-mv643xx";
++	reg = <0x76000 0x4000>;
++	interrupts = <47>;
++	shared_smi = <&smi0>;
++	tx_csum_limit = <1600>;
++	status = "disabled";
++};
++
++
++
++marvell,mv643xx-eth:
++
++Required properties:
++ - interrupts : the port interrupt number.
++ - mdio : phandle of the smi device as drescribed above
++
++Optional properties:
++ - port_number : the port number on this bus.
++ - phy_addr : the PHY address.
++ - reg : should match the mdio reg this device is attached to.
++	this is a required hack for now due to the way the
++	driver is constructed. This allows the device clock to be
++	kept running so that the MAC is not lost after boot.
++
++
++Example:
++
++egiga0 {
++	compatible = "marvell,mv643xx-eth";
++	reg = <0x72000 0x4000>;
++	mdio = <&smi0>;
++	port_number = <0>;
++	phy_addr = <0x80>;
++	interrupts = <11>;
++};
++
++egiga1 {
++	compatible = "marvell,mv643xx-eth";
++	reg = <0x76000 0x4000>;
++	mdio = <&smi1>;
++	port_number = <0>;
++	phy_addr = <0x81>;
++	interrupts = <15>;
++};
++
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 84c1326..7048d7c 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -48,6 +48,9 @@
+ #include <linux/ethtool.h>
+ #include <linux/platform_device.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/of_irq.h>
+ #include <linux/kernel.h>
+ #include <linux/spinlock.h>
+ #include <linux/workqueue.h>
+@@ -2586,7 +2589,7 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
+ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ {
+ 	static int mv643xx_eth_version_printed;
+-	struct mv643xx_eth_shared_platform_data *pd = pdev->dev.platform_data;
++	struct mv643xx_eth_shared_platform_data *pd;
+ 	struct mv643xx_eth_shared_private *msp;
+ 	const struct mbus_dram_target_info *dram;
+ 	struct resource *res;
+@@ -2610,6 +2613,26 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ 	if (msp->base == NULL)
+ 		goto out_free;
  
- 	gpio_keys {
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index ac27a3d..aa10096 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -46,10 +46,12 @@ config MACH_GURUPLUG
++	if (pdev->dev.of_node) {
++		struct device_node *np = NULL;
++
++		/* when all users of this driver use FDT, we can remove this */
++		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
++		if (!pd) {
++			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
++			goto out_free;
++		}
++
++		of_property_read_u32(pdev->dev.of_node,
++			"tx_csum_limit", &pd->tx_csum_limit);
++
++		np = of_parse_phandle(pdev->dev.of_node, "shared_smi", 0);
++		if (np)
++			pd->shared_smi = of_find_device_by_node(np);
++
++	} else {
++		pd = pdev->dev.platform_data;
++	}
+ 	/*
+ 	 * Set up and register SMI bus.
+ 	 */
+@@ -2642,7 +2665,6 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+ 	if (res != NULL) {
+ 		int err;
+-
+ 		err = request_irq(res->start, mv643xx_eth_err_irq,
+ 				  IRQF_SHARED, "mv643xx_eth", msp);
+ 		if (!err) {
+@@ -2660,6 +2682,10 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
  
- config ARCH_KIRKWOOD_DT
- 	bool "Marvell Kirkwood Flattened Device Tree"
-+	select ARM_APPENDED_DTB
- 	select POWER_SUPPLY
- 	select POWER_RESET
- 	select POWER_RESET_RESTART
- 	select POWER_RESET_GPIO
-+	select POWER_RESET_QNAP
- 	select REGULATOR
- 	select REGULATOR_FIXED_VOLTAGE
- 	select MVEBU_CLK_CORE
-@@ -67,21 +69,6 @@ config MACH_DLINK_KIRKWOOD_DT
- 	  Kirkwood-based D-Link NASes such as DNS-320 & DNS-325,
- 	  using Flattened Device Tree.
+ 	msp->tx_csum_limit = (pd != NULL && pd->tx_csum_limit) ?
+ 					pd->tx_csum_limit : 9 * 1024;
++
++	if (pdev->dev.of_node)
++		kfree(pd);  /* If we created a fake pd, free it now */
++
+ 	infer_hw_params(msp);
  
--config MACH_TS219_DT
--	bool "Device Tree for QNAP TS-11X, TS-21X NAS"
--	select ARCH_KIRKWOOD_DT
--	select ARM_APPENDED_DTB
--	select ARM_ATAG_DTB_COMPAT
--	select POWER_RESET_QNAP
--	help
--	  Say 'Y' here if you want your kernel to support the QNAP
--	  TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and
--	  TS-219P+ Turbo NAS devices using Fattened Device Tree.
--	  There are two different Device Tree descriptions, depending
--	  on if the device is based on an if the board uses the MV6281
--	  or MV6282. If you have the wrong one, the buttons will not
--	  work.
--
- config MACH_IOMEGA_IX2_200_DT
- 	bool "Iomega StorCenter ix2-200 (Flattened Device Tree)"
- 	select ARCH_KIRKWOOD_DT
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index ab739b0..e94973c 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -21,6 +21,5 @@ obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
+ 	platform_set_drvdata(pdev, msp);
+@@ -2693,12 +2719,21 @@ static int mv643xx_eth_shared_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
- obj-$(CONFIG_MACH_DLINK_KIRKWOOD_DT)	+= board-dnskw.o
--obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
- obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
- obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index edb1215..70c8d7d 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -121,9 +121,6 @@ static void __init kirkwood_dt_init(void)
- 	if (of_machine_is_compatible("dlink,dns-kirkwood"))
- 		dnskw_init();
++#ifdef CONFIG_OF
++static struct of_device_id mv_mdio_dt_ids[] __devinitdata = {
++	{ .compatible = "marvell,mdio-mv643xx", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, mv_mdio_dt_ids);
++#endif
++
+ static struct platform_driver mv643xx_eth_shared_driver = {
+ 	.probe		= mv643xx_eth_shared_probe,
+ 	.remove		= mv643xx_eth_shared_remove,
+ 	.driver = {
+ 		.name	= MV643XX_ETH_SHARED_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(mv_mdio_dt_ids),
+ 	},
+ };
  
--	if (of_machine_is_compatible("qnap,ts219"))
--		qnap_dt_ts219_init();
--
- 	if (of_machine_is_compatible("iom,ix2-200"))
- 		iomega_ix2_200_init();
+@@ -2858,7 +2893,36 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	int err;
  
-diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
-deleted file mode 100644
-index f00c0a9..0000000
---- a/arch/arm/mach-kirkwood/board-ts219.c
-+++ /dev/null
-@@ -1,37 +0,0 @@
--/*
-- *
-- * QNAP TS-11x/TS-21x Turbo NAS Board Setup via DT
-- *
-- * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
-- *
-- * Based on the board file ts219-setup.c:
-- *
-- * Copyright (C) 2009  Martin Michlmayr <tbm@cyrius.com>
-- * Copyright (C) 2008  Byron Bradley <byron.bbradley@gmail.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include <mach/kirkwood.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data qnap_ts219_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
--void __init qnap_dt_ts219_init(void)
--{
--	u32 dev, rev;
--
--	kirkwood_pcie_id(&dev, &rev);
--	if (dev == MV88F6282_DEV_ID)
--		qnap_ts219_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
--
--	kirkwood_ge00_init(&qnap_ts219_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index ba6eb9c..8f98b67 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -55,12 +55,6 @@ void kirkwood_restart(char, const char *);
- void kirkwood_clk_init(void);
+-	pd = pdev->dev.platform_data;
++	if (pdev->dev.of_node) {
++		struct device_node *np = NULL;
++
++		/* when all users of this driver use FDT, we can remove this */
++		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
++		if (!pd) {
++			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
++			return -ENOMEM;
++		}
++
++		of_property_read_u32(pdev->dev.of_node,
++			"port_number", &pd->port_number);
++
++		if (!of_property_read_u32(pdev->dev.of_node,
++				"phy_addr", &pd->phy_addr))
++			pd->phy_addr = MV643XX_ETH_PHY_ADDR(pd->phy_addr);
++		else
++			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
++
++		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
++		if (np) {
++			pd->shared = of_find_device_by_node(np);
++		} else {
++			kfree(pd);
++			return -ENODEV;
++		}
++	} else {
++		pd = pdev->dev.platform_data;
++	}
++
+ 	if (pd == NULL) {
+ 		dev_err(&pdev->dev, "no mv643xx_eth_platform_data\n");
+ 		return -ENODEV;
+@@ -2866,12 +2930,15 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
  
- /* board init functions for boards not fully converted to fdt */
--#ifdef CONFIG_MACH_TS219_DT
--void qnap_dt_ts219_init(void);
--#else
--static inline void qnap_dt_ts219_init(void) {};
--#endif
+ 	if (pd->shared == NULL) {
+ 		dev_err(&pdev->dev, "no mv643xx_eth_platform_data->shared\n");
+-		return -ENODEV;
++		err = -ENODEV;
++		goto out_free_pd;
+ 	}
+ 
+ 	dev = alloc_etherdev_mq(sizeof(struct mv643xx_eth_private), 8);
+-	if (!dev)
+-		return -ENOMEM;
++	if (!dev) {
++		err = -ENOMEM;
++		goto out_free_pd;
++	}
+ 
+ 	mp = netdev_priv(dev);
+ 	platform_set_drvdata(pdev, mp);
+@@ -2908,6 +2975,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 
+ 	init_pscr(mp, pd->speed, pd->duplex);
+ 
++	if (pdev->dev.of_node)
++		kfree(pd); /* If we created a fake pd, free it now */
+ 
+ 	mib_counters_clear(mp);
+ 
+@@ -2927,7 +2996,6 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 	mp->rx_oom.data = (unsigned long)mp;
+ 	mp->rx_oom.function = oom_timer_wrapper;
+ 
 -
- #ifdef CONFIG_MACH_DLINK_KIRKWOOD_DT
- void dnskw_init(void);
- #else
+ 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+ 	BUG_ON(!res);
+ 	dev->irq = res->start;
+@@ -2976,6 +3044,8 @@ out:
+ 	}
+ #endif
+ 	free_netdev(dev);
++out_free_pd:
++	kfree(pd);
+ 
+ 	return err;
+ }
+@@ -3015,6 +3085,14 @@ static void mv643xx_eth_shutdown(struct platform_device *pdev)
+ 		port_reset(mp);
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id mv_eth_dt_ids[] __devinitdata = {
++	{ .compatible = "marvell,mv643xx-eth", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, mv_eth_dt_ids);
++#endif
++
+ static struct platform_driver mv643xx_eth_driver = {
+ 	.probe		= mv643xx_eth_probe,
+ 	.remove		= mv643xx_eth_remove,
+@@ -3022,6 +3100,7 @@ static struct platform_driver mv643xx_eth_driver = {
+ 	.driver = {
+ 		.name	= MV643XX_ETH_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(mv_eth_dt_ids),
+ 	},
+ };
+ 
 -- 
 1.8.1.1
