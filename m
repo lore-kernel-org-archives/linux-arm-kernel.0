@@ -1,41 +1,26 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Jan 2013 16:10:29 +0100
-Subject: [PATCH 2/3] ARM: Kirkwood: Revert clkdev changes.
-In-Reply-To: <1359213030-18588-1-git-send-email-andrew@lunn.ch>
-References: <1359213030-18588-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1359213030-18588-3-git-send-email-andrew@lunn.ch>
+Date: Sat, 26 Jan 2013 16:12:56 +0100
+Subject: [PATCH V3 8/8] ARM: kirkwood: mv643xx_eth dt conversion
+In-Reply-To: <20130126150611.GL1758@titan.lakedaemon.net>
+References: <cover.1359146831.git.jason@lakedaemon.net>
+ <a4805edf01c39a374d71fbf4a6b6207dedf6b2bf.1359146831.git.jason@lakedaemon.net>
+ <20130126123827.GA5786@lunn.ch>
+ <20130126150611.GL1758@titan.lakedaemon.net>
+Message-ID: <20130126151256.GF29973@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the Ethernet driver can get its clock from device tree,
-revert this change which broken non-DT probing of the ethernet device.
+> > Something is not right here, or i'm not understanding something. DT
+> > devices should not need code like this, only devices not yet using
+> > DT....
+> 
+> Yes, hence my frustration yesterday.  I posted this so everyone could
+> see exactly what I was working with, and perhaps spot something I had
+> missed.  Looks like you did in your followup to Sebastian.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-kirkwood/board-dt.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Hi Jason
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 7ab92e5..edb1215 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -48,7 +48,7 @@ static void __init kirkwood_legacy_clk_init(void)
- 	clkspec.args_count = 1;
- 
- 	clkspec.args[0] = CGC_BIT_GE0;
--	orion_clkdev_add(NULL, "f1072000.egiga0",
-+	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
- 			 of_clk_get_from_provider(&clkspec));
- 
- 	clkspec.args[0] = CGC_BIT_PEX0;
-@@ -60,7 +60,7 @@ static void __init kirkwood_legacy_clk_init(void)
- 			 of_clk_get_from_provider(&clkspec));
- 
- 	clkspec.args[0] = CGC_BIT_GE1;
--	orion_clkdev_add(NULL, "f1076000.egiga1",
-+	orion_clkdev_add(NULL, "mv643xx_eth_port.1",
- 			 of_clk_get_from_provider(&clkspec));
- }
- 
--- 
-1.7.10.4
+I have it fixed now. I just sent some patches, which you can insert or
+squash as appropriate.
+
+       Andrew
