@@ -1,91 +1,30 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sat, 26 Jan 2013 16:16:45 +0100
-Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
-In-Reply-To: <50C8AC3C.9020908@ti.com>
-References: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
- <50C8AC3C.9020908@ti.com>
-Message-ID: <CABuKBeJsHCq98Pe-BwPajbQ+2OLQpwrbtVTJe=j9thPDQCCBrg@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 26 Jan 2013 19:21:32 +0400
+Subject: [PATCH v6 1/2] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <1359168322-17733-2-git-send-email-rtivy@ti.com>
+References: <1359168322-17733-1-git-send-email-rtivy@ti.com>
+ <1359168322-17733-2-git-send-email-rtivy@ti.com>
+Message-ID: <5103F47C.4020509@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Hello.
 
-2012/12/12 Benoit Cousson <b-cousson@ti.com>:
-> Hi Matthias,
->
-> On 12/12/2012 04:33 PM, Matthias Brugger wrote:
->> This patch is a follow-up patch for Javier Martinez effort adding initial
->> device tree support to IGEP technology devices. [1]
->>
->> It adds uart1 and uart2 bindings to the generic dtsi for the IGEP boards.
->>
->> [1] http://www.spinics.net/lists/linux-omap/msg83409.html
->>
->> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->> ---
->>  arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
->> index 125fe00..c02e3c0 100644
->> --- a/arch/arm/boot/dts/omap3-igep.dtsi
->> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
->> @@ -27,6 +27,20 @@
->>  };
->>
->>  &omap3_pmx_core {
->> +     uart1_pins: pinmux_uart1_pins {
->> +             pinctrl-single,pins = <
->> +                     0x152 0x100     /* uart1_rx.uart1_rx INPUT | MODE0 */
->> +                     0x14c 0         /* uart1_tx.uart1_tx OUTPUT | MODE0 */
->> +             >;
->> +     };
->> +
->> +     uart2_pins: pinmux_uart2_pins {
->> +             pinctrl-single,pins = <
->> +                     0x14a 0x100     /* uart2_rx.uart2_rx INPUT | MODE0 */
->> +                     0x148 0         /* uart2_tx.uart2_tx OUTPUT | MODE0 */
->> +             >;
->> +     };
->> +
->>       uart3_pins: pinmux_uart3_pins {
->>               pinctrl-single,pins = <
->>                       0x16e 0x100     /* uart3_rx.uart3_rx INPUT | MODE0 */
->> @@ -77,6 +91,16 @@
->>       status = "disabled";
->>  };
->>
->> +&uart1 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&uart1_pins>;
->> +};
->> +
->> +&uart2 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&uart2_pins>;
->> +};
->> +
->>  &uart3 {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&uart3_pins>;
->>
->
-> That looks good to me. I'll apply it on top of javier's series for 3.9.
+On 26-01-2013 6:45, Robert Tivy wrote:
 
-Can you pin-point me to the repository where this patches are in right
-now? I tried to figure it out these days, but didn't found where to
-clone the repository from.
+> Adding a remoteproc driver implementation for OMAP-L138 DSP
 
-Thanks,
-Matthias
+> diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+> new file mode 100644
+> index 0000000..c6eb6bf
+> --- /dev/null
+> +++ b/drivers/remoteproc/da8xx_remoteproc.c
+> @@ -0,0 +1,327 @@
+[...]
+> +#define SYSCFG_CHIPSIG_OFFSET 0x174
+> +#define SYSCFG_CHIPSIG_CLR_OFFSET 0x178
 
->
-> Thanks,
-> Benoit
->
+    Wait, you don't even use these #define's -- why they're here at all?
 
-
-
--- 
----
-motzblog.wordpress.com
+WBR, Sergei
