@@ -1,48 +1,27 @@
-From: mario.schuknecht@dresearch-fe.de (Mario Schuknecht)
-Date: Sat, 26 Jan 2013 17:30:30 +0000 (UTC)
-Subject: [PATCH] dma: =?utf-8?b?bXZfeG9yOg==?= remove minimal offload
- length threshold
-References: <1356636037-22948-1-git-send-email-lkundrak@v3.sk>
- <1356639358.28655.7.camel@sakura.staff.proxad.net>
-Message-ID: <loom.20130126T182854-381@post.gmane.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 26 Jan 2013 18:38:59 +0100
+Subject: [PATCH 2/2] ARM: Kirkwood: topkick: Enable i2c bus.
+In-Reply-To: <1359219326-5927-2-git-send-email-andrew@lunn.ch>
+References: <f6d483f3fb83826bce16f956afa013f0bcf11f52.1359146831.git.jason@lakedaemon.net>
+ <1359219326-5927-1-git-send-email-andrew@lunn.ch>
+ <1359219326-5927-2-git-send-email-andrew@lunn.ch>
+Message-ID: <510414B3.6000207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Bizon <mbizon <at> freebox.fr> writes:
+On 01/26/2013 05:55 PM, Andrew Lunn wrote:
+> Add a DT node for I2C and pinctrl hog for the pins. There appears to
+> be an i2c bus on topkick with a device on it:
+>
+> 60: -- -- -- -- 64 -- -- -- -- -- -- -- -- -- -- --
 
-> 
-> On Thu, 2012-12-27 at 20:20 +0100, Lubomir Rintel wrote:
-> > 
-> > of memory condition and retries indefinitelly, causing a soft lockup.
-> > The threshold does not seem to be enforced by hardware (couldn't find
-> > anything like that in a datasheet)
-> 
-> page 212
-> 
-> Table 63: Descriptor Byte Count Word
-> 
-> 3:0 ByteCount
-> 
-> XOR mode: Size of source and destination blocks in bytes.
-> CRC mode: Size of source block part represented by the descriptor.
-> DMA mode: Size of source and destination block in bytes.
-> Minimum blocks' size: 16B.
-> Maximum blocks' size: 16MB-1
-> 
-> > and things seems to work fine without it. If there's a 
-> 
-> my guess is that it transfers 16B so it seems to work but actually
-> corrupts data.
-> 
-> maybe we should teach net_dma_find_channel() about that limitation 
-> 
+Andrew,
 
-I observe the same error with the Marvell SoC 88F6282. The patch works. It is 
-sufficient to just change the #define MV_XOR_MIN_BYTE_COUNT of 128 to 16. But 
-I'm not very familiar with the code and Marvell xor/dma engine.
-Therefore the questions: Is the patch correctly for the SoC 88F6282? Is the 
-error still in work? And is there an offical solution soon?
+this could be a Nuvoton NCT3012S ACPI PMIC. It is located right next to
+Wifi/BT. There is i2c address should be 6c but officially it
+only supports 100kHz bus frequency. Can you post i2cdetect and
+i2cdump with 100kHz?
 
-Kind regards,
+Sebastian
 
-Mario Schuknecht
+[1] http://www.catagle.com/29-11/NCT3012S.htm
