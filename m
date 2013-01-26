@@ -1,20 +1,42 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Sat, 26 Jan 2013 16:44:15 +0100
-Subject: [PATCH 0/3] atmel_lcdfb: fix 16-bpp regression
-In-Reply-To: <1355142530-10366-1-git-send-email-jhovold@gmail.com>
-References: <1355142530-10366-1-git-send-email-jhovold@gmail.com>
-Message-ID: <20130126154415.GA25750@localhost>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 26 Jan 2013 10:46:34 -0500
+Subject: [PATCH 1/3] NET: mv643xx: Get clk from device tree.
+In-Reply-To: <1359213030-18588-2-git-send-email-andrew@lunn.ch>
+References: <1359213030-18588-1-git-send-email-andrew@lunn.ch>
+ <1359213030-18588-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20130126154634.GO1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 01:28:47PM +0100, Johan Hovold wrote:
-> These patches fix a regression in 16-bpp support for older SOCs which use
-> IBGR:555 rather than BGR:565 pixel layout. Use SOC-type to determine if the
-> controller uses the intensity-bit and restore the old layout in that case.
+On Sat, Jan 26, 2013 at 04:10:28PM +0100, Andrew Lunn wrote:
+> If we are passed a device tree node pointer, get the clock from it.
+> This avoids problems with con_id when using clk_get().
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/net/ethernet/marvell/mv643xx_eth.c |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 
-I understand the maintainer's been busy lately, but could someone pick
-these regression fixes up so we can get them into v3.8-rc and the stable
-trees?
+I like this much better than what I hacked together, thanks.
 
-Thanks,
-Johan
+Jason.
+
+> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> index 7048d7c..296beec 100644
+> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
+> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> @@ -2955,7 +2955,10 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+>  	 */
+>  	mp->t_clk = 133000000;
+>  #if defined(CONFIG_HAVE_CLK)
+> -	mp->clk = clk_get(&pdev->dev, (pdev->id ? "1" : "0"));
+> +	if (pdev->dev.of_node)
+> +		mp->clk = of_clk_get(pdev->dev.of_node, 0);
+> +	else
+> +		mp->clk = clk_get(&pdev->dev, (pdev->id ? "1" : "0"));
+>  	if (!IS_ERR(mp->clk)) {
+>  		clk_prepare_enable(mp->clk);
+>  		mp->t_clk = clk_get_rate(mp->clk);
+> -- 
+> 1.7.10.4
+> 
