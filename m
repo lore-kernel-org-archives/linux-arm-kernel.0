@@ -1,71 +1,45 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Jan 2013 17:21:22 +0100
-Subject: [PATCH V3 1/8] ARM: kirkwood: topkick: init mvsdio via DT
-In-Reply-To: <e99a647c7c1eae5dfee3b1ccf9f6803c3c859962.1359146831.git.jason@lakedaemon.net>
-References: <cover.1359146831.git.jason@lakedaemon.net>
- <e99a647c7c1eae5dfee3b1ccf9f6803c3c859962.1359146831.git.jason@lakedaemon.net>
-Message-ID: <20130126162122.GL17242@lunn.ch>
+Date: Sat, 26 Jan 2013 17:55:24 +0100
+Subject: [PATCH 1/2] ARM: Kirkwood: topkick: Fix SoC type and add missing pins
+In-Reply-To: <f6d483f3fb83826bce16f956afa013f0bcf11f52.1359146831.git.jason@lakedaemon.net>
+References: <f6d483f3fb83826bce16f956afa013f0bcf11f52.1359146831.git.jason@lakedaemon.net>
+Message-ID: <1359219326-5927-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 08:53:53PM +0000, Jason Cooper wrote:
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  arch/arm/boot/dts/kirkwood-topkick.dts     | 7 +++++++
->  arch/arm/mach-kirkwood/board-usi_topkick.c | 6 ------
->  2 files changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-> index cd15452..23c2ddc 100644
-> --- a/arch/arm/boot/dts/kirkwood-topkick.dts
-> +++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-> @@ -54,6 +54,13 @@
->  			status = "okay";
->  			nr-ports = <1>;
->  		};
-> +
-> +		mvsdio at 90000 {
-> +			pinctrl-0 = <&pmx_sdio>;
-> +			pinctrl-names = "default";
-> +			status = "okay";
-> +			/* No CD or WP GPIOs */
-> +		};
->  	};
->  
->  	gpio-leds {
-> diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
-> index 23d2dd1..95f0711 100644
-> --- a/arch/arm/mach-kirkwood/board-usi_topkick.c
-> +++ b/arch/arm/mach-kirkwood/board-usi_topkick.c
-> @@ -14,7 +14,6 @@
->  #include <linux/init.h>
->  #include <linux/mv643xx_eth.h>
->  #include <linux/gpio.h>
-> -#include <linux/platform_data/mmc-mvsdio.h>
->  #include "common.h"
->  #include "mpp.h"
->  
-> @@ -22,10 +21,6 @@ static struct mv643xx_eth_platform_data topkick_ge00_data = {
->  	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
->  };
->  
-> -static struct mvsdio_platform_data topkick_mvsdio_data = {
-> -	/* unfortunately the CD signal has not been connected */
-> -};
-> -
->  /*
->   * GPIO LED layout
->   *
-> @@ -73,5 +68,4 @@ void __init usi_topkick_init(void)
->  
->  
->  	kirkwood_ge00_init(&topkick_ge00_data);
-> -	kirkwood_sdio_init(&topkick_mvsdio_data);
->  }
-> -- 
-> 1.8.1.1
-> 
+Topkick contains a Marvell 6282, not an 6281 as included in the
+kirkwood-topkick.dts file.
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
+Also, add pinhogs for the serial port and nand devices.
 
-   Andrew
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/boot/dts/kirkwood-topkick.dts |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+index edefbb5..c8e8a64 100644
+--- a/arch/arm/boot/dts/kirkwood-topkick.dts
++++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ 
+ /include/ "kirkwood.dtsi"
+-/include/ "kirkwood-6281.dtsi"
++/include/ "kirkwood-6282.dtsi"
+ 
+ / {
+ 	model = "Univeral Scientific Industrial Co. Topkick-1281P2";
+@@ -50,7 +50,9 @@
+ 				      &pmx_sw_right
+ 				      &pmx_sw_idle
+ 				      &pmx_sw_left2
+-				      &pmx_led_wifi_yellow >;
++				      &pmx_led_wifi_yellow
++				      &pmx_uart0
++				      &pmx_nand >;
+ 			pinctrl-names = "default";
+ 
+ 			pmx_led_disk_yellow: pmx-led-disk-yellow {
+-- 
+1.7.10.4
