@@ -1,39 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Jan 2013 16:43:56 +0100
-Subject: [PATCH v2 0/3] Kirkwoode cpufreq driver
-Message-ID: <1359215039-2848-1-git-send-email-andrew@lunn.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 26 Jan 2013 10:44:16 -0500
+Subject: [PATCH V3 8/8] ARM: kirkwood: mv643xx_eth dt conversion
+In-Reply-To: <20130126153357.GG29973@lunn.ch>
+References: <cover.1359146831.git.jason@lakedaemon.net>
+ <a4805edf01c39a374d71fbf4a6b6207dedf6b2bf.1359146831.git.jason@lakedaemon.net>
+ <20130126153357.GG29973@lunn.ch>
+Message-ID: <20130126154416.GN1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds a cpufreq driver for Marvell Kirkwood SoCs.
+On Sat, Jan 26, 2013 at 04:33:57PM +0100, Andrew Lunn wrote:
+> > -config MACH_LSXL_DT
+> > -	bool "Buffalo Linkstation LS-XHL, LS-CHLv2 (Flattened Device Tree)"
+> > -	select ARCH_KIRKWOOD_DT
+> > -	select POWER_RESET_RESTART
+> > -	help
+> > -	  Say 'Y' here if you want your kernel to support the
+> > -	  Buffalo Linkstation LS-XHL & LS-CHLv2 devices, using
+> > -	  Flattened Device Tree.
+> 
+> Hi Jason
+> 
+> I don't think you add POWER_RESET_RESTART back anywhere. It should
+> probably be added to ARCH_KIRKWOOD_DT. Otherwise it will not be
+> possible to shutdown these boxes.
 
-The changes to kirkwood_defconfig enable it and set the default
-governor to ondemand.
+Good catch, I'll add that in.
 
-Changes since v1:
+thx,
 
-tabify Kconfig.arm entry
-Sort order of include files
-Remove some unnecassary include files
-Reformat multiline comment to be coding style conform.
-
-Andrew Lunn (3):
-  cpufreq: kirkwood: Add a cpufreq driver for Marvell Kirkwood SoCs
-  arm: kirkwood: Instantiate cpufreq driver
-  arm: kirkwood: Enable cpufreq and ondemand on kirkwood_defconfig
-
- arch/arm/Kconfig                                  |    1 +
- arch/arm/configs/kirkwood_defconfig               |    3 +
- arch/arm/mach-kirkwood/board-dt.c                 |    3 +-
- arch/arm/mach-kirkwood/common.c                   |   23 ++
- arch/arm/mach-kirkwood/common.h                   |    2 +
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    2 +
- drivers/clk/mvebu/clk-gating-ctrl.c               |    1 +
- drivers/cpufreq/Kconfig.arm                       |    6 +
- drivers/cpufreq/Makefile                          |    1 +
- drivers/cpufreq/kirkwood-cpufreq.c                |  271 +++++++++++++++++++++
- 10 files changed, 312 insertions(+), 1 deletion(-)
- create mode 100644 drivers/cpufreq/kirkwood-cpufreq.c
-
--- 
-1.7.10.4
+Jason.
