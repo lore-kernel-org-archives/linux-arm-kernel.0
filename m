@@ -1,198 +1,196 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 26 Jan 2013 20:50:14 +0000
-Subject: [PATCH V4 05/11] ARM: kirkwood: nsa310: convert to pinctrl
+Date: Sat, 26 Jan 2013 20:50:20 +0000
+Subject: [PATCH V4 11/11] ARM: Kirkwood: Convert QNAP TS219 Ethernet to DT.
 In-Reply-To: <cover.1359232975.git.jason@lakedaemon.net>
 References: <cover.1358983578.git.jason@lakedaemon.net>
  <cover.1359232975.git.jason@lakedaemon.net>
-Message-ID: <655862a52c4f90a3f90a566824b495c2017c3c5b.1359232975.git.jason@lakedaemon.net>
+Message-ID: <f2d2ca7fbc759b412b30f1e7b9c7059ab5a7f00f.1359232975.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Andrew Lunn <andrew@lunn.ch>
+
+Add DT nodes for the Ethernet ports and remove the C code. The PHY
+addresses depends on which SoC is used, so place the nodes into the
+SoC specific DTS files.
+
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/boot/dts/kirkwood-nsa310.dts | 99 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-dt.c     |  3 --
- arch/arm/mach-kirkwood/board-nsa310.c | 26 ---------
- arch/arm/mach-kirkwood/common.h       |  6 ---
- 4 files changed, 99 insertions(+), 35 deletions(-)
+ arch/arm/boot/dts/kirkwood-ts219-6281.dts |  9 ++++++++
+ arch/arm/boot/dts/kirkwood-ts219-6282.dts | 10 +++++++++
+ arch/arm/mach-kirkwood/Kconfig            | 17 ++------------
+ arch/arm/mach-kirkwood/Makefile           |  1 -
+ arch/arm/mach-kirkwood/board-dt.c         |  3 ---
+ arch/arm/mach-kirkwood/board-ts219.c      | 37 -------------------------------
+ arch/arm/mach-kirkwood/common.h           |  6 -----
+ 7 files changed, 21 insertions(+), 62 deletions(-)
+ delete mode 100644 arch/arm/mach-kirkwood/board-ts219.c
 
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
-index dbb3551..3a178cf 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
-@@ -16,6 +16,105 @@
+diff --git a/arch/arm/boot/dts/kirkwood-ts219-6281.dts b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
+index 8295c83..00b2c7f 100644
+--- a/arch/arm/boot/dts/kirkwood-ts219-6281.dts
++++ b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
+@@ -32,6 +32,15 @@
+ 				marvell,function = "gpio";
+ 			};
+ 		};
++
++		smi0: mdio at 72000 {
++			status = "ok";
++		};
++
++		egiga0 {
++			phy_addr = <0x88>;
++			status = "ok";
++		};
  	};
  
- 	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			pinctrl-0 = < &pmx_led_esata_green
-+				      &pmx_led_esata_red
-+				      &pmx_led_usb_green
-+				      &pmx_led_usb_red
-+				      &pmx_usb_power_off
-+				      &pmx_led_sys_green
-+				      &pmx_led_sys_red
-+				      &pmx_btn_reset
-+				      &pmx_btn_copy
-+				      &pmx_led_copy_green
-+				      &pmx_led_copy_red
-+				      &pmx_led_hdd_green
-+				      &pmx_led_hdd_red
-+				      &pmx_unknown
-+				      &pmx_btn_power
-+				      &pmx_pwr_off >;
-+			pinctrl-names = "default";
+ 	gpio_keys {
+diff --git a/arch/arm/boot/dts/kirkwood-ts219-6282.dts b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
+index df3f95d..61d69f5 100644
+--- a/arch/arm/boot/dts/kirkwood-ts219-6282.dts
++++ b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
+@@ -32,6 +32,16 @@
+ 				marvell,function = "gpio";
+ 			};
+ 		};
 +
-+			pmx_led_esata_green: pmx-led-esata-green {
-+				marvell,pins = "mpp12";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_esata_red: pmx-led-esata-red {
-+				marvell,pins = "mpp13";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_usb_green: pmx-led-usb-green {
-+				marvell,pins = "mpp15";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_usb_red: pmx-led-usb-red {
-+				marvell,pins = "mpp16";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_usb_power_off: pmx-usb-power-off {
-+				marvell,pins = "mpp21";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_sys_green: pmx-led-sys-green {
-+				marvell,pins = "mpp28";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_sys_red: pmx-led-sys-red {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_reset: pmx-btn-reset {
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_copy: pmx-btn-copy {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_copy_green: pmx-led-copy-green {
-+				marvell,pins = "mpp39";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_copy_red: pmx-led-copy-red {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd_green: pmx-led-hdd-green {
-+				marvell,pins = "mpp41";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd_red: pmx-led-hdd-red {
-+				marvell,pins = "mpp42";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_unknown: pmx-unknown {
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_power: pmx-btn-power {
-+				marvell,pins = "mpp46";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_pwr_off: pmx-pwr-off {
-+				marvell,pins = "mpp48";
-+				marvell,function = "gpio";
-+			};
++		smi0: mdio at 72000 {
++			status = "ok";
 +		};
++
++		egiga0 {
++			phy_addr = <0x80>;
++			status = "ok";
++		};
++
+ 	};
  
- 		serial at 12000 {
- 			clock-frequency = <200000000>;
+ 	gpio_keys {
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index ac27a3d..aa10096 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -46,10 +46,12 @@ config MACH_GURUPLUG
+ 
+ config ARCH_KIRKWOOD_DT
+ 	bool "Marvell Kirkwood Flattened Device Tree"
++	select ARM_APPENDED_DTB
+ 	select POWER_SUPPLY
+ 	select POWER_RESET
+ 	select POWER_RESET_RESTART
+ 	select POWER_RESET_GPIO
++	select POWER_RESET_QNAP
+ 	select REGULATOR
+ 	select REGULATOR_FIXED_VOLTAGE
+ 	select MVEBU_CLK_CORE
+@@ -67,21 +69,6 @@ config MACH_DLINK_KIRKWOOD_DT
+ 	  Kirkwood-based D-Link NASes such as DNS-320 & DNS-325,
+ 	  using Flattened Device Tree.
+ 
+-config MACH_TS219_DT
+-	bool "Device Tree for QNAP TS-11X, TS-21X NAS"
+-	select ARCH_KIRKWOOD_DT
+-	select ARM_APPENDED_DTB
+-	select ARM_ATAG_DTB_COMPAT
+-	select POWER_RESET_QNAP
+-	help
+-	  Say 'Y' here if you want your kernel to support the QNAP
+-	  TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and
+-	  TS-219P+ Turbo NAS devices using Fattened Device Tree.
+-	  There are two different Device Tree descriptions, depending
+-	  on if the device is based on an if the board uses the MV6281
+-	  or MV6282. If you have the wrong one, the buttons will not
+-	  work.
+-
+ config MACH_IOMEGA_IX2_200_DT
+ 	bool "Iomega StorCenter ix2-200 (Flattened Device Tree)"
+ 	select ARCH_KIRKWOOD_DT
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index ab739b0..e94973c 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -21,6 +21,5 @@ obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
+ 
+ obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
+ obj-$(CONFIG_MACH_DLINK_KIRKWOOD_DT)	+= board-dnskw.o
+-obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
+ obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
+ obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
 diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 8eac548..8b35157 100644
+index edb1215..70c8d7d 100644
 --- a/arch/arm/mach-kirkwood/board-dt.c
 +++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -141,9 +141,6 @@ static void __init kirkwood_dt_init(void)
- 	if (of_machine_is_compatible("usi,topkick"))
- 		usi_topkick_init();
+@@ -121,9 +121,6 @@ static void __init kirkwood_dt_init(void)
+ 	if (of_machine_is_compatible("dlink,dns-kirkwood"))
+ 		dnskw_init();
  
--	if (of_machine_is_compatible("zyxel,nsa310"))
--		nsa310_init();
+-	if (of_machine_is_compatible("qnap,ts219"))
+-		qnap_dt_ts219_init();
 -
- 	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
- }
+ 	if (of_machine_is_compatible("iom,ix2-200"))
+ 		iomega_ix2_200_init();
  
-diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-index 0b99533..55ade93 100644
---- a/arch/arm/mach-kirkwood/board-nsa310.c
-+++ b/arch/arm/mach-kirkwood/board-nsa310.c
-@@ -13,32 +13,6 @@
- #include <mach/kirkwood.h>
- #include <linux/of.h>
- #include "common.h"
--#include "mpp.h"
+diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
+deleted file mode 100644
+index f00c0a9..0000000
+--- a/arch/arm/mach-kirkwood/board-ts219.c
++++ /dev/null
+@@ -1,37 +0,0 @@
+-/*
+- *
+- * QNAP TS-11x/TS-21x Turbo NAS Board Setup via DT
+- *
+- * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
+- *
+- * Based on the board file ts219-setup.c:
+- *
+- * Copyright (C) 2009  Martin Michlmayr <tbm@cyrius.com>
+- * Copyright (C) 2008  Byron Bradley <byron.bbradley@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version
+- * 2 of the License, or (at your option) any later version.
+- */
 -
--static unsigned int nsa310_mpp_config[] __initdata = {
--	MPP12_GPIO, /* led esata green */
--	MPP13_GPIO, /* led esata red */
--	MPP15_GPIO, /* led usb green */
--	MPP16_GPIO, /* led usb red */
--	MPP21_GPIO, /* control usb power off */
--	MPP28_GPIO, /* led sys green */
--	MPP29_GPIO, /* led sys red */
--	MPP36_GPIO, /* key reset */
--	MPP37_GPIO, /* key copy */
--	MPP39_GPIO, /* led copy green */
--	MPP40_GPIO, /* led copy red */
--	MPP41_GPIO, /* led hdd green */
--	MPP42_GPIO, /* led hdd red */
--	MPP44_GPIO, /* ?? */
--	MPP46_GPIO, /* key power */
--	MPP48_GPIO, /* control power off */
--	0
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/mv643xx_eth.h>
+-#include <mach/kirkwood.h>
+-#include "common.h"
+-
+-static struct mv643xx_eth_platform_data qnap_ts219_ge00_data = {
+-	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
 -};
 -
--void __init nsa310_init(void)
+-void __init qnap_dt_ts219_init(void)
 -{
--	kirkwood_mpp_conf(nsa310_mpp_config);
+-	u32 dev, rev;
+-
+-	kirkwood_pcie_id(&dev, &rev);
+-	if (dev == MV88F6282_DEV_ID)
+-		qnap_ts219_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
+-
+-	kirkwood_ge00_init(&qnap_ts219_ge00_data);
 -}
- 
- static int __init nsa310_pci_init(void)
- {
 diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index e956d02..1c42cb8 100644
+index ba6eb9c..8f98b67 100644
 --- a/arch/arm/mach-kirkwood/common.h
 +++ b/arch/arm/mach-kirkwood/common.h
-@@ -130,12 +130,6 @@ void ns2_init(void);
- static inline void ns2_init(void) {};
- #endif
+@@ -55,12 +55,6 @@ void kirkwood_restart(char, const char *);
+ void kirkwood_clk_init(void);
  
--#ifdef CONFIG_MACH_NSA310_DT
--void nsa310_init(void);
+ /* board init functions for boards not fully converted to fdt */
+-#ifdef CONFIG_MACH_TS219_DT
+-void qnap_dt_ts219_init(void);
 -#else
--static inline void nsa310_init(void) {};
+-static inline void qnap_dt_ts219_init(void) {};
 -#endif
 -
- #ifdef CONFIG_MACH_OPENBLOCKS_A6_DT
- void openblocks_a6_init(void);
+ #ifdef CONFIG_MACH_DLINK_KIRKWOOD_DT
+ void dnskw_init(void);
  #else
 -- 
 1.8.1.1
