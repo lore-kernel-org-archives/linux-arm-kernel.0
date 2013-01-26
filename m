@@ -1,63 +1,197 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Sat, 26 Jan 2013 11:30:59 -0300
-Subject: [PATCHv3] ARM: sunxi: gpio: Add Allwinner SoCs GPIO drivers
-In-Reply-To: <1359192670-22543-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1359192670-22543-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CALF0-+UT+dX=a6NAufEsQ9HgWQevnKW4W26fSHLq1FRuVHht9w@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 26 Jan 2013 18:32:39 +0400
+Subject: [PATCH v6 1/2] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <1359168322-17733-2-git-send-email-rtivy@ti.com>
+References: <1359168322-17733-1-git-send-email-rtivy@ti.com>
+ <1359168322-17733-2-git-send-email-rtivy@ti.com>
+Message-ID: <5103E907.8020206@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hello.
 
-On Sat, Jan 26, 2013 at 6:31 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The IP responsible for the muxing on the Allwinner SoCs are also
-> handling the GPIOs on the system. This patch adds the needed driver that
-> relies on the pinctrl driver for most of its operations.
+On 26-01-2013 6:45, Robert Tivy wrote:
+
+> Adding a remoteproc driver implementation for OMAP-L138 DSP
+
+    You forgot to sign off the patch.
+
+> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> index 96ce101..e923599 100644
+> --- a/drivers/remoteproc/Kconfig
+> +++ b/drivers/remoteproc/Kconfig
+[...]
+> @@ -41,4 +41,28 @@ config STE_MODEM_RPROC
+>   	  This can be either built-in or a loadable module.
+>   	  If unsure say N.
 >
-> The number of pins available for GPIOs operations are already declared
-> in the pinctrl driver, we only need to probe a generic driver to handle
-> the banks available for each SoC.
->
-> This driver has been tested on a A13-Olinuxino.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
-> Changes from v2:
->   - Removed the call to kzalloc to build the pin name
->
->  drivers/pinctrl/pinctrl-sunxi.c |  134 ++++++++++++++++++++++++++++++++++++++-
->  drivers/pinctrl/pinctrl-sunxi.h |   25 +++++++-
->  2 files changed, 156 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-> index 6f02e34..4ed0e7e 100644
-> --- a/drivers/pinctrl/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/pinctrl-sunxi.c
-> @@ -11,6 +11,7 @@
->   */
->
->  #include <linux/io.h>
-> +#include <linux/gpio.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> @@ -609,11 +610,53 @@ static int sunxi_pmx_enable(struct pinctrl_dev *pctldev,
->         return 0;
->  }
->
-> +static int
-> +sunxi_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-> +                       struct pinctrl_gpio_range *range,
-> +                       unsigned offset,
-> +                       bool input)
+> +config DA8XX_REMOTEPROC
+> +	tristate "DaVinci DA850/OMAPL138 remoteproc support (EXPERIMENTAL)"
+
+    Neither DA850 nor OMAP-L138 are true DaVinci processors. Please drop the 
+"DaVinci" word.
+
+> +	depends on ARCH_DAVINCI_DA850
+
+    It's also not clear why you limit the driver d\to DA850 while you call it 
+da8xx_remoteproc.c. There's at least one more member to DA8xx familiy (at 
+least supported in the community): DA830/OMAP-L137.
+
+> +	select REMOTEPROC
+> +	select RPMSG
+> +	select CMA
+> +	default n
+> +	help
+> +	  Say y here to support DaVinci DA850/OMAPL138 remote processors
+
+    Same here.
+
+> diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+> new file mode 100644
+> index 0000000..c6eb6bf
+> --- /dev/null
+> +++ b/drivers/remoteproc/da8xx_remoteproc.c
+> @@ -0,0 +1,327 @@
+> +/*
+> + * Remote processor machine-specific module for DA8XX
+> + *
+> + * Copyright (C) 2013 Texas Instruments, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * version 2 as published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/remoteproc.h>
+> +
+> +#include <mach/clock.h>   /* for davinci_clk_reset_assert/deassert() */
+> +
+> +#include "remoteproc_internal.h"
+> +
+> +static char *da8xx_fw_name;
+> +module_param(da8xx_fw_name, charp, S_IRUGO);
+> +MODULE_PARM_DESC(da8xx_fw_name,
+> +	"\n\t\tName of DSP firmware file in /lib/firmware");
+> +
+> +/*
+> + * OMAP-L138 Technical References:
+> + * http://www.ti.com/product/omap-l138
+> + */
+> +#define SYSCFG_CHIPSIG_OFFSET 0x174
+> +#define SYSCFG_CHIPSIG_CLR_OFFSET 0x178
+
+    <mach/da8xx.h> has SYSCFG register #define's ending with '_REG', not 
+'_OFFSET' -- I'd like this tradition to be kept. And perhaps we should #define 
+these registers there instead of the driver?
+
+> +#define SYSCFG_CHIPINT0 BIT(0)
+> +#define SYSCFG_CHIPINT1 BIT(1)
+> +#define SYSCFG_CHIPINT2 BIT(2)
+> +#define SYSCFG_CHIPINT3 BIT(3)
+
+    DA830/OMAP-l137 has the same registers. Only the datasheet calls the bits 
+CHIPSIGn there. Bit 4 also exists and means DSP NMI.
+
+> +static int da8xx_rproc_probe(struct platform_device *pdev)
+[...]
+> +	chipsig = devm_request_and_ioremap(dev, chipsig_res);
+> +	if (!chipsig) {
+> +		dev_err(dev, "unable to map CHIPSIG register\n");
+> +		return -EINVAL;
+
+    Why -EINVAL? Comment to devm_request_and_ioremap() suggests returning 
+-EADDRNOTAVAIL.
+
+> +	}
+> +
+> +	bootreg = devm_request_and_ioremap(dev, bootreg_res);
+> +	if (!bootreg) {
+> +		dev_err(dev, "unable to map boot register\n");
+> +		return -EINVAL;
+
+    Same here.
+
+> +static int __devexit da8xx_rproc_remove(struct platform_device *pdev)
 > +{
-> +       struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
-> +       struct sunxi_desc_function *desc;
-> +       char pin_name[SUNXI_PIN_NAME_MAX_LEN];
-> +       char *func;
+> +	struct rproc *rproc = platform_get_drvdata(pdev);
+> +	struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
+> +	int ret;
+> +
+> +	/*
+> +	 * The devm subsystem might end up releasing things before
+> +	 * freeing the irq, thus allowing an interrupt to sneak in while
+> +	 * the device is being removed.  This should prevent that.
+> +	 */
+> +	disable_irq(drproc->irq);
 
-Nitpick: const char *func.
+    Will the IRQ be enabled properly upon reloading the driver? You're 
+effectively disabling it twice, once here and once in devm_free_irq(), aren't you?
 
--- 
-    Ezequiel
+> +static struct platform_driver da8xx_rproc_driver = {
+> +	.probe = da8xx_rproc_probe,
+> +	.remove = __devexit_p(da8xx_rproc_remove),
+
+    Isn't _devexit_p() removed now? I thought __devinit and friends have all 
+been removed in 3.8-rc1...
+
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index dd3bfaf..ac4449a 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -1222,19 +1222,39 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
+>   				const char *firmware, int len)
+>   {
+>   	struct rproc *rproc;
+> +	char *template = "rproc-%s-fw";
+> +	char *p;
+>
+>   	if (!dev || !name || !ops)
+>   		return NULL;
+>
+> +        if (!firmware)
+
+    It makes sense to use {} despite singkle-statement branch.
+
+> +                /*
+
+    Indent with tabs please.
+
+> +		 * Make room for default firmware name (minus %s plus '\0').
+> +		 * If the caller didn't pass in a firmware name then
+> +		 * construct a default name.  We're already glomming 'len'
+> +		 * bytes onto the end of the struct rproc allocation, so do
+> +		 * a few more for the default firmware name (but only if
+> +		 * the caller doesn't pass one).
+> +		 */
+> +                len += strlen(name) + strlen(template) - 2 + 1;
+
+    Same here.
+
+>   	rproc = kzalloc(sizeof(struct rproc) + len, GFP_KERNEL);
+>   	if (!rproc) {
+>   		dev_err(dev, "%s: kzalloc failed\n", __func__);
+>   		return NULL;
+>   	}
+>
+> +        if (!firmware) {
+> +                p = (char *)rproc + sizeof(struct rproc) + len;
+> +                sprintf(p, template, name);
+> +        }
+> +        else
+> +                p = (char *)firmware;
+> +
+> +        rproc->firmware = p;
+
+    Same here.
+
+WBR, Sergei
