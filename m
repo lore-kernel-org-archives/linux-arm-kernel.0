@@ -1,51 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Jan 2013 11:45:35 +0000
-Subject: [PATCH 11/19] regmap: regmap: avoid spurious warning in
- regmap_read_debugfs
-In-Reply-To: <20130126100744.GD23505@n2100.arm.linux.org.uk>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <20130126100326.GK30594@opensource.wolfsonmicro.com>
- <20130126100744.GD23505@n2100.arm.linux.org.uk>
-Message-ID: <201301261145.36158.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 26 Jan 2013 13:38:27 +0100
+Subject: [PATCH V3 8/8] ARM: kirkwood: mv643xx_eth dt conversion
+In-Reply-To: <a4805edf01c39a374d71fbf4a6b6207dedf6b2bf.1359146831.git.jason@lakedaemon.net>
+References: <cover.1359146831.git.jason@lakedaemon.net>
+ <a4805edf01c39a374d71fbf4a6b6207dedf6b2bf.1359146831.git.jason@lakedaemon.net>
+Message-ID: <20130126123827.GA5786@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index 73b76e4..7ab92e5 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -48,7 +48,7 @@ static void __init kirkwood_legacy_clk_init(void)
+>  	clkspec.args_count = 1;
+>  
+>  	clkspec.args[0] = CGC_BIT_GE0;
+> -	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
+> +	orion_clkdev_add(NULL, "f1072000.egiga0",
+>  			 of_clk_get_from_provider(&clkspec));
+>  
+>  	clkspec.args[0] = CGC_BIT_PEX0;
+> @@ -60,7 +60,7 @@ static void __init kirkwood_legacy_clk_init(void)
+>  			 of_clk_get_from_provider(&clkspec));
+>  
+>  	clkspec.args[0] = CGC_BIT_GE1;
+> -	orion_clkdev_add(NULL, "mv643xx_eth_port.1",
+> +	orion_clkdev_add(NULL, "f1076000.egiga1",
+>  			 of_clk_get_from_provider(&clkspec));
+>  }
+>  
 
-Gcc warns about the case where regmap_read_debugfs tries to walk an
-empty map->debugfs_off_cache list, which would results in uninitialized
-variable getting returned, if we hadn't checked the same condition
-just before that.
+Hi Jason
 
-After an originally suggested inferior patch from Arnd Bergmann,
-this is the solution that Russell King came up with, sidestepping
-the problem by merging the error case for an empty list with the
-normal path.
+These changes break any platform not yet converted, eg my QNAP box now
+locks up solid.
 
-Without this patch, building mxs_defconfig results in:
+Something is not right here, or i'm not understanding something. DT
+devices should not need code like this, only devices not yet using
+DT....
 
-drivers/base/regmap/regmap-debugfs.c: In function 'regmap_read_debugfs':
-drivers/base/regmap/regmap-debugfs.c:147:9: : warning: 'ret' may be used uninitialized in this function [-Wmaybe-uninitialized]
-
-Reported-by: Vincent Stehle <v-stehle@ti.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
-index 41b65f6..ef35c25 100644
---- a/drivers/base/regmap/regmap-debugfs.c
-+++ b/drivers/base/regmap/regmap-debugfs.c
-@@ -128,10 +128,8 @@ static unsigned int regmap_debugfs_get_dump_start(struct regmap *map,
- 	 * allocate and we should never be in this code if there are
- 	 * no registers at all.
- 	 */
--	if (list_empty(&map->debugfs_off_cache)) {
--		WARN_ON(list_empty(&map->debugfs_off_cache));
--		return base;
--	}
-+	WARN_ON(list_empty(&map->debugfs_off_cache));
-+	ret = base;
- 
- 	/* Find the relevant block */
- 	list_for_each_entry(c, &map->debugfs_off_cache, list) {
+	Andrew
