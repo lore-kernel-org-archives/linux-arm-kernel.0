@@ -1,44 +1,70 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 26 Jan 2013 22:39:53 +0800
-Subject: [PATCH 4/4] cpufreq, highbank: add support for highbank cpufreq
-In-Reply-To: <1359143205-20279-5-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1359143205-20279-1-git-send-email-mark.langsdorf@calxeda.com>
- <1359143205-20279-5-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <20130126143950.GA7079@S2101-09.ap.freescale.net>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 26 Jan 2013 18:42:49 +0400
+Subject: [PATCH v6 2/2] ARM: davinci: Remoteproc platform device creation
+ data/code
+In-Reply-To: <1359168322-17733-3-git-send-email-rtivy@ti.com>
+References: <1359168322-17733-1-git-send-email-rtivy@ti.com>
+ <1359168322-17733-3-git-send-email-rtivy@ti.com>
+Message-ID: <5103EB69.5070101@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+Hello.
 
-On Fri, Jan 25, 2013 at 01:46:45PM -0600, Mark Langsdorf wrote:
-> +static int hb_cpufreq_driver_init(void)
+On 26-01-2013 6:45, Robert Tivy wrote:
+
+> Added a new remoteproc platform device for DA8XX.  Contains CMA-based
+> reservation of physical memory block.  A new kernel command-line
+> parameter has been added to allow boot-time specification of the
+> physical memory block.
+
+    No signoff again.
+
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index fb2f51b..a455e5c 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+[...]
+> @@ -706,6 +706,96 @@ int __init da850_register_mmcsd1(struct davinci_mmc_config *config)
+>   }
+>   #endif
+>
+> +static struct resource da8xx_rproc_resources[] = {
+> +	{ /* DSP boot address */
+> +		.start		= DA8XX_SYSCFG0_BASE + DA8XX_HOST1CFG_REG,
+> +		.end		= DA8XX_SYSCFG0_BASE + DA8XX_HOST1CFG_REG + 3,
+> +		.flags		= IORESOURCE_MEM,
+> +	},
+> +	{ /* DSP interrupt registers */
+> +		.start		= DA8XX_SYSCFG0_BASE + DA8XX_CHIPSIG_REG,
+> +		.end		= DA8XX_SYSCFG0_BASE + DA8XX_CHIPSIG_REG + 7,
+> +		.flags		= IORESOURCE_MEM,
+
+    Does it really make sense to pass these as 2 resources -- they have the 
+same base address?
+
+> +int __init da8xx_register_rproc(void)
 > +{
-> +	struct device *cpu_dev;
-> +	struct clk *cpu_clk;
-> +	struct device_node *np;
 > +	int ret;
 > +
-> +	for_each_child_of_node(of_find_node_by_path("/cpus"), np)
-> +		if (of_get_property(np, "operating-points", NULL))
-> +			break;
+> +	ret = platform_device_register(&da8xx_dsp);
+> +	if (ret) {
+> +		pr_err("%s: platform_device_register: %d\n", __func__, ret);
+
+    Better message would be "can't register DSP device".
+
 > +
-> +	if (!np) {
-> +		pr_err("failed to find highbank cpufreq node\n");
-> +		return -ENOENT;
+
+    Empty line hardly needed here.
+
+> +		return ret;
+
+    Not needed here, just move it outside the {} to replace 'return 0'.
+
 > +	}
 > +
-...
-> +out_put_node:
-> +	of_node_put(np);
-> +	return ret;
-> +}
-> +module_init(hb_cpufreq_driver_init);
+> +	return 0;
+> +};
+> +
 
-As we are moving to multiplatform build, this init function will run
-on all other platforms built together with highbank.  We should
-probably eliminate that effect.  cpufreq-cpu0 driver is facing the
-same problem, and I just sent a patch "cpufreq: instantiate cpufreq-cpu0
-as a platform_driver" to address that.
-
-Shawn
+WBR, Sergei
