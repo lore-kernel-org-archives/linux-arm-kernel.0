@@ -1,34 +1,20 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Jan 2013 16:43:59 +0100
-Subject: [PATCH v2 3/3] arm: kirkwood: Enable cpufreq and ondemand on
- kirkwood_defconfig
-In-Reply-To: <1359215039-2848-1-git-send-email-andrew@lunn.ch>
-References: <1359215039-2848-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1359215039-2848-4-git-send-email-andrew@lunn.ch>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Sat, 26 Jan 2013 16:44:15 +0100
+Subject: [PATCH 0/3] atmel_lcdfb: fix 16-bpp regression
+In-Reply-To: <1355142530-10366-1-git-send-email-jhovold@gmail.com>
+References: <1355142530-10366-1-git-send-email-jhovold@gmail.com>
+Message-ID: <20130126154415.GA25750@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a cpufreq driver for kirkwood, enable it in
-kirkwood_defconfig and set the default governer to ondemand.
+On Mon, Dec 10, 2012 at 01:28:47PM +0100, Johan Hovold wrote:
+> These patches fix a regression in 16-bpp support for older SOCs which use
+> IBGR:555 rather than BGR:565 pixel layout. Use SOC-type to determine if the
+> controller uses the intensity-bit and restore the old layout in that case.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/configs/kirkwood_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+I understand the maintainer's been busy lately, but could someone pick
+these regression fixes up so we can get them into v3.8-rc and the stable
+trees?
 
-diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-index 93f3794..6ecb7de 100644
---- a/arch/arm/configs/kirkwood_defconfig
-+++ b/arch/arm/configs/kirkwood_defconfig
-@@ -55,6 +55,9 @@ CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_STAT_DETAILS=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_IDLE=y
- CONFIG_NET=y
- CONFIG_PACKET=y
--- 
-1.7.10.4
+Thanks,
+Johan
