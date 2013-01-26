@@ -1,32 +1,32 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 26 Jan 2013 15:36:50 +0100
-Subject: [PATCH 0/5] sunxi: Add pinctrl/gpio support for A10 SoCs
-Message-ID: <1359211016-24097-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sat, 26 Jan 2013 15:36:51 +0100
+Subject: [PATCH 1/5] ARM: sunxi: Increase the number of GPIOs available
+In-Reply-To: <1359211016-24097-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1359211016-24097-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1359211016-24097-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Allwinner A10 has 9 banks of 32 GPIOs available, so it doesn't fit
+in the usual 256 limit set by gpio.h. Increase this number to 288.
 
-This patchset add GPIO and pinctrl support for the Allwinner A10 SoC.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-It adds the pin description array in the pinctrl driver, and the needed bits
-in the A10 device tree.
-
-Thanks,
-Maxime
-
-Maxime Ripard (5):
-  ARM: sunxi: Increase the number of GPIOs available
-  pinctrl: sunxi: Document sun5i pins functions
-  ARM: pinctrl: sunxi: Add the pinctrl pin set for Allwinner A10
-  ARM: sunxi: Add the sun4i pinctrl and gpio nodes
-  ARM: sunxi: Add the pin groups for UART0 and UART1 on sun4i
-
- arch/arm/Kconfig                 |    2 +-
- arch/arm/boot/dts/sun4i-a10.dtsi |   30 ++
- drivers/pinctrl/pinctrl-sunxi.c  |  562 +++++++++++++++++++++++++++++++++++++-
- drivers/pinctrl/pinctrl-sunxi.h  |   68 +++++
- 4 files changed, 657 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f95ba14..1e86fa9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1632,7 +1632,7 @@ config ARCH_NR_GPIO
+ 	default 355 if ARCH_U8500
+ 	default 264 if MACH_H4700
+ 	default 512 if SOC_OMAP5
+-	default 288 if ARCH_VT8500
++	default 288 if ARCH_VT8500 || ARCH_SUNXI
+ 	default 0
+ 	help
+ 	  Maximum number of GPIOs in the system.
 -- 
 1.7.10.4
