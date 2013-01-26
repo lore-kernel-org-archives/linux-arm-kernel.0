@@ -1,191 +1,41 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 26 Jan 2013 16:10:30 +0100
-Subject: [PATCH 3/3] ARM: Kirkwood: Convert QNAP TS219 Ethernet to DT.
+Date: Sat, 26 Jan 2013 16:10:29 +0100
+Subject: [PATCH 2/3] ARM: Kirkwood: Revert clkdev changes.
 In-Reply-To: <1359213030-18588-1-git-send-email-andrew@lunn.ch>
 References: <1359213030-18588-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1359213030-18588-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1359213030-18588-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT nodes for the Ethernet ports and remove the C code. The PHY
-addresses depends on which SoC is used, so place the nodes into the
-SoC specific DTS files.
+Now that the Ethernet driver can get its clock from device tree,
+revert this change which broken non-DT probing of the ethernet device.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-ts219-6281.dts |    9 +++++++
- arch/arm/boot/dts/kirkwood-ts219-6282.dts |   10 ++++++++
- arch/arm/mach-kirkwood/Kconfig            |   17 ++-----------
- arch/arm/mach-kirkwood/Makefile           |    1 -
- arch/arm/mach-kirkwood/board-dt.c         |    3 ---
- arch/arm/mach-kirkwood/board-ts219.c      |   37 -----------------------------
- arch/arm/mach-kirkwood/common.h           |    6 -----
- 7 files changed, 21 insertions(+), 62 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/board-ts219.c
+ arch/arm/mach-kirkwood/board-dt.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6281.dts b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-index 8295c83..00b2c7f 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-@@ -32,6 +32,15 @@
- 				marvell,function = "gpio";
- 			};
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			phy_addr = <0x88>;
-+			status = "ok";
-+		};
- 	};
- 
- 	gpio_keys {
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6282.dts b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-index df3f95d..61d69f5 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-@@ -32,6 +32,16 @@
- 				marvell,function = "gpio";
- 			};
- 		};
-+
-+		smi0: mdio at 72000 {
-+			status = "ok";
-+		};
-+
-+		egiga0 {
-+			phy_addr = <0x80>;
-+			status = "ok";
-+		};
-+
- 	};
- 
- 	gpio_keys {
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 188651b..9ea5725 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -46,9 +46,11 @@ config MACH_GURUPLUG
- 
- config ARCH_KIRKWOOD_DT
- 	bool "Marvell Kirkwood Flattened Device Tree"
-+	select ARM_APPENDED_DTB
- 	select POWER_SUPPLY
- 	select POWER_RESET
- 	select POWER_RESET_GPIO
-+	select POWER_RESET_QNAP
- 	select REGULATOR
- 	select REGULATOR_FIXED_VOLTAGE
- 	select MVEBU_CLK_CORE
-@@ -66,21 +68,6 @@ config MACH_DLINK_KIRKWOOD_DT
- 	  Kirkwood-based D-Link NASes such as DNS-320 & DNS-325,
- 	  using Flattened Device Tree.
- 
--config MACH_TS219_DT
--	bool "Device Tree for QNAP TS-11X, TS-21X NAS"
--	select ARCH_KIRKWOOD_DT
--	select ARM_APPENDED_DTB
--	select ARM_ATAG_DTB_COMPAT
--	select POWER_RESET_QNAP
--	help
--	  Say 'Y' here if you want your kernel to support the QNAP
--	  TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and
--	  TS-219P+ Turbo NAS devices using Fattened Device Tree.
--	  There are two different Device Tree descriptions, depending
--	  on if the device is based on an if the board uses the MV6281
--	  or MV6282. If you have the wrong one, the buttons will not
--	  work.
--
- config MACH_IOMEGA_IX2_200_DT
- 	bool "Iomega StorCenter ix2-200 (Flattened Device Tree)"
- 	select ARCH_KIRKWOOD_DT
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index ab739b0..e94973c 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -21,6 +21,5 @@ obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
- 
- obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
- obj-$(CONFIG_MACH_DLINK_KIRKWOOD_DT)	+= board-dnskw.o
--obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
- obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
- obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
 diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index edb1215..70c8d7d 100644
+index 7ab92e5..edb1215 100644
 --- a/arch/arm/mach-kirkwood/board-dt.c
 +++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -121,9 +121,6 @@ static void __init kirkwood_dt_init(void)
- 	if (of_machine_is_compatible("dlink,dns-kirkwood"))
- 		dnskw_init();
+@@ -48,7 +48,7 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	clkspec.args_count = 1;
  
--	if (of_machine_is_compatible("qnap,ts219"))
--		qnap_dt_ts219_init();
--
- 	if (of_machine_is_compatible("iom,ix2-200"))
- 		iomega_ix2_200_init();
+ 	clkspec.args[0] = CGC_BIT_GE0;
+-	orion_clkdev_add(NULL, "f1072000.egiga0",
++	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
+ 			 of_clk_get_from_provider(&clkspec));
  
-diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
-deleted file mode 100644
-index f00c0a9..0000000
---- a/arch/arm/mach-kirkwood/board-ts219.c
-+++ /dev/null
-@@ -1,37 +0,0 @@
--/*
-- *
-- * QNAP TS-11x/TS-21x Turbo NAS Board Setup via DT
-- *
-- * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
-- *
-- * Based on the board file ts219-setup.c:
-- *
-- * Copyright (C) 2009  Martin Michlmayr <tbm@cyrius.com>
-- * Copyright (C) 2008  Byron Bradley <byron.bbradley@gmail.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/mv643xx_eth.h>
--#include <mach/kirkwood.h>
--#include "common.h"
--
--static struct mv643xx_eth_platform_data qnap_ts219_ge00_data = {
--	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
--};
--
--void __init qnap_dt_ts219_init(void)
--{
--	u32 dev, rev;
--
--	kirkwood_pcie_id(&dev, &rev);
--	if (dev == MV88F6282_DEV_ID)
--		qnap_ts219_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
--
--	kirkwood_ge00_init(&qnap_ts219_ge00_data);
--}
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index ba6eb9c..8f98b67 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -55,12 +55,6 @@ void kirkwood_restart(char, const char *);
- void kirkwood_clk_init(void);
+ 	clkspec.args[0] = CGC_BIT_PEX0;
+@@ -60,7 +60,7 @@ static void __init kirkwood_legacy_clk_init(void)
+ 			 of_clk_get_from_provider(&clkspec));
  
- /* board init functions for boards not fully converted to fdt */
--#ifdef CONFIG_MACH_TS219_DT
--void qnap_dt_ts219_init(void);
--#else
--static inline void qnap_dt_ts219_init(void) {};
--#endif
--
- #ifdef CONFIG_MACH_DLINK_KIRKWOOD_DT
- void dnskw_init(void);
- #else
+ 	clkspec.args[0] = CGC_BIT_GE1;
+-	orion_clkdev_add(NULL, "f1076000.egiga1",
++	orion_clkdev_add(NULL, "mv643xx_eth_port.1",
+ 			 of_clk_get_from_provider(&clkspec));
+ }
+ 
 -- 
 1.7.10.4
