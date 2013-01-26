@@ -1,47 +1,27 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 26 Jan 2013 15:22:08 -0500
-Subject: [RFC V2 PATCH 3/8] ARM: kirkwood: nsa310: cleanup includes and
- unneeded code
-In-Reply-To: <510437CC.1040106@mvista.com>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <cover.1359091286.git.jason@lakedaemon.net>
- <31142087d93c2713d067f4ccf470810e6e71f17b.1359091286.git.jason@lakedaemon.net>
- <510437CC.1040106@mvista.com>
-Message-ID: <20130126202208.GR1758@titan.lakedaemon.net>
+Date: Sat, 26 Jan 2013 15:39:28 -0500
+Subject: [PATCH 1/2] ARM: Kirkwood: topkick: Fix SoC type and add
+ missing pins
+In-Reply-To: <1359219326-5927-1-git-send-email-andrew@lunn.ch>
+References: <f6d483f3fb83826bce16f956afa013f0bcf11f52.1359146831.git.jason@lakedaemon.net>
+ <1359219326-5927-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130126203928.GS1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 12:08:44AM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Sat, Jan 26, 2013 at 05:55:24PM +0100, Andrew Lunn wrote:
+> Topkick contains a Marvell 6282, not an 6281 as included in the
+> kirkwood-topkick.dts file.
 > 
-> On 25-01-2013 9:32, Jason Cooper wrote:
+> Also, add pinhogs for the serial port and nand devices.
 > 
-> >Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> >---
-> >  arch/arm/mach-kirkwood/board-nsa310.c | 9 +--------
-> >  1 file changed, 1 insertion(+), 8 deletions(-)
-> 
-> >diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-> >index 1bd328d..0b99533 100644
-> >--- a/arch/arm/mach-kirkwood/board-nsa310.c
-> >+++ b/arch/arm/mach-kirkwood/board-nsa310.c
-> >@@ -10,11 +10,8 @@
-> >
-> >  #include <linux/kernel.h>
-> >  #include <linux/init.h>
-> >-#include <linux/i2c.h>
-> >-
-> >-#include <asm/mach-types.h>
-> >-#include <asm/mach/arch.h>
-> >  #include <mach/kirkwood.h>
-> >+#include <linux/of.h>
-> 
->    You also add an #include and don't mention it anywhere. Or is
-> that part of the cleanup?
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood-topkick.dts |    6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 
-After removing the unneeded linux/i2c.h, linux/of.h was needed for
-of_machine_is_compatible().  i2c.h had included of.h.
+Squashed into pinctrl conversion, thanks and good catch.
 
-thanks for the review,
+thx,
 
 Jason.
