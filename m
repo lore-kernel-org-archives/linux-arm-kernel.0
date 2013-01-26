@@ -1,281 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 26 Jan 2013 10:31:10 +0100
-Subject: [PATCHv3] ARM: sunxi: gpio: Add Allwinner SoCs GPIO drivers
-Message-ID: <1359192670-22543-1-git-send-email-maxime.ripard@free-electrons.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 26 Jan 2013 17:49:29 +0800
+Subject: [PATCH 11/19] regmap: avoid undefined return from
+ regmap_read_debugfs
+In-Reply-To: <201301260917.28028.arnd@arndb.de>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <1359123276-15833-12-git-send-email-arnd@arndb.de>
+ <20130126044219.GA10580@opensource.wolfsonmicro.com>
+ <201301260917.28028.arnd@arndb.de>
+Message-ID: <20130126094855.GI30594@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IP responsible for the muxing on the Allwinner SoCs are also
-handling the GPIOs on the system. This patch adds the needed driver that
-relies on the pinctrl driver for most of its operations.
+On Sat, Jan 26, 2013 at 09:17:27AM +0000, Arnd Bergmann wrote:
+> On Saturday 26 January 2013, Mark Brown wrote:
+> > On Fri, Jan 25, 2013 at 02:14:28PM +0000, Arnd Bergmann wrote:
 
-The number of pins available for GPIOs operations are already declared
-in the pinctrl driver, we only need to probe a generic driver to handle
-the banks available for each SoC.
+> > > Gcc warns about the case where regmap_read_debugfs tries
 
-This driver has been tested on a A13-Olinuxino.
+> > Are you sure about that function name?
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-Changes from v2:
-  - Removed the call to kzalloc to build the pin name
+> Yes, regmap_read_debugfs uses the return value from
+> regmap_debugfs_get_dump_start, for which gcc found
+> a path that returns the uninitialized value.
 
- drivers/pinctrl/pinctrl-sunxi.c |  134 ++++++++++++++++++++++++++++++++++++++-
- drivers/pinctrl/pinctrl-sunxi.h |   25 +++++++-
- 2 files changed, 156 insertions(+), 3 deletions(-)
+> > > to walk an empty map->debugfs_off_cache list, which results
+> > > in uninitialized variable getting returned.
 
-diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-index 6f02e34..4ed0e7e 100644
---- a/drivers/pinctrl/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/pinctrl-sunxi.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/io.h>
-+#include <linux/gpio.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -609,11 +610,53 @@ static int sunxi_pmx_enable(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
-+static int
-+sunxi_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-+			struct pinctrl_gpio_range *range,
-+			unsigned offset,
-+			bool input)
-+{
-+	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
-+	struct sunxi_desc_function *desc;
-+	char pin_name[SUNXI_PIN_NAME_MAX_LEN];
-+	char *func;
-+	u8 bank, pin;
-+	int ret;
-+
-+	bank = (offset) / PINS_PER_BANK;
-+	pin = (offset) % PINS_PER_BANK;
-+
-+	ret = sprintf(pin_name, "P%c%d", 'A' + bank, pin);
-+	if (!ret)
-+		goto error;
-+
-+	if (input)
-+		func = "gpio_in";
-+	else
-+		func = "gpio_out";
-+
-+	desc = sunxi_pinctrl_desc_find_function_by_name(pctl,
-+							pin_name,
-+							func);
-+	if (!desc) {
-+		ret = -EINVAL;
-+		goto error;
-+	}
-+
-+	sunxi_pmx_set(pctldev, offset, desc->muxval);
-+
-+	ret = 0;
-+
-+error:
-+	return ret;
-+}
-+
- static struct pinmux_ops sunxi_pmx_ops = {
- 	.get_functions_count	= sunxi_pmx_get_funcs_cnt,
- 	.get_function_name	= sunxi_pmx_get_func_name,
- 	.get_function_groups	= sunxi_pmx_get_func_groups,
- 	.enable			= sunxi_pmx_enable,
-+	.gpio_set_direction	= sunxi_pmx_gpio_set_direction,
- };
- 
- static struct pinctrl_desc sunxi_pctrl_desc = {
-@@ -622,6 +665,60 @@ static struct pinctrl_desc sunxi_pctrl_desc = {
- 	.pmxops		= &sunxi_pmx_ops,
- };
- 
-+static int sunxi_pinctrl_gpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	return pinctrl_request_gpio(chip->base + offset);
-+}
-+
-+static void sunxi_pinctrl_gpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	pinctrl_free_gpio(chip->base + offset);
-+}
-+
-+static int sunxi_pinctrl_gpio_direction_input(struct gpio_chip *chip,
-+					unsigned offset)
-+{
-+	return pinctrl_gpio_direction_input(chip->base + offset);
-+}
-+
-+static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
-+
-+	u32 reg = sunxi_data_reg(offset);
-+	u8 index = sunxi_data_offset(offset);
-+	u32 val = (readl(pctl->membase + reg) >> index) & DATA_PINS_MASK;
-+
-+	return val;
-+}
-+
-+static int sunxi_pinctrl_gpio_direction_output(struct gpio_chip *chip,
-+					unsigned offset, int value)
-+{
-+	return pinctrl_gpio_direction_output(chip->base + offset);
-+}
-+
-+static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
-+				unsigned offset, int value)
-+{
-+	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
-+	u32 reg = sunxi_data_reg(offset);
-+	u8 index = sunxi_data_offset(offset);
-+
-+	writel((value & DATA_PINS_MASK) << index, pctl->membase + reg);
-+}
-+
-+static struct gpio_chip sunxi_pinctrl_gpio_chip __devinitconst = {
-+	.owner			= THIS_MODULE,
-+	.request		= sunxi_pinctrl_gpio_request,
-+	.free			= sunxi_pinctrl_gpio_free,
-+	.direction_input	= sunxi_pinctrl_gpio_direction_input,
-+	.direction_output	= sunxi_pinctrl_gpio_direction_output,
-+	.get			= sunxi_pinctrl_gpio_get,
-+	.set			= sunxi_pinctrl_gpio_set,
-+	.can_sleep		= 0,
-+};
-+
- static struct of_device_id sunxi_pinctrl_match[] = {
- 	{ .compatible = "allwinner,sun5i-a13-pinctrl", .data = (void *)&sun5i_a13_pinctrl_data },
- 	{}
-@@ -737,7 +834,7 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
- 	const struct of_device_id *device;
- 	struct pinctrl_pin_desc *pins;
- 	struct sunxi_pinctrl *pctl;
--	int i, ret;
-+	int i, ret, last_pin;
- 
- 	pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
- 	if (!pctl)
-@@ -781,9 +878,42 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	dev_info(&pdev->dev, "initialized sunXi pin control driver\n");
-+	pctl->chip = devm_kzalloc(&pdev->dev, sizeof(*pctl->chip), GFP_KERNEL);
-+	if (!pctl->chip) {
-+		ret = -ENOMEM;
-+		goto pinctrl_error;
-+	}
-+
-+	last_pin = pctl->desc->pins[pctl->desc->npins - 1].pin.number;
-+	pctl->chip = &sunxi_pinctrl_gpio_chip;
-+	pctl->chip->ngpio = round_up(last_pin, PINS_PER_BANK);
-+	pctl->chip->label = dev_name(&pdev->dev);
-+	pctl->chip->dev = &pdev->dev;
-+	pctl->chip->base = 0;
-+
-+	ret = gpiochip_add(pctl->chip);
-+	if (ret)
-+		goto pinctrl_error;
-+
-+	for (i = 0; i < pctl->desc->npins; i++) {
-+		const struct sunxi_desc_pin *pin = pctl->desc->pins + i;
-+
-+		ret = gpiochip_add_pin_range(pctl->chip, dev_name(&pdev->dev),
-+					     pin->pin.number,
-+					     pin->pin.number, 1);
-+		if (ret)
-+			goto gpiochip_error;
-+	}
-+
-+	dev_info(&pdev->dev, "initialized sunXi PIO driver\n");
- 
- 	return 0;
-+
-+gpiochip_error:
-+	ret = gpiochip_remove(pctl->chip);
-+pinctrl_error:
-+	pinctrl_unregister(pctl->pctl_dev);
-+	return ret;
- }
- 
- static struct platform_driver sunxi_pinctrl_driver = {
-diff --git a/drivers/pinctrl/pinctrl-sunxi.h b/drivers/pinctrl/pinctrl-sunxi.h
-index 0dc3b9d..1ee35c0 100644
---- a/drivers/pinctrl/pinctrl-sunxi.h
-+++ b/drivers/pinctrl/pinctrl-sunxi.h
-@@ -254,8 +254,11 @@
- #define SUNXI_PINCTRL_PIN_PG30	PINCTRL_PIN(PG_BASE + 30, "PG30")
- #define SUNXI_PINCTRL_PIN_PG31	PINCTRL_PIN(PG_BASE + 31, "PG31")
- 
-+#define SUNXI_PIN_NAME_MAX_LEN	5
-+
- #define BANK_MEM_SIZE		0x24
- #define MUX_REGS_OFFSET		0x0
-+#define DATA_REGS_OFFSET	0x10
- #define DLEVEL_REGS_OFFSET	0x14
- #define PULL_REGS_OFFSET	0x1c
- 
-@@ -263,6 +266,9 @@
- #define MUX_PINS_PER_REG	8
- #define MUX_PINS_BITS		4
- #define MUX_PINS_MASK		0x0f
-+#define DATA_PINS_PER_REG	32
-+#define DATA_PINS_BITS		1
-+#define DATA_PINS_MASK		0x01
- #define DLEVEL_PINS_PER_REG	16
- #define DLEVEL_PINS_BITS	2
- #define DLEVEL_PINS_MASK	0x03
-@@ -283,6 +289,8 @@ struct sunxi_desc_pin {
- struct sunxi_pinctrl_desc {
- 	const struct sunxi_desc_pin	*pins;
- 	int				npins;
-+	struct pinctrl_gpio_range	*ranges;
-+	int				nranges;
- };
- 
- struct sunxi_pinctrl_function {
-@@ -299,6 +307,7 @@ struct sunxi_pinctrl_group {
- 
- struct sunxi_pinctrl {
- 	void __iomem			*membase;
-+	struct gpio_chip		*chip;
- 	struct sunxi_pinctrl_desc	*desc;
- 	struct device			*dev;
- 	struct sunxi_pinctrl_function	*functions;
-@@ -321,7 +330,6 @@ struct sunxi_pinctrl {
- 		.muxval = _val,					\
- 	}
- 
--
- /*
-  * The sunXi PIO registers are organized as is:
-  * 0x00 - 0x0c	Muxing values.
-@@ -354,6 +362,21 @@ static inline u32 sunxi_mux_offset(u16 pin)
- 	return pin_num * MUX_PINS_BITS;
- }
- 
-+static inline u32 sunxi_data_reg(u16 pin)
-+{
-+	u8 bank = pin / PINS_PER_BANK;
-+	u32 offset = bank * BANK_MEM_SIZE;
-+	offset += DATA_REGS_OFFSET;
-+	offset += pin % PINS_PER_BANK / DATA_PINS_PER_REG * 0x04;
-+	return round_down(offset, 4);
-+}
-+
-+static inline u32 sunxi_data_offset(u16 pin)
-+{
-+	u32 pin_num = pin % DATA_PINS_PER_REG;
-+	return pin_num * DATA_PINS_BITS;
-+}
-+
- static inline u32 sunxi_dlevel_reg(u16 pin)
- {
- 	u8 bank = pin / PINS_PER_BANK;
--- 
-1.7.10.4
+This is the bit that makes me think you're talking about the wrong
+function - regmap_debugfs_read() never looks at the off_cache list.
+
+> > > Setting this variable to 0 first avoids the warning and
+> > > the potentially undefined value.
+
+> > This probably won't apply against current code as there's already a
+> > better fix there, in general just picking a value to initialise masks
+> > errors.
+
+> I agree on the general rule not to do this, and I'm trying to avoid it
+> in the cases where I can find a better fix, but here I could not
+> (mostly because I could not figure out what this code actually
+> does. Thanks for taking a look.
+
+> Which code is the current version? Is your fix headed for 3.8 inclusion?
+
+It's all in mainline already.
+
+> I still see the warning in 3.8-rc5 as well as yesterday's linux-next,
+> with gcc-4.6, 4.7 and 4.8-pre.
+
+Oh, ffs.  This is a false positive from the compiler - there is no case
+where it can actually do this as we will bail out before the walk if the
+list is empty so we'll always take at least one trip through our
+list_for_each_entry() and either return or set ret.  It should be smart
+enough to work out that the list_empty() means list_for_each_entry()
+will iterate over at least one entry or more conservative in what it
+warns about.
+
+In any case, your change will break things - this is an example of why
+just picking a random value to assign is unhelpful.  You'd need to
+return base to avoid confusing the callers but even then doing it at the
+start of the function is overkill, it excludes a bunch of paths.  I
+guess we can work around it by putting a redundant assignment of pos and
+ret before the loop :/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130126/252c1e41/attachment.sig>
