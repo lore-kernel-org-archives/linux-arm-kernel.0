@@ -1,80 +1,17 @@
-From: kyungsik.lee@lge.com (Kyungsik Lee)
-Date: Sat, 26 Jan 2013 14:50:47 +0900
-Subject: [RFC PATCH 4/4] x86: add support for LZ4-compressed kernels
-In-Reply-To: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
-Message-ID: <1359179447-31118-5-git-send-email-kyungsik.lee@lge.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 26 Jan 2013 11:31:11 +0530
+Subject: [PATCH 00/13] ARM: spear multiplatform support
+In-Reply-To: <1359156956-32404-1-git-send-email-arnd@arndb.de>
+References: <1359156956-32404-1-git-send-email-arnd@arndb.de>
+Message-ID: <CAOh2x=mm-Gtmd2a-vOUx1uE9bOBGvEo5SUMqbc8nfRwVE74Deg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch integrates the LZ4 decompression code to the x86 pre-boot code.
-And it depends on two patchs below
+On Sat, Jan 26, 2013 at 5:05 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> This is a series I did some time ago but forgot to
+> send out earlier. I'd like to get this into v3.9,
+> so please give this a test if you can.
 
-lib: add support for LZ4-compressed kernels
-decompressors: add lz4 decompressor module
+Wow!! Awesome work Arnd.
 
-Signed-off-by: Kyungsik Lee <kyungsik.lee@lge.com>
----
- arch/x86/Kconfig                  | 1 +
- arch/x86/boot/compressed/Makefile | 5 ++++-
- arch/x86/boot/compressed/misc.c   | 4 ++++
- 3 files changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 8c185d0..7142bef 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -62,6 +62,7 @@ config X86
- 	select HAVE_KERNEL_LZMA
- 	select HAVE_KERNEL_XZ
- 	select HAVE_KERNEL_LZO
-+	select HAVE_KERNEL_LZ4
- 	select HAVE_HW_BREAKPOINT
- 	select HAVE_MIXED_BREAKPOINTS_REGS
- 	select PERF_EVENTS
-diff --git a/arch/x86/boot/compressed/Makefile b/arch/x86/boot/compressed/Makefile
-index 8a84501..c275db5 100644
---- a/arch/x86/boot/compressed/Makefile
-+++ b/arch/x86/boot/compressed/Makefile
-@@ -4,7 +4,7 @@
- # create a compressed vmlinux image from the original vmlinux
- #
- 
--targets := vmlinux.lds vmlinux vmlinux.bin vmlinux.bin.gz vmlinux.bin.bz2 vmlinux.bin.lzma vmlinux.bin.xz vmlinux.bin.lzo head_$(BITS).o misc.o string.o cmdline.o early_serial_console.o piggy.o
-+targets := vmlinux.lds vmlinux vmlinux.bin vmlinux.bin.gz vmlinux.bin.bz2 vmlinux.bin.lzma vmlinux.bin.xz vmlinux.bin.lzo vmlinux.bin.lz4 head_$(BITS).o misc.o string.o cmdline.o early_serial_console.o piggy.o
- 
- KBUILD_CFLAGS := -m$(BITS) -D__KERNEL__ $(LINUX_INCLUDE) -O2
- KBUILD_CFLAGS += -fno-strict-aliasing -fPIC
-@@ -64,12 +64,15 @@ $(obj)/vmlinux.bin.xz: $(vmlinux.bin.all-y) FORCE
- 	$(call if_changed,xzkern)
- $(obj)/vmlinux.bin.lzo: $(vmlinux.bin.all-y) FORCE
- 	$(call if_changed,lzo)
-+$(obj)/vmlinux.bin.lz4: $(vmlinux.bin.all-y) FORCE
-+	$(call if_changed,lz4)
- 
- suffix-$(CONFIG_KERNEL_GZIP)	:= gz
- suffix-$(CONFIG_KERNEL_BZIP2)	:= bz2
- suffix-$(CONFIG_KERNEL_LZMA)	:= lzma
- suffix-$(CONFIG_KERNEL_XZ)	:= xz
- suffix-$(CONFIG_KERNEL_LZO) 	:= lzo
-+suffix-$(CONFIG_KERNEL_LZ4) 	:= lz4
- 
- quiet_cmd_mkpiggy = MKPIGGY $@
-       cmd_mkpiggy = $(obj)/mkpiggy $< > $@ || ( rm -f $@ ; false )
-diff --git a/arch/x86/boot/compressed/misc.c b/arch/x86/boot/compressed/misc.c
-index 88f7ff6..166a0a8 100644
---- a/arch/x86/boot/compressed/misc.c
-+++ b/arch/x86/boot/compressed/misc.c
-@@ -145,6 +145,10 @@ static int lines, cols;
- #include "../../../../lib/decompress_unlzo.c"
- #endif
- 
-+#ifdef CONFIG_KERNEL_LZ4
-+#include "../../../../lib/decompress_unlz4.c"
-+#endif
-+
- static void scroll(void)
- {
- 	int i;
--- 
-1.8.0.3
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
