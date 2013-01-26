@@ -1,42 +1,71 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 26 Jan 2013 10:46:34 -0500
-Subject: [PATCH 1/3] NET: mv643xx: Get clk from device tree.
-In-Reply-To: <1359213030-18588-2-git-send-email-andrew@lunn.ch>
-References: <1359213030-18588-1-git-send-email-andrew@lunn.ch>
- <1359213030-18588-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20130126154634.GO1758@titan.lakedaemon.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 26 Jan 2013 17:21:22 +0100
+Subject: [PATCH V3 1/8] ARM: kirkwood: topkick: init mvsdio via DT
+In-Reply-To: <e99a647c7c1eae5dfee3b1ccf9f6803c3c859962.1359146831.git.jason@lakedaemon.net>
+References: <cover.1359146831.git.jason@lakedaemon.net>
+ <e99a647c7c1eae5dfee3b1ccf9f6803c3c859962.1359146831.git.jason@lakedaemon.net>
+Message-ID: <20130126162122.GL17242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 04:10:28PM +0100, Andrew Lunn wrote:
-> If we are passed a device tree node pointer, get the clock from it.
-> This avoids problems with con_id when using clk_get().
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+On Fri, Jan 25, 2013 at 08:53:53PM +0000, Jason Cooper wrote:
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 > ---
->  drivers/net/ethernet/marvell/mv643xx_eth.c |    5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-
-I like this much better than what I hacked together, thanks.
-
-Jason.
-
-> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> index 7048d7c..296beec 100644
-> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> @@ -2955,7 +2955,10 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
->  	 */
->  	mp->t_clk = 133000000;
->  #if defined(CONFIG_HAVE_CLK)
-> -	mp->clk = clk_get(&pdev->dev, (pdev->id ? "1" : "0"));
-> +	if (pdev->dev.of_node)
-> +		mp->clk = of_clk_get(pdev->dev.of_node, 0);
-> +	else
-> +		mp->clk = clk_get(&pdev->dev, (pdev->id ? "1" : "0"));
->  	if (!IS_ERR(mp->clk)) {
->  		clk_prepare_enable(mp->clk);
->  		mp->t_clk = clk_get_rate(mp->clk);
-> -- 
-> 1.7.10.4
+>  arch/arm/boot/dts/kirkwood-topkick.dts     | 7 +++++++
+>  arch/arm/mach-kirkwood/board-usi_topkick.c | 6 ------
+>  2 files changed, 7 insertions(+), 6 deletions(-)
 > 
+> diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+> index cd15452..23c2ddc 100644
+> --- a/arch/arm/boot/dts/kirkwood-topkick.dts
+> +++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+> @@ -54,6 +54,13 @@
+>  			status = "okay";
+>  			nr-ports = <1>;
+>  		};
+> +
+> +		mvsdio at 90000 {
+> +			pinctrl-0 = <&pmx_sdio>;
+> +			pinctrl-names = "default";
+> +			status = "okay";
+> +			/* No CD or WP GPIOs */
+> +		};
+>  	};
+>  
+>  	gpio-leds {
+> diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
+> index 23d2dd1..95f0711 100644
+> --- a/arch/arm/mach-kirkwood/board-usi_topkick.c
+> +++ b/arch/arm/mach-kirkwood/board-usi_topkick.c
+> @@ -14,7 +14,6 @@
+>  #include <linux/init.h>
+>  #include <linux/mv643xx_eth.h>
+>  #include <linux/gpio.h>
+> -#include <linux/platform_data/mmc-mvsdio.h>
+>  #include "common.h"
+>  #include "mpp.h"
+>  
+> @@ -22,10 +21,6 @@ static struct mv643xx_eth_platform_data topkick_ge00_data = {
+>  	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+>  };
+>  
+> -static struct mvsdio_platform_data topkick_mvsdio_data = {
+> -	/* unfortunately the CD signal has not been connected */
+> -};
+> -
+>  /*
+>   * GPIO LED layout
+>   *
+> @@ -73,5 +68,4 @@ void __init usi_topkick_init(void)
+>  
+>  
+>  	kirkwood_ge00_init(&topkick_ge00_data);
+> -	kirkwood_sdio_init(&topkick_mvsdio_data);
+>  }
+> -- 
+> 1.8.1.1
+> 
+
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+   Andrew
