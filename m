@@ -1,55 +1,50 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 26 Jan 2013 23:24:12 +0100
-Subject: [PATCH 4/4] cpufreq, highbank: add support for highbank cpufreq
-In-Reply-To: <20130126143950.GA7079@S2101-09.ap.freescale.net>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1359143205-20279-5-git-send-email-mark.langsdorf@calxeda.com>
- <20130126143950.GA7079@S2101-09.ap.freescale.net>
-Message-ID: <1523559.2KevGvelzH@vostro.rjw.lan>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 26 Jan 2013 18:04:59 -0500
+Subject: [PATCH v2 0/3] Kirkwoode cpufreq driver
+In-Reply-To: <3759655.fLV8aUUe7v@vostro.rjw.lan>
+References: <1359215039-2848-1-git-send-email-andrew@lunn.ch>
+ <3759655.fLV8aUUe7v@vostro.rjw.lan>
+Message-ID: <20130126230459.GU1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, January 26, 2013 10:39:53 PM Shawn Guo wrote:
-> Mark,
+On Sat, Jan 26, 2013 at 10:52:42PM +0100, Rafael J. Wysocki wrote:
+> On Saturday, January 26, 2013 04:43:56 PM Andrew Lunn wrote:
+> > This patchset adds a cpufreq driver for Marvell Kirkwood SoCs.
+> > 
+> > The changes to kirkwood_defconfig enable it and set the default
+> > governor to ondemand.
+> > 
+> > Changes since v1:
+> > 
+> > tabify Kconfig.arm entry
+> > Sort order of include files
+> > Remove some unnecassary include files
+> > Reformat multiline comment to be coding style conform.
+> > 
+> > Andrew Lunn (3):
+> >   cpufreq: kirkwood: Add a cpufreq driver for Marvell Kirkwood SoCs
+> >   arm: kirkwood: Instantiate cpufreq driver
+> >   arm: kirkwood: Enable cpufreq and ondemand on kirkwood_defconfig
 > 
-> On Fri, Jan 25, 2013 at 01:46:45PM -0600, Mark Langsdorf wrote:
-> > +static int hb_cpufreq_driver_init(void)
-> > +{
-> > +	struct device *cpu_dev;
-> > +	struct clk *cpu_clk;
-> > +	struct device_node *np;
-> > +	int ret;
-> > +
-> > +	for_each_child_of_node(of_find_node_by_path("/cpus"), np)
-> > +		if (of_get_property(np, "operating-points", NULL))
-> > +			break;
-> > +
-> > +	if (!np) {
-> > +		pr_err("failed to find highbank cpufreq node\n");
-> > +		return -ENOENT;
-> > +	}
-> > +
-> ...
-> > +out_put_node:
-> > +	of_node_put(np);
-> > +	return ret;
-> > +}
-> > +module_init(hb_cpufreq_driver_init);
-> 
-> As we are moving to multiplatform build, this init function will run
-> on all other platforms built together with highbank.  We should
-> probably eliminate that effect.
+> If you want me to take this, it'll need some ACKs from the clk people
+> and arm-soc maintainers at least.
 
-That change can be made on top of the Mark's patches I think, right?
+In the past, we've sent the driver changes (patch #1) through the
+appropriate driver maintainer's tree, and the subsequent patches (2 & 3)
+through arm-soc with a listed dependency on the driver maintainer's
+tree/branch.  We've found that causes the fewest conflicts/headaches
+that way.
 
-If so, I'd prefer it that way.  The Mark's patches have been in a limbo for
-too long already and that issue doesn't seem to be serious enough to block
-them any longer.
+If you're Ok with that, just let me know which tree and branch you pull
+it in to.
 
-Thanks,
-Rafael
+> An ACK from Viresh would be welcome too.
 
+fwiw:
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
