@@ -1,37 +1,63 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Sat, 26 Jan 2013 15:07:01 +0100
-Subject: [PATCH] ARM: imx27: clk-imx27: SPI: Rename IPG clock and add PER clock
-Message-ID: <1359209221-24346-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Sat, 26 Jan 2013 11:30:59 -0300
+Subject: [PATCHv3] ARM: sunxi: gpio: Add Allwinner SoCs GPIO drivers
+In-Reply-To: <1359192670-22543-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1359192670-22543-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CALF0-+UT+dX=a6NAufEsQ9HgWQevnKW4W26fSHLq1FRuVHht9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-spi-imx driver needs two clock: ipg and per. The first clock must be named and
-the second must be added.
+Hi Maxime,
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/mach-imx/clk-imx27.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+On Sat, Jan 26, 2013 at 6:31 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The IP responsible for the muxing on the Allwinner SoCs are also
+> handling the GPIOs on the system. This patch adds the needed driver that
+> relies on the pinctrl driver for most of its operations.
+>
+> The number of pins available for GPIOs operations are already declared
+> in the pinctrl driver, we only need to probe a generic driver to handle
+> the banks available for each SoC.
+>
+> This driver has been tested on a A13-Olinuxino.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> Changes from v2:
+>   - Removed the call to kzalloc to build the pin name
+>
+>  drivers/pinctrl/pinctrl-sunxi.c |  134 ++++++++++++++++++++++++++++++++++++++-
+>  drivers/pinctrl/pinctrl-sunxi.h |   25 +++++++-
+>  2 files changed, 156 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+> index 6f02e34..4ed0e7e 100644
+> --- a/drivers/pinctrl/pinctrl-sunxi.c
+> +++ b/drivers/pinctrl/pinctrl-sunxi.c
+> @@ -11,6 +11,7 @@
+>   */
+>
+>  #include <linux/io.h>
+> +#include <linux/gpio.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> @@ -609,11 +610,53 @@ static int sunxi_pmx_enable(struct pinctrl_dev *pctldev,
+>         return 0;
+>  }
+>
+> +static int
+> +sunxi_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+> +                       struct pinctrl_gpio_range *range,
+> +                       unsigned offset,
+> +                       bool input)
+> +{
+> +       struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+> +       struct sunxi_desc_function *desc;
+> +       char pin_name[SUNXI_PIN_NAME_MAX_LEN];
+> +       char *func;
 
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 4c1d1e4..c599839 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -228,9 +228,12 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.1");
- 	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.2");
- 	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.2");
--	clk_register_clkdev(clk[cspi1_ipg_gate], NULL, "imx27-cspi.0");
--	clk_register_clkdev(clk[cspi2_ipg_gate], NULL, "imx27-cspi.1");
--	clk_register_clkdev(clk[cspi3_ipg_gate], NULL, "imx27-cspi.2");
-+	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.0");
-+	clk_register_clkdev(clk[cspi1_ipg_gate], "ipg", "imx27-cspi.0");
-+	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.1");
-+	clk_register_clkdev(clk[cspi2_ipg_gate], "ipg", "imx27-cspi.1");
-+	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.2");
-+	clk_register_clkdev(clk[cspi3_ipg_gate], "ipg", "imx27-cspi.2");
- 	clk_register_clkdev(clk[per3_gate], "per", "imx21-fb.0");
- 	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx21-fb.0");
- 	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
+Nitpick: const char *func.
+
 -- 
-1.7.12.4
+    Ezequiel
