@@ -1,40 +1,66 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 26 Jan 2013 15:40:13 -0500
-Subject: [PATCH 2/2] ARM: Kirkwood: topkick: Enable i2c bus.
-In-Reply-To: <1359219326-5927-2-git-send-email-andrew@lunn.ch>
-References: <f6d483f3fb83826bce16f956afa013f0bcf11f52.1359146831.git.jason@lakedaemon.net>
- <1359219326-5927-1-git-send-email-andrew@lunn.ch>
- <1359219326-5927-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20130126204013.GT1758@titan.lakedaemon.net>
+Date: Sat, 26 Jan 2013 20:50:10 +0000
+Subject: [PATCH V4 01/11] ARM: kirkwood: topkick: init mvsdio via DT
+In-Reply-To: <cover.1359232975.git.jason@lakedaemon.net>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <cover.1359232975.git.jason@lakedaemon.net>
+Message-ID: <29681b2264eef92d3fcc4f5a61984e1530d3a9f0.1359232975.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 05:55:25PM +0100, Andrew Lunn wrote:
-> Add a DT node for I2C and pinctrl hog for the pins. There appears to
-> be an i2c bus on topkick with a device on it:
-> 
-> i2cdetect 0
-> WARNING! This program can confuse your I2C bus, cause data loss and worse!
-> I will probe file /dev/i2c-0.
-> I will probe address range 0x03-0x77.
-> Continue? [Y/n] y
->      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-> 00:          -- -- -- -- -- -- -- -- -- -- -- -- --
-> 10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 60: -- -- -- -- 64 -- -- -- -- -- -- -- -- -- -- --
-> 70: -- -- -- -- -- -- -- --
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/boot/dts/kirkwood-topkick.dts |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/boot/dts/kirkwood-topkick.dts     | 7 +++++++
+ arch/arm/mach-kirkwood/board-usi_topkick.c | 6 ------
+ 2 files changed, 7 insertions(+), 6 deletions(-)
 
-Pulled into series,
-
-thanks,
-
-Jason.
+diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+index cd15452..23c2ddc 100644
+--- a/arch/arm/boot/dts/kirkwood-topkick.dts
++++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+@@ -54,6 +54,13 @@
+ 			status = "okay";
+ 			nr-ports = <1>;
+ 		};
++
++		mvsdio at 90000 {
++			pinctrl-0 = <&pmx_sdio>;
++			pinctrl-names = "default";
++			status = "okay";
++			/* No CD or WP GPIOs */
++		};
+ 	};
+ 
+ 	gpio-leds {
+diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
+index 23d2dd1..95f0711 100644
+--- a/arch/arm/mach-kirkwood/board-usi_topkick.c
++++ b/arch/arm/mach-kirkwood/board-usi_topkick.c
+@@ -14,7 +14,6 @@
+ #include <linux/init.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+-#include <linux/platform_data/mmc-mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+@@ -22,10 +21,6 @@ static struct mv643xx_eth_platform_data topkick_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+ };
+ 
+-static struct mvsdio_platform_data topkick_mvsdio_data = {
+-	/* unfortunately the CD signal has not been connected */
+-};
+-
+ /*
+  * GPIO LED layout
+  *
+@@ -73,5 +68,4 @@ void __init usi_topkick_init(void)
+ 
+ 
+ 	kirkwood_ge00_init(&topkick_ge00_data);
+-	kirkwood_sdio_init(&topkick_mvsdio_data);
+ }
+-- 
+1.8.1.1
