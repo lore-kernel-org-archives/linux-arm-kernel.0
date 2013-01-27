@@ -1,53 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 27 Jan 2013 10:26:15 -0500
-Subject: [RFC V2 PATCH 3/8] ARM: kirkwood: nsa310: cleanup includes and
- unneeded code
-In-Reply-To: <51054219.1020004@mvista.com>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <cover.1359091286.git.jason@lakedaemon.net>
- <31142087d93c2713d067f4ccf470810e6e71f17b.1359091286.git.jason@lakedaemon.net>
- <510437CC.1040106@mvista.com>
- <20130126202208.GR1758@titan.lakedaemon.net>
- <51054219.1020004@mvista.com>
-Message-ID: <20130127152615.GY1758@titan.lakedaemon.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 27 Jan 2013 16:28:37 +0100
+Subject: [PATCH] clk: mvebu: Do not gate ge0/1 and runit clocks on Kirkwood
+In-Reply-To: <51050B9E.8000605@gmail.com>
+References: <1359226864-28811-1-git-send-email-gmbnomis@gmail.com>
+ <20130126235037.GV1758@titan.lakedaemon.net>
+ <20130127013131.GA2400@schnuecks.de> <5104FE5F.2040804@gmail.com>
+ <20130127105654.GA23127@schnuecks.de> <51050B9E.8000605@gmail.com>
+Message-ID: <20130127152837.GI29973@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 07:04:57PM +0400, Sergei Shtylyov wrote:
-> Hello.
+> Except for loosing the MAC address, I disagree. From a "clock gating"
+> point-of-view all kirkwoods (except that crippled one on keymile board)
+> are the same. Even if there is no/one/two ethernet _jacks_ on a specific
+> board you still want to disable all _unused_ ethernet modules inside the
+> SoC.
 > 
-> On 27-01-2013 0:22, Jason Cooper wrote:
-> 
-> >>>Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> >>>---
-> >>>  arch/arm/mach-kirkwood/board-nsa310.c | 9 +--------
-> >>>  1 file changed, 1 insertion(+), 8 deletions(-)
-> 
-> >>>diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-> >>>index 1bd328d..0b99533 100644
-> >>>--- a/arch/arm/mach-kirkwood/board-nsa310.c
-> >>>+++ b/arch/arm/mach-kirkwood/board-nsa310.c
-> >>>@@ -10,11 +10,8 @@
-> >>>
-> >>>  #include <linux/kernel.h>
-> >>>  #include <linux/init.h>
-> >>>-#include <linux/i2c.h>
-> >>>-
-> >>>-#include <asm/mach-types.h>
-> >>>-#include <asm/mach/arch.h>
-> >>>  #include <mach/kirkwood.h>
-> >>>+#include <linux/of.h>
-> 
-> >>    You also add an #include and don't mention it anywhere. Or is
-> >>that part of the cleanup?
-> 
-> >After removing the unneeded linux/i2c.h, linux/of.h was needed for
-> >of_machine_is_compatible().  i2c.h had included of.h.
-> 
->    Would be worth mentioning it in the changelog.
+> We should find a way to retain the MAC address and in the meantime we
+> can add a "always prepare ge clocks" workaround in
+> kirkwood_clk_legacy_init().
 
-Ok, I'll add it when I pull it in.
+Hi Sebastian
 
-thx,
+I've been thinking the same, store the MAC address before turning the
+clock off and restore it when enabling the clock. We have a need for
+special clocks on kirkwood anyway for turning off the sata and pcie
+PHYs. So adding special clocks for ethernet is not too big a deal.
 
-Jason.
+      Andrew
