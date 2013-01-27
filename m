@@ -1,69 +1,64 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 27 Jan 2013 14:41:00 +0100
-Subject: [PATCH V4 10/11] ARM: kirkwood: mv643xx_eth dt conversion
-In-Reply-To: <6f3e1f0ee3c5fd06fb3ca918a6c3b13552f32cac.1359232975.git.jason@lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <cover.1359232975.git.jason@lakedaemon.net>
- <6f3e1f0ee3c5fd06fb3ca918a6c3b13552f32cac.1359232975.git.jason@lakedaemon.net>
-Message-ID: <51052E6C.1020102@gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 27 Jan 2013 14:48:46 +0100
+Subject: [PATCH 6/6 v14] gpio: Add block gpio to several gpio drivers
+In-Reply-To: <CAOY=C6F0ExS1gtmA=4QMzXUMRjAH5o7K9KDwTjdU-dYHA1fF=g@mail.gmail.com>
+References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
+ <1358856404-8975-7-git-send-email-stigge@antcom.de>
+ <CAOY=C6H5xETt5UNXUfRkGW9q+bj0y2R3sXNvW87XXvQcYoL_-g@mail.gmail.com>
+ <510126E7.5090802@antcom.de>
+ <CAOY=C6F0ExS1gtmA=4QMzXUMRjAH5o7K9KDwTjdU-dYHA1fF=g@mail.gmail.com>
+Message-ID: <5105303E.5050007@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2013 09:50 PM, Jason Cooper wrote:
-> Tested on the dreamplug:
->
-> mv643xx_eth: MV-643xx 10/100/1000 ethernet driver version 1.4
-> libphy: mv643xx_eth smi: probed
-> libphy: mv643xx_eth smi: probed
-> mv643xx_eth_port f1072000.egiga0 eth0: port 0 with MAC address XX:XX:XX...
-> mv643xx_eth_port f1076000.egiga1 eth1: port 0 with MAC address XX:XX:XX...
->
-> Successfully pulled an ip address and pinged through the interface
->
-> ...
->
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 2c738d9..b13a405 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -201,5 +201,43 @@
->   			clocks =<&gate_clk 4>;
->   			status = "disabled";
->   		};
-> +
-> +		smi0: mdio at 72000 {
-> +			compatible = "marvell,mdio-mv643xx";
-> +			reg =<0x72000 0x4000>;
-> +			interrupts =<46>;
-> +			tx_csum_limit =<1600>;
-> +			status = "disabled";
-> +		};
-> +
-> +		smi1: mdio at 76000 {
-> +			compatible = "marvell,mdio-mv643xx";
-> +			reg =<0x76000 0x4000>;
-> +			interrupts =<47>;
-> +			tx_csum_limit =<1600>;
-> +			status = "disabled";
-> +		};
-> +
-> +		egiga0 {
-> +			compatible = "marvell,mv643xx-eth";
-> +			reg =<0x72000 0x4000>;
-> +			mdio =<&smi0>;
-> +			port_number =<0>;
-> +			phy_addr =<0x80>;
+On 27/01/13 13:18, Stijn Devriendt wrote:
+>>> In my patch, I go out of the way of this kind of thing for a simple reason:
+>>> You may generate incorrect timing by doing this.
+>>
+>> You are right, certain things like synchronous on+off is not really
+>> possible.
+>>
+>> However, the above at least supports switching on simulaneously, and
+>> switching off simultaneously, which is an improvement in certain cases
+>> (and this certain hardware part doesn't support more). Maybe this
+>> certain driver behaviour can be documented even better than just in the
+>> driver source.
+>>
+> 
+> The question here is: do you expect a user of the block-GPIO API to
+> go look into the base-driver code to see what will be supported?
+> 
+> In my version of the patch this means:
+> - do not provide a single GPIO-block that crosses multiple base-drivers
+> - only provide gpio_block_get/set for GPIO drivers that support the complete
+> operation in a single go. (for example, in the above example there would be
+> no gpio_block_set() function)
+> 
+> Perhaps the best approach is to make this explicit: Allow drivers to expose
+> their capabilities wrt timing and allow users to request strict-timing or
+> loose-timing. Loose-timing allows multiple gpio-drivers to be combined and
+> allows drivers with separate set/clear, hi/lo registers to be used.
 
-Jason,
+Interesting idea. However, it will be difficult to agree on good metrics
+here. As Mark Brown pointed out, even when hardware seems to support
+"simultaneousness" by registers, this doesn't actually mean that voltage
+levels are switched simultaneously wrt. sub-nanosecond timing.
 
-This will break phy_scan on all kirkwood boards as 0x80 is _not_ equal
-MV643XX_ETH_PHY_ADDR_DEFAULT.
+Also, it depends on further wiring between the actually supported GPIO
+hardware chip and the integrated device's I/O connections.
 
-I suggest not to set phy_addr in kirkwood.dtsi at all and let the
-board specific DT files set the phy addresses (or rely on phy_scan if not
-set).
+Resulting in scenarios where GPIO chips (in terms of Linux drivers)
+without explicit I/O set registers (e.g., set/clear regs) could be "more
+simultaneous" than those having explicit I/O regs but hardware wiring
+leading to bad "simultaneousness" behaviour.
 
-Also, you are ORing the address passed by phy_addr with 0x80 anyway. So
-all phy addresses should be passed as <0> or <1> instead the ORed ones.
+Questionable if the kernel could address those details.
 
-Sebastian
+> Of course, for a first version you may as well leave it out. Perhaps the
+> use-cases for cross-GPIO-driver blocks are not worth the extra complexity
+> as of today?
+
+I actually started the current block gpio patches to support this kind
+of use case. :-)
+
+Roland
