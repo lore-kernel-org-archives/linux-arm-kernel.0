@@ -1,40 +1,64 @@
-From: menon.nishanth@gmail.com (Nishanth Menon)
-Date: Sun, 27 Jan 2013 08:33:54 -0600
-Subject: [BUG] panda board locks up on boot
-In-Reply-To: <20130127141254.GC5714@stinkpad>
-References: <1359082886.21576.199.camel@gandalf.local.home>
- <51022FD2.8090101@compulab.co.il>
- <0247700D01F14443B9209F90AD938CC52409708C@sestoex09.enea.se>
- <20130127141254.GC5714@stinkpad>
-Message-ID: <51053AD2.8080805@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sun, 27 Jan 2013 20:13:07 +0530
+Subject: [PATCH v2 1/3] cpufreq: kirkwood: Add a cpufreq driver for
+ Marvell Kirkwood SoCs
+In-Reply-To: <20130127085926.GH29973@lunn.ch>
+References: <1359215039-2848-1-git-send-email-andrew@lunn.ch>
+ <1359215039-2848-2-git-send-email-andrew@lunn.ch>
+ <CAKohpok1w2RB1ncyNTcd04XTNFfnq_S98YEcxNjpWGWMVA7TaQ@mail.gmail.com>
+ <20130127085926.GH29973@lunn.ch>
+Message-ID: <CAKohpo=zrUUv-mtnUBDtJeWAHB00_Se0aGv7X-ZW95i=7DkQpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2013 08:12 AM, Paolo Pisati wrote:
-> On Fri, Jan 25, 2013 at 08:43:15AM +0000, Mats Liljegren wrote:
->> Hi Steven,
+On 27 January 2013 14:29, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Sun, Jan 27, 2013 at 09:21:42AM +0530, Viresh Kumar wrote:
+
+>> > +       kirkwood_cpufreq_set_cpu_state(index);
 >>
->> Do you have CONFIG_CPU_FREQ enabled? As I posted earlier in linux-kernel forum ("Failed booting PandaBoard ES with Linux 3.8 RC4" two days ago) my PandaBoard ES hangs while booting with this option enabled. It works fine without it. I have not bisected it down to a single commit though.
+>> This routine does have error cases, like: wrong value of "state"
+>> variable, so returning int from it might make sense. Though i believe
+>> state can't be anything else then STATE_CPU_FREQ or STATE_DDR_FREQ.
+>> In which case, switch must be modified?
 >
-> glad i'm not the only one who hit this problem:
+> As you say, state cannot be anything else that the two expected
+> values. I've just been taught that switch statements should always
+> have a default clause. I also thought that a BUG() is too strong, no
+> need to kill the machine. It is better to spam the kernel log so it
+> gets noticed. I can swap to a WARN_ON(1). I don't really think this is
+> an error that needs to be reported back to the framework. Its an
+> implementation problem, not a runtime problem. So i would prefer to
+> keep to void.
+
+Hmm. What i meant to say was, you just need an if,else instead of switch
+and you really don't have to take care of anything else than these two values.
+As that can't happen. Even the WARN_ON(). Its useless. Just believe on
+what is returned from cpufreq_frequency_table_target(). You really don't
+need to validate index returned from it, but only the return value (which
+you are already doing)
+
+>> > +static int kirkwood_cpufreq_cpu_exit(struct cpufreq_policy *policy)
+>> > +{
+>> > +       cpufreq_frequency_table_put_attr(policy->cpu);
+>> > +       return 0;
+>> > +}
+>>
+>> Hmm.. Exit is normally called in two cases. Either cpufreq driver is
+>> unregistered
+>> or cpu is removed. In that case i am not sure if this routine makes sense? As
+>> we have a uniprocessor SoC here.
 >
-> "3.8rc4+ and cpu_freq omap: hangs, oopses, etcetc"
->
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg83693.html
->
+> The current Kconfig entry does not allow it to be compiled as a
+> module. But the code does allow for it. With the current trend of
+> making the ARM kernel multiplatform, its likely that cpufreq drivers
+> will become modular so that only the appropriate driver gets loaded in
+> a multiplatform kernel. The question then becomes, is it O.K. not
+> being able to unload the module?
 
-Support for TPS is not yet in mainline kernel. you may want to do:
+You got me wrong. What i wanted to say is, even if you have it as module
+and "rmmod" it, then also calling this routine wouldn't make any difference.
 
-you could try running 'mw.w 0x4A31E05A 0x1' before bootm in u-boot -> 
-This will hack the pad of panda ES pin mean for controlling TPS voltage 
-register (again a kernel bug where the GPIO block setup by bootloader 
-got reset).
-
-CPUfreq needs both voltage and frequency scaling to work and without 
-support of the TPS voltage scaling on vdd_MPU, you are stuck at boot 
-voltage, and just scaling frequency. with the not-enough boot voltage, 
-moving to higher frequencies can/will result in unpredictable behavior.
-
----
-Regards,
-NM
+Then i went into the code to see the effect. So, this will set freq_table for
+a cpu as NULL which will be returned by calling cpufreq_frequency_get_table().
+And i now feel we must have this routine because once cpufreq driver isn't
+there for a cpu, we must not return any table for it. :)
