@@ -1,65 +1,197 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Jan 2013 12:21:19 +0000
-Subject: [PATCH V3 8/8] ARM: kirkwood: mv643xx_eth dt conversion
-In-Reply-To: <20130126134012.GE29973@lunn.ch>
-References: <cover.1359146831.git.jason@lakedaemon.net>
- <a4805edf01c39a374d71fbf4a6b6207dedf6b2bf.1359146831.git.jason@lakedaemon.net>
- <20130126123827.GA5786@lunn.ch> <5103D103.5040409@gmail.com>
- <20130126134012.GE29973@lunn.ch>
-Message-ID: <20130127122119.GF23505@n2100.arm.linux.org.uk>
+From: highguy@gmail.com (Stijn Devriendt)
+Date: Sun, 27 Jan 2013 14:07:14 +0100
+Subject: [PATCH 5/6 v14] gpio: Add device tree support to block GPIO API
+In-Reply-To: <1358856404-8975-6-git-send-email-stigge@antcom.de>
+References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
+ <1358856404-8975-6-git-send-email-stigge@antcom.de>
+Message-ID: <CAOY=C6E-+uKQGbRDjNh5ZP9Wrmd+PNbt7djkBTzwe29=qA1_PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 02:40:12PM +0100, Andrew Lunn wrote:
-> On Sat, Jan 26, 2013 at 01:50:11PM +0100, Sebastian Hesselbarth wrote:
-> The code here is based on dove_legacy_clk_init(). However the change
-> made by Jason is in order to make a DT device work, not an non-DT
-> device.
-> 
-> The problem is the way the driver is getting the clock.
-> 
-> 	mp->clk = clk_get(&pdev->dev, (pdev->id ? "1" : "0"));
-> 
-> clk_get() then calls
-> 
->                 clk = of_clk_get_by_name(dev->of_node, con_id);
-> 
->  * of_clk_get_by_name() - Parse and lookup a clock referenced by a device node
->  * @np: pointer to clock consumer node
->  * @name: name of consumer's clock input, or NULL for the first clock reference
-> 
-> So it is looking for a clock called "0" or "1" in the node. This does
-> not exist, and so it falls. Jason's change then comes into affect and
-> it finds the clkdev entries added above.
+On Tue, Jan 22, 2013 at 1:06 PM, Roland Stigge <stigge@antcom.de> wrote:
+> This patch adds device tree support to the block GPIO API.
+>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>
+> ---
+>  Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 ++++++
+>  drivers/gpio/Makefile                                 |    1
+>  drivers/gpio/gpioblock-of.c                           |  100 ++++++++++++++++++
+>  3 files changed, 137 insertions(+)
+>
+> --- /dev/null
+> +++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio-block.txt
+> @@ -0,0 +1,36 @@
+> +Block GPIO definition
+> +=====================
+> +
+> +This binding specifies arbitrary blocks of gpios, combining gpios from one or
+> +more GPIO controllers together, to form a word for r/w access.
+> +
+> +Required property:
+> +- compatible: must be "linux,gpio-block"
+> +
+> +Required subnodes:
+> +- the name will be the registered name of the block
+> +- property "gpios" is a list of gpios for the respective block
+> +
+> +Example:
+> +
+> +        blockgpio {
+> +                compatible = "linux,gpio-block";
+> +
+> +                block0 {
+> +                        gpios = <&gpio 3 0 0>,
+> +                                <&gpio 3 1 0>;
+> +                };
+> +                block1 {
+> +                        gpios = <&gpio 4 1 0>,
+> +                                <&gpio 4 3 0>,
+> +                                <&gpio 4 2 0>,
+> +                                <&gpio 4 4 0>,
+> +                                <&gpio 4 5 0>,
+> +                                <&gpio 4 6 0>,
+> +                                <&gpio 4 7 0>,
+> +                                <&gpio 4 8 0>,
+> +                                <&gpio 4 9 0>,
+> +                                <&gpio 4 10 0>,
+> +                                <&gpio 4 19 0>;
+> +                };
+> +        };
 
-This is just bollocks.  Sorry, but it is.  Yet again, people misunderstand
-the clk API...
+How do you see bindings for other kinds of drivers?
 
-Look, the clk API is very simple, as it also is when using clkdev or OF.
-Stop naming your bloody clocks individually - whenever anyone does that
-it all breaks.
+In my patchset, it's possible for other drivers to use gpio-blocks.
+One example we have is a power sequencer with 2 pins attached
+to GPIO pins. These 2 pins form a 2bit word to select power margining.
+These 2 pins need to be set synchronously (as otherwise when going
+from profile 0 to profile 3 you pass either profile 1 or profile 2 which
+could be bad for hardware)
 
-The API is designed to work as follows:
+In the device-tree this is specified as:
 
-FIRST argument to clk_get() is the struct device.  This _SHOULD_ be used
-to determine the clock or set of clocks which the device is going to use.
-In other words, it is the PRIMARY key in the lookup.
+powr at 0x20 {
+   // other properties
 
-SECOND argument to clk_get() identifies the CONNECTION ON THE DEVICE
-passed as the first argument.  To make this point, if the device only
-ever has one clock connection, convention is to pass NULL to ensure that
-people do _not_ think that they can use global clock names.
+  gpios = <&gpio 4 0
+               &gpio 5 0>;
+};
 
-So, the whole:
+Is this kind of integration also possible?
 
-	mp->clk = clk_get(&pdev->dev, (pdev->id ? "1" : "0"));
+Regards,
+Stijn
 
-is absolutely ludicrous.  You already know which device it is by means of
-the first argument.  You don't need to pass a "0" or a "1".  So that should
-be NULL, so:
-
-	mp->clk = clk_get(&pdev->dev, NULL);
-
-That will get a clock from clkdev which is setup in the _matching_ tables
-to correlate with the device (and a NULL connection ID _there_ too).  With
-OF, I believe it will get the first clock.
+> --- linux-2.6.orig/drivers/gpio/Makefile
+> +++ linux-2.6/drivers/gpio/Makefile
+> @@ -5,6 +5,7 @@ ccflags-$(CONFIG_DEBUG_GPIO)    += -DDEBUG
+>  obj-$(CONFIG_GPIOLIB)          += gpiolib.o devres.o
+>  obj-$(CONFIG_OF_GPIO)          += gpiolib-of.o
+>  obj-$(CONFIG_GPIO_ACPI)                += gpiolib-acpi.o
+> +obj-$(CONFIG_OF_GPIO)          += gpioblock-of.o
+>
+>  # Device drivers. Generally keep list sorted alphabetically
+>  obj-$(CONFIG_GPIO_GENERIC)     += gpio-generic.o
+> --- /dev/null
+> +++ linux-2.6/drivers/gpio/gpioblock-of.c
+> @@ -0,0 +1,100 @@
+> +/*
+> + * OF implementation for Block GPIO
+> + *
+> + * Copyright (C) 2012 Roland Stigge <stigge@antcom.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +#include <linux/of.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/module.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +
+> +static int gpioblock_of_probe(struct platform_device *pdev)
+> +{
+> +       struct device_node *block;
+> +       unsigned *gpios;
+> +       int ngpio;
+> +       int ret;
+> +       struct gpio_block *gb;
+> +
+> +       for_each_available_child_of_node(pdev->dev.of_node, block) {
+> +               int i;
+> +
+> +               ngpio = of_gpio_count(block);
+> +               if (ngpio < 1) {
+> +                       ret = -ENODEV;
+> +                       goto err1;
+> +               }
+> +
+> +               gpios = kzalloc(ngpio * sizeof(*gpios), GFP_KERNEL);
+> +               if (!gpios) {
+> +                       ret = -ENOMEM;
+> +                       goto err1;
+> +               }
+> +
+> +               for (i = 0; i < ngpio; i++) {
+> +                       ret = of_get_gpio(block, i);
+> +                       if (ret < 0)
+> +                               goto err2; /* expect -EPROBE_DEFER */
+> +                       gpios[i] = ret;
+> +               }
+> +               gb = gpio_block_create(gpios, ngpio, block->name);
+> +               if (IS_ERR(gb)) {
+> +                       dev_err(&pdev->dev,
+> +                               "Error creating GPIO block from device tree\n");
+> +                       ret = PTR_ERR(gb);
+> +                       goto err2;
+> +               }
+> +               ret = gpio_block_register(gb);
+> +               if (ret < 0)
+> +                       goto err3;
+> +
+> +               kfree(gpios);
+> +               dev_info(&pdev->dev, "Registered gpio block %s: %d gpios\n",
+> +                        block->name, ngpio);
+> +       }
+> +       return 0;
+> +
+> +err3:
+> +       gpio_block_free(gb);
+> +err2:
+> +       kfree(gpios);
+> +err1:
+> +       of_node_put(block);
+> +       return ret;
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +static struct of_device_id gpioblock_of_match[] = {
+> +       { .compatible = "linux,gpio-block", },
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(of, gpioblock_of_match);
+> +#endif
+> +
+> +static struct platform_driver gpioblock_of_driver = {
+> +       .driver = {
+> +               .name = "gpio-block",
+> +               .owner = THIS_MODULE,
+> +               .of_match_table = of_match_ptr(gpioblock_of_match),
+> +
+> +       },
+> +       .probe  = gpioblock_of_probe,
+> +};
+> +
+> +module_platform_driver(gpioblock_of_driver);
+> +
+> +MODULE_DESCRIPTION("GPIO Block driver");
+> +MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:gpioblock-of");
