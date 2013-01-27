@@ -1,77 +1,25 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Sun, 27 Jan 2013 15:11:14 +0100
-Subject: [PATCH v4 4/8] MFD: ti_am335x_tscadc: add device tree binding
- information
-In-Reply-To: <1358999112-31192-5-git-send-email-rachna@ti.com> (Rachna Patil's
- message of "Thu, 24 Jan 2013 09:15:08 +0530")
-References: <1358999112-31192-1-git-send-email-rachna@ti.com>
- <1358999112-31192-5-git-send-email-rachna@ti.com>
-Message-ID: <87mwvubtrx.fsf@dell.be.48ers.dk>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Sun, 27 Jan 2013 15:12:54 +0100
+Subject: [BUG] panda board locks up on boot
+In-Reply-To: <0247700D01F14443B9209F90AD938CC52409708C@sestoex09.enea.se>
+References: <1359082886.21576.199.camel@gandalf.local.home>
+ <51022FD2.8090101@compulab.co.il>
+ <0247700D01F14443B9209F90AD938CC52409708C@sestoex09.enea.se>
+Message-ID: <20130127141254.GC5714@stinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "P" == Patil, Rachna <rachna@ti.com> writes:
+On Fri, Jan 25, 2013 at 08:43:15AM +0000, Mats Liljegren wrote:
+> Hi Steven,
+> 
+> Do you have CONFIG_CPU_FREQ enabled? As I posted earlier in linux-kernel forum ("Failed booting PandaBoard ES with Linux 3.8 RC4" two days ago) my PandaBoard ES hangs while booting with this option enabled. It works fine without it. I have not bisected it down to a single commit though.
 
-Hi,
+glad i'm not the only one who hit this problem:
 
- P> From: "Patil, Rachna" <rachna@ti.com>
- P> Signed-off-by: Patil, Rachna <rachna@ti.com>
- P> ---
- P> Changes in v4:
- P> 	Subnodes and their properties documentation added.
- P> 	Non-standard properties prefixed with vendor name.
+"3.8rc4+ and cpu_freq omap: hangs, oopses, etcetc"
 
- P>  .../devicetree/bindings/mfd/ti_am335x_tscadc.txt   |   52 ++++++++++++++++++++
- P>  1 file changed, 52 insertions(+)
- P>  create mode 100644 Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
-
- P> diff --git a/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt b/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
- P> new file mode 100644
- P> index 0000000..0100771
- P> --- /dev/null
- P> +++ b/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
- P> @@ -0,0 +1,52 @@
- P> +Texas Instruments - TSC / ADC multi-functional device
- P> +
- P> +ti_tscadc is a multi-function device with touchscreen and ADC on chip.
- P> +This document describes the binding for mfd device.
- P> +
- P> +Required properties:
- P> +- compatible: "ti,ti-tscadc"
-
-That's a very generic name (and double ti). How about ti,am3352-tsadc
-instead?
-
-No pinmux?
-
-
- P> +Sub-node device required properties:
- P> +tsc:
- P> +- ti,wires:  4/5/8 wire touchscreen support on the platform.
- P> +- ti,x-plate-resistance: X plate resistance.
-
-In what kind of units?
-
-
- P> +- ti,steps-to-configure: A step is configured to read a single co-ordinate value,
- P> +			can be applied more number of times for better results.
-
-So it is some kind of averaging? Doesn't tslib do that for you already?
-Is there any limit to how many steps you can/will handle?
-
-
- P> +- ti,wire-config: Order for connecting wires on touchscreen.
-
-ti,wires seems redundant given ti,wire-config (E.G. number of elements
-in array). It is not clear to me what the magic values in wire-config
-mean?
-
- P> +
- P> +adc:
- P> +- ti,adc-channels: Number of ADC channels used.
-
-Is there ever any use case for this being something else than 8 -
-ti,wires?
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg83693.html
 
 -- 
-Bye, Peter Korsgaard
+bye,
+p.
