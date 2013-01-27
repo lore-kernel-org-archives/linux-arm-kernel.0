@@ -1,40 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 27 Jan 2013 11:41:20 -0500
-Subject: [PATCH] clk: mvebu: Do not gate ge0/1 and runit clocks on Kirkwood
-In-Reply-To: <20130127164104.1b2e66e6@skate>
-References: <1359226864-28811-1-git-send-email-gmbnomis@gmail.com>
- <20130126235037.GV1758@titan.lakedaemon.net>
- <20130127013131.GA2400@schnuecks.de> <5104FE5F.2040804@gmail.com>
- <20130127105654.GA23127@schnuecks.de> <51050B9E.8000605@gmail.com>
- <20130127152837.GI29973@lunn.ch> <20130127164104.1b2e66e6@skate>
-Message-ID: <20130127164120.GA1758@titan.lakedaemon.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sun, 27 Jan 2013 22:15:18 +0530
+Subject: [PATCH v3 1/3] cpufreq: kirkwood: Add a cpufreq driver for
+ Marvell Kirkwood SoCs
+In-Reply-To: <20130127162523.GK29973@lunn.ch>
+References: <1359281244-31455-1-git-send-email-andrew@lunn.ch>
+ <1359281244-31455-2-git-send-email-andrew@lunn.ch>
+ <CAKohpomWM41MhRjdhFixy-ELXc6QjE0BhCAHfTzovOD0CBPoOQ@mail.gmail.com>
+ <20130127154212.GJ29973@lunn.ch>
+ <CAKohpomQJfsWBY5o3ep4r86fYYQ39JnMPswjoe8YFT37ekM20w@mail.gmail.com>
+ <20130127162523.GK29973@lunn.ch>
+Message-ID: <CAKohponWS73JtB3Vwk5bR=+UcT2tfrKsAmHCJEW9DqobkuYgmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 04:41:04PM +0100, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Sun, 27 Jan 2013 16:28:37 +0100, Andrew Lunn wrote:
-> 
-> > I've been thinking the same, store the MAC address before turning the
-> > clock off and restore it when enabling the clock. We have a need for
-> > special clocks on kirkwood anyway for turning off the sata and pcie
-> > PHYs. So adding special clocks for ethernet is not too big a deal.
-> 
-> At least on Armada 370/XP, U-Boot passes the MAC address through a
-> special ATAG. Willy Tarreau has written some code to read this special
-> ATAG and feed it into the Device Tree, so that we get the MAC address
-> as set by U-Boot. I unfortunately haven't had the time to look at
-> Willy's code and push it, but it does seem like an interesting solution.
+On 27 January 2013 21:55, Andrew Lunn <andrew@lunn.ch> wrote:
+> So when we have a multiplatform kernel with many of these drivers
+> built in, all but one are going to notice they are not on the hardware
+> they support, and return -ENODEV.
+>
+> By making it a platform driver, the kirkwood cpufreq driver will only
+> get loaded on kirkwood systems, and won't slow down the boot for
+> everybody else.
 
-Does this add on to ARM_ATAG_DTB_COMPAT [1]?  Perhaps APPENDED_DTB
-should select it?
+I tried to grep platform_driver in drivers/cpufreq/ and got only:
+drivers/cpufreq/dbx500-cpufreq.c
 
-Maybe the answer is as simple as having the driver pull the mac address
-from the dtb while ARM_ATAG_DTB_COMPAT is configured.
+Now, the counter argument to your explanation is, multiplatform kernel would be
+built only for testing purpose and not for real product. So, even this kind
+of delay is really not a big issue. On the other hand with platform driver
+too, we will hit lot of other code and would consume some extra memory
+for keeping its structures :)
 
-thx,
-
-Jason.
-
-[1] arch/arm/Kconfig:1970
+--
+viresh
