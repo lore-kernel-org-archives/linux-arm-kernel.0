@@ -1,50 +1,48 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 27 Jan 2013 19:04:57 +0400
-Subject: [RFC V2 PATCH 3/8] ARM: kirkwood: nsa310: cleanup includes and
- unneeded code
-In-Reply-To: <20130126202208.GR1758@titan.lakedaemon.net>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <cover.1359091286.git.jason@lakedaemon.net>
- <31142087d93c2713d067f4ccf470810e6e71f17b.1359091286.git.jason@lakedaemon.net>
- <510437CC.1040106@mvista.com> <20130126202208.GR1758@titan.lakedaemon.net>
-Message-ID: <51054219.1020004@mvista.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 27 Jan 2013 10:24:31 -0500
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <51053F81.6020904@gmail.com>
+References: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
+ <1359283223-23082-2-git-send-email-gmbnomis@gmail.com>
+ <510506F9.3070500@gmail.com> <20130127110857.GA23687@schnuecks.de>
+ <51053761.1020009@gmail.com>
+ <20130127144610.GW1758@titan.lakedaemon.net>
+ <51053F81.6020904@gmail.com>
+Message-ID: <20130127152431.GX1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Sun, Jan 27, 2013 at 03:53:53PM +0100, Sebastian Hesselbarth wrote:
+> On 01/27/2013 03:46 PM, Jason Cooper wrote:
+> >>I _cannot_ confirm that gbe is loosing its MAC address on Dove. I will
+> >>post a follow-up patch to Jason's cleanup patches that will also
+> >>grab a clock for smi. With that patch insmod'ing/rmmod'ing mv643xx_eth
+> >>does work just fine here on Dove.
+> >
+> >I believe Simon's issue is that the mv643xx_eth driver is not loaded at
+> >boot, it's clocks get gated, then when he loads the driver, there is no
+> >mac address.  Is that correct Simon?  I don't think unloading the driver
+> >after boot will trigger this regression.
+> 
+> Loading and unloading the driver module hangs because of the missing
+> clk_prepeare_enable in shared driver part. This should be fixed by the
+> patch I sent you.
+> 
+> Dove and Kirkwood have the same gbe internally and I can boot into Dove
+> without mv643xx_eth, load, unload, reload the module and it always finds
+> its MAC address.
+> 
+> I just want Simon to confirm that Kirkwood's gbe is really loosing the
+> contents of its MAC address registers during gated clocks, which is from
+> a HW point of view very unlikely.
 
-On 27-01-2013 0:22, Jason Cooper wrote:
+Ok, I just wanted to make sure we understood his problem correctly, and
+if possible, reproduce it.
 
->>> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
->>> ---
->>>   arch/arm/mach-kirkwood/board-nsa310.c | 9 +--------
->>>   1 file changed, 1 insertion(+), 8 deletions(-)
+Simon, can you give us some steps to reproduce this on our side so we
+can see exactly what's happening?
 
->>> diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
->>> index 1bd328d..0b99533 100644
->>> --- a/arch/arm/mach-kirkwood/board-nsa310.c
->>> +++ b/arch/arm/mach-kirkwood/board-nsa310.c
->>> @@ -10,11 +10,8 @@
->>>
->>>   #include <linux/kernel.h>
->>>   #include <linux/init.h>
->>> -#include <linux/i2c.h>
->>> -
->>> -#include <asm/mach-types.h>
->>> -#include <asm/mach/arch.h>
->>>   #include <mach/kirkwood.h>
->>> +#include <linux/of.h>
+thx,
 
->>     You also add an #include and don't mention it anywhere. Or is
->> that part of the cleanup?
-
-> After removing the unneeded linux/i2c.h, linux/of.h was needed for
-> of_machine_is_compatible().  i2c.h had included of.h.
-
-    Would be worth mentioning it in the changelog.
-
-> thanks for the review,
-
-> Jason.
-
-WBR, Sergei
+Jason.
