@@ -1,78 +1,77 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Sun, 27 Jan 2013 12:41:21 +0100
-Subject: [PATCH v3 0/9] ARM: S3C24XX: rework irq handling for a later dt
- usage
-In-Reply-To: <016101cdfb2e$15cbd640$416382c0$@samsung.com>
-References: <201301190403.50317.heiko@sntech.de>
- <016101cdfb2e$15cbd640$416382c0$@samsung.com>
-Message-ID: <201301271241.21651.heiko@sntech.de>
+From: highguy@gmail.com (Stijn Devriendt)
+Date: Sun, 27 Jan 2013 13:18:48 +0100
+Subject: [PATCH 6/6 v14] gpio: Add block gpio to several gpio drivers
+In-Reply-To: <510126E7.5090802@antcom.de>
+References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
+ <1358856404-8975-7-git-send-email-stigge@antcom.de>
+ <CAOY=C6H5xETt5UNXUfRkGW9q+bj0y2R3sXNvW87XXvQcYoL_-g@mail.gmail.com>
+ <510126E7.5090802@antcom.de>
+Message-ID: <CAOY=C6F0ExS1gtmA=4QMzXUMRjAH5o7K9KDwTjdU-dYHA1fF=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 25. Januar 2013, 19:59:18 schrieb Kukjin Kim:
-> Heiko St?bner wrote:
-> > Third version of redoing the s3c24xx irqs in a generic way by using a
-> > declarative approach.
-> > 
-> > Main change is the different approach to the init. Moved the
-> > s3c24xx_init_intc function from the dt patchset here, so that both init
-> > types (dt and non-dt) can use a similar init scheme.
-> > 
-> > As in the second version, the 1st patch might be hard to read due to the
-> > rewrite character, but I didn't see a way to do these changes in
-> > individual steps. So it might be helpful to look at the result after
-> > applying this patch.
-> > 
-> > Runtime-tested on a s3c2416 based board and compile tested for the
-> > others.
-> > 
-> > As also written before, inclusion of the other S3C24XX SoCs to follow
-> > once the general approach is acceptable.
-> > 
-> > Applies to the most current for-next (from two hours ago) from linux-
-> > samsung
-> > 
-> > Heiko Stuebner (9):
-> >   ARM: S3C24XX: transform irq handling into a declarative form
-> >   ARM: S3C24XX: Move irq syscore-ops to irq-pm
-> >   ARM: S3C24XX: Modify s3c_irq_wake to use the hwirq property
-> >   ARM: S3C24XX: move s3c2416 irq init to common irq code
-> >   ARM: S3C24XX: modify s3c2416 irq init to initialize all irqs
-> >   ARM: S3C24XX: transform s3c2416 irqs into new structure
-> >   ARM: S3C24XX: move s3c2443 irq code to irq.c
-> >   ARM: S3C24XX: modify s3c2443 irq init to initialize all irqs
-> >   ARM: S3C24XX: transform s3c2443 subirqs into new structure
-> >  
-> >  arch/arm/mach-s3c24xx/Makefile               |    4 +-
-> >  arch/arm/mach-s3c24xx/common.h               |    2 +
-> >  arch/arm/mach-s3c24xx/irq-pm.c               |   41 +-
-> >  arch/arm/mach-s3c24xx/irq-s3c2416.c          |  348 --------
-> >  arch/arm/mach-s3c24xx/irq-s3c2443.c          |  281 -------
-> >  arch/arm/mach-s3c24xx/mach-smdk2416.c        |    2 +-
-> >  arch/arm/mach-s3c24xx/mach-smdk2443.c        |    2 +-
-> >  arch/arm/mach-s3c24xx/s3c2410.c              |    4 +-
-> >  arch/arm/mach-s3c24xx/s3c2412.c              |    4 +-
-> >  arch/arm/mach-s3c24xx/s3c2416.c              |    4 +-
-> >  arch/arm/mach-s3c24xx/s3c2440.c              |    4 +-
-> >  arch/arm/mach-s3c24xx/s3c2442.c              |    4 +-
-> >  arch/arm/plat-s3c24xx/Kconfig                |    1 +
-> >  arch/arm/plat-s3c24xx/irq.c                  | 1110
-> >  +++++++++++++++----------- arch/arm/plat-samsung/include/plat/pm.h     
-> >  |    6 -
-> >  arch/arm/plat-samsung/include/plat/s3c2416.h |    1 +
-> >  arch/arm/plat-samsung/include/plat/s3c2443.h |    2 +
-> >  17 files changed, 688 insertions(+), 1132 deletions(-)
-> >  delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2416.c
-> >  delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2443.c
-> > 
-> > --
-> > 1.7.2.3
-> 
-> Heiko, looks good to me :-)
-very cool :-)
+On Thu, Jan 24, 2013 at 1:19 PM, Roland Stigge <stigge@antcom.de> wrote:
+> On 01/24/2013 01:02 PM, Stijn Devriendt wrote:
+>>> +static void lpc32xx_gpio_set_block_p3(struct gpio_chip *chip,
+>>> +                                     unsigned long mask,
+>>> +                                     unsigned long values)
+>>> +{
+>>> +       struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+>>> +       u32 set_bits = values & mask;
+>>> +       u32 clr_bits = ~values & mask;
+>>> +
+>>> +       /* States of GPIO 0-5 start at bit 25 */
+>>> +       set_bits <<= 25;
+>>> +       clr_bits <<= 25;
+>>> +
+>>> +       /* Note: On LPC32xx, GPOs can only be set at once or cleared at once,
+>>> +        *       but not set and cleared at once
+>>> +        */
+>>> +       if (set_bits)
+>>> +               __raw_writel(set_bits, group->gpio_grp->outp_set);
+>>> +       if (clr_bits)
+>>> +               __raw_writel(clr_bits, group->gpio_grp->outp_clr);
+>>> +}
+>>> +
+>>
+>> In my patch, I go out of the way of this kind of thing for a simple reason:
+>> You may generate incorrect timing by doing this.
+>
+> You are right, certain things like synchronous on+off is not really
+> possible.
+>
+> However, the above at least supports switching on simulaneously, and
+> switching off simultaneously, which is an improvement in certain cases
+> (and this certain hardware part doesn't support more). Maybe this
+> certain driver behaviour can be documented even better than just in the
+> driver source.
+>
 
-> BTW, can you rebase this against on next/cleanup-s3c24xx branch in my tree?
-will try to do this today
+The question here is: do you expect a user of the block-GPIO API to
+go look into the base-driver code to see what will be supported?
 
+In my version of the patch this means:
+- do not provide a single GPIO-block that crosses multiple base-drivers
+- only provide gpio_block_get/set for GPIO drivers that support the complete
+operation in a single go. (for example, in the above example there would be
+no gpio_block_set() function)
 
-Heiko
+Perhaps the best approach is to make this explicit: Allow drivers to expose
+their capabilities wrt timing and allow users to request strict-timing or
+loose-timing. Loose-timing allows multiple gpio-drivers to be combined and
+allows drivers with separate set/clear, hi/lo registers to be used.
+Of course, for a first version you may as well leave it out. Perhaps the
+use-cases for cross-GPIO-driver blocks are not worth the extra complexity
+as of today?
+
+Regards,
+Stijn
+
+> If there is consensus that everything else in the patch set is settled,
+> and we just don't want to support behaviour like the above - well, we
+> can still drop it.
+>
+> Thanks for the note,
+>
+> Roland
+>
