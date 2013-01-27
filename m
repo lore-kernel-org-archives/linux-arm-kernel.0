@@ -1,77 +1,65 @@
-From: highguy@gmail.com (Stijn Devriendt)
-Date: Sun, 27 Jan 2013 13:18:48 +0100
-Subject: [PATCH 6/6 v14] gpio: Add block gpio to several gpio drivers
-In-Reply-To: <510126E7.5090802@antcom.de>
-References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
- <1358856404-8975-7-git-send-email-stigge@antcom.de>
- <CAOY=C6H5xETt5UNXUfRkGW9q+bj0y2R3sXNvW87XXvQcYoL_-g@mail.gmail.com>
- <510126E7.5090802@antcom.de>
-Message-ID: <CAOY=C6F0ExS1gtmA=4QMzXUMRjAH5o7K9KDwTjdU-dYHA1fF=g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 27 Jan 2013 12:21:19 +0000
+Subject: [PATCH V3 8/8] ARM: kirkwood: mv643xx_eth dt conversion
+In-Reply-To: <20130126134012.GE29973@lunn.ch>
+References: <cover.1359146831.git.jason@lakedaemon.net>
+ <a4805edf01c39a374d71fbf4a6b6207dedf6b2bf.1359146831.git.jason@lakedaemon.net>
+ <20130126123827.GA5786@lunn.ch> <5103D103.5040409@gmail.com>
+ <20130126134012.GE29973@lunn.ch>
+Message-ID: <20130127122119.GF23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 1:19 PM, Roland Stigge <stigge@antcom.de> wrote:
-> On 01/24/2013 01:02 PM, Stijn Devriendt wrote:
->>> +static void lpc32xx_gpio_set_block_p3(struct gpio_chip *chip,
->>> +                                     unsigned long mask,
->>> +                                     unsigned long values)
->>> +{
->>> +       struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
->>> +       u32 set_bits = values & mask;
->>> +       u32 clr_bits = ~values & mask;
->>> +
->>> +       /* States of GPIO 0-5 start at bit 25 */
->>> +       set_bits <<= 25;
->>> +       clr_bits <<= 25;
->>> +
->>> +       /* Note: On LPC32xx, GPOs can only be set at once or cleared at once,
->>> +        *       but not set and cleared at once
->>> +        */
->>> +       if (set_bits)
->>> +               __raw_writel(set_bits, group->gpio_grp->outp_set);
->>> +       if (clr_bits)
->>> +               __raw_writel(clr_bits, group->gpio_grp->outp_clr);
->>> +}
->>> +
->>
->> In my patch, I go out of the way of this kind of thing for a simple reason:
->> You may generate incorrect timing by doing this.
->
-> You are right, certain things like synchronous on+off is not really
-> possible.
->
-> However, the above at least supports switching on simulaneously, and
-> switching off simultaneously, which is an improvement in certain cases
-> (and this certain hardware part doesn't support more). Maybe this
-> certain driver behaviour can be documented even better than just in the
-> driver source.
->
+On Sat, Jan 26, 2013 at 02:40:12PM +0100, Andrew Lunn wrote:
+> On Sat, Jan 26, 2013 at 01:50:11PM +0100, Sebastian Hesselbarth wrote:
+> The code here is based on dove_legacy_clk_init(). However the change
+> made by Jason is in order to make a DT device work, not an non-DT
+> device.
+> 
+> The problem is the way the driver is getting the clock.
+> 
+> 	mp->clk = clk_get(&pdev->dev, (pdev->id ? "1" : "0"));
+> 
+> clk_get() then calls
+> 
+>                 clk = of_clk_get_by_name(dev->of_node, con_id);
+> 
+>  * of_clk_get_by_name() - Parse and lookup a clock referenced by a device node
+>  * @np: pointer to clock consumer node
+>  * @name: name of consumer's clock input, or NULL for the first clock reference
+> 
+> So it is looking for a clock called "0" or "1" in the node. This does
+> not exist, and so it falls. Jason's change then comes into affect and
+> it finds the clkdev entries added above.
 
-The question here is: do you expect a user of the block-GPIO API to
-go look into the base-driver code to see what will be supported?
+This is just bollocks.  Sorry, but it is.  Yet again, people misunderstand
+the clk API...
 
-In my version of the patch this means:
-- do not provide a single GPIO-block that crosses multiple base-drivers
-- only provide gpio_block_get/set for GPIO drivers that support the complete
-operation in a single go. (for example, in the above example there would be
-no gpio_block_set() function)
+Look, the clk API is very simple, as it also is when using clkdev or OF.
+Stop naming your bloody clocks individually - whenever anyone does that
+it all breaks.
 
-Perhaps the best approach is to make this explicit: Allow drivers to expose
-their capabilities wrt timing and allow users to request strict-timing or
-loose-timing. Loose-timing allows multiple gpio-drivers to be combined and
-allows drivers with separate set/clear, hi/lo registers to be used.
-Of course, for a first version you may as well leave it out. Perhaps the
-use-cases for cross-GPIO-driver blocks are not worth the extra complexity
-as of today?
+The API is designed to work as follows:
 
-Regards,
-Stijn
+FIRST argument to clk_get() is the struct device.  This _SHOULD_ be used
+to determine the clock or set of clocks which the device is going to use.
+In other words, it is the PRIMARY key in the lookup.
 
-> If there is consensus that everything else in the patch set is settled,
-> and we just don't want to support behaviour like the above - well, we
-> can still drop it.
->
-> Thanks for the note,
->
-> Roland
->
+SECOND argument to clk_get() identifies the CONNECTION ON THE DEVICE
+passed as the first argument.  To make this point, if the device only
+ever has one clock connection, convention is to pass NULL to ensure that
+people do _not_ think that they can use global clock names.
+
+So, the whole:
+
+	mp->clk = clk_get(&pdev->dev, (pdev->id ? "1" : "0"));
+
+is absolutely ludicrous.  You already know which device it is by means of
+the first argument.  You don't need to pass a "0" or a "1".  So that should
+be NULL, so:
+
+	mp->clk = clk_get(&pdev->dev, NULL);
+
+That will get a clock from clkdev which is setup in the _matching_ tables
+to correlate with the device (and a NULL connection ID _there_ too).  With
+OF, I believe it will get the first clock.
