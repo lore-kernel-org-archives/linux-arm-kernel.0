@@ -1,98 +1,77 @@
-From: anthony@codemonkey.ws (Anthony Liguori)
-Date: Sun, 27 Jan 2013 08:07:41 -0600
-Subject: [Qemu-devel] [RFC] Virtio-desktop: Virtio-based virtual desktop
-In-Reply-To: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
-References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
-Message-ID: <87wquysor6.fsf@codemonkey.ws>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Sun, 27 Jan 2013 15:11:14 +0100
+Subject: [PATCH v4 4/8] MFD: ti_am335x_tscadc: add device tree binding
+ information
+In-Reply-To: <1358999112-31192-5-git-send-email-rachna@ti.com> (Rachna Patil's
+ message of "Thu, 24 Jan 2013 09:15:08 +0530")
+References: <1358999112-31192-1-git-send-email-rachna@ti.com>
+ <1358999112-31192-5-git-send-email-rachna@ti.com>
+Message-ID: <87mwvubtrx.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anup Patel <anup.patel@linaro.org> writes:
+>>>>> "P" == Patil, Rachna <rachna@ti.com> writes:
 
-> Hi All,
->
-> How about having a generic Virtio-based machine for emulating a virtual
-> desktop ?
->
-> I know folks have already thought about this and probably also tried
-> something or other on this front but, it will be good to know the downsides.
->
-> Virtio-desktop can be a separate specification describing a virtual
-> desktop.
-> Of-course we cannot avoid few architecture dependent virtual devices in but
-> the Virtio-desktop specification will try to keep minimum possible
-> architecture dependent devices.
+Hi,
 
-There's a lot of reasons why a pure PV machine type is a bad idea.  Lots
-of people have enumerated them in this thread.
+ P> From: "Patil, Rachna" <rachna@ti.com>
+ P> Signed-off-by: Patil, Rachna <rachna@ti.com>
+ P> ---
+ P> Changes in v4:
+ P> 	Subnodes and their properties documentation added.
+ P> 	Non-standard properties prefixed with vendor name.
 
-But let me mention some things that I think we don't have covered today
-with PV:
+ P>  .../devicetree/bindings/mfd/ti_am335x_tscadc.txt   |   52 ++++++++++++++++++++
+ P>  1 file changed, 52 insertions(+)
+ P>  create mode 100644 Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
 
- - Graphics.  Yes, I know QXL exists but it's (a) dependent on PCI (b)
-   lacks the ability to gracefully degrade making it hopelessly tied to
-   spice.
+ P> diff --git a/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt b/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
+ P> new file mode 100644
+ P> index 0000000..0100771
+ P> --- /dev/null
+ P> +++ b/Documentation/devicetree/bindings/mfd/ti_am335x_tscadc.txt
+ P> @@ -0,0 +1,52 @@
+ P> +Texas Instruments - TSC / ADC multi-functional device
+ P> +
+ P> +ti_tscadc is a multi-function device with touchscreen and ADC on chip.
+ P> +This document describes the binding for mfd device.
+ P> +
+ P> +Required properties:
+ P> +- compatible: "ti,ti-tscadc"
 
- - Input.  PS/2 mouse provides relative input which sucks in guests.
-   For absolute input, we have VMMouse which is x86-specific, USB
-   tablets (which are expensive to emulate) or the spice mouse which is
-   intimately tied to the full Spice stack.
+That's a very generic name (and double ti). How about ti,am3352-tsadc
+instead?
 
- - Guest interaction.  Copy/paste, drag and drop, etc.  In theory this
-   is covered in spice agents but it's all again hopelessly tied to
-   Spice which makes it non-portable.
+No pinmux?
 
-So there's good work todo but it's almost certainly in working with the
-Spice community to try to make what they already have more accessible to
-non-x86 architectures.
 
-Regards,
+ P> +Sub-node device required properties:
+ P> +tsc:
+ P> +- ti,wires:  4/5/8 wire touchscreen support on the platform.
+ P> +- ti,x-plate-resistance: X plate resistance.
 
-Anthony Liguori
+In what kind of units?
 
->
-> As per our thoughts, a Virtio-desktop will have two kinds of devices:
-> 1. Architecture dependent devices: This devices will be emulated in-kernel
-> by architecture specific code of KVM or Xen or Some other hypervisor.
->    a) Virtualized CPU
->    b) Virtualized PIC (i.e. in-kernel architecture specific emulation of
-> irqchip)
->    c) Virtualized Timer (i.e. in-kernel architecture specific emulation of
-> timer chip)
-> 2. Architecture independent devices: This are Virtio-based devices which
-> are usually required by a desktop virtual machine.
->    a) Virtio-blk (storage)
->       - Already available
->    b) Virtio-net (network)
->      - Already available
->    c) Virtio-fb (display)
->      - It seems some work has been already done for Virtio frame buffer but
-> I did not find drivers/fb/virtio-fb.c in latest kernel
->        (http://thread.gmane.org/gmane.comp.emulators.kvm.devel/42720)
->      - Is Virtio-fb work still in-progress ??
->    d) Virtio-input (keyboard/mouse/multi-touch)
->      - Currently not available
->      - It will provide keyboard input events
->      - It will provide mouse input events
->      - It will provide multi-touch input events
->    e) Virtio-power (reset/shutdown/enumeration)
->      - It can provides info about the entire virtual machine including CPU,
-> PIC, Timer, available Virtio devices, etc.
->      - It can also provide CPU and Virtio-device hot-plugging
->      - Its primary purpose would be to provide reset and shutdown of CPU
-> and Virtio devices.
->      - There will be only one instance of this device and its location will
-> be fixed for each architecture.
->
-> The Virtio-desktop specification may also describe a recommended memory map
-> of for each architecture.
->
-> Right now, only missing devices seems to be Virtio-fb, Virtio-input, and
-> Virtio-power, which some of us are willing to take-up.
->
-> IMHO, If we have something like Virtio-desktop specification then all
-> possible guest OSes can have support for it and different hypervisor can
-> emulate it without worrying about guest support.
->
-> Best Regards,
-> Anup
+
+ P> +- ti,steps-to-configure: A step is configured to read a single co-ordinate value,
+ P> +			can be applied more number of times for better results.
+
+So it is some kind of averaging? Doesn't tslib do that for you already?
+Is there any limit to how many steps you can/will handle?
+
+
+ P> +- ti,wire-config: Order for connecting wires on touchscreen.
+
+ti,wires seems redundant given ti,wire-config (E.G. number of elements
+in array). It is not clear to me what the magic values in wire-config
+mean?
+
+ P> +
+ P> +adc:
+ P> +- ti,adc-channels: Number of ADC channels used.
+
+Is there ever any use case for this being something else than 8 -
+ti,wires?
+
+-- 
+Bye, Peter Korsgaard
