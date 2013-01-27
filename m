@@ -1,77 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 27 Jan 2013 10:35:32 -0500
-Subject: [PATCH V4 10/11] ARM: kirkwood: mv643xx_eth dt conversion
-In-Reply-To: <51052E6C.1020102@gmail.com>
-References: <cover.1358983578.git.jason@lakedaemon.net>
- <cover.1359232975.git.jason@lakedaemon.net>
- <6f3e1f0ee3c5fd06fb3ca918a6c3b13552f32cac.1359232975.git.jason@lakedaemon.net>
- <51052E6C.1020102@gmail.com>
-Message-ID: <20130127153532.GZ1758@titan.lakedaemon.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 27 Jan 2013 16:38:36 +0100
+Subject: [PATCH] clk: mvebu: Do not gate ge0/1 and runit clocks on Kirkwood
+In-Reply-To: <20130127152837.GI29973@lunn.ch>
+References: <1359226864-28811-1-git-send-email-gmbnomis@gmail.com>
+ <20130126235037.GV1758@titan.lakedaemon.net>
+ <20130127013131.GA2400@schnuecks.de> <5104FE5F.2040804@gmail.com>
+ <20130127105654.GA23127@schnuecks.de> <51050B9E.8000605@gmail.com>
+ <20130127152837.GI29973@lunn.ch>
+Message-ID: <510549FC.2060408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 02:41:00PM +0100, Sebastian Hesselbarth wrote:
-> On 01/26/2013 09:50 PM, Jason Cooper wrote:
-> >Tested on the dreamplug:
-> >
-> >mv643xx_eth: MV-643xx 10/100/1000 ethernet driver version 1.4
-> >libphy: mv643xx_eth smi: probed
-> >libphy: mv643xx_eth smi: probed
-> >mv643xx_eth_port f1072000.egiga0 eth0: port 0 with MAC address XX:XX:XX...
-> >mv643xx_eth_port f1076000.egiga1 eth1: port 0 with MAC address XX:XX:XX...
-> >
-> >Successfully pulled an ip address and pinged through the interface
-> >
-> >...
-> >
-> >diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> >index 2c738d9..b13a405 100644
-> >--- a/arch/arm/boot/dts/kirkwood.dtsi
-> >+++ b/arch/arm/boot/dts/kirkwood.dtsi
-> >@@ -201,5 +201,43 @@
-> >  			clocks =<&gate_clk 4>;
-> >  			status = "disabled";
-> >  		};
-> >+
-> >+		smi0: mdio at 72000 {
-> >+			compatible = "marvell,mdio-mv643xx";
-> >+			reg =<0x72000 0x4000>;
-> >+			interrupts =<46>;
-> >+			tx_csum_limit =<1600>;
-> >+			status = "disabled";
-> >+		};
-> >+
-> >+		smi1: mdio at 76000 {
-> >+			compatible = "marvell,mdio-mv643xx";
-> >+			reg =<0x76000 0x4000>;
-> >+			interrupts =<47>;
-> >+			tx_csum_limit =<1600>;
-> >+			status = "disabled";
-> >+		};
-> >+
-> >+		egiga0 {
-> >+			compatible = "marvell,mv643xx-eth";
-> >+			reg =<0x72000 0x4000>;
-> >+			mdio =<&smi0>;
-> >+			port_number =<0>;
-> >+			phy_addr =<0x80>;
-> 
-> Jason,
-> 
-> This will break phy_scan on all kirkwood boards as 0x80 is _not_ equal
-> MV643XX_ETH_PHY_ADDR_DEFAULT.
+On 01/27/2013 04:28 PM, Andrew Lunn wrote:
+>> Except for loosing the MAC address, I disagree. From a "clock gating"
+>> point-of-view all kirkwoods (except that crippled one on keymile board)
+>> are the same. Even if there is no/one/two ethernet _jacks_ on a specific
+>> board you still want to disable all _unused_ ethernet modules inside the
+>> SoC.
+>>
+>> We should find a way to retain the MAC address and in the meantime we
+>> can add a "always prepare ge clocks" workaround in
+>> kirkwood_clk_legacy_init().
+>
+> I've been thinking the same, store the MAC address before turning the
+> clock off and restore it when enabling the clock. We have a need for
+> special clocks on kirkwood anyway for turning off the sata and pcie
+> PHYs. So adding special clocks for ethernet is not too big a deal.
 
-Good point.
+Andrew,
 
-> I suggest not to set phy_addr in kirkwood.dtsi at all and let the
-> board specific DT files set the phy addresses (or rely on phy_scan if not
-> set).
-> 
-> Also, you are ORing the address passed by phy_addr with 0x80 anyway. So
-> all phy addresses should be passed as <0> or <1> instead the ORed ones.
+if Simon confirms that gbe is really loosing its MAC address when
+clocks get gated, I still think that we should rely on other mechanisms
+to get a valid MAC address.
 
-agreed.  I'll make the changes for V5.
+Have a look at other DT ethernet drivers, they use local-mac-address
+property to pass MAC address from boot loader. IMHO that is what we
+should exploit on mv643xx_eth, too.
 
-thanks for the review.
+If the property is set on boot, we can store it in some private data.
+If it is not set because some legacy u-boot without DT, we can rely
+on what is in the MAC address registers and just call modular eth
+on those platforms broken. If the easy fix is to update u-boot or
+compile it as built-in we shouldn't care at all. Without proper DT
+in u-boot you will always have a board specific kernel anyway.
 
-Jason.
+Sebastian
