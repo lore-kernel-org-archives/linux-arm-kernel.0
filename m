@@ -1,50 +1,98 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 27 Jan 2013 14:58:00 +0100
-Subject: [PATCH 1/6 v14] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <CAOY=C6ERX=2HdvmtAW-__947_-P8r=Lvp88KzZDQdf4kAuRB5Q@mail.gmail.com>
-References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
- <1358856404-8975-2-git-send-email-stigge@antcom.de>
- <CAOY=C6ERX=2HdvmtAW-__947_-P8r=Lvp88KzZDQdf4kAuRB5Q@mail.gmail.com>
-Message-ID: <51053268.2000002@antcom.de>
+From: anthony@codemonkey.ws (Anthony Liguori)
+Date: Sun, 27 Jan 2013 08:07:41 -0600
+Subject: [Qemu-devel] [RFC] Virtio-desktop: Virtio-based virtual desktop
+In-Reply-To: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
+References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
+Message-ID: <87wquysor6.fsf@codemonkey.ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/13 14:19, Stijn Devriendt wrote:
->> +Block GPIO
->> +----------
->> +
->> +The above described interface concentrates on handling single GPIOs.  However,
->> +in applications where it is critical to set several GPIOs at once, this
->> +interface doesn't work well, e.g. bit-banging protocols via grouped GPIO lines.
->> +Consider a GPIO controller that is connected via a slow I2C line. When
->> +switching two or more GPIOs one after another, there can be considerable time
->> +between those events. This is solved by an interface called Block GPIO:
->> +
->> +struct gpio_block *gpio_block_create(unsigned int *gpios, size_t size,
->> +                                    const char *name);
->> +
->> +This creates a new block of GPIOs as a list of GPIO numbers with the specified
->> +size which are accessible via the returned struct gpio_block and the accessor
->> +functions described below. Please note that you need to request the GPIOs
->> +separately via gpio_request(). Similarly, the direction of the used GPIOs need
->> +to be set by the user before using the block.
-> 
-> Is there anything holding you back from letting gpio_block_create() do
-> the request
-> for all the pins?
+Anup Patel <anup.patel@linaro.org> writes:
 
-It's analoguous to plain GPIOs: They exist, but are not requested (by
-whom?) by default.
+> Hi All,
+>
+> How about having a generic Virtio-based machine for emulating a virtual
+> desktop ?
+>
+> I know folks have already thought about this and probably also tried
+> something or other on this front but, it will be good to know the downsides.
+>
+> Virtio-desktop can be a separate specification describing a virtual
+> desktop.
+> Of-course we cannot avoid few architecture dependent virtual devices in but
+> the Virtio-desktop specification will try to keep minimum possible
+> architecture dependent devices.
 
-> Also, wouldn't it make sense to have a gpio_block_direction_input()
-> and _output()
-> variant? On the other hand, for things like I2C and SPI emulation,
-> some pins will
-> naturally be always output (like clock lines) while other could be
-> switched between
-> in and output (like the i2c data line).
+There's a lot of reasons why a pure PV machine type is a bad idea.  Lots
+of people have enumerated them in this thread.
 
-Right. Current implementation emphasizes on switching, not direction or
-other convenience functions, which could be added, nevertheless.
+But let me mention some things that I think we don't have covered today
+with PV:
 
-Roland
+ - Graphics.  Yes, I know QXL exists but it's (a) dependent on PCI (b)
+   lacks the ability to gracefully degrade making it hopelessly tied to
+   spice.
+
+ - Input.  PS/2 mouse provides relative input which sucks in guests.
+   For absolute input, we have VMMouse which is x86-specific, USB
+   tablets (which are expensive to emulate) or the spice mouse which is
+   intimately tied to the full Spice stack.
+
+ - Guest interaction.  Copy/paste, drag and drop, etc.  In theory this
+   is covered in spice agents but it's all again hopelessly tied to
+   Spice which makes it non-portable.
+
+So there's good work todo but it's almost certainly in working with the
+Spice community to try to make what they already have more accessible to
+non-x86 architectures.
+
+Regards,
+
+Anthony Liguori
+
+>
+> As per our thoughts, a Virtio-desktop will have two kinds of devices:
+> 1. Architecture dependent devices: This devices will be emulated in-kernel
+> by architecture specific code of KVM or Xen or Some other hypervisor.
+>    a) Virtualized CPU
+>    b) Virtualized PIC (i.e. in-kernel architecture specific emulation of
+> irqchip)
+>    c) Virtualized Timer (i.e. in-kernel architecture specific emulation of
+> timer chip)
+> 2. Architecture independent devices: This are Virtio-based devices which
+> are usually required by a desktop virtual machine.
+>    a) Virtio-blk (storage)
+>       - Already available
+>    b) Virtio-net (network)
+>      - Already available
+>    c) Virtio-fb (display)
+>      - It seems some work has been already done for Virtio frame buffer but
+> I did not find drivers/fb/virtio-fb.c in latest kernel
+>        (http://thread.gmane.org/gmane.comp.emulators.kvm.devel/42720)
+>      - Is Virtio-fb work still in-progress ??
+>    d) Virtio-input (keyboard/mouse/multi-touch)
+>      - Currently not available
+>      - It will provide keyboard input events
+>      - It will provide mouse input events
+>      - It will provide multi-touch input events
+>    e) Virtio-power (reset/shutdown/enumeration)
+>      - It can provides info about the entire virtual machine including CPU,
+> PIC, Timer, available Virtio devices, etc.
+>      - It can also provide CPU and Virtio-device hot-plugging
+>      - Its primary purpose would be to provide reset and shutdown of CPU
+> and Virtio devices.
+>      - There will be only one instance of this device and its location will
+> be fixed for each architecture.
+>
+> The Virtio-desktop specification may also describe a recommended memory map
+> of for each architecture.
+>
+> Right now, only missing devices seems to be Virtio-fb, Virtio-input, and
+> Virtio-power, which some of us are willing to take-up.
+>
+> IMHO, If we have something like Virtio-desktop specification then all
+> possible guest OSes can have support for it and different hypervisor can
+> emulate it without worrying about guest support.
+>
+> Best Regards,
+> Anup
