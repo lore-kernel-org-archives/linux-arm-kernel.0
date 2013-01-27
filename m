@@ -1,35 +1,88 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 27 Jan 2013 22:15:18 +0530
-Subject: [PATCH v3 1/3] cpufreq: kirkwood: Add a cpufreq driver for
- Marvell Kirkwood SoCs
-In-Reply-To: <20130127162523.GK29973@lunn.ch>
-References: <1359281244-31455-1-git-send-email-andrew@lunn.ch>
- <1359281244-31455-2-git-send-email-andrew@lunn.ch>
- <CAKohpomWM41MhRjdhFixy-ELXc6QjE0BhCAHfTzovOD0CBPoOQ@mail.gmail.com>
- <20130127154212.GJ29973@lunn.ch>
- <CAKohpomQJfsWBY5o3ep4r86fYYQ39JnMPswjoe8YFT37ekM20w@mail.gmail.com>
- <20130127162523.GK29973@lunn.ch>
-Message-ID: <CAKohponWS73JtB3Vwk5bR=+UcT2tfrKsAmHCJEW9DqobkuYgmQ@mail.gmail.com>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Sun, 27 Jan 2013 18:04:08 +0100
+Subject: [PATCH] ARM: mxs: gpio-mxs: Add IRQ_TYPE_EDGE_BOTH support
+Message-ID: <1359306248-28690-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 January 2013 21:55, Andrew Lunn <andrew@lunn.ch> wrote:
-> So when we have a multiplatform kernel with many of these drivers
-> built in, all but one are going to notice they are not on the hardware
-> they support, and return -ENODEV.
->
-> By making it a platform driver, the kirkwood cpufreq driver will only
-> get loaded on kirkwood systems, and won't slow down the boot for
-> everybody else.
+This patch adds support for IRQ_TYPE_EDGE_BOTH needed for some driver
+(gpio-keys).
+Inspired from gpio-mxc.c
 
-I tried to grep platform_driver in drivers/cpufreq/ and got only:
-drivers/cpufreq/dbx500-cpufreq.c
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ drivers/gpio/gpio-mxs.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-Now, the counter argument to your explanation is, multiplatform kernel would be
-built only for testing purpose and not for real product. So, even this kind
-of delay is really not a big issue. On the other hand with platform driver
-too, we will hit lot of other code and would consume some extra memory
-for keeping its structures :)
-
---
-viresh
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index fa2a63c..7690eec 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -65,6 +65,7 @@ struct mxs_gpio_port {
+ 	struct irq_domain *domain;
+ 	struct bgpio_chip bgc;
+ 	enum mxs_gpio_id devid;
++	u32 both_edges;
+ };
+ 
+ static inline int is_imx23_gpio(struct mxs_gpio_port *port)
+@@ -81,13 +82,24 @@ static inline int is_imx28_gpio(struct mxs_gpio_port *port)
+ 
+ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+ {
++	u32 val;
+ 	u32 pin_mask = 1 << d->hwirq;
++	u32 gpio_idx = d->hwirq;
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+ 	struct mxs_gpio_port *port = gc->private;
+ 	void __iomem *pin_addr;
+ 	int edge;
+ 
++	port->both_edges &= ~(1 << gpio_idx);
+ 	switch (type) {
++	case IRQ_TYPE_EDGE_BOTH:
++		val = gpio_get_value(port->bgc.gc.base + gpio_idx);
++		if (val)
++			edge = GPIO_INT_LOW_LEV;
++		else
++			edge = GPIO_INT_HIGH_LEV;
++		port->both_edges |= 1 << gpio_idx;
++		break;
+ 	case IRQ_TYPE_EDGE_RISING:
+ 		edge = GPIO_INT_RISE_EDGE;
+ 		break;
+@@ -123,6 +135,22 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+ 
+ 	return 0;
+ }
++static void mxs_flip_edge(struct mxs_gpio_port *port, u32 gpio)
++{
++	u32 bit, val, edge;
++	void __iomem *pin_addr;
++
++	bit = 1<<gpio;
++
++	pin_addr = port->base + PINCTRL_IRQPOL(port);
++	val = readl(pin_addr);
++	edge = val&bit;
++
++	if (edge)
++		writel(bit, pin_addr + MXS_CLR);
++	else
++		writel(bit, pin_addr + MXS_SET);
++}
+ 
+ /* MXS has one interrupt *per* gpio port */
+ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+@@ -137,6 +165,9 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ 
+ 	while (irq_stat != 0) {
+ 		int irqoffset = fls(irq_stat) - 1;
++		if (port->both_edges & (1 << irqoffset))
++			mxs_flip_edge(port, irqoffset);
++
+ 		generic_handle_irq(irq_find_mapping(port->domain, irqoffset));
+ 		irq_stat &= ~(1 << irqoffset);
+ 	}
+-- 
+1.7.12.4
