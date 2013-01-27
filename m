@@ -1,33 +1,70 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 27 Jan 2013 14:17:54 +0800
-Subject: [PATCH RESEND] ARM: dts: max77686: Add DTS file for max77686 PMIC
-In-Reply-To: <CADoNuNeF_fw1uuMt89=gZm-A2R6FHGpr-kCgFkOY0xXpA9+Jzw@mail.gmail.com>
-References: <1359053177-17725-1-git-send-email-tobetter@gmail.com>
- <20130126050618.GD10580@opensource.wolfsonmicro.com>
- <CADoNuNeF_fw1uuMt89=gZm-A2R6FHGpr-kCgFkOY0xXpA9+Jzw@mail.gmail.com>
-Message-ID: <20130127061751.GF8952@opensource.wolfsonmicro.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Sun, 27 Jan 2013 10:20:07 +0200
+Subject: [Qemu-devel] [kvmarm] [RFC] Virtio-desktop: Virtio-based virtual
+ desktop
+In-Reply-To: <C549A8FA-7BD7-4C9C-B2B7-AE960F402645@suse.de>
+References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
+ <CAAu8pHve_E-jtQAXidxroWHRVi_QKaYs6YeQhHqEap2bd7RMEQ@mail.gmail.com>
+ <C549A8FA-7BD7-4C9C-B2B7-AE960F402645@suse.de>
+Message-ID: <20130127082007.GA31120@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 03:06:53PM +0900, Dongjin Kim wrote:
-> Hello Mark,
+On Fri, Jan 25, 2013 at 08:31:54PM +0100, Alexander Graf wrote:
 > 
-> Yes, this is not ARM-specific chip at all. Just wanted to be reviewed
-> by you and others if the format is ok before integrating to my board
-> file. I had sent similar one before,
-> https://patchwork.kernel.org/patch/1287711, and you advised that was
-> too board specific. And plan to integrate like OMAP boards have with
-> twl6030.dtsi and twl6040.dtsi.
+> On 25.01.2013, at 20:04, Blue Swirl wrote:
+> 
+> > On Thu, Jan 24, 2013 at 6:10 AM, Anup Patel <anup.patel@linaro.org> wrote:
+> >> Hi All,
+> >> 
+> >> How about having a generic Virtio-based machine for emulating a virtual
+> >> desktop ?
+> > 
+> > I have also thought about this, current virtio design is not very
+> > clean. On the downside, pure no-legacy approach might not work well if
+> > you want the host to give control of a host device to guest (VFIO like
+> > pass through using IOMMUs).
+> > 
+> >> I know folks have already thought about this and probably also tried
+> >> something or other on this front but, it will be good to know the downsides.
+> >> 
+> >> Virtio-desktop can be a separate specification describing a virtual desktop.
+> >> Of-course we cannot avoid few architecture dependent virtual devices in but
+> >> the Virtio-desktop specification will try to keep minimum possible
+> >> architecture dependent devices.
+> >> 
+> >> As per our thoughts, a Virtio-desktop will have two kinds of devices:
+> >> 1. Architecture dependent devices: This devices will be emulated in-kernel
+> >> by architecture specific code of KVM or Xen or Some other hypervisor.
+> >>   a) Virtualized CPU
+> >>   b) Virtualized PIC (i.e. in-kernel architecture specific emulation of
+> >> irqchip)
+> >>   c) Virtualized Timer (i.e. in-kernel architecture specific emulation of
+> >> timer chip)
+> > 
+> > I think reusing PIC and timer design is not the most optimal. What a
+> > PV aware OS really wants is to wake up because of an external event or
+> > at some specific point of time (or after a specific delay) and easy
+> > way to manage the VM clock without timer tick counting. With a
+> > tickless approach, it would need the timer events as rarely as
+> > possible.
+> > 
+> > Perhaps a better approach would be to introduce a way for the guest to
+> > subscribe to a list of external events (including time), which would
+> > be fed to it via something like reverse hypercall (or just use legacy
+> > interrupts). Preferably it should be possible to pass any events
+> > through a stack of guests to the end consumer guest and even
+> > applications in a guest.
+> 
+> This approach falls apart once hardware vendors implement timer interrupts inside a guest context (which Intel and IIUC ARM are doing). At that point, it's actually more efficient to do real timer calls to real hardware.
+> 
+Same with irq chip. Implementing PV irqchip today is going backwards.
 
-> If would be nice if somewhere you specify a directory for such device files.
+> PV is bad. We only do it when we have to. Not doing PV where we don't have to is exactly the reason KVM is superior to Xen.
+> 
+Exactly. Implementing PV for something that does not require PV (for
+performance reasons mostly) is trading tested guest code, to untested,
+and unwritten, one.
 
-I think we need to create one, not quite sure where though.  drivers/of
-perhaps but that's a bit non-idiomatic, or possibly something top level.
-firmware might do too.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130127/6cbc0e71/attachment.sig>
+--
+			Gleb.
