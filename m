@@ -1,79 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 26 Jan 2013 18:50:37 -0500
-Subject: [PATCH] clk: mvebu: Do not gate ge0/1 and runit clocks on Kirkwood
-In-Reply-To: <1359226864-28811-1-git-send-email-gmbnomis@gmail.com>
-References: <1359226864-28811-1-git-send-email-gmbnomis@gmail.com>
-Message-ID: <20130126235037.GV1758@titan.lakedaemon.net>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Sun, 27 Jan 2013 01:42:00 +0100
+Subject: [PATCH 09/19] mfd/twl4030: don't warn about uninitialized return
+ code
+In-Reply-To: <1359153858-31992-10-git-send-email-arnd@arndb.de>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-10-git-send-email-arnd@arndb.de>
+Message-ID: <20130127004200.GJ1174@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon,
+Hi Arnd,
 
-On Sat, Jan 26, 2013 at 08:01:04PM +0100, Simon Baatz wrote:
-> Commits f479db "ARM: Kirkwood: Ensure runit clock always ticks." and
-> 128789 "ARM: Kirkwood: Fix clk problems modular ethernet driver"
-> ensured that the ge and runit clocks always tick on Kirkwood.  This
-> prevents the device from locking up and from forgetting the MAC addresses
-> which are usually set by the boot loader.
+On Fri, Jan 25, 2013 at 10:44:08PM +0000, Arnd Bergmann wrote:
+> If the twl4030_write_script function gets called with
+> a zero length argument, its return value does not
+> get set. We know that all scripts have a nonzero
+> length, but returning an error in case they ever
+> do is probably appropriate.
 > 
-> When moving the clock gating control to this driver for DT devices, these
-> changes were disabled.  Ensure that the respective clocks have the
-> CLK_IGNORE_UNUSED flag set.
+> Without this patch, building omap2plus_defconfig results in:
 > 
-> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> drivers/mfd/twl4030-power.c: In function 'load_twl4030_script':
+> drivers/mfd/twl4030-power.c:414:5: error: 'err' may be used uninitialized in this function
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: "Kristo, Tero" <t-kristo@ti.com>
 > ---
-> 
-> Hi,
-> 
-> kernel 3.8-rc5 will hang on kirkwood DT if the Ethernet driver is built
-> as a module or when no driver claiming the runit clock is built in. 
-> (Usually, at least the serial driver is built in, but it won't request
-> the clock if "clock-frequency" is given in DT.)
-> 
-> In the past, we fixed this by keeping the clocks ticking (which
-> probably is not be the nicest solution for the ge clocks).
+>  drivers/mfd/twl4030-power.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-I have to admit, I'm not really keen on this.  Most of these boards only
-have one ethernet port, so at least one port would be energized
-unnecessarily.
+Applied to my for-linus branch, thanks.
 
-Another facet of this problem is the keymile board.  It has to enable
-the clocks for sata in order to boot. (ref: board-km_kirkwood.c).
+Cheers,
+Samuel.
 
-Perhaps there is some way we could declare certain gate clocks to be
-non-gateable in the dts?  runit comes to mind, sata for keymile, and the
-relevant ge[01] per board.  After all, it is a characteristic of the
-board.  ;-)
-
-eg in kirkwood-km_kirkwood.dts:
-
-gate_clk: clock-gating-control at 2011c {
-	/*
-	 * need both sata clks enabled in order to boot
-	 * even though we have no sata
-	 */
-	ungateable = <14 15>;
-};
-
-and in any other board:
-
-gate_clk: clock-gating-control at 2011c {
-	/* don't lose eth0 mac address */
-	ungateable = <0>;
-};
-
-where in kirkwood.dtsi we had:
-
-gate_clk: clock-gating-control at 2011c {
-	compatible = "marvell,kirkwood-gating-clock";
-	reg = <0x2011c 0x4>;
-	clocks = <&core_clk 0>;
-	#clock-cells = <1>;
-	ungateable = <7>; /* never gate runit */
-};
-
-or, s/ungateable/ignore_unused/g
-
-thx,
-
-Jason.
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
