@@ -1,50 +1,37 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 27 Jan 2013 11:15:59 +0100
-Subject: [PATCH] clk: mvebu: Do not gate ge0/1 and runit clocks on Kirkwood
-In-Reply-To: <20130127013131.GA2400@schnuecks.de>
-References: <1359226864-28811-1-git-send-email-gmbnomis@gmail.com>
- <20130126235037.GV1758@titan.lakedaemon.net>
- <20130127013131.GA2400@schnuecks.de>
-Message-ID: <5104FE5F.2040804@gmail.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Sun, 27 Jan 2013 11:40:21 +0100
+Subject: [PATCH v2 0/2] Do not gate ge0/1 and runit clocks on Kirkwood
+Message-ID: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2013 02:31 AM, Simon Baatz wrote:
-> On Sat, Jan 26, 2013 at 06:50:37PM -0500, Jason Cooper wrote:
->> Another facet of this problem is the keymile board.  It has to enable
->> the clocks for sata in order to boot. (ref: board-km_kirkwood.c).
+Hi,
 
-The statement in board-km_kirkwood.c is just not true. Andrew and I did
-some tests with Valentin Longchamps back when we introduced DT clk
-gating. Keymile board hangs not because of the accesses to clk gating
-ctrl registers but the phy gating that accessed the sata registers
-that are missing on the Kirkwood used on that board.
+kernel 3.8-rc5 will hang on kirkwood DT if the Ethernet driver is built
+as a module or when no driver claiming the runit clock is built in. 
+(Usually, at least the serial driver is built in, but it won't request
+the clock if "clock-frequency" is given in DT.) In the past, we fixed
+this by keeping the clocks ticking.
 
-Phy gates have not been used since DT clk gating at all. If we
-reintroduce them in a DT compatible way we can still disable them
-for keymile board in DT.
+These two patches re-enable the ethernet fix for DT and declare the
+"runit" clock as not to gated even if unused.
 
-> I think we should do the following for 3.8:
->
-> - Get the clocks by device name in kirkwood_ge0x_init()
-> - Only set CLK_IGNORE_UNUSED for "runit" in clk-gating-ctrl.c. (I can
-> do this by simply adding another case to the existing "ddr"
-> exception, which makes the patch much less intrusive)
+Changes:
 
-I agree that we should have .flags for clk-gating-ctrl but that
-can live without any DT properties as we already have SoC specific
-structs there (and Keymile's kirkwood doesn't hang on clk gating
-control register accesses)
+v2:
 
->> and in any other board:
->>
->> gate_clk: clock-gating-control at 2011c {
->> 	/* don't lose eth0 mac address */
->> 	ungateable =<0>;
->> };
+- Do not turn on ge[01] clocks unconditionally. Instead, fix the
+  previous way we handled this on kirkwood.
 
-If there is any hang issue with gated ge clk on kirkwood, the
-solution is not to just disable the clock gate but make any
-code that accesses ge registers prepare the clock.
 
-Sebastian
+
+Simon Baatz (2):
+  ARM: kirkwood: Ensure that kirkwood_ge0[01]_init() finds its clock
+  clk: mvebu: Do not gate runit clock on Kirkwood
+
+ arch/arm/mach-kirkwood/common.c     |   13 +++++++++----
+ drivers/clk/mvebu/clk-gating-ctrl.c |    5 ++++-
+ 2 files changed, 13 insertions(+), 5 deletions(-)
+
+-- 
+1.7.9.5
