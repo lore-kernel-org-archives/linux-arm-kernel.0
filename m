@@ -1,92 +1,50 @@
-From: blauwirbel@gmail.com (Blue Swirl)
-Date: Sun, 27 Jan 2013 10:12:20 +0000
-Subject: [Qemu-devel] [kvmarm] [RFC] Virtio-desktop: Virtio-based virtual
- desktop
-In-Reply-To: <20130127082007.GA31120@redhat.com>
-References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
- <CAAu8pHve_E-jtQAXidxroWHRVi_QKaYs6YeQhHqEap2bd7RMEQ@mail.gmail.com>
- <C549A8FA-7BD7-4C9C-B2B7-AE960F402645@suse.de>
- <20130127082007.GA31120@redhat.com>
-Message-ID: <CAAu8pHuUfEezDEsYWTymFkuCEzdK+kr09MMFmVy-DZV8ztJbGw@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 27 Jan 2013 11:15:59 +0100
+Subject: [PATCH] clk: mvebu: Do not gate ge0/1 and runit clocks on Kirkwood
+In-Reply-To: <20130127013131.GA2400@schnuecks.de>
+References: <1359226864-28811-1-git-send-email-gmbnomis@gmail.com>
+ <20130126235037.GV1758@titan.lakedaemon.net>
+ <20130127013131.GA2400@schnuecks.de>
+Message-ID: <5104FE5F.2040804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 8:20 AM, Gleb Natapov <gleb@redhat.com> wrote:
-> On Fri, Jan 25, 2013 at 08:31:54PM +0100, Alexander Graf wrote:
->>
->> On 25.01.2013, at 20:04, Blue Swirl wrote:
->>
->> > On Thu, Jan 24, 2013 at 6:10 AM, Anup Patel <anup.patel@linaro.org> wrote:
->> >> Hi All,
->> >>
->> >> How about having a generic Virtio-based machine for emulating a virtual
->> >> desktop ?
->> >
->> > I have also thought about this, current virtio design is not very
->> > clean. On the downside, pure no-legacy approach might not work well if
->> > you want the host to give control of a host device to guest (VFIO like
->> > pass through using IOMMUs).
->> >
->> >> I know folks have already thought about this and probably also tried
->> >> something or other on this front but, it will be good to know the downsides.
->> >>
->> >> Virtio-desktop can be a separate specification describing a virtual desktop.
->> >> Of-course we cannot avoid few architecture dependent virtual devices in but
->> >> the Virtio-desktop specification will try to keep minimum possible
->> >> architecture dependent devices.
->> >>
->> >> As per our thoughts, a Virtio-desktop will have two kinds of devices:
->> >> 1. Architecture dependent devices: This devices will be emulated in-kernel
->> >> by architecture specific code of KVM or Xen or Some other hypervisor.
->> >>   a) Virtualized CPU
->> >>   b) Virtualized PIC (i.e. in-kernel architecture specific emulation of
->> >> irqchip)
->> >>   c) Virtualized Timer (i.e. in-kernel architecture specific emulation of
->> >> timer chip)
->> >
->> > I think reusing PIC and timer design is not the most optimal. What a
->> > PV aware OS really wants is to wake up because of an external event or
->> > at some specific point of time (or after a specific delay) and easy
->> > way to manage the VM clock without timer tick counting. With a
->> > tickless approach, it would need the timer events as rarely as
->> > possible.
->> >
->> > Perhaps a better approach would be to introduce a way for the guest to
->> > subscribe to a list of external events (including time), which would
->> > be fed to it via something like reverse hypercall (or just use legacy
->> > interrupts). Preferably it should be possible to pass any events
->> > through a stack of guests to the end consumer guest and even
->> > applications in a guest.
->>
->> This approach falls apart once hardware vendors implement timer interrupts inside a guest context (which Intel and IIUC ARM are doing). At that point, it's actually more efficient to do real timer calls to real hardware.
->>
-> Same with irq chip. Implementing PV irqchip today is going backwards.
+On 01/27/2013 02:31 AM, Simon Baatz wrote:
+> On Sat, Jan 26, 2013 at 06:50:37PM -0500, Jason Cooper wrote:
+>> Another facet of this problem is the keymile board.  It has to enable
+>> the clocks for sata in order to boot. (ref: board-km_kirkwood.c).
 
-I'm not sure this should be the conclusion. Obviously throwing more
-hardware at virtualization makes it faster and the x86 host will
-probably also benefit from faster interrupt handling as a side
-benefit, so emulating the PIC etc. makes sense for now and also in
-short term (some years from now).
+The statement in board-km_kirkwood.c is just not true. Andrew and I did
+some tests with Valentin Longchamps back when we introduced DT clk
+gating. Keymile board hangs not because of the accesses to clk gating
+ctrl registers but the phy gating that accessed the sata registers
+that are missing on the Kirkwood used on that board.
 
-But long term, if you could direct the hardware design efforts of
-major companies and standardization bodies to any direction, is fast
-emulation of 30 year old technology what would create the fastest
-architecture in the future? For example, maybe the PIC+LAPIC should be
-replaced in long term by something that can vector the interrupts to
-different VCPUs directly, each at different privilege levels?
+Phy gates have not been used since DT clk gating at all. If we
+reintroduce them in a DT compatible way we can still disable them
+for keymile board in DT.
 
+> I think we should do the following for 3.8:
 >
->> PV is bad. We only do it when we have to. Not doing PV where we don't have to is exactly the reason KVM is superior to Xen.
+> - Get the clocks by device name in kirkwood_ge0x_init()
+> - Only set CLK_IGNORE_UNUSED for "runit" in clk-gating-ctrl.c. (I can
+> do this by simply adding another case to the existing "ddr"
+> exception, which makes the patch much less intrusive)
+
+I agree that we should have .flags for clk-gating-ctrl but that
+can live without any DT properties as we already have SoC specific
+structs there (and Keymile's kirkwood doesn't hang on clk gating
+control register accesses)
+
+>> and in any other board:
 >>
-> Exactly. Implementing PV for something that does not require PV (for
-> performance reasons mostly) is trading tested guest code, to untested,
-> and unwritten, one.
+>> gate_clk: clock-gating-control at 2011c {
+>> 	/* don't lose eth0 mac address */
+>> 	ungateable =<0>;
+>> };
 
-HW acceleration of Xen would just need faster IPC, but that has
-probably reached max performance ages ago.
+If there is any hang issue with gated ge clk on kirkwood, the
+solution is not to just disable the clock gate but make any
+code that accesses ge registers prepare the clock.
 
-The legacy driver benefit is a good point, though more so for short term.
-
->
-> --
->                         Gleb.
+Sebastian
