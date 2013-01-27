@@ -1,35 +1,64 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 27 Jan 2013 21:33:04 +0530
-Subject: [PATCH v3 1/3] cpufreq: kirkwood: Add a cpufreq driver for
- Marvell Kirkwood SoCs
-In-Reply-To: <20130127154212.GJ29973@lunn.ch>
-References: <1359281244-31455-1-git-send-email-andrew@lunn.ch>
- <1359281244-31455-2-git-send-email-andrew@lunn.ch>
- <CAKohpomWM41MhRjdhFixy-ELXc6QjE0BhCAHfTzovOD0CBPoOQ@mail.gmail.com>
- <20130127154212.GJ29973@lunn.ch>
-Message-ID: <CAKohpomQJfsWBY5o3ep4r86fYYQ39JnMPswjoe8YFT37ekM20w@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Sun, 27 Jan 2013 17:23:09 +0100
+Subject: [kvmarm] [Qemu-devel] [RFC] Virtio-desktop: Virtio-based virtual
+ desktop
+In-Reply-To: <87wquysor6.fsf@codemonkey.ws>
+References: <CALrVBktEQM5D-L+60RTzdRgo7jLZ671KxWMUFGnQwQ1bzgjO2A@mail.gmail.com>
+ <87wquysor6.fsf@codemonkey.ws>
+Message-ID: <153CCD6C-C1F5-4BF5-985B-8FEA38B3397E@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 January 2013 21:12, Andrew Lunn <andrew@lunn.ch> wrote:
-> And how would the module get loaded? There is no hardware anchor to
-> make the module load. No enumeration of some bus causing it to be
-> loaded. In the ARM world, platform drivers are the norm.
 
-The way you do it now is by creating a platform device for it in your
-arch/arm/mach-* directory. And you are passing an IOMEM resource too.
+On 27.01.2013, at 15:07, Anthony Liguori wrote:
 
-I believe, normally we don't require any DT node or platform device from
-arch/arm/mach-* for cpufreq drivers. This is something which should
-always be initialized once it is selected in .config.
+> Anup Patel <anup.patel@linaro.org> writes:
+> 
+>> Hi All,
+>> 
+>> How about having a generic Virtio-based machine for emulating a virtual
+>> desktop ?
+>> 
+>> I know folks have already thought about this and probably also tried
+>> something or other on this front but, it will be good to know the downsides.
+>> 
+>> Virtio-desktop can be a separate specification describing a virtual
+>> desktop.
+>> Of-course we cannot avoid few architecture dependent virtual devices in but
+>> the Virtio-desktop specification will try to keep minimum possible
+>> architecture dependent devices.
+> 
+> There's a lot of reasons why a pure PV machine type is a bad idea.  Lots
+> of people have enumerated them in this thread.
+> 
+> But let me mention some things that I think we don't have covered today
+> with PV:
+> 
+> - Graphics.  Yes, I know QXL exists but it's (a) dependent on PCI (b)
+>   lacks the ability to gracefully degrade making it hopelessly tied to
+>   spice.
 
-Because we will call the _probe() (or renamed as kirkwood_cpufreq_init)
-from module_init() now, it will get initialized directly. No need to any
-enumeration at all. Now, in case there are multiple values of IOMEM resource
-depending on machine type, you can create properties in cpu node. Otherwise
-just embed the address directly into driver as nobody else is going to use it.
+There was a QXL-on-virtio port in the works a while ago IIRC:
 
-Makes sense?
+> - Input.  PS/2 mouse provides relative input which sucks in guests.
+>   For absolute input, we have VMMouse which is x86-specific, USB
+>   tablets (which are expensive to emulate) or the spice mouse which is
+>   intimately tied to the full Spice stack.
 
---
-viresh
+I thought the USB tablet is ok today thanks to auto-suspend of the bus? Or was that only with ehci?
+
+> 
+> - Guest interaction.  Copy/paste, drag and drop, etc.  In theory this
+>   is covered in spice agents but it's all again hopelessly tied to
+>   Spice which makes it non-portable.
+
+- Keyboard. When running with VNC, the 3 stacks involved in converting keyboard layouts back and forth are really confusing to users.
+
+> So there's good work todo but it's almost certainly in working with the
+> Spice community to try to make what they already have more accessible to
+> non-x86 architectures.
+
+Hooray :)
+
+
+Alex
