@@ -1,88 +1,68 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Sun, 27 Jan 2013 18:04:08 +0100
-Subject: [PATCH] ARM: mxs: gpio-mxs: Add IRQ_TYPE_EDGE_BOTH support
-Message-ID: <1359306248-28690-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 27 Jan 2013 17:11:11 +0000
+Subject: [PATCH v3 1/3] cpufreq: kirkwood: Add a cpufreq driver for
+ Marvell Kirkwood SoCs
+In-Reply-To: <1359281244-31455-2-git-send-email-andrew@lunn.ch>
+References: <1359281244-31455-1-git-send-email-andrew@lunn.ch>
+ <1359281244-31455-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20130127171111.GG23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for IRQ_TYPE_EDGE_BOTH needed for some driver
-(gpio-keys).
-Inspired from gpio-mxc.c
+On Sun, Jan 27, 2013 at 11:07:22AM +0100, Andrew Lunn wrote:
+> +static struct priv
+> +{
+> +	struct clk *cpu_clk;
+> +	struct clk *ddr_clk;
+> +	struct clk *powersave_clk;
+> +	struct device *dev;
+> +	void __iomem *base;
+> +} priv;
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- drivers/gpio/gpio-mxs.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+I guess you probably think that the compiler will do something special
+with this, like reference these all through a base address and offset,
+but you'd be wrong there.  This is no different from declaring each
+as an individual static variable.
 
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index fa2a63c..7690eec 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -65,6 +65,7 @@ struct mxs_gpio_port {
- 	struct irq_domain *domain;
- 	struct bgpio_chip bgc;
- 	enum mxs_gpio_id devid;
-+	u32 both_edges;
- };
- 
- static inline int is_imx23_gpio(struct mxs_gpio_port *port)
-@@ -81,13 +82,24 @@ static inline int is_imx28_gpio(struct mxs_gpio_port *port)
- 
- static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- {
-+	u32 val;
- 	u32 pin_mask = 1 << d->hwirq;
-+	u32 gpio_idx = d->hwirq;
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct mxs_gpio_port *port = gc->private;
- 	void __iomem *pin_addr;
- 	int edge;
- 
-+	port->both_edges &= ~(1 << gpio_idx);
- 	switch (type) {
-+	case IRQ_TYPE_EDGE_BOTH:
-+		val = gpio_get_value(port->bgc.gc.base + gpio_idx);
-+		if (val)
-+			edge = GPIO_INT_LOW_LEV;
-+		else
-+			edge = GPIO_INT_HIGH_LEV;
-+		port->both_edges |= 1 << gpio_idx;
-+		break;
- 	case IRQ_TYPE_EDGE_RISING:
- 		edge = GPIO_INT_RISE_EDGE;
- 		break;
-@@ -123,6 +135,22 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- 
- 	return 0;
- }
-+static void mxs_flip_edge(struct mxs_gpio_port *port, u32 gpio)
-+{
-+	u32 bit, val, edge;
-+	void __iomem *pin_addr;
-+
-+	bit = 1<<gpio;
-+
-+	pin_addr = port->base + PINCTRL_IRQPOL(port);
-+	val = readl(pin_addr);
-+	edge = val&bit;
-+
-+	if (edge)
-+		writel(bit, pin_addr + MXS_CLR);
-+	else
-+		writel(bit, pin_addr + MXS_SET);
-+}
- 
- /* MXS has one interrupt *per* gpio port */
- static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
-@@ -137,6 +165,9 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- 
- 	while (irq_stat != 0) {
- 		int irqoffset = fls(irq_stat) - 1;
-+		if (port->both_edges & (1 << irqoffset))
-+			mxs_flip_edge(port, irqoffset);
-+
- 		generic_handle_irq(irq_find_mapping(port->domain, irqoffset));
- 		irq_stat &= ~(1 << irqoffset);
- 	}
--- 
-1.7.12.4
+> +static unsigned int kirkwood_cpufreq_get_cpu_frequency(unsigned int cpu)
+> +{
+> +	if (__clk_is_enabled(priv.powersave_clk))
+
+This looks to me to be a layering violation.
+
+> +static int kirkwood_cpufreq_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = of_find_compatible_node(
+> +		NULL, NULL, "marvell,kirkwood-core-clock");
+
+What if np is NULL?
+
+> +
+> +	struct of_phandle_args clkspec;
+> +	struct resource *res;
+> +	int err;
+> +
+> +	priv.dev = &pdev->dev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "Cannot get memory resource\n");
+> +		return -ENODEV;
+> +	}
+> +	priv.base = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (!priv.base) {
+> +		dev_err(&pdev->dev, "Cannot ioremap\n");
+> +		return -ENOMEM;
+
+A number of people have been pointing out that the right return value for
+this is -EADDRNOTAVAIL as documented against devm_request_and_ioremap().
+
+> +	}
+> +
+> +	clkspec.np = np;
+> +	clkspec.args_count = 1;
+> +	clkspec.args[0] = 1;
+> +
+> +	priv.cpu_clk = of_clk_get_from_provider(&clkspec);
+
+Oh, yet another way to get clocks...
