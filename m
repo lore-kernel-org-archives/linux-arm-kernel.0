@@ -1,51 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 27 Jan 2013 20:02:12 +0100
-Subject: [PATCH 3/3] sunxi: a13-olinuxino: Add user LED to the device tree
-In-Reply-To: <1359313332-12305-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1359313332-12305-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1359313332-12305-4-git-send-email-maxime.ripard@free-electrons.com>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Sun, 27 Jan 2013 11:23:43 -0800
+Subject: [PATCH v3 16/22] PCI, arm: Kill pci_root_buses
+In-Reply-To: <1359314629-18651-1-git-send-email-yinghai@kernel.org>
+References: <CAE9FiQXHG01NjnYNDbC-KEpbcvY-q4pBe97CxTOGS7W4vZQBYQ@mail.gmail.com>
+ <1359314629-18651-1-git-send-email-yinghai@kernel.org>
+Message-ID: <1359314629-18651-17-git-send-email-yinghai@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Replace that with hotplug-safe version iteration.
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index 4a1e45d..33d1c7e 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -23,10 +23,30 @@
- 	};
+Signed-off-by: Yinghai Lu <yinghai@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/kernel/bios32.c |    9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 9b72261..d0befe4 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -57,13 +57,10 @@ static void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, in
  
- 	soc {
-+		pinctrl at 01c20800 {
-+			led_pins_olinuxino: led_pins at 0 {
-+				allwinner,pins = "PG9";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <1>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
- 		uart1: uart at 01c28400 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart1_pins_b>;
- 			status = "okay";
- 		};
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_olinuxino>;
-+
-+		power {
-+			gpios = <&pio 6 9 0>;
-+			default-state = "on";
-+		};
-+	};
- };
+ void pcibios_report_status(u_int status_mask, int warn)
+ {
+-	struct list_head *l;
++	struct pci_host_bridge *host_bridge = NULL;
+ 
+-	list_for_each(l, &pci_root_buses) {
+-		struct pci_bus *bus = pci_bus_b(l);
+-
+-		pcibios_bus_report_status(bus, status_mask, warn);
+-	}
++	for_each_pci_host_bridge(host_bridge)
++		pcibios_bus_report_status(host_bridge->bus, status_mask, warn);
+ }
+ 
+ /*
 -- 
 1.7.10.4
