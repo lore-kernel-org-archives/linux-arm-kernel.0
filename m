@@ -1,134 +1,44 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Sun, 27 Jan 2013 11:23:48 -0800
-Subject: [PATCH v3 21/22] PCI: Kill pci_find_next_bus
-In-Reply-To: <1359314629-18651-1-git-send-email-yinghai@kernel.org>
-References: <CAE9FiQXHG01NjnYNDbC-KEpbcvY-q4pBe97CxTOGS7W4vZQBYQ@mail.gmail.com>
- <1359314629-18651-1-git-send-email-yinghai@kernel.org>
-Message-ID: <1359314629-18651-22-git-send-email-yinghai@kernel.org>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sun, 27 Jan 2013 21:24:18 +0100
+Subject: [PATCH v4 0/9] ARM: S3C24XX: rework irq handling for a later dt usage
+Message-ID: <201301272124.18530.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No user now, remove it.
+This v4 does not change any code part. The patches are merely rebased
+to apply to the next/cleanup-s3c24xx branch as requested.
 
-That name is misleading as it only for root buses.
+Heiko Stuebner (9):
+  ARM: S3C24XX: transform irq handling into a declarative form
+  ARM: S3C24XX: Move irq syscore-ops to irq-pm
+  ARM: S3C24XX: Modify s3c_irq_wake to use the hwirq property
+  ARM: S3C24XX: move s3c2416 irq init to common irq code
+  ARM: S3C24XX: modify s3c2416 irq init to initialize all irqs
+  ARM: S3C24XX: transform s3c2416 irqs into new structure
+  ARM: S3C24XX: move s3c2443 irq code to irq.c
+  ARM: S3C24XX: modify s3c2443 irq init to initialize all irqs
+  ARM: S3C24XX: transform s3c2443 subirqs into new structure
 
-Signed-off-by: Yinghai Lu <yinghai@kernel.org>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Doug Thompson <dougthompson@xmission.com>
-Cc: linux-edac at vger.kernel.org
-Cc: x86 at kernel.org
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: sparclinux at vger.kernel.org
-Cc: Tony Luck <tony.luck@intel.com>
-Cc: Fenghua Yu <fenghua.yu@intel.com>
-Cc: linux-ia64 at vger.kernel.org
-Cc: linux-altix at sgi.com
-Cc: Richard Henderson <rth@twiddle.net>
-Cc: Ivan Kokshaysky <ink@jurassic.park.msu.ru>
-Cc: Matt Turner <mattst88@gmail.com>
-Cc: linux-alpha at vger.kernel.org
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: David Howells <dhowells@redhat.com>
-Cc: Michal Simek <monstr@monstr.eu>
-Cc: microblaze-uclinux at itee.uq.edu.au
-Cc: Koichi Yasutake <yasutake.koichi@jp.panasonic.com>
-Cc: linux-am33-list at redhat.com
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: linuxppc-dev at lists.ozlabs.org
----
- drivers/pci/search.c |   37 +++++++------------------------------
- include/linux/pci.h  |    4 ----
- 2 files changed, 7 insertions(+), 34 deletions(-)
+ arch/arm/mach-s3c24xx/Makefile               |    4 +-
+ arch/arm/mach-s3c24xx/common.h               |    2 +
+ arch/arm/mach-s3c24xx/irq-pm.c               |   41 +-
+ arch/arm/mach-s3c24xx/irq-s3c2416.c          |  348 --------
+ arch/arm/mach-s3c24xx/irq-s3c2443.c          |  281 -------
+ arch/arm/mach-s3c24xx/mach-smdk2416.c        |    2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2443.c        |    2 +-
+ arch/arm/mach-s3c24xx/s3c2410.c              |    4 +-
+ arch/arm/mach-s3c24xx/s3c2412.c              |    4 +-
+ arch/arm/mach-s3c24xx/s3c2416.c              |    4 +-
+ arch/arm/mach-s3c24xx/s3c2440.c              |    4 +-
+ arch/arm/mach-s3c24xx/s3c2442.c              |    4 +-
+ arch/arm/plat-s3c24xx/Kconfig                |    1 +
+ arch/arm/plat-s3c24xx/irq.c                  | 1110 +++++++++++++++-----------
+ arch/arm/plat-samsung/include/plat/pm.h      |    6 -
+ arch/arm/plat-samsung/include/plat/s3c2416.h |    1 +
+ arch/arm/plat-samsung/include/plat/s3c2443.h |    2 +
+ 17 files changed, 688 insertions(+), 1132 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2416.c
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2443.c
 
-diff --git a/drivers/pci/search.c b/drivers/pci/search.c
-index db0c3a9..329c533 100644
---- a/drivers/pci/search.c
-+++ b/drivers/pci/search.c
-@@ -79,44 +79,22 @@ static struct pci_bus *pci_do_find_bus(struct pci_bus *bus, unsigned char busnr)
-  */
- struct pci_bus * pci_find_bus(int domain, int busnr)
- {
--	struct pci_bus *bus = NULL;
-+	struct pci_host_bridge *host_bridge = NULL;
- 	struct pci_bus *tmp_bus;
- 
--	while ((bus = pci_find_next_bus(bus)) != NULL)  {
--		if (pci_domain_nr(bus) != domain)
-+	for_each_pci_host_bridge(host_bridge) {
-+		if (pci_domain_nr(host_bridge->bus) != domain)
- 			continue;
--		tmp_bus = pci_do_find_bus(bus, busnr);
--		if (tmp_bus)
-+		tmp_bus = pci_do_find_bus(host_bridge->bus, busnr);
-+		if (tmp_bus) {
-+			put_device(&host_bridge->dev);
- 			return tmp_bus;
-+		}
- 	}
- 	return NULL;
- }
- 
- /**
-- * pci_find_next_bus - begin or continue searching for a PCI bus
-- * @from: Previous PCI bus found, or %NULL for new search.
-- *
-- * Iterates through the list of known PCI busses.  A new search is
-- * initiated by passing %NULL as the @from argument.  Otherwise if
-- * @from is not %NULL, searches continue from next device on the
-- * global list.
-- */
--struct pci_bus * 
--pci_find_next_bus(const struct pci_bus *from)
--{
--	struct list_head *n;
--	struct pci_bus *b = NULL;
--
--	WARN_ON(in_interrupt());
--	down_read(&pci_bus_sem);
--	n = from ? from->node.next : pci_root_buses.next;
--	if (n != &pci_root_buses)
--		b = pci_bus_b(n);
--	up_read(&pci_bus_sem);
--	return b;
--}
--
--/**
-  * pci_get_slot - locate PCI device for a given PCI slot
-  * @bus: PCI bus on which desired PCI device resides
-  * @devfn: encodes number of PCI slot in which the desired PCI 
-@@ -356,7 +334,6 @@ EXPORT_SYMBOL(pci_dev_present);
- 
- /* For boot time work */
- EXPORT_SYMBOL(pci_find_bus);
--EXPORT_SYMBOL(pci_find_next_bus);
- /* For everyone */
- EXPORT_SYMBOL(pci_get_device);
- EXPORT_SYMBOL(pci_get_subsys);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 67879cb..bb07db2 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -763,7 +763,6 @@ int pci_find_ext_capability(struct pci_dev *dev, int cap);
- int pci_find_next_ext_capability(struct pci_dev *dev, int pos, int cap);
- int pci_find_ht_capability(struct pci_dev *dev, int ht_cap);
- int pci_find_next_ht_capability(struct pci_dev *dev, int pos, int ht_cap);
--struct pci_bus *pci_find_next_bus(const struct pci_bus *from);
- 
- struct pci_host_bridge *pci_get_next_host_bridge(struct pci_host_bridge *from);
- struct pci_dev *pci_get_device(unsigned int vendor, unsigned int device,
-@@ -1404,9 +1403,6 @@ static inline int pci_block_cfg_access_in_atomic(struct pci_dev *dev)
- static inline void pci_unblock_cfg_access(struct pci_dev *dev)
- { }
- 
--static inline struct pci_bus *pci_find_next_bus(const struct pci_bus *from)
--{ return NULL; }
--
- static inline struct pci_dev *pci_get_slot(struct pci_bus *bus,
- 						unsigned int devfn)
- { return NULL; }
 -- 
 1.7.10.4
