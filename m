@@ -1,60 +1,55 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 27 Jan 2013 20:02:10 +0100
-Subject: [PATCH 1/3] pinctrl: sunxi: Add of_xlate function
+Date: Sun, 27 Jan 2013 20:02:11 +0100
+Subject: [PATCH 2/3] sunxi: dts: Report the pinctrl nodes as gpio-controllers
 In-Reply-To: <1359313332-12305-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1359313332-12305-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1359313332-12305-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1359313332-12305-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the pin controller of sunxi chips is represented as a single bank
-in the driver.
-Since this is neither convenient nor represented that way in the
-datasheets, define a custom of_xlate function with the layout <bank pin
-flag>
-
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/pinctrl/pinctrl-sunxi.c |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi |    4 +++-
+ arch/arm/boot/dts/sun5i-a13.dtsi |    4 +++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-index 353f6a8..122eeca 100644
---- a/drivers/pinctrl/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/pinctrl-sunxi.c
-@@ -1261,6 +1261,24 @@ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
- 	writel((value & DATA_PINS_MASK) << index, pctl->membase + reg);
- }
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index f99f60d..03d2b53 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -18,11 +18,13 @@
+ 	};
  
-+static int sunxi_pinctrl_gpio_of_xlate(struct gpio_chip *gc,
-+				const struct of_phandle_args *gpiospec,
-+				u32 *flags)
-+{
-+	int pin, base;
-+
-+	base = PINS_PER_BANK * gpiospec->args[0];
-+	pin = base + gpiospec->args[1];
-+
-+	if (pin > (gc->base + gc->ngpio))
-+		return -EINVAL;
-+
-+	if (flags)
-+		*flags = gpiospec->args[2];
-+
-+	return pin;
-+}
-+
- static struct gpio_chip sunxi_pinctrl_gpio_chip __devinitconst = {
- 	.owner			= THIS_MODULE,
- 	.request		= sunxi_pinctrl_gpio_request,
-@@ -1269,6 +1287,8 @@ static struct gpio_chip sunxi_pinctrl_gpio_chip __devinitconst = {
- 	.direction_output	= sunxi_pinctrl_gpio_direction_output,
- 	.get			= sunxi_pinctrl_gpio_get,
- 	.set			= sunxi_pinctrl_gpio_set,
-+	.of_xlate		= sunxi_pinctrl_gpio_of_xlate,
-+	.of_gpio_n_cells	= 3,
- 	.can_sleep		= 0,
- };
+ 	soc {
+-		pinctrl at 01c20800 {
++		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun4i-a10-pinctrl";
+ 			reg = <0x01c20800 0x400>;
++			gpio-controller;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			#gpio-cells = <3>;
  
+ 			uart0_pins_a: uart0 at 0 {
+ 				allwinner,pins = "PB22", "PB23";
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index e112189..945bfac 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -19,11 +19,13 @@
+ 	};
+ 
+ 	soc {
+-		pinctrl at 01c20800 {
++		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun5i-a13-pinctrl";
+ 			reg = <0x01c20800 0x400>;
++			gpio-controller;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			#gpio-cells = <3>;
+ 
+ 			uart1_pins_a: uart1 at 0 {
+ 				allwinner,pins = "PE10", "PE11";
 -- 
 1.7.10.4
