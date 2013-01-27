@@ -1,84 +1,40 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 27 Jan 2013 15:29:25 +0100
-Subject: [PATCH 5/6 v14] gpio: Add device tree support to block GPIO API
-In-Reply-To: <CAOY=C6E-+uKQGbRDjNh5ZP9Wrmd+PNbt7djkBTzwe29=qA1_PA@mail.gmail.com>
-References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
- <1358856404-8975-6-git-send-email-stigge@antcom.de>
- <CAOY=C6E-+uKQGbRDjNh5ZP9Wrmd+PNbt7djkBTzwe29=qA1_PA@mail.gmail.com>
-Message-ID: <510539C5.8000208@antcom.de>
+From: menon.nishanth@gmail.com (Nishanth Menon)
+Date: Sun, 27 Jan 2013 08:33:54 -0600
+Subject: [BUG] panda board locks up on boot
+In-Reply-To: <20130127141254.GC5714@stinkpad>
+References: <1359082886.21576.199.camel@gandalf.local.home>
+ <51022FD2.8090101@compulab.co.il>
+ <0247700D01F14443B9209F90AD938CC52409708C@sestoex09.enea.se>
+ <20130127141254.GC5714@stinkpad>
+Message-ID: <51053AD2.8080805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/13 14:07, Stijn Devriendt wrote:
->> +Example:
->> +
->> +        blockgpio {
->> +                compatible = "linux,gpio-block";
->> +
->> +                block0 {
->> +                        gpios = <&gpio 3 0 0>,
->> +                                <&gpio 3 1 0>;
->> +                };
->> +                block1 {
->> +                        gpios = <&gpio 4 1 0>,
->> +                                <&gpio 4 3 0>,
->> +                                <&gpio 4 2 0>,
->> +                                <&gpio 4 4 0>,
->> +                                <&gpio 4 5 0>,
->> +                                <&gpio 4 6 0>,
->> +                                <&gpio 4 7 0>,
->> +                                <&gpio 4 8 0>,
->> +                                <&gpio 4 9 0>,
->> +                                <&gpio 4 10 0>,
->> +                                <&gpio 4 19 0>;
->> +                };
->> +        };
-> 
-> How do you see bindings for other kinds of drivers?
-> 
-> In my patchset, it's possible for other drivers to use gpio-blocks.
-> One example we have is a power sequencer with 2 pins attached
-> to GPIO pins. These 2 pins form a 2bit word to select power margining.
-> These 2 pins need to be set synchronously (as otherwise when going
-> from profile 0 to profile 3 you pass either profile 1 or profile 2 which
-> could be bad for hardware)
-> 
-> In the device-tree this is specified as:
-> 
-> powr at 0x20 {
->    // other properties
-> 
->   gpios = <&gpio 4 0
->                &gpio 5 0>;
-> };
-> 
-> Is this kind of integration also possible?
+On 01/27/2013 08:12 AM, Paolo Pisati wrote:
+> On Fri, Jan 25, 2013 at 08:43:15AM +0000, Mats Liljegren wrote:
+>> Hi Steven,
+>>
+>> Do you have CONFIG_CPU_FREQ enabled? As I posted earlier in linux-kernel forum ("Failed booting PandaBoard ES with Linux 3.8 RC4" two days ago) my PandaBoard ES hangs while booting with this option enabled. It works fine without it. I have not bisected it down to a single commit though.
+>
+> glad i'm not the only one who hit this problem:
+>
+> "3.8rc4+ and cpu_freq omap: hangs, oopses, etcetc"
+>
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg83693.html
+>
 
-You can reference the gpio block via a phandle, e.g.:
+Support for TPS is not yet in mainline kernel. you may want to do:
 
-        blockgpio {
-                compatible = "linux,gpio-block";
+you could try running 'mw.w 0x4A31E05A 0x1' before bootm in u-boot -> 
+This will hack the pad of panda ES pin mean for controlling TPS voltage 
+register (again a kernel bug where the GPIO block setup by bootloader 
+got reset).
 
-                selector1 {
-                        gpios = <&gpio 4 0>,
-                                <&gpio 5 0>;
-                };
-        };
+CPUfreq needs both voltage and frequency scaling to work and without 
+support of the TPS voltage scaling on vdd_MPU, you are stuck at boot 
+voltage, and just scaling frequency. with the not-enough boot voltage, 
+moving to higher frequencies can/will result in unpredictable behavior.
 
-        powr at 0x20 {
-                // ...
-
-                gpios = <&selector1>;
-        };
-
-
-In the driver, you can get the gpio block like this:
-
-block = gpio_block_find_by_name(of_parse_phandle(powr, "gpios", 0)->name);
-
-(Simplified by removed error/NULL handling!)
-
-If this turns out to be a common pattern, I can add a convenience "get"
-function for this.
-
-Roland
+---
+Regards,
+NM
