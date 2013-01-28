@@ -1,47 +1,46 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 27 Jan 2013 21:53:04 -0800
-Subject: [GIT PULL V2 2/4] ARM: mvebu: drivers for v3.9
-In-Reply-To: <1358909285.ca5b742.21555@triton>
+Date: Sun, 27 Jan 2013 21:57:26 -0800
+Subject: [GIT PULL V2 1/4] ARM: mvebu: cleanup for v3.9
+In-Reply-To: <1358909283.6D1c74D1.21555@triton>
 References: <pull-1358909291-876385>
- <1358909285.ca5b742.21555@triton>
-Message-ID: <20130128055304.GA25723@quad.lixom.net>
+ <1358909283.6D1c74D1.21555@triton>
+Message-ID: <20130128055726.GB25723@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 02:48:05AM +0000, Jason Cooper wrote:
-> The following changes since commit 4b53ab9cb853e446f628e561ce6fcc527df30a76:
+On Wed, Jan 23, 2013 at 02:48:03AM +0000, Jason Cooper wrote:
+> The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
 > 
->   Merge branch 'mvebu/fixes' into mvebu/drivers (2013-01-23 01:42:14 +0000)
+>   Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
 > 
 > are available in the git repository at:
 > 
+>   git://git.infradead.org/users/jcooper/linux.git tags/cleanup_for_v3.9
 > 
->   git://git.infradead.org/users/jcooper/linux.git tags/drivers_for_v3.9
+> for you to fetch changes up to b96e1b1c3c5319294edb0970b6d5bf099c0e85eb:
 > 
-> for you to fetch changes up to 43076a4c4e5fb92721bedc5d05b93468d6d76b2c:
-> 
->   mmc: mvsdio: add pinctrl integration (2013-01-23 01:42:29 +0000)
+>   ARM: Kirkwood: Cleanup unneeded include files (2013-01-12 21:50:10 +0000)
 > 
 > ----------------------------------------------------------------
-> mvebu drivers for v3.9
->  - mvsdio
->    - use slot-gpio for card detect and write protect
->    - add DT binding
->    - add pinctrl integration
->  - use rtc-mv in mvebu armv7 SoCs
->  - add pci-e hotplug for kirkwood
+> mvebu cleanup for v3.9
+>  - remove unneeded includes due to DT conversion
+> 
+> ----------------------------------------------------------------
+> Andrew Lunn (1):
+>       ARM: Kirkwood: Cleanup unneeded include files
+> 
+> Thomas Petazzoni (1):
+>       arm: kirkwood: dockstar: remove useless include of SDIO header
+> 
+>  arch/arm/mach-kirkwood/board-ib62x0.c   | 1 -
+>  arch/arm/mach-kirkwood/board-mplcec4.c  | 1 -
+>  arch/arm/mach-kirkwood/dockstar-setup.c | 1 -
+>  3 files changed, 3 deletions(-)
 
 Hi,
 
-I didn't see any acks by Chris Ball on these, he's usually pretty
-responsive on code reviews so I just wanted to make sure he's OK with
-us taking this through arm-soc, and aware of it.
-
-Looks like this whole branch could go through the mmc tree? The dtsi
-updates from the last branch would still go through arm-soc.
-
-Either way is fine with me, I just don't want to make life difficult for Chris
-in case he has some sweeping changes planned that might cause conflicts, etc.
+This one I pulled as mvebu/cleanup. I'm holding off on the others based
+on my reply, since the drivers branch is base for the later branches.
 
 
 -Olof
