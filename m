@@ -1,286 +1,32 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 19:56:17 +0100
-Subject: [PATCH v2 08/27] pci: implement an emulated PCI-to-PCI bridge
+Date: Mon, 28 Jan 2013 19:56:19 +0100
+Subject: [PATCH v2 10/27] arm: mvebu: fix address-cells in mpic DT node
 In-Reply-To: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1359399397-29729-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1359399397-29729-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There is no need to have a #address-cells property in the MPIC Device
+Tree node, and more than that, having it confuses the of_irq_map_raw()
+logic, which will be used by the Marvell PCIe driver.
+
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/Kconfig             |    3 +
- drivers/pci/Makefile            |    1 +
- drivers/pci/sw-pci-pci-bridge.c |  185 +++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h             |   43 +++++++++
- 4 files changed, 232 insertions(+)
- create mode 100644 drivers/pci/sw-pci-pci-bridge.c
+ arch/arm/boot/dts/armada-370-xp.dtsi |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-index f7548e2..6ed3db1 100644
---- a/drivers/pci/Kconfig
-+++ b/drivers/pci/Kconfig
-@@ -122,3 +122,6 @@ config PCI_LABEL
- 
- config PCI_SW_HOST_BRIDGE
- 	bool
-+
-+config PCI_SW_PCI_PCI_BRIDGE
-+	bool
-diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
-index 44ce914..5b48961 100644
---- a/drivers/pci/Makefile
-+++ b/drivers/pci/Makefile
-@@ -17,6 +17,7 @@ obj-$(CONFIG_PCI_IOAPIC) += ioapic.o
- 
- # Emulated PCI elements
- obj-$(CONFIG_PCI_SW_HOST_BRIDGE) += sw-host-bridge.o
-+obj-$(CONFIG_PCI_SW_PCI_PCI_BRIDGE) += sw-pci-pci-bridge.o
- 
- # Build the PCI Hotplug drivers if we were asked to
- obj-$(CONFIG_HOTPLUG_PCI) += hotplug/
-diff --git a/drivers/pci/sw-pci-pci-bridge.c b/drivers/pci/sw-pci-pci-bridge.c
-new file mode 100644
-index 0000000..25679cc
---- /dev/null
-+++ b/drivers/pci/sw-pci-pci-bridge.c
-@@ -0,0 +1,185 @@
-+/*
-+ * Implementation of a simple emulated PCI-to-PCI bridge.
-+ *
-+ * Thierry Reding <thierry.reding@avionic-design.de>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/pci.h>
-+#include <linux/module.h>
-+
-+int pci_sw_pci_bridge_init(struct pci_sw_pci_bridge *bridge)
-+{
-+	if (!bridge)
-+		return -EINVAL;
-+
-+	memset(bridge, 0, sizeof(struct pci_sw_pci_bridge));
-+
-+	bridge->status = PCI_STATUS_CAP_LIST;
-+	bridge->class = PCI_CLASS_BRIDGE_PCI;
-+	bridge->header_type = PCI_HEADER_TYPE_BRIDGE;
-+	bridge->cache_line_size = 0x10;
-+
-+	/* We support 32 bits I/O addressing */
-+	bridge->iobase = PCI_IO_RANGE_TYPE_32;
-+	bridge->iolimit = PCI_IO_RANGE_TYPE_32;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pci_sw_pci_bridge_init);
-+
-+int pci_sw_pci_bridge_read(struct pci_sw_pci_bridge *bridge,
-+			   unsigned int where, int size, u32 *value)
-+{
-+	switch (where & ~3) {
-+	case PCI_VENDOR_ID:
-+		*value = bridge->device << 16 | bridge->vendor;
-+		break;
-+
-+	case PCI_COMMAND:
-+		*value = bridge->status << 16 | bridge->command;
-+		break;
-+
-+	case PCI_CLASS_REVISION:
-+		*value = bridge->class << 16 | bridge->interface << 8 |
-+			 bridge->revision;
-+		break;
-+
-+	case PCI_CACHE_LINE_SIZE:
-+		*value = bridge->bist << 24 | bridge->header_type << 16 |
-+			 bridge->latency_timer << 8 | bridge->cache_line_size;
-+		break;
-+
-+	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
-+		*value = bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4];
-+		break;
-+
-+	case PCI_PRIMARY_BUS:
-+		*value = (bridge->secondary_latency_timer << 24 |
-+			  bridge->subordinate_bus         << 16 |
-+			  bridge->secondary_bus           <<  8 |
-+			  bridge->primary_bus);
-+		break;
-+
-+	case PCI_IO_BASE:
-+		*value = (bridge->secondary_status << 16 |
-+			  bridge->iolimit          <<  8 |
-+			  bridge->iobase);
-+		break;
-+
-+	case PCI_MEMORY_BASE:
-+		*value = (bridge->memlimit << 16 | bridge->membase);
-+		break;
-+
-+	case PCI_PREF_MEMORY_BASE:
-+		*value = (bridge->prefmemlimit << 16 | bridge->prefmembase);
-+		break;
-+
-+	case PCI_PREF_BASE_UPPER32:
-+		*value = bridge->prefbaseupper;
-+		break;
-+
-+	case PCI_PREF_LIMIT_UPPER32:
-+		*value = bridge->preflimitupper;
-+		break;
-+
-+	case PCI_IO_BASE_UPPER16:
-+		*value = (bridge->iolimitupper << 16 | bridge->iobaseupper);
-+		break;
-+
-+	case PCI_ROM_ADDRESS1:
-+		*value = 0;
-+		break;
-+
-+	default:
-+		*value = 0xffffffff;
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+	}
-+
-+	if (size == 2)
-+		*value = (*value >> (8 * (where & 3))) & 0xffff;
-+	else if (size == 1)
-+		*value = (*value >> (8 * (where & 3))) & 0xff;
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+EXPORT_SYMBOL_GPL(pci_sw_pci_bridge_read);
-+
-+int pci_sw_pci_bridge_write(struct pci_sw_pci_bridge *bridge,
-+			    unsigned int where, int size, u32 value)
-+{
-+	u32 mask, reg;
-+	int err;
-+
-+	if (size == 4)
-+		mask = 0x0;
-+	else if (size == 2)
-+		mask = ~(0xffff << ((where & 3) * 8));
-+	else if (size == 1)
-+		mask = ~(0xff << ((where & 3) * 8));
-+	else
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+
-+	err = pci_sw_pci_bridge_read(bridge, where & ~3, 4, &reg);
-+	if (err)
-+		return err;
-+
-+	value = (reg & mask) | value << ((where & 3) * 8);
-+
-+	switch (where & ~3) {
-+	case PCI_COMMAND:
-+		bridge->command = value & 0xffff;
-+		bridge->status = value >> 16;
-+		break;
-+
-+	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
-+		bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4] = value;
-+		break;
-+
-+	case PCI_IO_BASE:
-+		/*
-+		 * We also keep bit 1 set, it is a read-only bit that
-+		 * indicates we support 32 bits addressing for the
-+		 * I/O
-+		 */
-+		bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
-+		bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
-+		bridge->secondary_status = value >> 16;
-+		break;
-+
-+	case PCI_MEMORY_BASE:
-+		bridge->membase = value & 0xffff;
-+		bridge->memlimit = value >> 16;
-+		break;
-+
-+	case PCI_PREF_MEMORY_BASE:
-+		bridge->prefmembase = value & 0xffff;
-+		bridge->prefmemlimit = value >> 16;
-+		break;
-+
-+	case PCI_PREF_BASE_UPPER32:
-+		bridge->prefbaseupper = value;
-+		break;
-+
-+	case PCI_PREF_LIMIT_UPPER32:
-+		bridge->preflimitupper = value;
-+		break;
-+
-+	case PCI_IO_BASE_UPPER16:
-+		bridge->iobaseupper = value & 0xffff;
-+		bridge->iolimitupper = value >> 16;
-+		break;
-+
-+	default:
-+		break;
-+	}
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+EXPORT_SYMBOL_GPL(pci_sw_pci_bridge_write);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index c93e258..b83b4c8 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1864,4 +1864,47 @@ extern int pci_sw_host_bridge_read(struct pci_sw_host_bridge *bridge,
- extern int pci_sw_host_bridge_write(struct pci_sw_host_bridge *bridge,
- 				    unsigned int where, int size, u32 value);
- 
-+struct pci_sw_pci_bridge {
-+	u16 vendor;
-+	u16 device;
-+	u16 command;
-+	u16 status;
-+	u16 class;
-+	u8 interface;
-+	u8 revision;
-+	u8 bist;
-+	u8 header_type;
-+	u8 latency_timer;
-+	u8 cache_line_size;
-+	u32 bar[2];
-+	u8 primary_bus;
-+	u8 secondary_bus;
-+	u8 subordinate_bus;
-+	u8 secondary_latency_timer;
-+	u8 iobase;
-+	u8 iolimit;
-+	u16 secondary_status;
-+	u16 membase;
-+	u16 memlimit;
-+	u16 prefmembase;
-+	u16 prefmemlimit;
-+	u32 prefbaseupper;
-+	u32 preflimitupper;
-+	u16 iobaseupper;
-+	u16 iolimitupper;
-+	u8 cappointer;
-+	u8 reserved1;
-+	u16 reserved2;
-+	u32 romaddr;
-+	u8 intline;
-+	u8 intpin;
-+	u16 bridgectrl;
-+};
-+
-+extern int pci_sw_pci_bridge_init(struct pci_sw_pci_bridge *bridge);
-+extern int pci_sw_pci_bridge_read(struct pci_sw_pci_bridge *bridge,
-+				  unsigned int where, int size, u32 *value);
-+extern int pci_sw_pci_bridge_write(struct pci_sw_pci_bridge *bridge,
-+				   unsigned int where, int size, u32 value);
-+
- #endif /* LINUX_PCI_H */
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 4c0abe8..1dcdae9 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -31,7 +31,6 @@
+ 	mpic: interrupt-controller at d0020000 {
+ 	      compatible = "marvell,mpic";
+ 	      #interrupt-cells = <1>;
+-	      #address-cells = <1>;
+ 	      #size-cells = <1>;
+ 	      interrupt-controller;
+ 	};
 -- 
 1.7.9.5
