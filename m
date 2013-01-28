@@ -1,34 +1,32 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 28 Jan 2013 09:33:20 +0100
-Subject: [RFC] ARM: dma-mapping: Return 0 if no ->set_dma_mask()
-Message-ID: <20130128.103320.355771370936761237.hdoyu@nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 28 Jan 2013 16:37:18 +0800
+Subject: [PATCH 4/4] cpufreq, highbank: add support for highbank cpufreq
+In-Reply-To: <1523559.2KevGvelzH@vostro.rjw.lan>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1359143205-20279-5-git-send-email-mark.langsdorf@calxeda.com>
+ <20130126143950.GA7079@S2101-09.ap.freescale.net>
+ <1523559.2KevGvelzH@vostro.rjw.lan>
+Message-ID: <20130128083716.GE31689@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct dma_map_ops iommu_ops doesn't have ->set_dma_mask, which causes
-crash when dma_set_mask() is called from some driver.
+Rafael,
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/include/asm/dma-mapping.h |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+On Sat, Jan 26, 2013 at 11:24:12PM +0100, Rafael J. Wysocki wrote:
+> > As we are moving to multiplatform build, this init function will run
+> > on all other platforms built together with highbank.  We should
+> > probably eliminate that effect.
+> 
+> That change can be made on top of the Mark's patches I think, right?
+> 
+Yes.
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index a58e0f5..95328bf 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -32,7 +32,11 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
- 
- static inline int dma_set_mask(struct device *dev, u64 mask)
- {
--	return get_dma_ops(dev)->set_dma_mask(dev, mask);
-+	struct dma_map_ops *ops = get_dma_ops(dev);
-+
-+	if (ops->set_dma_mask)
-+		return ops->set_dma_mask(dev, mask);
-+	return 0;
- }
- 
- #ifdef __arch_page_to_dma
--- 
-1.7.9.5
+> If so, I'd prefer it that way.  The Mark's patches have been in a limbo for
+> too long already and that issue doesn't seem to be serious enough to block
+> them any longer.
+> 
+Ok, I will take care of the changes needed on highbank.  Do you have
+a branch with Mark's series and the EXPORT_SYMBOL() one applied,
+so that I can start my patch from there.
+
+Shawn
