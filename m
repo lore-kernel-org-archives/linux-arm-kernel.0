@@ -1,29 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jan 2013 20:18:17 +0000
-Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
-In-Reply-To: <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <201301282018.17714.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 28 Jan 2013 15:26:20 -0500
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <20130128182218.GB9436@obsidianresearch.com>
+References: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
+ <1359283223-23082-2-git-send-email-gmbnomis@gmail.com>
+ <510506F9.3070500@gmail.com>
+ <20130128182218.GB9436@obsidianresearch.com>
+Message-ID: <20130128202620.GM1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 January 2013, Thomas Petazzoni wrote:
-> From: Thierry Reding <thierry.reding@avionic-design.de>
+On Mon, Jan 28, 2013 at 11:22:18AM -0700, Jason Gunthorpe wrote:
+> On Sun, Jan 27, 2013 at 11:52:41AM +0100, Sebastian Hesselbarth wrote:
 > 
-> [Thomas Petazzoni:
->  - Simplify capabilities handling.
->  - Move to a separate file.
->  - Fix mask used when writing a 4 bytes value.]
+> > I agree that loosing the MAC address _is_ an issue but there must
+> > be another way to retain it during gated ge clocks than not gate the
+> > clocks at all.
+> > 
+> > I can think of some ways to retain it but don't know what is the most
+> > common with linux:
+> > - make u-boot pass it through cmdline and let mv643xx get it from there
+> > - have kirkwood's common code grab it before clk gates kick in
 > 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> The cannonical solution here is to have a DT attribute
+> 'local-mac-address' that is filled in by the bootloader rather than
+> attempting to pass the mac address to the kernel through the ethernet
+> controller registers.
+> 
+> Until the bootloaders are fixed a reasonable hack is to have the
+> platform startup code look for an all-zeros local-mac-address in the
+> DT and if found then copy the MAC from the ethernet registers into the
+> DT. Then the ethernet driver can safely be a module since the MAC is
+> captured in the DT.
+> 
+> I've been using this patch here on top of the original Ian Molton
+> patch.
+> 
+> Jason: Can you include something like this as well?
 
-Not even a description why this is needed?
+Seems reasonable.  Mind updating the binding docs?
 
-This patch (together with patch 8) seems like the most controversial
-one of the series, so you should better provide a really good reason
-why we would emulate something in software rather than using whatever
-hardware is there.
+I'd also like to confirm that legacy, factory-installed bootloaders are
+passing the mac addr via a special ATAG.  My cursory check of the
+current mainline u-boot code doesn't include it, but Marvell's version
+may have.
 
-	Arnd
+thx,
+
+Jason.
+
+> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> index 7048d7c..2b2cfcb 100644
+> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
+> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> @@ -2891,6 +2891,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+>  	struct mv643xx_eth_private *mp;
+>  	struct net_device *dev;
+>  	struct resource *res;
+> +	const u8 *mac;
+> +	int len;
+>  	int err;
+>  
+>  	if (pdev->dev.of_node) {
+> @@ -2912,6 +2914,10 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+>  		else
+>  			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
+>  
+> +		mac = of_get_property(pdev->dev.of_node, "local-mac-address", &len);
+> +		if (mac && len == 6)
+> +		    memcpy(pd->mac_addr, mac, sizeof pd->mac_addr);
+> +
+>  		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
+>  		if (np) {
+>  			pd->shared = of_find_device_by_node(np);
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
