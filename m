@@ -1,54 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 28 Jan 2013 08:25:23 +0000
-Subject: [PATCH 09/26] mfd: ab8500-debugfs: Provide a means for a user
- subscribe to IRQs
-In-Reply-To: <20130127235259.GO1174@sortiz-mobl>
-References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
- <1358254566-12419-10-git-send-email-lee.jones@linaro.org>
- <20130127235259.GO1174@sortiz-mobl>
-Message-ID: <20130128082523.GY15873@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 28 Jan 2013 16:32:01 +0800
+Subject: [PATCH] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+In-Reply-To: <7196597.b9sJl95POM@vostro.rjw.lan>
+References: <1359208550-16402-1-git-send-email-shawn.guo@linaro.org>
+ <7196597.b9sJl95POM@vostro.rjw.lan>
+Message-ID: <20130128083159.GD31689@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Jan 2013, Samuel Ortiz wrote:
-
-> Hi Lee,
+On Sat, Jan 26, 2013 at 11:21:27PM +0100, Rafael J. Wysocki wrote:
+> On Saturday, January 26, 2013 09:55:50 PM Shawn Guo wrote:
+> > As multiplatform build is being adopted by more and more ARM platforms,
+> > initcall function should be used very carefully.  For example, when
+> > GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
+> > will be called on all the platforms to initialize cpufreq-cpu0 driver.
+> > 
+> > To eliminate this undesired the effect, the patch changes cpufreq-cpu0
+> > driver to have it instantiated as a platform_driver.  Then it will only
+> > run on platforms that create the platform_device "cpufreq-cpu0".
+> > 
+> > Along with the change, it also changes cpu_dev to be &pdev->dev,
+> > so that managed functions can start working, and module build gets
+> > supported too.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > Rafael,
+> > 
+> > The patch depends patch "power: export opp cpufreq functions".
+> > https://patchwork.kernel.org/patch/1847261/
 > 
-> On Tue, Jan 15, 2013 at 12:55:49PM +0000, Lee Jones wrote:
-> > Allow users to subscribe to and view IRQ events live from debugfs.
-> I seem to remember that I got a similar patch some time ago for the same
-> purpose and my answer was: Please use a UIO driver for this. There already is
-> such driver, it's uio_pdrv_genirq. What your debugfs registration entry could
-> do is adding a platform device for the specific interrupt number. This would
-> avoid the irq handler registration and the sysfs entry creation, both things I
-> believe are not very elegant and open coded. It also gives you an IRQ count
-> implementation.
-> Ideally, the UIO framework could be improved to support IRQ ranges (through
-> IRQ domains) instead of the current single interrupt number.
+> That one should use EXPORT_SYMBOL_GPL() for exporting symbols, though.
 > 
-> Have you considered going through that path ?
+When commit 80126ce (PM / OPP: Export symbols for module usage.)
+already exported a few symbols with EXPORT_SYMBOL()?
 
-I haven't looked into re-writing any of the MFD stuff yet. Instead I
-have a plan of action:
+> Care to add a fixed version to the patch set along with the $subject one?
+> 
+> > AnilKumar,
+> > 
+> > Unfortunately, the change will require some platform level adoption
+> > to have cpufreq-cpu0 driver continue working for am33xx.  But it should
+> > be as simple as something like below.
+> > 
+> > 	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
+> > 	platform_device_register_full(&devinfo);
+> 
+> That should be included in your patch, then.
+> 
+Fair enough.  Will do.
 
-1. Upstream as many of the 100 patches from the internal kernel up
-into Mainline.
-
-2. Mark any patches which are unsuitable for Mainlining and re-work
-them after the remainder have been accepted. Not withstanding small
-fixups, as these can be done on the fly without too much disruption.
-
-3. Upstream the remainder once re-worked.
-
-If I don't follow this work-flow and fix-up/re-work as I go, not only
-will it take forever, but I'm also likely to encounter too many
-complications in the way of conflicts in the latter stages.
-
-I'm also following the same work-flow for 'drivers/power' and
-'drivers/regulator'.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Shawn
