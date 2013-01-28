@@ -1,43 +1,91 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 23:18:29 +0100
-Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
-In-Reply-To: <20130128220904.GA21446@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Jan 2013 15:21:45 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301282018.17714.arnd@arndb.de> <5106F5CB.8050304@wwwdotorg.org>
- <20130128220904.GA21446@obsidianresearch.com>
-Message-ID: <20130128231829.6b205c3c@skate>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5106F9F9.3010905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
-
-On Mon, 28 Jan 2013 15:09:04 -0700, Jason Gunthorpe wrote:
-
-> If Linux will discover properly (I strongly suspect it does) without
-> the host bridge, then I would say to ditch this...
+On 01/28/2013 11:56 AM, Thomas Petazzoni wrote:
+> This driver implements the support for the PCIe interfaces on the
+> Marvell Armada 370/XP ARM SoCs. In the future, it might be extended to
+> cover earlier families of Marvell SoCs, such as Dove, Orion and
+> Kirkwood.
 > 
-> The PCI-E standard requires a host bridge device, but if Linux doesn't
-> require it then there is no reason to emulate one.
+> The driver implements the hw_pci operations needed by the core ARM PCI
+> code to setup PCI devices and get their corresponding IRQs, and the
+> pci_ops operations that are used by the PCI core to read/write the
+> configuration space of PCI devices.
 > 
-> That would simplify the question of PCI IDs - for Marvell's case and
-> the sw root port bridge we can just copy the IDs from the bogus config
-> space of the HW.
+> Since the PCIe interfaces of Marvell SoCs are completely separate and
+> not linked together in a bus, this driver sets up an emulated PCI host
+> bridge, with one PCI-to-PCI bridge as child for each hardware PCIe
+> interface.
+> 
+> In addition, this driver enumerates the different PCIe slots, and for
+> those having a device plugged in, it sets up the necessary address
+> decoding windows, using the new armada_370_xp_alloc_pcie_window()
+> function from mach-mvebu/addr-map.c.
 
-Not sure what you mean in this last paragraph. In this second version,
-I really rely on the emulated PCI-to-PCI bridges for the resource
-allocation. I give the Linux PCI core a global range of addresses for
-memory regions and a global range of addresses for I/O regions, and
-then I let Linux do the allocation of ranges on a per bridge basis,
-depending on the devices detected downstream. And at the end, I use
-those allocated ranges to set up the address decoding windows.
+> diff --git a/Documentation/devicetree/bindings/pci/armada-370-xp-pcie.txt b/Documentation/devicetree/bindings/pci/armada-370-xp-pcie.txt
 
-This all comes from your suggestions during the review of the first
-revision of this patch set.
+> +Mandatory properties:
+> +- compatible: must be "marvell,armada-370-xp-pcie"
+> +- status: either "disabled" or "okay"
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+status is a standard DT property; I certainly wouldn't expect its
+presence to be mandatory (there's a defined default), nor would I expect
+each device's binding to redefine this property.
+
+> +In addition, the Device Tree node must have sub-nodes describing each
+> +PCIe interface, having the following mandatory properties:
+
+> +- marvell,pcie-port: the physical PCIe port number
+
+Should the standardized cell-index property be used here instead? Or,
+perhaps that property is deprecated/discouraged...
+
+> +- status: either "disabled" or "okay"
+
+Similar comment as above.
+
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+
+> +obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
+> +ccflags-$(CONFIG_PCI_MVEBU) += \
+> +	-I$(srctree)/arch/arm/plat-orion/include \
+> +	-I$(srctree)/arch/arm/mach-mvebu/include
+
+That seems a little dangerous w.r.t. multi-platform zImage. Can the
+required headers be moved out to somewhere more public to avoid this?
+
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+
+> +/*
+> + * Those are the product IDs used for the emulated PCI Host bridge and
+> + * emulated PCI-to-PCI bridges. They are temporary until we get
+> + * official IDs assigned.
+> + */
+> +#define MARVELL_EMULATED_HOST_BRIDGE_ID    4141
+> +#define MARVELL_EMULATED_PCI_PCI_BRIDGE_ID 4242
+
+I assume that means we can't merge this driver yet. The cover letter
+mentioned a desire to merge this for 3.9; there's not much time to get
+official IDs assigned, then.
+
+> +static int mvebu_pcie_init(void)
+> +{
+> +	return platform_driver_probe(&mvebu_pcie_driver,
+> +				     mvebu_pcie_probe);
+> +}
+> +
+> +subsys_initcall(mvebu_pcie_init);
+
+Why isn't that just platform_driver_register()?
+
+> +MODULE_LICENSE("GPL");
+
+"GPL v2".
