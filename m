@@ -1,104 +1,59 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Sat, 26 Jan 2013 16:56:57 +0100
-Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
-In-Reply-To: <CABuKBeJsHCq98Pe-BwPajbQ+2OLQpwrbtVTJe=j9thPDQCCBrg@mail.gmail.com>
-References: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
- <50C8AC3C.9020908@ti.com>
- <CABuKBeJsHCq98Pe-BwPajbQ+2OLQpwrbtVTJe=j9thPDQCCBrg@mail.gmail.com>
-Message-ID: <CAAwP0s01Jxh0f-T0sd5D980dZPcEV0J1KzjPbNHkrXLaKA3YUg@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 28 Jan 2013 13:53:11 +0100
+Subject: [GIT PULL v3] arm-soc: Xilinx zynq timer changes for v3.9
+In-Reply-To: <CAHTX3d+qeKPT3YYG3=YgWYN5YTS1oT9HoTEpVwC4GZAYve5uYw@mail.gmail.com>
+References: <CAHTX3d+qeKPT3YYG3=YgWYN5YTS1oT9HoTEpVwC4GZAYve5uYw@mail.gmail.com>
+Message-ID: <CAHTX3d+tDZF1-aKKfx+Zsb4FefrBbLaxe9qAz1Vsf3rDb-qHTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 4:16 PM, Matthias Brugger
-<matthias.bgg@gmail.com<javascript:;>>
-wrote:
-> Hi Benoit,
->
-> 2012/12/12 Benoit Cousson <b-cousson@ti.com <javascript:;>>:
->> Hi Matthias,
->>
->> On 12/12/2012 04:33 PM, Matthias Brugger wrote:
->>> This patch is a follow-up patch for Javier Martinez effort adding
-initial
->>> device tree support to IGEP technology devices. [1]
->>>
->>> It adds uart1 and uart2 bindings to the generic dtsi for the IGEP
-boards.
->>>
->>> [1] http://www.spinics.net/lists/linux-omap/msg83409.html
->>>
->>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com <javascript:;>>
->>> ---
->>>  arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
->>>  1 file changed, 24 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi
-b/arch/arm/boot/dts/omap3-igep.dtsi
->>> index 125fe00..c02e3c0 100644
->>> --- a/arch/arm/boot/dts/omap3-igep.dtsi
->>> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
->>> @@ -27,6 +27,20 @@
->>>  };
->>>
->>>  &omap3_pmx_core {
->>> +     uart1_pins: pinmux_uart1_pins {
->>> +             pinctrl-single,pins = <
->>> +                     0x152 0x100     /* uart1_rx.uart1_rx INPUT |
-MODE0 */
->>> +                     0x14c 0         /* uart1_tx.uart1_tx OUTPUT |
-MODE0 */
->>> +             >;
->>> +     };
->>> +
->>> +     uart2_pins: pinmux_uart2_pins {
->>> +             pinctrl-single,pins = <
->>> +                     0x14a 0x100     /* uart2_rx.uart2_rx INPUT |
-MODE0 */
->>> +                     0x148 0         /* uart2_tx.uart2_tx OUTPUT |
-MODE0 */
->>> +             >;
->>> +     };
->>> +
->>>       uart3_pins: pinmux_uart3_pins {
->>>               pinctrl-single,pins = <
->>>                       0x16e 0x100     /* uart3_rx.uart3_rx INPUT |
-MODE0 */
->>> @@ -77,6 +91,16 @@
->>>       status = "disabled";
->>>  };
->>>
->>> +&uart1 {
->>> +       pinctrl-names = "default";
->>> +       pinctrl-0 = <&uart1_pins>;
->>> +};
->>> +
->>> +&uart2 {
->>> +       pinctrl-names = "default";
->>> +       pinctrl-0 = <&uart2_pins>;
->>> +};
->>> +
->>>  &uart3 {
->>>         pinctrl-names = "default";
->>>         pinctrl-0 = <&uart3_pins>;
->>>
->>
->> That looks good to me. I'll apply it on top of javier's series for 3.9.
->
-> Can you pin-point me to the repository where this patches are in right
-> now? I tried to figure it out these days, but didn't found where to
-> clone the repository from.
->
-> Thanks,
-> Matthias
->
+Hi Olof,
 
-Hi Matthias,
+based on your previous email I am sending updated pull request which is based
+on arm-soc depends/cleanup branch.
+As I wrote in my email I tend to keep there Soren's patch around
+renaming PSS to PS
+and be more strict on this for future.
+I have also added one more patch which fix Rob's conversion to irqchip_init.
 
-OMAP DT tree is: git://
-git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+btw: As I mentioned in the previous email I want to add 2 defconfig
+updates + maintainer
+fragment. I have created branch zynq/misc in the same repo. Is this
+name ok for you?
+If yes, I will send you separate pull request just for this branch.
 
-Hope it helps,
-Javier
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130126/50b9097a/attachment-0001.html>
+Thanks,
+Michal
+
+The following changes since commit f8060f5446b1f2782f0a8ca9be2d870ea4198aee:
+  Olof Johansson (1):
+        Merge tag 'gic-vic-to-irqchip' of
+git://sources.calxeda.com/kernel/linux into next/cleanup
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git zynq/timer
+
+Michal Simek (1):
+      arm: zynq: Add missing irqchip.h to common.c
+
+Soren Brinkmann (7):
+      arm: zynq: timer: Replace PSS through PS
+      arm: zynq: timer: Remove unnecessary register write
+      arm: zynq: timer: Remove unused #defines
+      arm: zynq: timer: Align columns
+      arm: zynq: timer: Remove redundant #includes
+      arm: zynq: timer: Fix comment style
+      arm: zynq: timer: Set clock_event cpumask
+
+ arch/arm/mach-zynq/common.c |    3 +-
+ arch/arm/mach-zynq/common.h |    2 +-
+ arch/arm/mach-zynq/timer.c  |  150 ++++++++++++++++++++----------------------
+ 3 files changed, 74 insertions(+), 81 deletions(-)
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
