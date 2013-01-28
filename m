@@ -1,99 +1,42 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 19:56:14 +0100
-Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+Date: Mon, 28 Jan 2013 19:56:15 +0100
+Subject: [PATCH v2 06/27] lib: devres: don't enclose pcim_*() functions in
+ CONFIG_HAS_IOPORT
 In-Reply-To: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1359399397-29729-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1359399397-29729-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI specifications says that an I/O region must be aligned on a 4
-KB boundary, and a memory region aligned on a 1 MB boundary.
-
-However, the Marvell PCIe interfaces rely on address decoding windows
-(which allow to associate a range of physical addresses with a given
-device). For PCIe memory windows, those windows are defined with a 1
-MB granularity (which matches the PCI specs), but PCIe I/O windows can
-only be defined with a 64 KB granularity, so they have to be 64 KB
-aligned. We therefore need to tell the PCI core about this special
-alignement requirement.
-
-The PCI core already calls pcibios_align_resource() in the ARM PCI
-core, specifically for such purposes. So this patch extends the ARM
-PCI core so that it calls a ->align_resource() hook registered by the
-PCI driver, exactly like the existing ->map_irq() and ->swizzle()
-hooks.
-
-A particular PCI driver can register a align_resource() hook, and do
-its own specific alignement, depending on the specific constraints of
-the underlying hardware.
+The pcim_*() functions are used by the libata-sff subsystem, and this
+subsystem is used for many SATA drivers on ARM platforms that do not
+necessarily have I/O ports.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+Cc: Jesse Barnes <jbarnes@virtuousgeek.org>
+Cc: Yinghai Lu <yinghai@kernel.org>
+Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/include/asm/mach/pci.h |   11 +++++++++++
- arch/arm/kernel/bios32.c        |    6 ++++++
- 2 files changed, 17 insertions(+)
+ lib/devres.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 5cf2e97..7d2c3c8 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -30,6 +30,11 @@ struct hw_pci {
- 	void		(*postinit)(void);
- 	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
- 	int		(*map_irq)(const struct pci_dev *dev, u8 slot, u8 pin);
-+	resource_size_t (*align_resource)(struct pci_dev *dev,
-+					  const struct resource *res,
-+					  resource_size_t start,
-+					  resource_size_t size,
-+					  resource_size_t align);
- };
- 
- /*
-@@ -51,6 +56,12 @@ struct pci_sys_data {
- 	u8		(*swizzle)(struct pci_dev *, u8 *);
- 					/* IRQ mapping				*/
- 	int		(*map_irq)(const struct pci_dev *, u8, u8);
-+					/* Resource alignement requirements	*/
-+	resource_size_t (*align_resource)(struct pci_dev *dev,
-+					  const struct resource *res,
-+					  resource_size_t start,
-+					  resource_size_t size,
-+					  resource_size_t align);
- 	void		*private_data;	/* platform controller private data	*/
- };
- 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 5401645..be2e6c9 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -462,6 +462,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
- 		sys->busnr   = busnr;
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
-+		sys->align_resource = hw->align_resource;
- 		INIT_LIST_HEAD(&sys->resources);
- 
- 		if (hw->private_data)
-@@ -574,6 +575,8 @@ char * __init pcibios_setup(char *str)
- resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 				resource_size_t size, resource_size_t align)
- {
-+	struct pci_dev *dev = data;
-+	struct pci_sys_data *sys = dev->sysdata;
- 	resource_size_t start = res->start;
- 
- 	if (res->flags & IORESOURCE_IO && start & 0x300)
-@@ -581,6 +584,9 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 
- 	start = (start + align - 1) & ~(align - 1);
- 
-+	if (sys->align_resource)
-+		return sys->align_resource(dev, res, start, size, align);
-+
- 	return start;
+diff --git a/lib/devres.c b/lib/devres.c
+index 80b9c76..5639c3e 100644
+--- a/lib/devres.c
++++ b/lib/devres.c
+@@ -195,6 +195,7 @@ void devm_ioport_unmap(struct device *dev, void __iomem *addr)
+ 			       devm_ioport_map_match, (void *)addr));
  }
+ EXPORT_SYMBOL(devm_ioport_unmap);
++#endif /* CONFIG_HAS_IOPORT */
  
+ #ifdef CONFIG_PCI
+ /*
+@@ -400,4 +401,3 @@ void pcim_iounmap_regions(struct pci_dev *pdev, int mask)
+ }
+ EXPORT_SYMBOL(pcim_iounmap_regions);
+ #endif /* CONFIG_PCI */
+-#endif /* CONFIG_HAS_IOPORT */
 -- 
 1.7.9.5
