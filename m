@@ -1,55 +1,133 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 28 Jan 2013 11:57:39 +0100
-Subject: [PATCH v2 1/3] pwm: Add pwm_cansleep() as exported API to users
-In-Reply-To: <20130128095754.GA23134@avionic-0098.adnet.avionic-design.de>
-References: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
- <1359121471-21457-2-git-send-email-florian.vaussard@epfl.ch>
- <20130126054024.GB29243@avionic-0098.adnet.avionic-design.de>
- <51063AB5.2060108@ti.com> <51064687.5090605@epfl.ch>
- <20130128095754.GA23134@avionic-0098.adnet.avionic-design.de>
-Message-ID: <510659A3.7070906@epfl.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 28 Jan 2013 10:59:33 +0000
+Subject: [PATCH 12/15] ARM: mach-shmobile: sh73a0: Allow initialisation
+ of GIC by DT
+In-Reply-To: <20130128004819.GE3423@verge.net.au>
+References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
+ <1359086133-23357-13-git-send-email-horms+renesas@verge.net.au>
+ <20130125102210.GJ3075@e106331-lin.cambridge.arm.com>
+ <20130128004819.GE3423@verge.net.au>
+Message-ID: <20130128105933.GC7754@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/01/2013 10:57, Thierry Reding a ?crit :
-> On Mon, Jan 28, 2013 at 10:36:07AM +0100, Florian Vaussard wrote:
->> Hello,
->>
->> Le 28/01/2013 09:45, Peter Ujfalusi a ?crit :
->>> hi Thierry,
->>>
->>> On 01/26/2013 06:40 AM, Thierry Reding wrote:
-> [...]
->>>>> +{
->>>>> +	return pwm->chip->can_sleep;
->>>>> +}
->>>>> +EXPORT_SYMBOL_GPL(pwm_cansleep);
->>>>
->>>> Would it make sense to check for NULL pointers here? I guess that
->>>> passing NULL into the function could be considered a programming error
->>>> and an oops would be okay, but in that case there's no point in making
->>>> the function return an int. Also see my next comment.
->>>
->>> While it is unlikely to happen it is better to be safe, something like this
->>> will do:
->>>
->>> return pwm ? pwm->chip->can_sleep : 0;
->>>
->>
->> Ok. And what about:
->>
->> BUG_ON(pwm == NULL);
->> return pwm->chip->can_sleep;
->
-> I don't think we need that. In case pwm == NULL, dereferencing it will
-> oops anyway. So either we make it safe and return an error code, or we
-> let it oops without explicit BUG_ON().
->
+On Mon, Jan 28, 2013 at 12:48:19AM +0000, Simon Horman wrote:
+> On Fri, Jan 25, 2013 at 10:22:10AM +0000, Mark Rutland wrote:
+> > On Fri, Jan 25, 2013 at 03:55:30AM +0000, Simon Horman wrote:
+> > > This allows the GIC interrupt controller of the sh73a0 SoC to be
+> > > initialised using a flattened device tree blob.
+> > > 
+> > > It does not allow the INTC interrupt controller which is also present on
+> > > the sh73a0 SoC to be enabled via device tree.  Nor does it handle sharing
+> > > of interrupts between the GIC and INTC interrupt controllers.
+> > > 
+> > > This limits the usefulness of this code to applications which only wish to
+> > > access devices which use interrupts that can be handled by the GIC
+> > > interrupt controller. Other applications should, for now, continue using
+> > > non-device tree initialisation of the sh72a0 interrupt controllers.
+> > > 
+> > > Includes update to use irqchip_init() by Thierry Reding
+> > > 
+> > > Cc: Thierry Reding <thierry.reding@avionic-design.de>
+> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > ---
+> > >  arch/arm/boot/dts/sh73a0.dtsi                |   33 ++++++++++++++++++++++++++
+> > >  arch/arm/mach-shmobile/include/mach/common.h |    1 +
+> > >  arch/arm/mach-shmobile/intc-sh73a0.c         |    9 +++++++
+> > >  3 files changed, 43 insertions(+)
+> > >  create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
+> > > 
+> > > diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+> > > new file mode 100644
+> > > index 0000000..7dae1f4
+> > > --- /dev/null
+> > > +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> > > @@ -0,0 +1,33 @@
+> > > +/*
+> > > + * Device Tree Source for the SH73A0 SoC
+> > > + *
+> > > + * Copyright (C) 2012 Renesas Solutions Corp.
+> > > + *
+> > > + * This file is licensed under the terms of the GNU General Public License
+> > > + * version 2.  This program is licensed "as is" without any warranty of any
+> > > + * kind, whether express or implied.
+> > > + */
+> > > +
+> > > +/include/ "skeleton.dtsi"
+> > > +
+> > > +/ {
+> > > +	compatible = "renesas,sh73a0";
+> > > +
+> > > +	cpus {
+> > > +		cpu at 0 {
+> > > +			compatible = "arm,cortex-a9";
+> > > +		};
+> > > +		cpu at 1 {
+> > > +			compatible = "arm,cortex-a9";
+> > > +		};
+> > 
+> > I replied to v1, not realising you'd posted a v2:
+> > 
+> > It would be good to have the reg and device_type properties set here for the
+> > logical map.
+> 
+> Thanks.
+> 
+> I'd prefer to handle this as an incremental patch to be applied after the
+> pull-request in which the patch above appears. The patch below is what
+> I have in mind.
 
-Calling this function with a NULL pointer is a programming error, so there
-is no error codes for such errors. I propose to return bool, and let it
-oops if such case happens.
+Sure. The patch looks right to me :)
 
-Regards,
+> 
+> I also believe that the following files seem to be targets for a similar
+> change. The latter two are for UP boards, could you comment on if reg
+> and device_type are appropriate for them too.
+> 
+> arch/arm/boot/dts/emev2.dtsi
 
-Florian
+Yup, this one should have reg and device_type added.
+
+> arch/arm/boot/dts/r8a7740.dtsi
+> arch/arm/boot/dts/sh7372.dtsi
+
+I'm not sure what the deal is with v7 UP hardware. For v6 and below, the lack
+of an MPIDR means there's nothing to describe. On v7 we should have an MPIDR
+with Aff fields at least, so there is something to describe (even if we don't
+use this currently). I don't believe this would cause any problems, and it
+would make the dts look consistent.
+
+I've Cc'd Lorenzo in case he has any thoughts on the matter.
+
+> 
+> 
+> From: Simon Horman <horms+renesas@verge.net.au>
+> 
+> ARM: mach-shmobile: sh73a0:  Add reg and device_type properties to cpus
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+> index 721f486..f202298 100644
+> --- a/arch/arm/boot/dts/sh73a0.dtsi
+> +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> @@ -15,10 +15,14 @@
+>  
+>  	cpus {
+>  		cpu at 0 {
+> +			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+> +			reg = <0>;
+>  		};
+>  		cpu at 1 {
+> +			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+> +			reg = <1>;
+>  		};
+>  	};
+>  
+> 
+
+Thanks,
+Mark.
