@@ -1,61 +1,80 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 28 Jan 2013 13:04:24 -0500 (EST)
-Subject: [PATCH v3 0/3] introduce static_vm for ARM-specific static mapped
- area
-In-Reply-To: <20130128175106.GI23470@mudshark.cambridge.arm.com>
-References: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
- <20130128175106.GI23470@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1301281300250.6300@xanadu.home>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 28 Jan 2013 11:07:16 -0700
+Subject: [RFC V2 PATCH 0/8] ARM: kirkwood: cleanup DT conversion
+In-Reply-To: <20130128104008.GA5170@localhost>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <cover.1359091286.git.jason@lakedaemon.net>
+ <201301251115.47480.arnd@arndb.de>
+ <20130125125214.GI1758@titan.lakedaemon.net>
+ <CABJ1b_QaTBLgGASTs2yi435jR=LepN-iY97xTLXAu1hZw69Wuw@mail.gmail.com>
+ <20130125183407.GC7393@obsidianresearch.com>
+ <20130128104008.GA5170@localhost>
+Message-ID: <20130128180716.GA9436@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Jan 2013, Will Deacon wrote:
-
-> Hello,
+> >         // MBUS Decoder window for NAND
+> >         nand at f4000000 {
+> >                 #address-cells = <1>;
+> >                 #size-cells = <1>;
+> >                 compatible = "simple-bus", "marvell,orion-mbus";
+> > 		mbus-target = 0xXXXXX;
+> >                 ranges = <0 0xf4000000 0x10000>;
+> > 
+> >                 nand at 0 {
+> >                         cle = <0>;
+> >                         ale = <1>;
+> >                         bank-width = <1>;
+> >                         chip-delay = <50>;
+> >                         compatible = "marvell,orion-nand";
+> >                         reg = <0x0 0x400>;
+> >                 };
+> >         };
+> > 
 > 
-> On Thu, Jan 24, 2013 at 01:28:51AM +0000, Joonsoo Kim wrote:
-> > In current implementation, we used ARM-specific flag, that is,
-> > VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
-> > The purpose of static mapped area is to re-use static mapped area when
-> > entire physical address range of the ioremap request can be covered
-> > by this area.
-> > 
-> > This implementation causes needless overhead for some cases.
-> > For example, assume that there is only one static mapped area and
-> > vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
-> > deciding whether it is matched or not. Moreover, even if there is
-> > no static mapped area and vmlist has 300 areas, every time we call
-> > ioremap, we check 300 areas in now.
-> > 
-> > If we construct a extra list for static mapped area, we can eliminate
-> > above mentioned overhead.
-> > With a extra list, if there is one static mapped area,
-> > we just check only one area and proceed next operation quickly.
-> > 
-> > In fact, it is not a critical problem, because ioremap is not frequently
-> > used. But reducing overhead is better idea.
-> > 
-> > Another reason for doing this work is for removing vm_struct list management,
-> > entirely. For more information, look at the following link.
-> > http://lkml.org/lkml/2012/12/6/184
+> This is a nice idea.
 > 
-> First patch looks good (removing the unused vmregion stuff) but I'm not so
-> sure about the rest of it. If you really care about ioremap performance,
-> perhaps it would be better to have a container struct around the vm_struct
-> for static mappings and then stick them in an augmented rbtree so you can
-> efficiently find the mapping encompassing a particular physical address?
+> I have a few questions, though.
+> 
+> 1. Are you sure we should use "ranges" property?
+> In this case it's not an address translation but rather
+> and address window configuration.
 
-How can ioremap performance be a problem is the question I had since the 
-beginning.
+Yes, you'd use ranges with an identity transation. The purpose is so
+that child OF blocks are all relative to the start of the decode
+region. This way changing the address of the HW block behind the mbus
+window is simply done by changing the ranges property.
 
-Firstly, ioremap is _not_ meant to be used in performance critical 
-paths.
+Note the reg on the nand is starting at offset 0, so ranges will
+translate that to 0xf4000000. Similar for the internal regs.
 
-Secondly, there shouldn't be _that_ many entries on the vmlist such as 
-300.  That sounds a bit excessive.
+> I would think we could add a new "windows" property to reflect
+> address window configuration.
 
-So please, can we discuss the reasons that motivated those patches in 
-the first place?  Maybe that's where the actual problem is.
+My arrangement above would have each "marvell,orion-mbus" specify the
+mbus-target, which I imagined to be all the HW specific bits (target,
+attributes, etc). The addr-map driver would select a window for this
+bus and then assign those bits to it.
 
+> 2. Also, If we use "ranges" property. How would that work?
+> By reading the property in the addr-map driver or
+> by somehow improving on of_bus to include this new kind of busses?
 
-Nicolas
+The addr-map driver would have to read it, I believe the rules of how
+busses work make this fairly simple:
+
+1) very early on the addr-map driver would have to scan the OF tree,
+   find the address of the mbus mapping registers, and the internal
+   register map.
+2) Verify the mbus window for the internal registers matches the DT
+   This is just a sanity check, if the correct value doesn't come back
+   then the DT doesnt match what the bootloader setup, and some
+   jtag accessible diagnostic can be printed...
+3) Wipe all the mbus windows
+4) Register a "marvell,orion-mbus" bus handler somehow
+5) When OF processes the DT it would call the bus handler for each
+   "marvell,orion-mbus" which should parse the ranges, allocate
+   a free window, program that window then instantiate the child
+   devices.
+
+Jason
