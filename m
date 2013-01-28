@@ -1,68 +1,86 @@
-From: vipulkumar.samar@st.com (vipul kumar samar)
-Date: Mon, 28 Jan 2013 16:52:36 +0530
-Subject: [PATCH 00/13] ARM: spear multiplatform support
-In-Reply-To: <1359156956-32404-1-git-send-email-arnd@arndb.de>
-References: <1359156956-32404-1-git-send-email-arnd@arndb.de>
-Message-ID: <51065F7C.3030407@st.com>
+From: highguy@gmail.com (Stijn Devriendt)
+Date: Mon, 28 Jan 2013 12:27:36 +0100
+Subject: [PATCH 6/6 v14] gpio: Add block gpio to several gpio drivers
+In-Reply-To: <5105303E.5050007@antcom.de>
+References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
+ <1358856404-8975-7-git-send-email-stigge@antcom.de>
+ <CAOY=C6H5xETt5UNXUfRkGW9q+bj0y2R3sXNvW87XXvQcYoL_-g@mail.gmail.com>
+ <510126E7.5090802@antcom.de>
+ <CAOY=C6F0ExS1gtmA=4QMzXUMRjAH5o7K9KDwTjdU-dYHA1fF=g@mail.gmail.com>
+ <5105303E.5050007@antcom.de>
+Message-ID: <CAOY=C6E-SXM-FL+Y7zrmidHG4+6pgCnZ4APcn8kYj5TnAaqVAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Sun, Jan 27, 2013 at 2:48 PM, Roland Stigge <stigge@antcom.de> wrote:
+> On 27/01/13 13:18, Stijn Devriendt wrote:
+>>>> In my patch, I go out of the way of this kind of thing for a simple reason:
+>>>> You may generate incorrect timing by doing this.
+>>>
+>>> You are right, certain things like synchronous on+off is not really
+>>> possible.
+>>>
+>>> However, the above at least supports switching on simulaneously, and
+>>> switching off simultaneously, which is an improvement in certain cases
+>>> (and this certain hardware part doesn't support more). Maybe this
+>>> certain driver behaviour can be documented even better than just in the
+>>> driver source.
+>>>
+>>
+>> The question here is: do you expect a user of the block-GPIO API to
+>> go look into the base-driver code to see what will be supported?
+>>
+>> In my version of the patch this means:
+>> - do not provide a single GPIO-block that crosses multiple base-drivers
+>> - only provide gpio_block_get/set for GPIO drivers that support the complete
+>> operation in a single go. (for example, in the above example there would be
+>> no gpio_block_set() function)
+>>
+>> Perhaps the best approach is to make this explicit: Allow drivers to expose
+>> their capabilities wrt timing and allow users to request strict-timing or
+>> loose-timing. Loose-timing allows multiple gpio-drivers to be combined and
+>> allows drivers with separate set/clear, hi/lo registers to be used.
+>
+> Interesting idea. However, it will be difficult to agree on good metrics
+> here. As Mark Brown pointed out, even when hardware seems to support
+> "simultaneousness" by registers, this doesn't actually mean that voltage
+> levels are switched simultaneously wrt. sub-nanosecond timing.
+>
+> Also, it depends on further wiring between the actually supported GPIO
+> hardware chip and the integrated device's I/O connections.
+>
+> Resulting in scenarios where GPIO chips (in terms of Linux drivers)
+> without explicit I/O set registers (e.g., set/clear regs) could be "more
+> simultaneous" than those having explicit I/O regs but hardware wiring
+> leading to bad "simultaneousness" behaviour.
+>
+> Questionable if the kernel could address those details.
+>
 
-On 1/26/2013 5:05 AM, Arnd Bergmann wrote:
-> This is a series I did some time ago but forgot to
-> send out earlier. I'd like to get this into v3.9,
-> so please give this a test if you can.
+True, but does the kernel _need_ to address that? If this is fixed at the
+kernel level, at least the kernel is not the cause of the effect.
+Strict-timing could mean as much as "the kernel will do everything it can
+(int this case impose limits) to make sure timings are strict - actual
+results may
+depend on your H/W".
+It allows graceful degradation at the driver level (e.g. fallback to requesting
+separate pins and toggling them in the right order - or calling the request
+function again with loose-timing + dev_warn(... "things may break!") )
 
-Me and bhavna tried to test this patch set on spear1340 and 
-spear320-hmi. We applied your patch set on the latest kernel v3.8-rc5 
-and in both case (1340 and 320-hmi) we observe that the kernel load 
-address is changed form 0x8000 to 0xfffffff2.
+OTOH, is it worth it? There may be extra work involved when doing the latter.
+Usage of block GPIO for things like emulating busses will need testing anyway.
 
----------------------------------------------------------------
-Legacy Image at E6080000:
-    Image Name:   Linux-3.8.0-rc5-00013-g35c416f
-    Image Type:   ARM Linux Kernel Image (uncompressed)
-    Data Size:    2144560 Bytes = 2 MiB
-    Load Address: fffffff2
-    Entry Point:  fffffff2
-    Verifying Checksum ... OK
----------------------------------------------------------------
+>> Of course, for a first version you may as well leave it out. Perhaps the
+>> use-cases for cross-GPIO-driver blocks are not worth the extra complexity
+>> as of today?
+>
+> I actually started the current block gpio patches to support this kind
+> of use case. :-)
 
-Previously it was like:
+Right, our use-cases were less advanced... ;)
 
----------------------------------------------------------------
-Legacy Image at E6080000:
-    Image Name:   Linux-3.5.0-lsp-3.3.1-spear13xx
-    Image Type:   ARM Linux Kernel Image (uncompressed)
-    Data Size:    3060704 Bytes = 2.9 MiB
-    Load Address: 00008000
-    Entry Point:  00008000
-    Verifying Checksum ... O
----------------------------------------------------------------
+Regards,
+Stijn
 
-And thats why it is giving following crash:
-
----------------------------------------------------------------
-u-boot> bootm 0xe6080000 - 0xe6070000
-## Booting kernel from Legacy Image at e6080000 ...
-    Image Name:   Linux-3.8.0-rc5-00013-g35c416f
-    Image Type:   ARM Linux Kernel Image (uncompressed)
-    Data Size:    2144560 Bytes = 2 MiB
-    Load Address: fffffff2
-    Entry Point:  fffffff2
-    Verifying Checksum ... OK
-## Flattened Device Tree blob at e6070000
-    Booting using the fdt blob at 0xe6070000
-    Loading Kernel Image ... data abort
-pc : [<3ff94608>]          lr : [<3ff69ef4>]
-sp : 3fe65aa8  ip : 00000000     fp : 00000000
-r10: e6080040  r9 : e628b970     r8 : 3fe65f58
-r7 : e6080000  r6 : 00000000     r5 : 3fe65b10  r4 : 00000000
-r3 : fffffff2  r2 : 0000000d     r1 : e6080040  r0 : fffffff2
-Flags: nzCv  IRQs off  FIQs off  Mode SVC_32
-Resetting CPU ..
----------------------------------------------------------------
-
-Regards
-Vipul Samar
+>
+> Roland
