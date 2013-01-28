@@ -1,37 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Jan 2013 13:37:16 +0000
-Subject: [PATCH 00/13] ARM: spear multiplatform support
-In-Reply-To: <51065F7C.3030407@st.com>
-References: <1359156956-32404-1-git-send-email-arnd@arndb.de>
- <51065F7C.3030407@st.com>
-Message-ID: <201301281337.16951.arnd@arndb.de>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Mon, 28 Jan 2013 07:44:13 -0600
+Subject: [PATCH 3/4 v11] arm highbank: add support for pl320 IPC
+In-Reply-To: <1457500.uzVh9cxXhS@vostro.rjw.lan>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1359143205-20279-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1359143205-20279-4-git-send-email-mark.langsdorf@calxeda.com>
+ <1457500.uzVh9cxXhS@vostro.rjw.lan>
+Message-ID: <510680AD.2070908@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 January 2013, vipul kumar samar wrote:
-> Hello Arnd,
+On 01/28/2013 06:49 AM, Rafael J. Wysocki wrote:
+
+>> +int pl320_ipc_register_notifier(struct notifier_block *nb)
+>> +{
+>> +	return atomic_notifier_chain_register(&ipc_notifier, nb);
+>> +}
+>> +EXPORT_SYMBOL(pl320_ipc_register_notifier);
+>> +
+>> +int pl320_ipc_unregister_notifier(struct notifier_block *nb)
+>> +{
+>> +	return atomic_notifier_chain_unregister(&ipc_notifier, nb);
+>> +}
+>> +EXPORT_SYMBOL(pl320_ipc_unregister_notifier);
 > 
-> On 1/26/2013 5:05 AM, Arnd Bergmann wrote:
-> > This is a series I did some time ago but forgot to
-> > send out earlier. I'd like to get this into v3.9,
-> > so please give this a test if you can.
+> I need all of your symbols to be exported with EXPORT_SYMBOL_GPL().
 > 
-> Me and bhavna tried to test this patch set on spear1340 and 
-> spear320-hmi. We applied your patch set on the latest kernel v3.8-rc5 
-> and in both case (1340 and 320-hmi) we observe that the kernel load 
-> address is changed form 0x8000 to 0xfffffff2.
+> Is it OK to make that change when applying the patch or do you want to send
+> a new one?
 
-Hi Vipul and Bhavna,
+I probably should resend so I can include the drivers level Kconfig and
+Makefile.
 
-Thanks for testing out the patches. I forgot about the loadaddress,
-which indeed does not get set for multiplatform kernels, because
-the kernel does not know the correct address when it depends on
-the platform you are booting on.
+I'll get that out this morning.
 
-The recommended solution for this is to boot a normal 'vmlinux'
-or 'zImage' file rather than a uImage file. If you u-boot version
-is too old for that and you cannot update, you can manually
-call 'mkimage' to create a uImage file with the correct load
-address.
-
-	Arnd
+--Mark Langsdorf
+Calxeda, Inc.
