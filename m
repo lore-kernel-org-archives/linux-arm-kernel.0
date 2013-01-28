@@ -1,40 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Jan 2013 15:27:19 -0700
-Subject: [PATCH v2 11/27] clk: mvebu: create parent-child relation for
- PCIe clocks on Armada 370
-In-Reply-To: <20130128232150.53b56e62@skate>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 28 Jan 2013 23:30:48 +0100
+Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
+In-Reply-To: <20130128222348.GA21628@obsidianresearch.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-12-git-send-email-thomas.petazzoni@free-electrons.com>
- <5106F6EE.4000101@wwwdotorg.org> <20130128232150.53b56e62@skate>
-Message-ID: <5106FB47.9000508@wwwdotorg.org>
+ <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301282018.17714.arnd@arndb.de> <5106F5CB.8050304@wwwdotorg.org>
+ <20130128220904.GA21446@obsidianresearch.com>
+ <20130128231829.6b205c3c@skate>
+ <20130128222348.GA21628@obsidianresearch.com>
+Message-ID: <20130128233048.2ab6a6d2@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 03:21 PM, Thomas Petazzoni wrote:
-> Dear Stephen Warren,
-> 
-> On Mon, 28 Jan 2013 15:08:46 -0700, Stephen Warren wrote:
-> 
->> I must admit, I know nothing about struct mvebu_soc_descr, but I'm
->> having a hard time seeing how that code change makes one of those clock
->> a parent of the other, since the pex0 entry doesn't reference anything
->> "pex1"-related, nor vice-versa. Is more explanation in the commit
->> message warranted here?
-> 
-> See the definition of mvebu_soc_descr:
-> 
-> struct mvebu_soc_descr {
->         const char *name;
->         const char *parent;
->         int bit_idx;
-> };
-> 
-> It simply registers the pex0 clock with the pex0_en clock as its
-> parents. Those clocks are normal gatable clocks, registered with
-> clk_register_gate(). This ensures that whenever the pex0 clock is
-> enabled, its parent clock pex0_en gets enabled as well.
+Dear Jason Gunthorpe,
 
-Oh I see; I was confused by the patch description. The two clocks being
-made child/parent are the two clocks for a port, and this relationship
-is set up for each port; for some reason I thought there was a
-requirement to make one port's clock a child of the other port's clock.
+On Mon, 28 Jan 2013 15:23:48 -0700, Jason Gunthorpe wrote:
+
+> I'm refering to your earlier question about what PCI IDs to use for
+> the SW emulated devices. If there is no need for the host bridge then
+> you only need 1 PCI ID (for the root port bridge) and you can probably
+> fairly safely re-use the one in the Marvell config space of the HW.
+
+Ah, ok, I see. But isn't a host bridge needed to bind all the
+PCI-to-PCI bridges under a single bus, in order to get the global
+resource assignment I was referring to?
+
+Regarding the PCI IDs, I have started to work with Marvell to see what
+is possible. I, unfortunately, haven't received the answer for now.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
