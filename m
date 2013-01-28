@@ -1,38 +1,46 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 28 Jan 2013 12:50:44 +0530
-Subject: [PATCH] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
-In-Reply-To: <20130128070206.GB31689@S2101-09.ap.freescale.net>
-References: <1359208550-16402-1-git-send-email-shawn.guo@linaro.org>
- <CAOh2x=kCKbxX6ThzEty0F-MxxhsRMhh8++Nc7BqBaXNfaozoJw@mail.gmail.com>
- <20130128070206.GB31689@S2101-09.ap.freescale.net>
-Message-ID: <CAKohponYt7RPh=4u22LJhjBWeDbw0MScpYCAyj5fiZqDKjsdvQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 28 Jan 2013 07:24:30 +0000 (UTC)
+Subject: [PATCH v2 1/4] ARM: OMAP2+: dpll: round rate to closest value
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA9388C@DBDE01.ent.ti.com>
+References: <cover.1358937533.git.afzal@ti.com>
+ <871e6890897534b6c3669e252f23bef5ff1247b6.1358937533.git.afzal@ti.com>
+ <alpine.DEB.2.00.1301250816010.471@utopia.booyaka.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9388C@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1301280721390.23108@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2013 12:32, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Jan 28, 2013 at 09:42:29AM +0530, Viresh Kumar wrote:
->> >         struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
->> >         platform_device_register_full(&devinfo);
->>
->> Something similar was being discussed with Andrew (cc'd) on his patch
->> for kikwood cpufreq driver.
->>
->> We shouldn't encourage addition of above as we are moving towards DT.
->
-> Moving towards DT does not really mean that we should never register
-> platform_device from platform code.  DT is designed to present physical
-> devices, while what I'm adding here is somewhat a virtual one.  I'm
-> just using the platform_device/platform_driver mechanism to instantiate
-> the driver on particular platform.
->
->> So, i would except an compatible array too in your patch and then driver
->> can be probed based on compatible string being present in cpu node.
->
-> I believe device tree maintainer already stated that we should not
-> have node/compatible for cpuidle/cpufreq such stuff in DT merely for
-> asking DT core to create platform_device for them.
+Hi
 
-I see. I am really not sure if the alternative of DT node (i.e. platform_device)
-is good enough.
+On Fri, 25 Jan 2013, Mohammed, Afzal wrote:
 
-@Arnd: What do you say?
+> On Fri, Jan 25, 2013 at 13:48:11, Paul Walmsley wrote:
+> > On Wed, 23 Jan 2013, Afzal Mohammed wrote:
+> 
+> > > Currently round rate function would return proper rate iff requested
+> > > rate exactly matches the PLL lockable rate. This causes set_rate to
+> > > fail if exact rate could not be set. Instead round rate may return
+> > > closest rate possible (less than the requested). And if any user is
+> > > badly in need of exact rate, then return value of round rate could
+> > > be used to decide whether to invoke set rate or not.
+> > > 
+> > > Modify round rate so that it return closest possible rate.
+> > 
+> > This doesn't look like the right approach to me.  For some PLLs, an exact 
+> > rate is desired.
+> 
+> If exact rate is required, there is a way to achieve it as mentioned
+> in the commit message, i.e. by first invoking round rate over reqd. rate
+> and if it doesn't match, bail out w/o invoking set_rate.
+> 
+> And it seems requirement of CCF w.r.t to round rate is to return closest
+> possible rate.
+
+Hmm.  Maybe I need to take a closer look.  I'm a little worried that, 
+since __clk_round_rate() can be called from omap3_noncore_dpll_set_rate(), 
+we might wind up with inconsistent behavior.  Effectively we'd need to 
+mandate that clk_round_rate() would have to be called first for any DPLL 
+where we'd expect to set an exact rate.
+
+
+- Paul
