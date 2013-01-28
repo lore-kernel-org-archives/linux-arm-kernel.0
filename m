@@ -1,73 +1,42 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 28 Jan 2013 13:04:34 +0000
-Subject: [PATCH 5/6] ARM: dts: Add basic dts include files for Samsung
- S3C64xx SoCs
-In-Reply-To: <20130128090240.GA7754@e106331-lin.cambridge.arm.com>
-References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
- <20130114150531.GE21142@e102568-lin.cambridge.arm.com>
- <20130116105957.GA1963@linaro.org> <3747315.IyCCRDXgbD@flatron>
- <016c01cdfb30$64f80430$2ee80c90$@samsung.com>
- <20130128090240.GA7754@e106331-lin.cambridge.arm.com>
-Message-ID: <20130128130434.GB2027@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 28 Jan 2013 21:13:15 +0800
+Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
+In-Reply-To: <1359131057.32148.9.camel@linux-builds1>
+References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
+ <1359075633-13502-5-git-send-email-dinguyen@altera.com>
+ <20130125154955.GD10055@amd.pavel.ucw.cz>
+ <1359131057.32148.9.camel@linux-builds1>
+Message-ID: <20130128131312.GB20238@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 09:02:40AM +0000, Mark Rutland wrote:
-> On Fri, Jan 25, 2013 at 07:15:48PM +0000, Kukjin Kim wrote:
-> > Tomasz Figa wrote:
+On Fri, Jan 25, 2013 at 10:24:17AM -0600, Dinh Nguyen wrote:
+> Hi Pavel,
+> On Fri, 2013-01-25 at 16:49 +0100, Pavel Machek wrote:
+> > Hi!
 > > 
-> > [...]
+> > > mach-socfpga is another platform that needs to use
+> > > v7_invalidate_l1 to bringup additional cores. There was a comment that
+> > > the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
 > > 
-> > > > Well, the number of CPU types does not grow rapidly.  It will be much
-> > > > less than one per SoC -- so keeping the list up to date shouldn't be
-> > > > that much effort.
-> > > >
-> > > > For ARM1176JZF-S, it could make sense for the comatible list to be
-> > > >
-> > > > 	"arm,arm1176jzf-s", "arm,arm1176"
-> > > >
-> > > > ...since the differences between 1176 variants are software probeable
-> > > > (i.e., whether there is an FPU or not).  AFAIK the J, Z apply to all
-> > > > ARM1176, and the -S (synthesisable RTL) is nothing to do with software.
-> > > > The kernel probably only really needs to know "arm,arm1176".
-> > > 
-> > > OK. So the conclusion is that I should change the cpus node to following:
-> > > 
-> > >        cpus {
-> > >                cpu {
+> > If there are three copies of code, with fourth one needed for next
+> > platform, moving it into common code makes sense.
 > > 
-> > cpu at 0 { ?
+> > But... The code was not identical before the merge. Are you sure that
+> > the differences do not hurt? At the very least, it should be mentioned
+> > in the changelog.
 > 
-> As the CPU has no MPIDR, and thus doesn't have a reg property, there's no reason
-> to have a unit address. Just "cpu" should be fine.
+> Indeed, the addition of 
 > 
-> > 
-> > >                        compatible = "arm,arm1176jzf-s", "arm,arm1176";
-> > >                };
-> > >        };
-> > > 
-> > > Am I right?
-> > > 
-> > I think so :-)
-> > 
-> > - Kukjin
-> > 
+> mcr     p15, 0, r0, c7, c5, 0   @ invalidate I cache
 > 
-> As Dave pointed out, the "jzf-s" portion might be superfluous. It's worth
-> having the "arm,arm1176", though.
+This becomes unnecessary since commit 612539e (ARM: 7296/1: proc-v7.S:
+remove HARVARD_CACHE preprocessor guards) gets in.
 
-I think we should always have a fully-qualified part name as the first
-compatible entry, following general devicetree policy.  It's better to
-have this and not need it than to discover later that we want it and
-incompatibly backport it in.
+Shawn
 
-Before deciding, do we follow a consistent policy for other CPUs, such
-as arm1136?
-
-
-The issues there are similar: the only software-visible difference between
-arm1136j-s and arm1136jf-s should be the absence/presence of VFP, and it
-looks like the code in vfpmodule.c should be able to probe it.
-
-Cheers
----Dave
+> was done by commit # 5b2acf384c8a8707d32a98106192ee7187e4446d
+> 
+> This adds invalidate I-Cache as well as D-Cache, which I think should be
+> ok for most platforms. 
+> 
