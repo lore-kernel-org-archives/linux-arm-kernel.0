@@ -1,83 +1,66 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 19:56:11 +0100
-Subject: [PATCH v2 02/27] of/pci: Add of_pci_get_devfn() function
+Date: Mon, 28 Jan 2013 19:56:12 +0100
+Subject: [PATCH v2 03/27] of/pci: Add of_pci_parse_bus_range() function
 In-Reply-To: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1359399397-29729-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1359399397-29729-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <thierry.reding@avionic-design.de>
 
-This function can be used to parse the device and function number from a
-standard 5-cell PCI resource. PCI_SLOT() and PCI_FUNC() can be used on
-the returned value obtain the device and function numbers respectively.
+This function can be used to parse a bus-range property as specified by
+device nodes representing PCI bridges.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/of/of_pci.c    |   32 ++++++++++++++++++++++++++++----
+ drivers/of/of_pci.c    |   25 +++++++++++++++++++++++++
  include/linux/of_pci.h |    1 +
- 2 files changed, 29 insertions(+), 4 deletions(-)
+ 2 files changed, 26 insertions(+)
 
 diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 13e37e2..0dd52df 100644
+index 0dd52df..3ea0e84 100644
 --- a/drivers/of/of_pci.c
 +++ b/drivers/of/of_pci.c
-@@ -7,12 +7,13 @@
- static inline int __of_pci_pci_compare(struct device_node *node,
- 				       unsigned int devfn)
- {
--	unsigned int size;
--	const __be32 *reg = of_get_property(node, "reg", &size);
-+	int err;
- 
--	if (!reg || size < 5 * sizeof(__be32))
-+	err = of_pci_get_devfn(node);
-+	if (err < 0)
- 		return 0;
--	return ((be32_to_cpup(&reg[0]) >> 8) & 0xff) == devfn;
-+
-+	return devfn == err;
+@@ -64,3 +64,28 @@ int of_pci_get_devfn(struct device_node *np)
+ 	return (be32_to_cpup(reg) >> 8) & 0xff;
  }
- 
- struct device_node *of_pci_find_child_device(struct device_node *parent,
-@@ -40,3 +41,26 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- 	return NULL;
- }
- EXPORT_SYMBOL_GPL(of_pci_find_child_device);
+ EXPORT_SYMBOL_GPL(of_pci_get_devfn);
 +
 +/**
-+ * of_pci_get_devfn() - Get device and function numbers for a device node
-+ * @np: device node
++ * of_pci_parse_bus_range() - parse the bus-range property of a PCI device
++ * @node: device node
++ * @res: address to a struct resource to return the bus-range
 + *
-+ * Parses a standard 5-cell PCI resource and returns an 8-bit value that can
-+ * be passed to the PCI_SLOT() and PCI_FUNC() macros to extract the device
-+ * and function numbers respectively. On error a negative error code is
-+ * returned.
++ * Returns 0 on success or a negative error-code on failure.
 + */
-+int of_pci_get_devfn(struct device_node *np)
++int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
 +{
-+	unsigned int size;
-+	const __be32 *reg;
++	const __be32 *values;
++	int len;
 +
-+	reg = of_get_property(np, "reg", &size);
-+
-+	if (!reg || size < 5 * sizeof(__be32))
++	values = of_get_property(node, "bus-range", &len);
++	if (!values || len < sizeof(*values) * 2)
 +		return -EINVAL;
 +
-+	return (be32_to_cpup(reg) >> 8) & 0xff;
++	res->name = node->name;
++	res->start = be32_to_cpup(values++);
++	res->end = be32_to_cpup(values);
++	res->flags = IORESOURCE_BUS;
++
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(of_pci_get_devfn);
++EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
 diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index bb115de..91ec484 100644
+index 91ec484..7a04826 100644
 --- a/include/linux/of_pci.h
 +++ b/include/linux/of_pci.h
-@@ -10,5 +10,6 @@ int of_irq_map_pci(const struct pci_dev *pdev, struct of_irq *out_irq);
- struct device_node;
+@@ -11,5 +11,6 @@ struct device_node;
  struct device_node *of_pci_find_child_device(struct device_node *parent,
  					     unsigned int devfn);
-+int of_pci_get_devfn(struct device_node *np);
+ int of_pci_get_devfn(struct device_node *np);
++int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
  
  #endif
 -- 
