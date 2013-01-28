@@ -1,32 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 28 Jan 2013 08:49:12 +0000
-Subject: [PATCH 10/26] mfd: ab8500-debugfs: Wake-up device on debugfs IRQ
-In-Reply-To: <20130127235309.GP1174@sortiz-mobl>
-References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
- <1358254566-12419-11-git-send-email-lee.jones@linaro.org>
- <20130127235309.GP1174@sortiz-mobl>
-Message-ID: <20130128084912.GF15873@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 28 Jan 2013 09:02:40 +0000
+Subject: [PATCH 5/6] ARM: dts: Add basic dts include files for Samsung
+ S3C64xx SoCs
+In-Reply-To: <016c01cdfb30$64f80430$2ee80c90$@samsung.com>
+References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
+ <20130114150531.GE21142@e102568-lin.cambridge.arm.com>
+ <20130116105957.GA1963@linaro.org> <3747315.IyCCRDXgbD@flatron>
+ <016c01cdfb30$64f80430$2ee80c90$@samsung.com>
+Message-ID: <20130128090240.GA7754@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Jan 2013, Samuel Ortiz wrote:
-
-> Hi Lee,
+On Fri, Jan 25, 2013 at 07:15:48PM +0000, Kukjin Kim wrote:
+> Tomasz Figa wrote:
 > 
-> On Tue, Jan 15, 2013 at 12:55:50PM +0000, Lee Jones wrote:
-> > Ensure the device wakes up if the debugfs IRQ fires if we're
-> > in suspend mode.
+> [...]
+> 
+> > > Well, the number of CPU types does not grow rapidly.  It will be much
+> > > less than one per SoC -- so keeping the list up to date shouldn't be
+> > > that much effort.
+> > >
+> > > For ARM1176JZF-S, it could make sense for the comatible list to be
+> > >
+> > > 	"arm,arm1176jzf-s", "arm,arm1176"
+> > >
+> > > ...since the differences between 1176 variants are software probeable
+> > > (i.e., whether there is an FPU or not).  AFAIK the J, Z apply to all
+> > > ARM1176, and the -S (synthesisable RTL) is nothing to do with software.
+> > > The kernel probably only really needs to know "arm,arm1176".
 > > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/mfd/ab8500-debugfs.c |    3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> Please squash this one with the previous one.
+> > OK. So the conclusion is that I should change the cpus node to following:
+> > 
+> >        cpus {
+> >                cpu {
+> 
+> cpu at 0 { ?
 
-I'll fixup.
+As the CPU has no MPIDR, and thus doesn't have a reg property, there's no reason
+to have a unit address. Just "cpu" should be fine.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> >                        compatible = "arm,arm1176jzf-s", "arm,arm1176";
+> >                };
+> >        };
+> > 
+> > Am I right?
+> > 
+> I think so :-)
+> 
+> - Kukjin
+> 
+
+As Dave pointed out, the "jzf-s" portion might be superfluous. It's worth
+having the "arm,arm1176", though.
+
+Thanks,
+Mark.
