@@ -1,48 +1,40 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 28 Jan 2013 14:25:10 -0800
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
-Message-ID: <20130128142510.68092e10.akpm@linux-foundation.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Jan 2013 15:27:19 -0700
+Subject: [PATCH v2 11/27] clk: mvebu: create parent-child relation for
+ PCIe clocks on Armada 370
+In-Reply-To: <20130128232150.53b56e62@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-12-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5106F6EE.4000101@wwwdotorg.org> <20130128232150.53b56e62@skate>
+Message-ID: <5106FB47.9000508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Jan 2013 14:50:43 +0900
-Kyungsik Lee <kyungsik.lee@lge.com> wrote:
+On 01/28/2013 03:21 PM, Thomas Petazzoni wrote:
+> Dear Stephen Warren,
+> 
+> On Mon, 28 Jan 2013 15:08:46 -0700, Stephen Warren wrote:
+> 
+>> I must admit, I know nothing about struct mvebu_soc_descr, but I'm
+>> having a hard time seeing how that code change makes one of those clock
+>> a parent of the other, since the pex0 entry doesn't reference anything
+>> "pex1"-related, nor vice-versa. Is more explanation in the commit
+>> message warranted here?
+> 
+> See the definition of mvebu_soc_descr:
+> 
+> struct mvebu_soc_descr {
+>         const char *name;
+>         const char *parent;
+>         int bit_idx;
+> };
+> 
+> It simply registers the pex0 clock with the pex0_en clock as its
+> parents. Those clocks are normal gatable clocks, registered with
+> clk_register_gate(). This ensures that whenever the pex0 clock is
+> enabled, its parent clock pex0_en gets enabled as well.
 
-> This patchset is for supporting LZ4 compressed kernel and initial ramdisk on
-> the x86 and ARM architectures.
-> 
-> According to http://code.google.com/p/lz4/, LZ4 is a very fast lossless
-> compression algorithm and also features an extremely fast decoder.
-> 
-> Kernel Decompression APIs are based on implementation by Yann Collet
-> (http://code.google.com/p/lz4/source/checkout).
-> De/compression Tools are also provided from the site above.
-> 
-> The initial test result on ARM(v7) based board shows that the size of kernel
-> with LZ4 compressed is 8% bigger than LZO compressed  but the decompressing
-> speed is faster(especially under the enabled unaligned memory access).
-> 
-> Test: 3.4 based kernel built with many modules
-> Uncompressed kernel size: 13MB
-> lzo: 6.3MB, 301ms
-> lz4: 6.8MB, 251ms(167ms, with enabled unaligned memory access)
-> 
-> It seems that it___s worth trying LZ4 compressed kernel image or ramdisk 
-> for making the kernel boot more faster.
->
-> ...
->
->  20 files changed, 663 insertions(+), 3 deletions(-)
->
-> ...
->
-
-What's this "with enabled unaligned memory access" thing?  You mean "if
-the arch supports CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS"?  If so,
-that's only x86, which isn't really in the target market for this
-patch, yes?
-
-It's a lot of code for a 50ms boot-time improvement.  Does anyone have
-any opinions on whether or not the benefits are worth the cost?
+Oh I see; I was confused by the patch description. The two clocks being
+made child/parent are the two clocks for a port, and this relationship
+is set up for each port; for some reason I thought there was a
+requirement to make one port's clock a child of the other port's clock.
