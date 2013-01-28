@@ -1,58 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 28 Jan 2013 09:02:40 +0000
-Subject: [PATCH 5/6] ARM: dts: Add basic dts include files for Samsung
- S3C64xx SoCs
-In-Reply-To: <016c01cdfb30$64f80430$2ee80c90$@samsung.com>
-References: <1358039458-31960-1-git-send-email-tomasz.figa@gmail.com>
- <20130114150531.GE21142@e102568-lin.cambridge.arm.com>
- <20130116105957.GA1963@linaro.org> <3747315.IyCCRDXgbD@flatron>
- <016c01cdfb30$64f80430$2ee80c90$@samsung.com>
-Message-ID: <20130128090240.GA7754@e106331-lin.cambridge.arm.com>
+From: lliubbo@gmail.com (Bob Liu)
+Date: Mon, 28 Jan 2013 17:09:34 +0800
+Subject: [PATCH v5 31/45] blackfin/smp: Use get/put_online_cpus_atomic()
+ to prevent CPU offline
+In-Reply-To: <20130122074123.13822.39102.stgit@srivatsabhat.in.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122074123.13822.39102.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <CAA_GA1fSLNKSDTGSzHoA+j-mur85BvoSRkARq+DMfORuwrrX4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 07:15:48PM +0000, Kukjin Kim wrote:
-> Tomasz Figa wrote:
-> 
-> [...]
-> 
-> > > Well, the number of CPU types does not grow rapidly.  It will be much
-> > > less than one per SoC -- so keeping the list up to date shouldn't be
-> > > that much effort.
-> > >
-> > > For ARM1176JZF-S, it could make sense for the comatible list to be
-> > >
-> > > 	"arm,arm1176jzf-s", "arm,arm1176"
-> > >
-> > > ...since the differences between 1176 variants are software probeable
-> > > (i.e., whether there is an FPU or not).  AFAIK the J, Z apply to all
-> > > ARM1176, and the -S (synthesisable RTL) is nothing to do with software.
-> > > The kernel probably only really needs to know "arm,arm1176".
-> > 
-> > OK. So the conclusion is that I should change the cpus node to following:
-> > 
-> >        cpus {
-> >                cpu {
-> 
-> cpu at 0 { ?
+On Tue, Jan 22, 2013 at 3:41 PM, Srivatsa S. Bhat
+<srivatsa.bhat@linux.vnet.ibm.com> wrote:
+> Once stop_machine() is gone from the CPU offline path, we won't be able to
+> depend on preempt_disable() or local_irq_disable() to prevent CPUs from
+> going offline from under us.
+>
+> Use the get/put_online_cpus_atomic() APIs to prevent CPUs from going offline,
+> while invoking from atomic context.
+>
+> Cc: Mike Frysinger <vapier@gentoo.org>
+> Cc: Bob Liu <lliubbo@gmail.com>
+> Cc: Steven Miao <realmz6@gmail.com>
+> Cc: uclinux-dist-devel at blackfin.uclinux.org
+> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 
-As the CPU has no MPIDR, and thus doesn't have a reg property, there's no reason
-to have a unit address. Just "cpu" should be fine.
+Thanks, will be applied to my blackfin arch tree.
 
-> 
-> >                        compatible = "arm,arm1176jzf-s", "arm,arm1176";
-> >                };
-> >        };
-> > 
-> > Am I right?
-> > 
-> I think so :-)
-> 
-> - Kukjin
-> 
+> ---
+>
+>  arch/blackfin/mach-common/smp.c |    6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/blackfin/mach-common/smp.c b/arch/blackfin/mach-common/smp.c
+> index bb61ae4..6cc6d7a 100644
+> --- a/arch/blackfin/mach-common/smp.c
+> +++ b/arch/blackfin/mach-common/smp.c
+> @@ -194,6 +194,7 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
+>         struct ipi_data *bfin_ipi_data;
+>         unsigned long flags;
+>
+> +       get_online_cpus_atomic();
+>         local_irq_save(flags);
+>         smp_mb();
+>         for_each_cpu(cpu, cpumask) {
+> @@ -205,6 +206,7 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
+>         }
+>
+>         local_irq_restore(flags);
+> +       put_online_cpus_atomic();
+>  }
+>
+>  void arch_send_call_function_single_ipi(int cpu)
+> @@ -238,13 +240,13 @@ void smp_send_stop(void)
+>  {
+>         cpumask_t callmap;
+>
+> -       preempt_disable();
+> +       get_online_cpus_atomic();
+>         cpumask_copy(&callmap, cpu_online_mask);
+>         cpumask_clear_cpu(smp_processor_id(), &callmap);
+>         if (!cpumask_empty(&callmap))
+>                 send_ipi(&callmap, BFIN_IPI_CPU_STOP);
+>
+> -       preempt_enable();
+> +       put_online_cpus_atomic();
+>
+>         return;
+>  }
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-As Dave pointed out, the "jzf-s" portion might be superfluous. It's worth
-having the "arm,arm1176", though.
-
-Thanks,
-Mark.
+-- 
+Regards,
+--Bob
