@@ -1,77 +1,46 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 28 Jan 2013 12:50:23 +0000
-Subject: [PATCH 19/19] [INCOMPLETE] ARM: make return_address available
- for ARM_UNWIND
-In-Reply-To: <CA+KhAHYJus7+LsVhNa4RcxfpeTBtV=_vf2YDACtoMujo5c6tXA@mail.gmail.com>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <1359132254.21576.230.camel@gandalf.local.home>
- <20130125165934.GE2069@linaro.org>
- <201301260045.28804.arnd@arndb.de>
- <CA+KhAHYJus7+LsVhNa4RcxfpeTBtV=_vf2YDACtoMujo5c6tXA@mail.gmail.com>
-Message-ID: <20130128125023.GA2027@linaro.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 28 Jan 2013 13:55:43 +0100
+Subject: [PATCH] ARM: OMAP: hwmod_reset: Include errno.h to fix compilation
+ error
+Message-ID: <1359377743-30663-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 11:33:11AM +0900, Keun-O Park wrote:
-> Hello guys,
-> 
-> Could you please review the patch of fixing bug first of returning
-> wrong address when using frame pointer?
-> I am wondering if the first patch is not delivered to the mailing.
+Without the errno.h:
+  CC      arch/arm/mach-omap2/omap_hwmod_reset.o
+arch/arm/mach-omap2/omap_hwmod_reset.c: In function ?omap_hwmod_aess_preprogram?:
+arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: error: ?EINVAL? undeclared (first use in this function)
+arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: note: each undeclared identifier is reported only once for each function it appears in
+make[1]: *** [arch/arm/mach-omap2/omap_hwmod_reset.o] Error 1
 
-I posted a similar patch to alkml a couple of months ago, but I got
-no response and it looks like I forgot about it.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+Hi Paul,
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129381.html
+I could not find the patches from Sebastien's series:
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82971.html
 
-[...]
+But AFAIK you have taken them for 3.9.
 
-> 
-> ~~~~~~~~~~~~~~~~~~~~~snip~~~~~~~~~~~~~~~~~~~~~~~~~
-> From 3a60b536d22a2043d735c890a9aac9e7cb72de8f Mon Sep 17 00:00:00 2001
-> From: sahara <keun-o.park@windriver.com>
-> Date: Thu, 3 Jan 2013 17:12:37 +0900
-> Subject: [PATCH 1/2] arm: fix returning wrong CALLER_ADDRx
-> 
-> This makes return_address return correct value for ftrace feature.
-> unwind_frame does not update frame->lr but frame->pc for backtrace.
-> And, the initialization for data.addr was missing so that wrong value
-> returned when unwind_frame failed.
-> 
-> Signed-off-by: sahara <keun-o.park@windriver.com>
-> ---
->  arch/arm/kernel/return_address.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-> index 8085417..fafedd8 100644
-> --- a/arch/arm/kernel/return_address.c
-> +++ b/arch/arm/kernel/return_address.c
-> @@ -26,7 +26,7 @@ static int save_return_addr(struct stackframe *frame, void *d)
->         struct return_address_data *data = d;
-> 
->         if (!data->level) {
-> -               data->addr = (void *)frame->lr;
-> +               data->addr = (void *)frame->pc;
-> 
->                 return 1;
->         } else {
-> @@ -41,7 +41,8 @@ void *return_address(unsigned int level)
->         struct stackframe frame;
->         register unsigned long current_sp asm ("sp");
-> 
-> -       data.level = level + 1;
-> +       data.level = level + 2;
-> +       data.addr = NULL;
+This patch is on top of it to fix compilation error.
 
-Can you explain why this is needed?  I think I concluded it wasn't
-necessary, but you may be right -- I think if walk_stackframe()
-fails to unwind the next frame just after data.level reaches zero,
-then data.addr can remain unset and return_address() may return
-uninitialised garbage.
+Regards,
+Peter
 
-Initialising data.addr to NULL before we start seems a good way
-to avoid that.
+ arch/arm/mach-omap2/omap_hwmod_reset.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Cheers
----Dave
+diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
+index bba43fa..65e186c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_reset.c
++++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
+@@ -24,6 +24,7 @@
+  * 02110-1301 USA
+  */
+ #include <linux/kernel.h>
++#include <linux/errno.h>
+ 
+ #include <sound/aess.h>
+ 
+-- 
+1.8.1.1
