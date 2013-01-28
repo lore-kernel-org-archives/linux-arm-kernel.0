@@ -1,55 +1,62 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 28 Jan 2013 11:35:12 -0600
-Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <5106B4FD.4030108@wwwdotorg.org>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-5-git-send-email-dinguyen@altera.com>
- <51020D20.60505@wwwdotorg.org> <20130128104552.GB6073@amd.pavel.ucw.cz>
- <5106B4FD.4030108@wwwdotorg.org>
-Message-ID: <1359394512.17735.43.camel@linux-builds1>
+From: vikram186@gmail.com (Vikram Narayanan)
+Date: Mon, 28 Jan 2013 23:09:58 +0530
+Subject: i.Mx6Quad - eth0: tx queue full!
+Message-ID: <5106B7EE.3040603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Running the latest head <linux-2.6.git> on an i.Mx6Quad based platform
+gives me the below error when flooded with ping requests.
 
-On Mon, 2013-01-28 at 10:27 -0700, Stephen Warren wrote:
-> On 01/28/2013 03:45 AM, Pavel Machek wrote:
-> > On Thu 2013-01-24 20:42:08, Stephen Warren wrote:
-> >> On 01/24/2013 05:00 PM, dinguyen at altera.com wrote:
-> >>> From: Dinh Nguyen <dinguyen@altera.com>
-> >>>
-> >>> mach-socfpga is another platform that needs to use
-> >>> v7_invalidate_l1 to bringup additional cores. There was a comment that
-> >>> the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
-> >>
-> >>> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-> >>
-> >>> -ENTRY(v7_invalidate_l1)
-> >>> -        mov     r0, #0
-> >>
-> >> Unfortunately, there's a patch in the Tegra tree for 3.9 that moves that
-> >> function from headsmp.S to reset-handler.S, so this patch will conflict.
-> >> How do you want to handle that?
-> > 
-> > Drop the patch from Tegra tree and merge this one there? Having three
-> > copies of code is not nice to start with, no matter where it is...
-> 
-> Well, I guess for other reasons rebasing the Tegra tree is useful for a
-> few dependencies, so I'll drop that part of the patch which moves
-> v7_invalidate_l1() from one file to another, so there shouldn't be any
-> conflicts, and you can feel free to take this series through whatever
-> tree you want.
-> 
-> I haven't tested this patch yet though, to see whether the slight
-> differences in the code in your patch mentioned in the other sub-thread
-> affect Tegra at all. Hopefully I can test this later today.
+== Start log ==
+[ 2555.004031] ------------[ cut here ]------------
+[ 2555.009740] WARNING: at net/sched/sch_generic.c:254 dev_watchdog+0x298/0x2b8()
+[ 2555.018721] NETDEV WATCHDOG: eth0 (fec): transmit queue 0 timed out
+[ 2555.026733] Modules linked in:
+[ 2555.030598] Backtrace:
+[ 2555.034252] [<800119c8>] (dump_backtrace+0x0/0x10c) from [<803b8494>] (dump_stack+0x18/0x1c)
+[ 2555.044438]  r6:000000fe r5:80302f64 r4:80503dd0 r3:80510e80
+[ 2555.052019] [<803b847c>] (dump_stack+0x0/0x1c) from [<8001df08>] (warn_slowpath_common+0x54/0x6c)
+[ 2555.062679] [<8001deb4>] (warn_slowpath_common+0x0/0x6c) from [<8001dfc4>] (warn_slowpath_fmt+0x38/0x40)
+[ 2555.073936]  r8:8052ebf1 r7:805040c0 r6:00000000 r5:8f9771d4 r4:8f977000
+r3:00000009
+[ 2555.084816] [<8001df8c>] (warn_slowpath_fmt+0x0/0x40) from [<80302f64>] (dev_watchdog+0x298/0x2b8)
+[ 2555.095535]  r3:8f977000 r2:8049f6d4
+[ 2555.099868] [<80302ccc>] (dev_watchdog+0x0/0x2b8) from [<8002acf8>] (call_timer_fn.isra.33+0x2c/0x8c)
+[ 2555.110794] [<8002accc>] (call_timer_fn.isra.33+0x0/0x8c) from [<8002af48>] (run_timer_softirq+0x1f0/0x204)
+[ 2555.122240]  r7:80571114 r6:805040c0 r5:00000000 r4:80570900
+[ 2555.129894] [<8002ad58>] (run_timer_softirq+0x0/0x204) from [<80025750>] (__do_softirq+0xc8/0x180)
+[ 2555.140599] [<80025688>] (__do_softirq+0x0/0x180) from [<80025b40>] (irq_exit+0x88/0x90)
+[ 2555.150492] [<80025ab8>] (irq_exit+0x0/0x90) from [<8000ec58>] (handle_IRQ+0x44/0x98)
+[ 2555.160112]  r4:804ffde0 r3:00000220
+[ 2555.164848] [<8000ec14>] (handle_IRQ+0x0/0x98) from [<80008540>] (gic_handle_irq+0x30/0x64)
+[ 2555.174956]  r6:80503f28 r5:8050a518 r4:f400010c r3:00000000
+[ 2555.182694] [<80008510>] (gic_handle_irq+0x0/0x64) from [<8000df80>] (__irq_svc+0x40/0x50)
+[ 2555.192737] Exception stack(0x80503f28 to 0x80503f70)
+[ 2555.198639] 3f20:                   8052f150 a0000093 00000000 00000000 80502000 8052ed08
+[ 2555.208600] 3f40: 8050a4f4 803bfaec 8050df00 412fc09a 80502000 80503f7c 80503f80 80503f70
+[ 2555.218584] 3f60: 8000eee4 8000eee8 60000013 ffffffff
+[ 2555.224730]  r7:80503f5c r6:ffffffff r5:60000013 r4:8000eee8
+[ 2555.232292] [<8000eeb8>] (default_idle+0x0/0x38) from [<8000f0d8>] (cpu_idle+0xcc/0x114)
+[ 2555.242204] [<8000f00c>] (cpu_idle+0x0/0x114) from [<803b3718>] (rest_init+0x64/0x7c)
+[ 2555.251858] [<803b36b4>] (rest_init+0x0/0x7c) from [<804cc7dc>] (start_kernel+0x258/0x298)
+[ 2555.261963] [<804cc584>] (start_kernel+0x0/0x298) from [<10008078>] (0x10008078)
+[ 2555.271167] ---[ end trace 3d2ffb53e6fe41f3 ]---
+[ 2555.277270] eth0: tx queue full!.
+[ 2555.288776] eth0: tx queue full!.
+[ 2555.293594] eth0: tx queue full!.
+[ 2555.297944] eth0: tx queue full!.
+[ 2555.302229] eth0: tx queue full!.
 
-Shawn Guo mentioned that the instruction to invalidate I-Cache is
-unnecessary becauce of this commit: 612539e (ARM: 7296/1: proc-v7.S:
-remove HARVARD_CACHE preprocessor guards)
+...... continues indefinitely and needs a reboot to recover the system.
+== End log ==
 
-So I'll send v2 without the extra instruction.
+i.Mx6Quad's MAC is connected to SMSC LAN88730 PHY via an MII interface.
+
+I found a similar thread [1], but that solution didn't work for me.
+Any ideas on why the fec driver is unhappy?
 
 Thanks,
-Dinh
-> 
+Vikram
+
+[1] https://community.freescale.com/thread/281457
