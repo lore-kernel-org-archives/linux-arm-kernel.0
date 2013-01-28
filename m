@@ -1,201 +1,142 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 28 Jan 2013 13:30:02 +0200
-Subject: [PATCH 01/30] USB: EHCI: split ehci-omap out to a separate driver
+Date: Mon, 28 Jan 2013 13:30:04 +0200
+Subject: [PATCH v2 03/30] usb: phy: nop: Manage PHY clock
 In-Reply-To: <1359372631-8180-1-git-send-email-rogerq@ti.com>
 References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
-Message-ID: <1359372631-8180-2-git-send-email-rogerq@ti.com>
+Message-ID: <1359372631-8180-4-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alan Stern <stern@rowland.harvard.edu>
+If the PHY has a clock associated to it then manage the clock.
+We just enable the clock in .init() and disable it in .shutdown().
 
-This patch (as1645) converts ehci-omap over to the new "ehci-hcd is a
-library" approach, so that it can coexist peacefully with other EHCI
-platform drivers and can make use of the private area allocated at
-the end of struct ehci_hcd.
+Add clk_rate parameter in platform data and configure the
+clock rate during probe if supplied.
 
-Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/usb/host/Kconfig     |    2 +-
- drivers/usb/host/Makefile    |    1 +
- drivers/usb/host/ehci-hcd.c  |    6 +---
- drivers/usb/host/ehci-omap.c |   76 +++++++++++++++++++-----------------------
- 4 files changed, 37 insertions(+), 48 deletions(-)
+ drivers/usb/otg/nop-usb-xceiv.c   |   54 ++++++++++++++++++++++++++++++++++++-
+ include/linux/usb/nop-usb-xceiv.h |    1 +
+ 2 files changed, 54 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 3a21c5d..11e102e 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -155,7 +155,7 @@ config USB_EHCI_MXC
- 	  Variation of ARC USB block used in some Freescale chips.
- 
- config USB_EHCI_HCD_OMAP
--	bool "EHCI support for OMAP3 and later chips"
-+	tristate "EHCI support for OMAP3 and later chips"
- 	depends on USB_EHCI_HCD && ARCH_OMAP
- 	default y
- 	---help---
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 001fbff..56de410 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -27,6 +27,7 @@ obj-$(CONFIG_USB_EHCI_HCD)	+= ehci-hcd.o
- obj-$(CONFIG_USB_EHCI_PCI)	+= ehci-pci.o
- obj-$(CONFIG_USB_EHCI_HCD_PLATFORM)	+= ehci-platform.o
- obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
-+obj-$(CONFIG_USB_EHCI_HCD_OMAP)	+= ehci-omap.o
- 
- obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
- obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 09537b2..5a35246 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1251,11 +1251,6 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		ehci_hcd_sh_driver
- #endif
- 
--#ifdef CONFIG_USB_EHCI_HCD_OMAP
--#include "ehci-omap.c"
--#define        PLATFORM_DRIVER         ehci_hcd_omap_driver
--#endif
--
- #ifdef CONFIG_PPC_PS3
- #include "ehci-ps3.c"
- #define	PS3_SYSTEM_BUS_DRIVER	ps3_ehci_driver
-@@ -1345,6 +1340,7 @@ MODULE_LICENSE ("GPL");
- 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_PLATFORM) && \
- 	!IS_ENABLED(CONFIG_USB_CHIPIDEA_HOST) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_MXC) && \
-+	!IS_ENABLED(CONFIG_USB_EHCI_HCD_OMAP) && \
- 	!defined(PLATFORM_DRIVER) && \
- 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
- 	!defined(OF_PLATFORM_DRIVER) && \
-diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index b96a4bf..30fc482 100644
---- a/drivers/usb/host/ehci-omap.c
-+++ b/drivers/usb/host/ehci-omap.c
-@@ -36,6 +36,9 @@
-  *	- convert to use hwmod and runtime PM
-  */
- 
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
- #include <linux/platform_device.h>
+diff --git a/drivers/usb/otg/nop-usb-xceiv.c b/drivers/usb/otg/nop-usb-xceiv.c
+index 7ffb0c8..849eb9d 100644
+--- a/drivers/usb/otg/nop-usb-xceiv.c
++++ b/drivers/usb/otg/nop-usb-xceiv.c
+@@ -32,10 +32,12 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/nop-usb-xceiv.h>
  #include <linux/slab.h>
- #include <linux/usb/ulpi.h>
-@@ -43,6 +46,10 @@
- #include <linux/pm_runtime.h>
- #include <linux/gpio.h>
- #include <linux/clk.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+
-+#include "ehci.h"
++#include <linux/clk.h>
  
- #include <linux/platform_data/usb-omap.h>
- 
-@@ -57,9 +64,11 @@
- #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
- #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
- 
--/*-------------------------------------------------------------------------*/
-+#define DRIVER_DESC "OMAP-EHCI Host Controller driver"
- 
--static const struct hc_driver ehci_omap_hc_driver;
-+static const char hcd_name[] = "ehci-omap";
-+
-+/*-------------------------------------------------------------------------*/
- 
- 
- static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
-@@ -166,6 +175,12 @@ static void disable_put_regulator(
- /* configure so an HC device and id are always provided */
- /* always called with process context; sleeping is OK */
- 
-+static struct hc_driver __read_mostly ehci_omap_hc_driver;
-+
-+static const struct ehci_driver_overrides ehci_omap_overrides __initdata = {
-+	.reset =		omap_ehci_init,
-+};
-+
- /**
-  * ehci_hcd_omap_probe - initialize TI-based HCDs
-  *
-@@ -315,56 +330,33 @@ static struct platform_driver ehci_hcd_omap_driver = {
- 	/*.suspend		= ehci_hcd_omap_suspend, */
- 	/*.resume		= ehci_hcd_omap_resume, */
- 	.driver = {
--		.name		= "ehci-omap",
-+		.name		= hcd_name,
- 	}
+ struct nop_usb_xceiv {
+ 	struct usb_phy		phy;
+ 	struct device		*dev;
++	struct clk		*clk;
  };
  
- /*-------------------------------------------------------------------------*/
+ static struct platform_device *pd;
+@@ -64,6 +66,24 @@ static int nop_set_suspend(struct usb_phy *x, int suspend)
+ 	return 0;
+ }
  
--static const struct hc_driver ehci_omap_hc_driver = {
--	.description		= hcd_name,
--	.product_desc		= "OMAP-EHCI Host Controller",
--	.hcd_priv_size		= sizeof(struct ehci_hcd),
--
--	/*
--	 * generic hardware linkage
--	 */
--	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset			= omap_ehci_init,
--	.start			= ehci_run,
--	.stop			= ehci_stop,
--	.shutdown		= ehci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue		= ehci_urb_enqueue,
--	.urb_dequeue		= ehci_urb_dequeue,
--	.endpoint_disable	= ehci_endpoint_disable,
--	.endpoint_reset		= ehci_endpoint_reset,
-+static int __init ehci_omap_init(void)
++static int nop_init(struct usb_phy *phy)
 +{
-+	if (usb_disabled())
-+		return -ENODEV;
- 
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number	= ehci_get_frame,
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
- 
--	/*
--	 * root hub support
--	 */
--	.hub_status_data	= ehci_hub_status_data,
--	.hub_control		= ehci_hub_control,
--	.bus_suspend		= ehci_bus_suspend,
--	.bus_resume		= ehci_bus_resume,
-+	ehci_init_driver(&ehci_omap_hc_driver, &ehci_omap_overrides);
-+	return platform_driver_register(&ehci_hcd_omap_driver);
++	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
++
++	if (!IS_ERR(nop->clk))
++		clk_enable(nop->clk);
++
++	return 0;
 +}
-+module_init(ehci_omap_init);
- 
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
--};
-+static void __exit ehci_omap_cleanup(void)
++
++static void nop_shutdown(struct usb_phy *phy)
 +{
-+	platform_driver_unregister(&ehci_hcd_omap_driver);
++	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
++
++	if (!IS_ERR(nop->clk))
++		clk_disable(nop->clk);
 +}
-+module_exit(ehci_omap_cleanup);
++
+ static int nop_set_peripheral(struct usb_otg *otg, struct usb_gadget *gadget)
+ {
+ 	if (!otg)
+@@ -111,10 +131,34 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
+ 	if (pdata)
+ 		type = pdata->type;
  
- MODULE_ALIAS("platform:omap-ehci");
- MODULE_AUTHOR("Texas Instruments, Inc.");
- MODULE_AUTHOR("Felipe Balbi <felipe.balbi@nokia.com>");
++	nop->clk = devm_clk_get(&pdev->dev, "main_clk");
++	if (IS_ERR(nop->clk)) {
++		dev_dbg(&pdev->dev, "Can't get phy clock: %ld\n",
++					PTR_ERR(nop->clk));
++	}
++
++	if (!IS_ERR(nop->clk) && pdata && pdata->clk_rate) {
++		err = clk_set_rate(nop->clk, pdata->clk_rate);
++		if (err) {
++			dev_err(&pdev->dev, "Error setting clock rate\n");
++			return err;
++		}
++	}
++
++	if (!IS_ERR(nop->clk)) {
++		err = clk_prepare(nop->clk);
++		if (err) {
++			dev_err(&pdev->dev, "Error preparing clock\n");
++			return err;
++		}
++	}
++
+ 	nop->dev		= &pdev->dev;
+ 	nop->phy.dev		= nop->dev;
+ 	nop->phy.label		= "nop-xceiv";
+ 	nop->phy.set_suspend	= nop_set_suspend;
++	nop->phy.init		= nop_init;
++	nop->phy.shutdown	= nop_shutdown;
+ 	nop->phy.state		= OTG_STATE_UNDEFINED;
  
-+MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_LICENSE("GPL");
+ 	nop->phy.otg->phy		= &nop->phy;
+@@ -125,7 +169,7 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
+ 	if (err) {
+ 		dev_err(&pdev->dev, "can't register transceiver, err: %d\n",
+ 			err);
+-		return err;
++		goto err_add;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, nop);
+@@ -133,12 +177,20 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
+ 	ATOMIC_INIT_NOTIFIER_HEAD(&nop->phy.notifier);
+ 
+ 	return 0;
++
++err_add:
++	if (!IS_ERR(nop->clk))
++		clk_unprepare(nop->clk);
++	return err;
+ }
+ 
+ static int nop_usb_xceiv_remove(struct platform_device *pdev)
+ {
+ 	struct nop_usb_xceiv *nop = platform_get_drvdata(pdev);
+ 
++	if (!IS_ERR(nop->clk))
++		clk_unprepare(nop->clk);
++
+ 	usb_remove_phy(&nop->phy);
+ 
+ 	platform_set_drvdata(pdev, NULL);
+diff --git a/include/linux/usb/nop-usb-xceiv.h b/include/linux/usb/nop-usb-xceiv.h
+index 28884c7..3265b61 100644
+--- a/include/linux/usb/nop-usb-xceiv.h
++++ b/include/linux/usb/nop-usb-xceiv.h
+@@ -5,6 +5,7 @@
+ 
+ struct nop_usb_xceiv_platform_data {
+ 	enum usb_phy_type type;
++	unsigned long clk_rate;
+ };
+ 
+ #if defined(CONFIG_NOP_USB_XCEIV) || (defined(CONFIG_NOP_USB_XCEIV_MODULE) && defined(MODULE))
 -- 
 1.7.4.1
