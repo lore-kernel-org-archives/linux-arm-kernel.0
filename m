@@ -1,53 +1,62 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Mon, 28 Jan 2013 10:13:13 -0600
-Subject: [PATCH 2/4 v12] clk,
- highbank: Prevent glitches in non-bypass reset mode
-In-Reply-To: <1359389595-26580-1-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1359389595-26580-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <1359389595-26580-3-git-send-email-mark.langsdorf@calxeda.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 28 Jan 2013 10:37:13 -0600
+Subject: [PATCH 1/4] drm/tilcdc: add TI LCD Controller DRM driver (v3)
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA944D2@DBDE01.ent.ti.com>
+References: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
+ <1358894185-21617-2-git-send-email-robdclark@gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA939BB@DBDE01.ent.ti.com>
+ <CAF6AEGsqkUr0R3eYa4P371tUPq_NLSJLhH=N_MkyJF31s068+g@mail.gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA93A7D@DBDE01.ent.ti.com>
+ <CAF6AEGtrHBxvnp052K6z3aj3dAxJf1hy7H72EoAWr6PhTtwr8Q@mail.gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA944D2@DBDE01.ent.ti.com>
+Message-ID: <CAF6AEGtZvjh+==3rFo5gnZqF=orY=YqXf1fndYhE5s74v=rT1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The highbank clock will glitch with the current code if the
-clock rate is reset without relocking the PLL. Program the PLL
-correctly to prevent glitches.
+On Mon, Jan 28, 2013 at 3:56 AM, Mohammed, Afzal <afzal@ti.com> wrote:
+> Hi Rob,
+>
+> On Fri, Jan 25, 2013 at 20:22:55, Rob Clark wrote:
+>> On Fri, Jan 25, 2013 at 8:15 AM, Mohammed, Afzal <afzal@ti.com> wrote:
+>
+>> > It's not about being simple, but not doing the wrong way, here you are
+>> > relying on a platform specific clock in a driver, think about the case
+>> > where same IP is used on another platform. Either way it is not a good
+>> > thing to handle platform specific details (about disp_clk) in driver.
+>
+>> Right, but I was trying to understand what was the benefit that the
+>> added complexity is.  I didn't realize on davinci that you are limited
+>
+> Here I am referring to usage of disp_clk,
+>
+> Driver is not supposed to do platform hacks - here you are trying to
+> configure something (PLL) in your driver which is not part of LCDC IP.
+> And LCDC IP is not aware of PLL which is a platform specific matter
+> (existent only in AM335x), it is only aware of functional clock.
+>
+> You can set the rate on "fck" (functional clock) in AM335x using my patch,
+> "ARM: AM33XX: clock: SET_RATE_PARENT in lcd path", and there
+> would not be any need for driver to be aware of platform specific PLL.
 
-Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Mike Turquette <mturquette@linaro.org>
----
-Changes from v6, v7, v8, v9, v10, v11
-        None.
-Changes from v5
-        Added Mike Turquette's ack.
-Changes from v4
-        None.
-Changes from v3
-        Changelog text and patch name now correspond to the actual patch.
-        was clk, highbank: remove non-bypass reset mode.
-Changes from v2
-        None.
-Changes from v1
-        Removed erroneous reformating.
+right, but I think it would be better to just make another patch that
+changes tilcdc to just set rate on fck after that patch is merged.  I
+mean, I'd rather have the driver at least usable on AM33xx until then,
+rather than broken for everyone.
 
- drivers/clk/clk-highbank.c | 2 ++
- 1 file changed, 2 insertions(+)
+BR,
+-R
 
-diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
-index 52fecad..3a0b723 100644
---- a/drivers/clk/clk-highbank.c
-+++ b/drivers/clk/clk-highbank.c
-@@ -182,8 +182,10 @@ static int clk_pll_set_rate(struct clk_hw *hwclk, unsigned long rate,
- 		reg |= HB_PLL_EXT_ENA;
- 		reg &= ~HB_PLL_EXT_BYPASS;
- 	} else {
-+		writel(reg | HB_PLL_EXT_BYPASS, hbclk->reg);
- 		reg &= ~HB_PLL_DIVQ_MASK;
- 		reg |= divq << HB_PLL_DIVQ_SHIFT;
-+		writel(reg | HB_PLL_EXT_BYPASS, hbclk->reg);
- 	}
- 	writel(reg, hbclk->reg);
- 
--- 
-1.7.11.7
+>> >> >> +     priv->clk = clk_get(dev->dev, "fck");
+>
+>> >> >> +     priv->disp_clk = clk_get(dev->dev, "dpll_disp_ck");
+>
+>> at the moment all this discussion is a bit moot.  I'd propose leaving
+>> the driver as it is for now, because that at least makes it useful on
+>> am33xx.  And when CCF and davinci have the needed support in place,
+>
+> Let's forget about leveraging CCF in driver, but sane solution w.r.t PLL
+> configuration would be to do as mentioned above.
+>
+> Regards
+> Afzal
+>
