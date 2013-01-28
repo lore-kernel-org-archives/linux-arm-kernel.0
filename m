@@ -1,30 +1,29 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 28 Jan 2013 21:18:29 +0100
-Subject: [RFC/PATCH 29/32] usb: gadget: pxa27x_udc: let udc-core manage
- gadget->dev
-In-Reply-To: <1359042370-4358-30-git-send-email-balbi@ti.com> (Felipe Balbi's
- message of "Thu, 24 Jan 2013 17:46:07 +0200")
-References: <1359042370-4358-1-git-send-email-balbi@ti.com>
- <1359042370-4358-30-git-send-email-balbi@ti.com>
-Message-ID: <87txq1m57u.fsf@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Jan 2013 20:18:17 +0000
+Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
+In-Reply-To: <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201301282018.17714.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Balbi <balbi@ti.com> writes:
+On Monday 28 January 2013, Thomas Petazzoni wrote:
+> From: Thierry Reding <thierry.reding@avionic-design.de>
+> 
+> [Thomas Petazzoni:
+>  - Simplify capabilities handling.
+>  - Move to a separate file.
+>  - Fix mask used when writing a 4 bytes value.]
+> 
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-> By simply setting a flag, we can drop some
-> boilerplate code.
->
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/usb/gadget/pxa27x_udc.c | 9 +--------
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Not even a description why this is needed?
 
-And I tested also your patch and it works in my environment. For next patches
-I'd like to be CCed for pxa27x_udc stuff as I'm maintaining that one since its
-beginning (and yes, I know, I didn't put that in MAINTAINERS ...).
+This patch (together with patch 8) seems like the most controversial
+one of the series, so you should better provide a really good reason
+why we would emulate something in software rather than using whatever
+hardware is there.
 
-Cheers.
-
---
-Robert
+	Arnd
