@@ -1,41 +1,52 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 28 Jan 2013 15:28:51 +0100
-Subject: [PATCH] arm: zynq: Add missing irqchip.h to common.c
-In-Reply-To: <51068861.8060309@gmail.com>
-References: <1359376250-18841-1-git-send-email-michal.simek@xilinx.com>
- <51068861.8060309@gmail.com>
-Message-ID: <CAHTX3dL5yzM9br-jvh7-dMtHKjD-sT75qmQw52oi_8VCAZsxyA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Jan 2013 14:39:05 +0000
+Subject: [PATCH v2 01/16] ARM: introduce common set_auxcr/get_auxcr
+ functions
+In-Reply-To: <1359008879-9015-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359008879-9015-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130128143904.GB23470@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Thu, Jan 24, 2013 at 06:27:44AM +0000, Nicolas Pitre wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Move the private set_auxcr/get_auxcr functions from
+> drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/include/asm/cp15.h       | 14 ++++++++++++++
+>  drivers/cpuidle/cpuidle-calxeda.c | 14 --------------
+>  2 files changed, 14 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+> index 5ef4d8015a..ef0094abf2 100644
+> --- a/arch/arm/include/asm/cp15.h
+> +++ b/arch/arm/include/asm/cp15.h
+> @@ -59,6 +59,20 @@ static inline void set_cr(unsigned int val)
+>  	isb();
+>  }
+>  
+> +static inline unsigned int get_auxcr(void)
+> +{
+> +	unsigned int val;
+> +	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
+> +	return val;
+> +}
+> +
+> +static inline void set_auxcr(unsigned int val)
+> +{
+> +	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
+> +	  : : "r" (val) : "cc");
+> +	isb();
+> +}
 
-2013/1/28 Rob Herring <robherring2@gmail.com>:
-> On 01/28/2013 06:30 AM, Michal Simek wrote:
->> The patch: "ARM: use common irqchip_init for GIC init"
->> (sha1: 0529e315bbda5d502c93df2cfafba9bb337fbdf4)
->> should also add linux/irqchip.h header.
->>
->> Error message:
->> arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init'
->>   undeclared here (not in a function)
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->
-> FYI, there's already a patch posted for this:
->
-> http://www.spinics.net/lists/arm-kernel/msg219556.html
+Oh no! It's the return of the magic "cc" clobber! Could we have an extra
+patch to remove those please (since this is just a move)?
 
-Interesting that I am completely ignored in CC.
-Anyway updated maintainer fragment hopefully resolve this.
-
-Thanks,
-Michal
-
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+Will
