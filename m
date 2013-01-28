@@ -1,84 +1,278 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 28 Jan 2013 15:26:20 -0500
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130128182218.GB9436@obsidianresearch.com>
-References: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
- <1359283223-23082-2-git-send-email-gmbnomis@gmail.com>
- <510506F9.3070500@gmail.com>
- <20130128182218.GB9436@obsidianresearch.com>
-Message-ID: <20130128202620.GM1758@titan.lakedaemon.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Jan 2013 21:33:12 +0100
+Subject: [PATCHv4] ARM: sunxi: gpio: Add Allwinner SoCs GPIO drivers
+Message-ID: <1359405192-1192-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 11:22:18AM -0700, Jason Gunthorpe wrote:
-> On Sun, Jan 27, 2013 at 11:52:41AM +0100, Sebastian Hesselbarth wrote:
-> 
-> > I agree that loosing the MAC address _is_ an issue but there must
-> > be another way to retain it during gated ge clocks than not gate the
-> > clocks at all.
-> > 
-> > I can think of some ways to retain it but don't know what is the most
-> > common with linux:
-> > - make u-boot pass it through cmdline and let mv643xx get it from there
-> > - have kirkwood's common code grab it before clk gates kick in
-> 
-> The cannonical solution here is to have a DT attribute
-> 'local-mac-address' that is filled in by the bootloader rather than
-> attempting to pass the mac address to the kernel through the ethernet
-> controller registers.
-> 
-> Until the bootloaders are fixed a reasonable hack is to have the
-> platform startup code look for an all-zeros local-mac-address in the
-> DT and if found then copy the MAC from the ethernet registers into the
-> DT. Then the ethernet driver can safely be a module since the MAC is
-> captured in the DT.
-> 
-> I've been using this patch here on top of the original Ian Molton
-> patch.
-> 
-> Jason: Can you include something like this as well?
+The IP responsible for the muxing on the Allwinner SoCs are also
+handling the GPIOs on the system. This patch adds the needed driver that
+relies on the pinctrl driver for most of its operations.
 
-Seems reasonable.  Mind updating the binding docs?
+The number of pins available for GPIOs operations are already declared
+in the pinctrl driver, we only need to probe a generic driver to handle
+the banks available for each SoC.
 
-I'd also like to confirm that legacy, factory-installed bootloaders are
-passing the mac addr via a special ATAG.  My cursory check of the
-current mainline u-boot code doesn't include it, but Marvell's version
-may have.
+This driver has been tested on a A13-Olinuxino.
 
-thx,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/pinctrl-sunxi.c |  134 ++++++++++++++++++++++++++++++++++++++-
+ drivers/pinctrl/pinctrl-sunxi.h |   25 +++++++-
+ 2 files changed, 156 insertions(+), 3 deletions(-)
 
-Jason.
-
-> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> index 7048d7c..2b2cfcb 100644
-> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> @@ -2891,6 +2891,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
->  	struct mv643xx_eth_private *mp;
->  	struct net_device *dev;
->  	struct resource *res;
-> +	const u8 *mac;
-> +	int len;
->  	int err;
->  
->  	if (pdev->dev.of_node) {
-> @@ -2912,6 +2914,10 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
->  		else
->  			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
->  
-> +		mac = of_get_property(pdev->dev.of_node, "local-mac-address", &len);
-> +		if (mac && len == 6)
-> +		    memcpy(pd->mac_addr, mac, sizeof pd->mac_addr);
-> +
->  		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
->  		if (np) {
->  			pd->shared = of_find_device_by_node(np);
-> -- 
-> 1.7.5.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+index 6f02e34..fb000b0 100644
+--- a/drivers/pinctrl/pinctrl-sunxi.c
++++ b/drivers/pinctrl/pinctrl-sunxi.c
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include <linux/io.h>
++#include <linux/gpio.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+@@ -609,11 +610,53 @@ static int sunxi_pmx_enable(struct pinctrl_dev *pctldev,
+ 	return 0;
+ }
+ 
++static int
++sunxi_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
++			struct pinctrl_gpio_range *range,
++			unsigned offset,
++			bool input)
++{
++	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
++	struct sunxi_desc_function *desc;
++	char pin_name[SUNXI_PIN_NAME_MAX_LEN];
++	const char *func;
++	u8 bank, pin;
++	int ret;
++
++	bank = (offset) / PINS_PER_BANK;
++	pin = (offset) % PINS_PER_BANK;
++
++	ret = sprintf(pin_name, "P%c%d", 'A' + bank, pin);
++	if (!ret)
++		goto error;
++
++	if (input)
++		func = "gpio_in";
++	else
++		func = "gpio_out";
++
++	desc = sunxi_pinctrl_desc_find_function_by_name(pctl,
++							pin_name,
++							func);
++	if (!desc) {
++		ret = -EINVAL;
++		goto error;
++	}
++
++	sunxi_pmx_set(pctldev, offset, desc->muxval);
++
++	ret = 0;
++
++error:
++	return ret;
++}
++
+ static struct pinmux_ops sunxi_pmx_ops = {
+ 	.get_functions_count	= sunxi_pmx_get_funcs_cnt,
+ 	.get_function_name	= sunxi_pmx_get_func_name,
+ 	.get_function_groups	= sunxi_pmx_get_func_groups,
+ 	.enable			= sunxi_pmx_enable,
++	.gpio_set_direction	= sunxi_pmx_gpio_set_direction,
+ };
+ 
+ static struct pinctrl_desc sunxi_pctrl_desc = {
+@@ -622,6 +665,60 @@ static struct pinctrl_desc sunxi_pctrl_desc = {
+ 	.pmxops		= &sunxi_pmx_ops,
+ };
+ 
++static int sunxi_pinctrl_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	return pinctrl_request_gpio(chip->base + offset);
++}
++
++static void sunxi_pinctrl_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	pinctrl_free_gpio(chip->base + offset);
++}
++
++static int sunxi_pinctrl_gpio_direction_input(struct gpio_chip *chip,
++					unsigned offset)
++{
++	return pinctrl_gpio_direction_input(chip->base + offset);
++}
++
++static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
++
++	u32 reg = sunxi_data_reg(offset);
++	u8 index = sunxi_data_offset(offset);
++	u32 val = (readl(pctl->membase + reg) >> index) & DATA_PINS_MASK;
++
++	return val;
++}
++
++static int sunxi_pinctrl_gpio_direction_output(struct gpio_chip *chip,
++					unsigned offset, int value)
++{
++	return pinctrl_gpio_direction_output(chip->base + offset);
++}
++
++static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
++				unsigned offset, int value)
++{
++	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
++	u32 reg = sunxi_data_reg(offset);
++	u8 index = sunxi_data_offset(offset);
++
++	writel((value & DATA_PINS_MASK) << index, pctl->membase + reg);
++}
++
++static struct gpio_chip sunxi_pinctrl_gpio_chip = {
++	.owner			= THIS_MODULE,
++	.request		= sunxi_pinctrl_gpio_request,
++	.free			= sunxi_pinctrl_gpio_free,
++	.direction_input	= sunxi_pinctrl_gpio_direction_input,
++	.direction_output	= sunxi_pinctrl_gpio_direction_output,
++	.get			= sunxi_pinctrl_gpio_get,
++	.set			= sunxi_pinctrl_gpio_set,
++	.can_sleep		= 0,
++};
++
+ static struct of_device_id sunxi_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun5i-a13-pinctrl", .data = (void *)&sun5i_a13_pinctrl_data },
+ 	{}
+@@ -737,7 +834,7 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
+ 	const struct of_device_id *device;
+ 	struct pinctrl_pin_desc *pins;
+ 	struct sunxi_pinctrl *pctl;
+-	int i, ret;
++	int i, ret, last_pin;
+ 
+ 	pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
+ 	if (!pctl)
+@@ -781,9 +878,42 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	dev_info(&pdev->dev, "initialized sunXi pin control driver\n");
++	pctl->chip = devm_kzalloc(&pdev->dev, sizeof(*pctl->chip), GFP_KERNEL);
++	if (!pctl->chip) {
++		ret = -ENOMEM;
++		goto pinctrl_error;
++	}
++
++	last_pin = pctl->desc->pins[pctl->desc->npins - 1].pin.number;
++	pctl->chip = &sunxi_pinctrl_gpio_chip;
++	pctl->chip->ngpio = round_up(last_pin, PINS_PER_BANK);
++	pctl->chip->label = dev_name(&pdev->dev);
++	pctl->chip->dev = &pdev->dev;
++	pctl->chip->base = 0;
++
++	ret = gpiochip_add(pctl->chip);
++	if (ret)
++		goto pinctrl_error;
++
++	for (i = 0; i < pctl->desc->npins; i++) {
++		const struct sunxi_desc_pin *pin = pctl->desc->pins + i;
++
++		ret = gpiochip_add_pin_range(pctl->chip, dev_name(&pdev->dev),
++					     pin->pin.number,
++					     pin->pin.number, 1);
++		if (ret)
++			goto gpiochip_error;
++	}
++
++	dev_info(&pdev->dev, "initialized sunXi PIO driver\n");
+ 
+ 	return 0;
++
++gpiochip_error:
++	ret = gpiochip_remove(pctl->chip);
++pinctrl_error:
++	pinctrl_unregister(pctl->pctl_dev);
++	return ret;
+ }
+ 
+ static struct platform_driver sunxi_pinctrl_driver = {
+diff --git a/drivers/pinctrl/pinctrl-sunxi.h b/drivers/pinctrl/pinctrl-sunxi.h
+index 0dc3b9d..1ee35c0 100644
+--- a/drivers/pinctrl/pinctrl-sunxi.h
++++ b/drivers/pinctrl/pinctrl-sunxi.h
+@@ -254,8 +254,11 @@
+ #define SUNXI_PINCTRL_PIN_PG30	PINCTRL_PIN(PG_BASE + 30, "PG30")
+ #define SUNXI_PINCTRL_PIN_PG31	PINCTRL_PIN(PG_BASE + 31, "PG31")
+ 
++#define SUNXI_PIN_NAME_MAX_LEN	5
++
+ #define BANK_MEM_SIZE		0x24
+ #define MUX_REGS_OFFSET		0x0
++#define DATA_REGS_OFFSET	0x10
+ #define DLEVEL_REGS_OFFSET	0x14
+ #define PULL_REGS_OFFSET	0x1c
+ 
+@@ -263,6 +266,9 @@
+ #define MUX_PINS_PER_REG	8
+ #define MUX_PINS_BITS		4
+ #define MUX_PINS_MASK		0x0f
++#define DATA_PINS_PER_REG	32
++#define DATA_PINS_BITS		1
++#define DATA_PINS_MASK		0x01
+ #define DLEVEL_PINS_PER_REG	16
+ #define DLEVEL_PINS_BITS	2
+ #define DLEVEL_PINS_MASK	0x03
+@@ -283,6 +289,8 @@ struct sunxi_desc_pin {
+ struct sunxi_pinctrl_desc {
+ 	const struct sunxi_desc_pin	*pins;
+ 	int				npins;
++	struct pinctrl_gpio_range	*ranges;
++	int				nranges;
+ };
+ 
+ struct sunxi_pinctrl_function {
+@@ -299,6 +307,7 @@ struct sunxi_pinctrl_group {
+ 
+ struct sunxi_pinctrl {
+ 	void __iomem			*membase;
++	struct gpio_chip		*chip;
+ 	struct sunxi_pinctrl_desc	*desc;
+ 	struct device			*dev;
+ 	struct sunxi_pinctrl_function	*functions;
+@@ -321,7 +330,6 @@ struct sunxi_pinctrl {
+ 		.muxval = _val,					\
+ 	}
+ 
+-
+ /*
+  * The sunXi PIO registers are organized as is:
+  * 0x00 - 0x0c	Muxing values.
+@@ -354,6 +362,21 @@ static inline u32 sunxi_mux_offset(u16 pin)
+ 	return pin_num * MUX_PINS_BITS;
+ }
+ 
++static inline u32 sunxi_data_reg(u16 pin)
++{
++	u8 bank = pin / PINS_PER_BANK;
++	u32 offset = bank * BANK_MEM_SIZE;
++	offset += DATA_REGS_OFFSET;
++	offset += pin % PINS_PER_BANK / DATA_PINS_PER_REG * 0x04;
++	return round_down(offset, 4);
++}
++
++static inline u32 sunxi_data_offset(u16 pin)
++{
++	u32 pin_num = pin % DATA_PINS_PER_REG;
++	return pin_num * DATA_PINS_BITS;
++}
++
+ static inline u32 sunxi_dlevel_reg(u16 pin)
+ {
+ 	u8 bank = pin / PINS_PER_BANK;
+-- 
+1.7.10.4
