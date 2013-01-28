@@ -1,36 +1,55 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jan 2013 12:57:25 +0200
-Subject: OMAP baseline test results for v3.8-rc5
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA945AB@DBDE01.ent.ti.com>
-References: <alpine.DEB.2.00.1301260838300.19277@utopia.booyaka.com>
- <20130126084604.GB8754@arwen.pp.htv.fi>
- <C8443D0743D26F4388EA172BF4E2A7A93EA9456A@DBDE01.ent.ti.com>
- <20130128104752.GB28698@arwen.pp.htv.fi>
- <C8443D0743D26F4388EA172BF4E2A7A93EA945AB@DBDE01.ent.ti.com>
-Message-ID: <20130128105725.GC28698@arwen.pp.htv.fi>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 28 Jan 2013 11:57:39 +0100
+Subject: [PATCH v2 1/3] pwm: Add pwm_cansleep() as exported API to users
+In-Reply-To: <20130128095754.GA23134@avionic-0098.adnet.avionic-design.de>
+References: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359121471-21457-2-git-send-email-florian.vaussard@epfl.ch>
+ <20130126054024.GB29243@avionic-0098.adnet.avionic-design.de>
+ <51063AB5.2060108@ti.com> <51064687.5090605@epfl.ch>
+ <20130128095754.GA23134@avionic-0098.adnet.avionic-design.de>
+Message-ID: <510659A3.7070906@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Le 28/01/2013 10:57, Thierry Reding a ?crit :
+> On Mon, Jan 28, 2013 at 10:36:07AM +0100, Florian Vaussard wrote:
+>> Hello,
+>>
+>> Le 28/01/2013 09:45, Peter Ujfalusi a ?crit :
+>>> hi Thierry,
+>>>
+>>> On 01/26/2013 06:40 AM, Thierry Reding wrote:
+> [...]
+>>>>> +{
+>>>>> +	return pwm->chip->can_sleep;
+>>>>> +}
+>>>>> +EXPORT_SYMBOL_GPL(pwm_cansleep);
+>>>>
+>>>> Would it make sense to check for NULL pointers here? I guess that
+>>>> passing NULL into the function could be considered a programming error
+>>>> and an oops would be okay, but in that case there's no point in making
+>>>> the function return an int. Also see my next comment.
+>>>
+>>> While it is unlikely to happen it is better to be safe, something like this
+>>> will do:
+>>>
+>>> return pwm ? pwm->chip->can_sleep : 0;
+>>>
+>>
+>> Ok. And what about:
+>>
+>> BUG_ON(pwm == NULL);
+>> return pwm->chip->can_sleep;
+>
+> I don't think we need that. In case pwm == NULL, dereferencing it will
+> oops anyway. So either we make it safe and return an error code, or we
+> let it oops without explicit BUG_ON().
+>
 
-On Mon, Jan 28, 2013 at 11:55:20AM +0100, Mohammed, Afzal wrote:
-> Hi Felipe,
-> 
-> On Mon, Jan 28, 2013 at 16:17:52, Balbi, Felipe wrote:
-> 
-> > will try your patch, but are you using Beagle Bone white or black ? I
-> > should've made it clear I'm using beagle bone black.
-> 
-> Hmm.., I am using white, have never tried on black.
+Calling this function with a NULL pointer is a programming error, so there
+is no error codes for such errors. I propose to return bool, and let it
+oops if such case happens.
 
-ok, maybe there's something missing to get Black booting up :-s
+Regards,
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130128/2d396ebc/attachment-0001.sig>
+Florian
