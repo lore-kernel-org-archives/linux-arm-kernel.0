@@ -1,58 +1,45 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 19:56:33 +0100
-Subject: [PATCH v2 24/27] arm: mvebu: PCIe Device Tree informations for Armada
- XP DB
+Date: Mon, 28 Jan 2013 19:56:36 +0100
+Subject: [PATCH v2 27/27] arm: mvebu: update defconfig with PCI and USB support
 In-Reply-To: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1359399397-29729-25-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1359399397-29729-28-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell evaluation board (DB) for the Armada XP SoC has 6
-physicals full-size PCIe slots, so we enable the corresponding PCIe
-interfaces in the Device Tree.
+Now that we have the necessary drivers and Device Tree informations to
+support PCIe on Armada 370 and Armada XP, enable the CONFIG_PCI
+option.
+
+Also, since the Armada 370 Mirabox has a built-in USB XHCI controller
+connected on the PCIe bus, enable the corresponding options as well.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-db.dts |   27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/configs/mvebu_defconfig |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 8e53b25..7dcc36c 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -90,5 +90,32 @@
- 			phy = <&phy3>;
- 			phy-mode = "sgmii";
- 		};
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			/*
-+			 * All 6 slots are physically present as
-+			 * standard PCIe slots on the board.
-+			 */
-+			pcie at 0,0 {
-+				status = "okay";
-+			};
-+			pcie at 0,1 {
-+				status = "okay";
-+			};
-+			pcie at 0,2 {
-+				status = "okay";
-+			};
-+			pcie at 0,3 {
-+				status = "okay";
-+			};
-+			pcie at 2,0 {
-+				status = "okay";
-+			};
-+			pcie at 3,0 {
-+				status = "okay";
-+			};
-+		};
- 	};
- };
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index b5bc96c..68ef50b 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -13,6 +13,7 @@ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ # CONFIG_CACHE_L2X0 is not set
+ # CONFIG_SWP_EMULATE is not set
++CONFIG_PCI=y
+ CONFIG_SMP=y
+ # CONFIG_LOCAL_TIMERS is not set
+ CONFIG_AEABI=y
+@@ -36,7 +37,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_DMADEVICES=y
 -- 
 1.7.9.5
