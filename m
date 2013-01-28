@@ -1,82 +1,74 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Mon, 28 Jan 2013 05:17:28 +0000
-Subject: [PATCH 2/6] ARM: davinci: da850: add DT node for I2C0
-In-Reply-To: <51026365.1020402@ti.com>
-References: <1359027324-14534-1-git-send-email-manishv.b@ti.com>
- <51026365.1020402@ti.com>
-Message-ID: <A4887BF146CD57468F700B415D2F4701581768@DBDE01.ent.ti.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 28 Jan 2013 13:21:59 +0800
+Subject: [RESEND PATCH v5 4/7] usb: chipidea: consolidate
+ ci_role_driver's API for both roles
+In-Reply-To: <87sj5pbgwr.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1358733418-17969-1-git-send-email-peter.chen@freescale.com>
+ <1358733418-17969-5-git-send-email-peter.chen@freescale.com>
+ <8738xqodhp.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130125033013.GB29795@nchen-desktop>
+ <87sj5pbgwr.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20130128052158.GA8066@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 16:20:13, Nori, Sekhar wrote:
-> On 1/24/2013 5:05 PM, Vishwanathrao Badarkhe, Manish wrote:
-> > Add I2C0 device tree node information to da850-evm.
-> > Also, add I2C0 pin muxing information in da850-evm.
-> > 
-> > Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
-> > ---
-> > Depends on patch
-> > http://comments.gmane.org/gmane.linux.davinci/25993
-> > 
-> >  arch/arm/boot/dts/da850-evm.dts |   15 +++++++++++++++
-> >  arch/arm/boot/dts/da850.dtsi    |   10 ++++++++++
-> >  2 files changed, 25 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/da850-evm.dts 
-> > b/arch/arm/boot/dts/da850-evm.dts index 8cac9d2..3d8290a 100755
-> > --- a/arch/arm/boot/dts/da850-evm.dts
-> > +++ b/arch/arm/boot/dts/da850-evm.dts
-> > @@ -27,5 +27,20 @@
-> >  		serial2: serial at 1d0d000 {
-> >  			status = "okay";
-> >  		};
-> > +		i2c0 at 1c22000 {
+On Fri, Jan 25, 2013 at 02:12:20PM +0200, Alexander Shishkin wrote:
+> Peter Chen <peter.chen@freescale.com> writes:
 > 
-> This should be
-> 		i2c0: i2c at 1c22000
+> > On Thu, Jan 24, 2013 at 04:35:30PM +0200, Alexander Shishkin wrote:
+> >> Peter Chen <peter.chen@freescale.com> writes:
+> >> 
+> >> > - Create init/destroy API for probe and remove
+> >> > - start/stop API are only used otg id switch process
+> >> > - Create the gadget at ci_hdrc_probe if the gadget is supported
+> >> > at that port, the main purpose for this is to avoid gadget module
+> >> > load fail at init.rc
+> >> 
+> @@ -402,6 +402,12 @@ static ssize_t store_role(struct device *dev, struct device_attribute *attr,
+>  	if (ret)
+>  		return ret;
+>  
+> +	/*
+> +	 * there won't be an interrupt in case of manual switching,
+> +	 * so we need to check vbus session manually
+> +	 */
+> +	ci_handle_vbus_change(ci);
+> +
+It may not be used as there will be a vbus interrupt.
+>  	return count;
+>  }
+>  
+>  	}
+>  	dbg_remove_files(&ci->gadget.dev);
+>  	device_unregister(&ci->gadget.dev);
+> -	/* my kobject is dynamic, I swear! */
+> -	memset(&ci->gadget, 0, sizeof(ci->gadget));
+Any reason to delete it, another fix?
+>  }
+>  
+>  /**
+> @@ -1842,13 +1839,11 @@ int ci_hdrc_gadget_init(struct ci13xxx *ci)
+>  	if (!rdrv)
+>  		return -ENOMEM;
+>  
+> -	rdrv->init	= udc_start;
+>  	rdrv->start	= udc_id_switch_for_device;
+>  	rdrv->stop	= udc_id_switch_for_host;
+> -	rdrv->destroy	= udc_stop;
+Where we call udc_start and udc_stop? And the udc_start should only be called
+one time.
 > 
-> to follow the convention elsewhere in file.
+> Which is shorter (32 insertions(+), 53 deletions(-)) and makes the main
+> probe easier on the eyes. What do you think?
+OK, not matter how to change it, it needs to cover below things:
+(Covers last email)
+- Gadget needs to be only initialized one time.
+- Host/device function should be OK when the device on it or
+the usb cable connects to host during the boots up.
+- When the OTG port is at host mode, it should not call any
+register writing operations at gadget's API.
 
-Ok, I will change this in next version.
+-- 
 
-> 
-> > +			status = "okay";
-> > +		};
-> > +	};
-> > +};
-> > +&pmx_core {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <
-> > +		&i2c0_pins
-> > +	>;
-> > +
-> > +	i2c0_pins: pinmux_i2c0_pins{
-> > +		pinctrl-single,bits = <
-> > +			0x10 0x00002200 0x0000ff00	/* I2C0_SDA,I2C0_SCL */
-> > +		>;
-> 
-> This should go into the dtsi file. See the discussion on NAND DT support submitted by Anil Kumar.
-
-I have seen Anil Kumar's discussion for pin-muxing which includes Linus patch of grab pin 
-control handles from device core at following location:
-http://lkml.indiana.edu/hypermail/linux/kernel/1301.2/00094.html
-
-I have done changes accordingly for I2C0 pin muxing and seen kernel crashes giving message 
-like "i2c_davinci i2c_davinci.1: could not find pctldev for node /soc/
-pinmux at 1c14120/pinmux_i2c0_pins, deferring probe". This is happened because I2C0 driver 
-gets probed before pin mux driver.
-  
-To resolve this issue, I made changes in code to ensure pin control driver gets probed before 
-I2C0 driver by registering pin control driver during arch_init call.
- 
-Hence, in order to move I2C0 pin muxing in dtsi file above fix is required.
-> 
-> Thanks,
-> Sekhar
-> 
-> PS: You are using an old address for Kevin Hilman. The MAINTAINERS file has been updated for a long time now. Liam's address is also wrong but I don't have his updated e-mail.
-> 
-
-
-Regards, 
-Manish
+Best Regards,
+Peter Chen
