@@ -1,62 +1,45 @@
-From: vikram186@gmail.com (Vikram Narayanan)
-Date: Mon, 28 Jan 2013 23:09:58 +0530
-Subject: i.Mx6Quad - eth0: tx queue full!
-Message-ID: <5106B7EE.3040603@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Jan 2013 17:51:06 +0000
+Subject: [PATCH v3 0/3] introduce static_vm for ARM-specific static
+ mapped area
+In-Reply-To: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <20130128175106.GI23470@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Running the latest head <linux-2.6.git> on an i.Mx6Quad based platform
-gives me the below error when flooded with ping requests.
+Hello,
 
-== Start log ==
-[ 2555.004031] ------------[ cut here ]------------
-[ 2555.009740] WARNING: at net/sched/sch_generic.c:254 dev_watchdog+0x298/0x2b8()
-[ 2555.018721] NETDEV WATCHDOG: eth0 (fec): transmit queue 0 timed out
-[ 2555.026733] Modules linked in:
-[ 2555.030598] Backtrace:
-[ 2555.034252] [<800119c8>] (dump_backtrace+0x0/0x10c) from [<803b8494>] (dump_stack+0x18/0x1c)
-[ 2555.044438]  r6:000000fe r5:80302f64 r4:80503dd0 r3:80510e80
-[ 2555.052019] [<803b847c>] (dump_stack+0x0/0x1c) from [<8001df08>] (warn_slowpath_common+0x54/0x6c)
-[ 2555.062679] [<8001deb4>] (warn_slowpath_common+0x0/0x6c) from [<8001dfc4>] (warn_slowpath_fmt+0x38/0x40)
-[ 2555.073936]  r8:8052ebf1 r7:805040c0 r6:00000000 r5:8f9771d4 r4:8f977000
-r3:00000009
-[ 2555.084816] [<8001df8c>] (warn_slowpath_fmt+0x0/0x40) from [<80302f64>] (dev_watchdog+0x298/0x2b8)
-[ 2555.095535]  r3:8f977000 r2:8049f6d4
-[ 2555.099868] [<80302ccc>] (dev_watchdog+0x0/0x2b8) from [<8002acf8>] (call_timer_fn.isra.33+0x2c/0x8c)
-[ 2555.110794] [<8002accc>] (call_timer_fn.isra.33+0x0/0x8c) from [<8002af48>] (run_timer_softirq+0x1f0/0x204)
-[ 2555.122240]  r7:80571114 r6:805040c0 r5:00000000 r4:80570900
-[ 2555.129894] [<8002ad58>] (run_timer_softirq+0x0/0x204) from [<80025750>] (__do_softirq+0xc8/0x180)
-[ 2555.140599] [<80025688>] (__do_softirq+0x0/0x180) from [<80025b40>] (irq_exit+0x88/0x90)
-[ 2555.150492] [<80025ab8>] (irq_exit+0x0/0x90) from [<8000ec58>] (handle_IRQ+0x44/0x98)
-[ 2555.160112]  r4:804ffde0 r3:00000220
-[ 2555.164848] [<8000ec14>] (handle_IRQ+0x0/0x98) from [<80008540>] (gic_handle_irq+0x30/0x64)
-[ 2555.174956]  r6:80503f28 r5:8050a518 r4:f400010c r3:00000000
-[ 2555.182694] [<80008510>] (gic_handle_irq+0x0/0x64) from [<8000df80>] (__irq_svc+0x40/0x50)
-[ 2555.192737] Exception stack(0x80503f28 to 0x80503f70)
-[ 2555.198639] 3f20:                   8052f150 a0000093 00000000 00000000 80502000 8052ed08
-[ 2555.208600] 3f40: 8050a4f4 803bfaec 8050df00 412fc09a 80502000 80503f7c 80503f80 80503f70
-[ 2555.218584] 3f60: 8000eee4 8000eee8 60000013 ffffffff
-[ 2555.224730]  r7:80503f5c r6:ffffffff r5:60000013 r4:8000eee8
-[ 2555.232292] [<8000eeb8>] (default_idle+0x0/0x38) from [<8000f0d8>] (cpu_idle+0xcc/0x114)
-[ 2555.242204] [<8000f00c>] (cpu_idle+0x0/0x114) from [<803b3718>] (rest_init+0x64/0x7c)
-[ 2555.251858] [<803b36b4>] (rest_init+0x0/0x7c) from [<804cc7dc>] (start_kernel+0x258/0x298)
-[ 2555.261963] [<804cc584>] (start_kernel+0x0/0x298) from [<10008078>] (0x10008078)
-[ 2555.271167] ---[ end trace 3d2ffb53e6fe41f3 ]---
-[ 2555.277270] eth0: tx queue full!.
-[ 2555.288776] eth0: tx queue full!.
-[ 2555.293594] eth0: tx queue full!.
-[ 2555.297944] eth0: tx queue full!.
-[ 2555.302229] eth0: tx queue full!.
+On Thu, Jan 24, 2013 at 01:28:51AM +0000, Joonsoo Kim wrote:
+> In current implementation, we used ARM-specific flag, that is,
+> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+> The purpose of static mapped area is to re-use static mapped area when
+> entire physical address range of the ioremap request can be covered
+> by this area.
+> 
+> This implementation causes needless overhead for some cases.
+> For example, assume that there is only one static mapped area and
+> vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
+> deciding whether it is matched or not. Moreover, even if there is
+> no static mapped area and vmlist has 300 areas, every time we call
+> ioremap, we check 300 areas in now.
+> 
+> If we construct a extra list for static mapped area, we can eliminate
+> above mentioned overhead.
+> With a extra list, if there is one static mapped area,
+> we just check only one area and proceed next operation quickly.
+> 
+> In fact, it is not a critical problem, because ioremap is not frequently
+> used. But reducing overhead is better idea.
+> 
+> Another reason for doing this work is for removing vm_struct list management,
+> entirely. For more information, look at the following link.
+> http://lkml.org/lkml/2012/12/6/184
 
-...... continues indefinitely and needs a reboot to recover the system.
-== End log ==
+First patch looks good (removing the unused vmregion stuff) but I'm not so
+sure about the rest of it. If you really care about ioremap performance,
+perhaps it would be better to have a container struct around the vm_struct
+for static mappings and then stick them in an augmented rbtree so you can
+efficiently find the mapping encompassing a particular physical address?
 
-i.Mx6Quad's MAC is connected to SMSC LAN88730 PHY via an MII interface.
-
-I found a similar thread [1], but that solution didn't work for me.
-Any ideas on why the fec driver is unhappy?
-
-Thanks,
-Vikram
-
-[1] https://community.freescale.com/thread/281457
+Will
