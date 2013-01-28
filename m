@@ -1,5 +1,5 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Mon, 28 Jan 2013 15:41:12 -0300
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 28 Jan 2013 11:43:51 -0700
 Subject: [RFC V2 PATCH 0/8] ARM: kirkwood: cleanup DT conversion
 In-Reply-To: <20130128192445.6984e7dd@skate>
 References: <cover.1358983578.git.jason@lakedaemon.net>
@@ -11,53 +11,41 @@ References: <cover.1358983578.git.jason@lakedaemon.net>
  <20130128104008.GA5170@localhost>
  <20130128180716.GA9436@obsidianresearch.com>
  <20130128192445.6984e7dd@skate>
-Message-ID: <CALF0-+U5DVGAMZGw1nsBMe5cJ1=U1b19D+kunWtSYn3sUYiRDg@mail.gmail.com>
+Message-ID: <20130128184351.GD9436@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Mon, Jan 28, 2013 at 07:24:45PM +0100, Thomas Petazzoni wrote:
 
-On Mon, Jan 28, 2013 at 3:24 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
->
+> > 1) very early on the addr-map driver would have to scan the OF tree,
+> >    find the address of the mbus mapping registers, and the internal
+> >    register map.
+> > 2) Verify the mbus window for the internal registers matches the DT
+> >    This is just a sanity check, if the correct value doesn't come back
+> >    then the DT doesnt match what the bootloader setup, and some
+> >    jtag accessible diagnostic can be printed...
+> > 3) Wipe all the mbus windows
+> > 4) Register a "marvell,orion-mbus" bus handler somehow
+> > 5) When OF processes the DT it would call the bus handler for each
+> >    "marvell,orion-mbus" which should parse the ranges, allocate
+> >    a free window, program that window then instantiate the child
+> >    devices.
+
+[..]
+ 
 > Instead, I think the "address decoding window driver" in the kernel
 > should provide an API for device drivers to request an address decoding
 > window at a given address, with a given size and target/attribute. This
 > is already what the PCIe code is doing (I'm going to submit v2 of the
 > PCIe code soon), and I think we should to the same for other devices as
 > well.
->
 
-Note that in Jason's proposal, it's possible to instantiate a bus' child
-device, configure its address window and then call the corresponding
-driver using a regular of_node.
+Sure, but that isn't exclusive with setting up the bulk of the windows
+through DT - the tegra PCI-E driver can use a request API for its
+dynamic windows, while everyone else can be setup by having the DT bus
+declarations automatically request the proper windows.
 
-For instance,
+All this would do is replace the tables of window configurations in
+the board files with a DT representation of the same table.
 
-// MBUS Decoder window for NAND
-nand at f4000000 {
-        #address-cells = <1>;
-        #size-cells = <1>;
-        compatible = "simple-bus", "marvell,orion-mbus";
-        mbus-target = <0x01 0x2f>;
-        ranges = <0 0xf4000000 0x10000>;
-
-        nand at 0 {
-                // ...
-               compatible = "marvell,orion-nand";
-               reg = <0x0 0x400>;
-        };
-};
-
-In this example, we can configure the window using both mbus-target and ranges
-properties and then use the child node to instantiate an "orion-nand" device.
-
-I understand your point regarding PCIe flexibility needs.
-So I wonder, in your proposed scheme,
-who should call this "address decoding window" driver
-in order to still be able to instantiate child devices easily?
-
-Thanks,
-
--- 
-    Ezequiel
+Jason
