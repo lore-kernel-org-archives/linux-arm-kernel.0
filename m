@@ -1,55 +1,40 @@
-From: mats.liljegren@enea.com (Mats Liljegren)
-Date: Mon, 28 Jan 2013 09:59:47 +0000
-Subject: [BUG] panda board locks up on boot
-In-Reply-To: <51053AD2.8080805@gmail.com>
-References: <1359082886.21576.199.camel@gandalf.local.home>
- <51022FD2.8090101@compulab.co.il>
- <0247700D01F14443B9209F90AD938CC52409708C@sestoex09.enea.se>
- <20130127141254.GC5714@stinkpad> <51053AD2.8080805@gmail.com>
-Message-ID: <0247700D01F14443B9209F90AD938CC524099EA3@sestoex09.enea.se>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 28 Jan 2013 10:04:23 +0000
+Subject: [PATCH] mfd/vexpress: vexpress_sysreg_setup must not be __init
+In-Reply-To: <1359140032-6039-1-git-send-email-arnd@arndb.de>
+References: <1359140032-6039-1-git-send-email-arnd@arndb.de>
+Message-ID: <1359367463.8090.9.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Nishanth Menon [mailto:menon.nishanth at gmail.com]
-> Sent: den 27 januari 2013 15:34
-> To: Paolo Pisati
-> Cc: Mats Liljegren; Tony Lindgren; LKML; Steven Rostedt; Igor Grinberg;
-> Russell King; Venkatraman S; linux-arm-kernel; linux-omap
-> Subject: Re: [BUG] panda board locks up on boot
+On Fri, 2013-01-25 at 18:53 +0000, Arnd Bergmann wrote:
+> The patch 52666298a 'mfd: vexpress-sysreg: Don't skip initialization
+> on probe' adds a call to vexpress_sysreg_setup from a non-__init
+> function, so this also has to lose its __init annotation.
 > 
-> On 01/27/2013 08:12 AM, Paolo Pisati wrote:
-> > On Fri, Jan 25, 2013 at 08:43:15AM +0000, Mats Liljegren wrote:
-> >> Hi Steven,
-> >>
-> >> Do you have CONFIG_CPU_FREQ enabled? As I posted earlier in linux-
-> kernel forum ("Failed booting PandaBoard ES with Linux 3.8 RC4" two days
-> ago) my PandaBoard ES hangs while booting with this option enabled. It
-> works fine without it. I have not bisected it down to a single commit though.
-> >
-> > glad i'm not the only one who hit this problem:
-> >
-> > "3.8rc4+ and cpu_freq omap: hangs, oopses, etcetc"
-> >
-> > http://www.mail-archive.com/linux-
-> omap at vger.kernel.org/msg83693.html
-> >
-> 
-> Support for TPS is not yet in mainline kernel. you may want to do:
-> 
-> you could try running 'mw.w 0x4A31E05A 0x1' before bootm in u-boot -> This
-> will hack the pad of panda ES pin mean for controlling TPS voltage register
-> (again a kernel bug where the GPIO block setup by bootloader got reset).
-> 
-> CPUfreq needs both voltage and frequency scaling to work and without
-> support of the TPS voltage scaling on vdd_MPU, you are stuck at boot
-> voltage, and just scaling frequency. with the not-enough boot voltage,
-> moving to higher frequencies can/will result in unpredictable behavior.
-> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: arm at kernel.org
 > ---
-> Regards,
-> NM
+>  drivers/mfd/vexpress-sysreg.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+> index 77048b1..558c292 100644
+> --- a/drivers/mfd/vexpress-sysreg.c
+> +++ b/drivers/mfd/vexpress-sysreg.c
+> @@ -313,7 +313,7 @@ static void vexpress_sysreg_config_complete(unsigned long data)
+>  }
+>  
+> 
+> -void __init vexpress_sysreg_setup(struct device_node *node)
+> +void vexpress_sysreg_setup(struct device_node *node)
+>  {
+>  	if (WARN_ON(!vexpress_sysreg_base))
+>  		return;
 
-Thanks for the suggestion. Unfortunately it didn't make any difference for me, neither did an upgrade to 3.8-rc5. I guess I have to wait for the TPS support to hit mainline kernel.
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-Regards
-Mats
+Thanks!
+
+Pawel
