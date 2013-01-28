@@ -1,84 +1,80 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Mon, 28 Jan 2013 23:31:48 +0100
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130127152431.GX1758@titan.lakedaemon.net>
-References: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
- <1359283223-23082-2-git-send-email-gmbnomis@gmail.com>
- <510506F9.3070500@gmail.com> <20130127110857.GA23687@schnuecks.de>
- <51053761.1020009@gmail.com>
- <20130127144610.GW1758@titan.lakedaemon.net>
- <51053F81.6020904@gmail.com>
- <20130127152431.GX1758@titan.lakedaemon.net>
-Message-ID: <20130128223148.GA10275@schnuecks.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 28 Jan 2013 23:36:59 +0100
+Subject: [GIT PULL] Nomadik devicetree and cleanups
+In-Reply-To: <20130128213135.GA3047@quad.lixom.net>
+References: <CACRpkdZM8+6QaGrRtCCMWoZQO23uej7JDr1xz2zG7TtwQ7Ngqw@mail.gmail.com>
+ <20130128213135.GA3047@quad.lixom.net>
+Message-ID: <CACRpkdaHo_xLwqUDF9C71HbuGEcJHg_Jrsf0gCSPYXa4E+yJGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On Mon, Jan 28, 2013 at 10:31 PM, Olof Johansson <olof@lixom.net> wrote:
 
-On Sun, Jan 27, 2013 at 10:24:31AM -0500, Jason Cooper wrote:
-> On Sun, Jan 27, 2013 at 03:53:53PM +0100, Sebastian Hesselbarth wrote:
-> > On 01/27/2013 03:46 PM, Jason Cooper wrote:
-> > >>I _cannot_ confirm that gbe is loosing its MAC address on Dove. I will
-> > >>post a follow-up patch to Jason's cleanup patches that will also
-> > >>grab a clock for smi. With that patch insmod'ing/rmmod'ing mv643xx_eth
-> > >>does work just fine here on Dove.
-> > >
-> > >I believe Simon's issue is that the mv643xx_eth driver is not loaded at
-> > >boot, it's clocks get gated, then when he loads the driver, there is no
-> > >mac address.  Is that correct Simon?  I don't think unloading the driver
-> > >after boot will trigger this regression.
-> > 
-> > Loading and unloading the driver module hangs because of the missing
-> > clk_prepeare_enable in shared driver part. This should be fixed by the
-> > patch I sent you.
-> > 
-> > Dove and Kirkwood have the same gbe internally and I can boot into Dove
-> > without mv643xx_eth, load, unload, reload the module and it always finds
-> > its MAC address.
-> > 
-> > I just want Simon to confirm that Kirkwood's gbe is really loosing the
-> > contents of its MAC address registers during gated clocks, which is from
-> > a HW point of view very unlikely.
-> 
-> Ok, I just wanted to make sure we understood his problem correctly, and
-> if possible, reproduce it.
-> 
-> Simon, can you give us some steps to reproduce this on our side so we
-> can see exactly what's happening?
+> Would you mind rebasing on top of the depends/cleanup branch in arm-soc, sort
+> out the breakage (and test it) and resubmit?
 
-Nothing special here. My config originally based on a Debian config
-for a Kirkwood kernel.  Thus, amongst other drivers, mv643xx_eth is
-build as a module and is loaded from an initrd.
-Because all relevant drivers are loaded as modules, I need my
-runit patch to boot at all.
+So Olof, please try this instead, based on the ARM depends/cleanup HEAD
+when I fetched it:
 
-Here are my findings with various patches: ("non-DT" means booting
-the IBNAS6210 with machine ID 1680 ???Marvell DB-88F6281-BP
-Development Board???, which works reasonably well)
+The following changes since commit f8060f5446b1f2782f0a8ca9be2d870ea4198aee:
 
-3.8-rc5 + runit patch:
+  Merge tag 'gic-vic-to-irqchip' of
+git://sources.calxeda.com/kernel/linux into next/cleanup (2013-01-14
+19:55:03 -0800)
 
-DT: Hangs at boot (when loading mv643xx_eth)
-non-DT: Boots ok
-
-3.8-rc5 + runit patch + ge00/ge01 patch:
-
-DT: Boots ok
-non-DT: Boots ok
-
-3.8-rc5 + runit + Sebastians get smi clock patch (modified to use
-legacy clock names):
-
-DT: Boots, but no MAC
-non-DT: Boots ok
-
-3.8-rc5 + runit + using Sebastians patch + clks not ticking at module
-load:
-
-DT: Boots, but no MAC
-non-DT: Boots, but no MAC
+are available in the git repository at:
 
 
-hth,
-  Simon
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/nmk-dt-on-cleanups
+
+for you to fetch changes up to dea3eacd087cfa692ea20aafbfaf4827607afe45:
+
+  ARM: nomadik: get rid of <mach/hardware.h> (2013-01-28 23:25:40 +0100)
+
+----------------------------------------------------------------
+Nomadik Device Tree conversion rebased on ARM SoC cleanup branch
+
+This patch set converts the Nomadik (mach-nomadik) to
+Device Tree and delete the old board files, paving the
+road for single zImage.
+
+----------------------------------------------------------------
+Linus Walleij (11):
+      ARM: nomadik: move last custom calls to pinctrl
+      ARM: nomadik: initial devicetree support
+      ARM: nomadik: move pin maps to cpu file
+      ARM: nomadik: move remaining PrimeCells to device tree
+      ARM: nomadik: add FSMC NAND
+      ARM: nomadik: move GPIO and pinctrl to device tree
+      ARM: nomadik: convert SMSC91x ethernet to device tree
+      ARM: nomadik: migrate MMC/SD card support to device tree
+      ARM: nomadik: add I2C devices to the device tree
+      ARM: nomadik: delete old board files
+      ARM: nomadik: get rid of <mach/hardware.h>
+
+ .../devicetree/bindings/arm/ste-nomadik.txt        |  27 ++
+ .../devicetree/bindings/mtd/fsmc-nand.txt          |   2 +-
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/ste-nomadik-s8815.dts            |  30 ++
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 256 +++++++++++++++
+ arch/arm/mach-nomadik/Kconfig                      |  10 +-
+ arch/arm/mach-nomadik/Makefile                     |   6 -
+ arch/arm/mach-nomadik/board-nhk8815.c              | 353 --------------------
+ arch/arm/mach-nomadik/cpu-8815.c                   | 358 +++++++++++++++------
+ arch/arm/mach-nomadik/cpu-8815.h                   |   4 -
+ arch/arm/mach-nomadik/i2c-8815nhk.c                |  88 -----
+ arch/arm/mach-nomadik/include/mach/hardware.h      |  90 ------
+ arch/arm/mach-nomadik/include/mach/irqs.h          |   2 -
+ arch/arm/mach-nomadik/include/mach/uncompress.h    |   1 -
+ drivers/mtd/nand/fsmc_nand.c                       |   1 +
+ drivers/pinctrl/pinctrl-nomadik.c                  |   4 +
+ 17 files changed, 588 insertions(+), 647 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/ste-nomadik.txt
+ create mode 100644 arch/arm/boot/dts/ste-nomadik-s8815.dts
+ create mode 100644 arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+ delete mode 100644 arch/arm/mach-nomadik/board-nhk8815.c
+ delete mode 100644 arch/arm/mach-nomadik/cpu-8815.h
+ delete mode 100644 arch/arm/mach-nomadik/i2c-8815nhk.c
+ delete mode 100644 arch/arm/mach-nomadik/include/mach/hardware.h
