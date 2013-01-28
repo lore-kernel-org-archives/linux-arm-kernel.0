@@ -1,79 +1,47 @@
-From: lliubbo@gmail.com (Bob Liu)
-Date: Mon, 28 Jan 2013 17:09:34 +0800
-Subject: [PATCH v5 31/45] blackfin/smp: Use get/put_online_cpus_atomic()
- to prevent CPU offline
-In-Reply-To: <20130122074123.13822.39102.stgit@srivatsabhat.in.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122074123.13822.39102.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <CAA_GA1fSLNKSDTGSzHoA+j-mur85BvoSRkARq+DMfORuwrrX4Q@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 28 Jan 2013 09:18:08 +0000
+Subject: [PATCH v2 1/2] clk: divider: prepare for minimum divider
+In-Reply-To: <20130125223524.10623.29375@quantum>
+References: <6dc1c48cac5b2646a55da3079afb72f88e40c3bc.1358937138.git.afzal@ti.com>
+ <20130123214053.9205.49804@quantum>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA92ABC@DBDE01.ent.ti.com>
+ <20130124170630.10623.78749@quantum>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA93851@DBDE01.ent.ti.com>
+ <20130125223524.10623.29375@quantum>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA943FA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 3:41 PM, Srivatsa S. Bhat
-<srivatsa.bhat@linux.vnet.ibm.com> wrote:
-> Once stop_machine() is gone from the CPU offline path, we won't be able to
-> depend on preempt_disable() or local_irq_disable() to prevent CPUs from
-> going offline from under us.
->
-> Use the get/put_online_cpus_atomic() APIs to prevent CPUs from going offline,
-> while invoking from atomic context.
->
-> Cc: Mike Frysinger <vapier@gentoo.org>
-> Cc: Bob Liu <lliubbo@gmail.com>
-> Cc: Steven Miao <realmz6@gmail.com>
-> Cc: uclinux-dist-devel at blackfin.uclinux.org
-> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+Hi Mike,
 
-Thanks, will be applied to my blackfin arch tree.
+On Sat, Jan 26, 2013 at 04:05:24, Mike Turquette wrote:
 
-> ---
->
->  arch/blackfin/mach-common/smp.c |    6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/blackfin/mach-common/smp.c b/arch/blackfin/mach-common/smp.c
-> index bb61ae4..6cc6d7a 100644
-> --- a/arch/blackfin/mach-common/smp.c
-> +++ b/arch/blackfin/mach-common/smp.c
-> @@ -194,6 +194,7 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
->         struct ipi_data *bfin_ipi_data;
->         unsigned long flags;
->
-> +       get_online_cpus_atomic();
->         local_irq_save(flags);
->         smp_mb();
->         for_each_cpu(cpu, cpumask) {
-> @@ -205,6 +206,7 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
->         }
->
->         local_irq_restore(flags);
-> +       put_online_cpus_atomic();
->  }
->
->  void arch_send_call_function_single_ipi(int cpu)
-> @@ -238,13 +240,13 @@ void smp_send_stop(void)
->  {
->         cpumask_t callmap;
->
-> -       preempt_disable();
-> +       get_online_cpus_atomic();
->         cpumask_copy(&callmap, cpu_online_mask);
->         cpumask_clear_cpu(smp_processor_id(), &callmap);
->         if (!cpumask_empty(&callmap))
->                 send_ipi(&callmap, BFIN_IPI_CPU_STOP);
->
-> -       preempt_enable();
-> +       put_online_cpus_atomic();
->
->         return;
->  }
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Thank you for the information.  In short, the way you program your clock
+> depend on the configuration of your lcdc device.
+> 
+> As such I am not sure the basic divider is the right choice for you.
+> You might be better off creating a clock for your IP which takes into
+> account these details.  Luckily it is possible to inherit from the basic
+> clock types and create a new type.
+> 
+> An example of this is the MXS divider.  It uses the basic divider as a
+> "parent class" and adds a busy bit.  This is a better approach than
+> putting every feature into the basic divider type.  You can see how it
+> was done in drivers/clk/mxs/clk-div.c
+> 
+> Let me know what you think.
 
--- 
-Regards,
---Bob
+Yes, a derived divider is better.
+
+As mentioned in other thread, the modeling of clock nodes (derived plus
+gates) would bring in considerable (relative to complete driver) code, the
+advantage being higher pixel clock resolution. Current use cases work
+as per existing divider setting in driver. Hence now it seems a better
+decision now is to proceed with logic as in v2 (not using clock nodes).
+And later depending on the use case requirement, clock tree modeling can
+be implemented.
+
+Thanks for your input.
+
+Regards
+Afzal
