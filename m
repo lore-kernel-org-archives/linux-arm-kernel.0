@@ -1,62 +1,27 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 28 Jan 2013 10:37:13 -0600
-Subject: [PATCH 1/4] drm/tilcdc: add TI LCD Controller DRM driver (v3)
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA944D2@DBDE01.ent.ti.com>
-References: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
- <1358894185-21617-2-git-send-email-robdclark@gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA939BB@DBDE01.ent.ti.com>
- <CAF6AEGsqkUr0R3eYa4P371tUPq_NLSJLhH=N_MkyJF31s068+g@mail.gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA93A7D@DBDE01.ent.ti.com>
- <CAF6AEGtrHBxvnp052K6z3aj3dAxJf1hy7H72EoAWr6PhTtwr8Q@mail.gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA944D2@DBDE01.ent.ti.com>
-Message-ID: <CAF6AEGtZvjh+==3rFo5gnZqF=orY=YqXf1fndYhE5s74v=rT1Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Jan 2013 09:49:53 -0700
+Subject: [PATCH 2/2] clk: tegra: adapt tegra periph clk to mux table/mask
+In-Reply-To: <1359388467-32386-3-git-send-email-pdeschrijver@nvidia.com>
+References: <1359388467-32386-1-git-send-email-pdeschrijver@nvidia.com>
+ <1359388467-32386-3-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <5106AC31.1040207@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 3:56 AM, Mohammed, Afzal <afzal@ti.com> wrote:
-> Hi Rob,
->
-> On Fri, Jan 25, 2013 at 20:22:55, Rob Clark wrote:
->> On Fri, Jan 25, 2013 at 8:15 AM, Mohammed, Afzal <afzal@ti.com> wrote:
->
->> > It's not about being simple, but not doing the wrong way, here you are
->> > relying on a platform specific clock in a driver, think about the case
->> > where same IP is used on another platform. Either way it is not a good
->> > thing to handle platform specific details (about disp_clk) in driver.
->
->> Right, but I was trying to understand what was the benefit that the
->> added complexity is.  I didn't realize on davinci that you are limited
->
-> Here I am referring to usage of disp_clk,
->
-> Driver is not supposed to do platform hacks - here you are trying to
-> configure something (PLL) in your driver which is not part of LCDC IP.
-> And LCDC IP is not aware of PLL which is a platform specific matter
-> (existent only in AM335x), it is only aware of functional clock.
->
-> You can set the rate on "fck" (functional clock) in AM335x using my patch,
-> "ARM: AM33XX: clock: SET_RATE_PARENT in lcd path", and there
-> would not be any need for driver to be aware of platform specific PLL.
+On 01/28/2013 08:54 AM, Peter De Schrijver wrote:
+> The tegra peripheral clock type uses struct clk_mux directly, so it needs to
+> be updated to handle the new mask and table fields. Also the macros need
+> to be updated
 
-right, but I think it would be better to just make another patch that
-changes tilcdc to just set rate on fck after that patch is merged.  I
-mean, I'd rather have the driver at least usable on AM33xx until then,
-rather than broken for everyone.
+Just a quick note on patch dependencies here:
 
-BR,
--R
+Patch 1/2 can presumably be taken through the clk tree whenever Mike is
+OK with it.
 
->> >> >> +     priv->clk = clk_get(dev->dev, "fck");
->
->> >> >> +     priv->disp_clk = clk_get(dev->dev, "dpll_disp_ck");
->
->> at the moment all this discussion is a bit moot.  I'd propose leaving
->> the driver as it is for now, because that at least makes it useful on
->> am33xx.  And when CCF and davinci have the needed support in place,
->
-> Let's forget about leveraging CCF in driver, but sane solution w.r.t PLL
-> configuration would be to do as mentioned above.
->
-> Regards
-> Afzal
->
+Patch 2/2 depends on patches in the Tegra tree for 3.9. Since patch 2/2
+is useful mostly for the Tegra114 clock driver, and I don't imagine that
+will get posted/merged in time for 3.9, it's probably easiest to just
+take patch 2/2 for 3.10 along with the Tegra114 clock driver. Also, I
+imagine there won't be any more clk/Tegra tree dependencies in 3.10, so
+patch 2/2 and the Tegra114 clk driver patches can likely go through the
+clk tree itself for 3.10.
