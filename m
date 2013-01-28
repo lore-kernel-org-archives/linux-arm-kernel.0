@@ -1,67 +1,51 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 19:56:12 +0100
-Subject: [PATCH v2 03/27] of/pci: Add of_pci_parse_bus_range() function
+Date: Mon, 28 Jan 2013 19:56:13 +0100
+Subject: [PATCH v2 04/27] ARM: pci: Allow passing per-controller private data
 In-Reply-To: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1359399397-29729-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1359399397-29729-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <thierry.reding@avionic-design.de>
 
-This function can be used to parse a bus-range property as specified by
-device nodes representing PCI bridges.
+In order to allow drivers to specify private data for each controller,
+this commit adds a private_data field to the struct hw_pci. This field
+is an array of nr_controllers pointers that will be used to initialize
+the private_data field of the corresponding controller's pci_sys_data
+structure.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/of/of_pci.c    |   25 +++++++++++++++++++++++++
- include/linux/of_pci.h |    1 +
- 2 files changed, 26 insertions(+)
+ arch/arm/include/asm/mach/pci.h |    1 +
+ arch/arm/kernel/bios32.c        |    3 +++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 0dd52df..3ea0e84 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -64,3 +64,28 @@ int of_pci_get_devfn(struct device_node *np)
- 	return (be32_to_cpup(reg) >> 8) & 0xff;
- }
- EXPORT_SYMBOL_GPL(of_pci_get_devfn);
-+
-+/**
-+ * of_pci_parse_bus_range() - parse the bus-range property of a PCI device
-+ * @node: device node
-+ * @res: address to a struct resource to return the bus-range
-+ *
-+ * Returns 0 on success or a negative error-code on failure.
-+ */
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-+{
-+	const __be32 *values;
-+	int len;
-+
-+	values = of_get_property(node, "bus-range", &len);
-+	if (!values || len < sizeof(*values) * 2)
-+		return -EINVAL;
-+
-+	res->name = node->name;
-+	res->start = be32_to_cpup(values++);
-+	res->end = be32_to_cpup(values);
-+	res->flags = IORESOURCE_BUS;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 91ec484..7a04826 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -11,5 +11,6 @@ struct device_node;
- struct device_node *of_pci_find_child_device(struct device_node *parent,
- 					     unsigned int devfn);
- int of_pci_get_devfn(struct device_node *np);
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- 
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index db9fedb..5cf2e97 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -23,6 +23,7 @@ struct hw_pci {
  #endif
+ 	struct pci_ops	*ops;
+ 	int		nr_controllers;
++	void		**private_data;
+ 	int		(*setup)(int nr, struct pci_sys_data *);
+ 	struct pci_bus *(*scan)(int nr, struct pci_sys_data *);
+ 	void		(*preinit)(void);
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 379cf32..5401645 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -464,6 +464,9 @@ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+ 		sys->map_irq = hw->map_irq;
+ 		INIT_LIST_HEAD(&sys->resources);
+ 
++		if (hw->private_data)
++			sys->private_data = hw->private_data[nr];
++
+ 		ret = hw->setup(nr, sys);
+ 
+ 		if (ret > 0) {
 -- 
 1.7.9.5
