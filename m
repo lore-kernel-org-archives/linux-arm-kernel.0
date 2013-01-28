@@ -1,32 +1,22 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 28 Jan 2013 14:41:40 +0800
-Subject: [PATCH v3 1/3] cpufreq: kirkwood: Add a cpufreq driver for
- Marvell Kirkwood SoCs
-In-Reply-To: <20130127172358.GM29973@lunn.ch>
-References: <1359281244-31455-1-git-send-email-andrew@lunn.ch>
- <1359281244-31455-2-git-send-email-andrew@lunn.ch>
- <20130127171111.GG23505@n2100.arm.linux.org.uk>
- <20130127172358.GM29973@lunn.ch>
-Message-ID: <20130128064137.GA20238@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 27 Jan 2013 22:47:23 -0800
+Subject: [GIT PULL] perf updates for 3.9
+In-Reply-To: <20130123180347.GG26811@mudshark.cambridge.arm.com>
+References: <20130123180347.GG26811@mudshark.cambridge.arm.com>
+Message-ID: <20130128064723.GE25723@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 06:23:58PM +0100, Andrew Lunn wrote:
-> > > +	clkspec.np = np;
-> > > +	clkspec.args_count = 1;
-> > > +	clkspec.args[0] = 1;
-> > > +
-> > > +	priv.cpu_clk = of_clk_get_from_provider(&clkspec);
-> > 
-> > Oh, yet another way to get clocks...
+On Wed, Jan 23, 2013 at 06:03:47PM +0000, Will Deacon wrote:
+> Hi Russell, Arnd, Olof,
 > 
-> Yep. I didn't like it, but could not find a better way.  It has been
-> argued that cpufreq drivers should not have nodes in DT. So the normal
-> of_clk_get() does not work. Since the clocks themselves are
-> instantiated from DT, there are no clkdev alias, so plain clk_get()
-> also does not work.
-> 
-But you should have a cpu node in DT, and it will be perfectly fine to
-have cpu node consume that core_clk.
+> Please can you pull these perf updates for 3.9? They should go via both
+> rmk and arm-soc as they are a dependency for kvm and some Tegra SCU
+> stuff. I'll keep this branch stable, so others can base against it if
+> they like.
 
-Shawn
+Thanks, I've added a copy of this as depends/rmk-perf in arm-soc, will
+merge into branches as pull requests that depend on it come in.
+
+
+-Olof
