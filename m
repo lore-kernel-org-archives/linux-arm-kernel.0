@@ -1,46 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 28 Jan 2013 11:27:30 +0100
-Subject: [PATCH 01/10] gpio: pxa: set initcall level to module init
-In-Reply-To: <CAD6h2NSZoTaG1vN4gCRV5WdR07ZKepYP5z3JujuRs8Pn2pwdVQ@mail.gmail.com>
-References: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
- <1358929554-32265-2-git-send-email-haojian.zhuang@linaro.org>
- <87ham5nfi7.fsf@free.fr>
- <CAD6h2NSZoTaG1vN4gCRV5WdR07ZKepYP5z3JujuRs8Pn2pwdVQ@mail.gmail.com>
-Message-ID: <CACRpkdYcCQrciwzzHpjRdxEF-H=h9hAG0XaUoSqeA2+qh6RLzg@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 28 Jan 2013 10:34:15 +0000
+Subject: OMAP baseline test results for v3.8-rc5
+In-Reply-To: <20130126084604.GB8754@arwen.pp.htv.fi>
+References: <alpine.DEB.2.00.1301260838300.19277@utopia.booyaka.com>
+ <20130126084604.GB8754@arwen.pp.htv.fi>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA9456A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 5:26 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
-> On 26 January 2013 05:01, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->> Haojian Zhuang <haojian.zhuang@linaro.org> writes:
->>
->>> gpio & pinctrl driver are used together. The pinctrl driver is already
->>> launched before gpio driver in Makefile. So set gpio driver to module
->>> init level. Otherwise, the sequence will be inverted.
->> Hi Haojian,
->>
->> If you switch gpio to module level, and as some modules use gpios in their init
->> path, isn't it possible that some modules will fail their init, as GPIO API
->> won't provide the gpio_*_value() functions ?
->
-> gpio_request() should return EPROBE_DEFER, then the driver is using gpio API
-> fails and it should be retried after a while. At that time, gpio
-> driver should be launched
-> properly.
+Hi,
 
-Correct. However it is not uncommon for modules to have untested
-errorpaths, such as:
+On Sat, Jan 26, 2013 at 14:16:04, Balbi, Felipe wrote:
+> On Sat, Jan 26, 2013 at 08:40:07AM +0000, Paul Walmsley wrote:
 
-ret = gpio_request(12);
-if (ret)
-   return -ENODEV;
+> > * am335xbone: hangs after "Starting kernel"
+> >   - Cause unknown; may be due to CONFIG_EARLY_PRINTK=y?
+> >   - http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82297.html
+> >   - http://marc.info/?l=linux-omap&m=135903184512238&w=2
+> 
+> FYI, I don't think it's related to CONFIG_EARLY_PRINTK. Tested with and
+> without it, also removed CONFIG_DEBUG_LL completely and nothing seemed
+> to help my bone, no matter if I had appended DTB or not.
 
-So you will not know before you test.
+Following patch with low level debug may help to find where the issue is,
+(my observation is that it boots with mainline u-boot)
 
-Then it is often common to have memory leaks in the errorpath...
+Regards
+Afzal
 
-So Tested-by: tags are appreciated.
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 41b581f..178a411 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -117,6 +117,10 @@ config SOC_AM33XX
+        select CPU_V7
+        select MULTI_IRQ_HANDLER
+        select COMMON_CLK
++       select MACH_AM335XEVM
++
++config MACH_AM335XEVM
++       bool
+
+ config OMAP_PACKAGE_ZAF
+        bool
