@@ -1,29 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Jan 2013 15:20:10 +0000
-Subject: [PATCH 09/30] USB: ehci-omap: Use devm_request_and_ioremap()
-In-Reply-To: <Pine.LNX.4.44L0.1301281013010.1997-100000@iolanthe.rowland.org>
-References: <1359372631-8180-10-git-send-email-rogerq@ti.com>
- <Pine.LNX.4.44L0.1301281013010.1997-100000@iolanthe.rowland.org>
-Message-ID: <20130128152010.GN23505@n2100.arm.linux.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 28 Jan 2013 21:03:14 +0530
+Subject: [PATCH] ARM: davinci: da850: add interrupt-parent property in
+ soc node
+In-Reply-To: <1359112724-1217-1-git-send-email-prabhakar.lad@ti.com>
+References: <1359112724-1217-1-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <51069A3A.8090404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 10:17:33AM -0500, Alan Stern wrote:
-> On Mon, 28 Jan 2013, Roger Quadros wrote:
+On 1/25/2013 4:48 PM, Prabhakar Lad wrote:
+> From: Lad, Prabhakar <prabhakar.lad@ti.com>
 > 
-> > Make use of devm_request_and_ioremap() and correct comment.
+> This patch adds 'interrupt-parent' property in soc node, so that
+> the child inherits this property, this avoids adding 'interrupt-parent'
+> to each node.
 > 
-> Didn't a big patch come through recently converting all usages of 
-> devm_request_and_ioremap() to another function (I forget the name) that 
-> does its own error reporting and returns an ERR_PTR value?
-> 
-> (Checks the mailing list archive...)  Ah, here it is:
-> 
-> 	http://marc.info/?l=linux-usb&m=135876311801537&w=2
-> 
-> And the new function is devm_ioremap_resource().  We should avoid 
-> adding new usages of an old interface.
+> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Heiko Schocher <hs@denx.de>
+> ---
 
-Maybe... if devm_ioremap_resource() was already in the kernel.  The
-problem at the moment is it isn't, and it'll probably be rather
-horrid for everyone to deal with especially when it comes to testing.
+Looks good to me. Queuing for v3.9. BTW, we are moving the interrupt
+parent property to soc node rather than adding it. So, I think a better
+headline is "move interrupt-parent property to soc node". I change the
+headline while committing.
+
+Thanks,
+Sekhar
