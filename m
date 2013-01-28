@@ -1,43 +1,24 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 27 Jan 2013 23:13:12 -0800
-Subject: [PATCHv1 for soc 2/5] arm: socfpga: Add clock entries to
- socfpga.dtsi
-In-Reply-To: <1359075633-13502-3-git-send-email-dinguyen@altera.com>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-3-git-send-email-dinguyen@altera.com>
-Message-ID: <20130128071312.GI25723@quad.lixom.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 28 Jan 2013 09:18:55 +0200
+Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
+In-Reply-To: <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
+References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
+ <1358833924-24535-2-git-send-email-hdoyu@nvidia.com>
+ <50FE2CA8.20100@ti.com> <50FEC503.2080602@wwwdotorg.org>
+ <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
+Message-ID: <20130128091855.9e89d6da79bf5a264449ea5e@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Russell,
 
-On Thu, Jan 24, 2013 at 07:00:30PM -0600, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Pavel Machek <pavel@denx.de>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi |   37 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 936d230..688729f 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -78,6 +78,43 @@
->  			};
->  		};
->  
-> +		clkmgr at ffd04000 {
-> +			compatible = "altr, clk-mgr";
+On Tue, 22 Jan 2013 18:04:46 +0100
+Olof Johansson <olof@lixom.net> wrote:
 
+> Since Russell had comments on it earlier, I'd like him to give a nod
+> that he's happy with it too.
 
-No space after "altr,". Also, this should have documented bindings under
-Documentation/device-tree/bindings (and those should be cc:d to the appropriate
-maintainers).
+Is this ok for you?
 
-
--Olof
+The original patch is:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/143552.html
