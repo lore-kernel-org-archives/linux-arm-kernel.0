@@ -1,61 +1,43 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 28 Jan 2013 15:16:52 -0700
-Subject: [PATCH v2 08/27] pci: implement an emulated PCI-to-PCI bridge
-In-Reply-To: <5106F668.60605@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 28 Jan 2013 23:18:29 +0100
+Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
+In-Reply-To: <20130128220904.GA21446@obsidianresearch.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130128193516.GB17722@obsidianresearch.com>
- <20130128203947.07332698@skate>
- <20130128195501.GD17722@obsidianresearch.com>
- <5106F668.60605@wwwdotorg.org>
-Message-ID: <20130128221652.GB21446@obsidianresearch.com>
+ <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301282018.17714.arnd@arndb.de> <5106F5CB.8050304@wwwdotorg.org>
+ <20130128220904.GA21446@obsidianresearch.com>
+Message-ID: <20130128231829.6b205c3c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 03:06:32PM -0700, Stephen Warren wrote:
-> On 01/28/2013 12:55 PM, Jason Gunthorpe wrote:
-> > On Mon, Jan 28, 2013 at 08:39:47PM +0100, Thomas Petazzoni wrote:
-> > 
-> >>> In the Marvell case, this capability can be constructed by pulling
-> >>> data from the the Express End Point capability of the PCI-E port:
-> >>
-> >> I am not sure what you mean by "pulling". Do you mean that I should get
-> >> informations from the real PCIe interface, from within the emulated
-> >> PCI-to-PCI bridge implementation? This would unfortunately not be
-> >> really nice, because until now, the PCI-to-PCI bridge emulation is
-> >> clearly separated from the Marvell PCIe driver itself. Of course, it
-> >> could register a hook or something like that, so that the emulated
-> >> PCI-to-PCI bridge could potentially call back into the Marvell PCIe
-> >> driver.
-> > 
-> > Yes, a callback would be needed to the main driver and IIRC the driver
-> > can read/write the end port link info config regsiters via MMIO. They
-> > probably need a bit of massaging to be in root port format, but
-> > otherwise it should be straightforward..
-> > 
-> >> I'll have to dig a little bit more about this capability to see how it
-> >> works exactly.
-> > 
-> > All ports have registers to report and control the link, but the root
-> > port and end port versions are a bit different, so the goal is to read
-> > the end port formatted registers and map them into the root port
-> > format so that userspace can properly see the link state and
-> > configuration.
+Dear Jason Gunthorpe,
+
+On Mon, 28 Jan 2013 15:09:04 -0700, Jason Gunthorpe wrote:
+
+> If Linux will discover properly (I strongly suspect it does) without
+> the host bridge, then I would say to ditch this...
 > 
-> Isn't the thing being emulated here a host bridge, which "contains" the
-> PCIe root ports underneath, which in turn "contain" the PCIe devices
-> underneath? At least on Tegra, there is no host bridge device that
-> exposes PCIe config registers, but the PCIe root ports do exist and do
-> expose PCIe config registers...
+> The PCI-E standard requires a host bridge device, but if Linux doesn't
+> require it then there is no reason to emulate one.
+> 
+> That would simplify the question of PCI IDs - for Marvell's case and
+> the sw root port bridge we can just copy the IDs from the bogus config
+> space of the HW.
 
-Patch #7 create a SW emulated host bridge, which tegra and marvell
-lack in HW.
+Not sure what you mean in this last paragraph. In this second version,
+I really rely on the emulated PCI-to-PCI bridges for the resource
+allocation. I give the Linux PCI core a global range of addresses for
+memory regions and a global range of addresses for I/O regions, and
+then I let Linux do the allocation of ranges on a per bridge basis,
+depending on the devices detected downstream. And at the end, I use
+those allocated ranges to set up the address decoding windows.
 
-Patch #8 creates a SW emulated root port bridge, which tegra has
-properly in HW, while Marvell doesn't.
+This all comes from your suggestions during the review of the first
+revision of this patch set.
 
-Basically, on the Marvell chips, the PCI config space of the PCI
-complex is useless when used as a root complex - the config space is
-only usable when the device is configured as an end port.
-
-Jason
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
