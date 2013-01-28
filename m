@@ -1,42 +1,94 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 19:56:22 +0100
-Subject: [PATCH v2 13/27] arm: plat-orion: introduce WIN_CTRL_ENABLE in
- address mapping code
+Date: Mon, 28 Jan 2013 19:56:23 +0100
+Subject: [PATCH v2 14/27] arm: plat-orion: refactor the orion_disable_wins()
+ function
 In-Reply-To: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1359399397-29729-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1359399397-29729-15-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of hardcoding "1" as being the bit value to enable an address
-decoding window, introduce and use a WIN_CTRL_ENABLE definition.
+In the address decoding code, the orion_disable_wins() function is
+used at boot time to disable all address decoding windows, before
+configuring only the ones that are needed. This allows to make sure
+that no configuration is left from the bootloader.
+
+As a preparation for the introduction of address decoding window
+allocation/deallocation function, we refactor this function into an
+orion_disable_cpu_win() which disables a single window.
+
+The orion_config_wins() function is changed to call
+orion_disable_cpu_win() in a loop, to preserve an identical behavior.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/plat-orion/addr-map.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/plat-orion/addr-map.c |   35 +++++++++++++++++------------------
+ 1 file changed, 17 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
-index febe386..4dec3db 100644
+index 4dec3db..dd98638 100644
 --- a/arch/arm/plat-orion/addr-map.c
 +++ b/arch/arm/plat-orion/addr-map.c
-@@ -38,6 +38,7 @@ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
-  * CPU Address Decode Windows registers
-  */
- #define WIN_CTRL_OFF		0x0000
-+#define   WIN_CTRL_ENABLE       BIT(0)
- #define WIN_BASE_OFF		0x0004
- #define WIN_REMAP_LO_OFF	0x0008
- #define WIN_REMAP_HI_OFF	0x000c
-@@ -79,7 +80,8 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
+@@ -95,6 +95,19 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
  	}
+ }
  
- 	base_high = base & 0xffff0000;
--	ctrl = ((size - 1) & 0xffff0000) | (attr << 8) | (target << 4) | 1;
-+	ctrl = ((size - 1) & 0xffff0000) | (attr << 8) | (target << 4) |
-+		WIN_CTRL_ENABLE;
++static void __init orion_disable_cpu_win(const struct orion_addr_map_cfg *cfg,
++					 const int win)
++{
++	void __iomem *addr = cfg->win_cfg_base(cfg, win);
++
++	writel(0, addr + WIN_BASE_OFF);
++	writel(0, addr + WIN_CTRL_OFF);
++	if (cfg->cpu_win_can_remap(cfg, win)) {
++		writel(0, addr + WIN_REMAP_LO_OFF);
++		writel(0, addr + WIN_REMAP_HI_OFF);
++	}
++}
++
+ /*
+  * Configure a number of windows.
+  */
+@@ -108,36 +121,22 @@ static void __init orion_setup_cpu_wins(const struct orion_addr_map_cfg * cfg,
+ 	}
+ }
  
- 	writel(base_high, addr + WIN_BASE_OFF);
- 	writel(ctrl, addr + WIN_CTRL_OFF);
+-static void __init orion_disable_wins(const struct orion_addr_map_cfg * cfg)
+-{
+-	void __iomem *addr;
+-	int i;
+-
+-	for (i = 0; i < cfg->num_wins; i++) {
+-		addr = cfg->win_cfg_base(cfg, i);
+-
+-		writel(0, addr + WIN_BASE_OFF);
+-		writel(0, addr + WIN_CTRL_OFF);
+-		if (cfg->cpu_win_can_remap(cfg, i)) {
+-			writel(0, addr + WIN_REMAP_LO_OFF);
+-			writel(0, addr + WIN_REMAP_HI_OFF);
+-		}
+-	}
+-}
+-
+ /*
+  * Disable, clear and configure windows.
+  */
+ void __init orion_config_wins(struct orion_addr_map_cfg * cfg,
+ 			      const struct orion_addr_map_info *info)
+ {
++	int win;
++
+ 	if (!cfg->cpu_win_can_remap)
+ 		cfg->cpu_win_can_remap = orion_cpu_win_can_remap;
+ 
+ 	if (!cfg->win_cfg_base)
+ 		cfg->win_cfg_base = orion_win_cfg_base;
+ 
+-	orion_disable_wins(cfg);
++	for (win = 0; win < cfg->num_wins; win++)
++		orion_disable_cpu_win(cfg, win);
+ 
+ 	if (info)
+ 		orion_setup_cpu_wins(cfg, info);
 -- 
 1.7.9.5
