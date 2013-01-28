@@ -1,46 +1,38 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 28 Jan 2013 10:34:15 +0000
-Subject: OMAP baseline test results for v3.8-rc5
-In-Reply-To: <20130126084604.GB8754@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1301260838300.19277@utopia.booyaka.com>
- <20130126084604.GB8754@arwen.pp.htv.fi>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA9456A@DBDE01.ent.ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 28 Jan 2013 18:36:01 +0800
+Subject: [Suggestion] ARM:kernel: memcpy, checking the length before copy.
+Message-ID: <51065491.7040702@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Russell King:
 
-On Sat, Jan 26, 2013 at 14:16:04, Balbi, Felipe wrote:
-> On Sat, Jan 26, 2013 at 08:40:07AM +0000, Paul Walmsley wrote:
+in arch/arm/kernel/fiq.c:
 
-> > * am335xbone: hangs after "Starting kernel"
-> >   - Cause unknown; may be due to CONFIG_EARLY_PRINTK=y?
-> >   - http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82297.html
-> >   - http://marc.info/?l=linux-omap&m=135903184512238&w=2
-> 
-> FYI, I don't think it's related to CONFIG_EARLY_PRINTK. Tested with and
-> without it, also removed CONFIG_DEBUG_LL completely and nothing seemed
-> to help my bone, no matter if I had appended DTB or not.
+  since the function set_fiq_handler is an EXPORT_SYMBOL function.
+  do we need checking memory length, before copy ?
+    (have to understand the madly using by outside users)
 
-Following patch with low level debug may help to find where the issue is,
-(my observation is that it boots with mainline u-boot)
-
-Regards
-Afzal
+  if really it is, maybe also need provide the return value for failure.
 
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 41b581f..178a411 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -117,6 +117,10 @@ config SOC_AM33XX
-        select CPU_V7
-        select MULTI_IRQ_HANDLER
-        select COMMON_CLK
-+       select MACH_AM335XEVM
-+
-+config MACH_AM335XEVM
-+       bool
+  Regards
 
- config OMAP_PACKAGE_ZAF
-        bool
+gchen.
+
+
+ 80 void set_fiq_handler(void *start, unsigned int length)
+ 81 {
+ 82 #if defined(CONFIG_CPU_USE_DOMAINS)
+ 83         memcpy((void *)0xffff001c, start, length);
+ 84 #else
+ 85         memcpy(vectors_page + 0x1c, start, length);
+ 86 #endif
+ 87         flush_icache_range(0xffff001c, 0xffff001c + length);
+ 88         if (!vectors_high())
+ 89                 flush_icache_range(0x1c, 0x1c + length);
+ 90 }
+ 91 
+...
+
+137 EXPORT_SYMBOL(set_fiq_handler);
