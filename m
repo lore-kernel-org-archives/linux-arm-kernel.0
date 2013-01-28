@@ -1,100 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 28 Jan 2013 11:38:56 +0530
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <50FEAABA.6050307@ti.com>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
- <201301220931.24570.arnd@arndb.de> <50FE666B.10902@ti.com>
- <20130122145113.GK23505@n2100.arm.linux.org.uk> <50FEAABA.6050307@ti.com>
-Message-ID: <510615F8.7010203@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 27 Jan 2013 22:13:50 -0800
+Subject: [GIT PULL v2] arm-soc: Xilinx zynq timer changes for v3.9
+In-Reply-To: <CAHTX3dLSp5_OZmuvU18s=A19e7F1Jq7tgTjayV8qFDJ1FTJztA@mail.gmail.com>
+References: <CAHTX3d+qeKPT3YYG3=YgWYN5YTS1oT9HoTEpVwC4GZAYve5uYw@mail.gmail.com>
+ <CAHTX3dLSp5_OZmuvU18s=A19e7F1Jq7tgTjayV8qFDJ1FTJztA@mail.gmail.com>
+Message-ID: <20130128061350.GC25723@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 January 2013 08:35 PM, Santosh Shilimkar wrote:
-> On Tuesday 22 January 2013 08:21 PM, Russell King - ARM Linux wrote:
->> On Tue, Jan 22, 2013 at 03:44:03PM +0530, Santosh Shilimkar wrote:
->>> Sorry for not being clear enough. On OMAP, 32KHz is the only clock which
->>> is always running(even during low power states) and hence the clock
->>> source and clock event have been clocked using 32KHz clock. As mentioned
->>> by RMK, with 32768 Hz clock and HZ = 100, there will be always an
->>> error of 0.1 %. This accuracy also impacts the timer tick interval.
->>> This was the reason, OMAP has been using the HZ = 128.
->>
->> Ok.  Let's look at this.  As far as time-of-day is concerned, this
->> shouldn't really matter with the clocksource/clockevent based system
->> that we now have (where *important point* platforms have been converted
->> over.)
->>
->> Any platform providing a clocksource will override the jiffy-based
->> clocksource.  The measurement of time-of-day passing is now based on
->> the difference in values read from the clocksource, not from the actual
->> tick rate.
->>
->> Anything _not_ providing a clock source will be reliant on jiffies
->> incrementing, which in turn _requires_ one timer interrupt per jiffies
->> at a known rate (which is HZ).
->>
->> Now, that's the time of day, what about jiffies?  Well, jiffies is
->> incremented based on a certain number of nsec having passed since the
->> last jiffy update.  That means the code copes with dropped ticks and
->> the like.
->>
->> However, if your actual interrupt rate is close to the desired HZ, then
->> it can lead to some interesting effects (and noise):
->>
->> - if the interrupt rate is slightly faster than HZ, then you can end up
->>    with updates being delayed by 2x interrupt rate.
->> - if the interrupt rate is slightly slower than HZ, you can occasionally
->>    end up with jiffies incrementing by two.
->> - if your interrupt rate is dead on HZ, then other system noise can come
->>    into effect and you may get maybe zero, one or two jiffy increments
->> per
->>    interrupt.
->>
->> (You have to think about time passing in NS, where jiffy updates should
->> be vs where the timer interrupts happen.)  See tick_do_update_jiffies64()
->> for the details.
->>
->> The timer infrastructure is jiffy based - which includes scheduling where
->> the scheduler does not use hrtimers.  That means a slight discrepency
->> between HZ and the actual interrupt rate can cause around 1/HZ jitter.
->> That's a matter of fact due to how the code works.
->>
->> So, actually, I think the accuracy of HZ has much overall effect
->> _provided_
->> a platform provides a clocksource to the accuracy of jiffy based timers
->> nor timekeeping.  For those which don't, the accuracy of the timer
->> interrupt to HZ is very important.
->>
->> (This is just based on reading some code and not on practical
->> experiments - I'd suggest some research of this is done, trying HZ=100
->> on OMAP's 32kHz timers, checking whether there's any drift, checking
->> how accurately a single task can be woken from various select/poll/epoll
->> delays, and checking whether NTP works.)
->>
-> Thanks for expanding it. It is really helpful.
->
->> And I think further discussion is pointless until such research has been
->> done (or someone who _really_ knows the time keeping/timer/sched code
->> inside out comments.)
->>
-> Fully agree about experimentation to re-asses the drift.
->  From what I recollect from past, few OMAP customers did
-> report the time drift issue and that is how the switch
-> from 100 --> 128 happened.
->
-> Anyway I have added the suggested task to my long todo list.
->
-So I tried to see if any time drift with HZ = 100 on OMAP. I ran the
-setup for 62 hours and 27 mins with time synced up once with NTP server.
-I measure about ~174 millisecond drift which is almost noise considering
-the observed duration was ~224820000 milliseconds.
+On Fri, Jan 25, 2013 at 04:48:43PM +0100, Michal Simek wrote:
+> Hi Arnd and Olof,
+> 
+> can you please look at this pull request?
 
-Am re-running the setup with HZ = 128 for similar time frame to see if
-the minimal drift observed goes away.
+Hi,
 
-Once through that, I will send a patch to update the OMAP to use
-HZ = 100 and possibly get rid of the custom OMAP HZ config.
+Sorry for the delay. I was out sick part of last week and dealing with
+backlog when I got back on my feet. Doing a sweep of pull requests now.
 
-Regards,
-Santosh
+Two comments.
+
+1. mach-pxa/time.c conflict resolution doesn't seem right -- you for some
+   reason deleted the suspend/resume struct members from the
+   clock_event_device.
+
+2. Below:
+
+> > Soren Brinkmann (7):
+> >       arm: zynq: timer: Replace PSS through PS
+
+This is pure churn. :( We can't keep renaming things in the kernel just
+because some document writer decides to change a term, we tend to stick
+to what's already there. As long as it's not completely misleading, at least.
+
+
+I' shortly  push a new "depends/cleanup" branch to arm-soc. It essentially
+contains the next/cleanup contents that you merged together yourself,
+but as a branch that you can just pull in. Since others might need to
+do the same, providing the branch from us just makes sense.
+
+So, can you please rebase on top of that and send a fresh pull request? If
+you really want the PSS->PS rename included I'll give you a first-time
+pass for it but please keep it in mind for the future.
+
+
+Thanks!
+
+-Olof
