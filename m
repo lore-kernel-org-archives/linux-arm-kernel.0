@@ -1,24 +1,38 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 28 Jan 2013 09:18:55 +0200
-Subject: [v3 2/2] ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
-In-Reply-To: <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
-References: <1358833924-24535-1-git-send-email-hdoyu@nvidia.com>
- <1358833924-24535-2-git-send-email-hdoyu@nvidia.com>
- <50FE2CA8.20100@ti.com> <50FEC503.2080602@wwwdotorg.org>
- <CAOesGMgtaCkiv285TU_vbAokN5M2MrANQ9piDcyXu5YMmbQq3A@mail.gmail.com>
-Message-ID: <20130128091855.9e89d6da79bf5a264449ea5e@nvidia.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 28 Jan 2013 12:50:44 +0530
+Subject: [PATCH] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+In-Reply-To: <20130128070206.GB31689@S2101-09.ap.freescale.net>
+References: <1359208550-16402-1-git-send-email-shawn.guo@linaro.org>
+ <CAOh2x=kCKbxX6ThzEty0F-MxxhsRMhh8++Nc7BqBaXNfaozoJw@mail.gmail.com>
+ <20130128070206.GB31689@S2101-09.ap.freescale.net>
+Message-ID: <CAKohponYt7RPh=4u22LJhjBWeDbw0MScpYCAyj5fiZqDKjsdvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 28 January 2013 12:32, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Mon, Jan 28, 2013 at 09:42:29AM +0530, Viresh Kumar wrote:
+>> >         struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
+>> >         platform_device_register_full(&devinfo);
+>>
+>> Something similar was being discussed with Andrew (cc'd) on his patch
+>> for kikwood cpufreq driver.
+>>
+>> We shouldn't encourage addition of above as we are moving towards DT.
+>
+> Moving towards DT does not really mean that we should never register
+> platform_device from platform code.  DT is designed to present physical
+> devices, while what I'm adding here is somewhat a virtual one.  I'm
+> just using the platform_device/platform_driver mechanism to instantiate
+> the driver on particular platform.
+>
+>> So, i would except an compatible array too in your patch and then driver
+>> can be probed based on compatible string being present in cpu node.
+>
+> I believe device tree maintainer already stated that we should not
+> have node/compatible for cpuidle/cpufreq such stuff in DT merely for
+> asking DT core to create platform_device for them.
 
-On Tue, 22 Jan 2013 18:04:46 +0100
-Olof Johansson <olof@lixom.net> wrote:
+I see. I am really not sure if the alternative of DT node (i.e. platform_device)
+is good enough.
 
-> Since Russell had comments on it earlier, I'd like him to give a nod
-> that he's happy with it too.
-
-Is this ok for you?
-
-The original patch is:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/143552.html
+@Arnd: What do you say?
