@@ -1,63 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 27 Jan 2013 22:35:29 -0800
-Subject: [GIT PULL][for 3.8] request from armsoc/fix branch in pxa git tree
-In-Reply-To: <CAN1soZyvN_bY-+scb6_UQGxqiC235+yuxhZ0H22JdZy6-8y_vg@mail.gmail.com>
-References: <CAN1soZzTnVhMwQfOz7=MyHm7b6n=OmNL=wEENJz-SFOPU6Wsjw@mail.gmail.com>
- <CAOesGMjfJ6A37Ncek8221dsYNzf6pZNYYD-XOt4hoa9TD_VYAw@mail.gmail.com>
- <CAN1soZyvN_bY-+scb6_UQGxqiC235+yuxhZ0H22JdZy6-8y_vg@mail.gmail.com>
-Message-ID: <20130128063529.GD25723@quad.lixom.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 28 Jan 2013 14:41:40 +0800
+Subject: [PATCH v3 1/3] cpufreq: kirkwood: Add a cpufreq driver for
+ Marvell Kirkwood SoCs
+In-Reply-To: <20130127172358.GM29973@lunn.ch>
+References: <1359281244-31455-1-git-send-email-andrew@lunn.ch>
+ <1359281244-31455-2-git-send-email-andrew@lunn.ch>
+ <20130127171111.GG23505@n2100.arm.linux.org.uk>
+ <20130127172358.GM29973@lunn.ch>
+Message-ID: <20130128064137.GA20238@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 12:37:29PM +0800, Haojian Zhuang wrote:
-> On Thu, Jan 24, 2013 at 12:33 PM, Olof Johansson <olof@lixom.net> wrote:
-> > Hi,
-> >
-> > On Wed, Jan 23, 2013 at 1:15 AM, Haojian Zhuang
-> > <haojian.zhuang@gmail.com> wrote:
-> >> Hi Arnd & Olof,
-> >>
-> >> Please help to pull armsoc/fix branch in pxa git tree.
-> >>
-> >> Regards
-> >> Haojian
-> >>
-> >> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
-> >>
-> >>   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://github.com/hzhuang1/linux.git armsoc/fix
-> >>
-> >> for you to fetch changes up to eea6e39b916dd282c7fa4629be8934b5ad60e62b:
-> >>
-> >>   ARM: pxa: Minor naming fixes in spitz.c (2013-01-23 17:13:07 +0800)
-> >>
-> >> ----------------------------------------------------------------
-> >> Igor Grinberg (1):
-> >>       ARM: PXA3xx: program the CSMSADRCFG register
-> >>
-> >> Marko Katic (1):
-> >>       ARM: pxa: Minor naming fixes in spitz.c
-> >>
-> >> Mike Dunn (2):
-> >>       ARM: palmtreo: fix lcd initilialization on treo680
-> >>       ARM: palmtreo: fix #ifdefs for leds-gpio device
-> >
-> > I don't think some of those really are regressions, are they? I.e. the
-> > palmtreo fixes are for code that never in recent times worked I think?
-> >
-> > If so, I'd prefer to queue this for 3.9 as a fixes-non-critical
-> > instead, please let me know if that's ok.
-> >
-> > Thanks,
-> >
-> > -Olof
+On Sun, Jan 27, 2013 at 06:23:58PM +0100, Andrew Lunn wrote:
+> > > +	clkspec.np = np;
+> > > +	clkspec.args_count = 1;
+> > > +	clkspec.args[0] = 1;
+> > > +
+> > > +	priv.cpu_clk = of_clk_get_from_provider(&clkspec);
+> > 
+> > Oh, yet another way to get clocks...
 > 
-> It's fine to me. You can queue all of them into 3.9 release cycle.
+> Yep. I didn't like it, but could not find a better way.  It has been
+> argued that cpufreq drivers should not have nodes in DT. So the normal
+> of_clk_get() does not work. Since the clocks themselves are
+> instantiated from DT, there are no clkdev alias, so plain clk_get()
+> also does not work.
+> 
+But you should have a cpu node in DT, and it will be perfectly fine to
+have cpu node consume that core_clk.
 
-Great, merged into next/fixes-non-critical. Thanks!
-
-
--Olof
+Shawn
