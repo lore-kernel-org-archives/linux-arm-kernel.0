@@ -1,16 +1,16 @@
 From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Mon, 28 Jan 2013 19:17:55 +0530
-Subject: [PATCH v2 2/6] ARM: davinci: da850: add DT node for mdio device
+Date: Mon, 28 Jan 2013 19:17:56 +0530
+Subject: [PATCH v2 3/6] ARM: davinci: da850: add OF_DEV_AUXDATA entry for mdio.
 In-Reply-To: <1359380879-26306-1-git-send-email-prabhakar.lad@ti.com>
 References: <1359380879-26306-1-git-send-email-prabhakar.lad@ti.com>
-Message-ID: <1359380879-26306-3-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <1359380879-26306-4-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lad, Prabhakar <prabhakar.lad@ti.com>
 
-Add mdio device tree node information to da850 by
-providing register details and bus frequency of mdio.
+Add OF_DEV_AUXDATA for mdio driver in da850 board dt
+file to use mdio clock.
 
 Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
 Cc: linux-arm-kernel at lists.infradead.org
@@ -21,41 +21,29 @@ Cc: devicetree-discuss at lists.ozlabs.org
 Cc: Sekhar Nori <nsekhar@ti.com>
 Cc: Heiko Schocher <hs@denx.de>
 ---
- arch/arm/boot/dts/da850-evm.dts |    3 +++
- arch/arm/boot/dts/da850.dtsi    |    7 +++++++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 98c1a48..a319491 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -27,6 +27,9 @@
- 		serial2: serial at 1d0d000 {
- 			status = "okay";
- 		};
-+		mdio: davinci_mdio at 1e24000 {
-+			status = "okay";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 7c84822..ba28f2d 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -81,6 +81,13 @@
- 			interrupts = <61>;
- 			status = "disabled";
- 		};
-+		mdio: davinci_mdio at 1e24000 {
-+			compatible = "ti,davinci_mdio";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x224000 0x1000>;
-+			bus_freq = <2200000>;
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 37c27af..bd00042 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -39,9 +39,15 @@ static void __init da8xx_init_irq(void)
+ 
+ #ifdef CONFIG_ARCH_DAVINCI_DA850
+ 
++struct of_dev_auxdata da8xx_auxdata[] __initdata = {
++	OF_DEV_AUXDATA("ti,davinci_mdio", 0x01e24000, "davinci_mdio.0", NULL),
++	{},
++};
++
+ static void __init da850_init_machine(void)
+ {
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table,
++			     da8xx_auxdata, NULL);
+ 
+ 	da8xx_uart_clk_enable();
+ }
 -- 
 1.7.4.1
