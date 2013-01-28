@@ -1,68 +1,128 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 28 Jan 2013 13:30:10 +0200
-Subject: [PATCH 09/30] USB: ehci-omap: Use devm_request_and_ioremap()
+Date: Mon, 28 Jan 2013 13:30:11 +0200
+Subject: [PATCH v2 10/30] USB: ehci-omap: Use PHY APIs to get the PHY device
+ and put it out of suspend
 In-Reply-To: <1359372631-8180-1-git-send-email-rogerq@ti.com>
 References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
-Message-ID: <1359372631-8180-10-git-send-email-rogerq@ti.com>
+Message-ID: <1359372631-8180-11-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of devm_request_and_ioremap() and correct comment.
+For each port that is in PHY mode we obtain a PHY device using the USB PHY
+library and put it out of suspend.
+
+It is upto platform code to associate the PHY to the controller's
+port and it is upto the PHY driver to manage the PHY's resources.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/usb/host/ehci-omap.c |   19 +++++--------------
- 1 files changed, 5 insertions(+), 14 deletions(-)
+ drivers/usb/host/ehci-omap.c |   54 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 54 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index 30fc482..fd2f5450 100644
+index fd2f5450..a35e44e 100644
 --- a/drivers/usb/host/ehci-omap.c
 +++ b/drivers/usb/host/ehci-omap.c
-@@ -216,23 +216,17 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+@@ -70,6 +70,11 @@ static const char hcd_name[] = "ehci-omap";
  
- 	res =  platform_get_resource_byname(pdev,
- 				IORESOURCE_MEM, "ehci");
--	if (!res) {
--		dev_err(dev, "UHH EHCI get resource failed\n");
--		return -ENODEV;
--	}
--
--	regs = ioremap(res->start, resource_size(res));
-+	regs = devm_request_and_ioremap(dev, res);
- 	if (!regs) {
--		dev_err(dev, "UHH EHCI ioremap failed\n");
--		return -ENOMEM;
-+		dev_err(dev, "Resource request/ioremap failed\n");
-+		return -EADDRNOTAVAIL;
- 	}
+ /*-------------------------------------------------------------------------*/
  
- 	hcd = usb_create_hcd(&ehci_omap_hc_driver, dev,
- 			dev_name(dev));
- 	if (!hcd) {
--		dev_err(dev, "failed to create hcd with err %d\n", ret);
--		ret = -ENOMEM;
--		goto err_io;
-+		dev_err(dev, "Failed to create HCD\n");
++struct omap_hcd {
++	struct usb_hcd *hcd;
++	struct usb_phy **phy;	/* one PHY for each port */
++	int nports;
++};
+ 
+ static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
+ {
+@@ -179,6 +184,7 @@ static struct hc_driver __read_mostly ehci_omap_hc_driver;
+ 
+ static const struct ehci_driver_overrides ehci_omap_overrides __initdata = {
+ 	.reset =		omap_ehci_init,
++	.extra_priv_size =	sizeof(struct omap_hcd),
+ };
+ 
+ /**
+@@ -194,6 +200,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	struct usbhs_omap_platform_data		*pdata = dev->platform_data;
+ 	struct resource				*res;
+ 	struct usb_hcd				*hcd;
++	struct omap_hcd				*omap;
+ 	void __iomem				*regs;
+ 	int					ret = -ENODEV;
+ 	int					irq;
+@@ -233,6 +240,39 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	hcd->rsrc_len = resource_size(res);
+ 	hcd->regs = regs;
+ 
++	omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
++	omap->nports = pdata->nports;
++	i = sizeof(struct usb_phy *) * omap->nports;
++	omap->phy = devm_kzalloc(&pdev->dev, i, GFP_KERNEL);
++	if (!omap->phy) {
++		dev_err(dev, "Memory allocation failed\n");
 +		return -ENOMEM;
- 	}
- 
- 	hcd->rsrc_start = res->start;
-@@ -285,8 +279,6 @@ err_pm_runtime:
++	}
++
++	platform_set_drvdata(pdev, hcd);
++
++	/* get the PHY devices if needed */
++	for (i = 0 ; i < omap->nports ; i++) {
++		struct usb_phy *phy;
++
++		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY)
++			continue;
++
++		/* get the PHY device */
++		phy = devm_usb_get_phy_dev(dev, i);
++		if (IS_ERR(phy) || !phy) {
++			ret = IS_ERR(phy) ? PTR_ERR(phy) : -ENODEV;
++			dev_err(dev, "Can't get PHY device for port %d: %d\n",
++					i, ret);
++			goto err_phy;
++		}
++
++		omap->phy[i] = phy;
++		usb_phy_init(omap->phy[i]);
++		/* bring PHY out of suspend */
++		usb_phy_set_suspend(omap->phy[i], 0);
++	}
++
+ 	/* get ehci regulator and enable */
+ 	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
+ 		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY) {
+@@ -277,6 +317,13 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ err_pm_runtime:
+ 	disable_put_regulator(pdata);
  	pm_runtime_put_sync(dev);
++
++err_phy:
++	for (i = 0; i < omap->nports; i++) {
++		if (omap->phy[i])
++			usb_phy_shutdown(omap->phy[i]);
++	}
++
  	usb_put_hcd(hcd);
  
--err_io:
--	iounmap(regs);
  	return ret;
- }
- 
-@@ -306,7 +298,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+@@ -295,11 +342,18 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ {
+ 	struct device *dev				= &pdev->dev;
+ 	struct usb_hcd *hcd				= dev_get_drvdata(dev);
++	struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
++	int i;
  
  	usb_remove_hcd(hcd);
  	disable_put_regulator(dev->platform_data);
--	iounmap(hcd->regs);
  	usb_put_hcd(hcd);
  
++	for (i = 0; i < omap->nports; i++) {
++		if (omap->phy[i])
++			usb_phy_shutdown(omap->phy[i]);
++	}
++
  	pm_runtime_put_sync(dev);
+ 	pm_runtime_disable(dev);
+ 
 -- 
 1.7.4.1
