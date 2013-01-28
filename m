@@ -1,52 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Jan 2013 14:39:05 +0000
-Subject: [PATCH v2 01/16] ARM: introduce common set_auxcr/get_auxcr
- functions
-In-Reply-To: <1359008879-9015-2-git-send-email-nicolas.pitre@linaro.org>
-References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
- <1359008879-9015-2-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130128143904.GB23470@mudshark.cambridge.arm.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Mon, 28 Jan 2013 14:40:09 +0000
+Subject: OMAP baseline test results for v3.8-rc5
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA94745@DBDE01.ent.ti.com>
+References: <alpine.DEB.2.00.1301260838300.19277@utopia.booyaka.com>
+ <20130126084604.GB8754@arwen.pp.htv.fi>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9456A@DBDE01.ent.ti.com>
+ <20130128113818.GD28698@arwen.pp.htv.fi>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA946E4@DBDE01.ent.ti.com>
+ <20130128121635.GI28698@arwen.pp.htv.fi>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA94745@DBDE01.ent.ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAF78AE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 06:27:44AM +0000, Nicolas Pitre wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Mon, Jan 28, 2013 at 17:48:49, Mohammed, Afzal wrote:
+> Hi Felipe,
 > 
-> Move the private set_auxcr/get_auxcr functions from
-> drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
+> On Mon, Jan 28, 2013 at 17:46:35, Balbi, Felipe wrote:
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->  arch/arm/include/asm/cp15.h       | 14 ++++++++++++++
->  drivers/cpuidle/cpuidle-calxeda.c | 14 --------------
->  2 files changed, 14 insertions(+), 14 deletions(-)
+> > didn't help :-s
 > 
-> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-> index 5ef4d8015a..ef0094abf2 100644
-> --- a/arch/arm/include/asm/cp15.h
-> +++ b/arch/arm/include/asm/cp15.h
-> @@ -59,6 +59,20 @@ static inline void set_cr(unsigned int val)
->  	isb();
->  }
->  
-> +static inline unsigned int get_auxcr(void)
-> +{
-> +	unsigned int val;
-> +	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
-> +	return val;
-> +}
-> +
-> +static inline void set_auxcr(unsigned int val)
-> +{
-> +	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
-> +	  : : "r" (val) : "cc");
-> +	isb();
-> +}
+> Hands up :(
 
-Oh no! It's the return of the magic "cc" clobber! Could we have an extra
-patch to remove those please (since this is just a move)?
+Hi Felipe,
 
-Will
+Could you please try with any of these options?
+
+1. Change/add mem=512M (should be same value as u-boot printed RAM size) in your
+bootargs?
+
+Or
+
+2. set fdt_high 0xffffffff (at u-boot prompt).
+
+Thanks
+AnilKumar
