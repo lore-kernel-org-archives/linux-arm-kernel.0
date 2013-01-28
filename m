@@ -1,43 +1,22 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 28 Jan 2013 10:22:23 +0000
-Subject: [PATCH 09/26] mfd: ab8500-debugfs: Provide a means for a user
- subscribe to IRQs
-In-Reply-To: <20130127235259.GO1174@sortiz-mobl>
-References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
- <1358254566-12419-10-git-send-email-lee.jones@linaro.org>
- <20130127235259.GO1174@sortiz-mobl>
-Message-ID: <20130128102223.GA18212@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 28 Jan 2013 11:22:50 +0100
+Subject: [PATCH] ARM: mxs: gpio-mxs: Add IRQ_TYPE_EDGE_BOTH support
+In-Reply-To: <1359306248-28690-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1359306248-28690-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <CACRpkdadTBrnbw4+oqcwbSiBM4BjBmBEEpmrtw7DpALTEp9j=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Jan 2013, Samuel Ortiz wrote:
+On Sun, Jan 27, 2013 at 6:04 PM, Gwenhael Goavec-Merou
+<gwenhael.goavec-merou@armadeus.com> wrote:
 
-> Hi Lee,
-> 
-> On Tue, Jan 15, 2013 at 12:55:49PM +0000, Lee Jones wrote:
-> > Allow users to subscribe to and view IRQ events live from debugfs.
-> I seem to remember that I got a similar patch some time ago for the same
-> purpose and my answer was: Please use a UIO driver for this. There already is
-> such driver, it's uio_pdrv_genirq. What your debugfs registration entry could
-> do is adding a platform device for the specific interrupt number. This would
-> avoid the irq handler registration and the sysfs entry creation, both things I
-> believe are not very elegant and open coded. It also gives you an IRQ count
-> implementation.
-> Ideally, the UIO framework could be improved to support IRQ ranges (through
-> IRQ domains) instead of the current single interrupt number.
-> 
-> Have you considered going through that path ?
+> This patch adds support for IRQ_TYPE_EDGE_BOTH needed for some driver
+> (gpio-keys).
+> Inspired from gpio-mxc.c
+>
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 
-I'm going to have to put this patch-set in the bin. Pulling this
-patch, causes lots of conflicts to the remaining patches in the
-set.
+Looks correct to me, Shawn do you ACK this?
 
-I'll start again from scratch and find another way to sync the ab* MFD
-drivers. I might even have to do it manually i.e. throw out all
-commit history and upstream it as my own patches pulled in from diffs.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
