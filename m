@@ -1,25 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Jan 2013 14:04:04 -0800
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: remove unnecessary
- CONFIG_GPIOLIB
-In-Reply-To: <bb37ce3392153c4cae3a2bc642f831683620473a.1359057921.git.josh.cartwright@ni.com>
-References: <bb37ce3392153c4cae3a2bc642f831683620473a.1359057921.git.josh.cartwright@ni.com>
-Message-ID: <20130128220404.GB7789@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Jan 2013 15:06:32 -0700
+Subject: [PATCH v2 08/27] pci: implement an emulated PCI-to-PCI bridge
+In-Reply-To: <20130128195501.GD17722@obsidianresearch.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130128193516.GB17722@obsidianresearch.com> <20130128203947.07332698@skate>
+ <20130128195501.GD17722@obsidianresearch.com>
+Message-ID: <5106F668.60605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 24, 2013 at 12:59:22PM -0600, Josh Cartwright wrote:
-> Commit 38669e045dbf8f62a008898a7fb1e93975b3817c ("ARM: vexpress: Start
-> using new Versatile Express infrastructure") introduces a hard
-> dependency to GPIOLIB for the multi_v7_defconfig:
+On 01/28/2013 12:55 PM, Jason Gunthorpe wrote:
+> On Mon, Jan 28, 2013 at 08:39:47PM +0100, Thomas Petazzoni wrote:
 > 
->    ARCH_MULTI_V7 -> ARCH_VEXPRESS -> ARCH_REQUIRE_GPIOLIB -> GPIOLIB
+>>> In the Marvell case, this capability can be constructed by pulling
+>>> data from the the Express End Point capability of the PCI-E port:
+>>
+>> I am not sure what you mean by "pulling". Do you mean that I should get
+>> informations from the real PCIe interface, from within the emulated
+>> PCI-to-PCI bridge implementation? This would unfortunately not be
+>> really nice, because until now, the PCI-to-PCI bridge emulation is
+>> clearly separated from the Marvell PCIe driver itself. Of course, it
+>> could register a hook or something like that, so that the emulated
+>> PCI-to-PCI bridge could potentially call back into the Marvell PCIe
+>> driver.
 > 
-> Remove unnecessary explicit CONFIG_GPIOLIB=y from multi_v7_defconfig.
+> Yes, a callback would be needed to the main driver and IIRC the driver
+> can read/write the end port link info config regsiters via MMIO. They
+> probably need a bit of massaging to be in root port format, but
+> otherwise it should be straightforward..
 > 
-> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+>> I'll have to dig a little bit more about this capability to see how it
+>> works exactly.
+> 
+> All ports have registers to report and control the link, but the root
+> port and end port versions are a bit different, so the goal is to read
+> the end port formatted registers and map them into the root port
+> format so that userspace can properly see the link state and
+> configuration.
 
-
-Applied, thanks.
-
--Olof
+Isn't the thing being emulated here a host bridge, which "contains" the
+PCIe root ports underneath, which in turn "contain" the PCIe devices
+underneath? At least on Tegra, there is no host bridge device that
+exposes PCIe config registers, but the PCIe root ports do exist and do
+expose PCIe config registers...
