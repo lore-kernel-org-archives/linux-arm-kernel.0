@@ -1,33 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Jan 2013 14:03:53 -0800
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: add ARCH_ZYNQ
-In-Reply-To: <7b635cbd-4c77-41c7-9b69-c1b9ef92353c@CH1EHSMHS019.ehs.local>
-References: <bb37ce3392153c4cae3a2bc642f831683620473a.1359057921.git.josh.cartwright@ni.com>
- <621fb4946273492b88fe9a903118047f497e00ee.1359057921.git.josh.cartwright@ni.com>
- <20130124201709.GB1036@beefymiracle.amer.corp.natinst.com>
- <7b635cbd-4c77-41c7-9b69-c1b9ef92353c@CH1EHSMHS019.ehs.local>
-Message-ID: <20130128220353.GA7789@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Jan 2013 15:03:55 -0700
+Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
+In-Reply-To: <201301282018.17714.arnd@arndb.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301282018.17714.arnd@arndb.de>
+Message-ID: <5106F5CB.8050304@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 03:08:06PM +0000, Michal Simek wrote:
+On 01/28/2013 01:18 PM, Arnd Bergmann wrote:
+> On Monday 28 January 2013, Thomas Petazzoni wrote:
+>> From: Thierry Reding <thierry.reding@avionic-design.de>
+>>
+>> [Thomas Petazzoni:
+>>  - Simplify capabilities handling.
+>>  - Move to a separate file.
+>>  - Fix mask used when writing a 4 bytes value.]
+>>
+>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > 
+> Not even a description why this is needed?
 > 
-> > -----Original Message-----
-> > From: Josh Cartwright [mailto:josh.cartwright at ni.com]
-> > Sent: Thursday, January 24, 2013 9:17 PM
-> > To: arm at kernel.org; Rob Herring
-> > Cc: linux-arm-kernel at lists.infradead.org; Michal Simek
-> > Subject: Re: [PATCH 2/2] ARM: multi_v7_defconfig: add ARCH_ZYNQ
-> > 
-> > On Thu, Jan 24, 2013 at 01:33:25PM -0600, Josh Cartwright wrote:
-> > > Cc: Michal Simek <michal.simek@ni.com>
-> > 
-> > Ugh, my fingers typed '@ni.com' out of habit.  Corrected patch below (and
-> > correct Cc added).
-> 
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
+> This patch (together with patch 8) seems like the most controversial
+> one of the series, so you should better provide a really good reason
+> why we would emulate something in software rather than using whatever
+> hardware is there.
 
-Applied, thanks.
-
--Olof
+At least on Tegra, there is no HW that exposes PCI configuration
+registers for the host bridge itself. Only the root ports have exposed
+PCI configuration registers. There was some debate re: whether a host
+bridge device needed to exist or not. This patch makes such a device
+exist if it's required.
