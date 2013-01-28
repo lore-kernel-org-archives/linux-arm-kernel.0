@@ -1,65 +1,63 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 28 Jan 2013 11:22:18 -0700
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <510506F9.3070500@gmail.com>
-References: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
- <1359283223-23082-2-git-send-email-gmbnomis@gmail.com>
- <510506F9.3070500@gmail.com>
-Message-ID: <20130128182218.GB9436@obsidianresearch.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 28 Jan 2013 19:24:45 +0100
+Subject: [RFC V2 PATCH 0/8] ARM: kirkwood: cleanup DT conversion
+In-Reply-To: <20130128180716.GA9436@obsidianresearch.com>
+References: <cover.1358983578.git.jason@lakedaemon.net>
+ <cover.1359091286.git.jason@lakedaemon.net>
+ <201301251115.47480.arnd@arndb.de>
+ <20130125125214.GI1758@titan.lakedaemon.net>
+ <CABJ1b_QaTBLgGASTs2yi435jR=LepN-iY97xTLXAu1hZw69Wuw@mail.gmail.com>
+ <20130125183407.GC7393@obsidianresearch.com>
+ <20130128104008.GA5170@localhost>
+ <20130128180716.GA9436@obsidianresearch.com>
+Message-ID: <20130128192445.6984e7dd@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 11:52:41AM +0100, Sebastian Hesselbarth wrote:
+Dear Jason Gunthorpe,
 
-> I agree that loosing the MAC address _is_ an issue but there must
-> be another way to retain it during gated ge clocks than not gate the
-> clocks at all.
+On Mon, 28 Jan 2013 11:07:16 -0700, Jason Gunthorpe wrote:
+
+> > 2. Also, If we use "ranges" property. How would that work?
+> > By reading the property in the addr-map driver or
+> > by somehow improving on of_bus to include this new kind of busses?
 > 
-> I can think of some ways to retain it but don't know what is the most
-> common with linux:
-> - make u-boot pass it through cmdline and let mv643xx get it from there
-> - have kirkwood's common code grab it before clk gates kick in
+> The addr-map driver would have to read it, I believe the rules of how
+> busses work make this fairly simple:
+> 
+> 1) very early on the addr-map driver would have to scan the OF tree,
+>    find the address of the mbus mapping registers, and the internal
+>    register map.
+> 2) Verify the mbus window for the internal registers matches the DT
+>    This is just a sanity check, if the correct value doesn't come back
+>    then the DT doesnt match what the bootloader setup, and some
+>    jtag accessible diagnostic can be printed...
+> 3) Wipe all the mbus windows
+> 4) Register a "marvell,orion-mbus" bus handler somehow
+> 5) When OF processes the DT it would call the bus handler for each
+>    "marvell,orion-mbus" which should parse the ranges, allocate
+>    a free window, program that window then instantiate the child
+>    devices.
 
-The cannonical solution here is to have a DT attribute
-'local-mac-address' that is filled in by the bootloader rather than
-attempting to pass the mac address to the kernel through the ethernet
-controller registers.
+I am not totally convinced that we want to describe the address
+decoding windows in the DT, because it is too static. For example, the
+number, size and location of address decoding windows for PCIe
+interfaces vary depending on the PCIe devices connected in those PCIe
+interfaces. So we clearly do not want to have address decoding windows
+fixed in stone in the Device Tree, in my opinion.
 
-Until the bootloaders are fixed a reasonable hack is to have the
-platform startup code look for an all-zeros local-mac-address in the
-DT and if found then copy the MAC from the ethernet registers into the
-DT. Then the ethernet driver can safely be a module since the MAC is
-captured in the DT.
+Instead, I think the "address decoding window driver" in the kernel
+should provide an API for device drivers to request an address decoding
+window at a given address, with a given size and target/attribute. This
+is already what the PCIe code is doing (I'm going to submit v2 of the
+PCIe code soon), and I think we should to the same for other devices as
+well.
 
-I've been using this patch here on top of the original Ian Molton
-patch.
+Best regards,
 
-Jason: Can you include something like this as well?
-
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index 7048d7c..2b2cfcb 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -2891,6 +2891,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 	struct mv643xx_eth_private *mp;
- 	struct net_device *dev;
- 	struct resource *res;
-+	const u8 *mac;
-+	int len;
- 	int err;
- 
- 	if (pdev->dev.of_node) {
-@@ -2912,6 +2914,10 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 		else
- 			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
- 
-+		mac = of_get_property(pdev->dev.of_node, "local-mac-address", &len);
-+		if (mac && len == 6)
-+		    memcpy(pd->mac_addr, mac, sizeof pd->mac_addr);
-+
- 		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
- 		if (np) {
- 			pd->shared = of_find_device_by_node(np);
+Thomas
 -- 
-1.7.5.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
