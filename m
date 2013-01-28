@@ -1,50 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Jan 2013 18:51:59 +0200
-Subject: OMAP baseline test results for v3.8-rc5
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EAF78AE@DBDE01.ent.ti.com>
-References: <alpine.DEB.2.00.1301260838300.19277@utopia.booyaka.com>
- <20130126084604.GB8754@arwen.pp.htv.fi>
- <C8443D0743D26F4388EA172BF4E2A7A93EA9456A@DBDE01.ent.ti.com>
- <20130128113818.GD28698@arwen.pp.htv.fi>
- <C8443D0743D26F4388EA172BF4E2A7A93EA946E4@DBDE01.ent.ti.com>
- <20130128121635.GI28698@arwen.pp.htv.fi>
- <C8443D0743D26F4388EA172BF4E2A7A93EA94745@DBDE01.ent.ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EAF78AE@DBDE01.ent.ti.com>
-Message-ID: <20130128165159.GZ28698@arwen.pp.htv.fi>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Jan 2013 17:18:31 +0000
+Subject: [PATCH v2 06/16] ARM: bL_head.S: vlock-based first man election
+In-Reply-To: <1359008879-9015-7-git-send-email-nicolas.pitre@linaro.org>
+References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359008879-9015-7-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130128171831.GF23470@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 24, 2013 at 06:27:49AM +0000, Nicolas Pitre wrote:
+> From: Dave Martin <dave.martin@linaro.org>
+> 
+> Instead of requiring the first man to be elected in advance (which
+> can be suboptimal in some situations), this patch uses a per-
+> cluster mutex to co-ordinate selection of the first man.
+> 
+> This should also make it more feasible to reuse this code path for
+> asynchronous cluster resume (as in CPUidle scenarios).
+> 
+> We must ensure that the vlock data doesn't share a cacheline with
+> anything else, or dirty cache eviction could corrupt it.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-On Mon, Jan 28, 2013 at 03:40:09PM +0100, AnilKumar, Chimata wrote:
-> On Mon, Jan 28, 2013 at 17:48:49, Mohammed, Afzal wrote:
-> > Hi Felipe,
-> > 
-> > On Mon, Jan 28, 2013 at 17:46:35, Balbi, Felipe wrote:
-> > 
-> > > didn't help :-s
-> > 
-> > Hands up :(
-> 
-> Hi Felipe,
-> 
-> Could you please try with any of these options?
-> 
-> 1. Change/add mem=512M (should be same value as u-boot printed RAM size) in your
-> bootargs?
-> 
-> Or
-> 
-> 2. set fdt_high 0xffffffff (at u-boot prompt).
+[...]
 
-that helped, thank you :-)
+> +
+> +	.align	__CACHE_WRITEBACK_ORDER
+> +	.type	first_man_locks, #object
+> +first_man_locks:
+> +	.space	VLOCK_SIZE * BL_MAX_CLUSTERS
+> +	.align	__CACHE_WRITEBACK_ORDER
+>  
+>  	.type	bL_entry_vectors, #object
+>  ENTRY(bL_entry_vectors)
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130128/4ced70d0/attachment.sig>
+I've just been chatting to Dave about this and __CACHE_WRITEBACK_ORDER
+isn't really the correct solution here.
+
+To summarise the problem: although vlocks are only accessed by CPUs with
+their caches disabled, the lock structures could reside in the same
+cacheline (at some level of cache) as cacheable data being written by
+another CPU. This comes about because the vlock code has a cacheable alias
+via the kernel linear mapping and means that when the cacheable data is
+evicted, it clobbers the vlocks with stale values which are part of the
+dirty cacheline.
+
+Now, we also have this problem for DMA mappings, as mentioned here:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/124276.html
+
+It seems to me that we actually want a mechanism for allocating/managing
+physically contiguous blocks of memory such that the cacheable alias is
+removed from the linear mapping (perhaps we could use PAGE_NONE to avoid
+confusing the mm code?).
+
+Will
