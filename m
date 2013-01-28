@@ -1,66 +1,81 @@
-From: mrugesh.mk@ti.com (Mrugesh Katepallewar)
-Date: Mon, 28 Jan 2013 13:17:48 +0530
-Subject: [PATCH V2] ARM: davinci: da850: add RTC DT entries
-Message-ID: <1359359268-9781-1-git-send-email-mrugesh.mk@ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 28 Jan 2013 10:02:22 +0200
+Subject: [PATCH 06/10] gpio: pxa: define nr gpios in platform data
+In-Reply-To: <1358929554-32265-7-git-send-email-haojian.zhuang@linaro.org>
+References: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358929554-32265-7-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <5106308E.8050303@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add RTC DT entries in da850 dts file.
+On 01/23/13 10:25, Haojian Zhuang wrote:
+> Avoid to define gpio numbers in gpio driver. Define it in platform data
+> instead.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/mach-mmp/aspenite.c      |    1 +
+>  arch/arm/mach-mmp/avengers_lite.c |    1 +
+>  arch/arm/mach-mmp/brownstone.c    |    1 +
+>  arch/arm/mach-mmp/flint.c         |    1 +
+>  arch/arm/mach-mmp/gplugd.c        |    1 +
+>  arch/arm/mach-mmp/tavorevb.c      |    1 +
+>  arch/arm/mach-mmp/teton_bga.c     |    1 +
+>  arch/arm/mach-mmp/ttc_dkb.c       |    1 +
+>  arch/arm/mach-pxa/pxa25x.c        |    3 +++
+>  arch/arm/mach-pxa/pxa27x.c        |    1 +
+>  arch/arm/mach-pxa/pxa3xx.c        |   15 +++++++++++-
+>  drivers/gpio/gpio-pxa.c           |   48 +++++++------------------------------
+>  include/linux/gpio-pxa.h          |    1 +
+>  13 files changed, 35 insertions(+), 41 deletions(-)
 
-Signed-off-by: Mrugesh Katepallewar <mrugesh.mk@ti.com>
----
-Applies on top of v3.8-rc4 of linus tree.
+[...]
 
-This patch is depending on 
-"ARM: davinci: da850: add interrupt-parent property in soc node"
-https://patchwork.kernel.org/patch/2044101/
+> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> index 656a1bb..a0cc797 100644
+> --- a/arch/arm/mach-pxa/pxa3xx.c
+> +++ b/arch/arm/mach-pxa/pxa3xx.c
+> @@ -435,6 +435,10 @@ void __init pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info)
+>  	pxa_register_device(&pxa3xx_device_i2c_power, info);
+>  }
+>  
+> +static struct pxa_gpio_platform_data pxa3xx_gpio_info __initdata = {
+> +	.nr_gpios = 128,
+> +};
 
-Tested on da850-evm device.
+This misses the:
+#include <linux/gpio-pxa.h>
 
-Test Procedure:
-date 2013.01.28-10:00:00 (usage: date[YYYY.]MM.DD-hh:mm[:ss])
-hwclock -w
-reset board and check system time.
+> +
+>  static struct platform_device *devices[] __initdata = {
+>  	&pxa_device_gpio,
+>  	&pxa27x_device_udc,
+> @@ -482,8 +486,17 @@ static int __init pxa3xx_init(void)
+>  		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
+>  		register_syscore_ops(&pxa3xx_clock_syscore_ops);
+>  
+> -		if (!of_have_populated_dt())
+> +		if (!of_have_populated_dt()) {
+> +			if (cpu_is_pxa93x())
+> +				pxa3xx_gpio_info.nr_gpios = 192;
+> +			ret = platform_device_add_data(&pxa_device_gpio,
+> +					&pxa3xx_gpio_info,
+> +					sizeof(struct pxa_gpio_platform_data);
 
-Changes Since V1:
-Remove interrupt-parent property from RTC node.
-Change RTC node name in dts and dtsi file.
+Closing parenthesis is missing...
 
-:100644 100644 37dc5a3... af4b7cc... M	arch/arm/boot/dts/da850-evm.dts
-:100644 100644 640ab75... 90be701... M	arch/arm/boot/dts/da850.dtsi
- arch/arm/boot/dts/da850-evm.dts |    3 +++
- arch/arm/boot/dts/da850.dtsi    |    7 +++++++
- 2 files changed, 10 insertions(+)
+> +			if (ret < 0)
+> +				break;
+> +
+>  			ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+> +		}
+>  	}
+>  
+>  	return ret;
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 37dc5a3..af4b7cc 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -24,5 +24,8 @@
- 		serial2: serial at 1d0d000 {
- 			status = "okay";
- 		};
-+		rtc0: rtc at 1c23000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 640ab75..90be701 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -56,5 +56,12 @@
- 			interrupt-parent = <&intc>;
- 			status = "disabled";
- 		};
-+		rtc0: rtc at 1c23000 {
-+			compatible = "ti,da830-rtc";
-+			reg = <0x23000 0x1000>;
-+			interrupts = <19
-+				      19>;
-+			status = "disabled";
-+		};
- 	};
- };
+[...]
+
+
 -- 
-1.7.9.5
+Regards,
+Igor.
