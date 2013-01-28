@@ -1,30 +1,91 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Jan 2013 13:57:41 -0700
-Subject: [PATCH v4 4/7] ARM: Exynos: allow dt based discovery of mct
- controller using clocksource_of_init
-In-Reply-To: <1358762542-19008-5-git-send-email-thomas.abraham@linaro.org>
-References: <1358762542-19008-1-git-send-email-thomas.abraham@linaro.org>
- <1358762542-19008-5-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <5106E645.70807@wwwdotorg.org>
+From: smoch@web.de (Soeren Moch)
+Date: Mon, 28 Jan 2013 21:59:18 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20130123181029.GE20719@lunn.ch>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
+ <201301172026.45514.arnd@arndb.de> <50FABBED.1020905@web.de>
+ <20130119185907.GA20719@lunn.ch> <5100022D.9050106@web.de>
+ <20130123162515.GK13482@lunn.ch> <510018B4.9040903@web.de>
+ <51001BEE.9020201@web.de> <20130123181029.GE20719@lunn.ch>
+Message-ID: <5106E6A6.7010207@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2013 03:02 AM, Thomas Abraham wrote:
-> Add entries to __clksrc_of_table so that Exynos MCT controller is discoverable
-> using call to clocksource_of_init. With this change, it would be appropriate to
-> rename the function 'exynos4_timer_init' as 'mct_init' since it aptly describes
-> this function. Additionally, the 'init_time' callback of all machine descriptors
-> for exynos platforms that were previously set to 'exynos4_timer_init' are now
-> set to either 'mct_init' or 'clocksource_of_init'.
+On 23.01.2013 19:10, Andrew Lunn wrote:
+>>>>
+>>>
+>>> Now (in the last hour) stable, occasionally lower numbers:
+>>> 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+>>> 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+>>> 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+>>> 3396 3396 3396 3396 3396 3396 3396 3396 3396 3365 3396 3394 3396 3396
+>>> 3396 3396 3373 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+>>> 3396 3353 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+>>> 3394 3396 3396 3396 3396 3396 3396 3396
+>>>
+>>> Before the last pool exhaustion going down:
+>>> 3395 3395 3389 3379 3379 3374 3367 3360 3352 3343 3343 3343 3342 3336
+>>> 3332 3324 3318 3314 3310 3307 3305 3299 3290 3283 3279 3272 3266 3265
+>>> 3247 3247 3247 3242 3236 3236
+>>>
+>> Here I stopped vdr (and so closed all dvb_demux devices), the number
+>> was remaining the same 3236, even after restart of vdr (and restart
+>> of streaming).
+>
+> So it does suggest a leak. Probably somewhere on an error path,
+> e.g. its lost video sync.
+>
 
-> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+Now I activated the debug messages in em28xx. From the messages I see no 
+correlation of the pool exhaustion and lost sync. Also I cannot see any 
+error messages from the em28xx driver.
+I see a lot of init_isoc/stop_urbs (maybe EPG scan?) without draining 
+the coherent pool (checked with 'cat /debug/dma-api/num_free_entries', 
+which gave stable numbers), but after half an hour there are only 
+init_isoc messages without corresponding stop_urbs messages and 
+num_free_entries decreased until coherent pool exhaustion.
 
-> +#ifdef CONFIG_CLKSRC_OF
-> +CLOCKSOURCE_OF_DECLARE(exynos4210, "samsung,exynos4210-mct", mct_init)
-> +CLOCKSOURCE_OF_DECLARE(exynos4412, "samsung,exynos4412-mct", mct_init)
-> +#endif
+Any idea where the memory leak is? What is allocating coherent buffers 
+for orion-ehci?
 
-I suggested in another review (IIRC for a different SoC) that
-CLOCKSOURCE_OF_DECLARE() should always be declared so you don't need
-that ifdef. Would you care to send a patch to add to arm-soc's
-timer/cleanup branch to do that? If not, let me know and I can.
+   Soeren
+
+
+Jan 28 20:46:03 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers each 
+with 64 x 940 bytes
+Jan 28 20:46:03 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx: 
+called em28xx_init_isoc in mode 2
+Jan 28 20:46:03 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers each 
+with 64 x 940 bytes
+Jan 28 20:46:03 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx: 
+called em28xx_init_isoc in mode 2
+Jan 28 20:46:23 guruvdr kernel: em28xx #0 em28xx_stop_urbs :em28xx: 
+called em28xx_stop_urbs
+Jan 28 20:46:23 guruvdr kernel: em28xx #1 em28xx_stop_urbs :em28xx: 
+called em28xx_stop_urbs
+Jan 28 20:46:24 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers each 
+with 64 x 940 bytes
+Jan 28 20:46:24 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx: 
+called em28xx_init_isoc in mode 2
+Jan 28 20:46:24 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers each 
+with 64 x 940 bytes
+Jan 28 20:46:24 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx: 
+called em28xx_init_isoc in mode 2
+Jan 28 20:46:44 guruvdr kernel: em28xx #1 em28xx_stop_urbs :em28xx: 
+called em28xx_stop_urbs
+Jan 28 20:46:44 guruvdr kernel: em28xx #0 em28xx_stop_urbs :em28xx: 
+called em28xx_stop_urbs
+Jan 28 20:46:45 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers each 
+with 64 x 940 bytes
+Jan 28 20:46:45 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx: 
+called em28xx_init_isoc in mode 2
+Jan 28 20:46:45 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers each 
+with 64 x 940 bytes
+Jan 28 20:46:45 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx: 
+called em28xx_init_isoc in mode 2
+Jan 28 20:54:33 guruvdr kernel: ERROR: 1024 KiB atomic DMA coherent pool 
+is too small!
+Jan 28 20:54:33 guruvdr kernel: Please increase it with coherent_pool= 
+kernel parameter!
