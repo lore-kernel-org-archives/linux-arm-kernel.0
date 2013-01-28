@@ -1,69 +1,52 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 28 Jan 2013 10:02:27 +0900
-Subject: [PATCH 0/3] ARM: shmobile: sh-eth pins in DT for armadillo800eva
-In-Reply-To: <1531226.VAPa4M6s5W@avalon>
-References: <1359043653-11374-1-git-send-email-g.liakhovetski@gmx.de>
- <Pine.LNX.4.64.1301250856040.17518@axis700.grange>
- <20130125090544.GD30990@verge.net.au> <1531226.VAPa4M6s5W@avalon>
-Message-ID: <20130128010227.GI3423@verge.net.au>
+Date: Mon, 28 Jan 2013 10:03:22 +0900
+Subject: [PATCH 4/4] irqchip: gic: Perform the gic_secondary_init() call
+ via CPU notifier
+In-Reply-To: <20130125092527.GA6619@arm.com>
+References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
+ <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
+ <20130125043039.GN13691@verge.net.au>
+ <20130125092527.GA6619@arm.com>
+Message-ID: <20130128010322.GJ3423@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 10:57:08AM +0100, Laurent Pinchart wrote:
-> Hi Simon,
+On Fri, Jan 25, 2013 at 09:25:28AM +0000, Catalin Marinas wrote:
+> On Fri, Jan 25, 2013 at 04:30:39AM +0000, Simon Horman wrote:
+> > On Wed, Jan 23, 2013 at 05:59:34PM +0000, Catalin Marinas wrote:
+> > > All the calls to gic_secondary_init() pass 0 as the first argument.
+> > > Since this function is called on each CPU when starting, it can be done
+> > > in a platform-independent way via a CPU notifier registered by the GIC
+> > > code.
+> > >
+> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > > Cc: Rob Herring <rob.herring@calxeda.com>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: David Brown <davidb@codeaurora.org>
+> > > Cc: Daniel Walker <dwalker@fifo99.com>
+> > > Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> > > Cc: Tony Lindgren <tony@atomide.com>
+> > > Cc: Simon Horman <horms@verge.net.au>
+> > > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > > Cc: Dinh Nguyen <dinguyen@altera.com>
+> > > Cc: Viresh Kumar <viresh.linux@gmail.com>
+> > > Cc: Shiraz Hashim <shiraz.hashim@st.com>
+> > > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > > Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> > > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > 
+> > mach-shmobile portion:
+> > 
+> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> > 
+> > For the record, I tested this on the kzm9g, kzm9d and marzen boards
+> > which use the r8a7779, EMEV2 and r8a7779 SoCs respectively.
 > 
-> On Friday 25 January 2013 18:05:44 Simon Horman wrote:
-> > On Fri, Jan 25, 2013 at 09:09:54AM +0100, Guennadi Liakhovetski wrote:
-> > > On Fri, 25 Jan 2013, Simon Horman wrote:
-> > > > On Thu, Jan 24, 2013 at 05:07:30PM +0100, Guennadi Liakhovetski wrote:
-> > > > > This patch series gets rid of gpio_request()-style ethernet pin
-> > > > > configuration on armadillo800eva in reference implementation.
-> > > > 
-> > > > Hi Guennadi,
-> > > > 
-> > > > these changes seem to be reasonable to me.
-> > > > 
-> > > > Are there any dependencies for the sh_eth patch?
-> > > > I assume this will be handled by David Miller through the net-next tree.
-> > > > Are there any dependencies? The last time I checked the DT bindings
-> > > > for sh_eth had not been merged.
-> > > 
-> > > Obviously, it can only be applied, if the
-> > > Documentation/devicetree/bindings/net/sh_ether.txt file and the
-> > > sh_eth_parse_dt() function exist. Also, if there are no objections against
-> > > the new phy-reset-gpios DT property. Otherwise there are no dependencies -
-> > > as long as the phy-reset-gpios property isn't found in DT, the patch
-> > > doesn't affect the driver.
-> > 
-> > Thanks, I'm slightly concerned that the other patch(es) relating
-> > to Documentation/devicetree/bindings/net/sh_ether.txt have gone missing in
-> > action.
-> > 
-> > Do you have an interest in chasing them down or would you like me to?
-> > 
-> > > > For the remaining two patches, which I assume will go through my renesas
-> > > > tree:
-> > > > * Are there any dependencies that aren't satisfied by the of-intc
-> > > > branch?
-> > > 
-> > > AFAICS, that your branch doesn't contain Laurent's pinctrl patches, which
-> > > are needed for patch 1 to apply and for patch 3 to make sense. My earlier
-> > > MMC DT / pinctrl patches aren't required for these patches to function,
-> > > but these patches won't apply cleanly without them, since they touch the
-> > > same code fragments. So, it would be easier to merge them in the order of
-> > > submission.
-> > > 
-> > > > * Could you get some Acks. At least from Laurent?
-> > > 
-> > > Sure, let's give reviewers some more time :)
-> > 
-> > Indeed.
-> > 
-> > Laurent, if there are patches ready for me to take into the renesas tree
-> > please let me know. I'm reluctant to add any more pinmux changes for 3.9.
-> > But if a topic branch would help let me know.
-> 
-> I'd like the gpio_request_one() patches to go to v3.9 if possible. The other 
-> pinctrl patches will need to wait until v3.10 I'm afraid.
+> Thanks. Can I add a Tested-by as well?
 
-Understood. I have now queued the gpio_request_one() patches up for v3.9.
+Sure.
+
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
