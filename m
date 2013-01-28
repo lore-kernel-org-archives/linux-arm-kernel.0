@@ -1,38 +1,37 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Mon, 28 Jan 2013 07:44:13 -0600
-Subject: [PATCH 3/4 v11] arm highbank: add support for pl320 IPC
-In-Reply-To: <1457500.uzVh9cxXhS@vostro.rjw.lan>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1359143205-20279-1-git-send-email-mark.langsdorf@calxeda.com>
- <1359143205-20279-4-git-send-email-mark.langsdorf@calxeda.com>
- <1457500.uzVh9cxXhS@vostro.rjw.lan>
-Message-ID: <510680AD.2070908@calxeda.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Mon, 28 Jan 2013 19:17:53 +0530
+Subject: [PATCH v2 0/6] ARM: davinci: da850: add ethernet driver DT support
+Message-ID: <1359380879-26306-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 06:49 AM, Rafael J. Wysocki wrote:
+From: Lad, Prabhakar <prabhakar.lad@ti.com>
 
->> +int pl320_ipc_register_notifier(struct notifier_block *nb)
->> +{
->> +	return atomic_notifier_chain_register(&ipc_notifier, nb);
->> +}
->> +EXPORT_SYMBOL(pl320_ipc_register_notifier);
->> +
->> +int pl320_ipc_unregister_notifier(struct notifier_block *nb)
->> +{
->> +	return atomic_notifier_chain_unregister(&ipc_notifier, nb);
->> +}
->> +EXPORT_SYMBOL(pl320_ipc_unregister_notifier);
-> 
-> I need all of your symbols to be exported with EXPORT_SYMBOL_GPL().
-> 
-> Is it OK to make that change when applying the patch or do you want to send
-> a new one?
+This patch set enables Ethernet support through device tree model.
+This patch set enables mii interface only and is being tested to boot via
+rootfs. The rmii phy is present on the i2c gpio expander chip (UI board)
+for which yet support needs to be added, once the DT support for the chip
+is enabled, enabling rmii will be subsequnet patch.
 
-I probably should resend so I can include the drivers level Kconfig and
-Makefile.
+Changes for v2:
+1: Enabled mdio device.
+2: Fixed clock lookup.
 
-I'll get that out this morning.
+Lad, Prabhakar (6):
+  ARM: davinci: da850: fix clock lookup for mdio device
+  ARM: davinci: da850: add DT node for mdio device
+  ARM: davinci: da850: add OF_DEV_AUXDATA entry for mdio.
+  ARM: davinci: da850: add DT node for eth0.
+  ARM: davinci: da850: add OF_DEV_AUXDATA entry for eth0.
+  ARM: davinci: da850: configure system configuration chip(CFGCHIP3)
+    for emac
 
---Mark Langsdorf
-Calxeda, Inc.
+ arch/arm/boot/dts/da850-evm.dts       |    8 ++++++
+ arch/arm/boot/dts/da850.dtsi          |   42 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/da850.c         |    1 +
+ arch/arm/mach-davinci/da8xx-dt.c      |   38 +++++++++++++++++++++++++++++-
+ arch/arm/mach-davinci/devices-da8xx.c |    8 +----
+ 5 files changed, 90 insertions(+), 7 deletions(-)
+
+-- 
+1.7.4.1
