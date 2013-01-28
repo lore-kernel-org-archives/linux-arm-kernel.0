@@ -1,46 +1,65 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Jan 2013 12:20:11 -0600
-Subject: [PATCH] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
-In-Reply-To: <20130128083159.GD31689@S2101-09.ap.freescale.net>
-References: <1359208550-16402-1-git-send-email-shawn.guo@linaro.org>
- <7196597.b9sJl95POM@vostro.rjw.lan>
- <20130128083159.GD31689@S2101-09.ap.freescale.net>
-Message-ID: <20130128182011.GA6704@kahuna>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 28 Jan 2013 11:22:18 -0700
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <510506F9.3070500@gmail.com>
+References: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
+ <1359283223-23082-2-git-send-email-gmbnomis@gmail.com>
+ <510506F9.3070500@gmail.com>
+Message-ID: <20130128182218.GB9436@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:32-20130128, Shawn Guo wrote:
-> On Sat, Jan 26, 2013 at 11:21:27PM +0100, Rafael J. Wysocki wrote:
-> > On Saturday, January 26, 2013 09:55:50 PM Shawn Guo wrote:
-> > > As multiplatform build is being adopted by more and more ARM platforms,
-> > > initcall function should be used very carefully.  For example, when
-> > > GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
-> > > will be called on all the platforms to initialize cpufreq-cpu0 driver.
-> > > 
-> > > To eliminate this undesired the effect, the patch changes cpufreq-cpu0
-> > > driver to have it instantiated as a platform_driver.  Then it will only
-> > > run on platforms that create the platform_device "cpufreq-cpu0".
-> > > 
-> > > Along with the change, it also changes cpu_dev to be &pdev->dev,
-> > > so that managed functions can start working, and module build gets
-> > > supported too.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > ---
-> > > Rafael,
-> > > 
-> > > The patch depends patch "power: export opp cpufreq functions".
-> > > https://patchwork.kernel.org/patch/1847261/
-> > 
-> > That one should use EXPORT_SYMBOL_GPL() for exporting symbols, though.
-> > 
-> When commit 80126ce (PM / OPP: Export symbols for module usage.)
-> already exported a few symbols with EXPORT_SYMBOL()?
+On Sun, Jan 27, 2013 at 11:52:41AM +0100, Sebastian Hesselbarth wrote:
 
-I have split this out as a separate OPP series with a variant of 
-https://patchwork.kernel.org/patch/1847261/ added at last.
-Will post this out in a few mins.
+> I agree that loosing the MAC address _is_ an issue but there must
+> be another way to retain it during gated ge clocks than not gate the
+> clocks at all.
+> 
+> I can think of some ways to retain it but don't know what is the most
+> common with linux:
+> - make u-boot pass it through cmdline and let mv643xx get it from there
+> - have kirkwood's common code grab it before clk gates kick in
 
+The cannonical solution here is to have a DT attribute
+'local-mac-address' that is filled in by the bootloader rather than
+attempting to pass the mac address to the kernel through the ethernet
+controller registers.
+
+Until the bootloaders are fixed a reasonable hack is to have the
+platform startup code look for an all-zeros local-mac-address in the
+DT and if found then copy the MAC from the ethernet registers into the
+DT. Then the ethernet driver can safely be a module since the MAC is
+captured in the DT.
+
+I've been using this patch here on top of the original Ian Molton
+patch.
+
+Jason: Can you include something like this as well?
+
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 7048d7c..2b2cfcb 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -2891,6 +2891,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 	struct mv643xx_eth_private *mp;
+ 	struct net_device *dev;
+ 	struct resource *res;
++	const u8 *mac;
++	int len;
+ 	int err;
+ 
+ 	if (pdev->dev.of_node) {
+@@ -2912,6 +2914,10 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 		else
+ 			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
+ 
++		mac = of_get_property(pdev->dev.of_node, "local-mac-address", &len);
++		if (mac && len == 6)
++		    memcpy(pd->mac_addr, mac, sizeof pd->mac_addr);
++
+ 		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
+ 		if (np) {
+ 			pd->shared = of_find_device_by_node(np);
 -- 
-Regards,
-Nishanth Menon
+1.7.5.4
