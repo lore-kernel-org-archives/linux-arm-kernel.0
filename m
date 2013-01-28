@@ -1,23 +1,48 @@
-From: penguin-kernel@I-love.SAKURA.ne.jp (Tetsuo Handa)
-Date: Mon, 28 Jan 2013 20:16:35 +0900
-Subject: [PATCH v2] ARM: versatile: fix the PCI IRQ regression
-In-Reply-To: <1359328750-28046-1-git-send-email-linus.walleij@linaro.org>
-References: <1359328750-28046-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201301282016.BAG95395.VMOFFFQSHLOtJO@I-love.SAKURA.ne.jp>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 28 Jan 2013 12:19:30 +0100
+Subject: [PATCHv1 for soc 2/5] arm: socfpga: Add clock entries to
+ socfpga.dtsi
+In-Reply-To: <20130128071312.GI25723@quad.lixom.net>
+References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
+ <1359075633-13502-3-git-send-email-dinguyen@altera.com>
+ <20130128071312.GI25723@quad.lixom.net>
+Message-ID: <20130128111930.GD6073@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> ---
-> ChangeLog v1->v2:
-> - Got the PIC/SIC valid mask wrong again, take a deep breath
->   and use the foolproof method of defining each bit so that
->   nobody will get caught by this again. Didn't see this first
->   because the SCSI layer takes for ever to time out.
-> ---
->  arch/arm/mach-versatile/core.c | 15 ++++++++++++++-
->  arch/arm/mach-versatile/pci.c  | 11 ++++++-----
->  2 files changed, 20 insertions(+), 6 deletions(-)
-> 
+Hi!
 
-This patch fixes my problem. Please send to 3.8. Thank you!
+> On Thu, Jan 24, 2013 at 07:00:30PM -0600, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Cc: Pavel Machek <pavel@denx.de>
+> > ---
+> >  arch/arm/boot/dts/socfpga.dtsi |   37 +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 37 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> > index 936d230..688729f 100644
+> > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > @@ -78,6 +78,43 @@
+> >  			};
+> >  		};
+> >  
+> > +		clkmgr at ffd04000 {
+> > +			compatible = "altr, clk-mgr";
+> 
+> 
+> No space after "altr,". Also, this should have documented bindings under
+> Documentation/device-tree/bindings (and those should be cc:d to the appropriate
+> maintainers).
+
+Are the clk-mgr entries used in this series? I see only definition in
+device tree, but no usage... Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
