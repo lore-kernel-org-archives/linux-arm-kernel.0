@@ -1,56 +1,51 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Mon, 28 Jan 2013 10:49:57 +0100
-Subject: [PATCH 10/19] watchdog: at91sam9: at91_wdt_dt_ids cannot be __init
-In-Reply-To: <1359153858-31992-11-git-send-email-arnd@arndb.de>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <1359153858-31992-1-git-send-email-arnd@arndb.de>
- <1359153858-31992-11-git-send-email-arnd@arndb.de>
-Message-ID: <CAHkwnC-pQo03VNdRJZXGrRZHPFdMOJhHH4y+JmGtTENs7h-+wg@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 28 Jan 2013 09:56:15 +0000
+Subject: [PATCH 1/4] drm/tilcdc: add TI LCD Controller DRM driver (v3)
+In-Reply-To: <CAF6AEGtrHBxvnp052K6z3aj3dAxJf1hy7H72EoAWr6PhTtwr8Q@mail.gmail.com>
+References: <1358894185-21617-1-git-send-email-robdclark@gmail.com>
+ <1358894185-21617-2-git-send-email-robdclark@gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA939BB@DBDE01.ent.ti.com>
+ <CAF6AEGsqkUr0R3eYa4P371tUPq_NLSJLhH=N_MkyJF31s068+g@mail.gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA93A7D@DBDE01.ent.ti.com>
+ <CAF6AEGtrHBxvnp052K6z3aj3dAxJf1hy7H72EoAWr6PhTtwr8Q@mail.gmail.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA944D2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Rob,
 
-On Fri, Jan 25, 2013 at 11:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The device IDs are referenced by the driver and potentially
-> used beyond the init time, as kbuild correctly warns
-> about. Remove the __initconst annotation.
->
-> Without this patch, building at91_dt_defconfig results in:
->
-> WARNING: drivers/watchdog/built-in.o(.data+0x28): Section mismatch in reference from the variable at91wdt_driver to the (unknown reference) .init.rodata:(unknown)
-> The variable at91wdt_driver references
-> the (unknown reference) __initconst (unknown)
+On Fri, Jan 25, 2013 at 20:22:55, Rob Clark wrote:
+> On Fri, Jan 25, 2013 at 8:15 AM, Mohammed, Afzal <afzal@ti.com> wrote:
 
-Thanks for fixing my commit.
+> > It's not about being simple, but not doing the wrong way, here you are
+> > relying on a platform specific clock in a driver, think about the case
+> > where same IP is used on another platform. Either way it is not a good
+> > thing to handle platform specific details (about disp_clk) in driver.
 
-Best regards
+> Right, but I was trying to understand what was the benefit that the
+> added complexity is.  I didn't realize on davinci that you are limited
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Cc: linux-watchdog at vger.kernel.org
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
-> ---
->  drivers/watchdog/at91sam9_wdt.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index dc42e44..6dad954 100644
-> --- a/drivers/watchdog/at91sam9_wdt.c
-> +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -304,7 +304,7 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
->  }
->
->  #if defined(CONFIG_OF)
-> -static const struct of_device_id at91_wdt_dt_ids[] __initconst = {
-> +static const struct of_device_id at91_wdt_dt_ids[] = {
->         { .compatible = "atmel,at91sam9260-wdt" },
->         { /* sentinel */ }
->  };
-> --
-> 1.8.0
->
+Here I am referring to usage of disp_clk,
 
---
-Fabio Porcedda
+Driver is not supposed to do platform hacks - here you are trying to
+configure something (PLL) in your driver which is not part of LCDC IP.
+And LCDC IP is not aware of PLL which is a platform specific matter
+(existent only in AM335x), it is only aware of functional clock.
+
+You can set the rate on "fck" (functional clock) in AM335x using my patch,
+"ARM: AM33XX: clock: SET_RATE_PARENT in lcd path", and there
+would not be any need for driver to be aware of platform specific PLL.
+
+> >> >> +     priv->clk = clk_get(dev->dev, "fck");
+
+> >> >> +     priv->disp_clk = clk_get(dev->dev, "dpll_disp_ck");
+
+> at the moment all this discussion is a bit moot.  I'd propose leaving
+> the driver as it is for now, because that at least makes it useful on
+> am33xx.  And when CCF and davinci have the needed support in place,
+
+Let's forget about leveraging CCF in driver, but sane solution w.r.t PLL
+configuration would be to do as mentioned above.
+
+Regards
+Afzal
