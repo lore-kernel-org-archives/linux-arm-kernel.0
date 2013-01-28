@@ -1,62 +1,33 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 28 Jan 2013 08:27:44 -0300
-Subject: [PATCH] sunxi: a10-cubieboard: Add user LEDs to the device tree
-Message-ID: <1359372464-5811-1-git-send-email-emilio@elopez.com.ar>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 28 Jan 2013 13:30:08 +0200
+Subject: [PATCH 07/30] mfd: omap-usb-host: update nports in platform_data
+In-Reply-To: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+Message-ID: <1359372631-8180-8-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cubieboard has two LEDs available for use, a blue one (labeled LED1)
-and a green one (labeled LED2).
+EHCI driver would need to know the number of ports available
+on the platform. We set the nports parameter of platform_data
+based on IP version if it was not already provided.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 ---
-This patch requires all of the sunxi pinctrl/gpio/led patches by
-Maxime Ripard to function.
+ drivers/mfd/omap-usb-host.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 5cab825..88e2dc1 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -27,6 +27,15 @@
- 	};
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index 6b5edf6..0874352 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -575,6 +575,7 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+ 			 omap->usbhs_rev, omap->nports);
+ 			break;
+ 		}
++		pdata->nports = omap->nports;
+ 	}
  
- 	soc {
-+		pinctrl at 01c20800 {
-+			led_pins_cubieboard: led_pins at 0 {
-+				allwinner,pins = "PH20", "PH21";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <1>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
- 		uart0: uart at 01c28000 {
- 			status = "okay";
- 		};
-@@ -35,4 +44,21 @@
- 			status = "okay";
- 		};
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_cubieboard>;
-+
-+		blue {
-+			label = "cubieboard::blue";
-+			gpios = <&pio 7 21 0>; /* LED1 */
-+		};
-+
-+		green {
-+			label = "cubieboard::green";
-+			gpios = <&pio 7 20 0>; /* LED2 */
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
- };
+ 	i = sizeof(struct clk *) * omap->nports;
 -- 
-1.8.1.1
+1.7.4.1
