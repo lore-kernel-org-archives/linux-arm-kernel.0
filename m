@@ -1,30 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Jan 2013 14:00:26 -0800
-Subject: [GIT PULL] imx cleanup for 3.9
-In-Reply-To: <20130122144813.GD2812@S2101-09.ap.freescale.net>
-References: <20130122144813.GD2812@S2101-09.ap.freescale.net>
-Message-ID: <20130128220026.GC3047@quad.lixom.net>
+Date: Mon, 28 Jan 2013 14:03:53 -0800
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: add ARCH_ZYNQ
+In-Reply-To: <7b635cbd-4c77-41c7-9b69-c1b9ef92353c@CH1EHSMHS019.ehs.local>
+References: <bb37ce3392153c4cae3a2bc642f831683620473a.1359057921.git.josh.cartwright@ni.com>
+ <621fb4946273492b88fe9a903118047f497e00ee.1359057921.git.josh.cartwright@ni.com>
+ <20130124201709.GB1036@beefymiracle.amer.corp.natinst.com>
+ <7b635cbd-4c77-41c7-9b69-c1b9ef92353c@CH1EHSMHS019.ehs.local>
+Message-ID: <20130128220353.GA7789@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jan 25, 2013 at 03:08:06PM +0000, Michal Simek wrote:
+> 
+> 
+> > -----Original Message-----
+> > From: Josh Cartwright [mailto:josh.cartwright at ni.com]
+> > Sent: Thursday, January 24, 2013 9:17 PM
+> > To: arm at kernel.org; Rob Herring
+> > Cc: linux-arm-kernel at lists.infradead.org; Michal Simek
+> > Subject: Re: [PATCH 2/2] ARM: multi_v7_defconfig: add ARCH_ZYNQ
+> > 
+> > On Thu, Jan 24, 2013 at 01:33:25PM -0600, Josh Cartwright wrote:
+> > > Cc: Michal Simek <michal.simek@ni.com>
+> > 
+> > Ugh, my fingers typed '@ni.com' out of habit.  Corrected patch below (and
+> > correct Cc added).
+> 
+> Acked-by: Michal Simek <michal.simek@xilinx.com>
 
-On Tue, Jan 22, 2013 at 10:48:15PM +0800, Shawn Guo wrote:
-
-> Shawn Guo (4):
->       ARM: dts: imx: use nodes label in board dts
-
-Hmm.
-
-This patch is 1000 lines of pure churn. Sure, the style on OMAP is different,
-but there's no clear benefit from it -- it's actually advantageous to see some
-of the bus hierarchies even on the leaf-level board nodes.
-
-Would you mind respinning with this left out, please? If you still want to
-argue it to be included, we can do so, but I'd like to pick up the rest of the
-branch meanwhile. :-)
-
-
-Thanks!
+Applied, thanks.
 
 -Olof
