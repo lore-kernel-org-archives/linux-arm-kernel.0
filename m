@@ -1,149 +1,66 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 28 Jan 2013 20:31:13 +0100
-Subject: [PATCHv1 for soc 5/5] arm: socfpga: Add SMP support for actual
- socfpga harware
-In-Reply-To: <1359075633-13502-6-git-send-email-dinguyen@altera.com>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-6-git-send-email-dinguyen@altera.com>
-Message-ID: <20130128193113.GA26908@amd.pavel.ucw.cz>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 28 Jan 2013 21:34:25 +0200
+Subject: [PATCH v5 07/14] dmaengine: add dma_request_slave_channel_compat()
+In-Reply-To: <1358281974-8411-8-git-send-email-mporter@ti.com>
+References: <1358281974-8411-1-git-send-email-mporter@ti.com>
+ <1358281974-8411-8-git-send-email-mporter@ti.com>
+Message-ID: <CAHp75VeqikcTuOd14utb9E0P3b9t1mr=JsmkAbz5=3FJwU2kFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Tue, Jan 15, 2013 at 10:32 PM, Matt Porter <mporter@ti.com> wrote:
+> Adds a dma_request_slave_channel_compat() wrapper which accepts
+> both the arguments from dma_request_channel() and
+> dma_request_slave_channel(). Based on whether the driver is
+> instantiated via DT, the appropriate channel request call will be
+> made.
+>
+> This allows for a much cleaner migration of drivers to the
+> dmaengine DT API as platforms continue to be mixed between those
+> that boot using DT and those that do not.
 
-I believe cpu1start_addr should go to the device tree, so that this
-code is not neccessary. Proposed patch is below...
+Does it mean the introduced function is kinda temporary?
 
-Thanks,
-								Pavel
-
-> +static void __init init_socfpga_vt(void)
+>
+> Suggested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  include/linux/dmaengine.h |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 9fd0c5b..64f9f69 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -1047,6 +1047,16 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
+>  struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
+>  struct dma_chan *net_dma_find_channel(void);
+>  #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
+> +static inline struct dma_chan
+> +*dma_request_slave_channel_compat(dma_cap_mask_t mask, dma_filter_fn fn,
+> +                                 void *fn_param, struct device *dev,
+> +                                 char *name)
 > +{
-> +	cpu1start_addr = 0xffd08010;
+> +       if (dev->of_node)
+> +               return dma_request_slave_channel(dev, name);
+> +       else
+> +               return dma_request_channel(mask, fn, fn_param);
 > +}
-> +
-> +static void __init init_socfpga(void)
-> +{
-> +	cpu1start_addr = 0xffd080c4;
-> +}
-> +
-...
-> +
-> +	if (of_machine_is_compatible("altr,socfpga-vt"))
-> +		init_socfpga_vt();
-> +	else
-> +		init_socfpga();
+>
+>  /* --- Helper iov-locking functions --- */
+>
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-commit b0d651bb4deeb0d8d08969a47b77d3317cbbc0a2
-Author: Pavel <pavel@ucw.cz>
-Date:   Mon Jan 28 20:28:06 2013 +0100
-
-    Fix whitespace in socfpga.dtsi.
-    
-    Move cpu1-start-addr variable to device tree, so that config code is
-    not neccessary in kernel.
-    
-    Signed-off-by: Pavel Machek <pavel@denx.de>
-
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 688729f..35d4bdc 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -180,13 +180,13 @@
- 		};
- 
- 		rstmgr at ffd05000 {
--				compatible = "altr,rst-mgr";
--				reg = <0xffd05000 0x1000>;
--			};
-+			compatible = "altr,rst-mgr";
-+			reg = <0xffd05000 0x1000>;
-+		};
- 
- 		sysmgr at ffd08000 {
--				compatible = "altr,sys-mgr";
--				reg = <0xffd08000 0x4000>;
--			};
-+			compatible = "altr,sys-mgr";
-+			reg = <0xffd08000 0x4000>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-index 1a6d088..e922475 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-@@ -56,5 +56,9 @@
- 		serial1 at ffc03000 {
- 			clock-frequency = <100000000>;
- 		};
-+
-+		sysmgr at ffd08000 {
-+			cpu1-start-addr = <0xffd08010>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index df3551f..407ba14 100644
---- a/arch/arm/boot/dts/socfpga_vt.dts
-+++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -56,5 +56,9 @@
- 		serial1 at ffc03000 {
- 			clock-frequency = <7372800>;
- 		};
-+
-+		sysmgr at ffd08000 {
-+			cpu1-start-addr = <0xffd08010>;
-+		};
- 	};
- };
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 2d1e8db..bb17810 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -56,16 +56,6 @@ static void __init socfpga_scu_map_io(void)
- 	iotable_init(&scu_io_desc, 1);
- }
- 
--static void __init init_socfpga_vt(void)
--{
--	cpu1start_addr = 0xffd08010;
--}
--
--static void __init init_socfpga(void)
--{
--	cpu1start_addr = 0xffd080c4;
--}
--
- static void __init socfpga_map_io(void)
- {
- 	socfpga_scu_map_io();
-@@ -83,6 +73,11 @@ void __init socfpga_sysmgr_init(void)
- 	struct device_node *np;
- 
- 	np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
-+
-+	if (of_property_read_u32(np, "cpu1-start-addr", (u32 *) &cpu1start_addr)) {
-+		early_printk("Need cpu1-start-addr in device tree.\n");
-+		panic("Need cpu1-start-addr in device tree.\n");
-+	}
- 	sys_manager_base_addr = of_iomap(np, 0);
- 
- 	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
-@@ -93,11 +88,6 @@ static void __init gic_init_irq(void)
- {
- 	of_irq_init(irq_match);
- 	socfpga_sysmgr_init();
--
--	if (of_machine_is_compatible("altr,socfpga-vt"))
--		init_socfpga_vt();
--	else
--		init_socfpga();
- }
- 
- static void socfpga_cyclone5_restart(char mode, const char *cmd)
 
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+With Best Regards,
+Andy Shevchenko
