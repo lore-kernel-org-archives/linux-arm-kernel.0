@@ -1,46 +1,54 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 28 Jan 2013 12:16:35 -0700
-Subject: [PATCH 00/15] OMAP SHAM & AES Crypto Updates
-In-Reply-To: <20130117222728.GA32446@animalcreek.com>
-References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1212230836160.16045@utopia.booyaka.com>
- <20130108203853.GB1876@animalcreek.com>
- <alpine.DEB.2.00.1301171904070.14118@utopia.booyaka.com>
- <20130117222728.GA32446@animalcreek.com>
-Message-ID: <20130128191635.GA14158@animalcreek.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 28 Jan 2013 12:19:14 -0700
+Subject: [RFC V2 PATCH 0/8] ARM: kirkwood: cleanup DT conversion
+In-Reply-To: <20130128200332.2770093e@skate>
+References: <cover.1359091286.git.jason@lakedaemon.net>
+ <201301251115.47480.arnd@arndb.de>
+ <20130125125214.GI1758@titan.lakedaemon.net>
+ <CABJ1b_QaTBLgGASTs2yi435jR=LepN-iY97xTLXAu1hZw69Wuw@mail.gmail.com>
+ <20130125183407.GC7393@obsidianresearch.com>
+ <20130128104008.GA5170@localhost>
+ <20130128180716.GA9436@obsidianresearch.com>
+ <20130128192445.6984e7dd@skate>
+ <CALF0-+U5DVGAMZGw1nsBMe5cJ1=U1b19D+kunWtSYn3sUYiRDg@mail.gmail.com>
+ <20130128200332.2770093e@skate>
+Message-ID: <20130128191914.GA17722@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 17, 2013 at 03:27:28PM -0700, Mark A. Greer wrote:
-> On Thu, Jan 17, 2013 at 07:13:36PM +0000, Paul Walmsley wrote:
-> > Hi Mark,
-> 
-> Hi Paul.
+On Mon, Jan 28, 2013 at 08:03:32PM +0100, Thomas Petazzoni wrote:
 
-Hi again, Paul.  Sorry for the delay, I've been under the weather.
+> devices described in the DT, nothing different. In their ->probe()
+> function, those driver call some mvebu_setup_addr_decoding_window()
+> function, which is part of an API provided by the address mapping
+> driver.
 
-> > I regret the delay,
-> > 
-> > On Tue, 8 Jan 2013, Mark A. Greer wrote:
-> > 
-> > > On Sun, Dec 23, 2012 at 08:40:43AM +0000, Paul Walmsley wrote:
+I think that would be a layering mess to update these possibly shared
+drivers to conditionally call some mvebu specific function in some
+case, with some SOC specific set of parameters.. The MBUS driver
+should take care of that, just like the PCI framework takes care of
+address allocation.
+ 
+> The address at which we configure the various address decoding windows
+> is an operating system specific decision, it is not a description of
+> the hardware. Therefore, it shouldn't be encoded in the DT, because the
+> DT describes the hardware, not the Linux-specific decisions on how the
+> hardware should be used.
 
-> > What do you think about adding an am35xx_es11plus_hwmod_ocp_ifs[] array to 
-> > omap_hwmod_3xxx_data.c for these secure hwmods?  That carries the implicit 
-> > and possibly wrong assumption that it's likely to be ES1.0 devices that 
-> > are missing the SHAM/AES, but it seems unlikely that TI would have 
-> > multiple silicon revs running around claiming to be ES1.1?  Or maybe I'm 
-> > just being na?ve.
-> 
-> Something like that makes sense to me.  I'll re-read my email, etc. and
-> see if I can find something to help us figure it out.
+DT models PCI BARs/Bridge windows as well, which are functionally
+identical to the MBUS decode windows. There *is* a piece of address
+decoder hardware, and the DT binding for that kind of hardware is a
+bus with ranges. So it is completely appropriate to model that in DT.
 
-I couldn't find any information that helped with this so AFAIK there is no
-good way to tell if a particular am35xx has the crypto hardware available
-or not.  At this point, I vote for moving 'omap3xxx_l4_core__sham' and
-'omap3xxx_l4_core__aes' from omap3xxx_gp_hwmod_ocp_ifs[] and putting them
-in omap34xx_hwmod_ocp_ifs[] and omap36xx_hwmod_ocp_ifs[].  That should be
-safe in general and if someone with an am35xx wants to use those modules,
-they can edit am35xx_hwmod_ocp_ifs[] locally.
+The OF convention for bridge buses is to put the boot loader assigned
+address in the DT (under the assumption that the boot loader sets
+things up properly) so it is reasonable to include those addresses in
+DT as well..
 
-What do you think?
+If, someday, the MBUS driver wants to dynamically allocate every MBUS
+region, then that is fine, it can ignore/override the addresses from
+the DT, just like the PCI stuff does for BARs/etc, but for today
+without dynamic assignment it makes alot of sense to just use the DT
+values directly.
+
+Jason
