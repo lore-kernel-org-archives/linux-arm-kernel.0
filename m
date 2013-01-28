@@ -1,111 +1,98 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 28 Jan 2013 19:58:52 +0800
-Subject: [PATCH] ARM: mxs: gpio-mxs: Add IRQ_TYPE_EDGE_BOTH support
-In-Reply-To: <1359306248-28690-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1359306248-28690-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130128115850.GF31689@S2101-09.ap.freescale.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 28 Jan 2013 14:16:35 +0200
+Subject: OMAP baseline test results for v3.8-rc5
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA946E4@DBDE01.ent.ti.com>
+References: <alpine.DEB.2.00.1301260838300.19277@utopia.booyaka.com>
+ <20130126084604.GB8754@arwen.pp.htv.fi>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9456A@DBDE01.ent.ti.com>
+ <20130128113818.GD28698@arwen.pp.htv.fi>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA946E4@DBDE01.ent.ti.com>
+Message-ID: <20130128121635.GI28698@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 06:04:08PM +0100, Gwenhael Goavec-Merou wrote:
-> This patch adds support for IRQ_TYPE_EDGE_BOTH needed for some driver
-> (gpio-keys).
-> Inspired from gpio-mxc.c
+Hi,
+
+On Mon, Jan 28, 2013 at 12:46:21PM +0100, Mohammed, Afzal wrote:
+> Hi Felipe,
 > 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> ---
->  drivers/gpio/gpio-mxs.c | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
+> On Mon, Jan 28, 2013 at 17:08:19, Balbi, Felipe wrote:
 > 
-> diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-> index fa2a63c..7690eec 100644
-> --- a/drivers/gpio/gpio-mxs.c
-> +++ b/drivers/gpio/gpio-mxs.c
-> @@ -65,6 +65,7 @@ struct mxs_gpio_port {
->  	struct irq_domain *domain;
->  	struct bgpio_chip bgc;
->  	enum mxs_gpio_id devid;
-> +	u32 both_edges;
->  };
->  
->  static inline int is_imx23_gpio(struct mxs_gpio_port *port)
-> @@ -81,13 +82,24 @@ static inline int is_imx28_gpio(struct mxs_gpio_port *port)
->  
->  static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
->  {
-> +	u32 val;
->  	u32 pin_mask = 1 << d->hwirq;
-> +	u32 gpio_idx = d->hwirq;
-
-This does not really needed, since what you need in the code below is
-all about pin_mask.
-
->  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->  	struct mxs_gpio_port *port = gc->private;
->  	void __iomem *pin_addr;
->  	int edge;
->  
-> +	port->both_edges &= ~(1 << gpio_idx);
->  	switch (type) {
-> +	case IRQ_TYPE_EDGE_BOTH:
-> +		val = gpio_get_value(port->bgc.gc.base + gpio_idx);
-> +		if (val)
-> +			edge = GPIO_INT_LOW_LEV;
-> +		else
-> +			edge = GPIO_INT_HIGH_LEV;
-
-I do not quite understand this.  Why do you need to set LEVEL in case
-of EDGE_BOTH?
-
-> +		port->both_edges |= 1 << gpio_idx;
-> +		break;
->  	case IRQ_TYPE_EDGE_RISING:
->  		edge = GPIO_INT_RISE_EDGE;
->  		break;
-> @@ -123,6 +135,22 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
->  
->  	return 0;
->  }
-
-Have a new line here, please.
-
-> +static void mxs_flip_edge(struct mxs_gpio_port *port, u32 gpio)
-> +{
-> +	u32 bit, val, edge;
-> +	void __iomem *pin_addr;
-> +
-> +	bit = 1<<gpio;
-
-Nit: Have space before << and after, please.
-
-> +
-> +	pin_addr = port->base + PINCTRL_IRQPOL(port);
-> +	val = readl(pin_addr);
-> +	edge = val&bit;
-
-Ditto
-
-Shawn
-
-> +
-> +	if (edge)
-> +		writel(bit, pin_addr + MXS_CLR);
-> +	else
-> +		writel(bit, pin_addr + MXS_SET);
-> +}
->  
->  /* MXS has one interrupt *per* gpio port */
->  static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
-> @@ -137,6 +165,9 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
->  
->  	while (irq_stat != 0) {
->  		int irqoffset = fls(irq_stat) - 1;
-> +		if (port->both_edges & (1 << irqoffset))
-> +			mxs_flip_edge(port, irqoffset);
-> +
->  		generic_handle_irq(irq_find_mapping(port->domain, irqoffset));
->  		irq_stat &= ~(1 << irqoffset);
->  	}
-> -- 
-> 1.7.12.4
+> > seems to be a bug with __unflatten_device_tree()...
 > 
+> > U-Boot# bootm 0x80200000 - 0x80f80000
+> 
+> Try loading dtb at a different address, I do,
+> 
+> bootm 81000000 - 82000000
+
+didn't help :-s
+
+U-Boot# bootm 0x81000000 - 0x82000000
+## Booting kernel from Legacy Image at 81000000 ...
+   Image Name:   Linux-3.8.0-rc5-02311-g1308c2b-d
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    4265296 Bytes = 4.1 MiB
+   Load Address: 80008000
+   Entry Point:  80008000
+   Verifying Checksum ... OK
+## Flattened Device Tree blob at 82000000
+   Booting using the fdt blob at 0x82000000
+   Loading Kernel Image ... OK
+OK
+   Loading Device Tree to 9fe3e000, end 9fe42f1e ... OK
+
+Starting kernel ...
+
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 3.8.0-rc5-02311-g1308c2b-dirty (balbi at arwen) (gcc version 4.6.3 (Sourcery CodeBench Lite 2012.03-57) ) #37 SMP Mon
+ Jan 28 13:32:47 EET 2013
+[    0.000000] CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c53c7d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+[    0.000000] Machine: Generic AM33XX (Flattened Device Tree), model: TI AM335x BeagleBone
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] Memory policy: ECC disabled, Data cache writeback
+[    0.000000] On node 0 totalpages: 65280
+[    0.000000] free_area_init_node: node 0, pgdat c08331c0, node_mem_map c0d91000
+[    0.000000]   Normal zone: 512 pages used for memmap
+[    0.000000]   Normal zone: 0 pages reserved
+[    0.000000]   Normal zone: 64768 pages, LIFO batch:15
+[    0.000000] Unable to handle kernel paging request at virtual address dfe3e000
+[    0.000000] pgd = c0004000
+[    0.000000] [dfe3e000] *pgd=00000000
+[    0.000000] Internal error: Oops: 5 [#1] SMP ARM
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0    Not tainted  (3.8.0-rc5-02311-g1308c2b-dirty #37)
+[    0.000000] PC is at __unflatten_device_tree+0x1c/0x12c
+[    0.000000] LR is at unflatten_device_tree+0x1c/0x34
+[    0.000000] pc : [<c0457d2c>]    lr : [<c077a370>]    psr: a0000193
+[    0.000000] sp : c07a5f80  ip : 00000000  fp : 00000000
+[    0.000000] r10: 00000000  r9 : 413fc082  r8 : 80004059
+[    0.000000] r7 : c0755dd0  r6 : c0783ac0  r5 : dfe3e000  r4 : c0755dd0
+[    0.000000] r3 : d00dfeed  r2 : c0755dd0  r1 : c0d8a8d4  r0 : dfe3e000
+[    0.000000] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    0.000000] Control: 10c5387d  Table: 80004019  DAC: 00000017
+[    0.000000] Process swapper (pid: 0, stack limit = 0xc07a4240)
+[    0.000000] Stack: (0xc07a5f80 to 0xc07a6000)
+[    0.000000] 5f80: c07b13d0 c00503b4 8fefffff c0d8a8d4 c0755dd0 c083607c c0783ac0 c07a5fe4
+[    0.000000] 5fa0: 80004059 c077a370 c0781dd8 c0755028 00000000 c07a5fc4 c0783abc 00000001
+[    0.000000] 5fc0: 00000000 c0783abc c07b11c4 c0751618 00000000 00000000 00000000 00000000
+[    0.000000] 5fe0: 00000000 c0783ac0 00000000 10c53c7d c07ac98c 80008078 00000000 00000000
+[    0.000000] [<c0457d2c>] (__unflatten_device_tree+0x1c/0x12c) from [<c077a370>] (unflatten_device_tree+0x1c/0x34)
+[    0.000000] [<c077a370>] (unflatten_device_tree+0x1c/0x34) from [<c0755028>] (setup_arch+0xf8/0x190)
+[    0.000000] [<c0755028>] (setup_arch+0xf8/0x190) from [<c0751618>] (start_kernel+0x80/0x2a8)
+[    0.000000] [<c0751618>] (start_kernel+0x80/0x2a8) from [<80008078>] (0x80008078)
+[    0.000000] Code: e1a07002 e58d100c 0a000033 e59f30f4 (e5951000) 
+[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
+[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130128/b07198b9/attachment.sig>
