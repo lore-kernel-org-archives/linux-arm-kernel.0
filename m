@@ -1,55 +1,24 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 28 Jan 2013 11:49:33 +0100
-Subject: [PATCH 09/26] mfd: ab8500-debugfs: Provide a means for a user
- subscribe to IRQs
-In-Reply-To: <20130128102223.GA18212@gmail.com>
-References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
- <1358254566-12419-10-git-send-email-lee.jones@linaro.org>
- <20130127235259.GO1174@sortiz-mobl>
- <20130128102223.GA18212@gmail.com>
-Message-ID: <20130128104933.GY1174@sortiz-mobl>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 28 Jan 2013 10:55:20 +0000
+Subject: OMAP baseline test results for v3.8-rc5
+In-Reply-To: <20130128104752.GB28698@arwen.pp.htv.fi>
+References: <alpine.DEB.2.00.1301260838300.19277@utopia.booyaka.com>
+ <20130126084604.GB8754@arwen.pp.htv.fi>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9456A@DBDE01.ent.ti.com>
+ <20130128104752.GB28698@arwen.pp.htv.fi>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA945AB@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Felipe,
 
-On Mon, Jan 28, 2013 at 10:22:23AM +0000, Lee Jones wrote:
-> On Mon, 28 Jan 2013, Samuel Ortiz wrote:
-> 
-> > Hi Lee,
-> > 
-> > On Tue, Jan 15, 2013 at 12:55:49PM +0000, Lee Jones wrote:
-> > > Allow users to subscribe to and view IRQ events live from debugfs.
-> > I seem to remember that I got a similar patch some time ago for the same
-> > purpose and my answer was: Please use a UIO driver for this. There already is
-> > such driver, it's uio_pdrv_genirq. What your debugfs registration entry could
-> > do is adding a platform device for the specific interrupt number. This would
-> > avoid the irq handler registration and the sysfs entry creation, both things I
-> > believe are not very elegant and open coded. It also gives you an IRQ count
-> > implementation.
-> > Ideally, the UIO framework could be improved to support IRQ ranges (through
-> > IRQ domains) instead of the current single interrupt number.
-> > 
-> > Have you considered going through that path ?
-> 
-> I'm going to have to put this patch-set in the bin. Pulling this
-> patch, causes lots of conflicts to the remaining patches in the
-> set.
-I bet removing this one causes a lot of conflicts. I'm not saying it should
-absolutely be removed, but I'm afraid once it's upstream no one is going to
-look at improving it. And to be honest, having an IRQ handler from debugfs
-code looks weird to me. I know you can put all sort of crazyness into a
-debugfs entry, but still.
+On Mon, Jan 28, 2013 at 16:17:52, Balbi, Felipe wrote:
 
- 
-> I'll start again from scratch and find another way to sync the ab* MFD
-> drivers. I might even have to do it manually i.e. throw out all
-> commit history and upstream it as my own patches pulled in from diffs.
-I don't have any problems with that.
+> will try your patch, but are you using Beagle Bone white or black ? I
+> should've made it clear I'm using beagle bone black.
 
-Cheers,
-Samuel.
+Hmm.., I am using white, have never tried on black.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+
+Regards
+Afzal
