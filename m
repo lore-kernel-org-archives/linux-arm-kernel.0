@@ -1,38 +1,69 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 28 Jan 2013 13:30:31 +0200
-Subject: [PATCH 30/30] ARM: OMAP: USB: Remove unused fields from struct
- usbhs_omap_platform_data
-In-Reply-To: <1359372631-8180-1-git-send-email-rogerq@ti.com>
-References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
-Message-ID: <1359372631-8180-31-git-send-email-rogerq@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 28 Jan 2013 11:34:43 +0000
+Subject: [PATCH 09/26] mfd: ab8500-debugfs: Provide a means for a user
+ subscribe to IRQs
+In-Reply-To: <20130128104933.GY1174@sortiz-mobl>
+References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
+ <1358254566-12419-10-git-send-email-lee.jones@linaro.org>
+ <20130127235259.GO1174@sortiz-mobl>
+ <20130128102223.GA18212@gmail.com>
+ <20130128104933.GY1174@sortiz-mobl>
+Message-ID: <20130128113443.GB18212@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All users have been adapted to the changes in ehci-omap. We can now
-get rid of the unused fields from usbhs_omap_platform_data.
+On Mon, 28 Jan 2013, Samuel Ortiz wrote:
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- include/linux/platform_data/usb-omap.h |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+> Hi Lee,
+> 
+> On Mon, Jan 28, 2013 at 10:22:23AM +0000, Lee Jones wrote:
+> > On Mon, 28 Jan 2013, Samuel Ortiz wrote:
+> > 
+> > > Hi Lee,
+> > > 
+> > > On Tue, Jan 15, 2013 at 12:55:49PM +0000, Lee Jones wrote:
+> > > > Allow users to subscribe to and view IRQ events live from debugfs.
+> > > I seem to remember that I got a similar patch some time ago for the same
+> > > purpose and my answer was: Please use a UIO driver for this. There already is
+> > > such driver, it's uio_pdrv_genirq. What your debugfs registration entry could
+> > > do is adding a platform device for the specific interrupt number. This would
+> > > avoid the irq handler registration and the sysfs entry creation, both things I
+> > > believe are not very elegant and open coded. It also gives you an IRQ count
+> > > implementation.
+> > > Ideally, the UIO framework could be improved to support IRQ ranges (through
+> > > IRQ domains) instead of the current single interrupt number.
+> > > 
+> > > Have you considered going through that path ?
+> > 
+> > I'm going to have to put this patch-set in the bin. Pulling this
+> > patch, causes lots of conflicts to the remaining patches in the
+> > set.
+> I bet removing this one causes a lot of conflicts. I'm not saying it should
+> absolutely be removed, but I'm afraid once it's upstream no one is going to
+> look at improving it.
 
-diff --git a/include/linux/platform_data/usb-omap.h b/include/linux/platform_data/usb-omap.h
-index 925a4a7..227601f 100644
---- a/include/linux/platform_data/usb-omap.h
-+++ b/include/linux/platform_data/usb-omap.h
-@@ -41,13 +41,10 @@ enum usbhs_omap_port_mode {
- struct usbhs_omap_platform_data {
- 	int				nports;
- 	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
--	int				reset_gpio_port[OMAP3_HS_USB_PORTS];
--	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
- 
- 	/* OMAP3 <= ES2.1 have a single ulpi bypass control bit */
- 	unsigned			single_ulpi_bypass:1;
- 	unsigned			es2_compatibility:1;
--	unsigned			phy_reset:1;
- };
- 
- /*-------------------------------------------------------------------------*/
+This is really not the case. I have every intention of fixing each and
+every issue which are brought to my attention during the upstreaming
+process of 'drivers/regulators', 'drivers/power' and 'drivers/mfd'.
+
+All I'm doing is making a list of all the fixups and re-writes and
+I'll address them on the completion of the push. Hence if you're happy
+for this to go in with my promise of improvement, it would certainly
+make this task a great deal easier for me.
+
+> And to be honest, having an IRQ handler from debugfs
+> code looks weird to me. I know you can put all sort of crazyness into a
+> debugfs entry, but still.
+>  
+> > I'll start again from scratch and find another way to sync the ab* MFD
+> > drivers. I might even have to do it manually i.e. throw out all
+> > commit history and upstream it as my own patches pulled in from diffs.
+> I don't have any problems with that.
+
+I'm sure you don't, but it's me that's doing all the hard work. ;)
+
 -- 
-1.7.4.1
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
