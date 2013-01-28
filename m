@@ -1,9 +1,9 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 28 Jan 2013 13:30:25 +0200
-Subject: [PATCH 24/30] ARM: OMAP3: omap3evm: Adapt to ehci-omap changes
+Date: Mon, 28 Jan 2013 13:30:27 +0200
+Subject: [PATCH 26/30] ARM: OMAP3: omap3stalker: Adapt to ehci-omap changes
 In-Reply-To: <1359372631-8180-1-git-send-email-rogerq@ti.com>
 References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
-Message-ID: <1359372631-8180-25-git-send-email-rogerq@ti.com>
+Message-ID: <1359372631-8180-27-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,46 +15,37 @@ it to the 'nop-usb-xceiv' PHY.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/board-omap3evm.c |   63 ++++++++++++++++++++++++++++------
- 1 files changed, 52 insertions(+), 11 deletions(-)
+ arch/arm/mach-omap2/board-omap3stalker.c |   52 ++++++++++++++++++++++++++----
+ 1 files changed, 45 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 7bdc8a4..9f3550e 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -34,6 +34,7 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/musb.h>
- #include <linux/usb/nop-usb-xceiv.h>
+diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
+index 278ae95..ed343f0 100644
+--- a/arch/arm/mach-omap2/board-omap3stalker.c
++++ b/arch/arm/mach-omap2/board-omap3stalker.c
+@@ -26,6 +26,7 @@
+ 
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
 +#include <linux/usb/phy.h>
- #include <linux/smsc911x.h>
+ #include <linux/i2c/twl.h>
+ #include <linux/mmc/host.h>
+ #include <linux/input/matrix_keypad.h>
+@@ -357,19 +358,52 @@ static int __init omap3_stalker_i2c_init(void)
  
- #include <linux/wl12xx.h>
-@@ -538,17 +539,51 @@ static int __init omap3_evm_i2c_init(void)
- 	return 0;
- }
+ #define OMAP3_STALKER_TS_GPIO	175
  
--static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
 +/* PHY device on HS USB Port 2 i.e. nop_usb_xceiv.2 */
 +static struct platform_device hsusb2_phy_device = {
 +	.name = "nop_usb_xceiv",
 +	.id = 2,
 +};
- 
--	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
--	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
--	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
++
 +/* Regulator for HS USB Port 2 PHY reset */
 +static struct regulator_consumer_supply hsusb2_reset_supplies[] = {
 +	/* Link PHY device to reset supply so it gets used in the PHY driver */
 +	REGULATOR_SUPPLY("reset", "nop_usb_xceiv.2"),
 +};
- 
--	.phy_reset  = true,
--	/* PHY reset GPIO will be runtime programmed based on EVM version */
--	.reset_gpio_port[0]  = -EINVAL,
--	.reset_gpio_port[1]  = -EINVAL,
--	.reset_gpio_port[2]  = -EINVAL
++
 +static struct regulator_init_data hsusb2_reset_data = {
 +	.constraints = {
 +		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
@@ -66,7 +57,7 @@ index 7bdc8a4..9f3550e 100644
 +static struct fixed_voltage_config hsusb2_reset_config = {
 +	.supply_name = "hsusb2_reset",
 +	.microvolts = 3300000,
-+	.gpio = -1,		/* set at runtime */
++	.gpio = 21,
 +	.startup_delay = 70000, /* 70msec */
 +	.enable_high = 1,
 +	.enabled_at_boot = 0,   /* keep in RESET */
@@ -81,41 +72,34 @@ index 7bdc8a4..9f3550e 100644
 +	},
 +};
 +
-+static struct platform_device *omap3evm_devices[] __initdata = {
+ static struct platform_device *omap3_stalker_devices[] __initdata = {
+ 	&keys_gpio,
 +	&hsusb2_phy_device,
 +	&hsusb2_reset_device,
-+};
-+
-+static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
-+	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+ };
+ 
+ static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+-	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+ 	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+-	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+-
+-	.phy_reset = true,
+-	.reset_gpio_port[0] = -EINVAL,
+-	.reset_gpio_port[1] = 21,
+-	.reset_gpio_port[2] = -EINVAL,
  };
  
  #ifdef CONFIG_OMAP_MUX
-@@ -724,7 +759,7 @@ static void __init omap3_evm_init(void)
- 
- 		/* setup EHCI phy reset config */
- 		omap_mux_init_gpio(21, OMAP_PIN_INPUT_PULLUP);
--		usbhs_bdata.reset_gpio_port[1] = 21;
-+		hsusb2_reset_config.gpio = 21;
- 
- 		/* EVM REV >= E can supply 500mA with EXTVBUS programming */
- 		musb_board_data.power = 500;
-@@ -732,9 +767,15 @@ static void __init omap3_evm_init(void)
- 	} else {
- 		/* setup EHCI phy reset on MDC */
- 		omap_mux_init_gpio(135, OMAP_PIN_OUTPUT);
--		usbhs_bdata.reset_gpio_port[1] = 135;
-+		hsusb2_reset_config.gpio = 135;
- 	}
-+
-+	platform_add_devices(omap3evm_devices, ARRAY_SIZE(omap3evm_devices));
- 	usb_musb_init(&musb_board_data);
+@@ -405,6 +439,10 @@ static void __init omap3_stalker_init(void)
+ 	omap_serial_init();
+ 	omap_sdrc_init(mt46h32m32lf6_sdrc_params, NULL);
+ 	usb_musb_init(NULL);
 +
 +	/* PHY on HSUSB Port 2 i.e. index 1 */
 +	usb_bind_phy("ehci-omap.0", 1, "nop_usb_xceiv.2");
 +
  	usbhs_init(&usbhs_bdata);
- 	board_nand_init(omap3evm_nand_partitions,
- 			ARRAY_SIZE(omap3evm_nand_partitions), NAND_CS,
+ 	omap_ads7846_init(1, OMAP3_STALKER_TS_GPIO, 310, NULL);
+ 
 -- 
 1.7.4.1
