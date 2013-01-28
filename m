@@ -1,33 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 28 Jan 2013 15:02:08 +0800
-Subject: [PATCH] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
-In-Reply-To: <CAOh2x=kCKbxX6ThzEty0F-MxxhsRMhh8++Nc7BqBaXNfaozoJw@mail.gmail.com>
-References: <1359208550-16402-1-git-send-email-shawn.guo@linaro.org>
- <CAOh2x=kCKbxX6ThzEty0F-MxxhsRMhh8++Nc7BqBaXNfaozoJw@mail.gmail.com>
-Message-ID: <20130128070206.GB31689@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 27 Jan 2013 23:08:48 -0800
+Subject: [GIT PULL] CSR SiRFmarco SoC infrastructures for 3.9
+In-Reply-To: <CAGsJ_4z-7z8=3xQwU6iEsqHEcVrRWK+Fm7eoBEbjC-EAewGypA@mail.gmail.com>
+References: <CAGsJ_4z-7z8=3xQwU6iEsqHEcVrRWK+Fm7eoBEbjC-EAewGypA@mail.gmail.com>
+Message-ID: <20130128070848.GG25723@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 09:42:29AM +0530, Viresh Kumar wrote:
-> >         struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
-> >         platform_device_register_full(&devinfo);
+On Thu, Jan 24, 2013 at 11:21:02AM +0800, Barry Song wrote:
+> Hi Olof, Arnd,
 > 
-> Something similar was being discussed with Andrew (cc'd) on his patch
-> for kikwood cpufreq driver.
+> pls pull the following changes for CSR SiRFmarco SoC. it has been
+> rebased againest arm-soc timer/cleanup tree.
 > 
-> We shouldn't encourage addition of above as we are moving towards DT.
+> since commit 90cf214d6a549bf482e3c5751ee256cc885b96ea:
+> 
+>   ARM: at91: fix board-rm9200-dt after sys_timer conversion
+> (2013-01-14 10:14:04 -0800)
+> 
+> are available in the git repository at:
+>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
+> marco-timer-cleanup-rebase
 
-Moving towards DT does not really mean that we should never register
-platform_device from platform code.  DT is designed to present physical
-devices, while what I'm adding here is somewhat a virtual one.  I'm
-just using the platform_device/platform_driver mechanism to instantiate
-the driver on particular platform.
+Pulled in as prima2/marco, included in next/soc. Thanks!
 
-> So, i would except an compatible array too in your patch and then driver
-> can be probed based on compatible string being present in cpu node.
+I noticed that there is no defconfig for any mach-prima2 platforms. Feel
+free to submit one so we get build coverage of the platform.
 
-I believe device tree maintainer already stated that we should not
-have node/compatible for cpuidle/cpufreq such stuff in DT merely for
-asking DT core to create platform_device for them.
 
-Shawn
+-Olof
