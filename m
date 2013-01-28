@@ -1,49 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 28 Jan 2013 09:33:14 +0100
-Subject: [PATCH 14/19] spi/atmel: remove incorrect __exit_p()
-In-Reply-To: <1359153858-31992-15-git-send-email-arnd@arndb.de>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <1359153858-31992-1-git-send-email-arnd@arndb.de>
- <1359153858-31992-15-git-send-email-arnd@arndb.de>
-Message-ID: <510637CA.7010305@atmel.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 28 Jan 2013 09:33:20 +0100
+Subject: [RFC] ARM: dma-mapping: Return 0 if no ->set_dma_mask()
+Message-ID: <20130128.103320.355771370936761237.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2013 11:44 PM, Arnd Bergmann :
-> Since we no longer allow building without hotplug, the
-> atmel_spi_remove function is always present and we should
-> not use __exit_p() to refer to it.
-> 
-> Without this patch, building at91_dt_defconfig results in:
-> 
-> drivers/spi/spi-atmel.c:1006:12: warning: 'atmel_spi_remove' defined but not used [-Wunused-function]
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+struct dma_map_ops iommu_ops doesn't have ->set_dma_mask, which causes
+crash when dma_set_mask() is called from some driver.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/include/asm/dma-mapping.h |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: spi-devel-general at lists.sourceforge.net
-> ---
->  drivers/spi/spi-atmel.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index ab34497..656d137 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -1088,7 +1088,7 @@ static struct platform_driver atmel_spi_driver = {
->  	.suspend	= atmel_spi_suspend,
->  	.resume		= atmel_spi_resume,
->  	.probe		= atmel_spi_probe,
-> -	.remove		= __exit_p(atmel_spi_remove),
-> +	.remove		= atmel_spi_remove,
->  };
->  module_platform_driver(atmel_spi_driver);
->  
-> 
-
-
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index a58e0f5..95328bf 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -32,7 +32,11 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+ 
+ static inline int dma_set_mask(struct device *dev, u64 mask)
+ {
+-	return get_dma_ops(dev)->set_dma_mask(dev, mask);
++	struct dma_map_ops *ops = get_dma_ops(dev);
++
++	if (ops->set_dma_mask)
++		return ops->set_dma_mask(dev, mask);
++	return 0;
+ }
+ 
+ #ifdef __arch_page_to_dma
 -- 
-Nicolas Ferre
+1.7.9.5
