@@ -1,84 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Jan 2013 15:01:14 +0000
-Subject: [PATCH v2 1/3] pwm: Add pwm_cansleep() as exported API to users
-In-Reply-To: <51064687.5090605@epfl.ch>
-References: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
- <1359121471-21457-2-git-send-email-florian.vaussard@epfl.ch>
- <20130126054024.GB29243@avionic-0098.adnet.avionic-design.de>
- <51063AB5.2060108@ti.com> <51064687.5090605@epfl.ch>
-Message-ID: <20130128150113.GL23505@n2100.arm.linux.org.uk>
+Date: Mon, 28 Jan 2013 15:04:10 +0000
+Subject: [PATCH 2/2] gpio: pca953x: use managed resources
+In-Reply-To: <CACRpkdaEH+hqOo6i+4Lz+T4B+oAvCj+v0Ycr576yV2fWN2VNvg@mail.gmail.com>
+References: <1359133168-14879-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359133168-14879-3-git-send-email-gregory.clement@free-electrons.com>
+ <CACRpkdaEH+hqOo6i+4Lz+T4B+oAvCj+v0Ycr576yV2fWN2VNvg@mail.gmail.com>
+Message-ID: <20130128150410.GM23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 10:36:07AM +0100, Florian Vaussard wrote:
-> Hello,
->
-> Le 28/01/2013 09:45, Peter Ujfalusi a ?crit :
->> hi Thierry,
->>
->> On 01/26/2013 06:40 AM, Thierry Reding wrote:
->>>> +{
->>>> +	return pwm->chip->can_sleep;
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(pwm_cansleep);
->>>
->>> Would it make sense to check for NULL pointers here? I guess that
->>> passing NULL into the function could be considered a programming error
->>> and an oops would be okay, but in that case there's no point in making
->>> the function return an int. Also see my next comment.
->>
->> While it is unlikely to happen it is better to be safe, something like this
->> will do:
->>
->> return pwm ? pwm->chip->can_sleep : 0;
->>
->
-> Ok. And what about:
->
-> BUG_ON(pwm == NULL);
-> return pwm->chip->can_sleep;
+On Mon, Jan 28, 2013 at 11:17:48AM +0100, Linus Walleij wrote:
+> On Fri, Jan 25, 2013 at 5:59 PM, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+> 
+> > From: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > Using the devm_* managed resources the pca driver can be simplified
+> > and cut down on boilerplate code.
+> >
+> > [gcl: fixed a inccorect reference to a removed label, "goto fail_out"
+> > became "return ret"]
+> 
+> Oh now "gcl" means both Grant C. Likely and Gregory CLement :-)
 
-Let's get something straight.
+I'd say gcl means Grant C. Likely.  gc would be Gregory Clement.
+Initials. :)  Using anything else results in yet more many namespace
+clashes.
 
-1. Don't use BUG_ON() as some kind of willy nilly assert() replacement.
-   Linus refused to have assert() in the kernel because assert() gets not
-   only over-used, but also gets inappropriately used too.
-
-   _Only_ _ever_ use BUG_ON() if continuing is going to cause user
-   noticable data loss which is not reportable to userspace.  In other
-   words, block device queue corruption or the like - where bringing the
-   system down is going to _save_ the system from itself.
-
-   Otherwise, return an error and/or use WARN_ON().
-
-2. If you want a slow kernel, then by all means check your arguments to
-   your functions.  While you're at it, why not check that strings which
-   are passed contain only the characters you expect them to?  And, if
-   you're bothering to check against a NULL pointer, what about NULL+1
-   pointers which are also invalid?  Why not invent some function to
-   ensure that the pointer is a valid kernel pointer.  Maybe you'll have
-   to interate the vmalloc lists too - yay, more code to be executed!
-   That must be good!
-
-In your example, if you're going to check that pwm is non-NULL, what
-if pwm->chip is non-NULL?  How far do you take this?
-
-Or... just like most of the core kernel does, it does _not_ verify on
-function entry that the pointer is "correct" unless it is explicitly
-defined that the function may take a NULL pointer (like kfree()).
-Everything else just goes right on and does the dereference - and if
-the pointer was wrong, we hope that the MMU faults and we get a kernel
-oops.
-
-Have a read through the code in fs/ or kernel/ and see how many functions
-you can spot in there which validate their pointers which aren't dealing
-with data from userland.
-
-You'll find almost no function checking that an inode pointer is not NULL.
-Or a struct file pointer.  Or a struct path pointer... etc.
-
-Yet, you come to ARM code, and it seems "popular" that pointer arguments
-need to be verified on every single function call.  Why is this?
-
-I don't know if Andrew would like to inject something here (I've added
-him) on this subject...
+Maybe we should switch to a numeric namespace instead? :)
