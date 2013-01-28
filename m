@@ -1,93 +1,56 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 28 Jan 2013 10:36:07 +0100
-Subject: [PATCH v2 1/3] pwm: Add pwm_cansleep() as exported API to users
-In-Reply-To: <51063AB5.2060108@ti.com>
-References: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
- <1359121471-21457-2-git-send-email-florian.vaussard@epfl.ch>
- <20130126054024.GB29243@avionic-0098.adnet.avionic-design.de>
- <51063AB5.2060108@ti.com>
-Message-ID: <51064687.5090605@epfl.ch>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Mon, 28 Jan 2013 10:49:57 +0100
+Subject: [PATCH 10/19] watchdog: at91sam9: at91_wdt_dt_ids cannot be __init
+In-Reply-To: <1359153858-31992-11-git-send-email-arnd@arndb.de>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-11-git-send-email-arnd@arndb.de>
+Message-ID: <CAHkwnC-pQo03VNdRJZXGrRZHPFdMOJhHH4y+JmGtTENs7h-+wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Arnd,
 
-Le 28/01/2013 09:45, Peter Ujfalusi a ?crit :
-> hi Thierry,
+On Fri, Jan 25, 2013 at 11:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The device IDs are referenced by the driver and potentially
+> used beyond the init time, as kbuild correctly warns
+> about. Remove the __initconst annotation.
 >
-> On 01/26/2013 06:40 AM, Thierry Reding wrote:
->>> +  * @pwm: PWM device
->>> +  *
->>> +  * It returns nonzero if accessing the PWM can sleep.
->>> +  */
->>> +int pwm_cansleep(struct pwm_device *pwm)
->>
->> I actually liked pwm_can_sleep() better. I find it to be more consistent
->> with the naming of other function names. It would furthermore match the
->> field name.
+> Without this patch, building at91_dt_defconfig results in:
 >
-> I was looking at the GPIO API to suggest this name change, but you are right
-> we should be consistent with the PWM API here.
-> Sorry Florian.
->
+> WARNING: drivers/watchdog/built-in.o(.data+0x28): Section mismatch in reference from the variable at91wdt_driver to the (unknown reference) .init.rodata:(unknown)
+> The variable at91wdt_driver references
+> the (unknown reference) __initconst (unknown)
 
-No problem, I agree with the PWM API consistency.
+Thanks for fixing my commit.
 
->>
->>> +{
->>> +	return pwm->chip->can_sleep;
->>> +}
->>> +EXPORT_SYMBOL_GPL(pwm_cansleep);
->>
->> Would it make sense to check for NULL pointers here? I guess that
->> passing NULL into the function could be considered a programming error
->> and an oops would be okay, but in that case there's no point in making
->> the function return an int. Also see my next comment.
->
-> While it is unlikely to happen it is better to be safe, something like this
-> will do:
->
-> return pwm ? pwm->chip->can_sleep : 0;
->
+Best regards
 
-Ok. And what about:
-
-BUG_ON(pwm == NULL);
-return pwm->chip->can_sleep;
-
->>
->>> +
->>>   #ifdef CONFIG_DEBUG_FS
->>>   static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
->>>   {
->>> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
->>> index 70655a2..e2cb5c7 100644
->>> --- a/include/linux/pwm.h
->>> +++ b/include/linux/pwm.h
->>> @@ -146,6 +146,8 @@ struct pwm_ops {
->>>    * @base: number of first PWM controlled by this chip
->>>    * @npwm: number of PWMs controlled by this chip
->>>    * @pwms: array of PWM devices allocated by the framework
->>> + * @can_sleep: flag must be set iff config()/enable()/disable() methods sleep,
->>> + *      as they must while accessing PWM chips over I2C or SPI
->>>    */
->>>   struct pwm_chip {
->>>   	struct device		*dev;
->>> @@ -159,6 +161,7 @@ struct pwm_chip {
->>>   	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
->>>   					    const struct of_phandle_args *args);
->>>   	unsigned int		of_pwm_n_cells;
->>> +	unsigned int		can_sleep:1;
->>
->> What's the reason for making this a bitfield? Couldn't we just use a
->> bool instead?
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
+> Cc: linux-watchdog at vger.kernel.org
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
+> ---
+>  drivers/watchdog/at91sam9_wdt.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> I have also overlooked this. In my version I had the can_sleep as bool also.
+> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+> index dc42e44..6dad954 100644
+> --- a/drivers/watchdog/at91sam9_wdt.c
+> +++ b/drivers/watchdog/at91sam9_wdt.c
+> @@ -304,7 +304,7 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
+>  }
+>
+>  #if defined(CONFIG_OF)
+> -static const struct of_device_id at91_wdt_dt_ids[] __initconst = {
+> +static const struct of_device_id at91_wdt_dt_ids[] = {
+>         { .compatible = "atmel,at91sam9260-wdt" },
+>         { /* sentinel */ }
+>  };
+> --
+> 1.8.0
 >
 
-Ok for a bool.
-
-Thank you for your reviews. I will send a v3 sometimes today.
-
-Cheers,
-Florian
+--
+Fabio Porcedda
