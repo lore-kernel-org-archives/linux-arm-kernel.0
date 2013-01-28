@@ -1,52 +1,56 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 28 Jan 2013 10:03:22 +0900
-Subject: [PATCH 4/4] irqchip: gic: Perform the gic_secondary_init() call
- via CPU notifier
-In-Reply-To: <20130125092527.GA6619@arm.com>
-References: <1358963974-5496-1-git-send-email-catalin.marinas@arm.com>
- <1358963974-5496-5-git-send-email-catalin.marinas@arm.com>
- <20130125043039.GN13691@verge.net.au>
- <20130125092527.GA6619@arm.com>
-Message-ID: <20130128010322.GJ3423@verge.net.au>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 28 Jan 2013 09:58:44 +0800
+Subject: [PATCH v3 2/3] gpio: pca953x: add support for pca9505
+In-Reply-To: <51045261.5020709@free-electrons.com>
+References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
+ <1358889025-8530-3-git-send-email-gregory.clement@free-electrons.com>
+ <CACRpkda-N0GrKOeaz4Hji0ef9pSRNPCxW_jLGR28iX-sk0-=tg@mail.gmail.com>
+ <51024422.2060503@free-electrons.com>
+ <CACRpkdbe1fGVLNyJ+U+ozE32p+_fc-eQ4W1F8OeYC+fryu_dQQ@mail.gmail.com>
+ <51045261.5020709@free-electrons.com>
+Message-ID: <CAD6h2NSD0zW9aLkgzisEQ5s4UWMXqDG4ghDXrUX53Da4ZqOXAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 09:25:28AM +0000, Catalin Marinas wrote:
-> On Fri, Jan 25, 2013 at 04:30:39AM +0000, Simon Horman wrote:
-> > On Wed, Jan 23, 2013 at 05:59:34PM +0000, Catalin Marinas wrote:
-> > > All the calls to gic_secondary_init() pass 0 as the first argument.
-> > > Since this function is called on each CPU when starting, it can be done
-> > > in a platform-independent way via a CPU notifier registered by the GIC
-> > > code.
-> > >
-> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: David Brown <davidb@codeaurora.org>
-> > > Cc: Daniel Walker <dwalker@fifo99.com>
-> > > Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> > > Cc: Tony Lindgren <tony@atomide.com>
-> > > Cc: Simon Horman <horms@verge.net.au>
-> > > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > > Cc: Dinh Nguyen <dinguyen@altera.com>
-> > > Cc: Viresh Kumar <viresh.linux@gmail.com>
-> > > Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> > > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > > Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> > > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > mach-shmobile portion:
-> > 
-> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > For the record, I tested this on the kzm9g, kzm9d and marzen boards
-> > which use the r8a7779, EMEV2 and r8a7779 SoCs respectively.
-> 
-> Thanks. Can I add a Tested-by as well?
+On 27 January 2013 06:02, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> On 01/25/2013 09:51 AM, Linus Walleij wrote:
+>> On Fri, Jan 25, 2013 at 9:36 AM, Gregory CLEMENT
+>> <gregory.clement@free-electrons.com> wrote:
+>>
+>>> Well, at the beginning I thought adding support for pca9505 was just a matter
+>>> of a couple of lines to add. Then I realized that I need to handle the 40 bits
+>>> case, and I ended up refactoring all access to the registers. So now I am on it,
+>>> it seems I am volunteer to continue to improve this driver.
+>>
+>> I like the sound of this ;-)
+>
+> I was about to fix the issues you have pointed but I didn't find anything like
+>
+> #ifdef CONFIG_ARCH_PXA
+>         if (cpu_is_pxa25x()) {
+> #ifdef CONFIG_CPU_PXA26x
+>                 count = 89;
+>                 gpio_type = PXA26X_GPIO;
+> #elif defined(CONFIG_PXA25x)
+>
+>
+> in the pca953x driver! I think you messed up with another patch set!
+>
+> I saw that Haojian Zhuang have sent a patch set for gpio-pxa and
+> among this set the patch "[PATCH 06/10] gpio: pxa: define nr gpios
+> in platform data" seemed to exactly what you've expected.
+>
 
-Sure.
+PCA953X is a GPIO expander that is relied on I2C bus. It's a device in
+the cirucit,
+not in the PXA chips. So there's no cpu related code in this driver.
 
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
+Gregory's concern is that he found that this device is used on pxa27x
+platform, and
+he don't have the hardware to test. I also don't have pxa27x platform.
+I think that
+he can ping the volunteers in the mailing list.
+
+Regards
+Haojian
