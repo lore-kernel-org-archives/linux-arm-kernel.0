@@ -1,42 +1,20 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Mon, 28 Jan 2013 21:41:33 +0530
-Subject: [PATCH] ARM: davinci: da850: add interrupt-parent property in soc
- node
-In-Reply-To: <51069A3A.8090404@ti.com>
-References: <1359112724-1217-1-git-send-email-prabhakar.lad@ti.com>
- <51069A3A.8090404@ti.com>
-Message-ID: <CA+V-a8vNjbt4RGR99m9LTB7ZsE-RjqSyEHOUPWHAr-7TEv-yug@mail.gmail.com>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Mon, 28 Jan 2013 10:13:11 -0600
+Subject: [PATCH 0/4 v12] cpufreq: add support for Calxeda ECX-1000 (highbank)
+In-Reply-To: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <1359389595-26580-1-git-send-email-mark.langsdorf@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar,
+This patch series adds cpufreq support for the Calxeda
+ECX-1000 (highbank) SoCs. The EnergyCore Management Engine (ECME) on
+the ECX-1000 manages the voltage for the part and communications with
+Linux through a pl320 mailbox. clk notifications are used to control
+when to send messages to the ECME.
 
-On Mon, Jan 28, 2013 at 9:03 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 1/25/2013 4:48 PM, Prabhakar Lad wrote:
->> From: Lad, Prabhakar <prabhakar.lad@ti.com>
->>
->> This patch adds 'interrupt-parent' property in soc node, so that
->> the child inherits this property, this avoids adding 'interrupt-parent'
->> to each node.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Heiko Schocher <hs@denx.de>
->> ---
->
-> Looks good to me. Queuing for v3.9. BTW, we are moving the interrupt
-> parent property to soc node rather than adding it. So, I think a better
-> headline is "move interrupt-parent property to soc node". I change the
-> headline while committing.
->
-Thanks for fixing it.
+Previous versions of this patch set include two other patches. One has
+been dropped as unworkable and the other turned out to be unnecessary.
 
-Regards,
---Prabhakar
-
-> Thanks,
-> Sekhar
+--Mark Langsdorf
+Calxeda, Inc.
