@@ -1,45 +1,46 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 19:56:36 +0100
-Subject: [PATCH v2 27/27] arm: mvebu: update defconfig with PCI and USB support
+Date: Mon, 28 Jan 2013 19:56:34 +0100
+Subject: [PATCH v2 25/27] arm: mvebu: PCIe Device Tree informations for Armada
+ 370 Mirabox
 In-Reply-To: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1359399397-29729-28-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1359399397-29729-26-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the necessary drivers and Device Tree informations to
-support PCIe on Armada 370 and Armada XP, enable the CONFIG_PCI
-option.
-
-Also, since the Armada 370 Mirabox has a built-in USB XHCI controller
-connected on the PCIe bus, enable the corresponding options as well.
+The Globalscale Mirabox platform uses one PCIe interface for an
+available mini-PCIe slot, and the other PCIe interface for an internal
+USB 3.0 controller. We add the necessary Device Tree informations to
+enable those two interfaces.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/mvebu_defconfig |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-370-mirabox.dts |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index b5bc96c..68ef50b 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -13,6 +13,7 @@ CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- # CONFIG_CACHE_L2X0 is not set
- # CONFIG_SWP_EMULATE is not set
-+CONFIG_PCI=y
- CONFIG_SMP=y
- # CONFIG_LOCAL_TIMERS is not set
- CONFIG_AEABI=y
-@@ -36,7 +37,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_S35390A=y
- CONFIG_DMADEVICES=y
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index 3b40713..591068a 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -52,5 +52,19 @@
+ 			phy = <&phy1>;
+ 			phy-mode = "rgmii-id";
+ 		};
++
++		pcie-controller {
++			status = "okay";
++
++			/* Internal mini-PCIe connector */
++			pcie at 0,0 {
++				status = "okay";
++			};
++
++			/* Connected on the PCB to a USB 3.0 XHCI controller */
++			pcie at 1,0 {
++				status = "okay";
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
