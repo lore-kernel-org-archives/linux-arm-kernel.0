@@ -1,133 +1,135 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 28 Jan 2013 10:59:33 +0000
-Subject: [PATCH 12/15] ARM: mach-shmobile: sh73a0: Allow initialisation
- of GIC by DT
-In-Reply-To: <20130128004819.GE3423@verge.net.au>
-References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
- <1359086133-23357-13-git-send-email-horms+renesas@verge.net.au>
- <20130125102210.GJ3075@e106331-lin.cambridge.arm.com>
- <20130128004819.GE3423@verge.net.au>
-Message-ID: <20130128105933.GC7754@e106331-lin.cambridge.arm.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 28 Jan 2013 13:07:40 +0200
+Subject: [PATCH 03/10] gpio: pxa: avoid to use global irq base
+In-Reply-To: <1358929554-32265-4-git-send-email-haojian.zhuang@linaro.org>
+References: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
+ <1358929554-32265-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <51065BFC.6000205@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 12:48:19AM +0000, Simon Horman wrote:
-> On Fri, Jan 25, 2013 at 10:22:10AM +0000, Mark Rutland wrote:
-> > On Fri, Jan 25, 2013 at 03:55:30AM +0000, Simon Horman wrote:
-> > > This allows the GIC interrupt controller of the sh73a0 SoC to be
-> > > initialised using a flattened device tree blob.
-> > > 
-> > > It does not allow the INTC interrupt controller which is also present on
-> > > the sh73a0 SoC to be enabled via device tree.  Nor does it handle sharing
-> > > of interrupts between the GIC and INTC interrupt controllers.
-> > > 
-> > > This limits the usefulness of this code to applications which only wish to
-> > > access devices which use interrupts that can be handled by the GIC
-> > > interrupt controller. Other applications should, for now, continue using
-> > > non-device tree initialisation of the sh72a0 interrupt controllers.
-> > > 
-> > > Includes update to use irqchip_init() by Thierry Reding
-> > > 
-> > > Cc: Thierry Reding <thierry.reding@avionic-design.de>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > ---
-> > >  arch/arm/boot/dts/sh73a0.dtsi                |   33 ++++++++++++++++++++++++++
-> > >  arch/arm/mach-shmobile/include/mach/common.h |    1 +
-> > >  arch/arm/mach-shmobile/intc-sh73a0.c         |    9 +++++++
-> > >  3 files changed, 43 insertions(+)
-> > >  create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-> > > new file mode 100644
-> > > index 0000000..7dae1f4
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/sh73a0.dtsi
-> > > @@ -0,0 +1,33 @@
-> > > +/*
-> > > + * Device Tree Source for the SH73A0 SoC
-> > > + *
-> > > + * Copyright (C) 2012 Renesas Solutions Corp.
-> > > + *
-> > > + * This file is licensed under the terms of the GNU General Public License
-> > > + * version 2.  This program is licensed "as is" without any warranty of any
-> > > + * kind, whether express or implied.
-> > > + */
-> > > +
-> > > +/include/ "skeleton.dtsi"
-> > > +
-> > > +/ {
-> > > +	compatible = "renesas,sh73a0";
-> > > +
-> > > +	cpus {
-> > > +		cpu at 0 {
-> > > +			compatible = "arm,cortex-a9";
-> > > +		};
-> > > +		cpu at 1 {
-> > > +			compatible = "arm,cortex-a9";
-> > > +		};
-> > 
-> > I replied to v1, not realising you'd posted a v2:
-> > 
-> > It would be good to have the reg and device_type properties set here for the
-> > logical map.
+On 01/23/13 10:25, Haojian Zhuang wrote:
+> Avoid to use global irq_base in gpio-pxa driver. Define irq_base in each
+> pxa_gpio_chip instead. Then we can avoid to use macro PXA_GPIO_TO_IRQ() &
+> MMP_GPIO_TO_IRQ().
 > 
-> Thanks.
-> 
-> I'd prefer to handle this as an incremental patch to be applied after the
-> pull-request in which the patch above appears. The patch below is what
-> I have in mind.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/mach-pxa/pxa25x.c |    2 +-
+>  arch/arm/mach-pxa/pxa27x.c |    2 +-
+>  drivers/gpio/gpio-pxa.c    |  142 ++++++++++++++++++++++----------------------
+>  include/linux/gpio-pxa.h   |    4 +-
+>  4 files changed, 77 insertions(+), 73 deletions(-)
 
-Sure. The patch looks right to me :)
+[...]
 
-> 
-> I also believe that the following files seem to be targets for a similar
-> change. The latter two are for UP boards, could you comment on if reg
-> and device_type are appropriate for them too.
-> 
-> arch/arm/boot/dts/emev2.dtsi
+> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+> index 8e66c6b..da6e7fd 100644
+> --- a/drivers/gpio/gpio-pxa.c
+> +++ b/drivers/gpio/gpio-pxa.c
 
-Yup, this one should have reg and device_type added.
+[...]
 
-> arch/arm/boot/dts/r8a7740.dtsi
-> arch/arm/boot/dts/sh7372.dtsi
-
-I'm not sure what the deal is with v7 UP hardware. For v6 and below, the lack
-of an MPIDR means there's nothing to describe. On v7 we should have an MPIDR
-with Aff fields at least, so there is something to describe (even if we don't
-use this currently). I don't believe this would cause any problems, and it
-would make the dts look consistent.
-
-I've Cc'd Lorenzo in case he has any thoughts on the matter.
-
-> 
-> 
-> From: Simon Horman <horms+renesas@verge.net.au>
-> 
-> ARM: mach-shmobile: sh73a0:  Add reg and device_type properties to cpus
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-> index 721f486..f202298 100644
-> --- a/arch/arm/boot/dts/sh73a0.dtsi
-> +++ b/arch/arm/boot/dts/sh73a0.dtsi
-> @@ -15,10 +15,14 @@
+> @@ -485,7 +452,7 @@ static int pxa_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>  	return 0;
+>  }
 >  
->  	cpus {
->  		cpu at 0 {
-> +			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
-> +			reg = <0>;
->  		};
->  		cpu at 1 {
-> +			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
-> +			reg = <1>;
->  		};
->  	};
->  
-> 
+> -const struct irq_domain_ops pxa_irq_domain_ops = {
+> +static const struct irq_domain_ops pxa_irq_domain_ops = {
+>  	.map	= pxa_irq_domain_map,
+>  	.xlate	= irq_domain_xlate_twocell,
+>  };
 
-Thanks,
-Mark.
+You should also move this out of CONFIG_OF as I don't think it is a dependency,
+and also otherwise you get the below...
+
+> @@ -529,14 +496,6 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
+>  	nr_gpios = nr_banks << 5;
+>  	pxa_last_gpio = nr_gpios - 1;
+>  
+> -	irq_base = irq_alloc_descs(-1, 0, nr_gpios, 0);
+> -	if (irq_base < 0) {
+> -		dev_err(&pdev->dev, "Failed to allocate IRQ numbers\n");
+> -		goto err;
+> -	}
+> -	domain = irq_domain_add_legacy(np, nr_gpios, irq_base, 0,
+> -				       &pxa_irq_domain_ops, NULL);
+> -	pxa_gpio_of_node = np;
+>  	return 0;
+>  err:
+>  	iounmap(gpio_reg_base);
+> @@ -546,6 +505,56 @@ err:
+>  #define pxa_gpio_probe_dt(pdev)		(-1)
+>  #endif
+>  
+> +static int pxa_init_gpio_chip(struct platform_device *pdev, int gpio_end,
+> +			      int (*set_wake)(unsigned int, unsigned int))
+> +{
+> +	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
+> +	struct pxa_gpio_chip *chips;
+> +
+> +	chips = devm_kzalloc(&pdev->dev, nbanks * sizeof(*chips), GFP_KERNEL);
+> +	if (chips == NULL) {
+> +		pr_err("%s: failed to allocate GPIO chips\n", __func__);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	for (i = 0, gpio = 0; i < nbanks; i++, gpio += 32) {
+> +		struct gpio_chip *c = &chips[i].chip;
+> +
+> +		sprintf(chips[i].label, "gpio-%d", i);
+> +		chips[i].regbase = gpio_reg_base + BANK_OFF(i);
+> +		chips[i].set_wake = set_wake;
+> +
+> +		c->base  = gpio;
+> +		c->label = chips[i].label;
+> +
+> +		c->direction_input  = pxa_gpio_direction_input;
+> +		c->direction_output = pxa_gpio_direction_output;
+> +		c->get = pxa_gpio_get;
+> +		c->set = pxa_gpio_set;
+> +		c->to_irq = pxa_gpio_to_irq;
+> +#ifdef CONFIG_OF_GPIO
+> +		c->of_node = pxa_gpio_of_node;
+> +		c->of_xlate = pxa_gpio_of_xlate;
+> +		c->of_gpio_n_cells = 2;
+> +#endif
+> +
+> +		/* number of GPIOs on last bank may be less than 32 */
+> +		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
+> +
+> +		chips[i].irq_base = irq_alloc_descs(-1, 0, c->ngpio, 0);
+> +		if (chips[i].irq_base < 0)
+> +			return -EINVAL;
+> +		if (!irq_domain_add_legacy(pdev->dev.of_node, c->ngpio,
+> +					   chips[i].irq_base, 0,
+> +					   &pxa_irq_domain_ops, &chips[i]))
+
+if !CONFIG_OF, you get:
+drivers/gpio/gpio-pxa.c:479: error: 'pxa_irq_domain_ops' undeclared (first use in this function)
+
+Also, for !CONFIG_IRQ_DOMAIN, you get:
+drivers/gpio/gpio-pxa.c: In function 'pxa_init_gpio_chip':
+drivers/gpio/gpio-pxa.c:477: error: implicit declaration of function 'irq_domain_add_legacy'
+
+Should we select IRQ_DOMAIN for PXA?
+Will it work for other drivers?
+
+> +			return -ENODEV;
+> +
+> +		gpiochip_add(c);
+> +	}
+> +	pxa_gpio_chips = chips;
+> +	return 0;
+> +}
+> +
+>  static int pxa_gpio_probe(struct platform_device *pdev)
+>  {
+>  	struct pxa_gpio_chip *c;
+
+[...]
+
+
+-- 
+Regards,
+Igor.
