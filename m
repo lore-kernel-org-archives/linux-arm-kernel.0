@@ -1,91 +1,42 @@
-From: smoch@web.de (Soeren Moch)
-Date: Mon, 28 Jan 2013 21:59:18 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20130123181029.GE20719@lunn.ch>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <201301171049.30415.arnd@arndb.de> <50F800EB.6040104@web.de>
- <201301172026.45514.arnd@arndb.de> <50FABBED.1020905@web.de>
- <20130119185907.GA20719@lunn.ch> <5100022D.9050106@web.de>
- <20130123162515.GK13482@lunn.ch> <510018B4.9040903@web.de>
- <51001BEE.9020201@web.de> <20130123181029.GE20719@lunn.ch>
-Message-ID: <5106E6A6.7010207@web.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 28 Jan 2013 16:23:30 -0500
+Subject: [PATCH] mmc: vt8500: Remove erroneous __exitp in wmt_mci_driver
+In-Reply-To: <1358057960-24540-1-git-send-email-linux@prisktech.co.nz> (Tony
+ Prisk's message of "Sun, 13 Jan 2013 19:19:20 +1300")
+References: <1358057960-24540-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <87boc980j1.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.01.2013 19:10, Andrew Lunn wrote:
->>>>
->>>
->>> Now (in the last hour) stable, occasionally lower numbers:
->>> 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
->>> 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
->>> 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
->>> 3396 3396 3396 3396 3396 3396 3396 3396 3396 3365 3396 3394 3396 3396
->>> 3396 3396 3373 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
->>> 3396 3353 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
->>> 3394 3396 3396 3396 3396 3396 3396 3396
->>>
->>> Before the last pool exhaustion going down:
->>> 3395 3395 3389 3379 3379 3374 3367 3360 3352 3343 3343 3343 3342 3336
->>> 3332 3324 3318 3314 3310 3307 3305 3299 3290 3283 3279 3272 3266 3265
->>> 3247 3247 3247 3242 3236 3236
->>>
->> Here I stopped vdr (and so closed all dvb_demux devices), the number
->> was remaining the same 3236, even after restart of vdr (and restart
->> of streaming).
+Hi Tony,
+
+On Sun, Jan 13 2013, Tony Prisk wrote:
+> With the __devinit/__devexit attributes having been removed, this
+> __exitp attribute causes an unused function warning and should be
+> removed as well.
 >
-> So it does suggest a leak. Probably somewhere on an error path,
-> e.g. its lost video sync.
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+>  drivers/mmc/host/wmt-sdmmc.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
+> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+> index 154f0e8..c6d0015 100644
+> --- a/drivers/mmc/host/wmt-sdmmc.c
+> +++ b/drivers/mmc/host/wmt-sdmmc.c
+> @@ -1012,7 +1012,7 @@ static const struct dev_pm_ops wmt_mci_pm = {
+>  
+>  static struct platform_driver wmt_mci_driver = {
+>  	.probe = wmt_mci_probe,
+> -	.remove = __exit_p(wmt_mci_remove),
+> +	.remove = wmt_mci_remove,
+>  	.driver = {
+>  		.name = DRIVER_NAME,
+>  		.owner = THIS_MODULE,
 
-Now I activated the debug messages in em28xx. From the messages I see no 
-correlation of the pool exhaustion and lost sync. Also I cannot see any 
-error messages from the em28xx driver.
-I see a lot of init_isoc/stop_urbs (maybe EPG scan?) without draining 
-the coherent pool (checked with 'cat /debug/dma-api/num_free_entries', 
-which gave stable numbers), but after half an hour there are only 
-init_isoc messages without corresponding stop_urbs messages and 
-num_free_entries decreased until coherent pool exhaustion.
+Thanks, pushed to mmc-next for 3.9.
 
-Any idea where the memory leak is? What is allocating coherent buffers 
-for orion-ehci?
-
-   Soeren
-
-
-Jan 28 20:46:03 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers each 
-with 64 x 940 bytes
-Jan 28 20:46:03 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx: 
-called em28xx_init_isoc in mode 2
-Jan 28 20:46:03 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers each 
-with 64 x 940 bytes
-Jan 28 20:46:03 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx: 
-called em28xx_init_isoc in mode 2
-Jan 28 20:46:23 guruvdr kernel: em28xx #0 em28xx_stop_urbs :em28xx: 
-called em28xx_stop_urbs
-Jan 28 20:46:23 guruvdr kernel: em28xx #1 em28xx_stop_urbs :em28xx: 
-called em28xx_stop_urbs
-Jan 28 20:46:24 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers each 
-with 64 x 940 bytes
-Jan 28 20:46:24 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx: 
-called em28xx_init_isoc in mode 2
-Jan 28 20:46:24 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers each 
-with 64 x 940 bytes
-Jan 28 20:46:24 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx: 
-called em28xx_init_isoc in mode 2
-Jan 28 20:46:44 guruvdr kernel: em28xx #1 em28xx_stop_urbs :em28xx: 
-called em28xx_stop_urbs
-Jan 28 20:46:44 guruvdr kernel: em28xx #0 em28xx_stop_urbs :em28xx: 
-called em28xx_stop_urbs
-Jan 28 20:46:45 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers each 
-with 64 x 940 bytes
-Jan 28 20:46:45 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx: 
-called em28xx_init_isoc in mode 2
-Jan 28 20:46:45 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers each 
-with 64 x 940 bytes
-Jan 28 20:46:45 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx: 
-called em28xx_init_isoc in mode 2
-Jan 28 20:54:33 guruvdr kernel: ERROR: 1024 KiB atomic DMA coherent pool 
-is too small!
-Jan 28 20:54:33 guruvdr kernel: Please increase it with coherent_pool= 
-kernel parameter!
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
