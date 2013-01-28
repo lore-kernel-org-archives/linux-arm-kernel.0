@@ -1,47 +1,67 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 28 Jan 2013 12:23:56 +0000
-Subject: OMAP baseline test results for v3.8-rc4
-In-Reply-To: <20130125165942.GY22517@atomide.com>
-References: <20130121164510.GA18905@kahuna>
- <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
- <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
- <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
- <50FE66AC.2090306@mimc.co.uk>
- <B5906170F1614E41A8A28DE3B8D121433ECF3DD3@DBDE01.ent.ti.com>
- <50FE9692.2090001@mimc.co.uk> <20130122182331.GO22517@atomide.com>
- <B5906170F1614E41A8A28DE3B8D121433ECF6261@DBDE01.ent.ti.com>
- <20130125165942.GY22517@atomide.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ECFF0CA@DBDE01.ent.ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 28 Jan 2013 13:29:15 +0100
+Subject: [PATCH 5/6 v14] gpio: Add device tree support to block GPIO API
+In-Reply-To: <CAOY=C6HTRFY=rXOAhTwuR3NvtaRFbfbkkpn7FeyK+eqG7sVcKg@mail.gmail.com>
+References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
+ <1358856404-8975-6-git-send-email-stigge@antcom.de>
+ <CAOY=C6E-+uKQGbRDjNh5ZP9Wrmd+PNbt7djkBTzwe29=qA1_PA@mail.gmail.com>
+ <510539C5.8000208@antcom.de>
+ <CAOY=C6HTRFY=rXOAhTwuR3NvtaRFbfbkkpn7FeyK+eqG7sVcKg@mail.gmail.com>
+Message-ID: <51066F1B.9010102@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 22:29:43, Tony Lindgren wrote:
-> * Bedia, Vaibhav <vaibhav.bedia@ti.com> [130123 06:35]:
-> > Hi Tony,
-> > 
-> > On Tue, Jan 22, 2013 at 23:53:32, Tony Lindgren wrote:
-> > [...]
-> > > > 
-> > > > But I should get *something* from the kernel before it starts trying to access the rootfs ?
-> > > 
-> > > Here's something Kevin fixed but did not send it out before going to
-> > > a vacation. Can you give it a try with earlyprintk enabled?
-> > > 
-> > > Note that this does not help with no output early on, that sounds
-> > > like a bug configuring the DEBUG_LL port somewhere.
-> > > 
-> > 
-> > I think earlyprintk on AM335x has not been functional for a while [1].
-> > Will the latest patches from you to enable multiplatform debug-ll be sufficient
-> > to test this out? I am trying to track down the boot issues reported and just
-> > want to be sure of the dependencies. 
+On 01/28/2013 12:39 PM, Stijn Devriendt wrote:
+>>> In the device-tree this is specified as:
+>>>
+>>> powr at 0x20 {
+>>>    // other properties
+>>>
+>>>   gpios = <&gpio 4 0
+>>>                &gpio 5 0>;
+>>> };
+>>>
+>>> Is this kind of integration also possible?
+>>
+>> You can reference the gpio block via a phandle, e.g.:
+>>
+>>         blockgpio {
+>>                 compatible = "linux,gpio-block";
+>>
+>>                 selector1 {
+>>                         gpios = <&gpio 4 0>,
+>>                                 <&gpio 5 0>;
+>>                 };
+>>         };
+>>
+>>         powr at 0x20 {
+>>                 // ...
+>>
+>>                 gpios = <&selector1>;
+>>         };
+>>
+>>
+>> In the driver, you can get the gpio block like this:
+>>
+>> block = gpio_block_find_by_name(of_parse_phandle(powr, "gpios", 0)->name);
+>>
+>> (Simplified by removed error/NULL handling!)
+>>
+>> If this turns out to be a common pattern, I can add a convenience "get"
+>> function for this.
 > 
-> Yes you should check with current linux next and select the DEBUG_LL
-> port manually.
->  
+> Given the pick-up of device-tree in ARM and MIPS, I think this stands
+> a good chance
+> of becoming a common pattern. Do mind the "gpios" name; it's already used by the
+> normal GPIO request functions...
 
-Verified on linux-next that selecting the right UART port gives a functional early_console. 
-(One of the rare cases where forcing a kernel panic early in the boot process makes sense ;)
+Right, when providing the respective convenience function, I'll better
+use sth. like "gpioblock" as property name.
 
-Regards,
-Vaibhav
+Specifying a traditional list of GPIOs instead is easy, actually. The
+respective driver just needs to allocate a gpio block explicitly
+(insteady of implicitly via phandle as above). Unfortunately, gpio
+blocks that should be exported and available to userspace can't be
+specified this way. Therefore the strategy as above.
+
+Roland
