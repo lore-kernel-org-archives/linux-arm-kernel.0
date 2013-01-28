@@ -1,40 +1,40 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 28 Jan 2013 10:04:23 +0000
-Subject: [PATCH] mfd/vexpress: vexpress_sysreg_setup must not be __init
-In-Reply-To: <1359140032-6039-1-git-send-email-arnd@arndb.de>
-References: <1359140032-6039-1-git-send-email-arnd@arndb.de>
-Message-ID: <1359367463.8090.9.camel@hornet>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 28 Jan 2013 18:08:27 +0800
+Subject: [GIT PULL] CSR SiRFmarco SoC infrastructures for 3.9
+In-Reply-To: <20130128070848.GG25723@quad.lixom.net>
+References: <CAGsJ_4z-7z8=3xQwU6iEsqHEcVrRWK+Fm7eoBEbjC-EAewGypA@mail.gmail.com>
+ <20130128070848.GG25723@quad.lixom.net>
+Message-ID: <CAGsJ_4yV5KJ2yWQtbOLO5Dj_MrQS3v0sPN4hinJAzTsfH6quvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-01-25 at 18:53 +0000, Arnd Bergmann wrote:
-> The patch 52666298a 'mfd: vexpress-sysreg: Don't skip initialization
-> on probe' adds a call to vexpress_sysreg_setup from a non-__init
-> function, so this also has to lose its __init annotation.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: arm at kernel.org
-> ---
->  drivers/mfd/vexpress-sysreg.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-> index 77048b1..558c292 100644
-> --- a/drivers/mfd/vexpress-sysreg.c
-> +++ b/drivers/mfd/vexpress-sysreg.c
-> @@ -313,7 +313,7 @@ static void vexpress_sysreg_config_complete(unsigned long data)
->  }
->  
-> 
-> -void __init vexpress_sysreg_setup(struct device_node *node)
-> +void vexpress_sysreg_setup(struct device_node *node)
->  {
->  	if (WARN_ON(!vexpress_sysreg_base))
->  		return;
+2013/1/28 Olof Johansson <olof@lixom.net>:
+> On Thu, Jan 24, 2013 at 11:21:02AM +0800, Barry Song wrote:
+>> Hi Olof, Arnd,
+>>
+>> pls pull the following changes for CSR SiRFmarco SoC. it has been
+>> rebased againest arm-soc timer/cleanup tree.
+>>
+>> since commit 90cf214d6a549bf482e3c5751ee256cc885b96ea:
+>>
+>>   ARM: at91: fix board-rm9200-dt after sys_timer conversion
+>> (2013-01-14 10:14:04 -0800)
+>>
+>> are available in the git repository at:
+>>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
+>> marco-timer-cleanup-rebase
+>
+> Pulled in as prima2/marco, included in next/soc. Thanks!
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+Olof, thanks.
 
-Thanks!
+>
+> I noticed that there is no defconfig for any mach-prima2 platforms. Feel
+> free to submit one so we get build coverage of the platform.
 
-Pawel
+there have been. arch/arm/configs/prima2_defconfig
+
+>
+> -Olof
+
+-barry
