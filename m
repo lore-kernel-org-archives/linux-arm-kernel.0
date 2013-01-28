@@ -1,45 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Jan 2013 17:51:06 +0000
-Subject: [PATCH v3 0/3] introduce static_vm for ARM-specific static
- mapped area
-In-Reply-To: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <20130128175106.GI23470@mudshark.cambridge.arm.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 28 Jan 2013 18:54:06 +0100
+Subject: [PATCH 0/2] ARM: dts: OMAP3: Add GPMC controller and NAND memory to
+ Overo
+Message-ID: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Thu, Jan 24, 2013 at 01:28:51AM +0000, Joonsoo Kim wrote:
-> In current implementation, we used ARM-specific flag, that is,
-> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
-> The purpose of static mapped area is to re-use static mapped area when
-> entire physical address range of the ioremap request can be covered
-> by this area.
-> 
-> This implementation causes needless overhead for some cases.
-> For example, assume that there is only one static mapped area and
-> vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
-> deciding whether it is matched or not. Moreover, even if there is
-> no static mapped area and vmlist has 300 areas, every time we call
-> ioremap, we check 300 areas in now.
-> 
-> If we construct a extra list for static mapped area, we can eliminate
-> above mentioned overhead.
-> With a extra list, if there is one static mapped area,
-> we just check only one area and proceed next operation quickly.
-> 
-> In fact, it is not a critical problem, because ioremap is not frequently
-> used. But reducing overhead is better idea.
-> 
-> Another reason for doing this work is for removing vm_struct list management,
-> entirely. For more information, look at the following link.
-> http://lkml.org/lkml/2012/12/6/184
+This is more an RFC serie, as an issue is still unclear to me.
+Building on the work of Daniel Mack for the GPMC controller (staged
+in Tony's tree [1]), it was easy to add the GPMC controller to OMAP3.
 
-First patch looks good (removing the unused vmregion stuff) but I'm not so
-sure about the rest of it. If you really care about ioremap performance,
-perhaps it would be better to have a container struct around the vm_struct
-for static mappings and then stick them in an augmented rbtree so you can
-efficiently find the mapping encompassing a particular physical address?
+The issue comes from the Overo on-board NAND, as the amount of flash
+depends on the revision. Currently, partitions are handled in the board
+file using MTDPART_SIZ_FULL, but looking at the ofpart parser, the size
+given to the parser must be fixed.
 
-Will
+So how should we handle such case? Having several dtsi depending
+on the Overo's revision would be a mess to my sense, considering
+the non-conditional include inside the expansion boards' dts.
+Or would it make sense to extend the DT binding for partitions?
+
+This serie was tested on an Overo with 512MB of NAND.
+
+Best regards,
+
+Florian
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git omap-for-v3.9/gpmc
+
+Florian Vaussard (2):
+  ARM: dts: OMAP3: Add GPMC controller
+  ARM: dts: OMAP3: Add NAND memory for Overo products
+
+ arch/arm/boot/dts/omap3-overo.dtsi |   49 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3.dtsi       |   11 ++++++++
+ 2 files changed, 60 insertions(+), 0 deletions(-)
+
+-- 
+1.7.5.4
