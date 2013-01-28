@@ -1,112 +1,98 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 28 Jan 2013 13:30:12 +0200
-Subject: [PATCH v2 11/30] usb: ehci-omap: Remove PHY reset handling code
+Date: Mon, 28 Jan 2013 13:30:13 +0200
+Subject: [PATCH v2 12/30] usb: ehci-omap: Remove PHY regulator handling code
 In-Reply-To: <1359372631-8180-1-git-send-email-rogerq@ti.com>
 References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
-Message-ID: <1359372631-8180-12-git-send-email-rogerq@ti.com>
+Message-ID: <1359372631-8180-13-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reset GPIO handling for the PHY must be done in the PHY
-driver. We use the PHY helpers instead to reset the PHY.
+PHY regulator handling must be done in the PHY driver
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/usb/host/ehci-omap.c |   70 +++++------------------------------------
- 1 files changed, 9 insertions(+), 61 deletions(-)
+ drivers/usb/host/ehci-omap.c |   34 ----------------------------------
+ 1 files changed, 0 insertions(+), 34 deletions(-)
 
 diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index a35e44e..3c63619 100644
+index 3c63619..da3e322 100644
 --- a/drivers/usb/host/ehci-omap.c
 +++ b/drivers/usb/host/ehci-omap.c
-@@ -86,79 +86,27 @@ static inline u32 ehci_read(void __iomem *base, u32 reg)
- 	return __raw_readl(base + reg);
+@@ -42,7 +42,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/usb/ulpi.h>
+-#include <linux/regulator/consumer.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/gpio.h>
+ #include <linux/clk.h>
+@@ -112,19 +111,6 @@ static int omap_ehci_init(struct usb_hcd *hcd)
+ 	return rc;
  }
  
--
--static void omap_ehci_soft_phy_reset(struct usb_hcd *hcd, u8 port)
+-static void disable_put_regulator(
+-		struct usbhs_omap_platform_data *pdata)
 -{
--	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
--	unsigned reg = 0;
+-	int i;
 -
--	reg = ULPI_FUNC_CTRL_RESET
--		/* FUNCTION_CTRL_SET register */
--		| (ULPI_SET(ULPI_FUNC_CTRL) << EHCI_INSNREG05_ULPI_REGADD_SHIFT)
--		/* Write */
--		| (2 << EHCI_INSNREG05_ULPI_OPSEL_SHIFT)
--		/* PORTn */
--		| ((port + 1) << EHCI_INSNREG05_ULPI_PORTSEL_SHIFT)
--		/* start ULPI access*/
--		| (1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT);
--
--	ehci_write(hcd->regs, EHCI_INSNREG05_ULPI, reg);
--
--	/* Wait for ULPI access completion */
--	while ((ehci_read(hcd->regs, EHCI_INSNREG05_ULPI)
--			& (1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT))) {
--		cpu_relax();
--
--		if (time_after(jiffies, timeout)) {
--			dev_dbg(hcd->self.controller,
--					"phy reset operation timed out\n");
--			break;
+-	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
+-		if (pdata->regulator[i]) {
+-			regulator_disable(pdata->regulator[i]);
+-			regulator_put(pdata->regulator[i]);
 -		}
 -	}
 -}
 -
- static int omap_ehci_init(struct usb_hcd *hcd)
- {
- 	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
--	int			rc;
--	struct usbhs_omap_platform_data	*pdata;
--
--	pdata = hcd->self.controller->platform_data;
-+	struct omap_hcd		*omap = (struct omap_hcd *)ehci->priv;
-+	int			rc, i;
+ /* configure so an HC device and id are always provided */
+ /* always called with process context; sleeping is OK */
  
- 	/* Hold PHYs in reset while initializing EHCI controller */
--	if (pdata->phy_reset) {
--		if (gpio_is_valid(pdata->reset_gpio_port[0]))
--			gpio_set_value_cansleep(pdata->reset_gpio_port[0], 0);
--
--		if (gpio_is_valid(pdata->reset_gpio_port[1]))
--			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 0);
--
--		/* Hold the PHY in RESET for enough time till DIR is high */
--		udelay(10);
-+	for (i = 0; i < omap->nports; i++) {
-+		if (omap->phy[i])
-+			usb_phy_shutdown(omap->phy[i]);
+@@ -153,7 +139,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	int					ret = -ENODEV;
+ 	int					irq;
+ 	int					i;
+-	char					supply[7];
+ 
+ 	if (usb_disabled())
+ 		return -ENODEV;
+@@ -221,23 +206,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 		usb_phy_set_suspend(omap->phy[i], 0);
  	}
  
--	/* Soft reset the PHY using PHY reset command over ULPI */
--	if (pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_PHY)
--		omap_ehci_soft_phy_reset(hcd, 0);
--	if (pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_PHY)
--		omap_ehci_soft_phy_reset(hcd, 1);
+-	/* get ehci regulator and enable */
+-	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
+-		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY) {
+-			pdata->regulator[i] = NULL;
+-			continue;
+-		}
+-		snprintf(supply, sizeof(supply), "hsusb%d", i);
+-		pdata->regulator[i] = regulator_get(dev, supply);
+-		if (IS_ERR(pdata->regulator[i])) {
+-			pdata->regulator[i] = NULL;
+-			dev_dbg(dev,
+-			"failed to get ehci port%d regulator\n", i);
+-		} else {
+-			regulator_enable(pdata->regulator[i]);
+-		}
+-	}
 -
- 	/* we know this is the memory we want, no need to ioremap again */
- 	ehci->caps = hcd->regs;
+ 	pm_runtime_enable(dev);
+ 	pm_runtime_get_sync(dev);
  
- 	rc = ehci_setup(hcd);
+@@ -263,7 +231,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	return 0;
  
--	if (pdata->phy_reset) {
--		/* Hold the PHY in RESET for enough time till
--		 * PHY is settled and ready
--		 */
--		udelay(10);
--
--		if (gpio_is_valid(pdata->reset_gpio_port[0]))
--			gpio_set_value_cansleep(pdata->reset_gpio_port[0], 1);
--
--		if (gpio_is_valid(pdata->reset_gpio_port[1]))
--			gpio_set_value_cansleep(pdata->reset_gpio_port[1], 1);
-+	/* Bring PHYs out of reset */
-+	for (i = 0; i < omap->nports; i++) {
-+		if (omap->phy[i])
-+			usb_phy_init(omap->phy[i]);
- 	}
+ err_pm_runtime:
+-	disable_put_regulator(pdata);
+ 	pm_runtime_put_sync(dev);
  
- 	return rc;
+ err_phy:
+@@ -294,7 +261,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ 	int i;
+ 
+ 	usb_remove_hcd(hcd);
+-	disable_put_regulator(dev->platform_data);
+ 	usb_put_hcd(hcd);
+ 
+ 	for (i = 0; i < omap->nports; i++) {
 -- 
 1.7.4.1
