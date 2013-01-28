@@ -1,46 +1,43 @@
-From: bfields@redhat.com (J. Bruce Fields)
-Date: Mon, 28 Jan 2013 18:18:03 -0500
-Subject: [PATCH 15/19] sunrpc: don't warn for unused variable 'buf'
-In-Reply-To: <201301261334.56398.arnd@arndb.de>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <201301252345.25829.arnd@arndb.de>
- <20130126110321.GE23505@n2100.arm.linux.org.uk>
- <201301261334.56398.arnd@arndb.de>
-Message-ID: <20130128231803.GG5677@pad.fieldses.org>
+From: rtivy@ti.com (Tivy, Robert)
+Date: Mon, 28 Jan 2013 23:56:10 +0000
+Subject: [PATCH v6 1/2] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <5103F47C.4020509@mvista.com>
+References: <1359168322-17733-1-git-send-email-rtivy@ti.com>
+ <1359168322-17733-2-git-send-email-rtivy@ti.com>
+ <5103F47C.4020509@mvista.com>
+Message-ID: <13514BD7FAEBA745BBD7D8A672905C1431206A68@DFLE08.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 01:34:56PM +0000, Arnd Bergmann wrote:
-> On Saturday 26 January 2013, Russell King - ARM Linux wrote:
-> > On Fri, Jan 25, 2013 at 11:45:25PM +0000, Arnd Bergmann wrote:
-> > > On Friday 25 January 2013, Myklebust, Trond wrote:
-> > > > > -----Original Message-----
-> > > > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > > > Marking it as __maybe_unused avoids a harmless gcc warning.
-> > > > 
-> > > > Alternatively, just declare it using the RPC_IFDEBUG() macro.
-> > > 
-> > > Right, makes sense: that's more consistent with other functions
-> > > doing the same thing. Thanks for taking a look.
-> > 
-> > NAK.
-> > 
-> > There is already a fix queued up as a result of a previous report I
-> > sent, but for some reason (which I didn't question) it was decided
-> > not to queue it for -rc.
-> > 
-> > See Bruce's reply on lkml: 20130108212816.GA24572 at fieldses.org
-
-Apologies, I've seen so many "stop sending me post-rc1 patches that
-don't fix serious crashes!" flames.
-
-I guess obviousl compile fixes should be an exception--if nothing else
-it'd save a lot of duplicated work as this is something like the 3rd
-patch I've seen for this.
-
---b.
-
+> -----Original Message-----
+> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
+> Sent: Saturday, January 26, 2013 7:22 AM
 > 
-> Ok, makes sense. Then again, if that fix is queued for 3.9, maybe
-> it still makes sense to take the simpler fix into 3.8, and remove
-> it in 3.9 along with the other instances of RPC_IFDEBUG.
+> Hello.
+> 
+> On 26-01-2013 6:45, Robert Tivy wrote:
+> 
+> > Adding a remoteproc driver implementation for OMAP-L138 DSP
+> 
+> > diff --git a/drivers/remoteproc/da8xx_remoteproc.c
+> b/drivers/remoteproc/da8xx_remoteproc.c
+> > new file mode 100644
+> > index 0000000..c6eb6bf
+> > --- /dev/null
+> > +++ b/drivers/remoteproc/da8xx_remoteproc.c
+> > @@ -0,0 +1,327 @@
+> [...]
+> > +#define SYSCFG_CHIPSIG_OFFSET 0x174
+> > +#define SYSCFG_CHIPSIG_CLR_OFFSET 0x178
+> 
+>     Wait, you don't even use these #define's -- why they're here at
+> all?
+> 
+> WBR, Sergei
+
+I will remove those.  They were inadvertently left over from when the driver was mapping SYSCFG0's base address and using those offsets to get to the CHIPSIG registers.
+
+Regards,
+
+- Rob
