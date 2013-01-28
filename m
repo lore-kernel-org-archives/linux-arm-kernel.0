@@ -1,42 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 28 Jan 2013 21:13:15 +0800
-Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <1359131057.32148.9.camel@linux-builds1>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-5-git-send-email-dinguyen@altera.com>
- <20130125154955.GD10055@amd.pavel.ucw.cz>
- <1359131057.32148.9.camel@linux-builds1>
-Message-ID: <20130128131312.GB20238@S2101-09.ap.freescale.net>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 28 Jan 2013 14:16:23 +0100
+Subject: [PATCH v2 1/3] pwm: Add pwm_cansleep() as exported API to users
+In-Reply-To: <510659A3.7070906@epfl.ch>
+References: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359121471-21457-2-git-send-email-florian.vaussard@epfl.ch>
+ <20130126054024.GB29243@avionic-0098.adnet.avionic-design.de>
+ <51063AB5.2060108@ti.com> <51064687.5090605@epfl.ch>
+ <20130128095754.GA23134@avionic-0098.adnet.avionic-design.de>
+ <510659A3.7070906@epfl.ch>
+Message-ID: <20130128131622.GA1783@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 10:24:17AM -0600, Dinh Nguyen wrote:
-> Hi Pavel,
-> On Fri, 2013-01-25 at 16:49 +0100, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > mach-socfpga is another platform that needs to use
-> > > v7_invalidate_l1 to bringup additional cores. There was a comment that
-> > > the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
-> > 
-> > If there are three copies of code, with fourth one needed for next
-> > platform, moving it into common code makes sense.
-> > 
-> > But... The code was not identical before the merge. Are you sure that
-> > the differences do not hurt? At the very least, it should be mentioned
-> > in the changelog.
+On Mon, Jan 28, 2013 at 11:57:39AM +0100, Florian Vaussard wrote:
+> Le 28/01/2013 10:57, Thierry Reding a ?crit :
+> >On Mon, Jan 28, 2013 at 10:36:07AM +0100, Florian Vaussard wrote:
+> >>Hello,
+> >>
+> >>Le 28/01/2013 09:45, Peter Ujfalusi a ?crit :
+> >>>hi Thierry,
+> >>>
+> >>>On 01/26/2013 06:40 AM, Thierry Reding wrote:
+> >[...]
+> >>>>>+{
+> >>>>>+	return pwm->chip->can_sleep;
+> >>>>>+}
+> >>>>>+EXPORT_SYMBOL_GPL(pwm_cansleep);
+> >>>>
+> >>>>Would it make sense to check for NULL pointers here? I guess that
+> >>>>passing NULL into the function could be considered a programming error
+> >>>>and an oops would be okay, but in that case there's no point in making
+> >>>>the function return an int. Also see my next comment.
+> >>>
+> >>>While it is unlikely to happen it is better to be safe, something like this
+> >>>will do:
+> >>>
+> >>>return pwm ? pwm->chip->can_sleep : 0;
+> >>>
+> >>
+> >>Ok. And what about:
+> >>
+> >>BUG_ON(pwm == NULL);
+> >>return pwm->chip->can_sleep;
+> >
+> >I don't think we need that. In case pwm == NULL, dereferencing it will
+> >oops anyway. So either we make it safe and return an error code, or we
+> >let it oops without explicit BUG_ON().
+> >
 > 
-> Indeed, the addition of 
-> 
-> mcr     p15, 0, r0, c7, c5, 0   @ invalidate I cache
-> 
-This becomes unnecessary since commit 612539e (ARM: 7296/1: proc-v7.S:
-remove HARVARD_CACHE preprocessor guards) gets in.
+> Calling this function with a NULL pointer is a programming error, so there
+> is no error codes for such errors.
 
-Shawn
+You could return -EINVAL if pwm == NULL.
 
-> was done by commit # 5b2acf384c8a8707d32a98106192ee7187e4446d
-> 
-> This adds invalidate I-Cache as well as D-Cache, which I think should be
-> ok for most platforms. 
-> 
+> I propose to return bool, and let it oops if such case happens.
+
+My point was that it will oops even if you don't use BUG_ON() so there
+isn't so much point in using it explicitly.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130128/a79cde7f/attachment.sig>
