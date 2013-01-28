@@ -1,31 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Jan 2013 15:00:10 -0700
-Subject: [PATCH v2 02/27] of/pci: Add of_pci_get_devfn() function
-In-Reply-To: <1359399397-29729-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5106F4EA.20904@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 28 Jan 2013 14:00:26 -0800
+Subject: [GIT PULL] imx cleanup for 3.9
+In-Reply-To: <20130122144813.GD2812@S2101-09.ap.freescale.net>
+References: <20130122144813.GD2812@S2101-09.ap.freescale.net>
+Message-ID: <20130128220026.GC3047@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 11:56 AM, Thomas Petazzoni wrote:
-> From: Thierry Reding <thierry.reding@avionic-design.de>
-> 
-> This function can be used to parse the device and function number from a
-> standard 5-cell PCI resource. PCI_SLOT() and PCI_FUNC() can be used on
-> the returned value obtain the device and function numbers respectively.
+Hi,
 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+On Tue, Jan 22, 2013 at 10:48:15PM +0800, Shawn Guo wrote:
 
->  static inline int __of_pci_pci_compare(struct device_node *node,
->  				       unsigned int devfn)
->  {
-> -	unsigned int size;
-> -	const __be32 *reg = of_get_property(node, "reg", &size);
-> +	int err;
+> Shawn Guo (4):
+>       ARM: dts: imx: use nodes label in board dts
 
-I think I commented when Thierry posted this, that calling that "err"
-seems a little odd. Thierry replied:
+Hmm.
 
-Maybe renaming the devfn parameter to data and using devfn for the local
-variable would be more obvious.
+This patch is 1000 lines of pure churn. Sure, the style on OMAP is different,
+but there's no clear benefit from it -- it's actually advantageous to see some
+of the bus hierarchies even on the leaf-level board nodes.
+
+Would you mind respinning with this left out, please? If you still want to
+argue it to be included, we can do so, but I'd like to pick up the rest of the
+branch meanwhile. :-)
+
+
+Thanks!
+
+-Olof
