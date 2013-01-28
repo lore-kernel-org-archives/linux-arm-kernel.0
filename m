@@ -1,42 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 28 Jan 2013 08:17:05 -0600
-Subject: [PATCH] arm: zynq: Add missing irqchip.h to common.c
-In-Reply-To: <1359376250-18841-1-git-send-email-michal.simek@xilinx.com>
-References: <1359376250-18841-1-git-send-email-michal.simek@xilinx.com>
-Message-ID: <51068861.8060309@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 28 Jan 2013 22:22:52 +0800
+Subject: [PATCH 0/2] Uncompress debug for multiplatform
+In-Reply-To: <20130128141947.GA11626@S2101-09.ap.freescale.net>
+References: <1358436119-30808-1-git-send-email-shawn.guo@linaro.org>
+ <20130128141947.GA11626@S2101-09.ap.freescale.net>
+Message-ID: <20130128142250.GB11626@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 06:30 AM, Michal Simek wrote:
-> The patch: "ARM: use common irqchip_init for GIC init"
-> (sha1: 0529e315bbda5d502c93df2cfafba9bb337fbdf4)
-> should also add linux/irqchip.h header.
-> 
-> Error message:
-> arch/arm/mach-zynq/common.c:99:14: error: 'irqchip_init'
->   undeclared here (not in a function)
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Sorry, Russell.  I meant to put your email address on To.
 
-FYI, there's already a patch posted for this:
+Shawn
 
-http://www.spinics.net/lists/arm-kernel/msg219556.html
-
-Rob
-> ---
->  arch/arm/mach-zynq/common.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+On Mon, Jan 28, 2013 at 10:19:51PM +0800, Russell King wrote:
+> On Thu, Jan 17, 2013 at 11:21:57PM +0800, Shawn Guo wrote:
+> > It's not about running single zImage on multiple platforms with
+> > uncompress debug output, but having uncompress debug work for platform
+> > that DEBUG_LL is enabled for.  But still it's better than nothing.
+> > 
+> > Shawn Guo (2):
+> >   ARM: use Kconfig to select uncompress.h
+> >   ARM: use DEBUG_LL infrastructural for multiplatform uncompress debug
 > 
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index 6472a69..cf3ec54 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -24,6 +24,7 @@
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/of.h>
-> +#include <linux/irqchip.h>
->  
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
+> Just put them into patch tracker as #7633 and #7634.
+> 
+> Shawn
 > 
