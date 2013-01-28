@@ -1,135 +1,127 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 28 Jan 2013 13:07:40 +0200
-Subject: [PATCH 03/10] gpio: pxa: avoid to use global irq base
-In-Reply-To: <1358929554-32265-4-git-send-email-haojian.zhuang@linaro.org>
-References: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
- <1358929554-32265-4-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <51065BFC.6000205@compulab.co.il>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Mon, 28 Jan 2013 16:47:25 +0530
+Subject: [PATCH] arm: dts: omap5-evm: Add I2c pinctrl data
+Message-ID: <1359371845-27876-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/13 10:25, Haojian Zhuang wrote:
-> Avoid to use global irq_base in gpio-pxa driver. Define irq_base in each
-> pxa_gpio_chip instead. Then we can avoid to use macro PXA_GPIO_TO_IRQ() &
-> MMP_GPIO_TO_IRQ().
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/mach-pxa/pxa25x.c |    2 +-
->  arch/arm/mach-pxa/pxa27x.c |    2 +-
->  drivers/gpio/gpio-pxa.c    |  142 ++++++++++++++++++++++----------------------
->  include/linux/gpio-pxa.h   |    4 +-
->  4 files changed, 77 insertions(+), 73 deletions(-)
+Booting 3.8-rc4 om omap 5430evm results in the following error
 
-[...]
+omap_i2c 48070000.i2c: did not get pins for i2c error: -19
+[    1.024261] omap_i2c 48070000.i2c: bus 0 rev0.12 at 100 kHz
+[    1.030181] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
+[    1.037384] omap_i2c 48072000.i2c: bus 1 rev0.12 at 400 kHz
+[    1.043762] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
+[    1.050964] omap_i2c 48060000.i2c: bus 2 rev0.12 at 100 kHz
+[    1.056823] omap_i2c 4807a000.i2c: did not get pins for i2c error: -19
+[    1.064025] omap_i2c 4807a000.i2c: bus 3 rev0.12 at 400 kHz
 
-> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-> index 8e66c6b..da6e7fd 100644
-> --- a/drivers/gpio/gpio-pxa.c
-> +++ b/drivers/gpio/gpio-pxa.c
+This happens because omap5 dts file is not adapted to use i2c through pinctrl
+framework. Populating i2c pinctrl data to get rid of the error.
 
-[...]
+Tested on omap5430 evm with 3.8-rc4 kernel.
 
-> @@ -485,7 +452,7 @@ static int pxa_irq_domain_map(struct irq_domain *d, unsigned int irq,
->  	return 0;
->  }
->  
-> -const struct irq_domain_ops pxa_irq_domain_ops = {
-> +static const struct irq_domain_ops pxa_irq_domain_ops = {
->  	.map	= pxa_irq_domain_map,
->  	.xlate	= irq_domain_xlate_twocell,
->  };
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/boot/dts/omap5-evm.dts |   62 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 62 insertions(+), 0 deletions(-)
 
-You should also move this out of CONFIG_OF as I don't think it is a dependency,
-and also otherwise you get the below...
-
-> @@ -529,14 +496,6 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
->  	nr_gpios = nr_banks << 5;
->  	pxa_last_gpio = nr_gpios - 1;
->  
-> -	irq_base = irq_alloc_descs(-1, 0, nr_gpios, 0);
-> -	if (irq_base < 0) {
-> -		dev_err(&pdev->dev, "Failed to allocate IRQ numbers\n");
-> -		goto err;
-> -	}
-> -	domain = irq_domain_add_legacy(np, nr_gpios, irq_base, 0,
-> -				       &pxa_irq_domain_ops, NULL);
-> -	pxa_gpio_of_node = np;
->  	return 0;
->  err:
->  	iounmap(gpio_reg_base);
-> @@ -546,6 +505,56 @@ err:
->  #define pxa_gpio_probe_dt(pdev)		(-1)
->  #endif
->  
-> +static int pxa_init_gpio_chip(struct platform_device *pdev, int gpio_end,
-> +			      int (*set_wake)(unsigned int, unsigned int))
-> +{
-> +	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
-> +	struct pxa_gpio_chip *chips;
-> +
-> +	chips = devm_kzalloc(&pdev->dev, nbanks * sizeof(*chips), GFP_KERNEL);
-> +	if (chips == NULL) {
-> +		pr_err("%s: failed to allocate GPIO chips\n", __func__);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	for (i = 0, gpio = 0; i < nbanks; i++, gpio += 32) {
-> +		struct gpio_chip *c = &chips[i].chip;
-> +
-> +		sprintf(chips[i].label, "gpio-%d", i);
-> +		chips[i].regbase = gpio_reg_base + BANK_OFF(i);
-> +		chips[i].set_wake = set_wake;
-> +
-> +		c->base  = gpio;
-> +		c->label = chips[i].label;
-> +
-> +		c->direction_input  = pxa_gpio_direction_input;
-> +		c->direction_output = pxa_gpio_direction_output;
-> +		c->get = pxa_gpio_get;
-> +		c->set = pxa_gpio_set;
-> +		c->to_irq = pxa_gpio_to_irq;
-> +#ifdef CONFIG_OF_GPIO
-> +		c->of_node = pxa_gpio_of_node;
-> +		c->of_xlate = pxa_gpio_of_xlate;
-> +		c->of_gpio_n_cells = 2;
-> +#endif
-> +
-> +		/* number of GPIOs on last bank may be less than 32 */
-> +		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
-> +
-> +		chips[i].irq_base = irq_alloc_descs(-1, 0, c->ngpio, 0);
-> +		if (chips[i].irq_base < 0)
-> +			return -EINVAL;
-> +		if (!irq_domain_add_legacy(pdev->dev.of_node, c->ngpio,
-> +					   chips[i].irq_base, 0,
-> +					   &pxa_irq_domain_ops, &chips[i]))
-
-if !CONFIG_OF, you get:
-drivers/gpio/gpio-pxa.c:479: error: 'pxa_irq_domain_ops' undeclared (first use in this function)
-
-Also, for !CONFIG_IRQ_DOMAIN, you get:
-drivers/gpio/gpio-pxa.c: In function 'pxa_init_gpio_chip':
-drivers/gpio/gpio-pxa.c:477: error: implicit declaration of function 'irq_domain_add_legacy'
-
-Should we select IRQ_DOMAIN for PXA?
-Will it work for other drivers?
-
-> +			return -ENODEV;
-> +
-> +		gpiochip_add(c);
-> +	}
-> +	pxa_gpio_chips = chips;
-> +	return 0;
-> +}
-> +
->  static int pxa_gpio_probe(struct platform_device *pdev)
->  {
->  	struct pxa_gpio_chip *c;
-
-[...]
-
-
+diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
+index 8722c15..a96acc0 100644
+--- a/arch/arm/boot/dts/omap5-evm.dts
++++ b/arch/arm/boot/dts/omap5-evm.dts
+@@ -80,6 +80,41 @@
+ 			0x15a 0x100	/* abemcbsp2_clkx.abemcbsp2_clkx INPUT | MODE0 */
+ 		>;
+ 	};
++
++        i2c1_pins: pinmux_i2c1_pins {
++                pinctrl-single,pins = <
++                        0x1b2 0x118        /* i2c2_scl PULLUP | INPUTENABLE | MODE0 */
++                        0x1b4 0x118        /* i2c2_sda PULLUP | INPUTENABLE | MODE0 */
++                >;
++        };
++
++	i2c2_pins: pinmux_i2c2_pins {
++		pinctrl-single,pins = <
++			0x178 0x100        /* i2c2_scl INPUTENABLE | MODE0 */
++			0x17a 0x100        /* i2c2_sda INPUTENABLE | MODE0 */
++		>;
++	};
++
++	i2c3_pins: pinmux_i2c3_pins {
++		pinctrl-single,pins = <
++			0x13a 0x100        /* i2c3_scl INPUTENABLE | MODE0 */
++			0x13c 0x100     /* i2c3_sda INPUTENABLE | MODE0 */
++		>;
++	};
++
++	i2c4_pins: pinmux_i2c4_pins {
++		pinctrl-single,pins = <
++			0xb8 0x100        /* i2c4_scl INPUTENABLE | MODE0 */
++			0xba 0x100     /* i2c4_sda INPUTENABLE | MODE0 */
++		>;
++	};
++
++	i2c5_pins: pinmux_i2c5_pins {
++		pinctrl-single,pins = <
++			0x184 0x100        /* i2c4_scl INPUTENABLE | MODE0 */
++			0x186 0x100     /* i2c4_sda INPUTENABLE | MODE0 */
++		>;
++	};
+ };
+ 
+ &mmc1 {
+@@ -106,7 +141,17 @@
+ 	status = "disabled";
+ };
+ 
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++
++	clock-frequency = <400000>;
++};
++
+ &i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins>;
++
+ 	clock-frequency = <400000>;
+ 
+ 	/* Pressure Sensor */
+@@ -116,7 +161,17 @@
+ 	};
+ };
+ 
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins>;
++
++	clock-frequency = <400000>;
++};
++
+ &i2c4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c4_pins>;
++
+ 	clock-frequency = <400000>;
+ 
+ 	/* Temperature Sensor */
+@@ -126,6 +181,13 @@
+ 	};
+ };
+ 
++&i2c5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c5_pins>;
++
++	clock-frequency = <400000>;
++};
++
+ &keypad {
+ 	keypad,num-rows = <8>;
+ 	keypad,num-columns = <8>;
 -- 
-Regards,
-Igor.
+1.7.1
