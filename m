@@ -1,35 +1,25 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Jan 2013 15:03:55 -0700
-Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
-In-Reply-To: <201301282018.17714.arnd@arndb.de>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301282018.17714.arnd@arndb.de>
-Message-ID: <5106F5CB.8050304@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 28 Jan 2013 14:04:04 -0800
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: remove unnecessary
+ CONFIG_GPIOLIB
+In-Reply-To: <bb37ce3392153c4cae3a2bc642f831683620473a.1359057921.git.josh.cartwright@ni.com>
+References: <bb37ce3392153c4cae3a2bc642f831683620473a.1359057921.git.josh.cartwright@ni.com>
+Message-ID: <20130128220404.GB7789@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 01:18 PM, Arnd Bergmann wrote:
-> On Monday 28 January 2013, Thomas Petazzoni wrote:
->> From: Thierry Reding <thierry.reding@avionic-design.de>
->>
->> [Thomas Petazzoni:
->>  - Simplify capabilities handling.
->>  - Move to a separate file.
->>  - Fix mask used when writing a 4 bytes value.]
->>
->> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Thu, Jan 24, 2013 at 12:59:22PM -0600, Josh Cartwright wrote:
+> Commit 38669e045dbf8f62a008898a7fb1e93975b3817c ("ARM: vexpress: Start
+> using new Versatile Express infrastructure") introduces a hard
+> dependency to GPIOLIB for the multi_v7_defconfig:
 > 
-> Not even a description why this is needed?
+>    ARCH_MULTI_V7 -> ARCH_VEXPRESS -> ARCH_REQUIRE_GPIOLIB -> GPIOLIB
 > 
-> This patch (together with patch 8) seems like the most controversial
-> one of the series, so you should better provide a really good reason
-> why we would emulate something in software rather than using whatever
-> hardware is there.
+> Remove unnecessary explicit CONFIG_GPIOLIB=y from multi_v7_defconfig.
+> 
+> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
 
-At least on Tegra, there is no HW that exposes PCI configuration
-registers for the host bridge itself. Only the root ports have exposed
-PCI configuration registers. There was some debate re: whether a host
-bridge device needed to exist or not. This patch makes such a device
-exist if it's required.
+
+Applied, thanks.
+
+-Olof
