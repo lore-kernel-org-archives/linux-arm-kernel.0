@@ -1,51 +1,99 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 19:56:13 +0100
-Subject: [PATCH v2 04/27] ARM: pci: Allow passing per-controller private data
+Date: Mon, 28 Jan 2013 19:56:14 +0100
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
 In-Reply-To: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1359399397-29729-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1359399397-29729-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
+The PCI specifications says that an I/O region must be aligned on a 4
+KB boundary, and a memory region aligned on a 1 MB boundary.
 
-In order to allow drivers to specify private data for each controller,
-this commit adds a private_data field to the struct hw_pci. This field
-is an array of nr_controllers pointers that will be used to initialize
-the private_data field of the corresponding controller's pci_sys_data
-structure.
+However, the Marvell PCIe interfaces rely on address decoding windows
+(which allow to associate a range of physical addresses with a given
+device). For PCIe memory windows, those windows are defined with a 1
+MB granularity (which matches the PCI specs), but PCIe I/O windows can
+only be defined with a 64 KB granularity, so they have to be 64 KB
+aligned. We therefore need to tell the PCI core about this special
+alignement requirement.
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+The PCI core already calls pcibios_align_resource() in the ARM PCI
+core, specifically for such purposes. So this patch extends the ARM
+PCI core so that it calls a ->align_resource() hook registered by the
+PCI driver, exactly like the existing ->map_irq() and ->swizzle()
+hooks.
+
+A particular PCI driver can register a align_resource() hook, and do
+its own specific alignement, depending on the specific constraints of
+the underlying hardware.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/include/asm/mach/pci.h |    1 +
- arch/arm/kernel/bios32.c        |    3 +++
- 2 files changed, 4 insertions(+)
+ arch/arm/include/asm/mach/pci.h |   11 +++++++++++
+ arch/arm/kernel/bios32.c        |    6 ++++++
+ 2 files changed, 17 insertions(+)
 
 diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index db9fedb..5cf2e97 100644
+index 5cf2e97..7d2c3c8 100644
 --- a/arch/arm/include/asm/mach/pci.h
 +++ b/arch/arm/include/asm/mach/pci.h
-@@ -23,6 +23,7 @@ struct hw_pci {
- #endif
- 	struct pci_ops	*ops;
- 	int		nr_controllers;
-+	void		**private_data;
- 	int		(*setup)(int nr, struct pci_sys_data *);
- 	struct pci_bus *(*scan)(int nr, struct pci_sys_data *);
- 	void		(*preinit)(void);
+@@ -30,6 +30,11 @@ struct hw_pci {
+ 	void		(*postinit)(void);
+ 	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
+ 	int		(*map_irq)(const struct pci_dev *dev, u8 slot, u8 pin);
++	resource_size_t (*align_resource)(struct pci_dev *dev,
++					  const struct resource *res,
++					  resource_size_t start,
++					  resource_size_t size,
++					  resource_size_t align);
+ };
+ 
+ /*
+@@ -51,6 +56,12 @@ struct pci_sys_data {
+ 	u8		(*swizzle)(struct pci_dev *, u8 *);
+ 					/* IRQ mapping				*/
+ 	int		(*map_irq)(const struct pci_dev *, u8, u8);
++					/* Resource alignement requirements	*/
++	resource_size_t (*align_resource)(struct pci_dev *dev,
++					  const struct resource *res,
++					  resource_size_t start,
++					  resource_size_t size,
++					  resource_size_t align);
+ 	void		*private_data;	/* platform controller private data	*/
+ };
+ 
 diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 379cf32..5401645 100644
+index 5401645..be2e6c9 100644
 --- a/arch/arm/kernel/bios32.c
 +++ b/arch/arm/kernel/bios32.c
-@@ -464,6 +464,9 @@ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+@@ -462,6 +462,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+ 		sys->busnr   = busnr;
+ 		sys->swizzle = hw->swizzle;
  		sys->map_irq = hw->map_irq;
++		sys->align_resource = hw->align_resource;
  		INIT_LIST_HEAD(&sys->resources);
  
-+		if (hw->private_data)
-+			sys->private_data = hw->private_data[nr];
-+
- 		ret = hw->setup(nr, sys);
+ 		if (hw->private_data)
+@@ -574,6 +575,8 @@ char * __init pcibios_setup(char *str)
+ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 				resource_size_t size, resource_size_t align)
+ {
++	struct pci_dev *dev = data;
++	struct pci_sys_data *sys = dev->sysdata;
+ 	resource_size_t start = res->start;
  
- 		if (ret > 0) {
+ 	if (res->flags & IORESOURCE_IO && start & 0x300)
+@@ -581,6 +584,9 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 
+ 	start = (start + align - 1) & ~(align - 1);
+ 
++	if (sys->align_resource)
++		return sys->align_resource(dev, res, start, size, align);
++
+ 	return start;
+ }
+ 
 -- 
 1.7.9.5
