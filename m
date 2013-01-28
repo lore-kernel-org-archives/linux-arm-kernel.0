@@ -1,34 +1,43 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 28 Jan 2013 11:45:52 +0100
-Subject: [PATCHv1 for soc 4/5] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <51020D20.60505@wwwdotorg.org>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-5-git-send-email-dinguyen@altera.com>
- <51020D20.60505@wwwdotorg.org>
-Message-ID: <20130128104552.GB6073@amd.pavel.ucw.cz>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 28 Jan 2013 12:47:52 +0200
+Subject: OMAP baseline test results for v3.8-rc5
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA9456A@DBDE01.ent.ti.com>
+References: <alpine.DEB.2.00.1301260838300.19277@utopia.booyaka.com>
+ <20130126084604.GB8754@arwen.pp.htv.fi>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9456A@DBDE01.ent.ti.com>
+Message-ID: <20130128104752.GB28698@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2013-01-24 20:42:08, Stephen Warren wrote:
-> On 01/24/2013 05:00 PM, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > mach-socfpga is another platform that needs to use
-> > v7_invalidate_l1 to bringup additional cores. There was a comment that
-> > the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
-> 
-> > diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-> 
-> > -ENTRY(v7_invalidate_l1)
-> > -        mov     r0, #0
-> 
-> Unfortunately, there's a patch in the Tegra tree for 3.9 that moves that
-> function from headsmp.S to reset-handler.S, so this patch will conflict.
-> How do you want to handle that?
+Hi,
 
-Drop the patch from Tegra tree and merge this one there? Having three
-copies of code is not nice to start with, no matter where it is...
-								Pavel
+On Mon, Jan 28, 2013 at 11:34:15AM +0100, Mohammed, Afzal wrote:
+> Hi,
+> 
+> On Sat, Jan 26, 2013 at 14:16:04, Balbi, Felipe wrote:
+> > On Sat, Jan 26, 2013 at 08:40:07AM +0000, Paul Walmsley wrote:
+> 
+> > > * am335xbone: hangs after "Starting kernel"
+> > >   - Cause unknown; may be due to CONFIG_EARLY_PRINTK=y?
+> > >   - http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82297.html
+> > >   - http://marc.info/?l=linux-omap&m=135903184512238&w=2
+> > 
+> > FYI, I don't think it's related to CONFIG_EARLY_PRINTK. Tested with and
+> > without it, also removed CONFIG_DEBUG_LL completely and nothing seemed
+> > to help my bone, no matter if I had appended DTB or not.
+> 
+> Following patch with low level debug may help to find where the issue is,
+> (my observation is that it boots with mainline u-boot)
+
+will try your patch, but are you using Beagle Bone white or black ? I
+should've made it clear I'm using beagle bone black.
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130128/1cb14c78/attachment.sig>
