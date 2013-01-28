@@ -1,36 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 28 Jan 2013 23:44:23 +0100
-Subject: [PATCH v2 11/27] clk: mvebu: create parent-child relation for
- PCIe clocks on Armada 370
-In-Reply-To: <5106FB47.9000508@wwwdotorg.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 28 Jan 2013 15:51:05 -0700
+Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
+In-Reply-To: <20130128233048.2ab6a6d2@skate>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-12-git-send-email-thomas.petazzoni@free-electrons.com>
- <5106F6EE.4000101@wwwdotorg.org> <20130128232150.53b56e62@skate>
- <5106FB47.9000508@wwwdotorg.org>
-Message-ID: <20130128234423.00bfd28e@skate>
+ <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301282018.17714.arnd@arndb.de> <5106F5CB.8050304@wwwdotorg.org>
+ <20130128220904.GA21446@obsidianresearch.com>
+ <20130128231829.6b205c3c@skate>
+ <20130128222348.GA21628@obsidianresearch.com>
+ <20130128233048.2ab6a6d2@skate>
+Message-ID: <20130128225105.GA21935@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen Warren,
+On Mon, Jan 28, 2013 at 11:30:48PM +0100, Thomas Petazzoni wrote:
+> Dear Jason Gunthorpe,
+> 
+> On Mon, 28 Jan 2013 15:23:48 -0700, Jason Gunthorpe wrote:
+> 
+> > I'm refering to your earlier question about what PCI IDs to use for
+> > the SW emulated devices. If there is no need for the host bridge then
+> > you only need 1 PCI ID (for the root port bridge) and you can probably
+> > fairly safely re-use the one in the Marvell config space of the HW.
+> 
+> Ah, ok, I see. But isn't a host bridge needed to bind all the
+> PCI-to-PCI bridges under a single bus, in order to get the global
+> resource assignment I was referring to?
 
-On Mon, 28 Jan 2013 15:27:19 -0700, Stephen Warren wrote:
+The PCI-E spec requires it, but AFAIK it doesn't actually *do*
+anything on Linux, and Linux doesn't require it.
 
-> Oh I see; I was confused by the patch description. The two clocks being
-> made child/parent are the two clocks for a port, and this relationship
-> is set up for each port; for some reason I thought there was a
-> requirement to make one port's clock a child of the other port's clock.
+I thought Thierry did this experiment and decided it wasn't necessary:
 
-Aah, ok, I understand the confusion now. Re-reading my commit log, I'm
-not sure where the confusion comes from, but english is not my native
-language, so maybe something that sounds clear to me is not clear in
-reality. I'll rephrase the commit log to make sure this confusion is
-clarified.
+> The reason is that with the latest bindings the matching of root
+> ports to device tree nodes works as-is and nothing else indicates
+> that the emulated host bridge is actually required to make any of
+> this work. So in order not to introduce unneeded code I've left it
+> out for now. If somebody decides that we actually need this host
+> bridge (for standards compliance or whatnot) it could easily be
+> added back.
 
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jason
