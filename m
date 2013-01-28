@@ -1,93 +1,33 @@
-From: mrugesh.mk@ti.com (Katepallewar, Mrugesh)
-Date: Mon, 28 Jan 2013 07:00:19 +0000
-Subject: [PATCH] ARM: davinci: da850: add RTC driver DT entries
-In-Reply-To: <51026AEA.5050503@ti.com>
-References: <1359094430-14724-1-git-send-email-mrugesh.mk@ti.com>
- <51025FAE.3060503@ti.com>
- <4232EB8829679242B82E712C3DB3149D4233E9@DBDE01.ent.ti.com>
- <51026AEA.5050503@ti.com>
-Message-ID: <4232EB8829679242B82E712C3DB3149D42346E@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 28 Jan 2013 15:02:08 +0800
+Subject: [PATCH] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+In-Reply-To: <CAOh2x=kCKbxX6ThzEty0F-MxxhsRMhh8++Nc7BqBaXNfaozoJw@mail.gmail.com>
+References: <1359208550-16402-1-git-send-email-shawn.guo@linaro.org>
+ <CAOh2x=kCKbxX6ThzEty0F-MxxhsRMhh8++Nc7BqBaXNfaozoJw@mail.gmail.com>
+Message-ID: <20130128070206.GB31689@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 16:52:18, Nori, Sekhar wrote:
-> On 1/25/2013 4:34 PM, Katepallewar, Mrugesh wrote:
-> > On Fri, Jan 25, 2013 at 16:04:22, Nori, Sekhar wrote:
-> >> On 1/25/2013 11:43 AM, Mrugesh Katepallewar wrote:
-> >>> Add RTC DT entries in da850 dts file.
-> >>>
-> >>> Signed-off-by: Mrugesh Katepallewar <mrugesh.mk@ti.com>
-> >>> ---
-> >>> Applies on top of v3.8-rc4 of linus tree.
-> >>>
-> >>> Tested on da850-evm device.
-> >>>
-> >>> Test Procedure:
-> >>> date [YYYY.]MM.DD-hh:mm[:ss]
-> >>> hwclock -w
-> >>> reset board and check system time.
-> >>>
-> >>> :100644 100644 37dc5a3... b16efd4... M	arch/arm/boot/dts/da850-evm.dts
-> >>> :100644 100644 640ab75... a8eb1b1... M	arch/arm/boot/dts/da850.dtsi
-> >>>  arch/arm/boot/dts/da850-evm.dts |    3 +++
-> >>>  arch/arm/boot/dts/da850.dtsi    |    8 ++++++++
-> >>>  2 files changed, 11 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/da850-evm.dts 
-> >>> b/arch/arm/boot/dts/da850-evm.dts index 37dc5a3..b16efd4 100644
-> >>> --- a/arch/arm/boot/dts/da850-evm.dts
-> >>> +++ b/arch/arm/boot/dts/da850-evm.dts
-> >>> @@ -24,5 +24,8 @@
-> >>>  		serial2: serial at 1d0d000 {
-> >>>  			status = "okay";
-> >>>  		};
-> >>> +		rtc at 1c23000 {
+On Mon, Jan 28, 2013 at 09:42:29AM +0530, Viresh Kumar wrote:
+> >         struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
+> >         platform_device_register_full(&devinfo);
 > 
-> I did not mention this last time, but this should be:
+> Something similar was being discussed with Andrew (cc'd) on his patch
+> for kikwood cpufreq driver.
 > 
-> 		rtc0: rtc at 1c23000 {
-> 
-> to be consistent with rest of the file.
+> We shouldn't encourage addition of above as we are moving towards DT.
 
-Okay. I will send this in next version.
-> 
-> >>> +			status = "okay";
-> >>> +		};
-> >>>  	};
-> >>>  };
-> >>> diff --git a/arch/arm/boot/dts/da850.dtsi 
-> >>> b/arch/arm/boot/dts/da850.dtsi index 640ab75..a8eb1b1 100644
-> >>> --- a/arch/arm/boot/dts/da850.dtsi
-> >>> +++ b/arch/arm/boot/dts/da850.dtsi
-> >>> @@ -56,5 +56,13 @@
-> >>>  			interrupt-parent = <&intc>;
-> >>>  			status = "disabled";
-> >>>  		};
-> >>> +		rtc at 1c23000 {
-> 
-> Here too.
-> 
-Okay. I will send this in next version.
+Moving towards DT does not really mean that we should never register
+platform_device from platform code.  DT is designed to present physical
+devices, while what I'm adding here is somewhat a virtual one.  I'm
+just using the platform_device/platform_driver mechanism to instantiate
+the driver on particular platform.
 
-> >>> +			compatible = "ti,da830-rtc";
-> >>> +			reg = <0x23000 0x1000>;
-> >>> +			interrupts = <19
-> >>> +				      19>;
-> >>
-> >> Why two interrupts of the same number? If there is only one interrupt line then only one should be specified, no?
-> > We are using common OMAP RTC driver for da850 and other ti SoC's 
-> > (e.g.am33xx). I have seen in am33xx.dtsi rtc timer and alarm interrupts are different. So, two interrupt numbers are expected from RTC DT node.
-> 
-> Okay. Looking at the OMAP-L138 TRM, I see that the IP on that SoC supports both alarm and timer events and both arrive on the same interrupt number (as opposed to am335x where they supposedly arrive on different interrupt lines). What you have looks fine to me considering this.
-> 
-> Also, the interrupt-parent setting needs to be removed. See the patch Prabhakar just submitted.
+> So, i would except an compatible array too in your patch and then driver
+> can be probed based on compatible string being present in cpu node.
 
-Okay. I will send this in next version.
+I believe device tree maintainer already stated that we should not
+have node/compatible for cpuidle/cpufreq such stuff in DT merely for
+asking DT core to create platform_device for them.
 
-> 
-> Thanks,
-> Sekhar
-> 
-
-Regards, 
-Mrugesh
+Shawn
