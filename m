@@ -1,98 +1,62 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 28 Jan 2013 13:30:13 +0200
-Subject: [PATCH v2 12/30] usb: ehci-omap: Remove PHY regulator handling code
-In-Reply-To: <1359372631-8180-1-git-send-email-rogerq@ti.com>
-References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
-Message-ID: <1359372631-8180-13-git-send-email-rogerq@ti.com>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Mon, 28 Jan 2013 08:27:44 -0300
+Subject: [PATCH] sunxi: a10-cubieboard: Add user LEDs to the device tree
+Message-ID: <1359372464-5811-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PHY regulator handling must be done in the PHY driver
+Cubieboard has two LEDs available for use, a blue one (labeled LED1)
+and a green one (labeled LED2).
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- drivers/usb/host/ehci-omap.c |   34 ----------------------------------
- 1 files changed, 0 insertions(+), 34 deletions(-)
+This patch requires all of the sunxi pinctrl/gpio/led patches by
+Maxime Ripard to function.
 
-diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index 3c63619..da3e322 100644
---- a/drivers/usb/host/ehci-omap.c
-+++ b/drivers/usb/host/ehci-omap.c
-@@ -42,7 +42,6 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/usb/ulpi.h>
--#include <linux/regulator/consumer.h>
- #include <linux/pm_runtime.h>
- #include <linux/gpio.h>
- #include <linux/clk.h>
-@@ -112,19 +111,6 @@ static int omap_ehci_init(struct usb_hcd *hcd)
- 	return rc;
- }
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 5cab825..88e2dc1 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -27,6 +27,15 @@
+ 	};
  
--static void disable_put_regulator(
--		struct usbhs_omap_platform_data *pdata)
--{
--	int i;
--
--	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
--		if (pdata->regulator[i]) {
--			regulator_disable(pdata->regulator[i]);
--			regulator_put(pdata->regulator[i]);
--		}
--	}
--}
--
- /* configure so an HC device and id are always provided */
- /* always called with process context; sleeping is OK */
- 
-@@ -153,7 +139,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 	int					ret = -ENODEV;
- 	int					irq;
- 	int					i;
--	char					supply[7];
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -221,23 +206,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 		usb_phy_set_suspend(omap->phy[i], 0);
- 	}
- 
--	/* get ehci regulator and enable */
--	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
--		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY) {
--			pdata->regulator[i] = NULL;
--			continue;
--		}
--		snprintf(supply, sizeof(supply), "hsusb%d", i);
--		pdata->regulator[i] = regulator_get(dev, supply);
--		if (IS_ERR(pdata->regulator[i])) {
--			pdata->regulator[i] = NULL;
--			dev_dbg(dev,
--			"failed to get ehci port%d regulator\n", i);
--		} else {
--			regulator_enable(pdata->regulator[i]);
--		}
--	}
--
- 	pm_runtime_enable(dev);
- 	pm_runtime_get_sync(dev);
- 
-@@ -263,7 +231,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_pm_runtime:
--	disable_put_regulator(pdata);
- 	pm_runtime_put_sync(dev);
- 
- err_phy:
-@@ -294,7 +261,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
- 	int i;
- 
- 	usb_remove_hcd(hcd);
--	disable_put_regulator(dev->platform_data);
- 	usb_put_hcd(hcd);
- 
- 	for (i = 0; i < omap->nports; i++) {
+ 	soc {
++		pinctrl at 01c20800 {
++			led_pins_cubieboard: led_pins at 0 {
++				allwinner,pins = "PH20", "PH21";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <1>;
++				allwinner,pull = <0>;
++			};
++		};
++
+ 		uart0: uart at 01c28000 {
+ 			status = "okay";
+ 		};
+@@ -35,4 +44,21 @@
+ 			status = "okay";
+ 		};
+ 	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_cubieboard>;
++
++		blue {
++			label = "cubieboard::blue";
++			gpios = <&pio 7 21 0>; /* LED1 */
++		};
++
++		green {
++			label = "cubieboard::green";
++			gpios = <&pio 7 20 0>; /* LED2 */
++			linux,default-trigger = "heartbeat";
++		};
++	};
+ };
 -- 
-1.7.4.1
+1.8.1.1
