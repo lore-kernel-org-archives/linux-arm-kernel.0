@@ -1,33 +1,93 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 28 Jan 2013 09:25:41 +0000
-Subject: [PATCH v2 1/4] ARM: OMAP2+: dpll: round rate to closest value
-In-Reply-To: <20130125222032.10623.47200@quantum>
-References: <cover.1358937533.git.afzal@ti.com>
- <871e6890897534b6c3669e252f23bef5ff1247b6.1358937533.git.afzal@ti.com>
- <alpine.DEB.2.00.1301250816010.471@utopia.booyaka.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA9388C@DBDE01.ent.ti.com>
- <20130125222032.10623.47200@quantum>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA9446B@DBDE01.ent.ti.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 28 Jan 2013 10:36:07 +0100
+Subject: [PATCH v2 1/3] pwm: Add pwm_cansleep() as exported API to users
+In-Reply-To: <51063AB5.2060108@ti.com>
+References: <1359121471-21457-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359121471-21457-2-git-send-email-florian.vaussard@epfl.ch>
+ <20130126054024.GB29243@avionic-0098.adnet.avionic-design.de>
+ <51063AB5.2060108@ti.com>
+Message-ID: <51064687.5090605@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hello,
 
-On Sat, Jan 26, 2013 at 03:50:32, Mike Turquette wrote:
+Le 28/01/2013 09:45, Peter Ujfalusi a ?crit :
+> hi Thierry,
+>
+> On 01/26/2013 06:40 AM, Thierry Reding wrote:
+>>> +  * @pwm: PWM device
+>>> +  *
+>>> +  * It returns nonzero if accessing the PWM can sleep.
+>>> +  */
+>>> +int pwm_cansleep(struct pwm_device *pwm)
+>>
+>> I actually liked pwm_can_sleep() better. I find it to be more consistent
+>> with the naming of other function names. It would furthermore match the
+>> field name.
+>
+> I was looking at the GPIO API to suggest this name change, but you are right
+> we should be consistent with the PWM API here.
+> Sorry Florian.
+>
 
-> Is MULT_ROUND_UP doing the right thing for you in the clk_divider code?
-> What is the clock rate requested of the parent PLL?  I just want to make
-> sure that we're doing the right thing in the basic divider code.
+No problem, I agree with the PWM API consistency.
 
-Actually MULT_ROUND_UP made my life difficult earlier, and finally came up
-with this solution instead of removing it.
+>>
+>>> +{
+>>> +	return pwm->chip->can_sleep;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(pwm_cansleep);
+>>
+>> Would it make sense to check for NULL pointers here? I guess that
+>> passing NULL into the function could be considered a programming error
+>> and an oops would be okay, but in that case there's no point in making
+>> the function return an int. Also see my next comment.
+>
+> While it is unlikely to happen it is better to be safe, something like this
+> will do:
+>
+> return pwm ? pwm->chip->can_sleep : 0;
+>
 
-It was something like 60000000 requested of PLL, for i = 1, but for other
-values, it was something like 60000001, 60000002 etc.
+Ok. And what about:
 
-Even if round rate rounds, I thought removing MULT_ROUND_UP would be ok,
-couldn't spend time to understand fully rational behind it, and as it was
-in generic code, kept away from doing it.
+BUG_ON(pwm == NULL);
+return pwm->chip->can_sleep;
 
-Regards
-Afzal
+>>
+>>> +
+>>>   #ifdef CONFIG_DEBUG_FS
+>>>   static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
+>>>   {
+>>> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+>>> index 70655a2..e2cb5c7 100644
+>>> --- a/include/linux/pwm.h
+>>> +++ b/include/linux/pwm.h
+>>> @@ -146,6 +146,8 @@ struct pwm_ops {
+>>>    * @base: number of first PWM controlled by this chip
+>>>    * @npwm: number of PWMs controlled by this chip
+>>>    * @pwms: array of PWM devices allocated by the framework
+>>> + * @can_sleep: flag must be set iff config()/enable()/disable() methods sleep,
+>>> + *      as they must while accessing PWM chips over I2C or SPI
+>>>    */
+>>>   struct pwm_chip {
+>>>   	struct device		*dev;
+>>> @@ -159,6 +161,7 @@ struct pwm_chip {
+>>>   	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
+>>>   					    const struct of_phandle_args *args);
+>>>   	unsigned int		of_pwm_n_cells;
+>>> +	unsigned int		can_sleep:1;
+>>
+>> What's the reason for making this a bitfield? Couldn't we just use a
+>> bool instead?
+>
+> I have also overlooked this. In my version I had the can_sleep as bool also.
+>
+
+Ok for a bool.
+
+Thank you for your reviews. I will send a v3 sometimes today.
+
+Cheers,
+Florian
