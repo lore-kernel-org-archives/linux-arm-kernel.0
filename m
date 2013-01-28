@@ -1,79 +1,86 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 28 Jan 2013 18:54:08 +0100
-Subject: [PATCH 2/2] ARM: dts: OMAP3: Add NAND memory for Overo products
-In-Reply-To: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1359395648-2137-3-git-send-email-florian.vaussard@epfl.ch>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 28 Jan 2013 12:58:28 -0500 (EST)
+Subject: [PATCH v2 06/16] ARM: bL_head.S: vlock-based first man
+ election
+In-Reply-To: <20130128171831.GF23470@mudshark.cambridge.arm.com>
+References: <1359008879-9015-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359008879-9015-7-git-send-email-nicolas.pitre@linaro.org>
+ <20130128171831.GF23470@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1301281239340.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device-tree support for the on-board NAND memory,
-with corresponding partitions.
+On Mon, 28 Jan 2013, Will Deacon wrote:
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
- arch/arm/boot/dts/omap3-overo.dtsi |   49 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 49 insertions(+), 0 deletions(-)
+> On Thu, Jan 24, 2013 at 06:27:49AM +0000, Nicolas Pitre wrote:
+> > From: Dave Martin <dave.martin@linaro.org>
+> > 
+> > Instead of requiring the first man to be elected in advance (which
+> > can be suboptimal in some situations), this patch uses a per-
+> > cluster mutex to co-ordinate selection of the first man.
+> > 
+> > This should also make it more feasible to reuse this code path for
+> > asynchronous cluster resume (as in CPUidle scenarios).
+> > 
+> > We must ensure that the vlock data doesn't share a cacheline with
+> > anything else, or dirty cache eviction could corrupt it.
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> [...]
+> 
+> > +
+> > +	.align	__CACHE_WRITEBACK_ORDER
+> > +	.type	first_man_locks, #object
+> > +first_man_locks:
+> > +	.space	VLOCK_SIZE * BL_MAX_CLUSTERS
+> > +	.align	__CACHE_WRITEBACK_ORDER
+> >  
+> >  	.type	bL_entry_vectors, #object
+> >  ENTRY(bL_entry_vectors)
+> 
+> I've just been chatting to Dave about this and __CACHE_WRITEBACK_ORDER
+> isn't really the correct solution here.
+> 
+> To summarise the problem: although vlocks are only accessed by CPUs with
+> their caches disabled, the lock structures could reside in the same
+> cacheline (at some level of cache) as cacheable data being written by
+> another CPU. This comes about because the vlock code has a cacheable alias
+> via the kernel linear mapping and means that when the cacheable data is
+> evicted, it clobbers the vlocks with stale values which are part of the
+> dirty cacheline.
+> 
+> Now, we also have this problem for DMA mappings, as mentioned here:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/124276.html
+> 
+> It seems to me that we actually want a mechanism for allocating/managing
+> physically contiguous blocks of memory such that the cacheable alias is
+> removed from the linear mapping (perhaps we could use PAGE_NONE to avoid
+> confusing the mm code?).
 
-diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-index 81341fa..0efd6f3 100644
---- a/arch/arm/boot/dts/omap3-overo.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo.dtsi
-@@ -33,6 +33,55 @@
- 	};
- };
- 
-+&gpmc {
-+	ranges = <0 0 0x30000000 0x00000004>;       /* CS0: NAND */
-+
-+	nand at 0 {
-+		reg = <0 0 0>; /* CS0, offset 0 */
-+
-+		nand-bus-width = <16>;
-+		ti,nand-ecc-opt = "sw";
-+
-+		gpmc,sync-clk = <0>;
-+		gpmc,cs-on = <0>;
-+		gpmc,cs-rd-off = <36>;
-+		gpmc,cs-wr-off = <36>;
-+		gpmc,adv-on = <6>;
-+		gpmc,adv-rd-off = <24>;
-+		gpmc,adv-wr-off = <36>;
-+		gpmc,we-off = <30>;
-+		gpmc,oe-off = <48>;
-+		gpmc,access = <54>;
-+		gpmc,rd-cycle = <72>;
-+		gpmc,wr-cycle = <72>;
-+		gpmc,wr-access = <30>;
-+		gpmc,wr-data-mux-bus = <0>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		xloader at 0 {
-+			reg = <0x00000000 0x00080000>;
-+		};
-+
-+		uboot at 80000 {
-+			reg = <0x00080000 0x001c0000>;
-+		};
-+
-+		ubootenv at 240000 {
-+			reg = <0x00240000 0x00040000>;
-+		};
-+
-+		linux at 280000 {
-+			reg = <0x00280000 0x00400000>;
-+		};
-+
-+		rootfs at 680000 {
-+			reg = <0x00680000 0x1f980000>; /* 500 MB */
-+		};
-+	};
-+};
-+
- &i2c1 {
- 	clock-frequency = <2600000>;
- 
--- 
-1.7.5.4
+Well, I partly disagree.
+
+I don't dispute the need for a mechanism to allocate physically 
+contiguous blocks of memory in the DMA case or other similar users of 
+largish dynamic allocations.  
+
+But That's not the case here.  In the vlock case, what we actually need 
+in practice is equivalent to a _single_ cache line of cache free memory.  
+Requiring a dynamic allocation infrastructure tailored for this specific 
+case is going to waste much more CPU cycles and memory in the end than 
+what this static allocation is currently doing, even if it were 
+overallocating.
+
+Your suggestion would be needed when we get to the point where dynamic 
+sizing of the number of clusters is required. But, as I said in response 
+to your previous comment, let's not fall into the trap of 
+overengineering this solution for the time being.  Better approach this 
+incrementally if actual usage does indicate that some more 
+sophistication is needed.  The whole stack is already complex enough as 
+it is and I'd prefer if people could get familiar with the simpler 
+version initially.
+
+
+Nicolas
