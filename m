@@ -1,53 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 28 Jan 2013 16:32:01 +0800
-Subject: [PATCH] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
-In-Reply-To: <7196597.b9sJl95POM@vostro.rjw.lan>
-References: <1359208550-16402-1-git-send-email-shawn.guo@linaro.org>
- <7196597.b9sJl95POM@vostro.rjw.lan>
-Message-ID: <20130128083159.GD31689@S2101-09.ap.freescale.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 28 Jan 2013 09:32:17 +0100
+Subject: [PATCH 10/19] watchdog: at91sam9: at91_wdt_dt_ids cannot be __init
+In-Reply-To: <1359153858-31992-11-git-send-email-arnd@arndb.de>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-11-git-send-email-arnd@arndb.de>
+Message-ID: <51063791.9090606@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 11:21:27PM +0100, Rafael J. Wysocki wrote:
-> On Saturday, January 26, 2013 09:55:50 PM Shawn Guo wrote:
-> > As multiplatform build is being adopted by more and more ARM platforms,
-> > initcall function should be used very carefully.  For example, when
-> > GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
-> > will be called on all the platforms to initialize cpufreq-cpu0 driver.
-> > 
-> > To eliminate this undesired the effect, the patch changes cpufreq-cpu0
-> > driver to have it instantiated as a platform_driver.  Then it will only
-> > run on platforms that create the platform_device "cpufreq-cpu0".
-> > 
-> > Along with the change, it also changes cpu_dev to be &pdev->dev,
-> > so that managed functions can start working, and module build gets
-> > supported too.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > Rafael,
-> > 
-> > The patch depends patch "power: export opp cpufreq functions".
-> > https://patchwork.kernel.org/patch/1847261/
+On 01/25/2013 11:44 PM, Arnd Bergmann :
+> The device IDs are referenced by the driver and potentially
+> used beyond the init time, as kbuild correctly warns
+> about. Remove the __initconst annotation.
 > 
-> That one should use EXPORT_SYMBOL_GPL() for exporting symbols, though.
+> Without this patch, building at91_dt_defconfig results in:
 > 
-When commit 80126ce (PM / OPP: Export symbols for module usage.)
-already exported a few symbols with EXPORT_SYMBOL()?
+> WARNING: drivers/watchdog/built-in.o(.data+0x28): Section mismatch in reference from the variable at91wdt_driver to the (unknown reference) .init.rodata:(unknown)
+> The variable at91wdt_driver references
+> the (unknown reference) __initconst (unknown)
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
+> Cc: linux-watchdog at vger.kernel.org
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> Care to add a fixed version to the patch set along with the $subject one?
-> 
-> > AnilKumar,
-> > 
-> > Unfortunately, the change will require some platform level adoption
-> > to have cpufreq-cpu0 driver continue working for am33xx.  But it should
-> > be as simple as something like below.
-> > 
-> > 	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
-> > 	platform_device_register_full(&devinfo);
-> 
-> That should be included in your patch, then.
-> 
-Fair enough.  Will do.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Shawn
+Thanks,
+
+> Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
+> ---
+>  drivers/watchdog/at91sam9_wdt.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+> index dc42e44..6dad954 100644
+> --- a/drivers/watchdog/at91sam9_wdt.c
+> +++ b/drivers/watchdog/at91sam9_wdt.c
+> @@ -304,7 +304,7 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
+>  }
+>  
+>  #if defined(CONFIG_OF)
+> -static const struct of_device_id at91_wdt_dt_ids[] __initconst = {
+> +static const struct of_device_id at91_wdt_dt_ids[] = {
+>  	{ .compatible = "atmel,at91sam9260-wdt" },
+>  	{ /* sentinel */ }
+>  };
+> 
+
+
+-- 
+Nicolas Ferre
