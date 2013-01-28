@@ -1,33 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Jan 2013 15:08:46 -0700
-Subject: [PATCH v2 11/27] clk: mvebu: create parent-child relation for
- PCIe clocks on Armada 370
-In-Reply-To: <1359399397-29729-12-git-send-email-thomas.petazzoni@free-electrons.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 28 Jan 2013 15:09:04 -0700
+Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
+In-Reply-To: <5106F5CB.8050304@wwwdotorg.org>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-12-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5106F6EE.4000101@wwwdotorg.org>
+ <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301282018.17714.arnd@arndb.de> <5106F5CB.8050304@wwwdotorg.org>
+Message-ID: <20130128220904.GA21446@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 11:56 AM, Thomas Petazzoni wrote:
-> The Armada 370 has two gatable clocks for each PCIe interface, and we
-> want both of them to be enabled. We therefore make one of the two
-> clocks a child of the other, as we did for the sataX and sataXlnk
-> clocks on Armada XP.
+On Mon, Jan 28, 2013 at 03:03:55PM -0700, Stephen Warren wrote:
+> On 01/28/2013 01:18 PM, Arnd Bergmann wrote:
+> > On Monday 28 January 2013, Thomas Petazzoni wrote:
+> >> From: Thierry Reding <thierry.reding@avionic-design.de>
+> >>
+> >> [Thomas Petazzoni:
+> >>  - Simplify capabilities handling.
+> >>  - Move to a separate file.
+> >>  - Fix mask used when writing a 4 bytes value.]
+> >>
+> >> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> >> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > 
+> > Not even a description why this is needed?
+> > 
+> > This patch (together with patch 8) seems like the most controversial
+> > one of the series, so you should better provide a really good reason
+> > why we would emulate something in software rather than using whatever
+> > hardware is there.
+> 
+> At least on Tegra, there is no HW that exposes PCI configuration
+> registers for the host bridge itself. Only the root ports have exposed
+> PCI configuration registers. There was some debate re: whether a host
+> bridge device needed to exist or not. This patch makes such a device
+> exist if it's required.
 
-> diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
+If Linux will discover properly (I strongly suspect it does) without
+the host bridge, then I would say to ditch this...
 
-> @@ -119,8 +119,8 @@ static const struct mvebu_soc_descr __initconst armada_370_gating_descr[] = {
->  	{ "pex1_en", NULL,  2 },
->  	{ "ge1", NULL, 3 },
->  	{ "ge0", NULL, 4 },
-> -	{ "pex0", NULL, 5 },
-> -	{ "pex1", NULL, 9 },
-> +	{ "pex0", "pex0_en", 5 },
-> +	{ "pex1", "pex1_en", 9 },
+The PCI-E standard requires a host bridge device, but if Linux doesn't
+require it then there is no reason to emulate one.
 
-I must admit, I know nothing about struct mvebu_soc_descr, but I'm
-having a hard time seeing how that code change makes one of those clock
-a parent of the other, since the pex0 entry doesn't reference anything
-"pex1"-related, nor vice-versa. Is more explanation in the commit
-message warranted here?
+That would simplify the question of PCI IDs - for Marvell's case and
+the sw root port bridge we can just copy the IDs from the bogus config
+space of the HW.
+
+Jason
