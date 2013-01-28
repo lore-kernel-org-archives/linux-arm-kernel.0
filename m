@@ -1,59 +1,47 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 28 Jan 2013 13:53:11 +0100
-Subject: [GIT PULL v3] arm-soc: Xilinx zynq timer changes for v3.9
-In-Reply-To: <CAHTX3d+qeKPT3YYG3=YgWYN5YTS1oT9HoTEpVwC4GZAYve5uYw@mail.gmail.com>
-References: <CAHTX3d+qeKPT3YYG3=YgWYN5YTS1oT9HoTEpVwC4GZAYve5uYw@mail.gmail.com>
-Message-ID: <CAHTX3d+tDZF1-aKKfx+Zsb4FefrBbLaxe9qAz1Vsf3rDb-qHTw@mail.gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 28 Jan 2013 20:36:35 +0100
+Subject: [RFC] socfpga: make function static
+In-Reply-To: <1359075633-13502-6-git-send-email-dinguyen@altera.com>
+References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
+ <1359075633-13502-6-git-send-email-dinguyen@altera.com>
+Message-ID: <20130128193635.GB26908@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi!
 
-based on your previous email I am sending updated pull request which is based
-on arm-soc depends/cleanup branch.
-As I wrote in my email I tend to keep there Soren's patch around
-renaming PSS to PS
-and be more strict on this for future.
-I have also added one more patch which fix Rob's conversion to irqchip_init.
+While moving cpu1 start address into device tree, I noticed that
+sysmgr_init can be static. Trivial patch is below.
 
-btw: As I mentioned in the previous email I want to add 2 defconfig
-updates + maintainer
-fragment. I have created branch zynq/misc in the same repo. Is this
-name ok for you?
-If yes, I will send you separate pull request just for this branch.
+Signed-off-by: Pavel Machek <pavel@denx.de>
 
-Thanks,
-Michal
+commit 11030de41d7da7a14ca0c77abb726d6eec3a2fb7
 
-The following changes since commit f8060f5446b1f2782f0a8ca9be2d870ea4198aee:
-  Olof Johansson (1):
-        Merge tag 'gic-vic-to-irqchip' of
-git://sources.calxeda.com/kernel/linux into next/cleanup
-
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git zynq/timer
-
-Michal Simek (1):
-      arm: zynq: Add missing irqchip.h to common.c
-
-Soren Brinkmann (7):
-      arm: zynq: timer: Replace PSS through PS
-      arm: zynq: timer: Remove unnecessary register write
-      arm: zynq: timer: Remove unused #defines
-      arm: zynq: timer: Align columns
-      arm: zynq: timer: Remove redundant #includes
-      arm: zynq: timer: Fix comment style
-      arm: zynq: timer: Set clock_event cpumask
-
- arch/arm/mach-zynq/common.c |    3 +-
- arch/arm/mach-zynq/common.h |    2 +-
- arch/arm/mach-zynq/timer.c  |  150 ++++++++++++++++++++----------------------
- 3 files changed, 74 insertions(+), 81 deletions(-)
-
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+index 323c74a..3ebd469 100644
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@ -26,7 +26,6 @@ extern void v7_secondary_startup(void);
+ extern void __iomem *socfpga_scu_base_addr;
+ 
+ extern void socfpga_init_clocks(void);
+-extern void socfpga_sysmgr_init(void);
+ 
+ extern struct smp_operations socfpga_smp_ops;
+ extern char secondary_trampoline, secondary_trampoline_end;
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index bb17810..334c330 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -68,7 +68,7 @@ const static struct of_device_id irq_match[] = {
+ 	{}
+ };
+ 
+-void __init socfpga_sysmgr_init(void)
++static void __init socfpga_sysmgr_init(void)
+ {
+ 	struct device_node *np;
+ 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
