@@ -1,50 +1,42 @@
-From: david.woodhouse@intel.com (Woodhouse, David)
-Date: Tue, 29 Jan 2013 16:46:58 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130129083522.GA14302@pd.tnic>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
-Message-ID: <1359478014.3529.157.camel@shinybook.infradead.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 29 Jan 2013 08:51:10 -0800
+Subject: [GIT PULL] CSR SiRFmarco SoC infrastructures for 3.9
+In-Reply-To: <CAGsJ_4yV5KJ2yWQtbOLO5Dj_MrQS3v0sPN4hinJAzTsfH6quvg@mail.gmail.com>
+References: <CAGsJ_4z-7z8=3xQwU6iEsqHEcVrRWK+Fm7eoBEbjC-EAewGypA@mail.gmail.com>
+ <20130128070848.GG25723@quad.lixom.net>
+ <CAGsJ_4yV5KJ2yWQtbOLO5Dj_MrQS3v0sPN4hinJAzTsfH6quvg@mail.gmail.com>
+Message-ID: <20130129165110.GA16188@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-29 at 09:35 +0100, Borislav Petkov wrote:
+On Mon, Jan 28, 2013 at 06:08:27PM +0800, Barry Song wrote:
+> 2013/1/28 Olof Johansson <olof@lixom.net>:
+> > On Thu, Jan 24, 2013 at 11:21:02AM +0800, Barry Song wrote:
+> >> Hi Olof, Arnd,
+> >>
+> >> pls pull the following changes for CSR SiRFmarco SoC. it has been
+> >> rebased againest arm-soc timer/cleanup tree.
+> >>
+> >> since commit 90cf214d6a549bf482e3c5751ee256cc885b96ea:
+> >>
+> >>   ARM: at91: fix board-rm9200-dt after sys_timer conversion
+> >> (2013-01-14 10:14:04 -0800)
+> >>
+> >> are available in the git repository at:
+> >>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
+> >> marco-timer-cleanup-rebase
+> >
+> > Pulled in as prima2/marco, included in next/soc. Thanks!
 > 
-> >  
-> >  #ifdef CONFIG_ARCH_USE_BUILTIN_BSWAP
-> > -#if GCC_VERSION >= 40400
-> > +#if (!defined(__arm__) && GCC_VERSION >= 40400) || \
-> > +    (defined(__arm__) && GCC_VERSION >= 40600)
+> Olof, thanks.
 > 
-> There should be no arch-specific stuff in a generic header. I guess
-> you probably need to select ARCH_USE_BUILTIN_BSWAP in an arm-specific
-> compiler.h header after checking compiler version...
+> >
+> > I noticed that there is no defconfig for any mach-prima2 platforms. Feel
+> > free to submit one so we get build coverage of the platform.
+> 
+> there have been. arch/arm/configs/prima2_defconfig
 
-If we're really going to have many different architectures depending on
-different versions of GCC for this (if it wasn't sane to use it from
-4.4/4.8 when it got introduced, and depends on some later arch-specific
-optimisation), then perhaps we'll have the arch provide the
-corresponding required GCC_VERSION for using each of 64/32/16 bit
-builtins, instead of just a yes/no flag? Or just define
-__HAVE_BUILTIN_BSWAPxx__ for itself, perhaps?
-
-In fact we could start by having just the problematic architectures set
-__HAVE_BUILTIN_BSWAPxx__ for themselves according to whatever criteria
-they want, and then if there's scope for consolidating that in the
-generic code then we can do so later.
-
--- 
-                   Sent with MeeGo's ActiveSync support.
-
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+Ah, it enables ARCH_SIRF, I was searching for ARCH_PRIMA2 or ARCH_MARCO. Good.
 
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/9fde7c1d/attachment.bin>
+-Olof
