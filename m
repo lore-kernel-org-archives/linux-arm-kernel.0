@@ -1,269 +1,39 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Tue, 29 Jan 2013 09:57:19 +0100
-Subject: [PATCH v2 3/4] watchdog: add support for ux500_wdt watchdog
-In-Reply-To: <20130128211222.GA3338@spo001.leaseweb.com>
-References: <20130128211222.GA3338@spo001.leaseweb.com>
-Message-ID: <1359449839-17742-1-git-send-email-fabio.baltieri@linaro.org>
+From: lizefan@huawei.com (Li Zefan)
+Date: Tue, 29 Jan 2013 17:16:51 +0800
+Subject: backport patches to 2.6.34 to remove
+ __ARCH_WANT_INTERRUPTS_ON_CTXSW?
+In-Reply-To: <51077966.1060703@huawei.com>
+References: <51077966.1060703@huawei.com>
+Message-ID: <51079383.60406@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the ux500_wdt watchdog that is found in
-ST-Ericsson Ux500 platform.  The driver is based on PRCMU APIs.
+On 2013/1/29 15:25, Li Zefan wrote:
+> Hi Catalin,
+> 
+> We got system crashes, and then we managed to trigger the bug within minutes,
+> and we found this in upstream, which also backported to 2.6.34 stable:
+> 
+> commit cb297a3e433dbdcf7ad81e0564e7b804c941ff0d
+> Author: Chanho Min <chanho0207@gmail.com>
+> Date:   Thu Jan 5 20:00:19 2012 +0900
+> 
+>     sched/rt: Fix task stack corruption under __ARCH_WANT_INTERRUPTS_ON_CTXSW
+> 
+> The bug described in this commit resembles to ours. Unfortunately After applying
+> the fix, we still get crash in hours. We tried to bind each real-time task to a
+> single cpu to make sure no cpu migration will happen, and it ran without any
+> problem for ~20 hours.
+> 
+> We're still investigating this issue. One thing I'm doing is backporting patches
+> that removes __ARCH_WANT_INTERRUPTS_ON_CTXSW. With those patches, I can boot
+> the kernel, but it hung up when the system automatically start nfs and later
+> soft-lockup was reported. Things are fine if I disable nfs startup and start it
+> manually.
+> 
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
+I've confirmed it's the 1st patch that causes this lockup.
 
-Changes from v1:
-- changed timeout as unsigned in both module parameter and pdata
-- changed nowayout to bool
-- added Linus Walleij's Ack
-
- drivers/watchdog/Kconfig                |  12 +++
- drivers/watchdog/Makefile               |   1 +
- drivers/watchdog/ux500_wdt.c            | 171 ++++++++++++++++++++++++++++++++
- include/linux/platform_data/ux500_wdt.h |  19 ++++
- 4 files changed, 203 insertions(+)
- create mode 100644 drivers/watchdog/ux500_wdt.c
- create mode 100644 include/linux/platform_data/ux500_wdt.h
-
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 7f809fd..26e1fdb 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -364,6 +364,18 @@ config IMX2_WDT
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called imx2_wdt.
- 
-+config UX500_WATCHDOG
-+	tristate "ST-Ericsson Ux500 watchdog"
-+	depends on MFD_DB8500_PRCMU
-+	select WATCHDOG_CORE
-+	default y
-+	help
-+	  Say Y here to include Watchdog timer support for the watchdog
-+	  existing in the prcmu of ST-Ericsson Ux500 series platforms.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called ux500_wdt.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 97bbdb3a..bec86ee 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -52,6 +52,7 @@ obj-$(CONFIG_STMP3XXX_WATCHDOG) += stmp3xxx_wdt.o
- obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
- obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
- obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
-+obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/ux500_wdt.c b/drivers/watchdog/ux500_wdt.c
-new file mode 100644
-index 0000000..a614d84
---- /dev/null
-+++ b/drivers/watchdog/ux500_wdt.c
-@@ -0,0 +1,171 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2011-2013
-+ *
-+ * License Terms: GNU General Public License v2
-+ *
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org> for ST-Ericsson
-+ * Author: Jonas Aaberg <jonas.aberg@stericsson.com> for ST-Ericsson
-+ */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/moduleparam.h>
-+#include <linux/miscdevice.h>
-+#include <linux/err.h>
-+#include <linux/uaccess.h>
-+#include <linux/watchdog.h>
-+#include <linux/platform_device.h>
-+#include <linux/platform_data/ux500_wdt.h>
-+
-+#include <linux/mfd/dbx500-prcmu.h>
-+
-+#define WATCHDOG_TIMEOUT 600 /* 10 minutes */
-+
-+#define WATCHDOG_MIN	0
-+#define WATCHDOG_MAX28	268435  /* 28 bit resolution in ms == 268435.455 s */
-+#define WATCHDOG_MAX32	4294967 /* 32 bit resolution in ms == 4294967.295 s */
-+
-+static unsigned int timeout = WATCHDOG_TIMEOUT;
-+module_param(timeout, uint, 0);
-+MODULE_PARM_DESC(timeout,
-+	"Watchdog timeout in seconds. default="
-+				__MODULE_STRING(WATCHDOG_TIMEOUT) ".");
-+
-+static bool nowayout = WATCHDOG_NOWAYOUT;
-+module_param(nowayout, bool, 0);
-+MODULE_PARM_DESC(nowayout,
-+	"Watchdog cannot be stopped once started (default="
-+				__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
-+
-+static int ux500_wdt_start(struct watchdog_device *wdd)
-+{
-+	return prcmu_enable_a9wdog(PRCMU_WDOG_ALL);
-+}
-+
-+static int ux500_wdt_stop(struct watchdog_device *wdd)
-+{
-+	return prcmu_disable_a9wdog(PRCMU_WDOG_ALL);
-+}
-+
-+static int ux500_wdt_keepalive(struct watchdog_device *wdd)
-+{
-+	return prcmu_kick_a9wdog(PRCMU_WDOG_ALL);
-+}
-+
-+static int ux500_wdt_set_timeout(struct watchdog_device *wdd,
-+				 unsigned int timeout)
-+{
-+	ux500_wdt_stop(wdd);
-+	prcmu_load_a9wdog(PRCMU_WDOG_ALL, timeout * 1000);
-+	ux500_wdt_start(wdd);
-+
-+	return 0;
-+}
-+
-+static const struct watchdog_info ux500_wdt_info = {
-+	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
-+	.identity = "Ux500 WDT",
-+	.firmware_version = 1,
-+};
-+
-+static const struct watchdog_ops ux500_wdt_ops = {
-+	.owner = THIS_MODULE,
-+	.start = ux500_wdt_start,
-+	.stop  = ux500_wdt_stop,
-+	.ping  = ux500_wdt_keepalive,
-+	.set_timeout = ux500_wdt_set_timeout,
-+};
-+
-+static struct watchdog_device ux500_wdt = {
-+	.info = &ux500_wdt_info,
-+	.ops = &ux500_wdt_ops,
-+	.min_timeout = WATCHDOG_MIN,
-+	.max_timeout = WATCHDOG_MAX32,
-+};
-+
-+static int ux500_wdt_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct ux500_wdt_data *pdata = pdev->dev.platform_data;
-+
-+	if (pdata) {
-+		if (pdata->timeout > 0)
-+			timeout = pdata->timeout;
-+		if (pdata->has_28_bits_resolution)
-+			ux500_wdt.max_timeout = WATCHDOG_MAX28;
-+	}
-+
-+	watchdog_set_nowayout(&ux500_wdt, nowayout);
-+
-+	/* disable auto off on sleep */
-+	prcmu_config_a9wdog(PRCMU_WDOG_CPU1, false);
-+
-+	/* set HW initial value */
-+	prcmu_load_a9wdog(PRCMU_WDOG_ALL, timeout * 1000);
-+
-+	ret = watchdog_register_device(&ux500_wdt);
-+	if (ret)
-+		return ret;
-+
-+	dev_info(&pdev->dev, "initialized\n");
-+
-+	return 0;
-+}
-+
-+static int ux500_wdt_remove(struct platform_device *dev)
-+{
-+	watchdog_unregister_device(&ux500_wdt);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int ux500_wdt_suspend(struct platform_device *pdev,
-+			     pm_message_t state)
-+{
-+	if (watchdog_active(&ux500_wdt)) {
-+		ux500_wdt_stop(&ux500_wdt);
-+		prcmu_config_a9wdog(PRCMU_WDOG_CPU1, true);
-+
-+		prcmu_load_a9wdog(PRCMU_WDOG_ALL, timeout * 1000);
-+		ux500_wdt_start(&ux500_wdt);
-+	}
-+	return 0;
-+}
-+
-+static int ux500_wdt_resume(struct platform_device *pdev)
-+{
-+	if (watchdog_active(&ux500_wdt)) {
-+		ux500_wdt_stop(&ux500_wdt);
-+		prcmu_config_a9wdog(PRCMU_WDOG_CPU1, false);
-+
-+		prcmu_load_a9wdog(PRCMU_WDOG_ALL, timeout * 1000);
-+		ux500_wdt_start(&ux500_wdt);
-+	}
-+	return 0;
-+}
-+#else
-+#define ux500_wdt_suspend NULL
-+#define ux500_wdt_resume NULL
-+#endif
-+
-+static struct platform_driver ux500_wdt_driver = {
-+	.probe		= ux500_wdt_probe,
-+	.remove		= ux500_wdt_remove,
-+	.suspend	= ux500_wdt_suspend,
-+	.resume		= ux500_wdt_resume,
-+	.driver		= {
-+		.owner	= THIS_MODULE,
-+		.name	= "ux500_wdt",
-+	},
-+};
-+
-+module_platform_driver(ux500_wdt_driver);
-+
-+MODULE_AUTHOR("Jonas Aaberg <jonas.aberg@stericsson.com>");
-+MODULE_DESCRIPTION("Ux500 Watchdog Driver");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
-+MODULE_ALIAS("platform:ux500_wdt");
-diff --git a/include/linux/platform_data/ux500_wdt.h b/include/linux/platform_data/ux500_wdt.h
-new file mode 100644
-index 0000000..1689ff4
---- /dev/null
-+++ b/include/linux/platform_data/ux500_wdt.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) ST Ericsson SA 2011
-+ *
-+ * License Terms: GNU General Public License v2
-+ *
-+ * STE Ux500 Watchdog platform data
-+ */
-+#ifndef __UX500_WDT_H
-+#define __UX500_WDT_H
-+
-+/**
-+ * struct ux500_wdt_data
-+ */
-+struct ux500_wdt_data {
-+	unsigned int timeout;
-+	bool has_28_bits_resolution;
-+};
-+
-+#endif /* __UX500_WDT_H */
--- 
-1.7.12.1
+> So did I miss something when backporting, or is it infeasible to backport them
+> to 2.6.34? We're using ARMv7. I've attached the patches I backported.
+> 
