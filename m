@@ -1,29 +1,63 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Jan 2013 11:04:11 +0100
-Subject: [PATCH v2 02/27] of/pci: Add of_pci_get_devfn() function
-In-Reply-To: <20130128221604.GA24858@avionic-0098.mockup.avionic-design.de>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <5106F4EA.20904@wwwdotorg.org>
- <20130128221604.GA24858@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130129110411.6b5f4210@skate>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Tue, 29 Jan 2013 10:07:57 +0000
+Subject: [PATCH v2 8/9] ARM: DTS: AM33XX: Add nodes for OCMC RAM and
+ WKUP-M3
+In-Reply-To: <87622ge6xv.fsf@dell.be.48ers.dk>
+References: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
+ <1359442762-13697-9-git-send-email-vaibhav.bedia@ti.com>
+ <87622ge6xv.fsf@dell.be.48ers.dk>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED01B92@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry, Stephen,
+On Tue, Jan 29, 2013 at 13:50:44, Peter Korsgaard wrote:
+> >>>>> "Vaibhav" == Vaibhav Bedia <vaibhav.bedia@ti.com> writes:
+> 
+>  Vaibhav> Since AM33XX supports only DT-boot, this is needed
+>  Vaibhav> for the appropriate device nodes to be created.
+> 
+>  Vaibhav> Note: OCMC RAM is part of the PER power domain and supports
+>  Vaibhav> retention. The assembly code for low power entry/exit will
+>  Vaibhav> run from OCMC RAM. To ensure that the OMAP PM code does not
+>  Vaibhav> attempt to disable the clock to OCMC RAM as part of the
+>  Vaibhav> suspend process add the no_idle_on_suspend flag.
+> 
+>  Vaibhav> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>  Vaibhav> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>  Vaibhav> ---
+>  Vaibhav> v2: Add reg property
+> 
+>  Vaibhav>  arch/arm/boot/dts/am33xx.dtsi | 14 +++++++++++++
+>  Vaibhav>  1 file changed, 14 insertions(+)
+> 
+>  Vaibhav> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>  Vaibhav> index c2f14e8..423f898 100644
+>  Vaibhav> --- a/arch/arm/boot/dts/am33xx.dtsi
+>  Vaibhav> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>  Vaibhav> @@ -385,5 +385,19 @@
+>  Vaibhav>  				mac-address = [ 00 00 00 00 00 00 ];
+>  Vaibhav>  			};
+>  Vaibhav>  		};
+>  Vaibhav> +
+>  Vaibhav> +		ocmcram: ocmcram at 40300000 {
+>  Vaibhav> +			compatible = "ti,ocmcram";
+>  Vaibhav> +			reg = <0x40300000 0x10000>;
+>  Vaibhav> +			ti,hwmods = "ocmcram";
+>  Vaibhav> +			ti,no_idle_on_suspend;
+>  Vaibhav> +		};
+>  Vaibhav> +
+>  Vaibhav> +		wkup_m3: wkup_m3 at 44d00000 {
+>  Vaibhav> +			compatible = "ti,wkup_m3";
+> 
+> 
+> Both of these compatible properties should probably use less generic
+> names, like:
+> 
+> ti,am3352-ocmcram
+> ti,am3352-wkup-m3 ('-' instead of '_')
+> 
 
-On Mon, 28 Jan 2013 23:16:04 +0100, Thierry Reding wrote:
+Ok. Will do.
 
-> That's already fixed up in my series. I was going to wait until I was
-> done with the MSI rework but maybe posting an intermediate version is in
-> order to share the latest state.
-
-Thanks! Those first four patches are definitely shared between our
-series.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks,
+Vaibhav
