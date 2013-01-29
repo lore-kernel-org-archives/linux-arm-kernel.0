@@ -1,104 +1,98 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 29 Jan 2013 14:54:35 +0100
-Subject: [PATCH 1/3] atmel_lcdfb: fix 16-bpp modes on older SOCs
-In-Reply-To: <1355142530-10366-2-git-send-email-jhovold@gmail.com>
-References: <1355142530-10366-1-git-send-email-jhovold@gmail.com>
- <1355142530-10366-2-git-send-email-jhovold@gmail.com>
-Message-ID: <20130129135435.GN7360@game.jcrosoft.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 29 Jan 2013 19:27:00 +0530
+Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
+ hwmod data
+In-Reply-To: <20130122183213.GN15361@atomide.com>
+References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
+ <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
+ <20130118171500.GC15361@atomide.com> <50FCF838.6000105@ti.com>
+ <50FD5993.5010008@ti.com> <20130121180113.GA22517@atomide.com>
+ <50FE8C5C.2030409@ti.com> <20130122183213.GN15361@atomide.com>
+Message-ID: <5107D52C.80200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:28 Mon 10 Dec     , Johan Hovold wrote:
-> Fix regression introduced by commit 787f9fd23283 ("atmel_lcdfb: support
-> 16bit BGR:565 mode, remove unsupported 15bit modes") which broke 16-bpp
-> modes for older SOCs which use IBGR:555 (msb is intensity) rather
-> than BGR:565.
-> 
-> Use SOC-type to determine the pixel layout.
-> 
-> Tested on custom at91sam9263-board.
-> 
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Johan Hovold <jhovold@gmail.com>
-> ---
->  drivers/video/atmel_lcdfb.c | 22 +++++++++++++++-------
->  include/video/atmel_lcdc.h  |  1 +
->  2 files changed, 16 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-> index 1505539..1f68fa6 100644
-> --- a/drivers/video/atmel_lcdfb.c
-> +++ b/drivers/video/atmel_lcdfb.c
-> @@ -422,17 +422,22 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
->  			= var->bits_per_pixel;
->  		break;
->  	case 16:
-> +		/* Older SOCs use IBGR:555 rather than BGR:565. */
-> +		if (sinfo->have_intensity_bit)
-> +			var->green.length = 5;
-> +		else
-> +			var->green.length = 6;
-> +
->  		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
-> -			/* RGB:565 mode */
-> -			var->red.offset = 11;
-> +			/* RGB:5X5 mode */
-> +			var->red.offset = var->green.length + 5;
->  			var->blue.offset = 0;
->  		} else {
-> -			/* BGR:565 mode */
-> +			/* BGR:5X5 mode */
->  			var->red.offset = 0;
-> -			var->blue.offset = 11;
-> +			var->blue.offset = var->green.length + 5;
->  		}
->  		var->green.offset = 5;
-> -		var->green.length = 6;
->  		var->red.length = var->blue.length = 5;
->  		break;
->  	case 32:
-> @@ -679,8 +684,7 @@ static int atmel_lcdfb_setcolreg(unsigned int regno, unsigned int red,
->  
->  	case FB_VISUAL_PSEUDOCOLOR:
->  		if (regno < 256) {
-> -			if (cpu_is_at91sam9261() || cpu_is_at91sam9263()
-> -			    || cpu_is_at91sam9rl()) {
-> +			if (sinfo->have_intensity_bit) {
->  				/* old style I+BGR:555 */
->  				val  = ((red   >> 11) & 0x001f);
->  				val |= ((green >>  6) & 0x03e0);
-> @@ -870,6 +874,10 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
->  	}
->  	sinfo->info = info;
->  	sinfo->pdev = pdev;
-> +	if (cpu_is_at91sam9261() || cpu_is_at91sam9263() ||
-> +							cpu_is_at91sam9rl()) {
-> +		sinfo->have_intensity_bit = true;
-> +	}
-nack
+On Wednesday 23 January 2013 12:02 AM, Tony Lindgren wrote:
+> * Benoit Cousson <b-cousson@ti.com> [130122 04:59]:
+>> Hi Tony,
+>>
+>> On 01/21/2013 07:01 PM, Tony Lindgren wrote:
+>>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130121 07:09]:
+>>>>>
+>>>> So I looked at this one with help of Rajendra. We can get rid of the
+>>>> IRQ and DMA data(needs DMA biding updates) easily. The address
+>>>> space though is needed since hwmod code uses it to setup the
+>>>> sysconfig registers.
+>>>
+>>> OK great. The address space tinkering in hwmod code should be
+>>> moved to be done in the drivers.
+>>>
+>>> As discussed earlier, there should be a driver specific reset
+>>> function driver_xyz_reset() in the driver header file so the
+>>> hwmod code can call it too in a late_initcall if no driver is
+>>> loaded.
+>>>
+>>>> Extracting that from DT code seems to be really expensive and
+>>>> ugly [1]. I am yet to try out DMA lines removal but that seems
+>>>> to be doable by pulling Vinod'd DMA engine branch and updating
+>>>> DT file.
+>>>
+>>> The overhead here does not matter as it should only happen in a
+>>> late_initcall and only for some of the drivers. For that to
+>>> happen we just need to go through the list of modules not yet
+>>> probed. We also need to have some locking in the driver specific
+>>> reset function to avoid races with the loadable modules.
+>>
+>> Mmm, not really, that address is used by *every* hwmod for sysconfig
+>> access. So iterating over every DT nodes for every hwmods seems pretty
+>> ugly and un-optimized.
+>
+> I think you missed one point. Iterating over all the modules should
+> only happen for the unused modules. With sysconfig access moved to the
+> drivers getting the ioaddress is done in the standard way in the driver
+> probe instead of iterating over all of them.
+>
+>> That being said, it might worth checking the overhead. That will not
+>> make the fix nicer anyway, but at least it will allow a smooth
+>> transition toward a real clean solution. Assuming someone will work on
+>> that later, which might never happen.
+>
+> Right, so who is going to do all the work needed?
+>
+OK so we do managed to clean up the address space, IRQ lines
+and DMA request lines data from hwmod completely.
 
-you need to drop the cpu_is as this can only be use now for the core
+-OMAP5 hwmod data file, 2076 lines we could remove which significant
+reduction. I ran the same scripts on OMAP4 and there too about 2200
+lines getting deleted.
 
-use platform_device_id to indetify the IP as done on at91-i2c as we can not
-detect the IP version
+- I have to udapte DT file to add the all supported hwmods with reg
+property so that OMAP5 continue to boot. Similar work is needed for
+OMAP4 too once OMAP4 is made DT only support.
 
-Best Regards,
-J.
->  
->  	strcpy(info->fix.id, sinfo->pdev->name);
->  	info->flags = ATMEL_LCDFB_FBINFO_DEFAULT;
-> diff --git a/include/video/atmel_lcdc.h b/include/video/atmel_lcdc.h
-> index 28447f1..5f0e234 100644
-> --- a/include/video/atmel_lcdc.h
-> +++ b/include/video/atmel_lcdc.h
-> @@ -62,6 +62,7 @@ struct atmel_lcdfb_info {
->  	void (*atmel_lcdfb_power_control)(int on);
->  	struct fb_monspecs	*default_monspecs;
->  	u32			pseudo_palette[16];
-> +	bool			have_intensity_bit;
->  };
->  
->  #define ATMEL_LCDC_DMABADDR1	0x00
-> -- 
-> 1.8.0
-> 
+- To my suprise, the DT lookup isn't that bad. It is adding just
+24 milliseconds to the boot time which is more or less noise.
+
+Have pushed a branch with above update for OMAP5 here [1]
+
+So we are left with two other topics which you mentioned in the
+comments.
+
+1. Movement of clock data to drivers/clk. Till we get direction here
+I would like to hear the alternative to get OMAP5 booting from mainline.
+If there is no alternative, we can keep OMAP5 clock data alone
+out of tree and get rest of the data files merged.
+
+2. The iormap() done by hwmod for sysconfig handling which you are
+discussing with Rajendra. So far we don't have a viable way to
+get the iormapped address from device drivers back to platform
+code. Lets continue on this thread but this can evolve in
+parallel.
+
+Let me know your thoughts.
+
+Regards,
+Santosh
+
+[1] git://github.com/SantoshShilimkar/linux.git
+3.9/omap5-testing-hwmod-cleanup
