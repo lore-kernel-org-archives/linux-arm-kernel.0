@@ -1,87 +1,54 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Jan 2013 14:45:22 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130129132204.GA23886@arm.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130129132204.GA23886@arm.com>
-Message-ID: <20130129144522.44ed7373@skate>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 29 Jan 2013 15:45:40 +0200
+Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <201301291331.48427.arnd@arndb.de>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <201301291035.30265.arnd@arndb.de>
+ <CAKohpo=rD9=dEaPkKYcj55K4_ebdnU7qjv2TZBUwqHAB+Kk+aw@mail.gmail.com>
+ <201301291331.48427.arnd@arndb.de>
+Message-ID: <1359467140.31148.41.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Murray,
-
-On Tue, 29 Jan 2013 13:22:04 +0000, Andrew Murray wrote:
-
-> > +static int __init mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-> > +{
+On Tue, 2013-01-29 at 13:31 +0000, Arnd Bergmann wrote: 
+> On Tuesday 29 January 2013, Viresh Kumar wrote:
+> > You can still keep fargs as is and just fill them as:
+> > 
+> >        fargs.cfg_lo = 0;
+> > 
+> > if (DMA_TO_DEV)
+> >        // dest is periph
+> >        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 11;
+> > else if (DEV_TO_DMA)
+> >        // src is periph
+> >        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 7;
+> > 
+> > The field size is 4 bits.
 > 
-> [snip]
+> Ah, good. So I guess the "dma-requests" property should actually
+> be "16" then.
 > 
-> > +
-> > +       /*
-> > +        * Build an laddr array that describes the PCI device in a DT
-> > +        * way
-> > +        */
-> > +       laddr[0] = cpu_to_be32(port->devfn << 8);
-> > +       laddr[1] = laddr[2] = 0;
-> > +       intspec = cpu_to_be32(pin);
-> > +
-> > +       ret = of_irq_map_raw(port->dn, &intspec, 1, laddr, &oirq);
-> > +       if (ret) {
-> > +               dev_err(&pcie->pdev->dev,
-> > +                       "%s: of_irq_map_raw() failed, %d\n",
-> > +                       __func__, ret);
-> > +               return ret;
-> > +       }
-> 
-> Are you able to replace the above code with a call to of_irq_map_pci? I'm not
-> sure which approach is better. The of_irq_map_pci function doesn't require the
-> pin argument and instead uses the DT and/or performs its own pin swizzling. I
-> guess this means that if there are PCIe devices in the DT tree that does any
-> thing strange with pins then it would be reflected in the IRQ you get. I've
-> found that you will also need to provide an implementation of
-> pcibios_get_phb_of_node for this to work correctly (see my RFC bios32 patch).
+> Does this mean that an implicit zero request line means memory?
 
-I did try using the of_irq_map_pci() function, but unfortunately, it
-didn't work. IIRC, it didn't work because none of the pci_dev in my PCI
-tree had any 'struct device_node' associated to them, or at least not
-the one that had the right pdev->bus->number and pdev->devfn.
+No, it doesn't.
+When dma is doing mem2mem transfers the request line field is ignored by
+the hw.
 
-But, I guess that your patch that implements pcibios_get_phb_of_node()
-should fix this problem. I'll try this. Thanks!
+> Could we have device-to-device DMAs with this controller, and if
+> we can, should we have both 'src' and 'dst' fields?
 
-> > +static int mvebu_pcie_init(void)
-> > +{
-> > +       return platform_driver_probe(&mvebu_pcie_driver,
-> > +                                    mvebu_pcie_probe);
-> > +}
-> 
-> If you have multiple 'mvebu-pcie' in your DT then you will end up
-> with multiple calls to
-> mvebu_pcie_probe/mvebu_pcie_enable/pci_common_init.
+As far as I know there is no driver under dmaengine that supports
+per2per transfers.
 
-Right. In practice, there will only ever be a single DT node, since all
-PCIe interfaces are sub-nodes of the PCI controller node. But I
-understand the theoretical problem.
+>  Are the
+> two number ranges sharing the same address space, i.e. is
+> request '7' as the destination guaranteed to be the same device
+> as request '7' in the source?
 
-> However pci_common_init/pcibios_init_hw assumes it will only ever be called
-> once, and will thus result in trying to create multiple busses with the same
-> bus number. (The first root bus it creates is always zero provided you haven't
-> implemented hw->scan).
-> 
-> I noticed this in Thierry's patch set and posted an RFC patch which overcomes
-> this issue (patchwork.kernel.org/patch/2001171) and others. Perhaps you would
-> want to include this in your patchset?
+Request line should be unique. It means a real wire from slave hw to the
+dmac.
 
-Sure, I'll give it a test, and report if it works for me.
 
-Thanks a lot!
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
