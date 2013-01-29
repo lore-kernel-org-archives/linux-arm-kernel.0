@@ -1,46 +1,50 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Tue, 29 Jan 2013 12:29:14 +0530
-Subject: [PATCH v2 1/9] ARM: OMAP2+: AM33XX: CM: Get rid of unnecessary header
- inclusions
-In-Reply-To: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
-References: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1359442762-13697-2-git-send-email-vaibhav.bedia@ti.com>
+Date: Tue, 29 Jan 2013 12:29:13 +0530
+Subject: [PATCH v2 0/9] ARM: OMAP2+: AM33XX: Misc fixes/updates
+Message-ID: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cm33xx.h unnecessarily includes a lot of header files.
-Get rid of these and directly include "iomap.h" which
-is needed to keep things compiling.
+Hi,
 
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-v2: Reword the changelog
+The following patches were earlier posted as part the AM33XX
+suspend-resume support series [1]. Based on the suggestion
+from Santosh Shilimkar <santosh.shilimkar@ti.com> i have split
+out the changes which update the various data files related
+to AM33XX support. This version addresses the comments
+received from Sergei Shtylyov and Peter Korsgaard on the earlier
+patchset [2].
 
- arch/arm/mach-omap2/cm33xx.h | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+These patches apply on top of v3.8-rc5
 
-diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
-index 5fa0b62..8009e13 100644
---- a/arch/arm/mach-omap2/cm33xx.h
-+++ b/arch/arm/mach-omap2/cm33xx.h
-@@ -17,16 +17,11 @@
- #ifndef __ARCH_ARM_MACH_OMAP2_CM_33XX_H
- #define __ARCH_ARM_MACH_OMAP2_CM_33XX_H
- 
--#include <linux/delay.h>
--#include <linux/errno.h>
--#include <linux/err.h>
--#include <linux/io.h>
--
- #include "common.h"
- 
- #include "cm.h"
- #include "cm-regbits-33xx.h"
--#include "cm33xx.h"
-+#include "iomap.h"
- 
- /* CM base address */
- #define AM33XX_CM_BASE		0x44e00000
+Regards,
+Vaibhav
+
+[1] http://marc.info/?l=linux-arm-kernel&m=135698501821074&w=2
+[2] http://marc.info/?l=linux-omap&m=135849360005657&w=2
+
+Vaibhav Bedia (9):
+  ARM: OMAP2+: AM33XX: CM: Get rid of unnecessary header inclusions
+  ARM: OMAP2+: AM33XX: CM/PRM: Use __ASSEMBLER__ macros in header files
+  ARM: OMAP2+: AM33XX: hwmod: Register OCMC RAM hwmod
+  ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with the right flags
+  ARM: OMAP2+: AM33XX: hwmod: Fixup cpgmac0 hwmod entry
+  ARM: OMAP2+: AM33XX: hwmod: Update the WKUP-M3 hwmod with reset status
+    bit
+  ARM: OMAP2+: AM33XX: Update the hardreset API
+  ARM: DTS: AM33XX: Add nodes for OCMC RAM and WKUP-M3
+  ARM: OMAP2+: AM33XX: control: Add some control module registers and
+    APIs
+
+ arch/arm/boot/dts/am33xx.dtsi              | 14 +++++++++
+ arch/arm/mach-omap2/cm33xx.h               |  9 ++----
+ arch/arm/mach-omap2/control.c              | 20 ++++++++++++
+ arch/arm/mach-omap2/control.h              | 41 ++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c           |  5 +--
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 50 +++++++++++++++++-------------
+ arch/arm/mach-omap2/prm33xx.c              | 11 ++++---
+ arch/arm/mach-omap2/prm33xx.h              |  4 ++-
+ 8 files changed, 118 insertions(+), 36 deletions(-)
+
 -- 
 1.8.1
