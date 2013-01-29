@@ -1,20 +1,19 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Jan 2013 23:42:21 -0700
-Subject: [GIT PULL 3/4] ARM: bcm2835: device tree updates
+Date: Mon, 28 Jan 2013 23:42:22 -0700
+Subject: [GIT PULL 4/4] ARM: bcm2835: defconfig update
 In-Reply-To: <1359441742-32647-1-git-send-email-swarren@wwwdotorg.org>
 References: <1359441742-32647-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1359441742-32647-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1359441742-32647-4-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC's SDHCI and MMC controllers are added to device tree, and enabled
-in the Raspberry Pi board device tree. Some fixed clocks are added to the
-device tree to support these drivers. These could be replaced by real
-clocks in the future.
+The SDHCI and I2C subsytems and drivers are enabled.
 
-A hard-coded memreserve is removed from device tree; the bootloader should
-specify the correct memory node content instead, since the memory layout
-is dynamic.
+Various filesystems are enabled for use with the SDHCI driver.
+
+Various other options expected by distros are enabled. This allows the
+"Raspbian" filesystem published by the Raspberry Pi Foundation to boot
+to a serial console prompt.
 
 This branch is based on v3.8-rc3.
 
@@ -26,20 +25,16 @@ The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.9-dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.9-defconfig
 
-for you to fetch changes up to 9692c191ffffbd5255bec222b8f0f2854932a408:
+for you to fetch changes up to d1dc7c6c6a6666fff1d40009c71965dc6600d521:
 
-  ARM: bcm2835: fix clock node aliasing in device tree
+  ARM: bcm2835: defconfig updates
 
 ----------------------------------------------------------------
 
-Stephen Warren (4):
-      ARM: bcm2835 rpi: remove hard-coded memreserve from DT
-      ARM: bcm2835: add SDHCI node to DT
-      ARM: bcm2835: add I2C controllers to DT
-      ARM: bcm2835: fix clock node aliasing in device tree
+Stephen Warren (1):
+      ARM: bcm2835: defconfig updates
 
- arch/arm/boot/dts/bcm2835-rpi-b.dts |   16 ++++++++++-
- arch/arm/boot/dts/bcm2835.dtsi      |   44 ++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 1 deletion(-)
+ arch/arm/configs/bcm2835_defconfig |   43 ++++++++++++++++++++++++-------
+ 1 file changed, 33 insertions(+), 10 deletions(-)
