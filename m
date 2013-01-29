@@ -1,65 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 29 Jan 2013 12:02:28 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <5106E6A6.7010207@web.de>
-References: <50F800EB.6040104@web.de> <201301172026.45514.arnd@arndb.de>
- <50FABBED.1020905@web.de> <20130119185907.GA20719@lunn.ch>
- <5100022D.9050106@web.de> <20130123162515.GK13482@lunn.ch>
- <510018B4.9040903@web.de> <51001BEE.9020201@web.de>
- <20130123181029.GE20719@lunn.ch> <5106E6A6.7010207@web.de>
-Message-ID: <20130129110228.GA20242@lunn.ch>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 29 Jan 2013 19:11:43 +0800
+Subject: [PATCH] ARM:common: setting saved_state to NULL after kfree
+Message-ID: <5107AE6F.3080206@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Now I activated the debug messages in em28xx. From the messages I
-> see no correlation of the pool exhaustion and lost sync. Also I
-> cannot see any error messages from the em28xx driver.
-> I see a lot of init_isoc/stop_urbs (maybe EPG scan?) without
-> draining the coherent pool (checked with 'cat
-> /debug/dma-api/num_free_entries', which gave stable numbers), but
-> after half an hour there are only init_isoc messages without
-> corresponding stop_urbs messages and num_free_entries decreased
-> until coherent pool exhaustion.
 
-Hi Soeren
+  need set NULL before return, just like function sa1111_remove has done.
+  and better to use sa1111_remove directly, instead of current implementation.
 
-em28xx_stop_urbs() is only called by em28xx_stop_streaming().
 
-em28xx_stop_streaming() is only called by em28xx_stop_feed()
-when 0 == dvb->nfeeds.
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/common/sa1111.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-em28xx_stop_feed()and em28xx_start_feed() look O.K, dvb->nfeeds is
-protected by a mutex etc.
-
-Now, em28xx_init_isoc() is also called by buffer_prepare(). This uses
-em28xx_alloc_isoc() to do the actual allocation, and that function
-sets up the urb such that on completion the function
-em28xx_irq_callback() is called.
-
-It looks like there might be issues here:
-
-Once the data has been copied out, it resubmits the urb:
-
-       urb->status = usb_submit_urb(urb, GFP_ATOMIC);
-        if (urb->status) {
-                em28xx_isocdbg("urb resubmit failed (error=%i)\n",
-                               urb->status);
-        }
-  
-However, if the ubs_submit_urb fails, it looks like the urb is lost.
-
-If you look at other code submitting urbs you have this pattern:
-
-               rc = usb_submit_urb(isoc_bufs->urb[i], GFP_ATOMIC);
-                if (rc) {
-                        em28xx_err("submit of urb %i failed (error=%i)\n", i,
-                                   rc);
-                        em28xx_uninit_isoc(dev, mode);
-                        return rc;
-                }
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index e57d7e5..4bb8230 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -954,9 +954,7 @@ static int sa1111_resume(struct platform_device *dev)
+ 	 */
+ 	id = sa1111_readl(sachip->base + SA1111_SKID);
+ 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
+-		__sa1111_remove(sachip);
+-		platform_set_drvdata(dev, NULL);
+-		kfree(save);
++		sa1111_remove(dev);
+ 		return 0;
+ 	}
  
-Do you have your build such that you would see "urb resubmit failed"
-in your logs? Are there any?
-
-     Andrew
+-- 
+1.7.10.4
