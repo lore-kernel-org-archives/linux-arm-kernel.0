@@ -1,54 +1,36 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 29 Jan 2013 15:45:40 +0200
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <201301291331.48427.arnd@arndb.de>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <201301291035.30265.arnd@arndb.de>
- <CAKohpo=rD9=dEaPkKYcj55K4_ebdnU7qjv2TZBUwqHAB+Kk+aw@mail.gmail.com>
- <201301291331.48427.arnd@arndb.de>
-Message-ID: <1359467140.31148.41.camel@smile>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 29 Jan 2013 14:53:36 +0100
+Subject: [PATCH,RFC] usb: add devicetree helpers for determining
+ dr_mode and phy_type
+In-Reply-To: <5107D253.5030400@ti.com>
+References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
+ <5107D253.5030400@ti.com>
+Message-ID: <20130129135336.GA3323@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-29 at 13:31 +0000, Arnd Bergmann wrote: 
-> On Tuesday 29 January 2013, Viresh Kumar wrote:
-> > You can still keep fargs as is and just fill them as:
-> > 
-> >        fargs.cfg_lo = 0;
-> > 
-> > if (DMA_TO_DEV)
-> >        // dest is periph
-> >        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 11;
-> > else if (DEV_TO_DMA)
-> >        // src is periph
-> >        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 7;
-> > 
-> > The field size is 4 bits.
+
+> >+	err = of_property_read_string(np, "phy_type", &phy_type);
+> >+	if (err < 0)
+> >+		return USBPHY_INTERFACE_MODE_NA;
 > 
-> Ah, good. So I guess the "dma-requests" property should actually
-> be "16" then.
-> 
-> Does this mean that an implicit zero request line means memory?
+> Why don't we use a u32 property type for the *phy-type*? IMHO we
+> should use string property only when the property should be
+> absolutely unambiguous (e.g., compatible property should be string).
 
-No, it doesn't.
-When dma is doing mem2mem transfers the request line field is ignored by
-the hw.
+If we would use u32-numbers in the compatible entry, this would also be
+unambiguous, no? 0xd00dfeed would be the at24-driver. Pretty specific.
 
-> Could we have device-to-device DMAs with this controller, and if
-> we can, should we have both 'src' and 'dst' fields?
-
-As far as I know there is no driver under dmaengine that supports
-per2per transfers.
-
->  Are the
-> two number ranges sharing the same address space, i.e. is
-> request '7' as the destination guaranteed to be the same device
-> as request '7' in the source?
-
-Request line should be unique. It means a real wire from slave hw to the
-dmac.
-
+I don't mind having readable devicetrees. And we have it for ethernet
+phys already with strings, so it would be consistent.
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/0b5575ea/attachment.sig>
