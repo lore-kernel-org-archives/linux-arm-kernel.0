@@ -1,35 +1,79 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 29 Jan 2013 14:23:11 -0600
-Subject: [PATCH] ARM: OMAP2+: Fix selection of clockevent timer when using
- device-tree
-Message-ID: <1359490991-17688-1-git-send-email-jon-hunter@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 29 Jan 2013 21:30:50 +0100
+Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <5107D253.5030400@ti.com>
+References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
+ <5107D253.5030400@ti.com>
+Message-ID: <20130129203050.GT1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9725f44 (ARM: OMAP: Add DT support for timer driver) added
-device-tree support for selecting a clockevent timer by property.
-However, the code is currently ignoring the property passed and
-selecting the first available timer found. Hence, for the OMAP3 beagle
-board timer-12 is not being selected as expected. Fix this problem
-by ensuring the timer property is passed to omap_get_timer_dt().
+On Tue, Jan 29, 2013 at 07:14:51PM +0530, kishon wrote:
+> Hi,
+> 
+> On Tuesday 29 January 2013 04:52 PM, Sascha Hauer wrote:
+> >From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> >
+> >This adds two little devicetree helper functions for determining the
+> >dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
+> >the devicetree.
+> >
+> >Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> >Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> >---
+> >
+> >The properties and their values have been taken from the fsl-mph-dr driver.
+> >This binding is also documented (though currently not used) for the tegra
+> >ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
+> >This is a first attempt to parse these bindings at a common place so that
+> >others can make use of it.
+> >
+> >Basically I want to know whether this binding is recommended for new drivers
+> >since normally the devicetree uses '-' instead of '_', and maybe there are
+> >other problems with it.
+> >
+> >I need this binding for the chipidea driver. I suspect that the fsl-mph-dr
+> >driver also really handles a chipidea core.
+> >
+> >Should we agree on this I would convert the fsl-mph-dr driver to use these
+> >helpers.
+> >
+> >Sascha
+> >
+> >  drivers/usb/core/Makefile |    1 +
+> >  drivers/usb/core/of.c     |   76 +++++++++++++++++++++++++++++++++++++++++++++
+> 
+> This file should ideally go into drivers/usb/phy/.
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/timer.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I originally wanted to do that, but the host/peripheral/otg property is
+not phy specific. DO you still want to move it there?
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index b8ad6e6..265de51 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -228,7 +228,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	int r = 0;
- 
- 	if (of_have_populated_dt()) {
--		np = omap_get_timer_dt(omap_timer_match, NULL);
-+		np = omap_get_timer_dt(omap_timer_match, property);
- 		if (!np)
- 			return -ENODEV;
- 
+> >  include/linux/usb/of.h    |   22 +++++++++++++
+> >  include/linux/usb/phy.h   |    9 ++++++
+> >  4 files changed, 108 insertions(+)
+> >  create mode 100644 drivers/usb/core/of.c
+> >  create mode 100644 include/linux/usb/of.h
+> >
+> >diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
+> >index 26059b9..5378add 100644
+> >--- a/drivers/usb/core/Makefile
+> >+++ b/drivers/usb/core/Makefile
+> >@@ -10,5 +10,6 @@ usbcore-y += devio.o notify.o generic.o quirks.o devices.o
+> >
+> >  usbcore-$(CONFIG_PCI)		+= hcd-pci.o
+> >  usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
+> >+usbcore-$(CONFIG_OF)		+= of.o
+> 
+> No Kconfig? Shouldn't this file be compiled only when some one is
+> going to use the PHY?
+
+Yes. Just skipped that for the first shot.
+
+Sascha
+
 -- 
-1.7.10.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
