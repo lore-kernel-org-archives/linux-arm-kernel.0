@@ -1,64 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jan 2013 15:58:20 +0000
-Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
-In-Reply-To: <20130129161211.7bb8cada@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130129161211.7bb8cada@skate>
-Message-ID: <20130129155820.GB23505@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Jan 2013 17:01:31 +0100
+Subject: [PATCH 5/5] mv643xx_eth: convert to use the Marvell Orion MDIO
+ driver
+In-Reply-To: <1359473048-26551-6-git-send-email-florian@openwrt.org>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1359473048-26551-6-git-send-email-florian@openwrt.org>
+Message-ID: <20130129170131.7964a110@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 04:12:11PM +0100, Thomas Petazzoni wrote:
-> On Mon, 28 Jan 2013 19:56:14 +0100, Thomas Petazzoni wrote:
-> > The PCI specifications says that an I/O region must be aligned on a 4
-> > KB boundary, and a memory region aligned on a 1 MB boundary.
+Dear Florian Fainelli,
 
-BTW, this, as a general statement, is wrong - though it really depends
-what you mean by "region".
+On Tue, 29 Jan 2013 16:24:08 +0100, Florian Fainelli wrote:
+> This patch converts the Marvell MV643XX ethernet driver to use the
+> Marvell Orion MDIO driver. As a result, PowerPC and ARM platforms
+> registering the Marvell MV643XX ethernet driver are also updated to
+> register a Marvell Orion MDIO driver. This driver voluntarily overlaps
+> with the Marvell Ethernet shared registers because it will use a subset
+> of this shared register (shared_base + 0x4 - shared_base + 0x84). The
+> Ethernet driver is also updated to look up for a PHY device using the
+> Orion MDIO bus driver.
+> 
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> ---
+>  arch/arm/plat-orion/common.c               |   84 +++++++++++--
 
-Remember that BARs can be set where-ever provided that they satisify
-their _individual_ alignment requirements.  So, an IO bar which
-occupies 16 bytes must be set to a 16-byte boundary.
+In this file, there was one "MV643XX_ETH_SHARED_NAME" platform_device
+registered for each network interface. Why? If the driver is shared,
+isn't the whole idea to register it only once?
 
-Now, there's an additional complication there which occurs if you have
-ISA devices sharing the PCI IO space: ISA devices used to only decode
-10 bits of IO space, which means that their registers repeat throughout
-the IO space.
+In any case, one of the idea of separating the mvmdio driver from the
+mvneta driver in the first place is that there should be only one
+instance of the mvmdio device, even if there are multiple network
+interfaces. The reason is that from a HW point of the view, the MDIO
+unit is shared between the network interfaces. If you look at
+armada-370-xp.dtsi, there is only one mvmdio device registered, and two
+network interfaces (using the mvneta driver) that are registered (and
+actually up to four network interfaces can exist, they are added by
+some other .dtsi files depending on the specific SoC).
 
-Therefore, it is generally accepted that within any 1K block, only the
-first 256 locations are only usable.
+So I don't think there should be one instance of the mvmdio per network
+interface.
 
-Moreover, some PCI cards have taken advantage of this, particularly VGA
-cards.  For example, S3 VGA cards put different registers on 1K
-multiples of the standard PC VGA IO addresses...
+Also, I am wondering what's left in this MV643XX_ETH_SHARED_NAME driver
+once the MDIO stuff has been pulled out in a separate driver? I think
+the whole point of this work should be to get rid of this
+MV643XX_ETH_SHARED_NAME driver, no?
 
-Also, another reason why I suspect your statement is wrong if I were
-to interpret "region" as "BAR" is that consider a bunch of PCI peripherals
-behind a PCI bridge.  The total number of IO BARs on the peripherals
-is 16.
+Thanks,
 
-If you allocate each of those IO BARs to be 4K aligned, then you
-consume all 64K of IO space behind one bridge, which leaves no space
-for any other IO peripherals elsewhere in the bus structure.
-
-Last reason I think that intepretation is wrong is, on this PC, I see:
-
-        Region 4: I/O ports at 1800 [size=8]
-        Region 0: I/O ports at 1830 [size=8]
-        Region 2: I/O ports at 1840 [size=32]
-        Region 4: I/O ports at 1860 [size=32]
-        Region 4: I/O ports at 1880 [size=32]
-        Region 4: I/O ports at 18a0 [size=32]
-        Region 4: I/O ports at 18c0 [size=32]
-        Region 4: I/O ports at 18e0 [size=32]
-        Region 4: I/O ports at 1c00 [size=32]
-        Region 0: I/O ports at 1c48 [size=8]
-        Region 1: I/O ports at 183c [size=4]
-        Region 2: I/O ports at 1c40 [size=8]
-        Region 3: I/O ports at 1838 [size=4]
-        Region 4: I/O ports at 1c20 [size=32]
-        Region 4: I/O ports at 1c60 [size=32]
-
-which doesn't follow - and I can pull out other examples on other
-x86 platforms where IO BARs aren't aligned to 4K...
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
