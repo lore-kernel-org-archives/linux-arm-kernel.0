@@ -1,36 +1,36 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 29 Jan 2013 10:34:53 -0500 (EST)
-Subject: [PATCH 09/30] USB: ehci-omap: Use devm_request_and_ioremap()
-In-Reply-To: <20130128152010.GN23505@n2100.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.44L0.1301291033000.1507-100000@iolanthe.rowland.org>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 29 Jan 2013 16:35:50 +0100
+Subject: [PATCH 1/5] net: mvmdio: unmap base register address at driver
+ removal
+In-Reply-To: <20130129163242.1df2caf5@skate>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1359473048-26551-2-git-send-email-florian@openwrt.org>
+ <20130129163242.1df2caf5@skate>
+Message-ID: <5107EC56.2000703@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Jan 2013, Russell King - ARM Linux wrote:
+On 01/29/2013 04:32 PM, Thomas Petazzoni wrote:
+> Dear Florian Fainelli,
+>
+> On Tue, 29 Jan 2013 16:24:04 +0100, Florian Fainelli wrote:
+>> Fix the driver remove callback to unmap the base register address and
+>> not leak this mapping after the driver has been removed.
+>>
+>> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> What about using devm_request_and_ioremap() instead, in order to get
+> automatic unmap on error and in the ->remove() path?
 
-> On Mon, Jan 28, 2013 at 10:17:33AM -0500, Alan Stern wrote:
-> > On Mon, 28 Jan 2013, Roger Quadros wrote:
-> > 
-> > > Make use of devm_request_and_ioremap() and correct comment.
-> > 
-> > Didn't a big patch come through recently converting all usages of 
-> > devm_request_and_ioremap() to another function (I forget the name) that 
-> > does its own error reporting and returns an ERR_PTR value?
-> > 
-> > (Checks the mailing list archive...)  Ah, here it is:
-> > 
-> > 	http://marc.info/?l=linux-usb&m=135876311801537&w=2
-> > 
-> > And the new function is devm_ioremap_resource().  We should avoid 
-> > adding new usages of an old interface.
-> 
-> Maybe... if devm_ioremap_resource() was already in the kernel.  The
-> problem at the moment is it isn't, and it'll probably be rather
-> horrid for everyone to deal with especially when it comes to testing.
+Right now, you are using of_iomap() which eases the task of fetching the 
+resource and getting an ioremap cookie, which I why I kept that.
 
-Not in the kernel yet?  I didn't realize that.  Looks like Thierry 
-Reding will have some clean-up work to do when it does get in.
+>
+> But maybe it won't work because this memory range is claimed both by
+> the MDIO driver and the Ethernet driver itself. In that case, you could
+> use devm_ioremap().
+Then we would loose the facility of of_iomap(), but fair enough, it can 
+be inserted as a patch in this serie.
 
-Okay, then
-
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Thanks
+--
+Florian
