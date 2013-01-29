@@ -1,91 +1,161 @@
-From: prasanna.ps@samsung.com (Prasanna Kumar)
-Date: Tue, 29 Jan 2013 15:25:20 +0530
-Subject: [PATCH RESEND] ARM: EXYNOS: dts: Set up power domain for MFC and
- G-scaler
-In-Reply-To: <05b901cdfde0$a373a860$ea5af920$@samsung.com>
-References: <05b901cdfde0$a373a860$ea5af920$@samsung.com>
-Message-ID: <1359453320-14911-1-git-send-email-prasanna.ps@samsung.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 29 Jan 2013 11:50:32 +0200
+Subject: [PATCH v3 10/30] USB: ehci-omap: Use PHY APIs to get the PHY device
+ and put it out of suspend
+In-Reply-To: <1359372631-8180-11-git-send-email-rogerq@ti.com>
+References: <1359372631-8180-11-git-send-email-rogerq@ti.com>
+Message-ID: <1359453032-20604-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree nodes for MFC and G-scaler power
-domains of exynos5250.It binds these power-domain nodes to repsective
-device tree nodes
+For each port that is in PHY mode we obtain a PHY device using the USB PHY
+library and put it out of suspend.
 
-It also adds support to enable PM generic domains for exynos5250.
+It is up to platform code to associate the PHY to the controller's
+port and it is upto the PHY driver to manage the PHY's resources.
 
-Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+Also remove wired spacing around declarations we come across.
+
+Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/exynos5250.dtsi |   15 +++++++++++++++
- arch/arm/mach-exynos/Kconfig      |    1 +
- 2 files changed, 16 insertions(+), 0 deletions(-)
+ drivers/usb/host/ehci-omap.c |   76 ++++++++++++++++++++++++++++++++++--------
+ 1 files changed, 62 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 30485de..6d0e87c 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -85,6 +85,7 @@
- 		compatible = "samsung,mfc-v6";
- 		reg = <0x11000000 0x10000>;
- 		interrupts = <0 96 0>;
-+		samsung,power-domain = <&pd_mfc>;
- 	};
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index fd2f5450..ddc31fb 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -4,10 +4,11 @@
+  * Bus Glue for the EHCI controllers in OMAP3/4
+  * Tested on several OMAP3 boards, and OMAP4 Pandaboard
+  *
+- * Copyright (C) 2007-2011 Texas Instruments, Inc.
++ * Copyright (C) 2007-2013 Texas Instruments, Inc.
+  *	Author: Vikram Pandita <vikram.pandita@ti.com>
+  *	Author: Anand Gadiyar <gadiyar@ti.com>
+  *	Author: Keshava Munegowda <keshava_mgowda@ti.com>
++ *	Author: Roger Quadros <rogerq@ti.com>
+  *
+  * Copyright (C) 2009 Nokia Corporation
+  *	Contact: Felipe Balbi <felipe.balbi@nokia.com>
+@@ -70,6 +71,10 @@ static const char hcd_name[] = "ehci-omap";
  
- 	rtc {
-@@ -554,28 +555,42 @@
- 		};
- 	};
+ /*-------------------------------------------------------------------------*/
  
-+	pd_gsc: gsc-power-domain at 0x10044000 {
-+		compatible = "samsung,exynos4210-pd";
-+		reg = <0x10044000 0x20>;
-+	};
++struct omap_hcd {
++	struct usb_phy *phy[OMAP3_HS_USB_PORTS]; /* one PHY for each port */
++	int nports;
++};
+ 
+ static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
+ {
+@@ -178,7 +183,8 @@ static void disable_put_regulator(
+ static struct hc_driver __read_mostly ehci_omap_hc_driver;
+ 
+ static const struct ehci_driver_overrides ehci_omap_overrides __initdata = {
+-	.reset =		omap_ehci_init,
++	.reset = omap_ehci_init,
++	.extra_priv_size = sizeof(struct omap_hcd),
+ };
+ 
+ /**
+@@ -190,15 +196,16 @@ static const struct ehci_driver_overrides ehci_omap_overrides __initdata = {
+  */
+ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ {
+-	struct device				*dev = &pdev->dev;
+-	struct usbhs_omap_platform_data		*pdata = dev->platform_data;
+-	struct resource				*res;
+-	struct usb_hcd				*hcd;
+-	void __iomem				*regs;
+-	int					ret = -ENODEV;
+-	int					irq;
+-	int					i;
+-	char					supply[7];
++	struct device *dev = &pdev->dev;
++	struct usbhs_omap_platform_data *pdata = dev->platform_data;
++	struct resource	*res;
++	struct usb_hcd	*hcd;
++	void __iomem *regs;
++	int ret = -ENODEV;
++	int irq;
++	int i;
++	char supply[7];
++	struct omap_hcd	*omap;
+ 
+ 	if (usb_disabled())
+ 		return -ENODEV;
+@@ -233,6 +240,33 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 	hcd->rsrc_len = resource_size(res);
+ 	hcd->regs = regs;
+ 
++	omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
++	omap->nports = pdata->nports;
 +
-+	pd_mfc: mfc-power-domain at 0x10044040 {
-+		compatible = "samsung,exynos4210-pd";
-+		reg = <0x10044040 0x20>;
-+	};
++	platform_set_drvdata(pdev, hcd);
 +
- 	gsc_0:  gsc at 0x13e00000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e00000 0x1000>;
- 		interrupts = <0 85 0>;
-+		samsung,power-domain = <&pd_gsc>;
- 	};
++	/* get the PHY devices if needed */
++	for (i = 0 ; i < omap->nports ; i++) {
++		struct usb_phy *phy;
++
++		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY)
++			continue;
++
++		/* get the PHY device */
++		phy = devm_usb_get_phy_dev(dev, i);
++		if (IS_ERR(phy) || !phy) {
++			ret = IS_ERR(phy) ? PTR_ERR(phy) : -ENODEV;
++			dev_err(dev, "Can't get PHY device for port %d: %d\n",
++					i, ret);
++			goto err_phy;
++		}
++
++		omap->phy[i] = phy;
++		usb_phy_init(omap->phy[i]);
++		/* bring PHY out of suspend */
++		usb_phy_set_suspend(omap->phy[i], 0);
++	}
++
+ 	/* get ehci regulator and enable */
+ 	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
+ 		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY) {
+@@ -277,6 +311,13 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ err_pm_runtime:
+ 	disable_put_regulator(pdata);
+ 	pm_runtime_put_sync(dev);
++
++err_phy:
++	for (i = 0; i < omap->nports; i++) {
++		if (omap->phy[i])
++			usb_phy_shutdown(omap->phy[i]);
++	}
++
+ 	usb_put_hcd(hcd);
  
- 	gsc_1:  gsc at 0x13e10000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e10000 0x1000>;
- 		interrupts = <0 86 0>;
-+		samsung,power-domain = <&pd_gsc>;
- 	};
+ 	return ret;
+@@ -293,13 +334,20 @@ err_pm_runtime:
+  */
+ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ {
+-	struct device *dev				= &pdev->dev;
+-	struct usb_hcd *hcd				= dev_get_drvdata(dev);
++	struct device *dev = &pdev->dev;
++	struct usb_hcd *hcd = dev_get_drvdata(dev);
++	struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
++	int i;
  
- 	gsc_2:  gsc at 0x13e20000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e20000 0x1000>;
- 		interrupts = <0 87 0>;
-+		samsung,power-domain = <&pd_gsc>;
- 	};
+ 	usb_remove_hcd(hcd);
+ 	disable_put_regulator(dev->platform_data);
+-	usb_put_hcd(hcd);
  
- 	gsc_3:  gsc at 0x13e30000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e30000 0x1000>;
- 		interrupts = <0 88 0>;
-+		samsung,power-domain = <&pd_gsc>;
- 	};
++	for (i = 0; i < omap->nports; i++) {
++		if (omap->phy[i])
++			usb_phy_shutdown(omap->phy[i]);
++	}
++
++	usb_put_hcd(hcd);
+ 	pm_runtime_put_sync(dev);
+ 	pm_runtime_disable(dev);
  
- 	hdmi {
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index e103c29..96f4a9f 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -61,6 +61,7 @@ config SOC_EXYNOS5250
- 	bool "SAMSUNG EXYNOS5250"
- 	default y
- 	depends on ARCH_EXYNOS5
-+	select PM_GENERIC_DOMAINS if PM
- 	select S5P_PM if PM
- 	select S5P_SLEEP if PM
- 	select S5P_DEV_MFC
 -- 
-1.7.5.4
+1.7.4.1
