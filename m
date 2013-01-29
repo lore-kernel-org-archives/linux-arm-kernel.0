@@ -1,77 +1,76 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jan 2013 06:18:57 -0800
-Subject: [GIT PULL] imx cleanup for 3.9
-In-Reply-To: <20130129072603.GL1906@pengutronix.de>
-References: <20130122144813.GD2812@S2101-09.ap.freescale.net>
- <20130128220026.GC3047@quad.lixom.net>
- <20130129010853.GA24352@S2101-09.ap.freescale.net>
- <20130129072603.GL1906@pengutronix.de>
-Message-ID: <20130129141857.GA12723@quad.lixom.net>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 29 Jan 2013 15:20:15 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130129140522.GA24310@arm.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130129132204.GA23886@arm.com> <20130129144522.44ed7373@skate>
+ <20130129140522.GA24310@arm.com>
+Message-ID: <20130129142015.GA23640@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 08:26:03AM +0100, Sascha Hauer wrote:
-> On Tue, Jan 29, 2013 at 09:08:55AM +0800, Shawn Guo wrote:
-> > On Mon, Jan 28, 2013 at 02:00:26PM -0800, Olof Johansson wrote:
-> > > Hi,
-> > > 
-> > > On Tue, Jan 22, 2013 at 10:48:15PM +0800, Shawn Guo wrote:
-> > > 
-> > > > Shawn Guo (4):
-> > > >       ARM: dts: imx: use nodes label in board dts
-> > > 
-> > > Hmm.
-> > > 
-> > > This patch is 1000 lines of pure churn. Sure, the style on OMAP is different,
-> > > but there's no clear benefit from it -- it's actually advantageous to see some
-> > > of the bus hierarchies even on the leaf-level board nodes.
-> > > 
-> > > Would you mind respinning with this left out, please? If you still want to
-> > > argue it to be included, we can do so, but I'd like to pick up the rest of the
-> > > branch meanwhile. :-)
+On Tue, Jan 29, 2013 at 02:05:22PM +0000, Andrew Murray wrote:
+> On Tue, Jan 29, 2013 at 01:45:22PM +0000, Thomas Petazzoni wrote:
+> > Dear Andrew Murray,
 > > 
-> > I will refresh the pull-request to leave it out, but meanwhile I'd like
-> > to argue too, as the approach has been agreed by IMX people and all the
-> > patches I queued on imx/dt are all in this way.  And I will move the
-> > patch to imx/dt branch instead, if you're not strongly against the
-> > approach.
+> > On Tue, 29 Jan 2013 13:22:04 +0000, Andrew Murray wrote:
 > > 
-> > The board level dts are mostly used to add/overwrite properties for
-> > nodes defined in soc dts.  Therefore, what people who look at board
-> > dts care about is those properties, not really which bus the nodes
-> > are on.  We go this way to have board dts focus on the things they
-> > are created for.  It's much easer to read and edit those properties.
+> > > > +static int __init mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+> > > > +{
+> > > 
+> > > [snip]
+> > > 
+> > > > +
+> > > > +       /*
+> > > > +        * Build an laddr array that describes the PCI device in a DT
+> > > > +        * way
+> > > > +        */
+> > > > +       laddr[0] = cpu_to_be32(port->devfn << 8);
+> > > > +       laddr[1] = laddr[2] = 0;
+> > > > +       intspec = cpu_to_be32(pin);
+> > > > +
+> > > > +       ret = of_irq_map_raw(port->dn, &intspec, 1, laddr, &oirq);
+> > > > +       if (ret) {
+> > > > +               dev_err(&pcie->pdev->dev,
+> > > > +                       "%s: of_irq_map_raw() failed, %d\n",
+> > > > +                       __func__, ret);
+> > > > +               return ret;
+> > > > +       }
+> > > 
+> > > Are you able to replace the above code with a call to of_irq_map_pci? I'm not
+> > > sure which approach is better. The of_irq_map_pci function doesn't require the
+> > > pin argument and instead uses the DT and/or performs its own pin swizzling. I
+> > > guess this means that if there are PCIe devices in the DT tree that does any
+> > > thing strange with pins then it would be reflected in the IRQ you get. I've
+> > > found that you will also need to provide an implementation of
+> > > pcibios_get_phb_of_node for this to work correctly (see my RFC bios32 patch).
 > > 
-> > I'm not sure why it's important to maintain the bus topology in board
-> > dts while we have the full one in soc dts.  In the current way, people
-> > sometimes have to reassemble 3 or more levels bus hierarchies for only
-> > overwriting one property for one node.  
+> > I did try using the of_irq_map_pci() function, but unfortunately, it
+> > didn't work. IIRC, it didn't work because none of the pci_dev in my PCI
+> > tree had any 'struct device_node' associated to them, or at least not
+> > the one that had the right pdev->bus->number and pdev->devfn.
 > > 
-> > I'm pretty sure that people who work on board level dts would vote for
-> > this way.  It makes their life easier without increasing the
-> > maintainer's burden.  So why not?
+> > But, I guess that your patch that implements pcibios_get_phb_of_node()
+> > should fix this problem. I'll try this. Thanks!
 > 
-> I'm with Shawn here. With this board layout I'm now able to write board
-> dts files without looking much at the dtsi file at all. It's debatable
-> if existing boards have to be changed to use this layout, but since
-> people copy-paste all the time changing it increases the chance they
-> copy the right stuff.
+> My bios32 patch departs slightly from your v2 04/27 patch in that it updates
+> hw_pci to contain a device node rather than opaque private data and my
+> pcibios_get_phb_of_node implementation relies on this. If you wanted to stick
+> with the implementation you and Thierry share then you'd have to find another
+> way to get to the device node from the void **private_data.
 
-Ok. Just to make clear: While I personally prefer the regular way of specifying
-the board dts files, my main concern with this patch is that it is _pure
-churn_. It's 1000 lines of change without a functional benefit, and without
-really being a cleanup that benefits long-term development.
+If at all possible I think the right thing to do is reuse the generic
+pcibios_get_phb_of_node() implementation. On Tegra this turned out to
+require a minimal change to the DT bindings of the root port nodes to
+make sure they provide the correct address in the reg property.
 
-We're starting to get more comments about the volume of churn again (Linus made
-a couple of them the last merge window), and I'd rather be a bit more
-conservative on some of the larger changes that lack strong benefit for
-a release or two, than have him get ticked off and make life miserable for all
-of us.
-
-So, I'm not saying that it's a bad idea to change to labels, but I would rather
-hold off this while we give some of the remaining platforms still not
-multiplatform-enabled a chance to "use the churn quota" since they will need it
-for include file moves, etc, etc.
-
-
--Olof
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/47c1c5ce/attachment.sig>
