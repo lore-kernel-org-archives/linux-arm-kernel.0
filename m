@@ -1,161 +1,37 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 29 Jan 2013 11:50:32 +0200
-Subject: [PATCH v3 10/30] USB: ehci-omap: Use PHY APIs to get the PHY device
- and put it out of suspend
-In-Reply-To: <1359372631-8180-11-git-send-email-rogerq@ti.com>
-References: <1359372631-8180-11-git-send-email-rogerq@ti.com>
-Message-ID: <1359453032-20604-1-git-send-email-rogerq@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 29 Jan 2013 11:51:58 +0200
+Subject: [PATCH 2/2] clk: tegra: adapt tegra periph clk to mux table/mask
+In-Reply-To: <5106AC31.1040207@wwwdotorg.org>
+References: <1359388467-32386-1-git-send-email-pdeschrijver@nvidia.com>
+ <1359388467-32386-3-git-send-email-pdeschrijver@nvidia.com>
+ <5106AC31.1040207@wwwdotorg.org>
+Message-ID: <20130129095158.GS4118@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For each port that is in PHY mode we obtain a PHY device using the USB PHY
-library and put it out of suspend.
+On Mon, Jan 28, 2013 at 05:49:53PM +0100, Stephen Warren wrote:
+> On 01/28/2013 08:54 AM, Peter De Schrijver wrote:
+> > The tegra peripheral clock type uses struct clk_mux directly, so it needs to
+> > be updated to handle the new mask and table fields. Also the macros need
+> > to be updated
+> 
+> Just a quick note on patch dependencies here:
+> 
+> Patch 1/2 can presumably be taken through the clk tree whenever Mike is
+> OK with it.
+> 
+> Patch 2/2 depends on patches in the Tegra tree for 3.9. Since patch 2/2
+> is useful mostly for the Tegra114 clock driver, and I don't imagine that
+> will get posted/merged in time for 3.9, it's probably easiest to just
+> take patch 2/2 for 3.10 along with the Tegra114 clock driver. Also, I
+> imagine there won't be any more clk/Tegra tree dependencies in 3.10, so
+> patch 2/2 and the Tegra114 clk driver patches can likely go through the
+> clk tree itself for 3.10.
 
-It is up to platform code to associate the PHY to the controller's
-port and it is upto the PHY driver to manage the PHY's resources.
+No. Because 1/2 changes struct clk_mux and the tegra peripheral clock type 
+uses struct clk_mux directly, 2/2 needs to be applied together with 1/2, even
+if the new functionality is not yet used.
 
-Also remove wired spacing around declarations we come across.
+Cheers,
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- drivers/usb/host/ehci-omap.c |   76 ++++++++++++++++++++++++++++++++++--------
- 1 files changed, 62 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-index fd2f5450..ddc31fb 100644
---- a/drivers/usb/host/ehci-omap.c
-+++ b/drivers/usb/host/ehci-omap.c
-@@ -4,10 +4,11 @@
-  * Bus Glue for the EHCI controllers in OMAP3/4
-  * Tested on several OMAP3 boards, and OMAP4 Pandaboard
-  *
-- * Copyright (C) 2007-2011 Texas Instruments, Inc.
-+ * Copyright (C) 2007-2013 Texas Instruments, Inc.
-  *	Author: Vikram Pandita <vikram.pandita@ti.com>
-  *	Author: Anand Gadiyar <gadiyar@ti.com>
-  *	Author: Keshava Munegowda <keshava_mgowda@ti.com>
-+ *	Author: Roger Quadros <rogerq@ti.com>
-  *
-  * Copyright (C) 2009 Nokia Corporation
-  *	Contact: Felipe Balbi <felipe.balbi@nokia.com>
-@@ -70,6 +71,10 @@ static const char hcd_name[] = "ehci-omap";
- 
- /*-------------------------------------------------------------------------*/
- 
-+struct omap_hcd {
-+	struct usb_phy *phy[OMAP3_HS_USB_PORTS]; /* one PHY for each port */
-+	int nports;
-+};
- 
- static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
- {
-@@ -178,7 +183,8 @@ static void disable_put_regulator(
- static struct hc_driver __read_mostly ehci_omap_hc_driver;
- 
- static const struct ehci_driver_overrides ehci_omap_overrides __initdata = {
--	.reset =		omap_ehci_init,
-+	.reset = omap_ehci_init,
-+	.extra_priv_size = sizeof(struct omap_hcd),
- };
- 
- /**
-@@ -190,15 +196,16 @@ static const struct ehci_driver_overrides ehci_omap_overrides __initdata = {
-  */
- static int ehci_hcd_omap_probe(struct platform_device *pdev)
- {
--	struct device				*dev = &pdev->dev;
--	struct usbhs_omap_platform_data		*pdata = dev->platform_data;
--	struct resource				*res;
--	struct usb_hcd				*hcd;
--	void __iomem				*regs;
--	int					ret = -ENODEV;
--	int					irq;
--	int					i;
--	char					supply[7];
-+	struct device *dev = &pdev->dev;
-+	struct usbhs_omap_platform_data *pdata = dev->platform_data;
-+	struct resource	*res;
-+	struct usb_hcd	*hcd;
-+	void __iomem *regs;
-+	int ret = -ENODEV;
-+	int irq;
-+	int i;
-+	char supply[7];
-+	struct omap_hcd	*omap;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -233,6 +240,33 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- 	hcd->rsrc_len = resource_size(res);
- 	hcd->regs = regs;
- 
-+	omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
-+	omap->nports = pdata->nports;
-+
-+	platform_set_drvdata(pdev, hcd);
-+
-+	/* get the PHY devices if needed */
-+	for (i = 0 ; i < omap->nports ; i++) {
-+		struct usb_phy *phy;
-+
-+		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY)
-+			continue;
-+
-+		/* get the PHY device */
-+		phy = devm_usb_get_phy_dev(dev, i);
-+		if (IS_ERR(phy) || !phy) {
-+			ret = IS_ERR(phy) ? PTR_ERR(phy) : -ENODEV;
-+			dev_err(dev, "Can't get PHY device for port %d: %d\n",
-+					i, ret);
-+			goto err_phy;
-+		}
-+
-+		omap->phy[i] = phy;
-+		usb_phy_init(omap->phy[i]);
-+		/* bring PHY out of suspend */
-+		usb_phy_set_suspend(omap->phy[i], 0);
-+	}
-+
- 	/* get ehci regulator and enable */
- 	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
- 		if (pdata->port_mode[i] != OMAP_EHCI_PORT_MODE_PHY) {
-@@ -277,6 +311,13 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
- err_pm_runtime:
- 	disable_put_regulator(pdata);
- 	pm_runtime_put_sync(dev);
-+
-+err_phy:
-+	for (i = 0; i < omap->nports; i++) {
-+		if (omap->phy[i])
-+			usb_phy_shutdown(omap->phy[i]);
-+	}
-+
- 	usb_put_hcd(hcd);
- 
- 	return ret;
-@@ -293,13 +334,20 @@ err_pm_runtime:
-  */
- static int ehci_hcd_omap_remove(struct platform_device *pdev)
- {
--	struct device *dev				= &pdev->dev;
--	struct usb_hcd *hcd				= dev_get_drvdata(dev);
-+	struct device *dev = &pdev->dev;
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct omap_hcd *omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
-+	int i;
- 
- 	usb_remove_hcd(hcd);
- 	disable_put_regulator(dev->platform_data);
--	usb_put_hcd(hcd);
- 
-+	for (i = 0; i < omap->nports; i++) {
-+		if (omap->phy[i])
-+			usb_phy_shutdown(omap->phy[i]);
-+	}
-+
-+	usb_put_hcd(hcd);
- 	pm_runtime_put_sync(dev);
- 	pm_runtime_disable(dev);
- 
--- 
-1.7.4.1
+Peter.
