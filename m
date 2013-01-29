@@ -1,57 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jan 2013 10:50:23 +0000
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 29 Jan 2013 12:54:46 +0200
 Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <1359445171.31148.30.camel@smile>
+In-Reply-To: <CAKohpo=rD9=dEaPkKYcj55K4_ebdnU7qjv2TZBUwqHAB+Kk+aw@mail.gmail.com>
 References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
  <1359410300-26113-2-git-send-email-arnd@arndb.de>
- <1359445171.31148.30.camel@smile>
-Message-ID: <201301291050.23743.arnd@arndb.de>
+ <CAKohpomO6tYNYLdMOaJYgqGecXj5KMQprdb=gExi+QuGrtLTzw@mail.gmail.com>
+ <201301291035.30265.arnd@arndb.de>
+ <CAKohpo=rD9=dEaPkKYcj55K4_ebdnU7qjv2TZBUwqHAB+Kk+aw@mail.gmail.com>
+Message-ID: <1359456886.31148.37.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(putting back the Cc list, I assumed you dropped them accidentally)
+On Tue, 2013-01-29 at 16:19 +0530, Viresh Kumar wrote: 
+> On 29 January 2013 16:05, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 29 January 2013, Viresh Kumar wrote:
 
-On Tuesday 29 January 2013, Andy Shevchenko wrote:
-> On Mon, 2013-01-28 at 21:58 +0000, Arnd Bergmann wrote: 
-> > -	if ((last_dw == dw) && (last_bus_id == param))
-> > +	/* both the driver and the device must match */
-> > +        if (chan->device->dev->driver != &dw_driver.driver)
+> >> > +       /* FIXME: This binding is rather clumsy. Can't we use the
+> >> > +          request line numbers here instead? */
+> >>
+> >> yes.
+> >
+> > Ok, Very good. What is the encoding of the registers then?
 > 
-> Could we somehow pass the &.driver to the generic filter function (via
-> *_dma_controller_register() ? ) and do this to each DMA driver?
-
-My hope is still that we can avoid using filter functions entirely
-when we use xlate() logic, and instead just go through the channels
-of the dma engine we know we are looking at.
-
-I would also assume that the argument passed to *_dma_controller_register
-normally holds a pointer to the dma device. Now that I think about it,
-the check 'if (dw != fargs->dw)' already implies that we are looking
-at the correct driver, but it feels dirty to cast a random dma_device
-pointer to a driver specific one before we know which driver it is
-for.
-
-However, since we have a valid pointer to a dw_dma object, we can
-extract the driver from there:
-
-	struct dw_dma_filter_args *fargs = param;
-	struct dma_device *ddev = &fargs->dw->dma;
-	if (dma != chan->device)
-		return -EINVAL;
-
-which is simpler and cleaner that what I had.
-
-> > +	sd->dma_dev	= dw->dma.dev;
-> > +	sd->cfg_hi	= fargs->cfg_hi;
-> > +	sd->cfg_lo	= fargs->cfg_lo;
-> > +	sd->src_master	= fargs->src;
-> > +	sd->dst_master	= fargs->dst;
+> You can still keep fargs as is and just fill them as:
 > 
-> Could we use fargs structure directly?
+>        fargs.cfg_lo = 0;
+> 
+> if (DMA_TO_DEV)
+>        // dest is periph
+>        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 11;
+> else if (DEV_TO_DMA)
+>        // src is periph
+>        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 7;
 
-We could probably have no fargs but use the dw_dma_slave structure
-directly to pass the data, if cannot figure out a way to avoid
-the need for a filter function.  I thought about doing that, but
-intermediate versions of my patch had a different layout here.
+We have macros for such shifts.
 
-	Arnd
+drivers/dma/dw_dmac.c:187:   cfghi = DWC_CFGH_DST_PER(...
+drivers/dma/dw_dmac.c:189:   cfghi = DWC_CFGH_SRC_PER(...
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
