@@ -1,47 +1,55 @@
 From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Tue, 29 Jan 2013 13:08:50 +0530
-Subject: [PATCH V2 2/6] ARM: davinci: da850: add OF_DEV_AUXDATA entry for I2C0
+Date: Tue, 29 Jan 2013 13:08:52 +0530
+Subject: [PATCH V2 4/6] mfd: tps6507x: add device-tree support.
 In-Reply-To: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
 References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
-Message-ID: <1359445134-13323-3-git-send-email-manishv.b@ti.com>
+Message-ID: <1359445134-13323-5-git-send-email-manishv.b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OF_DEV_AUXDATA for I2C0 controller driver in da850 board
-dt file to use I2C0 clock.
+Add device tree based initialization support for TI's
+tps6507x mfd device.
 
 Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
 ---
 Changes since V1:
- - updated name for auxdata lookup
-   da850_evm_auxdata_lookup -> da850_auxdata_lookup
+ - updated subject line for commit.
 
-:100644 100644 37c27af... 95ca4e9... M	arch/arm/mach-davinci/da8xx-dt.c
- arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+:100644 100644 409afa2... 5ad4b77... M	drivers/mfd/tps6507x.c
+ drivers/mfd/tps6507x.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 37c27af..95ca4e9 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
- 	of_irq_init(da8xx_irq_match);
- }
+diff --git a/drivers/mfd/tps6507x.c b/drivers/mfd/tps6507x.c
+index 409afa2..5ad4b77 100644
+--- a/drivers/mfd/tps6507x.c
++++ b/drivers/mfd/tps6507x.c
+@@ -19,6 +19,7 @@
+ #include <linux/init.h>
+ #include <linux/slab.h>
+ #include <linux/i2c.h>
++#include <linux/of_device.h>
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/tps6507x.h>
  
-+struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
-+	{}
+@@ -116,11 +117,19 @@ static const struct i2c_device_id tps6507x_i2c_id[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, tps6507x_i2c_id);
+ 
++#ifdef CONFIG_OF
++static struct of_device_id tps6507x_of_match[] = {
++	{.compatible = "ti,tps6507x", },
++	{},
 +};
-+
- #ifdef CONFIG_ARCH_DAVINCI_DA850
++MODULE_DEVICE_TABLE(of, tps6507x_of_match);
++#endif
  
- static void __init da850_init_machine(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+				da850_auxdata_lookup, NULL);
- 
- 	da8xx_uart_clk_enable();
- }
+ static struct i2c_driver tps6507x_i2c_driver = {
+ 	.driver = {
+ 		   .name = "tps6507x",
+ 		   .owner = THIS_MODULE,
++		   .of_match_table = of_match_ptr(tps6507x_of_match),
+ 	},
+ 	.probe = tps6507x_i2c_probe,
+ 	.remove = tps6507x_i2c_remove,
 -- 
 1.7.4.1
