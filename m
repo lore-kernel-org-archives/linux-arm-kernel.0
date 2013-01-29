@@ -1,42 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Jan 2013 23:54:13 +0100
-Subject: [PATCH 1/3] pinctrl: sunxi: Add of_xlate function
-In-Reply-To: <CACRpkdZi0zCNf6LDd9UAcd57kFqqWyteVqxL8WfDrFfrt9_5sQ@mail.gmail.com>
-References: <1359313332-12305-1-git-send-email-maxime.ripard@free-electrons.com>
- <1359313332-12305-2-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdZi0zCNf6LDd9UAcd57kFqqWyteVqxL8WfDrFfrt9_5sQ@mail.gmail.com>
-Message-ID: <51085315.2000302@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jan 2013 22:54:00 +0000
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+In-Reply-To: <20130129213308.7e845064@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301292015.21478.arnd@arndb.de> <20130129213308.7e845064@skate>
+Message-ID: <201301292254.01069.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/01/2013 23:41, Linus Walleij a ?crit :
-> On Sun, Jan 27, 2013 at 8:02 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
+On Tuesday 29 January 2013, Thomas Petazzoni wrote:
+> Does this still allows me to give the Linux PCI one global range of
+> addresses for I/O space, and one global range of addresses for memory
+> space, and the the Linux PCI core assign ranges, within those global
+> ranges, to each host bridge?
 > 
->> Since the pin controller of sunxi chips is represented as a single bank
->> in the driver.
->> Since this is neither convenient nor represented that way in the
->> datasheets, define a custom of_xlate function with the layout <bank pin
->> flag>
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> This is absolutely essential for me, as I then read those allocated
+> ranges to configure the address decoding windows.
 > 
-> This does not apply and I only have 1/3 it seems?
+> Basically, I have currently two suggestions:
 > 
-> Sorry, help me understand which order these patches go in...
+>  * From Jason Gunthorpe, to not use any host bridge, and instead use
+>    only PCI-to-PCI bridges, one per PCIe interface.
+> 
+>  * From you, to not use any PCI-to-PCI bridge, and use only host
+>    bridges, one per PCIe interface.
+> 
+> Would it be possible to get some consensus on this? In the review of
+> RFCv1, I was already told to use one global host bridge, and then one
+> PCI-to-PCI bridge per PCIe interface, and now we're talking about doing
+> something different. I'd like to avoid having to try gazillions of
+> different possible implementations :-)
 
-My bad, I forgot to mention the order of the patchsets, and to cc you
-for the all series... Sorry about that.
+I'm actually fine with either of the two suggestions you mentioned above,
+whichever is easier to implement and/or more closely matches what the
+hardware actually implements is better IMHO.
 
-This patch should come after the patch series that adds the support for
-the A10 SoCs in the pinctrl driver.
+The part that I did not like about having emulated PCI-to-PCI bridges
+is that it seems to just work around a (percieved or real) limitation
+in the Linux kernel by adding a piece of infrastructure, rather than
+lifting that limitation by making the kernel deal with what the
+hardware provides. That reminded me of the original mach-vt8500
+PCI implementation that faked a complete PCI host bridge and a
+bunch of PCI devices on it, in order to use the via-velocity
+ethernet controller, instead of adding a simple 'platform_driver'
+struct to that driver.
 
-Do you want me to resend this serie and cc you?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
