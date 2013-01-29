@@ -1,109 +1,41 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 29 Jan 2013 10:47:09 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130129055508.GA3339@obsidianresearch.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
-Message-ID: <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 29 Jan 2013 09:50:28 -0800
+Subject: [GIT PULL] imx6q cpuidle for 3.9
+In-Reply-To: <20130129054635.GA21504@S2101-09.ap.freescale.net>
+References: <20130129054635.GA21504@S2101-09.ap.freescale.net>
+Message-ID: <20130129175028.GC17935@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 10:55 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Mon, Jan 28, 2013 at 08:29:24PM -0700, Bjorn Helgaas wrote:
->> On Mon, Jan 28, 2013 at 11:56 AM, Thomas Petazzoni
->> <thomas.petazzoni@free-electrons.com> wrote:
->> > This driver implements the support for the PCIe interfaces on the
->> > Marvell Armada 370/XP ARM SoCs. In the future, it might be extended to
->> > cover earlier families of Marvell SoCs, such as Dove, Orion and
->> > Kirkwood.
->> >
->> > The driver implements the hw_pci operations needed by the core ARM PCI
->> > code to setup PCI devices and get their corresponding IRQs, and the
->> > pci_ops operations that are used by the PCI core to read/write the
->> > configuration space of PCI devices.
->> >
->> > Since the PCIe interfaces of Marvell SoCs are completely separate and
->> > not linked together in a bus, this driver sets up an emulated PCI host
->> > bridge, with one PCI-to-PCI bridge as child for each hardware PCIe
->> > interface.
->>
->> There's no Linux requirement that multiple PCIe interfaces appear to
->> be in the same hierarchy.  You can just use pci_scan_root_bus()
->> separately on each interface.  Each interface can be in its own domain
->> if necessary.
->
-> What you suggest is basically what the Marvell driver did originally,
-> the probelm is that Linux requires a pre-assigned aperture for each
-> PCI domain/root bus, and these new chips have so many PCI-E ports that
-> they can exhaust the physical address space, and also a limited
-> internal HW resource for setting address routing.
->
-> Thus they require resource allocation that is sensitive to the devices
-> present downstream.
->
-> By far the simplest solution is to merge all the physical links into a
-> single domain and rely on existing PCI resource allocation code to
-> drive allocation of scarce physical address space and demand allocate
-> the HW routing resource (specifically there are enough resources to
-> accomidate MMIO only devices on every bus, but not enough to
-> accomidate MMIO and IO on every bus).
->
->> > +/*
->> > + * For a given PCIe interface (represented by a mvebu_pcie_port
->> > + * structure), we read the PCI configuration space of the
->> > + * corresponding PCI-to-PCI bridge in order to find out which range of
->> > + * I/O addresses and memory addresses have been assigned to this PCIe
->> > + * interface. Using these informations, we set up the appropriate
->> > + * address decoding windows so that the physical address are actually
->> > + * resolved to the right PCIe interface.
->> > + */
->>
->> Are you inferring the host bridge apertures by using the resources
->> assigned to devices under the bridge, i.e., taking the union of all
->
-> The flow is different, a portion of physical address space is set
-> aside for use by PCI-E (via DT) and that portion is specified in the
-> struct resource's ultimately attached to the PCI domain for the bus
-> scan. You could call that the 'host bridge aperture' though it doesn't
-> reflect any HW configuration at all. The values come from the device
-> tree.
+On Tue, Jan 29, 2013 at 01:46:37PM +0800, Shawn Guo wrote:
+> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+> 
+>   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx6q-cpudile-3.9
+> 
+> for you to fetch changes up to e510aafde64a3fdd741f598e4d2be3c079bf5b0e:
+> 
+>   ARM: imx6q: support WAIT mode using cpuidle (2013-01-29 13:41:42 +0800)
+> 
+> ----------------------------------------------------------------
+> It's imx6q cpuidle series for 3.9.
+> 
+> ----------------------------------------------------------------
+> Shawn Guo (4):
+>       ARM: imx: return zero in case next event gets a large increment
+>       ARM: imx: mask gpc interrupts initially
+>       ARM: imx: move imx6q_cpuidle_driver into a separate file
+>       ARM: imx6q: support WAIT mode using cpuidle
 
-I think I would understand this better if we had a concrete example to
-talk about, say a dmesg log and corresponding lspci -v output.
+This has some small conflicts with the cleanup branch. Can you please base it
+on top of cleanup so we can avoid the merge conflicts when things go upstream?
+It's common to have the per-soc cleanup branches as bases for some of the
+feature branches just for this reason.
 
-As I understand it, the DT is a description of the hardware, so in
-that sense, the DT can't set aside physical address space.  It can
-describe what the hardware does with the address space, and I assume
-that's what you mean.  Maybe the hardware isn't configurable, e.g., it
-is hard-wired to route certain address ranges to PCIe?
 
-> During the bus scan the Linux core code splits up that contiguous
-> space and assigns to the PCI-PCI bridges and devices under that domain.
->
-> Each physical PCI-E link on the chip is seen by Linux through the SW
-> emulated PCI-PCI bridge attached to bus 0. When Linux configures the
-> bridge windows it triggers this code here to copy that window
-> information from the PCI config space into non-standard internal HW
-> registers.
->
-> The purpose of the SW PCI-PCI bridge and this code here is to give
-> the Linux PCI core control over the window (MMIO,IO,busnr) assigned
-> to the PCI-E link.
->
-> This arrangement with PCI-PCI bridges controlling address routing is
-> part of the PCI-E standard, in this instance Marvell did not implement
-> the required config space in HW so the driver is working around that
-> deficiency.
->
-> Other drivers, like tegra have a similar design, but their hardware
-> does implement PCI-PCI bridge configuration space and does drive
-> address decoding through the HW PCI-PCI window registers.
->
-> Having PCI-E links be bridges, not domains/root_bus's is in-line with
-> the standard and works better with the Linux PCI resource allocator.
->
-> Jason
+Thanks!
+
+-Olof
