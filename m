@@ -1,89 +1,56 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 29 Jan 2013 15:56:56 +0900
-Subject: [PATCH v3 0/3] introduce static_vm for ARM-specific static
- mapped area
-In-Reply-To: <alpine.LFD.2.02.1301281300250.6300@xanadu.home>
-References: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
- <20130128175106.GI23470@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1301281300250.6300@xanadu.home>
-Message-ID: <20130129065656.GC5131@lge.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 29 Jan 2013 07:56:46 +0100
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <20130128182818.GC9436@obsidianresearch.com>
+References: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
+ <1359283223-23082-2-git-send-email-gmbnomis@gmail.com>
+ <510506F9.3070500@gmail.com> <20130127110857.GA23687@schnuecks.de>
+ <51053761.1020009@gmail.com>
+ <20130127144610.GW1758@titan.lakedaemon.net>
+ <51053F81.6020904@gmail.com>
+ <20130128182818.GC9436@obsidianresearch.com>
+Message-ID: <20130129065646.GO29973@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 01:04:24PM -0500, Nicolas Pitre wrote:
-> On Mon, 28 Jan 2013, Will Deacon wrote:
+On Mon, Jan 28, 2013 at 11:28:18AM -0700, Jason Gunthorpe wrote:
+> On Sun, Jan 27, 2013 at 03:53:53PM +0100, Sebastian Hesselbarth wrote:
 > 
-> > Hello,
-> > 
-> > On Thu, Jan 24, 2013 at 01:28:51AM +0000, Joonsoo Kim wrote:
-> > > In current implementation, we used ARM-specific flag, that is,
-> > > VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
-> > > The purpose of static mapped area is to re-use static mapped area when
-> > > entire physical address range of the ioremap request can be covered
-> > > by this area.
-> > > 
-> > > This implementation causes needless overhead for some cases.
-> > > For example, assume that there is only one static mapped area and
-> > > vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
-> > > deciding whether it is matched or not. Moreover, even if there is
-> > > no static mapped area and vmlist has 300 areas, every time we call
-> > > ioremap, we check 300 areas in now.
-> > > 
-> > > If we construct a extra list for static mapped area, we can eliminate
-> > > above mentioned overhead.
-> > > With a extra list, if there is one static mapped area,
-> > > we just check only one area and proceed next operation quickly.
-> > > 
-> > > In fact, it is not a critical problem, because ioremap is not frequently
-> > > used. But reducing overhead is better idea.
-> > > 
-> > > Another reason for doing this work is for removing vm_struct list management,
-> > > entirely. For more information, look at the following link.
-> > > http://lkml.org/lkml/2012/12/6/184
-> > 
-> > First patch looks good (removing the unused vmregion stuff) but I'm not so
-> > sure about the rest of it. If you really care about ioremap performance,
-> > perhaps it would be better to have a container struct around the vm_struct
-> > for static mappings and then stick them in an augmented rbtree so you can
-> > efficiently find the mapping encompassing a particular physical address?
+> > I just want Simon to confirm that Kirkwood's gbe is really loosing the
+> > contents of its MAC address registers during gated clocks, which is from
+> > a HW point of view very unlikely.
 > 
-> How can ioremap performance be a problem is the question I had since the 
-> beginning.
-> 
-> Firstly, ioremap is _not_ meant to be used in performance critical 
-> paths.
-> 
-> Secondly, there shouldn't be _that_ many entries on the vmlist such as 
-> 300.  That sounds a bit excessive.
-> 
-> So please, can we discuss the reasons that motivated those patches in 
-> the first place?  Maybe that's where the actual problem is.
+> FWIW, there are two block power management controls on the kirkwood
+> chips, one is documented to a clock gate, and one is documented to a
+> be a power down.
 
-Hello, Wiil and Nicolas.
-First of all, thanks for reviewing.
+Hi Jason
 
-There is another reason for doing this work.
-As mentioned above, I try to remove list management for vm_struct(vmlist),
-entirely. For that purpose, removing architecture dependency against vmlist
-is needed. Below link is for my RFC patch trying to remove list management
-for vm_struct.
+Are you referring to 
 
-http://lkml.org/lkml/2012/12/6/184
+Memory Power Management Control Register
+Offset: 0x20118
 
-Removing dependency for other architectures is rather trivial, but for ARM,
-it is not trivial case. So I prepared this patchset.
-My description makes you missleading possibly.
-Sorry for this.
+Bit Field Type / Init Val Description
+0 GE0_Mem_PD RW GbE0 Memory Power Down:
+                 0x0 0 = Functional
+                     1 = PowerDown
+1 PEX0_Mem_PD RW PCI Express0 Memory Power Down;
+                 0x0 0 = Functional
+                     1 = PowerDown
+2 USB0_Mem_PD RW USB0 Memory Power Down:
+                 0x0 0 = Functional
+                     1 = PowerDown
 
-Answer for your other questions is below.
+etc.
 
-I know ioremap is _not_ meant to be used in performance critical paths, and
-I mentioned it earlier.
-"In fact, it is not a critical problem, because ioremap is not frequently used.
-But reducing overhead is better idea."
+> I wouldn't expect the clock gate to have a problem
+> with the MAC address, but the powerdown I would expect to wipe it..
 
-And, there are many entries on the vmlist for my test devices(Android phone).
-I saw more than 300 entries in former days, but today, I re-check it and
-find 230~250 entries.
+As far as i know, we don't touch it. However, as a debug exercise, it
+would be good to print its value at boot, at ethernet driver load
+time, after unused clocks are disabled, when the ethernet clock is
+enabled by the driver, etc.
 
-Thanks.
+	Andrew
