@@ -1,61 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Jan 2013 16:48:57 +0100
-Subject: [PATCH 4/5] net: mvmdio: allow Device Tree and platform device
- to coexist
-In-Reply-To: <1359473048-26551-5-git-send-email-florian@openwrt.org>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1359473048-26551-5-git-send-email-florian@openwrt.org>
-Message-ID: <20130129164857.0ddcddf4@skate>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 29 Jan 2013 13:49:13 -0200
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Add VPU support
+In-Reply-To: <1359474553-8949-1-git-send-email-fabio.estevam@freescale.com>
+References: <1359474553-8949-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1359474553-8949-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Florian Fainelli,
+Let the VPU driver be built by default.
 
-On Tue, 29 Jan 2013 16:24:07 +0100, Florian Fainelli wrote:
-> This patch changes the Marvell MDIO driver to be registered by using
-> both Device Tree and platform device methods. The driver voluntarily
-> does not use devm_ioremap() to share the same error path for Device Tree
-> and non-Device Tree cases.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Not sure why you think devm_ioremap() can't be used here. Maybe I'm
-missing something, but could you explain? If you use devm_ioremap(),
-then basically you don't need to do anything in the error path
-regarding to the I/O mapping... since it's the whole purpose of the
-devm_*() stuff to automagically undo things in the error case, and in
-the ->remove() code.
-
-> -	dev->err_interrupt = irq_of_parse_and_map(pdev->dev.of_node, 0);
-> +	if (pdev->dev.of_node) {
-> +		dev->regs = of_iomap(pdev->dev.of_node, 0);
-> +		if (!dev->regs) {
-> +			dev_err(&pdev->dev, "No SMI register address given in DT\n");
-> +			ret = -ENODEV;
-> +			goto out_free;
-> +		}
-> +
-> +		dev->err_interrupt = irq_of_parse_and_map(pdev->dev.of_node, 0);
-> +	} else {
-> +		r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +		dev->regs = ioremap(r->start, resource_size(r));
-> +		if (!dev->regs) {
-> +			dev_err(&pdev->dev, "No SMI register address given\n");
-> +			ret = -ENODEV;
-> +			goto out_free;
-> +		}
-> +
-> +		dev->err_interrupt = platform_get_irq(pdev, 0);
-> +	}
-
-I think you can do a devm_ioremap() and a platform_get_irq() in both
-cases here, and therefore keep the code common between the DT case and
-the !DT case.
-
-Thanks,
-
-Thomas
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 6966713..83822d9 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -160,6 +160,8 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_VIDEO_MX3=y
++CONFIG_V4L_MEM2MEM_DRIVERS=y
++CONFIG_VIDEO_CODA=y
+ CONFIG_FB=y
+ CONFIG_LCD_PLATFORM=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
