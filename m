@@ -1,36 +1,48 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 29 Jan 2013 16:13:46 -0500
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130129195427.GB30831@schnuecks.de>
-References: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
- <1359283223-23082-2-git-send-email-gmbnomis@gmail.com>
- <510506F9.3070500@gmail.com>
- <20130128182218.GB9436@obsidianresearch.com>
- <20130128194656.GL1758@titan.lakedaemon.net>
- <20130129195427.GB30831@schnuecks.de>
-Message-ID: <20130129211346.GH7717@titan.lakedaemon.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 29 Jan 2013 21:13:52 +0000 (UTC)
+Subject: [PATCH 06/10] ARM: OMAP2+: powerdomain/clockdomain: add a
+ per-powerdomain spinlock
+In-Reply-To: <CAORVsuU3f9sf5Z3cVNeJbEKwc_VPpyYv2LfbXtehaMJRN7wARA@mail.gmail.com>
+References: <20121209011755.19716.25244.stgit@dusk.lan>
+ <20121209012340.19716.62316.stgit@dusk.lan>
+ <CAORVsuU3f9sf5Z3cVNeJbEKwc_VPpyYv2LfbXtehaMJRN7wARA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1301292101230.11442@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 08:54:27PM +0100, Simon Baatz wrote:
-> On Mon, Jan 28, 2013 at 02:46:56PM -0500, Jason Cooper wrote:
-> > Simon,
-> > 
-> > Can you try this in conjunction with enabling ARM_ATAG_DTB_COMPAT ?
-> > Does that solve your issue?
-> 
-> I use
-> 
-> CONFIG_ARM_ATAG_DTB_COMPAT=y
-> CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-> 
-> in my standard configuration already. I don't use the original U-Boot
-> that came with the device, but a mainline one which supports my box.
+Hi
 
-Ahh, I thought you were using the stock bootloader that came with the
-device.  Thanks for clearing that up.
+On Wed, 12 Dec 2012, Jean Pihet wrote:
 
-thx,
+> On Sun, Dec 9, 2012 at 2:23 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> 
+> > Add a per-powerdomain spinlock.  Use that instead of the clockdomain
+> > spinlock.  Add pwrdm_lock()/pwrdm_unlock() functions to allow other
+> > code to acquire or release the powerdomain spinlock without reaching
+> > directly into the struct powerdomain.
+> >
+> Since clockdomains are part of powerdomains it seems weird for the
+> clockdomain code to take a powerdoamin lock.
 
-Jason.
+Why?
+
+> Is there a reason why the powerdomain could not take the lock before
+> calling the clockdomain functions?
+
+Do you mean "is there a reason why the powerdomain _code_ could not take 
+the lock"?  If so, the reason is that code other than the powerdomain code 
+calls the clkdm_* functions directly, without calling any powerdomain 
+functions first.  So there's really no other place to take the lock unless 
+the callers are updated to take the powerdomain lock themselves.  That 
+seems like something to avoid if the caller doesn't have any other 
+relationship to the powerdomain code.
+
+> Also, are the lock and nolock version the clockdomain function needed?
+
+Did you have a different solution in mind?  The two versions are used for 
+code that needs to be called from two contexts: the first with the 
+powerdomain's lock already held; the second needing to acquire the 
+powerdomain's lock to avoid racing against other PRCM code.
+
+
+- Paul
