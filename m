@@ -1,7 +1,7 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 29 Jan 2013 18:32:59 +0000
-Subject: [GIT PULL] vexpress: fixes for v3.9
-Message-ID: <1359484379.8090.25.camel@hornet>
+Date: Tue, 29 Jan 2013 18:34:10 +0000
+Subject: [GIT PULL] vexpress: drivers for v3.9
+Message-ID: <1359484450.8090.27.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,30 @@ The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
 
 are available in the git repository at:
 
-  git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/fixes-for-3.9
+  git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/drivers-for-3.9
 
-for you to fetch changes up to aab7da708649388afc041b173e7d2cf0c4b27e50:
+for you to fetch changes up to d299d4b5c95d37df0a8964930a3586f8d3cdb4ef:
 
-  ARM: vexpress: Fix wdt interrupt in ca15{-tc1,_a7} dts (2013-01-29 18:20:28 +0000)
-
-----------------------------------------------------------------
-Versatile Express related fixes for 3.9
-* Correct interrupt definitions for WDT node in
-  V2P-CA15 and V2P-CA15_A7 Device Trees
+  arm: Move sp810.h to include/linux/amba/ (2013-01-29 18:13:24 +0000)
 
 ----------------------------------------------------------------
-Mark Rutland (1):
-      ARM: vexpress: Fix wdt interrupt in ca15{-tc1,_a7} dts
+Versatile Express related driver updates for 3.9:
+* Move sp810 header to a more generic location,
+  mainly to share it with arm64
+* Add pseudo-GPIO lines (and equivalent gpio LED definitions)
+  to control LEDs on vexpress motherboard.
 
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |    2 +-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+----------------------------------------------------------------
+Catalin Marinas (1):
+      arm: Move sp810.h to include/linux/amba/
+
+Pawel Moll (1):
+      mfd: vexpress: Add pseudo-GPIO based LEDs
+
+ arch/arm/plat-spear/restart.c                      |    2 +-
+ drivers/clk/versatile/clk-vexpress.c               |    3 +-
+ drivers/mfd/vexpress-sysreg.c                      |   73 +++++++++++++++-----
+ .../asm/hardware => include/linux/amba}/sp810.h    |    0
+ include/linux/vexpress.h                           |    8 +++
+ 5 files changed, 65 insertions(+), 21 deletions(-)
+ rename {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h (100%)
