@@ -1,42 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jan 2013 10:01:55 -0800
-Subject: Section mismatch in drivers/mfd/vexpress-sysreg.c
-In-Reply-To: <20130129131244.GU23505@n2100.arm.linux.org.uk>
-References: <20130129115535.GH21504@S2101-09.ap.freescale.net>
- <1359464711.8090.19.camel@hornet>
- <20130129131244.GU23505@n2100.arm.linux.org.uk>
-Message-ID: <20130129180155.GE17935@quad.lixom.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 29 Jan 2013 10:03:54 -0800
+Subject: [GIT PULL] Samsung fixes-4 for v3.8
+Message-ID: <06c601cdfe4b$01ef8890$05ce99b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 01:12:45PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 29, 2013 at 01:05:11PM +0000, Pawel Moll wrote:
-> > On Tue, 2013-01-29 at 11:55 +0000, Shawn Guo wrote:
-> > > I'm building v3.8-rc5 and seeing the following section mismatch warning
-> > > in drivers/mfd/vexpress-sysreg.c.
-> > > 
-> > > WARNING: drivers/mfd/built-in.o(.text+0x3108): Section mismatch in reference from the function vexpress_sysreg_probe() to the function .init.text:vexpress_sysreg_setup()
-> > > The function vexpress_sysreg_probe() references
-> > > the function __init vexpress_sysreg_setup().
-> > > This is often because vexpress_sysreg_probe lacks a __init
-> > > annotation or the annotation of vexpress_sysreg_setup is wrong.
-> > 
-> > Arnd's got a fix for this already:
-> > 
-> > https://patchwork.kernel.org/patch/2046991/
-> 
-> Adding arm-soc people...
-> 
-> Which wasn't in yesterday's arm-soc though, as highlighted by last night's
-> autobuild (the build tree was created at 9:28am yesterday, which'll be
-> just after my arm-soc pull).
+Hi Arnd and Olof,
 
-Right. I checked it in as commit e065d3d417274bafed162b3dffd2e03a5128623c
-yesterday, it's in 'fixes' as well as in for-next. It wasn't checked in until
-3pm Pacific time though, so it missed your build.
+Here is a pull request for Samsung fixes-4 for v3.8.
 
-Let me know if it isn't fixed by tonight's build.
+This fixes compatible values for exynos pinctrl and crash on soft reset,
+tick and alarm irq numbers on exynos5440 and uninitialized variable on
+s3c24xx.
 
+If any problems, please kindly let me know.
 
+Thanks.
 
--Olof
+- Kukjin
+
+The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+
+  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.8-samsung-fixes-4
+
+for you to fetch changes up to 60db7e5f9c9a25a7a9b01007e6e3f5a93bc16a3a:
+
+  ARM: EXYNOS: Fix crash on soft reset on EXYNOS5440 (2013-01-28 14:27:50
+-0800)
+
+----------------------------------------------------------------
+Cong Ding (1):
+      ARM: S3C24XX: fix uninitialized variable warning
+
+Giridhar Maruthy (1):
+      ARM: dts: fix tick and alarm irq numbers for exynos5440
+
+Kukjin Kim (1):
+      ARM: dts: fix compatible value for exynos pinctrl
+
+Thomas Abraham (2):
+      ARM: dts: Fix compatible value of pinctrl module on EXYNOS5440
+      ARM: EXYNOS: Fix crash on soft reset on EXYNOS5440
+
+ Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt |   12
+++++++------
+ arch/arm/boot/dts/exynos4210.dtsi                             |    6 +++---
+ arch/arm/boot/dts/exynos4x12.dtsi                             |    8
+++++----
+ arch/arm/boot/dts/exynos5440.dtsi                             |    4 ++--
+ arch/arm/mach-exynos/common.c                                 |   10
+++++++----
+ arch/arm/mach-s3c24xx/common.c                                |    2 +-
+ drivers/gpio/gpio-samsung.c                                   |    6 +++---
+ drivers/pinctrl/pinctrl-samsung.c                             |    4 ++--
+ 8 files changed, 27 insertions(+), 25 deletions(-)
