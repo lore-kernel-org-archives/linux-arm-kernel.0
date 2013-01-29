@@ -1,46 +1,47 @@
 From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Tue, 29 Jan 2013 13:08:49 +0530
-Subject: [PATCH V2 1/6] pinctrl: pinctrl-single: use arch_initcall and
- module_exit
+Date: Tue, 29 Jan 2013 13:08:50 +0530
+Subject: [PATCH V2 2/6] ARM: davinci: da850: add OF_DEV_AUXDATA entry for I2C0
 In-Reply-To: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
 References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
-Message-ID: <1359445134-13323-2-git-send-email-manishv.b@ti.com>
+Message-ID: <1359445134-13323-3-git-send-email-manishv.b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, I2C driver gets probed before pinctrl driver.
-To achieve I2C pin muxing via pinctrl driver before I2C
-probe get called, register pinctrl driver in arch_initcall.
-Also, add module_exit to unregister pinctrl driver.
+Add OF_DEV_AUXDATA for I2C0 controller driver in da850 board
+dt file to use I2C0 clock.
 
 Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
 ---
-:100644 100644 f6a360b... 3a96390... M	drivers/pinctrl/pinctrl-single.c
- drivers/pinctrl/pinctrl-single.c |   12 +++++++++++-
- 1 files changed, 11 insertions(+), 1 deletions(-)
+Changes since V1:
+ - updated name for auxdata lookup
+   da850_evm_auxdata_lookup -> da850_auxdata_lookup
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index f6a360b..3a96390 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -1089,7 +1089,17 @@ static struct platform_driver pcs_driver = {
- 	},
- };
+:100644 100644 37c27af... 95ca4e9... M	arch/arm/mach-davinci/da8xx-dt.c
+ arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 37c27af..95ca4e9 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
+ 	of_irq_init(da8xx_irq_match);
+ }
  
--module_platform_driver(pcs_driver);
-+static int __init pcs_pinctrl_init(void)
-+{
-+	return platform_driver_register(&pcs_driver);
-+}
-+arch_initcall(pcs_pinctrl_init);
++struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
++	{}
++};
 +
-+static void __exit pcs_pinctrl_exit(void)
-+{
-+	platform_driver_unregister(&pcs_driver);
-+}
-+module_exit(pcs_pinctrl_exit);
+ #ifdef CONFIG_ARCH_DAVINCI_DA850
  
- MODULE_AUTHOR("Tony Lindgren <tony@atomide.com>");
- MODULE_DESCRIPTION("One-register-per-pin type device tree based pinctrl driver");
+ static void __init da850_init_machine(void)
+ {
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table,
++				da850_auxdata_lookup, NULL);
+ 
+ 	da8xx_uart_clk_enable();
+ }
 -- 
 1.7.4.1
