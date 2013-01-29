@@ -1,35 +1,82 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 29 Jan 2013 18:03:13 +0530
-Subject: [PATCH 2/2] drivers: net:ethernet: cpsw: add support for VLAN
-In-Reply-To: <20130129073626.GB18272@localhost.localdomain>
-References: <1359403945-28585-1-git-send-email-mugunthanvnm@ti.com>
- <1359403945-28585-3-git-send-email-mugunthanvnm@ti.com>
- <20130129073626.GB18272@localhost.localdomain>
-Message-ID: <5107C189.1050604@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 29 Jan 2013 12:44:27 +0000
+Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
+ THUMB mode
+In-Reply-To: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20130129124427.GB1974@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/29/2013 1:06 PM, Richard Cochran wrote:
-> On Tue, Jan 29, 2013 at 01:42:25AM +0530, Mugunthan V N wrote:
->> @@ -947,6 +1042,10 @@ static const struct net_device_ops cpsw_netdev_ops = {
->>   #ifdef CONFIG_NET_POLL_CONTROLLER
->>   	.ndo_poll_controller	= cpsw_ndo_poll_controller,
->>   #endif
->> +#ifdef VLAN_SUPPORT
->> +	.ndo_vlan_rx_add_vid	= cpsw_ndo_vlan_rx_add_vid,
->> +	.ndo_vlan_rx_kill_vid	= cpsw_ndo_vlan_rx_kill_vid,
->> +#endif
-> These are not compile time conditionals in net_device_ops, so I wonder
-> (after reading Felipe's comments) whether you can simply keep the VLAN
-> code always present.
->
-> As long as the driver still compiles and loads, when VLAN is missing
-> from the stack, then I don't see why you can't just leave it in,
-> without all the ifdefs.
->
-> Thanks,
-> Richard
-This idea seems to be good. I will update the patch in next version.
+On Fri, Jan 11, 2013 at 12:39:57PM +0100, Uwe Kleine-K?nig wrote:
+> Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
+> obviously these cannot enter the kernel in ARM mode. Make an exception
+> for them and let them enter in THUMB mode.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/kernel/head-nommu.S |    8 +++++++-
+>  arch/arm/kernel/head.S       |    8 +++++++-
+>  arch/arm/mm/Kconfig          |    6 ++++++
+>  3 files changed, 20 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> index 3782320..ae7ed46 100644
+> --- a/arch/arm/kernel/head-nommu.S
+> +++ b/arch/arm/kernel/head-nommu.S
+> @@ -32,15 +32,21 @@
+>   * numbers for r1.
+>   *
+>   */
+> -	.arm
+>  
+>  	__HEAD
+> +
+> +#ifdef CONFIG_THUMBONLY_CPU
+> +	.thumb
+> +ENTRY(stext)
+> +#else
+> +	.arm
+>  ENTRY(stext)
+>  
+>   THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
+>   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
+>   THUMB(	.thumb			)	@ switch to Thumb now.
+>   THUMB(1:			)
+> +#endif
 
-Regards
-Mugunthan V N
+The behaviour is that we start the file is kernel entry state, then
+we switch to kernel run state.
+
+The switch is only needed for kernels which run on CPUs supporting
+both states, where the run state is not ARM.
+
+So, it would be neater for these entry sequences to look something
+like:
+
+HAS_ARM(.arm)	@ because -mthumb is default for Thumb kernels anyway
+
+ENTRY(stext)
+HAS_ARM(THUMB(	@ code to switch to Thumb ))
+
+	@ real code starts here, in run state.
+
+
+
+Where
+
+#ifdef CONFIG_THUMBONLY_CPU
+#define HAS_ARM(x...)
+#else
+#define HAS_ARM(x...) x
+#endif
+
+(I haven't read the whole thread yet, so decisions about what
+config variables and macro names should be used may be overridden
+by other people...)
+
+
+Thoughts?
+
+Cheers
+---Dave
