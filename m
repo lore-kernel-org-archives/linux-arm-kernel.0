@@ -1,42 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jan 2013 08:51:10 -0800
-Subject: [GIT PULL] CSR SiRFmarco SoC infrastructures for 3.9
-In-Reply-To: <CAGsJ_4yV5KJ2yWQtbOLO5Dj_MrQS3v0sPN4hinJAzTsfH6quvg@mail.gmail.com>
-References: <CAGsJ_4z-7z8=3xQwU6iEsqHEcVrRWK+Fm7eoBEbjC-EAewGypA@mail.gmail.com>
- <20130128070848.GG25723@quad.lixom.net>
- <CAGsJ_4yV5KJ2yWQtbOLO5Dj_MrQS3v0sPN4hinJAzTsfH6quvg@mail.gmail.com>
-Message-ID: <20130129165110.GA16188@quad.lixom.net>
+Date: Tue, 29 Jan 2013 08:57:49 -0800
+Subject: [GIT PULL] Renesas pinmux for v3.9
+In-Reply-To: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
+References: <1359080696-31489-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130129165749.GB16188@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 06:08:27PM +0800, Barry Song wrote:
-> 2013/1/28 Olof Johansson <olof@lixom.net>:
-> > On Thu, Jan 24, 2013 at 11:21:02AM +0800, Barry Song wrote:
-> >> Hi Olof, Arnd,
-> >>
-> >> pls pull the following changes for CSR SiRFmarco SoC. it has been
-> >> rebased againest arm-soc timer/cleanup tree.
-> >>
-> >> since commit 90cf214d6a549bf482e3c5751ee256cc885b96ea:
-> >>
-> >>   ARM: at91: fix board-rm9200-dt after sys_timer conversion
-> >> (2013-01-14 10:14:04 -0800)
-> >>
-> >> are available in the git repository at:
-> >>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
-> >> marco-timer-cleanup-rebase
-> >
-> > Pulled in as prima2/marco, included in next/soc. Thanks!
+On Fri, Jan 25, 2013 at 11:23:36AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> Olof, thanks.
+> please consider the following pinmux enhancements for 3.9.
 > 
-> >
-> > I noticed that there is no defconfig for any mach-prima2 platforms. Feel
-> > free to submit one so we get build coverage of the platform.
+> As discussed previously this series includes changes for shmobile (ARM
+> based SoC), the SH architecture and pinmux.  It has been agreed by the
+> maintainers, Paul Mundt, Linus Walleij and myself in conjunction with the
+> patch-series author Laurent Pinchart and arm-soc co-maintainer Olof
+> Johansson to take this seies through my renesas tree and thus the arm-soc
+> tree as a single branch to avoid a complex set of branch dependencies.
 > 
-> there have been. arch/arm/configs/prima2_defconfig
+> These changes have been sitting in next for several weeks now.
+> 
+> I expect there to be a follow-up series of similar complexity
+> in the 3.10 time-frame. A focus of that series being to add DT bindings.
+> 
+> ----------------------------------------------------------------
+> The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+> 
+>   Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git pfc
 
-Ah, it enables ARCH_SIRF, I was searching for ARCH_PRIMA2 or ARCH_MARCO. Good.
+This will go in through a next/sh-pinmux branch on its own given the
+size of the branch.  It's been pulled and merged in with for-next.
+
+Thanks!
 
 
 -Olof
