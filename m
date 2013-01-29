@@ -1,42 +1,116 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 29 Jan 2013 23:10:08 +0800
-Subject: [GIT PULL] imx cleanup for 3.9
-In-Reply-To: <20130129141857.GA12723@quad.lixom.net>
-References: <20130122144813.GD2812@S2101-09.ap.freescale.net>
- <20130128220026.GC3047@quad.lixom.net>
- <20130129010853.GA24352@S2101-09.ap.freescale.net>
- <20130129072603.GL1906@pengutronix.de>
- <20130129141857.GA12723@quad.lixom.net>
-Message-ID: <20130129151005.GC11345@S2101-09.ap.freescale.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Jan 2013 16:12:11 +0100
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+In-Reply-To: <1359399397-29729-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130129161211.7bb8cada@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 06:18:57AM -0800, Olof Johansson wrote:
-> Ok. Just to make clear: While I personally prefer the regular way of specifying
-> the board dts files, my main concern with this patch is that it is _pure
-> churn_. It's 1000 lines of change without a functional benefit, and without
-> really being a cleanup that benefits long-term development.
-> 
-You can say it's not a cleanup, but it definitely benefits long-term
-development.  It makes board dts development a lot easier, and that's
-why I came up with the patch.
+Russell,
 
-> We're starting to get more comments about the volume of churn again (Linus made
-> a couple of them the last merge window), and I'd rather be a bit more
-> conservative on some of the larger changes that lack strong benefit for
-> a release or two, than have him get ticked off and make life miserable for all
-> of us.
-> 
-> So, I'm not saying that it's a bad idea to change to labels, but I would rather
-> hold off this while we give some of the remaining platforms still not
-> multiplatform-enabled a chance to "use the churn quota" since they will need it
-> for include file moves, etc, etc.
-> 
-Then it will hold off the while IMX device tree development.  All the
-patches I queued on imx/dt branch are all based on that.  While it
-looks like a "churn", it should not cause any conflict, as all IMX
-dts changes will go via the same branch for this cycle.  So please
-give it a go to avoid hurting people who contribute IMX device tree
-development.
+As the arch/arm/kernel/ maintainer, what is your position regarding the
+below patch?
 
-Shawn
+Thanks for your review,
+
+Thomas
+
+On Mon, 28 Jan 2013 19:56:14 +0100, Thomas Petazzoni wrote:
+> The PCI specifications says that an I/O region must be aligned on a 4
+> KB boundary, and a memory region aligned on a 1 MB boundary.
+> 
+> However, the Marvell PCIe interfaces rely on address decoding windows
+> (which allow to associate a range of physical addresses with a given
+> device). For PCIe memory windows, those windows are defined with a 1
+> MB granularity (which matches the PCI specs), but PCIe I/O windows can
+> only be defined with a 64 KB granularity, so they have to be 64 KB
+> aligned. We therefore need to tell the PCI core about this special
+> alignement requirement.
+> 
+> The PCI core already calls pcibios_align_resource() in the ARM PCI
+> core, specifically for such purposes. So this patch extends the ARM
+> PCI core so that it calls a ->align_resource() hook registered by the
+> PCI driver, exactly like the existing ->map_irq() and ->swizzle()
+> hooks.
+> 
+> A particular PCI driver can register a align_resource() hook, and do
+> its own specific alignement, depending on the specific constraints of
+> the underlying hardware.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/mach/pci.h |   11 +++++++++++
+>  arch/arm/kernel/bios32.c        |    6 ++++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index 5cf2e97..7d2c3c8 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -30,6 +30,11 @@ struct hw_pci {
+>  	void		(*postinit)(void);
+>  	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
+>  	int		(*map_irq)(const struct pci_dev *dev, u8 slot, u8 pin);
+> +	resource_size_t (*align_resource)(struct pci_dev *dev,
+> +					  const struct resource *res,
+> +					  resource_size_t start,
+> +					  resource_size_t size,
+> +					  resource_size_t align);
+>  };
+>  
+>  /*
+> @@ -51,6 +56,12 @@ struct pci_sys_data {
+>  	u8		(*swizzle)(struct pci_dev *, u8 *);
+>  					/* IRQ mapping				*/
+>  	int		(*map_irq)(const struct pci_dev *, u8, u8);
+> +					/* Resource alignement requirements	*/
+> +	resource_size_t (*align_resource)(struct pci_dev *dev,
+> +					  const struct resource *res,
+> +					  resource_size_t start,
+> +					  resource_size_t size,
+> +					  resource_size_t align);
+>  	void		*private_data;	/* platform controller private data	*/
+>  };
+>  
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 5401645..be2e6c9 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -462,6 +462,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+>  		sys->busnr   = busnr;
+>  		sys->swizzle = hw->swizzle;
+>  		sys->map_irq = hw->map_irq;
+> +		sys->align_resource = hw->align_resource;
+>  		INIT_LIST_HEAD(&sys->resources);
+>  
+>  		if (hw->private_data)
+> @@ -574,6 +575,8 @@ char * __init pcibios_setup(char *str)
+>  resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  				resource_size_t size, resource_size_t align)
+>  {
+> +	struct pci_dev *dev = data;
+> +	struct pci_sys_data *sys = dev->sysdata;
+>  	resource_size_t start = res->start;
+>  
+>  	if (res->flags & IORESOURCE_IO && start & 0x300)
+> @@ -581,6 +584,9 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  
+>  	start = (start + align - 1) & ~(align - 1);
+>  
+> +	if (sys->align_resource)
+> +		return sys->align_resource(dev, res, start, size, align);
+> +
+>  	return start;
+>  }
+>  
+
+
+
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
