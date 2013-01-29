@@ -1,98 +1,67 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 Jan 2013 22:59:58 +0100
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <201301292040.50143.arnd@arndb.de>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <201301291636.38773.arnd@arndb.de>
- <20130129174546.GE23505@n2100.arm.linux.org.uk>
- <201301292040.50143.arnd@arndb.de>
-Message-ID: <CACRpkdbC56TaCzxcYpLxz5WWdfbB7vQSmRtHd64TZsTXbLEy=w@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 29 Jan 2013 15:01:34 -0700
+Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
+In-Reply-To: <87d2xcfeew.fsf@xmission.com>
+References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
+ <50E4C9C6.20609@codeaurora.org>
+ <20130103120259.GB5193@mudshark.cambridge.arm.com>
+ <20130103122100.GN2631@n2100.arm.linux.org.uk>
+ <50E5E967.3020805@wwwdotorg.org>
+ <20130106162200.GC11025@mudshark.cambridge.arm.com>
+ <20130106164033.GA3222@n2100.arm.linux.org.uk> <87ehhxahd1.fsf@xmission.com>
+ <20130107144812.GD3222@n2100.arm.linux.org.uk> <87d2xcfeew.fsf@xmission.com>
+Message-ID: <510846BE.5090704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 9:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 01/10/2013 10:59 PM, Eric W. Biederman wrote:
+...
+> disable_nonboot_cpus() should really be called
+> sometimes_dangerously_hotunplug_all_but_one_cpu().
+> 
+> If that code is going to be something other than power management
+> specific it is not cool that disable_nonboot_cpus() is not always
+> enabled when SMP is enabled.  It means that architectures need to
+> implement two different ways of shutting down cpus.
+> 
+> One of the truly nasty things about cpu_hotplug is that it requires that
+> irqs be migrated away from a cpu with interrupts disabled, which at
+> least on x86 in some interrupt delivery modes is impossible to do
+> safely.  The only way to losslessly (and without wedging irq
+> controllers) in those interrupt delivery modes (needed for more than 8
+> cpus) is to migrate an irq in it's irq handler.  Which is fine for
+> setting /proc/irq/$N/smp_affinity but is useless for cpu hot-unplug,
+> where we need to guarantee that all irqs are going to stop hitting a
+> cpu.
 
-> the patches were certainly on the mailing list
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017818.html
->
-> Do you (or Linus) know what happened to the patch series?
+I'm a little confused about this; disable_nonboot_cpus() calls
+_cpu_down() to hot-unplug the CPU, and the regular CPU hotplug path is
+drivers/base/cpu.c:store_online() -> cpu_down() -> _cpu_down(), i.e. the
+same basic code.
 
-Just stalled. My fault probably, and IIRC Russell sent a
-modified version of this patch at one time.
+Given that, why is CPU hot unplug safe on x86 via sysfs (well, I'm just
+assuming it must be, since it's enabled in my regular distro kernel and
+appears to work fine), but not safe when it's done from
+disable_nonboot_cpus()?
 
-> Based on your description, it sounds all doable, but the split
-> between platform specific code and device driver code would be
-> different: While the muxing that you describe all takes place
-> in the get_signal/put_signal functions in platform code, doing
-> a proper DT binding for the mux would imply moving that into the
-> pl080 driver itself, at least as a compile-time option for the
-> driver. Do you think that would be acceptable?
+> Now sometimes_dangerously_hotunplug_all_but_one_cpu() on the reboot path 
+> was added just a few months ago in Oct 2012, and it appears to due to
+> weird ARM maintainership.  At least the x86 reboot_cpu_id option is
+> broken due to that addition.
 
-This is the pushing-to-driver paradigm, and for the legacy
-support it will be troublesome as it needs to supply the
-base address of the mux etc through the platform data,
-and then with an ampersand reference to the syscon
-in the dma node.
+I guess this is true because reboot_cpu_id() isn't honored unless that
+CPU is already offline, and disable_nonboot_cpus() probably took it
+offline on average.
 
-> While I guess we could still keep the get_signal/put_signal
-> callbacks in mach-versatile but drop them for platforms
-> without a mux, I'm not sure if that would make the overall
-> driver better or worse.
+Perhaps x86's native_machine_shutdown() should explicitly bring that CPU
+online if it's in cpu_possible_mask? Or perhaps disable_nonboot_cpus()
+should be enhanced with x86's reboot_cpu_id logic, so it simply works
+the same way across all architectures; that way some chunk of x86's
+native_machine_shutdown() could be made common.
 
-I think that is not the big issue though.
+...
+> We should remove disable_nonboot_cpus() from the reboot path.   It is
+> still a crazy unmaintained cpu hotplug mess.
 
-I think the most important thing is to come up
-with a OS-neutral description of channels vs
-muxes and signals.
-
-Basically all DMA hardware has a mux, but in
-many cases it is fused with the DMA controller
-itself, and sometimes even hidden from software,
-i.e. it seems there is one channel per peripheral,
-but if you try to use them all at the same time
-something like round-robin bursts can be expected
-(in best case).
-
-For each channel, you need to be able to specify
-a number of applicable request lines, with an
-optional mux component inbetween. And I think
-the bindings should be generic, because the problem
-is generic.
-
-I tried to express this in DT syntax but failed, I
-just don't know how to do that, DT seems to be
-very much not about muxes and things that take
-optional paths, more about describing how static
-electronics are set up.
-
-The basic assumption of a 1:1 mapping between
-a peripheral and a channel is bogus - this is true on
-some hardware (like the COH901318), but certainly
-not all, the Versatile and RealView being the most
-problematic examples to date with the separate mux
-and all.
-
-Maybe stupid analogy:
-http://en.wikipedia.org/wiki/File:JT_Switchboard_770x540.jpg
-The actual channels are the cords.
-The the sockets are the devices.
-The telephonist is the mux.
-
-So looking up a DMA channel for RX for the PL011
-can be like trying to find a blue cord to put in the
-PL011 socket when the red light goes on for RX
-DMA. If no blue cord is available the telephonist can
-plug in the handset and say "sorry, failed to find a
-free line".
-
-Conversely to TX DMA you may need a red
-cord. Having a blue cord at hand will not help
-you.
-
-Coding it down in the device tree like in the
-example is like plugging the cords in to some
-holes at boot time and let the telephonist go
-home.
-
-Yours,
-Linus Walleij
+Even if we updated it to standardize the reboot_cpu_id logic across all
+architectures, and hence made it still suitable for x86?
