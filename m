@@ -1,60 +1,86 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 29 Jan 2013 18:16:02 +0100
-Subject: [PATCH, RFC] usb: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <510802C3.7090803@wwwdotorg.org>
-References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
- <510802C3.7090803@wwwdotorg.org>
-Message-ID: <510803D2.4080603@pengutronix.de>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 29 Jan 2013 11:23:00 -0600
+Subject: [PATCH 0/4] TI LCDC DRM driver
+Message-ID: <1359480184-9168-1-git-send-email-robdclark@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2013 06:11 PM, Stephen Warren wrote:
-> On 01/29/2013 04:22 AM, Sascha Hauer wrote:
->> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
->>
->> This adds two little devicetree helper functions for determining the
->> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
->> the devicetree.
->>
->> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> ---
->>
->> The properties and their values have been taken from the fsl-mph-dr driver.
->> This binding is also documented (though currently not used) for the tegra
->> ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
->> This is a first attempt to parse these bindings at a common place so that
->> others can make use of it.
->>
->> Basically I want to know whether this binding is recommended for new drivers
->> since normally the devicetree uses '-' instead of '_', and maybe there are
->> other problems with it.
-> 
-> It's certainly typical to use - not _ for freshly defined properties.
-> However, since this property already exists and is in-use, I don't think
-> there's any choice but to maintain its current definition.
-> 
-> The code looked fine to me.
+One more iteration.. now with more cowbell!
 
-The code for phy_type is lifted from the ethernet guys and adopted to
-the usb phy types.
+The first patch adds the basic driver and TFP410 DVI output.
 
-"dr_mode" is, as Sascha pointed out, only used in
-drivers/usb/host/fsl-mph-dr-of.c
+The second patch adds support for NXP TDA998x family of i2c connected
+HDMI encoders.  It is split out into an i2c encoder-slave in case someone
+else has hw with the same HDMI encoder.
 
-Marc
+The final patch adds support for LCD panels, with timings and panel info
+coming from device-tree.
+
+The patch set has dependencies on the following patches that I have sent
+earlier (which have not changed since then so I am not resending):
+
+ * drm/cma: add debugfs helpers -
+     https://patchwork.kernel.org/patch/1876721/
+ * drm: i2c encoder helper wrappers -
+     https://patchwork.kernel.org/patch/1950971/
+ * drm/i2c: give i2c it's own Kconfig -
+     https://patchwork.kernel.org/patch/2037181/
+
+In addition, the LCD panel patch also depends on Steffen Trumtrar's OF
+display helper series. I've moved this patch to last so it can be merged
+later if needed.  Although I really see no reason not to merge the OF
+display helper series for 3.9.
+
+These patches and their dependencies can also be found here:
+
+  git://people.freedesktop.org/~robclark/linux tilcdc-next
+  http://cgit.freedesktop.org/~robclark/linux/log/?h=tilcdc-next
+
+Rob Clark (4):
+  drm/tilcdc: add TI LCD Controller DRM driver (v4)
+  drm/i2c: nxp-tda998x (v3)
+  drm/tilcdc: add encoder slave (v2)
+  drm/tilcdc: add support for LCD panels (v5)
+
+ .../devicetree/bindings/drm/tilcdc/panel.txt       |  59 ++
+ .../devicetree/bindings/drm/tilcdc/slave.txt       |  19 +
+ .../devicetree/bindings/drm/tilcdc/tfp410.txt      |  21 +
+ .../devicetree/bindings/drm/tilcdc/tilcdc.txt      |  21 +
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/i2c/Kconfig                        |   6 +
+ drivers/gpu/drm/i2c/Makefile                       |   3 +
+ drivers/gpu/drm/i2c/tda998x_drv.c                  | 906 +++++++++++++++++++++
+ drivers/gpu/drm/tilcdc/Kconfig                     |  13 +
+ drivers/gpu/drm/tilcdc/Makefile                    |  10 +
+ drivers/gpu/drm/tilcdc/tilcdc_crtc.c               | 602 ++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c                | 611 ++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_drv.h                | 150 ++++
+ drivers/gpu/drm/tilcdc/tilcdc_panel.c              | 436 ++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_panel.h              |  26 +
+ drivers/gpu/drm/tilcdc/tilcdc_regs.h               | 154 ++++
+ drivers/gpu/drm/tilcdc/tilcdc_slave.c              | 376 +++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_slave.h              |  26 +
+ drivers/gpu/drm/tilcdc/tilcdc_tfp410.c             | 419 ++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_tfp410.h             |  26 +
+ 21 files changed, 3887 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/drm/tilcdc/panel.txt
+ create mode 100644 Documentation/devicetree/bindings/drm/tilcdc/slave.txt
+ create mode 100644 Documentation/devicetree/bindings/drm/tilcdc/tfp410.txt
+ create mode 100644 Documentation/devicetree/bindings/drm/tilcdc/tilcdc.txt
+ create mode 100644 drivers/gpu/drm/i2c/tda998x_drv.c
+ create mode 100644 drivers/gpu/drm/tilcdc/Kconfig
+ create mode 100644 drivers/gpu/drm/tilcdc/Makefile
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_drv.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_drv.h
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_panel.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_panel.h
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_regs.h
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_slave.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_slave.h
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
+ create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_tfp410.h
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/4bde3299/attachment-0001.sig>
+1.8.1
