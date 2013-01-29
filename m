@@ -1,92 +1,95 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 29 Jan 2013 15:46:11 +0100
-Subject: [RFC 1/3] net: freescale: fec: add support for optional enet_out clk
+Date: Tue, 29 Jan 2013 15:46:13 +0100
+Subject: [RFC 3/3] arm: mach-mxs: make enabling enet_out a legacy function
 In-Reply-To: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
 References: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1359470773-14290-2-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1359470773-14290-4-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some MX28 boards need the internal enet_out clock to be enabled. So, do
-this in the driver iff the clock was referenced via devicetree.
+enet_out is now handled via the driver, so handling it in board init
+will print a warning.
 
 Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
+ arch/arm/mach-mxs/mach-mxs.c |   24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
 
-davidm: Please don't apply before Shawn as the mxs-maintainer has given his ack
-on the general procedure. Or maybe he can merge it via his tree?
-
- drivers/net/ethernet/freescale/fec.c |   10 ++++++++++
- drivers/net/ethernet/freescale/fec.h |    1 +
- 2 files changed, 11 insertions(+)
-
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 0704bca..6573bd5 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1628,6 +1628,11 @@ fec_probe(struct platform_device *pdev)
- 		goto failed_clk;
- 	}
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index c66129b..1f2e3bf 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -252,17 +252,25 @@ static void __init imx23_evk_init(void)
+ 	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
+ }
  
-+	/* enet_out is optional, depends on board */
-+	fep->clk_enet_out = devm_clk_get(&pdev->dev, "enet_out");
-+	if (IS_ERR(fep->clk_enet_out))
-+		fep->clk_enet_out = NULL;
+-static inline void enable_clk_enet_out(void)
++static inline void legacy_enable_clk_enet_out(void)
+ {
+-	struct clk *clk = clk_get_sys("enet_out", NULL);
++	struct device_node *np;
++	struct clk *clk;
 +
- #ifdef CONFIG_FEC_PTP
- 	fep->clk_ptp = devm_clk_get(&pdev->dev, "ptp");
- 	if (IS_ERR(fep->clk_ptp)) {
-@@ -1638,6 +1643,7 @@ fec_probe(struct platform_device *pdev)
++	for_each_compatible_node(np, NULL, "fsl,imx28-fec")
++		if (of_property_match_string(np, "clock-names", "enet_out") >= 0)
++			return;
++
++	WARN(1, "Please specify enet_out-clk in devicetree.\n");
  
- 	clk_prepare_enable(fep->clk_ahb);
- 	clk_prepare_enable(fep->clk_ipg);
-+	clk_prepare_enable(fep->clk_enet_out);
- #ifdef CONFIG_FEC_PTP
- 	clk_prepare_enable(fep->clk_ptp);
- #endif
-@@ -1679,6 +1685,7 @@ failed_register:
- failed_mii_init:
- failed_init:
- failed_regulator:
-+	clk_disable_unprepare(fep->clk_enet_out);
- 	clk_disable_unprepare(fep->clk_ahb);
- 	clk_disable_unprepare(fep->clk_ipg);
- #ifdef CONFIG_FEC_PTP
-@@ -1722,6 +1729,7 @@ fec_drv_remove(struct platform_device *pdev)
- 	if (fep->ptp_clock)
- 		ptp_clock_unregister(fep->ptp_clock);
- #endif
-+	clk_disable_unprepare(fep->clk_enet_out);
- 	clk_disable_unprepare(fep->clk_ahb);
- 	clk_disable_unprepare(fep->clk_ipg);
- 	iounmap(fep->hwp);
-@@ -1747,6 +1755,7 @@ fec_suspend(struct device *dev)
- 		fec_stop(ndev);
- 		netif_device_detach(ndev);
- 	}
-+	clk_disable_unprepare(fep->clk_enet_out);
- 	clk_disable_unprepare(fep->clk_ahb);
- 	clk_disable_unprepare(fep->clk_ipg);
++	clk = clk_get_sys("enet_out", NULL);
+ 	if (!IS_ERR(clk))
+ 		clk_prepare_enable(clk);
+ }
  
-@@ -1759,6 +1768,7 @@ fec_resume(struct device *dev)
- 	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct fec_enet_private *fep = netdev_priv(ndev);
+ static void __init imx28_evk_init(void)
+ {
+-	enable_clk_enet_out();
++	legacy_enable_clk_enet_out();
+ 	update_fec_mac_prop(OUI_FSL);
  
-+	clk_prepare_enable(fep->clk_enet_out);
- 	clk_prepare_enable(fep->clk_ahb);
- 	clk_prepare_enable(fep->clk_ipg);
- 	if (netif_running(ndev)) {
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index c5a3bc1..0648dbe 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -203,6 +203,7 @@ struct fec_enet_private {
+ 	mxsfb_pdata.mode_list = mx28evk_video_modes;
+@@ -292,7 +300,7 @@ static void __init m28evk_init(void)
  
- 	struct clk *clk_ipg;
- 	struct clk *clk_ahb;
-+	struct clk *clk_enet_out;
- #ifdef CONFIG_FEC_PTP
- 	struct clk *clk_ptp;
- #endif
+ static void __init sc_sps1_init(void)
+ {
+-	enable_clk_enet_out();
++	legacy_enable_clk_enet_out();
+ }
+ 
+ static int apx4devkit_phy_fixup(struct phy_device *phy)
+@@ -303,7 +311,7 @@ static int apx4devkit_phy_fixup(struct phy_device *phy)
+ 
+ static void __init apx4devkit_init(void)
+ {
+-	enable_clk_enet_out();
++	legacy_enable_clk_enet_out();
+ 
+ 	if (IS_BUILTIN(CONFIG_PHYLIB))
+ 		phy_register_fixup_for_uid(PHY_ID_KSZ8051, MICREL_PHY_ID_MASK,
+@@ -351,7 +359,7 @@ static void __init tx28_post_init(void)
+ 	struct pinctrl *pctl;
+ 	int ret;
+ 
+-	enable_clk_enet_out();
++	legacy_enable_clk_enet_out();
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx28-fec");
+ 	pdev = of_find_device_by_node(np);
+@@ -391,13 +399,13 @@ static void __init tx28_post_init(void)
+ 
+ static void __init cfa10049_init(void)
+ {
+-	enable_clk_enet_out();
++	legacy_enable_clk_enet_out();
+ 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
+ }
+ 
+ static void __init apf28_init(void)
+ {
+-	enable_clk_enet_out();
++	legacy_enable_clk_enet_out();
+ 
+ 	mxsfb_pdata.mode_list = apf28dev_video_modes;
+ 	mxsfb_pdata.mode_count = ARRAY_SIZE(apf28dev_video_modes);
 -- 
 1.7.10.4
