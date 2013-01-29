@@ -1,45 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jan 2013 23:06:13 +0000
-Subject: [PATCH v2 08/27] pci: implement an emulated PCI-to-PCI bridge
-In-Reply-To: <CAErSpo6ajS87mh7u58sLeN6oL5ixiPhaD7O7BrH1Av28mTk=qQ@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo6ajS87mh7u58sLeN6oL5ixiPhaD7O7BrH1Av28mTk=qQ@mail.gmail.com>
-Message-ID: <201301292306.14012.arnd@arndb.de>
+From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
+Date: Wed, 30 Jan 2013 01:08:59 +0200
+Subject: [RFC PATCH 0/2] ARM: update cpuinfo to print CPU model name
+In-Reply-To: <20130129160243.GA3389@kahuna>
+References: <1359474865-15408-1-git-send-email-ruslan.bilovol@ti.com>
+ <20130129160243.GA3389@kahuna>
+Message-ID: <CAB=otbSV6CH4WOrr577bHXFcjEVRGjZxatgy4CJ3cr0M0h4vfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013, Bjorn Helgaas wrote:
-> If you need this, it can be done in architecture code, can't it?  It's
-> true that there's nothing architecture-specific in this patch (other
-> than the fact that ARM is the only arch that needs it), but I'm not
-> sure there's anything useful for sharing here.
+Hi,
 
-Since we're moving the host bridge code to drivers/pci/host now, I think
-this code should live in the same place. It's entirely possible that
-it will be shared between arch/arm and arch/arm64, although I would
-hope that we can do away with the emulated bridge code entirely.
+On Tue, Jan 29, 2013 at 6:02 PM, Nishanth Menon <nm@ti.com> wrote:
+>
+> On 17:54-20130129, Ruslan Bilovol wrote:
+> > Hi,
+> >
+> > The following patches update cpuinfo to print CPU
+> > model name for ARM. First patch exactly makes needed
+> > changes for ARM architecture.
+> > Second patch adds this ability to OMAP4 SoCs.
+> >
+> > This adds a common approach to show SoC name.
+> >
+> > Looks like there were few attempts to do similar
+> > changes to cpuinfo without any luck.
+> >
+> > So - comments are welcome
+> >
+> > Ruslan Bilovol (2):
+> >   ARM: kernel: update cpuinfo to print CPU model name
+> >   ARM: OMAP4: setup CPU model name during ID initialisation
+>
+> We had an discussion on similar lines but a generic suggestion:
+> https://patchwork.kernel.org/patch/98720/
+> SoCinfo framework which was supposed to introduce this
+>
+> Would'nt that be a better approach to take than an OMAP only solution?
 
-More generally speaking, this is infrastructure code, and for any
-piece of infrastructure my rule is
+My goal is only to say what is the SoC model name in the /proc/cpuinfo
+(And it is not an OMAP-only solution - it is common. Support for OMAP
+is added in second patch)
+This is the only type of information that we can apply for any SoC.
+My point is - any SoC-specific information should go through some other
+way - like SoCinfo framework mentioned by you.
+And additional point - in cpuinfo we already have CPU name and Machine name.
+The SoC name (that is something between these two things) looks also relevant
 
-* don't add platform specific infrastructure if it can be done at
-  the architecture level
-* don't add architecture specific infrastructure if it can be
-  written in an architecture independent way
-* don't add global infrastructure if you can use or extend the
-  existing infrastructure.
+>
+> Ccying eduardo who had driven this for some time.
 
-> In fact, it seems like what you're after is not so much an emulated
-> bridge that has no corresponding hardware, as it is a wrapper that
-> presents a standard PCIe interface to hardware that exists but doesn't
-> conform to the PCIe spec.  If you really do need to ultimately connect
-> this pci_sw_pci_bridge to a piece of hardware, that will certainly be
-> arch-specific.
+Yes, let's have additional comments
 
-As Jason Gunthorpe suggested, we might not need this at all, if the
-Linux PCI code can be convinced not to need a configuration space
-for the devices that in case of the Marvell hardware don't provide
-one.
-
-	Arnd
+> --
+> Regards,
+> Nishanth Menon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
