@@ -1,61 +1,56 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 24 Jan 2013 13:10:25 +0200
-Subject: [v4 5/6] ARM: dt: tegra114: Add new board, Pluto
-In-Reply-To: <1359025829-22306-1-git-send-email-hdoyu@nvidia.com>
-References: <1359025829-22306-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1359025829-22306-6-git-send-email-hdoyu@nvidia.com>
+Date: Tue, 29 Jan 2013 14:27:18 +0200
+Subject: [v2 1/1] ARM: dma-mapping: Call arm_dma_set_mask() if no
+ ->set_dma_mask()
+In-Reply-To: <5107B301.2060802@samsung.com>
+References: <5107B301.2060802@samsung.com>
+Message-ID: <1359462438-21006-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new evaluation board, Pluto for Tegra 114 family.
+struct dma_map_ops iommu_ops doesn't have ->set_dma_mask, which causes
+crash when dma_set_mask() is called from some driver.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/boot/dts/Makefile           |    3 ++-
- arch/arm/boot/dts/tegra114-pluto.dts |   21 +++++++++++++++++++++
- 2 files changed, 23 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/tegra114-pluto.dts
+ arch/arm/include/asm/dma-mapping.h |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 88ea9fc..b53f18f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -144,7 +144,8 @@ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-whistler.dtb \
- 	tegra30-cardhu-a02.dtb \
- 	tegra30-cardhu-a04.dtb \
--	tegra114-dalmore.dtb
-+	tegra114-dalmore.dtb \
-+	tegra114-pluto.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
- 	vexpress-v2p-ca9.dtb \
- 	vexpress-v2p-ca15-tc1.dtb \
-diff --git a/arch/arm/boot/dts/tegra114-pluto.dts b/arch/arm/boot/dts/tegra114-pluto.dts
-new file mode 100644
-index 0000000..9bea8f5
---- /dev/null
-+++ b/arch/arm/boot/dts/tegra114-pluto.dts
-@@ -0,0 +1,21 @@
-+/dts-v1/;
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 5b579b9..63cc49c 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -14,6 +14,7 @@
+ #define DMA_ERROR_CODE	(~0)
+ extern struct dma_map_ops arm_dma_ops;
+ extern struct dma_map_ops arm_coherent_dma_ops;
++extern int arm_dma_set_mask(struct device *dev, u64 dma_mask);
+ 
+ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+ {
+@@ -32,7 +33,13 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+ 
+ static inline int dma_set_mask(struct device *dev, u64 mask)
+ {
+-	return get_dma_ops(dev)->set_dma_mask(dev, mask);
++	struct dma_map_ops *ops = get_dma_ops(dev);
++	BUG_ON(!ops);
 +
-+/include/ "tegra114.dtsi"
++	if (ops->set_dma_mask)
++		return ops->set_dma_mask(dev, mask);
 +
-+/ {
-+	model = "NVIDIA Tegra114 Pluto evaluation board";
-+	compatible = "nvidia,pluto", "nvidia,tegra114";
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>;
-+	};
-+
-+	serial at 70006300 {
-+		status = "okay";
-+		clock-frequency = <408000000>;
-+	};
-+
-+	pmc {
-+		nvidia,invert-interrupt;
-+	};
-+};
++	return arm_dma_set_mask(dev, mask);
+ }
+ 
+ #ifdef __arch_page_to_dma
+@@ -112,8 +119,6 @@ static inline void dma_free_noncoherent(struct device *dev, size_t size,
+ 
+ extern int dma_supported(struct device *dev, u64 mask);
+ 
+-extern int arm_dma_set_mask(struct device *dev, u64 dma_mask);
+-
+ /**
+  * arm_dma_alloc - allocate consistent memory for DMA
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
 -- 
 1.7.9.5
