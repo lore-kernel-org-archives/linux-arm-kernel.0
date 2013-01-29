@@ -1,60 +1,51 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 29 Jan 2013 18:38:20 -0500
-Subject: [PATCH 1/2] drivers: net: cpsw: Add helper functions for VLAN
- ALE implementation
-In-Reply-To: <1359403945-28585-2-git-send-email-mugunthanvnm@ti.com>
-References: <1359403945-28585-1-git-send-email-mugunthanvnm@ti.com>
- <1359403945-28585-2-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <51085D6C.4050102@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 29 Jan 2013 15:38:22 -0800
+Subject: [GIT PULL] vexpress: drivers for v3.9
+In-Reply-To: <1359484450.8090.27.camel@hornet>
+References: <1359484450.8090.27.camel@hornet>
+Message-ID: <CAOesGMinJef-9OsKi0LGB0W6i73sgyUqhm2Mie4gyC2JLjnd1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 03:12 PM, Mugunthan V N wrote:
-> Add helper functions for VLAN ALE implementations for Add, Delete
-> Dump VLAN related ALE entries
+Hi,
+
+
+On Tue, Jan 29, 2013 at 10:34 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> Hi Arnd, Olof,
 >
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> ---
->   drivers/net/ethernet/ti/cpsw_ale.c |  172 ++++++++++++++++++++++++++++++++++--
->   drivers/net/ethernet/ti/cpsw_ale.h |   11 +++
->   2 files changed, 178 insertions(+), 5 deletions(-)
+> The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
 >
-> diff --git a/drivers/net/ethernet/ti/cpsw_ale.c b/drivers/net/ethernet/ti/cpsw_ale.c
-> index 0e9ccc2..0d7a60a 100644
-> --- a/drivers/net/ethernet/ti/cpsw_ale.c
-> +++ b/drivers/net/ethernet/ti/cpsw_ale.c
+>   Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/drivers-for-3.9
+>
+> for you to fetch changes up to d299d4b5c95d37df0a8964930a3586f8d3cdb4ef:
+>
+>   arm: Move sp810.h to include/linux/amba/ (2013-01-29 18:13:24 +0000)
+>
+> ----------------------------------------------------------------
+> Versatile Express related driver updates for 3.9:
+> * Move sp810 header to a more generic location,
+>   mainly to share it with arm64
+> * Add pseudo-GPIO lines (and equivalent gpio LED definitions)
+>   to control LEDs on vexpress motherboard.
+>
+> ----------------------------------------------------------------
+> Catalin Marinas (1):
+>       arm: Move sp810.h to include/linux/amba/
+>
+> Pawel Moll (1):
+>       mfd: vexpress: Add pseudo-GPIO based LEDs
 
-[...]
+I can't find record of this patch ever having been posted (under that
+subject at least) on any list I am on, including linux-arm-kernel and
+linux-kernel.
 
-> +int cpsw_ale_add_vlan(struct cpsw_ale *ale, u16 vid, int port, int untag,
-> +		      int reg_mcast, int unreg_mcast)
+You should at least post it to those lists, and cc the MFD maintainer.
+And you should get his ack if you are going to merge this patch
+through arm-soc instead of through his tree.
 
-[...]
 
-> +int cpsw_ale_del_vlan(struct cpsw_ale *ale, u16 vid, int port)
-
-[...]
-
-> +int cpsw_ale_vlan_add_ucast(struct cpsw_ale *ale, u8 *addr, int port,
-> +				int flags, u16 vid)
-
-[...]
-
-> +int cpsw_ale_vlan_del_ucast(struct cpsw_ale *ale, u8 *addr, int port, u16 vid)
-
-[...]
-
-> +int cpsw_ale_vlan_add_mcast(struct cpsw_ale *ale, u8 *addr,
-> +		int port_mask, u16 vid, int super, int mcast_state)
-
-[...]
-
-> +int cpsw_ale_vlan_del_mcast(struct cpsw_ale *ale, u8 *addr,
-> +				int port_mask, u16 vid)
-
-Are the VLAN and non-VLAN variants different enough to justify separate 
-implementations for all these functions?  Could we collapse these by 
-generalizing the original to take an optional vlan argument instead?
-
-Thanks
--- Cyril.
+-Olof
