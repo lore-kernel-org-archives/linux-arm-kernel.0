@@ -1,82 +1,67 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 29 Jan 2013 12:44:27 +0000
-Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
- THUMB mode
-In-Reply-To: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20130129124427.GB1974@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 29 Jan 2013 13:47:26 +0100
+Subject: [v2 1/1] ARM: dma-mapping: Call arm_dma_set_mask() if no
+ ->set_dma_mask()
+In-Reply-To: <1359462438-21006-1-git-send-email-hdoyu@nvidia.com>
+References: <5107B301.2060802@samsung.com>
+ <1359462438-21006-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <5107C4DE.7060607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 12:39:57PM +0100, Uwe Kleine-K?nig wrote:
-> Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
-> obviously these cannot enter the kernel in ARM mode. Make an exception
-> for them and let them enter in THUMB mode.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hello,
+
+On 1/29/2013 1:27 PM, Hiroshi Doyu wrote:
+> struct dma_map_ops iommu_ops doesn't have ->set_dma_mask, which causes
+> crash when dma_set_mask() is called from some driver.
+>
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 > ---
->  arch/arm/kernel/head-nommu.S |    8 +++++++-
->  arch/arm/kernel/head.S       |    8 +++++++-
->  arch/arm/mm/Kconfig          |    6 ++++++
->  3 files changed, 20 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> index 3782320..ae7ed46 100644
-> --- a/arch/arm/kernel/head-nommu.S
-> +++ b/arch/arm/kernel/head-nommu.S
-> @@ -32,15 +32,21 @@
->   * numbers for r1.
->   *
->   */
-> -	.arm
->  
->  	__HEAD
+>   arch/arm/include/asm/dma-mapping.h |   11 ++++++++---
+>   1 file changed, 8 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 5b579b9..63cc49c 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -14,6 +14,7 @@
+>   #define DMA_ERROR_CODE	(~0)
+>   extern struct dma_map_ops arm_dma_ops;
+>   extern struct dma_map_ops arm_coherent_dma_ops;
+> +extern int arm_dma_set_mask(struct device *dev, u64 dma_mask);
+>   
+>   static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+>   {
+> @@ -32,7 +33,13 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+>   
+>   static inline int dma_set_mask(struct device *dev, u64 mask)
+>   {
+> -	return get_dma_ops(dev)->set_dma_mask(dev, mask);
+> +	struct dma_map_ops *ops = get_dma_ops(dev);
+> +	BUG_ON(!ops);
 > +
-> +#ifdef CONFIG_THUMBONLY_CPU
-> +	.thumb
-> +ENTRY(stext)
-> +#else
-> +	.arm
->  ENTRY(stext)
->  
->   THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
->   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
->   THUMB(	.thumb			)	@ switch to Thumb now.
->   THUMB(1:			)
-> +#endif
+> +	if (ops->set_dma_mask)
+> +		return ops->set_dma_mask(dev, mask);
+> +
+> +	return arm_dma_set_mask(dev, mask);
+>   }
+>   
+>   #ifdef __arch_page_to_dma
+> @@ -112,8 +119,6 @@ static inline void dma_free_noncoherent(struct device *dev, size_t size,
+>   
+>   extern int dma_supported(struct device *dev, u64 mask);
+>   
+> -extern int arm_dma_set_mask(struct device *dev, u64 dma_mask);
+> -
+>   /**
+>    * arm_dma_alloc - allocate consistent memory for DMA
+>    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
 
-The behaviour is that we start the file is kernel entry state, then
-we switch to kernel run state.
+It can be done much simpler, please just add '.set_dma_mask = 
+arm_dma_set_mask,'
+to iommu_ops declaration. There is no point complicating the header files.
 
-The switch is only needed for kernels which run on CPUs supporting
-both states, where the run state is not ARM.
-
-So, it would be neater for these entry sequences to look something
-like:
-
-HAS_ARM(.arm)	@ because -mthumb is default for Thumb kernels anyway
-
-ENTRY(stext)
-HAS_ARM(THUMB(	@ code to switch to Thumb ))
-
-	@ real code starts here, in run state.
-
-
-
-Where
-
-#ifdef CONFIG_THUMBONLY_CPU
-#define HAS_ARM(x...)
-#else
-#define HAS_ARM(x...) x
-#endif
-
-(I haven't read the whole thread yet, so decisions about what
-config variables and macro names should be used may be overridden
-by other people...)
-
-
-Thoughts?
-
-Cheers
----Dave
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
