@@ -1,26 +1,20 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 29 Jan 2013 13:15:10 -0200
-Subject: [GIT PULL] imx cleanup for 3.9
-In-Reply-To: <20130129151005.GC11345@S2101-09.ap.freescale.net>
-References: <20130122144813.GD2812@S2101-09.ap.freescale.net>
- <20130128220026.GC3047@quad.lixom.net>
- <20130129010853.GA24352@S2101-09.ap.freescale.net>
- <20130129072603.GL1906@pengutronix.de>
- <20130129141857.GA12723@quad.lixom.net>
- <20130129151005.GC11345@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5AkmTaA9=EtZKazARAKF7VYOpE17TrQv-Mwd=MctjB04A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Jan 2013 15:15:01 +0000
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+In-Reply-To: <20130129161211.7bb8cada@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130129161211.7bb8cada@skate>
+Message-ID: <20130129151501.GY23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 1:10 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Jan 29, 2013 at 06:18:57AM -0800, Olof Johansson wrote:
->> Ok. Just to make clear: While I personally prefer the regular way of specifying
->> the board dts files, my main concern with this patch is that it is _pure
->> churn_. It's 1000 lines of change without a functional benefit, and without
->> really being a cleanup that benefits long-term development.
->>
-> You can say it's not a cleanup, but it definitely benefits long-term
-> development.  It makes board dts development a lot easier, and that's
-> why I came up with the patch.
+On Tue, Jan 29, 2013 at 04:12:11PM +0100, Thomas Petazzoni wrote:
+> Russell,
+> 
+> As the arch/arm/kernel/ maintainer, what is your position regarding the
+> below patch?
 
-I also agree here.
+Given the description, I'd feel much happier with this if we specified
+the alignment numerically rather than allowing "some random code" to do
+something with the passed values.
