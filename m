@@ -1,41 +1,40 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 29 Jan 2013 18:42:49 +0100
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <1359478014.3529.157.camel@shinybook.infradead.org>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
-Message-ID: <20130129174249.GB25415@pd.tnic>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 29 Jan 2013 09:43:11 -0800
+Subject: [GIT PULL v2] imx cleanup for 3.9
+In-Reply-To: <20130129064200.GC21504@S2101-09.ap.freescale.net>
+References: <20130129064200.GC21504@S2101-09.ap.freescale.net>
+Message-ID: <20130129174311.GB17935@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 04:46:58PM +0000, Woodhouse, David wrote:
-> If we're really going to have many different architectures depending
-> on different versions of GCC for this (if it wasn't sane to use
-> it from 4.4/4.8 when it got introduced, and depends on some later
-> arch-specific optimisation), then perhaps we'll have the arch
-> provide the corresponding required GCC_VERSION for using each of
-> 64/32/16 bit builtins, instead of just a yes/no flag? Or just define
-> __HAVE_BUILTIN_BSWAPxx__ for itself, perhaps?
+Hi,
 
-Damn, there's already the __powerpc__ thing in there.
 
-Yeah, something like defininig __HAVE_BUILTIN_BSWAPxx__ makes sense and
-can keep the header arch-agnostic without growing all those different
-arch defines.
+On Tue, Jan 29, 2013 at 02:42:02PM +0800, Shawn Guo wrote:
+> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+> 
+>   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-cleanup-3.9
 
-But I liked your other suggestion better to get the offending compilers
-fixed.
+Pulled. It had change/remove conflicts due to the removed board files that had
+been modified with the timer cleanup which I resolved.
 
-I dunno though, how generically is stuff like that getting implemented
-for every arch so probably single arches doing __HAVE* defines is
-probably going to be the realizable solution in the end.
+> 
+> for you to fetch changes up to 7356420cd34e40fe27bf26555b0bf3f2849a43dd:
+> 
+>   ARM: imx: Remove mx508 support (2013-01-29 14:05:43 +0800)
+> 
+> ----------------------------------------------------------------
+> I have left out the patch (ARM: dts: imx: use nodes label in board dts)
+> in question and other dts related changes, and will have them go via DT
+> branch  to save the cross branch dependency.
 
-Hmmm.
+This is a great message to have in the email, but as a tag description the
+previous version of the branch had better contents. So I saved that (and
+removed the dt/label reference).
 
--- 
-Regards/Gruss,
-    Boris.
 
-Sent from a fat crate under my desk. Formatting is fine.
---
+-Olof
