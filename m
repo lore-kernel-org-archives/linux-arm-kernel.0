@@ -1,48 +1,46 @@
-From: david.woodhouse@intel.com (Woodhouse, David)
-Date: Tue, 29 Jan 2013 14:43:23 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130129141328.GV23505@n2100.arm.linux.org.uk>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129141328.GV23505@n2100.arm.linux.org.uk>
-Message-ID: <1359470601.3529.120.camel@shinybook.infradead.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 29 Jan 2013 15:46:10 +0100
+Subject: [RFC 0/3] arm: mxs: sanitize enet_out clock handling
+Message-ID: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-29 at 14:13 +0000, Russell King - ARM Linux wrote:
-> 
-> So, this compiler (4.5.4) has support for 32-bit and 64-bit bswaps
-> across all our architectures, but not the 16-bit ones.
+Handling enet_out on MX28 is cumbersome at the moment. Most boards need it
+enabled and for that, they have to add code to mach-mxs.c (see sps1 as an
+example). Since this is board specific, we better encode it in the devicetree,
+that is the reason it was made for.
 
-That observation is consistent with my dig through GCC history. I had
-come to the conclusion that the 32-bit and 64-bit versions were added
-*generically* in 4.4, and that the 16-bit version was added in 4.6 to
-that PowerPC back end, and made generic in 4.8. So I *had* put that
-arch-specific check into compiler-gcc4.h, for PowerPC. It's just outside
-the context of Kim's patch. If it really does end up being different for
-every arch, I may reconsider that.
+My proposal will overwrite the generic "clock" and "clock-names" properties
+from imx28.dtsi in the board file. The original one has 2 entries, and boards
+needing enet_out will overload it with three entries. The network driver will
+enable the clock if it was specified. The old code enabling the clock will be
+backward compatible but print a WARN if the legacy mode needs to be used.
 
-As for the __bswapsi2() calls... if it's ever emitting an out-of-line
-call for something like that, that seems like a really dubious decision;
-surely it's better being inlined? So rather than adding it to your
-bits-of-libgcc.a in the kernel, I'd suggest just *not* using
-ARCH_USE_BUILTIN_BSWAP for the offending compilers, and filing a bug to
-get them fixed.
+This will make adding new board easier, since we don't have to touch mach-mxs.c
+for this case. It scales much better.
 
-But really, this is why I created ARCH_USE_BUILTIN_BSWAP and left it to
-architecture maintainers to enable it at their leisure.... :)
+Tested on a MX28EVK. Please review, comment, apply(?)
+
+Thanks,
+
+   Wolfram
+
+
+Wolfram Sang (3):
+  net: freescale: fec: add support for optional enet_out clk
+  arm: mxs: add enet_out clock to devicetree
+  arm: mach-mxs: make enabling enet_out a legacy function
+
+ arch/arm/boot/dts/imx28-apf28.dts      |    3 +++
+ arch/arm/boot/dts/imx28-apx4devkit.dts |    3 +++
+ arch/arm/boot/dts/imx28-cfa10049.dts   |    3 +++
+ arch/arm/boot/dts/imx28-evk.dts        |    3 +++
+ arch/arm/boot/dts/imx28-sps1.dts       |    3 +++
+ arch/arm/boot/dts/imx28-tx28.dts       |    3 +++
+ arch/arm/mach-mxs/mach-mxs.c           |   24 ++++++++++++++++--------
+ drivers/net/ethernet/freescale/fec.c   |   10 ++++++++++
+ drivers/net/ethernet/freescale/fec.h   |    1 +
+ 9 files changed, 45 insertions(+), 8 deletions(-)
 
 -- 
-                   Sent with MeeGo's ActiveSync support.
-
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/301d4e82/attachment.bin>
+1.7.10.4
