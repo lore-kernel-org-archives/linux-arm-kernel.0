@@ -1,35 +1,39 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 29 Jan 2013 17:39:02 +0530
-Subject: [PATCH 2/2] drivers: net:ethernet: cpsw: add support for VLAN
-In-Reply-To: <1359452926.4336.1.camel@coredoba.hi.pengutronix.de>
-References: <1359403945-28585-1-git-send-email-mugunthanvnm@ti.com>
- <1359403945-28585-3-git-send-email-mugunthanvnm@ti.com>
- <1359452926.4336.1.camel@coredoba.hi.pengutronix.de>
-Message-ID: <5107BBDE.7030401@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 29 Jan 2013 10:14:53 -0200
+Subject: [PATCH] ARM: imx: clk-imx27: Do not register peripheral clock for SSI
+Message-ID: <1359461693-27483-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/29/2013 3:18 PM, Jan L?bbe wrote:
-> On Tue, 2013-01-29 at 01:42 +0530, Mugunthan V N wrote:
->> --- a/Documentation/devicetree/bindings/net/cpsw.txt
->> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
->> @@ -24,6 +24,8 @@ Required properties:
->>   Optional properties:
->>   - ti,hwmods            : Must be "cpgmac0"
->>   - no_bd_ram            : Must be 0 or 1
->> +- default_vlan         : Specifies Default VLAN for non tagged packets
->> +                         ALE processing
-> This does not seem to be a property of the hardware. Could there be a
-> reasonable default for it?
->
-> Regards,
-> Jan
-Jan
+From: Fabio Estevam <fabio.estevam@freescale.com>>
 
-In VLAN aware mode, ALE always process only VLAN tagged packets. Even 
-untagged packets
-In hardware you can use any VLAN id for default (non tagged packet) 
-filtering.
+imx ssi block has two types of clocks:
+    
+- ipg: bus clock, the clock needed for accessing registers.
+- per: peripheral clock, the clock needed for generating the bit rate.
 
-Regards
-Mugunthan V N
+Currently ssi driver only supports slave mode and thus need only to handle
+the ipg clock, because the peripheral clock comes from the master codec.
+
+Only register the ipg clock and do not register the peripheral clock for ssi
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx27.c |    2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 1ffe3b534..303d7bd 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -274,8 +274,6 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
+ 	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
+ 	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
+-	clk_register_clkdev(clk[ssi1_baud_gate], "bitrate" , "imx-ssi.0");
+-	clk_register_clkdev(clk[ssi2_baud_gate], "bitrate" , "imx-ssi.1");
+ 
+ 	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
+ 
+-- 
+1.7.9.5
