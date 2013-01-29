@@ -1,73 +1,94 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 29 Jan 2013 10:43:13 -0800
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <51076FA2.9070002@ti.com>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
- <201301220931.24570.arnd@arndb.de> <50FE666B.10902@ti.com>
- <20130122145113.GK23505@n2100.arm.linux.org.uk> <50FEAABA.6050307@ti.com>
- <510615F8.7010203@ti.com> <5107114C.4070307@linaro.org>
- <51076FA2.9070002@ti.com>
-Message-ID: <51081841.2060103@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 29 Jan 2013 13:42:33 -0500 (EST)
+Subject: [PATCH v3 14/15] ARM: vexpress/dcscb: handle platform coherency
+ exit/setup and CCI
+In-Reply-To: <20130129104642.GK30563@e102568-lin.cambridge.arm.com>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-15-git-send-email-nicolas.pitre@linaro.org>
+ <20130129104642.GK30563@e102568-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1301291327340.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 10:43 PM, Santosh Shilimkar wrote:
-> Jon,
->
-> On Tuesday 29 January 2013 05:31 AM, John Stultz wrote:
->> On 01/27/2013 10:08 PM, Santosh Shilimkar wrote:
->>> On Tuesday 22 January 2013 08:35 PM, Santosh Shilimkar wrote:
->>>> On Tuesday 22 January 2013 08:21 PM, Russell King - ARM Linux wrote:
->>>>> On Tue, Jan 22, 2013 at 03:44:03PM +0530, Santosh Shilimkar wrote:
->
-> [..]
->
->>>> Thanks for expanding it. It is really helpful.
->>>>
->>>>> And I think further discussion is pointless until such research has
->>>>> been
->>>>> done (or someone who _really_ knows the time keeping/timer/sched code
->>>>> inside out comments.)
->>>>>
->>>> Fully agree about experimentation to re-asses the drift.
->>>>  From what I recollect from past, few OMAP customers did
->>>> report the time drift issue and that is how the switch
->>>> from 100 --> 128 happened.
->>>>
->>>> Anyway I have added the suggested task to my long todo list.
->>>>
->>> So I tried to see if any time drift with HZ = 100 on OMAP. I ran the
->>> setup for 62 hours and 27 mins with time synced up once with NTP 
->>> server.
->>> I measure about ~174 millisecond drift which is almost noise 
->>> considering
->>> the observed duration was ~224820000 milliseconds.
->>
->> So 174ms drift doesn't sound great, as < 2ms (often much less - though
->> that depends on how close the server is) can be expected with NTP.
->> Although its not clear how you were measuring: Did you see a max 174ms
->> offset while trying to sync with NTP? Was that offset shortly after
->> starting NTP or after NTP converged down?
->>
-> To avoid the server latency, we didn't do continuous sync. The time 
-> was synced in the beginning and after 62.5 hours (#ntpd -qg) and the 
-> drift
-> of about 174 ms was observed. As you said this could be because of
-> server sync time along with probably some addition from system calls
-> from #ntpd. 
+On Tue, 29 Jan 2013, Lorenzo Pieralisi wrote:
 
-Ahh.. Ok. Thanks for the clarification. After a one time sync, ~774ppb 
-drift is surprisingly good!
+> On Tue, Jan 29, 2013 at 07:51:09AM +0000, Nicolas Pitre wrote:
+> 
+> [...]
+> 
+> > +		/*
+> > +		 * Flush the local CPU cache.
+> > +		 *
+> > +		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
+> > +		 * a preliminary flush here for those CPUs.  At least, that's
+> > +		 * the theory -- without the extra flush, Linux explodes on
+> > +		 * RTSM (maybe not needed anymore, to be investigated).
+> > +		 */
+> > +		flush_cache_louis();
+> 
+> This is not needed. If it is, that is a model bug and should be flagged
+> up as such.
+
+Could someone at ARM do that?
+
+I just confirmed that this is still the case by commenting out the 
+preliminary flush calls and hot-plugging CPUs out and back.  Result is a 
+non-sensical kernel oops which has the looks of serious memory 
+corruption.  This is with RTSM version 7.1.42.
+
+> > +		cpu_proc_fin(); /* disable allocation into internal caches*/
+> 
+> This code disables the I-cache causing following instruction fetches from
+> DRAM; that is extremely slow and should be avoided, there is no point in
+> disabling the I-cache here, that is not required.
+> On fast-models that's a non-issue, but I really want to prevent copy'n'paste
+> of this sequence as it stands.
+
+Agreed, I'll change that.  The (not included in this series) TC2 backend 
+does leave the I-cache active already.
+
+> > diff --git a/arch/arm/mach-vexpress/dcscb_setup.S b/arch/arm/mach-vexpress/dcscb_setup.S
+> > new file mode 100644
+> > index 0000000000..cac033b982
+> > --- /dev/null
+> > +++ b/arch/arm/mach-vexpress/dcscb_setup.S
+> > @@ -0,0 +1,80 @@
+> > +/*
+> > + * arch/arm/include/asm/dcscb_setup.S
+> > + *
+> > + * Created by:  Dave Martin, 2012-06-22
+> > + * Copyright:   (C) 2012-2013  Linaro Limited
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +
+> > +#include <linux/linkage.h>
+> > +#include <asm/mcpm_entry.h>
+> > +
+> > +
+> > +#define SLAVE_SNOOPCTL_OFFSET	0
+> > +#define SNOOPCTL_SNOOP_ENABLE	(1 << 0)
+> > +#define SNOOPCTL_DVM_ENABLE	(1 << 1)
+> > +
+> > +#define CCI_STATUS_OFFSET	0xc
+> > +#define STATUS_CHANGE_PENDING	(1 << 0)
+> > +
+> > +#define CCI_SLAVE_OFFSET(n)	(0x1000 + 0x1000 * (n))
+> > +
+> > +#define RTSM_CCI_PHYS_BASE	0x2c090000
+> > +#define RTSM_CCI_SLAVE_A15	3
+> > +#define RTSM_CCI_SLAVE_A7	4
+> 
+> We need to remove these hardcoded values in due course as you know, I am
+> working on new code that allows us to match the CCI port address to
+> MPIDR on resume.
+
+Yes, absolutely.  I was expecting this code to become generic and more 
+closely tied to the CCI driver.  The CCI init 
+code could set up variables to be used by this code.
 
 
-> As mentioned, the other run with HZ = 128 which started
-> 15 hours 20 mins is already showing about 24 mS drift now. I will
-> let it run for couple of more days just to have similar duration run.
-
-Yea, this is also great drift wise (but its not surprising, as both 
-cases we're keeping time off of the same clocksource, and HZ shouldn't 
-come into play). But its good to have the timekeeping side validated.
-
-thanks
--john
+Nicolas
