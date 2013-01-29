@@ -1,73 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jan 2013 12:15:31 +0000
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <34874167.ghObrToI03@fb07-iapwap2>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
- <20130128142510.68092e10.akpm@linux-foundation.org>
- <20130129101549.GP23505@n2100.arm.linux.org.uk>
- <34874167.ghObrToI03@fb07-iapwap2>
-Message-ID: <20130129121530.GS23505@n2100.arm.linux.org.uk>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 29 Jan 2013 10:17:35 -0200
+Subject: [PATCH v2] ARM: imx: clk-imx27: Do not register peripheral clock for
+ SSI
+Message-ID: <1359461855-27551-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 12:43:20PM +0100, Egon Alter wrote:
-> Am Dienstag, 29. Januar 2013, 10:15:49 schrieb Russell King - ARM Linux:
-> > On Mon, Jan 28, 2013 at 02:25:10PM -0800, Andrew Morton wrote:
-> > > What's this "with enabled unaligned memory access" thing?  You mean "if
-> > > the arch supports CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS"?  If so,
-> > > that's only x86, which isn't really in the target market for this
-> > > patch, yes?
-> > > 
-> > > It's a lot of code for a 50ms boot-time improvement.  Does anyone have
-> > > any opinions on whether or not the benefits are worth the cost?
-> > 
-> > Well... when I saw this my immediate reaction was "oh no, yet another
-> > decompressor for the kernel".  We have five of these things already.
-> > Do we really need a sixth?
-> > 
-> > My feeling is that we should have:
-> > - one decompressor which is the fastest
-> > - one decompressor for the highest compression ratio
-> > - one popular decompressor (eg conventional gzip)
-> 
-> the problem gets more complicated as the "fastest" decompressor usually 
-> creates larger images which need more time to load from the storage, e.g. a 
-> one MB larger image on a 10 MB/s storage (note: bootloaders often configure 
-> the  storage controllers in slow modes) gives 100 ms more boot time, thus 
-> eating the gain of a "fast decompressor".
+imx ssi block has two types of clocks:
+    
+- ipg: bus clock, the clock needed for accessing registers.
+- per: peripheral clock, the clock needed for generating the bit rate.
 
-Ok.
+Currently ssi driver only supports slave mode and thus need only to handle
+the ipg clock, because the peripheral clock comes from the master codec.
 
-We already have:
+Only register the ipg clock and do not register the peripheral clock for ssi
 
-- lzma: 33% smaller than gzip, decompression speed between gzip and bzip2
-- xz: 30% smaller than gzip, decompression speed similar to lzma
-- bzip2: 10% smaller than gzip, slowest decompression
-- gzip: reference implementation
-- lzo: 10% bigger than gzip, fastest
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Fix typo in email address in the From field
 
-And now:
+ arch/arm/mach-imx/clk-imx27.c |    2 --
+ 1 file changed, 2 deletions(-)
 
-- lz4: 8% bigger than lzo, 16% faster than lzo?
-  (I make that 16% bigger than gzip)
-
-So, image size wise, on a 2MB compressed gzip image, we're looking at
-the difference between LZO at 2.2MB and LZ4 at 2.38MB.
-
-But let's not stop there - the figures given for a 13MB decompressed
-image were:
-
-lzo: 6.3MB, 301ms
-lz4: 6.8MB, 251ms(167ms, with enabled unaligned memory access)
-
-At 10MB/s (your figure), it takes .68s to read 6.8MB as opposed to .63s
-for LZO.  So, totalling up these figures gives to give the overall figure:
-
-lzo: 301ms + 630ms = 931ms
-lz4: 167ms + 680ms = 797ms
-
-Which gives the tradeoff at 10MB/s of 14% faster (but only with efficient
-unaligned memory access.)  So... this faster decompressor is still the
-fastest even with your media transfer rate factored in.
-
-That gives an argument for replacing lzo with lz4...
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 1ffe3b534..303d7bd 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -274,8 +274,6 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
+ 	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
+ 	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
+-	clk_register_clkdev(clk[ssi1_baud_gate], "bitrate" , "imx-ssi.0");
+-	clk_register_clkdev(clk[ssi2_baud_gate], "bitrate" , "imx-ssi.1");
+ 
+ 	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
+ 
+-- 
+1.7.9.5
