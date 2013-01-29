@@ -1,75 +1,56 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 29 Jan 2013 17:38:42 -0600
-Subject: [RFC PATCH 0/2] ARM: update cpuinfo to print CPU model name
-In-Reply-To: <CAB=otbSV6CH4WOrr577bHXFcjEVRGjZxatgy4CJ3cr0M0h4vfw@mail.gmail.com>
-References: <1359474865-15408-1-git-send-email-ruslan.bilovol@ti.com>
- <20130129160243.GA3389@kahuna>
- <CAB=otbSV6CH4WOrr577bHXFcjEVRGjZxatgy4CJ3cr0M0h4vfw@mail.gmail.com>
-Message-ID: <20130129233842.GA8024@kahuna>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 29 Jan 2013 15:40:41 -0800
+Subject: [PATCH v4 0/9] ARM: S3C24XX: rework irq handling for a later dt
+ usage
+In-Reply-To: <201301272124.18530.heiko@sntech.de>
+References: <201301272124.18530.heiko@sntech.de>
+Message-ID: <072d01cdfe7a$0e14ecd0$2a3ec670$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01:08-20130130, Ruslan Bilovol wrote:
-> Hi,
+Heiko St?bner wrote: 
 > 
-> On Tue, Jan 29, 2013 at 6:02 PM, Nishanth Menon <nm@ti.com> wrote:
-> >
-> > On 17:54-20130129, Ruslan Bilovol wrote:
-> > > Hi,
-> > >
-> > > The following patches update cpuinfo to print CPU
-> > > model name for ARM. First patch exactly makes needed
-> > > changes for ARM architecture.
-> > > Second patch adds this ability to OMAP4 SoCs.
-> > >
-> > > This adds a common approach to show SoC name.
-> > >
-> > > Looks like there were few attempts to do similar
-> > > changes to cpuinfo without any luck.
-> > >
-> > > So - comments are welcome
-> > >
-> > > Ruslan Bilovol (2):
-> > >   ARM: kernel: update cpuinfo to print CPU model name
-> > >   ARM: OMAP4: setup CPU model name during ID initialisation
-> >
-> > We had an discussion on similar lines but a generic suggestion:
-> > https://patchwork.kernel.org/patch/98720/
-> > SoCinfo framework which was supposed to introduce this
-> >
-> > Would'nt that be a better approach to take than an OMAP only solution?
+> This v4 does not change any code part. The patches are merely rebased
+> to apply to the next/cleanup-s3c24xx branch as requested.
 > 
-> My goal is only to say what is the SoC model name in the /proc/cpuinfo
-> (And it is not an OMAP-only solution - it is common. Support for OMAP
-> is added in second patch)
-> This is the only type of information that we can apply for any SoC.
-> My point is - any SoC-specific information should go through some other
-> way - like SoCinfo framework mentioned by you.
-> And additional point - in cpuinfo we already have CPU name and Machine name.
-> The SoC name (that is something between these two things) looks also relevant
-Looking at the sample output in patch #1/2
-OMAP4470 ES1.0 HS
+> Heiko Stuebner (9):
+>   ARM: S3C24XX: transform irq handling into a declarative form
+>   ARM: S3C24XX: Move irq syscore-ops to irq-pm
+>   ARM: S3C24XX: Modify s3c_irq_wake to use the hwirq property
+>   ARM: S3C24XX: move s3c2416 irq init to common irq code
+>   ARM: S3C24XX: modify s3c2416 irq init to initialize all irqs
+>   ARM: S3C24XX: transform s3c2416 irqs into new structure
+>   ARM: S3C24XX: move s3c2443 irq code to irq.c
+>   ARM: S3C24XX: modify s3c2443 irq init to initialize all irqs
+>   ARM: S3C24XX: transform s3c2443 subirqs into new structure
+> 
+>  arch/arm/mach-s3c24xx/Makefile               |    4 +-
+>  arch/arm/mach-s3c24xx/common.h               |    2 +
+>  arch/arm/mach-s3c24xx/irq-pm.c               |   41 +-
+>  arch/arm/mach-s3c24xx/irq-s3c2416.c          |  348 --------
+>  arch/arm/mach-s3c24xx/irq-s3c2443.c          |  281 -------
+>  arch/arm/mach-s3c24xx/mach-smdk2416.c        |    2 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2443.c        |    2 +-
+>  arch/arm/mach-s3c24xx/s3c2410.c              |    4 +-
+>  arch/arm/mach-s3c24xx/s3c2412.c              |    4 +-
+>  arch/arm/mach-s3c24xx/s3c2416.c              |    4 +-
+>  arch/arm/mach-s3c24xx/s3c2440.c              |    4 +-
+>  arch/arm/mach-s3c24xx/s3c2442.c              |    4 +-
+>  arch/arm/plat-s3c24xx/Kconfig                |    1 +
+>  arch/arm/plat-s3c24xx/irq.c                  | 1110
++++++++++++++++-----------
+>  arch/arm/plat-samsung/include/plat/pm.h      |    6 -
+>  arch/arm/plat-samsung/include/plat/s3c2416.h |    1 +
+>  arch/arm/plat-samsung/include/plat/s3c2443.h |    2 +
+>  17 files changed, 688 insertions(+), 1132 deletions(-)
+>  delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2416.c
+>  delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2443.c
+> 
+> --
+> 1.7.10.4
 
-OMAP4470 is SoC name
-ES1.0 is SoC revision
-HS is SoC type
+Looks good to me, applied.
 
-We even have SoC features (e.g. at boot NEON etc..)
+Thanks.
 
-Is the intent to put all this inside /proc/cpuinfo?? I bet every SoC has
-it's own interesting data it'd like to have (like some of the info
-populated by DT even). I am hardpressed to think this fits inside
-/proc/cpuinfo. I might even suspect that the list of interesting
-information might even vary per SoC.
-
-having machine name is something ARM specific? dumping it on my linux
-machines (x86[1] and sparc[2]) dont seem to show that.
-
-but in the interest of not breaking existing interfaces, new interfaces
-should potentially belong elsewhere.. my 2 cents.
-
-[1] http://pastebin.com/CF8HPDAC (Xubuntu 12.04 3.2.0-36)
-[2] http://pastebin.com/qNwWHwiu (Debian 3.2.35-2)
--- 
-Regards,
-Nishanth Menon
+- Kukjin
