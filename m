@@ -1,139 +1,134 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Jan 2013 16:39:57 +0100
-Subject: [PATCH 3/5] net: mvmdio: enhance driver to support SMI
- error/done interrupts
-In-Reply-To: <1359473048-26551-4-git-send-email-florian@openwrt.org>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1359473048-26551-4-git-send-email-florian@openwrt.org>
-Message-ID: <20130129163957.79815ff7@skate>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 29 Jan 2013 15:43:40 +0000
+Subject: [PATCH v3 07/15] ARM: vexpress: Select the correct SMP
+ operations at run-time
+In-Reply-To: <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1359474220.3731.45.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Florian Fainelli,
+On Tue, 2013-01-29 at 02:51 -0500, Nicolas Pitre wrote:
+> From: Jon Medhurst <tixy@linaro.org>
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
 
-On Tue, 29 Jan 2013 16:24:06 +0100, Florian Fainelli wrote:
+Should this patch be split into two. One to introduce the new smp_init
+hook into the generic ARM kernel code, and one to make vexpress use it?
+With, descriptions something like:
 
->  #define MVMDIO_SMI_DATA_SHIFT              0
->  #define MVMDIO_SMI_PHY_ADDR_SHIFT          16
-> @@ -36,12 +40,28 @@
->  #define MVMDIO_SMI_WRITE_OPERATION         0
->  #define MVMDIO_SMI_READ_VALID              BIT(27)
->  #define MVMDIO_SMI_BUSY                    BIT(28)
-> +#define MVMDIO_ERR_INT_CAUSE		   0x007C
-> +#define  MVMDIO_ERR_INT_SMI_DONE	   0x00000010
-> +#define MVMDIO_ERR_INT_MASK		   0x0080
->  
->  struct orion_mdio_dev {
->  	struct mutex lock;
->  	void __iomem *regs;
-> +	/*
-> +	 * If we have access to the error interrupt pin (which is
-> +	 * somewhat misnamed as it not only reflects internal errors
-> +	 * but also reflects SMI completion), use that to wait for
-> +	 * SMI access completion instead of polling the SMI busy bit.
-> +	 */
-> +	int err_interrupt;
-> +	wait_queue_head_t smi_busy_wait;
->  };
->  
-> +static int orion_mdio_smi_is_done(struct orion_mdio_dev *dev)
-> +{
-> +	return !(readl(dev->regs) & MVMDIO_SMI_BUSY);
-> +}
-> +
->  /* Wait for the SMI unit to be ready for another operation
->   */
->  static int orion_mdio_wait_ready(struct mii_bus *bus)
-> @@ -50,19 +70,30 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
->  	int count;
->  	u32 val;
->  
-> -	count = 0;
-> -	while (1) {
-> -		val = readl(dev->regs);
-> -		if (!(val & MVMDIO_SMI_BUSY))
-> -			break;
-> -
-> -		if (count > 100) {
-> -			dev_err(bus->parent, "Timeout: SMI busy for too long\n");
-> -			return -ETIMEDOUT;
-> +	if (dev->err_interrupt == NO_IRQ) {
-> +		count = 0;
-> +		while (1) {
-> +			val = readl(dev->regs);
-> +			if (!(val & MVMDIO_SMI_BUSY))
-> +				break;
+-----------------------------------------------------------------------
+ARM: kernel: Enable selection of SMP operations at boot time
 
-What about using your new orion_mdio_smi_is_done() function here?
+Add a new 'smp_init' hook to machine_desc so platforms can specify a
+function to be used to setup smp ops instead of having a statically
+defined value.
+-----------------------------------------------------------------------
+ARM: vexpress: Select multi-cluster SMP operation if required
+-----------------------------------------------------------------------
 
-> +
-> +			if (count > 100) {
-> +				dev_err(bus->parent,
-> +					"Timeout: SMI busy for too long\n");
-> +				return -ETIMEDOUT;
-> +			}
-> +
-> +			udelay(10);
-> +			count++;
->  		}
-> +	}
->  
-> -		udelay(10);
-> -		count++;
-> +	if (!orion_mdio_smi_is_done(dev)) {
-
-Maybe it should be in an else if block so that the waitqueue case is
-only considered if there is an IRQ registered? Of course practically
-speaking, it's OK because if there is no IRQ, we'll wait in the polling
-loop above, and either exit from the function on timeout, or continue
-on success. But it still would make the code a little bit clearer, I'd
-say.
-
->  static int orion_mdio_probe(struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
-> @@ -181,6 +227,19 @@ static int orion_mdio_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> +	dev->err_interrupt = NO_IRQ;
-
-Not needed, you already do dev->err_interrupt = something() below.
-
-> +	init_waitqueue_head(&dev->smi_busy_wait);
-> +
-> +	dev->err_interrupt = irq_of_parse_and_map(pdev->dev.of_node, 0);
-> +	if (dev->err_interrupt != NO_IRQ) {
-> +		ret = devm_request_irq(&pdev->dev, dev->err_interrupt,
-> +					orion_mdio_err_irq,
-> +					IRQF_SHARED, pdev->name, dev);
-> +		if (!ret)
-> +			writel(MVMDIO_ERR_INT_SMI_DONE,
-> +					dev->regs + MVMDIO_ERR_INT_MASK);
-> +	}
-> +
->  	mutex_init(&dev->lock);
->  
->  	ret = of_mdiobus_register(bus, np);
-> @@ -202,6 +261,8 @@ static int orion_mdio_remove(struct platform_device *pdev)
->  	struct mii_bus *bus = platform_get_drvdata(pdev);
->  	struct orion_mdio_dev *dev = bus->priv;
->  
-> +	writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
-> +	free_irq(dev->err_interrupt, dev);
-
-free_irq() not needed since the IRQ handler is registered with
-devm_request_irq().
-
->  	mdiobus_unregister(bus);
->  	kfree(bus->irq);
->  	mdiobus_free(bus);
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tixy
+
+
+>  arch/arm/include/asm/mach/arch.h |  3 +++
+>  arch/arm/kernel/setup.c          |  5 ++++-
+>  arch/arm/mach-vexpress/core.h    |  2 ++
+>  arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
+>  arch/arm/mach-vexpress/v2m.c     |  2 +-
+>  5 files changed, 22 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 917d4fcfd9..3d01c6d6c3 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -17,8 +17,10 @@ struct pt_regs;
+>  struct smp_operations;
+>  #ifdef CONFIG_SMP
+>  #define smp_ops(ops) (&(ops))
+> +#define smp_init_ops(ops) (&(ops))
+>  #else
+>  #define smp_ops(ops) (struct smp_operations *)NULL
+> +#define smp_init_ops(ops) (void (*)(void))NULL
+>  #endif
+>  
+>  struct machine_desc {
+> @@ -42,6 +44,7 @@ struct machine_desc {
+>  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+>  	char			restart_mode;	/* default restart mode	*/
+>  	struct smp_operations	*smp;		/* SMP operations	*/
+> +	void			(*smp_init)(void);
+>  	void			(*fixup)(struct tag *, char **,
+>  					 struct meminfo *);
+>  	void			(*reserve)(void);/* reserve mem blocks	*/
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3f6cbb2e3e..41edca8582 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
+>  	arm_dt_init_cpu_maps();
+>  #ifdef CONFIG_SMP
+>  	if (is_smp()) {
+> -		smp_set_ops(mdesc->smp);
+> +		if(mdesc->smp_init)
+> +			(*mdesc->smp_init)();
+> +		else
+> +			smp_set_ops(mdesc->smp);
+>  		smp_init_cpus();
+>  	}
+>  #endif
+> diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
+> index f134cd4a85..3a761fd76c 100644
+> --- a/arch/arm/mach-vexpress/core.h
+> +++ b/arch/arm/mach-vexpress/core.h
+> @@ -6,6 +6,8 @@
+>  
+>  void vexpress_dt_smp_map_io(void);
+>  
+> +void vexpress_smp_init_ops(void);
+> +
+>  extern struct smp_operations	vexpress_smp_ops;
+>  
+>  extern void vexpress_cpu_die(unsigned int cpu);
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index c5d70de9bb..667344b479 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/smp.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/vexpress.h>
+>  
+> @@ -206,3 +207,14 @@ struct smp_operations __initdata vexpress_smp_ops = {
+>  	.cpu_die		= vexpress_cpu_die,
+>  #endif
+>  };
+> +
+> +void __init vexpress_smp_init_ops(void)
+> +{
+> +	struct smp_operations *ops = &vexpress_smp_ops;
+> +#ifdef CONFIG_CLUSTER_PM
+> +	extern struct smp_operations mcpm_smp_ops;
+> +	if(of_find_compatible_node(NULL, NULL, "arm,cci"))
+> +		ops = &mcpm_smp_ops;
+> +#endif
+> +	smp_set_ops(ops);
+> +}
+> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> index 011661a6c5..34172bd504 100644
+> --- a/arch/arm/mach-vexpress/v2m.c
+> +++ b/arch/arm/mach-vexpress/v2m.c
+> @@ -494,7 +494,7 @@ static const char * const v2m_dt_match[] __initconst = {
+>  
+>  DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
+>  	.dt_compat	= v2m_dt_match,
+> -	.smp		= smp_ops(vexpress_smp_ops),
+> +	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
+>  	.map_io		= v2m_dt_map_io,
+>  	.init_early	= v2m_dt_init_early,
+>  	.init_irq	= v2m_dt_init_irq,
