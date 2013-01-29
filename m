@@ -1,36 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 29 Jan 2013 11:57:58 +0200
-Subject: [PATCH v3 10/30] USB: ehci-omap: Use PHY APIs to get the PHY
- device and put it out of suspend
-In-Reply-To: <1359453032-20604-1-git-send-email-rogerq@ti.com>
-References: <1359372631-8180-11-git-send-email-rogerq@ti.com>
- <1359453032-20604-1-git-send-email-rogerq@ti.com>
-Message-ID: <20130129095758.GM8708@arwen.pp.htv.fi>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Jan 2013 11:01:19 +0100
+Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
+In-Reply-To: <20130128225105.GA21935@obsidianresearch.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301282018.17714.arnd@arndb.de> <5106F5CB.8050304@wwwdotorg.org>
+ <20130128220904.GA21446@obsidianresearch.com>
+ <20130128231829.6b205c3c@skate>
+ <20130128222348.GA21628@obsidianresearch.com>
+ <20130128233048.2ab6a6d2@skate>
+ <20130128225105.GA21935@obsidianresearch.com>
+Message-ID: <20130129110119.07cb9ef3@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Jason Gunthorpe,
 
-On Tue, Jan 29, 2013 at 11:50:32AM +0200, Roger Quadros wrote:
-> For each port that is in PHY mode we obtain a PHY device using the USB PHY
-> library and put it out of suspend.
-> 
-> It is up to platform code to associate the PHY to the controller's
-> port and it is upto the PHY driver to manage the PHY's resources.
-> 
-> Also remove wired spacing around declarations we come across.
-> 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+On Mon, 28 Jan 2013 15:51:05 -0700, Jason Gunthorpe wrote:
 
-ideally, this would be done generically by ehci-hcd.ko itself. Alan,
-would you have objections provided it doesn't break anyone else ?
+> > > I'm refering to your earlier question about what PCI IDs to use for
+> > > the SW emulated devices. If there is no need for the host bridge then
+> > > you only need 1 PCI ID (for the root port bridge) and you can probably
+> > > fairly safely re-use the one in the Marvell config space of the HW.
+> > 
+> > Ah, ok, I see. But isn't a host bridge needed to bind all the
+> > PCI-to-PCI bridges under a single bus, in order to get the global
+> > resource assignment I was referring to?
+> 
+> The PCI-E spec requires it, but AFAIK it doesn't actually *do*
+> anything on Linux, and Linux doesn't require it.
+> 
+> I thought Thierry did this experiment and decided it wasn't necessary:
 
+Could you detail what would be visible PCI bus topology if I remove the
+emulated PCI host bridge? (And keeping one PCI-to-PCI bridge per PCIe
+interface) ?
+
+I'm just trying to understand what it would look like, in terms of
+"lspci -t" output, because for now, it's not clear to me how everything
+would fit together with the emulated host bridge.
+
+Thanks,
+
+Thomas
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/44445308/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
