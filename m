@@ -1,66 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jan 2013 14:55:49 +0000
+Date: Tue, 29 Jan 2013 15:28:41 +0000
 Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <20130129142434.GW23505@n2100.arm.linux.org.uk>
+In-Reply-To: <1359467140.31148.41.camel@smile>
 References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <201301291344.11066.arnd@arndb.de>
- <20130129142434.GW23505@n2100.arm.linux.org.uk>
-Message-ID: <201301291455.49347.arnd@arndb.de>
+ <201301291331.48427.arnd@arndb.de> <1359467140.31148.41.camel@smile>
+Message-ID: <201301291528.42176.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013, Russell King - ARM Linux wrote:
-> No, that's not what I mean.  I mean the situation we find on Versatile
-> platforms:
+On Tuesday 29 January 2013, Andy Shevchenko wrote:
+> On Tue, 2013-01-29 at 13:31 +0000, Arnd Bergmann wrote: 
+> > On Tuesday 29 January 2013, Viresh Kumar wrote:
+> > Ah, good. So I guess the "dma-requests" property should actually
+> > be "16" then.
+> > 
+> > Does this mean that an implicit zero request line means memory?
 > 
->             8     3                   >3
-> PL080 DMA --/--+--/------> FPGA Mux --/--> {bunch of off-CPU peripherals}
->                |  5
->                `--/------> {On-CPU peripherals}
+> No, it doesn't.
+> When dma is doing mem2mem transfers the request line field is ignored by
+> the hw.
+
+Ok.
+
+> > Could we have device-to-device DMAs with this controller, and if
+> > we can, should we have both 'src' and 'dst' fields?
 > 
-> This is something that I've been raising _every time_ I've been involved
-> with DMA engine discussions when it comes to the matching stuff, so this
-> is nothing new, and it's not unknown about.
+> As far as I know there is no driver under dmaengine that supports
+> per2per transfers.
 
-Ok, I see. I have not actually been involved with the DMA engine API
-much, so for me it's the first time /I/ see this being explained.
+Well, I'm asking because we need to describe the hardware properly,
+even if drivers today don't do this does not mean that it is not
+possible. We can always change the Linux implementation, but we
+cannot as easily change an established DT binding, just like
+we don't change user space interfaces.
 
->From the DT binding perspective, doing this should be no problem. I guess
-you would model the MUX as a trivial dma engine device that forwards to
-another one, just like we do for nested interrupt controllers:
+Of course, if that is a thing we don't expect anyone to do,
+we don't have to describe it, or we could make a compatible
+extension to the binding later.
 
-	pl080: dma-engine at 10000000 {
-		compatible ="arm,pl080", "arm,primecell";
-		reg = <0x10000000 0x1000>;
-		dma-requests = <8>;
-		dma-channels = <4>;
-		#dma-cells = <2>;
-	};
+> >  Are the
+> > two number ranges sharing the same address space, i.e. is
+> > request '7' as the destination guaranteed to be the same device
+> > as request '7' in the source?
+> 
+> Request line should be unique. It means a real wire from slave
+> hw to the dmac.
 
-	fpga {
-		mux: dma-mux at f0008000 {
-			reg = <0xf0008000 100>;
-			compatible = "arm,versatile-fpga-dmamux";
-			dma-requests = <7>;
-			dma-channels = <3>;
-			#dma-cells = <1>;
-			dmas = <&pl080 5 0>, <&pl080 6 0> <&pl080 7 0>;
-			dma-names = "mux5", "mux6", "mux7";
-		};
-		...
-
-		some-device at f000a000 {
-			compatible = "foo,using-muxed-dma";
-			dmas = <&mux 3>, <&mux 4>;
-			dma-names = "rx", "tx";
-		};
-	};
-
-The driver for foo,using-muxed-dma just requests a slave channel for its
-lines, which ends up calling the xlate function of the driver for the mux.
-That driver still needs to get written, of course, but it should be able
-to recursively call dma_request_slave_channel on the pl080 device.
-The arm,versatile-fpga-dmamux driver would not be registered to the dmaengine
-layer, but it would register as an of_dma_controller.
+Ok, good.
 
 	Arnd
