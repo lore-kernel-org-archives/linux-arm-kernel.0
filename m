@@ -1,49 +1,83 @@
 From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Tue, 29 Jan 2013 16:46:19 +0100
-Subject: [PATCH V3 5/5] DTS: Add device tree entry for onewire master on i.MX53
+Date: Tue, 29 Jan 2013 16:46:14 +0100
+Subject: [PATCH V3 3/5] W1: Convert MXC onewire master to devm_ functions.
 In-Reply-To: <20130129154608.5184.46101.stgit@localhost>
 References: <20130129154608.5184.46101.stgit@localhost>
-Message-ID: <20130129154619.5184.92015.stgit@localhost>
+Message-ID: <20130129154614.5184.4140.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+While doing this fix missing clk_disable_unprepare in error path.
 
 Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 Acked-by: Evgeniy Polyakov <zbr@ioremap.net>
 ---
- arch/arm/boot/dts/imx53.dtsi |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ drivers/w1/masters/mxc_w1.c |   26 ++++++--------------------
+ 1 files changed, 6 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index edc3f1e..00c957c 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -387,6 +387,14 @@
- 					};
- 				};
+diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
+index 949e566..317b2bc 100644
+--- a/drivers/w1/masters/mxc_w1.c
++++ b/drivers/w1/masters/mxc_w1.c
+@@ -117,7 +117,7 @@ static int mxc_w1_probe(struct platform_device *pdev)
+ 	if (!mdev)
+ 		return -ENOMEM;
  
-+				owire {
-+					pinctrl_owire_1: owiregrp-1 {
-+						fsl,pins = <
-+								1166 0x80000000 /* MX53_PAD_GPIO_18__OWIRE_LINE */
-+						>;
-+					};
-+				};
-+
- 				uart1 {
- 					pinctrl_uart1_1: uart1grp-1 {
- 						fsl,pins = <
-@@ -570,6 +578,13 @@
- 				status = "disabled";
- 			};
+-	mdev->clk = clk_get(&pdev->dev, NULL);
++	mdev->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(mdev->clk)) {
+ 		err = PTR_ERR(mdev->clk);
+ 		goto failed_clk;
+@@ -125,17 +125,11 @@ static int mxc_w1_probe(struct platform_device *pdev)
  
-+			owire: owire@63fa4000 {
-+				compatible = "fsl,imx53-owire", "fsl,imx21-owire";
-+				reg = <0x63fa4000 0x4000>;
-+				clocks = <&clks 159>;
-+				status = "disabled";
-+			};
+ 	mdev->clkdiv = (clk_get_rate(mdev->clk) / 1000000) - 1;
+ 
+-	res = request_mem_region(res->start, resource_size(res),
+-				"mxc_w1");
+-	if (!res) {
+-		err = -EBUSY;
+-		goto failed_req;
+-	}
+-
+-	mdev->regs = ioremap(res->start, resource_size(res));
++	mdev->regs = devm_request_and_ioremap(&pdev->dev, res);
+ 	if (!mdev->regs) {
+ 		dev_err(&pdev->dev, "Cannot map mxc_w1 registers\n");
+-		goto failed_ioremap;
++		err = -ENXIO;
++		goto failed_req;
+ 	}
+ 
+ 	clk_prepare_enable(mdev->clk);
+@@ -154,11 +148,9 @@ static int mxc_w1_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ failed_add:
+-	iounmap(mdev->regs);
+-failed_ioremap:
+-	release_mem_region(res->start, resource_size(res));
++	clk_disable_unprepare(mdev->clk);
 +
- 			ecspi2: ecspi at 63fac000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+ failed_req:
+-	clk_put(mdev->clk);
+ failed_clk:
+ 	kfree(mdev);
+ 	return err;
+@@ -170,16 +162,10 @@ failed_clk:
+ static int mxc_w1_remove(struct platform_device *pdev)
+ {
+ 	struct mxc_w1_device *mdev = platform_get_drvdata(pdev);
+-	struct resource *res;
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 
+ 	w1_remove_master_device(&mdev->bus_master);
+ 
+-	iounmap(mdev->regs);
+-	release_mem_region(res->start, resource_size(res));
+ 	clk_disable_unprepare(mdev->clk);
+-	clk_put(mdev->clk);
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 
