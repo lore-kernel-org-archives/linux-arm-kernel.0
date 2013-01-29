@@ -1,51 +1,30 @@
-From: mrugesh.mk@ti.com (Katepallewar, Mrugesh)
-Date: Tue, 29 Jan 2013 07:35:07 +0000
-Subject: [PATCH V2] ARM: davinci: da850: add RTC DT entries
-In-Reply-To: <5106A105.6030004@ti.com>
-References: <1359359268-9781-1-git-send-email-mrugesh.mk@ti.com>
- <5106A105.6030004@ti.com>
-Message-ID: <4232EB8829679242B82E712C3DB3149D42355C@DBDE01.ent.ti.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 29 Jan 2013 08:36:26 +0100
+Subject: [PATCH 2/2] drivers: net:ethernet: cpsw: add support for VLAN
+In-Reply-To: <1359403945-28585-3-git-send-email-mugunthanvnm@ti.com>
+References: <1359403945-28585-1-git-send-email-mugunthanvnm@ti.com>
+ <1359403945-28585-3-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <20130129073626.GB18272@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 21:32:13, Nori, Sekhar wrote:
-> Hi Mrugesh,
-> 
-> On 1/28/2013 1:17 PM, Mrugesh Katepallewar wrote:
-> > Add RTC DT entries in da850 dts file.
-> > 
-> > Signed-off-by: Mrugesh Katepallewar <mrugesh.mk@ti.com>
-> > ---
-> > Applies on top of v3.8-rc4 of linus tree.
-> > 
-> > This patch is depending on
-> > "ARM: davinci: da850: add interrupt-parent property in soc node"
-> > https://patchwork.kernel.org/patch/2044101/
-> 
-> > Tested on da850-evm device.
-> > 
-> > Test Procedure:
-> > date 2013.01.28-10:00:00 (usage: date[YYYY.]MM.DD-hh:mm[:ss]) hwclock 
-> > -w reset board and check system time.
-> 
-> Queuing this for v3.9. The testing information above is useful and should be part of the changelog. I moved it there while committing.
-> 
-> It will be nice to check the alarm functionality as well. Can you check that and let me know that works as well?
+On Tue, Jan 29, 2013 at 01:42:25AM +0530, Mugunthan V N wrote:
+> @@ -947,6 +1042,10 @@ static const struct net_device_ops cpsw_netdev_ops = {
+>  #ifdef CONFIG_NET_POLL_CONTROLLER
+>  	.ndo_poll_controller	= cpsw_ndo_poll_controller,
+>  #endif
+> +#ifdef VLAN_SUPPORT
+> +	.ndo_vlan_rx_add_vid	= cpsw_ndo_vlan_rx_add_vid,
+> +	.ndo_vlan_rx_kill_vid	= cpsw_ndo_vlan_rx_kill_vid,
+> +#endif
 
-I tried to test RTC alarm using "rtcwake" command, however it is not working and returning following error 
-"rtcwake: /dev/rtc0 not enabled for wakeup events"
-This is coming because we have not registered RTC device as a wakeup source yet. 
+These are not compile time conditionals in net_device_ops, so I wonder
+(after reading Felipe's comments) whether you can simply keep the VLAN
+code always present.
 
-For checking RTC alarm interrupt, I developed one simple program which opens RTC device, set alarm and exits.
-Then by entering "cat /proc/interrupts" checked RTC interrupt count.
+As long as the driver still compiles and loads, when VLAN is missing
+from the stack, then I don't see why you can't just leave it in,
+without all the ifdefs.
 
-Using above test it confirms that RTC alarm functionality is working fine. 
-
-> 
-> Thanks,
-> Sekhar
-> 
-
-
-Regards, 
-Mrugesh
+Thanks,
+Richard
