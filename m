@@ -1,40 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jan 2013 09:43:11 -0800
-Subject: [GIT PULL v2] imx cleanup for 3.9
-In-Reply-To: <20130129064200.GC21504@S2101-09.ap.freescale.net>
-References: <20130129064200.GC21504@S2101-09.ap.freescale.net>
-Message-ID: <20130129174311.GB17935@quad.lixom.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Jan 2013 18:43:20 +0100
+Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
+In-Reply-To: <20130129174205.GD25646@obsidianresearch.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301282018.17714.arnd@arndb.de> <5106F5CB.8050304@wwwdotorg.org>
+ <20130128220904.GA21446@obsidianresearch.com>
+ <20130128231829.6b205c3c@skate>
+ <20130128222348.GA21628@obsidianresearch.com>
+ <20130128233048.2ab6a6d2@skate>
+ <20130128225105.GA21935@obsidianresearch.com>
+ <20130129110119.07cb9ef3@skate>
+ <20130129174205.GD25646@obsidianresearch.com>
+Message-ID: <20130129184320.59f534c4@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Jason Gunthorpe,
 
+On Tue, 29 Jan 2013 10:42:05 -0700, Jason Gunthorpe wrote:
 
-On Tue, Jan 29, 2013 at 02:42:02PM +0800, Shawn Guo wrote:
-> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+> So if this is what you have now...
 > 
->   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+> -[0000:00]-+-00.0 <- Host bridge
+>            +-10.0 <- Bridge
+>            +-11.0 <- Bridge
+>            +-12.0 <- Bridge
 > 
-> are available in the git repository at:
+> Then removing the config space at 00.0 (ie the host bridge) will give
+> you:
 > 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-cleanup-3.9
-
-Pulled. It had change/remove conflicts due to the removed board files that had
-been modified with the timer cleanup which I resolved.
-
+> -[0000:00]-+-10.0 <- Bridge
+>            +-11.0 <- Bridge
+>            +-12.0 <- Bridge
 > 
-> for you to fetch changes up to 7356420cd34e40fe27bf26555b0bf3f2849a43dd:
-> 
->   ARM: imx: Remove mx508 support (2013-01-29 14:05:43 +0800)
-> 
-> ----------------------------------------------------------------
-> I have left out the patch (ARM: dts: imx: use nodes label in board dts)
-> in question and other dts related changes, and will have them go via DT
-> branch  to save the cross branch dependency.
+> The 'host bridge' isn't a bridge in the PCI-PCI sense, it is just a
+> normal device at bus 0, device 0, function 0.
 
-This is a great message to have in the email, but as a tag description the
-previous version of the branch had better contents. So I saved that (and
-removed the dt/label reference).
+Ok, thanks I'll try this!
 
-
--Olof
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
