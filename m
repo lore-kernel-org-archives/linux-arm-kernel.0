@@ -1,125 +1,302 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 29 Jan 2013 22:35:32 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: first set of clock and device integration
- cleanups for 3.9
-Message-ID: <alpine.DEB.2.00.1301292234440.11442@utopia.booyaka.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 29 Jan 2013 15:35:10 -0700
+Subject: [PATCH v2 08/27] pci: implement an emulated PCI-to-PCI bridge
+In-Reply-To: <1359399397-29729-9-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAErSpo6ajS87mh7u58sLeN6oL5ixiPhaD7O7BrH1Av28mTk=qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Mon, Jan 28, 2013 at 11:56 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/pci/Kconfig             |    3 +
+>  drivers/pci/Makefile            |    1 +
+>  drivers/pci/sw-pci-pci-bridge.c |  185 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci.h             |   43 +++++++++
+>  4 files changed, 232 insertions(+)
+>  create mode 100644 drivers/pci/sw-pci-pci-bridge.c
 
-Hi Tony,
+If you need this, it can be done in architecture code, can't it?  It's
+true that there's nothing architecture-specific in this patch (other
+than the fact that ARM is the only arch that needs it), but I'm not
+sure there's anything useful for sharing here.
 
-The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+In fact, it seems like what you're after is not so much an *emulated*
+bridge that has no corresponding hardware, as it is a wrapper that
+presents a standard PCIe interface to hardware that exists but doesn't
+conform to the PCIe spec.  If you really do need to ultimately connect
+this pci_sw_pci_bridge to a piece of hardware, that will certainly be
+arch-specific.
 
-  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-a-for-3.9
-
-for you to fetch changes up to aff2f7d90fc6553aa309db2a635d8e5d70d84916:
-
-  ARM: OMAP2420: hwmod data/PM: use hwmod to block WFI when I2C active (2013-01-26 01:42:33 -0700)
-
-- ----------------------------------------------------------------
-Remove some dead OMAP clock and device integration code and data.
-Also, clean up the way that the OMAP device integration code blocks
-WFI/WFE to use a consistent mechanism, controlled by a data flag.
-
-Basic test logs for this branch are here:
-
-   http://www.pwsan.com/omap/testlogs/cleanup_a_3.9/20130126014242/
-
-- ----------------------------------------------------------------
-
-vmlinux object size
-(delta in bytes from test_v3.8-rc5 (949db153b6466c6f7cad5a427ecea94985927311)):
-   text     data      bss    total  kernel
-  -1502       +8        0    -1494  am33xx_only
-  -1574     -664        0    -2238  n800_multi_omap2xxx
-  -1574     -344        0    -1918  n800_only_a
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-      0        0        0        0  omap1_defconfig_5912osk_only
-  -5702    -6200        0   -11902  omap2plus_defconfig
-  -5586     -320        0    -5906  omap2plus_defconfig_2430sdp_only
-  -5706    -6208        0   -11914  omap2plus_defconfig_cpupm
-  -1546    -6200        0    -7746  omap2plus_defconfig_no_pm
-  -5670    -6200        0   -11870  omap2plus_defconfig_omap2_4_only
- -13830    -5624        0   -19454  omap2plus_defconfig_omap3_4_only
-  -2164    -6216     +600    -7780  rmk_omap3430_ldp_allnoconfig
-  -1538      -64        0    -1602  rmk_omap3430_ldp_oldconfig
-  -2164    -6216     +600    -7780  rmk_omap4430_sdp_allnoconfig
-  -1526    -5640      -64    -7230  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.8-rc5 (949db153b6466c6f7cad5a427ecea94985927311))
-  avail  rsrvd   high  freed  board          kconfig
-    16k   -16k      .      .  2430sdp        omap2plus_defconfig
-    16k   -16k      .      .  3530es3beagle  omap2plus_defconfig
-    16k   -16k      .      .  3730beaglexm   omap2plus_defconfig
-    16k   -16k      .      .  37xxevm        omap2plus_defconfig
-    16k   -16k      .      .  4430es2panda   omap2plus_defconfig
-    16k   -16k      .      .  4460pandaes    omap2plus_defconfig
-    16k   -16k      .      .  cmt3517        omap2plus_defconfig
-
-Paul Walmsley (6):
-      ARM: OMAP2+: omap_device: remove obsolete pm_lats and early_device code
-      ARM: OMAP4: clock/hwmod data: start to remove some IP block control "clocks"
-      ARM: OMAP4: clock/hwmod data: remove MODULEMODE entries in mux + gate combos
-      ARM: OMAP2xxx: clock data: clean up unused null clocks
-      ARM: OMAP2+: hwmod: add support for blocking WFI when a device is active
-      ARM: OMAP2420: hwmod data/PM: use hwmod to block WFI when I2C active
-
- arch/arm/mach-omap2/am35xx-emac.c          |    2 +-
- arch/arm/mach-omap2/cclock2420_data.c      |   16 +-
- arch/arm/mach-omap2/cclock2430_data.c      |   16 +-
- arch/arm/mach-omap2/cclock44xx_data.c      |  578 ++++++----------------------
- arch/arm/mach-omap2/devices.c              |   25 +-
- arch/arm/mach-omap2/display.c              |    2 +-
- arch/arm/mach-omap2/dma.c                  |    2 +-
- arch/arm/mach-omap2/drm.c                  |    3 +-
- arch/arm/mach-omap2/gpio.c                 |    3 +-
- arch/arm/mach-omap2/gpmc.c                 |    2 +-
- arch/arm/mach-omap2/hdq1w.c                |    2 +-
- arch/arm/mach-omap2/hsmmc.c                |    2 +-
- arch/arm/mach-omap2/hwspinlock.c           |    3 +-
- arch/arm/mach-omap2/i2c.c                  |    3 +-
- arch/arm/mach-omap2/mcbsp.c                |    2 +-
- arch/arm/mach-omap2/msdi.c                 |    2 +-
- arch/arm/mach-omap2/omap-iommu.c           |    3 +-
- arch/arm/mach-omap2/omap_device.c          |  537 +++-----------------------
- arch/arm/mach-omap2/omap_device.h          |   79 +---
- arch/arm/mach-omap2/omap_hwmod.c           |    8 +
- arch/arm/mach-omap2/omap_hwmod.h           |    9 +
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    7 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   99 +++--
- arch/arm/mach-omap2/pm.c                   |    4 +-
- arch/arm/mach-omap2/pm24xx.c               |   13 -
- arch/arm/mach-omap2/pmu.c                  |    3 +-
- arch/arm/mach-omap2/serial.c               |    3 +-
- arch/arm/mach-omap2/sr_device.c            |    3 +-
- arch/arm/mach-omap2/timer.c                |    3 +-
- arch/arm/mach-omap2/usb-host.c             |   16 +-
- arch/arm/mach-omap2/usb-musb.c             |    2 +-
- arch/arm/mach-omap2/wd_timer.c             |    3 +-
- 32 files changed, 292 insertions(+), 1163 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.12 (GNU/Linux)
-
-iQIcBAEBAgAGBQJRCE54AAoJEMePsQ0LvSpLMQkP/35hjU9fAf/6SZk8NUNffUaP
-nRGVW34v9wbsT8tkcEQzIRiGUGeQXqOk0wczHJEf0daxmkZgzIWr/hjU9z3kUnDf
-QIan3CU0YvfcQOXR9PYR7ZB2Zz2HFxySkUy99ioriWjSUE3ff0CdLNq/fB7TEeLc
-2D/ourAzRfqJdCs49tGK9qbLUVEtmLDbS5+dN1KmldunZ6bvhhNtuYs72RQ+kWN0
-9WkCmJYVNYS8dTg6uZi2rBSStfYJkUJ1IDjtnBe6815KiZ3q2G21KTJUrywqd324
-iASZ2cnUVzFsNdWNGBHMQvWW/SmlbP7F4pimlfyd8rDHUv0K3KZEW110AB8nMpAz
-XzvuseiA+OWteTa2GLrsQJg8/wx5yAYZBkgyia2Vp1o79nfgOZ54X5LsZcyuOS/w
-jALgJJi2zAsqjNWpmt7BCGlCOfRQOu1I67rN6K6JdO1j66Nnc8MfpV6npds2hsH5
-xArNIlj95q2frQwlC5tVvXGTpY0lJZmAz0R9eAMZ3PFF08VTSdmUCdgTK5SNUIWO
-2ITee1s9BxbJxJir7YKI8c/sW5FS/oeERn6p9nR0LUWX+9+raWdx/wcZfoRRSshe
-d2odyViDuHiUbE2zKK513Sikb1XNrE5A5kB+40M011BEv3DjSWXv6opbfNNsB1eF
-fCuBsikVIJ+PWykLJt1F
-=bbcC
------END PGP SIGNATURE-----
+> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+> index f7548e2..6ed3db1 100644
+> --- a/drivers/pci/Kconfig
+> +++ b/drivers/pci/Kconfig
+> @@ -122,3 +122,6 @@ config PCI_LABEL
+>
+>  config PCI_SW_HOST_BRIDGE
+>         bool
+> +
+> +config PCI_SW_PCI_PCI_BRIDGE
+> +       bool
+> diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
+> index 44ce914..5b48961 100644
+> --- a/drivers/pci/Makefile
+> +++ b/drivers/pci/Makefile
+> @@ -17,6 +17,7 @@ obj-$(CONFIG_PCI_IOAPIC) += ioapic.o
+>
+>  # Emulated PCI elements
+>  obj-$(CONFIG_PCI_SW_HOST_BRIDGE) += sw-host-bridge.o
+> +obj-$(CONFIG_PCI_SW_PCI_PCI_BRIDGE) += sw-pci-pci-bridge.o
+>
+>  # Build the PCI Hotplug drivers if we were asked to
+>  obj-$(CONFIG_HOTPLUG_PCI) += hotplug/
+> diff --git a/drivers/pci/sw-pci-pci-bridge.c b/drivers/pci/sw-pci-pci-bridge.c
+> new file mode 100644
+> index 0000000..25679cc
+> --- /dev/null
+> +++ b/drivers/pci/sw-pci-pci-bridge.c
+> @@ -0,0 +1,185 @@
+> +/*
+> + * Implementation of a simple emulated PCI-to-PCI bridge.
+> + *
+> + * Thierry Reding <thierry.reding@avionic-design.de>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/pci.h>
+> +#include <linux/module.h>
+> +
+> +int pci_sw_pci_bridge_init(struct pci_sw_pci_bridge *bridge)
+> +{
+> +       if (!bridge)
+> +               return -EINVAL;
+> +
+> +       memset(bridge, 0, sizeof(struct pci_sw_pci_bridge));
+> +
+> +       bridge->status = PCI_STATUS_CAP_LIST;
+> +       bridge->class = PCI_CLASS_BRIDGE_PCI;
+> +       bridge->header_type = PCI_HEADER_TYPE_BRIDGE;
+> +       bridge->cache_line_size = 0x10;
+> +
+> +       /* We support 32 bits I/O addressing */
+> +       bridge->iobase = PCI_IO_RANGE_TYPE_32;
+> +       bridge->iolimit = PCI_IO_RANGE_TYPE_32;
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(pci_sw_pci_bridge_init);
+> +
+> +int pci_sw_pci_bridge_read(struct pci_sw_pci_bridge *bridge,
+> +                          unsigned int where, int size, u32 *value)
+> +{
+> +       switch (where & ~3) {
+> +       case PCI_VENDOR_ID:
+> +               *value = bridge->device << 16 | bridge->vendor;
+> +               break;
+> +
+> +       case PCI_COMMAND:
+> +               *value = bridge->status << 16 | bridge->command;
+> +               break;
+> +
+> +       case PCI_CLASS_REVISION:
+> +               *value = bridge->class << 16 | bridge->interface << 8 |
+> +                        bridge->revision;
+> +               break;
+> +
+> +       case PCI_CACHE_LINE_SIZE:
+> +               *value = bridge->bist << 24 | bridge->header_type << 16 |
+> +                        bridge->latency_timer << 8 | bridge->cache_line_size;
+> +               break;
+> +
+> +       case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+> +               *value = bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4];
+> +               break;
+> +
+> +       case PCI_PRIMARY_BUS:
+> +               *value = (bridge->secondary_latency_timer << 24 |
+> +                         bridge->subordinate_bus         << 16 |
+> +                         bridge->secondary_bus           <<  8 |
+> +                         bridge->primary_bus);
+> +               break;
+> +
+> +       case PCI_IO_BASE:
+> +               *value = (bridge->secondary_status << 16 |
+> +                         bridge->iolimit          <<  8 |
+> +                         bridge->iobase);
+> +               break;
+> +
+> +       case PCI_MEMORY_BASE:
+> +               *value = (bridge->memlimit << 16 | bridge->membase);
+> +               break;
+> +
+> +       case PCI_PREF_MEMORY_BASE:
+> +               *value = (bridge->prefmemlimit << 16 | bridge->prefmembase);
+> +               break;
+> +
+> +       case PCI_PREF_BASE_UPPER32:
+> +               *value = bridge->prefbaseupper;
+> +               break;
+> +
+> +       case PCI_PREF_LIMIT_UPPER32:
+> +               *value = bridge->preflimitupper;
+> +               break;
+> +
+> +       case PCI_IO_BASE_UPPER16:
+> +               *value = (bridge->iolimitupper << 16 | bridge->iobaseupper);
+> +               break;
+> +
+> +       case PCI_ROM_ADDRESS1:
+> +               *value = 0;
+> +               break;
+> +
+> +       default:
+> +               *value = 0xffffffff;
+> +               return PCIBIOS_BAD_REGISTER_NUMBER;
+> +       }
+> +
+> +       if (size == 2)
+> +               *value = (*value >> (8 * (where & 3))) & 0xffff;
+> +       else if (size == 1)
+> +               *value = (*value >> (8 * (where & 3))) & 0xff;
+> +
+> +       return PCIBIOS_SUCCESSFUL;
+> +}
+> +EXPORT_SYMBOL_GPL(pci_sw_pci_bridge_read);
+> +
+> +int pci_sw_pci_bridge_write(struct pci_sw_pci_bridge *bridge,
+> +                           unsigned int where, int size, u32 value)
+> +{
+> +       u32 mask, reg;
+> +       int err;
+> +
+> +       if (size == 4)
+> +               mask = 0x0;
+> +       else if (size == 2)
+> +               mask = ~(0xffff << ((where & 3) * 8));
+> +       else if (size == 1)
+> +               mask = ~(0xff << ((where & 3) * 8));
+> +       else
+> +               return PCIBIOS_BAD_REGISTER_NUMBER;
+> +
+> +       err = pci_sw_pci_bridge_read(bridge, where & ~3, 4, &reg);
+> +       if (err)
+> +               return err;
+> +
+> +       value = (reg & mask) | value << ((where & 3) * 8);
+> +
+> +       switch (where & ~3) {
+> +       case PCI_COMMAND:
+> +               bridge->command = value & 0xffff;
+> +               bridge->status = value >> 16;
+> +               break;
+> +
+> +       case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+> +               bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4] = value;
+> +               break;
+> +
+> +       case PCI_IO_BASE:
+> +               /*
+> +                * We also keep bit 1 set, it is a read-only bit that
+> +                * indicates we support 32 bits addressing for the
+> +                * I/O
+> +                */
+> +               bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
+> +               bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
+> +               bridge->secondary_status = value >> 16;
+> +               break;
+> +
+> +       case PCI_MEMORY_BASE:
+> +               bridge->membase = value & 0xffff;
+> +               bridge->memlimit = value >> 16;
+> +               break;
+> +
+> +       case PCI_PREF_MEMORY_BASE:
+> +               bridge->prefmembase = value & 0xffff;
+> +               bridge->prefmemlimit = value >> 16;
+> +               break;
+> +
+> +       case PCI_PREF_BASE_UPPER32:
+> +               bridge->prefbaseupper = value;
+> +               break;
+> +
+> +       case PCI_PREF_LIMIT_UPPER32:
+> +               bridge->preflimitupper = value;
+> +               break;
+> +
+> +       case PCI_IO_BASE_UPPER16:
+> +               bridge->iobaseupper = value & 0xffff;
+> +               bridge->iolimitupper = value >> 16;
+> +               break;
+> +
+> +       default:
+> +               break;
+> +       }
+> +
+> +       return PCIBIOS_SUCCESSFUL;
+> +}
+> +EXPORT_SYMBOL_GPL(pci_sw_pci_bridge_write);
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index c93e258..b83b4c8 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1864,4 +1864,47 @@ extern int pci_sw_host_bridge_read(struct pci_sw_host_bridge *bridge,
+>  extern int pci_sw_host_bridge_write(struct pci_sw_host_bridge *bridge,
+>                                     unsigned int where, int size, u32 value);
+>
+> +struct pci_sw_pci_bridge {
+> +       u16 vendor;
+> +       u16 device;
+> +       u16 command;
+> +       u16 status;
+> +       u16 class;
+> +       u8 interface;
+> +       u8 revision;
+> +       u8 bist;
+> +       u8 header_type;
+> +       u8 latency_timer;
+> +       u8 cache_line_size;
+> +       u32 bar[2];
+> +       u8 primary_bus;
+> +       u8 secondary_bus;
+> +       u8 subordinate_bus;
+> +       u8 secondary_latency_timer;
+> +       u8 iobase;
+> +       u8 iolimit;
+> +       u16 secondary_status;
+> +       u16 membase;
+> +       u16 memlimit;
+> +       u16 prefmembase;
+> +       u16 prefmemlimit;
+> +       u32 prefbaseupper;
+> +       u32 preflimitupper;
+> +       u16 iobaseupper;
+> +       u16 iolimitupper;
+> +       u8 cappointer;
+> +       u8 reserved1;
+> +       u16 reserved2;
+> +       u32 romaddr;
+> +       u8 intline;
+> +       u8 intpin;
+> +       u16 bridgectrl;
+> +};
+> +
+> +extern int pci_sw_pci_bridge_init(struct pci_sw_pci_bridge *bridge);
+> +extern int pci_sw_pci_bridge_read(struct pci_sw_pci_bridge *bridge,
+> +                                 unsigned int where, int size, u32 *value);
+> +extern int pci_sw_pci_bridge_write(struct pci_sw_pci_bridge *bridge,
+> +                                  unsigned int where, int size, u32 value);
+> +
+>  #endif /* LINUX_PCI_H */
+> --
+> 1.7.9.5
+>
