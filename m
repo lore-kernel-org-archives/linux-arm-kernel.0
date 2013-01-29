@@ -1,50 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 29 Jan 2013 09:08:55 +0800
-Subject: [GIT PULL] imx cleanup for 3.9
-In-Reply-To: <20130128220026.GC3047@quad.lixom.net>
-References: <20130122144813.GD2812@S2101-09.ap.freescale.net>
- <20130128220026.GC3047@quad.lixom.net>
-Message-ID: <20130129010853.GA24352@S2101-09.ap.freescale.net>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Tue, 29 Jan 2013 12:14:02 +1100
+Subject: [PATCH v5 31/45] blackfin/smp: Use get/put_online_cpus_atomic()
+ to prevent CPU offline
+In-Reply-To: <CAOS58YN_r-ahRvPekOo_84bM7z3YcFw1EA7DcTf0NVyEhv7ssA@mail.gmail.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122074123.13822.39102.stgit@srivatsabhat.in.ibm.com>
+ <CAA_GA1fSLNKSDTGSzHoA+j-mur85BvoSRkARq+DMfORuwrrX4Q@mail.gmail.com>
+ <CAOS58YN_r-ahRvPekOo_84bM7z3YcFw1EA7DcTf0NVyEhv7ssA@mail.gmail.com>
+Message-ID: <5107225A.5040702@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 02:00:26PM -0800, Olof Johansson wrote:
-> Hi,
+On 01/29/2013 06:06 AM, Tejun Heo wrote:
+> Hello, Bob.
 > 
-> On Tue, Jan 22, 2013 at 10:48:15PM +0800, Shawn Guo wrote:
+> On Mon, Jan 28, 2013 at 1:09 AM, Bob Liu <lliubbo@gmail.com> wrote:
+>> Thanks, will be applied to my blackfin arch tree.
 > 
-> > Shawn Guo (4):
-> >       ARM: dts: imx: use nodes label in board dts
+> I think we still have some work ahead of us to have this patchset
+> ready for inclusion and even then it probably would be best to route
+> these patches together, so probably not a very good idea to apply this
+> to blackfin right now.
 > 
-> Hmm.
-> 
-> This patch is 1000 lines of pure churn. Sure, the style on OMAP is different,
-> but there's no clear benefit from it -- it's actually advantageous to see some
-> of the bus hierarchies even on the leaf-level board nodes.
-> 
-> Would you mind respinning with this left out, please? If you still want to
-> argue it to be included, we can do so, but I'd like to pick up the rest of the
-> branch meanwhile. :-)
 
-I will refresh the pull-request to leave it out, but meanwhile I'd like
-to argue too, as the approach has been agreed by IMX people and all the
-patches I queued on imx/dt are all in this way.  And I will move the
-patch to imx/dt branch instead, if you're not strongly against the
-approach.
-
-The board level dts are mostly used to add/overwrite properties for
-nodes defined in soc dts.  Therefore, what people who look at board
-dts care about is those properties, not really which bus the nodes
-are on.  We go this way to have board dts focus on the things they
-are created for.  It's much easer to read and edit those properties.
-
-I'm not sure why it's important to maintain the bus topology in board
-dts while we have the full one in soc dts.  In the current way, people
-sometimes have to reassemble 3 or more levels bus hierarchies for only
-overwriting one property for one node.  
-
-I'm pretty sure that people who work on board level dts would vote for
-this way.  It makes their life easier without increasing the
-maintainer's burden.  So why not?
-
-Shawn
+Thanks Tejun for pointing that out! I'll address the review comments
+soon and respin the patchset.
+ 
+Regards,
+Srivatsa S. Bhat
