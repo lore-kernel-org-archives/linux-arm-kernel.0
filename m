@@ -1,124 +1,107 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jan 2013 10:35:30 +0000
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <CAKohpomO6tYNYLdMOaJYgqGecXj5KMQprdb=gExi+QuGrtLTzw@mail.gmail.com>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <1359410300-26113-2-git-send-email-arnd@arndb.de>
- <CAKohpomO6tYNYLdMOaJYgqGecXj5KMQprdb=gExi+QuGrtLTzw@mail.gmail.com>
-Message-ID: <201301291035.30265.arnd@arndb.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 29 Jan 2013 10:46:42 +0000
+Subject: [PATCH v3 14/15] ARM: vexpress/dcscb: handle platform coherency
+ exit/setup and CCI
+In-Reply-To: <1359445870-18925-15-git-send-email-nicolas.pitre@linaro.org>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-15-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130129104642.GK30563@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013, Viresh Kumar wrote:
-> > diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
-> > index 5bb3dfb..212d387 100644
-> > --- a/Documentation/devicetree/bindings/dma/snps-dma.txt
-> > +++ b/Documentation/devicetree/bindings/dma/snps-dma.txt
-> > @@ -3,59 +3,62 @@
-> >  Required properties:
-> >  - compatible: "snps,dma-spear1340"
-> >  - reg: Address range of the DMAC registers
-> > -- interrupt-parent: Should be the phandle for the interrupt controller
-> > -  that services interrupts for this device
-> >  - interrupt: Should contain the DMAC interrupt number
-> > -- nr_channels: Number of channels supported by hardware
-> > -- is_private: The device channels should be marked as private and not for by the
-> > -  general purpose DMA channel allocator. False if not passed.
-> > +- dma-channels: Number of channels supported by hardware
-> > +- dma-requests: Number of DMA request lines supported
-> > +- dma-masters: Number of AHB masters supported by the controller
-> > +- #dma-cells: must be <3>
-> 
-> Shouldn't this be 4? Would be better to mention what fields are these,
-> right here. I have seen them below though.
+On Tue, Jan 29, 2013 at 07:51:09AM +0000, Nicolas Pitre wrote:
 
-Correct. I changed these a couple of times while trying to understand
-what the fields are, and I missed this instance. I'm still not sure
-whether we actually need all four fields, or what the simplest format
-for them would be. This just mirrors what you had in your binding.
+[...]
 
-> > -bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
-> > +/* forward declaration used in filter */
-> > +static struct platform_driver dw_driver;
-> 
-> extern? This is not a declaration but definition.
+> +		/*
+> +		 * Flush the local CPU cache.
+> +		 *
+> +		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
+> +		 * a preliminary flush here for those CPUs.  At least, that's
+> +		 * the theory -- without the extra flush, Linux explodes on
+> +		 * RTSM (maybe not needed anymore, to be investigated).
+> +		 */
+> +		flush_cache_louis();
 
-No. You can have multiple declarations for a static symbol like this,
-but only one of them with an initilizer. I usually recommend against
-doing this myself, because it's confusing and somewhat bad style, but
-it is correct C.
+This is not needed. If it is, that is a model bug and should be flagged
+up as such.
 
-> > -       /*
-> > -        * dmaengine framework calls this routine for all channels of all dma
-> > -        * controller, until true is returned. If 'param' bus_id is not
-> > -        * registered with a dma controller (dw), then there is no need of
-> > -        * running below function for all channels of dw.
-> > -        *
-> > -        * This block of code does this by saving the parameters of last
-> > -        * failure. If dw and param are same, i.e. trying on same dw with
-> > -        * different channel, return false.
-> > -        */
-> > -       if ((last_dw == dw) && (last_bus_id == param))
-> > +       /* both the driver and the device must match */
-> > +        if (chan->device->dev->driver != &dw_driver.driver)
-> > +                return false;
-> 
-> Can this ever happen? Isn't it the case that this routine would be called
-> only for dw_dmac?
+> +		cpu_proc_fin(); /* disable allocation into internal caches*/
 
-I think not. AFAIK the filter function will be called for each channel
-on each DMA engine until one of them matches.
+This code disables the I-cache causing following instruction fetches from
+DRAM; that is extremely slow and should be avoided, there is no point in
+disabling the I-cache here, that is not required.
 
-> > -       while (++i < dw->sd_count) {
-> > -               if (!strcmp(dw->sd[i].bus_id, param)) {
-> > -                       chan->private = &dw->sd[i];
-> > -                       last_dw = NULL;
-> > -                       last_bus_id = NULL;
-> > +       /* FIXME: memory leak! could we put this into dw_dma_chan? */
-> > +       sd = devm_kzalloc(dw->dma.dev, sizeof (*sd), GFP_KERNEL);
-> 
-> Yes.
+On fast-models that's a non-issue, but I really want to prevent copy'n'paste
+of this sequence as it stands.
 
-Yes it can be in dw_dma_chan or yes it is a memory leak?
+> +		flush_cache_louis();
+> +
+> +		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
+> +		set_auxcr(get_auxcr() & ~(1 << 6));
+>  	}
+>  
+> -	/* Disable local coherency by clearing the ACTLR "SMP" bit: */
+> -	set_auxcr(get_auxcr() & ~(1 << 6));
+> +	__mcpm_cpu_down(cpu, cluster);
+>  
+>  	/* Now we are prepared for power-down, do it: */
+>  	if (!skip_wfi) {
+> @@ -179,6 +211,8 @@ static void __init dcscb_usage_count_init(void)
+>  	dcscb_use_count[cpu][cluster] = 1;
+>  }
+>  
+> +extern void dcscb_power_up_setup(unsigned int affinity_level);
+> +
+>  static int __init dcscb_init(void)
+>  {
+>  	unsigned int cfg;
+> @@ -193,6 +227,8 @@ static int __init dcscb_init(void)
+>  	dcscb_usage_count_init();
+>  
+>  	ret = mcpm_platform_register(&dcscb_power_ops);
+> +	if (!ret)
+> +		ret = mcpm_sync_init(dcscb_power_up_setup);
+>  	if (ret) {
+>  		iounmap(dcscb_base);
+>  		return ret;
+> diff --git a/arch/arm/mach-vexpress/dcscb_setup.S b/arch/arm/mach-vexpress/dcscb_setup.S
+> new file mode 100644
+> index 0000000000..cac033b982
+> --- /dev/null
+> +++ b/arch/arm/mach-vexpress/dcscb_setup.S
+> @@ -0,0 +1,80 @@
+> +/*
+> + * arch/arm/include/asm/dcscb_setup.S
+> + *
+> + * Created by:  Dave Martin, 2012-06-22
+> + * Copyright:   (C) 2012-2013  Linaro Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/mcpm_entry.h>
+> +
+> +
+> +#define SLAVE_SNOOPCTL_OFFSET	0
+> +#define SNOOPCTL_SNOOP_ENABLE	(1 << 0)
+> +#define SNOOPCTL_DVM_ENABLE	(1 << 1)
+> +
+> +#define CCI_STATUS_OFFSET	0xc
+> +#define STATUS_CHANGE_PENDING	(1 << 0)
+> +
+> +#define CCI_SLAVE_OFFSET(n)	(0x1000 + 0x1000 * (n))
+> +
+> +#define RTSM_CCI_PHYS_BASE	0x2c090000
+> +#define RTSM_CCI_SLAVE_A15	3
+> +#define RTSM_CCI_SLAVE_A7	4
 
-> > +static struct dma_chan *dw_dma_xlate(struct of_phandle_args *dma_spec,
-> > +                                        struct of_dma *ofdma)
-> > +{
-> > +       struct dw_dma *dw = ofdma->of_dma_data;
-> > +       struct dw_dma_filter_args fargs = {
-> > +               .dw = dw,
-> > +       };
-> > +       dma_cap_mask_t cap;
-> > +
-> > +       if (dma_spec->args_count != 4)
-> 
-> args_count contains count of all params leaving the phandle?
+We need to remove these hardcoded values in due course as you know, I am
+working on new code that allows us to match the CCI port address to
+MPIDR on resume.
 
-That was my interpretation from reading the code, but I have not tried it.
-
-> > +       /* FIXME: This binding is rather clumsy. Can't we use the
-> > +          request line numbers here instead? */
-> 
-> yes.
-
-Ok, Very good. What is the encoding of the registers then?
-
-> > +       fargs.cfg_lo = be32_to_cpup(dma_spec->args+0);
-> > +       fargs.cfg_hi = be32_to_cpup(dma_spec->args+1);
-> > +       fargs.src = be32_to_cpup(dma_spec->args+2);
-> > +       fargs.dst = be32_to_cpup(dma_spec->args+3);
-> > +
-> > +       dma_cap_zero(cap);
-> > +       dma_cap_set(DMA_SLAVE, cap);
-> > +       /* FIXME: there should be a simpler way to do this */
-> > +       return dma_request_channel(cap, dw_dma_generic_filter, &dma_spec->args[0]);
-> 
-> don't you need to send &fargs as the last argument?
-
-Right, my mistake.
-
-Thanks a lot for the input. When I fix the above, are actually able
-to test the changes, or have you lost access to the hardware when
-leaving ST?
-
-	Arnd
+Lorenzo
