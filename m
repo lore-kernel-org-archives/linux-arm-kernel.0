@@ -1,38 +1,24 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 29 Jan 2013 16:57:04 +0530
-Subject: [PATCH v3 0/9] ARM: OMAP2+: AM33XX: Misc fixes/updates
-In-Reply-To: <1359458108-8489-1-git-send-email-vaibhav.bedia@ti.com>
-References: <1359458108-8489-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <5107B208.80005@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Jan 2013 11:29:17 +0000
+Subject: [PATCH v2 0/5] ARM: Manage the pl310 erratas in a dynamic way
+In-Reply-To: <20130129101026.GA1063@bnru10>
+References: <20130129101026.GA1063@bnru10>
+Message-ID: <20130129112917.GF2637@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav,
+On Tue, Jan 29, 2013 at 03:40:38PM +0530, srinidhi kasagar wrote:
+> - Added l2x0_quirks to manage the errata in cpu_idle path. Tried to address
+>   Russell's comment on this, but could not completely. Because, neither I can
+>   keep the #ifdef CONFIG_PL310_ERRATA_769419 nor remove it entirely since
+>   the platform A suffers from this bug, whereas B do not but shares the same
+>   defconfig.
 
-On Tuesday 29 January 2013 04:44 PM, Vaibhav Bedia wrote:
-> Hi,
->
-> The following patches were earlier posted as part the AM33XX
-> suspend-resume support series [1]. Based on the suggestion
-> from Santosh Shilimkar <santosh.shilimkar@ti.com> i have split
-> out the changes which update the various data files related
-> to AM33XX support.
->
-> These patches apply on top of v3.8-rc5
->
-> v1->v2: Address the comments received from Sergei Shtylyov
-> and Peter Korsgaard.
->
-> v2->v3: Address an additional comment from Peter Korgaard
-> and add his Acked-by to the patches
->
-Just a suggestion here...
+Yes you can and I covered this situation in my email.  In that case,
+you _define_ CONFIG_PL310_ERRATA_769419 such that the barrier _always_
+gets included both both platforms.
 
-I saw v2 of $subject series just today morning and in just
-few hours, I see v3 as well. You should at least let v2 settle
-down for a while :-)
-Collecting tags and minor update can always be done once you
-gather sufficient comments to warrant a re-spin.
-
-Regards,
-Santosh
+As I already said, there is _no_ point making the barrier conditional;
+it's probably more expensive to make it conditional than just to execute
+it every time.  But we still might as well optimize it away if we are
+running _only_ on platforms which _do_ _not_ have that errata.
