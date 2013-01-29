@@ -1,98 +1,35 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 29 Jan 2013 11:37:22 +0200
-Subject: [RESEND PATCH v5 4/7] usb: chipidea: consolidate ci_role_driver's
- API for both roles
-In-Reply-To: <20130128052158.GA8066@nchen-desktop>
-References: <1358733418-17969-1-git-send-email-peter.chen@freescale.com>
- <1358733418-17969-5-git-send-email-peter.chen@freescale.com>
- <8738xqodhp.fsf@ashishki-desk.ger.corp.intel.com>
- <20130125033013.GB29795@nchen-desktop>
- <87sj5pbgwr.fsf@ashishki-desk.ger.corp.intel.com>
- <20130128052158.GA8066@nchen-desktop>
-Message-ID: <87vcagmist.fsf@ashishki-desk.ger.corp.intel.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 29 Jan 2013 09:42:39 +0000
+Subject: [PATCH v2 1/4] ARM: OMAP2+: dpll: round rate to closest value
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA9388C@DBDE01.ent.ti.com>
+References: <cover.1358937533.git.afzal@ti.com>
+ <871e6890897534b6c3669e252f23bef5ff1247b6.1358937533.git.afzal@ti.com>
+ <alpine.DEB.2.00.1301250816010.471@utopia.booyaka.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9388C@DBDE01.ent.ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA94FDD@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Chen <peter.chen@freescale.com> writes:
+Hi Paul,
 
-> On Fri, Jan 25, 2013 at 02:12:20PM +0200, Alexander Shishkin wrote:
->> Peter Chen <peter.chen@freescale.com> writes:
->> 
->> > On Thu, Jan 24, 2013 at 04:35:30PM +0200, Alexander Shishkin wrote:
->> >> Peter Chen <peter.chen@freescale.com> writes:
->> >> 
->> >> > - Create init/destroy API for probe and remove
->> >> > - start/stop API are only used otg id switch process
->> >> > - Create the gadget at ci_hdrc_probe if the gadget is supported
->> >> > at that port, the main purpose for this is to avoid gadget module
->> >> > load fail at init.rc
->> >> 
->> @@ -402,6 +402,12 @@ static ssize_t store_role(struct device *dev, struct device_attribute *attr,
->>  	if (ret)
->>  		return ret;
->>  
->> +	/*
->> +	 * there won't be an interrupt in case of manual switching,
->> +	 * so we need to check vbus session manually
->> +	 */
->> +	ci_handle_vbus_change(ci);
->> +
-> It may not be used as there will be a vbus interrupt.
+On Fri, Jan 25, 2013 at 17:48:22, Mohammed, Afzal wrote:
+> On Fri, Jan 25, 2013 at 13:48:11, Paul Walmsley wrote:
 
-Not if you write gadget to "role" file.
+> > like MPU CPUFreq.  I'd suggest reverting 
+> > 241d3a8dca239610d3d991bf58d4fe38c2d86fd5 or using a similar approach.
 
->>  	return count;
->>  }
->>  
->>  	}
->>  	dbg_remove_files(&ci->gadget.dev);
->>  	device_unregister(&ci->gadget.dev);
->> -	/* my kobject is dynamic, I swear! */
->> -	memset(&ci->gadget, 0, sizeof(ci->gadget));
-> Any reason to delete it, another fix?
+> As you prefer reverting the above commit, I will proceed so, hmm.. got
 
-It is currently like this because start and stop functions are called
-multiple times during the devices lifetime. This patch converts the
-driver to only call start at driver's probe() and stop at driver's
-remove().
+This patch or reverting the above mentioned commit is not required for
+lcdc to be usable on am335x, instead please consider for inclusion
+patches 3 & 4 of this series,
 
->>  }
->>  
->>  /**
->> @@ -1842,13 +1839,11 @@ int ci_hdrc_gadget_init(struct ci13xxx *ci)
->>  	if (!rdrv)
->>  		return -ENOMEM;
->>  
->> -	rdrv->init	= udc_start;
->>  	rdrv->start	= udc_id_switch_for_device;
->>  	rdrv->stop	= udc_id_switch_for_host;
->> -	rdrv->destroy	= udc_stop;
-> Where we call udc_start and udc_stop? And the udc_start should only be called
-> one time.
+"ARM: OMAP2+: clock: DEFINE_STRUCT_CLK_FLAGS helper" and
+"ARM: AM33XX: clock: SET_RATE_PARENT in lcd path"
 
-ci_hdrc_gadget_init() and ci_hdrc_gadget_destroy(). Look closer at the
-patch.
+Patches 3 & 4 are required to have a functional frame buffer driver
+on am335x, also it may help drm driver for the lcdc ip in am335x to
+be a platform independent one.
 
->> 
->> Which is shorter (32 insertions(+), 53 deletions(-)) and makes the main
->> probe easier on the eyes. What do you think?
-> OK, not matter how to change it, it needs to cover below things:
-> (Covers last email)
-> - Gadget needs to be only initialized one time.
-
-Yes, that's what we agreed on and that's what I'm suggesting in the
-above patch.
-
-> - Host/device function should be OK when the device on it or
-> the usb cable connects to host during the boots up.
-
-Should still work.
-
-> - When the OTG port is at host mode, it should not call any
-> register writing operations at gadget's API.
-
-Furthermore, there shouldn't be any calls to the gadget api.
-
-Regards,
---
-Alex
+Regards
+Afzal
