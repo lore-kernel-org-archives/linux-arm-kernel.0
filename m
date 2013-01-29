@@ -1,75 +1,88 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Tue, 29 Jan 2013 20:37:16 +0530
-Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
- addresses
-Message-ID: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Jan 2013 16:10:40 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130129150201.GA24101@avionic-0098.mockup.avionic-design.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130129132204.GA23886@arm.com> <20130129144522.44ed7373@skate>
+ <20130129140522.GA24310@arm.com>
+ <20130129142015.GA23640@avionic-0098.mockup.avionic-design.de>
+ <20130129152937.53ec9a9b@skate>
+ <20130129150201.GA24101@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130129161040.5cd5a814@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With LPAE enabled, alloc_init_section() does not map the
-entire address space for unaligned addresses.
+Dear Thierry Reding,
 
-The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
-with page granularity mappings during boot. alloc_init_pte()
-is called and out of 16MB, only 2MB gets mapped and rest remains
-unaccessible.
+On Tue, 29 Jan 2013 16:02:01 +0100, Thierry Reding wrote:
 
-Because of this OMAP5 boot is broken with CMA + LPAE enabled.
-Fix the issue by ensuring that the entire addresses are
-mapped.
+> Now that I think about it, there were a few more changes needed.
+> For one, the reg property of the root port nodes need to be in the
+> format specified by the PCI DT binding. That is, 3 cells for the
+> address and 2 cells for the size.
+> 
+> So I end up with something like this:
+> 
+> 	pcie-controller {
+> 		...
+> 
+> 		ranges = <0x00000800 0 0x80000000 0x80000000 0 0x00001000 /* port 0 registers */
+> 			  0x00001000 0 0x80001000 0x80001000 0 0x00001000 /* port 1 registers */
+> 			  ...>;
+> 
+> 		pci at 1,0 {
+> 			reg = <0x000800 0 0x80000000 0 0x1000>;
+> 			...
+> 		};
+> 
+> 		pci at 2,0 {
+> 			reg = <0x001000 0 0x80001000 0 0x1000>;
+> 			...
+> 		};
+> 	};
+> 
+> So what happens here is that for each root port (pci at 1,0 and pci at 2,0),
+> the reg property is translated into the parent address space via the
+> pcie-controller's ranges property. pci at 1,0 gets the memory region
+> 0x80000000-0x80000fff and pci at 2,0 gets 0x80001000-0x80001fff. (These are
+> actually windows through which the configuration space of the root ports
+> is accessed.)
+> 
+> At the same time this reg property maps both devices into the PCI
+> address space at addresses 0:01.0 and 0:02.0 respectively.
 
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <chris@cloudcar.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Tested-by: Christoffer Dall  <chris@cloudcar.com>
----
- [V2] Moved the loop to alloc_init_pte as per Russell's
-     feedback and changed the subject accordingly.
-     Using PMD_XXX instead of SECTION_XXX to avoid
-     different loop increments with/without LPAE.
+This part I think I've done exactly the same thing in the Marvell PCIe
+DT binding.
 
- [v3] Removed the dummy variable phys and updated
-      the commit log for CMA case.
+> The second change is that you can't rely on ARM's default implementation
+> of the bus scan operation, which calls pci_scan_root_bus(), passing in a
+> NULL as the struct device which acts as the bus' parent. So on Tegra I
+> added a custom implementation which calls pci_create_root_bus(), passing
+> in the struct device of the PCI host bridge, whose .of_node field will
+> be set to the pcie-controller node above. Incidentally this also fixed
+> another issue where the PCI core and ARM's pci_common_init() both
+> eventually end up calling pci_bus_add_devices(). I don't remember the
+> exact symptoms but I think this was causing resource conflicts during
+> the second enumeration or so.
+> 
+> Because a proper struct device with the correct .of_node field is passed
+> into pci_create_root_bus(), the generic pcibios_get_phb_of_node() will
+> know how to find it by looking at bus->bridge->parent->of_node. After
+> that the generic matching code will search the bridge (pcie-controller)
+> node's children and relate them to the struct pci_dev by devfn. This is
+> done in pci_set_of_node() defined in drivers/pci/of.c, which calls
+> of_pci_find_child_device() from drivers/of/of_pci.c.
 
- [v4] Resending with updated change log and 
-      updating the tags.
+This is quite certainly the part that I was missing. I'll try this and
+let you know.
 
- arch/arm/mm/mmu.c |   20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+Thanks a lot for the lengthy, but very useful explanation!
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index f8388ad..b94c313 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -569,11 +569,23 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  const struct mem_type *type)
- {
--	pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
-+	unsigned long next;
-+	pte_t *pte;
-+
- 	do {
--		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
--		pfn++;
--	} while (pte++, addr += PAGE_SIZE, addr != end);
-+		if ((end-addr) & PMD_MASK)
-+			next = (addr + PMD_SIZE) & PMD_MASK;
-+		else
-+			next = end;
-+
-+		pte = early_pte_alloc(pmd, addr, type->prot_l1);
-+		do {
-+			set_pte_ext(pte, pfn_pte(pfn,
-+					__pgprot(type->prot_pte)), 0);
-+			pfn++;
-+		} while (pte++, addr += PAGE_SIZE, addr != next);
-+
-+	} while (pmd++, addr = next, addr != end);
- }
- 
- static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
