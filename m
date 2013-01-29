@@ -1,22 +1,95 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 29 Jan 2013 13:48:14 +0530
-Subject: [PATCH 4/5] ata: arasan: remove the need for platform_data
-In-Reply-To: <1359410300-26113-5-git-send-email-arnd@arndb.de>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <1359410300-26113-1-git-send-email-arnd@arndb.de>
- <1359410300-26113-5-git-send-email-arnd@arndb.de>
-Message-ID: <CAKohponH5jU_iiSmzJyhP22EwZ=RFFHKCrPYk7AagiVw1RREuw@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 29 Jan 2013 09:20:15 +0100
+Subject: [PATCH v3 1/3] pwm: Add pwm_can_sleep() as exported API to users
+In-Reply-To: <1359381659-24454-2-git-send-email-florian.vaussard@epfl.ch>
+References: <1359381659-24454-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359381659-24454-2-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <5107863F.10503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2013 03:28, Arnd Bergmann <arnd@arndb.de> wrote:
-> This adds a complete DT binding for the arasan device driver. There is
-> currently only one user, which is the spear13xx platform, so we don't
-> actually have to parse all the properties until another user comes in,
-> but this does use the generic DMA binding to find the DMA channel.
->
-> The patch is untested so far and is part of a series to convert
-> the spear platform over to use the generic DMA binding, so it
-> should stay with the rest of the series.
+On 01/28/2013 03:00 PM, Florian Vaussard wrote:
+> Calls to some external PWM chips can sleep. To help users,
+> add pwm_can_sleep() API.
+> 
+> Cc: Thierry Reding <thierry.reding@avionic-design.de>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+> ---
+>  drivers/pwm/core.c  |   12 ++++++++++++
+>  include/linux/pwm.h |   10 ++++++++++
+>  2 files changed, 22 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> index 4a13da4..41c0b0c 100644
+> --- a/drivers/pwm/core.c
+> +++ b/drivers/pwm/core.c
+> @@ -763,6 +763,18 @@ void devm_pwm_put(struct device *dev, struct pwm_device *pwm)
+>  }
+>  EXPORT_SYMBOL_GPL(devm_pwm_put);
+>  
+> +/**
+> +  * pwm_can_sleep() - report whether PWM access will sleep
+> +  * @pwm: PWM device
+> +  *
+> +  * It returns true if accessing the PWM can sleep, false otherwise.
+> +  */
+> +bool pwm_can_sleep(struct pwm_device *pwm)
+> +{
+> +	return pwm->chip->can_sleep;
+> +}
+> +EXPORT_SYMBOL_GPL(pwm_can_sleep);
+> +
+>  #ifdef CONFIG_DEBUG_FS
+>  static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
+>  {
+> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> index 70655a2..747c657 100644
+> --- a/include/linux/pwm.h
+> +++ b/include/linux/pwm.h
+> @@ -146,6 +146,8 @@ struct pwm_ops {
+>   * @base: number of first PWM controlled by this chip
+>   * @npwm: number of PWMs controlled by this chip
+>   * @pwms: array of PWM devices allocated by the framework
+> + * @can_sleep: flag must be set iff config()/enable()/disable() methods sleep,
+> + *      as they must while accessing PWM chips over I2C or SPI
+>   */
+>  struct pwm_chip {
+>  	struct device		*dev;
+> @@ -159,6 +161,7 @@ struct pwm_chip {
+>  	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
+>  					    const struct of_phandle_args *args);
+>  	unsigned int		of_pwm_n_cells;
+> +	bool			can_sleep;
+>  };
+>  
+>  #if IS_ENABLED(CONFIG_PWM)
+> @@ -182,6 +185,8 @@ struct pwm_device *devm_pwm_get(struct device *dev, const char *con_id);
+>  struct pwm_device *devm_of_pwm_get(struct device *dev, struct device_node *np,
+>  				   const char *con_id);
+>  void devm_pwm_put(struct device *dev, struct pwm_device *pwm);
+> +
+> +bool pwm_can_sleep(struct pwm_device *pwm);
+>  #else
+>  static inline int pwm_set_chip_data(struct pwm_device *pwm, void *data)
+>  {
+> @@ -242,6 +247,11 @@ static inline struct pwm_device *devm_of_pwm_get(struct device *dev,
+>  static inline void devm_pwm_put(struct device *dev, struct pwm_device *pwm)
+>  {
+>  }
+> +
+> +static inline bool pwm_can_sleep(struct pwm_device *pwm)
+> +{
+> +	return false;
+> +}
+>  #endif
+>  
+>  struct pwm_lookup {
+> 
+
+
+-- 
+P?ter
