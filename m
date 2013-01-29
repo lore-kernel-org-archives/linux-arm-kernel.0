@@ -1,37 +1,69 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 29 Jan 2013 12:08:23 +0200
-Subject: [PATCH v3 10/30] USB: ehci-omap: Use PHY APIs to get the PHY
- device and put it out of suspend
-In-Reply-To: <20130129095758.GM8708@arwen.pp.htv.fi>
-References: <1359372631-8180-11-git-send-email-rogerq@ti.com>
- <1359453032-20604-1-git-send-email-rogerq@ti.com>
- <20130129095758.GM8708@arwen.pp.htv.fi>
-Message-ID: <51079F97.6080109@ti.com>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Tue, 29 Jan 2013 15:40:38 +0530
+Subject: [PATCH v2 0/5] ARM: Manage the pl310 erratas in a dynamic way
+Message-ID: <20130129101026.GA1063@bnru10>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2013 11:57 AM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Jan 29, 2013 at 11:50:32AM +0200, Roger Quadros wrote:
->> For each port that is in PHY mode we obtain a PHY device using the USB PHY
->> library and put it out of suspend.
->>
->> It is up to platform code to associate the PHY to the controller's
->> port and it is upto the PHY driver to manage the PHY's resources.
->>
->> Also remove wired spacing around declarations we come across.
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> 
-> ideally, this would be done generically by ehci-hcd.ko itself. Alan,
-> would you have objections provided it doesn't break anyone else ?
-> 
-Agreed, and PHY suspend/resume should be done at port granularity.
+This series of patches attempts to manage the pl310 erratas dynamically rather 
+allowing platforms to choose them during build time.
 
-But considering the erratas we have in OMAP EHCI, I would still prefer to
-have control of the PHY in ehci-omap. We might even have to do some ULPI
-transfers in certain scenarios to work around some of the erratas.
+A bit of information which triggered the cause for this series is here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138066.html
 
-cheers,
--roger
+v2:
+- The commit 74ddcdb868a84f4a9f65e33c1ca0d24e1134e53a 
+  (l2x0: Only set .set_debug on PL310 r3p0 and earlier) which makes the
+  assumption that non-secure platforms will implement .set_debug interface.
+  An attempt is made to set .set_debug only if 'smc' is passed either
+  through DT or through legacy interface (l2x0_init).
+  With this background, this series adds 'smc' identifier to differentiate
+  the paltforms which implements SMC interface.
+
+- Use the stashed value	instead of reading RTL revision all over the place(Will)
+
+- Added l2x0_quirks to manage the errata in cpu_idle path. Tried to address
+  Russell's comment on this, but could not completely. Because, neither I can
+  keep the #ifdef CONFIG_PL310_ERRATA_769419 nor remove it entirely since
+  the platform A suffers from this bug, whereas B do not but shares the same
+  defconfig.
+
+srinidhi kasagar (5):
+  ARM: cache-l2x0: add 'smc' identifier
+  ARM: cache-l2x0: Manage the errata at run time
+  ARM: make the platforms not to select the l2x0 erratas
+  ARM: Handle l2x0 quirks in cpu_idle path
+  ARM: mach-omap2: apply the errata at run time rather
+
+ arch/arm/boot/dts/omap4.dtsi                   |    1 +
+ arch/arm/include/asm/hardware/cache-l2x0.h     |   16 ++++-
+ arch/arm/kernel/process.c                      |    7 +-
+ arch/arm/mach-cns3xxx/core.c                   |    4 +-
+ arch/arm/mach-exynos/common.c                  |    4 +-
+ arch/arm/mach-imx/Kconfig                      |    3 -
+ arch/arm/mach-imx/mm-imx3.c                    |    4 +-
+ arch/arm/mach-nomadik/cpu-8815.c               |    4 +-
+ arch/arm/mach-omap2/Kconfig                    |    2 -
+ arch/arm/mach-omap2/omap4-common.c             |    2 +-
+ arch/arm/mach-omap2/sleep44xx.S                |   25 ++++++-
+ arch/arm/mach-realview/realview_eb.c           |    4 +-
+ arch/arm/mach-realview/realview_pb1176.c       |    4 +-
+ arch/arm/mach-realview/realview_pb11mp.c       |    4 +-
+ arch/arm/mach-realview/realview_pbx.c          |    4 +-
+ arch/arm/mach-shmobile/board-ag5evm.c          |    2 +-
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    4 +-
+ arch/arm/mach-shmobile/board-bonito.c          |    4 +-
+ arch/arm/mach-shmobile/board-kota2.c           |    4 +-
+ arch/arm/mach-shmobile/board-kzm9g.c           |    4 +-
+ arch/arm/mach-shmobile/setup-r8a7779.c         |    4 +-
+ arch/arm/mach-spear13xx/spear13xx.c            |    2 +-
+ arch/arm/mach-tegra/Kconfig                    |    3 -
+ arch/arm/mach-ux500/Kconfig                    |    1 -
+ arch/arm/mach-ux500/cache-l2x0.c               |    2 +-
+ arch/arm/mach-vexpress/Kconfig                 |    1 -
+ arch/arm/mach-vexpress/ct-ca9x4.c              |    2 +-
+ arch/arm/mm/cache-l2x0.c                       |   90 +++++++++++++-----------
+ 28 files changed, 121 insertions(+), 90 deletions(-)
+
+-- 
+1.7.2.dirty
