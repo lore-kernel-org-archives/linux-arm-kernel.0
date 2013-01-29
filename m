@@ -1,37 +1,36 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 29 Jan 2013 11:51:58 +0200
-Subject: [PATCH 2/2] clk: tegra: adapt tegra periph clk to mux table/mask
-In-Reply-To: <5106AC31.1040207@wwwdotorg.org>
-References: <1359388467-32386-1-git-send-email-pdeschrijver@nvidia.com>
- <1359388467-32386-3-git-send-email-pdeschrijver@nvidia.com>
- <5106AC31.1040207@wwwdotorg.org>
-Message-ID: <20130129095158.GS4118@tbergstrom-lnx.Nvidia.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 29 Jan 2013 11:57:58 +0200
+Subject: [PATCH v3 10/30] USB: ehci-omap: Use PHY APIs to get the PHY
+ device and put it out of suspend
+In-Reply-To: <1359453032-20604-1-git-send-email-rogerq@ti.com>
+References: <1359372631-8180-11-git-send-email-rogerq@ti.com>
+ <1359453032-20604-1-git-send-email-rogerq@ti.com>
+Message-ID: <20130129095758.GM8708@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 05:49:53PM +0100, Stephen Warren wrote:
-> On 01/28/2013 08:54 AM, Peter De Schrijver wrote:
-> > The tegra peripheral clock type uses struct clk_mux directly, so it needs to
-> > be updated to handle the new mask and table fields. Also the macros need
-> > to be updated
-> 
-> Just a quick note on patch dependencies here:
-> 
-> Patch 1/2 can presumably be taken through the clk tree whenever Mike is
-> OK with it.
-> 
-> Patch 2/2 depends on patches in the Tegra tree for 3.9. Since patch 2/2
-> is useful mostly for the Tegra114 clock driver, and I don't imagine that
-> will get posted/merged in time for 3.9, it's probably easiest to just
-> take patch 2/2 for 3.10 along with the Tegra114 clock driver. Also, I
-> imagine there won't be any more clk/Tegra tree dependencies in 3.10, so
-> patch 2/2 and the Tegra114 clk driver patches can likely go through the
-> clk tree itself for 3.10.
+Hi,
 
-No. Because 1/2 changes struct clk_mux and the tegra peripheral clock type 
-uses struct clk_mux directly, 2/2 needs to be applied together with 1/2, even
-if the new functionality is not yet used.
+On Tue, Jan 29, 2013 at 11:50:32AM +0200, Roger Quadros wrote:
+> For each port that is in PHY mode we obtain a PHY device using the USB PHY
+> library and put it out of suspend.
+> 
+> It is up to platform code to associate the PHY to the controller's
+> port and it is upto the PHY driver to manage the PHY's resources.
+> 
+> Also remove wired spacing around declarations we come across.
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-Cheers,
+ideally, this would be done generically by ehci-hcd.ko itself. Alan,
+would you have objections provided it doesn't break anyone else ?
 
-Peter.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/44445308/attachment.sig>
