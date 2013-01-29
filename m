@@ -1,33 +1,49 @@
-From: kishon@ti.com (kishon)
-Date: Tue, 29 Jan 2013 19:40:23 +0530
-Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <20130129135336.GA3323@pengutronix.de>
-References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
- <5107D253.5030400@ti.com> <20130129135336.GA3323@pengutronix.de>
-Message-ID: <5107D84F.80401@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Jan 2013 14:13:29 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+Message-ID: <20130129141328.GV23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013 07:23 PM, Wolfram Sang wrote:
->>> +	err = of_property_read_string(np, "phy_type", &phy_type);
->>> +	if (err < 0)
->>> +		return USBPHY_INTERFACE_MODE_NA;
->>
->> Why don't we use a u32 property type for the *phy-type*? IMHO we
->> should use string property only when the property should be
->> absolutely unambiguous (e.g., compatible property should be string).
->
-> If we would use u32-numbers in the compatible entry, this would also be
-> unambiguous, no? 0xd00dfeed would be the at24-driver. Pretty specific.
+On Mon, Jan 28, 2013 at 07:30:33PM -0600, Kim Phillips wrote:
+> AFAICT, arm gcc got __builtin_bswap{32,64} support in 4.6,
+> and for the 16-bit version in 4.8.
 
-hehe... But we don't have a corresponding *enum* representing the 
-drivers :-)
->
-> I don't mind having readable devicetrees. And we have it for ethernet
-> phys already with strings, so it would be consistent.
+Hmm.
 
-Ok. Fine with it then :-)
+$ /usr/local/aeabi/bin/arm-linux-gcc --version
+arm-linux-gcc (GCC) 4.5.4
+Copyright (C) 2010 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+$ for a in armv3 armv4 armv4t armv5t armv5te armv6k armv6 armv7-a; do \
+   echo $a:; \
+   for f in 16 32 64; do \
+      echo 'unsigned foo(unsigned val) { return __builtin_bswap'$f'(val); }' | \
+      /usr/local/aeabi/bin/arm-linux-gcc -x c -S -o - - -march=$a | grep 'bl'; \
+   done; \
+done
 
-Thanks
-Kishon
+produces:
+
+armv3:
+        bl __builtin_bswap16
+armv4:
+        bl __builtin_bswap16
+armv4t:
+        bl __builtin_bswap16
+armv5t:
+        bl __builtin_bswap16
+armv5te:
+        bl __builtin_bswap16
+armv6k:
+        bl __builtin_bswap16
+armv6:
+        bl __builtin_bswap16
+armv7-a:
+        bl __builtin_bswap16
+
+So, this compiler (4.5.4) has support for 32-bit and 64-bit bswaps
+across all our architectures, but not the 16-bit ones.
