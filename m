@@ -1,50 +1,43 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 29 Jan 2013 14:08:48 -0800
-Subject: [PATCH 09/30] USB: ehci-omap: Use devm_request_and_ioremap()
-In-Reply-To: <20130129160134.GC23505@n2100.arm.linux.org.uk>
-References: <20130128152010.GN23505@n2100.arm.linux.org.uk>
- <Pine.LNX.4.44L0.1301291033000.1507-100000@iolanthe.rowland.org>
- <20130129160134.GC23505@n2100.arm.linux.org.uk>
-Message-ID: <20130129220848.GA11524@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 29 Jan 2013 15:10:42 -0700
+Subject: [PATCH] ARM: call disable_nonboot_cpus() from machine_shutdown()
+In-Reply-To: <87obgwb5d1.fsf@xmission.com>
+References: <1357160861-26282-1-git-send-email-swarren@wwwdotorg.org>
+ <50E4C9C6.20609@codeaurora.org>
+ <20130103120259.GB5193@mudshark.cambridge.arm.com>
+ <20130103122100.GN2631@n2100.arm.linux.org.uk>
+ <50E5E967.3020805@wwwdotorg.org>
+ <20130106162200.GC11025@mudshark.cambridge.arm.com>
+ <20130106164033.GA3222@n2100.arm.linux.org.uk> <87ehhxahd1.fsf@xmission.com>
+ <50ECB49C.7010609@wwwdotorg.org> <87obgwb5d1.fsf@xmission.com>
+Message-ID: <510848E2.50203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 04:01:34PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 29, 2013 at 10:34:53AM -0500, Alan Stern wrote:
-> > On Mon, 28 Jan 2013, Russell King - ARM Linux wrote:
-> > 
-> > > On Mon, Jan 28, 2013 at 10:17:33AM -0500, Alan Stern wrote:
-> > > > On Mon, 28 Jan 2013, Roger Quadros wrote:
-> > > > 
-> > > > > Make use of devm_request_and_ioremap() and correct comment.
-> > > > 
-> > > > Didn't a big patch come through recently converting all usages of 
-> > > > devm_request_and_ioremap() to another function (I forget the name) that 
-> > > > does its own error reporting and returns an ERR_PTR value?
-> > > > 
-> > > > (Checks the mailing list archive...)  Ah, here it is:
-> > > > 
-> > > > 	http://marc.info/?l=linux-usb&m=135876311801537&w=2
-> > > > 
-> > > > And the new function is devm_ioremap_resource().  We should avoid 
-> > > > adding new usages of an old interface.
-> > > 
-> > > Maybe... if devm_ioremap_resource() was already in the kernel.  The
-> > > problem at the moment is it isn't, and it'll probably be rather
-> > > horrid for everyone to deal with especially when it comes to testing.
-> > 
-> > Not in the kernel yet?  I didn't realize that.  Looks like Thierry 
-> > Reding will have some clean-up work to do when it does get in.
-> 
-> It may be in linux-next, but it isn't in Linus' yet... (of course, it's
-> probably scheduled for the upcoming merge window).  Certainly:
-> 
-> $ grep -r devm_ioremap_resource include
-> 
-> against Linus' tree (6abb7c2) still turns up nothing.
+On 01/10/2013 11:28 PM, Eric W. Biederman wrote:
+...
+> I don't have any problem with generic code in the reboot path
+> doing:
+> if (cpu_online(0))
+> 	set_cpus_allowed_ptr(current, cpumask_of(0));
 
-It's in my driver-core-next tree and will be going to Linus for 3.9-rc1.
+It looks like that API just affects the scheduler, and not whether the
+other CPUs are actually active/hot-plugged-in. At least for my use-case,
+I need something that really disables the other CPUs so they aren't
+executing code, hence my tendency to hot-un-plug them using
+disable_nonboot_cpus(), rather than just shift task execution off them
+using the code above.
 
-thanks,
+I wonder if all architectures shouldn't always do the following in all
+reboot/shutdown/kexec cases:
 
-greg k-h
+* set_cpus_allowed_ptr() to limit code execution to a single CPU.
+* disable_nonboot_cpus() (or equivalent) if it's available to turn off
+all the other CPUs.
+
+The issue here would be that disable_nonboot_cpus() isn't always
+available; I assume that's part of the reason that there are
+arch-specific machine_xxx() hooks, so that architectures can
+power-off/reset their CPUs even when hotplug isn't enabled? I wonder if
+that can be refactored so that reboot/poweroff/kexec can share some
+CPU-disable code with CPU hotplug?
