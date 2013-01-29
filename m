@@ -1,54 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jan 2013 10:40:10 -0800
-Subject: [GIT PULL] ARM: mvebu fixes for v3.8-rc6
-In-Reply-To: <1359472708.4cD60.22570@triton>
-References: <1359472708.4cD60.22570@triton>
-Message-ID: <20130129184010.GB19906@quad.lixom.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 29 Jan 2013 11:41:57 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
+ <20130129055508.GA3339@obsidianresearch.com>
+ <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
+Message-ID: <20130129184157.GA29274@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 03:18:28PM +0000, Jason Cooper wrote:
-> The following changes since commit 09d75bc7d217bd8868899028a98b53423e6b3324:
-> 
->   ARM: kirkwood: fix missing #interrupt-cells property (2013-01-23 01:10:48 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8-rc6
+On Tue, Jan 29, 2013 at 10:47:09AM -0700, Bjorn Helgaas wrote:
 
-Pulled, but:
+> As I understand it, the DT is a description of the hardware, so in
+> that sense, the DT can't set aside physical address space.  It can
+> describe what the hardware does with the address space, and I assume
+> that's what you mean.  Maybe the hardware isn't configurable, e.g., it
+> is hard-wired to route certain address ranges to PCIe?
 
-> 
-> for you to fetch changes up to de27686b77f1c5c5dddf06d48fd322c52f098d51:
-> 
->   arm: mvebu: i2c come back in defconfig (2013-01-23 15:05:11 +0000)
-> 
-> ----------------------------------------------------------------
-> fixes for v3.8-rc6
-> 
->  - add missing gpio interrupt lines to dove dt
->  - fix bad logic for printing MPP error message on orion boards
->  - build proper serial port driver after changing mvebu DT compatible property
->    - This is a change to mvebu_defconfig that I wouldn't usually push out as a
->      fix.  However, the commit
-> 
->      b24212f arm: mvebu: Use dw-apb-uart instead of ns16650 as UART driver
-> 
->      changed the serial driver for the board in the dts file.  without the patch
->      I've included in this pull, users won't see any log messages.
-> 
-> ----------------------------------------------------------------
-> Gerlando Falauto (1):
->       arm: plat-orion: fix printing of "MPP config unavailable on this hardware"
-> 
-> Gregory CLEMENT (1):
->       arm: mvebu: i2c come back in defconfig
-> 
-> Jean-Francois Moine (1):
->       Dove: activate GPIO interrupts in DT
+The DT is largely a description of the hardware, but when it comes to
+addresses, particularly HW programmable addresess, there is an general
+expectation that the driver/bootloader will program HW address
+decoders to either match the addresses given in the DT, or to new
+values guided by the DT addresses.
 
-Please keep an eye on the patch subjects you apply. We're trying to standardize
-on "ARM: dove: <...>", etc.
+In a real sense that means the DT also describes the physical address
+map the kernel should use.
 
+In the PCI-E case the DT PCI-E HW description includes physical
+address ranges to use for the MMIO/IO/PREFETCH PCI-E interface windows
+and the driver is expected to program the internal HW address decoders
+based on those address ranges.
 
--Olof
+The catch is that the hardware decoders are on a link-by-link basis,
+not on a root-complex basis, so the programming can only take place
+once the Linux kernel has done PCI resource assignment.
+
+So when I say set aside, I mean for instance, the PCI-E entry in DT
+has 128M of physical address space marked for PCI MMIO use. The kernel
+does PCI resource allocation and the HW decoders in each link will be
+set to claim some portion of the 128M - based on the MMIO windows
+programmed on the PCI-PCI root port bridges. The reamining part of the
+128M is dead address space, not claimed by any hardware block at all.
+
+Jason
