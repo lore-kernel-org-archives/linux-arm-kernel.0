@@ -1,67 +1,80 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 29 Jan 2013 13:01:12 +0000
-Subject: [PATCH] arm: fix returning wrong CALLER_ADDRx
-In-Reply-To: <1357888690-24012-1-git-send-email-kpark3469@gmail.com>
-References: <1357888690-24012-1-git-send-email-kpark3469@gmail.com>
-Message-ID: <20130129130039.GA3817@linaro.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 29 Jan 2013 17:04:42 +0400
+Subject: [PATCH v2 5/5] ARM: mach-omap2: apply the errata at run time
+ rather
+In-Reply-To: <20130129101711.GA23311@bnru10>
+References: <20130129101711.GA23311@bnru10>
+Message-ID: <5107C8EA.5000209@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 11, 2013 at 04:18:10PM +0900, Keun-O Park wrote:
-> From: sahara <keun-o.park@windriver.com>
-> 
-> This makes return_address return correct value for ftrace feature.
-> unwind_frame does not update frame->lr but frame->pc for backtrace.
-> And, the initialization for data.addr was missing so that wrong value
-> returned when unwind_frame failed.
-> 
-> Signed-off-by: sahara <keun-o.park@windriver.com>
+Hello.
 
-Reviewed-by: Dave Martin <dave.martin@linaro.org>
+On 29-01-2013 14:17, srinidhi kasagar wrote:
 
-This is the same as a patch I previously posted:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129381.html
+> Get the pl310 rtl revision number which is stashed by the l2x0
+> driver and apply the required errata ERRATA_727915 accordingly.
 
-...except for the initialisation of data.addr to NULL, which is needed
-in order to prevent a garbage pointer being returned in the case where
-the unwinder fails to unwind a frame before the required level
-is reached.
-
-Cheers
----Dave
-
+> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 > ---
->  arch/arm/kernel/return_address.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-> index 8085417..fafedd8 100644
-> --- a/arch/arm/kernel/return_address.c
-> +++ b/arch/arm/kernel/return_address.c
-> @@ -26,7 +26,7 @@ static int save_return_addr(struct stackframe *frame, void *d)
->  	struct return_address_data *data = d;
->  
->  	if (!data->level) {
-> -		data->addr = (void *)frame->lr;
-> +		data->addr = (void *)frame->pc;
->  
->  		return 1;
->  	} else {
-> @@ -41,7 +41,8 @@ void *return_address(unsigned int level)
->  	struct stackframe frame;
->  	register unsigned long current_sp asm ("sp");
->  
-> -	data.level = level + 1;
-> +	data.level = level + 2;
-> +	data.addr = NULL;
->  
->  	frame.fp = (unsigned long)__builtin_frame_address(0);
->  	frame.sp = current_sp;
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   arch/arm/mach-omap2/sleep44xx.S |   25 +++++++++++++++++++++----
+>   1 files changed, 21 insertions(+), 4 deletions(-)
+
+> diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
+> index 88ff83a..7440f65 100644
+> --- a/arch/arm/mach-omap2/sleep44xx.S
+> +++ b/arch/arm/mach-omap2/sleep44xx.S
+> @@ -157,11 +157,19 @@ skip_scu_gp_set:
+>   	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]	@ memory.
+>   	cmp	r0, #3
+>   	bne	do_WFI
+> -#ifdef CONFIG_PL310_ERRATA_727915
+> +	/* Check for PL310_ERRATA_727915 */
+> +	ldr	r0, =l2x0_revision
+> +	cmp	r0, #0x4
+> +	beq	dosmc
+> +	cmp	r0, #0x5
+> +	beq	dosmc
+> +	b	nosmc
+
+    Why not just:
+	bne	nosmc
+
+> +dosmc:
+>   	mov	r0, #0x03
+>   	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
+>   	DO_SMC
+> -#endif
+> +
+> +nosmc:
+>   	bl	omap4_get_l2cache_base
+>   	mov	r2, r0
+>   	ldr	r0, =0xffff
+> @@ -171,11 +179,20 @@ wait:
+>   	ldr	r1, =0xffff
+>   	ands	r0, r0, r1
+>   	bne	wait
+> -#ifdef CONFIG_PL310_ERRATA_727915
+> +
+> +	/* Check for PL310_ERRATA_727915 */
+> +	ldr	r0, =l2x0_revision
+> +	cmp	r0, #0x4
+> +	beq	dosmc2
+> +	cmp	r0, #0x5
+> +	beq	dosmc2
+> +	b	nosmc2
+
+    Same question.
+
+> +dosmc2:
+>   	mov	r0, #0x00
+>   	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
+>   	DO_SMC
+> -#endif
+> +
+> +nosmc2:
+>   l2x_sync:
+>   	bl	omap4_get_l2cache_base
+>   	mov	r2, r0
+
+WBR, Sergei
