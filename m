@@ -1,51 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jan 2013 15:28:41 +0000
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <1359467140.31148.41.camel@smile>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <201301291331.48427.arnd@arndb.de> <1359467140.31148.41.camel@smile>
-Message-ID: <201301291528.42176.arnd@arndb.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 29 Jan 2013 10:30:05 -0500 (EST)
+Subject: [PATCH v3 10/30] USB: ehci-omap: Use PHY APIs to get the PHY
+ device and put it out of suspend
+In-Reply-To: <1359453032-20604-1-git-send-email-rogerq@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1301291026020.1507-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013, Andy Shevchenko wrote:
-> On Tue, 2013-01-29 at 13:31 +0000, Arnd Bergmann wrote: 
-> > On Tuesday 29 January 2013, Viresh Kumar wrote:
-> > Ah, good. So I guess the "dma-requests" property should actually
-> > be "16" then.
-> > 
-> > Does this mean that an implicit zero request line means memory?
+On Tue, 29 Jan 2013, Roger Quadros wrote:
+
+> For each port that is in PHY mode we obtain a PHY device using the USB PHY
+> library and put it out of suspend.
 > 
-> No, it doesn't.
-> When dma is doing mem2mem transfers the request line field is ignored by
-> the hw.
+> It is up to platform code to associate the PHY to the controller's
+> port and it is upto the PHY driver to manage the PHY's resources.
 
-Ok.
+s/upto/up to/
 
-> > Could we have device-to-device DMAs with this controller, and if
-> > we can, should we have both 'src' and 'dst' fields?
-> 
-> As far as I know there is no driver under dmaengine that supports
-> per2per transfers.
+> Also remove wired spacing around declarations we come across.
 
-Well, I'm asking because we need to describe the hardware properly,
-even if drivers today don't do this does not mean that it is not
-possible. We can always change the Linux implementation, but we
-cannot as easily change an established DT binding, just like
-we don't change user space interfaces.
+s/wired/weird/ -- not that people care about misspellings in the 
+Changelog.  You don't have to resubmit the patch just to fix these two 
+items.
 
-Of course, if that is a thing we don't expect anyone to do,
-we don't have to describe it, or we could make a compatible
-extension to the binding later.
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-> >  Are the
-> > two number ranges sharing the same address space, i.e. is
-> > request '7' as the destination guaranteed to be the same device
-> > as request '7' in the source?
-> 
-> Request line should be unique. It means a real wire from slave
-> hw to the dmac.
-
-Ok, good.
-
-	Arnd
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
