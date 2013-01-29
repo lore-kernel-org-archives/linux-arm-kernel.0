@@ -1,77 +1,73 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 29 Jan 2013 09:30:49 +0100
-Subject: [GIT PULL] ARM: OMAP: Audio support via omap-twl4030 and pwm
- support
-In-Reply-To: <50FE64DC.2030808@ti.com>
-References: <50FE64DC.2030808@ti.com>
-Message-ID: <510788B9.9050907@ti.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 29 Jan 2013 09:35:22 +0100
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+Message-ID: <20130129083522.GA14302@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 01/22/2013 11:07 AM, Peter Ujfalusi wrote:
-> Hi Tony,
+On Mon, Jan 28, 2013 at 07:30:33PM -0600, Kim Phillips wrote:
+> Enable the compiler intrinsic for byte swapping on arch ARM.  This
+> allows the compiler to detect and be able to optimize out byte
+> swappings, e.g. in big endian to big endian moves.
 > 
-> The content of this pull:
+> AFAICT, arm gcc got __builtin_bswap{32,64} support in 4.6,
+> and for the 16-bit version in 4.8.
 > 
-> update for audio support via omap-twl4030 and pwm updates in board level:
-> http://www.spinics.net/lists/linux-omap/msg85085.html
-> 
-> and zoom-peripherals update to not request the TWL GPIO7:
-> http://www.spinics.net/lists/linux-omap/msg85187.html
-> 
-> All is on top of mainline v3.8-rc4 tag.
-
-Have you already pulled this one? I can not find the patches in linux-next.
-
-Regards,
-P?ter
-
-> 
-> Regards,
-> P?ter
-> 
+> Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
 > ---
-> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+> akin to: http://comments.gmane.org/gmane.linux.kernel.cross-arch/16016
 > 
->   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+> based on linux-next.  Depends on commit "compiler-gcc{3,4}.h: Use
+> GCC_VERSION macro" by Daniel Santos <daniel.santos@pobox.com>,
+> currently in the akpm branch.
 > 
-> are available in the git repository at:
+> RFC because of unfamiliarity with arch ARM, and that at91sam9rl,
+> at91rm9200, and lpd270 (so far, at least) builds fail with:
 > 
->   git://gitorious.org/omap-audio/linux-audio.git peter/for-tony
+> include/uapi/linux/swab.h:60: undefined reference to `__bswapsi2'
 > 
-> for you to fetch changes up to e4f4e8bfa47431b91fbb21dd9b86d9bc2c15cbd7:
+> I'm using eldk-5.2.1/armv7a's arm-linux-gnueabi-gcc (GCC) 4.6.4
+> 20120303 (prerelease)
 > 
->   ARM: board-zoom: Do not request LCD panel enable GPIO from twl4030 (2013-01-22 10:35:16 +0100)
+>  arch/arm/Kconfig              |    1 +
+>  include/linux/compiler-gcc4.h |    3 ++-
+>  2 files changed, 3 insertions(+), 1 deletion(-)
 > 
-> ----------------------------------------------------------------
-> Peter Ujfalusi (9):
->       ARM: OMAP: 3430sdp: Enable extmute functionality for audio
->       ARM: OMAP: zoom: Zoom2 does not have extmute functionality
->       ARM: OMAP2+: twl-common: Add default twl4030 audio configuration
->       ARM: OMAP2+: twl-common: Allow boards to customize the twl4030 audio setup
->       ARM: OMAP: zoom: Audio support via the common omap-twl4030 machine driver
->       ARM: OMAP: sdp3430: Audio support via the common omap-twl4030 machine driver
->       ARM: OMAP: board-4430sdp: Proper support for TWL6030 PWM LED/Backlight
->       ARM: OMAP: omap3beagle: Use the pwm_leds driver to control the PMU_STAT led
->       ARM: board-zoom: Do not request LCD panel enable GPIO from twl4030
-> 
->  arch/arm/mach-omap2/board-3430sdp.c          | 20 ++++++++++++++++++++
->  arch/arm/mach-omap2/board-4430sdp.c          | 30 +++++++++++++++++++++++++++++-
->  arch/arm/mach-omap2/board-cm-t35.c           |  2 +-
->  arch/arm/mach-omap2/board-devkit8000.c       |  2 +-
->  arch/arm/mach-omap2/board-igep0020.c         |  2 +-
->  arch/arm/mach-omap2/board-omap3beagle.c      | 41 ++++++++++++++++++++++++++++++++---------
->  arch/arm/mach-omap2/board-omap3evm.c         |  2 +-
->  arch/arm/mach-omap2/board-overo.c            |  2 +-
->  arch/arm/mach-omap2/board-zoom-peripherals.c | 39 +++++++++++++++++++++------------------
->  arch/arm/mach-omap2/twl-common.c             | 17 +++++++++++------
->  arch/arm/mach-omap2/twl-common.h             |  3 ++-
->  11 files changed, 120 insertions(+), 40 deletions(-)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index eda8711..437d11a 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -3,6 +3,7 @@ config ARM
+>  	default y
+>  	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> +	select ARCH_USE_BUILTIN_BSWAP
+>  	select ARCH_HAVE_CUSTOM_GPIO_H
+>  	select ARCH_WANT_IPC_PARSE_VERSION
+>  	select BUILDTIME_EXTABLE_SORT if MMU
+> diff --git a/include/linux/compiler-gcc4.h b/include/linux/compiler-gcc4.h
+> index 68b162d..da5f728 100644
+> --- a/include/linux/compiler-gcc4.h
+> +++ b/include/linux/compiler-gcc4.h
+> @@ -67,7 +67,8 @@
+>  
+>  
+>  #ifdef CONFIG_ARCH_USE_BUILTIN_BSWAP
+> -#if GCC_VERSION >= 40400
+> +#if (!defined(__arm__) && GCC_VERSION >= 40400) || \
+> +    (defined(__arm__) && GCC_VERSION >= 40600)
+
+There should be no arch-specific stuff in a generic header. I guess
+you probably need to select ARCH_USE_BUILTIN_BSWAP in an arm-specific
+compiler.h header after checking compiler version...
+
+Thanks.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
