@@ -1,66 +1,66 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 29 Jan 2013 21:59:46 +0100
-Subject: [PATCH] ARM: dove: convert serial DT nodes to clocks property
-Message-ID: <1359493186-25589-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 29 Jan 2013 15:01:33 -0600
+Subject: [PATCH v3 15/15] ARM: vexpress/dcscb: probe via device tree
+In-Reply-To: <1359445870-18925-16-git-send-email-nicolas.pitre@linaro.org>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-16-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <510838AD.6040700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_serial now has support for using clocks property and we have
-a DT clock provider. This patch replaces the hard coded clock-frequency
-property with a clocks phandle to tclk.
+On 01/29/2013 01:51 AM, Nicolas Pitre wrote:
+> This allows for the DCSCB support to be compiled in and selected
+> at run time.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/dove.dtsi |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Shouldn't this just be rolled into the commit creating dcscb.c?
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 42eac1f..7b52463 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -55,7 +55,7 @@
- 			reg = <0x12000 0x100>;
- 			reg-shift = <2>;
- 			interrupts = <7>;
--			clock-frequency = <166666667>;
-+			clocks = <&core_clk 0>;
- 			status = "disabled";
- 		};
- 
-@@ -64,7 +64,7 @@
- 			reg = <0x12100 0x100>;
- 			reg-shift = <2>;
- 			interrupts = <8>;
--			clock-frequency = <166666667>;
-+			clocks = <&core_clk 0>;
- 			status = "disabled";
- 		};
- 
-@@ -73,7 +73,7 @@
- 			reg = <0x12000 0x100>;
- 			reg-shift = <2>;
- 			interrupts = <9>;
--			clock-frequency = <166666667>;
-+			clocks = <&core_clk 0>;
- 			status = "disabled";
- 		};
- 
-@@ -82,7 +82,7 @@
- 			reg = <0x12100 0x100>;
- 			reg-shift = <2>;
- 			interrupts = <10>;
--			clock-frequency = <166666667>;
-+			clocks = <&core_clk 0>;
- 			status = "disabled";
- 		};
- 
--- 
-1.7.10.4
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/mach-vexpress/dcscb.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+> index 58051ffafb..a724507cbc 100644
+> --- a/arch/arm/mach-vexpress/dcscb.c
+> +++ b/arch/arm/mach-vexpress/dcscb.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/io.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/errno.h>
+> +#include <linux/of_address.h>
+>  #include <linux/vexpress.h>
+>  #include <linux/arm-cci.h>
+>  
+> @@ -24,8 +25,6 @@
+>  #include <asm/cp15.h>
+>  
+>  
+> -#define DCSCB_PHYS_BASE	0x60000000
+> -
+>  #define RST_HOLD0	0x0
+>  #define RST_HOLD1	0x4
+>  #define SYS_SWRESET	0x8
+> @@ -215,10 +214,14 @@ extern void dcscb_power_up_setup(unsigned int affinity_level);
+>  
+>  static int __init dcscb_init(void)
+>  {
+> +	struct device_node *node;
+>  	unsigned int cfg;
+>  	int ret;
+>  
+> -	dcscb_base = ioremap(DCSCB_PHYS_BASE, 0x1000);
+> +	node = of_find_compatible_node(NULL, NULL, "arm,dcscb");
+
+This needs binding documentation and should be a more specific name. Not
+knowing what dcscb is, I don't have a suggestion. Perhaps should include
+vexpress or specific core tile name it is part of.
+
+Rob
+
+> +	if (!node)
+> +		return -ENODEV;
+> +	dcscb_base= of_iomap(node, 0);
+>  	if (!dcscb_base)
+>  		return -EADDRNOTAVAIL;
+>  	cfg = readl_relaxed(dcscb_base + DCS_CFG_R);
+> 
