@@ -1,51 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jan 2013 09:33:38 -0800
-Subject: [PATCH 02/10] gpio: pxa: identify ed mask reg with platform data
-In-Reply-To: <CACRpkdb8iQiSJZKe5ViGc08LJP686KmP2J8Z=GsbhjYkyvXF_g@mail.gmail.com>
-References: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
- <1358929554-32265-3-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdYnMhWYy_FGrJs+=DN7od08nk5eeansPNaq9nxhm61-=A@mail.gmail.com>
- <CACRpkdb8iQiSJZKe5ViGc08LJP686KmP2J8Z=GsbhjYkyvXF_g@mail.gmail.com>
-Message-ID: <20130129173338.GA17791@quad.lixom.net>
+Date: Tue, 29 Jan 2013 09:36:41 -0800
+Subject: [GIT PULL] Nomadik devicetree and cleanups
+In-Reply-To: <CACRpkdaHo_xLwqUDF9C71HbuGEcJHg_Jrsf0gCSPYXa4E+yJGA@mail.gmail.com>
+References: <CACRpkdZM8+6QaGrRtCCMWoZQO23uej7JDr1xz2zG7TtwQ7Ngqw@mail.gmail.com>
+ <20130128213135.GA3047@quad.lixom.net>
+ <CACRpkdaHo_xLwqUDF9C71HbuGEcJHg_Jrsf0gCSPYXa4E+yJGA@mail.gmail.com>
+Message-ID: <20130129173641.GA17935@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 10:57:03AM +0100, Linus Walleij wrote:
-> On Fri, Jan 25, 2013 at 10:54 AM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
-> > On Wed, Jan 23, 2013 at 9:25 AM, Haojian Zhuang
-> > <haojian.zhuang@linaro.org> wrote:
-> >
-> >> Avoid to judge whether edge mask register exists by CPU. Use platform
-> >> data to identify it instead. The gpio edge mask register exists in MMP
-> >> series SoC.
-> >>
-> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> >
-> > ARM SoC folks: do you approve (ACK) this patch so I
-> > can apply it to my GPIO tree?
-> >
-> > It looks allright to me, I just want to know so that there are no
-> > huge changes around this code in the ARM SoC tree that will
-> > cause trouble.
+On Mon, Jan 28, 2013 at 11:36:59PM +0100, Linus Walleij wrote:
+> On Mon, Jan 28, 2013 at 10:31 PM, Olof Johansson <olof@lixom.net> wrote:
 > 
-> Actually this goes for the whole series.
+> > Would you mind rebasing on top of the depends/cleanup branch in arm-soc, sort
+> > out the breakage (and test it) and resubmit?
 > 
-> It touches a lot of code in arch/arm/*
+> So Olof, please try this instead, based on the ARM depends/cleanup HEAD
+> when I fetched it:
 > 
-> Haoijan, do you prefer if ACK it so you can take it up through
-> ARM SoC?
+> The following changes since commit f8060f5446b1f2782f0a8ca9be2d870ea4198aee:
 > 
-> I'm OK to take it all through my GPIO tree as well if the
-> ARM people ACK them.
+>   Merge tag 'gic-vic-to-irqchip' of
+> git://sources.calxeda.com/kernel/linux into next/cleanup (2013-01-14
+> 19:55:03 -0800)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+> tags/nmk-dt-on-cleanups
 
-The series is:
-
-Acked-by: Olof Johansson <olof@lixom.net>
-
-Just in case, feel free to apply these to a topic branch that we can pull in as
-a shared one in case of (excessive) conflicts. I haven't seen any sign of any
-yet though.
+Beautiful! Pulled. Zero conflicts. :)
 
 
 -Olof
