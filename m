@@ -1,48 +1,114 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Tue, 29 Jan 2013 16:45:00 +0530
-Subject: [PATCH v3 1/9] ARM: OMAP2+: AM33XX: CM: Get rid of unnecessary header
- inclusions
+Date: Tue, 29 Jan 2013 16:45:08 +0530
+Subject: [PATCH v3 9/9] ARM: OMAP2+: AM33XX: control: Add some control module
+ registers and APIs
 In-Reply-To: <1359458108-8489-1-git-send-email-vaibhav.bedia@ti.com>
 References: <1359458108-8489-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1359458108-8489-2-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1359458108-8489-10-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cm33xx.h unnecessarily includes a lot of header files.
-Get rid of these and directly include "iomap.h" which
-is needed to keep things compiling.
+Add minimal APIs for writing to the IPC and the M3_TXEV registers
+in the Control module. These will be used in a subsequent patch which
+adds suspend-resume support for AM33XX.
 
 Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 ---
 v3: Add Peter's Acked-by
-v2: Reword the changelog
+v2: No change
 
- arch/arm/mach-omap2/cm33xx.h | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ arch/arm/mach-omap2/control.c | 20 ++++++++++++++++++++
+ arch/arm/mach-omap2/control.h | 41 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
-index 5fa0b62..8009e13 100644
---- a/arch/arm/mach-omap2/cm33xx.h
-+++ b/arch/arm/mach-omap2/cm33xx.h
-@@ -17,16 +17,11 @@
- #ifndef __ARCH_ARM_MACH_OMAP2_CM_33XX_H
- #define __ARCH_ARM_MACH_OMAP2_CM_33XX_H
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 2adb268..c5d54ae 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -604,3 +604,23 @@ int omap3_ctrl_save_padconf(void)
+ }
  
--#include <linux/delay.h>
--#include <linux/errno.h>
--#include <linux/err.h>
--#include <linux/io.h>
--
- #include "common.h"
+ #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
++
++#if defined(CONFIG_SOC_AM33XX) && defined(CONFIG_PM)
++void am33xx_txev_eoi(void)
++{
++	omap_ctrl_writel(AM33XX_M3_TXEV_ACK, AM33XX_CONTROL_M3_TXEV_EOI);
++}
++
++void am33xx_txev_enable(void)
++{
++	omap_ctrl_writel(AM33XX_M3_TXEV_ENABLE, AM33XX_CONTROL_M3_TXEV_EOI);
++}
++
++void am33xx_wkup_m3_ipc_cmd(struct am33xx_ipc_data *data)
++{
++	omap_ctrl_writel(data->resume_addr, AM33XX_CONTROL_IPC_MSG_REG0);
++	omap_ctrl_writel(data->sleep_mode, AM33XX_CONTROL_IPC_MSG_REG1);
++	omap_ctrl_writel(data->param1, AM33XX_CONTROL_IPC_MSG_REG2);
++	omap_ctrl_writel(data->param2, AM33XX_CONTROL_IPC_MSG_REG3);
++}
++#endif /* CONFIG_SOC_AM33XX && CONFIG_PM */
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index e6c3281..cb85f0a 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -358,6 +358,37 @@
+ #define AM33XX_CONTROL_STATUS_SYSBOOT1_WIDTH		0x2
+ #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
  
- #include "cm.h"
- #include "cm-regbits-33xx.h"
--#include "cm33xx.h"
-+#include "iomap.h"
++#define AM33XX_DDR_IO_CTRL		0x0E04
++#define AM33XX_VTP0_CTRL_REG		0x0E0C
++
++/* AM33XX VTP0_CTRL_REG bits */
++#define AM33XX_VTP_CTRL_START_EN	(1 << 0)
++#define AM33XX_VTP_CTRL_LOCK_EN		(1 << 4)
++#define AM33XX_VTP_CTRL_READY		(1 << 5)
++#define AM33XX_VTP_CTRL_ENABLE		(1 << 6)
++
++/* AM33XX M3_TXEV_EOI register */
++#define AM33XX_CONTROL_M3_TXEV_EOI	0x1324
++
++#define AM33XX_M3_TXEV_ACK		(0x1 << 0)
++#define AM33XX_M3_TXEV_ENABLE		(0x0 << 0)
++
++/* AM33XX IPC message registers */
++#define AM33XX_CONTROL_IPC_MSG_REG0	0x1328
++#define AM33XX_CONTROL_IPC_MSG_REG1	0x132C
++#define AM33XX_CONTROL_IPC_MSG_REG2	0x1330
++#define AM33XX_CONTROL_IPC_MSG_REG3	0x1334
++#define AM33XX_CONTROL_IPC_MSG_REG4	0x1338
++#define AM33XX_CONTROL_IPC_MSG_REG5	0x133C
++#define AM33XX_CONTROL_IPC_MSG_REG6	0x1340
++#define AM33XX_CONTROL_IPC_MSG_REG7	0x1344
++
++#define AM33XX_DDR_CMD0_IOCTRL		0x1404
++#define AM33XX_DDR_CMD1_IOCTRL		0x1408
++#define AM33XX_DDR_CMD2_IOCTRL		0x140C
++#define AM33XX_DDR_DATA0_IOCTRL		0x1440
++#define AM33XX_DDR_DATA1_IOCTRL		0x1444
++
+ /* CONTROL OMAP STATUS register to identify OMAP3 features */
+ #define OMAP3_CONTROL_OMAP_STATUS	0x044c
  
- /* CM base address */
- #define AM33XX_CM_BASE		0x44e00000
+@@ -417,6 +448,16 @@ extern void omap3630_ctrl_disable_rta(void);
+ extern int omap3_ctrl_save_padconf(void);
+ extern void omap2_set_globals_control(void __iomem *ctrl,
+ 				      void __iomem *ctrl_pad);
++struct am33xx_ipc_data {
++	u32 resume_addr;
++	u32 param1;
++	u32 param2;
++	u32 sleep_mode;
++};
++extern void am33xx_wkup_m3_ipc_cmd(struct am33xx_ipc_data *data);
++extern void am33xx_txev_eoi(void);
++extern void am33xx_txev_enable(void);
++
+ #else
+ #define omap_ctrl_base_get()		0
+ #define omap_ctrl_readb(x)		0
 -- 
 1.8.1
