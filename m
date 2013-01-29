@@ -1,52 +1,61 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Tue, 29 Jan 2013 11:46:40 -0700
-Subject: i.Mx6Quad - eth0: tx queue full!
-In-Reply-To: <5107FA00.2010809@gmail.com>
-References: <5106B7EE.3040603@gmail.com>
- <5106D5D4.2090200@boundarydevices.com> <5107FA00.2010809@gmail.com>
-Message-ID: <51081910.4030707@boundarydevices.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 29 Jan 2013 10:51:58 -0800
+Subject: [PATCH 5/5] ARM: ux500: select the DB8540 pin controller
+In-Reply-To: <CACRpkdZuu0skVSPV5qcUx3g5UYGxzigeCDkN_NeuNB+Ak8m3wQ@mail.gmail.com>
+References: <1359381151-28127-1-git-send-email-linus.walleij@stericsson.com>
+ <20130128230059.GE7789@quad.lixom.net>
+ <CACRpkdZuu0skVSPV5qcUx3g5UYGxzigeCDkN_NeuNB+Ak8m3wQ@mail.gmail.com>
+Message-ID: <CAOesGMjvVQXwi5VoW+NYsmRXm8EJutzunjA8QXOzcVVK09ER4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/29/2013 9:34 AM, Vikram Narayanan wrote:
-> On 1/29/2013 1:17 AM, Troy Kisky wrote:
->> On 1/28/2013 10:39 AM, Vikram Narayanan wrote:
->>> Running the latest head <linux-2.6.git> on an i.Mx6Quad based platform
->>> gives me the below error when flooded with ping requests.
+On Tue, Jan 29, 2013 at 10:16 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Tue, Jan 29, 2013 at 12:00 AM, Olof Johansson <olof@lixom.net> wrote:
+>> On Mon, Jan 28, 2013 at 02:52:31PM +0100, Linus Walleij wrote:
+>>> From: Linus Walleij <linus.walleij@linaro.org>
 >>>
->>> == Start log ==
->>> [ 2555.004031] ------------[ cut here ]------------
->>> [ 2555.009740] WARNING: at net/sched/sch_generic.c:254
->>> dev_watchdog+0x298/0x2b8()
->>> [ 2555.018721] NETDEV WATCHDOG: eth0 (fec): transmit queue 0 timed out
+>>> The pin controller is an inherent part of the SoC, without
+>>> it the system will not boot, thus it needs to be selected
+>>> from Kconfig.
+>>>
+>>> Cc: arm at kernel.org
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>> ---
+>>> Requesting ACK from ARM SoC on this patch.
 >>
->> I think the tx interrupt status bit was lost. The packets were
->> transmitted, but the interrupt never
->> happened. The controller should have been reset here, but perhaps a bug
->> with the reset code.
->> Are you using the mainline kernel, or a version Freescale's kernel.
+>> Acked-by: Olof Johansson <olof@lixom.net>
 >
-> I tried with both the kernels. Freescale's and mainline results in the 
-> same error.
+> Thanks!
 >
->> mainline fec_restart does not reset tx_full
->>
->> You can try adding
->> fep->tx_full = 0;
+>> ... but I wonder if this is growing out of hand. Since they will always
+>> be selected (and required) for UX500_SOC_DB8500, why not just make them
+>> silent options that default to y with that as a depend?
 >
-> With this there was no improvement.
+> So either I do it like this by using select FOO in the
+> Kconfig for the affected SoC, or I just turn it around
+> and make it depend on the affected SoC and select it
+> to "y" default.
+>
+> It's like eating eggs from the little or big end or something.
+>
+> This current approach has the upside of not proliferating
+> the SoC Kconfig symbol outside of the ARM tree, but
+> I have no strong preference...
+>
+> All this stuff used to live in the arch/arm/mach-foo
+> folders in the past, like the clocks you just have to
+> default-enable it somehow.
 
-I have fixed this bug (and more) on Freescale's kernel 
-(imx-3.0.35_1.1.0). I created a branch you can try.
-Feel free to port to mainline.
+Hm. Damned if we do, damned if we don't.
 
-This is the patch that should fix your problem
-fec: clear TX_FULL in fec_restart
+Well, the slightly awkward part is probably that we split them up in a
+bunch of Kconfig options that we need to select, but at the end of the
+day, they are all either selected or unselected together. So the
+granularity just means more Kconfig select lines.
 
-git://github.com/boundarydevices/linux-imx6.git ethernet_test
+Still, not a horrible problem, it just started to look at bit
+excessive in the arch/arm/mach-* Kconfig.
 
 
-
-Please let me know results.
-Thanks
-Troy
+-Olof
