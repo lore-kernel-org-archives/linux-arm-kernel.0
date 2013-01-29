@@ -1,79 +1,109 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jan 2013 17:45:46 +0000
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <201301291636.38773.arnd@arndb.de>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <201301291455.49347.arnd@arndb.de>
- <20130129154409.GA23505@n2100.arm.linux.org.uk>
- <201301291636.38773.arnd@arndb.de>
-Message-ID: <20130129174546.GE23505@n2100.arm.linux.org.uk>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 29 Jan 2013 10:47:09 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130129055508.GA3339@obsidianresearch.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
+ <20130129055508.GA3339@obsidianresearch.com>
+Message-ID: <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 04:36:38PM +0000, Arnd Bergmann wrote:
-> If the pl080 driver already has code for the mux in it, then it should
-> handle both of_dma_controller instances in my example. It would
-> not change anything regarding the binding, which just describes the
-> way that the hardware is connected. I have not looked at the implementation
-> of the pl080 driver, but I'd assume we could get away with just having
-> two separate xlate() functions.
+On Mon, Jan 28, 2013 at 10:55 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Mon, Jan 28, 2013 at 08:29:24PM -0700, Bjorn Helgaas wrote:
+>> On Mon, Jan 28, 2013 at 11:56 AM, Thomas Petazzoni
+>> <thomas.petazzoni@free-electrons.com> wrote:
+>> > This driver implements the support for the PCIe interfaces on the
+>> > Marvell Armada 370/XP ARM SoCs. In the future, it might be extended to
+>> > cover earlier families of Marvell SoCs, such as Dove, Orion and
+>> > Kirkwood.
+>> >
+>> > The driver implements the hw_pci operations needed by the core ARM PCI
+>> > code to setup PCI devices and get their corresponding IRQs, and the
+>> > pci_ops operations that are used by the PCI core to read/write the
+>> > configuration space of PCI devices.
+>> >
+>> > Since the PCIe interfaces of Marvell SoCs are completely separate and
+>> > not linked together in a bus, this driver sets up an emulated PCI host
+>> > bridge, with one PCI-to-PCI bridge as child for each hardware PCIe
+>> > interface.
+>>
+>> There's no Linux requirement that multiple PCIe interfaces appear to
+>> be in the same hierarchy.  You can just use pci_scan_root_bus()
+>> separately on each interface.  Each interface can be in its own domain
+>> if necessary.
+>
+> What you suggest is basically what the Marvell driver did originally,
+> the probelm is that Linux requires a pre-assigned aperture for each
+> PCI domain/root bus, and these new chips have so many PCI-E ports that
+> they can exhaust the physical address space, and also a limited
+> internal HW resource for setting address routing.
+>
+> Thus they require resource allocation that is sensitive to the devices
+> present downstream.
+>
+> By far the simplest solution is to merge all the physical links into a
+> single domain and rely on existing PCI resource allocation code to
+> drive allocation of scarce physical address space and demand allocate
+> the HW routing resource (specifically there are enough resources to
+> accomidate MMIO only devices on every bus, but not enough to
+> accomidate MMIO and IO on every bus).
+>
+>> > +/*
+>> > + * For a given PCIe interface (represented by a mvebu_pcie_port
+>> > + * structure), we read the PCI configuration space of the
+>> > + * corresponding PCI-to-PCI bridge in order to find out which range of
+>> > + * I/O addresses and memory addresses have been assigned to this PCIe
+>> > + * interface. Using these informations, we set up the appropriate
+>> > + * address decoding windows so that the physical address are actually
+>> > + * resolved to the right PCIe interface.
+>> > + */
+>>
+>> Are you inferring the host bridge apertures by using the resources
+>> assigned to devices under the bridge, i.e., taking the union of all
+>
+> The flow is different, a portion of physical address space is set
+> aside for use by PCI-E (via DT) and that portion is specified in the
+> struct resource's ultimately attached to the PCI domain for the bus
+> scan. You could call that the 'host bridge aperture' though it doesn't
+> reflect any HW configuration at all. The values come from the device
+> tree.
 
-Well, how it all works in the PL08x driver at present is:
+I think I would understand this better if we had a concrete example to
+talk about, say a dmesg log and corresponding lspci -v output.
 
-- the platform code passes into the PL08x driver a description of the
-  virtual channels, eg:
+As I understand it, the DT is a description of the hardware, so in
+that sense, the DT can't set aside physical address space.  It can
+describe what the hardware does with the address space, and I assume
+that's what you mean.  Maybe the hardware isn't configurable, e.g., it
+is hard-wired to route certain address ranges to PCIe?
 
-        [1] = {
-                /* Muxed on channel 0-3 */
-                .bus_id = "aacirx",
-                .min_signal = 0,
-                .max_signal = 2,
-                .muxval = 0x01,
-                .periph_buses = PL08X_AHB1 | PL08X_AHB2,
-        },
-
-- the virtual channels include:
-  - the minimum and maximum index of the DMA request signals into the
-    PL08x that can be used with this peripheral.
-  - the the register value for the external mux, if any.
-  - other PL08x specific data to do with this DMA peripheral
-
-- when a virtual channel is requested by a DMA client, it claims just
-  the virtual channel.  No actual hardware resources are assigned,
-  and no mappings are setup.
-
-- when a transfer is prepared on a virtual channel, part of the
-  preparation is to locate the request signal to be used - and
-  platform code is requested to supply that from the description
-  associated with the channel (such as the above fragment.)
-
-- the versatile PL08x code looks at min_signal/max_signal, and walks
-  this space looking for an unassigned request signal.  If there is
-  an external mux associated with this request signal, the mux is
-  appropriately programmed.  If a request signal is currently assigned
-  the next request signal will be tried until there are no further
-  possibilities, when failure occurs.  In that case, the prepare
-  function also fails.
-
-- the PL08x driver then knows which request signal is associated with
-  the peripheral, and sets up the descriptors to be dependent on this
-  request signal.  This mapping must not change until the transfer
-  has completed.
-
-- when the descriptor is completed - and freed, the muxing is released
-  and the DMA request signal becomes available for other users to make
-  use of.
-
-Practically, what this means is that:
-
-(a) we've ensured that all drivers using PL08x do _not_ expect that
-descriptors can always be prepared; they must continue to work correctly
-when the prepare function returns NULL.
-
-(b) several devices end up sharing the first three request signals
-and they're used on an opportunistic basis.  Theoretically, if you have
-one of these boards where AACI DMA works, you can be using one of these
-DMA requests for audio playback, another for record, and the remaining
-one can be used on an opportunistic basis between the second MMCI
-interface (should that also work - which I've proven is an impossiblity!)
-and the 3rd UART... or the USB if there was a driver for that device.
+> During the bus scan the Linux core code splits up that contiguous
+> space and assigns to the PCI-PCI bridges and devices under that domain.
+>
+> Each physical PCI-E link on the chip is seen by Linux through the SW
+> emulated PCI-PCI bridge attached to bus 0. When Linux configures the
+> bridge windows it triggers this code here to copy that window
+> information from the PCI config space into non-standard internal HW
+> registers.
+>
+> The purpose of the SW PCI-PCI bridge and this code here is to give
+> the Linux PCI core control over the window (MMIO,IO,busnr) assigned
+> to the PCI-E link.
+>
+> This arrangement with PCI-PCI bridges controlling address routing is
+> part of the PCI-E standard, in this instance Marvell did not implement
+> the required config space in HW so the driver is working around that
+> deficiency.
+>
+> Other drivers, like tegra have a similar design, but their hardware
+> does implement PCI-PCI bridge configuration space and does drive
+> address decoding through the HW PCI-PCI window registers.
+>
+> Having PCI-E links be bridges, not domains/root_bus's is in-line with
+> the standard and works better with the Linux PCI resource allocator.
+>
+> Jason
