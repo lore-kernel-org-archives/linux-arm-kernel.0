@@ -1,40 +1,92 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Jan 2013 23:42:22 -0700
-Subject: [GIT PULL 4/4] ARM: bcm2835: defconfig update
-In-Reply-To: <1359441742-32647-1-git-send-email-swarren@wwwdotorg.org>
-References: <1359441742-32647-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1359441742-32647-4-git-send-email-swarren@wwwdotorg.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 29 Jan 2013 15:46:11 +0100
+Subject: [RFC 1/3] net: freescale: fec: add support for optional enet_out clk
+In-Reply-To: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
+References: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1359470773-14290-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDHCI and I2C subsytems and drivers are enabled.
+Some MX28 boards need the internal enet_out clock to be enabled. So, do
+this in the driver iff the clock was referenced via devicetree.
 
-Various filesystems are enabled for use with the SDHCI driver.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
 
-Various other options expected by distros are enabled. This allows the
-"Raspbian" filesystem published by the Raspberry Pi Foundation to boot
-to a serial console prompt.
+davidm: Please don't apply before Shawn as the mxs-maintainer has given his ack
+on the general procedure. Or maybe he can merge it via his tree?
 
-This branch is based on v3.8-rc3.
+ drivers/net/ethernet/freescale/fec.c |   10 ++++++++++
+ drivers/net/ethernet/freescale/fec.h |    1 +
+ 2 files changed, 11 insertions(+)
 
-----------------------------------------------------------------
-
-The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
-
-  Linux 3.8-rc3
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.9-defconfig
-
-for you to fetch changes up to d1dc7c6c6a6666fff1d40009c71965dc6600d521:
-
-  ARM: bcm2835: defconfig updates
-
-----------------------------------------------------------------
-
-Stephen Warren (1):
-      ARM: bcm2835: defconfig updates
-
- arch/arm/configs/bcm2835_defconfig |   43 ++++++++++++++++++++++++-------
- 1 file changed, 33 insertions(+), 10 deletions(-)
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 0704bca..6573bd5 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -1628,6 +1628,11 @@ fec_probe(struct platform_device *pdev)
+ 		goto failed_clk;
+ 	}
+ 
++	/* enet_out is optional, depends on board */
++	fep->clk_enet_out = devm_clk_get(&pdev->dev, "enet_out");
++	if (IS_ERR(fep->clk_enet_out))
++		fep->clk_enet_out = NULL;
++
+ #ifdef CONFIG_FEC_PTP
+ 	fep->clk_ptp = devm_clk_get(&pdev->dev, "ptp");
+ 	if (IS_ERR(fep->clk_ptp)) {
+@@ -1638,6 +1643,7 @@ fec_probe(struct platform_device *pdev)
+ 
+ 	clk_prepare_enable(fep->clk_ahb);
+ 	clk_prepare_enable(fep->clk_ipg);
++	clk_prepare_enable(fep->clk_enet_out);
+ #ifdef CONFIG_FEC_PTP
+ 	clk_prepare_enable(fep->clk_ptp);
+ #endif
+@@ -1679,6 +1685,7 @@ failed_register:
+ failed_mii_init:
+ failed_init:
+ failed_regulator:
++	clk_disable_unprepare(fep->clk_enet_out);
+ 	clk_disable_unprepare(fep->clk_ahb);
+ 	clk_disable_unprepare(fep->clk_ipg);
+ #ifdef CONFIG_FEC_PTP
+@@ -1722,6 +1729,7 @@ fec_drv_remove(struct platform_device *pdev)
+ 	if (fep->ptp_clock)
+ 		ptp_clock_unregister(fep->ptp_clock);
+ #endif
++	clk_disable_unprepare(fep->clk_enet_out);
+ 	clk_disable_unprepare(fep->clk_ahb);
+ 	clk_disable_unprepare(fep->clk_ipg);
+ 	iounmap(fep->hwp);
+@@ -1747,6 +1755,7 @@ fec_suspend(struct device *dev)
+ 		fec_stop(ndev);
+ 		netif_device_detach(ndev);
+ 	}
++	clk_disable_unprepare(fep->clk_enet_out);
+ 	clk_disable_unprepare(fep->clk_ahb);
+ 	clk_disable_unprepare(fep->clk_ipg);
+ 
+@@ -1759,6 +1768,7 @@ fec_resume(struct device *dev)
+ 	struct net_device *ndev = dev_get_drvdata(dev);
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+ 
++	clk_prepare_enable(fep->clk_enet_out);
+ 	clk_prepare_enable(fep->clk_ahb);
+ 	clk_prepare_enable(fep->clk_ipg);
+ 	if (netif_running(ndev)) {
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index c5a3bc1..0648dbe 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -203,6 +203,7 @@ struct fec_enet_private {
+ 
+ 	struct clk *clk_ipg;
+ 	struct clk *clk_ahb;
++	struct clk *clk_enet_out;
+ #ifdef CONFIG_FEC_PTP
+ 	struct clk *clk_ptp;
+ #endif
+-- 
+1.7.10.4
