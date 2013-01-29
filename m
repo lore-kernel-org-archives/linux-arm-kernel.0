@@ -1,110 +1,114 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 28 Jan 2013 16:01:16 -0800
-Subject: One of these things (CONFIG_HZ) is not like the others..
-In-Reply-To: <510615F8.7010203@ti.com>
-References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
- <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
- <201301220931.24570.arnd@arndb.de> <50FE666B.10902@ti.com>
- <20130122145113.GK23505@n2100.arm.linux.org.uk> <50FEAABA.6050307@ti.com>
- <510615F8.7010203@ti.com>
-Message-ID: <5107114C.4070307@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 28 Jan 2013 19:13:54 -0500
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <5106E6A6.7010207@web.de>
+References: <50F800EB.6040104@web.de> <201301172026.45514.arnd@arndb.de>
+ <50FABBED.1020905@web.de> <20130119185907.GA20719@lunn.ch>
+ <5100022D.9050106@web.de> <20130123162515.GK13482@lunn.ch>
+ <510018B4.9040903@web.de> <51001BEE.9020201@web.de>
+ <20130123181029.GE20719@lunn.ch> <5106E6A6.7010207@web.de>
+Message-ID: <20130129001354.GN1758@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2013 10:08 PM, Santosh Shilimkar wrote:
-> On Tuesday 22 January 2013 08:35 PM, Santosh Shilimkar wrote:
->> On Tuesday 22 January 2013 08:21 PM, Russell King - ARM Linux wrote:
->>> On Tue, Jan 22, 2013 at 03:44:03PM +0530, Santosh Shilimkar wrote:
->>>> Sorry for not being clear enough. On OMAP, 32KHz is the only clock 
->>>> which
->>>> is always running(even during low power states) and hence the clock
->>>> source and clock event have been clocked using 32KHz clock. As 
->>>> mentioned
->>>> by RMK, with 32768 Hz clock and HZ = 100, there will be always an
->>>> error of 0.1 %. This accuracy also impacts the timer tick interval.
->>>> This was the reason, OMAP has been using the HZ = 128.
->>>
->>> Ok.  Let's look at this.  As far as time-of-day is concerned, this
->>> shouldn't really matter with the clocksource/clockevent based system
->>> that we now have (where *important point* platforms have been converted
->>> over.)
->>>
->>> Any platform providing a clocksource will override the jiffy-based
->>> clocksource.  The measurement of time-of-day passing is now based on
->>> the difference in values read from the clocksource, not from the actual
->>> tick rate.
->>>
->>> Anything _not_ providing a clock source will be reliant on jiffies
->>> incrementing, which in turn _requires_ one timer interrupt per jiffies
->>> at a known rate (which is HZ).
->>>
->>> Now, that's the time of day, what about jiffies?  Well, jiffies is
->>> incremented based on a certain number of nsec having passed since the
->>> last jiffy update.  That means the code copes with dropped ticks and
->>> the like.
->>>
->>> However, if your actual interrupt rate is close to the desired HZ, then
->>> it can lead to some interesting effects (and noise):
->>>
->>> - if the interrupt rate is slightly faster than HZ, then you can end up
->>>    with updates being delayed by 2x interrupt rate.
->>> - if the interrupt rate is slightly slower than HZ, you can 
->>> occasionally
->>>    end up with jiffies incrementing by two.
->>> - if your interrupt rate is dead on HZ, then other system noise can 
->>> come
->>>    into effect and you may get maybe zero, one or two jiffy increments
->>> per
->>>    interrupt.
->>>
->>> (You have to think about time passing in NS, where jiffy updates should
->>> be vs where the timer interrupts happen.)  See 
->>> tick_do_update_jiffies64()
->>> for the details.
->>>
->>> The timer infrastructure is jiffy based - which includes scheduling 
->>> where
->>> the scheduler does not use hrtimers.  That means a slight discrepency
->>> between HZ and the actual interrupt rate can cause around 1/HZ jitter.
->>> That's a matter of fact due to how the code works.
->>>
->>> So, actually, I think the accuracy of HZ has much overall effect
->>> _provided_
->>> a platform provides a clocksource to the accuracy of jiffy based timers
->>> nor timekeeping.  For those which don't, the accuracy of the timer
->>> interrupt to HZ is very important.
->>>
->>> (This is just based on reading some code and not on practical
->>> experiments - I'd suggest some research of this is done, trying HZ=100
->>> on OMAP's 32kHz timers, checking whether there's any drift, checking
->>> how accurately a single task can be woken from various 
->>> select/poll/epoll
->>> delays, and checking whether NTP works.)
->>>
->> Thanks for expanding it. It is really helpful.
->>
->>> And I think further discussion is pointless until such research has 
->>> been
->>> done (or someone who _really_ knows the time keeping/timer/sched code
->>> inside out comments.)
->>>
->> Fully agree about experimentation to re-asses the drift.
->>  From what I recollect from past, few OMAP customers did
->> report the time drift issue and that is how the switch
->> from 100 --> 128 happened.
->>
->> Anyway I have added the suggested task to my long todo list.
->>
-> So I tried to see if any time drift with HZ = 100 on OMAP. I ran the
-> setup for 62 hours and 27 mins with time synced up once with NTP server.
-> I measure about ~174 millisecond drift which is almost noise considering
-> the observed duration was ~224820000 milliseconds.
+On Mon, Jan 28, 2013 at 09:59:18PM +0100, Soeren Moch wrote:
+> On 23.01.2013 19:10, Andrew Lunn wrote:
+> >>>>
+> >>>
+> >>>Now (in the last hour) stable, occasionally lower numbers:
+> >>>3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >>>3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >>>3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >>>3396 3396 3396 3396 3396 3396 3396 3396 3396 3365 3396 3394 3396 3396
+> >>>3396 3396 3373 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >>>3396 3353 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
+> >>>3394 3396 3396 3396 3396 3396 3396 3396
+> >>>
+> >>>Before the last pool exhaustion going down:
+> >>>3395 3395 3389 3379 3379 3374 3367 3360 3352 3343 3343 3343 3342 3336
+> >>>3332 3324 3318 3314 3310 3307 3305 3299 3290 3283 3279 3272 3266 3265
+> >>>3247 3247 3247 3242 3236 3236
+> >>>
+> >>Here I stopped vdr (and so closed all dvb_demux devices), the number
+> >>was remaining the same 3236, even after restart of vdr (and restart
+> >>of streaming).
+> >
+> >So it does suggest a leak. Probably somewhere on an error path,
+> >e.g. its lost video sync.
+> >
+> 
+> Now I activated the debug messages in em28xx. From the messages I
+> see no correlation of the pool exhaustion and lost sync. Also I
+> cannot see any error messages from the em28xx driver.
+> I see a lot of init_isoc/stop_urbs (maybe EPG scan?) without
+> draining the coherent pool (checked with 'cat
+> /debug/dma-api/num_free_entries', which gave stable numbers), but
+> after half an hour there are only init_isoc messages without
+> corresponding stop_urbs messages and num_free_entries decreased
+> until coherent pool exhaustion.
+> 
+> Any idea where the memory leak is? What is allocating coherent
+> buffers for orion-ehci?
 
-So 174ms drift doesn't sound great, as < 2ms (often much less - though 
-that depends on how close the server is) can be expected with NTP. 
-Although its not clear how you were measuring: Did you see a max 174ms 
-offset while trying to sync with NTP? Was that offset shortly after 
-starting NTP or after NTP converged down?
+Keeping in mind that I am completely unfamiliar with usb dvb, my best
+guess is that the problem is in em28xx-core.c:1131
 
-thanks
--john
+According to your log messages, it is in mode 2, which is
+EM28XX_DIGITAL_MODE.
+
+There seem to be good hints in
+
+86d38d1e [media] em28xx: pre-allocate DVB isoc transfer buffers
+
+I added the relevant parties to the To:...
+
+For Gianluca and Mauro, the whole thread may be found at:
+
+http://markmail.org/message/wm4wlgzoudixd4so#query:+page:1+mid:o7phz7cosmwpcsrz+state:results
+
+thx,
+
+Jason.
+
+> 
+>   Soeren
+> 
+> 
+> Jan 28 20:46:03 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers
+> each with 64 x 940 bytes
+> Jan 28 20:46:03 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx:
+> called em28xx_init_isoc in mode 2
+> Jan 28 20:46:03 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers
+> each with 64 x 940 bytes
+> Jan 28 20:46:03 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx:
+> called em28xx_init_isoc in mode 2
+> Jan 28 20:46:23 guruvdr kernel: em28xx #0 em28xx_stop_urbs :em28xx:
+> called em28xx_stop_urbs
+> Jan 28 20:46:23 guruvdr kernel: em28xx #1 em28xx_stop_urbs :em28xx:
+> called em28xx_stop_urbs
+> Jan 28 20:46:24 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers
+> each with 64 x 940 bytes
+> Jan 28 20:46:24 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx:
+> called em28xx_init_isoc in mode 2
+> Jan 28 20:46:24 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers
+> each with 64 x 940 bytes
+> Jan 28 20:46:24 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx:
+> called em28xx_init_isoc in mode 2
+> Jan 28 20:46:44 guruvdr kernel: em28xx #1 em28xx_stop_urbs :em28xx:
+> called em28xx_stop_urbs
+> Jan 28 20:46:44 guruvdr kernel: em28xx #0 em28xx_stop_urbs :em28xx:
+> called em28xx_stop_urbs
+> Jan 28 20:46:45 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers
+> each with 64 x 940 bytes
+> Jan 28 20:46:45 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx:
+> called em28xx_init_isoc in mode 2
+> Jan 28 20:46:45 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers
+> each with 64 x 940 bytes
+> Jan 28 20:46:45 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx:
+> called em28xx_init_isoc in mode 2
+> Jan 28 20:54:33 guruvdr kernel: ERROR: 1024 KiB atomic DMA coherent
+> pool is too small!
+> Jan 28 20:54:33 guruvdr kernel: Please increase it with
+> coherent_pool= kernel parameter!
+> 
