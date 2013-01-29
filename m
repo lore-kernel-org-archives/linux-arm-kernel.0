@@ -1,43 +1,94 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 29 Jan 2013 15:21:24 +0800
-Subject: [PATCH 2/3] ARM: dts: mxs: Add muxing options for the third PWM
-In-Reply-To: <1359104048-26823-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1359104048-26823-1-git-send-email-maxime.ripard@free-electrons.com>
- <1359104048-26823-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130129072122.GD21504@S2101-09.ap.freescale.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 29 Jan 2013 09:21:49 +0200
+Subject: [PATCH 2/2] drivers: net:ethernet: cpsw: add support for VLAN
+In-Reply-To: <51075881.4050200@ti.com>
+References: <1359403945-28585-1-git-send-email-mugunthanvnm@ti.com>
+ <1359403945-28585-3-git-send-email-mugunthanvnm@ti.com>
+ <20130128204446.GB5509@arwen.pp.htv.fi> <51075881.4050200@ti.com>
+Message-ID: <20130129072149.GC7663@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 09:54:06AM +0100, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-Applied, thanks.
+On Tue, Jan 29, 2013 at 10:35:05AM +0530, Mugunthan V N wrote:
+> On 1/29/2013 2:14 AM, Felipe Balbi wrote:
+> >On Tue, Jan 29, 2013 at 01:42:25AM +0530, Mugunthan V N wrote:
+> >>adding support for VLAN interface for cpsw.
+> >>
+> >>CPSW VLAN Capability
+> >>* Can filter VLAN packets in Hardware
+> >>
+> >>Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+> >>---
+> >>  Documentation/devicetree/bindings/net/cpsw.txt |    2 +
+> >>  drivers/net/ethernet/ti/cpsw.c                 |  108 +++++++++++++++++++++++-
+> >>  include/linux/platform_data/cpsw.h             |    1 +
+> >>  3 files changed, 110 insertions(+), 1 deletion(-)
+> >>
+> >>diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+> >>index 6ddd028..99696bf 100644
+> >>--- a/Documentation/devicetree/bindings/net/cpsw.txt
+> >>+++ b/Documentation/devicetree/bindings/net/cpsw.txt
+> >>@@ -24,6 +24,8 @@ Required properties:
+> >>  Optional properties:
+> >>  - ti,hwmods		: Must be "cpgmac0"
+> >>  - no_bd_ram		: Must be 0 or 1
+> >>+- default_vlan		: Specifies Default VLAN for non tagged packets
+> >>+			  ALE processing
+> >>  Note: "ti,hwmods" field is used to fetch the base address and irq
+> >>  resources from TI, omap hwmod data base during device registration.
+> >>diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+> >>index b35e6a7..dee6951 100644
+> >>--- a/drivers/net/ethernet/ti/cpsw.c
+> >>+++ b/drivers/net/ethernet/ti/cpsw.c
+> >>@@ -32,6 +32,7 @@
+> >>  #include <linux/of.h>
+> >>  #include <linux/of_net.h>
+> >>  #include <linux/of_device.h>
+> >>+#include <linux/if_vlan.h>
+> >>  #include <linux/platform_data/cpsw.h>
+> >>@@ -72,6 +73,11 @@ do {								\
+> >>  		dev_notice(priv->dev, format, ## __VA_ARGS__);	\
+> >>  } while (0)
+> >>+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+> >use IS_ENABLED() instead.
+> Will change this in next patch version.
+> >
+> >>+#define VLAN_SUPPORT
+> >>+#define CPSW_VLAN_AWARE_MODE
+> >>+#endif
+> >>+
+> >>  #define ALE_ALL_PORTS		0x7
+> >>  #define CPSW_MAJOR_VERSION(reg)		(reg >> 8 & 0x7)
+> >>@@ -118,6 +124,14 @@ do {								\
+> >>  #define TX_PRIORITY_MAPPING	0x33221100
+> >>  #define CPDMA_TX_PRIORITY_MAP	0x76543210
+> >>+#ifdef CPSW_VLAN_AWARE_MODE
+> >>+#define CPSW_VLAN_AWARE		BIT(1)
+> >>+#define CPSW_ALE_VLAN_AWARE	1
+> >>+#else
+> >>+#define CPSW_VLAN_AWARE		0x0
+> >>+#define CPSW_ALE_VLAN_AWARE	0
+> >>+#endif
+> >you should really figure out a way of doing runtime detection for this.
+> >Depending on driver recompilation just to enable/disable VLAN support
+> >will be quite boring.
+> I am not able to find a way to know whether stack is compiled with
+> VLAN support or not
+> without using VLAN_SUPPORT compiler option. Only way is to hack
+> cpsw_ndo_vlan_rx_add_vid
+> and know whether stack has VLAN capability or not which is not advisable.
 
-> ---
->  arch/arm/boot/dts/imx28.dtsi |   10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 13b7053..7ba4966 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -502,6 +502,16 @@
->  					fsl,pull-up = <0>;
->  				};
->  
-> +				pwm3_pins_b: pwm3 at 1 {
-> +					reg = <1>;
-> +					fsl,pinmux-ids = <
-> +						0x3141 /* MX28_PAD_SAIF0_MCLK__PWM3 */
-> +					>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
->  				pwm4_pins_a: pwm4 at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <
-> -- 
-> 1.7.10.4
-> 
+you could use a module parameter or pass data to the driver. In any
+case, relying completely on compile-time choices isn't very nice.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/b52c5863/attachment-0001.sig>
