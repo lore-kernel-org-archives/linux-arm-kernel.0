@@ -1,83 +1,65 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Mon, 28 Jan 2013 22:18:04 -0800
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <alpine.LFD.2.02.1301282320430.6300@xanadu.home>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
- <20130128142510.68092e10.akpm@linux-foundation.org>
- <alpine.LFD.2.02.1301282320430.6300@xanadu.home>
-Message-ID: <bce35b9a-0b62-4655-ad5e-972e2bd51a95@email.android.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 29 Jan 2013 14:42:02 +0800
+Subject: [GIT PULL v2] imx cleanup for 3.9
+Message-ID: <20130129064200.GC21504@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uhm... you're saying we have to be at one extreme or the other?
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 
-We probably could drop the legacy lzma format, but someone might rely on it.
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 
-Nicolas Pitre <nico@fluxnic.net> wrote:
+are available in the git repository at:
 
->On Mon, 28 Jan 2013, Andrew Morton wrote:
->
->> On Sat, 26 Jan 2013 14:50:43 +0900
->> Kyungsik Lee <kyungsik.lee@lge.com> wrote:
->> 
->> > This patchset is for supporting LZ4 compressed kernel and initial
->ramdisk on
->> > the x86 and ARM architectures.
->> > 
->> > According to http://code.google.com/p/lz4/, LZ4 is a very fast
->lossless
->> > compression algorithm and also features an extremely fast decoder.
->> > 
->> > Kernel Decompression APIs are based on implementation by Yann
->Collet
->> > (http://code.google.com/p/lz4/source/checkout).
->> > De/compression Tools are also provided from the site above.
->> > 
->> > The initial test result on ARM(v7) based board shows that the size
->of kernel
->> > with LZ4 compressed is 8% bigger than LZO compressed  but the
->decompressing
->> > speed is faster(especially under the enabled unaligned memory
->access).
->> > 
->> > Test: 3.4 based kernel built with many modules
->> > Uncompressed kernel size: 13MB
->> > lzo: 6.3MB, 301ms
->> > lz4: 6.8MB, 251ms(167ms, with enabled unaligned memory access)
->> > 
->> > It seems that it___s worth trying LZ4 compressed kernel image or
->ramdisk 
->> > for making the kernel boot more faster.
->> >
->> > ...
->> >
->> >  20 files changed, 663 insertions(+), 3 deletions(-)
->> >
->> > ...
->> >
->> 
->> What's this "with enabled unaligned memory access" thing?  You mean
->"if
->> the arch supports CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS"?  If so,
->> that's only x86, which isn't really in the target market for this
->> patch, yes?
->
->I'm guessing this is referring to commit 5010192d5a.
->
->> It's a lot of code for a 50ms boot-time improvement.  Does anyone
->have
->> any opinions on whether or not the benefits are worth the cost?
->
->Well, we used to have only one compressed format.  Now we have nearly 
->half a dozen, with the same worthiness issue between themselves.  
->Either we keep it very simple, or we make it very flexible.  The former
->
->would argue in favor of removing some of the existing formats, the
->later 
->would let this new format in.
->
->
->Nicolas
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-cleanup-3.9
 
--- 
-Sent from my mobile phone. Please excuse brevity and lack of formatting.
+for you to fetch changes up to 7356420cd34e40fe27bf26555b0bf3f2849a43dd:
+
+  ARM: imx: Remove mx508 support (2013-01-29 14:05:43 +0800)
+
+----------------------------------------------------------------
+I have left out the patch (ARM: dts: imx: use nodes label in board dts)
+in question and other dts related changes, and will have them go via DT
+branch  to save the cross branch dependency.
+
+----------------------------------------------------------------
+Fabio Estevam (3):
+      ARM: mach-imx: Kconfig: Do not select Babbage for MACH_IMX51_DT
+      ARM: imx: Remove mach-mx51_3ds board
+      ARM: imx: Remove mx508 support
+
+Shawn Guo (2):
+      ARM: imx: remove unused imx6q_clock_map_io()
+      ARM: imx: use debug_ll_io_init() for imx6q
+
+ arch/arm/Kconfig.debug                        |   10 +-
+ arch/arm/configs/imx_v6_v7_defconfig          |    1 -
+ arch/arm/include/debug/imx.S                  |    2 +-
+ arch/arm/mach-imx/Kconfig                     |   36 -
+ arch/arm/mach-imx/Makefile                    |    3 -
+ arch/arm/mach-imx/Makefile.boot               |    4 -
+ arch/arm/mach-imx/clk-imx6q.c                 |    2 -
+ arch/arm/mach-imx/common.h                    |   11 -
+ arch/arm/mach-imx/cpu-imx5.c                  |   39 -
+ arch/arm/mach-imx/devices-imx50.h             |   33 -
+ arch/arm/mach-imx/devices/Kconfig             |    2 +-
+ arch/arm/mach-imx/devices/platform-fec.c      |    6 -
+ arch/arm/mach-imx/devices/platform-imx-i2c.c  |   10 -
+ arch/arm/mach-imx/devices/platform-imx-uart.c |   12 -
+ arch/arm/mach-imx/hardware.h                  |    6 -
+ arch/arm/mach-imx/iomux-mx50.h                |  977 -------------------------
+ arch/arm/mach-imx/lluart.c                    |   47 --
+ arch/arm/mach-imx/mach-imx6q.c                |    4 +-
+ arch/arm/mach-imx/mach-mx50_rdp.c             |  225 ------
+ arch/arm/mach-imx/mach-mx51_3ds.c             |  178 -----
+ arch/arm/mach-imx/mm-imx5.c                   |   48 --
+ arch/arm/mach-imx/mx50.h                      |  290 --------
+ arch/arm/mach-imx/mxc.h                       |   13 -
+ arch/arm/mach-imx/pm-imx5.c                   |    7 +-
+ 24 files changed, 11 insertions(+), 1955 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/devices-imx50.h
+ delete mode 100644 arch/arm/mach-imx/iomux-mx50.h
+ delete mode 100644 arch/arm/mach-imx/lluart.c
+ delete mode 100644 arch/arm/mach-imx/mach-mx50_rdp.c
+ delete mode 100644 arch/arm/mach-imx/mach-mx51_3ds.c
+ delete mode 100644 arch/arm/mach-imx/mx50.h
