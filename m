@@ -1,47 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 Jan 2013 19:16:23 +0100
-Subject: [PATCH 5/5] ARM: ux500: select the DB8540 pin controller
-In-Reply-To: <20130128230059.GE7789@quad.lixom.net>
-References: <1359381151-28127-1-git-send-email-linus.walleij@stericsson.com>
- <20130128230059.GE7789@quad.lixom.net>
-Message-ID: <CACRpkdZuu0skVSPV5qcUx3g5UYGxzigeCDkN_NeuNB+Ak8m3wQ@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 29 Jan 2013 18:32:59 +0000
+Subject: [GIT PULL] vexpress: fixes for v3.9
+Message-ID: <1359484379.8090.25.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 12:00 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Jan 28, 2013 at 02:52:31PM +0100, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> The pin controller is an inherent part of the SoC, without
->> it the system will not boot, thus it needs to be selected
->> from Kconfig.
->>
->> Cc: arm at kernel.org
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> Requesting ACK from ARM SoC on this patch.
->
-> Acked-by: Olof Johansson <olof@lixom.net>
+Hi Arnd, Olof,
 
-Thanks!
+The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
 
-> ... but I wonder if this is growing out of hand. Since they will always
-> be selected (and required) for UX500_SOC_DB8500, why not just make them
-> silent options that default to y with that as a depend?
+  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
 
-So either I do it like this by using select FOO in the
-Kconfig for the affected SoC, or I just turn it around
-and make it depend on the affected SoC and select it
-to "y" default.
+are available in the git repository at:
 
-It's like eating eggs from the little or big end or something.
+  git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/fixes-for-3.9
 
-This current approach has the upside of not proliferating
-the SoC Kconfig symbol outside of the ARM tree, but
-I have no strong preference...
+for you to fetch changes up to aab7da708649388afc041b173e7d2cf0c4b27e50:
 
-All this stuff used to live in the arch/arm/mach-foo
-folders in the past, like the clocks you just have to
-default-enable it somehow.
+  ARM: vexpress: Fix wdt interrupt in ca15{-tc1,_a7} dts (2013-01-29 18:20:28 +0000)
 
-Linus Walleij
+----------------------------------------------------------------
+Versatile Express related fixes for 3.9
+* Correct interrupt definitions for WDT node in
+  V2P-CA15 and V2P-CA15_A7 Device Trees
+
+----------------------------------------------------------------
+Mark Rutland (1):
+      ARM: vexpress: Fix wdt interrupt in ca15{-tc1,_a7} dts
+
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |    2 +-
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
