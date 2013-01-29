@@ -1,314 +1,76 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 29 Jan 2013 22:41:35 +0100
-Subject: [PATCH v3 2/2] ARM: dove: split legacy and DT setup
-In-Reply-To: <20130129212623.GJ7717@titan.lakedaemon.net>
-References: <20130129212623.GJ7717@titan.lakedaemon.net>
-Message-ID: <1359495695-29304-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 29 Jan 2013 16:41:49 -0500 (EST)
+Subject: [PATCH v3 15/15] ARM: vexpress/dcscb: probe via device tree
+In-Reply-To: <510838AD.6040700@gmail.com>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-16-git-send-email-nicolas.pitre@linaro.org>
+ <510838AD.6040700@gmail.com>
+Message-ID: <alpine.LFD.2.02.1301291634140.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the beginning of DT for Dove it was reasonable to have it close to
-non-DT code. With improved DT support, it became more and more difficult
-to not break non-DT while changing DT code.
+On Tue, 29 Jan 2013, Rob Herring wrote:
 
-This patch splits up DT board setup and introduces a DOVE_LEGACY config
-to allow to remove legacy code for DT-only kernels.
+> On 01/29/2013 01:51 AM, Nicolas Pitre wrote:
+> > This allows for the DCSCB support to be compiled in and selected
+> > at run time.
+> 
+> Shouldn't this just be rolled into the commit creating dcscb.c?
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Changelog:
-[v3]
-- also include new board-dt.c file that was missing in v2 of patch [2/2]
-  (patch [1/2] has not changed and is not resent)
+Probably, yes.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-dove/Kconfig    |    5 ++
- arch/arm/mach-dove/Makefile   |    4 +-
- arch/arm/mach-dove/board-dt.c |  103 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-dove/common.c   |   90 -----------------------------------
- arch/arm/mach-dove/common.h   |    1 +
- 5 files changed, 112 insertions(+), 91 deletions(-)
- create mode 100644 arch/arm/mach-dove/board-dt.c
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> >  arch/arm/mach-vexpress/dcscb.c | 9 ++++++---
+> >  1 file changed, 6 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+> > index 58051ffafb..a724507cbc 100644
+> > --- a/arch/arm/mach-vexpress/dcscb.c
+> > +++ b/arch/arm/mach-vexpress/dcscb.c
+> > @@ -14,6 +14,7 @@
+> >  #include <linux/io.h>
+> >  #include <linux/spinlock.h>
+> >  #include <linux/errno.h>
+> > +#include <linux/of_address.h>
+> >  #include <linux/vexpress.h>
+> >  #include <linux/arm-cci.h>
+> >  
+> > @@ -24,8 +25,6 @@
+> >  #include <asm/cp15.h>
+> >  
+> >  
+> > -#define DCSCB_PHYS_BASE	0x60000000
+> > -
+> >  #define RST_HOLD0	0x0
+> >  #define RST_HOLD1	0x4
+> >  #define SYS_SWRESET	0x8
+> > @@ -215,10 +214,14 @@ extern void dcscb_power_up_setup(unsigned int affinity_level);
+> >  
+> >  static int __init dcscb_init(void)
+> >  {
+> > +	struct device_node *node;
+> >  	unsigned int cfg;
+> >  	int ret;
+> >  
+> > -	dcscb_base = ioremap(DCSCB_PHYS_BASE, 0x1000);
+> > +	node = of_find_compatible_node(NULL, NULL, "arm,dcscb");
+> 
+> This needs binding documentation and should be a more specific name. Not
+> knowing what dcscb is, I don't have a suggestion.
 
-diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
-index 603c5fd..aedd0ba 100644
---- a/arch/arm/mach-dove/Kconfig
-+++ b/arch/arm/mach-dove/Kconfig
-@@ -2,8 +2,12 @@ if ARCH_DOVE
- 
- menu "Marvell Dove Implementations"
- 
-+config DOVE_LEGACY
-+	bool
-+
- config MACH_DOVE_DB
- 	bool "Marvell DB-MV88AP510 Development Board"
-+	select DOVE_LEGACY
- 	select I2C_BOARDINFO
- 	help
- 	  Say 'Y' here if you want your kernel to support the
-@@ -11,6 +15,7 @@ config MACH_DOVE_DB
- 
- config MACH_CM_A510
- 	bool "CompuLab CM-A510 Board"
-+	select DOVE_LEGACY
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  CompuLab CM-A510 Board.
-diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
-index 5e683ba..3f0a858 100644
---- a/arch/arm/mach-dove/Makefile
-+++ b/arch/arm/mach-dove/Makefile
-@@ -1,4 +1,6 @@
--obj-y				+= common.o addr-map.o irq.o mpp.o
-+obj-y				+= common.o addr-map.o irq.o
-+obj-$(CONFIG_DOVE_LEGACY)	+= mpp.o
- obj-$(CONFIG_PCI)		+= pcie.o
- obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
-+obj-$(CONFIG_MACH_DOVE_DT)	+= board-dt.o
- obj-$(CONFIG_MACH_CM_A510)	+= cm-a510.o
-diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-new file mode 100644
-index 0000000..c9c274a
---- /dev/null
-+++ b/arch/arm/mach-dove/board-dt.c
-@@ -0,0 +1,103 @@
-+/*
-+ * arch/arm/mach-dove/board-dt.c
-+ *
-+ * Marvell Dove 88AP510 System On Chip FDT Board
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/clk-provider.h>
-+#include <linux/clk/mvebu.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_data/usb-ehci-orion.h>
-+#include <asm/hardware/cache-tauros2.h>
-+#include <asm/mach/arch.h>
-+#include <mach/pm.h>
-+#include <plat/common.h>
-+#include <plat/irq.h>
-+#include "common.h"
-+
-+/*
-+ * There are still devices that doesn't even know about DT,
-+ * get clock gates here and add a clock lookup.
-+ */
-+static void __init dove_legacy_clk_init(void)
-+{
-+	struct device_node *np = of_find_compatible_node(NULL, NULL,
-+					 "marvell,dove-gating-clock");
-+	struct of_phandle_args clkspec;
-+
-+	clkspec.np = np;
-+	clkspec.args_count = 1;
-+
-+	clkspec.args[0] = CLOCK_GATING_BIT_USB0;
-+	orion_clkdev_add(NULL, "orion-ehci.0",
-+			 of_clk_get_from_provider(&clkspec));
-+
-+	clkspec.args[0] = CLOCK_GATING_BIT_USB1;
-+	orion_clkdev_add(NULL, "orion-ehci.1",
-+			 of_clk_get_from_provider(&clkspec));
-+
-+	clkspec.args[0] = CLOCK_GATING_BIT_GBE;
-+	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
-+			 of_clk_get_from_provider(&clkspec));
-+
-+	clkspec.args[0] = CLOCK_GATING_BIT_PCIE0;
-+	orion_clkdev_add("0", "pcie",
-+			 of_clk_get_from_provider(&clkspec));
-+
-+	clkspec.args[0] = CLOCK_GATING_BIT_PCIE1;
-+	orion_clkdev_add("1", "pcie",
-+			 of_clk_get_from_provider(&clkspec));
-+}
-+
-+static void __init dove_of_clk_init(void)
-+{
-+	mvebu_clocks_init();
-+	dove_legacy_clk_init();
-+}
-+
-+static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
-+	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
-+};
-+
-+static void __init dove_dt_init(void)
-+{
-+	pr_info("Dove 88AP510 SoC\n");
-+
-+#ifdef CONFIG_CACHE_TAUROS2
-+	tauros2_init(0);
-+#endif
-+	dove_setup_cpu_mbus();
-+
-+	/* Setup root of clk tree */
-+	dove_of_clk_init();
-+
-+	/* Internal devices not ported to DT yet */
-+	dove_rtc_init();
-+	dove_ge00_init(&dove_dt_ge00_data);
-+	dove_ehci0_init();
-+	dove_ehci1_init();
-+	dove_pcie_init(1, 1);
-+
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char * const dove_dt_board_compat[] = {
-+	"marvell,dove",
-+	NULL
-+};
-+
-+DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
-+	.map_io		= dove_map_io,
-+	.init_early	= dove_init_early,
-+	.init_irq	= orion_dt_init_irq,
-+	.timer		= &dove_timer,
-+	.init_machine	= dove_dt_init,
-+	.restart	= dove_restart,
-+	.dt_compat	= dove_dt_board_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index be887feea..aea14b4 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -9,22 +9,17 @@
-  */
- 
- #include <linux/clk-provider.h>
--#include <linux/clk/mvebu.h>
- #include <linux/dma-mapping.h>
- #include <linux/init.h>
--#include <linux/of.h>
--#include <linux/of_platform.h>
- #include <linux/platform_data/dma-mv_xor.h>
- #include <linux/platform_data/usb-ehci-orion.h>
- #include <linux/platform_device.h>
- #include <asm/hardware/cache-tauros2.h>
--#include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <mach/bridge-regs.h>
- #include <mach/pm.h>
- #include <plat/common.h>
--#include <plat/irq.h>
- #include <plat/time.h>
- #include "common.h"
- 
-@@ -364,88 +359,3 @@ void dove_restart(char mode, const char *cmd)
- 	while (1)
- 		;
- }
--
--#if defined(CONFIG_MACH_DOVE_DT)
--/*
-- * There are still devices that doesn't even know about DT,
-- * get clock gates here and add a clock lookup.
-- */
--static void __init dove_legacy_clk_init(void)
--{
--	struct device_node *np = of_find_compatible_node(NULL, NULL,
--					 "marvell,dove-gating-clock");
--	struct of_phandle_args clkspec;
--
--	clkspec.np = np;
--	clkspec.args_count = 1;
--
--	clkspec.args[0] = CLOCK_GATING_BIT_USB0;
--	orion_clkdev_add(NULL, "orion-ehci.0",
--			 of_clk_get_from_provider(&clkspec));
--
--	clkspec.args[0] = CLOCK_GATING_BIT_USB1;
--	orion_clkdev_add(NULL, "orion-ehci.1",
--			 of_clk_get_from_provider(&clkspec));
--
--	clkspec.args[0] = CLOCK_GATING_BIT_GBE;
--	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
--			 of_clk_get_from_provider(&clkspec));
--
--	clkspec.args[0] = CLOCK_GATING_BIT_PCIE0;
--	orion_clkdev_add("0", "pcie",
--			 of_clk_get_from_provider(&clkspec));
--
--	clkspec.args[0] = CLOCK_GATING_BIT_PCIE1;
--	orion_clkdev_add("1", "pcie",
--			 of_clk_get_from_provider(&clkspec));
--}
--
--static void __init dove_of_clk_init(void)
--{
--	mvebu_clocks_init();
--	dove_legacy_clk_init();
--}
--
--static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
--	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
--};
--
--static void __init dove_dt_init(void)
--{
--	pr_info("Dove 88AP510 SoC, TCLK = %d MHz.\n",
--		(dove_tclk + 499999) / 1000000);
--
--#ifdef CONFIG_CACHE_TAUROS2
--	tauros2_init(0);
--#endif
--	dove_setup_cpu_mbus();
--
--	/* Setup root of clk tree */
--	dove_of_clk_init();
--
--	/* Internal devices not ported to DT yet */
--	dove_rtc_init();
--
--	dove_ge00_init(&dove_dt_ge00_data);
--	dove_ehci0_init();
--	dove_ehci1_init();
--	dove_pcie_init(1, 1);
--
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
--static const char * const dove_dt_board_compat[] = {
--	"marvell,dove",
--	NULL
--};
--
--DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
--	.map_io		= dove_map_io,
--	.init_early	= dove_init_early,
--	.init_irq	= orion_dt_init_irq,
--	.timer		= &dove_timer,
--	.init_machine	= dove_dt_init,
--	.restart	= dove_restart,
--	.dt_compat	= dove_dt_board_compat,
--MACHINE_END
--#endif
-diff --git a/arch/arm/mach-dove/common.h b/arch/arm/mach-dove/common.h
-index 1a23340..d17f760 100644
---- a/arch/arm/mach-dove/common.h
-+++ b/arch/arm/mach-dove/common.h
-@@ -25,6 +25,7 @@ void dove_init_early(void);
- void dove_init_irq(void);
- void dove_setup_cpu_mbus(void);
- void dove_ge00_init(struct mv643xx_eth_platform_data *eth_data);
-+void dove_rtc_init(void);
- void dove_sata_init(struct mv_sata_platform_data *sata_data);
- #ifdef CONFIG_PCI
- void dove_pcie_init(int init_port0, int init_port1);
--- 
-1.7.10.4
+Yes, I mentioned in the cover page that DT bindings are not yet 
+documented.
+
+DCSCB stands for "Dual Cluster System Control Block".  This is in fact a 
+set of miscellaneous registers, mainly for reset control of individual 
+CPUs and clusters.
+
+> Perhaps should include vexpress or specific core tile name it is part 
+> of.
+
+/me hopes for some ARM dude more acquainted with their nomenclature to 
+chime in with suggestions.
+
+
+Nicolas
