@@ -1,98 +1,62 @@
-From: rtivy@ti.com (Tivy, Robert)
-Date: Tue, 29 Jan 2013 01:31:26 +0000
-Subject: [PATCH v6 2/2] ARM: davinci: Remoteproc platform device
- creation data/code
-In-Reply-To: <5103EB69.5070101@mvista.com>
-References: <1359168322-17733-1-git-send-email-rtivy@ti.com>
- <1359168322-17733-3-git-send-email-rtivy@ti.com>
- <5103EB69.5070101@mvista.com>
-Message-ID: <13514BD7FAEBA745BBD7D8A672905C1431206AA2@DFLE08.ent.ti.com>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Mon, 28 Jan 2013 19:30:33 -0600
+Subject: [RFC] arm: use built-in byte swap function
+Message-ID: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Enable the compiler intrinsic for byte swapping on arch ARM.  This
+allows the compiler to detect and be able to optimize out byte
+swappings, e.g. in big endian to big endian moves.
 
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
-> Sent: Saturday, January 26, 2013 6:43 AM
-> 
-> Hello.
-> 
-> On 26-01-2013 6:45, Robert Tivy wrote:
-> 
-> > Added a new remoteproc platform device for DA8XX.  Contains CMA-based
-> > reservation of physical memory block.  A new kernel command-line
-> > parameter has been added to allow boot-time specification of the
-> > physical memory block.
-> 
->     No signoff again.
+AFAICT, arm gcc got __builtin_bswap{32,64} support in 4.6,
+and for the 16-bit version in 4.8.
 
-Thanks, I will fix this.
+Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
+---
+akin to: http://comments.gmane.org/gmane.linux.kernel.cross-arch/16016
 
-> 
-> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-
-> davinci/devices-da8xx.c
-> > index fb2f51b..a455e5c 100644
-> > --- a/arch/arm/mach-davinci/devices-da8xx.c
-> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> [...]
-> > @@ -706,6 +706,96 @@ int __init da850_register_mmcsd1(struct
-> davinci_mmc_config *config)
-> >   }
-> >   #endif
-> >
-> > +static struct resource da8xx_rproc_resources[] = {
-> > +	{ /* DSP boot address */
-> > +		.start		= DA8XX_SYSCFG0_BASE +
-> DA8XX_HOST1CFG_REG,
-> > +		.end		= DA8XX_SYSCFG0_BASE + DA8XX_HOST1CFG_REG + 3,
-> > +		.flags		= IORESOURCE_MEM,
-> > +	},
-> > +	{ /* DSP interrupt registers */
-> > +		.start		= DA8XX_SYSCFG0_BASE + DA8XX_CHIPSIG_REG,
-> > +		.end		= DA8XX_SYSCFG0_BASE + DA8XX_CHIPSIG_REG + 7,
-> > +		.flags		= IORESOURCE_MEM,
-> 
->     Does it really make sense to pass these as 2 resources -- they have
-> the
-> same base address?
+based on linux-next.  Depends on commit "compiler-gcc{3,4}.h: Use
+GCC_VERSION macro" by Daniel Santos <daniel.santos@pobox.com>,
+currently in the akpm branch.
 
-I didn't want to impart that knowledge on the remoteproc driver.  As far as the driver is concerned, there is a boot address register and some interrupt-related registers.  That the boot address and interrupt-related registers share the same base address is a device-specific fact.
+RFC because of unfamiliarity with arch ARM, and that at91sam9rl,
+at91rm9200, and lpd270 (so far, at least) builds fail with:
 
-> 
-> > +int __init da8xx_register_rproc(void)
-> > +{
-> > +	int ret;
-> > +
-> > +	ret = platform_device_register(&da8xx_dsp);
-> > +	if (ret) {
-> > +		pr_err("%s: platform_device_register: %d\n", __func__,
-> ret);
-> 
->     Better message would be "can't register DSP device".
+include/uapi/linux/swab.h:60: undefined reference to `__bswapsi2'
 
-Agreed, I will change this.
+I'm using eldk-5.2.1/armv7a's arm-linux-gnueabi-gcc (GCC) 4.6.4
+20120303 (prerelease)
 
-> 
-> > +
-> 
->     Empty line hardly needed here.
-> 
-> > +		return ret;
-> 
->     Not needed here, just move it outside the {} to replace 'return 0'.
+ arch/arm/Kconfig              |    1 +
+ include/linux/compiler-gcc4.h |    3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-Thanks, I will change this.
-
-Regards,
-
-- Rob
-
-> 
-> > +	}
-> > +
-> > +	return 0;
-> > +};
-> > +
-> 
-> WBR, Sergei
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index eda8711..437d11a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -3,6 +3,7 @@ config ARM
+ 	default y
+ 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
++	select ARCH_USE_BUILTIN_BSWAP
+ 	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select ARCH_WANT_IPC_PARSE_VERSION
+ 	select BUILDTIME_EXTABLE_SORT if MMU
+diff --git a/include/linux/compiler-gcc4.h b/include/linux/compiler-gcc4.h
+index 68b162d..da5f728 100644
+--- a/include/linux/compiler-gcc4.h
++++ b/include/linux/compiler-gcc4.h
+@@ -67,7 +67,8 @@
+ 
+ 
+ #ifdef CONFIG_ARCH_USE_BUILTIN_BSWAP
+-#if GCC_VERSION >= 40400
++#if (!defined(__arm__) && GCC_VERSION >= 40400) || \
++    (defined(__arm__) && GCC_VERSION >= 40600)
+ #define __HAVE_BUILTIN_BSWAP32__
+ #define __HAVE_BUILTIN_BSWAP64__
+ #endif
+-- 
+1.7.9.7
