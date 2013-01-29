@@ -1,58 +1,61 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Tue, 29 Jan 2013 16:46:16 +0100
-Subject: [PATCH V3 4/5] W1: Add pinctrl support to MXC onewire master.
-In-Reply-To: <20130129154608.5184.46101.stgit@localhost>
-References: <20130129154608.5184.46101.stgit@localhost>
-Message-ID: <20130129154616.5184.41342.stgit@localhost>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Jan 2013 16:48:57 +0100
+Subject: [PATCH 4/5] net: mvmdio: allow Device Tree and platform device
+ to coexist
+In-Reply-To: <1359473048-26551-5-git-send-email-florian@openwrt.org>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1359473048-26551-5-git-send-email-florian@openwrt.org>
+Message-ID: <20130129164857.0ddcddf4@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Evgeniy Polyakov <zbr@ioremap.net>
----
- drivers/w1/masters/mxc_w1.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+Dear Florian Fainelli,
 
-diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
-index 317b2bc..48afc2c 100644
---- a/drivers/w1/masters/mxc_w1.c
-+++ b/drivers/w1/masters/mxc_w1.c
-@@ -24,6 +24,7 @@
- #include <linux/slab.h>
- #include <linux/delay.h>
- #include <linux/io.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include "../w1.h"
- #include "../w1_int.h"
-@@ -107,6 +108,7 @@ static int mxc_w1_probe(struct platform_device *pdev)
- {
- 	struct mxc_w1_device *mdev;
- 	struct resource *res;
-+	struct pinctrl *pinctrl;
- 	int err = 0;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -117,6 +119,13 @@ static int mxc_w1_probe(struct platform_device *pdev)
- 	if (!mdev)
- 		return -ENOMEM;
- 
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl)) {
-+		err = PTR_ERR(pinctrl);
-+		dev_err(&pdev->dev, "failed to get default pinctrl: %d\n", err);
-+		goto failed_pin;
-+	}
-+
- 	mdev->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(mdev->clk)) {
- 		err = PTR_ERR(mdev->clk);
-@@ -152,6 +161,7 @@ failed_add:
- 
- failed_req:
- failed_clk:
-+failed_pin:
- 	kfree(mdev);
- 	return err;
- }
+On Tue, 29 Jan 2013 16:24:07 +0100, Florian Fainelli wrote:
+> This patch changes the Marvell MDIO driver to be registered by using
+> both Device Tree and platform device methods. The driver voluntarily
+> does not use devm_ioremap() to share the same error path for Device Tree
+> and non-Device Tree cases.
+
+Not sure why you think devm_ioremap() can't be used here. Maybe I'm
+missing something, but could you explain? If you use devm_ioremap(),
+then basically you don't need to do anything in the error path
+regarding to the I/O mapping... since it's the whole purpose of the
+devm_*() stuff to automagically undo things in the error case, and in
+the ->remove() code.
+
+> -	dev->err_interrupt = irq_of_parse_and_map(pdev->dev.of_node, 0);
+> +	if (pdev->dev.of_node) {
+> +		dev->regs = of_iomap(pdev->dev.of_node, 0);
+> +		if (!dev->regs) {
+> +			dev_err(&pdev->dev, "No SMI register address given in DT\n");
+> +			ret = -ENODEV;
+> +			goto out_free;
+> +		}
+> +
+> +		dev->err_interrupt = irq_of_parse_and_map(pdev->dev.of_node, 0);
+> +	} else {
+> +		r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +		dev->regs = ioremap(r->start, resource_size(r));
+> +		if (!dev->regs) {
+> +			dev_err(&pdev->dev, "No SMI register address given\n");
+> +			ret = -ENODEV;
+> +			goto out_free;
+> +		}
+> +
+> +		dev->err_interrupt = platform_get_irq(pdev, 0);
+> +	}
+
+I think you can do a devm_ioremap() and a platform_get_irq() in both
+cases here, and therefore keep the code common between the DT case and
+the !DT case.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
