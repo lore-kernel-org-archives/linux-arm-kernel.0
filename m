@@ -1,32 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Jan 2013 19:14:22 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
-Message-ID: <20130129191422.7fc62c0d@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 29 Jan 2013 19:16:23 +0100
+Subject: [PATCH 5/5] ARM: ux500: select the DB8540 pin controller
+In-Reply-To: <20130128230059.GE7789@quad.lixom.net>
+References: <1359381151-28127-1-git-send-email-linus.walleij@stericsson.com>
+ <20130128230059.GE7789@quad.lixom.net>
+Message-ID: <CACRpkdZuu0skVSPV5qcUx3g5UYGxzigeCDkN_NeuNB+Ak8m3wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+On Tue, Jan 29, 2013 at 12:00 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Jan 28, 2013 at 02:52:31PM +0100, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> The pin controller is an inherent part of the SoC, without
+>> it the system will not boot, thus it needs to be selected
+>> from Kconfig.
+>>
+>> Cc: arm at kernel.org
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> Requesting ACK from ARM SoC on this patch.
+>
+> Acked-by: Olof Johansson <olof@lixom.net>
 
-On Tue, 29 Jan 2013 10:47:09 -0700, Bjorn Helgaas wrote:
+Thanks!
 
-> I think I would understand this better if we had a concrete example to
-> talk about, say a dmesg log and corresponding lspci -v output.
+> ... but I wonder if this is growing out of hand. Since they will always
+> be selected (and required) for UX500_SOC_DB8500, why not just make them
+> silent options that default to y with that as a depend?
 
-Please note that the cover letter of this patch series has the lspci
--vvv output.
+So either I do it like this by using select FOO in the
+Kconfig for the affected SoC, or I just turn it around
+and make it depend on the affected SoC and select it
+to "y" default.
 
-Best regards,
+It's like eating eggs from the little or big end or something.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+This current approach has the upside of not proliferating
+the SoC Kconfig symbol outside of the ARM tree, but
+I have no strong preference...
+
+All this stuff used to live in the arch/arm/mach-foo
+folders in the past, like the clocks you just have to
+default-enable it somehow.
+
+Linus Walleij
