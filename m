@@ -1,63 +1,38 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 29 Jan 2013 21:41:03 +0100
-Subject: [PATCH 5/5] mv643xx_eth: convert to use the Marvell Orion MDIO
- driver
-In-Reply-To: <20130129181306.GF25646@obsidianresearch.com>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1359473048-26551-6-git-send-email-florian@openwrt.org>
- <20130129181306.GF25646@obsidianresearch.com>
-Message-ID: <201301292141.03931.florian@openwrt.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jan 2013 20:40:49 +0000
+Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <20130129174546.GE23505@n2100.arm.linux.org.uk>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <201301291636.38773.arnd@arndb.de>
+ <20130129174546.GE23505@n2100.arm.linux.org.uk>
+Message-ID: <201301292040.50143.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 29 janvier 2013 19:13:06, Jason Gunthorpe a ?crit :
-> On Tue, Jan 29, 2013 at 04:24:08PM +0100, Florian Fainelli wrote:
-> > This patch converts the Marvell MV643XX ethernet driver to use the
-> > Marvell Orion MDIO driver. As a result, PowerPC and ARM platforms
-> > registering the Marvell MV643XX ethernet driver are also updated to
-> > register a Marvell Orion MDIO driver. This driver voluntarily overlaps
-> > with the Marvell Ethernet shared registers because it will use a subset
-> > of this shared register (shared_base + 0x4 - shared_base + 0x84). The
-> > Ethernet driver is also updated to look up for a PHY device using the
-> > Orion MDIO bus driver.
-> 
-> Can you finish off this job by making the mv643xx_eth driver accept
-> the standard phy-handle OF property instead of using a phy address?
+On Tuesday 29 January 2013, Russell King - ARM Linux wrote:
+> Well, how it all works in the PL08x driver at present is:
 
-I can certainly do that, at the same time we need to continue supporting the 
-"old" platform device style registration without breaking them (PowerPC in 
-particular, and the hopefully yet to be converted orion5x). So the phy_scan() 
-as I modified it will probably still be there.
+<snip>
 
-> 
-> Ie the end result should be something like:
-> 
->                 smi0: mdio at 72000 {
->                         device_type = "mdio";
->                         compatible = "marvell,orion-mdio";
->                         reg = <0x72004 0x4>;
-> 
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         PHY1: ethernet-phy at 1 {
->                                 reg = <1>;
->                                 device_type = "ethernet-phy";
->                                 phy-id = <0x01410e90>;
->                         };
->                 };
-> 
->                 egiga0 {
->                         device_type = "network";
->                         compatible = "marvell,mv643xx-eth";
->                         reg = <0x72000 0x4000>;
->                         port_number = <0>;
->                         phy-handle = <&PHY1>;
->                         interrupts = <11>;
->                         local-mac-address = [000000000002];  /* Filled by
-> boot loader */ };
-> 
-> Regards,
-> Jason
+Thanks for the explanations. If I end up implementing the DT support
+for pl08x, this will be very helpful. I looked at the git history
+for mach-versatile and could not find any of it there, although
+the patches were certainly on the mailing list
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017818.html
 
--- 
-Florian
+Do you (or Linus) know what happened to the patch series?
+
+Based on your description, it sounds all doable, but the split
+between platform specific code and device driver code would be
+different: While the muxing that you describe all takes place
+in the get_signal/put_signal functions in platform code, doing
+a proper DT binding for the mux would imply moving that into the
+pl080 driver itself, at least as a compile-time option for the
+driver. Do you think that would be acceptable?
+
+While I guess we could still keep the get_signal/put_signal
+callbacks in mach-versatile but drop them for platforms
+without a mux, I'm not sure if that would make the overall
+driver better or worse.
+
+	Arnd
