@@ -1,68 +1,447 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 29 Jan 2013 16:18:36 +0000
-Subject: [PATCH v2 1/4] arm: Move the set_handle_irq and handle_arch_irq
- declarations to asm/irq.h
+Date: Tue, 29 Jan 2013 16:18:37 +0000
+Subject: [PATCH v2 2/4] arm: Move chained_irq_(enter|exit) to a generic file
 In-Reply-To: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
 References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1359476319-23720-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1359476319-23720-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch prepares the removal of <asm/mach/irq.h> include in the
-GIC and VIC irqchip drivers.
+These functions have been introduced by commit 10a8c383 (irq: introduce
+entry and exit functions for chained handlers) in asm/mach/irq.h. This
+patch moves them to linux/irqchip/chained_irq.h so that generic irqchip
+drivers do not rely on architecture specific header files.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/include/asm/irq.h      | 5 +++++
- arch/arm/include/asm/mach/irq.h | 5 -----
- drivers/irqchip/irq-vic.c       | 2 +-
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/mach/irq.h             | 31 -----------------
+ arch/arm/mach-at91/gpio.c                   |  3 +-
+ arch/arm/mach-exynos/common.c               |  1 +
+ arch/arm/plat-samsung/irq-vic-timer.c       |  3 +-
+ arch/arm/plat-samsung/s5p-irq-gpioint.c     |  3 +-
+ drivers/gpio/gpio-msm-v2.c                  |  3 +-
+ drivers/gpio/gpio-mxc.c                     |  2 +-
+ drivers/gpio/gpio-omap.c                    |  3 +-
+ drivers/gpio/gpio-pl061.c                   |  2 +-
+ drivers/gpio/gpio-pxa.c                     |  3 +-
+ drivers/gpio/gpio-tegra.c                   |  3 +-
+ drivers/irqchip/irq-gic.c                   |  1 +
+ drivers/pinctrl/pinctrl-at91.c              |  3 +-
+ drivers/pinctrl/pinctrl-exynos.c            |  3 +-
+ drivers/pinctrl/pinctrl-nomadik.c           |  2 +-
+ drivers/pinctrl/pinctrl-sirf.c              |  2 +-
+ drivers/pinctrl/spear/pinctrl-plgpio.c      |  2 +-
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c |  2 +-
+ include/linux/irqchip/chained_irq.h         | 52 +++++++++++++++++++++++++++++
+ 19 files changed, 69 insertions(+), 55 deletions(-)
+ create mode 100644 include/linux/irqchip/chained_irq.h
 
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index 35c21c3..53c15de 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -30,6 +30,11 @@ extern void asm_do_IRQ(unsigned int, struct pt_regs *);
- void handle_IRQ(unsigned int, struct pt_regs *);
- void init_IRQ(void);
- 
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+extern void (*handle_arch_irq)(struct pt_regs *);
-+extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
-+#endif
-+
- #endif
- 
- #endif
 diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index 18c8830..749d505 100644
+index 749d505..2092ee1 100644
 --- a/arch/arm/include/asm/mach/irq.h
 +++ b/arch/arm/include/asm/mach/irq.h
-@@ -20,11 +20,6 @@ struct seq_file;
- extern void init_FIQ(int);
- extern int show_fiq_list(struct seq_file *, int);
+@@ -30,35 +30,4 @@ do {							\
+ 	raw_spin_unlock(&desc->lock);			\
+ } while(0)
  
--#ifdef CONFIG_MULTI_IRQ_HANDLER
--extern void (*handle_arch_irq)(struct pt_regs *);
--extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+-#ifndef __ASSEMBLY__
+-/*
+- * Entry/exit functions for chained handlers where the primary IRQ chip
+- * may implement either fasteoi or level-trigger flow control.
+- */
+-static inline void chained_irq_enter(struct irq_chip *chip,
+-				     struct irq_desc *desc)
+-{
+-	/* FastEOI controllers require no action on entry. */
+-	if (chip->irq_eoi)
+-		return;
+-
+-	if (chip->irq_mask_ack) {
+-		chip->irq_mask_ack(&desc->irq_data);
+-	} else {
+-		chip->irq_mask(&desc->irq_data);
+-		if (chip->irq_ack)
+-			chip->irq_ack(&desc->irq_data);
+-	}
+-}
+-
+-static inline void chained_irq_exit(struct irq_chip *chip,
+-				    struct irq_desc *desc)
+-{
+-	if (chip->irq_eoi)
+-		chip->irq_eoi(&desc->irq_data);
+-	else
+-		chip->irq_unmask(&desc->irq_data);
+-}
 -#endif
 -
- /*
-  * This is for easy migration, but should be changed in the source
-  */
-diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-index 3cf97aa..e38cb00 100644
---- a/drivers/irqchip/irq-vic.c
-+++ b/drivers/irqchip/irq-vic.c
-@@ -33,7 +33,7 @@
- #include <linux/irqchip/arm-vic.h>
+ #endif
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index c5d7e1e..a5afcf7 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -22,10 +22,9 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/of_address.h>
  
- #include <asm/exception.h>
 -#include <asm/mach/irq.h>
-+#include <asm/irq.h>
+-
+ #include <mach/hardware.h>
+ #include <mach/at91_pio.h>
  
- #include "irqchip.h"
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 7f01a92..60dad95 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -25,6 +25,7 @@
+ #include <linux/irqchip.h>
+ #include <linux/of_address.h>
+ #include <linux/irqchip/arm-gic.h>
++#include <linux/irqchip/chained_irq.h>
  
+ #include <asm/proc-fns.h>
+ #include <asm/exception.h>
+diff --git a/arch/arm/plat-samsung/irq-vic-timer.c b/arch/arm/plat-samsung/irq-vic-timer.c
+index f980cf3..5d205e7 100644
+--- a/arch/arm/plat-samsung/irq-vic-timer.c
++++ b/arch/arm/plat-samsung/irq-vic-timer.c
+@@ -16,6 +16,7 @@
+ #include <linux/kernel.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/io.h>
+ 
+ #include <mach/map.h>
+@@ -23,8 +24,6 @@
+ #include <plat/irq-vic-timer.h>
+ #include <plat/regs-timer.h>
+ 
+-#include <asm/mach/irq.h>
+-
+ static void s3c_irq_demux_vic_timer(unsigned int irq, struct irq_desc *desc)
+ {
+ 	struct irq_chip *chip = irq_get_chip(irq);
+diff --git a/arch/arm/plat-samsung/s5p-irq-gpioint.c b/arch/arm/plat-samsung/s5p-irq-gpioint.c
+index bae5613..fafdb05 100644
+--- a/arch/arm/plat-samsung/s5p-irq-gpioint.c
++++ b/arch/arm/plat-samsung/s5p-irq-gpioint.c
+@@ -14,6 +14,7 @@
+ #include <linux/kernel.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <linux/slab.h>
+@@ -22,8 +23,6 @@
+ #include <plat/gpio-core.h>
+ #include <plat/gpio-cfg.h>
+ 
+-#include <asm/mach/irq.h>
+-
+ #define GPIO_BASE(chip)		((void __iomem *)((unsigned long)((chip)->base) & 0xFFFFF000u))
+ 
+ #define CON_OFFSET		0x700
+diff --git a/drivers/gpio/gpio-msm-v2.c b/drivers/gpio/gpio-msm-v2.c
+index 55a7e77..dd2edde 100644
+--- a/drivers/gpio/gpio-msm-v2.c
++++ b/drivers/gpio/gpio-msm-v2.c
+@@ -23,13 +23,12 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/irq.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+ 
+-#include <asm/mach/irq.h>
+-
+ #include <mach/msm_gpiomux.h>
+ #include <mach/msm_iomap.h>
+ 
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index 7877335..7176743 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -24,6 +24,7 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+@@ -32,7 +33,6 @@
+ #include <linux/of_device.h>
+ #include <linux/module.h>
+ #include <asm-generic/bug.h>
+-#include <asm/mach/irq.h>
+ 
+ enum mxc_gpio_hwtype {
+ 	IMX1_GPIO,	/* runs on i.mx1 */
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index f1fbedb2..6996da9 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -25,11 +25,10 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/gpio.h>
+ #include <linux/platform_data/gpio-omap.h>
+ 
+-#include <asm/mach/irq.h>
+-
+ #define OFF_MODE	1
+ 
+ static LIST_HEAD(omap_gpio_list);
+diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
+index b820869..2976336 100644
+--- a/drivers/gpio/gpio-pl061.c
++++ b/drivers/gpio/gpio-pl061.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/ioport.h>
+ #include <linux/irq.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/bitops.h>
+ #include <linux/workqueue.h>
+ #include <linux/gpio.h>
+@@ -23,7 +24,6 @@
+ #include <linux/amba/pl061.h>
+ #include <linux/slab.h>
+ #include <linux/pm.h>
+-#include <asm/mach/irq.h>
+ 
+ #define GPIODIR 0x400
+ #define GPIOIS  0x404
+diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+index 8325f58..2d3af98 100644
+--- a/drivers/gpio/gpio-pxa.c
++++ b/drivers/gpio/gpio-pxa.c
+@@ -19,6 +19,7 @@
+ #include <linux/init.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -26,8 +27,6 @@
+ #include <linux/syscore_ops.h>
+ #include <linux/slab.h>
+ 
+-#include <asm/mach/irq.h>
+-
+ #include <mach/irqs.h>
+ 
+ /*
+diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+index 414ad91..8e21555 100644
+--- a/drivers/gpio/gpio-tegra.c
++++ b/drivers/gpio/gpio-tegra.c
+@@ -27,11 +27,10 @@
+ #include <linux/platform_device.h>
+ #include <linux/module.h>
+ #include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/pm.h>
+ 
+-#include <asm/mach/irq.h>
+-
+ #define GPIO_BANK(x)		((x) >> 5)
+ #define GPIO_PORT(x)		(((x) >> 3) & 0x3)
+ #define GPIO_BIT(x)		((x) & 0x7)
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 69d9a39..688b977 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -38,6 +38,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/percpu.h>
+ #include <linux/slab.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/irqchip/arm-gic.h>
+ 
+ #include <asm/irq.h>
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 75933a6..5cbadc9 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -18,6 +18,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <linux/pinctrl/machine.h>
+@@ -27,8 +28,6 @@
+ /* Since we request GPIOs from ourself */
+ #include <linux/pinctrl/consumer.h>
+ 
+-#include <asm/mach/irq.h>
+-
+ #include <mach/hardware.h>
+ #include <mach/at91_pio.h>
+ 
+diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+index 8738933..911c5e7 100644
+--- a/drivers/pinctrl/pinctrl-exynos.c
++++ b/drivers/pinctrl/pinctrl-exynos.c
+@@ -23,13 +23,12 @@
+ #include <linux/interrupt.h>
+ #include <linux/irqdomain.h>
+ #include <linux/irq.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/of_irq.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ 
+-#include <asm/mach/irq.h>
+-
+ #include "pinctrl-samsung.h"
+ #include "pinctrl-exynos.h"
+ 
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index 39c1651..d30d3c1 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -23,6 +23,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/slab.h>
+ #include <linux/of_device.h>
+ #include <linux/of_address.h>
+@@ -33,7 +34,6 @@
+ /* Since we request GPIOs from ourself */
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/platform_data/pinctrl-nomadik.h>
+-#include <asm/mach/irq.h>
+ #include "pinctrl-nomadik.h"
+ #include "core.h"
+ 
+diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
+index 498b2ba..35e8cea 100644
+--- a/drivers/pinctrl/pinctrl-sirf.c
++++ b/drivers/pinctrl/pinctrl-sirf.c
+@@ -14,6 +14,7 @@
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ #include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/pinmux.h>
+ #include <linux/pinctrl/consumer.h>
+@@ -25,7 +26,6 @@
+ #include <linux/bitops.h>
+ #include <linux/gpio.h>
+ #include <linux/of_gpio.h>
+-#include <asm/mach/irq.h>
+ 
+ #define DRIVER_NAME "pinmux-sirf"
+ 
+diff --git a/drivers/pinctrl/spear/pinctrl-plgpio.c b/drivers/pinctrl/spear/pinctrl-plgpio.c
+index 295b349..a4908ec 100644
+--- a/drivers/pinctrl/spear/pinctrl-plgpio.c
++++ b/drivers/pinctrl/spear/pinctrl-plgpio.c
+@@ -15,12 +15,12 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/module.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm.h>
+ #include <linux/spinlock.h>
+-#include <asm/mach/irq.h>
+ 
+ #define MAX_GPIO_PER_REG		32
+ #define PIN_OFFSET(pin)			(pin % MAX_GPIO_PER_REG)
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+index 366f259..6efe4e1 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+@@ -25,8 +25,8 @@
+ #include <linux/clk.h>
+ #include <linux/list.h>
+ #include <linux/irq.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/of_device.h>
+-#include <asm/mach/irq.h>
+ 
+ #include "imx-ipu-v3.h"
+ #include "ipu-prv.h"
+diff --git a/include/linux/irqchip/chained_irq.h b/include/linux/irqchip/chained_irq.h
+new file mode 100644
+index 0000000..adf4c30
+--- /dev/null
++++ b/include/linux/irqchip/chained_irq.h
+@@ -0,0 +1,52 @@
++/*
++ * Chained IRQ handlers support.
++ *
++ * Copyright (C) 2011 ARM Ltd.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __IRQCHIP_CHAINED_IRQ_H
++#define __IRQCHIP_CHAINED_IRQ_H
++
++#include <linux/irq.h>
++
++/*
++ * Entry/exit functions for chained handlers where the primary IRQ chip
++ * may implement either fasteoi or level-trigger flow control.
++ */
++static inline void chained_irq_enter(struct irq_chip *chip,
++				     struct irq_desc *desc)
++{
++	/* FastEOI controllers require no action on entry. */
++	if (chip->irq_eoi)
++		return;
++
++	if (chip->irq_mask_ack) {
++		chip->irq_mask_ack(&desc->irq_data);
++	} else {
++		chip->irq_mask(&desc->irq_data);
++		if (chip->irq_ack)
++			chip->irq_ack(&desc->irq_data);
++	}
++}
++
++static inline void chained_irq_exit(struct irq_chip *chip,
++				    struct irq_desc *desc)
++{
++	if (chip->irq_eoi)
++		chip->irq_eoi(&desc->irq_data);
++	else
++		chip->irq_unmask(&desc->irq_data);
++}
++
++#endif /* __IRQCHIP_CHAINED_IRQ_H */
