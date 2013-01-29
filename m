@@ -1,47 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 29 Jan 2013 20:47:13 +0530
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <201301291331.48427.arnd@arndb.de>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <201301291035.30265.arnd@arndb.de>
- <CAKohpo=rD9=dEaPkKYcj55K4_ebdnU7qjv2TZBUwqHAB+Kk+aw@mail.gmail.com>
- <201301291331.48427.arnd@arndb.de>
-Message-ID: <CAKohpoms+WC_XJnH2b6uoycRKkF-yxZUg2J+8NrYJP8fnDNLtg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 29 Jan 2013 15:18:28 +0000
+Subject: [GIT PULL] ARM: mvebu fixes for v3.8-rc6
+Message-ID: <1359472708.4cD60.22570@triton>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2013 19:01, Arnd Bergmann <arnd@arndb.de> wrote:
-> Ah, good. So I guess the "dma-requests" property should actually
-> be "16" then.
+The following changes since commit 09d75bc7d217bd8868899028a98b53423e6b3324:
 
-yes, even i was checking on that separately :)
+  ARM: kirkwood: fix missing #interrupt-cells property (2013-01-23 01:10:48 +0000)
 
-> Does this mean that an implicit zero request line means memory?
+are available in the git repository at:
 
-No. 0 is also request line for a peripheral and numbers are from 0 to 15.
-memcpy are identified by setting type of transfer as memcpy.
+  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8-rc6
 
-> Could we have device-to-device DMAs with this controller, and if
-> we can, should we have both 'src' and 'dst' fields? Are the
-> two number ranges sharing the same address space, i.e. is
-> request '7' as the destination guaranteed to be the same device
-> as request '7' in the source?
+for you to fetch changes up to de27686b77f1c5c5dddf06d48fd322c52f098d51:
 
-Request lines are per master... So, for a master single request line
-is independent of direction. Many DMA controllers have capability of
-doing dev-to-dev transfers but DMAENGINE doesn't have any support
-for it, even we don't have a usecase too :)
+  arm: mvebu: i2c come back in defconfig (2013-01-23 15:05:11 +0000)
 
-> If we need two lines, we could interleave them with the bus
-> master numbers:
+----------------------------------------------------------------
+fixes for v3.8-rc6
 
-not required.
+ - add missing gpio interrupt lines to dove dt
+ - fix bad logic for printing MPP error message on orion boards
+ - build proper serial port driver after changing mvebu DT compatible property
+   - This is a change to mvebu_defconfig that I wouldn't usually push out as a
+     fix.  However, the commit
 
-> In theory, we could use bit-stuffing to put them all into
-> a single 32 bit word I guess, but generally people don't
-> seem to like that for new bindings.
+     b24212f arm: mvebu: Use dw-apb-uart instead of ns16650 as UART driver
 
-:)
+     changed the serial driver for the board in the dts file.  without the patch
+     I've included in this pull, users won't see any log messages.
 
---
-viresh
+----------------------------------------------------------------
+Gerlando Falauto (1):
+      arm: plat-orion: fix printing of "MPP config unavailable on this hardware"
+
+Gregory CLEMENT (1):
+      arm: mvebu: i2c come back in defconfig
+
+Jean-Francois Moine (1):
+      Dove: activate GPIO interrupts in DT
+
+ arch/arm/boot/dts/dove.dtsi      | 2 ++
+ arch/arm/configs/mvebu_defconfig | 2 ++
+ arch/arm/plat-orion/mpp.c        | 2 +-
+ 3 files changed, 5 insertions(+), 1 deletion(-)
