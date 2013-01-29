@@ -1,62 +1,48 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 29 Jan 2013 16:33:02 +0200
-Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <5107D84F.80401@ti.com>
-References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
- <5107D253.5030400@ti.com> <20130129135336.GA3323@pengutronix.de>
- <5107D84F.80401@ti.com>
-Message-ID: <20130129143302.GF2046@arwen.pp.htv.fi>
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Tue, 29 Jan 2013 14:43:23 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130129141328.GV23505@n2100.arm.linux.org.uk>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129141328.GV23505@n2100.arm.linux.org.uk>
+Message-ID: <1359470601.3529.120.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jan 29, 2013 at 07:40:23PM +0530, kishon wrote:
-> On Tuesday 29 January 2013 07:23 PM, Wolfram Sang wrote:
-> >>>+	err = of_property_read_string(np, "phy_type", &phy_type);
-> >>>+	if (err < 0)
-> >>>+		return USBPHY_INTERFACE_MODE_NA;
-> >>
-> >>Why don't we use a u32 property type for the *phy-type*? IMHO we
-> >>should use string property only when the property should be
-> >>absolutely unambiguous (e.g., compatible property should be string).
-> >
-> >If we would use u32-numbers in the compatible entry, this would also be
-> >unambiguous, no? 0xd00dfeed would be the at24-driver. Pretty specific.
+On Tue, 2013-01-29 at 14:13 +0000, Russell King - ARM Linux wrote:
 > 
-> hehe... But we don't have a corresponding *enum* representing the
-> drivers :-)
-> >
-> >I don't mind having readable devicetrees. And we have it for ethernet
-> >phys already with strings, so it would be consistent.
-> 
-> Ok. Fine with it then :-)
+> So, this compiler (4.5.4) has support for 32-bit and 64-bit bswaps
+> across all our architectures, but not the 16-bit ones.
 
-I prefer u32 here, because we have the matching enum. Otherwise we end
-up with:
+That observation is consistent with my dig through GCC history. I had
+come to the conclusion that the 32-bit and 64-bit versions were added
+*generically* in 4.4, and that the 16-bit version was added in 4.6 to
+that PowerPC back end, and made generic in 4.8. So I *had* put that
+arch-specific check into compiler-gcc4.h, for PowerPC. It's just outside
+the context of Kim's patch. If it really does end up being different for
+every arch, I may reconsider that.
 
-of_property_read_string(...,&type);
+As for the __bswapsi2() calls... if it's ever emitting an out-of-line
+call for something like that, that seems like a really dubious decision;
+surely it's better being inlined? So rather than adding it to your
+bits-of-libgcc.a in the kernel, I'd suggest just *not* using
+ARCH_USE_BUILTIN_BSWAP for the offending compilers, and filing a bug to
+get them fixed.
 
-if (!strcmp(type, "ulpi"))
-	foo();
-else if (!strcmp(type, "utmi"))
-	bar();
-else if (!strcmp(type, "pipe3"))
-	baz();
-else
-	BUG();
-
-and I don't like that, it's ugly and error prone. Also looks awful when
-someone needs to change that, the diff looks messy. A u32 followed by a
-switch statement looks nicer.
+But really, this is why I created ARCH_USE_BUILTIN_BSWAP and left it to
+architecture maintainers to enable it at their leisure.... :)
 
 -- 
-balbi
+                   Sent with MeeGo's ActiveSync support.
+
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/bb037592/attachment.sig>
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4370 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/301d4e82/attachment.bin>
