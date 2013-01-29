@@ -1,36 +1,41 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Tue, 29 Jan 2013 12:29:17 +0530
-Subject: [PATCH v2 4/9] ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with
- the right flags
+Date: Tue, 29 Jan 2013 12:29:18 +0530
+Subject: [PATCH v2 5/9] ARM: OMAP2+: AM33XX: hwmod: Fixup cpgmac0 hwmod entry
 In-Reply-To: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
 References: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1359442762-13697-5-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1359442762-13697-6-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Third Party Transfer Controller (TPTC0) needs to be idled and
-put to standby under SW control. Add the appropriate flags in
-the TPTC0 hwmod entry.
+The current HWMOD code expects the memory region with
+the IP's SYSCONFIG register to be marked with ADDR_TYPE_RT
+flag.
+
+CPGMAC0 hwmod entry specifies two memory regions and marks
+both with the flag ADDR_TYPE_RT although only the 2nd region
+has the SYSCONFIG register. This leads to the HWMOD code
+accessing the wrong memory address for idle and standby
+operations. Fix this by removing the ADDR_TYPE_RT flag from
+the 1st memory region in CPGMAC0 hwmod entry.
 
 Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
-v2: Drop unnecessary parens
+v2: No change
 
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 8280f11..94254e8 100644
+index 94254e8..40bfde3 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -1823,6 +1823,7 @@ static struct omap_hwmod am33xx_tptc0_hwmod = {
- 	.class		= &am33xx_tptc_hwmod_class,
- 	.clkdm_name	= "l3_clkdm",
- 	.mpu_irqs	= am33xx_tptc0_irqs,
-+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
- 	.main_clk	= "l3_gclk",
- 	.prcm		= {
- 		.omap4	= {
+@@ -2496,7 +2496,6 @@ static struct omap_hwmod_addr_space am33xx_cpgmac0_addr_space[] = {
+ 	{
+ 		.pa_start	= 0x4a100000,
+ 		.pa_end		= 0x4a100000 + SZ_2K - 1,
+-		.flags		= ADDR_TYPE_RT,
+ 	},
+ 	/* cpsw wr */
+ 	{
 -- 
 1.8.1
