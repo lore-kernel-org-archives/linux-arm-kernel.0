@@ -1,134 +1,92 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 29 Jan 2013 15:43:40 +0000
-Subject: [PATCH v3 07/15] ARM: vexpress: Select the correct SMP
- operations at run-time
-In-Reply-To: <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1359474220.3731.45.camel@linaro1.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Jan 2013 15:44:09 +0000
+Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <201301291455.49347.arnd@arndb.de>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <201301291344.11066.arnd@arndb.de>
+ <20130129142434.GW23505@n2100.arm.linux.org.uk>
+ <201301291455.49347.arnd@arndb.de>
+Message-ID: <20130129154409.GA23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-29 at 02:51 -0500, Nicolas Pitre wrote:
-> From: Jon Medhurst <tixy@linaro.org>
+On Tue, Jan 29, 2013 at 02:55:49PM +0000, Arnd Bergmann wrote:
+> On Tuesday 29 January 2013, Russell King - ARM Linux wrote:
+> > No, that's not what I mean.  I mean the situation we find on Versatile
+> > platforms:
+> > 
+> >             8     3                   >3
+> > PL080 DMA --/--+--/------> FPGA Mux --/--> {bunch of off-CPU peripherals}
+> >                |  5
+> >                `--/------> {On-CPU peripherals}
+> > 
+> > This is something that I've been raising _every time_ I've been involved
+> > with DMA engine discussions when it comes to the matching stuff, so this
+> > is nothing new, and it's not unknown about.
 > 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> ---
-
-Should this patch be split into two. One to introduce the new smp_init
-hook into the generic ARM kernel code, and one to make vexpress use it?
-With, descriptions something like:
-
------------------------------------------------------------------------
-ARM: kernel: Enable selection of SMP operations at boot time
-
-Add a new 'smp_init' hook to machine_desc so platforms can specify a
-function to be used to setup smp ops instead of having a statically
-defined value.
------------------------------------------------------------------------
-ARM: vexpress: Select multi-cluster SMP operation if required
------------------------------------------------------------------------
-
--- 
-Tixy
-
-
->  arch/arm/include/asm/mach/arch.h |  3 +++
->  arch/arm/kernel/setup.c          |  5 ++++-
->  arch/arm/mach-vexpress/core.h    |  2 ++
->  arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
->  arch/arm/mach-vexpress/v2m.c     |  2 +-
->  5 files changed, 22 insertions(+), 2 deletions(-)
+> Ok, I see. I have not actually been involved with the DMA engine API
+> much, so for me it's the first time /I/ see this being explained.
 > 
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index 917d4fcfd9..3d01c6d6c3 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -17,8 +17,10 @@ struct pt_regs;
->  struct smp_operations;
->  #ifdef CONFIG_SMP
->  #define smp_ops(ops) (&(ops))
-> +#define smp_init_ops(ops) (&(ops))
->  #else
->  #define smp_ops(ops) (struct smp_operations *)NULL
-> +#define smp_init_ops(ops) (void (*)(void))NULL
->  #endif
->  
->  struct machine_desc {
-> @@ -42,6 +44,7 @@ struct machine_desc {
->  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
->  	char			restart_mode;	/* default restart mode	*/
->  	struct smp_operations	*smp;		/* SMP operations	*/
-> +	void			(*smp_init)(void);
->  	void			(*fixup)(struct tag *, char **,
->  					 struct meminfo *);
->  	void			(*reserve)(void);/* reserve mem blocks	*/
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 3f6cbb2e3e..41edca8582 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
->  	arm_dt_init_cpu_maps();
->  #ifdef CONFIG_SMP
->  	if (is_smp()) {
-> -		smp_set_ops(mdesc->smp);
-> +		if(mdesc->smp_init)
-> +			(*mdesc->smp_init)();
-> +		else
-> +			smp_set_ops(mdesc->smp);
->  		smp_init_cpus();
->  	}
->  #endif
-> diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
-> index f134cd4a85..3a761fd76c 100644
-> --- a/arch/arm/mach-vexpress/core.h
-> +++ b/arch/arm/mach-vexpress/core.h
-> @@ -6,6 +6,8 @@
->  
->  void vexpress_dt_smp_map_io(void);
->  
-> +void vexpress_smp_init_ops(void);
-> +
->  extern struct smp_operations	vexpress_smp_ops;
->  
->  extern void vexpress_cpu_die(unsigned int cpu);
-> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-> index c5d70de9bb..667344b479 100644
-> --- a/arch/arm/mach-vexpress/platsmp.c
-> +++ b/arch/arm/mach-vexpress/platsmp.c
-> @@ -12,6 +12,7 @@
->  #include <linux/errno.h>
->  #include <linux/smp.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
->  #include <linux/of_fdt.h>
->  #include <linux/vexpress.h>
->  
-> @@ -206,3 +207,14 @@ struct smp_operations __initdata vexpress_smp_ops = {
->  	.cpu_die		= vexpress_cpu_die,
->  #endif
->  };
-> +
-> +void __init vexpress_smp_init_ops(void)
-> +{
-> +	struct smp_operations *ops = &vexpress_smp_ops;
-> +#ifdef CONFIG_CLUSTER_PM
-> +	extern struct smp_operations mcpm_smp_ops;
-> +	if(of_find_compatible_node(NULL, NULL, "arm,cci"))
-> +		ops = &mcpm_smp_ops;
-> +#endif
-> +	smp_set_ops(ops);
-> +}
-> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-> index 011661a6c5..34172bd504 100644
-> --- a/arch/arm/mach-vexpress/v2m.c
-> +++ b/arch/arm/mach-vexpress/v2m.c
-> @@ -494,7 +494,7 @@ static const char * const v2m_dt_match[] __initconst = {
->  
->  DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
->  	.dt_compat	= v2m_dt_match,
-> -	.smp		= smp_ops(vexpress_smp_ops),
-> +	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
->  	.map_io		= v2m_dt_map_io,
->  	.init_early	= v2m_dt_init_early,
->  	.init_irq	= v2m_dt_init_irq,
+> From the DT binding perspective, doing this should be no problem. I guess
+> you would model the MUX as a trivial dma engine device that forwards to
+> another one, just like we do for nested interrupt controllers:
+> 
+> 	pl080: dma-engine at 10000000 {
+> 		compatible ="arm,pl080", "arm,primecell";
+> 		reg = <0x10000000 0x1000>;
+> 		dma-requests = <8>;
+> 		dma-channels = <4>;
+> 		#dma-cells = <2>;
+> 	};
+> 
+> 	fpga {
+> 		mux: dma-mux at f0008000 {
+> 			reg = <0xf0008000 100>;
+> 			compatible = "arm,versatile-fpga-dmamux";
+> 			dma-requests = <7>;
+> 			dma-channels = <3>;
+> 			#dma-cells = <1>;
+> 			dmas = <&pl080 5 0>, <&pl080 6 0> <&pl080 7 0>;
+> 			dma-names = "mux5", "mux6", "mux7";
+> 		};
+> 		...
+> 
+> 		some-device at f000a000 {
+> 			compatible = "foo,using-muxed-dma";
+> 			dmas = <&mux 3>, <&mux 4>;
+> 			dma-names = "rx", "tx";
+> 		};
+> 	};
+> 
+> The driver for foo,using-muxed-dma just requests a slave channel for its
+> lines, which ends up calling the xlate function of the driver for the mux.
+> That driver still needs to get written, of course, but it should be able
+> to recursively call dma_request_slave_channel on the pl080 device.
+> The arm,versatile-fpga-dmamux driver would not be registered to the dmaengine
+> layer, but it would register as an of_dma_controller.
+
+That's a good way to represent it but it fails in a very big way:
+You're stuffing N peripherals down to 3 request lines to the DMA
+engine, and you may want more than 3 of those peripherals to be
+making use of the DMA engine at any one time.
+
+Before anyone says "you shouldn't be doing this" consider this:
+your typical DMA slave engine already has this structure:
+
+N DMA channels <---> M DMA requests <---> M peripherals
+
+where N < M.  In other words, there is _already_ a MUX between the
+peripherals and the DMA engine channels themselves (what do you think
+the "request index" which you have to program into DMA channel control
+registers is doing...
+
+We support this external mux today in the PL080 driver - and we do that
+by having the PL080 driver do the scheduling of virtual DMA channels on
+the actual hardware itself.  The PL080 driver has knowledge that there
+may be some sort of additional muxing layer between it and the
+peripheral.
+
+As the APIs stand today, you just can't do this without having the
+DMA engine driver itself intimately involved because a layer above
+doesn't really have much clue as to what's going on, and the DMA
+engine stuff itself doesn't layer particularly well.
