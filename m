@@ -1,26 +1,36 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 29 Jan 2013 13:05:11 +0000
-Subject: Section mismatch in drivers/mfd/vexpress-sysreg.c
-In-Reply-To: <20130129115535.GH21504@S2101-09.ap.freescale.net>
-References: <20130129115535.GH21504@S2101-09.ap.freescale.net>
-Message-ID: <1359464711.8090.19.camel@hornet>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 29 Jan 2013 21:08:59 +0800
+Subject: [PATCH] ARM:common: setting saved_state to NULL after kfree
+In-Reply-To: <5107B3B1.1030406@asianux.com>
+References: <5107AE6F.3080206@asianux.com>
+ <20130129111526.GQ23505@n2100.arm.linux.org.uk>
+ <5107B3B1.1030406@asianux.com>
+Message-ID: <5107C9EB.6000803@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-29 at 11:55 +0000, Shawn Guo wrote:
-> I'm building v3.8-rc5 and seeing the following section mismatch warning
-> in drivers/mfd/vexpress-sysreg.c.
-> 
-> WARNING: drivers/mfd/built-in.o(.text+0x3108): Section mismatch in reference from the function vexpress_sysreg_probe() to the function .init.text:vexpress_sysreg_setup()
-> The function vexpress_sysreg_probe() references
-> the function __init vexpress_sysreg_setup().
-> This is often because vexpress_sysreg_probe lacks a __init
-> annotation or the annotation of vexpress_sysreg_setup is wrong.
 
-Arnd's got a fix for this already:
+  it is my fault, building failed for not declare sa1111_remove before using.
+  I should notice next time (at least, need building).
 
-https://patchwork.kernel.org/patch/2046991/
+  if sending patch v2 is welcome, I will do.
+    if need additional test, I should try (I try under qemu virtual machine).
 
-Thanks!
+  :-)
 
-Pawel
+
+gchen.
+
+
+? 2013?01?29? 19:34, Chen Gang ??:
+>> > 2. I don't think you tried to build with your patch in place.
+>> > 
+>> > 
+>   it is my fault, just like what you said, I did not try to build.
+>   and I should try now.
+
+
+-- 
+Chen Gang
+
+Asianux Corporation
