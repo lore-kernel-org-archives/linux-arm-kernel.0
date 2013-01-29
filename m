@@ -1,63 +1,37 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Tue, 29 Jan 2013 10:07:57 +0000
-Subject: [PATCH v2 8/9] ARM: DTS: AM33XX: Add nodes for OCMC RAM and
- WKUP-M3
-In-Reply-To: <87622ge6xv.fsf@dell.be.48ers.dk>
-References: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
- <1359442762-13697-9-git-send-email-vaibhav.bedia@ti.com>
- <87622ge6xv.fsf@dell.be.48ers.dk>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED01B92@DBDE01.ent.ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 29 Jan 2013 12:08:23 +0200
+Subject: [PATCH v3 10/30] USB: ehci-omap: Use PHY APIs to get the PHY
+ device and put it out of suspend
+In-Reply-To: <20130129095758.GM8708@arwen.pp.htv.fi>
+References: <1359372631-8180-11-git-send-email-rogerq@ti.com>
+ <1359453032-20604-1-git-send-email-rogerq@ti.com>
+ <20130129095758.GM8708@arwen.pp.htv.fi>
+Message-ID: <51079F97.6080109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 13:50:44, Peter Korsgaard wrote:
-> >>>>> "Vaibhav" == Vaibhav Bedia <vaibhav.bedia@ti.com> writes:
+On 01/29/2013 11:57 AM, Felipe Balbi wrote:
+> Hi,
 > 
->  Vaibhav> Since AM33XX supports only DT-boot, this is needed
->  Vaibhav> for the appropriate device nodes to be created.
+> On Tue, Jan 29, 2013 at 11:50:32AM +0200, Roger Quadros wrote:
+>> For each port that is in PHY mode we obtain a PHY device using the USB PHY
+>> library and put it out of suspend.
+>>
+>> It is up to platform code to associate the PHY to the controller's
+>> port and it is upto the PHY driver to manage the PHY's resources.
+>>
+>> Also remove wired spacing around declarations we come across.
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
 > 
->  Vaibhav> Note: OCMC RAM is part of the PER power domain and supports
->  Vaibhav> retention. The assembly code for low power entry/exit will
->  Vaibhav> run from OCMC RAM. To ensure that the OMAP PM code does not
->  Vaibhav> attempt to disable the clock to OCMC RAM as part of the
->  Vaibhav> suspend process add the no_idle_on_suspend flag.
+> ideally, this would be done generically by ehci-hcd.ko itself. Alan,
+> would you have objections provided it doesn't break anyone else ?
 > 
->  Vaibhav> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
->  Vaibhav> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->  Vaibhav> ---
->  Vaibhav> v2: Add reg property
-> 
->  Vaibhav>  arch/arm/boot/dts/am33xx.dtsi | 14 +++++++++++++
->  Vaibhav>  1 file changed, 14 insertions(+)
-> 
->  Vaibhav> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->  Vaibhav> index c2f14e8..423f898 100644
->  Vaibhav> --- a/arch/arm/boot/dts/am33xx.dtsi
->  Vaibhav> +++ b/arch/arm/boot/dts/am33xx.dtsi
->  Vaibhav> @@ -385,5 +385,19 @@
->  Vaibhav>  				mac-address = [ 00 00 00 00 00 00 ];
->  Vaibhav>  			};
->  Vaibhav>  		};
->  Vaibhav> +
->  Vaibhav> +		ocmcram: ocmcram at 40300000 {
->  Vaibhav> +			compatible = "ti,ocmcram";
->  Vaibhav> +			reg = <0x40300000 0x10000>;
->  Vaibhav> +			ti,hwmods = "ocmcram";
->  Vaibhav> +			ti,no_idle_on_suspend;
->  Vaibhav> +		};
->  Vaibhav> +
->  Vaibhav> +		wkup_m3: wkup_m3 at 44d00000 {
->  Vaibhav> +			compatible = "ti,wkup_m3";
-> 
-> 
-> Both of these compatible properties should probably use less generic
-> names, like:
-> 
-> ti,am3352-ocmcram
-> ti,am3352-wkup-m3 ('-' instead of '_')
-> 
+Agreed, and PHY suspend/resume should be done at port granularity.
 
-Ok. Will do.
+But considering the erratas we have in OMAP EHCI, I would still prefer to
+have control of the PHY in ehci-omap. We might even have to do some ULPI
+transfers in certain scenarios to work around some of the erratas.
 
-Thanks,
-Vaibhav
+cheers,
+-roger
