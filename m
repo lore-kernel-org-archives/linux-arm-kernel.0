@@ -1,41 +1,53 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 29 Jan 2013 13:14:24 +0200
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <CAKohpokZfQZ17PmQjS2ntN9js7=SxNkiwWpX2aD8cZcM9L0ydw@mail.gmail.com>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <1359410300-26113-2-git-send-email-arnd@arndb.de>
- <CAKohpomO6tYNYLdMOaJYgqGecXj5KMQprdb=gExi+QuGrtLTzw@mail.gmail.com>
- <201301291035.30265.arnd@arndb.de>
- <CAKohpo=rD9=dEaPkKYcj55K4_ebdnU7qjv2TZBUwqHAB+Kk+aw@mail.gmail.com>
- <1359456886.31148.37.camel@smile>
- <CAKohpokZfQZ17PmQjS2ntN9js7=SxNkiwWpX2aD8cZcM9L0ydw@mail.gmail.com>
-Message-ID: <1359458064.31148.38.camel@smile>
+From: vaibhav.bedia@ti.com (Vaibhav Bedia)
+Date: Tue, 29 Jan 2013 16:44:59 +0530
+Subject: [PATCH v3 0/9] ARM: OMAP2+: AM33XX: Misc fixes/updates
+Message-ID: <1359458108-8489-1-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-29 at 16:27 +0530, Viresh Kumar wrote: 
-> On 29 January 2013 16:24, Andy Shevchenko
-> <andriy.shevchenko@linux.intel.com> wrote:
-> > On Tue, 2013-01-29 at 16:19 +0530, Viresh Kumar wrote:
-> >> if (DMA_TO_DEV)
-> >>        // dest is periph
-> >>        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 11;
-> >> else if (DEV_TO_DMA)
-> >>        // src is periph
-> >>        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 7;
-> >
-> > We have macros for such shifts.
-> >
-> > drivers/dma/dw_dmac.c:187:   cfghi = DWC_CFGH_DST_PER(...
-> > drivers/dma/dw_dmac.c:189:   cfghi = DWC_CFGH_SRC_PER(...
-> 
-> I am getting older now, bad memory :)
-> I grepped into drivers/dma/dw_dmac_regs.h and left include/linux/dw_dmac.h :(
+Hi,
 
-Moreover the excerpt I showed from dw_dmac.c is the same piece of code
-you wrote above as a sample.
+The following patches were earlier posted as part the AM33XX
+suspend-resume support series [1]. Based on the suggestion
+from Santosh Shilimkar <santosh.shilimkar@ti.com> i have split
+out the changes which update the various data files related
+to AM33XX support.
 
+These patches apply on top of v3.8-rc5
+
+v1->v2: Address the comments received from Sergei Shtylyov
+and Peter Korsgaard.
+
+v2->v3: Address an additional comment from Peter Korgaard
+and add his Acked-by to the patches
+
+Regards,
+Vaibhav
+
+[1] http://marc.info/?l=linux-arm-kernel&m=135698501821074&w=2
+
+Vaibhav Bedia (9):
+  ARM: OMAP2+: AM33XX: CM: Get rid of unnecessary header inclusions
+  ARM: OMAP2+: AM33XX: CM/PRM: Use __ASSEMBLER__ macros in header files
+  ARM: OMAP2+: AM33XX: hwmod: Register OCMC RAM hwmod
+  ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod with the right flags
+  ARM: OMAP2+: AM33XX: hwmod: Fixup cpgmac0 hwmod entry
+  ARM: OMAP2+: AM33XX: hwmod: Update the WKUP-M3 hwmod with reset status
+    bit
+  ARM: OMAP2+: AM33XX: Update the hardreset API
+  ARM: DTS: AM33XX: Add nodes for OCMC RAM and WKUP-M3
+  ARM: OMAP2+: AM33XX: control: Add some control module registers and
+    APIs
+
+ arch/arm/boot/dts/am33xx.dtsi              | 14 +++++++++
+ arch/arm/mach-omap2/cm33xx.h               |  9 ++----
+ arch/arm/mach-omap2/control.c              | 20 ++++++++++++
+ arch/arm/mach-omap2/control.h              | 41 ++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c           |  5 +--
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 50 +++++++++++++++++-------------
+ arch/arm/mach-omap2/prm33xx.c              | 11 ++++---
+ arch/arm/mach-omap2/prm33xx.h              |  4 ++-
+ 8 files changed, 118 insertions(+), 36 deletions(-)
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+1.8.1
