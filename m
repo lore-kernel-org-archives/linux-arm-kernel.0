@@ -1,32 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jan 2013 15:25:18 +0000
-Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
-In-Reply-To: <20130129162337.0121cbab@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130129161211.7bb8cada@skate>
- <20130129151501.GY23505@n2100.arm.linux.org.uk>
- <20130129162337.0121cbab@skate>
-Message-ID: <20130129152518.GZ23505@n2100.arm.linux.org.uk>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 29 Jan 2013 16:24:03 +0100
+Subject: [PATCH 0/5] mv643xx_eth: use mvmdio MDIO bus driver
+Message-ID: <1359473048-26551-1-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 04:23:37PM +0100, Thomas Petazzoni wrote:
-> Russell,
-> 
-> Thanks for your quick feedback!
-> 
-> On Tue, 29 Jan 2013 15:15:01 +0000, Russell King - ARM Linux wrote:
-> 
-> > Given the description, I'd feel much happier with this if we specified
-> > the alignment numerically rather than allowing "some random code" to do
-> > something with the passed values.
-> 
-> So, you'd prefer to have two new members added in the hw_pci structure
-> to give the alignment requirements for I/O regions and memory regions?
+Hi all,
 
-Yep, otherwise we'll have yet more code to review rather than one
-algorithm with a set of numbers...
+This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
+instead of rolling its own implementation. As a result, all users of this
+mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
+The mvmdio driver is also updated to support an interrupt line which reports
+SMI error/completion, and to allow traditionnal platform device registration
+instead of just device tree.
 
-I work on the principle that if something can be expressed numerically,
-that's always better than expressing it with code.
+David, I think it makes sense for you to merge all of this, since we do
+not want the architecture files to be desynchronized from the mv643xx_eth to
+avoid runtime breakage. The potential for merge conflicts should be very small.
+
+You can probably safely merge patches 1 to 4 if Thomas agrees, and we will
+see what kind of feeback I get on patch 5.
+
+Florian Fainelli (5):
+  net: mvmdio: unmap base register address at driver removal
+  net: mvmdio: rename base register cookie from smireg to regs
+  net: mvmdio: enhance driver to support SMI error/done interrupts
+  net: mvmdio: allow Device Tree and platform device to coexist
+  mv643xx_eth: convert to use the Marvell Orion MDIO driver
+
+ .../devicetree/bindings/net/marvell-orion-mdio.txt |    3 +
+ arch/arm/plat-orion/common.c                       |   84 +++++++--
+ arch/powerpc/platforms/chrp/pegasos_eth.c          |   20 +++
+ arch/powerpc/sysdev/mv64x60_dev.c                  |   14 +-
+ drivers/net/ethernet/marvell/Kconfig               |    1 +
+ drivers/net/ethernet/marvell/mv643xx_eth.c         |  187 +-------------------
+ drivers/net/ethernet/marvell/mvmdio.c              |  136 +++++++++++---
+ 7 files changed, 226 insertions(+), 219 deletions(-)
+
+-- 
+1.7.10.4
