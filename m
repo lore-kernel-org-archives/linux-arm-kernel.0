@@ -1,98 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 28 Jan 2013 19:48:24 -0500
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130128223148.GA10275@schnuecks.de>
-References: <1359283223-23082-1-git-send-email-gmbnomis@gmail.com>
- <1359283223-23082-2-git-send-email-gmbnomis@gmail.com>
- <510506F9.3070500@gmail.com> <20130127110857.GA23687@schnuecks.de>
- <51053761.1020009@gmail.com>
- <20130127144610.GW1758@titan.lakedaemon.net>
- <51053F81.6020904@gmail.com>
- <20130127152431.GX1758@titan.lakedaemon.net>
- <20130128223148.GA10275@schnuecks.de>
-Message-ID: <20130129004824.GB7717@titan.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 29 Jan 2013 09:08:55 +0800
+Subject: [GIT PULL] imx cleanup for 3.9
+In-Reply-To: <20130128220026.GC3047@quad.lixom.net>
+References: <20130122144813.GD2812@S2101-09.ap.freescale.net>
+ <20130128220026.GC3047@quad.lixom.net>
+Message-ID: <20130129010853.GA24352@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 11:31:48PM +0100, Simon Baatz wrote:
-> Hi Jason,
+On Mon, Jan 28, 2013 at 02:00:26PM -0800, Olof Johansson wrote:
+> Hi,
 > 
-> On Sun, Jan 27, 2013 at 10:24:31AM -0500, Jason Cooper wrote:
-> > On Sun, Jan 27, 2013 at 03:53:53PM +0100, Sebastian Hesselbarth wrote:
-> > > On 01/27/2013 03:46 PM, Jason Cooper wrote:
-> > > >>I _cannot_ confirm that gbe is loosing its MAC address on Dove. I will
-> > > >>post a follow-up patch to Jason's cleanup patches that will also
-> > > >>grab a clock for smi. With that patch insmod'ing/rmmod'ing mv643xx_eth
-> > > >>does work just fine here on Dove.
-> > > >
-> > > >I believe Simon's issue is that the mv643xx_eth driver is not loaded at
-> > > >boot, it's clocks get gated, then when he loads the driver, there is no
-> > > >mac address.  Is that correct Simon?  I don't think unloading the driver
-> > > >after boot will trigger this regression.
-> > > 
-> > > Loading and unloading the driver module hangs because of the missing
-> > > clk_prepeare_enable in shared driver part. This should be fixed by the
-> > > patch I sent you.
-> > > 
-> > > Dove and Kirkwood have the same gbe internally and I can boot into Dove
-> > > without mv643xx_eth, load, unload, reload the module and it always finds
-> > > its MAC address.
-> > > 
-> > > I just want Simon to confirm that Kirkwood's gbe is really loosing the
-> > > contents of its MAC address registers during gated clocks, which is from
-> > > a HW point of view very unlikely.
-> > 
-> > Ok, I just wanted to make sure we understood his problem correctly, and
-> > if possible, reproduce it.
-> > 
-> > Simon, can you give us some steps to reproduce this on our side so we
-> > can see exactly what's happening?
+> On Tue, Jan 22, 2013 at 10:48:15PM +0800, Shawn Guo wrote:
 > 
-> Nothing special here. My config originally based on a Debian config
-> for a Kirkwood kernel.  Thus, amongst other drivers, mv643xx_eth is
-> build as a module and is loaded from an initrd.
-> Because all relevant drivers are loaded as modules, I need my
-> runit patch to boot at all.
+> > Shawn Guo (4):
+> >       ARM: dts: imx: use nodes label in board dts
+> 
+> Hmm.
+> 
+> This patch is 1000 lines of pure churn. Sure, the style on OMAP is different,
+> but there's no clear benefit from it -- it's actually advantageous to see some
+> of the bus hierarchies even on the leaf-level board nodes.
+> 
+> Would you mind respinning with this left out, please? If you still want to
+> argue it to be included, we can do so, but I'd like to pick up the rest of the
+> branch meanwhile. :-)
 
-Let's back up.  If you config early printk and COMMON_CLK_DEBUG and a
-vanilla v3.8-rc5 with your current config, what happens?
+I will refresh the pull-request to leave it out, but meanwhile I'd like
+to argue too, as the approach has been agreed by IMX people and all the
+patches I queued on imx/dt are all in this way.  And I will move the
+patch to imx/dt branch instead, if you're not strongly against the
+approach.
 
-Could you also please try kirkwood_defconfig and tell us if it boots?
+The board level dts are mostly used to add/overwrite properties for
+nodes defined in soc dts.  Therefore, what people who look at board
+dts care about is those properties, not really which bus the nodes
+are on.  We go this way to have board dts focus on the things they
+are created for.  It's much easer to read and edit those properties.
 
-thx,
+I'm not sure why it's important to maintain the bus topology in board
+dts while we have the full one in soc dts.  In the current way, people
+sometimes have to reassemble 3 or more levels bus hierarchies for only
+overwriting one property for one node.  
 
-Jason.
+I'm pretty sure that people who work on board level dts would vote for
+this way.  It makes their life easier without increasing the
+maintainer's burden.  So why not?
 
-> 
-> Here are my findings with various patches: ("non-DT" means booting
-> the IBNAS6210 with machine ID 1680 ???Marvell DB-88F6281-BP
-> Development Board???, which works reasonably well)
-> 
-> 3.8-rc5 + runit patch:
-> 
-> DT: Hangs at boot (when loading mv643xx_eth)
-> non-DT: Boots ok
-> 
-> 3.8-rc5 + runit patch + ge00/ge01 patch:
-> 
-> DT: Boots ok
-> non-DT: Boots ok
-> 
-> 3.8-rc5 + runit + Sebastians get smi clock patch (modified to use
-> legacy clock names):
-> 
-> DT: Boots, but no MAC
-> non-DT: Boots ok
-> 
-> 3.8-rc5 + runit + using Sebastians patch + clks not ticking at module
-> load:
-> 
-> DT: Boots, but no MAC
-> non-DT: Boots, but no MAC
-> 
-> 
-> hth,
->   Simon
-> 
-> 
+Shawn
