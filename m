@@ -1,109 +1,50 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 29 Jan 2013 15:46:12 +0100
-Subject: [RFC 2/3] arm: mxs: add enet_out clock to devicetree
-In-Reply-To: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
-References: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1359470773-14290-3-git-send-email-w.sang@pengutronix.de>
+From: narkewoody@gmail.com (Woody Wu)
+Date: Wed, 30 Jan 2013 07:52:57 +0800
+Subject: s3c2410 (Linux 2.6.36) Incorrect DRAM size
+In-Reply-To: <CA+E=qVe3=cCLuELB7tuHp2Qis6_2EL_Q_XgC+aUk4398HysPSQ@mail.gmail.com>
+References: <slrnkactau.29u.narkewoody@zuhnb712.local.com>
+ <CA+E=qVe3=cCLuELB7tuHp2Qis6_2EL_Q_XgC+aUk4398HysPSQ@mail.gmail.com>
+Message-ID: <CAAsE_uda4mKwOQ-4br-0Q7ZM46dFatRGi2GddVNJ98thXw84iQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Put the clock to the devicetree, so the driver can take care of it
-later. Then, we don't have to do the enabling as a workaround in board
-init.
+? 2012-11-17 AM1:29?"Vasily Khoruzhick" <anarsoul@gmail.com>???
+>
+> On Fri, Nov 16, 2012 at 8:19 PM, Woody Wu <narkewoody@gmail.com> wrote:
+> > Hi,
+> >
+> > I just buit a 2.6.36 and boot it from a s3c2410 board.  At the very
+> > beginning of consol log, the kernel reports the DRAM size if 16M.
+> > (Memory: 16M = 16M total).  But the board actually has 64M ram in two
+> > bands (each is 32M).
+> >
+> > Did someone know the cause and have a hint or solution? And, does anyone
+> > knows that the DRAM size is auto-detected by kernel or hard configured
+> > in some .h?
+>
+> Bootloader passes ATAGs with memory location and size, so something's
+> wrong with your bootloader.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
- arch/arm/boot/dts/imx28-apf28.dts      |    3 +++
- arch/arm/boot/dts/imx28-apx4devkit.dts |    3 +++
- arch/arm/boot/dts/imx28-cfa10049.dts   |    3 +++
- arch/arm/boot/dts/imx28-evk.dts        |    3 +++
- arch/arm/boot/dts/imx28-sps1.dts       |    3 +++
- arch/arm/boot/dts/imx28-tx28.dts       |    3 +++
- 6 files changed, 18 insertions(+)
+Sorry only see ur reply after such long time.  The problem solved. The
+bootloader did not have a problem, but it was not passing ATAGs, so I have
+to config the kernel to parse old parameter format.
 
-diff --git a/arch/arm/boot/dts/imx28-apf28.dts b/arch/arm/boot/dts/imx28-apf28.dts
-index 7eb0758..3047c0c 100644
---- a/arch/arm/boot/dts/imx28-apf28.dts
-+++ b/arch/arm/boot/dts/imx28-apf28.dts
-@@ -75,6 +75,9 @@
- 
- 	ahb at 80080000 {
- 		mac0: ethernet at 800f0000 {
-+			/* add enet_out clock */
-+			clocks = <&clks 57>, <&clks 57>, <&clks 64>;
-+			clock-names = "ipg", "ahb", "enet_out";
- 			phy-mode = "rmii";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mac0_pins_a>;
-diff --git a/arch/arm/boot/dts/imx28-apx4devkit.dts b/arch/arm/boot/dts/imx28-apx4devkit.dts
-index 5171667..b8c4b0c 100644
---- a/arch/arm/boot/dts/imx28-apx4devkit.dts
-+++ b/arch/arm/boot/dts/imx28-apx4devkit.dts
-@@ -159,6 +159,9 @@
- 
- 	ahb at 80080000 {
- 		mac0: ethernet at 800f0000 {
-+			/* add enet_out clock */
-+			clocks = <&clks 57>, <&clks 57>, <&clks 64>;
-+			clock-names = "ipg", "ahb", "enet_out";
- 			phy-mode = "rmii";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mac0_pins_a>;
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index bdc80a4..7204468 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -145,6 +145,9 @@
- 
- 	ahb at 80080000 {
- 		mac0: ethernet at 800f0000 {
-+			/* add enet_out clock */
-+			clocks = <&clks 57>, <&clks 57>, <&clks 64>;
-+			clock-names = "ipg", "ahb", "enet_out";
- 			phy-mode = "rmii";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mac0_pins_a>;
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 2da316e..6634d71 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -224,6 +224,9 @@
- 		};
- 
- 		mac0: ethernet at 800f0000 {
-+			/* add enet_out clock */
-+			clocks = <&clks 57>, <&clks 57>, <&clks 64>;
-+			clock-names = "ipg", "ahb", "enet_out";
- 			phy-mode = "rmii";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mac0_pins_a>;
-diff --git a/arch/arm/boot/dts/imx28-sps1.dts b/arch/arm/boot/dts/imx28-sps1.dts
-index e6cde8a..1df1859 100644
---- a/arch/arm/boot/dts/imx28-sps1.dts
-+++ b/arch/arm/boot/dts/imx28-sps1.dts
-@@ -112,6 +112,9 @@
- 		};
- 
- 		mac0: ethernet at 800f0000 {
-+			/* add enet_out clock */
-+			clocks = <&clks 57>, <&clks 57>, <&clks 64>;
-+			clock-names = "ipg", "ahb", "enet_out";
- 			phy-mode = "rmii";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mac0_pins_a>;
-diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-index 37be532..dcc90db 100644
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -89,6 +89,9 @@
- 
- 	ahb at 80080000 {
- 		mac0: ethernet at 800f0000 {
-+			/* add enet_out clock */
-+			clocks = <&clks 57>, <&clks 57>, <&clks 64>;
-+			clock-names = "ipg", "ahb", "enet_out";
- 			phy-mode = "rmii";
- 			pinctrl-names = "default", "gpio_mode";
- 			pinctrl-0 = <&mac0_pins_a>;
--- 
-1.7.10.4
+Thanks anyway.
+>
+> Regards
+> Vasily
+>
+> > Thanks in advance
+> >
+> > --
+> > -woody
+> > I can't go back to yesterday - because I was a different person then.
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130130/51e68791/attachment-0001.html>
