@@ -1,53 +1,44 @@
-From: david.woodhouse@intel.com (Woodhouse, David)
-Date: Tue, 29 Jan 2013 17:55:54 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130129174249.GB25415@pd.tnic>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
-Message-ID: <1359482147.3529.161.camel@shinybook.infradead.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 29 Jan 2013 10:59:12 -0700
+Subject: [PATCH 4/5] net: mvmdio: allow Device Tree and platform device
+ to coexist
+In-Reply-To: <1359473048-26551-5-git-send-email-florian@openwrt.org>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1359473048-26551-5-git-send-email-florian@openwrt.org>
+Message-ID: <20130129175912.GE25646@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-01-29 at 18:42 +0100, Borislav Petkov wrote:
-> On Tue, Jan 29, 2013 at 04:46:58PM +0000, Woodhouse, David wrote:
-> > If we're really going to have many different architectures depending
-> > on different versions of GCC for this (if it wasn't sane to use
-> > it from 4.4/4.8 when it got introduced, and depends on some later
-> > arch-specific optimisation), then perhaps we'll have the arch
-> > provide the corresponding required GCC_VERSION for using each of
-> > 64/32/16 bit builtins, instead of just a yes/no flag? Or just define
-> > __HAVE_BUILTIN_BSWAPxx__ for itself, perhaps?
-> 
-> Damn, there's already the __powerpc__ thing in there.
+On Tue, Jan 29, 2013 at 04:24:07PM +0100, Florian Fainelli wrote:
+  
+> -	dev->err_interrupt = irq_of_parse_and_map(pdev->dev.of_node, 0);
+> +	if (pdev->dev.of_node) {
+> +		dev->regs = of_iomap(pdev->dev.of_node, 0);
+> +		if (!dev->regs) {
+> +			dev_err(&pdev->dev, "No SMI register address given in DT\n");
+> +			ret = -ENODEV;
+> +			goto out_free;
+> +		}
+> +
+> +		dev->err_interrupt = irq_of_parse_and_map(pdev->dev.of_node, 0);
+> +	} else {
+> +		r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +		dev->regs = ioremap(r->start, resource_size(r));
+> +		if (!dev->regs) {
+> +			dev_err(&pdev->dev, "No SMI register address given\n");
+> +			ret = -ENODEV;
+> +			goto out_free;
+> +		}
+> +
+> +		dev->err_interrupt = platform_get_irq(pdev, 0);
+> +	}
 
-That's different though. That's because GCC didn't have a generic
-__builtin_bswap16() until 4.8, while PowerPC got it in 4.6.
+Why do you have these different paths for OF and platform? AFAIK these
+days when a OF device is automatically converted into a platform
+device all the struct resources are created too, so you can't you just
+use platform_get_resource and devm_request_and_ioremap for both flows?
 
-That's a relatively simple and manageable one-off arch-dependency. But
-once we get into a mass of "well, it wasn't actually *usable* for ARM
-until 4.9", we start wanting to push it into arch code.
+Ditto for the interrupt - platform_get_irq should work in both cases?
 
-> But I liked your other suggestion better to get the offending
-> compilers fixed.
-
-That wasn't an *alternative*. It's required if the compiler is doing
-something suboptimal, whatever happens. And then we start to *use* the
-compiler from the first version that's known to be fixed.
-
--- 
-                   Sent with MeeGo's ActiveSync support.
-
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/f29c0f6f/attachment.bin>
+Jason
