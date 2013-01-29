@@ -1,54 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jan 2013 20:15:21 +0000
-Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
-In-Reply-To: <20130129180936.3737e550@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301291645.08040.arnd@arndb.de> <20130129180936.3737e550@skate>
-Message-ID: <201301292015.21478.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 29 Jan 2013 14:23:11 -0600
+Subject: [PATCH] ARM: OMAP2+: Fix selection of clockevent timer when using
+ device-tree
+Message-ID: <1359490991-17688-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013, Thomas Petazzoni wrote:
-> Yes, it is about the emulated PCI-to-PCI bridges. Each
-> emulated PCI-to-PCI bridge corresponds to one hardware PCIe interface,
-> and I need the I/O base address assigned to each PCIe interface to be
-> aligned on a 64 KB boundary. I am not sure to understand why you think
-> this is a problem.
-> 
-> Also, what do you mean exactly by making them appear as individual
-> domains?
+Commit 9725f44 (ARM: OMAP: Add DT support for timer driver) added
+device-tree support for selecting a clockevent timer by property.
+However, the code is currently ignoring the property passed and
+selecting the first available timer found. Hence, for the OMAP3 beagle
+board timer-12 is not being selected as expected. Fix this problem
+by ensuring the timer property is passed to omap_get_timer_dt().
 
-I mean you could make each root port look like a separate host
-bridge that is not related to the others, and not have any
-emulated PCI-to-PCI bridges at all.
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/timer.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Remember that the very reason to use emulated PCI-to-PCI bridges is
-> that we want to assign a global range of addresses of I/O regions and a
-> global range of addresses of memory regions, and let the Linux PCI core
-> allocate from those two ranges to the different devices connected
-> downstream of the PCI-to-PCI bridges. This gives us for free the rather
-> complex allocation of addresses we need to set up our address decoding
-> windows.
-> 
-> If we have have separate domains for each of our hardware PCIe
-> interface, can we still benefit from this allocation of resources from
-> a globally defined range of I/O addresses and memory addresses?
-
-My interpretation of what you told me in the previous mail is that
-each root port has 
-
-* A separate configuration space
-* A separate 64KB I/O window that is not shared with the other ports,
-  or potentially multiple 64KB windows, which we would not want to use
-* A configurable range of the memory space that does not overlap
-  with the other ports
-
-Is the above a correct description?
-
-If so, I think it would be most sensible to not try to put all ports
-into the same domain, but give each port the full view of its own
-256 buses, and 64KB I/O space. The memory space can still be directly
-mapped, if you only set up the physical address window for that after
-the bus scan is complete.
-
-	Arnd
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index b8ad6e6..265de51 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -228,7 +228,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	int r = 0;
+ 
+ 	if (of_have_populated_dt()) {
+-		np = omap_get_timer_dt(omap_timer_match, NULL);
++		np = omap_get_timer_dt(omap_timer_match, property);
+ 		if (!np)
+ 			return -ENODEV;
+ 
+-- 
+1.7.10.4
