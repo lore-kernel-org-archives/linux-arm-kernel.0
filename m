@@ -1,98 +1,95 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 29 Jan 2013 19:27:00 +0530
-Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
- hwmod data
-In-Reply-To: <20130122183213.GN15361@atomide.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
- <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
- <20130118171500.GC15361@atomide.com> <50FCF838.6000105@ti.com>
- <50FD5993.5010008@ti.com> <20130121180113.GA22517@atomide.com>
- <50FE8C5C.2030409@ti.com> <20130122183213.GN15361@atomide.com>
-Message-ID: <5107D52C.80200@ti.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Tue, 29 Jan 2013 14:05:22 +0000
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130129144522.44ed7373@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130129132204.GA23886@arm.com> <20130129144522.44ed7373@skate>
+Message-ID: <20130129140522.GA24310@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 January 2013 12:02 AM, Tony Lindgren wrote:
-> * Benoit Cousson <b-cousson@ti.com> [130122 04:59]:
->> Hi Tony,
->>
->> On 01/21/2013 07:01 PM, Tony Lindgren wrote:
->>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130121 07:09]:
->>>>>
->>>> So I looked at this one with help of Rajendra. We can get rid of the
->>>> IRQ and DMA data(needs DMA biding updates) easily. The address
->>>> space though is needed since hwmod code uses it to setup the
->>>> sysconfig registers.
->>>
->>> OK great. The address space tinkering in hwmod code should be
->>> moved to be done in the drivers.
->>>
->>> As discussed earlier, there should be a driver specific reset
->>> function driver_xyz_reset() in the driver header file so the
->>> hwmod code can call it too in a late_initcall if no driver is
->>> loaded.
->>>
->>>> Extracting that from DT code seems to be really expensive and
->>>> ugly [1]. I am yet to try out DMA lines removal but that seems
->>>> to be doable by pulling Vinod'd DMA engine branch and updating
->>>> DT file.
->>>
->>> The overhead here does not matter as it should only happen in a
->>> late_initcall and only for some of the drivers. For that to
->>> happen we just need to go through the list of modules not yet
->>> probed. We also need to have some locking in the driver specific
->>> reset function to avoid races with the loadable modules.
->>
->> Mmm, not really, that address is used by *every* hwmod for sysconfig
->> access. So iterating over every DT nodes for every hwmods seems pretty
->> ugly and un-optimized.
->
-> I think you missed one point. Iterating over all the modules should
-> only happen for the unused modules. With sysconfig access moved to the
-> drivers getting the ioaddress is done in the standard way in the driver
-> probe instead of iterating over all of them.
->
->> That being said, it might worth checking the overhead. That will not
->> make the fix nicer anyway, but at least it will allow a smooth
->> transition toward a real clean solution. Assuming someone will work on
->> that later, which might never happen.
->
-> Right, so who is going to do all the work needed?
->
-OK so we do managed to clean up the address space, IRQ lines
-and DMA request lines data from hwmod completely.
+On Tue, Jan 29, 2013 at 01:45:22PM +0000, Thomas Petazzoni wrote:
+> Dear Andrew Murray,
+> 
+> On Tue, 29 Jan 2013 13:22:04 +0000, Andrew Murray wrote:
+> 
+> > > +static int __init mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+> > > +{
+> > 
+> > [snip]
+> > 
+> > > +
+> > > +       /*
+> > > +        * Build an laddr array that describes the PCI device in a DT
+> > > +        * way
+> > > +        */
+> > > +       laddr[0] = cpu_to_be32(port->devfn << 8);
+> > > +       laddr[1] = laddr[2] = 0;
+> > > +       intspec = cpu_to_be32(pin);
+> > > +
+> > > +       ret = of_irq_map_raw(port->dn, &intspec, 1, laddr, &oirq);
+> > > +       if (ret) {
+> > > +               dev_err(&pcie->pdev->dev,
+> > > +                       "%s: of_irq_map_raw() failed, %d\n",
+> > > +                       __func__, ret);
+> > > +               return ret;
+> > > +       }
+> > 
+> > Are you able to replace the above code with a call to of_irq_map_pci? I'm not
+> > sure which approach is better. The of_irq_map_pci function doesn't require the
+> > pin argument and instead uses the DT and/or performs its own pin swizzling. I
+> > guess this means that if there are PCIe devices in the DT tree that does any
+> > thing strange with pins then it would be reflected in the IRQ you get. I've
+> > found that you will also need to provide an implementation of
+> > pcibios_get_phb_of_node for this to work correctly (see my RFC bios32 patch).
+> 
+> I did try using the of_irq_map_pci() function, but unfortunately, it
+> didn't work. IIRC, it didn't work because none of the pci_dev in my PCI
+> tree had any 'struct device_node' associated to them, or at least not
+> the one that had the right pdev->bus->number and pdev->devfn.
+> 
+> But, I guess that your patch that implements pcibios_get_phb_of_node()
+> should fix this problem. I'll try this. Thanks!
 
--OMAP5 hwmod data file, 2076 lines we could remove which significant
-reduction. I ran the same scripts on OMAP4 and there too about 2200
-lines getting deleted.
-
-- I have to udapte DT file to add the all supported hwmods with reg
-property so that OMAP5 continue to boot. Similar work is needed for
-OMAP4 too once OMAP4 is made DT only support.
-
-- To my suprise, the DT lookup isn't that bad. It is adding just
-24 milliseconds to the boot time which is more or less noise.
-
-Have pushed a branch with above update for OMAP5 here [1]
-
-So we are left with two other topics which you mentioned in the
-comments.
-
-1. Movement of clock data to drivers/clk. Till we get direction here
-I would like to hear the alternative to get OMAP5 booting from mainline.
-If there is no alternative, we can keep OMAP5 clock data alone
-out of tree and get rest of the data files merged.
-
-2. The iormap() done by hwmod for sysconfig handling which you are
-discussing with Rajendra. So far we don't have a viable way to
-get the iormapped address from device drivers back to platform
-code. Lets continue on this thread but this can evolve in
-parallel.
-
-Let me know your thoughts.
-
-Regards,
-Santosh
-
-[1] git://github.com/SantoshShilimkar/linux.git
-3.9/omap5-testing-hwmod-cleanup
+My bios32 patch departs slightly from your v2 04/27 patch in that it updates
+hw_pci to contain a device node rather than opaque private data and my
+pcibios_get_phb_of_node implementation relies on this. If you wanted to stick
+with the implementation you and Thierry share then you'd have to find another
+way to get to the device node from the void **private_data.
+ 
+> > > +static int mvebu_pcie_init(void)
+> > > +{
+> > > +       return platform_driver_probe(&mvebu_pcie_driver,
+> > > +                                    mvebu_pcie_probe);
+> > > +}
+> > 
+> > If you have multiple 'mvebu-pcie' in your DT then you will end up
+> > with multiple calls to
+> > mvebu_pcie_probe/mvebu_pcie_enable/pci_common_init.
+> 
+> Right. In practice, there will only ever be a single DT node, since all
+> PCIe interfaces are sub-nodes of the PCI controller node. But I
+> understand the theoretical problem.
+> 
+> > However pci_common_init/pcibios_init_hw assumes it will only ever be called
+> > once, and will thus result in trying to create multiple busses with the same
+> > bus number. (The first root bus it creates is always zero provided you haven't
+> > implemented hw->scan).
+> > 
+> > I noticed this in Thierry's patch set and posted an RFC patch which overcomes
+> > this issue (patchwork.kernel.org/patch/2001171) and others. Perhaps you would
+> > want to include this in your patchset?
+> 
+> Sure, I'll give it a test, and report if it works for me.
+> 
+> Thanks a lot!
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+> 
