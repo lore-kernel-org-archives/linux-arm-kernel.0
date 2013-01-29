@@ -1,112 +1,89 @@
-From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Tue, 29 Jan 2013 12:29:22 +0530
-Subject: [PATCH v2 9/9] ARM: OMAP2+: AM33XX: control: Add some control module
- registers and APIs
-In-Reply-To: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
-References: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1359442762-13697-10-git-send-email-vaibhav.bedia@ti.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Tue, 29 Jan 2013 09:02:07 +0100
+Subject: [PATCH 2/2] ARM: davinci: da850: configure CS2(aemif) for norflash
+In-Reply-To: <1359436796-25135-3-git-send-email-anilkumar.v@ti.com>
+References: <1359436796-25135-1-git-send-email-anilkumar.v@ti.com>
+ <1359436796-25135-3-git-send-email-anilkumar.v@ti.com>
+Message-ID: <510781FF.7030400@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add minimal APIs for writing to the IPC and the M3_TXEV registers
-in the Control module. These will be used in a subsequent patch which
-adds suspend-resume support for AM33XX.
+Hello Kumar,
 
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-v2: No change
+On 29.01.2013 06:19, Kumar, Anil wrote:
+> Configure 16 bit data bus width for CS2(aemif) to use the norflash on
+> DA850.
+> 
+> Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
+> ---
+> :100644 100644 37c27af... 540e284... M	arch/arm/mach-davinci/da8xx-dt.c
+>  arch/arm/mach-davinci/da8xx-dt.c |   17 +++++++++++++++++
+>  1 files changed, 17 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> index 37c27af..540e284 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -38,12 +38,29 @@ static void __init da8xx_init_irq(void)
+>  }
+>  
+>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+> +#define DA8XX_AEMIF_CE2CFG_OFFSET       0x10
+> +#define DA8XX_AEMIF_ASIZE_16BIT         0x1
 
- arch/arm/mach-omap2/control.c | 20 ++++++++++++++++++++
- arch/arm/mach-omap2/control.h | 41 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+)
+Hmm... I am not really happy with such defines, because different
+boards need maybe different settings, and this should be catched
+by the device tree ...  Couldn't we add this infos in the
+device tree? I tried such an approach here:
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index 2adb268..c5d54ae 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -604,3 +604,23 @@ int omap3_ctrl_save_padconf(void)
- }
- 
- #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
-+
-+#if defined(CONFIG_SOC_AM33XX) && defined(CONFIG_PM)
-+void am33xx_txev_eoi(void)
-+{
-+	omap_ctrl_writel(AM33XX_M3_TXEV_ACK, AM33XX_CONTROL_M3_TXEV_EOI);
-+}
-+
-+void am33xx_txev_enable(void)
-+{
-+	omap_ctrl_writel(AM33XX_M3_TXEV_ENABLE, AM33XX_CONTROL_M3_TXEV_EOI);
-+}
-+
-+void am33xx_wkup_m3_ipc_cmd(struct am33xx_ipc_data *data)
-+{
-+	omap_ctrl_writel(data->resume_addr, AM33XX_CONTROL_IPC_MSG_REG0);
-+	omap_ctrl_writel(data->sleep_mode, AM33XX_CONTROL_IPC_MSG_REG1);
-+	omap_ctrl_writel(data->param1, AM33XX_CONTROL_IPC_MSG_REG2);
-+	omap_ctrl_writel(data->param2, AM33XX_CONTROL_IPC_MSG_REG3);
-+}
-+#endif /* CONFIG_SOC_AM33XX && CONFIG_PM */
-diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-index e6c3281..cb85f0a 100644
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -358,6 +358,37 @@
- #define AM33XX_CONTROL_STATUS_SYSBOOT1_WIDTH		0x2
- #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
- 
-+#define AM33XX_DDR_IO_CTRL		0x0E04
-+#define AM33XX_VTP0_CTRL_REG		0x0E0C
-+
-+/* AM33XX VTP0_CTRL_REG bits */
-+#define AM33XX_VTP_CTRL_START_EN	(1 << 0)
-+#define AM33XX_VTP_CTRL_LOCK_EN		(1 << 4)
-+#define AM33XX_VTP_CTRL_READY		(1 << 5)
-+#define AM33XX_VTP_CTRL_ENABLE		(1 << 6)
-+
-+/* AM33XX M3_TXEV_EOI register */
-+#define AM33XX_CONTROL_M3_TXEV_EOI	0x1324
-+
-+#define AM33XX_M3_TXEV_ACK		(0x1 << 0)
-+#define AM33XX_M3_TXEV_ENABLE		(0x0 << 0)
-+
-+/* AM33XX IPC message registers */
-+#define AM33XX_CONTROL_IPC_MSG_REG0	0x1328
-+#define AM33XX_CONTROL_IPC_MSG_REG1	0x132C
-+#define AM33XX_CONTROL_IPC_MSG_REG2	0x1330
-+#define AM33XX_CONTROL_IPC_MSG_REG3	0x1334
-+#define AM33XX_CONTROL_IPC_MSG_REG4	0x1338
-+#define AM33XX_CONTROL_IPC_MSG_REG5	0x133C
-+#define AM33XX_CONTROL_IPC_MSG_REG6	0x1340
-+#define AM33XX_CONTROL_IPC_MSG_REG7	0x1344
-+
-+#define AM33XX_DDR_CMD0_IOCTRL		0x1404
-+#define AM33XX_DDR_CMD1_IOCTRL		0x1408
-+#define AM33XX_DDR_CMD2_IOCTRL		0x140C
-+#define AM33XX_DDR_DATA0_IOCTRL		0x1440
-+#define AM33XX_DDR_DATA1_IOCTRL		0x1444
-+
- /* CONTROL OMAP STATUS register to identify OMAP3 features */
- #define OMAP3_CONTROL_OMAP_STATUS	0x044c
- 
-@@ -417,6 +448,16 @@ extern void omap3630_ctrl_disable_rta(void);
- extern int omap3_ctrl_save_padconf(void);
- extern void omap2_set_globals_control(void __iomem *ctrl,
- 				      void __iomem *ctrl_pad);
-+struct am33xx_ipc_data {
-+	u32 resume_addr;
-+	u32 param1;
-+	u32 param2;
-+	u32 sleep_mode;
-+};
-+extern void am33xx_wkup_m3_ipc_cmd(struct am33xx_ipc_data *data);
-+extern void am33xx_txev_eoi(void);
-+extern void am33xx_txev_enable(void);
-+
- #else
- #define omap_ctrl_base_get()		0
- #define omap_ctrl_readb(x)		0
+First post and some discussion:
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2011-December/010030.html
+
+Nori suggested here
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2011-December/011330.html
+to move such an driver out of arch/arm and IIRC it was
+suggested to move it into the mfd framework. I currently
+not know, if there was such a sort of patches, to get this
+in the mfd subsystem, but I think, this CS settings should be
+done like the pinmux settings ...
+
+My last posted version of this patch:
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-March/013036.html
+
+Maybe it is worth to discuss this again?
+
+> +
+> +static void __init da8xx_init_nor(void)
+> +{
+> +	void __iomem *aemif_addr;
+> +
+> +	aemif_addr = ioremap(DA8XX_AEMIF_CTL_BASE, SZ_32K);
+> +
+> +	/* Configure data bus width of CS2 to 16 bit */
+> +	writel(readl(aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET) |
+> +			DA8XX_AEMIF_ASIZE_16BIT,
+> +			aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET);
+
+I vote for avoiding such board specific code in a generic
+approach ...
+
+> +
+> +	iounmap(aemif_addr);
+> +}
+>  
+>  static void __init da850_init_machine(void)
+>  {
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  
+>  	da8xx_uart_clk_enable();
+> +	da8xx_init_nor();
+>  }
+>  
+>  static const char *da850_boards_compat[] __initdata = {
+> 
+
+bye,
+Heiko
 -- 
-1.8.1
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
