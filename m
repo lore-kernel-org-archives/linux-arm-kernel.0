@@ -1,101 +1,41 @@
-From: namhyung@kernel.org (Namhyung Kim)
-Date: Tue, 29 Jan 2013 20:12:37 +0900
-Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <5100B8CC.4080406@linux.vnet.ibm.com> (Srivatsa S. Bhat's message
- of "Thu, 24 Jan 2013 10:00:04 +0530")
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
- <20130123185522.GG2373@mtj.dyndns.org>
- <51003B20.2060506@linux.vnet.ibm.com>
- <20130123195740.GI2373@mtj.dyndns.org>
- <5100B8CC.4080406@linux.vnet.ibm.com>
-Message-ID: <87ip6gutsq.fsf@sejong.aot.lge.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 29 Jan 2013 13:14:24 +0200
+Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <CAKohpokZfQZ17PmQjS2ntN9js7=SxNkiwWpX2aD8cZcM9L0ydw@mail.gmail.com>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <1359410300-26113-2-git-send-email-arnd@arndb.de>
+ <CAKohpomO6tYNYLdMOaJYgqGecXj5KMQprdb=gExi+QuGrtLTzw@mail.gmail.com>
+ <201301291035.30265.arnd@arndb.de>
+ <CAKohpo=rD9=dEaPkKYcj55K4_ebdnU7qjv2TZBUwqHAB+Kk+aw@mail.gmail.com>
+ <1359456886.31148.37.camel@smile>
+ <CAKohpokZfQZ17PmQjS2ntN9js7=SxNkiwWpX2aD8cZcM9L0ydw@mail.gmail.com>
+Message-ID: <1359458064.31148.38.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Jan 2013 10:00:04 +0530, Srivatsa S. Bhat wrote:
-> On 01/24/2013 01:27 AM, Tejun Heo wrote:
->> On Thu, Jan 24, 2013 at 01:03:52AM +0530, Srivatsa S. Bhat wrote:
->>> CPU 0                          CPU 1
->>>
->>> read_lock(&rwlock)
->>>
->>>                               write_lock(&rwlock) //spins, because CPU 0
->>>                               //has acquired the lock for read
->>>
->>> read_lock(&rwlock)
->>>    ^^^^^
->>> What happens here? Does CPU 0 start spinning (and hence deadlock) or will
->>> it continue realizing that it already holds the rwlock for read?
->> 
->> I don't think rwlock allows nesting write lock inside read lock.
->> read_lock(); write_lock() will always deadlock.
->> 
->
-> Sure, I understand that :-) My question was, what happens when *two* CPUs
-> are involved, as in, the read_lock() is invoked only on CPU 0 whereas the
-> write_lock() is invoked on CPU 1.
->
-> For example, the same scenario shown above, but with slightly different
-> timing, will NOT result in a deadlock:
->
-> Scenario 2:
->   CPU 0                                CPU 1
->
-> read_lock(&rwlock)
->
->
-> read_lock(&rwlock) //doesn't spin
->
->                                     write_lock(&rwlock) //spins, because CPU 0
->                                     //has acquired the lock for read
->
->
-> So I was wondering whether the "fairness" logic of rwlocks would cause
-> the second read_lock() to spin (in the first scenario shown above) because
-> a writer is already waiting (and hence new readers should spin) and thus
-> cause a deadlock.
+On Tue, 2013-01-29 at 16:27 +0530, Viresh Kumar wrote: 
+> On 29 January 2013 16:24, Andy Shevchenko
+> <andriy.shevchenko@linux.intel.com> wrote:
+> > On Tue, 2013-01-29 at 16:19 +0530, Viresh Kumar wrote:
+> >> if (DMA_TO_DEV)
+> >>        // dest is periph
+> >>        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 11;
+> >> else if (DEV_TO_DMA)
+> >>        // src is periph
+> >>        fargs.cfg_hi = be32_to_cpup(dma_spec->args+0) << 7;
+> >
+> > We have macros for such shifts.
+> >
+> > drivers/dma/dw_dmac.c:187:   cfghi = DWC_CFGH_DST_PER(...
+> > drivers/dma/dw_dmac.c:189:   cfghi = DWC_CFGH_SRC_PER(...
+> 
+> I am getting older now, bad memory :)
+> I grepped into drivers/dma/dw_dmac_regs.h and left include/linux/dw_dmac.h :(
 
-In my understanding, current x86 rwlock does basically this (of course,
-in an atomic fashion):
+Moreover the excerpt I showed from dw_dmac.c is the same piece of code
+you wrote above as a sample.
 
 
-#define RW_LOCK_BIAS 0x10000
-
-rwlock_init(rwlock)
-{
-	rwlock->lock = RW_LOCK_BIAS;
-}
-
-arch_read_lock(rwlock)
-{
-retry:
-	if (--rwlock->lock >= 0)
-		return;
-
-        rwlock->lock++;
-        while (rwlock->lock < 1)
-        	continue;
-
-        goto retry;
-}
-
-arch_write_lock(rwlock)
-{
-retry:
-	if ((rwlock->lock -= RW_LOCK_BIAS) == 0)
-        	return;
-
-        rwlock->lock += RW_LOCK_BIAS;
-	while (rwlock->lock != RW_LOCK_BIAS)
-		continue;
-
-        goto retry;
-}
-
-
-So I can't find where the 'fairness' logic comes from..
-
-Thanks,
-Namhyung
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
