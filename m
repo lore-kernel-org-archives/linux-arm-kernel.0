@@ -1,51 +1,75 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jan 2013 15:38:22 -0800
-Subject: [GIT PULL] vexpress: drivers for v3.9
-In-Reply-To: <1359484450.8090.27.camel@hornet>
-References: <1359484450.8090.27.camel@hornet>
-Message-ID: <CAOesGMinJef-9OsKi0LGB0W6i73sgyUqhm2Mie4gyC2JLjnd1Q@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 29 Jan 2013 17:38:42 -0600
+Subject: [RFC PATCH 0/2] ARM: update cpuinfo to print CPU model name
+In-Reply-To: <CAB=otbSV6CH4WOrr577bHXFcjEVRGjZxatgy4CJ3cr0M0h4vfw@mail.gmail.com>
+References: <1359474865-15408-1-git-send-email-ruslan.bilovol@ti.com>
+ <20130129160243.GA3389@kahuna>
+ <CAB=otbSV6CH4WOrr577bHXFcjEVRGjZxatgy4CJ3cr0M0h4vfw@mail.gmail.com>
+Message-ID: <20130129233842.GA8024@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01:08-20130130, Ruslan Bilovol wrote:
+> Hi,
+> 
+> On Tue, Jan 29, 2013 at 6:02 PM, Nishanth Menon <nm@ti.com> wrote:
+> >
+> > On 17:54-20130129, Ruslan Bilovol wrote:
+> > > Hi,
+> > >
+> > > The following patches update cpuinfo to print CPU
+> > > model name for ARM. First patch exactly makes needed
+> > > changes for ARM architecture.
+> > > Second patch adds this ability to OMAP4 SoCs.
+> > >
+> > > This adds a common approach to show SoC name.
+> > >
+> > > Looks like there were few attempts to do similar
+> > > changes to cpuinfo without any luck.
+> > >
+> > > So - comments are welcome
+> > >
+> > > Ruslan Bilovol (2):
+> > >   ARM: kernel: update cpuinfo to print CPU model name
+> > >   ARM: OMAP4: setup CPU model name during ID initialisation
+> >
+> > We had an discussion on similar lines but a generic suggestion:
+> > https://patchwork.kernel.org/patch/98720/
+> > SoCinfo framework which was supposed to introduce this
+> >
+> > Would'nt that be a better approach to take than an OMAP only solution?
+> 
+> My goal is only to say what is the SoC model name in the /proc/cpuinfo
+> (And it is not an OMAP-only solution - it is common. Support for OMAP
+> is added in second patch)
+> This is the only type of information that we can apply for any SoC.
+> My point is - any SoC-specific information should go through some other
+> way - like SoCinfo framework mentioned by you.
+> And additional point - in cpuinfo we already have CPU name and Machine name.
+> The SoC name (that is something between these two things) looks also relevant
+Looking at the sample output in patch #1/2
+OMAP4470 ES1.0 HS
 
+OMAP4470 is SoC name
+ES1.0 is SoC revision
+HS is SoC type
 
-On Tue, Jan 29, 2013 at 10:34 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> Hi Arnd, Olof,
->
-> The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
->
->   Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
->
-> are available in the git repository at:
->
->   git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/drivers-for-3.9
->
-> for you to fetch changes up to d299d4b5c95d37df0a8964930a3586f8d3cdb4ef:
->
->   arm: Move sp810.h to include/linux/amba/ (2013-01-29 18:13:24 +0000)
->
-> ----------------------------------------------------------------
-> Versatile Express related driver updates for 3.9:
-> * Move sp810 header to a more generic location,
->   mainly to share it with arm64
-> * Add pseudo-GPIO lines (and equivalent gpio LED definitions)
->   to control LEDs on vexpress motherboard.
->
-> ----------------------------------------------------------------
-> Catalin Marinas (1):
->       arm: Move sp810.h to include/linux/amba/
->
-> Pawel Moll (1):
->       mfd: vexpress: Add pseudo-GPIO based LEDs
+We even have SoC features (e.g. at boot NEON etc..)
 
-I can't find record of this patch ever having been posted (under that
-subject at least) on any list I am on, including linux-arm-kernel and
-linux-kernel.
+Is the intent to put all this inside /proc/cpuinfo?? I bet every SoC has
+it's own interesting data it'd like to have (like some of the info
+populated by DT even). I am hardpressed to think this fits inside
+/proc/cpuinfo. I might even suspect that the list of interesting
+information might even vary per SoC.
 
-You should at least post it to those lists, and cc the MFD maintainer.
-And you should get his ack if you are going to merge this patch
-through arm-soc instead of through his tree.
+having machine name is something ARM specific? dumping it on my linux
+machines (x86[1] and sparc[2]) dont seem to show that.
 
+but in the interest of not breaking existing interfaces, new interfaces
+should potentially belong elsewhere.. my 2 cents.
 
--Olof
+[1] http://pastebin.com/CF8HPDAC (Xubuntu 12.04 3.2.0-36)
+[2] http://pastebin.com/qNwWHwiu (Debian 3.2.35-2)
+-- 
+Regards,
+Nishanth Menon
