@@ -1,35 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jan 2013 11:33:25 +0000
-Subject: [PATCH v1 1/5] ARM: cache-l2x0: add 'smc' identifier
-In-Reply-To: <20130129101328.GA11878@bnru10>
-References: <20130129101328.GA11878@bnru10>
-Message-ID: <20130129113325.GG2637@n2100.arm.linux.org.uk>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 29 Jan 2013 19:34:09 +0800
+Subject: [PATCH] ARM:common: setting saved_state to NULL after kfree
+In-Reply-To: <20130129111526.GQ23505@n2100.arm.linux.org.uk>
+References: <5107AE6F.3080206@asianux.com>
+ <20130129111526.GQ23505@n2100.arm.linux.org.uk>
+Message-ID: <5107B3B1.1030406@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 03:43:31PM +0530, srinidhi kasagar wrote:
-> Add 'smc' (Secure Monitor Call) identifier to differentiates
-> the platforms which implements this.
+? 2013?01?29? 19:15, Russell King - ARM Linux ??:
+> On Tue, Jan 29, 2013 at 07:11:43PM +0800, Chen Gang wrote:
+>> >   need set NULL before return, just like function sa1111_remove has done.
+>> >   and better to use sa1111_remove directly, instead of current implementation.
+> NAK.
+> 
+> 1. __sa1111_remove() will kfree sachip, so the value of sachip->saved_state
+>    at this point is meaningless.
 
-This patch makes no sense.
+  yes, just like what you said. it is not a bug
+    (it seems not necessary to set saved_state to NULL in sa1111_remove, either).
 
-So, if setting 'smc' in the DT description is supposed to mean that
-the platform has a secure monitor then...
+  I think, this patch can make the source code simpler and clearer.
+  so I still suggest to apply it (although it seems a minor patch).
 
-> +	is_smc = of_property_read_bool(np, "smc");
-> +
-> +	if (is_smc) {
-> +		/* set the debug interface */
-> +		outer_cache.set_debug = pl310_set_debug;
-> +	}
 
-Now, let's look at what pl310_set_debug() does:
+> 2. I don't think you tried to build with your patch in place.
+> 
+> 
+  it is my fault, just like what you said, I did not try to build.
+  and I should try now.
 
-static void pl310_set_debug(unsigned long val)
-{
-        writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
-}
+  thanks.
 
-Can you explain where the secure monitor call is there please, because
-I can't see one.  In fact, this is the function used when there _isn't_
-a secure monitor.  So this patch just seems totally wrong to me.
+-- 
+Chen Gang
+
+Asianux Corporation
