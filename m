@@ -1,43 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jan 2013 09:11:38 -0800
-Subject: [GIT PULL v2] Renesas ARM-based SoC for v3.9
-In-Reply-To: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
-References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130129171138.GE16188@quad.lixom.net>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 29 Jan 2013 18:16:02 +0100
+Subject: [PATCH, RFC] usb: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <510802C3.7090803@wwwdotorg.org>
+References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
+ <510802C3.7090803@wwwdotorg.org>
+Message-ID: <510803D2.4080603@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 12:55:18PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+On 01/29/2013 06:11 PM, Stephen Warren wrote:
+> On 01/29/2013 04:22 AM, Sascha Hauer wrote:
+>> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>>
+>> This adds two little devicetree helper functions for determining the
+>> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
+>> the devicetree.
+>>
+>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>> ---
+>>
+>> The properties and their values have been taken from the fsl-mph-dr driver.
+>> This binding is also documented (though currently not used) for the tegra
+>> ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
+>> This is a first attempt to parse these bindings at a common place so that
+>> others can make use of it.
+>>
+>> Basically I want to know whether this binding is recommended for new drivers
+>> since normally the devicetree uses '-' instead of '_', and maybe there are
+>> other problems with it.
 > 
-> please consider the following soc enhancements for 3.9.
+> It's certainly typical to use - not _ for freshly defined properties.
+> However, since this property already exists and is in-use, I don't think
+> there's any choice but to maintain its current definition.
 > 
-> This series is based on a merge of the irqchip/gic-vic-move and
-> timer/cleanup branches in the arm-soc tree. There were a number of
-> conflicts in this merge, as indicated by the merge commit
-> 6265b0f325eed54558b35769aecb1d79423295c7. In each case I took care to
-> match the merge made in the arm-soc tree which is evident in the for-next
-> branch.
-> 
-> ----------------------------------------------------------------
-> The following changes since commit 6265b0f325eed54558b35769aecb1d79423295c7:
-> 
->   Merge remote-tracking branches 'arm-soc/irqchip/gic-vic-move' and 'arm-soc/timer/cleanup' into soc (2013-01-24 17:57:20 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
-> 
+> The code looked fine to me.
 
-Merged, thanks. You had resolved the board_bcm conflict slightly differenlty
-(technically better), but to keep it common with what we have, I added back
-the extra line of whitespace.
+The code for phy_type is lifted from the ethernet guys and adopted to
+the usb phy types.
 
-By the way, you should look into starting to use signed tags for your pull
-requests, since it gives you a place to give a short description of the branch
-(and that description makes it into the commit with 0 work on our behalf :)
+"dr_mode" is, as Sascha pointed out, only used in
+drivers/usb/host/fsl-mph-dr-of.c
 
+Marc
 
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
--Olof
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/4bde3299/attachment-0001.sig>
