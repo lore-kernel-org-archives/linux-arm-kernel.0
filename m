@@ -1,46 +1,44 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 29 Jan 2013 12:31:13 +0100
-Subject: [RFC] ARM: dma-mapping: Return 0 if no ->set_dma_mask()
-In-Reply-To: <20130128.103320.355771370936761237.hdoyu@nvidia.com>
-References: <20130128.103320.355771370936761237.hdoyu@nvidia.com>
-Message-ID: <5107B301.2060802@samsung.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Tue, 29 Jan 2013 11:32:09 +0000
+Subject: [PATCH v3 0/9] ARM: OMAP2+: AM33XX: Misc fixes/updates
+In-Reply-To: <5107B208.80005@ti.com>
+References: <1359458108-8489-1-git-send-email-vaibhav.bedia@ti.com>
+ <5107B208.80005@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED01FC6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jan 29, 2013 at 16:57:04, Shilimkar, Santosh wrote:
+> Vaibhav,
+> 
+> On Tuesday 29 January 2013 04:44 PM, Vaibhav Bedia wrote:
+> > Hi,
+> >
+> > The following patches were earlier posted as part the AM33XX
+> > suspend-resume support series [1]. Based on the suggestion
+> > from Santosh Shilimkar <santosh.shilimkar@ti.com> i have split
+> > out the changes which update the various data files related
+> > to AM33XX support.
+> >
+> > These patches apply on top of v3.8-rc5
+> >
+> > v1->v2: Address the comments received from Sergei Shtylyov
+> > and Peter Korsgaard.
+> >
+> > v2->v3: Address an additional comment from Peter Korgaard
+> > and add his Acked-by to the patches
+> >
+> Just a suggestion here...
+> 
+> I saw v2 of $subject series just today morning and in just
+> few hours, I see v3 as well. You should at least let v2 settle
+> down for a while :-)
+> Collecting tags and minor update can always be done once you
+> gather sufficient comments to warrant a re-spin.
+> 
 
-On 1/28/2013 9:33 AM, Hiroshi Doyu wrote:
-> struct dma_map_ops iommu_ops doesn't have ->set_dma_mask, which causes
-> crash when dma_set_mask() is called from some driver.
+OK. v1 has been in the wild for more than 10 days without any
+more comments so I went aggressive on v3 :)
 
-I think that the issue is a bit different. It looks that iommu_ops lacks
-the mandatory set_dma_mask callback. arm_dma_set_mask() can be used for it,
-so please update your patch to add this missing callback.
-
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->   arch/arm/include/asm/dma-mapping.h |    6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index a58e0f5..95328bf 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -32,7 +32,11 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
->   
->   static inline int dma_set_mask(struct device *dev, u64 mask)
->   {
-> -	return get_dma_ops(dev)->set_dma_mask(dev, mask);
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
-> +
-> +	if (ops->set_dma_mask)
-> +		return ops->set_dma_mask(dev, mask);
-> +	return 0;
->   }
->   
->   #ifdef __arch_page_to_dma
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Regards,
+Vaibhav
