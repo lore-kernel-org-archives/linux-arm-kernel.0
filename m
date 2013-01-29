@@ -1,42 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jan 2013 13:13:03 +0000
-Subject: [PATCH 2/5] spi: pl022: use generic DMA slave configuration if
- possible
-In-Reply-To: <1359445794.31148.34.camel@smile>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <1359410300-26113-3-git-send-email-arnd@arndb.de>
- <1359445794.31148.34.camel@smile>
-Message-ID: <201301291313.03511.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Jan 2013 13:12:45 +0000
+Subject: Section mismatch in drivers/mfd/vexpress-sysreg.c
+In-Reply-To: <1359464711.8090.19.camel@hornet>
+References: <20130129115535.GH21504@S2101-09.ap.freescale.net>
+ <1359464711.8090.19.camel@hornet>
+Message-ID: <20130129131244.GU23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013, Andy Shevchenko wrote:
-
-> > +static int pl022_dma_autoprobe(struct pl022 *pl022)
-> > +{
-> > +	struct device *dev = &pl022->adev->dev;
-> > +
-> > +	/* automatically configure DMA channels from platform, normally using DT */
-> > +	pl022->dma_rx_channel = dma_request_slave_channel(dev, "rx");
-> > +	if (!pl022->dma_rx_channel)
-> > +		goto err_no_rxchan;
-> > +
-> > +	pl022->dma_tx_channel = dma_request_slave_channel(dev, "tx");
-> > +	if (!pl022->dma_tx_channel)
-> > +		goto err_no_txchan;
-> > +
-> > +	pl022->dummypage = kmalloc(PAGE_SIZE, GFP_KERNEL);
+On Tue, Jan 29, 2013 at 01:05:11PM +0000, Pawel Moll wrote:
+> On Tue, 2013-01-29 at 11:55 +0000, Shawn Guo wrote:
+> > I'm building v3.8-rc5 and seeing the following section mismatch warning
+> > in drivers/mfd/vexpress-sysreg.c.
+> > 
+> > WARNING: drivers/mfd/built-in.o(.text+0x3108): Section mismatch in reference from the function vexpress_sysreg_probe() to the function .init.text:vexpress_sysreg_setup()
+> > The function vexpress_sysreg_probe() references
+> > the function __init vexpress_sysreg_setup().
+> > This is often because vexpress_sysreg_probe lacks a __init
+> > annotation or the annotation of vexpress_sysreg_setup is wrong.
 > 
-> Where this memory will be freed?
-> In dependence of the answer could you consider to use
-> devm_kmalloc or __get_free_page?
+> Arnd's got a fix for this already:
+> 
+> https://patchwork.kernel.org/patch/2046991/
 
-There is another function like this called pl022_dma_probe()
-that has the same allocation, and it gets freed in the same place.
+Adding arm-soc people...
 
-It's probably worth changing this into something different, but
-I felt that it didn't belong into this patch. I was also not
-sure if the best option would be dmam_alloc_coherent, dev_kzalloc,
-or __get_free_page.
-
-	Arnd
+Which wasn't in yesterday's arm-soc though, as highlighted by last night's
+autobuild (the build tree was created at 9:28am yesterday, which'll be
+just after my arm-soc pull).
