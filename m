@@ -1,68 +1,125 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 29 Jan 2013 15:27:43 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
- <20130129184157.GA29274@obsidianresearch.com>
- <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
- <20130129191853.GB29274@obsidianresearch.com>
- <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
-Message-ID: <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 29 Jan 2013 22:35:32 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: first set of clock and device integration
+ cleanups for 3.9
+Message-ID: <alpine.DEB.2.00.1301292234440.11442@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 12:38 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Tue, Jan 29, 2013 at 12:18 PM, Jason Gunthorpe
-> <jgunthorpe@obsidianresearch.com> wrote:
->> On Tue, Jan 29, 2013 at 12:07:00PM -0700, Bjorn Helgaas wrote:
->>> > So when I say set aside, I mean for instance, the PCI-E entry in DT
->>> > has 128M of physical address space marked for PCI MMIO use. The kernel
->>> > does PCI resource allocation and the HW decoders in each link will be
->>> > set to claim some portion of the 128M - based on the MMIO windows
->>> > programmed on the PCI-PCI root port bridges. The reamining part of the
->>> > 128M is dead address space, not claimed by any hardware block at all.
->>>
->>> Thanks, this really helps get to the issue that the PCI core will care
->>> about.  The root ports look like normal bridges, so the core assumes
->>> it can manage their windows as needed, as long as the windows stay
->>> inside the host bridge apertures that are logically upstream from the
->>> root ports.
->>
->> Yes, that is basically correct. This is what the PCI-E specification
->> says the root complex/root port should look like and this is what some
->> SOC hardware implements fully in hardware. The small wrinkle with
->> Marvell is that the PCI-PCI bridge config space is created by the
->> driver since the HW does not expose a standard config space.
->
-> Oh, so the actual *root port* itself doesn't conform to the spec?
-> Wow, that's worse than I expected.
->
-> Then I guess you have emulate it and make sure its config space is
-> complete enough and functional enough so that all the link management,
-> power management, AER, etc., code in the core works as well as it
-> would with a conforming device.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-I'm not sure the existing emulation in these patches is sufficient.
-For example, pci_sw_pci_bridge_write() updates bridge->membase when we
-write to the window register, but I don't see anything that updates
-the actual hardware decoder.  That might be done in
-mvebu_pcie_window_config_port() via armada_370_xp_alloc_pcie_window(),
-but that looks like it's only done once.  If the PCI core updates a
-root port window later, I don't see where the hardware decoder will be
-updated.
+Hi Tony,
 
-Maybe you're counting on the window assignments to be static?  The PCI
-core doesn't guarantee anything like that, though in the absence of
-hotplug I don't know any reason why it would change things.
+The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
 
-I also forgot about the bus number munging in mvebu_pcie_rd_conf().
-The PCI core can update the bridge secondary/subordinate registers.
-It looks like you don't support writing to them, and the read path
-(pci_sw_pci_bridge_read()) looks like it doesn't do any translation
-between the hardware and Linux bus numbers.  I don't understand the
-system well enough to know if this is an issue.
+  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-a-for-3.9
+
+for you to fetch changes up to aff2f7d90fc6553aa309db2a635d8e5d70d84916:
+
+  ARM: OMAP2420: hwmod data/PM: use hwmod to block WFI when I2C active (2013-01-26 01:42:33 -0700)
+
+- ----------------------------------------------------------------
+Remove some dead OMAP clock and device integration code and data.
+Also, clean up the way that the OMAP device integration code blocks
+WFI/WFE to use a consistent mechanism, controlled by a data flag.
+
+Basic test logs for this branch are here:
+
+   http://www.pwsan.com/omap/testlogs/cleanup_a_3.9/20130126014242/
+
+- ----------------------------------------------------------------
+
+vmlinux object size
+(delta in bytes from test_v3.8-rc5 (949db153b6466c6f7cad5a427ecea94985927311)):
+   text     data      bss    total  kernel
+  -1502       +8        0    -1494  am33xx_only
+  -1574     -664        0    -2238  n800_multi_omap2xxx
+  -1574     -344        0    -1918  n800_only_a
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+  -5702    -6200        0   -11902  omap2plus_defconfig
+  -5586     -320        0    -5906  omap2plus_defconfig_2430sdp_only
+  -5706    -6208        0   -11914  omap2plus_defconfig_cpupm
+  -1546    -6200        0    -7746  omap2plus_defconfig_no_pm
+  -5670    -6200        0   -11870  omap2plus_defconfig_omap2_4_only
+ -13830    -5624        0   -19454  omap2plus_defconfig_omap3_4_only
+  -2164    -6216     +600    -7780  rmk_omap3430_ldp_allnoconfig
+  -1538      -64        0    -1602  rmk_omap3430_ldp_oldconfig
+  -2164    -6216     +600    -7780  rmk_omap4430_sdp_allnoconfig
+  -1526    -5640      -64    -7230  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.8-rc5 (949db153b6466c6f7cad5a427ecea94985927311))
+  avail  rsrvd   high  freed  board          kconfig
+    16k   -16k      .      .  2430sdp        omap2plus_defconfig
+    16k   -16k      .      .  3530es3beagle  omap2plus_defconfig
+    16k   -16k      .      .  3730beaglexm   omap2plus_defconfig
+    16k   -16k      .      .  37xxevm        omap2plus_defconfig
+    16k   -16k      .      .  4430es2panda   omap2plus_defconfig
+    16k   -16k      .      .  4460pandaes    omap2plus_defconfig
+    16k   -16k      .      .  cmt3517        omap2plus_defconfig
+
+Paul Walmsley (6):
+      ARM: OMAP2+: omap_device: remove obsolete pm_lats and early_device code
+      ARM: OMAP4: clock/hwmod data: start to remove some IP block control "clocks"
+      ARM: OMAP4: clock/hwmod data: remove MODULEMODE entries in mux + gate combos
+      ARM: OMAP2xxx: clock data: clean up unused null clocks
+      ARM: OMAP2+: hwmod: add support for blocking WFI when a device is active
+      ARM: OMAP2420: hwmod data/PM: use hwmod to block WFI when I2C active
+
+ arch/arm/mach-omap2/am35xx-emac.c          |    2 +-
+ arch/arm/mach-omap2/cclock2420_data.c      |   16 +-
+ arch/arm/mach-omap2/cclock2430_data.c      |   16 +-
+ arch/arm/mach-omap2/cclock44xx_data.c      |  578 ++++++----------------------
+ arch/arm/mach-omap2/devices.c              |   25 +-
+ arch/arm/mach-omap2/display.c              |    2 +-
+ arch/arm/mach-omap2/dma.c                  |    2 +-
+ arch/arm/mach-omap2/drm.c                  |    3 +-
+ arch/arm/mach-omap2/gpio.c                 |    3 +-
+ arch/arm/mach-omap2/gpmc.c                 |    2 +-
+ arch/arm/mach-omap2/hdq1w.c                |    2 +-
+ arch/arm/mach-omap2/hsmmc.c                |    2 +-
+ arch/arm/mach-omap2/hwspinlock.c           |    3 +-
+ arch/arm/mach-omap2/i2c.c                  |    3 +-
+ arch/arm/mach-omap2/mcbsp.c                |    2 +-
+ arch/arm/mach-omap2/msdi.c                 |    2 +-
+ arch/arm/mach-omap2/omap-iommu.c           |    3 +-
+ arch/arm/mach-omap2/omap_device.c          |  537 +++-----------------------
+ arch/arm/mach-omap2/omap_device.h          |   79 +---
+ arch/arm/mach-omap2/omap_hwmod.c           |    8 +
+ arch/arm/mach-omap2/omap_hwmod.h           |    9 +
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    7 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   99 +++--
+ arch/arm/mach-omap2/pm.c                   |    4 +-
+ arch/arm/mach-omap2/pm24xx.c               |   13 -
+ arch/arm/mach-omap2/pmu.c                  |    3 +-
+ arch/arm/mach-omap2/serial.c               |    3 +-
+ arch/arm/mach-omap2/sr_device.c            |    3 +-
+ arch/arm/mach-omap2/timer.c                |    3 +-
+ arch/arm/mach-omap2/usb-host.c             |   16 +-
+ arch/arm/mach-omap2/usb-musb.c             |    2 +-
+ arch/arm/mach-omap2/wd_timer.c             |    3 +-
+ 32 files changed, 292 insertions(+), 1163 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJRCE54AAoJEMePsQ0LvSpLMQkP/35hjU9fAf/6SZk8NUNffUaP
+nRGVW34v9wbsT8tkcEQzIRiGUGeQXqOk0wczHJEf0daxmkZgzIWr/hjU9z3kUnDf
+QIan3CU0YvfcQOXR9PYR7ZB2Zz2HFxySkUy99ioriWjSUE3ff0CdLNq/fB7TEeLc
+2D/ourAzRfqJdCs49tGK9qbLUVEtmLDbS5+dN1KmldunZ6bvhhNtuYs72RQ+kWN0
+9WkCmJYVNYS8dTg6uZi2rBSStfYJkUJ1IDjtnBe6815KiZ3q2G21KTJUrywqd324
+iASZ2cnUVzFsNdWNGBHMQvWW/SmlbP7F4pimlfyd8rDHUv0K3KZEW110AB8nMpAz
+XzvuseiA+OWteTa2GLrsQJg8/wx5yAYZBkgyia2Vp1o79nfgOZ54X5LsZcyuOS/w
+jALgJJi2zAsqjNWpmt7BCGlCOfRQOu1I67rN6K6JdO1j66Nnc8MfpV6npds2hsH5
+xArNIlj95q2frQwlC5tVvXGTpY0lJZmAz0R9eAMZ3PFF08VTSdmUCdgTK5SNUIWO
+2ITee1s9BxbJxJir7YKI8c/sW5FS/oeERn6p9nR0LUWX+9+raWdx/wcZfoRRSshe
+d2odyViDuHiUbE2zKK513Sikb1XNrE5A5kB+40M011BEv3DjSWXv6opbfNNsB1eF
+fCuBsikVIJ+PWykLJt1F
+=bbcC
+-----END PGP SIGNATURE-----
