@@ -1,38 +1,62 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 29 Jan 2013 19:34:09 +0800
-Subject: [PATCH] ARM:common: setting saved_state to NULL after kfree
-In-Reply-To: <20130129111526.GQ23505@n2100.arm.linux.org.uk>
-References: <5107AE6F.3080206@asianux.com>
- <20130129111526.GQ23505@n2100.arm.linux.org.uk>
-Message-ID: <5107B3B1.1030406@asianux.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Tue, 29 Jan 2013 17:08:53 +0530
+Subject: [PATCH v1 1/5] ARM: cache-l2x0: add 'smc' identifier
+In-Reply-To: <20130129113325.GG2637@n2100.arm.linux.org.uk>
+References: <20130129101328.GA11878@bnru10>
+ <20130129113325.GG2637@n2100.arm.linux.org.uk>
+Message-ID: <20130129113853.GA22145@bnru10>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?01?29? 19:15, Russell King - ARM Linux ??:
-> On Tue, Jan 29, 2013 at 07:11:43PM +0800, Chen Gang wrote:
->> >   need set NULL before return, just like function sa1111_remove has done.
->> >   and better to use sa1111_remove directly, instead of current implementation.
-> NAK.
+On Tue, Jan 29, 2013 at 12:33:25 +0100, Russell King - ARM Linux wrote:
+> On Tue, Jan 29, 2013 at 03:43:31PM +0530, srinidhi kasagar wrote:
+> > Add 'smc' (Secure Monitor Call) identifier to differentiates
+> > the platforms which implements this.
 > 
-> 1. __sa1111_remove() will kfree sachip, so the value of sachip->saved_state
->    at this point is meaningless.
-
-  yes, just like what you said. it is not a bug
-    (it seems not necessary to set saved_state to NULL in sa1111_remove, either).
-
-  I think, this patch can make the source code simpler and clearer.
-  so I still suggest to apply it (although it seems a minor patch).
-
-
-> 2. I don't think you tried to build with your patch in place.
+> This patch makes no sense.
 > 
+> So, if setting 'smc' in the DT description is supposed to mean that
+> the platform has a secure monitor then...
 > 
-  it is my fault, just like what you said, I did not try to build.
-  and I should try now.
+> > +	is_smc = of_property_read_bool(np, "smc");
+> > +
+> > +	if (is_smc) {
+> > +		/* set the debug interface */
+> > +		outer_cache.set_debug = pl310_set_debug;
+> > +	}
+> 
+> Now, let's look at what pl310_set_debug() does:
+> 
+> static void pl310_set_debug(unsigned long val)
+> {
+>         writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
+> }
+> 
+> Can you explain where the secure monitor call is there please, because
+> I can't see one.  In fact, this is the function used when there _isn't_
+> a secure monitor.  So this patch just seems totally wrong to me.
 
-  thanks.
+Today, one and only platform is omap. Please check below snapshot: 
 
--- 
-Chen Gang
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -51,6 +51,7 @@
+ 		reg = <0x48242000 0x1000>;
+ 		cache-unified;
+ 		cache-level = <2>;
++		smc;
+ 	};
 
-Asianux Corporation
+[...]
+
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -214,7 +214,7 @@ static int __init omap_l2_cache_init(void)
+ 	if (of_have_populated_dt())
+ 		l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
+ 	else
+-		l2x0_init(l2cache_base, aux_ctrl, L2X0_AUX_CTRL_MASK);
++		l2x0_init(l2cache_base, aux_ctrl, L2X0_AUX_CTRL_MASK, true);
+
+
+regards/srinidhi
