@@ -1,128 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Jan 2013 09:41:43 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <5106F9F9.3010905@wwwdotorg.org>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <5106F9F9.3010905@wwwdotorg.org>
-Message-ID: <20130129094143.1aad9377@skate>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Tue, 29 Jan 2013 09:43:13 +0100
+Subject: [PATCH 3/4] watchdog: add support for ux500_wdt watchdog
+In-Reply-To: <20130128211222.GA3338@spo001.leaseweb.com>
+References: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
+ <1358509214-22407-4-git-send-email-fabio.baltieri@linaro.org>
+ <20130128211222.GA3338@spo001.leaseweb.com>
+Message-ID: <20130129084313.GA20514@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen Warren,
+Hello Wim,
 
-On Mon, 28 Jan 2013 15:21:45 -0700, Stephen Warren wrote:
+thanks for the review!
 
-> > +Mandatory properties:
-> > +- compatible: must be "marvell,armada-370-xp-pcie"
-> > +- status: either "disabled" or "okay"
+On Mon, Jan 28, 2013 at 10:12:22PM +0100, Wim Van Sebroeck wrote:
+> > +static int timeout = WATCHDOG_TIMEOUT;
+> > +module_param(timeout, int, 0);
+> > +MODULE_PARM_DESC(timeout,
+> > +	"Watchdog timeout in seconds. default="
+> > +				__MODULE_STRING(WATCHDOG_TIMEOUT) ".");
 > 
-> status is a standard DT property; I certainly wouldn't expect its
-> presence to be mandatory (there's a defined default), nor would I expect
-> each device's binding to redefine this property.
+> We should go for unsigned int timeout values...
 
-Ok.
-
-> > +- marvell,pcie-port: the physical PCIe port number
-> 
-> Should the standardized cell-index property be used here instead? Or,
-> perhaps that property is deprecated/discouraged...
-
-The problem is that I need two identifiers, the pcie-port and
-pcie-lane, and it would be strange to have one referenced as
-cell-index, and the other one as marvell,pcie-lane, no? Unless of
-course we can put two numbers in the cell-index property, but a quick
-grep in Documentation/devicetree/bindings/ seems to indicate that all
-users of cell-index use it with a single identifier.
-
-Just tell me what to do here, I don't have a strong opinion on this.
-
-> > diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-> 
-> > +obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
-> > +ccflags-$(CONFIG_PCI_MVEBU) += \
-> > +	-I$(srctree)/arch/arm/plat-orion/include \
-> > +	-I$(srctree)/arch/arm/mach-mvebu/include
-> 
-> That seems a little dangerous w.r.t. multi-platform zImage. Can the
-> required headers be moved out to somewhere more public to avoid this?
-
-Why is this dangerous for multi-platform zImage? For this specific
-driver only, some SoC-specific headers are used. I don't think it
-prevents another PCI driver (such as the Tegra one) from being built
-into the same kernel image, no?
-
-Also, this is kind of a temporary solution, because I can't fix all the
-problems in just the PCI patch series without making it horribly large.
-The reason why we need those include paths at the moment are:
-
- * For plat-orion/include, because of pcie.h that provides functions
-   common to all Marvell SoCs regarding PCI. Ultimately, all the
-   Marvell SoCs that use this common code should be migrated over to
-   the DT-capable PCI driver that is submitted through this patch
-   series. This will take a bit of time, and is too complex to do in
-   one shot, together with the introduction of the driver itself. So
-   ultimately, all the code in plat-orion/pcie.c will migrate into
-   drivers/pci/host/pci-mvebu.c, and this
-   plat-orion/include/plat/pcie.h file should disappear, removing the
-   need for this special header path.
-
- * For mach-mvebu/include, because of the addr-map.h header that
-   provides functions related to address decoding windows. This is also
-   likely to evolve quite significantly when we'll make the PCI driver
-   being used by the other Marvell SoC families (Kirkwood, Dove,
-   Orion5x), and when this work is done, we can think of having a
-   public header in include/linux that exposes the address decoding
-   APIs, once it has stabilized a bit across the different Marvell SoC
-   families.
-
-So, the bottom line is: yes I know those include paths are not nice,
-but I don't think they prevent multiplatform builds, and they are a
-temporary solution until we convert more Marvell SoC families to this
-new PCI driver.
-
-> > +/*
-> > + * Those are the product IDs used for the emulated PCI Host bridge and
-> > + * emulated PCI-to-PCI bridges. They are temporary until we get
-> > + * official IDs assigned.
-> > + */
-> > +#define MARVELL_EMULATED_HOST_BRIDGE_ID    4141
-> > +#define MARVELL_EMULATED_PCI_PCI_BRIDGE_ID 4242
-> 
-> I assume that means we can't merge this driver yet. The cover letter
-> mentioned a desire to merge this for 3.9; there's not much time to get
-> official IDs assigned, then.
-
-I am working on getting real IDs assigned. For now, I'd like to work on
-getting all other issues fixed, and have this only problem remaining.
+You're right!  This ends up in an unsigned on the rest of the code
+anyway and I see other drivers using it as unsigned so I'll change it in
+v2 (here and in ux500_wdt_data).
 
 > 
-> > +static int mvebu_pcie_init(void)
-> > +{
-> > +	return platform_driver_probe(&mvebu_pcie_driver,
-> > +				     mvebu_pcie_probe);
-> > +}
-> > +
-> > +subsys_initcall(mvebu_pcie_init);
+> > +static int nowayout = WATCHDOG_NOWAYOUT;
+> > +module_param(nowayout, int, 0);
+> > +MODULE_PARM_DESC(nowayout,
+> > +	"Watchdog cannot be stopped once started (default="
+> > +				__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
 > 
-> Why isn't that just platform_driver_register()?
+> nowayout is a boolean value so please change this to
+> static bool nowayout = WATCHDOG_NOWAYOUT;
 
-I didn't test recently, but with my first version of the patch set,
-having an initialization as late as module_init() was too late. Some
-PCI fixup code was being executed *before* we get the opportunity of
-initializing the PCI driver, and it was crashing the kernel. I can
-provide more details if you want.
+Right.
 
-> > +MODULE_LICENSE("GPL");
-> 
-> "GPL v2".
+> The rest is OK by me. So if bowayout get's fixed then you have my acked-by.
 
-Sure.
+Ok, I'll send a v2 of this patch soon with both parameters fixed for you
+to ack.
 
-Thomas
+Thanks!
+Fabio
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Fabio Baltieri
