@@ -1,57 +1,38 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Jan 2013 17:01:31 +0100
-Subject: [PATCH 5/5] mv643xx_eth: convert to use the Marvell Orion MDIO
- driver
-In-Reply-To: <1359473048-26551-6-git-send-email-florian@openwrt.org>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1359473048-26551-6-git-send-email-florian@openwrt.org>
-Message-ID: <20130129170131.7964a110@skate>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 29 Jan 2013 10:02:44 -0600
+Subject: [RFC PATCH 0/2] ARM: update cpuinfo to print CPU model name
+In-Reply-To: <1359474865-15408-1-git-send-email-ruslan.bilovol@ti.com>
+References: <1359474865-15408-1-git-send-email-ruslan.bilovol@ti.com>
+Message-ID: <20130129160243.GA3389@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Florian Fainelli,
-
-On Tue, 29 Jan 2013 16:24:08 +0100, Florian Fainelli wrote:
-> This patch converts the Marvell MV643XX ethernet driver to use the
-> Marvell Orion MDIO driver. As a result, PowerPC and ARM platforms
-> registering the Marvell MV643XX ethernet driver are also updated to
-> register a Marvell Orion MDIO driver. This driver voluntarily overlaps
-> with the Marvell Ethernet shared registers because it will use a subset
-> of this shared register (shared_base + 0x4 - shared_base + 0x84). The
-> Ethernet driver is also updated to look up for a PHY device using the
-> Orion MDIO bus driver.
+On 17:54-20130129, Ruslan Bilovol wrote:
+> Hi,
 > 
-> Signed-off-by: Florian Fainelli <florian@openwrt.org>
-> ---
->  arch/arm/plat-orion/common.c               |   84 +++++++++++--
+> The following patches update cpuinfo to print CPU
+> model name for ARM. First patch exactly makes needed
+> changes for ARM architecture.
+> Second patch adds this ability to OMAP4 SoCs.
+> 
+> This adds a common approach to show SoC name.
+> 
+> Looks like there were few attempts to do similar
+> changes to cpuinfo without any luck.
+> 
+> So - comments are welcome
+> 
+> Ruslan Bilovol (2):
+>   ARM: kernel: update cpuinfo to print CPU model name
+>   ARM: OMAP4: setup CPU model name during ID initialisation
 
-In this file, there was one "MV643XX_ETH_SHARED_NAME" platform_device
-registered for each network interface. Why? If the driver is shared,
-isn't the whole idea to register it only once?
+We had an discussion on similar lines but a generic suggestion:
+https://patchwork.kernel.org/patch/98720/
+SoCinfo framework which was supposed to introduce this
 
-In any case, one of the idea of separating the mvmdio driver from the
-mvneta driver in the first place is that there should be only one
-instance of the mvmdio device, even if there are multiple network
-interfaces. The reason is that from a HW point of the view, the MDIO
-unit is shared between the network interfaces. If you look at
-armada-370-xp.dtsi, there is only one mvmdio device registered, and two
-network interfaces (using the mvneta driver) that are registered (and
-actually up to four network interfaces can exist, they are added by
-some other .dtsi files depending on the specific SoC).
+Would'nt that be a better approach to take than an OMAP only solution?
 
-So I don't think there should be one instance of the mvmdio per network
-interface.
-
-Also, I am wondering what's left in this MV643XX_ETH_SHARED_NAME driver
-once the MDIO stuff has been pulled out in a separate driver? I think
-the whole point of this work should be to get rid of this
-MV643XX_ETH_SHARED_NAME driver, no?
-
-Thanks,
-
-Thomas
+Ccying eduardo who had driven this for some time.
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Nishanth Menon
