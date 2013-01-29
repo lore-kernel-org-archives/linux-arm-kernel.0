@@ -1,41 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Jan 2013 23:42:19 -0700
-Subject: [GIT PULL 1/4] ARM: bcm2835: cleanup
-Message-ID: <1359441742-32647-1-git-send-email-swarren@wwwdotorg.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 29 Jan 2013 12:13:46 +0530
+Subject: One of these things (CONFIG_HZ) is not like the others..
+In-Reply-To: <5107114C.4070307@linaro.org>
+References: <CAKGA1bkiowcO7OPSfPmaB6eRj_3FNr+4ONnaQHEZkpxB2XfduQ@mail.gmail.com>
+ <20130121232322.GK15361@atomide.com> <50FE307F.9000701@ti.com>
+ <201301220931.24570.arnd@arndb.de> <50FE666B.10902@ti.com>
+ <20130122145113.GK23505@n2100.arm.linux.org.uk> <50FEAABA.6050307@ti.com>
+ <510615F8.7010203@ti.com> <5107114C.4070307@linaro.org>
+Message-ID: <51076FA2.9070002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This pull request simply converts the bcm2835 clocksource driver to use
-the recently added CLKSRC_OF feature.
+Jon,
 
-The branch is based on v3.8-rc3, followed by a merge of arm-soc's
-timer/cleanup branch.
+On Tuesday 29 January 2013 05:31 AM, John Stultz wrote:
+> On 01/27/2013 10:08 PM, Santosh Shilimkar wrote:
+>> On Tuesday 22 January 2013 08:35 PM, Santosh Shilimkar wrote:
+>>> On Tuesday 22 January 2013 08:21 PM, Russell King - ARM Linux wrote:
+>>>> On Tue, Jan 22, 2013 at 03:44:03PM +0530, Santosh Shilimkar wrote:
 
-(For this and pull 4/4, feel free to cherry-pick the one commit if you
-want to avoid the short pull requests!)
+[..]
 
-----------------------------------------------------------------
+>>> Thanks for expanding it. It is really helpful.
+>>>
+>>>> And I think further discussion is pointless until such research has
+>>>> been
+>>>> done (or someone who _really_ knows the time keeping/timer/sched code
+>>>> inside out comments.)
+>>>>
+>>> Fully agree about experimentation to re-asses the drift.
+>>>  From what I recollect from past, few OMAP customers did
+>>> report the time drift issue and that is how the switch
+>>> from 100 --> 128 happened.
+>>>
+>>> Anyway I have added the suggested task to my long todo list.
+>>>
+>> So I tried to see if any time drift with HZ = 100 on OMAP. I ran the
+>> setup for 62 hours and 27 mins with time synced up once with NTP server.
+>> I measure about ~174 millisecond drift which is almost noise considering
+>> the observed duration was ~224820000 milliseconds.
+>
+> So 174ms drift doesn't sound great, as < 2ms (often much less - though
+> that depends on how close the server is) can be expected with NTP.
+> Although its not clear how you were measuring: Did you see a max 174ms
+> offset while trying to sync with NTP? Was that offset shortly after
+> starting NTP or after NTP converged down?
+>
+To avoid the server latency, we didn't do continuous sync. The time was 
+synced in the beginning and after 62.5 hours (#ntpd -qg) and the drift
+of about 174 ms was observed. As you said this could be because of
+server sync time along with probably some addition from system calls
+from #ntpd. As mentioned, the other run with HZ = 128 which started
+15 hours 20 mins is already showing about 24 mS drift now. I will
+let it run for couple of more days just to have similar duration run.
 
-The following changes since commit b2fc382aad0a8f52803acdc3ac4e5540dbcdf1f6:
-
-  Merge remote-tracking branch 'korg_arm-soc/timer/cleanup' into cleanup
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.9-cleanup
-
-for you to fetch changes up to c1b724f6659a7e9e32f8fcf6409d053e1b7bccad:
-
-  ARM: bcm2835: make use of CLKSRC_OF
-
-----------------------------------------------------------------
-
-Stephen Warren (1):
-      ARM: bcm2835: make use of CLKSRC_OF
-
- arch/arm/Kconfig                    |    1 +
- arch/arm/mach-bcm2835/bcm2835.c     |    4 ++--
- drivers/clocksource/bcm2835_timer.c |    5 +++--
- include/linux/bcm2835_timer.h       |   22 ----------------------
- 4 files changed, 6 insertions(+), 26 deletions(-)
- delete mode 100644 include/linux/bcm2835_timer.h
+Regards,
+santosh
