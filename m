@@ -1,77 +1,83 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 28 Jan 2013 23:16:02 -0700
-Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
-In-Reply-To: <CAErSpo7-qXZTri-T+v4O3rKk9AXjHE4ckkWZ1UT63SC1fG02-A@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301282018.17714.arnd@arndb.de> <5106F5CB.8050304@wwwdotorg.org>
- <20130128220904.GA21446@obsidianresearch.com>
- <CAErSpo7-qXZTri-T+v4O3rKk9AXjHE4ckkWZ1UT63SC1fG02-A@mail.gmail.com>
-Message-ID: <20130129061602.GB3339@obsidianresearch.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Mon, 28 Jan 2013 22:18:04 -0800
+Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
+In-Reply-To: <alpine.LFD.2.02.1301282320430.6300@xanadu.home>
+References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
+ <20130128142510.68092e10.akpm@linux-foundation.org>
+ <alpine.LFD.2.02.1301282320430.6300@xanadu.home>
+Message-ID: <bce35b9a-0b62-4655-ad5e-972e2bd51a95@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 07:40:16PM -0700, Bjorn Helgaas wrote:
-> On Mon, Jan 28, 2013 at 3:09 PM, Jason Gunthorpe
-> <jgunthorpe@obsidianresearch.com> wrote:
-> > On Mon, Jan 28, 2013 at 03:03:55PM -0700, Stephen Warren wrote:
-> >> On 01/28/2013 01:18 PM, Arnd Bergmann wrote:
-> >> > On Monday 28 January 2013, Thomas Petazzoni wrote:
-> >> >> From: Thierry Reding <thierry.reding@avionic-design.de>
-> >> >>
-> >> >> [Thomas Petazzoni:
-> >> >>  - Simplify capabilities handling.
-> >> >>  - Move to a separate file.
-> >> >>  - Fix mask used when writing a 4 bytes value.]
-> >> >>
-> >> >> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> >> >> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> >> >
-> >> > Not even a description why this is needed?
-> >> >
-> >> > This patch (together with patch 8) seems like the most controversial
-> >> > one of the series, so you should better provide a really good reason
-> >> > why we would emulate something in software rather than using whatever
-> >> > hardware is there.
-> >>
-> >> At least on Tegra, there is no HW that exposes PCI configuration
-> >> registers for the host bridge itself. Only the root ports have exposed
-> >> PCI configuration registers. There was some debate re: whether a host
-> >> bridge device needed to exist or not. This patch makes such a device
-> >> exist if it's required.
-> 
-> Host bridges are not actually PCI devices on any architecture.  The
-> upstream side of a host bridge is by definition not on a PCI bus.  On
-> some architectures, it *looks* like the host bridge is a PCI device
-> because it responds to PCI config accesses and you can get to
+Uhm... you're saying we have to be at one extreme or the other?
 
-Sure, you can't discover domains through any standard means, but once
-you have found a domain (notably a way to issue config transactions)
-then the PCI-E standard actually does place requirements on what
-config transactions should return:
- - 0:00.0 is a host bridge config space.
- - 0:XX.X will be one of:
-   - A root complex internal function, with some restrictions this
-     is basically a PCI end device
-   - A PCI-PCI bridge with various mandatory capability headers.
-     One of these must show up for every physical PCI-E link
-     on the root complex.
-This collection of stuff on bus 0 is called the 'root complex'. This
-is new in PCI-E, PCI-X and PCI didn't have such requirements.
+We probably could drop the legacy lzma format, but someone might rely on it.
 
-SOC vendors are taking various liberties with their PCI-E implementations.
- - nvidia followed the standard but did not include the host bridge
-   at 0:00.0
- - Marvell ignored everything about the root complex config space
-   behavior :)
+Nicolas Pitre <nico@fluxnic.net> wrote:
 
-There are two patch sets in this subject, one for nvidia tegra and one
-for Marvell, both presenting to Linux a view of the HW that matches
-what the PCI-E spec describes - specifically that there is one domain,
-and each PCI-E link/controller shows up as a PCI-PCI bridge on bus 0.
+>On Mon, 28 Jan 2013, Andrew Morton wrote:
+>
+>> On Sat, 26 Jan 2013 14:50:43 +0900
+>> Kyungsik Lee <kyungsik.lee@lge.com> wrote:
+>> 
+>> > This patchset is for supporting LZ4 compressed kernel and initial
+>ramdisk on
+>> > the x86 and ARM architectures.
+>> > 
+>> > According to http://code.google.com/p/lz4/, LZ4 is a very fast
+>lossless
+>> > compression algorithm and also features an extremely fast decoder.
+>> > 
+>> > Kernel Decompression APIs are based on implementation by Yann
+>Collet
+>> > (http://code.google.com/p/lz4/source/checkout).
+>> > De/compression Tools are also provided from the site above.
+>> > 
+>> > The initial test result on ARM(v7) based board shows that the size
+>of kernel
+>> > with LZ4 compressed is 8% bigger than LZO compressed  but the
+>decompressing
+>> > speed is faster(especially under the enabled unaligned memory
+>access).
+>> > 
+>> > Test: 3.4 based kernel built with many modules
+>> > Uncompressed kernel size: 13MB
+>> > lzo: 6.3MB, 301ms
+>> > lz4: 6.8MB, 251ms(167ms, with enabled unaligned memory access)
+>> > 
+>> > It seems that it___s worth trying LZ4 compressed kernel image or
+>ramdisk 
+>> > for making the kernel boot more faster.
+>> >
+>> > ...
+>> >
+>> >  20 files changed, 663 insertions(+), 3 deletions(-)
+>> >
+>> > ...
+>> >
+>> 
+>> What's this "with enabled unaligned memory access" thing?  You mean
+>"if
+>> the arch supports CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS"?  If so,
+>> that's only x86, which isn't really in the target market for this
+>> patch, yes?
+>
+>I'm guessing this is referring to commit 5010192d5a.
+>
+>> It's a lot of code for a 50ms boot-time improvement.  Does anyone
+>have
+>> any opinions on whether or not the benefits are worth the cost?
+>
+>Well, we used to have only one compressed format.  Now we have nearly 
+>half a dozen, with the same worthiness issue between themselves.  
+>Either we keep it very simple, or we make it very flexible.  The former
+>
+>would argue in favor of removing some of the existing formats, the
+>later 
+>would let this new format in.
+>
+>
+>Nicolas
 
-In this model, there is no 'host bridge aperture' hardware, each PCI-E
-link has a dedicated aperture and control of that aperture is through
-the PCI-PCI bridge window registers, again as PCI-E specifies.
-
-Jason
+-- 
+Sent from my mobile phone. Please excuse brevity and lack of formatting.
