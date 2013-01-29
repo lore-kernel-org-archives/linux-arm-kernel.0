@@ -1,93 +1,66 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Tue, 29 Jan 2013 09:16:33 +0100
-Subject: [PATCH v2] ARM: mxs: gpio-mxs: Add IRQ_TYPE_EDGE_BOTH support
-Message-ID: <1359447393-2570-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Tue, 29 Jan 2013 16:18:13 +0800
+Subject: [PATCH] ARM: gic: add irq_set_affinity to gic_arch_extn
+In-Reply-To: <1359436629-19873-1-git-send-email-chao.xie@marvell.com>
+References: <1359436629-19873-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <CADApbeix2A5rCN-OJLL0Qx+hMB-2hw0wOUqnJX_NP1Cc-w+DCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for IRQ_TYPE_EDGE_BOTH needed for some driver
-(gpio-keys).
-Inspired from gpio-mxc.c
+On Tue, Jan 29, 2013 at 1:17 PM, Chao Xie <chao.xie@marvell.com> wrote:
+> gic_arch_extn is used for ARCH specific interrupt controller.
+> It has added the callbacks for irq_mask/irq_unamsk and so, but
+> irq_set_affinity is not used.
+> For SMP architecure, when both cores are powered off, the GIC may
+> be powered off too. An external interrupt controller can be used
+> as a logic to detect the interrupt and acknowledge power managment
+> unitto wake up core.
+> Because the irqs may be bound to different cors, when set irq
+> affinity, the external interrupt controller should be set too. Then
+> it can acknowledge the power managment unit to wake up correct core.
+>
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> ---
+>  arch/arm/common/gic.c |   17 +++++++++++------
+>  1 files changed, 11 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 36ae03a..8e4bc8a 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -82,12 +82,15 @@ static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
+>   * Default make them NULL.
+>   */
+>  struct irq_chip gic_arch_extn = {
+> -       .irq_eoi        = NULL,
+> -       .irq_mask       = NULL,
+> -       .irq_unmask     = NULL,
+> -       .irq_retrigger  = NULL,
+> -       .irq_set_type   = NULL,
+> -       .irq_set_wake   = NULL,
+> +       .irq_eoi                = NULL,
+> +       .irq_mask               = NULL,
+> +       .irq_unmask             = NULL,
+> +       .irq_retrigger          = NULL,
+> +       .irq_set_type           = NULL,
+> +#ifdef CONFIG_SMP
+> +       .irq_set_affinity       = NULL,
+> +#endif
+> +       .irq_set_wake           = NULL,
+>  };
+>
+>  #ifndef MAX_GIC_NR
+> @@ -253,6 +256,8 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>         bit = gic_cpu_map[cpu] << shift;
+>
+>         raw_spin_lock(&irq_controller_lock);
+> +       if (gic_arch_extn.irq_set_affinity)
+> +               return gic_arch_extn.irq_set_affinity(d, mask_val, force);
+>         val = readl_relaxed(reg) & ~mask;
+>         writel_relaxed(val | bit, reg);
+>         raw_spin_unlock(&irq_controller_lock);
+> --
+> 1.7.4.1
+>
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- Changes since v1 (as advised by Shawn Guo):
- * fix some typos
- * use GPIO_INT_xxx_EDGE instead of GPIO_INT_xxx_LEV
- * suppress useless variables
-
- drivers/gpio/gpio-mxs.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index fa2a63c..859b6fa 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -65,6 +65,7 @@ struct mxs_gpio_port {
- 	struct irq_domain *domain;
- 	struct bgpio_chip bgc;
- 	enum mxs_gpio_id devid;
-+	u32 both_edges;
- };
- 
- static inline int is_imx23_gpio(struct mxs_gpio_port *port)
-@@ -81,13 +82,23 @@ static inline int is_imx28_gpio(struct mxs_gpio_port *port)
- 
- static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- {
-+	u32 val;
- 	u32 pin_mask = 1 << d->hwirq;
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct mxs_gpio_port *port = gc->private;
- 	void __iomem *pin_addr;
- 	int edge;
- 
-+	port->both_edges &= ~pin_mask;
- 	switch (type) {
-+	case IRQ_TYPE_EDGE_BOTH:
-+		val = gpio_get_value(port->bgc.gc.base + d->hwirq);
-+		if (val)
-+			edge = GPIO_INT_FALL_EDGE;
-+		else
-+			edge = GPIO_INT_RISE_EDGE;
-+		port->both_edges |= pin_mask;
-+		break;
- 	case IRQ_TYPE_EDGE_RISING:
- 		edge = GPIO_INT_RISE_EDGE;
- 		break;
-@@ -124,6 +135,23 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- 	return 0;
- }
- 
-+static void mxs_flip_edge(struct mxs_gpio_port *port, u32 gpio)
-+{
-+	u32 bit, val, edge;
-+	void __iomem *pin_addr;
-+
-+	bit = 1 << gpio;
-+
-+	pin_addr = port->base + PINCTRL_IRQPOL(port);
-+	val = readl(pin_addr);
-+	edge = val & bit;
-+
-+	if (edge)
-+		writel(bit, pin_addr + MXS_CLR);
-+	else
-+		writel(bit, pin_addr + MXS_SET);
-+}
-+
- /* MXS has one interrupt *per* gpio port */
- static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- {
-@@ -137,6 +165,9 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- 
- 	while (irq_stat != 0) {
- 		int irqoffset = fls(irq_stat) - 1;
-+		if (port->both_edges & (1 << irqoffset))
-+			mxs_flip_edge(port, irqoffset);
-+
- 		generic_handle_irq(irq_find_mapping(port->domain, irqoffset));
- 		irq_stat &= ~(1 << irqoffset);
- 	}
--- 
-1.7.12.4
+I send the wrong patch, please ignore it, and i will send new one.
