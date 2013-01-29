@@ -1,107 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 29 Jan 2013 23:25:27 +0100
-Subject: Oddities with Energymicro's efm32
-Message-ID: <20130129222527.GA30975@pengutronix.de>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 29 Jan 2013 15:27:43 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
+ <20130129055508.GA3339@obsidianresearch.com>
+ <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
+ <20130129184157.GA29274@obsidianresearch.com>
+ <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
+ <20130129191853.GB29274@obsidianresearch.com>
+ <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
+Message-ID: <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jan 29, 2013 at 12:38 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Tue, Jan 29, 2013 at 12:18 PM, Jason Gunthorpe
+> <jgunthorpe@obsidianresearch.com> wrote:
+>> On Tue, Jan 29, 2013 at 12:07:00PM -0700, Bjorn Helgaas wrote:
+>>> > So when I say set aside, I mean for instance, the PCI-E entry in DT
+>>> > has 128M of physical address space marked for PCI MMIO use. The kernel
+>>> > does PCI resource allocation and the HW decoders in each link will be
+>>> > set to claim some portion of the 128M - based on the MMIO windows
+>>> > programmed on the PCI-PCI root port bridges. The reamining part of the
+>>> > 128M is dead address space, not claimed by any hardware block at all.
+>>>
+>>> Thanks, this really helps get to the issue that the PCI core will care
+>>> about.  The root ports look like normal bridges, so the core assumes
+>>> it can manage their windows as needed, as long as the windows stay
+>>> inside the host bridge apertures that are logically upstream from the
+>>> root ports.
+>>
+>> Yes, that is basically correct. This is what the PCI-E specification
+>> says the root complex/root port should look like and this is what some
+>> SOC hardware implements fully in hardware. The small wrinkle with
+>> Marvell is that the PCI-PCI bridge config space is created by the
+>> driver since the HW does not expose a standard config space.
+>
+> Oh, so the actual *root port* itself doesn't conform to the spec?
+> Wow, that's worse than I expected.
+>
+> Then I guess you have emulate it and make sure its config space is
+> complete enough and functional enough so that all the link management,
+> power management, AER, etc., code in the core works as well as it
+> would with a conforming device.
 
-I'm stuck with debugging a problem on my GiantGecko board (Cortex-M3
-efm32 SoC).
+I'm not sure the existing emulation in these patches is sufficient.
+For example, pci_sw_pci_bridge_write() updates bridge->membase when we
+write to the window register, but I don't see anything that updates
+the actual hardware decoder.  That might be done in
+mvebu_pcie_window_config_port() via armada_370_xp_alloc_pcie_window(),
+but that looks like it's only done once.  If the PCI core updates a
+root port window later, I don't see where the hardware decoder will be
+updated.
 
-Up to now I used the flash built into the SoC. But as it only has a size
-of 1 MiB I had to switch to the external flash---at least for
-development.
+Maybe you're counting on the window assignments to be static?  The PCI
+core doesn't guarantee anything like that, though in the absence of
+hotplug I don't know any reason why it would change things.
 
-I guess because of changed timing settings this triggers a problem with
-the stack pointer. The following code is executed:
-
-8c009e80 <update_process_times>:
-8c009e80:       b570            push    {r4, r5, r6, lr}
-8c009e82:       466b            mov     r3, sp
-8c009e84:       f423 54ff       bic.w   r4, r3, #8160   ; 0x1fe0
-8c009e88:       f024 041f       bic.w   r4, r4, #31
-8c009e8c:       4606            mov     r6, r0
-8c009e8e:       4810            ldr     r0, [pc, #64]   ; (8c009ed0 <update_process_times+0x50>)
-8c009e90:       68e5            ldr     r5, [r4, #12]
-8c009e92:       f7f8 fc9b       bl      8c0027cc <printascii>
-8c009e96:       f5b4 5f00       cmp.w   r4, #8192       ; 0x2000
-8c009e9a:       d806            bhi.n   8c009eaa <update_process_times+0x2a>
-8c009e9c:       4668            mov     r0, sp
-8c009e9e:       f7f8 fc6b       bl      8c002778 <printhex8>
-8c009ea2:       480c            ldr     r0, [pc, #48]   ; (8c009ed4 <update_process_times+0x54>)
-8c009ea4:       f7f8 fc92       bl      8c0027cc <printascii>
-8c009ea8:       e7fe            b.n     8c009ea8 <update_process_times+0x28>
-
-printascii is a function to print out a debug message, printhex prints
-out the value of r0. The code corresponds to this C-Code:
-
-#define THREAD_SIZE 8192
-static inline struct thread_info *current_thread_info(void)
-{       
-        register unsigned long sp asm ("sp");
-        return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
-}
-
-
-void update_process_times(int user_tick)
-{
-	...
-        printascii("up1\n");
-        if (current_thread_info() <= 0x2000) {
-                asm volatile("mov r0, sp\n" "bl printhex8" : : : "cc", "r0", "r1", "r2", "r3");
-                printascii("br0ken\n");
-                while (1) {}
-        }
-	...
-}
-
-That is the condition of the if is
-
-	(sp & ~0x1fff) <= 0x2000
-
-. If it triggers, the value of sp is printed. When the function in
-question is called for the second time the condition is true and sp is
-printed as 0x88009e88. The value of r4 is 0 then. The values on the
-stack don't look reasonable:
-
-	88009e70: 8c0ed2b8 8c01c75f 8c01c78d 88016980 
-	88009e80: 88018de4 8c01c797 88016900 88016900 
-	88009e90: 88016980 88018de4 0000001d 00000000 
-	88009ea0: 00000000 8c00306b 8c00305d 8c01d0a5 
-	88009eb0: 88018de4 88016980 88018de4 00000000 
-	88009ec0: 88026820 00000000 88009f44 88009f70 
-	88009ed0: 8c0ed2b1 8c01d1a7 88018de4 8c01e5c9 
-	88009ee0: 0000001d 8c01cd6b 0000001d 8c000cdb 
-
-which means that the value saved on the stack for lr would have been
-0x88018de4 which is outside of the kernel image. It's a RAM address. So
-sp probably was wrong when the function was entered, too. But even in
-the case that the caller corrupted sp, why isn't it < 0x2000 when
-printed out in the body of the if?
-
-The code is run with irqs off (PRIMASK=1). So the only things that could
-happen to influence sp between 0x8c009e82 and 0x8c009e9c are Reset, NMI
-and HardFault. For each of them the handler wouldn't return, so they can
-be ruled out.
-
-The timing settings for flash and sram are copied from Energymicro's
-Board Support Package, so they should be ok, too.
-
-This is hard to debug because I cannot set breakpoints in the external
-flash and I didn't get tracing up and running up to now. Also the
-problem is very sensible to changes: If I add instrumentation to the
-exception entry code the problem doesn't reproduce any more.
-
-I'm out of ideas now. So if you have an idea that would be great. If you
-want to reproduce I can provide you source code and/or binaries. Also if
-you have questions or see a gap in my conclusions, don't hesitate to
-contact me.
-
-Thanks for your time,
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I also forgot about the bus number munging in mvebu_pcie_rd_conf().
+The PCI core can update the bridge secondary/subordinate registers.
+It looks like you don't support writing to them, and the read path
+(pci_sw_pci_bridge_read()) looks like it doesn't do any translation
+between the hardware and Linux bus numbers.  I don't understand the
+system well enough to know if this is an issue.
