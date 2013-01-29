@@ -1,17 +1,17 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 29 Jan 2013 18:25:39 +0800
-Subject: [PATCH v2] ARM: mxs: gpio-mxs: Add IRQ_TYPE_EDGE_BOTH support
-In-Reply-To: <1359447393-2570-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1359447393-2570-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130129102536.GF21504@S2101-09.ap.freescale.net>
+From: ian.molton@codethink.co.uk (Ian Molton)
+Date: Tue, 29 Jan 2013 10:26:20 +0000
+Subject: [PATCH V3 7/8] mv643xx.c: Add basic device tree support.
+In-Reply-To: <20130128193840.GK1758@titan.lakedaemon.net>
+References: <cover.1359146831.git.jason@lakedaemon.net>
+ <d2db6ddfddf90dd79c6c6c90a6006887076dea1a.1359146831.git.jason@lakedaemon.net>
+ <20130128101249.GB7754@e106331-lin.cambridge.arm.com>
+ <20130128193840.GK1758@titan.lakedaemon.net>
+Message-ID: <5107A3CC.2020102@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 09:16:33AM +0100, Gwenhael Goavec-Merou wrote:
-> This patch adds support for IRQ_TYPE_EDGE_BOTH needed for some driver
-> (gpio-keys).
-> Inspired from gpio-mxc.c
-> 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+On 28/01/13 19:38, Jason Cooper wrote:
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Good to see this patch get some TLC guys - have at it :)
+
+-Ian
