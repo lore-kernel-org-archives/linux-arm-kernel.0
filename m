@@ -1,64 +1,54 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 29 Jan 2013 15:13:36 -0500 (EST)
-Subject: [RFC PATCH] arm: decompressor: initialize PIC offset base register
- for uClinux tools
-In-Reply-To: <1359480546-7033-1-git-send-email-jonathan.austin@arm.com>
-References: <1359480546-7033-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <alpine.LFD.2.02.1301291453530.6300@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jan 2013 20:15:21 +0000
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+In-Reply-To: <20130129180936.3737e550@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301291645.08040.arnd@arndb.de> <20130129180936.3737e550@skate>
+Message-ID: <201301292015.21478.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Jan 2013, Jonathan Austin wrote:
-
-> Before jumping to (position independent) C-code from the decompressor's
-> assembler world we set-up the C environment. This setup currently does not
-> set r9, which for arm-none-uclinux-uclibceabi should be the PIC offset base
-> register (IE should point to the beginning of the GOT).
+On Tuesday 29 January 2013, Thomas Petazzoni wrote:
+> Yes, it is about the emulated PCI-to-PCI bridges. Each
+> emulated PCI-to-PCI bridge corresponds to one hardware PCIe interface,
+> and I need the I/O base address assigned to each PCIe interface to be
+> aligned on a 64 KB boundary. I am not sure to understand why you think
+> this is a problem.
 > 
-> Currently, therefore, in order to build working kernels that use the
-> decompressor it is necessary to use an arm-linux-gnueabi toolchain, or
-> similar. uClinux toolchains cause a Prefetch Abort to occur at the beginning
-> of the decompress_kernel function.
+> Also, what do you mean exactly by making them appear as individual
+> domains?
+
+I mean you could make each root port look like a separate host
+bridge that is not related to the others, and not have any
+emulated PCI-to-PCI bridges at all.
+
+> Remember that the very reason to use emulated PCI-to-PCI bridges is
+> that we want to assign a global range of addresses of I/O regions and a
+> global range of addresses of memory regions, and let the Linux PCI core
+> allocate from those two ranges to the different devices connected
+> downstream of the PCI-to-PCI bridges. This gives us for free the rather
+> complex allocation of addresses we need to set up our address decoding
+> windows.
 > 
-> This patch allows uClinux toolchains to build bootable zImages by setting r9
-> to the beginning of the GOT when __uClinux__ is defined, allowing the
-> decompressor's C functions to work correctly.
-> 
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> ---
-> 
-> One other possibility would be to specify -mno-single-pic-base when building
-> the decompressor. This works around the problem, but forces the compiler to
-> generate less optimal code.
+> If we have have separate domains for each of our hardware PCIe
+> interface, can we still benefit from this allocation of resources from
+> a globally defined range of I/O addresses and memory addresses?
 
-How "less optimal"?  How much bigger/slower is it?
-If not significant enough then going with -mno-single-pic-base might be 
-fine.
+My interpretation of what you told me in the previous mail is that
+each root port has 
 
->  arch/arm/boot/compressed/head.S |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index fe4d9c3..4491e75 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -410,6 +410,10 @@ wont_overwrite:
->   *   sp  = stack pointer
->   */
->  		orrs	r1, r0, r5
-> +#ifdef __uClinux__
-> +		mov	r9, r11			@ PIC offset base register
-> +		addne	r9, r9, r0		@ Also needs relocating
-> +#endif
->  		beq	not_relocated
+* A separate configuration space
+* A separate 64KB I/O window that is not shared with the other ports,
+  or potentially multiple 64KB windows, which we would not want to use
+* A configurable range of the memory space that does not overlap
+  with the other ports
 
-Please don't insert your code between the orrs and the beq as those two 
-go logically together.
+Is the above a correct description?
 
-In fact, the best location for this would probably be between the 
-wont_overwrite label and the comment that immediately follows it. And 
-then, those comments that follow until the branch into C code should be 
-updated accordingly.
+If so, I think it would be most sensible to not try to put all ports
+into the same domain, but give each port the full view of its own
+256 buses, and 64KB I/O space. The memory space can still be directly
+mapped, if you only set up the physical address window for that after
+the bus scan is complete.
 
-
-Nicolas
+	Arnd
