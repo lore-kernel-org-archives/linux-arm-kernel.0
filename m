@@ -1,36 +1,54 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Tue, 29 Jan 2013 16:45:05 +0530
-Subject: [PATCH v3 6/9] ARM: OMAP2+: AM33XX: hwmod: Update the WKUP-M3 hwmod
- with reset status bit
+Date: Tue, 29 Jan 2013 16:45:07 +0530
+Subject: [PATCH v3 8/9] ARM: DTS: AM33XX: Add nodes for OCMC RAM and WKUP-M3
 In-Reply-To: <1359458108-8489-1-git-send-email-vaibhav.bedia@ti.com>
 References: <1359458108-8489-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1359458108-8489-7-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1359458108-8489-9-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WKUP-M3 has a reset status bit (RM_WKUP_STST.WKUP_M3_LRST)
-Update the WKUP-M3 hwmod data to reflect the same.
+Since AM33XX supports only DT-boot, this is needed
+for the appropriate device nodes to be created.
+
+Note: OCMC RAM is part of the PER power domain and supports
+retention. The assembly code for low power entry/exit will
+run from OCMC RAM. To ensure that the OMAP PM code does not
+attempt to disable the clock to OCMC RAM as part of the
+suspend process add the no_idle_on_suspend flag.
 
 Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 ---
-v3: Add Peter's Acked-by
-v2: No change
+v3: Update the compatible field as mentioned by Peter and his Acked-by
+v2: Add reg property
 
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/am33xx.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 40bfde3..9e34d4c 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -269,6 +269,7 @@ static struct omap_hwmod am33xx_wkup_m3_hwmod = {
- 		.omap4	= {
- 			.clkctrl_offs	= AM33XX_CM_WKUP_WKUP_M3_CLKCTRL_OFFSET,
- 			.rstctrl_offs	= AM33XX_RM_WKUP_RSTCTRL_OFFSET,
-+			.rstst_offs	= AM33XX_RM_WKUP_RSTST_OFFSET,
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index c2f14e8..0957645 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -385,5 +385,19 @@
+ 				mac-address = [ 00 00 00 00 00 00 ];
+ 			};
+ 		};
++
++		ocmcram: ocmcram at 40300000 {
++			compatible = "ti,am3352-ocmcram";
++			reg = <0x40300000 0x10000>;
++			ti,hwmods = "ocmcram";
++			ti,no_idle_on_suspend;
++		};
++
++		wkup_m3: wkup_m3 at 44d00000 {
++			compatible = "ti,am3353-wkup-m3";
++			reg = <0x44d00000 0x4000	/* M3 UMEM */
++			       0x44d80000 0x2000>;	/* M3 DMEM */
++			ti,hwmods = "wkup_m3";
++		};
+ 	};
+ };
 -- 
 1.8.1
