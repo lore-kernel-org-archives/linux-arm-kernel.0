@@ -1,28 +1,34 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 29 Jan 2013 10:30:05 -0500 (EST)
-Subject: [PATCH v3 10/30] USB: ehci-omap: Use PHY APIs to get the PHY
- device and put it out of suspend
-In-Reply-To: <1359453032-20604-1-git-send-email-rogerq@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1301291026020.1507-100000@iolanthe.rowland.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Jan 2013 16:32:42 +0100
+Subject: [PATCH 1/5] net: mvmdio: unmap base register address at driver
+ removal
+In-Reply-To: <1359473048-26551-2-git-send-email-florian@openwrt.org>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1359473048-26551-2-git-send-email-florian@openwrt.org>
+Message-ID: <20130129163242.1df2caf5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Jan 2013, Roger Quadros wrote:
+Dear Florian Fainelli,
 
-> For each port that is in PHY mode we obtain a PHY device using the USB PHY
-> library and put it out of suspend.
+On Tue, 29 Jan 2013 16:24:04 +0100, Florian Fainelli wrote:
+> Fix the driver remove callback to unmap the base register address and
+> not leak this mapping after the driver has been removed.
 > 
-> It is up to platform code to associate the PHY to the controller's
-> port and it is upto the PHY driver to manage the PHY's resources.
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
 
-s/upto/up to/
+What about using devm_request_and_ioremap() instead, in order to get
+automatic unmap on error and in the ->remove() path?
 
-> Also remove wired spacing around declarations we come across.
+But maybe it won't work because this memory range is claimed both by
+the MDIO driver and the Ethernet driver itself. In that case, you could
+use devm_ioremap().
 
-s/wired/weird/ -- not that people care about misspellings in the 
-Changelog.  You don't have to resubmit the patch just to fix these two 
-items.
+Best regards,
 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
