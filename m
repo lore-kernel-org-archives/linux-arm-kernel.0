@@ -1,42 +1,72 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Tue, 29 Jan 2013 17:19:27 +0530
-Subject: [PATCH v1 1/5] ARM: cache-l2x0: add 'smc' identifier
-In-Reply-To: <20130129113325.GG2637@n2100.arm.linux.org.uk>
-References: <20130129101328.GA11878@bnru10>
- <20130129113325.GG2637@n2100.arm.linux.org.uk>
-Message-ID: <20130129114926.GA14624@bnru10>
+From: smoch@web.de (Soeren Moch)
+Date: Tue, 29 Jan 2013 12:50:04 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20130129110228.GA20242@lunn.ch>
+References: <50F800EB.6040104@web.de> <201301172026.45514.arnd@arndb.de>
+ <50FABBED.1020905@web.de> <20130119185907.GA20719@lunn.ch>
+ <5100022D.9050106@web.de> <20130123162515.GK13482@lunn.ch>
+ <510018B4.9040903@web.de> <51001BEE.9020201@web.de>
+ <20130123181029.GE20719@lunn.ch> <5106E6A6.7010207@web.de>
+ <20130129110228.GA20242@lunn.ch>
+Message-ID: <5107B76C.6020704@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 12:33:25 +0100, Russell King - ARM Linux wrote:
-> On Tue, Jan 29, 2013 at 03:43:31PM +0530, srinidhi kasagar wrote:
-> > Add 'smc' (Secure Monitor Call) identifier to differentiates
-> > the platforms which implements this.
-> 
-> This patch makes no sense.
-> 
-> So, if setting 'smc' in the DT description is supposed to mean that
-> the platform has a secure monitor then...
-> 
-> > +	is_smc = of_property_read_bool(np, "smc");
-> > +
-> > +	if (is_smc) {
-> > +		/* set the debug interface */
-> > +		outer_cache.set_debug = pl310_set_debug;
-> > +	}
-> 
-> Now, let's look at what pl310_set_debug() does:
-> 
-> static void pl310_set_debug(unsigned long val)
-> {
->         writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
+On 29.01.2013 12:02, Andrew Lunn wrote:
+>> Now I activated the debug messages in em28xx. From the messages I
+>> see no correlation of the pool exhaustion and lost sync. Also I
+>> cannot see any error messages from the em28xx driver.
+>> I see a lot of init_isoc/stop_urbs (maybe EPG scan?) without
+>> draining the coherent pool (checked with 'cat
+>> /debug/dma-api/num_free_entries', which gave stable numbers), but
+>> after half an hour there are only init_isoc messages without
+>> corresponding stop_urbs messages and num_free_entries decreased
+>> until coherent pool exhaustion.
+>
+> Hi Soeren
+>
+> em28xx_stop_urbs() is only called by em28xx_stop_streaming().
+>
+> em28xx_stop_streaming() is only called by em28xx_stop_feed()
+> when 0 == dvb->nfeeds.
+>
+> em28xx_stop_feed()and em28xx_start_feed() look O.K, dvb->nfeeds is
+> protected by a mutex etc.
+>
+> Now, em28xx_init_isoc() is also called by buffer_prepare(). This uses
+> em28xx_alloc_isoc() to do the actual allocation, and that function
+> sets up the urb such that on completion the function
+> em28xx_irq_callback() is called.
+>
+> It looks like there might be issues here:
+>
+> Once the data has been copied out, it resubmits the urb:
+>
+>         urb->status = usb_submit_urb(urb, GFP_ATOMIC);
+>          if (urb->status) {
+>                  em28xx_isocdbg("urb resubmit failed (error=%i)\n",
+>                                 urb->status);
+>          }
+>
+> However, if the ubs_submit_urb fails, it looks like the urb is lost.
+>
+> If you look at other code submitting urbs you have this pattern:
+>
+>                 rc = usb_submit_urb(isoc_bufs->urb[i], GFP_ATOMIC);
+>                  if (rc) {
+>                          em28xx_err("submit of urb %i failed (error=%i)\n", i,
+>                                     rc);
+>                          em28xx_uninit_isoc(dev, mode);
+>                          return rc;
+>                  }
+>
+> Do you have your build such that you would see "urb resubmit failed"
+> in your logs? Are there any?
 
-You can do this operation (write to DEBUG_CTRL) only if SMC is implemented.
+I only had "urb resubmit failed" messages _after_ the coherent pool 
+exhaustion. So I guess something below the usb_submit_urb call is 
+allocating (too much) memory, sometimes. Or can dvb_demux allocate 
+memory and blame orion-ehci for it?
 
-> }
-> 
-> Can you explain where the secure monitor call is there please, because
-> I can't see one.  In fact, this is the function used when there _isn't_
-> a secure monitor.  So this patch just seems totally wrong to me.
-
-regards/srinidhi
+   Soeren
