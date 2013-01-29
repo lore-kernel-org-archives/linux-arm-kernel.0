@@ -1,114 +1,106 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 28 Jan 2013 19:13:54 -0500
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <5106E6A6.7010207@web.de>
-References: <50F800EB.6040104@web.de> <201301172026.45514.arnd@arndb.de>
- <50FABBED.1020905@web.de> <20130119185907.GA20719@lunn.ch>
- <5100022D.9050106@web.de> <20130123162515.GK13482@lunn.ch>
- <510018B4.9040903@web.de> <51001BEE.9020201@web.de>
- <20130123181029.GE20719@lunn.ch> <5106E6A6.7010207@web.de>
-Message-ID: <20130129001354.GN1758@titan.lakedaemon.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 29 Jan 2013 09:22:09 +0900
+Subject: [PATCH 12/15] ARM: mach-shmobile: sh73a0: Allow initialisation
+ of GIC by DT
+In-Reply-To: <20130128105933.GC7754@e106331-lin.cambridge.arm.com>
+References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
+ <1359086133-23357-13-git-send-email-horms+renesas@verge.net.au>
+ <20130125102210.GJ3075@e106331-lin.cambridge.arm.com>
+ <20130128004819.GE3423@verge.net.au>
+ <20130128105933.GC7754@e106331-lin.cambridge.arm.com>
+Message-ID: <20130129002208.GB27948@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 09:59:18PM +0100, Soeren Moch wrote:
-> On 23.01.2013 19:10, Andrew Lunn wrote:
-> >>>>
-> >>>
-> >>>Now (in the last hour) stable, occasionally lower numbers:
-> >>>3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
-> >>>3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
-> >>>3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
-> >>>3396 3396 3396 3396 3396 3396 3396 3396 3396 3365 3396 3394 3396 3396
-> >>>3396 3396 3373 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
-> >>>3396 3353 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396 3396
-> >>>3394 3396 3396 3396 3396 3396 3396 3396
-> >>>
-> >>>Before the last pool exhaustion going down:
-> >>>3395 3395 3389 3379 3379 3374 3367 3360 3352 3343 3343 3343 3342 3336
-> >>>3332 3324 3318 3314 3310 3307 3305 3299 3290 3283 3279 3272 3266 3265
-> >>>3247 3247 3247 3242 3236 3236
-> >>>
-> >>Here I stopped vdr (and so closed all dvb_demux devices), the number
-> >>was remaining the same 3236, even after restart of vdr (and restart
-> >>of streaming).
-> >
-> >So it does suggest a leak. Probably somewhere on an error path,
-> >e.g. its lost video sync.
-> >
+On Mon, Jan 28, 2013 at 10:59:33AM +0000, Mark Rutland wrote:
+> On Mon, Jan 28, 2013 at 12:48:19AM +0000, Simon Horman wrote:
+> > On Fri, Jan 25, 2013 at 10:22:10AM +0000, Mark Rutland wrote:
+> > > On Fri, Jan 25, 2013 at 03:55:30AM +0000, Simon Horman wrote:
+> > > > This allows the GIC interrupt controller of the sh73a0 SoC to be
+> > > > initialised using a flattened device tree blob.
+> > > > 
+> > > > It does not allow the INTC interrupt controller which is also present on
+> > > > the sh73a0 SoC to be enabled via device tree.  Nor does it handle sharing
+> > > > of interrupts between the GIC and INTC interrupt controllers.
+> > > > 
+> > > > This limits the usefulness of this code to applications which only wish to
+> > > > access devices which use interrupts that can be handled by the GIC
+> > > > interrupt controller. Other applications should, for now, continue using
+> > > > non-device tree initialisation of the sh72a0 interrupt controllers.
+> > > > 
+> > > > Includes update to use irqchip_init() by Thierry Reding
+> > > > 
+> > > > Cc: Thierry Reding <thierry.reding@avionic-design.de>
+> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > ---
+> > > >  arch/arm/boot/dts/sh73a0.dtsi                |   33 ++++++++++++++++++++++++++
+> > > >  arch/arm/mach-shmobile/include/mach/common.h |    1 +
+> > > >  arch/arm/mach-shmobile/intc-sh73a0.c         |    9 +++++++
+> > > >  3 files changed, 43 insertions(+)
+> > > >  create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+> > > > new file mode 100644
+> > > > index 0000000..7dae1f4
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> > > > @@ -0,0 +1,33 @@
+> > > > +/*
+> > > > + * Device Tree Source for the SH73A0 SoC
+> > > > + *
+> > > > + * Copyright (C) 2012 Renesas Solutions Corp.
+> > > > + *
+> > > > + * This file is licensed under the terms of the GNU General Public License
+> > > > + * version 2.  This program is licensed "as is" without any warranty of any
+> > > > + * kind, whether express or implied.
+> > > > + */
+> > > > +
+> > > > +/include/ "skeleton.dtsi"
+> > > > +
+> > > > +/ {
+> > > > +	compatible = "renesas,sh73a0";
+> > > > +
+> > > > +	cpus {
+> > > > +		cpu at 0 {
+> > > > +			compatible = "arm,cortex-a9";
+> > > > +		};
+> > > > +		cpu at 1 {
+> > > > +			compatible = "arm,cortex-a9";
+> > > > +		};
+> > > 
+> > > I replied to v1, not realising you'd posted a v2:
+> > > 
+> > > It would be good to have the reg and device_type properties set here for the
+> > > logical map.
+> > 
+> > Thanks.
+> > 
+> > I'd prefer to handle this as an incremental patch to be applied after the
+> > pull-request in which the patch above appears. The patch below is what
+> > I have in mind.
 > 
-> Now I activated the debug messages in em28xx. From the messages I
-> see no correlation of the pool exhaustion and lost sync. Also I
-> cannot see any error messages from the em28xx driver.
-> I see a lot of init_isoc/stop_urbs (maybe EPG scan?) without
-> draining the coherent pool (checked with 'cat
-> /debug/dma-api/num_free_entries', which gave stable numbers), but
-> after half an hour there are only init_isoc messages without
-> corresponding stop_urbs messages and num_free_entries decreased
-> until coherent pool exhaustion.
+> Sure. The patch looks right to me :)
 > 
-> Any idea where the memory leak is? What is allocating coherent
-> buffers for orion-ehci?
-
-Keeping in mind that I am completely unfamiliar with usb dvb, my best
-guess is that the problem is in em28xx-core.c:1131
-
-According to your log messages, it is in mode 2, which is
-EM28XX_DIGITAL_MODE.
-
-There seem to be good hints in
-
-86d38d1e [media] em28xx: pre-allocate DVB isoc transfer buffers
-
-I added the relevant parties to the To:...
-
-For Gianluca and Mauro, the whole thread may be found at:
-
-http://markmail.org/message/wm4wlgzoudixd4so#query:+page:1+mid:o7phz7cosmwpcsrz+state:results
-
-thx,
-
-Jason.
-
+> > 
+> > I also believe that the following files seem to be targets for a similar
+> > change. The latter two are for UP boards, could you comment on if reg
+> > and device_type are appropriate for them too.
+> > 
+> > arch/arm/boot/dts/emev2.dtsi
 > 
->   Soeren
+> Yup, this one should have reg and device_type added.
+
+Thanks, I'll prepare a patch.
+
+> > arch/arm/boot/dts/r8a7740.dtsi
+> > arch/arm/boot/dts/sh7372.dtsi
 > 
+> I'm not sure what the deal is with v7 UP hardware. For v6 and below, the lack
+> of an MPIDR means there's nothing to describe. On v7 we should have an MPIDR
+> with Aff fields at least, so there is something to describe (even if we don't
+> use this currently). I don't believe this would cause any problems, and it
+> would make the dts look consistent.
 > 
-> Jan 28 20:46:03 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers
-> each with 64 x 940 bytes
-> Jan 28 20:46:03 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx:
-> called em28xx_init_isoc in mode 2
-> Jan 28 20:46:03 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers
-> each with 64 x 940 bytes
-> Jan 28 20:46:03 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx:
-> called em28xx_init_isoc in mode 2
-> Jan 28 20:46:23 guruvdr kernel: em28xx #0 em28xx_stop_urbs :em28xx:
-> called em28xx_stop_urbs
-> Jan 28 20:46:23 guruvdr kernel: em28xx #1 em28xx_stop_urbs :em28xx:
-> called em28xx_stop_urbs
-> Jan 28 20:46:24 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers
-> each with 64 x 940 bytes
-> Jan 28 20:46:24 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx:
-> called em28xx_init_isoc in mode 2
-> Jan 28 20:46:24 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers
-> each with 64 x 940 bytes
-> Jan 28 20:46:24 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx:
-> called em28xx_init_isoc in mode 2
-> Jan 28 20:46:44 guruvdr kernel: em28xx #1 em28xx_stop_urbs :em28xx:
-> called em28xx_stop_urbs
-> Jan 28 20:46:44 guruvdr kernel: em28xx #0 em28xx_stop_urbs :em28xx:
-> called em28xx_stop_urbs
-> Jan 28 20:46:45 guruvdr kernel: em28xx #1/2-dvb: Using 5 buffers
-> each with 64 x 940 bytes
-> Jan 28 20:46:45 guruvdr kernel: em28xx #1 em28xx_init_isoc :em28xx:
-> called em28xx_init_isoc in mode 2
-> Jan 28 20:46:45 guruvdr kernel: em28xx #0/2-dvb: Using 5 buffers
-> each with 64 x 940 bytes
-> Jan 28 20:46:45 guruvdr kernel: em28xx #0 em28xx_init_isoc :em28xx:
-> called em28xx_init_isoc in mode 2
-> Jan 28 20:54:33 guruvdr kernel: ERROR: 1024 KiB atomic DMA coherent
-> pool is too small!
-> Jan 28 20:54:33 guruvdr kernel: Please increase it with
-> coherent_pool= kernel parameter!
-> 
+> I've Cc'd Lorenzo in case he has any thoughts on the matter.
+
+Understood, I'll wait to see if Lorenzo can guide me.
