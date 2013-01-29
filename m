@@ -1,48 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Jan 2013 23:44:15 +0100
-Subject: [PATCHv4] ARM: sunxi: gpio: Add Allwinner SoCs GPIO drivers
-In-Reply-To: <CACRpkdaNz6szEu6v=C97MfUzQzM3rG1hGHtHdO-aWXLCgHQEeQ@mail.gmail.com>
-References: <1359405192-1192-1-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdaNz6szEu6v=C97MfUzQzM3rG1hGHtHdO-aWXLCgHQEeQ@mail.gmail.com>
-Message-ID: <510850BF.7070003@free-electrons.com>
+Date: Tue, 29 Jan 2013 23:54:13 +0100
+Subject: [PATCH 1/3] pinctrl: sunxi: Add of_xlate function
+In-Reply-To: <CACRpkdZi0zCNf6LDd9UAcd57kFqqWyteVqxL8WfDrFfrt9_5sQ@mail.gmail.com>
+References: <1359313332-12305-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1359313332-12305-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdZi0zCNf6LDd9UAcd57kFqqWyteVqxL8WfDrFfrt9_5sQ@mail.gmail.com>
+Message-ID: <51085315.2000302@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-Le 29/01/2013 23:38, Linus Walleij a ?crit :
-> On Mon, Jan 28, 2013 at 9:33 PM, Maxime Ripard
+Le 29/01/2013 23:41, Linus Walleij a ?crit :
+> On Sun, Jan 27, 2013 at 8:02 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
 > 
->> The IP responsible for the muxing on the Allwinner SoCs are also
->> handling the GPIOs on the system. This patch adds the needed driver that
->> relies on the pinctrl driver for most of its operations.
->>
->> The number of pins available for GPIOs operations are already declared
->> in the pinctrl driver, we only need to probe a generic driver to handle
->> the banks available for each SoC.
->>
->> This driver has been tested on a A13-Olinuxino.
+>> Since the pin controller of sunxi chips is represented as a single bank
+>> in the driver.
+>> Since this is neither convenient nor represented that way in the
+>> datasheets, define a custom of_xlate function with the layout <bank pin
+>> flag>
 >>
 >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> Applied to my allwinner branch.
+> This does not apply and I only have 1/3 it seems?
 > 
-> I'm a bit confused with other patches floating around,
-> I hope I'm supposed to apply this first...
+> Sorry, help me understand which order these patches go in...
 
-Ah, yes, sorry, I forgot to mention the order of the patchset.
+My bad, I forgot to mention the order of the patchsets, and to cc you
+for the all series... Sorry about that.
 
-This one is indeed the first one, then comes "Add pinctrl/gpio support
-for A10 SoCs", and finally "Add support for user LED on the A13-Olinuxino".
+This patch should come after the patch series that adds the support for
+the A10 SoCs in the pinctrl driver.
 
-Since you already started to merge most of the patches for the sunxi
-device tree, maybe the most reasonnable thing to do to avoid merge
-conflicts would be for you to merge all of these patches.
+Do you want me to resend this serie and cc you?
 
-Thanks!
 Maxime
-
 
 -- 
 Maxime Ripard, Free Electrons
