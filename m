@@ -1,153 +1,87 @@
-From: kishon@ti.com (kishon)
-Date: Tue, 29 Jan 2013 19:14:51 +0530
-Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <5107D253.5030400@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Jan 2013 14:45:22 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130129132204.GA23886@arm.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130129132204.GA23886@arm.com>
+Message-ID: <20130129144522.44ed7373@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Andrew Murray,
 
-On Tuesday 29 January 2013 04:52 PM, Sascha Hauer wrote:
-> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
->
-> This adds two little devicetree helper functions for determining the
-> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
-> the devicetree.
->
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
->
-> The properties and their values have been taken from the fsl-mph-dr driver.
-> This binding is also documented (though currently not used) for the tegra
-> ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
-> This is a first attempt to parse these bindings at a common place so that
-> others can make use of it.
->
-> Basically I want to know whether this binding is recommended for new drivers
-> since normally the devicetree uses '-' instead of '_', and maybe there are
-> other problems with it.
->
-> I need this binding for the chipidea driver. I suspect that the fsl-mph-dr
-> driver also really handles a chipidea core.
->
-> Should we agree on this I would convert the fsl-mph-dr driver to use these
-> helpers.
->
-> Sascha
->
->   drivers/usb/core/Makefile |    1 +
->   drivers/usb/core/of.c     |   76 +++++++++++++++++++++++++++++++++++++++++++++
+On Tue, 29 Jan 2013 13:22:04 +0000, Andrew Murray wrote:
 
-This file should ideally go into drivers/usb/phy/.
->   include/linux/usb/of.h    |   22 +++++++++++++
->   include/linux/usb/phy.h   |    9 ++++++
->   4 files changed, 108 insertions(+)
->   create mode 100644 drivers/usb/core/of.c
->   create mode 100644 include/linux/usb/of.h
->
-> diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
-> index 26059b9..5378add 100644
-> --- a/drivers/usb/core/Makefile
-> +++ b/drivers/usb/core/Makefile
-> @@ -10,5 +10,6 @@ usbcore-y += devio.o notify.o generic.o quirks.o devices.o
->
->   usbcore-$(CONFIG_PCI)		+= hcd-pci.o
->   usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
-> +usbcore-$(CONFIG_OF)		+= of.o
+> > +static int __init mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+> > +{
+> 
+> [snip]
+> 
+> > +
+> > +       /*
+> > +        * Build an laddr array that describes the PCI device in a DT
+> > +        * way
+> > +        */
+> > +       laddr[0] = cpu_to_be32(port->devfn << 8);
+> > +       laddr[1] = laddr[2] = 0;
+> > +       intspec = cpu_to_be32(pin);
+> > +
+> > +       ret = of_irq_map_raw(port->dn, &intspec, 1, laddr, &oirq);
+> > +       if (ret) {
+> > +               dev_err(&pcie->pdev->dev,
+> > +                       "%s: of_irq_map_raw() failed, %d\n",
+> > +                       __func__, ret);
+> > +               return ret;
+> > +       }
+> 
+> Are you able to replace the above code with a call to of_irq_map_pci? I'm not
+> sure which approach is better. The of_irq_map_pci function doesn't require the
+> pin argument and instead uses the DT and/or performs its own pin swizzling. I
+> guess this means that if there are PCIe devices in the DT tree that does any
+> thing strange with pins then it would be reflected in the IRQ you get. I've
+> found that you will also need to provide an implementation of
+> pcibios_get_phb_of_node for this to work correctly (see my RFC bios32 patch).
 
-No Kconfig? Shouldn't this file be compiled only when some one is going 
-to use the PHY?
->
->   obj-$(CONFIG_USB)		+= usbcore.o
-> diff --git a/drivers/usb/core/of.c b/drivers/usb/core/of.c
-> new file mode 100644
-> index 0000000..d000d9f
-> --- /dev/null
-> +++ b/drivers/usb/core/of.c
-> @@ -0,0 +1,76 @@
-> +/*
-> + * OF helpers for usb devices.
-> + *
-> + * This file is released under the GPLv2
-> + *
-> + * Initially copied out of drivers/of/of_net.c
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/usb/of.h>
-> +#include <linux/usb/phy.h>
-> +#include <linux/export.h>
-> +
-> +static const char *usbphy_modes[] = {
-> +	[USBPHY_INTERFACE_MODE_NA]	= "",
-> +	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
-> +	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
-> +	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
-> +	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
-> +	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
-> +};
-> +
-> +/**
-> + * of_get_usbphy_mode - Get phy mode for given device_node
-> + * @np:	Pointer to the given device_node
-> + *
-> + * The function gets phy interface string from property 'phy_type',
-> + * and returns the correspondig enum usb_phy_interface
-> + */
-> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
-> +{
-> +	const char *phy_type;
-> +	int err, i;
-> +
-> +	err = of_property_read_string(np, "phy_type", &phy_type);
-> +	if (err < 0)
-> +		return USBPHY_INTERFACE_MODE_NA;
+I did try using the of_irq_map_pci() function, but unfortunately, it
+didn't work. IIRC, it didn't work because none of the pci_dev in my PCI
+tree had any 'struct device_node' associated to them, or at least not
+the one that had the right pdev->bus->number and pdev->devfn.
 
-Why don't we use a u32 property type for the *phy-type*? IMHO we should 
-use string property only when the property should be absolutely 
-unambiguous (e.g., compatible property should be string).
+But, I guess that your patch that implements pcibios_get_phb_of_node()
+should fix this problem. I'll try this. Thanks!
 
-> +
-> +	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
-> +		if (!strcasecmp(phy_type, usbphy_modes[i]))
-> +			return i;
-> +
-> +	return USBPHY_INTERFACE_MODE_NA;
-> +}
-> +EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
-> +
-> +static const char *usb_dr_modes[] = {
-> +	[USB_DR_MODE_UNKNOWN]		= "",
-> +	[USB_DR_MODE_HOST]		= "host",
-> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
-> +	[USB_DR_MODE_OTG]		= "otg",
-> +};
-> +
-> +/**
-> + * of_usb_get_dr_mode - Get dual role mode for given device_node
-> + * @np:	Pointer to the given device_node
-> + *
-> + * The function gets phy interface string from property 'dr_mode',
-> + * and returns the correspondig enum usb_phy_dr_mode
-> + */
-> +enum usb_phy_dr_mode of_usb_get_dr_mode(struct device_node *np)
-> +{
-> +	const char *dr_mode;
-> +	int err, i;
-> +
-> +	err = of_property_read_string(np, "dr_mode", &dr_mode);
-> +	if (err < 0)
-> +		return USB_DR_MODE_UNKNOWN;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
-> +		if (!strcasecmp(dr_mode, usb_dr_modes[i]))
-> +			return i;
+> > +static int mvebu_pcie_init(void)
+> > +{
+> > +       return platform_driver_probe(&mvebu_pcie_driver,
+> > +                                    mvebu_pcie_probe);
+> > +}
+> 
+> If you have multiple 'mvebu-pcie' in your DT then you will end up
+> with multiple calls to
+> mvebu_pcie_probe/mvebu_pcie_enable/pci_common_init.
 
-Same comment applies here too.
+Right. In practice, there will only ever be a single DT node, since all
+PCIe interfaces are sub-nodes of the PCI controller node. But I
+understand the theoretical problem.
 
-Thanks
-Kishon
+> However pci_common_init/pcibios_init_hw assumes it will only ever be called
+> once, and will thus result in trying to create multiple busses with the same
+> bus number. (The first root bus it creates is always zero provided you haven't
+> implemented hw->scan).
+> 
+> I noticed this in Thierry's patch set and posted an RFC patch which overcomes
+> this issue (patchwork.kernel.org/patch/2001171) and others. Perhaps you would
+> want to include this in your patchset?
+
+Sure, I'll give it a test, and report if it works for me.
+
+Thanks a lot!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
