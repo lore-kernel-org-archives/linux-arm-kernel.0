@@ -1,49 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Jan 2013 17:46:09 +0100
-Subject: [PATCH 5/5] mv643xx_eth: convert to use the Marvell Orion MDIO
- driver
-In-Reply-To: <5107F88C.8030002@openwrt.org>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1359473048-26551-6-git-send-email-florian@openwrt.org>
- <20130129170131.7964a110@skate> <5107F88C.8030002@openwrt.org>
-Message-ID: <20130129174609.6ff6fe03@skate>
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Tue, 29 Jan 2013 16:46:58 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130129083522.GA14302@pd.tnic>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129083522.GA14302@pd.tnic>
+Message-ID: <1359478014.3529.157.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Florian Fainelli,
+On Tue, 2013-01-29 at 09:35 +0100, Borislav Petkov wrote:
+> 
+> >  
+> >  #ifdef CONFIG_ARCH_USE_BUILTIN_BSWAP
+> > -#if GCC_VERSION >= 40400
+> > +#if (!defined(__arm__) && GCC_VERSION >= 40400) || \
+> > +    (defined(__arm__) && GCC_VERSION >= 40600)
+> 
+> There should be no arch-specific stuff in a generic header. I guess
+> you probably need to select ARCH_USE_BUILTIN_BSWAP in an arm-specific
+> compiler.h header after checking compiler version...
 
-On Tue, 29 Jan 2013 17:27:56 +0100, Florian Fainelli wrote:
+If we're really going to have many different architectures depending on
+different versions of GCC for this (if it wasn't sane to use it from
+4.4/4.8 when it got introduced, and depends on some later arch-specific
+optimisation), then perhaps we'll have the arch provide the
+corresponding required GCC_VERSION for using each of 64/32/16 bit
+builtins, instead of just a yes/no flag? Or just define
+__HAVE_BUILTIN_BSWAPxx__ for itself, perhaps?
 
-> It looks like I introduced two redundant mvmdio instances as ge01
-> refers to the ge00 smi bus (the same applies to ge11 and ge10).
-> Thanks for spotting this.
+In fact we could start by having just the problematic architectures set
+__HAVE_BUILTIN_BSWAPxx__ for themselves according to whatever criteria
+they want, and then if there's scope for consolidating that in the
+generic code then we can do so later.
 
-Ok, good.
-
-> If you take a closer look at mv643xx_eth you will see that the
-> "shared" driver still handles the mconf bus window configuration,
-> which is not abstracted yet.
-
-Indeed, I've seen that. But I don't understand why it's done in the
-mv643xx_eth_shared_probe(). The mbus window configuration registers are
-per-network interface, so this call to mv643xx_eth_conf_mbus_windows()
-could presumably be done in mv643xx_eth_probe().
-
-At least in mvneta, we have the same registers, and we do their
-initialization in the driver normal (and only) ->probe() routine.
-
-> Besides that, I would rather do it step by step.
-
-Yes, agreed. But I think it would be good to have followed patches that
-progressively get rid of the shared driver thing, as it will help in
-bringing a proper DT binding in the mv643xx_eth driver. But it
-certainly doesn't need to be part of this specific patch.
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+                   Sent with MeeGo's ActiveSync support.
+
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4370 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/9fde7c1d/attachment.bin>
