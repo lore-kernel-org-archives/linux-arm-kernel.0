@@ -1,67 +1,64 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Jan 2013 17:20:55 +0100
-Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
-In-Reply-To: <20130129155820.GB23505@n2100.arm.linux.org.uk>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130129161211.7bb8cada@skate>
- <20130129155820.GB23505@n2100.arm.linux.org.uk>
-Message-ID: <20130129172055.0ca5f341@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jan 2013 16:21:59 +0000
+Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <CAKohpoms+WC_XJnH2b6uoycRKkF-yxZUg2J+8NrYJP8fnDNLtg@mail.gmail.com>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <201301291331.48427.arnd@arndb.de>
+ <CAKohpoms+WC_XJnH2b6uoycRKkF-yxZUg2J+8NrYJP8fnDNLtg@mail.gmail.com>
+Message-ID: <201301291621.59425.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Tue, 29 Jan 2013 15:58:20 +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 29, 2013 at 04:12:11PM +0100, Thomas Petazzoni wrote:
-> > On Mon, 28 Jan 2013 19:56:14 +0100, Thomas Petazzoni wrote:
-> > > The PCI specifications says that an I/O region must be aligned on a 4
-> > > KB boundary, and a memory region aligned on a 1 MB boundary.
+On Tuesday 29 January 2013, Viresh Kumar wrote:
+> On 29 January 2013 19:01, Arnd Bergmann <arnd@arndb.de> wrote:
+> > Ah, good. So I guess the "dma-requests" property should actually
+> > be "16" then.
 > 
-> BTW, this, as a general statement, is wrong - though it really depends
-> what you mean by "region".
+> yes, even i was checking on that separately :)
 
-Yes, sorry, my statement does not correctly reflect the reality. My
-knowledge of the PCI terminology is still quite fuzzy (as you found
-out). What I am referring to is that the PCI standard requires the I/O
-base register of a PCI-to-PCI bridge to contain a 4 KB aligned address.
+Actually, I just discovered something odd in the
+arch/arm/mach-spear/spear13xx-dma.h file that gets removed
+in the last patch: there, we define request numbers up to
+32, e.g.
 
->From the PCI-to-PCI Bridge Architecture Specification, Revision 1.1,
-section 3.2.5.6. I/O Base Register and I/O Limit Register:
+-       SPEAR1310_DMA_REQ_UART2_RX = 14,
+-       SPEAR1310_DMA_REQ_UART2_TX = 15,
+-       SPEAR1310_DMA_REQ_UART5_RX = 16,
+-       SPEAR1310_DMA_REQ_UART5_TX = 17,
 
-"""
-   If a bridge implements an I/O address range, the upper 4 bits of
-   both the I/O Base and I/O Limit registers are writable and
-   correspond to address bits AD[15::12]. For the purpose of address
-   decoding, the bridge assumes that the lower 12 address bits,
-   AD[11::00], of the I/O base address (not implemented in the I/O Base
-   register) are zero. Similarly, the bridge assumes that the lower 12
-   address bits, AD[11::00], of the I/O limit address (not implemented
-   in the I/O Limit register) are FFFh. Thus, the bottom of the defined
-   I/O address range will be aligned to a 4 KB boundary and the top of
-   the defined I/O address range will be one less than a 4 KB boundary.
-"""
+What is the meaning of this, if the maximum request number is 15?
+ 
+> > Could we have device-to-device DMAs with this controller, and if
+> > we can, should we have both 'src' and 'dst' fields? Are the
+> > two number ranges sharing the same address space, i.e. is
+> > request '7' as the destination guaranteed to be the same device
+> > as request '7' in the source?
+> 
+> Request lines are per master... So, for a master single request line
+> is independent of direction. Many DMA controllers have capability of
+> doing dev-to-dev transfers but DMAENGINE doesn't have any support
+> for it, even we don't have a usecase too :)
+> 
+> > If we need two lines, we could interleave them with the bus
+> > master numbers:
+> 
+> not required.
 
-And the Linux PCI resource allocation code complies with this, so that
-if I have two PCI-to-PCI bridges (each having downstream a device with
-an I/O BAR), then the first PCI-to-PCI bridge gets its I/O base address
-register set to ADDR + 0x0, and the second bridge gets its I/O base
-address set to ADDR + 0x1000. And this doesn't play well with the
-requirements of Marvell address decoding windows for PCIe I/O regions,
-which must be 64 KB aligned.
+Ok. Would it be enough to have only one master and one request
+field in the DT dma descriptor then, and have the code figure
+whether to use it as source or destination, based on the
+configuration? Which one should come first? Since you have
+multiple masters per controller, and multiple requests per
+master, it sounds like the cleanest descriptor form would
+be 
 
-So I guess I should simply rewrite the commit log to make it clear that
-I'm referring to the I/O base address register of PCI-to-PCI bridges.
+	<controller master request>;
 
-Would this be more correct? In that case, maybe in fact I really need a
-hook so that this alignment requirement on only applied on the
-resources allocated to bridges, and not on their downstream devices?
+Or possibly
 
-Thanks,
+	<controller master request direction>;
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+if the direction needs to be known at the time the channel
+is requested.
+
+	Arnd
