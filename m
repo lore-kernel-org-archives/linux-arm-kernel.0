@@ -1,54 +1,75 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 29 Jan 2013 13:31:23 +0530
-Subject: [PATCH V2] ARM: davinci: da850: add RTC DT entries
-In-Reply-To: <4232EB8829679242B82E712C3DB3149D42355C@DBDE01.ent.ti.com>
-References: <1359359268-9781-1-git-send-email-mrugesh.mk@ti.com>
- <5106A105.6030004@ti.com>
- <4232EB8829679242B82E712C3DB3149D42355C@DBDE01.ent.ti.com>
-Message-ID: <510781D3.4070807@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 29 Jan 2013 13:46:05 +0530
+Subject: [PATCH 5/5] ARM: SPEAr13xx: Pass generic DW DMAC platform data
+ from DT
+In-Reply-To: <1359410300-26113-6-git-send-email-arnd@arndb.de>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <1359410300-26113-1-git-send-email-arnd@arndb.de>
+ <1359410300-26113-6-git-send-email-arnd@arndb.de>
+Message-ID: <CAKohpokrvYDaMgB-5HV+bJh01YNU4H5UrSUnzxa_NpvE1qQqiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/29/2013 1:05 PM, Katepallewar, Mrugesh wrote:
-> On Mon, Jan 28, 2013 at 21:32:13, Nori, Sekhar wrote:
->> Hi Mrugesh,
->>
->> On 1/28/2013 1:17 PM, Mrugesh Katepallewar wrote:
->>> Add RTC DT entries in da850 dts file.
->>>
->>> Signed-off-by: Mrugesh Katepallewar <mrugesh.mk@ti.com>
->>> ---
->>> Applies on top of v3.8-rc4 of linus tree.
->>>
->>> This patch is depending on
->>> "ARM: davinci: da850: add interrupt-parent property in soc node"
->>> https://patchwork.kernel.org/patch/2044101/
->>
->>> Tested on da850-evm device.
->>>
->>> Test Procedure:
->>> date 2013.01.28-10:00:00 (usage: date[YYYY.]MM.DD-hh:mm[:ss]) hwclock 
->>> -w reset board and check system time.
->>
->> Queuing this for v3.9. The testing information above is useful and should be part of the changelog. I moved it there while committing.
->>
->> It will be nice to check the alarm functionality as well. Can you check that and let me know that works as well?
-> 
-> I tried to test RTC alarm using "rtcwake" command, however it is not working and returning following error 
-> "rtcwake: /dev/rtc0 not enabled for wakeup events"
-> This is coming because we have not registered RTC device as a wakeup source yet.
+You forgot spear-devel for this series.
 
-rtcwake is too much to use if the purpose is just to test the alarm
-functionality.
+On 29 January 2013 03:28, Arnd Bergmann <arnd@arndb.de> wrote:
+> This replaces an earlier patch from Viresh Kumar to move
+> the spear platform over to the generic DMA binding. This
+> version is now based on the merged multiplatform capable
+> spear platform, rather than the separate spear13xx/3xx/6xx
+> directories.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Vinod Koul <vinod.koul@linux.intel.com>
+> Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> ---
+>  arch/arm/boot/dts/spear1340.dtsi         |   3 +
+>  arch/arm/boot/dts/spear13xx.dtsi         |  25 +++++-
+>  arch/arm/mach-spear/generic.h            |   6 --
+>  arch/arm/mach-spear/include/mach/spear.h |   2 -
+>  arch/arm/mach-spear/spear1310.c          |  30 +-------
+>  arch/arm/mach-spear/spear1340.c          |  32 +-------
+>  arch/arm/mach-spear/spear13xx-dma.h      | 128 -------------------------------
+>  arch/arm/mach-spear/spear13xx.c          |  58 --------------
+>  8 files changed, 29 insertions(+), 255 deletions(-)
+>  delete mode 100644 arch/arm/mach-spear/spear13xx-dma.h
+>
+> diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
+> index 34da11a..e1786a0 100644
+> --- a/arch/arm/boot/dts/spear1340.dtsi
+> +++ b/arch/arm/boot/dts/spear1340.dtsi
+> @@ -113,6 +113,9 @@
+>                                 reg = <0xb4100000 0x1000>;
+>                                 interrupts = <0 105 0x4>;
+>                                 status = "disabled";
+> +                               dmas = <&dwdma0 0x600 0 0 1>, /* 0xC << 11 */
+> +                                       <&dwdma0 0x680 0 1 0>; /* 0xD << 7 */
+> +                               dma-names = "tx", "rx";
+>                         };
+>
+>                         thermal at e07008c4 {
+> diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
+> index b4ca60f..45597fd 100644
+> --- a/arch/arm/boot/dts/spear13xx.dtsi
+> +++ b/arch/arm/boot/dts/spear13xx.dtsi
+> @@ -98,13 +98,24 @@
+>                         reg = <0xb2800000 0x1000>;
+>                         interrupts = <0 29 0x4>;
+>                         status = "disabled";
+> +                       dmas = <&dwdma0 0 0 0 0>;
+> +                       dma-names = "data";
+>                 };
+>
+> -               dma at ea800000 {
+> +               dwdma0: dma at ea800000 {
+>                         compatible = "snps,dma-spear1340";
+>                         reg = <0xea800000 0x1000>;
+>                         interrupts = <0 19 0x4>;
+>                         status = "disabled";
+> +
+> +                       dma-channels = <8>;
+> +                       #dma-cells = <3>;
 
-> For checking RTC alarm interrupt, I developed one simple program which opens RTC device, set alarm and exits.
-> Then by entering "cat /proc/interrupts" checked RTC interrupt count.
-
-No need of writing your own. Simply use the one in Documentation/rtc.txt
-
-> Using above test it confirms that RTC alarm functionality is working fine. 
-
-Okay. Thanks for confirming.
-
-Regards,
-Sekhar
+4?
