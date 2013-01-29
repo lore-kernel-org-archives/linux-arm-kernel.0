@@ -1,42 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jan 2013 16:01:34 +0000
-Subject: [PATCH 09/30] USB: ehci-omap: Use devm_request_and_ioremap()
-In-Reply-To: <Pine.LNX.4.44L0.1301291033000.1507-100000@iolanthe.rowland.org>
-References: <20130128152010.GN23505@n2100.arm.linux.org.uk>
- <Pine.LNX.4.44L0.1301291033000.1507-100000@iolanthe.rowland.org>
-Message-ID: <20130129160134.GC23505@n2100.arm.linux.org.uk>
+From: walimisdev@gmail.com (Liming Wang)
+Date: Wed, 30 Jan 2013 00:05:26 +0800
+Subject: [PATCH] serial: pl010/pl011: move clk_enable from console write to
+ setup
+Message-ID: <1359475526-17523-1-git-send-email-walimisdev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 10:34:53AM -0500, Alan Stern wrote:
-> On Mon, 28 Jan 2013, Russell King - ARM Linux wrote:
-> 
-> > On Mon, Jan 28, 2013 at 10:17:33AM -0500, Alan Stern wrote:
-> > > On Mon, 28 Jan 2013, Roger Quadros wrote:
-> > > 
-> > > > Make use of devm_request_and_ioremap() and correct comment.
-> > > 
-> > > Didn't a big patch come through recently converting all usages of 
-> > > devm_request_and_ioremap() to another function (I forget the name) that 
-> > > does its own error reporting and returns an ERR_PTR value?
-> > > 
-> > > (Checks the mailing list archive...)  Ah, here it is:
-> > > 
-> > > 	http://marc.info/?l=linux-usb&m=135876311801537&w=2
-> > > 
-> > > And the new function is devm_ioremap_resource().  We should avoid 
-> > > adding new usages of an old interface.
-> > 
-> > Maybe... if devm_ioremap_resource() was already in the kernel.  The
-> > problem at the moment is it isn't, and it'll probably be rather
-> > horrid for everyone to deal with especially when it comes to testing.
-> 
-> Not in the kernel yet?  I didn't realize that.  Looks like Thierry 
-> Reding will have some clean-up work to do when it does get in.
+There seems no need to call clk_enable in every console writing. And we
+can move clk_enable to setup function to enable the clock only once.
+Also combine the clk_enable and clk_prepare to clk_prepare_enable.
 
-It may be in linux-next, but it isn't in Linus' yet... (of course, it's
-probably scheduled for the upcoming merge window).  Certainly:
+Signed-off-by: Liming Wang <walimisdev@gmail.com>
+---
+ drivers/tty/serial/amba-pl010.c |    6 +-----
+ drivers/tty/serial/amba-pl011.c |    6 +-----
+ 2 files changed, 2 insertions(+), 10 deletions(-)
 
-$ grep -r devm_ioremap_resource include
-
-against Linus' tree (6abb7c2) still turns up nothing.
+diff --git a/drivers/tty/serial/amba-pl010.c b/drivers/tty/serial/amba-pl010.c
+index 22317dd..9b77188 100644
+--- a/drivers/tty/serial/amba-pl010.c
++++ b/drivers/tty/serial/amba-pl010.c
+@@ -569,8 +569,6 @@ pl010_console_write(struct console *co, const char *s, unsigned int count)
+ 	struct uart_amba_port *uap = amba_ports[co->index];
+ 	unsigned int status, old_cr;
+ 
+-	clk_enable(uap->clk);
+-
+ 	/*
+ 	 *	First save the CR then disable the interrupts
+ 	 */
+@@ -588,8 +586,6 @@ pl010_console_write(struct console *co, const char *s, unsigned int count)
+ 		barrier();
+ 	} while (status & UART01x_FR_BUSY);
+ 	writel(old_cr, uap->port.membase + UART010_CR);
+-
+-	clk_disable(uap->clk);
+ }
+ 
+ static void __init
+@@ -639,7 +635,7 @@ static int __init pl010_console_setup(struct console *co, char *options)
+ 	if (!uap)
+ 		return -ENODEV;
+ 
+-	ret = clk_prepare(uap->clk);
++	ret = clk_prepare_enable(uap->clk);
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 7fca402..53aafd4 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1777,8 +1777,6 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	unsigned long flags;
+ 	int locked = 1;
+ 
+-	clk_enable(uap->clk);
+-
+ 	local_irq_save(flags);
+ 	if (uap->port.sysrq)
+ 		locked = 0;
+@@ -1809,8 +1807,6 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	if (locked)
+ 		spin_unlock(&uap->port.lock);
+ 	local_irq_restore(flags);
+-
+-	clk_disable(uap->clk);
+ }
+ 
+ static void __init
+@@ -1876,7 +1872,7 @@ static int __init pl011_console_setup(struct console *co, char *options)
+ 				"could not set default pins\n");
+ 	}
+ 
+-	ret = clk_prepare(uap->clk);
++	ret = clk_prepare_enable(uap->clk);
+ 	if (ret)
+ 		return ret;
+ 
+-- 
+1.7.9.5
