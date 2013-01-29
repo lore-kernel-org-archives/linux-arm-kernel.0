@@ -1,108 +1,90 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Tue, 29 Jan 2013 12:29:16 +0530
-Subject: [PATCH v2 3/9] ARM: OMAP2+: AM33XX: hwmod: Register OCMC RAM hwmod
+Date: Tue, 29 Jan 2013 12:29:20 +0530
+Subject: [PATCH v2 7/9] ARM: OMAP2+: AM33XX: Update the hardreset API
 In-Reply-To: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
 References: <1359442762-13697-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1359442762-13697-4-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1359442762-13697-8-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OCMC RAM lies in the PER power domain and this memory
-support retention.
+WKUP-M3 has a reset status bit (RM_WKUP_STST.WKUP_M3_LRST)
+Update the hardreset API to ensure that the reset line properly
+deasserted.
 
 Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
 v2: No change
 
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 47 +++++++++++++++++-------------
- 1 file changed, 27 insertions(+), 20 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |  5 +----
+ arch/arm/mach-omap2/prm33xx.c    | 11 +++++++----
+ arch/arm/mach-omap2/prm33xx.h    |  2 +-
+ 3 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 646c14d..8280f11 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -414,7 +414,6 @@ static struct omap_hwmod am33xx_adc_tsc_hwmod = {
-  *    - cEFUSE (doesn't fall under any ocp_if)
-  *    - clkdiv32k
-  *    - debugss
-- *    - ocmc ram
-  *    - ocp watch point
-  *    - aes0
-  *    - sha0
-@@ -481,25 +480,6 @@ static struct omap_hwmod am33xx_debugss_hwmod = {
- 	},
- };
- 
--/* ocmcram */
--static struct omap_hwmod_class am33xx_ocmcram_hwmod_class = {
--	.name = "ocmcram",
--};
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 4653efb..6549439 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3041,11 +3041,8 @@ static int _am33xx_assert_hardreset(struct omap_hwmod *oh,
+ static int _am33xx_deassert_hardreset(struct omap_hwmod *oh,
+ 				     struct omap_hwmod_rst_info *ohri)
+ {
+-	if (ohri->st_shift)
+-		pr_err("omap_hwmod: %s: %s: hwmod data error: OMAP4 does not support st_shift\n",
+-		       oh->name, ohri->name);
 -
--static struct omap_hwmod am33xx_ocmcram_hwmod = {
--	.name		= "ocmcram",
--	.class		= &am33xx_ocmcram_hwmod_class,
--	.clkdm_name	= "l3_clkdm",
--	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET),
--	.main_clk	= "l3_gclk",
--	.prcm		= {
--		.omap4	= {
--			.clkctrl_offs	= AM33XX_CM_PER_OCMCRAM_CLKCTRL_OFFSET,
--			.modulemode	= MODULEMODE_SWCTRL,
--		},
--	},
--};
--
- /* ocpwp */
- static struct omap_hwmod_class am33xx_ocpwp_hwmod_class = {
- 	.name		= "ocpwp",
-@@ -570,6 +550,25 @@ static struct omap_hwmod am33xx_sha0_hwmod = {
+ 	return am33xx_prm_deassert_hardreset(ohri->rst_shift,
++				ohri->st_shift,
+ 				oh->clkdm->pwrdm.ptr->prcm_offs,
+ 				oh->prcm.omap4.rstctrl_offs,
+ 				oh->prcm.omap4.rstst_offs);
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index 1ac7388..44c0d72 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -110,11 +110,11 @@ int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs)
+  * -EINVAL upon an argument error, -EEXIST if the submodule was already out
+  * of reset, or -EBUSY if the submodule did not exit reset promptly.
+  */
+-int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
++int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, s16 inst,
+ 		u16 rstctrl_offs, u16 rstst_offs)
+ {
+ 	int c;
+-	u32 mask = 1 << shift;
++	u32 mask = 1 << st_shift;
  
+ 	/* Check the current status to avoid  de-asserting the line twice */
+ 	if (am33xx_prm_is_hardreset_asserted(shift, inst, rstctrl_offs) == 0)
+@@ -122,11 +122,14 @@ int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
+ 
+ 	/* Clear the reset status by writing 1 to the status bit */
+ 	am33xx_prm_rmw_reg_bits(0xffffffff, mask, inst, rstst_offs);
++
+ 	/* de-assert the reset control line */
++	mask = 1 << shift;
++
+ 	am33xx_prm_rmw_reg_bits(mask, 0, inst, rstctrl_offs);
+-	/* wait the status to be set */
+ 
+-	omap_test_timeout(am33xx_prm_is_hardreset_asserted(shift, inst,
++	/* wait the status to be set */
++	omap_test_timeout(am33xx_prm_is_hardreset_asserted(st_shift, inst,
+ 							   rstst_offs),
+ 			  MAX_MODULE_HARDRESET_WAIT, c);
+ 
+diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
+index 1c40373..9b9918d 100644
+--- a/arch/arm/mach-omap2/prm33xx.h
++++ b/arch/arm/mach-omap2/prm33xx.h
+@@ -125,7 +125,7 @@ extern void am33xx_prm_global_warm_sw_reset(void);
+ extern int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst,
+ 		u16 rstctrl_offs);
+ extern int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
+-extern int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
++extern int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, s16 inst,
+ 		u16 rstctrl_offs, u16 rstst_offs);
+ #endif /* ASSEMBLER */
  #endif
- 
-+/* ocmcram */
-+static struct omap_hwmod_class am33xx_ocmcram_hwmod_class = {
-+	.name = "ocmcram",
-+};
-+
-+static struct omap_hwmod am33xx_ocmcram_hwmod = {
-+	.name		= "ocmcram",
-+	.class		= &am33xx_ocmcram_hwmod_class,
-+	.clkdm_name	= "l3_clkdm",
-+	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET),
-+	.main_clk	= "l3_gclk",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs	= AM33XX_CM_PER_OCMCRAM_CLKCTRL_OFFSET,
-+			.modulemode	= MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
- /* 'smartreflex' class */
- static struct omap_hwmod_class am33xx_smartreflex_hwmod_class = {
- 	.name		= "smartreflex",
-@@ -3328,6 +3327,13 @@ static struct omap_hwmod_ocp_if am33xx_l3_s__usbss = {
- 	.flags		= OCPIF_SWSUP_IDLE,
- };
- 
-+/* l3 main -> ocmc */
-+static struct omap_hwmod_ocp_if am33xx_l3_main__ocmc = {
-+	.master		= &am33xx_l3_main_hwmod,
-+	.slave		= &am33xx_ocmcram_hwmod,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l4_fw__emif_fw,
- 	&am33xx_l3_main__emif,
-@@ -3398,6 +3404,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l3_main__tptc0,
- 	&am33xx_l3_main__tptc1,
- 	&am33xx_l3_main__tptc2,
-+	&am33xx_l3_main__ocmc,
- 	&am33xx_l3_s__usbss,
- 	&am33xx_l4_hs__cpgmac0,
- 	&am33xx_cpgmac0__mdio,
 -- 
 1.8.1
