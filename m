@@ -1,48 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jan 2013 22:54:00 +0000
-Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
-In-Reply-To: <20130129213308.7e845064@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301292015.21478.arnd@arndb.de> <20130129213308.7e845064@skate>
-Message-ID: <201301292254.01069.arnd@arndb.de>
+From: dsterba@suse.cz (David Sterba)
+Date: Tue, 29 Jan 2013 23:55:14 +0100
+Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
+In-Reply-To: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
+References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
+Message-ID: <20130129225508.GC30535@twin.jikos.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013, Thomas Petazzoni wrote:
-> Does this still allows me to give the Linux PCI one global range of
-> addresses for I/O space, and one global range of addresses for memory
-> space, and the the Linux PCI core assign ranges, within those global
-> ranges, to each host bridge?
-> 
-> This is absolutely essential for me, as I then read those allocated
-> ranges to configure the address decoding windows.
-> 
-> Basically, I have currently two suggestions:
-> 
->  * From Jason Gunthorpe, to not use any host bridge, and instead use
->    only PCI-to-PCI bridges, one per PCIe interface.
-> 
->  * From you, to not use any PCI-to-PCI bridge, and use only host
->    bridges, one per PCIe interface.
-> 
-> Would it be possible to get some consensus on this? In the review of
-> RFCv1, I was already told to use one global host bridge, and then one
-> PCI-to-PCI bridge per PCIe interface, and now we're talking about doing
-> something different. I'd like to avoid having to try gazillions of
-> different possible implementations :-)
+On Sat, Jan 26, 2013 at 02:50:43PM +0900, Kyungsik Lee wrote:
+> This patchset is for supporting LZ4 compressed kernel and initial ramdisk on
+> the x86 and ARM architectures.
 
-I'm actually fine with either of the two suggestions you mentioned above,
-whichever is easier to implement and/or more closely matches what the
-hardware actually implements is better IMHO.
+Have you considered the 'high compression' mode of lz4?
+http://code.google.com/p/lz4/source/browse/trunk/lz4hc.c
 
-The part that I did not like about having emulated PCI-to-PCI bridges
-is that it seems to just work around a (percieved or real) limitation
-in the Linux kernel by adding a piece of infrastructure, rather than
-lifting that limitation by making the kernel deal with what the
-hardware provides. That reminded me of the original mach-vt8500
-PCI implementation that faked a complete PCI host bridge and a
-bunch of PCI devices on it, in order to use the via-velocity
-ethernet controller, instead of adding a simple 'platform_driver'
-struct to that driver.
+The compression format remains the same, the compressor tries harder
+(but is slower), resulting compression ratio is better.
 
-	Arnd
+an examle compression for vmlinux.bin of x86_64 build:
+
+input size: 16509520 bytes
+
+lz4 (svn 88):
+output size:        6393684    (38.7%)
+compression time:      41.7 ms (395 MB/s)
+decompression time:    13.7 ms (1204 MB/s)
+
+lz4hc (svn 88):
+output size:        5319137    (32.2%)
+compression time:       683 ms (24 MB/s)
+decompression time:    13.1 ms (1259 MB/s)
+
+compressed file delta: 6393684 - 5319137 = 1074547 ~ 1MB
+
+tested on a Nehalem box; same test on my slow desktop gives
+
+lz4:
+compression time:      97   ms (169 MB/s)
+decompression time:    25.7 ms (643 MB/s)
+
+lz4hc:
+compression time:    1386 ms (11 MB/s)
+decompression time:    26 ms (619 MB/s)
+
+While the decompression time is almost the same, image size is smaller.
+The kernel image compression is run in userspace and the low speed is
+not much of concern for a one-time operation.
+
+For the reference, lzo (current kernel version) run on the destktop:
+
+output size:         6026256 (36.5%)
+decompression time:     79.6 ms (207 MB/s)
+
+> It seems that it?s worth trying LZ4 compressed kernel image or ramdisk 
+> for making the kernel boot more faster.
+
+There's another potential user of lz4: btrfs. I've submitted a feature
+preview integrating lz4 compression
+http://thread.gmane.org/gmane.comp.file-systems.btrfs/15744
+and we have tried to integrate the HC mode as well
+http://thread.gmane.org/gmane.comp.file-systems.btrfs/18165
+.
+So far it's on a slow track, conceptually it works, but I the code needs
+some work so it could live under lib/* (we've used the svn sources
+with minor changes, no kernel coding style). It would be easier for me
+to enhance the existing lib/lz4/* codebase.
+
+Also zram could consider lz4, I'm not sure if there are other potential
+users.
+
+
+david
