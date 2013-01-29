@@ -1,37 +1,87 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Tue, 29 Jan 2013 13:03:38 +0800
-Subject: [PATCH v3 1/1 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <20130125222306.GA2523@electric-eye.fr.zoreil.com>
-References: <1359077343-8271-1-git-send-email-Frank.Li@freescale.com>
- <20130125043311.GA4141@ppwaskie-mobl2.amr.corp.intel.com>
- <20130125222306.GA2523@electric-eye.fr.zoreil.com>
-Message-ID: <CAHrpEqTQBbNVAVN5FDTYAnnO9gX_WXdC9xgq7X4+gtYJoHjpDg@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Tue, 29 Jan 2013 10:35:05 +0530
+Subject: [PATCH 2/2] drivers: net:ethernet: cpsw: add support for VLAN
+In-Reply-To: <20130128204446.GB5509@arwen.pp.htv.fi>
+References: <1359403945-28585-1-git-send-email-mugunthanvnm@ti.com>
+ <1359403945-28585-3-git-send-email-mugunthanvnm@ti.com>
+ <20130128204446.GB5509@arwen.pp.htv.fi>
+Message-ID: <51075881.4050200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/26 Francois Romieu <romieu@fr.zoreil.com>:
-> Waskiewicz Jr, Peter P <peter.p.waskiewicz.jr@intel.com> :
-> [...]
->> Also, when you're disabling interrupts above, you're doing that in your
->> HW interrupt handler, you should be using spin_lock_irqsave()/irq_restore().
+On 1/29/2013 2:14 AM, Felipe Balbi wrote:
+> On Tue, Jan 29, 2013 at 01:42:25AM +0530, Mugunthan V N wrote:
+>> adding support for VLAN interface for cpsw.
+>>
+>> CPSW VLAN Capability
+>> * Can filter VLAN packets in Hardware
+>>
+>> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+>> ---
+>>   Documentation/devicetree/bindings/net/cpsw.txt |    2 +
+>>   drivers/net/ethernet/ti/cpsw.c                 |  108 +++++++++++++++++++++++-
+>>   include/linux/platform_data/cpsw.h             |    1 +
+>>   3 files changed, 110 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+>> index 6ddd028..99696bf 100644
+>> --- a/Documentation/devicetree/bindings/net/cpsw.txt
+>> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+>> @@ -24,6 +24,8 @@ Required properties:
+>>   Optional properties:
+>>   - ti,hwmods		: Must be "cpgmac0"
+>>   - no_bd_ram		: Must be 0 or 1
+>> +- default_vlan		: Specifies Default VLAN for non tagged packets
+>> +			  ALE processing
+>>   
+>>   Note: "ti,hwmods" field is used to fetch the base address and irq
+>>   resources from TI, omap hwmod data base during device registration.
+>> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+>> index b35e6a7..dee6951 100644
+>> --- a/drivers/net/ethernet/ti/cpsw.c
+>> +++ b/drivers/net/ethernet/ti/cpsw.c
+>> @@ -32,6 +32,7 @@
+>>   #include <linux/of.h>
+>>   #include <linux/of_net.h>
+>>   #include <linux/of_device.h>
+>> +#include <linux/if_vlan.h>
+>>   
+>>   #include <linux/platform_data/cpsw.h>
+>>   
+>> @@ -72,6 +73,11 @@ do {								\
+>>   		dev_notice(priv->dev, format, ## __VA_ARGS__);	\
+>>   } while (0)
+>>   
+>> +#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+> use IS_ENABLED() instead.
+Will change this in next patch version.
 >
-> Does the platform forbid to defer FEC_EIR / FEC_IEVENT write to the napi
+>> +#define VLAN_SUPPORT
+>> +#define CPSW_VLAN_AWARE_MODE
+>> +#endif
+>> +
+>>   #define ALE_ALL_PORTS		0x7
+>>   
+>>   #define CPSW_MAJOR_VERSION(reg)		(reg >> 8 & 0x7)
+>> @@ -118,6 +124,14 @@ do {								\
+>>   #define TX_PRIORITY_MAPPING	0x33221100
+>>   #define CPDMA_TX_PRIORITY_MAP	0x76543210
+>>   
+>> +#ifdef CPSW_VLAN_AWARE_MODE
+>> +#define CPSW_VLAN_AWARE		BIT(1)
+>> +#define CPSW_ALE_VLAN_AWARE	1
+>> +#else
+>> +#define CPSW_VLAN_AWARE		0x0
+>> +#define CPSW_ALE_VLAN_AWARE	0
+>> +#endif
+> you should really figure out a way of doing runtime detection for this.
+> Depending on driver recompilation just to enable/disable VLAN support
+> will be quite boring.
+I am not able to find a way to know whether stack is compiled with VLAN 
+support or not
+without using VLAN_SUPPORT compiler option. Only way is to hack 
+cpsw_ndo_vlan_rx_add_vid
+and know whether stack has VLAN capability or not which is not advisable.
 
-I can clean FEC_IEVENT, but rx irq still issue if new package
-received. I tested, performance drop if just clean FEC_IEVENT
-
-> poll handler and only disable the irq through FEC_EIMR / FEC_IMASK in
-> fec_enet_interrupt so as to remove the spinlock ?
-
-I can remove this spin lock in other way.  I will send new patch.
-
->
-> (Frank, please keep an empty line between variables declarations and
-> function body).
-
-Okay.
-
->
-> --
-> Ueimor
+Regards
+Mugunthan V N
