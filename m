@@ -1,41 +1,35 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Tue, 29 Jan 2013 12:02:54 +0000
-Subject: [PATCH V2 1/6] pinctrl: pinctrl-single: use arch_initcall and
- module_exit
-In-Reply-To: <CACRpkdbf7TwrjfT2rhqQFGc3yh_Nt117RtzQO2y6g5Ddx5Ay_w@mail.gmail.com>
-References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
- <1359445134-13323-2-git-send-email-manishv.b@ti.com>
- <CACRpkdbf7TwrjfT2rhqQFGc3yh_Nt117RtzQO2y6g5Ddx5Ay_w@mail.gmail.com>
-Message-ID: <A4887BF146CD57468F700B415D2F4701581AE9@DBDE01.ent.ti.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Tue, 29 Jan 2013 17:39:02 +0530
+Subject: [PATCH 2/2] drivers: net:ethernet: cpsw: add support for VLAN
+In-Reply-To: <1359452926.4336.1.camel@coredoba.hi.pengutronix.de>
+References: <1359403945-28585-1-git-send-email-mugunthanvnm@ti.com>
+ <1359403945-28585-3-git-send-email-mugunthanvnm@ti.com>
+ <1359452926.4336.1.camel@coredoba.hi.pengutronix.de>
+Message-ID: <5107BBDE.7030401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 1/29/2013 3:18 PM, Jan L?bbe wrote:
+> On Tue, 2013-01-29 at 01:42 +0530, Mugunthan V N wrote:
+>> --- a/Documentation/devicetree/bindings/net/cpsw.txt
+>> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+>> @@ -24,6 +24,8 @@ Required properties:
+>>   Optional properties:
+>>   - ti,hwmods            : Must be "cpgmac0"
+>>   - no_bd_ram            : Must be 0 or 1
+>> +- default_vlan         : Specifies Default VLAN for non tagged packets
+>> +                         ALE processing
+> This does not seem to be a property of the hardware. Could there be a
+> reasonable default for it?
+>
+> Regards,
+> Jan
+Jan
 
-On Tue, Jan 29, 2013 at 16:29:54, Linus Walleij wrote:
-> On Tue, Jan 29, 2013 at 8:38 AM, Vishwanathrao Badarkhe, Manish <manishv.b@ti.com> wrote:
-> 
-> > Currently, I2C driver gets probed before pinctrl driver.
-> > To achieve I2C pin muxing via pinctrl driver before I2C probe get 
-> > called, register pinctrl driver in arch_initcall.
-> > Also, add module_exit to unregister pinctrl driver.
-> >
-> > Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
-> 
-> So your I2C driver is not returning -EPROBE_DEFER if it cannot find its pins?
-Yes. In Davinci I2C driver, it's not implemented to return -EPROBE_DEFER if it 
-can't find its pins.
+In VLAN aware mode, ALE always process only VLAN tagged packets. Even 
+untagged packets
+In hardware you can use any VLAN id for default (non tagged packet) 
+filtering.
 
-Please see below discussion for more details: 
-https://patchwork2.kernel.org/patch/2031321/
- 
-> 
-> Hm, well I can live with this, if Tony ACKs it.
-> 
-> Yours,
-> Linus Walleij
-> 
-
-
-Regards, 
-Manish
+Regards
+Mugunthan V N
