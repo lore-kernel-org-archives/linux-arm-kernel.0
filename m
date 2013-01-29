@@ -1,41 +1,22 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 29 Jan 2013 10:17:35 -0200
-Subject: [PATCH v2] ARM: imx: clk-imx27: Do not register peripheral clock for
- SSI
-Message-ID: <1359461855-27551-1-git-send-email-fabio.estevam@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Jan 2013 12:20:08 +0000
+Subject: Section mismatch in drivers/mfd/vexpress-sysreg.c
+In-Reply-To: <20130129115535.GH21504@S2101-09.ap.freescale.net>
+References: <20130129115535.GH21504@S2101-09.ap.freescale.net>
+Message-ID: <20130129122008.GT23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx ssi block has two types of clocks:
-    
-- ipg: bus clock, the clock needed for accessing registers.
-- per: peripheral clock, the clock needed for generating the bit rate.
+On Tue, Jan 29, 2013 at 07:55:37PM +0800, Shawn Guo wrote:
+> Pawel,
+> 
+> I'm building v3.8-rc5 and seeing the following section mismatch warning
+> in drivers/mfd/vexpress-sysreg.c.
+> 
+> WARNING: drivers/mfd/built-in.o(.text+0x3108): Section mismatch in reference from the function vexpress_sysreg_probe() to the function .init.text:vexpress_sysreg_setup()
+> The function vexpress_sysreg_probe() references
+> the function __init vexpress_sysreg_setup().
+> This is often because vexpress_sysreg_probe lacks a __init
+> annotation or the annotation of vexpress_sysreg_setup is wrong.
 
-Currently ssi driver only supports slave mode and thus need only to handle
-the ipg clock, because the peripheral clock comes from the master codec.
-
-Only register the ipg clock and do not register the peripheral clock for ssi
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Fix typo in email address in the From field
-
- arch/arm/mach-imx/clk-imx27.c |    2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 1ffe3b534..303d7bd 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -274,8 +274,6 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
- 	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
- 	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
--	clk_register_clkdev(clk[ssi1_baud_gate], "bitrate" , "imx-ssi.0");
--	clk_register_clkdev(clk[ssi2_baud_gate], "bitrate" , "imx-ssi.1");
- 
- 	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
- 
--- 
-1.7.9.5
+I've already reported this - it's been around for a while now.
