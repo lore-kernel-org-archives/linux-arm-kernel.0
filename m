@@ -1,51 +1,82 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 29 Jan 2013 21:20:04 +0000 (UTC)
-Subject: [PATCH 02/12] ARM: OMAP2+: PM: introduce power domains functional
- states
-In-Reply-To: <CAORVsuVX5AHocHSAg7aMbnLy9FaaPDS5doTCY4_G_-3r+AWEgw@mail.gmail.com>
-References: <20121209174545.6933.59371.stgit@dusk.lan>
- <20121209175253.6933.87846.stgit@dusk.lan>
- <CAORVsuVX5AHocHSAg7aMbnLy9FaaPDS5doTCY4_G_-3r+AWEgw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1301292114231.11442@utopia.booyaka.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 29 Jan 2013 22:23:09 +0100
+Subject: [PATCH v2 1/2] ARM: dove: cleanup includes
+In-Reply-To: <1355790269-10596-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1355790269-10596-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1359494590-26005-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi 
+This patch cleans unneccessary includes and reorders the remaining
+includes in common dove code.
 
-(redacted some context)
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changelog:
+[v2]
+- restructure patches to first cleanup common.c includes [1/2]
+  and then split legacy and DT specific code [2/2]
+- removed v1 patch "[PATCH 3/3] ARM: Dove: add Cubox sdhci card
+  detect gpio" that was taken independently
 
-On Wed, 12 Dec 2012, Jean Pihet wrote:
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mach-dove/common.c |   29 +++++++++--------------------
+ 1 file changed, 9 insertions(+), 20 deletions(-)
 
-> On Sun, Dec 9, 2012 at 6:53 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> 
-> +/**
-> > + * _match_pwrst: determine the closest supported power state
-> > + * @pwrsts: list of allowed states, defined as a bitmask
-> > + * @pwrst: initial state to be used as a starting point
-> > + * @min: minimum (i.e. lowest consumption) allowed state
-> > + * @max: maximum (i.e. highest consumption) allowed state
-> > + *
-> > + * Search down then up for a valid state from a list of allowed
-> > + * states.  Used by states conversion functions (_pwrdm_fpwrst_to_*)
-> > + * to look for allowed power and logic states for a powerdomain.
-> > + * Returns the matching allowed state.  XXX Deprecated.  The software
-> > + * should not try to program unsupported powerstates.
-> >
-> 
-> Why is this new code already deprecated? Does this require a rewrite?
-
-The reason why is documented in the above comment.  The kernel should not 
-attempt to program power states that the hardware doesn't support.  Our 
-existing code will program unrequested power states, and that isn't 
-predictable behavior.  If the kernel attempts to program a powerdomain to 
-the CSWR power state, and the powerdomain doesn't support that state, it 
-shouldn't silently program a different power state and return success.  
-It should return an error, since the calling code shouldn't have tried to 
-program that power state in the first place.
-
-One of the subsequent patches removes this behavior and this code.  It's 
-only being kept to ensure an orderly, functional kernel from one patch 
-series to the next.
-
-
-- Paul
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index 89f4f99..be887feea 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -8,35 +8,24 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/kernel.h>
+-#include <linux/delay.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/pci.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clk/mvebu.h>
+-#include <linux/ata_platform.h>
+-#include <linux/gpio.h>
++#include <linux/dma-mapping.h>
++#include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+-#include <asm/page.h>
+-#include <asm/setup.h>
+-#include <asm/timex.h>
++#include <linux/platform_data/dma-mv_xor.h>
++#include <linux/platform_data/usb-ehci-orion.h>
++#include <linux/platform_device.h>
+ #include <asm/hardware/cache-tauros2.h>
++#include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+-#include <asm/mach/pci.h>
+-#include <mach/dove.h>
+-#include <mach/pm.h>
+ #include <mach/bridge-regs.h>
+-#include <asm/mach/arch.h>
+-#include <linux/irq.h>
+-#include <plat/time.h>
+-#include <linux/platform_data/usb-ehci-orion.h>
+-#include <linux/platform_data/dma-mv_xor.h>
+-#include <plat/irq.h>
++#include <mach/pm.h>
+ #include <plat/common.h>
+-#include <plat/addr-map.h>
++#include <plat/irq.h>
++#include <plat/time.h>
+ #include "common.h"
+ 
+ /*****************************************************************************
+-- 
+1.7.10.4
