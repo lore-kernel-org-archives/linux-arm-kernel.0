@@ -1,35 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jan 2013 10:15:49 +0000
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <20130128142510.68092e10.akpm@linux-foundation.org>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
- <20130128142510.68092e10.akpm@linux-foundation.org>
-Message-ID: <20130129101549.GP23505@n2100.arm.linux.org.uk>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Tue, 29 Jan 2013 15:47:13 +0530
+Subject: [PATCH v2 5/5] ARM: mach-omap2: apply the errata at run time rather
+Message-ID: <20130129101711.GA23311@bnru10>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 02:25:10PM -0800, Andrew Morton wrote:
-> What's this "with enabled unaligned memory access" thing?  You mean "if
-> the arch supports CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS"?  If so,
-> that's only x86, which isn't really in the target market for this
-> patch, yes?
-> 
-> It's a lot of code for a 50ms boot-time improvement.  Does anyone have
-> any opinions on whether or not the benefits are worth the cost?
+Get the pl310 rtl revision number which is stashed by the l2x0
+driver and apply the required errata ERRATA_727915 accordingly.
 
-Well... when I saw this my immediate reaction was "oh no, yet another
-decompressor for the kernel".  We have five of these things already.
-Do we really need a sixth?
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+---
+ arch/arm/mach-omap2/sleep44xx.S |   25 +++++++++++++++++++++----
+ 1 files changed, 21 insertions(+), 4 deletions(-)
 
-My feeling is that we should have:
-- one decompressor which is the fastest
-- one decompressor for the highest compression ratio
-- one popular decompressor (eg conventional gzip)
-
-And if we have a replacement one for one of these, then it should do
-exactly that: replace it.  I realise that various architectures will
-behave differently, so we should really be looking at numbers across
-several arches.
-
-Otherwise, where do we stop adding new ones?  After we have 6 of these
-(which is after this one).  After 12?  After the 20th?
+diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
+index 88ff83a..7440f65 100644
+--- a/arch/arm/mach-omap2/sleep44xx.S
++++ b/arch/arm/mach-omap2/sleep44xx.S
+@@ -157,11 +157,19 @@ skip_scu_gp_set:
+ 	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]	@ memory.
+ 	cmp	r0, #3
+ 	bne	do_WFI
+-#ifdef CONFIG_PL310_ERRATA_727915
++	/* Check for PL310_ERRATA_727915 */
++	ldr	r0, =l2x0_revision
++	cmp	r0, #0x4
++	beq	dosmc
++	cmp	r0, #0x5
++	beq	dosmc
++	b	nosmc
++dosmc:
+ 	mov	r0, #0x03
+ 	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
+ 	DO_SMC
+-#endif
++
++nosmc:
+ 	bl	omap4_get_l2cache_base
+ 	mov	r2, r0
+ 	ldr	r0, =0xffff
+@@ -171,11 +179,20 @@ wait:
+ 	ldr	r1, =0xffff
+ 	ands	r0, r0, r1
+ 	bne	wait
+-#ifdef CONFIG_PL310_ERRATA_727915
++
++	/* Check for PL310_ERRATA_727915 */
++	ldr	r0, =l2x0_revision
++	cmp	r0, #0x4
++	beq	dosmc2
++	cmp	r0, #0x5
++	beq	dosmc2
++	b	nosmc2
++dosmc2:
+ 	mov	r0, #0x00
+ 	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
+ 	DO_SMC
+-#endif
++
++nosmc2:
+ l2x_sync:
+ 	bl	omap4_get_l2cache_base
+ 	mov	r2, r0
+-- 
+1.7.2.dirty
