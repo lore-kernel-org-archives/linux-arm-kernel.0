@@ -1,30 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jan 2013 13:12:45 +0000
-Subject: Section mismatch in drivers/mfd/vexpress-sysreg.c
-In-Reply-To: <1359464711.8090.19.camel@hornet>
-References: <20130129115535.GH21504@S2101-09.ap.freescale.net>
- <1359464711.8090.19.camel@hornet>
-Message-ID: <20130129131244.GU23505@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Jan 2013 13:21:30 +0000
+Subject: [PATCH 5/5] ARM: SPEAr13xx: Pass generic DW DMAC platform data
+ from DT
+In-Reply-To: <CAKohpokrvYDaMgB-5HV+bJh01YNU4H5UrSUnzxa_NpvE1qQqiA@mail.gmail.com>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <1359410300-26113-6-git-send-email-arnd@arndb.de>
+ <CAKohpokrvYDaMgB-5HV+bJh01YNU4H5UrSUnzxa_NpvE1qQqiA@mail.gmail.com>
+Message-ID: <201301291321.30726.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 01:05:11PM +0000, Pawel Moll wrote:
-> On Tue, 2013-01-29 at 11:55 +0000, Shawn Guo wrote:
-> > I'm building v3.8-rc5 and seeing the following section mismatch warning
-> > in drivers/mfd/vexpress-sysreg.c.
-> > 
-> > WARNING: drivers/mfd/built-in.o(.text+0x3108): Section mismatch in reference from the function vexpress_sysreg_probe() to the function .init.text:vexpress_sysreg_setup()
-> > The function vexpress_sysreg_probe() references
-> > the function __init vexpress_sysreg_setup().
-> > This is often because vexpress_sysreg_probe lacks a __init
-> > annotation or the annotation of vexpress_sysreg_setup is wrong.
-> 
-> Arnd's got a fix for this already:
-> 
-> https://patchwork.kernel.org/patch/2046991/
+On Tuesday 29 January 2013, Viresh Kumar wrote:
+> You forgot spear-devel for this series.
 
-Adding arm-soc people...
+Ok, thanks for adding it.
 
-Which wasn't in yesterday's arm-soc though, as highlighted by last night's
-autobuild (the build tree was created at 9:28am yesterday, which'll be
-just after my arm-soc pull).
+> > +                       dma-channels = <8>;
+> > +                       #dma-cells = <3>;
+
+Yep, my mistake again. It was correct in v1 of the patch and then
+I changed it so it had to be 4.
+
+	Arnd
