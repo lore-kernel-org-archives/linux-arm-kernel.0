@@ -1,62 +1,40 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 28 Jan 2013 23:29:14 -0500 (EST)
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <20130128142510.68092e10.akpm@linux-foundation.org>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
- <20130128142510.68092e10.akpm@linux-foundation.org>
-Message-ID: <alpine.LFD.2.02.1301282320430.6300@xanadu.home>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 29 Jan 2013 13:46:37 +0800
+Subject: [GIT PULL] imx6q cpuidle for 3.9
+Message-ID: <20130129054635.GA21504@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Jan 2013, Andrew Morton wrote:
+The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 
-> On Sat, 26 Jan 2013 14:50:43 +0900
-> Kyungsik Lee <kyungsik.lee@lge.com> wrote:
-> 
-> > This patchset is for supporting LZ4 compressed kernel and initial ramdisk on
-> > the x86 and ARM architectures.
-> > 
-> > According to http://code.google.com/p/lz4/, LZ4 is a very fast lossless
-> > compression algorithm and also features an extremely fast decoder.
-> > 
-> > Kernel Decompression APIs are based on implementation by Yann Collet
-> > (http://code.google.com/p/lz4/source/checkout).
-> > De/compression Tools are also provided from the site above.
-> > 
-> > The initial test result on ARM(v7) based board shows that the size of kernel
-> > with LZ4 compressed is 8% bigger than LZO compressed  but the decompressing
-> > speed is faster(especially under the enabled unaligned memory access).
-> > 
-> > Test: 3.4 based kernel built with many modules
-> > Uncompressed kernel size: 13MB
-> > lzo: 6.3MB, 301ms
-> > lz4: 6.8MB, 251ms(167ms, with enabled unaligned memory access)
-> > 
-> > It seems that it___s worth trying LZ4 compressed kernel image or ramdisk 
-> > for making the kernel boot more faster.
-> >
-> > ...
-> >
-> >  20 files changed, 663 insertions(+), 3 deletions(-)
-> >
-> > ...
-> >
-> 
-> What's this "with enabled unaligned memory access" thing?  You mean "if
-> the arch supports CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS"?  If so,
-> that's only x86, which isn't really in the target market for this
-> patch, yes?
+  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 
-I'm guessing this is referring to commit 5010192d5a.
+are available in the git repository at:
 
-> It's a lot of code for a 50ms boot-time improvement.  Does anyone have
-> any opinions on whether or not the benefits are worth the cost?
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx6q-cpudile-3.9
 
-Well, we used to have only one compressed format.  Now we have nearly 
-half a dozen, with the same worthiness issue between themselves.  
-Either we keep it very simple, or we make it very flexible.  The former 
-would argue in favor of removing some of the existing formats, the later 
-would let this new format in.
+for you to fetch changes up to e510aafde64a3fdd741f598e4d2be3c079bf5b0e:
 
+  ARM: imx6q: support WAIT mode using cpuidle (2013-01-29 13:41:42 +0800)
 
-Nicolas
+----------------------------------------------------------------
+It's imx6q cpuidle series for 3.9.
+
+----------------------------------------------------------------
+Shawn Guo (4):
+      ARM: imx: return zero in case next event gets a large increment
+      ARM: imx: mask gpc interrupts initially
+      ARM: imx: move imx6q_cpuidle_driver into a separate file
+      ARM: imx6q: support WAIT mode using cpuidle
+
+ arch/arm/mach-imx/Makefile        |    6 ++-
+ arch/arm/mach-imx/clk-imx6q.c     |   12 +++++
+ arch/arm/mach-imx/common.h        |    3 ++
+ arch/arm/mach-imx/cpuidle-imx6q.c |   95 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/cpuidle.h       |    5 ++
+ arch/arm/mach-imx/gpc.c           |    5 ++
+ arch/arm/mach-imx/mach-imx6q.c    |   17 +++----
+ arch/arm/mach-imx/platsmp.c       |   10 ++++
+ arch/arm/mach-imx/time.c          |    3 +-
+ 9 files changed, 143 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
