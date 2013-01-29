@@ -1,38 +1,34 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 29 Jan 2013 16:36:17 -0500
-Subject: [PATCH v2 1/2] ARM: dove: cleanup includes
-In-Reply-To: <1359494590-26005-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1355790269-10596-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1359494590-26005-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130129213617.GK7717@titan.lakedaemon.net>
+Date: Tue, 29 Jan 2013 21:37:16 +0000
+Subject: [GIT PULL] ARM: mvebu cleanup for v3.9 round2
+Message-ID: <1359495436.F88c4680.7559@triton>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 10:23:09PM +0100, Sebastian Hesselbarth wrote:
-> This patch cleans unneccessary includes and reorders the remaining
-> includes in common dove code.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> [v2]
-> - restructure patches to first cleanup common.c includes [1/2]
->   and then split legacy and DT specific code [2/2]
-> - removed v1 patch "[PATCH 3/3] ARM: Dove: add Cubox sdhci card
->   detect gpio" that was taken independently
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-dove/common.c |   29 +++++++++--------------------
->  1 file changed, 9 insertions(+), 20 deletions(-)
+The following changes since commit b96e1b1c3c5319294edb0970b6d5bf099c0e85eb:
 
-Applied to mvebu/cleanup, thanks for turning this around so quickly.
+  ARM: Kirkwood: Cleanup unneeded include files (2013-01-12 21:50:10 +0000)
 
-thx,
+are available in the git repository at:
 
-Jason.
+  git://git.infradead.org/users/jcooper/linux.git tags/cleanup_for_v3.9_round2
+
+for you to fetch changes up to 63a069739a5826ab4007da88b7ec71eb9909271c:
+
+  ARM: dove: cleanup includes (2013-01-29 21:31:36 +0000)
+
+----------------------------------------------------------------
+cleanup for v3.9 round2
+ - remove unneeded #includes for mach-dove
+ - remove unneeded #includes and code for the nsa310
+
+----------------------------------------------------------------
+Jason Cooper (1):
+      ARM: kirkwood: nsa310: cleanup includes and unneeded code
+
+Sebastian Hesselbarth (1):
+      ARM: dove: cleanup includes
+
+ arch/arm/mach-dove/common.c           | 29 +++++++++--------------------
+ arch/arm/mach-kirkwood/board-nsa310.c |  9 +--------
+ 2 files changed, 10 insertions(+), 28 deletions(-)
