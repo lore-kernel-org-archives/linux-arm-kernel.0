@@ -1,47 +1,41 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 28 Jan 2013 20:36:35 +0100
-Subject: [RFC] socfpga: make function static
-In-Reply-To: <1359075633-13502-6-git-send-email-dinguyen@altera.com>
-References: <1359075633-13502-1-git-send-email-dinguyen@altera.com>
- <1359075633-13502-6-git-send-email-dinguyen@altera.com>
-Message-ID: <20130128193635.GB26908@amd.pavel.ucw.cz>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Jan 2013 23:42:20 -0700
+Subject: [GIT PULL 2/4] ARM: bcm2835: SoC driver updates
+In-Reply-To: <1359441742-32647-1-git-send-email-swarren@wwwdotorg.org>
+References: <1359441742-32647-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1359441742-32647-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The bcm2835 clock driver is enhanced to allow fixed clocks to be probed
+from device tree.
 
-While moving cpu1 start address into device tree, I noticed that
-sysmgr_init can be static. Trivial patch is below.
+A system power-off implementation is added.
 
-Signed-off-by: Pavel Machek <pavel@denx.de>
+This branch is based on v3.8-rc3.
 
-commit 11030de41d7da7a14ca0c77abb726d6eec3a2fb7
+----------------------------------------------------------------
 
-diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-index 323c74a..3ebd469 100644
---- a/arch/arm/mach-socfpga/core.h
-+++ b/arch/arm/mach-socfpga/core.h
-@@ -26,7 +26,6 @@ extern void v7_secondary_startup(void);
- extern void __iomem *socfpga_scu_base_addr;
- 
- extern void socfpga_init_clocks(void);
--extern void socfpga_sysmgr_init(void);
- 
- extern struct smp_operations socfpga_smp_ops;
- extern char secondary_trampoline, secondary_trampoline_end;
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index bb17810..334c330 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -68,7 +68,7 @@ const static struct of_device_id irq_match[] = {
- 	{}
- };
- 
--void __init socfpga_sysmgr_init(void)
-+static void __init socfpga_sysmgr_init(void)
- {
- 	struct device_node *np;
- 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+
+  Linux 3.8-rc3
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.9-soc
+
+for you to fetch changes up to 45e9d77a22b7b25373c7b8c0ea0b146168025360:
+
+  ARM: bcm2835: add a pm_power_off implementation
+
+----------------------------------------------------------------
+
+Dom Cobley (1):
+      ARM: bcm2835: add a pm_power_off implementation
+
+Stephen Warren (1):
+      clk: bcm2835: probe for fixed-clock in device tree
+
+ arch/arm/mach-bcm2835/bcm2835.c |   28 ++++++++++++++++++++++++++++
+ drivers/clk/clk-bcm2835.c       |    9 +++++++++
+ 2 files changed, 37 insertions(+)
