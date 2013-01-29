@@ -1,162 +1,60 @@
 From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 29 Jan 2013 11:23:04 -0600
-Subject: [PATCH 4/4] drm/tilcdc: add support for LCD panels (v5)
+Date: Tue, 29 Jan 2013 11:23:02 -0600
+Subject: [PATCH 2/4] drm/i2c: nxp-tda998x (v3)
 In-Reply-To: <1359480184-9168-1-git-send-email-robdclark@gmail.com>
 References: <1359480184-9168-1-git-send-email-robdclark@gmail.com>
-Message-ID: <1359480184-9168-5-git-send-email-robdclark@gmail.com>
+Message-ID: <1359480184-9168-3-git-send-email-robdclark@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an output panel driver for LCD panels.  Tested with LCD3 cape on
-beaglebone.
+Driver for the NXP TDA998X i2c hdmi encoder slave.
 
 v1: original
-v2: s/of_find_node_by_name()/of_get_child_by_name()/ from Pantelis
-    Antoniou
-v3: add backlight support
-v4: rebase to latest of video timing helpers
-v5: remove some unneeded fields from panel-info struct, add DT bindings
-    docs
+v2: fix npix/nline programming
+v3: add Kconfig, fix dup'd MODULE_DESCRIPTION
 
 Signed-off-by: Rob Clark <robdclark@gmail.com>
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 Tested-by: Koen Kooi <koen@dominion.thruhere.net>
 ---
- .../devicetree/bindings/drm/tilcdc/panel.txt       |  59 +++
- drivers/gpu/drm/tilcdc/Kconfig                     |   3 +
- drivers/gpu/drm/tilcdc/Makefile                    |   1 +
- drivers/gpu/drm/tilcdc/tilcdc_drv.c                |   3 +
- drivers/gpu/drm/tilcdc/tilcdc_panel.c              | 436 +++++++++++++++++++++
- drivers/gpu/drm/tilcdc/tilcdc_panel.h              |  26 ++
- 6 files changed, 528 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/drm/tilcdc/panel.txt
- create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_panel.c
- create mode 100644 drivers/gpu/drm/tilcdc/tilcdc_panel.h
+ drivers/gpu/drm/i2c/Kconfig       |   6 +
+ drivers/gpu/drm/i2c/Makefile      |   3 +
+ drivers/gpu/drm/i2c/tda998x_drv.c | 906 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 915 insertions(+)
+ create mode 100644 drivers/gpu/drm/i2c/tda998x_drv.c
 
-diff --git a/Documentation/devicetree/bindings/drm/tilcdc/panel.txt b/Documentation/devicetree/bindings/drm/tilcdc/panel.txt
+diff --git a/drivers/gpu/drm/i2c/Kconfig b/drivers/gpu/drm/i2c/Kconfig
+index 1611836..4d341db 100644
+--- a/drivers/gpu/drm/i2c/Kconfig
++++ b/drivers/gpu/drm/i2c/Kconfig
+@@ -19,4 +19,10 @@ config DRM_I2C_SIL164
+ 	  when used in pairs) TMDS transmitters, used in some nVidia
+ 	  video cards.
+ 
++config DRM_I2C_NXP_TDA998X
++	tristate "NXP Semiconductors TDA998X HDMI encoder"
++	default m if DRM_TILCDC
++	help
++	  Support for NXP Semiconductors TDA998X HDMI encoders.
++
+ endmenu
+diff --git a/drivers/gpu/drm/i2c/Makefile b/drivers/gpu/drm/i2c/Makefile
+index 9286256..43aa33b 100644
+--- a/drivers/gpu/drm/i2c/Makefile
++++ b/drivers/gpu/drm/i2c/Makefile
+@@ -5,3 +5,6 @@ obj-$(CONFIG_DRM_I2C_CH7006) += ch7006.o
+ 
+ sil164-y := sil164_drv.o
+ obj-$(CONFIG_DRM_I2C_SIL164) += sil164.o
++
++tda998x-y := tda998x_drv.o
++obj-$(CONFIG_DRM_I2C_NXP_TDA998X) += tda998x.o
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
 new file mode 100644
-index 0000000..5ff1e61
+index 0000000..e68b58a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/tilcdc/panel.txt
-@@ -0,0 +1,59 @@
-+Device-Tree bindings for tilcdc DRM generic panel output driver
-+
-+Required properties:
-+ - compatible: value should be "tilcdc,panel".
-+ - panel-info: configuration info to configure LCDC correctly for the panel
-+   - ac-bias: AC Bias Pin Frequency
-+   - ac-bias-intrpt: AC Bias Pin Transitions per Interrupt
-+   - dma-burst-sz: DMA burst size
-+   - bpp: Bits per pixel
-+   - fdd: FIFO DMA Request Delay
-+   - sync-edge: Horizontal and Vertical Sync Edge: 0=rising 1=falling
-+   - sync-ctrl: Horizontal and Vertical Sync: Control: 0=ignore
-+   - raster-order: Raster Data Order Select: 1=Most-to-least 0=Least-to-most
-+   - fifo-th: DMA FIFO threshold
-+ - display-timings: typical videomode of lcd panel.  Multiple video modes
-+   can be listed if the panel supports multiple timings, but the 'native-mode'
-+   should be the preferred/default resolution.  Refer to
-+   Documentation/devicetree/bindings/video/display-timing.txt for display
-+   timing binding details.
-+
-+Recommended properties:
-+ - pinctrl-names, pinctrl-0: the pincontrol settings to configure
-+   muxing properly for pins that connect to TFP410 device
-+
-+Example:
-+
-+	/* Settings for CDTech_S035Q01 / LCD3 cape: */
-+	lcd3 {
-+		compatible = "tilcdc,panel";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bone_lcd3_cape_lcd_pins>;
-+		panel-info {
-+			ac-bias           = <255>;
-+			ac-bias-intrpt    = <0>;
-+			dma-burst-sz      = <16>;
-+			bpp               = <16>;
-+			fdd               = <0x80>;
-+			sync-edge         = <0>;
-+			sync-ctrl         = <1>;
-+			raster-order      = <0>;
-+			fifo-th           = <0>;
-+		};
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: 320x240 {
-+				hactive         = <320>;
-+				vactive         = <240>;
-+				hback-porch     = <21>;
-+				hfront-porch    = <58>;
-+				hsync-len       = <47>;
-+				vback-porch     = <11>;
-+				vfront-porch    = <23>;
-+				vsync-len       = <2>;
-+				clock-frequency = <8000000>;
-+				hsync-active    = <0>;
-+				vsync-active    = <0>;
-+			};
-+		};
-+	};
-diff --git a/drivers/gpu/drm/tilcdc/Kconfig b/drivers/gpu/drm/tilcdc/Kconfig
-index ee9b592..ae14fd6 100644
---- a/drivers/gpu/drm/tilcdc/Kconfig
-+++ b/drivers/gpu/drm/tilcdc/Kconfig
-@@ -4,6 +4,9 @@ config DRM_TILCDC
- 	select DRM_KMS_HELPER
- 	select DRM_KMS_CMA_HELPER
- 	select DRM_GEM_CMA_HELPER
-+	select OF_VIDEOMODE
-+	select OF_DISPLAY_TIMING
-+	select BACKLIGHT_CLASS_DEVICE
- 	help
- 	  Choose this option if you have an TI SoC with LCDC display
- 	  controller, for example AM33xx in beagle-bone, DA8xx, or
-diff --git a/drivers/gpu/drm/tilcdc/Makefile b/drivers/gpu/drm/tilcdc/Makefile
-index aa9097e..deda656 100644
---- a/drivers/gpu/drm/tilcdc/Makefile
-+++ b/drivers/gpu/drm/tilcdc/Makefile
-@@ -4,6 +4,7 @@ tilcdc-y := \
- 	tilcdc_crtc.o \
- 	tilcdc_tfp410.o \
- 	tilcdc_slave.o \
-+	tilcdc_panel.o \
- 	tilcdc_drv.o
- 
- obj-$(CONFIG_DRM_TILCDC)	+= tilcdc.o
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-index 25f3add..c5b592d 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-@@ -21,6 +21,7 @@
- #include "tilcdc_regs.h"
- #include "tilcdc_tfp410.h"
- #include "tilcdc_slave.h"
-+#include "tilcdc_panel.h"
- 
- #include "drm_fb_helper.h"
- 
-@@ -589,6 +590,7 @@ static int __init tilcdc_drm_init(void)
- 	DBG("init");
- 	tilcdc_tfp410_init();
- 	tilcdc_slave_init();
-+	tilcdc_panel_init();
- 	return platform_driver_register(&tilcdc_platform_driver);
- }
- 
-@@ -597,6 +599,7 @@ static void __exit tilcdc_drm_fini(void)
- 	DBG("fini");
- 	tilcdc_tfp410_fini();
- 	tilcdc_slave_fini();
-+	tilcdc_panel_fini();
- 	platform_driver_unregister(&tilcdc_platform_driver);
- }
- 
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.c b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-new file mode 100644
-index 0000000..d1463f5
---- /dev/null
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-@@ -0,0 +1,436 @@
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -0,0 +1,906 @@
 +/*
 + * Copyright (C) 2012 Texas Instruments
 + * Author: Rob Clark <robdclark@gmail.com>
@@ -174,456 +72,894 @@ index 0000000..d1463f5
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/pinctrl/pinmux.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/backlight.h>
-+#include <video/display_timing.h>
-+#include <video/of_display_timing.h>
-+#include <video/videomode.h>
 +
-+#include "tilcdc_drv.h"
 +
-+struct panel_module {
-+	struct tilcdc_module base;
-+	struct tilcdc_panel_info *info;
-+	struct display_timings *timings;
-+	struct backlight_device *backlight;
++#include <linux/module.h>
++
++#include <drm/drmP.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_encoder_slave.h>
++#include <drm/drm_edid.h>
++
++
++#define DBG(fmt, ...) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
++
++struct tda998x_priv {
++	struct i2c_client *cec;
++	uint16_t rev;
++	uint8_t current_page;
++	int dpms;
 +};
-+#define to_panel_module(x) container_of(x, struct panel_module, base)
 +
++#define to_tda998x_priv(x)  ((struct tda998x_priv *)to_encoder_slave(x)->slave_priv)
 +
-+/*
-+ * Encoder:
++/* The TDA9988 series of devices use a paged register scheme.. to simplify
++ * things we encode the page # in upper bits of the register #.  To read/
++ * write a given register, we need to make sure CURPAGE register is set
++ * appropriately.  Which implies reads/writes are not atomic.  Fun!
 + */
 +
-+struct panel_encoder {
-+	struct drm_encoder base;
-+	struct panel_module *mod;
-+};
-+#define to_panel_encoder(x) container_of(x, struct panel_encoder, base)
++#define REG(page, addr) (((page) << 8) | (addr))
++#define REG2ADDR(reg)   ((reg) & 0xff)
++#define REG2PAGE(reg)   (((reg) >> 8) & 0xff)
++
++#define REG_CURPAGE               0xff                /* write */
 +
 +
-+static void panel_encoder_destroy(struct drm_encoder *encoder)
++/* Page 00h: General Control */
++#define REG_VERSION_LSB           REG(0x00, 0x00)     /* read */
++#define REG_MAIN_CNTRL0           REG(0x00, 0x01)     /* read/write */
++# define MAIN_CNTRL0_SR           (1 << 0)
++# define MAIN_CNTRL0_DECS         (1 << 1)
++# define MAIN_CNTRL0_DEHS         (1 << 2)
++# define MAIN_CNTRL0_CECS         (1 << 3)
++# define MAIN_CNTRL0_CEHS         (1 << 4)
++# define MAIN_CNTRL0_SCALER       (1 << 7)
++#define REG_VERSION_MSB           REG(0x00, 0x02)     /* read */
++#define REG_SOFTRESET             REG(0x00, 0x0a)     /* write */
++# define SOFTRESET_AUDIO          (1 << 0)
++# define SOFTRESET_I2C_MASTER     (1 << 1)
++#define REG_DDC_DISABLE           REG(0x00, 0x0b)     /* read/write */
++#define REG_CCLK_ON               REG(0x00, 0x0c)     /* read/write */
++#define REG_I2C_MASTER            REG(0x00, 0x0d)     /* read/write */
++# define I2C_MASTER_DIS_MM        (1 << 0)
++# define I2C_MASTER_DIS_FILT      (1 << 1)
++# define I2C_MASTER_APP_STRT_LAT  (1 << 2)
++#define REG_INT_FLAGS_0           REG(0x00, 0x0f)     /* read/write */
++#define REG_INT_FLAGS_1           REG(0x00, 0x10)     /* read/write */
++#define REG_INT_FLAGS_2           REG(0x00, 0x11)     /* read/write */
++# define INT_FLAGS_2_EDID_BLK_RD  (1 << 1)
++#define REG_ENA_VP_0              REG(0x00, 0x18)     /* read/write */
++#define REG_ENA_VP_1              REG(0x00, 0x19)     /* read/write */
++#define REG_ENA_VP_2              REG(0x00, 0x1a)     /* read/write */
++#define REG_ENA_AP                REG(0x00, 0x1e)     /* read/write */
++#define REG_VIP_CNTRL_0           REG(0x00, 0x20)     /* write */
++# define VIP_CNTRL_0_MIRR_A       (1 << 7)
++# define VIP_CNTRL_0_SWAP_A(x)    (((x) & 7) << 4)
++# define VIP_CNTRL_0_MIRR_B       (1 << 3)
++# define VIP_CNTRL_0_SWAP_B(x)    (((x) & 7) << 0)
++#define REG_VIP_CNTRL_1           REG(0x00, 0x21)     /* write */
++# define VIP_CNTRL_1_MIRR_C       (1 << 7)
++# define VIP_CNTRL_1_SWAP_C(x)    (((x) & 7) << 4)
++# define VIP_CNTRL_1_MIRR_D       (1 << 3)
++# define VIP_CNTRL_1_SWAP_D(x)    (((x) & 7) << 0)
++#define REG_VIP_CNTRL_2           REG(0x00, 0x22)     /* write */
++# define VIP_CNTRL_2_MIRR_E       (1 << 7)
++# define VIP_CNTRL_2_SWAP_E(x)    (((x) & 7) << 4)
++# define VIP_CNTRL_2_MIRR_F       (1 << 3)
++# define VIP_CNTRL_2_SWAP_F(x)    (((x) & 7) << 0)
++#define REG_VIP_CNTRL_3           REG(0x00, 0x23)     /* write */
++# define VIP_CNTRL_3_X_TGL        (1 << 0)
++# define VIP_CNTRL_3_H_TGL        (1 << 1)
++# define VIP_CNTRL_3_V_TGL        (1 << 2)
++# define VIP_CNTRL_3_EMB          (1 << 3)
++# define VIP_CNTRL_3_SYNC_DE      (1 << 4)
++# define VIP_CNTRL_3_SYNC_HS      (1 << 5)
++# define VIP_CNTRL_3_DE_INT       (1 << 6)
++# define VIP_CNTRL_3_EDGE         (1 << 7)
++#define REG_VIP_CNTRL_4           REG(0x00, 0x24)     /* write */
++# define VIP_CNTRL_4_BLC(x)       (((x) & 3) << 0)
++# define VIP_CNTRL_4_BLANKIT(x)   (((x) & 3) << 2)
++# define VIP_CNTRL_4_CCIR656      (1 << 4)
++# define VIP_CNTRL_4_656_ALT      (1 << 5)
++# define VIP_CNTRL_4_TST_656      (1 << 6)
++# define VIP_CNTRL_4_TST_PAT      (1 << 7)
++#define REG_VIP_CNTRL_5           REG(0x00, 0x25)     /* write */
++# define VIP_CNTRL_5_CKCASE       (1 << 0)
++# define VIP_CNTRL_5_SP_CNT(x)    (((x) & 3) << 1)
++#define REG_MAT_CONTRL            REG(0x00, 0x80)     /* write */
++# define MAT_CONTRL_MAT_SC(x)     (((x) & 3) << 0)
++# define MAT_CONTRL_MAT_BP        (1 << 2)
++#define REG_VIDFORMAT             REG(0x00, 0xa0)     /* write */
++#define REG_REFPIX_MSB            REG(0x00, 0xa1)     /* write */
++#define REG_REFPIX_LSB            REG(0x00, 0xa2)     /* write */
++#define REG_REFLINE_MSB           REG(0x00, 0xa3)     /* write */
++#define REG_REFLINE_LSB           REG(0x00, 0xa4)     /* write */
++#define REG_NPIX_MSB              REG(0x00, 0xa5)     /* write */
++#define REG_NPIX_LSB              REG(0x00, 0xa6)     /* write */
++#define REG_NLINE_MSB             REG(0x00, 0xa7)     /* write */
++#define REG_NLINE_LSB             REG(0x00, 0xa8)     /* write */
++#define REG_VS_LINE_STRT_1_MSB    REG(0x00, 0xa9)     /* write */
++#define REG_VS_LINE_STRT_1_LSB    REG(0x00, 0xaa)     /* write */
++#define REG_VS_PIX_STRT_1_MSB     REG(0x00, 0xab)     /* write */
++#define REG_VS_PIX_STRT_1_LSB     REG(0x00, 0xac)     /* write */
++#define REG_VS_LINE_END_1_MSB     REG(0x00, 0xad)     /* write */
++#define REG_VS_LINE_END_1_LSB     REG(0x00, 0xae)     /* write */
++#define REG_VS_PIX_END_1_MSB      REG(0x00, 0xaf)     /* write */
++#define REG_VS_PIX_END_1_LSB      REG(0x00, 0xb0)     /* write */
++#define REG_VS_PIX_STRT_2_MSB     REG(0x00, 0xb3)     /* write */
++#define REG_VS_PIX_STRT_2_LSB     REG(0x00, 0xb4)     /* write */
++#define REG_VS_PIX_END_2_MSB      REG(0x00, 0xb7)     /* write */
++#define REG_VS_PIX_END_2_LSB      REG(0x00, 0xb8)     /* write */
++#define REG_HS_PIX_START_MSB      REG(0x00, 0xb9)     /* write */
++#define REG_HS_PIX_START_LSB      REG(0x00, 0xba)     /* write */
++#define REG_HS_PIX_STOP_MSB       REG(0x00, 0xbb)     /* write */
++#define REG_HS_PIX_STOP_LSB       REG(0x00, 0xbc)     /* write */
++#define REG_VWIN_START_1_MSB      REG(0x00, 0xbd)     /* write */
++#define REG_VWIN_START_1_LSB      REG(0x00, 0xbe)     /* write */
++#define REG_VWIN_END_1_MSB        REG(0x00, 0xbf)     /* write */
++#define REG_VWIN_END_1_LSB        REG(0x00, 0xc0)     /* write */
++#define REG_DE_START_MSB          REG(0x00, 0xc5)     /* write */
++#define REG_DE_START_LSB          REG(0x00, 0xc6)     /* write */
++#define REG_DE_STOP_MSB           REG(0x00, 0xc7)     /* write */
++#define REG_DE_STOP_LSB           REG(0x00, 0xc8)     /* write */
++#define REG_TBG_CNTRL_0           REG(0x00, 0xca)     /* write */
++# define TBG_CNTRL_0_FRAME_DIS    (1 << 5)
++# define TBG_CNTRL_0_SYNC_MTHD    (1 << 6)
++# define TBG_CNTRL_0_SYNC_ONCE    (1 << 7)
++#define REG_TBG_CNTRL_1           REG(0x00, 0xcb)     /* write */
++# define TBG_CNTRL_1_VH_TGL_0     (1 << 0)
++# define TBG_CNTRL_1_VH_TGL_1     (1 << 1)
++# define TBG_CNTRL_1_VH_TGL_2     (1 << 2)
++# define TBG_CNTRL_1_VHX_EXT_DE   (1 << 3)
++# define TBG_CNTRL_1_VHX_EXT_HS   (1 << 4)
++# define TBG_CNTRL_1_VHX_EXT_VS   (1 << 5)
++# define TBG_CNTRL_1_DWIN_DIS     (1 << 6)
++#define REG_ENABLE_SPACE          REG(0x00, 0xd6)     /* write */
++#define REG_HVF_CNTRL_0           REG(0x00, 0xe4)     /* write */
++# define HVF_CNTRL_0_SM           (1 << 7)
++# define HVF_CNTRL_0_RWB          (1 << 6)
++# define HVF_CNTRL_0_PREFIL(x)    (((x) & 3) << 2)
++# define HVF_CNTRL_0_INTPOL(x)    (((x) & 3) << 0)
++#define REG_HVF_CNTRL_1           REG(0x00, 0xe5)     /* write */
++# define HVF_CNTRL_1_FOR          (1 << 0)
++# define HVF_CNTRL_1_YUVBLK       (1 << 1)
++# define HVF_CNTRL_1_VQR(x)       (((x) & 3) << 2)
++# define HVF_CNTRL_1_PAD(x)       (((x) & 3) << 4)
++# define HVF_CNTRL_1_SEMI_PLANAR  (1 << 6)
++#define REG_RPT_CNTRL             REG(0x00, 0xf0)     /* write */
++
++
++/* Page 02h: PLL settings */
++#define REG_PLL_SERIAL_1          REG(0x02, 0x00)     /* read/write */
++# define PLL_SERIAL_1_SRL_FDN     (1 << 0)
++# define PLL_SERIAL_1_SRL_IZ(x)   (((x) & 3) << 1)
++# define PLL_SERIAL_1_SRL_MAN_IZ  (1 << 6)
++#define REG_PLL_SERIAL_2          REG(0x02, 0x01)     /* read/write */
++# define PLL_SERIAL_2_SRL_NOSC(x) (((x) & 3) << 0)
++# define PLL_SERIAL_2_SRL_PR(x)   (((x) & 0xf) << 4)
++#define REG_PLL_SERIAL_3          REG(0x02, 0x02)     /* read/write */
++# define PLL_SERIAL_3_SRL_CCIR    (1 << 0)
++# define PLL_SERIAL_3_SRL_DE      (1 << 2)
++# define PLL_SERIAL_3_SRL_PXIN_SEL (1 << 4)
++#define REG_SERIALIZER            REG(0x02, 0x03)     /* read/write */
++#define REG_BUFFER_OUT            REG(0x02, 0x04)     /* read/write */
++#define REG_PLL_SCG1              REG(0x02, 0x05)     /* read/write */
++#define REG_PLL_SCG2              REG(0x02, 0x06)     /* read/write */
++#define REG_PLL_SCGN1             REG(0x02, 0x07)     /* read/write */
++#define REG_PLL_SCGN2             REG(0x02, 0x08)     /* read/write */
++#define REG_PLL_SCGR1             REG(0x02, 0x09)     /* read/write */
++#define REG_PLL_SCGR2             REG(0x02, 0x0a)     /* read/write */
++#define REG_AUDIO_DIV             REG(0x02, 0x0e)     /* read/write */
++#define REG_SEL_CLK               REG(0x02, 0x11)     /* read/write */
++# define SEL_CLK_SEL_CLK1         (1 << 0)
++# define SEL_CLK_SEL_VRF_CLK(x)   (((x) & 3) << 1)
++# define SEL_CLK_ENA_SC_CLK       (1 << 3)
++#define REG_ANA_GENERAL           REG(0x02, 0x12)     /* read/write */
++
++
++/* Page 09h: EDID Control */
++#define REG_EDID_DATA_0           REG(0x09, 0x00)     /* read */
++/* next 127 successive registers are the EDID block */
++#define REG_EDID_CTRL             REG(0x09, 0xfa)     /* read/write */
++#define REG_DDC_ADDR              REG(0x09, 0xfb)     /* read/write */
++#define REG_DDC_OFFS              REG(0x09, 0xfc)     /* read/write */
++#define REG_DDC_SEGM_ADDR         REG(0x09, 0xfd)     /* read/write */
++#define REG_DDC_SEGM              REG(0x09, 0xfe)     /* read/write */
++
++
++/* Page 10h: information frames and packets */
++
++
++/* Page 11h: audio settings and content info packets */
++#define REG_AIP_CNTRL_0           REG(0x11, 0x00)     /* read/write */
++# define AIP_CNTRL_0_RST_FIFO     (1 << 0)
++# define AIP_CNTRL_0_SWAP         (1 << 1)
++# define AIP_CNTRL_0_LAYOUT       (1 << 2)
++# define AIP_CNTRL_0_ACR_MAN      (1 << 5)
++# define AIP_CNTRL_0_RST_CTS      (1 << 6)
++#define REG_ENC_CNTRL             REG(0x11, 0x0d)     /* read/write */
++# define ENC_CNTRL_RST_ENC        (1 << 0)
++# define ENC_CNTRL_RST_SEL        (1 << 1)
++# define ENC_CNTRL_CTL_CODE(x)    (((x) & 3) << 2)
++
++
++/* Page 12h: HDCP and OTP */
++#define REG_TX3                   REG(0x12, 0x9a)     /* read/write */
++#define REG_TX33                  REG(0x12, 0xb8)     /* read/write */
++# define TX33_HDMI                (1 << 1)
++
++
++/* Page 13h: Gamut related metadata packets */
++
++
++
++/* CEC registers: (not paged)
++ */
++#define REG_CEC_FRO_IM_CLK_CTRL   0xfb                /* read/write */
++# define CEC_FRO_IM_CLK_CTRL_GHOST_DIS (1 << 7)
++# define CEC_FRO_IM_CLK_CTRL_ENA_OTP   (1 << 6)
++# define CEC_FRO_IM_CLK_CTRL_IMCLK_SEL (1 << 1)
++# define CEC_FRO_IM_CLK_CTRL_FRO_DIV   (1 << 0)
++#define REG_CEC_RXSHPDLEV         0xfe                /* read */
++# define CEC_RXSHPDLEV_RXSENS     (1 << 0)
++# define CEC_RXSHPDLEV_HPD        (1 << 1)
++
++#define REG_CEC_ENAMODS           0xff                /* read/write */
++# define CEC_ENAMODS_DIS_FRO      (1 << 6)
++# define CEC_ENAMODS_DIS_CCLK     (1 << 5)
++# define CEC_ENAMODS_EN_RXSENS    (1 << 2)
++# define CEC_ENAMODS_EN_HDMI      (1 << 1)
++# define CEC_ENAMODS_EN_CEC       (1 << 0)
++
++
++/* Device versions: */
++#define TDA9989N2                 0x0101
++#define TDA19989                  0x0201
++#define TDA19989N2                0x0202
++#define TDA19988                  0x0301
++
++static void
++cec_write(struct drm_encoder *encoder, uint16_t addr, uint8_t val)
 +{
-+	struct panel_encoder *panel_encoder = to_panel_encoder(encoder);
-+	drm_encoder_cleanup(encoder);
-+	kfree(panel_encoder);
-+}
-+
-+static void panel_encoder_dpms(struct drm_encoder *encoder, int mode)
-+{
-+	struct panel_encoder *panel_encoder = to_panel_encoder(encoder);
-+	struct backlight_device *backlight = panel_encoder->mod->backlight;
-+
-+	if (!backlight)
-+		return;
-+
-+	backlight->props.power = mode == DRM_MODE_DPMS_ON
-+				     ? FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
-+	backlight_update_status(backlight);
-+}
-+
-+static bool panel_encoder_mode_fixup(struct drm_encoder *encoder,
-+		const struct drm_display_mode *mode,
-+		struct drm_display_mode *adjusted_mode)
-+{
-+	/* nothing needed */
-+	return true;
-+}
-+
-+static void panel_encoder_prepare(struct drm_encoder *encoder)
-+{
-+	struct panel_encoder *panel_encoder = to_panel_encoder(encoder);
-+	panel_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
-+	tilcdc_crtc_set_panel_info(encoder->crtc, panel_encoder->mod->info);
-+}
-+
-+static void panel_encoder_commit(struct drm_encoder *encoder)
-+{
-+	panel_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
-+}
-+
-+static void panel_encoder_mode_set(struct drm_encoder *encoder,
-+		struct drm_display_mode *mode,
-+		struct drm_display_mode *adjusted_mode)
-+{
-+	/* nothing needed */
-+}
-+
-+static const struct drm_encoder_funcs panel_encoder_funcs = {
-+		.destroy        = panel_encoder_destroy,
-+};
-+
-+static const struct drm_encoder_helper_funcs panel_encoder_helper_funcs = {
-+		.dpms           = panel_encoder_dpms,
-+		.mode_fixup     = panel_encoder_mode_fixup,
-+		.prepare        = panel_encoder_prepare,
-+		.commit         = panel_encoder_commit,
-+		.mode_set       = panel_encoder_mode_set,
-+};
-+
-+static struct drm_encoder *panel_encoder_create(struct drm_device *dev,
-+		struct panel_module *mod)
-+{
-+	struct panel_encoder *panel_encoder;
-+	struct drm_encoder *encoder;
++	struct i2c_client *client = to_tda998x_priv(encoder)->cec;
++	uint8_t buf[] = {addr, val};
 +	int ret;
 +
-+	panel_encoder = kzalloc(sizeof(*panel_encoder), GFP_KERNEL);
-+	if (!panel_encoder) {
-+		dev_err(dev->dev, "allocation failed\n");
-+		return NULL;
-+	}
++	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
++	if (ret < 0)
++		dev_err(&client->dev, "Error %d writing to cec:0x%x\n", ret, addr);
++}
 +
-+	panel_encoder->mod = mod;
++static uint8_t
++cec_read(struct drm_encoder *encoder, uint8_t addr)
++{
++	struct i2c_client *client = to_tda998x_priv(encoder)->cec;
++	uint8_t val;
++	int ret;
 +
-+	encoder = &panel_encoder->base;
-+	encoder->possible_crtcs = 1;
-+
-+	ret = drm_encoder_init(dev, encoder, &panel_encoder_funcs,
-+			DRM_MODE_ENCODER_LVDS);
++	ret = i2c_master_send(client, &addr, sizeof(addr));
 +	if (ret < 0)
 +		goto fail;
 +
-+	drm_encoder_helper_add(encoder, &panel_encoder_helper_funcs);
++	ret = i2c_master_recv(client, &val, sizeof(val));
++	if (ret < 0)
++		goto fail;
 +
-+	return encoder;
++	return val;
 +
 +fail:
-+	panel_encoder_destroy(encoder);
-+	return NULL;
++	dev_err(&client->dev, "Error %d reading from cec:0x%x\n", ret, addr);
++	return 0;
 +}
 +
-+/*
-+ * Connector:
-+ */
-+
-+struct panel_connector {
-+	struct drm_connector base;
-+
-+	struct drm_encoder *encoder;  /* our connected encoder */
-+	struct panel_module *mod;
-+};
-+#define to_panel_connector(x) container_of(x, struct panel_connector, base)
-+
-+
-+static void panel_connector_destroy(struct drm_connector *connector)
++static void
++set_page(struct drm_encoder *encoder, uint16_t reg)
 +{
-+	struct panel_connector *panel_connector = to_panel_connector(connector);
-+	drm_connector_cleanup(connector);
-+	kfree(panel_connector);
-+}
++	struct tda998x_priv *priv = to_tda998x_priv(encoder);
 +
-+static enum drm_connector_status panel_connector_detect(
-+		struct drm_connector *connector,
-+		bool force)
-+{
-+	return connector_status_connected;
-+}
++	if (REG2PAGE(reg) != priv->current_page) {
++		struct i2c_client *client = drm_i2c_encoder_get_client(encoder);
++		uint8_t buf[] = {
++				REG_CURPAGE, REG2PAGE(reg)
++		};
++		int ret = i2c_master_send(client, buf, sizeof(buf));
++		if (ret < 0)
++			dev_err(&client->dev, "Error %d writing to REG_CURPAGE\n", ret);
 +
-+static int panel_connector_get_modes(struct drm_connector *connector)
-+{
-+	struct drm_device *dev = connector->dev;
-+	struct panel_connector *panel_connector = to_panel_connector(connector);
-+	struct display_timings *timings = panel_connector->mod->timings;
-+	int i;
-+
-+	for (i = 0; i < timings->num_timings; i++) {
-+		struct drm_display_mode *mode = drm_mode_create(dev);
-+		struct videomode vm;
-+
-+		if (videomode_from_timing(timings, &vm, i))
-+			break;
-+
-+		drm_display_mode_from_videomode(&vm, mode);
-+
-+		mode->type = DRM_MODE_TYPE_DRIVER;
-+
-+		if (timings->native_mode == i)
-+			mode->type |= DRM_MODE_TYPE_PREFERRED;
-+
-+		drm_mode_set_name(mode);
-+		drm_mode_probed_add(connector, mode);
++		priv->current_page = REG2PAGE(reg);
 +	}
-+
-+	return i;
 +}
 +
-+static int panel_connector_mode_valid(struct drm_connector *connector,
-+		  struct drm_display_mode *mode)
++static int
++reg_read_range(struct drm_encoder *encoder, uint16_t reg, char *buf, int cnt)
 +{
-+	struct tilcdc_drm_private *priv = connector->dev->dev_private;
-+	/* our only constraints are what the crtc can generate: */
-+	return tilcdc_crtc_mode_valid(priv->crtc, mode);
-+}
-+
-+static struct drm_encoder *panel_connector_best_encoder(
-+		struct drm_connector *connector)
-+{
-+	struct panel_connector *panel_connector = to_panel_connector(connector);
-+	return panel_connector->encoder;
-+}
-+
-+static const struct drm_connector_funcs panel_connector_funcs = {
-+	.destroy            = panel_connector_destroy,
-+	.dpms               = drm_helper_connector_dpms,
-+	.detect             = panel_connector_detect,
-+	.fill_modes         = drm_helper_probe_single_connector_modes,
-+};
-+
-+static const struct drm_connector_helper_funcs panel_connector_helper_funcs = {
-+	.get_modes          = panel_connector_get_modes,
-+	.mode_valid         = panel_connector_mode_valid,
-+	.best_encoder       = panel_connector_best_encoder,
-+};
-+
-+static struct drm_connector *panel_connector_create(struct drm_device *dev,
-+		struct panel_module *mod, struct drm_encoder *encoder)
-+{
-+	struct panel_connector *panel_connector;
-+	struct drm_connector *connector;
++	struct i2c_client *client = drm_i2c_encoder_get_client(encoder);
++	uint8_t addr = REG2ADDR(reg);
 +	int ret;
 +
-+	panel_connector = kzalloc(sizeof(*panel_connector), GFP_KERNEL);
-+	if (!panel_connector) {
-+		dev_err(dev->dev, "allocation failed\n");
-+		return NULL;
-+	}
++	set_page(encoder, reg);
 +
-+	panel_connector->encoder = encoder;
-+	panel_connector->mod = mod;
-+
-+	connector = &panel_connector->base;
-+
-+	drm_connector_init(dev, connector, &panel_connector_funcs,
-+			DRM_MODE_CONNECTOR_LVDS);
-+	drm_connector_helper_add(connector, &panel_connector_helper_funcs);
-+
-+	connector->interlace_allowed = 0;
-+	connector->doublescan_allowed = 0;
-+
-+	ret = drm_mode_connector_attach_encoder(connector, encoder);
-+	if (ret)
++	ret = i2c_master_send(client, &addr, sizeof(addr));
++	if (ret < 0)
 +		goto fail;
 +
-+	drm_sysfs_connector_add(connector);
++	ret = i2c_master_recv(client, buf, cnt);
++	if (ret < 0)
++		goto fail;
 +
-+	return connector;
++	return ret;
 +
 +fail:
-+	panel_connector_destroy(connector);
-+	return NULL;
-+}
-+
-+/*
-+ * Module:
-+ */
-+
-+static int panel_modeset_init(struct tilcdc_module *mod, struct drm_device *dev)
-+{
-+	struct panel_module *panel_mod = to_panel_module(mod);
-+	struct tilcdc_drm_private *priv = dev->dev_private;
-+	struct drm_encoder *encoder;
-+	struct drm_connector *connector;
-+
-+	encoder = panel_encoder_create(dev, panel_mod);
-+	if (!encoder)
-+		return -ENOMEM;
-+
-+	connector = panel_connector_create(dev, panel_mod, encoder);
-+	if (!connector)
-+		return -ENOMEM;
-+
-+	priv->encoders[priv->num_encoders++] = encoder;
-+	priv->connectors[priv->num_connectors++] = connector;
-+
-+	return 0;
-+}
-+
-+static void panel_destroy(struct tilcdc_module *mod)
-+{
-+	struct panel_module *panel_mod = to_panel_module(mod);
-+
-+	if (panel_mod->timings) {
-+		display_timings_release(panel_mod->timings);
-+		kfree(panel_mod->timings);
-+	}
-+
-+	tilcdc_module_cleanup(mod);
-+	kfree(panel_mod->info);
-+	kfree(panel_mod);
-+}
-+
-+static const struct tilcdc_module_ops panel_module_ops = {
-+		.modeset_init = panel_modeset_init,
-+		.destroy = panel_destroy,
-+};
-+
-+/*
-+ * Device:
-+ */
-+
-+/* maybe move this somewhere common if it is needed by other outputs? */
-+static struct tilcdc_panel_info * of_get_panel_info(struct device_node *np)
-+{
-+	struct device_node *info_np;
-+	struct tilcdc_panel_info *info;
-+	int ret = 0;
-+
-+	if (!np) {
-+		pr_err("%s: no devicenode given\n", __func__);
-+		return NULL;
-+	}
-+
-+	info_np = of_get_child_by_name(np, "panel-info");
-+	if (!info_np) {
-+		pr_err("%s: could not find panel-info node\n", __func__);
-+		return NULL;
-+	}
-+
-+	info = kzalloc(sizeof(*info), GFP_KERNEL);
-+	if (!info) {
-+		pr_err("%s: allocation failed\n", __func__);
-+		return NULL;
-+	}
-+
-+	ret |= of_property_read_u32(info_np, "ac-bias", &info->ac_bias);
-+	ret |= of_property_read_u32(info_np, "ac-bias-intrpt", &info->ac_bias_intrpt);
-+	ret |= of_property_read_u32(info_np, "dma-burst-sz", &info->dma_burst_sz);
-+	ret |= of_property_read_u32(info_np, "bpp", &info->bpp);
-+	ret |= of_property_read_u32(info_np, "fdd", &info->fdd);
-+	ret |= of_property_read_u32(info_np, "sync-edge", &info->sync_edge);
-+	ret |= of_property_read_u32(info_np, "sync-ctrl", &info->sync_ctrl);
-+	ret |= of_property_read_u32(info_np, "raster-order", &info->raster_order);
-+	ret |= of_property_read_u32(info_np, "fifo-th", &info->fifo_th);
-+
-+	/* optional: */
-+	info->tft_alt_mode      = of_property_read_bool(info_np, "tft-alt-mode");
-+	info->invert_pxl_clk    = of_property_read_bool(info_np, "invert-pxl-clk");
-+
-+	if (ret) {
-+		pr_err("%s: error reading panel-info properties\n", __func__);
-+		kfree(info);
-+		return NULL;
-+	}
-+
-+	return info;
-+}
-+
-+static struct of_device_id panel_of_match[];
-+
-+static int panel_probe(struct platform_device *pdev)
-+{
-+	struct device_node *node = pdev->dev.of_node;
-+	struct panel_module *panel_mod;
-+	struct tilcdc_module *mod;
-+	struct pinctrl *pinctrl;
-+	int ret = -EINVAL;
-+
-+
-+	/* bail out early if no DT data: */
-+	if (!node) {
-+		dev_err(&pdev->dev, "device-tree data is missing\n");
-+		return -ENXIO;
-+	}
-+
-+	panel_mod = kzalloc(sizeof(*panel_mod), GFP_KERNEL);
-+	if (!panel_mod)
-+		return -ENOMEM;
-+
-+	mod = &panel_mod->base;
-+
-+	tilcdc_module_init(mod, "panel", &panel_module_ops);
-+
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl))
-+		dev_warn(&pdev->dev, "pins are not configured\n");
-+
-+
-+	panel_mod->timings = of_get_display_timings(node);
-+	if (!panel_mod->timings) {
-+		dev_err(&pdev->dev, "could not get panel timings\n");
-+		goto fail;
-+	}
-+
-+	panel_mod->info = of_get_panel_info(node);
-+	if (!panel_mod->info) {
-+		dev_err(&pdev->dev, "could not get panel info\n");
-+		goto fail;
-+	}
-+
-+	panel_mod->backlight = of_find_backlight_by_node(node);
-+	if (panel_mod->backlight)
-+		dev_info(&pdev->dev, "found backlight\n");
-+
-+	return 0;
-+
-+fail:
-+	panel_destroy(mod);
++	dev_err(&client->dev, "Error %d reading from 0x%x\n", ret, reg);
 +	return ret;
 +}
 +
-+static int panel_remove(struct platform_device *pdev)
++static uint8_t
++reg_read(struct drm_encoder *encoder, uint16_t reg)
++{
++	uint8_t val = 0;
++	reg_read_range(encoder, reg, &val, sizeof(val));
++	return val;
++}
++
++static void
++reg_write(struct drm_encoder *encoder, uint16_t reg, uint8_t val)
++{
++	struct i2c_client *client = drm_i2c_encoder_get_client(encoder);
++	uint8_t buf[] = {REG2ADDR(reg), val};
++	int ret;
++
++	set_page(encoder, reg);
++
++	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
++	if (ret < 0)
++		dev_err(&client->dev, "Error %d writing to 0x%x\n", ret, reg);
++}
++
++static void
++reg_write16(struct drm_encoder *encoder, uint16_t reg, uint16_t val)
++{
++	struct i2c_client *client = drm_i2c_encoder_get_client(encoder);
++	uint8_t buf[] = {REG2ADDR(reg), val >> 8, val};
++	int ret;
++
++	set_page(encoder, reg);
++
++	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
++	if (ret < 0)
++		dev_err(&client->dev, "Error %d writing to 0x%x\n", ret, reg);
++}
++
++static void
++reg_set(struct drm_encoder *encoder, uint16_t reg, uint8_t val)
++{
++	reg_write(encoder, reg, reg_read(encoder, reg) | val);
++}
++
++static void
++reg_clear(struct drm_encoder *encoder, uint16_t reg, uint8_t val)
++{
++	reg_write(encoder, reg, reg_read(encoder, reg) & ~val);
++}
++
++static void
++tda998x_reset(struct drm_encoder *encoder)
++{
++	/* reset audio and i2c master: */
++	reg_set(encoder, REG_SOFTRESET, SOFTRESET_AUDIO | SOFTRESET_I2C_MASTER);
++	msleep(50);
++	reg_clear(encoder, REG_SOFTRESET, SOFTRESET_AUDIO | SOFTRESET_I2C_MASTER);
++	msleep(50);
++
++	/* reset transmitter: */
++	reg_set(encoder, REG_MAIN_CNTRL0, MAIN_CNTRL0_SR);
++	reg_clear(encoder, REG_MAIN_CNTRL0, MAIN_CNTRL0_SR);
++
++	/* PLL registers common configuration */
++	reg_write(encoder, REG_PLL_SERIAL_1, 0x00);
++	reg_write(encoder, REG_PLL_SERIAL_2, PLL_SERIAL_2_SRL_NOSC(1));
++	reg_write(encoder, REG_PLL_SERIAL_3, 0x00);
++	reg_write(encoder, REG_SERIALIZER,   0x00);
++	reg_write(encoder, REG_BUFFER_OUT,   0x00);
++	reg_write(encoder, REG_PLL_SCG1,     0x00);
++	reg_write(encoder, REG_AUDIO_DIV,    0x03);
++	reg_write(encoder, REG_SEL_CLK,      SEL_CLK_SEL_CLK1 | SEL_CLK_ENA_SC_CLK);
++	reg_write(encoder, REG_PLL_SCGN1,    0xfa);
++	reg_write(encoder, REG_PLL_SCGN2,    0x00);
++	reg_write(encoder, REG_PLL_SCGR1,    0x5b);
++	reg_write(encoder, REG_PLL_SCGR2,    0x00);
++	reg_write(encoder, REG_PLL_SCG2,     0x10);
++}
++
++/* DRM encoder functions */
++
++static void
++tda998x_encoder_set_config(struct drm_encoder *encoder, void *params)
++{
++}
++
++static void
++tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
++{
++	struct tda998x_priv *priv = to_tda998x_priv(encoder);
++
++	/* we only care about on or off: */
++	if (mode != DRM_MODE_DPMS_ON)
++		mode = DRM_MODE_DPMS_OFF;
++
++	if (mode == priv->dpms)
++		return;
++
++	switch (mode) {
++	case DRM_MODE_DPMS_ON:
++		/* enable audio and video ports */
++		reg_write(encoder, REG_ENA_AP, 0xff);
++		reg_write(encoder, REG_ENA_VP_0, 0xff);
++		reg_write(encoder, REG_ENA_VP_1, 0xff);
++		reg_write(encoder, REG_ENA_VP_2, 0xff);
++		/* set muxing after enabling ports: */
++		reg_write(encoder, REG_VIP_CNTRL_0,
++				VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3));
++		reg_write(encoder, REG_VIP_CNTRL_1,
++				VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1));
++		reg_write(encoder, REG_VIP_CNTRL_2,
++				VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5));
++		break;
++	case DRM_MODE_DPMS_OFF:
++		/* disable audio and video ports */
++		reg_write(encoder, REG_ENA_AP, 0x00);
++		reg_write(encoder, REG_ENA_VP_0, 0x00);
++		reg_write(encoder, REG_ENA_VP_1, 0x00);
++		reg_write(encoder, REG_ENA_VP_2, 0x00);
++		break;
++	}
++
++	priv->dpms = mode;
++}
++
++static void
++tda998x_encoder_save(struct drm_encoder *encoder)
++{
++	DBG("");
++}
++
++static void
++tda998x_encoder_restore(struct drm_encoder *encoder)
++{
++	DBG("");
++}
++
++static bool
++tda998x_encoder_mode_fixup(struct drm_encoder *encoder,
++			  const struct drm_display_mode *mode,
++			  struct drm_display_mode *adjusted_mode)
++{
++	return true;
++}
++
++static int
++tda998x_encoder_mode_valid(struct drm_encoder *encoder,
++			  struct drm_display_mode *mode)
++{
++	return MODE_OK;
++}
++
++static void
++tda998x_encoder_mode_set(struct drm_encoder *encoder,
++			struct drm_display_mode *mode,
++			struct drm_display_mode *adjusted_mode)
++{
++	struct tda998x_priv *priv = to_tda998x_priv(encoder);
++	uint16_t hs_start, hs_end, line_start, line_end;
++	uint16_t vwin_start, vwin_end, de_start, de_end;
++	uint16_t ref_pix, ref_line, pix_start2;
++	uint8_t reg, div, rep;
++
++	hs_start   = mode->hsync_start - mode->hdisplay;
++	hs_end     = mode->hsync_end - mode->hdisplay;
++	line_start = 1;
++	line_end   = 1 + mode->vsync_end - mode->vsync_start;
++	vwin_start = mode->vtotal - mode->vsync_start;
++	vwin_end   = vwin_start + mode->vdisplay;
++	de_start   = mode->htotal - mode->hdisplay;
++	de_end     = mode->htotal;
++
++	pix_start2 = 0;
++	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
++		pix_start2 = (mode->htotal / 2) + hs_start;
++
++	/* TODO how is this value calculated?  It is 2 for all common
++	 * formats in the tables in out of tree nxp driver (assuming
++	 * I've properly deciphered their byzantine table system)
++	 */
++	ref_line = 2;
++
++	/* this might changes for other color formats from the CRTC: */
++	ref_pix = 3 + hs_start;
++
++	div = 148500 / mode->clock;
++
++	DBG("clock=%d, div=%u", mode->clock, div);
++	DBG("hs_start=%u, hs_end=%u, line_start=%u, line_end=%u",
++			hs_start, hs_end, line_start, line_end);
++	DBG("vwin_start=%u, vwin_end=%u, de_start=%u, de_end=%u",
++			vwin_start, vwin_end, de_start, de_end);
++	DBG("ref_line=%u, ref_pix=%u, pix_start2=%u",
++			ref_line, ref_pix, pix_start2);
++
++	/* mute the audio FIFO: */
++	reg_set(encoder, REG_AIP_CNTRL_0, AIP_CNTRL_0_RST_FIFO);
++
++	/* set HDMI HDCP mode off: */
++	reg_set(encoder, REG_TBG_CNTRL_1, TBG_CNTRL_1_DWIN_DIS);
++	reg_clear(encoder, REG_TX33, TX33_HDMI);
++
++	reg_write(encoder, REG_ENC_CNTRL, ENC_CNTRL_CTL_CODE(0));
++	/* no pre-filter or interpolator: */
++	reg_write(encoder, REG_HVF_CNTRL_0, HVF_CNTRL_0_PREFIL(0) |
++			HVF_CNTRL_0_INTPOL(0));
++	reg_write(encoder, REG_VIP_CNTRL_5, VIP_CNTRL_5_SP_CNT(0));
++	reg_write(encoder, REG_VIP_CNTRL_4, VIP_CNTRL_4_BLANKIT(0) |
++			VIP_CNTRL_4_BLC(0));
++	reg_clear(encoder, REG_PLL_SERIAL_3, PLL_SERIAL_3_SRL_CCIR);
++
++	reg_clear(encoder, REG_PLL_SERIAL_1, PLL_SERIAL_1_SRL_MAN_IZ);
++	reg_clear(encoder, REG_PLL_SERIAL_3, PLL_SERIAL_3_SRL_DE);
++	reg_write(encoder, REG_SERIALIZER, 0);
++	reg_write(encoder, REG_HVF_CNTRL_1, HVF_CNTRL_1_VQR(0));
++
++	/* TODO enable pixel repeat for pixel rates less than 25Msamp/s */
++	rep = 0;
++	reg_write(encoder, REG_RPT_CNTRL, 0);
++	reg_write(encoder, REG_SEL_CLK, SEL_CLK_SEL_VRF_CLK(0) |
++			SEL_CLK_SEL_CLK1 | SEL_CLK_ENA_SC_CLK);
++
++	reg_write(encoder, REG_PLL_SERIAL_2, PLL_SERIAL_2_SRL_NOSC(div) |
++			PLL_SERIAL_2_SRL_PR(rep));
++
++	reg_write16(encoder, REG_VS_PIX_STRT_2_MSB, pix_start2);
++	reg_write16(encoder, REG_VS_PIX_END_2_MSB, pix_start2);
++
++	/* set color matrix bypass flag: */
++	reg_set(encoder, REG_MAT_CONTRL, MAT_CONTRL_MAT_BP);
++
++	/* set BIAS tmds value: */
++	reg_write(encoder, REG_ANA_GENERAL, 0x09);
++
++	reg_clear(encoder, REG_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_MTHD);
++
++	reg_write(encoder, REG_VIP_CNTRL_3, 0);
++	reg_set(encoder, REG_VIP_CNTRL_3, VIP_CNTRL_3_SYNC_HS);
++	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
++		reg_set(encoder, REG_VIP_CNTRL_3, VIP_CNTRL_3_V_TGL);
++
++	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
++		reg_set(encoder, REG_VIP_CNTRL_3, VIP_CNTRL_3_H_TGL);
++
++	reg_write(encoder, REG_VIDFORMAT, 0x00);
++	reg_write16(encoder, REG_NPIX_MSB, mode->hdisplay - 1);
++	reg_write16(encoder, REG_NLINE_MSB, mode->vdisplay - 1);
++	reg_write16(encoder, REG_VS_LINE_STRT_1_MSB, line_start);
++	reg_write16(encoder, REG_VS_LINE_END_1_MSB, line_end);
++	reg_write16(encoder, REG_VS_PIX_STRT_1_MSB, hs_start);
++	reg_write16(encoder, REG_VS_PIX_END_1_MSB, hs_start);
++	reg_write16(encoder, REG_HS_PIX_START_MSB, hs_start);
++	reg_write16(encoder, REG_HS_PIX_STOP_MSB, hs_end);
++	reg_write16(encoder, REG_VWIN_START_1_MSB, vwin_start);
++	reg_write16(encoder, REG_VWIN_END_1_MSB, vwin_end);
++	reg_write16(encoder, REG_DE_START_MSB, de_start);
++	reg_write16(encoder, REG_DE_STOP_MSB, de_end);
++
++	if (priv->rev == TDA19988) {
++		/* let incoming pixels fill the active space (if any) */
++		reg_write(encoder, REG_ENABLE_SPACE, 0x01);
++	}
++
++	reg_write16(encoder, REG_REFPIX_MSB, ref_pix);
++	reg_write16(encoder, REG_REFLINE_MSB, ref_line);
++
++	reg = TBG_CNTRL_1_VHX_EXT_DE |
++			TBG_CNTRL_1_VHX_EXT_HS |
++			TBG_CNTRL_1_VHX_EXT_VS |
++			TBG_CNTRL_1_DWIN_DIS | /* HDCP off */
++			TBG_CNTRL_1_VH_TGL_2;
++	if (mode->flags & (DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC))
++		reg |= TBG_CNTRL_1_VH_TGL_0;
++	reg_set(encoder, REG_TBG_CNTRL_1, reg);
++
++	/* must be last register set: */
++	reg_clear(encoder, REG_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
++}
++
++static enum drm_connector_status
++tda998x_encoder_detect(struct drm_encoder *encoder,
++		      struct drm_connector *connector)
++{
++	uint8_t val = cec_read(encoder, REG_CEC_RXSHPDLEV);
++	return (val & CEC_RXSHPDLEV_HPD) ? connector_status_connected :
++			connector_status_disconnected;
++}
++
++static int
++read_edid_block(struct drm_encoder *encoder, uint8_t *buf, int blk)
++{
++	uint8_t offset, segptr;
++	int ret, i;
++
++	/* enable EDID read irq: */
++	reg_set(encoder, REG_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
++
++	offset = (blk & 1) ? 128 : 0;
++	segptr = blk / 2;
++
++	reg_write(encoder, REG_DDC_ADDR, 0xa0);
++	reg_write(encoder, REG_DDC_OFFS, offset);
++	reg_write(encoder, REG_DDC_SEGM_ADDR, 0x60);
++	reg_write(encoder, REG_DDC_SEGM, segptr);
++
++	/* enable reading EDID: */
++	reg_write(encoder, REG_EDID_CTRL, 0x1);
++
++	/* flag must be cleared by sw: */
++	reg_write(encoder, REG_EDID_CTRL, 0x0);
++
++	/* wait for block read to complete: */
++	for (i = 100; i > 0; i--) {
++		uint8_t val = reg_read(encoder, REG_INT_FLAGS_2);
++		if (val & INT_FLAGS_2_EDID_BLK_RD)
++			break;
++		msleep(1);
++	}
++
++	if (i == 0)
++		return -ETIMEDOUT;
++
++	ret = reg_read_range(encoder, REG_EDID_DATA_0, buf, EDID_LENGTH);
++	if (ret != EDID_LENGTH) {
++		dev_err(encoder->dev->dev, "failed to read edid block %d: %d",
++				blk, ret);
++		return ret;
++	}
++
++	reg_clear(encoder, REG_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
++
++	return 0;
++}
++
++static uint8_t *
++do_get_edid(struct drm_encoder *encoder)
++{
++	int j = 0, valid_extensions = 0;
++	uint8_t *block, *new;
++	bool print_bad_edid = drm_debug & DRM_UT_KMS;
++
++	if ((block = kmalloc(EDID_LENGTH, GFP_KERNEL)) == NULL)
++		return NULL;
++
++	/* base block fetch */
++	if (read_edid_block(encoder, block, 0))
++		goto fail;
++
++	if (!drm_edid_block_valid(block, 0, print_bad_edid))
++		goto fail;
++
++	/* if there's no extensions, we're done */
++	if (block[0x7e] == 0)
++		return block;
++
++	new = krealloc(block, (block[0x7e] + 1) * EDID_LENGTH, GFP_KERNEL);
++	if (!new)
++		goto fail;
++	block = new;
++
++	for (j = 1; j <= block[0x7e]; j++) {
++		uint8_t *ext_block = block + (valid_extensions + 1) * EDID_LENGTH;
++		if (read_edid_block(encoder, ext_block, j))
++			goto fail;
++
++		if (!drm_edid_block_valid(ext_block, j, print_bad_edid))
++			goto fail;
++
++		valid_extensions++;
++	}
++
++	if (valid_extensions != block[0x7e]) {
++		block[EDID_LENGTH-1] += block[0x7e] - valid_extensions;
++		block[0x7e] = valid_extensions;
++		new = krealloc(block, (valid_extensions + 1) * EDID_LENGTH, GFP_KERNEL);
++		if (!new)
++			goto fail;
++		block = new;
++	}
++
++	return block;
++
++fail:
++	dev_warn(encoder->dev->dev, "failed to read EDID\n");
++	kfree(block);
++	return NULL;
++}
++
++static int
++tda998x_encoder_get_modes(struct drm_encoder *encoder,
++			 struct drm_connector *connector)
++{
++	struct edid *edid = (struct edid *)do_get_edid(encoder);
++	int n = 0;
++
++	if (edid) {
++		drm_mode_connector_update_edid_property(connector, edid);
++		n = drm_add_edid_modes(connector, edid);
++		kfree(edid);
++	}
++
++	return n;
++}
++
++static int
++tda998x_encoder_create_resources(struct drm_encoder *encoder,
++				struct drm_connector *connector)
++{
++	DBG("");
++	return 0;
++}
++
++static int
++tda998x_encoder_set_property(struct drm_encoder *encoder,
++			    struct drm_connector *connector,
++			    struct drm_property *property,
++			    uint64_t val)
++{
++	DBG("");
++	return 0;
++}
++
++static void
++tda998x_encoder_destroy(struct drm_encoder *encoder)
++{
++	struct tda998x_priv *priv = to_tda998x_priv(encoder);
++	drm_i2c_encoder_destroy(encoder);
++	kfree(priv);
++}
++
++static struct drm_encoder_slave_funcs tda998x_encoder_funcs = {
++	.set_config = tda998x_encoder_set_config,
++	.destroy = tda998x_encoder_destroy,
++	.dpms = tda998x_encoder_dpms,
++	.save = tda998x_encoder_save,
++	.restore = tda998x_encoder_restore,
++	.mode_fixup = tda998x_encoder_mode_fixup,
++	.mode_valid = tda998x_encoder_mode_valid,
++	.mode_set = tda998x_encoder_mode_set,
++	.detect = tda998x_encoder_detect,
++	.get_modes = tda998x_encoder_get_modes,
++	.create_resources = tda998x_encoder_create_resources,
++	.set_property = tda998x_encoder_set_property,
++};
++
++/* I2C driver functions */
++
++static int
++tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
 +{
 +	return 0;
 +}
 +
-+static struct of_device_id panel_of_match[] = {
-+		{ .compatible = "tilcdc,panel", },
-+		{ },
-+};
-+MODULE_DEVICE_TABLE(of, panel_of_match);
++static int
++tda998x_remove(struct i2c_client *client)
++{
++	return 0;
++}
 +
-+struct platform_driver panel_driver = {
-+	.probe = panel_probe,
-+	.remove = panel_remove,
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = "panel",
-+		.of_match_table = panel_of_match,
++static int
++tda998x_encoder_init(struct i2c_client *client,
++		    struct drm_device *dev,
++		    struct drm_encoder_slave *encoder_slave)
++{
++	struct drm_encoder *encoder = &encoder_slave->base;
++	struct tda998x_priv *priv;
++
++	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->current_page = 0;
++	priv->cec = i2c_new_dummy(client->adapter, 0x34);
++	priv->dpms = DRM_MODE_DPMS_OFF;
++
++	encoder_slave->slave_priv = priv;
++	encoder_slave->slave_funcs = &tda998x_encoder_funcs;
++
++	/* wake up the device: */
++	cec_write(encoder, REG_CEC_ENAMODS,
++			CEC_ENAMODS_EN_RXSENS | CEC_ENAMODS_EN_HDMI);
++
++	tda998x_reset(encoder);
++
++	/* read version: */
++	priv->rev = reg_read(encoder, REG_VERSION_LSB) |
++			reg_read(encoder, REG_VERSION_MSB) << 8;
++
++	/* mask off feature bits: */
++	priv->rev &= ~0x30; /* not-hdcp and not-scalar bit */
++
++	switch (priv->rev) {
++	case TDA9989N2:  dev_info(dev->dev, "found TDA9989 n2");  break;
++	case TDA19989:   dev_info(dev->dev, "found TDA19989");    break;
++	case TDA19989N2: dev_info(dev->dev, "found TDA19989 n2"); break;
++	case TDA19988:   dev_info(dev->dev, "found TDA19988");    break;
++	default:
++		DBG("found unsupported device: %04x", priv->rev);
++		goto fail;
++	}
++
++	/* after reset, enable DDC: */
++	reg_write(encoder, REG_DDC_DISABLE, 0x00);
++
++	/* set clock on DDC channel: */
++	reg_write(encoder, REG_TX3, 39);
++
++	/* if necessary, disable multi-master: */
++	if (priv->rev == TDA19989)
++		reg_set(encoder, REG_I2C_MASTER, I2C_MASTER_DIS_MM);
++
++	cec_write(encoder, REG_CEC_FRO_IM_CLK_CTRL,
++			CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
++
++	return 0;
++
++fail:
++	/* if encoder_init fails, the encoder slave is never registered,
++	 * so cleanup here:
++	 */
++	if (priv->cec)
++		i2c_unregister_device(priv->cec);
++	kfree(priv);
++	encoder_slave->slave_priv = NULL;
++	encoder_slave->slave_funcs = NULL;
++	return -ENXIO;
++}
++
++static struct i2c_device_id tda998x_ids[] = {
++	{ "tda998x", 0 },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, tda998x_ids);
++
++static struct drm_i2c_encoder_driver tda998x_driver = {
++	.i2c_driver = {
++		.probe = tda998x_probe,
++		.remove = tda998x_remove,
++		.driver = {
++			.name = "tda998x",
++		},
++		.id_table = tda998x_ids,
 +	},
++	.encoder_init = tda998x_encoder_init,
 +};
 +
-+int __init tilcdc_panel_init(void)
++/* Module initialization */
++
++static int __init
++tda998x_init(void)
 +{
-+	return platform_driver_register(&panel_driver);
++	DBG("");
++	return drm_i2c_encoder_register(THIS_MODULE, &tda998x_driver);
 +}
 +
-+void __exit tilcdc_panel_fini(void)
++static void __exit
++tda998x_exit(void)
 +{
-+	platform_driver_unregister(&panel_driver);
++	DBG("");
++	drm_i2c_encoder_unregister(&tda998x_driver);
 +}
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.h b/drivers/gpu/drm/tilcdc/tilcdc_panel.h
-new file mode 100644
-index 0000000..7db40aa
---- /dev/null
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments
-+ * Author: Rob Clark <robdclark@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
 +
-+#ifndef __TILCDC_PANEL_H__
-+#define __TILCDC_PANEL_H__
++MODULE_AUTHOR("Rob Clark <robdclark@gmail.com");
++MODULE_DESCRIPTION("NXP Semiconductors TDA998X HDMI Encoder");
++MODULE_LICENSE("GPL");
 +
-+/* sub-module for generic lcd panel output */
-+
-+int tilcdc_panel_init(void);
-+void tilcdc_panel_fini(void);
-+
-+#endif /* __TILCDC_PANEL_H__ */
++module_init(tda998x_init);
++module_exit(tda998x_exit);
 -- 
 1.8.1
