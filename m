@@ -1,97 +1,77 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 28 Jan 2013 22:55:08 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
+Date: Mon, 28 Jan 2013 23:16:02 -0700
+Subject: [PATCH v2 07/27] PCI: Add software-emulated host bridge
+In-Reply-To: <CAErSpo7-qXZTri-T+v4O3rKk9AXjHE4ckkWZ1UT63SC1fG02-A@mail.gmail.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
-Message-ID: <20130129055508.GA3339@obsidianresearch.com>
+ <1359399397-29729-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301282018.17714.arnd@arndb.de> <5106F5CB.8050304@wwwdotorg.org>
+ <20130128220904.GA21446@obsidianresearch.com>
+ <CAErSpo7-qXZTri-T+v4O3rKk9AXjHE4ckkWZ1UT63SC1fG02-A@mail.gmail.com>
+Message-ID: <20130129061602.GB3339@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 08:29:24PM -0700, Bjorn Helgaas wrote:
-> On Mon, Jan 28, 2013 at 11:56 AM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > This driver implements the support for the PCIe interfaces on the
-> > Marvell Armada 370/XP ARM SoCs. In the future, it might be extended to
-> > cover earlier families of Marvell SoCs, such as Dove, Orion and
-> > Kirkwood.
-> >
-> > The driver implements the hw_pci operations needed by the core ARM PCI
-> > code to setup PCI devices and get their corresponding IRQs, and the
-> > pci_ops operations that are used by the PCI core to read/write the
-> > configuration space of PCI devices.
-> >
-> > Since the PCIe interfaces of Marvell SoCs are completely separate and
-> > not linked together in a bus, this driver sets up an emulated PCI host
-> > bridge, with one PCI-to-PCI bridge as child for each hardware PCIe
-> > interface.
+On Mon, Jan 28, 2013 at 07:40:16PM -0700, Bjorn Helgaas wrote:
+> On Mon, Jan 28, 2013 at 3:09 PM, Jason Gunthorpe
+> <jgunthorpe@obsidianresearch.com> wrote:
+> > On Mon, Jan 28, 2013 at 03:03:55PM -0700, Stephen Warren wrote:
+> >> On 01/28/2013 01:18 PM, Arnd Bergmann wrote:
+> >> > On Monday 28 January 2013, Thomas Petazzoni wrote:
+> >> >> From: Thierry Reding <thierry.reding@avionic-design.de>
+> >> >>
+> >> >> [Thomas Petazzoni:
+> >> >>  - Simplify capabilities handling.
+> >> >>  - Move to a separate file.
+> >> >>  - Fix mask used when writing a 4 bytes value.]
+> >> >>
+> >> >> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> >> >> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> >> >
+> >> > Not even a description why this is needed?
+> >> >
+> >> > This patch (together with patch 8) seems like the most controversial
+> >> > one of the series, so you should better provide a really good reason
+> >> > why we would emulate something in software rather than using whatever
+> >> > hardware is there.
+> >>
+> >> At least on Tegra, there is no HW that exposes PCI configuration
+> >> registers for the host bridge itself. Only the root ports have exposed
+> >> PCI configuration registers. There was some debate re: whether a host
+> >> bridge device needed to exist or not. This patch makes such a device
+> >> exist if it's required.
 > 
-> There's no Linux requirement that multiple PCIe interfaces appear to
-> be in the same hierarchy.  You can just use pci_scan_root_bus()
-> separately on each interface.  Each interface can be in its own domain
-> if necessary.
+> Host bridges are not actually PCI devices on any architecture.  The
+> upstream side of a host bridge is by definition not on a PCI bus.  On
+> some architectures, it *looks* like the host bridge is a PCI device
+> because it responds to PCI config accesses and you can get to
 
-What you suggest is basically what the Marvell driver did originally,
-the probelm is that Linux requires a pre-assigned aperture for each
-PCI domain/root bus, and these new chips have so many PCI-E ports that
-they can exhaust the physical address space, and also a limited
-internal HW resource for setting address routing.
+Sure, you can't discover domains through any standard means, but once
+you have found a domain (notably a way to issue config transactions)
+then the PCI-E standard actually does place requirements on what
+config transactions should return:
+ - 0:00.0 is a host bridge config space.
+ - 0:XX.X will be one of:
+   - A root complex internal function, with some restrictions this
+     is basically a PCI end device
+   - A PCI-PCI bridge with various mandatory capability headers.
+     One of these must show up for every physical PCI-E link
+     on the root complex.
+This collection of stuff on bus 0 is called the 'root complex'. This
+is new in PCI-E, PCI-X and PCI didn't have such requirements.
 
-Thus they require resource allocation that is sensitive to the devices
-present downstream.
+SOC vendors are taking various liberties with their PCI-E implementations.
+ - nvidia followed the standard but did not include the host bridge
+   at 0:00.0
+ - Marvell ignored everything about the root complex config space
+   behavior :)
 
-By far the simplest solution is to merge all the physical links into a
-single domain and rely on existing PCI resource allocation code to
-drive allocation of scarce physical address space and demand allocate
-the HW routing resource (specifically there are enough resources to
-accomidate MMIO only devices on every bus, but not enough to
-accomidate MMIO and IO on every bus).
+There are two patch sets in this subject, one for nvidia tegra and one
+for Marvell, both presenting to Linux a view of the HW that matches
+what the PCI-E spec describes - specifically that there is one domain,
+and each PCI-E link/controller shows up as a PCI-PCI bridge on bus 0.
 
-> > +/*
-> > + * For a given PCIe interface (represented by a mvebu_pcie_port
-> > + * structure), we read the PCI configuration space of the
-> > + * corresponding PCI-to-PCI bridge in order to find out which range of
-> > + * I/O addresses and memory addresses have been assigned to this PCIe
-> > + * interface. Using these informations, we set up the appropriate
-> > + * address decoding windows so that the physical address are actually
-> > + * resolved to the right PCIe interface.
-> > + */
-> 
-> Are you inferring the host bridge apertures by using the resources
-> assigned to devices under the bridge, i.e., taking the union of all
-
-The flow is different, a portion of physical address space is set
-aside for use by PCI-E (via DT) and that portion is specified in the
-struct resource's ultimately attached to the PCI domain for the bus
-scan. You could call that the 'host bridge aperture' though it doesn't
-reflect any HW configuration at all. The values come from the device
-tree.
-
-During the bus scan the Linux core code splits up that contiguous
-space and assigns to the PCI-PCI bridges and devices under that domain.
-
-Each physical PCI-E link on the chip is seen by Linux through the SW
-emulated PCI-PCI bridge attached to bus 0. When Linux configures the
-bridge windows it triggers this code here to copy that window
-information from the PCI config space into non-standard internal HW
-registers.
-
-The purpose of the SW PCI-PCI bridge and this code here is to give
-the Linux PCI core control over the window (MMIO,IO,busnr) assigned
-to the PCI-E link.
-
-This arrangement with PCI-PCI bridges controlling address routing is
-part of the PCI-E standard, in this instance Marvell did not implement
-the required config space in HW so the driver is working around that
-deficiency.
-
-Other drivers, like tegra have a similar design, but their hardware
-does implement PCI-PCI bridge configuration space and does drive
-address decoding through the HW PCI-PCI window registers.
-
-Having PCI-E links be bridges, not domains/root_bus's is in-line with
-the standard and works better with the Linux PCI resource allocator.
+In this model, there is no 'host bridge aperture' hardware, each PCI-E
+link has a dedicated aperture and control of that aperture is through
+the PCI-PCI bridge window registers, again as PCI-E specifies.
 
 Jason
