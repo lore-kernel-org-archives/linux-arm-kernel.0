@@ -1,49 +1,47 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 29 Jan 2013 21:41:45 +0100
-Subject: [PATCH 4/5] net: mvmdio: allow Device Tree and platform device to
- coexist
-In-Reply-To: <20130129175912.GE25646@obsidianresearch.com>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1359473048-26551-5-git-send-email-florian@openwrt.org>
- <20130129175912.GE25646@obsidianresearch.com>
-Message-ID: <201301292141.45931.florian@openwrt.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 29 Jan 2013 21:48:00 +0100
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that kirkwood_ge0[01]_init()
+ finds its clock
+In-Reply-To: <20130129203221.GG7717@titan.lakedaemon.net>
+References: <510506F9.3070500@gmail.com> <20130127110857.GA23687@schnuecks.de>
+ <51053761.1020009@gmail.com> <20130127144610.GW1758@titan.lakedaemon.net>
+ <51053F81.6020904@gmail.com> <20130127152431.GX1758@titan.lakedaemon.net>
+ <20130128223148.GA10275@schnuecks.de>
+ <20130129004824.GB7717@titan.lakedaemon.net>
+ <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
+ <20130129203221.GG7717@titan.lakedaemon.net>
+Message-ID: <51083580.1010900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 29 janvier 2013 18:59:12, Jason Gunthorpe a ?crit :
-> On Tue, Jan 29, 2013 at 04:24:07PM +0100, Florian Fainelli wrote:
-> > -	dev->err_interrupt = irq_of_parse_and_map(pdev->dev.of_node, 0);
-> > +	if (pdev->dev.of_node) {
-> > +		dev->regs = of_iomap(pdev->dev.of_node, 0);
-> > +		if (!dev->regs) {
-> > +			dev_err(&pdev->dev, "No SMI register address given in 
-DT\n");
-> > +			ret = -ENODEV;
-> > +			goto out_free;
-> > +		}
-> > +
-> > +		dev->err_interrupt = irq_of_parse_and_map(pdev->dev.of_node, 0);
-> > +	} else {
-> > +		r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +
-> > +		dev->regs = ioremap(r->start, resource_size(r));
-> > +		if (!dev->regs) {
-> > +			dev_err(&pdev->dev, "No SMI register address given\n");
-> > +			ret = -ENODEV;
-> > +			goto out_free;
-> > +		}
-> > +
-> > +		dev->err_interrupt = platform_get_irq(pdev, 0);
-> > +	}
-> 
-> Why do you have these different paths for OF and platform? AFAIK these
-> days when a OF device is automatically converted into a platform
-> device all the struct resources are created too, so you can't you just
-> use platform_get_resource and devm_request_and_ioremap for both flows?
-> 
-> Ditto for the interrupt - platform_get_irq should work in both cases?
+On 01/29/2013 09:32 PM, Jason Cooper wrote:
+> On Tue, Jan 29, 2013 at 09:08:46PM +0100, Sebastian Hesselbarth wrote:
+>> (Issue 1: gated runit clock hangs kernel due to serial access)
+>
+> This can be fixed with a patch removing clock-frequency from all
+> kirkwood boards (dove, orion, etc?) I'll gin this up and add it to the
+> havoc ;-)
 
-There was no particular reason and I updated the patchset to do that precisely 
-in version 2.
--- 
-Florian
+For kirkwood.dtsi it is already there as you stated, but yes, it should
+be removed from the board files including kirkwood.dtsi and also the
+comments in kirkwood.dtsi. I'll prepare a patch for dove.dtsi.
+
+>> (Issue 2: gated gbe clock hangs kernel due to smi access)
+>
+> Here, I'm going to wait for Florian's mvmdio changes to settle out and
+> then readdress this.  My current understanding is that there will only
+> be one DT node for this.  iiuc, each board dts will have to say which
+> gate clocks to consume to prevent the mvmdio node in the dtsi from
+> consuming both unconditionally.
+
+Ok, feel free to consume the patch ;)
+
+>> Leaves Issue 3, gbe forgets about its MAC address when gated or powered
+>> down. That should be done with local-mac-address passed by DT enabled
+>> u-boot or any other (dirty) ATAG hack ;)
+>
+> A patch to mv643xx_eth to pull this from DT should solve this.
+
+Great.
+
+Sebastian
