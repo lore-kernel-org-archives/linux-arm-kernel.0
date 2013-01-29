@@ -1,153 +1,82 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 29 Jan 2013 02:51:05 -0500
-Subject: [PATCH v3 10/15] ARM: vexpress/dcscb: add CPU use counts to the power
- up/down API implementation
+Date: Tue, 29 Jan 2013 02:51:08 -0500
+Subject: [PATCH v3 13/15] ARM: CCI: ensure powerdown-time data is flushed from
+ cache
 In-Reply-To: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1359445870-18925-11-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1359445870-18925-14-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible for a CPU to be told to power up before it managed
-to power itself down.  Solve this race with a usage count as mandated
-by the API definition.
+From: Dave Martin <dave.martin@linaro.org>
 
-Signed-off-by: nicolas Pitre <nico@linaro.org>
+Non-local variables used by the CCI management function called after
+disabling the cache must be flushed out to main memory in advance,
+otherwise incoherency of those values may occur if they are sitting
+in the cache of some other CPU when cci_disable() executes.
+
+This patch adds the appropriate flushing to the CCI driver to ensure
+that the relevant data is available in RAM ahead of time.
+
+Because this creates a dependency on arch-specific cacheflushing
+functions, this patch also makes ARM_CCI depend on ARM.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/mach-vexpress/dcscb.c | 77 +++++++++++++++++++++++++++++++++---------
- 1 file changed, 61 insertions(+), 16 deletions(-)
+ drivers/bus/Kconfig   |  1 +
+ drivers/bus/arm-cci.c | 21 +++++++++++++++++++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 677ced9efc..f993608944 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -45,6 +45,7 @@
- static arch_spinlock_t dcscb_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index d032f74ff2..cd4ac9f001 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -22,5 +22,6 @@ config OMAP_INTERCONNECT
  
- static void __iomem *dcscb_base;
-+static int dcscb_use_count[4][2];
+ config ARM_CCI
+        bool "ARM CCI driver support"
++	depends on ARM
  
- static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- {
-@@ -61,14 +62,27 @@ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- 	local_irq_disable();
- 	arch_spin_lock(&dcscb_lock);
+ endmenu
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 25ae156924..30e4a77da0 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -21,8 +21,16 @@
+ #include <linux/slab.h>
+ #include <linux/arm-cci.h>
  
--	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
--	if (rst_hold & (1 << 8)) {
--		/* remove cluster reset and add individual CPU's reset */
--		rst_hold &= ~(1 << 8);
--		rst_hold |= 0xf;
-+	dcscb_use_count[cpu][cluster]++;
-+	if (dcscb_use_count[cpu][cluster] == 1) {
-+		rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-+		if (rst_hold & (1 << 8)) {
-+			/* remove cluster reset and add individual CPU's reset */
-+			rst_hold &= ~(1 << 8);
-+			rst_hold |= 0xf;
-+		}
-+		rst_hold &= ~(cpumask | (cpumask << 4));
-+		writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-+	} else if (dcscb_use_count[cpu][cluster] != 2) {
-+		/*
-+		 * The only possible values are:
-+		 * 0 = CPU down
-+		 * 1 = CPU (still) up
-+		 * 2 = CPU requested to be up before it had a chance
-+		 *     to actually make itself down.
-+		 * Any other value is a bug.
-+		 */
-+		BUG();
+-#define CCI400_EAG_OFFSET       0x4000
+-#define CCI400_KF_OFFSET        0x5000
++#include <asm/cacheflush.h>
++#include <asm/memory.h>
++#include <asm/outercache.h>
++
++#include <asm/irq_regs.h>
++#include <asm/pmu.h>
++
++#define CCI400_PMCR                   0x0100
++#define CCI400_EAG_OFFSET             0x4000
++#define CCI400_KF_OFFSET              0x5000
+ 
+ #define DRIVER_NAME	"CCI"
+ struct cci_drvdata {
+@@ -73,6 +81,15 @@ static int cci_driver_probe(struct platform_device *pdev)
+ 		goto ioremap_err;
  	}
--	rst_hold &= ~(cpumask | (cpumask << 4));
--	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
  
- 	arch_spin_unlock(&dcscb_lock);
- 	local_irq_enable();
-@@ -78,7 +92,8 @@ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- 
- static void dcscb_power_down(void)
- {
--	unsigned int mpidr, cpu, cluster, rst_hold, cpumask, last_man;
-+	unsigned int mpidr, cpu, cluster, rst_hold, cpumask;
-+	bool last_man = false, skip_wfi = false;
- 
- 	mpidr = read_cpuid_mpidr();
- 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-@@ -89,13 +104,26 @@ static void dcscb_power_down(void)
- 	BUG_ON(cpu >= 4 || cluster >= 2);
- 
- 	arch_spin_lock(&dcscb_lock);
--	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
--	rst_hold |= cpumask;
--	if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf)
--		rst_hold |= (1 << 8);
--	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-+	dcscb_use_count[cpu][cluster]--;
-+	if (dcscb_use_count[cpu][cluster] == 0) {
-+		rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-+		rst_hold |= cpumask;
-+		if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf) {
-+			rst_hold |= (1 << 8);
-+			last_man = true;
-+		}
-+		writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-+	} else if (dcscb_use_count[cpu][cluster] == 1) {
-+		/*
-+		 * A power_up request went ahead of us.
-+		 * Even if we do not want to shut this CPU down,
-+		 * the caller expects a certain state as if the WFI
-+		 * was aborted.  So let's continue with cache cleaning.
-+		 */
-+		skip_wfi = true;
-+	} else
-+		BUG();
- 	arch_spin_unlock(&dcscb_lock);
--	last_man = (rst_hold & (1 << 8));
- 
- 	/*
- 	 * Now let's clean our L1 cache and shut ourself down.
-@@ -122,8 +150,10 @@ static void dcscb_power_down(void)
- 	set_auxcr(get_auxcr() & ~(1 << 6));
- 
- 	/* Now we are prepared for power-down, do it: */
--	dsb();
--	wfi();
-+	if (!skip_wfi) {
-+		dsb();
-+		wfi();
-+	}
- 
- 	/* Not dead@this point?  Let our caller cope. */
- }
-@@ -133,6 +163,19 @@ static const struct mcpm_platform_ops dcscb_power_ops = {
- 	.power_down	= dcscb_power_down,
- };
- 
-+static void __init dcscb_usage_count_init(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
++	/*
++	 * Multi-cluster systems may need this data when non-coherent, during
++	 * cluster power-up/power-down. Make sure it reaches main memory:
++	 */
++	__cpuc_flush_dcache_area(info, sizeof *info);
++	__cpuc_flush_dcache_area(&info, sizeof info);
++	outer_clean_range(virt_to_phys(info), virt_to_phys(info + 1));
++	outer_clean_range(virt_to_phys(&info), virt_to_phys(&info + 1));
 +
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-+	BUG_ON(cpu >= 4 || cluster >= 2);
-+	dcscb_use_count[cpu][cluster] = 1;
-+}
-+
- static int __init dcscb_init(void)
- {
- 	int ret;
-@@ -141,6 +184,8 @@ static int __init dcscb_init(void)
- 	if (!dcscb_base)
- 		return -EADDRNOTAVAIL;
+ 	platform_set_drvdata(pdev, info);
  
-+	dcscb_usage_count_init();
-+
- 	ret = mcpm_platform_register(&dcscb_power_ops);
- 	if (ret) {
- 		iounmap(dcscb_base);
+ 	pr_info("CCI loaded at %p\n", info->baseaddr);
 -- 
 1.8.1.2
