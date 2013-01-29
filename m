@@ -1,24 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Jan 2013 11:29:17 +0000
-Subject: [PATCH v2 0/5] ARM: Manage the pl310 erratas in a dynamic way
-In-Reply-To: <20130129101026.GA1063@bnru10>
-References: <20130129101026.GA1063@bnru10>
-Message-ID: <20130129112917.GF2637@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 29 Jan 2013 12:31:13 +0100
+Subject: [RFC] ARM: dma-mapping: Return 0 if no ->set_dma_mask()
+In-Reply-To: <20130128.103320.355771370936761237.hdoyu@nvidia.com>
+References: <20130128.103320.355771370936761237.hdoyu@nvidia.com>
+Message-ID: <5107B301.2060802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 03:40:38PM +0530, srinidhi kasagar wrote:
-> - Added l2x0_quirks to manage the errata in cpu_idle path. Tried to address
->   Russell's comment on this, but could not completely. Because, neither I can
->   keep the #ifdef CONFIG_PL310_ERRATA_769419 nor remove it entirely since
->   the platform A suffers from this bug, whereas B do not but shares the same
->   defconfig.
+Hello,
 
-Yes you can and I covered this situation in my email.  In that case,
-you _define_ CONFIG_PL310_ERRATA_769419 such that the barrier _always_
-gets included both both platforms.
+On 1/28/2013 9:33 AM, Hiroshi Doyu wrote:
+> struct dma_map_ops iommu_ops doesn't have ->set_dma_mask, which causes
+> crash when dma_set_mask() is called from some driver.
 
-As I already said, there is _no_ point making the barrier conditional;
-it's probably more expensive to make it conditional than just to execute
-it every time.  But we still might as well optimize it away if we are
-running _only_ on platforms which _do_ _not_ have that errata.
+I think that the issue is a bit different. It looks that iommu_ops lacks
+the mandatory set_dma_mask callback. arm_dma_set_mask() can be used for it,
+so please update your patch to add this missing callback.
+
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>   arch/arm/include/asm/dma-mapping.h |    6 +++++-
+>   1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index a58e0f5..95328bf 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -32,7 +32,11 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+>   
+>   static inline int dma_set_mask(struct device *dev, u64 mask)
+>   {
+> -	return get_dma_ops(dev)->set_dma_mask(dev, mask);
+> +	struct dma_map_ops *ops = get_dma_ops(dev);
+> +
+> +	if (ops->set_dma_mask)
+> +		return ops->set_dma_mask(dev, mask);
+> +	return 0;
+>   }
+>   
+>   #ifdef __arch_page_to_dma
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
