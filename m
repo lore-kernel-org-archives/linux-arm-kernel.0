@@ -1,30 +1,45 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Tue, 29 Jan 2013 10:49:54 +0530
-Subject: [PATCH 0/2] DaVinci: da850: Add NOR flash DT node support
-Message-ID: <1359436796-25135-1-git-send-email-anilkumar.v@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 28 Jan 2013 21:22:29 -0800
+Subject: [PATCH 1/2] arm: exynos5: Enable PM generic domain support in
+ Kconfig
+In-Reply-To: <1357733733-18769-2-git-send-email-prasanna.ps@samsung.com>
+References: <1357733733-18769-1-git-send-email-prasanna.ps@samsung.com>
+ <1357733733-18769-2-git-send-email-prasanna.ps@samsung.com>
+Message-ID: <05b901cdfde0$a373a860$ea5af920$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NOR flash DT node support for DA850 EVM and related pin mux.
-Configure 16 bit data bus width for CS2(aemif) to use the norflash on
-DA850.
+Prasanna Kumar wrote:
+> 
+> This patch adds support to enable PM generic domains
+> under Exynos5 family
+> 
+> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-
+> exynos/Kconfig
+> index e103c29..871be97 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -63,6 +63,7 @@ config SOC_EXYNOS5250
+>  	depends on ARCH_EXYNOS5
+>  	select S5P_PM if PM
+>  	select S5P_SLEEP if PM
+> +	select PM_GENERIC_DOMAINS if PM
+>  	select S5P_DEV_MFC
+>  	select SAMSUNG_DMADEV
+>  	help
+> --
+> 1.7.5.4
 
-This series is based on top of 3.8-rc4 and the following patches.
+Firstly, this patch can be squashed into 2nd one.
+Secondly, please put the statements alphanumerically.
+Finally, please use the same format for subject like following:
+"ARM: EXYNOS: ..."
 
- -drivers/pinctrl: grab default handles from device core
-  https://patchwork.kernel.org/patch/1862231/
- -ARM: davinci: da850: add pinctrl driver DT entries
+Thanks.
 
-Tested on DA850 EVM.
-
-Kumar, Anil (2):
-  ARM: davinci: da850 evm: add norflash DT node
-  ARM: davinci: da850: configure CS2(aemif) for norflash
-
- arch/arm/boot/dts/da850-evm.dts  |   25 +++++++++++++++++++++++
- arch/arm/boot/dts/da850.dtsi     |   41 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-davinci/da8xx-dt.c |   17 +++++++++++++++
- 3 files changed, 83 insertions(+), 0 deletions(-)
-
--- 
-1.7.4.1
+- Kukjin
