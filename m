@@ -1,39 +1,43 @@
-From: lizefan@huawei.com (Li Zefan)
-Date: Tue, 29 Jan 2013 17:16:51 +0800
-Subject: backport patches to 2.6.34 to remove
- __ARCH_WANT_INTERRUPTS_ON_CTXSW?
-In-Reply-To: <51077966.1060703@huawei.com>
-References: <51077966.1060703@huawei.com>
-Message-ID: <51079383.60406@huawei.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 29 Jan 2013 10:20:06 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130129094143.1aad9377@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5106F9F9.3010905@wwwdotorg.org> <20130129094143.1aad9377@skate>
+Message-ID: <20130129092006.GA16377@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013/1/29 15:25, Li Zefan wrote:
-> Hi Catalin,
+On Tue, Jan 29, 2013 at 09:41:43AM +0100, Thomas Petazzoni wrote:
+> On Mon, 28 Jan 2013 15:21:45 -0700, Stephen Warren wrote:
+[...]
+> > > +static int mvebu_pcie_init(void)
+> > > +{
+> > > +	return platform_driver_probe(&mvebu_pcie_driver,
+> > > +				     mvebu_pcie_probe);
+> > > +}
+> > > +
+> > > +subsys_initcall(mvebu_pcie_init);
+> > 
+> > Why isn't that just platform_driver_register()?
 > 
-> We got system crashes, and then we managed to trigger the bug within minutes,
-> and we found this in upstream, which also backported to 2.6.34 stable:
-> 
-> commit cb297a3e433dbdcf7ad81e0564e7b804c941ff0d
-> Author: Chanho Min <chanho0207@gmail.com>
-> Date:   Thu Jan 5 20:00:19 2012 +0900
-> 
->     sched/rt: Fix task stack corruption under __ARCH_WANT_INTERRUPTS_ON_CTXSW
-> 
-> The bug described in this commit resembles to ours. Unfortunately After applying
-> the fix, we still get crash in hours. We tried to bind each real-time task to a
-> single cpu to make sure no cpu migration will happen, and it ran without any
-> problem for ~20 hours.
-> 
-> We're still investigating this issue. One thing I'm doing is backporting patches
-> that removes __ARCH_WANT_INTERRUPTS_ON_CTXSW. With those patches, I can boot
-> the kernel, but it hung up when the system automatically start nfs and later
-> soft-lockup was reported. Things are fine if I disable nfs startup and start it
-> manually.
-> 
+> I didn't test recently, but with my first version of the patch set,
+> having an initialization as late as module_init() was too late. Some
+> PCI fixup code was being executed *before* we get the opportunity of
+> initializing the PCI driver, and it was crashing the kernel. I can
+> provide more details if you want.
 
-I've confirmed it's the 1st patch that causes this lockup.
+Does this patch perhaps fix this crash?
 
-> So did I miss something when backporting, or is it infeasible to backport them
-> to 2.6.34? We're using ARMv7. I've attached the patches I backported.
-> 
+	http://patchwork.ozlabs.org/patch/210870/
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130129/579b43da/attachment.sig>
