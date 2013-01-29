@@ -1,46 +1,77 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 29 Jan 2013 15:46:10 +0100
-Subject: [RFC 0/3] arm: mxs: sanitize enet_out clock handling
-Message-ID: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 29 Jan 2013 08:53:57 -0600
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+Message-ID: <5107E285.8060304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handling enet_out on MX28 is cumbersome at the moment. Most boards need it
-enabled and for that, they have to add code to mach-mxs.c (see sps1 as an
-example). Since this is board specific, we better encode it in the devicetree,
-that is the reason it was made for.
+On 01/28/2013 07:30 PM, Kim Phillips wrote:
+> Enable the compiler intrinsic for byte swapping on arch ARM.  This
+> allows the compiler to detect and be able to optimize out byte
+> swappings, e.g. in big endian to big endian moves.
+> 
+> AFAICT, arm gcc got __builtin_bswap{32,64} support in 4.6,
+> and for the 16-bit version in 4.8.
 
-My proposal will overwrite the generic "clock" and "clock-names" properties
-from imx28.dtsi in the board file. The original one has 2 entries, and boards
-needing enet_out will overload it with three entries. The network driver will
-enable the clock if it was specified. The old code enabling the clock will be
-backward compatible but print a WARN if the legacy mode needs to be used.
+I think these are the versions ARM got optimized swap support. The newer
+compilers are smart enough to replace a swap written in C with a rev
+instruction. Last time I checked, they did not do rev16, but that is
+probably what was added in 4.8 (and backported to Linaro gcc). The
+Linaro backports make it impossible to define what gcc version has a
+specific feature.
 
-This will make adding new board easier, since we don't have to touch mach-mxs.c
-for this case. It scales much better.
+If you specify to use the builtin's, do you still get inline rev
+instructions emitted?
 
-Tested on a MX28EVK. Please review, comment, apply(?)
+Rob
 
-Thanks,
-
-   Wolfram
-
-
-Wolfram Sang (3):
-  net: freescale: fec: add support for optional enet_out clk
-  arm: mxs: add enet_out clock to devicetree
-  arm: mach-mxs: make enabling enet_out a legacy function
-
- arch/arm/boot/dts/imx28-apf28.dts      |    3 +++
- arch/arm/boot/dts/imx28-apx4devkit.dts |    3 +++
- arch/arm/boot/dts/imx28-cfa10049.dts   |    3 +++
- arch/arm/boot/dts/imx28-evk.dts        |    3 +++
- arch/arm/boot/dts/imx28-sps1.dts       |    3 +++
- arch/arm/boot/dts/imx28-tx28.dts       |    3 +++
- arch/arm/mach-mxs/mach-mxs.c           |   24 ++++++++++++++++--------
- drivers/net/ethernet/freescale/fec.c   |   10 ++++++++++
- drivers/net/ethernet/freescale/fec.h   |    1 +
- 9 files changed, 45 insertions(+), 8 deletions(-)
-
--- 
-1.7.10.4
+> 
+> Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
+> ---
+> akin to: http://comments.gmane.org/gmane.linux.kernel.cross-arch/16016
+> 
+> based on linux-next.  Depends on commit "compiler-gcc{3,4}.h: Use
+> GCC_VERSION macro" by Daniel Santos <daniel.santos@pobox.com>,
+> currently in the akpm branch.
+> 
+> RFC because of unfamiliarity with arch ARM, and that at91sam9rl,
+> at91rm9200, and lpd270 (so far, at least) builds fail with:
+> 
+> include/uapi/linux/swab.h:60: undefined reference to `__bswapsi2'
+> 
+> I'm using eldk-5.2.1/armv7a's arm-linux-gnueabi-gcc (GCC) 4.6.4
+> 20120303 (prerelease)
+> 
+>  arch/arm/Kconfig              |    1 +
+>  include/linux/compiler-gcc4.h |    3 ++-
+>  2 files changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index eda8711..437d11a 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -3,6 +3,7 @@ config ARM
+>  	default y
+>  	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> +	select ARCH_USE_BUILTIN_BSWAP
+>  	select ARCH_HAVE_CUSTOM_GPIO_H
+>  	select ARCH_WANT_IPC_PARSE_VERSION
+>  	select BUILDTIME_EXTABLE_SORT if MMU
+> diff --git a/include/linux/compiler-gcc4.h b/include/linux/compiler-gcc4.h
+> index 68b162d..da5f728 100644
+> --- a/include/linux/compiler-gcc4.h
+> +++ b/include/linux/compiler-gcc4.h
+> @@ -67,7 +67,8 @@
+>  
+>  
+>  #ifdef CONFIG_ARCH_USE_BUILTIN_BSWAP
+> -#if GCC_VERSION >= 40400
+> +#if (!defined(__arm__) && GCC_VERSION >= 40400) || \
+> +    (defined(__arm__) && GCC_VERSION >= 40600)
+>  #define __HAVE_BUILTIN_BSWAP32__
+>  #define __HAVE_BUILTIN_BSWAP64__
+>  #endif
+> 
