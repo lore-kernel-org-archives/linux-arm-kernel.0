@@ -1,60 +1,153 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Jan 2013 13:44:10 +0000
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <20130129111850.GR23505@n2100.arm.linux.org.uk>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <201301291050.23743.arnd@arndb.de>
- <20130129111850.GR23505@n2100.arm.linux.org.uk>
-Message-ID: <201301291344.11066.arnd@arndb.de>
+From: kishon@ti.com (kishon)
+Date: Tue, 29 Jan 2013 19:14:51 +0530
+Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
+References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <5107D253.5030400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013, Russell King - ARM Linux wrote:
-> > On Tuesday 29 January 2013, Andy Shevchenko wrote:
-> > > On Mon, 2013-01-28 at 21:58 +0000, Arnd Bergmann wrote: 
-> > > > - if ((last_dw == dw) && (last_bus_id == param))
-> > > > + /* both the driver and the device must match */
-> > > > +        if (chan->device->dev->driver != &dw_driver.driver)
-> > > 
-> > > Could we somehow pass the &.driver to the generic filter function (via
-> > > *_dma_controller_register() ? ) and do this to each DMA driver?
-> 
-> How, and what driver gets passed?
+Hi,
 
-of_dma_controller_register (see linux-next) already gets a device_node
-of a device that is owned by the driver calling this function. This
-driver could in theory pass its 'struct device_driver' as another
-argument, although I would expect it to pass its own device specific
-object (e.g. struct dw_dma or struct dma_pl330_dmac) as the 'data'
-pointer, and from there it can easily check if the device matches.
+On Tuesday 29 January 2013 04:52 PM, Sascha Hauer wrote:
+> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>
+> This adds two little devicetree helper functions for determining the
+> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
+> the devicetree.
+>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> ---
+>
+> The properties and their values have been taken from the fsl-mph-dr driver.
+> This binding is also documented (though currently not used) for the tegra
+> ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
+> This is a first attempt to parse these bindings at a common place so that
+> others can make use of it.
+>
+> Basically I want to know whether this binding is recommended for new drivers
+> since normally the devicetree uses '-' instead of '_', and maybe there are
+> other problems with it.
+>
+> I need this binding for the chipidea driver. I suspect that the fsl-mph-dr
+> driver also really handles a chipidea core.
+>
+> Should we agree on this I would convert the fsl-mph-dr driver to use these
+> helpers.
+>
+> Sascha
+>
+>   drivers/usb/core/Makefile |    1 +
+>   drivers/usb/core/of.c     |   76 +++++++++++++++++++++++++++++++++++++++++++++
 
-> > My hope is still that we can avoid using filter functions entirely
-> > when we use xlate() logic, and instead just go through the channels
-> > of the dma engine we know we are looking at.
-> 
-> Has anyone yet determined whether any of these new DMA engine slave APIs
-> are usable for implementations which have a separate MUX between the
-> DMA engine and the DMA peripheral?
+This file should ideally go into drivers/usb/phy/.
+>   include/linux/usb/of.h    |   22 +++++++++++++
+>   include/linux/usb/phy.h   |    9 ++++++
+>   4 files changed, 108 insertions(+)
+>   create mode 100644 drivers/usb/core/of.c
+>   create mode 100644 include/linux/usb/of.h
+>
+> diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
+> index 26059b9..5378add 100644
+> --- a/drivers/usb/core/Makefile
+> +++ b/drivers/usb/core/Makefile
+> @@ -10,5 +10,6 @@ usbcore-y += devio.o notify.o generic.o quirks.o devices.o
+>
+>   usbcore-$(CONFIG_PCI)		+= hcd-pci.o
+>   usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
+> +usbcore-$(CONFIG_OF)		+= of.o
 
-Can you give an example for this? We were careful to make sure it
-works with platforms that connect a slave to multiple dma engines,
-out of which any could be used for a given transfer. In the device
-tree binding, you specify all possible controllers and give the
-alternatives the same name, for example:
+No Kconfig? Shouldn't this file be compiled only when some one is going 
+to use the PHY?
+>
+>   obj-$(CONFIG_USB)		+= usbcore.o
+> diff --git a/drivers/usb/core/of.c b/drivers/usb/core/of.c
+> new file mode 100644
+> index 0000000..d000d9f
+> --- /dev/null
+> +++ b/drivers/usb/core/of.c
+> @@ -0,0 +1,76 @@
+> +/*
+> + * OF helpers for usb devices.
+> + *
+> + * This file is released under the GPLv2
+> + *
+> + * Initially copied out of drivers/of/of_net.c
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/of.h>
+> +#include <linux/usb/of.h>
+> +#include <linux/usb/phy.h>
+> +#include <linux/export.h>
+> +
+> +static const char *usbphy_modes[] = {
+> +	[USBPHY_INTERFACE_MODE_NA]	= "",
+> +	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
+> +	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
+> +	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
+> +	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
+> +	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
+> +};
+> +
+> +/**
+> + * of_get_usbphy_mode - Get phy mode for given device_node
+> + * @np:	Pointer to the given device_node
+> + *
+> + * The function gets phy interface string from property 'phy_type',
+> + * and returns the correspondig enum usb_phy_interface
+> + */
+> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
+> +{
+> +	const char *phy_type;
+> +	int err, i;
+> +
+> +	err = of_property_read_string(np, "phy_type", &phy_type);
+> +	if (err < 0)
+> +		return USBPHY_INTERFACE_MODE_NA;
 
-	serial at 10000000 {
-		compatible = "arm,pl011", "arm,primecell";
-		dmas = <dwdma0 7 0>, <dwdma0 8 1>, <&pl330 17>, <&pl330 15>;
-		dma-names = "rx", "tx", "rx", "tx;
-		...
-	};
+Why don't we use a u32 property type for the *phy-type*? IMHO we should 
+use string property only when the property should be absolutely 
+unambiguous (e.g., compatible property should be string).
 
-Here, you hve a UART that can use DMA for both receive and transmit, and
-can use either the dw_dma or the pl330 controller for each channel.
-The common dmaengine code will try to pick the first available channel
-on either one. We can probably try to be smarter about making the decision
-which one to use.
+> +
+> +	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
+> +		if (!strcasecmp(phy_type, usbphy_modes[i]))
+> +			return i;
+> +
+> +	return USBPHY_INTERFACE_MODE_NA;
+> +}
+> +EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
+> +
+> +static const char *usb_dr_modes[] = {
+> +	[USB_DR_MODE_UNKNOWN]		= "",
+> +	[USB_DR_MODE_HOST]		= "host",
+> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
+> +	[USB_DR_MODE_OTG]		= "otg",
+> +};
+> +
+> +/**
+> + * of_usb_get_dr_mode - Get dual role mode for given device_node
+> + * @np:	Pointer to the given device_node
+> + *
+> + * The function gets phy interface string from property 'dr_mode',
+> + * and returns the correspondig enum usb_phy_dr_mode
+> + */
+> +enum usb_phy_dr_mode of_usb_get_dr_mode(struct device_node *np)
+> +{
+> +	const char *dr_mode;
+> +	int err, i;
+> +
+> +	err = of_property_read_string(np, "dr_mode", &dr_mode);
+> +	if (err < 0)
+> +		return USB_DR_MODE_UNKNOWN;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
+> +		if (!strcasecmp(dr_mode, usb_dr_modes[i]))
+> +			return i;
 
-Is this what you are referring to?
+Same comment applies here too.
 
-	Arnd
+Thanks
+Kishon
