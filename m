@@ -1,53 +1,35 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 29 Jan 2013 21:24:46 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
- <20130129184157.GA29274@obsidianresearch.com>
- <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
- <20130129191853.GB29274@obsidianresearch.com>
- <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
- <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
-Message-ID: <20130130042446.GC5734@obsidianresearch.com>
+From: kyungsik.lee@lge.com (=?utf-8?B?7J206rK97Iud?=)
+Date: Wed, 30 Jan 2013 13:27:07 +0900
+Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
+In-Reply-To: <20130129225508.GC30535@twin.jikos.cz>
+References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
+ <20130129225508.GC30535@twin.jikos.cz>
+Message-ID: <006201cdfea2$116dfbb0$3449f310$@lee@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 03:27:43PM -0700, Bjorn Helgaas wrote:
-
-> I'm not sure the existing emulation in these patches is sufficient.
-> For example, pci_sw_pci_bridge_write() updates bridge->membase when we
-> write to the window register, but I don't see anything that updates
-> the actual hardware decoder.  That might be done in
-> mvebu_pcie_window_config_port() via armada_370_xp_alloc_pcie_window(),
-> but that looks like it's only done once.  If the PCI core updates a
-> root port window later, I don't see where the hardware decoder will be
-> updated.
+> > It seems that it?s worth trying LZ4 compressed kernel image or ramdisk
+> > for making the kernel boot more faster.
 > 
-> Maybe you're counting on the window assignments to be static?  The PCI
-> core doesn't guarantee anything like that, though in the absence of
-> hotplug I don't know any reason why it would change things.
- 
-Agree..
+> There's another potential user of lz4: btrfs. I've submitted a feature
+> preview integrating lz4 compression
+> http://thread.gmane.org/gmane.comp.file-systems.btrfs/15744
+> and we have tried to integrate the HC mode as well
+> http://thread.gmane.org/gmane.comp.file-systems.btrfs/18165
+> .
+> So far it's on a slow track, conceptually it works, but I the code needs
+> some work so it could live under lib/* (we've used the svn sources with
+> minor changes, no kernel coding style). It would be easier for me to
+> enhance the existing lib/lz4/* codebase.
+> 
+I don't know much about btrfs. But I guess the lz4 related APIs should
+be migrated and integrated under lib/lz4/* like the way lzo implemented.
 
-Thomas, I think you need to directly update the Marvell hardware
-registers when config writes are made to the SW bridge. If this means
-it is too hard/complex to keep the code general then I'd say make it
-part of the Marvell host driver.
+> Also zram could consider lz4, I'm not sure if there are other potential
+> users.
+> 
+> 
+> david
 
-> I also forgot about the bus number munging in mvebu_pcie_rd_conf().
-> The PCI core can update the bridge secondary/subordinate registers.
-> It looks like you don't support writing to them, and the read path
-> (pci_sw_pci_bridge_read()) looks like it doesn't do any translation
-> between the hardware and Linux bus numbers.  I don't understand the
-> system well enough to know if this is an issue.
-
-I was chatting with Thomas on this subject, it looks like there is a
-HW register that needs to be set to the subordinate bus number of the
-bridge, that will solve this weirdness.
-
-Jason
+Thanks,
+Kyungsik
