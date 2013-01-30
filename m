@@ -1,45 +1,63 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 30 Jan 2013 17:15:07 +0000 (UTC)
-Subject: OMAP4 PM bootloader dependency problems
-In-Reply-To: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1301301706580.17105@utopia.booyaka.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 30 Jan 2013 17:19:44 +0000
+Subject: [PATCH] ARM: architected timers: allow dt based discovery
+ using clocksource_of_init
+In-Reply-To: <20130122110456.GC18876@e106331-lin.cambridge.arm.com>
+References: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
+ <50FD7904.1070201@wwwdotorg.org>
+ <CAJuYYwSfH8jTterd6aNc_Aw81PBschfCUf=REKB35=Y4a=i_7A@mail.gmail.com>
+ <20130122110456.GC18876@e106331-lin.cambridge.arm.com>
+Message-ID: <20130130171930.GA23801@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero et al.,
+Thomas,
 
-On Tue, 22 Jan 2013, Paul Walmsley wrote:
-
-> As we've discussed, there are known bootloader dependencies with the OMAP4 
-> PM retention idle code, introduced in v3.8.  Boards booted with u-boot 
-> versions even as recent as 2011 won't enter retention idle correctly; for 
-> example:
+On Tue, Jan 22, 2013 at 11:04:56AM +0000, Mark Rutland wrote:
+> On Mon, Jan 21, 2013 at 06:30:47PM +0000, Thomas Abraham wrote:
+> > Hi Stephen,
+> > 
+> > On 21 January 2013 09:21, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > > On 01/20/2013 06:22 PM, Thomas Abraham wrote:
+> > >> Add an entry in __clksrc_of_table so that ARMv7 architected timer is
+> > >> discoverable using call to clocksource_of_init.
+> > >
+> > >> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+> > >
+> > >> +#ifdef CONFIG_CLKSRC_OF
+> > >> +CLOCKSOURCE_OF_DECLARE(armv7_timer, "arm,armv7-timer", arch_timer_of_register)
+> > >> +#endif
+> > >
+> > > I wonder if we shouldn't enhance include/linux/clocksource.h to define
+> > > CLOCKSOURCE_OF_DECLARE even when !CONFIG_CLKSRC_OF; that way, drivers
+> > > wouldn't need that ifdef.
+> > 
+> > Yes, it will be helpful to have a !CONFIG_CLKSRC_OF version of
+> > CLOCKSOURCE_OF_DECLARE. And can CONFIG_CLKSRC_OF be enabled by default
+> > for all ARM platforms?
+> > 
+> > Thanks,
+> > Thomas.
 > 
->     http://www.pwsan.com/omap/testlogs/test_v3.8-rc4/20130120122039/pm/4430es2panda/4430es2panda_log.txt
+> Thomas,
+> 
+> Once the above is worked out, could you send me the updated patch with a
+> pointer to whichever {branch,patch}(es) I need for CLKSRC_OF?
 
-...
+Is there any news on this? I'd like to be able to push out a branch ready for
+merging soon.
 
-> Barring that, what I'd like to see is a patch for v3.8-rc fixes that adds 
-> a warning, printed to the kernel console, during boot.  The warning should 
-> state that the OMAP4 PM code only works with certain bootloaders, and 
-> should identify the minimum u-boot release needed for OMAP4 full-chip 
-> retention idle to work.
+I've also realised that platforms using of_clocksource_init won't get the
+architected timer registered as a sched_clock, which would seem like a loss.
+I'm not sure what the relative requirements are for sched_clock and
+clocksource, so there may be some platforms that want it and some that don't.
 
-Any progress on this one?  Time is getting very short to get this into 
-v3.8-rc fixes, and it's important to get this into v3.8 so we don't 
-have users expecting chip power management to work correctly with most 
-u-boot versions that are out in the field.
+I see for exynos5440 the architected timer is regsitered as a
+clock{source,_event_device}, but not as a sched_clock, and omap5 is similar,
+but may register dmtimer_read_sched_clock first.
 
-All we should need for v3.8-rc are a few pr_warn()s that execute during 
-OMAP4 PM init, noting that the OMAP4 chip power management doesn't work 
-correctly with many bootloaders, due to missing code in the kernel to 
-properly reset and initialize some devices, and noting the first u-boot 
-version that is known to work correctly.
+We can probably leave it out for now, but it's something we'll need to consider
+in future.
 
-Otherwise there's a very real risk that folks out there will waste lots of 
-time trying to figure out why power management doesn't work as they 
-expect.   To respect our users, we shouldn't put them in that situation.
-
-
-- Paul
+Thanks,
+Mark.
