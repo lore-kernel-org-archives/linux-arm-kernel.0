@@ -1,99 +1,141 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 30 Jan 2013 12:50:41 +0530
-Subject: [PATCH] ARM: dts: specify all the per-cpu interrupts of arch
- timer for exynos5440
-In-Reply-To: <51013432.3080903@arm.com>
-References: <1358818887-16870-1-git-send-email-kgene.kim@samsung.com>
- <20130122101554.GA18876@e106331-lin.cambridge.arm.com>
- <063f01cdf8ec$926cda30$b7468e90$@samsung.com>
- <20130123103614.GD32237@e106331-lin.cambridge.arm.com>
- <50FFC1B0.8000601@ti.com> <51012C4B.5080300@ti.com>
- <51013432.3080903@arm.com>
-Message-ID: <5108C9C9.4010409@ti.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 30 Jan 2013 15:32:32 +0800
+Subject: [PATCH v2 1/1] usb: chipidea: imx: Add system suspend/resume API
+In-Reply-To: <1358735401-3779-1-git-send-email-peter.chen@freescale.com>
+References: <1358735401-3779-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130130073230.GA9777@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On Mon, Jan 21, 2013 at 10:30:01AM +0800, Peter Chen wrote:
+> During the system suspend/resume procedure, the USB also
+> needs to go suspend/resume procedure, this patch adds
+> related APIs. It is tested at i.mx6q sabrelite. Meanwhile,
+> it fixes the bug that the USB will out of work after
+> system suspend/resume.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Tested-by: Shawn Guo <shawn.guo@linaro.org>
 
-On Thursday 24 January 2013 06:46 PM, Marc Zyngier wrote:
-> Hi Benoit,
->
-> On 24/01/13 12:42, Benoit Cousson wrote:
->> Hi Santosh,
->>
->> On 01/23/2013 11:55 AM, Santosh Shilimkar wrote:
->>> Looping Marc, Benoit
->>>
->>> On Wednesday 23 January 2013 04:06 PM, Mark Rutland wrote:
->>>> On Tue, Jan 22, 2013 at 10:05:18PM +0000, Kukjin Kim wrote:
->>>>> Mark Rutland wrote:
->>>>>>
->>>>> + devicetree-discuss, Grant Likely, Rob Herring and Tony Lindgren
->>>>>
->>>>>> On Tue, Jan 22, 2013 at 01:41:27AM +0000, Kukjin Kim wrote:
->>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>>>>>
->>>>>>> Need to be changed requirements in the 'cpus' node for exynos5440
->>>>>>> to specify all the per-cpu interrupts of arch timer.
->>>>>>
->>>>>> The node(s) for the arch timer should not be in the cpus/cpu at N nodes.
->>>>>> Instead, there should be one node (in the root of the tree).
->>>>>>
->>>>> Well, I don't think so. As per my understanding, the local timers are
->>>>> attached to every ARM cores (cpus) and it generates certain interrupt
->>>>> to the
->>>>> GIC. So the correct representation for this in device tree is to
->>>>> include the
->>>>> interrupts in the cpu nodes in dts file. Your comments  refer to a
->>>>> limitation in the Linux kernel implementation of the arch_timer and it
->>>>> should not result in representing the hardware details incorrectly in
->>>>> the
->>>>> dts file.
->>>>
->>>> I disagree. The "correct representation" is whatever the devicetree
->>>> binding
->>>> documentation describes. It does not describe placing timer nodes in
->>>> the cpu
->>>> nodes.
->>>>
->>> This seems to be exact same topic what is getting discussed here [1]
->>> Technically DT is suppose to represent how the hardware is rather than
->>> how the bindings are done.
->>>
->>> But as Marc pointed out, the approach taken currently is to not
->>> duplicate the banked information. The thread [1] isn't concluded
->>> yet but looks like we might want to avoid duplicating the information
->>> considering, more of such duplication needs to follow. e.g gic i/f
->>>
->>> Am still waiting on what Benoit has to say ?
->>
->> I agree with you :-)
->>
->> I'm not sure the binding was properly done to reflect the HW accurately.
->>
->> A local timer for my point of view should be located in the cpu node
->> like a L1 cache. Or at least referenced in each cpu by a phandle.
->>
->> What was the rational to put it in the root?
->
-> The rational was to follow what we already do for most (all?) banked
-> resources. We already have TWD, GIC and PMU that have a root node,
-> avoiding duplicated resources. I think consistency is an important thing
-> to have.
->
-> If we decide to move everything into CPU nodes and duplicate all the
-> banked resources, fine. But that has impacts that reach far beyond the
-> simple case of the timer.
->
-> In particular, good luck with the GIC distributor interface, where the
-> 32 first interrupts are per CPU. This would also mandate a redesign of
-> the way we specify a PPI, as the CPU mask in the third field doesn't
-> mean a thing anymore.
->
-> If you insist on having a phandle to a timer node, fine by me.
->
-Can you please comment on it so that we can conclude this thread ?
-I would like to update my patches and hence the push.
+ping....
 
-Regards,
-Santosh
+Alex, can you help review it?
+> ---
+> Changes for v2:
+> - Add tested-by from Shawn Guo
+> - Using dev_get_drvdata to get driver data
+> 
+>  drivers/usb/chipidea/bits.h        |    1 +
+>  drivers/usb/chipidea/ci13xxx_imx.c |   59 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 60 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+> index ba9c6ef..d1467bb 100644
+> --- a/drivers/usb/chipidea/bits.h
+> +++ b/drivers/usb/chipidea/bits.h
+> @@ -47,6 +47,7 @@
+>  #define PORTSC_FPR            BIT(6)
+>  #define PORTSC_SUSP           BIT(7)
+>  #define PORTSC_HSP            BIT(9)
+> +#define PORTSC_PHCD           BIT(23) /* phy suspend mode */
+>  #define PORTSC_PTC            (0x0FUL << 16)
+>  
+>  /* DEVLC */
+> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> index 342eab0..ff11cee 100644
+> --- a/drivers/usb/chipidea/ci13xxx_imx.c
+> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/mfd/syscon.h>
+>  
+>  #include "ci.h"
+> +#include "bits.h"
+>  #include "ci13xxx_imx.h"
+>  
+>  #define pdev_to_phy(pdev) \
+> @@ -321,6 +322,61 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM
+> +static int ci13xxx_imx_suspend(struct device *dev)
+> +{
+> +	struct ci13xxx_imx_data *data = dev_get_drvdata(dev);
+> +	struct platform_device *plat_ci;
+> +	struct ci13xxx	*ci;
+> +
+> +	plat_ci = data->ci_pdev;
+> +	ci = platform_get_drvdata(plat_ci);
+> +
+> +	hw_write(ci, OP_PORTSC, PORTSC_PHCD, PORTSC_PHCD);
+> +
+> +	if (data->phy)
+> +		usb_phy_set_suspend(data->phy, 1);
+> +
+> +	clk_disable_unprepare(data->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ci13xxx_imx_resume(struct device *dev)
+> +{
+> +	int ret;
+> +	struct ci13xxx_imx_data *data = dev_get_drvdata(dev);
+> +	struct platform_device *plat_ci;
+> +	struct ci13xxx	*ci;
+> +
+> +	plat_ci = data->ci_pdev;
+> +	ci = platform_get_drvdata(plat_ci);
+> +
+> +	ret = clk_prepare_enable(data->clk);
+> +	if (ret) {
+> +		dev_err(dev,
+> +			"Failed to prepare or enable clock, err=%d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	if (hw_read(ci, OP_PORTSC, PORTSC_PHCD)) {
+> +		hw_write(ci, OP_PORTSC, PORTSC_PHCD, 0);
+> +		/* Some clks sync between Controller and USB PHY */
+> +		mdelay(1);
+> +	}
+> +
+> +	if (data->phy)
+> +		usb_phy_set_suspend(data->phy, 0);
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct dev_pm_ops ci13xxx_imx_pm_ops = {
+> +	.suspend	= ci13xxx_imx_suspend,
+> +	.resume		= ci13xxx_imx_resume,
+> +};
+> +#endif
+> +
+>  static const struct of_device_id ci13xxx_imx_dt_ids[] = {
+>  	{ .compatible = "fsl,imx27-usb", },
+>  	{ /* sentinel */ }
+> @@ -334,6 +390,9 @@ static struct platform_driver ci13xxx_imx_driver = {
+>  		.name = "imx_usb",
+>  		.owner = THIS_MODULE,
+>  		.of_match_table = ci13xxx_imx_dt_ids,
+> +#ifdef CONFIG_PM
+> +		.pm	= &ci13xxx_imx_pm_ops,
+> +#endif
+>  	 },
+>  };
+>  
+> -- 
+> 1.7.0.4
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+
+Best Regards,
+Peter Chen
