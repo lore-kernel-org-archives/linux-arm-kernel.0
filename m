@@ -1,236 +1,145 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Wed, 30 Jan 2013 01:03:41 +0100
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <51082C4E.5050903@gmail.com>
-References: <510506F9.3070500@gmail.com> <20130127110857.GA23687@schnuecks.de>
- <51053761.1020009@gmail.com>
- <20130127144610.GW1758@titan.lakedaemon.net>
- <51053F81.6020904@gmail.com>
- <20130127152431.GX1758@titan.lakedaemon.net>
- <20130128223148.GA10275@schnuecks.de>
- <20130129004824.GB7717@titan.lakedaemon.net>
- <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
-Message-ID: <20130130000341.GA10600@schnuecks.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 29 Jan 2013 19:05:32 -0500 (EST)
+Subject: [PATCH v3 2/3] ARM: static_vm: introduce an infrastructure for
+ static mapped area
+In-Reply-To: <1358990934-4893-3-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1358990934-4893-3-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <alpine.LFD.2.02.1301291840580.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 09:08:46PM +0100, Sebastian Hesselbarth wrote:
-> On 01/29/2013 08:42 PM, Simon Baatz wrote:
-> >On Mon, Jan 28, 2013 at 07:48:24PM -0500, Jason Cooper wrote:
-> >>On Mon, Jan 28, 2013 at 11:31:48PM +0100, Simon Baatz wrote:
-> >>>Nothing special here. My config originally based on a Debian config
-> >>>for a Kirkwood kernel.  Thus, amongst other drivers, mv643xx_eth is
-> >>>build as a module and is loaded from an initrd.
-> >>>Because all relevant drivers are loaded as modules, I need my
-> >>>runit patch to boot at all.
-> >>
-> >>Let's back up.  If you config early printk and COMMON_CLK_DEBUG and a
-> >>vanilla v3.8-rc5 with your current config, what happens?
-> >
-> >I thought it's clear what happens. "runit" is requested in the dts by
-> >serial, spi, watchdog, nand, i2c.  Each of these are either not built
-> >or built as a module in my config, except serial.
+On Thu, 24 Jan 2013, Joonsoo Kim wrote:
+
+> From: Joonsoo Kim <js1304@gmail.com>
 > 
-> Simon,
+> In current implementation, we used ARM-specific flag, that is,
+> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+> The purpose of static mapped area is to re-use static mapped area when
+> entire physical address range of the ioremap request can be covered
+> by this area.
 > 
-> it is clear what happens but just to blindly disable clock gating will
-> not help here. What you are suffering are several issues not only one.
-
-
-Sure it is more than one issue. That's why I ran different scenarios.
-
+> This implementation causes needless overhead for some cases.
+> For example, assume that there is only one static mapped area and
+> vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
+> deciding whether it is matched or not. Moreover, even if there is
+> no static mapped area and vmlist has 300 areas, every time we call
+> ioremap, we check 300 areas in now.
 > 
-> >of_serial.c does the following in of_platform_serial_setup():
-> >
-> >	if (of_property_read_u32(np, "clock-frequency",&clk)) {
-> >
-> >		/* Get clk rate through clk driver if present */
-> >		info->clk = clk_get(&ofdev->dev, NULL);
-> >		if (IS_ERR(info->clk)) {
-> >			dev_warn(&ofdev->dev,
-> >				"clk or clock-frequency not defined\n");
-> >			return PTR_ERR(info->clk);
-> >		}
-> >
-> >		clk_prepare_enable(info->clk);
-> >		clk = clk_get_rate(info->clk);
-> >	}
-> >
-> >and since "clock-frequency" is still given in the standard DTS for
-> >the IB-NAS 6210, it does not enable the clock.
-> >Thus, no driver uses the clock, it gets disabled and the system locks
-> >up.
-> >The system boots when removing "clock-frequency" from the DTS.
-> >
-> >Which lead to two questions:
-> >- Is it safe to remove "clock-frequency" now that we have the clocks
-> >   in place?
+> If we construct a extra list for static mapped area, we can eliminate
+> above mentioned overhead.
+> With a extra list, if there is one static mapped area,
+> we just check only one area and proceed next operation quickly.
 > 
-> Safe, as long as you replace it with the corresponding clocks=<&..> property.
+> In fact, it is not a critical problem, because ioremap is not frequently
+> used. But reducing overhead is better idea.
 > 
-> >- The behavior of of_serial.c looks strange to me, is this really the
-> >desired behavior?
+> Another reason for doing this work is for removing architecture dependency
+> on vmalloc layer. I think that vmlist and vmlist_lock is internal data
+> structure for vmalloc layer. Some codes for debugging and stat inevitably
+> use vmlist and vmlist_lock. But it is preferable that they are used
+> as least as possible in outside of vmalloc.c
 > 
-> I guess it is, rely on clock-frequency because a lot of boards still use it.
-> There was no clocks property in of_serial when we started with kirkwood and
-> dove. I think we can switch now to clocks property which will also remove
-> all hard coded occurrences of tclk frequency.
+> Now, I introduce an ARM-specific infrastructure for static mapped area. In
+> the following patch, we will use this and resolve above mentioned problem.
 > 
-> >For the "runit" clock, this means that any time you hit a
-> >configuration that does not keep the clock enabled, the system will
-> >lockup.  (We have gone through this more than once now. Especially,
-> >this hits you hard when you try to support a new board and disable as
-> >much as possible in the config/dts for a start...).
-> 
-> Well, if there is no device/driver using runit it should be safe to disable
-> it. If there is a driver using it, we need a clocks property for it. And
-> as you already stated, serial is using it. And you want serial in every
-> minimal kernel, don't you?
+> Signed-off-by: Joonsoo Kim <js1304@gmail.com>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
->From f479db4:
+First of all, I don't think you really need a new file with a global 
+scope header file.  Given that this code is meant to be used only for 
+ioremap optimization  on ARM, it is probably a better idea to simply put 
+it all into arch/arm/mm/ioremap.c instead.  The only function that needs 
+to be exported out of ioremap.c is insert_static_vm(), and only for the 
+benefit of arch/arm/mm/mmu.c, therefore this function prototype may as 
+well just be added to arch/arm/mm/mm.h.
 
- Marvell engineers tell us:
+More comments below.
 
- It seems that many units use the RUNIT clock.
- SPI, UART, NAND, TWSI, ...
- So it's not possible to clock gate it.
+> diff --git a/arch/arm/include/asm/mach/static_vm.h b/arch/arm/include/asm/mach/static_vm.h
+> new file mode 100644
+> index 0000000..72c8339
+> --- /dev/null
+> +++ b/arch/arm/include/asm/mach/static_vm.h
+> @@ -0,0 +1,45 @@
+> +/*
+> + * arch/arm/include/asm/mach/static_vm.h
+> + *
+> + * Copyright (C) 2012 LG Electronics, Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+> + */
+> +
+> +#ifndef _ASM_MACH_STATIC_VM_H
+> +#define _ASM_MACH_STATIC_VM_H
+> +
+> +#include <linux/types.h>
+> +#include <linux/vmalloc.h>
+> +
+> +struct static_vm {
+> +	struct static_vm	*next;
+> +	void			*vaddr;
+> +	unsigned long		size;
+> +	unsigned long		flags;
+> +	phys_addr_t		paddr;
+> +	const void		*caller;
+> +};
 
- Currently the SPI, NAND and TWSI driver will clk_prepaure_enable()
- this clk, but since we have no idea what ... is, and turning this clk
- off results in a hard lock, unconditionally enable runit.
+Here you're duplicating most of the vm_struct content for no obvious 
+reasons.  Patch #3 even allocates both a vm_struct and a static_vm 
+instance in parallel for each mapping.  Instead, you should consider 
+something like this:
 
+struct static_vm {
+	struct static_vm *next;
+	struct vm_struct vm;
+};
 
-Thus, if we know better than that, that's fine, but please don't tell
-me that this is "blindly" enabling clocks.
+This way, you only need to allocate one structure:
 
-> 
-> >Thus, we should keep it enabled even if it is unused, which is
-> >exactly the purpose of CLK_IGNORE_UNUSED if I understood this
-> >correctly.
-> 
-> True, but only if it is that important that it should _never_ be gated.
-> As long as it is 'only' used by peripheral devices, it should be safe
-> to gate it.
-> 
-> >>Could you also please try kirkwood_defconfig and tell us if it boots?
-> >
-> >It is very easy to get my system to boot with a stock kernel. Just
-> >build one of the drivers I use directly into the kernel and it boots
-> >(up to the point where the gbe driver is loaded if built as a module,
-> >of course).
-> >
-> >>>Here are my findings with various patches: ("non-DT" means booting
-> >>>the IBNAS6210 with machine ID 1680 ???Marvell DB-88F6281-BP
-> >>>Development Board???, which works reasonably well)
-> >>>
-> >>>3.8-rc5 + runit patch:
-> >>>
-> >>>DT: Hangs at boot (when loading mv643xx_eth)
-> >>>non-DT: Boots ok
-> >
-> >In the DT case ge0 and ge1 are NULL, and thus, kirkwood_ge0[01]_init()
-> >tries to enable NULL clocks, but not the gbe clocks. ->  The clocks
-> >get disabled.
-> >
-> >As described in Sebastian's patch (and also found by Andrew some time
-> >ago), this leads to a hanging system when loading the gbe driver.
-> 
-> If I got all your configs right, this DT case is with serial but no
-> clocks property? All other runit "users" are _not_ built into the
-> kernel? Maybe it is just a coincidence that it fails when loading
-> eth but I guess it hangs because of runit getting gated while serial
-> accessing it. When you replace serial's clock-frequency with clocks
-> property to "runit" it shouldn't hang.
+	struct static_vm *svm = early_alloc(...);
+	...
+	svm->vm.addr = addr;
+	...
+	vm_area_add_early(&svm->vm);
+	insert_static_vm(svm);
 
-No, this is the SMI hang already. As stated its "3.8-rc5 + runit
-patch".  So runit is running.
+And then, it would make sense for the insert_static_vm() to do the 
+vm_area_add_early() call itself as well.
 
-And sure, removing "clock-frequency" gets the kernel booting until
-the gbe driver loads, as I said above in the same mail.
+Maybe rename insert_static_vm() to static_vm_area_add_early() to better 
+identify its purpose as well.  It shouldn't be used for any other 
+purpose anyway.
 
-> (Issue 1: gated runit clock hangs kernel due to serial access)
+> +
+> +extern struct static_vm *static_vmlist;
+> +extern spinlock_t static_vmlist_lock;
 
-Yes, and issue 1a: gated runit clock hangs kernel due to "...".
+Your patch is providing the proper accessors to manipulate those.  They 
+therefore should not be exported globally.
 
-I can't get a stock kernel to boot when additionally disabling the
-serial driver altogether (and compiling the Ethernet driver into the
-kernel to avoid its lockup).
+> +
+> +extern struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
+> +			size_t size, unsigned long flags);
+> +extern struct static_vm *find_static_vm_vaddr(void *vaddr);
+> +extern void init_static_vm(struct static_vm *static_vm,
+> +			struct vm_struct *vm, unsigned long flags);
 
-When the runit clock is enabled all the time, it works. I have no
-idea where it gets stuck, since I have no console.  It looks like the
-SATA module does something (telling from the LEDs), but booting does
-not continue.
-
-So, we have a statement from Marvell not to gate it, we know that it
-is needed for "...", can we please not gate it?
-
-> 
-> >>>3.8-rc5 + runit patch + ge00/ge01 patch:
-> >>>
-> >>>DT: Boots ok
-> >>>non-DT: Boots ok
-> >
-> >Since the clocks are found now and kept enabled, DT behaves the same
-> >as non-DT.
-> >
-> >>>
-> >>>3.8-rc5 + runit + Sebastians get smi clock patch (modified to use
-> >>>legacy clock names):
-> >>>
-> >>>DT: Boots, but no MAC
-> >>>non-DT: Boots ok
-> >
-> >This is the behavior originally found by Andrew. The clock patch
-> >eliminates the lockup, but the hardware forgets its MAC address.
-> >
-> >>>
-> >>>3.8-rc5 + runit + using Sebastians patch + clks not ticking at module
-> >>>load:
-> >>>
-> >>>DT: Boots, but no MAC
-> >>>non-DT: Boots, but no MAC
-> 
-> Ok, here my patch for smi clock enables gbe clock before accessing gbe
-> registers.
-> 
-> (Issue 2: gated gbe clock hangs kernel due to smi access)
-> 
-> >I think non-DT and DT gated clocks behave differently, since the
-> >non-DT ones also enable/disable the PHY.  I explicitly removed the
-> >clk_prepare_enable() from kirkwood_ge0[01]_init() in order to see if
-> >this makes a difference.
-> 
-> True, DT gated clocks don't disable PHYs (and never will).
-> 
-> >(Which reminds me, that we wanted to implement the PHY enabling in
-> >the driver.)
-> >
-> >Apparently, it does not make a difference.
-> 
-> Leaves Issue 3, gbe forgets about its MAC address when gated or powered
-> down. That should be done with local-mac-address passed by DT enabled
-> u-boot or any other (dirty) ATAG hack ;)
-
-Fine with all of that. But: I am talking about 3.8 all the time. We
-have three options for issues 2 and 3 from my point of view:
-
-1. We do proper fixes in 3.8 for issues 2 and 3.
-
-2. We fix this regression by not gating the clock in both the DT and
-the non-DT case, preferably by using the correct clocks in
-kirkwood_ge0[01]_init().  Additionally, Jason promises that all gets
-well with the DT aware driver in 3.9.  ;-)
-
-3. Do nothing. Simply accept that we broke modular Ethernet for DT
-because some code relies on two pointers being set.  When we
-introduced a new code path for DT, we forgot about these pointers. 
-Bad luck, the solution was not nice anyway and we will do proper
-fixes in 3.9.
+Since those are only used in ioremap.c, and because I suggested their 
+implementation be moved there as well, you shouldn't need prototype 
+declarations anymore.  And init_static_vm() would be useless with my 
+previous suggestions.
 
 
-As should be clear by now, I think we should go for option 2.
-
-
-
-- Simon
+Nicolas
