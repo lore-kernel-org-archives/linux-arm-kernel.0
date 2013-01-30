@@ -1,58 +1,51 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 30 Jan 2013 12:55:47 +0100
-Subject: kernel 3.8 make problem
-Message-ID: <20130130125547.63d1cbd5@armhf>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Wed, 30 Jan 2013 08:57:20 -0300
+Subject: [PATCH 2/3] arm: sunxi: Add clock definitions for the new clock
+ driver
+In-Reply-To: <5108D8BE.1080906@free-electrons.com>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+ <1358835176-7197-3-git-send-email-emilio@elopez.com.ar>
+ <5108D8BE.1080906@free-electrons.com>
+Message-ID: <BLU0-SMTP4897778EE63E9FB119BDBD8A1E0@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-I build the kernels in my Cubox (Marvel Dove), and it is no more
-possible with kernels 3.8 while it works well with a kernel 3.5
-(on the same machine - the kernels 3.5 and 3.8 have quite the
-same .config).
+El 30/01/13 05:24, Maxime Ripard escribi?:
+> Hi Emilio,
+> 
+> Le 22/01/2013 07:12, Emilio L?pez a ?crit :
+> 
+>> +		cpu: cpu at 01c20054 {
+>> +			#clock-cells = <0>;
+>> +			compatible = "allwinner,sunxi-cpu-clk";
+>> +			reg = <0x01c20054 0x4>;
+>> +			clocks = <&osc32k>, <&osc24M>, <&pll1>;
+>> +		};
+> 
+> Why do you need these three clocks here ? From what you said in patch 3,
+> it seems like the 24M oscillator is not a direct parent, but only the
+> pll1 and the 32k oscillator, right?
 
-Doing:
+There are two reasons:
+ * Hardware wise it actually is a parent, as in, it is an usable source
+you can choose on the mux. There is also PLL6 as an option, but it has
+no representation yet so I have not listed it.
 
-make oldconfig
+  Quoting the linux-sunxi wiki:
 
-returns:
+    0x00 = 32 KHz internal RC clock
+    0x01 = 24 MHz external Oscillator
+    0x02 = PLL1
+    0x03 = 200 MHz sourced from PPL6
 
-Makefile:495: /home/jef/kernel/arch//Makefile: No such file or directory
-make: *** No rule to make target `/home/jef/kernel/arch//Makefile'.  Stop.
+ * The example in patch 3 is simplified, you may want to switch to the
+24M oscillator first. My intention was to just present the concept/idea,
+the actual clock handling on standby contains some more steps; see:
 
-Going further, it seems that it is because the make command 'shell'
-returns nothing. A simple Makefile as:
+https://github.com/linux-sunxi/linux-sunxi/blob/sunxi-3.0/arch/arm/mach-sun4i/pm/standby/standby.c#L179
 
-# Makefile
-var=$(shell echo toto)
-$(info var:$(var))
+Thanks for the review,
 
-returns:
-
-var:
-make: *** No targets.  Stop.
-
-With strace, I get:
-
-...
-read(3, "var=$(shell echo toto)\n$(info va"..., 4096) = 43
-pipe([4, 5])                            = 0
-vfork()                                 = 3545
-close(5)                                = 0
-read(4, "", 200)                        = 0
-close(4)                                = 0
-wait4(-1, [{WIFSIGNALED(s) && WTERMSIG(s) == SIGSEGV}], 0, NULL) = 3545
---- SIGCHLD (Child exited) @ 0 (0) ---
-sigreturn()                             = ? (mask now [])
-fstat64(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 1), ...}) = 0
-mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x76f70000
-write(1, "var:\n", 5var:
-)                   = 5
-...
-
-What did I miss?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Emilio
