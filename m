@@ -1,46 +1,82 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 31 Jan 2013 01:48:27 +1100
-Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
-Message-ID: <20130131014827.09251ece97f74377abada4ac@canb.auug.org.au>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 30 Jan 2013 14:52:43 +0000
+Subject: [PATCH] ARM: tlb: perform branch predictor maintenance for whole
+ invalidation
+In-Reply-To: <1359555125-27495-1-git-send-email-will.deacon@arm.com>
+References: <1359555125-27495-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20130130145243.GA2014@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Wed, Jan 30, 2013 at 02:12:05PM +0000, Will Deacon wrote:
+> The ARM architecture requires explicit branch predictor maintenance
+> when updating an instruction stream for a given virtual address. In
+> reality, this isn't so much of a burden because the branch predictor
+> is flushed during the cache maintenance required to make the new
+> instructions visible to the I-side of the processor.
+> 
+> One exception to this rule is when we flush the entire TLB for a CPU in
+> response to something other than writing new instructions (for example,
+> ASID rollover or switching to an identity mapping before disabling the
+> MMU).
+> 
+> This patch ensures that we flush the branch predictor as part of
+> invalidating the entire TLB.
 
-Today's linux-next merge of the samsung tree got a conflict in
-arch/arm/mach-exynos/common.c between commit b533c8685b16 ("ARM: dts: fix
-compatible value for exynos pinctrl") from the arm-soc tree and commit
-d28a60d89c83 ("ARM: EXYNOS: skip wakeup interrupt registration for
-exynos5250 if pinctrl is enabled") from the samsung tree.
+What about v6 implementations?  Is the branch predictor flush implicit?
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Cheers
+---Dave
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-exynos/common.c
-index 68c0689,cdaa55f..0000000
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@@ -1035,8 -1112,9 +1116,9 @@@ static int __init exynos_init_irq_eint(
-  	 * interrupt support code here can be completely removed.
-  	 */
-  	static const struct of_device_id exynos_pinctrl_ids[] = {
- -		{ .compatible = "samsung,pinctrl-exynos4210", },
- -		{ .compatible = "samsung,pinctrl-exynos4x12", },
- -		{ .compatible = "samsung,pinctrl-exynos5250", },
- +		{ .compatible = "samsung,exynos4210-pinctrl", },
- +		{ .compatible = "samsung,exynos4x12-pinctrl", },
-++		{ .compatible = "samsung,exynos5250-pinctrl", },
-  	};
-  	struct device_node *pctrl_np, *wkup_np;
-  	const char *wkup_compat = "samsung,exynos4210-wakeup-eint";
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/2c7bfc4e/attachment.sig>
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/tlbflush.h | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+> index 6e924d3..713ff32 100644
+> --- a/arch/arm/include/asm/tlbflush.h
+> +++ b/arch/arm/include/asm/tlbflush.h
+> @@ -38,6 +38,7 @@
+>  #define TLB_V7_UIS_PAGE	(1 << 19)
+>  #define TLB_V7_UIS_FULL (1 << 20)
+>  #define TLB_V7_UIS_ASID (1 << 21)
+> +#define TLB_V7_UIS_BP	(1 << 22)
+>  
+>  #define TLB_BARRIER	(1 << 28)
+>  #define TLB_L2CLEAN_FR	(1 << 29)		/* Feroceon */
+> @@ -166,9 +167,11 @@
+>  #endif
+>  
+>  #define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
+> -			 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | TLB_V7_UIS_ASID)
+> +				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
+> +				 TLB_V7_UIS_ASID | TLB_V7_UIS_BP)
+>  #define v7wbi_tlb_flags_up	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
+> -			 TLB_V6_U_FULL | TLB_V6_U_PAGE | TLB_V6_U_ASID)
+> +				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
+> +				 TLB_V6_U_ASID)
+>  
+>  #ifdef CONFIG_CPU_TLB_V7
+>  
+> @@ -330,6 +333,11 @@ static inline void local_flush_tlb_all(void)
+>  	tlb_op(TLB_V4_I_FULL | TLB_V6_I_FULL, "c8, c5, 0", zero);
+>  	tlb_op(TLB_V7_UIS_FULL, "c8, c3, 0", zero);
+>  
+> +	if (tlb_flag(TLB_V7_UIS_BP))
+> +		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
+> +	else
+> +		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
+> +
+>  	if (tlb_flag(TLB_BARRIER)) {
+>  		dsb();
+>  		isb();
+> -- 
+> 1.8.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
