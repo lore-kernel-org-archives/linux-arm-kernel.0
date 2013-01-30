@@ -1,28 +1,54 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 30 Jan 2013 13:19:17 +0000
-Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
-In-Reply-To: <20130130131504.GU15258@arwen.pp.htv.fi>
-References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
- <510916B2.7080509@ti.com> <20130130131504.GU15258@arwen.pp.htv.fi>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA95E97@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 30 Jan 2013 21:19:22 +0800
+Subject: [GIT PULL] imx6q cpuidle for 3.9
+In-Reply-To: <20130129175028.GC17935@quad.lixom.net>
+References: <20130129054635.GA21504@S2101-09.ap.freescale.net>
+ <20130129175028.GC17935@quad.lixom.net>
+Message-ID: <20130130131920.GD2757@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On Wed, Jan 30, 2013 at 18:45:04, Balbi, Felipe wrote:
-> On Wed, Jan 30, 2013 at 02:48:50PM +0200, Roger Quadros wrote:
-
-> > I would appreciate if someone who knows more about beaglebone can help
-> > with verification.
-> > 
-> > I could find that Robert C Nelson (now in cc) is maintaining out of tree
-> > patches for the beaglebone. Maybe he could help with verification?
+On Tue, Jan 29, 2013 at 09:50:28AM -0800, Olof Johansson wrote:
+> This has some small conflicts with the cleanup branch. Can you please base it
+> on top of cleanup so we can avoid the merge conflicts when things go upstream?
+> It's common to have the per-soc cleanup branches as bases for some of the
+> feature branches just for this reason.
 > 
-> Right, Afzal if you have the bone could you help Roger validating ?
+Ok, done as below.
 
-I am not in a position to validate it, in the middle of another task.
+The following changes since commit 1d7180e24e22a608cc4d7e8fd425a19a9394a7ed:
 
-Regards
-Afzal
+  Merge tag 'imx-cleanup-3.9' into imx6q-cpuidle (2013-01-30 21:07:14 +0800)
+
+are available in the git repository at:
+
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx6q-cpudile-3.9
+
+for you to fetch changes up to e5f9dec8ff5ff3f6254412abed1f68d758f6616b:
+
+  ARM: imx6q: support WAIT mode using cpuidle (2013-01-30 21:09:31 +0800)
+
+----------------------------------------------------------------
+imx6q cpuidle support for 3.9
+
+ - It's based on imx-cleanup-3.9 to avoid conflicts.
+
+----------------------------------------------------------------
+Shawn Guo (4):
+      ARM: imx: return zero in case next event gets a large increment
+      ARM: imx: mask gpc interrupts initially
+      ARM: imx: move imx6q_cpuidle_driver into a separate file
+      ARM: imx6q: support WAIT mode using cpuidle
+
+ arch/arm/mach-imx/Makefile        |    6 ++-
+ arch/arm/mach-imx/clk-imx6q.c     |   12 +++++
+ arch/arm/mach-imx/common.h        |    3 ++
+ arch/arm/mach-imx/cpuidle-imx6q.c |   95 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/cpuidle.h       |    5 ++
+ arch/arm/mach-imx/gpc.c           |    5 ++
+ arch/arm/mach-imx/mach-imx6q.c    |   17 +++----
+ arch/arm/mach-imx/platsmp.c       |   10 ++++
+ arch/arm/mach-imx/time.c          |    3 +-
+ 9 files changed, 143 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
