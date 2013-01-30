@@ -1,34 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 30 Jan 2013 09:17:25 +0100
-Subject: [PATCH 0/3] clock driver for sunxi
-In-Reply-To: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
-References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <5108D715.3080403@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Jan 2013 09:19:02 +0100
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+In-Reply-To: <20130130045655.GE5734@obsidianresearch.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130129155820.GB23505@n2100.arm.linux.org.uk>
+ <20130129172055.0ca5f341@skate> <201301291645.08040.arnd@arndb.de>
+ <20130130045655.GE5734@obsidianresearch.com>
+Message-ID: <20130130091902.4607b34d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+Dear Jason Gunthorpe,
 
-Le 22/01/2013 07:12, Emilio L?pez a ?crit :
-> Hello everyone,
-> 
-> This patchset adds basic clock support for sunxi devices. Currently, it
-> implements support for the two oscillators, the main PLL, the CPU mux,
-> and its three divisor clocks. With this in place, it is possible to
-> write a cpufreq driver and have it work.
-> 
-> I have tested this driver successfully on a Cubieboard (A10, sun4i)
-> using the cpufreq driver from the linux-sunxi tree after minor
-> modifications (the clock names are not the same).
+On Tue, 29 Jan 2013 21:56:55 -0700, Jason Gunthorpe wrote:
 
-Thanks for doing this. I'll try to test it on my boards this week.
+> However, Thomas how did you recover the high bits of the
+> IO window address from the bridge configuration? Are you reading the
+> struct resource directly? That probably causes problems with
+> hotplug/etc...
 
-I don't have a lot of comments, but Mike will probably have some.
+The PCI-to-PCI bridge configuration space has a register with the high
+bits of the I/O window address. If you look at the PCI-to-PCI emulation
+code, I set the bit that says "I'm a bridge capable of 32 bits
+addressing of I/O addresses", and then when setting up the windows, I
+reconstruct the full 32 bits address by reading the two I/O address
+registers.
 
-Maxime
+See 3.2.5.6 in the PCI-to-PCI bridge specification:
 
+  If the low four bits of the I/O Base and I/O Limit registers are 01h,
+  then the bridge supports 32-bit I/O address decoding, and the I/O
+  Base Upper 16 Bits and the I/O Limit Upper 16 Bits hold the upper 16
+  bits, corresponding to AD[31::16], of the 32-bit I/O Base and I/O
+  Limit addresses respectively. In this case, system configuration
+  software is permitted to locate the I/O address range supported by
+  the anywhere in the 4-GB I/O Space. Note that the 4-KB alignment and
+  granularity restrictions still apply when the bridge supports 32 -bit
+  I/O addressing.
+
+(And my code does ensure that the low four bits of the I/O Base and I/O
+Limit registers are 01h)
+
+Best regards,
+
+Thomas
 -- 
-Maxime Ripard, Free Electrons
+Thomas Petazzoni, Free Electrons
 Kernel, drivers, real-time and embedded Linux
 development, consulting, training and support.
 http://free-electrons.com
