@@ -1,112 +1,103 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 Jan 2013 23:21:06 +0100
-Subject: [GIT PULL] Nomadik devicetree and cleanups
-In-Reply-To: <20130129173641.GA17935@quad.lixom.net>
-References: <CACRpkdZM8+6QaGrRtCCMWoZQO23uej7JDr1xz2zG7TtwQ7Ngqw@mail.gmail.com>
- <20130128213135.GA3047@quad.lixom.net>
- <CACRpkdaHo_xLwqUDF9C71HbuGEcJHg_Jrsf0gCSPYXa4E+yJGA@mail.gmail.com>
- <20130129173641.GA17935@quad.lixom.net>
-Message-ID: <CACRpkdaVOV4d9xeuKnMyfGgM+Su3M6dmo2pyeEQE9Qb2sErzzA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Jan 2013 23:28:36 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
+ <20130129055508.GA3339@obsidianresearch.com>
+ <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
+ <20130129184157.GA29274@obsidianresearch.com>
+ <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
+ <20130129191853.GB29274@obsidianresearch.com>
+ <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
+ <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
+ <20130130103501.1873d39c@skate>
+ <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
+Message-ID: <20130130232836.1b1fd89b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 6:36 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Jan 28, 2013 at 11:36:59PM +0100, Linus Walleij wrote:
->> On Mon, Jan 28, 2013 at 10:31 PM, Olof Johansson <olof@lixom.net> wrote:
->>
->> > Would you mind rebasing on top of the depends/cleanup branch in arm-soc, sort
->> > out the breakage (and test it) and resubmit?
->>
->> So Olof, please try this instead, based on the ARM depends/cleanup HEAD
->> when I fetched it:
->>
->> The following changes since commit f8060f5446b1f2782f0a8ca9be2d870ea4198aee:
->>
->>   Merge tag 'gic-vic-to-irqchip' of
->> git://sources.calxeda.com/kernel/linux into next/cleanup (2013-01-14
->> 19:55:03 -0800)
->>
->> are available in the git repository at:
->>
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
->> tags/nmk-dt-on-cleanups
->
-> Beautiful! Pulled. Zero conflicts. :)
+Dear Bjorn Helgaas,
 
-So as I heard this blew up for selecting OF instead of USE_OF here
-is yet another pull request, with this oneliner change in the relevant
-patch ("ARM: nomadik: delete old board files"):
+On Wed, 30 Jan 2013 11:52:15 -0700, Bjorn Helgaas wrote:
 
-- select OF
-+ select USE_OF
+> I'm most concerned about the stuff in drivers/pci.  I hesitate to
+> merge drivers/pci/sw-pci-pci-bridge.c as-is because it's a model
+> that's not connected to hardware and only works in a completely static
+> situation, and the rest of the PCI core can't really deal with that.
+> 
+> But I don't think supporting hotplug should be a show-stopper at this
+> point, either.  It sounds like we might be heading towards hooking
+> this up more directly to the Marvell hardware, which will make it more
+> arch-dependent.  Something like that could either go in arch/arm, or
+> in some not-quite-so-generic spot under drivers/pci.
 
-I have tried to provoke builderrors with the defconfig but couldn't.
+If you really don't want sw-pci-pci-bridge.c in drivers/pci, then I can
+make it a part of the drivers/pci/host/pci-mvebu.c driver itself. I
+initially followed the idea started by Thierry Redding for the emulated
+host bridge, but if you feel that this emulated PCI-to-PCI bridge is
+too specific to this driver, then I'm fine with keeping it inside the
+driver itself.
 
-Here is then yet another pull request, and let's hope it works this
-time around:
+> >> I also forgot about the bus number munging in mvebu_pcie_rd_conf().
+> >> The PCI core can update the bridge secondary/subordinate registers.
+> >> It looks like you don't support writing to them, and the read path
+> >> (pci_sw_pci_bridge_read()) looks like it doesn't do any translation
+> >> between the hardware and Linux bus numbers.  I don't understand the
+> >> system well enough to know if this is an issue.
+> >
+> > Right. Could you explain a little bit for what reasons the PCI core
+> > could update the secondary/subordinate registers, and to what
+> > values it sets them?
+> 
+> The secondary/subordinate registers effectively define a bus number
+> aperture that tells the bridge which transactions to claim and forward
+> downstream.  When enumerating devices, we may update the subordinate
+> bus number to widen the aperture so we can enumerate an arbitrary tree
+> behind the bridge.  When we're finished, we'll probably narrow it by
+> updating the subordinate again, so the unused bus number space can be
+> used for other bridges.  I don't know the exact details of the
+> algorithm, and they're likely to change anyway, but pci_scan_bridge()
+> is where most of it happens.
+> 
+> It looks like your current system doesn't support trees below the
+> bridges, but hopefully we can make it so the generic enumeration
+> algorithms still work.
 
-The following changes since commit f8060f5446b1f2782f0a8ca9be2d870ea4198aee:
+In practice, in our situation, there isn't a tree below the bridge.
+There is one single device. I'd prefer to not implement features that I
+cannot effectively test, and let the implementation of those additional
+features to whoever will need them, and therefore be able to test them.
 
-  Merge tag 'gic-vic-to-irqchip' of
-git://sources.calxeda.com/kernel/linux into next/cleanup (2013-01-14
-19:55:03 -0800)
+I guess that if I integrate the PCI-to-PCI bridge emulation code within
+the Marvell driver, then I can keep it fairly limited to whatever the
+Marvell PCI driver requires, no?
 
-are available in the git repository at:
+> > For now, I statically assign the secondary bus register value to be
+> > X+1, where X is the number of the PCIe interface, since X=0 is
+> > reserved for the root bus (which has the host bridge and the
+> > PCI-to-PCI bridges).
+> 
+> That makes sense but limits you to a single bus (and really, a single
+> device since this is PCIe) below the bridge.
 
+Which is exactly what is happening here.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-devicetree-v2
+> > Also, could you detail what kind of translation I should be doing
+> > when reading the hardware and Linux bus numbers?
+> 
+> I'm hoping that the register Jason mentioned is enough to avoid the
+> need for translation.  If it's not, we can explore this a bit more.
 
-for you to fetch changes up to 2cac860881884564c86eeda4f622d8a7ca9b089c:
+Ok.
 
-  ARM: nomadik: get rid of <mach/hardware.h> (2013-01-30 22:55:34 +0100)
+Thanks,
 
-----------------------------------------------------------------
-Nomadik Device Tree conversion rebased on ARM SoC cleanup branch
-
-This patch set converts the Nomadik (mach-nomadik) to
-Device Tree and delete the old board files, paving the
-road for single zImage.
-
-This version also selects USE_OF instead of just OF.
-
-----------------------------------------------------------------
-Linus Walleij (11):
-      ARM: nomadik: move last custom calls to pinctrl
-      ARM: nomadik: initial devicetree support
-      ARM: nomadik: move pin maps to cpu file
-      ARM: nomadik: move remaining PrimeCells to device tree
-      ARM: nomadik: add FSMC NAND
-      ARM: nomadik: move GPIO and pinctrl to device tree
-      ARM: nomadik: convert SMSC91x ethernet to device tree
-      ARM: nomadik: migrate MMC/SD card support to device tree
-      ARM: nomadik: add I2C devices to the device tree
-      ARM: nomadik: delete old board files
-      ARM: nomadik: get rid of <mach/hardware.h>
-
- .../devicetree/bindings/arm/ste-nomadik.txt        |  27 ++
- .../devicetree/bindings/mtd/fsmc-nand.txt          |   2 +-
- arch/arm/Kconfig                                   |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/ste-nomadik-s8815.dts            |  30 ++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 256 +++++++++++++++
- arch/arm/mach-nomadik/Kconfig                      |  10 +-
- arch/arm/mach-nomadik/Makefile                     |   6 -
- arch/arm/mach-nomadik/board-nhk8815.c              | 353 --------------------
- arch/arm/mach-nomadik/cpu-8815.c                   | 358 +++++++++++++++------
- arch/arm/mach-nomadik/cpu-8815.h                   |   4 -
- arch/arm/mach-nomadik/i2c-8815nhk.c                |  88 -----
- arch/arm/mach-nomadik/include/mach/hardware.h      |  90 ------
- arch/arm/mach-nomadik/include/mach/irqs.h          |   2 -
- arch/arm/mach-nomadik/include/mach/uncompress.h    |   1 -
- drivers/mtd/nand/fsmc_nand.c                       |   1 +
- drivers/pinctrl/pinctrl-nomadik.c                  |   4 +
- 17 files changed, 588 insertions(+), 647 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/ste-nomadik.txt
- create mode 100644 arch/arm/boot/dts/ste-nomadik-s8815.dts
- create mode 100644 arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
- delete mode 100644 arch/arm/mach-nomadik/board-nhk8815.c
- delete mode 100644 arch/arm/mach-nomadik/cpu-8815.h
- delete mode 100644 arch/arm/mach-nomadik/i2c-8815nhk.c
- delete mode 100644 arch/arm/mach-nomadik/include/mach/hardware.h
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
