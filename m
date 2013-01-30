@@ -1,61 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 Jan 2013 17:07:50 +0000
-Subject: [PATCH 1/1] pinctrl: nomadik: Rename Device Tree compatible string
-In-Reply-To: <51094E50.4000302@wwwdotorg.org>
-References: <1359563102-5934-1-git-send-email-linus.walleij@stericsson.com>
- <51094E50.4000302@wwwdotorg.org>
-Message-ID: <20130130170750.GA5217@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 30 Jan 2013 17:15:07 +0000 (UTC)
+Subject: OMAP4 PM bootloader dependency problems
+In-Reply-To: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1301301706580.17105@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The preference is to use '-' instead of '_' in compatible strings.
+Hi Tero et al.,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/dbx5x0.dtsi     |    2 +-
- arch/arm/mach-ux500/cpu-db8500.c  |    2 +-
- drivers/pinctrl/pinctrl-nomadik.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+On Tue, 22 Jan 2013, Paul Walmsley wrote:
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 3381ba6..b6256f3 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -171,7 +171,7 @@
- 		};
- 
- 		pinctrl {
--			compatible = "stericsson,nmk_pinctrl";
-+			compatible = "stericsson,nmk-pinctrl";
- 			prcm = <&prcmu>;
- 		};
- 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 5b286e0..b80ad96 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -285,7 +285,7 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80110000, "nmk-i2c.3", NULL),
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x8012a000, "nmk-i2c.4", NULL),
- 	/* Requires device name bindings. */
--	OF_DEV_AUXDATA("stericsson,nmk_pinctrl", U8500_PRCMU_BASE,
-+	OF_DEV_AUXDATA("stericsson,nmk-pinctrl", U8500_PRCMU_BASE,
- 		"pinctrl-db8500", NULL),
- 	/* Requires clock name and DMA bindings. */
- 	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index 4954302..2081931 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -1847,7 +1847,7 @@ static struct pinctrl_desc nmk_pinctrl_desc = {
- 
- static const struct of_device_id nmk_pinctrl_match[] = {
- 	{
--		.compatible = "stericsson,nmk_pinctrl",
-+		.compatible = "stericsson,nmk-pinctrl",
- 		.data = (void *)PINCTRL_NMK_DB8500,
- 	},
- 	{},
--- 
-1.7.9.5
+> As we've discussed, there are known bootloader dependencies with the OMAP4 
+> PM retention idle code, introduced in v3.8.  Boards booted with u-boot 
+> versions even as recent as 2011 won't enter retention idle correctly; for 
+> example:
+> 
+>     http://www.pwsan.com/omap/testlogs/test_v3.8-rc4/20130120122039/pm/4430es2panda/4430es2panda_log.txt
+
+...
+
+> Barring that, what I'd like to see is a patch for v3.8-rc fixes that adds 
+> a warning, printed to the kernel console, during boot.  The warning should 
+> state that the OMAP4 PM code only works with certain bootloaders, and 
+> should identify the minimum u-boot release needed for OMAP4 full-chip 
+> retention idle to work.
+
+Any progress on this one?  Time is getting very short to get this into 
+v3.8-rc fixes, and it's important to get this into v3.8 so we don't 
+have users expecting chip power management to work correctly with most 
+u-boot versions that are out in the field.
+
+All we should need for v3.8-rc are a few pr_warn()s that execute during 
+OMAP4 PM init, noting that the OMAP4 chip power management doesn't work 
+correctly with many bootloaders, due to missing code in the kernel to 
+properly reset and initialize some devices, and noting the first u-boot 
+version that is known to work correctly.
+
+Otherwise there's a very real risk that folks out there will waste lots of 
+time trying to figure out why power management doesn't work as they 
+expect.   To respect our users, we shouldn't put them in that situation.
+
+
+- Paul
