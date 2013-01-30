@@ -1,48 +1,53 @@
 From: ccross@android.com (Colin Cross)
-Date: Tue, 29 Jan 2013 17:55:47 -0800
-Subject: [PATCH v3 3/3] ARM: stacktrace: enable save_stack_trace_tsk for
- CONFIG_SMP
-In-Reply-To: <1359510947-3950-1-git-send-email-ccross@android.com>
-References: <1359510947-3950-1-git-send-email-ccross@android.com>
-Message-ID: <1359510947-3950-4-git-send-email-ccross@android.com>
+Date: Tue, 29 Jan 2013 17:55:44 -0800
+Subject: [PATCH v3 0/3] ARM: enable dumping stacks for CONFIG_SMP
+Message-ID: <1359510947-3950-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that unwind_frame has been hardened against invalid stacks
-for CONFIG_ARM_UNWIND or CONFIG_FRAME_POINTER, enable dumping
-the stack on non-current threads for CONFIG_SMP.
+This topic has come up before, see
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/102458
+for the previous discussion.
 
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/kernel/stacktrace.c | 11 -----------
- 1 file changed, 11 deletions(-)
+SMP is now the norm for new ARM systems, and the limitation that
+CONFIG_STACKTRACE doesn't work for tasks besides 'current' causes
+problems.  The particular case I'm dealing with is automated
+debugging information collected from /proc/<pid>/stack when
+userspace detects a process is not responding.
 
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index d897f4c..c6e6477 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -187,22 +187,11 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 	data.skip = trace->skip;
- 
- 	if (tsk != current) {
--#ifdef CONFIG_SMP
--		/*
--		 * What guarantees do we have here that 'tsk' is not
--		 * running on another CPU?  For now, ignore it as we
--		 * can't guarantee we won't explode.
--		 */
--		if (trace->nr_entries < trace->max_entries)
--			trace->entries[trace->nr_entries++] = ULONG_MAX;
--		return;
--#else
- 		data.no_sched_functions = 1;
- 		frame.fp = thread_saved_fp(tsk);
- 		frame.sp = thread_saved_sp(tsk);
- 		frame.lr = 0;		/* recovered from the stack */
- 		frame.pc = thread_saved_pc(tsk);
--#endif
- 	} else {
- 		register unsigned long current_sp asm ("sp");
- 
--- 
-1.8.1
+Dumping stacktraces is currently disabled due to the worry that the
+task may be running on another CPU and that the unwinder may be
+unstable when presented with a stack that is being modified.  I have
+attempted to harden the frame pointer based unwinder and the unwind
+table based unwinder against invalid stacks.  I separated the two
+into individual patches, as I expect the patch to the table unwinder
+to be more controversial than the frame pointer unwinder.
+
+Even without the hardening, unwinding a stack for a running process
+is not completely untested.  When CONFIG_ARM_UNWIND is enabled,
+sysrq-t calls unwind_backtrace for all tasks including running ones.
+In addition, any callers to unwind_frame with preemption enabled,
+including proc_pid_stack, could see a modified stack even on a UP
+system (pointed out by Rabin Vincent the last time this topic came
+up).
+
+v2 of the patchset adds additional checks to avoid starting the
+stacktrace in an unmapped region or looping forever when unwinding
+a bad stack.
+
+v2:
+   add depth parameter to unwind_frame
+   verify that sp changes for non-leaf frames
+   verify that initial sp value is in mapped lowmem
+   verify that stack offsets are in the range
+      [sizeof(struct thread_info), THREAD_START_SP)
+
+v3:
+   fix calling sp_addr_valid before page structs are set up
+
+ arch/arm/include/asm/stacktrace.h |    6 ++-
+ arch/arm/kernel/process.c         |    2 +-
+ arch/arm/kernel/stacktrace.c      |  122 +++++++++++++++++++++++++++++++------
+ arch/arm/kernel/time.c            |    3 +-
+ arch/arm/kernel/unwind.c          |   46 ++++++++++----
+ 5 files changed, 145 insertions(+), 34 deletions(-)
