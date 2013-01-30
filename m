@@ -1,51 +1,45 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 30 Jan 2013 09:04:25 +0800
-Subject: [PATCH] rtc: pl031: fix the missing operation on enable
-Message-ID: <1359507865-29808-1-git-send-email-haojian.zhuang@linaro.org>
+From: kpark3469@gmail.com (kpark3469 at gmail.com)
+Date: Wed, 30 Jan 2013 10:20:49 +0900
+Subject: [PATCH v2] arm: fix returning wrong CALLER_ADDRx
+Message-ID: <1359508849-2831-1-git-send-email-kpark3469@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RTC control register should be enabled in the process of initliazing.
+From: sahara <keun-o.park@windriver.com>
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+This makes return_address return correct value for ftrace feature.
+unwind_frame does not update frame->lr but frame->pc for backtrace.
+And, the initialization for data.addr was missing so that wrong value
+returned when unwind_frame failed.
+
+Signed-off-by: Sahara <keun-o.park@windriver.com>
+Reviewed-by: Dave Martin <dave.martin@linaro.org>
 ---
- drivers/rtc/rtc-pl031.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/kernel/return_address.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 08378e3..10c1a34 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -44,6 +44,7 @@
- #define RTC_YMR		0x34	/* Year match register */
- #define RTC_YLR		0x38	/* Year data load register */
+diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+index 8085417..fafedd8 100644
+--- a/arch/arm/kernel/return_address.c
++++ b/arch/arm/kernel/return_address.c
+@@ -26,7 +26,7 @@ static int save_return_addr(struct stackframe *frame, void *d)
+ 	struct return_address_data *data = d;
  
-+#define RTC_CR_EN	(1 << 0)	/* counter enable bit */
- #define RTC_CR_CWEN	(1 << 26)	/* Clockwatch enable bit */
+ 	if (!data->level) {
+-		data->addr = (void *)frame->lr;
++		data->addr = (void *)frame->pc;
  
- #define RTC_TCR_EN	(1 << 1) /* Periodic timer enable bit */
-@@ -320,7 +321,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 	struct pl031_local *ldata;
- 	struct pl031_vendor_data *vendor = id->data;
- 	struct rtc_class_ops *ops = &vendor->ops;
--	unsigned long time;
-+	unsigned long time, data;
+ 		return 1;
+ 	} else {
+@@ -41,7 +41,8 @@ void *return_address(unsigned int level)
+ 	struct stackframe frame;
+ 	register unsigned long current_sp asm ("sp");
  
- 	ret = amba_request_regions(adev, NULL);
- 	if (ret)
-@@ -345,10 +346,11 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 	dev_dbg(&adev->dev, "designer ID = 0x%02x\n", amba_manf(adev));
- 	dev_dbg(&adev->dev, "revision = 0x%01x\n", amba_rev(adev));
+-	data.level = level + 1;
++	data.level = level + 2;
++	data.addr = NULL;
  
-+	data = readl(ldata->base + RTC_CR);
- 	/* Enable the clockwatch on ST Variants */
- 	if (vendor->clockwatch)
--		writel(readl(ldata->base + RTC_CR) | RTC_CR_CWEN,
--		       ldata->base + RTC_CR);
-+		data |= RTC_CR_CWEN;
-+	writel(data | RTC_CR_EN, ldata->base + RTC_CR);
- 
- 	/*
- 	 * On ST PL031 variants, the RTC reset value does not provide correct
+ 	frame.fp = (unsigned long)__builtin_frame_address(0);
+ 	frame.sp = current_sp;
 -- 
-1.7.10.4
+1.7.1
