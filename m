@@ -1,67 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 30 Jan 2013 12:47:21 +0100
-Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
-In-Reply-To: <201301300955.49473.arnd@arndb.de>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301292254.01069.arnd@arndb.de>
- <20130130042103.GB5734@obsidianresearch.com>
- <201301300955.49473.arnd@arndb.de>
-Message-ID: <20130130124721.0ad0294e@skate>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 30 Jan 2013 12:55:47 +0100
+Subject: kernel 3.8 make problem
+Message-ID: <20130130125547.63d1cbd5@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+Hi,
 
-On Wed, 30 Jan 2013 09:55:49 +0000, Arnd Bergmann wrote:
+I build the kernels in my Cubox (Marvel Dove), and it is no more
+possible with kernels 3.8 while it works well with a kernel 3.5
+(on the same machine - the kernels 3.5 and 3.8 have quite the
+same .config).
 
-> I don't remember the kernel ever caring about whether hardware complies
-> to a standard or not. The kernel's job is to make hardware work, based
-> on the actual implementation of that hardware. In a lot of cases that
-> means taking the standard document as a reference, and adding quirks
-> for the devices that are different.
-> 
-> In the end, it comes down to the impact on the code complexity, and
-> the run-time overhead for whatever hardware is most common when adding
-> those quirks.
+Doing:
 
-This is not only about standards, it is also about re-using the PCI
-resource allocation code.
+make oldconfig
 
-In my RFCv1, sent December, 7th, I wasn't using any emulated PCI-to-PCI
-bridge. So it *can* perfectly work without it.
+returns:
 
-However, one major drawback of my RFCv1 version is that since I didn't
-know how much I/O space and memory space was needed for each PCIe
-device, I had to oversize the address decoding windows. And also, I had
-to have a special allocator (certainly simple, but still) to find an
-available physical address to set up each address decoding window.
+Makefile:495: /home/jef/kernel/arch//Makefile: No such file or directory
+make: *** No rule to make target `/home/jef/kernel/arch//Makefile'.  Stop.
 
-Emulating a PCI-to-PCI bridge very nicely allows to re-use the PCI core
-resource allocation code. I think it's really the main reason for
-emulated those PCI-to-PCI bridges, rather than willing to comply to
-some standards.
+Going further, it seems that it is because the make command 'shell'
+returns nothing. A simple Makefile as:
 
-So what I'm going to do now is rework my patch series by removing the
-emulated host bridge (which is normally mandatory by PCIe standard, but
-Linux doesn't need it, so we don't care), but I'll keep the emulated
-PCI-to-PCI bridges in order to benefit for the PCI core resource
-allocation mechanisms.
+# Makefile
+var=$(shell echo toto)
+$(info var:$(var))
 
-Is this ok for you?
+returns:
 
-I'd like to settle on the strategy to follow, because we're really
-going a funny road here: on December 7th, I submit a series that
-doesn't use any PCI-to-PCI bridge, and I'm told that I should emulate
-some. I spent a long time working on an implementation that uses
-emumlated PCI-to-PCI bridges, which I submitted on Monday, now to be
-told that I should work really hard not to use PCI-to-PCI bridges. I
-hope you can feel my little embarrassment here...
+var:
+make: *** No targets.  Stop.
 
-Thanks,
+With strace, I get:
 
-Thomas
+...
+read(3, "var=$(shell echo toto)\n$(info va"..., 4096) = 43
+pipe([4, 5])                            = 0
+vfork()                                 = 3545
+close(5)                                = 0
+read(4, "", 200)                        = 0
+close(4)                                = 0
+wait4(-1, [{WIFSIGNALED(s) && WTERMSIG(s) == SIGSEGV}], 0, NULL) = 3545
+--- SIGCHLD (Child exited) @ 0 (0) ---
+sigreturn()                             = ? (mask now [])
+fstat64(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 1), ...}) = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x76f70000
+write(1, "var:\n", 5var:
+)                   = 5
+...
+
+What did I miss?
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
