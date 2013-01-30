@@ -1,141 +1,169 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 30 Jan 2013 15:32:32 +0800
-Subject: [PATCH v2 1/1] usb: chipidea: imx: Add system suspend/resume API
-In-Reply-To: <1358735401-3779-1-git-send-email-peter.chen@freescale.com>
-References: <1358735401-3779-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130130073230.GA9777@nchen-desktop>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Wed, 30 Jan 2013 16:36:03 +0900
+Subject: [PATCH v3 2/3] ARM: static_vm: introduce an infrastructure for
+ static mapped area
+In-Reply-To: <alpine.LFD.2.02.1301291840580.6300@xanadu.home>
+References: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1358990934-4893-3-git-send-email-iamjoonsoo.kim@lge.com>
+ <alpine.LFD.2.02.1301291840580.6300@xanadu.home>
+Message-ID: <20130130073603.GA2540@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 21, 2013 at 10:30:01AM +0800, Peter Chen wrote:
-> During the system suspend/resume procedure, the USB also
-> needs to go suspend/resume procedure, this patch adds
-> related APIs. It is tested at i.mx6q sabrelite. Meanwhile,
-> it fixes the bug that the USB will out of work after
-> system suspend/resume.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Hello, Nicolas.
 
-ping....
+On Tue, Jan 29, 2013 at 07:05:32PM -0500, Nicolas Pitre wrote:
+> On Thu, 24 Jan 2013, Joonsoo Kim wrote:
+> 
+> > From: Joonsoo Kim <js1304@gmail.com>
+> > 
+> > In current implementation, we used ARM-specific flag, that is,
+> > VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+> > The purpose of static mapped area is to re-use static mapped area when
+> > entire physical address range of the ioremap request can be covered
+> > by this area.
+> > 
+> > This implementation causes needless overhead for some cases.
+> > For example, assume that there is only one static mapped area and
+> > vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
+> > deciding whether it is matched or not. Moreover, even if there is
+> > no static mapped area and vmlist has 300 areas, every time we call
+> > ioremap, we check 300 areas in now.
+> > 
+> > If we construct a extra list for static mapped area, we can eliminate
+> > above mentioned overhead.
+> > With a extra list, if there is one static mapped area,
+> > we just check only one area and proceed next operation quickly.
+> > 
+> > In fact, it is not a critical problem, because ioremap is not frequently
+> > used. But reducing overhead is better idea.
+> > 
+> > Another reason for doing this work is for removing architecture dependency
+> > on vmalloc layer. I think that vmlist and vmlist_lock is internal data
+> > structure for vmalloc layer. Some codes for debugging and stat inevitably
+> > use vmlist and vmlist_lock. But it is preferable that they are used
+> > as least as possible in outside of vmalloc.c
+> > 
+> > Now, I introduce an ARM-specific infrastructure for static mapped area. In
+> > the following patch, we will use this and resolve above mentioned problem.
+> > 
+> > Signed-off-by: Joonsoo Kim <js1304@gmail.com>
+> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> 
+> First of all, I don't think you really need a new file with a global 
+> scope header file.  Given that this code is meant to be used only for 
+> ioremap optimization  on ARM, it is probably a better idea to simply put 
+> it all into arch/arm/mm/ioremap.c instead.  The only function that needs 
+> to be exported out of ioremap.c is insert_static_vm(), and only for the 
+> benefit of arch/arm/mm/mmu.c, therefore this function prototype may as 
+> well just be added to arch/arm/mm/mm.h.
 
-Alex, can you help review it?
-> ---
-> Changes for v2:
-> - Add tested-by from Shawn Guo
-> - Using dev_get_drvdata to get driver data
+I agree with your all opinions.
+I will re-work and will re-send v4 as soon as possible.
+Thanks for review.
+
+> More comments below.
 > 
->  drivers/usb/chipidea/bits.h        |    1 +
->  drivers/usb/chipidea/ci13xxx_imx.c |   59 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 60 insertions(+), 0 deletions(-)
+> > diff --git a/arch/arm/include/asm/mach/static_vm.h b/arch/arm/include/asm/mach/static_vm.h
+> > new file mode 100644
+> > index 0000000..72c8339
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/mach/static_vm.h
+> > @@ -0,0 +1,45 @@
+> > +/*
+> > + * arch/arm/include/asm/mach/static_vm.h
+> > + *
+> > + * Copyright (C) 2012 LG Electronics, Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+> > + */
+> > +
+> > +#ifndef _ASM_MACH_STATIC_VM_H
+> > +#define _ASM_MACH_STATIC_VM_H
+> > +
+> > +#include <linux/types.h>
+> > +#include <linux/vmalloc.h>
+> > +
+> > +struct static_vm {
+> > +	struct static_vm	*next;
+> > +	void			*vaddr;
+> > +	unsigned long		size;
+> > +	unsigned long		flags;
+> > +	phys_addr_t		paddr;
+> > +	const void		*caller;
+> > +};
 > 
-> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> index ba9c6ef..d1467bb 100644
-> --- a/drivers/usb/chipidea/bits.h
-> +++ b/drivers/usb/chipidea/bits.h
-> @@ -47,6 +47,7 @@
->  #define PORTSC_FPR            BIT(6)
->  #define PORTSC_SUSP           BIT(7)
->  #define PORTSC_HSP            BIT(9)
-> +#define PORTSC_PHCD           BIT(23) /* phy suspend mode */
->  #define PORTSC_PTC            (0x0FUL << 16)
->  
->  /* DEVLC */
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> index 342eab0..ff11cee 100644
-> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -25,6 +25,7 @@
->  #include <linux/mfd/syscon.h>
->  
->  #include "ci.h"
-> +#include "bits.h"
->  #include "ci13xxx_imx.h"
->  
->  #define pdev_to_phy(pdev) \
-> @@ -321,6 +322,61 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
-> +static int ci13xxx_imx_suspend(struct device *dev)
-> +{
-> +	struct ci13xxx_imx_data *data = dev_get_drvdata(dev);
-> +	struct platform_device *plat_ci;
-> +	struct ci13xxx	*ci;
-> +
-> +	plat_ci = data->ci_pdev;
-> +	ci = platform_get_drvdata(plat_ci);
-> +
-> +	hw_write(ci, OP_PORTSC, PORTSC_PHCD, PORTSC_PHCD);
-> +
-> +	if (data->phy)
-> +		usb_phy_set_suspend(data->phy, 1);
-> +
-> +	clk_disable_unprepare(data->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int ci13xxx_imx_resume(struct device *dev)
-> +{
-> +	int ret;
-> +	struct ci13xxx_imx_data *data = dev_get_drvdata(dev);
-> +	struct platform_device *plat_ci;
-> +	struct ci13xxx	*ci;
-> +
-> +	plat_ci = data->ci_pdev;
-> +	ci = platform_get_drvdata(plat_ci);
-> +
-> +	ret = clk_prepare_enable(data->clk);
-> +	if (ret) {
-> +		dev_err(dev,
-> +			"Failed to prepare or enable clock, err=%d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	if (hw_read(ci, OP_PORTSC, PORTSC_PHCD)) {
-> +		hw_write(ci, OP_PORTSC, PORTSC_PHCD, 0);
-> +		/* Some clks sync between Controller and USB PHY */
-> +		mdelay(1);
-> +	}
-> +
-> +	if (data->phy)
-> +		usb_phy_set_suspend(data->phy, 0);
-> +
-> +	return ret;
-> +}
-> +
-> +static const struct dev_pm_ops ci13xxx_imx_pm_ops = {
-> +	.suspend	= ci13xxx_imx_suspend,
-> +	.resume		= ci13xxx_imx_resume,
-> +};
-> +#endif
-> +
->  static const struct of_device_id ci13xxx_imx_dt_ids[] = {
->  	{ .compatible = "fsl,imx27-usb", },
->  	{ /* sentinel */ }
-> @@ -334,6 +390,9 @@ static struct platform_driver ci13xxx_imx_driver = {
->  		.name = "imx_usb",
->  		.owner = THIS_MODULE,
->  		.of_match_table = ci13xxx_imx_dt_ids,
-> +#ifdef CONFIG_PM
-> +		.pm	= &ci13xxx_imx_pm_ops,
-> +#endif
->  	 },
->  };
->  
-> -- 
-> 1.7.0.4
+> Here you're duplicating most of the vm_struct content for no obvious 
+> reasons.  Patch #3 even allocates both a vm_struct and a static_vm 
+> instance in parallel for each mapping.  Instead, you should consider 
+> something like this:
 > 
+> struct static_vm {
+> 	struct static_vm *next;
+> 	struct vm_struct vm;
+> };
 > 
+> This way, you only need to allocate one structure:
+> 
+> 	struct static_vm *svm = early_alloc(...);
+> 	...
+> 	svm->vm.addr = addr;
+> 	...
+> 	vm_area_add_early(&svm->vm);
+> 	insert_static_vm(svm);
+
+Yes!
+It's good idea.
+
+> And then, it would make sense for the insert_static_vm() to do the 
+> vm_area_add_early() call itself as well.
+
+Okay.
+
+> Maybe rename insert_static_vm() to static_vm_area_add_early() to better 
+> identify its purpose as well.  It shouldn't be used for any other 
+> purpose anyway.
+
+Okay.
+
+> > +
+> > +extern struct static_vm *static_vmlist;
+> > +extern spinlock_t static_vmlist_lock;
+> 
+> Your patch is providing the proper accessors to manipulate those.  They 
+> therefore should not be exported globally.
+
+Okay.
+
+> > +
+> > +extern struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
+> > +			size_t size, unsigned long flags);
+> > +extern struct static_vm *find_static_vm_vaddr(void *vaddr);
+> > +extern void init_static_vm(struct static_vm *static_vm,
+> > +			struct vm_struct *vm, unsigned long flags);
+> 
+> Since those are only used in ioremap.c, and because I suggested their 
+> implementation be moved there as well, you shouldn't need prototype 
+> declarations anymore.  And init_static_vm() would be useless with my 
+> previous suggestions.
+
+Yes.
+
+> 
+> Nicolas
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-
-Best Regards,
-Peter Chen
+> Please read the FAQ at  http://www.tux.org/lkml/
