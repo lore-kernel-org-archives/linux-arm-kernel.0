@@ -1,38 +1,61 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 31 Jan 2013 00:22:24 +0100
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that kirkwood_ge0[01]_init()
- finds its clock
-In-Reply-To: <20130130230100.GV7717@titan.lakedaemon.net>
-References: <51053F81.6020904@gmail.com>
- <20130127152431.GX1758@titan.lakedaemon.net>
- <20130128223148.GA10275@schnuecks.de>
- <20130129004824.GB7717@titan.lakedaemon.net>
- <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
- <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
- <20130130230100.GV7717@titan.lakedaemon.net>
-Message-ID: <5109AB30.5020202@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Jan 2013 23:24:08 +0000
+Subject: [RFC PATCH v3 1/2] ARM: kernel: update cpuinfo to print SoC
+ model name
+In-Reply-To: <alpine.LFD.2.02.1301301402330.6300@xanadu.home>
+References: <1359558091-29251-1-git-send-email-ruslan.bilovol@ti.com>
+ <1359558091-29251-2-git-send-email-ruslan.bilovol@ti.com>
+ <alpine.LFD.2.02.1301301402330.6300@xanadu.home>
+Message-ID: <20130130232408.GL2637@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2013 12:01 AM, Jason Cooper wrote:
-> As it stands, there are three patches to fix this issue:
->
-> ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
-> ARM: kirkwood: provide ge clock aliases for shared smi
-> ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
+On Wed, Jan 30, 2013 at 02:07:53PM -0500, Nicolas Pitre wrote:
+> On Wed, 30 Jan 2013, Ruslan Bilovol wrote:
+> 
+> > Currently, reading /proc/cpuinfo provides userspace with CPU ID of
+> > the CPU carrying out the read from the file.
+> > Userspace using this information may decide what module
+> > to load or how to configure some specific (and processor-depended)
+> > settings or so.
+> > However, since really different SoCs can share same ARM core,
+> > this information currently is not so useful.
+> > For example, TI OMAP4460 and OMAP4470 SoCs show the same
+> > information in the /proc/cpuinfo whereas they are different.
+> > Since in most cases ARM CPU is a part of some system on a chip (SoC),
+> > the "cpuinfo" file looks like exactly that place, where this
+> > information have to be displayed.
+> > 
+> > So added new line "SoC name" in the "cpuinfo" output for system
+> > on a chip name. It is placed between CPU information and machine
+> > information, so the file structure looks gracefully (CPU-SoC-Hardware)
+> > 
+> > Example:
+> > 
+> > / # cat proc/cpuinfo
+> > [...]
+> > CPU variant     : 0x2
+> > CPU part        : 0xc09
+> > CPU revision    : 10
+> > 
+> > SoC name        : OMAP4470
+> > 
+> > Hardware        : OMAP4 Blaze Tablet
+> 
+> Please remove that extra blank line between "SoC name" and "Hardware".  
+> The blank line after "CPU revision" is fine.
+> 
+> Also, please rename this to "System name".  Not all systems are "on 
+> chip".  By using "System name" this is more universally useful.
 
-Actually, for the second patch I got distracted by the smi split patch
-set floating around. But that is not in current kernel and smi will not
-request any clock at all.
+You may notice I've already suggested that this should be using the SoC
+infrastructure to export this information, which was explicitly designed
+to do this.
 
-If Simon can hit another round of testing without second patch included
-and agrees, I suggest to keep it for next release.
+If we're going to have one SoC doing one thing and another SoC exporting
+this information a completely different way, we're doomed.  We need to
+make a decision and do it one way and one way only - and that decision
+was made when drivers/base/soc.c was merged.
 
-> wrt to ge losing mac addresses, both DT and non-DT booting are covered by
-> Sebastian's patches, for non-DT aware mv643xx_eth.
-
-non-DT already ungates ge0/1 clocks on registration and cannot loose its
-mac address, not my fix.
-
-Sebastian
+Unfortunately, I'd forgotten about that when I made my initial comments
+about the difference between "CPU" and "SoC".
