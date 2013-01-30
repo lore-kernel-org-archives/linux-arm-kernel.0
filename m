@@ -1,85 +1,160 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jan 2013 14:27:44 +0000
-Subject: [PATCH 1/6] ARM: tlbflush: remove ARMv3 support
-In-Reply-To: <1359556069-28289-1-git-send-email-will.deacon@arm.com>
-References: <1359556069-28289-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1359556069-28289-2-git-send-email-will.deacon@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 30 Jan 2013 22:27:49 +0800
+Subject: [PATCH v3] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+Message-ID: <1359556069-16962-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We no longer support any ARMv3 platforms, so remove the old tlbflushing
-code.
+As multiplatform build is being adopted by more and more ARM platforms,
+initcall function should be used very carefully.  For example, when
+GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
+will be called on all the platforms to initialize cpufreq-cpu0 driver.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+To eliminate this undesired the effect, the patch changes cpufreq-cpu0
+driver to have it instantiated as a platform_driver.  Then it will only
+run on platforms that create the platform_device "cpufreq-cpu0".
+
+Along with the change, it also changes cpu_dev to be &pdev->dev,
+so that managed functions can start working, and module build gets
+supported too.
+
+The highbank-cpufreq driver is also updated accordingly to adapt the
+changes on cpufreq-cpu0.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/include/asm/tlbflush.h | 11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
+Changes since v2:
+ * Leave out omap2/am33xx bits to avoid conflicts with omap tree
 
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 6e924d3..23edd03 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -14,7 +14,6 @@
+ drivers/cpufreq/Kconfig            |    2 +-
+ drivers/cpufreq/cpufreq-cpu0.c     |   35 +++++++++++++++++++++++------------
+ drivers/cpufreq/highbank-cpufreq.c |    5 +++++
+ 3 files changed, 29 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index ea512f4..774dc1c 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -180,7 +180,7 @@ config CPU_FREQ_GOV_CONSERVATIVE
+ 	  If in doubt, say N.
  
- #include <asm/glue.h>
+ config GENERIC_CPUFREQ_CPU0
+-	bool "Generic CPU0 cpufreq driver"
++	tristate "Generic CPU0 cpufreq driver"
+ 	depends on HAVE_CLK && REGULATOR && PM_OPP && OF
+ 	select CPU_FREQ_TABLE
+ 	help
+diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+index 90e9d73..519c2f7 100644
+--- a/drivers/cpufreq/cpufreq-cpu0.c
++++ b/drivers/cpufreq/cpufreq-cpu0.c
+@@ -12,12 +12,12 @@
+ #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
  
--#define TLB_V3_PAGE	(1 << 0)
- #define TLB_V4_U_PAGE	(1 << 1)
- #define TLB_V4_D_PAGE	(1 << 2)
- #define TLB_V4_I_PAGE	(1 << 3)
-@@ -22,7 +21,6 @@
- #define TLB_V6_D_PAGE	(1 << 5)
- #define TLB_V6_I_PAGE	(1 << 6)
+ #include <linux/clk.h>
+-#include <linux/cpu.h>
+ #include <linux/cpufreq.h>
+ #include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/opp.h>
++#include <linux/platform_device.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/slab.h>
  
--#define TLB_V3_FULL	(1 << 8)
- #define TLB_V4_U_FULL	(1 << 9)
- #define TLB_V4_D_FULL	(1 << 10)
- #define TLB_V4_I_FULL	(1 << 11)
-@@ -49,7 +47,6 @@
-  *	=============
-  *
-  *	We have the following to choose from:
-- *	  v3    - ARMv3
-  *	  v4    - ARMv4 without write buffer
-  *	  v4wb  - ARMv4 with write buffer without I TLB flush entry instruction
-  *	  v4wbi - ARMv4 with write buffer with I TLB flush entry instruction
-@@ -324,7 +321,6 @@ static inline void local_flush_tlb_all(void)
- 	if (tlb_flag(TLB_WB))
- 		dsb();
+@@ -174,7 +174,7 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
+ 	.attr = cpu0_cpufreq_attr,
+ };
  
--	tlb_op(TLB_V3_FULL, "c6, c0, 0", zero);
- 	tlb_op(TLB_V4_U_FULL | TLB_V6_U_FULL, "c8, c7, 0", zero);
- 	tlb_op(TLB_V4_D_FULL | TLB_V6_D_FULL, "c8, c6, 0", zero);
- 	tlb_op(TLB_V4_I_FULL | TLB_V6_I_FULL, "c8, c5, 0", zero);
-@@ -345,9 +341,8 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
- 	if (tlb_flag(TLB_WB))
- 		dsb();
+-static int cpu0_cpufreq_driver_init(void)
++static int cpu0_cpufreq_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np;
+ 	int ret;
+@@ -189,23 +189,17 @@ static int cpu0_cpufreq_driver_init(void)
+ 		return -ENOENT;
+ 	}
  
--	if (possible_tlb_flags & (TLB_V3_FULL|TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
-+	if (possible_tlb_flags & (TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
- 		if (cpumask_test_cpu(get_cpu(), mm_cpumask(mm))) {
--			tlb_op(TLB_V3_FULL, "c6, c0, 0", zero);
- 			tlb_op(TLB_V4_U_FULL, "c8, c7, 0", zero);
- 			tlb_op(TLB_V4_D_FULL, "c8, c6, 0", zero);
- 			tlb_op(TLB_V4_I_FULL, "c8, c5, 0", zero);
-@@ -379,9 +374,8 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
- 	if (tlb_flag(TLB_WB))
- 		dsb();
+-	cpu_dev = get_cpu_device(0);
+-	if (!cpu_dev) {
+-		pr_err("failed to get cpu0 device\n");
+-		ret = -ENODEV;
+-		goto out_put_node;
+-	}
+-
++	cpu_dev = &pdev->dev;
+ 	cpu_dev->of_node = np;
  
--	if (possible_tlb_flags & (TLB_V3_PAGE|TLB_V4_U_PAGE|TLB_V4_D_PAGE|TLB_V4_I_PAGE|TLB_V4_I_FULL) &&
-+	if (possible_tlb_flags & (TLB_V4_U_PAGE|TLB_V4_D_PAGE|TLB_V4_I_PAGE|TLB_V4_I_FULL) &&
- 	    cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
--		tlb_op(TLB_V3_PAGE, "c6, c0, 0", uaddr);
- 		tlb_op(TLB_V4_U_PAGE, "c8, c7, 1", uaddr);
- 		tlb_op(TLB_V4_D_PAGE, "c8, c6, 1", uaddr);
- 		tlb_op(TLB_V4_I_PAGE, "c8, c5, 1", uaddr);
-@@ -412,7 +406,6 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
- 	if (tlb_flag(TLB_WB))
- 		dsb();
+-	cpu_clk = clk_get(cpu_dev, NULL);
++	cpu_clk = devm_clk_get(cpu_dev, NULL);
+ 	if (IS_ERR(cpu_clk)) {
+ 		ret = PTR_ERR(cpu_clk);
+ 		pr_err("failed to get cpu0 clock: %d\n", ret);
+ 		goto out_put_node;
+ 	}
  
--	tlb_op(TLB_V3_PAGE, "c6, c0, 0", kaddr);
- 	tlb_op(TLB_V4_U_PAGE, "c8, c7, 1", kaddr);
- 	tlb_op(TLB_V4_D_PAGE, "c8, c6, 1", kaddr);
- 	tlb_op(TLB_V4_I_PAGE, "c8, c5, 1", kaddr);
+-	cpu_reg = regulator_get(cpu_dev, "cpu0");
++	cpu_reg = devm_regulator_get(cpu_dev, "cpu0");
+ 	if (IS_ERR(cpu_reg)) {
+ 		pr_warn("failed to get cpu0 regulator\n");
+ 		cpu_reg = NULL;
+@@ -266,7 +260,24 @@ out_put_node:
+ 	of_node_put(np);
+ 	return ret;
+ }
+-late_initcall(cpu0_cpufreq_driver_init);
++
++static int cpu0_cpufreq_remove(struct platform_device *pdev)
++{
++	cpufreq_unregister_driver(&cpu0_cpufreq_driver);
++	opp_free_cpufreq_table(cpu_dev, &freq_table);
++
++	return 0;
++}
++
++static struct platform_driver cpu0_cpufreq_platdrv = {
++	.driver = {
++		.name	= "cpufreq-cpu0",
++		.owner	= THIS_MODULE,
++	},
++	.probe		= cpu0_cpufreq_probe,
++	.remove		= cpu0_cpufreq_remove,
++};
++module_platform_driver(cpu0_cpufreq_platdrv);
+ 
+ MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
+ MODULE_DESCRIPTION("Generic CPU0 cpufreq driver");
+diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
+index 2ea6276..0491f1f 100644
+--- a/drivers/cpufreq/highbank-cpufreq.c
++++ b/drivers/cpufreq/highbank-cpufreq.c
+@@ -20,6 +20,7 @@
+ #include <linux/err.h>
+ #include <linux/of.h>
+ #include <linux/mailbox.h>
++#include <linux/platform_device.h>
+ 
+ #define HB_CPUFREQ_CHANGE_NOTE	0x80000001
+ #define HB_CPUFREQ_IPC_LEN	7
+@@ -65,6 +66,7 @@ static struct notifier_block hb_cpufreq_clk_nb = {
+ 
+ static int hb_cpufreq_driver_init(void)
+ {
++	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
+ 	struct device *cpu_dev;
+ 	struct clk *cpu_clk;
+ 	struct device_node *np;
+@@ -104,6 +106,9 @@ static int hb_cpufreq_driver_init(void)
+ 		goto out_put_node;
+ 	}
+ 
++	/* Instantiate cpufreq-cpu0 */
++	platform_device_register_full(&devinfo);
++
+ out_put_node:
+ 	of_node_put(np);
+ 	return ret;
 -- 
-1.8.0
+1.7.9.5
