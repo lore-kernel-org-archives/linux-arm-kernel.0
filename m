@@ -1,40 +1,74 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Jan 2013 10:38:03 +0000
-Subject: [GIT PULL] vexpress: drivers for v3.9
-In-Reply-To: <CAOesGMinJef-9OsKi0LGB0W6i73sgyUqhm2Mie4gyC2JLjnd1Q@mail.gmail.com>
-References: <1359484450.8090.27.camel@hornet>
- <CAOesGMinJef-9OsKi0LGB0W6i73sgyUqhm2Mie4gyC2JLjnd1Q@mail.gmail.com>
-Message-ID: <1359542283.8090.32.camel@hornet>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Wed, 30 Jan 2013 11:40:09 +0100
+Subject: [PATCH v4 5/8] MFD: ti_am335x_tscadc: Add DT support
+In-Reply-To: <1358999112-31192-6-git-send-email-rachna@ti.com>
+References: <1358999112-31192-1-git-send-email-rachna@ti.com>
+ <1358999112-31192-6-git-send-email-rachna@ti.com>
+Message-ID: <A9839AA2-ABCD-4642-9766-D56824AC27AD@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Morning,
 
-> > Pawel Moll (1):
-> >       mfd: vexpress: Add pseudo-GPIO based LEDs
+Op 24 jan. 2013, om 04:45 heeft "Patil, Rachna" <rachna@ti.com> het volgende geschreven:
+
+> From: "Patil, Rachna" <rachna@ti.com>
 > 
-> I can't find record of this patch ever having been posted (under that
-> subject at least) on any list I am on, including linux-arm-kernel and
-> linux-kernel.
+> Make changes to add DT support in the MFD core driver.
+> 
+> Signed-off-by: Patil, Rachna <rachna@ti.com>
+> ---
+> Changes in v4:
+> 	Non-standard properties prefixed with vendor name.
+> 
+> drivers/mfd/ti_am335x_tscadc.c |   28 +++++++++++++++++++++++-----
+> 1 file changed, 23 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+> index e9f3fb5..87b446b 100644
+> --- a/drivers/mfd/ti_am335x_tscadc.c
+> +++ b/drivers/mfd/ti_am335x_tscadc.c
+> @@ -22,6 +22,8 @@
+> #include <linux/regmap.h>
+> #include <linux/mfd/core.h>
+> #include <linux/pm_runtime.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> 
+> #include <linux/mfd/ti_am335x_tscadc.h>
+> #include <linux/input/ti_am335x_tsc.h>
+> @@ -64,20 +66,31 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
+> 	struct resource		*res;
+> 	struct clk		*clk;
+> 	struct mfd_tscadc_board	*pdata = pdev->dev.platform_data;
+> +	struct device_node	*node = pdev->dev.of_node;
+> 	struct mfd_cell		*cell;
+> 	int			err, ctrl;
+> 	int			clk_value, clock_rate;
+> -	int			tsc_wires, adc_channels = 0, total_channels;
+> +	int			tsc_wires = 0, adc_channels = 0, total_channels;
+> 
+> -	if (!pdata) {
+> +	if (!pdata && !pdev->dev.of_node) {
+> 		dev_err(&pdev->dev, "Could not find platform data\n");
+> 		return -EINVAL;
+> 	}
+> 
+> -	if (pdata->adc_init)
+> -		adc_channels = pdata->adc_init->adc_channels;
+> +	if (pdev->dev.platform_data) {
+> +		if (pdata->tsc_init)
+> +			tsc_wires = pdata->tsc_init->wires;
+> +
+> +		if (pdata->adc_init)
+> +			adc_channels = pdata->adc_init->adc_channels;
+> +	} else {
+> +		node = of_find_node_by_name(pdev->dev.of_node, "tsc");
+> +		of_property_read_u32(node, "ti,wires", &tsc_wires);
+> +
+> +		node = of_find_node_by_name(pdev->dev.of_node, "adc");
+> +		of_property_read_u32(node, "ti,adc-channels", &adc_channels);
+> +	}
 
-Uh, the brief LEDs discussion happened so long ago (almost 3 months)
-that I was convinced I posted it back then. Should have checked it
-myself, sorry.
+Since AM335x is DT only, why is there a platform data codepath and why is it the first branch it tries? And I guess the next question is related to the first: why doesn't it work when used with DT? When I copy over the nodes from the evm.dts to my board I get "tsc tsc: Missing platform data" in dmesg.
 
-> You should at least post it to those lists, and cc the MFD maintainer.
-> And you should get his ack if you are going to merge this patch
-> through arm-soc instead of through his tree.
-
-You're right, I'll approach Samuel regarding this bit.
-
-In the meantime, could you please take the other patch please? I mean:
-
-> > Catalin Marinas (1):
-> >       arm: Move sp810.h to include/linux/amba/
-
-I can rework the branch to contain this patch only and send a new pull
-request if you prefer.
-
-Thanks!
-
-Pawe?
+What are the chances this driver will work when applied on top of 3.8-rcX? Has it even been tested with that? Has it been tested at all?
