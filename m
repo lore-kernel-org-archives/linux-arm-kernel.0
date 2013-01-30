@@ -1,49 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 30 Jan 2013 15:15:04 +0200
-Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
-In-Reply-To: <510916B2.7080509@ti.com>
-References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
- <510916B2.7080509@ti.com>
-Message-ID: <20130130131504.GU15258@arwen.pp.htv.fi>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 30 Jan 2013 14:16:00 +0100
+Subject: [PATCH v2] ARM i.MX25: clk: parent per5_clk to AHB clock
+Message-ID: <1359551760-28862-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The mxc-timer on the imx25 needs to be derived from the AHB clock.
+If a bootloader reparents this clock to the ipg_clk_highfreq, which according
+to the datasheet is a valid operation, the system can/will produce lockups/
+freezes after some time [1].
 
-On Wed, Jan 30, 2013 at 02:48:50PM +0200, Roger Quadros wrote:
-> On 01/30/2013 02:08 PM, Mohammed, Afzal wrote:
-> > Hi Roger,
-> > 
-> > On Mon, Jan 28, 2013 at 17:00:01, Quadros, Roger wrote:
-> > 
-> >> NOTE: Tested on 4460ES-B1 Panda and BeagleBoard C4 only. Other boards are only
-> >> build tested.
-> > 
-> > Please try to ensure that beagle bone USB0 works with this.
-> > 
-> 
-> Hi Afzal,
-> 
-> I do not have beaglebone with me and don't seem to find beaglebone
-> board support in mainline.
+This can be forced with code like
+	while(1)
+                syscall(SYS_clock_gettime, CLOCK_REALTIME, &tp);
 
-beagle bone is DT-only :-) (see arch/arm/boot/dts/am335x-bone.dts)
+This was already fixed with the commit
+	"i.MX25 GPT clock fix: ensure correct the clock source" [2],
+for 3.1-rc2, but was lost, when i.MX was converted to the common clock framework
+("ARM i.MX25: implement clocks using common clock framework") [3]
 
-> I would appreciate if someone who knows more about beaglebone can help
-> with verification.
-> 
-> I could find that Robert C Nelson (now in cc) is maintaining out of tree
-> patches for the beaglebone. Maybe he could help with verification?
+[1]: http://lists.arm.linux.org.uk/lurker/message/20130129.161230.229bda17.en.html
+[2]: 2012d9ca2a1381ae3e733330a7f0d1d2f1988bba
+[3]: 6bbaec5676e4f475b0d78743cbd4c70a8804ce14
 
-Right, Afzal if you have the bone could you help Roger validating ?
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Cc: stable at vger.kernel.org # v3.5+
+---
+ arch/arm/mach-imx/clk-imx25.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index 5d34f67..0e6dde6 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -177,6 +177,9 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
+ 			pr_err("i.MX25 clk %d: register failed with %ld\n",
+ 				i, PTR_ERR(clk[i]));
+ 
++	/* Clock source for gpt must be derived from AHB */
++	clk_set_parent(clk[per5_sel], clk[ahb]);
++
+ 	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
+ 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130130/073d5e53/attachment.sig>
+1.7.10.4
