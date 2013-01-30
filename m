@@ -1,40 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 30 Jan 2013 16:36:59 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130130151934.GK23505@n2100.arm.linux.org.uk>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130130113245.GH23505@n2100.arm.linux.org.uk>
- <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <20130130150856.GJ23505@n2100.arm.linux.org.uk>
- <20130130151934.GK23505@n2100.arm.linux.org.uk>
-Message-ID: <20130130163659.75360dba@skate>
+From: richard.genoud@gmail.com (Richard GENOUD)
+Date: Wed, 30 Jan 2013 16:40:52 +0100
+Subject: [PATCH] ARM:boot: support the command with COMMAND_LINE_SIZE - 1
+ useful chars
+In-Reply-To: <510912D5.5030505@asianux.com>
+References: <510912D5.5030505@asianux.com>
+Message-ID: <20130130154051.GA18119@lnx-rg.pr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
-
-On Wed, 30 Jan 2013 15:19:34 +0000, Russell King - ARM Linux wrote:
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index db9fedb..bba0cf3 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -29,6 +29,7 @@ struct hw_pci {
->  	void		(*postinit)(void);
->  	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
->  	int		(*map_irq)(const struct pci_dev *dev, u8 slot, u8 pin);
-> +	resource_size_t	(*window_align)(struct pci_bus *, unsigned long);
->  };
-
-Didn't you say just yesterday that you would prefer a numerical value
-rather than a hook that could do random things? :-)
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+On [mer., 30.01.2013 20:32:21], Chen Gang wrote:
+> 
+>   originally, not support the command with COMMAND_LINE_SIZE - 1 useful chars.
+>   but in fact, we can support it:
+> 
+You're right.
+Reviewed-by: Richard Genoud <richard.genoud@gmail.com>
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/boot/compressed/atags_to_fdt.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+> index aabc02a..ed23ec2 100644
+> --- a/arch/arm/boot/compressed/atags_to_fdt.c
+> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
+> @@ -63,7 +63,7 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+>  	/* copy the fdt command line into the buffer */
+>  	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
+>  	if (fdt_bootargs)
+> -		if (len < COMMAND_LINE_SIZE) {
+> +		if (len <= COMMAND_LINE_SIZE) {
+>  			memcpy(ptr, fdt_bootargs, len);
+>  			/* len is the length of the string
+>  			 * including the NULL terminator */
+> @@ -73,7 +73,7 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+>  	/* and append the ATAG_CMDLINE */
+>  	if (fdt_cmdline) {
+>  		len = strlen(fdt_cmdline);
+> -		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
+> +		if (ptr - cmdline + len + 2 <= COMMAND_LINE_SIZE) {
+>  			*ptr++ = ' ';
+>  			memcpy(ptr, fdt_cmdline, len);
+>  			ptr += len;
+> -- 
+> 1.7.10.4
