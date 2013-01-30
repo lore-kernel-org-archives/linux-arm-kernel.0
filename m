@@ -1,52 +1,24 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 29 Jan 2013 20:56:17 -0700
-Subject: [PATCH] ARM: imx: fix imx31-dt.c time-related warning
-Message-ID: <1359518177-21245-1-git-send-email-swarren@wwwdotorg.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 30 Jan 2013 09:24:51 +0530
+Subject: [PATCH 3/7] ARM: DT: tegra114: add APB DMA controller DT entry
+In-Reply-To: <510809FC.2080806@wwwdotorg.org>
+References: <1359464183-6255-1-git-send-email-ldewangan@nvidia.com>
+ <1359464183-6255-4-git-send-email-ldewangan@nvidia.com>
+ <510809FC.2080806@wwwdotorg.org>
+Message-ID: <5108998B.4040809@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Tuesday 29 January 2013 11:12 PM, Stephen Warren wrote:
+> On 01/29/2013 05:56 AM, Laxman Dewangan wrote:
+>> NVIDIA's Tegra114 has 32 channels APB DMA controller. Add DT entry for
+>> APB DMA controllers and make it compatible with "nvidia,tegra114-apbdma".
+> The APB DMA controller node needs a clocks property. The same goes for
+> I2C and KBC. I'd like to avoid merging those 3 patches until the
+> Tegra114 clock patches are present, since the nodes won't be useful
+> until then anyway. I expect the clock patches will be merged in 3.10.
+>
 
-Commit 6bb27d7 "ARM: delete struct sys_timer" caused the following:
-
-arch/arm/mach-imx/imx31-dt.c:56:2: warning: initialization from incompatible pointer type [enabled by default]
-arch/arm/mach-imx/imx31-dt.c:56:2: warning: (near initialization for ?__mach_desc_IMX31_DT.init_time?) [enabled by default]
-
-This is because mx31_clocks_init_dt() returns int, whereas the .init_time
-field prototype expects a function returning void. Implement a wrapper so
-that the prototypes match.
-
-Reported-by: Fengguang Wu <fengguang.wu@intel.com>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-This patch is based on arm-soc's timer/cleanup branch, which contains
-the commit mentioned above.
----
- arch/arm/mach-imx/imx31-dt.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/imx31-dt.c b/arch/arm/mach-imx/imx31-dt.c
-index f9a6909..b5c04ee 100644
---- a/arch/arm/mach-imx/imx31-dt.c
-+++ b/arch/arm/mach-imx/imx31-dt.c
-@@ -43,12 +43,17 @@ static const char *imx31_dt_board_compat[] __initdata = {
- 	NULL
- };
- 
-+static void __init imx31_dt_timer_init(void)
-+{
-+	mx31_clocks_init_dt();
-+}
-+
- DT_MACHINE_START(IMX31_DT, "Freescale i.MX31 (Device Tree Support)")
- 	.map_io		= mx31_map_io,
- 	.init_early	= imx31_init_early,
- 	.init_irq	= mx31_init_irq,
- 	.handle_irq	= imx31_handle_irq,
--	.init_time	= mx31_clocks_init_dt,
-+	.init_time	= imx31_dt_timer_init,
- 	.init_machine	= imx31_dt_init,
- 	.dt_compat	= imx31_dt_board_compat,
- 	.restart	= mxc_restart,
--- 
-1.7.10.4
+I think clock patches can be posted on top of this as Peter is working. 
+Although, the driver will fail in clk_get() but still I think this can 
+be apply to populate the dts file with controller specific information.
