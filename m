@@ -1,69 +1,43 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 30 Jan 2013 14:40:15 +0530
-Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
- hwmod data
-In-Reply-To: <20130129172410.GS15361@atomide.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
- <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
- <20130118171500.GC15361@atomide.com> <50FCF838.6000105@ti.com>
- <50FD5993.5010008@ti.com> <20130121180113.GA22517@atomide.com>
- <50FE8C5C.2030409@ti.com> <20130122183213.GN15361@atomide.com>
- <5107D52C.80200@ti.com> <20130129172410.GS15361@atomide.com>
-Message-ID: <5108E377.1020304@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 30 Jan 2013 10:12:35 +0100
+Subject: [PATCH] ARM: at91: at91sam9x5: fix usart3 pinctrl name
+In-Reply-To: <1359387816-11730-1-git-send-email-robertcnelson@gmail.com>
+References: <1359387816-11730-1-git-send-email-robertcnelson@gmail.com>
+Message-ID: <5108E403.9060504@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013 10:54 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130129 05:59]:
->> OK so we do managed to clean up the address space, IRQ lines
->> and DMA request lines data from hwmod completely.
->>
->> -OMAP5 hwmod data file, 2076 lines we could remove which significant
->> reduction. I ran the same scripts on OMAP4 and there too about 2200
->> lines getting deleted.
->
-> Great, thanks for looking into it. I guess we cannot do that quite
-> yet for omap4 as we have not made it DT only. But we should be able
-> to do that for am33xx as that's DT only already.
->
->> - I have to udapte DT file to add the all supported hwmods with reg
->> property so that OMAP5 continue to boot. Similar work is needed for
->> OMAP4 too once OMAP4 is made DT only support.
->
-> OK
->
->> - To my suprise, the DT lookup isn't that bad. It is adding just
->> 24 milliseconds to the boot time which is more or less noise.
->
-> That's good to hear.
->
->> Have pushed a branch with above update for OMAP5 here [1]
->>
->> So we are left with two other topics which you mentioned in the
->> comments.
->>
->> 1. Movement of clock data to drivers/clk. Till we get direction here
->> I would like to hear the alternative to get OMAP5 booting from mainline.
->> If there is no alternative, we can keep OMAP5 clock data alone
->> out of tree and get rest of the data files merged.
->
-> I agree, no reason to hold back the other patches. But we should
-> resolve the common clock move to drivers/clk properly now,
-> otherwise it will just get postponed again and we have even bigger
-> problem to deal with.
->
-I will go ahead and separate the clock data from rest of the data
-files so that we can get rest of the data patches in.
+On 01/28/2013 04:43 PM, Robert Nelson :
+> The renaming of pinctrl_uart3 to pinctrl_usart3 was missed in:
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=9e3129e937e2f178d2a003ea45765e5e63e34665
+> 
+> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
 
->> 2. The iormap() done by hwmod for sysconfig handling which you are
->> discussing with Rajendra. So far we don't have a viable way to
->> get the iormapped address from device drivers back to platform
->> code. Lets continue on this thread but this can evolve in
->> parallel.
->
-> Yes that can be fixed separately.
->
-Yep. Thanks for the comments.
+With little reformatting of commit message, queued in at91-fixes.
 
-Regards
-Santosh
+Thanks a lot!
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  arch/arm/boot/dts/at91sam9x5.dtsi |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index 8ecca69..464e34f 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -197,7 +197,7 @@
+>  				};
+>  
+>  				usart3 {
+> -					pinctrl_uart3: usart3-0 {
+> +					pinctrl_usart3: usart3-0 {
+>  						atmel,pins =
+>  							<2 23 0x2 0x1	/* PC22 periph B with pullup */
+>  							 2 23 0x2 0x0>;	/* PC23 periph B */
+> 
+
+
+-- 
+Nicolas Ferre
