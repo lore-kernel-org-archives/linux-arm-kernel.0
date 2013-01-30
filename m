@@ -1,39 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Jan 2013 18:03:31 +0000
-Subject: Commit 384a290283fde63ba8dc671fca5420111cdac19a seems to break
- 11MPCore boot
-In-Reply-To: <alpine.LFD.2.02.1301301223290.6300@xanadu.home>
-References: <51093B0B.7010708@arm.com>
- <alpine.LFD.2.02.1301301050230.6300@xanadu.home>
- <20130130162132.GM23505@n2100.arm.linux.org.uk>
- <20130130164535.GN23505@n2100.arm.linux.org.uk>
- <20130130171918.GO23505@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301301223290.6300@xanadu.home>
-Message-ID: <20130130180331.GP23505@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Jan 2013 10:05:33 -0800
+Subject: [GIT PULL] vexpress: drivers for v3.9
+In-Reply-To: <1359561551.3094.17.camel@hornet>
+References: <1359484450.8090.27.camel@hornet>
+ <CAOesGMinJef-9OsKi0LGB0W6i73sgyUqhm2Mie4gyC2JLjnd1Q@mail.gmail.com>
+ <1359542283.8090.32.camel@hornet> <1359561551.3094.17.camel@hornet>
+Message-ID: <20130130180533.GA23781@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 12:30:06PM -0500, Nicolas Pitre wrote:
-> That should probably be:
+On Wed, Jan 30, 2013 at 03:59:11PM +0000, Pawel Moll wrote:
+> On Wed, 2013-01-30 at 10:38 +0000, Pawel Moll wrote:
+> > In the meantime, could you please take the other patch please? I mean:
+> > 
+> > > > Catalin Marinas (1):
+> > > >       arm: Move sp810.h to include/linux/amba/
+> > 
+> > I can rework the branch to contain this patch only and send a new pull
+> > request if you prefer.
 > 
-> 	u32 mask;
+> As Samuel will take the LEDs patch through his tree, I've regenerated
+> the branch, so:
 > 
-> 	for (i = 0; i < 32; i += 4) {
-> 		mask = readl_relaxed(base + GIC_DIST_TARGET + i);
-> 		mask |= (mask >> 16);
-> 		mask |= (mask >> 8);
-> 		if (mask)
-> 			return mask;
-> 	}
+> The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
 > 
-> I know that the spec says that the GIC should accept byte sized 
-> accesses, but that too is known not to work on all implementations.
+>   Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/drivers-for-3.9
 
-Well, it really doesn't make that much difference... because from what
-I can see the kernel is rather sodded up as it currently stands.
+Pulled, thanks.
 
-There was a time when the kernel ran on the ARM Realview EB.  But it
-doesn't today...
 
-Why is it when I walk away from anything kernel related and then come
-back to it, it's always sodded up and rather terminally broken?
+-Olof
