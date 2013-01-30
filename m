@@ -1,36 +1,49 @@
-From: hongbo.zhang@linaro.org (Hongbo Zhang)
-Date: Wed, 30 Jan 2013 17:21:40 +0800
-Subject: [PATCH] ARM: ux500: enable ux500 EXT4_FS and LBDAF support by default
-Message-ID: <1359537700-19293-1-git-send-email-hongbo.zhang@linaro.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 30 Jan 2013 10:24:27 +0100
+Subject: [BUG] i.MX25: soft lockups/freezes while getnstimeofday
+In-Reply-To: <CAOMZO5DLDikzF5LMWQLw_65ADSy2-aydvhTbpFhbBV_DwS9sCQ@mail.gmail.com>
+References: <20130129161230.GA3128@pengutronix.de>
+ <CAOMZO5DLDikzF5LMWQLw_65ADSy2-aydvhTbpFhbBV_DwS9sCQ@mail.gmail.com>
+Message-ID: <20130130092427.GA6316@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EXT4 file system and LBDAF are used commonly, should be enabled by default.
+On Tue, Jan 29, 2013 at 02:38:59PM -0200, Fabio Estevam wrote:
+> Hi Steffen,
+> 
+> On Tue, Jan 29, 2013 at 2:12 PM, Steffen Trumtrar
+> <s.trumtrar@pengutronix.de> wrote:
+> 
+> > The board itself supposedly worked up until v3.4.
+> >
+> > The mxc-timer is set up to use ipg_clk_highfreq with a per5_div set to 2,
+> > therefore it is clocked with 120MHz. I tried to set the per5_div to 4 to have
+> > a 60MHz clock, but this didn't change anything.
+> > On the other hand, I tried parenting the ipg_clk to the per5_clk to get a
+> > 66MHz clock. This seems to be working fine, but I only have it running for 4h now.
+> 
+> Can you dump the clock tree in 3.4 and 3.7.2, so that we can compare them?
+> 
+> Just looked at the FSL BSP and they have the following:
+> 
+> 	/* GPT clock must be derived from AHB clock */
+> 	clk_set_rate(&per_clk[5], ahb_clk.rate / 10);
+> 
 
-Signed-off-by: Hongbo Zhang <hongbo.zhang@linaro.org>
----
- arch/arm/configs/u8500_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Well, v3.4 has 2012d9ca2a1381ae3e733330a7f0d1d2f1988bba
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 231dca6..746c8a2 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -5,7 +5,6 @@ CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
--# CONFIG_LBDAF is not set
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
-@@ -103,6 +102,7 @@ CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
- CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
-+CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
+	/* Clock source for gpt is ahb_div */
+	__raw_writel(__raw_readl(CRM_BASE+0x64) & ~(1 << 5), CRM_BASE + 0x64);
+
+Seems, that it got lost somewhere. Therefore the clocktree in v3.4 and v3.7.2
+is different.
+I will send a patch, that will clk_set_parent per5 to ahb.
+
+Thanks,
+Steffen
+
 -- 
-1.8.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
