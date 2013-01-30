@@ -1,49 +1,34 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Jan 2013 15:59:11 +0000
-Subject: [GIT PULL] vexpress: drivers for v3.9
-In-Reply-To: <1359542283.8090.32.camel@hornet>
-References: <1359484450.8090.27.camel@hornet>
- <CAOesGMinJef-9OsKi0LGB0W6i73sgyUqhm2Mie4gyC2JLjnd1Q@mail.gmail.com>
- <1359542283.8090.32.camel@hornet>
-Message-ID: <1359561551.3094.17.camel@hornet>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 30 Jan 2013 11:00:50 -0500 (EST)
+Subject: Commit 384a290283fde63ba8dc671fca5420111cdac19a seems to break
+ 11MPCore boot
+In-Reply-To: <51093B0B.7010708@arm.com>
+References: <51093B0B.7010708@arm.com>
+Message-ID: <alpine.LFD.2.02.1301301050230.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-30 at 10:38 +0000, Pawel Moll wrote:
-> In the meantime, could you please take the other patch please? I mean:
+On Wed, 30 Jan 2013, Punit Agrawal wrote:
+
+> Hi Nicolas,
 > 
-> > > Catalin Marinas (1):
-> > >       arm: Move sp810.h to include/linux/amba/
+> I was trying to boot 3.8-rc5 on Realview EB 11MPCore using
+> realview-smp_defconfig as a starting point but the kernel failed to progress
+> past the log below (config attached).
 > 
-> I can rework the branch to contain this patch only and send a new pull
-> request if you prefer.
+> Pawel suggested I try reverting 384a290283fde63ba8dc671fca5420111cdac19a -
+> "ARM: gic: use a private mapping for CPU target interfaces" that you've
+> authored. With this commit reverted the kernel boots.
+> 
+> I am not quite sure why the commit breaks 11MPCore but Pawel (cc'd) might be
+> able to shed light on that.
 
-As Samuel will take the LEDs patch through his tree, I've regenerated
-the branch, so:
+That would be appreciated as I don't have any good answer to provide.
 
-The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+Typically, this patch highlighted problems with bad holding pen 
+implementations where secondary CPUs would enter the kernel all at the 
+same time. In that case the kernel was crashing even before displaying 
+"CPU2: Booted secondary processor".
 
-  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
 
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/drivers-for-3.9
-
-for you to fetch changes up to da660b4a3b15caea9c198c4f26d1cf7023df92fc:
-
-  arm: Move sp810.h to include/linux/amba/ (2013-01-30 15:55:45 +0000)
-
-----------------------------------------------------------------
-Versatile Express related driver updates for 3.9:
-* Move sp810 header to a more generic location,
-  mainly to share it with arm64
-
-----------------------------------------------------------------
-Catalin Marinas (1):
-      arm: Move sp810.h to include/linux/amba/
-
- arch/arm/plat-spear/restart.c                                 |    2 +-
- drivers/clk/versatile/clk-vexpress.c                          |    3 +--
- {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h |    0
- 3 files changed, 2 insertions(+), 3 deletions(-)
- rename {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h (100%)
+Nicolas
