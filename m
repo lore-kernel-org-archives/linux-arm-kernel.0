@@ -1,54 +1,96 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 30 Jan 2013 21:19:22 +0800
-Subject: [GIT PULL] imx6q cpuidle for 3.9
-In-Reply-To: <20130129175028.GC17935@quad.lixom.net>
-References: <20130129054635.GA21504@S2101-09.ap.freescale.net>
- <20130129175028.GC17935@quad.lixom.net>
-Message-ID: <20130130131920.GD2757@S2101-09.ap.freescale.net>
+From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
+Date: Wed, 30 Jan 2013 15:20:31 +0200
+Subject: [RFC PATCH 0/2] ARM: update cpuinfo to print CPU model name
+In-Reply-To: <20130129233842.GA8024@kahuna>
+References: <1359474865-15408-1-git-send-email-ruslan.bilovol@ti.com>
+ <20130129160243.GA3389@kahuna>
+ <CAB=otbSV6CH4WOrr577bHXFcjEVRGjZxatgy4CJ3cr0M0h4vfw@mail.gmail.com>
+ <20130129233842.GA8024@kahuna>
+Message-ID: <CAB=otbQLxb26srPckpts6om7Y34oDecogfM_V2+8Bcgixg=LEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 09:50:28AM -0800, Olof Johansson wrote:
-> This has some small conflicts with the cleanup branch. Can you please base it
-> on top of cleanup so we can avoid the merge conflicts when things go upstream?
-> It's common to have the per-soc cleanup branches as bases for some of the
-> feature branches just for this reason.
-> 
-Ok, done as below.
+On Wed, Jan 30, 2013 at 1:38 AM, Nishanth Menon <nm@ti.com> wrote:
+> On 01:08-20130130, Ruslan Bilovol wrote:
+>> Hi,
+>>
+>> On Tue, Jan 29, 2013 at 6:02 PM, Nishanth Menon <nm@ti.com> wrote:
+>> >
+>> > On 17:54-20130129, Ruslan Bilovol wrote:
+>> > > Hi,
+>> > >
+>> > > The following patches update cpuinfo to print CPU
+>> > > model name for ARM. First patch exactly makes needed
+>> > > changes for ARM architecture.
+>> > > Second patch adds this ability to OMAP4 SoCs.
+>> > >
+>> > > This adds a common approach to show SoC name.
+>> > >
+>> > > Looks like there were few attempts to do similar
+>> > > changes to cpuinfo without any luck.
+>> > >
+>> > > So - comments are welcome
+>> > >
+>> > > Ruslan Bilovol (2):
+>> > >   ARM: kernel: update cpuinfo to print CPU model name
+>> > >   ARM: OMAP4: setup CPU model name during ID initialisation
+>> >
+>> > We had an discussion on similar lines but a generic suggestion:
+>> > https://patchwork.kernel.org/patch/98720/
+>> > SoCinfo framework which was supposed to introduce this
+>> >
+>> > Would'nt that be a better approach to take than an OMAP only solution?
+>>
+>> My goal is only to say what is the SoC model name in the /proc/cpuinfo
+>> (And it is not an OMAP-only solution - it is common. Support for OMAP
+>> is added in second patch)
+>> This is the only type of information that we can apply for any SoC.
+>> My point is - any SoC-specific information should go through some other
+>> way - like SoCinfo framework mentioned by you.
+>> And additional point - in cpuinfo we already have CPU name and Machine name.
+>> The SoC name (that is something between these two things) looks also relevant
+> Looking at the sample output in patch #1/2
+> OMAP4470 ES1.0 HS
+>
+> OMAP4470 is SoC name
+> ES1.0 is SoC revision
+> HS is SoC type
 
-The following changes since commit 1d7180e24e22a608cc4d7e8fd425a19a9394a7ed:
+Will fix it in next patchseries. Let's leave only only SoC name
 
-  Merge tag 'imx-cleanup-3.9' into imx6q-cpuidle (2013-01-30 21:07:14 +0800)
+>
+> We even have SoC features (e.g. at boot NEON etc..)
+>
+> Is the intent to put all this inside /proc/cpuinfo?? I bet every SoC has
+> it's own interesting data it'd like to have (like some of the info
+> populated by DT even). I am hardpressed to think this fits inside
+> /proc/cpuinfo. I might even suspect that the list of interesting
+> information might even vary per SoC.
 
-are available in the git repository at:
+No, I don't think we need all these information in cpuinfo - just because
+it will be different for different SoC - so the file structure will be
+very different..
+Let's have only SoC name in cpuinfo.
 
+>
+> having machine name is something ARM specific? dumping it on my linux
+> machines (x86[1] and sparc[2]) dont seem to show that.
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx6q-cpudile-3.9
+Yes - it's ARM specific.
 
-for you to fetch changes up to e5f9dec8ff5ff3f6254412abed1f68d758f6616b:
+>
+> but in the interest of not breaking existing interfaces, new interfaces
+> should potentially belong elsewhere.. my 2 cents.
+>
+> [1] http://pastebin.com/CF8HPDAC (Xubuntu 12.04 3.2.0-36)
+> [2] http://pastebin.com/qNwWHwiu (Debian 3.2.35-2)
 
-  ARM: imx6q: support WAIT mode using cpuidle (2013-01-30 21:09:31 +0800)
+Just look at changes in cpuinfo for ARM between kernels:
+3.4 kernel: http://pastebin.com/TfmE7b2b
+3.8-rc3: http://pastebin.com/zvvTGeNt
 
-----------------------------------------------------------------
-imx6q cpuidle support for 3.9
+The file structure has huge changes
 
- - It's based on imx-cleanup-3.9 to avoid conflicts.
-
-----------------------------------------------------------------
-Shawn Guo (4):
-      ARM: imx: return zero in case next event gets a large increment
-      ARM: imx: mask gpc interrupts initially
-      ARM: imx: move imx6q_cpuidle_driver into a separate file
-      ARM: imx6q: support WAIT mode using cpuidle
-
- arch/arm/mach-imx/Makefile        |    6 ++-
- arch/arm/mach-imx/clk-imx6q.c     |   12 +++++
- arch/arm/mach-imx/common.h        |    3 ++
- arch/arm/mach-imx/cpuidle-imx6q.c |   95 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/cpuidle.h       |    5 ++
- arch/arm/mach-imx/gpc.c           |    5 ++
- arch/arm/mach-imx/mach-imx6q.c    |   17 +++----
- arch/arm/mach-imx/platsmp.c       |   10 ++++
- arch/arm/mach-imx/time.c          |    3 +-
- 9 files changed, 143 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
+> --
+> Regards,
+> Nishanth Menon
