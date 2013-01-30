@@ -1,53 +1,24 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Wed, 30 Jan 2013 07:10:20 +0000
-Subject: [PATCH v2] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
-In-Reply-To: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
-References: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAF880F@DBDE01.ent.ti.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 30 Jan 2013 07:18:46 +0000
+Subject: [PATCH] ARM: OMAP2+: Fix selection of clockevent timer when
+ using device-tree
+In-Reply-To: <1359490991-17688-1-git-send-email-jon-hunter@ti.com>
+References: <1359490991-17688-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED03931@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 08:23:40, Shawn Guo wrote:
-> As multiplatform build is being adopted by more and more ARM platforms,
-> initcall function should be used very carefully.  For example, when
-> GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
-> will be called on all the platforms to initialize cpufreq-cpu0 driver.
-> 
-> To eliminate this undesired the effect, the patch changes cpufreq-cpu0
-> driver to have it instantiated as a platform_driver.  Then it will only
-> run on platforms that create the platform_device "cpufreq-cpu0".
-> 
-> Along with the change, it also changes cpu_dev to be &pdev->dev,
-> so that managed functions can start working, and module build gets
-> supported too.
-> 
-> The existing users of cpufreq-cpu0 driver highbank and am33xx are also
-> updated accordingly to adapt the changes.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
-> Cc: AnilKumar Ch <anilkumar@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> ---
-> Changes since v1:
->  * Migrate cpufreq-cpu0 users in the same patch
-> 
-> Rafael,
-> 
-> The patch is based on Mark's highbank-cpufreq series and Nishanth's
-> "PM / OPP : export symbol consolidation" sereis.
-> 
-> Mark, AnilKumar,
-> 
-> I only compile-tested it on highbank and omap2.  Please give it a test
-> no hardware to make sure cpufreq-cpu0 still works for you.  Thanks.
+On Wed, Jan 30, 2013 at 01:53:11, Hunter, Jon wrote:
+> Commit 9725f44 (ARM: OMAP: Add DT support for timer driver) added
+> device-tree support for selecting a clockevent timer by property.
+> However, the code is currently ignoring the property passed and
+> selecting the first available timer found. Hence, for the OMAP3 beagle
+> board timer-12 is not being selected as expected. Fix this problem
+> by ensuring the timer property is passed to omap_get_timer_dt().
 
-Hi Shawn,
+I thought that was intentional ;) and had this change in the clkevt-clksrc
+interchange patch for AM33xx.
 
-I hope this is based on linux-omap/master, to test the driver I have
-to add some patches on top of this patch, because of recent changes.
-I will provide the test details once I am done.
+Anyways, this change works for me so...
 
-Thanks
-AnilKumar
+Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
