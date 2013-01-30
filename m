@@ -1,28 +1,34 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 30 Jan 2013 13:48:40 +0800
-Subject: [RFC 3/3] arm: mach-mxs: make enabling enet_out a legacy function
-In-Reply-To: <1359470773-14290-4-git-send-email-w.sang@pengutronix.de>
-References: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
- <1359470773-14290-4-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20130130054833.GA24450@S2100-06.ap.freescale.net>
+Date: Wed, 30 Jan 2013 14:03:32 +0800
+Subject: [PATCH] ARM: imx: fix imx31-dt.c time-related warning
+In-Reply-To: <1359518177-21245-1-git-send-email-swarren@wwwdotorg.org>
+References: <1359518177-21245-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130130060329.GB24450@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 03:46:13PM +0100, Wolfram Sang wrote:
-> @@ -351,7 +359,7 @@ static void __init tx28_post_init(void)
->  	struct pinctrl *pctl;
->  	int ret;
->  
-> -	enable_clk_enet_out();
-> +	legacy_enable_clk_enet_out();
+On Tue, Jan 29, 2013 at 08:56:17PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Commit 6bb27d7 "ARM: delete struct sys_timer" caused the following:
+> 
+> arch/arm/mach-imx/imx31-dt.c:56:2: warning: initialization from incompatible pointer type [enabled by default]
+> arch/arm/mach-imx/imx31-dt.c:56:2: warning: (near initialization for ?__mach_desc_IMX31_DT.init_time?) [enabled by default]
+> 
+> This is because mx31_clocks_init_dt() returns int, whereas the .init_time
+> field prototype expects a function returning void. Implement a wrapper so
+> that the prototypes match.
+> 
+> Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-I think TX28 is the only case that really needs to turn on enet_out
-clock at platform level, since it has some dirty work about PHY to do
-here.  With with fec driver handling the clock, enable_clk_enet_out()
-can just be removed for other boards.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+> ---
+> This patch is based on arm-soc's timer/cleanup branch, which contains
+> the commit mentioned above.
+
+I suppose that it should just be applied by arm-soc folks on that
+branch, right?
 
 Shawn
-
->  
->  	np = of_find_compatible_node(NULL, NULL, "fsl,imx28-fec");
->  	pdev = of_find_device_by_node(np);
