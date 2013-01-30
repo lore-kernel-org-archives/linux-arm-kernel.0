@@ -1,19 +1,57 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Wed, 30 Jan 2013 09:55:03 +0800
-Subject: [PATCH v4 1/1 net-next] net: fec: add napi support to improve
- proformance
-In-Reply-To: <20130129.141800.2181207237672109119.davem@davemloft.net>
-References: <1359433903-15605-1-git-send-email-Frank.Li@freescale.com>
- <20130129.141800.2181207237672109119.davem@davemloft.net>
-Message-ID: <CAHrpEqQXH+n7K4L1m5yRiamp3CG9MPWhX+tNBD+brzArJy5WoQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 30 Jan 2013 07:34:21 +0530
+Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <201301291621.59425.arnd@arndb.de>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <201301291331.48427.arnd@arndb.de>
+ <CAKohpoms+WC_XJnH2b6uoycRKkF-yxZUg2J+8NrYJP8fnDNLtg@mail.gmail.com>
+ <201301291621.59425.arnd@arndb.de>
+Message-ID: <CAKohpon30hB9S+MUyXwZpefAGQE4hvF36d-6jXNRk_XoK5dwww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/1/30 David Miller <davem@davemloft.net>:
-> it is recommended to also to TX reclaim processing
-> in the NAPI handler as well, in fact it's best to make the hardware
-> interrupt handler do nothing other than trigger NAPI and then
-> move everything that was in your hardware interrupt handler into
-> NAPI poll instead.
+On 29 January 2013 21:51, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 29 January 2013, Viresh Kumar wrote:
+>> On 29 January 2013 19:01, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > Ah, good. So I guess the "dma-requests" property should actually
+>> > be "16" then.
+>>
+>> yes, even i was checking on that separately :)
+>
+> Actually, I just discovered something odd in the
+> arch/arm/mach-spear/spear13xx-dma.h file that gets removed
+> in the last patch: there, we define request numbers up to
+> 32, e.g.
+>
+> -       SPEAR1310_DMA_REQ_UART2_RX = 14,
+> -       SPEAR1310_DMA_REQ_UART2_TX = 15,
+> -       SPEAR1310_DMA_REQ_UART5_RX = 16,
+> -       SPEAR1310_DMA_REQ_UART5_TX = 17,
+>
+> What is the meaning of this, if the maximum request number is 15?
 
-Okay, I will work on this soon.
+I knew you will come to this :)
+So, the hardware is like: there are 16 request line slots per master, a
+platform can choose to connect same or separate devices to these.
+
+So, these are really 16 per master.
+
+> Ok. Would it be enough to have only one master and one request
+> field in the DT dma descriptor then, and have the code figure
+> whether to use it as source or destination, based on the
+> configuration? Which one should come first? Since you have
+> multiple masters per controller, and multiple requests per
+> master, it sounds like the cleanest descriptor form would
+> be
+>
+>         <controller master request>;
+>
+> Or possibly
+>
+>         <controller master request direction>;
+>
+> if the direction needs to be known at the time the channel
+> is requested.
+
+Its better to keep masters as is. So, that we can use appropriate
+masters for peripheral and memory to make the transfer fast.
