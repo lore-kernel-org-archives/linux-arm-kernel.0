@@ -1,71 +1,81 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 30 Jan 2013 21:50:13 +0100
-Subject: ixp4xx eth broken in 3.7.0/3.8-rc5?
-In-Reply-To: <20744.61933.566806.942439@pilspetsen.it.uu.se>
-References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
- <20744.25884.660535.514911@pilspetsen.it.uu.se>
- <51086A17.1090707@gmail.com>
- <1359509647.4144.36.camel@bwh-desktop.uk.solarflarecom.com>
- <20744.61933.566806.942439@pilspetsen.it.uu.se>
-Message-ID: <20745.34693.504730.621596@pilspetsen.it.uu.se>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 30 Jan 2013 16:02:06 -0500 (EST)
+Subject: Commit 384a290283fde63ba8dc671fca5420111cdac19a seems to break
+ 11MPCore boot
+In-Reply-To: <20130130203014.GU23505@n2100.arm.linux.org.uk>
+References: <51093B0B.7010708@arm.com>
+ <alpine.LFD.2.02.1301301050230.6300@xanadu.home>
+ <20130130162132.GM23505@n2100.arm.linux.org.uk>
+ <20130130164535.GN23505@n2100.arm.linux.org.uk>
+ <20130130171918.GO23505@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1301301223290.6300@xanadu.home>
+ <20130130203014.GU23505@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1301301556060.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mikael Pettersson writes:
- > Ben Hutchings writes:
- >  > On Tue, 2013-01-29 at 19:32 -0500, Xi Wang wrote:
- >  > > On 1/29/13 7:11 PM, Mikael Pettersson wrote:
- >  > > > A git bisect identified the following as the culprit:
- >  > > > 
- >  > > >   > From 1a4901177574083c35fafc24c4d151c2a7c7647c Mon Sep 17 00:00:00 2001
- >  > > >   > From: Xi Wang <xi.wang@gmail.com>
- >  > > >   > Date: Sat, 17 Nov 2012 20:25:09 +0000
- >  > > >   > Subject: [PATCH] ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
- >  > > >   >
- >  > > >   > Use &port->netdev->dev instead of NULL since dma_pool_create() doesn't
- >  > > >   > allow NULL dev.
- >  > > >   >
- >  > > >   > Signed-off-by: Xi Wang <xi.wang@gmail.com>
- >  > > >   > Cc: Andrew Morton <akpm@linux-foundation.org>
- >  > > >   > Signed-off-by: David S. Miller <davem@davemloft.net>
- >  > > >   > ---
- >  > > >   >  drivers/net/ethernet/xscale/ixp4xx_eth.c |    8 +++++---
- >  > > >   >  1 files changed, 5 insertions(+), 3 deletions(-)
- >  > > > 
- >  > > > Reverting this unbreaks ixp4xx_eth on my ixp4xx machine with kernels
- >  > > > 3.7.0 and 3.8-rc5.
- >  > > 
- >  > > Thanks.  The problem was that in init_queues(), the dma_pool_create()
- >  > > call requires a non-null dev.
- >  > > 
- >  > >   dma_pool = dma_pool_create(DRV_NAME, ??, ...);
- > 
- > I had a look around in the 3.8-rc5 kernel source.
- > 
- > mm/dmapool.c:dma_pool_create() needs a non-NULL dev in the CONFIG_NUMA case,
- > because it calls dev_to_node(dev) which dereferences dev if CONFIG_NUMA.
- > But in the non-CONFIG_NUMA case there is no dereference of dev, and in fact
- > there is an explicit check for dev being NULL or not towards the end of
- > dma_pool_create().  So that explains why ixp4xx works without the change:
- > it's not NUMA.
- > 
- > A quick grep found three calls to dma_pool_create() with a NULL dev parameter,
- > two in drivers/usb/gadget/amd5536udc.c and one in arch/arm/mach-s3c64xx/dma.c.
- > These would all be broken with CONFIG_NUMA but Ok otherwise.
- > 
- >  > > 
- >  > > What do you think would work here?
- >  > 
- >  > For DMA purposes I would expect the right device to be the parent bus
- >  > device, i.e. port->netdev->dev.parent.  The driver might also need to
- >  > set its DMA masks.
- > 
- > At least on ixp4xx the DMA masks are normally set by the platform PCI init
- > code (it has a 64MB PCI DMA window limitation).
- > 
- > I can give the port->netdev->dev.parent variant a try later this evening.
+On Wed, 30 Jan 2013, Russell King - ARM Linux wrote:
 
-No joy, s/&port->netdev->dev/port->netdev->dev.parent/ in init_queues' call
-to dma_pool_create made no difference, it still fails.
+> Right... this is what my current set of patches to make things work
+> again looks like... and still there's more problems to go...
+> 
+[...]
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 36ae03a..87dfa90 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -351,6 +351,25 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+>  	irq_set_chained_handler(irq, gic_handle_cascade_irq);
+>  }
+>  
+> +static u8 gic_get_cpumask(struct gic_chip_data *gic)
+> +{
+> +	void __iomem *base = gic_data_dist_base(gic);
+> +	u32 mask, i;
+> +
+> +	for (i = mask = 0; i < 32; i += 4) {
+> +		mask = readl_relaxed(base + GIC_DIST_TARGET + i);
+> +		mask |= mask >> 16;
+> +		mask |= mask >> 8;
+> +		if (mask)
+> +			break;
+> +	}
+> +
+> +	if (!mask)
+> +		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
+> +
+> +	return mask;
+> +}
+> +
+>  static void __init gic_dist_init(struct gic_chip_data *gic)
+>  {
+>  	unsigned int i;
+> @@ -369,7 +388,9 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+>  	/*
+>  	 * Set all global interrupts to this CPU only.
+>  	 */
+> -	cpumask = readl_relaxed(base + GIC_DIST_TARGET + 0);
+> +	cpumask = gic_get_cpumask(gic);
+> +	cpumask |= cpumask << 8;
+> +	cpumask |= cpumask << 16;
+>  	for (i = 32; i < gic_irqs; i += 4)
+>  		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
+>  
+> @@ -400,7 +421,7 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
+>  	 * Get what the GIC says our CPU mask is.
+>  	 */
+>  	BUG_ON(cpu >= NR_GIC_CPU_IF);
+> -	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
+> +	cpu_mask = gic_get_cpumask(gic);
+>  	gic_cpu_map[cpu] = cpu_mask;
+>  
+>  	/*
 
-/Mikael
+For the above...
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
+I'm not familiar with Realview and the other issues being fixed.
+
+
+Nicolas
