@@ -1,39 +1,67 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 30 Jan 2013 19:46:49 +0800
-Subject: [PATCH] ARM:omap2: using strlcpy instead of strncpy
-Message-ID: <51090829.1010109@asianux.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Jan 2013 12:47:21 +0100
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+In-Reply-To: <201301300955.49473.arnd@arndb.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301292254.01069.arnd@arndb.de>
+ <20130130042103.GB5734@obsidianresearch.com>
+ <201301300955.49473.arnd@arndb.de>
+Message-ID: <20130130124721.0ad0294e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Arnd Bergmann,
 
-  the fields must be null-terminated:
-  the caller may use it as null-terminted string, next.
+On Wed, 30 Jan 2013 09:55:49 +0000, Arnd Bergmann wrote:
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/mach-omap2/twl-common.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> I don't remember the kernel ever caring about whether hardware complies
+> to a standard or not. The kernel's job is to make hardware work, based
+> on the actual implementation of that hardware. In a lot of cases that
+> means taking the standard document as a reference, and adding quirks
+> for the devices that are different.
+> 
+> In the end, it comes down to the impact on the code complexity, and
+> the run-time overhead for whatever hardware is most common when adding
+> those quirks.
 
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index e49b40b..6a7aec6 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -23,6 +23,7 @@
- #include <linux/i2c.h>
- #include <linux/i2c/twl.h>
- #include <linux/gpio.h>
-+#include <linux/string.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
- 
-@@ -56,7 +57,7 @@ void __init omap_pmic_init(int bus, u32 clkrate,
- 			   struct twl4030_platform_data *pmic_data)
- {
- 	omap_mux_init_signal("sys_nirq", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
--	strncpy(pmic_i2c_board_info.type, pmic_type,
-+	strlcpy(pmic_i2c_board_info.type, pmic_type,
- 		sizeof(pmic_i2c_board_info.type));
- 	pmic_i2c_board_info.irq = pmic_irq;
- 	pmic_i2c_board_info.platform_data = pmic_data;
+This is not only about standards, it is also about re-using the PCI
+resource allocation code.
+
+In my RFCv1, sent December, 7th, I wasn't using any emulated PCI-to-PCI
+bridge. So it *can* perfectly work without it.
+
+However, one major drawback of my RFCv1 version is that since I didn't
+know how much I/O space and memory space was needed for each PCIe
+device, I had to oversize the address decoding windows. And also, I had
+to have a special allocator (certainly simple, but still) to find an
+available physical address to set up each address decoding window.
+
+Emulating a PCI-to-PCI bridge very nicely allows to re-use the PCI core
+resource allocation code. I think it's really the main reason for
+emulated those PCI-to-PCI bridges, rather than willing to comply to
+some standards.
+
+So what I'm going to do now is rework my patch series by removing the
+emulated host bridge (which is normally mandatory by PCIe standard, but
+Linux doesn't need it, so we don't care), but I'll keep the emulated
+PCI-to-PCI bridges in order to benefit for the PCI core resource
+allocation mechanisms.
+
+Is this ok for you?
+
+I'd like to settle on the strategy to follow, because we're really
+going a funny road here: on December 7th, I submit a series that
+doesn't use any PCI-to-PCI bridge, and I'm told that I should emulate
+some. I spent a long time working on an implementation that uses
+emumlated PCI-to-PCI bridges, which I submitted on Monday, now to be
+told that I should work really hard not to use PCI-to-PCI bridges. I
+hope you can feel my little embarrassment here...
+
+Thanks,
+
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
