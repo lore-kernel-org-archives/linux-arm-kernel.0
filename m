@@ -1,70 +1,50 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Wed, 30 Jan 2013 03:11:16 +0000
-Subject: [GIT PULL] CSR SiRFmarco SoC infrastructures for 3.9
-In-Reply-To: <CAOesGMgHpEaR4Hxjw1esMbqvvpRA5_rDE=ahKunwJ70FDJmNKQ@mail.gmail.com>
-References: <CAGsJ_4z-7z8=3xQwU6iEsqHEcVrRWK+Fm7eoBEbjC-EAewGypA@mail.gmail.com>
- <20130128070848.GG25723@quad.lixom.net>
- <CAGsJ_4yV5KJ2yWQtbOLO5Dj_MrQS3v0sPN4hinJAzTsfH6quvg@mail.gmail.com>
- <20130129165110.GA16188@quad.lixom.net>
- <CAOesGMgHpEaR4Hxjw1esMbqvvpRA5_rDE=ahKunwJ70FDJmNKQ@mail.gmail.com>
-Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E90122B8D3A7@SHAASIEXM01.ASIA.ROOT.PRI>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Tue, 29 Jan 2013 19:36:03 -0800
+Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
+In-Reply-To: <20130129101549.GP23505@n2100.arm.linux.org.uk>
+References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
+ <20130128142510.68092e10.akpm@linux-foundation.org>
+ <20130129101549.GP23505@n2100.arm.linux.org.uk>
+Message-ID: <51089523.3080804@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Olof Johansson [mailto:olof at lixom.net]
-> Sent: Wednesday, January 30, 2013 3:04 AM
-> To: Barry Song
-> Cc: Arnd Bergmann; linux-arm-kernel at lists.infradead.org;
-> DL-SHA-WorkGroupLinux
-> Subject: Re: [GIT PULL] CSR SiRFmarco SoC infrastructures for 3.9
-> 
-> On Tue, Jan 29, 2013 at 8:51 AM, Olof Johansson <olof@lixom.net> wrote:
-> > On Mon, Jan 28, 2013 at 06:08:27PM +0800, Barry Song wrote:
-> >> 2013/1/28 Olof Johansson <olof@lixom.net>:
-> >> > On Thu, Jan 24, 2013 at 11:21:02AM +0800, Barry Song wrote:
-> >> >> Hi Olof, Arnd,
-> >> >>
-> >> >> pls pull the following changes for CSR SiRFmarco SoC. it has been
-> >> >> rebased againest arm-soc timer/cleanup tree.
-> >> >>
-> >> >> since commit 90cf214d6a549bf482e3c5751ee256cc885b96ea:
-> >> >>
-> >> >>   ARM: at91: fix board-rm9200-dt after sys_timer conversion
-> >> >> (2013-01-14 10:14:04 -0800)
-> >> >>
-> >> >> are available in the git repository at:
-> >> >>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
-> >> >> marco-timer-cleanup-rebase
-> >> >
-> >> > Pulled in as prima2/marco, included in next/soc. Thanks!
-> >>
-> >> Olof, thanks.
-> >>
-> >> >
-> >> > I noticed that there is no defconfig for any mach-prima2 platforms. Feel
-> >> > free to submit one so we get build coverage of the platform.
-> >>
-> >> there have been. arch/arm/configs/prima2_defconfig
-> >
-> > Ah, it enables ARCH_SIRF, I was searching for ARCH_PRIMA2 or
-> ARCH_MARCO. Good.
-> 
-> ..and it's broken due to interaction with the gic-vic move. :(
-> 
-> Barry, can you please follow up with a patch to do the corresponding
-> changes for prima?
+On 01/29/2013 02:15 AM, Russell King - ARM Linux wrote:
+> On Mon, Jan 28, 2013 at 02:25:10PM -0800, Andrew Morton wrote:
+>> What's this "with enabled unaligned memory access" thing?  You mean "if
+>> the arch supports CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS"?  If so,
+>> that's only x86, which isn't really in the target market for this
+>> patch, yes?
+>>
+>> It's a lot of code for a 50ms boot-time improvement.  Does anyone have
+>> any opinions on whether or not the benefits are worth the cost?
+>
+> Well... when I saw this my immediate reaction was "oh no, yet another
+> decompressor for the kernel".  We have five of these things already.
+> Do we really need a sixth?
+>
+> My feeling is that we should have:
+> - one decompressor which is the fastest
+> - one decompressor for the highest compression ratio
+> - one popular decompressor (eg conventional gzip)
+>
+> And if we have a replacement one for one of these, then it should do
+> exactly that: replace it.  I realise that various architectures will
+> behave differently, so we should really be looking at numbers across
+> several arches.
+>
+> Otherwise, where do we stop adding new ones?  After we have 6 of these
+> (which is after this one).  After 12?  After the 20th?
+>
 
-Ok. I'll take care.
-> 
-> 
-> Thanks,
-> 
-> -Olof
-> 
--barry
+The only concern I have with that is if someone paints themselves into a 
+corner and absolutely wants, say, LZO.
 
+Otherwise, per your list it pretty much sounds like we should have lz4, 
+gzip, and xz.
 
+	-hpa
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
