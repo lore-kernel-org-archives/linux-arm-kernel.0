@@ -1,67 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jan 2013 14:12:05 +0000
-Subject: [PATCH] ARM: tlb: perform branch predictor maintenance for whole
- invalidation
-Message-ID: <1359555125-27495-1-git-send-email-will.deacon@arm.com>
+Date: Wed, 30 Jan 2013 14:27:43 +0000
+Subject: [PATCH 0/6] Fix 740t support and remove more unused ARMv3 code
+Message-ID: <1359556069-28289-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architecture requires explicit branch predictor maintenance
-when updating an instruction stream for a given virtual address. In
-reality, this isn't so much of a burden because the branch predictor
-is flushed during the cache maintenance required to make the new
-instructions visible to the I-side of the processor.
+Hello,
 
-One exception to this rule is when we flush the entire TLB for a CPU in
-response to something other than writing new instructions (for example,
-ASID rollover or switching to an identity mapping before disabling the
-MMU).
+When looking at the remaining ARMv3 code that we still have kicking
+around, I noticed that the only user of the cache-flushing routines is
+the 740t, an ARMv4 chip. Having read the datasheet, we can actually use
+our ARMv4 cache-flushing code and remove cache-v3.S.
 
-This patch ensures that we flush the branch predictor as part of
-invalidating the entire TLB.
+After making that change, I thought I'd better do some testing, which is
+where the fun began...
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/tlbflush.h | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+Even after getting hold of a 740t Integrator/AP core-tile, I ran into
+many problems with the CPU support, which I don't believe has *ever*
+worked. Anyway, having fixed those, the board runs like a charm.
 
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 6e924d3..713ff32 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -38,6 +38,7 @@
- #define TLB_V7_UIS_PAGE	(1 << 19)
- #define TLB_V7_UIS_FULL (1 << 20)
- #define TLB_V7_UIS_ASID (1 << 21)
-+#define TLB_V7_UIS_BP	(1 << 22)
- 
- #define TLB_BARRIER	(1 << 28)
- #define TLB_L2CLEAN_FR	(1 << 29)		/* Feroceon */
-@@ -166,9 +167,11 @@
- #endif
- 
- #define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
--			 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | TLB_V7_UIS_ASID)
-+				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
-+				 TLB_V7_UIS_ASID | TLB_V7_UIS_BP)
- #define v7wbi_tlb_flags_up	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
--			 TLB_V6_U_FULL | TLB_V6_U_PAGE | TLB_V6_U_ASID)
-+				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
-+				 TLB_V6_U_ASID)
- 
- #ifdef CONFIG_CPU_TLB_V7
- 
-@@ -330,6 +333,11 @@ static inline void local_flush_tlb_all(void)
- 	tlb_op(TLB_V4_I_FULL | TLB_V6_I_FULL, "c8, c5, 0", zero);
- 	tlb_op(TLB_V7_UIS_FULL, "c8, c3, 0", zero);
- 
-+	if (tlb_flag(TLB_V7_UIS_BP))
-+		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
-+	else
-+		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
-+
- 	if (tlb_flag(TLB_BARRIER)) {
- 		dsb();
- 		isb();
+Next stop is the 940t, which looks to be broken in similar ways.
+
+Will
+
+
+Will Deacon (6):
+  ARM: tlbflush: remove ARMv3 support
+  ARM: cache: remove ARMv3 support code
+  ARM: mm: fix numerous hideous errors in proc-arm740.S
+  ARM: mm: remove broken condition check for v4 flushing
+  ARM: modules: don't export cpu_set_pte_ext when !MMU
+  ARM: integrator: ensure ap_syscon_base is initialised when
+    !CONFIG_MMU
+
+ arch/arm/include/asm/glue-cache.h        |   8 --
+ arch/arm/include/asm/tlbflush.h          |  11 +--
+ arch/arm/mach-integrator/integrator_ap.c |   2 +-
+ arch/arm/mm/Kconfig                      |   5 +-
+ arch/arm/mm/Makefile                     |   1 -
+ arch/arm/mm/cache-v3.S                   | 137 -------------------------------
+ arch/arm/mm/cache-v4.S                   |   2 +-
+ arch/arm/mm/proc-arm740.S                |  30 ++++---
+ arch/arm/mm/proc-syms.c                  |   2 +
+ 9 files changed, 24 insertions(+), 174 deletions(-)
+ delete mode 100644 arch/arm/mm/cache-v3.S
+
 -- 
 1.8.0
