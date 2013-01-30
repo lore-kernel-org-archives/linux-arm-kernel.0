@@ -1,55 +1,51 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 30 Jan 2013 11:16:32 +0100
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that kirkwood_ge0[01]_init()
- finds its clock
-In-Reply-To: <20130130083044.GA25688@schnuecks.de>
-References: <51053761.1020009@gmail.com>
- <20130127144610.GW1758@titan.lakedaemon.net> <51053F81.6020904@gmail.com>
- <20130127152431.GX1758@titan.lakedaemon.net>
- <20130128223148.GA10275@schnuecks.de>
- <20130129004824.GB7717@titan.lakedaemon.net>
- <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
- <20130130083044.GA25688@schnuecks.de>
-Message-ID: <5108F300.7000705@gmail.com>
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Wed, 30 Jan 2013 10:22:15 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130129181046.GC25415@pd.tnic>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129083522.GA14302@pd.tnic>
+ <1359478014.3529.157.camel@shinybook.infradead.org>
+ <20130129174249.GB25415@pd.tnic>
+ <1359482147.3529.161.camel@shinybook.infradead.org>
+ <20130129181046.GC25415@pd.tnic>
+Message-ID: <1359541333.3529.186.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2013 09:30 AM, Simon Baatz wrote:
-> On Wed, Jan 30, 2013 at 01:51:18AM +0100, Sebastian Hesselbarth wrote:
->> - [PATCH v2 2/2] clk: mvebu: Do not gate runit clock on Kirkwood
->>    (no lockup for minimal kernel configs)
->>
->> - [PATCH] NET: mv643xx: get smi clock from device tree
->>    (no lockup for modular DT ethernet)
->>
->> - Some patch that adds MV643XX_ETH_SHARED_NAME ".0" and ".1" clk aliases
->>    (no lockup for modular non-DT ethernet)
->
-> I think your patch to get the smi clock is intended for device tree.
-> Thus, the driver won't use these aliases, right?
+On Tue, 2013-01-29 at 19:10 +0100, Borislav Petkov wrote:
+> So, IMHO it sounds to me like we want to explicitly state for each arch
+> separately that it is ok to use the __builtin_bswapXX things. This also
+> takes care of the case where the compiler is doing something suboptimal
+> by excluding the affected versions.
 
-Actually, both patches above will not fix modular ethernet for 3.8-rc as
-shared driver is probed before core driver and not requesting any clk at
-all. The "NET: mv643xx: get smi clock from device tree" patch is based
-on Jason's attempt to separate shared driver.
+Well, if it really does end up being different for every architecture,
+then that means I probably made the wrong decision when I chose to make
+it "generic", and override the __arch_swabXX() macros. I could have just
+pushed all the architectures to use the builtins in their __arch_swabXX
+macros instead, as appropriate.
 
-If we need to fix modular ethernet now, we also need to add a clk_get
-to shared ethernet.
+Let's see how many special cases we actually end up with, and perhaps
+we'll end up switching that round. For now, let's just make ARM set
+__HAVE_BUILTIN_BSWAPxx__ for the appropriate sizes in <asm/swab.h>,
+according to whatever criteria it needs.
 
-But yes, DT doesn't need any clock aliases.
+It's not entirely clear how much of a win it is on ARM anyway; we don't
+have load-and-swap or store-and-swap instructions so there are only a
+few added opportunities for optimisation that we get by letting the
+compiler see what's going on.
 
->> - Some patch that adds clk_prepare_enable to ge0/ge1 clocks to
->>    kirkwood_legacy_clk_init()
->>    (retain MAC address for modular DT ethernet)
->
-> I like mine better, since it only enables the clocks of the
-> interfaces that are initialized in the init code.  I tested it with
-> non-DT as well.  But either is fine with me.
+-- 
+                   Sent with MeeGo's ActiveSync support.
 
-I know the difference, but here it is not only about fixing an issue
-but have it cleanly removed later on. But I don't have a strong opinion
-on that and maybe Andrew or Jason should coordinate what must be fixed
-now and how we do it.
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
 
-Sebastian
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4370 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130130/366a3921/attachment.bin>
