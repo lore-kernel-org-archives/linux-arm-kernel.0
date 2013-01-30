@@ -1,53 +1,41 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Jan 2013 14:08:31 +0000
-Subject: [PATCH 1/2] ARM: memory: use SZ_ constants for defining the virtual
- memory layout
-Message-ID: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
+Date: Wed, 30 Jan 2013 14:08:32 +0000
+Subject: [PATCH 2/2] ARM: memory: define TASK_UNMAPPED_BASE in terms of
+ TASK_SIZE
+In-Reply-To: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
+References: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1359554912-26872-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parts of the virtual memory layout (mainly the modules area) are
-described using open-coded immediate values.
+TASK_UNMAPPED_BASE is defined directly in terms of PAGE_OFFSET, which is
+confusing given that the modules area sits between here and TASK_SIZE
+and is not available for user allocations.
 
-Use the SZ_ definitions from linux/sizes.h instead to make the code
-clearer.
+This patch defines TASK_UNMAPPED_BASE in terms of TASK_SIZE instead and
+fixes a bug introduced by 394ef6403abc ("mm: use vm_unmapped_area() on
+arm architecture") whereby TASK_UNMAPPED_BASE is no longer page-aligned
+for bottom-up mmap, causing get_unmapped_area to choke on misaligned
+addresses.
 
+Reported-by: Christoffer Dall <cdall@cs.columbia.edu>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/memory.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/memory.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 73cf03a..a0fd518 100644
+index a0fd518..255a01b 100644
 --- a/arch/arm/include/asm/memory.h
 +++ b/arch/arm/include/asm/memory.h
-@@ -36,23 +36,23 @@
-  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
+@@ -37,7 +37,7 @@
   */
  #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
--#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(0x01000000))
-+#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
- #define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
+ #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
+-#define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
++#define TASK_UNMAPPED_BASE	((TASK_SIZE / 3) & ~UL(SZ_16M - 1))
  
  /*
   * The maximum size of a 26-bit user space task.
-  */
--#define TASK_SIZE_26		UL(0x04000000)
-+#define TASK_SIZE_26		UL(SZ_64M)
- 
- /*
-  * The module space lives between the addresses given by TASK_SIZE
-  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
-  */
- #ifndef CONFIG_THUMB2_KERNEL
--#define MODULES_VADDR		(PAGE_OFFSET - 16*1024*1024)
-+#define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
- #else
- /* smaller range for Thumb-2 symbols relocation (2^24)*/
--#define MODULES_VADDR		(PAGE_OFFSET - 8*1024*1024)
-+#define MODULES_VADDR		(PAGE_OFFSET - SZ_8M)
- #endif
- 
- #if TASK_SIZE > MODULES_VADDR
 -- 
 1.8.0
