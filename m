@@ -1,75 +1,96 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 30 Jan 2013 22:53:10 +0800
-Subject: [PATCH 1/2] ARM i.MX6: Add regulator delay support
-In-Reply-To: <1359585224-11304-1-git-send-email-b20788@freescale.com>
-References: <1359585224-11304-1-git-send-email-b20788@freescale.com>
-Message-ID: <20130130145308.GF2757@S2101-09.ap.freescale.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 30 Jan 2013 15:55:52 +0100
+Subject: [PATCH] ARM: at91/DT: remove atmel,
+ use-dma-* from 9x5 and 9n12 USART nodes
+Message-ID: <1359557752-21417-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 05:33:44PM -0500, Anson Huang wrote:
-> For ANATOP LDOs, vddcpu, vddsoc and vddpu
-> have step time settings in the misc2 register, need
-> to add necessary step time info for these three LDOs,
-> then regulator driver can add necessary delay based on
-> these settings.
-> 
-> offset 0x170:
-> bit [24-25]: vddcpu
-> bit [26-27]: vddpu
-> bit [28-29]: vddsoc
-> 
-> field definition:
-> 0'b00: 64 cycles of 24M clock;
-> 0'b01: 128 cycles of 24M clock;
-> 0'b02: 256 cycles of 24M clock;
-> 0'b03: 512 cycles of 24M clock;
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+Fix the use of USART on both at91sam9x5 and at91sam9n12. In DTS, the
+atmel,use-dma-[rx|tx] property is present but a DMA channel cannot be used.
+Indeed the connexion between the DMA engine and the slave is not implemented
+yet in Device Tree.
+Note however that this property is also used for PDC (private DMA) on older
+SoCs. This is why the driver alone cannot determine the validity of this
+property.
 
-Looks good.  Will apply after the driver part gets accepted.
+Reported-by: Douglas Gilbert <dgilbert@interlog.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9n12.dtsi | 8 --------
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 6 ------
+ 2 files changed, 14 deletions(-)
 
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx6q.dtsi |    9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index d6265ca..a2e977d 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -480,6 +480,9 @@
->  					anatop-reg-offset = <0x140>;
->  					anatop-vol-bit-shift = <0>;
->  					anatop-vol-bit-width = <5>;
-> +					anatop-delay-reg-offset = <0x170>;
-> +					anatop-delay-bit-shift = <24>;
-> +					anatop-delay-bit-width = <2>;
->  					anatop-min-bit-val = <1>;
->  					anatop-min-voltage = <725000>;
->  					anatop-max-voltage = <1450000>;
-> @@ -494,6 +497,9 @@
->  					anatop-reg-offset = <0x140>;
->  					anatop-vol-bit-shift = <9>;
->  					anatop-vol-bit-width = <5>;
-> +					anatop-delay-reg-offset = <0x170>;
-> +					anatop-delay-bit-shift = <26>;
-> +					anatop-delay-bit-width = <2>;
->  					anatop-min-bit-val = <1>;
->  					anatop-min-voltage = <725000>;
->  					anatop-max-voltage = <1450000>;
-> @@ -508,6 +514,9 @@
->  					anatop-reg-offset = <0x140>;
->  					anatop-vol-bit-shift = <18>;
->  					anatop-vol-bit-width = <5>;
-> +					anatop-delay-reg-offset = <0x170>;
-> +					anatop-delay-bit-shift = <28>;
-> +					anatop-delay-bit-width = <2>;
->  					anatop-min-bit-val = <1>;
->  					anatop-min-voltage = <725000>;
->  					anatop-max-voltage = <1450000>;
-> -- 
-> 1.7.9.5
-> 
-> 
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 80e29c6..4801717 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -324,8 +324,6 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf801c000 0x4000>;
+ 				interrupts = <5 4 5>;
+-				atmel,use-dma-rx;
+-				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart0>;
+ 				status = "disabled";
+@@ -335,8 +333,6 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8020000 0x4000>;
+ 				interrupts = <6 4 5>;
+-				atmel,use-dma-rx;
+-				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart1>;
+ 				status = "disabled";
+@@ -346,8 +342,6 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8024000 0x4000>;
+ 				interrupts = <7 4 5>;
+-				atmel,use-dma-rx;
+-				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart2>;
+ 				status = "disabled";
+@@ -357,8 +351,6 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8028000 0x4000>;
+ 				interrupts = <8 4 5>;
+-				atmel,use-dma-rx;
+-				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart3>;
+ 				status = "disabled";
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 0c60090..d112c3a 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -402,8 +402,6 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf801c000 0x200>;
+ 				interrupts = <5 4 5>;
+-				atmel,use-dma-rx;
+-				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart0>;
+ 				status = "disabled";
+@@ -413,8 +411,6 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8020000 0x200>;
+ 				interrupts = <6 4 5>;
+-				atmel,use-dma-rx;
+-				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart1>;
+ 				status = "disabled";
+@@ -424,8 +420,6 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8024000 0x200>;
+ 				interrupts = <7 4 5>;
+-				atmel,use-dma-rx;
+-				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart2>;
+ 				status = "disabled";
+-- 
+1.8.0
