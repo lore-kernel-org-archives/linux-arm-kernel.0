@@ -1,41 +1,53 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 30 Jan 2013 14:07:08 +0000
-Subject: [PATCH v2] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
-In-Reply-To: <alpine.DEB.2.00.1212200734160.7362@utopia.booyaka.com>
-References: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
- <alpine.DEB.2.00.1212190210021.2446@utopia.booyaka.com>
- <1BAFE6F6C881BF42822005164F1491C33EB0C4FB@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1212200734160.7362@utopia.booyaka.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB5920F@DBDE01.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Jan 2013 14:08:31 +0000
+Subject: [PATCH 1/2] ARM: memory: use SZ_ constants for defining the virtual
+ memory layout
+Message-ID: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 20, 2012 at 13:05:27, Paul Walmsley wrote:
-> On Thu, 20 Dec 2012, Hebbar, Gururaja wrote:
-> 
-> > On Wed, Dec 19, 2012 at 07:43:50, Paul Walmsley wrote:
-> > 
-> > > We've got a few hwmods on OMAP44xx that don't have clkctrl_offs registers 
-> > > listed in the hwmod data, and which are not marked with HWMOD_NO_IDLEST.  
-> > > What's going to happen in those cases?
-> > 
-> > Hmm. This is a special case to me. Let me go back and do some review.
-> > Will be back with some more details.
-> 
-> Probably what needs to happen is that those hwmods need to be marked with 
-> HWMOD_NO_IDLEST, in a separate patch before yours.  As far as I can tell, 
-> that's how they should have been marked initially.  Then your patch should 
-> be fine.
+Parts of the virtual memory layout (mainly the modules area) are
+described using open-coded immediate values.
 
-Looking at latest kernel v3.8-rc5, there is separate cm33xx.c file which
-handles module ready checking for am33xx platform. So I will update this 
-patch to work on this file instead of touching omap4 related file 
-(cminst44xx.c)
+Use the SZ_ definitions from linux/sizes.h instead to make the code
+clearer.
 
-> 
-> - Paul
-> 
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/memory.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-
-Regards, 
-Gururaja
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 73cf03a..a0fd518 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -36,23 +36,23 @@
+  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
+  */
+ #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
+-#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(0x01000000))
++#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
+ #define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
+ 
+ /*
+  * The maximum size of a 26-bit user space task.
+  */
+-#define TASK_SIZE_26		UL(0x04000000)
++#define TASK_SIZE_26		UL(SZ_64M)
+ 
+ /*
+  * The module space lives between the addresses given by TASK_SIZE
+  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
+  */
+ #ifndef CONFIG_THUMB2_KERNEL
+-#define MODULES_VADDR		(PAGE_OFFSET - 16*1024*1024)
++#define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
+ #else
+ /* smaller range for Thumb-2 symbols relocation (2^24)*/
+-#define MODULES_VADDR		(PAGE_OFFSET - 8*1024*1024)
++#define MODULES_VADDR		(PAGE_OFFSET - SZ_8M)
+ #endif
+ 
+ #if TASK_SIZE > MODULES_VADDR
+-- 
+1.8.0
