@@ -1,54 +1,74 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 30 Jan 2013 14:42:36 -0700
-Subject: [GIT PULL 5/8] ARM: tegra: SCU base rework
+Date: Wed, 30 Jan 2013 14:42:37 -0700
+Subject: [GIT PULL 6/8] ARM: tegra: add Tegra114 SoC support
 In-Reply-To: <1359582159-28816-1-git-send-email-swarren@wwwdotorg.org>
 References: <1359582159-28816-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1359582159-28816-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1359582159-28816-6-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra currently relies on the SCU to determine the number of CPU
-cores, and also hard-codes the SCU physical address.
+This pull request adds initial support for the Tegra114 SoC, which
+integrates a quad-core ARM Cortex-A15 CPU. I'm proud to observe that we
+posted the initial versions of these patches before the final official
+announcement of this chip.
 
-This series adds a /cpus node to the Tegra device tree, and updates
-the code to rely solely on that to determine the CPU count. A new
-API is introduced to query for the existence of SCU registers, and the
-SCU register address. Tegra and OMAP2 are converted to use these new
-APIs.
+These patches are enough to boot with a UART-based console, support the
+Dalmore and Pluto reference/evaluation boards, instantiate the GPIO and
+pinctrl drivers, and enable a cpuidle state. As yet, no clocks or
+storage devices are supported, but patches for those will follow shortly.
 
-This pull request is based on a merge of v3.8-rc3, and arm-soc's
-depends/rmk-perf branch.
+This pull request is based on (most of) the previous pull request with
+tag tegra-for-3.9-soc-cpuidle, followed by a merge of the previous pull
+request with tag tegra-for-3.9-scu-base-rework.
 
 ----------------------------------------------------------------
 
-The following changes since commit 5681f76576af872ced97e8c58ccab3c84a6627e6:
+The following changes since commit ee059485175b21079d3639f167980d354afb3d4b:
 
-  Merge remote-tracking branch 'korg_arm-soc/depends/rmk-perf' into for-3.9/scu-base-rework
+  Merge branch 'for-3.9/scu-base-rework' into for-3.9/soc-t114
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.9-scu-base-rework
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.9-soc-t114
 
-for you to fetch changes up to 80d9375617f7544f7475e7f07003a08930559d43:
+for you to fetch changes up to 031b77afc374cf1b86dbcda5dfa6e1bbb989836c:
 
-  ARM: OMAP: Make use of available scu_a9_get_base() interface
+  ARM: DT: tegra114: add pinmux DT entry
 
 ----------------------------------------------------------------
 
-Hiroshi Doyu (5):
-      ARM: tegra: Add CPU nodes to Tegra20 device tree
-      ARM: tegra: Add CPU nodes to Tegra30 device tree
-      ARM: tegra: Use DT /cpu node to detect number of CPU core
-      ARM: Add API to detect SCU base address from CP15
-      ARM: tegra: Skip scu_enable(scu_base) if not Cortex A9
+Hiroshi Doyu (7):
+      ARM: tegra: fuse: Add chip ID Tegra114 0x35
+      ARM: dt: tegra114: Add new SoC base, Tegra114 SoC
+      ARM: dt: tegra114: Add new board, Dalmore
+      ARM: dt: tegra114: Add new board, Pluto
+      ARM: tegra: Add initial support for Tegra114 SoC.
+      ARM: tegra: add AHB entry to Tegra114 DT
+      ARM: tegra: Add SMMU entry to Tegra114 DT
 
-Santosh Shilimkar (1):
-      ARM: OMAP: Make use of available scu_a9_get_base() interface
+Joseph Lo (1):
+      ARM: tegra: add Tegra114 ARM_CPUIDLE_WFI_STATE support
 
- arch/arm/boot/dts/tegra20.dtsi |   17 +++++++++++++++++
- arch/arm/boot/dts/tegra30.dtsi |   29 +++++++++++++++++++++++++++++
- arch/arm/include/asm/smp_scu.h |   17 +++++++++++++++++
- arch/arm/mach-omap2/omap-smp.c |    2 +-
- arch/arm/mach-omap2/omap44xx.h |    1 -
- arch/arm/mach-tegra/platsmp.c  |   20 ++------------------
- 6 files changed, 66 insertions(+), 20 deletions(-)
+Laxman Dewangan (3):
+      ARM: tegra114: select PINCTRL for Tegra114 SoC
+      ARM: DT: tegra114: add GPIO DT entry
+      ARM: DT: tegra114: add pinmux DT entry
+
+ arch/arm/boot/dts/Makefile              |    4 +-
+ arch/arm/boot/dts/tegra114-dalmore.dts  |   21 ++++
+ arch/arm/boot/dts/tegra114-pluto.dts    |   21 ++++
+ arch/arm/boot/dts/tegra114.dtsi         |  153 ++++++++++++++++++++++++++
+ arch/arm/mach-tegra/Kconfig             |   12 ++
+ arch/arm/mach-tegra/Makefile            |    4 +
+ arch/arm/mach-tegra/board-dt-tegra114.c |   48 ++++++++
+ arch/arm/mach-tegra/common.c            |    1 +
+ arch/arm/mach-tegra/cpuidle-tegra114.c  |   61 ++++++++++
+ arch/arm/mach-tegra/cpuidle.c           |    3 +
+ arch/arm/mach-tegra/cpuidle.h           |    6 +
+ arch/arm/mach-tegra/fuse.h              |    1 +
+ 12 files changed, 334 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/tegra114-dalmore.dts
+ create mode 100644 arch/arm/boot/dts/tegra114-pluto.dts
+ create mode 100644 arch/arm/boot/dts/tegra114.dtsi
+ create mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
+ create mode 100644 arch/arm/mach-tegra/cpuidle-tegra114.c
