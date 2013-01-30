@@ -1,45 +1,32 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed, 30 Jan 2013 14:41:40 -0600
-Subject: [PATCH 1/2] ARM: memory: use SZ_ constants for defining the
- virtual memory layout
-In-Reply-To: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
-References: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKGA1b=dM3RASMKmGDWue=_A-ieNOyr-Mp_L2LJHVtg8D8m_3g@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 30 Jan 2013 15:46:40 -0500
+Subject: [PATCH V2] arm: mvebu: Improve the SMP support of the
+ interrupt controller
+In-Reply-To: <1354740203-26665-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1354740203-26665-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130130204640.GT7717@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 8:08 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Parts of the virtual memory layout (mainly the modules area) are
-> described using open-coded immediate values.
->
-> Use the SZ_ definitions from linux/sizes.h instead to make the code
-> clearer.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Wed, Dec 05, 2012 at 09:43:23PM +0100, Gregory CLEMENT wrote:
+> This patch makes the interrupt controller driver more SMP aware for
+> the Armada XP SoCs. It adds the support for the per-CPU irq. It also
+> adds the implementation for the set_affinity hook.
+> 
+> Patch initialy wrote by Yehuda Yitschak and reworked by Gregory
+> CLEMENT.
+> 
+> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  arch/arm/include/asm/memory.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 73cf03a..a0fd518 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -36,23 +36,23 @@
->   * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
->   */
->  #define PAGE_OFFSET            UL(CONFIG_PAGE_OFFSET)
-> -#define TASK_SIZE              (UL(CONFIG_PAGE_OFFSET) - UL(0x01000000))
-> +#define TASK_SIZE              (UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
->  #define TASK_UNMAPPED_BASE     (UL(CONFIG_PAGE_OFFSET) / 3)
->
->  /*
->   * The maximum size of a 26-bit user space task.
->   */
-> -#define TASK_SIZE_26           UL(0x04000000)
-> +#define TASK_SIZE_26           UL(SZ_64M)
+>  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
+>  arch/arm/mach-mvebu/irq-armada-370-xp.c |   52 +++++++++++++++++++++++++++++++
+>  2 files changed, 53 insertions(+), 1 deletion(-)
 
-Wouldn't this make far more sense as UL(1<<26) ?
+reapplied to mvebu/boards ;-)
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+squashed in Yehuda's fix.
+
+thx,
+
+Jason.
