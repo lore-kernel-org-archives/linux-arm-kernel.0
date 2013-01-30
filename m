@@ -1,19 +1,52 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Wed, 30 Jan 2013 21:03:27 +0100
-Subject: [PATCH 1/1] drivers: net: davinci_cpdma: acknowledge interrupt
- properly
-In-Reply-To: <1359575813-15703-1-git-send-email-mugunthanvnm@ti.com>
-References: <1359575813-15703-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <EF466712-C5FF-4A91-BDF3-477559B02705@dominion.thruhere.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 30 Jan 2013 13:10:29 -0700
+Subject: [PATCH 4/4] pinctrl/abx500: destroy mutex if returning early
+ due to error
+In-Reply-To: <1359574822-15729-1-git-send-email-linus.walleij@stericsson.com>
+References: <1359574822-15729-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <51097E35.6080100@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/30/2013 12:40 PM, Linus Walleij wrote:
+> From: Lee Jones <lee.jones@linaro.org>
+> 
+> Current failure path neglects to mutex_destroy() before returning
+> an error due to an invalid parameter or an error received from
+> gpiochip_add(). This patch aims to remedy that behaviour.
 
-Op 30 jan. 2013, om 20:56 heeft Mugunthan V N <mugunthanvnm@ti.com> het volgende geschreven:
+> diff --git a/drivers/pinctrl/pinctrl-abx500.c b/drivers/pinctrl/pinctrl-abx500.c
 
-> CPDMA interrupts are not properly acknowledged which leads to interrupt
-> storm, only cpdma interrupt 0 is acknowledged in Davinci CPDMA driver.
-> Changed cpdma_ctlr_eoi api to acknowledge 1 and 2 interrupts which are
-> used for rx and tx respectively.
+> @@ -1155,11 +1155,13 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+>  	default:
+>  		dev_err(&pdev->dev, "Unsupported pinctrl sub driver (%d)\n",
+>  				(int) platid->driver_data);
+> +		mutex_destroy(&pct->lock);
+>  		return -EINVAL;
 
-A brief inspection shows that this still isn't following the TRM, but Pantelis' patch does. Can you please fix this driver to follow the TRM and make it work on both PG1.0 and PG2.0 instead of papering over bugs instead of fixing them properly?
+Especially given there's already a label out_free which performs this
+mutex_destroy(), those last two lines would be better as:
+
+ret = -EINVAL;
+goto out_free;
+
+>  	}
+>  
+>  	if (!pct->soc) {
+>  		dev_err(&pdev->dev, "Invalid SOC data\n");
+> +		mutex_destroy(&pct->lock);
+>  		return -EINVAL;
+
+Same there.
+
+>  	}
+>  
+> @@ -1176,6 +1178,7 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+>  	ret = gpiochip_add(&pct->chip);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "unable to add gpiochip: %d\n", ret);
+> +		mutex_destroy(&pct->lock);
+>  		goto out_rem_irq;
+
+And here, just change the goto target to out_free rather than adding the
+mutex_destroy() call.
