@@ -1,53 +1,52 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 30 Jan 2013 11:49:34 -0600
-Subject: [RFC v2 13/18] ARM: OMAP2+: AM33XX: timer: Interchance clkevt
- and clksrc timers
-In-Reply-To: <51095CDA.9090701@ti.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-14-git-send-email-vaibhav.bedia@ti.com>
- <5101B622.7050901@ti.com> <51095CDA.9090701@ti.com>
-Message-ID: <51095D2E.1040708@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 30 Jan 2013 10:49:54 -0700
+Subject: [PATCH] ARM: architected timers: allow dt based discovery using
+ clocksource_of_init
+In-Reply-To: <20130130171930.GA23801@e106331-lin.cambridge.arm.com>
+References: <1358731326-2979-1-git-send-email-thomas.abraham@linaro.org>
+ <50FD7904.1070201@wwwdotorg.org>
+ <CAJuYYwSfH8jTterd6aNc_Aw81PBschfCUf=REKB35=Y4a=i_7A@mail.gmail.com>
+ <20130122110456.GC18876@e106331-lin.cambridge.arm.com>
+ <20130130171930.GA23801@e106331-lin.cambridge.arm.com>
+Message-ID: <51095D42.1020701@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 01/30/2013 11:48 AM, Jon Hunter wrote:
+On 01/30/2013 10:19 AM, Mark Rutland wrote:
+> Thomas,
 > 
-> On 01/24/2013 04:30 PM, Jon Hunter wrote:
->> Hi Vaibhav,
->>
->> On 12/31/2012 07:07 AM, Vaibhav Bedia wrote:
->>> AM33XX has two timers (DTIMER0/1) in the WKUP domain.
->>> On GP devices the source of DMTIMER0 is fixed to an
->>> inaccurate internal 32k RC oscillator and this makes
->>> the DMTIMER0 practically either as a clocksource or
->>> as clockevent.
+> On Tue, Jan 22, 2013 at 11:04:56AM +0000, Mark Rutland wrote:
+>> On Mon, Jan 21, 2013 at 06:30:47PM +0000, Thomas Abraham wrote:
+>>> Hi Stephen,
 >>>
->>> Currently the timer instance in WKUP domain is used
->>> as the clockevent and the timer in non-WKUP domain
->>> as the clocksource. DMTIMER1 in WKUP domain can keep
->>> running in suspend from a 32K clock fed from external
->>> OSC and can serve as the persistent clock for the kernel.
->>> To enable this, interchange the timers used as clocksource
->>> and clockevent for AM33XX.
+>>> On 21 January 2013 09:21, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>> On 01/20/2013 06:22 PM, Thomas Abraham wrote:
+>>>>> Add an entry in __clksrc_of_table so that ARMv7 architected timer is
+>>>>> discoverable using call to clocksource_of_init.
+>>>>
+>>>>> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+>>>>
+>>>>> +#ifdef CONFIG_CLKSRC_OF
+>>>>> +CLOCKSOURCE_OF_DECLARE(armv7_timer, "arm,armv7-timer", arch_timer_of_register)
+>>>>> +#endif
+>>>>
+>>>> I wonder if we shouldn't enhance include/linux/clocksource.h to define
+>>>> CLOCKSOURCE_OF_DECLARE even when !CONFIG_CLKSRC_OF; that way, drivers
+>>>> wouldn't need that ifdef.
+>>>
+>>> Yes, it will be helpful to have a !CONFIG_CLKSRC_OF version of
+>>> CLOCKSOURCE_OF_DECLARE. And can CONFIG_CLKSRC_OF be enabled by default
+>>> for all ARM platforms?
+>>>
+>>> Thanks,
+>>> Thomas.
 >>
->> I have been thinking about this some more. In the case where we are
->> using gptimers for both clock-events and clock-source (on both AM33xx
->> and OMAP) and I am wondering if it makes sense to switch the timers so
->> that we use the always-on timer for clock-source and a different one
->> from clock-events.
+>> Thomas,
 >>
->> For OMAP, if we are not using the 32k-sync for clock-source, then we are
->> never going to achieve low power states during idle as we will always
->> have one gptimer running. And in this case, to your point below, it
->> would be better to use the always-on for clock-source so that in suspend
->> we can at least hit low power states and maintain time.
+>> Once the above is worked out, could you send me the updated patch with a
+>> pointer to whichever {branch,patch}(es) I need for CLKSRC_OF?
 > 
-> I have posted a patch today [1] that I hope will address this issue for
-> you. Can you give that a try?
+> Is there any news on this? I'd like to be able to push out a branch ready for
+> merging soon.
 
-By the way, this need to be applied on top of the fix I sent yesterday
-to pass the property.
-
-Cheers
-Jon
+I just sent a patch for this.
