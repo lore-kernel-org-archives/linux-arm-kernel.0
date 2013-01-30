@@ -1,41 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 30 Jan 2013 10:38:12 +0100
-Subject: [GIT PULL] at91: fixes for 3.8-rc6
-Message-ID: <5108EA04.80002@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 30 Jan 2013 10:39:14 +0100
+Subject: [GIT PULL] ux500 <mach/id.h> removal
+In-Reply-To: <CAOesGMiKCHUz9BJ31o-4kthr0CZABuL7SuuMNEjbkUQ06KsfMw@mail.gmail.com>
+References: <CACRpkdY9BDyGQ-DiEhTiyHEYoxpGiL+H0baqsBYX_a-0upktUQ@mail.gmail.com>
+ <CAOesGMiKCHUz9BJ31o-4kthr0CZABuL7SuuMNEjbkUQ06KsfMw@mail.gmail.com>
+Message-ID: <CACRpkdYmTTgpnAOoNM3RJiF_oADgbuGK-vw6JF8J9rPAttA5PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Wed, Jan 30, 2013 at 1:12 AM, Olof Johansson <olof@lixom.net> wrote:
+> [Me]
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+>> tags/ux500-no-idh
+>
+> Pulled in.
+>
+> This has a somewhat annoying (but trivial) conflict against your own
+> code (the cpufreq driver changes).
 
-Here are two little DT fixes that will fix the use of
-USART3 on at91sam9x5 platforms.
+Arnd always told me to split stuff cleanly on branches, which of course
+leads to conflicts like that, but I thought he wanted them, rather than
+huge accumulated patch sets built on to of each othere ... a bit hard to
+do the right thing here, what would have been the right way?
 
+Does it help if I base stuff off ARM SoC tree branches, and which
+ones can be relied upon in that case?
 
-The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
-
-  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to 7d4cfece23f535b60496d88a717a3d7bfca50187:
-
-  ARM: at91/at91sam9x5.dtsi: fix usart3 TXD (2013-01-30 10:09:17 +0100)
-
-----------------------------------------------------------------
-Two little Device Tree fixes for USART on at91sam9x5.
-
-----------------------------------------------------------------
-Douglas Gilbert (1):
-      ARM: at91/at91sam9x5.dtsi: fix usart3 TXD
-
-Robert Nelson (1):
-      ARM: at91: at91sam9x5: fix usart3 pinctrl name
-
- arch/arm/boot/dts/at91sam9x5.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-Thanks, bye,
--- 
-Nicolas Ferre
+Yours,
+Linus Walleij
