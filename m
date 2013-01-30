@@ -1,96 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 30 Jan 2013 15:55:52 +0100
-Subject: [PATCH] ARM: at91/DT: remove atmel,
- use-dma-* from 9x5 and 9n12 USART nodes
-Message-ID: <1359557752-21417-1-git-send-email-nicolas.ferre@atmel.com>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Wed, 30 Jan 2013 17:01:29 +0200
+Subject: [RFC PATCH v3 0/2] ARM: update cpuinfo to print SoC model name
+Message-ID: <1359558091-29251-1-git-send-email-ruslan.bilovol@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the use of USART on both at91sam9x5 and at91sam9n12. In DTS, the
-atmel,use-dma-[rx|tx] property is present but a DMA channel cannot be used.
-Indeed the connexion between the DMA engine and the slave is not implemented
-yet in Device Tree.
-Note however that this property is also used for PDC (private DMA) on older
-SoCs. This is why the driver alone cannot determine the validity of this
-property.
 
-Reported-by: Douglas Gilbert <dgilbert@interlog.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9n12.dtsi | 8 --------
- arch/arm/boot/dts/at91sam9x5.dtsi  | 6 ------
- 2 files changed, 14 deletions(-)
+The following patches update cpuinfo to print SoC
+model name for ARM.
+The first patch exactly makes needed changes for ARM
+architecture and adds a common approach to show SoC name.
+Second patch uses this approach for TI OMAP4 SoCs (as live
+example).
 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 80e29c6..4801717 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -324,8 +324,6 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf801c000 0x4000>;
- 				interrupts = <5 4 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart0>;
- 				status = "disabled";
-@@ -335,8 +333,6 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf8020000 0x4000>;
- 				interrupts = <6 4 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1>;
- 				status = "disabled";
-@@ -346,8 +342,6 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf8024000 0x4000>;
- 				interrupts = <7 4 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2>;
- 				status = "disabled";
-@@ -357,8 +351,6 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf8028000 0x4000>;
- 				interrupts = <8 4 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart3>;
- 				status = "disabled";
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 0c60090..d112c3a 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -402,8 +402,6 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf801c000 0x200>;
- 				interrupts = <5 4 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart0>;
- 				status = "disabled";
-@@ -413,8 +411,6 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf8020000 0x200>;
- 				interrupts = <6 4 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1>;
- 				status = "disabled";
-@@ -424,8 +420,6 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf8024000 0x200>;
- 				interrupts = <7 4 5>;
--				atmel,use-dma-rx;
--				atmel,use-dma-tx;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2>;
- 				status = "disabled";
+Why we need it?
+
+First - the /proc/cpuinfo becomes more informative.
+Added new line "SoC name" in the "cpuinfo" output for system
+on a chip name. It is placed between CPU information and machine
+information, so the file structure looks gracefully
+('CPU-SoC-Hardware' instead of 'CPU-Hardware' that we have now)
+
+Second - this information may be used by userspace
+for different purposes (as example - OMAP4460 and
+OMAP4470 SoCs have different graphics accelerators,
+and userspace may want to know what libraries
+to use and what module to insert if the graphics
+drivers are built as modules)
+
+Looks like there were few attempts to do similar
+changes to cpuinfo without any luck (had stuck
+on review) so this functionality is still not
+in the kernel yet.
+In this patch series the update to cpuinfo is very
+short (10 lines) and easy.
+
+Comments are welcome as usual
+
+--------------------------------------------------
+v3:
+Addressed comments from Nishanth (changed 'SoC name'
+field for OMAP - now it shows only SoC name without
+additional info)
+
+Updated commit messages. Updated this cover letter
+with additional information
+
+--------------------------------------------------
+v2:
+Addressed comments from Russel (changed 'CPU name' > 'SoC name')
+Updatet commit messages. Updated cover letter
+
+Ruslan Bilovol (2):
+  ARM: kernel: update cpuinfo to print SoC model name
+  ARM: OMAP4: setup SoC model name during ID initialisation
+
+ arch/arm/include/asm/setup.h |    1 +
+ arch/arm/kernel/setup.c      |    9 +++++++++
+ arch/arm/mach-omap2/id.c     |    5 +++++
+ 3 files changed, 15 insertions(+)
+
 -- 
-1.8.0
+1.7.9.5
