@@ -1,73 +1,41 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 29 Jan 2013 17:25:44 -0800
-Subject: [PATCH] clk: divider: Use DIV_ROUND_CLOSEST
-Message-ID: <2e77dfe8-8d4f-4b77-bf1b-831ad1572c23@VA3EHSMHS046.ehs.local>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 30 Jan 2013 02:26:40 +0100
+Subject: [PATCH 1/2] ARM: kirkwood: provide ge clock aliases for shared smi
+Message-ID: <1359509201-11674-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the DIV_ROUND_CLOSEST macro to calculate divider values and minimize
-rounding errors.
+DT support for mv643xx_eth will split smi driver from core gbe driver.
+Although different drivers, both use the same internal device and the
+same (gateable) clock. This patch provides a proper clock alias for
+the smi driver to not break non-DT kernels.
 
+Reported-by: Simon Baatz <gmbnomis@gmail.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Simon Baatz <gmbnomis@gmail.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
-Hi,
+ arch/arm/mach-kirkwood/common.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-I just came across this behavior:
-I'm using the clk-divider as cpuclock which can be scaled through cpufreq.
-During boot I create an opp table which in this case holds the frequencies [MHz]
-666, 333 and 222. To make sure those are actually valid frequencies I call
-clk_round_rate().
-I added a debug line in clk-divider.c:clk_divider_bestdiv() before the return
-in line 163 giving me:
-	prate:1333333320, rate:333333330, div:4
-for adding the 333 MHz operating point.
-
-In the running system this gives me:
-zynq:/sys/devices/system/cpu/cpu0/cpufreq # cat scaling_available_frequencies 
-222222 333333 666666 
-zynq:/sys/devices/system/cpu/cpu0/cpufreq # cat scaling_cur_freq 
- 666666
-
- So far, so good. But now, let's scale the frequency:
-zynq:/sys/devices/system/cpu/cpu0/cpufreq # echo 333333 > scaling_setspeed 
-zynq:/sys/devices/system/cpu/cpu0/cpufreq # cat scaling_cur_freq
- 266666
-
-And the corresponding debug line:
-	prate:1333333320, rate:333333000, div:5
-
-So, with DIV_ROUND_UP an actual divider of 4.00000396 becomes 5, resulting in a
-huge error.
-
-	Regards,
-	S?ren
-
- drivers/clk/clk-divider.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index a9204c6..32e1b6a 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -157,7 +157,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 
- 	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
- 		parent_rate = *best_parent_rate;
--		bestdiv = DIV_ROUND_UP(parent_rate, rate);
-+		bestdiv = DIV_ROUND_CLOSEST(parent_rate, rate);
- 		bestdiv = bestdiv == 0 ? 1 : bestdiv;
- 		bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
- 		return bestdiv;
-@@ -207,7 +207,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long flags = 0;
- 	u32 val;
- 
--	div = parent_rate / rate;
-+	div = DIV_ROUND_CLOSEST(parent_rate, rate);
- 	value = _get_val(divider, div);
- 
- 	if (value > div_mask(divider))
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index bac21a5..502d80d 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -252,7 +252,9 @@ void __init kirkwood_clk_init(void)
+ 	orion_clkdev_add(NULL, "orion_spi.0", runit);
+ 	orion_clkdev_add(NULL, "orion_spi.1", runit);
+ 	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".0", ge0);
++	orion_clkdev_add(NULL, MV643XX_ETH_SHARED_NAME ".0", ge0);
+ 	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".1", ge1);
++	orion_clkdev_add(NULL, MV643XX_ETH_SHARED_NAME ".1", ge1);
+ 	orion_clkdev_add(NULL, "orion_wdt", tclk);
+ 	orion_clkdev_add("0", "sata_mv.0", sata0);
+ 	orion_clkdev_add("1", "sata_mv.0", sata1);
 -- 
-1.8.1.2
+1.7.10.4
