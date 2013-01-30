@@ -1,46 +1,29 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Jan 2013 13:57:24 -0500 (EST)
-Subject: [PATCH 2/2] ARM: memory: define TASK_UNMAPPED_BASE in terms of
- TASK_SIZE
-In-Reply-To: <1359554912-26872-2-git-send-email-will.deacon@arm.com>
-References: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
- <1359554912-26872-2-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1301301352180.6300@xanadu.home>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 31 Jan 2013 00:37:33 +0530
+Subject: [PATCH v2 0/2] Add CPSW VLAN Support
+Message-ID: <1359572855-12344-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jan 2013, Will Deacon wrote:
+CPSW is capable of filtering VLAN packets in hardware. This patch series
+implements VLAN support to CPSW driver.
+This patch series is tested on net-next with AM335x EVM with ping test.
 
-> TASK_UNMAPPED_BASE is defined directly in terms of PAGE_OFFSET, which is
-> confusing given that the modules area sits between here and TASK_SIZE
-> and is not available for user allocations.
-> 
-> This patch defines TASK_UNMAPPED_BASE in terms of TASK_SIZE instead and
-> fixes a bug introduced by 394ef6403abc ("mm: use vm_unmapped_area() on
-> arm architecture") whereby TASK_UNMAPPED_BASE is no longer page-aligned
-> for bottom-up mmap, causing get_unmapped_area to choke on misaligned
-> addresses.
-> 
-> Reported-by: Christoffer Dall <cdall@cs.columbia.edu>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/memory.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index a0fd518..255a01b 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -37,7 +37,7 @@
->   */
->  #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
->  #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
-> -#define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
-> +#define TASK_UNMAPPED_BASE	((TASK_SIZE / 3) & ~UL(SZ_16M - 1))
+Changes from initial version
+* added vlan support to existing add/delete unicast/multicast apis
+* Made driver as default VLAN enabled so that drivers need to be recompiled
+  when stack is compiled with VLAN
 
-Please round this up not down.  In most cases, TASK_SIZE is 0xbf000000 
-which is not nicely divisible by 3, unlike PAGE_OFFSET was.  By rounding 
-up you get a nice 0x40000000 as before.
+Mugunthan V N (2):
+  drivers: net: cpsw: Add helper functions for VLAN ALE implementation
+  drivers: net:ethernet: cpsw: add support for VLAN
 
+ Documentation/devicetree/bindings/net/cpsw.txt |    2 +
+ drivers/net/ethernet/ti/cpsw.c                 |  100 ++++++++++++++++++++--
+ drivers/net/ethernet/ti/cpsw_ale.c             |  106 +++++++++++++++++++++---
+ drivers/net/ethernet/ti/cpsw_ale.h             |   20 +++--
+ include/linux/platform_data/cpsw.h             |    1 +
+ 5 files changed, 205 insertions(+), 24 deletions(-)
 
-Nicolas
+-- 
+1.7.9.5
