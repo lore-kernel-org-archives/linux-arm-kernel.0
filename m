@@ -1,20 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 30 Jan 2013 18:35:34 +0800
-Subject: [PATCH v6 08/10] spi: omap2-mcspi: convert to
- dma_request_slave_channel_compat()
-In-Reply-To: <1359529229-22207-9-git-send-email-mporter@ti.com>
-References: <1359529229-22207-1-git-send-email-mporter@ti.com>
- <1359529229-22207-9-git-send-email-mporter@ti.com>
-Message-ID: <20130130103530.GA6229@opensource.wolfsonmicro.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 30 Jan 2013 10:38:03 +0000
+Subject: [GIT PULL] vexpress: drivers for v3.9
+In-Reply-To: <CAOesGMinJef-9OsKi0LGB0W6i73sgyUqhm2Mie4gyC2JLjnd1Q@mail.gmail.com>
+References: <1359484450.8090.27.camel@hornet>
+ <CAOesGMinJef-9OsKi0LGB0W6i73sgyUqhm2Mie4gyC2JLjnd1Q@mail.gmail.com>
+Message-ID: <1359542283.8090.32.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 02:00:27AM -0500, Matt Porter wrote:
-> Convert dmaengine channel requests to use
-> dma_request_slave_channel_compat(). This supports the DT case of
-> platforms requiring channel selection from either the OMAP DMA or
-> the EDMA engine. AM33xx only boots from DT and is the only user
-> implementing EDMA so in the !DT case we can default to the OMAP DMA
-> filter.
+Morning,
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > Pawel Moll (1):
+> >       mfd: vexpress: Add pseudo-GPIO based LEDs
+> 
+> I can't find record of this patch ever having been posted (under that
+> subject at least) on any list I am on, including linux-arm-kernel and
+> linux-kernel.
+
+Uh, the brief LEDs discussion happened so long ago (almost 3 months)
+that I was convinced I posted it back then. Should have checked it
+myself, sorry.
+
+> You should at least post it to those lists, and cc the MFD maintainer.
+> And you should get his ack if you are going to merge this patch
+> through arm-soc instead of through his tree.
+
+You're right, I'll approach Samuel regarding this bit.
+
+In the meantime, could you please take the other patch please? I mean:
+
+> > Catalin Marinas (1):
+> >       arm: Move sp810.h to include/linux/amba/
+
+I can rework the branch to contain this patch only and send a new pull
+request if you prefer.
+
+Thanks!
+
+Pawe?
