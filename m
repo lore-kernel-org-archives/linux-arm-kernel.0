@@ -1,32 +1,34 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 30 Jan 2013 09:14:53 +0100
-Subject: [PATCH v3 1/3] pwm: Add pwm_can_sleep() as exported API to users
-In-Reply-To: <1359381659-24454-2-git-send-email-florian.vaussard@epfl.ch>
-References: <1359381659-24454-1-git-send-email-florian.vaussard@epfl.ch>
- <1359381659-24454-2-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <20130130081453.GA13568@avionic-0098.mockup.avionic-design.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 30 Jan 2013 09:17:25 +0100
+Subject: [PATCH 0/3] clock driver for sunxi
+In-Reply-To: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <5108D715.3080403@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 03:00:57PM +0100, Florian Vaussard wrote:
-> Calls to some external PWM chips can sleep. To help users,
-> add pwm_can_sleep() API.
+Hi Emilio,
+
+Le 22/01/2013 07:12, Emilio L?pez a ?crit :
+> Hello everyone,
 > 
-> Cc: Thierry Reding <thierry.reding@avionic-design.de>
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  drivers/pwm/core.c  |   12 ++++++++++++
->  include/linux/pwm.h |   10 ++++++++++
->  2 files changed, 22 insertions(+), 0 deletions(-)
+> This patchset adds basic clock support for sunxi devices. Currently, it
+> implements support for the two oscillators, the main PLL, the CPU mux,
+> and its three divisor clocks. With this in place, it is possible to
+> write a cpufreq driver and have it work.
+> 
+> I have tested this driver successfully on a Cubieboard (A10, sun4i)
+> using the cpufreq driver from the linux-sunxi tree after minor
+> modifications (the clock names are not the same).
 
-Applied (with a minor fixup to the kerneldoc comment), thanks.
+Thanks for doing this. I'll try to test it on my boards this week.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130130/ea77a483/attachment.sig>
+I don't have a lot of comments, but Mike will probably have some.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
