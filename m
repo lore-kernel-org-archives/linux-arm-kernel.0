@@ -1,42 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Jan 2013 16:21:32 +0000
-Subject: Commit 384a290283fde63ba8dc671fca5420111cdac19a seems to break
- 11MPCore boot
-In-Reply-To: <alpine.LFD.2.02.1301301050230.6300@xanadu.home>
-References: <51093B0B.7010708@arm.com>
- <alpine.LFD.2.02.1301301050230.6300@xanadu.home>
-Message-ID: <20130130162132.GM23505@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 30 Jan 2013 17:25:02 +0100
+Subject: [PATCH] ARM: ux500: correct typo in pinctrl Device Tree node
+Message-ID: <1359563102-5934-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 11:00:50AM -0500, Nicolas Pitre wrote:
-> On Wed, 30 Jan 2013, Punit Agrawal wrote:
-> 
-> > Hi Nicolas,
-> > 
-> > I was trying to boot 3.8-rc5 on Realview EB 11MPCore using
-> > realview-smp_defconfig as a starting point but the kernel failed to progress
-> > past the log below (config attached).
-> > 
-> > Pawel suggested I try reverting 384a290283fde63ba8dc671fca5420111cdac19a -
-> > "ARM: gic: use a private mapping for CPU target interfaces" that you've
-> > authored. With this commit reverted the kernel boots.
-> > 
-> > I am not quite sure why the commit breaks 11MPCore but Pawel (cc'd) might be
-> > able to shed light on that.
-> 
-> That would be appreciated as I don't have any good answer to provide.
-> 
-> Typically, this patch highlighted problems with bad holding pen 
-> implementations where secondary CPUs would enter the kernel all at the 
-> same time. In that case the kernel was crashing even before displaying 
-> "CPU2: Booted secondary processor".
+From: Lee Jones <lee.jones@linaro.org>
 
-Well, the patch still looks fine to me.  It might be a good idea to
-dump out the value of GIC_DIST_TARGET + 0, just in case there's some
-version of the GIC which doesn't advertise its CPU mask via that
-register (it should, because it corresponds with SGI0..3, and every
-spec I have says that it will be implemented if these IRQs are present).
+The preference is to use '-' instead of '_' in compatible strings.
 
-We do know already that there are some implementations out there which
-don't conform to these documents...
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/dbx5x0.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 96f518b..69140ba 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -171,7 +171,7 @@
+ 		};
+ 
+ 		pinctrl {
+-			compatible = "stericsson,nmk_pinctrl";
++			compatible = "stericsson,nmk-pinctrl";
+ 			prcm = <&prcmu>;
+ 		};
+ 
+-- 
+1.7.11.3
