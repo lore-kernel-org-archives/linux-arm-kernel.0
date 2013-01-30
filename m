@@ -1,27 +1,77 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Jan 2013 16:39:08 -0800
-Subject: [arm-soc:next/soc 4/8] arch/arm/mach-prima2/platsmp.c:20:30:
- fatal error: asm/hardware/gic.h: No such file or directory
-In-Reply-To: <20130130002905.GA55457@bee>
-References: <51082342.HQ+h7FMwJqkm7gxO%fengguang.wu@intel.com>
- <20130130002905.GA55457@bee>
-Message-ID: <20130130003908.GA12315@quad.lixom.net>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Wed, 30 Jan 2013 02:38:57 +0200
+Subject: [RFC PATCH v2 2/2] ARM: OMAP4: setup SoC model name during ID
+ initialisation
+In-Reply-To: <1359506337-21619-1-git-send-email-ruslan.bilovol@ti.com>
+References: <1359506337-21619-1-git-send-email-ruslan.bilovol@ti.com>
+Message-ID: <1359506337-21619-3-git-send-email-ruslan.bilovol@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 08:29:05AM +0800, Xie ChanglongX wrote:
-> 
-> Hi Olof,
-> 
-> FYI, kernel build failed on
-> 
-> tree:   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/soc
-> head:   6ed05a2aab3763b58922247543d7079106b254dc
-> commit: af70fdc947dbe835acc26c6ee9e8e930f38935f8 [4/8] Merge branch 'marco-timer-cleanup-rebase' of git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel into next/soc
-> config: make ARCH=arm prima2_defconfig
+Set up the SoC model name during OMAP ID initialisation
+so it will be displayed in /proc/cpuinfo:
 
-Thanks! Yes, this is a known issue as of this morning, I didn't catch it before
-I merged in so I asked Barry to follow up with a fix.
+/ # cat proc/cpuinfo
+[...]
+CPU variant     : 0x2
+CPU part        : 0xc09
+CPU revision    : 10
 
+SoC name        : OMAP4470 ES1.0 HS
 
--Olof
+Hardware        : OMAP4 Blaze Tablet
+Revision        : 20edb4
+[...]
+
+Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+---
+ arch/arm/mach-omap2/id.c |   18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 45cc7ed4..b1fba35 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -20,6 +20,7 @@
+ #include <linux/io.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/setup.h>
+ 
+ #include "common.h"
+ 
+@@ -33,8 +34,17 @@
+ 
+ static unsigned int omap_revision;
+ static const char *cpu_rev;
++static char omap_soc_model_name[80];
+ u32 omap_features;
+ 
++static const char const *omap_types[] = {
++	[OMAP2_DEVICE_TYPE_TEST]	= "TST",
++	[OMAP2_DEVICE_TYPE_EMU]		= "EMU",
++	[OMAP2_DEVICE_TYPE_SEC]		= "HS",
++	[OMAP2_DEVICE_TYPE_GP]		= "GP",
++	[OMAP2_DEVICE_TYPE_BAD]		= "BAD",
++};
++
+ unsigned int omap_rev(void)
+ {
+ 	return omap_revision;
+@@ -502,8 +512,12 @@ void __init omap4xxx_check_revision(void)
+ 		omap_revision = OMAP4430_REV_ES2_3;
+ 	}
+ 
+-	pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,
+-		((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
++	sprintf(omap_soc_model_name, "OMAP%04x ES%d.%d %s", omap_rev() >> 16,
++			((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf),
++			omap_types[omap_type()]);
++	set_soc_model_name(omap_soc_model_name);
++
++	pr_info("%s\n", omap_soc_model_name);
+ }
+ 
+ void __init omap5xxx_check_revision(void)
+-- 
+1.7.9.5
