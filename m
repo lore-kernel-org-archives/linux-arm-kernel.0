@@ -1,88 +1,36 @@
-From: achin.gupta@arm.com (Achin Gupta)
-Date: Wed, 30 Jan 2013 12:22:29 +0000
-Subject: [PATCH v3 15/15] ARM: vexpress/dcscb: probe via device tree
-In-Reply-To: <alpine.LFD.2.02.1301291634140.6300@xanadu.home>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-16-git-send-email-nicolas.pitre@linaro.org>
- <510838AD.6040700@gmail.com>
- <alpine.LFD.2.02.1301291634140.6300@xanadu.home>
-Message-ID: <CAMpgmWA0CCSRYxSvA1rNDYLo_RD-UavmX7coBXVpC+HEwQaBFg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 30 Jan 2013 20:29:33 +0800
+Subject: [RFC 3/3] arm: mach-mxs: make enabling enet_out a legacy function
+In-Reply-To: <20130130075832.GA13075@pengutronix.de>
+References: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
+ <1359470773-14290-4-git-send-email-w.sang@pengutronix.de>
+ <20130130054833.GA24450@S2100-06.ap.freescale.net>
+ <20130130075832.GA13075@pengutronix.de>
+Message-ID: <20130130122931.GA2757@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 9:41 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Tue, 29 Jan 2013, Rob Herring wrote:
->
->> On 01/29/2013 01:51 AM, Nicolas Pitre wrote:
->> > This allows for the DCSCB support to be compiled in and selected
->> > at run time.
->>
->> Shouldn't this just be rolled into the commit creating dcscb.c?
->
-> Probably, yes.
->
->> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
->> > ---
->> >  arch/arm/mach-vexpress/dcscb.c | 9 ++++++---
->> >  1 file changed, 6 insertions(+), 3 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
->> > index 58051ffafb..a724507cbc 100644
->> > --- a/arch/arm/mach-vexpress/dcscb.c
->> > +++ b/arch/arm/mach-vexpress/dcscb.c
->> > @@ -14,6 +14,7 @@
->> >  #include <linux/io.h>
->> >  #include <linux/spinlock.h>
->> >  #include <linux/errno.h>
->> > +#include <linux/of_address.h>
->> >  #include <linux/vexpress.h>
->> >  #include <linux/arm-cci.h>
->> >
->> > @@ -24,8 +25,6 @@
->> >  #include <asm/cp15.h>
->> >
->> >
->> > -#define DCSCB_PHYS_BASE    0x60000000
->> > -
->> >  #define RST_HOLD0  0x0
->> >  #define RST_HOLD1  0x4
->> >  #define SYS_SWRESET        0x8
->> > @@ -215,10 +214,14 @@ extern void dcscb_power_up_setup(unsigned int affinity_level);
->> >
->> >  static int __init dcscb_init(void)
->> >  {
->> > +   struct device_node *node;
->> >     unsigned int cfg;
->> >     int ret;
->> >
->> > -   dcscb_base = ioremap(DCSCB_PHYS_BASE, 0x1000);
->> > +   node = of_find_compatible_node(NULL, NULL, "arm,dcscb");
->>
->> This needs binding documentation and should be a more specific name. Not
->> knowing what dcscb is, I don't have a suggestion.
->
-> Yes, I mentioned in the cover page that DT bindings are not yet
-> documented.
->
-> DCSCB stands for "Dual Cluster System Control Block".  This is in fact a
-> set of miscellaneous registers, mainly for reset control of individual
-> CPUs and clusters.
->
->> Perhaps should include vexpress or specific core tile name it is part
->> of.
->
-> /me hopes for some ARM dude more acquainted with their nomenclature to
-> chime in with suggestions.
->
+On Wed, Jan 30, 2013 at 08:58:32AM +0100, Wolfram Sang wrote:
+> On Wed, Jan 30, 2013 at 01:48:40PM +0800, Shawn Guo wrote:
+> > On Tue, Jan 29, 2013 at 03:46:13PM +0100, Wolfram Sang wrote:
+> > > @@ -351,7 +359,7 @@ static void __init tx28_post_init(void)
+> > >  	struct pinctrl *pctl;
+> > >  	int ret;
+> > >  
+> > > -	enable_clk_enet_out();
+> > > +	legacy_enable_clk_enet_out();
+> > 
+> > I think TX28 is the only case that really needs to turn on enet_out
+> > clock at platform level, since it has some dirty work about PHY to do
+> > here.  With with fec driver handling the clock, enable_clk_enet_out()
+> > can just be removed for other boards.
+> 
+> I would love to, but this will cause regression on boards which update
+> the kernel but not the devicetree (no third clock), or?
+> 
+Ah, that's the consideration.  When someday arch/arm/boot/dts gets
+maintained outside kernel tree, we may be required to keep devicetree
+compatibility to different kernel versions.  But we haven't got there
+yet.  Today people are supposed to use devicetree matching kernel.
 
-As nico said, the DCSCB is just a reset controller thats a part of the
-FastModels implementation.  The implementation should be referred to as
-VE bL RTSM. The official name goes by:
-
-RTSM_VE_Cortex-A15x4-A7x4
-RTSM_VE_Cortex-A15x1-A7x1
-
-The file should be renamed as bL_rtsm.c or something similar.
-
-Thanks,
-Achin
+Shawn
