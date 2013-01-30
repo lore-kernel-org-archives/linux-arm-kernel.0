@@ -1,67 +1,98 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Jan 2013 13:49:27 -0500 (EST)
-Subject: [PATCH 1/2] ARM: memory: use SZ_ constants for defining the
- virtual memory layout
-In-Reply-To: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
-References: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1301301348550.6300@xanadu.home>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 30 Jan 2013 18:50:17 +0000
+Subject: [PATCH] ARM: tlb: perform branch predictor maintenance for whole
+ invalidation
+In-Reply-To: <20130130155717.GG7484@mudshark.cambridge.arm.com>
+References: <1359555125-27495-1-git-send-email-will.deacon@arm.com>
+ <20130130145243.GA2014@linaro.org>
+ <20130130155717.GG7484@mudshark.cambridge.arm.com>
+Message-ID: <20130130185017.GB2014@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jan 2013, Will Deacon wrote:
+On Wed, Jan 30, 2013 at 03:57:17PM +0000, Will Deacon wrote:
+> On Wed, Jan 30, 2013 at 02:52:43PM +0000, Dave Martin wrote:
+> > On Wed, Jan 30, 2013 at 02:12:05PM +0000, Will Deacon wrote:
+> > > The ARM architecture requires explicit branch predictor maintenance
+> > > when updating an instruction stream for a given virtual address. In
+> > > reality, this isn't so much of a burden because the branch predictor
+> > > is flushed during the cache maintenance required to make the new
+> > > instructions visible to the I-side of the processor.
+> > > 
+> > > One exception to this rule is when we flush the entire TLB for a CPU in
+> > > response to something other than writing new instructions (for example,
+> > > ASID rollover or switching to an identity mapping before disabling the
+> > > MMU).
+> > > 
+> > > This patch ensures that we flush the branch predictor as part of
+> > > invalidating the entire TLB.
+> > 
+> > What about v6 implementations?  Is the branch predictor flush implicit?
+> 
+> No, they're also handled by the patch. There's no -UIS versions of iciall
+> and bpiall prior to v7, so the operations are broadcast via IPI, hence the
+> use of bpiall in the else case below.
 
-> Parts of the virtual memory layout (mainly the modules area) are
-> described using open-coded immediate values.
-> 
-> Use the SZ_ definitions from linux/sizes.h instead to make the code
-> clearer.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Ah, OK
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+---Dave
 
-> ---
->  arch/arm/include/asm/memory.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 73cf03a..a0fd518 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -36,23 +36,23 @@
->   * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
->   */
->  #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
-> -#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(0x01000000))
-> +#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
->  #define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
->  
->  /*
->   * The maximum size of a 26-bit user space task.
->   */
-> -#define TASK_SIZE_26		UL(0x04000000)
-> +#define TASK_SIZE_26		UL(SZ_64M)
->  
->  /*
->   * The module space lives between the addresses given by TASK_SIZE
->   * and PAGE_OFFSET - it must be within 32MB of the kernel text.
->   */
->  #ifndef CONFIG_THUMB2_KERNEL
-> -#define MODULES_VADDR		(PAGE_OFFSET - 16*1024*1024)
-> +#define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
->  #else
->  /* smaller range for Thumb-2 symbols relocation (2^24)*/
-> -#define MODULES_VADDR		(PAGE_OFFSET - 8*1024*1024)
-> +#define MODULES_VADDR		(PAGE_OFFSET - SZ_8M)
->  #endif
->  
->  #if TASK_SIZE > MODULES_VADDR
-> -- 
-> 1.8.0
+> Will
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> > Cheers
+> > ---Dave
+> > 
+> > > 
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  arch/arm/include/asm/tlbflush.h | 12 ++++++++++--
+> > >  1 file changed, 10 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+> > > index 6e924d3..713ff32 100644
+> > > --- a/arch/arm/include/asm/tlbflush.h
+> > > +++ b/arch/arm/include/asm/tlbflush.h
+> > > @@ -38,6 +38,7 @@
+> > >  #define TLB_V7_UIS_PAGE	(1 << 19)
+> > >  #define TLB_V7_UIS_FULL (1 << 20)
+> > >  #define TLB_V7_UIS_ASID (1 << 21)
+> > > +#define TLB_V7_UIS_BP	(1 << 22)
+> > >  
+> > >  #define TLB_BARRIER	(1 << 28)
+> > >  #define TLB_L2CLEAN_FR	(1 << 29)		/* Feroceon */
+> > > @@ -166,9 +167,11 @@
+> > >  #endif
+> > >  
+> > >  #define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
+> > > -			 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | TLB_V7_UIS_ASID)
+> > > +				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
+> > > +				 TLB_V7_UIS_ASID | TLB_V7_UIS_BP)
+> > >  #define v7wbi_tlb_flags_up	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
+> > > -			 TLB_V6_U_FULL | TLB_V6_U_PAGE | TLB_V6_U_ASID)
+> > > +				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
+> > > +				 TLB_V6_U_ASID)
+> > >  
+> > >  #ifdef CONFIG_CPU_TLB_V7
+> > >  
+> > > @@ -330,6 +333,11 @@ static inline void local_flush_tlb_all(void)
+> > >  	tlb_op(TLB_V4_I_FULL | TLB_V6_I_FULL, "c8, c5, 0", zero);
+> > >  	tlb_op(TLB_V7_UIS_FULL, "c8, c3, 0", zero);
+> > >  
+> > > +	if (tlb_flag(TLB_V7_UIS_BP))
+> > > +		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
+> > > +	else
+> > > +		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
+> > > +
+> > >  	if (tlb_flag(TLB_BARRIER)) {
+> > >  		dsb();
+> > >  		isb();
+> > > -- 
+> > > 1.8.0
+> > > 
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
