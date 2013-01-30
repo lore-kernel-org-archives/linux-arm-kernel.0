@@ -1,67 +1,75 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Wed, 30 Jan 2013 15:53:19 +0100
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <5108F300.7000705@gmail.com>
-References: <51053F81.6020904@gmail.com>
- <20130127152431.GX1758@titan.lakedaemon.net>
- <20130128223148.GA10275@schnuecks.de>
- <20130129004824.GB7717@titan.lakedaemon.net>
- <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
- <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
-Message-ID: <20130130145319.GA22332@schnuecks.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 30 Jan 2013 22:53:10 +0800
+Subject: [PATCH 1/2] ARM i.MX6: Add regulator delay support
+In-Reply-To: <1359585224-11304-1-git-send-email-b20788@freescale.com>
+References: <1359585224-11304-1-git-send-email-b20788@freescale.com>
+Message-ID: <20130130145308.GF2757@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+On Wed, Jan 30, 2013 at 05:33:44PM -0500, Anson Huang wrote:
+> For ANATOP LDOs, vddcpu, vddsoc and vddpu
+> have step time settings in the misc2 register, need
+> to add necessary step time info for these three LDOs,
+> then regulator driver can add necessary delay based on
+> these settings.
+> 
+> offset 0x170:
+> bit [24-25]: vddcpu
+> bit [26-27]: vddpu
+> bit [28-29]: vddsoc
+> 
+> field definition:
+> 0'b00: 64 cycles of 24M clock;
+> 0'b01: 128 cycles of 24M clock;
+> 0'b02: 256 cycles of 24M clock;
+> 0'b03: 512 cycles of 24M clock;
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 
-On Wed, Jan 30, 2013 at 11:16:32AM +0100, Sebastian Hesselbarth wrote:
-> On 01/30/2013 09:30 AM, Simon Baatz wrote:
-> >On Wed, Jan 30, 2013 at 01:51:18AM +0100, Sebastian Hesselbarth wrote:
-> >>- [PATCH v2 2/2] clk: mvebu: Do not gate runit clock on Kirkwood
-> >>   (no lockup for minimal kernel configs)
-> >>
-> >>- [PATCH] NET: mv643xx: get smi clock from device tree
-> >>   (no lockup for modular DT ethernet)
-> >>
-> >>- Some patch that adds MV643XX_ETH_SHARED_NAME ".0" and ".1" clk aliases
-> >>   (no lockup for modular non-DT ethernet)
-> >
-> >I think your patch to get the smi clock is intended for device tree.
-> >Thus, the driver won't use these aliases, right?
-> 
-> Actually, both patches above will not fix modular ethernet for 3.8-rc as
-> shared driver is probed before core driver and not requesting any clk at
-> all. The "NET: mv643xx: get smi clock from device tree" patch is based
-> on Jason's attempt to separate shared driver.
-> 
-> If we need to fix modular ethernet now, we also need to add a clk_get
-> to shared ethernet.
-> 
-> But yes, DT doesn't need any clock aliases.
-> 
-> >>- Some patch that adds clk_prepare_enable to ge0/ge1 clocks to
-> >>   kirkwood_legacy_clk_init()
-> >>   (retain MAC address for modular DT ethernet)
-> >
-> >I like mine better, since it only enables the clocks of the
-> >interfaces that are initialized in the init code.  I tested it with
-> >non-DT as well.  But either is fine with me.
-> 
-> I know the difference, but here it is not only about fixing an issue
-> but have it cleanly removed later on. But I don't have a strong opinion
-> on that and maybe Andrew or Jason should coordinate what must be fixed
-> now and how we do it.
+Looks good.  Will apply after the driver part gets accepted.
 
-Nitpicking here: For a DT aware driver on a DT board, the calls to
-kirkwood_ge0[01]_init() need to be removed anyway (this is already
-part of Jason's patches) and the clocks will not be enabled.  Thus,
-there is not need to cleanup anything for DT when keeping the
-clk_prepare_enable in those functions (beyond what we need to do
-anyhow).
+Shawn
 
-But now I will shut up. I fully agree that letting Jason/Andrew
-decide what to do is the best way forward.
-
-- Simon
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index d6265ca..a2e977d 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -480,6 +480,9 @@
+>  					anatop-reg-offset = <0x140>;
+>  					anatop-vol-bit-shift = <0>;
+>  					anatop-vol-bit-width = <5>;
+> +					anatop-delay-reg-offset = <0x170>;
+> +					anatop-delay-bit-shift = <24>;
+> +					anatop-delay-bit-width = <2>;
+>  					anatop-min-bit-val = <1>;
+>  					anatop-min-voltage = <725000>;
+>  					anatop-max-voltage = <1450000>;
+> @@ -494,6 +497,9 @@
+>  					anatop-reg-offset = <0x140>;
+>  					anatop-vol-bit-shift = <9>;
+>  					anatop-vol-bit-width = <5>;
+> +					anatop-delay-reg-offset = <0x170>;
+> +					anatop-delay-bit-shift = <26>;
+> +					anatop-delay-bit-width = <2>;
+>  					anatop-min-bit-val = <1>;
+>  					anatop-min-voltage = <725000>;
+>  					anatop-max-voltage = <1450000>;
+> @@ -508,6 +514,9 @@
+>  					anatop-reg-offset = <0x140>;
+>  					anatop-vol-bit-shift = <18>;
+>  					anatop-vol-bit-width = <5>;
+> +					anatop-delay-reg-offset = <0x170>;
+> +					anatop-delay-bit-shift = <28>;
+> +					anatop-delay-bit-width = <2>;
+>  					anatop-min-bit-val = <1>;
+>  					anatop-min-voltage = <725000>;
+>  					anatop-max-voltage = <1450000>;
+> -- 
+> 1.7.9.5
+> 
+> 
