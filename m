@@ -1,53 +1,126 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 30 Jan 2013 12:43:29 -0500 (EST)
-Subject: [PATCH v3 15/15] ARM: vexpress/dcscb: probe via device tree
-In-Reply-To: <CAMpgmWA0CCSRYxSvA1rNDYLo_RD-UavmX7coBXVpC+HEwQaBFg@mail.gmail.com>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-16-git-send-email-nicolas.pitre@linaro.org>
- <510838AD.6040700@gmail.com> <alpine.LFD.2.02.1301291634140.6300@xanadu.home>
- <CAMpgmWA0CCSRYxSvA1rNDYLo_RD-UavmX7coBXVpC+HEwQaBFg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1301301239220.6300@xanadu.home>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 30 Jan 2013 11:46:34 -0600
+Subject: [RFC v2 12/18] ARM: OMAP2+: timer: Add suspend-resume callbacks
+ for clockevent device
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECF0B60@DBDE01.ent.ti.com>
+References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
+ <1356959231-17335-13-git-send-email-vaibhav.bedia@ti.com>
+ <50EC37FE.705@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433ECE0D51@DBDE01.ent.ti.com>
+ <50F846D7.8060509@ti.com> <50F8DCD7.707@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433ECF0B60@DBDE01.ent.ti.com>
+Message-ID: <51095C7A.9080904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jan 2013, Achin Gupta wrote:
 
-> On Tue, Jan 29, 2013 at 9:41 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Tue, 29 Jan 2013, Rob Herring wrote:
-> >
-> >> On 01/29/2013 01:51 AM, Nicolas Pitre wrote:
-> >> > +   node = of_find_compatible_node(NULL, NULL, "arm,dcscb");
-> >>
-> >> This needs binding documentation and should be a more specific name. Not
-> >> knowing what dcscb is, I don't have a suggestion.
-> >
-> > Yes, I mentioned in the cover page that DT bindings are not yet
-> > documented.
-> >
-> > DCSCB stands for "Dual Cluster System Control Block".  This is in fact a
-> > set of miscellaneous registers, mainly for reset control of individual
-> > CPUs and clusters.
-> >
-> >> Perhaps should include vexpress or specific core tile name it is part
-> >> of.
-> >
-> > /me hopes for some ARM dude more acquainted with their nomenclature to
-> > chime in with suggestions.
-> >
+On 01/21/2013 01:22 AM, Bedia, Vaibhav wrote:
+> On Fri, Jan 18, 2013 at 10:55:43, Shilimkar, Santosh wrote:
+>> On Friday 18 January 2013 12:15 AM, Jon Hunter wrote:
+>>>
+>>> On 01/10/2013 10:37 PM, Bedia, Vaibhav wrote:
+>>>> On Tue, Jan 08, 2013 at 20:45:10, Shilimkar, Santosh wrote:
+>>>>> On Monday 31 December 2012 06:37 PM, Vaibhav Bedia wrote:
+>>>>>> The current OMAP timer code registers two timers -
+>>>>>> one as clocksource and one as clockevent.
+>>>>>> AM33XX has only one usable timer in the WKUP domain
+>>>>>> so one of the timers needs suspend-resume support
+>>>>>> to restore the configuration to pre-suspend state.
+>>>>>>
+>>>>>> commit adc78e6 (timekeeping: Add suspend and resume
+>>>>>> of clock event devices) introduced .suspend and .resume
+>>>>>> callbacks for clock event devices. Leverages these
+>>>>>> callbacks to have AM33XX clockevent timer which is
+>>>>>> in not in WKUP domain to behave properly across system
+>>>>>> suspend.
+>>>>>>
+>>>>>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>>>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>>> Cc: Benoit Cousson <b-cousson@ti.com>
+>>>>>> Cc: Paul Walmsley <paul@pwsan.com>
+>>>>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>>>>>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+>>>>>> Cc: Jon Hunter <jon-hunter@ti.com>
+>>>>>> ---
+>>>>>> v1->v2:
+>>>>>> 	Get rid of harcoded timer id.
+>>>>>> 	Note: since a platform device is not created for these timer
+>>>>>> 	instances and because there's very minimal change needed for
+>>>>>> 	restarting the timer a full blown context save and restore
+>>>>>> 	has been skipped.
+>>>>>>
+>>>>>>    arch/arm/mach-omap2/timer.c |   33 +++++++++++++++++++++++++++++++++
+>>>>>>    1 files changed, 33 insertions(+), 0 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>>>>>> index 691aa67..38f9cbc 100644
+>>>>>> --- a/arch/arm/mach-omap2/timer.c
+>>>>>> +++ b/arch/arm/mach-omap2/timer.c
+>>>>>> @@ -128,6 +128,36 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+>>>>>>    	}
+>>>>>>    }
+>>>>>>
+>>>>>> +static void omap_clkevt_suspend(struct clock_event_device *unused)
+>>>>>> +{
+>>>>>> +	char name[10];
+>>>>>> +	struct omap_hwmod *oh;
+>>>>>> +
+>>>>>> +	sprintf(name, "timer%d", clkev.id);
+>>>>>> +	oh = omap_hwmod_lookup(name);
+>>>>>> +	if (!oh)
+>>>>>> +		return;
+>>>>>> +
+>>>>>> +	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
+>>>>>> +	omap_hwmod_idle(oh);
+>>>>>> +}
+>>>>>> +
+>>>>>> +static void omap_clkevt_resume(struct clock_event_device *unused)
+>>>>>> +{
+>>>>>> +	char name[10];
+>>>>>> +	struct omap_hwmod *oh;
+>>>>>> +
+>>>>>> +	sprintf(name, "timer%d", clkev.id);
+>>>>>> +	oh = omap_hwmod_lookup(name);
+>>>>>> +	if (!oh)
+>>>>>> +		return;
+>>>>>> +
+>>>>>> +	omap_hwmod_enable(oh);
+>>>>>> +	__omap_dm_timer_load_start(&clkev,
+>>>>>> +			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
+>>>>>> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
+>>>>>> +}
+>>>>>> +
+>>>>> Am still bit uncomfortable with direct hwmod usage in the suspend/resmue
+>>>>> hooks.
+>>>>>
+>>>>> Jon, Any alternatives you can think of ?
+>>>>>
+>>>>
+>>>> Jon,
+>>>>
+>>>> Any suggestions here?
+>>>
+>>> Sorry completed this missed this!
+>>>
+>>> Unfortunately, I don't have any good suggestions here. However, I am
+>>> wondering if the suspend/resume handlers can just be calls to
+>>> omap_hwmod_idle/enable and we can remove these __omap_dm_timer_xxxx
+>>> calls (I don't think they are needed). Furthermore, my understanding is
+>>> this is only needed for AM335x (per the changelog), and so we should not
+>>> add suspend/resume handlers for all OMAP2+ based devices.
+>>>
+>> I agree with the direction.
+>>
 > 
-> As nico said, the DCSCB is just a reset controller thats a part of the
-> FastModels implementation.  The implementation should be referred to as
-> VE bL RTSM. The official name goes by:
-> 
-> RTSM_VE_Cortex-A15x4-A7x4
-> RTSM_VE_Cortex-A15x1-A7x1
-> 
-> The file should be renamed as bL_rtsm.c or something similar.
+> I need to retain the call to enable the interrupt but the others can be dropped.
+> Will take care of this and the comment on invoking the suspend/resume handlers
+> only for AM335x in the next version.
 
-I don't think the file name is a problem.  Actually, going with 
-bL_rtsm.c is rather too generic for what itcovers.
+Ok fair enough. By the way, I posted a patch today [1] that will use the
+hwmod name as the clockevent timer name. Care to try on top of that
+patch and then we can eliminate the sprintf.
 
-It's the actual device tree binding name that I'd need suggestions for.
+Cheers
+Jon
 
-
-Nicolas
+[1] http://www.spinics.net/lists/arm-kernel/msg221262.html
