@@ -1,108 +1,46 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 30 Jan 2013 11:52:15 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130130103501.1873d39c@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
- <20130129184157.GA29274@obsidianresearch.com>
- <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
- <20130129191853.GB29274@obsidianresearch.com>
- <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
- <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
- <20130130103501.1873d39c@skate>
-Message-ID: <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 30 Jan 2013 13:57:24 -0500 (EST)
+Subject: [PATCH 2/2] ARM: memory: define TASK_UNMAPPED_BASE in terms of
+ TASK_SIZE
+In-Reply-To: <1359554912-26872-2-git-send-email-will.deacon@arm.com>
+References: <1359554912-26872-1-git-send-email-will.deacon@arm.com>
+ <1359554912-26872-2-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1301301352180.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 2:35 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Bjorn Helgaas,
->
-> On Tue, 29 Jan 2013 15:27:43 -0700, Bjorn Helgaas wrote:
->
->> I'm not sure the existing emulation in these patches is sufficient.
->> For example, pci_sw_pci_bridge_write() updates bridge->membase when we
->> write to the window register, but I don't see anything that updates
->> the actual hardware decoder.  That might be done in
->> mvebu_pcie_window_config_port() via armada_370_xp_alloc_pcie_window(),
->> but that looks like it's only done once.
->
-> That's correct. I currently let the Linux PCI core enumerate the
-> real PCIe devices, allocate the resources, and set the appropriate
-> values in the emulated PCI-to-PCI bridge registers. Once this is all
-> done, the Marvell PCIe driver looks at each PCI-to-PCI bridge, reads
-> the membase and iobase registers, and creates address decoding windows
-> so that the physical addresses assigned by the Linux PCI core actually
-> resolve to the right PCIe interface. This is done once for all.
->
->> If the PCI core updates a root port window later, I don't see where the hardware
->> decoder will be updated.
->
-> It will not be updated.
->
->> Maybe you're counting on the window assignments to be static?  The PCI
->> core doesn't guarantee anything like that, though in the absence of
->> hotplug I don't know any reason why it would change things.
->
-> Right. Is supporting hotplug a show-stopper to get this included? I
-> think it could be added later, if it happens to be needed, no?
->
-> I could of course do it, but the patch series is already quite large
-> and complicated, so if we could merge a simple, but working, version
-> first, and then improve on top of it when needed, it would be nice.
+On Wed, 30 Jan 2013, Will Deacon wrote:
 
-I'm most concerned about the stuff in drivers/pci.  I hesitate to
-merge drivers/pci/sw-pci-pci-bridge.c as-is because it's a model
-that's not connected to hardware and only works in a completely static
-situation, and the rest of the PCI core can't really deal with that.
+> TASK_UNMAPPED_BASE is defined directly in terms of PAGE_OFFSET, which is
+> confusing given that the modules area sits between here and TASK_SIZE
+> and is not available for user allocations.
+> 
+> This patch defines TASK_UNMAPPED_BASE in terms of TASK_SIZE instead and
+> fixes a bug introduced by 394ef6403abc ("mm: use vm_unmapped_area() on
+> arm architecture") whereby TASK_UNMAPPED_BASE is no longer page-aligned
+> for bottom-up mmap, causing get_unmapped_area to choke on misaligned
+> addresses.
+> 
+> Reported-by: Christoffer Dall <cdall@cs.columbia.edu>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/memory.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index a0fd518..255a01b 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -37,7 +37,7 @@
+>   */
+>  #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
+>  #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
+> -#define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
+> +#define TASK_UNMAPPED_BASE	((TASK_SIZE / 3) & ~UL(SZ_16M - 1))
 
-But I don't think supporting hotplug should be a show-stopper at this
-point, either.  It sounds like we might be heading towards hooking
-this up more directly to the Marvell hardware, which will make it more
-arch-dependent.  Something like that could either go in arch/arm, or
-in some not-quite-so-generic spot under drivers/pci.
+Please round this up not down.  In most cases, TASK_SIZE is 0xbf000000 
+which is not nicely divisible by 3, unlike PAGE_OFFSET was.  By rounding 
+up you get a nice 0x40000000 as before.
 
->> I also forgot about the bus number munging in mvebu_pcie_rd_conf().
->> The PCI core can update the bridge secondary/subordinate registers.
->> It looks like you don't support writing to them, and the read path
->> (pci_sw_pci_bridge_read()) looks like it doesn't do any translation
->> between the hardware and Linux bus numbers.  I don't understand the
->> system well enough to know if this is an issue.
->
-> Right. Could you explain a little bit for what reasons the PCI core
-> could update the secondary/subordinate registers, and to what values it
-> sets them?
 
-The secondary/subordinate registers effectively define a bus number
-aperture that tells the bridge which transactions to claim and forward
-downstream.  When enumerating devices, we may update the subordinate
-bus number to widen the aperture so we can enumerate an arbitrary tree
-behind the bridge.  When we're finished, we'll probably narrow it by
-updating the subordinate again, so the unused bus number space can be
-used for other bridges.  I don't know the exact details of the
-algorithm, and they're likely to change anyway, but pci_scan_bridge()
-is where most of it happens.
-
-It looks like your current system doesn't support trees below the
-bridges, but hopefully we can make it so the generic enumeration
-algorithms still work.
-
-> For now, I statically assign the secondary bus register value to be
-> X+1, where X is the number of the PCIe interface, since X=0 is reserved
-> for the root bus (which has the host bridge and the PCI-to-PCI
-> bridges).
-
-That makes sense but limits you to a single bus (and really, a single
-device since this is PCIe) below the bridge.
-
-> Also, could you detail what kind of translation I should be doing when
-> reading the hardware and Linux bus numbers?
-
-I'm hoping that the register Jason mentioned is enough to avoid the
-need for translation.  If it's not, we can explore this a bit more.
-
-Bjorn
+Nicolas
