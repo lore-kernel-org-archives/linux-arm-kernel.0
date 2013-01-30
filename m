@@ -1,20 +1,39 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Wed, 30 Jan 2013 09:48:23 +0100
-Subject: [PATCH] ARM: at91: at91sam9x5.dtsi:usart3 TXD
-In-Reply-To: <51083A70.1070809@interlog.com>
-References: <51083A70.1070809@interlog.com>
-Message-ID: <5108DE57.4090905@interlog.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 30 Jan 2013 09:01:34 +0000
+Subject: [BUG] snowball board locks up on boot
+In-Reply-To: <CACRpkdZU80XB2GiDtc7nh0hgMpyVYesi+xwhndu50jGS1L=wiw@mail.gmail.com>
+References: <1359047682.21576.154.camel@gandalf.local.home>
+ <CACRpkdZU80XB2GiDtc7nh0hgMpyVYesi+xwhndu50jGS1L=wiw@mail.gmail.com>
+Message-ID: <20130130090134.GR18212@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-01-29 10:09 PM, Douglas Gilbert wrote:
-> Comment for usart3 TXD (TXD3) is correct, dt code is wrong.
->
-> The patch is against lk 3.8.0-rc5 .
+> > I tried to get my snowball board working on the latest kernel, but it
+> > locks up hard very early on boot up.
+> >
+> > I bisected it down to this commit:
+> >
+> > commit ebc96db7632f987e0b9bffcb782cf5cfb8afb0dd
+> > Author: Ulf Hansson <ulf.hansson@linaro.org>
+> > Date:   Mon Aug 27 15:45:53 2012 +0200
+> >
+> >     ARM: ux500: Switch to use common clock framework
+> 
+> Yeah the new common clock framework is a bit like a heart
+> transplant on the platforms you convert, some fallout is expected.
+> 
+> However I thought we had all the clk fixes covered by -rc4 :-(
+> 
+> I don't have a Snowball right now myself, so have to ask
+> for help here (non snowball ux500's work just fine for me).
+> 
+> Lee, are you still booting the Snowball on new kernels
+> everyday, and do you know if some fix is still missing?
 
-Actually this patch also depends on a patch by Robert Nelson
-titled: "[PATCH] ARM: at91: at91sam9x5: fix usart3 pinctrl name"
-posted on Monday 28 January, 2013. Two separate bugs in
-3 lines of code, not bad going :-)
+Can you provide your bootlog please Steven?
 
-Doug Gilbert
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
