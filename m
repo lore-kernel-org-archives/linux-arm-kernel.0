@@ -1,98 +1,108 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 30 Jan 2013 18:50:17 +0000
-Subject: [PATCH] ARM: tlb: perform branch predictor maintenance for whole
- invalidation
-In-Reply-To: <20130130155717.GG7484@mudshark.cambridge.arm.com>
-References: <1359555125-27495-1-git-send-email-will.deacon@arm.com>
- <20130130145243.GA2014@linaro.org>
- <20130130155717.GG7484@mudshark.cambridge.arm.com>
-Message-ID: <20130130185017.GB2014@linaro.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 30 Jan 2013 11:52:15 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130130103501.1873d39c@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
+ <20130129055508.GA3339@obsidianresearch.com>
+ <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
+ <20130129184157.GA29274@obsidianresearch.com>
+ <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
+ <20130129191853.GB29274@obsidianresearch.com>
+ <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
+ <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
+ <20130130103501.1873d39c@skate>
+Message-ID: <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 03:57:17PM +0000, Will Deacon wrote:
-> On Wed, Jan 30, 2013 at 02:52:43PM +0000, Dave Martin wrote:
-> > On Wed, Jan 30, 2013 at 02:12:05PM +0000, Will Deacon wrote:
-> > > The ARM architecture requires explicit branch predictor maintenance
-> > > when updating an instruction stream for a given virtual address. In
-> > > reality, this isn't so much of a burden because the branch predictor
-> > > is flushed during the cache maintenance required to make the new
-> > > instructions visible to the I-side of the processor.
-> > > 
-> > > One exception to this rule is when we flush the entire TLB for a CPU in
-> > > response to something other than writing new instructions (for example,
-> > > ASID rollover or switching to an identity mapping before disabling the
-> > > MMU).
-> > > 
-> > > This patch ensures that we flush the branch predictor as part of
-> > > invalidating the entire TLB.
-> > 
-> > What about v6 implementations?  Is the branch predictor flush implicit?
-> 
-> No, they're also handled by the patch. There's no -UIS versions of iciall
-> and bpiall prior to v7, so the operations are broadcast via IPI, hence the
-> use of bpiall in the else case below.
+On Wed, Jan 30, 2013 at 2:35 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Bjorn Helgaas,
+>
+> On Tue, 29 Jan 2013 15:27:43 -0700, Bjorn Helgaas wrote:
+>
+>> I'm not sure the existing emulation in these patches is sufficient.
+>> For example, pci_sw_pci_bridge_write() updates bridge->membase when we
+>> write to the window register, but I don't see anything that updates
+>> the actual hardware decoder.  That might be done in
+>> mvebu_pcie_window_config_port() via armada_370_xp_alloc_pcie_window(),
+>> but that looks like it's only done once.
+>
+> That's correct. I currently let the Linux PCI core enumerate the
+> real PCIe devices, allocate the resources, and set the appropriate
+> values in the emulated PCI-to-PCI bridge registers. Once this is all
+> done, the Marvell PCIe driver looks at each PCI-to-PCI bridge, reads
+> the membase and iobase registers, and creates address decoding windows
+> so that the physical addresses assigned by the Linux PCI core actually
+> resolve to the right PCIe interface. This is done once for all.
+>
+>> If the PCI core updates a root port window later, I don't see where the hardware
+>> decoder will be updated.
+>
+> It will not be updated.
+>
+>> Maybe you're counting on the window assignments to be static?  The PCI
+>> core doesn't guarantee anything like that, though in the absence of
+>> hotplug I don't know any reason why it would change things.
+>
+> Right. Is supporting hotplug a show-stopper to get this included? I
+> think it could be added later, if it happens to be needed, no?
+>
+> I could of course do it, but the patch series is already quite large
+> and complicated, so if we could merge a simple, but working, version
+> first, and then improve on top of it when needed, it would be nice.
 
-Ah, OK
+I'm most concerned about the stuff in drivers/pci.  I hesitate to
+merge drivers/pci/sw-pci-pci-bridge.c as-is because it's a model
+that's not connected to hardware and only works in a completely static
+situation, and the rest of the PCI core can't really deal with that.
 
----Dave
+But I don't think supporting hotplug should be a show-stopper at this
+point, either.  It sounds like we might be heading towards hooking
+this up more directly to the Marvell hardware, which will make it more
+arch-dependent.  Something like that could either go in arch/arm, or
+in some not-quite-so-generic spot under drivers/pci.
 
-> 
-> Will
-> 
-> > Cheers
-> > ---Dave
-> > 
-> > > 
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm/include/asm/tlbflush.h | 12 ++++++++++--
-> > >  1 file changed, 10 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-> > > index 6e924d3..713ff32 100644
-> > > --- a/arch/arm/include/asm/tlbflush.h
-> > > +++ b/arch/arm/include/asm/tlbflush.h
-> > > @@ -38,6 +38,7 @@
-> > >  #define TLB_V7_UIS_PAGE	(1 << 19)
-> > >  #define TLB_V7_UIS_FULL (1 << 20)
-> > >  #define TLB_V7_UIS_ASID (1 << 21)
-> > > +#define TLB_V7_UIS_BP	(1 << 22)
-> > >  
-> > >  #define TLB_BARRIER	(1 << 28)
-> > >  #define TLB_L2CLEAN_FR	(1 << 29)		/* Feroceon */
-> > > @@ -166,9 +167,11 @@
-> > >  #endif
-> > >  
-> > >  #define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
-> > > -			 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | TLB_V7_UIS_ASID)
-> > > +				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
-> > > +				 TLB_V7_UIS_ASID | TLB_V7_UIS_BP)
-> > >  #define v7wbi_tlb_flags_up	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
-> > > -			 TLB_V6_U_FULL | TLB_V6_U_PAGE | TLB_V6_U_ASID)
-> > > +				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
-> > > +				 TLB_V6_U_ASID)
-> > >  
-> > >  #ifdef CONFIG_CPU_TLB_V7
-> > >  
-> > > @@ -330,6 +333,11 @@ static inline void local_flush_tlb_all(void)
-> > >  	tlb_op(TLB_V4_I_FULL | TLB_V6_I_FULL, "c8, c5, 0", zero);
-> > >  	tlb_op(TLB_V7_UIS_FULL, "c8, c3, 0", zero);
-> > >  
-> > > +	if (tlb_flag(TLB_V7_UIS_BP))
-> > > +		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
-> > > +	else
-> > > +		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
-> > > +
-> > >  	if (tlb_flag(TLB_BARRIER)) {
-> > >  		dsb();
-> > >  		isb();
-> > > -- 
-> > > 1.8.0
-> > > 
-> > > 
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
+>> I also forgot about the bus number munging in mvebu_pcie_rd_conf().
+>> The PCI core can update the bridge secondary/subordinate registers.
+>> It looks like you don't support writing to them, and the read path
+>> (pci_sw_pci_bridge_read()) looks like it doesn't do any translation
+>> between the hardware and Linux bus numbers.  I don't understand the
+>> system well enough to know if this is an issue.
+>
+> Right. Could you explain a little bit for what reasons the PCI core
+> could update the secondary/subordinate registers, and to what values it
+> sets them?
+
+The secondary/subordinate registers effectively define a bus number
+aperture that tells the bridge which transactions to claim and forward
+downstream.  When enumerating devices, we may update the subordinate
+bus number to widen the aperture so we can enumerate an arbitrary tree
+behind the bridge.  When we're finished, we'll probably narrow it by
+updating the subordinate again, so the unused bus number space can be
+used for other bridges.  I don't know the exact details of the
+algorithm, and they're likely to change anyway, but pci_scan_bridge()
+is where most of it happens.
+
+It looks like your current system doesn't support trees below the
+bridges, but hopefully we can make it so the generic enumeration
+algorithms still work.
+
+> For now, I statically assign the secondary bus register value to be
+> X+1, where X is the number of the PCIe interface, since X=0 is reserved
+> for the root bus (which has the host bridge and the PCI-to-PCI
+> bridges).
+
+That makes sense but limits you to a single bus (and really, a single
+device since this is PCIe) below the bridge.
+
+> Also, could you detail what kind of translation I should be doing when
+> reading the hardware and Linux bus numbers?
+
+I'm hoping that the register Jason mentioned is enough to avoid the
+need for translation.  If it's not, we can explore this a bit more.
+
+Bjorn
