@@ -1,37 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 Jan 2013 10:45:42 +0100
-Subject: [PATCH] ARM: ux500: rename ab8500 to abx500 for hwmon driver
-In-Reply-To: <1359531747-3636-1-git-send-email-hongbo.zhang@linaro.org>
-References: <1359531747-3636-1-git-send-email-hongbo.zhang@linaro.org>
-Message-ID: <CACRpkdajhr__+8=6JbQAgYBq39S8XJZe6PDjVFA+znOJGHa7uQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Jan 2013 09:46:53 +0000
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+In-Reply-To: <20130130045655.GE5734@obsidianresearch.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301291645.08040.arnd@arndb.de>
+ <20130130045655.GE5734@obsidianresearch.com>
+Message-ID: <201301300946.54040.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 8:42 AM, Hongbo Zhang <hongbo.zhang@linaro.org> wrote:
+On Wednesday 30 January 2013, Jason Gunthorpe wrote:
+> > But we normally only assign a 64 KB I/O window to each PCI host bridge.
+> > Requiring PCI bridges to be space 64 KB apart would mean that we cannot
+> > actually support bridges at all.
+> 
+> The PCI resource code uses full 32 bit integers when it handles IO
+> addresses, so this actually does sort of work out.
 
-> We are using a generic abx500 hwmon layer, so rename specific ab8500 to generic
-> abx500 for hwmon device and driver matching.
->
-> Signed-off-by: Hongbo Zhang <hongbo.zhang@linaro.org>
+However, we only reserve 1 MB (I think) virtual address window for all
+I/O spaces of all PCI domains combined, at a fixed location (0xfee00000).
+This means we can have at most 16 such windows at run-time. That can
+be changed if necessary, but it seems like overkill when in practice
+you only need a few bytes at most.
 
-You need to have the ACK:ed by the MFD subsystem maintainer
-so that G?nther can merge it later, along with the HWMON patch.
-
-Also combine them into a series, this one as 1/2 and the other
-patch as 2/2.
-
-And remember to send both to the relevant maintainers
-(see MAINTAINERS file):
-
-HARDWARE MONITORING
-M:      Jean Delvare <khali@linux-fr.org>
-M:      Guenter Roeck <linux@roeck-us.net>
-
-MULTIFUNCTION DEVICES (MFD)
-M:      Samuel Ortiz <sameo@linux.intel.com>
-
-Both patches should also go into the linux-kernel at vger.kernel.org mailing
-list "LKML".
-
-Thanks!
-Linus Walleij
+	Arnd
