@@ -1,75 +1,43 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Wed, 30 Jan 2013 09:47:11 +0530
-Subject: [PATCH 1/2] drivers: net: cpsw: Add helper functions for VLAN
- ALE implementation
-In-Reply-To: <51085D6C.4050102@ti.com>
-References: <1359403945-28585-1-git-send-email-mugunthanvnm@ti.com>
- <1359403945-28585-2-git-send-email-mugunthanvnm@ti.com>
- <51085D6C.4050102@ti.com>
-Message-ID: <51089EC7.5070205@ti.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 29 Jan 2013 21:21:03 -0700
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+In-Reply-To: <201301292254.01069.arnd@arndb.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301292015.21478.arnd@arndb.de> <20130129213308.7e845064@skate>
+ <201301292254.01069.arnd@arndb.de>
+Message-ID: <20130130042103.GB5734@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/30/2013 5:08 AM, Cyril Chemparathy wrote:
-> On 01/28/2013 03:12 PM, Mugunthan V N wrote:
->> Add helper functions for VLAN ALE implementations for Add, Delete
->> Dump VLAN related ALE entries
->>
->> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
->> ---
->>   drivers/net/ethernet/ti/cpsw_ale.c |  172 
->> ++++++++++++++++++++++++++++++++++--
->>   drivers/net/ethernet/ti/cpsw_ale.h |   11 +++
->>   2 files changed, 178 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/ti/cpsw_ale.c 
->> b/drivers/net/ethernet/ti/cpsw_ale.c
->> index 0e9ccc2..0d7a60a 100644
->> --- a/drivers/net/ethernet/ti/cpsw_ale.c
->> +++ b/drivers/net/ethernet/ti/cpsw_ale.c
->
-> [...]
->
->> +int cpsw_ale_add_vlan(struct cpsw_ale *ale, u16 vid, int port, int 
->> untag,
->> +              int reg_mcast, int unreg_mcast)
->
-> [...]
->
->> +int cpsw_ale_del_vlan(struct cpsw_ale *ale, u16 vid, int port)
->
-> [...]
->
->> +int cpsw_ale_vlan_add_ucast(struct cpsw_ale *ale, u8 *addr, int port,
->> +                int flags, u16 vid)
->
-> [...]
->
->> +int cpsw_ale_vlan_del_ucast(struct cpsw_ale *ale, u8 *addr, int 
->> port, u16 vid)
->
-> [...]
->
->> +int cpsw_ale_vlan_add_mcast(struct cpsw_ale *ale, u8 *addr,
->> +        int port_mask, u16 vid, int super, int mcast_state)
->
-> [...]
->
->> +int cpsw_ale_vlan_del_mcast(struct cpsw_ale *ale, u8 *addr,
->> +                int port_mask, u16 vid)
->
-> Are the VLAN and non-VLAN variants different enough to justify 
-> separate implementations for all these functions?  Could we collapse 
-> these by generalizing the original to take an optional vlan argument 
-> instead?
->
-> Thanks
-> -- Cyril.
-Since vid is u16, any value to vid is valid, so only i have proposed new 
-api for vlan.
-add vlan and delete vlan has to be seperate vlan since these are new 
-apis. Will merge
-other api to existing api with additional vlan parameter.
+On Tue, Jan 29, 2013 at 10:54:00PM +0000, Arnd Bergmann wrote:
 
-Regards
-Mugunthan V N
+> I'm actually fine with either of the two suggestions you mentioned above,
+> whichever is easier to implement and/or more closely matches what the
+> hardware actually implements is better IMHO.
+> 
+> The part that I did not like about having emulated PCI-to-PCI bridges
+> is that it seems to just work around a (percieved or real) limitation
+> in the Linux kernel by adding a piece of infrastructure, rather than
+> lifting that limitation by making the kernel deal with what the
+> hardware provides. That reminded me of the original mach-vt8500
+
+Well.. in this case there is a standard - PCI-E for what HW vendors
+are supposed to do. The kernel core code follows it and works with
+compliant hardware.
+
+Marvell HW is not compliant.
+
+So..
+
+Should the kernel core PCI code support this particular non-compliance?
+Should the driver work around the non-compliance and present a
+compliant interface to the kernel and userspace?
+
+My take is the kernel core PCI code is fine, and I hope
+this will be an isolated issue with one family of Marvell IP. So
+working around the HW problem in the driver seems best.
+
+If we learn of many more instances like this then, yah, update the
+core code and rip out this driver work around...
+
+Jason
