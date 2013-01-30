@@ -1,56 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Jan 2013 09:27:18 +0000
-Subject: [PATCH v6 07/10] dmaengine: add dma_request_slave_channel_compat()
-In-Reply-To: <1359529229-22207-8-git-send-email-mporter@ti.com>
-References: <1359529229-22207-1-git-send-email-mporter@ti.com>
- <1359529229-22207-8-git-send-email-mporter@ti.com>
-Message-ID: <201301300927.18509.arnd@arndb.de>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 30 Jan 2013 09:17:28 +0100
+Subject: [PATCH v3 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can
+ sleep
+In-Reply-To: <1359381659-24454-4-git-send-email-florian.vaussard@epfl.ch>
+References: <1359381659-24454-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359381659-24454-4-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <20130130081728.GC13568@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 January 2013, Matt Porter wrote:
-> Adds a dma_request_slave_channel_compat() wrapper which accepts
-> both the arguments from dma_request_channel() and
-> dma_request_slave_channel(). Based on whether the driver is
-> instantiated via DT, the appropriate channel request call will be
-> made.
+On Mon, Jan 28, 2013 at 03:00:59PM +0100, Florian Vaussard wrote:
+> Call to led_pwm_set() can happen inside atomic context, like triggers.
+> If the PWM call can sleep, defer using a worker.
 > 
-> This allows for a much cleaner migration of drivers to the
-> dmaengine DT API as platforms continue to be mixed between those
-> that boot using DT and those that do not.
-> 
-> Suggested-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> ---
+>  drivers/leds/leds-pwm.c |   50 +++++++++++++++++++++++++++++++++++++++-------
+>  1 files changed, 42 insertions(+), 8 deletions(-)
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Bryan, I assume that you'll be taking this? It doesn't apply cleanly to
+my tree, probably because of Peter's recent changes that you took
+through your tree and Florian based his patches on top of that. The
+conflict resolution should be trivial, though.
 
-> @@ -1001,6 +1001,22 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
->  struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
->  struct dma_chan *net_dma_find_channel(void);
->  #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
-> +#define dma_request_slave_channel_compat(mask, x, y, dev, name) \
-> +	__dma_request_slave_channel_compat(&(mask), x, y, dev, name)
-> +
-> +static inline struct dma_chan
-> +*__dma_request_slave_channel_compat(dma_cap_mask_t *mask, dma_filter_fn fn,
-> +				  void *fn_param, struct device *dev,
-> +				  char *name)
-> +{
-> +	struct dma_chan *chan;
-> +
-> +	chan = dma_request_slave_channel(dev, name);
-> +	if (chan)
-> +		return chan;
-> +
-> +	return __dma_request_channel(mask, fn, fn_param);
-> +}
-
-After I have spent some more time with implementing the code for dw_dma,
-I think the mask is actually unnecessary here, the helper could just
-always set it to DMA_SLAVE before calling __dma_request_channel.
-
-It's not a bug to do it this way though, and it may help convert drivers
-a little easier if there is less to change.
-
-	Arnd
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130130/68110b04/attachment.sig>
