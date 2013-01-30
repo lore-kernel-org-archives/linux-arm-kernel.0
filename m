@@ -1,57 +1,48 @@
-From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Wed, 30 Jan 2013 20:09:20 +0530
-Subject: [PATCH v3] ARM: OMAP2: am33xx-hwmod: Fix "register offset NULL check"
- bug
-Message-ID: <1359556760-25214-1-git-send-email-gururaja.hebbar@ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 31 Jan 2013 01:48:01 +1100
+Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
+Message-ID: <20130131014801.09c81e1826a2fb234de85550@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-am33xx_cm_wait_module_ready() checks if register offset is NULL.
+Hi Kukjin,
 
-int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
-{
-	int i = 0;
+Today's linux-next merge of the samsung tree got a conflict in
+drivers/gpio/gpio-samsung.c between commits f69254328793 ("ARM: dts: Fix
+compatible value of pinctrl module on EXYNOS5440") and b533c8685b16
+("ARM: dts: fix compatible value for exynos pinctrl") from the arm-soc
+tree and commit bda7f6d4e198 ("gpio: samsung: skip gpiolib registration
+if pinctrl support is enabled for exynos5250") from the samsung tree.
 
-	if (!clkctrl_offs)
-		return 0;
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-In case of AM33xx, CLKCTRL register offset for different clock domains
-are not uniformly placed. An example of this would be the RTC clock
-domain with CLKCTRL offset at 0x00.
-In such cases the module ready check is skipped which leads to a data
-abort during boot-up when RTC registers is accessed.
-
-Remove this check here to avoid checking module readiness for modules
-with clkctrl register offset at 0x00.
-
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
----
-Changes in v3:
-	- Since now there is separate cm33xx.c file which handles module
-	ready checking for am33xx platform, use the same for the fix.
-	- Also update subject to indicate am33xx platform name
-
-Changes in v2:
-	- update commit message to reflect the actual cause. Previous
-	message conveyed a wrong/opposite message.
-
-:100644 100644 058ce3c... 325a515... M	arch/arm/mach-omap2/cm33xx.c
- arch/arm/mach-omap2/cm33xx.c |    3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index 058ce3c..325a515 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -241,9 +241,6 @@ int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
- {
- 	int i = 0;
- 
--	if (!clkctrl_offs)
--		return 0;
--
- 	omap_test_timeout(_is_module_ready(inst, cdoffs, clkctrl_offs),
- 			  MAX_MODULE_READY_TIME, i);
- 
 -- 
-1.7.9.5
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/gpio/gpio-samsung.c
+index b2016ed,0d46db6..0000000
+--- a/drivers/gpio/gpio-samsung.c
++++ b/drivers/gpio/gpio-samsung.c
+@@@ -3023,9 -3023,9 +3022,10 @@@ static __init int samsung_gpiolib_init(
+  	*/
+  	struct device_node *pctrl_np;
+  	static const struct of_device_id exynos_pinctrl_ids[] = {
+ -		{ .compatible = "samsung,pinctrl-exynos4210", },
+ -		{ .compatible = "samsung,pinctrl-exynos4x12", },
+ -		{ .compatible = "samsung,pinctrl-exynos5250", },
+ +		{ .compatible = "samsung,exynos4210-pinctrl", },
+ +		{ .compatible = "samsung,exynos4x12-pinctrl", },
+++		{ .compatible = "samsung,exynos5250-pinctrl", },
+ +		{ .compatible = "samsung,exynos5440-pinctrl", },
+  	};
+  	for_each_matching_node(pctrl_np, exynos_pinctrl_ids)
+  		if (pctrl_np && of_device_is_available(pctrl_np))
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/740be2b8/attachment.sig>
