@@ -1,75 +1,41 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 30 Jan 2013 16:29:41 +0100
-Subject: [PATCH 5/6] USB chipidea: introduce dual role mode pdata flags
-In-Reply-To: <1359559782-14552-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359559782-14552-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359559782-14552-6-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 30 Jan 2013 16:29:36 +0100
+Subject: [PATCH] Add USB of helpers and use them in the chipidea driver
+Message-ID: <1359559782-14552-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even if a chipidea core is otg capable the board may not. This allows
-to explicitly set the core to host/peripheral mode. Without these
-flags the driver falls back to the old behaviour.
+This is the 2nd version of the USB of helper patch, this time with
+adding support for the chipidea driver for the new properties.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/usb/chipidea/core.c  |   21 +++++++++++++++------
- include/linux/usb/chipidea.h |    2 +-
- 2 files changed, 16 insertions(+), 7 deletions(-)
+Kishon, I decided against adding an extra Kconfig option for the
+OF helpers since I found out the USB stuff already has enough options ;)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index dcb650f..f313927 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -436,6 +436,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	struct resource	*res;
- 	void __iomem	*base;
- 	int		ret;
-+	int		dr_mode;
- 
- 	if (!dev->platform_data) {
- 		dev_err(dev, "platform data missing\n");
-@@ -488,14 +489,22 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	dr_mode = ci->platdata->dr_mode;
-+	if (dr_mode == USB_DR_MODE_UNKNOWN)
-+		dr_mode = USB_DR_MODE_OTG;
-+
- 	/* initialize role(s) before the interrupt is requested */
--	ret = ci_hdrc_host_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support host\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
-+		ret = ci_hdrc_host_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support host\n");
-+	}
- 
--	ret = ci_hdrc_gadget_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support gadget\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
-+		ret = ci_hdrc_gadget_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support gadget\n");
-+	}
- 
- 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
- 		dev_err(dev, "no supported roles\n");
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 1a2aa18..d2d4101 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -20,7 +20,7 @@ struct ci13xxx_platform_data {
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
- #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
--
-+	enum usb_phy_dr_mode	dr_mode;
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
- #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
- 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
--- 
-1.7.10.4
+The helpers are now in usb-common.c which seems an appropriate place
+for them. For the phy_type helpers I had a look again and saw that
+it is not really phy specific, the PORTSC registers in the chipidea
+driver have to be configured even without phy support compiled in.
+
+Sascha
+
+----------------------------------------------------------------
+Michael Grzeschik (3):
+      usb: add devicetree helpers for determining dr_mode and phy_type
+      usb: chipidea: ci13xxx-imx: create dynamic platformdata
+      usb: chipidea: add PTW and PTS handling
+
+Sascha Hauer (2):
+      USB chipidea: introduce dual role mode pdata flags
+      USB chipidea i.MX: introduce dr_mode property
+
+ .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 ++
+ drivers/usb/chipidea/bits.h                        |    7 ++
+ drivers/usb/chipidea/ci13xxx_imx.c                 |   29 +++++---
+ drivers/usb/chipidea/core.c                        |   61 +++++++++++++++--
+ drivers/usb/usb-common.c                           |   69 ++++++++++++++++++++
+ include/linux/usb/chipidea.h                       |    3 +-
+ include/linux/usb/of.h                             |   27 ++++++++
+ include/linux/usb/otg.h                            |    7 ++
+ include/linux/usb/phy.h                            |    9 +++
+ 9 files changed, 201 insertions(+), 17 deletions(-)
+ create mode 100644 include/linux/usb/of.h
