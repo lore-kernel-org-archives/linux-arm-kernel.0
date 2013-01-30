@@ -1,33 +1,76 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 30 Jan 2013 11:51:01 -0600
-Subject: [PATCH] ARM: OMAP2+: Fix selection of clockevent timer when using
- device-tree
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ED03931@DBDE01.ent.ti.com>
-References: <1359490991-17688-1-git-send-email-jon-hunter@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ED03931@DBDE01.ent.ti.com>
-Message-ID: <51095D85.6080204@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Jan 2013 17:57:42 +0000
+Subject: Commit 384a290283fde63ba8dc671fca5420111cdac19a seems to break
+ 11MPCore boot
+In-Reply-To: <alpine.LFD.2.02.1301301223290.6300@xanadu.home>
+References: <51093B0B.7010708@arm.com>
+ <alpine.LFD.2.02.1301301050230.6300@xanadu.home>
+ <20130130162132.GM23505@n2100.arm.linux.org.uk>
+ <20130130164535.GN23505@n2100.arm.linux.org.uk>
+ <20130130171918.GO23505@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1301301223290.6300@xanadu.home>
+Message-ID: <20130130175742.GJ7484@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 01/30/2013 01:18 AM, Bedia, Vaibhav wrote:
-> On Wed, Jan 30, 2013 at 01:53:11, Hunter, Jon wrote:
->> Commit 9725f44 (ARM: OMAP: Add DT support for timer driver) added
->> device-tree support for selecting a clockevent timer by property.
->> However, the code is currently ignoring the property passed and
->> selecting the first available timer found. Hence, for the OMAP3 beagle
->> board timer-12 is not being selected as expected. Fix this problem
->> by ensuring the timer property is passed to omap_get_timer_dt().
+On Wed, Jan 30, 2013 at 05:30:06PM +0000, Nicolas Pitre wrote:
+> On Wed, 30 Jan 2013, Russell King - ARM Linux wrote:
 > 
-> I thought that was intentional ;) and had this change in the clkevt-clksrc
-> interchange patch for AM33xx.
-
-No definitely was not. Thanks, I had missed that detail in the patch you
-sent!
-
-> Anyways, this change works for me so...
+> > On Wed, Jan 30, 2013 at 04:45:35PM +0000, Russell King - ARM Linux wrote:
+> > > What we could do is scan interrupts 0-31 for a non-zero value.  If they're
+> > > all zero, we should complain.  Otherwise, we use the first non-zero value
+> > > we find and validate it for a single bit set.
+> > 
+> > And here's a patch to do this - I've not run this but it's just built
+> > successfully here.  Anyone want to give it a go?
+> > 
+> > I've decided that if we do hit the mask==0 case, we should just wail
+> > loudly - panic'ing will bring the kernel to a halt right there and then,
+> > which may be before any console drivers have been initialized (and the
+> > kernel message buffer is no longer easy to read).  Moreover, panic()ing,
+> > along with the possibility of rebooting won't really fix this kind of
+> > error - it's rather fatal as far as that goes.  So, I think just wailing
+> > at CRIT level is fine for this condition that should not occur.
+> > 
+> >  arch/arm/common/gic.c |   23 +++++++++++++++++++++--
+> >  1 files changed, 21 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> > index 36ae03a..3bcef49 100644
+> > --- a/arch/arm/common/gic.c
+> > +++ b/arch/arm/common/gic.c
+> > @@ -351,6 +351,23 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+> >  	irq_set_chained_handler(irq, gic_handle_cascade_irq);
+> >  }
+> >  
+> > +static u8 gic_get_cpumask(struct gic_chip_data *gic)
+> > +{
+> > +	void __iomem *base = gic_data_dist_base(gic);
+> > +	u8 mask, i;
+> > +
+> > +	for (i = mask = 0; i < 32; i++) {
+> > +		mask = readl_relaxed(base + GIC_DIST_TARGET + i);
+> > +		if (mask)
+> > +			break;
+> > +	}
 > 
-> Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> That should probably be:
+> 
+> 	u32 mask;
+> 
+> 	for (i = 0; i < 32; i += 4) {
+> 		mask = readl_relaxed(base + GIC_DIST_TARGET + i);
+> 		mask |= (mask >> 16);
+> 		mask |= (mask >> 8);
+> 		if (mask)
+> 			return mask;
+> 	}
+> 
+> I know that the spec says that the GIC should accept byte sized 
+> accesses, but that too is known not to work on all implementations.
 
-Thanks!
-Jon
+Oh, for a rotation operator!
+
+Tested-by: Will Deacon <will.deacon@arm.com>
+
+Will
