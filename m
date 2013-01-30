@@ -1,34 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Jan 2013 14:05:32 -0800
-Subject: [GIT PULL] ARM: OMAP: Audio support via omap-twl4030 and pwm
- support
-In-Reply-To: <510788B9.9050907@ti.com>
-References: <50FE64DC.2030808@ti.com>
- <510788B9.9050907@ti.com>
-Message-ID: <20130130220532.GA22517@atomide.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 30 Jan 2013 16:05:18 -0700
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <20130130224300.GU7717@titan.lakedaemon.net>
+References: <20130127144610.GW1758@titan.lakedaemon.net>
+ <51053F81.6020904@gmail.com>
+ <20130127152431.GX1758@titan.lakedaemon.net>
+ <20130128223148.GA10275@schnuecks.de>
+ <20130129004824.GB7717@titan.lakedaemon.net>
+ <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
+ <20130129203221.GG7717@titan.lakedaemon.net>
+ <51083580.1010900@gmail.com>
+ <20130130224300.GU7717@titan.lakedaemon.net>
+Message-ID: <20130130230518.GA7395@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [130129 00:34]:
-> Hi Tony,
+On Wed, Jan 30, 2013 at 05:43:00PM -0500, Jason Cooper wrote:
+> > On 01/29/2013 09:32 PM, Jason Cooper wrote:
+> > >On Tue, Jan 29, 2013 at 09:08:46PM +0100, Sebastian Hesselbarth wrote:
+> > >>Leaves Issue 3, gbe forgets about its MAC address when gated or powered
+> > >>down. That should be done with local-mac-address passed by DT enabled
+> > >>u-boot or any other (dirty) ATAG hack ;)
+> > >
+> > >A patch to mv643xx_eth to pull this from DT should solve this.
 > 
-> On 01/22/2013 11:07 AM, Peter Ujfalusi wrote:
-> > Hi Tony,
-> > 
-> > The content of this pull:
-> > 
-> > update for audio support via omap-twl4030 and pwm updates in board level:
-> > http://www.spinics.net/lists/linux-omap/msg85085.html
-> > 
-> > and zoom-peripherals update to not request the TWL GPIO7:
-> > http://www.spinics.net/lists/linux-omap/msg85187.html
-> > 
-> > All is on top of mainline v3.8-rc4 tag.
-> 
-> Have you already pulled this one? I can not find the patches in linux-next.
+> Somewhere, Jason Gunthorpe shared his patch to do this.  I'll poke
+> around for it and try to get it merged in.
 
-Pulled now thanks. Will push out to omap-for-v3.9/twl.
+Yes, you asked for the doc update and I haven't had a moment to get a
+tree setup for that..
 
-Regards,
+Here are some words though:
 
-Tony
+     - local-mac-address : Optional, the MAC address to assign to the
+       device. If not specified then the MAC address in the HW
+       registers is used, but the driver can not be made modular.
+
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 7048d7c..2b2cfcb 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -2891,6 +2891,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 	struct mv643xx_eth_private *mp;
+ 	struct net_device *dev;
+ 	struct resource *res;
++	const u8 *mac;
++	int len;
+ 	int err;
+ 
+ 	if (pdev->dev.of_node) {
+@@ -2912,6 +2914,10 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 		else
+ 			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
+ 
++		mac = of_get_property(pdev->dev.of_node, "local-mac-address", &len);
++		if (mac && len == 6)
++		    memcpy(pd->mac_addr, mac, sizeof pd->mac_addr);
++
+ 		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
+ 		if (np) {
+ 			pd->shared = of_find_device_by_node(np);
+-- 
+1.7.5.4
