@@ -1,75 +1,36 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 30 Jan 2013 02:00:24 -0500
-Subject: [PATCH v6 05/10] dmaengine: edma: Add TI EDMA device tree binding
-In-Reply-To: <1359529229-22207-1-git-send-email-mporter@ti.com>
-References: <1359529229-22207-1-git-send-email-mporter@ti.com>
-Message-ID: <1359529229-22207-6-git-send-email-mporter@ti.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Wed, 30 Jan 2013 08:03:15 +0100
+Subject: [BUG] i.MX25: soft lockups/freezes while getnstimeofday
+In-Reply-To: <CAOMZO5DLDikzF5LMWQLw_65ADSy2-aydvhTbpFhbBV_DwS9sCQ@mail.gmail.com>
+References: <20130129161230.GA3128@pengutronix.de>
+ <CAOMZO5DLDikzF5LMWQLw_65ADSy2-aydvhTbpFhbBV_DwS9sCQ@mail.gmail.com>
+Message-ID: <20130130070315.GC30136@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding definition is based on the generic DMA controller
-binding.
+On Tue, Jan 29, 2013 at 02:38:59PM -0200, Fabio Estevam wrote:
+> On Tue, Jan 29, 2013 at 2:12 PM, Steffen Trumtrar <s.trumtrar@pengutronix.de> wrote:
+> > The board itself supposedly worked up until v3.4.
+> >
+> > The mxc-timer is set up to use ipg_clk_highfreq with a per5_div set to 2,
+> > therefore it is clocked with 120MHz. I tried to set the per5_div to 4 to have
+> > a 60MHz clock, but this didn't change anything.
+> > On the other hand, I tried parenting the ipg_clk to the per5_clk to get a
+> > 66MHz clock. This seems to be working fine, but I only have it running for 4h now.
+>
+> Can you dump the clock tree in 3.4 and 3.7.2, so that we can compare them?
+>
+> Just looked at the FSL BSP and they have the following:
+>
+> 	/* GPT clock must be derived from AHB clock */
+> 	clk_set_rate(&per_clk[5], ahb_clk.rate / 10);
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- Documentation/devicetree/bindings/dma/ti-edma.txt |   49 +++++++++++++++++++++
- 1 file changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+Do your hardware guys have documentation about *why* it "must be derived
+from AHB clock"?
 
-diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-new file mode 100644
-index 0000000..075a60e3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-@@ -0,0 +1,49 @@
-+TI EDMA
-+
-+Required properties:
-+- compatible : "ti,edma3"
-+- ti,hwmods: Name of the hwmods associated to the EDMA
-+- ti,edma-regions: Number of regions
-+- ti,edma-slots: Number of slots
-+- ti,edma-queue-tc-map: List of transfer control to queue mappings
-+- ti,edma-queue-priority-map: List of queue priority mappings
-+- ti,edma-default-queue: Default queue value
-+
-+Optional properties:
-+- ti,edma-reserved-channels: List of reserved channel regions
-+- ti,edma-reserved-slots: List of reserved slot regions
-+- ti,edma-xbar-event-map: Crossbar event to channel map
-+
-+Example:
-+
-+edma: edma at 49000000 {
-+	reg = <0x49000000 0x10000>;
-+	interrupt-parent = <&intc>;
-+	interrupts = <12 13 14>;
-+	compatible = "ti,edma3";
-+	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-+	#dma-cells = <1>;
-+	dma-channels = <64>;
-+	ti,edma-regions = <4>;
-+	ti,edma-slots = <256>;
-+	ti,edma-reserved-channels = <0  2
-+				     14 2
-+				     26 6
-+				     48 4
-+				     56 8>;
-+	ti,edma-reserved-slots = <0  2
-+				  14 2
-+				  26 6
-+				  48 4
-+				  56 8
-+				  64 127>;
-+	ti,edma-queue-tc-map = <0 0
-+				1 1
-+				2 2>;
-+	ti,edma-queue-priority-map = <0 0
-+				      1 1
-+				      2 2>;
-+	ti,edma-default-queue = <0>;
-+	ti,edma-xbar-event-map = <1 12
-+				  2 13>;
-+};
+rsc
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
