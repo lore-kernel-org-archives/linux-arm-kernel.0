@@ -1,106 +1,77 @@
-From: kyungsik.lee@lge.com (=?utf-8?B?7J206rK97Iud?=)
-Date: Wed, 30 Jan 2013 13:03:31 +0900
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <20130129225508.GC30535@twin.jikos.cz>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
- <20130129225508.GC30535@twin.jikos.cz>
-Message-ID: <005901cdfe9e$c49b4390$4dd1cab0$@lee@lge.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 29 Jan 2013 21:12:19 -0700
+Subject: [PATCH v2 08/27] pci: implement an emulated PCI-to-PCI bridge
+In-Reply-To: <201301292306.14012.arnd@arndb.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo6ajS87mh7u58sLeN6oL5ixiPhaD7O7BrH1Av28mTk=qQ@mail.gmail.com>
+ <201301292306.14012.arnd@arndb.de>
+Message-ID: <20130130041219.GA5734@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 29, 2013 at 11:06:13PM +0000, Arnd Bergmann wrote:
+> On Tuesday 29 January 2013, Bjorn Helgaas wrote:
+> > If you need this, it can be done in architecture code, can't it?  It's
+> > true that there's nothing architecture-specific in this patch (other
+> > than the fact that ARM is the only arch that needs it), but I'm not
+> > sure there's anything useful for sharing here.
+> 
+> Since we're moving the host bridge code to drivers/pci/host now, I think
+> this code should live in the same place. It's entirely possible that
+> it will be shared between arch/arm and arch/arm64, although I would
+> hope that we can do away with the emulated bridge code entirely.
 
+This sounds right to me, this is part of the host bridge driver for
+various Marvell SOCs, so these days it should live in the
+drivers/pci/host or related, not arch/arm.
+ 
+> > In fact, it seems like what you're after is not so much an emulated
+> > bridge that has no corresponding hardware, as it is a wrapper that
+> > presents a standard PCIe interface to hardware that exists but doesn't
+> > conform to the PCIe spec.  If you really do need to ultimately connect
+> > this pci_sw_pci_bridge to a piece of hardware, that will certainly be
+> > arch-specific.
+> 
+> As Jason Gunthorpe suggested, we might not need this at all, if the
+> Linux PCI code can be convinced not to need a configuration space
+> for the devices that in case of the Marvell hardware don't provide
+> one.
 
-> -----Original Message-----
-> From: David Sterba [mailto:dsterba at suse.cz]
-> Sent: Wednesday, January 30, 2013 7:55 AM
-> To: Kyungsik Lee
-> Cc: Russell King; Thomas Gleixner; Ingo Molnar; H. Peter Anvin; Michal
-> Marek; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> linux-kbuild at vger.kernel.org; x86 at kernel.org; Nitin Gupta; Richard Purdie;
-> Josh Triplett; Joe Millenbach; Andrew Morton; Albin Tonnerre;
-> hyojun.im at lge.com; chan.jeong at lge.com; gunho.lee at lge.com;
-> minchan.kim at lge.com; namhyung.kim at lge.com; raphael.andy.lee at gmail.com
-> Subject: Re: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-> 
-> On Sat, Jan 26, 2013 at 02:50:43PM +0900, Kyungsik Lee wrote:
-> > This patchset is for supporting LZ4 compressed kernel and initial
-> > ramdisk on the x86 and ARM architectures.
-> 
-> Have you considered the 'high compression' mode of lz4?
-> http://code.google.com/p/lz4/source/browse/trunk/lz4hc.c
-> 
-Yes, The high compression mode of lz4 is set as default
-in the submitted patch. The figure shows:
+To be clear, that isn't what I was talking about.. Just to clarify a
+few things in the last couple emails:
 
-Uncompressed size: 13MB
-lz4: Normal compression mode
-output size: 8.1MB (62.7%)
-decompression time: 232ms(148ms, with enabled unaligned memory access)
+The PCI 'host bridge configuration space' software emulation code in
+patch #7 is not necessary. Bjorn and Thierry both confirm this.
 
-lz4: High compression mode
-output size: 6.8MB (52.3%)
-decompression time: 251ms(167ms)
+In several places when Bjorn/Arnd talked about a 'host bridge' this is
+referring to (more or less) the PCI host *driver* and its attachment
+to the kernel interfaces. Specifically a configuration access
+mechanism and the resource ranges to allocate against. It has nothing
+to do with the bus 0, device 0, function 0 host bridge config space.
 
-The size of output in NC(Normal Compression) is bigger than HC(High Compression)
-But decompression in NC is a bit faster than HC in ARM based board.
+Arnd's suggestion to use multiple domains would be broadly equivilent
+to the first iteration of this driver - essentially the driver would
+manage one link and there would be multiple instances. This gets us
+back to where Thomas started - there is currently no code to do cross
+domain resource allocation, and static allocation is not possible with
+so many links on the chip.
 
+Bjorn is quite right, the purpose of the PCI-PCI SW layer is to bind
+the non-standard registers in the Marvell SOC to the standard PCI-E
+config interface so the kernel can control it normally. This corrects
+what is, IMHO, a defect in the Marvell hardware.
 
-I assume that 
+The alternative is to add some kind of cross-domain resource
+allocation (or similar) to the PCI core code - however this would
+*only* be required to support hardware broken in the same way as
+Marvell, so I feel a bit leery about doing that kind of work before we
+know if other chips require this. (early on in the discussion there
+was some thought that Tegra might also be similary broken, but it
+turned out to be pretty much fine, with a bit of driver work)
 
-> The compression format remains the same, the compressor tries harder (but
-> is slower), resulting compression ratio is better.
-> 
-> an examle compression for vmlinux.bin of x86_64 build:
-> 
-> input size: 16509520 bytes
-> 
-> lz4 (svn 88):
-> output size:        6393684    (38.7%)
-> compression time:      41.7 ms (395 MB/s)
-> decompression time:    13.7 ms (1204 MB/s)
-> 
-> lz4hc (svn 88):
-> output size:        5319137    (32.2%)
-> compression time:       683 ms (24 MB/s)
-> decompression time:    13.1 ms (1259 MB/s)
-> 
-> compressed file delta: 6393684 - 5319137 = 1074547 ~ 1MB
-> 
-> tested on a Nehalem box; same test on my slow desktop gives
-> 
-> lz4:
-> compression time:      97   ms (169 MB/s)
-> decompression time:    25.7 ms (643 MB/s)
-> 
-> lz4hc:
-> compression time:    1386 ms (11 MB/s)
-> decompression time:    26 ms (619 MB/s)
-> 
-> While the decompression time is almost the same, image size is smaller.
-> The kernel image compression is run in userspace and the low speed is not
-> much of concern for a one-time operation.
-> 
-> For the reference, lzo (current kernel version) run on the destktop:
-> 
-> output size:         6026256 (36.5%)
-> decompression time:     79.6 ms (207 MB/s)
-> 
-> > It seems that it?s worth trying LZ4 compressed kernel image or ramdisk
-> > for making the kernel boot more faster.
-> 
-> There's another potential user of lz4: btrfs. I've submitted a feature
-> preview integrating lz4 compression
-> http://thread.gmane.org/gmane.comp.file-systems.btrfs/15744
-> and we have tried to integrate the HC mode as well
-> http://thread.gmane.org/gmane.comp.file-systems.btrfs/18165
-> .
-> So far it's on a slow track, conceptually it works, but I the code needs
-> some work so it could live under lib/* (we've used the svn sources with
-> minor changes, no kernel coding style). It would be easier for me to
-> enhance the existing lib/lz4/* codebase.
-> 
-> Also zram could consider lz4, I'm not sure if there are other potential
-> users.
-> 
-> 
-> david
+So, I still think using a SW layer to provide a compliant PCI-PCI
+bridge configuration space for the Marvell hardware is the best way
+forward..
+
+Jason
