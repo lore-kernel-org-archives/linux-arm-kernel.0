@@ -1,34 +1,22 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 30 Jan 2013 14:03:32 +0800
-Subject: [PATCH] ARM: imx: fix imx31-dt.c time-related warning
-In-Reply-To: <1359518177-21245-1-git-send-email-swarren@wwwdotorg.org>
-References: <1359518177-21245-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130130060329.GB24450@S2100-06.ap.freescale.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 29 Jan 2013 23:48:14 -0600
+Subject: [RFC PATCH v2 1/2] ARM: kernel: update cpuinfo to print SoC model
+ name
+In-Reply-To: <1359506337-21619-2-git-send-email-ruslan.bilovol@ti.com>
+References: <1359506337-21619-1-git-send-email-ruslan.bilovol@ti.com>
+ <1359506337-21619-2-git-send-email-ruslan.bilovol@ti.com>
+Message-ID: <CAGo_u6pvU0ZMJ0C-3pqW3-Sx87_o5_JM0HDT9eb_yxe+h_SiJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 08:56:17PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Commit 6bb27d7 "ARM: delete struct sys_timer" caused the following:
-> 
-> arch/arm/mach-imx/imx31-dt.c:56:2: warning: initialization from incompatible pointer type [enabled by default]
-> arch/arm/mach-imx/imx31-dt.c:56:2: warning: (near initialization for ?__mach_desc_IMX31_DT.init_time?) [enabled by default]
-> 
-> This is because mx31_clocks_init_dt() returns int, whereas the .init_time
-> field prototype expects a function returning void. Implement a wrapper so
-> that the prototypes match.
-> 
-> Reported-by: Fengguang Wu <fengguang.wu@intel.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+On Tue, Jan 29, 2013 at 6:38 PM, Ruslan Bilovol <ruslan.bilovol@ti.com> wrote:
+>
+> SoC name        : OMAP4470 ES1.0 HS
+I am sorry, but I have to NAK for specifically reasons explained in
+http://marc.info/?l=linux-omap&m=135950276616961&w=2
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+I just dont think SoC information belongs in /proc/cpuinfo. nor is SoC
+name "OMAP4470 ES1.0 HS" -> it is just OMAP4470.
 
-> ---
-> This patch is based on arm-soc's timer/cleanup branch, which contains
-> the commit mentioned above.
-
-I suppose that it should just be applied by arm-soc folks on that
-branch, right?
-
-Shawn
+Regards,
+Nishanth Menon
