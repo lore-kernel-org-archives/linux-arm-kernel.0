@@ -1,45 +1,44 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 30 Jan 2013 01:11:08 +0100
-Subject: ixp4xx eth broken in 3.7.0/3.8-rc5?
-In-Reply-To: <20744.9777.937924.822371@pilspetsen.it.uu.se>
-References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
-Message-ID: <20744.25884.660535.514911@pilspetsen.it.uu.se>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 29 Jan 2013 16:12:38 -0800
+Subject: [GIT PULL] ux500 <mach/id.h> removal
+In-Reply-To: <CACRpkdY9BDyGQ-DiEhTiyHEYoxpGiL+H0baqsBYX_a-0upktUQ@mail.gmail.com>
+References: <CACRpkdY9BDyGQ-DiEhTiyHEYoxpGiL+H0baqsBYX_a-0upktUQ@mail.gmail.com>
+Message-ID: <CAOesGMiKCHUz9BJ31o-4kthr0CZABuL7SuuMNEjbkUQ06KsfMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mikael Pettersson writes:
- > When I try to update my ixp4xx machine to a 3.8-rc5 kernel it boots
- > Ok but the network (CONFIG_IXP4XX_ETH=y) fails to come up, with the
- > following in the kernel log:
- > 
- > net eth0: coherent DMA mask is unset
- > 
- > With a 3.7.0 kernel the situation is similar, except that the "net
- > eth0: coherent DMA mask is unset" message repeats itself endlessly
- > and I can't even get in on the serial console.
- > 
- > With the 3.6.0 kernel everything works perfectly.
+Hi,
 
-A git bisect identified the following as the culprit:
+On Tue, Jan 29, 2013 at 10:06 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> Hi ARM SoC maintainers,
+>
+> This patch set removes the use of <mach/id.h> from being broadcasted across
+> the kernel and blocks any further usage of cpu_is* outside of the machine.
+>
+> Target is v3.9 cleanups.
+>
+> It is part of our path toward single zImage.
+>
+> Please pull it in! Detailed description in the tag, MFD hunk ACKed by
+> Samuel Ortiz.
+>
+> Yours,
+> Linus Walleij
+>
+> The following changes since commit d1c3ed669a2d452cacfb48c2d171a1f364dae2ed:
+>
+>   Linux 3.8-rc2 (2013-01-02 18:13:21 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-no-idh
 
- > From 1a4901177574083c35fafc24c4d151c2a7c7647c Mon Sep 17 00:00:00 2001
- > From: Xi Wang <xi.wang@gmail.com>
- > Date: Sat, 17 Nov 2012 20:25:09 +0000
- > Subject: [PATCH] ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
- > 
- > Use &port->netdev->dev instead of NULL since dma_pool_create() doesn't
- > allow NULL dev.
- > 
- > Signed-off-by: Xi Wang <xi.wang@gmail.com>
- > Cc: Andrew Morton <akpm@linux-foundation.org>
- > Signed-off-by: David S. Miller <davem@davemloft.net>
- > ---
- >  drivers/net/ethernet/xscale/ixp4xx_eth.c |    8 +++++---
- >  1 files changed, 5 insertions(+), 3 deletions(-)
+Pulled in.
 
-Reverting this unbreaks ixp4xx_eth on my ixp4xx machine with kernels
-3.7.0 and 3.8-rc5.
+This has a somewhat annoying (but trivial) conflict against your own
+code (the cpufreq driver changes).
 
-(Added cc: author and netdev.)
 
-/Mikael
+-Olof
