@@ -1,29 +1,58 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 30 Jan 2013 15:00:31 +0100
-Subject: kernel 3.8 make problem
-In-Reply-To: <bedmt81oibwyqccqjqgpshjv.1359552548411@email.android.com>
-References: <20130130125547.63d1cbd5@armhf>
- <2822D1C2B9B19F4A8261F756A13373F8CAF61C@DFLE12.ent.ti.com>
- <20130130142515.0600bf1e@armhf>
- <bedmt81oibwyqccqjqgpshjv.1359552548411@email.android.com>
-Message-ID: <20130130150031.0cf94356@armhf>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 30 Jan 2013 15:00:15 +0100
+Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <20130130020627.GA699@nchen-desktop>
+References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
+ <87pq0omcfb.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130130020627.GA699@nchen-desktop>
+Message-ID: <20130130140015.GZ1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jan 2013 13:29:11 +0000
-"Menon, Nishanth" <nm@ti.com> wrote:
-
-> I do a cross compile on x86 for omap(I am TI ;) ).
+On Wed, Jan 30, 2013 at 10:06:28AM +0800, Peter Chen wrote:
+> On Tue, Jan 29, 2013 at 01:55:04PM +0200, Alexander Shishkin wrote:
+> > Sascha Hauer <s.hauer@pengutronix.de> writes:
+> > 
+> > > From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > >
+> > > This adds two little devicetree helper functions for determining the
+> > > dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
+> > > the devicetree.
+> > >
+> > > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> > > ---
+> > >
+> > > The properties and their values have been taken from the fsl-mph-dr driver.
+> > > This binding is also documented (though currently not used) for the tegra
+> > > ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
+> > > This is a first attempt to parse these bindings at a common place so that
+> > > others can make use of it.
+> > >
+> > > Basically I want to know whether this binding is recommended for new drivers
+> > > since normally the devicetree uses '-' instead of '_', and maybe there are
+> > > other problems with it.
+> > >
+> > > I need this binding for the chipidea driver. I suspect that the fsl-mph-dr
+> > > driver also really handles a chipidea core.
+> > 
+> > As far as I know, it is a chipidea core. Adding Peter to Cc list, he can
+> > probably confirm.
 > 
-> Looks like an setup issue IMHO.
+> The fsl-mph-dr can't be used for chipdiea as it handles three platform
+> drivers for three roles (peripheral , host, otg). But chipidea only has
+> two platform drivers, one is the chipidea core, the other is related
+> controller wrapper.
 
-What are you thinking about?
+What do you mean by 'three platform drivers'? That's only how the driver
+is built, no? I was talking about the hardware the fsl-mph-dr driver
+handles which definitely smells like chipidea.
 
-For more information, I can say that everything else is working fine
-in my system: X11, network (mail, web browsing, ssh), compilation,
-edition, scripting (bash, busybox, javascript, tcl/tk, ghostscript..)...
-There is just a 'shell' problem with 'make'!
+Sascha
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
