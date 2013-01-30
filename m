@@ -1,96 +1,240 @@
-From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
-Date: Wed, 30 Jan 2013 15:20:31 +0200
-Subject: [RFC PATCH 0/2] ARM: update cpuinfo to print CPU model name
-In-Reply-To: <20130129233842.GA8024@kahuna>
-References: <1359474865-15408-1-git-send-email-ruslan.bilovol@ti.com>
- <20130129160243.GA3389@kahuna>
- <CAB=otbSV6CH4WOrr577bHXFcjEVRGjZxatgy4CJ3cr0M0h4vfw@mail.gmail.com>
- <20130129233842.GA8024@kahuna>
-Message-ID: <CAB=otbQLxb26srPckpts6om7Y34oDecogfM_V2+8Bcgixg=LEQ@mail.gmail.com>
+From: gururaja.hebbar@ti.com (Hebbar Gururaja)
+Date: Wed, 30 Jan 2013 18:52:35 +0530
+Subject: [PATCH 1/2] ASoC: tlv320aic3x: Convert mic bias to a supply widget
+Message-ID: <1359552155-17426-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 1:38 AM, Nishanth Menon <nm@ti.com> wrote:
-> On 01:08-20130130, Ruslan Bilovol wrote:
->> Hi,
->>
->> On Tue, Jan 29, 2013 at 6:02 PM, Nishanth Menon <nm@ti.com> wrote:
->> >
->> > On 17:54-20130129, Ruslan Bilovol wrote:
->> > > Hi,
->> > >
->> > > The following patches update cpuinfo to print CPU
->> > > model name for ARM. First patch exactly makes needed
->> > > changes for ARM architecture.
->> > > Second patch adds this ability to OMAP4 SoCs.
->> > >
->> > > This adds a common approach to show SoC name.
->> > >
->> > > Looks like there were few attempts to do similar
->> > > changes to cpuinfo without any luck.
->> > >
->> > > So - comments are welcome
->> > >
->> > > Ruslan Bilovol (2):
->> > >   ARM: kernel: update cpuinfo to print CPU model name
->> > >   ARM: OMAP4: setup CPU model name during ID initialisation
->> >
->> > We had an discussion on similar lines but a generic suggestion:
->> > https://patchwork.kernel.org/patch/98720/
->> > SoCinfo framework which was supposed to introduce this
->> >
->> > Would'nt that be a better approach to take than an OMAP only solution?
->>
->> My goal is only to say what is the SoC model name in the /proc/cpuinfo
->> (And it is not an OMAP-only solution - it is common. Support for OMAP
->> is added in second patch)
->> This is the only type of information that we can apply for any SoC.
->> My point is - any SoC-specific information should go through some other
->> way - like SoCinfo framework mentioned by you.
->> And additional point - in cpuinfo we already have CPU name and Machine name.
->> The SoC name (that is something between these two things) looks also relevant
-> Looking at the sample output in patch #1/2
-> OMAP4470 ES1.0 HS
->
-> OMAP4470 is SoC name
-> ES1.0 is SoC revision
-> HS is SoC type
+Convert MicBias widgets to supply widget.
 
-Will fix it in next patchseries. Let's leave only only SoC name
+On tlv320aic3x, Mic bias power on/off shares the same register bits
+with output mic bias voltage.  So, when power on mic bias, we need
+reclaim it to voltage value.
 
->
-> We even have SoC features (e.g. at boot NEON etc..)
->
-> Is the intent to put all this inside /proc/cpuinfo?? I bet every SoC has
-> it's own interesting data it'd like to have (like some of the info
-> populated by DT even). I am hardpressed to think this fits inside
-> /proc/cpuinfo. I might even suspect that the list of interesting
-> information might even vary per SoC.
+Provide a new platform data so that the micbias voltage can be sent
+according to board requirement. Now since tlc320aic3x codec driver
+is DT aware, update dt files and functions to handle this new
+"micbias-vg"  platform data.
 
-No, I don't think we need all these information in cpuinfo - just because
-it will be different for different SoC - so the file structure will be
-very different..
-Let's have only SoC name in cpuinfo.
+Because of sharing of bits, when enabling the micbias, voltage also
+needs to be updated. So use SND_SOC_DAPM_POST_PMU & SND_SOC_DAPM_PRE_PMD
+macro to create an event to handle this.
 
->
-> having machine name is something ARM specific? dumping it on my linux
-> machines (x86[1] and sparc[2]) dont seem to show that.
+Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+---
+Mark,
 
-Yes - it's ARM specific.
+I have updated the codec driver as you suggested. Can you confirm if
+this is sufficient?.
+If yes, then I will send all the patch once again with new revision.
 
->
-> but in the interest of not breaking existing interfaces, new interfaces
-> should potentially belong elsewhere.. my 2 cents.
->
-> [1] http://pastebin.com/CF8HPDAC (Xubuntu 12.04 3.2.0-36)
-> [2] http://pastebin.com/qNwWHwiu (Debian 3.2.35-2)
+:100644 100644 e7b98f4... f47c3f5... M	Documentation/devicetree/bindings/sound/tlv320aic3x.txt
+:100644 100644 ffd9bc7... 9407fd0... M	include/sound/tlv320aic3x.h
+:100644 100644 4989143... fe6dd27... M	sound/soc/codecs/tlv320aic3x.c
+:100644 100644 6db3c41... e521ac3... M	sound/soc/codecs/tlv320aic3x.h
+ .../devicetree/bindings/sound/tlv320aic3x.txt      |    6 ++
+ include/sound/tlv320aic3x.h                        |   10 +++
+ sound/soc/codecs/tlv320aic3x.c                     |   85 ++++++++++++++++++--
+ sound/soc/codecs/tlv320aic3x.h                     |    4 +
+ 4 files changed, 99 insertions(+), 6 deletions(-)
 
-Just look at changes in cpuinfo for ARM between kernels:
-3.4 kernel: http://pastebin.com/TfmE7b2b
-3.8-rc3: http://pastebin.com/zvvTGeNt
-
-The file structure has huge changes
-
-> --
-> Regards,
-> Nishanth Menon
+diff --git a/Documentation/devicetree/bindings/sound/tlv320aic3x.txt b/Documentation/devicetree/bindings/sound/tlv320aic3x.txt
+index e7b98f4..f47c3f5 100644
+--- a/Documentation/devicetree/bindings/sound/tlv320aic3x.txt
++++ b/Documentation/devicetree/bindings/sound/tlv320aic3x.txt
+@@ -11,6 +11,12 @@ Optional properties:
+ 
+ - gpio-reset - gpio pin number used for codec reset
+ - ai3x-gpio-func - <array of 2 int> - AIC3X_GPIO1 & AIC3X_GPIO2 Functionality
++- ai3x-micbias-vg - MicBias Voltage required.
++	1 - MICBIAS output is powered to 2.0V,
++	2 - MICBIAS output is powered to 2.5V,
++	3 - MICBIAS output is connected to AVDD,
++	If this node is not mentioned or if the value is incorrect, then MicBias
++	is powered down.
+ 
+ Example:
+ 
+diff --git a/include/sound/tlv320aic3x.h b/include/sound/tlv320aic3x.h
+index ffd9bc7..9407fd0 100644
+--- a/include/sound/tlv320aic3x.h
++++ b/include/sound/tlv320aic3x.h
+@@ -46,6 +46,13 @@ enum {
+ 	AIC3X_GPIO2_FUNC_BUTTON_PRESS_IRQ	= 15
+ };
+ 
++enum aic3x_micbias_voltage {
++	AIC3X_MICBIAS_OFF = 0,
++	AIC3X_MICBIAS_2_0V = 1,
++	AIC3X_MICBIAS_2_5V = 2,
++	AIC3X_MICBIAS_AVDDV = 3,
++};
++
+ struct aic3x_setup_data {
+ 	unsigned int gpio_func[2];
+ };
+@@ -53,6 +60,9 @@ struct aic3x_setup_data {
+ struct aic3x_pdata {
+ 	int gpio_reset; /* < 0 if not used */
+ 	struct aic3x_setup_data *setup;
++
++	/* Selects the micbias voltage */
++	enum aic3x_micbias_voltage micbias_vg;
+ };
+ 
+ #endif
+diff --git a/sound/soc/codecs/tlv320aic3x.c b/sound/soc/codecs/tlv320aic3x.c
+index 4989143..fe6dd27 100644
+--- a/sound/soc/codecs/tlv320aic3x.c
++++ b/sound/soc/codecs/tlv320aic3x.c
+@@ -85,6 +85,9 @@ struct aic3x_priv {
+ #define AIC3X_MODEL_33 1
+ #define AIC3X_MODEL_3007 2
+ 	u16 model;
++
++	/* Selects the micbias voltage */
++	enum aic3x_micbias_voltage micbias_vg;
+ };
+ 
+ /*
+@@ -195,6 +198,37 @@ static int snd_soc_dapm_put_volsw_aic3x(struct snd_kcontrol *kcontrol,
+ 	return ret;
+ }
+ 
++/*
++ * mic bias power on/off share the same register bits with
++ * output voltage of mic bias. when power on mic bias, we
++ * need reclaim it to voltage value.
++ * 0x0 = Powered off
++ * 0x1 = MICBIAS output is powered to 2.0V,
++ * 0x2 = MICBIAS output is powered to 2.5V
++ * 0x3 = MICBIAS output is connected to AVDD
++ */
++static int mic_bias_event(struct snd_soc_dapm_widget *w,
++	struct snd_kcontrol *kcontrol, int event)
++{
++	struct snd_soc_codec *codec = w->codec;
++	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
++
++	switch (event) {
++	case SND_SOC_DAPM_POST_PMU:
++		/* change mic bias voltage to user defined */
++		snd_soc_update_bits(codec, MICBIAS_CTRL,
++				MICBIAS_LEVEL_MASK,
++				aic3x->micbias_vg << MICBIAS_LEVEL_SHIFT);
++		break;
++
++	case SND_SOC_DAPM_PRE_PMD:
++		snd_soc_update_bits(codec, MICBIAS_CTRL,
++				MICBIAS_LEVEL_MASK, 0);
++		break;
++	}
++	return 0;
++}
++
+ static const char *aic3x_left_dac_mux[] = { "DAC_L1", "DAC_L3", "DAC_L2" };
+ static const char *aic3x_right_dac_mux[] = { "DAC_R1", "DAC_R3", "DAC_R2" };
+ static const char *aic3x_left_hpcom_mux[] =
+@@ -596,12 +630,9 @@ static const struct snd_soc_dapm_widget aic3x_dapm_widgets[] = {
+ 			 AIC3X_ASD_INTF_CTRLA, 0, 3, 3, 0),
+ 
+ 	/* Mic Bias */
+-	SND_SOC_DAPM_REG(snd_soc_dapm_micbias, "Mic Bias 2V",
+-			 MICBIAS_CTRL, 6, 3, 1, 0),
+-	SND_SOC_DAPM_REG(snd_soc_dapm_micbias, "Mic Bias 2.5V",
+-			 MICBIAS_CTRL, 6, 3, 2, 0),
+-	SND_SOC_DAPM_REG(snd_soc_dapm_micbias, "Mic Bias AVDD",
+-			 MICBIAS_CTRL, 6, 3, 3, 0),
++	SND_SOC_DAPM_SUPPLY("Mic Bias", MICBIAS_CTRL, 6, 0,
++			 mic_bias_event,
++			 SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+ 
+ 	/* Output mixers */
+ 	SND_SOC_DAPM_MIXER("Left Line Mixer", SND_SOC_NOPM, 0, 0,
+@@ -1386,6 +1417,24 @@ static int aic3x_probe(struct snd_soc_codec *codec)
+ 	if (aic3x->model == AIC3X_MODEL_3007)
+ 		snd_soc_add_codec_controls(codec, &aic3x_classd_amp_gain_ctrl, 1);
+ 
++	/* set mic bias voltage */
++	switch (aic3x->micbias_vg) {
++	case AIC3X_MICBIAS_2_0V:
++	case AIC3X_MICBIAS_2_5V:
++	case AIC3X_MICBIAS_AVDDV:
++		snd_soc_update_bits(codec, MICBIAS_CTRL,
++				    MICBIAS_LEVEL_MASK,
++				    (aic3x->micbias_vg) << MICBIAS_LEVEL_SHIFT);
++		break;
++	case AIC3X_MICBIAS_OFF:
++		/*
++		 * noting to do. target won't enter here. This is just to avoid
++		 * compile time warning "warning: enumeration value
++		 * 'AIC3X_MICBIAS_OFF' not handled in switch"
++		 */
++		break;
++	}
++
+ 	aic3x_add_widgets(codec);
+ 	list_add(&aic3x->list, &reset_list);
+ 
+@@ -1461,6 +1510,7 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
+ 	struct aic3x_setup_data *ai3x_setup;
+ 	struct device_node *np = i2c->dev.of_node;
+ 	int ret;
++	u32 value;
+ 
+ 	aic3x = devm_kzalloc(&i2c->dev, sizeof(struct aic3x_priv), GFP_KERNEL);
+ 	if (aic3x == NULL) {
+@@ -1474,6 +1524,7 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
+ 	if (pdata) {
+ 		aic3x->gpio_reset = pdata->gpio_reset;
+ 		aic3x->setup = pdata->setup;
++		aic3x->micbias_vg = pdata->micbias_vg;
+ 	} else if (np) {
+ 		ai3x_setup = devm_kzalloc(&i2c->dev, sizeof(*ai3x_setup),
+ 								GFP_KERNEL);
+@@ -1493,6 +1544,28 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
+ 			aic3x->setup = ai3x_setup;
+ 		}
+ 
++		if (!of_property_read_u32(np, "ai3x-micbias-vg", &value)) {
++			switch (value) {
++			case 1 :
++				aic3x->micbias_vg = AIC3X_MICBIAS_2_0V;
++				break;
++			case 2 :
++				aic3x->micbias_vg = AIC3X_MICBIAS_2_5V;
++				break;
++			case 3 :
++				aic3x->micbias_vg = AIC3X_MICBIAS_AVDDV;
++				break;
++			default :
++				aic3x->micbias_vg = AIC3X_MICBIAS_OFF;
++				dev_err(&i2c->dev, "Unsuitable MicBias voltage "
++							"found in DT\n");
++			}
++		} else {
++			dev_warn(&i2c->dev, "No MicBias voltage found in DT - "
++							"using default\n");
++			aic3x->micbias_vg = AIC3X_MICBIAS_OFF;
++		}
++
+ 	} else {
+ 		aic3x->gpio_reset = -1;
+ 	}
+diff --git a/sound/soc/codecs/tlv320aic3x.h b/sound/soc/codecs/tlv320aic3x.h
+index 6db3c41..e521ac3 100644
+--- a/sound/soc/codecs/tlv320aic3x.h
++++ b/sound/soc/codecs/tlv320aic3x.h
+@@ -238,6 +238,10 @@
+ /* Default input volume */
+ #define DEFAULT_GAIN    0x20
+ 
++/* MICBIAS Control Register */
++#define MICBIAS_LEVEL_SHIFT	(6)
++#define MICBIAS_LEVEL_MASK	(3 << 6)
++
+ /* headset detection / button API */
+ 
+ /* The AIC3x supports detection of stereo headsets (GND + left + right signal)
+-- 
+1.7.9.5
