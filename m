@@ -1,71 +1,128 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 30 Jan 2013 12:30:06 -0500 (EST)
-Subject: Commit 384a290283fde63ba8dc671fca5420111cdac19a seems to break
- 11MPCore boot
-In-Reply-To: <20130130171918.GO23505@n2100.arm.linux.org.uk>
-References: <51093B0B.7010708@arm.com>
- <alpine.LFD.2.02.1301301050230.6300@xanadu.home>
- <20130130162132.GM23505@n2100.arm.linux.org.uk>
- <20130130164535.GN23505@n2100.arm.linux.org.uk>
- <20130130171918.GO23505@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1301301223290.6300@xanadu.home>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Wed, 30 Jan 2013 18:28:35 +0100
+Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
+ board(DB-MV784MP-GP)
+In-Reply-To: <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <51095843.30107@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jan 2013, Russell King - ARM Linux wrote:
+Hello Gregory,
 
-> On Wed, Jan 30, 2013 at 04:45:35PM +0000, Russell King - ARM Linux wrote:
-> > What we could do is scan interrupts 0-31 for a non-zero value.  If they're
-> > all zero, we should complain.  Otherwise, we use the first non-zero value
-> > we find and validate it for a single bit set.
-> 
-> And here's a patch to do this - I've not run this but it's just built
-> successfully here.  Anyone want to give it a go?
-> 
-> I've decided that if we do hit the mask==0 case, we should just wail
-> loudly - panic'ing will bring the kernel to a halt right there and then,
-> which may be before any console drivers have been initialized (and the
-> kernel message buffer is no longer easy to read).  Moreover, panic()ing,
-> along with the possibility of rebooting won't really fix this kind of
-> error - it's rather fatal as far as that goes.  So, I think just wailing
-> at CRIT level is fine for this condition that should not occur.
-> 
->  arch/arm/common/gic.c |   23 +++++++++++++++++++++--
->  1 files changed, 21 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index 36ae03a..3bcef49 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -351,6 +351,23 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
->  	irq_set_chained_handler(irq, gic_handle_cascade_irq);
->  }
->  
-> +static u8 gic_get_cpumask(struct gic_chip_data *gic)
-> +{
-> +	void __iomem *base = gic_data_dist_base(gic);
-> +	u8 mask, i;
+On 01/30/2013 06:26 PM, Gregory CLEMENT wrote:
+> This is the new Armada XP evaluation board from Marvell. It comes with
+> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
+> Gigabit links.
+>
+> Support for USB (Host and device), SDIO, PCIe will be added as drivers
+> when they become available for Armada XP in mainline.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/Makefile         |    1 +
+>   arch/arm/boot/dts/armada-xp-gp.dts |   94 ++++++++++++++++++++++++++++++++++++
+>   2 files changed, 95 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 5ebb44f..51aab4b 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -78,6 +78,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>   dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>   	armada-370-mirabox.dtb \
+>   	armada-xp-db.dtb \
+> +	armada-xp-gp.dtb \
+>   	armada-xp-openblocks-ax3-4.dtb
+>   dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+>   	imx53-ard.dtb \
+> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> new file mode 100644
+> index 0000000..85ba642
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> @@ -0,0 +1,94 @@
+> +/*
+> + * Device Tree file for Marvell Armada XP evaluation board
+> + * (RD-MV784MP-GP)
+
+Marvell refers to this as a Reference Design (which it is because it is 
+boxed).
+
+> + *
+> + * Copyright (C) 2013 Marvell
+> + *
+> + * Lior Amsalem <alior@marvell.com>
+> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
 > +
-> +	for (i = mask = 0; i < 32; i++) {
-> +		mask = readl_relaxed(base + GIC_DIST_TARGET + i);
-> +		if (mask)
-> +			break;
-> +	}
+> +/dts-v1/;
+> +/include/ "armada-xp-mv78460.dtsi"
+> +
+> +/ {
+> +	model = "Marvell Armada XP Evaluation Board: RD-MV784MP-GP";
 
-That should probably be:
+Ditto, should be "Marvell Armada XP Reference Design Board".
+> +	compatible = "marvell,axp-db", "marvell,armadaxp-mv78460", "marvell,armadaxp", "marvell,armada-370-xp";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0xC0000000>; /* 3 GB */
+> +	};
+> +
+> +	soc {
+> +		serial at d0012000 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +		serial at d0012100 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +		serial at d0012200 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +		serial at d0012300 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +
+> +		sata at d00a0000 {
+> +			nr-ports = <2>;
+> +			status = "okay";
+> +		};
+> +
+> +		mdio {
+> +			phy0: ethernet-phy at 0 {
+> +				reg = <16>;
+> +			};
+> +
+> +			phy1: ethernet-phy at 1 {
+> +				reg = <17>;
+> +			};
+> +
+> +			phy2: ethernet-phy at 2 {
+> +				reg = <18>;
+> +			};
+> +
+> +			phy3: ethernet-phy at 3 {
+> +				reg = <19>;
+> +			};
+> +		};
 
-	u32 mask;
-
-	for (i = 0; i < 32; i += 4) {
-		mask = readl_relaxed(base + GIC_DIST_TARGET + i);
-		mask |= (mask >> 16);
-		mask |= (mask >> 8);
-		if (mask)
-			return mask;
-	}
-
-I know that the spec says that the GIC should accept byte sized 
-accesses, but that too is known not to work on all implementations.
-
-
-Nicolas
+It seemed to me like the PHY addresses were 0 to 3, but I will test that 
+within the next few minutes.
+--
+Florian
