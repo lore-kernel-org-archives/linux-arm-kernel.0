@@ -1,78 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Jan 2013 16:17:38 +0000
-Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
-In-Reply-To: <20130130124721.0ad0294e@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301300955.49473.arnd@arndb.de> <20130130124721.0ad0294e@skate>
-Message-ID: <201301301617.38883.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Jan 2013 16:21:32 +0000
+Subject: Commit 384a290283fde63ba8dc671fca5420111cdac19a seems to break
+ 11MPCore boot
+In-Reply-To: <alpine.LFD.2.02.1301301050230.6300@xanadu.home>
+References: <51093B0B.7010708@arm.com>
+ <alpine.LFD.2.02.1301301050230.6300@xanadu.home>
+Message-ID: <20130130162132.GM23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 January 2013, Thomas Petazzoni wrote:
-> Dear Arnd Bergmann,
+On Wed, Jan 30, 2013 at 11:00:50AM -0500, Nicolas Pitre wrote:
+> On Wed, 30 Jan 2013, Punit Agrawal wrote:
 > 
-> On Wed, 30 Jan 2013 09:55:49 +0000, Arnd Bergmann wrote:
-> 
-> > I don't remember the kernel ever caring about whether hardware complies
-> > to a standard or not. The kernel's job is to make hardware work, based
-> > on the actual implementation of that hardware. In a lot of cases that
-> > means taking the standard document as a reference, and adding quirks
-> > for the devices that are different.
+> > Hi Nicolas,
 > > 
-> > In the end, it comes down to the impact on the code complexity, and
-> > the run-time overhead for whatever hardware is most common when adding
-> > those quirks.
+> > I was trying to boot 3.8-rc5 on Realview EB 11MPCore using
+> > realview-smp_defconfig as a starting point but the kernel failed to progress
+> > past the log below (config attached).
+> > 
+> > Pawel suggested I try reverting 384a290283fde63ba8dc671fca5420111cdac19a -
+> > "ARM: gic: use a private mapping for CPU target interfaces" that you've
+> > authored. With this commit reverted the kernel boots.
+> > 
+> > I am not quite sure why the commit breaks 11MPCore but Pawel (cc'd) might be
+> > able to shed light on that.
 > 
-> This is not only about standards, it is also about re-using the PCI
-> resource allocation code.
+> That would be appreciated as I don't have any good answer to provide.
 > 
-> In my RFCv1, sent December, 7th, I wasn't using any emulated PCI-to-PCI
-> bridge. So it *can* perfectly work without it.
+> Typically, this patch highlighted problems with bad holding pen 
+> implementations where secondary CPUs would enter the kernel all at the 
+> same time. In that case the kernel was crashing even before displaying 
+> "CPU2: Booted secondary processor".
 
-Ok, Isee.
+Well, the patch still looks fine to me.  It might be a good idea to
+dump out the value of GIC_DIST_TARGET + 0, just in case there's some
+version of the GIC which doesn't advertise its CPU mask via that
+register (it should, because it corresponds with SGI0..3, and every
+spec I have says that it will be implemented if these IRQs are present).
 
-> However, one major drawback of my RFCv1 version is that since I didn't
-> know how much I/O space and memory space was needed for each PCIe
-> device, I had to oversize the address decoding windows. And also, I had
-> to have a special allocator (certainly simple, but still) to find an
-> available physical address to set up each address decoding window.
-
-Well, for the I/O space, there is no oversizing because either way you
-end up with exactly 64KB per root port, right?
-
-> Emulating a PCI-to-PCI bridge very nicely allows to re-use the PCI core
-> resource allocation code. I think it's really the main reason for
-> emulated those PCI-to-PCI bridges, rather than willing to comply to
-> some standards.
-> 
-> So what I'm going to do now is rework my patch series by removing the
-> emulated host bridge (which is normally mandatory by PCIe standard, but
-> Linux doesn't need it, so we don't care), but I'll keep the emulated
-> PCI-to-PCI bridges in order to benefit for the PCI core resource
-> allocation mechanisms.
-> 
-> Is this ok for you?
-
-Using the Linux allocator for memory resources does sound useful,
-so if that requires using the emulated PCI-to-PCI bridges, I guess
-it's the best compromise.
-
-> I'd like to settle on the strategy to follow, because we're really
-> going a funny road here: on December 7th, I submit a series that
-> doesn't use any PCI-to-PCI bridge, and I'm told that I should emulate
-> some. I spent a long time working on an implementation that uses
-> emumlated PCI-to-PCI bridges, which I submitted on Monday, now to be
-> told that I should work really hard not to use PCI-to-PCI bridges. I
-> hope you can feel my little embarrassment here...
-
-I'm sorry about this situation. Unfortunatly the way that such decisions
-are made is not always straightforward, and what seems like a good idea
-at one point turns out to be a mistake or more complex than anticipated
-later. With the description of the first patch set, I did not think
-it would be necessary to fake a bridge device and their config space.
-
-What I had guessed you could do was to call pci_scan_root_bus on
-each of the ports, and then set up the memory space window for
-the bus including all of its child devices.
-
-	Arnd
+We do know already that there are some implementations out there which
+don't conform to these documents...
