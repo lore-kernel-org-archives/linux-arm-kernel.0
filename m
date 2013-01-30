@@ -1,37 +1,31 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 29 Jan 2013 21:56:55 -0700
-Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
-In-Reply-To: <201301291645.08040.arnd@arndb.de>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130129155820.GB23505@n2100.arm.linux.org.uk>
- <20130129172055.0ca5f341@skate> <201301291645.08040.arnd@arndb.de>
-Message-ID: <20130130045655.GE5734@obsidianresearch.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 30 Jan 2013 13:01:07 +0800
+Subject: [PATCH] ARM:mach-msm: seting tail NUL after strncpy
+Message-ID: <5108A913.6080304@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 04:45:07PM +0000, Arnd Bergmann wrote:
-> On Tuesday 29 January 2013, Thomas Petazzoni wrote:
-> > And the Linux PCI resource allocation code complies with this, so that
-> > if I have two PCI-to-PCI bridges (each having downstream a device with
-> > an I/O BAR), then the first PCI-to-PCI bridge gets its I/O base address
-> > register set to ADDR + 0x0, and the second bridge gets its I/O base
-> > address set to ADDR + 0x1000. And this doesn't play well with the
-> > requirements of Marvell address decoding windows for PCIe I/O regions,
-> > which must be 64 KB aligned.
-> 
-> But we normally only assign a 64 KB I/O window to each PCI host bridge.
-> Requiring PCI bridges to be space 64 KB apart would mean that we cannot
-> actually support bridges at all.
 
-The PCI resource code uses full 32 bit integers when it handles IO
-addresses, so this actually does sort of work out.
+  temp need NUL terminated, or next ptr may cause issue.
 
-However, Thomas how did you recover the high bits of the
-IO window address from the bridge configuration? Are you reading the
-struct resource directly? That probably causes problems with
-hotplug/etc...
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/mach-msm/clock-debug.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-If you look back in your old emails I outlined a solution to this
-using the MMU.
+diff --git a/arch/arm/mach-msm/clock-debug.c
+b/arch/arm/mach-msm/clock-debug.c
+index 4886404..bdca900 100644
+--- a/arch/arm/mach-msm/clock-debug.c
++++ b/arch/arm/mach-msm/clock-debug.c
+@@ -105,6 +105,8 @@ int __init clock_debug_add(struct clk *clock)
+ 		return -ENOMEM;
 
-Jason
+ 	strncpy(temp, clock->dbg_name, ARRAY_SIZE(temp)-1);
++	temp[ARRAY_SIZE(temp)-1] = '\0';
++
+ 	for (ptr = temp; *ptr; ptr++)
+ 		*ptr = tolower(*ptr);
+
+-- 
+1.7.10.4
