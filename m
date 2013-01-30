@@ -1,58 +1,44 @@
-From: kishon@ti.com (kishon)
-Date: Wed, 30 Jan 2013 11:21:35 +0530
-Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <20130129203050.GT1906@pengutronix.de>
-References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
- <5107D253.5030400@ti.com> <20130129203050.GT1906@pengutronix.de>
-Message-ID: <5108B4E7.4020505@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 30 Jan 2013 11:22:50 +0530
+Subject: [RFC PATCH 1/2] ARM: kernel: update cpuinfo to print CPU model
+ name
+In-Reply-To: <CAB=otbR+MA3NUhxqRdo=w81gz9sTLAsLV5ELcpp77UxizMiaKw@mail.gmail.com>
+References: <1359474865-15408-1-git-send-email-ruslan.bilovol@ti.com>
+ <1359474865-15408-2-git-send-email-ruslan.bilovol@ti.com>
+ <20130129160827.GJ2637@n2100.arm.linux.org.uk>
+ <CAB=otbR+MA3NUhxqRdo=w81gz9sTLAsLV5ELcpp77UxizMiaKw@mail.gmail.com>
+Message-ID: <5108B532.6000706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 January 2013 02:00 AM, Sascha Hauer wrote:
-> On Tue, Jan 29, 2013 at 07:14:51PM +0530, kishon wrote:
->> Hi,
->>
->> On Tuesday 29 January 2013 04:52 PM, Sascha Hauer wrote:
->>> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
->>>
->>> This adds two little devicetree helper functions for determining the
->>> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
->>> the devicetree.
->>>
->>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->>> ---
->>>
->>> The properties and their values have been taken from the fsl-mph-dr driver.
->>> This binding is also documented (though currently not used) for the tegra
->>> ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
->>> This is a first attempt to parse these bindings at a common place so that
->>> others can make use of it.
->>>
->>> Basically I want to know whether this binding is recommended for new drivers
->>> since normally the devicetree uses '-' instead of '_', and maybe there are
->>> other problems with it.
->>>
->>> I need this binding for the chipidea driver. I suspect that the fsl-mph-dr
->>> driver also really handles a chipidea core.
->>>
->>> Should we agree on this I would convert the fsl-mph-dr driver to use these
->>> helpers.
->>>
->>> Sascha
->>>
->>>   drivers/usb/core/Makefile |    1 +
->>>   drivers/usb/core/of.c     |   76 +++++++++++++++++++++++++++++++++++++++++++++
->>
->> This file should ideally go into drivers/usb/phy/.
+On Wednesday 30 January 2013 04:42 AM, Ruslan Bilovol wrote:
+> Hi,
 >
-> I originally wanted to do that, but the host/peripheral/otg property is
-> not phy specific. DO you still want to move it there?
+> On Tue, Jan 29, 2013 at 6:08 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Jan 29, 2013 at 05:54:24PM +0200, Ruslan Bilovol wrote:
+>>> CPU implementer : 0x41
+>>> CPU name        : OMAP4470 ES1.0 HS
+>>
+>> Sigh.  No.  Look at what you're doing - look carefully at the above.
+>>
+>> "CPU implementer" - 0x41.  That's A.  For ARM Ltd.  ARM Ltd implemented
+>> this CPU.  Did ARM Ltd really implement OMAP4470 ?  I think TI would be
+>> very upset if that were to be the case.
+>
+> Yes, it would be very surprisingly :)
+>
+>>
+>> So no, OMAP4470 is _NOT_ a CPU.  It is a SoC.  The CPU inside the SoC is
+>> a collection of ARM Ltd Cortex A9 _CPUs_.
+>>
+>> See?  Please, learn what a CPU is as opposed to a SoC.
+>
+> Completely agree with you. I will fix this
+>
+Thank god you agreed to drop your current approach. Please elaborate
+what you are going to fix and also state what user-space features
+changes from OMAP4460 to OMAP4470.
 
-I think then you can just move of_usb_get_phy_mode() to phy/of.c.
-Then we can also move some functions defined in otg.c (specific to PHY 
-and dt) to phy/of.c.
-
-Thanks
-Kishon
+Regards,
+Santosh
