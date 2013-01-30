@@ -1,38 +1,77 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 30 Jan 2013 11:04:26 -0600
-Subject: [PATCH 0/5] ARM: OMAP2+: System timer updates
-Message-ID: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
+Date: Wed, 30 Jan 2013 11:04:28 -0600
+Subject: [PATCH 2/5] ARM: OMAP2+: Remove hard-coded test on timer ID
+In-Reply-To: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
+References: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1359565471-30721-3-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series consists mainly of clean-ups for clockevents and
-clocksource timers on OMAP2+ devices. The most significant change
-in functionality comes from the 5th patch which is changing the
-selection of the clocksource timer for OMAP3 and AM335x devices
-when gptimers are used for clocksource. This change came about from
-Vaibhav Bedia's series for AM335x [1]. See patch for more details on
-the exact nature of the change.
+Currently, when configuring the clock-events and clock-source timers
+for OMAP2+ devices, we check whether the timer ID is 12 before
+attempting to set the parent clock for the timer.
 
-Boot tested with and without  device-tree on OMAP2420 H4,
-OMAP3430 SDP, OMAP3430 Beagle Board, OMAP4430 SDP and
-AM335x EVM (AM335x only supports device-tree boot).
+This test was added for OMAP3 general purpose devices (no security
+features enabled) that a 12th timer available but unlike the other
+timers only has a single functional clock source. Calling
+clk_set_parent() for this 12th timer would always return an error
+because there is only one choice for a parent clock. Therefore,
+this hard-coded timer ID test was added.
 
-This series is based upon ARM-SoC next branch.
+To avoid this timer ID test, simply check to see if the timer's current
+parent clock is the desired parent clock and only call clk_set_parent()
+if this is not the case.
 
-[1] https://patchwork.kernel.org/patch/1921421/
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/timer.c |   26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-Jon Hunter (5):
-  ARM: OMAP2+: Display correct system timer name
-  ARM: OMAP2+: Remove hard-coded test on timer ID
-  ARM: OMAP2+: Simplify system timer clock definitions
-  ARM: OMAP2+: Simplify system timers definitions
-  ARM: OMAP3: Update clocksource timer selection
-
- arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
- arch/arm/mach-omap2/board-generic.c  |    2 +-
- arch/arm/mach-omap2/common.h         |    3 +-
- arch/arm/mach-omap2/timer.c          |  134 ++++++++++++++++------------------
- 4 files changed, 67 insertions(+), 74 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 18cb856..69fe623b 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -225,6 +225,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	struct device_node *np;
+ 	struct omap_hwmod *oh;
+ 	struct resource irq, mem;
++	struct clk *src;
+ 	int r = 0;
+ 
+ 	if (of_have_populated_dt()) {
+@@ -279,22 +280,19 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	if (IS_ERR(timer->fclk))
+ 		return -ENODEV;
+ 
+-	/* FIXME: Need to remove hard-coded test on timer ID */
+-	if (gptimer_id != 12) {
+-		struct clk *src;
+-
+-		src = clk_get(NULL, fck_source);
+-		if (IS_ERR(src)) {
+-			r = -EINVAL;
+-		} else {
+-			r = clk_set_parent(timer->fclk, src);
+-			if (IS_ERR_VALUE(r))
+-				pr_warn("%s: %s cannot set source\n",
+-					__func__, oh->name);
+-			clk_put(src);
+-		}
++	src = clk_get(NULL, fck_source);
++	if (IS_ERR(src))
++		return -EINVAL;
++
++	if (clk_get_parent(timer->fclk) != src) {
++		r = clk_set_parent(timer->fclk, src);
++		if (IS_ERR_VALUE(r))
++			pr_warn("%s: %s cannot set source\n",
++				__func__, oh->name);
+ 	}
+ 
++	clk_put(src);
++
+ 	omap_hwmod_setup_one(*name);
+ 	omap_hwmod_enable(oh);
+ 	__omap_dm_timer_init_regs(timer);
 -- 
 1.7.10.4
