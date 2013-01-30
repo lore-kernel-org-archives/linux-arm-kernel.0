@@ -1,41 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 Jan 2013 19:08:51 +0100
-Subject: [PATCH 1/1] pinctrl: nomadik: Rename Device Tree compatible string
-In-Reply-To: <20130130170750.GA5217@gmail.com>
-References: <1359563102-5934-1-git-send-email-linus.walleij@stericsson.com>
- <51094E50.4000302@wwwdotorg.org> <20130130170750.GA5217@gmail.com>
-Message-ID: <CACRpkdZ_4kaEFHmLvgfrsimg7YSY2gnfsQMVfzcYniVT-oR+jQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 30 Jan 2013 13:10:35 -0500
+Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
+ board(DB-MV784MP-GP)
+In-Reply-To: <510959D5.1010305@free-electrons.com>
+References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130130173306.GO7717@titan.lakedaemon.net>
+ <510959D5.1010305@free-electrons.com>
+Message-ID: <20130130181035.GP7717@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 6:07 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> The preference is to use '-' instead of '_' in compatible strings.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Gregory,
 
-This does not apply to pinctrl devel. (Same as linux-next)
+Adding devicetree-discuss.
 
-This is because the two hunks, as compared to the last patch,
-were already in-tree, they were changed as part of patch:
+Guys, how do you prefer to handle plug-in RAM modules?  describe the
+soldered-in amount, or?
 
-commit e32af889458837d11a1ec5ec98934a1e711b049d
-Author: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
-Date:   Mon Dec 17 15:53:24 2012 +0100
+On Wed, Jan 30, 2013 at 06:35:17PM +0100, Gregory CLEMENT wrote:
+> On 01/30/2013 06:33 PM, Jason Cooper wrote:
+> > On Wed, Jan 30, 2013 at 06:26:14PM +0100, Gregory CLEMENT wrote:
+> >> This is the new Armada XP evaluation board from Marvell. It comes with
+> >> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
+> >> Gigabit links.
+> >>
+> >> Support for USB (Host and device), SDIO, PCIe will be added as drivers
+> >> when they become available for Armada XP in mainline.
+> >>
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> ---
+> >>  arch/arm/boot/dts/Makefile         |    1 +
+> >>  arch/arm/boot/dts/armada-xp-gp.dts |   94 ++++++++++++++++++++++++++++++++++++
+> >>  2 files changed, 95 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
+> >>
+...
+> >> +	memory {
+> >> +		device_type = "memory";
+> >> +		reg = <0x00000000 0xC0000000>; /* 3 GB */
+> > 
+> > Is this the soldered on the board amount, or the amount with an
+> > expandable slot filled?
+> 
+> It is not soldered, so you can change the amount of memory
 
-    pinctrl/nomadik: add device tree support
+Well, there's something we don't encounter too much in the embedded
+world.  ;-)  I'm inclined to think the entry here should be the soldered
+on amount, and the bootloader would (hypothetically) change the DT to
+the probed amount.  But I haven't seen a precedent set yet...
 
-    This implements pin multiplexing and pin configuration for
-    the Nomadik pin controller using the device tree.
+thx,
 
-    Signed-off-by: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
-    Reviewed-by: Stephen Warren <swarren@nvidia.com>
-    Reviewed-by: Philippe Langlais <philippe.langlais@stericsson.com>
-    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Since I don't dare to squash this oneliner into that patch
-for fear of Lee's rage, I leave the old patch as it is.
-
-Yours,
-Linus Walleij
+Jason.
