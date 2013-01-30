@@ -1,103 +1,64 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 30 Jan 2013 23:28:36 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
- <20130129184157.GA29274@obsidianresearch.com>
- <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
- <20130129191853.GB29274@obsidianresearch.com>
- <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
- <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
- <20130130103501.1873d39c@skate>
- <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
-Message-ID: <20130130232836.1b1fd89b@skate>
+From: romieu@fr.zoreil.com (Francois Romieu)
+Date: Wed, 30 Jan 2013 23:02:08 +0100
+Subject: [PATCH v2 1/2] drivers: net: cpsw: Add helper functions for VLAN
+ ALE implementation
+In-Reply-To: <1359572855-12344-2-git-send-email-mugunthanvnm@ti.com>
+References: <1359572855-12344-1-git-send-email-mugunthanvnm@ti.com>
+ <1359572855-12344-2-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <20130130220208.GA22847@electric-eye.fr.zoreil.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+Mugunthan V N <mugunthanvnm@ti.com> :
+[...]
+> diff --git a/drivers/net/ethernet/ti/cpsw_ale.c b/drivers/net/ethernet/ti/cpsw_ale.c
+> index 0e9ccc2..18b88ce 100644
+> --- a/drivers/net/ethernet/ti/cpsw_ale.c
+> +++ b/drivers/net/ethernet/ti/cpsw_ale.c
+[...]
+> @@ -274,19 +292,26 @@ int cpsw_ale_flush(struct cpsw_ale *ale, int port_mask)
+>  	return 0;
+>  }
+>  
+> -int cpsw_ale_add_ucast(struct cpsw_ale *ale, u8 *addr, int port, int flags)
+> +int cpsw_ale_add_ucast(struct cpsw_ale *ale, u8 *addr, int port,
+> +		       int flags, u16 vid)
+>  {
+>  	u32 ale_entry[ALE_ENTRY_WORDS] = {0, 0, 0};
+>  	int idx;
+>  
+> -	cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_ADDR);
+> +	if (flags & ALE_VLAN) {
+> +		cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_VLAN_ADDR);
+> +		cpsw_ale_set_vlan_id(ale_entry, vid);
+> +	} else {
+> +		cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_ADDR);
+> +	}
+> +
+[...]
+> +	if (flags & ALE_VLAN) {
+> +		cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_VLAN_ADDR);
+> +		cpsw_ale_set_vlan_id(ale_entry, vid);
+> +	} else {
+> +		cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_ADDR);
+> +	}
+> +
 
-On Wed, 30 Jan 2013 11:52:15 -0700, Bjorn Helgaas wrote:
+It could be fctored out.
 
-> I'm most concerned about the stuff in drivers/pci.  I hesitate to
-> merge drivers/pci/sw-pci-pci-bridge.c as-is because it's a model
-> that's not connected to hardware and only works in a completely static
-> situation, and the rest of the PCI core can't really deal with that.
-> 
-> But I don't think supporting hotplug should be a show-stopper at this
-> point, either.  It sounds like we might be heading towards hooking
-> this up more directly to the Marvell hardware, which will make it more
-> arch-dependent.  Something like that could either go in arch/arm, or
-> in some not-quite-so-generic spot under drivers/pci.
+[...]
+> @@ -362,6 +395,55 @@ int cpsw_ale_del_mcast(struct cpsw_ale *ale, u8 *addr, int port_mask)
+>  	return 0;
+>  }
+>  
+> +int cpsw_ale_add_vlan(struct cpsw_ale *ale, u16 vid, int port, int untag,
+> +		      int reg_mcast, int unreg_mcast)
+> +{
+[...]
+> +int cpsw_ale_del_vlan(struct cpsw_ale *ale, u16 vid, int port_mask)
+[...]
 
-If you really don't want sw-pci-pci-bridge.c in drivers/pci, then I can
-make it a part of the drivers/pci/host/pci-mvebu.c driver itself. I
-initially followed the idea started by Thierry Redding for the emulated
-host bridge, but if you feel that this emulated PCI-to-PCI bridge is
-too specific to this driver, then I'm fine with keeping it inside the
-driver itself.
+Patch #2 doesn't use the returned status code.
 
-> >> I also forgot about the bus number munging in mvebu_pcie_rd_conf().
-> >> The PCI core can update the bridge secondary/subordinate registers.
-> >> It looks like you don't support writing to them, and the read path
-> >> (pci_sw_pci_bridge_read()) looks like it doesn't do any translation
-> >> between the hardware and Linux bus numbers.  I don't understand the
-> >> system well enough to know if this is an issue.
-> >
-> > Right. Could you explain a little bit for what reasons the PCI core
-> > could update the secondary/subordinate registers, and to what
-> > values it sets them?
-> 
-> The secondary/subordinate registers effectively define a bus number
-> aperture that tells the bridge which transactions to claim and forward
-> downstream.  When enumerating devices, we may update the subordinate
-> bus number to widen the aperture so we can enumerate an arbitrary tree
-> behind the bridge.  When we're finished, we'll probably narrow it by
-> updating the subordinate again, so the unused bus number space can be
-> used for other bridges.  I don't know the exact details of the
-> algorithm, and they're likely to change anyway, but pci_scan_bridge()
-> is where most of it happens.
-> 
-> It looks like your current system doesn't support trees below the
-> bridges, but hopefully we can make it so the generic enumeration
-> algorithms still work.
-
-In practice, in our situation, there isn't a tree below the bridge.
-There is one single device. I'd prefer to not implement features that I
-cannot effectively test, and let the implementation of those additional
-features to whoever will need them, and therefore be able to test them.
-
-I guess that if I integrate the PCI-to-PCI bridge emulation code within
-the Marvell driver, then I can keep it fairly limited to whatever the
-Marvell PCI driver requires, no?
-
-> > For now, I statically assign the secondary bus register value to be
-> > X+1, where X is the number of the PCIe interface, since X=0 is
-> > reserved for the root bus (which has the host bridge and the
-> > PCI-to-PCI bridges).
-> 
-> That makes sense but limits you to a single bus (and really, a single
-> device since this is PCIe) below the bridge.
-
-Which is exactly what is happening here.
-
-> > Also, could you detail what kind of translation I should be doing
-> > when reading the hardware and Linux bus numbers?
-> 
-> I'm hoping that the register Jason mentioned is enough to avoid the
-> need for translation.  If it's not, we can explore this a bit more.
-
-Ok.
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ueimor
