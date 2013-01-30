@@ -1,32 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 Jan 2013 16:58:24 +0000
-Subject: [PATCH] ARM: ux500: correct typo in pinctrl Device Tree node
-In-Reply-To: <51094E50.4000302@wwwdotorg.org>
-References: <1359563102-5934-1-git-send-email-linus.walleij@stericsson.com>
- <51094E50.4000302@wwwdotorg.org>
-Message-ID: <20130130165824.GA5078@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 30 Jan 2013 11:04:26 -0600
+Subject: [PATCH 0/5] ARM: OMAP2+: System timer updates
+Message-ID: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jan 2013, Stephen Warren wrote:
+This series consists mainly of clean-ups for clockevents and
+clocksource timers on OMAP2+ devices. The most significant change
+in functionality comes from the 5th patch which is changing the
+selection of the clocksource timer for OMAP3 and AM335x devices
+when gptimers are used for clocksource. This change came about from
+Vaibhav Bedia's series for AM335x [1]. See patch for more details on
+the exact nature of the change.
 
-> On 01/30/2013 09:25 AM, Linus Walleij wrote:
-> > The preference is to use '-' instead of '_' in compatible strings.
-> 
-> > diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-> 
-> >  		pinctrl {
-> > -			compatible = "stericsson,nmk_pinctrl";
-> > +			compatible = "stericsson,nmk-pinctrl";
-> 
-> Is there a driver-side patch which this depends on too?
+Boot tested with and without  device-tree on OMAP2420 H4,
+OMAP3430 SDP, OMAP3430 Beagle Board, OMAP4430 SDP and
+AM335x EVM (AM335x only supports device-tree boot).
 
-This seems very strange.
+This series is based upon ARM-SoC next branch.
 
-I'm going to reply to this email again with how the patch should look. 
+[1] https://patchwork.kernel.org/patch/1921421/
+
+Jon Hunter (5):
+  ARM: OMAP2+: Display correct system timer name
+  ARM: OMAP2+: Remove hard-coded test on timer ID
+  ARM: OMAP2+: Simplify system timer clock definitions
+  ARM: OMAP2+: Simplify system timers definitions
+  ARM: OMAP3: Update clocksource timer selection
+
+ arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
+ arch/arm/mach-omap2/board-generic.c  |    2 +-
+ arch/arm/mach-omap2/common.h         |    3 +-
+ arch/arm/mach-omap2/timer.c          |  134 ++++++++++++++++------------------
+ 4 files changed, 67 insertions(+), 74 deletions(-)
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10.4
