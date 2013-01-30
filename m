@@ -1,30 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 Jan 2013 10:39:14 +0100
-Subject: [GIT PULL] ux500 <mach/id.h> removal
-In-Reply-To: <CAOesGMiKCHUz9BJ31o-4kthr0CZABuL7SuuMNEjbkUQ06KsfMw@mail.gmail.com>
-References: <CACRpkdY9BDyGQ-DiEhTiyHEYoxpGiL+H0baqsBYX_a-0upktUQ@mail.gmail.com>
- <CAOesGMiKCHUz9BJ31o-4kthr0CZABuL7SuuMNEjbkUQ06KsfMw@mail.gmail.com>
-Message-ID: <CACRpkdYmTTgpnAOoNM3RJiF_oADgbuGK-vw6JF8J9rPAttA5PQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Jan 2013 09:41:35 +0000
+Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <CAKohpon30hB9S+MUyXwZpefAGQE4hvF36d-6jXNRk_XoK5dwww@mail.gmail.com>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <201301291621.59425.arnd@arndb.de>
+ <CAKohpon30hB9S+MUyXwZpefAGQE4hvF36d-6jXNRk_XoK5dwww@mail.gmail.com>
+Message-ID: <201301300941.35886.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 1:12 AM, Olof Johansson <olof@lixom.net> wrote:
-> [Me]
->>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
->> tags/ux500-no-idh
->
-> Pulled in.
->
-> This has a somewhat annoying (but trivial) conflict against your own
-> code (the cpufreq driver changes).
+On Wednesday 30 January 2013, Viresh Kumar wrote:
+> On 29 January 2013 21:51, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 29 January 2013, Viresh Kumar wrote:
+> >> On 29 January 2013 19:01, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > Ah, good. So I guess the "dma-requests" property should actually
+> >> > be "16" then.
+> >>
+> >> yes, even i was checking on that separately :)
+> >
+> > Actually, I just discovered something odd in the
+> > arch/arm/mach-spear/spear13xx-dma.h file that gets removed
+> > in the last patch: there, we define request numbers up to
+> > 32, e.g.
+> >
+> > -       SPEAR1310_DMA_REQ_UART2_RX = 14,
+> > -       SPEAR1310_DMA_REQ_UART2_TX = 15,
+> > -       SPEAR1310_DMA_REQ_UART5_RX = 16,
+> > -       SPEAR1310_DMA_REQ_UART5_TX = 17,
+> >
+> > What is the meaning of this, if the maximum request number is 15?
+> 
+> I knew you will come to this :)
+> So, the hardware is like: there are 16 request line slots per master, a
+> platform can choose to connect same or separate devices to these.
+> 
+> So, these are really 16 per master.
 
-Arnd always told me to split stuff cleanly on branches, which of course
-leads to conflicts like that, but I thought he wanted them, rather than
-huge accumulated patch sets built on to of each othere ... a bit hard to
-do the right thing here, what would have been the right way?
+Ok, I see. Do you know how these are numbered in the data sheet?
 
-Does it help if I base stuff off ARM SoC tree branches, and which
-ones can be relied upon in that case?
+If the convention is to have subsequent numbers for these in the
+hardware description, we should probably just have that single
+request number in the binding, too, and calculate the master number
+from that. If it lists pairs of request/master number, we should
+use pairs in the binding as well, in the same order.
 
-Yours,
-Linus Walleij
+> > Ok. Would it be enough to have only one master and one request
+> > field in the DT dma descriptor then, and have the code figure
+> > whether to use it as source or destination, based on the
+> > configuration? Which one should come first? Since you have
+> > multiple masters per controller, and multiple requests per
+> > master, it sounds like the cleanest descriptor form would
+> > be
+> >
+> >         <controller master request>;
+> >
+> > Or possibly
+> >
+> >         <controller master request direction>;
+> >
+> > if the direction needs to be known at the time the channel
+> > is requested.
+> 
+> Its better to keep masters as is. So, that we can use appropriate
+> masters for peripheral and memory to make the transfer fast.
+
+So you mean keep the format as
+
+	<controller request src-master dst-master>;
+
+?
+
+	Arnd
