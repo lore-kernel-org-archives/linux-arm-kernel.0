@@ -1,46 +1,53 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 30 Jan 2013 02:00:29 -0500
-Subject: [PATCH v6 10/10] ARM: dts: add AM33XX SPI DMA support
-In-Reply-To: <1359529229-22207-1-git-send-email-mporter@ti.com>
-References: <1359529229-22207-1-git-send-email-mporter@ti.com>
-Message-ID: <1359529229-22207-11-git-send-email-mporter@ti.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Wed, 30 Jan 2013 07:10:20 +0000
+Subject: [PATCH v2] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+In-Reply-To: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
+References: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EAF880F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds DMA resources to the AM33XX SPI nodes.
+On Tue, Jan 29, 2013 at 08:23:40, Shawn Guo wrote:
+> As multiplatform build is being adopted by more and more ARM platforms,
+> initcall function should be used very carefully.  For example, when
+> GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
+> will be called on all the platforms to initialize cpufreq-cpu0 driver.
+> 
+> To eliminate this undesired the effect, the patch changes cpufreq-cpu0
+> driver to have it instantiated as a platform_driver.  Then it will only
+> run on platforms that create the platform_device "cpufreq-cpu0".
+> 
+> Along with the change, it also changes cpu_dev to be &pdev->dev,
+> so that managed functions can start working, and module build gets
+> supported too.
+> 
+> The existing users of cpufreq-cpu0 driver highbank and am33xx are also
+> updated accordingly to adapt the changes.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> Cc: AnilKumar Ch <anilkumar@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> ---
+> Changes since v1:
+>  * Migrate cpufreq-cpu0 users in the same patch
+> 
+> Rafael,
+> 
+> The patch is based on Mark's highbank-cpufreq series and Nishanth's
+> "PM / OPP : export symbol consolidation" sereis.
+> 
+> Mark, AnilKumar,
+> 
+> I only compile-tested it on highbank and omap2.  Please give it a test
+> no hardware to make sure cpufreq-cpu0 still works for you.  Thanks.
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+Hi Shawn,
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index e711ffb..ddf702a 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -328,6 +328,11 @@
- 			interrupt = <65>;
- 			ti,spi-num-cs = <2>;
- 			ti,hwmods = "spi0";
-+			dmas = <&edma 16
-+				&edma 17
-+				&edma 18
-+				&edma 19>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
- 		};
- 
-@@ -339,6 +344,11 @@
- 			interrupt = <125>;
- 			ti,spi-num-cs = <2>;
- 			ti,hwmods = "spi1";
-+			dmas = <&edma 42
-+				&edma 43
-+				&edma 44
-+				&edma 45>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
- 		};
- 
--- 
-1.7.9.5
+I hope this is based on linux-omap/master, to test the driver I have
+to add some patches on top of this patch, because of recent changes.
+I will provide the test details once I am done.
+
+Thanks
+AnilKumar
