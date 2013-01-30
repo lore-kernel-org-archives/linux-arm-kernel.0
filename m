@@ -1,169 +1,483 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Wed, 30 Jan 2013 16:36:03 +0900
-Subject: [PATCH v3 2/3] ARM: static_vm: introduce an infrastructure for
- static mapped area
-In-Reply-To: <alpine.LFD.2.02.1301291840580.6300@xanadu.home>
-References: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1358990934-4893-3-git-send-email-iamjoonsoo.kim@lge.com>
- <alpine.LFD.2.02.1301291840580.6300@xanadu.home>
-Message-ID: <20130130073603.GA2540@lge.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 30 Jan 2013 09:40:52 +0200
+Subject: [PATCH v5 03/14] ARM: edma: add AM33XX support to the private
+ EDMA API
+In-Reply-To: <20130130064104.GN5256@beef>
+References: <1358281974-8411-1-git-send-email-mporter@ti.com>
+ <1358281974-8411-4-git-send-email-mporter@ti.com>
+ <CAHp75VeFZ19CCL-4huLNWbsXT-8sGrcvtxN=Dm0s+ojNA3w-3g@mail.gmail.com>
+ <20130130064104.GN5256@beef>
+Message-ID: <CAHp75Vdbv2tSLKY8OpPD7Y2Bf2dL9qn-gG7w=9KxMqL_zPA6sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Nicolas.
+On Wed, Jan 30, 2013 at 8:41 AM, Matt Porter <mporter@ti.com> wrote:
+> On Mon, Jan 28, 2013 at 09:27:24PM +0200, Andy Shevchenko wrote:
+>> On Tue, Jan 15, 2013 at 10:32 PM, Matt Porter <mporter@ti.com> wrote:
+>> > Adds support for parsing the TI EDMA DT data into the required
+>> > EDMA private API platform data. Enables runtime PM support to
+>> > initialize the EDMA hwmod. Adds AM33XX EMDA crossbar event mux
+>> > support.
+>> >
+>> > Signed-off-by: Matt Porter <mporter@ti.com>
+>> > ---
+>> >  arch/arm/common/edma.c             |  314 ++++++++++++++++++++++++++++++++++--
+>> >  include/linux/platform_data/edma.h |    1 +
+>> >  2 files changed, 306 insertions(+), 9 deletions(-)
+>> >
+>> > diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+>> > index 2dce245..beeb1d2 100644
+>> > --- a/arch/arm/common/edma.c
+>> > +++ b/arch/arm/common/edma.c
+>> > @@ -24,6 +24,13 @@
+>> >  #include <linux/platform_device.h>
+>> >  #include <linux/io.h>
+>> >  #include <linux/slab.h>
+>> > +#include <linux/edma.h>
+>> > +#include <linux/err.h>
+>> > +#include <linux/of_address.h>
+>> > +#include <linux/of_device.h>
+>> > +#include <linux/of_dma.h>
+>> > +#include <linux/of_irq.h>
+>> > +#include <linux/pm_runtime.h>
+>> >
+>> >  #include <linux/platform_data/edma.h>
+>> >
+>> > @@ -723,6 +730,9 @@ EXPORT_SYMBOL(edma_free_channel);
+>> >   */
+>> >  int edma_alloc_slot(unsigned ctlr, int slot)
+>> >  {
+>> > +       if (!edma_cc[ctlr])
+>> > +               return -EINVAL;
+>> > +
+>> >         if (slot >= 0)
+>> >                 slot = EDMA_CHAN_SLOT(slot);
+>> >
+>> > @@ -1366,31 +1376,291 @@ void edma_clear_event(unsigned channel)
+>> >  EXPORT_SYMBOL(edma_clear_event);
+>> >
+>> >  /*-----------------------------------------------------------------------*/
+>> > +static int edma_of_read_u32_to_s8_array(const struct device_node *np,
+>> > +                                        const char *propname, s8 *out_values,
+>> > +                                        size_t sz)
+>>
+>> I'm sorry I didn't get why you couldn't use of_property_read_u8_array() ?
+>> The similar comment to u16 and so on.
+>
+> There's some manipulation of the legacy Davinci platform data
+> structures going on here. The driving reason was to not change any of
+> the davinci platforms pdata which uses s8/s16 tables of mapping values
+> with signed values as terminators. These versions below add the
+> convert to the signed value and terminate the array as needed by the
+> existing driver. This will all go away when the driver is rewritten and
+> merged into drivers/dma/edma.c. At that point I want to throwaway all
+> these legacy data structures. First, there's some more drivers to
+> convert to dmaengine api.
+>
 
-On Tue, Jan 29, 2013 at 07:05:32PM -0500, Nicolas Pitre wrote:
-> On Thu, 24 Jan 2013, Joonsoo Kim wrote:
-> 
-> > From: Joonsoo Kim <js1304@gmail.com>
-> > 
-> > In current implementation, we used ARM-specific flag, that is,
-> > VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
-> > The purpose of static mapped area is to re-use static mapped area when
-> > entire physical address range of the ioremap request can be covered
-> > by this area.
-> > 
-> > This implementation causes needless overhead for some cases.
-> > For example, assume that there is only one static mapped area and
-> > vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
-> > deciding whether it is matched or not. Moreover, even if there is
-> > no static mapped area and vmlist has 300 areas, every time we call
-> > ioremap, we check 300 areas in now.
-> > 
-> > If we construct a extra list for static mapped area, we can eliminate
-> > above mentioned overhead.
-> > With a extra list, if there is one static mapped area,
-> > we just check only one area and proceed next operation quickly.
-> > 
-> > In fact, it is not a critical problem, because ioremap is not frequently
-> > used. But reducing overhead is better idea.
-> > 
-> > Another reason for doing this work is for removing architecture dependency
-> > on vmalloc layer. I think that vmlist and vmlist_lock is internal data
-> > structure for vmalloc layer. Some codes for debugging and stat inevitably
-> > use vmlist and vmlist_lock. But it is preferable that they are used
-> > as least as possible in outside of vmalloc.c
-> > 
-> > Now, I introduce an ARM-specific infrastructure for static mapped area. In
-> > the following patch, we will use this and resolve above mentioned problem.
-> > 
-> > Signed-off-by: Joonsoo Kim <js1304@gmail.com>
-> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> 
-> First of all, I don't think you really need a new file with a global 
-> scope header file.  Given that this code is meant to be used only for 
-> ioremap optimization  on ARM, it is probably a better idea to simply put 
-> it all into arch/arm/mm/ioremap.c instead.  The only function that needs 
-> to be exported out of ioremap.c is insert_static_vm(), and only for the 
-> benefit of arch/arm/mm/mmu.c, therefore this function prototype may as 
-> well just be added to arch/arm/mm/mm.h.
+I mean instead of custom functions you could use existing ones.
+And sign here will be implicitly applied.
 
-I agree with your all opinions.
-I will re-work and will re-send v4 as soon as possible.
-Thanks for review.
+So, what I propose is to do something like this
 
-> More comments below.
-> 
-> > diff --git a/arch/arm/include/asm/mach/static_vm.h b/arch/arm/include/asm/mach/static_vm.h
-> > new file mode 100644
-> > index 0000000..72c8339
-> > --- /dev/null
-> > +++ b/arch/arm/include/asm/mach/static_vm.h
-> > @@ -0,0 +1,45 @@
-> > +/*
-> > + * arch/arm/include/asm/mach/static_vm.h
-> > + *
-> > + * Copyright (C) 2012 LG Electronics, Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program; if not, write to the Free Software
-> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-> > + */
-> > +
-> > +#ifndef _ASM_MACH_STATIC_VM_H
-> > +#define _ASM_MACH_STATIC_VM_H
-> > +
-> > +#include <linux/types.h>
-> > +#include <linux/vmalloc.h>
-> > +
-> > +struct static_vm {
-> > +	struct static_vm	*next;
-> > +	void			*vaddr;
-> > +	unsigned long		size;
-> > +	unsigned long		flags;
-> > +	phys_addr_t		paddr;
-> > +	const void		*caller;
-> > +};
-> 
-> Here you're duplicating most of the vm_struct content for no obvious 
-> reasons.  Patch #3 even allocates both a vm_struct and a static_vm 
-> instance in parallel for each mapping.  Instead, you should consider 
-> something like this:
-> 
-> struct static_vm {
-> 	struct static_vm *next;
-> 	struct vm_struct vm;
-> };
-> 
-> This way, you only need to allocate one structure:
-> 
-> 	struct static_vm *svm = early_alloc(...);
-> 	...
-> 	svm->vm.addr = addr;
-> 	...
-> 	vm_area_add_early(&svm->vm);
-> 	insert_static_vm(svm);
+static int edma_of_read_u32_to_s8_array(const struct device_node *np,
+                                        const char *propname, s8 *out_values,
+                                        size_t sz)
+{
 
-Yes!
-It's good idea.
+int ret;
+ret = of_property_read_u8_array(np, propname, out_values, sz);
+if (ret)
+ return ret;
 
-> And then, it would make sense for the insert_static_vm() to do the 
-> vm_area_add_early() call itself as well.
+       /* Terminate it */
+       *out_values++ = -1;
+       *out_values++ = -1;
+}
 
-Okay.
+> -Matt
+>>
+>> > +{
+>> > +       struct property *prop = of_find_property(np, propname, NULL);
+>> > +       const __be32 *val;
+>> > +
+>> > +       if (!prop)
+>> > +               return -EINVAL;
+>> > +       if (!prop->value)
+>> > +               return -ENODATA;
+>> > +       if ((sz * sizeof(u32)) > prop->length)
+>> > +               return -EOVERFLOW;
+>> > +
+>> > +       val = prop->value;
+>> > +
+>> > +       while (sz--)
+>> > +               *out_values++ = (s8)(be32_to_cpup(val++) & 0xff);
+>> > +
+>> > +       /* Terminate it */
+>> > +       *out_values++ = -1;
+>> > +       *out_values++ = -1;
+>> > +
+>> > +       return 0;
+>> > +}
+>> > +
+>> > +static int edma_of_read_u32_to_s16_array(const struct device_node *np,
+>> > +                                        const char *propname, s16 *out_values,
+>> > +                                        size_t sz)
+>> > +{
+>> > +       struct property *prop = of_find_property(np, propname, NULL);
+>> > +       const __be32 *val;
+>> > +
+>> > +       if (!prop)
+>> > +               return -EINVAL;
+>> > +       if (!prop->value)
+>> > +               return -ENODATA;
+>> > +       if ((sz * sizeof(u32)) > prop->length)
+>> > +               return -EOVERFLOW;
+>> > +
+>> > +       val = prop->value;
+>> > +
+>> > +       while (sz--)
+>> > +               *out_values++ = (s16)(be32_to_cpup(val++) & 0xffff);
+>> > +
+>> > +       /* Terminate it */
+>> > +       *out_values++ = -1;
+>> > +       *out_values++ = -1;
+>> > +
+>> > +       return 0;
+>> > +}
+>> > +
+>> > +static int edma_xbar_event_map(struct device *dev,
+>> > +                              struct device_node *node,
+>> > +                              struct edma_soc_info *pdata, int len)
+>> > +{
+>> > +       int ret = 0;
+>> > +       int i;
+>> > +       struct resource res;
+>> > +       void *xbar;
+>> > +       const s16 (*xbar_chans)[2];
+>> > +       u32 shift, offset, mux;
+>> > +
+>> > +       xbar_chans = devm_kzalloc(dev,
+>> > +                                 len/sizeof(s16) + 2*sizeof(s16),
+>> > +                                 GFP_KERNEL);
+>> > +       if (!xbar_chans)
+>> > +               return -ENOMEM;
+>> > +
+>> > +       ret = of_address_to_resource(node, 1, &res);
+>> > +       if (IS_ERR_VALUE(ret))
+>> > +               return -EIO;
+>> > +
+>> > +       xbar = devm_ioremap(dev, res.start, resource_size(&res));
+>> > +       if (!xbar)
+>> > +               return -ENOMEM;
+>> > +
+>> > +       ret = edma_of_read_u32_to_s16_array(node,
+>> > +                                           "ti,edma-xbar-event-map",
+>> > +                                           (s16 *)xbar_chans,
+>> > +                                           len/sizeof(u32));
+>> > +       if (IS_ERR_VALUE(ret))
+>> > +               return -EIO;
+>> > +
+>> > +       for (i = 0; xbar_chans[i][0] != -1; i++) {
+>> > +               shift = (xbar_chans[i][1] % 4) * 8;
+>> > +               offset = xbar_chans[i][1] >> 2;
+>> > +               offset <<= 2;
+>> > +               mux = readl((void *)((u32)xbar + offset));
+>> > +               mux &= ~(0xff << shift);
+>> > +               mux |= xbar_chans[i][0] << shift;
+>> > +               writel(mux, (void *)((u32)xbar + offset));
+>> > +       }
+>> > +
+>> > +       pdata->xbar_chans = xbar_chans;
+>> > +
+>> > +       return 0;
+>> > +}
+>> > +
+>> > +static int edma_of_parse_dt(struct device *dev,
+>> > +                           struct device_node *node,
+>> > +                           struct edma_soc_info *pdata)
+>> > +{
+>> > +       int ret = 0;
+>> > +       u32 value;
+>> > +       struct property *prop;
+>> > +       size_t sz;
+>> > +       struct edma_rsv_info *rsv_info;
+>> > +       const s16 (*rsv_chans)[2], (*rsv_slots)[2];
+>> > +       const s8 (*queue_tc_map)[2], (*queue_priority_map)[2];
+>> > +
+>> > +       memset(pdata, 0, sizeof(struct edma_soc_info));
+>> > +
+>> > +       ret = of_property_read_u32(node, "dma-channels", &value);
+>> > +       if (ret < 0)
+>> > +               return ret;
+>> > +       pdata->n_channel = value;
+>> > +
+>> > +       ret = of_property_read_u32(node, "ti,edma-regions", &value);
+>> > +       if (ret < 0)
+>> > +               return ret;
+>> > +       pdata->n_region = value;
+>> > +
+>> > +       ret = of_property_read_u32(node, "ti,edma-slots", &value);
+>> > +       if (ret < 0)
+>> > +               return ret;
+>> > +       pdata->n_slot = value;
+>> > +
+>> > +       pdata->n_cc = 1;
+>> > +       pdata->n_tc = 3;
+>> > +
+>> > +       rsv_info =
+>> > +               devm_kzalloc(dev, sizeof(struct edma_rsv_info), GFP_KERNEL);
+>> > +       if (!rsv_info)
+>> > +               return -ENOMEM;
+>> > +       pdata->rsv = rsv_info;
+>> > +
+>> > +       /* Build the reserved channel/slots arrays */
+>> > +       prop = of_find_property(node, "ti,edma-reserved-channels", &sz);
+>> > +       if (prop) {
+>> > +               rsv_chans = devm_kzalloc(dev,
+>> > +                                        sz/sizeof(s16) + 2*sizeof(s16),
+>> > +                                        GFP_KERNEL);
+>> > +               if (!rsv_chans)
+>> > +                       return -ENOMEM;
+>> > +               pdata->rsv->rsv_chans = rsv_chans;
+>> > +
+>> > +               ret = edma_of_read_u32_to_s16_array(node,
+>> > +                                                   "ti,edma-reserved-channels",
+>> > +                                                   (s16 *)rsv_chans,
+>> > +                                                   sz/sizeof(u32));
+>> > +               if (ret < 0)
+>> > +                       return ret;
+>> > +       }
+>> > +
+>> > +       prop = of_find_property(node, "ti,edma-reserved-slots", &sz);
+>> > +       if (prop) {
+>> > +               rsv_slots = devm_kzalloc(dev,
+>> > +                                        sz/sizeof(s16) + 2*sizeof(s16),
+>> > +                                        GFP_KERNEL);
+>> > +               if (!rsv_slots)
+>> > +                       return -ENOMEM;
+>> > +               pdata->rsv->rsv_slots = rsv_slots;
+>> > +
+>> > +               ret = edma_of_read_u32_to_s16_array(node,
+>> > +                                                   "ti,edma-reserved-slots",
+>> > +                                                   (s16 *)rsv_slots,
+>> > +                                                   sz/sizeof(u32));
+>> > +               if (ret < 0)
+>> > +                       return ret;
+>> > +       }
+>> > +
+>> > +       prop = of_find_property(node, "ti,edma-queue-tc-map", &sz);
+>> > +       if (!prop)
+>> > +               return -EINVAL;
+>> > +
+>> > +       queue_tc_map = devm_kzalloc(dev,
+>> > +                                   sz/sizeof(s8) + 2*sizeof(s8),
+>> > +                                   GFP_KERNEL);
+>> > +       if (!queue_tc_map)
+>> > +               return -ENOMEM;
+>> > +       pdata->queue_tc_mapping = queue_tc_map;
+>> > +
+>> > +       ret = edma_of_read_u32_to_s8_array(node,
+>> > +                                          "ti,edma-queue-tc-map",
+>> > +                                          (s8 *)queue_tc_map,
+>> > +                                          sz/sizeof(u32));
+>> > +       if (ret < 0)
+>> > +               return ret;
+>> > +
+>> > +       prop = of_find_property(node, "ti,edma-queue-priority-map", &sz);
+>> > +       if (!prop)
+>> > +               return -EINVAL;
+>> > +
+>> > +       queue_priority_map = devm_kzalloc(dev,
+>> > +                                         sz/sizeof(s8) + 2*sizeof(s8),
+>> > +                                         GFP_KERNEL);
+>> > +       if (!queue_priority_map)
+>> > +               return -ENOMEM;
+>> > +       pdata->queue_priority_mapping = queue_priority_map;
+>> > +
+>> > +       ret = edma_of_read_u32_to_s8_array(node,
+>> > +                                          "ti,edma-queue-tc-map",
+>> > +                                          (s8 *)queue_priority_map,
+>> > +                                          sz/sizeof(u32));
+>> > +       if (ret < 0)
+>> > +               return ret;
+>> > +
+>> > +       ret = of_property_read_u32(node, "ti,edma-default-queue", &value);
+>> > +       if (ret < 0)
+>> > +               return ret;
+>> > +       pdata->default_queue = value;
+>> > +
+>> > +       prop = of_find_property(node, "ti,edma-xbar-event-map", &sz);
+>> > +       if (prop)
+>> > +               ret = edma_xbar_event_map(dev, node, pdata, sz);
+>> > +
+>> > +       return ret;
+>> > +}
+>> > +
+>> > +static struct of_dma_filter_info edma_filter_info = {
+>> > +       .filter_fn = edma_filter_fn,
+>> > +};
+>> >
+>> >  static int edma_probe(struct platform_device *pdev)
+>> >  {
+>> >         struct edma_soc_info    **info = pdev->dev.platform_data;
+>> > +       struct edma_soc_info    *ninfo[EDMA_MAX_CC] = {NULL, NULL};
+>> > +       struct edma_soc_info    tmpinfo;
+>> >         const s8                (*queue_priority_mapping)[2];
+>> >         const s8                (*queue_tc_mapping)[2];
+>> >         int                     i, j, off, ln, found = 0;
+>> >         int                     status = -1;
+>> >         const s16               (*rsv_chans)[2];
+>> >         const s16               (*rsv_slots)[2];
+>> > +       const s16               (*xbar_chans)[2];
+>> >         int                     irq[EDMA_MAX_CC] = {0, 0};
+>> >         int                     err_irq[EDMA_MAX_CC] = {0, 0};
+>> > -       struct resource         *r[EDMA_MAX_CC] = {NULL};
+>> > +       struct resource         *r[EDMA_MAX_CC] = {NULL, NULL};
+>> > +       struct resource         res[EDMA_MAX_CC];
+>> >         resource_size_t         len[EDMA_MAX_CC];
+>> >         char                    res_name[10];
+>> >         char                    irq_name[10];
+>> > +       struct device_node      *node = pdev->dev.of_node;
+>> > +       struct device           *dev = &pdev->dev;
+>> > +       int                     ret;
+>> > +
+>> > +       if (node) {
+>> > +               info = ninfo;
+>> > +               edma_of_parse_dt(dev, node, &tmpinfo);
+>> > +               info[0] = &tmpinfo;
+>> > +
+>> > +               dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
+>> > +               of_dma_controller_register(dev->of_node,
+>> > +                                          of_dma_simple_xlate,
+>> > +                                          &edma_filter_info);
+>> > +       }
+>> >
+>> >         if (!info)
+>> >                 return -ENODEV;
+>> >
+>> > +       pm_runtime_enable(dev);
+>> > +       ret = pm_runtime_get_sync(dev);
+>> > +       if (IS_ERR_VALUE(ret)) {
+>> > +               dev_err(dev, "pm_runtime_get_sync() failed\n");
+>> > +               return ret;
+>> > +       }
+>> > +
+>> >         for (j = 0; j < EDMA_MAX_CC; j++) {
+>> > -               sprintf(res_name, "edma_cc%d", j);
+>> > -               r[j] = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>> > +               if (!info[j]) {
+>> > +                       if (!found)
+>> > +                               return -ENODEV;
+>> > +                       break;
+>> > +               }
+>> > +               if (node) {
+>> > +                       ret = of_address_to_resource(node, j, &res[j]);
+>> > +                       if (!IS_ERR_VALUE(ret))
+>> > +                               r[j] = &res[j];
+>> > +               } else {
+>> > +                       sprintf(res_name, "edma_cc%d", j);
+>> > +                       r[j] = platform_get_resource_byname(pdev,
+>> > +                                               IORESOURCE_MEM,
+>> >                                                 res_name);
+>> > -               if (!r[j] || !info[j]) {
+>> > +               }
+>> > +               if (!r[j]) {
+>> >                         if (found)
+>> >                                 break;
+>> >                         else
+>> > @@ -1465,8 +1735,22 @@ static int edma_probe(struct platform_device *pdev)
+>> >                         }
+>> >                 }
+>> >
+>> > -               sprintf(irq_name, "edma%d", j);
+>> > -               irq[j] = platform_get_irq_byname(pdev, irq_name);
+>> > +               /* Clear the xbar mapped channels in unused list */
+>> > +               xbar_chans = info[j]->xbar_chans;
+>> > +               if (xbar_chans) {
+>> > +                       for (i = 0; xbar_chans[i][1] != -1; i++) {
+>> > +                               off = xbar_chans[i][1];
+>> > +                               clear_bits(off, 1,
+>> > +                                       edma_cc[j]->edma_unused);
+>> > +                       }
+>> > +               }
+>> > +
+>> > +               if (node)
+>> > +                       irq[j] = irq_of_parse_and_map(node, 0);
+>> > +               else {
+>> > +                       sprintf(irq_name, "edma%d", j);
+>> > +                       irq[j] = platform_get_irq_byname(pdev, irq_name);
+>> > +               }
+>> >                 edma_cc[j]->irq_res_start = irq[j];
+>> >                 status = request_irq(irq[j], dma_irq_handler, 0, "edma",
+>> >                                         &pdev->dev);
+>> > @@ -1476,8 +1760,12 @@ static int edma_probe(struct platform_device *pdev)
+>> >                         goto fail;
+>> >                 }
+>> >
+>> > -               sprintf(irq_name, "edma%d_err", j);
+>> > -               err_irq[j] = platform_get_irq_byname(pdev, irq_name);
+>> > +               if (node)
+>> > +                       err_irq[j] = irq_of_parse_and_map(node, 2);
+>> > +               else {
+>> > +                       sprintf(irq_name, "edma%d_err", j);
+>> > +                       err_irq[j] = platform_get_irq_byname(pdev, irq_name);
+>> > +               }
+>> >                 edma_cc[j]->irq_res_end = err_irq[j];
+>> >                 status = request_irq(err_irq[j], dma_ccerr_handler, 0,
+>> >                                         "edma_error", &pdev->dev);
+>> > @@ -1538,9 +1826,17 @@ fail1:
+>> >         return status;
+>> >  }
+>> >
+>> > +static const struct of_device_id edma_of_ids[] = {
+>> > +       { .compatible = "ti,edma3", },
+>> > +       {}
+>> > +};
+>> >
+>> >  static struct platform_driver edma_driver = {
+>> > -       .driver.name    = "edma",
+>> > +       .driver = {
+>> > +               .name   = "edma",
+>> > +               .of_match_table = edma_of_ids,
+>> > +       },
+>> > +       .probe = edma_probe,
+>> >  };
+>> >
+>> >  static int __init edma_init(void)
+>> > diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
+>> > index 2344ea2..ffc1fb2 100644
+>> > --- a/include/linux/platform_data/edma.h
+>> > +++ b/include/linux/platform_data/edma.h
+>> > @@ -177,6 +177,7 @@ struct edma_soc_info {
+>> >
+>> >         const s8        (*queue_tc_mapping)[2];
+>> >         const s8        (*queue_priority_mapping)[2];
+>> > +       const s16       (*xbar_chans)[2];
+>> >  };
+>> >
+>> >  #endif
+>> > --
+>> > 1.7.9.5
+>> >
+>> > --
+>> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> > the body of a message to majordomo at vger.kernel.org
+>> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> > Please read the FAQ at  http://www.tux.org/lkml/
+>>
+>>
+>>
+>> --
+>> With Best Regards,
+>> Andy Shevchenko
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-> Maybe rename insert_static_vm() to static_vm_area_add_early() to better 
-> identify its purpose as well.  It shouldn't be used for any other 
-> purpose anyway.
 
-Okay.
 
-> > +
-> > +extern struct static_vm *static_vmlist;
-> > +extern spinlock_t static_vmlist_lock;
-> 
-> Your patch is providing the proper accessors to manipulate those.  They 
-> therefore should not be exported globally.
-
-Okay.
-
-> > +
-> > +extern struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
-> > +			size_t size, unsigned long flags);
-> > +extern struct static_vm *find_static_vm_vaddr(void *vaddr);
-> > +extern void init_static_vm(struct static_vm *static_vm,
-> > +			struct vm_struct *vm, unsigned long flags);
-> 
-> Since those are only used in ioremap.c, and because I suggested their 
-> implementation be moved there as well, you shouldn't need prototype 
-> declarations anymore.  And init_static_vm() would be useless with my 
-> previous suggestions.
-
-Yes.
-
-> 
-> Nicolas
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+With Best Regards,
+Andy Shevchenko
