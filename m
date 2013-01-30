@@ -1,65 +1,84 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Wed, 30 Jan 2013 17:33:44 -0500
-Subject: [PATCH 1/2] ARM i.MX6: Add regulator delay support
-Message-ID: <1359585224-11304-1-git-send-email-b20788@freescale.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Jan 2013 10:35:01 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
+ <20130129055508.GA3339@obsidianresearch.com>
+ <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
+ <20130129184157.GA29274@obsidianresearch.com>
+ <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
+ <20130129191853.GB29274@obsidianresearch.com>
+ <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
+ <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
+Message-ID: <20130130103501.1873d39c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For ANATOP LDOs, vddcpu, vddsoc and vddpu
-have step time settings in the misc2 register, need
-to add necessary step time info for these three LDOs,
-then regulator driver can add necessary delay based on
-these settings.
+Dear Bjorn Helgaas,
 
-offset 0x170:
-bit [24-25]: vddcpu
-bit [26-27]: vddpu
-bit [28-29]: vddsoc
+On Tue, 29 Jan 2013 15:27:43 -0700, Bjorn Helgaas wrote:
 
-field definition:
-0'b00: 64 cycles of 24M clock;
-0'b01: 128 cycles of 24M clock;
-0'b02: 256 cycles of 24M clock;
-0'b03: 512 cycles of 24M clock;
+> I'm not sure the existing emulation in these patches is sufficient.
+> For example, pci_sw_pci_bridge_write() updates bridge->membase when we
+> write to the window register, but I don't see anything that updates
+> the actual hardware decoder.  That might be done in
+> mvebu_pcie_window_config_port() via armada_370_xp_alloc_pcie_window(),
+> but that looks like it's only done once.
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/boot/dts/imx6q.dtsi |    9 +++++++++
- 1 file changed, 9 insertions(+)
+That's correct. I currently let the Linux PCI core enumerate the
+real PCIe devices, allocate the resources, and set the appropriate
+values in the emulated PCI-to-PCI bridge registers. Once this is all
+done, the Marvell PCIe driver looks at each PCI-to-PCI bridge, reads
+the membase and iobase registers, and creates address decoding windows
+so that the physical addresses assigned by the Linux PCI core actually
+resolve to the right PCIe interface. This is done once for all.
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index d6265ca..a2e977d 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -480,6 +480,9 @@
- 					anatop-reg-offset = <0x140>;
- 					anatop-vol-bit-shift = <0>;
- 					anatop-vol-bit-width = <5>;
-+					anatop-delay-reg-offset = <0x170>;
-+					anatop-delay-bit-shift = <24>;
-+					anatop-delay-bit-width = <2>;
- 					anatop-min-bit-val = <1>;
- 					anatop-min-voltage = <725000>;
- 					anatop-max-voltage = <1450000>;
-@@ -494,6 +497,9 @@
- 					anatop-reg-offset = <0x140>;
- 					anatop-vol-bit-shift = <9>;
- 					anatop-vol-bit-width = <5>;
-+					anatop-delay-reg-offset = <0x170>;
-+					anatop-delay-bit-shift = <26>;
-+					anatop-delay-bit-width = <2>;
- 					anatop-min-bit-val = <1>;
- 					anatop-min-voltage = <725000>;
- 					anatop-max-voltage = <1450000>;
-@@ -508,6 +514,9 @@
- 					anatop-reg-offset = <0x140>;
- 					anatop-vol-bit-shift = <18>;
- 					anatop-vol-bit-width = <5>;
-+					anatop-delay-reg-offset = <0x170>;
-+					anatop-delay-bit-shift = <28>;
-+					anatop-delay-bit-width = <2>;
- 					anatop-min-bit-val = <1>;
- 					anatop-min-voltage = <725000>;
- 					anatop-max-voltage = <1450000>;
+> If the PCI core updates a root port window later, I don't see where the hardware
+> decoder will be updated.
+
+It will not be updated.
+
+> Maybe you're counting on the window assignments to be static?  The PCI
+> core doesn't guarantee anything like that, though in the absence of
+> hotplug I don't know any reason why it would change things.
+
+Right. Is supporting hotplug a show-stopper to get this included? I
+think it could be added later, if it happens to be needed, no?
+
+I could of course do it, but the patch series is already quite large
+and complicated, so if we could merge a simple, but working, version
+first, and then improve on top of it when needed, it would be nice.
+
+> I also forgot about the bus number munging in mvebu_pcie_rd_conf().
+> The PCI core can update the bridge secondary/subordinate registers.
+> It looks like you don't support writing to them, and the read path
+> (pci_sw_pci_bridge_read()) looks like it doesn't do any translation
+> between the hardware and Linux bus numbers.  I don't understand the
+> system well enough to know if this is an issue.
+
+Right. Could you explain a little bit for what reasons the PCI core
+could update the secondary/subordinate registers, and to what values it
+sets them?
+
+For now, I statically assign the secondary bus register value to be
+X+1, where X is the number of the PCIe interface, since X=0 is reserved
+for the root bus (which has the host bridge and the PCI-to-PCI
+bridges).
+
+Also, could you detail what kind of translation I should be doing when
+reading the hardware and Linux bus numbers?
+
+I apologize for asking so many, probably silly, questions, but I am
+still learning all those internal PCI mechanisms.
+
+Thanks,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
