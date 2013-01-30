@@ -1,45 +1,65 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 30 Jan 2013 10:33:55 +0100
-Subject: [PATCH] ARM i.MX25: clk: parent per5_clk to AHB clock
-Message-ID: <1359538435-21304-1-git-send-email-s.trumtrar@pengutronix.de>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 30 Jan 2013 17:33:44 -0500
+Subject: [PATCH 1/2] ARM i.MX6: Add regulator delay support
+Message-ID: <1359585224-11304-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxc-timer on the imx25 needs to be derived from the AHB clock.
-If a bootloader reparents this clock to the ipg_clk_highfreq, which according
-to the datasheet is a valid operation, the system can/will produce lockups/
-freezes after some time [1].
+For ANATOP LDOs, vddcpu, vddsoc and vddpu
+have step time settings in the misc2 register, need
+to add necessary step time info for these three LDOs,
+then regulator driver can add necessary delay based on
+these settings.
 
-This can be forced with code like
-	while(1)
-                syscall(SYS_clock_gettime, CLOCK_REALTIME, &tp);
+offset 0x170:
+bit [24-25]: vddcpu
+bit [26-27]: vddpu
+bit [28-29]: vddsoc
 
-This was already fixed with the commit
-	 "i.MX25 GPT clock fix: ensure correct the clock source" [2],
-but it seems, that it got lost. So, re-add this to have a correct gpt.
+field definition:
+0'b00: 64 cycles of 24M clock;
+0'b01: 128 cycles of 24M clock;
+0'b02: 256 cycles of 24M clock;
+0'b03: 512 cycles of 24M clock;
 
-[1]: http://lists.arm.linux.org.uk/lurker/message/20130129.161230.229bda17.en.html
-[2]: 2012d9ca2a1381ae3e733330a7f0d1d2f1988bba
-
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Cc: stable at vger.kernel.org
+Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx25.c |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/imx6q.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index 5d34f67..0e6dde6 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -177,6 +177,9 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
- 			pr_err("i.MX25 clk %d: register failed with %ld\n",
- 				i, PTR_ERR(clk[i]));
- 
-+	/* Clock source for gpt must be derived from AHB */
-+	clk_set_parent(clk[per5_sel], clk[ahb]);
-+
- 	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
- 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
- 
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index d6265ca..a2e977d 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -480,6 +480,9 @@
+ 					anatop-reg-offset = <0x140>;
+ 					anatop-vol-bit-shift = <0>;
+ 					anatop-vol-bit-width = <5>;
++					anatop-delay-reg-offset = <0x170>;
++					anatop-delay-bit-shift = <24>;
++					anatop-delay-bit-width = <2>;
+ 					anatop-min-bit-val = <1>;
+ 					anatop-min-voltage = <725000>;
+ 					anatop-max-voltage = <1450000>;
+@@ -494,6 +497,9 @@
+ 					anatop-reg-offset = <0x140>;
+ 					anatop-vol-bit-shift = <9>;
+ 					anatop-vol-bit-width = <5>;
++					anatop-delay-reg-offset = <0x170>;
++					anatop-delay-bit-shift = <26>;
++					anatop-delay-bit-width = <2>;
+ 					anatop-min-bit-val = <1>;
+ 					anatop-min-voltage = <725000>;
+ 					anatop-max-voltage = <1450000>;
+@@ -508,6 +514,9 @@
+ 					anatop-reg-offset = <0x140>;
+ 					anatop-vol-bit-shift = <18>;
+ 					anatop-vol-bit-width = <5>;
++					anatop-delay-reg-offset = <0x170>;
++					anatop-delay-bit-shift = <28>;
++					anatop-delay-bit-width = <2>;
+ 					anatop-min-bit-val = <1>;
+ 					anatop-min-voltage = <725000>;
+ 					anatop-max-voltage = <1450000>;
 -- 
-1.7.10.4
+1.7.9.5
