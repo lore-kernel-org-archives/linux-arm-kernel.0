@@ -1,40 +1,46 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 30 Jan 2013 16:10:35 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130130232836.1b1fd89b@skate>
-References: <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
- <20130129184157.GA29274@obsidianresearch.com>
- <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
- <20130129191853.GB29274@obsidianresearch.com>
- <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
- <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
- <20130130103501.1873d39c@skate>
- <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
- <20130130232836.1b1fd89b@skate>
-Message-ID: <20130130231035.GB7395@obsidianresearch.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Jan 2013 23:15:22 +0000
+Subject: [GIT PULL] ux500 <mach/id.h> removal
+In-Reply-To: <CACRpkdYmTTgpnAOoNM3RJiF_oADgbuGK-vw6JF8J9rPAttA5PQ@mail.gmail.com>
+References: <CACRpkdY9BDyGQ-DiEhTiyHEYoxpGiL+H0baqsBYX_a-0upktUQ@mail.gmail.com>
+ <CAOesGMiKCHUz9BJ31o-4kthr0CZABuL7SuuMNEjbkUQ06KsfMw@mail.gmail.com>
+ <CACRpkdYmTTgpnAOoNM3RJiF_oADgbuGK-vw6JF8J9rPAttA5PQ@mail.gmail.com>
+Message-ID: <201301302315.22357.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 11:28:36PM +0100, Thomas Petazzoni wrote:
-
-> > It looks like your current system doesn't support trees below the
-> > bridges, but hopefully we can make it so the generic enumeration
-> > algorithms still work.
+On Wednesday 30 January 2013, Linus Walleij wrote:
+> On Wed, Jan 30, 2013 at 1:12 AM, Olof Johansson <olof@lixom.net> wrote:
+> > [Me]
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> >> tags/ux500-no-idh
+> >
+> > Pulled in.
+> >
+> > This has a somewhat annoying (but trivial) conflict against your own
+> > code (the cpufreq driver changes).
 > 
-> In practice, in our situation, there isn't a tree below the bridge.
-> There is one single device. I'd prefer to not implement features that I
-> cannot effectively test, and let the implementation of those additional
-> features to whoever will need them, and therefore be able to test
-> them.
+> Arnd always told me to split stuff cleanly on branches, which of course
+> leads to conflicts like that, but I thought he wanted them, rather than
+> huge accumulated patch sets built on to of each othere ... a bit hard to
+> do the right thing here, what would have been the right way?
+> 
+> Does it help if I base stuff off ARM SoC tree branches, and which
+> ones can be relied upon in that case?
 
-Agreed it is hard to test, but be aware that any system that has PCI-E
-slots can host an add-in card that has a bridge on it. These are midly
-common in some areas like high port count ethernet cards.
+Not sure if it applies here, but in a lot of cases, one can extract the
+parts that do conflict and put those patches first in the series, and
+merge them together before the pull request.
 
-If you aren't going to attempt the implementation then a really big
-FIXME that the config access routing is not correct and needs to be
-based on the bus range assigned to the bridge would be friendly :)
+The classic example of this is two independent features A and B that
+both contain some cleanup. By moving the cleanup first, you can merge
+the cleanup-A patches with the cleanup-B patches and submit them as one
+branch, and then have feature A on top of cleanup-A merge cleanly with
+both feature-B (because there are no conflicts) and with cleanup-A-B
+(because cleanup-A-B has already resolved the conflict).
 
-Jason
+Unrelated to this: The mach/id.h removal seems to have caused a few
+build errors in the for-next tree with u8500_defconfig. Can you have
+a look at what went wrong there?
+
+	Arnd
