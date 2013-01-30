@@ -1,66 +1,55 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 30 Jan 2013 11:11:57 +0100
-Subject: ixp4xx eth broken in 3.7.0/3.8-rc5?
-In-Reply-To: <1359509647.4144.36.camel@bwh-desktop.uk.solarflarecom.com>
-References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
- <20744.25884.660535.514911@pilspetsen.it.uu.se>
- <51086A17.1090707@gmail.com>
- <1359509647.4144.36.camel@bwh-desktop.uk.solarflarecom.com>
-Message-ID: <20744.61933.566806.942439@pilspetsen.it.uu.se>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 30 Jan 2013 11:16:32 +0100
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that kirkwood_ge0[01]_init()
+ finds its clock
+In-Reply-To: <20130130083044.GA25688@schnuecks.de>
+References: <51053761.1020009@gmail.com>
+ <20130127144610.GW1758@titan.lakedaemon.net> <51053F81.6020904@gmail.com>
+ <20130127152431.GX1758@titan.lakedaemon.net>
+ <20130128223148.GA10275@schnuecks.de>
+ <20130129004824.GB7717@titan.lakedaemon.net>
+ <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
+ <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
+ <20130130083044.GA25688@schnuecks.de>
+Message-ID: <5108F300.7000705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Hutchings writes:
- > On Tue, 2013-01-29 at 19:32 -0500, Xi Wang wrote:
- > > On 1/29/13 7:11 PM, Mikael Pettersson wrote:
- > > > A git bisect identified the following as the culprit:
- > > > 
- > > >   > From 1a4901177574083c35fafc24c4d151c2a7c7647c Mon Sep 17 00:00:00 2001
- > > >   > From: Xi Wang <xi.wang@gmail.com>
- > > >   > Date: Sat, 17 Nov 2012 20:25:09 +0000
- > > >   > Subject: [PATCH] ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
- > > >   >
- > > >   > Use &port->netdev->dev instead of NULL since dma_pool_create() doesn't
- > > >   > allow NULL dev.
- > > >   >
- > > >   > Signed-off-by: Xi Wang <xi.wang@gmail.com>
- > > >   > Cc: Andrew Morton <akpm@linux-foundation.org>
- > > >   > Signed-off-by: David S. Miller <davem@davemloft.net>
- > > >   > ---
- > > >   >  drivers/net/ethernet/xscale/ixp4xx_eth.c |    8 +++++---
- > > >   >  1 files changed, 5 insertions(+), 3 deletions(-)
- > > > 
- > > > Reverting this unbreaks ixp4xx_eth on my ixp4xx machine with kernels
- > > > 3.7.0 and 3.8-rc5.
- > > 
- > > Thanks.  The problem was that in init_queues(), the dma_pool_create()
- > > call requires a non-null dev.
- > > 
- > >   dma_pool = dma_pool_create(DRV_NAME, ??, ...);
+On 01/30/2013 09:30 AM, Simon Baatz wrote:
+> On Wed, Jan 30, 2013 at 01:51:18AM +0100, Sebastian Hesselbarth wrote:
+>> - [PATCH v2 2/2] clk: mvebu: Do not gate runit clock on Kirkwood
+>>    (no lockup for minimal kernel configs)
+>>
+>> - [PATCH] NET: mv643xx: get smi clock from device tree
+>>    (no lockup for modular DT ethernet)
+>>
+>> - Some patch that adds MV643XX_ETH_SHARED_NAME ".0" and ".1" clk aliases
+>>    (no lockup for modular non-DT ethernet)
+>
+> I think your patch to get the smi clock is intended for device tree.
+> Thus, the driver won't use these aliases, right?
 
-I had a look around in the 3.8-rc5 kernel source.
+Actually, both patches above will not fix modular ethernet for 3.8-rc as
+shared driver is probed before core driver and not requesting any clk at
+all. The "NET: mv643xx: get smi clock from device tree" patch is based
+on Jason's attempt to separate shared driver.
 
-mm/dmapool.c:dma_pool_create() needs a non-NULL dev in the CONFIG_NUMA case,
-because it calls dev_to_node(dev) which dereferences dev if CONFIG_NUMA.
-But in the non-CONFIG_NUMA case there is no dereference of dev, and in fact
-there is an explicit check for dev being NULL or not towards the end of
-dma_pool_create().  So that explains why ixp4xx works without the change:
-it's not NUMA.
+If we need to fix modular ethernet now, we also need to add a clk_get
+to shared ethernet.
 
-A quick grep found three calls to dma_pool_create() with a NULL dev parameter,
-two in drivers/usb/gadget/amd5536udc.c and one in arch/arm/mach-s3c64xx/dma.c.
-These would all be broken with CONFIG_NUMA but Ok otherwise.
+But yes, DT doesn't need any clock aliases.
 
- > > 
- > > What do you think would work here?
- > 
- > For DMA purposes I would expect the right device to be the parent bus
- > device, i.e. port->netdev->dev.parent.  The driver might also need to
- > set its DMA masks.
+>> - Some patch that adds clk_prepare_enable to ge0/ge1 clocks to
+>>    kirkwood_legacy_clk_init()
+>>    (retain MAC address for modular DT ethernet)
+>
+> I like mine better, since it only enables the clocks of the
+> interfaces that are initialized in the init code.  I tested it with
+> non-DT as well.  But either is fine with me.
 
-At least on ixp4xx the DMA masks are normally set by the platform PCI init
-code (it has a 64MB PCI DMA window limitation).
+I know the difference, but here it is not only about fixing an issue
+but have it cleanly removed later on. But I don't have a strong opinion
+on that and maybe Andrew or Jason should coordinate what must be fixed
+now and how we do it.
 
-I can give the port->netdev->dev.parent variant a try later this evening.
-
-/Mikael
+Sebastian
