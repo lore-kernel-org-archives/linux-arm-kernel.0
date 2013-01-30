@@ -1,34 +1,19 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 31 Jan 2013 01:26:53 +0530
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Wed, 30 Jan 2013 21:03:27 +0100
 Subject: [PATCH 1/1] drivers: net: davinci_cpdma: acknowledge interrupt
  properly
-Message-ID: <1359575813-15703-1-git-send-email-mugunthanvnm@ti.com>
+In-Reply-To: <1359575813-15703-1-git-send-email-mugunthanvnm@ti.com>
+References: <1359575813-15703-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <EF466712-C5FF-4A91-BDF3-477559B02705@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPDMA interrupts are not properly acknowledged which leads to interrupt
-storm, only cpdma interrupt 0 is acknowledged in Davinci CPDMA driver.
-Changed cpdma_ctlr_eoi api to acknowledge 1 and 2 interrupts which are
-used for rx and tx respectively.
 
-Reported-by: Pantelis Antoniou <panto@antoniou-consulting.com>
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- drivers/net/ethernet/ti/davinci_cpdma.c |    2 ++
- 1 file changed, 2 insertions(+)
+Op 30 jan. 2013, om 20:56 heeft Mugunthan V N <mugunthanvnm@ti.com> het volgende geschreven:
 
-diff --git a/drivers/net/ethernet/ti/davinci_cpdma.c b/drivers/net/ethernet/ti/davinci_cpdma.c
-index f862918..afe14a6 100644
---- a/drivers/net/ethernet/ti/davinci_cpdma.c
-+++ b/drivers/net/ethernet/ti/davinci_cpdma.c
-@@ -487,6 +487,8 @@ int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable)
- void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr)
- {
- 	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, 0);
-+	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, 1);
-+	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, 2);
- }
- 
- struct cpdma_chan *cpdma_chan_create(struct cpdma_ctlr *ctlr, int chan_num,
--- 
-1.7.9.5
+> CPDMA interrupts are not properly acknowledged which leads to interrupt
+> storm, only cpdma interrupt 0 is acknowledged in Davinci CPDMA driver.
+> Changed cpdma_ctlr_eoi api to acknowledge 1 and 2 interrupts which are
+> used for rx and tx respectively.
+
+A brief inspection shows that this still isn't following the TRM, but Pantelis' patch does. Can you please fix this driver to follow the TRM and make it work on both PG1.0 and PG2.0 instead of papering over bugs instead of fixing them properly?
