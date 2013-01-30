@@ -1,43 +1,26 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 30 Jan 2013 10:12:35 +0100
-Subject: [PATCH] ARM: at91: at91sam9x5: fix usart3 pinctrl name
-In-Reply-To: <1359387816-11730-1-git-send-email-robertcnelson@gmail.com>
-References: <1359387816-11730-1-git-send-email-robertcnelson@gmail.com>
-Message-ID: <5108E403.9060504@atmel.com>
+Date: Wed, 30 Jan 2013 10:13:18 +0100
+Subject: [PATCH] ARM: at91: at91sam9x5.dtsi:usart3 TXD
+In-Reply-To: <51083A70.1070809@interlog.com>
+References: <51083A70.1070809@interlog.com>
+Message-ID: <5108E42E.2070800@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 04:43 PM, Robert Nelson :
-> The renaming of pinctrl_uart3 to pinctrl_usart3 was missed in:
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=9e3129e937e2f178d2a003ea45765e5e63e34665
+On 01/29/2013 10:09 PM, Douglas Gilbert :
+> Comment for usart3 TXD (TXD3) is correct, dt code is wrong.
 > 
-> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+> The patch is against lk 3.8.0-rc5 .
+> 
+> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
 
-With little reformatting of commit message, queued in at91-fixes.
+Queued in at91-fixes with little formating in message subject.
 
-Thanks a lot!
+Thank for your help.
+
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> ---
->  arch/arm/boot/dts/at91sam9x5.dtsi |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 8ecca69..464e34f 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -197,7 +197,7 @@
->  				};
->  
->  				usart3 {
-> -					pinctrl_uart3: usart3-0 {
-> +					pinctrl_usart3: usart3-0 {
->  						atmel,pins =
->  							<2 23 0x2 0x1	/* PC22 periph B with pullup */
->  							 2 23 0x2 0x0>;	/* PC23 periph B */
-> 
-
-
+Bye,
 -- 
 Nicolas Ferre
