@@ -1,46 +1,73 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 30 Jan 2013 10:53:53 +0100
-Subject: [PATCH] ARM i.MX25: clk: parent per5_clk to AHB clock
-In-Reply-To: <1359538435-21304-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1359538435-21304-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130130095353.GI8668@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Jan 2013 10:54:18 +0100
+Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
+In-Reply-To: <201301300946.54040.arnd@arndb.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201301291645.08040.arnd@arndb.de>
+ <20130130045655.GE5734@obsidianresearch.com>
+ <201301300946.54040.arnd@arndb.de>
+Message-ID: <20130130105418.7f53bc77@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 10:33:55AM +0100, Steffen Trumtrar wrote:
-> The mxc-timer on the imx25 needs to be derived from the AHB clock.
-> If a bootloader reparents this clock to the ipg_clk_highfreq, which according
-> to the datasheet is a valid operation, the system can/will produce lockups/
-> freezes after some time [1].
+Dear Arnd Bergmann,
+
+On Wed, 30 Jan 2013 09:46:53 +0000, Arnd Bergmann wrote:
+> On Wednesday 30 January 2013, Jason Gunthorpe wrote:
+> > > But we normally only assign a 64 KB I/O window to each PCI host bridge.
+> > > Requiring PCI bridges to be space 64 KB apart would mean that we cannot
+> > > actually support bridges at all.
+> > 
+> > The PCI resource code uses full 32 bit integers when it handles IO
+> > addresses, so this actually does sort of work out.
 > 
-> This can be forced with code like
-> 	while(1)
->                 syscall(SYS_clock_gettime, CLOCK_REALTIME, &tp);
-> 
-> This was already fixed with the commit
-> 	 "i.MX25 GPT clock fix: ensure correct the clock source" [2],
-> but it seems, that it got lost. So, re-add this to have a correct gpt.
-> 
-> [1]: http://lists.arm.linux.org.uk/lurker/message/20130129.161230.229bda17.en.html
-> [2]: 2012d9ca2a1381ae3e733330a7f0d1d2f1988bba
-Instead of the last paragraph I'd write:
+> However, we only reserve 1 MB (I think) virtual address window for all
+> I/O spaces of all PCI domains combined, at a fixed location (0xfee00000).
+> This means we can have at most 16 such windows at run-time. That can
+> be changed if necessary, but it seems like overkill when in practice
+> you only need a few bytes at most.
 
-	This problem was already fixed with commit
+I am not sure where this 0xfee00000 address comes from, but in my case
+(and I think in the Tegra PCI driver as well), we tell the Linux PCI
+core from which addresses the I/O ranges should be allocated. In my DT,
+I have:
 
-		2012d9c (i.MX25 GPT clock fix: ensure correct the clock source)
+                        ranges = <0x00000800 0 0xd0040000 0xd0040000 0 0x00002000   /* port 0.0 registers */
+                                  0x00004800 0 0xd0042000 0xd0042000 0 0x00002000   /* port 2.0 registers */
+                                  0x00001000 0 0xd0044000 0xd0044000 0 0x00002000   /* port 0.1 registers */
+                                  0x00001800 0 0xd0048000 0xd0048000 0 0x00002000   /* port 0.2 registers */
+                                  0x00002000 0 0xd004C000 0xd004C000 0 0x00002000   /* port 0.3 registers */
+                                  0x00002800 0 0xd0080000 0xd0080000 0 0x00002000   /* port 1.0 registers */
+                                  0x00005000 0 0xd0082000 0xd0082000 0 0x00002000   /* port 3.0 registers */
+                                  0x00003000 0 0xd0084000 0xd0084000 0 0x00002000   /* port 1.1 registers */
+                                  0x00003800 0 0xd0088000 0xd0088000 0 0x00002000   /* port 1.2 registers */
+                                  0x00004000 0 0xd008C000 0xd008C000 0 0x00002000   /* port 1.3 registers */
+                                  0x81000000 0 0          0xc0000000 0 0x00100000   /* downstream I/O */
+                                  0x82000000 0 0          0xc1000000 0 0x08000000>; /* non-prefetchable memory */
 
-	for v3.1-rc2 but this was lost when i.MX was converted to the common
-	clock framework (commit 6bbaec5; ARM i.MX25: implement clocks using
-	common clock framework).
+And then, the Marvell PCI driver gets the "downstream I/O" range,
+parses it into a "struct resource", and then does (where &pcie->io is
+the struct resource into which we parsed the "downstream I/O" range):
 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Cc: stable at vger.kernel.org
+        pci_add_resource_offset(&sys->resources, &pcie->io, sys->io_offset);
+	[...]
+	pci_ioremap_io(nr * SZ_64K, pcie->io.start);
 
-Cc: stable at vger.kernel.org # v3.5+
+And it works just fine, I get my I/O ranges allocated at 0xc0000000 for
+the first device, 0xc0010000 (i.e base address + 64KB) for the second
+device, etc.
 
-Best regards
-Uwe
+The Tegra PCI driver does exactly the same (I shamelessly copied what
+Thierry has done).
 
+I somehow have the feeling that we are looking for problems that simply
+don't exist...
+
+Best regards,
+
+Thomas
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
