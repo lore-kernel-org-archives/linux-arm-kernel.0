@@ -1,34 +1,33 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 30 Jan 2013 14:48:50 +0200
-Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
-References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
-Message-ID: <510916B2.7080509@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 30 Jan 2013 21:02:00 +0800
+Subject: [PATCH V3  0/5] W1: Support onewire master on i.MX53
+In-Reply-To: <20130129154608.5184.46101.stgit@localhost>
+References: <20130129154608.5184.46101.stgit@localhost>
+Message-ID: <20130130130157.GB2757@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2013 02:08 PM, Mohammed, Afzal wrote:
-> Hi Roger,
-> 
-> On Mon, Jan 28, 2013 at 17:00:01, Quadros, Roger wrote:
-> 
->> NOTE: Tested on 4460ES-B1 Panda and BeagleBoard C4 only. Other boards are only
->> build tested.
-> 
-> Please try to ensure that beagle bone USB0 works with this.
-> 
+On Tue, Jan 29, 2013 at 04:46:08PM +0100, Martin Fuzzey wrote:
+> W1: Support onewire master on i.MX53
+> 	* Add device tree and pinctrl support to the MXC master driver
+> 	* Convert to use devm_
+> 	* Add i.MX53 clocks
+> 	* Add i.MX53 device tree entries
 
-Hi Afzal,
+Applied, thanks.
 
-I do not have beaglebone with me and don't seem to find beaglebone
-board support in mainline.
+I changed the patch order a little bit, moving dts change to the last,
+and also fix the patch subject prefix.
 
-I would appreciate if someone who knows more about beaglebone can help
-with verification.
+      W1: Add device tree support to MXC onewire master.
+      W1: Convert MXC onewire master to devm_ functions.
+      W1: Add pinctrl support to MXC onewire master.
+      ARM: i.MX53: Add clocks for i.mx53 onewire master.
+      ARM: dts: Add device tree entry for onewire master on i.MX53
 
-I could find that Robert C Nelson (now in cc) is maintaining out of tree
-patches for the beaglebone. Maybe he could help with verification?
+One 'new blank line at EOF' warning on patch #1 gets fixed.
 
-regards,
--roger
+And please remember to add some commit log for patches you submit in
+the future.  Empty commit log is not good.
+
+Shawn
