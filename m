@@ -1,73 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 30 Jan 2013 10:54:18 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Jan 2013 09:55:49 +0000
 Subject: [PATCH v2 05/27] arm: pci: add a align_resource hook
-In-Reply-To: <201301300946.54040.arnd@arndb.de>
+In-Reply-To: <20130130042103.GB5734@obsidianresearch.com>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201301291645.08040.arnd@arndb.de>
- <20130130045655.GE5734@obsidianresearch.com>
- <201301300946.54040.arnd@arndb.de>
-Message-ID: <20130130105418.7f53bc77@skate>
+ <201301292254.01069.arnd@arndb.de>
+ <20130130042103.GB5734@obsidianresearch.com>
+Message-ID: <201301300955.49473.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On Wednesday 30 January 2013, Jason Gunthorpe wrote:
+> On Tue, Jan 29, 2013 at 10:54:00PM +0000, Arnd Bergmann wrote:
 
-On Wed, 30 Jan 2013 09:46:53 +0000, Arnd Bergmann wrote:
-> On Wednesday 30 January 2013, Jason Gunthorpe wrote:
-> > > But we normally only assign a 64 KB I/O window to each PCI host bridge.
-> > > Requiring PCI bridges to be space 64 KB apart would mean that we cannot
-> > > actually support bridges at all.
-> > 
-> > The PCI resource code uses full 32 bit integers when it handles IO
-> > addresses, so this actually does sort of work out.
+> > The part that I did not like about having emulated PCI-to-PCI bridges
+> > is that it seems to just work around a (percieved or real) limitation
+> > in the Linux kernel by adding a piece of infrastructure, rather than
+> > lifting that limitation by making the kernel deal with what the
+> > hardware provides. That reminded me of the original mach-vt8500
 > 
-> However, we only reserve 1 MB (I think) virtual address window for all
-> I/O spaces of all PCI domains combined, at a fixed location (0xfee00000).
-> This means we can have at most 16 such windows at run-time. That can
-> be changed if necessary, but it seems like overkill when in practice
-> you only need a few bytes at most.
+> Well.. in this case there is a standard - PCI-E for what HW vendors
+> are supposed to do. The kernel core code follows it and works with
+> compliant hardware.
+> 
+> Marvell HW is not compliant.
+> 
+> So..
+> 
+> Should the kernel core PCI code support this particular non-compliance?
+> Should the driver work around the non-compliance and present a
+> compliant interface to the kernel and userspace?
+> 
+> My take is the kernel core PCI code is fine, and I hope
+> this will be an isolated issue with one family of Marvell IP. So
+> working around the HW problem in the driver seems best.
 
-I am not sure where this 0xfee00000 address comes from, but in my case
-(and I think in the Tegra PCI driver as well), we tell the Linux PCI
-core from which addresses the I/O ranges should be allocated. In my DT,
-I have:
+I don't remember the kernel ever caring about whether hardware complies
+to a standard or not. The kernel's job is to make hardware work, based
+on the actual implementation of that hardware. In a lot of cases that
+means taking the standard document as a reference, and adding quirks
+for the devices that are different.
 
-                        ranges = <0x00000800 0 0xd0040000 0xd0040000 0 0x00002000   /* port 0.0 registers */
-                                  0x00004800 0 0xd0042000 0xd0042000 0 0x00002000   /* port 2.0 registers */
-                                  0x00001000 0 0xd0044000 0xd0044000 0 0x00002000   /* port 0.1 registers */
-                                  0x00001800 0 0xd0048000 0xd0048000 0 0x00002000   /* port 0.2 registers */
-                                  0x00002000 0 0xd004C000 0xd004C000 0 0x00002000   /* port 0.3 registers */
-                                  0x00002800 0 0xd0080000 0xd0080000 0 0x00002000   /* port 1.0 registers */
-                                  0x00005000 0 0xd0082000 0xd0082000 0 0x00002000   /* port 3.0 registers */
-                                  0x00003000 0 0xd0084000 0xd0084000 0 0x00002000   /* port 1.1 registers */
-                                  0x00003800 0 0xd0088000 0xd0088000 0 0x00002000   /* port 1.2 registers */
-                                  0x00004000 0 0xd008C000 0xd008C000 0 0x00002000   /* port 1.3 registers */
-                                  0x81000000 0 0          0xc0000000 0 0x00100000   /* downstream I/O */
-                                  0x82000000 0 0          0xc1000000 0 0x08000000>; /* non-prefetchable memory */
+In the end, it comes down to the impact on the code complexity, and
+the run-time overhead for whatever hardware is most common when adding
+those quirks.
 
-And then, the Marvell PCI driver gets the "downstream I/O" range,
-parses it into a "struct resource", and then does (where &pcie->io is
-the struct resource into which we parsed the "downstream I/O" range):
+Can you (or someone else) describe what kind of changes to the core
+code we would actually need to make it work without emulting the
+bridge?
 
-        pci_add_resource_offset(&sys->resources, &pcie->io, sys->io_offset);
-	[...]
-	pci_ioremap_io(nr * SZ_64K, pcie->io.start);
+> If we learn of many more instances like this then, yah, update the
+> core code and rip out this driver work around...
 
-And it works just fine, I get my I/O ranges allocated at 0xc0000000 for
-the first device, 0xc0010000 (i.e base address + 64KB) for the second
-device, etc.
+But the code was specifically written to be reusable, which is normally
+a good thing.
 
-The Tegra PCI driver does exactly the same (I shamelessly copied what
-Thierry has done).
-
-I somehow have the feeling that we are looking for problems that simply
-don't exist...
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
