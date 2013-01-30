@@ -1,288 +1,236 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 29 Jan 2013 18:36:23 -0500 (EST)
-Subject: [PATCH v3 1/3] ARM: vmregion: remove vmregion code entirely
-In-Reply-To: <1358990934-4893-2-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1358990934-4893-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1358990934-4893-2-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <alpine.LFD.2.02.1301291835590.6300@xanadu.home>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Wed, 30 Jan 2013 01:03:41 +0100
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <51082C4E.5050903@gmail.com>
+References: <510506F9.3070500@gmail.com> <20130127110857.GA23687@schnuecks.de>
+ <51053761.1020009@gmail.com>
+ <20130127144610.GW1758@titan.lakedaemon.net>
+ <51053F81.6020904@gmail.com>
+ <20130127152431.GX1758@titan.lakedaemon.net>
+ <20130128223148.GA10275@schnuecks.de>
+ <20130129004824.GB7717@titan.lakedaemon.net>
+ <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
+Message-ID: <20130130000341.GA10600@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Jan 2013, Joonsoo Kim wrote:
-
-> From: Joonsoo Kim <js1304@gmail.com>
+On Tue, Jan 29, 2013 at 09:08:46PM +0100, Sebastian Hesselbarth wrote:
+> On 01/29/2013 08:42 PM, Simon Baatz wrote:
+> >On Mon, Jan 28, 2013 at 07:48:24PM -0500, Jason Cooper wrote:
+> >>On Mon, Jan 28, 2013 at 11:31:48PM +0100, Simon Baatz wrote:
+> >>>Nothing special here. My config originally based on a Debian config
+> >>>for a Kirkwood kernel.  Thus, amongst other drivers, mv643xx_eth is
+> >>>build as a module and is loaded from an initrd.
+> >>>Because all relevant drivers are loaded as modules, I need my
+> >>>runit patch to boot at all.
+> >>
+> >>Let's back up.  If you config early printk and COMMON_CLK_DEBUG and a
+> >>vanilla v3.8-rc5 with your current config, what happens?
+> >
+> >I thought it's clear what happens. "runit" is requested in the dts by
+> >serial, spi, watchdog, nand, i2c.  Each of these are either not built
+> >or built as a module in my config, except serial.
 > 
-> Now, there is no user for vmregion.
-> So remove it.
+> Simon,
 > 
-> Signed-off-by: Joonsoo Kim <js1304@gmail.com>
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
+> it is clear what happens but just to blindly disable clock gating will
+> not help here. What you are suffering are several issues not only one.
 
 
+Sure it is more than one issue. That's why I ran different scenarios.
+
 > 
-> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-> index 8a9c4cb..4e333fa 100644
-> --- a/arch/arm/mm/Makefile
-> +++ b/arch/arm/mm/Makefile
-> @@ -6,7 +6,7 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
->  				   iomap.o
->  
->  obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
-> -				   mmap.o pgd.o mmu.o vmregion.o
-> +				   mmap.o pgd.o mmu.o
->  
->  ifneq ($(CONFIG_MMU),y)
->  obj-y				+= nommu.o
-> diff --git a/arch/arm/mm/vmregion.c b/arch/arm/mm/vmregion.c
-> deleted file mode 100644
-> index a631016..0000000
-> --- a/arch/arm/mm/vmregion.c
-> +++ /dev/null
-> @@ -1,205 +0,0 @@
-> -#include <linux/fs.h>
-> -#include <linux/spinlock.h>
-> -#include <linux/list.h>
-> -#include <linux/proc_fs.h>
-> -#include <linux/seq_file.h>
-> -#include <linux/slab.h>
-> -
-> -#include "vmregion.h"
-> -
-> -/*
-> - * VM region handling support.
-> - *
-> - * This should become something generic, handling VM region allocations for
-> - * vmalloc and similar (ioremap, module space, etc).
-> - *
-> - * I envisage vmalloc()'s supporting vm_struct becoming:
-> - *
-> - *  struct vm_struct {
-> - *    struct vmregion	region;
-> - *    unsigned long	flags;
-> - *    struct page	**pages;
-> - *    unsigned int	nr_pages;
-> - *    unsigned long	phys_addr;
-> - *  };
-> - *
-> - * get_vm_area() would then call vmregion_alloc with an appropriate
-> - * struct vmregion head (eg):
-> - *
-> - *  struct vmregion vmalloc_head = {
-> - *	.vm_list	= LIST_HEAD_INIT(vmalloc_head.vm_list),
-> - *	.vm_start	= VMALLOC_START,
-> - *	.vm_end		= VMALLOC_END,
-> - *  };
-> - *
-> - * However, vmalloc_head.vm_start is variable (typically, it is dependent on
-> - * the amount of RAM found at boot time.)  I would imagine that get_vm_area()
-> - * would have to initialise this each time prior to calling vmregion_alloc().
-> - */
-> -
-> -struct arm_vmregion *
-> -arm_vmregion_alloc(struct arm_vmregion_head *head, size_t align,
-> -		   size_t size, gfp_t gfp, const void *caller)
-> -{
-> -	unsigned long start = head->vm_start, addr = head->vm_end;
-> -	unsigned long flags;
-> -	struct arm_vmregion *c, *new;
-> -
-> -	if (head->vm_end - head->vm_start < size) {
-> -		printk(KERN_WARNING "%s: allocation too big (requested %#x)\n",
-> -			__func__, size);
-> -		goto out;
-> -	}
-> -
-> -	new = kmalloc(sizeof(struct arm_vmregion), gfp);
-> -	if (!new)
-> -		goto out;
-> -
-> -	new->caller = caller;
-> -
-> -	spin_lock_irqsave(&head->vm_lock, flags);
-> -
-> -	addr = rounddown(addr - size, align);
-> -	list_for_each_entry_reverse(c, &head->vm_list, vm_list) {
-> -		if (addr >= c->vm_end)
-> -			goto found;
-> -		addr = rounddown(c->vm_start - size, align);
-> -		if (addr < start)
-> -			goto nospc;
-> -	}
-> -
-> - found:
-> -	/*
-> -	 * Insert this entry after the one we found.
-> -	 */
-> -	list_add(&new->vm_list, &c->vm_list);
-> -	new->vm_start = addr;
-> -	new->vm_end = addr + size;
-> -	new->vm_active = 1;
-> -
-> -	spin_unlock_irqrestore(&head->vm_lock, flags);
-> -	return new;
-> -
-> - nospc:
-> -	spin_unlock_irqrestore(&head->vm_lock, flags);
-> -	kfree(new);
-> - out:
-> -	return NULL;
-> -}
-> -
-> -static struct arm_vmregion *__arm_vmregion_find(struct arm_vmregion_head *head, unsigned long addr)
-> -{
-> -	struct arm_vmregion *c;
-> -
-> -	list_for_each_entry(c, &head->vm_list, vm_list) {
-> -		if (c->vm_active && c->vm_start == addr)
-> -			goto out;
-> -	}
-> -	c = NULL;
-> - out:
-> -	return c;
-> -}
-> -
-> -struct arm_vmregion *arm_vmregion_find(struct arm_vmregion_head *head, unsigned long addr)
-> -{
-> -	struct arm_vmregion *c;
-> -	unsigned long flags;
-> -
-> -	spin_lock_irqsave(&head->vm_lock, flags);
-> -	c = __arm_vmregion_find(head, addr);
-> -	spin_unlock_irqrestore(&head->vm_lock, flags);
-> -	return c;
-> -}
-> -
-> -struct arm_vmregion *arm_vmregion_find_remove(struct arm_vmregion_head *head, unsigned long addr)
-> -{
-> -	struct arm_vmregion *c;
-> -	unsigned long flags;
-> -
-> -	spin_lock_irqsave(&head->vm_lock, flags);
-> -	c = __arm_vmregion_find(head, addr);
-> -	if (c)
-> -		c->vm_active = 0;
-> -	spin_unlock_irqrestore(&head->vm_lock, flags);
-> -	return c;
-> -}
-> -
-> -void arm_vmregion_free(struct arm_vmregion_head *head, struct arm_vmregion *c)
-> -{
-> -	unsigned long flags;
-> -
-> -	spin_lock_irqsave(&head->vm_lock, flags);
-> -	list_del(&c->vm_list);
-> -	spin_unlock_irqrestore(&head->vm_lock, flags);
-> -
-> -	kfree(c);
-> -}
-> -
-> -#ifdef CONFIG_PROC_FS
-> -static int arm_vmregion_show(struct seq_file *m, void *p)
-> -{
-> -	struct arm_vmregion *c = list_entry(p, struct arm_vmregion, vm_list);
-> -
-> -	seq_printf(m, "0x%08lx-0x%08lx %7lu", c->vm_start, c->vm_end,
-> -		c->vm_end - c->vm_start);
-> -	if (c->caller)
-> -		seq_printf(m, " %pS", (void *)c->caller);
-> -	seq_putc(m, '\n');
-> -	return 0;
-> -}
-> -
-> -static void *arm_vmregion_start(struct seq_file *m, loff_t *pos)
-> -{
-> -	struct arm_vmregion_head *h = m->private;
-> -	spin_lock_irq(&h->vm_lock);
-> -	return seq_list_start(&h->vm_list, *pos);
-> -}
-> -
-> -static void *arm_vmregion_next(struct seq_file *m, void *p, loff_t *pos)
-> -{
-> -	struct arm_vmregion_head *h = m->private;
-> -	return seq_list_next(p, &h->vm_list, pos);
-> -}
-> -
-> -static void arm_vmregion_stop(struct seq_file *m, void *p)
-> -{
-> -	struct arm_vmregion_head *h = m->private;
-> -	spin_unlock_irq(&h->vm_lock);
-> -}
-> -
-> -static const struct seq_operations arm_vmregion_ops = {
-> -	.start	= arm_vmregion_start,
-> -	.stop	= arm_vmregion_stop,
-> -	.next	= arm_vmregion_next,
-> -	.show	= arm_vmregion_show,
-> -};
-> -
-> -static int arm_vmregion_open(struct inode *inode, struct file *file)
-> -{
-> -	struct arm_vmregion_head *h = PDE(inode)->data;
-> -	int ret = seq_open(file, &arm_vmregion_ops);
-> -	if (!ret) {
-> -		struct seq_file *m = file->private_data;
-> -		m->private = h;
-> -	}
-> -	return ret;
-> -}
-> -
-> -static const struct file_operations arm_vmregion_fops = {
-> -	.open	= arm_vmregion_open,
-> -	.read	= seq_read,
-> -	.llseek	= seq_lseek,
-> -	.release = seq_release,
-> -};
-> -
-> -int arm_vmregion_create_proc(const char *path, struct arm_vmregion_head *h)
-> -{
-> -	proc_create_data(path, S_IRUSR, NULL, &arm_vmregion_fops, h);
-> -	return 0;
-> -}
-> -#else
-> -int arm_vmregion_create_proc(const char *path, struct arm_vmregion_head *h)
-> -{
-> -	return 0;
-> -}
-> -#endif
-> diff --git a/arch/arm/mm/vmregion.h b/arch/arm/mm/vmregion.h
-> deleted file mode 100644
-> index 0f5a5f2..0000000
-> --- a/arch/arm/mm/vmregion.h
-> +++ /dev/null
-> @@ -1,31 +0,0 @@
-> -#ifndef VMREGION_H
-> -#define VMREGION_H
-> -
-> -#include <linux/spinlock.h>
-> -#include <linux/list.h>
-> -
-> -struct page;
-> -
-> -struct arm_vmregion_head {
-> -	spinlock_t		vm_lock;
-> -	struct list_head	vm_list;
-> -	unsigned long		vm_start;
-> -	unsigned long		vm_end;
-> -};
-> -
-> -struct arm_vmregion {
-> -	struct list_head	vm_list;
-> -	unsigned long		vm_start;
-> -	unsigned long		vm_end;
-> -	int			vm_active;
-> -	const void		*caller;
-> -};
-> -
-> -struct arm_vmregion *arm_vmregion_alloc(struct arm_vmregion_head *, size_t, size_t, gfp_t, const void *);
-> -struct arm_vmregion *arm_vmregion_find(struct arm_vmregion_head *, unsigned long);
-> -struct arm_vmregion *arm_vmregion_find_remove(struct arm_vmregion_head *, unsigned long);
-> -void arm_vmregion_free(struct arm_vmregion_head *, struct arm_vmregion *);
-> -
-> -int arm_vmregion_create_proc(const char *, struct arm_vmregion_head *);
-> -
-> -#endif
-> -- 
-> 1.7.9.5
+> >of_serial.c does the following in of_platform_serial_setup():
+> >
+> >	if (of_property_read_u32(np, "clock-frequency",&clk)) {
+> >
+> >		/* Get clk rate through clk driver if present */
+> >		info->clk = clk_get(&ofdev->dev, NULL);
+> >		if (IS_ERR(info->clk)) {
+> >			dev_warn(&ofdev->dev,
+> >				"clk or clock-frequency not defined\n");
+> >			return PTR_ERR(info->clk);
+> >		}
+> >
+> >		clk_prepare_enable(info->clk);
+> >		clk = clk_get_rate(info->clk);
+> >	}
+> >
+> >and since "clock-frequency" is still given in the standard DTS for
+> >the IB-NAS 6210, it does not enable the clock.
+> >Thus, no driver uses the clock, it gets disabled and the system locks
+> >up.
+> >The system boots when removing "clock-frequency" from the DTS.
+> >
+> >Which lead to two questions:
+> >- Is it safe to remove "clock-frequency" now that we have the clocks
+> >   in place?
 > 
+> Safe, as long as you replace it with the corresponding clocks=<&..> property.
+> 
+> >- The behavior of of_serial.c looks strange to me, is this really the
+> >desired behavior?
+> 
+> I guess it is, rely on clock-frequency because a lot of boards still use it.
+> There was no clocks property in of_serial when we started with kirkwood and
+> dove. I think we can switch now to clocks property which will also remove
+> all hard coded occurrences of tclk frequency.
+> 
+> >For the "runit" clock, this means that any time you hit a
+> >configuration that does not keep the clock enabled, the system will
+> >lockup.  (We have gone through this more than once now. Especially,
+> >this hits you hard when you try to support a new board and disable as
+> >much as possible in the config/dts for a start...).
+> 
+> Well, if there is no device/driver using runit it should be safe to disable
+> it. If there is a driver using it, we need a clocks property for it. And
+> as you already stated, serial is using it. And you want serial in every
+> minimal kernel, don't you?
+
+>From f479db4:
+
+ Marvell engineers tell us:
+
+ It seems that many units use the RUNIT clock.
+ SPI, UART, NAND, TWSI, ...
+ So it's not possible to clock gate it.
+
+ Currently the SPI, NAND and TWSI driver will clk_prepaure_enable()
+ this clk, but since we have no idea what ... is, and turning this clk
+ off results in a hard lock, unconditionally enable runit.
+
+
+Thus, if we know better than that, that's fine, but please don't tell
+me that this is "blindly" enabling clocks.
+
+> 
+> >Thus, we should keep it enabled even if it is unused, which is
+> >exactly the purpose of CLK_IGNORE_UNUSED if I understood this
+> >correctly.
+> 
+> True, but only if it is that important that it should _never_ be gated.
+> As long as it is 'only' used by peripheral devices, it should be safe
+> to gate it.
+> 
+> >>Could you also please try kirkwood_defconfig and tell us if it boots?
+> >
+> >It is very easy to get my system to boot with a stock kernel. Just
+> >build one of the drivers I use directly into the kernel and it boots
+> >(up to the point where the gbe driver is loaded if built as a module,
+> >of course).
+> >
+> >>>Here are my findings with various patches: ("non-DT" means booting
+> >>>the IBNAS6210 with machine ID 1680 ???Marvell DB-88F6281-BP
+> >>>Development Board???, which works reasonably well)
+> >>>
+> >>>3.8-rc5 + runit patch:
+> >>>
+> >>>DT: Hangs at boot (when loading mv643xx_eth)
+> >>>non-DT: Boots ok
+> >
+> >In the DT case ge0 and ge1 are NULL, and thus, kirkwood_ge0[01]_init()
+> >tries to enable NULL clocks, but not the gbe clocks. ->  The clocks
+> >get disabled.
+> >
+> >As described in Sebastian's patch (and also found by Andrew some time
+> >ago), this leads to a hanging system when loading the gbe driver.
+> 
+> If I got all your configs right, this DT case is with serial but no
+> clocks property? All other runit "users" are _not_ built into the
+> kernel? Maybe it is just a coincidence that it fails when loading
+> eth but I guess it hangs because of runit getting gated while serial
+> accessing it. When you replace serial's clock-frequency with clocks
+> property to "runit" it shouldn't hang.
+
+No, this is the SMI hang already. As stated its "3.8-rc5 + runit
+patch".  So runit is running.
+
+And sure, removing "clock-frequency" gets the kernel booting until
+the gbe driver loads, as I said above in the same mail.
+
+> (Issue 1: gated runit clock hangs kernel due to serial access)
+
+Yes, and issue 1a: gated runit clock hangs kernel due to "...".
+
+I can't get a stock kernel to boot when additionally disabling the
+serial driver altogether (and compiling the Ethernet driver into the
+kernel to avoid its lockup).
+
+When the runit clock is enabled all the time, it works. I have no
+idea where it gets stuck, since I have no console.  It looks like the
+SATA module does something (telling from the LEDs), but booting does
+not continue.
+
+So, we have a statement from Marvell not to gate it, we know that it
+is needed for "...", can we please not gate it?
+
+> 
+> >>>3.8-rc5 + runit patch + ge00/ge01 patch:
+> >>>
+> >>>DT: Boots ok
+> >>>non-DT: Boots ok
+> >
+> >Since the clocks are found now and kept enabled, DT behaves the same
+> >as non-DT.
+> >
+> >>>
+> >>>3.8-rc5 + runit + Sebastians get smi clock patch (modified to use
+> >>>legacy clock names):
+> >>>
+> >>>DT: Boots, but no MAC
+> >>>non-DT: Boots ok
+> >
+> >This is the behavior originally found by Andrew. The clock patch
+> >eliminates the lockup, but the hardware forgets its MAC address.
+> >
+> >>>
+> >>>3.8-rc5 + runit + using Sebastians patch + clks not ticking at module
+> >>>load:
+> >>>
+> >>>DT: Boots, but no MAC
+> >>>non-DT: Boots, but no MAC
+> 
+> Ok, here my patch for smi clock enables gbe clock before accessing gbe
+> registers.
+> 
+> (Issue 2: gated gbe clock hangs kernel due to smi access)
+> 
+> >I think non-DT and DT gated clocks behave differently, since the
+> >non-DT ones also enable/disable the PHY.  I explicitly removed the
+> >clk_prepare_enable() from kirkwood_ge0[01]_init() in order to see if
+> >this makes a difference.
+> 
+> True, DT gated clocks don't disable PHYs (and never will).
+> 
+> >(Which reminds me, that we wanted to implement the PHY enabling in
+> >the driver.)
+> >
+> >Apparently, it does not make a difference.
+> 
+> Leaves Issue 3, gbe forgets about its MAC address when gated or powered
+> down. That should be done with local-mac-address passed by DT enabled
+> u-boot or any other (dirty) ATAG hack ;)
+
+Fine with all of that. But: I am talking about 3.8 all the time. We
+have three options for issues 2 and 3 from my point of view:
+
+1. We do proper fixes in 3.8 for issues 2 and 3.
+
+2. We fix this regression by not gating the clock in both the DT and
+the non-DT case, preferably by using the correct clocks in
+kirkwood_ge0[01]_init().  Additionally, Jason promises that all gets
+well with the DT aware driver in 3.9.  ;-)
+
+3. Do nothing. Simply accept that we broke modular Ethernet for DT
+because some code relies on two pointers being set.  When we
+introduced a new code path for DT, we forgot about these pointers. 
+Bad luck, the solution was not nice anyway and we will do proper
+fixes in 3.9.
+
+
+As should be clear by now, I think we should go for option 2.
+
+
+
+- Simon
