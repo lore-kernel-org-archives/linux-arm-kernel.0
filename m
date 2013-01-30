@@ -1,65 +1,40 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 30 Jan 2013 16:05:18 -0700
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130130224300.GU7717@titan.lakedaemon.net>
-References: <20130127144610.GW1758@titan.lakedaemon.net>
- <51053F81.6020904@gmail.com>
- <20130127152431.GX1758@titan.lakedaemon.net>
- <20130128223148.GA10275@schnuecks.de>
- <20130129004824.GB7717@titan.lakedaemon.net>
- <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130129203221.GG7717@titan.lakedaemon.net>
- <51083580.1010900@gmail.com>
- <20130130224300.GU7717@titan.lakedaemon.net>
-Message-ID: <20130130230518.GA7395@obsidianresearch.com>
+Date: Wed, 30 Jan 2013 16:10:35 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130130232836.1b1fd89b@skate>
+References: <20130129055508.GA3339@obsidianresearch.com>
+ <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
+ <20130129184157.GA29274@obsidianresearch.com>
+ <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
+ <20130129191853.GB29274@obsidianresearch.com>
+ <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
+ <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
+ <20130130103501.1873d39c@skate>
+ <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
+ <20130130232836.1b1fd89b@skate>
+Message-ID: <20130130231035.GB7395@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 05:43:00PM -0500, Jason Cooper wrote:
-> > On 01/29/2013 09:32 PM, Jason Cooper wrote:
-> > >On Tue, Jan 29, 2013 at 09:08:46PM +0100, Sebastian Hesselbarth wrote:
-> > >>Leaves Issue 3, gbe forgets about its MAC address when gated or powered
-> > >>down. That should be done with local-mac-address passed by DT enabled
-> > >>u-boot or any other (dirty) ATAG hack ;)
-> > >
-> > >A patch to mv643xx_eth to pull this from DT should solve this.
+On Wed, Jan 30, 2013 at 11:28:36PM +0100, Thomas Petazzoni wrote:
+
+> > It looks like your current system doesn't support trees below the
+> > bridges, but hopefully we can make it so the generic enumeration
+> > algorithms still work.
 > 
-> Somewhere, Jason Gunthorpe shared his patch to do this.  I'll poke
-> around for it and try to get it merged in.
+> In practice, in our situation, there isn't a tree below the bridge.
+> There is one single device. I'd prefer to not implement features that I
+> cannot effectively test, and let the implementation of those additional
+> features to whoever will need them, and therefore be able to test
+> them.
 
-Yes, you asked for the doc update and I haven't had a moment to get a
-tree setup for that..
+Agreed it is hard to test, but be aware that any system that has PCI-E
+slots can host an add-in card that has a bridge on it. These are midly
+common in some areas like high port count ethernet cards.
 
-Here are some words though:
+If you aren't going to attempt the implementation then a really big
+FIXME that the config access routing is not correct and needs to be
+based on the bus range assigned to the bridge would be friendly :)
 
-     - local-mac-address : Optional, the MAC address to assign to the
-       device. If not specified then the MAC address in the HW
-       registers is used, but the driver can not be made modular.
-
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index 7048d7c..2b2cfcb 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -2891,6 +2891,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 	struct mv643xx_eth_private *mp;
- 	struct net_device *dev;
- 	struct resource *res;
-+	const u8 *mac;
-+	int len;
- 	int err;
- 
- 	if (pdev->dev.of_node) {
-@@ -2912,6 +2914,10 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 		else
- 			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
- 
-+		mac = of_get_property(pdev->dev.of_node, "local-mac-address", &len);
-+		if (mac && len == 6)
-+		    memcpy(pd->mac_addr, mac, sizeof pd->mac_addr);
-+
- 		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
- 		if (np) {
- 			pd->shared = of_find_device_by_node(np);
--- 
-1.7.5.4
+Jason
