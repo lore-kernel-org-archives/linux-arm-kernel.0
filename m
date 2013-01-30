@@ -1,95 +1,52 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 30 Jan 2013 01:36:11 -0500
-Subject: [PATCH v5 07/14] dmaengine: add dma_request_slave_channel_compat()
-In-Reply-To: <201301232228.46716.arnd@arndb.de>
-References: <1358281974-8411-1-git-send-email-mporter@ti.com>
- <1358281974-8411-8-git-send-email-mporter@ti.com>
- <201301232228.46716.arnd@arndb.de>
-Message-ID: <20130130063611.GM5256@beef>
+From: sourav.poddar@ti.com (Sourav)
+Date: Wed, 30 Jan 2013 12:10:18 +0530
+Subject: [PATCH] arm: dts: omap4-sdp: Add I2c pinctrl data
+In-Reply-To: <1359527158.14894.37.camel@cumari.coelho.fi>
+References: <1359371865-27907-1-git-send-email-sourav.poddar@ti.com>
+ <1359527158.14894.37.camel@cumari.coelho.fi>
+Message-ID: <5108C052.3070604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 10:28:46PM +0000, Arnd Bergmann wrote:
-> On Tuesday 15 January 2013, Matt Porter wrote:
-> > Adds a dma_request_slave_channel_compat() wrapper which accepts
-> > both the arguments from dma_request_channel() and
-> > dma_request_slave_channel(). Based on whether the driver is
-> > instantiated via DT, the appropriate channel request call will be
-> > made.
-> > 
-> > This allows for a much cleaner migration of drivers to the
-> > dmaengine DT API as platforms continue to be mixed between those
-> > that boot using DT and those that do not.
-> 
-> I noticed today some drivers in linux-next that rely on this patch,
-> but the patch itself still missing from -next.
-> 
-> > --- a/include/linux/dmaengine.h
-> > +++ b/include/linux/dmaengine.h
-> > @@ -1047,6 +1047,16 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
-> >  struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
-> >  struct dma_chan *net_dma_find_channel(void);
-> >  #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
-> > +static inline struct dma_chan
-> > +*dma_request_slave_channel_compat(dma_cap_mask_t mask, dma_filter_fn fn,
-> > +                                 void *fn_param, struct device *dev,
-> > +                                 char *name)
-> > +{
-> > +       if (dev->of_node)
-> > +               return dma_request_slave_channel(dev, name);
-> > +       else
-> > +               return dma_request_channel(mask, fn, fn_param);
-> > +}
-> 
-> Hmm, dma_request_channel is actually a macro that passes mask by reference,
-> presumably because it can get modified by the filter function. Also, there
-> may be cases where we do have an of_node but don't use the dma binding
-> yet, or where dma_request_slave_channel doesn't actually use DT information
-> but rather one of the other methods that Vinod was talking about adding.
-> 
-> I think what it should look like instead is the below.
-
-Yes, looks correct now, thanks. I've incorporated it into v6.
-
--Matt
-
-> 
-> 	Arnd
-> 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index bfcdecb..b6ffd7d 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -993,6 +993,19 @@ static inline void dma_release_channel(struct dma_chan *chan)
->  }
->  #endif
->  
-> +static inline struct dma_chan *__dma_request_slave_channel_compat(dma_cap_mask_t *mask,
-> +				dma_filter_fn fn, void *fn_param, struct device *dev,
-> +				 char *name)
-> +{
-> +	struct dma_chan *chan;
-> +
-> +	chan = dma_request_slave_channel(dev, name);
-> +	if (chan)
-> +		return chan;
-> +
-> +	return __dma_request_channel(mask, fn, fn_param);
-> +}
-> +
->  /* --- DMA device --- */
->  
->  int dma_async_device_register(struct dma_device *device);
-> @@ -1001,6 +1014,8 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
->  struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
->  struct dma_chan *net_dma_find_channel(void);
->  #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
-> +#define dma_request_slave_channel_compat(mask, x, y, dev, name) \
-> +	 __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
->  
->  /* --- Helper iov-locking functions --- */
->  
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+Hi Luciano,
+On Wednesday 30 January 2013 11:55 AM, Luciano Coelho wrote:
+> Hi Sourav,
+>
+> On Mon, 2013-01-28 at 16:47 +0530, Sourav Poddar wrote:
+>> Booting 3.8-rc4 om omap 4430sdp results in the following error
+>>
+>> omap_i2c 48070000.i2c: did not get pins for i2c error: -19
+>> [    1.024261] omap_i2c 48070000.i2c: bus 0 rev0.12 at 100 kHz
+>> [    1.030181] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
+>> [    1.037384] omap_i2c 48072000.i2c: bus 1 rev0.12 at 400 kHz
+>> [    1.043762] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
+>> [    1.050964] omap_i2c 48060000.i2c: bus 2 rev0.12 at 100 kHz
+>> [    1.056823] omap_i2c 4807a000.i2c: did not get pins for i2c error: -19
+>> [    1.064025] omap_i2c 4807a000.i2c: bus 3 rev0.12 at 400 kHz
+>>
+>> This happens because omap4 dts file is not adapted to use i2c through pinctrl
+>> framework. Populating i2c pinctrl data to get rid of the error.
+>>
+>> Tested on omap4430 sdp with 3.8-rc4 kernel.
+>>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+> Could you do the same thing for panda? I'm getting the same kind of
+> errors with it:
+Sure, I will do that.
+> [    0.000000] Machine: Generic OMAP4 (Flattened Device Tree), model: TI OMAP4 PandaBoard
+> [...]
+> [    2.884826] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
+> [    2.890686] omap_i2c 48072000.i2c: bus 1 rev0.11 at 400 kHz
+> [    2.892028] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
+> [    2.899047] omap_i2c 48060000.i2c: bus 2 rev0.11 at 100 kHz
+> [    2.906677] omap_i2c 48350000.i2c: did not get pins for i2c error: -19
+> [    2.912872] omap_i2c 48350000.i2c: bus 3 rev0.11 at 400 kHz
+>
+> --
+> Cheers,
+> Luca.
+>
+Thanks,
+Sourav
