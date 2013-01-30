@@ -1,34 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 30 Jan 2013 14:07:30 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130130113245.GH23505@n2100.arm.linux.org.uk>
- <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130130140730.240b18c1@skate>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 30 Jan 2013 14:10:44 +0100
+Subject: [PATCH] ARM i.MX25: clk: parent per5_clk to AHB clock
+In-Reply-To: <20130130095353.GI8668@pengutronix.de>
+References: <1359538435-21304-1-git-send-email-s.trumtrar@pengutronix.de>
+ <20130130095353.GI8668@pengutronix.de>
+Message-ID: <20130130131044.GA20392@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
+On Wed, Jan 30, 2013 at 10:53:53AM +0100, Uwe Kleine-K?nig wrote:
+> On Wed, Jan 30, 2013 at 10:33:55AM +0100, Steffen Trumtrar wrote:
+> > The mxc-timer on the imx25 needs to be derived from the AHB clock.
+> > If a bootloader reparents this clock to the ipg_clk_highfreq, which according
+> > to the datasheet is a valid operation, the system can/will produce lockups/
+> > freezes after some time [1].
+> > 
+> > This can be forced with code like
+> > 	while(1)
+> >                 syscall(SYS_clock_gettime, CLOCK_REALTIME, &tp);
+> > 
+> > This was already fixed with the commit
+> > 	 "i.MX25 GPT clock fix: ensure correct the clock source" [2],
+> > but it seems, that it got lost. So, re-add this to have a correct gpt.
+> > 
+> > [1]: http://lists.arm.linux.org.uk/lurker/message/20130129.161230.229bda17.en.html
+> > [2]: 2012d9ca2a1381ae3e733330a7f0d1d2f1988bba
+> Instead of the last paragraph I'd write:
+> 
+> 	This problem was already fixed with commit
+> 
+> 		2012d9c (i.MX25 GPT clock fix: ensure correct the clock source)
+> 
+> 	for v3.1-rc2 but this was lost when i.MX was converted to the common
+> 	clock framework (commit 6bbaec5; ARM i.MX25: implement clocks using
+> 	common clock framework).
+> 
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > Cc: stable at vger.kernel.org
+> 
+> Cc: stable at vger.kernel.org # v3.5+
+> 
 
-On Wed, 30 Jan 2013 13:03:44 +0100, Thierry Reding wrote:
+That is better. I will resend my patch in a sec with a new commit message.
 
-> That approach isn't going to work very well with multi-platform,
-> though, since the function can only be overridden on a
-> per-architecture basis.
+Thanks,
+Steffen
 
-I can do like is done for pcibios_align_resource(): put a single
-implementation of the function in arch/arm/kernel/bios32.c, and make it
-call a hook registered in the hw_pci structure, or even directly use a
-numerical value in hw_pci, as Russell suggested earlier.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
