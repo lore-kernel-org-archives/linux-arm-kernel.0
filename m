@@ -1,77 +1,37 @@
-From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Wed, 30 Jan 2013 02:38:57 +0200
-Subject: [RFC PATCH v2 2/2] ARM: OMAP4: setup SoC model name during ID
- initialisation
-In-Reply-To: <1359506337-21619-1-git-send-email-ruslan.bilovol@ti.com>
-References: <1359506337-21619-1-git-send-email-ruslan.bilovol@ti.com>
-Message-ID: <1359506337-21619-3-git-send-email-ruslan.bilovol@ti.com>
+From: xi.wang@gmail.com (Xi Wang)
+Date: Tue, 29 Jan 2013 19:32:23 -0500
+Subject: ixp4xx eth broken in 3.7.0/3.8-rc5?
+In-Reply-To: <20744.25884.660535.514911@pilspetsen.it.uu.se>
+References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
+ <20744.25884.660535.514911@pilspetsen.it.uu.se>
+Message-ID: <51086A17.1090707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set up the SoC model name during OMAP ID initialisation
-so it will be displayed in /proc/cpuinfo:
+On 1/29/13 7:11 PM, Mikael Pettersson wrote:
+> A git bisect identified the following as the culprit:
+> 
+>   > From 1a4901177574083c35fafc24c4d151c2a7c7647c Mon Sep 17 00:00:00 2001
+>   > From: Xi Wang <xi.wang@gmail.com>
+>   > Date: Sat, 17 Nov 2012 20:25:09 +0000
+>   > Subject: [PATCH] ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
+>   >
+>   > Use &port->netdev->dev instead of NULL since dma_pool_create() doesn't
+>   > allow NULL dev.
+>   >
+>   > Signed-off-by: Xi Wang <xi.wang@gmail.com>
+>   > Cc: Andrew Morton <akpm@linux-foundation.org>
+>   > Signed-off-by: David S. Miller <davem@davemloft.net>
+>   > ---
+>   >  drivers/net/ethernet/xscale/ixp4xx_eth.c |    8 +++++---
+>   >  1 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> Reverting this unbreaks ixp4xx_eth on my ixp4xx machine with kernels
+> 3.7.0 and 3.8-rc5.
 
-/ # cat proc/cpuinfo
-[...]
-CPU variant     : 0x2
-CPU part        : 0xc09
-CPU revision    : 10
+Thanks.  The problem was that in init_queues(), the dma_pool_create()
+call requires a non-null dev.
 
-SoC name        : OMAP4470 ES1.0 HS
+  dma_pool = dma_pool_create(DRV_NAME, ??, ...);
 
-Hardware        : OMAP4 Blaze Tablet
-Revision        : 20edb4
-[...]
-
-Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
----
- arch/arm/mach-omap2/id.c |   18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 45cc7ed4..b1fba35 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -20,6 +20,7 @@
- #include <linux/io.h>
- 
- #include <asm/cputype.h>
-+#include <asm/setup.h>
- 
- #include "common.h"
- 
-@@ -33,8 +34,17 @@
- 
- static unsigned int omap_revision;
- static const char *cpu_rev;
-+static char omap_soc_model_name[80];
- u32 omap_features;
- 
-+static const char const *omap_types[] = {
-+	[OMAP2_DEVICE_TYPE_TEST]	= "TST",
-+	[OMAP2_DEVICE_TYPE_EMU]		= "EMU",
-+	[OMAP2_DEVICE_TYPE_SEC]		= "HS",
-+	[OMAP2_DEVICE_TYPE_GP]		= "GP",
-+	[OMAP2_DEVICE_TYPE_BAD]		= "BAD",
-+};
-+
- unsigned int omap_rev(void)
- {
- 	return omap_revision;
-@@ -502,8 +512,12 @@ void __init omap4xxx_check_revision(void)
- 		omap_revision = OMAP4430_REV_ES2_3;
- 	}
- 
--	pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,
--		((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
-+	sprintf(omap_soc_model_name, "OMAP%04x ES%d.%d %s", omap_rev() >> 16,
-+			((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf),
-+			omap_types[omap_type()]);
-+	set_soc_model_name(omap_soc_model_name);
-+
-+	pr_info("%s\n", omap_soc_model_name);
- }
- 
- void __init omap5xxx_check_revision(void)
--- 
-1.7.9.5
+What do you think would work here?
