@@ -1,41 +1,34 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 30 Jan 2013 20:32:21 +0800
-Subject: [PATCH] ARM:boot: support the command with COMMAND_LINE_SIZE - 1
- useful chars
-Message-ID: <510912D5.5030505@asianux.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 30 Jan 2013 14:48:50 +0200
+Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
+References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
+Message-ID: <510916B2.7080509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/30/2013 02:08 PM, Mohammed, Afzal wrote:
+> Hi Roger,
+> 
+> On Mon, Jan 28, 2013 at 17:00:01, Quadros, Roger wrote:
+> 
+>> NOTE: Tested on 4460ES-B1 Panda and BeagleBoard C4 only. Other boards are only
+>> build tested.
+> 
+> Please try to ensure that beagle bone USB0 works with this.
+> 
 
-  originally, not support the command with COMMAND_LINE_SIZE - 1 useful chars.
-  but in fact, we can support it:
+Hi Afzal,
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/boot/compressed/atags_to_fdt.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I do not have beaglebone with me and don't seem to find beaglebone
+board support in mainline.
 
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index aabc02a..ed23ec2 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -63,7 +63,7 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
- 	/* copy the fdt command line into the buffer */
- 	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
- 	if (fdt_bootargs)
--		if (len < COMMAND_LINE_SIZE) {
-+		if (len <= COMMAND_LINE_SIZE) {
- 			memcpy(ptr, fdt_bootargs, len);
- 			/* len is the length of the string
- 			 * including the NULL terminator */
-@@ -73,7 +73,7 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
- 	/* and append the ATAG_CMDLINE */
- 	if (fdt_cmdline) {
- 		len = strlen(fdt_cmdline);
--		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
-+		if (ptr - cmdline + len + 2 <= COMMAND_LINE_SIZE) {
- 			*ptr++ = ' ';
- 			memcpy(ptr, fdt_cmdline, len);
- 			ptr += len;
--- 
-1.7.10.4
+I would appreciate if someone who knows more about beaglebone can help
+with verification.
+
+I could find that Robert C Nelson (now in cc) is maintaining out of tree
+patches for the beaglebone. Maybe he could help with verification?
+
+regards,
+-roger
