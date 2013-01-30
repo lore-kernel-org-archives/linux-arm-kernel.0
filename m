@@ -1,51 +1,53 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Wed, 30 Jan 2013 08:57:20 -0300
-Subject: [PATCH 2/3] arm: sunxi: Add clock definitions for the new clock
- driver
-In-Reply-To: <5108D8BE.1080906@free-electrons.com>
-References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
- <1358835176-7197-3-git-send-email-emilio@elopez.com.ar>
- <5108D8BE.1080906@free-electrons.com>
-Message-ID: <BLU0-SMTP4897778EE63E9FB119BDBD8A1E0@phx.gbl>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 30 Jan 2013 13:03:44 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130130113245.GH23505@n2100.arm.linux.org.uk>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130130113245.GH23505@n2100.arm.linux.org.uk>
+Message-ID: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-El 30/01/13 05:24, Maxime Ripard escribi?:
-> Hi Emilio,
+On Wed, Jan 30, 2013 at 11:32:46AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 28, 2013 at 07:56:28PM +0100, Thomas Petazzoni wrote:
+> > +static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+> > +						 const struct resource *res,
+> > +						 resource_size_t start,
+> > +						 resource_size_t size,
+> > +						 resource_size_t align)
+> > +{
+> > +	if (!(res->flags & IORESOURCE_IO))
+> > +		return start;
+> > +
+> > +	/*
+> > +	 * The I/O regions must be 64K aligned, because the
+> > +	 * granularity of PCIe I/O address decoding windows is 64 K
+> > +	 */
+> > +	return round_up(start, SZ_64K);
+> > +}
 > 
-> Le 22/01/2013 07:12, Emilio L?pez a ?crit :
+> You do realise that this will result in all PCI I/O BARs being rounded
+> up to 64K.
 > 
->> +		cpu: cpu at 01c20054 {
->> +			#clock-cells = <0>;
->> +			compatible = "allwinner,sunxi-cpu-clk";
->> +			reg = <0x01c20054 0x4>;
->> +			clocks = <&osc32k>, <&osc24M>, <&pll1>;
->> +		};
+> I've just been digging through the PCI code and have come across a
+> function - pcibios_window_alignment() - which the PCI code allows to be
+> overriden which allows you to increase the alignment requirement of
+> bridge windows.  It takes the PCI bus and window type as arguments.
 > 
-> Why do you need these three clocks here ? From what you said in patch 3,
-> it seems like the 24M oscillator is not a direct parent, but only the
-> pll1 and the 32k oscillator, right?
+> I'd suggest using that, and checking whether the bus which is passed
+> corresponds with a bus which gives you problems, so that you don't
+> impose the 64K requirement on downstream bridges.
 
-There are two reasons:
- * Hardware wise it actually is a parent, as in, it is an usable source
-you can choose on the mux. There is also PLL6 as an option, but it has
-no representation yet so I have not listed it.
+That approach isn't going to work very well with multi-platform, though,
+since the function can only be overridden on a per-architecture basis.
 
-  Quoting the linux-sunxi wiki:
-
-    0x00 = 32 KHz internal RC clock
-    0x01 = 24 MHz external Oscillator
-    0x02 = PLL1
-    0x03 = 200 MHz sourced from PPL6
-
- * The example in patch 3 is simplified, you may want to switch to the
-24M oscillator first. My intention was to just present the concept/idea,
-the actual clock handling on standby contains some more steps; see:
-
-https://github.com/linux-sunxi/linux-sunxi/blob/sunxi-3.0/arch/arm/mach-sun4i/pm/standby/standby.c#L179
-
-Thanks for the review,
-
-Emilio
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130130/74cffa44/attachment.sig>
