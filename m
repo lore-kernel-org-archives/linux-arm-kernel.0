@@ -1,63 +1,45 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 29 Jan 2013 19:11:56 -0500 (EST)
-Subject: [PATCH v2 4/4] irqchip: gic: Perform the gic_secondary_init()
- call via CPU notifier
-In-Reply-To: <20130129231205.GA25176@MacBook-Pro.local>
-References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
- <1359476319-23720-5-git-send-email-catalin.marinas@arm.com>
- <alpine.LFD.2.02.1301291734140.6300@xanadu.home>
- <20130129231205.GA25176@MacBook-Pro.local>
-Message-ID: <alpine.LFD.2.02.1301291907340.6300@xanadu.home>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Wed, 30 Jan 2013 01:11:08 +0100
+Subject: ixp4xx eth broken in 3.7.0/3.8-rc5?
+In-Reply-To: <20744.9777.937924.822371@pilspetsen.it.uu.se>
+References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
+Message-ID: <20744.25884.660535.514911@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Jan 2013, Catalin Marinas wrote:
+Mikael Pettersson writes:
+ > When I try to update my ixp4xx machine to a 3.8-rc5 kernel it boots
+ > Ok but the network (CONFIG_IXP4XX_ETH=y) fails to come up, with the
+ > following in the kernel log:
+ > 
+ > net eth0: coherent DMA mask is unset
+ > 
+ > With a 3.7.0 kernel the situation is similar, except that the "net
+ > eth0: coherent DMA mask is unset" message repeats itself endlessly
+ > and I can't even get in on the serial console.
+ > 
+ > With the 3.6.0 kernel everything works perfectly.
 
-> On Tue, Jan 29, 2013 at 10:35:46PM +0000, Nicolas Pitre wrote:
-> > On Tue, 29 Jan 2013, Catalin Marinas wrote:
-> > 
-> > > All the calls to gic_secondary_init() pass 0 as the first argument.
-> > > Since this function is called on each CPU when starting, it can be done
-> > > in a platform-independent way via a CPU notifier registered by the GIC
-> > > code.
-> > >
-> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > Acked-by: Stephen Warren <swarren@nvidia.com>
-> > > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > > Acked-by: Rob Herring <rob.herring@calxeda.com>
-> > > Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> > > Tested-by: Simon Horman <horms+renesas@verge.net.au>
-> > > Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: David Brown <davidb@codeaurora.org>
-> > > Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> > > Cc: Tony Lindgren <tony@atomide.com>
-> > > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > > Cc: Dinh Nguyen <dinguyen@altera.com>
-> > > Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> > > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> Thanks.
-> 
-> > What is your plan in terms of merge path and schedule?  My mcpm series
-> > would depend on this.
-> 
-> I would like to get them in as soon as possible (ideally 3.9) as AArch64
-> needs GIC support. I can base them on Rob's branch (already in -next)
-> and send them the same route (the arm-soc tree if Olof/Arnd are ok to
-> take them).
+A git bisect identified the following as the culprit:
 
-Well...  I'd prefer if my series was merged by RMK since this is mostly 
-core ARM code.  That is posing dependency issues.
+ > From 1a4901177574083c35fafc24c4d151c2a7c7647c Mon Sep 17 00:00:00 2001
+ > From: Xi Wang <xi.wang@gmail.com>
+ > Date: Sat, 17 Nov 2012 20:25:09 +0000
+ > Subject: [PATCH] ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
+ > 
+ > Use &port->netdev->dev instead of NULL since dma_pool_create() doesn't
+ > allow NULL dev.
+ > 
+ > Signed-off-by: Xi Wang <xi.wang@gmail.com>
+ > Cc: Andrew Morton <akpm@linux-foundation.org>
+ > Signed-off-by: David S. Miller <davem@davemloft.net>
+ > ---
+ >  drivers/net/ethernet/xscale/ixp4xx_eth.c |    8 +++++---
+ >  1 files changed, 5 insertions(+), 3 deletions(-)
 
-I think I'll just ignore your change for now and we'll fix things up 
-during the v3.9-rc period.
+Reverting this unbreaks ixp4xx_eth on my ixp4xx machine with kernels
+3.7.0 and 3.8-rc5.
 
+(Added cc: author and netdev.)
 
-Nicolas
+/Mikael
