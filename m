@@ -1,81 +1,38 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Wed, 30 Jan 2013 19:19:43 +0530
-Subject: [PATCH 2/2] arm: dts: omap5-evm: Add mcspi data
-Message-ID: <1359553783-12129-1-git-send-email-sourav.poddar@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 30 Jan 2013 21:49:41 +0800
+Subject: [PATCH v2] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+In-Reply-To: <2871120.foIQeGmlHR@vostro.rjw.lan>
+References: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
+ <331ABD5ECB02734CA317220B2BBEABC13EAF880F@DBDE01.ent.ti.com>
+ <2871120.foIQeGmlHR@vostro.rjw.lan>
+Message-ID: <20130130134939.GE2757@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mcspi node and pinmux data for omap5 mcspi controller.
+On Wed, Jan 30, 2013 at 02:40:35PM +0100, Rafael J. Wysocki wrote:
+> > > Mark, AnilKumar,
+> > > 
+> > > I only compile-tested it on highbank and omap2.  Please give it a test
+> > > no hardware to make sure cpufreq-cpu0 still works for you.  Thanks.
+> > 
+> > Hi Shawn,
+> > 
+> > I hope this is based on linux-omap/master, to test the driver I have
+> > to add some patches on top of this patch, because of recent changes.
+> > I will provide the test details once I am done.
+> 
+> Shawn, does it mean I need to wait with applying the patch or will OMAP2
+> work as is?
+> 
+I would expect that omap2/am33xx should work as it is, but I do not
+have hardware to confirm that.
 
-Tested on omap5430 evm with 3.8-rc4 custom kernel.
+Also as the patch touches a few files in arch/arm/mach-omap2, we may
+need an ACK from Tony.
 
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
-Develops this on the patch[1] submitted in mainline
-[1]: http://www.spinics.net/lists/kernel/msg1473163.html
- arch/arm/boot/dts/omap5-evm.dts |   46 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 46 insertions(+), 0 deletions(-)
+Actually, I prefer to move omap2 bits into a separate patch and have
+it go via omap tree to avoid the possible conflict with cpufreq and
+arm-soc tree.  What do you say?  If you agree, I will re-iterate the
+patch to do so.
 
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-index a96acc0..252edda 100644
---- a/arch/arm/boot/dts/omap5-evm.dts
-+++ b/arch/arm/boot/dts/omap5-evm.dts
-@@ -115,6 +115,33 @@
- 			0x186 0x100     /* i2c4_sda INPUTENABLE | MODE0 */
- 		>;
- 	};
-+
-+	mcspi2_pins: pinmux_mcspi2_pins {
-+		pinctrl-single,pins = <
-+			0xbc 0x100
-+			0xbe 0x100
-+			0xc0 0x118
-+			0xc2 0x0
-+		>;
-+	};
-+
-+	mcspi3_pins: pinmux_mcspi3_pins {
-+		pinctrl-single,pins = <
-+			0x78 0x101
-+			0x7a 0x101
-+			0x7c 0x101
-+			0x7e 0x101
-+		>;
-+	};
-+
-+	mcspi4_pins: pinmux_mcspi4_pins {
-+		pinctrl-single,pins = <
-+			0x164 0x101
-+			0x168 0x101
-+			0x16a 0x101
-+			0x16c 0x101
-+		>;
-+	};
- };
- 
- &mmc1 {
-@@ -213,3 +240,22 @@
- 	cs1-used;
- 	device-handle = <&samsung_K3PE0E000B>;
- };
-+
-+&mcspi1 {
-+
-+};
-+
-+&mcspi2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c5_pins>;
-+};
-+
-+&mcspi3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c5_pins>;
-+};
-+
-+&mcspi4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c5_pins>;
-+};
--- 
-1.7.1
+Shawn
