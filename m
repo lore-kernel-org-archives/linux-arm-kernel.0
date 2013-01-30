@@ -1,99 +1,62 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Wed, 30 Jan 2013 14:26:37 +0100
-Subject: [PATCH 1/3] atmel_lcdfb: fix 16-bpp modes on older SOCs
-In-Reply-To: <20130129135435.GN7360@game.jcrosoft.org>
-References: <1355142530-10366-1-git-send-email-jhovold@gmail.com>
- <1355142530-10366-2-git-send-email-jhovold@gmail.com>
- <20130129135435.GN7360@game.jcrosoft.org>
-Message-ID: <20130130132637.GA29440@localhost>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 30 Jan 2013 14:40:35 +0100
+Subject: [PATCH v2] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EAF880F@DBDE01.ent.ti.com>
+References: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
+ <331ABD5ECB02734CA317220B2BBEABC13EAF880F@DBDE01.ent.ti.com>
+Message-ID: <2871120.foIQeGmlHR@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 02:54:35PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 13:28 Mon 10 Dec     , Johan Hovold wrote:
-> > Fix regression introduced by commit 787f9fd23283 ("atmel_lcdfb: support
-> > 16bit BGR:565 mode, remove unsupported 15bit modes") which broke 16-bpp
-> > modes for older SOCs which use IBGR:555 (msb is intensity) rather
-> > than BGR:565.
+On Wednesday, January 30, 2013 07:10:20 AM AnilKumar, Chimata wrote:
+> On Tue, Jan 29, 2013 at 08:23:40, Shawn Guo wrote:
+> > As multiplatform build is being adopted by more and more ARM platforms,
+> > initcall function should be used very carefully.  For example, when
+> > GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
+> > will be called on all the platforms to initialize cpufreq-cpu0 driver.
 > > 
-> > Use SOC-type to determine the pixel layout.
+> > To eliminate this undesired the effect, the patch changes cpufreq-cpu0
+> > driver to have it instantiated as a platform_driver.  Then it will only
+> > run on platforms that create the platform_device "cpufreq-cpu0".
 > > 
-> > Tested on custom at91sam9263-board.
+> > Along with the change, it also changes cpu_dev to be &pdev->dev,
+> > so that managed functions can start working, and module build gets
+> > supported too.
 > > 
-> > Cc: <stable@vger.kernel.org>
-> > Signed-off-by: Johan Hovold <jhovold@gmail.com>
+> > The existing users of cpufreq-cpu0 driver highbank and am33xx are also
+> > updated accordingly to adapt the changes.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> > Cc: AnilKumar Ch <anilkumar@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 > > ---
-> >  drivers/video/atmel_lcdfb.c | 22 +++++++++++++++-------
-> >  include/video/atmel_lcdc.h  |  1 +
-> >  2 files changed, 16 insertions(+), 7 deletions(-)
+> > Changes since v1:
+> >  * Migrate cpufreq-cpu0 users in the same patch
 > > 
-> > diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-> > index 1505539..1f68fa6 100644
-> > --- a/drivers/video/atmel_lcdfb.c
-> > +++ b/drivers/video/atmel_lcdfb.c
-> > @@ -422,17 +422,22 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
-> >  			= var->bits_per_pixel;
-> >  		break;
-> >  	case 16:
-> > +		/* Older SOCs use IBGR:555 rather than BGR:565. */
-> > +		if (sinfo->have_intensity_bit)
-> > +			var->green.length = 5;
-> > +		else
-> > +			var->green.length = 6;
-> > +
-> >  		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
-> > -			/* RGB:565 mode */
-> > -			var->red.offset = 11;
-> > +			/* RGB:5X5 mode */
-> > +			var->red.offset = var->green.length + 5;
-> >  			var->blue.offset = 0;
-> >  		} else {
-> > -			/* BGR:565 mode */
-> > +			/* BGR:5X5 mode */
-> >  			var->red.offset = 0;
-> > -			var->blue.offset = 11;
-> > +			var->blue.offset = var->green.length + 5;
-> >  		}
-> >  		var->green.offset = 5;
-> > -		var->green.length = 6;
-> >  		var->red.length = var->blue.length = 5;
-> >  		break;
-> >  	case 32:
-> > @@ -679,8 +684,7 @@ static int atmel_lcdfb_setcolreg(unsigned int regno, unsigned int red,
-> >  
-> >  	case FB_VISUAL_PSEUDOCOLOR:
-> >  		if (regno < 256) {
-> > -			if (cpu_is_at91sam9261() || cpu_is_at91sam9263()
-> > -			    || cpu_is_at91sam9rl()) {
-> > +			if (sinfo->have_intensity_bit) {
-> >  				/* old style I+BGR:555 */
-> >  				val  = ((red   >> 11) & 0x001f);
-> >  				val |= ((green >>  6) & 0x03e0);
-> > @@ -870,6 +874,10 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
-> >  	}
-> >  	sinfo->info = info;
-> >  	sinfo->pdev = pdev;
-> > +	if (cpu_is_at91sam9261() || cpu_is_at91sam9263() ||
-> > +							cpu_is_at91sam9rl()) {
-> > +		sinfo->have_intensity_bit = true;
-> > +	}
-> nack
+> > Rafael,
+> > 
+> > The patch is based on Mark's highbank-cpufreq series and Nishanth's
+> > "PM / OPP : export symbol consolidation" sereis.
+> > 
+> > Mark, AnilKumar,
+> > 
+> > I only compile-tested it on highbank and omap2.  Please give it a test
+> > no hardware to make sure cpufreq-cpu0 still works for you.  Thanks.
 > 
-> you need to drop the cpu_is as this can only be use now for the core
+> Hi Shawn,
 > 
-> use platform_device_id to indetify the IP as done on at91-i2c as we can not
-> detect the IP version
+> I hope this is based on linux-omap/master, to test the driver I have
+> to add some patches on top of this patch, because of recent changes.
+> I will provide the test details once I am done.
 
-If this was a new feature and not a regression, fix I'd fully agree. There
-are however currently four places in atmel_lcdfb where cpu_is macros are
-used, and my patch only refactors one of them.
+Shawn, does it mean I need to wait with applying the patch or will OMAP2
+work as is?
 
-I can submit a follow up patch which add platform_device_id support, but
-such a patch will be quite invasive and thus not 3.8-rc or stable material.
+Rafael
 
-How about accepting this patch as it is, considering that it fixes an
-obvious regression and also facilitate the move to platform_device_id by
-introducing the intensity-bit flag?
 
-Thanks,
-Johan
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
