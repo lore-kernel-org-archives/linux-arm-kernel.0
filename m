@@ -1,27 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Jan 2013 15:57:57 +0000
-Subject: [RFC PATCH v3 2/2] ARM: OMAP4: setup SoC model name during ID
- initialisation
-In-Reply-To: <1359558091-29251-3-git-send-email-ruslan.bilovol@ti.com>
-References: <1359558091-29251-1-git-send-email-ruslan.bilovol@ti.com>
- <1359558091-29251-3-git-send-email-ruslan.bilovol@ti.com>
-Message-ID: <20130130155757.GK2637@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 30 Jan 2013 15:59:11 +0000
+Subject: [GIT PULL] vexpress: drivers for v3.9
+In-Reply-To: <1359542283.8090.32.camel@hornet>
+References: <1359484450.8090.27.camel@hornet>
+ <CAOesGMinJef-9OsKi0LGB0W6i73sgyUqhm2Mie4gyC2JLjnd1Q@mail.gmail.com>
+ <1359542283.8090.32.camel@hornet>
+Message-ID: <1359561551.3094.17.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 05:01:31PM +0200, Ruslan Bilovol wrote:
-> Set up the SoC model name during OMAP ID initialisation
-> so it will be displayed in /proc/cpuinfo:
+On Wed, 2013-01-30 at 10:38 +0000, Pawel Moll wrote:
+> In the meantime, could you please take the other patch please? I mean:
 > 
-> / # cat proc/cpuinfo
-> [...]
-> CPU variant     : 0x2
-> CPU part        : 0xc09
-> CPU revision    : 10
+> > > Catalin Marinas (1):
+> > >       arm: Move sp810.h to include/linux/amba/
 > 
-> SoC name        : OMAP4470
+> I can rework the branch to contain this patch only and send a new pull
+> request if you prefer.
 
-Hmm.  Still not happy.  Wasn't there some SoC infrastructure added to the
-kernel to export this kind of information via sysfs?  See:
+As Samuel will take the LEDs patch through his tree, I've regenerated
+the branch, so:
 
-Documentation/ABI/testing/sysfs-devices-soc
+The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+
+  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/drivers-for-3.9
+
+for you to fetch changes up to da660b4a3b15caea9c198c4f26d1cf7023df92fc:
+
+  arm: Move sp810.h to include/linux/amba/ (2013-01-30 15:55:45 +0000)
+
+----------------------------------------------------------------
+Versatile Express related driver updates for 3.9:
+* Move sp810 header to a more generic location,
+  mainly to share it with arm64
+
+----------------------------------------------------------------
+Catalin Marinas (1):
+      arm: Move sp810.h to include/linux/amba/
+
+ arch/arm/plat-spear/restart.c                                 |    2 +-
+ drivers/clk/versatile/clk-vexpress.c                          |    3 +--
+ {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h |    0
+ 3 files changed, 2 insertions(+), 3 deletions(-)
+ rename {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h (100%)
