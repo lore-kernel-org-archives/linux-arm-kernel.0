@@ -1,62 +1,46 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 30 Jan 2013 14:40:35 +0100
-Subject: [PATCH v2] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EAF880F@DBDE01.ent.ti.com>
-References: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
- <331ABD5ECB02734CA317220B2BBEABC13EAF880F@DBDE01.ent.ti.com>
-Message-ID: <2871120.foIQeGmlHR@vostro.rjw.lan>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 31 Jan 2013 00:36:47 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the pinctrl tree
+Message-ID: <20130131003647.daebd2aed733d0304c2c7aa0@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, January 30, 2013 07:10:20 AM AnilKumar, Chimata wrote:
-> On Tue, Jan 29, 2013 at 08:23:40, Shawn Guo wrote:
-> > As multiplatform build is being adopted by more and more ARM platforms,
-> > initcall function should be used very carefully.  For example, when
-> > GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
-> > will be called on all the platforms to initialize cpufreq-cpu0 driver.
-> > 
-> > To eliminate this undesired the effect, the patch changes cpufreq-cpu0
-> > driver to have it instantiated as a platform_driver.  Then it will only
-> > run on platforms that create the platform_device "cpufreq-cpu0".
-> > 
-> > Along with the change, it also changes cpu_dev to be &pdev->dev,
-> > so that managed functions can start working, and module build gets
-> > supported too.
-> > 
-> > The existing users of cpufreq-cpu0 driver highbank and am33xx are also
-> > updated accordingly to adapt the changes.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
-> > Cc: AnilKumar Ch <anilkumar@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > ---
-> > Changes since v1:
-> >  * Migrate cpufreq-cpu0 users in the same patch
-> > 
-> > Rafael,
-> > 
-> > The patch is based on Mark's highbank-cpufreq series and Nishanth's
-> > "PM / OPP : export symbol consolidation" sereis.
-> > 
-> > Mark, AnilKumar,
-> > 
-> > I only compile-tested it on highbank and omap2.  Please give it a test
-> > no hardware to make sure cpufreq-cpu0 still works for you.  Thanks.
-> 
-> Hi Shawn,
-> 
-> I hope this is based on linux-omap/master, to test the driver I have
-> to add some patches on top of this patch, because of recent changes.
-> I will provide the test details once I am done.
+Hi all,
 
-Shawn, does it mean I need to wait with applying the patch or will OMAP2
-work as is?
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/pinctrl/pinctrl-nomadik.c between commit e32af8894588
+("pinctrl/nomadik: add device tree support") from the pinctrl tree and
+commit 6010d40320f8 ("ARM: nomadik: move GPIO and pinctrl to device
+tree") from the arm-soc tree.
 
-Rafael
-
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/pinctrl/pinctrl-nomadik.c
+index 39c1651,ef21a66..0000000
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@@ -2104,7 -1846,11 +2104,11 @@@ static struct pinctrl_desc nmk_pinctrl_
+  
+  static const struct of_device_id nmk_pinctrl_match[] = {
+  	{
++ 		.compatible = "stericsson,nmk-pinctrl-stn8815",
++ 		.data = (void *)PINCTRL_NMK_STN8815,
++ 	},
++ 	{
+ -		.compatible = "stericsson,nmk_pinctrl",
+ +		.compatible = "stericsson,nmk-pinctrl",
+  		.data = (void *)PINCTRL_NMK_DB8500,
+  	},
+  	{},
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/b17bd058/attachment.sig>
