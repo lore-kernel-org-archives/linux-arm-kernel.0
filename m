@@ -1,28 +1,110 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 30 Jan 2013 16:15:52 -0700
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130130230100.GV7717@titan.lakedaemon.net>
-References: <20130127152431.GX1758@titan.lakedaemon.net>
- <20130128223148.GA10275@schnuecks.de>
- <20130129004824.GB7717@titan.lakedaemon.net>
- <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
- <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
- <20130130230100.GV7717@titan.lakedaemon.net>
-Message-ID: <20130130231552.GA7915@obsidianresearch.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 31 Jan 2013 00:18:06 +0100
+Subject: [RFC PATCH v3 1/2] ARM: kernel: update cpuinfo to print SoC
+ model name
+In-Reply-To: <1359558091-29251-2-git-send-email-ruslan.bilovol@ti.com>
+References: <1359558091-29251-1-git-send-email-ruslan.bilovol@ti.com>
+ <1359558091-29251-2-git-send-email-ruslan.bilovol@ti.com>
+Message-ID: <20130130231806.GO7360@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 06:01:00PM -0500, Jason Cooper wrote:
+On 17:01 Wed 30 Jan     , Ruslan Bilovol wrote:
+> Currently, reading /proc/cpuinfo provides userspace with CPU ID of
+> the CPU carrying out the read from the file.
+> Userspace using this information may decide what module
+> to load or how to configure some specific (and processor-depended)
+> settings or so.
+> However, since really different SoCs can share same ARM core,
+> this information currently is not so useful.
+> For example, TI OMAP4460 and OMAP4470 SoCs show the same
+> information in the /proc/cpuinfo whereas they are different.
+> Since in most cases ARM CPU is a part of some system on a chip (SoC),
+> the "cpuinfo" file looks like exactly that place, where this
+> information have to be displayed.
+> 
+> So added new line "SoC name" in the "cpuinfo" output for system
+> on a chip name. It is placed between CPU information and machine
+> information, so the file structure looks gracefully (CPU-SoC-Hardware)
+Nack
 
-> Once we add proper DT support to mv643xx_eth, the local-mac-address will
-> need to be defined in the dtb.  We should probably poke the other Jason
-> to see if there is a cooresponding u-boot patch to his local-mac-address
-> patch.
+this break the kernel ABI
 
-Sorry I don't have a u-boot fix, we don't use u-boot here - but
-local-mac-address is common on other ARM drivers so I'd hope there is
-a u-boot facility for stuffing it already?
+and we have now socinfo via sysfs
 
-Jason
+Best Regards,
+J.
+> 
+> Example:
+> 
+> / # cat proc/cpuinfo
+> [...]
+> CPU variant     : 0x2
+> CPU part        : 0xc09
+> CPU revision    : 10
+> 
+> SoC name        : OMAP4470
+> 
+> Hardware        : OMAP4 Blaze Tablet
+> Revision        : 20edb4
+> [...]
+> 
+> Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+> ---
+>  arch/arm/include/asm/setup.h |    1 +
+>  arch/arm/kernel/setup.c      |    9 +++++++++
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+> index c50f056..621df40 100644
+> --- a/arch/arm/include/asm/setup.h
+> +++ b/arch/arm/include/asm/setup.h
+> @@ -52,5 +52,6 @@ extern struct meminfo meminfo;
+>  extern int arm_add_memory(phys_addr_t start, phys_addr_t size);
+>  extern void early_print(const char *str, ...);
+>  extern void dump_machine_table(void);
+> +extern void set_soc_model_name(char *name);
+>  
+>  #endif
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3f6cbb2..bb3805f 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -134,6 +134,7 @@ char elf_platform[ELF_PLATFORM_SIZE];
+>  EXPORT_SYMBOL(elf_platform);
+>  
+>  static const char *cpu_name;
+> +static const char *soc_name;
+>  static const char *machine_name;
+>  static char __initdata cmd_line[COMMAND_LINE_SIZE];
+>  struct machine_desc *machine_desc __initdata;
+> @@ -493,6 +494,11 @@ static void __init setup_processor(void)
+>  	cpu_init();
+>  }
+>  
+> +void set_soc_model_name(char *name)
+> +{
+> +	soc_name = name;
+> +}
+> +
+>  void __init dump_machine_table(void)
+>  {
+>  	struct machine_desc *p;
+> @@ -902,6 +908,9 @@ static int c_show(struct seq_file *m, void *v)
+>  		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
+>  	}
+>  
+> +	if (soc_name)
+> +		seq_printf(m, "SoC name\t: %s\n\n", soc_name);
+> +
+>  	seq_printf(m, "Hardware\t: %s\n", machine_name);
+>  	seq_printf(m, "Revision\t: %04x\n", system_rev);
+>  	seq_printf(m, "Serial\t\t: %08x%08x\n",
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
