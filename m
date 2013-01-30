@@ -1,61 +1,69 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Wed, 30 Jan 2013 11:06:10 +0200
-Subject: [PATCH] arm: dts: omap4-sdp: Add I2c pinctrl data
-In-Reply-To: <5108DE5F.5090803@ti.com>
-References: <1359371865-27907-1-git-send-email-sourav.poddar@ti.com>
- <1359527158.14894.37.camel@cumari.coelho.fi> <5108C052.3070604@ti.com>
- <F3DBB1B3EF102E4994C89758CFCA32412C16DD@DBDE01.ent.ti.com>
- <5108DE5F.5090803@ti.com>
-Message-ID: <1359536770.14894.38.camel@cumari.coelho.fi>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 30 Jan 2013 14:40:15 +0530
+Subject: [PATCH 08/10] ARM: OMAP5: hwmod data: Create initial OMAP5 SOC
+ hwmod data
+In-Reply-To: <20130129172410.GS15361@atomide.com>
+References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
+ <1358522856-12180-9-git-send-email-santosh.shilimkar@ti.com>
+ <20130118171500.GC15361@atomide.com> <50FCF838.6000105@ti.com>
+ <50FD5993.5010008@ti.com> <20130121180113.GA22517@atomide.com>
+ <50FE8C5C.2030409@ti.com> <20130122183213.GN15361@atomide.com>
+ <5107D52C.80200@ti.com> <20130129172410.GS15361@atomide.com>
+Message-ID: <5108E377.1020304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-01-30 at 14:18 +0530, Santosh Shilimkar wrote:
-> On Wednesday 30 January 2013 02:13 PM, Kumar, Anil wrote:
-> > Hi Sourav,
-> >
-> > On Wed, Jan 30, 2013 at 12:10:18, Poddar, Sourav wrote:
-> >> Hi Luciano,
-> >> On Wednesday 30 January 2013 11:55 AM, Luciano Coelho wrote:
-> >>> Hi Sourav,
-> >>>
-> >>> On Mon, 2013-01-28 at 16:47 +0530, Sourav Poddar wrote:
-> >>>> Booting 3.8-rc4 om omap 4430sdp results in the following error
-> >>>>
-> >>>> omap_i2c 48070000.i2c: did not get pins for i2c error: -19
-> >>>> [    1.024261] omap_i2c 48070000.i2c: bus 0 rev0.12 at 100 kHz
-> >>>> [    1.030181] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
-> >>>> [    1.037384] omap_i2c 48072000.i2c: bus 1 rev0.12 at 400 kHz
-> >>>> [    1.043762] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
-> >>>> [    1.050964] omap_i2c 48060000.i2c: bus 2 rev0.12 at 100 kHz
-> >>>> [    1.056823] omap_i2c 4807a000.i2c: did not get pins for i2c error: -19
-> >>>> [    1.064025] omap_i2c 4807a000.i2c: bus 3 rev0.12 at 400 kHz
-> >>>>
-> >>>> This happens because omap4 dts file is not adapted to use i2c through pinctrl
-> >>>> framework. Populating i2c pinctrl data to get rid of the error.
-> >>>>
-> >>>> Tested on omap4430 sdp with 3.8-rc4 kernel.
-> >>>>
-> >>>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> >>>> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>>> ---
-> >>> Could you do the same thing for panda? I'm getting the same kind of
-> >>> errors with it:
-> >
-> > omap4 uses pinctrl-single driver for pinmux with DT. Currently
-> > pinctrl-single driver is getting up after I2C driver. So I2c cannot
-> > use pinctrl. The below patch solve this issue
-> >
-> > http://www.gossamer-threads.com/lists/linux/kernel/1669067
-> >
-> > Can you try with this ? it may solve it.
-> >
-> OMAP i2c driver already takes care of -EPROBE_DEFER. The issue
-> as you see from the log is not probe failure but missing the
-> pin information in DT blob. And thats what patch does.
+On Tuesday 29 January 2013 10:54 PM, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130129 05:59]:
+>> OK so we do managed to clean up the address space, IRQ lines
+>> and DMA request lines data from hwmod completely.
+>>
+>> -OMAP5 hwmod data file, 2076 lines we could remove which significant
+>> reduction. I ran the same scripts on OMAP4 and there too about 2200
+>> lines getting deleted.
+>
+> Great, thanks for looking into it. I guess we cannot do that quite
+> yet for omap4 as we have not made it DT only. But we should be able
+> to do that for am33xx as that's DT only already.
+>
+>> - I have to udapte DT file to add the all supported hwmods with reg
+>> property so that OMAP5 continue to boot. Similar work is needed for
+>> OMAP4 too once OMAP4 is made DT only support.
+>
+> OK
+>
+>> - To my suprise, the DT lookup isn't that bad. It is adding just
+>> 24 milliseconds to the boot time which is more or less noise.
+>
+> That's good to hear.
+>
+>> Have pushed a branch with above update for OMAP5 here [1]
+>>
+>> So we are left with two other topics which you mentioned in the
+>> comments.
+>>
+>> 1. Movement of clock data to drivers/clk. Till we get direction here
+>> I would like to hear the alternative to get OMAP5 booting from mainline.
+>> If there is no alternative, we can keep OMAP5 clock data alone
+>> out of tree and get rest of the data files merged.
+>
+> I agree, no reason to hold back the other patches. But we should
+> resolve the common clock move to drivers/clk properly now,
+> otherwise it will just get postponed again and we have even bigger
+> problem to deal with.
+>
+I will go ahead and separate the clock data from rest of the data
+files so that we can get rest of the data patches in.
 
-Yes, Santosh is right.  I tried this patch, but it didn't fix the
-warnings.
+>> 2. The iormap() done by hwmod for sysconfig handling which you are
+>> discussing with Rajendra. So far we don't have a viable way to
+>> get the iormapped address from device drivers back to platform
+>> code. Lets continue on this thread but this can evolve in
+>> parallel.
+>
+> Yes that can be fixed separately.
+>
+Yep. Thanks for the comments.
 
---
-Luca.
+Regards
+Santosh
