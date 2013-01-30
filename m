@@ -1,36 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 30 Jan 2013 20:29:33 +0800
-Subject: [RFC 3/3] arm: mach-mxs: make enabling enet_out a legacy function
-In-Reply-To: <20130130075832.GA13075@pengutronix.de>
-References: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
- <1359470773-14290-4-git-send-email-w.sang@pengutronix.de>
- <20130130054833.GA24450@S2100-06.ap.freescale.net>
- <20130130075832.GA13075@pengutronix.de>
-Message-ID: <20130130122931.GA2757@S2101-09.ap.freescale.net>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 30 Jan 2013 20:32:21 +0800
+Subject: [PATCH] ARM:boot: support the command with COMMAND_LINE_SIZE - 1
+ useful chars
+Message-ID: <510912D5.5030505@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 08:58:32AM +0100, Wolfram Sang wrote:
-> On Wed, Jan 30, 2013 at 01:48:40PM +0800, Shawn Guo wrote:
-> > On Tue, Jan 29, 2013 at 03:46:13PM +0100, Wolfram Sang wrote:
-> > > @@ -351,7 +359,7 @@ static void __init tx28_post_init(void)
-> > >  	struct pinctrl *pctl;
-> > >  	int ret;
-> > >  
-> > > -	enable_clk_enet_out();
-> > > +	legacy_enable_clk_enet_out();
-> > 
-> > I think TX28 is the only case that really needs to turn on enet_out
-> > clock at platform level, since it has some dirty work about PHY to do
-> > here.  With with fec driver handling the clock, enable_clk_enet_out()
-> > can just be removed for other boards.
-> 
-> I would love to, but this will cause regression on boards which update
-> the kernel but not the devicetree (no third clock), or?
-> 
-Ah, that's the consideration.  When someday arch/arm/boot/dts gets
-maintained outside kernel tree, we may be required to keep devicetree
-compatibility to different kernel versions.  But we haven't got there
-yet.  Today people are supposed to use devicetree matching kernel.
 
-Shawn
+  originally, not support the command with COMMAND_LINE_SIZE - 1 useful chars.
+  but in fact, we can support it:
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/boot/compressed/atags_to_fdt.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+index aabc02a..ed23ec2 100644
+--- a/arch/arm/boot/compressed/atags_to_fdt.c
++++ b/arch/arm/boot/compressed/atags_to_fdt.c
+@@ -63,7 +63,7 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+ 	/* copy the fdt command line into the buffer */
+ 	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
+ 	if (fdt_bootargs)
+-		if (len < COMMAND_LINE_SIZE) {
++		if (len <= COMMAND_LINE_SIZE) {
+ 			memcpy(ptr, fdt_bootargs, len);
+ 			/* len is the length of the string
+ 			 * including the NULL terminator */
+@@ -73,7 +73,7 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+ 	/* and append the ATAG_CMDLINE */
+ 	if (fdt_cmdline) {
+ 		len = strlen(fdt_cmdline);
+-		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
++		if (ptr - cmdline + len + 2 <= COMMAND_LINE_SIZE) {
+ 			*ptr++ = ' ';
+ 			memcpy(ptr, fdt_cmdline, len);
+ 			ptr += len;
+-- 
+1.7.10.4
