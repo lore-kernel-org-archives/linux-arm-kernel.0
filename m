@@ -1,43 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 31 Jan 2013 11:00:24 +0100
-Subject: [PATCH 2/2] ARM: mxs: dts: Add rotary encoder to the CFA-10049
-In-Reply-To: <1359626424-22546-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1359626424-22546-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1359626424-22546-3-git-send-email-maxime.ripard@free-electrons.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 31 Jan 2013 18:01:08 +0800
+Subject: [PATCH 2/6] USB: add devicetree helpers for determining
+ dr_mode and phy_type
+In-Reply-To: <1359622873-23345-3-git-send-email-s.hauer@pengutronix.de>
+References: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
+ <1359622873-23345-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130131100107.GD14629@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10049.dts |    9 +++++++++
- 1 file changed, 9 insertions(+)
+On Thu, Jan 31, 2013 at 10:01:09AM +0100, Sascha Hauer wrote:
+> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> 
+> 
+> +	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
+> +		if (!strcmp(dr_mode, usb_dr_modes[i]))
+> +			return i;
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index 5db3789..a0d3e9f 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -45,6 +45,8 @@
- 					reg = <0>;
- 					fsl,pinmux-ids = <
- 						0x2133 /* MX28_PAD_SSP2_D3__GPIO_2_19 */
-+						0x3183 /* MX28_PAD_I2C0_SCL__GPIO_3_24 */
-+						0x3193 /* MX28_PAD_I2C0_SDA__GPIO_3_25 */
- 						0x31a3 /* MX28_PAD_SAIF_SDATA0__GPIO_3_26 */
- 						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
- 					>;
-@@ -290,6 +292,13 @@
- 		};
- 	};
- 
-+	rotary {
-+		compatible = "rotary-encoder";
-+		gpios = <&gpio3 24 1>, <&gpio3 25 1>;
-+		linux,axis = <1>; /* REL_Y */
-+		rotary-encoder,relative-axis;
-+	};
-+
- 	backlight {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm 3 5000000>;
+if (strcmp(dr_mode, usb_dr_modes[i]) == 0) may be more friendly.
+
+> +
+> +#ifndef __LINUX_USB_OF_H
+> +#define __LINUX_USB_OF_H
+> +
+> +#include <linux/usb/phy.h>
+> +
+> +#ifdef CONFIG_OF
+> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
+
+Will you put definition to phy.c, I can't find it at this version
+
+> index e8a5fe8..4e8bfbb 100644
+> --- a/include/linux/usb/otg.h
+> +++ b/include/linux/usb/otg.h
+> @@ -99,4 +99,11 @@ otg_start_srp(struct usb_otg *otg)
+>  /* for OTG controller drivers (and maybe other stuff) */
+>  extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
+>  
+> +enum usb_dr_mode {
+> +	USB_DR_MODE_UNKNOWN,
+> +	USB_DR_MODE_HOST,
+> +	USB_DR_MODE_PERIPHERAL,
+> +	USB_DR_MODE_OTG,
+> +};
+> +
+
+I am not sure if otg.h is a good place to put this, in fact, we need
+a common header file for it.
 -- 
-1.7.10.4
+
+Best Regards,
+Peter Chen
