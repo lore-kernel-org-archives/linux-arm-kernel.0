@@ -1,64 +1,85 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 31 Jan 2013 08:45:36 +0100
-Subject: [PATCH 4/6] usb: chipidea: add PTW and PTS handling
-In-Reply-To: <20130131030853.GG9777@nchen-desktop>
-References: <1359559782-14552-1-git-send-email-s.hauer@pengutronix.de>
- <1359559782-14552-5-git-send-email-s.hauer@pengutronix.de>
- <20130131030853.GG9777@nchen-desktop>
-Message-ID: <20130131074536.GJ1906@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 31 Jan 2013 08:01:51 +0000
+Subject: [PATCH 4/4] pinctrl/abx500: destroy mutex if returning early due
+ to error
+In-Reply-To: <51097E35.6080100@wwwdotorg.org>
+References: <1359574822-15729-1-git-send-email-linus.walleij@stericsson.com>
+ <51097E35.6080100@wwwdotorg.org>
+Message-ID: <20130131080151.GA5301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 11:08:54AM +0800, Peter Chen wrote:
-> On Wed, Jan 30, 2013 at 04:29:40PM +0100, Sascha Hauer wrote:
-> > From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+On Wed, 30 Jan 2013, Stephen Warren wrote:
+
+> On 01/30/2013 12:40 PM, Linus Walleij wrote:
+> > From: Lee Jones <lee.jones@linaro.org>
 > > 
-> > +static void hw_phymode_configure(struct ci13xxx *ci)
-> > +{
-> > +	u32 portsc;
-> > +
-> > +	/*
-> > +	 * The lpm version has the corresponding bits in the devlc register.
-> > +	 * Currently not implemented.
-> > +	 */
-> > +	if (ci->hw_bank.lpm)
-> > +		return;
-> > +
-> > +	switch (ci->platdata->phy_mode) {
-> > +	case USBPHY_INTERFACE_MODE_UTMI:
-> > +		portsc = PORTSC_PTS_PTW_UTMI;
-> > +		break;
-> > +	case USBPHY_INTERFACE_MODE_UTMIW:
-> > +		portsc = PORTSC_PTS_PTW_UTMIW;
-> > +		break;
-> > +	case USBPHY_INTERFACE_MODE_ULPI:
-> > +		portsc = PORTSC_PTS_PTW_ULPI;
-> > +		break;
-> > +	case USBPHY_INTERFACE_MODE_SERIAL:
-> > +		portsc = PORTSC_PTS_PTW_SERIAL;
-> > +		break;
-> > +	case USBPHY_INTERFACE_MODE_HSIC:
-> > +		portsc = PORTSC_PTS_PTW_HSIC;
-> > +		break;
-> > +	default:
-> > +		return;
-> > +	}
-> > +
-> > +	hw_write(ci, OP_PORTSC, PORTSC_PTS_PTW, portsc);
-> > +
-> > +	mdelay(10);
-> Please use usleep_range, can we recall which platform needs it?
-> As we as I know, there is no such delay at FSL internal release
-> code.
+> > Current failure path neglects to mutex_destroy() before returning
+> > an error due to an invalid parameter or an error received from
+> > gpiochip_add(). This patch aims to remedy that behaviour.
+> 
+> > diff --git a/drivers/pinctrl/pinctrl-abx500.c b/drivers/pinctrl/pinctrl-abx500.c
+> 
+> > @@ -1155,11 +1155,13 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+> >  	default:
+> >  		dev_err(&pdev->dev, "Unsupported pinctrl sub driver (%d)\n",
+> >  				(int) platid->driver_data);
+> > +		mutex_destroy(&pct->lock);
+> >  		return -EINVAL;
+> 
+> Especially given there's already a label out_free which performs this
+> mutex_destroy(), those last two lines would be better as:
+> 
+> ret = -EINVAL;
+> goto out_free;
 
-Then let's drop it. People will complain when they find the platform
-that needs it and then we can decide whether we add this unconditionally
-or do something better.
+Yes, that's one way of doing it. I figured it was 6 of one and half a
+dozen of the other to be honest.
 
-Sascha
+Either I:
+
+ +           mutex_destroy(&pct->lock);
+
+Or:
+
+ +           ret = -EINVAL; 
+ +           goto out_free;
+ -           return -EINVAL;
+
+I figured the smallest diff would be best. To be honest, I'm not
+bothered either way. If it offends you, I can do it the other way, no
+problem. Just let me know quick, so I can get the fixed up patch to
+Linus.
+
+NB: There is no 'out_free:' at this point, it has already been
+removed.
+
+I'll leave it up to you.
+
+> >  	}
+> >  
+> >  	if (!pct->soc) {
+> >  		dev_err(&pdev->dev, "Invalid SOC data\n");
+> > +		mutex_destroy(&pct->lock);
+> >  		return -EINVAL;
+> 
+> Same there.
+> 
+> >  	}
+> >  
+> > @@ -1176,6 +1178,7 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+> >  	ret = gpiochip_add(&pct->chip);
+> >  	if (ret) {
+> >  		dev_err(&pdev->dev, "unable to add gpiochip: %d\n", ret);
+> > +		mutex_destroy(&pct->lock);
+> >  		goto out_rem_irq;
+> 
+> And here, just change the goto target to out_free rather than adding the
+> mutex_destroy() call.
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
