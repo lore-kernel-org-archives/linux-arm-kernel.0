@@ -1,52 +1,46 @@
 From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Thu, 31 Jan 2013 05:25:24 +0000
-Subject: [PATCH v2] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
-In-Reply-To: <alpine.DEB.2.00.1301301634310.17105@utopia.booyaka.com>
-References: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
- <alpine.DEB.2.00.1212190210021.2446@utopia.booyaka.com>
- <1BAFE6F6C881BF42822005164F1491C33EB0C4FB@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1212200734160.7362@utopia.booyaka.com>
- <1BAFE6F6C881BF42822005164F1491C33EB5920F@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1301301634310.17105@utopia.booyaka.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB59A7A@DBDE01.ent.ti.com>
+Date: Thu, 31 Jan 2013 05:27:26 +0000
+Subject: [PATCH 1/2] ASoC: tlv320aic3x: Convert mic bias to a supply widget
+In-Reply-To: <20130131023221.GA6027@opensource.wolfsonmicro.com>
+References: <1359552155-17426-1-git-send-email-gururaja.hebbar@ti.com>
+ <20130131023221.GA6027@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB59A8C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 22:09:51, Paul Walmsley wrote:
-> On Wed, 30 Jan 2013, Hebbar, Gururaja wrote:
+On Thu, Jan 31, 2013 at 08:02:25, Mark Brown wrote:
+> On Wed, Jan 30, 2013 at 06:52:35PM +0530, Hebbar Gururaja wrote:
 > 
-> > On Thu, Dec 20, 2012 at 13:05:27, Paul Walmsley wrote:
-> > > On Thu, 20 Dec 2012, Hebbar, Gururaja wrote:
-> > > 
-> > > > On Wed, Dec 19, 2012 at 07:43:50, Paul Walmsley wrote:
-> > > > 
-> > > > > We've got a few hwmods on OMAP44xx that don't have clkctrl_offs registers 
-> > > > > listed in the hwmod data, and which are not marked with HWMOD_NO_IDLEST.  
-> > > > > What's going to happen in those cases?
-> > > > 
-> > > > Hmm. This is a special case to me. Let me go back and do some review.
-> > > > Will be back with some more details.
-> > > 
-> > > Probably what needs to happen is that those hwmods need to be marked with 
-> > > HWMOD_NO_IDLEST, in a separate patch before yours.  As far as I can tell, 
-> > > that's how they should have been marked initially.  Then your patch should 
-> > > be fine.
-> > 
-> > Looking at latest kernel v3.8-rc5, there is separate cm33xx.c file which
-> > handles module ready checking for am33xx platform. So I will update this 
-> > patch to work on this file instead of touching omap4 related file 
-> > (cminst44xx.c)
+> > Convert MicBias widgets to supply widget.
 > 
-> The same problem still exists.  According to the TRM, there's at least one
-> AM335x CLKCTRL register that doesn't have IDLEST bits.  So to avoid 
-> reading reserved bits, either this patch or a preceding patch should
-> mark those hwmods with HWMOD_NO_IDLEST.
+> > On tlv320aic3x, Mic bias power on/off shares the same register bits
+> > with output mic bias voltage.  So, when power on mic bias, we need
+> > reclaim it to voltage value.
+> 
+> This should update machine drivers that use the CODEC too.
 
-Ok. I will look into this now.
+Yes. I have that patch ready. Once this is accepted, I will send all 
+the patch as a series
 
 > 
+> > +- ai3x-micbias-vg - MicBias Voltage required.
+> > +	1 - MICBIAS output is powered to 2.0V,
+> > +	2 - MICBIAS output is powered to 2.5V,
+> > +	3 - MICBIAS output is connected to AVDD,
+> > +	If this node is not mentioned or if the value is incorrect, then MicBias
+> > +	is powered down.
 > 
-> - Paul
+> Would 2.0V not be a more sensible default (it is the lowest voltage so
+> is unlikely to cause hardware damage if it's wrong)?
+
+The only reason I made this choice was because none of the existing platforms
+using this codec are setting the MicBias.
+
+> 
+> Otherwise this looks good.
+
+Ok. I will send all the patch as a series now.
+
 > 
 
 
