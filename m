@@ -1,61 +1,50 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 30 Jan 2013 19:33:07 -0500 (EST)
-Subject: [RFC PATCH v3 1/2] ARM: kernel: update cpuinfo to print SoC model
- name
-In-Reply-To: <20130130232408.GL2637@n2100.arm.linux.org.uk>
-References: <1359558091-29251-1-git-send-email-ruslan.bilovol@ti.com>
- <1359558091-29251-2-git-send-email-ruslan.bilovol@ti.com>
- <alpine.LFD.2.02.1301301402330.6300@xanadu.home>
- <20130130232408.GL2637@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1301301932240.6300@xanadu.home>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 30 Jan 2013 17:39:47 -0700
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <20130131002916.GW7717@titan.lakedaemon.net>
+References: <20130127152431.GX1758@titan.lakedaemon.net>
+ <20130128223148.GA10275@schnuecks.de>
+ <20130129004824.GB7717@titan.lakedaemon.net>
+ <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
+ <20130129203221.GG7717@titan.lakedaemon.net>
+ <51083580.1010900@gmail.com>
+ <20130130224300.GU7717@titan.lakedaemon.net>
+ <20130130230518.GA7395@obsidianresearch.com>
+ <20130131002916.GW7717@titan.lakedaemon.net>
+Message-ID: <20130131003947.GA23787@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jan 2013, Russell King - ARM Linux wrote:
+On Wed, Jan 30, 2013 at 07:29:16PM -0500, Jason Cooper wrote:
 
-> On Wed, Jan 30, 2013 at 02:07:53PM -0500, Nicolas Pitre wrote:
-> > On Wed, 30 Jan 2013, Ruslan Bilovol wrote:
-> > 
-> > > Currently, reading /proc/cpuinfo provides userspace with CPU ID of
-> > > the CPU carrying out the read from the file.
-> > > Userspace using this information may decide what module
-> > > to load or how to configure some specific (and processor-depended)
-> > > settings or so.
-> > > However, since really different SoCs can share same ARM core,
-> > > this information currently is not so useful.
-> > > For example, TI OMAP4460 and OMAP4470 SoCs show the same
-> > > information in the /proc/cpuinfo whereas they are different.
-> > > Since in most cases ARM CPU is a part of some system on a chip (SoC),
-> > > the "cpuinfo" file looks like exactly that place, where this
-> > > information have to be displayed.
-> > > 
-> > > So added new line "SoC name" in the "cpuinfo" output for system
-> > > on a chip name. It is placed between CPU information and machine
-> > > information, so the file structure looks gracefully (CPU-SoC-Hardware)
-> > > 
-> > > Example:
-> > > 
-> > > / # cat proc/cpuinfo
-> > > [...]
-> > > CPU variant     : 0x2
-> > > CPU part        : 0xc09
-> > > CPU revision    : 10
-> > > 
-> > > SoC name        : OMAP4470
-> > > 
-> > > Hardware        : OMAP4 Blaze Tablet
-> > 
-> > Please remove that extra blank line between "SoC name" and "Hardware".  
-> > The blank line after "CPU revision" is fine.
-> > 
-> > Also, please rename this to "System name".  Not all systems are "on 
-> > chip".  By using "System name" this is more universally useful.
+> > Yes, you asked for the doc update and I haven't had a moment to get a
+> > tree setup for that..
 > 
-> You may notice I've already suggested that this should be using the SoC
-> infrastructure to export this information, which was explicitly designed
-> to do this.
+> Ahh, that's right.  Sorry, wasn't trying to put pressure on you.  Just
+> trying to make a reminder to myself of what to look for when I get to
+> around to it.  (I have a separate IMAP folder for such things ;-) )
 
-Absolutely.  If a mechanism is already in place then it should be used.
+No worries, right now I'm in a spot where the lastest ARM stuff has
+diverged so much that it is a major job to get my custom board working
+against the latest tree, so I'm kinda stuck waiting on some spare
+time/things to settle out...
+ 
+> > Here are some words though:
+> > 
+> >      - local-mac-address : Optional, the MAC address to assign to the
+> >        device. If not specified then the MAC address in the HW
+> >        registers is used, but the driver can not be made modular.
+> 
+> I like it.  If I haven't seen anything when I get to this, I'll add this
+> to your patch.  Please Ack if it's ok.  I prefer not to change peoples
+> patches without approval.
 
+Please feel free to merge this text and the patch into Ian's DT patch,
+or rebase ontop of the latest version as you like:
 
-Nicolas
+Signed-off-by: Jason Gunthorpe
+
+Thanks for sorting this ethernet stuff!
+
+Jason
