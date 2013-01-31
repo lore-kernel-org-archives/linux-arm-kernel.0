@@ -1,52 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jan 2013 15:08:01 +0000
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130131155737.4ab97a0b@skate>
-References: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130130113245.GH23505@n2100.arm.linux.org.uk>
- <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <20130130150856.GJ23505@n2100.arm.linux.org.uk>
- <20130130151934.GK23505@n2100.arm.linux.org.uk>
- <20130130163659.75360dba@skate>
- <20130130154602.GL23505@n2100.arm.linux.org.uk>
- <20130131153041.35fa3b60@skate>
- <20130131145002.GZ23505@n2100.arm.linux.org.uk>
- <20130131155737.4ab97a0b@skate>
-Message-ID: <20130131150801.GA23505@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Jan 2013 15:09:08 +0000
+Subject: [PATCH v2 1/2] ARM: memory: use SZ_ constants for defining the
+ virtual memory layout
+Message-ID: <1359644949-18550-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 03:57:37PM +0100, Thomas Petazzoni wrote:
-> Indeed. But this function never gets called with bus->number == 0, only
-> with bus->number = 1, 2, 3, 4, 5, 6. So those are child busses, and
-> therefore they have a parent.
+Parts of the virtual memory layout (mainly the modules area) are
+described using open-coded immediate values.
 
-Having thought about it, yes, that's what I expect, because root bus
-resources are never resized.  Root bus resources are normally setup
-before probing to indicate what size they _can_ be and define what
-space is available to the downstream devices.
+Use the SZ_ definitions from linux/sizes.h instead to make the code
+clearer.
 
-Child busses (behind a PCI-2-PCI bridge) are a different matter - these
-will be adjusted according to their on-bus devices and the windows for
-them sized and allocated appropriately _within_ the confines of the
-root bus resource.
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/memory.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> I am talking about the PCI-to-PCI bridges. I want the I/O windows
-> assigned to each PCI-to-PCI bridge to be 64K aligned. The PCI-to-PCI
-> bridges are devices that sit on bus 0, each giving access to the child
-> buses 1, 2, 3, 4, 5, 6.
-
-Right, so you've just confirmed that this _is_ the right hook and it
-_is_ being called at the right time.
-
-However, I had interpreted your requirement as the _host_ bridge only
-(insufficient information in your previous emails, or I missed it).
-
-If that's what your bridge requires, then we need to detect it via
-its vendor and device IDs and only apply this fixup to those bridges
-which require a 64K alignment.
-
-So, the IDs are vendor:device = 0x11ab:0x1092 ?  And let me get this
-straight, it _is_ a specific requirement for this particular bridge
-P2P bridge?
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 73cf03a..924320f 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -36,23 +36,23 @@
+  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
+  */
+ #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
+-#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(0x01000000))
++#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
+ #define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
+ 
+ /*
+  * The maximum size of a 26-bit user space task.
+  */
+-#define TASK_SIZE_26		UL(0x04000000)
++#define TASK_SIZE_26		(UL(1) << 26)
+ 
+ /*
+  * The module space lives between the addresses given by TASK_SIZE
+  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
+  */
+ #ifndef CONFIG_THUMB2_KERNEL
+-#define MODULES_VADDR		(PAGE_OFFSET - 16*1024*1024)
++#define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
+ #else
+ /* smaller range for Thumb-2 symbols relocation (2^24)*/
+-#define MODULES_VADDR		(PAGE_OFFSET - 8*1024*1024)
++#define MODULES_VADDR		(PAGE_OFFSET - SZ_8M)
+ #endif
+ 
+ #if TASK_SIZE > MODULES_VADDR
+-- 
+1.8.0
