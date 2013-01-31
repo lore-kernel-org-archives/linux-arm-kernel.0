@@ -1,56 +1,52 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 31 Jan 2013 22:33:27 +0100
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130131145947.f62474a0600848df86548b96@freescale.com>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
-Message-ID: <20130131213327.GB5050@pd.tnic>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 31 Jan 2013 16:42:41 -0500
+Subject: [PATCH v6 03/10] ARM: edma: add AM33XX support to the private
+ EDMA API
+In-Reply-To: <6932828d68394f71ba6df8e6bf608635@DFLE72.ent.ti.com>
+References: <1359529229-22207-1-git-send-email-mporter@ti.com>
+ <201301300932.58732.arnd@arndb.de> <20130131183255.GI2244@beef>
+ <6932828d68394f71ba6df8e6bf608635@DFLE72.ent.ti.com>
+Message-ID: <20130131214241.GJ2244@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 02:59:47PM -0600, Kim Phillips wrote:
-> - add new ARCH_DEFINES_BUILTIN_BSWAP (see Kconfig help).
->   - if set, generic compiler header does not set HAVE_BUILTIN_BSWAPxx
->   - not too sure about this having to be a new CONFIG_, but it's hard
->     to find a place for it given linux/compiler.h doesn't include any
->     arch-specific files.
+On Thu, Jan 31, 2013 at 08:58:39PM +0000, Arnd Bergmann wrote:
+> On Thursday 31 January 2013, Matt Porter wrote:
+> > On Wed, Jan 30, 2013 at 09:32:58AM +0000, Arnd Bergmann wrote:
+> > > On Wednesday 30 January 2013, Matt Porter wrote:
+> > > > +               dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
+> > > > +               of_dma_controller_register(dev->of_node,
+> > > > +                                          of_dma_simple_xlate,
+> > > > +                                          &edma_filter_info);
+> > > > +       }
+> > > 
+> > > How do you actually deal with the problem mentioned by Padma, that
+> > > the filter function does not know which edma instance it is looking
+> > > at? If you assume that there can only be a single edma instance in
+> > > the system, that is probably a limitation that should be documented
+> > > somewhere, and ideally the probe() function should check for that.
+> > 
+> > I make an assumption of one edma instance in the system in the case of
+> > DT being populated. This is always true right now as the only SoC with
+> > two EDMA controllers in existence is Davinci DA850. Until recently,
+> > Davinci had no DT support. Given the steady work being done today on DT
+> > support for DA850, it'll probably be something needed in 3.10.
+> > 
+> > I will add a comment and check in probe() to capture this assumption
+> > and then plan to update separately to support DA850 booting from DT.
+> 
+> Ok, sounds good. Hopefully by then we will already have a nicer
+> way to write an xlate function that does not rely on a filter
+> function.
 
-Yeah, me neither. It seems to me the whole deal can be simplified even
-further without introducing CONFIG_ARCH_DEFINES_BUILTIN_BSWAP.
+Yes, it would be nice to avoid what Padma had to do. I should have
+mentioned also that the second EDMA on DA850 has no DMA events of
+immediate use on it anyway. All the in-kernel users use events on the
+first controller, except for the second MMC instance. That's only used
+for a wl12xx module on the EVM and that driver has no DT support so it
+doesn't matter yet in the DT case. Because of this, DA850 can actually
+add EDMA DT support immediately (on top of this series) and add DMA
+support to the DT support already posted for the Davinci SPI and MMC
+client drivers.
 
-And, we don't even want to use CONFIG_ARCH_USE_BUILTIN_BSWAP on arm due
-to different compiler versions supporting it (correct me if I'm wrong
-here) vs the generic thing in include/linux/compiler-gcc4.h which we
-want off.
-
-If so, you'd need to simply put the following from below in
-arch/arm/include/asm/swab.h
-
-#if GCC_VERSION >= 40600
-#define __HAVE_BUILTIN_BSWAP32__
-#define __HAVE_BUILTIN_BSWAP64__
-#if GCC_VERSION >= 40800
-#define __HAVE_BUILTIN_BSWAP16__
-#endif /* GCC_VERSION >= 40800 */
-#endif /* GCC_VERSION >= 40600 */
-
-and that's it.
-
-Makes sense or am I over-simplifying this?
-
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+-Matt
