@@ -1,98 +1,49 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 31 Jan 2013 17:19:46 +0530
-Subject: [PATCH 07/10] ARM: OMAP5: clock data: Add OMAP54XX full clock
- tree and headers
-In-Reply-To: <51095A65.9070102@ti.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
- <1358522856-12180-8-git-send-email-santosh.shilimkar@ti.com>
- <51095A65.9070102@ti.com>
-Message-ID: <510A5A5A.9090708@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 31 Jan 2013 11:49:36 +0000
+Subject: [PATCH v2 4/4] irqchip: gic: Perform the gic_secondary_init()
+ call via CPU notifier
+In-Reply-To: <20130131112538.GW23505@n2100.arm.linux.org.uk>
+References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
+ <1359476319-23720-5-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1301291734140.6300@xanadu.home>
+ <20130129231205.GA25176@MacBook-Pro.local>
+ <alpine.LFD.2.02.1301291907340.6300@xanadu.home>
+ <20130131112538.GW23505@n2100.arm.linux.org.uk>
+Message-ID: <20130131114935.GD12877@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 January 2013 11:07 PM, Jon Hunter wrote:
->
-> On 01/18/2013 09:27 AM, Santosh Shilimkar wrote:
->> From: Rajendra Nayak <rnayak@ti.com>
->>
->> Add the clock tree related data for OMAP54xx platforms.
->
-> [snip]
->
->> +	CLK("omap_timer.1",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.2",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.3",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.4",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.5",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.6",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.7",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.8",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.9",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.10",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->> +	CLK("omap_timer.11",	"32k_ck",		&sys_32k_ck,	CK_54XX),
->
-> I have been trying to get away from having so many aliases for the same
-> clock for timers. Here we should replace all of the above and just have ...
->
-> +	CLK(NULL,	"timer_32k_ck",		&sys_32k_ck, CK_54XX),
->
-> For more details see [1].
->
->> +	CLK("omap_timer.1",	"sys_ck",		&sys_clkin,	CK_54XX),
->> +	CLK("omap_timer.2",	"sys_ck",		&sys_clkin,	CK_54XX),
->> +	CLK("omap_timer.3",	"sys_ck",		&sys_clkin,	CK_54XX),
->> +	CLK("omap_timer.4",	"sys_ck",		&sys_clkin,	CK_54XX),
->> +	CLK("omap_timer.9",	"sys_ck",		&sys_clkin,	CK_54XX),
->> +	CLK("omap_timer.10",	"sys_ck",		&sys_clkin,	CK_54XX),
->> +	CLK("omap_timer.11",	"sys_ck",		&sys_clkin,	CK_54XX),
->> +	CLK("omap_timer.5",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
->> +	CLK("omap_timer.6",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
->> +	CLK("omap_timer.7",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
->> +	CLK("omap_timer.8",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
->> +};
->
-> These aliases will not work with device-tree because the device-name is
-> formatted <addr>.<device>. Hence, when configuring a the timer parent
-> clock via the dmtimer driver it will fail. So it should be more like ...
->
-> +	CLK("4ae18000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
-> +	CLK("48032000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
-> +	CLK("48034000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
-> +	CLK("48036000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
-> +	CLK("40138000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
-> +	CLK("4013a000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
-> +	CLK("4013c000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
-> +	CLK("4013e000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div, 	
-> CK_54XX),
-> +	CLK("4803e000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div, CK_54XX),
-> +	CLK("48086000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div, CK_54XX),
-> +	CLK("48088000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div, CK_54XX),
->
-> For more details see [2].
+On Thu, Jan 31, 2013 at 11:25:38AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 29, 2013 at 07:11:56PM -0500, Nicolas Pitre wrote:
+> > On Tue, 29 Jan 2013, Catalin Marinas wrote:
+> > > I would like to get them in as soon as possible (ideally 3.9) as AArch64
+> > > needs GIC support. I can base them on Rob's branch (already in -next)
+> > > and send them the same route (the arm-soc tree if Olof/Arnd are ok to
+> > > take them).
+> > 
+> > Well...  I'd prefer if my series was merged by RMK since this is mostly 
+> > core ARM code.  That is posing dependency issues.
+> > 
+> > I think I'll just ignore your change for now and we'll fix things up 
+> > during the v3.9-rc period.
+> 
+> Given that the ARM kernel seems to be rather broken at the moment, that's
+> not going to happen until the 32-bit kernel gets some loving attention to
+> make it work again.
+> 
+> Our primary responsibility is not to stuff the kernel with new features
+> as quickly as we possibly can.  It's to make sure that the kernel works,
+> and at the moment, it doesn't.  I'm not talking about ancient architectures.
+> I'm talking about platforms using ARMv6 and above - platforms with the GIC
+> which I'd be able to test this change on.
 
-Thanks Jon. I will update the autogen scripts to generate these
-accordingly.
+FWIW, I tested this on vexpress with CA9x4 tile with both 3.8-rc3 (Rob's
+branch) and latest linux-next.
 
->
-> If you would like to test the dmtimer driver on omap5, then you can grab
-> my omap-test module [3], build it (see README), load it and then ...
->
-> # echo 1 > /sys/kernel/debug/omap-test/timer/all
->
-> This will perform some basic tests on all the dmtimers. I would do it
-> myself, but there appears to be several issues getting this to boot on
-> an ES1.0 (which is probably expected).
+If you want to test this change for longer, I'm ok to leave it for 3.10
+and stick it in -next at some point (after 3.9-rc1 since there are many
+conflicts). I'd like however to push the other trivial code-moving
+patches in this series.
 
-Right. This is ES2.0 data, so won't boot on an ES1.0 device.
-
-regards,
-Rajendra
-
->
-> Cheers
-> Jon
->
-> [1] http://www.spinics.net/lists/linux-omap/msg71272.html
-> [2] https://patchwork.kernel.org/patch/1204351/
-> [3] https://github.com/jonhunter/omap-test
->
+-- 
+Catalin
