@@ -1,22 +1,35 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 31 Jan 2013 21:42:01 +0530
-Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
- for all cores
-In-Reply-To: <1604688.EafV1ohaV9@amdc1227>
-References: <1887364.fvxYYNb7Mm@amdc1227> <1520678.Zm627xxIN3@amdc1227>
- <CAKohpomEcrPa7UnZmtTouxN6JXxcaa7dBstMGUWjXGL0n1+=Ng@mail.gmail.com>
- <1604688.EafV1ohaV9@amdc1227>
-Message-ID: <CAKohpo=_cR7dk_V2+6bQwUMk-raa3ENAJqBCSe_mYfS+Ur8PnA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 31 Jan 2013 10:15:11 -0600
+Subject: BogoMIPS change in 3.6+
+Message-ID: <510A988F.6030508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 January 2013 21:37, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hmm. Now as I think of it, there might be another confusing aspect:
->
-> Could you explain what "sw coordination" and "any coordination" mean?
-> I mean specifically cpufreq_policy.cpus and cpufreq_policy.related_cpus
-> masks.
+The BogoMIPS value has changed on highbank since the commit below in
+3.6. It is now half the value it used to be. Does that matter other than
+perception (I've checked that I'm not running at half the freq)?
 
-Check this out:
+Rob
 
-https://lkml.org/lkml/2013/1/30/587
+commit d0a533b18235d36206b9b422efadb7cee444dfdb
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Fri Jul 6 15:47:17 2012 +0100
+
+    ARM: 7452/1: delay: allow timer-based delay implementation to be
+selected
+
+    This patch allows a timer-based delay implementation to be selected by
+    switching the delay routines over to use get_cycles, which is
+    implemented in terms of read_current_timer. This further allows us to
+    skip the loop calibration and have a consistent delay function in the
+    face of core frequency scaling.
+
+    To avoid the pain of dealing with memory-mapped counters, this
+    implementation uses the co-processor interface to the architected timers
+    when they are available. The previous loop-based implementation is
+    kept around for CPUs without the architected timers and we retain both
+    the maximum delay (2ms) and the corresponding conversion factors for
+    determining the number of loops required for a given interval. Since the
+    indirection of the timer routines will only work when called from C,
+    the sa1100 sleep routines are modified to branch to the loop-based delay
+    functions directly.
