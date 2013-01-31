@@ -1,29 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 31 Jan 2013 14:57:56 -0600
-Subject: BogoMIPS change in 3.6+
-In-Reply-To: <20130131162322.GD835@mudshark.cambridge.arm.com>
-References: <510A988F.6030508@gmail.com>
- <20130131162322.GD835@mudshark.cambridge.arm.com>
-Message-ID: <510ADAD4.2050600@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 31 Jan 2013 20:58:39 +0000
+Subject: [PATCH v6 03/10] ARM: edma: add AM33XX support to the private
+ EDMA API
+In-Reply-To: <20130131183255.GI2244@beef>
+References: <1359529229-22207-1-git-send-email-mporter@ti.com>
+ <201301300932.58732.arnd@arndb.de> <20130131183255.GI2244@beef>
+Message-ID: <201301312058.39948.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2013 10:23 AM, Will Deacon wrote:
-> Hi Rob,
+On Thursday 31 January 2013, Matt Porter wrote:
+> On Wed, Jan 30, 2013 at 09:32:58AM +0000, Arnd Bergmann wrote:
+> > On Wednesday 30 January 2013, Matt Porter wrote:
+> > > +               dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
+> > > +               of_dma_controller_register(dev->of_node,
+> > > +                                          of_dma_simple_xlate,
+> > > +                                          &edma_filter_info);
+> > > +       }
+> > 
+> > How do you actually deal with the problem mentioned by Padma, that
+> > the filter function does not know which edma instance it is looking
+> > at? If you assume that there can only be a single edma instance in
+> > the system, that is probably a limitation that should be documented
+> > somewhere, and ideally the probe() function should check for that.
 > 
-> On Thu, Jan 31, 2013 at 04:15:11PM +0000, Rob Herring wrote:
->> The BogoMIPS value has changed on highbank since the commit below in
->> 3.6. It is now half the value it used to be. Does that matter other than
->> perception (I've checked that I'm not running at half the freq)?
+> I make an assumption of one edma instance in the system in the case of
+> DT being populated. This is always true right now as the only SoC with
+> two EDMA controllers in existence is Davinci DA850. Until recently,
+> Davinci had no DT support. Given the steady work being done today on DT
+> support for DA850, it'll probably be something needed in 3.10.
 > 
-> Are you registering a delay timer? If not, then the delay loop should be
-> identical to what it was before, so that's certainly a surprise...
-> 
-> Are your delays ballpark correct (try 2ms)?
-> 
+> I will add a comment and check in probe() to capture this assumption
+> and then plan to update separately to support DA850 booting from DT.
 
-Yes, the delays are correct and this is an A9. So I guess this may be a
-surprise, but seems it is a non-issue. I'm sure I'll be getting asked
-about this...
+Ok, sounds good. Hopefully by then we will already have a nicer
+way to write an xlate function that does not rely on a filter
+function.
 
-Rob
+	Arnd
