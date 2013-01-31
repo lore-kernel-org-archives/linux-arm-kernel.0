@@ -1,104 +1,38 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 31 Jan 2013 08:10:14 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130130151934.GK23505@n2100.arm.linux.org.uk>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130130113245.GH23505@n2100.arm.linux.org.uk>
- <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <20130130150856.GJ23505@n2100.arm.linux.org.uk>
- <20130130151934.GK23505@n2100.arm.linux.org.uk>
-Message-ID: <20130131071014.GA32104@avionic-0098.mockup.avionic-design.de>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Thu, 31 Jan 2013 08:28:36 +0100
+Subject: [PATCH v3] ARM: OMAP2: am33xx-hwmod: Fix "register offset NULL
+ check" bug
+In-Reply-To: <1359556760-25214-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1359556760-25214-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <D0DE2843-AA5C-4DFA-ADBE-61BC11D24836@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 03:19:34PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 30, 2013 at 03:08:56PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Jan 30, 2013 at 01:03:44PM +0100, Thierry Reding wrote:
-> > > On Wed, Jan 30, 2013 at 11:32:46AM +0000, Russell King - ARM Linux wrote:
-> > > > On Mon, Jan 28, 2013 at 07:56:28PM +0100, Thomas Petazzoni wrote:
-> > > > > +static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
-> > > > > +						 const struct resource *res,
-> > > > > +						 resource_size_t start,
-> > > > > +						 resource_size_t size,
-> > > > > +						 resource_size_t align)
-> > > > > +{
-> > > > > +	if (!(res->flags & IORESOURCE_IO))
-> > > > > +		return start;
-> > > > > +
-> > > > > +	/*
-> > > > > +	 * The I/O regions must be 64K aligned, because the
-> > > > > +	 * granularity of PCIe I/O address decoding windows is 64 K
-> > > > > +	 */
-> > > > > +	return round_up(start, SZ_64K);
-> > > > > +}
-> > > > 
-> > > > You do realise that this will result in all PCI I/O BARs being rounded
-> > > > up to 64K.
-> > > > 
-> > > > I've just been digging through the PCI code and have come across a
-> > > > function - pcibios_window_alignment() - which the PCI code allows to be
-> > > > overriden which allows you to increase the alignment requirement of
-> > > > bridge windows.  It takes the PCI bus and window type as arguments.
-> > > > 
-> > > > I'd suggest using that, and checking whether the bus which is passed
-> > > > corresponds with a bus which gives you problems, so that you don't
-> > > > impose the 64K requirement on downstream bridges.
-> > > 
-> > > That approach isn't going to work very well with multi-platform, though,
-> > > since the function can only be overridden on a per-architecture basis.
-> > 
-> > The same can be said of all the various other functions which the PCI
-> > stuff expects the arch to provide, yet we seem to cope just fine...
-> 
-> And this (untested) is how it's done:
-> 
->  arch/arm/include/asm/mach/pci.h |    1 +
->  arch/arm/kernel/bios32.c        |    8 ++++++++
->  2 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index db9fedb..bba0cf3 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -29,6 +29,7 @@ struct hw_pci {
->  	void		(*postinit)(void);
->  	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
->  	int		(*map_irq)(const struct pci_dev *dev, u8 slot, u8 pin);
-> +	resource_size_t	(*window_align)(struct pci_bus *, unsigned long);
->  };
->  
->  /*
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 379cf32..32c3bd9 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -581,6 +581,14 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->  	return start;
->  }
->  
-> +resource_size_t pcibios_window_alignment(struct pci_bus *bus,
-> +					 unsigned long type)
-> +{
-> +	struct pci_sys_data *sys = bus->sysdata;
-> +
-> +	return sys->window_alignment ? sys->window_alignment(bus, type) : 1;
-> +}
-> +
->  /**
->   * pcibios_enable_device - Enable I/O and memory.
->   * @dev: PCI device to be enabled
 
-Yes, something like that'll work. I had been under the impression that
-what you proposed was overriding pcibios_window_alignment() for Marvell
-only.
+Op 30 jan. 2013, om 15:39 heeft Hebbar Gururaja <gururaja.hebbar@ti.com> het volgende geschreven:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/88de3d77/attachment.sig>
+> am33xx_cm_wait_module_ready() checks if register offset is NULL.
+> 
+> int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
+> {
+> 	int i = 0;
+> 
+> 	if (!clkctrl_offs)
+> 		return 0;
+> 
+> In case of AM33xx, CLKCTRL register offset for different clock domains
+> are not uniformly placed. An example of this would be the RTC clock
+> domain with CLKCTRL offset at 0x00.
+> In such cases the module ready check is skipped which leads to a data
+> abort during boot-up when RTC registers is accessed.
+> 
+> Remove this check here to avoid checking module readiness for modules
+> with clkctrl register offset at 0x00.
+> 
+> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+
+I can confirm that this fixes the crash on boot with CONFIG_RTC_DRV_OMAP=y with 3.8-rc5
+
+regards,
+
+Koen
