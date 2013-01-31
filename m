@@ -1,50 +1,36 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 31 Jan 2013 14:44:59 -0800
-Subject: [rtc-linux] [PATCH] rtc: pl031: fix the missing operation on
- enable
-In-Reply-To: <1359507865-29808-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1359507865-29808-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130131144459.39f9a978.akpm@linux-foundation.org>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Thu, 31 Jan 2013 23:44:57 +0100
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <20130130230100.GV7717@titan.lakedaemon.net>
+References: <20130127152431.GX1758@titan.lakedaemon.net>
+ <20130128223148.GA10275@schnuecks.de>
+ <20130129004824.GB7717@titan.lakedaemon.net>
+ <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
+ <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
+ <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
+ <20130130230100.GV7717@titan.lakedaemon.net>
+Message-ID: <20130131224457.GB17976@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Jan 2013 09:04:25 +0800
-Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
+Hi Jason, Sebastian,
 
-> RTC control register should be enabled in the process of initliazing.
+On Wed, Jan 30, 2013 at 06:01:00PM -0500, Jason Cooper wrote:
 > 
-> ...
->
-> --- a/drivers/rtc/rtc-pl031.c
-> +++ b/drivers/rtc/rtc-pl031.c
-> @@ -44,6 +44,7 @@
->  #define RTC_YMR		0x34	/* Year match register */
->  #define RTC_YLR		0x38	/* Year data load register */
->  
-> +#define RTC_CR_EN	(1 << 0)	/* counter enable bit */
->  #define RTC_CR_CWEN	(1 << 26)	/* Clockwatch enable bit */
->  
->  #define RTC_TCR_EN	(1 << 1) /* Periodic timer enable bit */
-> @@ -320,7 +321,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
->  	struct pl031_local *ldata;
->  	struct pl031_vendor_data *vendor = id->data;
->  	struct rtc_class_ops *ops = &vendor->ops;
-> -	unsigned long time;
-> +	unsigned long time, data;
->  
->  	ret = amba_request_regions(adev, NULL);
->  	if (ret)
-> @@ -345,10 +346,11 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
->  	dev_dbg(&adev->dev, "designer ID = 0x%02x\n", amba_manf(adev));
->  	dev_dbg(&adev->dev, "revision = 0x%01x\n", amba_rev(adev));
->  
-> +	data = readl(ldata->base + RTC_CR);
->  	/* Enable the clockwatch on ST Variants */
->  	if (vendor->clockwatch)
-> -		writel(readl(ldata->base + RTC_CR) | RTC_CR_CWEN,
-> -		       ldata->base + RTC_CR);
-> +		data |= RTC_CR_CWEN;
-> +	writel(data | RTC_CR_EN, ldata->base + RTC_CR);
+> wrt to runit gating, the only case we are not covering is if of_serial
+> is a module (and so is everything else using the runit clk).  That's
+> *really* rare.  If someone embarks down that path, they get the
+> responsibility of not writing to all the deactivated registers. ;-)
 
-Does this patch fix some user-visible misbehaviour?  If so, please
-fully describe that misbehaviour.
+With the serial driver now enabling runit it is really rare, but
+where is your enthusiasm to get to the bottom of it?  At least we
+have indications that there really is something in "..." (my box
+stops somewhere when no driver enables runit)
+
+Sebastian, are you still interested in the .flags stuff from the
+runit patch or do you see no need now since "ddr" is the only
+exception anyway?
+
+
+- Simon
