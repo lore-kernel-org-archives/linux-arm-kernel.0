@@ -1,56 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jan 2013 18:17:19 +0000
-Subject: [PATCH 1/2] ARM: memory: use SZ_ constants for defining the virtual
- memory layout
-Message-ID: <1359656239-18171-1-git-send-email-will.deacon@arm.com>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 31 Jan 2013 13:32:55 -0500
+Subject: [PATCH v6 03/10] ARM: edma: add AM33XX support to the private
+ EDMA API
+In-Reply-To: <201301300932.58732.arnd@arndb.de>
+References: <1359529229-22207-1-git-send-email-mporter@ti.com>
+ <1359529229-22207-4-git-send-email-mporter@ti.com>
+ <201301300932.58732.arnd@arndb.de>
+Message-ID: <20130131183255.GI2244@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parts of the virtual memory layout (mainly the modules area) are
-described using open-coded immediate values.
+On Wed, Jan 30, 2013 at 09:32:58AM +0000, Arnd Bergmann wrote:
+> On Wednesday 30 January 2013, Matt Porter wrote:
+> > +               dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
+> > +               of_dma_controller_register(dev->of_node,
+> > +                                          of_dma_simple_xlate,
+> > +                                          &edma_filter_info);
+> > +       }
+> 
+> How do you actually deal with the problem mentioned by Padma, that
+> the filter function does not know which edma instance it is looking
+> at? If you assume that there can only be a single edma instance in
+> the system, that is probably a limitation that should be documented
+> somewhere, and ideally the probe() function should check for that.
 
-Use the SZ_ definitions from linux/sizes.h instead to make the code
-clearer.
+I make an assumption of one edma instance in the system in the case of
+DT being populated. This is always true right now as the only SoC with
+two EDMA controllers in existence is Davinci DA850. Until recently,
+Davinci had no DT support. Given the steady work being done today on DT
+support for DA850, it'll probably be something needed in 3.10.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+I will add a comment and check in probe() to capture this assumption
+and then plan to update separately to support DA850 booting from DT.
 
-KernelVersion: 3.8-rc5
----
- arch/arm/include/asm/memory.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 73cf03a..924320f 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -36,23 +36,23 @@
-  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
-  */
- #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
--#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(0x01000000))
-+#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
- #define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
- 
- /*
-  * The maximum size of a 26-bit user space task.
-  */
--#define TASK_SIZE_26		UL(0x04000000)
-+#define TASK_SIZE_26		(UL(1) << 26)
- 
- /*
-  * The module space lives between the addresses given by TASK_SIZE
-  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
-  */
- #ifndef CONFIG_THUMB2_KERNEL
--#define MODULES_VADDR		(PAGE_OFFSET - 16*1024*1024)
-+#define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
- #else
- /* smaller range for Thumb-2 symbols relocation (2^24)*/
--#define MODULES_VADDR		(PAGE_OFFSET - 8*1024*1024)
-+#define MODULES_VADDR		(PAGE_OFFSET - SZ_8M)
- #endif
- 
- #if TASK_SIZE > MODULES_VADDR
--- 
-1.8.0
+-Matt
