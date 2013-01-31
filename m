@@ -1,81 +1,63 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 31 Jan 2013 16:22:37 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130131150801.GA23505@n2100.arm.linux.org.uk>
-References: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130130113245.GH23505@n2100.arm.linux.org.uk>
- <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <20130130150856.GJ23505@n2100.arm.linux.org.uk>
- <20130130151934.GK23505@n2100.arm.linux.org.uk>
- <20130130163659.75360dba@skate>
- <20130130154602.GL23505@n2100.arm.linux.org.uk>
- <20130131153041.35fa3b60@skate>
- <20130131145002.GZ23505@n2100.arm.linux.org.uk>
- <20130131155737.4ab97a0b@skate>
- <20130131150801.GA23505@n2100.arm.linux.org.uk>
-Message-ID: <20130131162237.79de29c4@skate>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 31 Jan 2013 15:28:24 +0000 (UTC)
+Subject: [Patch v2 1/2] ARM: OMAP2+: AM33xx: hwmod: add missing
+ HWMOD_NO_IDLEST flags
+In-Reply-To: <1359642327-5542-2-git-send-email-gururaja.hebbar@ti.com>
+References: <1359642327-5542-1-git-send-email-gururaja.hebbar@ti.com>
+ <1359642327-5542-2-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <alpine.DEB.2.00.1301311527190.23099@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
+Hi
 
-On Thu, 31 Jan 2013 15:08:01 +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 31, 2013 at 03:57:37PM +0100, Thomas Petazzoni wrote:
-> > Indeed. But this function never gets called with bus->number == 0, only
-> > with bus->number = 1, 2, 3, 4, 5, 6. So those are child busses, and
-> > therefore they have a parent.
+On Thu, 31 Jan 2013, Hebbar Gururaja wrote:
+
+> struct omap_hwmod records belonging to wkup m3 domain is missing
+> HWMOD_NO_IDLEST flags; add them.
 > 
-> Having thought about it, yes, that's what I expect, because root bus
-> resources are never resized.  Root bus resources are normally setup
-> before probing to indicate what size they _can_ be and define what
-> space is available to the downstream devices.
-> 
-> Child busses (behind a PCI-2-PCI bridge) are a different matter - these
-> will be adjusted according to their on-bus devices and the windows for
-> them sized and allocated appropriately _within_ the confines of the
-> root bus resource.
+> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
 
-Ok.
+I've modified this patch to add some more description of why it's needed 
+as a fix, and queued it for v3.8-rc fixes.
 
-> > I am talking about the PCI-to-PCI bridges. I want the I/O windows
-> > assigned to each PCI-to-PCI bridge to be 64K aligned. The PCI-to-PCI
-> > bridges are devices that sit on bus 0, each giving access to the child
-> > buses 1, 2, 3, 4, 5, 6.
-> 
-> Right, so you've just confirmed that this _is_ the right hook and it
-> _is_ being called at the right time.
+Updated patch follows.
 
-Ok.
 
-> However, I had interpreted your requirement as the _host_ bridge only
-> (insufficient information in your previous emails, or I missed it).
+- Paul
 
-Might be insufficient information, or wrong terminology on my side.
+From: Hebbar Gururaja <gururaja.hebbar@ti.com>
+Date: Thu, 31 Jan 2013 19:55:26 +0530
+Subject: [PATCH] ARM: OMAP2+: AM33xx: hwmod: add missing HWMOD_NO_IDLEST
+ flags
 
-> If that's what your bridge requires, then we need to detect it via
-> its vendor and device IDs and only apply this fixup to those bridges
-> which require a 64K alignment.
-> 
-> So, the IDs are vendor:device = 0x11ab:0x1092 ?  And let me get this
-> straight, it _is_ a specific requirement for this particular bridge
-> P2P bridge?
+struct omap_hwmod records belonging to wkup m3 domain is missing
+HWMOD_NO_IDLEST flags; add them.
 
-The vendor/device ID will change. This P2P bridge is emulated. However,
-I'm not sure why you need to know the vendor:device ID to make the
-fixup specific.
+This patch is a prerequisite for a subsequent patch, 'ARM: OMAP2:
+am33xx-hwmod: Fix "register offset NULL check" bug'.  That patch would
+otherwise attempt to read from reserved bits.
 
-The fixup is already specific to those bridges, since I am just setting
-pci_sys_data->win_align_io to 64K for the particular buses that are
-downstream the problematic bridges. So it doesn't affect any other bus
-on the system, and therefore I don't think this fixup needs to be made
-specific to a given vendor:device, no?
+Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+[paul at pwsan.com: add some more explanation in the patch description]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Best regards,
-
-Thomas
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 646c14d..1ab693e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -262,7 +262,8 @@ static struct omap_hwmod am33xx_wkup_m3_hwmod = {
+ 	.name		= "wkup_m3",
+ 	.class		= &am33xx_wkup_m3_hwmod_class,
+ 	.clkdm_name	= "l4_wkup_aon_clkdm",
+-	.flags		= HWMOD_INIT_NO_RESET,	/* Keep hardreset asserted */
++	/* Keep hardreset asserted */
++	.flags		= HWMOD_INIT_NO_RESET | HWMOD_NO_IDLEST,
+ 	.mpu_irqs	= am33xx_wkup_m3_irqs,
+ 	.main_clk	= "dpll_core_m4_div2_ck",
+ 	.prcm		= {
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
