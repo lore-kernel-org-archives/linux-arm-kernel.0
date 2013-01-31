@@ -1,43 +1,46 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 31 Jan 2013 16:12:35 +0100
-Subject: [RFC 1/3] net: freescale: fec: add support for optional
- enet_out clk
-In-Reply-To: <20130130052547.GA23670@S2100-06.ap.freescale.net>
-References: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
- <1359470773-14290-2-git-send-email-w.sang@pengutronix.de>
- <20130130052547.GA23670@S2100-06.ap.freescale.net>
-Message-ID: <20130131151235.GC3400@pengutronix.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 31 Jan 2013 20:46:10 +0530
+Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
+ for all cores
+In-Reply-To: <1520678.Zm627xxIN3@amdc1227>
+References: <1887364.fvxYYNb7Mm@amdc1227> <1520677.WES295RohH@amdc1227>
+ <CAKohpombSKY-HMXovBAyZd5Ce8ZAEo2+yiwYL1G4=OEUJM1u5g@mail.gmail.com>
+ <1520678.Zm627xxIN3@amdc1227>
+Message-ID: <CAKohpomEcrPa7UnZmtTouxN6JXxcaa7dBstMGUWjXGL0n1+=Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 01:25:50PM +0800, Shawn Guo wrote:
-> Thanks for working on this, Wolfram.
-> 
-> On Tue, Jan 29, 2013 at 03:46:11PM +0100, Wolfram Sang wrote:
-> > Some MX28 boards need the internal enet_out clock to be enabled. So, do
-> > this in the driver iff the clock was referenced via devicetree.
-> > 
-> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> > ---
-> > 
-> > davidm: Please don't apply before Shawn as the mxs-maintainer has given his ack
-> > on the general procedure. Or maybe he can merge it via his tree?
-> > 
-> I prefer to have the patch go via net tree for 3.9, and then we clean
-> up mxs platform code from 3.9-rc1.
+On 31 January 2013 20:34, Tomasz Figa <t.figa@samsung.com> wrote:
+> Well, the fact that it isn't used at the moment doesn't mean that it
+> shouldn't be set correctly. The field is present in the structure and has
+> a set of defined values - one of which should be selected. For example,
+> I can imagine some governor taking this information into account.
 
-Fine with me, too.
+Governors already take this information but from a different variable:
+policy->cpus.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/57a58704/attachment.sig>
+Look at the patch which added it:
+
+commit 3b2d99429e3386b6e2ac949fc72486509c8bbe36
+Author: Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
+Date:   Wed Dec 14 15:05:00 2005 -0500
+
+    P-state software coordination for ACPI core
+
+    http://bugzilla.kernel.org/show_bug.cgi?id=5737
+
+    Signed-off-by: Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
+    Signed-off-by: Len Brown <len.brown@intel.com>
+---
+ drivers/acpi/processor_perflib.c | 228
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/acpi/processor.h         |  27 ++++++++++++-
+ include/linux/cpufreq.h          |   4 ++
+ 3 files changed, 258 insertions(+), 1 deletion(-)
+
+
+It was clearly for ACPI, but was probably named badly and we people
+got confused that it is for our use.
+
+--
+viresh
