@@ -1,63 +1,41 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 31 Jan 2013 10:03:59 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130131173343.46514422@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
- <20130129184157.GA29274@obsidianresearch.com>
- <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
- <20130129191853.GB29274@obsidianresearch.com>
- <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
- <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
- <20130130103501.1873d39c@skate>
- <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
- <20130131170401.4b3bfbbf@skate>
- <CAErSpo7fPzrF_OZSL7Ss0LT70Qz+veXLW-ihA7fAXCwsn142cQ@mail.gmail.com>
- <20130131173343.46514422@skate>
-Message-ID: <CAErSpo79GFu2Vnrft7OvtHe7d+E+uAtq7xwc6D69nb_6PuxEqA@mail.gmail.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Thu, 31 Jan 2013 11:05:39 -0600
+Subject: [PATCHv2 for soc 0/4] Enabling socfpga on hardware
+Message-ID: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 9:33 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Bjorn Helgaas,
->
-> On Thu, 31 Jan 2013 09:30:07 -0700, Bjorn Helgaas wrote:
->
->> > Following you're recommendation, I've changed this, and left those
->> > values initialized to 0 by default, in order to let Linux set correct
->> > values. Yes, Linux does assign appropriate values in the Secondary Bus
->> > Number Register. But before that Linux also complains loudly that the
->> > bridge configuration is invalid:
->> >
->> > pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
->> > pci 0000:00:02.0: bridge configuration invalid ([bus 00-00]), reconfiguring
->> > pci 0000:00:03.0: bridge configuration invalid ([bus 00-00]), reconfiguring
->> > pci 0000:00:04.0: bridge configuration invalid ([bus 00-00]), reconfiguring
->> > pci 0000:00:05.0: bridge configuration invalid ([bus 00-00]), reconfiguring
->> > pci 0000:00:06.0: bridge configuration invalid ([bus 00-00]), reconfiguring
->>
->> Linux makes the unwarranted assumption that the PCI hierarchy has
->> already been configured by firmware.  If the only problem is the
->> messages above, I think we could just rework the message so it doesn't
->> look like an error.  I would guess that we probably also see the same
->> distressing message when we hot-add a card with a bridge on it,
->> because firmware won't have initialized the bridge.
->>
->> My rule of thumb is that I like to note something in dmesg about the
->> initial configuration of bus/mem/io apertures and BARs, as well as
->> indications when we update them.  That way, the dmesg log should
->> contain enough information to debug most enumeration and configuration
->> defects.  pci_scan_bridge() is somewhat lacking in this regard.
->
-> Ok. Would something like:
->
->  "bridge configuration with unassigned bus numbers ([bus 00-00]), reconfiguring"
->
-> be an acceptable to replace this one?
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Seems reasonable.
+V2:
+- Remove patch that adds clock entries in the socfpga.dtsi as this
+should accompany a rework in drivers/clk and will done in a different
+patch series.
+- Removed I-cache invalidate from v7_invalidate_l1
+- Defined cpu1-start-addr as a device tree entry
+- Removed the need to use CONFIG_VMSPLIT_2G
+
+Dinh Nguyen (4):
+  arm: socfpga: Add new device tree source for actual socfpga HW
+  arm: socfpga: Add entries to enable make dtbs socfpga
+  arm: Add v7_invalidate_l1 to cache-v7.S
+  arm: socfpga: Add SMP support for actual socfpga harware
+
+ .../bindings/arm/altera/socfpga-system.txt         |    2 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/socfpga.dtsi                     |   22 +++----
+ arch/arm/boot/dts/socfpga_cyclone5.dts             |   34 ++++++++++-
+ arch/arm/boot/dts/socfpga_vt.dts                   |   64 ++++++++++++++++++++
+ arch/arm/mach-imx/headsmp.S                        |   47 --------------
+ arch/arm/mach-shmobile/headsmp.S                   |   48 ---------------
+ arch/arm/mach-socfpga/core.h                       |    4 +-
+ arch/arm/mach-socfpga/headsmp.S                    |   16 +++--
+ arch/arm/mach-socfpga/platsmp.c                    |    3 +-
+ arch/arm/mach-socfpga/socfpga.c                    |    9 +++
+ arch/arm/mach-tegra/headsmp.S                      |   43 -------------
+ arch/arm/mm/cache-v7.S                             |   46 ++++++++++++++
+ 13 files changed, 182 insertions(+), 158 deletions(-)
+ create mode 100644 arch/arm/boot/dts/socfpga_vt.dts
+
+-- 
+1.7.9.5
