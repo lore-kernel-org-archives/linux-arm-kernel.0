@@ -1,40 +1,47 @@
 From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Thu, 31 Jan 2013 16:53:11 +0530
-Subject: [PATCH v3 2/4] ASoC: davinci: update machine driver dapm routes
+Date: Thu, 31 Jan 2013 16:53:13 +0530
+Subject: [PATCH v3 4/4] ASoC: davinci: remove __dev* attributes
 In-Reply-To: <1359631394-9511-1-git-send-email-gururaja.hebbar@ti.com>
 References: <1359631394-9511-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1359631394-9511-3-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1359631394-9511-5-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now since micbias is converted to supply widget, updated machine driver
-as well.
+CONFIG_HOTPLUG is going away as an option.  As result the __dev*
+markings will be going away.
+
+Remove use of __devexit_p and __devexit.
 
 Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
 ---
 Changes in v3
 	 - New patch
 
-:100644 100644 d55e647... 484b22c... M	sound/soc/davinci/davinci-evm.c
- sound/soc/davinci/davinci-evm.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+:100644 100644 e6009a4... 37b8e78... M	sound/soc/davinci/davinci-evm.c
+ sound/soc/davinci/davinci-evm.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
-index d55e647..484b22c 100644
+index e6009a4..37b8e78 100644
 --- a/sound/soc/davinci/davinci-evm.c
 +++ b/sound/soc/davinci/davinci-evm.c
-@@ -116,9 +116,9 @@ static const struct snd_soc_dapm_route audio_map[] = {
- 	{"Line Out", NULL, "RLOUT"},
+@@ -390,7 +390,7 @@ static int davinci_evm_probe(struct platform_device *pdev)
+ 	return ret;
+ }
  
- 	/* Mic connected to (MIC3L | MIC3R) */
--	{"MIC3L", NULL, "Mic Bias 2V"},
--	{"MIC3R", NULL, "Mic Bias 2V"},
--	{"Mic Bias 2V", NULL, "Mic Jack"},
-+	{"MIC3L", NULL, "Mic Bias"},
-+	{"MIC3R", NULL, "Mic Bias"},
-+	{"Mic Bias", NULL, "Mic Jack"},
+-static int __devexit davinci_evm_remove(struct platform_device *pdev)
++static int davinci_evm_remove(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = platform_get_drvdata(pdev);
  
- 	/* Line In connected to (LINE1L | LINE2L), (LINE1R | LINE2R) */
- 	{"LINE1L", NULL, "Line In"},
+@@ -401,7 +401,7 @@ static int __devexit davinci_evm_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver davinci_evm_driver = {
+ 	.probe		= davinci_evm_probe,
+-	.remove		= __devexit_p(davinci_evm_remove),
++	.remove		= davinci_evm_remove,
+ 	.driver		= {
+ 		.name	= "davinci_evm",
+ 		.owner	= THIS_MODULE,
 -- 
 1.7.9.5
