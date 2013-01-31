@@ -1,22 +1,31 @@
-From: kishon@ti.com (kishon)
-Date: Thu, 31 Jan 2013 19:43:27 +0530
-Subject: [PATCH 2/2] USB chipidea i.MX: use devm_usb_get_phy_by_phandle
- to get phy
-In-Reply-To: <1359631937-26646-3-git-send-email-s.hauer@pengutronix.de>
-References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
- <1359631937-26646-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <510A7C07.5010901@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Jan 2013 14:13:20 +0000
+Subject: Failure to boot...
+In-Reply-To: <510A78E1.8010308@ti.com>
+References: <20130131014912.GM2637@n2100.arm.linux.org.uk>
+ <20130131030203.GA8374@quad.lixom.net>
+ <alpine.LFD.2.02.1301302312030.6300@xanadu.home>
+ <20130131092024.GN2637@n2100.arm.linux.org.uk>
+ <20130131104044.GO2637@n2100.arm.linux.org.uk> <510A6877.9080307@ti.com>
+ <20130131130437.GP2637@n2100.arm.linux.org.uk> <510A78E1.8010308@ti.com>
+Message-ID: <20130131141320.GQ2637@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 31, 2013 at 07:30:01PM +0530, Santosh Shilimkar wrote:
+> Linus' tip(commit: 04c2eee5) + arm-soc for-next boots fine as well.
+> The pull request from Tony [1] fixed the multi-platform boot issue
+> for OMAP.
+>
+> Now trying to merge your for-next and test.
 
-On Thursday 31 January 2013 05:02 PM, Sascha Hauer wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Some maintainers don't accept patches without a commit message.
+Well, my tip (which is based on Linus' 6abb7c25) also builds and
+boots fine.
 
-Apart from that you can add,
-Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
+Hang on... 
 
-Thanks
-Kishon
+# CONFIG_ARCH_OMAP2PLUS is not set
+CONFIG_ARCH_VEXPRESS=y
+
+which of course won't boot, and this happens on both oldconfigs because
+of the change to multiplatform support.
