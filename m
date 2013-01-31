@@ -1,30 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jan 2013 11:47:04 +0000
-Subject: [PATCH v2 0/4] Preparatory GIC patches for arm64 support
-In-Reply-To: <20130131103044.GB12877@arm.com>
-References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
- <20130131103044.GB12877@arm.com>
-Message-ID: <20130131114703.GX23505@n2100.arm.linux.org.uk>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 31 Jan 2013 11:49:29 +0000
+Subject: [PATCH v3 1/4] ASoC: tlv320aic3x: Convert mic bias to a supply
+ widget
+In-Reply-To: <20130131113035.GF11078@opensource.wolfsonmicro.com>
+References: <1359631394-9511-1-git-send-email-gururaja.hebbar@ti.com>
+ <1359631394-9511-2-git-send-email-gururaja.hebbar@ti.com>
+ <20130131112414.GE11078@opensource.wolfsonmicro.com>
+ <1BAFE6F6C881BF42822005164F1491C33EB5A48E@DBDE01.ent.ti.com>
+ <20130131113035.GF11078@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB5A52E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 10:30:44AM +0000, Catalin Marinas wrote:
-> Olof, Arnd,
+On Thu, Jan 31, 2013 at 17:00:38, Mark Brown wrote:
+> On Thu, Jan 31, 2013 at 11:27:07AM +0000, Hebbar, Gururaja wrote:
+> > On Thu, Jan 31, 2013 at 16:54:16, Mark Brown wrote:
 > 
-> On Tue, Jan 29, 2013 at 04:18:35PM +0000, Catalin Marinas wrote:
-> > That's the second version of the GIC clean-up patches to support arm64.
-> > The only change from v1 is that the second patch (chained_irq.h) also
-> > covers drivers/gpio and drivers/pinctrl (#include change).
+> > > As mentioned when you posted this before this patch needs to update the
+> > > machine drivers using the device too.
 > 
-> Are you ok to merge this series via the arm-soc tree for 3.9-rc1? There
-> are no complaints so far (only acks ;). This would allow me to push GIC
-> support for arm64.
+> > The patch-set 2/4 does the same thing. Since I have da850-evm at my end, I 
+> > have modified that machine driver and sent-it as 2/4.
+> 
+> Two problems here.  One is that the update should be done in the same
+> patch and the other is that you need to update *all* the machine drivers
+> using the device, not just one of them.
 
-So I don't exist anymore to you?
+Ok, I will send the updated version now.
 
-Catalin, it's already been suggested to you that this series is more
-core ARM stuff than SoC stuff, and it's also been suggested that you
-merge this through my tree.
+> 
 
-No, I guess this figures after all your excessively negative replies
-on all of my comments during the review of ARM64.
+
+Regards, 
+Gururaja
