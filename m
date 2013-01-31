@@ -1,96 +1,105 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 31 Jan 2013 17:04:01 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
- <20130129184157.GA29274@obsidianresearch.com>
- <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
- <20130129191853.GB29274@obsidianresearch.com>
- <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
- <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
- <20130130103501.1873d39c@skate>
- <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
-Message-ID: <20130131170401.4b3bfbbf@skate>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 31 Jan 2013 21:38:23 +0530
+Subject: [PATCH v3 03/15] ARM: mcpm: introduce helpers for platform
+ coherency exit/setup
+In-Reply-To: <1359445870-18925-4-git-send-email-nicolas.pitre@linaro.org>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-4-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <510A96F7.8090106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+On Tuesday 29 January 2013 01:20 PM, Nicolas Pitre wrote:
+> From: Dave Martin <dave.martin@linaro.org>
+>
+> This provides helper methods to coordinate between CPUs coming down
+> and CPUs going up, as well as documentation on the used algorithms,
+> so that cluster teardown and setup
+> operations are not done for a cluster simultaneously.
+>
+> For use in the power_down() implementation:
+>    * __mcpm_cpu_going_down(unsigned int cluster, unsigned int cpu)
+>    * __mcpm_outbound_enter_critical(unsigned int cluster)
+>    * __mcpm_outbound_leave_critical(unsigned int cluster)
+>    * __mcpm_cpu_down(unsigned int cluster, unsigned int cpu)
+>
+> The power_up_setup() helper should do platform-specific setup in
+> preparation for turning the CPU on, such as invalidating local caches
+> or entering coherency.  It must be assembler for now, since it must
+> run before the MMU can be switched on.  It is passed the affinity level
+> which should be initialized.
+>
+> Because the mcpm_sync_struct content is looked-up and modified
+> with the cache enabled or disabled depending on the code path, it is
+> crucial to always ensure proper cache maintenance to update main memory
+> right away.  Therefore, any cached write must be followed by a cache
+> clean operation and any cached read must be preceded by a cache
+> invalidate operation (actually a cache flush i.e. clean+invalidate to
+> avoid discarding possible concurrent writes) on the accessed memory.
+>
+> Also, in order to prevent a cached writer from interfering with an
+> adjacent non-cached writer, we ensure each state variable is located to
+> a separate cache line.
+>
+> Thanks to Nicolas Pitre and Achin Gupta for the help with this
+> patch.
+>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+[..]
 
-On Wed, 30 Jan 2013 11:52:15 -0700, Bjorn Helgaas wrote:
+> diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+> index c8c0e2113e..2b83121966 100644
+> --- a/arch/arm/common/mcpm_entry.c
+> +++ b/arch/arm/common/mcpm_entry.c
+> @@ -18,6 +18,7 @@
+>   #include <asm/proc-fns.h>
+>   #include <asm/cacheflush.h>
+>   #include <asm/idmap.h>
+> +#include <asm/cputype.h>
+>
+>   extern volatile unsigned long mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
+>
+[...]
 
-> The secondary/subordinate registers effectively define a bus number
-> aperture that tells the bridge which transactions to claim and forward
-> downstream.  When enumerating devices, we may update the subordinate
-> bus number to widen the aperture so we can enumerate an arbitrary tree
-> behind the bridge.  When we're finished, we'll probably narrow it by
-> updating the subordinate again, so the unused bus number space can be
-> used for other bridges.  I don't know the exact details of the
-> algorithm, and they're likely to change anyway, but pci_scan_bridge()
-> is where most of it happens.
-> 
-> It looks like your current system doesn't support trees below the
-> bridges, but hopefully we can make it so the generic enumeration
-> algorithms still work.
+> +/*
+> + * Ensure preceding writes to *p by other CPUs are visible to
+> + * subsequent reads by this CPU.  We must be careful not to
+> + * discard data simultaneously written by another CPU, hence the
+> + * usage of flush rather than invalidate operations.
+> + */
+> +static void __sync_range_r(volatile void *p, size_t size)
+> +{
+> +	char *_p = (char *)p;
+> +
+> +#ifdef CONFIG_OUTER_CACHE
+> +	if (outer_cache.flush_range) {
+> +
+You don't need above #ifdef. In case of non-outer
+cache the function pointer is null anyways.
+		/*
+> +		 * Ensure dirty data migrated from other CPUs into our cache
+> +		 * are cleaned out safely before the outer cache is cleaned:
+> +		 */
+> +		__cpuc_clean_dcache_area(_p, size);
+> +
+> +		/* Clean and invalidate stale data for *p from outer ... */
+> +		outer_flush_range(__pa(_p), __pa(_p + size));
+> +	}
+> +#endif
+> +
+> +	/* ... and inner cache: */
+> +	__cpuc_flush_dcache_area(_p, size);
+This will be un-necessary when inner cache is available, no ?
+May be you can re-arrange the code like below, unless and until
+you would like to invalidate any speculative fetches during the
+outer_flush_range()
 
-The PCI-to-PCI bridge specification says that the Primary Bus Number
-Register, Secondary Bus Number Register and Subordinate Bus Number
-Register of the PCI configuration space of a PCI-to-PCI bridge should
-all be set to 0 after reset.
+	__cpuc_clean_dcache_area(_p, size);
+	if (outer_cache.flush_range)
+		outer_flush_range(__pa(_p), __pa(_p + size));
 
-Until now, I was forcing a specific value of the Secondary Bus Number
-and Subordinate Bus Number (1 for my first bridge, 2 for my second
-bridge, etc.).
+Rest of the patch looks fine to me.
 
-Following you're recommendation, I've changed this, and left those
-values initialized to 0 by default, in order to let Linux set correct
-values. Yes, Linux does assign appropriate values in the Secondary Bus
-Number Register. But before that Linux also complains loudly that the
-bridge configuration is invalid:
-
-pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:00:02.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:00:03.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:00:04.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:00:05.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:00:06.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-
-Looking at the code, we have:
-
-        /* Check if setup is sensible at all */
-        if (!pass &&
-            (primary != bus->number || secondary <= bus->number ||
-             secondary > subordinate)) {
-                dev_info(&dev->dev, "bridge configuration invalid ([bus %02x-%02x]), reconfiguring\n",
-                         secondary, subordinate);
-                broken = 1;
-        }
-
-Due to the default values of the Primary Bus Number Register, Secondary
-Bus Number Register and Subordinate Bus Number Register, we have:
-
- primary = 0
- secondary = 0
- subordinate = 0
-
-We are enumerating the root bus, so bus->number = 0. Therefore:
-
- * The test primary != bus->number is false, so it's not the problem.
-
- * secondary <= bus->number is true, because secondary = 0, and
-   bus->number = 0. It is the problem.
-
- * secondary > subordinate is false.
-
-So I'm not sure what to do with this...
-
-Thoas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Santosh
