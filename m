@@ -1,218 +1,197 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 31 Jan 2013 10:50:50 +0900
-Subject: [PATCH 3/4] ARM: mach-shmobile: r8a7779: Minimal setup using DT
+Date: Thu, 31 Jan 2013 10:50:51 +0900
+Subject: [PATCH 4/4] ARM: mach-shmobile: marzen: Reference DT implementation
 In-Reply-To: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
 References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359597051-32700-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359597051-32700-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow a minimal setup of the r8a7779 SoC using a flattened device tree.
-In particular, configure the i2c and ethernet controllers using a
-flattened device tree.
-
-SCI serial controller and TMU clock source, whose drivers do not yet
-support configuration using a flattened device tree, are still configured
-using C code in order to allow booting of a board with this SoC.
-
-The ethernet controller also requires a regulator which is a board property.
-A sample snippet DT for the marzen board is as follows:
-
-/dts-v1/;
-/include/ "r8a7779.dtsi"
-
-/ {
-	fixedregulator3v3: fixedregulator at 0 {
-		compatible = "regulator-fixed";
-		regulator-name = "fixed-3.3V";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		regulator-boot-on;
-		regulator-always-on;
-	};
-};
-
-&lan0 {
-	vddvario-supply = <&fixedregulator3v3>;
-	vdd33a-supply = <&fixedregulator3v3>;
-};
+Provide alternate board code for the marzen to demonstrate
+how DT may be used given the current state of driver
+device tree support. This is intended to act as a reference
+for mach-shmobile developers.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779.dtsi               |   45 ++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/common.h |    2 +
- arch/arm/mach-shmobile/setup-r8a7779.c       |   58 +++++++++++++++++++++++---
- 3 files changed, 99 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/Makefile                      |    1 +
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts  |   41 +++++++++++++
+ arch/arm/mach-shmobile/Kconfig                  |   11 ++++
+ arch/arm/mach-shmobile/Makefile                 |    1 +
+ arch/arm/mach-shmobile/board-marzen-reference.c |   71 +++++++++++++++++++++++
+ 5 files changed, 125 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
+ create mode 100644 arch/arm/mach-shmobile/board-marzen-reference.c
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index eadc12e..9564040 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -37,4 +37,49 @@
-                 reg = <0xf0001000 0x1000>,
-                       <0xf0000100 0x100>;
-         };
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2c6f9ef..6dfa67a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -123,6 +123,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7740-armadillo800eva-reference.dtb \
++	r8a7779-marzen-reference.dtb \
+ 	sh73a0-kzm9g.dtb \
+ 	sh73a0-kzm9g-reference.dtb \
+ 	sh7372-mackerel.dtb \
+diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+new file mode 100644
+index 0000000..377d8df
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+@@ -0,0 +1,41 @@
++/*
++ * Reference Device Tree Source for the Marzen board
++ *
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013 Simon Horman
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+	i2c0: i2c at 0xffc70000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xffc70000 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 79 0x4>;
++/dts-v1/;
++/include/ "r8a7779.dtsi"
++
++/ {
++	model = "marzen";
++	compatible = "renesas,marzen-reference", "renesas,r8a7779";
++
++	chosen {
++		bootargs = "console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on";
 +	};
 +
-+	i2c1: i2c at 0xffc71000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xffc71000 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 82 0x4>;
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x40000000>;
 +	};
 +
-+	i2c2: i2c at 0xffc72000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xffc72000 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 80 0x4>;
++	fixedregulator3v3: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
 +	};
-+
-+	i2c3: i2c at 0xffc73000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xffc73000 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 81 0x4>;
-+	};
-+
-+	lan0: lan0 at 18000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x18000000 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 28 0x4>;
-+		reg-io-width = <4>;
-+	};
- };
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 8ef7ebb..4b85b18 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -67,7 +67,9 @@ extern void r8a7779_init_irq_dt(void);
- extern void r8a7779_map_io(void);
- extern void r8a7779_earlytimer_init(void);
- extern void r8a7779_add_early_devices(void);
-+extern void r8a7779_add_early_devices_dt(void);
- extern void r8a7779_add_standard_devices(void);
-+extern void r8a7779_add_standard_devices_dt(void);
- extern void r8a7779_clock_init(void);
- extern void r8a7779_pinmux_init(void);
- extern void r8a7779_pm_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index c54ff9b..d4818c2 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -321,7 +321,7 @@ static struct platform_device i2c3_device = {
- 	.num_resources	= ARRAY_SIZE(rcar_i2c3_res),
- };
- 
--static struct platform_device *r8a7779_early_devices[] __initdata = {
-+static struct platform_device *r8a7779_early_devices_dt[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
- 	&scif2_device,
-@@ -330,15 +330,15 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
- 	&scif5_device,
- 	&tmu00_device,
- 	&tmu01_device,
 +};
 +
-+static struct platform_device *r8a7779_early_devices[] __initdata = {
- 	&i2c0_device,
- 	&i2c1_device,
- 	&i2c2_device,
- 	&i2c3_device,
- };
- 
--static struct platform_device *r8a7779_late_devices[] __initdata = {
--};
--
- void __init r8a7779_add_standard_devices(void)
- {
- #ifdef CONFIG_CACHE_L2X0
-@@ -349,10 +349,10 @@ void __init r8a7779_add_standard_devices(void)
- 
- 	r8a7779_init_pm_domains();
- 
-+	platform_add_devices(r8a7779_early_devices_dt,
-+			    ARRAY_SIZE(r8a7779_early_devices_dt));
- 	platform_add_devices(r8a7779_early_devices,
- 			    ARRAY_SIZE(r8a7779_early_devices));
--	platform_add_devices(r8a7779_late_devices,
--			    ARRAY_SIZE(r8a7779_late_devices));
- }
- 
- /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
-@@ -367,6 +367,8 @@ void __init r8a7779_earlytimer_init(void)
- 
- void __init r8a7779_add_early_devices(void)
- {
-+	early_platform_add_devices(r8a7779_early_devices_dt,
-+				   ARRAY_SIZE(r8a7779_early_devices_dt));
- 	early_platform_add_devices(r8a7779_early_devices,
- 				   ARRAY_SIZE(r8a7779_early_devices));
- 
-@@ -386,3 +388,47 @@ void __init r8a7779_add_early_devices(void)
- 	 * command line in case of the marzen board.
- 	 */
- }
-+
-+#ifdef CONFIG_USE_OF
-+void __init r8a7779_add_early_devices_dt(void)
-+{
-+	shmobile_setup_delay(1000, 2, 4); /* Cortex-A9 @ 1000MHz */
-+
-+	early_platform_add_devices(r8a7779_early_devices_dt,
-+				   ARRAY_SIZE(r8a7779_early_devices_dt));
-+
-+	/* Early serial console setup is not included here.
-+	 * See comment in r8a7779_add_early_devices().
-+	 */
-+}
-+
-+static const struct of_dev_auxdata r8a7779_auxdata_lookup[] __initconst = {
-+	{},
++&lan0 {
++	vddvario-supply = <&fixedregulator3v3>;
++	vdd33a-supply = <&fixedregulator3v3>;
 +};
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 5f61e8f..4695bf8 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -120,6 +120,17 @@ config MACH_MARZEN
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 
++config MACH_MARZEN_REFERENCE
++	bool "MARZEN board - Reference Device Tree Implementation"
++	depends on MACH_MARZEN
++	select USE_OF
++	---help---
++	   Use reference implementation of Marzen board support
++	   which makes use of device tree at the expense
++	   of not supporting a number of devices.
 +
-+void __init r8a7779_add_standard_devices_dt(void)
++	   This is intended to aid developers
++
+ config MACH_KZM9D
+ 	bool "KZM9D board"
+ 	depends on ARCH_EMEV2
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index fd7ec65..6ab7ee2 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -40,6 +40,7 @@ obj-$(CONFIG_MACH_MACKEREL_REFERENCE)	+= board-mackerel-reference.o
+ obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
+ obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
++obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)     += board-armadillo800eva-reference.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+new file mode 100644
+index 0000000..012548f
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -0,0 +1,71 @@
++/*
++ * marzen board support - Reference DT implementation
++ *
++ * Copyright (C) 2011  Renesas Solutions Corp.
++ * Copyright (C) 2011  Magnus Damm
++ * Copyright (C) 2013  Simon Horman
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/gpio.h>
++#include <mach/r8a7779.h>
++#include <mach/common.h>
++#include <mach/irqs.h>
++#include <asm/mach/arch.h>
++
++static void __init marzen_init(void)
 +{
-+	/* clocks are setup late during boot in the case of DT */
-+	r8a7779_clock_init();
++	r8a7779_pinmux_init();
 +
-+	platform_add_devices(r8a7779_early_devices_dt,
-+			    ARRAY_SIZE(r8a7779_early_devices_dt));
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     r8a7779_auxdata_lookup, NULL);
++	/* SCIF2 (CN18: DEBUG0) */
++	gpio_request(GPIO_FN_TX2_C, NULL);
++	gpio_request(GPIO_FN_RX2_C, NULL);
++
++	/* SCIF4 (CN19: DEBUG1) */
++	gpio_request(GPIO_FN_TX4, NULL);
++	gpio_request(GPIO_FN_RX4, NULL);
++
++	/* LAN89218 */
++	gpio_request(GPIO_FN_EX_CS0, NULL); /* nCS */
++	gpio_request(GPIO_FN_IRQ1_B, NULL); /* IRQ + PME */
++
++	/* SD0 (CN20) */
++	gpio_request(GPIO_FN_SD0_CLK, NULL);
++	gpio_request(GPIO_FN_SD0_CMD, NULL);
++	gpio_request(GPIO_FN_SD0_DAT0, NULL);
++	gpio_request(GPIO_FN_SD0_DAT1, NULL);
++	gpio_request(GPIO_FN_SD0_DAT2, NULL);
++	gpio_request(GPIO_FN_SD0_DAT3, NULL);
++	gpio_request(GPIO_FN_SD0_CD, NULL);
++	gpio_request(GPIO_FN_SD0_WP, NULL);
++
++	r8a7779_add_standard_devices_dt();
 +}
 +
-+static const char *r8a7779_compat_dt[] __initdata = {
-+	"renesas,r8a7779",
++static const char *marzen_boards_compat_dt[] __initdata = {
++	"renesas,marzen-reference",
 +	NULL,
 +};
 +
-+DT_MACHINE_START(SH73A0_DT, "Generic R8A7779 (Flattened Device Tree)")
++DT_MACHINE_START(MARZEN, "marzen")
++	.smp		= smp_ops(r8a7779_smp_ops),
 +	.map_io		= r8a7779_map_io,
 +	.init_early	= r8a7779_add_early_devices_dt,
 +	.nr_irqs	= NR_IRQS_LEGACY,
 +	.init_irq	= r8a7779_init_irq_dt,
-+	.init_machine	= r8a7779_add_standard_devices_dt,
++	.init_machine	= marzen_init,
 +	.init_time	= shmobile_timer_init,
-+	.dt_compat	= r8a7779_compat_dt,
++	.dt_compat	= marzen_boards_compat_dt,
 +MACHINE_END
-+#endif /* CONFIG_USE_OF */
 -- 
 1.7.10.4
