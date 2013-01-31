@@ -1,33 +1,41 @@
-From: romieu@fr.zoreil.com (Francois Romieu)
-Date: Thu, 31 Jan 2013 22:43:06 +0100
-Subject: [PATCH v2 1/2] drivers: net: cpsw: Add helper functions for VLAN
- ALE implementation
-In-Reply-To: <510A50DE.1010308@ti.com>
-References: <1359572855-12344-1-git-send-email-mugunthanvnm@ti.com>
- <1359572855-12344-2-git-send-email-mugunthanvnm@ti.com>
- <20130130220208.GA22847@electric-eye.fr.zoreil.com> <510A50DE.1010308@ti.com>
-Message-ID: <20130131214306.GA18739@electric-eye.fr.zoreil.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 31 Jan 2013 17:16:27 -0500 (EST)
+Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
+In-Reply-To: <510AE6BF.4080303@zytor.com>
+References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
+ <20130128142510.68092e10.akpm@linux-foundation.org>
+ <20130129101549.GP23505@n2100.arm.linux.org.uk> <51089523.3080804@zytor.com>
+ <alpine.LFD.2.02.1301301326530.6300@xanadu.home> <510AE6BF.4080303@zytor.com>
+Message-ID: <alpine.LFD.2.02.1301311700470.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mugunthan V N <mugunthanvnm@ti.com> :
-> On 1/31/2013 3:32 AM, Francois Romieu wrote:
-[...]
-> > It could be factored out.
-> Are you mentioning to have static inline function for the above two
-> statements above?
+On Thu, 31 Jan 2013, H. Peter Anvin wrote:
 
-Yes. The helper function does not need to be inlined if it does not
-save space: this path is not performance critical.
+> On 01/30/2013 10:33 AM, Nicolas Pitre wrote:
+> >>
+> >> The only concern I have with that is if someone paints themselves into a
+> >> corner and absolutely wants, say, LZO.
+> > 
+> > That would be hard to justify given that the kernel provides its own 
+> > decompressor code, making the compression format transparent to 
+> > bootloaders, etc.  And no one should be poking into the compressed 
+> > zImage.
+> > 
+> 
+> Some utterly weird things like the Xen domain builder do that, because
+> they have to.  That is why we explicitly document that the payload is
+> ELF and how to access it in the bzImage spec.
 
-[...]
-> >Patch #2 doesn't use the returned status code.
-> Will modify the prototype to return void
+Are you kidding?
 
-:o(
+And what format do they expect?
 
-The driver should notify the upper layers that the request failed instead
-of hiding the stuff under the carpet.
+If people are doing weird things with formats we're about to remove then 
+it's their fault if they didn't make upstream developers aware of it.  
+And if the reason they didn't tell anyone is because it is too nasty for 
+public confession then they simply deserve to be broken and come up with 
+a more sustainable solution.
 
--- 
-Ueimor
+
+Nicolas
