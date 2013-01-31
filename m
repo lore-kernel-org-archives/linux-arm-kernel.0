@@ -1,37 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jan 2013 16:18:23 +0000
-Subject: Failure to boot...
-In-Reply-To: <CAOMZO5BrGcffzd2YBrF6YQTs7X38RuniYhm010fpLMnigecnTw@mail.gmail.com>
-References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <20130131104044.GO2637@n2100.arm.linux.org.uk> <510A6877.9080307@ti.com>
- <20130131130437.GP2637@n2100.arm.linux.org.uk> <510A78E1.8010308@ti.com>
- <20130131141320.GQ2637@n2100.arm.linux.org.uk>
- <20130131141635.GR2637@n2100.arm.linux.org.uk> <510A7D9F.7040507@ti.com>
- <20130131142758.GS2637@n2100.arm.linux.org.uk>
- <CAOMZO5BrGcffzd2YBrF6YQTs7X38RuniYhm010fpLMnigecnTw@mail.gmail.com>
-Message-ID: <20130131161823.GT2637@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 31 Jan 2013 21:54:56 +0530
+Subject: BogoMIPS change in 3.6+
+In-Reply-To: <510A988F.6030508@gmail.com>
+References: <510A988F.6030508@gmail.com>
+Message-ID: <510A9AD8.8060003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 02:01:14PM -0200, Fabio Estevam wrote:
-> On Thu, Jan 31, 2013 at 12:27 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
-> > too.  It also looks like Versatile Express support _can't_ be disabled in
-> > a multiplatform kernel, which is ludicrous.
-> 
-> Should we go with this approach?
-> https://patchwork.kernel.org/patch/1774521/
+On Thursday 31 January 2013 09:45 PM, Rob Herring wrote:
+> The BogoMIPS value has changed on highbank since the commit below in
+> 3.6. It is now half the value it used to be. Does that matter other than
+> perception (I've checked that I'm not running at half the freq)?
+>
+I also stumbled on this while testing Will's series.[1]
+There should be no other functional issue apart from getting surprised.
 
-We need to go with an approach which isn't going to break allnoconfig
-and randconfig.
+Regards,
+Santosh
 
-I've suggested that we should have a basic, minimalist platform always
-built in for DT supporting kernels.  I've actually suggested that we
-should end up not having a machine_desc at all once the DT conversion
-is complete.  Either of those solves the problem of us ending up with
-no platform support built with these configurations.
-
-The alternative is we end up with quite a long disgusting Kconfig
-option which becomes enabled when everything but Versatile Express
-is disabled...
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/109281.html
