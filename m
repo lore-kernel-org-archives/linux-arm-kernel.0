@@ -1,148 +1,68 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Jan 2013 12:15:31 +0000
-Subject: [PATCHv5 08/16] arm: arch_timer: divorce from local_timer api
+Date: Thu, 31 Jan 2013 12:15:32 +0000
+Subject: [PATCHv5 09/16] arm: arch_timer: add arch_counter_set_user_access
 In-Reply-To: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
 References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1359634539-9580-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <1359634539-9580-10-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the arch_timer driver is tied to the arm port, as it relies
-on code in arch/arm/smp.c to setup and teardown timers as cores are
-hotplugged on and off. The timer is registered through an arm-specific
-registration mechanism, preventing sharing the driver with the arm64
-port.
+Several bits in CNTKCTL reset to 0, including PL0VTEN. For architectures
+using the generic timer which wish to have a fast gettimeofday vDSO
+implementation, these bits must be set to 1 by the kernel. For
+architectures without a vDSO, it's best to leave the bits set to 0 for
+now to ensure that if and when support is added, it's implemented sanely
+architecture wide.
 
-This patch moves the driver to using a cpu notifier instead, making it
-easier to port.
+As the bootloader might set PL0VTEN to a value that doesn't correspond
+to that which the kernel prefers, we must explicitly set it to the
+architecture port's preferred value.
+
+This patch adds arch_counter_set_user_access, which sets the PL0 access
+permissions to that required by the architecture. For arch/arm, this
+currently means disabling all userspace access.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/kernel/arch_timer.c | 52 ++++++++++++++++++++++++--------------------
- 1 file changed, 29 insertions(+), 23 deletions(-)
+ arch/arm/include/asm/arch_timer.h | 12 ++++++++++++
+ arch/arm/kernel/arch_timer.c      |  2 ++
+ 2 files changed, 14 insertions(+)
 
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 75975d9..729f6d9 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -106,6 +106,18 @@ static inline u64 arch_counter_get_cntvct(void)
+ 	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (cval));
+ 	return cval;
+ }
++
++static inline void __cpuinit arch_counter_set_user_access(void)
++{
++	u32 cntkctl;
++
++	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
++
++	/* disable user access to everything */
++	cntkctl &= ~((3 << 8) | (7 << 0));
++
++	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
++}
+ #else
+ static inline int arch_timer_of_register(void)
+ {
 diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index e973cc0..c8dfec0 100644
+index c8dfec0..94f5033 100644
 --- a/arch/arm/kernel/arch_timer.c
 +++ b/arch/arm/kernel/arch_timer.c
-@@ -21,7 +21,6 @@
- #include <linux/io.h>
- 
- #include <asm/delay.h>
--#include <asm/localtimer.h>
- #include <asm/arch_timer.h>
- #include <asm/sched_clock.h>
- 
-@@ -37,7 +36,7 @@ enum ppi_nr {
- 
- static int arch_timer_ppi[MAX_TIMER_PPI];
- 
--static struct clock_event_device __percpu **arch_timer_evt;
-+static struct clock_event_device __percpu *arch_timer_evt;
- static struct delay_timer arch_delay_timer;
- 
- static bool arch_timer_use_virtual = true;
-@@ -63,14 +62,14 @@ static irqreturn_t inline timer_handler(const int access,
- 
- static irqreturn_t arch_timer_handler_virt(int irq, void *dev_id)
- {
--	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
-+	struct clock_event_device *evt = dev_id;
- 
- 	return timer_handler(ARCH_TIMER_VIRT_ACCESS, evt);
- }
- 
- static irqreturn_t arch_timer_handler_phys(int irq, void *dev_id)
- {
--	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
-+	struct clock_event_device *evt = dev_id;
- 
- 	return timer_handler(ARCH_TIMER_PHYS_ACCESS, evt);
- }
-@@ -141,13 +140,13 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
- 		clk->set_next_event = arch_timer_set_next_event_phys;
+@@ -155,6 +155,8 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
+ 			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
  	}
  
-+	clk->cpumask = cpumask_of(smp_processor_id());
++	arch_counter_set_user_access();
 +
- 	clk->set_mode(CLOCK_EVT_MODE_SHUTDOWN, NULL);
- 
- 	clockevents_config_and_register(clk, arch_timer_rate,
- 					0xf, 0x7fffffff);
- 
--	*__this_cpu_ptr(arch_timer_evt) = clk;
--
- 	if (arch_timer_use_virtual)
- 		enable_percpu_irq(arch_timer_ppi[VIRT_PPI], 0);
- 	else {
-@@ -251,12 +250,26 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
- 	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+ 	return 0;
  }
  
--static struct local_timer_ops arch_timer_ops __cpuinitdata = {
--	.setup	= arch_timer_setup,
--	.stop	= arch_timer_stop,
--};
-+static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
-+					   unsigned long action, void *hcpu)
-+{
-+	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
-+
-+	switch (action & ~CPU_TASKS_FROZEN) {
-+	case CPU_STARTING:
-+		arch_timer_setup(evt);
-+		break;
-+	case CPU_DYING:
-+		arch_timer_stop(evt);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
- 
--static struct clock_event_device arch_timer_global_evt;
-+static struct notifier_block arch_timer_cpu_nb __cpuinitdata = {
-+	.notifier_call = arch_timer_cpu_notify,
-+};
- 
- static int __init arch_timer_register(void)
- {
-@@ -267,7 +280,7 @@ static int __init arch_timer_register(void)
- 	if (err)
- 		goto out;
- 
--	arch_timer_evt = alloc_percpu(struct clock_event_device *);
-+	arch_timer_evt = alloc_percpu(struct clock_event_device);
- 	if (!arch_timer_evt) {
- 		err = -ENOMEM;
- 		goto out;
-@@ -303,20 +316,13 @@ static int __init arch_timer_register(void)
- 		goto out_free;
- 	}
- 
--	err = local_timer_register(&arch_timer_ops);
--	if (err) {
--		/*
--		 * We couldn't register as a local timer (could be
--		 * because we're on a UP platform, or because some
--		 * other local timer is already present...). Try as a
--		 * global timer instead.
--		 */
--		arch_timer_global_evt.cpumask = cpumask_of(0);
--		err = arch_timer_setup(&arch_timer_global_evt);
--	}
-+	err = register_cpu_notifier(&arch_timer_cpu_nb);
- 	if (err)
- 		goto out_free_irq;
- 
-+	/* Immediately configure the timer on the boot CPU */
-+	arch_timer_setup(this_cpu_ptr(arch_timer_evt));
-+
- 	/* Use the architected timer for the delay loop. */
- 	arch_delay_timer.read_current_timer = &arch_timer_read_current_timer;
- 	arch_delay_timer.freq = arch_timer_rate;
 -- 
 1.8.1.1
