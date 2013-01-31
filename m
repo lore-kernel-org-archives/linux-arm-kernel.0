@@ -1,38 +1,27 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 31 Jan 2013 08:28:36 +0100
-Subject: [PATCH v3] ARM: OMAP2: am33xx-hwmod: Fix "register offset NULL
- check" bug
-In-Reply-To: <1359556760-25214-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1359556760-25214-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <D0DE2843-AA5C-4DFA-ADBE-61BC11D24836@dominion.thruhere.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 31 Jan 2013 15:36:34 +0800
+Subject: [PATCH] Asoc: Samsung: I2S: Add support for runtime S2R
+In-Reply-To: <1359547864-1057-1-git-send-email-rcsekar@samsung.com>
+References: <1359547864-1057-1-git-send-email-rcsekar@samsung.com>
+Message-ID: <20130131073632.GG7663@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Op 30 jan. 2013, om 15:39 heeft Hebbar Gururaja <gururaja.hebbar@ti.com> het volgende geschreven:
-
-> am33xx_cm_wait_module_ready() checks if register offset is NULL.
+On Wed, Jan 30, 2013 at 05:41:04PM +0530, R. Chandrasekar wrote:
+> From: "R. Chandrasekar" <rcsekar@samsung.com>
 > 
-> int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
-> {
-> 	int i = 0;
-> 
-> 	if (!clkctrl_offs)
-> 		return 0;
-> 
-> In case of AM33xx, CLKCTRL register offset for different clock domains
-> are not uniformly placed. An example of this would be the RTC clock
-> domain with CLKCTRL offset at 0x00.
-> In such cases the module ready check is skipped which leads to a data
-> abort during boot-up when RTC registers is accessed.
-> 
-> Remove this check here to avoid checking module readiness for modules
-> with clkctrl register offset at 0x00.
-> 
-> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> This patch adds runtime suspend to resume support for I2S.
+> I2S clk is disabled at suspend and enabled at resume.
 
-I can confirm that this fixes the crash on boot with CONFIG_RTC_DRV_OMAP=y with 3.8-rc5
+Applied, thanks.  Please use subject lines appropriate to the subsystem
+and keep your signoffs in order:
 
-regards,
-
-Koen
+> Signed-off-by: R. Chandrasekar <rcsekar@samsung.com>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/9c0eda64/attachment.sig>
