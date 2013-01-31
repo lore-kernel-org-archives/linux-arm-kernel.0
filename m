@@ -1,77 +1,108 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 31 Jan 2013 13:07:35 +0100
-Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
- board(DB-MV784MP-GP)
-In-Reply-To: <20130130181035.GP7717@titan.lakedaemon.net>
-References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
- <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
- <20130130173306.GO7717@titan.lakedaemon.net>
- <510959D5.1010305@free-electrons.com>
- <20130130181035.GP7717@titan.lakedaemon.net>
-Message-ID: <510A5E87.60509@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 31 Jan 2013 12:08:33 +0000
+Subject: [GIT PULL] power: ab8500-bm: Latest Mainline<->STE delta
+ reduction patch-set
+In-Reply-To: <20130123144441.GN15873@gmail.com>
+References: <20130123113854.GK15873@gmail.com>
+ <20130123144441.GN15873@gmail.com>
+Message-ID: <20130131120833.GH5301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2013 07:10 PM, Jason Cooper wrote:
-> 
-> Gregory,
-> 
-> Adding devicetree-discuss.
+Hi Anton,
 
-I should have added it in in CC in my first version
+> Okay, after Linus Walleij's diligent observaions, I have removed all
+> new functionallity related to Deep Debug and will continue to
+> investigate what I need to do in that regard.
+> 
+> In the mean-time, here's the fresh deep-debug:less pull-request:
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 8fd526fd18233887ba652079a369f4eee0de9d9d:
+> 
+>   qnap-poweroff: Fix license string (2013-01-19 18:04:04 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/ljones/linux-3.0-ux500.git tb-power-2
+> 
+> for you to fetch changes up to 34c11a709e928090cf34ecd706f7d3170f4e5026:
+> 
+>   u8500-charger: Delay for USB enumeration (2013-01-23 14:39:22 +0000)
 
-> 
-> Guys, how do you prefer to handle plug-in RAM modules?  describe the
-> soldered-in amount, or?
-> 
-> On Wed, Jan 30, 2013 at 06:35:17PM +0100, Gregory CLEMENT wrote:
->> On 01/30/2013 06:33 PM, Jason Cooper wrote:
->>> On Wed, Jan 30, 2013 at 06:26:14PM +0100, Gregory CLEMENT wrote:
->>>> This is the new Armada XP evaluation board from Marvell. It comes with
->>>> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
->>>> Gigabit links.
->>>>
->>>> Support for USB (Host and device), SDIO, PCIe will be added as drivers
->>>> when they become available for Armada XP in mainline.
->>>>
->>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>> ---
->>>>  arch/arm/boot/dts/Makefile         |    1 +
->>>>  arch/arm/boot/dts/armada-xp-gp.dts |   94 ++++++++++++++++++++++++++++++++++++
->>>>  2 files changed, 95 insertions(+)
->>>>  create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
->>>>
-> ...
->>>> +	memory {
->>>> +		device_type = "memory";
->>>> +		reg = <0x00000000 0xC0000000>; /* 3 GB */
->>>
->>> Is this the soldered on the board amount, or the amount with an
->>> expandable slot filled?
->>
->> It is not soldered, so you can change the amount of memory
-> 
-> Well, there's something we don't encounter too much in the embedded
-> world.  ;-)  I'm inclined to think the entry here should be the soldered
-> on amount, and the bootloader would (hypothetically) change the DT to
-> the probed amount.  But I haven't seen a precedent set yet...
+Did you pull this in the end?
 
-Well on this board there is no soldered memory at all.
-
+> ----------------------------------------------------------------
+> Hakan Berg (1):
+>       ab8500-fg: Adjust for RF bursts voltage drops
 > 
-> thx,
+> Henrik S?lver (1):
+>       ab8500-charger: AB workaround for invalid charger
 > 
-> Jason.
+> Jonas Aaberg (2):
+>       ab8500-bm: Flush all work queues before suspending
+>       ab8500-charger: Do not touch VBUSOVV bits
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Lee Jones (7):
+>       ab8500-charger: Kick watchdog
+>       ab8500-chargalg: Update battery health on safety timer exp
+>       pm2301: Move all configuration and emum structs out to a header
+>       file
+>       ab8500-chargalg: Only root should have write permission on sysfs
+>       file
+>       abx500-chargalg: Add new sysfs interface to get current charge
+>       status
+>       pm2301: LPN mode control support
+>       ab8500-bm: Remove individual [charger|btemp|fg|chargalg] pdata
+>       structures
 > 
-
+> Loic Pallardy (2):
+>       pm2301: Remove volt_now & curr_now properties
+>       pm2301: Update watchdog for pm2xxx support
+> 
+> Martin Bergstr?m (1):
+>       ab8500-fg: Go to INIT_RECOVERY when charger removed
+> 
+> Michel JAOUEN (2):
+>       pm2301: Provide u9540 support for the pm2301 charger
+>       ab8500-btemp: Adaptation to AB8505 and AB9540 platforms
+> 
+> Nicolas Guion (1):
+>       ab8500-charger: Add support for autopower on AB8505 and AB9540
+> 
+> Olivier Clergeaud (1):
+>       pm2301: Clean-up PM2301 interrupt management
+> 
+> Paer-Olof Haakansson (1):
+>       u8500-charger: Delay for USB enumeration
+> 
+> Rajkumar Kasirajan (2):
+>       pm2301: Enable vbat low monitoring
+>       ab8500-fg: Use correct battery charge full design
+> 
+>  drivers/mfd/ab8500-core.c                 |    6 +
+>  drivers/power/Kconfig                     |    7 +
+>  drivers/power/Makefile                    |    1 +
+>  drivers/power/ab8500_btemp.c              |   67 +-
+>  drivers/power/ab8500_charger.c            |  617 ++++++++++++----
+>  drivers/power/ab8500_fg.c                 |   51 +-
+>  drivers/power/abx500_chargalg.c           |   43 +-
+>  drivers/power/pm2301_charger.c            | 1088 +++++++++++++++++++++++++++++
+>  drivers/power/pm2301_charger.h            |  513 ++++++++++++++
+>  include/linux/mfd/abx500.h                |    3 +
+>  include/linux/mfd/abx500/ab8500-bm.h      |   22 +-
+>  include/linux/mfd/abx500/ab8500.h         |   19 +
+>  include/linux/mfd/abx500/ux500_chargalg.h |    5 +
+>  include/linux/pm2301_charger.h            |   61 ++
+>  14 files changed, 2306 insertions(+), 197 deletions(-)
+>  create mode 100644 drivers/power/pm2301_charger.c
+>  create mode 100644 drivers/power/pm2301_charger.h
+>  create mode 100644 include/linux/pm2301_charger.h
+> 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
