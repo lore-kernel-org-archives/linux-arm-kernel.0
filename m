@@ -1,64 +1,101 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Thu, 31 Jan 2013 16:58:20 -0500
-Subject: [PATCH v4 01/13] ARM: LPAE: use signed arithmetic for mask definitions
+Date: Thu, 31 Jan 2013 16:58:27 -0500
+Subject: [PATCH v4 08/13] ARM: LPAE: factor out T1SZ and TTBR1 computations
 In-Reply-To: <1359669512-31276-1-git-send-email-cyril@ti.com>
 References: <1359669512-31276-1-git-send-email-cyril@ti.com>
-Message-ID: <1359669512-31276-2-git-send-email-cyril@ti.com>
+Message-ID: <1359669512-31276-9-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch applies to PAGE_MASK, PMD_MASK, and PGDIR_MASK, where forcing
-unsigned long math truncates the mask at the 32-bits.  This clearly does bad
-things on PAE systems.
-
-This patch fixes this problem by defining these masks as signed quantities.
-We then rely on sign extension to do the right thing.
+This patch moves the TTBR1 offset calculation and the T1SZ calculation out
+of the TTB setup assembly code.  This should not affect functionality in
+any way, but improves code readability as well as readability of subsequent
+patches in this series.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/page.h           |    2 +-
- arch/arm/include/asm/pgtable-3level.h |    6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/pgtable-3level-hwdef.h |   20 ++++++++++++++++++
+ arch/arm/mm/proc-v7-3level.S                |   29 ++++++++-------------------
+ 2 files changed, 28 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-index 812a494..6363f3d 100644
---- a/arch/arm/include/asm/page.h
-+++ b/arch/arm/include/asm/page.h
-@@ -13,7 +13,7 @@
- /* PAGE_SHIFT determines the page size */
- #define PAGE_SHIFT		12
- #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
--#define PAGE_MASK		(~(PAGE_SIZE-1))
-+#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
+diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
+index d795282..e9d70a3 100644
+--- a/arch/arm/include/asm/pgtable-3level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+@@ -74,4 +74,24 @@
+ #define PHYS_MASK_SHIFT		(40)
+ #define PHYS_MASK		((1ULL << PHYS_MASK_SHIFT) - 1)
  
- #ifndef __ASSEMBLY__
++/*
++ * TTBR0/TTBR1 split (PAGE_OFFSET):
++ *   0x40000000: T0SZ = 2, T1SZ = 0 (not used)
++ *   0x80000000: T0SZ = 0, T1SZ = 1
++ *   0xc0000000: T0SZ = 0, T1SZ = 2
++ *
++ * Only use this feature if PHYS_OFFSET <= PAGE_OFFSET, otherwise
++ * booting secondary CPUs would end up using TTBR1 for the identity
++ * mapping set up in TTBR0.
++ */
++#if defined CONFIG_VMSPLIT_2G
++#define TTBR1_OFFSET	16			/* skip two L1 entries */
++#elif defined CONFIG_VMSPLIT_3G
++#define TTBR1_OFFSET	(4096 * (1 + 3))	/* only L2, skip pgd + 3*pmd */
++#else
++#define TTBR1_OFFSET	0
++#endif
++
++#define TTBR1_SIZE	(((PAGE_OFFSET >> 30) - 1) << 16)
++
+ #endif
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index e64be21..e6576f5 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -113,7 +113,7 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	 */
+ 	.macro	v7_ttb_setup, zero, ttbr0, ttbr1, tmp
+ 	ldr	\tmp, =swapper_pg_dir		@ swapper_pg_dir virtual address
+-	cmp	\ttbr1, \tmp			@ PHYS_OFFSET > PAGE_OFFSET? (branch below)
++	cmp	\ttbr1, \tmp			@ PHYS_OFFSET > PAGE_OFFSET?
+ 	mrc	p15, 0, \tmp, c2, c0, 2		@ TTB control register
+ 	orr	\tmp, \tmp, #TTB_EAE
+ 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP)
+@@ -121,27 +121,14 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP << 16)
+ 	ALT_UP(orr	\tmp, \tmp, #TTB_FLAGS_UP << 16)
+ 	/*
+-	 * TTBR0/TTBR1 split (PAGE_OFFSET):
+-	 *   0x40000000: T0SZ = 2, T1SZ = 0 (not used)
+-	 *   0x80000000: T0SZ = 0, T1SZ = 1
+-	 *   0xc0000000: T0SZ = 0, T1SZ = 2
+-	 *
+-	 * Only use this feature if PHYS_OFFSET <= PAGE_OFFSET, otherwise
+-	 * booting secondary CPUs would end up using TTBR1 for the identity
+-	 * mapping set up in TTBR0.
++	 * Only use split TTBRs if PHYS_OFFSET <= PAGE_OFFSET (cmp above),
++	 * otherwise booting secondary CPUs would end up using TTBR1 for the
++	 * identity mapping set up in TTBR0.
+ 	 */
+-	bhi	9001f				@ PHYS_OFFSET > PAGE_OFFSET?
+-	orr	\tmp, \tmp, #(((PAGE_OFFSET >> 30) - 1) << 16) @ TTBCR.T1SZ
+-#if defined CONFIG_VMSPLIT_2G
+-	/* PAGE_OFFSET == 0x80000000, T1SZ == 1 */
+-	add	\ttbr1, \ttbr1, #1 << 4		@ skip two L1 entries
+-#elif defined CONFIG_VMSPLIT_3G
+-	/* PAGE_OFFSET == 0xc0000000, T1SZ == 2 */
+-	add	\ttbr1, \ttbr1, #4096 * (1 + 3)	@ only L2 used, skip pgd+3*pmd
+-#endif
+-	/* CONFIG_VMSPLIT_1G does not need TTBR1 adjustment */
+-9001:	mcr	p15, 0, \tmp, c2, c0, 2		@ TTB control register
+-	mcrr	p15, 1, \ttbr1, \zero, c2	@ load TTBR1
++	orrls	\tmp, \tmp, #TTBR1_SIZE				@ TTBCR.T1SZ
++	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
++	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
++	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
+ 	.endm
  
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index a3f3792..554f6d3 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -48,16 +48,16 @@
- #define PMD_SHIFT		21
- 
- #define PMD_SIZE		(1UL << PMD_SHIFT)
--#define PMD_MASK		(~(PMD_SIZE-1))
-+#define PMD_MASK		(~((1 << PMD_SHIFT) - 1))
- #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
--#define PGDIR_MASK		(~(PGDIR_SIZE-1))
-+#define PGDIR_MASK		(~((1 << PGDIR_SHIFT) - 1))
- 
- /*
-  * section address mask and size definitions.
-  */
- #define SECTION_SHIFT		21
- #define SECTION_SIZE		(1UL << SECTION_SHIFT)
--#define SECTION_MASK		(~(SECTION_SIZE-1))
-+#define SECTION_MASK		(~((1 << SECTION_SHIFT) - 1))
- 
- #define USER_PTRS_PER_PGD	(PAGE_OFFSET / PGDIR_SIZE)
- 
+ 	__CPUINIT
 -- 
 1.7.9.5
