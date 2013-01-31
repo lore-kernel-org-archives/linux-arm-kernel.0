@@ -1,40 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 31 Jan 2013 11:07:16 +0100
-Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
- board(DB-MV784MP-GP)
-In-Reply-To: <20130131095025.GC20242@lunn.ch>
-References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
- <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
- <20130130173306.GO7717@titan.lakedaemon.net>
- <510959D5.1010305@free-electrons.com>
- <20130130181035.GP7717@titan.lakedaemon.net>
- <20130131095025.GC20242@lunn.ch>
-Message-ID: <20130131110716.50b7340b@skate>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Thu, 31 Jan 2013 10:11:30 +0000
+Subject: [PATCH RFC] davinci: poll for sleep completion in resume routine.
+In-Reply-To: <510A3EAE.107@ti.com>
+References: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
+ <510A3EAE.107@ti.com>
+Message-ID: <A4887BF146CD57468F700B415D2F4701581C4A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hi Sekhar
 
-On Thu, 31 Jan 2013 10:50:25 +0100, Andrew Lunn wrote:
-
-> We have the same issue with OpenBox AX3. All the devices we have in
-> our hands have 1GB soldered down, plus 2GB on expansion. The DT
-> currently has the full 3GB.
+On Thu, Jan 31, 2013 at 15:21:42, Nori, Sekhar wrote:
 > 
-> However, there has been discussion of reducing this down to 1GB since
-> both Thomas and Gregory have unstable systems with the full 3GB, but
-> mine box is stable with the full 3GB. So i don't know how strong a
-> precedent that sets....
+> 
+> On 1/31/2013 2:56 PM, Vishwanathrao Badarkhe, Manish wrote:
+> > As per OMAP-L138 TRM, Software must poll for SLEEPCOMPLETE bit until 
+> > it is set to 1 before clearing SLEEPENABLE bit in DEEPSLEEP register 
+> > in resume routine.
+> > Modifications are as per datasheet:
+> > http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+> > See sections 10.10.2.2 and 11.5.21 for more detailed explanation.
+> > 
+> > Tested on da850-evm.
+> > 
+> > Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+> 
+> Is this a bug fix? Do you see any issue without this patch?
 
-It seems that if we have CONFIG_ARM_ATAG_DTB_COMPAT, then the code in
-arch/arm/boot/compressed/atags_to_fdt.c will update the DT memory node
-according to the ATAG_MEM passed by the bootloader.
+This is not a bug fix. I have not seen any issue without this patch. 
+Only, modifications are done as per OMAP-L138 TRM.   
 
-Best regards,
+> 
+> Thanks,
+> Sekhar
+> 
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+Regards, 
+Manish
