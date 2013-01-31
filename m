@@ -1,55 +1,84 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 31 Jan 2013 12:32:09 +0000
-Subject: [PATCH v2 0/4] Preparatory GIC patches for arm64 support
-In-Reply-To: <20130131114703.GX23505@n2100.arm.linux.org.uk>
-References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
- <20130131103044.GB12877@arm.com>
- <20130131114703.GX23505@n2100.arm.linux.org.uk>
-Message-ID: <20130131123208.GE12877@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Jan 2013 12:32:13 +0000
+Subject: [PATCH 2/4] ARM: mach-shmobile: r8a7779: Allow initialisation
+ of GIC by DT
+In-Reply-To: <1359597051-32700-3-git-send-email-horms+renesas@verge.net.au>
+References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
+ <1359597051-32700-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130131123213.GB7235@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 11:47:04AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 31, 2013 at 10:30:44AM +0000, Catalin Marinas wrote:
-> > On Tue, Jan 29, 2013 at 04:18:35PM +0000, Catalin Marinas wrote:
-> > > That's the second version of the GIC clean-up patches to support arm64.
-> > > The only change from v1 is that the second patch (chained_irq.h) also
-> > > covers drivers/gpio and drivers/pinctrl (#include change).
-> > 
-> > Are you ok to merge this series via the arm-soc tree for 3.9-rc1? There
-> > are no complaints so far (only acks ;). This would allow me to push GIC
-> > support for arm64.
+Hi Simon,
+
+On Thu, Jan 31, 2013 at 01:50:49AM +0000, Simon Horman wrote:
+> This allows the GIC interrupt controller of the  r8a7779 SoC to be
+> initialised using a flattened device tree blob.
 > 
-> So I don't exist anymore to you?
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7779.dtsi               |   40 ++++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/include/mach/common.h |    1 +
+>  arch/arm/mach-shmobile/intc-r8a7779.c        |   27 +++++++++++++----
+>  3 files changed, 62 insertions(+), 6 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/r8a7779.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> new file mode 100644
+> index 0000000..eadc12e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> @@ -0,0 +1,40 @@
+> +/*
+> + * Device Tree Source for Renesas r8a7740
+> + *
+> + * Copyright (C) 2013 Renesas Solutions Corp.
+> + * Copyright (C) 2013 Simon Horman
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "renesas,r8a7779";
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a9";
+> +		};
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a9";
+> +		};
+> +		cpu at 2 {
+> +			compatible = "arm,cortex-a9";
+> +		};
+> +		cpu at 3 {
+> +			compatible = "arm,cortex-a9";
+> +		};
+> +	};
 
-You do ;) and you've been cc'ed on these patches. Just wasn't sure you
-care about patches that have 'arm64' in the cover email ;).
+Sorry to sound like a broken record, but it'd be good to see reg and
+device_type set here.
 
-Since Rob's series went through the arm-soc, I consider that further
-changes should go the same route as there is a dependency and I'd like
-to get them merged sooner. These patches touch primarily SoC code, apart
-from some trivial code moving and the CPU notifier in irq-gic.c (you are
-the original author of this driver) and I'm ok if you want to merge it.
+> +
+> +        gic: interrupt-controller at f0001000 {
+> +                compatible = "arm,cortex-a9-gic";
+> +                #interrupt-cells = <3>;
+> +                #address-cells = <1>;
 
-I really don't mind if you or Olof merge the whole series as long as it
-gets upstream at some point. As you expressed an opinion on these
-patches and you want to merge them, they'll have to wait until after
-3.9-rc1 for Rob's patches to get in.
+Why is #address-cells needed here (and without #size-cells)? I see it's in the
+binding document example, but I can't figure out why.
 
-> Catalin, it's already been suggested to you that this series is more
-> core ARM stuff than SoC stuff, and it's also been suggested that you
-> merge this through my tree.
+> +                interrupt-controller;
+> +                reg = <0xf0001000 0x1000>,
+> +                      <0xf0000100 0x100>;
+> +        };
+> +};
 
-No, it hasn't. Just Nico saying that he'd prefer *his* series was merged
-by RMK (and I agree). A way to sort the dependency issue for Nico is to
-at least push some of this series in 3.9-rc1. Otherwise we just postpone
-the dependency issue.
+[...]
 
-> No, I guess this figures after all your excessively negative replies
-> on all of my comments during the review of ARM64.
-
-It's all relative - negative reply to negative reply would make it
-positive ;).
-
--- 
-Catalin
+Thanks,
+Mark.
