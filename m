@@ -1,35 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Jan 2013 14:11:32 +0000
-Subject: [GIT PULL] ARM: mvebu cleanup for v3.9 round2
-In-Reply-To: <20130131125116.GC7717@titan.lakedaemon.net>
-References: <1359495436.F88c4680.7559@triton>
- <20130131125116.GC7717@titan.lakedaemon.net>
-Message-ID: <201301311411.33125.arnd@arndb.de>
+From: kishon@ti.com (kishon)
+Date: Thu, 31 Jan 2013 19:43:27 +0530
+Subject: [PATCH 2/2] USB chipidea i.MX: use devm_usb_get_phy_by_phandle
+ to get phy
+In-Reply-To: <1359631937-26646-3-git-send-email-s.hauer@pengutronix.de>
+References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359631937-26646-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <510A7C07.5010901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 January 2013, Jason Cooper wrote:
-> Arnd, Olof,
-> 
-> Please don't pull this yet.  The nsa310 patch built fine at the tip of
-> my for-next, but didn't do so well when applied to mvebu/cleanup.
-> 
-> I'll redo and resubmit the whole series of pr's.
+Hi,
 
+On Thursday 31 January 2013 05:02 PM, Sascha Hauer wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Some maintainers don't accept patches without a commit message.
 
-FWIW, when I was building all defconfigs for for-next yesterday, I needed
-this patch, but nothing else for mvebu or kirkwood.
+Apart from that you can add,
+Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-	Arnd
-
-index 61c4b18..970174a 100644
---- a/arch/arm/mach-kirkwood/board-nsa310.c
-+++ b/arch/arm/mach-kirkwood/board-nsa310.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/gpio.h>
-+#include <linux/i2c.h>
- #include <mach/kirkwood.h>
- #include <linux/of.h>
- #include "common.h"
+Thanks
+Kishon
