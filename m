@@ -1,34 +1,34 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Thu, 31 Jan 2013 22:54:54 +0100
-Subject: ixp4xx eth broken in 3.7.0/3.8-rc5?
-In-Reply-To: <20744.25884.660535.514911@pilspetsen.it.uu.se> (Mikael
- Pettersson's message of "Wed, 30 Jan 2013 01:11:08 +0100")
-References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
- <20744.25884.660535.514911@pilspetsen.it.uu.se>
-Message-ID: <m3622duifl.fsf@intrepid.localdomain>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Thu, 31 Jan 2013 16:58:26 -0500
+Subject: [PATCH v4 07/13] ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for bootmem
+In-Reply-To: <1359669512-31276-1-git-send-email-cyril@ti.com>
+References: <1359669512-31276-1-git-send-email-cyril@ti.com>
+Message-ID: <1359669512-31276-8-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mikael Pettersson <mikpe@it.uu.se> writes:
+This patch adds an architecture defined override for ARCH_LOW_ADDRESS_LIMIT.
+On PAE systems, the absence of this override causes bootmem to incorrectly
+limit itself to 32-bit addressable physical memory.
 
->  > When I try to update my ixp4xx machine to a 3.8-rc5 kernel it boots
->  > Ok but the network (CONFIG_IXP4XX_ETH=y) fails to come up, with the
->  > following in the kernel log:
->  >
->  > net eth0: coherent DMA mask is unset
->
-> A git bisect identified the following as the culprit:
->
->  > From 1a4901177574083c35fafc24c4d151c2a7c7647c Mon Sep 17 00:00:00 2001
->  > From: Xi Wang <xi.wang@gmail.com>
->  > Date: Sat, 17 Nov 2012 20:25:09 +0000
->  > Subject: [PATCH] ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
->  >
->  > Use &port->netdev->dev instead of NULL since dma_pool_create() doesn't
->  > allow NULL dev.
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+---
+ arch/arm/include/asm/memory.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-IIRC NULL dev in dma_pool_create() meant the usual IXP4xx mask (64MB)
-was used. Perhaps devices don't get a mask by default anymore. I will
-look at this in few days.
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 73cf03a..8825abb 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -275,6 +275,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+ #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+ #define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
+ 
++#define ARCH_LOW_ADDRESS_LIMIT		PHYS_MASK
++
+ #endif
+ 
+ #include <asm-generic/memory_model.h>
 -- 
-Krzysztof Halasa
+1.7.9.5
