@@ -1,26 +1,22 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 31 Jan 2013 17:22:54 +0100
-Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
- board(DB-MV784MP-GP)
-In-Reply-To: <510A689B.6040407@free-electrons.com>
-References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
- <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
- <20130130173306.GO7717@titan.lakedaemon.net>
- <510959D5.1010305@free-electrons.com>
- <20130130181035.GP7717@titan.lakedaemon.net>
- <510A5E87.60509@free-electrons.com>
- <20130131124542.GB7717@titan.lakedaemon.net>
- <510A689B.6040407@free-electrons.com>
-Message-ID: <20130131162254.GD20242@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Jan 2013 16:23:22 +0000
+Subject: BogoMIPS change in 3.6+
+In-Reply-To: <510A988F.6030508@gmail.com>
+References: <510A988F.6030508@gmail.com>
+Message-ID: <20130131162322.GD835@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Well in fact it is 4GB RAM but we can only use 3GB (we need the last GB
-> of address space for peripheral, CPU registers and IOmem).
+Hi Rob,
 
-Hi Gregory
+On Thu, Jan 31, 2013 at 04:15:11PM +0000, Rob Herring wrote:
+> The BogoMIPS value has changed on highbank since the commit below in
+> 3.6. It is now half the value it used to be. Does that matter other than
+> perception (I've checked that I'm not running at half the freq)?
 
-Does the CPU support Large Physical Addressing, LPA? Is that on the
-roadmap for Armada?
+Are you registering a delay timer? If not, then the delay loop should be
+identical to what it was before, so that's certainly a surprise...
 
-	Andrew
+Are your delays ballpark correct (try 2ms)?
+
+Will
