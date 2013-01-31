@@ -1,36 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jan 2013 16:19:57 +0000
-Subject: Failure to boot...
-In-Reply-To: <20130131160000.GW15361@atomide.com>
-References: <20130131104044.GO2637@n2100.arm.linux.org.uk>
- <510A6877.9080307@ti.com> <20130131130437.GP2637@n2100.arm.linux.org.uk>
- <510A78E1.8010308@ti.com> <20130131141320.GQ2637@n2100.arm.linux.org.uk>
- <20130131141635.GR2637@n2100.arm.linux.org.uk> <510A7D9F.7040507@ti.com>
- <20130131142758.GS2637@n2100.arm.linux.org.uk> <510A82FE.6050803@ti.com>
- <20130131160000.GW15361@atomide.com>
-Message-ID: <20130131161957.GU2637@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 31 Jan 2013 16:25:26 +0000 (UTC)
+Subject: [PATCH 3/4] ARM: OMAP2+: clock: DEFINE_STRUCT_CLK_FLAGS helper
+In-Reply-To: <abe7aceb564b97ab00b88b13a9aac487363e01c1.1358871018.git.afzal@ti.com>
+References: <cover.1358871018.git.afzal@ti.com>
+ <abe7aceb564b97ab00b88b13a9aac487363e01c1.1358871018.git.afzal@ti.com>
+Message-ID: <alpine.DEB.2.00.1301311625120.32145@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 08:00:02AM -0800, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130131 06:45]:
-> > On Thursday 31 January 2013 07:57 PM, Russell King - ARM Linux wrote:
-> > >>>
-> > >>># 13 Jan 2013: Update for OMAP moving to multiplatform
-> > >>>CONFIG_ARCH_MULTIPLATFORM=y
-> > >>>CONFIG_ARCH_MULTI_V7=y
-> > >>>
-> > >>>don't fix it either, it needs more options defined...
-> 
-> Just trying to figure out what was the missing entry in case
-> others have the same problem.
-> 
-> In addition to the ones above, I had also CONFIG_ARCH_OMAP2PLUS=y
-> listed in my comments. Did you also need something else added
-> manually?
+On Tue, 22 Jan 2013, Afzal Mohammed wrote:
 
-Interesting, that's the one which got missed.  The ones which did get
-updated on the 13th were just the noconfigs which were failing to build,
-and not the two oldconfigs which are the booted ones.  The noconfigs
-already had OMAP2PLUS enabled in them which is probably how it got
-lost.
+> DEFINE_STRUCT_CLK does not have the capability to set flags, define
+> DEFINE_STRUCT_CLK_FLAGS to handle flags. This is needed to add
+> SET_RATE_PARENT flag in statically defined lcd clock in am335x.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+
+Thanks, queued for 3.9.
+
+
+- Paul
