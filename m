@@ -1,51 +1,158 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jan 2013 09:28:01 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
-Message-ID: <20130131092801.GV23505@n2100.arm.linux.org.uk>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 31 Jan 2013 10:20:32 +0100
+Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
+ board(DB-MV784MP-GP)
+In-Reply-To: <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130131092032.GE652@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 08:09:00PM -0600, Kim Phillips wrote:
-> The savings come mostly from device-tree related code, and some
-> from drivers.
+On Wed, Jan 30, 2013 at 06:26:14PM +0100, Gregory CLEMENT wrote:
+> This is the new Armada XP evaluation board from Marvell. It comes with
+> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
+> Gigabit links.
+> 
+> Support for USB (Host and device), SDIO, PCIe will be added as drivers
+> when they become available for Armada XP in mainline.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/Makefile         |    1 +
+>  arch/arm/boot/dts/armada-xp-gp.dts |   94 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 95 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
 
-You forget that IP networking is all big endian, so these will be using
-the byte swapping too (search it for htons/ntohs/htonl/ntohl).
+It works fine for me. Thank you for the patch.
 
-> v2:
-> - at91 and lpd270 builds fixed by limiting to ARMv6 and above
->   (i.e., ARM cores that have support for the 'rev' instruction).
->   Otherwise, the compiler emits calls to libgcc's __bswapsi2 on
->   these ARMv4/v5 builds (and arch ARM doesn't link with libgcc).
+Tested-by: Simon Guinot <simon.guinot@sequanux.org>
 
-Which compiler version?  gcc 4.5.4 doesn't do this, except for the 16-bit
-swap, so I doubt that any later compiler does.
-
-> --- a/arch/arm/include/uapi/asm/swab.h
-> +++ b/arch/arm/include/uapi/asm/swab.h
-> @@ -50,4 +50,14 @@ static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
->  
->  #endif
->  
-> +#if defined(__KERNEL__) && __LINUX_ARM_ARCH__ >= 6
-> +#if GCC_VERSION >= 40600
-> +#define __HAVE_BUILTIN_BSWAP32__
-> +#define __HAVE_BUILTIN_BSWAP64__
-> +#endif
-> +#if GCC_VERSION >= 40800
-> +#define __HAVE_BUILTIN_BSWAP16__
-> +#endif
-> +#endif
-
-If this is __KERNEL__ only, it should not be in a uapi header.  UAPI
-headers get exported to userland, this is not userland interface code.
-IT should be in arch/arm/include/asm/swab.h
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 5ebb44f..51aab4b 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -78,6 +78,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>  	armada-370-mirabox.dtb \
+>  	armada-xp-db.dtb \
+> +	armada-xp-gp.dtb \
+>  	armada-xp-openblocks-ax3-4.dtb
+>  dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+>  	imx53-ard.dtb \
+> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> new file mode 100644
+> index 0000000..85ba642
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> @@ -0,0 +1,94 @@
+> +/*
+> + * Device Tree file for Marvell Armada XP evaluation board
+> + * (RD-MV784MP-GP)
+> + *
+> + * Copyright (C) 2013 Marvell
+> + *
+> + * Lior Amsalem <alior@marvell.com>
+> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "armada-xp-mv78460.dtsi"
+> +
+> +/ {
+> +	model = "Marvell Armada XP Evaluation Board: RD-MV784MP-GP";
+> +	compatible = "marvell,axp-db", "marvell,armadaxp-mv78460", "marvell,armadaxp", "marvell,armada-370-xp";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0xC0000000>; /* 3 GB */
+> +	};
+> +
+> +	soc {
+> +		serial at d0012000 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +		serial at d0012100 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +		serial at d0012200 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +		serial at d0012300 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +
+> +		sata at d00a0000 {
+> +			nr-ports = <2>;
+> +			status = "okay";
+> +		};
+> +
+> +		mdio {
+> +			phy0: ethernet-phy at 0 {
+> +				reg = <16>;
+> +			};
+> +
+> +			phy1: ethernet-phy at 1 {
+> +				reg = <17>;
+> +			};
+> +
+> +			phy2: ethernet-phy at 2 {
+> +				reg = <18>;
+> +			};
+> +
+> +			phy3: ethernet-phy at 3 {
+> +				reg = <19>;
+> +			};
+> +		};
+> +
+> +		ethernet at d0070000 {
+> +			status = "okay";
+> +			phy = <&phy0>;
+> +			phy-mode = "rgmii-id";
+> +		};
+> +		ethernet at d0074000 {
+> +			status = "okay";
+> +			phy = <&phy1>;
+> +			phy-mode = "rgmii-id";
+> +		};
+> +		ethernet at d0030000 {
+> +			status = "okay";
+> +			phy = <&phy2>;
+> +			phy-mode = "rgmii-id";
+> +		};
+> +		ethernet at d0034000 {
+> +			status = "okay";
+> +			phy = <&phy3>;
+> +			phy-mode = "rgmii-id";
+> +		};
+> +	};
+> +};
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/3ecbb08e/attachment.sig>
