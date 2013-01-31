@@ -1,50 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jan 2013 13:47:47 +0000
-Subject: IPC SHM alignment on ARMv7
-In-Reply-To: <510A7262.4060307@parallels.com>
-References: <510A7262.4060307@parallels.com>
-Message-ID: <20130131134747.GY23505@n2100.arm.linux.org.uk>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Thu, 31 Jan 2013 14:53:51 +0100
+Subject: [REGRESSION+BISECT] imx6: 3.8+: sata failure with 24d340ac "ARM
+ i.MX6: Fix ethernet PLL clocks"
+In-Reply-To: <20130131133054.GD2735@S2101-09.ap.freescale.net>
+References: <20130131113627.GA5452@luxor.wired.org>
+ <20130131133054.GD2735@S2101-09.ap.freescale.net>
+Message-ID: <20130131135351.GB5452@luxor.wired.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 05:32:18PM +0400, Alexander Kartashov wrote:
-> Dear colleagues,
->
-> It tuned out that IPC SHM works in a bit strange way on ARMv7:
-> the syscall sys_shmat() requires the argument shmaddr to be SHMLBA-aligned:
->
-> [ipc/shm.c]
-> [...]
->  979     else if ((addr = (ulong)shmaddr)) {
->  980         if (addr & (shmlba - 1)) {
->  981             if (shmflg & SHM_RND)
->  982                 addr &= ~(shmlba - 1);     /* round down */
->  983             else
->  984 #ifndef __ARCH_FORCE_SHMLBA
->  985                 if (addr & ~PAGE_MASK)
->  986 #endif
->  987                     goto out;
->  988         }
->  989         flags = MAP_SHARED | MAP_FIXED;
-> [...]
->
-> since macro __ARCH_FORCE_SHMLBA is unconditionally defined for the ARM
-> architecture. However it uses the function arch_get_unmapped_area()
-> introduced in the commit 4197692eef113eeb8e3e413cc70993a5e667e5b8
-> in the mainstream kernel to allocate memory for a SHM segment.
+On Thu, Jan 31, 2013 at 09:30:56PM +0800, Shawn Guo wrote:
+> 
+> Can you please try to see if the following change bring that SATA back
+> to work?
+> 
+> Shawn
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index c0c4e72..8f756af 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -436,6 +436,9 @@ int __init mx6q_clocks_init(void)
+>         for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+>                 clk_prepare_enable(clk[clks_init_on[i]]);
+> 
+> +       if (IS_ENABLED(CONFIG_SATA_AHCI_PLATFORM))
+> +               clk_prepare_enable(clk[sata_ref_100m]);
+> +
+>         /* Set initial power mode */
+>         imx6q_set_lpm(WAIT_CLOCKED);
 
-Err, no.  Try again - this is the mainline kernel:
+yes, it fixes SATA.
 
-$ git log 4197692eef113eeb8e3e413cc70993a5e667e5b8
-fatal: bad object 4197692eef113eeb8e3e413cc70993a5e667e5b8
-
-Would this be in linux-next?  Maybe it's a patch which someone else has
-applied which isn't in Linus' kernel?
-
-With just the commit ID and no description (we're *constantly* harping
-on about that on this list, especially in commit comments: ALWAYS provide
-the description as well) it's much harder to do anything with your report.
-
-Please try again.
-
-Thanks.
+Tested-by: <p.pisati@gmail.com>
+-- 
+bye,
+p.
