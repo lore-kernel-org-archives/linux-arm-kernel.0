@@ -1,49 +1,37 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 31 Jan 2013 10:58:32 -0500 (EST)
-Subject: [PATCH v2 2/2] ARM: memory: define TASK_UNMAPPED_BASE in terms of
- TASK_SIZE
-In-Reply-To: <1359644949-18550-2-git-send-email-will.deacon@arm.com>
-References: <1359644949-18550-1-git-send-email-will.deacon@arm.com>
- <1359644949-18550-2-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1301311058070.6300@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 31 Jan 2013 08:00:02 -0800
+Subject: Failure to boot...
+In-Reply-To: <510A82FE.6050803@ti.com>
+References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
+ <20130131104044.GO2637@n2100.arm.linux.org.uk>
+ <510A6877.9080307@ti.com>
+ <20130131130437.GP2637@n2100.arm.linux.org.uk>
+ <510A78E1.8010308@ti.com>
+ <20130131141320.GQ2637@n2100.arm.linux.org.uk>
+ <20130131141635.GR2637@n2100.arm.linux.org.uk>
+ <510A7D9F.7040507@ti.com>
+ <20130131142758.GS2637@n2100.arm.linux.org.uk>
+ <510A82FE.6050803@ti.com>
+Message-ID: <20130131160000.GW15361@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Jan 2013, Will Deacon wrote:
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130131 06:45]:
+> On Thursday 31 January 2013 07:57 PM, Russell King - ARM Linux wrote:
+> >>>
+> >>># 13 Jan 2013: Update for OMAP moving to multiplatform
+> >>>CONFIG_ARCH_MULTIPLATFORM=y
+> >>>CONFIG_ARCH_MULTI_V7=y
+> >>>
+> >>>don't fix it either, it needs more options defined...
 
-> TASK_UNMAPPED_BASE is defined directly in terms of PAGE_OFFSET, which is
-> confusing given that the modules area sits between here and TASK_SIZE
-> and is not available for user allocations.
-> 
-> This patch defines TASK_UNMAPPED_BASE in terms of TASK_SIZE instead and
-> fixes a bug introduced by 394ef6403abc ("mm: use vm_unmapped_area() on
-> arm architecture") whereby TASK_UNMAPPED_BASE is no longer page-aligned
-> for bottom-up mmap, causing get_unmapped_area to choke on misaligned
-> addresses.
-> 
-> Reported-by: Christoffer Dall <cdall@cs.columbia.edu>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Just trying to figure out what was the missing entry in case
+others have the same problem.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+In addition to the ones above, I had also CONFIG_ARCH_OMAP2PLUS=y
+listed in my comments. Did you also need something else added
+manually?
 
+Regards,
 
-> ---
->  arch/arm/include/asm/memory.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 924320f..64c770d 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -37,7 +37,7 @@
->   */
->  #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
->  #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
-> -#define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
-> +#define TASK_UNMAPPED_BASE	ALIGN(TASK_SIZE / 3, SZ_16M)
->  
->  /*
->   * The maximum size of a 26-bit user space task.
-> -- 
-> 1.8.0
-> 
+Tony
