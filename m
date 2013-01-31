@@ -1,59 +1,91 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Jan 2013 12:15:25 +0000
-Subject: [PATCHv5 02/16] arm: arch_timer: remove redundant available check
+Date: Thu, 31 Jan 2013 12:15:26 +0000
+Subject: [PATCHv5 03/16] arm: arch_timer: use u64/u32 for register data
 In-Reply-To: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
 References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1359634539-9580-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1359634539-9580-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This check is a holdover from the pre-devicetree days. As the timer
-is not probed except by platforms which register it via devicetree,
-it's not strictly necessary.
+To ensure the correct size of types, use u64 for the return value of
+arch_timer_get_cnt{p,v}ct, and u32 for arch_timer_rate, matching the
+size of the registers these values are taken from. While we're changing
+them anyway, simplify the implementation of arch_timer_get_cnt{p,v}ct.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/kernel/arch_timer.c | 12 ------------
- 1 file changed, 12 deletions(-)
+ arch/arm/kernel/arch_timer.c | 30 +++++++++++-------------------
+ 1 file changed, 11 insertions(+), 19 deletions(-)
 
 diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 6dd73c6..1bb3b582 100644
+index 1bb3b582..498c29f 100644
 --- a/arch/arm/kernel/arch_timer.c
 +++ b/arch/arm/kernel/arch_timer.c
-@@ -20,11 +20,9 @@
- #include <linux/of_irq.h>
- #include <linux/io.h>
- 
--#include <asm/cputype.h>
- #include <asm/delay.h>
- #include <asm/localtimer.h>
+@@ -25,7 +25,7 @@
  #include <asm/arch_timer.h>
--#include <asm/system_info.h>
  #include <asm/sched_clock.h>
  
- static unsigned long arch_timer_rate;
-@@ -259,20 +257,10 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
- 	return 0;
+-static unsigned long arch_timer_rate;
++static u32 arch_timer_rate;
+ 
+ enum ppi_nr {
+ 	PHYS_SECURE_PPI,
+@@ -121,27 +121,18 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
+ 	return val;
  }
  
--/* Is the optional system timer available? */
--static int local_timer_is_architected(void)
+-static inline cycle_t arch_timer_counter_read(const int access)
++static inline u64 arch_counter_get_cntpct(void)
+ {
+-	cycle_t cval = 0;
+-
+-	if (access == ARCH_TIMER_PHYS_ACCESS)
+-		asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
+-
+-	if (access == ARCH_TIMER_VIRT_ACCESS)
+-		asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (cval));
+-
++	u64 cval;
++	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
+ 	return cval;
+ }
+ 
+-static inline cycle_t arch_counter_get_cntpct(void)
 -{
--	return (cpu_architecture() >= CPU_ARCH_ARMv7) &&
--	       ((read_cpuid_ext(CPUID_EXT_PFR1) >> 16) & 0xf) == 1;
+-	return arch_timer_counter_read(ARCH_TIMER_PHYS_ACCESS);
 -}
 -
+-static inline cycle_t arch_counter_get_cntvct(void)
++static inline u64 arch_counter_get_cntvct(void)
+ {
+-	return arch_timer_counter_read(ARCH_TIMER_VIRT_ACCESS);
++	u64 cval;
++	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (cval));
++	return cval;
+ }
+ 
+ static irqreturn_t inline timer_handler(const int access,
+@@ -259,7 +250,7 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
+ 
  static int arch_timer_available(void)
  {
- 	unsigned long freq;
+-	unsigned long freq;
++	u32 freq;
  
--	if (!local_timer_is_architected())
--		return -ENXIO;
--
  	if (arch_timer_rate == 0) {
  		freq = arch_timer_reg_read(ARCH_TIMER_PHYS_ACCESS,
- 					   ARCH_TIMER_REG_FREQ);
+@@ -275,7 +266,8 @@ static int arch_timer_available(void)
+ 	}
+ 
+ 	pr_info_once("Architected local timer running at %lu.%02luMHz (%s).\n",
+-		     arch_timer_rate / 1000000, (arch_timer_rate / 10000) % 100,
++		     (unsigned long)arch_timer_rate / 1000000,
++		     (unsigned long)(arch_timer_rate / 10000) % 100,
+ 		     arch_timer_use_virtual ? "virt" : "phys");
+ 	return 0;
+ }
 -- 
 1.8.1.1
