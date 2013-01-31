@@ -1,37 +1,42 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Thu, 31 Jan 2013 14:18:42 -0800
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <alpine.LFD.2.02.1301311700470.6300@xanadu.home>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
- <20130128142510.68092e10.akpm@linux-foundation.org>
- <20130129101549.GP23505@n2100.arm.linux.org.uk> <51089523.3080804@zytor.com>
- <alpine.LFD.2.02.1301301326530.6300@xanadu.home> <510AE6BF.4080303@zytor.com>
- <alpine.LFD.2.02.1301311700470.6300@xanadu.home>
-Message-ID: <510AEDC2.80107@zytor.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Thu, 31 Jan 2013 23:26:16 +0100
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <20130131003222.GX7717@titan.lakedaemon.net>
+References: <20130129004824.GB7717@titan.lakedaemon.net>
+ <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
+ <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
+ <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
+ <20130130230100.GV7717@titan.lakedaemon.net>
+ <5109AB30.5020202@gmail.com>
+ <20130131003222.GX7717@titan.lakedaemon.net>
+Message-ID: <20130131222615.GA17976@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2013 02:16 PM, Nicolas Pitre wrote:
->>
->> Some utterly weird things like the Xen domain builder do that, because
->> they have to.  That is why we explicitly document that the payload is
->> ELF and how to access it in the bzImage spec.
+Hi Jason,
+
+On Wed, Jan 30, 2013 at 07:32:22PM -0500, Jason Cooper wrote:
+> On Thu, Jan 31, 2013 at 12:22:24AM +0100, Sebastian Hesselbarth wrote:
+> > On 01/31/2013 12:01 AM, Jason Cooper wrote:
+> > >As it stands, there are three patches to fix this issue:
+> > >
+> > >ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
+> > >ARM: kirkwood: provide ge clock aliases for shared smi
+> > >ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
+> > 
+> > Actually, for the second patch I got distracted by the smi split patch
+> > set floating around. But that is not in current kernel and smi will not
+> > request any clock at all.
+> > 
+> > If Simon can hit another round of testing without second patch included
+> > and agrees, I suggest to keep it for next release.
 > 
-> Are you kidding?
-> 
-> And what format do they expect?
-> 
+> Ok, I'll wait for Simon on this.  fixes can go anytime, so no rush.
+> Better to get it right the first (second?) time out.
 
-I think they can be fairly flexible.  Obviously gzip is always
-supported.  I don't know the details.
-
-> If people are doing weird things with formats we're about to remove then 
-> it's their fault if they didn't make upstream developers aware of it.  
-> And if the reason they didn't tell anyone is because it is too nasty for 
-> public confession then they simply deserve to be broken and come up with 
-> a more sustainable solution.
-
-Well, it is too nasty for public confession, but it's called
-"paravirtualization".
-
-	-hpa
+Ok, will do. For the first patch you already have my Tested-by. 
+Sebastian is right on the second one, it does not add value for 3.8
+yet.  I will test the third patch as soon as I find time.
+ 
+- Simon
