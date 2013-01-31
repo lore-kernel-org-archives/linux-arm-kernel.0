@@ -1,91 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 31 Jan 2013 15:30:41 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130130154602.GL23505@n2100.arm.linux.org.uk>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130130113245.GH23505@n2100.arm.linux.org.uk>
- <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <20130130150856.GJ23505@n2100.arm.linux.org.uk>
- <20130130151934.GK23505@n2100.arm.linux.org.uk>
- <20130130163659.75360dba@skate>
- <20130130154602.GL23505@n2100.arm.linux.org.uk>
-Message-ID: <20130131153041.35fa3b60@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Jan 2013 14:27:58 +0000
+Subject: Failure to boot...
+In-Reply-To: <510A7D9F.7040507@ti.com>
+References: <20130131030203.GA8374@quad.lixom.net>
+ <alpine.LFD.2.02.1301302312030.6300@xanadu.home>
+ <20130131092024.GN2637@n2100.arm.linux.org.uk>
+ <20130131104044.GO2637@n2100.arm.linux.org.uk> <510A6877.9080307@ti.com>
+ <20130131130437.GP2637@n2100.arm.linux.org.uk> <510A78E1.8010308@ti.com>
+ <20130131141320.GQ2637@n2100.arm.linux.org.uk>
+ <20130131141635.GR2637@n2100.arm.linux.org.uk> <510A7D9F.7040507@ti.com>
+Message-ID: <20130131142758.GS2637@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
+On Thu, Jan 31, 2013 at 07:50:15PM +0530, Santosh Shilimkar wrote:
+> On Thursday 31 January 2013 07:46 PM, Russell King - ARM Linux wrote:
+>> On Thu, Jan 31, 2013 at 02:13:20PM +0000, Russell King - ARM Linux wrote:
+>>> On Thu, Jan 31, 2013 at 07:30:01PM +0530, Santosh Shilimkar wrote:
+>>>> Linus' tip(commit: 04c2eee5) + arm-soc for-next boots fine as well.
+>>>> The pull request from Tony [1] fixed the multi-platform boot issue
+>>>> for OMAP.
+>>>>
+>>>> Now trying to merge your for-next and test.
+>>>
+>>> Well, my tip (which is based on Linus' 6abb7c25) also builds and
+>>> boots fine.
+>>>
+>>> Hang on...
+>>>
+>>> # CONFIG_ARCH_OMAP2PLUS is not set
+>>> CONFIG_ARCH_VEXPRESS=y
+>>>
+>>> which of course won't boot, and this happens on both oldconfigs because
+>>> of the change to multiplatform support.
+>>
+>> And no, the instructions given last time around to add:
+>>
+>> # 13 Jan 2013: Update for OMAP moving to multiplatform
+>> CONFIG_ARCH_MULTIPLATFORM=y
+>> CONFIG_ARCH_MULTI_V7=y
+>>
+>> don't fix it either, it needs more options defined...
+>>
+> Linus' tip + Tony's pull [1] request also makes things work
+> on OMAP.
 
-On Wed, 30 Jan 2013 15:46:02 +0000, Russell King - ARM Linux wrote:
+Thanks to all this multiplatform stuff, the autobuilder has been building
+nothing but Versatile Express kernels for the last 20 days.  That totally
+explains why it won't boot.
 
-> +resource_size_t pcibios_window_alignment(struct pci_bus *bus,
-> +					 unsigned long type)
-> +{
-> +	struct pci_sys_data *sys = bus->sysdata;
-> +
-> +	/* Ignore downstream buses */
-> +	if (!bus->parent) {
-> +		if (type & IORESOURCE_MEM)
-> +			return sys->win_align_mem;
-> +		if (type & IORESOURCE_IO)
-> +			return sys->win_align_io;
-> +	}
-> +	return 1;
-> +}
-> +
+The only thing I was told is to add the above two config symbols.  That
+is not the complete story.  There's also other symbols which need adding
+too.  It also looks like Versatile Express support _can't_ be disabled in
+a multiplatform kernel, which is ludicrous.
 
-Unfortunately, this doesn't work as is for me: the if (!bus->parent)
-prevents the thing from being effective. Here my lspci output:
-
-# /usr/sbin/lspci 
-00:00.0 Host bridge: Marvell Technology Group Ltd. Device 102d
-00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 1092
-00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 1092
-00:03.0 PCI bridge: Marvell Technology Group Ltd. Device 1092
-00:04.0 PCI bridge: Marvell Technology Group Ltd. Device 1092
-00:05.0 PCI bridge: Marvell Technology Group Ltd. Device 1092
-00:06.0 PCI bridge: Marvell Technology Group Ltd. Device 1092
-03:00.0 SCSI storage controller: Marvell Technology Group Ltd. 88SX7042 PCI-e 4-port SATA-II (rev 02)
-05:00.0 Ethernet controller: Intel Corporation 82572EI Gigabit Ethernet Controller (Copper) (rev 06)
-
-And the function pcibios_window_alignment() only gets called for bus 1,
-2, 3, 4, 5, 6 and never for bus 0. And therefore, the !bus->parent test
-is always false. So, if I keep your implementation, I have the following
-addresses assigned to my bridges:
-
-pci 0000:00:03.0: PCI bridge to [bus 03]
-pci 0000:00:03.0:   bridge window [io  0xc0000000-0xc0000fff]
-pci 0000:00:03.0:   bridge window [mem 0xc1000000-0xc10fffff]
-pci 0000:00:03.0:   bridge window [mem 0xc1100000-0xc11fffff pref]
-pci 0000:00:05.0: PCI bridge to [bus 05]
-pci 0000:00:05.0:   bridge window [io  0xc0001000-0xc0001fff]
-pci 0000:00:05.0:   bridge window [mem 0xc1200000-0xc12fffff]
-pci 0000:00:05.0:   bridge window [mem 0xc1300000-0xc13fffff pref]
-
-Notice how the io window of the second bridge starts 4K after the io
-window of the first bridge. Which cannot work on Marvell SoC, due to
-the 64KB alignment.
-
-If, however, I remove the !bus->parent test, the I/O addresses
-correctly take into account the 64K requirement:
-
-pci 0000:00:03.0: PCI bridge to [bus 03]
-pci 0000:00:03.0:   bridge window [io  0xc0000000-0xc000ffff]
-pci 0000:00:03.0:   bridge window [mem 0xc1000000-0xc10fffff]
-pci 0000:00:03.0:   bridge window [mem 0xc1100000-0xc11fffff pref]
-pci 0000:00:05.0: PCI bridge to [bus 05]
-pci 0000:00:05.0:   bridge window [io  0xc0010000-0xc001ffff]
-pci 0000:00:05.0:   bridge window [mem 0xc1200000-0xc12fffff]
-pci 0000:00:05.0:   bridge window [mem 0xc1300000-0xc13fffff pref]
-
-Any idea?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+And... fixing the config finally results in something that boots on the
+SDP4430.
