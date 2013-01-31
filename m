@@ -1,29 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 31 Jan 2013 15:36:13 +0000
-Subject: [PATCHv5 09/16] arm: arch_timer: add arch_counter_set_user_access
-In-Reply-To: <1359634539-9580-10-git-send-email-mark.rutland@arm.com>
-References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
- <1359634539-9580-10-git-send-email-mark.rutland@arm.com>
-Message-ID: <20130131153613.GJ12877@arm.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 31 Jan 2013 16:36:27 +0100
+Subject: [PATCH 2/2] ARM: stub out read_cpuid and read_cpuid_ext for CPU_CP15=n
+In-Reply-To: <1359646587-1788-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1359646587-1788-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1359646587-1788-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 12:15:32PM +0000, Mark Rutland wrote:
-> Several bits in CNTKCTL reset to 0, including PL0VTEN. For architectures
-> using the generic timer which wish to have a fast gettimeofday vDSO
-> implementation, these bits must be set to 1 by the kernel. For
-> architectures without a vDSO, it's best to leave the bits set to 0 for
-> now to ensure that if and when support is added, it's implemented sanely
-> architecture wide.
-> 
-> As the bootloader might set PL0VTEN to a value that doesn't correspond
-> to that which the kernel prefers, we must explicitly set it to the
-> architecture port's preferred value.
-> 
-> This patch adds arch_counter_set_user_access, which sets the PL0 access
-> permissions to that required by the architecture. For arch/arm, this
-> currently means disabling all userspace access.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Traditionally for !CPU_CP15 read_cpuid and read_cpuid_ext returned the
+processor id independent of the parameter passed in. This is wrong of
+course but theoretically this doesn't harm because it's only called on
+machines having a cp15.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Instead return 0 unconditionally which might make unused code paths be
+better optimizable and so smaller and warn about unexpected usage.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/include/asm/cputype.h |   31 +++++++++++++++++++++++++++----
+ 1 file changed, 27 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index a59dcb5..574269e 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -50,6 +50,7 @@ extern unsigned int processor_id;
+ 		    : "cc");						\
+ 		__val;							\
+ 	})
++
+ #define read_cpuid_ext(ext_reg)						\
+ 	({								\
+ 		unsigned int __val;					\
+@@ -59,12 +60,25 @@ extern unsigned int processor_id;
+ 		    : "cc");						\
+ 		__val;							\
+ 	})
+-#else
+-#define read_cpuid(reg) (processor_id)
+-#define read_cpuid_ext(reg) 0
+-#endif
++
++#else /* ifdef CONFIG_CPU_CP15 */
+ 
+ /*
++ * read_cpuid and read_cpuid_ext should only ever be called on machines that
++ * have cp15 so warn on other usages.
++ */
++#define read_cpuid(reg)							\
++	({								\
++		WARN_ON_ONCE(1);					\
++		0;							\
++	})
++
++#define read_cpuid_ext(reg) read_cpuid(reg)
++
++#endif /* ifdef CONFIG_CPU_CP15 / else */
++
++#ifdef CONFIG_CPU_CP15
++/*
+  * The CPU ID never changes at run time, so we might as well tell the
+  * compiler that it's constant.  Use this function to read the CPU ID
+  * rather than directly reading processor_id or read_cpuid() directly.
+@@ -74,6 +88,15 @@ static inline unsigned int __attribute_const__ read_cpuid_id(void)
+ 	return read_cpuid(CPUID_ID);
+ }
+ 
++#else /* ifdef CONFIG_CPU_CP15 */
++
++static inline unsigned int __attribute_const__ read_cpuid_id(void)
++{
++	return processor_id;
++}
++
++#endif /* ifdef CONFIG_CPU_CP15 / else */
++
+ static inline unsigned int __attribute_const__ read_cpuid_cachetype(void)
+ {
+ 	return read_cpuid(CPUID_CACHETYPE);
+-- 
+1.7.10.4
