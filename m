@@ -1,58 +1,29 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 31 Jan 2013 13:57:28 -0500
-Subject: [PATCH] power/reset: restart: remove __dev{init,exit}
-In-Reply-To: <1359658469-14856-1-git-send-email-jason@lakedaemon.net>
-References: <20130106220426.GE26928@lizard.sbx05280.losalca.wayport.net>
- <1359658469-14856-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <20130131185728.GH7717@titan.lakedaemon.net>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Thu, 31 Jan 2013 21:24:42 +0200
+Subject: [PATCH 0/2] ARM: OMAP2+: Export SoC information to userspace using
+ SoC infrastructure
+Message-ID: <1359660284-5225-1-git-send-email-ruslan.bilovol@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anton,
+Hi,
 
-I forgot to mention, this fixes a build breakage on battery/master.
+This patch series is an attempt to export some OMAP SoC
+information (like name, revision etc.) to userspace.
+The first patch does some unification of OMAP SoC
+information representation in current sources.
+Second patch adds exactly needed changes using
+exists in Linux kernel SoC infrastructure.
 
-thx,
+Ruslan Bilovol (2):
+  ARM: OMAP2+: SoC name and revision unification
+  ARM: OMAP2+: Export SoC information to userspace
 
-Jason.
+ arch/arm/mach-omap2/Kconfig  |    1 +
+ arch/arm/mach-omap2/common.h |    8 +++
+ arch/arm/mach-omap2/id.c     |  152 ++++++++++++++++++++++++++++++++----------
+ arch/arm/mach-omap2/io.c     |    1 +
+ 4 files changed, 125 insertions(+), 37 deletions(-)
 
-On Thu, Jan 31, 2013 at 06:54:29PM +0000, Jason Cooper wrote:
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  drivers/power/reset/restart-poweroff.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/power/reset/restart-poweroff.c b/drivers/power/reset/restart-poweroff.c
-> index b11b9e8..059cd15 100644
-> --- a/drivers/power/reset/restart-poweroff.c
-> +++ b/drivers/power/reset/restart-poweroff.c
-> @@ -22,7 +22,7 @@ static void restart_poweroff_do_poweroff(void)
->  	arm_pm_restart('h', NULL);
->  }
->  
-> -static int __devinit restart_poweroff_probe(struct platform_device *pdev)
-> +static int restart_poweroff_probe(struct platform_device *pdev)
->  {
->  	/* If a pm_power_off function has already been added, leave it alone */
->  	if (pm_power_off != NULL) {
-> @@ -35,7 +35,7 @@ static int __devinit restart_poweroff_probe(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static int __devexit restart_poweroff_remove(struct platform_device *pdev)
-> +static int restart_poweroff_remove(struct platform_device *pdev)
->  {
->  	if (pm_power_off == &restart_poweroff_do_poweroff)
->  		pm_power_off = NULL;
-> @@ -50,7 +50,7 @@ static const struct of_device_id of_restart_poweroff_match[] = {
->  
->  static struct platform_driver restart_poweroff_driver = {
->  	.probe = restart_poweroff_probe,
-> -	.remove = __devexit_p(restart_poweroff_remove),
-> +	.remove = restart_poweroff_remove,
->  	.driver = {
->  		.name = "poweroff-restart",
->  		.owner = THIS_MODULE,
-> -- 
-> 1.8.1.1
-> 
+-- 
+1.7.9.5
