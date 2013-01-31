@@ -1,50 +1,64 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Thu, 31 Jan 2013 16:58:22 -0500
-Subject: [PATCH v4 03/13] ARM: LPAE: use phys_addr_t in free_memmap()
+Date: Thu, 31 Jan 2013 16:58:20 -0500
+Subject: [PATCH v4 01/13] ARM: LPAE: use signed arithmetic for mask definitions
 In-Reply-To: <1359669512-31276-1-git-send-email-cyril@ti.com>
 References: <1359669512-31276-1-git-send-email-cyril@ti.com>
-Message-ID: <1359669512-31276-4-git-send-email-cyril@ti.com>
+Message-ID: <1359669512-31276-2-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+This patch applies to PAGE_MASK, PMD_MASK, and PGDIR_MASK, where forcing
+unsigned long math truncates the mask at the 32-bits.  This clearly does bad
+things on PAE systems.
 
-The free_memmap() was mistakenly using unsigned long type to represent
-physical addresses.  This breaks on PAE systems where memory could be placed
-above the 32-bit addressible limit.
+This patch fixes this problem by defining these masks as signed quantities.
+We then rely on sign extension to do the right thing.
 
-This patch fixes this function to properly use phys_addr_t instead.
-
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mm/init.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/page.h           |    2 +-
+ arch/arm/include/asm/pgtable-3level.h |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index ad722f1..1c5151a 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -457,7 +457,7 @@ static inline void
- free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- {
- 	struct page *start_pg, *end_pg;
--	unsigned long pg, pgend;
-+	phys_addr_t pg, pgend;
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index 812a494..6363f3d 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -13,7 +13,7 @@
+ /* PAGE_SHIFT determines the page size */
+ #define PAGE_SHIFT		12
+ #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
+-#define PAGE_MASK		(~(PAGE_SIZE-1))
++#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
  
- 	/*
- 	 * Convert start_pfn/end_pfn to a struct page pointer.
-@@ -469,8 +469,8 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- 	 * Convert to physical addresses, and
- 	 * round start upwards and end downwards.
- 	 */
--	pg = (unsigned long)PAGE_ALIGN(__pa(start_pg));
--	pgend = (unsigned long)__pa(end_pg) & PAGE_MASK;
-+	pg = PAGE_ALIGN(__pa(start_pg));
-+	pgend = __pa(end_pg) & PAGE_MASK;
+ #ifndef __ASSEMBLY__
  
- 	/*
- 	 * If there are free pages between these,
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index a3f3792..554f6d3 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -48,16 +48,16 @@
+ #define PMD_SHIFT		21
+ 
+ #define PMD_SIZE		(1UL << PMD_SHIFT)
+-#define PMD_MASK		(~(PMD_SIZE-1))
++#define PMD_MASK		(~((1 << PMD_SHIFT) - 1))
+ #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
+-#define PGDIR_MASK		(~(PGDIR_SIZE-1))
++#define PGDIR_MASK		(~((1 << PGDIR_SHIFT) - 1))
+ 
+ /*
+  * section address mask and size definitions.
+  */
+ #define SECTION_SHIFT		21
+ #define SECTION_SIZE		(1UL << SECTION_SHIFT)
+-#define SECTION_MASK		(~(SECTION_SIZE-1))
++#define SECTION_MASK		(~((1 << SECTION_SHIFT) - 1))
+ 
+ #define USER_PTRS_PER_PGD	(PAGE_OFFSET / PGDIR_SIZE)
+ 
 -- 
 1.7.9.5
