@@ -1,30 +1,36 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 31 Jan 2013 12:32:11 -0500 (EST)
-Subject: [PATCH v2 4/4] irqchip: gic: Perform the gic_secondary_init()
- call via CPU notifier
-In-Reply-To: <20130131112538.GW23505@n2100.arm.linux.org.uk>
-References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
- <1359476319-23720-5-git-send-email-catalin.marinas@arm.com>
- <alpine.LFD.2.02.1301291734140.6300@xanadu.home>
- <20130129231205.GA25176@MacBook-Pro.local>
- <alpine.LFD.2.02.1301291907340.6300@xanadu.home>
- <20130131112538.GW23505@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1301311230140.6300@xanadu.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 31 Jan 2013 10:39:59 -0700
+Subject: [PATCHv5 00/16] Unify arm_generic and arch_timer drivers
+In-Reply-To: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
+References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <510AAC6F.90302@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Jan 2013, Russell King - ARM Linux wrote:
+On 01/31/2013 05:15 AM, Mark Rutland wrote:
+> This is an updated version of v4 of the series I posted 2 weeks ago [1].
+> 
+> The only change is the last two patches, moving over to always using the
+> virtual counters. I've left these as separate patches rather than
+> folding them in to allow them to be reviewed more easily.
+> 
+> I've tested the series on a TC2 and an AArch64 model, and I'm happy that
+> it all works.
+> 
+> Stephen, Thomas:
+> 
+> I've not folded the CLOCKSOURCE_OF_DECLARE patch as it's unclear what
+> path everything is going to take, and I don't a have a tree with
+> Stephen's patch that I can base on.
 
-> I haven't tried Versatile Express yet as it has the TC2 tile on, and I
-> don't yet a boot loader on it which is capable of TFTP (which makes it
-> rather useless to me - I've been saying this for a time now but this is
-> probably the first time publically.)  I'm thinking about putting the
-> CA9x4 tile back on because that's a lot more functionally useful to me
-> than TC2.
+I'm pretty sure it'll go through arm-soc's timer/cleanup branch. At the
+very least, it'd have to go through some tree based on that...
 
-You might be interested by this then:
+> There's already a dependency on the timer broadcast rework, and adding
+> more branches to the mix is going to get messy. I can take the version
+> with ifdefs under the assumption we remove them in a later patch once
+> Stephen's patch is in. Does that sound ok?
 
-http://lists.linaro.org/pipermail/linaro-dev/2012-October/014136.html
+Just one more simple merge:-)
 
-
-Nicolas
+But yet, it's a simple cleanup to do later, so I have no problem with that.
