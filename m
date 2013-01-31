@@ -1,19 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Jan 2013 17:21:19 +0100
-Subject: BogoMIPS change in 3.6+
-In-Reply-To: <510A988F.6030508@gmail.com>
-References: <510A988F.6030508@gmail.com>
-Message-ID: <1397779.tl4QmIB7p2@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 31 Jan 2013 17:22:54 +0100
+Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
+ board(DB-MV784MP-GP)
+In-Reply-To: <510A689B.6040407@free-electrons.com>
+References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130130173306.GO7717@titan.lakedaemon.net>
+ <510959D5.1010305@free-electrons.com>
+ <20130130181035.GP7717@titan.lakedaemon.net>
+ <510A5E87.60509@free-electrons.com>
+ <20130131124542.GB7717@titan.lakedaemon.net>
+ <510A689B.6040407@free-electrons.com>
+Message-ID: <20130131162254.GD20242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 January 2013 10:15:11 Rob Herring wrote:
-> The BogoMIPS value has changed on highbank since the commit below in
-> 3.6. It is now half the value it used to be. Does that matter other than
-> perception (I've checked that I'm not running at half the freq)?
+> Well in fact it is 4GB RAM but we can only use 3GB (we need the last GB
+> of address space for peripheral, CPU registers and IOmem).
 
-I think the only danger is that your customers might think they
-are running at half the clock rate. Nothing in the kernel should
-be using the BogoMIPS value.
+Hi Gregory
 
-	Arnd
+Does the CPU support Large Physical Addressing, LPA? Is that on the
+roadmap for Armada?
+
+	Andrew
