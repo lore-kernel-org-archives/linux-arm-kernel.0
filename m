@@ -1,152 +1,49 @@
-From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Thu, 31 Jan 2013 21:24:44 +0200
-Subject: [PATCH 2/2] ARM: OMAP2+: Export SoC information to userspace
-In-Reply-To: <1359660284-5225-1-git-send-email-ruslan.bilovol@ti.com>
-References: <1359660284-5225-1-git-send-email-ruslan.bilovol@ti.com>
-Message-ID: <1359660284-5225-3-git-send-email-ruslan.bilovol@ti.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 31 Jan 2013 20:28:26 +0100
+Subject: [PATCH v3] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
+In-Reply-To: <20130131175743.GF7717@titan.lakedaemon.net>
+References: <3816648.2TVsTiMOWx@bender>
+ <1358174852-19752-1-git-send-email-florian@openwrt.org>
+ <20130131175743.GF7717@titan.lakedaemon.net>
+Message-ID: <510AC5DA.5070505@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some situations it is useful for userspace to
-know some SoC-specific information. For example,
-this may be used for deciding what kernel module to
-use or how to better configure some settings etc.
-This patch exports OMAP SoC information to userspace
-using existing in Linux kernel SoC infrastructure.
+Le 31/01/2013 18:57, Jason Cooper a ?crit :
+> Florian,
+>
+> On Mon, Jan 14, 2013 at 03:47:32PM +0100, Florian Fainelli wrote:
+>> This patch adds the DTS file to support the Marvell RD-A370-A1
+>> (Reference Design board) also known as RD-88F6710 board. It is almost
+>> entirely similar to the DB-A370 except on the following points:
+>>
+>> - second Ethernet MAC is connected to a switch using RGMII
+>> - it only has 512MB of physical RAM
+>> - SDIO interface is enabled and working by default (no need for jumpers)
+>>
+>> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+>> ---
+>> Jason,
+>>
+>> This is rebased against your mvebu/for-next branch, can you please drop v2 of
+>> the previous patch and take this one instead? Thanks!
+>>
+>> Changes since v2:
+>> - rebased against Jason's mvebu/for-next
+>> - added SDIO bindings
+>> - changed commit message a bit
+>
+> This breaks badly as sdio bindings aren't added until mvebu/dt.  Since
+> this is a new board, it goes in *before* mvebu/dt (mvebu/boards).  I'm
+> going to go ahead and pull v2 instead as there seems to be no
+> significant difference other than mvsdio being added.
 
-This information can be read under
-/sys/devices/socX directory
+Whoops, sounds like the right thing to do, thanks!
 
-Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
----
- arch/arm/mach-omap2/Kconfig  |    1 +
- arch/arm/mach-omap2/common.h |    8 ++++++
- arch/arm/mach-omap2/id.c     |   65 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/io.c     |    1 +
- 4 files changed, 75 insertions(+)
+>
+> If you want to get sdio support in for v3.9, please submit a separate
+> patch on top of your v2.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index fe926e0..47da0bd 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -17,6 +17,7 @@ config ARCH_OMAP2PLUS
- 	select PROC_DEVICETREE if PROC_FS
- 	select SPARSE_IRQ
- 	select USE_OF
-+	select SOC_BUS
- 	help
- 	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
- 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 948bcaa..2a6f866 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -111,6 +111,14 @@ void ti81xx_init_late(void);
- void omap4430_init_late(void);
- int omap2_common_pm_late_init(void);
- 
-+#ifdef CONFIG_SOC_BUS
-+void omap_soc_device_init(void);
-+#else
-+static inline void omap_soc_device_init(void)
-+{
-+}
-+#endif
-+
- #if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
- void omap2xxx_restart(char mode, const char *cmd);
- #else
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 436fcf9..5724ee8 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -18,6 +18,11 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/slab.h>
-+
-+#ifdef CONFIG_SOC_BUS
-+#include <linux/sys_soc.h>
-+#endif
- 
- #include <asm/cputype.h>
- 
-@@ -572,3 +577,63 @@ void __init omap2_set_globals_tap(u32 class, void __iomem *tap)
- 	else
- 		tap_prod_id = 0x0208;
- }
-+
-+#ifdef CONFIG_SOC_BUS
-+
-+static const char const *omap_types[] = {
-+	[OMAP2_DEVICE_TYPE_TEST]	= "TST",
-+	[OMAP2_DEVICE_TYPE_EMU]		= "EMU",
-+	[OMAP2_DEVICE_TYPE_SEC]		= "HS",
-+	[OMAP2_DEVICE_TYPE_GP]		= "GP",
-+	[OMAP2_DEVICE_TYPE_BAD]		= "BAD",
-+};
-+
-+static const char * __init omap_get_family(void)
-+{
-+	if (cpu_is_omap24xx())
-+		return kasprintf(GFP_KERNEL, "OMAP2");
-+	else if (cpu_is_omap34xx())
-+		return kasprintf(GFP_KERNEL, "OMAP3");
-+	else if (cpu_is_omap44xx())
-+		return kasprintf(GFP_KERNEL, "OMAP4");
-+	else if (soc_is_omap54xx())
-+		return kasprintf(GFP_KERNEL, "OMAP5");
-+	else
-+		return kasprintf(GFP_KERNEL, "Unknown");
-+}
-+
-+static ssize_t omap_get_type(struct device *dev,
-+					struct device_attribute *attr,
-+					char *buf)
-+{
-+	return sprintf(buf, "%s\n", omap_types[omap_type()]);
-+}
-+
-+static struct device_attribute omap_soc_attr =
-+	__ATTR(type,  S_IRUGO, omap_get_type,  NULL);
-+
-+void __init omap_soc_device_init(void)
-+{
-+	struct device *parent;
-+	struct soc_device *soc_dev;
-+	struct soc_device_attribute *soc_dev_attr;
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return;
-+
-+	soc_dev_attr->machine  = cpu_name;
-+	soc_dev_attr->family   = omap_get_family();
-+	soc_dev_attr->revision = cpu_rev;
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR_OR_NULL(soc_dev)) {
-+		kfree(soc_dev_attr);
-+		return;
-+	}
-+
-+	parent = soc_device_to_device(soc_dev);
-+	if (!IS_ERR_OR_NULL(parent))
-+		device_create_file(parent, &omap_soc_attr);
-+}
-+#endif /* CONFIG_SOC_BUS */
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 2c3fdd6..08003c1 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -602,6 +602,7 @@ void __init omap4430_init_late(void)
- 	omap2_common_pm_late_init();
- 	omap4_pm_init();
- 	omap2_clk_enable_autoidle_all();
-+	omap_soc_device_init();
- }
- #endif
- 
--- 
-1.7.9.5
+Will do.
+--
+Florian
