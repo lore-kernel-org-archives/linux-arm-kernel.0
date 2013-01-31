@@ -1,72 +1,60 @@
-From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Thu, 31 Jan 2013 13:50:07 +0200
-Subject: [RFC PATCH v3 1/2] ARM: kernel: update cpuinfo to print SoC model
- name
-In-Reply-To: <20130130232408.GL2637@n2100.arm.linux.org.uk>
-References: <1359558091-29251-1-git-send-email-ruslan.bilovol@ti.com>
- <1359558091-29251-2-git-send-email-ruslan.bilovol@ti.com>
- <alpine.LFD.2.02.1301301402330.6300@xanadu.home>
- <20130130232408.GL2637@n2100.arm.linux.org.uk>
-Message-ID: <CAB=otbQuJR75BSxtB8BHdLaTKYkPWp3jvuT3pRognHY5O6pP+Q@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 31 Jan 2013 13:02:00 +0100
+Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
+ board(DB-MV784MP-GP)
+In-Reply-To: <20130131110716.50b7340b@skate>
+References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130130173306.GO7717@titan.lakedaemon.net>
+ <510959D5.1010305@free-electrons.com>
+ <20130130181035.GP7717@titan.lakedaemon.net> <20130131095025.GC20242@lunn.ch>
+ <20130131110716.50b7340b@skate>
+Message-ID: <510A5D38.9040608@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 1:24 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jan 30, 2013 at 02:07:53PM -0500, Nicolas Pitre wrote:
->> On Wed, 30 Jan 2013, Ruslan Bilovol wrote:
+On 01/31/2013 11:07 AM, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
+> 
+> On Thu, 31 Jan 2013 10:50:25 +0100, Andrew Lunn wrote:
+> 
+>> We have the same issue with OpenBox AX3. All the devices we have in
+>> our hands have 1GB soldered down, plus 2GB on expansion. The DT
+>> currently has the full 3GB.
 >>
->> > Currently, reading /proc/cpuinfo provides userspace with CPU ID of
->> > the CPU carrying out the read from the file.
->> > Userspace using this information may decide what module
->> > to load or how to configure some specific (and processor-depended)
->> > settings or so.
->> > However, since really different SoCs can share same ARM core,
->> > this information currently is not so useful.
->> > For example, TI OMAP4460 and OMAP4470 SoCs show the same
->> > information in the /proc/cpuinfo whereas they are different.
->> > Since in most cases ARM CPU is a part of some system on a chip (SoC),
->> > the "cpuinfo" file looks like exactly that place, where this
->> > information have to be displayed.
->> >
->> > So added new line "SoC name" in the "cpuinfo" output for system
->> > on a chip name. It is placed between CPU information and machine
->> > information, so the file structure looks gracefully (CPU-SoC-Hardware)
->> >
->> > Example:
->> >
->> > / # cat proc/cpuinfo
->> > [...]
->> > CPU variant     : 0x2
->> > CPU part        : 0xc09
->> > CPU revision    : 10
->> >
->> > SoC name        : OMAP4470
->> >
->> > Hardware        : OMAP4 Blaze Tablet
->>
->> Please remove that extra blank line between "SoC name" and "Hardware".
->> The blank line after "CPU revision" is fine.
->>
->> Also, please rename this to "System name".  Not all systems are "on
->> chip".  By using "System name" this is more universally useful.
->
-> You may notice I've already suggested that this should be using the SoC
-> infrastructure to export this information, which was explicitly designed
-> to do this.
->
-> If we're going to have one SoC doing one thing and another SoC exporting
-> this information a completely different way, we're doomed.  We need to
-> make a decision and do it one way and one way only - and that decision
-> was made when drivers/base/soc.c was merged.
->
-> Unfortunately, I'd forgotten about that when I made my initial comments
-> about the difference between "CPU" and "SoC".
+>> However, there has been discussion of reducing this down to 1GB since
+>> both Thomas and Gregory have unstable systems with the full 3GB, but
+>> mine box is stable with the full 3GB. So i don't know how strong a
+>> precedent that sets....
+> 
+> It seems that if we have CONFIG_ARM_ATAG_DTB_COMPAT, then the code in
+> arch/arm/boot/compressed/atags_to_fdt.c will update the DT memory node
+> according to the ATAG_MEM passed by the bootloader.
+> 
 
-Yes agree - let's stop this discussion at this point. I'm going to
-learn that soc framework and provide better solution.
-Unfortunately, I didn't find it when looked into the kernel sources
-for similar approaches.
+>From my point of view these dts file are just given as reference, and the
+bootloader should be able to modify them on the fly according the hardware
+configuration of the board.
 
-Regards,
-Ruslan
+And for old bootloader then we can use the CONFIG_ARM_ATAG_DTB_COMPAT as
+pointed by Thomas.
+
+So I am not sure that the amount of memory is very important.
+
+However I think that having a value by default is useful, so unless
+there is a strong argument against it, I would like to keep it, maybe with
+a comment in the dts to emphasize that it is just a default value and the
+amount of memory can be changed.
+
+
+> Best regards,
+> 
+> Thomas
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
