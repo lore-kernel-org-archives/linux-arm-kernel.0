@@ -1,67 +1,28 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 31 Jan 2013 10:50:25 +0100
-Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
- board(DB-MV784MP-GP)
-In-Reply-To: <20130130181035.GP7717@titan.lakedaemon.net>
-References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
- <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
- <20130130173306.GO7717@titan.lakedaemon.net>
- <510959D5.1010305@free-electrons.com>
- <20130130181035.GP7717@titan.lakedaemon.net>
-Message-ID: <20130131095025.GC20242@lunn.ch>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 31 Jan 2013 15:21:42 +0530
+Subject: [PATCH RFC] davinci: poll for sleep completion in resume routine.
+In-Reply-To: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
+References: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
+Message-ID: <510A3EAE.107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 01:10:35PM -0500, Jason Cooper wrote:
-> 
-> Gregory,
-> 
-> Adding devicetree-discuss.
-> 
-> Guys, how do you prefer to handle plug-in RAM modules?  describe the
-> soldered-in amount, or?
-> 
-> On Wed, Jan 30, 2013 at 06:35:17PM +0100, Gregory CLEMENT wrote:
-> > On 01/30/2013 06:33 PM, Jason Cooper wrote:
-> > > On Wed, Jan 30, 2013 at 06:26:14PM +0100, Gregory CLEMENT wrote:
-> > >> This is the new Armada XP evaluation board from Marvell. It comes with
-> > >> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
-> > >> Gigabit links.
-> > >>
-> > >> Support for USB (Host and device), SDIO, PCIe will be added as drivers
-> > >> when they become available for Armada XP in mainline.
-> > >>
-> > >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > >> ---
-> > >>  arch/arm/boot/dts/Makefile         |    1 +
-> > >>  arch/arm/boot/dts/armada-xp-gp.dts |   94 ++++++++++++++++++++++++++++++++++++
-> > >>  2 files changed, 95 insertions(+)
-> > >>  create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
-> > >>
-> ...
-> > >> +	memory {
-> > >> +		device_type = "memory";
-> > >> +		reg = <0x00000000 0xC0000000>; /* 3 GB */
-> > > 
-> > > Is this the soldered on the board amount, or the amount with an
-> > > expandable slot filled?
-> > 
-> > It is not soldered, so you can change the amount of memory
-> 
-> Well, there's something we don't encounter too much in the embedded
-> world.  ;-)  I'm inclined to think the entry here should be the soldered
-> on amount, and the bootloader would (hypothetically) change the DT to
-> the probed amount.  But I haven't seen a precedent set yet...
 
-Hi Jason
 
-We have the same issue with OpenBox AX3. All the devices we have in
-our hands have 1GB soldered down, plus 2GB on expansion. The DT
-currently has the full 3GB.
+On 1/31/2013 2:56 PM, Vishwanathrao Badarkhe, Manish wrote:
+> As per OMAP-L138 TRM, Software must poll for
+> SLEEPCOMPLETE bit until it is set to 1 before clearing
+> SLEEPENABLE bit in DEEPSLEEP register in resume routine.
+> Modifications are as per datasheet:
+> http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+> See sections 10.10.2.2 and 11.5.21 for more detailed
+> explanation.
+> 
+> Tested on da850-evm.
+> 
+> Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
 
-However, there has been discussion of reducing this down to 1GB since
-both Thomas and Gregory have unstable systems with the full 3GB, but
-mine box is stable with the full 3GB. So i don't know how strong a
-precedent that sets....
+Is this a bug fix? Do you see any issue without this patch?
 
-	  Andrew
+Thanks,
+Sekhar
