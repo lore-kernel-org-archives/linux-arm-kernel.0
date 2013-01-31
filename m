@@ -1,78 +1,28 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 31 Jan 2013 09:30:07 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130131170401.4b3bfbbf@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
- <20130129184157.GA29274@obsidianresearch.com>
- <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
- <20130129191853.GB29274@obsidianresearch.com>
- <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
- <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
- <20130130103501.1873d39c@skate>
- <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
- <20130131170401.4b3bfbbf@skate>
-Message-ID: <CAErSpo7fPzrF_OZSL7Ss0LT70Qz+veXLW-ihA7fAXCwsn142cQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 31 Jan 2013 22:01:44 +0530
+Subject: BogoMIPS change in 3.6+
+In-Reply-To: <20130131162523.GE835@mudshark.cambridge.arm.com>
+References: <510A988F.6030508@gmail.com> <510A9AD8.8060003@ti.com>
+ <20130131162523.GE835@mudshark.cambridge.arm.com>
+Message-ID: <510A9C70.8090606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 9:04 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Bjorn Helgaas,
+On Thursday 31 January 2013 09:55 PM, Will Deacon wrote:
+> On Thu, Jan 31, 2013 at 04:24:56PM +0000, Santosh Shilimkar wrote:
+>> On Thursday 31 January 2013 09:45 PM, Rob Herring wrote:
+>>> The BogoMIPS value has changed on highbank since the commit below in
+>>> 3.6. It is now half the value it used to be. Does that matter other than
+>>> perception (I've checked that I'm not running at half the freq)?
+>>>
+>> I also stumbled on this while testing Will's series.[1]
+>> There should be no other functional issue apart from getting surprised.
 >
-> On Wed, 30 Jan 2013 11:52:15 -0700, Bjorn Helgaas wrote:
+> Right, but you were using the arch-timers w/ Cortex-A15. I thought Highbank
+> was A9?
 >
->> The secondary/subordinate registers effectively define a bus number
->> aperture that tells the bridge which transactions to claim and forward
->> downstream.  When enumerating devices, we may update the subordinate
->> bus number to widen the aperture so we can enumerate an arbitrary tree
->> behind the bridge.  When we're finished, we'll probably narrow it by
->> updating the subordinate again, so the unused bus number space can be
->> used for other bridges.  I don't know the exact details of the
->> algorithm, and they're likely to change anyway, but pci_scan_bridge()
->> is where most of it happens.
->>
->> It looks like your current system doesn't support trees below the
->> bridges, but hopefully we can make it so the generic enumeration
->> algorithms still work.
->
-> The PCI-to-PCI bridge specification says that the Primary Bus Number
-> Register, Secondary Bus Number Register and Subordinate Bus Number
-> Register of the PCI configuration space of a PCI-to-PCI bridge should
-> all be set to 0 after reset.
->
-> Until now, I was forcing a specific value of the Secondary Bus Number
-> and Subordinate Bus Number (1 for my first bridge, 2 for my second
-> bridge, etc.).
->
-> Following you're recommendation, I've changed this, and left those
-> values initialized to 0 by default, in order to let Linux set correct
-> values. Yes, Linux does assign appropriate values in the Secondary Bus
-> Number Register. But before that Linux also complains loudly that the
-> bridge configuration is invalid:
->
-> pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> pci 0000:00:02.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> pci 0000:00:03.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> pci 0000:00:04.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> pci 0000:00:05.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> pci 0000:00:06.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+Ahh.. Sorry looking at description I just thought it could be the same
+issue.
 
-Linux makes the unwarranted assumption that the PCI hierarchy has
-already been configured by firmware.  If the only problem is the
-messages above, I think we could just rework the message so it doesn't
-look like an error.  I would guess that we probably also see the same
-distressing message when we hot-add a card with a bridge on it,
-because firmware won't have initialized the bridge.
-
-My rule of thumb is that I like to note something in dmesg about the
-initial configuration of bus/mem/io apertures and BARs, as well as
-indications when we update them.  That way, the dmesg log should
-contain enough information to debug most enumeration and configuration
-defects.  pci_scan_bridge() is somewhat lacking in this regard.
-
-Bjorn
+Regards,
+Santosh
