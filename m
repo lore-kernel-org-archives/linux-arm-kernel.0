@@ -1,32 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 Jan 2013 21:21:04 +0100
-Subject: [PATCH 6/6] ARM: integrator: ensure ap_syscon_base is initialised
- when !CONFIG_MMU
-In-Reply-To: <1359556069-28289-7-git-send-email-will.deacon@arm.com>
-References: <1359556069-28289-1-git-send-email-will.deacon@arm.com>
- <1359556069-28289-7-git-send-email-will.deacon@arm.com>
-Message-ID: <CACRpkdbFL6cA9wPdc7h8bTmH0t7PeVwmO+4LBwQGbSKNFJOS+Q@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 31 Jan 2013 15:31:57 -0500 (EST)
+Subject: [PATCH v2 4/4] irqchip: gic: Perform the gic_secondary_init()
+ call via CPU notifier
+In-Reply-To: <20130131175526.GE23505@n2100.arm.linux.org.uk>
+References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
+ <1359476319-23720-5-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1301291734140.6300@xanadu.home>
+ <20130129231205.GA25176@MacBook-Pro.local>
+ <alpine.LFD.2.02.1301291907340.6300@xanadu.home>
+ <20130131112538.GW23505@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1301311230140.6300@xanadu.home>
+ <20130131175526.GE23505@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1301311521310.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 3:27 PM, Will Deacon <will.deacon@arm.com> wrote:
+On Thu, 31 Jan 2013, Russell King - ARM Linux wrote:
 
-> When running on Integrator/AP using atags, ap_syscon_base is initialised
-> in ->map_io, which isn't called for !MMU platforms.
+> On Thu, Jan 31, 2013 at 12:32:11PM -0500, Nicolas Pitre wrote:
+> > On Thu, 31 Jan 2013, Russell King - ARM Linux wrote:
+> > 
+> > > I haven't tried Versatile Express yet as it has the TC2 tile on, and I
+> > > don't yet a boot loader on it which is capable of TFTP (which makes it
+> > > rather useless to me - I've been saying this for a time now but this is
+> > > probably the first time publically.)  I'm thinking about putting the
+> > > CA9x4 tile back on because that's a lot more functionally useful to me
+> > > than TC2.
+> > 
+> > You might be interested by this then:
+> > 
+> > http://lists.linaro.org/pipermail/linaro-dev/2012-October/014136.html
+> 
+> Great news.  Everyone has been telling me that there's no uboot for TC2,
+> or "we think Linaro might have something but we don't really know".
 
-Oh hm. Haha apparently there is one guy with more bizarre hobbies
-than myself, you're making me feel un-geeky... ;-)
+Note that I cobbled those instructions on my own and the result is not 
+officially supported by Linaro.  This is obviously not suitable for 
+setting up products or demo systems, but for a kernel developer I think 
+such a setup is invaluable.
 
-> Instead, initialise the pointer in ->machine_init, as we do when booting
-> with device-tree.
 
-I was trying to figure out if there is some case where we need it earlier
-but apparently not so.
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Maybe you should send this oneliner directly to the ARM SoC
-people?
-
-Yours,
-Linus Walleij
+Nicolas
