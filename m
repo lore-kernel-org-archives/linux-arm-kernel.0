@@ -1,37 +1,30 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 31 Jan 2013 17:14:08 +0530
-Subject: [PATCH] ARM: omap4: clock data: Add missing clkdm association
- for dpll_usb
-In-Reply-To: <alpine.DEB.2.00.1301250810090.471@utopia.booyaka.com>
-References: <1359095795-9538-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1301250810090.471@utopia.booyaka.com>
-Message-ID: <510A5908.30804@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Jan 2013 11:47:04 +0000
+Subject: [PATCH v2 0/4] Preparatory GIC patches for arm64 support
+In-Reply-To: <20130131103044.GB12877@arm.com>
+References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
+ <20130131103044.GB12877@arm.com>
+Message-ID: <20130131114703.GX23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Thu, Jan 31, 2013 at 10:30:44AM +0000, Catalin Marinas wrote:
+> Olof, Arnd,
+> 
+> On Tue, Jan 29, 2013 at 04:18:35PM +0000, Catalin Marinas wrote:
+> > That's the second version of the GIC clean-up patches to support arm64.
+> > The only change from v1 is that the second patch (chained_irq.h) also
+> > covers drivers/gpio and drivers/pinctrl (#include change).
+> 
+> Are you ok to merge this series via the arm-soc tree for 3.9-rc1? There
+> are no complaints so far (only acks ;). This would allow me to push GIC
+> support for arm64.
 
->> dpll_usb needs the clkdm association so the clkdm can be
->> turned on before a relock. All other dplls for omap4 belong
->> to the ALWON (always on) domain.
->>
->> The association was present as part of the older data file
->> (clock44xx_data.c) but looks like was accidently dropped with
->> the common clk convertion.
->
-> Thanks, queued for v3.8-rc fixes.
+So I don't exist anymore to you?
 
-I just realized that apart from adding the missing .clkdm_name, I
-also need to populate a .init as part of clk_ops for dpll_usb
-so the clockdomain lookup can then happen based on the .clkdm_name.
+Catalin, it's already been suggested to you that this series is more
+core ARM stuff than SoC stuff, and it's also been suggested that you
+merge this through my tree.
 
-I have updated the $Subject patch and posted a v2 (http://marc.info
-/?l=linux-omap&m=135963212530790&w=2). Would it be possible for you to
-pick the v2 instead and drop this one from your fixes branch.
-
-regards,
-Rajendra
-
->
-> - Paul
->
+No, I guess this figures after all your excessively negative replies
+on all of my comments during the review of ARM64.
