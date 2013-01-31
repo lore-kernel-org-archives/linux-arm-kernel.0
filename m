@@ -1,32 +1,26 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 31 Jan 2013 19:30:38 +0800
-Subject: [PATCH v3 1/4] ASoC: tlv320aic3x: Convert mic bias to a supply
- widget
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EB5A48E@DBDE01.ent.ti.com>
-References: <1359631394-9511-1-git-send-email-gururaja.hebbar@ti.com>
- <1359631394-9511-2-git-send-email-gururaja.hebbar@ti.com>
- <20130131112414.GE11078@opensource.wolfsonmicro.com>
- <1BAFE6F6C881BF42822005164F1491C33EB5A48E@DBDE01.ent.ti.com>
-Message-ID: <20130131113035.GF11078@opensource.wolfsonmicro.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 31 Jan 2013 12:32:15 +0100
+Subject: [PATCH] USB chipidea i.MX: use framework phy handling
+Message-ID: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 11:27:07AM +0000, Hebbar, Gururaja wrote:
-> On Thu, Jan 31, 2013 at 16:54:16, Mark Brown wrote:
+This series switches the mxs phy and the i.MX chipidea support
+from homegrew phy support to use usb_add_phy_dev/devm_usb_get_phy_by_phandle.
 
-> > As mentioned when you posted this before this patch needs to update the
-> > machine drivers using the device too.
+Based on
 
-> The patch-set 2/4 does the same thing. Since I have da850-evm at my end, I 
-> have modified that machine driver and sent-it as 2/4.
+[PATCH v2] Add USB of helpers and use them in the chipidea driver
 
-Two problems here.  One is that the update should be done in the same
-patch and the other is that you need to update *all* the machine drivers
-using the device, not just one of them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/6d513f38/attachment.sig>
+But I think this could also be applied separately if necessary.
+
+Sascha
+
+----------------------------------------------------------------
+Sascha Hauer (2):
+      USB mxs-phy: Register phy with framework
+      USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
+
+ drivers/usb/chipidea/ci13xxx_imx.c |   31 ++++++++++---------------------
+ drivers/usb/otg/mxs-phy.c          |    9 +++++++++
+ 2 files changed, 19 insertions(+), 21 deletions(-)
