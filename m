@@ -1,7 +1,7 @@
 From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Thu, 31 Jan 2013 14:56:33 +0530
+Date: Thu, 31 Jan 2013 14:53:41 +0530
 Subject: [PATCH RFC] davinci: poll for sleep completion in resume routine.
-Message-ID: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
+Message-ID: <1359624221-5378-1-git-send-email-manishv.b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
