@@ -1,28 +1,34 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Thu, 31 Jan 2013 13:48:47 -0800
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <alpine.LFD.2.02.1301301326530.6300@xanadu.home>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
- <20130128142510.68092e10.akpm@linux-foundation.org>
- <20130129101549.GP23505@n2100.arm.linux.org.uk> <51089523.3080804@zytor.com>
- <alpine.LFD.2.02.1301301326530.6300@xanadu.home>
-Message-ID: <510AE6BF.4080303@zytor.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Thu, 31 Jan 2013 22:54:54 +0100
+Subject: ixp4xx eth broken in 3.7.0/3.8-rc5?
+In-Reply-To: <20744.25884.660535.514911@pilspetsen.it.uu.se> (Mikael
+ Pettersson's message of "Wed, 30 Jan 2013 01:11:08 +0100")
+References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
+ <20744.25884.660535.514911@pilspetsen.it.uu.se>
+Message-ID: <m3622duifl.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2013 10:33 AM, Nicolas Pitre wrote:
->>
->> The only concern I have with that is if someone paints themselves into a
->> corner and absolutely wants, say, LZO.
-> 
-> That would be hard to justify given that the kernel provides its own 
-> decompressor code, making the compression format transparent to 
-> bootloaders, etc.  And no one should be poking into the compressed 
-> zImage.
-> 
+Mikael Pettersson <mikpe@it.uu.se> writes:
 
-Some utterly weird things like the Xen domain builder do that, because
-they have to.  That is why we explicitly document that the payload is
-ELF and how to access it in the bzImage spec.
+>  > When I try to update my ixp4xx machine to a 3.8-rc5 kernel it boots
+>  > Ok but the network (CONFIG_IXP4XX_ETH=y) fails to come up, with the
+>  > following in the kernel log:
+>  >
+>  > net eth0: coherent DMA mask is unset
+>
+> A git bisect identified the following as the culprit:
+>
+>  > From 1a4901177574083c35fafc24c4d151c2a7c7647c Mon Sep 17 00:00:00 2001
+>  > From: Xi Wang <xi.wang@gmail.com>
+>  > Date: Sat, 17 Nov 2012 20:25:09 +0000
+>  > Subject: [PATCH] ixp4xx_eth: avoid calling dma_pool_create() with NULL dev
+>  >
+>  > Use &port->netdev->dev instead of NULL since dma_pool_create() doesn't
+>  > allow NULL dev.
 
-	-hpa
+IIRC NULL dev in dma_pool_create() meant the usual IXP4xx mask (64MB)
+was used. Perhaps devices don't get a mask by default anymore. I will
+look at this in few days.
+-- 
+Krzysztof Halasa
