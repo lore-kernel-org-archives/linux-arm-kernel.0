@@ -1,60 +1,37 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Thu, 31 Jan 2013 14:12:24 +0530
-Subject: [PATCH 5/5] drm/exynos: don't include plat/gpio-cfg.h
-In-Reply-To: <1359127711-19070-6-git-send-email-arnd@arndb.de>
-References: <1359127711-19070-1-git-send-email-arnd@arndb.de>
- <1359127711-19070-6-git-send-email-arnd@arndb.de>
-Message-ID: <CAPdUM4MbFN6htJ9Xa_OtdfgpxNH=7JD6-eUAkVM5_O5SZYv2+w@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 31 Jan 2013 09:50:15 +0100
+Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
+ board(DB-MV784MP-GP)
+In-Reply-To: <2206499.VqjeY6AxuS@bender>
+References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+ <2206499.VqjeY6AxuS@bender>
+Message-ID: <510A3047.5070503@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd Bergmann,
+On 01/30/2013 08:30 PM, Florian Fainelli wrote:
+> On Wednesday 30 January 2013 18:26:14 Gregory CLEMENT wrote:
+>> This is the new Armada XP evaluation board from Marvell. It comes with
+>> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
+>> Gigabit links.
+>>
+>> Support for USB (Host and device), SDIO, PCIe will be added as drivers
+>> when they become available for Armada XP in mainline.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Tested-by: Florian Fainelli <florian@openwrt.org>
+> 
+> The PHY mapping you have is the right one, besides the minor naming in model 
+> and header comment, this is good, thanks a lot!
+> 
+Thanks!
+So I am waiting for the official Tested-by from Simon, and I will send a V2
+patch with the name fixed and with your tested-by.
 
-It looks good to me. My patch caused this issue.
-Thanks for the fix.
-
-regards,
-Rahul Sharma.
-
-On Fri, Jan 25, 2013 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Patch  9eb3e9e6f3 "drm/exynos: add support for ARCH_MULTIPLATFORM"
-> allowed building the exynos hdmi driver on non-samsung platforms,
-> which unfortunately broke compilation in combination with 22c4f42897
-> "drm: exynos: hdmi: add support for exynos5 hdmi", which added
-> an inclusion of the samsung-specific plat/gpio-cfg.h header file.
->
-> Fortunately, that header file is not required any more here, so
-> we can simply revert the inclusion in order to build the ARM
-> allyesconfig again without getting this error:
->
-> drivers/gpu/drm/exynos/exynos_hdmi.c:37:27: fatal error: plat/gpio-cfg.h: No such file or directory
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Rob Clark <rob@ti.com>
-> Cc: Inki Dae <inki.dae@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Rahul Sharma <rahul.sharma@samsung.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_hdmi.c | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> index 41ff79d..b5f5119 100644
-> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> @@ -34,7 +34,6 @@
->  #include <linux/regulator/consumer.h>
->  #include <linux/io.h>
->  #include <linux/of_gpio.h>
-> -#include <plat/gpio-cfg.h>
->
->  #include <drm/exynos_drm.h>
->
-> --
-> 1.8.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
