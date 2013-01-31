@@ -1,72 +1,68 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 31 Jan 2013 10:54:36 +0000
-Subject: [PATCH v3 15/15] ARM: vexpress/dcscb: probe via device tree
-In-Reply-To: <alpine.LFD.2.02.1301301239220.6300@xanadu.home>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-16-git-send-email-nicolas.pitre@linaro.org>
- <510838AD.6040700@gmail.com>
- <alpine.LFD.2.02.1301291634140.6300@xanadu.home>
- <CAMpgmWA0CCSRYxSvA1rNDYLo_RD-UavmX7coBXVpC+HEwQaBFg@mail.gmail.com>
- <alpine.LFD.2.02.1301301239220.6300@xanadu.home>
-Message-ID: <20130131105436.GA2091@linaro.org>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 31 Jan 2013 16:39:18 +0530
+Subject: [PATCH v2 1/2] drivers: net: cpsw: Add helper functions for VLAN
+ ALE implementation
+In-Reply-To: <20130130220208.GA22847@electric-eye.fr.zoreil.com>
+References: <1359572855-12344-1-git-send-email-mugunthanvnm@ti.com>
+ <1359572855-12344-2-git-send-email-mugunthanvnm@ti.com>
+ <20130130220208.GA22847@electric-eye.fr.zoreil.com>
+Message-ID: <510A50DE.1010308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 12:43:29PM -0500, Nicolas Pitre wrote:
-> On Wed, 30 Jan 2013, Achin Gupta wrote:
-> 
-> > On Tue, Jan 29, 2013 at 9:41 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > > On Tue, 29 Jan 2013, Rob Herring wrote:
-> > >
-> > >> On 01/29/2013 01:51 AM, Nicolas Pitre wrote:
-> > >> > +   node = of_find_compatible_node(NULL, NULL, "arm,dcscb");
-> > >>
-> > >> This needs binding documentation and should be a more specific name. Not
-> > >> knowing what dcscb is, I don't have a suggestion.
+On 1/31/2013 3:32 AM, Francois Romieu wrote:
+> Mugunthan V N <mugunthanvnm@ti.com> :
+> [...]
+>> diff --git a/drivers/net/ethernet/ti/cpsw_ale.c b/drivers/net/ethernet/ti/cpsw_ale.c
+>> index 0e9ccc2..18b88ce 100644
+>> --- a/drivers/net/ethernet/ti/cpsw_ale.c
+>> +++ b/drivers/net/ethernet/ti/cpsw_ale.c
+> [...]
+>> @@ -274,19 +292,26 @@ int cpsw_ale_flush(struct cpsw_ale *ale, int port_mask)
+>>   	return 0;
+>>   }
+>>   
+>> -int cpsw_ale_add_ucast(struct cpsw_ale *ale, u8 *addr, int port, int flags)
+>> +int cpsw_ale_add_ucast(struct cpsw_ale *ale, u8 *addr, int port,
+>> +		       int flags, u16 vid)
+>>   {
+>>   	u32 ale_entry[ALE_ENTRY_WORDS] = {0, 0, 0};
+>>   	int idx;
+>>   
+>> -	cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_ADDR);
+>> +	if (flags & ALE_VLAN) {
+>> +		cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_VLAN_ADDR);
+>> +		cpsw_ale_set_vlan_id(ale_entry, vid);
+>> +	} else {
+>> +		cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_ADDR);
+>> +	}
+>> +
+> [...]
+>> +	if (flags & ALE_VLAN) {
+>> +		cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_VLAN_ADDR);
+>> +		cpsw_ale_set_vlan_id(ale_entry, vid);
+>> +	} else {
+>> +		cpsw_ale_set_entry_type(ale_entry, ALE_TYPE_ADDR);
+>> +	}
+>> +
+> It could be fctored out.
+Are you mentioning to have static inline function for the above two 
+statements above?
+>
+> [...]
+>> @@ -362,6 +395,55 @@ int cpsw_ale_del_mcast(struct cpsw_ale *ale, u8 *addr, int port_mask)
+>>   	return 0;
+>>   }
+>>   
+>> +int cpsw_ale_add_vlan(struct cpsw_ale *ale, u16 vid, int port, int untag,
+>> +		      int reg_mcast, int unreg_mcast)
+>> +{
+> [...]
+>> +int cpsw_ale_del_vlan(struct cpsw_ale *ale, u16 vid, int port_mask)
+> [...]
+>
+> Patch #2 doesn't use the returned status code.
+Will modify the prototype to return void
 
-The name is 100% specific.  The real problem seems to be that it's also
-very cryptic, and undocumented.
-
-> > >
-> > > Yes, I mentioned in the cover page that DT bindings are not yet
-> > > documented.
-> > >
-> > > DCSCB stands for "Dual Cluster System Control Block".  This is in fact a
-> > > set of miscellaneous registers, mainly for reset control of individual
-> > > CPUs and clusters.
-> > >
-> > >> Perhaps should include vexpress or specific core tile name it is part
-> > >> of.
-> > >
-> > > /me hopes for some ARM dude more acquainted with their nomenclature to
-> > > chime in with suggestions.
-> > >
-> > 
-> > As nico said, the DCSCB is just a reset controller thats a part of the
-> > FastModels implementation.  The implementation should be referred to as
-> > VE bL RTSM. The official name goes by:
-> > 
-> > RTSM_VE_Cortex-A15x4-A7x4
-> > RTSM_VE_Cortex-A15x1-A7x1
-> > 
-> > The file should be renamed as bL_rtsm.c or something similar.
-> 
-> I don't think the file name is a problem.  Actually, going with 
-> bL_rtsm.c is rather too generic for what itcovers.
-> 
-> It's the actual device tree binding name that I'd need suggestions for.
-
-We could go for a slightly more generic, informative name like
-
-	arm,dcscb-system-controller
-
-Any views on that?
-
-I think the most important thing is to document the binding, though.
-
-As discussed, this thing appears in the fast models, but we don't
-anticipate its being used in real SoCs because they will usually need
-something more sophisticated.
-
-Cheers
----Dave
+Regards
+Mugunthan V N
