@@ -1,28 +1,27 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 31 Jan 2013 15:21:42 +0530
-Subject: [PATCH RFC] davinci: poll for sleep completion in resume routine.
-In-Reply-To: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
-References: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
-Message-ID: <510A3EAE.107@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 31 Jan 2013 10:54:46 +0100
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Add VPU support
+In-Reply-To: <20130130130453.GC2757@S2101-09.ap.freescale.net>
+References: <1359474553-8949-1-git-send-email-fabio.estevam@freescale.com>
+ <1359474553-8949-2-git-send-email-fabio.estevam@freescale.com>
+ <20130130130453.GC2757@S2101-09.ap.freescale.net>
+Message-ID: <20130131095446.GP1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jan 30, 2013 at 09:04:55PM +0800, Shawn Guo wrote:
+> On Tue, Jan 29, 2013 at 01:49:13PM -0200, Fabio Estevam wrote:
+> > Let the VPU driver be built by default.
+> > 
+> Do we have any imx_v6_v7 platform supported by VPU driver today?
 
+Does this matter? IMO it's good to keep the driver in a compilable state
+even if it ends up being unused for now.
 
-On 1/31/2013 2:56 PM, Vishwanathrao Badarkhe, Manish wrote:
-> As per OMAP-L138 TRM, Software must poll for
-> SLEEPCOMPLETE bit until it is set to 1 before clearing
-> SLEEPENABLE bit in DEEPSLEEP register in resume routine.
-> Modifications are as per datasheet:
-> http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
-> See sections 10.10.2.2 and 11.5.21 for more detailed
-> explanation.
-> 
-> Tested on da850-evm.
-> 
-> Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+Sascha
 
-Is this a bug fix? Do you see any issue without this patch?
-
-Thanks,
-Sekhar
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
