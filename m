@@ -1,275 +1,101 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 31 Jan 2013 03:23:54 +0100
-Subject: [PATCH 2/4] drm/i2c: nxp-tda998x (v3)
-In-Reply-To: <1359480184-9168-3-git-send-email-robdclark@gmail.com>
-References: <1359480184-9168-1-git-send-email-robdclark@gmail.com>
- <1359480184-9168-3-git-send-email-robdclark@gmail.com>
-Message-ID: <5109D5BA.2030801@gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 31 Jan 2013 10:30:36 +0800
+Subject: [PATCH 2/6] usb: add devicetree helpers for determining
+ dr_mode and phy_type
+In-Reply-To: <1359559782-14552-3-git-send-email-s.hauer@pengutronix.de>
+References: <1359559782-14552-1-git-send-email-s.hauer@pengutronix.de>
+ <1359559782-14552-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130131023034.GF9777@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2013 06:23 PM, Rob Clark wrote:
-> Driver for the NXP TDA998X i2c hdmi encoder slave.
-
-Rob,
-
-good to see a driver for TDA998x comming! I'd love to test
-it on CuBox (mach-dove) but there is no gpu driver I can hook up,
-yet. Anyway, I will make some comments how I think the driver
-should be improved.
-
-> diff --git a/drivers/gpu/drm/i2c/Kconfig b/drivers/gpu/drm/i2c/Kconfig
-> index 1611836..4d341db 100644
-> --- a/drivers/gpu/drm/i2c/Kconfig
-> +++ b/drivers/gpu/drm/i2c/Kconfig
-> @@ -19,4 +19,10 @@ config DRM_I2C_SIL164
->   	  when used in pairs) TMDS transmitters, used in some nVidia
->   	  video cards.
->
-> +config DRM_I2C_NXP_TDA998X
-> +	tristate "NXP Semiconductors TDA998X HDMI encoder"
-> +	default m if DRM_TILCDC
-> +	help
-> +	  Support for NXP Semiconductors TDA998X HDMI encoders.
-
-Maybe nit-picking but later down you actually support TDA9989,
-TDA19988, and TDA19989. The latter ones don't fit in TDA998x,
-so at least the Kconfig entry should reflect TDA9989/TDA1998x.
-
-> [...]
-> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> new file mode 100644
-> index 0000000..e68b58a
-> --- /dev/null
-> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> @@ -0,0 +1,906 @@
-> +/*
-> + * Copyright (C) 2012 Texas Instruments
-> + * Author: Rob Clark<robdclark@gmail.com>
+On Wed, Jan 30, 2013 at 04:29:38PM +0100, Sascha Hauer wrote:
+> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> 
+> This adds two little devicetree helper functions for determining the
+> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
+> the devicetree.
+> 
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/usb/usb-common.c |   69 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/usb/of.h   |   27 ++++++++++++++++++
+>  include/linux/usb/otg.h  |    7 +++++
+>  include/linux/usb/phy.h  |    9 ++++++
+>  4 files changed, 112 insertions(+)
+>  create mode 100644 include/linux/usb/of.h
+> 
+> diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
+> index d29503e..1c0292c 100644
+> --- a/drivers/usb/usb-common.c
+> +++ b/drivers/usb/usb-common.c
+> @@ -14,6 +14,9 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/usb/ch9.h>
+> +#include <linux/of.h>
+> +#include <linux/usb/of.h>
+> +#include <linux/usb/otg.h>
+>  
+>  const char *usb_speed_string(enum usb_device_speed speed)
+>  {
+> @@ -32,4 +35,70 @@ const char *usb_speed_string(enum usb_device_speed speed)
+>  }
+>  EXPORT_SYMBOL_GPL(usb_speed_string);
+>  
+> +#ifdef CONFIG_OF
+> +static const char *usb_dr_modes[] = {
+> +	[USB_DR_MODE_UNKNOWN]		= "",
+> +	[USB_DR_MODE_HOST]		= "host",
+> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
+> +	[USB_DR_MODE_OTG]		= "otg",
+> +};
+> +
+> +/**
+> + * of_usb_get_dr_mode - Get dual role mode for given device_node
+> + * @np:	Pointer to the given device_node
 > + *
-> +
-> [...]
-> +
-> +/* The TDA9988 series of devices use a paged register scheme.. to simplify
-> + * things we encode the page # in upper bits of the register #.  To read/
-> + * write a given register, we need to make sure CURPAGE register is set
-> + * appropriately.  Which implies reads/writes are not atomic.  Fun!
+> + * The function gets phy interface string from property 'dr_mode',
+> + * and returns the correspondig enum usb_phy_dr_mode
 > + */
-
-Please have a look at regmap-i2c, it also supports paged i2c registers
-and will save you _a lot_ of the i2c handling.
-
-> [...]
-> +
-> +/* Device versions: */
-> +#define TDA9989N2                 0x0101
-> +#define TDA19989                  0x0201
-> +#define TDA19989N2                0x0202
-> +#define TDA19988                  0x0301
-
-Maybe split this into device_version/revision? What does N2 stand for
-or is this the name NXP uses for that device?
-
- > [...]
-> +static void
-> +cec_write(struct drm_encoder *encoder, uint16_t addr, uint8_t val)
+> +enum usb_phy_dr_mode of_usb_get_dr_mode(struct device_node *np)
+The word "phy" at usb_phy_dr_mode may cause misunderstand, just usb_dr_mode
+is ok
 > +{
-> +	struct i2c_client *client = to_tda998x_priv(encoder)->cec;
-> +	uint8_t buf[] = {addr, val};
-> +	int ret;
+> +	const char *dr_mode;
+> +	int err, i;
 > +
-> +	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
-> +	if (ret<  0)
-> +		dev_err(&client->dev, "Error %d writing to cec:0x%x\n", ret, addr);
-> +}
-
-Has there been any decision on how to split/integrate cec from drm?
-Or is there display stuff located in cec i2c slave (I see HPD in
-..._detect below)?
-
-> [...]
-> +static void
-> +tda998x_encoder_save(struct drm_encoder *encoder)
-> +{
-> +	DBG("");
+> +	err = of_property_read_string(np, "dr_mode", &dr_mode);
+> +	if (err < 0)
+> +		return USB_DR_MODE_UNKNOWN;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
+> +		if (!strcasecmp(dr_mode, usb_dr_modes[i]))
+> +			return i;
+Just curious, why not using strcmp?
+> +
+> +	return USB_DR_MODE_UNKNOWN;
 > +}
 > +
-> +static void
-> +tda998x_encoder_restore(struct drm_encoder *encoder)
+> +#ifdef CONFIG_OF
+> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
+> +enum usb_phy_dr_mode of_usb_get_dr_mode(struct device_node *np);
+> +#else
+> +static inline enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
 > +{
-> +	DBG("");
-> +}
-
-Hmmm, these DBG("") shouldn't be in upstream kernel code?
-
-> +static bool
-> +tda998x_encoder_mode_fixup(struct drm_encoder *encoder,
-> +			  const struct drm_display_mode *mode,
-> +			  struct drm_display_mode *adjusted_mode)
-> +{
-> +	return true;
+> +	return USBPHY_INTERFACE_MODE_NA;
 > +}
 > +
-> +static int
-> +tda998x_encoder_mode_valid(struct drm_encoder *encoder,
-> +			  struct drm_display_mode *mode)
+> +static inline enum usb_phy_dr_mode of_usb_get_dr_mode(struct device_node *np)
 > +{
-> +	return MODE_OK;
+> +	return USB_DR_MODE_UNKNOWN;
 > +}
+For, dr_mode, if value has not existed, you use *_UNKNOWN, why
+for usbphy,  you use *_NA. It is better uniform.
 
-At least a note would be helpful to see what callbacks are
-not yet done. I guess there will be some kind of mode check
-someday?
+-- 
 
-> [...]
-> +static enum drm_connector_status
-> +tda998x_encoder_detect(struct drm_encoder *encoder,
-> +		      struct drm_connector *connector)
-> +{
-> +	uint8_t val = cec_read(encoder, REG_CEC_RXSHPDLEV);
-> +	return (val&  CEC_RXSHPDLEV_HPD) ? connector_status_connected :
-> +			connector_status_disconnected;
-> +}
-
-This is where cec slave gets called from hdmi i2c driver. Any chance
-there is HPD status in hdmi registers, too?
-
-> +/* I2C driver functions */
-> +
-> +static int
-> +tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
-> +{
-> +	return 0;
-> +}
-> +
-> +static int
-> +tda998x_remove(struct i2c_client *client)
-> +{
-> +	return 0;
-> +}
-
-Hmm, empty _probe and _remove? Maybe these should get some code
-from _init below?
-
-> +static int
-> +tda998x_encoder_init(struct i2c_client *client,
-> +		    struct drm_device *dev,
-> +		    struct drm_encoder_slave *encoder_slave)
-> +{
-> +	struct drm_encoder *encoder =&encoder_slave->base;
-> +	struct tda998x_priv *priv;
-> +
-> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->current_page = 0;
-> +	priv->cec = i2c_new_dummy(client->adapter, 0x34);
-> +	priv->dpms = DRM_MODE_DPMS_OFF;
-> +
-> +	encoder_slave->slave_priv = priv;
-> +	encoder_slave->slave_funcs =&tda998x_encoder_funcs;
-> +
-> +	/* wake up the device: */
-> +	cec_write(encoder, REG_CEC_ENAMODS,
-> +			CEC_ENAMODS_EN_RXSENS | CEC_ENAMODS_EN_HDMI);
-> +
-> +	tda998x_reset(encoder);
-> +
-> +	/* read version: */
-> +	priv->rev = reg_read(encoder, REG_VERSION_LSB) |
-> +			reg_read(encoder, REG_VERSION_MSB)<<  8;
-> +
-> +	/* mask off feature bits: */
-> +	priv->rev&= ~0x30; /* not-hdcp and not-scalar bit */
-
-If revision register contains features, why not save them for later
-driver improvements?
-
-> +	switch (priv->rev) {
-> +	case TDA9989N2:  dev_info(dev->dev, "found TDA9989 n2");  break;
-> +	case TDA19989:   dev_info(dev->dev, "found TDA19989");    break;
-> +	case TDA19989N2: dev_info(dev->dev, "found TDA19989 n2"); break;
-> +	case TDA19988:   dev_info(dev->dev, "found TDA19988");    break;
-> +	default:
-> +		DBG("found unsupported device: %04x", priv->rev);
-> +		goto fail;
-> +	}
-
-I think printing revision is sufficient, no user will care about the
-actual device or revision.
-
-> +	/* after reset, enable DDC: */
-> +	reg_write(encoder, REG_DDC_DISABLE, 0x00);
-> +
-> +	/* set clock on DDC channel: */
-> +	reg_write(encoder, REG_TX3, 39);
-
-This should be kept disabled as long as there is no monitor attached
-(HPD!)
-
-> +	/* if necessary, disable multi-master: */
-> +	if (priv->rev == TDA19989)
-> +		reg_set(encoder, REG_I2C_MASTER, I2C_MASTER_DIS_MM);
-> +
-> +	cec_write(encoder, REG_CEC_FRO_IM_CLK_CTRL,
-> +			CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
-> +
-> +	return 0;
-> +
-> +fail:
-> +	/* if encoder_init fails, the encoder slave is never registered,
-> +	 * so cleanup here:
-> +	 */
-> +	if (priv->cec)
-> +		i2c_unregister_device(priv->cec);
-> +	kfree(priv);
-> +	encoder_slave->slave_priv = NULL;
-> +	encoder_slave->slave_funcs = NULL;
-> +	return -ENXIO;
-> +}
-> +
-> +static struct i2c_device_id tda998x_ids[] = {
-> +	{ "tda998x", 0 },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(i2c, tda998x_ids);
-
-Shouldn't the above carry the hdmi core i2c address at least?
-
-> +static struct drm_i2c_encoder_driver tda998x_driver = {
-> +	.i2c_driver = {
-> +		.probe = tda998x_probe,
-> +		.remove = tda998x_remove,
-> +		.driver = {
-> +			.name = "tda998x",
-> +		},
-> +		.id_table = tda998x_ids,
-> +	},
-> +	.encoder_init = tda998x_encoder_init,
-> +};
-> +
-> +/* Module initialization */
-> +
-> +static int __init
-> +tda998x_init(void)
-> +{
-> +	DBG("");
-> +	return drm_i2c_encoder_register(THIS_MODULE,&tda998x_driver);
-> +}
-> +
-> +static void __exit
-> +tda998x_exit(void)
-> +{
-> +	DBG("");
-> +	drm_i2c_encoder_unregister(&tda998x_driver);
-> +}
-> +
-> +MODULE_AUTHOR("Rob Clark<robdclark@gmail.com");
-> +MODULE_DESCRIPTION("NXP Semiconductors TDA998X HDMI Encoder");
-> +MODULE_LICENSE("GPL");
-
-Maybe stick to one version of "TDA998X" or "TDA998x" ?
-
-Regards,
-   Sebastian
+Best Regards,
+Peter Chen
