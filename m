@@ -1,45 +1,70 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 30 Jan 2013 19:52:13 -0500
-Subject: [PATCH v3 2/2] ARM: dove: split legacy and DT setup
-In-Reply-To: <1359495695-29304-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <20130129212623.GJ7717@titan.lakedaemon.net>
- <1359495695-29304-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130131005213.GZ7717@titan.lakedaemon.net>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Thu, 31 Jan 2013 10:00:05 +0900
+Subject: [PATCH v4 0/3] introduce static_vm for ARM-specific static mapped area
+Message-ID: <1359594008-14688-1-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 10:41:35PM +0100, Sebastian Hesselbarth wrote:
-> In the beginning of DT for Dove it was reasonable to have it close to
-> non-DT code. With improved DT support, it became more and more difficult
-> to not break non-DT while changing DT code.
-> 
-> This patch splits up DT board setup and introduces a DOVE_LEGACY config
-> to allow to remove legacy code for DT-only kernels.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> [v3]
-> - also include new board-dt.c file that was missing in v2 of patch [2/2]
->   (patch [1/2] has not changed and is not resent)
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-dove/Kconfig    |    5 ++
->  arch/arm/mach-dove/Makefile   |    4 +-
->  arch/arm/mach-dove/board-dt.c |  103 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-dove/common.c   |   90 -----------------------------------
->  arch/arm/mach-dove/common.h   |    1 +
->  5 files changed, 112 insertions(+), 91 deletions(-)
->  create mode 100644 arch/arm/mach-dove/board-dt.c
+In current implementation, we used ARM-specific flag, that is,
+VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+The purpose of static mapped area is to re-use static mapped area when
+entire physical address range of the ioremap request can be covered
+by this area.
 
-Applied to mvebu/boards
+This implementation causes needless overhead for some cases.
+For example, assume that there is only one static mapped area and
+vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
+deciding whether it is matched or not. Moreover, even if there is
+no static mapped area and vmlist has 300 areas, every time we call
+ioremap, we check 300 areas in now.
 
-thx,
+If we construct a extra list for static mapped area, we can eliminate
+above mentioned overhead.
+With a extra list, if there is one static mapped area,
+we just check only one area and proceed next operation quickly.
 
-Jason.
+In fact, it is not a critical problem, because ioremap is not frequently
+used. But reducing overhead is better idea.
+
+Another reason for doing this work is for removing vm_struct list management,
+entirely. For more information, look at the following link.
+http://lkml.org/lkml/2012/12/6/184
+
+Changelog
+v3->v4:
+  [2/3]: Changes from Nicolas' suggestion
+         - embed static_vm code in ioremap.c
+         - simplify struct static_vm
+         - remove init_static_vm, instead, add_static_vm_early() init static_vm
+         Use generic list for list management of static_vm
+         Convert spin_lock to rw_lock
+         Modify static_vm's flags bits
+  [3/3]: Rework according to [2/3] change
+  Rebased on v3.8-rc5
+
+v2->v3:
+  coverletter: refer a link related to this work
+  [2/3]: drop @flags of find_static_vm_vaddr
+  Rebased on v3.8-rc4
+
+v1->v2: 
+  [2/3]: patch description is improved.
+  Rebased on v3.7-rc7
+
+Joonsoo Kim (3):
+  ARM: vmregion: remove vmregion code entirely
+  ARM: ioremap: introduce an infrastructure for static mapped area
+  ARM: mm: use static_vm for managing static mapped areas
+
+ arch/arm/mm/Makefile   |    2 +-
+ arch/arm/mm/ioremap.c  |  147 +++++++++++++++++++++++-----------
+ arch/arm/mm/mm.h       |   28 ++++---
+ arch/arm/mm/mmu.c      |   47 ++++++-----
+ arch/arm/mm/vmregion.c |  205 ------------------------------------------------
+ arch/arm/mm/vmregion.h |   31 --------
+ 6 files changed, 147 insertions(+), 313 deletions(-)
+ delete mode 100644 arch/arm/mm/vmregion.c
+ delete mode 100644 arch/arm/mm/vmregion.h
+
+-- 
+1.7.9.5
