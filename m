@@ -1,53 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 31 Jan 2013 07:51:16 -0500
-Subject: [GIT PULL] ARM: mvebu cleanup for v3.9 round2
-In-Reply-To: <1359495436.F88c4680.7559@triton>
-References: <1359495436.F88c4680.7559@triton>
-Message-ID: <20130131125116.GC7717@titan.lakedaemon.net>
+From: gururaja.hebbar@ti.com (Hebbar Gururaja)
+Date: Thu, 31 Jan 2013 18:23:06 +0530
+Subject: [PATCH v4 3/3] ASoC: davinci: remove __dev* attributes
+In-Reply-To: <1359636786-7056-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1359636786-7056-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1359636786-7056-4-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+CONFIG_HOTPLUG is going away as an option.  As result the __dev*
+markings will be going away.
 
-Please don't pull this yet.  The nsa310 patch built fine at the tip of
-my for-next, but didn't do so well when applied to mvebu/cleanup.
+Remove use of __devexit_p and __devexit.
 
-I'll redo and resubmit the whole series of pr's.
+Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+---
+Changes in v4
+	 - No change
 
-thx,
+Changes in v3
+	 - New patch
 
-Jason.
+:100644 100644 e6009a4... 37b8e78... M	sound/soc/davinci/davinci-evm.c
+ sound/soc/davinci/davinci-evm.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-On Tue, Jan 29, 2013 at 09:37:16PM +0000, Jason Cooper wrote:
-> The following changes since commit b96e1b1c3c5319294edb0970b6d5bf099c0e85eb:
-> 
->   ARM: Kirkwood: Cleanup unneeded include files (2013-01-12 21:50:10 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/cleanup_for_v3.9_round2
-> 
-> for you to fetch changes up to 63a069739a5826ab4007da88b7ec71eb9909271c:
-> 
->   ARM: dove: cleanup includes (2013-01-29 21:31:36 +0000)
-> 
-> ----------------------------------------------------------------
-> cleanup for v3.9 round2
->  - remove unneeded #includes for mach-dove
->  - remove unneeded #includes and code for the nsa310
-> 
-> ----------------------------------------------------------------
-> Jason Cooper (1):
->       ARM: kirkwood: nsa310: cleanup includes and unneeded code
-> 
-> Sebastian Hesselbarth (1):
->       ARM: dove: cleanup includes
-> 
->  arch/arm/mach-dove/common.c           | 29 +++++++++--------------------
->  arch/arm/mach-kirkwood/board-nsa310.c |  9 +--------
->  2 files changed, 10 insertions(+), 28 deletions(-)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
+index e6009a4..37b8e78 100644
+--- a/sound/soc/davinci/davinci-evm.c
++++ b/sound/soc/davinci/davinci-evm.c
+@@ -390,7 +390,7 @@ static int davinci_evm_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static int __devexit davinci_evm_remove(struct platform_device *pdev)
++static int davinci_evm_remove(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = platform_get_drvdata(pdev);
+ 
+@@ -401,7 +401,7 @@ static int __devexit davinci_evm_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver davinci_evm_driver = {
+ 	.probe		= davinci_evm_probe,
+-	.remove		= __devexit_p(davinci_evm_remove),
++	.remove		= davinci_evm_remove,
+ 	.driver		= {
+ 		.name	= "davinci_evm",
+ 		.owner	= THIS_MODULE,
+-- 
+1.7.9.5
