@@ -1,53 +1,40 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 31 Jan 2013 18:01:08 +0800
-Subject: [PATCH 2/6] USB: add devicetree helpers for determining
- dr_mode and phy_type
-In-Reply-To: <1359622873-23345-3-git-send-email-s.hauer@pengutronix.de>
-References: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
- <1359622873-23345-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130131100107.GD14629@nchen-desktop>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 31 Jan 2013 11:07:16 +0100
+Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
+ board(DB-MV784MP-GP)
+In-Reply-To: <20130131095025.GC20242@lunn.ch>
+References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130130173306.GO7717@titan.lakedaemon.net>
+ <510959D5.1010305@free-electrons.com>
+ <20130130181035.GP7717@titan.lakedaemon.net>
+ <20130131095025.GC20242@lunn.ch>
+Message-ID: <20130131110716.50b7340b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 10:01:09AM +0100, Sascha Hauer wrote:
-> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Dear Andrew Lunn,
+
+On Thu, 31 Jan 2013 10:50:25 +0100, Andrew Lunn wrote:
+
+> We have the same issue with OpenBox AX3. All the devices we have in
+> our hands have 1GB soldered down, plus 2GB on expansion. The DT
+> currently has the full 3GB.
 > 
-> 
-> +	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
-> +		if (!strcmp(dr_mode, usb_dr_modes[i]))
-> +			return i;
+> However, there has been discussion of reducing this down to 1GB since
+> both Thomas and Gregory have unstable systems with the full 3GB, but
+> mine box is stable with the full 3GB. So i don't know how strong a
+> precedent that sets....
 
-if (strcmp(dr_mode, usb_dr_modes[i]) == 0) may be more friendly.
+It seems that if we have CONFIG_ARM_ATAG_DTB_COMPAT, then the code in
+arch/arm/boot/compressed/atags_to_fdt.c will update the DT memory node
+according to the ATAG_MEM passed by the bootloader.
 
-> +
-> +#ifndef __LINUX_USB_OF_H
-> +#define __LINUX_USB_OF_H
-> +
-> +#include <linux/usb/phy.h>
-> +
-> +#ifdef CONFIG_OF
-> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
+Best regards,
 
-Will you put definition to phy.c, I can't find it at this version
-
-> index e8a5fe8..4e8bfbb 100644
-> --- a/include/linux/usb/otg.h
-> +++ b/include/linux/usb/otg.h
-> @@ -99,4 +99,11 @@ otg_start_srp(struct usb_otg *otg)
->  /* for OTG controller drivers (and maybe other stuff) */
->  extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
->  
-> +enum usb_dr_mode {
-> +	USB_DR_MODE_UNKNOWN,
-> +	USB_DR_MODE_HOST,
-> +	USB_DR_MODE_PERIPHERAL,
-> +	USB_DR_MODE_OTG,
-> +};
-> +
-
-I am not sure if otg.h is a good place to put this, in fact, we need
-a common header file for it.
+Thomas
 -- 
-
-Best Regards,
-Peter Chen
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
