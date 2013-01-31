@@ -1,45 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jan 2013 22:34:17 +0000
-Subject: [PATCH 6/6] ARM: integrator: ensure ap_syscon_base is
- initialised when !CONFIG_MMU
-In-Reply-To: <CACRpkdbFL6cA9wPdc7h8bTmH0t7PeVwmO+4LBwQGbSKNFJOS+Q@mail.gmail.com>
-References: <1359556069-28289-1-git-send-email-will.deacon@arm.com>
- <1359556069-28289-7-git-send-email-will.deacon@arm.com>
- <CACRpkdbFL6cA9wPdc7h8bTmH0t7PeVwmO+4LBwQGbSKNFJOS+Q@mail.gmail.com>
-Message-ID: <20130131223417.GB19961@mudshark.cambridge.arm.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 31 Jan 2013 14:44:59 -0800
+Subject: [rtc-linux] [PATCH] rtc: pl031: fix the missing operation on
+ enable
+In-Reply-To: <1359507865-29808-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1359507865-29808-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130131144459.39f9a978.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, 30 Jan 2013 09:04:25 +0800
+Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
 
-On Thu, Jan 31, 2013 at 08:21:04PM +0000, Linus Walleij wrote:
-> On Wed, Jan 30, 2013 at 3:27 PM, Will Deacon <will.deacon@arm.com> wrote:
+> RTC control register should be enabled in the process of initliazing.
 > 
-> > When running on Integrator/AP using atags, ap_syscon_base is initialised
-> > in ->map_io, which isn't called for !MMU platforms.
-> 
-> Oh hm. Haha apparently there is one guy with more bizarre hobbies
-> than myself, you're making me feel un-geeky... ;-)
+> ...
+>
+> --- a/drivers/rtc/rtc-pl031.c
+> +++ b/drivers/rtc/rtc-pl031.c
+> @@ -44,6 +44,7 @@
+>  #define RTC_YMR		0x34	/* Year match register */
+>  #define RTC_YLR		0x38	/* Year data load register */
+>  
+> +#define RTC_CR_EN	(1 << 0)	/* counter enable bit */
+>  #define RTC_CR_CWEN	(1 << 26)	/* Clockwatch enable bit */
+>  
+>  #define RTC_TCR_EN	(1 << 1) /* Periodic timer enable bit */
+> @@ -320,7 +321,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+>  	struct pl031_local *ldata;
+>  	struct pl031_vendor_data *vendor = id->data;
+>  	struct rtc_class_ops *ops = &vendor->ops;
+> -	unsigned long time;
+> +	unsigned long time, data;
+>  
+>  	ret = amba_request_regions(adev, NULL);
+>  	if (ret)
+> @@ -345,10 +346,11 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+>  	dev_dbg(&adev->dev, "designer ID = 0x%02x\n", amba_manf(adev));
+>  	dev_dbg(&adev->dev, "revision = 0x%01x\n", amba_rev(adev));
+>  
+> +	data = readl(ldata->base + RTC_CR);
+>  	/* Enable the clockwatch on ST Variants */
+>  	if (vendor->clockwatch)
+> -		writel(readl(ldata->base + RTC_CR) | RTC_CR_CWEN,
+> -		       ldata->base + RTC_CR);
+> +		data |= RTC_CR_CWEN;
+> +	writel(data | RTC_CR_EN, ldata->base + RTC_CR);
 
-Ha! Unfortunately, I only have one core-tile otherwise you could have one to
-help you feel less left-out :)
-
-> > Instead, initialise the pointer in ->machine_init, as we do when booting
-> > with device-tree.
-> 
-> I was trying to figure out if there is some case where we need it earlier
-> but apparently not so.
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Cheers!
-
-> Maybe you should send this oneliner directly to the ARM SoC
-> people?
-
-[adding Olof and Arnd] Is it worth sending a pull request containing a
-single patch, or can this patch just be picked directly?
-
-Cheers,
-
-Will
+Does this patch fix some user-visible misbehaviour?  If so, please
+fully describe that misbehaviour.
