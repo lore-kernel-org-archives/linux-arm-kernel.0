@@ -1,46 +1,79 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 31 Jan 2013 20:46:10 +0530
-Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
- for all cores
-In-Reply-To: <1520678.Zm627xxIN3@amdc1227>
-References: <1887364.fvxYYNb7Mm@amdc1227> <1520677.WES295RohH@amdc1227>
- <CAKohpombSKY-HMXovBAyZd5Ce8ZAEo2+yiwYL1G4=OEUJM1u5g@mail.gmail.com>
- <1520678.Zm627xxIN3@amdc1227>
-Message-ID: <CAKohpomEcrPa7UnZmtTouxN6JXxcaa7dBstMGUWjXGL0n1+=Ng@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 31 Jan 2013 15:21:27 +0000 (UTC)
+Subject: OMAP4 PM bootloader dependency problems
+In-Reply-To: <1359622829.10415.40.camel@sokoban>
+References: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
+ <alpine.DEB.2.00.1301301706580.17105@utopia.booyaka.com>
+ <1359622829.10415.40.camel@sokoban>
+Message-ID: <alpine.DEB.2.00.1301311416360.23099@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 January 2013 20:34, Tomasz Figa <t.figa@samsung.com> wrote:
-> Well, the fact that it isn't used at the moment doesn't mean that it
-> shouldn't be set correctly. The field is present in the structure and has
-> a set of defined values - one of which should be selected. For example,
-> I can imagine some governor taking this information into account.
+Hi,
 
-Governors already take this information but from a different variable:
-policy->cpus.
+On Thu, 31 Jan 2013, Tero Kristo wrote:
 
-Look at the patch which added it:
+> Personally I don't like too much to have just extra spam during boot,
+> which in many cases is even unnecessary (e.g. people who actually have
+> good u-boot in use.)
 
-commit 3b2d99429e3386b6e2ac949fc72486509c8bbe36
-Author: Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
-Date:   Wed Dec 14 15:05:00 2005 -0500
+The impact of two or three informative lines sent to the kernel console on 
+boot is lower than the cost of people spending hours trying to figure out 
+why chip retention idle doesn't work.
 
-    P-state software coordination for ACPI core
+Linux distributions that control the bootloader version can easily 
+comment out the warning.
 
-    http://bugzilla.kernel.org/show_bug.cgi?id=5737
+I'm hoping the console messages will inspire someone out there to fix the 
+root cause of the problem -- that the kernel is missing device 
+reset and initialization code for several OMAP4 devices.
 
-    Signed-off-by: Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
-    Signed-off-by: Len Brown <len.brown@intel.com>
----
- drivers/acpi/processor_perflib.c | 228
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- include/acpi/processor.h         |  27 ++++++++++++-
- include/linux/cpufreq.h          |   4 ++
- 3 files changed, 258 insertions(+), 1 deletion(-)
+> Personally I would like to have some sort of test during boot which 
+> detects broken PM and maybe prevents core idle completely if this is the 
+> case.
+
+As far as I know, a simple, clean test for this that can be merged 
+right now doesn't exist, and has never been posted to the lists.
+
+Personally, it's unclear how such a test can be implemented reliably.  
+You've proposed checking IP block idle/standby states during PM init in 
+previous E-mails.  But the problem with this is that those IP blocks might 
+already be in use by their drivers by the time the OMAP4 PM code 
+initializes.
+
+It's also important to keep in mind that adding any significant amount of 
+new code this late in the 3.8-rc cycle is not acceptable for my upstreams.
+
+That said, if you have a clean, reliable, and short solution for this, 
+please post it by the end of the week.
+
+> Alternatively we can add extra info to the failed suspend dump and 
+> mention a good u-boot to try out (v2012-07 or newer.)
+
+Folks might be using dynamic idle, so just adding a message on resume from 
+suspend isn't enough.
+
+> If we could detect boot loader version from kernel side, that would work
+> also.
+
+I haven't seen any proposals for how to do this.  Even if one were 
+available, it would require maintaining kernel blacklists.  Considering 
+that the fault is in the kernel OMAP4 integration code and data, adding 
+such a blacklist seems like the wrong approach.
+
+...
+
+In any case, all of the options that you've mentioned are workarounds, not 
+real solutions.  Fixing the root cause would involve adding reset and 
+initialization code for the remaining devices.  No one is working on this 
+as far as I'm aware.  And even if they were, it would be too much code to 
+add during the v3.8-rc fixes cycle.
+
+I understand that you don't want to add an unconditional message on boot.  
+But right now, it's the best approach.  Please post a patch for this by 
+the end of this week that I or Kevin can send upstream ASAP.
 
 
-It was clearly for ACPI, but was probably named badly and we people
-got confused that it is for our use.
+regards,
 
---
-viresh
+- Paul
