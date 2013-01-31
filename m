@@ -1,141 +1,51 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Thu, 31 Jan 2013 12:31:17 -0400
-Subject: [PATCH 1/2] ARM: shmobile: sh73a0: Add CPU sleep suspend
-In-Reply-To: <20130130042218.GK28230@verge.net.au>
-References: <1354709587-25288-1-git-send-email-hechtb+renesas@gmail.com>
- <CANqRtoQMweOU-Azfwu3-HXKx0Hr0seQYy1hi+arLHN-q=BSh+w@mail.gmail.com>
- <20121214134727.GL16382@verge.net.au>
- <Pine.LNX.4.64.1301111031220.2604@axis700.grange>
- <CABYn4swp_DGZTSWm+Otc_xwx4pDS7quUop5RNMH+32mjuGZj5g@mail.gmail.com>
- <20130130042218.GK28230@verge.net.au>
-Message-ID: <CABYn4syaAmi6mJApwa_kTRBDwv+HPbPnAJAwwRWrN2-0zY=SmQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 31 Jan 2013 16:32:56 +0000 (UTC)
+Subject: OMAP4 PM bootloader dependency problems
+In-Reply-To: <510A9BFB.5070802@ti.com>
+References: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
+ <alpine.DEB.2.00.1301301706580.17105@utopia.booyaka.com>
+ <1359622829.10415.40.camel@sokoban> <510A54F8.4090609@ti.com>
+ <alpine.DEB.2.00.1301311537530.23099@utopia.booyaka.com>
+ <510A9BFB.5070802@ti.com>
+Message-ID: <alpine.DEB.2.00.1301311630090.32145@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks perfect, thanks!
+Hi,
 
-2013/1/30 Simon Horman <horms@verge.net.au>:
-> On Sat, Jan 12, 2013 at 04:43:29PM +0100, Bastian Hecht wrote:
->> Hi Guennadi, hi Simon,
->>
->> yes somehow a chunk is missing from my original patch in the patch of
->> the next branch that got merged from soc2. I've prepared a revert of
->> the bad patch and a corrected version, but now I'm unsure if that
->> helps at all. Finally you don't want to get that fixups pulled into
->> the mainline.
->>
->> It seems to me to be a real mess to correct some patch somewhere in
->> the middle of merged patch stacks. If I can help Simon, please let me
->> know.
->
-> Could you see if the following is correct?
-> If not could you please prepare whichever of the following makes sense.
->
-> * An incremental patch to add the missing hunk
->
-> * A revert patch and a new patch
->
-> * A revert patch
->
-> http://git.kernel.org/?p=linux/kernel/git/horms/renesas.git;a=commitdiff;h=13baf88bd69ed3cf7e2374eec4a7128f62ae9c1f
->
->
-> From 13baf88bd69ed3cf7e2374eec4a7128f62ae9c1f Mon Sep 17 00:00:00 2001
-> From: Bastian Hecht <hechtb@gmail.com>
-> Date: Wed, 5 Dec 2012 12:13:06 +0000
-> Subject: [PATCH] ARM: shmobile: sh73a0: Add CPU sleep suspend
->
-> Add the lighest possible sleep mode on Cortex-A9 cores: CPU sleep. It is
-> entered by a simple dsb and wfi instruction via cpu_do_idle(). As just
-> clocks are stopped there is no need to save or restore any state of the
-> system.
->
-> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-> Acked-by: Magnus Damm <damm@opensource.se>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/Makefile              |    1 +
->  arch/arm/mach-shmobile/board-kzm9g.c         |    2 ++
->  arch/arm/mach-shmobile/include/mach/common.h |    1 +
->  arch/arm/mach-shmobile/pm-sh73a0.c           |   32 ++++++++++++++++++++++++++
->  4 files changed, 36 insertions(+)
->  create mode 100644 arch/arm/mach-shmobile/pm-sh73a0.c
->
-> diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-> index 0b71479..f6aba6d 100644
-> --- a/arch/arm/mach-shmobile/Makefile
-> +++ b/arch/arm/mach-shmobile/Makefile
-> @@ -37,6 +37,7 @@ obj-$(CONFIG_ARCH_SHMOBILE)   += pm-rmobile.o
->  obj-$(CONFIG_ARCH_SH7372)      += pm-sh7372.o sleep-sh7372.o
->  obj-$(CONFIG_ARCH_R8A7740)     += pm-r8a7740.o
->  obj-$(CONFIG_ARCH_R8A7779)     += pm-r8a7779.o
-> +obj-$(CONFIG_ARCH_SH73A0)      += pm-sh73a0.o
->
->  # Board objects
->  obj-$(CONFIG_MACH_AP4EVB)      += board-ap4evb.o
-> diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-> index ac94285..363c6ed 100644
-> --- a/arch/arm/mach-shmobile/board-kzm9g.c
-> +++ b/arch/arm/mach-shmobile/board-kzm9g.c
-> @@ -772,6 +772,8 @@ static void __init kzm_init(void)
->
->         sh73a0_add_standard_devices();
->         platform_add_devices(kzm_devices, ARRAY_SIZE(kzm_devices));
-> +
-> +       sh73a0_pm_init();
->  }
->
->  static void kzm9g_restart(char mode, const char *cmd)
-> diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-> index 2d1686b..f221c11 100644
-> --- a/arch/arm/mach-shmobile/include/mach/common.h
-> +++ b/arch/arm/mach-shmobile/include/mach/common.h
-> @@ -40,6 +40,7 @@ extern void sh73a0_add_early_devices(void);
->  extern void sh73a0_add_standard_devices(void);
->  extern void sh73a0_clock_init(void);
->  extern void sh73a0_pinmux_init(void);
-> +extern void sh73a0_pm_init(void);
->  extern struct clk sh73a0_extal1_clk;
->  extern struct clk sh73a0_extal2_clk;
->  extern struct clk sh73a0_extcki_clk;
-> diff --git a/arch/arm/mach-shmobile/pm-sh73a0.c b/arch/arm/mach-shmobile/pm-sh73a0.c
-> new file mode 100644
-> index 0000000..99086e9
-> --- /dev/null
-> +++ b/arch/arm/mach-shmobile/pm-sh73a0.c
-> @@ -0,0 +1,32 @@
-> +/*
-> + * sh73a0 Power management support
-> + *
-> + *  Copyright (C) 2012 Bastian Hecht <hechtb+renesas@gmail.com>
-> + *
-> + * This file is subject to the terms and conditions of the GNU General Public
-> + * License.  See the file "COPYING" in the main directory of this archive
-> + * for more details.
-> + */
-> +
-> +#include <linux/suspend.h>
-> +#include <mach/common.h>
-> +
-> +#ifdef CONFIG_SUSPEND
-> +static int sh73a0_enter_suspend(suspend_state_t suspend_state)
-> +{
-> +       cpu_do_idle();
-> +       return 0;
-> +}
-> +
-> +static void sh73a0_suspend_init(void)
-> +{
-> +       shmobile_suspend_ops.enter = sh73a0_enter_suspend;
-> +}
-> +#else
-> +static void sh73a0_suspend_init(void) {}
-> +#endif
-> +
-> +void __init sh73a0_pm_init(void)
-> +{
-> +       sh73a0_suspend_init();
-> +}
-> --
-> 1.7.10.4
->
+On Thu, 31 Jan 2013, Santosh Shilimkar wrote:
+
+> On Thursday 31 January 2013 09:10 PM, Paul Walmsley wrote:
+> > On Thu, 31 Jan 2013, Rajendra Nayak wrote:
+> > 
+> > > Throw a pr_warn() at boot only when CONFIG_CPU_IDLE is enabled. Note
+> > > that it isn't enabled by default in omap2plus_defconfig. Also
+> > > throw one when a suspend fails, saying bootloader *could be* a possible
+> > > cause specifying the right version to be used.
+> > 
+> > In my view, these steps aren't sufficient, for the reasons described in
+> > 
+> > http://marc.info/?l=linux-omap&m=135964568904053&w=2
+> > 
+> > Even with CONFIG_CPU_IDLE=n, it's still possible to attempt to enter
+> > full-chip retention idle on OMAP4 via 'echo mem > /sys/power/state', so it
+> > doesn't seem right to restrict a solution to that case.
+> > 
+> 
+> I think rajendra also mentioned adding one in suspend path too
+> when it fails.
+> " Also throw one when a suspend fails, saying bootloader
+> *could be* a possible cause specifying the right version to be used."
+> 
+> I find Rajendra's suggestion reasonable because some one might
+> just miss the boot message but getting the message on failure
+> case cant' be missed.
+
+Right.  I don't have any problem with adding a message to the suspend path 
+also.  But I'd like to see a boot-time message added even if 
+CONFIG_CPU_IDLE=n, since it's still possible to enter full-chip retention 
+idle with dynamic idle.  In other words, not everyone might use 'echo mem 
+> /sys/power/state'.
+
+
+- Paul
