@@ -1,169 +1,72 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 31 Jan 2013 16:03:06 +0530
-Subject: [PATCH 2/3] mmc: davinci_mmc: add DT support
-In-Reply-To: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
-References: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1359628387-14437-3-git-send-email-prakash.pm@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 31 Jan 2013 10:54:36 +0000
+Subject: [PATCH v3 15/15] ARM: vexpress/dcscb: probe via device tree
+In-Reply-To: <alpine.LFD.2.02.1301301239220.6300@xanadu.home>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-16-git-send-email-nicolas.pitre@linaro.org>
+ <510838AD.6040700@gmail.com>
+ <alpine.LFD.2.02.1301291634140.6300@xanadu.home>
+ <CAMpgmWA0CCSRYxSvA1rNDYLo_RD-UavmX7coBXVpC+HEwQaBFg@mail.gmail.com>
+ <alpine.LFD.2.02.1301301239220.6300@xanadu.home>
+Message-ID: <20130131105436.GA2091@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds device tree support for davinci_mmc. Also add
-binding documentation.
-Tested with non-dma PIO mode and without GPIO
-card_detect/write_protect option because of
-dependencies on EDMA and GPIO modules DT support.
+On Wed, Jan 30, 2013 at 12:43:29PM -0500, Nicolas Pitre wrote:
+> On Wed, 30 Jan 2013, Achin Gupta wrote:
+> 
+> > On Tue, Jan 29, 2013 at 9:41 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > > On Tue, 29 Jan 2013, Rob Herring wrote:
+> > >
+> > >> On 01/29/2013 01:51 AM, Nicolas Pitre wrote:
+> > >> > +   node = of_find_compatible_node(NULL, NULL, "arm,dcscb");
+> > >>
+> > >> This needs binding documentation and should be a more specific name. Not
+> > >> knowing what dcscb is, I don't have a suggestion.
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: cjb at laptop.org
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: mporter at ti.com
----
- .../devicetree/bindings/mmc/davinci_mmc.txt        |   23 +++++++
- drivers/mmc/host/davinci_mmc.c                     |   69 +++++++++++++++++++-
- 2 files changed, 91 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+The name is 100% specific.  The real problem seems to be that it's also
+very cryptic, and undocumented.
 
-diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-new file mode 100644
-index 0000000..144bee6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-@@ -0,0 +1,23 @@
-+* TI Highspeed MMC host controller for DaVinci
-+
-+The Highspeed MMC Host Controller on TI DaVinci family
-+provides an interface for MMC, SD and SDIO types of memory cards.
-+
-+This file documents differences between the core properties described
-+by mmc.txt and the properties used by the davinci_mmc driver.
-+
-+Required properties:
-+- compatible:
-+ Should be "ti,davinci_mmc", for davinci controllers
-+
-+Optional properties:
-+- bus-width: Number of data lines, can be <1>, <4>, or <8>, default <1>
-+- max-frequency: maximum operating clock frequency.
-+- caps: Check for Host capabilities in <linux/mmc/host.h>
-+- version: version of controller.
-+Example:
-+	mmc1: mmc at 0x4809c000 {
-+		compatible = "ti,omap4-hsmmc";
-+		reg = <0x4809c000 0x400>;
-+		bus-width = <4>;
-+	};
-diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-index 382b79d..ce6730d 100644
---- a/drivers/mmc/host/davinci_mmc.c
-+++ b/drivers/mmc/host/davinci_mmc.c
-@@ -34,6 +34,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/edma.h>
- #include <linux/mmc/mmc.h>
-+#include <linux/of.h>
- 
- #include <linux/platform_data/mmc-davinci.h>
- 
-@@ -1156,16 +1157,75 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
- 
- 	mmc_davinci_reset_ctrl(host, 0);
- }
-+#ifdef CONFIG_OF
-+static struct davinci_mmc_config
-+	*mmc_of_get_pdata(struct platform_device *pdev)
-+{
-+	struct device_node *np;
-+	struct davinci_mmc_config *pdata = NULL;
-+	u32 data;
-+	int ret;
-+
-+	pdata = pdev->dev.platform_data;
-+	if (!pdata) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
-+			goto nodata;
-+		}
-+	}
-+
-+	np = pdev->dev.of_node;
-+	if (!np)
-+		goto nodata;
-+
-+	ret = of_property_read_u32(np, "bus-width", &data);
-+	if (ret)
-+		dev_info(&pdev->dev, "wires not specified, defaulting to 4 bit mode\n");
-+	pdata->wires = data;
-+
-+	ret = of_property_read_u32(np, "max-frequency", &data);
-+	if (ret)
-+		dev_info(&pdev->dev, "max-frequency not specified, defaulting to 25MHz\n");
-+	pdata->max_freq = data;
-+
-+	ret = of_property_read_u32(np, "caps", &data);
-+	if (ret)
-+		dev_info(&pdev->dev, "card capability not specified\n");
-+	pdata->caps = data;
-+
-+	ret = of_property_read_u32(np, "version", &data);
-+	if (ret)
-+		dev_err(&pdev->dev, "version not specified\n");
-+	pdata->version = data;
-+
-+nodata:
-+	return pdata;
-+}
-+
-+#else
-+static struct davinci_mmc_config
-+	*mmc_of_get_pdata(struct platform_device *pdev)
-+{
-+	return pdev->dev.platform_data;
-+}
-+#endif
- 
- static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- {
--	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
-+	struct davinci_mmc_config *pdata = NULL;
- 	struct mmc_davinci_host *host = NULL;
- 	struct mmc_host *mmc = NULL;
- 	struct resource *r, *mem = NULL;
- 	int ret = 0, irq = 0;
- 	size_t mem_size;
- 
-+	pdata = mmc_of_get_pdata(pdev);
-+	if (pdata == NULL) {
-+		dev_err(&pdev->dev, "Can not get platform data\n");
-+		return -ENOENT;
-+	}
-+
- 	/* REVISIT:  when we're fully converted, fail if pdata is NULL */
- 
- 	ret = -ENODEV;
-@@ -1403,11 +1463,18 @@ static const struct dev_pm_ops davinci_mmcsd_pm = {
- #define davinci_mmcsd_pm_ops NULL
- #endif
- 
-+static const struct of_device_id davinci_mmc_of_match[] = {
-+	{.compatible = "ti,davinci_mmc", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, davinci_mmc_of_match);
-+
- static struct platform_driver davinci_mmcsd_driver = {
- 	.driver		= {
- 		.name	= "davinci_mmc",
- 		.owner	= THIS_MODULE,
- 		.pm	= davinci_mmcsd_pm_ops,
-+		.of_match_table = of_match_ptr(davinci_mmc_of_match),
- 	},
- 	.remove		= __exit_p(davinci_mmcsd_remove),
- };
--- 
-1.7.4.1
+> > >
+> > > Yes, I mentioned in the cover page that DT bindings are not yet
+> > > documented.
+> > >
+> > > DCSCB stands for "Dual Cluster System Control Block".  This is in fact a
+> > > set of miscellaneous registers, mainly for reset control of individual
+> > > CPUs and clusters.
+> > >
+> > >> Perhaps should include vexpress or specific core tile name it is part
+> > >> of.
+> > >
+> > > /me hopes for some ARM dude more acquainted with their nomenclature to
+> > > chime in with suggestions.
+> > >
+> > 
+> > As nico said, the DCSCB is just a reset controller thats a part of the
+> > FastModels implementation.  The implementation should be referred to as
+> > VE bL RTSM. The official name goes by:
+> > 
+> > RTSM_VE_Cortex-A15x4-A7x4
+> > RTSM_VE_Cortex-A15x1-A7x1
+> > 
+> > The file should be renamed as bL_rtsm.c or something similar.
+> 
+> I don't think the file name is a problem.  Actually, going with 
+> bL_rtsm.c is rather too generic for what itcovers.
+> 
+> It's the actual device tree binding name that I'd need suggestions for.
+
+We could go for a slightly more generic, informative name like
+
+	arm,dcscb-system-controller
+
+Any views on that?
+
+I think the most important thing is to document the binding, though.
+
+As discussed, this thing appears in the fast models, but we don't
+anticipate its being used in real SoCs because they will usually need
+something more sophisticated.
+
+Cheers
+---Dave
