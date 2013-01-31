@@ -1,31 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jan 2013 14:13:20 +0000
-Subject: Failure to boot...
-In-Reply-To: <510A78E1.8010308@ti.com>
-References: <20130131014912.GM2637@n2100.arm.linux.org.uk>
- <20130131030203.GA8374@quad.lixom.net>
- <alpine.LFD.2.02.1301302312030.6300@xanadu.home>
- <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <20130131104044.GO2637@n2100.arm.linux.org.uk> <510A6877.9080307@ti.com>
- <20130131130437.GP2637@n2100.arm.linux.org.uk> <510A78E1.8010308@ti.com>
-Message-ID: <20130131141320.GQ2637@n2100.arm.linux.org.uk>
+From: kishon@ti.com (kishon)
+Date: Thu, 31 Jan 2013 19:44:27 +0530
+Subject: [PATCH 1/2] USB mxs-phy: Register phy with framework
+In-Reply-To: <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
+References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <510A7C43.1080709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 07:30:01PM +0530, Santosh Shilimkar wrote:
-> Linus' tip(commit: 04c2eee5) + arm-soc for-next boots fine as well.
-> The pull request from Tony [1] fixed the multi-platform boot issue
-> for OMAP.
+On Thursday 31 January 2013 05:02 PM, Sascha Hauer wrote:
+> We now have usb_add_phy_dev(), so use it to register with the framework
+> to be able to find the phy from the USB driver.
 >
-> Now trying to merge your for-next and test.
-
-Well, my tip (which is based on Linus' 6abb7c25) also builds and
-boots fine.
-
-Hang on... 
-
-# CONFIG_ARCH_OMAP2PLUS is not set
-CONFIG_ARCH_VEXPRESS=y
-
-which of course won't boot, and this happens on both oldconfigs because
-of the change to multiplatform support.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>   drivers/usb/otg/mxs-phy.c |    9 +++++++++
+>   1 file changed, 9 insertions(+)
+>
+> diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
+> index 5158332..5b39885 100644
+> --- a/drivers/usb/otg/mxs-phy.c
+> +++ b/drivers/usb/otg/mxs-phy.c
+> @@ -127,6 +127,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>   	void __iomem *base;
+>   	struct clk *clk;
+>   	struct mxs_phy *mxs_phy;
+> +	int ret;
+>
+>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>   	if (!res) {
+> @@ -166,11 +167,19 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>
+>   	platform_set_drvdata(pdev, &mxs_phy->phy);
+>
+> +	ret = usb_add_phy_dev(&mxs_phy->phy);
+> +	if (ret)
+> +		return ret;
+> +
+>   	return 0;
+>   }
+>
+>   static int mxs_phy_remove(struct platform_device *pdev)
+>   {
+> +	struct mxs_phy *mxs_phy = platform_get_drvdata(pdev);
+> +
+> +	usb_remove_phy(&mxs_phy->phy);
+> +
+>   	platform_set_drvdata(pdev, NULL);
+>
+>   	return 0;
+>
