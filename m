@@ -1,80 +1,47 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 30 Jan 2013 19:29:16 -0500
+Date: Wed, 30 Jan 2013 19:32:22 -0500
 Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
  kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130130230518.GA7395@obsidianresearch.com>
-References: <51053F81.6020904@gmail.com>
- <20130127152431.GX1758@titan.lakedaemon.net>
- <20130128223148.GA10275@schnuecks.de>
+In-Reply-To: <5109AB30.5020202@gmail.com>
+References: <20130128223148.GA10275@schnuecks.de>
  <20130129004824.GB7717@titan.lakedaemon.net>
  <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130129203221.GG7717@titan.lakedaemon.net>
- <51083580.1010900@gmail.com>
- <20130130224300.GU7717@titan.lakedaemon.net>
- <20130130230518.GA7395@obsidianresearch.com>
-Message-ID: <20130131002916.GW7717@titan.lakedaemon.net>
+ <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
+ <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
+ <20130130230100.GV7717@titan.lakedaemon.net>
+ <5109AB30.5020202@gmail.com>
+Message-ID: <20130131003222.GX7717@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 04:05:18PM -0700, Jason Gunthorpe wrote:
-> On Wed, Jan 30, 2013 at 05:43:00PM -0500, Jason Cooper wrote:
-> > > On 01/29/2013 09:32 PM, Jason Cooper wrote:
-> > > >On Tue, Jan 29, 2013 at 09:08:46PM +0100, Sebastian Hesselbarth wrote:
-> > > >>Leaves Issue 3, gbe forgets about its MAC address when gated or powered
-> > > >>down. That should be done with local-mac-address passed by DT enabled
-> > > >>u-boot or any other (dirty) ATAG hack ;)
-> > > >
-> > > >A patch to mv643xx_eth to pull this from DT should solve this.
-> > 
-> > Somewhere, Jason Gunthorpe shared his patch to do this.  I'll poke
-> > around for it and try to get it merged in.
+On Thu, Jan 31, 2013 at 12:22:24AM +0100, Sebastian Hesselbarth wrote:
+> On 01/31/2013 12:01 AM, Jason Cooper wrote:
+> >As it stands, there are three patches to fix this issue:
+> >
+> >ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
+> >ARM: kirkwood: provide ge clock aliases for shared smi
+> >ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
 > 
-> Yes, you asked for the doc update and I haven't had a moment to get a
-> tree setup for that..
-
-Ahh, that's right.  Sorry, wasn't trying to put pressure on you.  Just
-trying to make a reminder to myself of what to look for when I get to
-around to it.  (I have a separate IMAP folder for such things ;-) )
-
-> Here are some words though:
+> Actually, for the second patch I got distracted by the smi split patch
+> set floating around. But that is not in current kernel and smi will not
+> request any clock at all.
 > 
->      - local-mac-address : Optional, the MAC address to assign to the
->        device. If not specified then the MAC address in the HW
->        registers is used, but the driver can not be made modular.
+> If Simon can hit another round of testing without second patch included
+> and agrees, I suggest to keep it for next release.
 
-I like it.  If I haven't seen anything when I get to this, I'll add this
-to your patch.  Please Ack if it's ok.  I prefer not to change peoples
-patches without approval.
+Ok, I'll wait for Simon on this.  fixes can go anytime, so no rush.
+Better to get it right the first (second?) time out.
+
+> >wrt to ge losing mac addresses, both DT and non-DT booting are covered by
+> >Sebastian's patches, for non-DT aware mv643xx_eth.
+> 
+> non-DT already ungates ge0/1 clocks on registration and cannot loose its
+> mac address, not my fix.
+
+Yes, bad wording on my part.  I meant that everything was magically
+fixed by Sebastian and that his thesis should be approved without
+challenge.  ;-)
 
 thx,
 
 Jason.
-
-> 
-> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> index 7048d7c..2b2cfcb 100644
-> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> @@ -2891,6 +2891,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
->  	struct mv643xx_eth_private *mp;
->  	struct net_device *dev;
->  	struct resource *res;
-> +	const u8 *mac;
-> +	int len;
->  	int err;
->  
->  	if (pdev->dev.of_node) {
-> @@ -2912,6 +2914,10 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
->  		else
->  			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
->  
-> +		mac = of_get_property(pdev->dev.of_node, "local-mac-address", &len);
-> +		if (mac && len == 6)
-> +		    memcpy(pd->mac_addr, mac, sizeof pd->mac_addr);
-> +
->  		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
->  		if (np) {
->  			pd->shared = of_find_device_by_node(np);
-> -- 
-> 1.7.5.4
-> 
