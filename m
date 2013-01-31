@@ -1,42 +1,45 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Thu, 31 Jan 2013 23:26:16 +0100
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130131003222.GX7717@titan.lakedaemon.net>
-References: <20130129004824.GB7717@titan.lakedaemon.net>
- <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
- <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
- <20130130230100.GV7717@titan.lakedaemon.net>
- <5109AB30.5020202@gmail.com>
- <20130131003222.GX7717@titan.lakedaemon.net>
-Message-ID: <20130131222615.GA17976@schnuecks.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Jan 2013 22:34:17 +0000
+Subject: [PATCH 6/6] ARM: integrator: ensure ap_syscon_base is
+ initialised when !CONFIG_MMU
+In-Reply-To: <CACRpkdbFL6cA9wPdc7h8bTmH0t7PeVwmO+4LBwQGbSKNFJOS+Q@mail.gmail.com>
+References: <1359556069-28289-1-git-send-email-will.deacon@arm.com>
+ <1359556069-28289-7-git-send-email-will.deacon@arm.com>
+ <CACRpkdbFL6cA9wPdc7h8bTmH0t7PeVwmO+4LBwQGbSKNFJOS+Q@mail.gmail.com>
+Message-ID: <20130131223417.GB19961@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hi Linus,
 
-On Wed, Jan 30, 2013 at 07:32:22PM -0500, Jason Cooper wrote:
-> On Thu, Jan 31, 2013 at 12:22:24AM +0100, Sebastian Hesselbarth wrote:
-> > On 01/31/2013 12:01 AM, Jason Cooper wrote:
-> > >As it stands, there are three patches to fix this issue:
-> > >
-> > >ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
-> > >ARM: kirkwood: provide ge clock aliases for shared smi
-> > >ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
-> > 
-> > Actually, for the second patch I got distracted by the smi split patch
-> > set floating around. But that is not in current kernel and smi will not
-> > request any clock at all.
-> > 
-> > If Simon can hit another round of testing without second patch included
-> > and agrees, I suggest to keep it for next release.
+On Thu, Jan 31, 2013 at 08:21:04PM +0000, Linus Walleij wrote:
+> On Wed, Jan 30, 2013 at 3:27 PM, Will Deacon <will.deacon@arm.com> wrote:
 > 
-> Ok, I'll wait for Simon on this.  fixes can go anytime, so no rush.
-> Better to get it right the first (second?) time out.
+> > When running on Integrator/AP using atags, ap_syscon_base is initialised
+> > in ->map_io, which isn't called for !MMU platforms.
+> 
+> Oh hm. Haha apparently there is one guy with more bizarre hobbies
+> than myself, you're making me feel un-geeky... ;-)
 
-Ok, will do. For the first patch you already have my Tested-by. 
-Sebastian is right on the second one, it does not add value for 3.8
-yet.  I will test the third patch as soon as I find time.
- 
-- Simon
+Ha! Unfortunately, I only have one core-tile otherwise you could have one to
+help you feel less left-out :)
+
+> > Instead, initialise the pointer in ->machine_init, as we do when booting
+> > with device-tree.
+> 
+> I was trying to figure out if there is some case where we need it earlier
+> but apparently not so.
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Cheers!
+
+> Maybe you should send this oneliner directly to the ARM SoC
+> people?
+
+[adding Olof and Arnd] Is it worth sending a pull request containing a
+single patch, or can this patch just be picked directly?
+
+Cheers,
+
+Will
