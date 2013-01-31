@@ -1,23 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jan 2013 16:25:23 +0000
-Subject: BogoMIPS change in 3.6+
-In-Reply-To: <510A9AD8.8060003@ti.com>
-References: <510A988F.6030508@gmail.com>
- <510A9AD8.8060003@ti.com>
-Message-ID: <20130131162523.GE835@mudshark.cambridge.arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 31 Jan 2013 16:26:09 +0000 (UTC)
+Subject: [PATCH 4/4] ARM: AM33XX: clock: SET_RATE_PARENT in lcd path
+In-Reply-To: <24c9e4241b2988e66abd053508991d96cac964b7.1358871018.git.afzal@ti.com>
+References: <cover.1358871018.git.afzal@ti.com>
+ <24c9e4241b2988e66abd053508991d96cac964b7.1358871018.git.afzal@ti.com>
+Message-ID: <alpine.DEB.2.00.1301311625290.32145@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 04:24:56PM +0000, Santosh Shilimkar wrote:
-> On Thursday 31 January 2013 09:45 PM, Rob Herring wrote:
-> > The BogoMIPS value has changed on highbank since the commit below in
-> > 3.6. It is now half the value it used to be. Does that matter other than
-> > perception (I've checked that I'm not running at half the freq)?
-> >
-> I also stumbled on this while testing Will's series.[1]
-> There should be no other functional issue apart from getting surprised.
+On Tue, 22 Jan 2013, Afzal Mohammed wrote:
 
-Right, but you were using the arch-timers w/ Cortex-A15. I thought Highbank
-was A9?
+> LCDC clock node is a one that does not have set rate capability. It
+> just passes on the rate that is sent downstream by it's parent. While
+> lcdc clock parent and it's grand parent - dpll_disp_m2_ck and
+> dpll_disp_ck has the capability to configure rate.
+> 
+> And the default rates provided by LCDC clock's ancestors are not
+> sufficient to obtain pixel clock for current LCDC use cases, hence
+> currently display would not work on AM335x SoC's (with driver
+> modifications in platfrom independent way).
+> 
+> Hence inform clock framework to propogate set rate for LCDC clock as
+> well as it's parent - dpll_disp_m2_ck. With this change, set rate on
+> LCDC clock would get propogated till dpll_disp_ck via dpll_disp_m2_ck,
+> hence allowing the driver (same driver is used in DaVinci too) to set
+> rates using LCDC clock without worrying about platform dependent clock
+> details.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
 
-Will
+This one doesn't apply for me on v3.8-rc5 + your patches 2 and 3.  Could 
+you please update it and re-send?
+
+
+- Paul
