@@ -1,329 +1,234 @@
-From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Thu, 31 Jan 2013 16:53:12 +0530
-Subject: [PATCH v3 3/4] ASoC: davinci: machine: Add device tree binding
-In-Reply-To: <1359631394-9511-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1359631394-9511-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1359631394-9511-4-git-send-email-gururaja.hebbar@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Jan 2013 11:23:03 +0000
+Subject: [PATCH 2/3] mmc: davinci_mmc: add DT support
+In-Reply-To: <1359628387-14437-3-git-send-email-prakash.pm@ti.com>
+References: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
+ <1359628387-14437-3-git-send-email-prakash.pm@ti.com>
+Message-ID: <20130131112303.GA7235@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
+Hello,
 
-Device tree support for Davinci Machine driver
+I have a few comments on the devicetree binding and the way it's parsed.
 
-When the board boots with device tree, the driver will receive card,
-codec, dai interface details (like the card name, DAPM routing map,
-phandle for the audio components described in the dts file, codec mclk
-speed).
-The card will be set up based on this information.
-Since the routing is provided via DT we can mark the card fully routed
-so core can take care of disconnecting the unused pins.
+On Thu, Jan 31, 2013 at 10:33:06AM +0000, Manjunathappa, Prakash wrote:
+> Adds device tree support for davinci_mmc. Also add
+> binding documentation.
+> Tested with non-dma PIO mode and without GPIO
+> card_detect/write_protect option because of
+> dependencies on EDMA and GPIO modules DT support.
+> 
+> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: cjb at laptop.org
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: mporter at ti.com
+> ---
+>  .../devicetree/bindings/mmc/davinci_mmc.txt        |   23 +++++++
+>  drivers/mmc/host/davinci_mmc.c                     |   69 +++++++++++++++++++-
+>  2 files changed, 91 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> new file mode 100644
+> index 0000000..144bee6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> @@ -0,0 +1,23 @@
+> +* TI Highspeed MMC host controller for DaVinci
+> +
+> +The Highspeed MMC Host Controller on TI DaVinci family
+> +provides an interface for MMC, SD and SDIO types of memory cards.
+> +
+> +This file documents differences between the core properties described
+> +by mmc.txt and the properties used by the davinci_mmc driver.
+> +
+> +Required properties:
+> +- compatible:
+> + Should be "ti,davinci_mmc", for davinci controllers
 
-Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
----
-Changes in v3
-	 - New patch
+"ti,davinci-mmc" (with '-' rather than '_') would be preferable.
 
-Changes in v2
-	 - Remove reference to Linux & software details from DT binding
+> +
+> +Optional properties:
+> +- bus-width: Number of data lines, can be <1>, <4>, or <8>, default <1>
+> +- max-frequency: maximum operating clock frequency.
 
-:000000 100644 0000000... 92ad4c7... A	Documentation/devicetree/bindings/sound/davinci-evm-audio.txt
-:100644 100644 484b22c... e6009a4... M	sound/soc/davinci/davinci-evm.c
- .../bindings/sound/davinci-evm-audio.txt           |   53 ++++++
- sound/soc/davinci/davinci-evm.c                    |  179 +++++++++++++++++---
- 2 files changed, 212 insertions(+), 20 deletions(-)
+You said you only described differences from mmc.txt, but this is listed in
+mmc.txt.
 
-diff --git a/Documentation/devicetree/bindings/sound/davinci-evm-audio.txt b/Documentation/devicetree/bindings/sound/davinci-evm-audio.txt
-new file mode 100644
-index 0000000..92ad4c7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/davinci-evm-audio.txt
-@@ -0,0 +1,53 @@
-+* Texas Instruments SoC audio setups with TLV320AIC3X Codec
-+
-+Required properties:
-+- compatible :
-+	"ti,dm365-voice-codec-audio"	: for DM365 platforms with Voice Codec
-+	"ti,da830-evm-audio"		: for DM365/DA8xx/OMAPL1x/AM33xx
-+
-+- ti,model : The user-visible name of this sound complex.
-+- ti,audio-codec : The phandle of the TLV320AIC3x audio codec
-+- ti,mcasp-controller : The phandle of the McASP controller
-+- ti,codec-clock-rate : The Codec Clock rate (in Hz) applied to the Codec
-+- ti,audio-routing : A list of the connections between audio components.
-+  Each entry is a pair of strings, the first being the connection's sink,
-+  the second being the connection's source. Valid names for sources and
-+  sinks are the codec's pins, and the jacks on the board:
-+
-+  Codec pins:
-+
-+  * MIC3L
-+  * MIC3R
-+  * LINE1L
-+  * LINE2L
-+  * LINE1R
-+  * LINE2R
-+
-+  Board connectors:
-+
-+  * Headphone Jack
-+  * Line Out
-+  * Mic Jack
-+
-+
-+Example:
-+
-+sound {
-+	compatible = "ti,da830-evm-audio";
-+	ti,model = "DA830 EVM";
-+	ti,audio-codec = <&tlv320aic3x>;
-+	ti,mcasp-controller = <&mcasp1>;
-+	ti,codec-clock-rate = <12000000>;
-+	ti,audio-routing =
-+		"Headphone Jack",       "HPLOUT",
-+		"Headphone Jack",       "HPROUT",
-+		"Line Out",             "LLOUT",
-+		"Line Out",             "RLOUT",
-+		"MIC3L",                "Mic Bias",
-+		"MIC3R",                "Mic Bias",
-+		"Mic Bias",             "Mic Jack",
-+		"LINE1L",               "Line In",
-+		"LINE2L",               "Line In",
-+		"LINE1R",               "Line In",
-+		"LINE2R",               "Line In";
-+};
-diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
-index 484b22c..e6009a4 100644
---- a/sound/soc/davinci/davinci-evm.c
-+++ b/sound/soc/davinci/davinci-evm.c
-@@ -15,6 +15,7 @@
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
-+#include <linux/of_platform.h>
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/soc.h>
-@@ -34,27 +35,38 @@ static int evm_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
- 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-+	struct snd_soc_codec *codec = rtd->codec;
-+	struct snd_soc_card *soc_card = codec->card;
-+	struct device_node *np = soc_card->dev->of_node;
- 	int ret = 0;
- 	unsigned sysclk;
- 
--	/* ASP1 on DM355 EVM is clocked by an external oscillator */
--	if (machine_is_davinci_dm355_evm() || machine_is_davinci_dm6467_evm() ||
--	    machine_is_davinci_dm365_evm())
--		sysclk = 27000000;
--
--	/* ASP0 in DM6446 EVM is clocked by U55, as configured by
--	 * board-dm644x-evm.c using GPIOs from U18.  There are six
--	 * options; here we "know" we use a 48 KHz sample rate.
--	 */
--	else if (machine_is_davinci_evm())
--		sysclk = 12288000;
--
--	else if (machine_is_davinci_da830_evm() ||
--				machine_is_davinci_da850_evm())
--		sysclk = 24576000;
--
--	else
--		return -EINVAL;
-+	if (np) {
-+		ret = of_property_read_u32(np, "ti,codec-clock-rate", &sysclk);
-+		if (ret < 0)
-+			return ret;
-+	} else {
-+		/* ASP1 on DM355 EVM is clocked by an external oscillator */
-+		if (machine_is_davinci_dm355_evm() ||
-+			machine_is_davinci_dm6467_evm() ||
-+			machine_is_davinci_dm365_evm())
-+			sysclk = 27000000;
-+
-+		/*
-+		 * ASP0 in DM6446 EVM is clocked by U55, as configured by
-+		 * board-dm644x-evm.c using GPIOs from U18.  There are six
-+		 * options; here we "know" we use a 48 KHz sample rate.
-+		 */
-+		else if (machine_is_davinci_evm())
-+			sysclk = 12288000;
-+
-+		else if (machine_is_davinci_da830_evm() ||
-+					machine_is_davinci_da850_evm())
-+			sysclk = 24576000;
-+
-+		else
-+			return -EINVAL;
-+	}
- 
- 	/* set codec DAI configuration */
- 	ret = snd_soc_dai_set_fmt(codec_dai, AUDIO_FORMAT);
-@@ -132,13 +144,22 @@ static int evm_aic3x_init(struct snd_soc_pcm_runtime *rtd)
- {
- 	struct snd_soc_codec *codec = rtd->codec;
- 	struct snd_soc_dapm_context *dapm = &codec->dapm;
-+	struct device_node *np = codec->card->dev->of_node;
-+	int ret;
- 
- 	/* Add davinci-evm specific widgets */
- 	snd_soc_dapm_new_controls(dapm, aic3x_dapm_widgets,
- 				  ARRAY_SIZE(aic3x_dapm_widgets));
- 
--	/* Set up davinci-evm specific audio path audio_map */
--	snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
-+	if (np) {
-+		ret = snd_soc_of_parse_audio_routing(codec->card,
-+							"ti,audio-routing");
-+		if (ret)
-+			return ret;
-+	} else {
-+		/* Set up davinci-evm specific audio path audio_map */
-+		snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
-+	}
- 
- 	/* not connected */
- 	snd_soc_dapm_disable_pin(dapm, "MONO_LOUT");
-@@ -287,6 +308,108 @@ static struct snd_soc_card da850_snd_soc_card = {
- 	.num_links = 1,
- };
- 
-+#if defined(CONFIG_OF)
-+
-+enum {
-+	MACHINE_VERSION_1 = 0,	/* DM365 with Voice Codec */
-+	MACHINE_VERSION_2,	/* DM365/DA8xx/OMAPL1x/AM33xx */
-+};
-+
-+static const struct of_device_id davinci_evm_dt_ids[] = {
-+	{
-+		.compatible = "ti,dm365-voice-codec-audio",
-+		.data = (void *)MACHINE_VERSION_1,
-+	},
-+	{
-+		.compatible = "ti,da830-evm-audio",
-+		.data = (void *)MACHINE_VERSION_2,
-+	},
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, davinci_mcasp_dt_ids);
-+
-+/*
-+ * This struct is just used as place holder. It will be filled with
-+ * data from dt node
-+ */
-+static struct snd_soc_dai_link evm_dai = {
-+	.name		= "TLV320AIC3X",
-+	.stream_name	= "AIC3X",
-+	.codec_dai_name	= "tlv320aic3x-hifi",
-+};
-+
-+/* davinci evm audio machine driver */
-+static struct snd_soc_card evm_soc_card = {
-+	.owner = THIS_MODULE,
-+	.dai_link = &evm_dai,
-+	.num_links = 1,
-+};
-+
-+static int davinci_evm_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *match =
-+		of_match_device(of_match_ptr(davinci_evm_dt_ids), &pdev->dev);
-+	u32 machine_ver;
-+	int ret = 0;
-+
-+	machine_ver = (u32)match->data;
-+	switch (machine_ver) {
-+	case MACHINE_VERSION_1:
-+		evm_dai.name		= "Voice Codec - CQ93VC";
-+		evm_dai.stream_name	= "CQ93";
-+		evm_dai.codec_dai_name	= "cq93vc-hifi";
-+		break;
-+
-+	case MACHINE_VERSION_2:
-+		evm_dai.ops = &evm_ops;
-+		evm_dai.init = evm_aic3x_init;
-+		break;
-+	}
-+
-+	evm_dai.codec_of_node = of_parse_phandle(np, "ti,audio-codec", 0);
-+	if (!evm_dai.codec_of_node)
-+		return -EINVAL;
-+
-+	evm_dai.cpu_of_node = of_parse_phandle(np,
-+						"ti,mcasp-controller", 0);
-+	if (!evm_dai.cpu_of_node)
-+		return -EINVAL;
-+
-+	evm_dai.platform_of_node = evm_dai.cpu_of_node;
-+
-+	evm_soc_card.dev = &pdev->dev;
-+	ret = snd_soc_of_parse_card_name(&evm_soc_card, "ti,model");
-+	if (ret)
-+		return ret;
-+
-+	ret = snd_soc_register_card(&evm_soc_card);
-+	if (ret)
-+		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
-+
-+	return ret;
-+}
-+
-+static int __devexit davinci_evm_remove(struct platform_device *pdev)
-+{
-+	struct snd_soc_card *card = platform_get_drvdata(pdev);
-+
-+	snd_soc_unregister_card(card);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver davinci_evm_driver = {
-+	.probe		= davinci_evm_probe,
-+	.remove		= __devexit_p(davinci_evm_remove),
-+	.driver		= {
-+		.name	= "davinci_evm",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(davinci_evm_dt_ids),
-+	},
-+};
-+#endif
-+
- static struct platform_device *evm_snd_device;
- 
- static int __init evm_init(void)
-@@ -295,6 +418,15 @@ static int __init evm_init(void)
- 	int index;
- 	int ret;
- 
-+#if defined(CONFIG_OF)
-+	/*
-+	 * If dtb is there, the devices will be created dynamically.
-+	 * Only register platfrom driver structure.
-+	 */
-+	if (of_have_populated_dt())
-+		return platform_driver_register(&davinci_evm_driver);
-+#endif
-+
- 	if (machine_is_davinci_evm()) {
- 		evm_snd_dev_data = &dm6446_snd_soc_card_evm;
- 		index = 0;
-@@ -330,6 +462,13 @@ static int __init evm_init(void)
- 
- static void __exit evm_exit(void)
- {
-+#if defined(CONFIG_OF)
-+	if (of_have_populated_dt()) {
-+		platform_driver_unregister(&davinci_evm_driver);
-+		return;
-+	}
-+#endif
-+
- 	platform_device_unregister(evm_snd_device);
- }
- 
--- 
-1.7.9.5
+> +- caps: Check for Host capabilities in <linux/mmc/host.h>
+
+Is this a set of binary flags? Also, is this Linux-specific?
+
+I really don't think this should be in the devicetree binding. Why do you need
+this?
+
+> +- version: version of controller.
+
+This should be encoded as part of the compatible string.
+
+> +Example:
+> +	mmc1: mmc at 0x4809c000 {
+> +		compatible = "ti,omap4-hsmmc";
+> +		reg = <0x4809c000 0x400>;
+> +		bus-width = <4>;
+> +	};
+
+It would be nice if the example referred to this binding rather than another.
+
+> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+> index 382b79d..ce6730d 100644
+> --- a/drivers/mmc/host/davinci_mmc.c
+> +++ b/drivers/mmc/host/davinci_mmc.c
+> @@ -34,6 +34,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/edma.h>
+>  #include <linux/mmc/mmc.h>
+> +#include <linux/of.h>
+>  
+>  #include <linux/platform_data/mmc-davinci.h>
+>  
+> @@ -1156,16 +1157,75 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
+>  
+>  	mmc_davinci_reset_ctrl(host, 0);
+>  }
+> +#ifdef CONFIG_OF
+> +static struct davinci_mmc_config
+> +	*mmc_of_get_pdata(struct platform_device *pdev)
+> +{
+> +	struct device_node *np;
+> +	struct davinci_mmc_config *pdata = NULL;
+> +	u32 data;
+> +	int ret;
+> +
+> +	pdata = pdev->dev.platform_data;
+> +	if (!pdata) {
+> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +		if (!pdata) {
+> +			dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
+> +			goto nodata;
+> +		}
+> +	}
+
+Why do you need to conditionally allocate this? This only seems to be called
+once.
+
+> +
+> +	np = pdev->dev.of_node;
+> +	if (!np)
+> +		goto nodata;
+
+Why not just return immediately here? You do nothing special at nodata.
+
+> +
+> +	ret = of_property_read_u32(np, "bus-width", &data);
+> +	if (ret)
+> +		dev_info(&pdev->dev, "wires not specified, defaulting to 4 bit mode\n");
+> +	pdata->wires = data;
+
+That dev_info doesn't seem to match up with what the next line is doing (data
+might not have been initialised). Also, unless I've misunderstood, it doesn't
+match up with the default of 1 mentioned in the binding doc.
+
+> +
+> +	ret = of_property_read_u32(np, "max-frequency", &data);
+> +	if (ret)
+> +		dev_info(&pdev->dev, "max-frequency not specified, defaulting to 25MHz\n");
+> +	pdata->max_freq = data;
+
+Again, the dev_info doesn't match up with the line below it. I notice
+the default's not one specified in the binding. Is this frequency chosen
+from the hardware docs, or is it an arbitrary choice. If not arbitrary,
+it might be worth specifying in the binding.
+
+
+> +
+> +	ret = of_property_read_u32(np, "caps", &data);
+> +	if (ret)
+> +		dev_info(&pdev->dev, "card capability not specified\n");
+> +	pdata->caps = data;
+
+Again, you may be using garbage data.
+
+> +
+> +	ret = of_property_read_u32(np, "version", &data);
+> +	if (ret)
+> +		dev_err(&pdev->dev, "version not specified\n");
+> +	pdata->version = data;
+
+And again, though I'd prefer to see this property go entirely.
+
+> +
+> +nodata:
+> +	return pdata;
+> +}
+> +
+> +#else
+> +static struct davinci_mmc_config
+> +	*mmc_of_get_pdata(struct platform_device *pdev)
+> +{
+> +	return pdev->dev.platform_data;
+> +}
+> +#endif
+
+This is poorly named if it's required for !CONFIG_OF.
+
+Why not change this to something like mmc_parse_pdata, returning an
+error code. For !CONFIG_OF, it can simply return 0, which should be less
+surprising for anyone else reading this code.
+
+>  
+>  static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+>  {
+> -	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
+> +	struct davinci_mmc_config *pdata = NULL;
+>  	struct mmc_davinci_host *host = NULL;
+>  	struct mmc_host *mmc = NULL;
+>  	struct resource *r, *mem = NULL;
+>  	int ret = 0, irq = 0;
+>  	size_t mem_size;
+>  
+> +	pdata = mmc_of_get_pdata(pdev);
+> +	if (pdata == NULL) {
+> +		dev_err(&pdev->dev, "Can not get platform data\n");
+> +		return -ENOENT;
+> +	}
+> +
+>  	/* REVISIT:  when we're fully converted, fail if pdata is NULL */
+>  
+>  	ret = -ENODEV;
+> @@ -1403,11 +1463,18 @@ static const struct dev_pm_ops davinci_mmcsd_pm = {
+>  #define davinci_mmcsd_pm_ops NULL
+>  #endif
+>  
+> +static const struct of_device_id davinci_mmc_of_match[] = {
+> +	{.compatible = "ti,davinci_mmc", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, davinci_mmc_of_match);
+
+For supporting multiple versions, you could either use some auxdata
+here, or check each one in davince_mmcsd_probe.
+
+> +
+>  static struct platform_driver davinci_mmcsd_driver = {
+>  	.driver		= {
+>  		.name	= "davinci_mmc",
+>  		.owner	= THIS_MODULE,
+>  		.pm	= davinci_mmcsd_pm_ops,
+> +		.of_match_table = of_match_ptr(davinci_mmc_of_match),
+>  	},
+>  	.remove		= __exit_p(davinci_mmcsd_remove),
+>  };
+
+Where does davinci_mmcsd_probe get called from, and how is the
+of_match_table used? Should it not be set as .probe on the driver?
+
+Thanks,
+Mark.
