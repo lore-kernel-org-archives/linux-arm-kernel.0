@@ -1,111 +1,54 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 31 Jan 2013 05:02:04 +0000
-Subject: [PATCH v4 5/8] MFD: ti_am335x_tscadc: Add DT support
-In-Reply-To: <4CE347531D4CA947960AF71FF095B9323E9B1EE9@DBDE01.ent.ti.com>
-References: <1358999112-31192-1-git-send-email-rachna@ti.com>
- <1358999112-31192-6-git-send-email-rachna@ti.com>
- <A9839AA2-ABCD-4642-9766-D56824AC27AD@dominion.thruhere.net>
- <4CE347531D4CA947960AF71FF095B9323E9B1EE9@DBDE01.ent.ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EBEFAE8@DBDE01.ent.ti.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 31 Jan 2013 05:25:24 +0000
+Subject: [PATCH v2] ARM: OMAP2: hwmod: Fix "register offset NULL check" bug
+In-Reply-To: <alpine.DEB.2.00.1301301634310.17105@utopia.booyaka.com>
+References: <1355835378-23437-1-git-send-email-gururaja.hebbar@ti.com>
+ <alpine.DEB.2.00.1212190210021.2446@utopia.booyaka.com>
+ <1BAFE6F6C881BF42822005164F1491C33EB0C4FB@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1212200734160.7362@utopia.booyaka.com>
+ <1BAFE6F6C881BF42822005164F1491C33EB5920F@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1301301634310.17105@utopia.booyaka.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB59A7A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 09:41:11, Patil, Rachna wrote:
-> On Wed, Jan 30, 2013 at 16:10:09, Koen Kooi wrote:
+On Wed, Jan 30, 2013 at 22:09:51, Paul Walmsley wrote:
+> On Wed, 30 Jan 2013, Hebbar, Gururaja wrote:
+> 
+> > On Thu, Dec 20, 2012 at 13:05:27, Paul Walmsley wrote:
+> > > On Thu, 20 Dec 2012, Hebbar, Gururaja wrote:
+> > > 
+> > > > On Wed, Dec 19, 2012 at 07:43:50, Paul Walmsley wrote:
+> > > > 
+> > > > > We've got a few hwmods on OMAP44xx that don't have clkctrl_offs registers 
+> > > > > listed in the hwmod data, and which are not marked with HWMOD_NO_IDLEST.  
+> > > > > What's going to happen in those cases?
+> > > > 
+> > > > Hmm. This is a special case to me. Let me go back and do some review.
+> > > > Will be back with some more details.
+> > > 
+> > > Probably what needs to happen is that those hwmods need to be marked with 
+> > > HWMOD_NO_IDLEST, in a separate patch before yours.  As far as I can tell, 
+> > > that's how they should have been marked initially.  Then your patch should 
+> > > be fine.
 > > 
-> > Op 24 jan. 2013, om 04:45 heeft "Patil, Rachna" <rachna@ti.com> het volgende geschreven:
-> > 
-> > > From: "Patil, Rachna" <rachna@ti.com>
-> > > 
-> > > Make changes to add DT support in the MFD core driver.
-> > > 
-> > > Signed-off-by: Patil, Rachna <rachna@ti.com>
-> > > ---
-> > > Changes in v4:
-> > > 	Non-standard properties prefixed with vendor name.
-> > > 
-> > > drivers/mfd/ti_am335x_tscadc.c |   28 +++++++++++++++++++++++-----
-> > > 1 file changed, 23 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/drivers/mfd/ti_am335x_tscadc.c 
-> > > b/drivers/mfd/ti_am335x_tscadc.c index e9f3fb5..87b446b 100644
-> > > --- a/drivers/mfd/ti_am335x_tscadc.c
-> > > +++ b/drivers/mfd/ti_am335x_tscadc.c
-> > > @@ -22,6 +22,8 @@
-> > > #include <linux/regmap.h>
-> > > #include <linux/mfd/core.h>
-> > > #include <linux/pm_runtime.h>
-> > > +#include <linux/of.h>
-> > > +#include <linux/of_device.h>
-> > > 
-> > > #include <linux/mfd/ti_am335x_tscadc.h> #include 
-> > > <linux/input/ti_am335x_tsc.h>
-> > > @@ -64,20 +66,31 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
-> > > 	struct resource		*res;
-> > > 	struct clk		*clk;
-> > > 	struct mfd_tscadc_board	*pdata = pdev->dev.platform_data;
-> > > +	struct device_node	*node = pdev->dev.of_node;
-> > > 	struct mfd_cell		*cell;
-> > > 	int			err, ctrl;
-> > > 	int			clk_value, clock_rate;
-> > > -	int			tsc_wires, adc_channels = 0, total_channels;
-> > > +	int			tsc_wires = 0, adc_channels = 0, total_channels;
-> > > 
-> > > -	if (!pdata) {
-> > > +	if (!pdata && !pdev->dev.of_node) {
-> > > 		dev_err(&pdev->dev, "Could not find platform data\n");
-> > > 		return -EINVAL;
-> > > 	}
-> > > 
-> > > -	if (pdata->adc_init)
-> > > -		adc_channels = pdata->adc_init->adc_channels;
-> > > +	if (pdev->dev.platform_data) {
-> > > +		if (pdata->tsc_init)
-> > > +			tsc_wires = pdata->tsc_init->wires;
-> > > +
-> > > +		if (pdata->adc_init)
-> > > +			adc_channels = pdata->adc_init->adc_channels;
-> > > +	} else {
-> > > +		node = of_find_node_by_name(pdev->dev.of_node, "tsc");
-> > > +		of_property_read_u32(node, "ti,wires", &tsc_wires);
-> > > +
-> > > +		node = of_find_node_by_name(pdev->dev.of_node, "adc");
-> > > +		of_property_read_u32(node, "ti,adc-channels", &adc_channels);
-> > > +	}
-> > 
-> > Since AM335x is DT only, why is there a platform data codepath and why is it the first branch it tries? And I guess the next question is related to the first: why doesn't it work when used with DT? When I copy over the nodes from the evm.dts to my board I get "tsc tsc: Missing platform data" in dmesg.
+> > Looking at latest kernel v3.8-rc5, there is separate cm33xx.c file which
+> > handles module ready checking for am33xx platform. So I will update this 
+> > patch to work on this file instead of touching omap4 related file 
+> > (cminst44xx.c)
 > 
-> This IP came up 1st on AM335x, but it is not platform dependent. The driver can be used on other platforms where-in DT is not supported.
-> According to the maintainers platform data takes precedence over DT. Hence the order.
+> The same problem still exists.  According to the TRM, there's at least one
+> AM335x CLKCTRL register that doesn't have IDLEST bits.  So to avoid 
+> reading reserved bits, either this patch or a preceding patch should
+> mark those hwmods with HWMOD_NO_IDLEST.
+
+Ok. I will look into this now.
+
+> 
+> 
+> - Paul
 > 
 
-Rachana,
 
-I see no point adding support for platform_data when you know that none of 
-older platforms are going to use this driver and all future platforms _must_ 
-follow device-tree model.
-
-So I agree that you should remove board file dependency from the driver.
-
-
-> I do not see "Missing platform data" error msg in the latest driver. I am not able to trace from where this got populated.
-> 
-
-Can you share the branch which you have tested?
-
-Thanks,
-Vaibhav
-
-> > 
-> > What are the chances this driver will work when applied on top of 3.8-rcX? Has it even been tested with that? Has it been tested at all?
-> 
-> This driver has been tested on top of v3.8-rc3 on a AM335x EVM.
-> 
-> Regards,
-> Rachna
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+Regards, 
+Gururaja
