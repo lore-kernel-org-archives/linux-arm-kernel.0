@@ -1,49 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 Jan 2013 21:54:38 +0100
-Subject: [PATCH 05/10] gpio: pxa: remove gpio_type
-In-Reply-To: <51066118.1000200@compulab.co.il>
-References: <1358929554-32265-1-git-send-email-haojian.zhuang@linaro.org>
- <1358929554-32265-6-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdYj3Bm0GKhdvcmvwu4mz3YLTnyaOWjGT7qt2atbZ_x2EA@mail.gmail.com>
- <51066118.1000200@compulab.co.il>
-Message-ID: <CACRpkda1LGN=HQwXAGNvc3sJ2D2Eq1Qe9g_gOXMAeFbnJH-O_w@mail.gmail.com>
+Date: Thu, 31 Jan 2013 21:56:20 +0100
+Subject: [PATCH 1/6 v14] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <CAOY=C6GReEpO7ukOS8WiQgdFFAreaYK1YrZ8HQrQ9dGMFObAdQ@mail.gmail.com>
+References: <1358856404-8975-1-git-send-email-stigge@antcom.de>
+ <1358856404-8975-2-git-send-email-stigge@antcom.de>
+ <CAOY=C6ERX=2HdvmtAW-__947_-P8r=Lvp88KzZDQdf4kAuRB5Q@mail.gmail.com>
+ <51053268.2000002@antcom.de>
+ <CAOY=C6GReEpO7ukOS8WiQgdFFAreaYK1YrZ8HQrQ9dGMFObAdQ@mail.gmail.com>
+Message-ID: <CACRpkdaEG3UNntPGy1wnXyKahtDOWXUnqSvr-RG4ak-Ho3+AMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 12:29 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> On 01/25/13 12:01, Linus Walleij wrote:
->> On Wed, Jan 23, 2013 at 9:25 AM, Haojian Zhuang
->> <haojian.zhuang@linaro.org> wrote:
->>
->>> Since gpio_type is used to check whether gafr register is valid. So
->>> move it into platform data.
->>>
->>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->>
->> (...)
->>
->>> +++ b/drivers/gpio/gpio-pxa.c
->>> @@ -72,6 +72,7 @@ struct pxa_gpio_chip {
->>>         void __iomem    *regbase;
->>>         unsigned int    irq_base;
->>>         unsigned int    inverted;
->>> +       unsigned int    gafr;
->>>         char label[10];
->>
->> Also looks like some kind of a bool.
->
-> Actually, no... GAFR is the PXA Alternate Function register name,
-> so unsigned int (or u32) is good.
+On Mon, Jan 28, 2013 at 12:30 PM, Stijn Devriendt <highguy@gmail.com> wrote:
 
-Alternate funtion register?
+> This is one of the warts of the GPIO API, if you ask me (and probably
+> others too).
+> Using a resource without allocating it first is just asking for
+> trouble. It's one of those
+> things pinctl was designed to solve... I've been thinking about
+> spending spare time
+> sending out patches converting all implicit requests and then removing
+> the implicit
+> request, but spare time is limited...
 
-Thanks for telling!
-
-So this is about muxing and should thus be in the pinctrl
-framework?
-
-Or is there some criss-cross with pinctrl already that I'm
-not aware of?
+It would be much appreciated. We can make good use of all
+help we can get in this area...
 
 Yours,
 Linus Walleij
