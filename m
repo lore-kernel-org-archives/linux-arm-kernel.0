@@ -1,79 +1,81 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 31 Jan 2013 15:21:27 +0000 (UTC)
-Subject: OMAP4 PM bootloader dependency problems
-In-Reply-To: <1359622829.10415.40.camel@sokoban>
-References: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
- <alpine.DEB.2.00.1301301706580.17105@utopia.booyaka.com>
- <1359622829.10415.40.camel@sokoban>
-Message-ID: <alpine.DEB.2.00.1301311416360.23099@utopia.booyaka.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 31 Jan 2013 16:22:37 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130131150801.GA23505@n2100.arm.linux.org.uk>
+References: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130130113245.GH23505@n2100.arm.linux.org.uk>
+ <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <20130130150856.GJ23505@n2100.arm.linux.org.uk>
+ <20130130151934.GK23505@n2100.arm.linux.org.uk>
+ <20130130163659.75360dba@skate>
+ <20130130154602.GL23505@n2100.arm.linux.org.uk>
+ <20130131153041.35fa3b60@skate>
+ <20130131145002.GZ23505@n2100.arm.linux.org.uk>
+ <20130131155737.4ab97a0b@skate>
+ <20130131150801.GA23505@n2100.arm.linux.org.uk>
+Message-ID: <20130131162237.79de29c4@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Russell King - ARM Linux,
 
-On Thu, 31 Jan 2013, Tero Kristo wrote:
+On Thu, 31 Jan 2013 15:08:01 +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 31, 2013 at 03:57:37PM +0100, Thomas Petazzoni wrote:
+> > Indeed. But this function never gets called with bus->number == 0, only
+> > with bus->number = 1, 2, 3, 4, 5, 6. So those are child busses, and
+> > therefore they have a parent.
+> 
+> Having thought about it, yes, that's what I expect, because root bus
+> resources are never resized.  Root bus resources are normally setup
+> before probing to indicate what size they _can_ be and define what
+> space is available to the downstream devices.
+> 
+> Child busses (behind a PCI-2-PCI bridge) are a different matter - these
+> will be adjusted according to their on-bus devices and the windows for
+> them sized and allocated appropriately _within_ the confines of the
+> root bus resource.
 
-> Personally I don't like too much to have just extra spam during boot,
-> which in many cases is even unnecessary (e.g. people who actually have
-> good u-boot in use.)
+Ok.
 
-The impact of two or three informative lines sent to the kernel console on 
-boot is lower than the cost of people spending hours trying to figure out 
-why chip retention idle doesn't work.
+> > I am talking about the PCI-to-PCI bridges. I want the I/O windows
+> > assigned to each PCI-to-PCI bridge to be 64K aligned. The PCI-to-PCI
+> > bridges are devices that sit on bus 0, each giving access to the child
+> > buses 1, 2, 3, 4, 5, 6.
+> 
+> Right, so you've just confirmed that this _is_ the right hook and it
+> _is_ being called at the right time.
 
-Linux distributions that control the bootloader version can easily 
-comment out the warning.
+Ok.
 
-I'm hoping the console messages will inspire someone out there to fix the 
-root cause of the problem -- that the kernel is missing device 
-reset and initialization code for several OMAP4 devices.
+> However, I had interpreted your requirement as the _host_ bridge only
+> (insufficient information in your previous emails, or I missed it).
 
-> Personally I would like to have some sort of test during boot which 
-> detects broken PM and maybe prevents core idle completely if this is the 
-> case.
+Might be insufficient information, or wrong terminology on my side.
 
-As far as I know, a simple, clean test for this that can be merged 
-right now doesn't exist, and has never been posted to the lists.
+> If that's what your bridge requires, then we need to detect it via
+> its vendor and device IDs and only apply this fixup to those bridges
+> which require a 64K alignment.
+> 
+> So, the IDs are vendor:device = 0x11ab:0x1092 ?  And let me get this
+> straight, it _is_ a specific requirement for this particular bridge
+> P2P bridge?
 
-Personally, it's unclear how such a test can be implemented reliably.  
-You've proposed checking IP block idle/standby states during PM init in 
-previous E-mails.  But the problem with this is that those IP blocks might 
-already be in use by their drivers by the time the OMAP4 PM code 
-initializes.
+The vendor/device ID will change. This P2P bridge is emulated. However,
+I'm not sure why you need to know the vendor:device ID to make the
+fixup specific.
 
-It's also important to keep in mind that adding any significant amount of 
-new code this late in the 3.8-rc cycle is not acceptable for my upstreams.
+The fixup is already specific to those bridges, since I am just setting
+pci_sys_data->win_align_io to 64K for the particular buses that are
+downstream the problematic bridges. So it doesn't affect any other bus
+on the system, and therefore I don't think this fixup needs to be made
+specific to a given vendor:device, no?
 
-That said, if you have a clean, reliable, and short solution for this, 
-please post it by the end of the week.
+Best regards,
 
-> Alternatively we can add extra info to the failed suspend dump and 
-> mention a good u-boot to try out (v2012-07 or newer.)
-
-Folks might be using dynamic idle, so just adding a message on resume from 
-suspend isn't enough.
-
-> If we could detect boot loader version from kernel side, that would work
-> also.
-
-I haven't seen any proposals for how to do this.  Even if one were 
-available, it would require maintaining kernel blacklists.  Considering 
-that the fault is in the kernel OMAP4 integration code and data, adding 
-such a blacklist seems like the wrong approach.
-
-...
-
-In any case, all of the options that you've mentioned are workarounds, not 
-real solutions.  Fixing the root cause would involve adding reset and 
-initialization code for the remaining devices.  No one is working on this 
-as far as I'm aware.  And even if they were, it would be too much code to 
-add during the v3.8-rc fixes cycle.
-
-I understand that you don't want to add an unconditional message on boot.  
-But right now, it's the best approach.  Please post a patch for this by 
-the end of this week that I or Kevin can send upstream ASAP.
-
-
-regards,
-
-- Paul
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
