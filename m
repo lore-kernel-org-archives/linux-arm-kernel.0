@@ -1,98 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 31 Jan 2013 12:32:17 +0100
-Subject: [PATCH 2/2] USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get
- phy
-In-Reply-To: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359631937-26646-3-git-send-email-s.hauer@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 31 Jan 2013 17:05:12 +0530
+Subject: [PATCH v2] ARM: omap4: clock data: Add missing clkdm association for
+ dpll_usb
+Message-ID: <1359632112-9808-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/usb/chipidea/ci13xxx_imx.c |   31 ++++++++++---------------------
- 1 file changed, 10 insertions(+), 21 deletions(-)
+dpll_usb needs the clkdm association so the clkdm can be
+turned on before a relock. All other dplls for omap4 belong
+to the ALWON (always on) domain.
 
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index b598bb8f..1df4b41 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -30,7 +30,6 @@
- 	((struct usb_phy *)platform_get_drvdata(pdev))
+The association was present as part of the older data file
+(clock44xx_data.c) but looks like got accidently dropped with
+the common clk convertion.
+
+More details of the patch which fixed this up in the older
+data file can be dound here..
+http://www.spinics.net/lists/linux-omap/msg63076.html
+
+Adding the .clkdm_name as part of the clk_hw_omap struct also
+means a new .init needs to be part of the clk_ops for dpll_usb
+to initialise the clkdm.
+
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/cclock44xx_data.c |   13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+index a2cc046..e71a19c 100644
+--- a/arch/arm/mach-omap2/cclock44xx_data.c
++++ b/arch/arm/mach-omap2/cclock44xx_data.c
+@@ -595,15 +595,26 @@ static const char *dpll_usb_ck_parents[] = {
  
- struct ci13xxx_imx_data {
--	struct device_node *phy_np;
- 	struct usb_phy *phy;
- 	struct platform_device *ci_pdev;
- 	struct clk *clk;
-@@ -90,12 +89,12 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- {
- 	struct ci13xxx_imx_data *data;
- 	struct ci13xxx_platform_data *pdata;
--	struct platform_device *plat_ci, *phy_pdev;
--	struct device_node *phy_np;
-+	struct platform_device *plat_ci;
- 	struct resource *res;
- 	struct regulator *reg_vbus;
- 	struct pinctrl *pinctrl;
- 	int ret;
-+	struct usb_phy *phy;
+ static struct clk dpll_usb_ck;
  
- 	if (of_find_property(pdev->dev.of_node, "fsl,usbmisc", NULL)
- 		&& !usbmisc_ops)
-@@ -147,18 +146,12 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
++static const struct clk_ops dpll_usb_ck_ops = {
++	.enable		= &omap3_noncore_dpll_enable,
++	.disable	= &omap3_noncore_dpll_disable,
++	.recalc_rate	= &omap3_dpll_recalc,
++	.round_rate	= &omap2_dpll_round_rate,
++	.set_rate	= &omap3_noncore_dpll_set_rate,
++	.get_parent	= &omap2_init_dpll_parent,
++	.init		= &omap2_init_clk_clkdm,
++};
++
+ static struct clk_hw_omap dpll_usb_ck_hw = {
+ 	.hw = {
+ 		.clk = &dpll_usb_ck,
+ 	},
+ 	.dpll_data	= &dpll_usb_dd,
++	.clkdm_name	= "l3_init_clkdm",
+ 	.ops		= &clkhwops_omap3_dpll,
+ };
  
--	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
--	if (phy_np) {
--		data->phy_np = phy_np;
--		phy_pdev = of_find_device_by_node(phy_np);
--		if (phy_pdev) {
--			struct usb_phy *phy;
--			phy = pdev_to_phy(phy_pdev);
--			if (phy &&
--			    try_module_get(phy_pdev->dev.driver->owner)) {
--				usb_phy_init(phy);
--				data->phy = phy;
--			}
-+	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
-+	if (!IS_ERR(phy)) {
-+		ret = usb_phy_init(phy);
-+		if (ret) {
-+			dev_err(&pdev->dev, "unable to init phy: %d\n", ret);
-+			goto err_clk;
- 		}
- 	}
+-DEFINE_STRUCT_CLK(dpll_usb_ck, dpll_usb_ck_parents, dpll_ck_ops);
++DEFINE_STRUCT_CLK(dpll_usb_ck, dpll_usb_ck_parents, dpll_usb_ck_ops);
  
-@@ -170,7 +163,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 			dev_err(&pdev->dev,
- 				"Failed to enable vbus regulator, err=%d\n",
- 				ret);
--			goto put_np;
-+			goto err_clk;
- 		}
- 		data->reg_vbus = reg_vbus;
- 	} else {
-@@ -222,9 +215,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- err:
- 	if (reg_vbus)
- 		regulator_disable(reg_vbus);
--put_np:
--	if (phy_np)
--		of_node_put(phy_np);
-+err_clk:
- 	clk_disable_unprepare(data->clk);
- 	return ret;
- }
-@@ -244,8 +235,6 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
- 		module_put(data->phy->dev->driver->owner);
- 	}
- 
--	of_node_put(data->phy_np);
--
- 	clk_disable_unprepare(data->clk);
- 
- 	platform_set_drvdata(pdev, NULL);
+ static const char *dpll_usb_clkdcoldo_ck_parents[] = {
+ 	"dpll_usb_ck",
 -- 
-1.7.10.4
+1.7.9.5
