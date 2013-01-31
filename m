@@ -1,85 +1,37 @@
 From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 31 Jan 2013 16:03:07 +0530
-Subject: [PATCH 3/3] ARM: davinci: da850: add mmc DT entries
-In-Reply-To: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
-References: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1359628387-14437-4-git-send-email-prakash.pm@ti.com>
+Date: Thu, 31 Jan 2013 16:03:04 +0530
+Subject: [PATCH 0/3] Add DT support for davinci_mmc driver
+Message-ID: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT entry for MMC. Also add entry for pinmux information.
-Tested on da850-evm without card detect and EDMA support as
-DT support for GPIO and EDMA are yet come.
+Patch set adds DT support for davinci_mmc driver and is
+verified on da850-evm without card_detect/write_protect and
+EDMA support.
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: cjb at laptop.org
-Cc: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/boot/dts/da850-evm.dts |   13 +++++++++++++
- arch/arm/boot/dts/da850.dtsi    |   15 +++++++++++++++
- 2 files changed, 28 insertions(+), 0 deletions(-)
+This patch depends on below patches under review:
+1) Patch "pinctrl: pinctrl-single: use arch_initcall and module_exit"
+	http://www.gossamer-threads.com/lists/linux/kernel/1669067
+2) Patch "drivers/pinctrl: grab default handles from device core"
+	http://www.gossamer-threads.com/lists/linux/kernel/1664015?page=last
+3) Patch "mmc: davinci: allow driver to work without DMA resource"
+	http://permalink.gmane.org/gmane.linux.kernel.mmc/18978
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index fa04152..51c87e7 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -30,6 +30,19 @@
- 		rtc0: rtc at 1c23000 {
- 			status = "okay";
- 		};
-+		mmc0: mmc at 1c40000 {
-+			status = "okay";
-+			bus-width = <4>;
-+			max-frequency = <50000000>;
-+			/*
-+			 * BIT(1) MMC_CAP_MMC_HIGHSPEED
-+			 * BIT(2) MMC_CAP_SD_HIGHSPEED
-+			 */
-+			caps = <6>;
-+			version = <1>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins>;
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 099c81e..5978a83 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -56,6 +56,15 @@
- 					0x30 0x01100000  0x0ff00000
- 				>;
- 			};
-+			mmc0_pins: pinmux_mmc_pins {
-+				pinctrl-single,bits = <
-+					/* MMCSD0_DAT[3] MMCSD0_DAT[2]
-+					 * MMCSD0_DAT[1] MMCSD0_DAT[0]
-+					 * MMCSD0_CMD    MMCSD0_CLK
-+					 */
-+					0x28 0x00222222  0x00ffffff
-+				>;
-+			};
- 		};
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
-@@ -88,6 +97,12 @@
- 				      19>;
- 			status = "disabled";
- 		};
-+		mmc0: mmc at 1c40000 {
-+			compatible = "ti,davinci_mmc";
-+			reg = <0x40000 0x1000>;
-+			interrupts = <16>;
-+			status = "disabled";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
+Applies on top of v3.9/dt branch of linux_davinci tree:
+git://gitorious.org/linux-davinci/linux-davinci.git
+
+Manjunathappa, Prakash (3):
+  ARM: davinci: da850: override mmc DT node device name
+  mmc: davinci_mmc: add DT support
+  ARM: davinci: da850: add mmc DT entries
+
+ .../devicetree/bindings/mmc/davinci_mmc.txt        |   23 +++++++
+ arch/arm/boot/dts/da850-evm.dts                    |   13 ++++
+ arch/arm/boot/dts/da850.dtsi                       |   15 ++++
+ arch/arm/mach-davinci/da8xx-dt.c                   |    8 ++-
+ drivers/mmc/host/davinci_mmc.c                     |   69 +++++++++++++++++++-
+ 5 files changed, 126 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+
 -- 
 1.7.4.1
