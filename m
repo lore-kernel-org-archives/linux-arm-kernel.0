@@ -1,44 +1,36 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 28 Feb 2013 20:18:34 -0800
-Subject: [GIT PULL 0/3] arm-soc: late changes for 3.9
-In-Reply-To: <1362092093-4839-1-git-send-email-olof@lixom.net>
-References: <1362092093-4839-1-git-send-email-olof@lixom.net>
-Message-ID: <CA+55aFx2Cuuq2YW6mexxZ88TNm=FLYUYPzeLqN=y46oYxZJ3wQ@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Fri, 1 Feb 2013 00:33:18 +0530
+Subject: [PATCH v3 0/2] Add CPSW VLAN Support
+Message-ID: <1359659000-25995-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 2:54 PM, Olof Johansson <olof@lixom.net> wrote:
->
-> Final two pull requests are for the same code. As Arnd describes in the
-> tags, they are for a set of mvebu patches that depend on contents in
-> the MMC tree. We had pulled in part of the MMC branch as a dependency,
-> but unfortunately Chris Ball rebased it.
+CPSW is capable of filtering VLAN packets in hardware. This patch series
+implements VLAN support to CPSW driver.
+This patch series is tested on net-next with AM335x EVM with ping test.
 
-Has Chris Ball been told what an incredible pain this kind of crap is,
-and that there's a damn good reason why WE DO NOT REBASE PUBLIC TREES
-THAT OTHERS MAY BE BASING THEIR DEVELOPMENT ON!
+Changes from initial version
+* added vlan support to existing add/delete unicast/multicast apis
+* Made driver as default VLAN enabled so that drivers need to be recompiled
+  when stack is compiled with VLAN
 
-Chris, can you hear me shouting? Don't do that.
+Changes from V2
+* Moved repeated code to static inline function
+* Made vlan add/delete function return type to void as it is not used in
+  the current driver implementation
+* Modified cpsw_add_default_vlan for better readability
+* changed BIT(1) port representation to defines
 
-> We're giving you the choice of taking the rebased version, or a
-> non-rebased-but-merged-and-fixed-up version to avoid dealing with the
-> excessive conflicts. The rebased one has the obvious benefit of not
-> having duplicate commits in the tree for the same changes, but, well,
-> it's rebased. Actual tree contents is identical though.
+Mugunthan V N (2):
+  drivers: net: cpsw: Add helper functions for VLAN ALE implementation
+  drivers: net:ethernet: cpsw: add support for VLAN
 
-I'm taking the rebased one, thanks for the explanation. I really don't
-like rebasing, but you did it for a valid reason, and it wasn't your
-mistake. And duplicating the commits just to be a pain is not worth
-it.
+ Documentation/devicetree/bindings/net/cpsw.txt |    2 +
+ drivers/net/ethernet/ti/cpsw.c                 |   93 +++++++++++++++++++--
+ drivers/net/ethernet/ti/cpsw_ale.c             |  105 +++++++++++++++++++++---
+ drivers/net/ethernet/ti/cpsw_ale.h             |   24 ++++--
+ include/linux/platform_data/cpsw.h             |    1 +
+ 5 files changed, 201 insertions(+), 24 deletions(-)
 
-> I've pushed a resolved branch for reference (late-branches-resolved)
-> in case you want to compare conflict resolutions.
-
-So Arnd's tag talked about removing the stale gpio.h, but I think it
-was the i2c.h that was now also stale. So I removed both - even though
-technically, the merge should have left i2c.h since it was in both
-parents. You should double-check that, but I don't see how that
-<linux/i2c.h> could *possibly* be valid any more, and people had tried
-(unsuccessfully) to remove it once already, so...
-
-              Linus
+-- 
+1.7.9.5
