@@ -1,48 +1,37 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 31 Jan 2013 09:36:10 +0000
-Subject: [PATCH v2 0/3] Add device tree support for NAND flash in
- am335x-evm
-In-Reply-To: <cover.1359007746.git.avinashphilip@ti.com>
-References: <cover.1359007746.git.avinashphilip@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA68A6D@DBDE01.ent.ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 31 Jan 2013 15:10:11 +0530
+Subject: [PATCH 0/5] ARM: OMAP2+: System timer updates
+In-Reply-To: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
+References: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <510A3BFB.5050805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On Wednesday 30 January 2013 10:34 PM, Jon Hunter wrote:
+> This series consists mainly of clean-ups for clockevents and
+> clocksource timers on OMAP2+ devices. The most significant change
+> in functionality comes from the 5th patch which is changing the
+> selection of the clocksource timer for OMAP3 and AM335x devices
+> when gptimers are used for clocksource. This change came about from
+> Vaibhav Bedia's series for AM335x [1]. See patch for more details on
+> the exact nature of the change.
+>
+> Boot tested with and without  device-tree on OMAP2420 H4,
+> OMAP3430 SDP, OMAP3430 Beagle Board, OMAP4430 SDP and
+> AM335x EVM (AM335x only supports device-tree boot).
+>
+> This series is based upon ARM-SoC next branch.
+>
+> [1] https://patchwork.kernel.org/patch/1921421/
+>
+> Jon Hunter (5):
+>    ARM: OMAP2+: Display correct system timer name
+>    ARM: OMAP2+: Remove hard-coded test on timer ID
+>    ARM: OMAP2+: Simplify system timer clock definitions
+>    ARM: OMAP2+: Simplify system timers definitions
+>    ARM: OMAP3: Update clocksource timer selection
+>
+Nice work Jon. All the patches in the series looks good
+to my eyes.
 
-On Thu, Jan 24, 2013 at 13:32:26, Philip, Avinash wrote:
-> This patch series adds device tree support for NAND flash in am335x-evm.
-> Also ELM node is populated in device tree and been used for BCH error
-> correction in NAND flash part. Also this patch series ensures RBL ecc
-> layout maintained in Linux kernel with BCH8 ecc scheme.
-> 
-> This patch series based on [1] and depends on [2].
-> 
-> 1. http://git.kernel.org/?p=linux/kernel/git/bcousson/linux-omap-dt.git;a=tree;h=refs/heads/for_3.9/dts;hb=refs/heads/for_3.9/dts
-> 
-> 2.mtd: devices: elm: Removes <xx> literals in elm DT node
->   https://lkml.org/lkml/2013/1/24/30
-> 
-
-Can you accept this patch series so that NAND flash with BCH support
-for am335x-evm available in 3.9.
-
-Thanks
-Avinash
-
-
-> Philip Avinash (1):
->   ARM: dts: AM33XX: Add NAND flash device tree data to am335x-evm
-> 
-> Philip, Avinash (2):
->   ARM: dts: AM33XX: Add ELM node
->   ARM: dts: AM33XX: Add GPMC node
-> 
->  arch/arm/boot/dts/am335x-evm.dts |   98 +++++++++++++++++++++++++++++++++++++-
->  arch/arm/boot/dts/am33xx.dtsi    |   20 ++++++++
->  2 files changed, 117 insertions(+), 1 deletion(-)
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
