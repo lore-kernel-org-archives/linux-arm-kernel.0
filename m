@@ -1,27 +1,96 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 31 Jan 2013 14:01:14 -0200
-Subject: Failure to boot...
-In-Reply-To: <20130131142758.GS2637@n2100.arm.linux.org.uk>
-References: <20130131030203.GA8374@quad.lixom.net>
- <alpine.LFD.2.02.1301302312030.6300@xanadu.home>
- <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <20130131104044.GO2637@n2100.arm.linux.org.uk>
- <510A6877.9080307@ti.com>
- <20130131130437.GP2637@n2100.arm.linux.org.uk>
- <510A78E1.8010308@ti.com>
- <20130131141320.GQ2637@n2100.arm.linux.org.uk>
- <20130131141635.GR2637@n2100.arm.linux.org.uk>
- <510A7D9F.7040507@ti.com>
- <20130131142758.GS2637@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5BrGcffzd2YBrF6YQTs7X38RuniYhm010fpLMnigecnTw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 31 Jan 2013 17:04:01 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
+ <20130129055508.GA3339@obsidianresearch.com>
+ <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
+ <20130129184157.GA29274@obsidianresearch.com>
+ <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
+ <20130129191853.GB29274@obsidianresearch.com>
+ <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
+ <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
+ <20130130103501.1873d39c@skate>
+ <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
+Message-ID: <20130131170401.4b3bfbbf@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 12:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Dear Bjorn Helgaas,
 
-> too.  It also looks like Versatile Express support _can't_ be disabled in
-> a multiplatform kernel, which is ludicrous.
+On Wed, 30 Jan 2013 11:52:15 -0700, Bjorn Helgaas wrote:
 
-Should we go with this approach?
-https://patchwork.kernel.org/patch/1774521/
+> The secondary/subordinate registers effectively define a bus number
+> aperture that tells the bridge which transactions to claim and forward
+> downstream.  When enumerating devices, we may update the subordinate
+> bus number to widen the aperture so we can enumerate an arbitrary tree
+> behind the bridge.  When we're finished, we'll probably narrow it by
+> updating the subordinate again, so the unused bus number space can be
+> used for other bridges.  I don't know the exact details of the
+> algorithm, and they're likely to change anyway, but pci_scan_bridge()
+> is where most of it happens.
+> 
+> It looks like your current system doesn't support trees below the
+> bridges, but hopefully we can make it so the generic enumeration
+> algorithms still work.
+
+The PCI-to-PCI bridge specification says that the Primary Bus Number
+Register, Secondary Bus Number Register and Subordinate Bus Number
+Register of the PCI configuration space of a PCI-to-PCI bridge should
+all be set to 0 after reset.
+
+Until now, I was forcing a specific value of the Secondary Bus Number
+and Subordinate Bus Number (1 for my first bridge, 2 for my second
+bridge, etc.).
+
+Following you're recommendation, I've changed this, and left those
+values initialized to 0 by default, in order to let Linux set correct
+values. Yes, Linux does assign appropriate values in the Secondary Bus
+Number Register. But before that Linux also complains loudly that the
+bridge configuration is invalid:
+
+pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+pci 0000:00:02.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+pci 0000:00:03.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+pci 0000:00:04.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+pci 0000:00:05.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+pci 0000:00:06.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+
+Looking at the code, we have:
+
+        /* Check if setup is sensible at all */
+        if (!pass &&
+            (primary != bus->number || secondary <= bus->number ||
+             secondary > subordinate)) {
+                dev_info(&dev->dev, "bridge configuration invalid ([bus %02x-%02x]), reconfiguring\n",
+                         secondary, subordinate);
+                broken = 1;
+        }
+
+Due to the default values of the Primary Bus Number Register, Secondary
+Bus Number Register and Subordinate Bus Number Register, we have:
+
+ primary = 0
+ secondary = 0
+ subordinate = 0
+
+We are enumerating the root bus, so bus->number = 0. Therefore:
+
+ * The test primary != bus->number is false, so it's not the problem.
+
+ * secondary <= bus->number is true, because secondary = 0, and
+   bus->number = 0. It is the problem.
+
+ * secondary > subordinate is false.
+
+So I'm not sure what to do with this...
+
+Thoas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
