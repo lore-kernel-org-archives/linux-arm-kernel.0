@@ -1,251 +1,40 @@
-From: hyok.choi@samsung.com (Hyok S. Choi)
-Date: Thu, 31 Jan 2013 09:40:18 +0900
-Subject: [PATCH 2/6] ARM: cache: remove ARMv3 support code
-In-Reply-To: <1359556069-28289-3-git-send-email-will.deacon@arm.com>
-References: <1359556069-28289-1-git-send-email-will.deacon@arm.com>
- <1359556069-28289-3-git-send-email-will.deacon@arm.com>
-Message-ID: <0a6801cdff4b$8ae22940$a0a67bc0$@samsung.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 30 Jan 2013 19:40:42 -0500
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <20130130231552.GA7915@obsidianresearch.com>
+References: <20130128223148.GA10275@schnuecks.de>
+ <20130129004824.GB7717@titan.lakedaemon.net>
+ <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
+ <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
+ <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
+ <20130130230100.GV7717@titan.lakedaemon.net>
+ <20130130231552.GA7915@obsidianresearch.com>
+Message-ID: <20130131004042.GY7717@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I know there is no v3 architecture in current platforms in mainline tree,
-but can we _remove_ v3 support codes? IOW, Is there no platform port users
-for ARM7 nommu families(such as ARM700 or ARM710)?
+On Wed, Jan 30, 2013 at 04:15:52PM -0700, Jason Gunthorpe wrote:
+> On Wed, Jan 30, 2013 at 06:01:00PM -0500, Jason Cooper wrote:
+> 
+> > Once we add proper DT support to mv643xx_eth, the local-mac-address will
+> > need to be defined in the dtb.  We should probably poke the other Jason
+> > to see if there is a cooresponding u-boot patch to his local-mac-address
+> > patch.
+> 
+> Sorry I don't have a u-boot fix, we don't use u-boot here - but
+> local-mac-address is common on other ARM drivers so I'd hope there is
+> a u-boot facility for stuffing it already?
 
------Original Message-----
-From: Will Deacon [mailto:will.deacon at arm.com] 
-Sent: Wednesday, January 30, 2013 11:28 PM
-To: linux-arm-kernel at lists.infradead.org
-Cc: Will Deacon; Hyok S. Choi; Greg Ungerer
-Subject: [PATCH 2/6] ARM: cache: remove ARMv3 support code
+a quick search of the u-boot source reveals common/fdt_support.c:477:
 
-This is only used by 740t, which is a v4 core and (by my reading of the
-datasheet for the CPU) ignores CRm for the cp15 cache flush operation,
-making the v4 cache implementation in cache-v4.S sufficient for this CPU.
+                do_fixup_by_path(fdt, path, "local-mac-address",
+                                &mac_addr, 6, 1);
 
-Tested with 740T core-tile on Integrator/AP baseboard.
+which is indeed called from bootm if u-boot is compiled with OF_LIBFDT.
 
-Cc: Hyok S. Choi <hyok.choi@samsung.com>
-Cc: Greg Ungerer <gerg@uclinux.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/glue-cache.h |   8 ---
- arch/arm/mm/Kconfig               |   5 +-
- arch/arm/mm/Makefile              |   1 -
- arch/arm/mm/cache-v3.S            | 137
---------------------------------------
- arch/arm/mm/proc-arm740.S         |   2 +-
- 5 files changed, 2 insertions(+), 151 deletions(-)  delete mode 100644
-arch/arm/mm/cache-v3.S
+I'll test this when I work on the mv643xx_eth DT binding series.
 
-diff --git a/arch/arm/include/asm/glue-cache.h
-b/arch/arm/include/asm/glue-cache.h
-index cca9f15..ea289e1 100644
---- a/arch/arm/include/asm/glue-cache.h
-+++ b/arch/arm/include/asm/glue-cache.h
-@@ -19,14 +19,6 @@
- #undef _CACHE
- #undef MULTI_CACHE
- 
--#if defined(CONFIG_CPU_CACHE_V3)
--# ifdef _CACHE
--#  define MULTI_CACHE 1
--# else
--#  define _CACHE v3
--# endif
--#endif
--
- #if defined(CONFIG_CPU_CACHE_V4)
- # ifdef _CACHE
- #  define MULTI_CACHE 1
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig index
-3fd629d..c430f46 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -43,7 +43,7 @@ config CPU_ARM740T
- 	depends on !MMU
- 	select CPU_32v4T
- 	select CPU_ABRT_LV4T
--	select CPU_CACHE_V3	# although the core is v4t
-+	select CPU_CACHE_V4
- 	select CPU_CP15_MPU
- 	select CPU_PABRT_LEGACY
- 	help
-@@ -469,9 +469,6 @@ config CPU_PABRT_V7
- 	bool
- 
- # The cache model
--config CPU_CACHE_V3
--	bool
--
- config CPU_CACHE_V4
- 	bool
- 
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile index
-8a9c4cb..c0fd3c1 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -33,7 +33,6 @@ obj-$(CONFIG_CPU_PABRT_LEGACY)	+= pabort-legacy.o
- obj-$(CONFIG_CPU_PABRT_V6)	+= pabort-v6.o
- obj-$(CONFIG_CPU_PABRT_V7)	+= pabort-v7.o
- 
--obj-$(CONFIG_CPU_CACHE_V3)	+= cache-v3.o
- obj-$(CONFIG_CPU_CACHE_V4)	+= cache-v4.o
- obj-$(CONFIG_CPU_CACHE_V4WT)	+= cache-v4wt.o
- obj-$(CONFIG_CPU_CACHE_V4WB)	+= cache-v4wb.o
-diff --git a/arch/arm/mm/cache-v3.S b/arch/arm/mm/cache-v3.S deleted file
-mode 100644 index 8a3fade..0000000
---- a/arch/arm/mm/cache-v3.S
-+++ /dev/null
-@@ -1,137 +0,0 @@
--/*
-- *  linux/arch/arm/mm/cache-v3.S
-- *
-- *  Copyright (C) 1997-2002 Russell king
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <linux/init.h>
--#include <asm/page.h>
--#include "proc-macros.S"
--
--/*
-- *	flush_icache_all()
-- *
-- *	Unconditionally clean and invalidate the entire icache.
-- */
--ENTRY(v3_flush_icache_all)
--	mov	pc, lr
--ENDPROC(v3_flush_icache_all)
--
--/*
-- *	flush_user_cache_all()
-- *
-- *	Invalidate all cache entries in a particular address
-- *	space.
-- *
-- *	- mm	- mm_struct describing address space
-- */
--ENTRY(v3_flush_user_cache_all)
--	/* FALLTHROUGH */
--/*
-- *	flush_kern_cache_all()
-- *
-- *	Clean and invalidate the entire cache.
-- */
--ENTRY(v3_flush_kern_cache_all)
--	/* FALLTHROUGH */
--
--/*
-- *	flush_user_cache_range(start, end, flags)
-- *
-- *	Invalidate a range of cache entries in the specified
-- *	address space.
-- *
-- *	- start - start address (may not be aligned)
-- *	- end	- end address (exclusive, may not be aligned)
-- *	- flags	- vma_area_struct flags describing address space
-- */
--ENTRY(v3_flush_user_cache_range)
--	mov	ip, #0
--	mcreq	p15, 0, ip, c7, c0, 0		@ flush ID cache
--	mov	pc, lr
--
--/*
-- *	coherent_kern_range(start, end)
-- *
-- *	Ensure coherency between the Icache and the Dcache in the
-- *	region described by start.  If you have non-snooping
-- *	Harvard caches, you need to implement this function.
-- *
-- *	- start  - virtual start address
-- *	- end	 - virtual end address
-- */
--ENTRY(v3_coherent_kern_range)
--	/* FALLTHROUGH */
--
--/*
-- *	coherent_user_range(start, end)
-- *
-- *	Ensure coherency between the Icache and the Dcache in the
-- *	region described by start.  If you have non-snooping
-- *	Harvard caches, you need to implement this function.
-- *
-- *	- start  - virtual start address
-- *	- end	 - virtual end address
-- */
--ENTRY(v3_coherent_user_range)
--	mov	r0, #0
--	mov	pc, lr
--
--/*
-- *	flush_kern_dcache_area(void *page, size_t size)
-- *
-- *	Ensure no D cache aliasing occurs, either with itself or
-- *	the I cache
-- *
-- *	- addr	- kernel address
-- *	- size	- region size
-- */
--ENTRY(v3_flush_kern_dcache_area)
--	/* FALLTHROUGH */
--
--/*
-- *	dma_flush_range(start, end)
-- *
-- *	Clean and invalidate the specified virtual address range.
-- *
-- *	- start  - virtual start address
-- *	- end	 - virtual end address
-- */
--ENTRY(v3_dma_flush_range)
--	mov	r0, #0
--	mcr	p15, 0, r0, c7, c0, 0		@ flush ID cache
--	mov	pc, lr
--
--/*
-- *	dma_unmap_area(start, size, dir)
-- *	- start	- kernel virtual start address
-- *	- size	- size of region
-- *	- dir	- DMA direction
-- */
--ENTRY(v3_dma_unmap_area)
--	teq	r2, #DMA_TO_DEVICE
--	bne	v3_dma_flush_range
--	/* FALLTHROUGH */
--
--/*
-- *	dma_map_area(start, size, dir)
-- *	- start	- kernel virtual start address
-- *	- size	- size of region
-- *	- dir	- DMA direction
-- */
--ENTRY(v3_dma_map_area)
--	mov	pc, lr
--ENDPROC(v3_dma_unmap_area)
--ENDPROC(v3_dma_map_area)
--
--	.globl	v3_flush_kern_cache_louis
--	.equ	v3_flush_kern_cache_louis, v3_flush_kern_cache_all
--
--	__INITDATA
--
--	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and
-proc-macros.S)
--	define_cache_functions v3
-diff --git a/arch/arm/mm/proc-arm740.S b/arch/arm/mm/proc-arm740.S index
-dc5de5d..2088234 100644
---- a/arch/arm/mm/proc-arm740.S
-+++ b/arch/arm/mm/proc-arm740.S
-@@ -145,5 +145,5 @@ __arm740_proc_info:
- 	.long	arm740_processor_functions
- 	.long	0
- 	.long	0
--	.long	v3_cache_fns			@ cache model
-+	.long	v4_cache_fns			@ cache model
- 	.size	__arm740_proc_info, . - __arm740_proc_info
---
-1.8.0
+thx,
+
+Jason.
