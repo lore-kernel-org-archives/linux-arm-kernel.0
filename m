@@ -1,37 +1,63 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 31 Jan 2013 10:32:25 +0800
-Subject: [PATCH 1/2] ASoC: tlv320aic3x: Convert mic bias to a supply widget
-In-Reply-To: <1359552155-17426-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1359552155-17426-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20130131023221.GA6027@opensource.wolfsonmicro.com>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Thu, 31 Jan 2013 02:32:27 +0000
+Subject: [PATCH] arm: dts: omap4-sdp: Add I2c pinctrl data
+In-Reply-To: <1359536770.14894.38.camel@cumari.coelho.fi>
+References: <1359371865-27907-1-git-send-email-sourav.poddar@ti.com>
+ <1359527158.14894.37.camel@cumari.coelho.fi> <5108C052.3070604@ti.com>
+ <F3DBB1B3EF102E4994C89758CFCA32412C16DD@DBDE01.ent.ti.com>
+ <5108DE5F.5090803@ti.com> <1359536770.14894.38.camel@cumari.coelho.fi>
+Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412C1B46@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 06:52:35PM +0530, Hebbar Gururaja wrote:
+On Wed, Jan 30, 2013 at 14:36:10, Coelho, Luciano wrote:
+> On Wed, 2013-01-30 at 14:18 +0530, Santosh Shilimkar wrote:
+> > On Wednesday 30 January 2013 02:13 PM, Kumar, Anil wrote:
+> > > Hi Sourav,
+> > >
+> > > On Wed, Jan 30, 2013 at 12:10:18, Poddar, Sourav wrote:
+> > >> Hi Luciano,
+> > >> On Wednesday 30 January 2013 11:55 AM, Luciano Coelho wrote:
+> > >>> Hi Sourav,
+> > >>>
+> > >>> On Mon, 2013-01-28 at 16:47 +0530, Sourav Poddar wrote:
+> > >>>> Booting 3.8-rc4 om omap 4430sdp results in the following error
+> > >>>>
+> > >>>> omap_i2c 48070000.i2c: did not get pins for i2c error: -19
+> > >>>> [    1.024261] omap_i2c 48070000.i2c: bus 0 rev0.12 at 100 kHz
+> > >>>> [    1.030181] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
+> > >>>> [    1.037384] omap_i2c 48072000.i2c: bus 1 rev0.12 at 400 kHz
+> > >>>> [    1.043762] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
+> > >>>> [    1.050964] omap_i2c 48060000.i2c: bus 2 rev0.12 at 100 kHz
+> > >>>> [    1.056823] omap_i2c 4807a000.i2c: did not get pins for i2c error: -19
+> > >>>> [    1.064025] omap_i2c 4807a000.i2c: bus 3 rev0.12 at 400 kHz
+> > >>>>
+> > >>>> This happens because omap4 dts file is not adapted to use i2c through pinctrl
+> > >>>> framework. Populating i2c pinctrl data to get rid of the error.
+> > >>>>
+> > >>>> Tested on omap4430 sdp with 3.8-rc4 kernel.
+> > >>>>
+> > >>>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> > >>>> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > >>>> ---
+> > >>> Could you do the same thing for panda? I'm getting the same kind of
+> > >>> errors with it:
+> > >
+> > > omap4 uses pinctrl-single driver for pinmux with DT. Currently
+> > > pinctrl-single driver is getting up after I2C driver. So I2c cannot
+> > > use pinctrl. The below patch solve this issue
+> > >
+> > > http://www.gossamer-threads.com/lists/linux/kernel/1669067
+> > >
+> > > Can you try with this ? it may solve it.
+> > >
+> > OMAP i2c driver already takes care of -EPROBE_DEFER. The issue
+> > as you see from the log is not probe failure but missing the
+> > pin information in DT blob. And thats what patch does.
+> 
+> Yes, Santosh is right.  I tried this patch, but it didn't fix the
+> warnings.
 
-> Convert MicBias widgets to supply widget.
+Sorry, I misunderstood this issue.
 
-> On tlv320aic3x, Mic bias power on/off shares the same register bits
-> with output mic bias voltage.  So, when power on mic bias, we need
-> reclaim it to voltage value.
-
-This should update machine drivers that use the CODEC too.
-
-> +- ai3x-micbias-vg - MicBias Voltage required.
-> +	1 - MICBIAS output is powered to 2.0V,
-> +	2 - MICBIAS output is powered to 2.5V,
-> +	3 - MICBIAS output is connected to AVDD,
-> +	If this node is not mentioned or if the value is incorrect, then MicBias
-> +	is powered down.
-
-Would 2.0V not be a more sensible default (it is the lowest voltage so
-is unlikely to cause hardware damage if it's wrong)?
-
-Otherwise this looks good.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/c8628dbd/attachment.sig>
+Anil 
