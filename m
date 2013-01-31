@@ -1,37 +1,169 @@
 From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 31 Jan 2013 16:03:04 +0530
-Subject: [PATCH 0/3] Add DT support for davinci_mmc driver
-Message-ID: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
+Date: Thu, 31 Jan 2013 16:03:06 +0530
+Subject: [PATCH 2/3] mmc: davinci_mmc: add DT support
+In-Reply-To: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
+References: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <1359628387-14437-3-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch set adds DT support for davinci_mmc driver and is
-verified on da850-evm without card_detect/write_protect and
-EDMA support.
+Adds device tree support for davinci_mmc. Also add
+binding documentation.
+Tested with non-dma PIO mode and without GPIO
+card_detect/write_protect option because of
+dependencies on EDMA and GPIO modules DT support.
 
-This patch depends on below patches under review:
-1) Patch "pinctrl: pinctrl-single: use arch_initcall and module_exit"
-	http://www.gossamer-threads.com/lists/linux/kernel/1669067
-2) Patch "drivers/pinctrl: grab default handles from device core"
-	http://www.gossamer-threads.com/lists/linux/kernel/1664015?page=last
-3) Patch "mmc: davinci: allow driver to work without DMA resource"
-	http://permalink.gmane.org/gmane.linux.kernel.mmc/18978
-
-Applies on top of v3.9/dt branch of linux_davinci tree:
-git://gitorious.org/linux-davinci/linux-davinci.git
-
-Manjunathappa, Prakash (3):
-  ARM: davinci: da850: override mmc DT node device name
-  mmc: davinci_mmc: add DT support
-  ARM: davinci: da850: add mmc DT entries
-
+Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+Cc: linux-mmc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: cjb at laptop.org
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: mporter at ti.com
+---
  .../devicetree/bindings/mmc/davinci_mmc.txt        |   23 +++++++
- arch/arm/boot/dts/da850-evm.dts                    |   13 ++++
- arch/arm/boot/dts/da850.dtsi                       |   15 ++++
- arch/arm/mach-davinci/da8xx-dt.c                   |    8 ++-
  drivers/mmc/host/davinci_mmc.c                     |   69 +++++++++++++++++++-
- 5 files changed, 126 insertions(+), 2 deletions(-)
+ 2 files changed, 91 insertions(+), 1 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
 
+diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+new file mode 100644
+index 0000000..144bee6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+@@ -0,0 +1,23 @@
++* TI Highspeed MMC host controller for DaVinci
++
++The Highspeed MMC Host Controller on TI DaVinci family
++provides an interface for MMC, SD and SDIO types of memory cards.
++
++This file documents differences between the core properties described
++by mmc.txt and the properties used by the davinci_mmc driver.
++
++Required properties:
++- compatible:
++ Should be "ti,davinci_mmc", for davinci controllers
++
++Optional properties:
++- bus-width: Number of data lines, can be <1>, <4>, or <8>, default <1>
++- max-frequency: maximum operating clock frequency.
++- caps: Check for Host capabilities in <linux/mmc/host.h>
++- version: version of controller.
++Example:
++	mmc1: mmc at 0x4809c000 {
++		compatible = "ti,omap4-hsmmc";
++		reg = <0x4809c000 0x400>;
++		bus-width = <4>;
++	};
+diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+index 382b79d..ce6730d 100644
+--- a/drivers/mmc/host/davinci_mmc.c
++++ b/drivers/mmc/host/davinci_mmc.c
+@@ -34,6 +34,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/edma.h>
+ #include <linux/mmc/mmc.h>
++#include <linux/of.h>
+ 
+ #include <linux/platform_data/mmc-davinci.h>
+ 
+@@ -1156,16 +1157,75 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
+ 
+ 	mmc_davinci_reset_ctrl(host, 0);
+ }
++#ifdef CONFIG_OF
++static struct davinci_mmc_config
++	*mmc_of_get_pdata(struct platform_device *pdev)
++{
++	struct device_node *np;
++	struct davinci_mmc_config *pdata = NULL;
++	u32 data;
++	int ret;
++
++	pdata = pdev->dev.platform_data;
++	if (!pdata) {
++		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata) {
++			dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
++			goto nodata;
++		}
++	}
++
++	np = pdev->dev.of_node;
++	if (!np)
++		goto nodata;
++
++	ret = of_property_read_u32(np, "bus-width", &data);
++	if (ret)
++		dev_info(&pdev->dev, "wires not specified, defaulting to 4 bit mode\n");
++	pdata->wires = data;
++
++	ret = of_property_read_u32(np, "max-frequency", &data);
++	if (ret)
++		dev_info(&pdev->dev, "max-frequency not specified, defaulting to 25MHz\n");
++	pdata->max_freq = data;
++
++	ret = of_property_read_u32(np, "caps", &data);
++	if (ret)
++		dev_info(&pdev->dev, "card capability not specified\n");
++	pdata->caps = data;
++
++	ret = of_property_read_u32(np, "version", &data);
++	if (ret)
++		dev_err(&pdev->dev, "version not specified\n");
++	pdata->version = data;
++
++nodata:
++	return pdata;
++}
++
++#else
++static struct davinci_mmc_config
++	*mmc_of_get_pdata(struct platform_device *pdev)
++{
++	return pdev->dev.platform_data;
++}
++#endif
+ 
+ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+ {
+-	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
++	struct davinci_mmc_config *pdata = NULL;
+ 	struct mmc_davinci_host *host = NULL;
+ 	struct mmc_host *mmc = NULL;
+ 	struct resource *r, *mem = NULL;
+ 	int ret = 0, irq = 0;
+ 	size_t mem_size;
+ 
++	pdata = mmc_of_get_pdata(pdev);
++	if (pdata == NULL) {
++		dev_err(&pdev->dev, "Can not get platform data\n");
++		return -ENOENT;
++	}
++
+ 	/* REVISIT:  when we're fully converted, fail if pdata is NULL */
+ 
+ 	ret = -ENODEV;
+@@ -1403,11 +1463,18 @@ static const struct dev_pm_ops davinci_mmcsd_pm = {
+ #define davinci_mmcsd_pm_ops NULL
+ #endif
+ 
++static const struct of_device_id davinci_mmc_of_match[] = {
++	{.compatible = "ti,davinci_mmc", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, davinci_mmc_of_match);
++
+ static struct platform_driver davinci_mmcsd_driver = {
+ 	.driver		= {
+ 		.name	= "davinci_mmc",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= davinci_mmcsd_pm_ops,
++		.of_match_table = of_match_ptr(davinci_mmc_of_match),
+ 	},
+ 	.remove		= __exit_p(davinci_mmcsd_remove),
+ };
 -- 
 1.7.4.1
