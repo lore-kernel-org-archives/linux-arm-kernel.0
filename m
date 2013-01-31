@@ -1,65 +1,56 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 31 Jan 2013 20:13:10 +0530
-Subject: Failure to boot...
-In-Reply-To: <20130131142758.GS2637@n2100.arm.linux.org.uk>
-References: <20130131030203.GA8374@quad.lixom.net>
- <alpine.LFD.2.02.1301302312030.6300@xanadu.home>
- <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <20130131104044.GO2637@n2100.arm.linux.org.uk> <510A6877.9080307@ti.com>
- <20130131130437.GP2637@n2100.arm.linux.org.uk> <510A78E1.8010308@ti.com>
- <20130131141320.GQ2637@n2100.arm.linux.org.uk>
- <20130131141635.GR2637@n2100.arm.linux.org.uk> <510A7D9F.7040507@ti.com>
- <20130131142758.GS2637@n2100.arm.linux.org.uk>
-Message-ID: <510A82FE.6050803@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 31 Jan 2013 15:45:19 +0100
+Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
+ for all cores
+In-Reply-To: <CAOh2x==GeK4qM=kjy-tzhbEh4L9AmRXoG_0tUzov1SK+uRFxcw@mail.gmail.com>
+References: <1887364.fvxYYNb7Mm@amdc1227>
+ <CAOh2x==GeK4qM=kjy-tzhbEh4L9AmRXoG_0tUzov1SK+uRFxcw@mail.gmail.com>
+Message-ID: <1520677.WES295RohH@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 January 2013 07:57 PM, Russell King - ARM Linux wrote:
-> On Thu, Jan 31, 2013 at 07:50:15PM +0530, Santosh Shilimkar wrote:
->> On Thursday 31 January 2013 07:46 PM, Russell King - ARM Linux wrote:
->>> On Thu, Jan 31, 2013 at 02:13:20PM +0000, Russell King - ARM Linux wrote:
->>>> On Thu, Jan 31, 2013 at 07:30:01PM +0530, Santosh Shilimkar wrote:
->>>>> Linus' tip(commit: 04c2eee5) + arm-soc for-next boots fine as well.
->>>>> The pull request from Tony [1] fixed the multi-platform boot issue
->>>>> for OMAP.
->>>>>
->>>>> Now trying to merge your for-next and test.
->>>>
->>>> Well, my tip (which is based on Linus' 6abb7c25) also builds and
->>>> boots fine.
->>>>
->>>> Hang on...
->>>>
->>>> # CONFIG_ARCH_OMAP2PLUS is not set
->>>> CONFIG_ARCH_VEXPRESS=y
->>>>
->>>> which of course won't boot, and this happens on both oldconfigs because
->>>> of the change to multiplatform support.
->>>
->>> And no, the instructions given last time around to add:
->>>
->>> # 13 Jan 2013: Update for OMAP moving to multiplatform
->>> CONFIG_ARCH_MULTIPLATFORM=y
->>> CONFIG_ARCH_MULTI_V7=y
->>>
->>> don't fix it either, it needs more options defined...
->>>
->> Linus' tip + Tony's pull [1] request also makes things work
->> on OMAP.
->
-> Thanks to all this multiplatform stuff, the autobuilder has been building
-> nothing but Versatile Express kernels for the last 20 days.  That totally
-> explains why it won't boot.
->
-> The only thing I was told is to add the above two config symbols.  That
-> is not the complete story.  There's also other symbols which need adding
-> too.  It also looks like Versatile Express support _can't_ be disabled in
-> a multiplatform kernel, which is ludicrous.
->
-> And... fixing the config finally results in something that boots on the
-> SDP4430.
->
-Great. Thanks for the confirmation.
+Hi Viresh,
 
-Regards,
-Santosh
+On Thursday 31 of January 2013 09:50:37 Viresh Kumar wrote:
+> On Tue, Nov 13, 2012 at 2:56 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > On Exynos SoCs all cores share the same frequency setting, so changing
+> > frequency of one core will affect rest of cores.
+> > 
+> > This patch modifies the exynos-cpufreq driver to inform cpufreq core
+> > about this behavior and broadcast frequency change notifications for
+> > all cores.
+> > 
+> >         /* When the new frequency is lower than current frequency */
+> >         if ((freqs.new < freqs.old) ||
+> > 
+> > @@ -235,6 +237,7 @@ static int exynos_cpufreq_cpu_init(struct
+> > cpufreq_policy *policy)> 
+> >                 cpumask_copy(policy->related_cpus, cpu_possible_mask);
+> >                 cpumask_copy(policy->cpus, cpu_online_mask);
+> >         
+> >         } else {
+> > 
+> > +               policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
+> > 
+> >                 cpumask_setall(policy->cpus);
+> 
+> I couldn't understand the use of this change. Can you please explain ?
+
+All cores on Exynos SoCs share the same clock source, which means that 
+they all always run at the same frequency. So setting frequency on one 
+core sets the frequency on all cores and so it doesn't matter on which 
+core the frequency setting operation is done.
+
+As you can see in include/linux/cpufreq.h:
+
+#define CPUFREQ_SHARED_TYPE_ANY  (3) /* Freq can be set from any dependent 
+CPU*/
+
+which basically tells (together with rest of the patch) the cpufreq 
+subsystem about what I wrote earlier.
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
