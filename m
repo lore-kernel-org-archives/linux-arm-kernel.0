@@ -1,40 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Jan 2013 20:57:13 +0000
-Subject: [PATCH, RFC] default machine descriptor for multiplatform
-In-Reply-To: <510ABD70.1020408@wwwdotorg.org>
-References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <1638002.UJ7zfj1Wn5@wuerfel> <510ABD70.1020408@wwwdotorg.org>
-Message-ID: <201301312057.13913.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 31 Jan 2013 14:57:56 -0600
+Subject: BogoMIPS change in 3.6+
+In-Reply-To: <20130131162322.GD835@mudshark.cambridge.arm.com>
+References: <510A988F.6030508@gmail.com>
+ <20130131162322.GD835@mudshark.cambridge.arm.com>
+Message-ID: <510ADAD4.2050600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 January 2013, Stephen Warren wrote:
-
-> With that change, we can remove the custom .init_machine() functions for
-> all of Tegra, since they just do that:-)
-
-Yes, actually quite a lot of them have the same code, and we also have
-an increasing number of users of the irqchip_init and clocksource_of_init,
-so those can also be cleaned up as a follow-on to this patch.
-
-The main thing that has to remain for a lot of the platforms is SMP
-support, and I don't see a good way around that yet.
- 
-> > diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+On 01/31/2013 10:23 AM, Will Deacon wrote:
+> Hi Rob,
 > 
-> > +#ifdef CONFIG_IRQCHIP
-> >  void __init irqchip_init(void)
-> >  {
-> >  	of_irq_init(__irqchip_begin);
-> >  }
-> > +#else
-> > +static inline void irqchip_init(void)
-> > +{
-> > +}
-> > +#endif
+> On Thu, Jan 31, 2013 at 04:15:11PM +0000, Rob Herring wrote:
+>> The BogoMIPS value has changed on highbank since the commit below in
+>> 3.6. It is now half the value it used to be. Does that matter other than
+>> perception (I've checked that I'm not running at half the freq)?
 > 
-> That'd need to go in a header file.
+> Are you registering a delay timer? If not, then the delay loop should be
+> identical to what it was before, so that's certainly a surprise...
+> 
+> Are your delays ballpark correct (try 2ms)?
+> 
 
-Yep, you're right, my mistake.
+Yes, the delays are correct and this is an A9. So I guess this may be a
+surprise, but seems it is a non-issue. I'm sure I'll be getting asked
+about this...
 
-	Arnd
+Rob
