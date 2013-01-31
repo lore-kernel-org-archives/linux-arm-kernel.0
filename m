@@ -1,71 +1,131 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 31 Jan 2013 10:30:44 +0000
-Subject: [PATCH v2 0/4] Preparatory GIC patches for arm64 support
-In-Reply-To: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
-References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20130131103044.GB12877@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 31 Jan 2013 12:31:01 +0200
+Subject: [PATCH v9 00/20] OMAP USB Host cleanup
+In-Reply-To: <1358937492-8129-1-git-send-email-rogerq@ti.com>
+References: <1358937492-8129-1-git-send-email-rogerq@ti.com>
+Message-ID: <510A47E5.1050800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof, Arnd,
+Hi Samuel,
 
-On Tue, Jan 29, 2013 at 04:18:35PM +0000, Catalin Marinas wrote:
-> That's the second version of the GIC clean-up patches to support arm64.
-> The only change from v1 is that the second patch (chained_irq.h) also
-> covers drivers/gpio and drivers/pinctrl (#include change).
+Could you please pull this if it looks OK? Thanks :).
 
-Are you ok to merge this series via the arm-soc tree for 3.9-rc1? There
-are no complaints so far (only acks ;). This would allow me to push GIC
-support for arm64.
+cheers,
+-roger
 
-Thanks,
-
-Catalin
-
-
-Stats below for reference:
-
-> Catalin Marinas (4):
->   arm: Move the set_handle_irq and handle_arch_irq declarations to
->     asm/irq.h
->   arm: Move chained_irq_(enter|exit) to a generic file
->   irqchip: gic: Call handle_bad_irq() directly
->   irqchip: gic: Perform the gic_secondary_init() call via CPU notifier
+On 01/23/2013 12:37 PM, Roger Quadros wrote:
+> Hi Samuel,
 > 
->  arch/arm/include/asm/irq.h                  |  5 +++
->  arch/arm/include/asm/mach/irq.h             | 36 --------------------
->  arch/arm/mach-at91/gpio.c                   |  3 +-
->  arch/arm/mach-exynos/common.c               |  1 +
->  arch/arm/mach-exynos/platsmp.c              |  8 -----
->  arch/arm/mach-highbank/platsmp.c            |  7 ----
->  arch/arm/mach-imx/platsmp.c                 | 12 -------
->  arch/arm/mach-msm/platsmp.c                 |  8 -----
->  arch/arm/mach-omap2/omap-smp.c              |  7 ----
->  arch/arm/mach-shmobile/smp-emev2.c          |  7 ----
->  arch/arm/mach-shmobile/smp-r8a7779.c        |  7 ----
->  arch/arm/mach-shmobile/smp-sh73a0.c         |  7 ----
->  arch/arm/mach-socfpga/platsmp.c             | 12 -------
->  arch/arm/mach-spear13xx/platsmp.c           |  8 -----
->  arch/arm/mach-tegra/platsmp.c               |  8 -----
->  arch/arm/mach-ux500/platsmp.c               |  8 -----
->  arch/arm/plat-samsung/irq-vic-timer.c       |  3 +-
->  arch/arm/plat-samsung/s5p-irq-gpioint.c     |  3 +-
->  arch/arm/plat-versatile/platsmp.c           |  8 -----
->  drivers/gpio/gpio-msm-v2.c                  |  3 +-
->  drivers/gpio/gpio-mxc.c                     |  2 +-
->  drivers/gpio/gpio-omap.c                    |  3 +-
->  drivers/gpio/gpio-pl061.c                   |  2 +-
->  drivers/gpio/gpio-pxa.c                     |  3 +-
->  drivers/gpio/gpio-tegra.c                   |  3 +-
->  drivers/irqchip/irq-gic.c                   | 32 +++++++++++++-----
->  drivers/irqchip/irq-vic.c                   |  2 +-
->  drivers/pinctrl/pinctrl-at91.c              |  3 +-
->  drivers/pinctrl/pinctrl-exynos.c            |  3 +-
->  drivers/pinctrl/pinctrl-nomadik.c           |  2 +-
->  drivers/pinctrl/pinctrl-sirf.c              |  2 +-
->  drivers/pinctrl/spear/pinctrl-plgpio.c      |  2 +-
->  drivers/staging/imx-drm/ipu-v3/ipu-common.c |  2 +-
->  include/linux/irqchip/arm-gic.h             |  1 -
->  include/linux/irqchip/chained_irq.h         | 52 +++++++++++++++++++++++++++++
->  35 files changed, 97 insertions(+), 178 deletions(-)
->  create mode 100644 include/linux/irqchip/chained_irq.h
+> I think this series is in a pretty good shape to pull now :). I've added
+> Reviewed-by and Acked-by tags. You can please pull from below.
+> 
+> NOTE: the first patch is a stable fix so Greg KH might want to pick it up for 3.8-rc.
+> 
+> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+> 
+>   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+> 
+> are available in the git repository at:
+>   git://github.com/rogerq/linux.git linux-usbhost14-part
+> 
+> This patchset addresses the following
+> 
+> - Consolidate USB Host platform data.
+> - Avoid addressing clocks one by one by name and use a for loop + bunch
+>   of cleanups.
+> - Get number of channels/ports dynamically either from revision register
+>   or from platform data. Avoids getting clocks that are not present.
+> - Add OMAP5 and HSIC mode (Not tested).
+> 
+> v9:
+> - Addressed clock framework related comments from Russell King.
+> - Removed 2 clock data patches from the series as they will be taken care
+>   of by Paul Walmsey.
+> 
+> v8:
+> - Re-arranged patch "USB-ehci-omap-Don-t-free-gpios-that-we-didn-t-reques.patch"
+>   to be the first since it is a candidate for stable.
+> - Fixed issues raised by Felipe, i.e. indentation and use of switch ()
+> 
+> v7:
+> - Updated patch 4 to not hold a spinlock when using clk_get().
+> - Updated patches 3 and 11 to return -EADDRNOTAVAIL on failure of
+>   demv_request_and_ioremap().
+> 
+> v6:
+> - Added USB Host platform data consolidation patch as the first patch.
+>   based on request from Tony.
+> - Rebased on v3.8-rc3.
+> 
+> v5:
+> - Rebased on top of todays arm-soc/for-next.
+> - Removed the clock merging patch from the list.
+> - Updated patches 14, 19 and 20 to accomodate the above change.
+> - Added patch 22 to fix a build warning.
+> 
+> v4:
+> - Added appropriate maintainers in to/cc.
+> - minor print message fix in patch 23 to maintain consistency.
+> 
+> v3:
+> - Rebased on arm-soc/for-next commit f979306c4d38d213c6977aaf3b1115e8ded71e3a.
+> - Rearranged patch that get rids of cpu_is_omap..() macros.
+> - Coding style fixes.
+> 
+> v2:
+> - Clocks are allocated dynamically based on number of ports available
+>   on the platform.
+> - Reduced console spam if non critical clocks are not found on the platform.
+> - Get rid of cpu_is_.. macros from USB host driver.
+> 
+> cheers,
+> -roger
+> 
+> ---
+> Roger Quadros (20):
+>       USB: ehci-omap: Don't free gpios that we didn't request
+>       mfd: omap-usb-host: Consolidate OMAP USB-HS platform data
+>       mfd: omap-usb-tll: Fix channel count detection
+>       mfd: omap-usb-tll: Use devm_kzalloc/ioremap and clean up error path
+>       mfd: omap-usb-tll: Clean up clock handling
+>       mfd: omap-usb-tll: introduce and use mode_needs_tll()
+>       mfd: omap-usb-tll: Check for missing platform data in probe
+>       mfd: omap-usb-tll: Fix error message
+>       mfd: omap-usb-tll: serialize access to TLL device
+>       mfd: omap-usb-tll: Add OMAP5 revision and HSIC support
+>       mfd: omap_usb_host: Avoid missing platform data checks in suspend/resume
+>       mfd: omap-usb-host: Use devm_kzalloc() and devm_request_and_ioremap()
+>       mfd: omap-usb-host: know about number of ports from revision register
+>       mfd: omap-usb-host: override number of ports from platform data
+>       mfd: omap-usb-host: cleanup clock management code
+>       mfd: omap-usb-host: Manage HSIC clocks for HSIC mode
+>       mfd: omap-usb-host: Get rid of unnecessary spinlock
+>       mfd: omap-usb-host: clean up omap_usbhs_init()
+>       mfd: omap-usb-host: Don't spam console on clk_set_parent failure
+>       mdf: omap-usb-host: get rid of build warning
+> 
+>  arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
+>  arch/arm/mach-omap2/board-3630sdp.c        |    2 +-
+>  arch/arm/mach-omap2/board-am3517crane.c    |    2 +-
+>  arch/arm/mach-omap2/board-am3517evm.c      |    2 +-
+>  arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
+>  arch/arm/mach-omap2/board-cm-t3517.c       |    2 +-
+>  arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
+>  arch/arm/mach-omap2/board-igep0020.c       |    4 +-
+>  arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
+>  arch/arm/mach-omap2/board-omap3evm.c       |    2 +-
+>  arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
+>  arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
+>  arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
+>  arch/arm/mach-omap2/board-omap4panda.c     |    2 +-
+>  arch/arm/mach-omap2/board-overo.c          |    2 +-
+>  arch/arm/mach-omap2/board-zoom.c           |    2 +-
+>  arch/arm/mach-omap2/usb-host.c             |   29 +--
+>  arch/arm/mach-omap2/usb.h                  |   20 +-
+>  drivers/mfd/omap-usb-host.c                |  558 +++++++++++++++++-----------
+>  drivers/mfd/omap-usb-tll.c                 |  243 +++++++------
+>  drivers/usb/host/ehci-omap.c               |   14 +-
+>  include/linux/platform_data/usb-omap.h     |   24 +-
+>  22 files changed, 497 insertions(+), 425 deletions(-)
+> 
