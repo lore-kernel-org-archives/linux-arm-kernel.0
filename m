@@ -1,77 +1,87 @@
-From: kishon@ti.com (kishon)
-Date: Thu, 31 Jan 2013 14:42:48 +0530
-Subject: [PATCH 2/6] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <1359622873-23345-3-git-send-email-s.hauer@pengutronix.de>
-References: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
- <1359622873-23345-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <510A3590.2090309@ti.com>
+From: matthieu.castet@parrot.com (Matthieu CASTET)
+Date: Thu, 31 Jan 2013 10:15:54 +0100
+Subject: [PATCH 4/6] usb: chipidea: add PTW and PTS handling
+In-Reply-To: <20130130193327.GA1906@pengutronix.de>
+References: <1359559782-14552-1-git-send-email-s.hauer@pengutronix.de>
+ <1359559782-14552-5-git-send-email-s.hauer@pengutronix.de>
+ <5109505E.7040204@parrot.com> <20130130193327.GA1906@pengutronix.de>
+Message-ID: <510A364A.4020209@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Sascha Hauer a ?crit :
+> On Wed, Jan 30, 2013 at 05:54:54PM +0100, Matthieu CASTET wrote:
+>>> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+>>> index 57cae1f..dcb650f 100644
+>>> --- a/drivers/usb/chipidea/core.c
+>>> +++ b/drivers/usb/chipidea/core.c
+>>> @@ -67,6 +67,8 @@
+>>>  #include <linux/usb/gadget.h>
+>>>  #include <linux/usb/otg.h>
+>>>  #include <linux/usb/chipidea.h>
+>>> +#include <linux/usb/of.h>
+>>> +#include <linux/phy.h>
+>>>  
+>>>  #include "ci.h"
+>>>  #include "udc.h"
+>>> @@ -211,6 +213,42 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
+>>>  	return 0;
+>>>  }
+>>>  
+>>> +static void hw_phymode_configure(struct ci13xxx *ci)
+>>> +{
+>>> +	u32 portsc;
+>>> +
+>>> +	/*
+>>> +	 * The lpm version has the corresponding bits in the devlc register.
+>>> +	 * Currently not implemented.
+>>> +	 */
+>>> +	if (ci->hw_bank.lpm)
+>>> +		return;
+>> Why you don't implement it ?
+>>
+>> If you don't implement it, I believe you should add a warning in order to catch
+>> it when used with lpm devices.
+> 
+> I'm against adding a warning because current users seem to go well
+> without this setting. Adding a warning would lead to more confusion than
+> it would help.
+> 
+> I could try and implement it, though I'm unsure about the register
+> layout.
+> 
+> What I know from an earlier post from you is this:
+> 
+> #define LPM_PTS(d)  (((d)>>29)&7)
+> #define LPM_STS     BIT(28) /* serial transceiver select */
+> #define LPM_PTW     BIT(27) /* parallel transceiver width */
+> 
+> Do you also know how LPM_PTS is decoded?
 
-On Thursday 31 January 2013 02:31 PM, Sascha Hauer wrote:
-> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
->
-> This adds two little devicetree helper functions for determining the
-> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
-> the devicetree.
->
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->   drivers/usb/phy/Makefile |    1 +
->   drivers/usb/phy/phy.c    |   10 ++++++++++
->   drivers/usb/usb-common.c |   36 ++++++++++++++++++++++++++++++++++++
->   include/linux/usb/of.h   |   27 +++++++++++++++++++++++++++
->   include/linux/usb/otg.h  |    7 +++++++
->   include/linux/usb/phy.h  |    9 +++++++++
->   6 files changed, 90 insertions(+)
->   create mode 100644 include/linux/usb/of.h
->
-> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-> index 9fa6327..e1be1e8 100644
-> --- a/drivers/usb/phy/Makefile
-> +++ b/drivers/usb/phy/Makefile
-> @@ -5,6 +5,7 @@
->   ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
->
->   obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
-> +obj-$(CONFIG_OF)			+= of.o
+I will say the same as not lpm device :
 
-You've missed doing "git add ..usb/phy/of.c".
+PTS is  made up from PORTSCx bits 25, 30 and 31.
 
->   obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
->   obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
->   obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
-> diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
-> index ef35eb0..3ad4b5c 100644
-> --- a/drivers/usb/phy/phy.c
-> +++ b/drivers/usb/phy/phy.c
-> @@ -1,3 +1,13 @@
-> +/*
-> + * phy.c -- USB phy handling
-> + *
-> + * Copyright (C) 2004 Texas Instruments
+PTS is  made up from devlc bits 31, 30 and 29.
 
-it's 2013 already :-P
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
 
-But your *MODULE_LICENSE("GPL")* below tells it's only GPL.
-> + */
-.
-.
-<snip>
-.
-.
+Also in my datasheet, they give a way to check if the bits are read only or read
+write [1]. I don't know if it is worth the trouble to check it.
 
->   MODULE_LICENSE("GPL");
 
-Thanks
-Kishon
+Matthieu
+
+
+[1]
+PTS
+This register bit pair is used in conjunction with the configuration constant
+VUSB_HS_PHY_TYPE to control which parallel transceiver interface is selected. If
+VUSB_HS_PHY_TYPE is set for 0, 1, 2, 3, 8 or 10 then this bit is read only. If
+VUSB_HS_PHY_TYPE is 4, 5, 6, 7, 9 or 11 then this bit is read/write.
+
+This field is reset to:
+'000b' if VUSB_HS_PHY_TYPE = 0, 4 ? UTMI/UTMI+
+'001b' if VUSB_HS_PHY_TYPE = 1, 5 ? ULPI DDR
+'010b' if VUSB_HS_PHY_TYPE = 2, 6 ? ULPI
+'011b' if VUSB_HS_PHY_TYPE = 3, 7, 8, 9 ? Serial/1.1 PHY/IC_USB (FS Only)
+'100b' if VUSB_HS_PHY_TYPE = 10, 11 ? UTMI for HSIC PHY
