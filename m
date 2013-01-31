@@ -1,71 +1,51 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 31 Jan 2013 15:15:02 +0100
-Subject: [PATCH v2] arm: mvebu: support for the new Armada XP development
- board(DB-MV784MP-GP)
-In-Reply-To: <1359641286-18182-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1359641286-18182-1-git-send-email-gregory.clement@free-electrons.com>
- <1359641286-18182-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <510A7C66.40906@openwrt.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 31 Jan 2013 19:50:15 +0530
+Subject: Failure to boot...
+In-Reply-To: <20130131141635.GR2637@n2100.arm.linux.org.uk>
+References: <20130131014912.GM2637@n2100.arm.linux.org.uk>
+ <20130131030203.GA8374@quad.lixom.net>
+ <alpine.LFD.2.02.1301302312030.6300@xanadu.home>
+ <20130131092024.GN2637@n2100.arm.linux.org.uk>
+ <20130131104044.GO2637@n2100.arm.linux.org.uk> <510A6877.9080307@ti.com>
+ <20130131130437.GP2637@n2100.arm.linux.org.uk> <510A78E1.8010308@ti.com>
+ <20130131141320.GQ2637@n2100.arm.linux.org.uk>
+ <20130131141635.GR2637@n2100.arm.linux.org.uk>
+Message-ID: <510A7D9F.7040507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2013 03:08 PM, Gregory CLEMENT wrote:
-> This is the new Armada XP evaluation board from Marvell. It comes with
-> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
-> Gigabit links.
+On Thursday 31 January 2013 07:46 PM, Russell King - ARM Linux wrote:
+> On Thu, Jan 31, 2013 at 02:13:20PM +0000, Russell King - ARM Linux wrote:
+>> On Thu, Jan 31, 2013 at 07:30:01PM +0530, Santosh Shilimkar wrote:
+>>> Linus' tip(commit: 04c2eee5) + arm-soc for-next boots fine as well.
+>>> The pull request from Tony [1] fixed the multi-platform boot issue
+>>> for OMAP.
+>>>
+>>> Now trying to merge your for-next and test.
+>>
+>> Well, my tip (which is based on Linus' 6abb7c25) also builds and
+>> boots fine.
+>>
+>> Hang on...
+>>
+>> # CONFIG_ARCH_OMAP2PLUS is not set
+>> CONFIG_ARCH_VEXPRESS=y
+>>
+>> which of course won't boot, and this happens on both oldconfigs because
+>> of the change to multiplatform support.
 >
-> Support for USB (Host and device), SDIO, PCIe will be added as drivers
-> when they become available for Armada XP in mainline.
+> And no, the instructions given last time around to add:
 >
-> Tested-by: Simon Guinot <simon.guinot@sequanux.org>
-> Tested-by: Florian Fainelli <florian@openwrt.org>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->   arch/arm/boot/dts/Makefile         |    1 +
->   arch/arm/boot/dts/armada-xp-gp.dts |  101 ++++++++++++++++++++++++++++++++++++
->   2 files changed, 102 insertions(+)
->   create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
+> # 13 Jan 2013: Update for OMAP moving to multiplatform
+> CONFIG_ARCH_MULTIPLATFORM=y
+> CONFIG_ARCH_MULTI_V7=y
 >
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 5ebb44f..51aab4b 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -78,6 +78,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->   dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->   	armada-370-mirabox.dtb \
->   	armada-xp-db.dtb \
-> +	armada-xp-gp.dtb \
->   	armada-xp-openblocks-ax3-4.dtb
->   dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
->   	imx53-ard.dtb \
-> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-> new file mode 100644
-> index 0000000..50e44e7
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
-> @@ -0,0 +1,101 @@
-> +/*
-> + * Device Tree file for Marvell Armada XP development board
-> + * (DB-MV784MP-GP)
-> + *
-> + * Copyright (C) 2013 Marvell
-> + *
-> + * Lior Amsalem <alior@marvell.com>
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "armada-xp-mv78460.dtsi"
-> +
-> +/ {
-> +	model = "Marvell Armada XP Development Board: DB-MV784MP-GP";
+> don't fix it either, it needs more options defined...
+>
+Linus' tip + Tony's pull [1] request also makes things work
+on OMAP.
 
-I noticed this just now, please do not use ":" for consistency with the 
-other DTS files for Armada XP/370.
---
-Florian
+Regards,
+Santosh
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg83084.html
