@@ -1,90 +1,135 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Jan 2013 12:15:26 +0000
-Subject: [PATCHv5 03/16] arm: arch_timer: use u64/u32 for register data
+Date: Thu, 31 Jan 2013 12:15:27 +0000
+Subject: [PATCHv5 04/16] arm: arch_timer: standardise counter reading
 In-Reply-To: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
 References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1359634539-9580-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1359634539-9580-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To ensure the correct size of types, use u64 for the return value of
-arch_timer_get_cnt{p,v}ct, and u32 for arch_timer_rate, matching the
-size of the registers these values are taken from. While we're changing
-them anyway, simplify the implementation of arch_timer_get_cnt{p,v}ct.
+We're currently inconsistent with respect to our accesses to the
+physical and virtual counters, mixing and matching the two.
+
+This patch introduces and uses a function pointer for accessing the
+correct counter based on whether we're using physical or virtual
+interrupts. All current accesses to the counter accessors are redirected
+through it.
+
+When the driver is moved out to drivers/clocksource, there's the
+possibility that code called before the timer code is initialised will
+attempt to call arch_timer_read_counter (e.g. sched_clock for AArch64).
+To avoid having to have to check whether the timer has been initialised
+either in arch_timer_read_counter or one of it's callers, a default
+implementation is assigned that simply returns 0.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/kernel/arch_timer.c | 30 +++++++++++-------------------
- 1 file changed, 11 insertions(+), 19 deletions(-)
+ arch/arm/kernel/arch_timer.c | 58 +++++++++++++++++---------------------------
+ 1 file changed, 22 insertions(+), 36 deletions(-)
 
 diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 1bb3b582..498c29f 100644
+index 498c29f..eb78f43 100644
 --- a/arch/arm/kernel/arch_timer.c
 +++ b/arch/arm/kernel/arch_timer.c
-@@ -25,7 +25,7 @@
- #include <asm/arch_timer.h>
- #include <asm/sched_clock.h>
- 
--static unsigned long arch_timer_rate;
-+static u32 arch_timer_rate;
- 
- enum ppi_nr {
- 	PHYS_SECURE_PPI,
-@@ -121,27 +121,18 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
- 	return val;
+@@ -272,51 +272,37 @@ static int arch_timer_available(void)
+ 	return 0;
  }
  
--static inline cycle_t arch_timer_counter_read(const int access)
-+static inline u64 arch_counter_get_cntpct(void)
+-static u32 notrace arch_counter_get_cntpct32(void)
++/*
++ * Some external users of arch_timer_read_counter (e.g. sched_clock) may try to
++ * call it before it has been initialised. Rather than incur a performance
++ * penalty checking for initialisation, provide a default implementation that
++ * won't lead to time appearing to jump backwards.
++ */
++static u64 arch_timer_read_zero(void)
  {
--	cycle_t cval = 0;
+-	cycle_t cnt = arch_counter_get_cntpct();
 -
--	if (access == ARCH_TIMER_PHYS_ACCESS)
--		asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
--
--	if (access == ARCH_TIMER_VIRT_ACCESS)
--		asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (cval));
--
-+	u64 cval;
-+	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
- 	return cval;
+-	/*
+-	 * The sched_clock infrastructure only knows about counters
+-	 * with at most 32bits. Forget about the upper 24 bits for the
+-	 * time being...
+-	 */
+-	return (u32)cnt;
++	return 0;
  }
  
--static inline cycle_t arch_counter_get_cntpct(void)
+-static u32 notrace arch_counter_get_cntvct32(void)
 -{
--	return arch_timer_counter_read(ARCH_TIMER_PHYS_ACCESS);
--}
--
--static inline cycle_t arch_counter_get_cntvct(void)
-+static inline u64 arch_counter_get_cntvct(void)
- {
--	return arch_timer_counter_read(ARCH_TIMER_VIRT_ACCESS);
-+	u64 cval;
-+	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (cval));
-+	return cval;
+-	cycle_t cnt = arch_counter_get_cntvct();
++u64 (*arch_timer_read_counter)(void) = arch_timer_read_zero;
+ 
+-	/*
+-	 * The sched_clock infrastructure only knows about counters
+-	 * with at most 32bits. Forget about the upper 24 bits for the
+-	 * time being...
+-	 */
+-	return (u32)cnt;
++static u32 arch_timer_read_counter32(void)
++{
++	return arch_timer_read_counter();
  }
  
- static irqreturn_t inline timer_handler(const int access,
-@@ -259,7 +250,7 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
- 
- static int arch_timer_available(void)
+ static cycle_t arch_counter_read(struct clocksource *cs)
  {
--	unsigned long freq;
-+	u32 freq;
+-	/*
+-	 * Always use the physical counter for the clocksource.
+-	 * CNTHCTL.PL1PCTEN must be set to 1.
+-	 */
+-	return arch_counter_get_cntpct();
++	return arch_timer_read_counter();
+ }
  
- 	if (arch_timer_rate == 0) {
- 		freq = arch_timer_reg_read(ARCH_TIMER_PHYS_ACCESS,
-@@ -275,7 +266,8 @@ static int arch_timer_available(void)
+ static unsigned long arch_timer_read_current_timer(void)
+ {
+-	return arch_counter_get_cntpct();
++	return arch_timer_read_counter();
+ }
+ 
+ static cycle_t arch_counter_read_cc(const struct cyclecounter *cc)
+ {
+-	/*
+-	 * Always use the physical counter for the clocksource.
+-	 * CNTHCTL.PL1PCTEN must be set to 1.
+-	 */
+-	return arch_counter_get_cntpct();
++	return arch_timer_read_counter();
+ }
+ 
+ static struct clocksource clocksource_counter = {
+@@ -484,23 +470,23 @@ int __init arch_timer_of_register(void)
+ 		}
  	}
  
- 	pr_info_once("Architected local timer running at %lu.%02luMHz (%s).\n",
--		     arch_timer_rate / 1000000, (arch_timer_rate / 10000) % 100,
-+		     (unsigned long)arch_timer_rate / 1000000,
-+		     (unsigned long)(arch_timer_rate / 10000) % 100,
- 		     arch_timer_use_virtual ? "virt" : "phys");
++	if (arch_timer_use_virtual)
++		arch_timer_read_counter = arch_counter_get_cntvct;
++	else
++		arch_timer_read_counter = arch_counter_get_cntpct;
++
+ 	return arch_timer_register();
+ }
+ 
+ int __init arch_timer_sched_clock_init(void)
+ {
+-	u32 (*cnt32)(void);
+ 	int err;
+ 
+ 	err = arch_timer_available();
+ 	if (err)
+ 		return err;
+ 
+-	if (arch_timer_use_virtual)
+-		cnt32 = arch_counter_get_cntvct32;
+-	else
+-		cnt32 = arch_counter_get_cntpct32;
+-
+-	setup_sched_clock(cnt32, 32, arch_timer_rate);
++	setup_sched_clock(arch_timer_read_counter32,
++			  32, arch_timer_rate);
  	return 0;
  }
 -- 
