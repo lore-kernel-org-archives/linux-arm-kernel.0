@@ -1,38 +1,69 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 31 Jan 2013 15:47:20 +0530
-Subject: [PATCH 1/1] drivers: net: davinci_cpdma: acknowledge interrupt
- properly
-In-Reply-To: <EF466712-C5FF-4A91-BDF3-477559B02705@dominion.thruhere.net>
-References: <1359575813-15703-1-git-send-email-mugunthanvnm@ti.com>
- <EF466712-C5FF-4A91-BDF3-477559B02705@dominion.thruhere.net>
-Message-ID: <510A44B0.30200@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 31 Jan 2013 11:29:13 +0100
+Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <20130131020542.GD9777@nchen-desktop>
+References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
+ <87pq0omcfb.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130130020627.GA699@nchen-desktop>
+ <20130130140015.GZ1906@pengutronix.de>
+ <20130131020542.GD9777@nchen-desktop>
+Message-ID: <20130131102913.GA6937@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/31/2013 1:33 AM, Koen Kooi wrote:
-> Op 30 jan. 2013, om 20:56 heeft Mugunthan V N <mugunthanvnm@ti.com> het volgende geschreven:
->
->> CPDMA interrupts are not properly acknowledged which leads to interrupt
->> storm, only cpdma interrupt 0 is acknowledged in Davinci CPDMA driver.
->> Changed cpdma_ctlr_eoi api to acknowledge 1 and 2 interrupts which are
->> used for rx and tx respectively.
-> A brief inspection shows that this still isn't following the TRM, but Pantelis' patch does. Can you please fix this driver to follow the TRM and make it work on both PG1.0 and PG2.0 instead of papering over bugs instead of fixing them properly?
-Existing driver implementation is also complies with TRM. What Pantelis 
-added
-additionally are non-napi implementation, handled cpdma processed tx and rx
-processing separately and renamed wr_reg as per TRM naming convention.. 
-Also he
-has added a dummy reading tx/rx stat which is mentioned in TRM, but this 
-stat
-is required only when using multichannel for data transfer. Current 
-implementation
-of CPSW driver uses only channel 0 of Tx and Rx channels respectively 
-for transmission
-and reading stat doesn't gets any effect in interrupt acknowledgment.
+On Thu, Jan 31, 2013 at 10:05:44AM +0800, Peter Chen wrote:
+> On Wed, Jan 30, 2013 at 03:00:15PM +0100, Sascha Hauer wrote:
+> > On Wed, Jan 30, 2013 at 10:06:28AM +0800, Peter Chen wrote:
+> > > On Tue, Jan 29, 2013 at 01:55:04PM +0200, Alexander Shishkin wrote:
+> > > > Sascha Hauer <s.hauer@pengutronix.de> writes:
+> > > > 
+> > > > > From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > > >
+> > > > > This adds two little devicetree helper functions for determining the
+> > > > > dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
+> > > > > the devicetree.
+> > > > >
+> > > > > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > > > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> > > > > ---
+> > > > >
+> > > > > The properties and their values have been taken from the fsl-mph-dr driver.
+> > > > > This binding is also documented (though currently not used) for the tegra
+> > > > > ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
+> > > > > This is a first attempt to parse these bindings at a common place so that
+> > > > > others can make use of it.
+> > > > >
+> > > > > Basically I want to know whether this binding is recommended for new drivers
+> > > > > since normally the devicetree uses '-' instead of '_', and maybe there are
+> > > > > other problems with it.
+> > > > >
+> > > > > I need this binding for the chipidea driver. I suspect that the fsl-mph-dr
+> > > > > driver also really handles a chipidea core.
+> > > > 
+> > > > As far as I know, it is a chipidea core. Adding Peter to Cc list, he can
+> > > > probably confirm.
+> > > 
+> > > The fsl-mph-dr can't be used for chipdiea as it handles three platform
+> > > drivers for three roles (peripheral , host, otg). But chipidea only has
+> > > two platform drivers, one is the chipidea core, the other is related
+> > > controller wrapper.
+> > 
+> > What do you mean by 'three platform drivers'? That's only how the driver
+> > is built, no? I was talking about the hardware the fsl-mph-dr driver
+> > handles which definitely smells like chipidea.
+> 
+> It creates host/device/otg platform device according to dr_mode from
+> the device tree.
 
-Since both tx and rx are processed in same napi api, so i have added 
-interrupt
-acknowledgment to the same existing api.
+Again, that's software specific. What I'd like to know is whether the
+*hardware* could be handled by the chipidea driver.
 
-Regards
-Mugunthan V N
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
