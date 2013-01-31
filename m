@@ -1,37 +1,61 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 31 Jan 2013 09:50:15 +0100
-Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
- board(DB-MV784MP-GP)
-In-Reply-To: <2206499.VqjeY6AxuS@bender>
-References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
- <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
- <2206499.VqjeY6AxuS@bender>
-Message-ID: <510A3047.5070503@free-electrons.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 31 Jan 2013 11:00:29 +0200
+Subject: OMAP4 PM bootloader dependency problems
+In-Reply-To: <alpine.DEB.2.00.1301301706580.17105@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
+ <alpine.DEB.2.00.1301301706580.17105@utopia.booyaka.com>
+Message-ID: <1359622829.10415.40.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2013 08:30 PM, Florian Fainelli wrote:
-> On Wednesday 30 January 2013 18:26:14 Gregory CLEMENT wrote:
->> This is the new Armada XP evaluation board from Marvell. It comes with
->> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
->> Gigabit links.
->>
->> Support for USB (Host and device), SDIO, PCIe will be added as drivers
->> when they become available for Armada XP in mainline.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Wed, 2013-01-30 at 17:15 +0000, Paul Walmsley wrote:
+> Hi Tero et al.,
 > 
-> Tested-by: Florian Fainelli <florian@openwrt.org>
+> On Tue, 22 Jan 2013, Paul Walmsley wrote:
 > 
-> The PHY mapping you have is the right one, besides the minor naming in model 
-> and header comment, this is good, thanks a lot!
+> > As we've discussed, there are known bootloader dependencies with the OMAP4 
+> > PM retention idle code, introduced in v3.8.  Boards booted with u-boot 
+> > versions even as recent as 2011 won't enter retention idle correctly; for 
+> > example:
+> > 
+> >     http://www.pwsan.com/omap/testlogs/test_v3.8-rc4/20130120122039/pm/4430es2panda/4430es2panda_log.txt
 > 
-Thanks!
-So I am waiting for the official Tested-by from Simon, and I will send a V2
-patch with the name fixed and with your tested-by.
+> ...
+> 
+> > Barring that, what I'd like to see is a patch for v3.8-rc fixes that adds 
+> > a warning, printed to the kernel console, during boot.  The warning should 
+> > state that the OMAP4 PM code only works with certain bootloaders, and 
+> > should identify the minimum u-boot release needed for OMAP4 full-chip 
+> > retention idle to work.
+> 
+> Any progress on this one?  Time is getting very short to get this into 
+> v3.8-rc fixes, and it's important to get this into v3.8 so we don't 
+> have users expecting chip power management to work correctly with most 
+> u-boot versions that are out in the field.
+> 
+> All we should need for v3.8-rc are a few pr_warn()s that execute during 
+> OMAP4 PM init, noting that the OMAP4 chip power management doesn't work 
+> correctly with many bootloaders, due to missing code in the kernel to 
+> properly reset and initialize some devices, and noting the first u-boot 
+> version that is known to work correctly.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Personally I don't like too much to have just extra spam during boot,
+which in many cases is even unnecessary (e.g. people who actually have
+good u-boot in use.) Personally I would like to have some sort of test
+during boot which detects broken PM and maybe prevents core idle
+completely if this is the case. Alternatively we can add extra info to
+the failed suspend dump and mention a good u-boot to try out (v2012-07
+or newer.)
+
+If we could detect boot loader version from kernel side, that would work
+also.
+
+-Tero
+
+> 
+> Otherwise there's a very real risk that folks out there will waste lots of 
+> time trying to figure out why power management doesn't work as they 
+> expect.   To respect our users, we shouldn't put them in that situation.
+> 
+> 
+> - Paul
