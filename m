@@ -1,281 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 31 Jan 2013 11:12:57 +0100
-Subject: [PATCH 2/6] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <20130131100107.GD14629@nchen-desktop>
-References: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
- <1359622873-23345-3-git-send-email-s.hauer@pengutronix.de>
- <20130131100107.GD14629@nchen-desktop>
-Message-ID: <20130131101257.GR1906@pengutronix.de>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 31 Jan 2013 15:47:20 +0530
+Subject: [PATCH 1/1] drivers: net: davinci_cpdma: acknowledge interrupt
+ properly
+In-Reply-To: <EF466712-C5FF-4A91-BDF3-477559B02705@dominion.thruhere.net>
+References: <1359575813-15703-1-git-send-email-mugunthanvnm@ti.com>
+ <EF466712-C5FF-4A91-BDF3-477559B02705@dominion.thruhere.net>
+Message-ID: <510A44B0.30200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 06:01:08PM +0800, Peter Chen wrote:
-> On Thu, Jan 31, 2013 at 10:01:09AM +0100, Sascha Hauer wrote:
-> > From: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > 
-> > 
-> > +	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
-> > +		if (!strcmp(dr_mode, usb_dr_modes[i]))
-> > +			return i;
-> 
-> if (strcmp(dr_mode, usb_dr_modes[i]) == 0) may be more friendly.
-> 
-> > +
-> > +#ifndef __LINUX_USB_OF_H
-> > +#define __LINUX_USB_OF_H
-> > +
-> > +#include <linux/usb/phy.h>
-> > +
-> > +#ifdef CONFIG_OF
-> > +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
-> 
-> Will you put definition to phy.c, I can't find it at this version
+On 1/31/2013 1:33 AM, Koen Kooi wrote:
+> Op 30 jan. 2013, om 20:56 heeft Mugunthan V N <mugunthanvnm@ti.com> het volgende geschreven:
+>
+>> CPDMA interrupts are not properly acknowledged which leads to interrupt
+>> storm, only cpdma interrupt 0 is acknowledged in Davinci CPDMA driver.
+>> Changed cpdma_ctlr_eoi api to acknowledge 1 and 2 interrupts which are
+>> used for rx and tx respectively.
+> A brief inspection shows that this still isn't following the TRM, but Pantelis' patch does. Can you please fix this driver to follow the TRM and make it work on both PG1.0 and PG2.0 instead of papering over bugs instead of fixing them properly?
+Existing driver implementation is also complies with TRM. What Pantelis 
+added
+additionally are non-napi implementation, handled cpdma processed tx and rx
+processing separately and renamed wr_reg as per TRM naming convention.. 
+Also he
+has added a dummy reading tx/rx stat which is mentioned in TRM, but this 
+stat
+is required only when using multichannel for data transfer. Current 
+implementation
+of CPSW driver uses only channel 0 of Tx and Rx channels respectively 
+for transmission
+and reading stat doesn't gets any effect in interrupt acknowledgment.
 
-This goes to drivers/usb/phy/of.c Sorry, as Kishon noted I missed to git
-add the file. See the attached updated patch.
+Since both tx and rx are processed in same napi api, so i have added 
+interrupt
+acknowledgment to the same existing api.
 
-> 
-> > index e8a5fe8..4e8bfbb 100644
-> > --- a/include/linux/usb/otg.h
-> > +++ b/include/linux/usb/otg.h
-> > @@ -99,4 +99,11 @@ otg_start_srp(struct usb_otg *otg)
-> >  /* for OTG controller drivers (and maybe other stuff) */
-> >  extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
-> >  
-> > +enum usb_dr_mode {
-> > +	USB_DR_MODE_UNKNOWN,
-> > +	USB_DR_MODE_HOST,
-> > +	USB_DR_MODE_PERIPHERAL,
-> > +	USB_DR_MODE_OTG,
-> > +};
-> > +
-> 
-> I am not sure if otg.h is a good place to put this, in fact, we need
-> a common header file for it.
-
-Well linux/usb/otg.h is at least a header which can be included safely
-by everyone interested in usb_dr_mode. Anyway, I'm open for better
-suggestions, I just hesitated to add a new file just for this enum.
-
-Sascha
-
-
->From 19c1a6552d6aa93f5ff354a224de0679d55a8126 Mon Sep 17 00:00:00 2001
-From: Michael Grzeschik <m.grzeschik@pengutronix.de>
-Date: Tue, 6 Nov 2012 16:10:10 +0100
-Subject: [PATCH] USB: add devicetree helpers for determining dr_mode and
- phy_type
-
-This adds two little devicetree helper functions for determining the
-dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
-the devicetree.
-
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/usb/phy/Makefile |    1 +
- drivers/usb/phy/of.c     |   47 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/usb/usb-common.c |   36 +++++++++++++++++++++++++++++++++++
- include/linux/usb/of.h   |   27 ++++++++++++++++++++++++++
- include/linux/usb/otg.h  |    7 +++++++
- include/linux/usb/phy.h  |    9 +++++++++
- 6 files changed, 127 insertions(+)
- create mode 100644 drivers/usb/phy/of.c
- create mode 100644 include/linux/usb/of.h
-
-diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-index 9fa6327..e1be1e8 100644
---- a/drivers/usb/phy/Makefile
-+++ b/drivers/usb/phy/Makefile
-@@ -5,6 +5,7 @@
- ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
- 
- obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
-+obj-$(CONFIG_OF)			+= of.o
- obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
- obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
- obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
-diff --git a/drivers/usb/phy/of.c b/drivers/usb/phy/of.c
-new file mode 100644
-index 0000000..e6f3b74
---- /dev/null
-+++ b/drivers/usb/phy/of.c
-@@ -0,0 +1,47 @@
-+/*
-+ * USB of helper code
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/usb/of.h>
-+#include <linux/usb/otg.h>
-+
-+static const char *usbphy_modes[] = {
-+	[USBPHY_INTERFACE_MODE_UNKNOWN]	= "",
-+	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
-+	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
-+	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
-+	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
-+	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
-+};
-+
-+/**
-+ * of_usb_get_phy_mode - Get phy mode for given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * The function gets phy interface string from property 'phy_type',
-+ * and returns the correspondig enum usb_phy_interface
-+ */
-+enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
-+{
-+	const char *phy_type;
-+	int err, i;
-+
-+	err = of_property_read_string(np, "phy_type", &phy_type);
-+	if (err < 0)
-+		return USBPHY_INTERFACE_MODE_UNKNOWN;
-+
-+	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
-+		if (!strcmp(phy_type, usbphy_modes[i]))
-+			return i;
-+
-+	return USBPHY_INTERFACE_MODE_UNKNOWN;
-+}
-+EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
-diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
-index d29503e..ad4d87d 100644
---- a/drivers/usb/usb-common.c
-+++ b/drivers/usb/usb-common.c
-@@ -14,6 +14,9 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/usb/ch9.h>
-+#include <linux/of.h>
-+#include <linux/usb/of.h>
-+#include <linux/usb/otg.h>
- 
- const char *usb_speed_string(enum usb_device_speed speed)
- {
-@@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
- }
- EXPORT_SYMBOL_GPL(usb_speed_string);
- 
-+#ifdef CONFIG_OF
-+static const char *usb_dr_modes[] = {
-+	[USB_DR_MODE_UNKNOWN]		= "",
-+	[USB_DR_MODE_HOST]		= "host",
-+	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
-+	[USB_DR_MODE_OTG]		= "otg",
-+};
-+
-+/**
-+ * of_usb_get_dr_mode - Get dual role mode for given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * The function gets phy interface string from property 'dr_mode',
-+ * and returns the correspondig enum usb_dr_mode
-+ */
-+enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
-+{
-+	const char *dr_mode;
-+	int err, i;
-+
-+	err = of_property_read_string(np, "dr_mode", &dr_mode);
-+	if (err < 0)
-+		return USB_DR_MODE_UNKNOWN;
-+
-+	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
-+		if (!strcmp(dr_mode, usb_dr_modes[i]))
-+			return i;
-+
-+	return USB_DR_MODE_UNKNOWN;
-+}
-+EXPORT_SYMBOL_GPL(of_usb_get_dr_mode);
-+#endif
-+
- MODULE_LICENSE("GPL");
-diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
-new file mode 100644
-index 0000000..4681a20
---- /dev/null
-+++ b/include/linux/usb/of.h
-@@ -0,0 +1,27 @@
-+/*
-+ * OF helpers for usb devices.
-+ *
-+ * This file is released under the GPLv2
-+ */
-+
-+#ifndef __LINUX_USB_OF_H
-+#define __LINUX_USB_OF_H
-+
-+#include <linux/usb/phy.h>
-+
-+#ifdef CONFIG_OF
-+enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
-+enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np);
-+#else
-+static inline enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
-+{
-+	return USBPHY_INTERFACE_MODE_UNKNOWN;
-+}
-+
-+static inline enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
-+{
-+	return USB_DR_MODE_UNKNOWN;
-+}
-+#endif
-+
-+#endif /* __LINUX_USB_OF_H */
-diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-index e8a5fe8..4e8bfbb 100644
---- a/include/linux/usb/otg.h
-+++ b/include/linux/usb/otg.h
-@@ -99,4 +99,11 @@ otg_start_srp(struct usb_otg *otg)
- /* for OTG controller drivers (and maybe other stuff) */
- extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
- 
-+enum usb_dr_mode {
-+	USB_DR_MODE_UNKNOWN,
-+	USB_DR_MODE_HOST,
-+	USB_DR_MODE_PERIPHERAL,
-+	USB_DR_MODE_OTG,
-+};
-+
- #endif /* __LINUX_USB_OTG_H */
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index 15847cb..5edddb1 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -12,6 +12,15 @@
- #include <linux/notifier.h>
- #include <linux/usb.h>
- 
-+enum usb_phy_interface {
-+	USBPHY_INTERFACE_MODE_UNKNOWN,
-+	USBPHY_INTERFACE_MODE_UTMI,
-+	USBPHY_INTERFACE_MODE_UTMIW,
-+	USBPHY_INTERFACE_MODE_ULPI,
-+	USBPHY_INTERFACE_MODE_SERIAL,
-+	USBPHY_INTERFACE_MODE_HSIC,
-+};
-+
- enum usb_phy_events {
- 	USB_EVENT_NONE,         /* no events or cable disconnected */
- 	USB_EVENT_VBUS,         /* vbus valid event */
--- 
-1.7.10.4
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Mugunthan V N
