@@ -1,56 +1,42 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 31 Jan 2013 15:45:19 +0100
-Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
- for all cores
-In-Reply-To: <CAOh2x==GeK4qM=kjy-tzhbEh4L9AmRXoG_0tUzov1SK+uRFxcw@mail.gmail.com>
-References: <1887364.fvxYYNb7Mm@amdc1227>
- <CAOh2x==GeK4qM=kjy-tzhbEh4L9AmRXoG_0tUzov1SK+uRFxcw@mail.gmail.com>
-Message-ID: <1520677.WES295RohH@amdc1227>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 31 Jan 2013 15:50:11 +0100
+Subject: [PATCH v3] Adding support for the new Armada XP development board
+ from Marvell
+Message-ID: <1359643812-32654-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hello,
 
-On Thursday 31 of January 2013 09:50:37 Viresh Kumar wrote:
-> On Tue, Nov 13, 2012 at 2:56 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > On Exynos SoCs all cores share the same frequency setting, so changing
-> > frequency of one core will affect rest of cores.
-> > 
-> > This patch modifies the exynos-cpufreq driver to inform cpufreq core
-> > about this behavior and broadcast frequency change notifications for
-> > all cores.
-> > 
-> >         /* When the new frequency is lower than current frequency */
-> >         if ((freqs.new < freqs.old) ||
-> > 
-> > @@ -235,6 +237,7 @@ static int exynos_cpufreq_cpu_init(struct
-> > cpufreq_policy *policy)> 
-> >                 cpumask_copy(policy->related_cpus, cpu_possible_mask);
-> >                 cpumask_copy(policy->cpus, cpu_online_mask);
-> >         
-> >         } else {
-> > 
-> > +               policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
-> > 
-> >                 cpumask_setall(policy->cpus);
-> 
-> I couldn't understand the use of this change. Can you please explain ?
+This is the third version (and hopefully the last) of a single patch
+to add the dts support for new Armada XP development board from
+Marvell called DB-MV784MP-GP.
 
-All cores on Exynos SoCs share the same clock source, which means that 
-they all always run at the same frequency. So setting frequency on one 
-core sets the frequency on all cores and so it doesn't matter on which 
-core the frequency setting operation is done.
+The branch GP-board is available at
+https://github.com/MISL-EBU-System-SW/mainline-public.git
 
-As you can see in include/linux/cpufreq.h:
+Changelog:
 
-#define CPUFREQ_SHARED_TYPE_ANY  (3) /* Freq can be set from any dependent 
-CPU*/
+V2->v3
+- fixed typos in comments
+- fixed the compatible string for the board and use marvell,axp-gp
+  instead of marvell,axp-db which was already used by an other board
+- fixed the model name by remove the colon
 
-which basically tells (together with rest of the patch) the cpufreq 
-subsystem about what I wrote earlier.
+v2->v1:
+- added tested-by from Simon Guinot and Florian Fainelli
+- added some comments to emphasize that the amount of memory may
+  change.
+- named the board ``development board''
 
-Best regards,
+Gregory CLEMENT (1):
+  arm: mvebu: support for the new Armada XP development
+    board(DB-MV784MP-GP)
+
+ arch/arm/boot/dts/Makefile         |    1 +
+ arch/arm/boot/dts/armada-xp-gp.dts |  101 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 102 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
+
 -- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+1.7.9.5
