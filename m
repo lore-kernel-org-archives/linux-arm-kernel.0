@@ -1,64 +1,104 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 31 Jan 2013 07:44:35 +0100
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
-Message-ID: <20130131064435.GB4926@pd.tnic>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 31 Jan 2013 08:10:14 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130130151934.GK23505@n2100.arm.linux.org.uk>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130130113245.GH23505@n2100.arm.linux.org.uk>
+ <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <20130130150856.GJ23505@n2100.arm.linux.org.uk>
+ <20130130151934.GK23505@n2100.arm.linux.org.uk>
+Message-ID: <20130131071014.GA32104@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 08:09:00PM -0600, Kim Phillips wrote:
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 40e2b12..c8798b9 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -141,6 +141,16 @@ config ARCH_USE_BUILTIN_BSWAP
->  	 instructions should set this. And it shouldn't hurt to set it
->  	 on architectures that don't have such instructions.
+On Wed, Jan 30, 2013 at 03:19:34PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 30, 2013 at 03:08:56PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Jan 30, 2013 at 01:03:44PM +0100, Thierry Reding wrote:
+> > > On Wed, Jan 30, 2013 at 11:32:46AM +0000, Russell King - ARM Linux wrote:
+> > > > On Mon, Jan 28, 2013 at 07:56:28PM +0100, Thomas Petazzoni wrote:
+> > > > > +static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+> > > > > +						 const struct resource *res,
+> > > > > +						 resource_size_t start,
+> > > > > +						 resource_size_t size,
+> > > > > +						 resource_size_t align)
+> > > > > +{
+> > > > > +	if (!(res->flags & IORESOURCE_IO))
+> > > > > +		return start;
+> > > > > +
+> > > > > +	/*
+> > > > > +	 * The I/O regions must be 64K aligned, because the
+> > > > > +	 * granularity of PCIe I/O address decoding windows is 64 K
+> > > > > +	 */
+> > > > > +	return round_up(start, SZ_64K);
+> > > > > +}
+> > > > 
+> > > > You do realise that this will result in all PCI I/O BARs being rounded
+> > > > up to 64K.
+> > > > 
+> > > > I've just been digging through the PCI code and have come across a
+> > > > function - pcibios_window_alignment() - which the PCI code allows to be
+> > > > overriden which allows you to increase the alignment requirement of
+> > > > bridge windows.  It takes the PCI bus and window type as arguments.
+> > > > 
+> > > > I'd suggest using that, and checking whether the bus which is passed
+> > > > corresponds with a bus which gives you problems, so that you don't
+> > > > impose the 64K requirement on downstream bridges.
+> > > 
+> > > That approach isn't going to work very well with multi-platform, though,
+> > > since the function can only be overridden on a per-architecture basis.
+> > 
+> > The same can be said of all the various other functions which the PCI
+> > stuff expects the arch to provide, yet we seem to cope just fine...
+> 
+> And this (untested) is how it's done:
+> 
+>  arch/arm/include/asm/mach/pci.h |    1 +
+>  arch/arm/kernel/bios32.c        |    8 ++++++++
+>  2 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index db9fedb..bba0cf3 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -29,6 +29,7 @@ struct hw_pci {
+>  	void		(*postinit)(void);
+>  	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
+>  	int		(*map_irq)(const struct pci_dev *dev, u8 slot, u8 pin);
+> +	resource_size_t	(*window_align)(struct pci_bus *, unsigned long);
+>  };
 >  
-> +config ARCH_DEFINES_BUILTIN_BSWAP
-> +       depends on ARCH_USE_BUILTIN_BSWAP
-> +       bool
-> +       help
-> +	 ARCH selects this when it wants to control HAVE_BUILTIN_BSWAPxx
-
-This is what threw me off: if ARCH selects this, I don't think we want
-to have a help text and the option be user visible? Normally such
-options are only bool and are selected automatically by hm.. ARCH, as
-you say above and do so below. :-)
-
-> +	 definitions over those in the generic compiler headers.  It
-> +	 can be dependent on a combination of byte swapping instruction
-> +	 availability, the instruction set version, and the state
-> +	 of support in different compiler versions.
+>  /*
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 379cf32..32c3bd9 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -581,6 +581,14 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  	return start;
+>  }
+>  
+> +resource_size_t pcibios_window_alignment(struct pci_bus *bus,
+> +					 unsigned long type)
+> +{
+> +	struct pci_sys_data *sys = bus->sysdata;
 > +
->  config HAVE_SYSCALL_WRAPPERS
->  	bool
->  
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 73027aa..b5868c2 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -57,6 +57,8 @@ config ARM
->  	select CLONE_BACKWARDS
->  	select OLD_SIGSUSPEND3
->  	select OLD_SIGACTION
-> +	select ARCH_USE_BUILTIN_BSWAP
-> +	select ARCH_DEFINES_BUILTIN_BSWAP
->  	help
+> +	return sys->window_alignment ? sys->window_alignment(bus, type) : 1;
+> +}
+> +
+>  /**
+>   * pcibios_enable_device - Enable I/O and memory.
+>   * @dev: PCI device to be enabled
 
-Thanks.
+Yes, something like that'll work. I had been under the impression that
+what you proposed was overriding pcibios_window_alignment() for Marvell
+only.
 
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/88de3d77/attachment.sig>
