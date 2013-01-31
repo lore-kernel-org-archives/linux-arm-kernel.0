@@ -1,40 +1,213 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Jan 2013 20:58:39 +0000
-Subject: [PATCH v6 03/10] ARM: edma: add AM33XX support to the private
- EDMA API
-In-Reply-To: <20130131183255.GI2244@beef>
-References: <1359529229-22207-1-git-send-email-mporter@ti.com>
- <201301300932.58732.arnd@arndb.de> <20130131183255.GI2244@beef>
-Message-ID: <201301312058.39948.arnd@arndb.de>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Thu, 31 Jan 2013 14:59:47 -0600
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130131092801.GV23505@n2100.arm.linux.org.uk>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129083522.GA14302@pd.tnic>
+ <1359478014.3529.157.camel@shinybook.infradead.org>
+ <20130129174249.GB25415@pd.tnic>
+ <1359482147.3529.161.camel@shinybook.infradead.org>
+ <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+Message-ID: <20130131145947.f62474a0600848df86548b96@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 January 2013, Matt Porter wrote:
-> On Wed, Jan 30, 2013 at 09:32:58AM +0000, Arnd Bergmann wrote:
-> > On Wednesday 30 January 2013, Matt Porter wrote:
-> > > +               dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
-> > > +               of_dma_controller_register(dev->of_node,
-> > > +                                          of_dma_simple_xlate,
-> > > +                                          &edma_filter_info);
-> > > +       }
-> > 
-> > How do you actually deal with the problem mentioned by Padma, that
-> > the filter function does not know which edma instance it is looking
-> > at? If you assume that there can only be a single edma instance in
-> > the system, that is probably a limitation that should be documented
-> > somewhere, and ideally the probe() function should check for that.
-> 
-> I make an assumption of one edma instance in the system in the case of
-> DT being populated. This is always true right now as the only SoC with
-> two EDMA controllers in existence is Davinci DA850. Until recently,
-> Davinci had no DT support. Given the steady work being done today on DT
-> support for DA850, it'll probably be something needed in 3.10.
-> 
-> I will add a comment and check in probe() to capture this assumption
-> and then plan to update separately to support DA850 booting from DT.
+On Thu, 31 Jan 2013 09:28:01 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Ok, sounds good. Hopefully by then we will already have a nicer
-way to write an xlate function that does not rely on a filter
-function.
+> On Wed, Jan 30, 2013 at 08:09:00PM -0600, Kim Phillips wrote:
+> > The savings come mostly from device-tree related code, and some
+> > from drivers.
+> 
+> You forget that IP networking is all big endian, so these will be using
+> the byte swapping too (search it for htons/ntohs/htonl/ntohl).
 
-	Arnd
+As David mentioned, there isn't much gain from net/ code.
+
+> > v2:
+> > - at91 and lpd270 builds fixed by limiting to ARMv6 and above
+> >   (i.e., ARM cores that have support for the 'rev' instruction).
+> >   Otherwise, the compiler emits calls to libgcc's __bswapsi2 on
+> >   these ARMv4/v5 builds (and arch ARM doesn't link with libgcc).
+> 
+> Which compiler version?  gcc 4.5.4 doesn't do this, except for the 16-bit
+> swap, so I doubt that any later compiler does.
+
+I've tried both gcc 4.6.3 [1] and 4.6.4 [2].  If you can point me to
+a 4.5.x, I'll try that, too, but as it stands now, if one moves the
+code added to swab.h below outside of its armv6 protection,
+gcc adds calls to __bswapsi2.
+
+> > --- a/arch/arm/include/uapi/asm/swab.h
+> > +++ b/arch/arm/include/uapi/asm/swab.h
+> > @@ -50,4 +50,14 @@ static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
+> >  
+> >  #endif
+> >  
+> > +#if defined(__KERNEL__) && __LINUX_ARM_ARCH__ >= 6
+> > +#if GCC_VERSION >= 40600
+> > +#define __HAVE_BUILTIN_BSWAP32__
+> > +#define __HAVE_BUILTIN_BSWAP64__
+> > +#endif
+> > +#if GCC_VERSION >= 40800
+> > +#define __HAVE_BUILTIN_BSWAP16__
+> > +#endif
+> > +#endif
+> 
+> If this is __KERNEL__ only, it should not be in a uapi header.  UAPI
+> headers get exported to userland, this is not userland interface code.
+> IT should be in arch/arm/include/asm/swab.h
+
+right, I've fixed this and Boris' remove the help text comment, and
+made a v3:
+
+>From 18c86580efba42d2680f2947867722705292f80a Mon Sep 17 00:00:00 2001
+From: Kim Phillips <kim.phillips@freescale.com>
+Date: Mon, 28 Jan 2013 19:30:33 -0600
+Subject: [PATCH] arm: use built-in byte swap function
+
+Enable the compiler intrinsic for byte swapping on arch ARM.  This
+allows the compiler to detect and be able to optimize out byte
+swappings, e.g. in big endian to big endian moves.
+
+A ARCH_DEFINES_BUILTIN_BSWAP is added to allow an ARCH to select
+it when it wants to control HAVE_BUILTIN_BSWAPxx definitions over
+those in the generic compiler headers.  It can be dependent on a
+combination of byte swapping instruction availability, the
+instruction set version, and the state of support in different
+compiler versions.
+
+AFAICT, arm gcc got __builtin_bswap{32,64} support in 4.6,
+and for the 16-bit version in 4.8.
+
+This has a tiny benefit on vmlinux text size (gcc 4.6.4):
+
+multi_v7_defconfig:
+   text    data     bss     dec     hex filename
+3135208  188396  203344 3526948  35d124 vmlinux
+multi_v7_defconfig with builtin_bswap:
+   text    data     bss     dec     hex filename
+3135112  188396  203344 3526852  35d0c4 vmlinux
+
+exynos_defconfig:
+   text    data     bss     dec     hex filename
+4286605  360564  223172 4870341  4a50c5 vmlinux
+exynos_defconfig with builtin_bswap:
+   text    data     bss     dec     hex filename
+4286405  360564  223172 4870141  4a4ffd vmlinux
+
+The savings come mostly from device-tree related code, and some
+from drivers.
+
+Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
+---
+akin to: http://comments.gmane.org/gmane.linux.kernel.cross-arch/16016
+
+based on linux-next-20130128.  Depends on commit "compiler-gcc{3,4}.h:
+Use GCC_VERSION macro" by Daniel Santos <daniel.santos@pobox.com>,
+currently in the akpm branch.
+
+v3:
+- moved out of uapi swab.h into arch/arm/include/asm/swab.h
+- moved ARCH_DEFINES_BUILTIN_BSWAP help text into commit message
+- moved GCC_VERSION >= 40800 ifdef into GCC_VERSION >= 40600 block
+
+v2:
+- at91 and lpd270 builds fixed by limiting to ARMv6 and above
+  (i.e., ARM cores that have support for the 'rev' instruction).
+  Otherwise, the compiler emits calls to libgcc's __bswapsi2 on
+  these ARMv4/v5 builds (and arch ARM doesn't link with libgcc).
+  All ARM defconfigs now have the same build status as they did
+  without this patch (some are broken on linux-next).
+
+- move ARM check from generic compiler.h to arch ARM's swab.h.
+  - pretty sure it should be limited to __KERNEL__ builds
+
+- add new ARCH_DEFINES_BUILTIN_BSWAP (see Kconfig help).
+  - if set, generic compiler header does not set HAVE_BUILTIN_BSWAPxx
+  - not too sure about this having to be a new CONFIG_, but it's hard
+    to find a place for it given linux/compiler.h doesn't include any
+    arch-specific files.
+
+- move new selects to end of CONFIG_ARM's Kconfig select list,
+  as is done in David Woodhouse's original patchseries for ppc/x86.
+
+ arch/Kconfig                  |    4 ++++
+ arch/arm/Kconfig              |    2 ++
+ arch/arm/include/asm/swab.h   |    8 ++++++++
+ include/linux/compiler-gcc4.h |    3 ++-
+ 4 files changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 40e2b12..bc5ed77 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -141,6 +141,10 @@ config ARCH_USE_BUILTIN_BSWAP
+ 	 instructions should set this. And it shouldn't hurt to set it
+ 	 on architectures that don't have such instructions.
+ 
++config ARCH_DEFINES_BUILTIN_BSWAP
++       depends on ARCH_USE_BUILTIN_BSWAP
++       bool
++
+ config HAVE_SYSCALL_WRAPPERS
+ 	bool
+ 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 73027aa..b5868c2 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -57,6 +57,8 @@ config ARM
+ 	select CLONE_BACKWARDS
+ 	select OLD_SIGSUSPEND3
+ 	select OLD_SIGACTION
++	select ARCH_USE_BUILTIN_BSWAP
++	select ARCH_DEFINES_BUILTIN_BSWAP
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/include/asm/swab.h b/arch/arm/include/asm/swab.h
+index 537fc9b..e56acff 100644
+--- a/arch/arm/include/asm/swab.h
++++ b/arch/arm/include/asm/swab.h
+@@ -34,5 +34,13 @@ static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
+ }
+ #define __arch_swab32 __arch_swab32
+ 
++#if GCC_VERSION >= 40600
++#define __HAVE_BUILTIN_BSWAP32__
++#define __HAVE_BUILTIN_BSWAP64__
++#if GCC_VERSION >= 40800
++#define __HAVE_BUILTIN_BSWAP16__
++#endif
++#endif
++
+ #endif
+ #endif
+diff --git a/include/linux/compiler-gcc4.h b/include/linux/compiler-gcc4.h
+index 68b162d..fce39cb 100644
+--- a/include/linux/compiler-gcc4.h
++++ b/include/linux/compiler-gcc4.h
+@@ -66,7 +66,8 @@
+ #endif
+ 
+ 
+-#ifdef CONFIG_ARCH_USE_BUILTIN_BSWAP
++#if defined(CONFIG_ARCH_USE_BUILTIN_BSWAP) && \
++    !defined(CONFIG_ARCH_DEFINES_BUILTIN_BSWAP)
+ #if GCC_VERSION >= 40400
+ #define __HAVE_BUILTIN_BSWAP32__
+ #define __HAVE_BUILTIN_BSWAP64__
+-- 
+1.7.9.7
+
+Thanks,
+
+Kim
+
+[1] http://kernel.org/pub/tools/crosstool/files/bin/x86_64/
+
+[2] http://ftp.denx.de/pub/eldk/5.2.1/targets/armv7a/
