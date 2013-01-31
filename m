@@ -1,95 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Jan 2013 12:15:39 +0000
-Subject: [PATCHv5 16/16] clocksource: arch_timer: use virtual counters
-In-Reply-To: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
-References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1359634539-9580-17-git-send-email-mark.rutland@arm.com>
+From: rachna@ti.com (Patil, Rachna)
+Date: Thu, 31 Jan 2013 12:25:07 +0000
+Subject: [PATCH v4 5/8] MFD: ti_am335x_tscadc: Add DT support
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EBEFAE8@DBDE01.ent.ti.com>
+References: <1358999112-31192-1-git-send-email-rachna@ti.com>
+ <1358999112-31192-6-git-send-email-rachna@ti.com>
+ <A9839AA2-ABCD-4642-9766-D56824AC27AD@dominion.thruhere.net>
+ <4CE347531D4CA947960AF71FF095B9323E9B1EE9@DBDE01.ent.ti.com>
+ <79CD15C6BA57404B839C016229A409A83EBEFAE8@DBDE01.ent.ti.com>
+Message-ID: <4CE347531D4CA947960AF71FF095B9323E9B21C5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switching between reading the virtual or physical counters is
-problematic, as some core code wants a view of time before we're fully
-set up. Using a function pointer and switching the source after the
-first read can make time appear to go backwards, and having a check in
-the read function is an unfortunate block on what we want to be a fast
-path.
+Vaibhav,
 
-Instead, this patch makes us always use the virtual counters. If we're a
-guest, or don't have hyp mode, we'll use the virtual timers, and as such
-don't care about CNTVOFF as long as it doesn't change in such a way as
-to make time travel backwards. If we do have hyp mode, and might be a
-KVM host, we have to use the physical timers, and require CNTVOFF to be
-zero so as to have a consistent view of time between the physical timers
-and virtual counters.
+<SNIP>
+> > > > 
+> > > > -	if (!pdata) {
+> > > > +	if (!pdata && !pdev->dev.of_node) {
+> > > > 		dev_err(&pdev->dev, "Could not find platform data\n");
+> > > > 		return -EINVAL;
+> > > > 	}
+> > > > 
+> > > > -	if (pdata->adc_init)
+> > > > -		adc_channels = pdata->adc_init->adc_channels;
+> > > > +	if (pdev->dev.platform_data) {
+> > > > +		if (pdata->tsc_init)
+> > > > +			tsc_wires = pdata->tsc_init->wires;
+> > > > +
+> > > > +		if (pdata->adc_init)
+> > > > +			adc_channels = pdata->adc_init->adc_channels;
+> > > > +	} else {
+> > > > +		node = of_find_node_by_name(pdev->dev.of_node, "tsc");
+> > > > +		of_property_read_u32(node, "ti,wires", &tsc_wires);
+> > > > +
+> > > > +		node = of_find_node_by_name(pdev->dev.of_node, "adc");
+> > > > +		of_property_read_u32(node, "ti,adc-channels", &adc_channels);
+> > > > +	}
+> > > 
+> > > Since AM335x is DT only, why is there a platform data codepath and why is it the first branch it tries? And I guess the next question is related to the first: why doesn't it work when used with DT? When I copy over the nodes from the evm.dts to my board I get "tsc tsc: Missing platform data" in dmesg.
+> > 
+> > This IP came up 1st on AM335x, but it is not platform dependent. The driver can be used on other platforms where-in DT is not supported.
+> > According to the maintainers platform data takes precedence over DT. Hence the order.
+> > 
+> 
+> Rachana,
+> 
+> I see no point adding support for platform_data when you know that none of older platforms are going to use this driver and all future platforms _must_ follow device-tree model.
+> 
+> So I agree that you should remove board file dependency from the driver.
 
-Any code which may want to alter CNTVOFF (e.g. KVM) will need to ensure
-that it is zeroed when entering the host.
+Ok. I will remove support for platform data in the next version of patches.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- drivers/clocksource/arm_arch_timer.c | 21 ++++-----------------
- include/clocksource/arm_arch_timer.h |  2 +-
- 2 files changed, 5 insertions(+), 18 deletions(-)
+> 
+> 
+> > I do not see "Missing platform data" error msg in the latest driver. I am not able to trace from where this got populated.
+> > 
+> 
+> Can you share the branch which you have tested?
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index d7ad425..f0705fb 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -186,27 +186,19 @@ u32 arch_timer_get_rate(void)
- 	return arch_timer_rate;
- }
- 
--/*
-- * Some external users of arch_timer_read_counter (e.g. sched_clock) may try to
-- * call it before it has been initialised. Rather than incur a performance
-- * penalty checking for initialisation, provide a default implementation that
-- * won't lead to time appearing to jump backwards.
-- */
--static u64 arch_timer_read_zero(void)
-+u64 arch_timer_read_counter(void)
- {
--	return 0;
-+	return arch_counter_get_cntvct();
- }
- 
--u64 (*arch_timer_read_counter)(void) = arch_timer_read_zero;
--
- static cycle_t arch_counter_read(struct clocksource *cs)
- {
--	return arch_timer_read_counter();
-+	return arch_counter_get_cntvct();
- }
- 
- static cycle_t arch_counter_read_cc(const struct cyclecounter *cc)
- {
--	return arch_timer_read_counter();
-+	return arch_counter_get_cntvct();
- }
- 
- static struct clocksource clocksource_counter = {
-@@ -382,10 +374,5 @@ int __init arch_timer_init(void)
- 		}
- 	}
- 
--	if (arch_timer_use_virtual)
--		arch_timer_read_counter = arch_counter_get_cntvct;
--	else
--		arch_timer_read_counter = arch_counter_get_cntpct;
--
- 	return arch_timer_register();
- }
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index b61f996..34dccbe 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -33,7 +33,7 @@
- 
- extern int arch_timer_init(void);
- extern u32 arch_timer_get_rate(void);
--extern u64 (*arch_timer_read_counter)(void);
-+extern u64 arch_timer_read_counter(void);
- extern struct timecounter *arch_timer_get_timecounter(void);
- 
- #else
--- 
-1.8.1.1
+https://github.com/patilrachna/linux/tree/v3.8_rc3_MFD_TSCADC_DT-v2
+
+Regards,
+Rachna
