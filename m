@@ -1,66 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 31 Jan 2013 14:01:14 -0600
-Subject: [PATCH 3/3] ARM: highbank: mask cluster id from cpu_logical_map
-In-Reply-To: <1359662474-1883-1-git-send-email-robherring2@gmail.com>
-References: <1359662474-1883-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1359662474-1883-4-git-send-email-robherring2@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 31 Jan 2013 21:02:50 +0100
+Subject: [PATCH] power/reset: restart: remove __dev{init,exit}
+In-Reply-To: <1359658469-14856-1-git-send-email-jason@lakedaemon.net>
+References: <20130106220426.GE26928@lizard.sbx05280.losalca.wayport.net>
+ <1359658469-14856-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <20130131200250.GR29973@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Thu, Jan 31, 2013 at 06:54:29PM +0000, Jason Cooper wrote:
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 
-With commit a0ae0240 (ARM: kernel: add device tree init map function),
-the cpu id value may include the cluster id and is no longer 0-3, so we
-need to mask it now to get the right hard cpu index.
+Hi Jason
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-highbank/highbank.c |    3 ++-
- arch/arm/mach-highbank/sysregs.h  |    4 ++--
- 2 files changed, 4 insertions(+), 3 deletions(-)
+I Acked-by: a very similar patch to this yesterday....
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 981dc1e..e6c0612 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -28,6 +28,7 @@
- 
- #include <asm/arch_timer.h>
- #include <asm/cacheflush.h>
-+#include <asm/cputype.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_twd.h>
- #include <asm/hardware/arm_timer.h>
-@@ -59,7 +60,7 @@ static void __init highbank_scu_map_io(void)
- 
- void highbank_set_cpu_jump(int cpu, void *jump_addr)
- {
--	cpu = cpu_logical_map(cpu);
-+	cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(cpu), 0);
- 	writel(virt_to_phys(jump_addr), HB_JUMP_TABLE_VIRT(cpu));
- 	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
- 	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
-diff --git a/arch/arm/mach-highbank/sysregs.h b/arch/arm/mach-highbank/sysregs.h
-index 70af9d1..5995df7 100644
---- a/arch/arm/mach-highbank/sysregs.h
-+++ b/arch/arm/mach-highbank/sysregs.h
-@@ -37,7 +37,7 @@ extern void __iomem *sregs_base;
- 
- static inline void highbank_set_core_pwr(void)
- {
--	int cpu = cpu_logical_map(smp_processor_id());
-+	int cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(smp_processor_id()), 0);
- 	if (scu_base_addr)
- 		scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
- 	else
-@@ -46,7 +46,7 @@ static inline void highbank_set_core_pwr(void)
- 
- static inline void highbank_clear_core_pwr(void)
- {
--	int cpu = cpu_logical_map(smp_processor_id());
-+	int cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(smp_processor_id()), 0);
- 	if (scu_base_addr)
- 		scu_power_mode(scu_base_addr, SCU_PM_NORMAL);
- 	else
--- 
-1.7.10.4
+https://lkml.org/lkml/2013/1/30/233
+
+	Andrew
+
+> ---
+>  drivers/power/reset/restart-poweroff.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/power/reset/restart-poweroff.c b/drivers/power/reset/restart-poweroff.c
+> index b11b9e8..059cd15 100644
+> --- a/drivers/power/reset/restart-poweroff.c
+> +++ b/drivers/power/reset/restart-poweroff.c
+> @@ -22,7 +22,7 @@ static void restart_poweroff_do_poweroff(void)
+>  	arm_pm_restart('h', NULL);
+>  }
+>  
+> -static int __devinit restart_poweroff_probe(struct platform_device *pdev)
+> +static int restart_poweroff_probe(struct platform_device *pdev)
+>  {
+>  	/* If a pm_power_off function has already been added, leave it alone */
+>  	if (pm_power_off != NULL) {
+> @@ -35,7 +35,7 @@ static int __devinit restart_poweroff_probe(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static int __devexit restart_poweroff_remove(struct platform_device *pdev)
+> +static int restart_poweroff_remove(struct platform_device *pdev)
+>  {
+>  	if (pm_power_off == &restart_poweroff_do_poweroff)
+>  		pm_power_off = NULL;
+> @@ -50,7 +50,7 @@ static const struct of_device_id of_restart_poweroff_match[] = {
+>  
+>  static struct platform_driver restart_poweroff_driver = {
+>  	.probe = restart_poweroff_probe,
+> -	.remove = __devexit_p(restart_poweroff_remove),
+> +	.remove = restart_poweroff_remove,
+>  	.driver = {
+>  		.name = "poweroff-restart",
+>  		.owner = THIS_MODULE,
+> -- 
+> 1.8.1.1
+> 
