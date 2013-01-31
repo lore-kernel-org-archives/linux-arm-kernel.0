@@ -1,168 +1,264 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 31 Jan 2013 11:05:43 -0600
-Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
- socfpga harware
+Date: Thu, 31 Jan 2013 11:05:42 -0600
+Subject: [PATCHv2 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
 In-Reply-To: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
 References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1359651943-21752-5-git-send-email-dinguyen@altera.com>
+Message-ID: <1359651943-21752-4-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Because the CPU1 start address is different for socfpga-vt and
-socfpga-cyclone5, we add code to use the correct CPU1 start addr.
+mach-socfpga is another platform that needs to use
+v7_invalidate_l1 to bringup additional cores. There was a comment that
+the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Tested-by: Pavel Machek <pavel@denx.de>
+Reviewed-by: Pavel Machek <pavel@denx.de>
 Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Olof Johansson <olof@lixom.net>
-Cc: Pavel Machek <pavel@denx.de>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
 ---
- .../bindings/arm/altera/socfpga-system.txt         |    2 ++
- arch/arm/boot/dts/socfpga_cyclone5.dts             |    4 ++++
- arch/arm/boot/dts/socfpga_vt.dts                   |    4 ++++
- arch/arm/mach-socfpga/core.h                       |    4 +++-
- arch/arm/mach-socfpga/headsmp.S                    |   16 ++++++++++++----
- arch/arm/mach-socfpga/platsmp.c                    |    3 ++-
- arch/arm/mach-socfpga/socfpga.c                    |    8 ++++++++
- 7 files changed, 35 insertions(+), 6 deletions(-)
+ arch/arm/mach-imx/headsmp.S      |   47 -------------------------------------
+ arch/arm/mach-shmobile/headsmp.S |   48 --------------------------------------
+ arch/arm/mach-tegra/headsmp.S    |   43 ----------------------------------
+ arch/arm/mm/cache-v7.S           |   46 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 46 insertions(+), 138 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
-index 07c65e3..f4d04a0 100644
---- a/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
-@@ -3,9 +3,11 @@ Altera SOCFPGA System Manager
- Required properties:
- - compatible : "altr,sys-mgr"
- - reg : Should contain 1 register ranges(address and length)
-+- cpu1-start-addr : CPU1 start address in hex.
+diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+index 7e49deb..921fc15 100644
+--- a/arch/arm/mach-imx/headsmp.S
++++ b/arch/arm/mach-imx/headsmp.S
+@@ -17,53 +17,6 @@
  
- Example:
- 	 sysmgr at ffd08000 {
- 		compatible = "altr,sys-mgr";
- 		reg = <0xffd08000 0x1000>;
-+		cpu1-start-addr = <0xffd080c4>;
- 	};
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-index 7ad3cc6..3ae8a83 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-@@ -56,5 +56,9 @@
- 		serial1 at ffc03000 {
- 			clock-frequency = <100000000>;
- 		};
-+
-+		sysmgr at ffd08000 {
-+			cpu1-start-addr = <0xffd080c4>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index a0c6c65..1036eba 100644
---- a/arch/arm/boot/dts/socfpga_vt.dts
-+++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -56,5 +56,9 @@
- 		serial1 at ffc03000 {
- 			clock-frequency = <7372800>;
- 		};
-+
-+		sysmgr at ffd08000 {
-+			cpu1-start-addr = <0xffd08010>;
-+		};
- 	};
- };
-diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-index 9941caa..5b76dd4 100644
---- a/arch/arm/mach-socfpga/core.h
-+++ b/arch/arm/mach-socfpga/core.h
-@@ -20,7 +20,7 @@
- #ifndef __MACH_CORE_H
- #define __MACH_CORE_H
+ 	.section ".text.head", "ax"
  
--extern void secondary_startup(void);
-+extern void v7_secondary_startup(void);
- extern void __iomem *socfpga_scu_base_addr;
- 
- extern void socfpga_init_clocks(void);
-@@ -29,6 +29,8 @@ extern void socfpga_sysmgr_init(void);
- extern struct smp_operations socfpga_smp_ops;
- extern char secondary_trampoline, secondary_trampoline_end;
- 
-+extern unsigned long cpu1start_addr;
-+
- #define SOCFPGA_SCU_VIRT_BASE   0xfffec000
- 
- #endif
-diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
-index f09b128..3c83582 100644
---- a/arch/arm/mach-socfpga/headsmp.S
-+++ b/arch/arm/mach-socfpga/headsmp.S
-@@ -13,13 +13,21 @@
- 	__CPUINIT
- 	.arch	armv7-a
- 
--#define CPU1_START_ADDR 	        0xffd08010
+-/*
+- * The secondary kernel init calls v7_flush_dcache_all before it enables
+- * the L1; however, the L1 comes out of reset in an undefined state, so
+- * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
+- * of cache lines with uninitialized data and uninitialized tags to get
+- * written out to memory, which does really unpleasant things to the main
+- * processor.  We fix this by performing an invalidate, rather than a
+- * clean + invalidate, before jumping into the kernel.
+- *
+- * This funciton is cloned from arch/arm/mach-tegra/headsmp.S, and needs
+- * to be called for both secondary cores startup and primary core resume
+- * procedures.  Ideally, it should be moved into arch/arm/mm/cache-v7.S.
+- */
+-ENTRY(v7_invalidate_l1)
+-	mov	r0, #0
+-	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
+-	mcr	p15, 2, r0, c0, c0, 0
+-	mrc	p15, 1, r0, c0, c0, 0
 -
- ENTRY(secondary_trampoline)
--	movw	r0, #:lower16:CPU1_START_ADDR
--	movt  r0, #:upper16:CPU1_START_ADDR
-+	movw	r2, #:lower16:cpu1start_addr
-+	movt  r2, #:upper16:cpu1start_addr
+-	ldr	r1, =0x7fff
+-	and	r2, r1, r0, lsr #13
+-
+-	ldr	r1, =0x3ff
+-
+-	and	r3, r1, r0, lsr #3	@ NumWays - 1
+-	add	r2, r2, #1		@ NumSets
+-
+-	and	r0, r0, #0x7
+-	add	r0, r0, #4	@ SetShift
+-
+-	clz	r1, r3		@ WayShift
+-	add	r4, r3, #1	@ NumWays
+-1:	sub	r2, r2, #1	@ NumSets--
+-	mov	r3, r4		@ Temp = NumWays
+-2:	subs	r3, r3, #1	@ Temp--
+-	mov	r5, r3, lsl r1
+-	mov	r6, r2, lsl r0
+-	orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
+-	mcr	p15, 0, r5, c7, c6, 2
+-	bgt	2b
+-	cmp	r2, #0
+-	bgt	1b
+-	dsb
+-	isb
+-	mov	pc, lr
+-ENDPROC(v7_invalidate_l1)
+-
+ #ifdef CONFIG_SMP
+ ENTRY(v7_secondary_startup)
+ 	bl	v7_invalidate_l1
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index b202c12..96001fd 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -16,54 +16,6 @@
+ 
+ 	__CPUINIT
+ 
+-/* Cache invalidation nicked from arch/arm/mach-imx/head-v7.S, thanks!
+- *
+- * The secondary kernel init calls v7_flush_dcache_all before it enables
+- * the L1; however, the L1 comes out of reset in an undefined state, so
+- * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
+- * of cache lines with uninitialized data and uninitialized tags to get
+- * written out to memory, which does really unpleasant things to the main
+- * processor.  We fix this by performing an invalidate, rather than a
+- * clean + invalidate, before jumping into the kernel.
+- *
+- * This funciton is cloned from arch/arm/mach-tegra/headsmp.S, and needs
+- * to be called for both secondary cores startup and primary core resume
+- * procedures.  Ideally, it should be moved into arch/arm/mm/cache-v7.S.
+- */
+-ENTRY(v7_invalidate_l1)
+-	mov	r0, #0
+-	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
+-	mcr	p15, 2, r0, c0, c0, 0
+-	mrc	p15, 1, r0, c0, c0, 0
+-
+-	ldr	r1, =0x7fff
+-	and	r2, r1, r0, lsr #13
+-
+-	ldr	r1, =0x3ff
+-
+-	and	r3, r1, r0, lsr #3	@ NumWays - 1
+-	add	r2, r2, #1		@ NumSets
+-
+-	and	r0, r0, #0x7
+-	add	r0, r0, #4	@ SetShift
+-
+-	clz	r1, r3		@ WayShift
+-	add	r4, r3, #1	@ NumWays
+-1:	sub	r2, r2, #1	@ NumSets--
+-	mov	r3, r4		@ Temp = NumWays
+-2:	subs	r3, r3, #1	@ Temp--
+-	mov	r5, r3, lsl r1
+-	mov	r6, r2, lsl r0
+-	orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
+-	mcr	p15, 0, r5, c7, c6, 2
+-	bgt	2b
+-	cmp	r2, #0
+-	bgt	1b
+-	dsb
+-	isb
+-	mov	pc, lr
+-ENDPROC(v7_invalidate_l1)
+-
+ ENTRY(shmobile_invalidate_start)
+ 	bl	v7_invalidate_l1
+ 	b	secondary_startup
+diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+index 4a317fa..fb082c4 100644
+--- a/arch/arm/mach-tegra/headsmp.S
++++ b/arch/arm/mach-tegra/headsmp.S
+@@ -18,49 +18,6 @@
+         .section ".text.head", "ax"
+ 	__CPUINIT
+ 
+-/*
+- * Tegra specific entry point for secondary CPUs.
+- *   The secondary kernel init calls v7_flush_dcache_all before it enables
+- *   the L1; however, the L1 comes out of reset in an undefined state, so
+- *   the clean + invalidate performed by v7_flush_dcache_all causes a bunch
+- *   of cache lines with uninitialized data and uninitialized tags to get
+- *   written out to memory, which does really unpleasant things to the main
+- *   processor.  We fix this by performing an invalidate, rather than a
+- *   clean + invalidate, before jumping into the kernel.
+- */
+-ENTRY(v7_invalidate_l1)
+-        mov     r0, #0
+-        mcr     p15, 2, r0, c0, c0, 0
+-        mrc     p15, 1, r0, c0, c0, 0
+-
+-        ldr     r1, =0x7fff
+-        and     r2, r1, r0, lsr #13
+-
+-        ldr     r1, =0x3ff
+-
+-        and     r3, r1, r0, lsr #3  @ NumWays - 1
+-        add     r2, r2, #1          @ NumSets
+-
+-        and     r0, r0, #0x7
+-        add     r0, r0, #4          @ SetShift
+-
+-        clz     r1, r3              @ WayShift
+-        add     r4, r3, #1          @ NumWays
+-1:      sub     r2, r2, #1          @ NumSets--
+-        mov     r3, r4              @ Temp = NumWays
+-2:      subs    r3, r3, #1          @ Temp--
+-        mov     r5, r3, lsl r1
+-        mov     r6, r2, lsl r0
+-        orr     r5, r5, r6          @ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
+-        mcr     p15, 0, r5, c7, c6, 2
+-        bgt     2b
+-        cmp     r2, #0
+-        bgt     1b
+-        dsb
+-        isb
+-        mov     pc, lr
+-ENDPROC(v7_invalidate_l1)
+-
+ 
+ ENTRY(tegra_secondary_startup)
+         bl      v7_invalidate_l1
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index 7539ec2..15451ee 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -19,6 +19,52 @@
+ #include "proc-macros.S"
+ 
+ /*
++ * The secondary kernel init calls v7_flush_dcache_all before it enables
++ * the L1; however, the L1 comes out of reset in an undefined state, so
++ * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
++ * of cache lines with uninitialized data and uninitialized tags to get
++ * written out to memory, which does really unpleasant things to the main
++ * processor.  We fix this by performing an invalidate, rather than a
++ * clean + invalidate, before jumping into the kernel.
++ *
++ * This function is cloned from arch/arm/mach-tegra/headsmp.S, and needs
++ * to be called for both secondary cores startup and primary core resume
++ * procedures.
++ */
++ENTRY(v7_invalidate_l1)
++       mov     r0, #0
++       mcr     p15, 2, r0, c0, c0, 0
++       mrc     p15, 1, r0, c0, c0, 0
 +
-+	/* The socfpga VT cannot handle a 0xC0000000 page offset when loading
-+		the cpu1start_addr, we bit clear it. Tested on HW and VT. */
-+	bic	r2, r2, #0x40000000
- 
-+	ldr	r0, [r2]
- 	ldr	r1, [r0]
- 	bx	r1
- 
- ENTRY(secondary_trampoline_end)
++       ldr     r1, =0x7fff
++       and     r2, r1, r0, lsr #13
 +
-+ENTRY(v7_secondary_startup)
-+       bl      v7_invalidate_l1
-+       b       secondary_startup
-+ENDPROC(v7_secondary_startup)
-diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-index 68dd1b6..c428519 100644
---- a/arch/arm/mach-socfpga/platsmp.c
-+++ b/arch/arm/mach-socfpga/platsmp.c
-@@ -49,7 +49,8 @@ static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct
- 
- 	memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
- 
--	__raw_writel(virt_to_phys(secondary_startup), (sys_manager_base_addr+0x10));
-+	__raw_writel(virt_to_phys(v7_secondary_startup),
-+		(sys_manager_base_addr + (cpu1start_addr & 0x000000ff)));
- 
- 	flush_cache_all();
- 	smp_wmb();
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 198f491..5a56370 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -29,6 +29,7 @@
- void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
- void __iomem *sys_manager_base_addr;
- void __iomem *rst_manager_base_addr;
-+unsigned long cpu1start_addr;
- 
- static struct map_desc scu_io_desc __initdata = {
- 	.virtual	= SOCFPGA_SCU_VIRT_BASE,
-@@ -72,6 +73,13 @@ void __init socfpga_sysmgr_init(void)
- 	struct device_node *np;
- 
- 	np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
++       ldr     r1, =0x3ff
 +
-+	if (of_property_read_u32(np, "cpu1-start-addr",
-+			(u32 *) &cpu1start_addr)) {
-+		early_printk("Need cpu1-start-addr in device tree.\n");
-+		panic("Need cpu1-start-addr in device tree.\n");
-+	}
++       and     r3, r1, r0, lsr #3      @ NumWays - 1
++       add     r2, r2, #1              @ NumSets
 +
- 	sys_manager_base_addr = of_iomap(np, 0);
- 
- 	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
++       and     r0, r0, #0x7
++       add     r0, r0, #4      @ SetShift
++
++       clz     r1, r3          @ WayShift
++       add     r4, r3, #1      @ NumWays
++1:     sub     r2, r2, #1      @ NumSets--
++       mov     r3, r4          @ Temp = NumWays
++2:     subs    r3, r3, #1      @ Temp--
++       mov     r5, r3, lsl r1
++       mov     r6, r2, lsl r0
++       orr     r5, r5, r6      @ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
++       mcr     p15, 0, r5, c7, c6, 2
++       bgt     2b
++       cmp     r2, #0
++       bgt     1b
++       dsb
++       isb
++       mov     pc, lr
++ENDPROC(v7_invalidate_l1)
++
++/*
+  *	v7_flush_icache_all()
+  *
+  *	Flush the whole I-cache.
 -- 
 1.7.9.5
