@@ -1,93 +1,88 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 31 Jan 2013 15:30:32 +0000 (UTC)
-Subject: [Patch v2 2/2] ARM: OMAP2: am33xx-hwmod: Fix "register offset
- NULL check" bug
-In-Reply-To: <1359642327-5542-3-git-send-email-gururaja.hebbar@ti.com>
-References: <1359642327-5542-1-git-send-email-gururaja.hebbar@ti.com>
- <1359642327-5542-3-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <alpine.DEB.2.00.1301311528320.23099@utopia.booyaka.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 31 Jan 2013 21:02:00 +0530
+Subject: [PATCH] ARM: OMAP2+: Get rid of custom OMAP_32K_TIMER_HZ
+Message-ID: <1359646320-9086-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Koen
+The timekeeping doesn't depend on HZ value in presence of fine grained
+clocksource and hence there should not be any time drift because of HZ
+value which was chosen to be divisor of 32768.
 
-Hi
+OMAP has been using HZ = 128 value to avoid any time drift issues
+because of 32768 HZ clock. But with various measurements performed
+with HZ = 100, no time drift is observed and it also proves the
+point about HZ not having impact on time keeping on OMAP.
 
-On Thu, 31 Jan 2013, Hebbar Gururaja wrote:
+Very informative thread on this topic is here:
+	https://lkml.org/lkml/2013/1/29/435
 
-> am33xx_cm_wait_module_ready() checks if register offset is NULL.
-> 
-> int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
-> {
-> 	int i = 0;
-> 
-> 	if (!clkctrl_offs)
-> 		return 0;
-> 
-> In case of AM33xx, CLKCTRL register offset for different clock domains
-> are not uniformly placed. An example of this would be the RTC clock
-> domain with CLKCTRL offset at 0x00.
-> In such cases the module ready check is skipped which leads to a data
-> abort during boot-up when RTC registers is accessed.
-> 
-> Remove this check here to avoid checking module readiness for modules
-> with clkctrl register offset at 0x00.
-> 
-> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+Special thanks to John Stulz, Arnd Bergmann and Russell King for their
+valuable suggestions.
 
-Some text has been added to the patch description to describe Koen's test 
-results, and the updated patch has been queued for v3.8-rc fixes.  Updated 
-patch follows.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Tony Lindgren <tony@atomide.com>
 
-- Paul
-
-From: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Date: Thu, 31 Jan 2013 19:55:27 +0530
-Subject: [PATCH] ARM: OMAP2: am33xx-hwmod: Fix "register offset NULL check"
- bug
-
-am33xx_cm_wait_module_ready() checks if register offset is NULL.
-
-int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
-{
-	int i = 0;
-
-	if (!clkctrl_offs)
-		return 0;
-
-In case of AM33xx, CLKCTRL register offset for different clock domains
-are not uniformly placed. An example of this would be the RTC clock
-domain with CLKCTRL offset at 0x00.
-In such cases the module ready check is skipped which leads to a data
-abort during boot-up when RTC registers is accessed.
-
-Remove this check here to avoid checking module readiness for modules
-with clkctrl register offset at 0x00.
-
-Koen Kooi notes that this patch fixes a crash on boot with
-CONFIG_RTC_DRV_OMAP=y with v3.8-rc5.
-
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Cc: Koen Kooi <koen@dominion.thruhere.net>
-[paul at pwsan.com: noted Koen's test in the patch description]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm/mach-omap2/cm33xx.c |    3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/Kconfig                        |    1 -
+ arch/arm/plat-omap/Kconfig              |    9 ---------
+ arch/arm/plat-omap/include/plat/timex.h |    8 --------
+ 3 files changed, 18 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index 058ce3c..325a515 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -241,9 +241,6 @@ int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
- {
- 	int i = 0;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b35b27f..5493164 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1648,7 +1648,6 @@ config HZ
+ 	int
+ 	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
+ 		ARCH_S5PV210 || ARCH_EXYNOS4
+-	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
+ 	default AT91_TIMER_HZ if ARCH_AT91
+ 	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
+ 	default 100
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 67c859c..ce66eb9 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -147,15 +147,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
+ 	help
+ 	  PPA routine service ID for setting L2 auxiliary control register.
  
--	if (!clkctrl_offs)
--		return 0;
+-config OMAP_32K_TIMER_HZ
+-	int "Kernel internal timer frequency for 32KHz timer"
+-	range 32 1024
+-	depends on OMAP_32K_TIMER
+-	default "128"
+-	help
+-	  Kernel internal timer frequency should be a divisor of 32768,
+-	  such as 64 or 128.
 -
- 	omap_test_timeout(_is_module_ready(inst, cdoffs, clkctrl_offs),
- 			  MAX_MODULE_READY_TIME, i);
+ config OMAP_DM_TIMER
+ 	bool "Use dual-mode timer"
+ 	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
+diff --git a/arch/arm/plat-omap/include/plat/timex.h b/arch/arm/plat-omap/include/plat/timex.h
+index 6d35767..e27d2da 100644
+--- a/arch/arm/plat-omap/include/plat/timex.h
++++ b/arch/arm/plat-omap/include/plat/timex.h
+@@ -28,14 +28,6 @@
+ #if !defined(__ASM_ARCH_OMAP_TIMEX_H)
+ #define __ASM_ARCH_OMAP_TIMEX_H
  
+-/*
+- * OMAP 32KHz timer updates time one jiffie at a time from a secondary timer,
+- * and that's why the CLOCK_TICK_RATE is not 32768.
+- */
+-#ifdef CONFIG_OMAP_32K_TIMER
+-#define CLOCK_TICK_RATE		(CONFIG_OMAP_32K_TIMER_HZ)
+-#else
+ #define CLOCK_TICK_RATE		(HZ * 100000UL)
+-#endif
+ 
+ #endif /* __ASM_ARCH_OMAP_TIMEX_H */
 -- 
-1.7.10.4
+1.7.9.5
