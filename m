@@ -1,183 +1,148 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 31 Jan 2013 18:51:18 +0100
-Subject: [PATCH, RFC] default machine descriptor for multiplatform
-In-Reply-To: <1731670.s76EGcEZ7m@wuerfel>
-References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <20130131161823.GT2637@n2100.arm.linux.org.uk> <1731670.s76EGcEZ7m@wuerfel>
-Message-ID: <1638002.UJ7zfj1Wn5@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 31 Jan 2013 12:57:43 -0500
+Subject: [PATCH v3] arm: mvebu: add DTS file for Marvell RD-A370-A1 board
+In-Reply-To: <1358174852-19752-1-git-send-email-florian@openwrt.org>
+References: <3816648.2TVsTiMOWx@bender>
+ <1358174852-19752-1-git-send-email-florian@openwrt.org>
+Message-ID: <20130131175743.GF7717@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is what I think it would look like to do a default platform
-with an empty machine descriptor on ARM. It makes the few required
-entries in the descriptor optional by using the new irqchip_init()
-and clocksource_of_init() functions as defaults, and adds
-a fallback for the DT case to customize_machine to probe all
-the default devices.
+Florian,
 
-For the case that CONFIG_MULTIPLATFORM is enabled, it then
-adds a machine descriptor that never matches any machine but
-is used as a fallback if nothing else matches.
+On Mon, Jan 14, 2013 at 03:47:32PM +0100, Florian Fainelli wrote:
+> This patch adds the DTS file to support the Marvell RD-A370-A1
+> (Reference Design board) also known as RD-88F6710 board. It is almost
+> entirely similar to the DB-A370 except on the following points:
+> 
+> - second Ethernet MAC is connected to a switch using RGMII
+> - it only has 512MB of physical RAM
+> - SDIO interface is enabled and working by default (no need for jumpers)
+> 
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> ---
+> Jason,
+> 
+> This is rebased against your mvebu/for-next branch, can you please drop v2 of
+> the previous patch and take this one instead? Thanks!
+> 
+> Changes since v2:
+> - rebased against Jason's mvebu/for-next
+> - added SDIO bindings
+> - changed commit message a bit
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+This breaks badly as sdio bindings aren't added until mvebu/dt.  Since
+this is a new board, it goes in *before* mvebu/dt (mvebu/boards).  I'm
+going to go ahead and pull v2 instead as there seems to be no
+significant difference other than mvsdio being added.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3e3444e..8ff1d38 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -979,7 +979,6 @@ config ARCH_MULTI_V7
- 	bool "ARMv7 based platforms (Cortex-A, PJ4, Krait)"
- 	default y
- 	select ARCH_MULTI_V6_V7
--	select ARCH_VEXPRESS
- 	select CPU_V7
- 
- config ARCH_MULTI_V6_V7
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 70f1bde..e6e34ba 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -180,6 +180,13 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 	unsigned long dt_root;
- 	const char *model;
- 
-+	if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
-+		DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-+		MACHINE_END
-+
-+		mdesc_best = (struct machine_desc *)&__mach_desc_GENERIC_DT;
-+	}
-+
- 	if (!dt_phys)
- 		return NULL;
- 
-@@ -199,7 +206,7 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 			mdesc_score = score;
- 		}
- 	}
--	if (!mdesc_best) {
-+	if (!mdesc_best && !IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
- 		const char *prop;
- 		long size;
- 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 8e4ef4c..df6f9a1 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -26,6 +26,7 @@
- #include <linux/ioport.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
- #include <linux/random.h>
- #include <linux/smp.h>
- #include <linux/init.h>
-@@ -114,7 +115,10 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
- 
- void __init init_IRQ(void)
- {
--	machine_desc->init_irq();
-+	if (machine_desc->init_irq)
-+		machine_desc->init_irq();
-+	else
-+		irqchip_init();
- }
- 
- #ifdef CONFIG_MULTI_IRQ_HANDLER
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3f6cbb2..1d40c9d 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -18,6 +18,7 @@
- #include <linux/bootmem.h>
- #include <linux/seq_file.h>
- #include <linux/screen_info.h>
-+#include <linux/of_platform.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
- #include <linux/of_fdt.h>
-@@ -640,9 +641,17 @@ struct screen_info screen_info = {
- 
- static int __init customize_machine(void)
- {
--	/* customizes platform devices, or adds new ones */
-+	/*
-+	 * customizes platform devices, or adds new ones
-+	 * On DT based machines, we fall back to populating the
-+	 * machine from the device tree, if no callback is provided,
-+	 * otherwise we would always need an init_machine callback.
-+	 */
- 	if (machine_desc->init_machine)
- 		machine_desc->init_machine();
-+	else
-+		of_platform_populate(NULL, of_default_bus_match_table,
-+					NULL, NULL);
- 	return 0;
- }
- arch_initcall(customize_machine);
-@@ -732,7 +741,7 @@ void __init setup_arch(char **cmdline_p)
- 
- 	setup_processor();
- 	mdesc = setup_machine_fdt(__atags_pointer);
--	if (!mdesc)
-+	if (!mdesc && __machine_arch_type != ~0)
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
- 	machine_desc = mdesc;
- 	machine_name = mdesc->name;
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 955d92d..abff4e9 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -22,6 +22,7 @@
- #include <linux/errno.h>
- #include <linux/profile.h>
- #include <linux/timer.h>
-+#include <linux/clocksource.h>
- #include <linux/irq.h>
- 
- #include <asm/thread_info.h>
-@@ -115,6 +116,10 @@ int __init register_persistent_clock(clock_access_fn read_boot,
- 
- void __init time_init(void)
- {
--	machine_desc->init_time();
-+	if (machine_desc->init_time)
-+		machine_desc->init_time();
-+	else
-+		clocksource_of_init();
-+
- 	sched_clock_postinit();
- }
-diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
-index f496afc..c5e7a45 100644
---- a/drivers/irqchip/irqchip.c
-+++ b/drivers/irqchip/irqchip.c
-@@ -24,7 +24,13 @@ irqchip_of_match_end __used __section(__irqchip_of_end);
- 
- extern struct of_device_id __irqchip_begin[];
- 
-+#ifdef CONFIG_IRQCHIP
- void __init irqchip_init(void)
- {
- 	of_irq_init(__irqchip_begin);
- }
-+#else
-+static inline void irqchip_init(void)
-+{
-+}
-+#endif
-diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-index 7944f14..b14d224 100644
---- a/include/linux/clocksource.h
-+++ b/include/linux/clocksource.h
-@@ -339,6 +339,10 @@ extern void clocksource_of_init(void);
- 	static const struct of_device_id __clksrc_of_table_##name	\
- 		__used __section(__clksrc_of_table)			\
- 		 = { .compatible = compat, .data = fn };
-+#else
-+static inline void clocksource_of_init(void)
-+{
-+}
- #endif
- 
- #endif /* _LINUX_CLOCKSOURCE_H */
+If you want to get sdio support in for v3.9, please submit a separate
+patch on top of your v2.
+
+thx,
+
+Jason.
+
+> 
+> Changes since v1:
+> - added missing entry in arch/arm/boot/dts/Makefile to actually build the DTB
+> 
+>  arch/arm/boot/dts/Makefile          |    1 +
+>  arch/arm/boot/dts/armada-370-rd.dts |   68 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 69 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-370-rd.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b7246d6..7a75171 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -78,6 +78,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>  	msm8960-cdp.dtb
+>  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>  	armada-370-mirabox.dtb \
+> +	armada-370-rd.dtb \
+>  	armada-xp-db.dtb \
+>  	armada-xp-openblocks-ax3-4.dtb
+>  dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+> new file mode 100644
+> index 0000000..f8e4855
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-370-rd.dts
+> @@ -0,0 +1,68 @@
+> +/*
+> + * Device Tree file for Marvell Armada 370 Reference Design board
+> + * (RD-88F6710-A1)
+> + *
+> + *  Copied from arch/arm/boot/dts/armada-370-db.dts
+> + *
+> + *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "armada-370.dtsi"
+> +
+> +/ {
+> +	model = "Marvell Armada 370 Reference Design";
+> +	compatible = "marvell,a370-rd", "marvell,armada370", "marvell,armada-370-xp";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x20000000>; /* 512 MB */
+> +	};
+> +
+> +	soc {
+> +		serial at d0012000 {
+> +			clock-frequency = <200000000>;
+> +			status = "okay";
+> +		};
+> +		sata at d00a0000 {
+> +			nr-ports = <2>;
+> +			status = "okay";
+> +		};
+> +
+> +		mdio {
+> +			phy0: ethernet-phy at 0 {
+> +				reg = <0>;
+> +			};
+> +
+> +			phy1: ethernet-phy at 1 {
+> +				reg = <1>;
+> +			};
+> +		};
+> +
+> +		ethernet at d0070000 {
+> +			status = "okay";
+> +			phy = <&phy0>;
+> +			phy-mode = "sgmii";
+> +		};
+> +		ethernet at d0074000 {
+> +			status = "okay";
+> +			phy = <&phy1>;
+> +			phy-mode = "rgmii-id";
+> +		};
+> +
+> +		mvsdio at d00d4000 {
+> +			pinctrl-0 = <&sdio_pins1>;
+> +			pinctrl-names = "default";
+> +			status = "okay";
+> +			/* No CD or WP GPIOs */
+> +		};
+> +	};
+> +};
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
