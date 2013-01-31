@@ -1,86 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 31 Jan 2013 10:28:05 +0100
-Subject: [PATCH 2/6] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <510A3590.2090309@ti.com>
-References: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
- <1359622873-23345-3-git-send-email-s.hauer@pengutronix.de>
- <510A3590.2090309@ti.com>
-Message-ID: <20130131092805.GB24675@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Jan 2013 09:28:01 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129083522.GA14302@pd.tnic>
+ <1359478014.3529.157.camel@shinybook.infradead.org>
+ <20130129174249.GB25415@pd.tnic>
+ <1359482147.3529.161.camel@shinybook.infradead.org>
+ <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+Message-ID: <20130131092801.GV23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 02:42:48PM +0530, kishon wrote:
-> Hi,
-> 
-> On Thursday 31 January 2013 02:31 PM, Sascha Hauer wrote:
-> >From: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> >
-> >This adds two little devicetree helper functions for determining the
-> >dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
-> >the devicetree.
-> >
-> >Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> >Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> >Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> >---
-> >  drivers/usb/phy/Makefile |    1 +
-> >  drivers/usb/phy/phy.c    |   10 ++++++++++
-> >  drivers/usb/usb-common.c |   36 ++++++++++++++++++++++++++++++++++++
-> >  include/linux/usb/of.h   |   27 +++++++++++++++++++++++++++
-> >  include/linux/usb/otg.h  |    7 +++++++
-> >  include/linux/usb/phy.h  |    9 +++++++++
-> >  6 files changed, 90 insertions(+)
-> >  create mode 100644 include/linux/usb/of.h
-> >
-> >diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-> >index 9fa6327..e1be1e8 100644
-> >--- a/drivers/usb/phy/Makefile
-> >+++ b/drivers/usb/phy/Makefile
-> >@@ -5,6 +5,7 @@
-> >  ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
-> >
-> >  obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
-> >+obj-$(CONFIG_OF)			+= of.o
-> 
-> You've missed doing "git add ..usb/phy/of.c".
-> 
-> >  obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
-> >  obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
-> >  obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
-> >diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
-> >index ef35eb0..3ad4b5c 100644
-> >--- a/drivers/usb/phy/phy.c
-> >+++ b/drivers/usb/phy/phy.c
-> >@@ -1,3 +1,13 @@
-> >+/*
-> >+ * phy.c -- USB phy handling
-> >+ *
-> >+ * Copyright (C) 2004 Texas Instruments
-> 
-> it's 2013 already :-P
-> >+ *
-> >+ * This program is free software; you can redistribute it and/or modify
-> >+ * it under the terms of the GNU General Public License as published by
-> >+ * the Free Software Foundation; either version 2 of the License, or
-> >+ * (at your option) any later version.
-> 
-> But your *MODULE_LICENSE("GPL")* below tells it's only GPL.
+On Wed, Jan 30, 2013 at 08:09:00PM -0600, Kim Phillips wrote:
+> The savings come mostly from device-tree related code, and some
+> from drivers.
 
-The MODULE_LICENSE("GPL") is in usb-common.c, not in the file I added.
+You forget that IP networking is all big endian, so these will be using
+the byte swapping too (search it for htons/ntohs/htonl/ntohl).
 
-Sascha
+> v2:
+> - at91 and lpd270 builds fixed by limiting to ARMv6 and above
+>   (i.e., ARM cores that have support for the 'rev' instruction).
+>   Otherwise, the compiler emits calls to libgcc's __bswapsi2 on
+>   these ARMv4/v5 builds (and arch ARM doesn't link with libgcc).
 
-> .
-> <snip>
-> .
-> .
-> 
-> >  MODULE_LICENSE("GPL");
-> 
+Which compiler version?  gcc 4.5.4 doesn't do this, except for the 16-bit
+swap, so I doubt that any later compiler does.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> --- a/arch/arm/include/uapi/asm/swab.h
+> +++ b/arch/arm/include/uapi/asm/swab.h
+> @@ -50,4 +50,14 @@ static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
+>  
+>  #endif
+>  
+> +#if defined(__KERNEL__) && __LINUX_ARM_ARCH__ >= 6
+> +#if GCC_VERSION >= 40600
+> +#define __HAVE_BUILTIN_BSWAP32__
+> +#define __HAVE_BUILTIN_BSWAP64__
+> +#endif
+> +#if GCC_VERSION >= 40800
+> +#define __HAVE_BUILTIN_BSWAP16__
+> +#endif
+> +#endif
+
+If this is __KERNEL__ only, it should not be in a uapi header.  UAPI
+headers get exported to userland, this is not userland interface code.
+IT should be in arch/arm/include/asm/swab.h
