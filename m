@@ -1,67 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 31 Jan 2013 17:33:43 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <CAErSpo7fPzrF_OZSL7Ss0LT70Qz+veXLW-ihA7fAXCwsn142cQ@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5H08j=dZx9zapDaf1c9x6VUfuJ5oB=J0M1UFF55pg=mw@mail.gmail.com>
- <20130129055508.GA3339@obsidianresearch.com>
- <CAErSpo7gCFfLB6+ebvANQjkr7Bii8Jqt3y5YqExD-DcnBG7hgA@mail.gmail.com>
- <20130129184157.GA29274@obsidianresearch.com>
- <CAErSpo5K8yKqjzQ6s+imb3d5wLSkhvWp-d=pPv9CZk+o67kyaQ@mail.gmail.com>
- <20130129191853.GB29274@obsidianresearch.com>
- <CAErSpo4Zvy7=ROajygecfsEFVJxy-yNbSntdQdDFcQBPz=Qgfg@mail.gmail.com>
- <CAErSpo41TbWTZ_6m0_uv-EaKnnqMR9jpqsarOJLGYZ31mrdkiw@mail.gmail.com>
- <20130130103501.1873d39c@skate>
- <CAErSpo5NTyrHv8AQkw3hYpJRiZsk1HKHP3jP_MMpEVVhCgjKYg@mail.gmail.com>
- <20130131170401.4b3bfbbf@skate>
- <CAErSpo7fPzrF_OZSL7Ss0LT70Qz+veXLW-ihA7fAXCwsn142cQ@mail.gmail.com>
-Message-ID: <20130131173343.46514422@skate>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 31 Jan 2013 17:38:14 +0100
+Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
+ board(DB-MV784MP-GP)
+In-Reply-To: <20130131162254.GD20242@lunn.ch>
+References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130130173306.GO7717@titan.lakedaemon.net>
+ <510959D5.1010305@free-electrons.com>
+ <20130130181035.GP7717@titan.lakedaemon.net>
+ <510A5E87.60509@free-electrons.com>
+ <20130131124542.GB7717@titan.lakedaemon.net>
+ <510A689B.6040407@free-electrons.com>
+ <20130131162254.GD20242@lunn.ch>
+Message-ID: <20130131163814.GE20242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
-
-On Thu, 31 Jan 2013 09:30:07 -0700, Bjorn Helgaas wrote:
-
-> > Following you're recommendation, I've changed this, and left those
-> > values initialized to 0 by default, in order to let Linux set correct
-> > values. Yes, Linux does assign appropriate values in the Secondary Bus
-> > Number Register. But before that Linux also complains loudly that the
-> > bridge configuration is invalid:
-> >
-> > pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> > pci 0000:00:02.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> > pci 0000:00:03.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> > pci 0000:00:04.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> > pci 0000:00:05.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> > pci 0000:00:06.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+On Thu, Jan 31, 2013 at 05:22:54PM +0100, Andrew Lunn wrote:
+> > Well in fact it is 4GB RAM but we can only use 3GB (we need the last GB
+> > of address space for peripheral, CPU registers and IOmem).
 > 
-> Linux makes the unwarranted assumption that the PCI hierarchy has
-> already been configured by firmware.  If the only problem is the
-> messages above, I think we could just rework the message so it doesn't
-> look like an error.  I would guess that we probably also see the same
-> distressing message when we hot-add a card with a bridge on it,
-> because firmware won't have initialized the bridge.
+> Hi Gregory
 > 
-> My rule of thumb is that I like to note something in dmesg about the
-> initial configuration of bus/mem/io apertures and BARs, as well as
-> indications when we update them.  That way, the dmesg log should
-> contain enough information to debug most enumeration and configuration
-> defects.  pci_scan_bridge() is somewhat lacking in this regard.
+> Does the CPU support Large Physical Addressing, LPA? Is that on the
+> roadmap for Armada?
 
-Ok. Would something like:
+I did a bit of googling:
 
- "bridge configuration with unassigned bus numbers ([bus 00-00]), reconfiguring"
+http://www.linleygroup.com/newsletters/newsletter_detail.php?num=3982
 
-be an acceptable to replace this one?
+	To address the cloud-computing market, the company added
+	40-bit physical addressing to Armada XP, using a method
+	similar to what ARM implemented in Cortex-A15. This feature
+	allows the memory controller to support up to one terabyte
+	(1TB) of DRAM.
 
-Thanks for your quick feedback,
+Also:
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+http://www.theregister.co.uk/2012/10/24/dell_zinc_arm_server_apache_software/
+
+talks about 40-bit.
+
+So it should be possible to use the full 4GBytes of RAM, in theory.
+
+   Andrew
