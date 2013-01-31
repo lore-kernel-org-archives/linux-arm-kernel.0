@@ -1,55 +1,67 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 31 Jan 2013 17:47:05 +0800
-Subject: [PATCH 6/6] USB chipidea i.MX: introduce dr_mode property
-In-Reply-To: <1359622873-23345-7-git-send-email-s.hauer@pengutronix.de>
-References: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
- <1359622873-23345-7-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130131094704.GC14629@nchen-desktop>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 31 Jan 2013 10:50:25 +0100
+Subject: [PATCH] arm: mvebu: support for the new Armada XP evaluation
+ board(DB-MV784MP-GP)
+In-Reply-To: <20130130181035.GP7717@titan.lakedaemon.net>
+References: <1359566774-27669-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359566774-27669-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130130173306.GO7717@titan.lakedaemon.net>
+ <510959D5.1010305@free-electrons.com>
+ <20130130181035.GP7717@titan.lakedaemon.net>
+Message-ID: <20130131095025.GC20242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 10:01:13AM +0100, Sascha Hauer wrote:
-> The dr_mode devicetree property allows to explicitly specify the
-> host/peripheral/otg mode. This is necessary for boards without proper
-> ID pin handling.
+On Wed, Jan 30, 2013 at 01:10:35PM -0500, Jason Cooper wrote:
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  Documentation/devicetree/bindings/usb/ci13xxx-imx.txt |    1 +
->  drivers/usb/chipidea/ci13xxx_imx.c                    |    1 +
->  2 files changed, 2 insertions(+)
+> Gregory,
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> index dd42ccd..493a414 100644
-> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> @@ -9,6 +9,7 @@ Recommended properies:
->  - phy_type: the type of the phy connected to the core. Should be one
->    of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
->    property the PORTSC register won't be touched
-> +- dr_mode: One of "host", "peripheral" or "otg". Defaults to "otg"
->  
->  Optional properties:
->  - fsl,usbphy: phandler of usb phy that connects to the only one port
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> index ebc1148..b598bb8f 100644
-> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -114,6 +114,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
->  		       CI13XXX_DISABLE_STREAMING;
->  
->  	pdata->phy_mode = of_usb_get_phy_mode(pdev->dev.of_node);
-> +	pdata->dr_mode = of_usb_get_dr_mode(pdev->dev.of_node);
->  
->  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
->  	if (!data) {
-Reviewed-by: Peter Chen <peter.chen@freescale.com>
-> -- 
-> 1.7.10.4
+> Adding devicetree-discuss.
 > 
+> Guys, how do you prefer to handle plug-in RAM modules?  describe the
+> soldered-in amount, or?
 > 
+> On Wed, Jan 30, 2013 at 06:35:17PM +0100, Gregory CLEMENT wrote:
+> > On 01/30/2013 06:33 PM, Jason Cooper wrote:
+> > > On Wed, Jan 30, 2013 at 06:26:14PM +0100, Gregory CLEMENT wrote:
+> > >> This is the new Armada XP evaluation board from Marvell. It comes with
+> > >> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
+> > >> Gigabit links.
+> > >>
+> > >> Support for USB (Host and device), SDIO, PCIe will be added as drivers
+> > >> when they become available for Armada XP in mainline.
+> > >>
+> > >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > >> ---
+> > >>  arch/arm/boot/dts/Makefile         |    1 +
+> > >>  arch/arm/boot/dts/armada-xp-gp.dts |   94 ++++++++++++++++++++++++++++++++++++
+> > >>  2 files changed, 95 insertions(+)
+> > >>  create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
+> > >>
+> ...
+> > >> +	memory {
+> > >> +		device_type = "memory";
+> > >> +		reg = <0x00000000 0xC0000000>; /* 3 GB */
+> > > 
+> > > Is this the soldered on the board amount, or the amount with an
+> > > expandable slot filled?
+> > 
+> > It is not soldered, so you can change the amount of memory
+> 
+> Well, there's something we don't encounter too much in the embedded
+> world.  ;-)  I'm inclined to think the entry here should be the soldered
+> on amount, and the bootloader would (hypothetically) change the DT to
+> the probed amount.  But I haven't seen a precedent set yet...
 
--- 
+Hi Jason
 
-Best Regards,
-Peter Chen
+We have the same issue with OpenBox AX3. All the devices we have in
+our hands have 1GB soldered down, plus 2GB on expansion. The DT
+currently has the full 3GB.
+
+However, there has been discussion of reducing this down to 1GB since
+both Thomas and Gregory have unstable systems with the full 3GB, but
+mine box is stable with the full 3GB. So i don't know how strong a
+precedent that sets....
+
+	  Andrew
