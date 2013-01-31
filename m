@@ -1,47 +1,61 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 30 Jan 2013 19:32:22 -0500
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <5109AB30.5020202@gmail.com>
-References: <20130128223148.GA10275@schnuecks.de>
- <20130129004824.GB7717@titan.lakedaemon.net>
- <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
- <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
- <20130130230100.GV7717@titan.lakedaemon.net>
- <5109AB30.5020202@gmail.com>
-Message-ID: <20130131003222.GX7717@titan.lakedaemon.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 30 Jan 2013 19:33:07 -0500 (EST)
+Subject: [RFC PATCH v3 1/2] ARM: kernel: update cpuinfo to print SoC model
+ name
+In-Reply-To: <20130130232408.GL2637@n2100.arm.linux.org.uk>
+References: <1359558091-29251-1-git-send-email-ruslan.bilovol@ti.com>
+ <1359558091-29251-2-git-send-email-ruslan.bilovol@ti.com>
+ <alpine.LFD.2.02.1301301402330.6300@xanadu.home>
+ <20130130232408.GL2637@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1301301932240.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 12:22:24AM +0100, Sebastian Hesselbarth wrote:
-> On 01/31/2013 12:01 AM, Jason Cooper wrote:
-> >As it stands, there are three patches to fix this issue:
-> >
-> >ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
-> >ARM: kirkwood: provide ge clock aliases for shared smi
-> >ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
+On Wed, 30 Jan 2013, Russell King - ARM Linux wrote:
+
+> On Wed, Jan 30, 2013 at 02:07:53PM -0500, Nicolas Pitre wrote:
+> > On Wed, 30 Jan 2013, Ruslan Bilovol wrote:
+> > 
+> > > Currently, reading /proc/cpuinfo provides userspace with CPU ID of
+> > > the CPU carrying out the read from the file.
+> > > Userspace using this information may decide what module
+> > > to load or how to configure some specific (and processor-depended)
+> > > settings or so.
+> > > However, since really different SoCs can share same ARM core,
+> > > this information currently is not so useful.
+> > > For example, TI OMAP4460 and OMAP4470 SoCs show the same
+> > > information in the /proc/cpuinfo whereas they are different.
+> > > Since in most cases ARM CPU is a part of some system on a chip (SoC),
+> > > the "cpuinfo" file looks like exactly that place, where this
+> > > information have to be displayed.
+> > > 
+> > > So added new line "SoC name" in the "cpuinfo" output for system
+> > > on a chip name. It is placed between CPU information and machine
+> > > information, so the file structure looks gracefully (CPU-SoC-Hardware)
+> > > 
+> > > Example:
+> > > 
+> > > / # cat proc/cpuinfo
+> > > [...]
+> > > CPU variant     : 0x2
+> > > CPU part        : 0xc09
+> > > CPU revision    : 10
+> > > 
+> > > SoC name        : OMAP4470
+> > > 
+> > > Hardware        : OMAP4 Blaze Tablet
+> > 
+> > Please remove that extra blank line between "SoC name" and "Hardware".  
+> > The blank line after "CPU revision" is fine.
+> > 
+> > Also, please rename this to "System name".  Not all systems are "on 
+> > chip".  By using "System name" this is more universally useful.
 > 
-> Actually, for the second patch I got distracted by the smi split patch
-> set floating around. But that is not in current kernel and smi will not
-> request any clock at all.
-> 
-> If Simon can hit another round of testing without second patch included
-> and agrees, I suggest to keep it for next release.
+> You may notice I've already suggested that this should be using the SoC
+> infrastructure to export this information, which was explicitly designed
+> to do this.
 
-Ok, I'll wait for Simon on this.  fixes can go anytime, so no rush.
-Better to get it right the first (second?) time out.
+Absolutely.  If a mechanism is already in place then it should be used.
 
-> >wrt to ge losing mac addresses, both DT and non-DT booting are covered by
-> >Sebastian's patches, for non-DT aware mv643xx_eth.
-> 
-> non-DT already ungates ge0/1 clocks on registration and cannot loose its
-> mac address, not my fix.
 
-Yes, bad wording on my part.  I meant that everything was magically
-fixed by Sebastian and that his thesis should be approved without
-challenge.  ;-)
-
-thx,
-
-Jason.
+Nicolas
