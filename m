@@ -1,35 +1,22 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 31 Jan 2013 11:41:50 +0800
-Subject: [PATCH v4] cpufreq: add imx6q-cpufreq driver
-In-Reply-To: <20130129025652.GB11546@S2101-09.ap.freescale.net>
-References: <1359214303-3319-1-git-send-email-shawn.guo@linaro.org>
- <20130129025652.GB11546@S2101-09.ap.freescale.net>
-Message-ID: <20130131034148.GB17607@S2101-09.ap.freescale.net>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 31 Jan 2013 11:53:36 +0800
+Subject: [PATCH 0/4] ASoC: atmel: fixes for working as module
+Message-ID: <1359604420-15171-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 10:56:54AM +0800, Shawn Guo wrote:
-> On Sat, Jan 26, 2013 at 11:31:43PM +0800, Shawn Guo wrote:
-> > Add an imx6q-cpufreq driver for Freescale i.MX6Q SoC to handle the
-> > hardware specific frequency and voltage scaling requirements.
-> > 
-> > The driver supports module build and is instantiated by the platform
-> > device/driver mechanism, so that it will not be instantiated on other
-> > platforms, as IMX is built with multiplatform support.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
-> 
-> Rafael,
-> 
-> I think the patch needs to go via cpufreq tree, as it has dependency
-> on Nishanth's "PM / OPP : export symbol consolidation" series.
+The following patches fixes the audio part when working as module
 
-Rafael,
+Bo Shen (4):
+  ASoC: atmel_pcm: make it buildable as module
+  ASoC: atmel_ssc_dai: remove error set private data
+  ASoC: atmel_ssc_dai: correct sequence when unload
+  ASoC: sam9g20_wm8731: disable clock and correct sequence when unload
 
-Please hold off this one.  I plan to send v5 to handle regulator
-latency through regulator API, since my colleague is pushing patches
-to take care of voltage ramping time in anatop regulator driver.
+ sound/soc/atmel/atmel-pcm.h      |    6 ++++--
+ sound/soc/atmel/atmel_ssc_dai.c  |   12 +-----------
+ sound/soc/atmel/sam9g20_wm8731.c |    6 +++---
+ 3 files changed, 8 insertions(+), 16 deletions(-)
 
-Shawn
+-- 
+1.7.9.5
