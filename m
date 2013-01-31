@@ -1,35 +1,98 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Thu, 31 Jan 2013 11:49:29 +0000
-Subject: [PATCH v3 1/4] ASoC: tlv320aic3x: Convert mic bias to a supply
- widget
-In-Reply-To: <20130131113035.GF11078@opensource.wolfsonmicro.com>
-References: <1359631394-9511-1-git-send-email-gururaja.hebbar@ti.com>
- <1359631394-9511-2-git-send-email-gururaja.hebbar@ti.com>
- <20130131112414.GE11078@opensource.wolfsonmicro.com>
- <1BAFE6F6C881BF42822005164F1491C33EB5A48E@DBDE01.ent.ti.com>
- <20130131113035.GF11078@opensource.wolfsonmicro.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB5A52E@DBDE01.ent.ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 31 Jan 2013 17:19:46 +0530
+Subject: [PATCH 07/10] ARM: OMAP5: clock data: Add OMAP54XX full clock
+ tree and headers
+In-Reply-To: <51095A65.9070102@ti.com>
+References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
+ <1358522856-12180-8-git-send-email-santosh.shilimkar@ti.com>
+ <51095A65.9070102@ti.com>
+Message-ID: <510A5A5A.9090708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 17:00:38, Mark Brown wrote:
-> On Thu, Jan 31, 2013 at 11:27:07AM +0000, Hebbar, Gururaja wrote:
-> > On Thu, Jan 31, 2013 at 16:54:16, Mark Brown wrote:
-> 
-> > > As mentioned when you posted this before this patch needs to update the
-> > > machine drivers using the device too.
-> 
-> > The patch-set 2/4 does the same thing. Since I have da850-evm at my end, I 
-> > have modified that machine driver and sent-it as 2/4.
-> 
-> Two problems here.  One is that the update should be done in the same
-> patch and the other is that you need to update *all* the machine drivers
-> using the device, not just one of them.
+On Wednesday 30 January 2013 11:07 PM, Jon Hunter wrote:
+>
+> On 01/18/2013 09:27 AM, Santosh Shilimkar wrote:
+>> From: Rajendra Nayak <rnayak@ti.com>
+>>
+>> Add the clock tree related data for OMAP54xx platforms.
+>
+> [snip]
+>
+>> +	CLK("omap_timer.1",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.2",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.3",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.4",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.5",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.6",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.7",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.8",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.9",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.10",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>> +	CLK("omap_timer.11",	"32k_ck",		&sys_32k_ck,	CK_54XX),
+>
+> I have been trying to get away from having so many aliases for the same
+> clock for timers. Here we should replace all of the above and just have ...
+>
+> +	CLK(NULL,	"timer_32k_ck",		&sys_32k_ck, CK_54XX),
+>
+> For more details see [1].
+>
+>> +	CLK("omap_timer.1",	"sys_ck",		&sys_clkin,	CK_54XX),
+>> +	CLK("omap_timer.2",	"sys_ck",		&sys_clkin,	CK_54XX),
+>> +	CLK("omap_timer.3",	"sys_ck",		&sys_clkin,	CK_54XX),
+>> +	CLK("omap_timer.4",	"sys_ck",		&sys_clkin,	CK_54XX),
+>> +	CLK("omap_timer.9",	"sys_ck",		&sys_clkin,	CK_54XX),
+>> +	CLK("omap_timer.10",	"sys_ck",		&sys_clkin,	CK_54XX),
+>> +	CLK("omap_timer.11",	"sys_ck",		&sys_clkin,	CK_54XX),
+>> +	CLK("omap_timer.5",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
+>> +	CLK("omap_timer.6",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
+>> +	CLK("omap_timer.7",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
+>> +	CLK("omap_timer.8",	"sys_ck",		&dss_syc_gfclk_div,	CK_54XX),
+>> +};
+>
+> These aliases will not work with device-tree because the device-name is
+> formatted <addr>.<device>. Hence, when configuring a the timer parent
+> clock via the dmtimer driver it will fail. So it should be more like ...
+>
+> +	CLK("4ae18000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
+> +	CLK("48032000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
+> +	CLK("48034000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
+> +	CLK("48036000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
+> +	CLK("40138000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
+> +	CLK("4013a000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
+> +	CLK("4013c000.timer",	"timer_sys_ck",	&sys_clkin, CK_54XX),
+> +	CLK("4013e000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div, 	
+> CK_54XX),
+> +	CLK("4803e000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div, CK_54XX),
+> +	CLK("48086000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div, CK_54XX),
+> +	CLK("48088000.timer",	"timer_sys_ck",	&dss_syc_gfclk_div, CK_54XX),
+>
+> For more details see [2].
 
-Ok, I will send the updated version now.
+Thanks Jon. I will update the autogen scripts to generate these
+accordingly.
 
-> 
+>
+> If you would like to test the dmtimer driver on omap5, then you can grab
+> my omap-test module [3], build it (see README), load it and then ...
+>
+> # echo 1 > /sys/kernel/debug/omap-test/timer/all
+>
+> This will perform some basic tests on all the dmtimers. I would do it
+> myself, but there appears to be several issues getting this to boot on
+> an ES1.0 (which is probably expected).
 
+Right. This is ES2.0 data, so won't boot on an ES1.0 device.
 
-Regards, 
-Gururaja
+regards,
+Rajendra
+
+>
+> Cheers
+> Jon
+>
+> [1] http://www.spinics.net/lists/linux-omap/msg71272.html
+> [2] https://patchwork.kernel.org/patch/1204351/
+> [3] https://github.com/jonhunter/omap-test
+>
