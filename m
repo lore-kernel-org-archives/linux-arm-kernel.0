@@ -1,118 +1,111 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Thu, 31 Jan 2013 12:53:20 -0500
-Subject: [PATCH 2/2] regulators: anatop: add set_voltage_time_sel interface
-In-Reply-To: <51099107.3070705@boundarydevices.com>
-References: <1359585461-11377-1-git-send-email-b20788@freescale.com>
- <51099107.3070705@boundarydevices.com>
-Message-ID: <20130131175320.GA22977@ubuntu>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 31 Jan 2013 05:02:04 +0000
+Subject: [PATCH v4 5/8] MFD: ti_am335x_tscadc: Add DT support
+In-Reply-To: <4CE347531D4CA947960AF71FF095B9323E9B1EE9@DBDE01.ent.ti.com>
+References: <1358999112-31192-1-git-send-email-rachna@ti.com>
+ <1358999112-31192-6-git-send-email-rachna@ti.com>
+ <A9839AA2-ABCD-4642-9766-D56824AC27AD@dominion.thruhere.net>
+ <4CE347531D4CA947960AF71FF095B9323E9B1EE9@DBDE01.ent.ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EBEFAE8@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 02:30:47PM -0700, Troy Kisky wrote:
-> On 1/30/2013 3:37 PM, Anson Huang wrote:
-> >some of anatop's regulators(vppcpu, vddpu and vddsoc) have
-> >register settings about LDO's step time, which will impact
-> >the LDO ramp up speed, need to use set_voltage_time_sel
-> >interface to add necessary delay everytime LDOs' voltage
-> >is increased.
-> >
-> >offset 0x170:
-> >bit [24-25]: vddcpu
-> >bit [26-27]: vddpu
-> >bit [28-29]: vddsoc
-> >
-> >field definition:
-> >0'b00: 64 cycles of 24M clock;
-> >0'b01: 128 cycles of 24M clock;
-> >0'b02: 256 cycles of 24M clock;
-> >0'b03: 512 cycles of 24M clock;
-> >
-> >Signed-off-by: Anson Huang <b20788@freescale.com>
-> >---
-> >  drivers/regulator/anatop-regulator.c |   42 ++++++++++++++++++++++++++++++++++
-> >  1 file changed, 42 insertions(+)
-> >
-> >diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
-> >index 8f39cac..a857b9c 100644
-> >--- a/drivers/regulator/anatop-regulator.c
-> >+++ b/drivers/regulator/anatop-regulator.c
-> >@@ -31,12 +31,18 @@
-> >  #include <linux/regulator/driver.h>
-> >  #include <linux/regulator/of_regulator.h>
-> >+#define LDO_RAMP_UP_UNIT_IN_CYCLES      64 /* 64 cycles per step */
-> >+#define LDO_RAMP_UP_FREQ_IN_MHZ         24 /* cycle based on 24M OSC */
-> >+
-> >  struct anatop_regulator {
-> >  	const char *name;
-> >  	u32 control_reg;
-> >  	struct regmap *anatop;
-> >  	int vol_bit_shift;
-> >  	int vol_bit_width;
-> >+	u32 delay_reg;
-> >+	int delay_bit_shift;
-> >+	int delay_bit_width;
-> >  	int min_bit_val;
-> >  	int min_voltage;
-> >  	int max_voltage;
-> >@@ -55,6 +61,33 @@ static int anatop_regmap_set_voltage_sel(struct regulator_dev *reg,
-> >  	return regulator_set_voltage_sel_regmap(reg, selector);
-> >  }
-> >+static int anatop_regmap_set_voltage_time_sel(struct regulator_dev *reg,
-> >+	unsigned int old_sel,
-> >+	unsigned int new_sel)
-> >+{
-> >+	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
-> >+	u32 val;
-> >+	int ret = 0;
-> >+
-> >+	/* check whether need to care about LDO ramp up speed */
-> >+	if (anatop_reg->delay_reg) {
-> >+		/*
-> >+		 * the delay for LDO ramp up time is
-> >+		 * based on the register setting, we need
-> >+		 * to calculate how many steps LDO need to
-> >+		 * ramp up, and how much delay needed. (us)
-> >+		 */
-> >+		regmap_read(anatop_reg->anatop, anatop_reg->delay_reg, &val);
-> >+		val = (val >> anatop_reg->delay_bit_shift) &
-> >+			((1 << anatop_reg->delay_bit_width) - 1);
-> >+		ret = new_sel > old_sel ? (new_sel - old_sel) *
+On Thu, Jan 31, 2013 at 09:41:11, Patil, Rachna wrote:
+> On Wed, Jan 30, 2013 at 16:10:09, Koen Kooi wrote:
+> > 
+> > Op 24 jan. 2013, om 04:45 heeft "Patil, Rachna" <rachna@ti.com> het volgende geschreven:
+> > 
+> > > From: "Patil, Rachna" <rachna@ti.com>
+> > > 
+> > > Make changes to add DT support in the MFD core driver.
+> > > 
+> > > Signed-off-by: Patil, Rachna <rachna@ti.com>
+> > > ---
+> > > Changes in v4:
+> > > 	Non-standard properties prefixed with vendor name.
+> > > 
+> > > drivers/mfd/ti_am335x_tscadc.c |   28 +++++++++++++++++++++++-----
+> > > 1 file changed, 23 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/drivers/mfd/ti_am335x_tscadc.c 
+> > > b/drivers/mfd/ti_am335x_tscadc.c index e9f3fb5..87b446b 100644
+> > > --- a/drivers/mfd/ti_am335x_tscadc.c
+> > > +++ b/drivers/mfd/ti_am335x_tscadc.c
+> > > @@ -22,6 +22,8 @@
+> > > #include <linux/regmap.h>
+> > > #include <linux/mfd/core.h>
+> > > #include <linux/pm_runtime.h>
+> > > +#include <linux/of.h>
+> > > +#include <linux/of_device.h>
+> > > 
+> > > #include <linux/mfd/ti_am335x_tscadc.h> #include 
+> > > <linux/input/ti_am335x_tsc.h>
+> > > @@ -64,20 +66,31 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
+> > > 	struct resource		*res;
+> > > 	struct clk		*clk;
+> > > 	struct mfd_tscadc_board	*pdata = pdev->dev.platform_data;
+> > > +	struct device_node	*node = pdev->dev.of_node;
+> > > 	struct mfd_cell		*cell;
+> > > 	int			err, ctrl;
+> > > 	int			clk_value, clock_rate;
+> > > -	int			tsc_wires, adc_channels = 0, total_channels;
+> > > +	int			tsc_wires = 0, adc_channels = 0, total_channels;
+> > > 
+> > > -	if (!pdata) {
+> > > +	if (!pdata && !pdev->dev.of_node) {
+> > > 		dev_err(&pdev->dev, "Could not find platform data\n");
+> > > 		return -EINVAL;
+> > > 	}
+> > > 
+> > > -	if (pdata->adc_init)
+> > > -		adc_channels = pdata->adc_init->adc_channels;
+> > > +	if (pdev->dev.platform_data) {
+> > > +		if (pdata->tsc_init)
+> > > +			tsc_wires = pdata->tsc_init->wires;
+> > > +
+> > > +		if (pdata->adc_init)
+> > > +			adc_channels = pdata->adc_init->adc_channels;
+> > > +	} else {
+> > > +		node = of_find_node_by_name(pdev->dev.of_node, "tsc");
+> > > +		of_property_read_u32(node, "ti,wires", &tsc_wires);
+> > > +
+> > > +		node = of_find_node_by_name(pdev->dev.of_node, "adc");
+> > > +		of_property_read_u32(node, "ti,adc-channels", &adc_channels);
+> > > +	}
+> > 
+> > Since AM335x is DT only, why is there a platform data codepath and why is it the first branch it tries? And I guess the next question is related to the first: why doesn't it work when used with DT? When I copy over the nodes from the evm.dts to my board I get "tsc tsc: Missing platform data" in dmesg.
 > 
-> The (new_sel > old_sel) could be part of the above if.
+> This IP came up 1st on AM335x, but it is not platform dependent. The driver can be used on other platforms where-in DT is not supported.
+> According to the maintainers platform data takes precedence over DT. Hence the order.
 > 
-> if (anatop_reg->delay_reg && new_sel > old_sel)
-[Anson Huang]Good point, accepted. Please help review my v3 patch,thanks!
+
+Rachana,
+
+I see no point adding support for platform_data when you know that none of 
+older platforms are going to use this driver and all future platforms _must_ 
+follow device-tree model.
+
+So I agree that you should remove board file dependency from the driver.
+
+
+> I do not see "Missing platform data" error msg in the latest driver. I am not able to trace from where this got populated.
 > 
-> >+			((LDO_RAMP_UP_UNIT_IN_CYCLES << val) /
-> >+			LDO_RAMP_UP_FREQ_IN_MHZ + 1) : 0;
-> >+	}
-> >+
-> >+	return ret;
-> >+}
-> >+
-> >  static int anatop_regmap_get_voltage_sel(struct regulator_dev *reg)
-> >  {
-> >  	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
-> >@@ -67,6 +100,7 @@ static int anatop_regmap_get_voltage_sel(struct regulator_dev *reg)
-> >  static struct regulator_ops anatop_rops = {
-> >  	.set_voltage_sel = anatop_regmap_set_voltage_sel,
-> >+	.set_voltage_time_sel = anatop_regmap_set_voltage_time_sel,
-> >  	.get_voltage_sel = anatop_regmap_get_voltage_sel,
-> >  	.list_voltage = regulator_list_voltage_linear,
-> >  	.map_voltage = regulator_map_voltage_linear,
-> >@@ -143,6 +177,14 @@ static int anatop_regulator_probe(struct platform_device *pdev)
-> >  		goto anatop_probe_end;
-> >  	}
-> >+	/* read LDO ramp up setting, only for core reg */
-> >+	of_property_read_u32(np, "anatop-delay-reg-offset",
-> >+			     &sreg->delay_reg);
-> >+	of_property_read_u32(np, "anatop-delay-bit-width",
-> >+			     &sreg->delay_bit_width);
-> >+	of_property_read_u32(np, "anatop-delay-bit-shift",
-> >+			     &sreg->delay_bit_shift);
-> >+
-> >  	rdesc->n_voltages = (sreg->max_voltage - sreg->min_voltage) / 25000 + 1
-> >  			    + sreg->min_bit_val;
-> >  	rdesc->min_uV = sreg->min_voltage;
+
+Can you share the branch which you have tested?
+
+Thanks,
+Vaibhav
+
+> > 
+> > What are the chances this driver will work when applied on top of 3.8-rcX? Has it even been tested with that? Has it been tested at all?
 > 
+> This driver has been tested on top of v3.8-rc3 on a AM335x EVM.
+> 
+> Regards,
+> Rachna
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
 > 
