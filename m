@@ -1,83 +1,96 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 31 Jan 2013 10:01:10 +0100
-Subject: [PATCH 3/6] USB: chipidea: ci13xxx-imx: create dynamic platformdata
-In-Reply-To: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359622873-23345-4-git-send-email-s.hauer@pengutronix.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 31 Jan 2013 11:08:35 +0200
+Subject: [PATCH 5/5] ARM: OMAP3: Update clocksource timer selection
+In-Reply-To: <1359565471-30721-6-git-send-email-jon-hunter@ti.com>
+References: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
+ <1359565471-30721-6-git-send-email-jon-hunter@ti.com>
+Message-ID: <510A3493.6050508@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+On 01/30/13 19:04, Jon Hunter wrote:
+> When booting with device-tree for OMAP3 and AM335x devices and a gptimer
+> is used as the clocksource (which is always the case for AM335x), a
+> gptimer located in a power domain that is not always-on is selected.
+> Ideally we should use a gptimer located in a power domain that is always
+> on (such as the wake-up domain) so that time can be maintained during a
+> kernel suspend without keeping on additional power domains unnecessarily.
+> 
+> In order to fix this so that we can select a gptimer located in a power
+> domain that is always-on, the following changes were made ...
+> 1. Currently, only when selecting a gptimer to use for a clockevent
+>    timer, do we pass a timer property that can be used to select a
+>    specific gptimer. Change this so that we can pass a property when
+>    selecting a gptimer to use for a clocksource timer too.
+> 2. Currently, when selecting either a gptimer to use for a clockevent
+>    timer or a clocksource timer and no timer property is passed, then
+>    the first available timer is selected regardless of the properties
+>    it has. Change this so that if no properties are passed, then a timer
+>    that does not have additional features (such as always-on, dsp-irq,
+>    pwm, and secure) is selected.
+> 
+> Please note that using a gptimer for both clocksource and clockevents
+> can have a system power impact during idle. The reason being is that
+> OMAP and AMxxx devices typically only have one gptimer in a power domain
+> that is always-on. Therefore when the kernel is idle both the clocksource
+> and clockevent timers will be active and this will keep additional power
+> domains on. During kernel suspend, only the clocksource timer is active
+> and therefore, it is better to use a gptimer in a power domain that is
+> always-on for clocksource.
 
-This patch removes the limitation of having only one instance of the
-ci13xxx-imx platformdata and makes different configurations possible.
+This should explain the gptimer number switch in the
+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+section below, right?
+I would really like to see that clearly stated in the commit message.
+For instance:
+... it is better to use a gptimer in a power domain that is
+always-on for clocksource. Therefore we switch to use the first gptimer
+for clocksource and the second for clockevents.
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/usb/chipidea/ci13xxx_imx.c |   25 +++++++++++++++----------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 8c29122..69024e0 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -85,17 +85,10 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
- 
- /* End of common functions shared by usbmisc drivers*/
- 
--static struct ci13xxx_platform_data ci13xxx_imx_platdata  = {
--	.name			= "ci13xxx_imx",
--	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
--				  CI13XXX_PULLUP_ON_VBUS |
--				  CI13XXX_DISABLE_STREAMING,
--	.capoffset		= DEF_CAPOFFSET,
--};
--
- static int ci13xxx_imx_probe(struct platform_device *pdev)
- {
- 	struct ci13xxx_imx_data *data;
-+	struct ci13xxx_platform_data *pdata;
- 	struct platform_device *plat_ci, *phy_pdev;
- 	struct device_node *phy_np;
- 	struct resource *res;
-@@ -107,6 +100,18 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		&& !usbmisc_ops)
- 		return -EPROBE_DEFER;
- 
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX pdata!\n");
-+		return -ENOMEM;
-+	}
-+
-+	pdata->name = "ci13xxx_imx";
-+	pdata->capoffset = DEF_CAPOFFSET;
-+	pdata->flags = CI13XXX_REQUIRE_TRANSCEIVER |
-+		       CI13XXX_PULLUP_ON_VBUS |
-+		       CI13XXX_DISABLE_STREAMING;
-+
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data) {
- 		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
-@@ -168,7 +173,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		reg_vbus = NULL;
- 	}
- 
--	ci13xxx_imx_platdata.phy = data->phy;
-+	pdata->phy = data->phy;
- 
- 	if (!pdev->dev.dma_mask) {
- 		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
-@@ -193,7 +198,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 
- 	plat_ci = ci13xxx_add_device(&pdev->dev,
- 				pdev->resource, pdev->num_resources,
--				&ci13xxx_imx_platdata);
-+				pdata);
- 	if (IS_ERR(plat_ci)) {
- 		ret = PTR_ERR(plat_ci);
- 		dev_err(&pdev->dev,
+Apart from above,
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
+> ---
+>  arch/arm/mach-omap2/timer.c |   32 +++++++++++++++++++++-----------
+>  1 file changed, 21 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index af20be7..acf9f82 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+
+[...]
+
+> @@ -557,19 +567,19 @@ void __init omap##name##_sync32k_timer_init(void)		\
+>  #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP4) ||		\
+>  	defined(CONFIG_SOC_OMAP5)
+>  OMAP_SYS_32K_TIMER_INIT(2, 1, "timer_32k_ck", "ti,timer-alwon",
+> -			2, "timer_sys_ck");
+> +			2, "timer_sys_ck", NULL);
+>  #endif
+>  
+>  #ifdef CONFIG_ARCH_OMAP3
+>  OMAP_SYS_32K_TIMER_INIT(3, 1, "timer_32k_ck", "ti,timer-alwon",
+> -			2, "timer_sys_ck");
+> +			2, "timer_sys_ck", NULL);
+>  OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+> -			2, "timer_sys_ck");
+> +			2, "timer_sys_ck", NULL);
+>  #endif /* CONFIG_ARCH_OMAP3 */
+>  
+>  #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+> -OMAP_SYS_GP_TIMER_INIT(3, 1, "timer_sys_ck", "ti,timer-alwon",
+> -		       2, "timer_sys_ck");
+> +OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+> +		       1, "timer_sys_ck", "ti,timer-alwon");
+>  #endif
+>  
+>  #ifdef CONFIG_ARCH_OMAP4
+> 
+
 -- 
-1.7.10.4
+Regards,
+Igor.
