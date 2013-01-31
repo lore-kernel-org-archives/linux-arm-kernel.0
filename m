@@ -1,56 +1,62 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 31 Jan 2013 17:07:06 +0100
-Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
- for all cores
-In-Reply-To: <CAKohpomEcrPa7UnZmtTouxN6JXxcaa7dBstMGUWjXGL0n1+=Ng@mail.gmail.com>
-References: <1887364.fvxYYNb7Mm@amdc1227> <1520678.Zm627xxIN3@amdc1227>
- <CAKohpomEcrPa7UnZmtTouxN6JXxcaa7dBstMGUWjXGL0n1+=Ng@mail.gmail.com>
-Message-ID: <1604688.EafV1ohaV9@amdc1227>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 31 Jan 2013 10:07:19 -0600
+Subject: [PATCH 5/5] ARM: OMAP3: Update clocksource timer selection
+In-Reply-To: <510A3493.6050508@compulab.co.il>
+References: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
+ <1359565471-30721-6-git-send-email-jon-hunter@ti.com>
+ <510A3493.6050508@compulab.co.il>
+Message-ID: <510A96B7.7010503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 of January 2013 20:46:10 Viresh Kumar wrote:
-> On 31 January 2013 20:34, Tomasz Figa <t.figa@samsung.com> wrote:
-> > Well, the fact that it isn't used at the moment doesn't mean that it
-> > shouldn't be set correctly. The field is present in the structure and
-> > has a set of defined values - one of which should be selected. For
-> > example, I can imagine some governor taking this information into
-> > account.
-> Governors already take this information but from a different variable:
-> policy->cpus.
-> 
-> Look at the patch which added it:
-> 
-> commit 3b2d99429e3386b6e2ac949fc72486509c8bbe36
-> Author: Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
-> Date:   Wed Dec 14 15:05:00 2005 -0500
-> 
->     P-state software coordination for ACPI core
-> 
->     http://bugzilla.kernel.org/show_bug.cgi?id=5737
-> 
->     Signed-off-by: Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
->     Signed-off-by: Len Brown <len.brown@intel.com>
-> ---
->  drivers/acpi/processor_perflib.c | 228
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> +++++++++++++++++++++++++++++++++++++ include/acpi/processor.h         |
->  27 ++++++++++++-
->  include/linux/cpufreq.h          |   4 ++
->  3 files changed, 258 insertions(+), 1 deletion(-)
-> 
-> 
-> It was clearly for ACPI, but was probably named badly and we people
-> got confused that it is for our use.
 
-Hmm. Now as I think of it, there might be another confusing aspect:
+On 01/31/2013 03:08 AM, Igor Grinberg wrote:
+> On 01/30/13 19:04, Jon Hunter wrote:
+>> When booting with device-tree for OMAP3 and AM335x devices and a gptimer
+>> is used as the clocksource (which is always the case for AM335x), a
+>> gptimer located in a power domain that is not always-on is selected.
+>> Ideally we should use a gptimer located in a power domain that is always
+>> on (such as the wake-up domain) so that time can be maintained during a
+>> kernel suspend without keeping on additional power domains unnecessarily.
+>>
+>> In order to fix this so that we can select a gptimer located in a power
+>> domain that is always-on, the following changes were made ...
+>> 1. Currently, only when selecting a gptimer to use for a clockevent
+>>    timer, do we pass a timer property that can be used to select a
+>>    specific gptimer. Change this so that we can pass a property when
+>>    selecting a gptimer to use for a clocksource timer too.
+>> 2. Currently, when selecting either a gptimer to use for a clockevent
+>>    timer or a clocksource timer and no timer property is passed, then
+>>    the first available timer is selected regardless of the properties
+>>    it has. Change this so that if no properties are passed, then a timer
+>>    that does not have additional features (such as always-on, dsp-irq,
+>>    pwm, and secure) is selected.
+>>
+>> Please note that using a gptimer for both clocksource and clockevents
+>> can have a system power impact during idle. The reason being is that
+>> OMAP and AMxxx devices typically only have one gptimer in a power domain
+>> that is always-on. Therefore when the kernel is idle both the clocksource
+>> and clockevent timers will be active and this will keep additional power
+>> domains on. During kernel suspend, only the clocksource timer is active
+>> and therefore, it is better to use a gptimer in a power domain that is
+>> always-on for clocksource.
+> 
+> This should explain the gptimer number switch in the
+> #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+> section below, right?
+> I would really like to see that clearly stated in the commit message.
+> For instance:
+> ... it is better to use a gptimer in a power domain that is
+> always-on for clocksource. Therefore we switch to use the first gptimer
+> for clocksource and the second for clockevents.
 
-Could you explain what "sw coordination" and "any coordination" mean?
-I mean specifically cpufreq_policy.cpus and cpufreq_policy.related_cpus 
-masks.
+Yes exactly. Good point I can make that bit explicit.
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+>>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> 
+> Apart from above,
+> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
+Thanks
+Jon
