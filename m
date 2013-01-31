@@ -1,19 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 31 Jan 2013 21:25:23 +0530
-Subject: [PATCH v3 02/15] ARM: mcpm: introduce the CPU/cluster power API
-In-Reply-To: <1359445870-18925-3-git-send-email-nicolas.pitre@linaro.org>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-3-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <510A93EB.7090506@ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 31 Jan 2013 10:58:32 -0500 (EST)
+Subject: [PATCH v2 2/2] ARM: memory: define TASK_UNMAPPED_BASE in terms of
+ TASK_SIZE
+In-Reply-To: <1359644949-18550-2-git-send-email-will.deacon@arm.com>
+References: <1359644949-18550-1-git-send-email-will.deacon@arm.com>
+ <1359644949-18550-2-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1301311058070.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013 01:20 PM, Nicolas Pitre wrote:
-> This is the basic API used to handle the powering up/down of individual
-> CPUs in a (multi-)cluster system.  The platform specific backend
-> implementation has the responsibility to also handle the cluster level
-> power as well when the first/last CPU in a cluster is brought up/down.
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+On Thu, 31 Jan 2013, Will Deacon wrote:
+
+> TASK_UNMAPPED_BASE is defined directly in terms of PAGE_OFFSET, which is
+> confusing given that the modules area sits between here and TASK_SIZE
+> and is not available for user allocations.
+> 
+> This patch defines TASK_UNMAPPED_BASE in terms of TASK_SIZE instead and
+> fixes a bug introduced by 394ef6403abc ("mm: use vm_unmapped_area() on
+> arm architecture") whereby TASK_UNMAPPED_BASE is no longer page-aligned
+> for bottom-up mmap, causing get_unmapped_area to choke on misaligned
+> addresses.
+> 
+> Reported-by: Christoffer Dall <cdall@cs.columbia.edu>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
 > ---
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>  arch/arm/include/asm/memory.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 924320f..64c770d 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -37,7 +37,7 @@
+>   */
+>  #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
+>  #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
+> -#define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
+> +#define TASK_UNMAPPED_BASE	ALIGN(TASK_SIZE / 3, SZ_16M)
+>  
+>  /*
+>   * The maximum size of a 26-bit user space task.
+> -- 
+> 1.8.0
+> 
