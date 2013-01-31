@@ -1,52 +1,48 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 31 Jan 2013 15:26:08 +0900
-Subject: [PATCH 3/4] ARM: mach-shmobile: add shmobile_cpu_disable_any()
-In-Reply-To: <1359613569-26981-1-git-send-email-horms+renesas@verge.net.au>
-References: <1359613569-26981-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1359613569-26981-4-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 31 Jan 2013 15:39:29 +0900
+Subject: [GIT PULL v2] Renesas ARM-based SoC for v3.9
+In-Reply-To: <20130130021802.GD28230@verge.net.au>
+References: <1359086133-23357-1-git-send-email-horms+renesas@verge.net.au>
+ <20130129171138.GE16188@quad.lixom.net>
+ <20130130021802.GD28230@verge.net.au>
+Message-ID: <20130131063929.GD24518@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht@gmail.com>
+On Wed, Jan 30, 2013 at 11:18:02AM +0900, Simon Horman wrote:
+> On Tue, Jan 29, 2013 at 09:11:38AM -0800, Olof Johansson wrote:
+> > On Fri, Jan 25, 2013 at 12:55:18PM +0900, Simon Horman wrote:
+> > > Hi Olof, Hi Arnd,
+> > > 
+> > > please consider the following soc enhancements for 3.9.
+> > > 
+> > > This series is based on a merge of the irqchip/gic-vic-move and
+> > > timer/cleanup branches in the arm-soc tree. There were a number of
+> > > conflicts in this merge, as indicated by the merge commit
+> > > 6265b0f325eed54558b35769aecb1d79423295c7. In each case I took care to
+> > > match the merge made in the arm-soc tree which is evident in the for-next
+> > > branch.
+> > > 
+> > > ----------------------------------------------------------------
+> > > The following changes since commit 6265b0f325eed54558b35769aecb1d79423295c7:
+> > > 
+> > >   Merge remote-tracking branches 'arm-soc/irqchip/gic-vic-move' and 'arm-soc/timer/cleanup' into soc (2013-01-24 17:57:20 +0900)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
+> > > 
+> > 
+> > Merged, thanks. You had resolved the board_bcm conflict slightly differenlty
+> > (technically better), but to keep it common with what we have, I added back
+> > the extra line of whitespace.
+> > 
+> > By the way, you should look into starting to use signed tags for your pull
+> > requests, since it gives you a place to give a short description of the branch
+> > (and that description makes it into the commit with 0 work on our behalf :)
+> 
+> Sure, will do.
 
-Method to disable any core to be used on platforms where CPU0 does not
-need special treatment.
-
-Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/hotplug.c             |    6 ++++++
- arch/arm/mach-shmobile/include/mach/common.h |    1 +
- 2 files changed, 7 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/hotplug.c b/arch/arm/mach-shmobile/hotplug.c
-index b09a0bd..a1524e3 100644
---- a/arch/arm/mach-shmobile/hotplug.c
-+++ b/arch/arm/mach-shmobile/hotplug.c
-@@ -56,6 +56,12 @@ int shmobile_cpu_disable(unsigned int cpu)
- 	return cpu == 0 ? -EPERM : 0;
- }
- 
-+int shmobile_cpu_disable_any(unsigned int cpu)
-+{
-+	cpumask_clear_cpu(cpu, &dead_cpus);
-+	return 0;
-+}
-+
- int shmobile_cpu_is_dead(unsigned int cpu)
- {
- 	return cpumask_test_cpu(cpu, &dead_cpus);
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 64c0622..e48606d 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -84,6 +84,7 @@ static inline int shmobile_cpuidle_init(void) { return 0; }
- 
- extern void shmobile_cpu_die(unsigned int cpu);
- extern int shmobile_cpu_disable(unsigned int cpu);
-+extern int shmobile_cpu_disable_any(unsigned int cpu);
- 
- #ifdef CONFIG_HOTPLUG_CPU
- extern int shmobile_cpu_is_dead(unsigned int cpu);
--- 
-1.7.10.4
+I have attempted to do so for two pull requests I sent a little earlier
+today. Please let me know if I have missed something.
