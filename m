@@ -1,101 +1,37 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 31 Jan 2013 10:30:36 +0800
-Subject: [PATCH 2/6] usb: add devicetree helpers for determining
- dr_mode and phy_type
-In-Reply-To: <1359559782-14552-3-git-send-email-s.hauer@pengutronix.de>
-References: <1359559782-14552-1-git-send-email-s.hauer@pengutronix.de>
- <1359559782-14552-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130131023034.GF9777@nchen-desktop>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 31 Jan 2013 10:32:25 +0800
+Subject: [PATCH 1/2] ASoC: tlv320aic3x: Convert mic bias to a supply widget
+In-Reply-To: <1359552155-17426-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1359552155-17426-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20130131023221.GA6027@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 04:29:38PM +0100, Sascha Hauer wrote:
-> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> 
-> This adds two little devicetree helper functions for determining the
-> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
-> the devicetree.
-> 
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/usb/usb-common.c |   69 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/usb/of.h   |   27 ++++++++++++++++++
->  include/linux/usb/otg.h  |    7 +++++
->  include/linux/usb/phy.h  |    9 ++++++
->  4 files changed, 112 insertions(+)
->  create mode 100644 include/linux/usb/of.h
-> 
-> diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
-> index d29503e..1c0292c 100644
-> --- a/drivers/usb/usb-common.c
-> +++ b/drivers/usb/usb-common.c
-> @@ -14,6 +14,9 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/usb/ch9.h>
-> +#include <linux/of.h>
-> +#include <linux/usb/of.h>
-> +#include <linux/usb/otg.h>
->  
->  const char *usb_speed_string(enum usb_device_speed speed)
->  {
-> @@ -32,4 +35,70 @@ const char *usb_speed_string(enum usb_device_speed speed)
->  }
->  EXPORT_SYMBOL_GPL(usb_speed_string);
->  
-> +#ifdef CONFIG_OF
-> +static const char *usb_dr_modes[] = {
-> +	[USB_DR_MODE_UNKNOWN]		= "",
-> +	[USB_DR_MODE_HOST]		= "host",
-> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
-> +	[USB_DR_MODE_OTG]		= "otg",
-> +};
-> +
-> +/**
-> + * of_usb_get_dr_mode - Get dual role mode for given device_node
-> + * @np:	Pointer to the given device_node
-> + *
-> + * The function gets phy interface string from property 'dr_mode',
-> + * and returns the correspondig enum usb_phy_dr_mode
-> + */
-> +enum usb_phy_dr_mode of_usb_get_dr_mode(struct device_node *np)
-The word "phy" at usb_phy_dr_mode may cause misunderstand, just usb_dr_mode
-is ok
-> +{
-> +	const char *dr_mode;
-> +	int err, i;
-> +
-> +	err = of_property_read_string(np, "dr_mode", &dr_mode);
-> +	if (err < 0)
-> +		return USB_DR_MODE_UNKNOWN;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
-> +		if (!strcasecmp(dr_mode, usb_dr_modes[i]))
-> +			return i;
-Just curious, why not using strcmp?
-> +
-> +	return USB_DR_MODE_UNKNOWN;
-> +}
-> +
-> +#ifdef CONFIG_OF
-> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
-> +enum usb_phy_dr_mode of_usb_get_dr_mode(struct device_node *np);
-> +#else
-> +static inline enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
-> +{
-> +	return USBPHY_INTERFACE_MODE_NA;
-> +}
-> +
-> +static inline enum usb_phy_dr_mode of_usb_get_dr_mode(struct device_node *np)
-> +{
-> +	return USB_DR_MODE_UNKNOWN;
-> +}
-For, dr_mode, if value has not existed, you use *_UNKNOWN, why
-for usbphy,  you use *_NA. It is better uniform.
+On Wed, Jan 30, 2013 at 06:52:35PM +0530, Hebbar Gururaja wrote:
 
--- 
+> Convert MicBias widgets to supply widget.
 
-Best Regards,
-Peter Chen
+> On tlv320aic3x, Mic bias power on/off shares the same register bits
+> with output mic bias voltage.  So, when power on mic bias, we need
+> reclaim it to voltage value.
+
+This should update machine drivers that use the CODEC too.
+
+> +- ai3x-micbias-vg - MicBias Voltage required.
+> +	1 - MICBIAS output is powered to 2.0V,
+> +	2 - MICBIAS output is powered to 2.5V,
+> +	3 - MICBIAS output is connected to AVDD,
+> +	If this node is not mentioned or if the value is incorrect, then MicBias
+> +	is powered down.
+
+Would 2.0V not be a more sensible default (it is the lowest voltage so
+is unlikely to cause hardware damage if it's wrong)?
+
+Otherwise this looks good.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/c8628dbd/attachment.sig>
