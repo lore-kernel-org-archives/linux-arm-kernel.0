@@ -1,51 +1,42 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 31 Jan 2013 19:50:15 +0530
-Subject: Failure to boot...
-In-Reply-To: <20130131141635.GR2637@n2100.arm.linux.org.uk>
-References: <20130131014912.GM2637@n2100.arm.linux.org.uk>
- <20130131030203.GA8374@quad.lixom.net>
- <alpine.LFD.2.02.1301302312030.6300@xanadu.home>
- <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <20130131104044.GO2637@n2100.arm.linux.org.uk> <510A6877.9080307@ti.com>
- <20130131130437.GP2637@n2100.arm.linux.org.uk> <510A78E1.8010308@ti.com>
- <20130131141320.GQ2637@n2100.arm.linux.org.uk>
- <20130131141635.GR2637@n2100.arm.linux.org.uk>
-Message-ID: <510A7D9F.7040507@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 31 Jan 2013 09:19:55 -0500
+Subject: [GIT PULL] ARM: mvebu cleanup for v3.9 round2
+In-Reply-To: <201301311411.33125.arnd@arndb.de>
+References: <1359495436.F88c4680.7559@triton>
+ <20130131125116.GC7717@titan.lakedaemon.net>
+ <201301311411.33125.arnd@arndb.de>
+Message-ID: <20130131141955.GE7717@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 January 2013 07:46 PM, Russell King - ARM Linux wrote:
-> On Thu, Jan 31, 2013 at 02:13:20PM +0000, Russell King - ARM Linux wrote:
->> On Thu, Jan 31, 2013 at 07:30:01PM +0530, Santosh Shilimkar wrote:
->>> Linus' tip(commit: 04c2eee5) + arm-soc for-next boots fine as well.
->>> The pull request from Tony [1] fixed the multi-platform boot issue
->>> for OMAP.
->>>
->>> Now trying to merge your for-next and test.
->>
->> Well, my tip (which is based on Linus' 6abb7c25) also builds and
->> boots fine.
->>
->> Hang on...
->>
->> # CONFIG_ARCH_OMAP2PLUS is not set
->> CONFIG_ARCH_VEXPRESS=y
->>
->> which of course won't boot, and this happens on both oldconfigs because
->> of the change to multiplatform support.
->
-> And no, the instructions given last time around to add:
->
-> # 13 Jan 2013: Update for OMAP moving to multiplatform
-> CONFIG_ARCH_MULTIPLATFORM=y
-> CONFIG_ARCH_MULTI_V7=y
->
-> don't fix it either, it needs more options defined...
->
-Linus' tip + Tony's pull [1] request also makes things work
-on OMAP.
+On Thu, Jan 31, 2013 at 02:11:32PM +0000, Arnd Bergmann wrote:
+> On Thursday 31 January 2013, Jason Cooper wrote:
+> > Arnd, Olof,
+> > 
+> > Please don't pull this yet.  The nsa310 patch built fine at the tip of
+> > my for-next, but didn't do so well when applied to mvebu/cleanup.
+> > 
+> > I'll redo and resubmit the whole series of pr's.
+> 
+> 
+> FWIW, when I was building all defconfigs for for-next yesterday, I needed
+> this patch, but nothing else for mvebu or kirkwood.
 
-Regards,
-Santosh
+Yep, that was it.  Thanks!  in mvebu/dt we init i2c via DT, and
+mvebu/cleanup is before that.
 
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg83084.html
+thx,
+
+Jason.
+
+> index 61c4b18..970174a 100644
+> --- a/arch/arm/mach-kirkwood/board-nsa310.c
+> +++ b/arch/arm/mach-kirkwood/board-nsa310.c
+> @@ -11,6 +11,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/gpio.h>
+> +#include <linux/i2c.h>
+>  #include <mach/kirkwood.h>
+>  #include <linux/of.h>
+>  #include "common.h"
