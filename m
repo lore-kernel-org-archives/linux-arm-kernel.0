@@ -1,104 +1,52 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Thu, 31 Jan 2013 11:53:21 +0530
-Subject: [PATCH] arm: dts: omap4-panda: Add I2c pinctrl data
-Message-ID: <1359613401-29133-1-git-send-email-sourav.poddar@ti.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 31 Jan 2013 15:23:53 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC for v3.9 #2
+Message-ID: <1359613442-26038-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Booting 3.8-rc4 on omap4 panda results in the following error
+Hi Olof, Hi Arnd,
 
-[    0.444427] omap_i2c 48070000.i2c: did not get pins for i2c error: -19
-[    0.445770] omap_i2c 48070000.i2c: bus 0 rev0.11 at 400 kHz
-[    0.473937] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
-[    0.474670] omap_i2c 48072000.i2c: bus 1 rev0.11 at 400 kHz
-[    0.474822] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
-[    0.476379] omap_i2c 48060000.i2c: bus 2 rev0.11 at 100 kHz
-[    0.477294] omap_i2c 48350000.i2c: did not get pins for i2c error: -19
-[    0.477996] omap_i2c 48350000.i2c: bus 3 rev0.11 at 400 kHz
-[    0.483398] Switching to clocksource 32k_counter
+The following changes since commit 42dd581bc4dba82e8756bb881fa974742250b4c6:
 
-This happens because omap4 panda dts file is not adapted to use i2c through
-pinctrl framework. Populating i2c pinctrl data to get rid of the error.
+  ARM: shmobile: Include sh73a0 DTSI in kzm9g (2013-01-25 09:26:33 +0900)
 
-Tested on omap4460 panda with 3.8-rc4 kernel.
+are available in the git repository at:
 
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-Reported-by: Luciano Coelho <coelho@ti.com>
----
- arch/arm/boot/dts/omap4-panda.dts |   40 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards2-for-v3.9
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 4122efe..f951e6b 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -110,9 +110,40 @@
- 			0x58 0x10b	/* hdmi_hpd.gpio_63 INPUT PULLDOWN | MODE3 */
- 		>;
- 	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			0xe2 0x118        /* i2c1_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xe4 0x118        /* i2c1_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
-+
-+	i2c2_pins: pinmux_i2c2_pins {
-+		pinctrl-single,pins = <
-+			0xe6 0x118        /* i2c2_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xe8 0x118        /* i2c2_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
-+
-+	i2c3_pins: pinmux_i2c3_pins {
-+		pinctrl-single,pins = <
-+			0xea 0x118        /* i2c3_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xec 0x118     /* i2c3_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
-+
-+	i2c4_pins: pinmux_i2c4_pins {
-+		pinctrl-single,pins = <
-+			0xee 0x118        /* i2c4_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
- };
- 
- &i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+
- 	clock-frequency = <400000>;
- 
- 	twl: twl at 48 {
-@@ -139,10 +170,16 @@
- /include/ "twl6030.dtsi"
- 
- &i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
-+
- 	clock-frequency = <400000>;
- };
- 
- &i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins>;
-+
- 	clock-frequency = <100000>;
- 
- 	/*
-@@ -156,6 +193,9 @@
- };
- 
- &i2c4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c4_pins>;
-+
- 	clock-frequency = <400000>;
- };
- 
--- 
-1.7.1
+for you to fetch changes up to 2f27c40656fecba44e839c77910f75ee1024df62:
+
+  ARM: shmobile: armadillo800eva: set clock rates before timer init (2013-01-30 13:24:07 +0900)
+
+----------------------------------------------------------------
+Second round of Renesas ARM-based SoC board changes for v3.9
+
+* Fix to correct timer initialisation on the armadillo 800 eva board
+  from Hideki EIRAKU
+
+* The remaining of the changes relate to updating boards to
+  make use of gpio_request_one(). These changes are from  Laurent Pinchart.
+
+----------------------------------------------------------------
+Hideki EIRAKU (1):
+      ARM: shmobile: armadillo800eva: set clock rates before timer init
+
+Laurent Pinchart (8):
+      ARM: shmobile: ag5evm: Use gpio_request_one()
+      ARM: shmobile: ap4evb: Use gpio_request_one()
+      ARM: shmobile: armadillo800eva: Use gpio_request_one()
+      ARM: shmobile: armadillo800eva: Use gpio_set_value() to set GPIO value
+      ARM: shmobile: kota2: Use gpio_request_one()
+      ARM: shmobile: bonito: Use gpio_request_one()
+      ARM: shmobile: kzm9g: Use gpio_request_one()
+      ARM: shmobile: mackerel: Use gpio_request_one()
+
+ arch/arm/mach-shmobile/board-ag5evm.c          |   22 ++++-----
+ arch/arm/mach-shmobile/board-ap4evb.c          |   33 ++++----------
+ arch/arm/mach-shmobile/board-armadillo800eva.c |   57 +++++++++---------------
+ arch/arm/mach-shmobile/board-bonito.c          |    7 ++-
+ arch/arm/mach-shmobile/board-kota2.c           |    9 ++--
+ arch/arm/mach-shmobile/board-kzm9g.c           |   18 +++-----
+ arch/arm/mach-shmobile/board-mackerel.c        |   16 +++----
+ 7 files changed, 57 insertions(+), 105 deletions(-)
