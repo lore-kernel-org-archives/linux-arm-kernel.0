@@ -1,30 +1,60 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 31 Jan 2013 16:30:53 +0800
-Subject: [PATCH 1/2] ARM i.MX6: Add regulator delay support
-In-Reply-To: <1359585224-11304-1-git-send-email-b20788@freescale.com>
-References: <1359585224-11304-1-git-send-email-b20788@freescale.com>
-Message-ID: <20130131083050.GA2735@S2101-09.ap.freescale.net>
+From: r.sh.open@gmail.com (Rahul Sharma)
+Date: Thu, 31 Jan 2013 14:12:24 +0530
+Subject: [PATCH 5/5] drm/exynos: don't include plat/gpio-cfg.h
+In-Reply-To: <1359127711-19070-6-git-send-email-arnd@arndb.de>
+References: <1359127711-19070-1-git-send-email-arnd@arndb.de>
+ <1359127711-19070-6-git-send-email-arnd@arndb.de>
+Message-ID: <CAPdUM4MbFN6htJ9Xa_OtdfgpxNH=7JD6-eUAkVM5_O5SZYv2+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 05:33:44PM -0500, Anson Huang wrote:
-> For ANATOP LDOs, vddcpu, vddsoc and vddpu
-> have step time settings in the misc2 register, need
-> to add necessary step time info for these three LDOs,
-> then regulator driver can add necessary delay based on
-> these settings.
-> 
-> offset 0x170:
-> bit [24-25]: vddcpu
-> bit [26-27]: vddpu
-> bit [28-29]: vddsoc
-> 
-> field definition:
-> 0'b00: 64 cycles of 24M clock;
-> 0'b01: 128 cycles of 24M clock;
-> 0'b02: 256 cycles of 24M clock;
-> 0'b03: 512 cycles of 24M clock;
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+Hi Arnd Bergmann,
 
-Applied, thanks.
+It looks good to me. My patch caused this issue.
+Thanks for the fix.
+
+regards,
+Rahul Sharma.
+
+On Fri, Jan 25, 2013 at 8:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Patch  9eb3e9e6f3 "drm/exynos: add support for ARCH_MULTIPLATFORM"
+> allowed building the exynos hdmi driver on non-samsung platforms,
+> which unfortunately broke compilation in combination with 22c4f42897
+> "drm: exynos: hdmi: add support for exynos5 hdmi", which added
+> an inclusion of the samsung-specific plat/gpio-cfg.h header file.
+>
+> Fortunately, that header file is not required any more here, so
+> we can simply revert the inclusion in order to build the ARM
+> allyesconfig again without getting this error:
+>
+> drivers/gpu/drm/exynos/exynos_hdmi.c:37:27: fatal error: plat/gpio-cfg.h: No such file or directory
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Rob Clark <rob@ti.com>
+> Cc: Inki Dae <inki.dae@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Rahul Sharma <rahul.sharma@samsung.com>
+> ---
+>  drivers/gpu/drm/exynos/exynos_hdmi.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> index 41ff79d..b5f5119 100644
+> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> @@ -34,7 +34,6 @@
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/io.h>
+>  #include <linux/of_gpio.h>
+> -#include <plat/gpio-cfg.h>
+>
+>  #include <drm/exynos_drm.h>
+>
+> --
+> 1.8.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
