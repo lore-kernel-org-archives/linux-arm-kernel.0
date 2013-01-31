@@ -1,54 +1,115 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Jan 2013 12:15:28 +0000
-Subject: [PATCHv5 05/16] arm: arch_timer: split cntfrq accessor
+Date: Thu, 31 Jan 2013 12:15:29 +0000
+Subject: [PATCHv5 06/16] arm: arch_timer: factor out register accessors
 In-Reply-To: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
 References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1359634539-9580-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1359634539-9580-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CNTFRQ register is not duplicated for physical and virtual timers,
-and accessing it as if it were is confusing.
+Currently the arch_timer register accessors are thrown together with
+the main driver, preventing us from porting the driver to other
+architectures.
 
-Instead, use a separate accessor which doesn't take the access type
-as a parameter.
+This patch moves the register accessors into a header file, as with
+the arm64 version. Constants required by the accessors are also moved.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/kernel/arch_timer.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/arch_timer.h | 94 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/arch_timer.c      | 92 --------------------------------------
+ 2 files changed, 94 insertions(+), 92 deletions(-)
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index eb78f43..f31c9ee 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -51,8 +51,7 @@ static bool arch_timer_use_virtual = true;
- #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index d40229d..db0fdc4 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -1,13 +1,107 @@
+ #ifndef __ASMARM_ARCH_TIMER_H
+ #define __ASMARM_ARCH_TIMER_H
  
- #define ARCH_TIMER_REG_CTRL		0
--#define ARCH_TIMER_REG_FREQ		1
--#define ARCH_TIMER_REG_TVAL		2
++#include <asm/barrier.h>
+ #include <asm/errno.h>
+ #include <linux/clocksource.h>
++#include <linux/types.h>
+ 
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ int arch_timer_of_register(void);
+ int arch_timer_sched_clock_init(void);
+ struct timecounter *arch_timer_get_timecounter(void);
++
++#define ARCH_TIMER_CTRL_ENABLE		(1 << 0)
++#define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
++#define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
++
++#define ARCH_TIMER_REG_CTRL		0
 +#define ARCH_TIMER_REG_TVAL		1
- 
- #define ARCH_TIMER_PHYS_ACCESS		0
- #define ARCH_TIMER_VIRT_ACCESS		1
-@@ -101,9 +100,6 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
- 		case ARCH_TIMER_REG_TVAL:
- 			asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
- 			break;
--		case ARCH_TIMER_REG_FREQ:
--			asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
--			break;
- 		}
- 	}
- 
-@@ -121,6 +117,13 @@ static inline u32 arch_timer_reg_read(const int access, const int reg)
- 	return val;
- }
- 
++
++#define ARCH_TIMER_PHYS_ACCESS		0
++#define ARCH_TIMER_VIRT_ACCESS		1
++
++/*
++ * These register accessors are marked inline so the compiler can
++ * nicely work out which register we want, and chuck away the rest of
++ * the code. At least it does so with a recent GCC (4.6.3).
++ */
++static inline void arch_timer_reg_write(const int access, const int reg, u32 val)
++{
++	if (access == ARCH_TIMER_PHYS_ACCESS) {
++		switch (reg) {
++		case ARCH_TIMER_REG_CTRL:
++			asm volatile("mcr p15, 0, %0, c14, c2, 1" : : "r" (val));
++			break;
++		case ARCH_TIMER_REG_TVAL:
++			asm volatile("mcr p15, 0, %0, c14, c2, 0" : : "r" (val));
++			break;
++		}
++	}
++
++	if (access == ARCH_TIMER_VIRT_ACCESS) {
++		switch (reg) {
++		case ARCH_TIMER_REG_CTRL:
++			asm volatile("mcr p15, 0, %0, c14, c3, 1" : : "r" (val));
++			break;
++		case ARCH_TIMER_REG_TVAL:
++			asm volatile("mcr p15, 0, %0, c14, c3, 0" : : "r" (val));
++			break;
++		}
++	}
++}
++
++static inline u32 arch_timer_reg_read(const int access, const int reg)
++{
++	u32 val = 0;
++
++	if (access == ARCH_TIMER_PHYS_ACCESS) {
++		switch (reg) {
++		case ARCH_TIMER_REG_CTRL:
++			asm volatile("mrc p15, 0, %0, c14, c2, 1" : "=r" (val));
++			break;
++		case ARCH_TIMER_REG_TVAL:
++			asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
++			break;
++		}
++	}
++
++	if (access == ARCH_TIMER_VIRT_ACCESS) {
++		switch (reg) {
++		case ARCH_TIMER_REG_CTRL:
++			asm volatile("mrc p15, 0, %0, c14, c3, 1" : "=r" (val));
++			break;
++		case ARCH_TIMER_REG_TVAL:
++			asm volatile("mrc p15, 0, %0, c14, c3, 0" : "=r" (val));
++			break;
++		}
++	}
++
++	return val;
++}
++
 +static inline u32 arch_timer_get_cntfrq(void)
 +{
 +	u32 val;
@@ -56,18 +117,126 @@ index eb78f43..f31c9ee 100644
 +	return val;
 +}
 +
- static inline u64 arch_counter_get_cntpct(void)
++static inline u64 arch_counter_get_cntpct(void)
++{
++	u64 cval;
++
++	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
++	return cval;
++}
++
++static inline u64 arch_counter_get_cntvct(void)
++{
++	u64 cval;
++
++	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (cval));
++	return cval;
++}
+ #else
+ static inline int arch_timer_of_register(void)
  {
- 	u64 cval;
-@@ -253,8 +256,7 @@ static int arch_timer_available(void)
- 	u32 freq;
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index f31c9ee..e973cc0 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -46,98 +46,6 @@ static bool arch_timer_use_virtual = true;
+  * Architected system timer support.
+  */
  
- 	if (arch_timer_rate == 0) {
--		freq = arch_timer_reg_read(ARCH_TIMER_PHYS_ACCESS,
--					   ARCH_TIMER_REG_FREQ);
-+		freq = arch_timer_get_cntfrq();
- 
- 		/* Check the timer frequency. */
- 		if (freq == 0) {
+-#define ARCH_TIMER_CTRL_ENABLE		(1 << 0)
+-#define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
+-#define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
+-
+-#define ARCH_TIMER_REG_CTRL		0
+-#define ARCH_TIMER_REG_TVAL		1
+-
+-#define ARCH_TIMER_PHYS_ACCESS		0
+-#define ARCH_TIMER_VIRT_ACCESS		1
+-
+-/*
+- * These register accessors are marked inline so the compiler can
+- * nicely work out which register we want, and chuck away the rest of
+- * the code. At least it does so with a recent GCC (4.6.3).
+- */
+-static inline void arch_timer_reg_write(const int access, const int reg, u32 val)
+-{
+-	if (access == ARCH_TIMER_PHYS_ACCESS) {
+-		switch (reg) {
+-		case ARCH_TIMER_REG_CTRL:
+-			asm volatile("mcr p15, 0, %0, c14, c2, 1" : : "r" (val));
+-			break;
+-		case ARCH_TIMER_REG_TVAL:
+-			asm volatile("mcr p15, 0, %0, c14, c2, 0" : : "r" (val));
+-			break;
+-		}
+-	}
+-
+-	if (access == ARCH_TIMER_VIRT_ACCESS) {
+-		switch (reg) {
+-		case ARCH_TIMER_REG_CTRL:
+-			asm volatile("mcr p15, 0, %0, c14, c3, 1" : : "r" (val));
+-			break;
+-		case ARCH_TIMER_REG_TVAL:
+-			asm volatile("mcr p15, 0, %0, c14, c3, 0" : : "r" (val));
+-			break;
+-		}
+-	}
+-
+-	isb();
+-}
+-
+-static inline u32 arch_timer_reg_read(const int access, const int reg)
+-{
+-	u32 val = 0;
+-
+-	if (access == ARCH_TIMER_PHYS_ACCESS) {
+-		switch (reg) {
+-		case ARCH_TIMER_REG_CTRL:
+-			asm volatile("mrc p15, 0, %0, c14, c2, 1" : "=r" (val));
+-			break;
+-		case ARCH_TIMER_REG_TVAL:
+-			asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
+-			break;
+-		}
+-	}
+-
+-	if (access == ARCH_TIMER_VIRT_ACCESS) {
+-		switch (reg) {
+-		case ARCH_TIMER_REG_CTRL:
+-			asm volatile("mrc p15, 0, %0, c14, c3, 1" : "=r" (val));
+-			break;
+-		case ARCH_TIMER_REG_TVAL:
+-			asm volatile("mrc p15, 0, %0, c14, c3, 0" : "=r" (val));
+-			break;
+-		}
+-	}
+-
+-	return val;
+-}
+-
+-static inline u32 arch_timer_get_cntfrq(void)
+-{
+-	u32 val;
+-	asm volatile("mrc p15, 0, %0, c14, c0, 0" : "=r" (val));
+-	return val;
+-}
+-
+-static inline u64 arch_counter_get_cntpct(void)
+-{
+-	u64 cval;
+-	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
+-	return cval;
+-}
+-
+-static inline u64 arch_counter_get_cntvct(void)
+-{
+-	u64 cval;
+-	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (cval));
+-	return cval;
+-}
+-
+ static irqreturn_t inline timer_handler(const int access,
+ 					struct clock_event_device *evt)
+ {
 -- 
 1.8.1.1
