@@ -1,93 +1,81 @@
-From: alekskartashov@parallels.com (Alexander Kartashov)
-Date: Thu, 31 Jan 2013 18:08:32 +0400
-Subject: IPC SHM alignment on ARMv7
-In-Reply-To: <20130131134747.GY23505@n2100.arm.linux.org.uk>
-References: <510A7262.4060307@parallels.com>
- <20130131134747.GY23505@n2100.arm.linux.org.uk>
-Message-ID: <510A7AE0.10309@parallels.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 31 Jan 2013 19:40:51 +0530
+Subject: Failure to boot...
+In-Reply-To: <510A78E1.8010308@ti.com>
+References: <20130131014912.GM2637@n2100.arm.linux.org.uk>
+ <20130131030203.GA8374@quad.lixom.net>
+ <alpine.LFD.2.02.1301302312030.6300@xanadu.home>
+ <20130131092024.GN2637@n2100.arm.linux.org.uk>
+ <20130131104044.GO2637@n2100.arm.linux.org.uk> <510A6877.9080307@ti.com>
+ <20130131130437.GP2637@n2100.arm.linux.org.uk> <510A78E1.8010308@ti.com>
+Message-ID: <510A7B6B.1080600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2013 05:47 PM, Russell King - ARM Linux wrote:
-> Err, no.  Try again - this is the mainline kernel:
+On Thursday 31 January 2013 07:30 PM, Santosh Shilimkar wrote:
+> On Thursday 31 January 2013 06:34 PM, Russell King - ARM Linux wrote:
+>> On Thu, Jan 31, 2013 at 06:19:59PM +0530, Santosh Shilimkar wrote:
+>>> On Thursday 31 January 2013 04:10 PM, Russell King - ARM Linux wrote:
+>>>> On Thu, Jan 31, 2013 at 09:20:24AM +0000, Russell King - ARM Linux
+>>>> wrote:
+>>>>> On Wed, Jan 30, 2013 at 11:19:40PM -0500, Nicolas Pitre wrote:
+>>>>>> Better yet (IMHO): just enable the zboot command in U-Boot to let you
+>>>>>> boot a zImage binary directly.
+>>>>>
+>>>>> I wish it were that easy but it isn't.  I've no idea where to get a
+>>>>> version of uboot for my boards which supports that; TI have always
+>>>>> supplied updates to uboot for me, and with the current state of TI
+>>>>> being afaict in chaos.
+>>>>>
+>>>>> TI have always supplied a replacement X-Loader with each uboot update.
+>>>>> I've no idea what X-Loader is or why both get updated together, but...
+>>>>>
+>>>>> Moreover, I doubt that the 3430LDP, of which there are multiple
+>>>>> versions,
+>>>>> will ever see a uboot update.  It already suffers from a lack of
+>>>>> correct
+>>>>> kernel support due to random wiring changes between these versions
+>>>>> (the
+>>>>> keypad doesn't work correctly) and I've yet to indentify which version
+>>>>> it is despite downloading the circuits.  So trying to locate the right
+>>>>> uboot will be impossible there.
+>>>>>
+>>>>> So, I'm _stuck_ with uImages for these platforms.
+>>>>
+>>>> Right, so I'm now passing LOADADDR= which allows this to work - and the
+>>>> latest OMAP4430SDP boot result shows almost the same sad broken story.
+>>>>
+>>> I just tried latest mainline (commit: 04c2eee5) and default config
+>>> just boots fine.
+>>
+>> Please read the notes at the bottom of the page, specifically:
+>>   * Build tree is currently created on an ad-hoc basis from Linus'
+>> tip, rmk's
+>>     development tip and arm-soc for-next branches.
+>>
+>> This system does *not* build and boot vanilla mainline kernels.  It is
+>> (as the above says):
+>>
+>> - Linus' tip
+>> - My for-next plus a few other bits
+>> - arm-soc for-next
+>>
+>> all merged together.
+>>
+> Linus' tip(commit: 04c2eee5) + arm-soc for-next boots fine as well.
+> The pull request from Tony [1] fixed the multi-platform boot issue
+> for OMAP.
+>
+> Now trying to merge your for-next and test.
+>
+This is fine as well. I think the issue is the way uImage is created.
+'make LOADADDRESS=XXXX uImage' actually doesn't work. Am using below
+method to create an uImage.
 
-I'm sorry, I forgot to note that it's very old code,
-it's from the tglx/history.git that you may find here:
-http://git.kernel.org/?p=linux/kernel/git/tglx/history.git;a=commit;h=4197692eef113eeb8e3e413cc70993a5e667e5b8
+mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 -n 
+"Linux" -d zImage uImage
 
-The piece of code I'm telling about hasn't changed
-very much since then, it looks in the following way
-in that commit:
+Will you be able to try this out please ?
 
-  25 unsigned long
-  26 arch_get_unmapped_area(struct file *filp, unsigned long addr,
-  27         unsigned long len, unsigned long pgoff, unsigned long flags)
-  28 {
-  29     struct mm_struct *mm = current->mm;
-  30     struct vm_area_struct *vma;
-  31     unsigned long start_addr;
-  32 #ifdef CONFIG_CPU_V6
-  33     unsigned int cache_type;
-  34     int do_align = 0, aliasing = 0;
-  35
-  36     /*
-  37      * We only need to do colour alignment if either the I or D
-  38      * caches alias.  This is indicated by bits 9 and 21 of the
-  39      * cache type register.
-  40      */
-  41     cache_type = read_cpuid(CPUID_CACHETYPE);
-  42     if (cache_type != read_cpuid(CPUID_ID)) {
-  43         aliasing = (cache_type | cache_type >> 12) & (1 << 9);
-  44         if (aliasing)
-  45             do_align = filp || flags & MAP_SHARED;
-  46     }
-
-
-The last commit that touches the file is 
-394ef6403abc36900d9303395a49a72d32666f2a
-(http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=394ef6403abc36900d9303395a49a72d32666f2a)
-and currently the lines look in the following way:
-
-[arch/arm/mm/mmap.c]
-[...]
-54 unsigned long
-55 arch_get_unmapped_area(struct file *filp, unsigned long addr,
-56                 unsigned long len, unsigned long pgoff, unsigned long 
-flags)
-57 {
-58         struct mm_struct *mm = current->mm;
-59         struct vm_area_struct *vma;
-60         int do_align = 0;
-61         int aliasing = cache_is_vipt_aliasing();
-62         struct vm_unmapped_area_info info;
-63
-64         /*
-65          * We only need to do colour alignment if either the I or D
-66          * caches alias.
-67          */
-68         if (aliasing)
-69                 do_align = filp || (flags & MAP_SHARED);
-
-
-Particularly, the lines
-
-  68     if (aliasing)
-  69         do_align = filp || (flags & MAP_SHARED);
-
-hasn't changed since then.
-
-
-I intentionally provided a reference to a historical branch
-to point out that this code hasn't changed.
-
--- 
-Sincerely yours,
-Alexander Kartashov
-
-Intern
-Core team
-
-www.parallels.com
-
-Skype: aleksandr.kartashov
-Email: alekskartashov at parallels.com
+Regards,
+Santosh
