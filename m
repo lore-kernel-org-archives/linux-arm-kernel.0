@@ -1,41 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Jan 2013 15:09:09 +0000
-Subject: [PATCH v2 2/2] ARM: memory: define TASK_UNMAPPED_BASE in terms of
- TASK_SIZE
-In-Reply-To: <1359644949-18550-1-git-send-email-will.deacon@arm.com>
-References: <1359644949-18550-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1359644949-18550-2-git-send-email-will.deacon@arm.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 31 Jan 2013 16:12:35 +0100
+Subject: [RFC 1/3] net: freescale: fec: add support for optional
+ enet_out clk
+In-Reply-To: <20130130052547.GA23670@S2100-06.ap.freescale.net>
+References: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
+ <1359470773-14290-2-git-send-email-w.sang@pengutronix.de>
+ <20130130052547.GA23670@S2100-06.ap.freescale.net>
+Message-ID: <20130131151235.GC3400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TASK_UNMAPPED_BASE is defined directly in terms of PAGE_OFFSET, which is
-confusing given that the modules area sits between here and TASK_SIZE
-and is not available for user allocations.
+On Wed, Jan 30, 2013 at 01:25:50PM +0800, Shawn Guo wrote:
+> Thanks for working on this, Wolfram.
+> 
+> On Tue, Jan 29, 2013 at 03:46:11PM +0100, Wolfram Sang wrote:
+> > Some MX28 boards need the internal enet_out clock to be enabled. So, do
+> > this in the driver iff the clock was referenced via devicetree.
+> > 
+> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> > ---
+> > 
+> > davidm: Please don't apply before Shawn as the mxs-maintainer has given his ack
+> > on the general procedure. Or maybe he can merge it via his tree?
+> > 
+> I prefer to have the patch go via net tree for 3.9, and then we clean
+> up mxs platform code from 3.9-rc1.
 
-This patch defines TASK_UNMAPPED_BASE in terms of TASK_SIZE instead and
-fixes a bug introduced by 394ef6403abc ("mm: use vm_unmapped_area() on
-arm architecture") whereby TASK_UNMAPPED_BASE is no longer page-aligned
-for bottom-up mmap, causing get_unmapped_area to choke on misaligned
-addresses.
+Fine with me, too.
 
-Reported-by: Christoffer Dall <cdall@cs.columbia.edu>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/memory.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 924320f..64c770d 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -37,7 +37,7 @@
-  */
- #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
- #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
--#define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
-+#define TASK_UNMAPPED_BASE	ALIGN(TASK_SIZE / 3, SZ_16M)
- 
- /*
-  * The maximum size of a 26-bit user space task.
 -- 
-1.8.0
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130131/57a58704/attachment.sig>
