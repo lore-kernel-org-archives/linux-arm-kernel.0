@@ -1,32 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 31 Jan 2013 15:38:01 +0000
-Subject: [PATCHv5 16/16] clocksource: arch_timer: use virtual counters
-In-Reply-To: <1359634539-9580-17-git-send-email-mark.rutland@arm.com>
-References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
- <1359634539-9580-17-git-send-email-mark.rutland@arm.com>
-Message-ID: <20130131153801.GM12877@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 31 Jan 2013 15:40:29 +0000 (UTC)
+Subject: OMAP4 PM bootloader dependency problems
+In-Reply-To: <510A54F8.4090609@ti.com>
+References: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
+ <alpine.DEB.2.00.1301301706580.17105@utopia.booyaka.com>
+ <1359622829.10415.40.camel@sokoban> <510A54F8.4090609@ti.com>
+Message-ID: <alpine.DEB.2.00.1301311537530.23099@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 12:15:39PM +0000, Mark Rutland wrote:
-> Switching between reading the virtual or physical counters is
-> problematic, as some core code wants a view of time before we're fully
-> set up. Using a function pointer and switching the source after the
-> first read can make time appear to go backwards, and having a check in
-> the read function is an unfortunate block on what we want to be a fast
-> path.
-> 
-> Instead, this patch makes us always use the virtual counters. If we're a
-> guest, or don't have hyp mode, we'll use the virtual timers, and as such
-> don't care about CNTVOFF as long as it doesn't change in such a way as
-> to make time travel backwards. If we do have hyp mode, and might be a
-> KVM host, we have to use the physical timers, and require CNTVOFF to be
-> zero so as to have a consistent view of time between the physical timers
-> and virtual counters.
-> 
-> Any code which may want to alter CNTVOFF (e.g. KVM) will need to ensure
-> that it is zeroed when entering the host.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Hi,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On Thu, 31 Jan 2013, Rajendra Nayak wrote:
+
+> Throw a pr_warn() at boot only when CONFIG_CPU_IDLE is enabled. Note
+> that it isn't enabled by default in omap2plus_defconfig. Also
+> throw one when a suspend fails, saying bootloader *could be* a possible
+> cause specifying the right version to be used.
+
+In my view, these steps aren't sufficient, for the reasons described in 
+
+http://marc.info/?l=linux-omap&m=135964568904053&w=2
+
+Even with CONFIG_CPU_IDLE=n, it's still possible to attempt to enter 
+full-chip retention idle on OMAP4 via 'echo mem > /sys/power/state', so it 
+doesn't seem right to restrict a solution to that case.
+
+regards,
+
+
+- Paul
