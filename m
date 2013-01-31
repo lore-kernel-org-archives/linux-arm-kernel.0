@@ -1,41 +1,38 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 31 Jan 2013 11:05:39 -0600
-Subject: [PATCHv2 for soc 0/4] Enabling socfpga on hardware
-Message-ID: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+Date: Thu, 31 Jan 2013 11:05:41 -0600
+Subject: [PATCHv2 for soc 2/4] arm: socfpga: Add entries to enable make dtbs
+ socfpga
+In-Reply-To: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1359651943-21752-3-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-V2:
-- Remove patch that adds clock entries in the socfpga.dtsi as this
-should accompany a rework in drivers/clk and will done in a different
-patch series.
-- Removed I-cache invalidate from v7_invalidate_l1
-- Defined cpu1-start-addr as a device tree entry
-- Removed the need to use CONFIG_VMSPLIT_2G
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Tested-by: Pavel Machek <pavel@denx.de>
+Reviewed-by: Pavel Machek <pavel@denx.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Pavel Machek <pavel@denx.de>
+---
+ arch/arm/boot/dts/Makefile |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Dinh Nguyen (4):
-  arm: socfpga: Add new device tree source for actual socfpga HW
-  arm: socfpga: Add entries to enable make dtbs socfpga
-  arm: Add v7_invalidate_l1 to cache-v7.S
-  arm: socfpga: Add SMP support for actual socfpga harware
-
- .../bindings/arm/altera/socfpga-system.txt         |    2 +
- arch/arm/boot/dts/Makefile                         |    2 +
- arch/arm/boot/dts/socfpga.dtsi                     |   22 +++----
- arch/arm/boot/dts/socfpga_cyclone5.dts             |   34 ++++++++++-
- arch/arm/boot/dts/socfpga_vt.dts                   |   64 ++++++++++++++++++++
- arch/arm/mach-imx/headsmp.S                        |   47 --------------
- arch/arm/mach-shmobile/headsmp.S                   |   48 ---------------
- arch/arm/mach-socfpga/core.h                       |    4 +-
- arch/arm/mach-socfpga/headsmp.S                    |   16 +++--
- arch/arm/mach-socfpga/platsmp.c                    |    3 +-
- arch/arm/mach-socfpga/socfpga.c                    |    9 +++
- arch/arm/mach-tegra/headsmp.S                      |   43 -------------
- arch/arm/mm/cache-v7.S                             |   46 ++++++++++++++
- 13 files changed, 182 insertions(+), 158 deletions(-)
- create mode 100644 arch/arm/boot/dts/socfpga_vt.dts
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5ebb44f..1b8276c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -124,6 +124,8 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	sh73a0-kzm9g.dtb \
+ 	sh7372-mackerel.dtb
++dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
++	socfpga_vt.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ 	spear1340-evb.dtb
+ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
 -- 
 1.7.9.5
