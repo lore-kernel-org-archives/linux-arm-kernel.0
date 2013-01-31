@@ -1,20 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Jan 2013 01:49:12 +0000
-Subject: Failure to boot...
-Message-ID: <20130131014912.GM2637@n2100.arm.linux.org.uk>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 31 Jan 2013 10:50:48 +0900
+Subject: [PATCH 1/4] ARM: mach-shmobile: marzen: defconfig: use regulators by
+ default
+In-Reply-To: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
+References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1359597051-32700-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having spent today sorting out the Realview EB boot, the last thing
-I expected to find was that both my OMAP platforms are unbootable
-to the point that absolutely nothing happens after the boot loader
-transfers control.
+Use regulators by default
 
-I've not been running the boots for about a month, so I'm not sure
-when this breakage crept in.
+This is in preparation for initialising devices using DT.
 
-You can see the results in the boot logs on the website.  Please
-investigate.  And I'll try without arm-soc tomorrow.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/marzen_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Very disappointed that the ARM kernel seems to be rather screwed at
-the moment across multiple sub-arches.
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index 728a43c..afee4a2 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -83,6 +83,8 @@ CONFIG_USB=y
+ CONFIG_USB_RCAR_PHY=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHI=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_DUMMY=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
+-- 
+1.7.10.4
