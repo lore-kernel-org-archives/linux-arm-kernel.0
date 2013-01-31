@@ -1,49 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 31 Jan 2013 11:49:36 +0000
-Subject: [PATCH v2 4/4] irqchip: gic: Perform the gic_secondary_init()
- call via CPU notifier
-In-Reply-To: <20130131112538.GW23505@n2100.arm.linux.org.uk>
-References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
- <1359476319-23720-5-git-send-email-catalin.marinas@arm.com>
- <alpine.LFD.2.02.1301291734140.6300@xanadu.home>
- <20130129231205.GA25176@MacBook-Pro.local>
- <alpine.LFD.2.02.1301291907340.6300@xanadu.home>
- <20130131112538.GW23505@n2100.arm.linux.org.uk>
-Message-ID: <20130131114935.GD12877@arm.com>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Thu, 31 Jan 2013 13:50:07 +0200
+Subject: [RFC PATCH v3 1/2] ARM: kernel: update cpuinfo to print SoC model
+ name
+In-Reply-To: <20130130232408.GL2637@n2100.arm.linux.org.uk>
+References: <1359558091-29251-1-git-send-email-ruslan.bilovol@ti.com>
+ <1359558091-29251-2-git-send-email-ruslan.bilovol@ti.com>
+ <alpine.LFD.2.02.1301301402330.6300@xanadu.home>
+ <20130130232408.GL2637@n2100.arm.linux.org.uk>
+Message-ID: <CAB=otbQuJR75BSxtB8BHdLaTKYkPWp3jvuT3pRognHY5O6pP+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 11:25:38AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 29, 2013 at 07:11:56PM -0500, Nicolas Pitre wrote:
-> > On Tue, 29 Jan 2013, Catalin Marinas wrote:
-> > > I would like to get them in as soon as possible (ideally 3.9) as AArch64
-> > > needs GIC support. I can base them on Rob's branch (already in -next)
-> > > and send them the same route (the arm-soc tree if Olof/Arnd are ok to
-> > > take them).
-> > 
-> > Well...  I'd prefer if my series was merged by RMK since this is mostly 
-> > core ARM code.  That is posing dependency issues.
-> > 
-> > I think I'll just ignore your change for now and we'll fix things up 
-> > during the v3.9-rc period.
-> 
-> Given that the ARM kernel seems to be rather broken at the moment, that's
-> not going to happen until the 32-bit kernel gets some loving attention to
-> make it work again.
-> 
-> Our primary responsibility is not to stuff the kernel with new features
-> as quickly as we possibly can.  It's to make sure that the kernel works,
-> and at the moment, it doesn't.  I'm not talking about ancient architectures.
-> I'm talking about platforms using ARMv6 and above - platforms with the GIC
-> which I'd be able to test this change on.
+On Thu, Jan 31, 2013 at 1:24 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jan 30, 2013 at 02:07:53PM -0500, Nicolas Pitre wrote:
+>> On Wed, 30 Jan 2013, Ruslan Bilovol wrote:
+>>
+>> > Currently, reading /proc/cpuinfo provides userspace with CPU ID of
+>> > the CPU carrying out the read from the file.
+>> > Userspace using this information may decide what module
+>> > to load or how to configure some specific (and processor-depended)
+>> > settings or so.
+>> > However, since really different SoCs can share same ARM core,
+>> > this information currently is not so useful.
+>> > For example, TI OMAP4460 and OMAP4470 SoCs show the same
+>> > information in the /proc/cpuinfo whereas they are different.
+>> > Since in most cases ARM CPU is a part of some system on a chip (SoC),
+>> > the "cpuinfo" file looks like exactly that place, where this
+>> > information have to be displayed.
+>> >
+>> > So added new line "SoC name" in the "cpuinfo" output for system
+>> > on a chip name. It is placed between CPU information and machine
+>> > information, so the file structure looks gracefully (CPU-SoC-Hardware)
+>> >
+>> > Example:
+>> >
+>> > / # cat proc/cpuinfo
+>> > [...]
+>> > CPU variant     : 0x2
+>> > CPU part        : 0xc09
+>> > CPU revision    : 10
+>> >
+>> > SoC name        : OMAP4470
+>> >
+>> > Hardware        : OMAP4 Blaze Tablet
+>>
+>> Please remove that extra blank line between "SoC name" and "Hardware".
+>> The blank line after "CPU revision" is fine.
+>>
+>> Also, please rename this to "System name".  Not all systems are "on
+>> chip".  By using "System name" this is more universally useful.
+>
+> You may notice I've already suggested that this should be using the SoC
+> infrastructure to export this information, which was explicitly designed
+> to do this.
+>
+> If we're going to have one SoC doing one thing and another SoC exporting
+> this information a completely different way, we're doomed.  We need to
+> make a decision and do it one way and one way only - and that decision
+> was made when drivers/base/soc.c was merged.
+>
+> Unfortunately, I'd forgotten about that when I made my initial comments
+> about the difference between "CPU" and "SoC".
 
-FWIW, I tested this on vexpress with CA9x4 tile with both 3.8-rc3 (Rob's
-branch) and latest linux-next.
+Yes agree - let's stop this discussion at this point. I'm going to
+learn that soc framework and provide better solution.
+Unfortunately, I didn't find it when looked into the kernel sources
+for similar approaches.
 
-If you want to test this change for longer, I'm ok to leave it for 3.10
-and stick it in -next at some point (after 3.9-rc1 since there are many
-conflicts). I'd like however to push the other trivial code-moving
-patches in this series.
-
--- 
-Catalin
+Regards,
+Ruslan
