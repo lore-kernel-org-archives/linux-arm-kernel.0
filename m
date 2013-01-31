@@ -1,75 +1,45 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 31 Jan 2013 10:01:12 +0100
-Subject: [PATCH 5/6] USB chipidea: introduce dual role mode pdata flags
+Date: Thu, 31 Jan 2013 10:01:13 +0100
+Subject: [PATCH 6/6] USB chipidea i.MX: introduce dr_mode property
 In-Reply-To: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
 References: <1359622873-23345-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359622873-23345-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359622873-23345-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even if a chipidea core is otg capable the board may not. This allows
-to explicitly set the core to host/peripheral mode. Without these
-flags the driver falls back to the old behaviour.
+The dr_mode devicetree property allows to explicitly specify the
+host/peripheral/otg mode. This is necessary for boards without proper
+ID pin handling.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/usb/chipidea/core.c  |   21 +++++++++++++++------
- include/linux/usb/chipidea.h |    2 +-
- 2 files changed, 16 insertions(+), 7 deletions(-)
+ Documentation/devicetree/bindings/usb/ci13xxx-imx.txt |    1 +
+ drivers/usb/chipidea/ci13xxx_imx.c                    |    1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index a3ec29d..b2dbf55 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -435,6 +435,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	struct resource	*res;
- 	void __iomem	*base;
- 	int		ret;
-+	int		dr_mode;
+diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+index dd42ccd..493a414 100644
+--- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
++++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+@@ -9,6 +9,7 @@ Recommended properies:
+ - phy_type: the type of the phy connected to the core. Should be one
+   of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
+   property the PORTSC register won't be touched
++- dr_mode: One of "host", "peripheral" or "otg". Defaults to "otg"
  
- 	if (!dev->platform_data) {
- 		dev_err(dev, "platform data missing\n");
-@@ -487,14 +488,22 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
+ Optional properties:
+ - fsl,usbphy: phandler of usb phy that connects to the only one port
+diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+index ebc1148..b598bb8f 100644
+--- a/drivers/usb/chipidea/ci13xxx_imx.c
++++ b/drivers/usb/chipidea/ci13xxx_imx.c
+@@ -114,6 +114,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		       CI13XXX_DISABLE_STREAMING;
  
-+	dr_mode = ci->platdata->dr_mode;
-+	if (dr_mode == USB_DR_MODE_UNKNOWN)
-+		dr_mode = USB_DR_MODE_OTG;
-+
- 	/* initialize role(s) before the interrupt is requested */
--	ret = ci_hdrc_host_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support host\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
-+		ret = ci_hdrc_host_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support host\n");
-+	}
+ 	pdata->phy_mode = of_usb_get_phy_mode(pdev->dev.of_node);
++	pdata->dr_mode = of_usb_get_dr_mode(pdev->dev.of_node);
  
--	ret = ci_hdrc_gadget_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support gadget\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
-+		ret = ci_hdrc_gadget_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support gadget\n");
-+	}
- 
- 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
- 		dev_err(dev, "no supported roles\n");
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 1a2aa18..b314647 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -20,7 +20,7 @@ struct ci13xxx_platform_data {
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
- #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
--
-+	enum usb_dr_mode	dr_mode;
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
- #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
- 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data) {
 -- 
 1.7.10.4
