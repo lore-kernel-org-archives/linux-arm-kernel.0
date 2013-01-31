@@ -1,107 +1,54 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 31 Jan 2013 12:24:46 +0100
-Subject: [PATCH v7 0/6] watchdog: dt: add support for the timeout-sec dt
- property
-In-Reply-To: <20130108153447.GC7360@game.jcrosoft.org>
-References: <1357639455-21935-1-git-send-email-fabio.porcedda@gmail.com>
- <20130108153447.GC7360@game.jcrosoft.org>
-Message-ID: <CAHkwnC-mLG9mehc8eRwEZGf1o8S7x16abtjoZLZTCmJ+UZYgMw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Jan 2013 11:25:38 +0000
+Subject: [PATCH v2 4/4] irqchip: gic: Perform the gic_secondary_init()
+ call via CPU notifier
+In-Reply-To: <alpine.LFD.2.02.1301291907340.6300@xanadu.home>
+References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
+ <1359476319-23720-5-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1301291734140.6300@xanadu.home>
+ <20130129231205.GA25176@MacBook-Pro.local>
+ <alpine.LFD.2.02.1301291907340.6300@xanadu.home>
+Message-ID: <20130131112538.GW23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 8, 2013 at 4:34 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 11:04 Tue 08 Jan     , Fabio Porcedda wrote:
->> Hi all,
->> this patchset add the timeout-sec property to the watchdog core,
->> to the at91sam9_wdt driver and on all framework enabled watchdog driver
->> with dt support.
->> The at91sam9_wdt is tested on evk-pr3,
->> the other drivers are compile tested only.
->>
->
-> I'll prefer a macro to abstract the string in every driver
+On Tue, Jan 29, 2013 at 07:11:56PM -0500, Nicolas Pitre wrote:
+> On Tue, 29 Jan 2013, Catalin Marinas wrote:
+> > I would like to get them in as soon as possible (ideally 3.9) as AArch64
+> > needs GIC support. I can base them on Rob's branch (already in -next)
+> > and send them the same route (the arm-soc tree if Olof/Arnd are ok to
+> > take them).
+> 
+> Well...  I'd prefer if my series was merged by RMK since this is mostly 
+> core ARM code.  That is posing dependency issues.
+> 
+> I think I'll just ignore your change for now and we'll fix things up 
+> during the v3.9-rc period.
 
-I know but Rob Herring dislikes that macro/function. I had to remove that part.
+Given that the ARM kernel seems to be rather broken at the moment, that's
+not going to happen until the 32-bit kernel gets some loving attention to
+make it work again.
 
-> except this fine by me
+Our primary responsibility is not to stuff the kernel with new features
+as quickly as we possibly can.  It's to make sure that the kernel works,
+and at the moment, it doesn't.  I'm not talking about ancient architectures.
+I'm talking about platforms using ARMv6 and above - platforms with the GIC
+which I'd be able to test this change on.
 
-On Fri, Dec 21, 2012 at 12:32 PM, Wim Van Sebroeck <wim@iguana.be> wrote:
->> Ping.
->>
->> The dependency is already merged.
->
-> Will not be for this merge window. Will review next week.
+Realview EB (MPCore)
+- Various failures yesterday but now works in my tree. Fixes queued for
+  the next -rc.  (But the hardware randomly locks up during kernel boot,
+  normally around the time when the CLCD is enabled, so this can't really
+  be used for testing.)
+OMAP4430SDP (Cortex A9)
+- Fails to boot even with proper uImage addresses (no idea yet).  No
+  kernel output.
+OMAP3430LDP (Cortex A8 iirc)
+- Ditto.  No kernel output.
 
-Hi Wim,
-
-Ping.
-
-Best regards
-Fabio Porcedda
-
-> Best Regards,
-> J.
->
->> Best regards
->> Fabio Porcedda
->>
->> changes:
->> v7:
->>   - rebase over v3.8-rc2
->>   - remove the patch already merged
->> v6:
->>   - remove patch for function of_get_timeout_sec as aked by Rob Herring
->>   - add Acked-by: Jason Cooper <jason@lakedaemon.net>
->>   - add Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> v5:
->>   - fix codestyle for compilance ti checkpatch.pl about
->>     "ERROR: do not initialise statics to 0 or NULL"
->>     for s3c2410_wdt.c:56 and at91sam9_wdt.c:63
->> v4:
->>   - add of_get_timeout_sec
->>   - add s3c2410_wdt driver
->>   - split driver patch
->>   - fixed watchdog_init_timeout handling of min_timeout and max_timeout
->> v3:
->>   - rename watchdog_probe_dt_timeout ->  watchdog_init_timeout
->>   - move the watchdog_init_timeout function from inline to watchdog_core.c
->>   - add timeout parameter handling code to watchdog_init_timeout
->>   - add timeout-sec property to the pnx4008-wdt driver
->>   - add two small commit for fixup and cleanup
->> v2:
->>   - change "timeout" to "timeout-sec" as asked by Jean-Christophe
->>   - at91sam9_wdt: use the new helper function
->>   - at91sam9_wdt: add bounds checking
->>   - watchdog.h: add bounds checking
->>
->> Fabio Porcedda (6):
->>   watchdog: core: dt: add support for the timeout-sec dt property
->>   watchdog: orion_wdt: add timeout-sec property binding
->>   watchdog: pnx4008: add timeout-sec property binding
->>   watchdog: s3c2410_wdt: add timeout-sec property binding
->>   watchdog: at91sam9_wdt: add timeout-sec property binding
->>   watchdog: orion_wdt: move the min_timeout initialization
->>
->>  .../devicetree/bindings/watchdog/atmel-wdt.txt     |  4 +++
->>  .../devicetree/bindings/watchdog/marvel.txt        |  5 +++
->>  .../devicetree/bindings/watchdog/pnx4008-wdt.txt   |  4 +++
->>  .../devicetree/bindings/watchdog/samsung-wdt.txt   |  3 ++
->>  Documentation/watchdog/watchdog-kernel-api.txt     | 10 ++++++
->>  drivers/watchdog/Kconfig                           |  1 +
->>  drivers/watchdog/at91sam9_wdt.c                    | 16 ++++++++--
->>  drivers/watchdog/orion_wdt.c                       | 10 +++---
->>  drivers/watchdog/pnx4008_wdt.c                     |  7 ++--
->>  drivers/watchdog/s3c2410_wdt.c                     |  6 ++--
->>  drivers/watchdog/watchdog_core.c                   | 37 ++++++++++++++++++++++
->>  include/linux/watchdog.h                           |  3 ++
->>  12 files changed, 91 insertions(+), 15 deletions(-)
->>
->> --
->> 1.8.0.3
->>
-
-
-
---
-Fabio Porcedda
+I haven't tried Versatile Express yet as it has the TC2 tile on, and I
+don't yet a boot loader on it which is capable of TFTP (which makes it
+rather useless to me - I've been saying this for a time now but this is
+probably the first time publically.)  I'm thinking about putting the
+CA9x4 tile back on because that's a lot more functionally useful to me
+than TC2.
