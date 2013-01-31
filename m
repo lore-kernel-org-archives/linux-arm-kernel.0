@@ -1,37 +1,31 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 31 Jan 2013 16:56:48 +0530
-Subject: OMAP4 PM bootloader dependency problems
-In-Reply-To: <1359622829.10415.40.camel@sokoban>
-References: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
- <alpine.DEB.2.00.1301301706580.17105@utopia.booyaka.com>
- <1359622829.10415.40.camel@sokoban>
-Message-ID: <510A54F8.4090609@ti.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 31 Jan 2013 11:27:07 +0000
+Subject: [PATCH v3 1/4] ASoC: tlv320aic3x: Convert mic bias to a supply
+ widget
+In-Reply-To: <20130131112414.GE11078@opensource.wolfsonmicro.com>
+References: <1359631394-9511-1-git-send-email-gururaja.hebbar@ti.com>
+ <1359631394-9511-2-git-send-email-gururaja.hebbar@ti.com>
+ <20130131112414.GE11078@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB5A48E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero,
+On Thu, Jan 31, 2013 at 16:54:16, Mark Brown wrote:
+> On Thu, Jan 31, 2013 at 04:53:10PM +0530, Hebbar Gururaja wrote:
+> 
+> > :100644 100644 e7b98f4... f47c3f5... M	Documentation/devicetree/bindings/sound/tlv320aic3x.txt
+> > :100644 100644 ffd9bc7... 9407fd0... M	include/sound/tlv320aic3x.h
+> > :100644 100644 4989143... 65d09d6... M	sound/soc/codecs/tlv320aic3x.c
+> > :100644 100644 6db3c41... e521ac3... M	sound/soc/codecs/tlv320aic3x.h
+> 
+> As mentioned when you posted this before this patch needs to update the
+> machine drivers using the device too.
 
-On Thursday 31 January 2013 02:30 PM, Tero Kristo wrote:
-> Personally I don't like too much to have just extra spam during boot,
-> which in many cases is even unnecessary (e.g. people who actually have
-> good u-boot in use.) Personally I would like to have some sort of test
-> during boot which detects broken PM and maybe prevents core idle
-> completely if this is the case. Alternatively we can add extra info to
-> the failed suspend dump and mention a good u-boot to try out (v2012-07
-> or newer.)
->
-> If we could detect boot loader version from kernel side, that would work
-> also.
+The patch-set 2/4 does the same thing. Since I have da850-evm at my end, I 
+have modified that machine driver and sent-it as 2/4.
 
-Given that there is no easy way to say for sure the bootloader is the
-cause for broken PM in the kernel, neither is it possible to know the
-bootloader version, why don't we do this.
-Throw a pr_warn() at boot only when CONFIG_CPU_IDLE is enabled. Note
-that it isn't enabled by default in omap2plus_defconfig. Also
-throw one when a suspend fails, saying bootloader *could be* a possible
-cause specifying the right version to be used. That should give enough
-hints to folks still using old bootloaders and testing PM.
-Does that sound good?
+> 
 
-regards,
-Rajendra
+
+Regards, 
+Gururaja
