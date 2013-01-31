@@ -1,124 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 31 Jan 2013 16:51:59 +0100
-Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
- THUMB mode
-In-Reply-To: <20130129124427.GB1974@linaro.org>
-References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20130129124427.GB1974@linaro.org>
-Message-ID: <20130131155159.GJ8668@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Jan 2013 15:48:38 +0000
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130131164735.3e1d4a88@skate>
+References: <20130130151934.GK23505@n2100.arm.linux.org.uk>
+ <20130130163659.75360dba@skate>
+ <20130130154602.GL23505@n2100.arm.linux.org.uk>
+ <20130131153041.35fa3b60@skate>
+ <20130131145002.GZ23505@n2100.arm.linux.org.uk>
+ <20130131155737.4ab97a0b@skate>
+ <20130131150801.GA23505@n2100.arm.linux.org.uk>
+ <20130131162237.79de29c4@skate>
+ <20130131153625.GB23505@n2100.arm.linux.org.uk>
+ <20130131164735.3e1d4a88@skate>
+Message-ID: <20130131154838.GC23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Dave,
-
-On Tue, Jan 29, 2013 at 12:44:27PM +0000, Dave Martin wrote:
-> On Fri, Jan 11, 2013 at 12:39:57PM +0100, Uwe Kleine-K?nig wrote:
-> > Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
-> > obviously these cannot enter the kernel in ARM mode. Make an exception
-> > for them and let them enter in THUMB mode.
+On Thu, Jan 31, 2013 at 04:47:35PM +0100, Thomas Petazzoni wrote:
+> Dear Russell King - ARM Linux,
+> 
+> On Thu, 31 Jan 2013 15:36:25 +0000, Russell King - ARM Linux wrote:
+> 
+> > > The fixup is already specific to those bridges, since I am just setting
+> > > pci_sys_data->win_align_io to 64K for the particular buses that are
+> > > downstream the problematic bridges. So it doesn't affect any other bus
+> > > on the system, and therefore I don't think this fixup needs to be made
+> > > specific to a given vendor:device, no?
 > > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  arch/arm/kernel/head-nommu.S |    8 +++++++-
-> >  arch/arm/kernel/head.S       |    8 +++++++-
-> >  arch/arm/mm/Kconfig          |    6 ++++++
-> >  3 files changed, 20 insertions(+), 2 deletions(-)
+> > The pci_sys_data is not specific to one bus.  It's specific from the
+> > root bus downwards, and is shared by all child busses.
+> 
+> Ah, ok, that's the part I was missing.
+> 
+> > The problem is if you have some card or a conventional P2P bridge which
+> > has 4K windows.  If you merely set the alignment to 64K for all bridges,
+> > then all bridges get this treatment whether or not they need it.  That's
+> > what I'm trying to avoid.
 > > 
-> > diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> > index 3782320..ae7ed46 100644
-> > --- a/arch/arm/kernel/head-nommu.S
-> > +++ b/arch/arm/kernel/head-nommu.S
-> > @@ -32,15 +32,21 @@
-> >   * numbers for r1.
-> >   *
-> >   */
-> > -	.arm
-> >  
-> >  	__HEAD
-> > +
-> > +#ifdef CONFIG_THUMBONLY_CPU
-> > +	.thumb
-> > +ENTRY(stext)
-> > +#else
-> > +	.arm
-> >  ENTRY(stext)
-> >  
-> >   THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
-> >   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-> >   THUMB(	.thumb			)	@ switch to Thumb now.
-> >   THUMB(1:			)
-> > +#endif
+> > Take, for instance, a cardbus bridge (remember, there are PCI cards which
+> > can be plugged in to give you a cardbus slot.)  I have a device here which
+> > can be plugged into a cardbus slot which has not just one P2P bridge but
+> > two, and a bunch of downsteam devices, including VGA, ethernet, USB, PS/2
+> > etc.  (Okay, Linux doesn't support this hardware because of crappy X86
+> > stuff, despite the fact Windows cope with it just fine.)
+> > 
+> > There have been cards in the past which have had P2P bridges on them as
+> > well.
+> > 
+> > So, simply believing that the only P2P bridges in the system will be
+> > those on the physical board is a mistake.
 > 
-> The behaviour is that we start the file is kernel entry state, then
-> we switch to kernel run state.
+> Yes, indeed, I understand this. I just thought this pci_sys_data
+> structure was per-bus. Of course, if it's shared by all buses on the
+> system, we need a way to apply this fixup only to the Marvell bridges.
 > 
-> The switch is only needed for kernels which run on CPUs supporting
-> both states, where the run state is not ARM.
-> 
-> So, it would be neater for these entry sequences to look something
-> like:
-> 
-> HAS_ARM(.arm)	@ because -mthumb is default for Thumb kernels anyway
-> 
-> ENTRY(stext)
-> HAS_ARM(THUMB(	@ code to switch to Thumb ))
-> 
-> 	@ real code starts here, in run state.
-> 
-> 
-> 
-> Where
-> 
-> #ifdef CONFIG_THUMBONLY_CPU
-> #define HAS_ARM(x...)
-> #else
-> #define HAS_ARM(x...) x
-> #endif
-> 
-> (I haven't read the whole thread yet, so decisions about what
-> config variables and macro names should be used may be overridden
-> by other people...)
-I don't agree on better readability, the result would look like:
+> Should I just hard-code this special fixup in
+> pcibios_window_alignment() with a check on VID/PID ?
 
-		__HEAD
-
-	HAS_ARM(.arm)
-
-		ENTRY(stext)
-
-	HAS_ARM(THUMB(adr	r9, BSYM(1f)	)
-	HAS_ARM(THUMB(bx	r9		)
-	HAS_ARM(THUMB(.thumb			)
-	HAS_ARM(THUMB(1:			)
-
-in contrast to:
-
-		__HEAD
-
-	#ifdef CONFIG_CPU_THUMBONLY
-		.thumb
-	ENTRY(stext)
-	#else
-		.arm
-	ENTRY(stext)
-
-	 THUMB( adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
-	 THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
-	 THUMB( .thumb                  )       @ switch to Thumb now.
-	 THUMB(1:                       )
-	#endif
-
-(modulo comments and indention maybe). Even though it uses an #ifdef I
-consider the latter variant more readable.  Maybe it's only me? Other
-than that I'd probably choose a longer name instead of HAS_ARM to make
-it more self-documenting what it is about (something with _ISA_ in its
-name). This obviously makes readability worse.
-
-So I'm still happy with the version I sent.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Yes please.
