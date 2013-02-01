@@ -1,42 +1,41 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri,  1 Feb 2013 11:38:28 +0100
-Subject: [PATCH] arm: mvebu: enable the SD card slot on Armada 370 Reference
- Design board
-In-Reply-To: <20130131175743.GF7717@titan.lakedaemon.net>
-References: <20130131175743.GF7717@titan.lakedaemon.net>
-Message-ID: <1359715108-13982-1-git-send-email-florian@openwrt.org>
+From: pavel@denx.de (Pavel Machek)
+Date: Fri, 1 Feb 2013 11:46:55 +0100
+Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
+ socfpga harware
+In-Reply-To: <20130201035040.GE4838@quad.lixom.net>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-5-git-send-email-dinguyen@altera.com>
+ <20130201035040.GE4838@quad.lixom.net>
+Message-ID: <20130201104655.GA3124@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 Reference Design board has one SD card slot, directly
-connected to the SDIO IP of the SoC, so we enable this IP. there are no
-GPIOs for card-detect and write-protect so we do not specify any.
+Hi!
 
-Signed-off-by: Florian Fainelli <florian@openwrt.org>
----
-Jason,
+> > Because the CPU1 start address is different for socfpga-vt and
+> > socfpga-cyclone5, we add code to use the correct CPU1 start addr.
 
-This is against your mvebu/dt branch
+> > @@ -72,6 +73,13 @@ void __init socfpga_sysmgr_init(void)
+> >  	struct device_node *np;
+> >  
+> >  	np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
+> > +
+> > +	if (of_property_read_u32(np, "cpu1-start-addr",
+> > +			(u32 *) &cpu1start_addr)) {
+> > +		early_printk("Need cpu1-start-addr in device tree.\n");
+> > +		panic("Need cpu1-start-addr in device tree.\n");
+> > +	}
+> > +
+> >  	sys_manager_base_addr = of_iomap(np, 0);
+> 
+> Wouldn't it be easier to diagnose this failure if you just printed the error
+> and continued booting without the second CPU? An early panic is usually really
+> hard to debug since you might not get early console without extra work.
 
- arch/arm/boot/dts/armada-370-rd.dts |    7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index d62dfac..f8e4855 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -57,5 +57,12 @@
- 			phy = <&phy1>;
- 			phy-mode = "rgmii-id";
- 		};
-+
-+		mvsdio at d00d4000 {
-+			pinctrl-0 = <&sdio_pins1>;
-+			pinctrl-names = "default";
-+			status = "okay";
-+			/* No CD or WP GPIOs */
-+		};
- 	};
- };
+I actually thought about that... but could not think of non-ugly way
+of doing that. I hope dts will normally be "right" for any production
+system...
+									Pavel
 -- 
-1.7.10.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
