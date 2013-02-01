@@ -1,31 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Feb 2013 11:16:24 -0800
-Subject: [PATCH v2 2/4] ARM: OMAP: devices: create device for usb part
- of control module
-In-Reply-To: <20130123112422.GF29258@arwen.pp.htv.fi>
-References: <1358777308-2409-1-git-send-email-kishon@ti.com>
- <1358777308-2409-3-git-send-email-kishon@ti.com>
- <20130123112422.GF29258@arwen.pp.htv.fi>
-Message-ID: <20130201191624.GR22517@atomide.com>
+Date: Fri, 1 Feb 2013 11:18:10 -0800
+Subject: [PATCH v2 3/6] ARM: OMAP: USB: Add phy binding information
+In-Reply-To: <1359081206-5602-4-git-send-email-kishon@ti.com>
+References: <1359081206-5602-1-git-send-email-kishon@ti.com>
+ <1359081206-5602-4-git-send-email-kishon@ti.com>
+Message-ID: <20130201191810.GS22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [130123 03:27]:
-> Hi,
-> 
-> On Mon, Jan 21, 2013 at 07:38:26PM +0530, Kishon Vijay Abraham I wrote:
-> > A seperate driver has been added to handle the usb part of control
-> > module. A device for the above driver is created here, using the register
-> > address information to be used by the driver for powering on the PHY and
-> > for writing to the mailbox.
-> > 
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
-> Tony ? Without this we won't have the control module driver.
+* Kishon Vijay Abraham I <kishon@ti.com> [130124 18:36]:
+> This is w.r.t the changes in PHY library to support adding and getting
+> multiple PHYs of the same type. In the new design, the
+> binding information between the PHY and the USB controller should be
+> specified in the platform specific initialization code. So it's been
+> done here for OMAP platforms.
 
-Looks OK to me, but please see my other reply regarding on
-you setting up some immutable branches to avoid pointless
-merge conflicts.
+This looks OK to me, but should be queued by Felipe in his
+minimal USB platform_data changes branch that I can pull in too
+to avoid pointless merge conflicts.
 
 Regards,
 
