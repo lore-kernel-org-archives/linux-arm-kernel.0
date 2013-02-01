@@ -1,10 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Feb 2013 10:47:40 +0100
-Subject: [PATCH 4/5] ARM: sunxi: Add the sun4i pinctrl and gpio nodes
-In-Reply-To: <1359211016-24097-5-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 1 Feb 2013 10:48:30 +0100
+Subject: [PATCH 5/5] ARM: sunxi: Add the pin groups for UART0 and UART1 on
+ sun4i
+In-Reply-To: <1359211016-24097-6-git-send-email-maxime.ripard@free-electrons.com>
 References: <1359211016-24097-1-git-send-email-maxime.ripard@free-electrons.com>
- <1359211016-24097-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdYWu_bV9va-KKJhJxknimFHqi=AofHVi5wTaPMqmzUnPQ@mail.gmail.com>
+ <1359211016-24097-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdYApDeJox9reczr5iNUstu=XY2FGo-iFDHbqPE0Gw8J0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,5 +16,5 @@ On Sat, Jan 26, 2013 at 3:36 PM, Maxime Ripard
 
 Applied to my allwinner branch.
 
-Thanks,
+Yours,
 Linus Walleij
