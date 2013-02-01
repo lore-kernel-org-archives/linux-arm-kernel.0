@@ -1,87 +1,59 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 1 Feb 2013 13:14:51 -0500 (EST)
-Subject: [PATCH v4 02/13] ARM: LPAE: use phys_addr_t in
- alloc_init_pud()
-In-Reply-To: <510BFC84.2030902@gmail.com>
-References: <1359669512-31276-1-git-send-email-cyril@ti.com>
- <1359669512-31276-3-git-send-email-cyril@ti.com> <510B327E.3050502@gmail.com>
- <alpine.LFD.2.02.1301312218270.6300@xanadu.home> <510BFC84.2030902@gmail.com>
-Message-ID: <alpine.LFD.2.02.1302011310090.6300@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Feb 2013 18:18:54 +0000
+Subject: [RFC PATCH] arm: decompressor: initialize PIC offset base
+ register for uClinux tools
+In-Reply-To: <510BF0B3.3030608@arm.com>
+References: <1359480546-7033-1-git-send-email-jonathan.austin@arm.com>
+ <alpine.LFD.2.02.1301291453530.6300@xanadu.home> <510BF0B3.3030608@arm.com>
+Message-ID: <20130201181854.GU23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Feb 2013, Subash Patel wrote:
-
-> Hi Nicolas,
+On Fri, Feb 01, 2013 at 04:43:31PM +0000, Jonathan Austin wrote:
+> Code that needs to access anything global will need to derive the location
+> of the GOT for itself, but there's a possible upside there that there's an
+> extra free register (r9 can be used as a general purpose register...)
 > 
-> On Thursday 31 January 2013 07:35 PM, Nicolas Pitre wrote:
-> > On Fri, 1 Feb 2013, Hui Wang wrote:
-> > 
-> > > Cyril Chemparathy wrote:
-> > > > From: Vitaly Andrianov <vitalya@ti.com>
-> > > > 
-> > > > This patch fixes the alloc_init_pud() function to use phys_addr_t
-> > > > instead of
-> > > > unsigned long when passing in the phys argument.
-> > > > 
-> > > > This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a
-> > > > (ARM:
-> > > > pgtable: use phys_addr_t for physical addresses), which applied similar
-> > > > changes
-> > > > elsewhere in the ARM memory management code.
-> > > > 
-> > > > Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> > > > Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> > > > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > > ---
-> > > >   arch/arm/mm/mmu.c |    3 ++-
-> > > >   1 file changed, 2 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> > > > index 9f06102..ef43689 100644
-> > > > --- a/arch/arm/mm/mmu.c
-> > > > +++ b/arch/arm/mm/mmu.c
-> > > > @@ -612,7 +612,8 @@ static void __init alloc_init_section(pud_t *pud,
-> > > > unsigned long addr,
-> > > >   }
-> > > >    static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-> > > > -	unsigned long end, unsigned long phys, const struct mem_type *type)
-> > > > +				  unsigned long end, phys_addr_t phys,
-> > > > +				  const struct mem_type *type)
-> > > > 
-> > > The change is correct but seems useless so far. This function only be
-> > > called
-> > > from map_lowmem and devicemaps_init, from i know neither lowmem nor device
-> > > io
-> > > registers of existing platforms exceed 32bit address.
-> > 
-> > It is not because you are not aware of any existing platforms with RAM
-> > or device IO above the 4GB mark that they don't exist.
-> > 
-> > For example, some LPAE systems have all their RAM located above the 4G
-> > physical address mark. A simple (potentially non DMA capable) alias
-> > exists in the low 32-bit address space to allow the system to boot and
-> > switch to the real physical RAM addresses once the MMU is turned on.
-> > Some of that RAM is still qualified as "low mem" i.e. the portion of RAM
-> > that the kernel keeps permanently mapped in the 32-bit virtual space
-> > even if all of it is above the 4G mark in physical space.
+> The patch would look like:
+> -----8<-------
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index 5cad8a6..afed28e 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -120,7 +120,7 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+>  KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+>  endif
+>  -ccflags-y := -fpic -fno-builtin -I$(obj)
+> +ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
+>  asflags-y := -Wa,-march=all -DZIMAGE
+>   # Supply kernel BSS size to the decompressor via a linker symbol.
+> ------>8---------
 > 
-> I think he is right. You cannot have low_mem and devices in 36-bit areas.
-> Atleast this is what I saw in one of the platforms on which I tested these
-> patches. I am not sure what you mean by hardware address aliasing(as I have
-> real RAM), but we need 32-bit areas to boot the CPU and I have mapped them for
-> the LOW_MEM. But, I have used 36-bit areas for the HIGH_MEM. Since you said
-> about aliasing DDR area in 32-bits, and then switching to 36-bit RAM, does the
-> dma of the devices still use 32-bit aliased addresses?
 > 
-> I haven't tested a configuration where LOW_MEM can have both 32-bit and 36-bit
-> DDR PA though. I think its not possible too.
+> I did a fairly crude benchmark - count how many instructions we need in
+> order to finish decompressing the kernel...
+> 
+> Setup r9 correctly:       129,976,282
+> Use -mno-single-pic-base: 124,826,778
+> 
+> (this was done using an R-class model and a magic semi-hosting call to pause
+> the model at the end of the decompress_kernel function)
+> 
+> So, it seems like the extra register means there's actually a 4% *win* 
+> in instruction terms from using -mno-single-pic-base
 
-Don't get confused by the 36-bit supersections introduced with ARMv6.  
-This patch series is about LPAE capable systems using a completely 
-different page table format providing physical addressing beyond 36 
-bits.
+Hmm.  This is the opposite of what I'd expect.  -msingle-pic-base says:
 
+     Treat the register used for PIC addressing as read-only, rather
+     than loading it in the prologue for each function.  The run-time
+     system is responsible for initializing this register with an
+     appropriate value before execution begins.
 
-Nicolas
+which implies that we should be able to load it before calling the C
+code (as you're doing) and then the compiler won't issue instructions
+to reload that register.
+
+Giving -mno-single-pic-base suggests that it would turn _off_ this
+behaviour (which afaik - sensibly - is not by default enabled.)
+
+So, I'm not sure I fully understand what's going on here.
