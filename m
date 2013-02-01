@@ -1,25 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Feb 2013 15:14:10 +0000
-Subject: [PATCH v4 00/13] ARM LPAE Fixes - Part 1
-In-Reply-To: <510BDAED.8060805@ti.com>
-References: <1359669512-31276-1-git-send-email-cyril@ti.com>
- <alpine.LFD.2.02.1301312252230.6300@xanadu.home> <510BDAED.8060805@ti.com>
-Message-ID: <20130201151410.GR23505@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Feb 2013 15:16:57 +0000
+Subject: [PATCH V2 3/4] ARM: dts: Add #dma-cells for generic dma binding
+ support
+In-Reply-To: <1359723116-18173-4-git-send-email-padma.v@samsung.com>
+References: <1359723116-18173-1-git-send-email-padma.v@samsung.com>
+ <1359723116-18173-4-git-send-email-padma.v@samsung.com>
+Message-ID: <201302011516.57649.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 10:10:37AM -0500, Cyril Chemparathy wrote:
-> With this, I ran simple network and filesystem performance tests to  
-> compare the code-patching vs. non-code-patching variants.  These tests  
-> didn't yield any significant performance difference between the two on  
-> an ARMv7 (Cortex-A8) platform.
+On Friday 01 February 2013, Padmavathi Venna wrote:
+> 
+> This patch adds #dma-cells property to PL330 DMA controller
+> nodes for supporting generic dma dt bindings on samsung
+> exynos5250 platform.
+> 
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 
-It's not network and fs activity that this kind of stuff is likely to
-show up in, but more to do with walking pages tables and the like -
-remember that page tables are stored using physical addresses, and any
-walks of them have to convert those physical addresses to virtual
-addresses and back again.
+The generic binding also lists the dma-channels and dma-requests
+properties. Those are currently not required by the code, but I think
+it would be good to list them anyway, to be future-proof in case
+we ever need them.
 
-So, things like page scanning for eviction (eg, page aging, page
-faults even those which just re-use a page from the page cache) have
-to use the v:p / p:v translation macros.
+Otherwise
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
