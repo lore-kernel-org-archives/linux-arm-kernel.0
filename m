@@ -1,47 +1,23 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 1 Feb 2013 11:13:50 +0000
-Subject: [PATCHv5 15/16] ARM: hyp: initialize CNTVOFF to zero
-In-Reply-To: <1359634539-9580-16-git-send-email-mark.rutland@arm.com>
-References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
- <1359634539-9580-16-git-send-email-mark.rutland@arm.com>
-Message-ID: <20130201111350.GA1970@linaro.org>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Fri, 01 Feb 2013 12:23:05 +0100
+Subject: [PATCH] ARM: dts: AM33XX: Corrects typo in interrupt field in SPI
+ node
+In-Reply-To: <1359697047-1816-1-git-send-email-avinashphilip@ti.com> (Philip
+ Avinash's message of "Fri, 1 Feb 2013 11:07:27 +0530")
+References: <1359697047-1816-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <8738xg8ehy.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 12:15:38PM +0000, Mark Rutland wrote:
-> From: Marc Zyngier <Marc.Zyngier@arm.com>
-> 
-> In order to be able to use the virtual counter in a safe way,
-> make sure it is initialized to zero before dropping to SVC.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> ---
->  arch/arm/kernel/hyp-stub.S | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> index 65b2417..455603a 100644
-> --- a/arch/arm/kernel/hyp-stub.S
-> +++ b/arch/arm/kernel/hyp-stub.S
-> @@ -152,6 +152,9 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
->  	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
->  	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
->  	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
-> +	mov	r6, #0
-> +	mov	r7, #0
-> +	mcrr	p15, 4, r6, r7, c14	@ CNTVOFF
+>>>>> "Philip" == Philip Avinash <avinashphilip@ti.com> writes:
 
-Is this required for safety, or is it more a sanity feature?
+ Philip> DT field of "interrupts" was mentioned wrongly as "interrupt" in SPI
+ Philip> node. This went unnoticed as spi-omap2 driver not making use of
+ Philip> interrupt. Fixes the typo.
 
-The architected timer counters are supposed to be monotonic time sources
-only, so applying a random offset shouldn't really change anything.
+ Philip> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
 
-The main thing I can think of is that it is easier for the host to
-manage guests' virtual counter offsets if the host's offset is 0 (and
-we don't really want to be changing the host offset after the host kernel
-boots).
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 
-Cheers
----Dave
+-- 
+Bye, Peter Korsgaard
