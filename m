@@ -1,49 +1,61 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 01 Feb 2013 14:38:42 +0000
-Subject: [PATCH v2 4/4] irqchip: gic: Perform the gic_secondary_init()
- call via CPU notifier
-In-Reply-To: <alpine.LFD.2.02.1301311521310.6300@xanadu.home>
-References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
- <1359476319-23720-5-git-send-email-catalin.marinas@arm.com>
- <alpine.LFD.2.02.1301291734140.6300@xanadu.home>
- <20130129231205.GA25176@MacBook-Pro.local>
- <alpine.LFD.2.02.1301291907340.6300@xanadu.home>
- <20130131112538.GW23505@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301311230140.6300@xanadu.home>
- <20130131175526.GE23505@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301311521310.6300@xanadu.home>
-Message-ID: <1359729522.3256.4.camel@linaro1.home>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 1 Feb 2013 20:13:34 +0530
+Subject: [PATCHv2 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
+In-Reply-To: <20130201143136.GP23505@n2100.arm.linux.org.uk>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-4-git-send-email-dinguyen@altera.com>
+ <510BA728.4060300@ti.com>
+ <20130201121137.GC23869@e102568-lin.cambridge.arm.com>
+ <20130201125417.GL23505@n2100.arm.linux.org.uk>
+ <20130201141052.GA25172@e102568-lin.cambridge.arm.com>
+ <20130201141914.GO23505@n2100.arm.linux.org.uk>
+ <20130201143136.GP23505@n2100.arm.linux.org.uk>
+Message-ID: <510BD496.6080305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-01-31 at 15:31 -0500, Nicolas Pitre wrote:
-> On Thu, 31 Jan 2013, Russell King - ARM Linux wrote:
-> 
-> > On Thu, Jan 31, 2013 at 12:32:11PM -0500, Nicolas Pitre wrote:
-> > > On Thu, 31 Jan 2013, Russell King - ARM Linux wrote:
-> > > 
-> > > > I haven't tried Versatile Express yet as it has the TC2 tile on, and I
-> > > > don't yet a boot loader on it which is capable of TFTP (which makes it
-> > > > rather useless to me - I've been saying this for a time now but this is
-> > > > probably the first time publically.)  I'm thinking about putting the
-> > > > CA9x4 tile back on because that's a lot more functionally useful to me
-> > > > than TC2.
-> > > 
-> > > You might be interested by this then:
-> > > 
-> > > http://lists.linaro.org/pipermail/linaro-dev/2012-October/014136.html
-> > 
-> > Great news.  Everyone has been telling me that there's no uboot for TC2,
-> > or "we think Linaro might have something but we don't really know".
-> 
-> Note that I cobbled those instructions on my own and the result is not 
-> officially supported by Linaro.  This is obviously not suitable for 
-> setting up products or demo systems, but for a kernel developer I think 
-> such a setup is invaluable.
+On Friday 01 February 2013 08:01 PM, Russell King - ARM Linux wrote:
+> Just to further provide some insight into the reasoning:
+>
+> Invalidating data out of a working cache risks data corruption; maybe
+> the data being invalidated is filesystem metadata which was about to
+> be cleaned and written back to storage.  That risks filesystem
+> corruption.
+>
+> Invalidating fewer levels than are actually required is different: we
+> may leave dirty cache lines behind which may be evicted, but there's
+> also the chance that the CPU will end up _reading_ from its
+> uninitialized caches and may crash before that happens.
+>
+> So, the risks are:
+> 1. invalidate more levels than are necessary and risk discarding data
+>     which other CPUs are using, which may be important data.
+> 2. invalidate less levels than are necessary and risk writing out
+>     data from the CPU cache, which may or may not happen _before_ the
+>     CPU crashes due to reading invalid data.
+>
+> Out of those two, (2) sounds to me to be the safer approach.
+>
+> Plus, I can't think of a reason why you'd want to put on a SMP system
+> more than one layer of CPU local caches... to do so would seem to me to
+> be an exercise in coherency complexity...  So, I suspect that in the
+> real world, we will _never_ see any system which has more than one
+> layer of caches local to the CPU.  But we may see a system with a
+> cache architecture similar to the one I drew in my email to Santosh.
+>
+I still scratching my head on why you would even have a CPU design
+with two L2 shared caches for a 4 CPU system.
 
-If I remember correctly, you will also only get 1GB of RAM available not
-the 2GB most TC2 boards have. (I did take a quick look at hacking U-Boot
-to get around that but couldn't get anything to work.)
+If you ever design such a system, you need to ensure that
 
--- 
-Tixy
+1. Both L2 are used in exclusive mode
+2. Both L2 cache has coherency hardware connected to keep them in sync 
+for shared data.
+
+For 1, one would just increase the size of L2 and have only 1 memory.
+
+2 Doesn't bring much advantage unless and until your L3 is too far
+away for access in terms of CPU access cycles.
+
+Regards
+Santosh
