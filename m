@@ -1,74 +1,23 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Fri, 1 Feb 2013 13:40:29 +0800
-Subject: [PATCH v4 02/13] ARM: LPAE: use phys_addr_t in alloc_init_pud()
-In-Reply-To: <alpine.LFD.2.02.1301312218270.6300@xanadu.home>
-References: <1359669512-31276-1-git-send-email-cyril@ti.com>
- <1359669512-31276-3-git-send-email-cyril@ti.com> <510B327E.3050502@gmail.com>
- <alpine.LFD.2.02.1301312218270.6300@xanadu.home>
-Message-ID: <510B554D.1000905@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 1 Feb 2013 11:14:55 +0530
+Subject: [PATCH v3 08/15] ARM: introduce common set_auxcr/get_auxcr
+ functions
+In-Reply-To: <1359445870-18925-9-git-send-email-nicolas.pitre@linaro.org>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-9-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <510B5657.8050707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> On Fri, 1 Feb 2013, Hui Wang wrote:
+On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 >
->   
->> Cyril Chemparathy wrote:
->>     
->>> From: Vitaly Andrianov <vitalya@ti.com>
->>>
->>> This patch fixes the alloc_init_pud() function to use phys_addr_t instead of
->>> unsigned long when passing in the phys argument.
->>>
->>> This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a
->>> (ARM:
->>> pgtable: use phys_addr_t for physical addresses), which applied similar
->>> changes
->>> elsewhere in the ARM memory management code.
->>>
->>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
->>> Acked-by: Nicolas Pitre <nico@linaro.org>
->>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>> ---
->>>  arch/arm/mm/mmu.c |    3 ++-
->>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->>> index 9f06102..ef43689 100644
->>> --- a/arch/arm/mm/mmu.c
->>> +++ b/arch/arm/mm/mmu.c
->>> @@ -612,7 +612,8 @@ static void __init alloc_init_section(pud_t *pud,
->>> unsigned long addr,
->>>  }
->>>   static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
->>> -	unsigned long end, unsigned long phys, const struct mem_type *type)
->>> +				  unsigned long end, phys_addr_t phys,
->>> +				  const struct mem_type *type)
->>>   
->>>       
->> The change is correct but seems useless so far. This function only be called
->> from map_lowmem and devicemaps_init, from i know neither lowmem nor device io
->> registers of existing platforms exceed 32bit address.
->>     
+> Move the private set_auxcr/get_auxcr functions from
+> drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
 >
-> It is not because you are not aware of any existing platforms with RAM 
-> or device IO above the 4GB mark that they don't exist.
->
-> For example, some LPAE systems have all their RAM located above the 4G 
-> physical address mark. A simple (potentially non DMA capable) alias 
-> exists in the low 32-bit address space to allow the system to boot and 
-> switch to the real physical RAM addresses once the MMU is turned on.  
-> Some of that RAM is still qualified as "low mem" i.e. the portion of RAM 
-> that the kernel keeps permanently mapped in the 32-bit virtual space 
-> even if all of it is above the 4G mark in physical space.
->
->
->   
-Got it, thanks for sharing the knowledge.
-
-Regards,
-Hui.
-> Nicolas
->
->   
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
