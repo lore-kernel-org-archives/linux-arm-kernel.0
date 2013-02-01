@@ -1,38 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri,  1 Feb 2013 15:31:35 +0100
-Subject: [PATCH v4 3/3] arm: kirkwood: Enable cpufreq and ondemand on
- kirkwood_defconfig
-In-Reply-To: <1359729096-15371-1-git-send-email-andrew@lunn.ch>
-References: <1359729096-15371-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1359729096-15371-4-git-send-email-andrew@lunn.ch>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 1 Feb 2013 16:31:38 +0200
+Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA9FFD5@DBDE01.ent.ti.com>
+References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
+ <510916B2.7080509@ti.com> <20130130131504.GU15258@arwen.pp.htv.fi>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA95E97@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9FF9C@DBDE01.ent.ti.com>
+ <510BD04A.4000909@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9FFD5@DBDE01.ent.ti.com>
+Message-ID: <510BD1CA.9020309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a cpufreq driver for kirkwood, enable it in
-kirkwood_defconfig and set the default governer to ondemand.
+On 02/01/2013 04:27 PM, Mohammed, Afzal wrote:
+> Hi Roger,
+> 
+> On Fri, Feb 01, 2013 at 19:55:14, Quadros, Roger wrote:
+> 
+>> Thanks Afzal :). You mean the non device tree boot right?
+> 
+> No, dt boot, am335x can only dt boot.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
----
+but DT boot is not supported for OMAP USB Host. How did you get it to work?
 
-To be commited by: Jason Coope
+Are you testing the Host connector or the OTG connector?
 
- arch/arm/configs/kirkwood_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-index 93f3794..6ecb7de 100644
---- a/arch/arm/configs/kirkwood_defconfig
-+++ b/arch/arm/configs/kirkwood_defconfig
-@@ -55,6 +55,9 @@ CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_STAT_DETAILS=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_IDLE=y
- CONFIG_NET=y
- CONFIG_PACKET=y
--- 
-1.7.10.4
+regards,
+-roger
