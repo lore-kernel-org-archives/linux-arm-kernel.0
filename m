@@ -1,41 +1,24 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Fri, 1 Feb 2013 11:46:55 +0100
-Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
- socfpga harware
-In-Reply-To: <20130201035040.GE4838@quad.lixom.net>
-References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
- <1359651943-21752-5-git-send-email-dinguyen@altera.com>
- <20130201035040.GE4838@quad.lixom.net>
-Message-ID: <20130201104655.GA3124@amd.pavel.ucw.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Feb 2013 10:46:26 +0000
+Subject: [PATCH v4] arm: use built-in byte swap function
+In-Reply-To: <20130131183747.d56289dbd89b165cf12a9d28@freescale.com>
+References: <1359478014.3529.157.camel@shinybook.infradead.org>
+ <20130129174249.GB25415@pd.tnic>
+ <1359482147.3529.161.camel@shinybook.infradead.org>
+ <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <1359670248.27468.13.camel@shinybook.infradead.org>
+ <20130131183747.d56289dbd89b165cf12a9d28@freescale.com>
+Message-ID: <20130201104626.GH23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, Jan 31, 2013 at 06:37:47PM -0600, Kim Phillips wrote:
+> +#if GCC_VERSION >= 40600
+> +#define __HAVE_BUILTIN_BSWAP32__
+> +#define __HAVE_BUILTIN_BSWAP64__
 
-> > Because the CPU1 start address is different for socfpga-vt and
-> > socfpga-cyclone5, we add code to use the correct CPU1 start addr.
-
-> > @@ -72,6 +73,13 @@ void __init socfpga_sysmgr_init(void)
-> >  	struct device_node *np;
-> >  
-> >  	np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
-> > +
-> > +	if (of_property_read_u32(np, "cpu1-start-addr",
-> > +			(u32 *) &cpu1start_addr)) {
-> > +		early_printk("Need cpu1-start-addr in device tree.\n");
-> > +		panic("Need cpu1-start-addr in device tree.\n");
-> > +	}
-> > +
-> >  	sys_manager_base_addr = of_iomap(np, 0);
-> 
-> Wouldn't it be easier to diagnose this failure if you just printed the error
-> and continued booting without the second CPU? An early panic is usually really
-> hard to debug since you might not get early console without extra work.
-
-I actually thought about that... but could not think of non-ugly way
-of doing that. I hope dts will normally be "right" for any production
-system...
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+You really aren't listening to anything that's been said to you.
