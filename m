@@ -1,64 +1,75 @@
-From: b13634@freescale.com (Gary Zhang)
-Date: Fri, 1 Feb 2013 14:46:57 +0800
-Subject: [PATCH 2/2] ARM: imx: set CKO1 parent clock source in imx6q sabresd
-Message-ID: <1359701217-23931-1-git-send-email-b13634@freescale.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri,  1 Feb 2013 08:48:26 +0100
+Subject: [PATCH 5/9] USB chipidea: introduce dual role mode pdata flags
+In-Reply-To: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
+References: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359704911-8275-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-in imx6q sabresd board, set ahb as CKO1 parent clock sourrce
+Even if a chipidea core is otg capable the board may not. This allows
+to explicitly set the core to host/peripheral mode. Without these
+flags the driver falls back to the old behaviour.
 
-Signed-off-by: Gary Zhang <b13634@freescale.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/mach-imx6q.c |   15 ++++++++++++---
- 1 files changed, 12 insertions(+), 3 deletions(-)
+ drivers/usb/chipidea/core.c  |   21 +++++++++++++++------
+ include/linux/usb/chipidea.h |    2 +-
+ 2 files changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 4eb1b3a..860e272 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -119,7 +119,7 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- 	return 0;
- }
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index a3ec29d..b2dbf55 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -435,6 +435,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	struct resource	*res;
+ 	void __iomem	*base;
+ 	int		ret;
++	int		dr_mode;
  
--static void __init imx6q_sabrelite_cko1_setup(void)
-+static void __init cko1_setup(unsigned long freq)
- {
- 	struct clk *cko1_sel, *ahb, *cko1;
- 	unsigned long rate;
-@@ -132,8 +132,10 @@ static void __init imx6q_sabrelite_cko1_setup(void)
- 		goto put_clk;
+ 	if (!dev->platform_data) {
+ 		dev_err(dev, "platform data missing\n");
+@@ -487,14 +488,22 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		return -ENODEV;
  	}
- 	clk_set_parent(cko1_sel, ahb);
--	rate = clk_round_rate(cko1, 16000000);
-+	rate = clk_round_rate(cko1, freq);
- 	clk_set_rate(cko1, rate);
+ 
++	dr_mode = ci->platdata->dr_mode;
++	if (dr_mode == USB_DR_MODE_UNKNOWN)
++		dr_mode = USB_DR_MODE_OTG;
 +
-+	return;
- put_clk:
- 	if (!IS_ERR(cko1_sel))
- 		clk_put(cko1_sel);
-@@ -148,7 +150,12 @@ static void __init imx6q_sabrelite_init(void)
- 	if (IS_BUILTIN(CONFIG_PHYLIB))
- 		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
- 				ksz9021rn_phy_fixup);
--	imx6q_sabrelite_cko1_setup();
-+	cko1_setup(16000000);
-+}
-+
-+static void __init imx6q_sabresd_init(void)
-+{
-+	cko1_setup(24000000);
- }
+ 	/* initialize role(s) before the interrupt is requested */
+-	ret = ci_hdrc_host_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support host\n");
++	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
++		ret = ci_hdrc_host_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support host\n");
++	}
  
- static void __init imx6q_1588_init(void)
-@@ -193,6 +200,8 @@ static void __init imx6q_init_machine(void)
- {
- 	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
- 		imx6q_sabrelite_init();
-+	else if (of_machine_is_compatible("fsl,imx6q-sabresd"))
-+		imx6q_sabresd_init();
+-	ret = ci_hdrc_gadget_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support gadget\n");
++	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
++		ret = ci_hdrc_gadget_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support gadget\n");
++	}
  
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
+ 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+ 		dev_err(dev, "no supported roles\n");
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 1a2aa18..b314647 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -20,7 +20,7 @@ struct ci13xxx_platform_data {
+ #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+ #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
+ #define CI13XXX_DISABLE_STREAMING	BIT(3)
+-
++	enum usb_dr_mode	dr_mode;
+ #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
+ 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
 -- 
-1.7.0.4
+1.7.10.4
