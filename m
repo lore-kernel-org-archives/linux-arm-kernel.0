@@ -1,54 +1,59 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 1 Feb 2013 10:32:07 -0500
-Subject: [GIT PULL] ARM: LPAE Fixes - Part 1 for v3.9
-Message-ID: <510BDFF7.4050405@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Feb 2013 15:31:52 +0000
+Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
+ socfpga harware
+In-Reply-To: <71B37E0559AC6849A68C5BA94C509FB45A63D4E47D@SJ-ITMSG02.altera.priv.altera.com>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-5-git-send-email-dinguyen@altera.com>
+ <20130201035040.GE4838@quad.lixom.net>
+ <20130201104655.GA3124@amd.pavel.ucw.cz>
+ <71B37E0559AC6849A68C5BA94C509FB45A63D4E47D@SJ-ITMSG02.altera.priv.altera.com>
+Message-ID: <20130201153152.GS23505@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
+On Fri, Feb 01, 2013 at 07:27:46AM -0800, Dinh Nguyen wrote:
+> Hi Olof,
+> On Fri, 2013-02-01 at 11:46 +0100, ZY - pavel wrote:
+> > Hi!
+> >
+> > > > Because the CPU1 start address is different for socfpga-vt and
+> > > > socfpga-cyclone5, we add code to use the correct CPU1 start addr.
+> >
+> > > > @@ -72,6 +73,13 @@ void __init socfpga_sysmgr_init(void)
+> > > >   struct device_node *np;
+> > > >
+> > > >   np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
+> > > > +
+> > > > + if (of_property_read_u32(np, "cpu1-start-addr",
+> > > > +                 (u32 *) &cpu1start_addr)) {
+> > > > +         early_printk("Need cpu1-start-addr in device tree.\n");
+> > > > +         panic("Need cpu1-start-addr in device tree.\n");
+> > > > + }
+> > > > +
+> > > >   sys_manager_base_addr = of_iomap(np, 0);
+> > >
+> > > Wouldn't it be easier to diagnose this failure if you just printed the error
+> > > and continued booting without the second CPU? An early panic is usually really
+> > > hard to debug since you might not get early console without extra work.
+> >
+> > I actually thought about that... but could not think of non-ugly way
+> > of doing that. I hope dts will normally be "right" for any production
+> > system...
+> 
+> I think a panic is better just for the reason that if someone is
+> expecting SMP, but missed the warning message, and later finds out that
+> the secondary core never came up, it would save some debugging time.
+> 
+> Since I have to send out a v3 from the 1st patch anyways, let me verify
+> that I can get the early warning.
 
-   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+The choice is between a panic() at a point where the only way to find
+out is to throw in printascii() or a working printk, and ending up with
+an unbootable kernel, vs continuing the boot and having an almost
+working system which can be logged into and the messages viewed.
 
-are available in the git repository at:
-
- 
-git://git.kernel.org/pub/scm/linux/kernel/git/cchemparathy/linux-keystone.git 
-upstream/keystone-lpae-v4
-
-for you to fetch changes up to 4dc17a8282221854896a0d6a83c758fde4f9b139:
-
-   ARM: fix type of PHYS_PFN_OFFSET to unsigned long (2013-02-01 
-09:37:53 -0500)
-
-----------------------------------------------------------------
-Cyril Chemparathy (10):
-       ARM: LPAE: use signed arithmetic for mask definitions
-       ARM: LPAE: use phys_addr_t in switch_mm()
-       ARM: LPAE: use 64-bit accessors for TTBR registers
-       ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for bootmem
-       ARM: LPAE: factor out T1SZ and TTBR1 computations
-       ARM: LPAE: accomodate >32-bit addresses for page table base
-       ARM: mm: use physical addresses in highmem sanity checks
-       ARM: mm: cleanup checks for membank overlap with vmalloc area
-       ARM: mm: clean up membank size limit checks
-       ARM: fix type of PHYS_PFN_OFFSET to unsigned long
-
-Vitaly Andrianov (3):
-       ARM: LPAE: use phys_addr_t in alloc_init_pud()
-       ARM: LPAE: use phys_addr_t in free_memmap()
-       ARM: LPAE: use phys_addr_t for initrd location
-
-  arch/arm/include/asm/memory.h               |   20 +++++++++-
-  arch/arm/include/asm/page.h                 |    2 +-
-  arch/arm/include/asm/pgtable-3level-hwdef.h |   20 ++++++++++
-  arch/arm/include/asm/pgtable-3level.h       |    6 +--
-  arch/arm/include/asm/proc-fns.h             |   26 +++++++++----
-  arch/arm/kernel/head.S                      |   10 ++---
-  arch/arm/kernel/smp.c                       |   11 +++++-
-  arch/arm/mm/context.c                       |    9 +----
-  arch/arm/mm/init.c                          |   19 +++++-----
-  arch/arm/mm/mmu.c                           |   49 
-+++++++++----------------
-  arch/arm/mm/proc-v7-3level.S                |   53 
-++++++++++++++-------------
-  11 files changed, 132 insertions(+), 93 deletions(-)
+If you have an application which relies on the second CPU coming up,
+why not have it verify that the second CPU came up (it's quite easy
+to do - there's POSIX standard libc calls to get the number of online
+CPUs).
