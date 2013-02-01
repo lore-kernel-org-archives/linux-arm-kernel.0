@@ -1,74 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 01 Feb 2013 14:53:59 -0800
-Subject: [PATCH 2/7] clk: tegra: Use common of_clk_init() function
-In-Reply-To: <510B496B.2030303@nvidia.com>
-References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
- <1357282858-2112-2-git-send-email-pgaikwad@nvidia.com>
- <50E703A8.1080808@wwwdotorg.org> <50E793A0.4020702@nvidia.com>
- <20130124192043.10623.60751@quantum> <51018C55.6000709@wwwdotorg.org>
- <20130125005729.10623.61165@quantum> <51020D94.4010509@wwwdotorg.org>
- <510B496B.2030303@nvidia.com>
-Message-ID: <20130201225359.16898.41318@quantum>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 02 Feb 2013 03:10:24 +0400
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130201205600.GA31762@arwen.pp.htv.fi>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
+ <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
+ <20130201185820.GE29898@arwen.pp.htv.fi> <510C2A47.1090607@mvista.com>
+ <20130201205600.GA31762@arwen.pp.htv.fi>
+Message-ID: <510C4B60.20802@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Prashant Gaikwad (2013-01-31 20:49:47)
-> On Friday 25 January 2013 10:14 AM, Stephen Warren wrote:
-> > On 01/24/2013 04:57 PM, Mike Turquette wrote:
-> >> Quoting Stephen Warren (2013-01-24 11:32:37)
-> >>> On 01/24/2013 11:20 AM, Mike Turquette wrote:
-> >>>> Quoting Prashant Gaikwad (2013-01-04 18:44:48)
-> >>>>> On Friday 04 January 2013 10:00 PM, Stephen Warren wrote:
-> >>>>>> On 01/04/2013 12:00 AM, Prashant Gaikwad wrote:
-> >>>>>>> Use common of_clk_init() function for clocks initialization.
-> >>>>>>>    drivers/clk/tegra/clk-tegra20.c |    3 ++-
-> >>>>>>>    drivers/clk/tegra/clk-tegra30.c |    3 ++-
-> >>>>>> Oh, so this series is written assuming that the Tegra CCF rework is
-> >>>>>> already applied then? That makes the dependencies quite painful, since I
-> >>>>>> think we'll end up with the following order being needed:
-> >>>>>>
-> >>>>>> 1) clk: Add composite clock type
-> >>>>>>      -> This would usually go through the clk tree.
-> >>>>>> 2) The Tegra CCF rework series
-> >>>>>>      -> This must go through the Tegra tree due to lots of dependencies
-> >>>>>>      and merge conflicts with other Tegra patches.
-> >>>>>> 3) This series
-> >>>>>>      -> This would usually go through the clk tree.
-> >>>>>>
-> >>>>>> Is it possible to re-order the dependencies as (1) (3) (2), so that Mike
-> >>>>>> can apply (1) and (3) to the clock tree, then I can use the clk tree as
-> >>>>>> the basis for a branch in the Tegra tree to apply (2) and all the other
-> >>>>>> Tegra patches that will conflict with (2)?
-> >>>>> If Mike approves the concept and implementation in (1) and (3) then I
-> >>>>> will repost (2) and (3) with dependencies re-ordered.
-> >>>> Patch (1) still has some unaddressed comments, and is not a real
-> >>>> dependency for this series.
-> >>> I assume "Patch (1)" refers to the list of series a couple emails above,
-> >>> not the first patch in the series you're replying to; that threw me for
-> >>> a moment.
-> >>>
-> >>>> Since all of the patches have received their
-> >>>> Tested-by's then I propose to merge all patches from this series into
-> >>>> clk-next, which exception of patch 2/7 (the Tegra patch).
-> >>>>
-> >>>> This reduces your Tegra CCF conversion dependencies and you can role the
-> >>>> necessary of_clk_init change into your Tegra CCF conversion branch (it
-> >>>> has my implicit Ack and can be taken through your tree).
-> >>>>
-> >>>> Let me know if this is OK for you.
-> >>> OK, I'm happy to merge your clock tree into the Tegra tree and then
-> >>> apply 2/7 on top of the Tegra CCF work.
-> >> Hmm, maybe the clk tree needs to be a dependency branch of arm-soc
-> >> again, as it has in the past.  Would that help with any Tegra merge
-> >> pain?
-> > Yes, I think that's what would end up happening if I merge the clk tree
-> > into the Tegra tree anyway.
-> 
-> Hi Mike,
-> 
-> Have you merged these patches for 3.9?
+Hello.
 
-Yes, these have been sitting in clk-next for a few days now.
+On 02-02-2013 0:56, Felipe Balbi wrote:
 
-Regards,
-Mike
+>>> good point, do you wanna send some patches ?
+
+>>     I have already sent them countless times and even stuck CPPI 4.1 support (in
+>> arch/arm/common/cppi41.c) in Russell's patch system. TI requested to remove the
+>> patch. :-(
+
+> sticking into arch/arm/common/ wasn't a nice move.
+
+    Like with EDMA we have nothing else to do with CPPI 4.1 being shared by 
+DaVinci-like and OMAP-like SOCs. Thank TI for creatring this mess. And 
+actually even that is not a good place since I think I know of a MIPS SoC 
+having CPPI 4.1 as well, just out of tree.
+
+ > But then again, so
+ > wasn't asking for the patch to be removed :-s
+
+    Unfortunately, Russell has done it -- all that was discuseed without me in 
+the loop even. :-/
+
+>>> I guess to make the MUSB side simpler we would need musb-dma-engine glue
+>>> to map dmaengine to the private MUSB API. Then we would have some
+>>> starting point to also move inventra (and anybody else) to dmaengine
+>>> API.
+
+>>     Why? Inventra is a dedicated device's private DMA controller, why make
+>> universal DMA driver for it?
+
+> because it doesn't make sense to support multiple DMA APIs. We can check
+> from MUSB's registers if it was configured with Inventra DMA support and
+> based on that we can register MUSB's own DMA Engine to dmaengine API.
+
+     I still disagree. IMO drivers/dma/ is for standalone DMA engines. Else we 
+could stick every bus mastering device's DMA engines there. CPPI 4.1 is in 
+design standlone DMA engine, despite all in-tree implementations having it as 
+subblock of MUSB and serving only MUSB.
+
+WBR, Sergei
