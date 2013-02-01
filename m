@@ -1,93 +1,101 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Feb 2013 11:08:41 +0530
-Subject: [PATCH v3 06/15] ARM: mcpm: generic SMP secondary bringup and
- hotplug support
-In-Reply-To: <1359445870-18925-7-git-send-email-nicolas.pitre@linaro.org>
+Date: Fri, 1 Feb 2013 11:11:24 +0530
+Subject: [PATCH v3 07/15] ARM: vexpress: Select the correct SMP operations
+ at run-time
+In-Reply-To: <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
 References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-7-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <510B54E1.1080707@ti.com>
+ <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <510B5584.6020800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
-> Now that the cluster power API is in place, we can use it for SMP secondary
-> bringup and CPU hotplug in a generic fashion.
+> From: Jon Medhurst <tixy@linaro.org>
 >
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+The patch deserves couple of lines of description here.
+
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
 > ---
->   arch/arm/common/Makefile       |  2 +-
->   arch/arm/common/mcpm_platsmp.c | 85 ++++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 86 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/common/mcpm_platsmp.c
+>   arch/arm/include/asm/mach/arch.h |  3 +++
+>   arch/arm/kernel/setup.c          |  5 ++++-
+>   arch/arm/mach-vexpress/core.h    |  2 ++
+>   arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
+>   arch/arm/mach-vexpress/v2m.c     |  2 +-
+>   5 files changed, 22 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-> index c901a38c59..e1c9db45de 100644
-> --- a/arch/arm/common/Makefile
-> +++ b/arch/arm/common/Makefile
-> @@ -13,4 +13,4 @@ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
->   obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
->   obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
->   obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
-> -obj-$(CONFIG_CLUSTER_PM)	+= mcpm_head.o mcpm_entry.o vlock.o
-> +obj-$(CONFIG_CLUSTER_PM)	+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
-> diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
-> new file mode 100644
-> index 0000000000..401298f5ee
-> --- /dev/null
-> +++ b/arch/arm/common/mcpm_platsmp.c
-> @@ -0,0 +1,85 @@
-> +/*
-> + * linux/arch/arm/mach-vexpress/mcpm_platsmp.c
-> + *
-> + * Created by:  Nicolas Pitre, November 2012
-> + * Copyright:   (C) 2012-2013  Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Code to handle secondary CPU bringup and hotplug for the cluster power API.
-> + */
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 917d4fcfd9..3d01c6d6c3 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -17,8 +17,10 @@ struct pt_regs;
+>   struct smp_operations;
+>   #ifdef CONFIG_SMP
+>   #define smp_ops(ops) (&(ops))
+> +#define smp_init_ops(ops) (&(ops))
+>   #else
+>   #define smp_ops(ops) (struct smp_operations *)NULL
+> +#define smp_init_ops(ops) (void (*)(void))NULL
+>   #endif
+>
+>   struct machine_desc {
+> @@ -42,6 +44,7 @@ struct machine_desc {
+>   	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+>   	char			restart_mode;	/* default restart mode	*/
+>   	struct smp_operations	*smp;		/* SMP operations	*/
+> +	void			(*smp_init)(void);
+>   	void			(*fixup)(struct tag *, char **,
+>   					 struct meminfo *);
+>   	void			(*reserve)(void);/* reserve mem blocks	*/
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3f6cbb2e3e..41edca8582 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
+>   	arm_dt_init_cpu_maps();
+>   #ifdef CONFIG_SMP
+>   	if (is_smp()) {
+> -		smp_set_ops(mdesc->smp);
+> +		if(mdesc->smp_init)
+> +			(*mdesc->smp_init)();
+> +		else
+> +			smp_set_ops(mdesc->smp);
+>   		smp_init_cpus();
+>   	}
+>   #endif
+> diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
+> index f134cd4a85..3a761fd76c 100644
+> --- a/arch/arm/mach-vexpress/core.h
+> +++ b/arch/arm/mach-vexpress/core.h
+> @@ -6,6 +6,8 @@
+>
+>   void vexpress_dt_smp_map_io(void);
+>
+> +void vexpress_smp_init_ops(void);
 > +
-> +#include <linux/init.h>
-> +#include <linux/smp.h>
+>   extern struct smp_operations	vexpress_smp_ops;
+>
+>   extern void vexpress_cpu_die(unsigned int cpu);
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index c5d70de9bb..667344b479 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -12,6 +12,7 @@
+>   #include <linux/errno.h>
+>   #include <linux/smp.h>
+>   #include <linux/io.h>
+> +#include <linux/of.h>
+>   #include <linux/of_fdt.h>
+>   #include <linux/vexpress.h>
+>
+> @@ -206,3 +207,14 @@ struct smp_operations __initdata vexpress_smp_ops = {
+>   	.cpu_die		= vexpress_cpu_die,
+>   #endif
+>   };
 > +
-> +#include <asm/mcpm_entry.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/hardware/gic.h>
-> +
-> +static void __init simple_smp_init_cpus(void)
+> +void __init vexpress_smp_init_ops(void)
 > +{
-> +	set_smp_cross_call(gic_raise_softirq);
-> +}
-> +
-> +static int __cpuinit mcpm_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	unsigned int mpidr, pcpu, pcluster, ret;
-> +	extern void secondary_startup(void);
-> +
-> +	mpidr = cpu_logical_map(cpu);
-> +	pcpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	pcluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +	pr_debug("%s: logical CPU %d is physical CPU %d cluster %d\n",
-> +		 __func__, cpu, pcpu, pcluster);
-> +
-> +	mcpm_set_entry_vector(pcpu, pcluster, NULL);
-> +	ret = mcpm_cpu_power_up(pcpu, pcluster);
-> +	if (ret)
-> +		return ret;
-> +	mcpm_set_entry_vector(pcpu, pcluster, secondary_startup);
-> +	gic_raise_softirq(cpumask_of(cpu), 0);
-> +	dsb_sev();
-> +	return 0;
-> +}
-> +
-> +static void __cpuinit mcpm_secondary_init(unsigned int cpu)
-> +{
-> +	mcpm_cpu_powered_up();
-> +	gic_secondary_init(0);
-This gic init should not be needed with Catalin's notifier
-series. Some thing to be removed based on when that series
-gets in.
+> +	struct smp_operations *ops = &vexpress_smp_ops;
+> +#ifdef CONFIG_CLUSTER_PM
+See if you can avoid this #ifdef in the middle of function.
 
 Reviewed-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
