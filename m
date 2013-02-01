@@ -1,170 +1,159 @@
-From: chris@cloudcar.com (Christoffer Dall)
-Date: Fri, 1 Feb 2013 11:40:35 -0500
-Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
- addresses
-In-Reply-To: <20130201163722.GH5151@arm.com>
-References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
- <20130201162631.GG5151@arm.com>
- <CANOGCgOp=kSatDu8fL7grk+bXLQ2pgKAEvEK6LoG8Ba4mqUH=w@mail.gmail.com>
- <20130201163722.GH5151@arm.com>
-Message-ID: <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri, 01 Feb 2013 16:43:31 +0000
+Subject: [RFC PATCH] arm: decompressor: initialize PIC offset base register
+ for uClinux tools
+In-Reply-To: <alpine.LFD.2.02.1301291453530.6300@xanadu.home>
+References: <1359480546-7033-1-git-send-email-jonathan.austin@arm.com>
+ <alpine.LFD.2.02.1301291453530.6300@xanadu.home>
+Message-ID: <510BF0B3.3030608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 1, 2013 at 11:37 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Fri, Feb 01, 2013 at 04:32:54PM +0000, Christoffer Dall wrote:
->> On Fri, Feb 1, 2013 at 11:26 AM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > On Tue, Jan 29, 2013 at 03:07:16PM +0000, R Sricharan wrote:
->> >> With LPAE enabled, alloc_init_section() does not map the
->> >> entire address space for unaligned addresses.
->> >>
->> >> The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
->> >> with page granularity mappings during boot. alloc_init_pte()
->> >> is called and out of 16MB, only 2MB gets mapped and rest remains
->> >> unaccessible.
->> >>
->> >> Because of this OMAP5 boot is broken with CMA + LPAE enabled.
->> >> Fix the issue by ensuring that the entire addresses are
->> >> mapped.
->> >>
->> >> Signed-off-by: R Sricharan <r.sricharan@ti.com>
->> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> >> Cc: Christoffer Dall <chris@cloudcar.com>
->> >> Cc: Russell King <linux@arm.linux.org.uk>
->> >> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> >> Tested-by: Christoffer Dall  <chris@cloudcar.com>
->> >> ---
->> >>  [V2] Moved the loop to alloc_init_pte as per Russell's
->> >>      feedback and changed the subject accordingly.
->> >>      Using PMD_XXX instead of SECTION_XXX to avoid
->> >>      different loop increments with/without LPAE.
->> >>
->> >>  [v3] Removed the dummy variable phys and updated
->> >>       the commit log for CMA case.
->> >>
->> >>  [v4] Resending with updated change log and
->> >>       updating the tags.
->> >>
->> >>  arch/arm/mm/mmu.c |   20 ++++++++++++++++----
->> >>  1 file changed, 16 insertions(+), 4 deletions(-)
->> >>
->> >> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> >> index f8388ad..b94c313 100644
->> >> --- a/arch/arm/mm/mmu.c
->> >> +++ b/arch/arm/mm/mmu.c
->> >> @@ -569,11 +569,23 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
->> >>                                 unsigned long end, unsigned long pfn,
->> >>                                 const struct mem_type *type)
->> >>  {
->> >> -     pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
->> >> +     unsigned long next;
->> >> +     pte_t *pte;
->> >> +
->> >>       do {
->> >> -             set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
->> >> -             pfn++;
->> >> -     } while (pte++, addr += PAGE_SIZE, addr != end);
->> >> +             if ((end-addr) & PMD_MASK)
->> >> +                     next = (addr + PMD_SIZE) & PMD_MASK;
->> >> +             else
->> >> +                     next = end;
->> >
->> > Can use pmd_addr_end(addr, end) here?
->> >
->> >> +             pte = early_pte_alloc(pmd, addr, type->prot_l1);
->> >> +             do {
->> >> +                     set_pte_ext(pte, pfn_pte(pfn,
->> >> +                                     __pgprot(type->prot_pte)), 0);
->> >> +                     pfn++;
->> >> +             } while (pte++, addr += PAGE_SIZE, addr != next);
->> >> +
->> >> +     } while (pmd++, addr = next, addr != end);
->> >
->> > I would actually keep the loop in alloc_init_section(). There is even a
->> > comment in there saying "no need to loop" but you actually moved the
->> > loop in alloc_init_pte().
->> >
->> > I'm proposing a simpler patch below (only lightly tested on VE/C-A9).
->> > The only difference is that we do more flush_pmd_entry() calls but I'm
->> > not really bothered, it's during boot and you won't notice.
->> >
->> >
->> > diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
->> > index 9c82f98..eaa8ba8 100644
->> > --- a/arch/arm/include/asm/pgtable.h
->> > +++ b/arch/arm/include/asm/pgtable.h
->> > @@ -205,6 +205,11 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
->> >
->> >  #define pte_present_user(pte)  (pte_present(pte) && (pte_val(pte) & L_PTE_USER))
->> >
->> > +#define section_addr_end(addr, end)                                            \
->> > +({     unsigned long __boundary = ((addr) + SECTION_SIZE) & SECTION_MASK;      \
->> > +       (__boundary - 1 < (end) - 1)? __boundary: (end);                        \
->> > +})
->> > +
->> >  #if __LINUX_ARM_ARCH__ < 6
->> >  static inline void __sync_icache_dcache(pte_t pteval)
->> >  {
->> > diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> > index 9f06102..0d0faed 100644
->> > --- a/arch/arm/mm/mmu.c
->> > +++ b/arch/arm/mm/mmu.c
->> > @@ -581,34 +581,19 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
->> >                                       const struct mem_type *type)
->> >  {
->> >         pmd_t *pmd = pmd_offset(pud, addr);
->> > +       unsigned long next;
->> >
->> > -       /*
->> > -        * Try a section mapping - end, addr and phys must all be aligned
->> > -        * to a section boundary.  Note that PMDs refer to the individual
->> > -        * L1 entries, whereas PGDs refer to a group of L1 entries making
->> > -        * up one logical pointer to an L2 table.
->> > -        */
->> > -       if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
->> > -               pmd_t *p = pmd;
->> > -
->> > -#ifndef CONFIG_ARM_LPAE
->> > -               if (addr & SECTION_SIZE)
->> > -                       pmd++;
->> > -#endif
->> > -
->> > -               do {
->> > +       do {
->> > +               next = section_addr_end(addr, end);
->> > +               /* try section mapping first */
->> > +               if (((addr | next | phys) & ~SECTION_MASK) == 0) {
->> >                         *pmd = __pmd(phys | type->prot_sect);
->> > -                       phys += SECTION_SIZE;
->> > -               } while (pmd++, addr += SECTION_SIZE, addr != end);
->> > -
->> > -               flush_pmd_entry(p);
->> > -       } else {
->> > -               /*
->> > -                * No need to loop; pte's aren't interested in the
->> > -                * individual L1 entries.
->> > -                */
->> > -               alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
->> > -       }
->> > +                       flush_pmd_entry(pmd);
->> > +               } else {
->> > +                       alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys), type);
->>
->> aren't you wasting memory here? The pte doesn't alloc a full page, but
->> the memblock allocator allocates a full page right?
->>
->> I thought this was the rationale behind Russell's previous comments on
->> Santosh's earlier patch version.
->
-> You are right, it's allocating more ptes. Than we can use pmd_addr_end.
-> I'll go back to the code.
->
-don't get me wrong, I strongly prefer keeping that loop in
-alloc_init_section, the other way it was weird to read, felt like
-shoehorning something, but you may have to keep a pointer around for
-unused part of a page for pte or something, not sure what ends up
-being nicest.
+Hi Nicolas, thanks for the comments,
 
--Christoffer
+On 29/01/13 20:13, Nicolas Pitre wrote:
+> On Tue, 29 Jan 2013, Jonathan Austin wrote:
+> 
+>> Before jumping to (position independent) C-code from the decompressor's
+>> assembler world we set-up the C environment. This setup currently does not
+>> set r9, which for arm-none-uclinux-uclibceabi should be the PIC offset base
+>> register (IE should point to the beginning of the GOT).
+>>
+>> Currently, therefore, in order to build working kernels that use the
+>> decompressor it is necessary to use an arm-linux-gnueabi toolchain, or
+>> similar. uClinux toolchains cause a Prefetch Abort to occur at the beginning
+>> of the decompress_kernel function.
+>>
+>> This patch allows uClinux toolchains to build bootable zImages by setting r9
+>> to the beginning of the GOT when __uClinux__ is defined, allowing the
+>> decompressor's C functions to work correctly.
+>>
+>> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+>> ---
+>>
+>> One other possibility would be to specify -mno-single-pic-base when building
+>> the decompressor. This works around the problem, but forces the compiler to
+>> generate less optimal code.
+> 
+> How "less optimal"?  How much bigger/slower is it?
+> If not significant enough then going with -mno-single-pic-base might be
+> fine.
+
+Code that needs to access anything global will need to derive the location
+of the GOT for itself, but there's a possible upside there that there's an
+extra free register (r9 can be used as a general purpose register...)
+
+The patch would look like:
+-----8<-------
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 5cad8a6..afed28e 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -120,7 +120,7 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
+ -ccflags-y := -fpic -fno-builtin -I$(obj)
++ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
+ asflags-y := -Wa,-march=all -DZIMAGE
+  # Supply kernel BSS size to the decompressor via a linker symbol.
+------>8---------
+
+
+I did a fairly crude benchmark - count how many instructions we need in
+order to finish decompressing the kernel...
+
+Setup r9 correctly:       129,976,282
+Use -mno-single-pic-base: 124,826,778
+
+(this was done using an R-class model and a magic semi-hosting call to pause
+the model at the end of the decompress_kernel function)
+
+So, it seems like the extra register means there's actually a 4% *win* 
+in instruction terms from using -mno-single-pic-base
+
+That said, I've still made some comments/amendments below...
+
+> 
+>>   arch/arm/boot/compressed/head.S |    4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>> index fe4d9c3..4491e75 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -410,6 +410,10 @@ wont_overwrite:
+>>    *   sp  = stack pointer
+>>    */
+>>   		orrs	r1, r0, r5
+>> +#ifdef __uClinux__
+>> +		mov	r9, r11			@ PIC offset base register
+>> +		addne	r9, r9, r0		@ Also needs relocating
+>> +#endif
+>>   		beq	not_relocated
+> 
+> Please don't insert your code between the orrs and the beq as those two
+> go logically together.
+
+I'd initially done this in order to change only one site - as we need to
+set r9 and then add the offset I was using the condition code to test r0...
+
+However, this was silly - I think I can just do it in one instruction:
+
+add   r9, r11, r0
+
+In the case that we're not relocated, r0 should be 0 anyway...
+
+> 
+> In fact, the best location for this would probably be between the
+> wont_overwrite label and the comment that immediately follows it. And
+> then, those comments that follow until the branch into C code should be
+> updated accordingly.
+
+
+Okay, assuming I've understood you correctly, you're suggesting something
+like this:
+
+-----8<-------
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index fe4d9c3..d81efbd 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -396,6 +396,9 @@ dtb_check_done:
+                mov     pc, r0
+  wont_overwrite:
++#ifdef __uClinux__
++               add     r9, r11, r0             @ uClinux PIC offset base register
++#endif
+ /*
+  * If delta is zero, we are running@the address we were linked at.
+  *   r0  = delta
+@@ -405,6 +408,7 @@ wont_overwrite:
+  *   r5  = appended dtb size (0 if not present)
+  *   r7  = architecture ID
+  *   r8  = atags pointer
++ *   r9  = GOT start (for uClinux ABI), relocated
+  *   r11 = GOT start
+  *   r12 = GOT end
+  *   sp  = stack pointer
+@@ -470,6 +474,7 @@ not_relocated:      mov     r0, #0
+  *   r4  = kernel execution address
+  *   r7  = architecture ID
+  *   r8  = atags pointer
++ *   r9  = GOT start (for uClinux ABI)
+  */
+                mov     r0, r4
+                mov     r1, sp                  @ malloc space above stack
+------->8-----------
+
+
+The question that now occurs is whether we should just set r9 whether or not
+we're using a uClinux toolchain - I don't think it is going to hurt as the
+arm-linux-gnueabi world can happily clobber it with no bad consequences...
+
+But after all this, it seems that just using -mno-single-pic base as in the patch
+above is best...
+
+Thoughts?
+
+Jonny
