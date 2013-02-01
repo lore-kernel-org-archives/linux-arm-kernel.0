@@ -1,75 +1,52 @@
-From: kyungsik.lee@lge.com (kyungsik.lee)
-Date: Fri, 01 Feb 2013 16:13:40 +0900
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <20130129225508.GC30535@twin.jikos.cz>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
- <20130129225508.GC30535@twin.jikos.cz>
-Message-ID: <510B6B24.8040000@lge.com>
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Fri, 1 Feb 2013 07:33:17 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130201011712.GF23505@n2100.arm.linux.org.uk>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129083522.GA14302@pd.tnic>
+ <1359478014.3529.157.camel@shinybook.infradead.org>
+ <20130129174249.GB25415@pd.tnic>
+ <1359482147.3529.161.camel@shinybook.infradead.org>
+ <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <20130201011712.GF23505@n2100.arm.linux.org.uk>
+Message-ID: <1359703995.23531.6.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-01-30 ?? 7:55, David Sterba wrote:
-> On Sat, Jan 26, 2013 at 02:50:43PM +0900, Kyungsik Lee wrote:
->> This patchset is for supporting LZ4 compressed kernel and initial ramdisk on
->> the x86 and ARM architectures.
-> Have you considered the 'high compression' mode of lz4?
-> http://code.google.com/p/lz4/source/browse/trunk/lz4hc.c
->
-> The compression format remains the same, the compressor tries harder
-> (but is slower), resulting compression ratio is better.
->
-> an examle compression for vmlinux.bin of x86_64 build:
->
-> input size: 16509520 bytes
->
-> lz4 (svn 88):
-> output size:        6393684    (38.7%)
-> compression time:      41.7 ms (395 MB/s)
-> decompression time:    13.7 ms (1204 MB/s)
->
-> lz4hc (svn 88):
-> output size:        5319137    (32.2%)
-> compression time:       683 ms (24 MB/s)
-> decompression time:    13.1 ms (1259 MB/s)
->
-> compressed file delta: 6393684 - 5319137 = 1074547 ~ 1MB
->
-> tested on a Nehalem box; same test on my slow desktop gives
->
-> lz4:
-> compression time:      97   ms (169 MB/s)
-> decompression time:    25.7 ms (643 MB/s)
->
-> lz4hc:
-> compression time:    1386 ms (11 MB/s)
-> decompression time:    26 ms (619 MB/s)
->
-> While the decompression time is almost the same, image size is smaller.
-> The kernel image compression is run in userspace and the low speed is
-> not much of concern for a one-time operation.
->
-> For the reference, lzo (current kernel version) run on the destktop:
->
-> output size:         6026256 (36.5%)
-> decompression time:     79.6 ms (207 MB/s)
->
->> It seems that it?s worth trying LZ4 compressed kernel image or ramdisk
->> for making the kernel boot more faster.
-> There's another potential user of lz4: btrfs. I've submitted a feature
-> preview integrating lz4 compression
-> http://thread.gmane.org/gmane.comp.file-systems.btrfs/15744
-> and we have tried to integrate the HC mode as well
-> http://thread.gmane.org/gmane.comp.file-systems.btrfs/18165
-> .
-> So far it's on a slow track, conceptually it works, but I the code needs
-> some work so it could live under lib/* (we've used the svn sources
-> with minor changes, no kernel coding style). It would be easier for me
-> to enhance the existing lib/lz4/* codebase.
->
-> Also zram could consider lz4, I'm not sure if there are other potential
-> users.
-Yes, I guess squash fs and crypto would also benefit from lz4.
+On Fri, 2013-02-01 at 01:17 +0000, Russell King - ARM Linux wrote:
+> 
+> > I've tried both gcc 4.6.3 [1] and 4.6.4 [2].  If you can point me to
+> > a 4.5.x, I'll try that, too, but as it stands now, if one moves the
+> > code added to swab.h below outside of its armv6 protection,
+> > gcc adds calls to __bswapsi2.
+> 
+> Take a look at the message I sent on the 29th towards the beginning of
+> this thread for details of gcc 4.5.4 behaviour.
+
+I'd like to see a comment (with PR# if appropriate) explaining clearly
+*why* it isn't enabled for <ARMv6 even with a bleeding-edge compiler.
+
+Russell's test also seemed to indicate that the 32-bit and 64-bit swap
+support was present and functional in GCC 4.5.4 (as indeed it should
+have been since 4.4), so I'm still not quite sure why you require 4.6
+for that.
+
+-- 
+                   Sent with MeeGo's ActiveSync support.
+
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse@intel.com                              Intel Corporation
 
 
-Thanks,
-Kyungsik
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4370 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130201/d2606b09/attachment-0001.bin>
