@@ -1,30 +1,47 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Thu, 31 Jan 2013 22:37:16 -0800
-Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
-In-Reply-To: <alpine.LFD.2.02.1301312117240.6300@xanadu.home>
-References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
- <20130128142510.68092e10.akpm@linux-foundation.org>
- <20130129101549.GP23505@n2100.arm.linux.org.uk> <51089523.3080804@zytor.com>
- <alpine.LFD.2.02.1301301326530.6300@xanadu.home> <510AE6BF.4080303@zytor.com>
- <alpine.LFD.2.02.1301311700470.6300@xanadu.home> <510AEDC2.80107@zytor.com>
- <alpine.LFD.2.02.1301312117240.6300@xanadu.home>
-Message-ID: <510B629C.1010605@zytor.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 31 Jan 2013 23:46:58 -0700
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <20130201061450.GS29973@lunn.ch>
+References: <51082C4E.5050903@gmail.com> <20130130000341.GA10600@schnuecks.de>
+ <51086E86.8040705@gmail.com> <20130130083044.GA25688@schnuecks.de>
+ <5108F300.7000705@gmail.com>
+ <20130130230100.GV7717@titan.lakedaemon.net>
+ <20130131224457.GB17976@schnuecks.de>
+ <20130201000109.GK7717@titan.lakedaemon.net>
+ <20130201001932.GA13044@obsidianresearch.com>
+ <20130201061450.GS29973@lunn.ch>
+Message-ID: <20130201064658.GA17576@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2013 06:28 PM, Nicolas Pitre wrote:
->>
->> Well, it is too nasty for public confession, but it's called
->> "paravirtualization".
+On Fri, Feb 01, 2013 at 07:14:50AM +0100, Andrew Lunn wrote:
+> > My guesses would be the RTC and/or GPIO blocks (the GPIO blinker needs
+> > a clock), based on table 94.
 > 
-> The fact that you are aware of it means we're not going to break them.  
+> I've used AT91 parts where you can do GPO with the clock disabled, but
+> GPI needed a ticking clock. So, yes, GPIO is a good candidate for
+> ruint clock as well.
 > 
-> But my point is that we must not be held back just in case someone out 
-> there might have painted himself in a corner without telling anyone.
+> Looking through the data sheets, and comparing against the gated
+> clocks, we have the following without their own clock:
 > 
+> RTC, I2C (a.k.a. TWI), UART, NAND, SPI, Watchdog, eFuse,
 
-Yes.  However, it makes it more questionable to simply rip out
-compression methods without warning.  Not that warnings help, as we have
-learned.
+Hmm..
 
-	-hpa
+If watchdog is on the runit clock then the bridge registers and thus
+the timer are on the runit clock, so the whole point would be moot.
+
+Any easy test would be to boot a system with a minimal DT, basically
+serial only, and have the kernel disable the runit clock, read a
+register from one of those blocks, enable the clock and print OK. The
+ones that lock up need the runit clock for sure. 7 boots should answer
+the question :)
+
+My guess is that all the peripherals behind mbus unit 0x1 (see table
+94, and table 96) are controlled by that clock gate. The other gates
+seem to be organized by mbus unit, and there is something very tidy
+about that from a hardware perspective :)
+
+Jason
