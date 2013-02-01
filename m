@@ -1,98 +1,913 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  1 Feb 2013 08:52:12 +0100
-Subject: [PATCH 9/9] USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get
- phy
+Date: Fri,  1 Feb 2013 08:52:04 +0100
+Subject: [PATCH 1/9] USB: move bulk of otg/otg.c to phy/phy.c
 In-Reply-To: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
 References: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359705132-9434-10-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359705132-9434-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/usb/chipidea/ci13xxx_imx.c |   31 ++++++++++---------------------
- 1 file changed, 10 insertions(+), 21 deletions(-)
+Most of otg/otg.c is not otg specific, but phy specific, so move it
+to the phy directory.
 
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index b598bb8f..1df4b41 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -30,7 +30,6 @@
- 	((struct usb_phy *)platform_get_drvdata(pdev))
- 
- struct ci13xxx_imx_data {
--	struct device_node *phy_np;
- 	struct usb_phy *phy;
- 	struct platform_device *ci_pdev;
- 	struct clk *clk;
-@@ -90,12 +89,12 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- {
- 	struct ci13xxx_imx_data *data;
- 	struct ci13xxx_platform_data *pdata;
--	struct platform_device *plat_ci, *phy_pdev;
--	struct device_node *phy_np;
-+	struct platform_device *plat_ci;
- 	struct resource *res;
- 	struct regulator *reg_vbus;
- 	struct pinctrl *pinctrl;
- 	int ret;
-+	struct usb_phy *phy;
- 
- 	if (of_find_property(pdev->dev.of_node, "fsl,usbmisc", NULL)
- 		&& !usbmisc_ops)
-@@ -147,18 +146,12 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
--	if (phy_np) {
--		data->phy_np = phy_np;
--		phy_pdev = of_find_device_by_node(phy_np);
--		if (phy_pdev) {
--			struct usb_phy *phy;
--			phy = pdev_to_phy(phy_pdev);
--			if (phy &&
--			    try_module_get(phy_pdev->dev.driver->owner)) {
--				usb_phy_init(phy);
--				data->phy = phy;
--			}
-+	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
-+	if (!IS_ERR(phy)) {
-+		ret = usb_phy_init(phy);
-+		if (ret) {
-+			dev_err(&pdev->dev, "unable to init phy: %d\n", ret);
-+			goto err_clk;
- 		}
- 	}
- 
-@@ -170,7 +163,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 			dev_err(&pdev->dev,
- 				"Failed to enable vbus regulator, err=%d\n",
- 				ret);
--			goto put_np;
-+			goto err_clk;
- 		}
- 		data->reg_vbus = reg_vbus;
- 	} else {
-@@ -222,9 +215,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- err:
- 	if (reg_vbus)
- 		regulator_disable(reg_vbus);
--put_np:
--	if (phy_np)
--		of_node_put(phy_np);
-+err_clk:
- 	clk_disable_unprepare(data->clk);
- 	return ret;
- }
-@@ -244,8 +235,6 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
- 		module_put(data->phy->dev->driver->owner);
- 	}
- 
--	of_node_put(data->phy_np);
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reported-by: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+---
+ drivers/usb/otg/otg.c    |  423 --------------------------------------------
+ drivers/usb/phy/Makefile |    1 +
+ drivers/usb/phy/phy.c    |  434 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 435 insertions(+), 423 deletions(-)
+ create mode 100644 drivers/usb/phy/phy.c
+
+diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
+index e181439..358cfd9 100644
+--- a/drivers/usb/otg/otg.c
++++ b/drivers/usb/otg/otg.c
+@@ -8,432 +8,9 @@
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  */
 -
- 	clk_disable_unprepare(data->clk);
+-#include <linux/kernel.h>
+ #include <linux/export.h>
+-#include <linux/err.h>
+-#include <linux/device.h>
+-#include <linux/module.h>
+-#include <linux/slab.h>
+-#include <linux/of.h>
+-
+ #include <linux/usb/otg.h>
  
- 	platform_set_drvdata(pdev, NULL);
+-static LIST_HEAD(phy_list);
+-static LIST_HEAD(phy_bind_list);
+-static DEFINE_SPINLOCK(phy_lock);
+-
+-static struct usb_phy *__usb_find_phy(struct list_head *list,
+-	enum usb_phy_type type)
+-{
+-	struct usb_phy  *phy = NULL;
+-
+-	list_for_each_entry(phy, list, head) {
+-		if (phy->type != type)
+-			continue;
+-
+-		return phy;
+-	}
+-
+-	return ERR_PTR(-ENODEV);
+-}
+-
+-static struct usb_phy *__usb_find_phy_dev(struct device *dev,
+-	struct list_head *list, u8 index)
+-{
+-	struct usb_phy_bind *phy_bind = NULL;
+-
+-	list_for_each_entry(phy_bind, list, list) {
+-		if (!(strcmp(phy_bind->dev_name, dev_name(dev))) &&
+-				phy_bind->index == index) {
+-			if (phy_bind->phy)
+-				return phy_bind->phy;
+-			else
+-				return ERR_PTR(-EPROBE_DEFER);
+-		}
+-	}
+-
+-	return ERR_PTR(-ENODEV);
+-}
+-
+-static struct usb_phy *__of_usb_find_phy(struct device_node *node)
+-{
+-	struct usb_phy  *phy;
+-
+-	list_for_each_entry(phy, &phy_list, head) {
+-		if (node != phy->dev->of_node)
+-			continue;
+-
+-		return phy;
+-	}
+-
+-	return ERR_PTR(-ENODEV);
+-}
+-
+-static void devm_usb_phy_release(struct device *dev, void *res)
+-{
+-	struct usb_phy *phy = *(struct usb_phy **)res;
+-
+-	usb_put_phy(phy);
+-}
+-
+-static int devm_usb_phy_match(struct device *dev, void *res, void *match_data)
+-{
+-	return res == match_data;
+-}
+-
+-/**
+- * devm_usb_get_phy - find the USB PHY
+- * @dev - device that requests this phy
+- * @type - the type of the phy the controller requires
+- *
+- * Gets the phy using usb_get_phy(), and associates a device with it using
+- * devres. On driver detach, release function is invoked on the devres data,
+- * then, devres data is freed.
+- *
+- * For use by USB host and peripheral drivers.
+- */
+-struct usb_phy *devm_usb_get_phy(struct device *dev, enum usb_phy_type type)
+-{
+-	struct usb_phy **ptr, *phy;
+-
+-	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
+-	if (!ptr)
+-		return NULL;
+-
+-	phy = usb_get_phy(type);
+-	if (!IS_ERR(phy)) {
+-		*ptr = phy;
+-		devres_add(dev, ptr);
+-	} else
+-		devres_free(ptr);
+-
+-	return phy;
+-}
+-EXPORT_SYMBOL(devm_usb_get_phy);
+-
+-/**
+- * usb_get_phy - find the USB PHY
+- * @type - the type of the phy the controller requires
+- *
+- * Returns the phy driver, after getting a refcount to it; or
+- * -ENODEV if there is no such phy.  The caller is responsible for
+- * calling usb_put_phy() to release that count.
+- *
+- * For use by USB host and peripheral drivers.
+- */
+-struct usb_phy *usb_get_phy(enum usb_phy_type type)
+-{
+-	struct usb_phy	*phy = NULL;
+-	unsigned long	flags;
+-
+-	spin_lock_irqsave(&phy_lock, flags);
+-
+-	phy = __usb_find_phy(&phy_list, type);
+-	if (IS_ERR(phy)) {
+-		pr_err("unable to find transceiver of type %s\n",
+-			usb_phy_type_string(type));
+-		goto err0;
+-	}
+-
+-	get_device(phy->dev);
+-
+-err0:
+-	spin_unlock_irqrestore(&phy_lock, flags);
+-
+-	return phy;
+-}
+-EXPORT_SYMBOL(usb_get_phy);
+-
+- /**
+- * devm_usb_get_phy_by_phandle - find the USB PHY by phandle
+- * @dev - device that requests this phy
+- * @phandle - name of the property holding the phy phandle value
+- * @index - the index of the phy
+- *
+- * Returns the phy driver associated with the given phandle value,
+- * after getting a refcount to it, -ENODEV if there is no such phy or
+- * -EPROBE_DEFER if there is a phandle to the phy, but the device is
+- * not yet loaded. While at that, it also associates the device with
+- * the phy using devres. On driver detach, release function is invoked
+- * on the devres data, then, devres data is freed.
+- *
+- * For use by USB host and peripheral drivers.
+- */
+-struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
+-	const char *phandle, u8 index)
+-{
+-	struct usb_phy	*phy = ERR_PTR(-ENOMEM), **ptr;
+-	unsigned long	flags;
+-	struct device_node *node;
+-
+-	if (!dev->of_node) {
+-		dev_dbg(dev, "device does not have a device node entry\n");
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+-	node = of_parse_phandle(dev->of_node, phandle, index);
+-	if (!node) {
+-		dev_dbg(dev, "failed to get %s phandle in %s node\n", phandle,
+-			dev->of_node->full_name);
+-		return ERR_PTR(-ENODEV);
+-	}
+-
+-	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
+-	if (!ptr) {
+-		dev_dbg(dev, "failed to allocate memory for devres\n");
+-		goto err0;
+-	}
+-
+-	spin_lock_irqsave(&phy_lock, flags);
+-
+-	phy = __of_usb_find_phy(node);
+-	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+-		phy = ERR_PTR(-EPROBE_DEFER);
+-		devres_free(ptr);
+-		goto err1;
+-	}
+-
+-	*ptr = phy;
+-	devres_add(dev, ptr);
+-
+-	get_device(phy->dev);
+-
+-err1:
+-	spin_unlock_irqrestore(&phy_lock, flags);
+-
+-err0:
+-	of_node_put(node);
+-
+-	return phy;
+-}
+-EXPORT_SYMBOL(devm_usb_get_phy_by_phandle);
+-
+-/**
+- * usb_get_phy_dev - find the USB PHY
+- * @dev - device that requests this phy
+- * @index - the index of the phy
+- *
+- * Returns the phy driver, after getting a refcount to it; or
+- * -ENODEV if there is no such phy.  The caller is responsible for
+- * calling usb_put_phy() to release that count.
+- *
+- * For use by USB host and peripheral drivers.
+- */
+-struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
+-{
+-	struct usb_phy	*phy = NULL;
+-	unsigned long	flags;
+-
+-	spin_lock_irqsave(&phy_lock, flags);
+-
+-	phy = __usb_find_phy_dev(dev, &phy_bind_list, index);
+-	if (IS_ERR(phy)) {
+-		pr_err("unable to find transceiver\n");
+-		goto err0;
+-	}
+-
+-	get_device(phy->dev);
+-
+-err0:
+-	spin_unlock_irqrestore(&phy_lock, flags);
+-
+-	return phy;
+-}
+-EXPORT_SYMBOL(usb_get_phy_dev);
+-
+-/**
+- * devm_usb_get_phy_dev - find the USB PHY using device ptr and index
+- * @dev - device that requests this phy
+- * @index - the index of the phy
+- *
+- * Gets the phy using usb_get_phy_dev(), and associates a device with it using
+- * devres. On driver detach, release function is invoked on the devres data,
+- * then, devres data is freed.
+- *
+- * For use by USB host and peripheral drivers.
+- */
+-struct usb_phy *devm_usb_get_phy_dev(struct device *dev, u8 index)
+-{
+-	struct usb_phy **ptr, *phy;
+-
+-	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
+-	if (!ptr)
+-		return NULL;
+-
+-	phy = usb_get_phy_dev(dev, index);
+-	if (!IS_ERR(phy)) {
+-		*ptr = phy;
+-		devres_add(dev, ptr);
+-	} else
+-		devres_free(ptr);
+-
+-	return phy;
+-}
+-EXPORT_SYMBOL(devm_usb_get_phy_dev);
+-
+-/**
+- * devm_usb_put_phy - release the USB PHY
+- * @dev - device that wants to release this phy
+- * @phy - the phy returned by devm_usb_get_phy()
+- *
+- * destroys the devres associated with this phy and invokes usb_put_phy
+- * to release the phy.
+- *
+- * For use by USB host and peripheral drivers.
+- */
+-void devm_usb_put_phy(struct device *dev, struct usb_phy *phy)
+-{
+-	int r;
+-
+-	r = devres_destroy(dev, devm_usb_phy_release, devm_usb_phy_match, phy);
+-	dev_WARN_ONCE(dev, r, "couldn't find PHY resource\n");
+-}
+-EXPORT_SYMBOL(devm_usb_put_phy);
+-
+-/**
+- * usb_put_phy - release the USB PHY
+- * @x: the phy returned by usb_get_phy()
+- *
+- * Releases a refcount the caller received from usb_get_phy().
+- *
+- * For use by USB host and peripheral drivers.
+- */
+-void usb_put_phy(struct usb_phy *x)
+-{
+-	if (x)
+-		put_device(x->dev);
+-}
+-EXPORT_SYMBOL(usb_put_phy);
+-
+-/**
+- * usb_add_phy - declare the USB PHY
+- * @x: the USB phy to be used; or NULL
+- * @type - the type of this PHY
+- *
+- * This call is exclusively for use by phy drivers, which
+- * coordinate the activities of drivers for host and peripheral
+- * controllers, and in some cases for VBUS current regulation.
+- */
+-int usb_add_phy(struct usb_phy *x, enum usb_phy_type type)
+-{
+-	int		ret = 0;
+-	unsigned long	flags;
+-	struct usb_phy	*phy;
+-
+-	if (x->type != USB_PHY_TYPE_UNDEFINED) {
+-		dev_err(x->dev, "not accepting initialized PHY %s\n", x->label);
+-		return -EINVAL;
+-	}
+-
+-	spin_lock_irqsave(&phy_lock, flags);
+-
+-	list_for_each_entry(phy, &phy_list, head) {
+-		if (phy->type == type) {
+-			ret = -EBUSY;
+-			dev_err(x->dev, "transceiver type %s already exists\n",
+-						usb_phy_type_string(type));
+-			goto out;
+-		}
+-	}
+-
+-	x->type = type;
+-	list_add_tail(&x->head, &phy_list);
+-
+-out:
+-	spin_unlock_irqrestore(&phy_lock, flags);
+-	return ret;
+-}
+-EXPORT_SYMBOL(usb_add_phy);
+-
+-/**
+- * usb_add_phy_dev - declare the USB PHY
+- * @x: the USB phy to be used; or NULL
+- *
+- * This call is exclusively for use by phy drivers, which
+- * coordinate the activities of drivers for host and peripheral
+- * controllers, and in some cases for VBUS current regulation.
+- */
+-int usb_add_phy_dev(struct usb_phy *x)
+-{
+-	struct usb_phy_bind *phy_bind;
+-	unsigned long flags;
+-
+-	if (!x->dev) {
+-		dev_err(x->dev, "no device provided for PHY\n");
+-		return -EINVAL;
+-	}
+-
+-	spin_lock_irqsave(&phy_lock, flags);
+-	list_for_each_entry(phy_bind, &phy_bind_list, list)
+-		if (!(strcmp(phy_bind->phy_dev_name, dev_name(x->dev))))
+-			phy_bind->phy = x;
+-
+-	list_add_tail(&x->head, &phy_list);
+-
+-	spin_unlock_irqrestore(&phy_lock, flags);
+-	return 0;
+-}
+-EXPORT_SYMBOL(usb_add_phy_dev);
+-
+-/**
+- * usb_remove_phy - remove the OTG PHY
+- * @x: the USB OTG PHY to be removed;
+- *
+- * This reverts the effects of usb_add_phy
+- */
+-void usb_remove_phy(struct usb_phy *x)
+-{
+-	unsigned long	flags;
+-	struct usb_phy_bind *phy_bind;
+-
+-	spin_lock_irqsave(&phy_lock, flags);
+-	if (x) {
+-		list_for_each_entry(phy_bind, &phy_bind_list, list)
+-			if (phy_bind->phy == x)
+-				phy_bind->phy = NULL;
+-		list_del(&x->head);
+-	}
+-	spin_unlock_irqrestore(&phy_lock, flags);
+-}
+-EXPORT_SYMBOL(usb_remove_phy);
+-
+-/**
+- * usb_bind_phy - bind the phy and the controller that uses the phy
+- * @dev_name: the device name of the device that will bind to the phy
+- * @index: index to specify the port number
+- * @phy_dev_name: the device name of the phy
+- *
+- * Fills the phy_bind structure with the dev_name and phy_dev_name. This will
+- * be used when the phy driver registers the phy and when the controller
+- * requests this phy.
+- *
+- * To be used by platform specific initialization code.
+- */
+-int __init usb_bind_phy(const char *dev_name, u8 index,
+-				const char *phy_dev_name)
+-{
+-	struct usb_phy_bind *phy_bind;
+-	unsigned long flags;
+-
+-	phy_bind = kzalloc(sizeof(*phy_bind), GFP_KERNEL);
+-	if (!phy_bind) {
+-		pr_err("phy_bind(): No memory for phy_bind");
+-		return -ENOMEM;
+-	}
+-
+-	phy_bind->dev_name = dev_name;
+-	phy_bind->phy_dev_name = phy_dev_name;
+-	phy_bind->index = index;
+-
+-	spin_lock_irqsave(&phy_lock, flags);
+-	list_add_tail(&phy_bind->list, &phy_bind_list);
+-	spin_unlock_irqrestore(&phy_lock, flags);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(usb_bind_phy);
+-
+ const char *otg_state_string(enum usb_otg_state state)
+ {
+ 	switch (state) {
+diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+index b13faa1..9fa6327 100644
+--- a/drivers/usb/phy/Makefile
++++ b/drivers/usb/phy/Makefile
+@@ -4,6 +4,7 @@
+ 
+ ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
+ 
++obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
+ obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
+ obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
+ obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
+diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
+new file mode 100644
+index 0000000..2c9e4e7
+--- /dev/null
++++ b/drivers/usb/phy/phy.c
+@@ -0,0 +1,434 @@
++/*
++ * phy.c -- USB phy handling
++ *
++ * Copyright (C) 2004-2013 Texas Instruments
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/kernel.h>
++#include <linux/export.h>
++#include <linux/err.h>
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/of.h>
++
++#include <linux/usb/phy.h>
++
++static LIST_HEAD(phy_list);
++static LIST_HEAD(phy_bind_list);
++static DEFINE_SPINLOCK(phy_lock);
++
++static struct usb_phy *__usb_find_phy(struct list_head *list,
++	enum usb_phy_type type)
++{
++	struct usb_phy  *phy = NULL;
++
++	list_for_each_entry(phy, list, head) {
++		if (phy->type != type)
++			continue;
++
++		return phy;
++	}
++
++	return ERR_PTR(-ENODEV);
++}
++
++static struct usb_phy *__usb_find_phy_dev(struct device *dev,
++	struct list_head *list, u8 index)
++{
++	struct usb_phy_bind *phy_bind = NULL;
++
++	list_for_each_entry(phy_bind, list, list) {
++		if (!(strcmp(phy_bind->dev_name, dev_name(dev))) &&
++				phy_bind->index == index) {
++			if (phy_bind->phy)
++				return phy_bind->phy;
++			else
++				return ERR_PTR(-EPROBE_DEFER);
++		}
++	}
++
++	return ERR_PTR(-ENODEV);
++}
++
++static struct usb_phy *__of_usb_find_phy(struct device_node *node)
++{
++	struct usb_phy  *phy;
++
++	list_for_each_entry(phy, &phy_list, head) {
++		if (node != phy->dev->of_node)
++			continue;
++
++		return phy;
++	}
++
++	return ERR_PTR(-ENODEV);
++}
++
++static void devm_usb_phy_release(struct device *dev, void *res)
++{
++	struct usb_phy *phy = *(struct usb_phy **)res;
++
++	usb_put_phy(phy);
++}
++
++static int devm_usb_phy_match(struct device *dev, void *res, void *match_data)
++{
++	return res == match_data;
++}
++
++/**
++ * devm_usb_get_phy - find the USB PHY
++ * @dev - device that requests this phy
++ * @type - the type of the phy the controller requires
++ *
++ * Gets the phy using usb_get_phy(), and associates a device with it using
++ * devres. On driver detach, release function is invoked on the devres data,
++ * then, devres data is freed.
++ *
++ * For use by USB host and peripheral drivers.
++ */
++struct usb_phy *devm_usb_get_phy(struct device *dev, enum usb_phy_type type)
++{
++	struct usb_phy **ptr, *phy;
++
++	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return NULL;
++
++	phy = usb_get_phy(type);
++	if (!IS_ERR(phy)) {
++		*ptr = phy;
++		devres_add(dev, ptr);
++	} else
++		devres_free(ptr);
++
++	return phy;
++}
++EXPORT_SYMBOL(devm_usb_get_phy);
++
++/**
++ * usb_get_phy - find the USB PHY
++ * @type - the type of the phy the controller requires
++ *
++ * Returns the phy driver, after getting a refcount to it; or
++ * -ENODEV if there is no such phy.  The caller is responsible for
++ * calling usb_put_phy() to release that count.
++ *
++ * For use by USB host and peripheral drivers.
++ */
++struct usb_phy *usb_get_phy(enum usb_phy_type type)
++{
++	struct usb_phy	*phy = NULL;
++	unsigned long	flags;
++
++	spin_lock_irqsave(&phy_lock, flags);
++
++	phy = __usb_find_phy(&phy_list, type);
++	if (IS_ERR(phy)) {
++		pr_err("unable to find transceiver of type %s\n",
++			usb_phy_type_string(type));
++		goto err0;
++	}
++
++	get_device(phy->dev);
++
++err0:
++	spin_unlock_irqrestore(&phy_lock, flags);
++
++	return phy;
++}
++EXPORT_SYMBOL(usb_get_phy);
++
++ /**
++ * devm_usb_get_phy_by_phandle - find the USB PHY by phandle
++ * @dev - device that requests this phy
++ * @phandle - name of the property holding the phy phandle value
++ * @index - the index of the phy
++ *
++ * Returns the phy driver associated with the given phandle value,
++ * after getting a refcount to it, -ENODEV if there is no such phy or
++ * -EPROBE_DEFER if there is a phandle to the phy, but the device is
++ * not yet loaded. While at that, it also associates the device with
++ * the phy using devres. On driver detach, release function is invoked
++ * on the devres data, then, devres data is freed.
++ *
++ * For use by USB host and peripheral drivers.
++ */
++struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
++	const char *phandle, u8 index)
++{
++	struct usb_phy	*phy = ERR_PTR(-ENOMEM), **ptr;
++	unsigned long	flags;
++	struct device_node *node;
++
++	if (!dev->of_node) {
++		dev_dbg(dev, "device does not have a device node entry\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	node = of_parse_phandle(dev->of_node, phandle, index);
++	if (!node) {
++		dev_dbg(dev, "failed to get %s phandle in %s node\n", phandle,
++			dev->of_node->full_name);
++		return ERR_PTR(-ENODEV);
++	}
++
++	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr) {
++		dev_dbg(dev, "failed to allocate memory for devres\n");
++		goto err0;
++	}
++
++	spin_lock_irqsave(&phy_lock, flags);
++
++	phy = __of_usb_find_phy(node);
++	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
++		phy = ERR_PTR(-EPROBE_DEFER);
++		devres_free(ptr);
++		goto err1;
++	}
++
++	*ptr = phy;
++	devres_add(dev, ptr);
++
++	get_device(phy->dev);
++
++err1:
++	spin_unlock_irqrestore(&phy_lock, flags);
++
++err0:
++	of_node_put(node);
++
++	return phy;
++}
++EXPORT_SYMBOL(devm_usb_get_phy_by_phandle);
++
++/**
++ * usb_get_phy_dev - find the USB PHY
++ * @dev - device that requests this phy
++ * @index - the index of the phy
++ *
++ * Returns the phy driver, after getting a refcount to it; or
++ * -ENODEV if there is no such phy.  The caller is responsible for
++ * calling usb_put_phy() to release that count.
++ *
++ * For use by USB host and peripheral drivers.
++ */
++struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
++{
++	struct usb_phy	*phy = NULL;
++	unsigned long	flags;
++
++	spin_lock_irqsave(&phy_lock, flags);
++
++	phy = __usb_find_phy_dev(dev, &phy_bind_list, index);
++	if (IS_ERR(phy)) {
++		pr_err("unable to find transceiver\n");
++		goto err0;
++	}
++
++	get_device(phy->dev);
++
++err0:
++	spin_unlock_irqrestore(&phy_lock, flags);
++
++	return phy;
++}
++EXPORT_SYMBOL(usb_get_phy_dev);
++
++/**
++ * devm_usb_get_phy_dev - find the USB PHY using device ptr and index
++ * @dev - device that requests this phy
++ * @index - the index of the phy
++ *
++ * Gets the phy using usb_get_phy_dev(), and associates a device with it using
++ * devres. On driver detach, release function is invoked on the devres data,
++ * then, devres data is freed.
++ *
++ * For use by USB host and peripheral drivers.
++ */
++struct usb_phy *devm_usb_get_phy_dev(struct device *dev, u8 index)
++{
++	struct usb_phy **ptr, *phy;
++
++	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return NULL;
++
++	phy = usb_get_phy_dev(dev, index);
++	if (!IS_ERR(phy)) {
++		*ptr = phy;
++		devres_add(dev, ptr);
++	} else
++		devres_free(ptr);
++
++	return phy;
++}
++EXPORT_SYMBOL(devm_usb_get_phy_dev);
++
++/**
++ * devm_usb_put_phy - release the USB PHY
++ * @dev - device that wants to release this phy
++ * @phy - the phy returned by devm_usb_get_phy()
++ *
++ * destroys the devres associated with this phy and invokes usb_put_phy
++ * to release the phy.
++ *
++ * For use by USB host and peripheral drivers.
++ */
++void devm_usb_put_phy(struct device *dev, struct usb_phy *phy)
++{
++	int r;
++
++	r = devres_destroy(dev, devm_usb_phy_release, devm_usb_phy_match, phy);
++	dev_WARN_ONCE(dev, r, "couldn't find PHY resource\n");
++}
++EXPORT_SYMBOL(devm_usb_put_phy);
++
++/**
++ * usb_put_phy - release the USB PHY
++ * @x: the phy returned by usb_get_phy()
++ *
++ * Releases a refcount the caller received from usb_get_phy().
++ *
++ * For use by USB host and peripheral drivers.
++ */
++void usb_put_phy(struct usb_phy *x)
++{
++	if (x)
++		put_device(x->dev);
++}
++EXPORT_SYMBOL(usb_put_phy);
++
++/**
++ * usb_add_phy - declare the USB PHY
++ * @x: the USB phy to be used; or NULL
++ * @type - the type of this PHY
++ *
++ * This call is exclusively for use by phy drivers, which
++ * coordinate the activities of drivers for host and peripheral
++ * controllers, and in some cases for VBUS current regulation.
++ */
++int usb_add_phy(struct usb_phy *x, enum usb_phy_type type)
++{
++	int		ret = 0;
++	unsigned long	flags;
++	struct usb_phy	*phy;
++
++	if (x->type != USB_PHY_TYPE_UNDEFINED) {
++		dev_err(x->dev, "not accepting initialized PHY %s\n", x->label);
++		return -EINVAL;
++	}
++
++	spin_lock_irqsave(&phy_lock, flags);
++
++	list_for_each_entry(phy, &phy_list, head) {
++		if (phy->type == type) {
++			ret = -EBUSY;
++			dev_err(x->dev, "transceiver type %s already exists\n",
++						usb_phy_type_string(type));
++			goto out;
++		}
++	}
++
++	x->type = type;
++	list_add_tail(&x->head, &phy_list);
++
++out:
++	spin_unlock_irqrestore(&phy_lock, flags);
++	return ret;
++}
++EXPORT_SYMBOL(usb_add_phy);
++
++/**
++ * usb_add_phy_dev - declare the USB PHY
++ * @x: the USB phy to be used; or NULL
++ *
++ * This call is exclusively for use by phy drivers, which
++ * coordinate the activities of drivers for host and peripheral
++ * controllers, and in some cases for VBUS current regulation.
++ */
++int usb_add_phy_dev(struct usb_phy *x)
++{
++	struct usb_phy_bind *phy_bind;
++	unsigned long flags;
++
++	if (!x->dev) {
++		dev_err(x->dev, "no device provided for PHY\n");
++		return -EINVAL;
++	}
++
++	spin_lock_irqsave(&phy_lock, flags);
++	list_for_each_entry(phy_bind, &phy_bind_list, list)
++		if (!(strcmp(phy_bind->phy_dev_name, dev_name(x->dev))))
++			phy_bind->phy = x;
++
++	list_add_tail(&x->head, &phy_list);
++
++	spin_unlock_irqrestore(&phy_lock, flags);
++	return 0;
++}
++EXPORT_SYMBOL(usb_add_phy_dev);
++
++/**
++ * usb_remove_phy - remove the OTG PHY
++ * @x: the USB OTG PHY to be removed;
++ *
++ * This reverts the effects of usb_add_phy
++ */
++void usb_remove_phy(struct usb_phy *x)
++{
++	unsigned long	flags;
++	struct usb_phy_bind *phy_bind;
++
++	spin_lock_irqsave(&phy_lock, flags);
++	if (x) {
++		list_for_each_entry(phy_bind, &phy_bind_list, list)
++			if (phy_bind->phy == x)
++				phy_bind->phy = NULL;
++		list_del(&x->head);
++	}
++	spin_unlock_irqrestore(&phy_lock, flags);
++}
++EXPORT_SYMBOL(usb_remove_phy);
++
++/**
++ * usb_bind_phy - bind the phy and the controller that uses the phy
++ * @dev_name: the device name of the device that will bind to the phy
++ * @index: index to specify the port number
++ * @phy_dev_name: the device name of the phy
++ *
++ * Fills the phy_bind structure with the dev_name and phy_dev_name. This will
++ * be used when the phy driver registers the phy and when the controller
++ * requests this phy.
++ *
++ * To be used by platform specific initialization code.
++ */
++int __init usb_bind_phy(const char *dev_name, u8 index,
++				const char *phy_dev_name)
++{
++	struct usb_phy_bind *phy_bind;
++	unsigned long flags;
++
++	phy_bind = kzalloc(sizeof(*phy_bind), GFP_KERNEL);
++	if (!phy_bind) {
++		pr_err("phy_bind(): No memory for phy_bind");
++		return -ENOMEM;
++	}
++
++	phy_bind->dev_name = dev_name;
++	phy_bind->phy_dev_name = phy_dev_name;
++	phy_bind->index = index;
++
++	spin_lock_irqsave(&phy_lock, flags);
++	list_add_tail(&phy_bind->list, &phy_bind_list);
++	spin_unlock_irqrestore(&phy_lock, flags);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(usb_bind_phy);
 -- 
 1.7.10.4
