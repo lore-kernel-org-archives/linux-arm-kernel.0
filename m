@@ -1,194 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 1 Feb 2013 11:31:50 +0000
-Subject: [PATCH 2/4] ARM: mach-shmobile: r8a7779: Allow initialisation
- of GIC by DT
-In-Reply-To: <20130201043931.GA11947@verge.net.au>
-References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
- <1359597051-32700-3-git-send-email-horms+renesas@verge.net.au>
- <20130131123213.GB7235@e106331-lin.cambridge.arm.com>
- <20130201001119.GO10312@verge.net.au>
- <20130201003410.GA30007@verge.net.au>
- <20130201014706.GA14046@verge.net.au>
- <20130201043931.GA11947@verge.net.au>
-Message-ID: <20130201113150.GA2094@e106331-lin.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 1 Feb 2013 16:59:44 +0530
+Subject: [PATCHv2 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
+In-Reply-To: <1359651943-21752-4-git-send-email-dinguyen@altera.com>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-4-git-send-email-dinguyen@altera.com>
+Message-ID: <510BA728.4060300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 04:39:31AM +0000, Simon Horman wrote:
-> On Fri, Feb 01, 2013 at 10:47:06AM +0900, Simon Horman wrote:
-> > On Fri, Feb 01, 2013 at 09:34:10AM +0900, Simon Horman wrote:
-> > > On Fri, Feb 01, 2013 at 09:11:19AM +0900, Simon Horman wrote:
-> > > > On Thu, Jan 31, 2013 at 12:32:13PM +0000, Mark Rutland wrote:
-> > > > > Hi Simon,
-> > > > > 
-> > > > > On Thu, Jan 31, 2013 at 01:50:49AM +0000, Simon Horman wrote:
-> > > > > > This allows the GIC interrupt controller of the  r8a7779 SoC to be
-> > > > > > initialised using a flattened device tree blob.
-> > > > > > 
-> > > > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > > > > ---
-> > > > > >  arch/arm/boot/dts/r8a7779.dtsi               |   40 ++++++++++++++++++++++++++
-> > > > > >  arch/arm/mach-shmobile/include/mach/common.h |    1 +
-> > > > > >  arch/arm/mach-shmobile/intc-r8a7779.c        |   27 +++++++++++++----
-> > > > > >  3 files changed, 62 insertions(+), 6 deletions(-)
-> > > > > >  create mode 100644 arch/arm/boot/dts/r8a7779.dtsi
-> > > > > > 
-> > > > > > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> > > > > > new file mode 100644
-> > > > > > index 0000000..eadc12e
-> > > > > > --- /dev/null
-> > > > > > +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> > > > > > @@ -0,0 +1,40 @@
-> > > > > > +/*
-> > > > > > + * Device Tree Source for Renesas r8a7740
-> > > > > > + *
-> > > > > > + * Copyright (C) 2013 Renesas Solutions Corp.
-> > > > > > + * Copyright (C) 2013 Simon Horman
-> > > > > > + *
-> > > > > > + * This file is licensed under the terms of the GNU General Public License
-> > > > > > + * version 2.  This program is licensed "as is" without any warranty of any
-> > > > > > + * kind, whether express or implied.
-> > > > > > + */
-> > > > > > +
-> > > > > > +/include/ "skeleton.dtsi"
-> > > > > > +
-> > > > > > +/ {
-> > > > > > +	compatible = "renesas,r8a7779";
-> > > > > > +
-> > > > > > +	cpus {
-> > > > > > +		cpu at 0 {
-> > > > > > +			compatible = "arm,cortex-a9";
-> > > > > > +		};
-> > > > > > +		cpu at 1 {
-> > > > > > +			compatible = "arm,cortex-a9";
-> > > > > > +		};
-> > > > > > +		cpu at 2 {
-> > > > > > +			compatible = "arm,cortex-a9";
-> > > > > > +		};
-> > > > > > +		cpu at 3 {
-> > > > > > +			compatible = "arm,cortex-a9";
-> > > > > > +		};
-> > > > > > +	};
-> > > > > 
-> > > > > Sorry to sound like a broken record, but it'd be good to see reg and
-> > > > > device_type set here.
-> > > > 
-> > > > Sure, will do.
-> > > > 
-> > > > > > +
-> > > > > > +        gic: interrupt-controller at f0001000 {
-> > > > > > +                compatible = "arm,cortex-a9-gic";
-> > > > > > +                #interrupt-cells = <3>;
-> > > > > > +                #address-cells = <1>;
-> > > > > 
-> > > > > Why is #address-cells needed here (and without #size-cells)? I see it's in the
-> > > > > binding document example, but I can't figure out why.
-> > > > 
-> > > > Its here because I copied the example.
-> > > > I will see about removing it from here.
-> > > > 
-> > > > > > +                interrupt-controller;
-> > > > > > +                reg = <0xf0001000 0x1000>,
-> > > > > > +                      <0xf0000100 0x100>;
-> > > > > > +        };
-> > > > > > +};
-> > > 
-> > > A revised patch is below. I should also remove "#address-cells = <1>" from
-> > > gic in arch/arm/boot/dts/sh73a0.dtsi if it is indeed unnecessary.
++ Lorenzo,
 
-I just poked Rob and Grant in another subthread. Hopefully they'll be able to
-tell us if there's something we missed.
+On Thursday 31 January 2013 10:35 PM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+>
+> mach-socfpga is another platform that needs to use
+> v7_invalidate_l1 to bringup additional cores. There was a comment that
+> the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
+>
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> Tested-by: Pavel Machek <pavel@denx.de>
+> Reviewed-by: Pavel Machek <pavel@denx.de>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+>   arch/arm/mach-imx/headsmp.S      |   47 -------------------------------------
+>   arch/arm/mach-shmobile/headsmp.S |   48 --------------------------------------
+>   arch/arm/mach-tegra/headsmp.S    |   43 ----------------------------------
+>   arch/arm/mm/cache-v7.S           |   46 ++++++++++++++++++++++++++++++++++++
+>   4 files changed, 46 insertions(+), 138 deletions(-)
+>
+[..]
 
-> 
-> One more time:
-> 
-> From 6031d5177193431a57392dfd2f38be0676bdb535 Mon Sep 17 00:00:00 2001
-> From: Simon Horman <horms+renesas@verge.net.au>
-> Date: Tue, 29 Jan 2013 14:21:46 +0900
-> Subject: [PATCH] ARM: mach-shmobile: r8a7779: Allow initialisation of GIC by
->  DT
-> 
-> This allows the GIC interrupt controller of the  r8a7779 SoC to be
-> initialised using a flattened device tree blob.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> ---
-> 
-> v3
-> * Fix copy-paste error and use unique reg values for each CPU
-> 
-> v2
-> As suggested by Mark Rutland
-> * Add reg and device_type to cpus
-> * Remove #address-cells from gic
-> ---
->  arch/arm/boot/dts/r8a7779.dtsi               |   50 ++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/include/mach/common.h |    1 +
->  arch/arm/mach-shmobile/intc-r8a7779.c        |   27 ++++++++++----
->  3 files changed, 72 insertions(+), 6 deletions(-)
->  create mode 100644 arch/arm/boot/dts/r8a7779.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> new file mode 100644
-> index 0000000..8c6d52c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> @@ -0,0 +1,50 @@
-> +/*
-> + * Device Tree Source for Renesas r8a7740
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index 7539ec2..15451ee 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -19,6 +19,52 @@
+>   #include "proc-macros.S"
+>
+>   /*
+> + * The secondary kernel init calls v7_flush_dcache_all before it enables
+> + * the L1; however, the L1 comes out of reset in an undefined state, so
+> + * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
+> + * of cache lines with uninitialized data and uninitialized tags to get
+> + * written out to memory, which does really unpleasant things to the main
+> + * processor.  We fix this by performing an invalidate, rather than a
+> + * clean + invalidate, before jumping into the kernel.
 > + *
-> + * Copyright (C) 2013 Renesas Solutions Corp.
-> + * Copyright (C) 2013 Simon Horman
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
+> + * This function is cloned from arch/arm/mach-tegra/headsmp.S, and needs
+> + * to be called for both secondary cores startup and primary core resume
+> + * procedures.
 > + */
-> +
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	compatible = "renesas,r8a7779";
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0>;
-> +		};
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <1>;
-> +		};
-> +		cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <2>;
-> +		};
-> +		cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <3>;
-> +		};
-> +	};
-> +
-> +        gic: interrupt-controller at f0001000 {
-> +                compatible = "arm,cortex-a9-gic";
-> +                #interrupt-cells = <3>;
-> +                interrupt-controller;
-> +                reg = <0xf0001000 0x1000>,
-> +                      <0xf0000100 0x100>;
-> +        };
-> +};
+> +ENTRY(v7_invalidate_l1)
+Now since we are moving the code under common place, probably we should
+update this a function a bit so that it invalidates the CPU cache till
+line of unification. Just to be consistent with other flush API.
 
-Thanks, this looks much better now! :)
+Lorenzo,
+Does that make sense ?
 
-For the dtsi: Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+Regards,
+Santosh
