@@ -1,52 +1,26 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 1 Feb 2013 12:52:25 -0700
+Date: Fri, 1 Feb 2013 12:58:04 -0700
 Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
  systems
-In-Reply-To: <201302011130.18442.arnd@arndb.de>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <201301312046.22560.arnd@arndb.de>
- <20130131224459.GA11846@obsidianresearch.com>
- <201302011130.18442.arnd@arndb.de>
-Message-ID: <20130201195225.GB19335@obsidianresearch.com>
+In-Reply-To: <201302011745.29223.arnd@arndb.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302011607.49205.arnd@arndb.de>
+ <20130201162638.GT23505@n2100.arm.linux.org.uk>
+ <201302011745.29223.arnd@arndb.de>
+Message-ID: <20130201195804.GD19335@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 11:30:18AM +0000, Arnd Bergmann wrote:
+On Fri, Feb 01, 2013 at 05:45:29PM +0000, Arnd Bergmann wrote:
 
-> IO Resources are always expressed in the kernel's view, so they are
-> in the range from 0 to IO_SPACE_LIMIT. The idea is that you can have
-> multiple buses that each have their own address space start at 0,
-> but can put them into the kernel address space at a different
-> address.
+> Yes, that was my point. I think in this case, the bug is in the new
+> of_pci_process_ranges functions, which returns a 'struct resource'
+> translated into IORESOURCE_MEM space, but with the type set
+> to IORESOURCE_IO. This resource then gets passed to 
+> pci_add_resource_offset().
 
-Sure, I see that.. and that seems reasonable as long as any IO bus
-address aliases are put in separate PCI domains. It would be wonky if
-devices on different PCI bus numbers in a single PCI domain had
-overlaping IO addresses.
-
-> > No, for *all* links. You use a mmap scheme with 4k granularity, I
-> > explained in a past email, but to quickly review..
-> > 
-> > - Each link gets 64k of reserved physical address space for IO,
-> >   this is just set aside, no MBUS windows are permantently assigned.
-> > - Linux is told to use a 64k IO range with bus IO address 0->0xFFFF
-> > - When the IO base/limit register in the link PCI-PCI bridge is programmed
-> >   the driver gets a 4k aligned region somewhere from 0->0xFFFF and then:
-> >     - Allocates a 64k MBUS window that translates physical address
-> >       0xZZZZxxxx to IO bus address 0x0000xxxx (goes in the TLP) for
-> >       that link
-> >     - Uses pci_ioremap_io to map the fraction of the link's 64k MBUS window
-> >       allocated to that bridge to the correct offset in the 
-> >       PCI_IO_VIRT_BASE region
-> 
-> We'd have to change pci_ioremap_io to allow mapping less than 64k, but
-> yes, that would work, too. I don't see an advantage to it though,
-> other than having io_offset always be zero.
-
-Erm, that is the whole point. No PCI device in the system, on any of
-the 10 links, would be required to use a 32 bit IO address. All are 16
-bit and there is no compatibility problem on any links. You don't need
-to declare any one link as being 'io supporting' or something like
-that, it just works out of the box.
+A standard way to express the required address translation from CPU
+physical address to IO bus address might help other people avoid this
+trap??
 
 Jason
