@@ -1,75 +1,84 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  1 Feb 2013 08:52:08 +0100
-Subject: [PATCH 5/9] USB chipidea: introduce dual role mode pdata flags
+Date: Fri,  1 Feb 2013 08:52:06 +0100
+Subject: [PATCH 3/9] USB: chipidea: ci13xxx-imx: create dynamic platformdata
 In-Reply-To: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
 References: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359705132-9434-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359705132-9434-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even if a chipidea core is otg capable the board may not. This allows
-to explicitly set the core to host/peripheral mode. Without these
-flags the driver falls back to the old behaviour.
+From: Michael Grzeschik <m.grzeschik@pengutronix.de>
 
+This patch removes the limitation of having only one instance of the
+ci13xxx-imx platformdata and makes different configurations possible.
+
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reviewed-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/core.c  |   21 +++++++++++++++------
- include/linux/usb/chipidea.h |    2 +-
- 2 files changed, 16 insertions(+), 7 deletions(-)
+ drivers/usb/chipidea/ci13xxx_imx.c |   25 +++++++++++++++----------
+ 1 file changed, 15 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index a3ec29d..b2dbf55 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -435,6 +435,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	struct resource	*res;
- 	void __iomem	*base;
- 	int		ret;
-+	int		dr_mode;
+diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+index 8c29122..69024e0 100644
+--- a/drivers/usb/chipidea/ci13xxx_imx.c
++++ b/drivers/usb/chipidea/ci13xxx_imx.c
+@@ -85,17 +85,10 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
  
- 	if (!dev->platform_data) {
- 		dev_err(dev, "platform data missing\n");
-@@ -487,14 +488,22 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		return -ENODEV;
+ /* End of common functions shared by usbmisc drivers*/
+ 
+-static struct ci13xxx_platform_data ci13xxx_imx_platdata  = {
+-	.name			= "ci13xxx_imx",
+-	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+-				  CI13XXX_PULLUP_ON_VBUS |
+-				  CI13XXX_DISABLE_STREAMING,
+-	.capoffset		= DEF_CAPOFFSET,
+-};
+-
+ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ {
+ 	struct ci13xxx_imx_data *data;
++	struct ci13xxx_platform_data *pdata;
+ 	struct platform_device *plat_ci, *phy_pdev;
+ 	struct device_node *phy_np;
+ 	struct resource *res;
+@@ -107,6 +100,18 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		&& !usbmisc_ops)
+ 		return -EPROBE_DEFER;
+ 
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata) {
++		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX pdata!\n");
++		return -ENOMEM;
++	}
++
++	pdata->name = "ci13xxx_imx";
++	pdata->capoffset = DEF_CAPOFFSET;
++	pdata->flags = CI13XXX_REQUIRE_TRANSCEIVER |
++		       CI13XXX_PULLUP_ON_VBUS |
++		       CI13XXX_DISABLE_STREAMING;
++
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data) {
+ 		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
+@@ -168,7 +173,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		reg_vbus = NULL;
  	}
  
-+	dr_mode = ci->platdata->dr_mode;
-+	if (dr_mode == USB_DR_MODE_UNKNOWN)
-+		dr_mode = USB_DR_MODE_OTG;
-+
- 	/* initialize role(s) before the interrupt is requested */
--	ret = ci_hdrc_host_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support host\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
-+		ret = ci_hdrc_host_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support host\n");
-+	}
+-	ci13xxx_imx_platdata.phy = data->phy;
++	pdata->phy = data->phy;
  
--	ret = ci_hdrc_gadget_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support gadget\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
-+		ret = ci_hdrc_gadget_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support gadget\n");
-+	}
+ 	if (!pdev->dev.dma_mask) {
+ 		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
+@@ -193,7 +198,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
  
- 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
- 		dev_err(dev, "no supported roles\n");
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 1a2aa18..b314647 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -20,7 +20,7 @@ struct ci13xxx_platform_data {
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
- #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
--
-+	enum usb_dr_mode	dr_mode;
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
- #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
- 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
+ 	plat_ci = ci13xxx_add_device(&pdev->dev,
+ 				pdev->resource, pdev->num_resources,
+-				&ci13xxx_imx_platdata);
++				pdata);
+ 	if (IS_ERR(plat_ci)) {
+ 		ret = PTR_ERR(plat_ci);
+ 		dev_err(&pdev->dev,
 -- 
 1.7.10.4
