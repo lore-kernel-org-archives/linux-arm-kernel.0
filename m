@@ -1,126 +1,114 @@
 From: mporter@ti.com (Matt Porter)
-Date: Fri,  1 Feb 2013 13:22:53 -0500
-Subject: [PATCH v7 08/10] spi: omap2-mcspi: convert to
- dma_request_slave_channel_compat()
+Date: Fri, 1 Feb 2013 13:32:31 -0500
+Subject: [PATCH v7 00/10] DMA Engine support for AM33XX
 In-Reply-To: <1359742975-10421-1-git-send-email-mporter@ti.com>
 References: <1359742975-10421-1-git-send-email-mporter@ti.com>
-Message-ID: <1359742975-10421-9-git-send-email-mporter@ti.com>
+Message-ID: <20130201183231.GO2244@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert dmaengine channel requests to use
-dma_request_slave_channel_compat(). This supports the DT case of
-platforms requiring channel selection from either the OMAP DMA or
-the EDMA engine. AM33xx only boots from DT and is the only user
-implementing EDMA so in the !DT case we can default to the OMAP DMA
-filter.
+On Fri, Feb 01, 2013 at 01:22:45PM -0500, Matt Porter wrote:
 
-Signed-off-by: Matt Porter <mporter@ti.com>
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- drivers/spi/spi-omap2-mcspi.c |   65 ++++++++++++++++++++++++++++-------------
- 1 file changed, 45 insertions(+), 20 deletions(-)
+<snip>
 
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index b610f52..2c02c02 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -102,6 +102,9 @@ struct omap2_mcspi_dma {
- 
- 	struct completion dma_tx_completion;
- 	struct completion dma_rx_completion;
-+
-+	char dma_rx_ch_name[14];
-+	char dma_tx_ch_name[14];
- };
- 
- /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
-@@ -822,14 +825,23 @@ static int omap2_mcspi_request_dma(struct spi_device *spi)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 	sig = mcspi_dma->dma_rx_sync_dev;
--	mcspi_dma->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+
-+	mcspi_dma->dma_rx =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &sig, &master->dev,
-+						 mcspi_dma->dma_rx_ch_name);
-+
- 	if (!mcspi_dma->dma_rx) {
- 		dev_err(&spi->dev, "no RX DMA engine channel for McSPI\n");
- 		return -EAGAIN;
- 	}
- 
- 	sig = mcspi_dma->dma_tx_sync_dev;
--	mcspi_dma->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+	mcspi_dma->dma_tx =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &sig, &master->dev,
-+						 mcspi_dma->dma_tx_ch_name);
-+
- 	if (!mcspi_dma->dma_tx) {
- 		dev_err(&spi->dev, "no TX DMA engine channel for McSPI\n");
- 		dma_release_channel(mcspi_dma->dma_rx);
-@@ -1223,29 +1235,42 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
- 		goto free_master;
- 
- 	for (i = 0; i < master->num_chipselect; i++) {
--		char dma_ch_name[14];
-+		char *dma_rx_ch_name = mcspi->dma_channels[i].dma_rx_ch_name;
-+		char *dma_tx_ch_name = mcspi->dma_channels[i].dma_tx_ch_name;
- 		struct resource *dma_res;
- 
--		sprintf(dma_ch_name, "rx%d", i);
--		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
--							dma_ch_name);
--		if (!dma_res) {
--			dev_dbg(&pdev->dev, "cannot get DMA RX channel\n");
--			status = -ENODEV;
--			break;
--		}
-+		sprintf(dma_rx_ch_name, "rx%d", i);
-+		if (!pdev->dev.of_node) {
-+			dma_res =
-+				platform_get_resource_byname(pdev,
-+							     IORESOURCE_DMA,
-+							     dma_rx_ch_name);
-+			if (!dma_res) {
-+				dev_dbg(&pdev->dev,
-+					"cannot get DMA RX channel\n");
-+				status = -ENODEV;
-+				break;
-+			}
- 
--		mcspi->dma_channels[i].dma_rx_sync_dev = dma_res->start;
--		sprintf(dma_ch_name, "tx%d", i);
--		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
--							dma_ch_name);
--		if (!dma_res) {
--			dev_dbg(&pdev->dev, "cannot get DMA TX channel\n");
--			status = -ENODEV;
--			break;
-+			mcspi->dma_channels[i].dma_rx_sync_dev =
-+				dma_res->start;
- 		}
-+		sprintf(dma_tx_ch_name, "tx%d", i);
-+		if (!pdev->dev.of_node) {
-+			dma_res =
-+				platform_get_resource_byname(pdev,
-+							     IORESOURCE_DMA,
-+							     dma_tx_ch_name);
-+			if (!dma_res) {
-+				dev_dbg(&pdev->dev,
-+					"cannot get DMA TX channel\n");
-+				status = -ENODEV;
-+				break;
-+			}
- 
--		mcspi->dma_channels[i].dma_tx_sync_dev = dma_res->start;
-+			mcspi->dma_channels[i].dma_tx_sync_dev =
-+				dma_res->start;
-+		}
- 	}
- 
- 	if (status < 0)
--- 
-1.7.9.5
+> This series adds DMA Engine support for AM33xx, which uses
+> an EDMA DMAC. The EDMA DMAC has been previously supported by only
+> a private API implementation (much like the situation with OMAP
+> DMA) found on the DaVinci family of SoCs.
+
+Tony,
+
+Will you be able to take this series in through your tree? It appears we
+just need acks on the new bindings and the compat api change. I haven't
+heard from you or Benoit on the dts patches so it seems those are ready
+as well.
+
+Thanks,
+Matt
+
+> 
+> The series applies on top of 3.8-rc5 and the following patches:
+> 
+> 	- dmaengine DT support and edma dmaengine driver fix from 
+> 	  the git://git.infradead.org/users/vkoul/slave-dma.git next
+> 	  branch
+> 
+> The approach taken is similar to how OMAP DMA is being converted to
+> DMA Engine support. With the functional EDMA private API already
+> existing in mach-davinci/dma.c, we first move that to an ARM common
+> area so it can be shared. Adding DT and runtime PM support to the
+> private EDMA API implementation allows it to run on AM33xx. AM33xx
+> *only* boots using DT so we leverage Jon's generic DT DMA helpers to
+> register EDMA DMAC with the of_dma framework and then add support
+> for calling the dma_request_slave_channel() API to both the mmc
+> and spi drivers.
+> 
+> With this series both BeagleBone and the AM335x EVM have working
+> SPI DMA support (and MMC support with the separate MMC series).
+> 
+> This is tested on BeagleBone with a SPI framebuffer driver and MMC
+> rootfs. A trivial gpio DMA event misc driver was used to test the
+> crossbar DMA event support. It is also tested on the AM335x EVM
+> with the onboard SPI flash and MMC rootfs. The branch at
+> https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-v7
+> has the complete series, dependencies, and some test
+> drivers/defconfigs. Note that MMC can only be tested with a
+> separate MMC dmaengine/DT series applied.
+> 
+> Regression testing was done on AM180x-EVM (which also makes use
+> of the EDMA dmaengine driver and the EDMA private API) using SD,
+> SPI flash, and the onboard audio supported by the ASoC Davinci
+> driver. Regression testing was also done on a BeagleBoard xM
+> booting from the legacy board file using MMC rootfs.
+> 
+> 
+> Matt Porter (10):
+>   ARM: davinci: move private EDMA API to arm/common
+>   ARM: edma: remove unused transfer controller handlers
+>   ARM: edma: add AM33XX support to the private EDMA API
+>   dmaengine: edma: enable build for AM33XX
+>   dmaengine: edma: Add TI EDMA device tree binding
+>   ARM: dts: add AM33XX EDMA support
+>   dmaengine: add dma_request_slave_channel_compat()
+>   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
+>   spi: omap2-mcspi: add generic DMA request support to the DT binding
+>   ARM: dts: add AM33XX SPI DMA support
+> 
+>  Documentation/devicetree/bindings/dma/ti-edma.txt  |   49 +++
+>  Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +-
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/boot/dts/am33xx.dtsi                      |   30 ++
+>  arch/arm/common/Kconfig                            |    3 +
+>  arch/arm/common/Makefile                           |    1 +
+>  arch/arm/{mach-davinci/dma.c => common/edma.c}     |  342 +++++++++++++++++---
+>  arch/arm/mach-davinci/Makefile                     |    2 +-
+>  arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
+>  arch/arm/mach-davinci/davinci.h                    |    2 +-
+>  arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
+>  arch/arm/mach-davinci/devices.c                    |    6 +-
+>  arch/arm/mach-davinci/dm355.c                      |    2 +-
+>  arch/arm/mach-davinci/dm365.c                      |    2 +-
+>  arch/arm/mach-davinci/dm644x.c                     |    2 +-
+>  arch/arm/mach-davinci/dm646x.c                     |    2 +-
+>  arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
+>  arch/arm/plat-omap/Kconfig                         |    1 +
+>  drivers/dma/Kconfig                                |    2 +-
+>  drivers/dma/edma.c                                 |    2 +-
+>  drivers/mmc/host/davinci_mmc.c                     |    1 +
+>  drivers/spi/spi-omap2-mcspi.c                      |   65 ++--
+>  include/linux/dmaengine.h                          |   16 +
+>  include/linux/mfd/davinci_voicecodec.h             |    3 +-
+>  .../mach => include/linux/platform_data}/edma.h    |   90 +-----
+>  include/linux/platform_data/spi-davinci.h          |    2 +-
+>  sound/soc/davinci/davinci-evm.c                    |    1 +
+>  sound/soc/davinci/davinci-pcm.c                    |    1 +
+>  sound/soc/davinci/davinci-pcm.h                    |    2 +-
+>  sound/soc/davinci/davinci-sffsdr.c                 |    7 +-
+>  30 files changed, 496 insertions(+), 174 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+>  rename arch/arm/{mach-davinci/dma.c => common/edma.c} (86%)
+>  rename {arch/arm/mach-davinci/include/mach => include/linux/platform_data}/edma.h (59%)
+> 
+> -- 
+> 1.7.9.5
+> 
