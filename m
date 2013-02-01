@@ -1,24 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Feb 2013 15:51:43 +0000
-Subject: [GIT PULL 5/8] ARM: tegra: SCU base rework
-In-Reply-To: <510B4892.3050900@wwwdotorg.org>
-References: <1359582159-28816-1-git-send-email-swarren@wwwdotorg.org>
- <CAOesGMjjgz7Am7-D_fQHqgLX=G+Wc_LKL-GYMHd1-NzVC-DUfA@mail.gmail.com>
- <510B4892.3050900@wwwdotorg.org>
-Message-ID: <201302011551.43947.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 1 Feb 2013 15:51:58 +0000
+Subject: [GIT PULL  1/4] ARM: mvebu: cleanup for v3.9
+In-Reply-To: <1359733918.Bf7ecc0.22262@triton>
+Message-ID: <1359733918.FF53C1.22262@triton>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 February 2013, Stephen Warren wrote:
-> Hmm. And here I was thinking that I was basing branches on top of
-> each-other too much given your previous comments about merge conflicts
-> being OK!
+The following changes since commit b96e1b1c3c5319294edb0970b6d5bf099c0e85eb:
 
-IMHO the cleanup branches are special in this regard because they
-are primarily meant as a way to resolve the merge conflicts.
-If you are able to put all the conflicts between the normal branches
-into cleanup patches, you can put them all in one branch and
-base your other branches on top of that. Of course that doesn't
-always work, but it would solve this particular instance.
+  ARM: Kirkwood: Cleanup unneeded include files
 
-	Arnd
+are available in the git repository at:
+
+  git://git.infradead.org/users/jcooper/linux.git tags/cleanup_for_v3.9_round2
+
+for you to fetch changes up to b3af7a1ffd1e5e9ec536a915393b7e07a8793f2a:
+
+  ARM: dove: cleanup includes
+
+----------------------------------------------------------------
+cleanup for v3.9 round2
+     - remove unneeded #includes for mach-dove
+     - remove unneeded #includes and code for the nsa310
+----------------------------------------------------------------
+Jason Cooper (1):
+      ARM: kirkwood: nsa310: cleanup includes and unneeded code
+
+Sebastian Hesselbarth (1):
+      ARM: dove: cleanup includes
+
+ arch/arm/mach-dove/common.c           | 29 +++++++++--------------------
+ arch/arm/mach-kirkwood/board-nsa310.c |  8 +-------
+ 2 files changed, 10 insertions(+), 27 deletions(-)
