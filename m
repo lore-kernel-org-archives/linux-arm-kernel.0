@@ -1,101 +1,53 @@
-From: subashrp@gmail.com (Subash Patel)
-Date: Fri, 01 Feb 2013 12:32:07 -0800
-Subject: [PATCH v4 02/13] ARM: LPAE: use phys_addr_t in alloc_init_pud()
-In-Reply-To: <alpine.LFD.2.02.1302011310090.6300@xanadu.home>
-References: <1359669512-31276-1-git-send-email-cyril@ti.com>
- <1359669512-31276-3-git-send-email-cyril@ti.com> <510B327E.3050502@gmail.com>
- <alpine.LFD.2.02.1301312218270.6300@xanadu.home> <510BFC84.2030902@gmail.com>
- <alpine.LFD.2.02.1302011310090.6300@xanadu.home>
-Message-ID: <510C2647.3080305@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 1 Feb 2013 22:56:00 +0200
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <510C2A47.1090607@mvista.com>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
+ <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
+ <20130201185820.GE29898@arwen.pp.htv.fi>
+ <510C2A47.1090607@mvista.com>
+Message-ID: <20130201205600.GA31762@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+hi,
 
+On Fri, Feb 01, 2013 at 11:49:11PM +0300, Sergei Shtylyov wrote:
+> > good point, do you wanna send some patches ?
+> 
+>    I have already sent them countless times and even stuck CPPI 4.1 support (in
+> arch/arm/common/cppi41.c) in Russell's patch system. TI requested to remove the
+> patch. :-(
 
-On Friday 01 February 2013 10:14 AM, Nicolas Pitre wrote:
-> On Fri, 1 Feb 2013, Subash Patel wrote:
->
->> Hi Nicolas,
->>
->> On Thursday 31 January 2013 07:35 PM, Nicolas Pitre wrote:
->>> On Fri, 1 Feb 2013, Hui Wang wrote:
->>>
->>>> Cyril Chemparathy wrote:
->>>>> From: Vitaly Andrianov <vitalya@ti.com>
->>>>>
->>>>> This patch fixes the alloc_init_pud() function to use phys_addr_t
->>>>> instead of
->>>>> unsigned long when passing in the phys argument.
->>>>>
->>>>> This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a
->>>>> (ARM:
->>>>> pgtable: use phys_addr_t for physical addresses), which applied similar
->>>>> changes
->>>>> elsewhere in the ARM memory management code.
->>>>>
->>>>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->>>>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
->>>>> Acked-by: Nicolas Pitre <nico@linaro.org>
->>>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>>>> ---
->>>>>    arch/arm/mm/mmu.c |    3 ++-
->>>>>    1 file changed, 2 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->>>>> index 9f06102..ef43689 100644
->>>>> --- a/arch/arm/mm/mmu.c
->>>>> +++ b/arch/arm/mm/mmu.c
->>>>> @@ -612,7 +612,8 @@ static void __init alloc_init_section(pud_t *pud,
->>>>> unsigned long addr,
->>>>>    }
->>>>>     static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
->>>>> -	unsigned long end, unsigned long phys, const struct mem_type *type)
->>>>> +				  unsigned long end, phys_addr_t phys,
->>>>> +				  const struct mem_type *type)
->>>>>
->>>> The change is correct but seems useless so far. This function only be
->>>> called
->>>> from map_lowmem and devicemaps_init, from i know neither lowmem nor device
->>>> io
->>>> registers of existing platforms exceed 32bit address.
->>>
->>> It is not because you are not aware of any existing platforms with RAM
->>> or device IO above the 4GB mark that they don't exist.
->>>
->>> For example, some LPAE systems have all their RAM located above the 4G
->>> physical address mark. A simple (potentially non DMA capable) alias
->>> exists in the low 32-bit address space to allow the system to boot and
->>> switch to the real physical RAM addresses once the MMU is turned on.
->>> Some of that RAM is still qualified as "low mem" i.e. the portion of RAM
->>> that the kernel keeps permanently mapped in the 32-bit virtual space
->>> even if all of it is above the 4G mark in physical space.
->>
->> I think he is right. You cannot have low_mem and devices in 36-bit areas.
->> Atleast this is what I saw in one of the platforms on which I tested these
->> patches. I am not sure what you mean by hardware address aliasing(as I have
->> real RAM), but we need 32-bit areas to boot the CPU and I have mapped them for
->> the LOW_MEM. But, I have used 36-bit areas for the HIGH_MEM. Since you said
->> about aliasing DDR area in 32-bits, and then switching to 36-bit RAM, does the
->> dma of the devices still use 32-bit aliased addresses?
->>
->> I haven't tested a configuration where LOW_MEM can have both 32-bit and 36-bit
->> DDR PA though. I think its not possible too.
->
-> Don't get confused by the 36-bit supersections introduced with ARMv6.
-> This patch series is about LPAE capable systems using a completely
-> different page table format providing physical addressing beyond 36
-> bits.
+sticking into arch/arm/common/ wasn't a nice move. But then again, so
+wasn't asking for the patch to be removed :-s
 
-Yes, I mean LPAE capable MMU's introduced with Cortex-A15. Infact I have 
-programmed that MMU with 1G super-section for non-linux usage :) Cyril 
-explained his platform and aliasing. My platform has a real memory in 
-32-bit area, and we use it for 32-bit DMA's as well. So it looks we are 
-speaking of various configurations of LPAE systems here.
+> > I guess to make the MUSB side simpler we would need musb-dma-engine glue
+> > to map dmaengine to the private MUSB API. Then we would have some
+> > starting point to also move inventra (and anybody else) to dmaengine
+> > API.
+> 
+>    Why? Inventra is a dedicated device's private DMA controller, why make
+> universal DMA driver for it?
 
-Regards,
-Subash
+because it doesn't make sense to support multiple DMA APIs. We can check
+from MUSB's registers if it was configured with Inventra DMA support and
+based on that we can register MUSB's own DMA Engine to dmaengine API.
 
->
->
-> Nicolas
->
+> > Once that's done, we drop MUSB's private API.
+> 
+>    Don't think it's a good idea.
+
+see above.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130201/859fc0e0/attachment.sig>
