@@ -1,32 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Feb 2013 12:54:17 +0000
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 1 Feb 2013 18:34:06 +0530
 Subject: [PATCHv2 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <20130201121137.GC23869@e102568-lin.cambridge.arm.com>
+In-Reply-To: <20130201124807.GK23505@n2100.arm.linux.org.uk>
 References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
  <1359651943-21752-4-git-send-email-dinguyen@altera.com>
- <510BA728.4060300@ti.com>
- <20130201121137.GC23869@e102568-lin.cambridge.arm.com>
-Message-ID: <20130201125417.GL23505@n2100.arm.linux.org.uk>
+ <510BA728.4060300@ti.com> <20130201113233.GJ23505@n2100.arm.linux.org.uk>
+ <510BAA8B.1030506@ti.com> <20130201124807.GK23505@n2100.arm.linux.org.uk>
+Message-ID: <510BBD46.9020207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 12:11:38PM +0000, Lorenzo Pieralisi wrote:
-> Well, on latest processors (A15, A7) caches are invalidated on reset unless
-> the chip is programmed to skip that on reset (ie L2 retained).
-> 
-> But it makes sense, for sure it should not be called v7_invalidate_l1,
-> but invalidate_louis, and instead of forcing level 0 we should be
-> reading LoUIS and invalidate up to that level as we do in the clean and
-> invalidate function.
+On Friday 01 February 2013 06:18 PM, Russell King - ARM Linux wrote:
+> On Fri, Feb 01, 2013 at 05:14:11PM +0530, Santosh Shilimkar wrote:
+>> On Friday 01 February 2013 05:02 PM, Russell King - ARM Linux wrote:
+>>> On Fri, Feb 01, 2013 at 04:59:44PM +0530, Santosh Shilimkar wrote:
+>>>> Now since we are moving the code under common place, probably we should
+>>>> update this a function a bit so that it invalidates the CPU cache till
+>>>> line of unification. Just to be consistent with other flush API.
+>>>
+>>> Hmm.  Do you really want a CPU being brought up to do that to the PoU,
+>>> every time that it is brought up?  I thought you wanted to get rid of
+>>> that kind of stuff from the hotplug paths so that a CPU being brought
+>>> up/taken down doesn't affect the caches for the other CPUs within the
+>>> inner sharable domain.
+>>>
+>> You are right. We already git rid of the flush of all cache levels
+>> in hotplug and wakeup paths and now it is restricted till the PoU.
+>>
+>> Assuming for the current v7 machines, PoU is L2, invalidating the cache
+>> *till* PoU means only CPU local cache. So the API will in a way
+>> invalidate only local cache.
+>
+> Err, you want to _invalidate_ the caches down to the point of I/D/TLB
+> unification?  Are you really sure you want to do that on a system
+> here other CPUs are running?
+>
+> Even going down to the LoUIS, that point is the point at which the
+> _other_ CPUs may be sharing caches.
+>
+> And invalidating those caches while the other CPUs are running on
+> secondary CPU startup will be VERY VERY VERY bad.
+>
+Absolutly and my intention was never to invalidate all the cache
+levels. When I said lous, I mean till that point and not including
+that and next cache levels. May be my terminology isn't accurate.
 
-No.  Think about it.  c7, c6, 2 _invalidates_ the cache.  That means any
-data contained within the cache is discarded.  Data is not written back.
-
-If you do this down to the LoUIS, that includes all cache levels in the
-inner sharable domain.  The inner sharable domain includes the other CPUs
-in the system which may already be running (certainly the boot CPU will
-be running).
-
-Are you _really_ sure you want to be invalidating _valid_ data held in
-caches in the inner sharable domain by other CPUs, rather than just the
-cache associated with the CPU which is being brought online?
+Regards,
+Santosh
