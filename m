@@ -1,18 +1,17 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 1 Feb 2013 20:58:20 +0200
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 1 Feb 2013 13:59:59 -0500
 Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <510C1D0E.6030401@mvista.com>
+In-Reply-To: <2077c13e12314dc3adc8e5b653855da0@DFLE72.ent.ti.com>
 References: <1359742975-10421-1-git-send-email-mporter@ti.com>
  <1359742975-10421-2-git-send-email-mporter@ti.com>
  <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
- <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
-Message-ID: <20130201185820.GE29898@arwen.pp.htv.fi>
+ <20130201184915.GP2244@beef>
+ <2077c13e12314dc3adc8e5b653855da0@DFLE72.ent.ti.com>
+Message-ID: <20130201185959.GQ2244@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Feb 01, 2013 at 10:52:46PM +0300, Sergei Shtylyov wrote:
+On Fri, Feb 01, 2013 at 07:52:46PM +0000, Sergei Shtylyov wrote:
 > Hello.
 > 
 > On 02/01/2013 09:49 PM, Matt Porter wrote:
@@ -31,21 +30,10 @@ On Fri, Feb 01, 2013 at 10:52:46PM +0300, Sergei Shtylyov wrote:
 > that, instead of waiting indefinitely for TI to convert it to drivers/dma/
 > directly. We could have working MUSB DMA on OMAP-L1x/Sitara all this time... Sigh.
 
-good point, do you wanna send some patches ?
+That is a shame. Yeah, I've pointed out that I was doing this exactly
+the same way as was acceptable for the OMAP DMA conversion since it was
+in RFC. The reasons are sound since in both cases, we have many drivers
+to convert that need to continue using the private DMA APIs.
 
-I guess to make the MUSB side simpler we would need musb-dma-engine glue
-to map dmaengine to the private MUSB API. Then we would have some
-starting point to also move inventra (and anybody else) to dmaengine
-API.
-
-Once that's done, we drop MUSB's private API.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130201/82d77776/attachment.sig>
+-Matt
+> 
