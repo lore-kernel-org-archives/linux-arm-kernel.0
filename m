@@ -1,43 +1,56 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 1 Feb 2013 12:18:39 +0200
-Subject: [PATCH v5 10/10] clk: tegra: devicetree match for nvidia, tegra114-car
-In-Reply-To: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1359713962-16822-11-git-send-email-pdeschrijver@nvidia.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Fri, 1 Feb 2013 15:58:22 +0530
+Subject: [PATCH] ARM: OMAP2: AM33XX: id: Add support for AM335x PG2.0
+Message-ID: <1359714502-21528-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- drivers/clk/tegra/clk.c |    1 +
- drivers/clk/tegra/clk.h |    7 +++++++
- 2 files changed, 8 insertions(+), 0 deletions(-)
+Add support for chip id recognition of AM335x PG2.0 silicon. By default
+omap3xxx_check_revision() recognizes PG1.0, which is extended by adding
+PG2.0 support
 
-diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-index a603b9a..a328365 100644
---- a/drivers/clk/tegra/clk.c
-+++ b/drivers/clk/tegra/clk.c
-@@ -76,6 +76,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
- static const struct of_device_id tegra_dt_clk_match[] = {
- 	{ .compatible = "nvidia,tegra20-car", .data = tegra20_clock_init },
- 	{ .compatible = "nvidia,tegra30-car", .data = tegra30_clock_init },
-+	{ .compatible = "nvidia,tegra114-car", .data = tegra114_clock_init },
- 	{ }
- };
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/mach-omap2/id.c  |   14 ++++++++++++--
+ arch/arm/mach-omap2/soc.h |    1 +
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 45cc7ed4..8a68f1e 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -399,8 +399,18 @@ void __init omap3xxx_check_revision(void)
+ 		}
+ 		break;
+ 	case 0xb944:
+-		omap_revision = AM335X_REV_ES1_0;
+-		cpu_rev = "1.0";
++		switch (rev) {
++		case 0:
++			omap_revision = AM335X_REV_ES1_0;
++			cpu_rev = "1.0";
++			break;
++		case 1:
++		/* FALLTHROUGH */
++		default:
++			omap_revision = AM335X_REV_ES2_0;
++			cpu_rev = "2.0";
++			break;
++		}
+ 		break;
+ 	case 0xb8f2:
+ 		switch (rev) {
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 092aedd..c62116b 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -395,6 +395,7 @@ IS_OMAP_TYPE(3430, 0x3430)
  
-diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index 8756d9f..8097850 100644
---- a/drivers/clk/tegra/clk.h
-+++ b/drivers/clk/tegra/clk.h
-@@ -576,4 +576,11 @@ void tegra30_clock_init(struct device_node *np);
- static inline void tegra30_clock_init(struct device_node *np) {}
- #endif /* CONFIG_ARCH_TEGRA_3x_SOC */
+ #define AM335X_CLASS		0x33500033
+ #define AM335X_REV_ES1_0	AM335X_CLASS
++#define AM335X_REV_ES2_0	(AM335X_CLASS | (0x1 << 8))
  
-+#ifdef CONFIG_ARCH_TEGRA_114_SOC
-+void tegra114_clock_init(struct device_node *np);
-+#else
-+static inline void tegra114_clock_init(struct device_node *np) {}
-+#endif /* CONFIG_ARCH_TEGRA114_SOC */
-+
-+
- #endif /* TEGRA_CLK_H */
+ #define OMAP443X_CLASS		0x44300044
+ #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
+-- 
+1.7.9.5
