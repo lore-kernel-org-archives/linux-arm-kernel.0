@@ -1,25 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Feb 2013 10:12:05 -0800
-Subject: [PATCH] arm: omap: Remove apollon board support
-In-Reply-To: <50DDE0B2.60006@ti.com>
-References: <20121226052106.GA8929@july>
- <50DDE0B2.60006@ti.com>
-Message-ID: <20130201181205.GG22517@atomide.com>
+Date: Fri, 1 Feb 2013 10:13:17 -0800
+Subject: [PATCH v2] ARM: OMAP3: cm-t3517: add MMC support
+In-Reply-To: <50FE845A.8090309@compulab.co.il>
+References: <1354795206-12048-1-git-send-email-grinberg@compulab.co.il>
+ <1354871155-32528-1-git-send-email-grinberg@compulab.co.il>
+ <50E3DEDA.7020807@compulab.co.il> <50FE845A.8090309@compulab.co.il>
+Message-ID: <20130201181317.GH22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [121228 10:12]:
-> On Wednesday 26 December 2012 10:51 AM, Kyungmin Park wrote:
-> >From: Kyungmin Park <kyungmin.park@samsung.com>
-> >
-> >As apollon board doesn't used anymore, remove it.
-> >
-> >Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >---
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+* Igor Grinberg <grinberg@compulab.co.il> [130122 04:25]:
+> ping!
+> 
+> It has been 1.5 month and we are at rc4 already...
 
-Thanks applying into omap-for-v3.9/board.
+Sorry for the delay, applying finally into omap-for-v3.9/board.
 
 Regards,
 
-Tony 
+Tony
