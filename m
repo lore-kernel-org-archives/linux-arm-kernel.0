@@ -1,39 +1,33 @@
 From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
 Date: Fri, 1 Feb 2013 09:31:04 +0000
-Subject: [PATCH 1/5] ARM: OMAP2+: Display correct system timer name
-In-Reply-To: <510B8297.8070305@ti.com>
+Subject: [PATCH 5/5] ARM: OMAP3: Update clocksource timer selection
+In-Reply-To: <510B8A0B.9000600@ti.com>
 References: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
- <1359565471-30721-2-git-send-email-jon-hunter@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ED07255@DBDE01.ent.ti.com>
- <510B8297.8070305@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED073A5@DBDE01.ent.ti.com>
+ <1359565471-30721-6-git-send-email-jon-hunter@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433ED07250@DBDE01.ent.ti.com>
+ <510B83D5.1090500@ti.com> <510B8A0B.9000600@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED073AA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 14:23:43, Hunter, Jon wrote:
+On Fri, Feb 01, 2013 at 14:55:31, Hunter, Jon wrote:
 [...]
-> >>  
-> >> +/* Timer name needs to be big enough to store a string of "timerXX" */
-> >> +static char timer_name[10];
-> >> +
 > > 
-> > Why not move this inside omap_dm_timer_init_one()?
+> > I don't see this as being DT specific. It is more of a policy change to
+> > ensure a wake-up domain timer is used for clocksource when we are using
+> > gptimers for both clocksource and clockevents. It was your patch for
+> > AM335x that made me see the need for this, if that makes sense. May be I
+> > should have referenced that in the changelog.
 > 
-> In the non-DT case, the name member of the clocksource/event struct will
-> point to this array and so it needs to reside in memory permanently and
-> not just temporary. Once we migrate completely to DT then we will be
-> able to remove this completely. See following snippet ...
+> Sorry to be clear, I don't see the policy change as DT specific.
 > 
-> -		sprintf(name, "timer%d", gptimer_id);
-> -		oh_name = name;
-> +		sprintf(timer_name, "timer%d", gptimer_id);
-> +		*name = timer_name;
+> In answer to your question, yes clkev_nr and clksrc_nr are changed so
+> the policy it is consistent regardless of whether you use DT or not. In
+> other words, an OMAP3 board using a gptimer for clocksource  (such as
+> cm-t3517) and does not use DT, would work the same as AM335x with DT.
+> 
 
-Ok. But in case of non-DT boot if someone selects gptimers for both clkevt and
-clksrc, both the name members will end up pointing to the same memory location.
-To be specific, in the current code the clkevt timer name will point to the clksrc
-name. This won't be noticeable during boot since the clkevt name gets printed
-before it is over-written.
+Ok. Thanks for clarifying.
 
 Regards,
 Vaibhav
