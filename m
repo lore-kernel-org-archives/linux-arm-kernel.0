@@ -1,49 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Jan 2013 15:07:51 +0000
-Subject: [PATCH] ARM: spinlock: avoid exclusive accesses on unlock() path
-Message-ID: <1357916871-19920-1-git-send-email-will.deacon@arm.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Thu, 31 Jan 2013 22:37:16 -0800
+Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
+In-Reply-To: <alpine.LFD.2.02.1301312117240.6300@xanadu.home>
+References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
+ <20130128142510.68092e10.akpm@linux-foundation.org>
+ <20130129101549.GP23505@n2100.arm.linux.org.uk> <51089523.3080804@zytor.com>
+ <alpine.LFD.2.02.1301301326530.6300@xanadu.home> <510AE6BF.4080303@zytor.com>
+ <alpine.LFD.2.02.1301311700470.6300@xanadu.home> <510AEDC2.80107@zytor.com>
+ <alpine.LFD.2.02.1301312117240.6300@xanadu.home>
+Message-ID: <510B629C.1010605@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When unlocking a spinlock, all we need to do is increment the owner
-field of the lock. Since only one CPU can be performing an unlock()
-operation for a given lock, this doesn't need to be exclusive.
+On 01/31/2013 06:28 PM, Nicolas Pitre wrote:
+>>
+>> Well, it is too nasty for public confession, but it's called
+>> "paravirtualization".
+> 
+> The fact that you are aware of it means we're not going to break them.  
+> 
+> But my point is that we must not be held back just in case someone out 
+> there might have painted himself in a corner without telling anyone.
+> 
 
-This patch simplifies arch_spin_unlock to use non-exclusive accesses
-when updating the owner field of the lock.
+Yes.  However, it makes it more questionable to simply rip out
+compression methods without warning.  Not that warnings help, as we have
+learned.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/spinlock.h | 16 +---------------
- 1 file changed, 1 insertion(+), 15 deletions(-)
-
-diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
-index b4ca707..6220e9f 100644
---- a/arch/arm/include/asm/spinlock.h
-+++ b/arch/arm/include/asm/spinlock.h
-@@ -119,22 +119,8 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
- 
- static inline void arch_spin_unlock(arch_spinlock_t *lock)
- {
--	unsigned long tmp;
--	u32 slock;
--
- 	smp_mb();
--
--	__asm__ __volatile__(
--"	mov	%1, #1\n"
--"1:	ldrex	%0, [%2]\n"
--"	uadd16	%0, %0, %1\n"
--"	strex	%1, %0, [%2]\n"
--"	teq	%1, #0\n"
--"	bne	1b"
--	: "=&r" (slock), "=&r" (tmp)
--	: "r" (&lock->slock)
--	: "cc");
--
-+	lock->tickets.owner++;
- 	dsb_sev();
- }
- 
--- 
-1.8.0
+	-hpa
