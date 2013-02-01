@@ -1,101 +1,74 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Feb 2013 11:11:24 +0530
-Subject: [PATCH v3 07/15] ARM: vexpress: Select the correct SMP operations
- at run-time
-In-Reply-To: <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <510B5584.6020800@ti.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Fri, 1 Feb 2013 13:40:29 +0800
+Subject: [PATCH v4 02/13] ARM: LPAE: use phys_addr_t in alloc_init_pud()
+In-Reply-To: <alpine.LFD.2.02.1301312218270.6300@xanadu.home>
+References: <1359669512-31276-1-git-send-email-cyril@ti.com>
+ <1359669512-31276-3-git-send-email-cyril@ti.com> <510B327E.3050502@gmail.com>
+ <alpine.LFD.2.02.1301312218270.6300@xanadu.home>
+Message-ID: <510B554D.1000905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
-> From: Jon Medhurst <tixy@linaro.org>
+Nicolas Pitre wrote:
+> On Fri, 1 Feb 2013, Hui Wang wrote:
 >
-The patch deserves couple of lines of description here.
+>   
+>> Cyril Chemparathy wrote:
+>>     
+>>> From: Vitaly Andrianov <vitalya@ti.com>
+>>>
+>>> This patch fixes the alloc_init_pud() function to use phys_addr_t instead of
+>>> unsigned long when passing in the phys argument.
+>>>
+>>> This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a
+>>> (ARM:
+>>> pgtable: use phys_addr_t for physical addresses), which applied similar
+>>> changes
+>>> elsewhere in the ARM memory management code.
+>>>
+>>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+>>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+>>> Acked-by: Nicolas Pitre <nico@linaro.org>
+>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> ---
+>>>  arch/arm/mm/mmu.c |    3 ++-
+>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>>> index 9f06102..ef43689 100644
+>>> --- a/arch/arm/mm/mmu.c
+>>> +++ b/arch/arm/mm/mmu.c
+>>> @@ -612,7 +612,8 @@ static void __init alloc_init_section(pud_t *pud,
+>>> unsigned long addr,
+>>>  }
+>>>   static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+>>> -	unsigned long end, unsigned long phys, const struct mem_type *type)
+>>> +				  unsigned long end, phys_addr_t phys,
+>>> +				  const struct mem_type *type)
+>>>   
+>>>       
+>> The change is correct but seems useless so far. This function only be called
+>> from map_lowmem and devicemaps_init, from i know neither lowmem nor device io
+>> registers of existing platforms exceed 32bit address.
+>>     
+>
+> It is not because you are not aware of any existing platforms with RAM 
+> or device IO above the 4GB mark that they don't exist.
+>
+> For example, some LPAE systems have all their RAM located above the 4G 
+> physical address mark. A simple (potentially non DMA capable) alias 
+> exists in the low 32-bit address space to allow the system to boot and 
+> switch to the real physical RAM addresses once the MMU is turned on.  
+> Some of that RAM is still qualified as "low mem" i.e. the portion of RAM 
+> that the kernel keeps permanently mapped in the 32-bit virtual space 
+> even if all of it is above the 4G mark in physical space.
+>
+>
+>   
+Got it, thanks for sharing the knowledge.
 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> ---
->   arch/arm/include/asm/mach/arch.h |  3 +++
->   arch/arm/kernel/setup.c          |  5 ++++-
->   arch/arm/mach-vexpress/core.h    |  2 ++
->   arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
->   arch/arm/mach-vexpress/v2m.c     |  2 +-
->   5 files changed, 22 insertions(+), 2 deletions(-)
+Regards,
+Hui.
+> Nicolas
 >
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index 917d4fcfd9..3d01c6d6c3 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -17,8 +17,10 @@ struct pt_regs;
->   struct smp_operations;
->   #ifdef CONFIG_SMP
->   #define smp_ops(ops) (&(ops))
-> +#define smp_init_ops(ops) (&(ops))
->   #else
->   #define smp_ops(ops) (struct smp_operations *)NULL
-> +#define smp_init_ops(ops) (void (*)(void))NULL
->   #endif
->
->   struct machine_desc {
-> @@ -42,6 +44,7 @@ struct machine_desc {
->   	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
->   	char			restart_mode;	/* default restart mode	*/
->   	struct smp_operations	*smp;		/* SMP operations	*/
-> +	void			(*smp_init)(void);
->   	void			(*fixup)(struct tag *, char **,
->   					 struct meminfo *);
->   	void			(*reserve)(void);/* reserve mem blocks	*/
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 3f6cbb2e3e..41edca8582 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
->   	arm_dt_init_cpu_maps();
->   #ifdef CONFIG_SMP
->   	if (is_smp()) {
-> -		smp_set_ops(mdesc->smp);
-> +		if(mdesc->smp_init)
-> +			(*mdesc->smp_init)();
-> +		else
-> +			smp_set_ops(mdesc->smp);
->   		smp_init_cpus();
->   	}
->   #endif
-> diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
-> index f134cd4a85..3a761fd76c 100644
-> --- a/arch/arm/mach-vexpress/core.h
-> +++ b/arch/arm/mach-vexpress/core.h
-> @@ -6,6 +6,8 @@
->
->   void vexpress_dt_smp_map_io(void);
->
-> +void vexpress_smp_init_ops(void);
-> +
->   extern struct smp_operations	vexpress_smp_ops;
->
->   extern void vexpress_cpu_die(unsigned int cpu);
-> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-> index c5d70de9bb..667344b479 100644
-> --- a/arch/arm/mach-vexpress/platsmp.c
-> +++ b/arch/arm/mach-vexpress/platsmp.c
-> @@ -12,6 +12,7 @@
->   #include <linux/errno.h>
->   #include <linux/smp.h>
->   #include <linux/io.h>
-> +#include <linux/of.h>
->   #include <linux/of_fdt.h>
->   #include <linux/vexpress.h>
->
-> @@ -206,3 +207,14 @@ struct smp_operations __initdata vexpress_smp_ops = {
->   	.cpu_die		= vexpress_cpu_die,
->   #endif
->   };
-> +
-> +void __init vexpress_smp_init_ops(void)
-> +{
-> +	struct smp_operations *ops = &vexpress_smp_ops;
-> +#ifdef CONFIG_CLUSTER_PM
-See if you can avoid this #ifdef in the middle of function.
-
-Reviewed-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>   
