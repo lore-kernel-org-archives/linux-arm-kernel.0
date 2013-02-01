@@ -1,34 +1,77 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 31 Jan 2013 17:19:32 -0700
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130201000109.GK7717@titan.lakedaemon.net>
-References: <20130129004824.GB7717@titan.lakedaemon.net>
- <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
- <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
- <20130130230100.GV7717@titan.lakedaemon.net>
- <20130131224457.GB17976@schnuecks.de>
- <20130201000109.GK7717@titan.lakedaemon.net>
-Message-ID: <20130201001932.GA13044@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 31 Jan 2013 17:34:36 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <510B0D9C.1000101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 07:01:09PM -0500, Jason Cooper wrote:
+On 01/28/2013 11:56 AM, Thomas Petazzoni wrote:
+> This driver implements the support for the PCIe interfaces on the
+> Marvell Armada 370/XP ARM SoCs. In the future, it might be extended to
+> cover earlier families of Marvell SoCs, such as Dove, Orion and
+> Kirkwood.
 
-> If you're interested, I still have a few ideas.  One was to wire two USB
-> serial adapters end to end to create a different console
-> (console=/dev/ttyUSB0,115200, getty, etc).  Since they would be going
-> over usb, that's a different clock, so it should work and provide us
-> with a safety net.
+Bjorn and I happen to live very close, so we got together today and
+talked about PCIe on ARM.
 
-I can't recall, can you still use JTAG once the CPU has hung on a mbus
-access?
+One of the questions he asked is: why does the window management on the
+Marvell SoCs need to be dynamic?
 
-If so memory dumping the console ring, or cpu registers would get the
-answer pretty directly..
+(Sorry if this was covered earlier; I vaguely recall some discussion on
+the topic, but couldn't find it quickly)
 
-My guesses would be the RTC and/or GPIO blocks (the GPIO blinker needs
-a clock), based on table 94.
+As background, PCIe enumeration in Linux usually works like:
 
-Jason
+1) You start off with some CPU physical address regions that generate
+transactions on the PCIe bus.
+
+2) You enumerate all the PCIe devices, and assign an address to each BAR
+found, carved out of the PCIe address range corresponding to the regions
+you knew from (1).
+
+However, it sounds like the Marvell code wants to:
+
+1) Start off with no real knowledge of the CPU physical address that
+will generate transactions on the PCIe bus, since you want to assign
+that later.
+
+2) You enumerate all the PCIe devices, and assign an address. But, what
+address range do you use?
+
+3) Then you program the SoC's windows to set up the CPU->PCIe address
+translations.
+
+Am I recalling what you're trying to do correctly, or am I completely
+confused?
+
+Now, I recall that a related issue was that you are tight on CPU
+physical address space, and the second algorithm above would allow the
+size of the PCIe controller's window configuration to be as small as
+possible, and hence there would be more CPU physical address space
+available to fit in other peripherals.
+
+However, why does this need to be dynamic? On a particular board, you
+know all the other (non-PCIe) peripherals that you need to fit into the
+CPU physical address space, so you know how much is left over for PCIe,
+so why not always make the PCIe window fill up all the available space,
+and use the first algorithm I described above? And also, I think you
+always know the exact set of PCIe devices that are attached to the
+boards, so you know the exact BAR size requirements there (or are there
+user-accessible PCIe devices; I don't think so from your recent comments
+about PCIe<->PCIe bridges not needing to be supported since the user
+couldn't plug one in?)
+
+Note that with DT, you can easily specify the window location/size in
+the board .dts file rather than the SoC .dtsi file, so it can easily be
+customized based on how much physical address space is taken up by RAM,
+directly mapped NOR flash, etc.
+
+With a static window configuration in DT, you'd end up with a system
+that worked much like any x86 system or Tegra, with some static memory
+range available to PCIe. It's just that in your case, the region
+location/size could change from boot to boot based on DT, whereas it's
+hard-coded in HW for Tegra and I assume x86 too.
