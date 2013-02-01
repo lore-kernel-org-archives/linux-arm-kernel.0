@@ -1,39 +1,52 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 1 Feb 2013 16:58:42 +0200
-Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EAA0011@DBDE01.ent.ti.com>
-References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
- <510916B2.7080509@ti.com> <20130130131504.GU15258@arwen.pp.htv.fi>
- <C8443D0743D26F4388EA172BF4E2A7A93EA95E97@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA9FF9C@DBDE01.ent.ti.com>
- <510BD04A.4000909@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA9FFD5@DBDE01.ent.ti.com>
- <510BD1CA.9020309@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EAA0011@DBDE01.ent.ti.com>
-Message-ID: <510BD822.8010905@ti.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Fri, 1 Feb 2013 10:10:37 -0500
+Subject: [PATCH v4 00/13] ARM LPAE Fixes - Part 1
+In-Reply-To: <alpine.LFD.2.02.1301312252230.6300@xanadu.home>
+References: <1359669512-31276-1-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1301312252230.6300@xanadu.home>
+Message-ID: <510BDAED.8060805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2013 04:35 PM, Mohammed, Afzal wrote:
-> Hi Roger,
-> 
-> On Fri, Feb 01, 2013 at 20:01:38, Quadros, Roger wrote:
-> 
->> but DT boot is not supported for OMAP USB Host. How did you get it to work?
+Hi Nico,
+
+On 01/31/2013 11:00 PM, Nicolas Pitre wrote:
+> On Thu, 31 Jan 2013, Cyril Chemparathy wrote:
+>
+>> This series is a repost of the LPAE related changes in preparation for the
+>> introduction of the Keystone sub-architecture.  The original series has now
+>> been split, and this particular series excludes the earlier changes to the
+>> runtime code patching implementation.  Earlier versions of this series can be
+>> found at [1], [2], [3] and [4].
 >>
->> Are you testing the Host connector or the OTG connector?
-> 
-> If you see latest changes on musb_dsps.c, you will be able to find
-> out.
-> 
-> As beagle bone first instance works only in device, it was tested
-> using ether gadget.
-> 
+>> These patches are also available in git:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/cchemparathy/linux-keystone.git upstream/keystone-lpae-v4
+>
+> This part 1 looks very nice.  It received many review cycles already as
+> well.  It would be about time it goes upstream.
+>
+> I think it is ready to be merged in Russell's tree.  Feel free to send
+> him a pull request whenever you're ready.
+>
 
-OK, it seems that you are testing the OTG port. This patchset has nothing to do with
-it. These are for getting the USB type A (the bigger) port to work. But for that to work on
-beaglebone we need to wait for the DT adaptation.
+Great.  I'll apply your acks and post a pull request.
 
-cheers,
--roger
+> Then we'll be free to look at the more controvertial p2v patching stuff.
+>
+
+On the P2V patching stuff, I've implemented an alternative approach to 
+get past this problem.  Essentially, the new implementation retains the 
+kernel location detection part, but avoids the code patching by using 
+simple inline P2V and V2P functions that use the offset detected early 
+on in boot.
+
+With this, I ran simple network and filesystem performance tests to 
+compare the code-patching vs. non-code-patching variants.  These tests 
+didn't yield any significant performance difference between the two on 
+an ARMv7 (Cortex-A8) platform.
+
+This series is basically operational at this point, but it needs a bit 
+more test coverage before I post it out.
+
+Thanks
+-- Cyril.
