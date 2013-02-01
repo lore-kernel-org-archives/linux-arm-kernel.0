@@ -1,25 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 31 Jan 2013 19:40:35 -0800
-Subject: [GIT PULL] Renesas ARM-based SoC for v3.9 #2
-In-Reply-To: <1359613569-26981-1-git-send-email-horms+renesas@verge.net.au>
-References: <1359613569-26981-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130201034035.GB4838@quad.lixom.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 31 Jan 2013 22:42:57 -0500 (EST)
+Subject: [PATCH v4 07/13] ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for
+ bootmem
+In-Reply-To: <1359669512-31276-8-git-send-email-cyril@ti.com>
+References: <1359669512-31276-1-git-send-email-cyril@ti.com>
+ <1359669512-31276-8-git-send-email-cyril@ti.com>
+Message-ID: <alpine.LFD.2.02.1301312242300.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 03:26:05PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+On Thu, 31 Jan 2013, Cyril Chemparathy wrote:
+
+> This patch adds an architecture defined override for ARCH_LOW_ADDRESS_LIMIT.
+> On PAE systems, the absence of this override causes bootmem to incorrectly
+> limit itself to 32-bit addressable physical memory.
 > 
-> The following changes since commit ff8de98d50e551057978ea90d09255c528fde1ac:
-> 
->   ARM: shmobile: r8a7779: scif .irqs used SCIx_IRQ_MUXED() (2013-01-25 12:43:50 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.9
-> 
+> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
 
-Pulled.
-
--Olof
+> ---
+>  arch/arm/include/asm/memory.h |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 73cf03a..8825abb 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -275,6 +275,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+>  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+>  #define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
+>  
+> +#define ARCH_LOW_ADDRESS_LIMIT		PHYS_MASK
+> +
+>  #endif
+>  
+>  #include <asm-generic/memory_model.h>
+> -- 
+> 1.7.9.5
+> 
