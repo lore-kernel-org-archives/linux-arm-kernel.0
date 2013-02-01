@@ -1,112 +1,88 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 1 Feb 2013 12:28:19 -0500 (EST)
-Subject: [PATCH v3 07/15] ARM: vexpress: Select the correct SMP operations
- at run-time
-In-Reply-To: <510B5584.6020800@ti.com>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
- <510B5584.6020800@ti.com>
-Message-ID: <alpine.LFD.2.02.1302011226270.6300@xanadu.home>
+From: subashrp@gmail.com (Subash Patel)
+Date: Fri, 01 Feb 2013 09:33:56 -0800
+Subject: [PATCH v4 02/13] ARM: LPAE: use phys_addr_t in alloc_init_pud()
+In-Reply-To: <alpine.LFD.2.02.1301312218270.6300@xanadu.home>
+References: <1359669512-31276-1-git-send-email-cyril@ti.com>
+ <1359669512-31276-3-git-send-email-cyril@ti.com> <510B327E.3050502@gmail.com>
+ <alpine.LFD.2.02.1301312218270.6300@xanadu.home>
+Message-ID: <510BFC84.2030902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
+Hi Nicolas,
 
-> On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
-> > From: Jon Medhurst <tixy@linaro.org>
-> > 
-> The patch deserves couple of lines of description here.
+On Thursday 31 January 2013 07:35 PM, Nicolas Pitre wrote:
+> On Fri, 1 Feb 2013, Hui Wang wrote:
+>
+>> Cyril Chemparathy wrote:
+>>> From: Vitaly Andrianov <vitalya@ti.com>
+>>>
+>>> This patch fixes the alloc_init_pud() function to use phys_addr_t instead of
+>>> unsigned long when passing in the phys argument.
+>>>
+>>> This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a
+>>> (ARM:
+>>> pgtable: use phys_addr_t for physical addresses), which applied similar
+>>> changes
+>>> elsewhere in the ARM memory management code.
+>>>
+>>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+>>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+>>> Acked-by: Nicolas Pitre <nico@linaro.org>
+>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> ---
+>>>   arch/arm/mm/mmu.c |    3 ++-
+>>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>>> index 9f06102..ef43689 100644
+>>> --- a/arch/arm/mm/mmu.c
+>>> +++ b/arch/arm/mm/mmu.c
+>>> @@ -612,7 +612,8 @@ static void __init alloc_init_section(pud_t *pud,
+>>> unsigned long addr,
+>>>   }
+>>>    static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+>>> -	unsigned long end, unsigned long phys, const struct mem_type *type)
+>>> +				  unsigned long end, phys_addr_t phys,
+>>> +				  const struct mem_type *type)
+>>>
+>> The change is correct but seems useless so far. This function only be called
+>> from map_lowmem and devicemaps_init, from i know neither lowmem nor device io
+>> registers of existing platforms exceed 32bit address.
+>
+> It is not because you are not aware of any existing platforms with RAM
+> or device IO above the 4GB mark that they don't exist.
+>
+> For example, some LPAE systems have all their RAM located above the 4G
+> physical address mark. A simple (potentially non DMA capable) alias
+> exists in the low 32-bit address space to allow the system to boot and
+> switch to the real physical RAM addresses once the MMU is turned on.
+> Some of that RAM is still qualified as "low mem" i.e. the portion of RAM
+> that the kernel keeps permanently mapped in the 32-bit virtual space
+> even if all of it is above the 4G mark in physical space.
 
-Yes, Tixy has split it into 2 patches with proper description which 
-should be part of the next round.
+I think he is right. You cannot have low_mem and devices in 36-bit 
+areas. Atleast this is what I saw in one of the platforms on which I 
+tested these patches. I am not sure what you mean by hardware address 
+aliasing(as I have real RAM), but we need 32-bit areas to boot the CPU 
+and I have mapped them for the LOW_MEM. But, I have used 36-bit areas 
+for the HIGH_MEM. Since you said about aliasing DDR area in 32-bits, and 
+then switching to 36-bit RAM, does the dma of the devices still use 
+32-bit aliased addresses?
+
+I haven't tested a configuration where LOW_MEM can have both 32-bit and 
+36-bit DDR PA though. I think its not possible too.
+
+Regards,
+Subash
 
 
-> 
-> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > ---
-> >   arch/arm/include/asm/mach/arch.h |  3 +++
-> >   arch/arm/kernel/setup.c          |  5 ++++-
-> >   arch/arm/mach-vexpress/core.h    |  2 ++
-> >   arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
-> >   arch/arm/mach-vexpress/v2m.c     |  2 +-
-> >   5 files changed, 22 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/mach/arch.h
-> > b/arch/arm/include/asm/mach/arch.h
-> > index 917d4fcfd9..3d01c6d6c3 100644
-> > --- a/arch/arm/include/asm/mach/arch.h
-> > +++ b/arch/arm/include/asm/mach/arch.h
-> > @@ -17,8 +17,10 @@ struct pt_regs;
-> >   struct smp_operations;
-> >   #ifdef CONFIG_SMP
-> >   #define smp_ops(ops) (&(ops))
-> > +#define smp_init_ops(ops) (&(ops))
-> >   #else
-> >   #define smp_ops(ops) (struct smp_operations *)NULL
-> > +#define smp_init_ops(ops) (void (*)(void))NULL
-> >   #endif
-> > 
-> >   struct machine_desc {
-> > @@ -42,6 +44,7 @@ struct machine_desc {
-> >   	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
-> >   	char			restart_mode;	/* default restart mode	*/
-> >   	struct smp_operations	*smp;		/* SMP operations	*/
-> > +	void			(*smp_init)(void);
-> >   	void			(*fixup)(struct tag *, char **,
-> >   					 struct meminfo *);
-> >   	void			(*reserve)(void);/* reserve mem blocks	*/
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index 3f6cbb2e3e..41edca8582 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
-> >   	arm_dt_init_cpu_maps();
-> >   #ifdef CONFIG_SMP
-> >   	if (is_smp()) {
-> > -		smp_set_ops(mdesc->smp);
-> > +		if(mdesc->smp_init)
-> > +			(*mdesc->smp_init)();
-> > +		else
-> > +			smp_set_ops(mdesc->smp);
-> >   		smp_init_cpus();
-> >   	}
-> >   #endif
-> > diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
-> > index f134cd4a85..3a761fd76c 100644
-> > --- a/arch/arm/mach-vexpress/core.h
-> > +++ b/arch/arm/mach-vexpress/core.h
-> > @@ -6,6 +6,8 @@
-> > 
-> >   void vexpress_dt_smp_map_io(void);
-> > 
-> > +void vexpress_smp_init_ops(void);
-> > +
-> >   extern struct smp_operations	vexpress_smp_ops;
-> > 
-> >   extern void vexpress_cpu_die(unsigned int cpu);
-> > diff --git a/arch/arm/mach-vexpress/platsmp.c
-> > b/arch/arm/mach-vexpress/platsmp.c
-> > index c5d70de9bb..667344b479 100644
-> > --- a/arch/arm/mach-vexpress/platsmp.c
-> > +++ b/arch/arm/mach-vexpress/platsmp.c
-> > @@ -12,6 +12,7 @@
-> >   #include <linux/errno.h>
-> >   #include <linux/smp.h>
-> >   #include <linux/io.h>
-> > +#include <linux/of.h>
-> >   #include <linux/of_fdt.h>
-> >   #include <linux/vexpress.h>
-> > 
-> > @@ -206,3 +207,14 @@ struct smp_operations __initdata vexpress_smp_ops = {
-> >   	.cpu_die		= vexpress_cpu_die,
-> >   #endif
-> >   };
-> > +
-> > +void __init vexpress_smp_init_ops(void)
-> > +{
-> > +	struct smp_operations *ops = &vexpress_smp_ops;
-> > +#ifdef CONFIG_CLUSTER_PM
-> See if you can avoid this #ifdef in the middle of function.
-> 
-> Reviewed-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
-> 
+>
+>
+> Nicolas
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
