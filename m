@@ -1,39 +1,64 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 1 Feb 2013 13:59:59 -0500
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <2077c13e12314dc3adc8e5b653855da0@DFLE72.ent.ti.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com>
- <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
- <20130201184915.GP2244@beef>
- <2077c13e12314dc3adc8e5b653855da0@DFLE72.ent.ti.com>
-Message-ID: <20130201185959.GQ2244@beef>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 01 Feb 2013 20:09:21 +0100
+Subject: [PATCH v4 00/10] Device tree support for Exynos SoC camera subsystem
+Message-ID: <1359745771-23684-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 07:52:46PM +0000, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 02/01/2013 09:49 PM, Matt Porter wrote:
-> 
-> >>> Move mach-davinci/dma.c to common/edma.c so it can be used
-> >>> by OMAP (specifically AM33xx) as well.
-> 
-> >> I think this should rather go to drivers/dma/?
-> 
-> > No, this is the private EDMA API. It's the analogous thing to
-> > the private OMAP dma API that is in plat-omap/dma.c. The actual
-> > dmaengine driver is in drivers/dma/edma.c as a wrapper around
-> > this...same way OMAP DMA engine conversion is being done.
-> 
->   Keeps me wondering why we couldn't have the same with CPPI 4.1 when I proposed
-> that, instead of waiting indefinitely for TI to convert it to drivers/dma/
-> directly. We could have working MUSB DMA on OMAP-L1x/Sitara all this time... Sigh.
+This is an updated patch series adding initial support for the Exynos4
+SoC series camera subsystem. It is based on the video interfaces common
+device tree bindings and depends on patch series [1]. The full source
+tree can be browsed at [2].
 
-That is a shame. Yeah, I've pointed out that I was doing this exactly
-the same way as was acceptable for the OMAP DMA conversion since it was
-in RFC. The reasons are sound since in both cases, we have many drivers
-to convert that need to continue using the private DMA APIs.
+I've dropped the RFC tag from this series and I'm going to continue with
+adding support for asynchronous sensor subdevs registration and the
+FIMC-IS on top of it. Unless there are further changes in the bindings.
 
--Matt
-> 
+Still, any comments are welcome.
+The changes are listed in each patch, if any.
+
+This series likely won't make it to v3.9. It would be nice, but there
+seems not to be much interest in getting [1] in the mainline and the
+reviews are relatively slow.
+
+Any Ack/nack from the device tree maintainers are welcome, so I could
+finally have this patch set merged and carry on with other, even more
+interesting things. :)
+
+Thanks,
+Sylwester
+
+[1] http://www.spinics.net/lists/linux-media/msg59471.html
+[2] http://git.linuxtv.org/snawrocki/samsung.git/exynos_fimc
+
+Sylwester Nawrocki (10):
+  s5p-csis: Add device tree support
+  s5p-fimc: Add device tree support for FIMC devices
+  s5p-fimc: Add device tree support for FIMC-LITE devices
+  s5p-fimc: Add device tree support for the main media device driver
+  s5p-fimc: Add device tree based sensors registration
+  s5p-fimc: Use pinctrl API for camera ports configuration
+  ARM: dts: Add camera to node exynos4.dtsi
+  ARM: dts: Add ISP power domain node for Exynos4x12
+  ARM: dts: Add FIMC and MIPI CSIS device nodes for Exynos4x12
+  ARM: dts: Correct camera pinctrl nodes for Exynos4x12 SoCs
+
+ .../devicetree/bindings/media/soc/samsung-fimc.txt |  183 +++++++++++
+ .../bindings/media/soc/samsung-mipi-csis.txt       |   82 +++++
+ arch/arm/boot/dts/exynos4.dtsi                     |   64 ++++
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi          |   26 +-
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   52 ++++
+ drivers/media/platform/s5p-fimc/fimc-capture.c     |    2 +-
+ drivers/media/platform/s5p-fimc/fimc-core.c        |   94 ++++--
+ drivers/media/platform/s5p-fimc/fimc-lite.c        |   65 ++--
+ drivers/media/platform/s5p-fimc/fimc-mdevice.c     |  319 ++++++++++++++++++--
+ drivers/media/platform/s5p-fimc/fimc-mdevice.h     |    4 +
+ drivers/media/platform/s5p-fimc/mipi-csis.c        |  154 +++++++---
+ drivers/media/platform/s5p-fimc/mipi-csis.h        |    1 +
+ include/media/s5p_fimc.h                           |   17 ++
+ 13 files changed, 936 insertions(+), 127 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
+ create mode 100644 Documentation/devicetree/bindings/media/soc/samsung-mipi-csis.txt
+
+--
+1.7.9.5
