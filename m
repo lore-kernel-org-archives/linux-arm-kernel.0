@@ -1,38 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Feb 2013 10:26:37 -0800
-Subject: [PATCH 1/1] ARM: OMAP3: igep0020: simplify GPIO LEDs dependencies
-In-Reply-To: <CABxcv=k6wypYO+JOV1rWyuGtR-seNQ2PFqym7QsAdkC+mC7P8g@mail.gmail.com>
-References: <1355505428-24302-1-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv=k6wypYO+JOV1rWyuGtR-seNQ2PFqym7QsAdkC+mC7P8g@mail.gmail.com>
-Message-ID: <20130201182637.GJ22517@atomide.com>
+From: mporter@ti.com (Matt Porter)
+Date: Fri,  1 Feb 2013 13:22:47 -0500
+Subject: [PATCH v7 02/10] ARM: edma: remove unused transfer controller handlers
+In-Reply-To: <1359742975-10421-1-git-send-email-mporter@ti.com>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+Message-ID: <1359742975-10421-3-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@dowhile0.org> [121220 06:08]:
-> 
-> Any comments on this patch?
+Fix build on OMAP, the irqs are undefined on AM33xx.
+These error interrupt handlers were hardcoded as disabled
+so since they are unused code, simply remove them.
 
-No comments, sorry for the delay. Applying it into omap-for-v3.9/board.
+Signed-off-by: Matt Porter <mporter@ti.com>
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/common/edma.c |   37 -------------------------------------
+ 1 file changed, 37 deletions(-)
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index aa4a49a..3440d16 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -494,26 +494,6 @@ static irqreturn_t dma_ccerr_handler(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
  
-> I wonder if I should keep sending fixes/improvements for board-igep0020.c
-> 
-> I already sent an initial Device Tree support for IGEP boards [1] and
-> Benoit told me he is going to queue for 3.9. But still doesn't support
-> many peripherals found on these boards because they still don't proper
-> DT support, for instance NAND and Ethernet need the GPMC bindings
-> patches that haven't hit mainline yet.
-> 
-> So, it seems I will have to keep working on the board file until it
-> can be completely deprecated.
-
-Yes we still have few missing things for complete DT support. While we
-are working at it, let's just keep the board-*.c changes to minimum.
-
-Regards,
-
-Tony
+-/******************************************************************************
+- *
+- * Transfer controller error interrupt handlers
+- *
+- *****************************************************************************/
+-
+-#define tc_errs_handled	false	/* disabled as long as they're NOPs */
+-
+-static irqreturn_t dma_tc0err_handler(int irq, void *data)
+-{
+-	dev_dbg(data, "dma_tc0err_handler\n");
+-	return IRQ_HANDLED;
+-}
+-
+-static irqreturn_t dma_tc1err_handler(int irq, void *data)
+-{
+-	dev_dbg(data, "dma_tc1err_handler\n");
+-	return IRQ_HANDLED;
+-}
+-
+ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+ 				     unsigned int num_slots,
+ 				     unsigned int start_slot)
+@@ -1743,23 +1723,6 @@ static int edma_probe(struct platform_device *pdev)
+ 		arch_num_cc++;
+ 	}
  
-> Thanks a lot and best regards,
-> Javier
-> 
-> [1]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82383.html
+-	if (tc_errs_handled) {
+-		status = request_irq(IRQ_TCERRINT0, dma_tc0err_handler, 0,
+-					"edma_tc0", &pdev->dev);
+-		if (status < 0) {
+-			dev_dbg(&pdev->dev, "request_irq %d failed --> %d\n",
+-				IRQ_TCERRINT0, status);
+-			return status;
+-		}
+-		status = request_irq(IRQ_TCERRINT, dma_tc1err_handler, 0,
+-					"edma_tc1", &pdev->dev);
+-		if (status < 0) {
+-			dev_dbg(&pdev->dev, "request_irq %d --> %d\n",
+-				IRQ_TCERRINT, status);
+-			return status;
+-		}
+-	}
+-
+ 	return 0;
+ 
+ fail:
+-- 
+1.7.9.5
