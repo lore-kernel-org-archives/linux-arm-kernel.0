@@ -1,88 +1,68 @@
-From: subashrp@gmail.com (Subash Patel)
-Date: Fri, 01 Feb 2013 09:33:56 -0800
-Subject: [PATCH v4 02/13] ARM: LPAE: use phys_addr_t in alloc_init_pud()
-In-Reply-To: <alpine.LFD.2.02.1301312218270.6300@xanadu.home>
-References: <1359669512-31276-1-git-send-email-cyril@ti.com>
- <1359669512-31276-3-git-send-email-cyril@ti.com> <510B327E.3050502@gmail.com>
- <alpine.LFD.2.02.1301312218270.6300@xanadu.home>
-Message-ID: <510BFC84.2030902@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 1 Feb 2013 17:35:05 +0000 (UTC)
+Subject: [PATCH 00/15] OMAP SHAM & AES Crypto Updates
+In-Reply-To: <20130128191635.GA14158@animalcreek.com>
+References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1212230836160.16045@utopia.booyaka.com>
+ <20130108203853.GB1876@animalcreek.com>
+ <alpine.DEB.2.00.1301171904070.14118@utopia.booyaka.com>
+ <20130117222728.GA32446@animalcreek.com>
+ <20130128191635.GA14158@animalcreek.com>
+Message-ID: <alpine.DEB.2.00.1302011722070.10853@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Mark
 
-On Thursday 31 January 2013 07:35 PM, Nicolas Pitre wrote:
-> On Fri, 1 Feb 2013, Hui Wang wrote:
->
->> Cyril Chemparathy wrote:
->>> From: Vitaly Andrianov <vitalya@ti.com>
->>>
->>> This patch fixes the alloc_init_pud() function to use phys_addr_t instead of
->>> unsigned long when passing in the phys argument.
->>>
->>> This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a
->>> (ARM:
->>> pgtable: use phys_addr_t for physical addresses), which applied similar
->>> changes
->>> elsewhere in the ARM memory management code.
->>>
->>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
->>> Acked-by: Nicolas Pitre <nico@linaro.org>
->>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>> ---
->>>   arch/arm/mm/mmu.c |    3 ++-
->>>   1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->>> index 9f06102..ef43689 100644
->>> --- a/arch/arm/mm/mmu.c
->>> +++ b/arch/arm/mm/mmu.c
->>> @@ -612,7 +612,8 @@ static void __init alloc_init_section(pud_t *pud,
->>> unsigned long addr,
->>>   }
->>>    static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
->>> -	unsigned long end, unsigned long phys, const struct mem_type *type)
->>> +				  unsigned long end, phys_addr_t phys,
->>> +				  const struct mem_type *type)
->>>
->> The change is correct but seems useless so far. This function only be called
->> from map_lowmem and devicemaps_init, from i know neither lowmem nor device io
->> registers of existing platforms exceed 32bit address.
->
-> It is not because you are not aware of any existing platforms with RAM
-> or device IO above the 4GB mark that they don't exist.
->
-> For example, some LPAE systems have all their RAM located above the 4G
-> physical address mark. A simple (potentially non DMA capable) alias
-> exists in the low 32-bit address space to allow the system to boot and
-> switch to the real physical RAM addresses once the MMU is turned on.
-> Some of that RAM is still qualified as "low mem" i.e. the portion of RAM
-> that the kernel keeps permanently mapped in the 32-bit virtual space
-> even if all of it is above the 4G mark in physical space.
+On Mon, 28 Jan 2013, Mark A. Greer wrote:
 
-I think he is right. You cannot have low_mem and devices in 36-bit 
-areas. Atleast this is what I saw in one of the platforms on which I 
-tested these patches. I am not sure what you mean by hardware address 
-aliasing(as I have real RAM), but we need 32-bit areas to boot the CPU 
-and I have mapped them for the LOW_MEM. But, I have used 36-bit areas 
-for the HIGH_MEM. Since you said about aliasing DDR area in 32-bits, and 
-then switching to 36-bit RAM, does the dma of the devices still use 
-32-bit aliased addresses?
+> On Thu, Jan 17, 2013 at 03:27:28PM -0700, Mark A. Greer wrote:
+> > On Thu, Jan 17, 2013 at 07:13:36PM +0000, Paul Walmsley wrote:
+> > > On Tue, 8 Jan 2013, Mark A. Greer wrote:
+> > > 
+> > > > On Sun, Dec 23, 2012 at 08:40:43AM +0000, Paul Walmsley wrote:
+> 
+> > > What do you think about adding an am35xx_es11plus_hwmod_ocp_ifs[] array to 
+> > > omap_hwmod_3xxx_data.c for these secure hwmods?  That carries the implicit 
+> > > and possibly wrong assumption that it's likely to be ES1.0 devices that 
+> > > are missing the SHAM/AES, but it seems unlikely that TI would have 
+> > > multiple silicon revs running around claiming to be ES1.1?  Or maybe I'm 
+> > > just being na?ve.
+> > 
+> > Something like that makes sense to me.  I'll re-read my email, etc. and
+> > see if I can find something to help us figure it out.
+> 
+> I couldn't find any information that helped with this so AFAIK there is no
+> good way to tell if a particular am35xx has the crypto hardware available
+> or not.
 
-I haven't tested a configuration where LOW_MEM can have both 32-bit and 
-36-bit DDR PA though. I think its not possible too.
+I was thinking that we might assume that they are present on AM35xx 
+ES1.1+.  If the TI folks are saying that they aren't available on only a 
+few early devices, I'd guess that means ES1.0.  I personally have never 
+seen an ES1.0 AM35xx device... 
 
-Regards,
-Subash
+Discriminating between ES1.0 and ES1.1+ should be pretty easy in the hwmod 
+init...
+
+>  At this point, I vote for moving 'omap3xxx_l4_core__sham' and
+> 'omap3xxx_l4_core__aes' from omap3xxx_gp_hwmod_ocp_ifs[] and putting them
+> in omap34xx_hwmod_ocp_ifs[] and omap36xx_hwmod_ocp_ifs[].  
+
+I'm pretty sure that's going to break on HS OMAPs, like the HS OMAP3430 in 
+the N900.  I don't think those IP blocks are directly accessible from 
+Linux on most HS setups, although this might vary by device.  I'd feel 
+more comfortable if you created an omap34xx_gp_hwmod_ocp_ifs[] list and an 
+omap36xx_gp_hwmod_ocp_ifs[] list.  We should probably get rid of 
+omap3xxx_gp_hwmod_ocp_ifs[] altogether.
+
+> That should be safe in general and if someone with an am35xx wants to 
+> use those modules, they can edit am35xx_hwmod_ocp_ifs[] locally.
+
+If you want to just leave them commented in am35xx_hwmod_ocp_ifs[], rather 
+than enabling them for ES1.1+ AM35xx, that's fine with me too, since we 
+don't know that they are ES-level-based.  Maybe put a comment there that 
+says that these are likely to be present, but no one seems to know for 
+certain?  Seems ludicrous, but I guess that's what we're reduced to!
 
 
->
->
-> Nicolas
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
+- Paul
