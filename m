@@ -1,32 +1,71 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Feb 2013 17:17:33 +0530
-Subject: [PATCH, RFC] default machine descriptor for multiplatform
-In-Reply-To: <1638002.UJ7zfj1Wn5@wuerfel>
-References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <20130131161823.GT2637@n2100.arm.linux.org.uk> <1731670.s76EGcEZ7m@wuerfel>
- <1638002.UJ7zfj1Wn5@wuerfel>
-Message-ID: <510BAB55.30603@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Feb 2013 11:46:41 +0000
+Subject: [PATCHv5 15/16] ARM: hyp: initialize CNTVOFF to zero
+In-Reply-To: <20130201111350.GA1970@linaro.org>
+References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
+ <1359634539-9580-16-git-send-email-mark.rutland@arm.com>
+ <20130201111350.GA1970@linaro.org>
+Message-ID: <20130201114641.GB2094@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 January 2013 11:21 PM, Arnd Bergmann wrote:
-> This is what I think it would look like to do a default platform
-> with an empty machine descriptor on ARM. It makes the few required
-> entries in the descriptor optional by using the new irqchip_init()
-> and clocksource_of_init() functions as defaults, and adds
-> a fallback for the DT case to customize_machine to probe all
-> the default devices.
->
-> For the case that CONFIG_MULTIPLATFORM is enabled, it then
-> adds a machine descriptor that never matches any machine but
-> is used as a fallback if nothing else matches.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-This is indeed a nice update towards consolidation. Though
-on OMAP, we need to do some work to effectively get rid
-of machine, time and irq inits. Will add this task in my
-TODO queue.
+On Fri, Feb 01, 2013 at 11:13:50AM +0000, Dave Martin wrote:
+> On Thu, Jan 31, 2013 at 12:15:38PM +0000, Mark Rutland wrote:
+> > From: Marc Zyngier <Marc.Zyngier@arm.com>
+> > 
+> > In order to be able to use the virtual counter in a safe way,
+> > make sure it is initialized to zero before dropping to SVC.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Dave Martin <dave.martin@arm.com>
+> > ---
+> >  arch/arm/kernel/hyp-stub.S | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> > index 65b2417..455603a 100644
+> > --- a/arch/arm/kernel/hyp-stub.S
+> > +++ b/arch/arm/kernel/hyp-stub.S
+> > @@ -152,6 +152,9 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+> >  	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
+> >  	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
+> >  	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
+> > +	mov	r6, #0
+> > +	mov	r7, #0
+> > +	mcrr	p15, 4, r6, r7, c14	@ CNTVOFF
+> 
+> Is this required for safety, or is it more a sanity feature?
 
-Regards,
-Santosh
+This makes more sense with the next patch, which makes the arch_timer
+driver always use the virtual counters (to avoid indirection in the fast
+path and messy races with the setup of function pointers otherwise).
+
+It's required for safety when hyp mode is enabled, and the arch_timer
+driver uses the physical timers in combination with the virtual
+counters. Either the driver has to apply CNTVOFF manually when setting
+the physical timers, or the physical timers and virtual counters need
+the same view of time (i.e. CNTVOFF == 0).
+
+It also brings us in line with arm64, which always uses the virtual
+counter for its vDSO.
+
+> 
+> The architected timer counters are supposed to be monotonic time sources
+> only, so applying a random offset shouldn't really change anything.
+
+This is true except when we want to use the physical timers as described above.
+
+> 
+> The main thing I can think of is that it is easier for the host to
+> manage guests' virtual counter offsets if the host's offset is 0 (and
+> we don't really want to be changing the host offset after the host kernel
+> boots).
+
+That's pretty much it. We don't want to have to further separate the handling
+of the timer for host and guest. By having CNTVOFF as zero for the host, we
+don't need to duplicate reading of the timers and/or incur an additional
+overhead on reading them.
+
+Thanks,
+Mark.
