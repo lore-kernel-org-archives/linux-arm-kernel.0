@@ -1,309 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 1 Feb 2013 15:51:58 +0000
-Subject: [GIT PULL  0/4] ARM: mvebu: changes for v3.9
-Message-ID: <1359733918.Bf7ecc0.22262@triton>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Feb 2013 16:02:36 +0000
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130201094613.38fa2ad0@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <510B268E.2040104@wwwdotorg.org> <20130201094613.38fa2ad0@skate>
+Message-ID: <201302011602.36848.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 19d23dac1b8f95e4a960fcbbb5687c33b9a2cd01:
+On Friday 01 February 2013, Thomas Petazzoni wrote:
+> > So while it's obvious that window base address and size shouldn't be
+> > static, I wonder if the assignment of a specific window ID to a
+> > specific root port ID shouldn be dynamic or static. For example, if
+> > your HW configuration leaves you with 6 windows available, you could
+> > support 2 PCIe root ports by statically assigning 3 windows to serve
+> > each of those 2 root ports. Would that work, or are there systems
+> > where over-commit is needed, e.g. if there's no IO space behind a
+> > root port, you could get away with two windows per root port, and
+> > hence be able to run 3 root ports rather than just 2? Still, if you
+> > know which PCIe devices are being the root ports, you could still
+> > represent the over-commit statically in DT
+> 
+> For now, I haven't figured out how not to allocate an I/O window if the
+> downstream device doesn't use I/O, but I'd like to achieve that, as it
+> would save one of the two windows needed per PCIe interface... and many
+> PCIe devices don't need the I/O window.
 
-  Merge branch 'fixes' into for-next
+The easiest hack would be to only ever allow one I/O window on exactly
+one of the ports, and not do PIO on the other ports at all. Given the
+various troubles of making any other combination work, that sounds like
+a good enough compromise to me. A lot of the add-on cards would not
+work in the remaining ports anyway, and worrying too much about that
+legacy hardware may just not be worth it. That way, you only need 11
+windows for PCIe (10*mem, 1*IO), which will always fit.
 
-are available in the git repository at:
+Do you actually have /any/ PCIe cards with PIO BARs that you can test
+with?
 
-  git://git.infradead.org/users/jcooper/linux.git mvebu/for-next
-
-for you to fetch changes up to 7d8a7dce24f76242daf1c469878597b8acc4f78f:
-
-  Merge tag 'tags/dt_for_v3.9' into mvebu/for-next
-
-Jason Cooper (5):
-      Merge tag 'tags/mvebu_fixes_for_v3.8-rc6' into mvebu/for-next
-      Merge tag 'tags/cleanup_for_v3.9_round2' into mvebu/for-next
-      Merge tag 'tags/drivers_for_v3.9' into mvebu/for-next
-      Merge tag 'tags/boards_for_v3.9' into mvebu/for-next
-      Merge tag 'tags/dt_for_v3.9' into mvebu/for-next
-
- .../bindings/mmc/brcm,bcm2835-sdhci.txt         |  18 ++
- .../devicetree/bindings/mmc/orion-sdio.txt      |  17 ++
- Documentation/filesystems/f2fs.txt              |  18 +-
- MAINTAINERS                                     |   2 +-
- Makefile                                        |   4 +-
- arch/arm/boot/dts/Makefile                      |   2 +
- arch/arm/boot/dts/armada-370-db.dts             |  15 +
- arch/arm/boot/dts/armada-370-mirabox.dts        |  10 +
- arch/arm/boot/dts/armada-370-rd.dts             |  61 ++++
- arch/arm/boot/dts/armada-370-xp.dtsi            |  14 +
- arch/arm/boot/dts/armada-370.dtsi               |  12 +
- arch/arm/boot/dts/armada-xp-db.dts              |   7 +
- arch/arm/boot/dts/armada-xp-mv78230.dtsi        |   6 +
- arch/arm/boot/dts/armada-xp-mv78260.dtsi        |   6 +
- arch/arm/boot/dts/armada-xp-mv78460.dtsi        |   6 +
- .../arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  12 +
- arch/arm/boot/dts/armada-xp.dtsi                |   2 +-
- arch/arm/boot/dts/dove-cubox.dts                |  28 +-
- arch/arm/boot/dts/dove.dtsi                     |   2 +
- arch/arm/boot/dts/kirkwood-6282.dtsi            |  17 ++
- arch/arm/boot/dts/kirkwood-dreamplug.dts        |   7 +
- .../boot/dts/kirkwood-guruplug-server-plus.dts  |  94 +++++++
- arch/arm/boot/dts/kirkwood-mplcec4.dts          |  11 +-
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi      |   6 +
- arch/arm/boot/dts/kirkwood-nsa310.dts           |  27 ++
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts    | 116 ++++++++
- arch/arm/boot/dts/kirkwood.dtsi                 |   8 +
- arch/arm/configs/dove_defconfig                 |  28 +-
- arch/arm/configs/kirkwood_defconfig             |   1 +
- arch/arm/configs/mvebu_defconfig                |  16 ++
- arch/arm/kernel/head.S                          |   5 +-
- arch/arm/kernel/hyp-stub.S                      |  18 +-
- arch/arm/mach-dove/Kconfig                      |   7 +
- arch/arm/mach-dove/Makefile                     |   4 +-
- arch/arm/mach-dove/board-dt.c                   | 102 +++++++
- arch/arm/mach-dove/common.c                     | 114 +-------
- arch/arm/mach-imx/clk-imx25.c                   |   6 +-
- arch/arm/mach-imx/clk-imx27.c                   |   6 +-
- arch/arm/mach-imx/clk-imx31.c                   |   6 +-
- arch/arm/mach-imx/clk-imx35.c                   |   6 +-
- arch/arm/mach-imx/clk-imx51-imx53.c             |   6 +-
- arch/arm/mach-imx/devices/devices-common.h      |   1 +
- .../mach-imx/devices/platform-fsl-usb2-udc.c    |  15 +-
- arch/arm/mach-kirkwood/Kconfig                  |   7 +
- arch/arm/mach-kirkwood/Makefile                 |   2 +-
- arch/arm/mach-kirkwood/board-dreamplug.c        |   6 -
- arch/arm/mach-kirkwood/board-dt.c               |  15 +-
- arch/arm/mach-kirkwood/board-guruplug.c         |  39 +++
- arch/arm/mach-kirkwood/board-ib62x0.c           |   1 -
- arch/arm/mach-kirkwood/board-mplcec4.c          |   8 -
- arch/arm/mach-kirkwood/board-ns2.c              |  14 -
- arch/arm/mach-kirkwood/board-nsa310.c           |  51 +---
- arch/arm/mach-kirkwood/board-openblocks_a6.c    |  44 ---
- arch/arm/mach-kirkwood/common.c                 |  23 ++
- arch/arm/mach-kirkwood/common.h                 |   6 +
- arch/arm/mach-kirkwood/dockstar-setup.c         |   1 -
- arch/arm/mach-kirkwood/include/mach/kirkwood.h  |   3 +-
- arch/arm/mach-kirkwood/pcie.c                   |  10 +-
- arch/arm/mach-mvebu/irq-armada-370-xp.c         |  72 +++++
- arch/arm/mm/dma-mapping.c                       |  18 +-
- arch/arm/mm/mmu.c                               |   2 +-
- arch/arm/plat-orion/mpp.c                       |   2 +-
- arch/arm/vfp/entry.S                            |   6 +-
- arch/arm/vfp/vfphw.S                            |   4 +-
- arch/arm64/include/asm/elf.h                    |   5 +-
- arch/ia64/kernel/ptrace.c                       |  27 --
- arch/m68k/include/asm/dma-mapping.h             |  16 ++
- arch/m68k/include/asm/pgtable_no.h              |   2 +
- arch/m68k/include/asm/unistd.h                  |   2 +-
- arch/m68k/include/uapi/asm/unistd.h             |   1 +
- arch/m68k/kernel/syscalltable.S                 |   1 +
- arch/m68k/mm/init.c                             |   8 +-
- arch/parisc/kernel/entry.S                      |  18 +-
- arch/parisc/kernel/irq.c                        |   6 +-
- arch/parisc/kernel/ptrace.c                     |   2 +-
- arch/parisc/kernel/signal.c                     |   4 +-
- arch/parisc/math-emu/cnv_float.h                |  11 +-
- arch/powerpc/kvm/emulate.c                      |   2 +
- arch/x86/kernel/cpu/perf_event.c                |   6 -
- arch/x86/kernel/entry_32.S                      |   1 -
- arch/x86/kernel/step.c                          |   9 +-
- arch/x86/xen/smp.c                              |   7 -
- drivers/acpi/apei/apei-base.c                   |   3 +
- drivers/acpi/processor_idle.c                   |   4 +
- drivers/acpi/processor_perflib.c                |   7 +
- drivers/ata/ahci.c                              |   8 +-
- drivers/ata/libahci.c                           |   6 +-
- drivers/ata/libata-core.c                       |  22 +-
- drivers/ata/libata-eh.c                         |   2 +-
- drivers/base/regmap/regmap-debugfs.c            |   2 -
- drivers/base/regmap/regmap.c                    |   2 +-
- drivers/block/virtio_blk.c                      |   7 +-
- drivers/cpufreq/Kconfig.x86                     |   2 +-
- drivers/cpufreq/acpi-cpufreq.c                  |   7 +
- drivers/cpufreq/cpufreq-cpu0.c                  |   5 +
- drivers/cpufreq/omap-cpufreq.c                  |   3 +
- drivers/cpuidle/Kconfig                         |   6 +
- drivers/cpuidle/Makefile                        |   1 +
- .../cpuidle/cpuidle-kirkwood.c                  |  45 ++-
- drivers/devfreq/devfreq.c                       |   5 +
- drivers/devfreq/exynos4_bus.c                   |  94 +++++--
- drivers/dma/imx-dma.c                           |   5 +-
- drivers/dma/ioat/dma_v3.c                       |   2 +-
- drivers/dma/tegra20-apb-dma.c                   |   8 +-
- drivers/gpio/gpio-mvebu.c                       |   6 -
- drivers/gpio/gpio-samsung.c                     |  14 +-
- drivers/gpu/drm/i915/i915_debugfs.c             |   3 +
- drivers/gpu/drm/i915/i915_drv.h                 |   3 +
- drivers/gpu/drm/i915/i915_gem_execbuffer.c      |  21 ++
- drivers/gpu/drm/i915/i915_irq.c                 |  11 +
- drivers/gpu/drm/i915/i915_reg.h                 |   2 +
- drivers/gpu/drm/i915/intel_dp.c                 |  47 +++-
- drivers/gpu/drm/i915/intel_pm.c                 |  17 +-
- drivers/gpu/drm/radeon/evergreen.c              |   6 +
- drivers/gpu/drm/radeon/ni.c                     |   6 +
- drivers/gpu/drm/radeon/r600.c                   |   6 +
- drivers/gpu/drm/radeon/radeon.h                 |   3 +-
- drivers/gpu/drm/radeon/radeon_drv.c             |   3 +-
- drivers/gpu/drm/radeon/radeon_object.c          |  18 +-
- drivers/gpu/drm/radeon/radeon_ring.c            |   2 +
- drivers/gpu/drm/radeon/radeon_semaphore.c       |   4 +
- drivers/gpu/drm/radeon/reg_srcs/rv515           |   2 +
- drivers/gpu/drm/radeon/si.c                     |   6 +
- drivers/gpu/drm/ttm/ttm_bo.c                    |   1 +
- drivers/gpu/drm/ttm/ttm_bo_util.c               |  11 +-
- drivers/hv/hv_balloon.c                         |  35 ++-
- drivers/i2c/busses/i2c-designware-core.c        |   4 +
- drivers/i2c/busses/i2c-mxs.c                    |   6 +-
- drivers/i2c/busses/i2c-omap.c                   |   6 +-
- drivers/i2c/busses/i2c-sirf.c                   |   4 +
- drivers/i2c/muxes/i2c-mux-pinctrl.c             |   2 +-
- drivers/idle/intel_idle.c                       |   3 +-
- drivers/media/i2c/m5mols/m5mols_core.c          |   2 +-
- drivers/media/platform/omap3isp/ispvideo.c      |   3 -
- drivers/media/platform/s5p-fimc/fimc-mdevice.c  |   2 +-
- drivers/media/platform/s5p-mfc/s5p_mfc.c        |  88 +++---
- drivers/media/usb/gspca/kinect.c                |   1 +
- drivers/media/usb/gspca/sonixb.c                |  13 +-
- drivers/media/usb/gspca/sonixj.c                |   1 +
- drivers/media/usb/uvc/uvc_ctrl.c                |   4 +-
- drivers/media/usb/uvc/uvc_v4l2.c                |   6 +-
- drivers/media/v4l2-core/videobuf2-core.c        |   4 +-
- drivers/misc/ti-st/st_kim.c                     |  37 ++-
- drivers/mmc/card/block.c                        |  30 +-
- drivers/mmc/card/queue.c                        |  32 ++-
- drivers/mmc/card/queue.h                        |   3 +
- drivers/mmc/core/bus.c                          |   1 +
- drivers/mmc/core/core.c                         | 121 +++++++-
- drivers/mmc/core/core.h                         |   1 +
- drivers/mmc/core/sdio.c                         |  33 ++-
- drivers/mmc/core/slot-gpio.c                    |  57 +++-
- drivers/mmc/host/Kconfig                        |  11 +
- drivers/mmc/host/Makefile                       |   1 +
- drivers/mmc/host/mvsdio.c                       | 131 +++++----
- drivers/mmc/host/sdhci-bcm2835.c                | 227 +++++++++++++++
- drivers/mmc/host/sdhci-esdhc-imx.c              |  59 +---
- drivers/mmc/host/sdhci-pxav3.c                  |  12 +-
- drivers/mmc/host/sdhci.c                        | 117 +++++---
- drivers/mmc/host/sh_mmcif.c                     | 280 +++++++++++--------
- drivers/mmc/host/tmio_mmc_pio.c                 |   8 -
- drivers/pci/hotplug/pciehp.h                    |   2 +-
- drivers/pci/hotplug/pciehp_core.c               |  11 +-
- drivers/pci/hotplug/pciehp_ctrl.c               |   8 +-
- drivers/pci/hotplug/pciehp_hpc.c                |  11 +-
- drivers/pci/hotplug/shpchp.h                    |   3 +-
- drivers/pci/hotplug/shpchp_core.c               |  36 +--
- drivers/pci/hotplug/shpchp_ctrl.c               |   6 +-
- drivers/pci/pcie/Kconfig                        |   2 +-
- drivers/pci/pcie/aer/aerdrv_core.c              |   1 +
- drivers/pci/pcie/aspm.c                         |   3 +
- drivers/rtc/Kconfig                             |   2 +-
- drivers/staging/iio/adc/mxs-lradc.c             |   2 +-
- drivers/staging/iio/gyro/adis16080_core.c       |   2 +-
- drivers/staging/sb105x/sb_pci_mp.c              |   2 +-
- drivers/staging/vt6656/bssdb.h                  |   1 -
- drivers/staging/vt6656/int.h                    |   1 -
- drivers/staging/vt6656/iocmd.h                  |  33 ++-
- drivers/staging/vt6656/iowpa.h                  |   8 +-
- drivers/staging/wlan-ng/prism2mgmt.c            |   2 +-
- drivers/tty/pty.c                               |   2 +
- drivers/tty/serial/8250/8250.c                  |  11 +
- drivers/tty/serial/8250/8250.h                  |   1 +
- drivers/tty/serial/8250/8250_dw.c               |   2 +-
- drivers/tty/serial/8250/8250_pci.c              |  42 ++-
- drivers/tty/serial/ifx6x60.c                    |   4 +-
- drivers/tty/serial/mxs-auart.c                  |   6 +-
- drivers/tty/serial/samsung.c                    |   1 -
- drivers/tty/serial/vt8500_serial.c              |   2 +-
- drivers/usb/dwc3/gadget.c                       |   1 +
- drivers/usb/gadget/f_fs.c                       |   6 +-
- drivers/usb/gadget/fsl_mxc_udc.c                |  40 ++-
- drivers/usb/gadget/fsl_udc_core.c               |  42 +--
- drivers/usb/gadget/fsl_usb2_udc.h               |   5 +-
- drivers/usb/host/Kconfig                        |   2 +-
- drivers/usb/host/Makefile                       |   1 +
- drivers/usb/host/ehci-hcd.c                     |  12 +-
- drivers/usb/host/ehci-mxc.c                     | 120 ++++----
- drivers/usb/host/ehci.h                         |   7 +
- drivers/usb/host/uhci-hcd.c                     |  15 +-
- drivers/usb/musb/cppi_dma.c                     |   4 +-
- drivers/usb/serial/io_ti.c                      |   3 +
- drivers/usb/serial/option.c                     |   9 +-
- drivers/vfio/pci/vfio_pci_rdwr.c                |   4 +-
- drivers/xen/cpu_hotplug.c                       |   4 +-
- drivers/xen/gntdev.c                            | 130 ++++++---
- drivers/xen/grant-table.c                       |  48 ++--
- drivers/xen/privcmd.c                           |  89 +++---
- drivers/xen/xen-pciback/pciback.h               |   2 +-
- fs/Kconfig                                      |  10 -
- fs/btrfs/extent-tree.c                          |   6 +-
- fs/btrfs/extent_map.c                           |  13 +-
- fs/btrfs/extent_map.h                           |   1 +
- fs/btrfs/file-item.c                            |   4 +-
- fs/btrfs/file.c                                 |  10 +-
- fs/btrfs/free-space-cache.c                     |  20 +-
- fs/btrfs/inode.c                                | 137 ++++++---
- fs/btrfs/ioctl.c                                | 129 ++++++---
- fs/btrfs/qgroup.c                               |  20 +-
- fs/btrfs/send.c                                 |   4 +-
- fs/btrfs/super.c                                |   2 +-
- fs/btrfs/transaction.c                          |  19 +-
- fs/btrfs/tree-log.c                             |  10 +-
- fs/btrfs/volumes.c                              |  23 +-
- fs/cifs/cifs_dfs_ref.c                          |   2 +
- fs/cifs/connect.c                               |   2 +-
- fs/f2fs/acl.c                                   |  13 +-
- fs/f2fs/checkpoint.c                            |   3 +-
- fs/f2fs/data.c                                  |  17 +-
- fs/f2fs/debug.c                                 |  50 ++--
- fs/f2fs/dir.c                                   |   2 +-
- fs/f2fs/f2fs.h                                  |  18 +-
- fs/f2fs/file.c                                  |  16 +-
- fs/f2fs/gc.c                                    |  68 ++---
- fs/f2fs/inode.c                                 |   3 +
- fs/f2fs/node.c                                  |  19 +-
- fs/f2fs/recovery.c                              |  10 +-
- fs/f2fs/segment.c                               |   2 +-
- fs/f2fs/super.c                                 |  97 +++++--
- fs/f2fs/xattr.c                                 |   2 +
- fs/fuse/Kconfig                                 |  16 +-
- fs/fuse/cuse.c                                  |  36 ++-
- fs/fuse/dev.c                                   |   5 -
- fs/fuse/file.c                                  |   5 +-
- include/asm-generic/dma-mapping-broken.h        |  16 ++
- include/asm-generic/pgtable.h                   |   6 +-
- include/asm-generic/syscalls.h                  |   2 +
- include/linux/ata.h                             |   8 +-
- include/linux/libata.h                          |   4 +-
- include/linux/mmc/card.h                        |  12 +
- include/linux/mmc/core.h                        |   3 +-
- include/linux/mmc/host.h                        |  25 ++
- include/linux/module.h                          |  10 +-
- include/linux/ptrace.h                          |   1 -
- include/linux/sched.h                           |  11 +-
- include/uapi/linux/serial_core.h                |   3 +-
- init/do_mounts_initrd.c                         |   4 +
- init/main.c                                     |   4 +-
- kernel/async.c                                  |  27 +-
- kernel/compat.c                                 |  23 +-
- kernel/debug/kdb/kdb_main.c                     |   2 +
- kernel/fork.c                                   |   6 +-
- kernel/module.c                                 | 154 +++++++---
- kernel/ptrace.c                                 |  74 ++++-
- kernel/sched/core.c                             |   3 +-
- kernel/signal.c                                 |  24 +-
- kernel/trace/ftrace.c                           |   2 +-
- lib/bug.c                                       |   1 +
- security/device_cgroup.c                        |   2 +
- security/integrity/evm/evm_crypto.c             |   4 +-
- sound/pci/hda/hda_codec.c                       |   5 +-
- sound/pci/hda/patch_conexant.c                  |   9 +
- sound/pci/hda/patch_realtek.c                   |   2 +
- tools/perf/MANIFEST                             |  10 +
- tools/perf/Makefile                             |   2 +-
- 274 files changed, 3501 insertions(+), 1617 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
- create mode 100644 Documentation/devicetree/bindings/mmc/orion-sdio.txt
- create mode 100644 arch/arm/boot/dts/armada-370-rd.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
- create mode 100644 arch/arm/mach-dove/board-dt.c
- create mode 100644 arch/arm/mach-kirkwood/board-guruplug.c
- rename arch/arm/mach-kirkwood/cpuidle.c => drivers/cpuidle/cpuidle-kirkwood.c (61%)
- create mode 100644 drivers/mmc/host/sdhci-bcm2835.c
+	Arnd
