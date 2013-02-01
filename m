@@ -1,125 +1,112 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 1 Feb 2013 12:26:11 -0500 (EST)
-Subject: [PATCH v3 03/15] ARM: mcpm: introduce helpers for platform
- coherency exit/setup
-In-Reply-To: <510B4E2B.1030104@ti.com>
+Date: Fri, 1 Feb 2013 12:28:19 -0500 (EST)
+Subject: [PATCH v3 07/15] ARM: vexpress: Select the correct SMP operations
+ at run-time
+In-Reply-To: <510B5584.6020800@ti.com>
 References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-4-git-send-email-nicolas.pitre@linaro.org>
- <510A96F7.8090106@ti.com> <alpine.LFD.2.02.1301311210040.6300@xanadu.home>
- <510B4E2B.1030104@ti.com>
-Message-ID: <alpine.LFD.2.02.1302011225410.6300@xanadu.home>
+ <1359445870-18925-8-git-send-email-nicolas.pitre@linaro.org>
+ <510B5584.6020800@ti.com>
+Message-ID: <alpine.LFD.2.02.1302011226270.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
 
-> On Thursday 31 January 2013 10:46 PM, Nicolas Pitre wrote:
-> > On Thu, 31 Jan 2013, Santosh Shilimkar wrote:
+> On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
+> > From: Jon Medhurst <tixy@linaro.org>
 > > 
-> > > On Tuesday 29 January 2013 01:20 PM, Nicolas Pitre wrote:
-> > > > From: Dave Martin <dave.martin@linaro.org>
-> > > > 
-> > > > This provides helper methods to coordinate between CPUs coming down
-> > > > and CPUs going up, as well as documentation on the used algorithms,
-> > > > so that cluster teardown and setup
-> > > > operations are not done for a cluster simultaneously.
-> > > > 
-> > > > For use in the power_down() implementation:
-> > > >     * __mcpm_cpu_going_down(unsigned int cluster, unsigned int cpu)
-> > > >     * __mcpm_outbound_enter_critical(unsigned int cluster)
-> > > >     * __mcpm_outbound_leave_critical(unsigned int cluster)
-> > > >     * __mcpm_cpu_down(unsigned int cluster, unsigned int cpu)
-> > > > 
-> > > > The power_up_setup() helper should do platform-specific setup in
-> > > > preparation for turning the CPU on, such as invalidating local caches
-> > > > or entering coherency.  It must be assembler for now, since it must
-> > > > run before the MMU can be switched on.  It is passed the affinity level
-> > > > which should be initialized.
-> > > > 
-> > > > Because the mcpm_sync_struct content is looked-up and modified
-> > > > with the cache enabled or disabled depending on the code path, it is
-> > > > crucial to always ensure proper cache maintenance to update main memory
-> > > > right away.  Therefore, any cached write must be followed by a cache
-> > > > clean operation and any cached read must be preceded by a cache
-> > > > invalidate operation (actually a cache flush i.e. clean+invalidate to
-> > > > avoid discarding possible concurrent writes) on the accessed memory.
-> > > > 
-> > > > Also, in order to prevent a cached writer from interfering with an
-> > > > adjacent non-cached writer, we ensure each state variable is located to
-> > > > a separate cache line.
-> > > > 
-> > > > Thanks to Nicolas Pitre and Achin Gupta for the help with this
-> > > > patch.
-> > > > 
-> > > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > > > ---
-> > > [..]
-> > > 
-> > > > diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-> > > > index c8c0e2113e..2b83121966 100644
-> > > > --- a/arch/arm/common/mcpm_entry.c
-> > > > +++ b/arch/arm/common/mcpm_entry.c
-> > > > @@ -18,6 +18,7 @@
-> > > >    #include <asm/proc-fns.h>
-> > > >    #include <asm/cacheflush.h>
-> > > >    #include <asm/idmap.h>
-> > > > +#include <asm/cputype.h>
-> > > > 
-> > > >    extern volatile unsigned long
-> > > > mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
-> > > > 
-> > > [...]
-> > > 
-> > > > +/*
-> > > > + * Ensure preceding writes to *p by other CPUs are visible to
-> > > > + * subsequent reads by this CPU.  We must be careful not to
-> > > > + * discard data simultaneously written by another CPU, hence the
-> > > > + * usage of flush rather than invalidate operations.
-> > > > + */
-> > > > +static void __sync_range_r(volatile void *p, size_t size)
-> > > > +{
-> > > > +	char *_p = (char *)p;
-> > > > +
-> > > > +#ifdef CONFIG_OUTER_CACHE
-> > > > +	if (outer_cache.flush_range) {
-> > > > +
-> > > You don't need above #ifdef. In case of non-outer
-> > > cache the function pointer is null anyways.
-> > 
-> > We do need the #ifdef, because if CONFIG_OUTER_CACHE is not selected
-> > then the outer_cache structure simply doesn't exist.
-> > 
-> You are right. #ifdef in middle of the code looks bit ugly and hence
-> was thinking to avoid it.
+> The patch deserves couple of lines of description here.
+
+Yes, Tixy has split it into 2 patches with proper description which 
+should be part of the next round.
+
+
 > 
-> > > 		/*
-> > > > +		 * Ensure dirty data migrated from other CPUs into our cache
-> > > > +		 * are cleaned out safely before the outer cache is cleaned:
-> > > > +		 */
-> > > > +		__cpuc_clean_dcache_area(_p, size);
-> > > > +
-> > > > +		/* Clean and invalidate stale data for *p from outer ... */
-> > > > +		outer_flush_range(__pa(_p), __pa(_p + size));
-> > > > +	}
-> > > > +#endif
-> > > > +
-> > > > +	/* ... and inner cache: */
-> > > > +	__cpuc_flush_dcache_area(_p, size);
-> > > This will be un-necessary when inner cache is available, no ?
-> > > May be you can re-arrange the code like below, unless and until
-> > > you would like to invalidate any speculative fetches during the
-> > > outer_flush_range()
-> > > 
-> > > 	__cpuc_clean_dcache_area(_p, size);
-> > > 	if (outer_cache.flush_range)
-> > > 		outer_flush_range(__pa(_p), __pa(_p + size));
+> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > ---
+> >   arch/arm/include/asm/mach/arch.h |  3 +++
+> >   arch/arm/kernel/setup.c          |  5 ++++-
+> >   arch/arm/mach-vexpress/core.h    |  2 ++
+> >   arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
+> >   arch/arm/mach-vexpress/v2m.c     |  2 +-
+> >   5 files changed, 22 insertions(+), 2 deletions(-)
 > > 
-> > As you said, the code is sequenced that way to get rid of potential
-> > speculative fetch that could happen right before L2 is flushed.
+> > diff --git a/arch/arm/include/asm/mach/arch.h
+> > b/arch/arm/include/asm/mach/arch.h
+> > index 917d4fcfd9..3d01c6d6c3 100644
+> > --- a/arch/arm/include/asm/mach/arch.h
+> > +++ b/arch/arm/include/asm/mach/arch.h
+> > @@ -17,8 +17,10 @@ struct pt_regs;
+> >   struct smp_operations;
+> >   #ifdef CONFIG_SMP
+> >   #define smp_ops(ops) (&(ops))
+> > +#define smp_init_ops(ops) (&(ops))
+> >   #else
+> >   #define smp_ops(ops) (struct smp_operations *)NULL
+> > +#define smp_init_ops(ops) (void (*)(void))NULL
+> >   #endif
 > > 
-> Thanks for clarifying it. It makes sense.
-
-May I translate this into an ACK tag?  ;-)
-
-
-Nicolas
+> >   struct machine_desc {
+> > @@ -42,6 +44,7 @@ struct machine_desc {
+> >   	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+> >   	char			restart_mode;	/* default restart mode	*/
+> >   	struct smp_operations	*smp;		/* SMP operations	*/
+> > +	void			(*smp_init)(void);
+> >   	void			(*fixup)(struct tag *, char **,
+> >   					 struct meminfo *);
+> >   	void			(*reserve)(void);/* reserve mem blocks	*/
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index 3f6cbb2e3e..41edca8582 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
+> >   	arm_dt_init_cpu_maps();
+> >   #ifdef CONFIG_SMP
+> >   	if (is_smp()) {
+> > -		smp_set_ops(mdesc->smp);
+> > +		if(mdesc->smp_init)
+> > +			(*mdesc->smp_init)();
+> > +		else
+> > +			smp_set_ops(mdesc->smp);
+> >   		smp_init_cpus();
+> >   	}
+> >   #endif
+> > diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
+> > index f134cd4a85..3a761fd76c 100644
+> > --- a/arch/arm/mach-vexpress/core.h
+> > +++ b/arch/arm/mach-vexpress/core.h
+> > @@ -6,6 +6,8 @@
+> > 
+> >   void vexpress_dt_smp_map_io(void);
+> > 
+> > +void vexpress_smp_init_ops(void);
+> > +
+> >   extern struct smp_operations	vexpress_smp_ops;
+> > 
+> >   extern void vexpress_cpu_die(unsigned int cpu);
+> > diff --git a/arch/arm/mach-vexpress/platsmp.c
+> > b/arch/arm/mach-vexpress/platsmp.c
+> > index c5d70de9bb..667344b479 100644
+> > --- a/arch/arm/mach-vexpress/platsmp.c
+> > +++ b/arch/arm/mach-vexpress/platsmp.c
+> > @@ -12,6 +12,7 @@
+> >   #include <linux/errno.h>
+> >   #include <linux/smp.h>
+> >   #include <linux/io.h>
+> > +#include <linux/of.h>
+> >   #include <linux/of_fdt.h>
+> >   #include <linux/vexpress.h>
+> > 
+> > @@ -206,3 +207,14 @@ struct smp_operations __initdata vexpress_smp_ops = {
+> >   	.cpu_die		= vexpress_cpu_die,
+> >   #endif
+> >   };
+> > +
+> > +void __init vexpress_smp_init_ops(void)
+> > +{
+> > +	struct smp_operations *ops = &vexpress_smp_ops;
+> > +#ifdef CONFIG_CLUSTER_PM
+> See if you can avoid this #ifdef in the middle of function.
+> 
+> Reviewed-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> 
