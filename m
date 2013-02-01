@@ -1,62 +1,86 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 1 Feb 2013 06:57:39 -0500
-Subject: [PATCH v6 03/10] ARM: edma: add AM33XX support to the private
- EDMA API
-In-Reply-To: <1359698501.14894.74.camel@cumari.coelho.fi>
-References: <1359529229-22207-1-git-send-email-mporter@ti.com>
- <201301300932.58732.arnd@arndb.de> <20130131183255.GI2244@beef>
- <6932828d68394f71ba6df8e6bf608635@DFLE72.ent.ti.com>
- <20130131214241.GJ2244@beef>
- <1359698501.14894.74.camel@cumari.coelho.fi>
-Message-ID: <20130201115738.GL2244@beef>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 1 Feb 2013 12:11:38 +0000
+Subject: [PATCHv2 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
+In-Reply-To: <510BA728.4060300@ti.com>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-4-git-send-email-dinguyen@altera.com>
+ <510BA728.4060300@ti.com>
+Message-ID: <20130201121137.GC23869@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 08:01:41AM +0200, Luciano Coelho wrote:
-> On Thu, 2013-01-31 at 16:42 -0500, Matt Porter wrote:
-> > On Thu, Jan 31, 2013 at 08:58:39PM +0000, Arnd Bergmann wrote:
-> > > On Thursday 31 January 2013, Matt Porter wrote:
-> > > > On Wed, Jan 30, 2013 at 09:32:58AM +0000, Arnd Bergmann wrote:
-> > > > > On Wednesday 30 January 2013, Matt Porter wrote:
-> > > > > > +               dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
-> > > > > > +               of_dma_controller_register(dev->of_node,
-> > > > > > +                                          of_dma_simple_xlate,
-> > > > > > +                                          &edma_filter_info);
-> > > > > > +       }
-> > > > > 
-> > > > > How do you actually deal with the problem mentioned by Padma, that
-> > > > > the filter function does not know which edma instance it is looking
-> > > > > at? If you assume that there can only be a single edma instance in
-> > > > > the system, that is probably a limitation that should be documented
-> > > > > somewhere, and ideally the probe() function should check for that.
-> > > > 
-> > > > I make an assumption of one edma instance in the system in the case of
-> > > > DT being populated. This is always true right now as the only SoC with
-> > > > two EDMA controllers in existence is Davinci DA850. Until recently,
-> > > > Davinci had no DT support. Given the steady work being done today on DT
-> > > > support for DA850, it'll probably be something needed in 3.10.
-> > > > 
-> > > > I will add a comment and check in probe() to capture this assumption
-> > > > and then plan to update separately to support DA850 booting from DT.
-> > > 
-> > > Ok, sounds good. Hopefully by then we will already have a nicer
-> > > way to write an xlate function that does not rely on a filter
-> > > function.
-> > 
-> > Yes, it would be nice to avoid what Padma had to do. I should have
-> > mentioned also that the second EDMA on DA850 has no DMA events of
-> > immediate use on it anyway. All the in-kernel users use events on the
-> > first controller, except for the second MMC instance. That's only used
-> > for a wl12xx module on the EVM and that driver has no DT support so it
-> > doesn't matter yet in the DT case. Because of this, DA850 can actually
-> > add EDMA DT support immediately (on top of this series) and add DMA
-> > support to the DT support already posted for the Davinci SPI and MMC
-> > client drivers.
+On Fri, Feb 01, 2013 at 11:29:44AM +0000, Santosh Shilimkar wrote:
+> + Lorenzo,
 > 
-> I haven't followed this whole discussion in details, but please notice
-> that I'm aiming to get DT support for the WiLink modules (wlcore,
-> wl12xx...) for 3.10. ;)
+> On Thursday 31 January 2013 10:35 PM, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> >
+> > mach-socfpga is another platform that needs to use
+> > v7_invalidate_l1 to bringup additional cores. There was a comment that
+> > the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
+> >
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> > Tested-by: Pavel Machek <pavel@denx.de>
+> > Reviewed-by: Pavel Machek <pavel@denx.de>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > ---
+> >   arch/arm/mach-imx/headsmp.S      |   47 -------------------------------------
+> >   arch/arm/mach-shmobile/headsmp.S |   48 --------------------------------------
+> >   arch/arm/mach-tegra/headsmp.S    |   43 ----------------------------------
+> >   arch/arm/mm/cache-v7.S           |   46 ++++++++++++++++++++++++++++++++++++
+> >   4 files changed, 46 insertions(+), 138 deletions(-)
+> >
+> [..]
+> 
+> > diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> > index 7539ec2..15451ee 100644
+> > --- a/arch/arm/mm/cache-v7.S
+> > +++ b/arch/arm/mm/cache-v7.S
+> > @@ -19,6 +19,52 @@
+> >   #include "proc-macros.S"
+> >
+> >   /*
+> > + * The secondary kernel init calls v7_flush_dcache_all before it enables
+> > + * the L1; however, the L1 comes out of reset in an undefined state, so
+> > + * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
+> > + * of cache lines with uninitialized data and uninitialized tags to get
+> > + * written out to memory, which does really unpleasant things to the main
+> > + * processor.  We fix this by performing an invalidate, rather than a
+> > + * clean + invalidate, before jumping into the kernel.
+> > + *
+> > + * This function is cloned from arch/arm/mach-tegra/headsmp.S, and needs
+> > + * to be called for both secondary cores startup and primary core resume
+> > + * procedures.
+> > + */
+> > +ENTRY(v7_invalidate_l1)
+> Now since we are moving the code under common place, probably we should
+> update this a function a bit so that it invalidates the CPU cache till
+> line of unification. Just to be consistent with other flush API.
+> 
+> Lorenzo,
+> Does that make sense ?
 
-Great, looks like we'll all be synced then. ;)
+Well, on latest processors (A15, A7) caches are invalidated on reset unless
+the chip is programmed to skip that on reset (ie L2 retained).
 
--Matt
+But it makes sense, for sure it should not be called v7_invalidate_l1,
+but invalidate_louis, and instead of forcing level 0 we should be
+reading LoUIS and invalidate up to that level as we do in the clean and
+invalidate function.
+
+Is it worth adding a v7 cache function where the only difference wrt the clean
+and invalidate operation is a coprocessor opcode ? Probably not IMHO, why add
+the set/way loop again ?
+
+It is never called from C code, so I do not think there is a point in
+adding a C API either.
+
+Lorenzo
