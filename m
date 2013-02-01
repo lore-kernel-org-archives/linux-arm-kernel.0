@@ -1,52 +1,31 @@
-From: david.woodhouse@intel.com (Woodhouse, David)
-Date: Fri, 1 Feb 2013 07:33:17 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130201011712.GF23505@n2100.arm.linux.org.uk>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
-Message-ID: <1359703995.23531.6.camel@shinybook.infradead.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 1 Feb 2013 08:36:14 +0100
+Subject: [PATCH] USB chipidea i.MX: use framework phy handling
+In-Reply-To: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
+References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130201073614.GX1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-02-01 at 01:17 +0000, Russell King - ARM Linux wrote:
+On Thu, Jan 31, 2013 at 12:32:15PM +0100, Sascha Hauer wrote:
+> This series switches the mxs phy and the i.MX chipidea support
+> from homegrew phy support to use usb_add_phy_dev/devm_usb_get_phy_by_phandle.
 > 
-> > I've tried both gcc 4.6.3 [1] and 4.6.4 [2].  If you can point me to
-> > a 4.5.x, I'll try that, too, but as it stands now, if one moves the
-> > code added to swab.h below outside of its armv6 protection,
-> > gcc adds calls to __bswapsi2.
+> Based on
 > 
-> Take a look at the message I sent on the 29th towards the beginning of
-> this thread for details of gcc 4.5.4 behaviour.
+> [PATCH v2] Add USB of helpers and use them in the chipidea driver
+> 
+> But I think this could also be applied separately if necessary.
 
-I'd like to see a comment (with PR# if appropriate) explaining clearly
-*why* it isn't enabled for <ARMv6 even with a bleeding-edge compiler.
+Kishon, Peter,
 
-Russell's test also seemed to indicate that the 32-bit and 64-bit swap
-support was present and functional in GCC 4.5.4 (as indeed it should
-have been since 4.4), so I'm still not quite sure why you require 4.6
-for that.
+Thanks for reviewing these, but I'm afraid I must send another iteration
+for these. These patches do not handle -EPROBE_DEFER correctly.
+
+Sascha
 
 -- 
-                   Sent with MeeGo's ActiveSync support.
-
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse@intel.com                              Intel Corporation
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130201/d2606b09/attachment-0001.bin>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
