@@ -1,148 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 Feb 2013 17:42:47 +0000
-Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for
- unaligned addresses
-In-Reply-To: <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
-References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
- <20130201162631.GG5151@arm.com>
- <CANOGCgOp=kSatDu8fL7grk+bXLQ2pgKAEvEK6LoG8Ba4mqUH=w@mail.gmail.com>
- <20130201163722.GH5151@arm.com>
- <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
-Message-ID: <20130201174246.GJ5151@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Feb 2013 17:45:29 +0000
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130201162638.GT23505@n2100.arm.linux.org.uk>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302011607.49205.arnd@arndb.de>
+ <20130201162638.GT23505@n2100.arm.linux.org.uk>
+Message-ID: <201302011745.29223.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 04:40:35PM +0000, Christoffer Dall wrote:
-> On Fri, Feb 1, 2013 at 11:37 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Fri, Feb 01, 2013 at 04:32:54PM +0000, Christoffer Dall wrote:
-> >> On Fri, Feb 1, 2013 at 11:26 AM, Catalin Marinas
-> >> > --- a/arch/arm/mm/mmu.c
-> >> > +++ b/arch/arm/mm/mmu.c
-> >> > @@ -581,34 +581,19 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
-> >> >                                       const struct mem_type *type)
-> >> >  {
-> >> >         pmd_t *pmd = pmd_offset(pud, addr);
-> >> > +       unsigned long next;
-> >> >
-> >> > -       /*
-> >> > -        * Try a section mapping - end, addr and phys must all be aligned
-> >> > -        * to a section boundary.  Note that PMDs refer to the individual
-> >> > -        * L1 entries, whereas PGDs refer to a group of L1 entries making
-> >> > -        * up one logical pointer to an L2 table.
-> >> > -        */
-> >> > -       if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
-> >> > -               pmd_t *p = pmd;
-> >> > -
-> >> > -#ifndef CONFIG_ARM_LPAE
-> >> > -               if (addr & SECTION_SIZE)
-> >> > -                       pmd++;
-> >> > -#endif
-> >> > -
-> >> > -               do {
-> >> > +       do {
-> >> > +               next = section_addr_end(addr, end);
-> >> > +               /* try section mapping first */
-> >> > +               if (((addr | next | phys) & ~SECTION_MASK) == 0) {
-> >> >                         *pmd = __pmd(phys | type->prot_sect);
-> >> > -                       phys += SECTION_SIZE;
-> >> > -               } while (pmd++, addr += SECTION_SIZE, addr != end);
-> >> > -
-> >> > -               flush_pmd_entry(p);
-> >> > -       } else {
-> >> > -               /*
-> >> > -                * No need to loop; pte's aren't interested in the
-> >> > -                * individual L1 entries.
-> >> > -                */
-> >> > -               alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
-> >> > -       }
-> >> > +                       flush_pmd_entry(pmd);
-> >> > +               } else {
-> >> > +                       alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys), type);
-> >>
-> >> aren't you wasting memory here? The pte doesn't alloc a full page, but
-> >> the memblock allocator allocates a full page right?
-> >>
-> >> I thought this was the rationale behind Russell's previous comments on
-> >> Santosh's earlier patch version.
-> >
-> > You are right, it's allocating more ptes. Than we can use pmd_addr_end.
-> > I'll go back to the code.
-> >
-> don't get me wrong, I strongly prefer keeping that loop in
-> alloc_init_section, the other way it was weird to read, felt like
-> shoehorning something, but you may have to keep a pointer around for
-> unused part of a page for pte or something, not sure what ends up
-> being nicest.
+On Friday 01 February 2013, Russell King - ARM Linux wrote:
+> On Fri, Feb 01, 2013 at 04:07:49PM +0000, Arnd Bergmann wrote:
+> > On Friday 01 February 2013, Thomas Petazzoni wrote:
+> > > So there is really a range of I/O addresses associated to it, even
+> > > though the device will apparently not use it. Would it be possible to
+> > > detect that the I/O range is not used by the device, and therefore
+> > > avoid the allocation of an address decoding window for this I/O range?
+> > 
+> > I suspect it just gets disabled because the port number 0xc0010000 is
+> > larger than IO_PORT_LIMIT and we cannot access that offset inside
+> > of the virtual memory window we use for PIO.
+> 
+> You're running into that trap again which you fall into on other
+> architectures.
+> 
+> If you arrange for your PCI IO space to start at 0 rather than the
+> physical address that it appears on your CPU, then you shouldn't
+> end up with it extending up to something at 0xcXXXXXXX.
+> 
+> Remember that we should be ensuring that inb(0) hits the first address
+> of the cross-subarch PCI IO area - this alway requires that any sub-arch
+> taking part in a multiplatform kernel must start its IO space addresses
+> at 0 and not the physical address on the local CPU.
 
-Another try. This time I kept the same logic as before but added a loop
-on the outside (and indented the code). With classic MMU
-pmd_addr_end(addr, end) always return end, so the logic doesn't change.
-With LPAE we should get the standard looping over pmd entries. Again,
-only tested on C-A9.
+Yes, that was my point. I think in this case, the bug is in the new
+of_pci_process_ranges functions, which returns a 'struct resource'
+translated into IORESOURCE_MEM space, but with the type set
+to IORESOURCE_IO. This resource then gets passed to 
+pci_add_resource_offset().
 
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 9f06102..47154f3 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -581,34 +581,36 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
- 				      const struct mem_type *type)
- {
- 	pmd_t *pmd = pmd_offset(pud, addr);
-+	unsigned long next;
- 
--	/*
--	 * Try a section mapping - end, addr and phys must all be aligned
--	 * to a section boundary.  Note that PMDs refer to the individual
--	 * L1 entries, whereas PGDs refer to a group of L1 entries making
--	 * up one logical pointer to an L2 table.
--	 */
--	if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
--		pmd_t *p = pmd;
-+	do {
-+		next = pmd_addr_end(addr, end);
-+
-+		/*
-+		 * Try a section mapping - next, addr and phys must all be
-+		 * aligned to a section boundary.  Note that PMDs refer to the
-+		 * individual L1 entries, whereas PGDs refer to a group of L1
-+		 * entries making up one logical pointer to an L2 table.
-+		 */
-+		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
-+			pmd_t *p = pmd;
- 
- #ifndef CONFIG_ARM_LPAE
--		if (addr & SECTION_SIZE)
--			pmd++;
-+			if (addr & SECTION_SIZE)
-+				pmd++;
- #endif
-+			do {
-+				*pmd = __pmd(phys | type->prot_sect);
-+				phys += SECTION_SIZE;
-+			} while (pmd++, addr += SECTION_SIZE, addr != next);
- 
--		do {
--			*pmd = __pmd(phys | type->prot_sect);
--			phys += SECTION_SIZE;
--		} while (pmd++, addr += SECTION_SIZE, addr != end);
--
--		flush_pmd_entry(p);
--	} else {
--		/*
--		 * No need to loop; pte's aren't interested in the
--		 * individual L1 entries.
--		 */
--		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
--	}
-+			flush_pmd_entry(p);
-+		} else {
-+			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys), type);
-+			phys += next - addr;
-+			pmd++;
-+		}
-+	} while (addr = next, addr != end);
- }
- 
- static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+	Arnd
