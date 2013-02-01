@@ -1,50 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Feb 2013 10:53:36 +0100
-Subject: [PATCH 1/3] pinctrl: sunxi: Add of_xlate function
-In-Reply-To: <51085315.2000302@free-electrons.com>
-References: <1359313332-12305-1-git-send-email-maxime.ripard@free-electrons.com>
- <1359313332-12305-2-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdZi0zCNf6LDd9UAcd57kFqqWyteVqxL8WfDrFfrt9_5sQ@mail.gmail.com>
- <51085315.2000302@free-electrons.com>
-Message-ID: <CACRpkdYzX8PFVLei0+UJvEA6rGq_RBGsMKdRs0RnmAQL3h7S5A@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 1 Feb 2013 12:16:42 +0200
+Subject: [PATCH v5 00/10] Tegra114 clockframework
+Message-ID: <1359713860-16631-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 11:54 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Le 29/01/2013 23:41, Linus Walleij a ?crit :
->> On Sun, Jan 27, 2013 at 8:02 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->>
->>> Since the pin controller of sunxi chips is represented as a single bank
->>> in the driver.
->>> Since this is neither convenient nor represented that way in the
->>> datasheets, define a custom of_xlate function with the layout <bank pin
->>> flag>
->>>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>
->> This does not apply and I only have 1/3 it seems?
->>
->> Sorry, help me understand which order these patches go in...
->
-> My bad, I forgot to mention the order of the patchsets, and to cc you
-> for the all series... Sorry about that.
->
-> This patch should come after the patch series that adds the support for
-> the A10 SoCs in the pinctrl driver.
+This is the fifth version of the Tegra114 clockframework. It is based on the
+for-next branch of
+git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git and
+http://www.spinics.net/lists/arm-kernel/msg220452.html.
 
-I now tried to apply this on top of the A10 series and it
-*still* does not apply.
+It has been boottested on Pluto.
 
-> Do you want me to resend this serie and cc you?
+Changes from v4:
 
-Please rebase these three on my allwinner branch:
-git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
-allwinner-sunxi
+* Split the new PLL types patch into smaller patches
+* Fix some bugs in the PLL patches
 
-Seen here:
-http://git.kernel.org/?p=linux/kernel/git/linusw/linux-pinctrl.git;a=shortlog;h=refs/heads/allwinner-sunxi
+Changes from v3:
 
-Yours,
-Linus Walleij
+* Merge with for-next branch
+* Provide empty tegra_cpu_car_ops to make SMP boot not crash
+
+Changes from v2:
+
+* Added missing PLLs
+* Added bindings to tegra114.dtsi
+* Moved the table patch for clk-mux.c to 'clk: add table lookup to mux'
+* Bugfixes
+
+Changes from v1:
+
+* Remove SATA and PCIe clocks. They don't appear in the internal TRM, so I
+  assume they don't exist.
+* Rebase on top of Hiroshi's latest Tegra114 patches
+* More generic mux code. This is necessary for the AHUB and DAM clocks.
+
+TODO:
+
+* Remove clk_register_clkdev() where possible
+* PLL clock init functions are incomplete and/or need refactoring
+* Superclocks are missing
+* The audio clocks are almost the same then Tegra30. Refactor the code to
+  avoid duplication.
+* Should blink and blink_override be clocks?
+
+Peter De Schrijver (10):
+  clk: tegra: Refactor PLL programming code
+  clk: tegra: Add TEGRA_PLL_BYPASS flag
+  clk: tegra: Add PLL post divider table
+  clk: tegra: Add new fields and PLL types for Tegra114
+  clk: tegra: Add flags to tegra_clk_periph()
+  clk: tegra: Workaround for Tegra114 MSENC problem
+  ARM: tegra: Define Tegra114 CAR binding
+  ARM: dt: Add references to tegra_car clocks
+  clk: tegra: Implement clocks for Tegra114
+  clk: tegra: devicetree match for nvidia,tegra114-car
+
+ .../bindings/clock/nvidia,tegra114-car.txt         |  311 +++
+ arch/arm/boot/dts/tegra114.dtsi                    |    7 +-
+ drivers/clk/tegra/Makefile                         |    1 +
+ drivers/clk/tegra/clk-periph-gate.c                |    9 +
+ drivers/clk/tegra/clk-periph.c                     |   11 +-
+ drivers/clk/tegra/clk-pll.c                        |  940 +++++++++-
+ drivers/clk/tegra/clk-tegra114.c                   | 2002 ++++++++++++++++++++
+ drivers/clk/tegra/clk-tegra20.c                    |  153 +-
+ drivers/clk/tegra/clk-tegra30.c                    |  243 ++--
+ drivers/clk/tegra/clk.c                            |    1 +
+ drivers/clk/tegra/clk.h                            |   85 +-
+ 11 files changed, 3481 insertions(+), 282 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
+ create mode 100644 drivers/clk/tegra/clk-tegra114.c
