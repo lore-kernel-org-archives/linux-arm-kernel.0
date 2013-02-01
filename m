@@ -1,137 +1,183 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 01 Feb 2013 10:57:20 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130201094613.38fa2ad0@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <510B0D9C.1000101@wwwdotorg.org>
- <20130201014138.GA16234@obsidianresearch.com>
- <510B268E.2040104@wwwdotorg.org> <20130201094613.38fa2ad0@skate>
-Message-ID: <510C0200.5040505@wwwdotorg.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 01 Feb 2013 13:07:51 -0500 (EST)
+Subject: [RFC PATCH] arm: decompressor: initialize PIC offset base register
+ for uClinux tools
+In-Reply-To: <510BF0B3.3030608@arm.com>
+References: <1359480546-7033-1-git-send-email-jonathan.austin@arm.com>
+ <alpine.LFD.2.02.1301291453530.6300@xanadu.home> <510BF0B3.3030608@arm.com>
+Message-ID: <alpine.LFD.2.02.1302011259520.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2013 01:46 AM, Thomas Petazzoni wrote:
-> Dear Stephen Warren,
+On Fri, 1 Feb 2013, Jonathan Austin wrote:
+
+> Hi Nicolas, thanks for the comments,
 > 
-> Thanks for this great discussion. I see that Jason has already answered
-> most of the questions on the why we need this "dynamicity" in the window
-> configuration. A few comments below.
+> On 29/01/13 20:13, Nicolas Pitre wrote:
+> > On Tue, 29 Jan 2013, Jonathan Austin wrote:
+> > 
+> >> Before jumping to (position independent) C-code from the decompressor's
+> >> assembler world we set-up the C environment. This setup currently does not
+> >> set r9, which for arm-none-uclinux-uclibceabi should be the PIC offset base
+> >> register (IE should point to the beginning of the GOT).
+> >>
+> >> Currently, therefore, in order to build working kernels that use the
+> >> decompressor it is necessary to use an arm-linux-gnueabi toolchain, or
+> >> similar. uClinux toolchains cause a Prefetch Abort to occur at the beginning
+> >> of the decompress_kernel function.
+> >>
+> >> This patch allows uClinux toolchains to build bootable zImages by setting r9
+> >> to the beginning of the GOT when __uClinux__ is defined, allowing the
+> >> decompressor's C functions to work correctly.
+> >>
+> >> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+> >> ---
+> >>
+> >> One other possibility would be to specify -mno-single-pic-base when building
+> >> the decompressor. This works around the problem, but forces the compiler to
+> >> generate less optimal code.
+> > 
+> > How "less optimal"?  How much bigger/slower is it?
+> > If not significant enough then going with -mno-single-pic-base might be
+> > fine.
 > 
-> On Thu, 31 Jan 2013 19:21:02 -0700, Stephen Warren wrote:
+> Code that needs to access anything global will need to derive the location
+> of the GOT for itself, but there's a possible upside there that there's an
+> extra free register (r9 can be used as a general purpose register...)
+
+We try to minimize those in order to perform the easy relocation trick 
+which requires no reference to global initialized data.  Hence this in 
+the linker script:
+
+  /DISCARD/ : {
+    *(.ARM.exidx*)
+    *(.ARM.extab*)
+    /*
+     * Discard any r/w data - this produces a link error if we have any,
+     * which is required for PIC decompression.  Local data generates
+     * GOTOFF relocations, which prevents it being relocated independently
+     * of the text/got segments.
+     */
+    *(.data)
+  }
+
+> The patch would look like:
+> -----8<-------
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index 5cad8a6..afed28e 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -120,7 +120,7 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+>  KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+>  endif
+>  -ccflags-y := -fpic -fno-builtin -I$(obj)
+> +ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
+>  asflags-y := -Wa,-march=all -DZIMAGE
+>   # Supply kernel BSS size to the decompressor via a linker symbol.
+> ------>8---------
 > 
->> So, the dynamic programming of the windows on Marvell HW is the exact
->> logical equivalent of programming a standard PCIe root port's BAR
->> registers. It makes perfect sense that should be dynamic. Presumably
->> this is something you can make work inside your emulated PCIe/PCIe
->> bridge module, simply by capturing writes to the BAR registers, and
->> translating them into writes to the Marvell window registers.
 > 
-> That's what I'm doing. In the PATCHv2, my PCIe host driver was reading
-> back the BARs in the PCI-to-PCI bridges configuration space, and was
-> setting up the windows according to the addresses that had been
-> assigned to each bridge.
+> I did a fairly crude benchmark - count how many instructions we need in
+> order to finish decompressing the kernel...
 > 
-> I am currently working in making this more dynamic: it is directly when
-> the BAR is being written to in the PCI-to-PCI bridge configuration
-> space that a window will be setup.
+> Setup r9 correctly:       129,976,282
+> Use -mno-single-pic-base: 124,826,778
 > 
->> Now, I do have one follow-on question: You said you don't have 30
->> windows, but how many do you have free after allocating windows to any
->> other peripherals that need them, relative to (3 *
->> number-of-root-ports-in-the-SoC)? (3 being IO+Mem+PrefetchableMem.)
+> (this was done using an R-class model and a magic semi-hosting call to pause
+> the model at the end of the decompress_kernel function)
 > 
-> We have 20 windows on Armada XP if I remember correctly, and they are
-> not only used for PCIe, but also to map the BootROM (needed to boot
-> secondary CPUs), to map SPI flashes or NOR flashes, for example. So
-> they are really shared between many uses. In terms of PCIe, there are
-> only two types of windows: I/O and Memory, there is no notion of
-> Prefetchable Memory window as far as I could see.
+> So, it seems like the extra register means there's actually a 4% *win* 
+> in instruction terms from using -mno-single-pic-base
 
-In Tegra, we end up having separate MMIO vs. Prefetchable MMIO chunks of
-our overall PCIe aperture. However, the HW setup appears the same for
-both of those. I'm not sure if it's a bug in the driver, or if it's just
-to separate the two address spaces so that the page tables can be
-configured for those two regions with large rather than small
-granularity. I need to go investigate that.
+Looks like you have a winner.
 
-> We have up to 10 PCIe interfaces, and only 20 windows. It means that
-> you basically can't use all PCIe interfaces, there will necessarily be
-> some limit, due to the limited number of windows.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-So there are 10 PCIe interfaces (root ports). That's on the SoC itself
-right. Are all 10 (or a large number of them) actually used at once on
-any given board design? I suppose this must be the case, or Marvell
-wouldn't have wasted the silicon space on 10 root ports... Still, that's
-a rather large number of ports!
-
-If only a few PCIe ports are ever in use at once on a design and/or the
-PCIe ports generally contain soldered-down devices rather than
-user-accessible ports, the statically assigning window *IDs* to
-individual ports would make for easier code in the driver, since the BAR
-register emulation would never have to allocate/de-allocate windows, but
-rather only ever have to enable/disable/configure them.
-
-However, if many PCIe ports are in use at once and there are
-user-accessible ports, you can't know ahead of time which ports will
-need MMIO vs. MMIO prefetch vs. IO, so you'd have to dynamically
-allocate window IDs to ports, in addition to dynamically setting up the
-address/size of windows.
-
-> Also, I'd like to point out that the dynamic configuration is needed
-> for two reasons:
+> That said, I've still made some comments/amendments below...
 > 
->  * The number of windows, as we are discussing now.
-
-OK.
-
->  * The amount of physical address space available. If you don't
->    dynamically configure those windows, then you have to account the
->    "worst case", i.e the PCIe devices that require very large memory
->    areas. So you end up creating static windows that reserve 32M or 64M
->    or 128M *per* PCIe link. You can see that it "consumes" pretty
->    quickly a large part of the 4G physical address space that we have.
->    Thanks to the dynamic window configuration that we do with the
->    PCI-to-PCI bridge, we can size the windows exactly the size needed
->    by the downstream device on each PCIe interface.
-
-That aspect is applicable to any PCIe system; there's always some chunk
-of physical address space that maps to PCIe, and which must be divided
-into per-root-port chunks.
-
-I think the only difference on the Marvell HW is:
-
-* The overall total size of the physical address space is dynamic rather
-than fixed, because it's programmed through windows rather than
-hard-coded into HW.
-
-* Hence, the windows /both/ define the physical address space layout
-/and/ define the routing of transactions to individual root ports. On
-regular PCIe, the root port BARs only divide up the overall physical
-(PCIe bus 0 really) address space and hence perform routing; they have
-no influence over the CPU physical address space.
-
-So I think the crux of the problem is that you really have 10 PCIe root
-ports, each of which is a nominally a separate PCIe domain (since the
-windows connect CPU physical address space to an individual/specific
-root port's PCIe address space, rather than having separate connections
-from CPU -> PCIe bus 0 address space, then BARs/windows connecting PCIe
-bus 0 address space to individual root port/subordinate bus address
-space), but you're attempting to treat all 10 ports as a single PCIe
-domain so that you don't have to dedicate separate physical CPU address
-space to each port, which you would have to do if they were actually
-treated as separate domains.
-
->> The thing here is that when the PCIe core writes to a root port BAR
->> window to configure/enable it the first time, you'll need to capture
->> that transaction and dynamically allocate a window and program it in a
->> way equivalent to what the BAR register write would have achieved on
->> standard HW. Later, the window might need resizing, or even to be
->> completely disabled, if the PCIe core were to change the standard BAR
->> register. Dynamically allocating a window when the BAR is written
->> seems a little heavy-weight.
+> > 
+> >>   arch/arm/boot/compressed/head.S |    4 ++++
+> >>   1 file changed, 4 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> >> index fe4d9c3..4491e75 100644
+> >> --- a/arch/arm/boot/compressed/head.S
+> >> +++ b/arch/arm/boot/compressed/head.S
+> >> @@ -410,6 +410,10 @@ wont_overwrite:
+> >>    *   sp  = stack pointer
+> >>    */
+> >>   		orrs	r1, r0, r5
+> >> +#ifdef __uClinux__
+> >> +		mov	r9, r11			@ PIC offset base register
+> >> +		addne	r9, r9, r0		@ Also needs relocating
+> >> +#endif
+> >>   		beq	not_relocated
+> > 
+> > Please don't insert your code between the orrs and the beq as those two
+> > go logically together.
 > 
-> Why?
+> I'd initially done this in order to change only one site - as we need to
+> set r9 and then add the offset I was using the condition code to test r0...
+> 
+> However, this was silly - I think I can just do it in one instruction:
+> 
+> add   r9, r11, r0
+> 
+> In the case that we're not relocated, r0 should be 0 anyway...
+> 
+> > 
+> > In fact, the best location for this would probably be between the
+> > wont_overwrite label and the comment that immediately follows it. And
+> > then, those comments that follow until the branch into C code should be
+> > updated accordingly.
+> 
+> 
+> Okay, assuming I've understood you correctly, you're suggesting something
+> like this:
+> 
+> -----8<-------
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index fe4d9c3..d81efbd 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -396,6 +396,9 @@ dtb_check_done:
+>                 mov     pc, r0
+>   wont_overwrite:
+> +#ifdef __uClinux__
+> +               add     r9, r11, r0             @ uClinux PIC offset base register
+> +#endif
+>  /*
+>   * If delta is zero, we are running at the address we were linked at.
+>   *   r0  = delta
+> @@ -405,6 +408,7 @@ wont_overwrite:
+>   *   r5  = appended dtb size (0 if not present)
+>   *   r7  = architecture ID
+>   *   r8  = atags pointer
+> + *   r9  = GOT start (for uClinux ABI), relocated
+>   *   r11 = GOT start
+>   *   r12 = GOT end
+>   *   sp  = stack pointer
+> @@ -470,6 +474,7 @@ not_relocated:      mov     r0, #0
+>   *   r4  = kernel execution address
+>   *   r7  = architecture ID
+>   *   r8  = atags pointer
+> + *   r9  = GOT start (for uClinux ABI)
+>   */
+>                 mov     r0, r4
+>                 mov     r1, sp                  @ malloc space above stack
+> ------->8-----------
 
-Well, it's just a bunch more code; much more than a simple writel().
+Yes, that's what I was suggesting.
+
+> The question that now occurs is whether we should just set r9 whether or not
+> we're using a uClinux toolchain - I don't think it is going to hurt as the
+> arm-linux-gnueabi world can happily clobber it with no bad consequences...
+> 
+> But after all this, it seems that just using -mno-single-pic base as in the patch
+> above is best...
+
+Indeed.  As longas this option is compatible with all toolchains.
+
+
+Nicolas
