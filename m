@@ -1,93 +1,73 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 1 Feb 2013 07:58:34 +0100
-Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <20130201011153.GE14629@nchen-desktop>
-References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
- <87pq0omcfb.fsf@ashishki-desk.ger.corp.intel.com>
- <20130130020627.GA699@nchen-desktop>
- <20130130140015.GZ1906@pengutronix.de>
- <20130131020542.GD9777@nchen-desktop>
- <20130131102913.GA6937@pengutronix.de>
- <20130201011153.GE14629@nchen-desktop>
-Message-ID: <20130201065833.GV1906@pengutronix.de>
+From: kyungsik.lee@lge.com (kyungsik.lee)
+Date: Fri, 01 Feb 2013 16:00:57 +0900
+Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
+In-Reply-To: <254788880.18003.1359493798737.JavaMail.tomcat@be12>
+References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>,
+ <20130128142510.68092e10.akpm@linux-foundation.org>
+ <254788880.18003.1359493798737.JavaMail.tomcat@be12>
+Message-ID: <510B6829.7050908@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 09:11:54AM +0800, Peter Chen wrote:
-> On Thu, Jan 31, 2013 at 11:29:13AM +0100, Sascha Hauer wrote:
-> > On Thu, Jan 31, 2013 at 10:05:44AM +0800, Peter Chen wrote:
-> > > On Wed, Jan 30, 2013 at 03:00:15PM +0100, Sascha Hauer wrote:
-> > > > On Wed, Jan 30, 2013 at 10:06:28AM +0800, Peter Chen wrote:
-> > > > > On Tue, Jan 29, 2013 at 01:55:04PM +0200, Alexander Shishkin wrote:
-> > > > > > Sascha Hauer <s.hauer@pengutronix.de> writes:
-> > > > > > 
-> > > > > > > From: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > > > > > >
-> > > > > > > This adds two little devicetree helper functions for determining the
-> > > > > > > dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
-> > > > > > > the devicetree.
-> > > > > > >
-> > > > > > > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > > > > > > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> > > > > > > ---
-> > > > > > >
-> > > > > > > The properties and their values have been taken from the fsl-mph-dr driver.
-> > > > > > > This binding is also documented (though currently not used) for the tegra
-> > > > > > > ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
-> > > > > > > This is a first attempt to parse these bindings at a common place so that
-> > > > > > > others can make use of it.
-> > > > > > >
-> > > > > > > Basically I want to know whether this binding is recommended for new drivers
-> > > > > > > since normally the devicetree uses '-' instead of '_', and maybe there are
-> > > > > > > other problems with it.
-> > > > > > >
-> > > > > > > I need this binding for the chipidea driver. I suspect that the fsl-mph-dr
-> > > > > > > driver also really handles a chipidea core.
-> > > > > > 
-> > > > > > As far as I know, it is a chipidea core. Adding Peter to Cc list, he can
-> > > > > > probably confirm.
-> > > > > 
-> > > > > The fsl-mph-dr can't be used for chipdiea as it handles three platform
-> > > > > drivers for three roles (peripheral , host, otg). But chipidea only has
-> > > > > two platform drivers, one is the chipidea core, the other is related
-> > > > > controller wrapper.
-> > > > 
-> > > > What do you mean by 'three platform drivers'? That's only how the driver
-> > > > is built, no? I was talking about the hardware the fsl-mph-dr driver
-> > > > handles which definitely smells like chipidea.
-> > > 
-> > > It creates host/device/otg platform device according to dr_mode from
-> > > the device tree.
-> > 
-> > Again, that's software specific. What I'd like to know is whether the
-> > *hardware* could be handled by the chipidea driver.
-> not understand u, you mean the DT information at there? Those DT information
-> may not be used for i.mx hardware.
+On 2013-01-30 ?? 6:09, Rajesh Pawar wrote:
+>> Andrew Morton <akpm@linux-foundation.org> wrote:
+>>
+>> On Sat, 26 Jan 2013 14:50:43 +0900
+>> Kyungsik Lee <kyungsik.lee@lge.com> wrote:
+>>> This patchset is for supporting LZ4 compressed kernel and initial ramdisk on
+>>> the x86 and ARM architectures.
+>>>
+>>> According to [[http://code.google.com/p/lz4/,]] LZ4 is a very fast lossless
+>>> compression algorithm and also features an extremely fast decoder.
+>>>
+>>> Kernel Decompression APIs are based on implementation by Yann Collet
+>>> ([[http://code.google.com/p/lz4/source/checkout]]).
+>>> De/compression Tools are also provided from the site above.
+>>>
+>>> The initial test result on ARM(v7) based board shows that the size of kernel
+>>> with LZ4 compressed is 8% bigger than LZO compressed but the decompressing
+>>> speed is faster(especially under the enabled unaligned memory access).
+>>>
+>>> Test: 3.4 based kernel built with many modules
+>>> Uncompressed kernel size: 13MB
+>>> lzo: 6.3MB, 301ms
+>>> lz4: 6.8MB, 251ms(167ms, with enabled unaligned memory access)
+>>>
+>>> It seems that it___s worth trying LZ4 compressed kernel image or ramdisk
+>>> for making the kernel boot more faster.
+>>>
+>>> ...
+>>>
+>>> 20 files changed, 663 insertions(+), 3 deletions(-)
+>>>
+>>> ...
+>>>
+>> What's this "with enabled unaligned memory access" thing? You mean "if
+>> the arch supports CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS"? If so,
+>> that's only x86, which isn't really in the target market for this
+>> patch, yes?
+>> It's a lot of code for a 50ms boot-time improvement. Does anyone have
+>> any opinions on whether or not the benefits are worth the cost?
+> BTW, what happened to the proposed LZO update - woudn't it better to merge this first?
+>
+> Also, under the hood LZ4 seems to be quite similar to LZO, so probably
+> LZO speed would also greatly benefit from unaligned access and some other
+> ARM optimisations
+>   
+I didn't test with the proposed LZO update you mentioned. Sorry, which 
+one do you mean?
+I did some tests with the latest LZO in the mainline.
 
-The original question was:
+As a result, LZO is not faster in an unaligned access enabled on ARM. 
+Actually Slower.
 
-There is a driver in the tree called fsl-mph-dr-of.c. Does this driver
-handle a hardware which is compatible to the hardware the chipidea
-driver handles?
+Decompression time: 336ms(383ms, with unaligned access enabled)
 
-I think the answer is yes, because said driver registers a ehci device,
-or fsl-usb2-udc device (the same we used on i.MX). This hardware also
-has a PORTSC register. All this seems to suggest that
+You may refer to https://lkml.org/lkml/2012/10/7/85 to know more about it.
 
-drivers/usb/host/fsl-mph-dr-of.c
-drivers/usb/host/ehci-fsl.c
-drivers/usb/otg/fsl_otg.c
-drivers/usb/gadget/fsl_usb2_udc.h
-drivers/usb/gadget/fsl_udc_core.c
-
-Could be replaced by the chipidea driver.
-
-Sascha
+Thanks,
+Kyungsik
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Kyungsik
