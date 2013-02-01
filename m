@@ -1,43 +1,80 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 31 Jan 2013 22:42:57 -0500 (EST)
-Subject: [PATCH v4 07/13] ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for
- bootmem
-In-Reply-To: <1359669512-31276-8-git-send-email-cyril@ti.com>
-References: <1359669512-31276-1-git-send-email-cyril@ti.com>
- <1359669512-31276-8-git-send-email-cyril@ti.com>
-Message-ID: <alpine.LFD.2.02.1301312242300.6300@xanadu.home>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 31 Jan 2013 19:46:42 -0800
+Subject: [PATCHv2 for soc 1/4] arm: socfpga: Add new device tree source
+ for actual socfpga HW
+In-Reply-To: <1359651943-21752-2-git-send-email-dinguyen@altera.com>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-2-git-send-email-dinguyen@altera.com>
+Message-ID: <20130201034642.GC4838@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Jan 2013, Cyril Chemparathy wrote:
-
-> This patch adds an architecture defined override for ARCH_LOW_ADDRESS_LIMIT.
-> On PAE systems, the absence of this override causes bootmem to incorrectly
-> limit itself to 32-bit addressable physical memory.
+On Thu, Jan 31, 2013 at 11:05:40AM -0600, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-> ---
->  arch/arm/include/asm/memory.h |    2 ++
->  1 file changed, 2 insertions(+)
+> Up to this point, support for socfpga has only been on a virtual
+> platform. Now that actual hardware is available, we add the appropriate
+> device tree source files.
 > 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 73cf03a..8825abb 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -275,6 +275,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
->  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
->  #define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Tested-by: Pavel Machek <pavel@denx.de>
+> Reviewed-by: Pavel Machek <pavel@denx.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+
+Are you planning on sending us a merge request, or do you want us to apply this
+to a branch in arm-soc for you?
+
+(Note comment below though)
+
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> index ab7e4a9..7ad3cc6 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> @@ -20,7 +20,7 @@
 >  
-> +#define ARCH_LOW_ADDRESS_LIMIT		PHYS_MASK
+>  / {
+>  	model = "Altera SOCFPGA Cyclone V";
+> -	compatible = "altr,socfpga-cyclone5";
+> +	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+>  
+>  	chosen {
+>  		bootargs = "console=ttyS0,57600";
+
+[...]
+
+> diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+> new file mode 100644
+> index 0000000..a0c6c65
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/socfpga_vt.dts
+[...]
 > +
->  #endif
->  
->  #include <asm-generic/memory_model.h>
-> -- 
-> 1.7.9.5
-> 
+> +/ {
+> +	model = "Altera SOCFPGA VT";
+> +	compatible = "altr,socfpga-vt", "altr,socfpga";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,57600";
+> +	};
+> +
+[...]
+> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+> index 6732924..198f491 100644
+> --- a/arch/arm/mach-socfpga/socfpga.c
+> +++ b/arch/arm/mach-socfpga/socfpga.c
+> @@ -99,6 +99,7 @@ static void __init socfpga_cyclone5_init(void)
+>  static const char *altera_dt_match[] = {
+>  	"altr,socfpga",
+>  	"altr,socfpga-cyclone5",
+> +	"altr,socfpga-vt",
+>  	NULL
+>  };
+
+Since you have altr,socfpga in the compatible for the new board, you don't need
+to add an explicit check for the more specific one here. Same for cyclone5, you
+should even be able to remove that.
+
+
+-Olof
