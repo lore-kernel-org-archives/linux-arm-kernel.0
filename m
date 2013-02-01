@@ -1,61 +1,38 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri,  1 Feb 2013 13:22:54 -0500
-Subject: [PATCH v7 09/10] spi: omap2-mcspi: add generic DMA request support to
- the DT binding
-In-Reply-To: <1359742975-10421-1-git-send-email-mporter@ti.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
-Message-ID: <1359742975-10421-10-git-send-email-mporter@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Feb 2013 10:26:37 -0800
+Subject: [PATCH 1/1] ARM: OMAP3: igep0020: simplify GPIO LEDs dependencies
+In-Reply-To: <CABxcv=k6wypYO+JOV1rWyuGtR-seNQ2PFqym7QsAdkC+mC7P8g@mail.gmail.com>
+References: <1355505428-24302-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CABxcv=k6wypYO+JOV1rWyuGtR-seNQ2PFqym7QsAdkC+mC7P8g@mail.gmail.com>
+Message-ID: <20130201182637.GJ22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding definition is based on the generic DMA request binding
+* Javier Martinez Canillas <javier@dowhile0.org> [121220 06:08]:
+> 
+> Any comments on this patch?
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+No comments, sorry for the delay. Applying it into omap-for-v3.9/board.
+ 
+> I wonder if I should keep sending fixes/improvements for board-igep0020.c
+> 
+> I already sent an initial Device Tree support for IGEP boards [1] and
+> Benoit told me he is going to queue for 3.9. But still doesn't support
+> many peripherals found on these boards because they still don't proper
+> DT support, for instance NAND and Ethernet need the GPMC bindings
+> patches that haven't hit mainline yet.
+> 
+> So, it seems I will have to keep working on the board file until it
+> can be completely deprecated.
 
-diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
-index 938809c..4c85c4c 100644
---- a/Documentation/devicetree/bindings/spi/omap-spi.txt
-+++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
-@@ -10,7 +10,18 @@ Required properties:
- 			  input. The default is D0 as input and
- 			  D1 as output.
+Yes we still have few missing things for complete DT support. While we
+are working at it, let's just keep the board-*.c changes to minimum.
+
+Regards,
+
+Tony
  
--Example:
-+Optional properties:
-+- dmas: List of DMA specifiers with the controller specific format
-+	as described in the generic DMA client binding. A tx and rx
-+	specifier is required for each chip select.
-+- dma-names: List of DMA request names. These strings correspond
-+	1:1 with the DMA specifiers listed in dmas. The string naming
-+	is to be "rxN" and "txN" for RX and TX requests,
-+	respectively, where N equals the chip select number.
-+
-+Examples:
-+
-+[hwmod populated DMA resources]
- 
- mcspi1: mcspi at 1 {
-     #address-cells = <1>;
-@@ -20,3 +31,17 @@ mcspi1: mcspi at 1 {
-     ti,spi-num-cs = <4>;
- };
- 
-+[generic DMA request binding]
-+
-+mcspi1: mcspi at 1 {
-+    #address-cells = <1>;
-+    #size-cells = <0>;
-+    compatible = "ti,omap4-mcspi";
-+    ti,hwmods = "mcspi1";
-+    ti,spi-num-cs = <2>;
-+    dmas = <&edma 42
-+	    &edma 43
-+	    &edma 44
-+	    &edma 45>;
-+    dma-names = "tx0", "rx0", "tx1", "rx1";
-+};
--- 
-1.7.9.5
+> Thanks a lot and best regards,
+> Javier
+> 
+> [1]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82383.html
