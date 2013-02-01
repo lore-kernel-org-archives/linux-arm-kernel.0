@@ -1,55 +1,24 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  1 Feb 2013 13:49:57 -0200
-Subject: [PATCH] ARM: mxs: Enable cpuidle
-Message-ID: <1359733797-19538-1-git-send-email-festevam@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Feb 2013 15:51:43 +0000
+Subject: [GIT PULL 5/8] ARM: tegra: SCU base rework
+In-Reply-To: <510B4892.3050900@wwwdotorg.org>
+References: <1359582159-28816-1-git-send-email-swarren@wwwdotorg.org>
+ <CAOesGMjjgz7Am7-D_fQHqgLX=G+Wc_LKL-GYMHd1-NzVC-DUfA@mail.gmail.com>
+ <510B4892.3050900@wwwdotorg.org>
+Message-ID: <201302011551.43947.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Friday 01 February 2013, Stephen Warren wrote:
+> Hmm. And here I was thinking that I was basing branches on top of
+> each-other too much given your previous comments about merge conflicts
+> being OK!
 
-Enable CONFIG_CPU_IDLE, so that suspend/resume can be tested on mxs platforms.
+IMHO the cleanup branches are special in this regard because they
+are primarily meant as a way to resolve the merge conflicts.
+If you are able to put all the conflicts between the normal branches
+into cleanup patches, you can put them all in one branch and
+base your other branches on top of that. Of course that doesn't
+always work, but it would solve this particular instance.
 
-Tested on a mx28evk board:
-
-$ echo enabled > /sys/devices/80000000.apb/80040000.apbx/80074000.serial/tty/ttyAMA0/power/wakeup
-$ echo mem > /sys/power/state
-[  507.040000] PM: Syncing filesystems ... done.
-[  507.060000] mmc0: card e624 removed
-[  507.160000] Freezing user space processes ... (elapsed 0.01 seconds) done.
-[  507.180000] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
-[  507.200000] Suspending console(s) (use no_console_suspend to debug)
-
-(Then send any character via AUART to wakeup the system).
-
- [  507.220000] PM: suspend of devices complete after 10.468 msecs
-[  507.220000] PM: late suspend of devices complete after 3.531 msecs
-[  507.230000] PM: noirq suspend of devices complete after 5.187 msecs
-[  507.230000] PM: noirq resume of devices complete after 2.312 msecs
-[  507.230000] PM: early resume of devices complete after 2.437 msecs
-[  507.320000] PM: resume of devices complete after 81.312 msecs
-[  507.360000] Restarting tasks ... done.
-[  507.530000] mmc0: new SDHC card at address e624
-[  507.550000] mmcblk0: mmc0:e624 SU04G 3.69 GiB
-[  507.560000]  mmcblk0: p1 p2 p3
-[  509.240000] libphy: 800f0000.etherne:01 - Link is Down
-[  511.240000] libphy: 800f0000.etherne:01 - Link is Up
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/mxs_defconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 7bf5351..7bf9aba 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -29,6 +29,7 @@ CONFIG_HIGH_RES_TIMERS=y
- CONFIG_PREEMPT_VOLUNTARY=y
- CONFIG_AEABI=y
- CONFIG_AUTO_ZRELADDR=y
-+CONFIG_CPU_IDLE=y
- CONFIG_FPE_NWFPE=y
- CONFIG_NET=y
- CONFIG_PACKET=y
--- 
-1.7.9.5
+	Arnd
