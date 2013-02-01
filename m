@@ -1,32 +1,23 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 1 Feb 2013 14:35:28 +0000
-Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
-In-Reply-To: <510BD1CA.9020309@ti.com>
-References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
- <510916B2.7080509@ti.com> <20130130131504.GU15258@arwen.pp.htv.fi>
- <C8443D0743D26F4388EA172BF4E2A7A93EA95E97@DBDE01.ent.ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA9FF9C@DBDE01.ent.ti.com>
- <510BD04A.4000909@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EA9FFD5@DBDE01.ent.ti.com>
- <510BD1CA.9020309@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EAA0011@DBDE01.ent.ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 1 Feb 2013 15:37:52 +0100
+Subject: [PATCH 43 0/3] Kirkwoode cpufreq driver
+In-Reply-To: <CAKohpokjN8kx9Tan=wG4d0tdicWpb6DLN7o+rbX5f9oppJK7bA@mail.gmail.com>
+References: <1359729096-15371-1-git-send-email-andrew@lunn.ch>
+ <CAKohpokjN8kx9Tan=wG4d0tdicWpb6DLN7o+rbX5f9oppJK7bA@mail.gmail.com>
+Message-ID: <20130201143752.GQ17242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
-
-On Fri, Feb 01, 2013 at 20:01:38, Quadros, Roger wrote:
-
-> but DT boot is not supported for OMAP USB Host. How did you get it to work?
+On Fri, Feb 01, 2013 at 08:04:27PM +0530, Viresh Kumar wrote:
+> On 1 February 2013 20:01, Andrew Lunn <andrew@lunn.ch> wrote:
+> > This patchset adds a cpufreq driver for Marvell Kirkwood SoCs.
+> >
+> > The changes to kirkwood_defconfig enable it and set the default
+> > governor to ondemand.
 > 
-> Are you testing the Host connector or the OTG connector?
+> Wow! [PATCH 43 0/3] :)
+> It looks you are adding v4 manually to every patch? 
 
-If you see latest changes on musb_dsps.c, you will be able to find
-out.
+No, I just edited the cover note. For the others i used --subject=...
 
-As beagle bone first instance works only in device, it was tested
-using ether gadget.
-
-Regards
-Afzal
+    Andrew
