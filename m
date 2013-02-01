@@ -1,72 +1,126 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 1 Feb 2013 13:18:24 -0700
-Subject: [PATCH 00/15] OMAP SHAM & AES Crypto Updates
-In-Reply-To: <alpine.DEB.2.00.1302011722070.10853@utopia.booyaka.com>
-References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1212230836160.16045@utopia.booyaka.com>
- <20130108203853.GB1876@animalcreek.com>
- <alpine.DEB.2.00.1301171904070.14118@utopia.booyaka.com>
- <20130117222728.GA32446@animalcreek.com>
- <20130128191635.GA14158@animalcreek.com>
- <alpine.DEB.2.00.1302011722070.10853@utopia.booyaka.com>
-Message-ID: <20130201201824.GA6326@animalcreek.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Fri, 01 Feb 2013 12:21:49 -0800
+Subject: [PATCH v4 00/13] ARM LPAE Fixes - Part 1
+In-Reply-To: <1359669512-31276-1-git-send-email-cyril@ti.com>
+References: <1359669512-31276-1-git-send-email-cyril@ti.com>
+Message-ID: <510C23DD.9050601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 05:35:05PM +0000, Paul Walmsley wrote:
-> Hi Mark
-> 
-> On Mon, 28 Jan 2013, Mark A. Greer wrote:
-> 
-> > On Thu, Jan 17, 2013 at 03:27:28PM -0700, Mark A. Greer wrote:
-> > > On Thu, Jan 17, 2013 at 07:13:36PM +0000, Paul Walmsley wrote:
-> > > > On Tue, 8 Jan 2013, Mark A. Greer wrote:
-> > > > 
-> > > > > On Sun, Dec 23, 2012 at 08:40:43AM +0000, Paul Walmsley wrote:
-> > 
-> > > > What do you think about adding an am35xx_es11plus_hwmod_ocp_ifs[] array to 
-> > > > omap_hwmod_3xxx_data.c for these secure hwmods?  That carries the implicit 
-> > > > and possibly wrong assumption that it's likely to be ES1.0 devices that 
-> > > > are missing the SHAM/AES, but it seems unlikely that TI would have 
-> > > > multiple silicon revs running around claiming to be ES1.1?  Or maybe I'm 
-> > > > just being na?ve.
-> > > 
-> > > Something like that makes sense to me.  I'll re-read my email, etc. and
-> > > see if I can find something to help us figure it out.
-> > 
-> > I couldn't find any information that helped with this so AFAIK there is no
-> > good way to tell if a particular am35xx has the crypto hardware available
-> > or not.
-> 
-> I was thinking that we might assume that they are present on AM35xx 
-> ES1.1+.  If the TI folks are saying that they aren't available on only a 
-> few early devices, I'd guess that means ES1.0.  I personally have never 
-> seen an ES1.0 AM35xx device... 
-> 
-> Discriminating between ES1.0 and ES1.1+ should be pretty easy in the hwmod 
-> init...
-> 
-> >  At this point, I vote for moving 'omap3xxx_l4_core__sham' and
-> > 'omap3xxx_l4_core__aes' from omap3xxx_gp_hwmod_ocp_ifs[] and putting them
-> > in omap34xx_hwmod_ocp_ifs[] and omap36xx_hwmod_ocp_ifs[].  
-> 
-> I'm pretty sure that's going to break on HS OMAPs, like the HS OMAP3430 in 
-> the N900.  I don't think those IP blocks are directly accessible from 
-> Linux on most HS setups, although this might vary by device.  I'd feel 
-> more comfortable if you created an omap34xx_gp_hwmod_ocp_ifs[] list and an 
-> omap36xx_gp_hwmod_ocp_ifs[] list.  We should probably get rid of 
-> omap3xxx_gp_hwmod_ocp_ifs[] altogether.
-> 
-> > That should be safe in general and if someone with an am35xx wants to 
-> > use those modules, they can edit am35xx_hwmod_ocp_ifs[] locally.
-> 
-> If you want to just leave them commented in am35xx_hwmod_ocp_ifs[], rather 
-> than enabling them for ES1.1+ AM35xx, that's fine with me too, since we 
-> don't know that they are ES-level-based.  Maybe put a comment there that 
-> says that these are likely to be present, but no one seems to know for 
-> certain?  Seems ludicrous, but I guess that's what we're reduced to!
+Hi Cyril,
 
-Thanks Paul.  I will have some patches early next week.
+Thanks for posting fixes patch set again. I have in fact used your 
+previous patch series on a real LPAE system with split memory banks in 
+both 32-bit and 36-bit physical addresses. I compared your below patches 
+with previous version, and don't see significant changes. Hence you can use
 
-Mark
---
+Tested By: Subash Patel <subash.rp@samsung.com>
+
+for this series as well. In the meantime, I have used the pa/va patching 
+from v3, but haven't tested any performance numbers on it. But I will 
+wait for your next reworked version.
+
+Regards,
+Subash
+
+On Thursday 31 January 2013 01:58 PM, Cyril Chemparathy wrote:
+> This series is a repost of the LPAE related changes in preparation for the
+> introduction of the Keystone sub-architecture.  The original series has now
+> been split, and this particular series excludes the earlier changes to the
+> runtime code patching implementation.  Earlier versions of this series can be
+> found at [1], [2], [3] and [4].
+>
+> These patches are also available in git:
+> git://git.kernel.org/pub/scm/linux/kernel/git/cchemparathy/linux-keystone.git upstream/keystone-lpae-v4
+>
+> [1] http://comments.gmane.org/gmane.linux.kernel/1341497
+> [2] http://comments.gmane.org/gmane.linux.kernel/1332069
+> [3] http://comments.gmane.org/gmane.linux.kernel/1356716
+> [4] http://comments.gmane.org/gmane.linux.kernel/1362529
+>
+> Series changelog:
+>
+> [01/13] ARM: LPAE: use signed arithmetic for mask
+> [02/13] ARM: LPAE: use phys_addr_t in alloc_init_pud()
+> [03/13] ARM: LPAE: use phys_addr_t in free_memmap()
+>    (v4)	unchanged from v3
+>    (v3)	unchanged from v2
+>    (v2)	unchanged from v1
+>
+> [04/13] ARM: LPAE: use phys_addr_t for initrd location
+>    (v4)	unchanged from v3
+>    (v3)	unchanged from v2
+>    (v2)	revert to unsigned long for initrd size
+>
+> [05/13] ARM: LPAE: use phys_addr_t in switch_mm()
+>    (v4)  collapse shift and or into a single instruction
+>    (v3)	remove unnecessary handling for !LPAE in proc-v7-3level
+>    (v2)	use phys_addr_t instead of u64 in switch_mm()
+>    (v2)	revert on changes to v6 and v7-2level
+>    (v2)	fix register mapping for big-endian in v7-3level
+>
+> [06/13] ARM: LPAE: use 64-bit accessors for TTBR registers
+>    (v4)  remove unnecessary condition code clobber
+>    (v3)	remove unnecessary condition code clobber
+>    (v2)	restore comment in cpu_set_reserved_ttbr0()
+>
+> [07/13] ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for
+>    (v4)	unchanged from v3
+>    (v3)	unchanged from v2
+>    (v2)	unchanged from v1
+>
+> [08/13] ARM: LPAE: factor out T1SZ and TTBR1 computations
+>    (v4)  cleanup and move code comments
+>    (v3)	unchanged from v2
+>    (v2)	unchanged from v1
+>
+> [09/13] ARM: LPAE: accomodate >32-bit addresses for page
+>    (v4)	unchanged from v3
+>    (v3)	unchanged from v2
+>    (v2)	apply arch_pgd_shift only on lpae
+>    (v2)	move arch_pgd_shift definition to asm/memory.h
+>    (v2)	revert on changes to non-lpae procs
+>    (v2)	add check to ensure that the pgd physical address is aligned at an
+> 	ARCH_PGD_SHIFT boundary
+>
+> [10/13] ARM: mm: use physical addresses in highmem sanity
+> [11/13] ARM: mm: cleanup checks for membank overlap with
+> [12/13] ARM: mm: clean up membank size limit checks
+>    (v4)	unchanged from v3
+>    (v3)	unchanged from v2
+>    (v2)	unchanged from v1
+>
+> [13/13] ARM: fix type of PHYS_PFN_OFFSET to unsigned long
+>    (v4)	introduced here
+>
+>
+> Cyril Chemparathy (10):
+>    ARM: LPAE: use signed arithmetic for mask definitions
+>    ARM: LPAE: use phys_addr_t in switch_mm()
+>    ARM: LPAE: use 64-bit accessors for TTBR registers
+>    ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for bootmem
+>    ARM: LPAE: factor out T1SZ and TTBR1 computations
+>    ARM: LPAE: accomodate >32-bit addresses for page table base
+>    ARM: mm: use physical addresses in highmem sanity checks
+>    ARM: mm: cleanup checks for membank overlap with vmalloc area
+>    ARM: mm: clean up membank size limit checks
+>    ARM: fix type of PHYS_PFN_OFFSET to unsigned long
+>
+> Vitaly Andrianov (3):
+>    ARM: LPAE: use phys_addr_t in alloc_init_pud()
+>    ARM: LPAE: use phys_addr_t in free_memmap()
+>    ARM: LPAE: use phys_addr_t for initrd location
+>
+>   arch/arm/include/asm/memory.h               |   20 +++++++++-
+>   arch/arm/include/asm/page.h                 |    2 +-
+>   arch/arm/include/asm/pgtable-3level-hwdef.h |   20 ++++++++++
+>   arch/arm/include/asm/pgtable-3level.h       |    6 +--
+>   arch/arm/include/asm/proc-fns.h             |   26 +++++++++----
+>   arch/arm/kernel/head.S                      |   10 ++---
+>   arch/arm/kernel/smp.c                       |   11 +++++-
+>   arch/arm/mm/context.c                       |    9 +----
+>   arch/arm/mm/init.c                          |   19 +++++-----
+>   arch/arm/mm/mmu.c                           |   49 +++++++++----------------
+>   arch/arm/mm/proc-v7-3level.S                |   53 ++++++++++++++-------------
+>   11 files changed, 132 insertions(+), 93 deletions(-)
+>
