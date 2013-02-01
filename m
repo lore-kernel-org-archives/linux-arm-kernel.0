@@ -1,27 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Feb 2013 15:23:25 +0000
-Subject: [PATCH V2 4/4] DMA: PL330: Modify pl330 filter based on new
- generic dma dt bindings.
-In-Reply-To: <1359723116-18173-5-git-send-email-padma.v@samsung.com>
-References: <1359723116-18173-1-git-send-email-padma.v@samsung.com>
- <1359723116-18173-5-git-send-email-padma.v@samsung.com>
-Message-ID: <201302011523.25771.arnd@arndb.de>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Fri, 1 Feb 2013 07:27:46 -0800
+Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
+ socfpga harware
+In-Reply-To: <20130201104655.GA3124@amd.pavel.ucw.cz>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-5-git-send-email-dinguyen@altera.com>
+ <20130201035040.GE4838@quad.lixom.net>
+ <20130201104655.GA3124@amd.pavel.ucw.cz>
+Message-ID: <71B37E0559AC6849A68C5BA94C509FB45A63D4E47D@SJ-ITMSG02.altera.priv.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 February 2013, Padmavathi Venna wrote:
-> This patch modify the filter function to filter the required channel
-> based on new filter params.
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Hi Olof,
+On Fri, 2013-02-01 at 11:46 +0100, ZY - pavel wrote:
+> Hi!
+>
+> > > Because the CPU1 start address is different for socfpga-vt and
+> > > socfpga-cyclone5, we add code to use the correct CPU1 start addr.
+>
+> > > @@ -72,6 +73,13 @@ void __init socfpga_sysmgr_init(void)
+> > >   struct device_node *np;
+> > >
+> > >   np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
+> > > +
+> > > + if (of_property_read_u32(np, "cpu1-start-addr",
+> > > +                 (u32 *) &cpu1start_addr)) {
+> > > +         early_printk("Need cpu1-start-addr in device tree.\n");
+> > > +         panic("Need cpu1-start-addr in device tree.\n");
+> > > + }
+> > > +
+> > >   sys_manager_base_addr = of_iomap(np, 0);
+> >
+> > Wouldn't it be easier to diagnose this failure if you just printed the error
+> > and continued booting without the second CPU? An early panic is usually really
+> > hard to debug since you might not get early console without extra work.
+>
+> I actually thought about that... but could not think of non-ugly way
+> of doing that. I hope dts will normally be "right" for any production
+> system...
 
-The result of this looks good, but I fear that changing the filter function
-like this wil break all drivers that currently use the plat-samsung/dma-ops.c
-code. For migration purposes, I think the best way is to change
-samsung_dmadev_request() to match the new filter_param format.
+I think a panic is better just for the reason that if someone is
+expecting SMP, but missed the warning message, and later finds out that
+the secondary core never came up, it would save some debugging time.
 
-After that is done, you can migrate all the drivers using samsung_dma_get_ops
-over to the new dma_request_slave_channel interface without breaking
-anything when only part of the series is applied.
+Since I have to send out a v3 from the 1st patch anyways, let me verify
+that I can get the early warning.
 
-	Arnd
+Thanks,
+Dinh
+>                                                                       Pavel
+
+
+Confidentiality Notice.
+This message may contain information that is confidential or otherwise protected from disclosure. If you are not the intended recipient, you are hereby notified that any use, disclosure, dissemination, distribution,  or copying  of this message, or any attachments, is strictly prohibited.  If you have received this message in error, please advise the sender by reply e-mail, and delete the message and any attachments.  Thank you.
