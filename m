@@ -1,84 +1,46 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  1 Feb 2013 08:48:24 +0100
-Subject: [PATCH 3/9] USB: chipidea: ci13xxx-imx: create dynamic platformdata
+Date: Fri,  1 Feb 2013 08:48:27 +0100
+Subject: [PATCH 6/9] USB chipidea i.MX: introduce dr_mode property
 In-Reply-To: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
 References: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359704911-8275-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359704911-8275-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+The dr_mode devicetree property allows to explicitly specify the
+host/peripheral/otg mode. This is necessary for boards without proper
+ID pin handling.
 
-This patch removes the limitation of having only one instance of the
-ci13xxx-imx platformdata and makes different configurations possible.
-
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Reviewed-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci13xxx_imx.c |   25 +++++++++++++++----------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+ Documentation/devicetree/bindings/usb/ci13xxx-imx.txt |    1 +
+ drivers/usb/chipidea/ci13xxx_imx.c                    |    1 +
+ 2 files changed, 2 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+index dd42ccd..493a414 100644
+--- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
++++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+@@ -9,6 +9,7 @@ Recommended properies:
+ - phy_type: the type of the phy connected to the core. Should be one
+   of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
+   property the PORTSC register won't be touched
++- dr_mode: One of "host", "peripheral" or "otg". Defaults to "otg"
+ 
+ Optional properties:
+ - fsl,usbphy: phandler of usb phy that connects to the only one port
 diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 8c29122..69024e0 100644
+index ebc1148..b598bb8f 100644
 --- a/drivers/usb/chipidea/ci13xxx_imx.c
 +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -85,17 +85,10 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
+@@ -114,6 +114,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		       CI13XXX_DISABLE_STREAMING;
  
- /* End of common functions shared by usbmisc drivers*/
+ 	pdata->phy_mode = of_usb_get_phy_mode(pdev->dev.of_node);
++	pdata->dr_mode = of_usb_get_dr_mode(pdev->dev.of_node);
  
--static struct ci13xxx_platform_data ci13xxx_imx_platdata  = {
--	.name			= "ci13xxx_imx",
--	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
--				  CI13XXX_PULLUP_ON_VBUS |
--				  CI13XXX_DISABLE_STREAMING,
--	.capoffset		= DEF_CAPOFFSET,
--};
--
- static int ci13xxx_imx_probe(struct platform_device *pdev)
- {
- 	struct ci13xxx_imx_data *data;
-+	struct ci13xxx_platform_data *pdata;
- 	struct platform_device *plat_ci, *phy_pdev;
- 	struct device_node *phy_np;
- 	struct resource *res;
-@@ -107,6 +100,18 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		&& !usbmisc_ops)
- 		return -EPROBE_DEFER;
- 
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX pdata!\n");
-+		return -ENOMEM;
-+	}
-+
-+	pdata->name = "ci13xxx_imx";
-+	pdata->capoffset = DEF_CAPOFFSET;
-+	pdata->flags = CI13XXX_REQUIRE_TRANSCEIVER |
-+		       CI13XXX_PULLUP_ON_VBUS |
-+		       CI13XXX_DISABLE_STREAMING;
-+
  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
  	if (!data) {
- 		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
-@@ -168,7 +173,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		reg_vbus = NULL;
- 	}
- 
--	ci13xxx_imx_platdata.phy = data->phy;
-+	pdata->phy = data->phy;
- 
- 	if (!pdev->dev.dma_mask) {
- 		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
-@@ -193,7 +198,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 
- 	plat_ci = ci13xxx_add_device(&pdev->dev,
- 				pdev->resource, pdev->num_resources,
--				&ci13xxx_imx_platdata);
-+				pdata);
- 	if (IS_ERR(plat_ci)) {
- 		ret = PTR_ERR(plat_ci);
- 		dev_err(&pdev->dev,
 -- 
 1.7.10.4
