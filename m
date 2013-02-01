@@ -1,18 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Feb 2013 14:58:00 +0000
-Subject: [PATCH V2 2/4] DMA: PL330: Register the DMA controller with the
- generic DMA helpers
-In-Reply-To: <1359723116-18173-3-git-send-email-padma.v@samsung.com>
-References: <1359723116-18173-1-git-send-email-padma.v@samsung.com>
- <1359723116-18173-3-git-send-email-padma.v@samsung.com>
-Message-ID: <201302011458.01103.arnd@arndb.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 1 Feb 2013 16:58:42 +0200
+Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EAA0011@DBDE01.ent.ti.com>
+References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA95DF0@DBDE01.ent.ti.com>
+ <510916B2.7080509@ti.com> <20130130131504.GU15258@arwen.pp.htv.fi>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA95E97@DBDE01.ent.ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9FF9C@DBDE01.ent.ti.com>
+ <510BD04A.4000909@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EA9FFD5@DBDE01.ent.ti.com>
+ <510BD1CA.9020309@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EAA0011@DBDE01.ent.ti.com>
+Message-ID: <510BD822.8010905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 February 2013, Padmavathi Venna wrote:
-> This patch registers the pl330 dma controller driver with the generic
-> device tree dma helper functions.
+On 02/01/2013 04:35 PM, Mohammed, Afzal wrote:
+> Hi Roger,
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> On Fri, Feb 01, 2013 at 20:01:38, Quadros, Roger wrote:
+> 
+>> but DT boot is not supported for OMAP USB Host. How did you get it to work?
+>>
+>> Are you testing the Host connector or the OTG connector?
+> 
+> If you see latest changes on musb_dsps.c, you will be able to find
+> out.
+> 
+> As beagle bone first instance works only in device, it was tested
+> using ether gadget.
+> 
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+OK, it seems that you are testing the OTG port. This patchset has nothing to do with
+it. These are for getting the USB type A (the bigger) port to work. But for that to work on
+beaglebone we need to wait for the DT adaptation.
+
+cheers,
+-roger
