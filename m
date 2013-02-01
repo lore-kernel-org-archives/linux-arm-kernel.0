@@ -1,117 +1,514 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Thu, 31 Jan 2013 18:37:47 -0600
-Subject: [PATCH v4] arm: use built-in byte swap function
-In-Reply-To: <1359670248.27468.13.camel@shinybook.infradead.org>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <1359670248.27468.13.camel@shinybook.infradead.org>
-Message-ID: <20130131183747.d56289dbd89b165cf12a9d28@freescale.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 31 Jan 2013 17:02:58 -0800
+Subject: [PATCH] ARM: S3C24XX: Remove plat-s3c24xx directory in arch/arm/
+Message-ID: <1359680578-6914-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 1490bd8823c05e0dda982524bb70cb6c6427ddf9 Mon Sep 17 00:00:00 2001
-From: Kim Phillips <kim.phillips@freescale.com>
-Date: Mon, 28 Jan 2013 19:30:33 -0600
-Subject: [PATCH] arm: use built-in byte swap function
+This patch is for just moving plat-s3c24xx/*.c into mach-s3c24xx/, so
+that we could remove plat-s3c24xx directory. But since the PLAT_S3C24XX
+is used in drivers, the statement is not deleted and it will be sorted
+out next time.
 
-Enable the compiler intrinsic for byte swapping on arch ARM.  This
-allows the compiler to detect and be able to optimize out byte
-swappings, e.g. in big endian to big endian moves.
-
-A ARCH_DEFINES_BUILTIN_BSWAP is added to allow an ARCH to select
-it when it wants to control HAVE_BUILTIN_BSWAPxx definitions over
-those in the generic compiler headers.  It can be dependent on a
-combination of byte swapping instruction availability, the
-instruction set version, and the state of support in different
-compiler versions.
-
-AFAICT, arm gcc got __builtin_bswap{32,64} support in 4.6,
-and for the 16-bit version in 4.8.
-
-This has a tiny benefit on vmlinux text size (gcc 4.6.4):
-
-multi_v7_defconfig:
-   text    data     bss     dec     hex filename
-3135208  188396  203344 3526948  35d124 vmlinux
-multi_v7_defconfig with builtin_bswap:
-   text    data     bss     dec     hex filename
-3135112  188396  203344 3526852  35d0c4 vmlinux
-
-exynos_defconfig:
-   text    data     bss     dec     hex filename
-4286605  360564  223172 4870341  4a50c5 vmlinux
-exynos_defconfig with builtin_bswap:
-   text    data     bss     dec     hex filename
-4286405  360564  223172 4870141  4a4ffd vmlinux
-
-The savings come mostly from device-tree related code, and some
-from drivers.
-
-Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
-akin to: http://comments.gmane.org/gmane.linux.kernel.cross-arch/16016
+ arch/arm/Kconfig                                   |    1 -
+ arch/arm/Makefile                                  |    2 +-
+ arch/arm/mach-s3c24xx/Kconfig                      |  104 +++++++++++++++++
+ arch/arm/mach-s3c24xx/Makefile                     |   14 ++-
+ .../{plat-s3c24xx => mach-s3c24xx}/clock-dclk.c    |    3 +-
+ .../clock-s3c2410.c}                               |    3 +-
+ .../cpufreq-debugfs.c}                             |    3 +-
+ .../cpufreq-utils.c}                               |    3 +-
+ .../cpu-freq.c => mach-s3c24xx/cpufreq.c}          |    3 +-
+ arch/arm/{plat-s3c24xx => mach-s3c24xx}/dma.c      |    3 +-
+ .../iotiming-s3c2410.c}                            |    3 +-
+ .../iotiming-s3c2412.c}                            |    3 +-
+ arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq.c      |    0
+ arch/arm/plat-s3c24xx/Kconfig                      |  117 --------------------
+ arch/arm/plat-s3c24xx/Makefile                     |   27 -----
+ 15 files changed, 126 insertions(+), 163 deletions(-)
+ rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/clock-dclk.c (98%)
+ rename arch/arm/{plat-s3c24xx/s3c2410-clock.c => mach-s3c24xx/clock-s3c2410.c} (99%)
+ rename arch/arm/{plat-s3c24xx/cpu-freq-debugfs.c => mach-s3c24xx/cpufreq-debugfs.c} (98%)
+ rename arch/arm/{plat-s3c24xx/s3c2410-cpufreq-utils.c => mach-s3c24xx/cpufreq-utils.c} (96%)
+ rename arch/arm/{plat-s3c24xx/cpu-freq.c => mach-s3c24xx/cpufreq.c} (99%)
+ rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/dma.c (99%)
+ rename arch/arm/{plat-s3c24xx/s3c2410-iotiming.c => mach-s3c24xx/iotiming-s3c2410.c} (99%)
+ rename arch/arm/{plat-s3c24xx/s3c2412-iotiming.c => mach-s3c24xx/iotiming-s3c2412.c} (99%)
+ rename arch/arm/{plat-s3c24xx => mach-s3c24xx}/irq.c (100%)
+ delete mode 100644 arch/arm/plat-s3c24xx/Kconfig
+ delete mode 100644 arch/arm/plat-s3c24xx/Makefile
 
-based on linux-next-20130128.  Depends on commit "compiler-gcc{3,4}.h:
-Use GCC_VERSION macro" by Daniel Santos <daniel.santos@pobox.com>,
-currently in the akpm branch.
-
-v4:
-- undo v2-3's addition of ARCH_DEFINES_BUILTIN_BSWAP per Boris
-  and David - patch is much less intrusive :)
-
-v3:
-- moved out of uapi swab.h into arch/arm/include/asm/swab.h
-- moved ARCH_DEFINES_BUILTIN_BSWAP help text into commit message
-- moved GCC_VERSION >= 40800 ifdef into GCC_VERSION >= 40600 block
-
-v2:
-- at91 and lpd270 builds fixed by limiting to ARMv6 and above
-  (i.e., ARM cores that have support for the 'rev' instruction).
-  Otherwise, the compiler emits calls to libgcc's __bswapsi2 on
-  these ARMv4/v5 builds (and arch ARM doesn't link with libgcc).
-  All ARM defconfigs now have the same build status as they did
-  without this patch (some are broken on linux-next).
-
-- move ARM check from generic compiler.h to arch ARM's swab.h.
-  - pretty sure it should be limited to __KERNEL__ builds
-
-- add new ARCH_DEFINES_BUILTIN_BSWAP (see Kconfig help).
-  - if set, generic compiler header does not set HAVE_BUILTIN_BSWAPxx
-  - not too sure about this having to be a new CONFIG_, but it's hard
-    to find a place for it given linux/compiler.h doesn't include any
-    arch-specific files.
-
-- move new selects to end of CONFIG_ARM's Kconfig select list,
-  as is done in David Woodhouse's original patchseries for ppc/x86.
-
- arch/arm/include/asm/swab.h |    8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/include/asm/swab.h b/arch/arm/include/asm/swab.h
-index 537fc9b..e56acff 100644
---- a/arch/arm/include/asm/swab.h
-+++ b/arch/arm/include/asm/swab.h
-@@ -34,5 +34,13 @@ static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
- }
- #define __arch_swab32 __arch_swab32
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4350235..8b72d23 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1089,7 +1089,6 @@ source "arch/arm/mach-realview/Kconfig"
+ source "arch/arm/mach-sa1100/Kconfig"
  
-+#if GCC_VERSION >= 40600
-+#define __HAVE_BUILTIN_BSWAP32__
-+#define __HAVE_BUILTIN_BSWAP64__
-+#if GCC_VERSION >= 40800
-+#define __HAVE_BUILTIN_BSWAP16__
-+#endif
-+#endif
+ source "arch/arm/plat-samsung/Kconfig"
+-source "arch/arm/plat-s3c24xx/Kconfig"
+ 
+ source "arch/arm/mach-socfpga/Kconfig"
+ 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 0935dac..a554f75 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -204,7 +204,7 @@ plat-$(CONFIG_ARCH_S3C64XX)	+= samsung
+ plat-$(CONFIG_PLAT_IOP)		+= iop
+ plat-$(CONFIG_PLAT_ORION)	+= orion
+ plat-$(CONFIG_PLAT_PXA)		+= pxa
+-plat-$(CONFIG_PLAT_S3C24XX)	+= s3c24xx samsung
++plat-$(CONFIG_PLAT_S3C24XX)	+= samsung
+ plat-$(CONFIG_PLAT_S5P)		+= samsung
+ plat-$(CONFIG_PLAT_SPEAR)	+= spear
+ plat-$(CONFIG_PLAT_VERSATILE)	+= versatile
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index 5e17e1d..d4f1fea 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -9,6 +9,15 @@
+ 
+ if ARCH_S3C24XX
+ 
++config PLAT_S3C24XX
++	def_bool y
++	select ARCH_REQUIRE_GPIOLIB
++	select NO_IOPORT
++	select S3C_DEV_NAND
++	select IRQ_DOMAIN
++	help
++	  Base platform code for any Samsung S3C24XX device
 +
- #endif
- #endif
+ menu "SAMSUNG S3C24XX SoCs Support"
+ 
+ comment "S3C24XX SoCs"
+@@ -89,6 +98,17 @@ config CPU_S3C2443
+ 
+ # common code
+ 
++config S3C2410_CLOCK
++	bool
++	help
++	  Clock code for the S3C2410, and similar processors which
++	  is currently includes the S3C2410, S3C2440, S3C2442.
++
++config S3C24XX_DCLK
++	bool
++	help
++	  Clock code for supporting DCLK/CLKOUT on S3C24XX architectures
++
+ config S3C24XX_SMDK
+ 	bool
+ 	help
+@@ -117,6 +137,22 @@ config S3C24XX_SETUP_TS
+ 	help
+ 	  Compile in platform device definition for Samsung TouchScreen.
+ 
++config S3C24XX_DMA
++	bool "S3C2410 DMA support"
++	depends on ARCH_S3C24XX
++	select S3C_DMA
++	help
++	  S3C2410 DMA support. This is needed for drivers like sound which
++	  use the S3C2410's DMA system to move data to and from the
++	  peripheral blocks.
++
++config S3C2410_DMA_DEBUG
++	bool "S3C2410 DMA support debug"
++	depends on ARCH_S3C24XX && S3C2410_DMA
++	help
++	  Enable debugging output for the DMA code. This option sends info
++	  to the kernel log, at priority KERN_DEBUG.
++
+ config S3C2410_DMA
+ 	bool
+ 	depends on S3C24XX_DMA && (CPU_S3C2410 || CPU_S3C2442)
+@@ -129,6 +165,74 @@ config S3C2410_PM
+ 	help
+ 	  Power Management code common to S3C2410 and better
+ 
++# low-level serial option nodes
++
++config CPU_LLSERIAL_S3C2410_ONLY
++	bool
++	default y if CPU_LLSERIAL_S3C2410 && !CPU_LLSERIAL_S3C2440
++
++config CPU_LLSERIAL_S3C2440_ONLY
++	bool
++	default y if CPU_LLSERIAL_S3C2440 && !CPU_LLSERIAL_S3C2410
++
++config CPU_LLSERIAL_S3C2410
++	bool
++	help
++	  Selected if there is an S3C2410 (or register compatible) serial
++	  low-level implementation needed
++
++config CPU_LLSERIAL_S3C2440
++	bool
++	help
++	  Selected if there is an S3C2440 (or register compatible) serial
++	  low-level implementation needed
++
++# gpio configurations
++
++config S3C24XX_GPIO_EXTRA
++	int
++	default 128 if S3C24XX_GPIO_EXTRA128
++	default 64 if S3C24XX_GPIO_EXTRA64
++	default 16 if ARCH_H1940
++	default 0
++
++config S3C24XX_GPIO_EXTRA64
++	bool
++	help
++	  Add an extra 64 gpio numbers to the available GPIO pool. This is
++	  available for boards that need extra gpios for external devices.
++
++config S3C24XX_GPIO_EXTRA128
++	bool
++	help
++	  Add an extra 128 gpio numbers to the available GPIO pool. This is
++	  available for boards that need extra gpios for external devices.
++
++# cpu frequency items common between s3c2410 and s3c2440/s3c2442
++
++config S3C2410_IOTIMING
++	bool
++	depends on CPU_FREQ_S3C24XX
++	help
++	  Internal node to select io timing code that is common to the s3c2410
++	  and s3c2440/s3c2442 cpu frequency support.
++
++config S3C2410_CPUFREQ_UTILS
++	bool
++	depends on CPU_FREQ_S3C24XX
++	help
++	  Internal node to select timing code that is common to the s3c2410
++	  and s3c2440/s3c244 cpu frequency support.
++
++# cpu frequency support common to s3c2412, s3c2413 and s3c2442
++
++config S3C2412_IOTIMING
++	bool
++	depends on CPU_FREQ_S3C24XX && (CPU_S3C2412 || CPU_S3C2443)
++	help
++	  Intel node to select io timing code that is common to the s3c2412
++	  and the s3c2443.
++
+ # cpu-specific sections
+ 
+ if CPU_S3C2410
+diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
+index 1d67582..af53d27 100644
+--- a/arch/arm/mach-s3c24xx/Makefile
++++ b/arch/arm/mach-s3c24xx/Makefile
+@@ -14,7 +14,7 @@ obj-				:=
+ 
+ # core
+ 
+-obj-y				+= common.o
++obj-y				+= common.o irq.o
+ 
+ obj-$(CONFIG_CPU_S3C2410)	+= s3c2410.o
+ obj-$(CONFIG_S3C2410_CPUFREQ)	+= cpufreq-s3c2410.o
+@@ -47,9 +47,21 @@ obj-$(CONFIG_PM)		+= pm.o irq-pm.o sleep.o
+ 
+ # common code
+ 
++obj-$(CONFIG_S3C24XX_DCLK)	+= clock-dclk.o
++obj-$(CONFIG_S3C24XX_DMA)	+= dma.o
++
++obj-$(CONFIG_S3C2410_CLOCK)	+= clock-s3c2410.o
++obj-$(CONFIG_S3C2410_CPUFREQ_UTILS) += cpufreq-utils.o
++
++obj-$(CONFIG_S3C2410_IOTIMING)	+= iotiming-s3c2410.o
++obj-$(CONFIG_S3C2412_IOTIMING)	+= iotiming-s3c2412.o
++
+ obj-$(CONFIG_S3C2443_COMMON)	+= common-s3c2443.o
+ obj-$(CONFIG_S3C2443_DMA)	+= dma-s3c2443.o
+ 
++obj-$(CONFIG_CPU_FREQ_S3C24XX)	+= cpufreq.o
++obj-$(CONFIG_CPU_FREQ_S3C24XX_DEBUGFS) += cpufreq-debugfs.o
++
+ #
+ # machine support
+ # following is ordered alphabetically by option text.
+diff --git a/arch/arm/plat-s3c24xx/clock-dclk.c b/arch/arm/mach-s3c24xx/clock-dclk.c
+similarity index 98%
+rename from arch/arm/plat-s3c24xx/clock-dclk.c
+rename to arch/arm/mach-s3c24xx/clock-dclk.c
+index f95d326..1edd9b2 100644
+--- a/arch/arm/plat-s3c24xx/clock-dclk.c
++++ b/arch/arm/mach-s3c24xx/clock-dclk.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/plat-s3c24xx/clock-dclk.c
+- *
++/*
+  * Copyright (c) 2004-2008 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
+  *	http://armlinux.simtec.co.uk/
+diff --git a/arch/arm/plat-s3c24xx/s3c2410-clock.c b/arch/arm/mach-s3c24xx/clock-s3c2410.c
+similarity index 99%
+rename from arch/arm/plat-s3c24xx/s3c2410-clock.c
+rename to arch/arm/mach-s3c24xx/clock-s3c2410.c
+index 25dc4d4..641266f3 100644
+--- a/arch/arm/plat-s3c24xx/s3c2410-clock.c
++++ b/arch/arm/mach-s3c24xx/clock-s3c2410.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-s3c2410/clock.c
+- *
++/*
+  * Copyright (c) 2006 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
+  *
+diff --git a/arch/arm/plat-s3c24xx/cpu-freq-debugfs.c b/arch/arm/mach-s3c24xx/cpufreq-debugfs.c
+similarity index 98%
+rename from arch/arm/plat-s3c24xx/cpu-freq-debugfs.c
+rename to arch/arm/mach-s3c24xx/cpufreq-debugfs.c
+index c7adad0..9b7b428 100644
+--- a/arch/arm/plat-s3c24xx/cpu-freq-debugfs.c
++++ b/arch/arm/mach-s3c24xx/cpufreq-debugfs.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/plat-s3c24xx/cpu-freq-debugfs.c
+- *
++/*
+  * Copyright (c) 2009 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+  *	Ben Dooks <ben@simtec.co.uk>
+diff --git a/arch/arm/plat-s3c24xx/s3c2410-cpufreq-utils.c b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+similarity index 96%
+rename from arch/arm/plat-s3c24xx/s3c2410-cpufreq-utils.c
+rename to arch/arm/mach-s3c24xx/cpufreq-utils.c
+index 43ea801..89e4e2b 100644
+--- a/arch/arm/plat-s3c24xx/s3c2410-cpufreq-utils.c
++++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/plat-s3c24xx/s3c2410-cpufreq-utils.c
+- *
++/*
+  * Copyright (c) 2009 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+  *	Ben Dooks <ben@simtec.co.uk>
+diff --git a/arch/arm/plat-s3c24xx/cpu-freq.c b/arch/arm/mach-s3c24xx/cpufreq.c
+similarity index 99%
+rename from arch/arm/plat-s3c24xx/cpu-freq.c
+rename to arch/arm/mach-s3c24xx/cpufreq.c
+index 4680799..5f181e7 100644
+--- a/arch/arm/plat-s3c24xx/cpu-freq.c
++++ b/arch/arm/mach-s3c24xx/cpufreq.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/plat-s3c24xx/cpu-freq.c
+- *
++/*
+  * Copyright (c) 2006-2008 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+  *	Ben Dooks <ben@simtec.co.uk>
+diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/mach-s3c24xx/dma.c
+similarity index 99%
+rename from arch/arm/plat-s3c24xx/dma.c
+rename to arch/arm/mach-s3c24xx/dma.c
+index ba3e76c..aab6490 100644
+--- a/arch/arm/plat-s3c24xx/dma.c
++++ b/arch/arm/mach-s3c24xx/dma.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/plat-s3c24xx/dma.c
+- *
++/*
+  * Copyright 2003-2006 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
+  *
+diff --git a/arch/arm/plat-s3c24xx/s3c2410-iotiming.c b/arch/arm/mach-s3c24xx/iotiming-s3c2410.c
+similarity index 99%
+rename from arch/arm/plat-s3c24xx/s3c2410-iotiming.c
+rename to arch/arm/mach-s3c24xx/iotiming-s3c2410.c
+index b1908e5..48ccfcf 100644
+--- a/arch/arm/plat-s3c24xx/s3c2410-iotiming.c
++++ b/arch/arm/mach-s3c24xx/iotiming-s3c2410.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/plat-s3c24xx/s3c2410-iotiming.c
+- *
++/*
+  * Copyright (c) 2006-2009 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+  *	Ben Dooks <ben@simtec.co.uk>
+diff --git a/arch/arm/plat-s3c24xx/s3c2412-iotiming.c b/arch/arm/mach-s3c24xx/iotiming-s3c2412.c
+similarity index 99%
+rename from arch/arm/plat-s3c24xx/s3c2412-iotiming.c
+rename to arch/arm/mach-s3c24xx/iotiming-s3c2412.c
+index 48eee39..9527342 100644
+--- a/arch/arm/plat-s3c24xx/s3c2412-iotiming.c
++++ b/arch/arm/mach-s3c24xx/iotiming-s3c2412.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/plat-s3c24xx/s3c2412-iotiming.c
+- *
++/*
+  * Copyright (c) 2006-2008 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+  *	Ben Dooks <ben@simtec.co.uk>
+diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/mach-s3c24xx/irq.c
+similarity index 100%
+rename from arch/arm/plat-s3c24xx/irq.c
+rename to arch/arm/mach-s3c24xx/irq.c
+diff --git a/arch/arm/plat-s3c24xx/Kconfig b/arch/arm/plat-s3c24xx/Kconfig
+deleted file mode 100644
+index 3bb5c8f..0000000
+--- a/arch/arm/plat-s3c24xx/Kconfig
++++ /dev/null
+@@ -1,117 +0,0 @@
+-# Copyright 2007 Simtec Electronics
+-#
+-# Licensed under GPLv2
+-
+-config PLAT_S3C24XX
+-	bool
+-	depends on ARCH_S3C24XX
+-	default y
+-	select ARCH_REQUIRE_GPIOLIB
+-	select NO_IOPORT
+-	select S3C_DEV_NAND
+-	select IRQ_DOMAIN
+-	help
+-	  Base platform code for any Samsung S3C24XX device
+-
+-if PLAT_S3C24XX
+-
+-# low-level serial option nodes
+-
+-config CPU_LLSERIAL_S3C2410_ONLY
+-	bool
+-	default y if CPU_LLSERIAL_S3C2410 && !CPU_LLSERIAL_S3C2440
+-
+-config CPU_LLSERIAL_S3C2440_ONLY
+-	bool
+-	default y if CPU_LLSERIAL_S3C2440 && !CPU_LLSERIAL_S3C2410
+-
+-config CPU_LLSERIAL_S3C2410
+-	bool
+-	help
+-	  Selected if there is an S3C2410 (or register compatible) serial
+-	  low-level implementation needed
+-
+-config CPU_LLSERIAL_S3C2440
+-	bool
+-	help
+-	  Selected if there is an S3C2440 (or register compatible) serial
+-	  low-level implementation needed
+-
+-# code that is shared between a number of the s3c24xx implementations
+-
+-config S3C2410_CLOCK
+-	bool
+-	help
+-	  Clock code for the S3C2410, and similar processors which
+-	  is currently includes the S3C2410, S3C2440, S3C2442.
+-
+-config S3C24XX_DCLK
+-	bool
+-	help
+-	  Clock code for supporting DCLK/CLKOUT on S3C24XX architectures
+-
+-# gpio configurations
+-
+-config S3C24XX_GPIO_EXTRA
+-	int
+-	default 128 if S3C24XX_GPIO_EXTRA128
+-	default 64 if S3C24XX_GPIO_EXTRA64
+-	default 16 if ARCH_H1940
+-	default 0
+-
+-config S3C24XX_GPIO_EXTRA64
+-	bool
+-	help
+-	  Add an extra 64 gpio numbers to the available GPIO pool. This is
+-	  available for boards that need extra gpios for external devices.
+-
+-config S3C24XX_GPIO_EXTRA128
+-	bool
+-	help
+-	  Add an extra 128 gpio numbers to the available GPIO pool. This is
+-	  available for boards that need extra gpios for external devices.
+-
+-config S3C24XX_DMA
+-	bool "S3C2410 DMA support"
+-	depends on ARCH_S3C24XX
+-	select S3C_DMA
+-	help
+-	  S3C2410 DMA support. This is needed for drivers like sound which
+-	  use the S3C2410's DMA system to move data to and from the
+-	  peripheral blocks.
+-
+-config S3C2410_DMA_DEBUG
+-	bool "S3C2410 DMA support debug"
+-	depends on ARCH_S3C24XX && S3C2410_DMA
+-	help
+-	  Enable debugging output for the DMA code. This option sends info
+-	  to the kernel log, at priority KERN_DEBUG.
+-
+-# common code for s3c24xx based machines, such as the SMDKs.
+-
+-# cpu frequency items common between s3c2410 and s3c2440/s3c2442
+-
+-config S3C2410_IOTIMING
+-	bool
+-	depends on CPU_FREQ_S3C24XX
+-	help
+-	  Internal node to select io timing code that is common to the s3c2410
+-	  and s3c2440/s3c2442 cpu frequency support.
+-
+-config S3C2410_CPUFREQ_UTILS
+-	bool
+-	depends on CPU_FREQ_S3C24XX
+-	help
+-	  Internal node to select timing code that is common to the s3c2410
+-	  and s3c2440/s3c244 cpu frequency support.
+-
+-# cpu frequency support common to s3c2412, s3c2413 and s3c2442
+-
+-config S3C2412_IOTIMING
+-	bool
+-	depends on CPU_FREQ_S3C24XX && (CPU_S3C2412 || CPU_S3C2443)
+-	help
+-	  Intel node to select io timing code that is common to the s3c2412
+-	  and the s3c2443.
+-
+-endif
+diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
+deleted file mode 100644
+index 9f60549c..0000000
+--- a/arch/arm/plat-s3c24xx/Makefile
++++ /dev/null
+@@ -1,27 +0,0 @@
+-# arch/arm/plat-s3c24xx/Makefile
+-#
+-# Copyright 2007 Simtec Electronics
+-#
+-# Licensed under GPLv2
+-
+-obj-y				:=
+-obj-m				:=
+-obj-n				:=
+-obj-				:=
+-
+-
+-# Core files
+-
+-obj-y				+= irq.o
+-obj-$(CONFIG_S3C24XX_DCLK)	+= clock-dclk.o
+-
+-obj-$(CONFIG_CPU_FREQ_S3C24XX)	+= cpu-freq.o
+-obj-$(CONFIG_CPU_FREQ_S3C24XX_DEBUGFS) += cpu-freq-debugfs.o
+-
+-# Architecture dependent builds
+-
+-obj-$(CONFIG_S3C2410_CLOCK)	+= s3c2410-clock.o
+-obj-$(CONFIG_S3C24XX_DMA)	+= dma.o
+-obj-$(CONFIG_S3C2410_IOTIMING)	+= s3c2410-iotiming.o
+-obj-$(CONFIG_S3C2412_IOTIMING)	+= s3c2412-iotiming.o
+-obj-$(CONFIG_S3C2410_CPUFREQ_UTILS) += s3c2410-cpufreq-utils.o
 -- 
-1.7.9.7
+1.7.10.4
