@@ -1,55 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 Feb 2013 17:55:09 +0000
-Subject: [RFC PATCH] ARM: mm: Fix alloc_init_section bug on LPAE
-In-Reply-To: <1359160318-27068-1-git-send-email-chris@cloudcar.com>
-References: <1359160318-27068-1-git-send-email-chris@cloudcar.com>
-Message-ID: <20130201175509.GK5151@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 1 Feb 2013 12:56:26 -0500 (EST)
+Subject: [PATCH v4 00/13] ARM LPAE Fixes - Part 1
+In-Reply-To: <510BE9BC.9090701@ti.com>
+References: <1359669512-31276-1-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1301312252230.6300@xanadu.home> <510BDAED.8060805@ti.com>
+ <20130201151410.GR23505@n2100.arm.linux.org.uk> <510BE9BC.9090701@ti.com>
+Message-ID: <alpine.LFD.2.02.1302011246080.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 12:31:58AM +0000, Christoffer Dall wrote:
-> When using LPAE the call to alloc_init_pte is passed then end address
-> for the entire 1st level page table region, and the code unluckily ends
-> up going over the bounds of the single allocated PTE, which is sad.
-> 
-> This caused LPAE boot on omap5 to crash.
-> 
-> There may be some hidden mystery in the boot code that I'm unaware of
-> or it may be assumed that all mappings are always mappable as sections
-> on LPAE and therefore omap5 just does something bad, in which case this
-> patch isn't the right fix, but I'd be happy to be told the reason.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Jeremy C. Andrus <jeremya@cs.columbia.edu>
-> Signed-off-by: Christoffer Dall <chris@cloudcar.com>
-> ---
->  arch/arm/mm/mmu.c |   12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index ce328c7..1cecc99 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -603,11 +603,13 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
->  
->  		flush_pmd_entry(p);
->  	} else {
-> -		/*
-> -		 * No need to loop; pte's aren't interested in the
-> -		 * individual L1 entries.
-> -		 */
-> -		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
-> +		unsigned long next;
-> +
-> +		do {
-> +			next = pmd_addr_end(addr, end);
-> +			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys), type);
-> +			phys += next - addr;
-> +		} while (pmd++, addr = next, addr != end);
+On Fri, 1 Feb 2013, Cyril Chemparathy wrote:
 
-I now noticed your patch (I'm a bit behind with the list). It looks to
-me like it should work since next == end with the classic MMU, so we
-only go through the loop once.
+> On 02/01/2013 10:14 AM, Russell King - ARM Linux wrote:
+> > On Fri, Feb 01, 2013 at 10:10:37AM -0500, Cyril Chemparathy wrote:
+> > > With this, I ran simple network and filesystem performance tests to
+> > > compare the code-patching vs. non-code-patching variants.  These tests
+> > > didn't yield any significant performance difference between the two on
+> > > an ARMv7 (Cortex-A8) platform.
+> > 
+> > It's not network and fs activity that this kind of stuff is likely to
+> > show up in, but more to do with walking pages tables and the like -
+> > remember that page tables are stored using physical addresses, and any
+> > walks of them have to convert those physical addresses to virtual
+> > addresses and back again.
+> > 
+> > So, things like page scanning for eviction (eg, page aging, page
+> > faults even those which just re-use a page from the page cache) have
+> > to use the v:p / p:v translation macros.
+> > 
+> 
+> Thanks, Russell.  Any recommendations on how to best benchmark this?
 
--- 
-Catalin
+Well, the benchmark issue can be side-stepped altogether.  We know that 
+the assembly patching is the best thing that can be done, and we do have 
+most of it already.
+
+As previously stated, the p2v patching may remain essentially identical 
+to what we have right now.  Since the result is a 32-bit value, the 
+current code should just work.
+
+On the v2p side, it's just a matter of adding two instructions around 
+the existing one (which should be turned into an adds).  The first is a 
+mov to load the high bits of PHYS_OFFSET which are likely to be 
+representable with a simple immediate operand, and the third one would 
+be a simple adc with #0 which doesn't need any patching.
+
+
+Nicolas
