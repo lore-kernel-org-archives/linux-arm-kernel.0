@@ -1,43 +1,31 @@
 From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
 Date: Fri, 1 Feb 2013 08:41:37 +0000
-Subject: [PATCH 1/5] ARM: OMAP2+: Display correct system timer name
-In-Reply-To: <1359565471-30721-2-git-send-email-jon-hunter@ti.com>
+Subject: [PATCH 0/5] ARM: OMAP2+: System timer updates
+In-Reply-To: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
 References: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
- <1359565471-30721-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED07255@DBDE01.ent.ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED0725A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jon,
 
-On Wed, Jan 30, 2013 at 22:34:27, Hunter, Jon wrote:
-> Currently on boot, when displaying the name of the gptimer used for
-> clockevents and clocksource timers, the timer ID is shown. However,
-> when booting with device-tree, the timer ID is not used to select a
-> gptimer but a timer property. Hence, it is possible that the timer
-> selected when booting with device-tree does not match the ID shown.
-> Therefore, instead display the HWMOD name of the gptimer and use
-> the HWMOD name as the name of clockevent and clocksource timer (if a
-> gptimer is used).
+On Wed, Jan 30, 2013 at 22:34:26, Hunter, Jon wrote:
+> This series consists mainly of clean-ups for clockevents and
+> clocksource timers on OMAP2+ devices. The most significant change
+> in functionality comes from the 5th patch which is changing the
+> selection of the clocksource timer for OMAP3 and AM335x devices
+> when gptimers are used for clocksource. This change came about from
+> Vaibhav Bedia's series for AM335x [1]. See patch for more details on
+> the exact nature of the change.
 > 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  arch/arm/mach-omap2/timer.c |   44 +++++++++++++++++++++----------------------
->  1 file changed, 22 insertions(+), 22 deletions(-)
+> Boot tested with and without  device-tree on OMAP2420 H4,
+> OMAP3430 SDP, OMAP3430 Beagle Board, OMAP4430 SDP and
+> AM335x EVM (AM335x only supports device-tree boot).
 > 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 72c2ca1..18cb856 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -71,6 +71,9 @@
->  #define INCREMENTER_DENUMERATOR_RELOAD_OFFSET		0x14
->  #define NUMERATOR_DENUMERATOR_MASK			0xfffff000
->  
-> +/* Timer name needs to be big enough to store a string of "timerXX" */
-> +static char timer_name[10];
-> +
 
-Why not move this inside omap_dm_timer_init_one()?
+Thanks for working on this. I have couple of minor comments but with this
+series in place I can drop the patch for interchanging the timers for AM33xx
+and the suspend-resume handlers for the clockevent also don't need the
+sprintf() that I had :)
 
-Regards,
-Vaibhav
+Reviewed-and-Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
