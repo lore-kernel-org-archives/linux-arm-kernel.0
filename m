@@ -1,57 +1,71 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 1 Feb 2013 02:53:43 -0600
-Subject: [PATCH 1/5] ARM: OMAP2+: Display correct system timer name
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ED07255@DBDE01.ent.ti.com>
+Date: Fri, 1 Feb 2013 02:59:01 -0600
+Subject: [PATCH 5/5] ARM: OMAP3: Update clocksource timer selection
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ED07250@DBDE01.ent.ti.com>
 References: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
- <1359565471-30721-2-git-send-email-jon-hunter@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ED07255@DBDE01.ent.ti.com>
-Message-ID: <510B8297.8070305@ti.com>
+ <1359565471-30721-6-git-send-email-jon-hunter@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433ED07250@DBDE01.ent.ti.com>
+Message-ID: <510B83D5.1090500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
 
 On 02/01/2013 02:41 AM, Bedia, Vaibhav wrote:
 > Hi Jon,
 > 
-> On Wed, Jan 30, 2013 at 22:34:27, Hunter, Jon wrote:
->> Currently on boot, when displaying the name of the gptimer used for
->> clockevents and clocksource timers, the timer ID is shown. However,
->> when booting with device-tree, the timer ID is not used to select a
->> gptimer but a timer property. Hence, it is possible that the timer
->> selected when booting with device-tree does not match the ID shown.
->> Therefore, instead display the HWMOD name of the gptimer and use
->> the HWMOD name as the name of clockevent and clocksource timer (if a
->> gptimer is used).no
+> On Wed, Jan 30, 2013 at 22:34:31, Hunter, Jon wrote:
+>> When booting with device-tree for OMAP3 and AM335x devices and a gptimer
+>> is used as the clocksource (which is always the case for AM335x), a
+>> gptimer located in a power domain that is not always-on is selected.
+>> Ideally we should use a gptimer located in a power domain that is always
+>> on (such as the wake-up domain) so that time can be maintained during a
+>> kernel suspend without keeping on additional power domains unnecessarily.
 >>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> ---
->>  arch/arm/mach-omap2/timer.c |   44 +++++++++++++++++++++----------------------
->>  1 file changed, 22 insertions(+), 22 deletions(-)
+>> In order to fix this so that we can select a gptimer located in a power
+>> domain that is always-on, the following changes were made ...
+>> 1. Currently, only when selecting a gptimer to use for a clockevent
+>>    timer, do we pass a timer property that can be used to select a
+>>    specific gptimer. Change this so that we can pass a property when
+>>    selecting a gptimer to use for a clocksource timer too.
+>> 2. Currently, when selecting either a gptimer to use for a clockevent
+>>    timer or a clocksource timer and no timer property is passed, then
+>>    the first available timer is selected regardless of the properties
+>>    it has. Change this so that if no properties are passed, then a timer
+>>    that does not have additional features (such as always-on, dsp-irq,
+>>    pwm, and secure) is selected.
 >>
->> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->> index 72c2ca1..18cb856 100644
->> --- a/arch/arm/mach-omap2/timer.c
->> +++ b/arch/arm/mach-omap2/timer.c
->> @@ -71,6 +71,9 @@
->>  #define INCREMENTER_DENUMERATOR_RELOAD_OFFSET		0x14
->>  #define NUMERATOR_DENUMERATOR_MASK			0xfffff000
->>  
->> +/* Timer name needs to be big enough to store a string of "timerXX" */
->> +static char timer_name[10];
->> +
+>> Please note that using a gptimer for both clocksource and clockevents
+>> can have a system power impact during idle. The reason being is that
+>> OMAP and AMxxx devices typically only have one gptimer in a power domain
+>> that is always-on. Therefore when the kernel is idle both the clocksource
+>> and clockevent timers will be active and this will keep additional power
+>> domains on. During kernel suspend, only the clocksource timer is active
+>> and therefore, it is better to use a gptimer in a power domain that is
+>> always-on for clocksource.
+>>
 > 
-> Why not move this inside omap_dm_timer_init_one()?
+> It's always a pleasure reading the changelog in your patches :)
 
-In the non-DT case, the name member of the clocksource/event struct will
-point to this array and so it needs to reside in memory permanently and
-not just temporary. Once we migrate completely to DT then we will be
-able to remove this completely. See following snippet ...
+Thanks.
 
--		sprintf(name, "timer%d", gptimer_id);
--		oh_name = name;
-+		sprintf(timer_name, "timer%d", gptimer_id);
-+		*name = timer_name;
+> [...]
+>>  
+>>  #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+>> -OMAP_SYS_GP_TIMER_INIT(3, 1, "timer_sys_ck", "ti,timer-alwon",
+>> -		       2, "timer_sys_ck");
+>> +OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+>> +		       1, "timer_sys_ck", "ti,timer-alwon");
+>>  #endif
+>>
+> 
+> Minor point... was the intention of changing of clkev_nr and clksrc_nr to make
+> it consistent with what happens on AM33xx which is DT-only?
+
+I don't see this as being DT specific. It is more of a policy change to
+ensure a wake-up domain timer is used for clocksource when we are using
+gptimers for both clocksource and clockevents. It was your patch for
+AM335x that made me see the need for this, if that makes sense. May be I
+should have referenced that in the changelog.
 
 Cheers
 Jon
