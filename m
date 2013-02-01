@@ -1,24 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Feb 2013 11:18:10 -0800
-Subject: [PATCH v2 3/6] ARM: OMAP: USB: Add phy binding information
-In-Reply-To: <1359081206-5602-4-git-send-email-kishon@ti.com>
-References: <1359081206-5602-1-git-send-email-kishon@ti.com>
- <1359081206-5602-4-git-send-email-kishon@ti.com>
-Message-ID: <20130201191810.GS22517@atomide.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 1 Feb 2013 12:39:35 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <510C0200.5040505@wwwdotorg.org>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <510B0D9C.1000101@wwwdotorg.org>
+ <20130201014138.GA16234@obsidianresearch.com>
+ <510B268E.2040104@wwwdotorg.org> <20130201094613.38fa2ad0@skate>
+ <510C0200.5040505@wwwdotorg.org>
+Message-ID: <20130201193935.GA19335@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [130124 18:36]:
-> This is w.r.t the changes in PHY library to support adding and getting
-> multiple PHYs of the same type. In the new design, the
-> binding information between the PHY and the USB controller should be
-> specified in the platform specific initialization code. So it's been
-> done here for OMAP platforms.
+On Fri, Feb 01, 2013 at 10:57:20AM -0700, Stephen Warren wrote:
 
-This looks OK to me, but should be queued by Felipe in his
-minimal USB platform_data changes branch that I can pull in too
-to avoid pointless merge conflicts.
+> > We have 20 windows on Armada XP if I remember correctly, and they are
+> > not only used for PCIe, but also to map the BootROM (needed to boot
+> > secondary CPUs), to map SPI flashes or NOR flashes, for example. So
+> > they are really shared between many uses. In terms of PCIe, there are
+> > only two types of windows: I/O and Memory, there is no notion of
+> > Prefetchable Memory window as far as I could see.
+> 
+> In Tegra, we end up having separate MMIO vs. Prefetchable MMIO
+> chunks of our overall PCIe aperture. However, the HW setup appears
+> the same for both of those. I'm not sure if it's a bug in the
+> driver, or if it's just to separate the two address spaces so that
+> the page tables can be configured for those two regions with large
+> rather than small granularity. I need to go investigate that.
 
-Regards,
+The only purpose of prefetchable space is for legacy PCI. When a P2P
+bridge targets legacy PCI it has different behavior for its
+prefetchable memory window compared to the non-prefetchable memory
+window.
 
-Tony
+IIRC (though it has been a long time since I looked really close at
+this) PCI-X and PCI-E did away with this special bridge behaviour but
+kept the prefetchable memory space for compatibility.
+
+These days it is typically used to mark cachable memory on an end
+device.
+
+>From a SOC perspective, there is no need to treat MMIO and prefetch
+areas any differently. ARM's per-page cachability flags can be used to
+deal with the differing caching requirements.
+
+However, the bus tree downstream of each root port will require the
+prefetch window to be contiguous. On Marvell, today, this means you
+need to burn two mbus windows to get this. If the Linux pci core could
+allocate the prefetch space for each root port bridge contiguously
+with the mmio space for the same root port then this could be reduced
+to one window covering both spaces for the port.
+
+> So there are 10 PCIe interfaces (root ports). That's on the SoC itself
+> right. Are all 10 (or a large number of them) actually used at once on
+> any given board design? I suppose this must be the case, or Marvell
+> wouldn't have wasted the silicon space on 10 root ports... Still, that's
+> a rather large number of ports!
+
+Agreed.. I have no idea what the target is for this..
+ 
+> I think the only difference on the Marvell HW is:
+> 
+> * The overall total size of the physical address space is dynamic rather
+> than fixed, because it's programmed through windows rather than
+> hard-coded into HW.
+
+Is it hard coded on tegra? I thought there was a register set that was
+used to set the overall PCI-E MMIO window location and size. I know
+even on x86 the PCI window is set via register, though that typically
+isn't disclosed except to bios writers.. 
+
+Jason
