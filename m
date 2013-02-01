@@ -1,34 +1,56 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 1 Feb 2013 15:51:58 +0000
-Subject: [GIT PULL  1/4] ARM: mvebu: cleanup for v3.9
+Date: Fri, 1 Feb 2013 15:51:59 +0000
+Subject: [GIT PULL  2/4] ARM: mvebu: drivers for v3.9
 In-Reply-To: <1359733918.Bf7ecc0.22262@triton>
-Message-ID: <1359733918.FF53C1.22262@triton>
+Message-ID: <1359733919.FCB62.22262@triton>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b96e1b1c3c5319294edb0970b6d5bf099c0e85eb:
+The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
 
-  ARM: Kirkwood: Cleanup unneeded include files
+  Linux 3.8-rc5
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/cleanup_for_v3.9_round2
+  git://git.infradead.org/users/jcooper/linux.git tags/drivers_for_v3.9
 
-for you to fetch changes up to b3af7a1ffd1e5e9ec536a915393b7e07a8793f2a:
+for you to fetch changes up to 9cfc94eb0f4843af5d1141a37d7b7ca5d3b27220:
 
-  ARM: dove: cleanup includes
+  cpuidle: kirkwood: Move out of mach directory
 
 ----------------------------------------------------------------
-cleanup for v3.9 round2
-     - remove unneeded #includes for mach-dove
-     - remove unneeded #includes and code for the nsa310
+mvebu drivers for v3.9
+     - use rtc-mv in mvebu armv7 SoCs
+     - add pci-e hotplug for kirkwood
+    
+    Depends on:
+     - tags/mvebu_fixes_for_v3.8-rc6
 ----------------------------------------------------------------
+Andrew Lunn (1):
+      cpuidle: kirkwood: Move out of mach directory
+
+Gregory CLEMENT (1):
+      rtc: Add support of rtc-mv for MVEBU SoCs
+
 Jason Cooper (1):
-      ARM: kirkwood: nsa310: cleanup includes and unneeded code
+      Merge tag 'tags/mvebu_fixes_for_v3.8-rc6' into mvebu/drivers
 
-Sebastian Hesselbarth (1):
-      ARM: dove: cleanup includes
+Jason Gunthorpe (1):
+      ARM: Kirkwood: Support basic hotplug for PCI-E
 
- arch/arm/mach-dove/common.c           | 29 +++++++++--------------------
- arch/arm/mach-kirkwood/board-nsa310.c |  8 +-------
- 2 files changed, 10 insertions(+), 27 deletions(-)
+ arch/arm/boot/dts/dove.dtsi                     |  2 +
+ arch/arm/configs/kirkwood_defconfig             |  1 +
+ arch/arm/configs/mvebu_defconfig                |  2 +
+ arch/arm/mach-kirkwood/Makefile                 |  1 -
+ arch/arm/mach-kirkwood/board-dt.c               |  2 +
+ arch/arm/mach-kirkwood/common.c                 | 23 ++++++++++
+ arch/arm/mach-kirkwood/common.h                 |  1 +
+ arch/arm/mach-kirkwood/include/mach/kirkwood.h  |  3 +-
+ arch/arm/mach-kirkwood/pcie.c                   | 10 ++---
+ arch/arm/plat-orion/mpp.c                       |  2 +-
+ drivers/cpuidle/Kconfig                         |  6 +++
+ drivers/cpuidle/Makefile                        |  1 +
+ .../cpuidle/cpuidle-kirkwood.c                  | 45 +++++++++++++++++---
+ drivers/rtc/Kconfig                             |  2 +-
+ 14 files changed, 84 insertions(+), 17 deletions(-)
+ rename arch/arm/mach-kirkwood/cpuidle.c => drivers/cpuidle/cpuidle-kirkwood.c (61%)
