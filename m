@@ -1,64 +1,54 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 1 Feb 2013 13:28:04 -0500
-Subject: [PATCH v7 07/10] dmaengine: add dma_request_slave_channel_compat()
-In-Reply-To: <1359742975-10421-8-git-send-email-mporter@ti.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-8-git-send-email-mporter@ti.com>
-Message-ID: <20130201182804.GN2244@beef>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Feb 2013 10:35:14 -0800
+Subject: [PATCH 1/2] ARM: OMAP2+: omap2plus_defconfig: enable TFP410
+ chip support
+In-Reply-To: <CABxcv=nyuOJaLcHR=DgnXSxLkF-TqU2_mxt=46qZVWg_Vhh_9Q@mail.gmail.com>
+References: <1355920420-20852-1-git-send-email-javier.martinez@collabora.co.uk>
+ <50D1DC95.8090003@ti.com>
+ <CABxcv=nyuOJaLcHR=DgnXSxLkF-TqU2_mxt=46qZVWg_Vhh_9Q@mail.gmail.com>
+Message-ID: <20130201183513.GK22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 01:22:52PM -0500, Matt Porter wrote:
-> Adds a dma_request_slave_channel_compat() wrapper which accepts
-> both the arguments from dma_request_channel() and
-> dma_request_slave_channel(). Based on whether the driver is
-> instantiated via DT, the appropriate channel request call will be
-> made.
+* Javier Martinez Canillas <javier@dowhile0.org> [130110 01:31]:
+> On Wed, Dec 19, 2012 at 4:26 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> > On 2012-12-19 14:33, Javier Martinez Canillas wrote:
+> >> Many OMAP3 based boards such as Beagle, Overo and IGEP use
+> >> the TFP410 DPI-to-DVI chip. So, it's good to have it built
+> >> as a module by default on OMAP2+ config.
+> >
+> > Also on OMAP4 boards, like Panda.
+> >
+> >> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> >> ---
+> >>  arch/arm/configs/omap2plus_defconfig |    1 +
+> >>  1 files changed, 1 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> >> index a1dc5c0..da530a0 100644
+> >> --- a/arch/arm/configs/omap2plus_defconfig
+> >> +++ b/arch/arm/configs/omap2plus_defconfig
+> >> @@ -146,6 +146,7 @@ CONFIG_OMAP2_DSS_SDI=y
+> >>  CONFIG_OMAP2_DSS_DSI=y
+> >>  CONFIG_FB_OMAP2=m
+> >>  CONFIG_PANEL_GENERIC_DPI=m
+> >> +CONFIG_PANEL_TFP410=m
+> >>  CONFIG_PANEL_SHARP_LS037V7DW01=m
+> >>  CONFIG_PANEL_NEC_NL8048HL11_01B=m
+> >>  CONFIG_PANEL_TAAL=m
+> >>
+> >
+> > For both patches:
+> >
+> > Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> >
+> >  Tomi
+> >
 > 
-> This allows for a much cleaner migration of drivers to the
-> dmaengine DT API as platforms continue to be mixed between those
-> that boot using DT and those that do not.
+> Hello Tony,
 > 
-> Suggested-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Any comments on these?
 
-Vinod, can I get an ack on this one?
+No comments, applying into omap-for-v3.9/board thanks.
 
--Matt
-
-> ---
->  include/linux/dmaengine.h |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index bfcdecb..17d8ffd 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -1001,6 +1001,22 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
->  struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
->  struct dma_chan *net_dma_find_channel(void);
->  #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
-> +#define dma_request_slave_channel_compat(mask, x, y, dev, name) \
-> +	__dma_request_slave_channel_compat(&(mask), x, y, dev, name)
-> +
-> +static inline struct dma_chan
-> +*__dma_request_slave_channel_compat(dma_cap_mask_t *mask, dma_filter_fn fn,
-> +				  void *fn_param, struct device *dev,
-> +				  char *name)
-> +{
-> +	struct dma_chan *chan;
-> +
-> +	chan = dma_request_slave_channel(dev, name);
-> +	if (chan)
-> +		return chan;
-> +
-> +	return __dma_request_channel(mask, fn, fn_param);
-> +}
->  
->  /* --- Helper iov-locking functions --- */
->  
-> -- 
-> 1.7.9.5
-> 
+Tony
