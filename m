@@ -1,54 +1,148 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 1 Feb 2013 12:39:15 -0500 (EST)
-Subject: [PATCH v2 4/4] irqchip: gic: Perform the gic_secondary_init()
- call via CPU notifier
-In-Reply-To: <1359729522.3256.4.camel@linaro1.home>
-References: <1359476319-23720-1-git-send-email-catalin.marinas@arm.com>
- <1359476319-23720-5-git-send-email-catalin.marinas@arm.com>
- <alpine.LFD.2.02.1301291734140.6300@xanadu.home>
- <20130129231205.GA25176@MacBook-Pro.local>
- <alpine.LFD.2.02.1301291907340.6300@xanadu.home>
- <20130131112538.GW23505@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301311230140.6300@xanadu.home>
- <20130131175526.GE23505@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1301311521310.6300@xanadu.home>
- <1359729522.3256.4.camel@linaro1.home>
-Message-ID: <alpine.LFD.2.02.1302011236340.6300@xanadu.home>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 Feb 2013 17:42:47 +0000
+Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for
+ unaligned addresses
+In-Reply-To: <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
+References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
+ <20130201162631.GG5151@arm.com>
+ <CANOGCgOp=kSatDu8fL7grk+bXLQ2pgKAEvEK6LoG8Ba4mqUH=w@mail.gmail.com>
+ <20130201163722.GH5151@arm.com>
+ <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
+Message-ID: <20130201174246.GJ5151@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Feb 2013, Jon Medhurst (Tixy) wrote:
+On Fri, Feb 01, 2013 at 04:40:35PM +0000, Christoffer Dall wrote:
+> On Fri, Feb 1, 2013 at 11:37 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Fri, Feb 01, 2013 at 04:32:54PM +0000, Christoffer Dall wrote:
+> >> On Fri, Feb 1, 2013 at 11:26 AM, Catalin Marinas
+> >> > --- a/arch/arm/mm/mmu.c
+> >> > +++ b/arch/arm/mm/mmu.c
+> >> > @@ -581,34 +581,19 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+> >> >                                       const struct mem_type *type)
+> >> >  {
+> >> >         pmd_t *pmd = pmd_offset(pud, addr);
+> >> > +       unsigned long next;
+> >> >
+> >> > -       /*
+> >> > -        * Try a section mapping - end, addr and phys must all be aligned
+> >> > -        * to a section boundary.  Note that PMDs refer to the individual
+> >> > -        * L1 entries, whereas PGDs refer to a group of L1 entries making
+> >> > -        * up one logical pointer to an L2 table.
+> >> > -        */
+> >> > -       if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
+> >> > -               pmd_t *p = pmd;
+> >> > -
+> >> > -#ifndef CONFIG_ARM_LPAE
+> >> > -               if (addr & SECTION_SIZE)
+> >> > -                       pmd++;
+> >> > -#endif
+> >> > -
+> >> > -               do {
+> >> > +       do {
+> >> > +               next = section_addr_end(addr, end);
+> >> > +               /* try section mapping first */
+> >> > +               if (((addr | next | phys) & ~SECTION_MASK) == 0) {
+> >> >                         *pmd = __pmd(phys | type->prot_sect);
+> >> > -                       phys += SECTION_SIZE;
+> >> > -               } while (pmd++, addr += SECTION_SIZE, addr != end);
+> >> > -
+> >> > -               flush_pmd_entry(p);
+> >> > -       } else {
+> >> > -               /*
+> >> > -                * No need to loop; pte's aren't interested in the
+> >> > -                * individual L1 entries.
+> >> > -                */
+> >> > -               alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+> >> > -       }
+> >> > +                       flush_pmd_entry(pmd);
+> >> > +               } else {
+> >> > +                       alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys), type);
+> >>
+> >> aren't you wasting memory here? The pte doesn't alloc a full page, but
+> >> the memblock allocator allocates a full page right?
+> >>
+> >> I thought this was the rationale behind Russell's previous comments on
+> >> Santosh's earlier patch version.
+> >
+> > You are right, it's allocating more ptes. Than we can use pmd_addr_end.
+> > I'll go back to the code.
+> >
+> don't get me wrong, I strongly prefer keeping that loop in
+> alloc_init_section, the other way it was weird to read, felt like
+> shoehorning something, but you may have to keep a pointer around for
+> unused part of a page for pte or something, not sure what ends up
+> being nicest.
 
-> On Thu, 2013-01-31 at 15:31 -0500, Nicolas Pitre wrote:
-> > On Thu, 31 Jan 2013, Russell King - ARM Linux wrote:
-> > 
-> > > On Thu, Jan 31, 2013 at 12:32:11PM -0500, Nicolas Pitre wrote:
-> > > > On Thu, 31 Jan 2013, Russell King - ARM Linux wrote:
-> > > > 
-> > > > > I haven't tried Versatile Express yet as it has the TC2 tile on, and I
-> > > > > don't yet a boot loader on it which is capable of TFTP (which makes it
-> > > > > rather useless to me - I've been saying this for a time now but this is
-> > > > > probably the first time publically.)  I'm thinking about putting the
-> > > > > CA9x4 tile back on because that's a lot more functionally useful to me
-> > > > > than TC2.
-> > > > 
-> > > > You might be interested by this then:
-> > > > 
-> > > > http://lists.linaro.org/pipermail/linaro-dev/2012-October/014136.html
-> > > 
-> > > Great news.  Everyone has been telling me that there's no uboot for TC2,
-> > > or "we think Linaro might have something but we don't really know".
-> > 
-> > Note that I cobbled those instructions on my own and the result is not 
-> > officially supported by Linaro.  This is obviously not suitable for 
-> > setting up products or demo systems, but for a kernel developer I think 
-> > such a setup is invaluable.
-> 
-> If I remember correctly, you will also only get 1GB of RAM available not
-> the 2GB most TC2 boards have. (I did take a quick look at hacking U-Boot
-> to get around that but couldn't get anything to work.)
-
-I simply added "mem=2048m at 0x80000000" to my kernel cmdline.
+Another try. This time I kept the same logic as before but added a loop
+on the outside (and indented the code). With classic MMU
+pmd_addr_end(addr, end) always return end, so the logic doesn't change.
+With LPAE we should get the standard looping over pmd entries. Again,
+only tested on C-A9.
 
 
-Nicolas
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 9f06102..47154f3 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -581,34 +581,36 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+ 				      const struct mem_type *type)
+ {
+ 	pmd_t *pmd = pmd_offset(pud, addr);
++	unsigned long next;
+ 
+-	/*
+-	 * Try a section mapping - end, addr and phys must all be aligned
+-	 * to a section boundary.  Note that PMDs refer to the individual
+-	 * L1 entries, whereas PGDs refer to a group of L1 entries making
+-	 * up one logical pointer to an L2 table.
+-	 */
+-	if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
+-		pmd_t *p = pmd;
++	do {
++		next = pmd_addr_end(addr, end);
++
++		/*
++		 * Try a section mapping - next, addr and phys must all be
++		 * aligned to a section boundary.  Note that PMDs refer to the
++		 * individual L1 entries, whereas PGDs refer to a group of L1
++		 * entries making up one logical pointer to an L2 table.
++		 */
++		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
++			pmd_t *p = pmd;
+ 
+ #ifndef CONFIG_ARM_LPAE
+-		if (addr & SECTION_SIZE)
+-			pmd++;
++			if (addr & SECTION_SIZE)
++				pmd++;
+ #endif
++			do {
++				*pmd = __pmd(phys | type->prot_sect);
++				phys += SECTION_SIZE;
++			} while (pmd++, addr += SECTION_SIZE, addr != next);
+ 
+-		do {
+-			*pmd = __pmd(phys | type->prot_sect);
+-			phys += SECTION_SIZE;
+-		} while (pmd++, addr += SECTION_SIZE, addr != end);
+-
+-		flush_pmd_entry(p);
+-	} else {
+-		/*
+-		 * No need to loop; pte's aren't interested in the
+-		 * individual L1 entries.
+-		 */
+-		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+-	}
++			flush_pmd_entry(p);
++		} else {
++			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys), type);
++			phys += next - addr;
++			pmd++;
++		}
++	} while (addr = next, addr != end);
+ }
+ 
+ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
