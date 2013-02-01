@@ -1,49 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 01 Feb 2013 09:54:27 -0800
-Subject: [PATCH] ARM: OMAP2+: dpll: Add missing soc_is_am33xx() check
-In-Reply-To: <1359714424-21167-1-git-send-email-anilkumar@ti.com>
-References: <1359714424-21167-1-git-send-email-anilkumar@ti.com>
-Message-ID: <20130201175427.16898.39901@quantum>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 Feb 2013 17:55:09 +0000
+Subject: [RFC PATCH] ARM: mm: Fix alloc_init_section bug on LPAE
+In-Reply-To: <1359160318-27068-1-git-send-email-chris@cloudcar.com>
+References: <1359160318-27068-1-git-send-email-chris@cloudcar.com>
+Message-ID: <20130201175509.GK5151@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting AnilKumar Ch (2013-02-01 02:27:04)
-> Add missing soc_is_am33xx() check in noncore DPLL set rate function.
-> Without this, dpll set_rate function throughs warnings for am33xx
-> family of devices.
+On Sat, Jan 26, 2013 at 12:31:58AM +0000, Christoffer Dall wrote:
+> When using LPAE the call to alloc_init_pte is passed then end address
+> for the entire 1st level page table region, and the code unluckily ends
+> up going over the bounds of the single allocated PTE, which is sad.
 > 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-
-I think that only 3430 needs the freqsel calculation.  If this is true,
-then I think it would be better to just have a check for cpu_is_3430()
-instead of appending new SoCs to the list that do not care about the
-freqsel calculation.
-
-Regards,
-Mike
-
+> This caused LPAE boot on omap5 to crash.
+> 
+> There may be some hidden mystery in the boot code that I'm unaware of
+> or it may be assumed that all mappings are always mappable as sections
+> on LPAE and therefore omap5 just does something bad, in which case this
+> patch isn't the right fix, but I'd be happy to be told the reason.
+> 
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Jeremy C. Andrus <jeremya@cs.columbia.edu>
+> Signed-off-by: Christoffer Dall <chris@cloudcar.com>
 > ---
->  arch/arm/mach-omap2/dpll3xxx.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  arch/arm/mm/mmu.c |   12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-> index 0a02aab5..4bb3f78 100644
-> --- a/arch/arm/mach-omap2/dpll3xxx.c
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c
-> @@ -501,7 +501,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
->                         return -EINVAL;
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index ce328c7..1cecc99 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -603,11 +603,13 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
 >  
->                 /* No freqsel on OMAP4 and OMAP3630 */
-> -               if (!cpu_is_omap44xx() && !cpu_is_omap3630()) {
-> +               if (!cpu_is_omap44xx() && !cpu_is_omap3630() &&
-> +                                       !soc_is_am33xx()) {
->                         freqsel = _omap3_dpll_compute_freqsel(clk,
->                                                 dd->last_rounded_n);
->                         WARN_ON(!freqsel);
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  		flush_pmd_entry(p);
+>  	} else {
+> -		/*
+> -		 * No need to loop; pte's aren't interested in the
+> -		 * individual L1 entries.
+> -		 */
+> -		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+> +		unsigned long next;
+> +
+> +		do {
+> +			next = pmd_addr_end(addr, end);
+> +			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys), type);
+> +			phys += next - addr;
+> +		} while (pmd++, addr = next, addr != end);
+
+I now noticed your patch (I'm a bit behind with the list). It looks to
+me like it should work since next == end with the classic MMU, so we
+only go through the loop once.
+
+-- 
+Catalin
