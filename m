@@ -1,88 +1,93 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Feb 2013 11:51:29 +0530
-Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
- addresses
-In-Reply-To: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
-References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <510B5EE9.40502@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 1 Feb 2013 07:58:34 +0100
+Subject: [PATCH,RFC] usb: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <20130201011153.GE14629@nchen-desktop>
+References: <1359458548-25071-1-git-send-email-s.hauer@pengutronix.de>
+ <87pq0omcfb.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130130020627.GA699@nchen-desktop>
+ <20130130140015.GZ1906@pengutronix.de>
+ <20130131020542.GD9777@nchen-desktop>
+ <20130131102913.GA6937@pengutronix.de>
+ <20130201011153.GE14629@nchen-desktop>
+Message-ID: <20130201065833.GV1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin, Russell,
+On Fri, Feb 01, 2013 at 09:11:54AM +0800, Peter Chen wrote:
+> On Thu, Jan 31, 2013 at 11:29:13AM +0100, Sascha Hauer wrote:
+> > On Thu, Jan 31, 2013 at 10:05:44AM +0800, Peter Chen wrote:
+> > > On Wed, Jan 30, 2013 at 03:00:15PM +0100, Sascha Hauer wrote:
+> > > > On Wed, Jan 30, 2013 at 10:06:28AM +0800, Peter Chen wrote:
+> > > > > On Tue, Jan 29, 2013 at 01:55:04PM +0200, Alexander Shishkin wrote:
+> > > > > > Sascha Hauer <s.hauer@pengutronix.de> writes:
+> > > > > > 
+> > > > > > > From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > > > > >
+> > > > > > > This adds two little devicetree helper functions for determining the
+> > > > > > > dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
+> > > > > > > the devicetree.
+> > > > > > >
+> > > > > > > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > > > > > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> > > > > > > ---
+> > > > > > >
+> > > > > > > The properties and their values have been taken from the fsl-mph-dr driver.
+> > > > > > > This binding is also documented (though currently not used) for the tegra
+> > > > > > > ehci driver (Documentation/devicetree/bindings/usb/nvidia,tegra20-ehci.txt).
+> > > > > > > This is a first attempt to parse these bindings at a common place so that
+> > > > > > > others can make use of it.
+> > > > > > >
+> > > > > > > Basically I want to know whether this binding is recommended for new drivers
+> > > > > > > since normally the devicetree uses '-' instead of '_', and maybe there are
+> > > > > > > other problems with it.
+> > > > > > >
+> > > > > > > I need this binding for the chipidea driver. I suspect that the fsl-mph-dr
+> > > > > > > driver also really handles a chipidea core.
+> > > > > > 
+> > > > > > As far as I know, it is a chipidea core. Adding Peter to Cc list, he can
+> > > > > > probably confirm.
+> > > > > 
+> > > > > The fsl-mph-dr can't be used for chipdiea as it handles three platform
+> > > > > drivers for three roles (peripheral , host, otg). But chipidea only has
+> > > > > two platform drivers, one is the chipidea core, the other is related
+> > > > > controller wrapper.
+> > > > 
+> > > > What do you mean by 'three platform drivers'? That's only how the driver
+> > > > is built, no? I was talking about the hardware the fsl-mph-dr driver
+> > > > handles which definitely smells like chipidea.
+> > > 
+> > > It creates host/device/otg platform device according to dr_mode from
+> > > the device tree.
+> > 
+> > Again, that's software specific. What I'd like to know is whether the
+> > *hardware* could be handled by the chipidea driver.
+> not understand u, you mean the DT information at there? Those DT information
+> may not be used for i.mx hardware.
 
-On Tuesday 29 January 2013 08:37 PM, R Sricharan wrote:
-> With LPAE enabled, alloc_init_section() does not map the
-> entire address space for unaligned addresses.
->
-> The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
-> with page granularity mappings during boot. alloc_init_pte()
-> is called and out of 16MB, only 2MB gets mapped and rest remains
-> unaccessible.
->
-> Because of this OMAP5 boot is broken with CMA + LPAE enabled.
-> Fix the issue by ensuring that the entire addresses are
-> mapped.
->
-> Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <chris@cloudcar.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Tested-by: Christoffer Dall  <chris@cloudcar.com>
-> ---
-This patch has been on the list for quite some time. Its
-a bug fix and should into mainline. Christoffer already
-stumbled on the same issue and has to spend debugging the
-known issue.
+The original question was:
 
-Can you please give your ack's if it is fine to get into
-patch system ?
+There is a driver in the tree called fsl-mph-dr-of.c. Does this driver
+handle a hardware which is compatible to the hardware the chipidea
+driver handles?
+
+I think the answer is yes, because said driver registers a ehci device,
+or fsl-usb2-udc device (the same we used on i.MX). This hardware also
+has a PORTSC register. All this seems to suggest that
+
+drivers/usb/host/fsl-mph-dr-of.c
+drivers/usb/host/ehci-fsl.c
+drivers/usb/otg/fsl_otg.c
+drivers/usb/gadget/fsl_usb2_udc.h
+drivers/usb/gadget/fsl_udc_core.c
+
+Could be replaced by the chipidea driver.
+
+Sascha
 
 
->   [V2] Moved the loop to alloc_init_pte as per Russell's
->       feedback and changed the subject accordingly.
->       Using PMD_XXX instead of SECTION_XXX to avoid
->       different loop increments with/without LPAE.
->
->   [v3] Removed the dummy variable phys and updated
->        the commit log for CMA case.
->
->   [v4] Resending with updated change log and
->        updating the tags.
->
->   arch/arm/mm/mmu.c |   20 ++++++++++++++++----
->   1 file changed, 16 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index f8388ad..b94c313 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -569,11 +569,23 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
->   				  unsigned long end, unsigned long pfn,
->   				  const struct mem_type *type)
->   {
-> -	pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
-> +	unsigned long next;
-> +	pte_t *pte;
-> +
->   	do {
-> -		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
-> -		pfn++;
-> -	} while (pte++, addr += PAGE_SIZE, addr != end);
-> +		if ((end-addr) & PMD_MASK)
-> +			next = (addr + PMD_SIZE) & PMD_MASK;
-> +		else
-> +			next = end;
-> +
-> +		pte = early_pte_alloc(pmd, addr, type->prot_l1);
-> +		do {
-> +			set_pte_ext(pte, pfn_pte(pfn,
-> +					__pgprot(type->prot_pte)), 0);
-> +			pfn++;
-> +		} while (pte++, addr += PAGE_SIZE, addr != next);
-> +
-> +	} while (pmd++, addr = next, addr != end);
->   }
->
->   static void __init alloc_init_section(pud_t *pud, unsigned long addr,
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
