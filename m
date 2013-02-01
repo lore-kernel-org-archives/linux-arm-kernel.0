@@ -1,147 +1,57 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 01 Feb 2013 22:13:14 +0100
-Subject: [PATCH v2 1/6] usb: otg: Add an API to bind the USB controller
- and PHY
-In-Reply-To: <1359081206-5602-2-git-send-email-kishon@ti.com>
-References: <1359081206-5602-1-git-send-email-kishon@ti.com>
- <1359081206-5602-2-git-send-email-kishon@ti.com>
-Message-ID: <510C2FEA.1080207@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Feb 2013 21:30:03 +0000
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130201205600.GA31762@arwen.pp.htv.fi>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
+ <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
+ <20130201185820.GE29898@arwen.pp.htv.fi> <510C2A47.1090607@mvista.com>
+ <20130201205600.GA31762@arwen.pp.htv.fi>
+Message-ID: <20130201213003.GW2637@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2013 03:33 AM, Kishon Vijay Abraham I wrote:
-> In order to support platforms which has multiple PHY's (of same type) and
-> which has multiple USB controllers, a new design is adopted wherin the binding
-> information (between the PHY and the USB controller) should be passed to the
-> PHY library from platform specific file (board file).
-> So added a new API to pass the binding information.
+On Fri, Feb 01, 2013 at 10:56:00PM +0200, Felipe Balbi wrote:
+> hi,
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/usb/otg/otg.c   |   37 +++++++++++++++++++++++++++++++++++++
->  include/linux/usb/phy.h |   22 ++++++++++++++++++++++
->  2 files changed, 59 insertions(+)
+> On Fri, Feb 01, 2013 at 11:49:11PM +0300, Sergei Shtylyov wrote:
+> > > good point, do you wanna send some patches ?
+> > 
+> >    I have already sent them countless times and even stuck CPPI 4.1 support (in
+> > arch/arm/common/cppi41.c) in Russell's patch system. TI requested to remove the
+> > patch. :-(
 > 
-> diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
-> index a30c041..8e756d9 100644
-> --- a/drivers/usb/otg/otg.c
-> +++ b/drivers/usb/otg/otg.c
-> @@ -18,6 +18,7 @@
->  #include <linux/usb/otg.h>
->  
->  static LIST_HEAD(phy_list);
-> +static LIST_HEAD(phy_bind_list);
->  static DEFINE_SPINLOCK(phy_lock);
->  
->  static struct usb_phy *__usb_find_phy(struct list_head *list,
-> @@ -201,6 +202,42 @@ void usb_remove_phy(struct usb_phy *x)
->  }
->  EXPORT_SYMBOL(usb_remove_phy);
->  
-> +/**
-> + * usb_bind_phy - bind the phy and the controller that uses the phy
-> + * @dev_name: the device name of the device that will bind to the phy
-> + * @index: index to specify the port number
-> + * @phy_dev_name: the device name of the phy
-> + *
-> + * Fills the phy_bind structure with the dev_name and phy_dev_name. This will
-> + * be used when the phy driver registers the phy and when the controller
-> + * requests this phy.
-> + *
-> + * To be used by platform specific initialization code.
-> + */
-> +int __init usb_bind_phy(const char *dev_name, u8 index,
-> +				const char *phy_dev_name)
-> +{
-> +	struct usb_phy_bind *phy_bind;
-> +	unsigned long flags;
-> +
-> +	phy_bind = kzalloc(sizeof(*phy_bind), GFP_KERNEL);
-> +	if (!phy_bind) {
-> +		pr_err("phy_bind(): No memory for phy_bind");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	phy_bind->dev_name = dev_name;
-> +	phy_bind->phy_dev_name = phy_dev_name;
-> +	phy_bind->index = index;
-> +
-> +	spin_lock_irqsave(&phy_lock, flags);
-> +	list_add_tail(&phy_bind->list, &phy_bind_list);
-> +	spin_unlock_irqrestore(&phy_lock, flags);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(usb_bind_phy);
-> +
->  const char *otg_state_string(enum usb_otg_state state)
->  {
->  	switch (state) {
-> diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-> index a29ae1e..e7eb429 100644
-> --- a/include/linux/usb/phy.h
-> +++ b/include/linux/usb/phy.h
-> @@ -106,6 +106,21 @@ struct usb_phy {
->  			enum usb_device_speed speed);
->  };
->  
-> +/**
-> + * struct usb_phy_bind - represent the binding for the phy
-> + * @dev_name: the device name of the device that will bind to the phy
-> + * @phy_dev_name: the device name of the phy
-> + * @index: used if a single controller uses multiple phys
-> + * @phy: reference to the phy
-> + * @list: to maintain a linked list of the binding information
-> + */
-> +struct usb_phy_bind {
-> +	const char	*dev_name;
-> +	const char	*phy_dev_name;
-> +	u8		index;
-> +	struct usb_phy	*phy;
-> +	struct list_head list;
-> +};
->  
->  /* for board-specific init logic */
->  extern int usb_add_phy(struct usb_phy *, enum usb_phy_type type);
-> @@ -151,6 +166,8 @@ extern struct usb_phy *devm_usb_get_phy(struct device *dev,
->  	enum usb_phy_type type);
->  extern void usb_put_phy(struct usb_phy *);
->  extern void devm_usb_put_phy(struct device *dev, struct usb_phy *x);
-> +extern int usb_bind_phy(const char *dev_name, u8 index,
-> +				const char *phy_dev_name);
->  #else
->  static inline struct usb_phy *usb_get_phy(enum usb_phy_type type)
->  {
-> @@ -171,6 +188,11 @@ static inline void devm_usb_put_phy(struct device *dev, struct usb_phy *x)
->  {
->  }
->  
-> +static inline int usb_bind_phy(const char *dev_name, u8 index,
-> +				const char *phy_dev_name)
-> +{
-> +	return NULL;
+> sticking into arch/arm/common/ wasn't a nice move. But then again, so
+> wasn't asking for the patch to be removed :-s
 
-The return value looks bogus.
+Err, patches don't get removed, they get moved to 'discarded'.
 
-Marc
-
-> +}
->  #endif
->  
->  static inline int
+> > > I guess to make the MUSB side simpler we would need musb-dma-engine glue
+> > > to map dmaengine to the private MUSB API. Then we would have some
+> > > starting point to also move inventra (and anybody else) to dmaengine
+> > > API.
+> > 
+> >    Why? Inventra is a dedicated device's private DMA controller, why make
+> > universal DMA driver for it?
 > 
+> because it doesn't make sense to support multiple DMA APIs. We can check
+> from MUSB's registers if it was configured with Inventra DMA support and
+> based on that we can register MUSB's own DMA Engine to dmaengine API.
 
+Hang on.  This is one of the DMA implementations which is closely
+coupled with the USB and only the USB?  If it is...
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+I thought this had been discussed _extensively_ before.  I thought the
+resolution on it was:
+1. It would not use the DMA engine API.
+2. It would not live in arch/arm.
+3. It would be placed nearby the USB driver it's associated with.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130201/7ccbeae2/attachment.sig>
+(1) because we don't use APIs just for the hell of it - think.  Do we
+use the DMA engine API for PCI bus mastering ethernet controllers?  No.
+Do we use it for PCI bus mastering SCSI controllers?  No.  Because the
+DMA is integral to the rest of the device.
+
+The DMA engine API only makes sense if the DMA engine is a shared
+system resource.
