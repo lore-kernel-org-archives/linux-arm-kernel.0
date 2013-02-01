@@ -1,71 +1,183 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 1 Feb 2013 02:59:01 -0600
-Subject: [PATCH 5/5] ARM: OMAP3: Update clocksource timer selection
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ED07250@DBDE01.ent.ti.com>
-References: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
- <1359565471-30721-6-git-send-email-jon-hunter@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ED07250@DBDE01.ent.ti.com>
-Message-ID: <510B83D5.1090500@ti.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Fri, 1 Feb 2013 10:00:46 +0100
+Subject: [PATCH 4/9] USB: chipidea: add PTW and PTS handling
+In-Reply-To: <1359705132-9434-5-git-send-email-s.hauer@pengutronix.de>
+References: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
+ <1359705132-9434-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130201090046.GA8056@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/01/2013 02:41 AM, Bedia, Vaibhav wrote:
-> Hi Jon,
+On Fri, Feb 01, 2013 at 08:52:07AM +0100, Sascha Hauer wrote:
+> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
 > 
-> On Wed, Jan 30, 2013 at 22:34:31, Hunter, Jon wrote:
->> When booting with device-tree for OMAP3 and AM335x devices and a gptimer
->> is used as the clocksource (which is always the case for AM335x), a
->> gptimer located in a power domain that is not always-on is selected.
->> Ideally we should use a gptimer located in a power domain that is always
->> on (such as the wake-up domain) so that time can be maintained during a
->> kernel suspend without keeping on additional power domains unnecessarily.
->>
->> In order to fix this so that we can select a gptimer located in a power
->> domain that is always-on, the following changes were made ...
->> 1. Currently, only when selecting a gptimer to use for a clockevent
->>    timer, do we pass a timer property that can be used to select a
->>    specific gptimer. Change this so that we can pass a property when
->>    selecting a gptimer to use for a clocksource timer too.
->> 2. Currently, when selecting either a gptimer to use for a clockevent
->>    timer or a clocksource timer and no timer property is passed, then
->>    the first available timer is selected regardless of the properties
->>    it has. Change this so that if no properties are passed, then a timer
->>    that does not have additional features (such as always-on, dsp-irq,
->>    pwm, and secure) is selected.
->>
->> Please note that using a gptimer for both clocksource and clockevents
->> can have a system power impact during idle. The reason being is that
->> OMAP and AMxxx devices typically only have one gptimer in a power domain
->> that is always-on. Therefore when the kernel is idle both the clocksource
->> and clockevent timers will be active and this will keep additional power
->> domains on. During kernel suspend, only the clocksource timer is active
->> and therefore, it is better to use a gptimer in a power domain that is
->> always-on for clocksource.
->>
+> This patch makes it possible to configure the PTW and PTS bits inside
+> the portsc register for host and device mode before the driver starts
+> and the phy can be addressed as hardware implementation is designed.
 > 
-> It's always a pleasure reading the changelog in your patches :)
-
-Thanks.
-
-> [...]
->>  
->>  #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
->> -OMAP_SYS_GP_TIMER_INIT(3, 1, "timer_sys_ck", "ti,timer-alwon",
->> -		       2, "timer_sys_ck");
->> +OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
->> +		       1, "timer_sys_ck", "ti,timer-alwon");
->>  #endif
->>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +++
+>  drivers/usb/chipidea/bits.h                        |   14 ++++++-
+>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
+>  drivers/usb/chipidea/core.c                        |   39 ++++++++++++++++++++
+>  include/linux/usb/chipidea.h                       |    1 +
+>  5 files changed, 61 insertions(+), 1 deletion(-)
 > 
-> Minor point... was the intention of changing of clkev_nr and clksrc_nr to make
-> it consistent with what happens on AM33xx which is DT-only?
+> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> index 5778b9c..dd42ccd 100644
+> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> @@ -5,6 +5,11 @@ Required properties:
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain controller interrupt
+>  
+> +Recommended properies:
+> +- phy_type: the type of the phy connected to the core. Should be one
+> +  of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
+> +  property the PORTSC register won't be touched
+> +
+>  Optional properties:
+>  - fsl,usbphy: phandler of usb phy that connects to the only one port
+>  - fsl,usbmisc: phandler of non-core register device, with one argument
+> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+> index 050de85..d8ffc2f 100644
+> --- a/drivers/usb/chipidea/bits.h
+> +++ b/drivers/usb/chipidea/bits.h
+> @@ -48,10 +48,22 @@
+>  #define PORTSC_SUSP           BIT(7)
+>  #define PORTSC_HSP            BIT(9)
+>  #define PORTSC_PTC            (0x0FUL << 16)
+> +/* PTS and PTW for non lpm version only */
+> +#define PORTSC_PTS(d)         ((((d) & 0x3) << 30) | (((d) & 0x4) ? BIT(25) : 0))
+> +#define PORTSC_PTW            BIT(28)
+>  
+>  /* DEVLC */
+>  #define DEVLC_PSPD            (0x03UL << 25)
+> -#define    DEVLC_PSPD_HS      (0x02UL << 25)
+> +#define DEVLC_PSPD_HS         (0x02UL << 25)
+> +#define DEVLC_PTW             BIT(27)
+> +#define DEVLC_STS             BIT(28)
+> +#define DEVLC_PTS(d)          (((d) & 0x7) << 29)
+> +
+> +/* Encoding for DEVLC_PTS and PORTSC_PTS */
+> +#define PTS_UTMI              0
+> +#define PTS_ULPI              2
+> +#define PTS_SERIAL            3
+> +#define PTS_HSIC              4
+>  
+>  /* OTGSC */
+>  #define OTGSC_IDPU	      BIT(5)
+> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> index 69024e0..ebc1148 100644
+> --- a/drivers/usb/chipidea/ci13xxx_imx.c
+> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/pinctrl/consumer.h>
+> +#include <linux/usb/of.h>
+>  
+>  #include "ci.h"
+>  #include "ci13xxx_imx.h"
+> @@ -112,6 +113,8 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+>  		       CI13XXX_PULLUP_ON_VBUS |
+>  		       CI13XXX_DISABLE_STREAMING;
+>  
+> +	pdata->phy_mode = of_usb_get_phy_mode(pdev->dev.of_node);
+> +
+>  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>  	if (!data) {
+>  		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 57cae1f..a3ec29d 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -67,6 +67,8 @@
+>  #include <linux/usb/gadget.h>
+>  #include <linux/usb/otg.h>
+>  #include <linux/usb/chipidea.h>
+> +#include <linux/usb/of.h>
+> +#include <linux/phy.h>
+>  
+>  #include "ci.h"
+>  #include "udc.h"
+> @@ -211,6 +213,41 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
+>  	return 0;
+>  }
+>  
+> +static void hw_phymode_configure(struct ci13xxx *ci)
+> +{
+> +	u32 portsc, lpm;
+> +
+> +	switch (ci->platdata->phy_mode) {
+> +	case USBPHY_INTERFACE_MODE_UTMI:
+> +		portsc = PORTSC_PTS(PTS_UTMI);
+> +		lpm = DEVLC_PTS(PTS_UTMI);
+> +		break;
+> +	case USBPHY_INTERFACE_MODE_UTMIW:
+> +		portsc = PORTSC_PTS(PTS_UTMI) | PORTSC_PTW;
+> +		lpm = DEVLC_PTS(PTS_UTMI) | DEVLC_PTW;
+> +		break;
+> +	case USBPHY_INTERFACE_MODE_ULPI:
+> +		portsc = PORTSC_PTS(PTS_ULPI);
+> +		lpm = DEVLC_PTS(PTS_ULPI);
+> +		break;
+> +	case USBPHY_INTERFACE_MODE_SERIAL:
+> +		portsc = PORTSC_PTS(PTS_SERIAL);
+> +		lpm = DEVLC_PTS(PTS_SERIAL);
+> +		break;
+> +	case USBPHY_INTERFACE_MODE_HSIC:
+> +		portsc = PORTSC_PTS(PTS_HSIC);
+> +		lpm = DEVLC_PTS(PTS_HSIC);
+> +		break;
+> +	default:
+> +		return;
+> +	}
+> +
+> +	if (ci->hw_bank.lpm)
+> +		hw_write(ci, OP_PORTSC, DEVLC_PTS(7) | DEVLC_PTW, lpm);
+                             ^^^^^^^^^
 
-I don't see this as being DT specific. It is more of a policy change to
-ensure a wake-up domain timer is used for clocksource when we are using
-gptimers for both clocksource and clockevents. It was your patch for
-AM335x that made me see the need for this, if that makes sense. May be I
-should have referenced that in the changelog.
+This is probably supposed to be OP_DEVLC.
 
-Cheers
-Jon
+> +	else
+> +		hw_write(ci, OP_PORTSC, PORTSC_PTS(7) | PORTSC_PTW, portsc);
+> +}
+> +
+>  /**
+>   * hw_device_reset: resets chip (execute without interruption)
+>   * @ci: the controller
+> @@ -476,6 +513,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>  			: CI_ROLE_GADGET;
+>  	}
+>  
+> +	hw_phymode_configure(ci);
+> +
+>  	ret = ci_role_start(ci, ci->role);
+>  	if (ret) {
+>  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+> index 544825d..1a2aa18 100644
+> --- a/include/linux/usb/chipidea.h
+> +++ b/include/linux/usb/chipidea.h
+> @@ -14,6 +14,7 @@ struct ci13xxx_platform_data {
+>  	uintptr_t	 capoffset;
+>  	unsigned	 power_budget;
+>  	struct usb_phy	*phy;
+> +	enum usb_phy_interface phy_mode;
+>  	unsigned long	 flags;
+>  #define CI13XXX_REGS_SHARED		BIT(0)
+>  #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+> -- 
+> 1.7.10.4
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
