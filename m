@@ -1,77 +1,117 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 31 Jan 2013 17:34:36 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <510B0D9C.1000101@wwwdotorg.org>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Thu, 31 Jan 2013 18:37:47 -0600
+Subject: [PATCH v4] arm: use built-in byte swap function
+In-Reply-To: <1359670248.27468.13.camel@shinybook.infradead.org>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129083522.GA14302@pd.tnic>
+ <1359478014.3529.157.camel@shinybook.infradead.org>
+ <20130129174249.GB25415@pd.tnic>
+ <1359482147.3529.161.camel@shinybook.infradead.org>
+ <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <1359670248.27468.13.camel@shinybook.infradead.org>
+Message-ID: <20130131183747.d56289dbd89b165cf12a9d28@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2013 11:56 AM, Thomas Petazzoni wrote:
-> This driver implements the support for the PCIe interfaces on the
-> Marvell Armada 370/XP ARM SoCs. In the future, it might be extended to
-> cover earlier families of Marvell SoCs, such as Dove, Orion and
-> Kirkwood.
+>From 1490bd8823c05e0dda982524bb70cb6c6427ddf9 Mon Sep 17 00:00:00 2001
+From: Kim Phillips <kim.phillips@freescale.com>
+Date: Mon, 28 Jan 2013 19:30:33 -0600
+Subject: [PATCH] arm: use built-in byte swap function
 
-Bjorn and I happen to live very close, so we got together today and
-talked about PCIe on ARM.
+Enable the compiler intrinsic for byte swapping on arch ARM.  This
+allows the compiler to detect and be able to optimize out byte
+swappings, e.g. in big endian to big endian moves.
 
-One of the questions he asked is: why does the window management on the
-Marvell SoCs need to be dynamic?
+A ARCH_DEFINES_BUILTIN_BSWAP is added to allow an ARCH to select
+it when it wants to control HAVE_BUILTIN_BSWAPxx definitions over
+those in the generic compiler headers.  It can be dependent on a
+combination of byte swapping instruction availability, the
+instruction set version, and the state of support in different
+compiler versions.
 
-(Sorry if this was covered earlier; I vaguely recall some discussion on
-the topic, but couldn't find it quickly)
+AFAICT, arm gcc got __builtin_bswap{32,64} support in 4.6,
+and for the 16-bit version in 4.8.
 
-As background, PCIe enumeration in Linux usually works like:
+This has a tiny benefit on vmlinux text size (gcc 4.6.4):
 
-1) You start off with some CPU physical address regions that generate
-transactions on the PCIe bus.
+multi_v7_defconfig:
+   text    data     bss     dec     hex filename
+3135208  188396  203344 3526948  35d124 vmlinux
+multi_v7_defconfig with builtin_bswap:
+   text    data     bss     dec     hex filename
+3135112  188396  203344 3526852  35d0c4 vmlinux
 
-2) You enumerate all the PCIe devices, and assign an address to each BAR
-found, carved out of the PCIe address range corresponding to the regions
-you knew from (1).
+exynos_defconfig:
+   text    data     bss     dec     hex filename
+4286605  360564  223172 4870341  4a50c5 vmlinux
+exynos_defconfig with builtin_bswap:
+   text    data     bss     dec     hex filename
+4286405  360564  223172 4870141  4a4ffd vmlinux
 
-However, it sounds like the Marvell code wants to:
+The savings come mostly from device-tree related code, and some
+from drivers.
 
-1) Start off with no real knowledge of the CPU physical address that
-will generate transactions on the PCIe bus, since you want to assign
-that later.
+Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
+---
+akin to: http://comments.gmane.org/gmane.linux.kernel.cross-arch/16016
 
-2) You enumerate all the PCIe devices, and assign an address. But, what
-address range do you use?
+based on linux-next-20130128.  Depends on commit "compiler-gcc{3,4}.h:
+Use GCC_VERSION macro" by Daniel Santos <daniel.santos@pobox.com>,
+currently in the akpm branch.
 
-3) Then you program the SoC's windows to set up the CPU->PCIe address
-translations.
+v4:
+- undo v2-3's addition of ARCH_DEFINES_BUILTIN_BSWAP per Boris
+  and David - patch is much less intrusive :)
 
-Am I recalling what you're trying to do correctly, or am I completely
-confused?
+v3:
+- moved out of uapi swab.h into arch/arm/include/asm/swab.h
+- moved ARCH_DEFINES_BUILTIN_BSWAP help text into commit message
+- moved GCC_VERSION >= 40800 ifdef into GCC_VERSION >= 40600 block
 
-Now, I recall that a related issue was that you are tight on CPU
-physical address space, and the second algorithm above would allow the
-size of the PCIe controller's window configuration to be as small as
-possible, and hence there would be more CPU physical address space
-available to fit in other peripherals.
+v2:
+- at91 and lpd270 builds fixed by limiting to ARMv6 and above
+  (i.e., ARM cores that have support for the 'rev' instruction).
+  Otherwise, the compiler emits calls to libgcc's __bswapsi2 on
+  these ARMv4/v5 builds (and arch ARM doesn't link with libgcc).
+  All ARM defconfigs now have the same build status as they did
+  without this patch (some are broken on linux-next).
 
-However, why does this need to be dynamic? On a particular board, you
-know all the other (non-PCIe) peripherals that you need to fit into the
-CPU physical address space, so you know how much is left over for PCIe,
-so why not always make the PCIe window fill up all the available space,
-and use the first algorithm I described above? And also, I think you
-always know the exact set of PCIe devices that are attached to the
-boards, so you know the exact BAR size requirements there (or are there
-user-accessible PCIe devices; I don't think so from your recent comments
-about PCIe<->PCIe bridges not needing to be supported since the user
-couldn't plug one in?)
+- move ARM check from generic compiler.h to arch ARM's swab.h.
+  - pretty sure it should be limited to __KERNEL__ builds
 
-Note that with DT, you can easily specify the window location/size in
-the board .dts file rather than the SoC .dtsi file, so it can easily be
-customized based on how much physical address space is taken up by RAM,
-directly mapped NOR flash, etc.
+- add new ARCH_DEFINES_BUILTIN_BSWAP (see Kconfig help).
+  - if set, generic compiler header does not set HAVE_BUILTIN_BSWAPxx
+  - not too sure about this having to be a new CONFIG_, but it's hard
+    to find a place for it given linux/compiler.h doesn't include any
+    arch-specific files.
 
-With a static window configuration in DT, you'd end up with a system
-that worked much like any x86 system or Tegra, with some static memory
-range available to PCIe. It's just that in your case, the region
-location/size could change from boot to boot based on DT, whereas it's
-hard-coded in HW for Tegra and I assume x86 too.
+- move new selects to end of CONFIG_ARM's Kconfig select list,
+  as is done in David Woodhouse's original patchseries for ppc/x86.
+
+ arch/arm/include/asm/swab.h |    8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/include/asm/swab.h b/arch/arm/include/asm/swab.h
+index 537fc9b..e56acff 100644
+--- a/arch/arm/include/asm/swab.h
++++ b/arch/arm/include/asm/swab.h
+@@ -34,5 +34,13 @@ static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
+ }
+ #define __arch_swab32 __arch_swab32
+ 
++#if GCC_VERSION >= 40600
++#define __HAVE_BUILTIN_BSWAP32__
++#define __HAVE_BUILTIN_BSWAP64__
++#if GCC_VERSION >= 40800
++#define __HAVE_BUILTIN_BSWAP16__
++#endif
++#endif
++
+ #endif
+ #endif
+-- 
+1.7.9.7
