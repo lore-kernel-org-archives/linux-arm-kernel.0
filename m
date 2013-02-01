@@ -1,187 +1,196 @@
 From: js1304@gmail.com (JoonSoo Kim)
-Date: Fri, 1 Feb 2013 23:54:02 +0900
-Subject: [PATCH v4 2/3] ARM: ioremap: introduce an infrastructure for
- static mapped area
-In-Reply-To: <alpine.LFD.2.02.1301311722540.6300@xanadu.home>
+Date: Fri, 1 Feb 2013 23:56:26 +0900
+Subject: [PATCH v4 3/3] ARM: mm: use static_vm for managing static mapped
+ areas
+In-Reply-To: <alpine.LFD.2.02.1301312306080.6300@xanadu.home>
 References: <1359594008-14688-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1359594008-14688-3-git-send-email-iamjoonsoo.kim@lge.com>
- <alpine.LFD.2.02.1301311722540.6300@xanadu.home>
-Message-ID: <CAAmzW4PjNr-Jh+DhoMGYWazJWFDhXc=A7zMTQ3GehM=pvi0r=A@mail.gmail.com>
+ <1359594008-14688-4-git-send-email-iamjoonsoo.kim@lge.com>
+ <alpine.LFD.2.02.1301312306080.6300@xanadu.home>
+Message-ID: <CAAmzW4PqYLtuTn3S5atArix5=eYvCp4G2KHRMhedo=96LoB08Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hello, Nicolas.
 
 2013/2/1 Nicolas Pitre <nicolas.pitre@linaro.org>:
 > On Thu, 31 Jan 2013, Joonsoo Kim wrote:
 >
->> In current implementation, we used ARM-specific flag, that is,
->> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
->> The purpose of static mapped area is to re-use static mapped area when
->> entire physical address range of the ioremap request can be covered
->> by this area.
+>> A static mapped area is ARM-specific, so it is better not to use
+>> generic vmalloc data structure, that is, vmlist and vmlist_lock
+>> for managing static mapped area. And it causes some needless overhead and
+>> reducing this overhead is better idea.
 >>
->> This implementation causes needless overhead for some cases.
->> For example, assume that there is only one static mapped area and
->> vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
->> deciding whether it is matched or not. Moreover, even if there is
->> no static mapped area and vmlist has 300 areas, every time we call
->> ioremap, we check 300 areas in now.
->>
->> If we construct a extra list for static mapped area, we can eliminate
->> above mentioned overhead.
->> With a extra list, if there is one static mapped area,
->> we just check only one area and proceed next operation quickly.
->>
->> In fact, it is not a critical problem, because ioremap is not frequently
->> used. But reducing overhead is better idea.
->>
->> Another reason for doing this work is for removing architecture dependency
->> on vmalloc layer. I think that vmlist and vmlist_lock is internal data
->> structure for vmalloc layer. Some codes for debugging and stat inevitably
->> use vmlist and vmlist_lock. But it is preferable that they are used
->> as least as possible in outside of vmalloc.c
->>
->> Now, I introduce an ARM-specific infrastructure for static mapped area. In
->> the following patch, we will use this and resolve above mentioned problem.
+>> Now, we have newly introduced static_vm infrastructure.
+>> With it, we don't need to iterate all mapped areas. Instead, we just
+>> iterate static mapped areas. It helps to reduce an overhead of finding
+>> matched area. And architecture dependency on vmalloc layer is removed,
+>> so it will help to maintainability for vmalloc layer.
 >>
 >> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 >
-> Much better.  Comments below.
-
-Thanks.
-
+> Comments below.
+>
+>>
 >> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
->> index 88fd86c..ceb34ae 100644
+>> index ceb34ae..7fe5b48 100644
 >> --- a/arch/arm/mm/ioremap.c
 >> +++ b/arch/arm/mm/ioremap.c
->> @@ -39,6 +39,78 @@
->>  #include <asm/mach/pci.h>
->>  #include "mm.h"
+>> @@ -269,13 +269,14 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+>>       const struct mem_type *type;
+>>       int err;
+>>       unsigned long addr;
+>> -     struct vm_struct * area;
+>> +     struct vm_struct *area;
+>> +     phys_addr_t paddr = __pfn_to_phys(pfn);
 >>
+>>  #ifndef CONFIG_ARM_LPAE
+>>       /*
+>>        * High mappings must be supersection aligned
+>>        */
+>> -     if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
+>> +     if (pfn >= 0x100000 && (paddr & ~SUPERSECTION_MASK))
+>>               return NULL;
+>>  #endif
+>>
+>> @@ -291,24 +292,17 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+>>       /*
+>>        * Try to reuse one of the static mapping whenever possible.
+>>        */
+>> -     read_lock(&vmlist_lock);
+>> -     for (area = vmlist; area; area = area->next) {
+>> -             if (!size || (sizeof(phys_addr_t) == 4 && pfn >= 0x100000))
+>> -                     break;
+>> -             if (!(area->flags & VM_ARM_STATIC_MAPPING))
+>> -                     continue;
+>> -             if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+>> -                     continue;
+>> -             if (__phys_to_pfn(area->phys_addr) > pfn ||
+>> -                 __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
+>> -                     continue;
+>> -             /* we can drop the lock here as we know *area is static */
+>> -             read_unlock(&vmlist_lock);
+>> -             addr = (unsigned long)area->addr;
+>> -             addr += __pfn_to_phys(pfn) - area->phys_addr;
+>> -             return (void __iomem *) (offset + addr);
+>> +     if (size && !((sizeof(phys_addr_t) == 4 && pfn >= 0x100000))) {
+>> +             struct static_vm *svm;
 >> +
->> +LIST_HEAD(static_vmlist);
->> +static DEFINE_RWLOCK(static_vmlist_lock);
->
-> In fact you don't need a lock at all.  The only writer is
-> add_static_vm_early() and we know it is only used during boot when the
-> kernel is still single-threaded.
-
-Yes!
-
->> +
->> +static struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
->> +                     size_t size, unsigned long flags)
->> +{
->> +     struct static_vm *svm;
->> +     struct vm_struct *vm;
->> +
->> +     read_lock(&static_vmlist_lock);
->> +     list_for_each_entry(svm, &static_vmlist, list) {
->> +             if (svm->flags != flags)
->> +                     continue;
->> +
->> +             vm = &svm->vm;
->> +             if (vm->phys_addr > paddr ||
->> +                     paddr + size - 1 > vm->phys_addr + vm->size - 1)
->> +                     continue;
->> +
->> +             read_unlock(&static_vmlist_lock);
->> +             return svm;
->> +     }
->> +
->> +     return NULL;
->> +}
->> +
->> +struct static_vm *find_static_vm_vaddr(void *vaddr)
->> +{
->> +     struct static_vm *svm;
->> +     struct vm_struct *vm;
->> +
->> +     read_lock(&static_vmlist_lock);
->> +     list_for_each_entry(svm, &static_vmlist, list) {
->> +             vm = &svm->vm;
->> +
->> +             /* static_vmlist is ascending order */
->> +             if (vm->addr > vaddr)
->> +                     break;
->> +
->> +             if (vm->addr <= vaddr && vm->addr + vm->size > vaddr) {
->> +                     read_unlock(&static_vmlist_lock);
->> +                     return svm;
+>> +             svm = find_static_vm_paddr(paddr, size,
+>> +                             STATIC_VM_TYPE(STATIC_VM_MEM, mtype));
+>> +             if (svm) {
+>> +                     addr = (unsigned long)svm->vm.addr;
+>> +                     addr += paddr - svm->vm.phys_addr;
+>> +                     return (void __iomem *) (offset + addr);
 >> +             }
->> +     }
->> +     read_unlock(&static_vmlist_lock);
+>>       }
+>> -     read_unlock(&vmlist_lock);
+>>
+>>       /*
+>>        * Don't allow RAM to be mapped - this causes problems with ARMv6+
+>> @@ -320,21 +314,21 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+>>       if (!area)
+>>               return NULL;
+>>       addr = (unsigned long)area->addr;
+>> -     area->phys_addr = __pfn_to_phys(pfn);
+>> +     area->phys_addr = paddr;
+>>
+>>  #if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
+>>       if (DOMAIN_IO == 0 &&
+>>           (((cpu_architecture() >= CPU_ARCH_ARMv6) && (get_cr() & CR_XP)) ||
+>>              cpu_is_xsc3()) && pfn >= 0x100000 &&
+>> -            !((__pfn_to_phys(pfn) | size | addr) & ~SUPERSECTION_MASK)) {
+>> +            !((paddr | size | addr) & ~SUPERSECTION_MASK)) {
+>>               area->flags |= VM_ARM_SECTION_MAPPING;
+>>               err = remap_area_supersections(addr, pfn, size, type);
+>> -     } else if (!((__pfn_to_phys(pfn) | size | addr) & ~PMD_MASK)) {
+>> +     } else if (!((paddr | size | addr) & ~PMD_MASK)) {
+>>               area->flags |= VM_ARM_SECTION_MAPPING;
+>>               err = remap_area_sections(addr, pfn, size, type);
+>>       } else
+>>  #endif
+>> -             err = ioremap_page_range(addr, addr + size, __pfn_to_phys(pfn),
+>> +             err = ioremap_page_range(addr, addr + size, paddr,
+>>                                        __pgprot(type->prot_pte));
+>>
+>>       if (err) {
+>> @@ -418,34 +412,21 @@ __arm_ioremap_exec(unsigned long phys_addr, size_t size, bool cached)
+>>  void __iounmap(volatile void __iomem *io_addr)
+>>  {
+>>       void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
+>> -     struct vm_struct *vm;
+>> +     struct static_vm *svm;
 >> +
->> +     return NULL;
->> +}
->> +
->> +void add_static_vm_early(struct static_vm *svm, unsigned long flags)
 >
-> This should be marked with __init.  This way, it is less likely to be
-> used after boot, especially with no locking.  And vm_area_add_early() is
-> valid only if !vmap_initialized anyway, and also __init.
+> You could salvage the "/* If this is a static mapping we must leave it
+> alone */" comment here.
 
 Okay.
 
->> +{
->> +     struct static_vm *curr_svm;
->> +     struct vm_struct *vm;
->> +     void *vaddr;
+>> +     svm = find_static_vm_vaddr(addr);
+>> +     if (svm)
+>> +             return;
+>>
+>> -     read_lock(&vmlist_lock);
+>> -     for (vm = vmlist; vm; vm = vm->next) {
+>> -             if (vm->addr > addr)
+>> -                     break;
+>> -             if (!(vm->flags & VM_IOREMAP))
+>> -                     continue;
+>> -             /* If this is a static mapping we must leave it alone */
+>> -             if ((vm->flags & VM_ARM_STATIC_MAPPING) &&
+>> -                 (vm->addr <= addr) && (vm->addr + vm->size > addr)) {
+>> -                     read_unlock(&vmlist_lock);
+>> -                     return;
+>> -             }
+>>  #if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
+>> -             /*
+>> -              * If this is a section based mapping we need to handle it
+>> -              * specially as the VM subsystem does not know how to handle
+>> -              * such a beast.
+>> -              */
+>
+> Please don't remove the above comment.  It is still relevant.
+
+Yes.
+
+Thanks for comments.
+
+>> -             if ((vm->addr == addr) &&
+>> -                 (vm->flags & VM_ARM_SECTION_MAPPING)) {
+>> +     {
+>> +             struct vm_struct *vm;
 >> +
->> +     vm_area_add_early(&svm->vm);
->> +
->> +     vaddr = svm->vm.addr;
->> +     svm->flags = flags;
->> +
->> +     write_lock(&static_vmlist_lock);
->> +     list_for_each_entry(curr_svm, &static_vmlist, list) {
->> +             vm = &curr_svm->vm;
->> +
->> +             if (vm->addr > vaddr)
->> +                     break;
->> +     }
->> +     list_add_tail(&svm->list, &curr_svm->list);
->> +     write_unlock(&static_vmlist_lock);
->> +}
->> +
->>  int ioremap_page(unsigned long virt, unsigned long phys,
->>                const struct mem_type *mtype)
->>  {
+>> +             vm = find_vm_area(addr);
+>> +             if (vm && (vm->flags & VM_ARM_SECTION_MAPPING))
+>>                       unmap_area_sections((unsigned long)vm->addr, vm->size);
+>> -                     break;
+>> -             }
+>> -#endif
+>>       }
+>> -     read_unlock(&vmlist_lock);
+>> +#endif
+>>
+>>       vunmap(addr);
+>>  }
 >> diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
->> index a8ee92d..fb45c79 100644
+>> index fb45c79..24c1df4 100644
 >> --- a/arch/arm/mm/mm.h
 >> +++ b/arch/arm/mm/mm.h
->> @@ -1,4 +1,6 @@
->>  #ifdef CONFIG_MMU
->> +#include <linux/list.h>
->> +#include <linux/vmalloc.h>
+>> @@ -54,16 +54,6 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
+>>  /* (super)section-mapped I/O regions used by ioremap()/iounmap() */
+>>  #define VM_ARM_SECTION_MAPPING       0x80000000
 >>
->>  /* the upper-most page table pointer */
->>  extern pmd_t *top_pmd;
->> @@ -65,6 +67,24 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
->>  /* consistent regions used by dma_alloc_attrs() */
->>  #define VM_ARM_DMA_CONSISTENT        0x20000000
->>
->> +
->> +/* ARM specific static_vm->flags bits */
->> +#define STATIC_VM_MEM                0x00000001
->> +#define STATIC_VM_EMPTY              0x00000002
->> +#define STATIC_VM_MTYPE(mtype)       ((mtype) << 20)
->> +
->> +#define STATIC_VM_TYPE(type, mtype) (type | STATIC_VM_MTYPE(mtype))
->> +
->> +struct static_vm {
->> +     struct vm_struct vm;
->> +     struct list_head list;
->> +     unsigned long flags;
->> +};
+>> -/* permanent static mappings from iotable_init() */
+>> -#define VM_ARM_STATIC_MAPPING        0x40000000
+>> -
+>> -/* empty mapping */
+>> -#define VM_ARM_EMPTY_MAPPING 0x20000000
+>> -
+>> -/* mapping type (attributes) for permanent static mappings */
+>> -#define VM_ARM_MTYPE(mt)             ((mt) << 20)
+>> -#define VM_ARM_MTYPE_MASK    (0x1f << 20)
+>> -
 >
-> What is your motivation for having separate flags instead of simply
-> keeping the current vm->flags usage?
+> This goes with a related question in my previous email: why didn't you
+> keep those flags as they were?
 >
-
-Keeping the current vm->flags is better idea.
-I will re-work about all your comments.
-
-Thanks.
+>
+> Nicolas
