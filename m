@@ -1,55 +1,41 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Fri, 1 Feb 2013 06:10:25 +0000
-Subject: [PATCH] ARM: dts: AM33XX: Corrects typo in interrupt field in
- SPI node
-In-Reply-To: <1359697047-1816-1-git-send-email-avinashphilip@ti.com>
-References: <1359697047-1816-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA6977C@DBDE01.ent.ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 1 Feb 2013 11:43:11 +0530
+Subject: [PATCH v3 13/15] ARM: CCI: ensure powerdown-time data is flushed
+ from cache
+In-Reply-To: <1359445870-18925-14-git-send-email-nicolas.pitre@linaro.org>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-14-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <510B5CF7.5080902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 11:07:27, Philip, Avinash wrote:
-> DT field of "interrupts" was mentioned wrongly as "interrupt" in SPI
-> node. This went unnoticed as spi-omap2 driver not making use of
-> interrupt. Fixes the typo.
-> 
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
+> From: Dave Martin <dave.martin@linaro.org>
+>
+> Non-local variables used by the CCI management function called after
+> disabling the cache must be flushed out to main memory in advance,
+> otherwise incoherency of those values may occur if they are sitting
+> in the cache of some other CPU when cci_disable() executes.
+>
+Any CPU calling cci_disable() would have already cleaned its local
+cache and the snoop unit should take care of syncing the shared data
+before hand from other CPU local caches for shared accesses.
+May be I am unable to visualize the issue here or missing some key
+point.
 
-Reported-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> This patch adds the appropriate flushing to the CCI driver to ensure
+> that the relevant data is available in RAM ahead of time.
+>
+> Because this creates a dependency on arch-specific cacheflushing
+> functions, this patch also makes ARM_CCI depend on ARM.
+>
+You should do that otherwise to avoid other arch building this
+driver for random builds and breaking their builds.
 
-Typo mistake was reported by Vaibhav. I forgot to mention "Reported-by"
-tag while posting. Add the same on his behalf.
 
-Thanks
-Avinash
-
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 > ---
->  arch/arm/boot/dts/am33xx.dtsi |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index fbcb90b..cece3ad 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -309,7 +309,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			reg = <0x48030000 0x400>;
-> -			interrupt = <65>;
-> +			interrupts = <65>;
->  			ti,spi-num-cs = <2>;
->  			ti,hwmods = "spi0";
->  			status = "disabled";
-> @@ -320,7 +320,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			reg = <0x481a0000 0x400>;
-> -			interrupt = <125>;
-> +			interrupts = <125>;
->  			ti,spi-num-cs = <2>;
->  			ti,hwmods = "spi1";
->  			status = "disabled";
-> -- 
-> 1.7.9.5
-> 
-> 
+Patch is fine apart from the question.
+
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
