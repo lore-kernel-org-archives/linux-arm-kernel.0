@@ -1,24 +1,25 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Feb 2013 14:08:04 -0800
-Subject: [PATCH 1/2] ARM: OMAP2+: Prevent potential crash if GPMC probe
- fails
-In-Reply-To: <1359736726-10193-2-git-send-email-jon-hunter@ti.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <20130201220804.GZ22517@atomide.com>
+Date: Fri, 1 Feb 2013 14:12:10 -0800
+Subject: [PATCH v3 3/3] arm: omap2: gpmc: add DT bindings for OneNAND
+In-Reply-To: <20130128115339.GD7754@e106331-lin.cambridge.arm.com>
+References: <1359116591-32730-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1359116591-32730-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130125155633.GC16795@e106331-lin.cambridge.arm.com>
+ <CALF0-+X2qsF5OETerRSVsJbjkC-JdVXsZhyw1sxQYR+PWX6LHA@mail.gmail.com>
+ <20130128115339.GD7754@e106331-lin.cambridge.arm.com>
+Message-ID: <20130201221209.GA22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130201 08:42]:
-> If the GPMC probe fails, devices that use the GPMC (such as ethernet
-> chips, flash memories, etc) can still allocate a GPMC chip-select and
-> register the device. On the OMAP2420 H4 board, this was causing the
-> kernel to crash after the gpmc probe failed and the board attempted
-> to start networking. Prevent this by marking all the chip-selects as
-> reserved by default and only make them available for devices to request
-> if the GPMC probe succeeds.
+* Mark Rutland <mark.rutland@arm.com> [130128 03:57]:
+> 
+> So if I've understood correctly, the first address cell is the CS, and the
+> second the offset within this (as the comment in the onenand at 0 node hints)?
+> 
+> If so, the code now makes sense to me :)
 
-Thanks applying into omap-for-v3.9/gpmc.
+Sounds like further checking can be added as needed, so applying this
+series into omap-for-v3.9/gpmc.
 
 Regards,
 
