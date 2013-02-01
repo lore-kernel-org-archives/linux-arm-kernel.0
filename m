@@ -1,73 +1,187 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Feb 2013 20:23:43 +0530
-Subject: [PATCHv2 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <20130201144913.GQ23505@n2100.arm.linux.org.uk>
-References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
- <1359651943-21752-4-git-send-email-dinguyen@altera.com>
- <510BA728.4060300@ti.com>
- <20130201121137.GC23869@e102568-lin.cambridge.arm.com>
- <20130201125417.GL23505@n2100.arm.linux.org.uk>
- <20130201141052.GA25172@e102568-lin.cambridge.arm.com>
- <20130201141914.GO23505@n2100.arm.linux.org.uk>
- <20130201143136.GP23505@n2100.arm.linux.org.uk> <510BD496.6080305@ti.com>
- <20130201144913.GQ23505@n2100.arm.linux.org.uk>
-Message-ID: <510BD6F7.9070706@ti.com>
+From: js1304@gmail.com (JoonSoo Kim)
+Date: Fri, 1 Feb 2013 23:54:02 +0900
+Subject: [PATCH v4 2/3] ARM: ioremap: introduce an infrastructure for
+ static mapped area
+In-Reply-To: <alpine.LFD.2.02.1301311722540.6300@xanadu.home>
+References: <1359594008-14688-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1359594008-14688-3-git-send-email-iamjoonsoo.kim@lge.com>
+ <alpine.LFD.2.02.1301311722540.6300@xanadu.home>
+Message-ID: <CAAmzW4PjNr-Jh+DhoMGYWazJWFDhXc=A7zMTQ3GehM=pvi0r=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 February 2013 08:19 PM, Russell King - ARM Linux wrote:
-> On Fri, Feb 01, 2013 at 08:13:34PM +0530, Santosh Shilimkar wrote:
->> On Friday 01 February 2013 08:01 PM, Russell King - ARM Linux wrote:
->>> Just to further provide some insight into the reasoning:
->>>
->>> Invalidating data out of a working cache risks data corruption; maybe
->>> the data being invalidated is filesystem metadata which was about to
->>> be cleaned and written back to storage.  That risks filesystem
->>> corruption.
->>>
->>> Invalidating fewer levels than are actually required is different: we
->>> may leave dirty cache lines behind which may be evicted, but there's
->>> also the chance that the CPU will end up _reading_ from its
->>> uninitialized caches and may crash before that happens.
->>>
->>> So, the risks are:
->>> 1. invalidate more levels than are necessary and risk discarding data
->>>      which other CPUs are using, which may be important data.
->>> 2. invalidate less levels than are necessary and risk writing out
->>>      data from the CPU cache, which may or may not happen _before_ the
->>>      CPU crashes due to reading invalid data.
->>>
->>> Out of those two, (2) sounds to me to be the safer approach.
->>>
->>> Plus, I can't think of a reason why you'd want to put on a SMP system
->>> more than one layer of CPU local caches... to do so would seem to me to
->>> be an exercise in coherency complexity...  So, I suspect that in the
->>> real world, we will _never_ see any system which has more than one
->>> layer of caches local to the CPU.  But we may see a system with a
->>> cache architecture similar to the one I drew in my email to Santosh.
->>>
->> I still scratching my head on why you would even have a CPU design
->> with two L2 shared caches for a 4 CPU system.
->>
->> If you ever design such a system, you need to ensure that
->>
->> 1. Both L2 are used in exclusive mode
->> 2. Both L2 cache has coherency hardware connected to keep them in sync
->> for shared data.
->>
->> For 1, one would just increase the size of L2 and have only 1 memory.
->>
->> 2 Doesn't bring much advantage unless and until your L3 is too far
->> away for access in terms of CPU access cycles.
->
-> I don't think you quite understood my diagram.  There aren't two separate
-> L2 data caches (CL1I and CL1D).  I'm showing the L2 cache as having a
-> harvard structure (separate instruction and data) with no coherency
-> between them - and because they're harvard structured, that means the
-> unification level must be _below_ that point.
->
-Now I get it. Yes I missed the I and D separation in the diagram.
-Thanks a lot for drawing.
+Hello, Nicolas.
 
-Regards,
-Santosh
+2013/2/1 Nicolas Pitre <nicolas.pitre@linaro.org>:
+> On Thu, 31 Jan 2013, Joonsoo Kim wrote:
+>
+>> In current implementation, we used ARM-specific flag, that is,
+>> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+>> The purpose of static mapped area is to re-use static mapped area when
+>> entire physical address range of the ioremap request can be covered
+>> by this area.
+>>
+>> This implementation causes needless overhead for some cases.
+>> For example, assume that there is only one static mapped area and
+>> vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
+>> deciding whether it is matched or not. Moreover, even if there is
+>> no static mapped area and vmlist has 300 areas, every time we call
+>> ioremap, we check 300 areas in now.
+>>
+>> If we construct a extra list for static mapped area, we can eliminate
+>> above mentioned overhead.
+>> With a extra list, if there is one static mapped area,
+>> we just check only one area and proceed next operation quickly.
+>>
+>> In fact, it is not a critical problem, because ioremap is not frequently
+>> used. But reducing overhead is better idea.
+>>
+>> Another reason for doing this work is for removing architecture dependency
+>> on vmalloc layer. I think that vmlist and vmlist_lock is internal data
+>> structure for vmalloc layer. Some codes for debugging and stat inevitably
+>> use vmlist and vmlist_lock. But it is preferable that they are used
+>> as least as possible in outside of vmalloc.c
+>>
+>> Now, I introduce an ARM-specific infrastructure for static mapped area. In
+>> the following patch, we will use this and resolve above mentioned problem.
+>>
+>> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+>
+> Much better.  Comments below.
+
+Thanks.
+
+>> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+>> index 88fd86c..ceb34ae 100644
+>> --- a/arch/arm/mm/ioremap.c
+>> +++ b/arch/arm/mm/ioremap.c
+>> @@ -39,6 +39,78 @@
+>>  #include <asm/mach/pci.h>
+>>  #include "mm.h"
+>>
+>> +
+>> +LIST_HEAD(static_vmlist);
+>> +static DEFINE_RWLOCK(static_vmlist_lock);
+>
+> In fact you don't need a lock at all.  The only writer is
+> add_static_vm_early() and we know it is only used during boot when the
+> kernel is still single-threaded.
+
+Yes!
+
+>> +
+>> +static struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
+>> +                     size_t size, unsigned long flags)
+>> +{
+>> +     struct static_vm *svm;
+>> +     struct vm_struct *vm;
+>> +
+>> +     read_lock(&static_vmlist_lock);
+>> +     list_for_each_entry(svm, &static_vmlist, list) {
+>> +             if (svm->flags != flags)
+>> +                     continue;
+>> +
+>> +             vm = &svm->vm;
+>> +             if (vm->phys_addr > paddr ||
+>> +                     paddr + size - 1 > vm->phys_addr + vm->size - 1)
+>> +                     continue;
+>> +
+>> +             read_unlock(&static_vmlist_lock);
+>> +             return svm;
+>> +     }
+>> +
+>> +     return NULL;
+>> +}
+>> +
+>> +struct static_vm *find_static_vm_vaddr(void *vaddr)
+>> +{
+>> +     struct static_vm *svm;
+>> +     struct vm_struct *vm;
+>> +
+>> +     read_lock(&static_vmlist_lock);
+>> +     list_for_each_entry(svm, &static_vmlist, list) {
+>> +             vm = &svm->vm;
+>> +
+>> +             /* static_vmlist is ascending order */
+>> +             if (vm->addr > vaddr)
+>> +                     break;
+>> +
+>> +             if (vm->addr <= vaddr && vm->addr + vm->size > vaddr) {
+>> +                     read_unlock(&static_vmlist_lock);
+>> +                     return svm;
+>> +             }
+>> +     }
+>> +     read_unlock(&static_vmlist_lock);
+>> +
+>> +     return NULL;
+>> +}
+>> +
+>> +void add_static_vm_early(struct static_vm *svm, unsigned long flags)
+>
+> This should be marked with __init.  This way, it is less likely to be
+> used after boot, especially with no locking.  And vm_area_add_early() is
+> valid only if !vmap_initialized anyway, and also __init.
+
+Okay.
+
+>> +{
+>> +     struct static_vm *curr_svm;
+>> +     struct vm_struct *vm;
+>> +     void *vaddr;
+>> +
+>> +     vm_area_add_early(&svm->vm);
+>> +
+>> +     vaddr = svm->vm.addr;
+>> +     svm->flags = flags;
+>> +
+>> +     write_lock(&static_vmlist_lock);
+>> +     list_for_each_entry(curr_svm, &static_vmlist, list) {
+>> +             vm = &curr_svm->vm;
+>> +
+>> +             if (vm->addr > vaddr)
+>> +                     break;
+>> +     }
+>> +     list_add_tail(&svm->list, &curr_svm->list);
+>> +     write_unlock(&static_vmlist_lock);
+>> +}
+>> +
+>>  int ioremap_page(unsigned long virt, unsigned long phys,
+>>                const struct mem_type *mtype)
+>>  {
+>> diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+>> index a8ee92d..fb45c79 100644
+>> --- a/arch/arm/mm/mm.h
+>> +++ b/arch/arm/mm/mm.h
+>> @@ -1,4 +1,6 @@
+>>  #ifdef CONFIG_MMU
+>> +#include <linux/list.h>
+>> +#include <linux/vmalloc.h>
+>>
+>>  /* the upper-most page table pointer */
+>>  extern pmd_t *top_pmd;
+>> @@ -65,6 +67,24 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
+>>  /* consistent regions used by dma_alloc_attrs() */
+>>  #define VM_ARM_DMA_CONSISTENT        0x20000000
+>>
+>> +
+>> +/* ARM specific static_vm->flags bits */
+>> +#define STATIC_VM_MEM                0x00000001
+>> +#define STATIC_VM_EMPTY              0x00000002
+>> +#define STATIC_VM_MTYPE(mtype)       ((mtype) << 20)
+>> +
+>> +#define STATIC_VM_TYPE(type, mtype) (type | STATIC_VM_MTYPE(mtype))
+>> +
+>> +struct static_vm {
+>> +     struct vm_struct vm;
+>> +     struct list_head list;
+>> +     unsigned long flags;
+>> +};
+>
+> What is your motivation for having separate flags instead of simply
+> keeping the current vm->flags usage?
+>
+
+Keeping the current vm->flags is better idea.
+I will re-work about all your comments.
+
+Thanks.
