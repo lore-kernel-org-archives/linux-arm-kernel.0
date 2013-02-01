@@ -1,33 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Feb 2013 14:16:18 -0800
-Subject: [PATCH 0/2] ARM: dts: OMAP3: Add GPMC controller and NAND
- memory to Overo
-In-Reply-To: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <20130201221618.GB22517@atomide.com>
+Date: Fri, 1 Feb 2013 14:38:36 -0800
+Subject: [PATCH] arm: omap: make wakeupgen_lock raw
+In-Reply-To: <51023995.1050703@ti.com>
+References: <1354891787-24119-1-git-send-email-balbi@ti.com>
+ <20130124182159.GL4424@arwen.pp.htv.fi> <51023995.1050703@ti.com>
+Message-ID: <20130201223836.GC22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Florian Vaussard <florian.vaussard@epfl.ch> [130128 09:57]:
-> Hello,
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130124 23:54]:
+> On Thursday 24 January 2013 11:52 PM, Felipe Balbi wrote:
+> >Hi,
+> >
+> >On Fri, Dec 07, 2012 at 04:49:47PM +0200, Felipe Balbi wrote:
+> >>From: Thomas Gleixner <tglx@linutronix.de>
+> >>
+> >>When applying RT patch on top of Linux, spinlocks are
+> >>implemented as RT-mutexes, which means they are preemptable.
+> >>
+> >>Current GIC implementation on OMAP is using a spinlock
+> >>to protect against preemption. As it turns out, we need
+> >>to convert that lock into a raw_spinlock so that OMAP's
+> >>interrupt controller works as expected after RT-patch
+> >>is applied.
+> >>
+> >>This patch is simply to decrease the amount of changes
+> >>RT-team needs to carry out of tree. It doesn't cause any
+> >>changes in behavior.
+> >>
+> >>Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> >>Signed-off-by: Felipe Balbi <balbi@ti.com>
+> >
+> Sorry i missed this patch. Tony can you please
+> pick it up?
 > 
-> This is more an RFC serie, as an issue is still unclear to me.
-> Building on the work of Daniel Mack for the GPMC controller (staged
-> in Tony's tree [1]), it was easy to add the GPMC controller to OMAP3.
+> For the patch,
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > 
-> The issue comes from the Overo on-board NAND, as the amount of flash
-> depends on the revision. Currently, partitions are handled in the board
-> file using MTDPART_SIZ_FULL, but looking at the ofpart parser, the size
-> given to the parser must be fixed.
-> 
-> So how should we handle such case? Having several dtsi depending
-> on the Overo's revision would be a mess to my sense, considering
-> the non-conditional include inside the expansion boards' dts.
-> Or would it make sense to extend the DT binding for partitions?
 
-Yes makes sense to extend the binding to use the full flash memory
-if the size can be probed.
+Looks like no comments, so applying this into
+omap-for-v3.9/fixes-non-critical.
 
 Regards,
 
-Tony
+Tony 
+ 
