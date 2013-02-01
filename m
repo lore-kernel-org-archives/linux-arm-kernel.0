@@ -1,70 +1,94 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 1 Feb 2013 14:10:52 +0000
-Subject: [PATCHv2 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <20130201125417.GL23505@n2100.arm.linux.org.uk>
-References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
- <1359651943-21752-4-git-send-email-dinguyen@altera.com>
- <510BA728.4060300@ti.com>
- <20130201121137.GC23869@e102568-lin.cambridge.arm.com>
- <20130201125417.GL23505@n2100.arm.linux.org.uk>
-Message-ID: <20130201141052.GA25172@e102568-lin.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 01 Feb 2013 08:15:37 -0600
+Subject: [PATCH 2/4] ARM: mach-shmobile: r8a7779: Allow initialisation
+ of GIC by DT
+In-Reply-To: <20130201105849.GB21191@e106331-lin.cambridge.arm.com>
+References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
+ <1359597051-32700-3-git-send-email-horms+renesas@verge.net.au>
+ <20130131123213.GB7235@e106331-lin.cambridge.arm.com>
+ <20130201001119.GO10312@verge.net.au> <20130201003410.GA30007@verge.net.au>
+ <20130201105849.GB21191@e106331-lin.cambridge.arm.com>
+Message-ID: <510BCE09.7050302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 12:54:17PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 01, 2013 at 12:11:38PM +0000, Lorenzo Pieralisi wrote:
-> > Well, on latest processors (A15, A7) caches are invalidated on reset unless
-> > the chip is programmed to skip that on reset (ie L2 retained).
-> > 
-> > But it makes sense, for sure it should not be called v7_invalidate_l1,
-> > but invalidate_louis, and instead of forcing level 0 we should be
-> > reading LoUIS and invalidate up to that level as we do in the clean and
-> > invalidate function.
+On 02/01/2013 04:58 AM, Mark Rutland wrote:
+> On Fri, Feb 01, 2013 at 12:34:10AM +0000, Simon Horman wrote:
+>> On Fri, Feb 01, 2013 at 09:11:19AM +0900, Simon Horman wrote:
+>>> On Thu, Jan 31, 2013 at 12:32:13PM +0000, Mark Rutland wrote:
+>>>> Hi Simon,
+>>>>
+>>>> On Thu, Jan 31, 2013 at 01:50:49AM +0000, Simon Horman wrote:
+
+>>>>> +
+>>>>> +        gic: interrupt-controller at f0001000 {
+>>>>> +                compatible = "arm,cortex-a9-gic";
+>>>>> +                #interrupt-cells = <3>;
+>>>>> +                #address-cells = <1>;
+>>>>
+>>>> Why is #address-cells needed here (and without #size-cells)? I see it's in the
+>>>> binding document example, but I can't figure out why.
+>>>
+>>> Its here because I copied the example.
+>>> I will see about removing it from here.
 > 
-> No.  Think about it.  c7, c6, 2 _invalidates_ the cache.  That means any
-> data contained within the cache is discarded.  Data is not written back.
+> Rob, Grant, do either of you know if there's a reason for this that we've
+> missed?
 > 
-> If you do this down to the LoUIS, that includes all cache levels in the
-> inner sharable domain.  The inner sharable domain includes the other CPUs
-> in the system which may already be running (certainly the boot CPU will
-> be running).
+> The gic doesn't have any direct children, and this doesn't seem to be
+> some decvicetree interrupt-controller magic.
 
-On all v7 ARM systems I know of LoUIS correspond to L1 and using LoUIS is a
-plaster that works for current systems (where by LoUIS I mean all cache
-levels down to but not inclusive of, LoUIS).
+If you look at of_irq_map_raw, there are cases that look at
+#address-cells. Those appear to be only when you have an interrupt-map
+though.
+> 
+> If this is superfluous, how about the patch below?
 
-What you are saying is true for cpu_suspend code and hotplug as well, there we
-are cleaning and invalidating down to the LoUIS, which might not be needed
-since LoUIS does not mean that all cache levels included are _local_ to the
-CPU.
+The docs probably should state #addr-cells is only required with
+interrupt-map.
 
-There is no way on ARM systems to detect what cache levels are local to
-a CPU, so we decided to use LoUIS for that, as a temporary solution to
-avoid cluttering the code with DT bindings that link cache topology and
-CPU topology.
+> 
+> I took a quick look at arch/arm/boot/dts/. Some gic nodes don't have
+> #address-cells, some have it but not #size-cells, and some have both. These
+> should probably be cleaned up too.
 
-And on all ARM systems in the mainline "operating on all levels down to
-but not inclusive of LoUIS" is equivalent to cache levels local to a CPU,
-if it is not I am missing something and I apologize.
+Some boards are using interrupt-map, so they may need #address-cells. So
+I'm inclined to leave things alone.
 
-> Are you _really_ sure you want to be invalidating _valid_ data held in
-> caches in the inner sharable domain by other CPUs, rather than just the
-> cache associated with the CPU which is being brought online?
+Rob
 
-We know that LoUIS corresponds to cache levels local to a CPU for now and we
-know that it will fail as soon as there are caches in the inner shareability
-domain that belong to multiple CPUs. Again, that's valid for the clean
-and invalidate functions as well (though there it is an optimization
-problem, here I agree is a validity issue and more serious).
-
-There is no way to detect cache levels local to a CPU, I tried to do
-that before posting the new LoUIS API, and all I can say is that we need
-device tree bindings to do that cleanly, architecturally it is just not
-detectable.
-
-I am happy to discuss a way forward Russell, your concerns are correct,
-we are aware of them and happy to improve the code to make it work
-consistently.
-
-Thanks,
-Lorenzo
+> 
+> [...]
+> 
+> Thanks,
+> Mark.
+> 
+> ---->8----
+> 
+> From dc734edb8040513785429c11e40a420870dc55a4 Mon Sep 17 00:00:00 2001
+> From: Mark Rutland <mark.rutland@arm.com>
+> Date: Fri, 1 Feb 2013 10:18:05 +0000
+> Subject: [PATCH] Docs: gic: remove #address-cells from example
+> 
+> The gic has no child nodes, and so doesn't need #address-cells. Having
+> the property defined in the example only serves as a source of
+> confusion.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/gic.txt | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> index 62eb8df..45b99ab 100644
+> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -54,7 +54,6 @@ Example:
+>  	intc: interrupt-controller at fff11000 {
+>  		compatible = "arm,cortex-a9-gic";
+>  		#interrupt-cells = <3>;
+> -		#address-cells = <1>;
+>  		interrupt-controller;
+>  		reg = <0xfff11000 0x1000>,
+>  		      <0xfff10100 0x100>;
+> 
