@@ -1,39 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Feb 2013 01:17:12 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130131145947.f62474a0600848df86548b96@freescale.com>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
-Message-ID: <20130201011712.GF23505@n2100.arm.linux.org.uk>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 1 Feb 2013 09:32:59 +0800
+Subject: [rtc-linux] [PATCH] rtc: pl031: fix the missing operation on
+ enable
+In-Reply-To: <20130131144459.39f9a978.akpm@linux-foundation.org>
+References: <1359507865-29808-1-git-send-email-haojian.zhuang@linaro.org>
+ <20130131144459.39f9a978.akpm@linux-foundation.org>
+Message-ID: <CAD6h2NS6dGYBvbwQ2u4FvQZ_uW8wUcT+cSA14xRzUyDfLwyQCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 02:59:47PM -0600, Kim Phillips wrote:
-> On Thu, 31 Jan 2013 09:28:01 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Wed, Jan 30, 2013 at 08:09:00PM -0600, Kim Phillips wrote:
-> > > v2:
-> > > - at91 and lpd270 builds fixed by limiting to ARMv6 and above
-> > >   (i.e., ARM cores that have support for the 'rev' instruction).
-> > >   Otherwise, the compiler emits calls to libgcc's __bswapsi2 on
-> > >   these ARMv4/v5 builds (and arch ARM doesn't link with libgcc).
-> > 
-> > Which compiler version?  gcc 4.5.4 doesn't do this, except for the 16-bit
-> > swap, so I doubt that any later compiler does.
-> 
-> I've tried both gcc 4.6.3 [1] and 4.6.4 [2].  If you can point me to
-> a 4.5.x, I'll try that, too, but as it stands now, if one moves the
-> code added to swab.h below outside of its armv6 protection,
-> gcc adds calls to __bswapsi2.
+On 1 February 2013 06:44, Andrew Morton <akpm@linux-foundation.org> wrote:
+> On Wed, 30 Jan 2013 09:04:25 +0800
+> Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
+>
+>> RTC control register should be enabled in the process of initliazing.
+>>
+>> ...
+>>
+>> --- a/drivers/rtc/rtc-pl031.c
+>> +++ b/drivers/rtc/rtc-pl031.c
+>> @@ -44,6 +44,7 @@
+>>  #define RTC_YMR              0x34    /* Year match register */
+>>  #define RTC_YLR              0x38    /* Year data load register */
+>>
+>> +#define RTC_CR_EN    (1 << 0)        /* counter enable bit */
+>>  #define RTC_CR_CWEN  (1 << 26)       /* Clockwatch enable bit */
+>>
+>>  #define RTC_TCR_EN   (1 << 1) /* Periodic timer enable bit */
+>> @@ -320,7 +321,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+>>       struct pl031_local *ldata;
+>>       struct pl031_vendor_data *vendor = id->data;
+>>       struct rtc_class_ops *ops = &vendor->ops;
+>> -     unsigned long time;
+>> +     unsigned long time, data;
+>>
+>>       ret = amba_request_regions(adev, NULL);
+>>       if (ret)
+>> @@ -345,10 +346,11 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+>>       dev_dbg(&adev->dev, "designer ID = 0x%02x\n", amba_manf(adev));
+>>       dev_dbg(&adev->dev, "revision = 0x%01x\n", amba_rev(adev));
+>>
+>> +     data = readl(ldata->base + RTC_CR);
+>>       /* Enable the clockwatch on ST Variants */
+>>       if (vendor->clockwatch)
+>> -             writel(readl(ldata->base + RTC_CR) | RTC_CR_CWEN,
+>> -                    ldata->base + RTC_CR);
+>> +             data |= RTC_CR_CWEN;
+>> +     writel(data | RTC_CR_EN, ldata->base + RTC_CR);
+>
+> Does this patch fix some user-visible misbehaviour?  If so, please
+> fully describe that misbehaviour.
+>
+Hi Andrew,
 
-Take a look at the message I sent on the 29th towards the beginning of
-this thread for details of gcc 4.5.4 behaviour.
+I copy the description from rtc pl031 user manual (page 33 of
+DDI0224.pdf) in below.
+
+RTCCR is a 1-bit control register. When HIGH, the counter enable
+signal is asserted to
+enable the counter. Table 3-5 shows the bit assignments for the RTCCR register.
+
+Table 3-5 RTCCR register
+-----------------------------------------------------------------------------------------------------------------------
+Bits       Name              Type                      Function
+31:1       -                     Read/write             Reserved. Read
+unpredictable. Should
+                                                                be written as 0.
+0           RTC start         Read/write             If set to 1, the
+RTC is enabled. Once it is
+
+enabled, any writes to this bit have no
+                                                                effect
+on the RTC until a system reset.
+                                                                A read
+returns the status of the RTC.
+-----------------------------------------------------------------------------------------------------------------------
+
+>From this document, RTCCR must be enabled before usage. Without this
+patch, I really
+failed to enable RTC in Hisilicon Hi3620 SoC. It results that the
+register mapping section
+in RTC is always read as zero. So I doubt that ST guys may already
+enable this register
+in bootloader. So they won't meet this issue.
+
+Best Regards
+Haojian
