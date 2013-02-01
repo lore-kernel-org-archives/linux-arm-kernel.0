@@ -1,218 +1,83 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  1 Feb 2013 08:52:05 +0100
-Subject: [PATCH 2/9] USB: add devicetree helpers for determining dr_mode and
+Date: Fri,  1 Feb 2013 08:52:03 +0100
+Subject: [PATCH v3] USB: add devicetree helpers for determining dr_mode and
  phy_type
-In-Reply-To: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359705132-9434-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+(resend because I got the linux-usb address wrong)
 
-This adds two little devicetree helper functions for determining the
-dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
-the devicetree.
+Here's another round of the dr_mode/phy_type patches. I think they should
+be ready for merging now. Greg, will you apply them should there be no
+problems anymore?
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/usb/phy/Makefile |    1 +
- drivers/usb/phy/of.c     |   47 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/usb/usb-common.c |   36 +++++++++++++++++++++++++++++++++++
- include/linux/usb/of.h   |   27 ++++++++++++++++++++++++++
- include/linux/usb/otg.h  |    7 +++++++
- include/linux/usb/phy.h  |    9 +++++++++
- 6 files changed, 127 insertions(+)
+Sascha
+
+changes since v2:
+
+- fix adding of GPL Header was in wrong patch
+- add missing hunk for new file of.c
+
+changes since v1:
+- move phy specific of helper to drivers/usb/phy/of.c
+- use strcmp instead of strcasecmp for matching property values
+- change usb_phy_dr_mode to usb_dr_mode
+- change USBPHY_INTERFACE_MODE_NA to USBPHY_INTERFACE_MODE_UNKNOWN
+- add copyright header to new files
+- chipidea: drop mdelay at end of PTS/PTW setup
+- chipidea: implement lpm core type handling for PTS/PTW
+
+The following changes since commit 7b8bc3aad0deabf3bc50cd2fe29bce29be5681fe:
+
+  USB: chipidea: ci13xxx_imx: Remove sparse warning (2013-01-30 00:17:39 -0500)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-for-next
+
+for you to fetch changes up to b82b92ba281add3e4d67bf6704052c0fd8c5c7f0:
+
+  USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy (2013-01-31 12:27:36 +0100)
+
+----------------------------------------------------------------
+USB Chipidea patches for v3.9
+
+These add OF helpers for handling the dr_mode and phy_type property
+and makes use of them in the chipidea driver.
+
+----------------------------------------------------------------
+Michael Grzeschik (3):
+      USB: add devicetree helpers for determining dr_mode and phy_type
+      USB: chipidea: ci13xxx-imx: create dynamic platformdata
+      USB: chipidea: add PTW and PTS handling
+
+Sascha Hauer (6):
+      USB: move bulk of otg/otg.c to phy/phy.c
+      USB chipidea: introduce dual role mode pdata flags
+      USB chipidea i.MX: introduce dr_mode property
+      como fec wip
+      USB mxs-phy: Register phy with framework
+      USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
+
+ Documentation/devicetree/bindings/net/fsl-fec.txt  |   20 +
+ .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 +
+ drivers/net/ethernet/freescale/fec.c               |   77 ++--
+ drivers/net/ethernet/freescale/fec.h               |    1 +
+ drivers/usb/chipidea/bits.h                        |   14 +-
+ drivers/usb/chipidea/ci13xxx_imx.c                 |   60 ++-
+ drivers/usb/chipidea/core.c                        |   60 ++-
+ drivers/usb/otg/mxs-phy.c                          |    9 +
+ drivers/usb/otg/otg.c                              |  423 -------------------
+ drivers/usb/phy/Makefile                           |    2 +
+ drivers/usb/phy/of.c                               |   47 +++
+ drivers/usb/phy/phy.c                              |  434 ++++++++++++++++++++
+ drivers/usb/usb-common.c                           |   36 ++
+ include/linux/usb/chipidea.h                       |    3 +-
+ include/linux/usb/of.h                             |   27 ++
+ include/linux/usb/otg.h                            |    7 +
+ include/linux/usb/phy.h                            |    9 +
+ 17 files changed, 742 insertions(+), 493 deletions(-)
  create mode 100644 drivers/usb/phy/of.c
+ create mode 100644 drivers/usb/phy/phy.c
  create mode 100644 include/linux/usb/of.h
-
-diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-index 9fa6327..e1be1e8 100644
---- a/drivers/usb/phy/Makefile
-+++ b/drivers/usb/phy/Makefile
-@@ -5,6 +5,7 @@
- ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
- 
- obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
-+obj-$(CONFIG_OF)			+= of.o
- obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
- obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
- obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
-diff --git a/drivers/usb/phy/of.c b/drivers/usb/phy/of.c
-new file mode 100644
-index 0000000..e6f3b74
---- /dev/null
-+++ b/drivers/usb/phy/of.c
-@@ -0,0 +1,47 @@
-+/*
-+ * USB of helper code
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/usb/of.h>
-+#include <linux/usb/otg.h>
-+
-+static const char *usbphy_modes[] = {
-+	[USBPHY_INTERFACE_MODE_UNKNOWN]	= "",
-+	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
-+	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
-+	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
-+	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
-+	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
-+};
-+
-+/**
-+ * of_usb_get_phy_mode - Get phy mode for given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * The function gets phy interface string from property 'phy_type',
-+ * and returns the correspondig enum usb_phy_interface
-+ */
-+enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
-+{
-+	const char *phy_type;
-+	int err, i;
-+
-+	err = of_property_read_string(np, "phy_type", &phy_type);
-+	if (err < 0)
-+		return USBPHY_INTERFACE_MODE_UNKNOWN;
-+
-+	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
-+		if (!strcmp(phy_type, usbphy_modes[i]))
-+			return i;
-+
-+	return USBPHY_INTERFACE_MODE_UNKNOWN;
-+}
-+EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
-diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
-index d29503e..ad4d87d 100644
---- a/drivers/usb/usb-common.c
-+++ b/drivers/usb/usb-common.c
-@@ -14,6 +14,9 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/usb/ch9.h>
-+#include <linux/of.h>
-+#include <linux/usb/of.h>
-+#include <linux/usb/otg.h>
- 
- const char *usb_speed_string(enum usb_device_speed speed)
- {
-@@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
- }
- EXPORT_SYMBOL_GPL(usb_speed_string);
- 
-+#ifdef CONFIG_OF
-+static const char *usb_dr_modes[] = {
-+	[USB_DR_MODE_UNKNOWN]		= "",
-+	[USB_DR_MODE_HOST]		= "host",
-+	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
-+	[USB_DR_MODE_OTG]		= "otg",
-+};
-+
-+/**
-+ * of_usb_get_dr_mode - Get dual role mode for given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * The function gets phy interface string from property 'dr_mode',
-+ * and returns the correspondig enum usb_dr_mode
-+ */
-+enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
-+{
-+	const char *dr_mode;
-+	int err, i;
-+
-+	err = of_property_read_string(np, "dr_mode", &dr_mode);
-+	if (err < 0)
-+		return USB_DR_MODE_UNKNOWN;
-+
-+	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
-+		if (!strcmp(dr_mode, usb_dr_modes[i]))
-+			return i;
-+
-+	return USB_DR_MODE_UNKNOWN;
-+}
-+EXPORT_SYMBOL_GPL(of_usb_get_dr_mode);
-+#endif
-+
- MODULE_LICENSE("GPL");
-diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
-new file mode 100644
-index 0000000..4681a20
---- /dev/null
-+++ b/include/linux/usb/of.h
-@@ -0,0 +1,27 @@
-+/*
-+ * OF helpers for usb devices.
-+ *
-+ * This file is released under the GPLv2
-+ */
-+
-+#ifndef __LINUX_USB_OF_H
-+#define __LINUX_USB_OF_H
-+
-+#include <linux/usb/phy.h>
-+
-+#ifdef CONFIG_OF
-+enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
-+enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np);
-+#else
-+static inline enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
-+{
-+	return USBPHY_INTERFACE_MODE_UNKNOWN;
-+}
-+
-+static inline enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
-+{
-+	return USB_DR_MODE_UNKNOWN;
-+}
-+#endif
-+
-+#endif /* __LINUX_USB_OF_H */
-diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-index e8a5fe8..4e8bfbb 100644
---- a/include/linux/usb/otg.h
-+++ b/include/linux/usb/otg.h
-@@ -99,4 +99,11 @@ otg_start_srp(struct usb_otg *otg)
- /* for OTG controller drivers (and maybe other stuff) */
- extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
- 
-+enum usb_dr_mode {
-+	USB_DR_MODE_UNKNOWN,
-+	USB_DR_MODE_HOST,
-+	USB_DR_MODE_PERIPHERAL,
-+	USB_DR_MODE_OTG,
-+};
-+
- #endif /* __LINUX_USB_OTG_H */
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index 15847cb..5edddb1 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -12,6 +12,15 @@
- #include <linux/notifier.h>
- #include <linux/usb.h>
- 
-+enum usb_phy_interface {
-+	USBPHY_INTERFACE_MODE_UNKNOWN,
-+	USBPHY_INTERFACE_MODE_UTMI,
-+	USBPHY_INTERFACE_MODE_UTMIW,
-+	USBPHY_INTERFACE_MODE_ULPI,
-+	USBPHY_INTERFACE_MODE_SERIAL,
-+	USBPHY_INTERFACE_MODE_HSIC,
-+};
-+
- enum usb_phy_events {
- 	USB_EVENT_NONE,         /* no events or cable disconnected */
- 	USB_EVENT_VBUS,         /* vbus valid event */
--- 
-1.7.10.4
