@@ -1,183 +1,119 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Fri, 1 Feb 2013 10:00:46 +0100
-Subject: [PATCH 4/9] USB: chipidea: add PTW and PTS handling
-In-Reply-To: <1359705132-9434-5-git-send-email-s.hauer@pengutronix.de>
-References: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
- <1359705132-9434-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130201090046.GA8056@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 1 Feb 2013 10:03:29 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130201035115.GA23649@obsidianresearch.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <510B0D9C.1000101@wwwdotorg.org>
+ <20130201014138.GA16234@obsidianresearch.com>
+ <510B268E.2040104@wwwdotorg.org>
+ <20130201035115.GA23649@obsidianresearch.com>
+Message-ID: <20130201100329.4d57fa55@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 08:52:07AM +0100, Sascha Hauer wrote:
-> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> 
-> This patch makes it possible to configure the PTW and PTS bits inside
-> the portsc register for host and device mode before the driver starts
-> and the phy can be addressed as hardware implementation is designed.
-> 
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +++
->  drivers/usb/chipidea/bits.h                        |   14 ++++++-
->  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
->  drivers/usb/chipidea/core.c                        |   39 ++++++++++++++++++++
->  include/linux/usb/chipidea.h                       |    1 +
->  5 files changed, 61 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> index 5778b9c..dd42ccd 100644
-> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> @@ -5,6 +5,11 @@ Required properties:
->  - reg: Should contain registers location and length
->  - interrupts: Should contain controller interrupt
->  
-> +Recommended properies:
-> +- phy_type: the type of the phy connected to the core. Should be one
-> +  of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
-> +  property the PORTSC register won't be touched
-> +
->  Optional properties:
->  - fsl,usbphy: phandler of usb phy that connects to the only one port
->  - fsl,usbmisc: phandler of non-core register device, with one argument
-> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> index 050de85..d8ffc2f 100644
-> --- a/drivers/usb/chipidea/bits.h
-> +++ b/drivers/usb/chipidea/bits.h
-> @@ -48,10 +48,22 @@
->  #define PORTSC_SUSP           BIT(7)
->  #define PORTSC_HSP            BIT(9)
->  #define PORTSC_PTC            (0x0FUL << 16)
-> +/* PTS and PTW for non lpm version only */
-> +#define PORTSC_PTS(d)         ((((d) & 0x3) << 30) | (((d) & 0x4) ? BIT(25) : 0))
-> +#define PORTSC_PTW            BIT(28)
->  
->  /* DEVLC */
->  #define DEVLC_PSPD            (0x03UL << 25)
-> -#define    DEVLC_PSPD_HS      (0x02UL << 25)
-> +#define DEVLC_PSPD_HS         (0x02UL << 25)
-> +#define DEVLC_PTW             BIT(27)
-> +#define DEVLC_STS             BIT(28)
-> +#define DEVLC_PTS(d)          (((d) & 0x7) << 29)
-> +
-> +/* Encoding for DEVLC_PTS and PORTSC_PTS */
-> +#define PTS_UTMI              0
-> +#define PTS_ULPI              2
-> +#define PTS_SERIAL            3
-> +#define PTS_HSIC              4
->  
->  /* OTGSC */
->  #define OTGSC_IDPU	      BIT(5)
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> index 69024e0..ebc1148 100644
-> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -21,6 +21,7 @@
->  #include <linux/clk.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/pinctrl/consumer.h>
-> +#include <linux/usb/of.h>
->  
->  #include "ci.h"
->  #include "ci13xxx_imx.h"
-> @@ -112,6 +113,8 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
->  		       CI13XXX_PULLUP_ON_VBUS |
->  		       CI13XXX_DISABLE_STREAMING;
->  
-> +	pdata->phy_mode = of_usb_get_phy_mode(pdev->dev.of_node);
-> +
->  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
->  	if (!data) {
->  		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 57cae1f..a3ec29d 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -67,6 +67,8 @@
->  #include <linux/usb/gadget.h>
->  #include <linux/usb/otg.h>
->  #include <linux/usb/chipidea.h>
-> +#include <linux/usb/of.h>
-> +#include <linux/phy.h>
->  
->  #include "ci.h"
->  #include "udc.h"
-> @@ -211,6 +213,41 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
->  	return 0;
->  }
->  
-> +static void hw_phymode_configure(struct ci13xxx *ci)
-> +{
-> +	u32 portsc, lpm;
-> +
-> +	switch (ci->platdata->phy_mode) {
-> +	case USBPHY_INTERFACE_MODE_UTMI:
-> +		portsc = PORTSC_PTS(PTS_UTMI);
-> +		lpm = DEVLC_PTS(PTS_UTMI);
-> +		break;
-> +	case USBPHY_INTERFACE_MODE_UTMIW:
-> +		portsc = PORTSC_PTS(PTS_UTMI) | PORTSC_PTW;
-> +		lpm = DEVLC_PTS(PTS_UTMI) | DEVLC_PTW;
-> +		break;
-> +	case USBPHY_INTERFACE_MODE_ULPI:
-> +		portsc = PORTSC_PTS(PTS_ULPI);
-> +		lpm = DEVLC_PTS(PTS_ULPI);
-> +		break;
-> +	case USBPHY_INTERFACE_MODE_SERIAL:
-> +		portsc = PORTSC_PTS(PTS_SERIAL);
-> +		lpm = DEVLC_PTS(PTS_SERIAL);
-> +		break;
-> +	case USBPHY_INTERFACE_MODE_HSIC:
-> +		portsc = PORTSC_PTS(PTS_HSIC);
-> +		lpm = DEVLC_PTS(PTS_HSIC);
-> +		break;
-> +	default:
-> +		return;
-> +	}
-> +
-> +	if (ci->hw_bank.lpm)
-> +		hw_write(ci, OP_PORTSC, DEVLC_PTS(7) | DEVLC_PTW, lpm);
-                             ^^^^^^^^^
+Dear Jason Gunthorpe,
 
-This is probably supposed to be OP_DEVLC.
+Thanks again for continuing this discussion while I was sleeping :-)
 
-> +	else
-> +		hw_write(ci, OP_PORTSC, PORTSC_PTS(7) | PORTSC_PTW, portsc);
-> +}
-> +
->  /**
->   * hw_device_reset: resets chip (execute without interruption)
->   * @ci: the controller
-> @@ -476,6 +513,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->  			: CI_ROLE_GADGET;
->  	}
->  
-> +	hw_phymode_configure(ci);
-> +
->  	ret = ci_role_start(ci, ci->role);
->  	if (ret) {
->  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
-> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-> index 544825d..1a2aa18 100644
-> --- a/include/linux/usb/chipidea.h
-> +++ b/include/linux/usb/chipidea.h
-> @@ -14,6 +14,7 @@ struct ci13xxx_platform_data {
->  	uintptr_t	 capoffset;
->  	unsigned	 power_budget;
->  	struct usb_phy	*phy;
-> +	enum usb_phy_interface phy_mode;
->  	unsigned long	 flags;
->  #define CI13XXX_REGS_SHARED		BIT(0)
->  #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
-> -- 
-> 1.7.10.4
-> 
-> 
+On Thu, 31 Jan 2013 20:51:15 -0700, Jason Gunthorpe wrote:
 
+> > Now, I do have one follow-on question: You said you don't have 30
+> > windows, but how many do you have free after allocating windows to
+> > any other peripherals that need them, relative to (3 *
+> > number-of-root-ports-in-the-SoC)? (3 being IO+Mem+PrefetchableMem.)
+> 
+> Thomas will have to answer this, it varies depending on the SOC, and
+> what other on chip peripherals are in use. For instance Kirkwood has
+> the same design but there are plenty of windows for the two PCI-E
+> links.
+
+Right. I already answered this point directly to Stephen. On Kirkwood,
+there are many windows and two PCIe links, so the windows were
+statically allocated. On Armada XP, there are 20 windows and 10 PCIe
+links. Static allocation is no longer reasonable.
+
+> > The thing here is that when the PCIe core writes to a root port BAR
+> > window to configure/enable it the first time, you'll need to capture
+> > that transaction and dynamically allocate a window and program it
+> > in a way equivalent to what the BAR register write would have
+> > achieved on standard HW. Later, the window might need resizing, or
+> > even to be completely disabled, if the PCIe core were to change the
+> > standard BAR
+> 
+> Right. This is pretty straightforward except for the need to hook the
+> alignment fixup..
+> 
+> > register. Dynamically allocating a window when the BAR is written
+> > seems a little heavy-weight.
+> 
+> I think what Thomas had here was pretty small, and the windows need to
+> be shared with other on chip periphals beyond PCI-E..
+
+Yes, it is not very complicated. We already have some common code that
+creates/removes those windows, so it is just a matter of calling the
+right thing at the right time. Definitely not hundreds of line of crap.
+
+> Right, this is the main point. If you plug in 3 devices and they all
+> only use MMIO regions then you only need to grab 3 windows. The kernel
+> disables the unused windows on the bridge so it is easy to tell when
+> they are disused.
+
+Ah, I'm interested in further discussing this. I currently have a setup
+with one SATA PCIe card and one NIC PCIe card. On the NIC, the I/O
+ports are said to be "disabled", but still an I/O region gets allocated
+in the PCI-to-PCI bridge that gives access to this particular device.
+
+The device in question is:
+
+05:00.0 Ethernet controller: Intel Corporation 82572EI Gigabit Ethernet Controller (Copper) (rev 06)
+	Subsystem: Intel Corporation PRO/1000 PT Server Adapter
+	Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+	Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+	Latency: 0, Cache Line Size: 64 bytes
+	Interrupt: pin A routed to IRQ 106
+	Region 0: Memory at c1200000 (32-bit, non-prefetchable) [size=128K]
+	Region 1: Memory at c1220000 (32-bit, non-prefetchable) [size=128K]
+	Region 2: I/O ports at c0010000 [disabled] [size=32]
+	[virtual] Expansion ROM@c1300000 [disabled] [size=128K]
+
+So the Region 2 is disabled. But, in the corresponding bridge:
+
+00:05.0 PCI bridge: Marvell Technology Group Ltd. Device 1092 (prog-if 00 [Normal decode])
+	Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+	Status: Cap+ 66MHz+ UDF+ FastB2B+ ParErr+ DEVSEL=?? >TAbort+ <TAbort+ <MAbort+ >SERR+ <PERR+ INTx+
+	Latency: 0, Cache Line Size: 64 bytes
+	Bus: primary=00, secondary=05, subordinate=05, sec-latency=0
+	I/O behind bridge: c0010000-c001ffff
+	Memory behind bridge: c1200000-c12fffff
+	Prefetchable memory behind bridge: c1300000-c13fffff
+
+So there is really a range of I/O addresses associated to it, even
+though the device will apparently not use it. Would it be possible to
+detect that the I/O range is not used by the device, and therefore
+avoid the allocation of an address decoding window for this I/O range?
+
+> Agreed.. At the very least generic code would need call back
+> functions to the driver... It has a fair bit to do for Marvell:
+>  - Translate MMIO, prefetch and IO ranges to mbus windows
+>  - Keep track of the secondary/subordinate bus numbers and fiddle
+>    with other hardware registers to set those up
+>  - Copy the link state/control regsiters from the end port config
+>    space into the bridge express root port capability
+>  - Probably ditto for AER as well..
+> 
+> Probably simpler just to make one for marvell then mess excessively
+> with callbacks..
+
+As replied to Stephen, I've chosen to bring the PCI-to-PCI bridge
+emulation code directly into the driver, specifically for this reason.
+
+Best regards,
+
+Thomas
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
