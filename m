@@ -1,218 +1,199 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  1 Feb 2013 08:48:23 +0100
-Subject: [PATCH 2/9] USB: add devicetree helpers for determining dr_mode and
- phy_type
-In-Reply-To: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359704911-8275-3-git-send-email-s.hauer@pengutronix.de>
+Date: Fri,  1 Feb 2013 08:52:10 +0100
+Subject: [PATCH 7/9] como fec wip
+In-Reply-To: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
+References: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359705132-9434-8-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Grzeschik <m.grzeschik@pengutronix.de>
-
-This adds two little devicetree helper functions for determining the
-dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
-the devicetree.
-
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/usb/phy/Makefile |    1 +
- drivers/usb/phy/of.c     |   47 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/usb/usb-common.c |   36 +++++++++++++++++++++++++++++++++++
- include/linux/usb/of.h   |   27 ++++++++++++++++++++++++++
- include/linux/usb/otg.h  |    7 +++++++
- include/linux/usb/phy.h  |    9 +++++++++
- 6 files changed, 127 insertions(+)
- create mode 100644 drivers/usb/phy/of.c
- create mode 100644 include/linux/usb/of.h
+ Documentation/devicetree/bindings/net/fsl-fec.txt |   20 ++++++
+ drivers/net/ethernet/freescale/fec.c              |   77 ++++++++++++---------
+ drivers/net/ethernet/freescale/fec.h              |    1 +
+ 3 files changed, 67 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-index 9fa6327..e1be1e8 100644
---- a/drivers/usb/phy/Makefile
-+++ b/drivers/usb/phy/Makefile
-@@ -5,6 +5,7 @@
- ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
+diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
+index d536392..ec7060b 100644
+--- a/Documentation/devicetree/bindings/net/fsl-fec.txt
++++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
+@@ -15,6 +15,9 @@ Optional properties:
+   only if property "phy-reset-gpios" is available.  Missing the property
+   will have the duration be 1 millisecond.  Numbers greater than 1000 are
+   invalid and 1 millisecond will be used instead.
++- phy : a phandle for the PHY device used for the fec. Used to specify an
++  external phy or to specify a particular address if the mdio bus has multiple
++  phys on it.
  
- obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
-+obj-$(CONFIG_OF)			+= of.o
- obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
- obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
- obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
-diff --git a/drivers/usb/phy/of.c b/drivers/usb/phy/of.c
-new file mode 100644
-index 0000000..e6f3b74
---- /dev/null
-+++ b/drivers/usb/phy/of.c
-@@ -0,0 +1,47 @@
-+/*
-+ * USB of helper code
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
+ Example:
+ 
+@@ -26,3 +29,20 @@ ethernet at 83fec000 {
+ 	phy-reset-gpios = <&gpio2 14 0>; /* GPIO2_14 */
+ 	local-mac-address = [00 04 9F 01 1B B9];
+ };
 +
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/usb/of.h>
-+#include <linux/usb/otg.h>
++Example with specific phy address:
 +
-+static const char *usbphy_modes[] = {
-+	[USBPHY_INTERFACE_MODE_UNKNOWN]	= "",
-+	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
-+	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
-+	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
-+	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
-+	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
++ethernet at 83fec000 {
++	compatible = "fsl,imx51-fec", "fsl,imx27-fec";
++	reg = <0x83fec000 0x4000>;
++	interrupts = <87>;
++	phy-mode = "mii";
++	phy-reset-gpios = <&gpio2 14 0>; /* GPIO2_14 */
++	local-mac-address = [00 04 9F 01 1B B9];
++	phy = &phy3;
++
++	phy3: ethernet-phy at 3 {
++		reg = <3>;
++		device_type = "ethernet-phy";
++	};
 +};
-+
-+/**
-+ * of_usb_get_phy_mode - Get phy mode for given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * The function gets phy interface string from property 'phy_type',
-+ * and returns the correspondig enum usb_phy_interface
-+ */
-+enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
-+{
-+	const char *phy_type;
-+	int err, i;
-+
-+	err = of_property_read_string(np, "phy_type", &phy_type);
-+	if (err < 0)
-+		return USBPHY_INTERFACE_MODE_UNKNOWN;
-+
-+	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
-+		if (!strcmp(phy_type, usbphy_modes[i]))
-+			return i;
-+
-+	return USBPHY_INTERFACE_MODE_UNKNOWN;
-+}
-+EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
-diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
-index d29503e..ad4d87d 100644
---- a/drivers/usb/usb-common.c
-+++ b/drivers/usb/usb-common.c
-@@ -14,6 +14,9 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/usb/ch9.h>
-+#include <linux/of.h>
-+#include <linux/usb/of.h>
-+#include <linux/usb/otg.h>
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 0704bca..54a8506 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -48,6 +48,7 @@
+ #include <linux/of_device.h>
+ #include <linux/of_gpio.h>
+ #include <linux/of_net.h>
++#include <linux/of_mdio.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/regulator/consumer.h>
  
- const char *usb_speed_string(enum usb_device_speed speed)
- {
-@@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
+@@ -950,31 +951,38 @@ static int fec_enet_mii_probe(struct net_device *ndev)
+ 
+ 	fep->phy_dev = NULL;
+ 
+-	/* check for attached phy */
+-	for (phy_id = 0; (phy_id < PHY_MAX_ADDR); phy_id++) {
+-		if ((fep->mii_bus->phy_mask & (1 << phy_id)))
+-			continue;
+-		if (fep->mii_bus->phy_map[phy_id] == NULL)
+-			continue;
+-		if (fep->mii_bus->phy_map[phy_id]->phy_id == 0)
+-			continue;
+-		if (dev_id--)
+-			continue;
+-		strncpy(mdio_bus_id, fep->mii_bus->id, MII_BUS_ID_SIZE);
+-		break;
+-	}
++	if (fep->phy_node) {
++		phy_dev = of_phy_connect(ndev, fep->phy_node, &fec_enet_adjust_link, 0,
++			      fep->phy_interface);
++	} else {
++		/* check for attached phy */
++		for (phy_id = 0; (phy_id < PHY_MAX_ADDR); phy_id++) {
++			if ((fep->mii_bus->phy_mask & (1 << phy_id)))
++				continue;
++			if (fep->mii_bus->phy_map[phy_id] == NULL)
++				continue;
++			if (fep->mii_bus->phy_map[phy_id]->phy_id == 0)
++				continue;
++			if (dev_id--)
++				continue;
++			strncpy(mdio_bus_id, fep->mii_bus->id, MII_BUS_ID_SIZE);
++			break;
++		}
+ 
+-	if (phy_id >= PHY_MAX_ADDR) {
+-		printk(KERN_INFO
+-			"%s: no PHY, assuming direct connection to switch\n",
+-			ndev->name);
+-		strncpy(mdio_bus_id, "fixed-0", MII_BUS_ID_SIZE);
+-		phy_id = 0;
++		if (phy_id >= PHY_MAX_ADDR) {
++			printk(KERN_INFO
++				"%s: no PHY, assuming direct connection to switch\n",
++				ndev->name);
++			strncpy(mdio_bus_id, "fixed-0", MII_BUS_ID_SIZE);
++			phy_id = 0;
++		}
++
++		snprintf(phy_name, sizeof(phy_name), PHY_ID_FMT, mdio_bus_id, phy_id);
++
++		phy_dev = phy_connect(ndev, phy_name, &fec_enet_adjust_link, 0,
++				      fep->phy_interface);
+ 	}
+ 
+-	snprintf(phy_name, sizeof(phy_name), PHY_ID_FMT, mdio_bus_id, phy_id);
+-	phy_dev = phy_connect(ndev, phy_name, &fec_enet_adjust_link, 0,
+-			      fep->phy_interface);
+ 	if (IS_ERR(phy_dev)) {
+ 		printk(KERN_ERR "%s: could not attach to PHY\n", ndev->name);
+ 		return PTR_ERR(phy_dev);
+@@ -1076,7 +1084,12 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+ 	for (i = 0; i < PHY_MAX_ADDR; i++)
+ 		fep->mii_bus->irq[i] = PHY_POLL;
+ 
+-	if (mdiobus_register(fep->mii_bus))
++	if (fep->phy_node)
++		err = of_mdiobus_register(fep->mii_bus, pdev->dev.of_node);
++	else
++		err = mdiobus_register(fep->mii_bus);
++
++	if (err)
+ 		goto err_out_free_mdio_irq;
+ 
+ 	mii_cnt++;
+@@ -1484,12 +1497,16 @@ static int fec_enet_init(struct net_device *ndev)
  }
- EXPORT_SYMBOL_GPL(usb_speed_string);
  
-+#ifdef CONFIG_OF
-+static const char *usb_dr_modes[] = {
-+	[USB_DR_MODE_UNKNOWN]		= "",
-+	[USB_DR_MODE_HOST]		= "host",
-+	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
-+	[USB_DR_MODE_OTG]		= "otg",
-+};
+ #ifdef CONFIG_OF
+-static int fec_get_phy_mode_dt(struct platform_device *pdev)
++static int fec_probe_dt(struct fec_enet_private *fep)
+ {
+-	struct device_node *np = pdev->dev.of_node;
++	struct device_node *np = fep->pdev->dev.of_node;
 +
-+/**
-+ * of_usb_get_dr_mode - Get dual role mode for given device_node
-+ * @np:	Pointer to the given device_node
-+ *
-+ * The function gets phy interface string from property 'dr_mode',
-+ * and returns the correspondig enum usb_dr_mode
-+ */
-+enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
-+{
-+	const char *dr_mode;
-+	int err, i;
-+
-+	err = of_property_read_string(np, "dr_mode", &dr_mode);
-+	if (err < 0)
-+		return USB_DR_MODE_UNKNOWN;
-+
-+	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
-+		if (!strcmp(dr_mode, usb_dr_modes[i]))
-+			return i;
-+
-+	return USB_DR_MODE_UNKNOWN;
-+}
-+EXPORT_SYMBOL_GPL(of_usb_get_dr_mode);
-+#endif
-+
- MODULE_LICENSE("GPL");
-diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
-new file mode 100644
-index 0000000..4681a20
---- /dev/null
-+++ b/include/linux/usb/of.h
-@@ -0,0 +1,27 @@
-+/*
-+ * OF helpers for usb devices.
-+ *
-+ * This file is released under the GPLv2
-+ */
-+
-+#ifndef __LINUX_USB_OF_H
-+#define __LINUX_USB_OF_H
-+
-+#include <linux/usb/phy.h>
-+
-+#ifdef CONFIG_OF
-+enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
-+enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np);
-+#else
-+static inline enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
-+{
-+	return USBPHY_INTERFACE_MODE_UNKNOWN;
-+}
-+
-+static inline enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
-+{
-+	return USB_DR_MODE_UNKNOWN;
-+}
-+#endif
-+
-+#endif /* __LINUX_USB_OF_H */
-diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
-index e8a5fe8..4e8bfbb 100644
---- a/include/linux/usb/otg.h
-+++ b/include/linux/usb/otg.h
-@@ -99,4 +99,11 @@ otg_start_srp(struct usb_otg *otg)
- /* for OTG controller drivers (and maybe other stuff) */
- extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
++	if (!np)
++		return -ENODEV;
  
-+enum usb_dr_mode {
-+	USB_DR_MODE_UNKNOWN,
-+	USB_DR_MODE_HOST,
-+	USB_DR_MODE_PERIPHERAL,
-+	USB_DR_MODE_OTG,
-+};
+-	if (np)
+-		return of_get_phy_mode(np);
++	fep->phy_interface = of_get_phy_mode(np);
 +
- #endif /* __LINUX_USB_OTG_H */
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index 15847cb..5edddb1 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -12,6 +12,15 @@
- #include <linux/notifier.h>
- #include <linux/usb.h>
++	fep->phy_node = of_parse_phandle(np, "phy", 0);
  
-+enum usb_phy_interface {
-+	USBPHY_INTERFACE_MODE_UNKNOWN,
-+	USBPHY_INTERFACE_MODE_UTMI,
-+	USBPHY_INTERFACE_MODE_UTMIW,
-+	USBPHY_INTERFACE_MODE_ULPI,
-+	USBPHY_INTERFACE_MODE_SERIAL,
-+	USBPHY_INTERFACE_MODE_HSIC,
-+};
-+
- enum usb_phy_events {
- 	USB_EVENT_NONE,         /* no events or cable disconnected */
- 	USB_EVENT_VBUS,         /* vbus valid event */
+ 	return -ENODEV;
+ }
+@@ -1519,7 +1536,7 @@ static void fec_reset_phy(struct platform_device *pdev)
+ 	gpio_set_value(phy_reset, 1);
+ }
+ #else /* CONFIG_OF */
+-static inline int fec_get_phy_mode_dt(struct platform_device *pdev)
++static inline int fec_probe_dt(struct fec_enet_private *fep)
+ {
+ 	return -ENODEV;
+ }
+@@ -1581,15 +1598,13 @@ fec_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, ndev);
+ 
+-	ret = fec_get_phy_mode_dt(pdev);
++	ret = fec_probe_dt(fep);
+ 	if (ret < 0) {
+ 		pdata = pdev->dev.platform_data;
+ 		if (pdata)
+ 			fep->phy_interface = pdata->phy;
+ 		else
+ 			fep->phy_interface = PHY_INTERFACE_MODE_MII;
+-	} else {
+-		fep->phy_interface = ret;
+ 	}
+ 
+ 	for (i = 0; i < FEC_IRQ_NUM; i++) {
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index c5a3bc1..0120ea6 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -236,6 +236,7 @@ struct fec_enet_private {
+ 	/* Phylib and MDIO interface */
+ 	struct	mii_bus *mii_bus;
+ 	struct	phy_device *phy_dev;
++	struct	device_node *phy_node;
+ 	int	mii_timeout;
+ 	uint	phy_speed;
+ 	phy_interface_t	phy_interface;
 -- 
 1.7.10.4
