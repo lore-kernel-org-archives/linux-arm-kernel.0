@@ -1,97 +1,98 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 1 Feb 2013 08:53:07 +0100
-Subject: [PATCH v3] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130201075307.GY1906@pengutronix.de>
+Date: Fri,  1 Feb 2013 08:52:12 +0100
+Subject: [PATCH 9/9] USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get
+ phy
+In-Reply-To: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
+References: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359705132-9434-10-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 08:48:21AM +0100, Sascha Hauer wrote:
-> Here's another round of the dr_mode/phy_type patches. I think they should
-> be ready for merging now. Greg, will you apply them should there be no
-> problems anymore?
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/usb/chipidea/ci13xxx_imx.c |   31 ++++++++++---------------------
+ 1 file changed, 10 insertions(+), 21 deletions(-)
 
-Please ignore, the linux-usb address is wrong, I just resent these.
-
-Sascha
-
-> 
-> Sascha
-> 
-> changes since v2:
-> 
-> - fix adding of GPL Header was in wrong patch
-> - add missing hunk for new file of.c
-> 
-> changes since v1:
-> - move phy specific of helper to drivers/usb/phy/of.c
-> - use strcmp instead of strcasecmp for matching property values
-> - change usb_phy_dr_mode to usb_dr_mode
-> - change USBPHY_INTERFACE_MODE_NA to USBPHY_INTERFACE_MODE_UNKNOWN
-> - add copyright header to new files
-> - chipidea: drop mdelay at end of PTS/PTW setup
-> - chipidea: implement lpm core type handling for PTS/PTW
-> 
-> 
-> The following changes since commit 7b8bc3aad0deabf3bc50cd2fe29bce29be5681fe:
-> 
->   USB: chipidea: ci13xxx_imx: Remove sparse warning (2013-01-30 00:17:39 -0500)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-for-next
-> 
-> for you to fetch changes up to b82b92ba281add3e4d67bf6704052c0fd8c5c7f0:
-> 
->   USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy (2013-01-31 12:27:36 +0100)
-> 
-> ----------------------------------------------------------------
-> USB Chipidea patches for v3.9
-> 
-> These add OF helpers for handling the dr_mode and phy_type property
-> and makes use of them in the chipidea driver.
-> 
-> ----------------------------------------------------------------
-> Michael Grzeschik (3):
->       USB: add devicetree helpers for determining dr_mode and phy_type
->       USB: chipidea: ci13xxx-imx: create dynamic platformdata
->       USB: chipidea: add PTW and PTS handling
-> 
-> Sascha Hauer (6):
->       USB: move bulk of otg/otg.c to phy/phy.c
->       USB chipidea: introduce dual role mode pdata flags
->       USB chipidea i.MX: introduce dr_mode property
->       como fec wip
->       USB mxs-phy: Register phy with framework
->       USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
-> 
->  Documentation/devicetree/bindings/net/fsl-fec.txt  |   20 +
->  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 +
->  drivers/net/ethernet/freescale/fec.c               |   77 ++--
->  drivers/net/ethernet/freescale/fec.h               |    1 +
->  drivers/usb/chipidea/bits.h                        |   14 +-
->  drivers/usb/chipidea/ci13xxx_imx.c                 |   60 ++-
->  drivers/usb/chipidea/core.c                        |   60 ++-
->  drivers/usb/otg/mxs-phy.c                          |    9 +
->  drivers/usb/otg/otg.c                              |  423 -------------------
->  drivers/usb/phy/Makefile                           |    2 +
->  drivers/usb/phy/of.c                               |   47 +++
->  drivers/usb/phy/phy.c                              |  434 ++++++++++++++++++++
->  drivers/usb/usb-common.c                           |   36 ++
->  include/linux/usb/chipidea.h                       |    3 +-
->  include/linux/usb/of.h                             |   27 ++
->  include/linux/usb/otg.h                            |    7 +
->  include/linux/usb/phy.h                            |    9 +
->  17 files changed, 742 insertions(+), 493 deletions(-)
->  create mode 100644 drivers/usb/phy/of.c
->  create mode 100644 drivers/usb/phy/phy.c
->  create mode 100644 include/linux/usb/of.h
-> 
-
+diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+index b598bb8f..1df4b41 100644
+--- a/drivers/usb/chipidea/ci13xxx_imx.c
++++ b/drivers/usb/chipidea/ci13xxx_imx.c
+@@ -30,7 +30,6 @@
+ 	((struct usb_phy *)platform_get_drvdata(pdev))
+ 
+ struct ci13xxx_imx_data {
+-	struct device_node *phy_np;
+ 	struct usb_phy *phy;
+ 	struct platform_device *ci_pdev;
+ 	struct clk *clk;
+@@ -90,12 +89,12 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ {
+ 	struct ci13xxx_imx_data *data;
+ 	struct ci13xxx_platform_data *pdata;
+-	struct platform_device *plat_ci, *phy_pdev;
+-	struct device_node *phy_np;
++	struct platform_device *plat_ci;
+ 	struct resource *res;
+ 	struct regulator *reg_vbus;
+ 	struct pinctrl *pinctrl;
+ 	int ret;
++	struct usb_phy *phy;
+ 
+ 	if (of_find_property(pdev->dev.of_node, "fsl,usbmisc", NULL)
+ 		&& !usbmisc_ops)
+@@ -147,18 +146,12 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
+-	if (phy_np) {
+-		data->phy_np = phy_np;
+-		phy_pdev = of_find_device_by_node(phy_np);
+-		if (phy_pdev) {
+-			struct usb_phy *phy;
+-			phy = pdev_to_phy(phy_pdev);
+-			if (phy &&
+-			    try_module_get(phy_pdev->dev.driver->owner)) {
+-				usb_phy_init(phy);
+-				data->phy = phy;
+-			}
++	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
++	if (!IS_ERR(phy)) {
++		ret = usb_phy_init(phy);
++		if (ret) {
++			dev_err(&pdev->dev, "unable to init phy: %d\n", ret);
++			goto err_clk;
+ 		}
+ 	}
+ 
+@@ -170,7 +163,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 			dev_err(&pdev->dev,
+ 				"Failed to enable vbus regulator, err=%d\n",
+ 				ret);
+-			goto put_np;
++			goto err_clk;
+ 		}
+ 		data->reg_vbus = reg_vbus;
+ 	} else {
+@@ -222,9 +215,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ err:
+ 	if (reg_vbus)
+ 		regulator_disable(reg_vbus);
+-put_np:
+-	if (phy_np)
+-		of_node_put(phy_np);
++err_clk:
+ 	clk_disable_unprepare(data->clk);
+ 	return ret;
+ }
+@@ -244,8 +235,6 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
+ 		module_put(data->phy->dev->driver->owner);
+ 	}
+ 
+-	of_node_put(data->phy_np);
+-
+ 	clk_disable_unprepare(data->clk);
+ 
+ 	platform_set_drvdata(pdev, NULL);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
