@@ -1,71 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 1 Feb 2013 11:46:41 +0000
-Subject: [PATCHv5 15/16] ARM: hyp: initialize CNTVOFF to zero
-In-Reply-To: <20130201111350.GA1970@linaro.org>
-References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
- <1359634539-9580-16-git-send-email-mark.rutland@arm.com>
- <20130201111350.GA1970@linaro.org>
-Message-ID: <20130201114641.GB2094@e106331-lin.cambridge.arm.com>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 1 Feb 2013 06:57:39 -0500
+Subject: [PATCH v6 03/10] ARM: edma: add AM33XX support to the private
+ EDMA API
+In-Reply-To: <1359698501.14894.74.camel@cumari.coelho.fi>
+References: <1359529229-22207-1-git-send-email-mporter@ti.com>
+ <201301300932.58732.arnd@arndb.de> <20130131183255.GI2244@beef>
+ <6932828d68394f71ba6df8e6bf608635@DFLE72.ent.ti.com>
+ <20130131214241.GJ2244@beef>
+ <1359698501.14894.74.camel@cumari.coelho.fi>
+Message-ID: <20130201115738.GL2244@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 11:13:50AM +0000, Dave Martin wrote:
-> On Thu, Jan 31, 2013 at 12:15:38PM +0000, Mark Rutland wrote:
-> > From: Marc Zyngier <Marc.Zyngier@arm.com>
+On Fri, Feb 01, 2013 at 08:01:41AM +0200, Luciano Coelho wrote:
+> On Thu, 2013-01-31 at 16:42 -0500, Matt Porter wrote:
+> > On Thu, Jan 31, 2013 at 08:58:39PM +0000, Arnd Bergmann wrote:
+> > > On Thursday 31 January 2013, Matt Porter wrote:
+> > > > On Wed, Jan 30, 2013 at 09:32:58AM +0000, Arnd Bergmann wrote:
+> > > > > On Wednesday 30 January 2013, Matt Porter wrote:
+> > > > > > +               dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
+> > > > > > +               of_dma_controller_register(dev->of_node,
+> > > > > > +                                          of_dma_simple_xlate,
+> > > > > > +                                          &edma_filter_info);
+> > > > > > +       }
+> > > > > 
+> > > > > How do you actually deal with the problem mentioned by Padma, that
+> > > > > the filter function does not know which edma instance it is looking
+> > > > > at? If you assume that there can only be a single edma instance in
+> > > > > the system, that is probably a limitation that should be documented
+> > > > > somewhere, and ideally the probe() function should check for that.
+> > > > 
+> > > > I make an assumption of one edma instance in the system in the case of
+> > > > DT being populated. This is always true right now as the only SoC with
+> > > > two EDMA controllers in existence is Davinci DA850. Until recently,
+> > > > Davinci had no DT support. Given the steady work being done today on DT
+> > > > support for DA850, it'll probably be something needed in 3.10.
+> > > > 
+> > > > I will add a comment and check in probe() to capture this assumption
+> > > > and then plan to update separately to support DA850 booting from DT.
+> > > 
+> > > Ok, sounds good. Hopefully by then we will already have a nicer
+> > > way to write an xlate function that does not rely on a filter
+> > > function.
 > > 
-> > In order to be able to use the virtual counter in a safe way,
-> > make sure it is initialized to zero before dropping to SVC.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Dave Martin <dave.martin@arm.com>
-> > ---
-> >  arch/arm/kernel/hyp-stub.S | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> > index 65b2417..455603a 100644
-> > --- a/arch/arm/kernel/hyp-stub.S
-> > +++ b/arch/arm/kernel/hyp-stub.S
-> > @@ -152,6 +152,9 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
-> >  	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
-> >  	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
-> >  	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
-> > +	mov	r6, #0
-> > +	mov	r7, #0
-> > +	mcrr	p15, 4, r6, r7, c14	@ CNTVOFF
+> > Yes, it would be nice to avoid what Padma had to do. I should have
+> > mentioned also that the second EDMA on DA850 has no DMA events of
+> > immediate use on it anyway. All the in-kernel users use events on the
+> > first controller, except for the second MMC instance. That's only used
+> > for a wl12xx module on the EVM and that driver has no DT support so it
+> > doesn't matter yet in the DT case. Because of this, DA850 can actually
+> > add EDMA DT support immediately (on top of this series) and add DMA
+> > support to the DT support already posted for the Davinci SPI and MMC
+> > client drivers.
 > 
-> Is this required for safety, or is it more a sanity feature?
+> I haven't followed this whole discussion in details, but please notice
+> that I'm aiming to get DT support for the WiLink modules (wlcore,
+> wl12xx...) for 3.10. ;)
 
-This makes more sense with the next patch, which makes the arch_timer
-driver always use the virtual counters (to avoid indirection in the fast
-path and messy races with the setup of function pointers otherwise).
+Great, looks like we'll all be synced then. ;)
 
-It's required for safety when hyp mode is enabled, and the arch_timer
-driver uses the physical timers in combination with the virtual
-counters. Either the driver has to apply CNTVOFF manually when setting
-the physical timers, or the physical timers and virtual counters need
-the same view of time (i.e. CNTVOFF == 0).
-
-It also brings us in line with arm64, which always uses the virtual
-counter for its vDSO.
-
-> 
-> The architected timer counters are supposed to be monotonic time sources
-> only, so applying a random offset shouldn't really change anything.
-
-This is true except when we want to use the physical timers as described above.
-
-> 
-> The main thing I can think of is that it is easier for the host to
-> manage guests' virtual counter offsets if the host's offset is 0 (and
-> we don't really want to be changing the host offset after the host kernel
-> boots).
-
-That's pretty much it. We don't want to have to further separate the handling
-of the timer for host and guest. By having CNTVOFF as zero for the host, we
-don't need to duplicate reading of the timers and/or incur an additional
-overhead on reading them.
-
-Thanks,
-Mark.
+-Matt
