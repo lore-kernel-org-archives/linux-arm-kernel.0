@@ -1,50 +1,28 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Fri, 1 Feb 2013 11:11:58 +0800
-Subject: [PATCH v4 02/13] ARM: LPAE: use phys_addr_t in alloc_init_pud()
-In-Reply-To: <1359669512-31276-3-git-send-email-cyril@ti.com>
-References: <1359669512-31276-1-git-send-email-cyril@ti.com>
- <1359669512-31276-3-git-send-email-cyril@ti.com>
-Message-ID: <510B327E.3050502@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 1 Feb 2013 09:17:59 +0530
+Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
+ for all cores
+In-Reply-To: <CAKohpo=_cR7dk_V2+6bQwUMk-raa3ENAJqBCSe_mYfS+Ur8PnA@mail.gmail.com>
+References: <1887364.fvxYYNb7Mm@amdc1227> <1520678.Zm627xxIN3@amdc1227>
+ <CAKohpomEcrPa7UnZmtTouxN6JXxcaa7dBstMGUWjXGL0n1+=Ng@mail.gmail.com>
+ <1604688.EafV1ohaV9@amdc1227>
+ <CAKohpo=_cR7dk_V2+6bQwUMk-raa3ENAJqBCSe_mYfS+Ur8PnA@mail.gmail.com>
+Message-ID: <CAKohpo=5jPSaZMJOJTYpWiSBReRJrVayXhT7zQuFRYCR7S5hqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cyril Chemparathy wrote:
-> From: Vitaly Andrianov <vitalya@ti.com>
+On 31 January 2013 21:42, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 31 January 2013 21:37, Tomasz Figa <t.figa@samsung.com> wrote:
+>> Hmm. Now as I think of it, there might be another confusing aspect:
+>>
+>> Could you explain what "sw coordination" and "any coordination" mean?
+>> I mean specifically cpufreq_policy.cpus and cpufreq_policy.related_cpus
+>> masks.
 >
-> This patch fixes the alloc_init_pud() function to use phys_addr_t instead of
-> unsigned long when passing in the phys argument.
+> Check this out:
 >
-> This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a (ARM:
-> pgtable: use phys_addr_t for physical addresses), which applied similar changes
-> elsewhere in the ARM memory management code.
->
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm/mm/mmu.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 9f06102..ef43689 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -612,7 +612,8 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
->  }
->  
->  static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-> -	unsigned long end, unsigned long phys, const struct mem_type *type)
-> +				  unsigned long end, phys_addr_t phys,
-> +				  const struct mem_type *type)
->   
-The change is correct but seems useless so far. This function only be 
-called from map_lowmem and devicemaps_init, from i know neither lowmem 
-nor device io registers of existing platforms exceed 32bit address.
+> https://lkml.org/lkml/2013/1/30/587
 
-regards,
-Hui.
->  {
->  	pud_t *pud = pud_offset(pgd, addr);
->  	unsigned long next;
->   
+You would really like to look and ack this one too:
+
+https://lkml.org/lkml/2013/1/30/592
