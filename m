@@ -1,24 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Feb 2013 10:46:26 +0000
-Subject: [PATCH v4] arm: use built-in byte swap function
-In-Reply-To: <20130131183747.d56289dbd89b165cf12a9d28@freescale.com>
-References: <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <1359670248.27468.13.camel@shinybook.infradead.org>
- <20130131183747.d56289dbd89b165cf12a9d28@freescale.com>
-Message-ID: <20130201104626.GH23505@n2100.arm.linux.org.uk>
+From: pavel@denx.de (Pavel Machek)
+Date: Fri, 1 Feb 2013 11:50:47 +0100
+Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
+ socfpga harware
+In-Reply-To: <1359651943-21752-5-git-send-email-dinguyen@altera.com>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-5-git-send-email-dinguyen@altera.com>
+Message-ID: <20130201105047.GB3124@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 06:37:47PM -0600, Kim Phillips wrote:
-> +#if GCC_VERSION >= 40600
-> +#define __HAVE_BUILTIN_BSWAP32__
-> +#define __HAVE_BUILTIN_BSWAP64__
+On Thu 2013-01-31 11:05:43, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Because the CPU1 start address is different for socfpga-vt and
+> socfpga-cyclone5, we add code to use the correct CPU1 start addr.
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Pavel Machek <pavel@denx.de>
+Signed-off-by: Pavel Machek <pavel@denx.de>
 
-You really aren't listening to anything that's been said to you.
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
