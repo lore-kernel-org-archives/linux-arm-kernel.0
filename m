@@ -1,61 +1,30 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Feb 2013 20:13:34 +0530
-Subject: [PATCHv2 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <20130201143136.GP23505@n2100.arm.linux.org.uk>
-References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
- <1359651943-21752-4-git-send-email-dinguyen@altera.com>
- <510BA728.4060300@ti.com>
- <20130201121137.GC23869@e102568-lin.cambridge.arm.com>
- <20130201125417.GL23505@n2100.arm.linux.org.uk>
- <20130201141052.GA25172@e102568-lin.cambridge.arm.com>
- <20130201141914.GO23505@n2100.arm.linux.org.uk>
- <20130201143136.GP23505@n2100.arm.linux.org.uk>
-Message-ID: <510BD496.6080305@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 01 Feb 2013 15:49:03 +0100
+Subject: [PATCH] ARM: Exynos: enable ARM_HAS_SG_CHAIN
+Message-ID: <1359730143-462-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 February 2013 08:01 PM, Russell King - ARM Linux wrote:
-> Just to further provide some insight into the reasoning:
->
-> Invalidating data out of a working cache risks data corruption; maybe
-> the data being invalidated is filesystem metadata which was about to
-> be cleaned and written back to storage.  That risks filesystem
-> corruption.
->
-> Invalidating fewer levels than are actually required is different: we
-> may leave dirty cache lines behind which may be evicted, but there's
-> also the chance that the CPU will end up _reading_ from its
-> uninitialized caches and may crash before that happens.
->
-> So, the risks are:
-> 1. invalidate more levels than are necessary and risk discarding data
->     which other CPUs are using, which may be important data.
-> 2. invalidate less levels than are necessary and risk writing out
->     data from the CPU cache, which may or may not happen _before_ the
->     CPU crashes due to reading invalid data.
->
-> Out of those two, (2) sounds to me to be the safer approach.
->
-> Plus, I can't think of a reason why you'd want to put on a SMP system
-> more than one layer of CPU local caches... to do so would seem to me to
-> be an exercise in coherency complexity...  So, I suspect that in the
-> real world, we will _never_ see any system which has more than one
-> layer of caches local to the CPU.  But we may see a system with a
-> cache architecture similar to the one I drew in my email to Santosh.
->
-I still scratching my head on why you would even have a CPU design
-with two L2 shared caches for a 4 CPU system.
+Exynos DRM driver needs support for scatter-list chaining and all
+drivers available on Samsung platform, which use scatter-lists are
+already aware of chaining api, so lets enable global support for it.
 
-If you ever design such a system, you need to ensure that
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-1. Both L2 are used in exclusive mode
-2. Both L2 cache has coherency hardware connected to keep them in sync 
-for shared data.
-
-For 1, one would just increase the size of L2 and have only 1 memory.
-
-2 Doesn't bring much advantage unless and until your L3 is too far
-away for access in terms of CPU access cycles.
-
-Regards
-Santosh
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index cb06d7a..939b0d9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -836,6 +836,7 @@ config ARCH_EXYNOS
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_SPARSEMEM_ENABLE
++	select ARM_HAS_SG_CHAIN
+ 	select CLKDEV_LOOKUP
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+-- 
+1.7.9.5
