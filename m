@@ -1,82 +1,84 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  1 Feb 2013 08:48:21 +0100
-Subject: [PATCH v3] USB: add devicetree helpers for determining dr_mode and
- phy_type
-Message-ID: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
+Date: Fri,  1 Feb 2013 08:48:24 +0100
+Subject: [PATCH 3/9] USB: chipidea: ci13xxx-imx: create dynamic platformdata
+In-Reply-To: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
+References: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359704911-8275-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's another round of the dr_mode/phy_type patches. I think they should
-be ready for merging now. Greg, will you apply them should there be no
-problems anymore?
+From: Michael Grzeschik <m.grzeschik@pengutronix.de>
 
-Sascha
+This patch removes the limitation of having only one instance of the
+ci13xxx-imx platformdata and makes different configurations possible.
 
-changes since v2:
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reviewed-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/chipidea/ci13xxx_imx.c |   25 +++++++++++++++----------
+ 1 file changed, 15 insertions(+), 10 deletions(-)
 
-- fix adding of GPL Header was in wrong patch
-- add missing hunk for new file of.c
-
-changes since v1:
-- move phy specific of helper to drivers/usb/phy/of.c
-- use strcmp instead of strcasecmp for matching property values
-- change usb_phy_dr_mode to usb_dr_mode
-- change USBPHY_INTERFACE_MODE_NA to USBPHY_INTERFACE_MODE_UNKNOWN
-- add copyright header to new files
-- chipidea: drop mdelay at end of PTS/PTW setup
-- chipidea: implement lpm core type handling for PTS/PTW
-
-
-The following changes since commit 7b8bc3aad0deabf3bc50cd2fe29bce29be5681fe:
-
-  USB: chipidea: ci13xxx_imx: Remove sparse warning (2013-01-30 00:17:39 -0500)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-for-next
-
-for you to fetch changes up to b82b92ba281add3e4d67bf6704052c0fd8c5c7f0:
-
-  USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy (2013-01-31 12:27:36 +0100)
-
-----------------------------------------------------------------
-USB Chipidea patches for v3.9
-
-These add OF helpers for handling the dr_mode and phy_type property
-and makes use of them in the chipidea driver.
-
-----------------------------------------------------------------
-Michael Grzeschik (3):
-      USB: add devicetree helpers for determining dr_mode and phy_type
-      USB: chipidea: ci13xxx-imx: create dynamic platformdata
-      USB: chipidea: add PTW and PTS handling
-
-Sascha Hauer (6):
-      USB: move bulk of otg/otg.c to phy/phy.c
-      USB chipidea: introduce dual role mode pdata flags
-      USB chipidea i.MX: introduce dr_mode property
-      como fec wip
-      USB mxs-phy: Register phy with framework
-      USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
-
- Documentation/devicetree/bindings/net/fsl-fec.txt  |   20 +
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 +
- drivers/net/ethernet/freescale/fec.c               |   77 ++--
- drivers/net/ethernet/freescale/fec.h               |    1 +
- drivers/usb/chipidea/bits.h                        |   14 +-
- drivers/usb/chipidea/ci13xxx_imx.c                 |   60 ++-
- drivers/usb/chipidea/core.c                        |   60 ++-
- drivers/usb/otg/mxs-phy.c                          |    9 +
- drivers/usb/otg/otg.c                              |  423 -------------------
- drivers/usb/phy/Makefile                           |    2 +
- drivers/usb/phy/of.c                               |   47 +++
- drivers/usb/phy/phy.c                              |  434 ++++++++++++++++++++
- drivers/usb/usb-common.c                           |   36 ++
- include/linux/usb/chipidea.h                       |    3 +-
- include/linux/usb/of.h                             |   27 ++
- include/linux/usb/otg.h                            |    7 +
- include/linux/usb/phy.h                            |    9 +
- 17 files changed, 742 insertions(+), 493 deletions(-)
- create mode 100644 drivers/usb/phy/of.c
- create mode 100644 drivers/usb/phy/phy.c
- create mode 100644 include/linux/usb/of.h
+diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+index 8c29122..69024e0 100644
+--- a/drivers/usb/chipidea/ci13xxx_imx.c
++++ b/drivers/usb/chipidea/ci13xxx_imx.c
+@@ -85,17 +85,10 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
+ 
+ /* End of common functions shared by usbmisc drivers*/
+ 
+-static struct ci13xxx_platform_data ci13xxx_imx_platdata  = {
+-	.name			= "ci13xxx_imx",
+-	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+-				  CI13XXX_PULLUP_ON_VBUS |
+-				  CI13XXX_DISABLE_STREAMING,
+-	.capoffset		= DEF_CAPOFFSET,
+-};
+-
+ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ {
+ 	struct ci13xxx_imx_data *data;
++	struct ci13xxx_platform_data *pdata;
+ 	struct platform_device *plat_ci, *phy_pdev;
+ 	struct device_node *phy_np;
+ 	struct resource *res;
+@@ -107,6 +100,18 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		&& !usbmisc_ops)
+ 		return -EPROBE_DEFER;
+ 
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata) {
++		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX pdata!\n");
++		return -ENOMEM;
++	}
++
++	pdata->name = "ci13xxx_imx";
++	pdata->capoffset = DEF_CAPOFFSET;
++	pdata->flags = CI13XXX_REQUIRE_TRANSCEIVER |
++		       CI13XXX_PULLUP_ON_VBUS |
++		       CI13XXX_DISABLE_STREAMING;
++
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data) {
+ 		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
+@@ -168,7 +173,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		reg_vbus = NULL;
+ 	}
+ 
+-	ci13xxx_imx_platdata.phy = data->phy;
++	pdata->phy = data->phy;
+ 
+ 	if (!pdev->dev.dma_mask) {
+ 		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
+@@ -193,7 +198,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 
+ 	plat_ci = ci13xxx_add_device(&pdev->dev,
+ 				pdev->resource, pdev->num_resources,
+-				&ci13xxx_imx_platdata);
++				pdata);
+ 	if (IS_ERR(plat_ci)) {
+ 		ret = PTR_ERR(plat_ci);
+ 		dev_err(&pdev->dev,
+-- 
+1.7.10.4
