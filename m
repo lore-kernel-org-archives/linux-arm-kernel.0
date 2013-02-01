@@ -1,112 +1,35 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Feb 2013 11:23:17 +0530
-Subject: [PATCH v3 10/15] ARM: vexpress/dcscb: add CPU use counts to the
- power up/down API implementation
-In-Reply-To: <1359445870-18925-11-git-send-email-nicolas.pitre@linaro.org>
+Date: Fri, 1 Feb 2013 11:27:22 +0530
+Subject: [PATCH v3 11/15] ARM: vexpress/dcscb: do not hardcode number
+ of CPUs per cluster
+In-Reply-To: <1359445870-18925-12-git-send-email-nicolas.pitre@linaro.org>
 References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-11-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <510B584D.9020805@ti.com>
+ <1359445870-18925-12-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <510B5942.20307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
-> It is possible for a CPU to be told to power up before it managed
-> to power itself down.  Solve this race with a usage count as mandated
-> by the API definition.
+> If 4 CPUs are assumed, the A15x1-A7x1 model configuration would never
+> shut down the initial cluster as the 0xf reset bit mask will never be
+> observed.  Let's construct this mask based on the provided information
+> in the DCSCB config register for the number of CPUs per cluster.
 >
-> Signed-off-by: nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 > ---
->   arch/arm/mach-vexpress/dcscb.c | 77 +++++++++++++++++++++++++++++++++---------
->   1 file changed, 61 insertions(+), 16 deletions(-)
+>   arch/arm/mach-vexpress/dcscb.c | 14 ++++++++++----
+>   1 file changed, 10 insertions(+), 4 deletions(-)
 >
 > diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-> index 677ced9efc..f993608944 100644
+> index f993608944..8d363357ef 100644
 > --- a/arch/arm/mach-vexpress/dcscb.c
 > +++ b/arch/arm/mach-vexpress/dcscb.c
-> @@ -45,6 +45,7 @@
->   static arch_spinlock_t dcscb_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+> @@ -46,10 +46,12 @@ static arch_spinlock_t dcscb_lock = __ARCH_SPIN_LOCK_UNLOCKED;
 >
 >   static void __iomem *dcscb_base;
-> +static int dcscb_use_count[4][2];
->
->   static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
->   {
-> @@ -61,14 +62,27 @@ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
->   	local_irq_disable();
->   	arch_spin_lock(&dcscb_lock);
->
-> -	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-> -	if (rst_hold & (1 << 8)) {
-> -		/* remove cluster reset and add individual CPU's reset */
-> -		rst_hold &= ~(1 << 8);
-> -		rst_hold |= 0xf;
-> +	dcscb_use_count[cpu][cluster]++;
-> +	if (dcscb_use_count[cpu][cluster] == 1) {
-> +		rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-> +		if (rst_hold & (1 << 8)) {
-> +			/* remove cluster reset and add individual CPU's reset */
-> +			rst_hold &= ~(1 << 8);
-> +			rst_hold |= 0xf;
-> +		}
-> +		rst_hold &= ~(cpumask | (cpumask << 4));
-> +		writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-> +	} else if (dcscb_use_count[cpu][cluster] != 2) {
-> +		/*
-> +		 * The only possible values are:
-> +		 * 0 = CPU down
-> +		 * 1 = CPU (still) up
-> +		 * 2 = CPU requested to be up before it had a chance
-> +		 *     to actually make itself down.
-> +		 * Any other value is a bug.
-> +		 */
-> +		BUG();
-No strong opinion but would switch case be better here ?
+>   static int dcscb_use_count[4][2];
+> +static int dcscb_mcpm_cpu_mask[2];
+s/2/MAX_CLUSTERS ?
 
->   	}
-> -	rst_hold &= ~(cpumask | (cpumask << 4));
-> -	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
->
->   	arch_spin_unlock(&dcscb_lock);
->   	local_irq_enable();
-> @@ -78,7 +92,8 @@ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
->
->   static void dcscb_power_down(void)
->   {
-> -	unsigned int mpidr, cpu, cluster, rst_hold, cpumask, last_man;
-> +	unsigned int mpidr, cpu, cluster, rst_hold, cpumask;
-> +	bool last_man = false, skip_wfi = false;
->
->   	mpidr = read_cpuid_mpidr();
->   	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> @@ -89,13 +104,26 @@ static void dcscb_power_down(void)
->   	BUG_ON(cpu >= 4 || cluster >= 2);
->
->   	arch_spin_lock(&dcscb_lock);
-> -	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-> -	rst_hold |= cpumask;
-> -	if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf)
-> -		rst_hold |= (1 << 8);
-> -	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-> +	dcscb_use_count[cpu][cluster]--;
-> +	if (dcscb_use_count[cpu][cluster] == 0) {
-> +		rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-> +		rst_hold |= cpumask;
-> +		if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf) {
-> +			rst_hold |= (1 << 8);
-> +			last_man = true;
-> +		}
-> +		writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-> +	} else if (dcscb_use_count[cpu][cluster] == 1) {
-> +		/*
-> +		 * A power_up request went ahead of us.
-> +		 * Even if we do not want to shut this CPU down,
-> +		 * the caller expects a certain state as if the WFI
-> +		 * was aborted.  So let's continue with cache cleaning.
-> +		 */
-> +		skip_wfi = true;
-> +	} else
-> +		BUG();
-Same comment as above.
-
-Rest looks fine.
+Apart from above minor question,
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
