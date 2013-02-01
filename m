@@ -1,34 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Feb 2013 17:14:11 +0530
-Subject: [PATCHv2 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
-In-Reply-To: <20130201113233.GJ23505@n2100.arm.linux.org.uk>
-References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
- <1359651943-21752-4-git-send-email-dinguyen@altera.com>
- <510BA728.4060300@ti.com> <20130201113233.GJ23505@n2100.arm.linux.org.uk>
-Message-ID: <510BAA8B.1030506@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 01 Feb 2013 11:43:23 +0000
+Subject: [PATCHv5 15/16] ARM: hyp: initialize CNTVOFF to zero
+In-Reply-To: <20130201111350.GA1970@linaro.org>
+References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
+ <1359634539-9580-16-git-send-email-mark.rutland@arm.com>
+ <20130201111350.GA1970@linaro.org>
+Message-ID: <510BAA5B.2060704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 February 2013 05:02 PM, Russell King - ARM Linux wrote:
-> On Fri, Feb 01, 2013 at 04:59:44PM +0530, Santosh Shilimkar wrote:
->> Now since we are moving the code under common place, probably we should
->> update this a function a bit so that it invalidates the CPU cache till
->> line of unification. Just to be consistent with other flush API.
->
-> Hmm.  Do you really want a CPU being brought up to do that to the PoU,
-> every time that it is brought up?  I thought you wanted to get rid of
-> that kind of stuff from the hotplug paths so that a CPU being brought
-> up/taken down doesn't affect the caches for the other CPUs within the
-> inner sharable domain.
->
-You are right. We already git rid of the flush of all cache levels
-in hotplug and wakeup paths and now it is restricted till the PoU.
+Hi Dave,
 
-Assuming for the current v7 machines, PoU is L2, invalidating the cache
-*till* PoU means only CPU local cache. So the API will in a way
-invalidate only local cache.
+On 01/02/13 11:13, Dave Martin wrote:
+> On Thu, Jan 31, 2013 at 12:15:38PM +0000, Mark Rutland wrote:
+>> From: Marc Zyngier <Marc.Zyngier@arm.com>
+>>
+>> In order to be able to use the virtual counter in a safe way,
+>> make sure it is initialized to zero before dropping to SVC.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Dave Martin <dave.martin@arm.com>
+>> ---
+>>  arch/arm/kernel/hyp-stub.S | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+>> index 65b2417..455603a 100644
+>> --- a/arch/arm/kernel/hyp-stub.S
+>> +++ b/arch/arm/kernel/hyp-stub.S
+>> @@ -152,6 +152,9 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+>>  	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
+>>  	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
+>>  	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
+>> +	mov	r6, #0
+>> +	mov	r7, #0
+>> +	mcrr	p15, 4, r6, r7, c14	@ CNTVOFF
+> 
+> Is this required for safety, or is it more a sanity feature?
+> 
+> The architected timer counters are supposed to be monotonic time sources
+> only, so applying a random offset shouldn't really change anything.
+> 
+> The main thing I can think of is that it is easier for the host to
+> manage guests' virtual counter offsets if the host's offset is 0 (and
+> we don't really want to be changing the host offset after the host kernel
+> boots).
 
-May be I am missing your point here.
+As you noticed, the offset itself doesn't matter as long as it is
+constant. However, setting it to zero makes it nicer to the hypervisor:
+no need to remember the host offset, just reset it to zero when exiting
+a guest.
 
-Regards,
-Santosh
+	M.
+-- 
+Jazz is not dead. It just smells funny...
