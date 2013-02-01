@@ -1,50 +1,52 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 01 Feb 2013 23:49:11 +0300
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130201185820.GE29898@arwen.pp.htv.fi>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com>
- <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
- <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
- <20130201185820.GE29898@arwen.pp.htv.fi>
-Message-ID: <510C2A47.1090607@mvista.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 1 Feb 2013 12:52:25 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <201302011130.18442.arnd@arndb.de>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <201301312046.22560.arnd@arndb.de>
+ <20130131224459.GA11846@obsidianresearch.com>
+ <201302011130.18442.arnd@arndb.de>
+Message-ID: <20130201195225.GB19335@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Feb 01, 2013 at 11:30:18AM +0000, Arnd Bergmann wrote:
 
-On 02/01/2013 09:58 PM, Felipe Balbi wrote:
+> IO Resources are always expressed in the kernel's view, so they are
+> in the range from 0 to IO_SPACE_LIMIT. The idea is that you can have
+> multiple buses that each have their own address space start at 0,
+> but can put them into the kernel address space at a different
+> address.
 
->>>>> Move mach-davinci/dma.c to common/edma.c so it can be used
->>>>> by OMAP (specifically AM33xx) as well.
+Sure, I see that.. and that seems reasonable as long as any IO bus
+address aliases are put in separate PCI domains. It would be wonky if
+devices on different PCI bus numbers in a single PCI domain had
+overlaping IO addresses.
 
->>>> I think this should rather go to drivers/dma/?
+> > No, for *all* links. You use a mmap scheme with 4k granularity, I
+> > explained in a past email, but to quickly review..
+> > 
+> > - Each link gets 64k of reserved physical address space for IO,
+> >   this is just set aside, no MBUS windows are permantently assigned.
+> > - Linux is told to use a 64k IO range with bus IO address 0->0xFFFF
+> > - When the IO base/limit register in the link PCI-PCI bridge is programmed
+> >   the driver gets a 4k aligned region somewhere from 0->0xFFFF and then:
+> >     - Allocates a 64k MBUS window that translates physical address
+> >       0xZZZZxxxx to IO bus address 0x0000xxxx (goes in the TLP) for
+> >       that link
+> >     - Uses pci_ioremap_io to map the fraction of the link's 64k MBUS window
+> >       allocated to that bridge to the correct offset in the 
+> >       PCI_IO_VIRT_BASE region
+> 
+> We'd have to change pci_ioremap_io to allow mapping less than 64k, but
+> yes, that would work, too. I don't see an advantage to it though,
+> other than having io_offset always be zero.
 
->>> No, this is the private EDMA API. It's the analogous thing to
->>> the private OMAP dma API that is in plat-omap/dma.c. The actual
->>> dmaengine driver is in drivers/dma/edma.c as a wrapper around
->>> this...same way OMAP DMA engine conversion is being done.
+Erm, that is the whole point. No PCI device in the system, on any of
+the 10 links, would be required to use a 32 bit IO address. All are 16
+bit and there is no compatibility problem on any links. You don't need
+to declare any one link as being 'io supporting' or something like
+that, it just works out of the box.
 
->>   Keeps me wondering why we couldn't have the same with CPPI 4.1 when I proposed
->> that, instead of waiting indefinitely for TI to convert it to drivers/dma/
->> directly. We could have working MUSB DMA on OMAP-L1x/Sitara all this time... Sigh.
-
-> good point, do you wanna send some patches ?
-
-   I have already sent them countless times and even stuck CPPI 4.1 support (in
-arch/arm/common/cppi41.c) in Russell's patch system. TI requested to remove the
-patch. :-(
-
-> I guess to make the MUSB side simpler we would need musb-dma-engine glue
-> to map dmaengine to the private MUSB API. Then we would have some
-> starting point to also move inventra (and anybody else) to dmaengine
-> API.
-
-   Why? Inventra is a dedicated device's private DMA controller, why make
-universal DMA driver for it?
-
-> Once that's done, we drop MUSB's private API.
-
-   Don't think it's a good idea.
-
-WBR, Sergei
+Jason
