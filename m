@@ -1,199 +1,82 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  1 Feb 2013 08:48:28 +0100
-Subject: [PATCH 7/9] como fec wip
-In-Reply-To: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1359704911-8275-8-git-send-email-s.hauer@pengutronix.de>
+Date: Fri,  1 Feb 2013 08:48:21 +0100
+Subject: [PATCH v3] USB: add devicetree helpers for determining dr_mode and
+ phy_type
+Message-ID: <1359704911-8275-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- Documentation/devicetree/bindings/net/fsl-fec.txt |   20 ++++++
- drivers/net/ethernet/freescale/fec.c              |   77 ++++++++++++---------
- drivers/net/ethernet/freescale/fec.h              |    1 +
- 3 files changed, 67 insertions(+), 31 deletions(-)
+Here's another round of the dr_mode/phy_type patches. I think they should
+be ready for merging now. Greg, will you apply them should there be no
+problems anymore?
 
-diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
-index d536392..ec7060b 100644
---- a/Documentation/devicetree/bindings/net/fsl-fec.txt
-+++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
-@@ -15,6 +15,9 @@ Optional properties:
-   only if property "phy-reset-gpios" is available.  Missing the property
-   will have the duration be 1 millisecond.  Numbers greater than 1000 are
-   invalid and 1 millisecond will be used instead.
-+- phy : a phandle for the PHY device used for the fec. Used to specify an
-+  external phy or to specify a particular address if the mdio bus has multiple
-+  phys on it.
- 
- Example:
- 
-@@ -26,3 +29,20 @@ ethernet at 83fec000 {
- 	phy-reset-gpios = <&gpio2 14 0>; /* GPIO2_14 */
- 	local-mac-address = [00 04 9F 01 1B B9];
- };
-+
-+Example with specific phy address:
-+
-+ethernet at 83fec000 {
-+	compatible = "fsl,imx51-fec", "fsl,imx27-fec";
-+	reg = <0x83fec000 0x4000>;
-+	interrupts = <87>;
-+	phy-mode = "mii";
-+	phy-reset-gpios = <&gpio2 14 0>; /* GPIO2_14 */
-+	local-mac-address = [00 04 9F 01 1B B9];
-+	phy = &phy3;
-+
-+	phy3: ethernet-phy at 3 {
-+		reg = <3>;
-+		device_type = "ethernet-phy";
-+	};
-+};
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 0704bca..54a8506 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -48,6 +48,7 @@
- #include <linux/of_device.h>
- #include <linux/of_gpio.h>
- #include <linux/of_net.h>
-+#include <linux/of_mdio.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/regulator/consumer.h>
- 
-@@ -950,31 +951,38 @@ static int fec_enet_mii_probe(struct net_device *ndev)
- 
- 	fep->phy_dev = NULL;
- 
--	/* check for attached phy */
--	for (phy_id = 0; (phy_id < PHY_MAX_ADDR); phy_id++) {
--		if ((fep->mii_bus->phy_mask & (1 << phy_id)))
--			continue;
--		if (fep->mii_bus->phy_map[phy_id] == NULL)
--			continue;
--		if (fep->mii_bus->phy_map[phy_id]->phy_id == 0)
--			continue;
--		if (dev_id--)
--			continue;
--		strncpy(mdio_bus_id, fep->mii_bus->id, MII_BUS_ID_SIZE);
--		break;
--	}
-+	if (fep->phy_node) {
-+		phy_dev = of_phy_connect(ndev, fep->phy_node, &fec_enet_adjust_link, 0,
-+			      fep->phy_interface);
-+	} else {
-+		/* check for attached phy */
-+		for (phy_id = 0; (phy_id < PHY_MAX_ADDR); phy_id++) {
-+			if ((fep->mii_bus->phy_mask & (1 << phy_id)))
-+				continue;
-+			if (fep->mii_bus->phy_map[phy_id] == NULL)
-+				continue;
-+			if (fep->mii_bus->phy_map[phy_id]->phy_id == 0)
-+				continue;
-+			if (dev_id--)
-+				continue;
-+			strncpy(mdio_bus_id, fep->mii_bus->id, MII_BUS_ID_SIZE);
-+			break;
-+		}
- 
--	if (phy_id >= PHY_MAX_ADDR) {
--		printk(KERN_INFO
--			"%s: no PHY, assuming direct connection to switch\n",
--			ndev->name);
--		strncpy(mdio_bus_id, "fixed-0", MII_BUS_ID_SIZE);
--		phy_id = 0;
-+		if (phy_id >= PHY_MAX_ADDR) {
-+			printk(KERN_INFO
-+				"%s: no PHY, assuming direct connection to switch\n",
-+				ndev->name);
-+			strncpy(mdio_bus_id, "fixed-0", MII_BUS_ID_SIZE);
-+			phy_id = 0;
-+		}
-+
-+		snprintf(phy_name, sizeof(phy_name), PHY_ID_FMT, mdio_bus_id, phy_id);
-+
-+		phy_dev = phy_connect(ndev, phy_name, &fec_enet_adjust_link, 0,
-+				      fep->phy_interface);
- 	}
- 
--	snprintf(phy_name, sizeof(phy_name), PHY_ID_FMT, mdio_bus_id, phy_id);
--	phy_dev = phy_connect(ndev, phy_name, &fec_enet_adjust_link, 0,
--			      fep->phy_interface);
- 	if (IS_ERR(phy_dev)) {
- 		printk(KERN_ERR "%s: could not attach to PHY\n", ndev->name);
- 		return PTR_ERR(phy_dev);
-@@ -1076,7 +1084,12 @@ static int fec_enet_mii_init(struct platform_device *pdev)
- 	for (i = 0; i < PHY_MAX_ADDR; i++)
- 		fep->mii_bus->irq[i] = PHY_POLL;
- 
--	if (mdiobus_register(fep->mii_bus))
-+	if (fep->phy_node)
-+		err = of_mdiobus_register(fep->mii_bus, pdev->dev.of_node);
-+	else
-+		err = mdiobus_register(fep->mii_bus);
-+
-+	if (err)
- 		goto err_out_free_mdio_irq;
- 
- 	mii_cnt++;
-@@ -1484,12 +1497,16 @@ static int fec_enet_init(struct net_device *ndev)
- }
- 
- #ifdef CONFIG_OF
--static int fec_get_phy_mode_dt(struct platform_device *pdev)
-+static int fec_probe_dt(struct fec_enet_private *fep)
- {
--	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *np = fep->pdev->dev.of_node;
-+
-+	if (!np)
-+		return -ENODEV;
- 
--	if (np)
--		return of_get_phy_mode(np);
-+	fep->phy_interface = of_get_phy_mode(np);
-+
-+	fep->phy_node = of_parse_phandle(np, "phy", 0);
- 
- 	return -ENODEV;
- }
-@@ -1519,7 +1536,7 @@ static void fec_reset_phy(struct platform_device *pdev)
- 	gpio_set_value(phy_reset, 1);
- }
- #else /* CONFIG_OF */
--static inline int fec_get_phy_mode_dt(struct platform_device *pdev)
-+static inline int fec_probe_dt(struct fec_enet_private *fep)
- {
- 	return -ENODEV;
- }
-@@ -1581,15 +1598,13 @@ fec_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, ndev);
- 
--	ret = fec_get_phy_mode_dt(pdev);
-+	ret = fec_probe_dt(fep);
- 	if (ret < 0) {
- 		pdata = pdev->dev.platform_data;
- 		if (pdata)
- 			fep->phy_interface = pdata->phy;
- 		else
- 			fep->phy_interface = PHY_INTERFACE_MODE_MII;
--	} else {
--		fep->phy_interface = ret;
- 	}
- 
- 	for (i = 0; i < FEC_IRQ_NUM; i++) {
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index c5a3bc1..0120ea6 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -236,6 +236,7 @@ struct fec_enet_private {
- 	/* Phylib and MDIO interface */
- 	struct	mii_bus *mii_bus;
- 	struct	phy_device *phy_dev;
-+	struct	device_node *phy_node;
- 	int	mii_timeout;
- 	uint	phy_speed;
- 	phy_interface_t	phy_interface;
--- 
-1.7.10.4
+Sascha
+
+changes since v2:
+
+- fix adding of GPL Header was in wrong patch
+- add missing hunk for new file of.c
+
+changes since v1:
+- move phy specific of helper to drivers/usb/phy/of.c
+- use strcmp instead of strcasecmp for matching property values
+- change usb_phy_dr_mode to usb_dr_mode
+- change USBPHY_INTERFACE_MODE_NA to USBPHY_INTERFACE_MODE_UNKNOWN
+- add copyright header to new files
+- chipidea: drop mdelay at end of PTS/PTW setup
+- chipidea: implement lpm core type handling for PTS/PTW
+
+
+The following changes since commit 7b8bc3aad0deabf3bc50cd2fe29bce29be5681fe:
+
+  USB: chipidea: ci13xxx_imx: Remove sparse warning (2013-01-30 00:17:39 -0500)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-for-next
+
+for you to fetch changes up to b82b92ba281add3e4d67bf6704052c0fd8c5c7f0:
+
+  USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy (2013-01-31 12:27:36 +0100)
+
+----------------------------------------------------------------
+USB Chipidea patches for v3.9
+
+These add OF helpers for handling the dr_mode and phy_type property
+and makes use of them in the chipidea driver.
+
+----------------------------------------------------------------
+Michael Grzeschik (3):
+      USB: add devicetree helpers for determining dr_mode and phy_type
+      USB: chipidea: ci13xxx-imx: create dynamic platformdata
+      USB: chipidea: add PTW and PTS handling
+
+Sascha Hauer (6):
+      USB: move bulk of otg/otg.c to phy/phy.c
+      USB chipidea: introduce dual role mode pdata flags
+      USB chipidea i.MX: introduce dr_mode property
+      como fec wip
+      USB mxs-phy: Register phy with framework
+      USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
+
+ Documentation/devicetree/bindings/net/fsl-fec.txt  |   20 +
+ .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 +
+ drivers/net/ethernet/freescale/fec.c               |   77 ++--
+ drivers/net/ethernet/freescale/fec.h               |    1 +
+ drivers/usb/chipidea/bits.h                        |   14 +-
+ drivers/usb/chipidea/ci13xxx_imx.c                 |   60 ++-
+ drivers/usb/chipidea/core.c                        |   60 ++-
+ drivers/usb/otg/mxs-phy.c                          |    9 +
+ drivers/usb/otg/otg.c                              |  423 -------------------
+ drivers/usb/phy/Makefile                           |    2 +
+ drivers/usb/phy/of.c                               |   47 +++
+ drivers/usb/phy/phy.c                              |  434 ++++++++++++++++++++
+ drivers/usb/usb-common.c                           |   36 ++
+ include/linux/usb/chipidea.h                       |    3 +-
+ include/linux/usb/of.h                             |   27 ++
+ include/linux/usb/otg.h                            |    7 +
+ include/linux/usb/phy.h                            |    9 +
+ 17 files changed, 742 insertions(+), 493 deletions(-)
+ create mode 100644 drivers/usb/phy/of.c
+ create mode 100644 drivers/usb/phy/phy.c
+ create mode 100644 include/linux/usb/of.h
