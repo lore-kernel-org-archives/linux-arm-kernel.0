@@ -1,17 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Feb 2013 10:41:08 -0800
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <1359742975-10421-2-git-send-email-mporter@ti.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com>
-Message-ID: <20130201184107.GM22517@atomide.com>
+Date: Fri, 1 Feb 2013 10:42:59 -0800
+Subject: [PATCH v4] ARM: OMAP2+: AM33XX: omap2plus_defconfig: Add
+ support for few drivers
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EAF03E7@DBDE01.ent.ti.com>
+References: <1357202279-6094-1-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EAF03E7@DBDE01.ent.ti.com>
+Message-ID: <20130201184259.GN22517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matt Porter <mporter@ti.com> [130201 10:25]:
-> Move mach-davinci/dma.c to common/edma.c so it can be used
-> by OMAP (specifically AM33xx) as well.
+* AnilKumar, Chimata <anilkumar@ti.com> [130118 03:23]:
+> On Thu, Jan 03, 2013 at 14:07:59, AnilKumar, Chimata wrote:
+> > Adds tps65910 PMIC, lis3lv02d accelerometer, tsl2550 ambient light sensor,
+> > tmp275 temperature sensor, matrix keypad, gbio based leds and D_CAN drivers
+> > support. These peripherals are present on AM33XX family of devices (EVM,
+> > BeagleBone and EVMSK). One has to manually enable these support to use the
+> > drivers, so this patch enables all the drivers in omap2plus_defconfig
+> 
+> Hi Tony,
+> 
+> Could you please pull this patch, if there are no further comments?
 
-I think this should rather go to drivers/dma/?
+Thanks applying into omap-for-v3.9/board.
+
+Regards,
 
 Tony
