@@ -1,105 +1,120 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Fri, 1 Feb 2013 05:05:54 +0000
-Subject: [Patch v2 2/2] ARM: OMAP2: am33xx-hwmod: Fix "register offset
- NULL check" bug
-In-Reply-To: <alpine.DEB.2.00.1301311528320.23099@utopia.booyaka.com>
-References: <1359642327-5542-1-git-send-email-gururaja.hebbar@ti.com>
- <1359642327-5542-3-git-send-email-gururaja.hebbar@ti.com>
- <alpine.DEB.2.00.1301311528320.23099@utopia.booyaka.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB5B145@DBDE01.ent.ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 1 Feb 2013 10:40:03 +0530
+Subject: [PATCH v3 03/15] ARM: mcpm: introduce helpers for platform
+ coherency exit/setup
+In-Reply-To: <alpine.LFD.2.02.1301311210040.6300@xanadu.home>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-4-git-send-email-nicolas.pitre@linaro.org>
+ <510A96F7.8090106@ti.com> <alpine.LFD.2.02.1301311210040.6300@xanadu.home>
+Message-ID: <510B4E2B.1030104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 21:00:32, Paul Walmsley wrote:
-> + Koen
-> 
-> Hi
-> 
-> On Thu, 31 Jan 2013, Hebbar Gururaja wrote:
-> 
-> > am33xx_cm_wait_module_ready() checks if register offset is NULL.
-> > 
-> > int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
-> > {
-> > 	int i = 0;
-> > 
-> > 	if (!clkctrl_offs)
-> > 		return 0;
-> > 
-> > In case of AM33xx, CLKCTRL register offset for different clock domains
-> > are not uniformly placed. An example of this would be the RTC clock
-> > domain with CLKCTRL offset at 0x00.
-> > In such cases the module ready check is skipped which leads to a data
-> > abort during boot-up when RTC registers is accessed.
-> > 
-> > Remove this check here to avoid checking module readiness for modules
-> > with clkctrl register offset at 0x00.
-> > 
-> > Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> 
-> Some text has been added to the patch description to describe Koen's test 
-> results, and the updated patch has been queued for v3.8-rc fixes.  Updated 
-> patch follows.
-> 
-> - Paul
+On Thursday 31 January 2013 10:46 PM, Nicolas Pitre wrote:
+> On Thu, 31 Jan 2013, Santosh Shilimkar wrote:
+>
+>> On Tuesday 29 January 2013 01:20 PM, Nicolas Pitre wrote:
+>>> From: Dave Martin <dave.martin@linaro.org>
+>>>
+>>> This provides helper methods to coordinate between CPUs coming down
+>>> and CPUs going up, as well as documentation on the used algorithms,
+>>> so that cluster teardown and setup
+>>> operations are not done for a cluster simultaneously.
+>>>
+>>> For use in the power_down() implementation:
+>>>     * __mcpm_cpu_going_down(unsigned int cluster, unsigned int cpu)
+>>>     * __mcpm_outbound_enter_critical(unsigned int cluster)
+>>>     * __mcpm_outbound_leave_critical(unsigned int cluster)
+>>>     * __mcpm_cpu_down(unsigned int cluster, unsigned int cpu)
+>>>
+>>> The power_up_setup() helper should do platform-specific setup in
+>>> preparation for turning the CPU on, such as invalidating local caches
+>>> or entering coherency.  It must be assembler for now, since it must
+>>> run before the MMU can be switched on.  It is passed the affinity level
+>>> which should be initialized.
+>>>
+>>> Because the mcpm_sync_struct content is looked-up and modified
+>>> with the cache enabled or disabled depending on the code path, it is
+>>> crucial to always ensure proper cache maintenance to update main memory
+>>> right away.  Therefore, any cached write must be followed by a cache
+>>> clean operation and any cached read must be preceded by a cache
+>>> invalidate operation (actually a cache flush i.e. clean+invalidate to
+>>> avoid discarding possible concurrent writes) on the accessed memory.
+>>>
+>>> Also, in order to prevent a cached writer from interfering with an
+>>> adjacent non-cached writer, we ensure each state variable is located to
+>>> a separate cache line.
+>>>
+>>> Thanks to Nicolas Pitre and Achin Gupta for the help with this
+>>> patch.
+>>>
+>>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>>> ---
+>> [..]
+>>
+>>> diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+>>> index c8c0e2113e..2b83121966 100644
+>>> --- a/arch/arm/common/mcpm_entry.c
+>>> +++ b/arch/arm/common/mcpm_entry.c
+>>> @@ -18,6 +18,7 @@
+>>>    #include <asm/proc-fns.h>
+>>>    #include <asm/cacheflush.h>
+>>>    #include <asm/idmap.h>
+>>> +#include <asm/cputype.h>
+>>>
+>>>    extern volatile unsigned long
+>>> mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
+>>>
+>> [...]
+>>
+>>> +/*
+>>> + * Ensure preceding writes to *p by other CPUs are visible to
+>>> + * subsequent reads by this CPU.  We must be careful not to
+>>> + * discard data simultaneously written by another CPU, hence the
+>>> + * usage of flush rather than invalidate operations.
+>>> + */
+>>> +static void __sync_range_r(volatile void *p, size_t size)
+>>> +{
+>>> +	char *_p = (char *)p;
+>>> +
+>>> +#ifdef CONFIG_OUTER_CACHE
+>>> +	if (outer_cache.flush_range) {
+>>> +
+>> You don't need above #ifdef. In case of non-outer
+>> cache the function pointer is null anyways.
+>
+> We do need the #ifdef, because if CONFIG_OUTER_CACHE is not selected
+> then the outer_cache structure simply doesn't exist.
+>
+You are right. #ifdef in middle of the code looks bit ugly and hence
+was thinking to avoid it.
 
+>> 		/*
+>>> +		 * Ensure dirty data migrated from other CPUs into our cache
+>>> +		 * are cleaned out safely before the outer cache is cleaned:
+>>> +		 */
+>>> +		__cpuc_clean_dcache_area(_p, size);
+>>> +
+>>> +		/* Clean and invalidate stale data for *p from outer ... */
+>>> +		outer_flush_range(__pa(_p), __pa(_p + size));
+>>> +	}
+>>> +#endif
+>>> +
+>>> +	/* ... and inner cache: */
+>>> +	__cpuc_flush_dcache_area(_p, size);
+>> This will be un-necessary when inner cache is available, no ?
+>> May be you can re-arrange the code like below, unless and until
+>> you would like to invalidate any speculative fetches during the
+>> outer_flush_range()
+>>
+>> 	__cpuc_clean_dcache_area(_p, size);
+>> 	if (outer_cache.flush_range)
+>> 		outer_flush_range(__pa(_p), __pa(_p + size));
+>
+> As you said, the code is sequenced that way to get rid of potential
+> speculative fetch that could happen right before L2 is flushed.
+>
+Thanks for clarifying it. It makes sense.
 
-Thanks for the review & update.
-
-
-Regards, 
-Gururaja
-
-> 
-> From: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> Date: Thu, 31 Jan 2013 19:55:27 +0530
-> Subject: [PATCH] ARM: OMAP2: am33xx-hwmod: Fix "register offset NULL check"
->  bug
-> 
-> am33xx_cm_wait_module_ready() checks if register offset is NULL.
-> 
-> int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
-> {
-> 	int i = 0;
-> 
-> 	if (!clkctrl_offs)
-> 		return 0;
-> 
-> In case of AM33xx, CLKCTRL register offset for different clock domains
-> are not uniformly placed. An example of this would be the RTC clock
-> domain with CLKCTRL offset at 0x00.
-> In such cases the module ready check is skipped which leads to a data
-> abort during boot-up when RTC registers is accessed.
-> 
-> Remove this check here to avoid checking module readiness for modules
-> with clkctrl register offset at 0x00.
-> 
-> Koen Kooi notes that this patch fixes a crash on boot with
-> CONFIG_RTC_DRV_OMAP=y with v3.8-rc5.
-> 
-> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> Cc: Koen Kooi <koen@dominion.thruhere.net>
-> [paul at pwsan.com: noted Koen's test in the patch description]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/mach-omap2/cm33xx.c |    3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-> index 058ce3c..325a515 100644
-> --- a/arch/arm/mach-omap2/cm33xx.c
-> +++ b/arch/arm/mach-omap2/cm33xx.c
-> @@ -241,9 +241,6 @@ int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
->  {
->  	int i = 0;
->  
-> -	if (!clkctrl_offs)
-> -		return 0;
-> -
->  	omap_test_timeout(_is_module_ready(inst, cdoffs, clkctrl_offs),
->  			  MAX_MODULE_READY_TIME, i);
->  
-> -- 
-> 1.7.10.4
-> 
-> 
+Regards,
+Santosh
