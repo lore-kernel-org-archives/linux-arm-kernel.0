@@ -1,88 +1,241 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 1 Feb 2013 09:32:59 +0800
-Subject: [rtc-linux] [PATCH] rtc: pl031: fix the missing operation on
- enable
-In-Reply-To: <20130131144459.39f9a978.akpm@linux-foundation.org>
-References: <1359507865-29808-1-git-send-email-haojian.zhuang@linaro.org>
- <20130131144459.39f9a978.akpm@linux-foundation.org>
-Message-ID: <CAD6h2NS6dGYBvbwQ2u4FvQZ_uW8wUcT+cSA14xRzUyDfLwyQCg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 1 Feb 2013 10:47:06 +0900
+Subject: [PATCH 2/4] ARM: mach-shmobile: r8a7779: Allow initialisation of
+ GIC by DT
+In-Reply-To: <20130201003410.GA30007@verge.net.au>
+References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
+ <1359597051-32700-3-git-send-email-horms+renesas@verge.net.au>
+ <20130131123213.GB7235@e106331-lin.cambridge.arm.com>
+ <20130201001119.GO10312@verge.net.au>
+ <20130201003410.GA30007@verge.net.au>
+Message-ID: <20130201014706.GA14046@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2013 06:44, Andrew Morton <akpm@linux-foundation.org> wrote:
-> On Wed, 30 Jan 2013 09:04:25 +0800
-> Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
->
->> RTC control register should be enabled in the process of initliazing.
->>
->> ...
->>
->> --- a/drivers/rtc/rtc-pl031.c
->> +++ b/drivers/rtc/rtc-pl031.c
->> @@ -44,6 +44,7 @@
->>  #define RTC_YMR              0x34    /* Year match register */
->>  #define RTC_YLR              0x38    /* Year data load register */
->>
->> +#define RTC_CR_EN    (1 << 0)        /* counter enable bit */
->>  #define RTC_CR_CWEN  (1 << 26)       /* Clockwatch enable bit */
->>
->>  #define RTC_TCR_EN   (1 << 1) /* Periodic timer enable bit */
->> @@ -320,7 +321,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
->>       struct pl031_local *ldata;
->>       struct pl031_vendor_data *vendor = id->data;
->>       struct rtc_class_ops *ops = &vendor->ops;
->> -     unsigned long time;
->> +     unsigned long time, data;
->>
->>       ret = amba_request_regions(adev, NULL);
->>       if (ret)
->> @@ -345,10 +346,11 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
->>       dev_dbg(&adev->dev, "designer ID = 0x%02x\n", amba_manf(adev));
->>       dev_dbg(&adev->dev, "revision = 0x%01x\n", amba_rev(adev));
->>
->> +     data = readl(ldata->base + RTC_CR);
->>       /* Enable the clockwatch on ST Variants */
->>       if (vendor->clockwatch)
->> -             writel(readl(ldata->base + RTC_CR) | RTC_CR_CWEN,
->> -                    ldata->base + RTC_CR);
->> +             data |= RTC_CR_CWEN;
->> +     writel(data | RTC_CR_EN, ldata->base + RTC_CR);
->
-> Does this patch fix some user-visible misbehaviour?  If so, please
-> fully describe that misbehaviour.
->
-Hi Andrew,
+On Fri, Feb 01, 2013 at 09:34:10AM +0900, Simon Horman wrote:
+> On Fri, Feb 01, 2013 at 09:11:19AM +0900, Simon Horman wrote:
+> > On Thu, Jan 31, 2013 at 12:32:13PM +0000, Mark Rutland wrote:
+> > > Hi Simon,
+> > > 
+> > > On Thu, Jan 31, 2013 at 01:50:49AM +0000, Simon Horman wrote:
+> > > > This allows the GIC interrupt controller of the  r8a7779 SoC to be
+> > > > initialised using a flattened device tree blob.
+> > > > 
+> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > ---
+> > > >  arch/arm/boot/dts/r8a7779.dtsi               |   40 ++++++++++++++++++++++++++
+> > > >  arch/arm/mach-shmobile/include/mach/common.h |    1 +
+> > > >  arch/arm/mach-shmobile/intc-r8a7779.c        |   27 +++++++++++++----
+> > > >  3 files changed, 62 insertions(+), 6 deletions(-)
+> > > >  create mode 100644 arch/arm/boot/dts/r8a7779.dtsi
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> > > > new file mode 100644
+> > > > index 0000000..eadc12e
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> > > > @@ -0,0 +1,40 @@
+> > > > +/*
+> > > > + * Device Tree Source for Renesas r8a7740
+> > > > + *
+> > > > + * Copyright (C) 2013 Renesas Solutions Corp.
+> > > > + * Copyright (C) 2013 Simon Horman
+> > > > + *
+> > > > + * This file is licensed under the terms of the GNU General Public License
+> > > > + * version 2.  This program is licensed "as is" without any warranty of any
+> > > > + * kind, whether express or implied.
+> > > > + */
+> > > > +
+> > > > +/include/ "skeleton.dtsi"
+> > > > +
+> > > > +/ {
+> > > > +	compatible = "renesas,r8a7779";
+> > > > +
+> > > > +	cpus {
+> > > > +		cpu at 0 {
+> > > > +			compatible = "arm,cortex-a9";
+> > > > +		};
+> > > > +		cpu at 1 {
+> > > > +			compatible = "arm,cortex-a9";
+> > > > +		};
+> > > > +		cpu at 2 {
+> > > > +			compatible = "arm,cortex-a9";
+> > > > +		};
+> > > > +		cpu at 3 {
+> > > > +			compatible = "arm,cortex-a9";
+> > > > +		};
+> > > > +	};
+> > > 
+> > > Sorry to sound like a broken record, but it'd be good to see reg and
+> > > device_type set here.
+> > 
+> > Sure, will do.
+> > 
+> > > > +
+> > > > +        gic: interrupt-controller at f0001000 {
+> > > > +                compatible = "arm,cortex-a9-gic";
+> > > > +                #interrupt-cells = <3>;
+> > > > +                #address-cells = <1>;
+> > > 
+> > > Why is #address-cells needed here (and without #size-cells)? I see it's in the
+> > > binding document example, but I can't figure out why.
+> > 
+> > Its here because I copied the example.
+> > I will see about removing it from here.
+> > 
+> > > > +                interrupt-controller;
+> > > > +                reg = <0xf0001000 0x1000>,
+> > > > +                      <0xf0000100 0x100>;
+> > > > +        };
+> > > > +};
+> 
+> A revised patch is below. I should also remove "#address-cells = <1>" from
+> gic in arch/arm/boot/dts/sh73a0.dtsi if it is indeed unnecessary.
+> 
+> 
+> >From f08f5df1bd6e2133232d06b8cfb847424d6d4cc8 Mon Sep 17 00:00:00 2001
+> From: Simon Horman <horms+renesas@verge.net.au>
+> Date: Tue, 29 Jan 2013 14:21:46 +0900
+> Subject: [PATCH] ARM: mach-shmobile: r8a7779: Allow initialisation of GIC by
+>  DT
+> 
+> This allows the GIC interrupt controller of the  r8a7779 SoC to be
+> initialised using a flattened device tree blob.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7779.dtsi               |   50 ++++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/include/mach/common.h |    1 +
+>  arch/arm/mach-shmobile/intc-r8a7779.c        |   27 ++++++++++----
+>  3 files changed, 72 insertions(+), 6 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/r8a7779.dtsi
+> 
+> v2
+> As suggested by Mark Rutland
+> * Add reg and device_type to cpus
+> * Remove #address-cells from gic
+> 
+> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> new file mode 100644
+> index 0000000..d1fde48
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> @@ -0,0 +1,50 @@
+> +/*
+> + * Device Tree Source for Renesas r8a7740
+> + *
+> + * Copyright (C) 2013 Renesas Solutions Corp.
+> + * Copyright (C) 2013 Simon Horman
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "renesas,r8a7779";
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0>;
+> +		};
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0>;
+> +		};
+> +		cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0>;
+> +		};
+> +		cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0>;
+> +		};
+> +	};
 
-I copy the description from rtc pl031 user manual (page 33 of
-DDI0224.pdf) in below.
+Sorry, the above reg values are rubbish. I'll fix them and repost.
 
-RTCCR is a 1-bit control register. When HIGH, the counter enable
-signal is asserted to
-enable the counter. Table 3-5 shows the bit assignments for the RTCCR register.
-
-Table 3-5 RTCCR register
------------------------------------------------------------------------------------------------------------------------
-Bits       Name              Type                      Function
-31:1       -                     Read/write             Reserved. Read
-unpredictable. Should
-                                                                be written as 0.
-0           RTC start         Read/write             If set to 1, the
-RTC is enabled. Once it is
-
-enabled, any writes to this bit have no
-                                                                effect
-on the RTC until a system reset.
-                                                                A read
-returns the status of the RTC.
------------------------------------------------------------------------------------------------------------------------
-
->From this document, RTCCR must be enabled before usage. Without this
-patch, I really
-failed to enable RTC in Hisilicon Hi3620 SoC. It results that the
-register mapping section
-in RTC is always read as zero. So I doubt that ST guys may already
-enable this register
-in bootloader. So they won't meet this issue.
-
-Best Regards
-Haojian
+> +
+> +        gic: interrupt-controller at f0001000 {
+> +                compatible = "arm,cortex-a9-gic";
+> +                #interrupt-cells = <3>;
+> +                interrupt-controller;
+> +                reg = <0xf0001000 0x1000>,
+> +                      <0xf0000100 0x100>;
+> +        };
+> +};
+> diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+> index 16dab18..8ef7ebb 100644
+> --- a/arch/arm/mach-shmobile/include/mach/common.h
+> +++ b/arch/arm/mach-shmobile/include/mach/common.h
+> @@ -63,6 +63,7 @@ extern void r8a7740_pinmux_init(void);
+>  extern void r8a7740_pm_init(void);
+>  
+>  extern void r8a7779_init_irq(void);
+> +extern void r8a7779_init_irq_dt(void);
+>  extern void r8a7779_map_io(void);
+>  extern void r8a7779_earlytimer_init(void);
+>  extern void r8a7779_add_early_devices(void);
+> diff --git a/arch/arm/mach-shmobile/intc-r8a7779.c b/arch/arm/mach-shmobile/intc-r8a7779.c
+> index 8807c27..f9cc4bc 100644
+> --- a/arch/arm/mach-shmobile/intc-r8a7779.c
+> +++ b/arch/arm/mach-shmobile/intc-r8a7779.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/io.h>
+>  #include <linux/irqchip/arm-gic.h>
+>  #include <mach/common.h>
+> +#include <linux/irqchip.h>
+>  #include <mach/intc.h>
+>  #include <mach/r8a7779.h>
+>  #include <asm/mach-types.h>
+> @@ -43,13 +44,8 @@ static int r8a7779_set_wake(struct irq_data *data, unsigned int on)
+>  	return 0; /* always allow wakeup */
+>  }
+>  
+> -void __init r8a7779_init_irq(void)
+> +static void __init r8a7779_init_irq_common(void)
+>  {
+> -	void __iomem *gic_dist_base = IOMEM(0xf0001000);
+> -	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
+> -
+> -	/* use GIC to handle interrupts */
+> -	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+>  	gic_arch_extn.irq_set_wake = r8a7779_set_wake;
+>  
+>  	/* route all interrupts to ARM */
+> @@ -63,3 +59,22 @@ void __init r8a7779_init_irq(void)
+>  	__raw_writel(0xbffffffc, INT2SMSKCR3);
+>  	__raw_writel(0x003fee3f, INT2SMSKCR4);
+>  }
+> +
+> +void __init r8a7779_init_irq(void)
+> +{
+> +	void __iomem *gic_dist_base = IOMEM(0xf0001000);
+> +	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
+> +
+> +	/* use GIC to handle interrupts */
+> +	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+> +
+> +	r8a7779_init_irq_common();
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +void __init r8a7779_init_irq_dt(void)
+> +{
+> +	irqchip_init();
+> +	r8a7779_init_irq_common();
+> +}
+> +#endif
+> -- 
+> 1.7.10.4
+> 
