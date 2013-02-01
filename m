@@ -1,200 +1,195 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 01 Feb 2013 20:09:24 +0100
-Subject: [PATCH v4 03/10] s5p-fimc: Add device tree support for FIMC-LITE
- devices
+Date: Fri, 01 Feb 2013 20:09:25 +0100
+Subject: [PATCH v4 04/10] s5p-fimc: Add device tree support for the main media
+ device driver
 In-Reply-To: <1359745771-23684-1-git-send-email-s.nawrocki@samsung.com>
 References: <1359745771-23684-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1359745771-23684-4-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1359745771-23684-5-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for binding the driver to FIMC-LITE devices
-instantiated from the device tree.
+This patch adds changes required for the main camera media device
+driver to be initialized on systems instantiated from the device tree.
+
+The platform devices corresponding to child nodes of the 'camera'
+node are looked up and and registered as sub-devices to the common
+media device. The main driver's probing is deferred if any of the
+sub-device drivers is not yet initialized and ready.
+
+An OF matching table is added for the main driver associated with
+the 'camera' node.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- .../devicetree/bindings/media/soc/samsung-fimc.txt |   15 +++++
- drivers/media/platform/s5p-fimc/fimc-lite.c        |   65 ++++++++++++++------
- 2 files changed, 61 insertions(+), 19 deletions(-)
+ drivers/media/platform/s5p-fimc/fimc-core.c    |    1 -
+ drivers/media/platform/s5p-fimc/fimc-mdevice.c |   77 +++++++++++++++++++++---
+ drivers/media/platform/s5p-fimc/fimc-mdevice.h |    4 ++
+ include/media/s5p_fimc.h                       |    1 +
+ 4 files changed, 75 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt b/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
-index 916b2c3..2b932f2 100644
---- a/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
-+++ b/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
-@@ -41,6 +41,21 @@ Optional properties
+diff --git a/drivers/media/platform/s5p-fimc/fimc-core.c b/drivers/media/platform/s5p-fimc/fimc-core.c
+index 07ca0e0..ba743a5 100644
+--- a/drivers/media/platform/s5p-fimc/fimc-core.c
++++ b/drivers/media/platform/s5p-fimc/fimc-core.c
+@@ -1276,7 +1276,6 @@ static const struct platform_device_id fimc_driver_ids[] = {
+ 	},
+ 	{ },
+ };
+-MODULE_DEVICE_TABLE(platform, fimc_driver_ids);
  
-  - clock-frequency - maximum FIMC local clock (LCLK) frequency
- 
-+'fimc-lite' device nodes
-+-----------------------
-+
-+Required properties:
-+
-+- compatible : should be "samsung,exynos4212-fimc" for Exynos4212 and
-+	       Exynos4412 SoCs;
-+- reg	     : physical base address and size of the device memory mapped
-+	       registers;
-+- interrupts : should contain FIMC-LITE interrupt;
-+
-+For every fimc-lite node a numbered alias should be present in the aliases
-+node. Aliases are in form of fimc-lite<n>, where <n> is an integer (0...N)
-+specifying the IP's instance index.
-+
- Example:
- 
- 	aliases {
-diff --git a/drivers/media/platform/s5p-fimc/fimc-lite.c b/drivers/media/platform/s5p-fimc/fimc-lite.c
-index e18babf..a0a70bc 100644
---- a/drivers/media/platform/s5p-fimc/fimc-lite.c
-+++ b/drivers/media/platform/s5p-fimc/fimc-lite.c
-@@ -17,6 +17,7 @@
+ static const struct of_device_id fimc_of_match[] = {
+ 	{
+diff --git a/drivers/media/platform/s5p-fimc/fimc-mdevice.c b/drivers/media/platform/s5p-fimc/fimc-mdevice.c
+index f49f6f1..c113734 100644
+--- a/drivers/media/platform/s5p-fimc/fimc-mdevice.c
++++ b/drivers/media/platform/s5p-fimc/fimc-mdevice.c
+@@ -17,6 +17,8 @@
  #include <linux/kernel.h>
  #include <linux/list.h>
  #include <linux/module.h>
 +#include <linux/of.h>
- #include <linux/types.h>
++#include <linux/of_platform.h>
  #include <linux/platform_device.h>
  #include <linux/pm_runtime.h>
-@@ -1480,18 +1481,34 @@ static int fimc_lite_clk_get(struct fimc_lite *fimc)
- 	return ret;
+ #include <linux/types.h>
+@@ -457,6 +459,51 @@ static int fimc_md_pdev_match(struct device *dev, void *data)
+ 	return 0;
  }
  
-+static const struct of_device_id flite_of_match[];
++/* Register FIMC, FIMC-LITE and CSIS media entities */
++#ifdef CONFIG_OF
++static int fimc_md_register_of_platform_entities(struct fimc_md *fmd,
++						 struct device_node *parent)
++{
++	struct device_node *node;
++	int ret = 0;
 +
- static int fimc_lite_probe(struct platform_device *pdev)
- {
--	struct flite_drvdata *drv_data = fimc_lite_get_drvdata(pdev);
-+	struct flite_drvdata *drv_data = NULL;
-+	struct device *dev = &pdev->dev;
-+	const struct of_device_id *of_id;
- 	struct fimc_lite *fimc;
- 	struct resource *res;
- 	int ret;
- 
--	fimc = devm_kzalloc(&pdev->dev, sizeof(*fimc), GFP_KERNEL);
-+	fimc = devm_kzalloc(dev, sizeof(*fimc), GFP_KERNEL);
- 	if (!fimc)
- 		return -ENOMEM;
- 
--	fimc->index = pdev->id;
-+	if (dev->of_node) {
-+		of_id = of_match_node(flite_of_match, dev->of_node);
-+		if (of_id)
-+			drv_data = (struct flite_drvdata *)of_id->data;
-+		fimc->index = of_alias_get_id(dev->of_node, "fimc-lite");
-+	} else {
-+		drv_data = fimc_lite_get_drvdata(pdev);
-+		fimc->index = pdev->id;
++	for_each_available_child_of_node(parent, node) {
++		struct platform_device *pdev;
++		int plat_entity = -1;
++
++		pdev = of_find_device_by_node(node);
++		if (!pdev)
++			continue;
++
++		/* If driver of any entity isn't ready try all again later. */
++		if (!strcmp(node->name, CSIS_OF_NODE_NAME))
++			plat_entity = IDX_CSIS;
++		else if (!strcmp(node->name, FIMC_LITE_OF_NODE_NAME))
++			plat_entity = IDX_FLITE;
++		else if	(!strcmp(node->name, FIMC_OF_NODE_NAME))
++			plat_entity = IDX_FIMC;
++
++		if (plat_entity >= 0)
++			ret = fimc_md_register_platform_entity(fmd, pdev,
++							plat_entity);
++		put_device(&pdev->dev);
++		if (ret < 0)
++			break;
++
++		/* FIMC-IS child devices */
++		if (plat_entity == IDX_IS_ISP) {
++			ret = fimc_md_register_of_platform_entities(fmd, node);
++			if (ret < 0)
++				break;
++		}
 +	}
 +
-+	if (!drv_data || fimc->index < 0 || fimc->index >= FIMC_LITE_MAX_DEVS)
-+		return -EINVAL;
++	return ret;
++}
++#else
++#define fimc_md_register_platform_entities(fmd) (-ENOSYS)
++#endif
 +
- 	fimc->variant = drv_data->variant[fimc->index];
- 	fimc->pdev = pdev;
+ static void fimc_md_unregister_entities(struct fimc_md *fmd)
+ {
+ 	int i;
+@@ -948,8 +995,8 @@ static int fimc_md_probe(struct platform_device *pdev)
+ 	v4l2_dev = &fmd->v4l2_dev;
+ 	v4l2_dev->mdev = &fmd->media_dev;
+ 	v4l2_dev->notify = fimc_sensor_notify;
+-	snprintf(v4l2_dev->name, sizeof(v4l2_dev->name), "%s",
+-		 dev_name(&pdev->dev));
++	strlcpy(v4l2_dev->name, "s5p-fimc-md", sizeof(v4l2_dev->name));
++
  
-@@ -1500,15 +1517,15 @@ static int fimc_lite_probe(struct platform_device *pdev)
- 	mutex_init(&fimc->lock);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	fimc->regs = devm_request_and_ioremap(&pdev->dev, res);
-+	fimc->regs = devm_request_and_ioremap(dev, res);
- 	if (fimc->regs == NULL) {
--		dev_err(&pdev->dev, "Failed to obtain io memory\n");
-+		dev_err(dev, "Failed to obtain io memory\n");
- 		return -ENOENT;
- 	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	if (res == NULL) {
--		dev_err(&pdev->dev, "Failed to get IRQ resource\n");
-+		dev_err(dev, "Failed to get IRQ resource\n");
- 		return -ENXIO;
- 	}
- 
-@@ -1516,10 +1533,10 @@ static int fimc_lite_probe(struct platform_device *pdev)
+ 	ret = v4l2_device_register(&pdev->dev, &fmd->v4l2_dev);
+ 	if (ret < 0) {
+@@ -965,13 +1012,16 @@ static int fimc_md_probe(struct platform_device *pdev)
  	if (ret)
- 		return ret;
- 
--	ret = devm_request_irq(&pdev->dev, res->start, flite_irq_handler,
--			       0, dev_name(&pdev->dev), fimc);
-+	ret = devm_request_irq(dev, res->start, flite_irq_handler,
-+			       0, dev_name(dev), fimc);
- 	if (ret) {
--		dev_err(&pdev->dev, "Failed to install irq (%d)\n", ret);
-+		dev_err(dev, "Failed to install irq (%d)\n", ret);
- 		goto err_clk;
- 	}
- 
-@@ -1529,23 +1546,23 @@ static int fimc_lite_probe(struct platform_device *pdev)
  		goto err_clk;
  
- 	platform_set_drvdata(pdev, fimc);
--	pm_runtime_enable(&pdev->dev);
--	ret = pm_runtime_get_sync(&pdev->dev);
-+	pm_runtime_enable(dev);
-+	ret = pm_runtime_get_sync(dev);
- 	if (ret < 0)
- 		goto err_sd;
+-	fmd->user_subdev_api = false;
++	fmd->user_subdev_api = (dev->of_node != NULL);
  
--	fimc->alloc_ctx = vb2_dma_contig_init_ctx(&pdev->dev);
-+	fimc->alloc_ctx = vb2_dma_contig_init_ctx(dev);
- 	if (IS_ERR(fimc->alloc_ctx)) {
- 		ret = PTR_ERR(fimc->alloc_ctx);
- 		goto err_pm;
- 	}
--	pm_runtime_put(&pdev->dev);
-+	pm_runtime_put(dev);
+ 	/* Protect the media graph while we're registering entities */
+ 	mutex_lock(&fmd->media_dev.graph_mutex);
  
--	dev_dbg(&pdev->dev, "FIMC-LITE.%d registered successfully\n",
-+	dev_dbg(dev, "FIMC-LITE.%d registered successfully\n",
- 		fimc->index);
- 	return 0;
- err_pm:
--	pm_runtime_put(&pdev->dev);
-+	pm_runtime_put(dev);
- err_sd:
- 	fimc_lite_unregister_capture_subdev(fimc);
- err_clk:
-@@ -1636,6 +1653,12 @@ static int fimc_lite_remove(struct platform_device *pdev)
+-	ret = bus_for_each_dev(&platform_bus_type, NULL, fmd,
+-					fimc_md_pdev_match);
++	if (fmd->pdev->dev.of_node)
++		ret = fimc_md_register_of_platform_entities(fmd, dev->of_node);
++	else
++		ret = bus_for_each_dev(&platform_bus_type, NULL, fmd,
++						fimc_md_pdev_match);
+ 	if (ret)
+ 		goto err_unlock;
+ 
+@@ -1019,12 +1069,25 @@ static int fimc_md_remove(struct platform_device *pdev)
  	return 0;
  }
  
-+static const struct dev_pm_ops fimc_lite_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(fimc_lite_suspend, fimc_lite_resume)
-+	SET_RUNTIME_PM_OPS(fimc_lite_runtime_suspend, fimc_lite_runtime_resume,
-+			   NULL)
++static struct platform_device_id fimc_driver_ids[] __always_unused = {
++	{ .name = "s5p-fimc-md" },
++	{ },
 +};
++MODULE_DEVICE_TABLE(platform, fimc_driver_ids);
 +
- static struct flite_variant fimc_lite0_variant_exynos4 = {
- 	.max_width		= 8192,
- 	.max_height		= 8192,
-@@ -1661,17 +1684,21 @@ static struct platform_device_id fimc_lite_driver_ids[] = {
- };
- MODULE_DEVICE_TABLE(platform, fimc_lite_driver_ids);
- 
--static const struct dev_pm_ops fimc_lite_pm_ops = {
--	SET_SYSTEM_SLEEP_PM_OPS(fimc_lite_suspend, fimc_lite_resume)
--	SET_RUNTIME_PM_OPS(fimc_lite_runtime_suspend, fimc_lite_runtime_resume,
--			   NULL)
-+static const struct of_device_id flite_of_match[] = {
-+	{
-+		.compatible = "samsung,exynos4212-fimc-lite",
-+		.data = &fimc_lite_drvdata_exynos4,
-+	},
-+	{ /* sentinel */ },
- };
-+MODULE_DEVICE_TABLE(of, flite_of_match);
- 
- static struct platform_driver fimc_lite_driver = {
- 	.probe		= fimc_lite_probe,
- 	.remove		= fimc_lite_remove,
- 	.id_table	= fimc_lite_driver_ids,
++static const struct of_device_id fimc_md_of_match[] __initconst = {
++	{ .compatible = "samsung,fimc" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, fimc_md_of_match);
++
+ static struct platform_driver fimc_md_driver = {
+ 	.probe		= fimc_md_probe,
+ 	.remove		= fimc_md_remove,
  	.driver = {
-+		.of_match_table = flite_of_match,
- 		.name		= FIMC_LITE_DRV_NAME,
- 		.owner		= THIS_MODULE,
- 		.pm		= &fimc_lite_pm_ops,
+-		.name	= "s5p-fimc-md",
+-		.owner	= THIS_MODULE,
++		.of_match_table = fimc_md_of_match,
++		.name		= "s5p-fimc-md",
++		.owner		= THIS_MODULE,
+ 	}
+ };
+ 
+diff --git a/drivers/media/platform/s5p-fimc/fimc-mdevice.h b/drivers/media/platform/s5p-fimc/fimc-mdevice.h
+index 06b0d82..f3e0251 100644
+--- a/drivers/media/platform/s5p-fimc/fimc-mdevice.h
++++ b/drivers/media/platform/s5p-fimc/fimc-mdevice.h
+@@ -21,6 +21,10 @@
+ #include "fimc-lite.h"
+ #include "mipi-csis.h"
+ 
++#define FIMC_OF_NODE_NAME	"fimc"
++#define FIMC_LITE_OF_NODE_NAME	"fimc-lite"
++#define CSIS_OF_NODE_NAME	"csis"
++
+ /* Group IDs of sensor, MIPI-CSIS, FIMC-LITE and the writeback subdevs. */
+ #define GRP_ID_SENSOR		(1 << 8)
+ #define GRP_ID_FIMC_IS_SENSOR	(1 << 9)
+diff --git a/include/media/s5p_fimc.h b/include/media/s5p_fimc.h
+index 28f3590..17fd2fa 100644
+--- a/include/media/s5p_fimc.h
++++ b/include/media/s5p_fimc.h
+@@ -81,6 +81,7 @@ enum fimc_subdev_index {
+ 	IDX_SENSOR,
+ 	IDX_CSIS,
+ 	IDX_FLITE,
++	IDX_IS_ISP,
+ 	IDX_FIMC,
+ 	IDX_MAX,
+ };
 -- 
 1.7.9.5
