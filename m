@@ -1,106 +1,60 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Feb 2013 11:31:52 +0530
-Subject: [PATCH v3 12/15] drivers/bus: add ARM CCI support
-In-Reply-To: <1359445870-18925-13-git-send-email-nicolas.pitre@linaro.org>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-13-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <510B5A50.3090003@ti.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Fri, 1 Feb 2013 08:01:41 +0200
+Subject: [PATCH v6 03/10] ARM: edma: add AM33XX support to the private
+ EDMA API
+In-Reply-To: <20130131214241.GJ2244@beef>
+References: <1359529229-22207-1-git-send-email-mporter@ti.com>
+ <201301300932.58732.arnd@arndb.de> <20130131183255.GI2244@beef>
+ <6932828d68394f71ba6df8e6bf608635@DFLE72.ent.ti.com>
+ <20130131214241.GJ2244@beef>
+Message-ID: <1359698501.14894.74.camel@cumari.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
-> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->
-> On ARM multi-cluster systems coherency between cores running on
-> different clusters is managed by the cache-coherent interconnect (CCI).
-> It allows broadcasting of TLB invalidates and memory barriers and it
-> guarantees cache coherency at system level.
->
-> This patch enables the basic infrastructure required in Linux to
-> handle and programme the CCI component. The first implementation is
-> based on a platform device, its relative DT compatible property and
-> a simple programming interface.
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->   drivers/bus/Kconfig     |   4 ++
->   drivers/bus/Makefile    |   2 +
->   drivers/bus/arm-cci.c   | 107 ++++++++++++++++++++++++++++++++++++++++++++++++
->   include/linux/arm-cci.h |  30 ++++++++++++++
->   4 files changed, 143 insertions(+)
->   create mode 100644 drivers/bus/arm-cci.c
->   create mode 100644 include/linux/arm-cci.h
->
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index 0f51ed687d..d032f74ff2 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -19,4 +19,8 @@ config OMAP_INTERCONNECT
->
->   	help
->   	  Driver to enable OMAP interconnect error handling driver.
-> +
-> +config ARM_CCI
-> +       bool "ARM CCI driver support"
-> +
->   endmenu
-> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-> index 45d997c854..55aac809e5 100644
-> --- a/drivers/bus/Makefile
-> +++ b/drivers/bus/Makefile
-> @@ -6,3 +6,5 @@ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
->
->   # Interconnect bus driver for OMAP SoCs.
->   obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
-> +
-> +obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> new file mode 100644
-> index 0000000000..25ae156924
-> --- /dev/null
-> +++ b/drivers/bus/arm-cci.c
-> @@ -0,0 +1,107 @@
-> +/*
-> + * ARM Cache Coherency Interconnect (CCI400) support
-> + *
-> + * Copyright (C) 2012-2013 ARM Ltd.
-> + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/arm-cci.h>
-> +
-> +#define CCI400_EAG_OFFSET       0x4000
-> +#define CCI400_KF_OFFSET        0x5000
-> +
-> +#define DRIVER_NAME	"CCI"
-> +struct cci_drvdata {
-> +	void __iomem *baseaddr;
-> +	spinlock_t lock;
-> +};
-> +
-> +static struct cci_drvdata *info;
-> +
-> +void disable_cci(int cluster)
-> +{
-> +	u32 cci_reg = cluster ? CCI400_KF_OFFSET : CCI400_EAG_OFFSET;
-> +	writel_relaxed(0x0, info->baseaddr	+ cci_reg);
-> +
-> +	while (readl_relaxed(info->baseaddr + 0xc) & 0x1)
-0xc ? Is that a status register ? A define for the same would be
-good. Rest of the patch looks fine.
+On Thu, 2013-01-31 at 16:42 -0500, Matt Porter wrote:
+> On Thu, Jan 31, 2013 at 08:58:39PM +0000, Arnd Bergmann wrote:
+> > On Thursday 31 January 2013, Matt Porter wrote:
+> > > On Wed, Jan 30, 2013 at 09:32:58AM +0000, Arnd Bergmann wrote:
+> > > > On Wednesday 30 January 2013, Matt Porter wrote:
+> > > > > +               dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
+> > > > > +               of_dma_controller_register(dev->of_node,
+> > > > > +                                          of_dma_simple_xlate,
+> > > > > +                                          &edma_filter_info);
+> > > > > +       }
+> > > > 
+> > > > How do you actually deal with the problem mentioned by Padma, that
+> > > > the filter function does not know which edma instance it is looking
+> > > > at? If you assume that there can only be a single edma instance in
+> > > > the system, that is probably a limitation that should be documented
+> > > > somewhere, and ideally the probe() function should check for that.
+> > > 
+> > > I make an assumption of one edma instance in the system in the case of
+> > > DT being populated. This is always true right now as the only SoC with
+> > > two EDMA controllers in existence is Davinci DA850. Until recently,
+> > > Davinci had no DT support. Given the steady work being done today on DT
+> > > support for DA850, it'll probably be something needed in 3.10.
+> > > 
+> > > I will add a comment and check in probe() to capture this assumption
+> > > and then plan to update separately to support DA850 booting from DT.
+> > 
+> > Ok, sounds good. Hopefully by then we will already have a nicer
+> > way to write an xlate function that does not rely on a filter
+> > function.
+> 
+> Yes, it would be nice to avoid what Padma had to do. I should have
+> mentioned also that the second EDMA on DA850 has no DMA events of
+> immediate use on it anyway. All the in-kernel users use events on the
+> first controller, except for the second MMC instance. That's only used
+> for a wl12xx module on the EVM and that driver has no DT support so it
+> doesn't matter yet in the DT case. Because of this, DA850 can actually
+> add EDMA DT support immediately (on top of this series) and add DMA
+> support to the DT support already posted for the Davinci SPI and MMC
+> client drivers.
 
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+I haven't followed this whole discussion in details, but please notice
+that I'm aiming to get DT support for the WiLink modules (wlcore,
+wl12xx...) for 3.10. ;)
+
+--
+Cheers,
+Luca.
