@@ -1,56 +1,61 @@
 From: mporter@ti.com (Matt Porter)
-Date: Fri,  1 Feb 2013 13:22:52 -0500
-Subject: [PATCH v7 07/10] dmaengine: add dma_request_slave_channel_compat()
+Date: Fri,  1 Feb 2013 13:22:54 -0500
+Subject: [PATCH v7 09/10] spi: omap2-mcspi: add generic DMA request support to
+ the DT binding
 In-Reply-To: <1359742975-10421-1-git-send-email-mporter@ti.com>
 References: <1359742975-10421-1-git-send-email-mporter@ti.com>
-Message-ID: <1359742975-10421-8-git-send-email-mporter@ti.com>
+Message-ID: <1359742975-10421-10-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a dma_request_slave_channel_compat() wrapper which accepts
-both the arguments from dma_request_channel() and
-dma_request_slave_channel(). Based on whether the driver is
-instantiated via DT, the appropriate channel request call will be
-made.
+The binding definition is based on the generic DMA request binding
 
-This allows for a much cleaner migration of drivers to the
-dmaengine DT API as platforms continue to be mixed between those
-that boot using DT and those that do not.
-
-Suggested-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Matt Porter <mporter@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- include/linux/dmaengine.h |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index bfcdecb..17d8ffd 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -1001,6 +1001,22 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
- struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
- struct dma_chan *net_dma_find_channel(void);
- #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
-+#define dma_request_slave_channel_compat(mask, x, y, dev, name) \
-+	__dma_request_slave_channel_compat(&(mask), x, y, dev, name)
-+
-+static inline struct dma_chan
-+*__dma_request_slave_channel_compat(dma_cap_mask_t *mask, dma_filter_fn fn,
-+				  void *fn_param, struct device *dev,
-+				  char *name)
-+{
-+	struct dma_chan *chan;
-+
-+	chan = dma_request_slave_channel(dev, name);
-+	if (chan)
-+		return chan;
-+
-+	return __dma_request_channel(mask, fn, fn_param);
-+}
+diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
+index 938809c..4c85c4c 100644
+--- a/Documentation/devicetree/bindings/spi/omap-spi.txt
++++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
+@@ -10,7 +10,18 @@ Required properties:
+ 			  input. The default is D0 as input and
+ 			  D1 as output.
  
- /* --- Helper iov-locking functions --- */
+-Example:
++Optional properties:
++- dmas: List of DMA specifiers with the controller specific format
++	as described in the generic DMA client binding. A tx and rx
++	specifier is required for each chip select.
++- dma-names: List of DMA request names. These strings correspond
++	1:1 with the DMA specifiers listed in dmas. The string naming
++	is to be "rxN" and "txN" for RX and TX requests,
++	respectively, where N equals the chip select number.
++
++Examples:
++
++[hwmod populated DMA resources]
  
+ mcspi1: mcspi at 1 {
+     #address-cells = <1>;
+@@ -20,3 +31,17 @@ mcspi1: mcspi at 1 {
+     ti,spi-num-cs = <4>;
+ };
+ 
++[generic DMA request binding]
++
++mcspi1: mcspi at 1 {
++    #address-cells = <1>;
++    #size-cells = <0>;
++    compatible = "ti,omap4-mcspi";
++    ti,hwmods = "mcspi1";
++    ti,spi-num-cs = <2>;
++    dmas = <&edma 42
++	    &edma 43
++	    &edma 44
++	    &edma 45>;
++    dma-names = "tx0", "rx0", "tx1", "rx1";
++};
 -- 
 1.7.9.5
