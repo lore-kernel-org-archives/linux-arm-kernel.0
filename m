@@ -1,125 +1,59 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Sat, 2 Feb 2013 13:37:21 -0800
-Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
- socfpga harware
-In-Reply-To: <20130202192409.GA17736@amd.pavel.ucw.cz>
-References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
- <1359651943-21752-5-git-send-email-dinguyen@altera.com>
- <20130201035040.GE4838@quad.lixom.net>
- <20130201104655.GA3124@amd.pavel.ucw.cz>
- <71B37E0559AC6849A68C5BA94C509FB45A63D4E47D@SJ-ITMSG02.altera.priv.altera.com>
- <20130201153152.GS23505@n2100.arm.linux.org.uk>
- <1359736762.2932.1.camel@linux-builds1>
- <20130202192409.GA17736@amd.pavel.ucw.cz>
-Message-ID: <71B37E0559AC6849A68C5BA94C509FB45A645BA4EA@SJ-ITMSG02.altera.priv.altera.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Sat, 2 Feb 2013 14:50:36 -0700
+Subject: [PATCH v3 00/22] PCI: Iterate pci host bridge instead of pci root
+ bus
+In-Reply-To: <1359314629-18651-1-git-send-email-yinghai@kernel.org>
+References: <CAE9FiQXHG01NjnYNDbC-KEpbcvY-q4pBe97CxTOGS7W4vZQBYQ@mail.gmail.com>
+ <1359314629-18651-1-git-send-email-yinghai@kernel.org>
+Message-ID: <CAErSpo6r_LNEtYB3j5ELb8NdHu0a6_YOVj8S32CmByGFUpSsbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Sun, Jan 27, 2013 at 12:23 PM, Yinghai Lu <yinghai@kernel.org> wrote:
+> Now we have pci_root_buses list, and there is lots of iteration with
+> list_of_each of it, that is not safe after we add pci root bus hotplug
+> support after booting stage.
+>
+> Add pci_get_next_host_bridge and use bus_find_device in driver core to
+> iterate host bridge and the same time get root bus.
+>
+> We replace searching root bus with searching host_bridge,
+> as host_bridge->bus is the root bus.
+> After those replacing, we even could kill pci_root_buses list.
 
-> -----Original Message-----
-> From: ZY - pavel
-> Sent: Saturday, February 02, 2013 1:24 PM
-> To: Dinh Nguyen
-> Cc: Russell King - ARM Linux; olof at lixom.net; linux-arm-
-> kernel at lists.infradead.org; arnd at arndb.de
-> Subject: Re: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for
-> actual socfpga harware
->
-> Hi!
->
-> > > > > I actually thought about that... but could not think of non-
-> ugly way
-> > > > > of doing that. I hope dts will normally be "right" for any
-> production
-> > > > > system...
-> > > >
-> > > > I think a panic is better just for the reason that if someone is
-> > > > expecting SMP, but missed the warning message, and later finds
-> out that
-> > > > the secondary core never came up, it would save some debugging
-> time.
-> > > >
-> > > > Since I have to send out a v3 from the 1st patch anyways, let me
-> verify
-> > > > that I can get the early warning.
-> > >
-> > > The choice is between a panic() at a point where the only way to
-> find
-> > > out is to throw in printascii() or a working printk, and ending up
-> with
-> > > an unbootable kernel, vs continuing the boot and having an almost
-> > > working system which can be logged into and the messages viewed.
-> > >
-> > > If you have an application which relies on the second CPU coming
-> up,
-> > > why not have it verify that the second CPU came up (it's quite easy
-> > > to do - there's POSIX standard libc calls to get the number of
-> online
-> > > CPUs).
-> >
-> > Point taken...thanks Russell.
->
-> Well, I don't think we normally check dtbs for validity with
-> user-helpful error messages, but it is relatively easy in this case.
->
-> ---cut here---
->
-> Continue booting with second core disabled if cpu1-start-addr is not
-> present in .dtb.
->
-> Signed-off-by: Pavel Machek <pavel@denx.de>
->
-> diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-
-> socfpga/platsmp.c
-> index 81e0da0..90facdd 100644
-> --- a/arch/arm/mach-socfpga/platsmp.c
-> +++ b/arch/arm/mach-socfpga/platsmp.c
-> @@ -82,6 +82,9 @@ static void __init socfpga_smp_init_cpus(void)
->               ncores = 1;
->       }
->  #endif
-> +     if (!cpu1start_addr)
-> +             ncores = 1;
-> +
+These are the problems I think you're fixing:
 
-This will not work because of commit 5587164eea4aad88fcb79d9b21dc8f14fea598cd
-I sent out a V3 series of this patch, CPU1 will simply fail to come online if
-cpu1-start-addr is not defined.
+1) pci_find_next_bus() is not safe because even though it holds
+pci_bus_sem while walking the pci_root_buses list, it doesn't hold a
+reference on the bus it returns.  The bus could be removed while the
+caller is using it.
 
-Dinh
+2) "list_for_each_entry(bus, &pci_root_buses, node)" is not safe
+because hotplug might modify the pci_root_buses list.  Replacing that
+with for_each_pci_host_bridge() solves that problem by using
+bus_find_device(), which is built on klists, which are designed for
+that problem.
 
->       for (i = 0; i < ncores; i++)
->               set_cpu_possible(i, true);
->
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-
-> socfpga/socfpga.c
-> index 334c330..c3cd88b 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -74,10 +74,9 @@ static void __init socfpga_sysmgr_init(void)
->
->       np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
->
-> -     if (of_property_read_u32(np, "cpu1-start-addr", (u32 *)
-> &cpu1start_addr)) {
-> -             early_printk("Need cpu1-start-addr in device tree.\n");
-> -             panic("Need cpu1-start-addr in device tree.\n");
-> -     }
-> +     if (of_property_read_u32(np, "cpu1-start-addr", (u32 *)
-> &cpu1start_addr))
-> +             printk(KERN_ALERT "Need cpu1-start-addr in device tree for
-> SMP operation.\n");
-> +
->       sys_manager_base_addr = of_iomap(np, 0);
->
->       np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
->
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures)
-> http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+3) pci_find_next_bus() claims to iterate through all known PCI buses,
+but in fact only iterates through root buses.
 
+So far, so good.  Those are problems we need to fix.
 
-Confidentiality Notice.
-This message may contain information that is confidential or otherwise protected from disclosure. If you are not the intended recipient, you are hereby notified that any use, disclosure, dissemination, distribution,  or copying  of this message, or any attachments, is strictly prohibited.  If you have received this message in error, please advise the sender by reply e-mail, and delete the message and any attachments.  Thank you.
+Your solution is to introduce for_each_pci_host_bridge() as an
+iterator through the known host bridges.  There are two scenarios
+where we use something like this:
+
+1) We want to perform an operation on every known host bridge.
+
+2) We want to initialize something for every host bridge.
+
+In my opinion, the only instance of scenario 1) is bus_rescan_store(),
+where we want to rescan all PCI host bridges.
+
+In every other case, we're doing some kind of initialization of all
+the host bridges.  For these cases, for_each_pci_host_bridge() is the
+wrong solution because it doesn't work for hot-added bridges.  I think
+these cases should be changed to use pcibios_root_bridge_prepare() or
+something something else called in the host bridge add path.
+
+Bjorn
