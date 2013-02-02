@@ -1,295 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat,  2 Feb 2013 15:35:48 +0100
-Subject: [PATCH v3 3/4] Thermal: Dove: Add Themal sensor support for Dove.
-In-Reply-To: <1359815749-27705-1-git-send-email-andrew@lunn.ch>
-References: <1359815749-27705-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1359815749-27705-4-git-send-email-andrew@lunn.ch>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Sat,  2 Feb 2013 23:44:04 +0900
+Subject: [PATCH 0/2] gpiolib: remove gpiochip_reserve()
+Message-ID: <1359816246-3979-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Dove SoC has a thermal sensor. Add a driver using the
-thermal framework.
+The Tosa (Sharp SL-C6000x) target is the last remaining user of
+gpiochip_reserve(). I would like to get rid of this function as part of my
+project to totally remove the big static gpio_desc[] array of gpiolib. Patches
+that achieve this are written and working, but the presence of
+gpiochip_reserve() makes it necessary to maintain a list of "reserved" ranges
+in the GPIO space, which complexifies code that would be much simpler
+otherwise.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
- .../devicetree/bindings/thermal/dove-thermal.txt   |   18 ++
- drivers/thermal/Kconfig                            |    7 +
- drivers/thermal/Makefile                           |    1 +
- drivers/thermal/dove_thermal.c                     |  211 ++++++++++++++++++++
- 4 files changed, 237 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/dove-thermal.txt
- create mode 100644 drivers/thermal/dove_thermal.c
+Even for Tosa the use of gpiochip_reserve() does not seem necessary - all GPIO
+controllers have their own base GPIO set AFAICT, so there should be no need to
+use it. And without any user in the kernel, there should be no reason to keep
+this function.
 
-diff --git a/Documentation/devicetree/bindings/thermal/dove-thermal.txt b/Documentation/devicetree/bindings/thermal/dove-thermal.txt
-new file mode 100644
-index 0000000..6f47467
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/dove-thermal.txt
-@@ -0,0 +1,18 @@
-+* Dove Thermal
-+
-+This driver is for Dove SoCs which contain a thermal sensor.
-+
-+Required properties:
-+- compatible : "marvell,dove-thermal"
-+- reg : Address range of the thermal registers
-+
-+The reg properties should contain two ranges. The first is for the
-+three Thermal Manager registers, while the second range contains the
-+Thermal Diode Control Registers.
-+
-+Example:
-+
-+	thermal at 10078 {
-+		compatible = "marvell,dove-thermal";
-+		reg = <0xd001c 0x0c>, <0xd005c 0x08>;
-+	};
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index e691500..cdc267e 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -108,6 +108,13 @@ config EXYNOS_THERMAL
- 	  If you say yes here you get support for TMU (Thermal Management
- 	  Unit) on SAMSUNG EXYNOS series of SoC.
- 
-+config DOVE_THERMAL
-+	tristate "Temperature sensor on Marvell Dove SoCs"
-+	depends on ARCH_DOVE
-+	help
-+	  Support for the Dove thermal sensor driver in the Linux thermal
-+	  framework.
-+
- config DB8500_THERMAL
- 	bool "DB8500 thermal management"
- 	depends on ARCH_U8500
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index 99026b2..5ed357e 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -17,5 +17,6 @@ obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
- obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
- obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
- obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
-+obj-$(CONFIG_DOVE_THERMAL)  	+= dove_thermal.o
- obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
- obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
-diff --git a/drivers/thermal/dove_thermal.c b/drivers/thermal/dove_thermal.c
-new file mode 100644
-index 0000000..3a92b55
---- /dev/null
-+++ b/drivers/thermal/dove_thermal.c
-@@ -0,0 +1,211 @@
-+/*
-+ * Dove thermal sensor driver
-+ *
-+ * Copyright (C) 2013 Andrew Lunn <andrew@lunn.ch>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/thermal.h>
-+
-+#define DOVE_THERMAL_TEMP_OFFSET	1
-+#define DOVE_THERMAL_TEMP_MASK		0x1FF
-+
-+/* Dove Thermal Manager Control and Status Register */
-+#define PMU_TM_DISABLE_OFFS		0
-+#define PMU_TM_DISABLE_MASK		(0x1 << PMU_TM_DISABLE_OFFS)
-+
-+/* Dove Theraml Diode Control 0 Register */
-+#define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
-+#define PMU_TDC0_SEL_VCAL_OFFS		5
-+#define PMU_TDC0_SEL_VCAL_MASK		(0x3 << PMU_TDC0_SEL_VCAL_OFFS)
-+#define PMU_TDC0_REF_CAL_CNT_OFFS	11
-+#define PMU_TDC0_REF_CAL_CNT_MASK	(0x1FF << PMU_TDC0_REF_CAL_CNT_OFFS)
-+#define PMU_TDC0_AVG_NUM_OFFS		25
-+#define PMU_TDC0_AVG_NUM_MASK		(0x7 << PMU_TDC0_AVG_NUM_OFFS)
-+
-+/* Dove Thermal Diode Control 1 Register */
-+#define PMU_TEMP_DIOD_CTRL1_REG		0x04
-+#define PMU_TDC1_TEMP_VALID_MASK	(0x1 << 10)
-+
-+/* Dove Thermal Sensor Dev Structure */
-+struct dove_thermal_priv {
-+	void __iomem *sensor;
-+	void __iomem *control;
-+};
-+
-+static int dove_init_sensor(const struct dove_thermal_priv *priv)
-+{
-+	u32 reg;
-+	u32 i;
-+
-+	/* Configure the Diode Control Register #0 */
-+	reg = readl_relaxed(priv->control);
-+
-+	/* Use average of 2 */
-+	reg &= ~PMU_TDC0_AVG_NUM_MASK;
-+	reg |= (0x1 << PMU_TDC0_AVG_NUM_OFFS);
-+
-+	/* Reference calibration value */
-+	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-+	reg |= (0x0F1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-+
-+	/* Set the high level reference for calibration */
-+	reg &= ~PMU_TDC0_SEL_VCAL_MASK;
-+	reg |= (0x2 << PMU_TDC0_SEL_VCAL_OFFS);
-+	writel(reg, priv->control);
-+
-+	/* Reset the sensor */
-+	reg = readl_relaxed(priv->control);
-+	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
-+	writel(reg, priv->control);
-+
-+	/* Enable the sensor */
-+	reg = readl_relaxed(priv->sensor);
-+	reg &= ~PMU_TM_DISABLE_MASK;
-+	writel(reg, priv->sensor);
-+
-+	/* Poll the sensor for the first reading */
-+	for (i = 0; i < 1000000; i++) {
-+		reg = readl_relaxed(priv->sensor);
-+		if (reg & DOVE_THERMAL_TEMP_MASK)
-+			break;
-+	}
-+
-+	if (i == 1000000)
-+		return -EIO;
-+
-+	return 0;
-+}
-+
-+static int dove_get_temp(struct thermal_zone_device *thermal,
-+			  unsigned long *temp)
-+{
-+	unsigned long reg;
-+	struct dove_thermal_priv *priv = thermal->devdata;
-+
-+	/* Valid check */
-+	reg = readl_relaxed(priv->control + PMU_TEMP_DIOD_CTRL1_REG);
-+	if ((reg & PMU_TDC1_TEMP_VALID_MASK) == 0x0) {
-+		dev_err(&thermal->device,
-+			"Temperature sensor reading not valid\n");
-+		return -EIO;
-+	}
-+
-+	/*
-+	 * Calculate temperature. See Section 8.10.1 of 88AP510,
-+	 * Documentation/arm/Marvell/README
-+	 */
-+	reg = readl_relaxed(priv->sensor);
-+	reg = (reg >> DOVE_THERMAL_TEMP_OFFSET) & DOVE_THERMAL_TEMP_MASK;
-+	*temp = ((2281638UL - (7298*reg)) / 10);
-+
-+	return 0;
-+}
-+
-+static struct thermal_zone_device_ops ops = {
-+	.get_temp = dove_get_temp,
-+};
-+
-+static const struct of_device_id dove_thermal_id_table[] = {
-+	{ .compatible = "marvell,dove-thermal" },
-+	{}
-+};
-+
-+static int dove_thermal_probe(struct platform_device *pdev)
-+{
-+	struct thermal_zone_device *thermal = NULL;
-+	struct dove_thermal_priv *priv;
-+	struct resource *res;
-+	int ret;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get platform resource\n");
-+		return -ENODEV;
-+	}
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv) {
-+		dev_err(&pdev->dev, "kzalloc fail\n");
-+		return -ENOMEM;
-+	}
-+
-+	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!priv->sensor) {
-+		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
-+		return -EADDRNOTAVAIL;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get platform resource\n");
-+		return -ENODEV;
-+	}
-+	priv->control = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!priv->control) {
-+		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
-+		return -EADDRNOTAVAIL;
-+	}
-+
-+	ret = dove_init_sensor(priv);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to initialize sensor\n");
-+		return ret;
-+	}
-+
-+	thermal = thermal_zone_device_register("dove_thermal", 0, 0,
-+					       priv, &ops, NULL, 0, 0);
-+	if (IS_ERR(thermal)) {
-+		dev_err(&pdev->dev,
-+			"Failed to register thermal zone device\n");
-+		return PTR_ERR(thermal);
-+	}
-+
-+	platform_set_drvdata(pdev, thermal);
-+
-+	return 0;
-+}
-+
-+static int dove_thermal_exit(struct platform_device *pdev)
-+{
-+	struct thermal_zone_device *dove_thermal =
-+		platform_get_drvdata(pdev);
-+
-+	thermal_zone_device_unregister(dove_thermal);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+MODULE_DEVICE_TABLE(of, dove_thermal_id_table);
-+
-+static struct platform_driver dove_thermal_driver = {
-+	.probe = dove_thermal_probe,
-+	.remove = dove_thermal_exit,
-+	.driver = {
-+		.name = "dove_thermal",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(dove_thermal_id_table),
-+	},
-+};
-+
-+module_platform_driver(dove_thermal_driver);
-+
-+MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
-+MODULE_DESCRIPTION("Dove thermal driver");
-+MODULE_LICENSE("GPL");
+If Dmitri could give his Acked-by or Tested-by and one of the GPIO maintainers
+merge this series, I could go ahead with the deeper changes to gpiolib.
+
+Thanks,
+
+Alexandre Courbot (2):
+  arm: pxa: tosa: do not use gpiochip_reserve()
+  gpiolib: remove gpiochip_reserve()
+
+ arch/arm/mach-pxa/tosa.c   |  6 -----
+ drivers/gpio/gpiolib.c     | 58 +++++++---------------------------------------
+ include/asm-generic/gpio.h |  1 -
+ 3 files changed, 8 insertions(+), 57 deletions(-)
+
 -- 
-1.7.10.4
+1.8.1.1
