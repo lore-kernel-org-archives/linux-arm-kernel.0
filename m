@@ -1,75 +1,87 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 02 Feb 2013 23:06:06 +0400
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130202180747.GS2244@beef>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com>
- <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
- <20130201184915.GP2244@beef>
- <2077c13e12314dc3adc8e5b653855da0@DFLE72.ent.ti.com>
- <20130201185959.GQ2244@beef>
- <e9be6668da8b4372a04687847daa1d8c@DFLE72.ent.ti.com>
- <20130202180747.GS2244@beef>
-Message-ID: <510D639E.3060706@mvista.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Sat, 2 Feb 2013 20:24:09 +0100
+Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
+ socfpga harware
+In-Reply-To: <1359736762.2932.1.camel@linux-builds1>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-5-git-send-email-dinguyen@altera.com>
+ <20130201035040.GE4838@quad.lixom.net>
+ <20130201104655.GA3124@amd.pavel.ucw.cz>
+ <71B37E0559AC6849A68C5BA94C509FB45A63D4E47D@SJ-ITMSG02.altera.priv.altera.com>
+ <20130201153152.GS23505@n2100.arm.linux.org.uk>
+ <1359736762.2932.1.camel@linux-builds1>
+Message-ID: <20130202192409.GA17736@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi!
 
-On 02-02-2013 22:07, Matt Porter wrote:
+> > > > I actually thought about that... but could not think of non-ugly way
+> > > > of doing that. I hope dts will normally be "right" for any production
+> > > > system...
+> > > 
+> > > I think a panic is better just for the reason that if someone is
+> > > expecting SMP, but missed the warning message, and later finds out that
+> > > the secondary core never came up, it would save some debugging time.
+> > > 
+> > > Since I have to send out a v3 from the 1st patch anyways, let me verify
+> > > that I can get the early warning.
+> > 
+> > The choice is between a panic() at a point where the only way to find
+> > out is to throw in printascii() or a working printk, and ending up with
+> > an unbootable kernel, vs continuing the boot and having an almost
+> > working system which can be logged into and the messages viewed.
+> > 
+> > If you have an application which relies on the second CPU coming up,
+> > why not have it verify that the second CPU came up (it's quite easy
+> > to do - there's POSIX standard libc calls to get the number of online
+> > CPUs).
+> 
+> Point taken...thanks Russell.
 
->>>>>>> Move mach-davinci/dma.c to common/edma.c so it can be used
->>>>>>> by OMAP (specifically AM33xx) as well.
+Well, I don't think we normally check dtbs for validity with
+user-helpful error messages, but it is relatively easy in this case.
 
->>>>>> I think this should rather go to drivers/dma/?
+---cut here---
 
->>>>> No, this is the private EDMA API. It's the analogous thing to
->>>>> the private OMAP dma API that is in plat-omap/dma.c. The actual
->>>>> dmaengine driver is in drivers/dma/edma.c as a wrapper around
->>>>> this...same way OMAP DMA engine conversion is being done.
+Continue booting with second core disabled if cpu1-start-addr is not
+present in .dtb.
 
->>>>     Keeps me wondering why we couldn't have the same with CPPI 4.1 when I proposed
->>>> that, instead of waiting indefinitely for TI to convert it to drivers/dma/
->>>> directly. We could have working MUSB DMA on OMAP-L1x/Sitara all this time... Sigh.
+Signed-off-by: Pavel Machek <pavel@denx.de>
 
->>> That is a shame. Yeah, I've pointed out that I was doing this exactly
->>> the same way as was acceptable for the OMAP DMA conversion since it was
->>> in RFC. The reasons are sound since in both cases, we have many drivers
->>> to convert that need to continue using the private DMA APIs.
+diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+index 81e0da0..90facdd 100644
+--- a/arch/arm/mach-socfpga/platsmp.c
++++ b/arch/arm/mach-socfpga/platsmp.c
+@@ -82,6 +82,9 @@ static void __init socfpga_smp_init_cpus(void)
+ 		ncores = 1;
+ 	}
+ #endif
++	if (!cpu1start_addr)
++		ncores = 1;
++
+ 	for (i = 0; i < ncores; i++)
+ 		set_cpu_possible(i, true);
+ 
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index 334c330..c3cd88b 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -74,10 +74,9 @@ static void __init socfpga_sysmgr_init(void)
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
+ 
+-	if (of_property_read_u32(np, "cpu1-start-addr", (u32 *) &cpu1start_addr)) {
+-		early_printk("Need cpu1-start-addr in device tree.\n");
+-		panic("Need cpu1-start-addr in device tree.\n");
+-	}
++	if (of_property_read_u32(np, "cpu1-start-addr", (u32 *) &cpu1start_addr))
++		printk(KERN_ALERT "Need cpu1-start-addr in device tree for SMP operation.\n");
++
+ 	sys_manager_base_addr = of_iomap(np, 0);
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
 
->>      In case of CPPI 4.1, we'd only have to convert MUSB DMA driver. Other
->> in-tree CPPI 4.1 having SoCs don't use it for anything but MUSB -- it even is
->> sub-block of their MUSB device, AFAIK (I maybe wrong about Sitaras -- I don't
->> know them well).
-
-> Well, it's pretty clear to me now that there's good reason for it not
-> landing in arch/arm/ so the obvious path is to do the dmaengine
-> conversion and put it in drivers/dma/ if it's really a generic dma engine.
-> I'm not sure why you express concern over the dma engine api not fitting
-> with CPPI 4.1?
-
-    It's not a DMA controller only, it's 3 distinct devices, with the DMA 
-controller being one among them and using another one, the queue manager, as 
-some sort of proxy. The third device doesn't exist on OMAP-L1x SoCs -- it's 
-the buffer manager.
-
-> If it doesn't work, work with Vinod to fix the api. It's
-> expected, I'm working on dmaengine API changes right now to deal with a
-> limitation of EDMA that needs to be abstracted.
-
-    Sorry, now it's TI's task. I no longer have time to work on this (my 
-internal project to push OMAP-L1x support upstream has expired at Sep 2010) 
-and my future in MV is very uncertain at this moment. Most probably I'll leave 
-it (or be forced to leave).
-
-> As pointed out, edma.c is already here in arch/arm/, so moving it doesn't
-> add something new. It does let us regression test all platforms that use it
-> (both Davinci and AM33xx) as I go through the conversion process.
-
-    Could have been the same with CPPI 4.1 in theory if it was added to 
-mach-davinci/ back in 2009... we'd then only have to move it. EDMA code is 
-much older of course, so it's probably more justified.
-
-> -Matt
-
-WBR, Sergei
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
