@@ -1,5 +1,5 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 02 Feb 2013 04:07:59 +0400
+Date: Sat, 02 Feb 2013 04:13:57 +0400
 Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
 In-Reply-To: <20130201213003.GW2637@n2100.arm.linux.org.uk>
 References: <1359742975-10421-1-git-send-email-mporter@ti.com>
@@ -9,7 +9,7 @@ References: <1359742975-10421-1-git-send-email-mporter@ti.com>
  <20130201185820.GE29898@arwen.pp.htv.fi> <510C2A47.1090607@mvista.com>
  <20130201205600.GA31762@arwen.pp.htv.fi>
  <20130201213003.GW2637@n2100.arm.linux.org.uk>
-Message-ID: <510C58DF.3010103@mvista.com>
+Message-ID: <510C5A45.5050802@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,10 +28,6 @@ On 02-02-2013 1:30, Russell King - ARM Linux wrote:
 >> wasn't asking for the patch to be removed :-s
 
 > Err, patches don't get removed, they get moved to 'discarded'.
-
-    Any chance to bring it back to life? :-)
-    Although... drivers/usb/musb/cppi41.c would need to be somewhat reworked 
-for at least AM35x and I don't have time. But that may change, of course.
 
 >>>> I guess to make the MUSB side simpler we would need musb-dma-engine glue
 >>>> to map dmaengine to the private MUSB API. Then we would have some
@@ -54,14 +50,8 @@ for at least AM35x and I don't have time. But that may change, of course.
 > 2. It would not live in arch/arm.
 > 3. It would be placed nearby the USB driver it's associated with.
 
-> (1) because we don't use APIs just for the hell of it - think.  Do we
-> use the DMA engine API for PCI bus mastering ethernet controllers?  No.
-> Do we use it for PCI bus mastering SCSI controllers?  No.  Because the
-> DMA is integral to the rest of the device.
-
-> The DMA engine API only makes sense if the DMA engine is a shared
-> system resource.
-
-    Thanks for such extensive wording in the support of my point. :-)
+    Note that all this doesn't apply to CPPI 4.1 controller (as contrasted to 
+CPPI 3.0 support in MUSB aand EMAC drivers) -- it's shared by design. Just the 
+implementations that are in tree have it as MUSB's sub-block, serving only MUSB.
 
 WBR, Sergei
