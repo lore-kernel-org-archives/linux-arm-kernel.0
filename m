@@ -1,38 +1,46 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Sat, 2 Feb 2013 14:56:23 +0900
-Subject: [PATCH v6 05/12] iommu/exynos: support for device tree
-In-Reply-To: <20130201135114.GF25591@8bytes.org>
-References: <003801cde30b$d9667b90$8c3372b0$%cho@samsung.com>
- <50E1E62B.3090501@gmail.com>
- <CAHQjnOMav9A43m4=7=N9kzEHTHE_q_ygu8x6mzY6Cus=q0c06A@mail.gmail.com>
- <20130201135114.GF25591@8bytes.org>
-Message-ID: <CAHQjnOP1U=LRU-fe-HuWzp=17s=KG8zPvSO3_zeVrrviEkmyHw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 2 Feb 2013 12:24:11 +0530
+Subject: [PATCH v3 11/15] ARM: vexpress/dcscb: do not hardcode number
+ of CPUs per cluster
+In-Reply-To: <alpine.LFD.2.02.1302011222320.6300@xanadu.home>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-12-git-send-email-nicolas.pitre@linaro.org>
+ <510B5942.20307@ti.com> <alpine.LFD.2.02.1302011222320.6300@xanadu.home>
+Message-ID: <510CB813.2000606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 1, 2013 at 10:51 PM, Joerg Roedel <joro@8bytes.org> wrote:
-> Cho,
+On Friday 01 February 2013 10:54 PM, Nicolas Pitre wrote:
+> On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
 >
-> On Wed, Jan 02, 2013 at 02:53:49PM +0900, KyongHo Cho wrote:
->> On Tuesday, January 1, 2013, Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+>> On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
+>>> If 4 CPUs are assumed, the A15x1-A7x1 model configuration would never
+>>> shut down the initial cluster as the 0xf reset bit mask will never be
+>>> observed.  Let's construct this mask based on the provided information
+>>> in the DCSCB config register for the number of CPUs per cluster.
+>>>
+>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>>> ---
+>>>    arch/arm/mach-vexpress/dcscb.c | 14 ++++++++++----
+>>>    1 file changed, 10 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+>>> index f993608944..8d363357ef 100644
+>>> --- a/arch/arm/mach-vexpress/dcscb.c
+>>> +++ b/arch/arm/mach-vexpress/dcscb.c
+>>> @@ -46,10 +46,12 @@ static arch_spinlock_t dcscb_lock =
+>>> __ARCH_SPIN_LOCK_UNLOCKED;
+>>>
+>>>    static void __iomem *dcscb_base;
+>>>    static int dcscb_use_count[4][2];
+>>> +static int dcscb_mcpm_cpu_mask[2];
+>> s/2/MAX_CLUSTERS ?
 >
->> > Cc: devicetree-discuss at lists.ozlabs.org
+> No.  The DCSCB (*dual* cluster system control block) does manage only 2
+> clusters, regardless of the MAX_CLUSTERS definition which might increase
+> in the future.
 >
-> Since patch 7 of this set is already merged, do you mind to re-post the
-> rest of this patch-set with the latest comments addressed? I can have a
-> look at it again then and consider it for 3.9.
->
-Thank you for your considerations.
+OK. Thanks for clarification.
 
-I also think that I need to post the patch set again with some fixes that are
-addressed in the comments.
-
-Due to the heavy workload in my business I have hardly had a chance to
-handle this patch-set.
-As soon as the business lets me handle other pending issues, I will
-work on this patchset.
-I think I can start to it in the next 2 weeks.
-
-Thank you.
-
-KyongHo.
+Regards
+Santosh
