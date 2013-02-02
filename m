@@ -1,7 +1,9 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Sun,  3 Feb 2013 01:29:22 +0900
+Date: Sun,  3 Feb 2013 01:29:23 +0900
 Subject: [PATCH 0/9] gpiolib: remove gpio_desc[] static array
-Message-ID: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+In-Reply-To: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1359822572-26009-2-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
