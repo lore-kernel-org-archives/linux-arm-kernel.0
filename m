@@ -1,48 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 02 Feb 2013 16:09:55 +0100
-Subject: [PATCH V2 4/4] DMA: PL330: Modify pl330 filter based on new
- generic dma dt bindings.
-In-Reply-To: <CAAgF-Bf55eN2WOgU5nQa=nF76fHvBHR7NdmvoBpF-n4ke6rd1g@mail.gmail.com>
-References: <1359723116-18173-1-git-send-email-padma.v@samsung.com>
- <201302011523.25771.arnd@arndb.de>
- <CAAgF-Bf55eN2WOgU5nQa=nF76fHvBHR7NdmvoBpF-n4ke6rd1g@mail.gmail.com>
-Message-ID: <1692358.6BmDsJsb25@wuerfel>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Sun,  3 Feb 2013 01:29:22 +0900
+Subject: [PATCH 0/9] gpiolib: remove gpio_desc[] static array
+Message-ID: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 02 February 2013 08:00:54 Padma Venkat wrote:
+Since Linus kindly merged the gpiochip_reserve() removal patches, here comes the
+main course.
 
-> > The result of this looks good, but I fear that changing the filter function
-> > like this wil break all drivers that currently use the plat-samsung/dma-ops.c
-> > code. For migration purposes, I think the best way is to change
-> > samsung_dmadev_request() to match the new filter_param format.
-> >
-> > After that is done, you can migrate all the drivers using samsung_dma_get_ops
-> > over to the new dma_request_slave_channel interface without breaking
-> > anything when only part of the series is applied.
-> >
-> >         Arnd
-> 
-> Please check the below link where I made the dma request compatible to
-> both DT and non-DT
-> 
-> http://git.kernel.org/?p=linux/kernel/git/broonie/sound.git;a=commit;h=e7ba5f1d0f6292e1b99c63cc4bb74c70232e9065
-> http://git.kernel.org/?p=linux/kernel/git/broonie/sound.git;a=commit;h=b5be04d35dbb2e00ab27a97bfd26e17019e857ef
-> 
-> Please let me know if any changes required.
-> 
+This series removes the ARCH_NR_GPIOS sized static array of GPIO descriptors
+that stood in gpiolib and replaces it with a more flexible mechanism that
+dynamically allocates GPIO descriptors as chips are added.
 
-Those two changes by themselves still look ok, I think but you
-still break the non-DT case in this 4/4 patch by changing the
-pl330_filter function in an incompatible way. You will still
-have to either change the filter_param argument in the
-samsung_dmadev_request() function, or provide separate filter
-functions, one to be used by samsung_dmadev_request and
-one for the pl330_xlate function.
+ARCH_NR_GPIOS is still here, but now only controls the upper limit of the GPIO
+integer space, i.e. which GPIO numbers are valid and where GPIO chips without a
+base GPIO are placed in the GPIO space. Technically it would be possible to get
+rid of it completely - but this might change GPIO numbers on some architectures
+and make people unhappy. At least it can now be arbitrarily high without
+consuming more memory.
 
-In the long run, I think it would be better to move the slave
-drivers away from the samsung_dma wrappers and use
-dma_request_slave_channel directly, but that is an independent
-discussion.
+As a result of this series, gpiolib has a slightly lower memory footprint (~-9KB
+on my Tegra2 board which has a GPIO space of 1024 but only uses 232 of them), is
+very slightly slower (because of the gpio to descriptor conversion which is
+linear instead of being constant), and (most importantly) is prepared to receive
+the new descriptor-based public GPIO interface.
 
-	Arnd
+The linear-time conversion between GPIO numbers and descriptors might make some
+teeth grind, but please consider the following. First, even though the
+conversion is O(n), this is a very small n (the number of GPIO chips), and I
+doubt the overhead would be even perceptible. Second, the gpio descriptor
+interface that will follow this series will not require this conversion since it
+works with descriptors directly. Finally, the GPIO framework allow platforms
+that are concerned about performance to implement gpio_get_value() and
+gpio_set_value() with a fast path shortcutting gpiolib for those GPIO numbers
+for which performance matters, and this is not affected at all by this series.
+
+The patches are split as much as possible to make the switch as easy to follow
+as possible - they may actually be oversplit, if this is the case please let me
+know and I will resubmit the series.
+
+This has been tested on a Tegra 2 Ventana board. I made sure that debugfs and
+sysfs were working as before, and that GPIOs had the expected value. Being a
+rather deep change, it should certainly undergo some more testing.
+
+Alexandre Courbot (9):
+  gpiolib: link all gpio_chips using a list
+  gpiolib: use gpio_chips list in gpiolib_sysfs_init
+  gpiolib: use gpio_chips list in gpiochip_find
+  gpiolib: use gpio_chips list in sysfs ops
+  gpiolib: use gpio_chips list in gpiochip_find_base
+  gpiolib: use descriptors internally
+  gpiolib: let gpio_chip reference its descriptors
+  gpiolib: use gpio_chips list in gpio_to_desc
+  gpiolib: dynamically allocate descriptors array
+
+ drivers/gpio/gpiolib.c     | 694 ++++++++++++++++++++++++++++-----------------
+ include/asm-generic/gpio.h |   5 +
+ 2 files changed, 440 insertions(+), 259 deletions(-)
+
+-- 
+1.8.1.1
