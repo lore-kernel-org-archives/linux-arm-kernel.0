@@ -1,42 +1,29 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 2 Feb 2013 10:11:48 -0800
-Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
-In-Reply-To: <510C6A3D.70401@ti.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
- <20130201215154.GV22517@atomide.com> <510C6A3D.70401@ti.com>
-Message-ID: <20130202181147.GC577@atomide.com>
+Date: Sat, 2 Feb 2013 10:16:43 -0800
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130202180747.GS2244@beef>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
+ <20130201184915.GP2244@beef>
+ <2077c13e12314dc3adc8e5b653855da0@DFLE72.ent.ti.com>
+ <20130201185959.GQ2244@beef>
+ <e9be6668da8b4372a04687847daa1d8c@DFLE72.ent.ti.com>
+ <20130202180747.GS2244@beef>
+Message-ID: <20130202181643.GD577@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130201 17:25]:
-> 
-> On 02/01/2013 03:51 PM, Tony Lindgren wrote:
-> > 
-> > How about let's fix this properly to start with so we don't add
-> > more blockers moving this code to drivers/bus?
-> > 
-> > Looks like gpmc_mem_init() gets called from gpmc_probe() so
-> > we can pass that information in pdev.
-> 
-> I wondered if you would suggest that ;-)
+* Matt Porter <mporter@ti.com> [130202 10:10]:
+> If it doesn't work, work with Vinod to fix the api. It's expected,
+> I'm working on dmaengine API changes right now to deal with a
+> limitation of EDMA that needs to be abstracted.
 
-:)
- 
-> I definitely can and it is probably best. Things like this become
-> painful when we move to device-tree. We really need a generic way for
-> passing stuff like this to drivers for omap. Our options are auxdata or
-> bus notifiers. I am wondering whether we can plug pdata in the
-> omap_device bus notifier for device-tree. Let me know if you have any
-> thoughts.
+Regarding the DMA API limitations, I'm only aware of lack of capability
+to configure autoincrement at the device end. And that keeps us from
+converting all GPMC related devices using omap SDMA to use the DMA API.
 
-Hmm but in this case can't you just do it based on the compatible
-flag? For legacy systems we also need to pass it in pdata.
-
-Regarding omap_device, we should find a way to keep the dependencies
-between drivers and the bus code down to minimum. So ideally things
-like this would be only done using just the compatible flag. But the
-pdata we cannot remove quite yet.
+Are there other limitations currently known with the DMA API?
 
 Regards,
 
