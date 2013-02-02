@@ -1,23 +1,42 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 2 Feb 2013 10:07:24 -0800
-Subject: [PATCH] ARM:omap2: using strlcpy instead of strncpy
-In-Reply-To: <510C7925.9040006@asianux.com>
-References: <51090829.1010109@asianux.com> <20130201224546.GG22517@atomide.com>
- <510C7925.9040006@asianux.com>
-Message-ID: <20130202180723.GB577@atomide.com>
+Date: Sat, 2 Feb 2013 10:11:48 -0800
+Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
+In-Reply-To: <510C6A3D.70401@ti.com>
+References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
+ <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
+ <20130201215154.GV22517@atomide.com> <510C6A3D.70401@ti.com>
+Message-ID: <20130202181147.GC577@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chen Gang <gang.chen@asianux.com> [130201 18:29]:
-> ? 2013?02?02? 06:45, Tony Lindgren ??:
-> > Added Peter to cc on this one too, it's best that he queues
-> > all the twl changes.
+* Jon Hunter <jon-hunter@ti.com> [130201 17:25]:
 > 
->   is it suitable to sync the MAINTAINER file for it ?
->     if suitable, can you help to change it ?
+> On 02/01/2013 03:51 PM, Tony Lindgren wrote:
+> > 
+> > How about let's fix this properly to start with so we don't add
+> > more blockers moving this code to drivers/bus?
+> > 
+> > Looks like gpmc_mem_init() gets called from gpmc_probe() so
+> > we can pass that information in pdev.
+> 
+> I wondered if you would suggest that ;-)
 
-Yes I suggest we add Peter as the maintainer for all twl
-related things.
+:)
+ 
+> I definitely can and it is probably best. Things like this become
+> painful when we move to device-tree. We really need a generic way for
+> passing stuff like this to drivers for omap. Our options are auxdata or
+> bus notifiers. I am wondering whether we can plug pdata in the
+> omap_device bus notifier for device-tree. Let me know if you have any
+> thoughts.
+
+Hmm but in this case can't you just do it based on the compatible
+flag? For legacy systems we also need to pass it in pdata.
+
+Regarding omap_device, we should find a way to keep the dependencies
+between drivers and the bus code down to minimum. So ideally things
+like this would be only done using just the compatible flag. But the
+pdata we cannot remove quite yet.
 
 Regards,
 
