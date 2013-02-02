@@ -1,29 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 2 Feb 2013 12:49:06 +0000
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130201184107.GM22517@atomide.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com>
- <20130201184107.GM22517@atomide.com>
-Message-ID: <20130202124906.GB2637@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat,  2 Feb 2013 15:35:45 +0100
+Subject: [PATCH v3 0/4] Kirkwood and Dove Thermal drivers
+Message-ID: <1359815749-27705-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 10:41:08AM -0800, Tony Lindgren wrote:
-> * Matt Porter <mporter@ti.com> [130201 10:25]:
-> > Move mach-davinci/dma.c to common/edma.c so it can be used
-> > by OMAP (specifically AM33xx) as well.
-> 
-> I think this should rather go to drivers/dma/?
+This patchset adds thermal support for Kirkwood and Dove SoCs.
 
-Yes, it should, but just like OMAP, there's a conversion effort that needs
-to be gone through.  It has one point - and only one point - which allows
-its continued existence under arch/arm, and that is it already exists
-there.
+Changes since v2
+* More marvel -> marvell
+* Dove driver. Debugged by Sebastian Hesselbarth
 
-If it was new code, the answer would be a definite NACK, but it isn't.
-It's pre-existing code which is already in mainline.  It's merely being
-moved.
+Changes since v1
+* Temperature Reading in milligrad
+* marvel -> marvell
+* generalized to Orion
+* Compatibility string marvell,kirkwood-thermal
+* Arithmetic using unsigned long
 
-Another plus point for it is that there does seem to be a DMA engine
-driver for it, so hopefully we'll see it killed off in arch/arm soon.
+Andrew Lunn (2):
+  Thermal: Dove: Add Themal sensor support for Dove.
+  Dove: Thermal: Add DT node and enable in defconfig
+
+Nobuhiro Iwamatsu (2):
+  thermal: Add support for the thermal sensor on Kirkwood SoCs
+  ARM: Kirkwood: Add support thermal sensor for 88F6282 and 88F6283
+
+ .../devicetree/bindings/thermal/dove-thermal.txt   |   18 ++
+ .../bindings/thermal/kirkwood-thermal.txt          |   15 ++
+ arch/arm/boot/dts/dove.dtsi                        |    5 +
+ arch/arm/boot/dts/kirkwood-6282.dtsi               |    6 +
+ arch/arm/configs/dove_defconfig                    |    2 +
+ arch/arm/configs/kirkwood_defconfig                |    2 +
+ drivers/thermal/Kconfig                            |   14 ++
+ drivers/thermal/Makefile                           |    2 +
+ drivers/thermal/dove_thermal.c                     |  211 ++++++++++++++++++++
+ drivers/thermal/kirkwood_thermal.c                 |  136 +++++++++++++
+ 10 files changed, 411 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/dove-thermal.txt
+ create mode 100644 Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
+ create mode 100644 drivers/thermal/dove_thermal.c
+ create mode 100644 drivers/thermal/kirkwood_thermal.c
+
+-- 
+1.7.10.4
