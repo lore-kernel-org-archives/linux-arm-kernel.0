@@ -1,63 +1,90 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sun,  3 Feb 2013 01:25:45 +0800
-Subject: [PATCH v8 04/12] gpio: pl061: allocate irq dynamically
+Date: Sun,  3 Feb 2013 01:25:46 +0800
+Subject: [PATCH v8 05/12] pinctrl: verify whether gpio chip overlapps range
 In-Reply-To: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1359825953-15663-5-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1359825953-15663-6-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In original implementation, irq base is always specified in platform
-data. If it's not specified, pl061 gpio driver can't pass the probe()
-function since irq base is missing. While moving to device tree, everything
-should be parsed from DTS file. So allocate irq dynamically for irq
-base.
+pinctrl_get_device_gpio_range() only checks whether a certain GPIO pin
+is in gpio range. But maybe some GPIO pins don't have back-end pinctrl
+interface, it means that these pins are always configured as GPIO
+function.
+
+Append pinctrl_overlapped_gpio_range() that is used to check whether
+the pins of GPIO chip are overlapped with pins in the GPIO range. This
+function will be called after pinctrl_get_device_gpio_range() fails.
+
+If overlapped GPIO pins are found, it means that pinctrl device is already
+launched and a certain GPIO pin don't have back-end pinctrl interface.
+Then pinctrl_request_gpio() shouldn't return -EPROBE_DEFER in this case.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/gpio/gpio-pl061.c |   15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ drivers/pinctrl/core.c |   36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index b820869..fd26f63 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -15,6 +15,7 @@
- #include <linux/io.h>
- #include <linux/ioport.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/bitops.h>
- #include <linux/workqueue.h>
- #include <linux/gpio.h>
-@@ -211,6 +212,10 @@ static void __init pl061_init_gc(struct pl061_gpio *chip, int irq_base)
- 			       IRQ_GC_INIT_NESTED_LOCK, IRQ_NOREQUEST, 0);
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index 5a2fe9a..f5814cf 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -27,6 +27,7 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/machine.h>
++#include <asm-generic/gpio.h>
+ #include "core.h"
+ #include "devicetree.h"
+ #include "pinmux.h"
+@@ -293,6 +294,39 @@ pinctrl_match_gpio_range(struct pinctrl_dev *pctldev, unsigned gpio)
  }
  
-+static const struct irq_domain_ops pl061_domain_ops = {
-+	.xlate	= irq_domain_xlate_twocell,
-+};
+ /**
++ * pinctrl_overlapped_gpio_range() - check if the GPIO chip of a certain GPIO
++ * pin is overlapped with gpio range.
++ * @gpio: gpio pin to check taken from the global GPIO pin space
++ *
++ * This function is complement of pinctrl_match_gpio_range(). If the return
++ * value of pinctrl_match_gpio_range() is NULL, this function could be used
++ * to check whether pinctrl device is ready or not. Maybe some GPIO pins
++ * don't have back-end pinctrl interface.
++ * If the return value is true, it means that pinctrl device is ready & the
++ * certain GPIO pin doesn't have back-end pinctrl device. If the return value
++ * is false, it means that pinctrl device may not be ready.
++ */
++static bool pinctrl_overlapped_gpio_range(unsigned gpio)
++{
++	struct pinctrl_dev *pctldev;
++	struct pinctrl_gpio_range *range = NULL;
++	struct gpio_chip *chip = gpio_to_chip(gpio);
 +
- static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	struct device *dev = &adev->dev;
-@@ -225,10 +230,14 @@ static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (pdata) {
- 		chip->gc.base = pdata->gpio_base;
- 		chip->irq_base = pdata->irq_base;
--	} else if (adev->dev.of_node) {
-+	} else {
- 		chip->gc.base = -1;
--		chip->irq_base = 0;
--	} else
-+		chip->irq_base = irq_alloc_descs(-1, 0, PL061_GPIO_NR, 0);
-+		if (chip->irq_base < 0)
-+			return chip->irq_base;
++	/* Loop over the pin controllers */
++	list_for_each_entry(pctldev, &pinctrldev_list, node) {
++		/* Loop over the ranges */
++		list_for_each_entry(range, &pctldev->gpio_ranges, node) {
++			/* Check if any gpio range overlapped with gpio chip */
++			if (range->base + range->npins - 1 < chip->base ||
++			    range->base > chip->base + chip->ngpio - 1)
++				continue;
++			return true;
++		}
 +	}
-+	if (!irq_domain_add_legacy(adev->dev.of_node, PL061_GPIO_NR,
-+				   chip->irq_base, 0, &pl061_domain_ops, chip))
- 		return -ENODEV;
++	return false;
++}
++
++/**
+  * pinctrl_get_device_gpio_range() - find device for GPIO range
+  * @gpio: the pin to locate the pin controller for
+  * @outdev: the pin control device if found
+@@ -459,6 +493,8 @@ int pinctrl_request_gpio(unsigned gpio)
  
- 	if (!devm_request_mem_region(dev, adev->res.start,
+ 	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
+ 	if (ret) {
++		if (pinctrl_overlapped_gpio_range(gpio))
++			ret = 0;
+ 		mutex_unlock(&pinctrl_mutex);
+ 		return ret;
+ 	}
 -- 
 1.7.10.4
