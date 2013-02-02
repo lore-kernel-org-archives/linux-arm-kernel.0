@@ -1,80 +1,54 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sun,  3 Feb 2013 01:25:50 +0800
-Subject: [PATCH v8 09/12] pinctrl: single: set function mask as optional
-In-Reply-To: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1359825953-15663-10-git-send-email-haojian.zhuang@linaro.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 02 Feb 2013 21:27:38 +0400
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130202124533.GA2637@n2100.arm.linux.org.uk>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
+ <20130201184915.GP2244@beef>
+ <2077c13e12314dc3adc8e5b653855da0@DFLE72.ent.ti.com>
+ <20130201185959.GQ2244@beef> <20130202124533.GA2637@n2100.arm.linux.org.uk>
+Message-ID: <510D4C8A.4050305@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Hisilicon's pin controller is divided into two parts. One is the
-function mux, and the other is pin configuration. These two parts are
-in the different memory regions. So make pinctrl-single,function-mask
-as optional property. Then we can define pingroups without valid
-function mux that is only used for pin configuration.
+Hello.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- drivers/pinctrl/pinctrl-single.c |   26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
+On 02-02-2013 16:45, Russell King - ARM Linux wrote:
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index 8b9dd95..fe8f321 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -350,6 +350,9 @@ static int pcs_enable(struct pinctrl_dev *pctldev, unsigned fselector,
- 	int i;
- 
- 	pcs = pinctrl_dev_get_drvdata(pctldev);
-+	/* If function mask is null, needn't enable it. */
-+	if (!pcs->fmask)
-+		return 0;
- 	func = radix_tree_lookup(&pcs->ftree, fselector);
- 	if (!func)
- 		return -EINVAL;
-@@ -384,6 +387,10 @@ static void pcs_disable(struct pinctrl_dev *pctldev, unsigned fselector,
- 	int i;
- 
- 	pcs = pinctrl_dev_get_drvdata(pctldev);
-+	/* If function mask is null, needn't disable it. */
-+	if (!pcs->fmask)
-+		return;
-+
- 	func = radix_tree_lookup(&pcs->ftree, fselector);
- 	if (!func) {
- 		dev_err(pcs->dev, "%s could not find function%i\n",
-@@ -427,6 +434,10 @@ static int pcs_request_gpio(struct pinctrl_dev *pctldev,
- 	int mux_bytes = 0;
- 	unsigned data;
- 
-+	/* If function mask is null, return directly. */
-+	if (!pcs->fmask)
-+		return -ENOTSUPP;
-+
- 	list_for_each_safe(pos, tmp, &pcs->gpiofuncs) {
- 		frange = list_entry(pos, struct pcs_gpiofunc_range, node);
- 		if (pin >= frange->offset + frange->npins
-@@ -969,10 +980,17 @@ static int pcs_probe(struct platform_device *pdev)
- 	PCS_GET_PROP_U32("pinctrl-single,register-width", &pcs->width,
- 			 "register width not specified\n");
- 
--	PCS_GET_PROP_U32("pinctrl-single,function-mask", &pcs->fmask,
--			 "function register mask not specified\n");
--	pcs->fshift = ffs(pcs->fmask) - 1;
--	pcs->fmax = pcs->fmask >> pcs->fshift;
-+	ret = of_property_read_u32(np, "pinctrl-single,function-mask",
-+				   &pcs->fmask);
-+	if (!ret) {
-+		pcs->fshift = ffs(pcs->fmask) - 1;
-+		pcs->fmax = pcs->fmask >> pcs->fshift;
-+	} else {
-+		/* If mask property doesn't exist, function mux is invalid. */
-+		pcs->fmask = 0;
-+		pcs->fshift = 0;
-+		pcs->fmax = 0;
-+	}
- 
- 	ret = of_property_read_u32(np, "pinctrl-single,function-off",
- 					&pcs->foff);
--- 
-1.7.10.4
+> Now, CPPI is brand new code to arch/arm - always has been.  It post-dates
+> the DMA engine API.  And it's been said many times about moving it to
+> drivers/dma.  The problem is Sergei doesn't want to do it - he's anti the
+
+    I *can't* do it, and I have denied all further responibility for it.
+
+> DMA engine API for whatever reasons he can dream up.  He professes no
+
+    I'm not dreaming anything up. Please understand that CPPI 4.1 is not just 
+a normal DMA controller -- it's a complex of several devices with DMA 
+controller being only one of them, and one that can't work autonomously but 
+only thru the proxy of the queue manager. That queue manager stuff I found 
+hard to fit into drivers/dma/ infrastructure. Myabe it was a honest mistake, 
+of course.
+
+> knowledge of my dislike for having it in arch/arm, yet there's emails
+> from years back showing that he knew about it.  TI knows about it; Ajay
+> about it.  Yet... well... history speaks volumes about this.
+
+    Some details have slipped rom my memory after that many years. Im sorry 
+for that.
+
+> Now, there may be a new problem with CPPI.  That being we're now requiring
+> DT support.  _Had_ this been done prior to the push for DT, then it would
+> not have been a concern, because then the problem becomes one for DT.
+> But now that OMAP is being converted to DT, and DT is The Way To Go now,
+> that's an additional problem that needs to be grappled with - or it may
+> make things easier.
+
+    DaVinci is also being converted to device tree. However, that support 
+remains optional for now. Not sure it will make things easier, as we still 
+have two distinct devices to declare in the device tree: DMA controller and 
+queue manager, and we'll have to describe the interconnect between them too 
+(as a props of DMA controller I guess)...
+
+WBR, Sergei
