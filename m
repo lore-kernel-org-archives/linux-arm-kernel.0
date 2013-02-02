@@ -1,163 +1,82 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Sun,  3 Feb 2013 01:29:30 +0900
-Subject: [PATCH 7/9] gpiolib: let gpio_chip reference its descriptors
+Date: Sun,  3 Feb 2013 01:29:32 +0900
+Subject: [PATCH 9/9] gpiolib: dynamically allocate descriptors array
 In-Reply-To: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
 References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1359822572-26009-9-git-send-email-acourbot@nvidia.com>
+Message-ID: <1359822572-26009-11-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a pointer to the gpio_chip structure that references the array of
-GPIO descriptors belonging to the chip, and update gpiolib code to use
-this pointer instead of the global gpio_desc[] array. This is another
-step towards the removal of the gpio_desc[] global array.
+Allocate the GPIO descriptor's memory dynamically when GPIO chips are
+added instead of using the static gpio_desc[] array. gpio_desc[] is now
+totally unused and therefore removed.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- drivers/gpio/gpiolib.c     | 39 +++++++++++++++++++++++----------------
- include/asm-generic/gpio.h |  3 +++
- 2 files changed, 26 insertions(+), 16 deletions(-)
+ drivers/gpio/gpiolib.c | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 82c40bd..9599b9a 100644
+index 0247c48..893cf94 100644
 --- a/drivers/gpio/gpiolib.c
 +++ b/drivers/gpio/gpiolib.c
-@@ -72,6 +72,8 @@ struct gpio_desc {
+@@ -41,7 +41,7 @@
+ #define	extra_checks	0
+ #endif
+ 
+-/* gpio_lock prevents conflicts during gpio_desc[] table updates.
++/* gpio_lock prevents conflicts during gpio descriptors updates.
+  * While any GPIO is requested, its gpio_chip is not removable;
+  * each GPIO's "requested" flag serves as a lock and refcount.
+  */
+@@ -70,7 +70,6 @@ struct gpio_desc {
+ 	const char		*label;
+ #endif
  };
- static struct gpio_desc gpio_desc[ARCH_NR_GPIOS];
+-static struct gpio_desc gpio_desc[ARCH_NR_GPIOS];
  
-+#define GPIO_OFFSET_VALID(chip, offset) (offset >= 0 && offset < chip->ngpio)
+ #define GPIO_OFFSET_VALID(chip, offset) (offset >= 0 && offset < chip->ngpio)
+ 
+@@ -1163,6 +1162,13 @@ int gpiochip_add(struct gpio_chip *chip)
+ 		goto fail;
+ 	}
+ 
++	chip->desc = kzalloc(sizeof(struct gpio_desc) * chip->ngpio,
++			     GFP_KERNEL);
++	if (!chip->desc) {
++		status = -ENOMEM;
++		goto fail;
++	}
 +
- static LIST_HEAD(gpio_chips);
+ 	spin_lock_irqsave(&gpio_lock, flags);
  
- #ifdef CONFIG_GPIO_SYSFS
-@@ -112,7 +114,7 @@ static inline void desc_set_label(struct gpio_desc *d, const char *label)
-  */
- static int gpio_chip_hwgpio(const struct gpio_desc *desc)
- {
--	return (desc - &gpio_desc[0]) - desc->chip->base;
-+	return desc - &desc->chip->desc[0];
- }
- 
- /**
-@@ -133,7 +135,7 @@ static struct gpio_desc *gpio_to_desc(unsigned gpio)
-  */
- static int desc_to_gpio(const struct gpio_desc *desc)
- {
--	return desc - &gpio_desc[0];
-+	return desc->chip->base + gpio_chip_hwgpio(desc);
- }
- 
- 
-@@ -1006,9 +1008,9 @@ static int gpiochip_export(struct gpio_chip *chip)
- 		unsigned	gpio;
- 
- 		spin_lock_irqsave(&gpio_lock, flags);
--		gpio = chip->base;
--		while (gpio_desc[gpio].chip == chip)
--			gpio_desc[gpio++].chip = NULL;
-+		gpio = 0;
-+		while (gpio < chip->ngpio)
-+			chip->desc[gpio++].chip = NULL;
- 		spin_unlock_irqrestore(&gpio_lock, flags);
- 
- 		pr_debug("%s: chip %s status %d\n", __func__,
-@@ -1164,8 +1166,11 @@ int gpiochip_add(struct gpio_chip *chip)
+ 	if (base < 0) {
+@@ -1177,8 +1183,6 @@ int gpiochip_add(struct gpio_chip *chip)
  	status = gpiochip_add_to_list(chip);
  
  	if (status == 0) {
--		for (id = base; id < base + chip->ngpio; id++) {
--			gpio_desc[id].chip = chip;
-+		chip->desc = &gpio_desc[chip->base];
+-		chip->desc = &gpio_desc[chip->base];
+-
+ 		for (id = 0; id < chip->ngpio; id++) {
+ 			struct gpio_desc *desc = &chip->desc[id];
+ 			desc->chip = chip;
+@@ -1218,6 +1222,8 @@ unlock:
+ 
+ 	return 0;
+ fail:
++	kfree(chip->desc);
 +
-+		for (id = 0; id < chip->ngpio; id++) {
-+			struct gpio_desc *desc = &chip->desc[id];
-+			desc->chip = chip;
+ 	/* failures here can mean systems won't boot... */
+ 	pr_err("gpiochip_add: gpios %d..%d (%s) failed to register\n",
+ 		chip->base, chip->base + chip->ngpio - 1,
+@@ -1261,6 +1267,8 @@ int gpiochip_remove(struct gpio_chip *chip)
+ 	if (status == 0)
+ 		gpiochip_unexport(chip);
  
- 			/* REVISIT:  most hardware initializes GPIOs as
- 			 * inputs (often with pullups enabled) so power
-@@ -1174,7 +1179,7 @@ int gpiochip_add(struct gpio_chip *chip)
- 			 * and in case chip->get_direction is not set,
- 			 * we may expose the wrong direction in sysfs.
- 			 */
--			gpio_desc[id].flags = !chip->direction_input
-+			desc->flags = !chip->direction_input
- 				? (1 << FLAG_IS_OUT)
- 				: 0;
- 		}
-@@ -1227,15 +1232,15 @@ int gpiochip_remove(struct gpio_chip *chip)
- 	gpiochip_remove_pin_ranges(chip);
- 	of_gpiochip_remove(chip);
- 
--	for (id = chip->base; id < chip->base + chip->ngpio; id++) {
--		if (test_bit(FLAG_REQUESTED, &gpio_desc[id].flags)) {
-+	for (id = 0; id < chip->ngpio; id++) {
-+		if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
- 			status = -EBUSY;
- 			break;
- 		}
- 	}
- 	if (status == 0) {
--		for (id = chip->base; id < chip->base + chip->ngpio; id++)
--			gpio_desc[id].chip = NULL;
-+		for (id = 0; id < chip->ngpio; id++)
-+			chip->desc[id].chip = NULL;
- 
- 		list_del(&chip->list);
- 	}
-@@ -1560,11 +1565,13 @@ EXPORT_SYMBOL_GPL(gpio_free_array);
-  */
- const char *gpiochip_is_requested(struct gpio_chip *chip, unsigned offset)
- {
--	unsigned gpio = chip->base + offset;
--	struct gpio_desc *desc = &gpio_desc[gpio];
-+	struct gpio_desc *desc;
- 
--	if (!gpio_is_valid(gpio) || desc->chip != chip)
-+	if (!GPIO_OFFSET_VALID(chip, offset))
- 		return NULL;
++	kfree(chip->desc);
 +
-+	desc = &chip->desc[offset];
-+
- 	if (test_bit(FLAG_REQUESTED, &desc->flags) == 0)
- 		return NULL;
- #ifdef CONFIG_DEBUG_FS
-@@ -2003,7 +2010,7 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- {
- 	unsigned		i;
- 	unsigned		gpio = chip->base;
--	struct gpio_desc	*gdesc = &gpio_desc[gpio];
-+	struct gpio_desc	*gdesc = &chip->desc[0];
- 	int			is_out;
- 
- 	for (i = 0; i < chip->ngpio; i++, gpio++, gdesc++) {
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index b562f95..bde6469 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -47,6 +47,7 @@ struct gpio;
- struct seq_file;
- struct module;
- struct device_node;
-+struct gpio_desc;
- 
- /**
-  * struct gpio_chip - abstract a GPIO controller
-@@ -76,6 +77,7 @@ struct device_node;
-  *	negative during registration, requests dynamic ID allocation.
-  * @ngpio: the number of GPIOs handled by this controller; the last GPIO
-  *	handled is (base + ngpio - 1).
-+ * @desc: array of ngpio descriptors. Private.
-  * @can_sleep: flag must be set iff get()/set() methods sleep, as they
-  *	must while accessing GPIO expander chips over I2C or SPI
-  * @names: if set, must be an array of strings to use as alternative
-@@ -126,6 +128,7 @@ struct gpio_chip {
- 						struct gpio_chip *chip);
- 	int			base;
- 	u16			ngpio;
-+	struct gpio_desc	*desc;
- 	const char		*const *names;
- 	unsigned		can_sleep:1;
- 	unsigned		exported:1;
+ 	return status;
+ }
+ EXPORT_SYMBOL_GPL(gpiochip_remove);
 -- 
 1.8.1.1
