@@ -1,69 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 2 Feb 2013 17:23:46 -0500 (EST)
-Subject: [PATCH v3 13/15] ARM: CCI: ensure powerdown-time data is flushed
- from cache
-In-Reply-To: <510B5CF7.5080902@ti.com>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-14-git-send-email-nicolas.pitre@linaro.org>
- <510B5CF7.5080902@ti.com>
-Message-ID: <alpine.LFD.2.02.1302021708460.6300@xanadu.home>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Sun, 3 Feb 2013 00:04:18 +0100
+Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
+ kirkwood_ge0[01]_init() finds its clock
+In-Reply-To: <20130201001932.GA13044@obsidianresearch.com>
+References: <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
+ <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
+ <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
+ <20130130230100.GV7717@titan.lakedaemon.net>
+ <20130131224457.GB17976@schnuecks.de>
+ <20130201000109.GK7717@titan.lakedaemon.net>
+ <20130201001932.GA13044@obsidianresearch.com>
+Message-ID: <20130202230418.GA17361@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
+Hi Jason,
 
-> On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
-> > From: Dave Martin <dave.martin@linaro.org>
-> > 
-> > Non-local variables used by the CCI management function called after
-> > disabling the cache must be flushed out to main memory in advance,
-> > otherwise incoherency of those values may occur if they are sitting
-> > in the cache of some other CPU when cci_disable() executes.
-> > 
-> Any CPU calling cci_disable() would have already cleaned its local
-> cache and the snoop unit should take care of syncing the shared data
-> before hand from other CPU local caches for shared accesses.
-> May be I am unable to visualize the issue here or missing some key
-> point.
-
-Let's suppose CPU0 initializes the CCI.  Without this patch, the CCI 
-base address might be sitting in CPU0's cache.
-
-The last CPU in a cluster to shut itself down is responsible for calling 
-cci_disable().  And being the last, it is also responsible for flushing 
-out its L1 and L2 caches before doing that.  If CPU0 went down before 
-that, it did flush its L1 already. So the base address will be flushed 
-to RAM in that case.
-
-But if it is a CPU in _another_ cluster which is shutting down and 
-becoming the last man _there_.  It will flush its L1 and L2 cache 
-before calling cci_disable().  And 
-because the cache is disabled at that point, that CPU won't 
-send any snoop request across to the other cluster where CPU0 holds the 
-base address in its L1 or even L2 cache.
-
-This is why we must push out that value out to RAM before cci_disable() 
-is used.
-
-> > This patch adds the appropriate flushing to the CCI driver to ensure
-> > that the relevant data is available in RAM ahead of time.
-> > 
-> > Because this creates a dependency on arch-specific cacheflushing
-> > functions, this patch also makes ARM_CCI depend on ARM.
-> > 
-> You should do that otherwise to avoid other arch building this
-> driver for random builds and breaking their builds.
-
-Before this patch the driver was buildable on any architecture.  That's 
-why this dependency is added only in this patch.
-
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> Patch is fine apart from the question.
+On Thu, Jan 31, 2013 at 05:19:32PM -0700, Jason Gunthorpe wrote:
+> On Thu, Jan 31, 2013 at 07:01:09PM -0500, Jason Cooper wrote:
 > 
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > If you're interested, I still have a few ideas.  One was to wire two USB
+> > serial adapters end to end to create a different console
+> > (console=/dev/ttyUSB0,115200, getty, etc).  Since they would be going
+> > over usb, that's a different clock, so it should work and provide us
+> > with a safety net.
 > 
+> I can't recall, can you still use JTAG once the CPU has hung on a mbus
+> access?
+> 
+> If so memory dumping the console ring, or cpu registers would get the
+> answer pretty directly..
+> 
+> My guesses would be the RTC and/or GPIO blocks (the GPIO blinker needs
+> a clock), based on table 94.
+
+These guesses seem to be dead on:
+
+Moved the RTC module and GPIO modules (keys, leds) out of the way, to
+see whether they cause the boot with disabled runit to lock up.
+
+System boots now and SSH login is possible!
+
+# mount -t debugfs debugfs /sys/kernel/debug 
+# cat /sys/kernel/debug/clk/tclk/runit/clk_enable_count 
+0
+# insmod ./gpio_keys.ko 
+
+System locks up.
+
+and, after a reboot:
+
+# insmod ./rtc-mv.ko 
+
+System locks up.
+
+Bingo!
 
 
-Nicvolas
+- Simon
