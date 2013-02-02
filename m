@@ -1,85 +1,31 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 1 Feb 2013 19:22:05 -0600
-Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
-In-Reply-To: <20130201215154.GV22517@atomide.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
- <20130201215154.GV22517@atomide.com>
-Message-ID: <510C6A3D.70401@ti.com>
+From: girishks2000@gmail.com (girishks2000 at gmail.com)
+Date: Fri,  1 Feb 2013 17:56:24 -0800
+Subject: [PATCH 1/2] ahci: sata: add support for exynos5440 sata
+Message-ID: <510c7282.a4d1440a.7061.2697@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Girish K S <ks.giri@samsung.com>
 
-On 02/01/2013 03:51 PM, Tony Lindgren wrote:
-> Hi Jon,
-> 
-> * Jon Hunter <jon-hunter@ti.com> [130201 08:42]:
->> --- a/arch/arm/mach-omap2/gpmc.c
->> +++ b/arch/arm/mach-omap2/gpmc.c
->> @@ -32,6 +32,7 @@
->>  
->>  #include "soc.h"
->>  #include "common.h"
->> +#include "control.h"
->>  #include "omap_device.h"
->>  #include "gpmc.h"
->>  
->> @@ -778,18 +779,26 @@ static void gpmc_mem_exit(void)
->>  static int gpmc_mem_init(void)
->>  {
->>  	int cs, rc;
->> -	unsigned long boot_rom_space = 0;
->>  
->> -	/* never allocate the first page, to facilitate bug detection;
->> -	 * even if we didn't boot from ROM.
->> +	/*
->> +	 * The first 1MB of GPMC address space is mapped to the
->> +	 * internal ROM. OMAP2 devices are an exception to this
->> +	 * where the first 1MB may be mapped to the GPMC.
->>  	 */
->> -	boot_rom_space = BOOT_ROM_SPACE;
->> -	/* In apollon the CS0 is mapped as 0x0000 0000 */
->> -	if (machine_is_omap_apollon())
->> -		boot_rom_space = 0;
-> 
-> This part is going away anyways with the patch dropping apollon
-> board support from Kyungin.
+This patch adds the compatible string of the exynos5440 sata controller
+compliant with the ahci 1.3 and sata 3.0 specification.
 
-Yes just saw that today.
+Signed-off-by: Girish K S <ks.giri@samsung.com>
+---
+ drivers/ata/ahci_platform.c |    1 +
+ 1 file changed, 1 insertion(+)
 
->> -	gpmc_mem_root.start = GPMC_MEM_START + boot_rom_space;
->> +	gpmc_mem_root.start = GPMC_MEM_START + BOOT_ROM_SPACE;
->>  	gpmc_mem_root.end = GPMC_MEM_END;
->>  
->> +	/*
->> +	 * OMAP2 devices that boot from external memory devices, will
->> +	 * map CS0 to the start of the GPMC address space (0x0). We can
->> +	 * test this by checking if SYS_BOOT3 pin is set. If not set
->> +	 * then CS0 is mapped to 0x0.
->> +	 */
->> +	if (cpu_is_omap24xx())
->> +		if (!(omap_ctrl_readl(OMAP24XX_CONTROL_STATUS) &
->> +		      OMAP2_SYSBOOT_3_MASK))
->> +			gpmc_mem_root.start = GPMC_MEM_START;
->> +
->>  	/* Reserve all regions that has been set up by bootloader */
->>  	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
->>  		u32 base, size;
-> 
-> How about let's fix this properly to start with so we don't add
-> more blockers moving this code to drivers/bus?
-> 
-> Looks like gpmc_mem_init() gets called from gpmc_probe() so
-> we can pass that information in pdev.
-
-I wondered if you would suggest that ;-)
-
-I definitely can and it is probably best. Things like this become
-painful when we move to device-tree. We really need a generic way for
-passing stuff like this to drivers for omap. Our options are auxdata or
-bus notifiers. I am wondering whether we can plug pdata in the
-omap_device bus notifier for device-tree. Let me know if you have any
-thoughts.
-
-Cheers
-Jon
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 7a8a284..c06f021 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -327,6 +327,7 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
+ 
+ static const struct of_device_id ahci_of_match[] = {
+ 	{ .compatible = "snps,spear-ahci", },
++	{ .compatible = "samsung,exynos5440-ahci", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, ahci_of_match);
+-- 
+1.7.10.4
