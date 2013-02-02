@@ -1,60 +1,36 @@
 From: gmbnomis@gmail.com (Simon Baatz)
-Date: Sun, 3 Feb 2013 00:04:18 +0100
-Subject: [PATCH v2 1/2] ARM: kirkwood: Ensure that
- kirkwood_ge0[01]_init() finds its clock
-In-Reply-To: <20130201001932.GA13044@obsidianresearch.com>
-References: <20130129194243.GA30831@schnuecks.de> <51082C4E.5050903@gmail.com>
- <20130130000341.GA10600@schnuecks.de> <51086E86.8040705@gmail.com>
- <20130130083044.GA25688@schnuecks.de> <5108F300.7000705@gmail.com>
- <20130130230100.GV7717@titan.lakedaemon.net>
- <20130131224457.GB17976@schnuecks.de>
- <20130201000109.GK7717@titan.lakedaemon.net>
- <20130201001932.GA13044@obsidianresearch.com>
-Message-ID: <20130202230418.GA17361@schnuecks.de>
+Date: Sun, 3 Feb 2013 00:49:20 +0100
+Subject: [PATCH v2 2/2] ARM: kirkwood: fix to retain gbe MAC addresses
+ for DT kernels
+In-Reply-To: <1359577799-23351-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <20130130183049.GR7717@titan.lakedaemon.net>
+ <1359577799-23351-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130202234919.GB17361@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hi Sebastian, Jason,
 
-On Thu, Jan 31, 2013 at 05:19:32PM -0700, Jason Gunthorpe wrote:
-> On Thu, Jan 31, 2013 at 07:01:09PM -0500, Jason Cooper wrote:
+On Wed, Jan 30, 2013 at 09:29:58PM +0100, Sebastian Hesselbarth wrote:
+> The ethernet controller used on kirkwood looses its MAC address
+> register contents when the corresponding clock is gated. As soon as
+> mv643xx_eth is built as module, the clock gets gated and when loading
+> the module, the MAC address is gone.
 > 
-> > If you're interested, I still have a few ideas.  One was to wire two USB
-> > serial adapters end to end to create a different console
-> > (console=/dev/ttyUSB0,115200, getty, etc).  Since they would be going
-> > over usb, that's a different clock, so it should work and provide us
-> > with a safety net.
+> Proper DT support for the mv643xx_eth driver is expected soon, so we add
+> a workaround to always enable ge0/ge1 clocks on kirkwood. This workaround
+> is also already used on non-DT kirkwood kernels.
 > 
-> I can't recall, can you still use JTAG once the CPU has hung on a mbus
-> access?
-> 
-> If so memory dumping the console ring, or cpu registers would get the
-> answer pretty directly..
-> 
-> My guesses would be the RTC and/or GPIO blocks (the GPIO blinker needs
-> a clock), based on table 94.
+> Reported-by: Simon Baatz <gmbnomis@gmail.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-These guesses seem to be dead on:
+Tested this on IB-NAS6210 (kirkwood, single GBE interface). Using
+mv643xx_eth as a module works again now and yields
 
-Moved the RTC module and GPIO modules (keys, leds) out of the way, to
-see whether they cause the boot with disabled runit to lock up.
+# cat /sys/kernel/debug/clk/tclk/ge[01]/clk_enable_count 
+2
+1
 
-System boots now and SSH login is possible!
-
-# mount -t debugfs debugfs /sys/kernel/debug 
-# cat /sys/kernel/debug/clk/tclk/runit/clk_enable_count 
-0
-# insmod ./gpio_keys.ko 
-
-System locks up.
-
-and, after a reboot:
-
-# insmod ./rtc-mv.ko 
-
-System locks up.
-
-Bingo!
-
+as expected.
 
 - Simon
