@@ -1,46 +1,21 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 2 Feb 2013 12:24:11 +0530
-Subject: [PATCH v3 11/15] ARM: vexpress/dcscb: do not hardcode number
- of CPUs per cluster
-In-Reply-To: <alpine.LFD.2.02.1302011222320.6300@xanadu.home>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-12-git-send-email-nicolas.pitre@linaro.org>
- <510B5942.20307@ti.com> <alpine.LFD.2.02.1302011222320.6300@xanadu.home>
-Message-ID: <510CB813.2000606@ti.com>
+Date: Sat, 2 Feb 2013 13:50:25 +0530
+Subject: [PATCHv3 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
+In-Reply-To: <1359740758-29703-4-git-send-email-dinguyen@altera.com>
+References: <1359740758-29703-1-git-send-email-dinguyen@altera.com>
+ <1359740758-29703-4-git-send-email-dinguyen@altera.com>
+Message-ID: <510CCC49.6020002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 February 2013 10:54 PM, Nicolas Pitre wrote:
-> On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
+On Friday 01 February 2013 11:15 PM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 >
->> On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
->>> If 4 CPUs are assumed, the A15x1-A7x1 model configuration would never
->>> shut down the initial cluster as the 0xf reset bit mask will never be
->>> observed.  Let's construct this mask based on the provided information
->>> in the DCSCB config register for the number of CPUs per cluster.
->>>
->>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->>> ---
->>>    arch/arm/mach-vexpress/dcscb.c | 14 ++++++++++----
->>>    1 file changed, 10 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
->>> index f993608944..8d363357ef 100644
->>> --- a/arch/arm/mach-vexpress/dcscb.c
->>> +++ b/arch/arm/mach-vexpress/dcscb.c
->>> @@ -46,10 +46,12 @@ static arch_spinlock_t dcscb_lock =
->>> __ARCH_SPIN_LOCK_UNLOCKED;
->>>
->>>    static void __iomem *dcscb_base;
->>>    static int dcscb_use_count[4][2];
->>> +static int dcscb_mcpm_cpu_mask[2];
->> s/2/MAX_CLUSTERS ?
+> mach-socfpga is another platform that needs to use
+> v7_invalidate_l1 to bringup additional cores. There was a comment that
+> the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
 >
-> No.  The DCSCB (*dual* cluster system control block) does manage only 2
-> clusters, regardless of the MAX_CLUSTERS definition which might increase
-> in the future.
->
-OK. Thanks for clarification.
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 
-Regards
-Santosh
+> ---
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
