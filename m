@@ -1,59 +1,69 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sat, 2 Feb 2013 14:50:36 -0700
-Subject: [PATCH v3 00/22] PCI: Iterate pci host bridge instead of pci root
- bus
-In-Reply-To: <1359314629-18651-1-git-send-email-yinghai@kernel.org>
-References: <CAE9FiQXHG01NjnYNDbC-KEpbcvY-q4pBe97CxTOGS7W4vZQBYQ@mail.gmail.com>
- <1359314629-18651-1-git-send-email-yinghai@kernel.org>
-Message-ID: <CAErSpo6r_LNEtYB3j5ELb8NdHu0a6_YOVj8S32CmByGFUpSsbg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 2 Feb 2013 17:23:46 -0500 (EST)
+Subject: [PATCH v3 13/15] ARM: CCI: ensure powerdown-time data is flushed
+ from cache
+In-Reply-To: <510B5CF7.5080902@ti.com>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-14-git-send-email-nicolas.pitre@linaro.org>
+ <510B5CF7.5080902@ti.com>
+Message-ID: <alpine.LFD.2.02.1302021708460.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 12:23 PM, Yinghai Lu <yinghai@kernel.org> wrote:
-> Now we have pci_root_buses list, and there is lots of iteration with
-> list_of_each of it, that is not safe after we add pci root bus hotplug
-> support after booting stage.
->
-> Add pci_get_next_host_bridge and use bus_find_device in driver core to
-> iterate host bridge and the same time get root bus.
->
-> We replace searching root bus with searching host_bridge,
-> as host_bridge->bus is the root bus.
-> After those replacing, we even could kill pci_root_buses list.
+On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
 
-These are the problems I think you're fixing:
+> On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
+> > From: Dave Martin <dave.martin@linaro.org>
+> > 
+> > Non-local variables used by the CCI management function called after
+> > disabling the cache must be flushed out to main memory in advance,
+> > otherwise incoherency of those values may occur if they are sitting
+> > in the cache of some other CPU when cci_disable() executes.
+> > 
+> Any CPU calling cci_disable() would have already cleaned its local
+> cache and the snoop unit should take care of syncing the shared data
+> before hand from other CPU local caches for shared accesses.
+> May be I am unable to visualize the issue here or missing some key
+> point.
 
-1) pci_find_next_bus() is not safe because even though it holds
-pci_bus_sem while walking the pci_root_buses list, it doesn't hold a
-reference on the bus it returns.  The bus could be removed while the
-caller is using it.
+Let's suppose CPU0 initializes the CCI.  Without this patch, the CCI 
+base address might be sitting in CPU0's cache.
 
-2) "list_for_each_entry(bus, &pci_root_buses, node)" is not safe
-because hotplug might modify the pci_root_buses list.  Replacing that
-with for_each_pci_host_bridge() solves that problem by using
-bus_find_device(), which is built on klists, which are designed for
-that problem.
+The last CPU in a cluster to shut itself down is responsible for calling 
+cci_disable().  And being the last, it is also responsible for flushing 
+out its L1 and L2 caches before doing that.  If CPU0 went down before 
+that, it did flush its L1 already. So the base address will be flushed 
+to RAM in that case.
 
-3) pci_find_next_bus() claims to iterate through all known PCI buses,
-but in fact only iterates through root buses.
+But if it is a CPU in _another_ cluster which is shutting down and 
+becoming the last man _there_.  It will flush its L1 and L2 cache 
+before calling cci_disable().  And 
+because the cache is disabled at that point, that CPU won't 
+send any snoop request across to the other cluster where CPU0 holds the 
+base address in its L1 or even L2 cache.
 
-So far, so good.  Those are problems we need to fix.
+This is why we must push out that value out to RAM before cci_disable() 
+is used.
 
-Your solution is to introduce for_each_pci_host_bridge() as an
-iterator through the known host bridges.  There are two scenarios
-where we use something like this:
+> > This patch adds the appropriate flushing to the CCI driver to ensure
+> > that the relevant data is available in RAM ahead of time.
+> > 
+> > Because this creates a dependency on arch-specific cacheflushing
+> > functions, this patch also makes ARM_CCI depend on ARM.
+> > 
+> You should do that otherwise to avoid other arch building this
+> driver for random builds and breaking their builds.
 
-1) We want to perform an operation on every known host bridge.
+Before this patch the driver was buildable on any architecture.  That's 
+why this dependency is added only in this patch.
 
-2) We want to initialize something for every host bridge.
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> Patch is fine apart from the question.
+> 
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
 
-In my opinion, the only instance of scenario 1) is bus_rescan_store(),
-where we want to rescan all PCI host bridges.
 
-In every other case, we're doing some kind of initialization of all
-the host bridges.  For these cases, for_each_pci_host_bridge() is the
-wrong solution because it doesn't work for hot-added bridges.  I think
-these cases should be changed to use pcibios_root_bridge_prepare() or
-something something else called in the host bridge add path.
-
-Bjorn
+Nicvolas
