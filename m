@@ -1,25 +1,25 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 2 Feb 2013 15:54:38 +0100
-Subject: [PATCH v3] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <20130201175352.GA2553@pengutronix.de>
-References: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
- <20130201175352.GA2553@pengutronix.de>
-Message-ID: <20130202145438.GA1434@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 2 Feb 2013 16:01:37 +0100
+Subject: [PATCH 0/2] gpiolib: remove gpiochip_reserve()
+In-Reply-To: <1359816246-3979-1-git-send-email-acourbot@nvidia.com>
+References: <1359816246-3979-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <CACRpkdbFTt3bN4y5QFMFq6dfAA3XOkKWF4FY5X4jcGfYbYvxOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 06:53:52PM +0100, Sascha Hauer wrote:
-> Apparantly I was not fully awake while sending this series :(
-> 
-> On Fri, Feb 01, 2013 at 08:52:03AM +0100, Sascha Hauer wrote:
-> > (resend because I got the linux-usb address wrong)
-> > 
-> > Here's another round of the dr_mode/phy_type patches. I think they should
-> > be ready for merging now. Greg, will you apply them should there be no
-> > problems anymore?
+On Sat, Feb 2, 2013 at 3:44 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
 
-I need all chipidea patches to come from the maintainer of the driver, I
-don't take git pull requests, sorry.
+> If Dmitri could give his Acked-by or Tested-by and one of the GPIO maintainers
+> merge this series, I could go ahead with the deeper changes to gpiolib.
 
-greg k-h
+Good riddance.
+
+Both patches applied to get some rotation in linux-next.
+
+This is too good stuff to wait and I like to push this work ahead
+a bit. I can still back them out if there is some problem on the
+TOSA.
+
+
+Yours,
+Linus Walleij
