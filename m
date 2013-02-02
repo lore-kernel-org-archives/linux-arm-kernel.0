@@ -1,79 +1,71 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Sun,  3 Feb 2013 01:29:27 +0900
-Subject: [PATCH 4/9] gpiolib: use gpio_chips list in sysfs ops
+Date: Sun,  3 Feb 2013 01:29:28 +0900
+Subject: [PATCH 5/9] gpiolib: use gpio_chips list in gpiochip_find_base
 In-Reply-To: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
 References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1359822572-26009-6-git-send-email-acourbot@nvidia.com>
+Message-ID: <1359822572-26009-7-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes the code both simpler and faster compared to parsing the GPIO
-number space.
+Re-implement gpiochip_find_base using the list of chips instead of the
+global gpio_desc[] array. This makes it both simpler and more efficient,
+and is needed to remove the global descriptors array.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- drivers/gpio/gpiolib.c | 37 ++++++++++---------------------------
- 1 file changed, 10 insertions(+), 27 deletions(-)
+ drivers/gpio/gpiolib.c | 37 ++++++++++++++++---------------------
+ 1 file changed, 16 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 92f9ee4..e473ded 100644
+index e473ded..af4c350 100644
 --- a/drivers/gpio/gpiolib.c
 +++ b/drivers/gpio/gpiolib.c
-@@ -1889,45 +1889,28 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- static void *gpiolib_seq_start(struct seq_file *s, loff_t *pos)
+@@ -126,30 +126,25 @@ struct gpio_chip *gpio_to_chip(unsigned gpio)
+ /* dynamic allocation of GPIOs, e.g. on a hotplugged device */
+ static int gpiochip_find_base(int ngpio)
  {
- 	struct gpio_chip *chip = NULL;
--	unsigned int gpio;
--	void *ret = NULL;
--	loff_t index = 0;
-+	loff_t index = *pos;
- 
- 	/* REVISIT this isn't locked against gpio_chip removal ... */
- 
--	for (gpio = 0; gpio_is_valid(gpio); gpio++) {
--		if (gpio_desc[gpio].chip == chip)
--			continue;
+-	int i;
+-	int spare = 0;
+-	int base = -ENOSPC;
 -
--		chip = gpio_desc[gpio].chip;
--		if (!chip)
--			continue;
+-	for (i = ARCH_NR_GPIOS - 1; i >= 0 ; i--) {
+-		struct gpio_desc *desc = &gpio_desc[i];
+-		struct gpio_chip *chip = desc->chip;
 -
--		if (index++ >= *pos) {
--			ret = chip;
--			break;
+-		if (!chip) {
+-			spare++;
+-			if (spare == ngpio) {
+-				base = i;
+-				break;
+-			}
+-		} else {
+-			spare = 0;
+-			if (chip)
+-				i -= chip->ngpio - 1;
 -		}
--	}
--
- 	s->private = "";
- 
--	return ret;
-+	list_for_each_entry(chip, &gpio_chips, list)
-+		if (index-- == 0)
-+			return chip;
++	struct gpio_chip *chip;
++	int base = ARCH_NR_GPIOS - ngpio;
 +
-+	return NULL;
++	list_for_each_entry_reverse(chip, &gpio_chips, list) {
++		/* found a free space? */
++		if (chip->base + chip->ngpio <= base)
++			break;
++		else
++			/* nope, check the space right before the chip */
++			base = chip->base - ngpio;
+ 	}
+ 
+-	if (gpio_is_valid(base))
++	if (gpio_is_valid(base)) {
+ 		pr_debug("%s: found new base at %d\n", __func__, base);
+-	return base;
++		return base;
++	} else {
++		pr_err("%s: cannot find free range\n", __func__);
++		return -ENOSPC;
++	}
  }
  
- static void *gpiolib_seq_next(struct seq_file *s, void *v, loff_t *pos)
- {
- 	struct gpio_chip *chip = v;
--	unsigned int gpio;
- 	void *ret = NULL;
- 
--	/* skip GPIOs provided by the current chip */
--	for (gpio = chip->base + chip->ngpio; gpio_is_valid(gpio); gpio++) {
--		chip = gpio_desc[gpio].chip;
--		if (chip) {
--			ret = chip;
--			break;
--		}
--	}
-+	if (list_is_last(&chip->list, &gpio_chips))
-+		ret = NULL;
-+	else
-+		ret = list_entry(chip->list.next, struct gpio_chip, list);
- 
- 	s->private = "\n";
- 	++*pos;
+ /* caller ensures gpio is valid and requested, chip->get_direction may sleep  */
 -- 
 1.8.1.1
