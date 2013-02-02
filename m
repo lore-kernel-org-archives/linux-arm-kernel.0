@@ -1,178 +1,57 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sun,  3 Feb 2013 01:25:53 +0800
-Subject: [PATCH v8 12/12] document: devicetree: bind pinconf with pin single
-In-Reply-To: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1359825953-15663-13-git-send-email-haojian.zhuang@linaro.org>
+From: mporter@ti.com (Matt Porter)
+Date: Sat, 2 Feb 2013 13:07:47 -0500
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <e9be6668da8b4372a04687847daa1d8c@DFLE72.ent.ti.com>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
+ <20130201184915.GP2244@beef>
+ <2077c13e12314dc3adc8e5b653855da0@DFLE72.ent.ti.com>
+ <20130201185959.GQ2244@beef>
+ <e9be6668da8b4372a04687847daa1d8c@DFLE72.ent.ti.com>
+Message-ID: <20130202180747.GS2244@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Haojian Zhuang <haojian.zhuang@gmail.com>
+On Sat, Feb 02, 2013 at 12:01:37AM +0000, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 01-02-2013 22:59, Matt Porter wrote:
+> 
+> >>>>> Move mach-davinci/dma.c to common/edma.c so it can be used
+> >>>>> by OMAP (specifically AM33xx) as well.
+> 
+> >>>> I think this should rather go to drivers/dma/?
+> 
+> >>> No, this is the private EDMA API. It's the analogous thing to
+> >>> the private OMAP dma API that is in plat-omap/dma.c. The actual
+> >>> dmaengine driver is in drivers/dma/edma.c as a wrapper around
+> >>> this...same way OMAP DMA engine conversion is being done.
+> 
+> >>    Keeps me wondering why we couldn't have the same with CPPI 4.1 when I proposed
+> >> that, instead of waiting indefinitely for TI to convert it to drivers/dma/
+> >> directly. We could have working MUSB DMA on OMAP-L1x/Sitara all this time... Sigh.
+> 
+> > That is a shame. Yeah, I've pointed out that I was doing this exactly
+> > the same way as was acceptable for the OMAP DMA conversion since it was
+> > in RFC. The reasons are sound since in both cases, we have many drivers
+> > to convert that need to continue using the private DMA APIs.
+> 
+>     In case of CPPI 4.1, we'd only have to convert MUSB DMA driver. Other 
+> in-tree CPPI 4.1 having SoCs don't use it for anything but MUSB -- it even is 
+> sub-block of their MUSB device, AFAIK (I maybe wrong about Sitaras -- I don't 
+> know them well).
 
-Add comments with pinconf & gpio range in the document of
-pinctrl-single.
+Well, it's pretty clear to me now that there's good reason for it not
+landing in arch/arm/ so the obvious path is to do the dmaengine
+conversion and put it in drivers/dma/ if it's really a generic dma engine.
+I'm not sure why you express concern over the dma engine api not fitting
+with CPPI 4.1? If it doesn't work, work with Vinod to fix the api. It's
+expected, I'm working on dmaengine API changes right now to deal with a
+limitation of EDMA that needs to be abstracted.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- .../devicetree/bindings/pinctrl/pinctrl-single.txt |  108 +++++++++++++++++++-
- 1 file changed, 107 insertions(+), 1 deletion(-)
+As pointed out, edma.c is already here in arch/arm/, so moving it doesn't
+add something new. It does let us regression test all platforms that use it
+(both Davinci and AM33xx) as I go through the conversion process.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-index 2c81e45..eeb2e93 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-@@ -1,7 +1,9 @@
- One-register-per-pin type device tree based pinctrl driver
- 
- Required properties:
--- compatible : "pinctrl-single"
-+- compatible : "pinctrl-single" or "pinconf-single".
-+  "pinctrl-single" means that pinconf isn't supported.
-+  "pinconf-single" means that generic pinconf is supported.
- 
- - reg : offset and length of the register set for the mux registers
- 
-@@ -14,9 +16,61 @@ Optional properties:
- - pinctrl-single,function-off : function off mode for disabled state if
-   available and same for all registers; if not specified, disabling of
-   pin functions is ignored
-+
- - pinctrl-single,bit-per-mux : boolean to indicate that one register controls
-   more than one pin
- 
-+- pinctrl-single,drive-strength : array of value that are used to configure
-+  drive strength in the pinmux register. They're value of drive strength
-+  current and drive strength mask.
-+
-+		/* drive strength current, mask */
-+		pinctrl-single,power-source = <0x30 0xf0>;
-+
-+- pinctrl-single,bias-disable : array of value that are used to configure the
-+  input bias disabled in the pinmux register. They're value of bias value,
-+  match bias disabled value and bias disabled mask.
-+
-+		/* bias value, match bias disabled value, mask */
-+		pinctrl-single,bias-disable = <2 0 3>;
-+
-+- pinctrl-single,bias-pullup : array of value that are used to configure the
-+  input bias pullup in the pinmux register. They're value of bias value,
-+  match bias pullup value and bias pullup mask.
-+
-+		/* bias value, match bias pullup value, mask */
-+		pinctrl-single,bias-pullup = <0 1 1>;
-+
-+- pinctrl-single,bias-pulldown : array of value that are used to configure the
-+  input bias pulldown in the pinmux register. They're value of bias value,
-+  match bias pulldown value and bias pulldown mask.
-+
-+		/* bias value, match bias pulldown value, mask */
-+		pinctrl-single,bias-pulldown = <2 2 2>;
-+
-+- pinctrl-single,input-schmitt : array of value that are used to configure
-+  input schmitt in the pinmux register. In some silicons, there're two input
-+  schmitt value (rising-edge & falling-edge) in the pinmux register.
-+
-+		/* input schmitt value, mask */
-+		pinctrl-single,input-schmitt = <0x30 0x70>;
-+
-+- pinctrl-single,input-schmitt-disable : array of value that are used to
-+  configure input schmitt disabled in the pinmux register. They're value of
-+  input schmitt field, match disable value & mask.
-+
-+		/* input schmitt value, match disable value, mask */
-+		pinctrl-single,input-schmitt-disable = <0x30 0x40 0x70>;
-+
-+- pinctrl-single,gpio-range : list of value that are used to configure a GPIO
-+  range. They're value of subnode phandle, pin base in pinctrl device, pin
-+  number in this range, GPIO function value of this GPIO range.
-+  The number of parameters is depend on #pinctrl-single,gpio-range-cells
-+  property.
-+
-+		/* pin base, nr pins & gpio function */
-+		pinctrl-single,gpio-range = <&range 0 3 0 &range 3 9 1>;
-+
- This driver assumes that there is only one register for each pin (unless the
- pinctrl-single,bit-per-mux is set), and uses the common pinctrl bindings as
- specified in the pinctrl-bindings.txt document in this directory.
-@@ -42,6 +96,20 @@ Where 0xdc is the offset from the pinctrl register base address for the
- device pinctrl register, 0x18 is the desired value, and 0xff is the sub mask to
- be used when applying this change to the register.
- 
-+
-+Optional sub-node: In case some pins could be configured as GPIO in the pinmux
-+register, those pins could be defined as a GPIO range. This sub-node is required
-+by pinctrl-single,gpio-range property.
-+
-+Required properties in sub-node:
-+- #pinctrl-single,gpio-range-cells : the number of parameters after phandle in
-+  pinctrl-single,gpio-range property.
-+
-+	range: gpio-range {
-+		#pinctrl-single,gpio-range-cells = <3>;
-+	};
-+
-+
- Example:
- 
- /* SoC common file */
-@@ -76,6 +144,29 @@ control_devconf0: pinmux at 48002274 {
- 	pinctrl-single,function-mask = <0x5F>;
- };
- 
-+/* third controller instance for pins in gpio domain */
-+pmx_gpio: pinmux at d401e000 {
-+	compatible = "pinconf-single";
-+	reg = <0xd401e000 0x0330>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	pinctrl-single,register-width = <32>;
-+	pinctrl-single,function-mask = <7>;
-+
-+	/* sparse GPIO range could be supported */
-+	pinctrl-single,gpio-range = <&range 0 3 0 &range 3 9 1
-+				&range 12 1 0 &range 13 29 1
-+				&range 43 1 0 &range 44 49 1
-+				&range 94 1 1 &range 96 2 1>;
-+
-+	range: gpio-range {
-+		#pinctrl-single,gpio-range-cells = <3>;
-+	};
-+};
-+
-+
- /* board specific .dts file */
- 
- &pmx_core {
-@@ -96,6 +187,16 @@ control_devconf0: pinmux at 48002274 {
- 		>;
- 	};
- 
-+	uart0_pins: pinmux_uart0_pins {
-+		pinctrl-single,pins = <
-+			0x208 0		/* UART0_RXD (IOCFG138) */
-+			0x20c 0		/* UART0_TXD (IOCFG139) */
-+		>;
-+		pinctrl-single,bias-pulldown = <0 2 2>;
-+		pinctrl-single,bias-pullup = <0 1 1>;
-+		pinctrl-single,bias-disable = <0 0 3>;
-+	};
-+
- 	/* map uart2 pins */
- 	uart2_pins: pinmux_uart2_pins {
- 		pinctrl-single,pins = <
-@@ -122,6 +223,11 @@ control_devconf0: pinmux@48002274 {
- 
- };
- 
-+&uart1 {
-+       pinctrl-names = "default";
-+       pinctrl-0 = <&uart0_pins>;
-+};
-+
- &uart2 {
-        pinctrl-names = "default";
-        pinctrl-0 = <&uart2_pins>;
--- 
-1.7.10.4
+-Matt
