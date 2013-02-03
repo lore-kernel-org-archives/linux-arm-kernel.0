@@ -1,52 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  3 Feb 2013 12:18:31 +0100
-Subject: [PATCH 3/3] sunxi: a13-olinuxino: Add user LED to the device tree
-In-Reply-To: <1359890311-10110-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1359889813-10029-1-git-send-email-maxime.ripard@free-electrons.com>
- <1359890311-10110-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1359890311-10110-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  3 Feb 2013 12:24:48 +0100
+Subject: [PATCH] ARM: multiplatform: Sort the max gpio numbers.
+Message-ID: <1359890688-10336-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When building a multiplatform kernel, we could end up with a smaller
+number of GPIOs than the one required by the platform the kernel was
+running on.
+
+Sort the max GPIO number by descending order so that we always take the
+highest number required.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/Kconfig |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index 4a1e45d..33d1c7e 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -23,10 +23,30 @@
- 	};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1e86fa9..852ae76 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1626,13 +1626,16 @@ config LOCAL_TIMERS
+ 	  accounting to be spread across the timer interval, preventing a
+ 	  "thundering herd" at every timer tick.
  
- 	soc {
-+		pinctrl at 01c20800 {
-+			led_pins_olinuxino: led_pins at 0 {
-+				allwinner,pins = "PG9";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <1>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
- 		uart1: uart at 01c28400 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart1_pins_b>;
- 			status = "okay";
- 		};
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_olinuxino>;
-+
-+		power {
-+			gpios = <&pio 6 9 0>;
-+			default-state = "on";
-+		};
-+	};
- };
++# The GPIO number here must be sorted by descending number. In case of
++# a multiplatform kernel, we just want the highest value required by the
++# selected platforms.
+ config ARCH_NR_GPIO
+ 	int
+ 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+-	default 355 if ARCH_U8500
+-	default 264 if MACH_H4700
+ 	default 512 if SOC_OMAP5
++	default 355 if ARCH_U8500
+ 	default 288 if ARCH_VT8500 || ARCH_SUNXI
++	default 264 if MACH_H4700
+ 	default 0
+ 	help
+ 	  Maximum number of GPIOs in the system.
 -- 
 1.7.10.4
