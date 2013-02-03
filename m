@@ -1,77 +1,91 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 3 Feb 2013 13:29:56 -0500 (EST)
-Subject: [PATCH v3 13/15] ARM: CCI: ensure powerdown-time data is flushed
- from cache
-In-Reply-To: <510E36CD.9000005@ti.com>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-14-git-send-email-nicolas.pitre@linaro.org>
- <510B5CF7.5080902@ti.com> <alpine.LFD.2.02.1302021708460.6300@xanadu.home>
- <510E36CD.9000005@ti.com>
-Message-ID: <alpine.LFD.2.02.1302031327450.6300@xanadu.home>
+From: pavel@denx.de (Pavel Machek)
+Date: Sun, 3 Feb 2013 19:36:41 +0100
+Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
+ socfpga harware
+In-Reply-To: <71B37E0559AC6849A68C5BA94C509FB45A645BA4EA@SJ-ITMSG02.altera.priv.altera.com>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-5-git-send-email-dinguyen@altera.com>
+ <20130201035040.GE4838@quad.lixom.net>
+ <20130201104655.GA3124@amd.pavel.ucw.cz>
+ <71B37E0559AC6849A68C5BA94C509FB45A63D4E47D@SJ-ITMSG02.altera.priv.altera.com>
+ <20130201153152.GS23505@n2100.arm.linux.org.uk>
+ <1359736762.2932.1.camel@linux-builds1>
+ <20130202192409.GA17736@amd.pavel.ucw.cz>
+ <71B37E0559AC6849A68C5BA94C509FB45A645BA4EA@SJ-ITMSG02.altera.priv.altera.com>
+Message-ID: <20130203183641.GA30825@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 3 Feb 2013, Santosh Shilimkar wrote:
+Hi!
 
-> On Sunday 03 February 2013 03:53 AM, Nicolas Pitre wrote:
-> > On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
+> > > Point taken...thanks Russell.
 > > 
-> > > On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
-> > > > From: Dave Martin <dave.martin@linaro.org>
-> > > > 
-> > > > Non-local variables used by the CCI management function called after
-> > > > disabling the cache must be flushed out to main memory in advance,
-> > > > otherwise incoherency of those values may occur if they are sitting
-> > > > in the cache of some other CPU when cci_disable() executes.
-> > > > 
-> > > Any CPU calling cci_disable() would have already cleaned its local
-> > > cache and the snoop unit should take care of syncing the shared data
-> > > before hand from other CPU local caches for shared accesses.
-> > > May be I am unable to visualize the issue here or missing some key
-> > > point.
+> > Well, I don't think we normally check dtbs for validity with
+> > user-helpful error messages, but it is relatively easy in this case.
 > > 
-> > Let's suppose CPU0 initializes the CCI.  Without this patch, the CCI
-> > base address might be sitting in CPU0's cache.
+> > ---cut here---
 > > 
-> > The last CPU in a cluster to shut itself down is responsible for calling
-> > cci_disable().  And being the last, it is also responsible for flushing
-> > out its L1 and L2 caches before doing that.  If CPU0 went down before
-> > that, it did flush its L1 already. So the base address will be flushed
-> > to RAM in that case.
+> > Continue booting with second core disabled if cpu1-start-addr is not
+> > present in .dtb.
 > > 
-> Yes. This is valid case. Thanks for description.
+> > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > 
+> > diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-
+> > socfpga/platsmp.c
+> > index 81e0da0..90facdd 100644
+> > --- a/arch/arm/mach-socfpga/platsmp.c
+> > +++ b/arch/arm/mach-socfpga/platsmp.c
+> > @@ -82,6 +82,9 @@ static void __init socfpga_smp_init_cpus(void)
+> >  		ncores = 1;
+> >  	}
+> >  #endif
+> > +	if (!cpu1start_addr)
+> > +		ncores = 1;
+> > +
 > 
-> > But if it is a CPU in _another_ cluster which is shutting down and
-> > becoming the last man _there_.  It will flush its L1 and L2 cache
-> > before calling cci_disable().  And
-> > because the cache is disabled at that point, that CPU won't
-> > send any snoop request across to the other cluster where CPU0 holds the
-> > base address in its L1 or even L2 cache.
-> > 
-> > This is why we must push out that value out to RAM before cci_disable()
-> > is used.
-> > 
-> > > > This patch adds the appropriate flushing to the CCI driver to ensure
-> > > > that the relevant data is available in RAM ahead of time.
-> > > > 
-> > > > Because this creates a dependency on arch-specific cacheflushing
-> > > > functions, this patch also makes ARM_CCI depend on ARM.
-> > > > 
-> > > You should do that otherwise to avoid other arch building this
-> > > driver for random builds and breaking their builds.
-> > 
-> > Before this patch the driver was buildable on any architecture.  That's
-> > why this dependency is added only in this patch.
-> > 
-> I was just trying to counter the reasoning in the changelog which says
-> dependency is added because of arch specific cache flushing function.
-> Meaning even without that ARM dependency should be in place to avoid
-> driver getting build for other archs.
+> This will not work because of commit 5587164eea4aad88fcb79d9b21dc8f14fea598cd 
+> I sent out a V3 series of this patch, CPU1 will simply fail to come online if 
+> cpu1-start-addr is not defined.
 
-Well, some upstream maintainers' opinion is that you should not put 
-artificial dependencies on a specific architecture if a driver is 
-buildable on any architecture, even if the built driver is of no use to 
-those other architectures.
+Are you sure? As far as I can see you still need such a line in v3 of
+the patch:
 
+@@ -72,6 +73,11 @@ void __init socfpga_sysmgr_init(void)
+        struct device_node *np;
 
-Nicolas
+        np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
++       
++       if (of_property_read_u32(np, "cpu1-start-addr",
++                       (u32 *) &cpu1start_addr))
++               pr_err("SMP: Need cpu1-start-addr in device tree.\n");
++
+        sys_manager_base_addr = of_iomap(np, 0);
+
+        np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
+
+...so cpu1-start-addr is not there, cpu1start_addr is NULL but you
+continue booting.
+
+ ENTRY(secondary_trampoline)
+-       movw    r0, #:lower16:CPU1_START_ADDR
+-       movt  r0, #:upper16:CPU1_START_ADDR
++       movw    r2, #:lower16:cpu1start_addr
++       movt  r2, #:upper16:cpu1start_addr
++                       
++       /* The socfpga VT cannot handle a 0xC0000000 page offset when
+loading
++               the cpu1start_addr, we bit clear it. Tested on HW and
+VT. */
++       bic     r2, r2, #0x40000000
+
++       ldr     r0, [r2]
+        ldr     r1, [r0]
+        bx      r1
+
+...and you'll dereference the NULL pointer here, no?
+
+Sorry for the noise, this really is not all that important...
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
