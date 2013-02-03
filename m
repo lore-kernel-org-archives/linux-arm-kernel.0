@@ -1,42 +1,77 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sun, 3 Feb 2013 18:07:18 +0100
-Subject: [PATCH 0/4] add ux500_wdt support
-In-Reply-To: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1358509214-22407-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <20130203170718.GR8476@sortiz-mobl>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 3 Feb 2013 13:29:56 -0500 (EST)
+Subject: [PATCH v3 13/15] ARM: CCI: ensure powerdown-time data is flushed
+ from cache
+In-Reply-To: <510E36CD.9000005@ti.com>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-14-git-send-email-nicolas.pitre@linaro.org>
+ <510B5CF7.5080902@ti.com> <alpine.LFD.2.02.1302021708460.6300@xanadu.home>
+ <510E36CD.9000005@ti.com>
+Message-ID: <alpine.LFD.2.02.1302031327450.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Sun, 3 Feb 2013, Santosh Shilimkar wrote:
 
-On Fri, Jan 18, 2013 at 12:40:10PM +0100, Fabio Baltieri wrote:
-> Hi all,
+> On Sunday 03 February 2013 03:53 AM, Nicolas Pitre wrote:
+> > On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
+> > 
+> > > On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
+> > > > From: Dave Martin <dave.martin@linaro.org>
+> > > > 
+> > > > Non-local variables used by the CCI management function called after
+> > > > disabling the cache must be flushed out to main memory in advance,
+> > > > otherwise incoherency of those values may occur if they are sitting
+> > > > in the cache of some other CPU when cci_disable() executes.
+> > > > 
+> > > Any CPU calling cci_disable() would have already cleaned its local
+> > > cache and the snoop unit should take care of syncing the shared data
+> > > before hand from other CPU local caches for shared accesses.
+> > > May be I am unable to visualize the issue here or missing some key
+> > > point.
+> > 
+> > Let's suppose CPU0 initializes the CCI.  Without this patch, the CCI
+> > base address might be sitting in CPU0's cache.
+> > 
+> > The last CPU in a cluster to shut itself down is responsible for calling
+> > cci_disable().  And being the last, it is also responsible for flushing
+> > out its L1 and L2 caches before doing that.  If CPU0 went down before
+> > that, it did flush its L1 already. So the base address will be flushed
+> > to RAM in that case.
+> > 
+> Yes. This is valid case. Thanks for description.
 > 
-> this set adds support for the ux500_wdt timer, implemented in the PRCMU
-> unit of ST-Ericsson ux500 architecture.
-> 
-> The first two patches add the necessary definitions and function export
-> to the PRCMU driver currently in mainline, while the third an fourth
-> patches add the actual watchdog driver and mfd_cell definition to make
-> it probe when PRCMU is compiled in.
-> 
-> As the patches touches files in both mfd and watchdog subsystems, what do
-> you think is the best way to handle this set?
-> 
-> Thanks,
-> Fabio
-> 
-> 
-> Fabio Baltieri (4):
->   mfd: dbx500-prcmu: add watchdog ID definitions
->   mfd: dbx500-prcmu: export a9wdog functions
->   watchdog: add support for ux500_wdt watchdog
->   mfd: db8500-prcmu: add ux500_wdt mfd_cell
-All 4 patches (v2 for #3) applied, many thanks.
+> > But if it is a CPU in _another_ cluster which is shutting down and
+> > becoming the last man _there_.  It will flush its L1 and L2 cache
+> > before calling cci_disable().  And
+> > because the cache is disabled at that point, that CPU won't
+> > send any snoop request across to the other cluster where CPU0 holds the
+> > base address in its L1 or even L2 cache.
+> > 
+> > This is why we must push out that value out to RAM before cci_disable()
+> > is used.
+> > 
+> > > > This patch adds the appropriate flushing to the CCI driver to ensure
+> > > > that the relevant data is available in RAM ahead of time.
+> > > > 
+> > > > Because this creates a dependency on arch-specific cacheflushing
+> > > > functions, this patch also makes ARM_CCI depend on ARM.
+> > > > 
+> > > You should do that otherwise to avoid other arch building this
+> > > driver for random builds and breaking their builds.
+> > 
+> > Before this patch the driver was buildable on any architecture.  That's
+> > why this dependency is added only in this patch.
+> > 
+> I was just trying to counter the reasoning in the changelog which says
+> dependency is added because of arch specific cache flushing function.
+> Meaning even without that ARM dependency should be in place to avoid
+> driver getting build for other archs.
 
-Cheers,
-Samuel.
+Well, some upstream maintainers' opinion is that you should not put 
+artificial dependencies on a specific architecture if a driver is 
+buildable on any architecture, even if the built driver is of no use to 
+those other architectures.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+
+Nicolas
