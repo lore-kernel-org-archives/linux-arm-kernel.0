@@ -1,104 +1,85 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 03 Feb 2013 14:50:23 +0200
-Subject: [PATCH] ARM: OMAP2+: Get rid of custom OMAP_32K_TIMER_HZ
-In-Reply-To: <1359646320-9086-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1359646320-9086-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <510E5D0F.3050708@compulab.co.il>
+Date: Sun, 03 Feb 2013 15:18:18 +0200
+Subject: [PATCH v2 05/10] gpio: pxa: define nr gpios in platform data
+In-Reply-To: <1359886551-20950-6-git-send-email-haojian.zhuang@linaro.org>
+References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
+ <1359886551-20950-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <510E639A.7070600@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/13 17:32, Santosh Shilimkar wrote:
-> The timekeeping doesn't depend on HZ value in presence of fine grained
-> clocksource and hence there should not be any time drift because of HZ
-> value which was chosen to be divisor of 32768.
-> 
-> OMAP has been using HZ = 128 value to avoid any time drift issues
-> because of 32768 HZ clock. But with various measurements performed
-> with HZ = 100, no time drift is observed and it also proves the
-> point about HZ not having impact on time keeping on OMAP.
+Hi Haojian,
 
-Great! I had the same patch in my tree already for several months,
-but I was afraid to send it as I had no time to test it thoroughly.
-These kind of things are always scary to send without proper testing...
-
-Thank you very much for testing and sending this out!
-
+On 02/03/13 12:15, Haojian Zhuang wrote:
+> Avoid to define gpio numbers in gpio driver. Define it in platform data
+> instead.
 > 
-> Very informative thread on this topic is here:
-> 	https://lkml.org/lkml/2013/1/29/435
-> 
-> Special thanks to John Stulz, Arnd Bergmann and Russell King for their
-> valuable suggestions.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-If it still not too late:
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+Same comments as for previous version...
 
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
 > ---
->  arch/arm/Kconfig                        |    1 -
->  arch/arm/plat-omap/Kconfig              |    9 ---------
->  arch/arm/plat-omap/include/plat/timex.h |    8 --------
->  3 files changed, 18 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index b35b27f..5493164 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1648,7 +1648,6 @@ config HZ
->  	int
->  	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
->  		ARCH_S5PV210 || ARCH_EXYNOS4
-> -	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
->  	default AT91_TIMER_HZ if ARCH_AT91
->  	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
->  	default 100
-> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-> index 67c859c..ce66eb9 100644
-> --- a/arch/arm/plat-omap/Kconfig
-> +++ b/arch/arm/plat-omap/Kconfig
-> @@ -147,15 +147,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
->  	help
->  	  PPA routine service ID for setting L2 auxiliary control register.
+>  arch/arm/mach-mmp/aspenite.c      |    1 +
+>  arch/arm/mach-mmp/avengers_lite.c |    1 +
+>  arch/arm/mach-mmp/brownstone.c    |    1 +
+>  arch/arm/mach-mmp/flint.c         |    1 +
+>  arch/arm/mach-mmp/gplugd.c        |    1 +
+>  arch/arm/mach-mmp/tavorevb.c      |    1 +
+>  arch/arm/mach-mmp/teton_bga.c     |    1 +
+>  arch/arm/mach-mmp/ttc_dkb.c       |    1 +
+>  arch/arm/mach-pxa/pxa25x.c        |    3 +++
+>  arch/arm/mach-pxa/pxa27x.c        |    1 +
+>  arch/arm/mach-pxa/pxa3xx.c        |   15 +++++++++++-
+>  drivers/gpio/gpio-pxa.c           |   48 +++++++------------------------------
+>  include/linux/gpio-pxa.h          |    1 +
+>  13 files changed, 35 insertions(+), 41 deletions(-)
+
+[...]
+
+> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> index 656a1bb..a0cc797 100644
+> --- a/arch/arm/mach-pxa/pxa3xx.c
+> +++ b/arch/arm/mach-pxa/pxa3xx.c
+> @@ -435,6 +435,10 @@ void __init pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info)
+>  	pxa_register_device(&pxa3xx_device_i2c_power, info);
+>  }
 >  
-> -config OMAP_32K_TIMER_HZ
-> -	int "Kernel internal timer frequency for 32KHz timer"
-> -	range 32 1024
-> -	depends on OMAP_32K_TIMER
-> -	default "128"
-> -	help
-> -	  Kernel internal timer frequency should be a divisor of 32768,
-> -	  such as 64 or 128.
-> -
->  config OMAP_DM_TIMER
->  	bool "Use dual-mode timer"
->  	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
-> diff --git a/arch/arm/plat-omap/include/plat/timex.h b/arch/arm/plat-omap/include/plat/timex.h
-> index 6d35767..e27d2da 100644
-> --- a/arch/arm/plat-omap/include/plat/timex.h
-> +++ b/arch/arm/plat-omap/include/plat/timex.h
-> @@ -28,14 +28,6 @@
->  #if !defined(__ASM_ARCH_OMAP_TIMEX_H)
->  #define __ASM_ARCH_OMAP_TIMEX_H
+> +static struct pxa_gpio_platform_data pxa3xx_gpio_info __initdata = {
+> +	.nr_gpios = 128,
+> +};
+> +
+
+missing 
+#include <linux/gpio-pxa.h>
+
+>  static struct platform_device *devices[] __initdata = {
+>  	&pxa_device_gpio,
+>  	&pxa27x_device_udc,
+> @@ -482,8 +486,17 @@ static int __init pxa3xx_init(void)
+>  		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
+>  		register_syscore_ops(&pxa3xx_clock_syscore_ops);
 >  
-> -/*
-> - * OMAP 32KHz timer updates time one jiffie at a time from a secondary timer,
-> - * and that's why the CLOCK_TICK_RATE is not 32768.
-> - */
-> -#ifdef CONFIG_OMAP_32K_TIMER
-> -#define CLOCK_TICK_RATE		(CONFIG_OMAP_32K_TIMER_HZ)
-> -#else
->  #define CLOCK_TICK_RATE		(HZ * 100000UL)
-> -#endif
+> -		if (!of_have_populated_dt())
+> +		if (!of_have_populated_dt()) {
+> +			if (cpu_is_pxa93x())
+> +				pxa3xx_gpio_info.nr_gpios = 192;
+> +			ret = platform_device_add_data(&pxa_device_gpio,
+> +					&pxa3xx_gpio_info,
+> +					sizeof(struct pxa_gpio_platform_data);
+
+Closing parenthesis is missing...
+
+> +			if (ret < 0)
+> +				break;
+> +
+>  			ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+> +		}
+>  	}
 >  
->  #endif /* __ASM_ARCH_OMAP_TIMEX_H */
-> 
+>  	return ret;
+
+[...]
+
 
 -- 
 Regards,
