@@ -1,86 +1,105 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 3 Feb 2013 18:19:05 +0530
-Subject: [PATCH V2 3/6] ARM: davinci: da850: add DT node for I2C0
-In-Reply-To: <1359445134-13323-4-git-send-email-manishv.b@ti.com>
-References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
- <1359445134-13323-4-git-send-email-manishv.b@ti.com>
-Message-ID: <510E5CC1.8050801@ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 03 Feb 2013 14:50:23 +0200
+Subject: [PATCH] ARM: OMAP2+: Get rid of custom OMAP_32K_TIMER_HZ
+In-Reply-To: <1359646320-9086-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1359646320-9086-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <510E5D0F.3050708@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 1/29/2013 1:08 PM, Vishwanathrao Badarkhe, Manish wrote:
-> Add I2C0 device tree node information to da850-evm.
-> Also, add I2C0 pin muxing information in da850-evm.
+On 01/31/13 17:32, Santosh Shilimkar wrote:
+> The timekeeping doesn't depend on HZ value in presence of fine grained
+> clocksource and hence there should not be any time drift because of HZ
+> value which was chosen to be divisor of 32768.
 > 
-> Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+> OMAP has been using HZ = 128 value to avoid any time drift issues
+> because of 32768 HZ clock. But with various measurements performed
+> with HZ = 100, no time drift is observed and it also proves the
+> point about HZ not having impact on time keeping on OMAP.
+
+Great! I had the same patch in my tree already for several months,
+but I was afraid to send it as I had no time to test it thoroughly.
+These kind of things are always scary to send without proper testing...
+
+Thank you very much for testing and sending this out!
+
+> 
+> Very informative thread on this topic is here:
+> 	https://lkml.org/lkml/2013/1/29/435
+> 
+> Special thanks to John Stulz, Arnd Bergmann and Russell King for their
+> valuable suggestions.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+
+If it still not too late:
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
 > ---
-> Changes since V1:
->  - Updated i2c0 node names in dts and dtsi file.
->  - Removed interrupt parent from i2c0 node.
->  - Handled i2c0 pin mux inside i2c0 node.
+>  arch/arm/Kconfig                        |    1 -
+>  arch/arm/plat-omap/Kconfig              |    9 ---------
+>  arch/arm/plat-omap/include/plat/timex.h |    8 --------
+>  3 files changed, 18 deletions(-)
 > 
-> :100644 100644 433027f... c9ed683... M	arch/arm/boot/dts/da850-evm.dts
-> :100644 100644 5e0eb5c... 245ab9a... M	arch/arm/boot/dts/da850.dtsi
->  arch/arm/boot/dts/da850-evm.dts |    5 +++++
->  arch/arm/boot/dts/da850.dtsi    |   15 +++++++++++++++
->  2 files changed, 20 insertions(+), 0 deletions(-)
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index b35b27f..5493164 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1648,7 +1648,6 @@ config HZ
+>  	int
+>  	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
+>  		ARCH_S5PV210 || ARCH_EXYNOS4
+> -	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
+>  	default AT91_TIMER_HZ if ARCH_AT91
+>  	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
+>  	default 100
+> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> index 67c859c..ce66eb9 100644
+> --- a/arch/arm/plat-omap/Kconfig
+> +++ b/arch/arm/plat-omap/Kconfig
+> @@ -147,15 +147,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
+>  	help
+>  	  PPA routine service ID for setting L2 auxiliary control register.
+>  
+> -config OMAP_32K_TIMER_HZ
+> -	int "Kernel internal timer frequency for 32KHz timer"
+> -	range 32 1024
+> -	depends on OMAP_32K_TIMER
+> -	default "128"
+> -	help
+> -	  Kernel internal timer frequency should be a divisor of 32768,
+> -	  such as 64 or 128.
+> -
+>  config OMAP_DM_TIMER
+>  	bool "Use dual-mode timer"
+>  	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
+> diff --git a/arch/arm/plat-omap/include/plat/timex.h b/arch/arm/plat-omap/include/plat/timex.h
+> index 6d35767..e27d2da 100644
+> --- a/arch/arm/plat-omap/include/plat/timex.h
+> +++ b/arch/arm/plat-omap/include/plat/timex.h
+> @@ -28,14 +28,6 @@
+>  #if !defined(__ASM_ARCH_OMAP_TIMEX_H)
+>  #define __ASM_ARCH_OMAP_TIMEX_H
+>  
+> -/*
+> - * OMAP 32KHz timer updates time one jiffie at a time from a secondary timer,
+> - * and that's why the CLOCK_TICK_RATE is not 32768.
+> - */
+> -#ifdef CONFIG_OMAP_32K_TIMER
+> -#define CLOCK_TICK_RATE		(CONFIG_OMAP_32K_TIMER_HZ)
+> -#else
+>  #define CLOCK_TICK_RATE		(HZ * 100000UL)
+> -#endif
+>  
+>  #endif /* __ASM_ARCH_OMAP_TIMEX_H */
 > 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index 433027f..c9ed683 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -27,6 +27,11 @@
->  		serial2: serial at 1d0d000 {
->  			status = "okay";
->  		};
-> +		i2c0: i2c0 at 1c22000 {
 
-This should be:
-
-i2c0: i2c at 1c22000
-
-inline with what has been done in rest of this file.
-
-> +			status = "okay";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c0_pins>;
-> +		};
->  	};
->  	nand_cs3 at 62000000 {
->  		status = "okay";
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 5e0eb5c..245ab9a 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -56,6 +56,12 @@
->  					0x30 0x01100000  0x0ff00000
->  				>;
->  			};
-> +			i2c0_pins: pinmux_i2c0_pins {
-> +				pinctrl-single,bits = <
-> +					/* I2C0_SDA,I2C0_SCL */
-> +					0x10 0x00002200 0x0000ff00
-> +				>;
-> +			};
->  		};
->  		serial0: serial at 1c42000 {
->  			compatible = "ns16550a";
-> @@ -81,6 +87,15 @@
->  			interrupts = <61>;
->  			status = "disabled";
->  		};
-> +		i2c0: i2c0 at 1c22000 {
-> +			compatible = "ti,davinci-i2c";
-> +			reg = <0x22000 0x1000>;
-> +			clock-frequency = <100000>;
-
-The clock frequency is board specific. This should come from da850-evm.dts.
-
-Also, I think you can merge the auxdata addition with this patch. Can
-you post the i2c0 support separate from this series, so it can be taken
-independently? Looks like other patches have some dependencies/acks needed.
-
-Thanks,
-Sekhar
+-- 
+Regards,
+Igor.
