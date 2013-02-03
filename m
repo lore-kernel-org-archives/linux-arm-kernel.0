@@ -1,39 +1,28 @@
 From: anton@enomsg.org (Anton Vorontsov)
-Date: Sat, 2 Feb 2013 19:32:49 -0800
-Subject: [GIT PULL] power: ab8500-bm: Latest Mainline<->STE delta
- reduction patch-set
-In-Reply-To: <20130131120833.GH5301@gmail.com>
-References: <20130123113854.GK15873@gmail.com>
- <20130123144441.GN15873@gmail.com>
- <20130131120833.GH5301@gmail.com>
-Message-ID: <20130203033249.GC25016@lizard.sbx00618.mountca.wayport.net>
+Date: Sat, 2 Feb 2013 19:43:15 -0800
+Subject: [PATCH] power/reset: restart: remove __dev{init,exit}
+In-Reply-To: <20130131202000.GI7717@titan.lakedaemon.net>
+References: <20130106220426.GE26928@lizard.sbx05280.losalca.wayport.net>
+ <1359658469-14856-1-git-send-email-jason@lakedaemon.net>
+ <20130131200250.GR29973@lunn.ch>
+ <20130131202000.GI7717@titan.lakedaemon.net>
+Message-ID: <20130203034315.GG25016@lizard.sbx00618.mountca.wayport.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 12:08:33PM +0000, Lee Jones wrote:
-> > Okay, after Linus Walleij's diligent observaions, I have removed all
-> > new functionallity related to Deep Debug and will continue to
-> > investigate what I need to do in that regard.
+On Thu, Jan 31, 2013 at 03:20:00PM -0500, Jason Cooper wrote:
+> On Thu, Jan 31, 2013 at 09:02:50PM +0100, Andrew Lunn wrote:
+> > On Thu, Jan 31, 2013 at 06:54:29PM +0000, Jason Cooper wrote:
+> > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 > > 
-> > In the mean-time, here's the fresh deep-debug:less pull-request:
+> > Hi Jason
 > > 
-> > ----------------------------------------------------------------
+> > I Acked-by: a very similar patch to this yesterday....
 > > 
-> > The following changes since commit 8fd526fd18233887ba652079a369f4eee0de9d9d:
-> > 
-> >   qnap-poweroff: Fix license string (2013-01-19 18:04:04 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.linaro.org/people/ljones/linux-3.0-ux500.git tb-power-2
-> > 
-> > for you to fetch changes up to 34c11a709e928090cf34ecd706f7d3170f4e5026:
-> > 
-> >   u8500-charger: Delay for USB enumeration (2013-01-23 14:39:22 +0000)
-> 
-> Did you pull this in the end?
+> > https://lkml.org/lkml/2013/1/30/233
 
-I was buried under my homework, sorry. :-) The changes look good, thanks a
-lot! Pulled now.
+I've added Jason's Signed-off-by to the Thierry's patch.
+
+Thanks!
 
 Anton
