@@ -1,372 +1,302 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 3 Feb 2013 22:14:20 +0800
-Subject: [PATCH v4 1/3] cpufreq: kirkwood: Add a cpufreq driver for
- Marvell Kirkwood SoCs
-In-Reply-To: <1359729096-15371-2-git-send-email-andrew@lunn.ch>
-References: <1359729096-15371-1-git-send-email-andrew@lunn.ch>
- <1359729096-15371-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20130203141417.GC24081@S2101-09.ap.freescale.net>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Sun,  3 Feb 2013 23:00:38 +0800
+Subject: [PATCH v2 05/11] gpio: pxa: define nr gpios in platform data
+In-Reply-To: <510E639A.7070600@compulab.co.il>
+References: <510E639A.7070600@compulab.co.il>
+Message-ID: <1359903638-27590-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 03:31:33PM +0100, Andrew Lunn wrote:
-> The Marvell Kirkwood SoCs have simple cpufreq support in hardware. The
-> CPU can either use the a high speed cpu clock, or the slower DDR
-> clock. Add a driver to swap between these two clock sources.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> ---
-> 
-> To be commited by: Rafael J. Wysocki
-> 
->  drivers/clk/mvebu/clk-gating-ctrl.c |    1 +
->  drivers/cpufreq/Kconfig.arm         |    6 +
->  drivers/cpufreq/Makefile            |    1 +
->  drivers/cpufreq/kirkwood-cpufreq.c  |  277 +++++++++++++++++++++++++++++++++++
->  4 files changed, 285 insertions(+)
->  create mode 100644 drivers/cpufreq/kirkwood-cpufreq.c
-> 
-> diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
-> index 8fa5408..ebf141d 100644
-> --- a/drivers/clk/mvebu/clk-gating-ctrl.c
-> +++ b/drivers/clk/mvebu/clk-gating-ctrl.c
-> @@ -193,6 +193,7 @@ static const struct mvebu_soc_descr __initconst kirkwood_gating_descr[] = {
->  	{ "runit", NULL, 7 },
->  	{ "xor0", NULL, 8 },
->  	{ "audio", NULL, 9 },
-> +	{ "powersave", "cpuclk", 11 },
->  	{ "sata0", NULL, 14 },
->  	{ "sata1", NULL, 15 },
->  	{ "xor1", NULL, 16 },
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index a0b3661..80c8229 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -77,6 +77,12 @@ config ARM_EXYNOS5250_CPUFREQ
->  	  This adds the CPUFreq driver for Samsung EXYNOS5250
->  	  SoC.
->  
-> +config ARM_KIRKWOOD_CPUFREQ
-> +	def_bool ARCH_KIRKWOOD && OF
-> +	help
-> +	  This adds the CPUFreq driver for Marvell Kirkwood
-> +	  SoCs.
-> +
->  config ARM_SPEAR_CPUFREQ
->  	bool "SPEAr CPUFreq support"
->  	depends on PLAT_SPEAR
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index fadc4d4..39a0ffe 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -50,6 +50,7 @@ obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
->  obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
->  obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
->  obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
-> +obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
->  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)     += omap-cpufreq.o
->  obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
->  
-> diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
-> new file mode 100644
-> index 0000000..8923689
-> --- /dev/null
-> +++ b/drivers/cpufreq/kirkwood-cpufreq.c
-> @@ -0,0 +1,277 @@
-> +/*
-> + *	kirkwood_freq.c: cpufreq driver for the Marvell kirkwood
-> + *
-> + *	Copyright (C) 2013 Andrew Lunn <andrew@lunn.ch>
-> + *
-> + *	This program is free software; you can redistribute it and/or
-> + *	modify it under the terms of the GNU General Public License
-> + *	as published by the Free Software Foundation; either version
-> + *	2 of the License, or (at your option) any later version.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
+Avoid to define gpio numbers in gpio driver. Define it in platform data
+instead.
 
-Why do you need this header?
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/mach-mmp/aspenite.c      |    1 +
+ arch/arm/mach-mmp/avengers_lite.c |    1 +
+ arch/arm/mach-mmp/brownstone.c    |    1 +
+ arch/arm/mach-mmp/flint.c         |    1 +
+ arch/arm/mach-mmp/gplugd.c        |    1 +
+ arch/arm/mach-mmp/tavorevb.c      |    1 +
+ arch/arm/mach-mmp/teton_bga.c     |    1 +
+ arch/arm/mach-mmp/ttc_dkb.c       |    1 +
+ arch/arm/mach-pxa/pxa25x.c        |    3 +++
+ arch/arm/mach-pxa/pxa27x.c        |    1 +
+ arch/arm/mach-pxa/pxa3xx.c        |   17 +++++++++++--
+ drivers/gpio/gpio-pxa.c           |   48 +++++++------------------------------
+ include/linux/gpio-pxa.h          |    1 +
+ 13 files changed, 36 insertions(+), 42 deletions(-)
 
-> +#include <linux/cpufreq.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <asm/proc-fns.h>
-> +
-> +#define CPU_SW_INT_BLK BIT(28)
-> +
-> +static struct priv
-> +{
-> +	struct clk *cpu_clk;
-> +	struct clk *ddr_clk;
-> +	struct clk *powersave_clk;
-> +	struct device *dev;
-> +	void __iomem *base;
-> +} priv;
-> +
-> +#define STATE_CPU_FREQ 0x01
-> +#define STATE_DDR_FREQ 0x02
-> +
-> +/*
-> + * Kirkwood can swap the clock to the CPU between two clocks:
-> + *
-> + * - cpu clk
-> + * - ddr clk
-> + *
-> + * The frequencies are set at runtime before registering this *
-> + * table.
-> + */
-> +static struct cpufreq_frequency_table kirkwood_freq_table[] = {
-> +	{STATE_CPU_FREQ,	0}, /* CPU uses cpuclk */
-> +	{STATE_DDR_FREQ,	0}, /* CPU uses ddrclk */
-> +	{0,			CPUFREQ_TABLE_END},
-> +};
-> +
-> +static unsigned int kirkwood_cpufreq_get_cpu_frequency(unsigned int cpu)
-> +{
-> +	if (__clk_is_enabled(priv.powersave_clk))
-> +		return kirkwood_freq_table[1].frequency;
-> +	return kirkwood_freq_table[0].frequency;
-> +}
-> +
-> +static void kirkwood_cpufreq_set_cpu_state(unsigned int index)
-> +{
-> +	struct cpufreq_freqs freqs;
-> +	unsigned int state = kirkwood_freq_table[index].index;
-> +	unsigned long reg;
-> +
-> +	freqs.old = kirkwood_cpufreq_get_cpu_frequency(0);
-> +	freqs.new = kirkwood_freq_table[index].frequency;
-> +	freqs.cpu = 0; /* Kirkwood is UP */
-> +
-> +	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> +
-> +	dev_dbg(priv.dev, "Attempting to set frequency to %i KHz\n",
-> +		kirkwood_freq_table[index].frequency);
-> +	dev_dbg(priv.dev, "old frequency was %i KHz\n",
-> +		kirkwood_cpufreq_get_cpu_frequency(0));
-> +
-> +	if (freqs.old != freqs.new) {
-> +		local_irq_disable();
-> +
-> +		/* Disable interrupts to the CPU */
-> +		reg = readl_relaxed(priv.base);
-> +		reg |= CPU_SW_INT_BLK;
-> +		writel_relaxed(reg, priv.base);
-> +
-> +		switch (state) {
-> +		case STATE_CPU_FREQ:
-> +			clk_disable(priv.powersave_clk);
-> +			break;
-> +		case STATE_DDR_FREQ:
-> +			clk_enable(priv.powersave_clk);
-> +			break;
-> +		}
-> +
-> +		/* Wait-for-Interrupt, while the hardware changes frequency */
-> +		cpu_do_idle();
-> +
-> +		/* Enable interrupts to the CPU */
-> +		reg = readl_relaxed(priv.base);
-> +		reg &= ~CPU_SW_INT_BLK;
-> +		writel_relaxed(reg, priv.base);
-> +
-> +		local_irq_enable();
-> +	}
-> +	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> +};
-> +
-> +static int kirkwood_cpufreq_verify(struct cpufreq_policy *policy)
-> +{
-> +	return cpufreq_frequency_table_verify(policy, kirkwood_freq_table);
-> +}
-> +
-> +static int kirkwood_cpufreq_target(struct cpufreq_policy *policy,
-> +			    unsigned int target_freq,
-> +			    unsigned int relation)
-> +{
-> +	unsigned int index = 0;
-> +
-> +	if (cpufreq_frequency_table_target(policy, kirkwood_freq_table,
-> +				target_freq, relation, &index))
-> +		return -EINVAL;
-> +
-> +	kirkwood_cpufreq_set_cpu_state(index);
-> +
-> +	return 0;
-> +}
-> +
-> +/* Module init and exit code */
-> +static int kirkwood_cpufreq_cpu_init(struct cpufreq_policy *policy)
-> +{
-> +	int result;
-> +
-> +	/* cpuinfo and default policy values */
-> +	policy->cpuinfo.transition_latency = 5000; /* 5uS */
-> +	policy->cur = kirkwood_cpufreq_get_cpu_frequency(0);
-> +
-> +	result = cpufreq_frequency_table_cpuinfo(policy, kirkwood_freq_table);
-> +	if (result)
-> +		return result;
-> +
-> +	cpufreq_frequency_table_get_attr(kirkwood_freq_table, policy->cpu);
-> +
-> +	return 0;
-> +}
-> +
-> +static int kirkwood_cpufreq_cpu_exit(struct cpufreq_policy *policy)
-> +{
-> +	cpufreq_frequency_table_put_attr(policy->cpu);
-> +	return 0;
-> +}
-> +
-> +static struct freq_attr *kirkwood_cpufreq_attr[] = {
-> +	&cpufreq_freq_attr_scaling_available_freqs,
-> +	NULL,
-> +};
-> +
-> +static struct cpufreq_driver kirkwood_cpufreq_driver = {
-> +	.get	= kirkwood_cpufreq_get_cpu_frequency,
-> +	.verify	= kirkwood_cpufreq_verify,
-> +	.target	= kirkwood_cpufreq_target,
-> +	.init	= kirkwood_cpufreq_cpu_init,
-> +	.exit	= kirkwood_cpufreq_cpu_exit,
-> +	.name	= "kirkwood-cpufreq",
-> +	.owner	= THIS_MODULE,
-> +	.attr	= kirkwood_cpufreq_attr,
-> +};
-> +
-> +static int kirkwood_cpufreq_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np_core = of_find_compatible_node(
-> +		NULL, NULL, "marvell,kirkwood-core-clock");
-> +	struct device_node *np_gating = of_find_compatible_node(
-> +		NULL, NULL, "marvell,kirkwood-gating-clock");
-> +	struct of_phandle_args clkspec;
-> +	struct resource *res;
-> +	int err;
-> +
-> +	if (!np_core || !np_gating) {
-> +		if (np_core)
-> +			of_node_put(np_core);
-> +		if (np_gating)
-> +			of_node_put(np_gating);
-> +		return -ENODEV;
-> +	}
-> +	
-> +	priv.dev = &pdev->dev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Cannot get memory resource\n");
-> +		return -ENODEV;
-> +	}
-> +	priv.base = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!priv.base) {
-> +		dev_err(&pdev->dev, "Cannot ioremap\n");
-> +		return -EADDRNOTAVAIL;
-> +	}
-> +
-> +	clkspec.np = np_core;
-> +	clkspec.args_count = 1;
-> +	clkspec.args[0] = 1;
-> +
-> +	priv.cpu_clk = of_clk_get_from_provider(&clkspec);
-
-Again, clk client is not really supposed to call this.  Having a node
-in device tree consuming all the clocks you need and attaching the
-node to pdev->dev.of_node will have devm_clk_get just work for you.
-The node could reasonably be /cpus/cpu at 0.
-
-Shawn
-
-> +	if (IS_ERR(priv.cpu_clk)) {
-> +		dev_err(priv.dev, "Unable to get cpuclk");
-> +		return PTR_ERR(priv.cpu_clk);
-> +	}
-> +
-> +	clk_prepare_enable(priv.cpu_clk);
-> +	kirkwood_freq_table[0].frequency = clk_get_rate(priv.cpu_clk) / 1000;
-> +
-> +	clkspec.args[0] = 3;
-> +	priv.ddr_clk = of_clk_get_from_provider(&clkspec);
-> +	if (IS_ERR(priv.ddr_clk)) {
-> +		dev_err(priv.dev, "Unable to get ddrclk");
-> +		err = PTR_ERR(priv.ddr_clk);
-> +		goto out_cpu;
-> +	}
-> +
-> +	clk_prepare_enable(priv.ddr_clk);
-> +	kirkwood_freq_table[1].frequency = clk_get_rate(priv.ddr_clk) / 1000;
-> +
-> +	clkspec.np = np_gating;
-> +	clkspec.args[0] = 11;
-> +	priv.powersave_clk = of_clk_get_from_provider(&clkspec);
-> +	if (IS_ERR(priv.powersave_clk)) {
-> +		dev_err(priv.dev, "Unable to get powersave");
-> +		err = PTR_ERR(priv.powersave_clk);
-> +		goto out_ddr;
-> +	}
-> +	clk_prepare(priv.powersave_clk);
-> +
-> +	of_node_put(np_core);
-> +	np_core = NULL;
-> +	of_node_put(np_gating);
-> +	np_gating = NULL;
-> +
-> +	err = cpufreq_register_driver(&kirkwood_cpufreq_driver);
-> +	if (!err)
-> +		return 0;
-> +
-> +	dev_err(priv.dev, "Failed to register cpufreq driver");
-> +
-> +	clk_disable_unprepare(priv.powersave_clk);
-> +out_ddr:
-> +	clk_disable_unprepare(priv.ddr_clk);
-> +out_cpu:
-> +	clk_disable_unprepare(priv.cpu_clk);
-> +	of_node_put(np_core);
-> +	of_node_put(np_gating);
-> +
-> +	return err;
-> +}
-> +
-> +static int kirkwood_cpufreq_remove(struct platform_device *pdev)
-> +{
-> +	cpufreq_unregister_driver(&kirkwood_cpufreq_driver);
-> +
-> +	clk_disable_unprepare(priv.powersave_clk);
-> +	clk_disable_unprepare(priv.ddr_clk);
-> +	clk_disable_unprepare(priv.cpu_clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver kirkwood_cpufreq_platform_driver = {
-> +	.probe = kirkwood_cpufreq_probe,
-> +	.remove = kirkwood_cpufreq_remove,
-> +	.driver = {
-> +		.name = "kirkwood-cpufreq",
-> +		.owner = THIS_MODULE,
-> +	},
-> +};
-> +
-> +module_platform_driver(kirkwood_cpufreq_platform_driver);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch");
-> +MODULE_DESCRIPTION("cpufreq driver for Marvell's kirkwood CPU");
-> +MODULE_ALIAS("platform:kirkwood-cpufreq");
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+index 36f5781..a3e42dc 100644
+--- a/arch/arm/mach-mmp/aspenite.c
++++ b/arch/arm/mach-mmp/aspenite.c
+@@ -112,6 +112,7 @@ static unsigned long common_pin_config[] __initdata = {
+ };
+ 
+ static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
++	.nr_gpios	= 128,
+ 	.ed_mask	= true,
+ };
+ 
+diff --git a/arch/arm/mach-mmp/avengers_lite.c b/arch/arm/mach-mmp/avengers_lite.c
+index b8fe447..1ea6502 100644
+--- a/arch/arm/mach-mmp/avengers_lite.c
++++ b/arch/arm/mach-mmp/avengers_lite.c
+@@ -34,6 +34,7 @@ static unsigned long avengers_lite_pin_config_V16F[] __initdata = {
+ };
+ 
+ static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
++	.nr_gpios	= 128,
+ 	.ed_mask	= true,
+ };
+ 
+diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+index d6ea5c4..a32156f 100644
+--- a/arch/arm/mach-mmp/brownstone.c
++++ b/arch/arm/mach-mmp/brownstone.c
+@@ -106,6 +106,7 @@ static unsigned long brownstone_pin_config[] __initdata = {
+ };
+ 
+ static struct pxa_gpio_platform_data mmp2_gpio_pdata = {
++	.nr_gpios	= 192,
+ 	.ed_mask	= true,
+ };
+ 
+diff --git a/arch/arm/mach-mmp/flint.c b/arch/arm/mach-mmp/flint.c
+index 0955f44..3f301b5 100644
+--- a/arch/arm/mach-mmp/flint.c
++++ b/arch/arm/mach-mmp/flint.c
+@@ -79,6 +79,7 @@ static unsigned long flint_pin_config[] __initdata = {
+ };
+ 
+ static struct pxa_gpio_platform_data mmp2_gpio_pdata = {
++	.nr_gpios	= 192,
+ 	.ed_mask	= true,
+ };
+ 
+diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+index 2315cce..019b178 100644
+--- a/arch/arm/mach-mmp/gplugd.c
++++ b/arch/arm/mach-mmp/gplugd.c
+@@ -129,6 +129,7 @@ static unsigned long gplugd_pin_config[] __initdata = {
+ };
+ 
+ static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
++	.nr_gpios	= 128,
+ 	.ed_mask	= true,
+ };
+ 
+diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
+index eaec649..6e8cf80 100644
+--- a/arch/arm/mach-mmp/tavorevb.c
++++ b/arch/arm/mach-mmp/tavorevb.c
+@@ -62,6 +62,7 @@ static unsigned long tavorevb_pin_config[] __initdata = {
+ };
+ 
+ static struct pxa_gpio_platform_data ttc_dkb_gpio_pdata = {
++	.nr_gpios	= 128,
+ 	.ed_mask	= true,
+ };
+ 
+diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
+index 6682100..b5146bb 100644
+--- a/arch/arm/mach-mmp/teton_bga.c
++++ b/arch/arm/mach-mmp/teton_bga.c
+@@ -51,6 +51,7 @@ static unsigned long teton_bga_pin_config[] __initdata = {
+ };
+ 
+ static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
++	.nr_gpios	= 128,
+ 	.ed_mask	= true,
+ };
+ 
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index 984d902..123a0bf 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -75,6 +75,7 @@ static unsigned long ttc_dkb_pin_config[] __initdata = {
+ };
+ 
+ static struct pxa_gpio_platform_data ttc_dkb_gpio_pdata = {
++	.nr_gpios	= 128,
+ 	.ed_mask	= true,
+ };
+ 
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index 3460de1..ff91660 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -342,6 +342,9 @@ void __init pxa25x_map_io(void)
+ static struct pxa_gpio_platform_data pxa25x_gpio_info __initdata = {
+ #ifdef CONFIG_CPU_PXA26x
+ 	.inverted = true,
++	.nr_gpios = 90,
++#else
++	.nr_gpios = 85,
+ #endif
+ 	.gafr = true,
+ 	.gpio_set_wake = gpio_set_wake,
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 999d681..4de9572 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -431,6 +431,7 @@ void __init pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info)
+ 
+ static struct pxa_gpio_platform_data pxa27x_gpio_info __initdata = {
+ 	.gafr = true,
++	.nr_gpios = 121,
+ 	.gpio_set_wake = gpio_set_wake,
+ };
+ 
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 656a1bb..f6bff16 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -15,6 +15,7 @@
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/gpio-pxa.h>
+ #include <linux/pm.h>
+ #include <linux/platform_device.h>
+ #include <linux/irq.h>
+@@ -435,6 +436,10 @@ void __init pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info)
+ 	pxa_register_device(&pxa3xx_device_i2c_power, info);
+ }
+ 
++static struct pxa_gpio_platform_data pxa3xx_gpio_info __initdata = {
++	.nr_gpios = 128,
++};
++
+ static struct platform_device *devices[] __initdata = {
+ 	&pxa_device_gpio,
+ 	&pxa27x_device_udc,
+@@ -482,8 +487,16 @@ static int __init pxa3xx_init(void)
+ 		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
+ 		register_syscore_ops(&pxa3xx_clock_syscore_ops);
+ 
+-		if (!of_have_populated_dt())
+-			ret = platform_add_devices(devices, ARRAY_SIZE(devices));
++		if (!of_have_populated_dt()) {
++			if (cpu_is_pxa93x())
++				pxa3xx_gpio_info.nr_gpios = 192;
++			ret = platform_device_add_data(&pxa_device_gpio,
++					&pxa3xx_gpio_info,
++					sizeof(struct pxa_gpio_platform_data));
++			if (!ret)
++				ret = platform_add_devices(devices,
++							   ARRAY_SIZE(devices));
++		}
+ 	}
+ 
+ 	return ret;
+diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+index 6c6e21c..8fbf4c6 100644
+--- a/drivers/gpio/gpio-pxa.c
++++ b/drivers/gpio/gpio-pxa.c
+@@ -380,36 +380,6 @@ static struct irq_chip pxa_muxed_gpio_chip = {
+ 	.irq_set_wake	= pxa_gpio_set_wake,
+ };
+ 
+-static int pxa_gpio_nums(void)
+-{
+-	int count = 0;
+-
+-#ifdef CONFIG_ARCH_PXA
+-	if (cpu_is_pxa25x()) {
+-#ifdef CONFIG_CPU_PXA26x
+-		count = 89;
+-#elif defined(CONFIG_PXA25x)
+-		count = 84;
+-#endif /* CONFIG_CPU_PXA26x */
+-	} else if (cpu_is_pxa27x()) {
+-		count = 120;
+-	} else if (cpu_is_pxa93x()) {
+-		count = 191;
+-	} else if (cpu_is_pxa3xx()) {
+-		count = 127;
+-	}
+-#endif /* CONFIG_ARCH_PXA */
+-
+-#ifdef CONFIG_ARCH_MMP
+-	if (cpu_is_pxa168() || cpu_is_pxa910()) {
+-		count = 127;
+-	} else if (cpu_is_mmp2()) {
+-		count = 191;
+-	}
+-#endif /* CONFIG_ARCH_MMP */
+-	return count;
+-}
+-
+ static int pxa_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 			      irq_hw_number_t hw)
+ {
+@@ -433,7 +403,7 @@ static struct of_device_id pxa_gpio_dt_ids[] = {
+ 
+ static int pxa_gpio_probe_dt(struct platform_device *pdev)
+ {
+-	int ret, nr_banks, nr_gpios;
++	int ret, nr_banks;
+ 	struct pxa_gpio_platform_data *pdata;
+ 	struct device_node *prev, *next, *np = pdev->dev.of_node;
+ 	const struct of_device_id *of_id =
+@@ -451,6 +421,11 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
+ 	/* It's only valid for PXA26x */
+ 	if (of_find_property(np, "marvell,gpio-inverted", NULL))
+ 		pdata->inverted = true;
++	ret = of_property_read_u32(np, "marvell,nr-gpios", &pdata->nr_gpios);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "nr-gpios isn't specified\n");
++		return -ENOTSUPP;
++	}
+ 	/* set the platform data */
+ 	pdev->dev.platform_data = pdata;
+ 
+@@ -468,8 +443,6 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
+ 		prev = next;
+ 	}
+ 	of_node_put(prev);
+-	nr_gpios = nr_banks << 5;
+-	pxa_last_gpio = nr_gpios - 1;
+ 
+ 	return 0;
+ err:
+@@ -540,14 +513,8 @@ static int pxa_gpio_probe(struct platform_device *pdev)
+ 	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
+ 
+ 	ret = pxa_gpio_probe_dt(pdev);
+-	if (ret < 0) {
+-		pxa_last_gpio = pxa_gpio_nums();
+-	} else {
++	if (!ret)
+ 		use_of = 1;
+-	}
+-
+-	if (!pxa_last_gpio)
+-		return -EINVAL;
+ 
+ 	irq0 = platform_get_irq_byname(pdev, "gpio0");
+ 	irq1 = platform_get_irq_byname(pdev, "gpio1");
+@@ -581,6 +548,7 @@ static int pxa_gpio_probe(struct platform_device *pdev)
+ 
+ 	/* Initialize GPIO chips */
+ 	info = dev_get_platdata(&pdev->dev);
++	pxa_last_gpio = info->nr_gpios - 1;
+ 	pxa_init_gpio_chip(pdev, pxa_last_gpio,
+ 			   info ? info->gpio_set_wake : NULL);
+ 
+diff --git a/include/linux/gpio-pxa.h b/include/linux/gpio-pxa.h
+index 80e0322..b357fdc 100644
+--- a/include/linux/gpio-pxa.h
++++ b/include/linux/gpio-pxa.h
+@@ -19,6 +19,7 @@ struct pxa_gpio_platform_data {
+ 	bool ed_mask;	/* true means that ed_mask reg is available */
+ 	bool inverted;	/* only valid for PXA26x */
+ 	bool gafr;	/* only valid for PXA25x/PXA26x/PXA27x */
++	unsigned nr_gpios;
+ 	int (*gpio_set_wake)(unsigned int gpio, unsigned int on);
+ };
+ 
+-- 
+1.7.10.4
