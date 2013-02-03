@@ -1,28 +1,20 @@
-From: anton@enomsg.org (Anton Vorontsov)
-Date: Sat, 2 Feb 2013 19:43:15 -0800
-Subject: [PATCH] power/reset: restart: remove __dev{init,exit}
-In-Reply-To: <20130131202000.GI7717@titan.lakedaemon.net>
-References: <20130106220426.GE26928@lizard.sbx05280.losalca.wayport.net>
- <1359658469-14856-1-git-send-email-jason@lakedaemon.net>
- <20130131200250.GR29973@lunn.ch>
- <20130131202000.GI7717@titan.lakedaemon.net>
-Message-ID: <20130203034315.GG25016@lizard.sbx00618.mountca.wayport.net>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 02 Feb 2013 23:08:51 -0500 (EST)
+Subject: [PATCH 1/1] net: fec: fix miss init spinlock
+In-Reply-To: <1359708986-23634-1-git-send-email-Frank.Li@freescale.com>
+References: <1359708986-23634-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20130202.230851.809969826800130930.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 03:20:00PM -0500, Jason Cooper wrote:
-> On Thu, Jan 31, 2013 at 09:02:50PM +0100, Andrew Lunn wrote:
-> > On Thu, Jan 31, 2013 at 06:54:29PM +0000, Jason Cooper wrote:
-> > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > 
-> > Hi Jason
-> > 
-> > I Acked-by: a very similar patch to this yesterday....
-> > 
-> > https://lkml.org/lkml/2013/1/30/233
+From: Frank Li <Frank.Li@freescale.com>
+Date: Fri, 1 Feb 2013 16:56:26 +0800
 
-I've added Jason's Signed-off-by to the Thierry's patch.
+> @@ -1607,6 +1607,7 @@ static int fec_enet_init(struct net_device *ndev)
+>  	}
+>  
+>  	spin_lock_init(&fep->hw_lock);
+> +	spin_lock_init(&fep->tmreg_lock);
 
-Thanks!
-
-Anton
+This breaks the build, tmreg_lock is only present in certain
+configurations.
