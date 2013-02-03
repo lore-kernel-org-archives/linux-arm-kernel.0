@@ -1,36 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  3 Feb 2013 12:10:10 +0100
-Subject: [PATCHv2 0/3] 	Add support for user LED on the A13-Olinuxino
-Message-ID: <1359889813-10029-1-git-send-email-maxime.ripard@free-electrons.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Sun, 3 Feb 2013 12:10:55 +0100
+Subject: [PATCH] rtc: rtc-mv: Add support for clk to avoid lockups
+In-Reply-To: <1359887453-17189-1-git-send-email-andrew@lunn.ch>
+References: <1359887453-17189-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130203111055.GA29236@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andrew,
 
-This patchset adds the user LED of the Olinuxino to the device tree.
+On Sun, Feb 03, 2013 at 11:30:53AM +0100, Andrew Lunn wrote:
+> The Marvell RTC on Kirkwood makes use of the runit clock. Ensure the
+> driver clk_prepare_enable() this clock, otherwise there is a danger
+> the SoC will lockup when accessing RTC registers with the clock
+> disabled.
+> 
+> Reported-by: Simon Baatz gmbnomis at gmail.com
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood.dtsi |    1 +
+>  drivers/rtc/rtc-mv.c            |   15 ++++++++++++++-
+>  2 files changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index 6c5d75f..c57b9c6 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -77,6 +77,7 @@
+>  			compatible = "marvell,kirkwood-rtc", "marvell,orion-rtc";
+>  			reg = <0x10300 0x20>;
+>  			interrupts = <53>;
+> +			clocks = <&gate_clk 7>;
+>  		};
+>  
+>  		spi at 10600 {
+> diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+> index 57233c8..365bc83 100644
+> --- a/drivers/rtc/rtc-mv.c
+> +++ b/drivers/rtc/rtc-mv.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+>  #include <linux/delay.h>
+> +#include <linux/clk.h>
+>  #include <linux/gfp.h>
+>  #include <linux/module.h>
+>  
+> @@ -41,6 +42,7 @@ struct rtc_plat_data {
+>  	struct rtc_device *rtc;
+>  	void __iomem *ioaddr;
+>  	int		irq;
+> +	struct clk	*clk;
+>  };
+>  
+>  static int mv_rtc_set_time(struct device *dev, struct rtc_time *tm)
+> @@ -260,6 +262,11 @@ static int mv_rtc_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, pdata);
+>  
+> +	pdata->clk = devm_clk_get(&pdev->dev, NULL);
+> +	/* Not all SoCs require a clock.*/
+> +	if (!IS_ERR(pdata->clk))
+> +		clk_prepare_enable(pdata->clk);
+> +
 
-To do so, we also add a custom of_xlate function to the PIO driver so that
-we can use a more convenient format for the gpios from the device tree.
+There are already I/O accesses to the RTC above this. Thus, you
+probably need to move this up.
 
-Linus, since you took the dt changes for the pinctrl driver in your tree, maybe you could merge the two first patches, the second patch depending on patches in
-your tree.
 
-Thanks,
-Maxime
-
-Changes:
-  - Rebased on top of linus walleij allwinner-pinctrl branch
-
-Maxime Ripard (3):
-  pinctrl: sunxi: Add of_xlate function
-  sunxi: dts: Report the pinctrl nodes as gpio-controllers
-  sunxi: a13-olinuxino: Add user LED to the device tree
-
- arch/arm/boot/dts/sun4i-a10.dtsi          |    4 +++-
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts |   20 ++++++++++++++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi          |    4 +++-
- drivers/pinctrl/pinctrl-sunxi.c           |   20 ++++++++++++++++++++
- 4 files changed, 46 insertions(+), 2 deletions(-)
-
--- 
-1.7.10.4
+- Simon
