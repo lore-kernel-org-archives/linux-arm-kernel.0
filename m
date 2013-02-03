@@ -1,28 +1,26 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sun, 3 Feb 2013 23:31:18 +0100
-Subject: [PATCH V2 4/6] mfd: tps6507x: add device-tree support.
-In-Reply-To: <1359445134-13323-5-git-send-email-manishv.b@ti.com>
-References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
- <1359445134-13323-5-git-send-email-manishv.b@ti.com>
-Message-ID: <20130203223118.GU8476@sortiz-mobl>
+Date: Sun, 3 Feb 2013 23:31:43 +0100
+Subject: [PATCH] mfd: remove redundant devm_* for 88pm80x PMIC
+In-Reply-To: <1358822625-5948-1-git-send-email-yizhang@marvell.com>
+References: <1358822625-5948-1-git-send-email-yizhang@marvell.com>
+Message-ID: <20130203223143.GV8476@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manish,
+Hi Yi,
 
-On Tue, Jan 29, 2013 at 01:08:52PM +0530, Vishwanathrao Badarkhe, Manish wrote:
-> Add device tree based initialization support for TI's
-> tps6507x mfd device.
+On Tue, Jan 22, 2013 at 10:43:45AM +0800, Yi Zhang wrote:
+> devm_* functions are device managed and make error handling
+> and code simpler; it also fix error exit paths
 > 
-> Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+> Signed-off-by: Yi Zhang <yizhang@marvell.com>
 > ---
-> Changes since V1:
->  - updated subject line for commit.
-> 
-> :100644 100644 409afa2... 5ad4b77... M	drivers/mfd/tps6507x.c
->  drivers/mfd/tps6507x.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-Applied, thanks.
+>  drivers/mfd/88pm800.c       |   10 +++-------
+>  drivers/mfd/88pm805.c       |    4 ++--
+>  drivers/mfd/88pm80x.c       |   22 ++++------------------
+>  include/linux/mfd/88pm80x.h |    2 +-
+>  4 files changed, 10 insertions(+), 28 deletions(-)
+Applied, thanks for the fix.
 
 Cheers,
 Samuel.
