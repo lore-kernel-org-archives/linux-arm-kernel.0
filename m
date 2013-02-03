@@ -1,36 +1,69 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Sun, 3 Feb 2013 00:49:20 +0100
-Subject: [PATCH v2 2/2] ARM: kirkwood: fix to retain gbe MAC addresses
- for DT kernels
-In-Reply-To: <1359577799-23351-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <20130130183049.GR7717@titan.lakedaemon.net>
- <1359577799-23351-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130202234919.GB17361@schnuecks.de>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Sun,  3 Feb 2013 02:15:10 +0200
+Subject: [PATCH] ARM: OMAP2+: mux: correct wrong error messages
+Message-ID: <1359850510-32298-1-git-send-email-ruslan.bilovol@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian, Jason,
+This is needed because the omap_mux_get_by_name()
+function calls the _omap_mux_get_by_name subfunction
+for each mux partition until needed mux is not found.
+As a result, we get messages like
+"Could not find signal XXX" for each partition
+where this mux name does not exist.
 
-On Wed, Jan 30, 2013 at 09:29:58PM +0100, Sebastian Hesselbarth wrote:
-> The ethernet controller used on kirkwood looses its MAC address
-> register contents when the corresponding clock is gated. As soon as
-> mv643xx_eth is built as module, the clock gets gated and when loading
-> the module, the MAC address is gone.
-> 
-> Proper DT support for the mv643xx_eth driver is expected soon, so we add
-> a workaround to always enable ge0/ge1 clocks on kirkwood. This workaround
-> is also already used on non-DT kirkwood kernels.
-> 
-> Reported-by: Simon Baatz <gmbnomis@gmail.com>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+This patch fixes wrong error message in
+the _omap_mux_get_by_name() function moving it
+to the omap_mux_get_by_name() one and as result
+reduces noise in the kernel log.
 
-Tested this on IB-NAS6210 (kirkwood, single GBE interface). Using
-mv643xx_eth as a module works again now and yields
+My kernel log without this patch:
+[...]
+[    0.221801] omap_mux_init: Add partition: #2: wkup, flags: 3
+[    0.222045] _omap_mux_get_by_name: Could not find signal fref_clk0_out.sys_drm_msecure
+[    0.222137] _omap_mux_get_by_name: Could not find signal sys_nirq
+[    0.222167] _omap_mux_get_by_name: Could not find signal sys_nirq
+[    0.225006] _omap_mux_get_by_name: Could not find signal uart1_rx.uart1_rx
+[    0.225006] _omap_mux_get_by_name: Could not find signal uart1_rx.uart1_rx
+[    0.270111] _omap_mux_get_by_name: Could not find signal fref_clk4_out.fref_clk4_out
+[    0.273406] twl: not initialized
 
-# cat /sys/kernel/debug/clk/tclk/ge[01]/clk_enable_count 
-2
-1
+[...]
 
-as expected.
+My kernel log with this patch:
+[...]
+[    0.221771] omap_mux_init: Add partition: #2: wkup, flags: 3
+[    0.222106] omap_mux_get_by_name: Could not find signal sys_nirq
+[    0.224945] omap_mux_get_by_name: Could not find signal uart1_rx.uart1_rx
+[    0.274536] twl: not initialized
+[...]
 
-- Simon
+Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+---
+ arch/arm/mach-omap2/mux.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 6a217c9..9578ec0 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -211,8 +211,6 @@ static int __init _omap_mux_get_by_name(struct omap_mux_partition *partition,
+ 		return -EINVAL;
+ 	}
+ 
+-	pr_err("%s: Could not find signal %s\n", __func__, muxname);
+-
+ 	return -ENODEV;
+ }
+ 
+@@ -234,6 +232,8 @@ int __init omap_mux_get_by_name(const char *muxname,
+ 		return mux_mode;
+ 	}
+ 
++	pr_err("%s: Could not find signal %s\n", __func__, muxname);
++
+ 	return -ENODEV;
+ }
+ 
+-- 
+1.7.9.5
