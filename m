@@ -1,86 +1,55 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 03 Feb 2013 15:18:18 +0200
-Subject: [PATCH v2 05/10] gpio: pxa: define nr gpios in platform data
-In-Reply-To: <1359886551-20950-6-git-send-email-haojian.zhuang@linaro.org>
-References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
- <1359886551-20950-6-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <510E639A.7070600@compulab.co.il>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 3 Feb 2013 21:36:24 +0800
+Subject: [PATCH 1/2] ARM: mxs: dts: Add gpio-keys for the rotary to the
+ CFA-10049
+In-Reply-To: <1359626424-22546-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1359626424-22546-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1359626424-22546-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130203133620.GA24081@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+On Thu, Jan 31, 2013 at 11:00:23AM +0100, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-On 02/03/13 12:15, Haojian Zhuang wrote:
-> Avoid to define gpio numbers in gpio driver. Define it in platform data
-> instead.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-
-Same comments as for previous version...
+Applied both, thanks.
 
 > ---
->  arch/arm/mach-mmp/aspenite.c      |    1 +
->  arch/arm/mach-mmp/avengers_lite.c |    1 +
->  arch/arm/mach-mmp/brownstone.c    |    1 +
->  arch/arm/mach-mmp/flint.c         |    1 +
->  arch/arm/mach-mmp/gplugd.c        |    1 +
->  arch/arm/mach-mmp/tavorevb.c      |    1 +
->  arch/arm/mach-mmp/teton_bga.c     |    1 +
->  arch/arm/mach-mmp/ttc_dkb.c       |    1 +
->  arch/arm/mach-pxa/pxa25x.c        |    3 +++
->  arch/arm/mach-pxa/pxa27x.c        |    1 +
->  arch/arm/mach-pxa/pxa3xx.c        |   15 +++++++++++-
->  drivers/gpio/gpio-pxa.c           |   48 +++++++------------------------------
->  include/linux/gpio-pxa.h          |    1 +
->  13 files changed, 35 insertions(+), 41 deletions(-)
-
-[...]
-
-> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-> index 656a1bb..a0cc797 100644
-> --- a/arch/arm/mach-pxa/pxa3xx.c
-> +++ b/arch/arm/mach-pxa/pxa3xx.c
-> @@ -435,6 +435,10 @@ void __init pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info)
->  	pxa_register_device(&pxa3xx_device_i2c_power, info);
->  }
+>  arch/arm/boot/dts/imx28-cfa10049.dts |   14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+> index cabc33a..5db3789 100644
+> --- a/arch/arm/boot/dts/imx28-cfa10049.dts
+> +++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+> @@ -45,6 +45,7 @@
+>  					reg = <0>;
+>  					fsl,pinmux-ids = <
+>  						0x2133 /* MX28_PAD_SSP2_D3__GPIO_2_19 */
+> +						0x31a3 /* MX28_PAD_SAIF_SDATA0__GPIO_3_26 */
+>  						0x31e3 /* MX28_PAD_LCD_RESET__GPIO_3_30 */
+>  					>;
+>  					fsl,drive-strength = <0>;
+> @@ -276,6 +277,19 @@
+>  		};
+>  	};
 >  
-> +static struct pxa_gpio_platform_data pxa3xx_gpio_info __initdata = {
-> +	.nr_gpios = 128,
-> +};
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 > +
-
-missing 
-#include <linux/gpio-pxa.h>
-
->  static struct platform_device *devices[] __initdata = {
->  	&pxa_device_gpio,
->  	&pxa27x_device_udc,
-> @@ -482,8 +486,17 @@ static int __init pxa3xx_init(void)
->  		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
->  		register_syscore_ops(&pxa3xx_clock_syscore_ops);
->  
-> -		if (!of_have_populated_dt())
-> +		if (!of_have_populated_dt()) {
-> +			if (cpu_is_pxa93x())
-> +				pxa3xx_gpio_info.nr_gpios = 192;
-> +			ret = platform_device_add_data(&pxa_device_gpio,
-> +					&pxa3xx_gpio_info,
-> +					sizeof(struct pxa_gpio_platform_data);
-
-Closing parenthesis is missing...
-
-> +			if (ret < 0)
-> +				break;
+> +		rotary_button {
+> +			label = "rotary_button";
+> +			gpios = <&gpio3 26 1>;
+> +			debounce-interval = <10>;
+> +			linux,code = <28>;
+> +		};
+> +	};
 > +
->  			ret = platform_add_devices(devices, ARRAY_SIZE(devices));
-> +		}
->  	}
->  
->  	return ret;
-
-[...]
-
-
--- 
-Regards,
-Igor.
+>  	backlight {
+>  		compatible = "pwm-backlight";
+>  		pwms = <&pwm 3 5000000>;
+> -- 
+> 1.7.10.4
+> 
