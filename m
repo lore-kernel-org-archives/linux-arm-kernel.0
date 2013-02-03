@@ -1,72 +1,69 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun,  3 Feb 2013 10:55:39 +0100
-Subject: [PATCH] gpio: mvebu: Add clk support to prevent lockup
-Message-ID: <1359885339-14858-1-git-send-email-andrew@lunn.ch>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sun, 3 Feb 2013 15:37:09 +0530
+Subject: [PATCH v3 13/15] ARM: CCI: ensure powerdown-time data is flushed
+ from cache
+In-Reply-To: <alpine.LFD.2.02.1302021708460.6300@xanadu.home>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-14-git-send-email-nicolas.pitre@linaro.org>
+ <510B5CF7.5080902@ti.com> <alpine.LFD.2.02.1302021708460.6300@xanadu.home>
+Message-ID: <510E36CD.9000005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kirkwood SoC GPIO cores use the tclk. Add code to
-clk_prepare_enable() tclk, otherwise there is a danger of locking up
-the SoC by accessing the GPIO registers when tclk is not ticking.
+On Sunday 03 February 2013 03:53 AM, Nicolas Pitre wrote:
+> On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
+>
+>> On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
+>>> From: Dave Martin <dave.martin@linaro.org>
+>>>
+>>> Non-local variables used by the CCI management function called after
+>>> disabling the cache must be flushed out to main memory in advance,
+>>> otherwise incoherency of those values may occur if they are sitting
+>>> in the cache of some other CPU when cci_disable() executes.
+>>>
+>> Any CPU calling cci_disable() would have already cleaned its local
+>> cache and the snoop unit should take care of syncing the shared data
+>> before hand from other CPU local caches for shared accesses.
+>> May be I am unable to visualize the issue here or missing some key
+>> point.
+>
+> Let's suppose CPU0 initializes the CCI.  Without this patch, the CCI
+> base address might be sitting in CPU0's cache.
+>
+> The last CPU in a cluster to shut itself down is responsible for calling
+> cci_disable().  And being the last, it is also responsible for flushing
+> out its L1 and L2 caches before doing that.  If CPU0 went down before
+> that, it did flush its L1 already. So the base address will be flushed
+> to RAM in that case.
+>
+Yes. This is valid case. Thanks for description.
 
-Reported-by: Simon Baatz <gmbnomis@gmail.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/kirkwood.dtsi |    2 ++
- drivers/gpio/gpio-mvebu.c       |    7 +++++++
- 2 files changed, 9 insertions(+)
+> But if it is a CPU in _another_ cluster which is shutting down and
+> becoming the last man _there_.  It will flush its L1 and L2 cache
+> before calling cci_disable().  And
+> because the cache is disabled at that point, that CPU won't
+> send any snoop request across to the other cluster where CPU0 holds the
+> base address in its L1 or even L2 cache.
+>
+> This is why we must push out that value out to RAM before cci_disable()
+> is used.
+>
+>>> This patch adds the appropriate flushing to the CCI driver to ensure
+>>> that the relevant data is available in RAM ahead of time.
+>>>
+>>> Because this creates a dependency on arch-specific cacheflushing
+>>> functions, this patch also makes ARM_CCI depend on ARM.
+>>>
+>> You should do that otherwise to avoid other arch building this
+>> driver for random builds and breaking their builds.
+>
+> Before this patch the driver was buildable on any architecture.  That's
+> why this dependency is added only in this patch.
+>
+I was just trying to counter the reasoning in the changelog which says
+dependency is added because of arch specific cache flushing function.
+Meaning even without that ARM dependency should be in place to avoid
+driver getting build for other archs.
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index d6ab442..6c5d75f 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -38,6 +38,7 @@
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
- 			interrupts = <35>, <36>, <37>, <38>;
-+			clocks = <&gate_clk 7>;
- 		};
- 
- 		gpio1: gpio at 10140 {
-@@ -49,6 +50,7 @@
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
- 			interrupts = <39>, <40>, <41>;
-+			clocks = <&gate_clk 7>;
- 		};
- 
- 		serial at 12000 {
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index 6819d63..456663c 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -41,6 +41,7 @@
- #include <linux/io.h>
- #include <linux/of_irq.h>
- #include <linux/of_device.h>
-+#include <linux/clk.h>
- #include <linux/pinctrl/consumer.h>
- 
- /*
-@@ -495,6 +496,7 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct irq_chip_generic *gc;
- 	struct irq_chip_type *ct;
-+	struct clk *clk;
- 	unsigned int ngpios;
- 	int soc_variant;
- 	int i, cpu, id;
-@@ -528,6 +530,11 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
- 		return id;
- 	}
- 
-+	clk = devm_clk_get(&pdev->dev, NULL);
-+	/* Not all SoCs require a clock.*/
-+	if (!IS_ERR(clk))
-+		clk_prepare_enable(clk);
-+
- 	mvchip->soc_variant = soc_variant;
- 	mvchip->chip.label = dev_name(&pdev->dev);
- 	mvchip->chip.dev = &pdev->dev;
--- 
-1.7.10.4
+Regards,
+Santosh
