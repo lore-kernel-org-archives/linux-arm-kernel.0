@@ -1,71 +1,60 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Sun, 3 Feb 2013 12:10:55 +0100
-Subject: [PATCH] rtc: rtc-mv: Add support for clk to avoid lockups
-In-Reply-To: <1359887453-17189-1-git-send-email-andrew@lunn.ch>
-References: <1359887453-17189-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20130203111055.GA29236@schnuecks.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun,  3 Feb 2013 12:10:11 +0100
+Subject: [PATCH 1/3] pinctrl: sunxi: Add of_xlate function
+In-Reply-To: <1359889813-10029-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1359889813-10029-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1359889813-10029-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Since the pin controller of sunxi chips is represented as a single bank
+in the driver.
+Since this is neither convenient nor represented that way in the
+datasheets, define a custom of_xlate function with the layout <bank pin
+flag>
 
-On Sun, Feb 03, 2013 at 11:30:53AM +0100, Andrew Lunn wrote:
-> The Marvell RTC on Kirkwood makes use of the runit clock. Ensure the
-> driver clk_prepare_enable() this clock, otherwise there is a danger
-> the SoC will lockup when accessing RTC registers with the clock
-> disabled.
-> 
-> Reported-by: Simon Baatz gmbnomis at gmail.com
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/boot/dts/kirkwood.dtsi |    1 +
->  drivers/rtc/rtc-mv.c            |   15 ++++++++++++++-
->  2 files changed, 15 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 6c5d75f..c57b9c6 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -77,6 +77,7 @@
->  			compatible = "marvell,kirkwood-rtc", "marvell,orion-rtc";
->  			reg = <0x10300 0x20>;
->  			interrupts = <53>;
-> +			clocks = <&gate_clk 7>;
->  		};
->  
->  		spi at 10600 {
-> diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
-> index 57233c8..365bc83 100644
-> --- a/drivers/rtc/rtc-mv.c
-> +++ b/drivers/rtc/rtc-mv.c
-> @@ -14,6 +14,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/of.h>
->  #include <linux/delay.h>
-> +#include <linux/clk.h>
->  #include <linux/gfp.h>
->  #include <linux/module.h>
->  
-> @@ -41,6 +42,7 @@ struct rtc_plat_data {
->  	struct rtc_device *rtc;
->  	void __iomem *ioaddr;
->  	int		irq;
-> +	struct clk	*clk;
->  };
->  
->  static int mv_rtc_set_time(struct device *dev, struct rtc_time *tm)
-> @@ -260,6 +262,11 @@ static int mv_rtc_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, pdata);
->  
-> +	pdata->clk = devm_clk_get(&pdev->dev, NULL);
-> +	/* Not all SoCs require a clock.*/
-> +	if (!IS_ERR(pdata->clk))
-> +		clk_prepare_enable(pdata->clk);
-> +
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/pinctrl-sunxi.c |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-There are already I/O accesses to the RTC above this. Thus, you
-probably need to move this up.
-
-
-- Simon
+diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+index e4d32c6..80b11e3 100644
+--- a/drivers/pinctrl/pinctrl-sunxi.c
++++ b/drivers/pinctrl/pinctrl-sunxi.c
+@@ -1261,6 +1261,24 @@ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
+ 	writel((value & DATA_PINS_MASK) << index, pctl->membase + reg);
+ }
+ 
++static int sunxi_pinctrl_gpio_of_xlate(struct gpio_chip *gc,
++				const struct of_phandle_args *gpiospec,
++				u32 *flags)
++{
++	int pin, base;
++
++	base = PINS_PER_BANK * gpiospec->args[0];
++	pin = base + gpiospec->args[1];
++
++	if (pin > (gc->base + gc->ngpio))
++		return -EINVAL;
++
++	if (flags)
++		*flags = gpiospec->args[2];
++
++	return pin;
++}
++
+ static struct gpio_chip sunxi_pinctrl_gpio_chip = {
+ 	.owner			= THIS_MODULE,
+ 	.request		= sunxi_pinctrl_gpio_request,
+@@ -1269,6 +1287,8 @@ static struct gpio_chip sunxi_pinctrl_gpio_chip = {
+ 	.direction_output	= sunxi_pinctrl_gpio_direction_output,
+ 	.get			= sunxi_pinctrl_gpio_get,
+ 	.set			= sunxi_pinctrl_gpio_set,
++	.of_xlate		= sunxi_pinctrl_gpio_of_xlate,
++	.of_gpio_n_cells	= 3,
+ 	.can_sleep		= 0,
+ };
+ 
+-- 
+1.7.10.4
