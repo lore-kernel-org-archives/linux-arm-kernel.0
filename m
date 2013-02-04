@@ -1,57 +1,37 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Feb 2013 11:42:59 -0600
-Subject: [PATCH V2 0/7] ARM: OMAP2+: System timer updates
-Message-ID: <1359999786-8740-1-git-send-email-jon-hunter@ti.com>
+Date: Mon, 4 Feb 2013 11:43:00 -0600
+Subject: [PATCH V2 1/7] ARM: OMAP2+: Fix selection of clockevent timer when
+ using device-tree
+In-Reply-To: <1359999786-8740-1-git-send-email-jon-hunter@ti.com>
+References: <1359999786-8740-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1359999786-8740-2-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series consists mainly of clean-ups for clockevents and
-clocksource timers on OMAP2+ devices. The most significant change
-in functionality comes from the 5th patch which is changing the
-selection of the clocksource timer for OMAP3 and AM335x devices
-when gptimers are used for clocksource. This change came about from
-Vaibhav Bedia's series for AM335x [1]. See patch for more details on
-the exact nature of the change.
+Commit 9725f44 (ARM: OMAP: Add DT support for timer driver) added
+device-tree support for selecting a clockevent timer by property.
+However, the code is currently ignoring the property passed and
+selecting the first available timer found. Hence, for the OMAP3 beagle
+board timer-12 is not being selected as expected. Fix this problem
+by ensuring the timer property is passed to omap_get_timer_dt().
 
-Boot tested with and without  device-tree on OMAP2420 H4, OMAP3430 SDP,
-OMAP3430 Beagle Board, OMAP4430 SDP and AM335x EVM (AM335x only
-supports device-tree boot). Also boot tested boards with kernel boot
-parameter "clocksource=gp_timer".
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/timer.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This series is based upon ARM-SoC next branch.
-
-V2 changes:
-- Fixed bug in patch that updates clocksource and clockevents timer
-  names to use the hwmod timer names (thanks Vaibhav Bedia!)
-- Updated patch that removes the hard-coded ID test to return an error
-  as soon as clk_set_parent fails instead of waiting for the end of the
-  function.
-- Fixed bug in patches that "simplify system timer clock definitions"
-  and "simplify system timer definitions" that was prevent omap4/5
-  boards from booting with kernel boot parameter "clocksource=gp_timer".
-- Updated changelog for patch "simplify system timer definitions" per
-  feedback received from Igor.
-- Added new patch to store the timer ID in the omap_dm_timer structure
-  to clean-up the code.
-- Added new patch to fix a sparse warning seen in ARM-SOC next.
-
-[1] https://patchwork.kernel.org/patch/1921421/
-
-
-Jon Hunter (7):
-  ARM: OMAP2+: Fix selection of clockevent timer when using device-tree
-  ARM: OMAP2+: Display correct system timer name
-  ARM: OMAP2+: Remove hard-coded test on timer ID
-  ARM: OMAP2+: Simplify system timer clock definitions
-  ARM: OMAP2+: Simplify system timers definitions
-  ARM: OMAP2+: Store ID of system timers in timer structure
-  ARM: OMAP4+: Fix sparse warning in system timers
-
- arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
- arch/arm/mach-omap2/board-generic.c  |    2 +-
- arch/arm/mach-omap2/common.h         |    3 +-
- arch/arm/mach-omap2/timer.c          |  121 +++++++++++++++++-----------------
- 4 files changed, 65 insertions(+), 63 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 2822833..72c2ca1 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -227,7 +227,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	int r = 0;
+ 
+ 	if (of_have_populated_dt()) {
+-		np = omap_get_timer_dt(omap_timer_match, NULL);
++		np = omap_get_timer_dt(omap_timer_match, property);
+ 		if (!np)
+ 			return -ENODEV;
+ 
 -- 
 1.7.10.4
