@@ -1,140 +1,29 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 4 Feb 2013 12:45:31 +0200
-Subject: [PATCH v5 09/10] clk: tegra: Implement clocks for Tegra114
-In-Reply-To: <510F5E87.90801@nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-10-git-send-email-pdeschrijver@nvidia.com>
- <510F5E87.90801@nvidia.com>
-Message-ID: <20130204104531.GQ2364@tbergstrom-lnx.Nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Feb 2013 10:50:52 +0000
+Subject: [RFC PATCH 0/4] Add support for LZ4-compressed kernels
+In-Reply-To: <510F16C9.2060901@oberhumer.com>
+References: <1359179447-31118-1-git-send-email-kyungsik.lee@lge.com>
+ <20130128142510.68092e10.akpm@linux-foundation.org>
+ <alpine.LFD.2.02.1301282320430.6300@xanadu.home>
+ <20130130102353.GA8925@sig21.net> <510F16C9.2060901@oberhumer.com>
+Message-ID: <20130204105052.GA17786@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 08:08:55AM +0100, Prashant Gaikwad wrote:
-
-...
-
-> > +#define RST_DEVICES_L                  0x004
-> > +#define RST_DEVICES_H                  0x008
-> > +#define RST_DEVICES_U                  0x00C
-> > +#define RST_DEVICES_V                  0x358
-> > +#define RST_DEVICES_W                  0x35C
-> > +#define RST_DEVICES_X                  0x28C
-> > +#define RST_DEVICES_SET_L              0x300
-> > +#define RST_DEVICES_CLR_L              0x304
-> > +#define RST_DEVICES_SET_H              0x308
-> > +#define RST_DEVICES_CLR_H              0x30c
-> > +#define RST_DEVICES_SET_U              0x310
-> > +#define RST_DEVICES_CLR_U              0x314
-> > +#define RST_DEVICES_SET_V              0x430
-> > +#define RST_DEVICES_CLR_V              0x434
-> > +#define RST_DEVICES_SET_W              0x438
-> > +#define RST_DEVICES_CLR_W              0x43c
-> > +#define RST_DEVICES_NUM                        5
+On Mon, Feb 04, 2013 at 03:02:49AM +0100, Markus F.X.J. Oberhumer wrote:
+> At least akpm did approve the LZO update for inclusion into 3.7, but the code
+> still has not been merged into the main tree.
+>   > On 2012-10-09 21:26, Andrew Morton wrote:
+>   > [...]
+>   > The changes look OK to me.  Please ask Stephen to include the tree in
+>   > linux-next, for a 3.7 merge.
 > 
-> RST_DEVICES_SET/CLR_X?
-> 
+> Well, this probably means I have done a rather poor marketing.
 
-For all I can see (from the not yet public TRM), this is not actually used?
-So I decided to not mention it here.
+I assume this code is sitting in *your* tree?  How do you think it gets
+into mainline?
 
-> > +
-> > +#define CLK_OUT_ENB_L                  0x010
-> > +#define CLK_OUT_ENB_H                  0x014
-> > +#define CLK_OUT_ENB_U                  0x018
-> > +#define CLK_OUT_ENB_V                  0x360
-> > +#define CLK_OUT_ENB_W                  0x364
-> > +#define CLK_OUT_ENB_X                  0x280
-> > +#define CLK_OUT_ENB_SET_L              0x320
-> > +#define CLK_OUT_ENB_CLR_L              0x324
-> > +#define CLK_OUT_ENB_SET_H              0x328
-> > +#define CLK_OUT_ENB_CLR_H              0x32c
-> > +#define CLK_OUT_ENB_SET_U              0x330
-> > +#define CLK_OUT_ENB_CLR_U              0x334
-> > +#define CLK_OUT_ENB_SET_V              0x440
-> > +#define CLK_OUT_ENB_CLR_V              0x444
-> > +#define CLK_OUT_ENB_SET_W              0x448
-> > +#define CLK_OUT_ENB_CLR_W              0x44c
-> > +#define CLK_OUT_ENB_SET_X              0x284
-> > +#define CLK_OUT_ENB_CLR_X              0x288
-> > +#define CLK_OUT_ENB_NUM                        6
-> 
-> <snip>
-> 
-> > +
-> > +       /* dsia */
-> > +       clk = clk_register_mux(NULL, "dsia_mux", mux_plld_out0_plld2_out0,
-> > +                              ARRAY_SIZE(mux_plld_out0_plld2_out0), 0,
-> > +                              clk_base + PLLD_BASE, 25, 1, 0, &pll_d_lock);
-> > +       clks[dsia_mux] = clk;
-> > +       clk = tegra_clk_register_periph_gate("dsia", "dsia_mux", 0, clk_base,
-> > +                                   0, 48, &periph_h_regs,
-> > +                                   periph_clk_enb_refcnt);
-> > +       clk_register_clkdev(clk, "dsia", "tegradc.0");
-> > +       clks[dsia] = clk;
-> > +
-> > +       /* dsib */
-> > +       clk = clk_register_mux(NULL, "dsib_mux", mux_plld_out0_plld2_out0,
-> > +                              ARRAY_SIZE(mux_plld_out0_plld2_out0), 0,
-> > +                              clk_base + PLLD2_BASE, 25, 1, 0, &pll_d2_lock);
-> > +       clks[dsib_mux] = clk;
-> > +       clk = tegra_clk_register_periph_gate("dsib", "dsib_mux", 0, clk_base,
-> > +                                   0, 82, &periph_u_regs,
-> > +                                   periph_clk_enb_refcnt);
-> > +       clk_register_clkdev(clk, "dsib", "tegradc.1");
-> > +       clks[dsib] = clk;
-> > +
-> 
-> Can we use periph no div clock here for dsia and dsib?
-> 
-
-Will check.
-
-> > +       /* xusb_hs_src */
-> > +       val = readl(clk_base + CLK_SOURCE_XUSB_SS_SRC);
-> > +       val |= BIT(25); /* always select PLLU_60M */
-> > +       writel(val, clk_base + CLK_SOURCE_XUSB_SS_SRC);
-> > +
-> > +       clk = clk_register_fixed_factor(NULL, "xusb_hs_src", "pll_u_60M", 0,
-> > +                                       1, 1);
-> > +       clks[xusb_hs_src] = clk;
-> > +
-> 
-> With device tree we can directly use pll_u_60M, no need to register 
-> clock with fixed factor 1.
-
-This is true for now. In the future these clocks will need to be dvfs aware
-though. I think it makes sense to have a separate clock then?
-
-> Same comment for dis1-fixed, dsi2-fixed and mipi-cal-fast clocks.
-> 
-
-Those might not need to become dvfs aware.
-
-> > +       /* xusb_host */
-> > +       clk = tegra_clk_register_periph_gate("xusb_host", "xusb_host_src", 0,
-> > +                                   clk_base, 0, 89, &periph_u_regs,
-> > +                                   periph_clk_enb_refcnt);
-> > +       clk_register_clkdev(clk, "tegra_xhci", "host");
-> > +       clks[xusb_host] = clk;
-> > +
-> > +       /* xusb_ss */
-> > +       clk = tegra_clk_register_periph_gate("xusb_ss", "xusb_ss_src", 0,
-> > +                                   clk_base, 0, 156, &periph_w_regs,
-> > +                                   periph_clk_enb_refcnt);
-> > +       clk_register_clkdev(clk, "tegra_xhci", "ss");
-> > +       clks[xusb_host] = clk;
-> > +
-> > +       /* xusb_dev */
-> > +       clk = tegra_clk_register_periph_gate("xusb_dev", "xusb_dev_src", 0,
-> > +                                   clk_base, 0, 95, &periph_u_regs,
-> > +                                   periph_clk_enb_refcnt);
-> > +       clk_register_clkdev(clk, "tegra_xhci", "dev");
-> 
-> clks[xusb_dev] = clk;
-> 
-
-Missing indeed.
-
-Cheers,
-
-Peter.
+There is no automatic way that code from linux-next gets merged into
+mainline.  That is up to the tree owner to make happen, either by getting
+their tree into a parent maintainers tree, or if there is none, asking
+Linus to pull your tree at the appropriate time.
