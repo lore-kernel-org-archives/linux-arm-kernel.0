@@ -1,72 +1,97 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Mon, 4 Feb 2013 16:40:36 +0530
-Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
- addresses
-In-Reply-To: <510F3CA3.7080604@ti.com>
-References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
- <20130201162631.GG5151@arm.com>
- <CANOGCgOp=kSatDu8fL7grk+bXLQ2pgKAEvEK6LoG8Ba4mqUH=w@mail.gmail.com>
- <20130201163722.GH5151@arm.com>
- <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
- <20130201174246.GJ5151@arm.com> <510F3BA8.8070700@ti.com>
- <510F3CA3.7080604@ti.com>
-Message-ID: <510F972C.6020103@ti.com>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
+Date: Mon, 4 Feb 2013 16:43:35 +0530
+Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
+In-Reply-To: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
+References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <CAKuRcO+DZJU3nB9x_fkxQZBkitKMZE0dzGDNWvboziMVFrwq_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Below are the links on multi master bus arbitration where it has been
+discussing.
 
-On Monday 04 February 2013 10:14 AM, R Sricharan wrote:
-> On Monday 04 February 2013 10:10 AM, R Sricharan wrote:
->> Hi Catalin,
->>
->> [ snip..]
->>>
->>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->>> index 9f06102..47154f3 100644
->>> --- a/arch/arm/mm/mmu.c
->>> +++ b/arch/arm/mm/mmu.c
->>> @@ -581,34 +581,36 @@ static void __init alloc_init_section(pud_t
->>> *pud, unsigned long addr,
->>>                         const struct mem_type *type)
->>>   {
->>>       pmd_t *pmd = pmd_offset(pud, addr);
->>> +    unsigned long next;
->>>
->>> -    /*
->>> -     * Try a section mapping - end, addr and phys must all be aligned
->>> -     * to a section boundary.  Note that PMDs refer to the individual
->>> -     * L1 entries, whereas PGDs refer to a group of L1 entries making
->>> -     * up one logical pointer to an L2 table.
->>> -     */
->>> -    if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) ==
->>> 0) {
->>> -        pmd_t *p = pmd;
->>> +    do {
->>> +        next = pmd_addr_end(addr, end);
->>> +
->>> +        /*
->>> +         * Try a section mapping - next, addr and phys must all be
->>> +         * aligned to a section boundary.  Note that PMDs refer to the
->>> +         * individual L1 entries, whereas PGDs refer to a group of L1
->>> +         * entries making up one logical pointer to an L2 table.
->>> +         */
->>> +        if (((addr | next | phys) & ~SECTION_MASK) == 0) {
->>> +            pmd_t *p = pmd;
->>>
->>     There is a  need to do page mappings even when all the addresses
->>     are aligned. This was added with CMA, which required the initial
->>     mappings to be set with 2 level tables.
->>
->     Sorry, i wanted to ask type->prot_sect is removed here and is that
->    intentional?
-       Tested this patch on OMAP5. The type->prot_sect check is
-       required, without which mappings are not even created for CMA.
-       (ie) type->prot_sect is not set when this function is called
-       in CMA context, thus no valid mapping is created.
+ http://comments.gmane.org/gmane.linux.kernel/1410276
 
-       After fixing this, the LPAE + CMA enabled combination booted
-       fine on OMAP5.
+ http://www.kernelhub.org/?msg=179505&p=2
 
-Regards,
-  Sricharan
+
+On Mon, Feb 4, 2013 at 2:33 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+> This RFC patch is w.r.t multimaster bus arbitration which is already
+> being discussing in the mainline.
+> This patch provides hooks for the i2c multimaster bus arbitration
+> and to have the arbitration parameters.
+>
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> ---
+>  drivers/i2c/i2c-core.c |   13 ++++++++++++-
+>  include/linux/i2c.h    |   12 ++++++++++++
+>  2 files changed, 24 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index e388590..ed89fc8 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -1408,18 +1408,29 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+>                                 (msgs[ret].flags & I2C_M_RECV_LEN) ? "+" : "");
+>                 }
+>  #endif
+> +               if (adap->mm_arbit_algo) {
+> +                       ret = adap->mm_arbit_algo->i2c_mm_bus_get(adap);
+> +                       if (ret)
+> +                               /* I2C bus under control of another master. */
+> +                               return -EAGAIN;
+> +               }
+>
+>                 if (in_atomic() || irqs_disabled()) {
+>                         ret = i2c_trylock_adapter(adap);
+> -                       if (!ret)
+> +                       if (!ret && adap->mm_arbit_algo) {
+> +                               adap->mm_arbit_algo->i2c_mm_bus_release(adap);
+> +
+>                                 /* I2C activity is ongoing. */
+>                                 return -EAGAIN;
+> +                       }
+>                 } else {
+>                         i2c_lock_adapter(adap);
+>                 }
+>
+>                 ret = __i2c_transfer(adap, msgs, num);
+>                 i2c_unlock_adapter(adap);
+> +               if (adap->mm_arbit_algo)
+> +                       adap->mm_arbit_algo->i2c_mm_bus_release(adap);
+>
+>                 return ret;
+>         } else {
+> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> index d0c4db7..61fbfe3 100644
+> --- a/include/linux/i2c.h
+> +++ b/include/linux/i2c.h
+> @@ -371,6 +371,17 @@ struct i2c_algorithm {
+>  };
+>
+>  /*
+> + *This struct provides hooks for i2c multi-master arbitration needs.
+> + */
+> +struct i2c_mm_arbitration {
+> +       void *arbitration_data;
+> +
+> +       /* Should return 0 if mastership could be successfully established */
+> +       int (*i2c_mm_bus_get)(struct i2c_adapter *adap);
+> +       void (*i2c_mm_bus_release)(struct i2c_adapter *adap);
+> +};
+> +
+> +/*
+>   * i2c_adapter is the structure used to identify a physical i2c bus along
+>   * with the access algorithms necessary to access it.
+>   */
+> @@ -393,6 +404,7 @@ struct i2c_adapter {
+>
+>         struct mutex userspace_clients_lock;
+>         struct list_head userspace_clients;
+> +       struct i2c_mm_arbitration *mm_arbit_algo;
+>  };
+>  #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
+>
+> --
+> 1.7.9.5
+>
