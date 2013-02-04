@@ -1,97 +1,41 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Feb 2013 11:43:03 -0600
-Subject: [PATCH V2 4/7] ARM: OMAP2+: Simplify system timer clock definitions
+Date: Mon, 4 Feb 2013 11:43:06 -0600
+Subject: [PATCH V2 7/7] ARM: OMAP4+: Fix sparse warning in system timers
 In-Reply-To: <1359999786-8740-1-git-send-email-jon-hunter@ti.com>
 References: <1359999786-8740-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1359999786-8740-5-git-send-email-jon-hunter@ti.com>
+Message-ID: <1359999786-8740-8-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit c59b537 (ARM: OMAP2+: Simplify dmtimer clock aliases), new
-clock aliases for dmtimers were added to simplify the code. These clock
-aliases can also be used when configuring the system timers and allow us
-to remove the current definitions, simplifying the code.
+Commit 6bb27d7 (ARM: delete struct sys_timer) changed the function
+created by the macro OMAP_SYS_32K_TIMER_INIT from static void to void.
+For OMAP4+ devices this created the following sparse warning ...
 
-Please note that for OMAP4/5 devices (unlike OMAP2/3 devices), there is
-no clock alias for "timer_sys_ck" with NULL as the device name. Therefore
-we still need to use the alias "sys_clkin_ck" for these devices.
+arch/arm/mach-omap2/timer.c:585:1: warning: symbol
+	'omap4_sync32k_timer_init' was not declared. Should it be static?
+
+The function omap4_sync32k_timer_init() is not referenced outside of the
+file timer.c and so make this function static.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/timer.c |   37 ++++++++++++++-----------------------
- 1 file changed, 14 insertions(+), 23 deletions(-)
+ arch/arm/mach-omap2/timer.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index ec2fb80..4213bf4 100644
+index c5770ff..a5f88b2 100644
 --- a/arch/arm/mach-omap2/timer.c
 +++ b/arch/arm/mach-omap2/timer.c
-@@ -57,15 +57,6 @@
- #include "common.h"
- #include "powerdomain.h"
+@@ -587,8 +587,8 @@ OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+ #endif
  
--/* Parent clocks, eventually these will come from the clock framework */
--
--#define OMAP2_MPU_SOURCE	"sys_ck"
--#define OMAP3_MPU_SOURCE	OMAP2_MPU_SOURCE
--#define OMAP4_MPU_SOURCE	"sys_clkin_ck"
--#define OMAP2_32K_SOURCE	"func_32k_ck"
--#define OMAP3_32K_SOURCE	"omap_32k_fck"
--#define OMAP4_32K_SOURCE	"sys_32k_ck"
--
- #define REALTIME_COUNTER_BASE				0x48243200
- #define INCREMENTER_NUMERATOR_OFFSET			0x10
- #define INCREMENTER_DENUMERATOR_RELOAD_OFFSET		0x14
-@@ -569,27 +560,27 @@ void __init omap##name##_sync32k_timer_init(void)		\
- }
- 
- #ifdef CONFIG_ARCH_OMAP2
--OMAP_SYS_32K_TIMER_INIT(2, 1, OMAP2_32K_SOURCE, "ti,timer-alwon",
--			2, OMAP2_MPU_SOURCE);
-+OMAP_SYS_32K_TIMER_INIT(2, 1, "timer_32k_ck", "ti,timer-alwon",
-+			2, "timer_sys_ck");
- #endif /* CONFIG_ARCH_OMAP2 */
- 
- #ifdef CONFIG_ARCH_OMAP3
--OMAP_SYS_32K_TIMER_INIT(3, 1, OMAP3_32K_SOURCE, "ti,timer-alwon",
--			2, OMAP3_MPU_SOURCE);
--OMAP_SYS_32K_TIMER_INIT(3_secure, 12, OMAP3_32K_SOURCE, "ti,timer-secure",
--			2, OMAP3_MPU_SOURCE);
--OMAP_SYS_GP_TIMER_INIT(3_gp, 1, OMAP3_MPU_SOURCE, "ti,timer-alwon",
--		       2, OMAP3_MPU_SOURCE);
-+OMAP_SYS_32K_TIMER_INIT(3, 1, "timer_32k_ck", "ti,timer-alwon",
-+			2, "timer_sys_ck");
-+OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
-+			2, "timer_sys_ck");
-+OMAP_SYS_GP_TIMER_INIT(3_gp, 1, "timer_sys_ck", "ti,timer-alwon",
-+		       2, "timer_sys_ck");
- #endif /* CONFIG_ARCH_OMAP3 */
- 
- #ifdef CONFIG_SOC_AM33XX
--OMAP_SYS_GP_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, "ti,timer-alwon",
--		       2, OMAP4_MPU_SOURCE);
-+OMAP_SYS_GP_TIMER_INIT(3_am33xx, 1, "timer_sys_ck", "ti,timer-alwon",
-+		       2, "timer_sys_ck");
- #endif /* CONFIG_SOC_AM33XX */
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+-OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+-			2, "sys_clkin_ck", NULL);
++static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
++			       2, "sys_clkin_ck", NULL);
+ #endif
  
  #ifdef CONFIG_ARCH_OMAP4
--OMAP_SYS_32K_TIMER_INIT(4, 1, OMAP4_32K_SOURCE, "ti,timer-alwon",
--			2, OMAP4_MPU_SOURCE);
-+OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
-+			2, "sys_clkin_ck");
- #ifdef CONFIG_LOCAL_TIMERS
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
- void __init omap4_local_timer_init(void)
-@@ -618,8 +609,8 @@ void __init omap4_local_timer_init(void)
- #endif /* CONFIG_ARCH_OMAP4 */
- 
- #ifdef CONFIG_SOC_OMAP5
--OMAP_SYS_32K_TIMER_INIT(5, 1, OMAP4_32K_SOURCE, "ti,timer-alwon",
--			2, OMAP4_MPU_SOURCE);
-+OMAP_SYS_32K_TIMER_INIT(5, 1, "timer_32k_ck", "ti,timer-alwon",
-+			2, "sys_clkin_ck");
- void __init omap5_realtime_timer_init(void)
- {
- 	int err;
 -- 
 1.7.10.4
