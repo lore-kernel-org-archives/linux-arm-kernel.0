@@ -1,83 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 4 Feb 2013 09:26:31 +0000
-Subject: [GIT PULL] mfd: First patch-set to update the AB8500 series
-Message-ID: <20130204092631.GV2042@gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 4 Feb 2013 10:27:38 +0100
+Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
+In-Reply-To: <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
+References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <CABxcv=k_gwB3ExQYUeappDZ6FE4L7x8Acer4ZQpDH09BL6LG0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+Hi Florian,
 
-  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+On Mon, Jan 28, 2013 at 6:54 PM, Florian Vaussard
+<florian.vaussard@epfl.ch> wrote:
+> Add device-tree support for the GPMC controller on the OMAP3.
+>
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> ---
+>  arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index 6c63118..2ddae38 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -403,5 +403,16 @@
+>                         ti,timer-alwon;
+>                         ti,timer-secure;
+>                 };
+> +
+> +               gpmc: gpmc at 6e000000 {
+> +                       compatible = "ti,omap3430-gpmc";
+> +                       ti,hwmods = "gpmc";
+> +                       reg = <0x6e000000 0x1000000>;
+> +                       interrupts = <20>;
+> +                       gpmc,num-cs = <8>;
+> +                       gpmc,num-waitpins = <4>;
+> +                       #address-cells = <2>;
+> +                       #size-cells = <1>;
+> +               };
+>         };
+>  };
 
-are available in the git repository at:
+I had the same patch on a tree I was working on to add DT support for
+gpmc-smsc911x on an OMAP3 board but I was waiting for Daniel's patches
+to hit mainline before sending the RFC. So please feel free to add:
 
-  git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-mfd
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-for you to fetch changes up to 8908c04985ed67b9138c6e06be2c81867f24e2d4:
-
-  mfd: ab8500-gpadc: Use new ab8500_gpadc_get() with name parameter (2013-02-04 08:33:30 +0000)
-
-----------------------------------------------------------------
-Ashok G (1):
-      mfd: ab8500-debugfs: sizeof() mismatch bugfix
-
-Bengt Jonsson (1):
-      mfd: ab8500-debugfs: Add interrupt debug
-
-John Beckett (1):
-      mfd: ab8500-debugfs: Export all AB8500 ADCs as debugfs nodes
-
-Jonas Aaberg (4):
-      mfd: ab8500-sysctrl: If a charger is present, reboot instead
-      mfd: ab8500-sysctrl: Only reboot into charging mode if battery type is known
-      mfd: ab8500-sysctrl.c: Provide charging as reset reason
-      mfd: ab8500-sysctrl: export read/write symbols
-
-Kennet Wallden (1):
-      mfd: ab8500-sysctrl: Provide configuration for SysClkReqRfClkBuf registers
-
-Lee Jones (7):
-      mfd: ab8500-sysctrl: Provide a platform specific pm_power_off() call-back
-      mfd: ab8500-gpadc: Change to usleep_range() for greater resolution
-      mfd: ab8500-debugfs: Provide a means for a user subscribe to IRQs
-      mfd: ab8500-debugfs: Use NULL to initialise remaining NULL pointer
-      mfd: ab8500-gpadc: Add runtime pm support
-      mfd: ab8500-gpadc: Reduce conversion timeout
-      mfd: ab8500-gpadc: Remove unused 'struct ab8500_gpadc'
-
-Linus Walleij (1):
-      mfd: ab8500-debugfs: Allow number of IRQs to be provided more dynamically
-
-Mattias Wallin (1):
-      mfd: ab8500-debugfs: Keep count of IRQs in debugfs
-
-Mian Yousaf Kaukab (3):
-      mfd: abx500-core: Provide an API to dump all ABx500 registers
-      mfd: ab8500-debugfs: add debugfs node to read all registers
-      mfd: ab8500-core: Allow the possibility to dump all AB8500 registers
-
-Michel JAOUEN (1):
-      mfd ab8500-gpadc: Introduce new AB version detection
-
-Philippe Langlais (2):
-      mfd: ab8500-debugfs: Set the USB charging current to 300mA for ABV3
-      mfd: ab8500-gpadc: Use new ab8500_gpadc_get() with name parameter
-
-carriere etienne (1):
-      mfd: ab8500-debugfs: Formated access AB8500 registers from debugfs entry
-
- drivers/mfd/ab8500-core.c                 |    2 +
- drivers/mfd/ab8500-debugfs.c              | 1249 +++++++++++++++++++++++++++--
- drivers/mfd/ab8500-gpadc.c                |   90 ++-
- drivers/mfd/ab8500-sysctrl.c              |   92 +++
- drivers/mfd/abx500-core.c                 |   16 +
- include/linux/mfd/abx500.h                |    2 +
- include/linux/mfd/abx500/ab8500-sysctrl.h |    5 +
- include/linux/mfd/abx500/ab8500.h         |   12 +
- 8 files changed, 1394 insertions(+), 74 deletions(-)
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best regards,
+Javier
