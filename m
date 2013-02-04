@@ -1,34 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 04 Feb 2013 23:03:41 +0100
-Subject: [PATCH 0/3] clock driver for sunxi
-In-Reply-To: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
-References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <5110303D.3050702@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 04 Feb 2013 15:09:57 -0700
+Subject: [PATCH] clocksource: tegra: move to of_clk_get
+In-Reply-To: <1359985230-11506-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1359985230-11506-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <511031B5.4010900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+On 02/04/2013 06:40 AM, Peter De Schrijver wrote:
+> The new clockframework introduced DT IDs for each clock. To be able to remove
+> the device registrations, this driver needs to be updated to use the DT IDs.
+> Note that the actual removal of the clk_register_clkdev() calls will be done
+> in a later series.
 
-Le 22/01/2013 07:12, Emilio L?pez a ?crit :
-> This patchset adds basic clock support for sunxi devices. Currently, it
-> implements support for the two oscillators, the main PLL, the CPU mux,
-> and its three divisor clocks. With this in place, it is possible to
-> write a cpufreq driver and have it work.
-> 
-> I have tested this driver successfully on a Cubieboard (A10, sun4i)
-> using the cpufreq driver from the linux-sunxi tree after minor
-> modifications (the clock names are not the same).
-
-I just tested this patchset on a A13-Olinuxino, and it looks to be
-working fine. I tested without the cpufreq patch though.
-
-Mike, could you give us your feedback on this serie? It would be really
-great if we could get this merged by 3.9, if you're ok with it of course.
-
-Thanks,
-Maxime
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+This seems fine for 3.10, but I wonder about dependencies. Will there be
+a bunch of other similar changes? I guess this patch is a dependency of
+some changes to drivers/clk/tegra/ to remove the non-DT clock
+registrations? It'd be good to get a clear idea of all the dependencies,
+so we can see what's the best tree to apply the changes to; perhaps this
+should go through the drivers/clk tree, or Tegra's clk driver changes
+need to go through the Tegra tree again in 3.10?
