@@ -1,52 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 4 Feb 2013 10:55:27 +0530
-Subject: [PATCH v3 13/15] ARM: CCI: ensure powerdown-time data is flushed
- from cache
-In-Reply-To: <alpine.LFD.2.02.1302031327450.6300@xanadu.home>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <1359445870-18925-14-git-send-email-nicolas.pitre@linaro.org>
- <510B5CF7.5080902@ti.com> <alpine.LFD.2.02.1302021708460.6300@xanadu.home>
- <510E36CD.9000005@ti.com> <alpine.LFD.2.02.1302031327450.6300@xanadu.home>
-Message-ID: <510F4647.6070505@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 4 Feb 2013 10:58:46 +0530
+Subject: [PATCH v2 6/6] ARM: davinci: da850: configure system configuration
+ chip(CFGCHIP3) for emac
+In-Reply-To: <510E5BCF.9080006@ti.com>
+References: <1359380879-26306-1-git-send-email-prabhakar.lad@ti.com>
+ <1359380879-26306-7-git-send-email-prabhakar.lad@ti.com>
+ <510E5BCF.9080006@ti.com>
+Message-ID: <510F470E.5040205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 03 February 2013 11:59 PM, Nicolas Pitre wrote:
-> On Sun, 3 Feb 2013, Santosh Shilimkar wrote:
->
->> On Sunday 03 February 2013 03:53 AM, Nicolas Pitre wrote:
->>> On Fri, 1 Feb 2013, Santosh Shilimkar wrote:
->>>
->>>> On Tuesday 29 January 2013 01:21 PM, Nicolas Pitre wrote:
->>>>> From: Dave Martin <dave.martin@linaro.org>
+On 2/3/2013 6:15 PM, Sekhar Nori wrote:
+> On 1/28/2013 7:17 PM, Prabhakar Lad wrote:
+>> From: Lad, Prabhakar <prabhakar.lad@ti.com>
 
-[..]
+> There are couple of issues with this implementation.
+> 
+> 1) da8xx_config_emac() is specific to DA850 EVM, but masquerades as
+>    generic for da8xx. Looks like you need two functions, one for soc
+>    specific configuration and one board specific.
+> 2) da8xx_config_emac() goes through all the time, whether the
+>    particular board has emac module or not. Shouldn't
+>    da8xx_config_emac() check if emac is actually enabled in the passed
+>    dtb and only the do the configuration?
+> 3) The function assumes mii is used always, you can use the rmii_en dt
+>    property to check if rmii/mii is enabled and configure the soc/board
+>    accordingly.
+> 4) If the same function can work both for da850 and da830, then it can
+>    be implemented outside of CONFIG_ARCH_DAVINCI_DA850.
 
->>>>> This patch adds the appropriate flushing to the CCI driver to ensure
->>>>> that the relevant data is available in RAM ahead of time.
->>>>>
->>>>> Because this creates a dependency on arch-specific cacheflushing
->>>>> functions, this patch also makes ARM_CCI depend on ARM.
->>>>>
->>>> You should do that otherwise to avoid other arch building this
->>>> driver for random builds and breaking their builds.
->>>
->>> Before this patch the driver was buildable on any architecture.  That's
->>> why this dependency is added only in this patch.
->>>
->> I was just trying to counter the reasoning in the changelog which says
->> dependency is added because of arch specific cache flushing function.
->> Meaning even without that ARM dependency should be in place to avoid
->> driver getting build for other archs.
->
-> Well, some upstream maintainers' opinion is that you should not put
-> artificial dependencies on a specific architecture if a driver is
-> buildable on any architecture, even if the built driver is of no use to
-> those other architectures.
->
-I see. I have seen some complaint about not adding the arch dependency.
-Anyways, the patch has the dependency set with ARM and hence its
-non-issue.
+Another thing I forgot to mention:
 
-Regards,
-Santosh
+5) This patch replicates a lot of code form board-da850-evm.c. This
+needs to be avoided. May be create function to configure emac in
+da850.c. This can then be called in board-da850-evm.c as well as in the
+dt case.
+
+Thanks,
+Sekhar
