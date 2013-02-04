@@ -1,32 +1,75 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Feb 2013 09:27:43 -0600
-Subject: [PATCH 4/5] ARM: OMAP2+: Simplify system timers definitions
-In-Reply-To: <1359565471-30721-5-git-send-email-jon-hunter@ti.com>
-References: <1359565471-30721-1-git-send-email-jon-hunter@ti.com>
- <1359565471-30721-5-git-send-email-jon-hunter@ti.com>
-Message-ID: <510FD36F.5090603@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 4 Feb 2013 17:41:53 +0200
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130201213003.GW2637@n2100.arm.linux.org.uk>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
+ <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
+ <20130201185820.GE29898@arwen.pp.htv.fi>
+ <510C2A47.1090607@mvista.com>
+ <20130201205600.GA31762@arwen.pp.htv.fi>
+ <20130201213003.GW2637@n2100.arm.linux.org.uk>
+Message-ID: <20130204154153.GA18237@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 01/30/2013 11:04 AM, Jon Hunter wrote:
-> There is a lot of redundancy in the definitions for the various system
-> timers for OMAP2+ devices. For example, the omap3_am33xx_gptimer_timer_init()
-> function is the same as the omap3_gp_gptimer_timer_init() function and the
-> function omap2_sync32k_timer_init() can be re-used for OMAP4/5 devices.
+On Fri, Feb 01, 2013 at 09:30:03PM +0000, Russell King - ARM Linux wrote:
+> > > > I guess to make the MUSB side simpler we would need musb-dma-engine glue
+> > > > to map dmaengine to the private MUSB API. Then we would have some
+> > > > starting point to also move inventra (and anybody else) to dmaengine
+> > > > API.
+> > > 
+> > >    Why? Inventra is a dedicated device's private DMA controller, why make
+> > > universal DMA driver for it?
+> > 
+> > because it doesn't make sense to support multiple DMA APIs. We can check
+> > from MUSB's registers if it was configured with Inventra DMA support and
+> > based on that we can register MUSB's own DMA Engine to dmaengine API.
+> 
+> Hang on.  This is one of the DMA implementations which is closely
+> coupled with the USB and only the USB?  If it is...
+> 
+> I thought this had been discussed _extensively_ before.  I thought the
+> resolution on it was:
+> 1. It would not use the DMA engine API.
+> 2. It would not live in arch/arm.
+> 3. It would be placed nearby the USB driver it's associated with.
+> 
+> (1) because we don't use APIs just for the hell of it - think.  Do we
+> use the DMA engine API for PCI bus mastering ethernet controllers?  No.
+> Do we use it for PCI bus mastering SCSI controllers?  No.  Because the
+> DMA is integral to the rest of the device.
 
-After further testing, I have found that using the
-omap2_sync32k_timer_init() for omap4/5 devices does not work for the
-case where we boot with boot parameter "clocksource=gp_timer". The
-problem is omap4/5 devices, unlike omap2/3 devices, does not have a
-clock alias for "timer_sys_ck" with NULL as the device name. Therefore
-we fail to find the parent clock and boot fails.
+that's not really a fair comparison, however. MUSB is used with several
+DMA engines.
 
-So I am going to update this patch so that omap4 and omap5 both use
-omap4_sync32k_timer_init() and just get rid of the extra function
-defined for omap5.
+The only DMA engine which is really coupled with MUSB is the Inventra
+DMA engine which comes as an optional feature to the IP. Many users have
+opted out of it. From the top of my head we have CPPI 3.x, CPPI 4.1,
+Inventra DMA, OMAP sDMA and ux500 DMA engines supported by the driver.
 
-Hope this makes sense.
+Granted, CPPI 4.1 makes some assumptions about the fact that it's
+handling USB tranfers, but nevertheless, the IP can be, and in fact is,
+used with many different DMA engines and driver needs to cope with it.
 
-Cheers
-Jon
+Current DMA abstraction is quite poor, for example there's no way to
+compile support for multiple DMA engines. Code also makes certain, IMO
+unnecessary, assumptions about the underlying DMA engine (abstraction is
+poor, as said above but it we could follow MUSB's programming guide when
+it comes to programming DMA transfers).
+
+Considering all of the above, it's far better to use DMA engine and get
+rid of all the mess.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130204/054ca073/attachment.sig>
