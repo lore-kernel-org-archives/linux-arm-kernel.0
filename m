@@ -1,110 +1,150 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 4 Feb 2013 17:20:55 +0530
-Subject: [PATCH 2/2] ARM: davinci: da850: add wdt OF_DEV_AUXDATA entry
-In-Reply-To: <1359016695-10362-3-git-send-email-anilkumar.v@ti.com>
-References: <1359016695-10362-1-git-send-email-anilkumar.v@ti.com>
- <1359016695-10362-3-git-send-email-anilkumar.v@ti.com>
-Message-ID: <510FA09F.7030604@ti.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 4 Feb 2013 12:57:17 +0100
+Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
+In-Reply-To: <510F8F49.9020800@epfl.ch>
+References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
+ <CABxcv=k_gwB3ExQYUeappDZ6FE4L7x8Acer4ZQpDH09BL6LG0Q@mail.gmail.com>
+ <510F8F49.9020800@epfl.ch>
+Message-ID: <CABxcv==7KiBbkTyr7VLVw82F=9vVWRftpbyZWub_CVp3pQW0tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anil,
+On Mon, Feb 4, 2013 at 11:36 AM, Florian Vaussard
+<florian.vaussard@epfl.ch> wrote:
+> Hi Javier,
+>
+>
 
-On 1/24/2013 2:08 PM, Kumar, Anil wrote:
-> Add OF_DEV_AUXDATA for wdt driver in da850 board dt
-> file to use wdt clock.
-> 
-> Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
-> ---
-> :100644 100644 37c27af... 1b295d2... M	arch/arm/mach-davinci/da8xx-dt.c
->  arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> index 37c27af..1b295d2 100644
-> --- a/arch/arm/mach-davinci/da8xx-dt.c
-> +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> @@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
->  	of_irq_init(da8xx_irq_match);
->  }
->  
-> +struct of_dev_auxdata da850_evm_auxdata_lookup[] __initdata = {
+Hi Florian,
 
-Auxdata is not evm specific. This can instead be called da850_auxdata_lookup[].
+> On 02/04/2013 10:27 AM, Javier Martinez Canillas wrote:
+>>
+>> Hi Florian,
+>>
+>> On Mon, Jan 28, 2013 at 6:54 PM, Florian Vaussard
+>> <florian.vaussard@epfl.ch> wrote:
+>>>
+>>> Add device-tree support for the GPMC controller on the OMAP3.
+>>>
+>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>>> ---
+>>>   arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
+>>>   1 files changed, 11 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+>>> index 6c63118..2ddae38 100644
+>>> --- a/arch/arm/boot/dts/omap3.dtsi
+>>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>>> @@ -403,5 +403,16 @@
+>>>                          ti,timer-alwon;
+>>>                          ti,timer-secure;
+>>>                  };
+>>> +
+>>> +               gpmc: gpmc at 6e000000 {
+>>> +                       compatible = "ti,omap3430-gpmc";
+>>> +                       ti,hwmods = "gpmc";
+>>> +                       reg = <0x6e000000 0x1000000>;
+>>> +                       interrupts = <20>;
+>>> +                       gpmc,num-cs = <8>;
+>>> +                       gpmc,num-waitpins = <4>;
+>>> +                       #address-cells = <2>;
+>>> +                       #size-cells = <1>;
+>>> +               };
+>>>          };
+>>>   };
+>>
+>>
+>> I had the same patch on a tree I was working on to add DT support for
+>> gpmc-smsc911x on an OMAP3 board but I was waiting for Daniel's patches
+>> to hit mainline before sending the RFC. So please feel free to add:
+>>
+>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>
+>
+> Great, the smsc911x was on my TODO list, I can cross it out :) BTW,
+> do you have a public git for this, so I can test your work on my setup?
+>
 
-Also, I dont think it is necessary to add auxdata in a separate patch 
-from dt nodes. So, I fixed these issues and came up with below patch. I 
-tested basic wdt reboot. reboot command is still broken (with or 
-without this patch). Can you please look at that?
+Yes, it is the gpmc-smsc911x-wip branch on my github linux tree [1]
 
-Thanks,
-Sekhar
+That branch is Linus master tree + linux-omap/omap-for-v3.9/gpmc +
+linux-omap-dt/for_3.9/dts
 
-----8<----
-From: "Kumar, Anil" <anilkumar.v@ti.com>
-Date: Thu, 24 Jan 2013 14:08:14 +0530
-Subject: [PATCH 1/1] ARM: davinci: da850: add wdt DT node
+plus these patches:
 
-Add da850 wdt DT node.
+Javier Martinez Canillas (4):
+      ARM: OMAP: gpmc-smsc911x: add DT dev node init function
+      ARM: OMAP: gpmc: add support for gpmc-smsc911x child nodes
+      ARM: dts: OMAP: Add an GPMC node for OMAP3
+      ARM: dts: omap3-igep0020: Add SMSC911x LAN chip support
 
-Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/boot/dts/da850-evm.dts  |    3 +++
- arch/arm/boot/dts/da850.dtsi     |    5 +++++
- arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
- 3 files changed, 15 insertions(+), 1 deletion(-)
+You can browse these patches here [2].
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index fa04152..cc777dc 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -30,6 +30,9 @@
- 		rtc0: rtc at 1c23000 {
- 			status = "okay";
- 		};
-+		wdt: wdt at 1c21000 {
-+			status = "okay";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 8dd15c0..2800090 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -88,6 +88,11 @@
- 				      19>;
- 			status = "disabled";
- 		};
-+		wdt: wdt at 1c21000 {
-+			compatible = "ti,davinci-wdt";
-+			reg = <0x21000 0xfff>;
-+			status = "disabled";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 37c27af..90c3c69 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
- 	of_irq_init(da8xx_irq_match);
- }
- 
-+struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
-+	{}
-+};
-+
- #ifdef CONFIG_ARCH_DAVINCI_DA850
- 
- static void __init da850_init_machine(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     da850_auxdata_lookup, NULL);
- 
- 	da8xx_uart_clk_enable();
- }
+With these patches I have ethernet working on my IGEPv2 but this board
+uses an OMAP GPIO pin as the smsc911x IRQ line, so it needs to set a
+mux pin (mcspi1_cs2.gpio_176 INPUT | MODE4) or it will fallback on
+poll mode.
+
+For some reasons I still couldn't figure out (I'm still learning about
+Device Trees) adding:
+
+       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+
+to the gpmc-smsc911x child node parse function (gpmc_smsc911x_init_dt)
+didn't have a functional effect and I had to initialize the defined
+pinctrl-single pins for the smsc911x in the omap3_pmx_core device node
+instead of pmc_smsc911x at 0 as I do for other devices (mmc, uarts, etc).
+
+So I just removed the devm_pinctrl_get_select_default() call in
+gpmc_smsc911x_init_dt() in for this RFC.
+
+I don't know if this is because arch/arm/mach-omap2/gpmc-smsc911x.c is
+not a real platform driver (is just a wrapper/helper function) and
+doesn't have a probe function.
+
+Which brings me to the question if my approach of adding a binding for
+gpmc-smsc911x is correct or if we should extend/use the binding that
+already exist for smsc911x
+(Documentation/devicetree/bindings/net/smsc911x.txt).
+
+> For the GPMC support, I will have to make a few more more as discussed with
+> Tony, and as I will be away for more than 2 weeks, feel free to go ahead
+> before me. This patchset was only at an RFC stage.
+>
+> Regards,
+>
+> Florian
+>
+
+Yes, I saw on the list that Tony asked you too extend the GPMC DT
+support. Flash support is on my TODO list too but I don't know if I'm
+going to have time to work on this in the next few weeks.
+
+Since you are thinking to change the binding, there is something I
+want to discuss with you.
+
+We have two different version for each IGEP board, one that uses NAND
+memory and another that has OneNAND.
+
+With board files this is easy because the flash memory type is
+hardcoded (in hardware) using sysboot pins [3]. So we check the
+sysboot value and call board_nand_init() or board_onenand_init()
+accordingly and pass the same static struct mtd_partition
+igep_flash_partitions[] in both cases.
+
+But with DT this is a little bit trickier since you have to define
+either a nand at 0 or onenand at 0 child node for the gpmc device node. So,
+we will have to create lots of dts and dtsi to handle each combination
+(IGEPv2 + NAND, IGEPv2 + OneNAND, IGEP COM + NAND, etc).
+
+I wonder if we could just have a generic gpmc-flash binding and maybe
+use a "gpmc, flash_type" property or something like that to decide if
+gpmc_onenand_init() or gpmc_nand_init() has to be called.
+
+Thanks a lot and best regards,
+Javier
+
+[1]: git://github.com/martinezjavier/linux.git
+[2]: https://github.com/martinezjavier/linux/commits/gpmc-smsc911x-wip
+[3]: http://omappedia.org/wiki/Bootloader_Project#SYSBOOT_Pins
