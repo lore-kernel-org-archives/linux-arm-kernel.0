@@ -1,59 +1,55 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 04 Feb 2013 15:24:51 +0100
-Subject: [PATCHv2 1/2] ARM: dma-mapping: add support for CMA regions
- placed in highmem zone
-In-Reply-To: <20130204141053.GD17786@n2100.arm.linux.org.uk>
-References: <1358350284-6972-2-git-send-email-m.szyprowski@samsung.com>
- <1359984182-6307-1-git-send-email-m.szyprowski@samsung.com>
- <xa1tlib4b30n.fsf@mina86.com> <20130204141053.GD17786@n2100.arm.linux.org.uk>
-Message-ID: <xa1tfw1cb1ho.fsf@mina86.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Feb 2013 15:27:09 +0100
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <510C58DF.3010103@mvista.com>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <20130201213003.GW2637@n2100.arm.linux.org.uk> <510C58DF.3010103@mvista.com>
+Message-ID: <7655522.SvRnLo3eyU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04 2013, Russell King - ARM Linux wrote:
-> On Mon, Feb 04, 2013 at 02:51:52PM +0100, Michal Nazarewicz wrote:
->> On Mon, Feb 04 2013, Marek Szyprowski wrote:
->> > @@ -186,13 +186,24 @@ static u64 get_coherent_dma_mask(struct device *dev)
->> >  
->> >  static void __dma_clear_buffer(struct page *page, size_t size)
->> >  {
->> > -	void *ptr;
->> >  	/*
->> >  	 * Ensure that the allocated pages are zeroed, and that any data
->> >  	 * lurking in the kernel direct-mapped region is invalidated.
->> >  	 */
->> > -	ptr = page_address(page);
->> > -	if (ptr) {
->> > +	if (PageHighMem(page)) {
->> > +		phys_addr_t base = __pfn_to_phys(page_to_pfn(page));
->> > +		phys_addr_t end = base + size;
->> > +		while (size > 0) {
->> > +			void *ptr = kmap_atomic(page);
->> > +			memset(ptr, 0, PAGE_SIZE);
->> > +			dmac_flush_range(ptr, ptr + PAGE_SIZE);
->> > +			kunmap_atomic(ptr);
->> > +			page++;
->> > +			size -= PAGE_SIZE;
->> > +		}
->> > +		outer_flush_range(base, end);
->> > +	} else {
->> > +		void *ptr = page_address(page);
->> 
->> There used to be a ?if (ptr)? check which is now missing.  Why is that?
->
-> Because lowmem pages always have an address.
+On Saturday 02 February 2013 04:07:59 Sergei Shtylyov wrote:
+> On 02-02-2013 1:30, Russell King - ARM Linux wrote:
 
-Perhaps it should use lowmem_page_address() then?
+> >> because it doesn't make sense to support multiple DMA APIs. We can check
+> >> from MUSB's registers if it was configured with Inventra DMA support and
+> >> based on that we can register MUSB's own DMA Engine to dmaengine API.
+> 
+> > Hang on.  This is one of the DMA implementations which is closely
+> > coupled with the USB and only the USB?  If it is...
+> 
+> > I thought this had been discussed _extensively_ before.  I thought the
+> > resolution on it was:
+> > 1. It would not use the DMA engine API.
+> > 2. It would not live in arch/arm.
+> > 3. It would be placed nearby the USB driver it's associated with.
+> 
+> > (1) because we don't use APIs just for the hell of it - think.  Do we
+> > use the DMA engine API for PCI bus mastering ethernet controllers?  No.
+> > Do we use it for PCI bus mastering SCSI controllers?  No.  Because the
+> > DMA is integral to the rest of the device.
+> 
+> > The DMA engine API only makes sense if the DMA engine is a shared
+> > system resource.
+> 
+>     Thanks for such extensive wording in the support of my point. 
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 835 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130204/3e4952c3/attachment.sig>
+Actually there is another problem with the musb driver, which is that
+you can only have one DMA controller configured at build time, and
+that currently prevents us from building a kernel that supports both
+the Inventra and TUSB variants together. With multiplatform coming
+up for both ux500 and omap2, we will also have to make a decision
+about ux500 vs omap being supported in DMA mode.
+
+I can see two ways out of this: either we extend the musb driver to
+have run-time registration of the DMA controller, which duplicates
+infrastructure that already exists in the dmaengine API, or we
+make the dmaengine back-end for musb the default and require all
+platforms to use that if they want to coexist with other platforms
+and also use DMA support in musb.
+
+Note that the ux500_dma code in musb already uses dmaengine. It could
+probably be extended to support any platform that has a dmaengine
+driver for the DMA controller used in MUSB.
+
+	Arnd
