@@ -1,200 +1,198 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Feb 2013 16:12:23 -0600
-Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
-In-Reply-To: <20130201215154.GV22517@atomide.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
- <20130201215154.GV22517@atomide.com>
-Message-ID: <51103247.2030906@ti.com>
+From: kgene@kernel.org (kgene at kernel.org)
+Date: Mon, 04 Feb 2013 14:25:37 -0800
+Subject: [PATCH] ARM: dts: specify all the per-cpu interrupts of arch timer
+ for exynos5440
+In-Reply-To: <5108C9C9.4010409@ti.com>
+References: <1358818887-16870-1-git-send-email-kgene.kim@samsung.com>
+ <20130122101554.GA18876@e106331-lin.cambridge.arm.com>
+ <063f01cdf8ec$926cda30$b7468e90$@samsung.com>
+ <20130123103614.GD32237@e106331-lin.cambridge.arm.com>
+ <50FFC1B0.8000601@ti.com> <51012C4B.5080300@ti.com> <51013432.3080903@arm.com>
+ <5108C9C9.4010409@ti.com>
+Message-ID: <11ec01ce0326$90bcb590$b23620b0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/01/2013 03:51 PM, Tony Lindgren wrote:
-
-> How about let's fix this properly to start with so we don't add
-> more blockers moving this code to drivers/bus?
+Santosh Shilimkar wrote:
 > 
-> Looks like gpmc_mem_init() gets called from gpmc_probe() so
-> we can pass that information in pdev.
+> Benoit,
+> 
+> On Thursday 24 January 2013 06:46 PM, Marc Zyngier wrote:
+> > Hi Benoit,
+> >
+> > On 24/01/13 12:42, Benoit Cousson wrote:
+> >> Hi Santosh,
+> >>
+> >> On 01/23/2013 11:55 AM, Santosh Shilimkar wrote:
+> >>> Looping Marc, Benoit
+> >>>
+> >>> On Wednesday 23 January 2013 04:06 PM, Mark Rutland wrote:
+> >>>> On Tue, Jan 22, 2013 at 10:05:18PM +0000, Kukjin Kim wrote:
+> >>>>> Mark Rutland wrote:
+> >>>>>>
+> >>>>> + devicetree-discuss, Grant Likely, Rob Herring and Tony Lindgren
+> >>>>>
+> >>>>>> On Tue, Jan 22, 2013 at 01:41:27AM +0000, Kukjin Kim wrote:
+> >>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
+> >>>>>>>
+> >>>>>>> Need to be changed requirements in the 'cpus' node for
+> exynos5440
+> >>>>>>> to specify all the per-cpu interrupts of arch timer.
+> >>>>>>
+> >>>>>> The node(s) for the arch timer should not be in the cpus/cpu at N
+> nodes.
+> >>>>>> Instead, there should be one node (in the root of the tree).
+> >>>>>>
+> >>>>> Well, I don't think so. As per my understanding, the local timers
+are
+> >>>>> attached to every ARM cores (cpus) and it generates certain
+interrupt
+> >>>>> to the
+> >>>>> GIC. So the correct representation for this in device tree is to
+> >>>>> include the
+> >>>>> interrupts in the cpu nodes in dts file. Your comments  refer to a
+> >>>>> limitation in the Linux kernel implementation of the arch_timer and
+it
+> >>>>> should not result in representing the hardware details incorrectly
+in
+> >>>>> the
+> >>>>> dts file.
+> >>>>
+> >>>> I disagree. The "correct representation" is whatever the devicetree
+> >>>> binding
+> >>>> documentation describes. It does not describe placing timer nodes in
+> >>>> the cpu
+> >>>> nodes.
+> >>>>
+> >>> This seems to be exact same topic what is getting discussed here [1]
+> >>> Technically DT is suppose to represent how the hardware is rather than
+> >>> how the bindings are done.
+> >>>
+> >>> But as Marc pointed out, the approach taken currently is to not
+> >>> duplicate the banked information. The thread [1] isn't concluded
+> >>> yet but looks like we might want to avoid duplicating the information
+> >>> considering, more of such duplication needs to follow. e.g gic i/f
+> >>>
+> >>> Am still waiting on what Benoit has to say ?
+> >>
+> >> I agree with you :-)
+> >>
+> >> I'm not sure the binding was properly done to reflect the HW
+accurately.
+> >>
+> >> A local timer for my point of view should be located in the cpu node
+> >> like a L1 cache. Or at least referenced in each cpu by a phandle.
+> >>
+> >> What was the rational to put it in the root?
+> >
+> > The rational was to follow what we already do for most (all?) banked
+> > resources. We already have TWD, GIC and PMU that have a root node,
+> > avoiding duplicated resources. I think consistency is an important thing
+> > to have.
+> >
+> > If we decide to move everything into CPU nodes and duplicate all the
+> > banked resources, fine. But that has impacts that reach far beyond the
+> > simple case of the timer.
+> >
+> > In particular, good luck with the GIC distributor interface, where the
+> > 32 first interrupts are per CPU. This would also mandate a redesign of
+> > the way we specify a PPI, as the CPU mask in the third field doesn't
+> > mean a thing anymore.
+> >
+> > If you insist on having a phandle to a timer node, fine by me.
+> >
+> Can you please comment on it so that we can conclude this thread ?
+> I would like to update my patches and hence the push.
+> 
+Hmm...it's time to decide for now.
 
-I have re-worked this a bit to use platform data. I have also updated
-the logic for testing internal/external boot on omap2430 which is
-different from omap2420 (according to the TRM). However, I have only
-boot tested on omap2420. 
+Let me add timer node for ARM arch timer at this moment. Then if any change
+is required, will do it later.
 
-Do you know why this was changed in the first place? See below ...
+If any objection, let me know. If not, I will queue following patch for
+v3.9.
 
-http://permalink.gmane.org/gmane.linux.kernel.commits.head/95931
+Thanks.
 
-Heres what I have now ...
+- Kukjin
 
+---------8<------------------------------8<---------------------------------
+-
 
->From df2eebd3580f478f569241d294c2f810359fab6a Mon Sep 17 00:00:00 2001
-From: Jon Hunter <jon-hunter@ti.com>
-Date: Thu, 31 Jan 2013 15:56:08 -0600
-Subject: [PATCH] ARM: OMAP2: Fix GPMC memory initialisation
+From: Kukjin Kim <kgene.kim@samsung.com>
+Subject: [PATCH] ARM: dts: re-organized cpu node for exynos5440
 
-OMAP2+ devices have an internal ROM that by default is typically mapped
-to the first 1MB of the GPMC address space (0x0).
+This patch adds timer node and re-organizes cpu node for exynos5440.
 
-For OMAP24xx devices, GPMC chip-select 0 (CS0) may be mapped to address
-0x0 instead of the internal ROM if configured for an external boot mode.
-If configured for an internal boot mode then the internal ROM is mapped
-to 0x0.
-
-Currently, the function gpmc_mem_init() function reserves the first 1MB
-of GPMC address space for the internal OMAP ROM. This prevents any
-device (ethernet chip, flash memories, etc) from using this address
-range. This causes the GPMC probe to fail on the OMAP2420 H4 when NOR
-flash is mapped to address 0x0. Fix this by checking the SYS_BOOT pin
-setting for OMAP24xx devices, to see the device is configured for
-an internal or external boot and pass the amount of ROM mapped to
-address 0x0 to the GPMC driver via platform data.
-
-Please note that for OMAP3-5 devices, when booting from NOR or NAND
-memories connected to CS0, these memories are always mapped to address
-0x08000000 and so reserving this memory range does not present any
-problems for these devices.
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Acked-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-omap2/gpmc.c |   53 +++++++++++++++++++++++++++++++++++---------
- arch/arm/mach-omap2/gpmc.h |    5 +++++
- 2 files changed, 48 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/exynos5440.dtsi |   37
++++++++++++++++++--------------------
+ 1 file changed, 17 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index a124849..71c0134 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -20,6 +20,7 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/ioport.h>
-+#include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/io.h>
- #include <linux/module.h>
-@@ -32,6 +33,7 @@
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi
+b/arch/arm/boot/dts/exynos5440.dtsi
+index 1e7a2b0..5c5a699 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -24,40 +24,37 @@
+ 	};
  
- #include "soc.h"
- #include "common.h"
-+#include "control.h"
- #include "omap_device.h"
- #include "gpmc.h"
- 
-@@ -87,7 +89,6 @@
- 
- #define GPMC_MEM_START		0x00000000
- #define GPMC_MEM_END		0x3FFFFFFF
--#define BOOT_ROM_SPACE		0x100000	/* 1MB */
- 
- #define GPMC_CHUNK_SHIFT	24		/* 16 MB */
- #define GPMC_SECTION_SHIFT	28		/* 128 MB */
-@@ -775,16 +776,11 @@ static void gpmc_mem_exit(void)
- 
- }
- 
--static int gpmc_mem_init(void)
-+static int gpmc_mem_init(u32 offset)
- {
- 	int cs, rc;
--	unsigned long boot_rom_space = 0;
- 
--	/* never allocate the first page, to facilitate bug detection;
--	 * even if we didn't boot from ROM.
--	 */
--	boot_rom_space = BOOT_ROM_SPACE;
--	gpmc_mem_root.start = GPMC_MEM_START + boot_rom_space;
-+	gpmc_mem_root.start = GPMC_MEM_START + offset;
- 	gpmc_mem_root.end = GPMC_MEM_END;
- 
- 	/* Reserve all regions that has been set up by bootloader */
-@@ -1124,6 +1120,12 @@ static int gpmc_probe(struct platform_device *pdev)
- 	int rc;
- 	u32 l;
- 	struct resource *res;
-+	struct gpmc_platform_data *pdata = pdev->dev.platform_data;
+ 	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "%s: no platform data.\n", __func__);
-+		return -ENODEV;
-+	}
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a15";
+-			timer {
+-				compatible = "arm,armv7-timer";
+-				interrupts = <1 13 0xf08>;
+-				clock-frequency = <1000000>;
+-			};
++			reg = <0>;
+ 		};
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a15";
+-			timer {
+-				compatible = "arm,armv7-timer";
+-				interrupts = <1 14 0xf08>;
+-				clock-frequency = <1000000>;
+-			};
++			reg = <1>;
+ 		};
+ 		cpu at 2 {
+ 			compatible = "arm,cortex-a15";
+-			timer {
+-				compatible = "arm,armv7-timer";
+-				interrupts = <1 14 0xf08>;
+-				clock-frequency = <1000000>;
+-			};
++			reg = <2>;
+ 		};
+ 		cpu at 3 {
+ 			compatible = "arm,cortex-a15";
+-			timer {
+-				compatible = "arm,armv7-timer";
+-				interrupts = <1 14 0xf08>;
+-				clock-frequency = <1000000>;
+-			};
++			reg = <3>;
+ 		};
+ 	};
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (res == NULL)
-@@ -1161,7 +1163,7 @@ static int gpmc_probe(struct platform_device *pdev)
- 	dev_info(gpmc_dev, "GPMC revision %d.%d\n", GPMC_REVISION_MAJOR(l),
- 		 GPMC_REVISION_MINOR(l));
- 
--	rc = gpmc_mem_init();
-+	rc = gpmc_mem_init(pdata->gpmc_rom_space);
- 	if (IS_ERR_VALUE(rc)) {
- 		clk_disable_unprepare(gpmc_l3_clk);
- 		clk_put(gpmc_l3_clk);
-@@ -1213,15 +1215,46 @@ static int __init omap_gpmc_init(void)
- {
- 	struct omap_hwmod *oh;
- 	struct platform_device *pdev;
-+	struct gpmc_platform_data *pdata;
- 	char *oh_name = "gpmc";
- 
-+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		pr_err("%s: No memory for gpmc\n", __func__);
-+		return -ENOMEM;
-+	}
++	timer {
++		compatible = "arm,cortex-a15-timer",
++			     "arm,armv7-timer";
++		interrupts = <1 13 0xf08>,
++			     <1 14 0xf08>,
++			     <1 11 0xf08>,
++			     <1 10 0xf08>;
++		clock-frequency = <50000000>;
++	};
 +
-+	/*
-+	 * The first 1MB of GPMC address space is mapped to the internal
-+	 * ROM. OMAP2 devices are an exception to this where the first
-+	 * 1MB may be mapped to the GPMC. OMAP2 devices that boot from
-+	 * external memory devices, will map CS0 to the start of the
-+	 * GPMC address space (0x0). We can test this by checking the
-+	 * SYS_BOOT pins.
-+	 *
-+	 * OMAP2420 SYS_BOOT[3] = 1b, then GPMC CS0 is mapped to 0x0.
-+	 * OMAP2430 SYS_BOOT[2:1] = 00b, then GPMC CS0 is mapped to 0x0.
-+	 */
-+	pdata->gpmc_rom_space = SZ_1M;
-+
-+	if (cpu_is_omap242x()) {
-+		if (!(omap_ctrl_readl(OMAP24XX_CONTROL_STATUS) &
-+		      OMAP2_SYSBOOT_3_MASK))
-+			pdata->gpmc_rom_space = 0;
-+	} else if (cpu_is_omap243x()) {
-+		if (!(omap_ctrl_readl(OMAP24XX_CONTROL_STATUS) &
-+		      (OMAP2_SYSBOOT_2_MASK | OMAP2_SYSBOOT_1_MASK)))
-+			pdata->gpmc_rom_space = 0;
-+	}
-+
- 	oh = omap_hwmod_lookup(oh_name);
- 	if (!oh) {
- 		pr_err("Could not look up %s\n", oh_name);
- 		return -ENODEV;
- 	}
- 
--	pdev = omap_device_build(DEVICE_NAME, -1, oh, NULL, 0, NULL, 0, 0);
-+	pdev = omap_device_build(DEVICE_NAME, -1, oh, pdata, sizeof(*pdata),
-+				 NULL, 0, 0);
- 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
- 
- 	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
-diff --git a/arch/arm/mach-omap2/gpmc.h b/arch/arm/mach-omap2/gpmc.h
-index fe0a844..b33ef26 100644
---- a/arch/arm/mach-omap2/gpmc.h
-+++ b/arch/arm/mach-omap2/gpmc.h
-@@ -189,6 +189,11 @@ struct gpmc_device_timings {
- 	bool we_xdelay;
- };
- 
-+/* GPMC platform data */
-+struct gpmc_platform_data {
-+	u32 gpmc_rom_space;
-+};
-+
- extern int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
- 				struct gpmc_device_timings *dev_t);
- 
+ 	serial at B0000 {
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0xB0000 0x1000>;
 -- 
 1.7.10.4
