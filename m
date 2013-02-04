@@ -1,28 +1,101 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Feb 2013 16:01:33 +0000
-Subject: [PATCH v2 2/2] ARM: uncompress debug support for multiplatform
- build
-In-Reply-To: <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
-References: <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
- <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130204160133.GH17786@n2100.arm.linux.org.uk>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Mon, 4 Feb 2013 10:12:44 -0600
+Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
+ socfpga harware
+In-Reply-To: <20130203183641.GA30825@amd.pavel.ucw.cz>
+References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
+ <1359651943-21752-5-git-send-email-dinguyen@altera.com>
+ <20130201035040.GE4838@quad.lixom.net>
+ <20130201104655.GA3124@amd.pavel.ucw.cz>
+ <71B37E0559AC6849A68C5BA94C509FB45A63D4E47D@SJ-ITMSG02.altera.priv.altera.com>
+ <20130201153152.GS23505@n2100.arm.linux.org.uk>
+ <1359736762.2932.1.camel@linux-builds1>
+ <20130202192409.GA17736@amd.pavel.ucw.cz>
+ <71B37E0559AC6849A68C5BA94C509FB45A645BA4EA@SJ-ITMSG02.altera.priv.altera.com>
+ <20130203183641.GA30825@amd.pavel.ucw.cz>
+Message-ID: <1359994364.10570.4.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 10:45:20AM +0800, Shawn Guo wrote:
-> Instead of giving zero support of uncompress debug for multiplatform
-> build, the patch turns uncompress debug into one part of DEBUG_LL
-> support.  When DEBUG_LL is turned on for a particular platform,
-> uncompress debug works too for that platform.
+Hi Pavel,
+
+On Sun, 2013-02-03 at 19:36 +0100, ZY - pavel wrote:
+> Hi!
 > 
-> It reuses the platform DEBUG_LL macros by creating a simple
-> arch/arm/boot/compressed/debug.S with CONFIG_DEBUG_LL_INCLUDE
-> included there, and implements a generic putc() using those macros.
+> > > > Point taken...thanks Russell.
+> > > 
+> > > Well, I don't think we normally check dtbs for validity with
+> > > user-helpful error messages, but it is relatively easy in this case.
+> > > 
+> > > ---cut here---
+> > > 
+> > > Continue booting with second core disabled if cpu1-start-addr is not
+> > > present in .dtb.
+> > > 
+> > > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > > 
+> > > diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-
+> > > socfpga/platsmp.c
+> > > index 81e0da0..90facdd 100644
+> > > --- a/arch/arm/mach-socfpga/platsmp.c
+> > > +++ b/arch/arm/mach-socfpga/platsmp.c
+> > > @@ -82,6 +82,9 @@ static void __init socfpga_smp_init_cpus(void)
+> > >  		ncores = 1;
+> > >  	}
+> > >  #endif
+> > > +	if (!cpu1start_addr)
+> > > +		ncores = 1;
+> > > +
+> > 
+> > This will not work because of commit 5587164eea4aad88fcb79d9b21dc8f14fea598cd 
+> > I sent out a V3 series of this patch, CPU1 will simply fail to come online if 
+> > cpu1-start-addr is not defined.
+> 
+> Are you sure? As far as I can see you still need such a line in v3 of
+> the patch:
+> 
+> @@ -72,6 +73,11 @@ void __init socfpga_sysmgr_init(void)
+>         struct device_node *np;
+> 
+>         np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
+> +       
+> +       if (of_property_read_u32(np, "cpu1-start-addr",
+> +                       (u32 *) &cpu1start_addr))
+> +               pr_err("SMP: Need cpu1-start-addr in device tree.\n");
+> +
+>         sys_manager_base_addr = of_iomap(np, 0);
+> 
+>         np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
+> 
+> ...so cpu1-start-addr is not there, cpu1start_addr is NULL but you
+> continue booting.
+> 
+>  ENTRY(secondary_trampoline)
+> -       movw    r0, #:lower16:CPU1_START_ADDR
+> -       movt  r0, #:upper16:CPU1_START_ADDR
+> +       movw    r2, #:lower16:cpu1start_addr
+> +       movt  r2, #:upper16:cpu1start_addr
+> +                       
+> +       /* The socfpga VT cannot handle a 0xC0000000 page offset when
+> loading
+> +               the cpu1start_addr, we bit clear it. Tested on HW and
+> VT. */
+> +       bic     r2, r2, #0x40000000
+> 
+> +       ldr     r0, [r2]
+>         ldr     r1, [r0]
+>         bx      r1
+> 
+> ...and you'll dereference the NULL pointer here, no?
 
-Ok, I've applied this on the previso that _no one_ in future whinges if
-the debug infrastructure doesn't quite meet their expectation.  The
-debug infrastructure remains first and foremost that: a simple debug
-infrastructure suitable for use in the early assembly and the like.
+You're right, somehow my initial test did not catch this error. For v4,
+I'm just going to wrap everything in sofpga_boot_secodardy in a 
 
-That is its primary concern and trumps any requirements from consoles,
-early printk, decompressor output, and the like.
+if (cpu1start_addr){}
+
+
+Dinh
+
+> 
+> Sorry for the noise, this really is not all that important...
+> 									Pavel
