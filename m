@@ -1,123 +1,113 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Mon, 4 Feb 2013 10:37:32 +0530
-Subject: [PATCH v2 4/6] ARM: davinci: da850: add DT node for eth0.
-In-Reply-To: <510E51FF.8090005@ti.com>
-References: <1359380879-26306-1-git-send-email-prabhakar.lad@ti.com>
- <1359380879-26306-5-git-send-email-prabhakar.lad@ti.com>
- <510E51FF.8090005@ti.com>
-Message-ID: <CA+V-a8uT-iF_TdWQwvnc1PfcQ9z3WBuZ2MYS1X_u3wO0_p=T0w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 4 Feb 2013 13:09:11 +0800
+Subject: [PATCH v5] cpufreq: add imx6q-cpufreq driver
+In-Reply-To: <20130204160622.GB5209@ubuntu>
+References: <1359946302-25953-1-git-send-email-shawn.guo@linaro.org>
+ <20130204160622.GB5209@ubuntu>
+Message-ID: <20130204050909.GD26233@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar ,
+On Mon, Feb 04, 2013 at 11:06:22AM -0500, Anson Huang wrote:
+> > +	/*
+> > +	 * The setpoints are selected per PLL/PDF frequencies, so we need to
+> > +	 * reprogram PLL for frequency scaling.  The procedure of reprogramming
+> > +	 * PLL1 is as below.
+> > +	 *
+> > +	 *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
+> > +	 *  - Disable pll1_sys_clk and reprogram it
+> > +	 *  - Enable pll1_sys_clk and reparent pll1_sw_clk back to it
+> > +	 *  - Disable pll2_pfd2_396m_clk
+> > +	 */
+> > +	clk_prepare_enable(pll2_pfd2_396m_clk);
+> > +	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+> > +	clk_set_parent(pll1_sw_clk, step_clk);
+> > +	clk_prepare_enable(pll1_sys_clk);
+> > +	if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+> > +		clk_disable_unprepare(pll1_sys_clk);
+> > +		clk_set_rate(pll1_sys_clk, freqs.new * 1000);
+> > +		clk_prepare_enable(pll1_sys_clk);
+> > +		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+> > +		clk_disable_unprepare(pll2_pfd2_396m_clk);
+> > +	} else {
+> > +		/*
+> > +		 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
+> > +		 * to provide the frequency.
+> > +		 */
+> > +		clk_disable_unprepare(pll1_sys_clk);
+> > +	}
+> Seems like we will get pll2_pfd2_396m_clk's use count mismatch? As every time cpu freq is changed, pll2_pfd2_396m_clk will be added at the beginning of this code piece, but only decreased when cpu freq > 396M, so everytime cpu freq changed to 396M, this pll2_pfd2_396m_clk will in increased?
 
-On Sun, Feb 3, 2013 at 5:33 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 1/28/2013 7:17 PM, Prabhakar Lad wrote:
->> From: Lad, Prabhakar <prabhakar.lad@ti.com>
->>
->> Add eth0 device tree node information and pinmux for mii to da850 by
->> providing interrupt details and local mac address of eth0.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: netdev at vger.kernel.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Heiko Schocher <hs@denx.de>
->> ---
->>  arch/arm/boot/dts/da850-evm.dts |    5 +++++
->>  arch/arm/boot/dts/da850.dtsi    |   35 +++++++++++++++++++++++++++++++++++
->>  2 files changed, 40 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
->> index a319491..19aa2b3 100644
->> --- a/arch/arm/boot/dts/da850-evm.dts
->> +++ b/arch/arm/boot/dts/da850-evm.dts
->> @@ -30,6 +30,11 @@
->>               mdio: davinci_mdio at 1e24000 {
->>                       status = "okay";
->>               };
->> +             eth0: emac at 1e20000 {
->> +                     status = "okay";
->> +                     pinctrl-names = "default";
->> +                     pinctrl-0 = <&mii_pins>;
->> +             };
->>       };
->>       nand_cs3 at 62000000 {
->>               status = "okay";
->> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->> index ba28f2d..76905f3 100644
->> --- a/arch/arm/boot/dts/da850.dtsi
->> +++ b/arch/arm/boot/dts/da850.dtsi
->> @@ -56,6 +56,26 @@
->>                                       0x30 0x01100000  0x0ff00000
->>                               >;
->>                       };
->> +                     mii_pins: pinmux_mii_pins {
->> +                             pinctrl-single,bits = <
->> +                                     /*
->> +                                      * MII_TXEN, MII_TXCLK, MII_COL
->> +                                      * MII_TXD_3, MII_TXD_2, MII_TXD_1
->> +                                      * MII_TXD_0
->> +                                      */
->> +                                     0x8 0x88888880 0xfffffff0
->> +                                     /*
->> +                                      * MII_RXER, MII_CRS, MII_RXCLK
->> +                                      * MII_RXDV, MII_RXD_3, MII_RXD_2
->> +                                      * MII_RXD_1, MII_RXD_0
->> +                                      */
->> +                                     0xc 0x88888888 0xffffffff
->> +                                     /* MDIO_CLK, MDIO_D */
->
-> You call this mii_pins, but include mdio pins in there as well. Can you
-> separate them out? Then some board which uses rmii can simply reuse the
-> entry.
->
-Ok makes sense.
+Ah, good catch.  And pll1_sys_clk has the same problem.  Since it's
+been verified by FSL kernel that we do not necessarily need to disable
+pll1_sys_clk before reprogramming it, I would choose to rewrite the
+code as below to make it cleaner and correct on clock usage.
 
->> +                                     0x10 0x00222288 0x00ffffff
->> +                                     /* GPIO2_6 */
->> +                                     0x18 0x00000080 0x000000f0
->
-> This is SoC specific pin list. Such board specific pins should not make
-> it here.
->
-Ok, so this should be set up using GPIO API's ?
+        /*
+         * The setpoints are selected per PLL/PDF frequencies, so we need to
+         * reprogram PLL for frequency scaling.  The procedure of reprogramming
+         * PLL1 is as below.
+         *
+         *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
+         *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
+         *  - Disable pll2_pfd2_396m_clk
+         */
+        clk_prepare_enable(pll2_pfd2_396m_clk);
+        clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+        clk_set_parent(pll1_sw_clk, step_clk);
+        if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+                clk_set_rate(pll1_sys_clk, freqs.new * 1000);
+                /*
+                 * If we are leaving 396 MHz set-point, we need to enable
+                 * pll1_sys_clk and disable pll2_pfd2_396m_clk to keep
+                 * their use count correct.
+                 */
+                if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
+                        clk_prepare_enable(pll1_sys_clk);
+                        clk_disable_unprepare(pll2_pfd2_396m_clk);
+                }
+                clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+                clk_disable_unprepare(pll2_pfd2_396m_clk);
+        } else {
+                /*
+                 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
+                 * to provide the frequency.
+                 */
+                clk_disable_unprepare(pll1_sys_clk);
+        }
 
->> +                             >;
->> +                     };
->>               };
->>               serial0: serial at 1c42000 {
->>                       compatible = "ns16550a";
->> @@ -88,6 +108,21 @@
->>                       reg = <0x224000 0x1000>;
->>                       bus_freq = <2200000>;
->>               };
->> +             eth0: emac at 1e20000 {
->> +                     compatible = "ti,davinci-dm6467-emac";
->> +                     reg = <0x220000 0x4000>;
->> +                     ti,davinci-ctrl-reg-offset = <0x3000>;
->> +                     ti,davinci-ctrl-mod-reg-offset = <0x2000>;
->> +                     ti,davinci-ctrl-ram-offset = <0>;
->> +                     ti,davinci-ctrl-ram-size = <0x2000>;
->> +                     local-mac-address = [ 00 00 00 00 00 00 ];
->> +                     interrupts = <33
->> +                                     34
->> +                                     35
->> +                                     36
->> +                                     >;
->> +                     phy-handle = <&mdio>;
->
-> I doubt this is required. This property is to pass a handle to the phy,
-> not mdio bus.
->
-Ok I'll check on this.
+> > +
+> > +	/* Ensure the arm clock divider is what we expect */
+> > +	ret = clk_set_rate(arm_clk, freqs.new * 1000);
+> > +	if (ret) {
+> > +		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+> > +		regulator_set_voltage_tol(arm_reg, volt_old, 0);
+> > +		return ret;
+> > +	}
+> > +
+> > +	/* scaling down?  scale voltage after frequency */
+> > +	if (freqs.new < freqs.old) {
+> > +		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+> > +		if (ret)
+> > +			dev_warn(cpu_dev,
+> > +				 "failed to scale vddarm down: %d\n", ret);
+> > +
+> > +		if (freqs.old == FREQ_1P2_GHZ / 1000) {
+> > +			regulator_set_voltage_tol(pu_reg,
+> > +					PU_SOC_VOLTAGE_NORMAL, 0);
+> > +			regulator_set_voltage_tol(soc_reg,
+> > +					PU_SOC_VOLTAGE_NORMAL, 0);
+> > +		}
+> > +	}
+> > +
+> > +	for_each_online_cpu(cpu) {
+> > +		freqs.cpu = cpu;
+> > +		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > +	}
+> > +
+> Should we need to update the percpu loops_per_jiffy variable and global loops_per_jiffy? As the udelay and mdelay will rely on this global loops_per_jiffy? Or the latest kernel has handle it in other place such as cpufreq common driver? I remembered that common cpufreq driver only handle the noSMP case.
 
-Regards,
---Prabhakar
+No, it's not needed since commit ec971ea (ARM: add cpufreq transiton
+notifier to adjust loops_per_jiffy for smp) is in place.
 
-
-> Thanks,
-> Sekhar
+Shawn
