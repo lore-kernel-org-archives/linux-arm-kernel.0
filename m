@@ -1,61 +1,84 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Feb 2013 13:46:29 -0600
-Subject: [PATCH V3 0/7] ARM: OMAP2+: System timer updates
-Message-ID: <1360007196-21350-1-git-send-email-jon-hunter@ti.com>
+Date: Mon, 4 Feb 2013 13:46:31 -0600
+Subject: [PATCH V3 2/7] ARM: OMAP2+: Remove hard-coded test on timer ID
+In-Reply-To: <1360007196-21350-1-git-send-email-jon-hunter@ti.com>
+References: <1360007196-21350-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1360007196-21350-3-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series consists mainly of clean-ups for clockevents and
-clocksource timers on OMAP2+ devices. The most significant change
-in functionality comes from the 5th patch which is changing the
-selection of the clocksource timer for OMAP3 and AM335x devices
-when gptimers are used for clocksource. This change came about from
-Vaibhav Bedia's series for AM335x [1]. See patch for more details on
-the exact nature of the change.
+Currently, when configuring the clock-events and clock-source timers
+for OMAP2+ devices, we check whether the timer ID is 12 before
+attempting to set the parent clock for the timer.
 
-Boot tested with and without  device-tree on OMAP2420 H4, OMAP3430 SDP,
-OMAP3430 Beagle Board, OMAP4430 SDP and AM335x EVM (AM335x only
-supports device-tree boot). Also boot tested boards with kernel boot
-parameter "clocksource=gp_timer".
+This test was added for OMAP3 general purpose devices (no security
+features enabled) that a 12th timer available but unlike the other
+timers only has a single functional clock source. Calling
+clk_set_parent() for this 12th timer would always return an error
+because there is only one choice for a parent clock. Therefore,
+this hard-coded timer ID test was added.
 
-This series is based upon ARM-SoC next branch.
+To avoid this timer ID test, simply check to see if the timer's current
+parent clock is the desired parent clock and only call clk_set_parent()
+if this is not the case.
 
-V3 changes:
-- Post the intended patches this time!
-- Use PTR_ERR() to return the error code if clk_get() fails (thanks
-  Russell!)
+Also if clk_get() fails, then use PTR_ERR() to return the error code.
 
-V2 changes:
-- Fixed bug in patch that updates clocksource and clockevents timer
-  names to use the hwmod timer names (thanks Vaibhav Bedia!)
-- Updated patch that removes the hard-coded ID test to return an error
-  as soon as clk_set_parent fails instead of waiting for the end of the
-  function.
-- Fixed bug in patches that "simplify system timer clock definitions"
-  and "simplify system timer definitions" that was prevent omap4/5
-  boards from booting with kernel boot parameter "clocksource=gp_timer".
-- Updated changelog for patch "simplify system timer definitions" per
-  feedback received from Igor.
-- Added new patch to store the timer ID in the omap_dm_timer structure
-  to clean-up the code.
-- Added new patch to fix a sparse warning seen in ARM-SOC next.
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/timer.c |   27 ++++++++++++++-------------
+ 1 file changed, 14 insertions(+), 13 deletions(-)
 
-[1] https://patchwork.kernel.org/patch/1921421/
-
-Jon Hunter (7):
-  ARM: OMAP2+: Display correct system timer name
-  ARM: OMAP2+: Remove hard-coded test on timer ID
-  ARM: OMAP2+: Simplify system timer clock definitions
-  ARM: OMAP2+: Simplify system timers definitions
-  ARM: OMAP3: Update clocksource timer selection
-  ARM: OMAP2+: Store ID of system timers in timer structure
-  ARM: OMAP4+: Fix sparse warning in system timers
-
- arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
- arch/arm/mach-omap2/board-generic.c  |    2 +-
- arch/arm/mach-omap2/common.h         |    3 +-
- arch/arm/mach-omap2/timer.c          |  121 +++++++++++++++++-----------------
- 4 files changed, 65 insertions(+), 63 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 83118fb..c6b3fdd 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -224,6 +224,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	struct device_node *np;
+ 	struct omap_hwmod *oh;
+ 	struct resource irq, mem;
++	struct clk *src;
+ 	int r = 0;
+ 
+ 	if (of_have_populated_dt()) {
+@@ -278,24 +279,24 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	/* After the dmtimer is using hwmod these clocks won't be needed */
+ 	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
+ 	if (IS_ERR(timer->fclk))
+-		return -ENODEV;
++		return PTR_ERR(timer->fclk);
++
++	src = clk_get(NULL, fck_source);
++	if (IS_ERR(src))
++		return PTR_ERR(src);
+ 
+-	/* FIXME: Need to remove hard-coded test on timer ID */
+-	if (gptimer_id != 12) {
+-		struct clk *src;
+-
+-		src = clk_get(NULL, fck_source);
+-		if (IS_ERR(src)) {
+-			r = -EINVAL;
+-		} else {
+-			r = clk_set_parent(timer->fclk, src);
+-			if (IS_ERR_VALUE(r))
+-				pr_warn("%s: %s cannot set source\n",
+-					__func__, oh->name);
++	if (clk_get_parent(timer->fclk) != src) {
++		r = clk_set_parent(timer->fclk, src);
++		if (IS_ERR_VALUE(r)) {
++			pr_warn("%s: %s cannot set source\n", __func__,
++				oh->name);
+ 			clk_put(src);
++			return r;
+ 		}
+ 	}
+ 
++	clk_put(src);
++
+ 	omap_hwmod_setup_one(oh_name);
+ 	omap_hwmod_enable(oh);
+ 	__omap_dm_timer_init_regs(timer);
 -- 
 1.7.10.4
