@@ -1,226 +1,266 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 4 Feb 2013 14:12:08 -0600
-Subject: [PATCHv4 for soc 1/4] arm: socfpga: Add new device tree source for
- actual socfpga HW
+Date: Mon, 4 Feb 2013 14:12:10 -0600
+Subject: [PATCHv4 for soc 3/4] arm: Add v7_invalidate_l1 to cache-v7.S
 In-Reply-To: <1360008731-17021-1-git-send-email-dinguyen@altera.com>
 References: <1360008731-17021-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1360008731-17021-2-git-send-email-dinguyen@altera.com>
+Message-ID: <1360008731-17021-4-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Up to this point, support for socfpga has only been on a virtual
-platform. Now that actual hardware is available, we add the appropriate
-device tree source files.
+mach-socfpga is another platform that needs to use
+v7_invalidate_l1 to bringup additional cores. There was a comment that
+the ideal place for v7_invalidate_l1 should be in arm/mm/cache-v7.S
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Tested-by: Pavel Machek <pavel@denx.de>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Stephen Warren <swarren@nvidia.com>
 Reviewed-by: Pavel Machek <pavel@denx.de>
-Cc: Russell King <linux@arm.linux.org.uk>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Pavel Machek <pavel@denx.de>
+Tested-by: Stephen Warren <swarren@nvidia.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Olof Johansson <olof@lixom.net>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 ---
- arch/arm/boot/dts/socfpga.dtsi         |   22 ++++++------
- arch/arm/boot/dts/socfpga_cyclone5.dts |   30 ++++++++++++++--
- arch/arm/boot/dts/socfpga_vt.dts       |   60 ++++++++++++++++++++++++++++++++
- arch/arm/mach-socfpga/socfpga.c        |    1 -
- 4 files changed, 98 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm/boot/dts/socfpga_vt.dts
+ arch/arm/mach-imx/headsmp.S      |   47 -------------------------------------
+ arch/arm/mach-shmobile/headsmp.S |   48 --------------------------------------
+ arch/arm/mach-tegra/headsmp.S    |   43 ----------------------------------
+ arch/arm/mm/cache-v7.S           |   46 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 46 insertions(+), 138 deletions(-)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 19aec42..936d230 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -25,6 +25,10 @@
- 		ethernet0 = &gmac0;
- 		serial0 = &uart0;
- 		serial1 = &uart1;
-+		timer0 = &timer0;
-+		timer1 = &timer1;
-+		timer2 = &timer2;
-+		timer3 = &timer3;
- 	};
+diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+index 7e49deb..921fc15 100644
+--- a/arch/arm/mach-imx/headsmp.S
++++ b/arch/arm/mach-imx/headsmp.S
+@@ -17,53 +17,6 @@
  
- 	cpus {
-@@ -98,47 +102,41 @@
- 			interrupts = <1 13 0xf04>;
- 		};
+ 	.section ".text.head", "ax"
  
--		timer0: timer at ffc08000 {
-+		timer0: timer0 at ffc08000 {
- 			compatible = "snps,dw-apb-timer-sp";
- 			interrupts = <0 167 4>;
--			clock-frequency = <200000000>;
- 			reg = <0xffc08000 0x1000>;
- 		};
+-/*
+- * The secondary kernel init calls v7_flush_dcache_all before it enables
+- * the L1; however, the L1 comes out of reset in an undefined state, so
+- * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
+- * of cache lines with uninitialized data and uninitialized tags to get
+- * written out to memory, which does really unpleasant things to the main
+- * processor.  We fix this by performing an invalidate, rather than a
+- * clean + invalidate, before jumping into the kernel.
+- *
+- * This funciton is cloned from arch/arm/mach-tegra/headsmp.S, and needs
+- * to be called for both secondary cores startup and primary core resume
+- * procedures.  Ideally, it should be moved into arch/arm/mm/cache-v7.S.
+- */
+-ENTRY(v7_invalidate_l1)
+-	mov	r0, #0
+-	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
+-	mcr	p15, 2, r0, c0, c0, 0
+-	mrc	p15, 1, r0, c0, c0, 0
+-
+-	ldr	r1, =0x7fff
+-	and	r2, r1, r0, lsr #13
+-
+-	ldr	r1, =0x3ff
+-
+-	and	r3, r1, r0, lsr #3	@ NumWays - 1
+-	add	r2, r2, #1		@ NumSets
+-
+-	and	r0, r0, #0x7
+-	add	r0, r0, #4	@ SetShift
+-
+-	clz	r1, r3		@ WayShift
+-	add	r4, r3, #1	@ NumWays
+-1:	sub	r2, r2, #1	@ NumSets--
+-	mov	r3, r4		@ Temp = NumWays
+-2:	subs	r3, r3, #1	@ Temp--
+-	mov	r5, r3, lsl r1
+-	mov	r6, r2, lsl r0
+-	orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
+-	mcr	p15, 0, r5, c7, c6, 2
+-	bgt	2b
+-	cmp	r2, #0
+-	bgt	1b
+-	dsb
+-	isb
+-	mov	pc, lr
+-ENDPROC(v7_invalidate_l1)
+-
+ #ifdef CONFIG_SMP
+ ENTRY(v7_secondary_startup)
+ 	bl	v7_invalidate_l1
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index b202c12..96001fd 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -16,54 +16,6 @@
  
--		timer1: timer at ffc09000 {
-+		timer1: timer1 at ffc09000 {
- 			compatible = "snps,dw-apb-timer-sp";
- 			interrupts = <0 168 4>;
--			clock-frequency = <200000000>;
- 			reg = <0xffc09000 0x1000>;
- 		};
+ 	__CPUINIT
  
--		timer2: timer at ffd00000 {
-+		timer2: timer2 at ffd00000 {
- 			compatible = "snps,dw-apb-timer-osc";
- 			interrupts = <0 169 4>;
--			clock-frequency = <200000000>;
- 			reg = <0xffd00000 0x1000>;
- 		};
+-/* Cache invalidation nicked from arch/arm/mach-imx/head-v7.S, thanks!
+- *
+- * The secondary kernel init calls v7_flush_dcache_all before it enables
+- * the L1; however, the L1 comes out of reset in an undefined state, so
+- * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
+- * of cache lines with uninitialized data and uninitialized tags to get
+- * written out to memory, which does really unpleasant things to the main
+- * processor.  We fix this by performing an invalidate, rather than a
+- * clean + invalidate, before jumping into the kernel.
+- *
+- * This funciton is cloned from arch/arm/mach-tegra/headsmp.S, and needs
+- * to be called for both secondary cores startup and primary core resume
+- * procedures.  Ideally, it should be moved into arch/arm/mm/cache-v7.S.
+- */
+-ENTRY(v7_invalidate_l1)
+-	mov	r0, #0
+-	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
+-	mcr	p15, 2, r0, c0, c0, 0
+-	mrc	p15, 1, r0, c0, c0, 0
+-
+-	ldr	r1, =0x7fff
+-	and	r2, r1, r0, lsr #13
+-
+-	ldr	r1, =0x3ff
+-
+-	and	r3, r1, r0, lsr #3	@ NumWays - 1
+-	add	r2, r2, #1		@ NumSets
+-
+-	and	r0, r0, #0x7
+-	add	r0, r0, #4	@ SetShift
+-
+-	clz	r1, r3		@ WayShift
+-	add	r4, r3, #1	@ NumWays
+-1:	sub	r2, r2, #1	@ NumSets--
+-	mov	r3, r4		@ Temp = NumWays
+-2:	subs	r3, r3, #1	@ Temp--
+-	mov	r5, r3, lsl r1
+-	mov	r6, r2, lsl r0
+-	orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
+-	mcr	p15, 0, r5, c7, c6, 2
+-	bgt	2b
+-	cmp	r2, #0
+-	bgt	1b
+-	dsb
+-	isb
+-	mov	pc, lr
+-ENDPROC(v7_invalidate_l1)
+-
+ ENTRY(shmobile_invalidate_start)
+ 	bl	v7_invalidate_l1
+ 	b	secondary_startup
+diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+index 4a317fa..fb082c4 100644
+--- a/arch/arm/mach-tegra/headsmp.S
++++ b/arch/arm/mach-tegra/headsmp.S
+@@ -18,49 +18,6 @@
+         .section ".text.head", "ax"
+ 	__CPUINIT
  
--		timer3: timer at ffd01000 {
-+		timer3: timer3 at ffd01000 {
- 			compatible = "snps,dw-apb-timer-osc";
- 			interrupts = <0 170 4>;
--			clock-frequency = <200000000>;
- 			reg = <0xffd01000 0x1000>;
- 		};
+-/*
+- * Tegra specific entry point for secondary CPUs.
+- *   The secondary kernel init calls v7_flush_dcache_all before it enables
+- *   the L1; however, the L1 comes out of reset in an undefined state, so
+- *   the clean + invalidate performed by v7_flush_dcache_all causes a bunch
+- *   of cache lines with uninitialized data and uninitialized tags to get
+- *   written out to memory, which does really unpleasant things to the main
+- *   processor.  We fix this by performing an invalidate, rather than a
+- *   clean + invalidate, before jumping into the kernel.
+- */
+-ENTRY(v7_invalidate_l1)
+-        mov     r0, #0
+-        mcr     p15, 2, r0, c0, c0, 0
+-        mrc     p15, 1, r0, c0, c0, 0
+-
+-        ldr     r1, =0x7fff
+-        and     r2, r1, r0, lsr #13
+-
+-        ldr     r1, =0x3ff
+-
+-        and     r3, r1, r0, lsr #3  @ NumWays - 1
+-        add     r2, r2, #1          @ NumSets
+-
+-        and     r0, r0, #0x7
+-        add     r0, r0, #4          @ SetShift
+-
+-        clz     r1, r3              @ WayShift
+-        add     r4, r3, #1          @ NumWays
+-1:      sub     r2, r2, #1          @ NumSets--
+-        mov     r3, r4              @ Temp = NumWays
+-2:      subs    r3, r3, #1          @ Temp--
+-        mov     r5, r3, lsl r1
+-        mov     r6, r2, lsl r0
+-        orr     r5, r5, r6          @ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
+-        mcr     p15, 0, r5, c7, c6, 2
+-        bgt     2b
+-        cmp     r2, #0
+-        bgt     1b
+-        dsb
+-        isb
+-        mov     pc, lr
+-ENDPROC(v7_invalidate_l1)
+-
  
--		uart0: uart at ffc02000 {
-+		uart0: serial0 at ffc02000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0xffc02000 0x1000>;
--			clock-frequency = <7372800>;
- 			interrupts = <0 162 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 		};
+ ENTRY(tegra_secondary_startup)
+         bl      v7_invalidate_l1
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index 7539ec2..15451ee 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -19,6 +19,52 @@
+ #include "proc-macros.S"
  
--		uart1: uart at ffc03000 {
-+		uart1: serial1 at ffc03000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0xffc03000 0x1000>;
--			clock-frequency = <7372800>;
- 			interrupts = <0 163 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-index ab7e4a9..7ad3cc6 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-@@ -20,7 +20,7 @@
- 
- / {
- 	model = "Altera SOCFPGA Cyclone V";
--	compatible = "altr,socfpga-cyclone5";
-+	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "console=ttyS0,57600";
-@@ -29,6 +29,32 @@
- 	memory {
- 		name = "memory";
- 		device_type = "memory";
--		reg = <0x0 0x10000000>; /* 256MB */
-+		reg = <0x0 0x40000000>; /* 1GB */
-+	};
-+
-+	soc {
-+		timer0 at ffc08000 {
-+			clock-frequency = <100000000>;
-+		};
-+
-+		timer1 at ffc09000 {
-+			clock-frequency = <100000000>;
-+		};
-+
-+		timer2 at ffd00000 {
-+			clock-frequency = <25000000>;
-+		};
-+
-+		timer3 at ffd01000 {
-+			clock-frequency = <25000000>;
-+		};
-+
-+		serial0 at ffc02000 {
-+			clock-frequency = <100000000>;
-+		};
-+
-+		serial1 at ffc03000 {
-+			clock-frequency = <100000000>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-new file mode 100644
-index 0000000..a0c6c65
---- /dev/null
-+++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -0,0 +1,60 @@
-+/*
-+ *  Copyright (C) 2013 Altera Corporation <www.altera.com>
+ /*
++ * The secondary kernel init calls v7_flush_dcache_all before it enables
++ * the L1; however, the L1 comes out of reset in an undefined state, so
++ * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
++ * of cache lines with uninitialized data and uninitialized tags to get
++ * written out to memory, which does really unpleasant things to the main
++ * processor.  We fix this by performing an invalidate, rather than a
++ * clean + invalidate, before jumping into the kernel.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * This function is cloned from arch/arm/mach-tegra/headsmp.S, and needs
++ * to be called for both secondary cores startup and primary core resume
++ * procedures.
 + */
++ENTRY(v7_invalidate_l1)
++       mov     r0, #0
++       mcr     p15, 2, r0, c0, c0, 0
++       mrc     p15, 1, r0, c0, c0, 0
 +
-+/dts-v1/;
-+/include/ "socfpga.dtsi"
++       ldr     r1, =0x7fff
++       and     r2, r1, r0, lsr #13
 +
-+/ {
-+	model = "Altera SOCFPGA VT";
-+	compatible = "altr,socfpga-vt", "altr,socfpga";
++       ldr     r1, =0x3ff
 +
-+	chosen {
-+		bootargs = "console=ttyS0,57600";
-+	};
++       and     r3, r1, r0, lsr #3      @ NumWays - 1
++       add     r2, r2, #1              @ NumSets
 +
-+	memory {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>; /* 1 GB */
-+	};
++       and     r0, r0, #0x7
++       add     r0, r0, #4      @ SetShift
 +
-+	soc {
-+		timer0 at ffc08000 {
-+			clock-frequency = <7000000>;
-+		};
++       clz     r1, r3          @ WayShift
++       add     r4, r3, #1      @ NumWays
++1:     sub     r2, r2, #1      @ NumSets--
++       mov     r3, r4          @ Temp = NumWays
++2:     subs    r3, r3, #1      @ Temp--
++       mov     r5, r3, lsl r1
++       mov     r6, r2, lsl r0
++       orr     r5, r5, r6      @ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
++       mcr     p15, 0, r5, c7, c6, 2
++       bgt     2b
++       cmp     r2, #0
++       bgt     1b
++       dsb
++       isb
++       mov     pc, lr
++ENDPROC(v7_invalidate_l1)
 +
-+		timer1 at ffc09000 {
-+			clock-frequency = <7000000>;
-+		};
-+
-+		timer2 at ffd00000 {
-+			clock-frequency = <7000000>;
-+		};
-+
-+		timer3 at ffd01000 {
-+			clock-frequency = <7000000>;
-+		};
-+
-+		serial0 at ffc02000 {
-+			clock-frequency = <7372800>;
-+		};
-+
-+		serial1 at ffc03000 {
-+			clock-frequency = <7372800>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 6732924..94aa6ad 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -98,7 +98,6 @@ static void __init socfpga_cyclone5_init(void)
- 
- static const char *altera_dt_match[] = {
- 	"altr,socfpga",
--	"altr,socfpga-cyclone5",
- 	NULL
- };
- 
++/*
+  *	v7_flush_icache_all()
+  *
+  *	Flush the whole I-cache.
 -- 
 1.7.9.5
