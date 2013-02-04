@@ -1,23 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 04 Feb 2013 14:57:17 -0700
-Subject: [PATCH v5 01/10] clk: tegra: Refactor PLL programming code
-In-Reply-To: <1359713962-16822-2-git-send-email-pdeschrijver@nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-2-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <51102EBD.1060507@wwwdotorg.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 04 Feb 2013 23:03:41 +0100
+Subject: [PATCH 0/3] clock driver for sunxi
+In-Reply-To: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <5110303D.3050702@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2013 03:18 AM, Peter De Schrijver wrote:
-> Refactor the PLL programming code to make it useable by the new PLL types
-> introduced by Tegra114.
+Hi Emilio,
 
-I tested this series on Tegra20 and Tegra30 for regressions and found
-none. Note that I didn't test on Tegra114. The series,
+Le 22/01/2013 07:12, Emilio L?pez a ?crit :
+> This patchset adds basic clock support for sunxi devices. Currently, it
+> implements support for the two oscillators, the main PLL, the CPU mux,
+> and its three divisor clocks. With this in place, it is possible to
+> write a cpufreq driver and have it work.
+> 
+> I have tested this driver successfully on a Cubieboard (A10, sun4i)
+> using the cpufreq driver from the linux-sunxi tree after minor
+> modifications (the clock names are not the same).
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
+I just tested this patchset on a A13-Olinuxino, and it looks to be
+working fine. I tested without the cpufreq patch though.
 
-Also, I briefly reviewed the code and aside from comments that have
-already been made, so the series,
+Mike, could you give us your feedback on this serie? It would be really
+great if we could get this merged by 3.9, if you're ok with it of course.
 
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Thanks,
+Maxime
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
