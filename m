@@ -1,204 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Feb 2013 14:06:16 +0000
-Subject: [PATCH 2/3] mmc: davinci_mmc: add DT support
-In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA46049@DBDE01.ent.ti.com>
-References: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
- <1359628387-14437-3-git-send-email-prakash.pm@ti.com>
- <20130131112303.GA7235@e106331-lin.cambridge.arm.com>
- <A73F36158E33644199EB82C5EC81C7BC3EA46049@DBDE01.ent.ti.com>
-Message-ID: <20130204140616.GB28464@e106331-lin.cambridge.arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 4 Feb 2013 16:07:55 +0200
+Subject: [PATCH v5 09/10] clk: tegra: Implement clocks for Tegra114
+In-Reply-To: <20130204104531.GQ2364@tbergstrom-lnx.Nvidia.com>
+References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
+ <1359713962-16822-10-git-send-email-pdeschrijver@nvidia.com>
+ <510F5E87.90801@nvidia.com>
+ <20130204104531.GQ2364@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20130204140755.GU2364@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Feb 04, 2013 at 11:45:31AM +0100, Peter De Schrijver wrote:
+> On Mon, Feb 04, 2013 at 08:08:55AM +0100, Prashant Gaikwad wrote:
 
-On Mon, Feb 04, 2013 at 01:28:14PM +0000, Manjunathappa, Prakash wrote:
-> Hi Mark,
-> 
-> On Thu, Jan 31, 2013 at 16:53:03, Mark Rutland wrote:
-> > Hello,
-> >
-> > I have a few comments on the devicetree binding and the way it's parsed.
-> >
-> 
-> Thanks for review.
-> 
-> > On Thu, Jan 31, 2013 at 10:33:06AM +0000, Manjunathappa, Prakash wrote:
-
-[...]
-
-> > > +- caps: Check for Host capabilities in <linux/mmc/host.h>
-> >
-> > Is this a set of binary flags? Also, is this Linux-specific?
-> >
-> > I really don't think this should be in the devicetree binding. Why do you need
-> > this?
-> >
-> 
-> I was using this to specify the below controller capabilities:
-> MMC_CAP_MMC_HIGHSPEED and MMC_CAP_SD_HIGHSPEED,
-> Found from discussion[1] that this can be derived from max-frequency,
-> That is above capabilities are supported when max-frequency >= 50MHz.
-> 
-> [1] https://lkml.org/lkml/2012/10/15/231
-
-Great!
-
-[...]
-
-> > > @@ -1156,16 +1157,75 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
-> > >
-> > >     mmc_davinci_reset_ctrl(host, 0);
-> > >  }
-> > > +#ifdef CONFIG_OF
-> > > +static struct davinci_mmc_config
-> > > +   *mmc_of_get_pdata(struct platform_device *pdev)
-> > > +{
-> > > +   struct device_node *np;
-> > > +   struct davinci_mmc_config *pdata = NULL;
-> > > +   u32 data;
-> > > +   int ret;
-> > > +
-> > > +   pdata = pdev->dev.platform_data;
-> > > +   if (!pdata) {
-> > > +           pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> > > +           if (!pdata) {
-> > > +                   dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
-> > > +                   goto nodata;
-> > > +           }
-> > > +   }
-> >
-> > Why do you need to conditionally allocate this? This only seems to be called
-> > once.
-> >
-> 
-> This is common function for DT and non-DT kernel(will be removing #ifdef CONFIG_OF),
-> So above check is necessary for to allocate pdata for DT kernel.
-
-Ah. Am I right in thinking if you moved the check for pdev->dev.of_node above
-the pdata allocation, it wouldn't have to be done conditionally?
-
-> 
-> > > +
-> > > +   np = pdev->dev.of_node;
-> > > +   if (!np)
-> > > +           goto nodata;
-> >
-> > Why not just return immediately here? You do nothing special at nodata.
-> >
-> 
-> Following convention to not have more than 1 return from function and have
-> Common exit point. May not be necessary now since we have devm_* calls now.
-> Can I still prefer to keep this goto?
-
-It just looks a little odd to me. I have no strong feelings here.
-
-[...]
+...
 
 > > > +
-> > > +   ret = of_property_read_u32(np, "version", &data);
-> > > +   if (ret)
-> > > +           dev_err(&pdev->dev, "version not specified\n");
-> > > +   pdata->version = data;
-> >
-> > And again, though I'd prefer to see this property go entirely.
-> >
-> 
-> Yes this is going to go away.
-
-Great!
-
-> 
+> > > +       /* dsia */
+> > > +       clk = clk_register_mux(NULL, "dsia_mux", mux_plld_out0_plld2_out0,
+> > > +                              ARRAY_SIZE(mux_plld_out0_plld2_out0), 0,
+> > > +                              clk_base + PLLD_BASE, 25, 1, 0, &pll_d_lock);
+> > > +       clks[dsia_mux] = clk;
+> > > +       clk = tegra_clk_register_periph_gate("dsia", "dsia_mux", 0, clk_base,
+> > > +                                   0, 48, &periph_h_regs,
+> > > +                                   periph_clk_enb_refcnt);
+> > > +       clk_register_clkdev(clk, "dsia", "tegradc.0");
+> > > +       clks[dsia] = clk;
 > > > +
-> > > +nodata:
-> > > +   return pdata;
-> > > +}
+> > > +       /* dsib */
+> > > +       clk = clk_register_mux(NULL, "dsib_mux", mux_plld_out0_plld2_out0,
+> > > +                              ARRAY_SIZE(mux_plld_out0_plld2_out0), 0,
+> > > +                              clk_base + PLLD2_BASE, 25, 1, 0, &pll_d2_lock);
+> > > +       clks[dsib_mux] = clk;
+> > > +       clk = tegra_clk_register_periph_gate("dsib", "dsib_mux", 0, clk_base,
+> > > +                                   0, 82, &periph_u_regs,
+> > > +                                   periph_clk_enb_refcnt);
+> > > +       clk_register_clkdev(clk, "dsib", "tegradc.1");
+> > > +       clks[dsib] = clk;
 > > > +
-> > > +#else
-> > > +static struct davinci_mmc_config
-> > > +   *mmc_of_get_pdata(struct platform_device *pdev)
-> > > +{
-> > > +   return pdev->dev.platform_data;
-> > > +}
-> > > +#endif
-> >
-> > This is poorly named if it's required for !CONFIG_OF.
-> >
-> > Why not change this to something like mmc_parse_pdata, returning an
-> > error code. For !CONFIG_OF, it can simply return 0, which should be less
-> > surprising for anyone else reading this code.
-> >
+> > 
+> > Can we use periph no div clock here for dsia and dsib?
+> > 
 > 
-> I will remove #ifdef CONFIG_OF conditional compilation and consideration
-> your suggestion to name function as mmc_parse_pdata.
-
-Sounds good.
-
+> Will check.
 > 
-> > >
-> > >  static int __init davinci_mmcsd_probe(struct platform_device *pdev)
-> > >  {
-> > > -   struct davinci_mmc_config *pdata = pdev->dev.platform_data;
-> > > +   struct davinci_mmc_config *pdata = NULL;
-> > >     struct mmc_davinci_host *host = NULL;
-> > >     struct mmc_host *mmc = NULL;
-> > >     struct resource *r, *mem = NULL;
-> > >     int ret = 0, irq = 0;
-> > >     size_t mem_size;
-> > >
-> > > +   pdata = mmc_of_get_pdata(pdev);
-> > > +   if (pdata == NULL) {
-> > > +           dev_err(&pdev->dev, "Can not get platform data\n");
-> > > +           return -ENOENT;
-> > > +   }
-> > > +
-> > >     /* REVISIT:  when we're fully converted, fail if pdata is NULL */
-> > >
-> > >     ret = -ENODEV;
-> > > @@ -1403,11 +1463,18 @@ static const struct dev_pm_ops davinci_mmcsd_pm = {
-> > >  #define davinci_mmcsd_pm_ops NULL
-> > >  #endif
-> > >
-> > > +static const struct of_device_id davinci_mmc_of_match[] = {
-> > > +   {.compatible = "ti,davinci_mmc", },
-> > > +   {},
-> > > +};
-> > > +MODULE_DEVICE_TABLE(of, davinci_mmc_of_match);
-> >
-> > For supporting multiple versions, you could either use some auxdata
-> > here, or check each one in davince_mmcsd_probe.
-> >
-> 
-> I will consider keeping auxdata via compatible field.
-> 
-> > > +
-> > >  static struct platform_driver davinci_mmcsd_driver = {
-> > >     .driver         = {
-> > >             .name   = "davinci_mmc",
-> > >             .owner  = THIS_MODULE,
-> > >             .pm     = davinci_mmcsd_pm_ops,
-> > > +           .of_match_table = of_match_ptr(davinci_mmc_of_match),
-> > >     },
-> > >     .remove         = __exit_p(davinci_mmcsd_remove),
-> > >  };
-> >
-> > Where does davinci_mmcsd_probe get called from, and how is the
-> > of_match_table used? Should it not be set as .probe on the driver?
-> >
-> 
-> Driver probe is registered in module_init.
 
-Ah, I'd missed the module_init when scanning through the code.
+Not as such. As you can see the muxes need a lock to protect access to the
+PLLD_BASE and PLLD2_BASE registers respectively. The periph no div clock
+doesn't provide for these locks though. Do you think it makes sense to add
+the lock support for these 2 clocks?
 
-I couldn't figure out how davinci_mmcsd_probe got called for elements matched
-by the match table. I see platform_driver_probe temporarily sets the .probe on
-the driver, so that makes sense now.
+Cheers,
 
-> And are you suggesting me to use module_platform_driver? If yes can it not
-> be taken separately as it is unrelated to DT support I am adding.
-
-No, I'd just managed to miss that which got called via module_init. It should
-be fine as-is.
-
-Thanks,
-Mark.
+Peter.
