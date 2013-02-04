@@ -1,150 +1,132 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 4 Feb 2013 12:57:17 +0100
-Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
-In-Reply-To: <510F8F49.9020800@epfl.ch>
-References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
- <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
- <CABxcv=k_gwB3ExQYUeappDZ6FE4L7x8Acer4ZQpDH09BL6LG0Q@mail.gmail.com>
- <510F8F49.9020800@epfl.ch>
-Message-ID: <CABxcv==7KiBbkTyr7VLVw82F=9vVWRftpbyZWub_CVp3pQW0tQ@mail.gmail.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Mon, 04 Feb 2013 12:00:00 +0000
+Subject: [RFC PATCH] arm: decompressor: initialize PIC offset base register
+ for uClinux tools
+In-Reply-To: <20130201181854.GU23505@n2100.arm.linux.org.uk>
+References: <1359480546-7033-1-git-send-email-jonathan.austin@arm.com>
+ <alpine.LFD.2.02.1301291453530.6300@xanadu.home> <510BF0B3.3030608@arm.com>
+ <20130201181854.GU23505@n2100.arm.linux.org.uk>
+Message-ID: <510FA2C0.3020505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 4, 2013 at 11:36 AM, Florian Vaussard
-<florian.vaussard@epfl.ch> wrote:
-> Hi Javier,
->
->
+Hi Russell,
 
-Hi Florian,
-
-> On 02/04/2013 10:27 AM, Javier Martinez Canillas wrote:
+On 01/02/13 18:18, Russell King - ARM Linux wrote:
+> On Fri, Feb 01, 2013 at 04:43:31PM +0000, Jonathan Austin wrote:
+>> Code that needs to access anything global will need to derive the location
+>> of the GOT for itself, but there's a possible upside there that there's an
+>> extra free register (r9 can be used as a general purpose register...)
 >>
->> Hi Florian,
->>
->> On Mon, Jan 28, 2013 at 6:54 PM, Florian Vaussard
->> <florian.vaussard@epfl.ch> wrote:
->>>
->>> Add device-tree support for the GPMC controller on the OMAP3.
->>>
->>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->>> ---
->>>   arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
->>>   1 files changed, 11 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
->>> index 6c63118..2ddae38 100644
->>> --- a/arch/arm/boot/dts/omap3.dtsi
->>> +++ b/arch/arm/boot/dts/omap3.dtsi
->>> @@ -403,5 +403,16 @@
->>>                          ti,timer-alwon;
->>>                          ti,timer-secure;
->>>                  };
->>> +
->>> +               gpmc: gpmc at 6e000000 {
->>> +                       compatible = "ti,omap3430-gpmc";
->>> +                       ti,hwmods = "gpmc";
->>> +                       reg = <0x6e000000 0x1000000>;
->>> +                       interrupts = <20>;
->>> +                       gpmc,num-cs = <8>;
->>> +                       gpmc,num-waitpins = <4>;
->>> +                       #address-cells = <2>;
->>> +                       #size-cells = <1>;
->>> +               };
->>>          };
->>>   };
+>> The patch would look like:
+>> -----8<-------
+>> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+>> index 5cad8a6..afed28e 100644
+>> --- a/arch/arm/boot/compressed/Makefile
+>> +++ b/arch/arm/boot/compressed/Makefile
+>> @@ -120,7 +120,7 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+>>   KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+>>   endif
+>>   -ccflags-y := -fpic -fno-builtin -I$(obj)
+>> +ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
+>>   asflags-y := -Wa,-march=all -DZIMAGE
+>>    # Supply kernel BSS size to the decompressor via a linker symbol.
+>> ------>8---------
 >>
 >>
->> I had the same patch on a tree I was working on to add DT support for
->> gpmc-smsc911x on an OMAP3 board but I was waiting for Daniel's patches
->> to hit mainline before sending the RFC. So please feel free to add:
+>> I did a fairly crude benchmark - count how many instructions we need in
+>> order to finish decompressing the kernel...
 >>
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Setup r9 correctly:       129,976,282
+>> Use -mno-single-pic-base: 124,826,778
 >>
->
-> Great, the smsc911x was on my TODO list, I can cross it out :) BTW,
-> do you have a public git for this, so I can test your work on my setup?
->
+>> (this was done using an R-class model and a magic semi-hosting call to pause
+>> the model at the end of the decompress_kernel function)
+>>
+>> So, it seems like the extra register means there's actually a 4% *win*
+>> in instruction terms from using -mno-single-pic-base
+> 
+> Hmm.  This is the opposite of what I'd expect.  -msingle-pic-base says:
+> 
+>       Treat the register used for PIC addressing as read-only, rather
+>       than loading it in the prologue for each function.  The run-time
+>       system is responsible for initializing this register with an
+>       appropriate value before execution begins.
+> 
+> which implies that we should be able to load it before calling the C
+> code (as you're doing) and then the compiler won't issue instructions
+> to reload that register.
+> 
+> Giving -mno-single-pic-base suggests that it would turn _off_ this
+> behaviour (which afaik - sensibly - is not by default enabled.)
+> 
+> So, I'm not sure I fully understand what's going on here.
 
-Yes, it is the gpmc-smsc911x-wip branch on my github linux tree [1]
+You seem to have understood! Specifying -mno-single-pic-base
+means the compiler *won't* expect r9 to point to the GOT, but also
+means r9 is free as a general purpose register, the effect that I
+believe gives the performance improvement in the decompresser.
 
-That branch is Linus master tree + linux-omap/omap-for-v3.9/gpmc +
-linux-omap-dt/for_3.9/dts
+Perhaps the context missing is that these are two independent patch
+suggestions that achieve the same thing in different ways (that is,
+they stop the decompresser running off to some incorrect memory location
+because r9 isn't set-up). The -mno-single-pic base patch does it by not
+using r9 as a PIC offset, and the 'initialise r9' patch does what it says
+on the tin.
 
-plus these patches:
+As you see, I benchmarked them and got the opposite result to what I
+expected (IE -mno-songle-pic-base is quicker), so, based also on
+Nicolas's Ack, would now champion a different patch to the original one
+that I posted...
 
-Javier Martinez Canillas (4):
-      ARM: OMAP: gpmc-smsc911x: add DT dev node init function
-      ARM: OMAP: gpmc: add support for gpmc-smsc911x child nodes
-      ARM: dts: OMAP: Add an GPMC node for OMAP3
-      ARM: dts: omap3-igep0020: Add SMSC911x LAN chip support
+This is probably overkill, but here's a simple C example for comparison:
+$cat pic.c
+----------------
+int foo;
+int ret_foo()
+{
+	return foo;
+}
+----------------
+$arm-none-uclinux-uclibceabi-gcc -O2 -fPIC -S pic.c -o pic.s
+$cat pic.s
+-------------
+[...]
+ret_foo:
+	ldr	r3, .L2
+	ldr	r3, [r9, r3]
+	ldr	r0, [r3, #0]
+	bx	lr
+.L3:
+	.align	2
+.L2:
+	.word	foo(GOT)
+	.size	ret_foo, .-ret_foo
+[...]
+-------------
+$arm-none-uclinux-uclibceabi-gcc -O2 -fPIC -mno-single-pic-base -S pic.c -o no-single-pic-base.s
+$cat no-single-pic-base.s
+-------------
+[...]
+ret_foo:
+	ldr	r3, .L2
+	ldr	r2, .L2+4
+.LPIC0:
+	add	r3, pc, r3
+	ldr	r3, [r3, r2]
+	ldr	r0, [r3, #0]
+	bx	lr
+.L3:
+	.align	2
+.L2:
+	.word	_GLOBAL_OFFSET_TABLE_-(.LPIC0+8)
+	.word	foo(GOT)
+[...]
+-----------
 
-You can browse these patches here [2].
+So we have a 'penalty' of an extra ldr and add when we don't use a read-only
+PIC base, but the win of a register free seems to trump that in the decompresser.
 
-With these patches I have ethernet working on my IGEPv2 but this board
-uses an OMAP GPIO pin as the smsc911x IRQ line, so it needs to set a
-mux pin (mcspi1_cs2.gpio_176 INPUT | MODE4) or it will fallback on
-poll mode.
+Does that clear things up, or did I miss the point of what wasn't clear to you?
 
-For some reasons I still couldn't figure out (I'm still learning about
-Device Trees) adding:
-
-       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-
-to the gpmc-smsc911x child node parse function (gpmc_smsc911x_init_dt)
-didn't have a functional effect and I had to initialize the defined
-pinctrl-single pins for the smsc911x in the omap3_pmx_core device node
-instead of pmc_smsc911x at 0 as I do for other devices (mmc, uarts, etc).
-
-So I just removed the devm_pinctrl_get_select_default() call in
-gpmc_smsc911x_init_dt() in for this RFC.
-
-I don't know if this is because arch/arm/mach-omap2/gpmc-smsc911x.c is
-not a real platform driver (is just a wrapper/helper function) and
-doesn't have a probe function.
-
-Which brings me to the question if my approach of adding a binding for
-gpmc-smsc911x is correct or if we should extend/use the binding that
-already exist for smsc911x
-(Documentation/devicetree/bindings/net/smsc911x.txt).
-
-> For the GPMC support, I will have to make a few more more as discussed with
-> Tony, and as I will be away for more than 2 weeks, feel free to go ahead
-> before me. This patchset was only at an RFC stage.
->
-> Regards,
->
-> Florian
->
-
-Yes, I saw on the list that Tony asked you too extend the GPMC DT
-support. Flash support is on my TODO list too but I don't know if I'm
-going to have time to work on this in the next few weeks.
-
-Since you are thinking to change the binding, there is something I
-want to discuss with you.
-
-We have two different version for each IGEP board, one that uses NAND
-memory and another that has OneNAND.
-
-With board files this is easy because the flash memory type is
-hardcoded (in hardware) using sysboot pins [3]. So we check the
-sysboot value and call board_nand_init() or board_onenand_init()
-accordingly and pass the same static struct mtd_partition
-igep_flash_partitions[] in both cases.
-
-But with DT this is a little bit trickier since you have to define
-either a nand at 0 or onenand at 0 child node for the gpmc device node. So,
-we will have to create lots of dts and dtsi to handle each combination
-(IGEPv2 + NAND, IGEPv2 + OneNAND, IGEP COM + NAND, etc).
-
-I wonder if we could just have a generic gpmc-flash binding and maybe
-use a "gpmc, flash_type" property or something like that to decide if
-gpmc_onenand_init() or gpmc_nand_init() has to be called.
-
-Thanks a lot and best regards,
-Javier
-
-[1]: git://github.com/martinezjavier/linux.git
-[2]: https://github.com/martinezjavier/linux/commits/gpmc-smsc911x-wip
-[3]: http://omappedia.org/wiki/Bootloader_Project#SYSBOOT_Pins
+Jonny
