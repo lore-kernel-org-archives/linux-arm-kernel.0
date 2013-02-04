@@ -1,142 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  4 Feb 2013 13:55:28 +0000
-Subject: [GIT PULL 1/4] core ARM kvm implementation for 3.9
-Message-ID: <1359986131-13034-1-git-send-email-will.deacon@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 4 Feb 2013 15:59:18 +0200
+Subject: [PATCH 1/9] usb: otg: use try_module_get in all usb_get_phy
+ functions and add missing module_put
+In-Reply-To: <1359984275-24646-2-git-send-email-s.hauer@pengutronix.de>
+References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359984275-24646-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <510FBEB6.7060906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Arnd, Olof,
+On 02/04/2013 03:24 PM, Sascha Hauer wrote:
+> From: Marc Kleine-Budde <mkl@pengutronix.de>
+> 
+> In patch "5d3c28b usb: otg: add device tree support to otg library"
+> devm_usb_get_phy_by_phandle() was added. It uses try_module_get() to lock the
+> phy driver in memory. The corresponding module_put() is missing in that patch.
+> 
+> This patch adds try_module_get() to usb_get_phy() and usb_get_phy_dev().
+> Further the missing module_put() is added to usb_put_phy().
+> 
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/usb/otg/otg.c |   10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
+> index e181439..2bd03d2 100644
+> --- a/drivers/usb/otg/otg.c
+> +++ b/drivers/usb/otg/otg.c
+> @@ -130,7 +130,7 @@ struct usb_phy *usb_get_phy(enum usb_phy_type type)
+>  	spin_lock_irqsave(&phy_lock, flags);
+>  
+>  	phy = __usb_find_phy(&phy_list, type);
+> -	if (IS_ERR(phy)) {
+> +	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+>  		pr_err("unable to find transceiver of type %s\n",
+>  			usb_phy_type_string(type));
+>  		goto err0;
 
-Here is the first (and most significant) pull request introducing KVM
-support for ARM. I'm sending this later than I would have liked due to
-various indirect dependencies on other branches that didn't stabilise
-until the end of last week (then I was at FOSDEM over the weekend), but
-this branch has been stable since -rc3.
+There are 2 problems with this.
 
-The only direct dependency is on my for-rmk/perf branch, which you have
-already pulled.
+- If phy was found but try_module_get failed you are not returning error code.
 
-Cheers,
+- If phy was found and try_module_get fails we would want to use deferred probing,
+since this case is possible if the phy module is not yet loaded and alive but can be in
+the future.
 
-Will
+I would change the code to
 
---->8
+	if (IS_ERR(phy)) {
+		pr_err("unable to find transceiver of type %s\n",
+			usb_phy_type_string(type));
+		goto err0;
+	}
 
-The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
+	if (!try_module_get(phy->dev->driver->owner)) {
+		phy = ERR_PTR(-EPROBE_DEFER);
+		goto err0;
+	}
 
-  Linux 3.8-rc3 (2013-01-09 18:59:55 -0800)
+> @@ -228,7 +228,7 @@ struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
+>  	spin_lock_irqsave(&phy_lock, flags);
+>  
+>  	phy = __usb_find_phy_dev(dev, &phy_bind_list, index);
+> -	if (IS_ERR(phy)) {
+> +	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+>  		pr_err("unable to find transceiver\n");
+>  		goto err0;
+>  	}
+> @@ -301,8 +301,12 @@ EXPORT_SYMBOL(devm_usb_put_phy);
+>   */
+>  void usb_put_phy(struct usb_phy *x)
+>  {
+> -	if (x)
+> +	if (x) {
+> +		struct module *owner = x->dev->driver->owner;
+> +
+>  		put_device(x->dev);
+> +		module_put(owner);
+> +	}
+>  }
+>  EXPORT_SYMBOL(usb_put_phy);
+>  
+> 
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/virt/kvm/core
-
-for you to fetch changes up to da141b67d29a05267a9a0d56bd7856b7f3f58d44:
-
-  Merge branch 'for-will/kvm/core' of git://github.com/virtualopensystems/linux-kvm-arm into for-rmk/virt/kvm/core (2013-01-24 10:37:49 +0000)
-
-----------------------------------------------------------------
-
-Christoffer Dall (15):
-      ARM: Define CPU part numbers and implementors
-      ARM: Use implementor and part defines from cputype.h
-      ARM: Add page table and page defines needed by KVM
-      ARM: Section based HYP idmap
-      KVM: ARM: Initial skeleton to compile KVM support
-      KVM: ARM: Hypervisor initialization
-      KVM: ARM: Memory virtualization setup
-      KVM: ARM: Inject IRQs and FIQs from userspace
-      KVM: ARM: World-switch implementation
-      KVM: ARM: Emulation framework and CP15 emulation
-      KVM: ARM: User space API for getting/setting co-proc registers
-      KVM: ARM: Demux CCSIDR in the userspace API
-      KVM: ARM: Handle guest faults in KVM
-      KVM: ARM: Handle I/O aborts
-      KVM: ARM: Add maintainer entry for KVM/ARM
-
-Marc Zyngier (1):
-      KVM: ARM: Power State Coordination Interface implementation
-
-Mark Rutland (3):
-      ARM: perf: handle armpmu_register failing
-      ARM: perf: remove unnecessary checks for idx < 0
-      ARM: perf: simplify __hw_perf_event_init err handling
-
-Rusty Russell (1):
-      KVM: ARM: VFP userspace interface
-
-Will Deacon (4):
-      ARM: perf: remove redundant NULL check on cpu_pmu
-      ARM: perf: don't pretend to support counting of L1I writes
-      Merge branch 'for-rmk/perf' into for-rmk/virt/kvm/core
-      Merge branch 'for-will/kvm/core' of git://github.com/virtualopensystems/linux-kvm-arm into for-rmk/virt/kvm/core
-
- Documentation/virtual/kvm/api.txt           |   99 ++-
- MAINTAINERS                                 |    9 +
- arch/arm/Kconfig                            |    2 +
- arch/arm/Makefile                           |    1 +
- arch/arm/include/asm/cputype.h              |   33 +
- arch/arm/include/asm/idmap.h                |    1 +
- arch/arm/include/asm/kvm_arm.h              |  214 ++++++
- arch/arm/include/asm/kvm_asm.h              |   82 +++
- arch/arm/include/asm/kvm_coproc.h           |   47 ++
- arch/arm/include/asm/kvm_emulate.h          |   72 ++
- arch/arm/include/asm/kvm_host.h             |  161 +++++
- arch/arm/include/asm/kvm_mmio.h             |   56 ++
- arch/arm/include/asm/kvm_mmu.h              |   50 ++
- arch/arm/include/asm/kvm_psci.h             |   23 +
- arch/arm/include/asm/pgtable-3level-hwdef.h |    5 +
- arch/arm/include/asm/pgtable-3level.h       |   18 +
- arch/arm/include/asm/pgtable.h              |    7 +
- arch/arm/include/uapi/asm/kvm.h             |  164 +++++
- arch/arm/kernel/asm-offsets.c               |   25 +
- arch/arm/kernel/perf_event.c                |   16 +-
- arch/arm/kernel/perf_event_cpu.c            |   51 +-
- arch/arm/kernel/perf_event_v6.c             |    4 +-
- arch/arm/kernel/perf_event_v7.c             |   18 +-
- arch/arm/kernel/perf_event_xscale.c         |    2 +-
- arch/arm/kernel/vmlinux.lds.S               |    6 +-
- arch/arm/kvm/Kconfig                        |   56 ++
- arch/arm/kvm/Makefile                       |   21 +
- arch/arm/kvm/arm.c                          | 1015 ++++++++++++++++++++++++++
- arch/arm/kvm/coproc.c                       | 1046 +++++++++++++++++++++++++++
- arch/arm/kvm/coproc.h                       |  153 ++++
- arch/arm/kvm/coproc_a15.c                   |  162 +++++
- arch/arm/kvm/emulate.c                      |  373 ++++++++++
- arch/arm/kvm/guest.c                        |  222 ++++++
- arch/arm/kvm/init.S                         |  114 +++
- arch/arm/kvm/interrupts.S                   |  478 ++++++++++++
- arch/arm/kvm/interrupts_head.S              |  441 +++++++++++
- arch/arm/kvm/mmio.c                         |  153 ++++
- arch/arm/kvm/mmu.c                          |  787 ++++++++++++++++++++
- arch/arm/kvm/psci.c                         |  108 +++
- arch/arm/kvm/reset.c                        |   74 ++
- arch/arm/kvm/trace.h                        |  235 ++++++
- arch/arm/mm/idmap.c                         |   55 +-
- arch/arm/mm/mmu.c                           |   22 +
- include/uapi/linux/kvm.h                    |    9 +
- 44 files changed, 6621 insertions(+), 69 deletions(-)
- create mode 100644 arch/arm/include/asm/kvm_arm.h
- create mode 100644 arch/arm/include/asm/kvm_asm.h
- create mode 100644 arch/arm/include/asm/kvm_coproc.h
- create mode 100644 arch/arm/include/asm/kvm_emulate.h
- create mode 100644 arch/arm/include/asm/kvm_host.h
- create mode 100644 arch/arm/include/asm/kvm_mmio.h
- create mode 100644 arch/arm/include/asm/kvm_mmu.h
- create mode 100644 arch/arm/include/asm/kvm_psci.h
- create mode 100644 arch/arm/include/uapi/asm/kvm.h
- create mode 100644 arch/arm/kvm/Kconfig
- create mode 100644 arch/arm/kvm/Makefile
- create mode 100644 arch/arm/kvm/arm.c
- create mode 100644 arch/arm/kvm/coproc.c
- create mode 100644 arch/arm/kvm/coproc.h
- create mode 100644 arch/arm/kvm/coproc_a15.c
- create mode 100644 arch/arm/kvm/emulate.c
- create mode 100644 arch/arm/kvm/guest.c
- create mode 100644 arch/arm/kvm/init.S
- create mode 100644 arch/arm/kvm/interrupts.S
- create mode 100644 arch/arm/kvm/interrupts_head.S
- create mode 100644 arch/arm/kvm/mmio.c
- create mode 100644 arch/arm/kvm/mmu.c
- create mode 100644 arch/arm/kvm/psci.c
- create mode 100644 arch/arm/kvm/reset.c
- create mode 100644 arch/arm/kvm/trace.h
+cheers,
+-roger
