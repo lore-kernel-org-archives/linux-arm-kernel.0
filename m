@@ -1,40 +1,33 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sun, 3 Feb 2013 23:32:29 +0100
-Subject: [PATCH] mfd: vexpress: Add pseudo-GPIO based LEDs
-In-Reply-To: <1359541996-18127-1-git-send-email-pawel.moll@arm.com>
-References: <1359541996-18127-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20130203223229.GA8476@sortiz-mobl>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 04 Feb 2013 09:17:48 +0800
+Subject: [PATCH] ARM:omap2: using strlcpy instead of strncpy
+In-Reply-To: <20130202180723.GB577@atomide.com>
+References: <51090829.1010109@asianux.com>
+ <20130201224546.GG22517@atomide.com> <510C7925.9040006@asianux.com>
+ <20130202180723.GB577@atomide.com>
+Message-ID: <510F0C3C.1040003@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+? 2013?02?03? 02:07, Tony Lindgren ??:
+>>   is it suitable to sync the MAINTAINER file for it ?
+>> >     if suitable, can you help to change it ?
+> Yes I suggest we add Peter as the maintainer for all twl
+> related things.
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
 
-On Wed, Jan 30, 2013 at 10:33:16AM +0000, Pawel Moll wrote:
-> The LEDs on the Versatile Express motherboard are controlled
-> through simple memory-mapped register. This patch extends
-> the pseudo-GPIO controller definition for these lines and
-> creates generic "leds-gpio" device using them
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
-> 
-> Hello Samuel,
-> 
-> Would you be so kind to take this patch in for 3.9? Or would
-> you prefer to get it in through arm-soc tree?
-> 
-> Thanks!
-> 
-> Pawel
-> 
->  drivers/mfd/vexpress-sysreg.c |   73 +++++++++++++++++++++++++++++++----------
->  include/linux/vexpress.h      |    8 +++++
->  2 files changed, 63 insertions(+), 18 deletions(-)
-Applied to my for-next branch, thanks.
+  ok, thanks.
 
-Cheers,
-Samuel.
+by the way:
+  if necessary (not find another suitable members to sync it), I should
+sync it (since I found it)
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Chen Gang
+
+Asianux Corporation
