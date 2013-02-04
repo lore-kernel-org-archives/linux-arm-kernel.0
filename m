@@ -1,60 +1,27 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Feb 2013 09:05:36 -0600
-Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
-In-Reply-To: <20130202181147.GC577@atomide.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
- <20130201215154.GV22517@atomide.com> <510C6A3D.70401@ti.com>
- <20130202181147.GC577@atomide.com>
-Message-ID: <510FCE40.5040202@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Feb 2013 15:11:32 +0000
+Subject: [PATCHv2 1/2] ARM: dma-mapping: add support for CMA regions
+ placed in highmem zone
+In-Reply-To: <xa1ta9rkb0od.fsf@mina86.com>
+References: <1358350284-6972-2-git-send-email-m.szyprowski@samsung.com>
+ <1359984182-6307-1-git-send-email-m.szyprowski@samsung.com>
+ <xa1tlib4b30n.fsf@mina86.com> <20130204141053.GD17786@n2100.arm.linux.org.uk>
+ <xa1tfw1cb1ho.fsf@mina86.com> <20130204143433.GE17786@n2100.arm.linux.org.uk>
+ <xa1ta9rkb0od.fsf@mina86.com>
+Message-ID: <20130204151132.GF17786@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/02/2013 12:11 PM, Tony Lindgren wrote:
-> * Jon Hunter <jon-hunter@ti.com> [130201 17:25]:
->>
->> On 02/01/2013 03:51 PM, Tony Lindgren wrote:
->>>
->>> How about let's fix this properly to start with so we don't add
->>> more blockers moving this code to drivers/bus?
->>>
->>> Looks like gpmc_mem_init() gets called from gpmc_probe() so
->>> we can pass that information in pdev.
->>
->> I wondered if you would suggest that ;-)
+On Mon, Feb 04, 2013 at 03:42:26PM +0100, Michal Nazarewicz wrote:
+> > On Mon, Feb 04, 2013 at 03:24:51PM +0100, Michal Nazarewicz wrote:
+> >> Perhaps it should use lowmem_page_address() then?
 > 
-> :)
->  
->> I definitely can and it is probably best. Things like this become
->> painful when we move to device-tree. We really need a generic way for
->> passing stuff like this to drivers for omap. Our options are auxdata or
->> bus notifiers. I am wondering whether we can plug pdata in the
->> omap_device bus notifier for device-tree. Let me know if you have any
->> thoughts.
+> On Mon, Feb 04 2013, Russell King - ARM Linux wrote:
+> > It's well defined that page_address() will be non-NULL for lowmem pages.
+> > There is nothing wrong with the above.
 > 
-> Hmm but in this case can't you just do it based on the compatible
-> flag? For legacy systems we also need to pass it in pdata.
+> It would save on a branch and a function call though.
 
-This is a boot-time configuration. So really you need to read the
-control status register at boot and then determine the mapping. We could
-store the address of the control status read in the pdata, but I think
-that is a bit of a hack.
-
-> Regarding omap_device, we should find a way to keep the dependencies
-> between drivers and the bus code down to minimum. So ideally things
-> like this would be only done using just the compatible flag. But the
-> pdata we cannot remove quite yet.
-
-Agree. However, there are several drivers today (gpio, dmtimer, mmc,
-serial, dss, etc), that make use of a function pointer to
-omap_pm_get_dev_context_loss_count() to determine when the peripheral's
-state has been lost. When booting with DT this function pointer is not
-populated and so with DT we currently have no way to determine this. I
-see this as a blocker to migrating completely to DT. Ideally we would
-find a way for RPM to handle this and remove the function pointer.
-However, right now we still need a generic way to pass this type of
-platform data to drivers.
-
-Cheers
-Jon
+Depending on the size of struct page, if we care that much, we can probably
+enable WANT_PAGE_VIRTUAL which'll make it even cheaper as it's just a
+dereference.
