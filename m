@@ -1,52 +1,42 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 4 Feb 2013 16:29:15 -0300
+Date: Mon, 4 Feb 2013 16:33:16 -0300
 Subject: [PATCH 0/2] ARM: mvebu: Add support for SPI controller in Armada
  370/XP
-In-Reply-To: <20130204183733.GM14746@titan.lakedaemon.net>
+In-Reply-To: <20130204190326.GA20212@lunn.ch>
 References: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130204165119.GA2440@localhost>
- <20130204183733.GM14746@titan.lakedaemon.net>
-Message-ID: <20130204192914.GA2456@localhost>
+ <20130204165119.GA2440@localhost> <20130204190326.GA20212@lunn.ch>
+Message-ID: <20130204193315.GB2456@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+Andrew,
 
-On Mon, Feb 04, 2013 at 01:37:33PM -0500, Jason Cooper wrote:
-> This series looks good.  just a few comments:
-> 
+On Mon, Feb 04, 2013 at 08:03:26PM +0100, Andrew Lunn wrote:
 > On Mon, Feb 04, 2013 at 01:51:20PM -0300, Ezequiel Garcia wrote:
 > > Hi,
 > > 
 > > This patchset adds support for the SPI controller
 > > available in Armada 370 and Armada XP SoC.
-> > 
-> > The patches are based in Jason Cooper's mvebu/dt branch.
 > 
-> It probably doesn't matter for this series (I haven't tried to apply it
-> yet), but please base future work off of a mainline tag (eg v3.8-rc6).
-> It makes merge conflicts easier to resolve.
+> Hi Ezequiel
 > 
-> Feel free to test-merge against the mvebu/ branches and let me know of
-> any conflicts.
+> Do any of the boards we have with mainline support have any devices on
+> the SPI busses? Its hard to test otherwise.
 > 
 
-Ah, I see.
+Mmm... very true.
 
-I was mistakenly assuming you wanted against that branch;
-I'll base the patches on mainline in the future.
+Recently added Armada XP GP board as an SPI flash.
+Probably other evaluation boards also has similar SPI flashes,
+but I should check that.
 
-Thanks for the advice.
+I'll prepare a patch for GP board tomorrow,
+based on Gregory's patches for that board,
+so you can test that.
+Also, I hope to prepare patches for the other
+evaluation boards soon.
 
-> Also, your patch series appears to be out of order, did you use git
-> send-email once per file?
-> 
-
-I always send the cover letter manually. This time I did it after the patches.
-I'm in the process of automating this in my workflow,
-but feel free to make a suggestion.
-
-Thanks,
+Regards,
 
 -- 
 Ezequiel Garc?a, Free Electrons
