@@ -1,74 +1,38 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Mon, 4 Feb 2013 12:15:14 +0530
-Subject: [PATCH v5 08/10] ARM: dt: Add references to tegra_car clocks
-In-Reply-To: <1359713962-16822-9-git-send-email-pdeschrijver@nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-9-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <510F58FA.5000101@nvidia.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 04 Feb 2013 09:07:41 +0200
+Subject: [PATCH 05/11 v2] ARM: nomadik: add FSMC NAND
+In-Reply-To: <1358607204-24264-1-git-send-email-linus.walleij@linaro.org>
+References: <1358607204-24264-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1359961661.13791.5.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
-> Add references to tegra_car clocks for the basic device nodes.
->
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+On Sat, 2013-01-19 at 15:53 +0100, Linus Walleij wrote:
+> This adds the FSMC NAND driver and flash partitions to the Nomadik
+> device tree.
+> 
+> The only compatible string accepted by this driver is currently
+> "st,spear600-fsmc-nand" which is inappropriate for this system, so
+> this patch adds the compatible value "stericsson,fsmc-nand" as
+> well.
+> 
+> Cc: linux-mtd at vger.kernel.org
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Artem Bityutskiy <dedekind1@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
+> I'm requesting an ACK from the MTD maintainers to be able to apply
+> this patch through the ARM SoC tree.
 
-Reviewed-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+Acked-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
 
->   arch/arm/boot/dts/tegra114.dtsi |    7 ++++++-
->   1 files changed, 6 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-> index 96a8235..1dec620 100644
-> --- a/arch/arm/boot/dts/tegra114.dtsi
-> +++ b/arch/arm/boot/dts/tegra114.dtsi
-> @@ -27,7 +27,7 @@
->   	};
->   
->   	tegra_car: clock {
-> -		compatible = "nvidia,tegra114-car, nvidia,tegra30-car";
-> +		compatible = "nvidia,tegra114-car";
->   		reg = <0x60006000 0x1000>;
->   		#clock-cells = <1>;
->   	};
-> @@ -43,6 +43,7 @@
->   		reg-shift = <2>;
->   		interrupts = <0 36 0x04>;
->   		status = "disabled";
-> +		clocks = <&tegra_car 6>;
->   	};
->   
->   	serial at 70006040 {
-> @@ -51,6 +52,7 @@
->   		reg-shift = <2>;
->   		interrupts = <0 37 0x04>;
->   		status = "disabled";
-> +		clocks = <&tegra_car 192>;
->   	};
->   
->   	serial at 70006200 {
-> @@ -59,6 +61,7 @@
->   		reg-shift = <2>;
->   		interrupts = <0 46 0x04>;
->   		status = "disabled";
-> +		clocks = <&tegra_car 55>;
->   	};
->   
->   	serial at 70006300 {
-> @@ -67,12 +70,14 @@
->   		reg-shift = <2>;
->   		interrupts = <0 90 0x04>;
->   		status = "disabled";
-> +		clocks = <&tegra_car 65>;
->   	};
->   
->   	rtc {
->   		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
->   		reg = <0x7000e000 0x100>;
->   		interrupts = <0 2 0x04>;
-> +		clocks = <&tegra_car 4>;
->   	};
->   
->   	pmc {
->
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130204/d87f0656/attachment.sig>
