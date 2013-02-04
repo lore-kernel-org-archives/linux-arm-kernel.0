@@ -1,63 +1,54 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Mon, 4 Feb 2013 17:53:34 +0800
-Subject: [PATCH] pinctrl: sirf: replace of_gpio_simple_xlate by sirf specific
- of_xlate
-Message-ID: <1359971614-18681-1-git-send-email-Barry.Song@csr.com>
+From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
+Date: Mon, 4 Feb 2013 11:19:25 +0100
+Subject: [PATCH] ARM: imx27: clk-imx27: SPI: Rename IPG clock and add
+ PER clock
+In-Reply-To: <1359209221-24346-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1359209221-24346-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20130204111925.2228edda@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
 
-the default of_gpio_simple_xlate() will make us fail while getting gpios
-bigger than 32 by of_get_named_gpio() or related APIs.
-this patch adds a specific of_xlate callback for sirf gpio_chip and fix
-the problem.
+Ping?
+Gwenhael
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/pinctrl/pinctrl-sirf.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+On Sat, 26 Jan 2013 15:07:01 +0100
+Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com> wrote:
 
-diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index fc76f28..7051874 100644
---- a/drivers/pinctrl/pinctrl-sirf.c
-+++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -1246,6 +1246,22 @@ static void __iomem *sirfsoc_rsc_of_iomap(void)
- 	return of_iomap(np, 0);
- }
- 
-+static int sirfsoc_gpio_of_xlate(struct gpio_chip *gc,
-+       const struct of_phandle_args *gpiospec,
-+       u32 *flags)
-+{
-+       if (gpiospec->args[0] > SIRFSOC_GPIO_NO_OF_BANKS * SIRFSOC_GPIO_BANK_SIZE)
-+               return -EINVAL;
-+
-+       if (gc != &sgpio_bank[gpiospec->args[0] / SIRFSOC_GPIO_BANK_SIZE].chip.gc)
-+               return -EINVAL;
-+
-+       if (flags)
-+               *flags = gpiospec->args[1];
-+
-+       return gpiospec->args[0] % SIRFSOC_GPIO_BANK_SIZE;
-+}
-+
- static int sirfsoc_pinmux_probe(struct platform_device *pdev)
- {
- 	int ret;
-@@ -1747,6 +1763,8 @@ static int sirfsoc_gpio_probe(struct device_node *np)
- 		bank->chip.gc.ngpio = SIRFSOC_GPIO_BANK_SIZE;
- 		bank->chip.gc.label = kstrdup(np->full_name, GFP_KERNEL);
- 		bank->chip.gc.of_node = np;
-+		bank->chip.gc.of_xlate = sirfsoc_gpio_of_xlate;
-+		bank->chip.gc.of_gpio_n_cells = 2;
- 		bank->chip.regs = regs;
- 		bank->id = i;
- 		bank->is_marco = is_marco;
--- 
-1.7.5.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+> spi-imx driver needs two clock: ipg and per. The first clock must be named and
+> the second must be added.
+> 
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> ---
+>  arch/arm/mach-imx/clk-imx27.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+> index 4c1d1e4..c599839 100644
+> --- a/arch/arm/mach-imx/clk-imx27.c
+> +++ b/arch/arm/mach-imx/clk-imx27.c
+> @@ -228,9 +228,12 @@ int __init mx27_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.1");
+>  	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.2");
+>  	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.2");
+> -	clk_register_clkdev(clk[cspi1_ipg_gate], NULL, "imx27-cspi.0");
+> -	clk_register_clkdev(clk[cspi2_ipg_gate], NULL, "imx27-cspi.1");
+> -	clk_register_clkdev(clk[cspi3_ipg_gate], NULL, "imx27-cspi.2");
+> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.0");
+> +	clk_register_clkdev(clk[cspi1_ipg_gate], "ipg", "imx27-cspi.0");
+> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.1");
+> +	clk_register_clkdev(clk[cspi2_ipg_gate], "ipg", "imx27-cspi.1");
+> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.2");
+> +	clk_register_clkdev(clk[cspi3_ipg_gate], "ipg", "imx27-cspi.2");
+>  	clk_register_clkdev(clk[per3_gate], "per", "imx21-fb.0");
+>  	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx21-fb.0");
+>  	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
+> -- 
+> 1.7.12.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
