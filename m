@@ -1,59 +1,86 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 4 Feb 2013 09:27:53 +0000
-Subject: [PATCH 09/26] mfd: ab8500-debugfs: Provide a means for a user
- subscribe to IRQs
-In-Reply-To: <20130203170158.GO8476@sortiz-mobl>
-References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
- <1358254566-12419-10-git-send-email-lee.jones@linaro.org>
- <20130127235259.GO1174@sortiz-mobl>
- <20130128102223.GA18212@gmail.com>
- <20130128104933.GY1174@sortiz-mobl>
- <20130128113443.GB18212@gmail.com>
- <20130203170158.GO8476@sortiz-mobl>
-Message-ID: <20130204092753.GW2042@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 4 Feb 2013 09:29:12 +0000
+Subject: [PATCHv5 15/16] ARM: hyp: initialize CNTVOFF to zero
+In-Reply-To: <20130201180753.GB1970@linaro.org>
+References: <1359634539-9580-1-git-send-email-mark.rutland@arm.com>
+ <1359634539-9580-16-git-send-email-mark.rutland@arm.com>
+ <20130201111350.GA1970@linaro.org>
+ <20130201114641.GB2094@e106331-lin.cambridge.arm.com>
+ <20130201180753.GB1970@linaro.org>
+Message-ID: <20130204092912.GA28464@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > I'm going to have to put this patch-set in the bin. Pulling this
-> > > > patch, causes lots of conflicts to the remaining patches in the
-> > > > set.
-> > > I bet removing this one causes a lot of conflicts. I'm not saying it should
-> > > absolutely be removed, but I'm afraid once it's upstream no one is going to
-> > > look at improving it.
+On Fri, Feb 01, 2013 at 06:07:53PM +0000, Dave Martin wrote:
+> On Fri, Feb 01, 2013 at 11:46:41AM +0000, Mark Rutland wrote:
+> > On Fri, Feb 01, 2013 at 11:13:50AM +0000, Dave Martin wrote:
+> > > On Thu, Jan 31, 2013 at 12:15:38PM +0000, Mark Rutland wrote:
+> > > > From: Marc Zyngier <Marc.Zyngier@arm.com>
+> > > > 
+> > > > In order to be able to use the virtual counter in a safe way,
+> > > > make sure it is initialized to zero before dropping to SVC.
+> > > > 
+> > > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > > Cc: Dave Martin <dave.martin@arm.com>
+> > > > ---
+> > > >  arch/arm/kernel/hyp-stub.S | 3 +++
+> > > >  1 file changed, 3 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> > > > index 65b2417..455603a 100644
+> > > > --- a/arch/arm/kernel/hyp-stub.S
+> > > > +++ b/arch/arm/kernel/hyp-stub.S
+> > > > @@ -152,6 +152,9 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+> > > >  	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
+> > > >  	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
+> > > >  	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
+> > > > +	mov	r6, #0
+> > > > +	mov	r7, #0
+> > > > +	mcrr	p15, 4, r6, r7, c14	@ CNTVOFF
+> > > 
+> > > Is this required for safety, or is it more a sanity feature?
 > > 
-> > This is really not the case. 
-> I trust you here, but usually people get busy with other stuff after their
-> patchset is upstreamed and never get back to me on the initial issues.
+> > This makes more sense with the next patch, which makes the arch_timer
+> > driver always use the virtual counters (to avoid indirection in the fast
+> > path and messy races with the setup of function pointers otherwise).
+> > 
+> > It's required for safety when hyp mode is enabled, and the arch_timer
+> > driver uses the physical timers in combination with the virtual
+> > counters. Either the driver has to apply CNTVOFF manually when setting
+> > the physical timers, or the physical timers and virtual counters need
+> > the same view of time (i.e. CNTVOFF == 0).
+> > 
+> > It also brings us in line with arm64, which always uses the virtual
+> > counter for its vDSO.
 > 
-> > I have every intention of fixing each and
-> > every issue which are brought to my attention during the upstreaming
-> > process of 'drivers/regulators', 'drivers/power' and 'drivers/mfd'.
+> OK.  This definitely sounds like the correct model.
+
+Good to hear.
+
+> 
 > > 
-> > All I'm doing is making a list of all the fixups and re-writes and
-> > I'll address them on the completion of the push. Hence if you're happy
-> > for this to go in with my promise of improvement, it would certainly
-> > make this task a great deal easier for me.
-> I'll take your words here. I'll apply this one once you adressed the other
-> issues I commented about on this patchset.
-
-Fixups complete, pull-request sent.
-
-> > > And to be honest, having an IRQ handler from debugfs
-> > > code looks weird to me. I know you can put all sort of crazyness into a
-> > > debugfs entry, but still.
-> > >  
-> > > > I'll start again from scratch and find another way to sync the ab* MFD
-> > > > drivers. I might even have to do it manually i.e. throw out all
-> > > > commit history and upstream it as my own patches pulled in from diffs.
-> > > I don't have any problems with that.
+> > > 
+> > > The architected timer counters are supposed to be monotonic time sources
+> > > only, so applying a random offset shouldn't really change anything.
 > > 
-> > I'm sure you don't, but it's me that's doing all the hard work. ;)
-> What's wrong with that ? ;)
+> > This is true except when we want to use the physical timers as described above.
+> > 
+> > > 
+> > > The main thing I can think of is that it is easier for the host to
+> > > manage guests' virtual counter offsets if the host's offset is 0 (and
+> > > we don't really want to be changing the host offset after the host kernel
+> > > boots).
+> > 
+> > That's pretty much it. We don't want to have to further separate the handling
+> > of the timer for host and guest. By having CNTVOFF as zero for the host, we
+> > don't need to duplicate reading of the timers and/or incur an additional
+> > overhead on reading them.
+> 
+> That all sounds sensible.  FWIW:
+> 
+> Reviewed-by: Dave Martin <dave.martin@linaro.org>
 
-Hmmm... :D
+Thanks!
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Mark.
