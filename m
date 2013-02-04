@@ -1,24 +1,150 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 4 Feb 2013 21:12:17 +0800
-Subject: [PATCH v6] cpufreq: add imx6q-cpufreq driver
-In-Reply-To: <8795375.qIWYRXDKue@vostro.rjw.lan>
-References: <1359956789-17918-1-git-send-email-shawn.guo@linaro.org>
- <8795375.qIWYRXDKue@vostro.rjw.lan>
-Message-ID: <20130204131213.GA19301@S2101-09.ap.freescale.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 04 Feb 2013 14:23:02 +0100
+Subject: [PATCHv2 1/2] ARM: dma-mapping: add support for CMA regions placed in
+ highmem zone
+In-Reply-To: <1358350284-6972-2-git-send-email-m.szyprowski@samsung.com>
+References: <1358350284-6972-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1359984182-6307-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 01:19:25PM +0100, Rafael J. Wysocki wrote:
-> On Monday, February 04, 2013 01:46:29 PM Shawn Guo wrote:
-> > Add an imx6q-cpufreq driver for Freescale i.MX6Q SoC to handle the
-> > hardware specific frequency and voltage scaling requirements.
-> > 
-> > The driver supports module build and is instantiated by the platform
-> > device/driver mechanism, so that it will not be instantiated on other
-> > platforms, as IMX is built with multiplatform support.
-> 
-> Am I supposed to take it this time? :-)
+This patch adds missing pieces to correctly support memory pages served
+from CMA regions placed in high memory zones. Please note that the default
+global CMA area is still put into lowmem and is limited by optional
+architecture specific DMA zone. One can however put device specific CMA
+regions in high memory zone to reduce lowmem usage.
 
-Yes, finally :)
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
 
-Shawn
+Changle log: 
+v2: restructured code and made all himem checks positive 
+    ('if (PageHighMem(page))' instead of 'if (!PageHighMem(page))')
+---
+ arch/arm/mm/dma-mapping.c |   53 ++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 40 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 076c26d..90e059b 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -186,13 +186,24 @@ static u64 get_coherent_dma_mask(struct device *dev)
+ 
+ static void __dma_clear_buffer(struct page *page, size_t size)
+ {
+-	void *ptr;
+ 	/*
+ 	 * Ensure that the allocated pages are zeroed, and that any data
+ 	 * lurking in the kernel direct-mapped region is invalidated.
+ 	 */
+-	ptr = page_address(page);
+-	if (ptr) {
++	if (PageHighMem(page)) {
++		phys_addr_t base = __pfn_to_phys(page_to_pfn(page));
++		phys_addr_t end = base + size;
++		while (size > 0) {
++			void *ptr = kmap_atomic(page);
++			memset(ptr, 0, PAGE_SIZE);
++			dmac_flush_range(ptr, ptr + PAGE_SIZE);
++			kunmap_atomic(ptr);
++			page++;
++			size -= PAGE_SIZE;
++		}
++		outer_flush_range(base, end);
++	} else {
++		void *ptr = page_address(page);
+ 		memset(ptr, 0, size);
+ 		dmac_flush_range(ptr, ptr + size);
+ 		outer_flush_range(__pa(ptr), __pa(ptr) + size);
+@@ -243,7 +254,8 @@ static void __dma_free_buffer(struct page *page, size_t size)
+ #endif
+ 
+ static void *__alloc_from_contiguous(struct device *dev, size_t size,
+-				     pgprot_t prot, struct page **ret_page);
++				     pgprot_t prot, struct page **ret_page,
++				     const void *caller);
+ 
+ static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
+ 				 pgprot_t prot, struct page **ret_page,
+@@ -346,10 +358,11 @@ static int __init atomic_pool_init(void)
+ 		goto no_pages;
+ 
+ 	if (IS_ENABLED(CONFIG_CMA))
+-		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page);
++		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page,
++					      atomic_pool_init);
+ 	else
+ 		ptr = __alloc_remap_buffer(NULL, pool->size, GFP_KERNEL, prot,
+-					   &page, NULL);
++					   &page, atomic_pool_init);
+ 	if (ptr) {
+ 		int i;
+ 
+@@ -542,27 +555,41 @@ static int __free_from_pool(void *start, size_t size)
+ }
+ 
+ static void *__alloc_from_contiguous(struct device *dev, size_t size,
+-				     pgprot_t prot, struct page **ret_page)
++				     pgprot_t prot, struct page **ret_page,
++				     const void *caller)
+ {
+ 	unsigned long order = get_order(size);
+ 	size_t count = size >> PAGE_SHIFT;
+ 	struct page *page;
++	void *ptr;
+ 
+ 	page = dma_alloc_from_contiguous(dev, count, order);
+ 	if (!page)
+ 		return NULL;
+ 
+ 	__dma_clear_buffer(page, size);
+-	__dma_remap(page, size, prot);
+ 
++	if (PageHighMem(page)) {
++		ptr = __dma_alloc_remap(page, size, GFP_KERNEL, prot, caller);
++		if (!ptr) {
++			dma_release_from_contiguous(dev, page, count);
++			return NULL;
++		}
++	} else {
++		__dma_remap(page, size, prot);
++		ptr = page_address(page);
++	}
+ 	*ret_page = page;
+-	return page_address(page);
++	return ptr;
+ }
+ 
+ static void __free_from_contiguous(struct device *dev, struct page *page,
+-				   size_t size)
++				   void *cpu_addr, size_t size)
+ {
+-	__dma_remap(page, size, pgprot_kernel);
++	if (PageHighMem(page))
++		__dma_free_remap(cpu_addr, size);
++	else
++		__dma_remap(page, size, pgprot_kernel);
+ 	dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
+ }
+ 
+@@ -645,7 +672,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 	else if (!IS_ENABLED(CONFIG_CMA))
+ 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
+ 	else
+-		addr = __alloc_from_contiguous(dev, size, prot, &page);
++		addr = __alloc_from_contiguous(dev, size, prot, &page, caller);
+ 
+ 	if (addr)
+ 		*handle = pfn_to_dma(dev, page_to_pfn(page));
+@@ -739,7 +766,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+ 		 * Non-atomic allocations cannot be freed with IRQs disabled
+ 		 */
+ 		WARN_ON(irqs_disabled());
+-		__free_from_contiguous(dev, page, size);
++		__free_from_contiguous(dev, page, cpu_addr, size);
+ 	}
+ }
+ 
+-- 
+1.7.9.5
