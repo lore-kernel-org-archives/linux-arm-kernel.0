@@ -1,26 +1,64 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 04 Feb 2013 09:58:33 +0100
-Subject: [PATCH 0/2] ARM: dts: OMAP3: Add GPMC controller and NAND memory
- to Overo
-In-Reply-To: <20130201221618.GB22517@atomide.com>
-References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
- <20130201221618.GB22517@atomide.com>
-Message-ID: <510F7839.9040603@epfl.ch>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 4 Feb 2013 16:59:42 +0800
+Subject: [PATCH v7 0/8] Add tested id switch and vbus connect detect support
+ for Chipidea
+Message-ID: <1359968390-317-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> So how should we handle such case? Having several dtsi depending
->> on the Overo's revision would be a mess to my sense, considering
->> the non-conditional include inside the expansion boards' dts.
->> Or would it make sense to extend the DT binding for partitions?
->
-> Yes makes sense to extend the binding to use the full flash memory
-> if the size can be probed.
->
+Changes for v6:
+For Patch 8/8, we only need to set ci->driver to NULL when usb cable
+is not connected, for other changes, it will case some runtime pm
+unmatch and un-align with udc-core & composite driver problems.
 
-Ok, I will see for a patch soon (i.e. in the coming weeks).
+Changes for v5:
+- Add Alex comments for init/destroy function [3/8] [4/8]
+- Remove memset(&ci->gadget, 0, sizeof(ci->gadget)) at destory function [4/8]
+- Add Kishon's comment: Change the format of struct usb_otg otg at drivers/usb/chipidea/ci.h
+[1/8]
+- Add comments for CI_VBUS_STABLE_TIMEOUT [3/8]
+- Change the otg_set_peripheral return value check as the fully
+chipidea driver users don't need it. [4/8]
+- Fix one bug that the oops when re-plug in usb cable after
+rmmod gadget [8/8]
 
-Regards,
+Anyone who has tested this patchset, please give a tested-by, thanks.
 
-Florian
+This patchset adds tested otg id switch function and
+vbus connect/disconnect detection for chipidea driver.
+The mainly design of id/vbus handling follows msm otg driver.
+I hope the msm usb maintainer can have a look of this patchset,
+and give some comments, and move the whole msm usb driver to
+chipidea framework if possible in the future.
+
+This patch is fully tested at imx6 sabrelite platform.
+My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
+which is rebased of 3.8-rc5.
+
+Peter Chen (8):
+  Revert "USB: chipidea: add vbus detect for udc"
+  usb: chipidea: add otg file
+  usb: chipidea: add otg id switch and vbus connect/disconnect detect
+  usb: chipidea: consolidate kinds of APIs for both roles
+  usb: chipidea: udc: add pullup/pulldown dp at hw_device_state
+  usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
+  usb: chipidea: imx: add internal vbus regulator control
+  usb: chipidea: udc: fix the oops when plugs in usb cable after rmmod
+    gadget
+
+ drivers/usb/chipidea/Makefile      |    2 +-
+ drivers/usb/chipidea/bits.h        |   10 ++
+ drivers/usb/chipidea/ci.h          |   12 ++-
+ drivers/usb/chipidea/ci13xxx_imx.c |   81 ++++++++++++----
+ drivers/usb/chipidea/ci13xxx_msm.c |    1 -
+ drivers/usb/chipidea/core.c        |  186 +++++++++++++++++++++++++++++++-----
+ drivers/usb/chipidea/host.c        |    6 +
+ drivers/usb/chipidea/host.h        |    4 +-
+ drivers/usb/chipidea/otg.c         |   68 +++++++++++++
+ drivers/usb/chipidea/otg.h         |    9 ++
+ drivers/usb/chipidea/udc.c         |  107 +++++++++------------
+ drivers/usb/chipidea/udc.h         |    4 +-
+ include/linux/usb/chipidea.h       |    1 -
+ 13 files changed, 379 insertions(+), 112 deletions(-)
+ create mode 100644 drivers/usb/chipidea/otg.c
+ create mode 100644 drivers/usb/chipidea/otg.h
