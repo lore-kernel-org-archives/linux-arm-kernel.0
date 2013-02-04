@@ -1,54 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  4 Feb 2013 23:32:39 +0100
-Subject: [PATCH] sunxi: Cleanup the reset code and add meaningful registers
- defines
-Message-ID: <1360017159-24318-1-git-send-email-maxime.ripard@free-electrons.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 04 Feb 2013 14:45:18 -0800
+Subject: [PATCH] ARM: dts: Fix MSHC property and add RTC node
+In-Reply-To: <1358959242-1667-1-git-send-email-tobetter@gmail.com>
+References: <1358959242-1667-1-git-send-email-tobetter@gmail.com>
+Message-ID: <11f301ce0329$50329dc0$f097d940$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/mach-sunxi/sunxi.c |   19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
+Dongjin Kim wrote:
+> 
+> This fixes the property of dw-mshc-sdr-timing and dw-mshc-ddr-timing as
+> per
+> its current binding, it only has two cells.
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 1dc8a92..f9555c3 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -29,7 +29,10 @@
- #include "sunxi.h"
- 
- #define WATCHDOG_CTRL_REG	0x00
-+#define WATCHDOG_CTRL_RESTART		(1 << 0)
- #define WATCHDOG_MODE_REG	0x04
-+#define WATCHDOG_MODE_ENABLE		(1 << 0)
-+#define WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
- 
- static void __iomem *wdt_base;
- 
-@@ -50,11 +53,19 @@ static void sunxi_restart(char mode, const char *cmd)
- 		return;
- 
- 	/* Enable timer and set reset bit in the watchdog */
--	writel(3, wdt_base + WATCHDOG_MODE_REG);
--	writel(0xa57 << 1 | 1, wdt_base + WATCHDOG_CTRL_REG);
--	while(1) {
-+	writel(WATCHDOG_MODE_ENABLE | WATCHDOG_MODE_RESET_ENABLE,
-+		wdt_base + WATCHDOG_MODE_REG);
-+
-+	/*
-+	 * Restart the watchdog. The default (and lowest) interval
-+	 * value for the watchdog is 0.5s.
-+	 */
-+	writel(WATCHDOG_CTRL_RESTART, wdt_base + WATCHDOG_CTRL_REG);
-+
-+	while (1) {
- 		mdelay(5);
--		writel(3, wdt_base + WATCHDOG_MODE_REG);
-+		writel(WATCHDOG_MODE_ENABLE | WATCHDOG_MODE_RESET_ENABLE,
-+			wdt_base + WATCHDOG_MODE_REG);
- 	}
- }
- 
--- 
-1.7.10.4
+Yes, it should be fixed.
+
+> And also RTC node is added new.
+
+Above two changes should be separated.
+
+> 
+> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-odroidx.dts |    8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts
+> b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> index f41a84e..1c1d5ec 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
+> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> @@ -49,8 +49,8 @@
+>  		fifo-depth = <0x80>;
+>  		card-detect-delay = <200>;
+>  		samsung,dw-mshc-ciu-div = <3>;
+> -		samsung,dw-mshc-sdr-timing = <2 3 3>;
+> -		samsung,dw-mshc-ddr-timing = <1 2 3>;
+> +		samsung,dw-mshc-sdr-timing = <2 3>;
+> +		samsung,dw-mshc-ddr-timing = <1 2>;
+> 
+>  		slot at 0 {
+>  			reg = <0>;
+> @@ -90,4 +90,8 @@
+>  	serial at 13830000 {
+>  		status = "okay";
+>  	};
+> +
+> +	rtc at 10070000 {
+> +		status = "okay";
+> +	};
+
+Please put above node in alphabetical order.
+
+Thanks.
+
+- Kukjin
