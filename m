@@ -1,124 +1,30 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Mon, 4 Feb 2013 11:43:28 +0530
-Subject: [PATCH v5 02/10] clk: tegra: Add TEGRA_PLL_BYPASS flag
-In-Reply-To: <1359713962-16822-3-git-send-email-pdeschrijver@nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-3-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <510F5188.3010806@nvidia.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Sun, 3 Feb 2013 23:24:26 -0700
+Subject: [PATCH] rtc: rtc-mv: Add support for clk to avoid lockups
+In-Reply-To: <20130203111415.GE27791@lunn.ch>
+References: <1359887453-17189-1-git-send-email-andrew@lunn.ch>
+ <20130203111055.GA29236@schnuecks.de>
+ <20130203111415.GE27791@lunn.ch>
+Message-ID: <20130204062426.GB7115@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
-> Not all PLLs in Tegra114 have a bypass bit. Adapt the common code to only use
-> this bit when available.
->
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
+On Sun, Feb 03, 2013 at 12:14:15PM +0100, Andrew Lunn wrote:
+> > > +	pdata->clk = devm_clk_get(&pdev->dev, NULL);
+> > > +	/* Not all SoCs require a clock.*/
+> > > +	if (!IS_ERR(pdata->clk))
+> > > +		clk_prepare_enable(pdata->clk);
+> > > +
+> > 
+> > There are already I/O accesses to the RTC above this. Thus, you
+> > probably need to move this up.
+> 
+> Doh!
+> 
+> I was trying to keep the cleanup on error simple....
 
-Looks good to me.
+Why is this stuff in the drivers anyhow? All the other kernel power
+management seems to be done by the device core prior to probing the
+device, why is clk different?
 
-Reviewed-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-
->   drivers/clk/tegra/clk-pll.c |   15 ++++++++++-----
->   drivers/clk/tegra/clk.h     |    8 +++++---
->   2 files changed, 15 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
-> index 912c977..3c3a25e 100644
-> --- a/drivers/clk/tegra/clk-pll.c
-> +++ b/drivers/clk/tegra/clk-pll.c
-> @@ -166,7 +166,8 @@ static void _clk_pll_enable(struct clk_hw *hw)
->   	clk_pll_enable_lock(pll);
->   
->   	val = pll_readl_base(pll);
-> -	val &= ~PLL_BASE_BYPASS;
-> +	if (pll->flags & TEGRA_PLL_BYPASS)
-> +		val &= ~PLL_BASE_BYPASS;
->   	val |= PLL_BASE_ENABLE;
->   	pll_writel_base(val, pll);
->   
-> @@ -183,7 +184,9 @@ static void _clk_pll_disable(struct clk_hw *hw)
->   	u32 val;
->   
->   	val = pll_readl_base(pll);
-> -	val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
-> +	if (pll->flags & TEGRA_PLL_BYPASS)
-> +		val &= ~PLL_BASE_BYPASS;
-> +	val &= ~PLL_BASE_ENABLE;
->   	pll_writel_base(val, pll);
->   
->   	if (pll->flags & TEGRA_PLLM) {
-> @@ -454,7 +457,7 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
->   
->   	val = pll_readl_base(pll);
->   
-> -	if (val & PLL_BASE_BYPASS)
-> +	if ((pll->flags & TEGRA_PLL_BYPASS) && (val & PLL_BASE_BYPASS))
->   		return parent_rate;
->   
->   	if ((pll->flags & TEGRA_PLL_FIXED) && !(val & PLL_BASE_OVERRIDE)) {
-> @@ -660,9 +663,10 @@ static struct clk *_tegra_clk_register_pll(const char *name,
->   struct clk *tegra_clk_register_pll(const char *name, const char *parent_name,
->   		void __iomem *clk_base, void __iomem *pmc,
->   		unsigned long flags, unsigned long fixed_rate,
-> -		struct tegra_clk_pll_params *pll_params, u8 pll_flags,
-> +		struct tegra_clk_pll_params *pll_params, u32 pll_flags,
->   		struct tegra_clk_pll_freq_table *freq_table, spinlock_t *lock)
->   {
-> +	pll_flags |= TEGRA_PLL_BYPASS;
->   	return _tegra_clk_register_pll(name, parent_name, clk_base, pmc,
->   			flags, fixed_rate, pll_params, pll_flags, freq_table,
->   			lock, &tegra_clk_pll_ops);
-> @@ -671,9 +675,10 @@ struct clk *tegra_clk_register_pll(const char *name, const char *parent_name,
->   struct clk *tegra_clk_register_plle(const char *name, const char *parent_name,
->   		void __iomem *clk_base, void __iomem *pmc,
->   		unsigned long flags, unsigned long fixed_rate,
-> -		struct tegra_clk_pll_params *pll_params, u8 pll_flags,
-> +		struct tegra_clk_pll_params *pll_params, u32 pll_flags,
->   		struct tegra_clk_pll_freq_table *freq_table, spinlock_t *lock)
->   {
-> +	pll_flags |= TEGRA_PLL_BYPASS;
->   	return _tegra_clk_register_pll(name, parent_name, clk_base, pmc,
->   			flags, fixed_rate, pll_params, pll_flags, freq_table,
->   			lock, &tegra_clk_plle_ops);
-> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-> index a09d7dc..3cff1df 100644
-> --- a/drivers/clk/tegra/clk.h
-> +++ b/drivers/clk/tegra/clk.h
-> @@ -182,12 +182,13 @@ struct tegra_clk_pll_params {
->    * TEGRA_PLL_FIXED - We are not supposed to change output frequency
->    *     of some plls.
->    * TEGRA_PLLE_CONFIGURE - Configure PLLE when enabling.
-> + * TEGRA_PLL_BYPASS - PLL has bypass bit
->    */
->   struct tegra_clk_pll {
->   	struct clk_hw	hw;
->   	void __iomem	*clk_base;
->   	void __iomem	*pmc;
-> -	u8		flags;
-> +	u32		flags;
->   	unsigned long	fixed_rate;
->   	spinlock_t	*lock;
->   	u8		divn_shift;
-> @@ -210,18 +211,19 @@ struct tegra_clk_pll {
->   #define TEGRA_PLLM BIT(5)
->   #define TEGRA_PLL_FIXED BIT(6)
->   #define TEGRA_PLLE_CONFIGURE BIT(7)
-> +#define TEGRA_PLL_BYPASS BIT(8)
->   
->   extern const struct clk_ops tegra_clk_pll_ops;
->   extern const struct clk_ops tegra_clk_plle_ops;
->   struct clk *tegra_clk_register_pll(const char *name, const char *parent_name,
->   		void __iomem *clk_base, void __iomem *pmc,
->   		unsigned long flags, unsigned long fixed_rate,
-> -		struct tegra_clk_pll_params *pll_params, u8 pll_flags,
-> +		struct tegra_clk_pll_params *pll_params, u32 pll_flags,
->   		struct tegra_clk_pll_freq_table *freq_table, spinlock_t *lock);
->   struct clk *tegra_clk_register_plle(const char *name, const char *parent_name,
->   		void __iomem *clk_base, void __iomem *pmc,
->   		unsigned long flags, unsigned long fixed_rate,
-> -		struct tegra_clk_pll_params *pll_params, u8 pll_flags,
-> +		struct tegra_clk_pll_params *pll_params, u32 pll_flags,
->   		struct tegra_clk_pll_freq_table *freq_table, spinlock_t *lock);
->   
->   /**
+Jason
