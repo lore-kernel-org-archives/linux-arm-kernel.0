@@ -1,43 +1,31 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 3 Feb 2013 20:44:39 -0500
-Subject: [PATCH v2] gpio: mvebu: Add clk support to prevent lockup
-In-Reply-To: <1359887666-17552-1-git-send-email-andrew@lunn.ch>
-References: <1359887666-17552-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20130204014439.GI14746@titan.lakedaemon.net>
+Date: Sun, 3 Feb 2013 20:50:13 -0500
+Subject: [PATCH v2] rtc: rtc-mv: Add support for clk to avoid lockups
+In-Reply-To: <1359891126-21909-1-git-send-email-andrew@lunn.ch>
+References: <1359891126-21909-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130204015013.GJ14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 03, 2013 at 11:34:26AM +0100, Andrew Lunn wrote:
-> The kirkwood SoC GPIO cores use the runit clock. Add code to
-> clk_prepare_enable() runit, otherwise there is a danger of locking up
-> the SoC by accessing the GPIO registers when runit clock is not
-> ticking.
+On Sun, Feb 03, 2013 at 12:32:06PM +0100, Andrew Lunn wrote:
+> The Marvell RTC on Kirkwood makes use of the runit clock. Ensure the
+> driver clk_prepare_enable() this clock, otherwise there is a danger
+> the SoC will lockup when accessing RTC registers with the clock
+> disabled.
 > 
-> Reported-by: Simon Baatz <gmbnomis@gmail.com>
+> Reported-by: Simon Baatz gmbnomis at gmail.com
 > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
-> Since v1:
-> ChangeLog: tclk->runit clock
 > 
->  arch/arm/boot/dts/kirkwood.dtsi |    2 ++
->  drivers/gpio/gpio-mvebu.c       |    7 +++++++
->  2 files changed, 9 insertions(+)
+> Since v1:
+> Enable clock before accessing RTC registers.
+> 
+>  arch/arm/boot/dts/kirkwood.dtsi |    1 +
+>  drivers/rtc/rtc-mv.c            |   28 ++++++++++++++++++++++++----
+>  2 files changed, 25 insertions(+), 4 deletions(-)
 
-Linus,
-
-I merge-tested this against your gpio/fixes branch since you had a patch
-to the same file:
-
-11c0cee gpio: mvebu: Don't free chip label memory
-
-There were no conflicts.  If you don't mind, I'd like to take this
-through mvebu/fixes -> arm-soc since this is one of four patches to fix
-one reported issue.  I'd like to keep them in the same branch.
-
-If this causes a headache for you, please let me know and you can take
-it.
-
-Otherwise, applied to mvebu/fixes with Simon's Tested-by:
+Applied to mvebu/fixes with Simon's Tested-by: and added '<' '>' to the
+Reported-by:.
 
 thx,
 
