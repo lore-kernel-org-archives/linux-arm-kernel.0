@@ -1,26 +1,20 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 04 Feb 2013 15:03:59 -0500 (EST)
-Subject: [PATCH 1/1] net: fec: fix miss init spinlock
-In-Reply-To: <CAHrpEqQwmAN8fBVQKOJzw5uD0WTfu9zR-gP1SPmq+JxocxjFSA@mail.gmail.com>
-References: <CAHrpEqSLx-J-1SYC6OapqidY+U3acnTmNyOj8UrNRZwYZRXCoQ@mail.gmail.com>
- <20130204.002410.508273179967651174.davem@davemloft.net>
- <CAHrpEqQwmAN8fBVQKOJzw5uD0WTfu9zR-gP1SPmq+JxocxjFSA@mail.gmail.com>
-Message-ID: <20130204.150359.599088894678143987.davem@davemloft.net>
+From: mats.liljegren@enea.com (Mats Liljegren)
+Date: Mon, 4 Feb 2013 21:02:39 +0100
+Subject: Porting 3.8-rc4-nohz3 to ARM (PandaBoard)
+Message-ID: <20130204200238.GA16718@enea.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <lznuaa@gmail.com>
-Date: Mon, 4 Feb 2013 14:31:52 +0800
+Hi Frederic,
 
->>>> This breaks the build, tmreg_lock is only present in certain
->>>> configurations.
->>>
->>> No, FEC have changed to check dramatically instead of static config.
->>> You can look fec.h.  tmreg_lock is always defined.
->>
->> Not in the 'net' tree or you don't want this bug fixed there at all?
-> 
-> Sorry, I forget mask tree.
-> This patch is for net-next.
+(Sorry for the re-post, I spelled the mailing list wrong...)
 
-Ok, applied to net-next.
+I want to port dynticks patches 3.8-rc4-nohz3 to ARM architecture, and try it out on the PandaBoard. Initially this is for evaluating it, but if it looks promising I'd like to upstream this.
+
+As far as I can see the first thing to do is to implement virtual time accounting. After an initial look at the patches done for ia64, it doesn't look too difficult.
+
+Are there any caveats I should be aware of?
+Has anyone else started any work in this area that I could co-operate with?
+
+Regards
+Mats Liljegren
