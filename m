@@ -1,40 +1,117 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 4 Feb 2013 10:58:46 +0530
-Subject: [PATCH v2 6/6] ARM: davinci: da850: configure system configuration
- chip(CFGCHIP3) for emac
-In-Reply-To: <510E5BCF.9080006@ti.com>
-References: <1359380879-26306-1-git-send-email-prabhakar.lad@ti.com>
- <1359380879-26306-7-git-send-email-prabhakar.lad@ti.com>
- <510E5BCF.9080006@ti.com>
-Message-ID: <510F470E.5040205@ti.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Mon, 4 Feb 2013 13:40:18 -0500
+Subject: [PATCH v5] cpufreq: add imx6q-cpufreq driver
+In-Reply-To: <20130204050909.GD26233@S2101-09.ap.freescale.net>
+References: <1359946302-25953-1-git-send-email-shawn.guo@linaro.org>
+ <20130204160622.GB5209@ubuntu>
+ <20130204050909.GD26233@S2101-09.ap.freescale.net>
+Message-ID: <20130204184018.GA12696@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/3/2013 6:15 PM, Sekhar Nori wrote:
-> On 1/28/2013 7:17 PM, Prabhakar Lad wrote:
->> From: Lad, Prabhakar <prabhakar.lad@ti.com>
-
-> There are couple of issues with this implementation.
+On Mon, Feb 04, 2013 at 01:09:11PM +0800, Shawn Guo wrote:
+> On Mon, Feb 04, 2013 at 11:06:22AM -0500, Anson Huang wrote:
+> > > +	/*
+> > > +	 * The setpoints are selected per PLL/PDF frequencies, so we need to
+> > > +	 * reprogram PLL for frequency scaling.  The procedure of reprogramming
+> > > +	 * PLL1 is as below.
+> > > +	 *
+> > > +	 *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
+> > > +	 *  - Disable pll1_sys_clk and reprogram it
+> > > +	 *  - Enable pll1_sys_clk and reparent pll1_sw_clk back to it
+> > > +	 *  - Disable pll2_pfd2_396m_clk
+> > > +	 */
+> > > +	clk_prepare_enable(pll2_pfd2_396m_clk);
+> > > +	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+> > > +	clk_set_parent(pll1_sw_clk, step_clk);
+> > > +	clk_prepare_enable(pll1_sys_clk);
+> > > +	if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+> > > +		clk_disable_unprepare(pll1_sys_clk);
+> > > +		clk_set_rate(pll1_sys_clk, freqs.new * 1000);
+> > > +		clk_prepare_enable(pll1_sys_clk);
+> > > +		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+> > > +		clk_disable_unprepare(pll2_pfd2_396m_clk);
+> > > +	} else {
+> > > +		/*
+> > > +		 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
+> > > +		 * to provide the frequency.
+> > > +		 */
+> > > +		clk_disable_unprepare(pll1_sys_clk);
+> > > +	}
+> > Seems like we will get pll2_pfd2_396m_clk's use count mismatch? As every time cpu freq is changed, pll2_pfd2_396m_clk will be added at the beginning of this code piece, but only decreased when cpu freq > 396M, so everytime cpu freq changed to 396M, this pll2_pfd2_396m_clk will in increased?
 > 
-> 1) da8xx_config_emac() is specific to DA850 EVM, but masquerades as
->    generic for da8xx. Looks like you need two functions, one for soc
->    specific configuration and one board specific.
-> 2) da8xx_config_emac() goes through all the time, whether the
->    particular board has emac module or not. Shouldn't
->    da8xx_config_emac() check if emac is actually enabled in the passed
->    dtb and only the do the configuration?
-> 3) The function assumes mii is used always, you can use the rmii_en dt
->    property to check if rmii/mii is enabled and configure the soc/board
->    accordingly.
-> 4) If the same function can work both for da850 and da830, then it can
->    be implemented outside of CONFIG_ARCH_DAVINCI_DA850.
-
-Another thing I forgot to mention:
-
-5) This patch replicates a lot of code form board-da850-evm.c. This
-needs to be avoided. May be create function to configure emac in
-da850.c. This can then be called in board-da850-evm.c as well as in the
-dt case.
-
-Thanks,
-Sekhar
+> Ah, good catch.  And pll1_sys_clk has the same problem.  Since it's
+> been verified by FSL kernel that we do not necessarily need to disable
+> pll1_sys_clk before reprogramming it, I would choose to rewrite the
+> code as below to make it cleaner and correct on clock usage.
+> 
+>         /*
+>          * The setpoints are selected per PLL/PDF frequencies, so we need to
+>          * reprogram PLL for frequency scaling.  The procedure of reprogramming
+>          * PLL1 is as below.
+>          *
+>          *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
+>          *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
+>          *  - Disable pll2_pfd2_396m_clk
+>          */
+>         clk_prepare_enable(pll2_pfd2_396m_clk);
+>         clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+>         clk_set_parent(pll1_sw_clk, step_clk);
+>         if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+>                 clk_set_rate(pll1_sys_clk, freqs.new * 1000);
+>                 /*
+>                  * If we are leaving 396 MHz set-point, we need to enable
+>                  * pll1_sys_clk and disable pll2_pfd2_396m_clk to keep
+>                  * their use count correct.
+>                  */
+>                 if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
+>                         clk_prepare_enable(pll1_sys_clk);
+>                         clk_disable_unprepare(pll2_pfd2_396m_clk);
+>                 }
+>                 clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+>                 clk_disable_unprepare(pll2_pfd2_396m_clk);
+>         } else {
+>                 /*
+>                  * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
+>                  * to provide the frequency.
+>                  */
+>                 clk_disable_unprepare(pll1_sys_clk);
+>         }
+>
+Looks good:)
+> > > +
+> > > +	/* Ensure the arm clock divider is what we expect */
+> > > +	ret = clk_set_rate(arm_clk, freqs.new * 1000);
+> > > +	if (ret) {
+> > > +		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+> > > +		regulator_set_voltage_tol(arm_reg, volt_old, 0);
+> > > +		return ret;
+> > > +	}
+> > > +
+> > > +	/* scaling down?  scale voltage after frequency */
+> > > +	if (freqs.new < freqs.old) {
+> > > +		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+> > > +		if (ret)
+> > > +			dev_warn(cpu_dev,
+> > > +				 "failed to scale vddarm down: %d\n", ret);
+> > > +
+> > > +		if (freqs.old == FREQ_1P2_GHZ / 1000) {
+> > > +			regulator_set_voltage_tol(pu_reg,
+> > > +					PU_SOC_VOLTAGE_NORMAL, 0);
+> > > +			regulator_set_voltage_tol(soc_reg,
+> > > +					PU_SOC_VOLTAGE_NORMAL, 0);
+> > > +		}
+> > > +	}
+> > > +
+> > > +	for_each_online_cpu(cpu) {
+> > > +		freqs.cpu = cpu;
+> > > +		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > > +	}
+> > > +
+> > Should we need to update the percpu loops_per_jiffy variable and global loops_per_jiffy? As the udelay and mdelay will rely on this global loops_per_jiffy? Or the latest kernel has handle it in other place such as cpufreq common driver? I remembered that common cpufreq driver only handle the noSMP case.
+> 
+> No, it's not needed since commit ec971ea (ARM: add cpufreq transiton
+> notifier to adjust loops_per_jiffy for smp) is in place.
+> 
+> Shawn
+I see, just check the latest kernel's implementation about global loops_per_jiffy, it is OK.
