@@ -1,296 +1,81 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Mon, 4 Feb 2013 13:28:14 +0000
-Subject: [PATCH 2/3] mmc: davinci_mmc: add DT support
-In-Reply-To: <20130131112303.GA7235@e106331-lin.cambridge.arm.com>
-References: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
- <1359628387-14437-3-git-send-email-prakash.pm@ti.com>
- <20130131112303.GA7235@e106331-lin.cambridge.arm.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA46049@DBDE01.ent.ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 4 Feb 2013 15:40:30 +0200
+Subject: [PATCH] clocksource: tegra: move to of_clk_get
+Message-ID: <1359985230-11506-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The new clockframework introduced DT IDs for each clock. To be able to remove
+the device registrations, this driver needs to be updated to use the DT IDs.
+Note that the actual removal of the clk_register_clkdev() calls will be done
+in a later series.
 
-On Thu, Jan 31, 2013 at 16:53:03, Mark Rutland wrote:
-> Hello,
-> 
-> I have a few comments on the devicetree binding and the way it's parsed.
-> 
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20.dtsi      |    2 ++
+ arch/arm/boot/dts/tegra30.dtsi      |    2 ++
+ drivers/clocksource/tegra20_timer.c |    4 ++--
+ 3 files changed, 6 insertions(+), 2 deletions(-)
 
-Thanks for review.
-
-> On Thu, Jan 31, 2013 at 10:33:06AM +0000, Manjunathappa, Prakash wrote:
-> > Adds device tree support for davinci_mmc. Also add
-> > binding documentation.
-> > Tested with non-dma PIO mode and without GPIO
-> > card_detect/write_protect option because of
-> > dependencies on EDMA and GPIO modules DT support.
-> > 
-> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> > Cc: linux-mmc at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > Cc: davinci-linux-open-source at linux.davincidsp.com
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> > Cc: cjb at laptop.org
-> > Cc: Sekhar Nori <nsekhar@ti.com>
-> > Cc: mporter at ti.com
-> > ---
-> >  .../devicetree/bindings/mmc/davinci_mmc.txt        |   23 +++++++
-> >  drivers/mmc/host/davinci_mmc.c                     |   69 +++++++++++++++++++-
-> >  2 files changed, 91 insertions(+), 1 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-> > new file mode 100644
-> > index 0000000..144bee6
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-> > @@ -0,0 +1,23 @@
-> > +* TI Highspeed MMC host controller for DaVinci
-> > +
-> > +The Highspeed MMC Host Controller on TI DaVinci family
-> > +provides an interface for MMC, SD and SDIO types of memory cards.
-> > +
-> > +This file documents differences between the core properties described
-> > +by mmc.txt and the properties used by the davinci_mmc driver.
-> > +
-> > +Required properties:
-> > +- compatible:
-> > + Should be "ti,davinci_mmc", for davinci controllers
-> 
-> "ti,davinci-mmc" (with '-' rather than '_') would be preferable.
-> 
-
-I agree, will correct it.
-
-> > +
-> > +Optional properties:
-> > +- bus-width: Number of data lines, can be <1>, <4>, or <8>, default <1>
-> > +- max-frequency: maximum operating clock frequency.
-> 
-> You said you only described differences from mmc.txt, but this is listed in
-> mmc.txt.
-> 
-
-Agreed, I will remove it from here.
-
-> > +- caps: Check for Host capabilities in <linux/mmc/host.h>
-> 
-> Is this a set of binary flags? Also, is this Linux-specific?
-> 
-> I really don't think this should be in the devicetree binding. Why do you need
-> this?
-> 
-
-I was using this to specify the below controller capabilities:
-MMC_CAP_MMC_HIGHSPEED and MMC_CAP_SD_HIGHSPEED,
-Found from discussion[1] that this can be derived from max-frequency,
-That is above capabilities are supported when max-frequency >= 50MHz.
-
-[1] https://lkml.org/lkml/2012/10/15/231
-
-> > +- version: version of controller.
-> 
-> This should be encoded as part of the compatible string.
-> 
-
-Agreed will make change accordingly to accommodate version info in compatible string.
-
-> > +Example:
-> > +	mmc1: mmc at 0x4809c000 {
-> > +		compatible = "ti,omap4-hsmmc";
-> > +		reg = <0x4809c000 0x400>;
-> > +		bus-width = <4>;
-> > +	};
-> 
-> It would be nice if the example referred to this binding rather than another.
-> 
-
-Agreed, I will change.
-
-> > diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-> > index 382b79d..ce6730d 100644
-> > --- a/drivers/mmc/host/davinci_mmc.c
-> > +++ b/drivers/mmc/host/davinci_mmc.c
-> > @@ -34,6 +34,7 @@
-> >  #include <linux/dma-mapping.h>
-> >  #include <linux/edma.h>
-> >  #include <linux/mmc/mmc.h>
-> > +#include <linux/of.h>
-> >  
-> >  #include <linux/platform_data/mmc-davinci.h>
-> >  
-> > @@ -1156,16 +1157,75 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
-> >  
-> >  	mmc_davinci_reset_ctrl(host, 0);
-> >  }
-> > +#ifdef CONFIG_OF
-> > +static struct davinci_mmc_config
-> > +	*mmc_of_get_pdata(struct platform_device *pdev)
-> > +{
-> > +	struct device_node *np;
-> > +	struct davinci_mmc_config *pdata = NULL;
-> > +	u32 data;
-> > +	int ret;
-> > +
-> > +	pdata = pdev->dev.platform_data;
-> > +	if (!pdata) {
-> > +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> > +		if (!pdata) {
-> > +			dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
-> > +			goto nodata;
-> > +		}
-> > +	}
-> 
-> Why do you need to conditionally allocate this? This only seems to be called
-> once.
-> 
-
-This is common function for DT and non-DT kernel(will be removing #ifdef CONFIG_OF),
-So above check is necessary for to allocate pdata for DT kernel.
-
-> > +
-> > +	np = pdev->dev.of_node;
-> > +	if (!np)
-> > +		goto nodata;
-> 
-> Why not just return immediately here? You do nothing special at nodata.
-> 
-
-Following convention to not have more than 1 return from function and have
-Common exit point. May not be necessary now since we have devm_* calls now.
-Can I still prefer to keep this goto?
-
-> > +
-> > +	ret = of_property_read_u32(np, "bus-width", &data);
-> > +	if (ret)
-> > +		dev_info(&pdev->dev, "wires not specified, defaulting to 4 bit mode\n");
-> > +	pdata->wires = data;
-> 
-> That dev_info doesn't seem to match up with what the next line is doing (data
-> might not have been initialised). Also, unless I've misunderstood, it doesn't
-> match up with the default of 1 mentioned in the binding doc.
-> 
-
-Yes with missing bus-width property module comes in 1 bit mode, I will correct it.
-
-> > +
-> > +	ret = of_property_read_u32(np, "max-frequency", &data);
-> > +	if (ret)
-> > +		dev_info(&pdev->dev, "max-frequency not specified, defaulting to 25MHz\n");
-> > +	pdata->max_freq = data;
-> 
-> Again, the dev_info doesn't match up with the line below it. I notice
-> the default's not one specified in the binding. Is this frequency chosen
-> from the hardware docs, or is it an arbitrary choice. If not arbitrary,
-> it might be worth specifying in the binding.
-> 
-
-Agreed, I will make the changes for the default values.
-
-> 
-> > +
-> > +	ret = of_property_read_u32(np, "caps", &data);
-> > +	if (ret)
-> > +		dev_info(&pdev->dev, "card capability not specified\n");
-> > +	pdata->caps = data;
-> 
-> Again, you may be using garbage data.
-> 
-
-Ok I will correct it.
-
-> > +
-> > +	ret = of_property_read_u32(np, "version", &data);
-> > +	if (ret)
-> > +		dev_err(&pdev->dev, "version not specified\n");
-> > +	pdata->version = data;
-> 
-> And again, though I'd prefer to see this property go entirely.
-> 
-
-Yes this is going to go away.
-
-> > +
-> > +nodata:
-> > +	return pdata;
-> > +}
-> > +
-> > +#else
-> > +static struct davinci_mmc_config
-> > +	*mmc_of_get_pdata(struct platform_device *pdev)
-> > +{
-> > +	return pdev->dev.platform_data;
-> > +}
-> > +#endif
-> 
-> This is poorly named if it's required for !CONFIG_OF.
-> 
-> Why not change this to something like mmc_parse_pdata, returning an
-> error code. For !CONFIG_OF, it can simply return 0, which should be less
-> surprising for anyone else reading this code.
-> 
-
-I will remove #ifdef CONFIG_OF conditional compilation and consideration
-your suggestion to name function as mmc_parse_pdata.
-
-> >  
-> >  static int __init davinci_mmcsd_probe(struct platform_device *pdev)
-> >  {
-> > -	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
-> > +	struct davinci_mmc_config *pdata = NULL;
-> >  	struct mmc_davinci_host *host = NULL;
-> >  	struct mmc_host *mmc = NULL;
-> >  	struct resource *r, *mem = NULL;
-> >  	int ret = 0, irq = 0;
-> >  	size_t mem_size;
-> >  
-> > +	pdata = mmc_of_get_pdata(pdev);
-> > +	if (pdata == NULL) {
-> > +		dev_err(&pdev->dev, "Can not get platform data\n");
-> > +		return -ENOENT;
-> > +	}
-> > +
-> >  	/* REVISIT:  when we're fully converted, fail if pdata is NULL */
-> >  
-> >  	ret = -ENODEV;
-> > @@ -1403,11 +1463,18 @@ static const struct dev_pm_ops davinci_mmcsd_pm = {
-> >  #define davinci_mmcsd_pm_ops NULL
-> >  #endif
-> >  
-> > +static const struct of_device_id davinci_mmc_of_match[] = {
-> > +	{.compatible = "ti,davinci_mmc", },
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, davinci_mmc_of_match);
-> 
-> For supporting multiple versions, you could either use some auxdata
-> here, or check each one in davince_mmcsd_probe.
-> 
-
-I will consider keeping auxdata via compatible field.
-
-> > +
-> >  static struct platform_driver davinci_mmcsd_driver = {
-> >  	.driver		= {
-> >  		.name	= "davinci_mmc",
-> >  		.owner	= THIS_MODULE,
-> >  		.pm	= davinci_mmcsd_pm_ops,
-> > +		.of_match_table = of_match_ptr(davinci_mmc_of_match),
-> >  	},
-> >  	.remove		= __exit_p(davinci_mmcsd_remove),
-> >  };
-> 
-> Where does davinci_mmcsd_probe get called from, and how is the
-> of_match_table used? Should it not be set as .probe on the driver?
-> 
-
-Driver probe is registered in module_init. 
-And are you suggesting me to use module_platform_driver? If yes can it not
-be taken separately as it is unrelated to DT support I am adding.
-
-of_match_table is used by device tree. (will point to NULL for !CONFIG_OF)
-
-Thanks,
-Prakash
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 63b0d81..6e41a4f 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -144,6 +144,7 @@
+ 			      0 1 0x04
+ 			      0 41 0x04
+ 			      0 42 0x04>;
++		clocks = <&tegra_car 5>;
+ 	};
+ 
+ 	tegra_car: clock {
+@@ -308,6 +309,7 @@
+ 		compatible = "nvidia,tegra20-rtc";
+ 		reg = <0x7000e000 0x100>;
+ 		interrupts = <0 2 0x04>;
++		clocks = <&tegra_car 4>;
+ 	};
+ 
+ 	i2c at 7000c000 {
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 313fa71..7bc07e6 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -147,6 +147,7 @@
+ 			      0 42 0x04
+ 			      0 121 0x04
+ 			      0 122 0x04>;
++		clocks = <&tegra_car 5>;
+ 	};
+ 
+ 	tegra_car: clock {
+@@ -295,6 +296,7 @@
+ 		compatible = "nvidia,tegra30-rtc", "nvidia,tegra20-rtc";
+ 		reg = <0x7000e000 0x100>;
+ 		interrupts = <0 2 0x04>;
++		clocks = <&tegra_car 4>;
+ 	};
+ 
+ 	i2c at 7000c000 {
+diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+index 5bc1429..546c537 100644
+--- a/drivers/clocksource/tegra20_timer.c
++++ b/drivers/clocksource/tegra20_timer.c
+@@ -189,7 +189,7 @@ static void __init tegra20_init_timer(void)
+ 		BUG();
+ 	}
+ 
+-	clk = clk_get_sys("timer", NULL);
++	clk = of_clk_get(np, 0);
+ 	if (IS_ERR(clk)) {
+ 		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+ 		rate = 12000000;
+@@ -216,7 +216,7 @@ static void __init tegra20_init_timer(void)
+ 	 * rtc registers are used by read_persistent_clock, keep the rtc clock
+ 	 * enabled
+ 	 */
+-	clk = clk_get_sys("rtc-tegra", NULL);
++	clk = of_clk_get(np, 0);
+ 	if (IS_ERR(clk))
+ 		pr_warn("Unable to get rtc-tegra clock\n");
+ 	else
