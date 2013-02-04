@@ -1,58 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Feb 2013 15:45:02 +0000
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130204154153.GA18237@arwen.pp.htv.fi>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com>
- <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
- <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
- <20130201185820.GE29898@arwen.pp.htv.fi> <510C2A47.1090607@mvista.com>
- <20130201205600.GA31762@arwen.pp.htv.fi>
- <20130201213003.GW2637@n2100.arm.linux.org.uk>
- <20130204154153.GA18237@arwen.pp.htv.fi>
-Message-ID: <20130204154502.GD2637@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 4 Feb 2013 17:53:00 +0200
+Subject: [PATCH v4 4/4] drivers: usb: start using the control module driver
+In-Reply-To: <20130201191424.GQ22517@atomide.com>
+References: <1359109440-2195-1-git-send-email-kishon@ti.com>
+ <1359109440-2195-5-git-send-email-kishon@ti.com>
+ <20130125102700.GO15886@arwen.pp.htv.fi>
+ <20130201191424.GQ22517@atomide.com>
+Message-ID: <20130204155300.GC18237@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 05:41:53PM +0200, Felipe Balbi wrote:
-> Hi,
-> 
-> On Fri, Feb 01, 2013 at 09:30:03PM +0000, Russell King - ARM Linux wrote:
-> > > > > I guess to make the MUSB side simpler we would need musb-dma-engine glue
-> > > > > to map dmaengine to the private MUSB API. Then we would have some
-> > > > > starting point to also move inventra (and anybody else) to dmaengine
-> > > > > API.
-> > > > 
-> > > >    Why? Inventra is a dedicated device's private DMA controller, why make
-> > > > universal DMA driver for it?
+Hi,
+
+On Fri, Feb 01, 2013 at 11:14:24AM -0800, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [130125 02:30]:
+> > Hi,
+> > 
+> > On Fri, Jan 25, 2013 at 03:54:00PM +0530, Kishon Vijay Abraham I wrote:
+> > > Start using the control module driver for powering on the PHY and for
+> > > writing to the mailbox instead of writing to the control module
+> > > registers on their own.
 > > > 
-> > > because it doesn't make sense to support multiple DMA APIs. We can check
-> > > from MUSB's registers if it was configured with Inventra DMA support and
-> > > based on that we can register MUSB's own DMA Engine to dmaengine API.
+> > > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/usb/omap-usb.txt |    4 ++
+> > >  Documentation/devicetree/bindings/usb/usb-phy.txt  |    7 +-
+> > >  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   13 ----
 > > 
-> > Hang on.  This is one of the DMA implementations which is closely
-> > coupled with the USB and only the USB?  If it is...
-> > 
-> > I thought this had been discussed _extensively_ before.  I thought the
-> > resolution on it was:
-> > 1. It would not use the DMA engine API.
-> > 2. It would not live in arch/arm.
-> > 3. It would be placed nearby the USB driver it's associated with.
-> > 
-> > (1) because we don't use APIs just for the hell of it - think.  Do we
-> > use the DMA engine API for PCI bus mastering ethernet controllers?  No.
-> > Do we use it for PCI bus mastering SCSI controllers?  No.  Because the
-> > DMA is integral to the rest of the device.
+> > I'm taking this patch but I'm leaving out the omap_hwmod_44xx_data.c
+> > change just to kill dependency. Can you send that single change as a
+> > separate patch which Tony can queue ?
 > 
-> that's not really a fair comparison, however. MUSB is used with several
-> DMA engines.
+> For the USB patches, please also leave out patches touching
+> arch/arm/mach-omap2/devices.c. Those are almost guaranteed to
+> cause pointless merge conflicts with other branches.
+> 
+> I suggest you set up few immutable branches:
+> 
+> 1. Minimal platform_data changes for all your USB changes
+> 
+> This should contain include/linux/platform_data changes and
+> changes to arch/arm/*omap* so me and Paul can merge it in too
+> to avoid merge conflicts.
+> 
+> 2. The rest of the driver/usb changes
+> 
+> This can then be based on #1 branch above.
+> 
+> 3. Changes for the .dts files for Benoit
+> 
+> These can be queued separately from #1 and #2 above.
 
-I only mentioned it because it _was_ brought up as an argument against
-using the DMA engine API in the previous discussions.  I'm just reminding
-people what was discussed.
+I'm done with all USB stuff for this merge window. The patches which I
+didn't take have no dependencies on any drivers/ part. You can easily
+queue this through your tree.
 
-> Considering all of the above, it's far better to use DMA engine and get
-> rid of all the mess.
+cheers
 
-Which is what both you and I have been saying for the last 3 or so years
-on this subject...
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130204/db23f9de/attachment.sig>
