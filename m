@@ -1,51 +1,59 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 4 Feb 2013 10:27:38 +0100
-Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
-In-Reply-To: <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
-References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
- <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <CABxcv=k_gwB3ExQYUeappDZ6FE4L7x8Acer4ZQpDH09BL6LG0Q@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 4 Feb 2013 09:27:53 +0000
+Subject: [PATCH 09/26] mfd: ab8500-debugfs: Provide a means for a user
+ subscribe to IRQs
+In-Reply-To: <20130203170158.GO8476@sortiz-mobl>
+References: <1358254566-12419-1-git-send-email-lee.jones@linaro.org>
+ <1358254566-12419-10-git-send-email-lee.jones@linaro.org>
+ <20130127235259.GO1174@sortiz-mobl>
+ <20130128102223.GA18212@gmail.com>
+ <20130128104933.GY1174@sortiz-mobl>
+ <20130128113443.GB18212@gmail.com>
+ <20130203170158.GO8476@sortiz-mobl>
+Message-ID: <20130204092753.GW2042@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+> > > > I'm going to have to put this patch-set in the bin. Pulling this
+> > > > patch, causes lots of conflicts to the remaining patches in the
+> > > > set.
+> > > I bet removing this one causes a lot of conflicts. I'm not saying it should
+> > > absolutely be removed, but I'm afraid once it's upstream no one is going to
+> > > look at improving it.
+> > 
+> > This is really not the case. 
+> I trust you here, but usually people get busy with other stuff after their
+> patchset is upstreamed and never get back to me on the initial issues.
+> 
+> > I have every intention of fixing each and
+> > every issue which are brought to my attention during the upstreaming
+> > process of 'drivers/regulators', 'drivers/power' and 'drivers/mfd'.
+> > 
+> > All I'm doing is making a list of all the fixups and re-writes and
+> > I'll address them on the completion of the push. Hence if you're happy
+> > for this to go in with my promise of improvement, it would certainly
+> > make this task a great deal easier for me.
+> I'll take your words here. I'll apply this one once you adressed the other
+> issues I commented about on this patchset.
 
-On Mon, Jan 28, 2013 at 6:54 PM, Florian Vaussard
-<florian.vaussard@epfl.ch> wrote:
-> Add device-tree support for the GPMC controller on the OMAP3.
->
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 6c63118..2ddae38 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -403,5 +403,16 @@
->                         ti,timer-alwon;
->                         ti,timer-secure;
->                 };
-> +
-> +               gpmc: gpmc at 6e000000 {
-> +                       compatible = "ti,omap3430-gpmc";
-> +                       ti,hwmods = "gpmc";
-> +                       reg = <0x6e000000 0x1000000>;
-> +                       interrupts = <20>;
-> +                       gpmc,num-cs = <8>;
-> +                       gpmc,num-waitpins = <4>;
-> +                       #address-cells = <2>;
-> +                       #size-cells = <1>;
-> +               };
->         };
->  };
+Fixups complete, pull-request sent.
 
-I had the same patch on a tree I was working on to add DT support for
-gpmc-smsc911x on an OMAP3 board but I was waiting for Daniel's patches
-to hit mainline before sending the RFC. So please feel free to add:
+> > > And to be honest, having an IRQ handler from debugfs
+> > > code looks weird to me. I know you can put all sort of crazyness into a
+> > > debugfs entry, but still.
+> > >  
+> > > > I'll start again from scratch and find another way to sync the ab* MFD
+> > > > drivers. I might even have to do it manually i.e. throw out all
+> > > > commit history and upstream it as my own patches pulled in from diffs.
+> > > I don't have any problems with that.
+> > 
+> > I'm sure you don't, but it's me that's doing all the hard work. ;)
+> What's wrong with that ? ;)
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Hmmm... :D
 
-Best regards,
-Javier
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
