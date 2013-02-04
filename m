@@ -1,101 +1,120 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Mon, 4 Feb 2013 10:14:19 +0530
-Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
- addresses
-In-Reply-To: <510F3BA8.8070700@ti.com>
-References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
- <20130201162631.GG5151@arm.com>
- <CANOGCgOp=kSatDu8fL7grk+bXLQ2pgKAEvEK6LoG8Ba4mqUH=w@mail.gmail.com>
- <20130201163722.GH5151@arm.com>
- <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
- <20130201174246.GJ5151@arm.com> <510F3BA8.8070700@ti.com>
-Message-ID: <510F3CA3.7080604@ti.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Mon, 4 Feb 2013 10:33:15 +0530
+Subject: [PATCH v2 6/6] ARM: davinci: da850: configure system
+ configuration chip(CFGCHIP3) for emac
+In-Reply-To: <510E5BCF.9080006@ti.com>
+References: <1359380879-26306-1-git-send-email-prabhakar.lad@ti.com>
+ <1359380879-26306-7-git-send-email-prabhakar.lad@ti.com>
+ <510E5BCF.9080006@ti.com>
+Message-ID: <CA+V-a8uE6jymk5Z14ydCmuoCAkcLM-ZJKpwp2-0CRXWQtXvTSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 February 2013 10:10 AM, R Sricharan wrote:
-> Hi Catalin,
->
-> [ snip..]
+Sekhar ,
+
+On Sun, Feb 3, 2013 at 6:15 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 1/28/2013 7:17 PM, Prabhakar Lad wrote:
+>> From: Lad, Prabhakar <prabhakar.lad@ti.com>
 >>
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index 9f06102..47154f3 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -581,34 +581,36 @@ static void __init alloc_init_section(pud_t
->> *pud, unsigned long addr,
->>                         const struct mem_type *type)
->>   {
->>       pmd_t *pmd = pmd_offset(pud, addr);
->> +    unsigned long next;
+>> The system configuration chip CFGCHIP3, controls the emac module.
+>> This patch appropriately configures this register for emac and
+>> sets DA850_MII_MDIO_CLKEN_PIN GPIO pin appropriately.
 >>
->> -    /*
->> -     * Try a section mapping - end, addr and phys must all be aligned
->> -     * to a section boundary.  Note that PMDs refer to the individual
->> -     * L1 entries, whereas PGDs refer to a group of L1 entries making
->> -     * up one logical pointer to an L2 table.
->> -     */
->> -    if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
->> -        pmd_t *p = pmd;
->> +    do {
->> +        next = pmd_addr_end(addr, end);
+>> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: netdev at vger.kernel.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Heiko Schocher <hs@denx.de>
+>> ---
+>>  arch/arm/mach-davinci/da8xx-dt.c |   28 ++++++++++++++++++++++++++++
+>>  1 files changed, 28 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+>> index e533a0a..4a096e3 100644
+>> --- a/arch/arm/mach-davinci/da8xx-dt.c
+>> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+>> @@ -8,6 +8,7 @@
+>>   * published by the Free Software Foundation.
+>>   */
+>>  #include <linux/io.h>
+>> +#include <linux/gpio.h>
+>>  #include <linux/of_irq.h>
+>>  #include <linux/of_platform.h>
+>>  #include <linux/irqdomain.h>
+>> @@ -39,6 +40,32 @@ static void __init da8xx_init_irq(void)
+>>
+>>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+>>
+>> +static void __init da8xx_config_emac(void)
+>> +{
+>> +#define DA850_MII_MDIO_CLKEN_PIN     GPIO_TO_PIN(2, 6)
+>> +#define DA850_EMAC_MODE_SELECT               BIT(8)
+>> +     void __iomem *cfg_chip3_base;
+>> +     int ret;
+>> +     u32 val;
 >> +
->> +        /*
->> +         * Try a section mapping - next, addr and phys must all be
->> +         * aligned to a section boundary.  Note that PMDs refer to the
->> +         * individual L1 entries, whereas PGDs refer to a group of L1
->> +         * entries making up one logical pointer to an L2 table.
->> +         */
->> +        if (((addr | next | phys) & ~SECTION_MASK) == 0) {
->> +            pmd_t *p = pmd;
->>
->     There is a  need to do page mappings even when all the addresses
->     are aligned. This was added with CMA, which required the initial
->     mappings to be set with 2 level tables.
+>> +     cfg_chip3_base = DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG);
+>> +
+>> +     val = __raw_readl(cfg_chip3_base);
+>> +     val &= ~DA850_EMAC_MODE_SELECT;
+>> +     /* configure the CFGCHIP3 register for MII */
+>> +     __raw_writel(val, cfg_chip3_base);
 >
-    Sorry, i wanted to ask type->prot_sect is removed here and is that
-   intentional?
->>   #ifndef CONFIG_ARM_LPAE
->> -        if (addr & SECTION_SIZE)
->> -            pmd++;
->> +            if (addr & SECTION_SIZE)
->> +                pmd++;
->>   #endif
->> +            do {
->> +                *pmd = __pmd(phys | type->prot_sect);
->> +                phys += SECTION_SIZE;
->> +            } while (pmd++, addr += SECTION_SIZE, addr != next);
->>
->> -        do {
->> -            *pmd = __pmd(phys | type->prot_sect);
->> -            phys += SECTION_SIZE;
->> -        } while (pmd++, addr += SECTION_SIZE, addr != end);
->> -
->> -        flush_pmd_entry(p);
->> -    } else {
->> -        /*
->> -         * No need to loop; pte's aren't interested in the
->> -         * individual L1 entries.
->> -         */
->> -        alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
->> -    }
->> +            flush_pmd_entry(p);
->> +        } else {
->> +            alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys), type);
->> +            phys += next - addr;
->> +            pmd++;
->> +        }
->> +    } while (addr = next, addr != end);
->>   }
->>
->>   static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
->>
-   I did a similar kind of patch in my V1 [1].
-    I should be using PMD_MASK instead of SECTION_MASK there, and
-   updated it in the next version.
+> Use readl/writel instead.
+>
+Ok.
 
-    [1] https://patchwork.kernel.org/patch/1272991/
+>> +     pr_info("EMAC: MII PHY configured\n");
+>> +
+>> +     ret = gpio_request(DA850_MII_MDIO_CLKEN_PIN, "mdio_clk_en");
+>> +     if (ret) {
+>> +             pr_warn("Cannot open GPIO %d\n",
+>> +                                     DA850_MII_MDIO_CLKEN_PIN);
+>> +             return;
+>> +     }
+>> +     /* Enable/Disable MII MDIO clock */
+>> +     gpio_direction_output(DA850_MII_MDIO_CLKEN_PIN, 0);
+>> +}
+>> +
+>>  struct of_dev_auxdata da8xx_auxdata[] __initdata = {
+>>       OF_DEV_AUXDATA("ti,davinci_mdio", 0x01e24000, "davinci_mdio.0", NULL),
+>>       OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
+>> @@ -52,6 +79,7 @@ static void __init da850_init_machine(void)
+>>                            da8xx_auxdata, NULL);
+>>
+>>       da8xx_uart_clk_enable();
+>> +     da8xx_config_emac();
+>
+> There are couple of issues with this implementation.
+>
+> 1) da8xx_config_emac() is specific to DA850 EVM, but masquerades as
+>    generic for da8xx. Looks like you need two functions, one for soc
+>    specific configuration and one board specific.
+Ok.
 
+> 2) da8xx_config_emac() goes through all the time, whether the
+>    particular board has emac module or not. Shouldn't
+>    da8xx_config_emac() check if emac is actually enabled in the passed
+>    dtb and only the do the configuration?
+
+Ok. Can you give some pointers how we can access the dtb in board files.
+
+> 3) The function assumes mii is used always, you can use the rmii_en dt
+>    property to check if rmii/mii is enabled and configure the soc/board
+>    accordingly.
+
+Ok.
+
+> 4) If the same function can work both for da850 and da830, then it can
+>    be implemented outside of CONFIG_ARCH_DAVINCI_DA850.
+>
+Ok.
 
 Regards,
-   Sricharan
+--Prabhakar
+
+> Thanks,
+> Sekhar
