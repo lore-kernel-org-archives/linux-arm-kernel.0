@@ -1,55 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 4 Feb 2013 15:59:48 -0500 (EST)
-Subject: [PATCH v3 00/15] multi-cluster power management
-In-Reply-To: <20130204142417.GE28975@mudshark.cambridge.arm.com>
-References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
- <20130204142417.GE28975@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1302041510200.6300@xanadu.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 04 Feb 2013 14:01:09 -0700
+Subject: [PATCH v5 09/10] clk: tegra: Implement clocks for Tegra114
+In-Reply-To: <20130204104531.GQ2364@tbergstrom-lnx.Nvidia.com>
+References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
+ <1359713962-16822-10-git-send-email-pdeschrijver@nvidia.com>
+ <510F5E87.90801@nvidia.com> <20130204104531.GQ2364@tbergstrom-lnx.Nvidia.com>
+Message-ID: <51102195.9050604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Feb 2013, Will Deacon wrote:
+On 02/04/2013 03:45 AM, Peter De Schrijver wrote:
+> On Mon, Feb 04, 2013 at 08:08:55AM +0100, Prashant Gaikwad wrote:
 
-> Hi Nicolas,
+>>> +       /* xusb_hs_src */
+>>> +       val = readl(clk_base + CLK_SOURCE_XUSB_SS_SRC);
+>>> +       val |= BIT(25); /* always select PLLU_60M */
+>>> +       writel(val, clk_base + CLK_SOURCE_XUSB_SS_SRC);
+>>> +
+>>> +       clk = clk_register_fixed_factor(NULL, "xusb_hs_src", "pll_u_60M", 0,
+>>> +                                       1, 1);
+>>> +       clks[xusb_hs_src] = clk;
+>>> +
+>>
+>> With device tree we can directly use pll_u_60M, no need to register 
+>> clock with fixed factor 1.
 > 
-> On Tue, Jan 29, 2013 at 07:50:55AM +0000, Nicolas Pitre wrote:
-> > This is version 3 of the patch series required to safely power up
-> > and down CPUs in a cluster as can be found in b.L systems.  Also
-> > included are the needed patches to allow CPU hotplug on RTSM configured
-> > for big.LITTLE.
-> 
-> [...]
-> 
-> For patches 1-6 and 8:
-> 
->   Reviewed-by: Will Deacon <will.deacon@arm.com>
+> This is true for now. In the future these clocks will need to be dvfs aware
+> though. I think it makes sense to have a separate clock then?
 
-Thanks.
-
-> Please keep me posted when you have a crack at removing the compile-time
-> cluster/cpu limits!
-
-The trick would entail standard memory allocation from the boot CPU, and 
-the physical address for those allocations passed to the assembly code.  
-
-Then we have this code:
-
-	mrc     p15, 0, r0, c0, c0, 5           @ MPIDR
-	ubfx    r9, r0, #0, #8                  @ r9 = cpu
-	ubfx    r10, r0, #8, #8                 @ r10 = cluster
-	mov     r3, #MAX_CPUS_PER_CLUSTER
-	mla     r4, r3, r10, r9                 @ r4 = canonical CPU index
-	cmp     r4, #(MAX_CPUS_PER_CLUSTER * MAX_NR_CLUSTERS)
-	blo     2f
-	... out-of-bound code here
-
-Those constants just need to be turned into global variables as well.  
-Or if we want to be really fancy, we could do some trivial instruction 
-rewriting.
-
-Still, for the foreseeable future, going with dynamic allocation isn't 
-going to provide much of a gain while the compile-time limits keep the 
-code simple while people get familiar with it.
-
-
-Nicolas
+Why does DVFS-awareness require it to be a different clock/ID?
