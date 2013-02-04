@@ -1,54 +1,64 @@
-From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
-Date: Mon, 4 Feb 2013 11:19:25 +0100
-Subject: [PATCH] ARM: imx27: clk-imx27: SPI: Rename IPG clock and add
- PER clock
-In-Reply-To: <1359209221-24346-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1359209221-24346-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130204111925.2228edda@dell>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 04 Feb 2013 11:36:57 +0100
+Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
+In-Reply-To: <CABxcv=k_gwB3ExQYUeappDZ6FE4L7x8Acer4ZQpDH09BL6LG0Q@mail.gmail.com>
+References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
+ <CABxcv=k_gwB3ExQYUeappDZ6FE4L7x8Acer4ZQpDH09BL6LG0Q@mail.gmail.com>
+Message-ID: <510F8F49.9020800@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Javier,
 
-Ping?
-Gwenhael
+On 02/04/2013 10:27 AM, Javier Martinez Canillas wrote:
+> Hi Florian,
+>
+> On Mon, Jan 28, 2013 at 6:54 PM, Florian Vaussard
+> <florian.vaussard@epfl.ch> wrote:
+>> Add device-tree support for the GPMC controller on the OMAP3.
+>>
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> ---
+>>   arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
+>>   1 files changed, 11 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+>> index 6c63118..2ddae38 100644
+>> --- a/arch/arm/boot/dts/omap3.dtsi
+>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>> @@ -403,5 +403,16 @@
+>>                          ti,timer-alwon;
+>>                          ti,timer-secure;
+>>                  };
+>> +
+>> +               gpmc: gpmc at 6e000000 {
+>> +                       compatible = "ti,omap3430-gpmc";
+>> +                       ti,hwmods = "gpmc";
+>> +                       reg = <0x6e000000 0x1000000>;
+>> +                       interrupts = <20>;
+>> +                       gpmc,num-cs = <8>;
+>> +                       gpmc,num-waitpins = <4>;
+>> +                       #address-cells = <2>;
+>> +                       #size-cells = <1>;
+>> +               };
+>>          };
+>>   };
+>
+> I had the same patch on a tree I was working on to add DT support for
+> gpmc-smsc911x on an OMAP3 board but I was waiting for Daniel's patches
+> to hit mainline before sending the RFC. So please feel free to add:
+>
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>
 
-On Sat, 26 Jan 2013 15:07:01 +0100
-Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com> wrote:
+Great, the smsc911x was on my TODO list, I can cross it out :) BTW,
+do you have a public git for this, so I can test your work on my setup?
 
-> spi-imx driver needs two clock: ipg and per. The first clock must be named and
-> the second must be added.
-> 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> ---
->  arch/arm/mach-imx/clk-imx27.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 4c1d1e4..c599839 100644
-> --- a/arch/arm/mach-imx/clk-imx27.c
-> +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -228,9 +228,12 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.1");
->  	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.2");
->  	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.2");
-> -	clk_register_clkdev(clk[cspi1_ipg_gate], NULL, "imx27-cspi.0");
-> -	clk_register_clkdev(clk[cspi2_ipg_gate], NULL, "imx27-cspi.1");
-> -	clk_register_clkdev(clk[cspi3_ipg_gate], NULL, "imx27-cspi.2");
-> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.0");
-> +	clk_register_clkdev(clk[cspi1_ipg_gate], "ipg", "imx27-cspi.0");
-> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.1");
-> +	clk_register_clkdev(clk[cspi2_ipg_gate], "ipg", "imx27-cspi.1");
-> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.2");
-> +	clk_register_clkdev(clk[cspi3_ipg_gate], "ipg", "imx27-cspi.2");
->  	clk_register_clkdev(clk[per3_gate], "per", "imx21-fb.0");
->  	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx21-fb.0");
->  	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
-> -- 
-> 1.7.12.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+For the GPMC support, I will have to make a few more more as discussed with
+Tony, and as I will be away for more than 2 weeks, feel free to go ahead
+before me. This patchset was only at an RFC stage.
+
+Regards,
+
+Florian
