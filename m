@@ -1,53 +1,61 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 4 Feb 2013 07:05:14 -0500
-Subject: [GIT PULL  0/4] ARM: mvebu: changes for v3.9
-In-Reply-To: <510F7156.70005@free-electrons.com>
-References: <1359733918.Bf7ecc0.22262@triton>
- <510F7156.70005@free-electrons.com>
-Message-ID: <20130204120514.GK14746@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Feb 2013 12:07:08 +0000
+Subject: [RFC PATCH] arm: decompressor: initialize PIC offset base
+ register for uClinux tools
+In-Reply-To: <510FA2C0.3020505@arm.com>
+References: <1359480546-7033-1-git-send-email-jonathan.austin@arm.com>
+ <alpine.LFD.2.02.1301291453530.6300@xanadu.home> <510BF0B3.3030608@arm.com>
+ <20130201181854.GU23505@n2100.arm.linux.org.uk> <510FA2C0.3020505@arm.com>
+Message-ID: <20130204120708.GB17786@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 09:29:10AM +0100, Gregory CLEMENT wrote:
-> Hi Jason,
+On Mon, Feb 04, 2013 at 12:00:00PM +0000, Jonathan Austin wrote:
+> You seem to have understood! Specifying -mno-single-pic-base
+> means the compiler *won't* expect r9 to point to the GOT, but also
+> means r9 is free as a general purpose register, the effect that I
+> believe gives the performance improvement in the decompresser.
 > 
-> On 02/01/2013 04:51 PM, Jason Cooper wrote:
-> > The following changes since commit 19d23dac1b8f95e4a960fcbbb5687c33b9a2cd01:
-> > 
-> >   Merge branch 'fixes' into for-next
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.infradead.org/users/jcooper/linux.git mvebu/for-next
-> > 
-> > for you to fetch changes up to 7d8a7dce24f76242daf1c469878597b8acc4f78f:
-> > 
-> >   Merge tag 'tags/dt_for_v3.9' into mvebu/for-next
-> > 
-> > Jason Cooper (5):
-> >       Merge tag 'tags/mvebu_fixes_for_v3.8-rc6' into mvebu/for-next
-> >       Merge tag 'tags/cleanup_for_v3.9_round2' into mvebu/for-next
-> >       Merge tag 'tags/drivers_for_v3.9' into mvebu/for-next
-> >       Merge tag 'tags/boards_for_v3.9' into mvebu/for-next
-> >       Merge tag 'tags/dt_for_v3.9' into mvebu/for-next
+> Perhaps the context missing is that these are two independent patch
+> suggestions that achieve the same thing in different ways (that is,
+> they stop the decompresser running off to some incorrect memory location
+> because r9 isn't set-up). The -mno-single-pic base patch does it by not
+> using r9 as a PIC offset, and the 'initialise r9' patch does what it says
+> on the tin.
 > 
-> I didn't see anything about the USB support for Armada370/XP sent
-> by Ezequiel. Is there any reason to not have it? Or do you plan
-> to send a new pull request soon with his patch set?
+> As you see, I benchmarked them and got the opposite result to what I
+> expected (IE -mno-songle-pic-base is quicker), so, based also on
+> Nicolas's Ack, would now champion a different patch to the original one
+> that I posted...
+> 
+> This is probably overkill, but here's a simple C example for comparison:
+> $cat pic.c
+> ----------------
+> int foo;
+> int ret_foo()
+> {
+> 	return foo;
+> }
+> ----------------
+> $arm-none-uclinux-uclibceabi-gcc -O2 -fPIC -S pic.c -o pic.s
+> $cat pic.s
+> -------------
+> [...]
+> ret_foo:
+> 	ldr	r3, .L2
+> 	ldr	r3, [r9, r3]
+> 	ldr	r0, [r3, #0]
+> 	bx	lr
+> .L3:
+> 	.align	2
+> .L2:
+> 	.word	foo(GOT)
+> 	.size	ret_foo, .-ret_foo
 
-Yes, this is a redo of the first series of requests I sent out.  I had
-to move mvsdio out to the appropriate maintainer tree and depend on it.
-As soon as this gets pulled in, I have another round with everything but
-Thomas' pci work.  His will most likely be a separate pr series.
+Ah, so the problem is that the default for single-pic-base is different
+with uclinux compilers from other compilers.  Other compilers will
+default to -mno-single-pic-base, but what your build above shows is that
+for your compiler, your default is -msingle-pic-base.
 
-> PS: I noticed that there are a some files not related to mvebu at all
-> (such as the arch/parisc/... for example), but I guess it is due to some
-> dependencies.
-
-Yeah, I'm working on that.  It's purely in the diffstat, so it's not a
-show stopper.  It's much cleaner than the first time around, which is an
-improvement.
-
-thx,
-
-Jason.
+So, passing -mno-single-pic-base means that you're actually _restoring_
+the compiler behaviour that we're expecting for the decompressor.
