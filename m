@@ -1,75 +1,42 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 4 Feb 2013 17:58:51 +0200
-Subject: [PATCH 04/13] mfd: omap-usb-tll: Add device tree support
+Date: Mon, 4 Feb 2013 17:58:52 +0200
+Subject: [PATCH 05/13] USB: ehci-omap: Get platform resources by index rather
+ than by name
 In-Reply-To: <1359993540-20780-1-git-send-email-rogerq@ti.com>
 References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
-Message-ID: <1359993540-20780-5-git-send-email-rogerq@ti.com>
+Message-ID: <1359993540-20780-6-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable this driver to probe in device tree boot.
+Since there is only one resource per type we don't really need
+to use resource name to obtain it. This also also makes it easier
+for device tree adaptation.
 
-CC: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- .../devicetree/bindings/mfd/omap-usb-tll.txt       |   17 +++++++++++++++++
- drivers/mfd/omap-usb-tll.c                         |    9 +++++++++
- 2 files changed, 26 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
+ drivers/usb/host/ehci-omap.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt b/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
-new file mode 100644
-index 0000000..835cf4f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
-@@ -0,0 +1,17 @@
-+OMAP HS USB Host TLL (Transceiver-Less Interface)
-+
-+Required properties:
-+
-+- compatible : should be "ti,usbhs-tll"
-+- reg : should contain one register range i.e. start and length
-+- interrupts : should contain the TLL module's interrupt
-+- ti,hwmod : must contain "usb_tll_hs"
-+
-+Example:
-+
-+	usbhstll: usbhstll at 0x4a062000 {
-+		compatible = "ti,usbhs-tll";
-+		reg = <0x4a062000 0x1000>;
-+		interrupts = <78>;
-+		ti,hwmods = "usb_tll_hs";
-+	  };
-diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
-index f7d2568..f7afb22 100644
---- a/drivers/mfd/omap-usb-tll.c
-+++ b/drivers/mfd/omap-usb-tll.c
-@@ -28,6 +28,7 @@
- #include <linux/err.h>
- #include <linux/pm_runtime.h>
- #include <linux/platform_data/usb-omap.h>
-+#include <linux/of.h>
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index 60c4a2d..5a831aef 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -148,14 +148,13 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
- #define USBTLL_DRIVER_NAME	"usbhs_tll"
+-	irq = platform_get_irq_byname(pdev, "ehci-irq");
++	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(dev, "EHCI irq failed\n");
+ 		return -ENODEV;
+ 	}
  
-@@ -311,10 +312,18 @@ static int usbtll_omap_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id usbtll_omap_dt_ids[] = {
-+	{ .compatible = "ti,usbhs-tll" },
-+	{ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, usbtll_omap_dt_ids);
-+
- static struct platform_driver usbtll_omap_driver = {
- 	.driver = {
- 		.name		= (char *)usbtll_driver_name,
- 		.owner		= THIS_MODULE,
-+		.of_match_table = of_match_ptr(usbtll_omap_dt_ids),
- 	},
- 	.probe		= usbtll_omap_probe,
- 	.remove		= usbtll_omap_remove,
+-	res =  platform_get_resource_byname(pdev,
+-				IORESOURCE_MEM, "ehci");
++	res =  platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(regs)) {
+ 		dev_err(dev, "Resource request/ioremap failed\n");
 -- 
 1.7.4.1
