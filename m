@@ -1,108 +1,28 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 4 Feb 2013 17:59:00 +0200
-Subject: [PATCH 13/13] ARM: dts: omap3-beagle: Add USB Host support
-In-Reply-To: <1359993540-20780-1-git-send-email-rogerq@ti.com>
-References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
-Message-ID: <1359993540-20780-14-git-send-email-rogerq@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Feb 2013 16:01:33 +0000
+Subject: [PATCH v2 2/2] ARM: uncompress debug support for multiplatform
+ build
+In-Reply-To: <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
+References: <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
+ <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130204160133.GH17786@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide RESET and Power regulators for the USB PHY,
-the USB Host port mode and the PHY device.
+On Fri, Jan 18, 2013 at 10:45:20AM +0800, Shawn Guo wrote:
+> Instead of giving zero support of uncompress debug for multiplatform
+> build, the patch turns uncompress debug into one part of DEBUG_LL
+> support.  When DEBUG_LL is turned on for a particular platform,
+> uncompress debug works too for that platform.
+> 
+> It reuses the platform DEBUG_LL macros by creating a simple
+> arch/arm/boot/compressed/debug.S with CONFIG_DEBUG_LL_INCLUDE
+> included there, and implements a generic putc() using those macros.
 
-Also provide pin multiplexer information for USB host
-pins.
+Ok, I've applied this on the previso that _no one_ in future whinges if
+the debug infrastructure doesn't quite meet their expectation.  The
+debug infrastructure remains first and foremost that: a simple debug
+infrastructure suitable for use in the early assembly and the like.
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/omap3-beagle.dts |   71 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 71 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index f624dc8..2c4a6d6 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -38,6 +38,57 @@
- 		};
- 	};
- 
-+	/* HS USB Port 2 RESET */
-+	hsusb2_reset: hsusb2_reset_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_reset";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio5 19 0>;	/* gpio_147 */
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+	};
-+
-+	/* HS USB Port 2 Power */
-+	hsusb2_power: hsusb2_power_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_vbus";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
-+		startup-delay-us = <70000>;
-+	};
-+
-+	/* HS USB Host PHY on PORT 2 */
-+	hsusb2_phy: hsusb2_phy {
-+		compatible = "usb-nop-xceiv";
-+		reset-supply = <&hsusb2_reset>;
-+		vcc-supply = <&hsusb2_power>;
-+	};
-+};
-+
-+&omap3_pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&hsusbb2_pins
-+	>;
-+
-+	hsusbb2_pins: pinmux_hsusbb2_pins {
-+		pinctrl-single,pins = <
-+			0x5c0 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk OUTPUT */
-+			0x5c2 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp OUTPUT */
-+			0x5c4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir INPUT | PULLDOWN */
-+			0x5c6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt INPUT | PULLDOWN */
-+			0x5c8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 INPUT | PULLDOWN */
-+			0x5cA 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 INPUT | PULLDOWN */
-+			0x1a4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 INPUT | PULLDOWN */
-+			0x1a6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 INPUT | PULLDOWN */
-+			0x1a8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 INPUT | PULLDOWN */
-+			0x1aa 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 INPUT | PULLDOWN */
-+			0x1ac 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 INPUT | PULLDOWN */
-+			0x1ae 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -65,3 +116,23 @@
- &mmc3 {
- 	status = "disabled";
- };
-+
-+&usbhshost {
-+	port2_mode = <1>; /* OMAP_EHCI_PORT_MODE_PHY */
-+};
-+
-+&usbhsehci {
-+	phy = <0 &hsusb2_phy>;
-+};
-+
-+&twl_gpio {
-+	ti,use-leds;
-+	/* pullups: BIT(1) */
-+	ti,pullups = <0x000002>;
-+	/*
-+	 * pulldowns:
-+	 * BIT(2), BIT(6), BIT(7), BIT(8), BIT(13)
-+	 * BIT(15), BIT(16), BIT(17)
-+	 */
-+	ti,pulldowns = <0x03a1c4>;
-+};
--- 
-1.7.4.1
+That is its primary concern and trumps any requirements from consoles,
+early printk, decompressor output, and the like.
