@@ -1,84 +1,62 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Feb 2013 13:46:31 -0600
-Subject: [PATCH V3 2/7] ARM: OMAP2+: Remove hard-coded test on timer ID
-In-Reply-To: <1360007196-21350-1-git-send-email-jon-hunter@ti.com>
-References: <1360007196-21350-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1360007196-21350-3-git-send-email-jon-hunter@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 4 Feb 2013 14:47:14 -0500
+Subject: [PATCH 0/2] ARM: mvebu: Add support for SPI controller in
+ Armada 370/XP
+In-Reply-To: <20130204192914.GA2456@localhost>
+References: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130204165119.GA2440@localhost>
+ <20130204183733.GM14746@titan.lakedaemon.net>
+ <20130204192914.GA2456@localhost>
+Message-ID: <20130204194714.GN14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, when configuring the clock-events and clock-source timers
-for OMAP2+ devices, we check whether the timer ID is 12 before
-attempting to set the parent clock for the timer.
+Ezequiel,
 
-This test was added for OMAP3 general purpose devices (no security
-features enabled) that a 12th timer available but unlike the other
-timers only has a single functional clock source. Calling
-clk_set_parent() for this 12th timer would always return an error
-because there is only one choice for a parent clock. Therefore,
-this hard-coded timer ID test was added.
+On Mon, Feb 04, 2013 at 04:29:15PM -0300, Ezequiel Garcia wrote:
+> On Mon, Feb 04, 2013 at 01:37:33PM -0500, Jason Cooper wrote:
+> > On Mon, Feb 04, 2013 at 01:51:20PM -0300, Ezequiel Garcia wrote:
+> > > The patches are based in Jason Cooper's mvebu/dt branch.
+> > 
+> > It probably doesn't matter for this series (I haven't tried to apply it
+> > yet), but please base future work off of a mainline tag (eg v3.8-rc6).
+> > It makes merge conflicts easier to resolve.
+> > 
+> > Feel free to test-merge against the mvebu/ branches and let me know of
+> > any conflicts.
+> > 
+> 
+> Ah, I see.
+> 
+> I was mistakenly assuming you wanted against that branch;
+> I'll base the patches on mainline in the future.
 
-To avoid this timer ID test, simply check to see if the timer's current
-parent clock is the desired parent clock and only call clk_set_parent()
-if this is not the case.
+Nope, the branches are organized that way to sanely merge in with all
+the other arm-soc code.  While I make every effort to keep them stable
+(ie, not rebased), they may change at anytime if I need to fix things.
 
-Also if clk_get() fails, then use PTR_ERR() to return the error code.
+tags are stable, and if all patches are based on tags, then merge
+conflicts follow a predictable pattern.  Anything else devolves into
+chaos.
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/timer.c |   27 ++++++++++++++-------------
- 1 file changed, 14 insertions(+), 13 deletions(-)
+> > Also, your patch series appears to be out of order, did you use git
+> > send-email once per file?
+> 
+> I always send the cover letter manually. This time I did it after the patches.
+> I'm in the process of automating this in my workflow,
+> but feel free to make a suggestion.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 83118fb..c6b3fdd 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -224,6 +224,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	struct device_node *np;
- 	struct omap_hwmod *oh;
- 	struct resource irq, mem;
-+	struct clk *src;
- 	int r = 0;
- 
- 	if (of_have_populated_dt()) {
-@@ -278,24 +279,24 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	/* After the dmtimer is using hwmod these clocks won't be needed */
- 	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
- 	if (IS_ERR(timer->fclk))
--		return -ENODEV;
-+		return PTR_ERR(timer->fclk);
-+
-+	src = clk_get(NULL, fck_source);
-+	if (IS_ERR(src))
-+		return PTR_ERR(src);
- 
--	/* FIXME: Need to remove hard-coded test on timer ID */
--	if (gptimer_id != 12) {
--		struct clk *src;
--
--		src = clk_get(NULL, fck_source);
--		if (IS_ERR(src)) {
--			r = -EINVAL;
--		} else {
--			r = clk_set_parent(timer->fclk, src);
--			if (IS_ERR_VALUE(r))
--				pr_warn("%s: %s cannot set source\n",
--					__func__, oh->name);
-+	if (clk_get_parent(timer->fclk) != src) {
-+		r = clk_set_parent(timer->fclk, src);
-+		if (IS_ERR_VALUE(r)) {
-+			pr_warn("%s: %s cannot set source\n", __func__,
-+				oh->name);
- 			clk_put(src);
-+			return r;
- 		}
- 	}
- 
-+	clk_put(src);
-+
- 	omap_hwmod_setup_one(oh_name);
- 	omap_hwmod_enable(oh);
- 	__omap_dm_timer_init_regs(timer);
--- 
-1.7.10.4
+if format-patch is called properly (I know from experience how to call
+it improperly ;-) ), you can just do
+
+$ git send-email ... /path/to/patches/*.patch
+
+and it'll get the order correct.  It will also ask for confirmation
+before sending each email.
+
+Dry-run sending a series just to yourself lets you see how it will
+appear once it goes out to the list.
+
+hth,
+
+Jason.
