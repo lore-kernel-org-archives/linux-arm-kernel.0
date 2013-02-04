@@ -1,185 +1,226 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 4 Feb 2013 14:12:11 -0600
-Subject: [PATCHv4 for soc 4/4] arm: socfpga: Add SMP support for actual
- socfpga harware
+Date: Mon, 4 Feb 2013 14:12:08 -0600
+Subject: [PATCHv4 for soc 1/4] arm: socfpga: Add new device tree source for
+ actual socfpga HW
 In-Reply-To: <1360008731-17021-1-git-send-email-dinguyen@altera.com>
 References: <1360008731-17021-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1360008731-17021-5-git-send-email-dinguyen@altera.com>
+Message-ID: <1360008731-17021-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Because the CPU1 start address is different for socfpga-vt and
-socfpga-cyclone5, we add code to use the correct CPU1 start addr.
+Up to this point, support for socfpga has only been on a virtual
+platform. Now that actual hardware is available, we add the appropriate
+device tree source files.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Signed-off-by: Pavel Machek <pavel@denx.de>
+Tested-by: Pavel Machek <pavel@denx.de>
+Reviewed-by: Pavel Machek <pavel@denx.de>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof Johansson <olof@lixom.net>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
 ---
- .../bindings/arm/altera/socfpga-system.txt         |    2 ++
- arch/arm/boot/dts/socfpga_cyclone5.dts             |    4 ++++
- arch/arm/boot/dts/socfpga_vt.dts                   |    4 ++++
- arch/arm/mach-socfpga/core.h                       |    4 +++-
- arch/arm/mach-socfpga/headsmp.S                    |   16 ++++++++++++----
- arch/arm/mach-socfpga/platsmp.c                    |   17 ++++++++++-------
- arch/arm/mach-socfpga/socfpga.c                    |    6 ++++++
- 7 files changed, 41 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/socfpga.dtsi         |   22 ++++++------
+ arch/arm/boot/dts/socfpga_cyclone5.dts |   30 ++++++++++++++--
+ arch/arm/boot/dts/socfpga_vt.dts       |   60 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c        |    1 -
+ 4 files changed, 98 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/boot/dts/socfpga_vt.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
-index 07c65e3..f4d04a0 100644
---- a/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
-@@ -3,9 +3,11 @@ Altera SOCFPGA System Manager
- Required properties:
- - compatible : "altr,sys-mgr"
- - reg : Should contain 1 register ranges(address and length)
-+- cpu1-start-addr : CPU1 start address in hex.
- 
- Example:
- 	 sysmgr at ffd08000 {
- 		compatible = "altr,sys-mgr";
- 		reg = <0xffd08000 0x1000>;
-+		cpu1-start-addr = <0xffd080c4>;
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 19aec42..936d230 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -25,6 +25,10 @@
+ 		ethernet0 = &gmac0;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
++		timer0 = &timer0;
++		timer1 = &timer1;
++		timer2 = &timer2;
++		timer3 = &timer3;
  	};
+ 
+ 	cpus {
+@@ -98,47 +102,41 @@
+ 			interrupts = <1 13 0xf04>;
+ 		};
+ 
+-		timer0: timer at ffc08000 {
++		timer0: timer0 at ffc08000 {
+ 			compatible = "snps,dw-apb-timer-sp";
+ 			interrupts = <0 167 4>;
+-			clock-frequency = <200000000>;
+ 			reg = <0xffc08000 0x1000>;
+ 		};
+ 
+-		timer1: timer at ffc09000 {
++		timer1: timer1 at ffc09000 {
+ 			compatible = "snps,dw-apb-timer-sp";
+ 			interrupts = <0 168 4>;
+-			clock-frequency = <200000000>;
+ 			reg = <0xffc09000 0x1000>;
+ 		};
+ 
+-		timer2: timer at ffd00000 {
++		timer2: timer2 at ffd00000 {
+ 			compatible = "snps,dw-apb-timer-osc";
+ 			interrupts = <0 169 4>;
+-			clock-frequency = <200000000>;
+ 			reg = <0xffd00000 0x1000>;
+ 		};
+ 
+-		timer3: timer at ffd01000 {
++		timer3: timer3 at ffd01000 {
+ 			compatible = "snps,dw-apb-timer-osc";
+ 			interrupts = <0 170 4>;
+-			clock-frequency = <200000000>;
+ 			reg = <0xffd01000 0x1000>;
+ 		};
+ 
+-		uart0: uart at ffc02000 {
++		uart0: serial0 at ffc02000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0xffc02000 0x1000>;
+-			clock-frequency = <7372800>;
+ 			interrupts = <0 162 4>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 		};
+ 
+-		uart1: uart at ffc03000 {
++		uart1: serial1 at ffc03000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0xffc03000 0x1000>;
+-			clock-frequency = <7372800>;
+ 			interrupts = <0 163 4>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
 diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-index 7ad3cc6..3ae8a83 100644
+index ab7e4a9..7ad3cc6 100644
 --- a/arch/arm/boot/dts/socfpga_cyclone5.dts
 +++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-@@ -56,5 +56,9 @@
- 		serial1 at ffc03000 {
- 			clock-frequency = <100000000>;
- 		};
+@@ -20,7 +20,7 @@
+ 
+ / {
+ 	model = "Altera SOCFPGA Cyclone V";
+-	compatible = "altr,socfpga-cyclone5";
++	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+ 
+ 	chosen {
+ 		bootargs = "console=ttyS0,57600";
+@@ -29,6 +29,32 @@
+ 	memory {
+ 		name = "memory";
+ 		device_type = "memory";
+-		reg = <0x0 0x10000000>; /* 256MB */
++		reg = <0x0 0x40000000>; /* 1GB */
++	};
 +
-+		sysmgr at ffd08000 {
-+			cpu1-start-addr = <0xffd080c4>;
++	soc {
++		timer0 at ffc08000 {
++			clock-frequency = <100000000>;
++		};
++
++		timer1 at ffc09000 {
++			clock-frequency = <100000000>;
++		};
++
++		timer2 at ffd00000 {
++			clock-frequency = <25000000>;
++		};
++
++		timer3 at ffd01000 {
++			clock-frequency = <25000000>;
++		};
++
++		serial0 at ffc02000 {
++			clock-frequency = <100000000>;
++		};
++
++		serial1 at ffc03000 {
++			clock-frequency = <100000000>;
 +		};
  	};
  };
 diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index a0c6c65..1036eba 100644
---- a/arch/arm/boot/dts/socfpga_vt.dts
+new file mode 100644
+index 0000000..a0c6c65
+--- /dev/null
 +++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -56,5 +56,9 @@
- 		serial1 at ffc03000 {
- 			clock-frequency = <7372800>;
- 		};
+@@ -0,0 +1,60 @@
++/*
++ *  Copyright (C) 2013 Altera Corporation <www.altera.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+		sysmgr at ffd08000 {
-+			cpu1-start-addr = <0xffd08010>;
++/dts-v1/;
++/include/ "socfpga.dtsi"
++
++/ {
++	model = "Altera SOCFPGA VT";
++	compatible = "altr,socfpga-vt", "altr,socfpga";
++
++	chosen {
++		bootargs = "console=ttyS0,57600";
++	};
++
++	memory {
++		name = "memory";
++		device_type = "memory";
++		reg = <0x0 0x40000000>; /* 1 GB */
++	};
++
++	soc {
++		timer0 at ffc08000 {
++			clock-frequency = <7000000>;
 +		};
- 	};
- };
-diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-index 9941caa..5b76dd4 100644
---- a/arch/arm/mach-socfpga/core.h
-+++ b/arch/arm/mach-socfpga/core.h
-@@ -20,7 +20,7 @@
- #ifndef __MACH_CORE_H
- #define __MACH_CORE_H
- 
--extern void secondary_startup(void);
-+extern void v7_secondary_startup(void);
- extern void __iomem *socfpga_scu_base_addr;
- 
- extern void socfpga_init_clocks(void);
-@@ -29,6 +29,8 @@ extern void socfpga_sysmgr_init(void);
- extern struct smp_operations socfpga_smp_ops;
- extern char secondary_trampoline, secondary_trampoline_end;
- 
-+extern unsigned long cpu1start_addr;
 +
- #define SOCFPGA_SCU_VIRT_BASE   0xfffec000
- 
- #endif
-diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
-index f09b128..3c83582 100644
---- a/arch/arm/mach-socfpga/headsmp.S
-+++ b/arch/arm/mach-socfpga/headsmp.S
-@@ -13,13 +13,21 @@
- 	__CPUINIT
- 	.arch	armv7-a
- 
--#define CPU1_START_ADDR 	        0xffd08010
--
- ENTRY(secondary_trampoline)
--	movw	r0, #:lower16:CPU1_START_ADDR
--	movt  r0, #:upper16:CPU1_START_ADDR
-+	movw	r2, #:lower16:cpu1start_addr
-+	movt  r2, #:upper16:cpu1start_addr
++		timer1 at ffc09000 {
++			clock-frequency = <7000000>;
++		};
 +
-+	/* The socfpga VT cannot handle a 0xC0000000 page offset when loading
-+		the cpu1start_addr, we bit clear it. Tested on HW and VT. */
-+	bic	r2, r2, #0x40000000
- 
-+	ldr	r0, [r2]
- 	ldr	r1, [r0]
- 	bx	r1
- 
- ENTRY(secondary_trampoline_end)
++		timer2 at ffd00000 {
++			clock-frequency = <7000000>;
++		};
 +
-+ENTRY(v7_secondary_startup)
-+       bl      v7_invalidate_l1
-+       b       secondary_startup
-+ENDPROC(v7_secondary_startup)
-diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-index 68dd1b6..d89bc67 100644
---- a/arch/arm/mach-socfpga/platsmp.c
-+++ b/arch/arm/mach-socfpga/platsmp.c
-@@ -47,16 +47,19 @@ static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct
- {
- 	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
- 
--	memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
-+	if (cpu1start_addr) {
-+		memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
- 
--	__raw_writel(virt_to_phys(secondary_startup), (sys_manager_base_addr+0x10));
-+		__raw_writel(virt_to_phys(v7_secondary_startup),
-+			(sys_manager_base_addr + (cpu1start_addr & 0x000000ff)));
- 
--	flush_cache_all();
--	smp_wmb();
--	outer_clean_range(0, trampoline_size);
-+		flush_cache_all();
-+		smp_wmb();
-+		outer_clean_range(0, trampoline_size);
- 
--	/* This will release CPU #1 out of reset.*/
--	__raw_writel(0, rst_manager_base_addr + 0x10);
-+		/* This will release CPU #1 out of reset.*/
-+		__raw_writel(0, rst_manager_base_addr + 0x10);
-+	}
- 
- 	return 0;
- }
++		timer3 at ffd01000 {
++			clock-frequency = <7000000>;
++		};
++
++		serial0 at ffc02000 {
++			clock-frequency = <7372800>;
++		};
++
++		serial1 at ffc03000 {
++			clock-frequency = <7372800>;
++		};
++	};
++};
 diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 94aa6ad..cec1266 100644
+index 6732924..94aa6ad 100644
 --- a/arch/arm/mach-socfpga/socfpga.c
 +++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -29,6 +29,7 @@
- void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
- void __iomem *sys_manager_base_addr;
- void __iomem *rst_manager_base_addr;
-+unsigned long cpu1start_addr;
+@@ -98,7 +98,6 @@ static void __init socfpga_cyclone5_init(void)
  
- static struct map_desc scu_io_desc __initdata = {
- 	.virtual	= SOCFPGA_SCU_VIRT_BASE,
-@@ -72,6 +73,11 @@ void __init socfpga_sysmgr_init(void)
- 	struct device_node *np;
+ static const char *altera_dt_match[] = {
+ 	"altr,socfpga",
+-	"altr,socfpga-cyclone5",
+ 	NULL
+ };
  
- 	np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
-+
-+	if (of_property_read_u32(np, "cpu1-start-addr",
-+			(u32 *) &cpu1start_addr))
-+		pr_err("SMP: Need cpu1-start-addr in device tree.\n");
-+
- 	sys_manager_base_addr = of_iomap(np, 0);
- 
- 	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
 -- 
 1.7.9.5
