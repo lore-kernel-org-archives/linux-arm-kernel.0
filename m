@@ -1,26 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 4 Feb 2013 18:35:42 +0000
-Subject: [PATCH v4 1/3] ASoC: tlv320aic3x: Convert mic bias to a supply
- widget
-In-Reply-To: <1359636786-7056-2-git-send-email-gururaja.hebbar@ti.com>
-References: <1359636786-7056-1-git-send-email-gururaja.hebbar@ti.com>
- <1359636786-7056-2-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20130204183542.GS4720@opensource.wolfsonmicro.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 4 Feb 2013 13:37:33 -0500
+Subject: [PATCH 0/2] ARM: mvebu: Add support for SPI controller in
+ Armada 370/XP
+In-Reply-To: <20130204165119.GA2440@localhost>
+References: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130204165119.GA2440@localhost>
+Message-ID: <20130204183733.GM14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 06:23:04PM +0530, Hebbar Gururaja wrote:
-> Convert MicBias widgets to supply widget.
-> 
-> On tlv320aic3x, Mic bias power on/off shares the same register bits
-> with output mic bias voltage.  So, when power on mic bias, we need
-> reclaim it to voltage value.
+Ezequiel,
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130204/e1d80052/attachment.sig>
+This series looks good.  just a few comments:
+
+On Mon, Feb 04, 2013 at 01:51:20PM -0300, Ezequiel Garcia wrote:
+> Hi,
+> 
+> This patchset adds support for the SPI controller
+> available in Armada 370 and Armada XP SoC.
+> 
+> The patches are based in Jason Cooper's mvebu/dt branch.
+
+It probably doesn't matter for this series (I haven't tried to apply it
+yet), but please base future work off of a mainline tag (eg v3.8-rc6).
+It makes merge conflicts easier to resolve.
+
+Feel free to test-merge against the mvebu/ branches and let me know of
+any conflicts.
+
+Also, your patch series appears to be out of order, did you use git
+send-email once per file?
+
+thx,
+
+Jason.
