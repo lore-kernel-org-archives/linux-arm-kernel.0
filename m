@@ -1,73 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Feb 2013 09:45:02 -0800
-Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
-In-Reply-To: <510FCE40.5040202@ti.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
- <20130201215154.GV22517@atomide.com> <510C6A3D.70401@ti.com>
- <20130202181147.GC577@atomide.com> <510FCE40.5040202@ti.com>
-Message-ID: <20130204174501.GO22517@atomide.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 4 Feb 2013 11:47:36 -0600
+Subject: [PATCH V2 0/7] ARM: OMAP2+: System timer updates
+In-Reply-To: <1359999786-8740-1-git-send-email-jon-hunter@ti.com>
+References: <1359999786-8740-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <510FF438.9090103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130204 07:09]:
+
+On 02/04/2013 11:42 AM, Jon Hunter wrote:
+> This series consists mainly of clean-ups for clockevents and
+> clocksource timers on OMAP2+ devices. The most significant change
+> in functionality comes from the 5th patch which is changing the
+> selection of the clocksource timer for OMAP3 and AM335x devices
+> when gptimers are used for clocksource. This change came about from
+> Vaibhav Bedia's series for AM335x [1]. See patch for more details on
+> the exact nature of the change.
 > 
-> On 02/02/2013 12:11 PM, Tony Lindgren wrote:
-> > * Jon Hunter <jon-hunter@ti.com> [130201 17:25]:
-> >>
-> >> On 02/01/2013 03:51 PM, Tony Lindgren wrote:
-> >>>
-> >>> How about let's fix this properly to start with so we don't add
-> >>> more blockers moving this code to drivers/bus?
-> >>>
-> >>> Looks like gpmc_mem_init() gets called from gpmc_probe() so
-> >>> we can pass that information in pdev.
-> >>
-> >> I wondered if you would suggest that ;-)
-> > 
-> > :)
-> >  
-> >> I definitely can and it is probably best. Things like this become
-> >> painful when we move to device-tree. We really need a generic way for
-> >> passing stuff like this to drivers for omap. Our options are auxdata or
-> >> bus notifiers. I am wondering whether we can plug pdata in the
-> >> omap_device bus notifier for device-tree. Let me know if you have any
-> >> thoughts.
-> > 
-> > Hmm but in this case can't you just do it based on the compatible
-> > flag? For legacy systems we also need to pass it in pdata.
+> Boot tested with and without  device-tree on OMAP2420 H4, OMAP3430 SDP,
+> OMAP3430 Beagle Board, OMAP4430 SDP and AM335x EVM (AM335x only
+> supports device-tree boot). Also boot tested boards with kernel boot
+> parameter "clocksource=gp_timer".
 > 
-> This is a boot-time configuration. So really you need to read the
-> control status register at boot and then determine the mapping. We could
-> store the address of the control status read in the pdata, but I think
-> that is a bit of a hack.
-
-Ah right. Well once we have Haojian's generic pinconf patches merged for
-pinctrl-single, we can set up the CONTROL_STATUS register as a
-pinctrl-single,bits register and query the SYSBOOT_3 pin value directly
-from the driver.
-
-AFAIK SYSBOOT_n values reflect the boot time values of the actual SYSBOOT
-pins, so using generic pinconf there makes sense. But this of course should
-be checked.
- 
-> > Regarding omap_device, we should find a way to keep the dependencies
-> > between drivers and the bus code down to minimum. So ideally things
-> > like this would be only done using just the compatible flag. But the
-> > pdata we cannot remove quite yet.
+> This series is based upon ARM-SoC next branch.
 > 
-> Agree. However, there are several drivers today (gpio, dmtimer, mmc,
-> serial, dss, etc), that make use of a function pointer to
-> omap_pm_get_dev_context_loss_count() to determine when the peripheral's
-> state has been lost. When booting with DT this function pointer is not
-> populated and so with DT we currently have no way to determine this. I
-> see this as a blocker to migrating completely to DT. Ideally we would
-> find a way for RPM to handle this and remove the function pointer.
-> However, right now we still need a generic way to pass this type of
-> platform data to drivers.
+> V2 changes:
+> - Fixed bug in patch that updates clocksource and clockevents timer
+>   names to use the hwmod timer names (thanks Vaibhav Bedia!)
+> - Updated patch that removes the hard-coded ID test to return an error
+>   as soon as clk_set_parent fails instead of waiting for the end of the
+>   function.
+> - Fixed bug in patches that "simplify system timer clock definitions"
+>   and "simplify system timer definitions" that was prevent omap4/5
+>   boards from booting with kernel boot parameter "clocksource=gp_timer".
+> - Updated changelog for patch "simplify system timer definitions" per
+>   feedback received from Igor.
+> - Added new patch to store the timer ID in the omap_dm_timer structure
+>   to clean-up the code.
+> - Added new patch to fix a sparse warning seen in ARM-SOC next.
+> 
+> [1] https://patchwork.kernel.org/patch/1921421/
+> 
+> 
+> Jon Hunter (7):
+>   ARM: OMAP2+: Fix selection of clockevent timer when using device-tree
 
-Yeah pinconf generic won't help us with the legacy boot.
+Ugh, sorry something got screwed up here. This was not meant to be
+included and I am missing another patch. Will resend this series.
 
-Regards,
-
-Tony
+Jon
