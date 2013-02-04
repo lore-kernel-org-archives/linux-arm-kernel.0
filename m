@@ -1,42 +1,42 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 4 Feb 2013 13:50:02 +0800
-Subject: [arm-soc:next/soc 4/8] arch/arm/mach-prima2/platsmp.c:20:30:
- fatal error: asm/hardware/gic.h: No such file or directory
-In-Reply-To: <20130130003908.GA12315@quad.lixom.net>
-References: <51082342.HQ+h7FMwJqkm7gxO%fengguang.wu@intel.com>
- <20130130002905.GA55457@bee> <20130130003908.GA12315@quad.lixom.net>
-Message-ID: <CAGsJ_4w=VbgeynkwHiWkozsGFvQDZR=Grgc67yJ_n_Q7Bc=JTQ@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 4 Feb 2013 17:04:21 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the mfd tree
+Message-ID: <20130204170421.1dd829d596474b12c12190df@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi all,
 
-2013/1/30 Olof Johansson <olof@lixom.net>
->
-> On Wed, Jan 30, 2013 at 08:29:05AM +0800, Xie ChanglongX wrote:
-> >
-> > Hi Olof,
-> >
-> > FYI, kernel build failed on
-> >
-> > tree:   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-> > next/soc
-> > head:   6ed05a2aab3763b58922247543d7079106b254dc
-> > commit: af70fdc947dbe835acc26c6ee9e8e930f38935f8 [4/8] Merge branch
-> > 'marco-timer-cleanup-rebase' of
-> > git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel into next/soc
-> > config: make ARCH=arm prima2_defconfig
->
-> Thanks! Yes, this is a known issue as of this morning, I didn't catch it
-> before
-> I merged in so I asked Barry to follow up with a fix.
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/mfd/db8500-prcmu.c between commit 5073e7b57041 ("mfd:
+db8500-prcmu: Add ux500_wdt mfd_cell") from the mfd tree and commit
+520f7bd73354 ("irqchip: Move ARM gic.h to
+include/linux/irqchip/arm-gic.h") from the arm-soc tree.
 
-done by "[PATCH] ARM: MARCO: fix the build issue due to
-gic-vic-to-irqchip move".
-i'll not send a pull request for it, would you apply it separately?
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
->
->
-> -Olof
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
--barry
+diff --cc drivers/mfd/db8500-prcmu.c
+index e42a417,42f3afc..0000000
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@@ -32,8 -33,6 +33,7 @@@
+  #include <linux/regulator/db8500-prcmu.h>
+  #include <linux/regulator/machine.h>
+  #include <linux/cpufreq.h>
+ +#include <linux/platform_data/ux500_wdt.h>
+- #include <asm/hardware/gic.h>
+  #include <mach/hardware.h>
+  #include <mach/irqs.h>
+  #include <mach/db8500-regs.h>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130204/4814b64b/attachment.sig>
