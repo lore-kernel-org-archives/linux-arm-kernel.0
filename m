@@ -1,33 +1,87 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 04 Feb 2013 09:17:48 +0800
-Subject: [PATCH] ARM:omap2: using strlcpy instead of strncpy
-In-Reply-To: <20130202180723.GB577@atomide.com>
-References: <51090829.1010109@asianux.com>
- <20130201224546.GG22517@atomide.com> <510C7925.9040006@asianux.com>
- <20130202180723.GB577@atomide.com>
-Message-ID: <510F0C3C.1040003@asianux.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Mon, 4 Feb 2013 09:29:00 +0800
+Subject: [PATCH V1 RESEND] ARM: gic: add irq_set_affinity to gic_arch_extn
+In-Reply-To: <1359447959-20554-1-git-send-email-chao.xie@marvell.com>
+References: <1359447959-20554-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <CADApbejF1K5UB24S6J_RGCEV6LKewOoozfVZpO3oNpZEp3kPEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?02?03? 02:07, Tony Lindgren ??:
->>   is it suitable to sync the MAINTAINER file for it ?
->> >     if suitable, can you help to change it ?
-> Yes I suggest we add Peter as the maintainer for all twl
-> related things.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
+hi, Russell
+How do you think about this patch?
 
-  ok, thanks.
 
-by the way:
-  if necessary (not find another suitable members to sync it), I should
-sync it (since I found it)
-
--- 
-Chen Gang
-
-Asianux Corporation
+On Tue, Jan 29, 2013 at 4:25 PM, Chao Xie <chao.xie@marvell.com> wrote:
+> gic_arch_extn is used for ARCH specific interrupt controller.
+> It has added the callbacks for irq_mask/irq_unamsk and so, but
+> irq_set_affinity is not used.
+> For SMP architecure, when both cores are powered off, the GIC may
+> be powered off too. An external interrupt controller can be used
+> as a logic to detect the interrupt and acknowledge power managment
+> unitto wake up core.
+> Because the irqs may be bound to different cors, when set irq
+> affinity, the external interrupt controller should be set too. Then
+> it can acknowledge the power managment unit to wake up correct core.
+>
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> ---
+>  arch/arm/common/gic.c |   27 ++++++++++++++++++---------
+>  1 files changed, 18 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 36ae03a..49920a0 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -82,12 +82,15 @@ static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
+>   * Default make them NULL.
+>   */
+>  struct irq_chip gic_arch_extn = {
+> -       .irq_eoi        = NULL,
+> -       .irq_mask       = NULL,
+> -       .irq_unmask     = NULL,
+> -       .irq_retrigger  = NULL,
+> -       .irq_set_type   = NULL,
+> -       .irq_set_wake   = NULL,
+> +       .irq_eoi                = NULL,
+> +       .irq_mask               = NULL,
+> +       .irq_unmask             = NULL,
+> +       .irq_retrigger          = NULL,
+> +       .irq_set_type           = NULL,
+> +#ifdef CONFIG_SMP
+> +       .irq_set_affinity       = NULL,
+> +#endif
+> +       .irq_set_wake           = NULL,
+>  };
+>
+>  #ifndef MAX_GIC_NR
+> @@ -245,6 +248,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>         unsigned int shift = (gic_irq(d) % 4) * 8;
+>         unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+>         u32 val, mask, bit;
+> +       int ret = IRQ_SET_MASK_OK;
+>
+>         if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
+>                 return -EINVAL;
+> @@ -253,11 +257,16 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>         bit = gic_cpu_map[cpu] << shift;
+>
+>         raw_spin_lock(&irq_controller_lock);
+> -       val = readl_relaxed(reg) & ~mask;
+> -       writel_relaxed(val | bit, reg);
+> +       if (gic_arch_extn.irq_set_affinity)
+> +               ret = gic_arch_extn.irq_set_affinity(d, mask_val, force);
+> +
+> +       if (ret == IRQ_SET_MASK_OK) {
+> +               val = readl_relaxed(reg) & ~mask;
+> +               writel_relaxed(val | bit, reg);
+> +       }
+>         raw_spin_unlock(&irq_controller_lock);
+>
+> -       return IRQ_SET_MASK_OK;
+> +       return ret;
+>  }
+>  #endif
+>
+> --
+> 1.7.4.1
+>
