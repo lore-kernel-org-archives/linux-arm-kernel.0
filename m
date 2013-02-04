@@ -1,36 +1,51 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 4 Feb 2013 16:34:01 +0200
-Subject: [PATCH v5 09/10] clk: tegra: Implement clocks for Tegra114
-In-Reply-To: <510F5E87.90801@nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-10-git-send-email-pdeschrijver@nvidia.com>
- <510F5E87.90801@nvidia.com>
-Message-ID: <20130204143401.GW2364@tbergstrom-lnx.Nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Feb 2013 14:34:33 +0000
+Subject: [PATCHv2 1/2] ARM: dma-mapping: add support for CMA regions
+ placed in highmem zone
+In-Reply-To: <xa1tfw1cb1ho.fsf@mina86.com>
+References: <1358350284-6972-2-git-send-email-m.szyprowski@samsung.com>
+ <1359984182-6307-1-git-send-email-m.szyprowski@samsung.com>
+ <xa1tlib4b30n.fsf@mina86.com> <20130204141053.GD17786@n2100.arm.linux.org.uk>
+ <xa1tfw1cb1ho.fsf@mina86.com>
+Message-ID: <20130204143433.GE17786@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 08:08:55AM +0100, Prashant Gaikwad wrote:
-> On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
-
-...
-
-> > +       /* xusb_hs_src */
-> > +       val = readl(clk_base + CLK_SOURCE_XUSB_SS_SRC);
-> > +       val |= BIT(25); /* always select PLLU_60M */
-> > +       writel(val, clk_base + CLK_SOURCE_XUSB_SS_SRC);
-> > +
-> > +       clk = clk_register_fixed_factor(NULL, "xusb_hs_src", "pll_u_60M", 0,
-> > +                                       1, 1);
-> > +       clks[xusb_hs_src] = clk;
-> > +
+On Mon, Feb 04, 2013 at 03:24:51PM +0100, Michal Nazarewicz wrote:
+> On Mon, Feb 04 2013, Russell King - ARM Linux wrote:
+> > On Mon, Feb 04, 2013 at 02:51:52PM +0100, Michal Nazarewicz wrote:
+> >> On Mon, Feb 04 2013, Marek Szyprowski wrote:
+> >> > @@ -186,13 +186,24 @@ static u64 get_coherent_dma_mask(struct device *dev)
+> >> >  
+> >> >  static void __dma_clear_buffer(struct page *page, size_t size)
+> >> >  {
+> >> > -	void *ptr;
+> >> >  	/*
+> >> >  	 * Ensure that the allocated pages are zeroed, and that any data
+> >> >  	 * lurking in the kernel direct-mapped region is invalidated.
+> >> >  	 */
+> >> > -	ptr = page_address(page);
+> >> > -	if (ptr) {
+> >> > +	if (PageHighMem(page)) {
+> >> > +		phys_addr_t base = __pfn_to_phys(page_to_pfn(page));
+> >> > +		phys_addr_t end = base + size;
+> >> > +		while (size > 0) {
+> >> > +			void *ptr = kmap_atomic(page);
+> >> > +			memset(ptr, 0, PAGE_SIZE);
+> >> > +			dmac_flush_range(ptr, ptr + PAGE_SIZE);
+> >> > +			kunmap_atomic(ptr);
+> >> > +			page++;
+> >> > +			size -= PAGE_SIZE;
+> >> > +		}
+> >> > +		outer_flush_range(base, end);
+> >> > +	} else {
+> >> > +		void *ptr = page_address(page);
+> >> 
+> >> There used to be a ?if (ptr)? check which is now missing.  Why is that?
+> >
+> > Because lowmem pages always have an address.
 > 
-> With device tree we can directly use pll_u_60M, no need to register 
-> clock with fixed factor 1.
-> Same comment for dis1-fixed, dsi2-fixed and mipi-cal-fast clocks.
-> 
+> Perhaps it should use lowmem_page_address() then?
 
-Does it make sense to have separate DT IDs at all then?
-
-Cheers,
-
-Peter.
+It's well defined that page_address() will be non-NULL for lowmem pages.
+There is nothing wrong with the above.
