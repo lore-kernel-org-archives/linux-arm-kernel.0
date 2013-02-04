@@ -1,55 +1,59 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 4 Feb 2013 16:59:47 +0800
-Subject: [PATCH v7 5/8] usb: chipidea: udc: add pullup/pulldown dp at
- hw_device_state
-In-Reply-To: <1359968390-317-1-git-send-email-peter.chen@freescale.com>
-References: <1359968390-317-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1359968390-317-6-git-send-email-peter.chen@freescale.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 4 Feb 2013 10:00:27 +0100
+Subject: [PATCH] ARM:omap2: using strlcpy instead of strncpy
+In-Reply-To: <20130201224546.GG22517@atomide.com>
+References: <51090829.1010109@asianux.com> <20130201224546.GG22517@atomide.com>
+Message-ID: <510F78AB.4000602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- During the connect/disconnect host, we need to pullup
-and pulldown dp
-- Make sure the dp is not pullup until the vbus is on when
-flag CI13XXX_PULLUP_ON_VBUS is set
-- Using hw_device_state when set run/stop bit
+Hi Tony,
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/chipidea/udc.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
+On 02/01/2013 11:45 PM, Tony Lindgren wrote:
+> * Chen Gang <gang.chen@asianux.com> [130130 03:50]:
+>>
+>>   the fields must be null-terminated:
+>>   the caller may use it as null-terminted string, next.
+> 
+> Added Peter to cc on this one too, it's best that he queues
+> all the twl changes.
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index e82dae4..597ae64 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -91,8 +91,10 @@ static int hw_device_state(struct ci13xxx *ci, u32 dma)
- 		/* interrupt, error, port change, reset, sleep/suspend */
- 		hw_write(ci, OP_USBINTR, ~0,
- 			     USBi_UI|USBi_UEI|USBi_PCI|USBi_URI|USBi_SLI);
-+		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
- 	} else {
- 		hw_write(ci, OP_USBINTR, ~0, 0);
-+		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
- 	}
- 	return 0;
- }
-@@ -1424,10 +1426,14 @@ static int ci13xxx_pullup(struct usb_gadget *_gadget, int is_on)
- {
- 	struct ci13xxx *ci = container_of(_gadget, struct ci13xxx, gadget);
- 
-+	if ((ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) &&
-+			!ci->vbus_active)
-+		return -ENOTSUPP;
-+
- 	if (is_on)
--		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
-+		hw_device_state(ci, ci->ep0out->qh.dma);
- 	else
--		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
-+		hw_device_state(ci, 0);
- 
- 	return 0;
- }
--- 
-1.7.0.4
+I can create a branch for you in our gitorious tree
+(git://gitorious.org/omap-audio/linux-audio.git) for this patch. But I think
+for now it would be best if you could take this via linux-omap (the file is
+under arch/arm/mach-omap2 anyways)
+
+Regards,
+P?ter
+
+> 
+> Tony
+>  
+>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>> ---
+>>  arch/arm/mach-omap2/twl-common.c |    3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+>> index e49b40b..6a7aec6 100644
+>> --- a/arch/arm/mach-omap2/twl-common.c
+>> +++ b/arch/arm/mach-omap2/twl-common.c
+>> @@ -23,6 +23,7 @@
+>>  #include <linux/i2c.h>
+>>  #include <linux/i2c/twl.h>
+>>  #include <linux/gpio.h>
+>> +#include <linux/string.h>
+>>  #include <linux/regulator/machine.h>
+>>  #include <linux/regulator/fixed.h>
+>>  
+>> @@ -56,7 +57,7 @@ void __init omap_pmic_init(int bus, u32 clkrate,
+>>  			   struct twl4030_platform_data *pmic_data)
+>>  {
+>>  	omap_mux_init_signal("sys_nirq", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+>> -	strncpy(pmic_i2c_board_info.type, pmic_type,
+>> +	strlcpy(pmic_i2c_board_info.type, pmic_type,
+>>  		sizeof(pmic_i2c_board_info.type));
+>>  	pmic_i2c_board_info.irq = pmic_irq;
+>>  	pmic_i2c_board_info.platform_data = pmic_data;
+>> -- 
+>> 1.7.10.4
