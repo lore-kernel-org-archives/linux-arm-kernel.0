@@ -1,55 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Feb 2013 17:10:59 +0000
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130204164712.GB4269@arwen.pp.htv.fi>
-References: <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
- <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
- <20130201185820.GE29898@arwen.pp.htv.fi> <510C2A47.1090607@mvista.com>
- <20130201205600.GA31762@arwen.pp.htv.fi>
- <20130201213003.GW2637@n2100.arm.linux.org.uk>
- <20130204154153.GA18237@arwen.pp.htv.fi> <510FF1A6.403@mvista.com>
- <20130204164712.GB4269@arwen.pp.htv.fi>
-Message-ID: <20130204171059.GE2637@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon,  4 Feb 2013 18:21:06 +0100
+Subject: [PATCH v4 0/2] Adding support for the new Armada XP development board
+ from Marvell
+Message-ID: <1359998469-28133-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 06:47:12PM +0200, Felipe Balbi wrote:
-> Hi,
-> 
-> On Mon, Feb 04, 2013 at 08:36:38PM +0300, Sergei Shtylyov wrote:
-> >    In my eyes, getting rid of the mess doesn't justify breaking the rules that
-> > Russell formulated above.
-> 
-> MUSB is no PCI, there is no single, standard interface to the DMA
-> engine (unlike Synopsys' dwc-usb3 and dwc-usb2, where we don't use DMA
-> engine), every DMA engine comes with its own set of registers, its own
-> programming model and so forth.
+Hello,
 
-Err, before you get too wrapped up in that argument... if you think there's
-anything like a common hardware interface for DMA on PCI, you'd be wrong.
-There isn't.
+This is the forth version (the third was not the last one finally) of
+a patch set to add the dts support for new Armada XP development
+board from Marvell called DB-MV784MP-GP.
 
-What there is is a bus protocol for it.  How the device decides to perform
-DMA is up to the device; there's no standard register definitions across
-all devices.  Yes, some classes have a standard register set (like USB,
-and ATA) but others are totally device specific (eg, network chips).
+The branch GP-board is available at
+https://github.com/MISL-EBU-System-SW/mainline-public.git
 
-However, on PCI, the DMA support is always integrated with the rest of
-the device itself.  That is not the case here.
+Changelog:
+v3->v4:
+- change the amount of memory in DTS to indicate the size actually
+  present on the board
+- add a patch which allow the kernel to receive the amount of memory
+  available on the board using ATAG (for legacy bootloader such as the
+  one currently used on Marvell boards).
 
-So, bringing PCI up into this discussion is totally irrelevant.  As I've
-already explained, this was brought up in the _previous_ discussion as
-a reason why _not_ to use the DMA engine API for this.
+V2->v3
+- fixed typos in comments
+- fixed the compatible string for the board and use marvell,axp-gp
+  instead of marvell,axp-db which was already used by an other board
+- fixed the model name by remove the colon
 
-So, can we please leave PCI totally out of this?  It didn't belong here
-2-3 years ago, and it sure enough doesn't belong here now.  It's nothing
-but pure distraction.  And the more this goes on, the more I can see,
-yet again, the CPPI 4.1 going nowhere at all.
+v2->v1:
+- added tested-by from Simon Guinot and Florian Fainelli
+- added some comments to emphasize that the amount of memory may
+  change.
+- named the board ``development board''
 
-As I can see it, there's nothing more to talk about.  The issue has been
-extensively talked to death.  What it needs now is not _more_ talk, it
-needs someone to actually go and _do_ something useful with it.
+Gregory CLEMENT (2):
+  arm: mvebu: update defconfig with ATAG support when using DT
+  arm: mvebu: support for the new Armada XP development
+    board(DB-MV784MP-GP)
 
-I realise that may be difficult given the mess that TI must still be in
-internally since the upheaval of OMAP, but it sounds like there's a
-different group needing this stuff to work...
+ arch/arm/boot/dts/Makefile         |    1 +
+ arch/arm/boot/dts/armada-xp-gp.dts |  101 ++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/mvebu_defconfig   |    1 +
+ 3 files changed, 103 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
+
+-- 
+1.7.9.5
