@@ -1,43 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 4 Feb 2013 21:45:17 +0100
-Subject: [PATCH v2] gpio: mvebu: Add clk support to prevent lockup
-In-Reply-To: <20130204014439.GI14746@titan.lakedaemon.net>
-References: <1359887666-17552-1-git-send-email-andrew@lunn.ch>
- <20130204014439.GI14746@titan.lakedaemon.net>
-Message-ID: <CACRpkdadJ_vauQ1mPAOyfQBcDm3J0rE1pqssDd38=0sY9dEopg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 4 Feb 2013 15:59:48 -0500 (EST)
+Subject: [PATCH v3 00/15] multi-cluster power management
+In-Reply-To: <20130204142417.GE28975@mudshark.cambridge.arm.com>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <20130204142417.GE28975@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1302041510200.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 4, 2013 at 2:44 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Sun, Feb 03, 2013 at 11:34:26AM +0100, Andrew Lunn wrote:
->> The kirkwood SoC GPIO cores use the runit clock. Add code to
->> clk_prepare_enable() runit, otherwise there is a danger of locking up
->> the SoC by accessing the GPIO registers when runit clock is not
->> ticking.
->>
->> Reported-by: Simon Baatz <gmbnomis@gmail.com>
->> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->> ---
->> Since v1:
->> ChangeLog: tclk->runit clock
->>
->>  arch/arm/boot/dts/kirkwood.dtsi |    2 ++
->>  drivers/gpio/gpio-mvebu.c       |    7 +++++++
->>  2 files changed, 9 insertions(+)
->
-> Linus,
->
-> I merge-tested this against your gpio/fixes branch since you had a patch
-> to the same file:
->
-> 11c0cee gpio: mvebu: Don't free chip label memory
->
-> There were no conflicts.  If you don't mind, I'd like to take this
-> through mvebu/fixes -> arm-soc since this is one of four patches to fix
-> one reported issue.  I'd like to keep them in the same branch.
+On Mon, 4 Feb 2013, Will Deacon wrote:
 
-No problem, go ahead.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Hi Nicolas,
+> 
+> On Tue, Jan 29, 2013 at 07:50:55AM +0000, Nicolas Pitre wrote:
+> > This is version 3 of the patch series required to safely power up
+> > and down CPUs in a cluster as can be found in b.L systems.  Also
+> > included are the needed patches to allow CPU hotplug on RTSM configured
+> > for big.LITTLE.
+> 
+> [...]
+> 
+> For patches 1-6 and 8:
+> 
+>   Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-Yours,
-Linus Walleij
+Thanks.
+
+> Please keep me posted when you have a crack at removing the compile-time
+> cluster/cpu limits!
+
+The trick would entail standard memory allocation from the boot CPU, and 
+the physical address for those allocations passed to the assembly code.  
+
+Then we have this code:
+
+	mrc     p15, 0, r0, c0, c0, 5           @ MPIDR
+	ubfx    r9, r0, #0, #8                  @ r9 = cpu
+	ubfx    r10, r0, #8, #8                 @ r10 = cluster
+	mov     r3, #MAX_CPUS_PER_CLUSTER
+	mla     r4, r3, r10, r9                 @ r4 = canonical CPU index
+	cmp     r4, #(MAX_CPUS_PER_CLUSTER * MAX_NR_CLUSTERS)
+	blo     2f
+	... out-of-bound code here
+
+Those constants just need to be turned into global variables as well.  
+Or if we want to be really fancy, we could do some trivial instruction 
+rewriting.
+
+Still, for the foreseeable future, going with dynamic allocation isn't 
+going to provide much of a gain while the compile-time limits keep the 
+code simple while people get familiar with it.
+
+
+Nicolas
