@@ -1,71 +1,82 @@
 From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 4 Feb 2013 14:22:10 +0530
-Subject: [PATCHv2 1/2] arm: dts: omap5: add SPI devices to OMAP5 DeviceTree
- file
-Message-ID: <1359967930-26687-1-git-send-email-sourav.poddar@ti.com>
+Date: Mon, 4 Feb 2013 14:22:18 +0530
+Subject: [PATCHv2 2/2] arm: dts: omap5-evm: Add mcspi data
+Message-ID: <1359967938-26718-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+Add mcspi node and pinmux data for omap5 mcspi controller.
 
-Add all 4 mcspi instances to omap5.dtsi file.
+Tested on omap5430 evm with 3.8-rc4 custom kernel.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi |   40 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
+v1->v2
+Pinctrl nodes were pointing to a different parent.
+Fixing the same.
+ arch/arm/boot/dts/omap5-evm.dts |   46 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 46 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 790bb2a..9e182a9 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -241,6 +241,46 @@
- 			ti,hwmods = "i2c5";
- 		};
+diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
+index 8722c15..3625c5c 100644
+--- a/arch/arm/boot/dts/omap5-evm.dts
++++ b/arch/arm/boot/dts/omap5-evm.dts
+@@ -80,6 +80,33 @@
+ 			0x15a 0x100	/* abemcbsp2_clkx.abemcbsp2_clkx INPUT | MODE0 */
+ 		>;
+ 	};
++
++	mcspi2_pins: pinmux_mcspi2_pins {
++		pinctrl-single,pins = <
++			0xbc 0x100
++			0xbe 0x100
++			0xc0 0x118
++			0xc2 0x0
++		>;
++	};
++
++	mcspi3_pins: pinmux_mcspi3_pins {
++		pinctrl-single,pins = <
++			0x78 0x101
++			0x7a 0x101
++			0x7c 0x101
++			0x7e 0x101
++		>;
++	};
++
++	mcspi4_pins: pinmux_mcspi4_pins {
++		pinctrl-single,pins = <
++			0x164 0x101
++			0x168 0x101
++			0x16a 0x101
++			0x16c 0x101
++		>;
++	};
+ };
  
-+		mcspi1: spi at 48098000 {
-+			compatible = "ti,omap4-mcspi";
-+			reg = <0x48098000 0x200>;
-+			interrupts = <0 65 0x4>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			ti,hwmods = "mcspi1";
-+			ti,spi-num-cs = <4>;
-+		};
+ &mmc1 {
+@@ -151,3 +178,22 @@
+ 	cs1-used;
+ 	device-handle = <&samsung_K3PE0E000B>;
+ };
 +
-+		mcspi2: spi at 4809a000 {
-+			compatible = "ti,omap4-mcspi";
-+			reg = <0x4809a000 0x200>;
-+			interrupts = <0 66 0x4>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			ti,hwmods = "mcspi2";
-+			ti,spi-num-cs = <2>;
-+		};
++&mcspi1 {
 +
-+		mcspi3: spi at 480b8000 {
-+			compatible = "ti,omap4-mcspi";
-+			reg = <0x480b8000 0x200>;
-+			interrupts = <0 91 0x4>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			ti,hwmods = "mcspi3";
-+			ti,spi-num-cs = <2>;
-+		};
++};
 +
-+		mcspi4: spi at 480ba000 {
-+			compatible = "ti,omap4-mcspi";
-+			reg = <0x480ba000 0x200>;
-+			interrupts = <0 48 0x4>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			ti,hwmods = "mcspi4";
-+			ti,spi-num-cs = <1>;
-+		};
++&mcspi2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mcspi2_pins>;
++};
 +
- 		uart1: serial at 4806a000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806a000 0x100>;
++&mcspi3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mcspi3_pins>;
++};
++
++&mcspi4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mcspi4_pins>;
++};
 -- 
 1.7.1
