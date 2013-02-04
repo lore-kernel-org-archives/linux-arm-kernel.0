@@ -1,113 +1,36 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 4 Feb 2013 13:09:11 +0800
-Subject: [PATCH v5] cpufreq: add imx6q-cpufreq driver
-In-Reply-To: <20130204160622.GB5209@ubuntu>
-References: <1359946302-25953-1-git-send-email-shawn.guo@linaro.org>
- <20130204160622.GB5209@ubuntu>
-Message-ID: <20130204050909.GD26233@S2101-09.ap.freescale.net>
+Date: Mon, 4 Feb 2013 13:12:51 +0800
+Subject: [PATCH 2/2] ARM: imx: set CKO1 parent clock source in imx6q
+ sabresd
+In-Reply-To: <8D894AC610DA3944965280D4097EAC4603CD2F55@039-SN2MPN1-021.039d.mgd.msft.net>
+References: <1359701217-23931-1-git-send-email-b13634@freescale.com>
+ <20130203104636.GB26233@S2101-09.ap.freescale.net>
+ <8D894AC610DA3944965280D4097EAC4603CD2F55@039-SN2MPN1-021.039d.mgd.msft.net>
+Message-ID: <20130204051250.GE26233@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 11:06:22AM -0500, Anson Huang wrote:
-> > +	/*
-> > +	 * The setpoints are selected per PLL/PDF frequencies, so we need to
-> > +	 * reprogram PLL for frequency scaling.  The procedure of reprogramming
-> > +	 * PLL1 is as below.
-> > +	 *
-> > +	 *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
-> > +	 *  - Disable pll1_sys_clk and reprogram it
-> > +	 *  - Enable pll1_sys_clk and reparent pll1_sw_clk back to it
-> > +	 *  - Disable pll2_pfd2_396m_clk
-> > +	 */
-> > +	clk_prepare_enable(pll2_pfd2_396m_clk);
-> > +	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
-> > +	clk_set_parent(pll1_sw_clk, step_clk);
-> > +	clk_prepare_enable(pll1_sys_clk);
-> > +	if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
-> > +		clk_disable_unprepare(pll1_sys_clk);
-> > +		clk_set_rate(pll1_sys_clk, freqs.new * 1000);
-> > +		clk_prepare_enable(pll1_sys_clk);
-> > +		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> > +		clk_disable_unprepare(pll2_pfd2_396m_clk);
-> > +	} else {
-> > +		/*
-> > +		 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
-> > +		 * to provide the frequency.
-> > +		 */
-> > +		clk_disable_unprepare(pll1_sys_clk);
-> > +	}
-> Seems like we will get pll2_pfd2_396m_clk's use count mismatch? As every time cpu freq is changed, pll2_pfd2_396m_clk will be added at the beginning of this code piece, but only decreased when cpu freq > 396M, so everytime cpu freq changed to 396M, this pll2_pfd2_396m_clk will in increased?
+On Mon, Feb 04, 2013 at 03:13:40AM +0000, Zhang Quan-B13634 wrote:
+> >  > -static void __init imx6q_sabrelite_cko1_setup(void)
+> >  > +static void __init cko1_setup(unsigned long freq)
+> >  >  {
+> >  >  	struct clk *cko1_sel, *ahb, *cko1;
+> >  >  	unsigned long rate;
+> >  > @@ -132,8 +132,10 @@ static void __init imx6q_sabrelite_cko1_setup(void)
+> >  >  		goto put_clk;
+> >  >  	}
+> >  >  	clk_set_parent(cko1_sel, ahb);
+> >  > -	rate = clk_round_rate(cko1, 16000000);
+> >  > +	rate = clk_round_rate(cko1, freq);
+> >  >  	clk_set_rate(cko1, rate);
+> >  > +
+> >  > +	return;
+> >  
+> >  Why does this "return" needs to be added here?
+> [Gary-b13634] because the codes below may be ignored when execute 'return' ,
+> Saving cpu consumption.
 
-Ah, good catch.  And pll1_sys_clk has the same problem.  Since it's
-been verified by FSL kernel that we do not necessarily need to disable
-pll1_sys_clk before reprogramming it, I would choose to rewrite the
-code as below to make it cleaner and correct on clock usage.
-
-        /*
-         * The setpoints are selected per PLL/PDF frequencies, so we need to
-         * reprogram PLL for frequency scaling.  The procedure of reprogramming
-         * PLL1 is as below.
-         *
-         *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
-         *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
-         *  - Disable pll2_pfd2_396m_clk
-         */
-        clk_prepare_enable(pll2_pfd2_396m_clk);
-        clk_set_parent(step_clk, pll2_pfd2_396m_clk);
-        clk_set_parent(pll1_sw_clk, step_clk);
-        if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
-                clk_set_rate(pll1_sys_clk, freqs.new * 1000);
-                /*
-                 * If we are leaving 396 MHz set-point, we need to enable
-                 * pll1_sys_clk and disable pll2_pfd2_396m_clk to keep
-                 * their use count correct.
-                 */
-                if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
-                        clk_prepare_enable(pll1_sys_clk);
-                        clk_disable_unprepare(pll2_pfd2_396m_clk);
-                }
-                clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-                clk_disable_unprepare(pll2_pfd2_396m_clk);
-        } else {
-                /*
-                 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
-                 * to provide the frequency.
-                 */
-                clk_disable_unprepare(pll1_sys_clk);
-        }
-
-> > +
-> > +	/* Ensure the arm clock divider is what we expect */
-> > +	ret = clk_set_rate(arm_clk, freqs.new * 1000);
-> > +	if (ret) {
-> > +		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
-> > +		regulator_set_voltage_tol(arm_reg, volt_old, 0);
-> > +		return ret;
-> > +	}
-> > +
-> > +	/* scaling down?  scale voltage after frequency */
-> > +	if (freqs.new < freqs.old) {
-> > +		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
-> > +		if (ret)
-> > +			dev_warn(cpu_dev,
-> > +				 "failed to scale vddarm down: %d\n", ret);
-> > +
-> > +		if (freqs.old == FREQ_1P2_GHZ / 1000) {
-> > +			regulator_set_voltage_tol(pu_reg,
-> > +					PU_SOC_VOLTAGE_NORMAL, 0);
-> > +			regulator_set_voltage_tol(soc_reg,
-> > +					PU_SOC_VOLTAGE_NORMAL, 0);
-> > +		}
-> > +	}
-> > +
-> > +	for_each_online_cpu(cpu) {
-> > +		freqs.cpu = cpu;
-> > +		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> > +	}
-> > +
-> Should we need to update the percpu loops_per_jiffy variable and global loops_per_jiffy? As the udelay and mdelay will rely on this global loops_per_jiffy? Or the latest kernel has handle it in other place such as cpufreq common driver? I remembered that common cpufreq driver only handle the noSMP case.
-
-No, it's not needed since commit ec971ea (ARM: add cpufreq transiton
-notifier to adjust loops_per_jiffy for smp) is in place.
+But we haven't finished our job.  We need to "put" those clocks before
+returning to balance the "get" call.
 
 Shawn
