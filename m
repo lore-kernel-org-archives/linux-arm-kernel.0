@@ -1,88 +1,32 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 04 Feb 2013 20:36:38 +0300
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130204154153.GA18237@arwen.pp.htv.fi>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com>
- <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
- <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
- <20130201185820.GE29898@arwen.pp.htv.fi> <510C2A47.1090607@mvista.com>
- <20130201205600.GA31762@arwen.pp.htv.fi>
- <20130201213003.GW2637@n2100.arm.linux.org.uk>
- <20130204154153.GA18237@arwen.pp.htv.fi>
-Message-ID: <510FF1A6.403@mvista.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon,  4 Feb 2013 13:38:08 -0300
+Subject: [PATCH 2/2] ARM: mvebu: Update defconfig to select SPI support
+In-Reply-To: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1359995888-2385-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/configs/mvebu_defconfig |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-On 02/04/2013 06:41 PM, Felipe Balbi wrote:
-
->>>>> I guess to make the MUSB side simpler we would need musb-dma-engine glue
->>>>> to map dmaengine to the private MUSB API. Then we would have some
->>>>> starting point to also move inventra (and anybody else) to dmaengine
->>>>> API.
-
->>>>    Why? Inventra is a dedicated device's private DMA controller, why make
->>>> universal DMA driver for it?
-
->>> because it doesn't make sense to support multiple DMA APIs. We can check
->>> from MUSB's registers if it was configured with Inventra DMA support and
->>> based on that we can register MUSB's own DMA Engine to dmaengine API.
-
->> Hang on.  This is one of the DMA implementations which is closely
->> coupled with the USB and only the USB?  If it is...
-
->> I thought this had been discussed _extensively_ before.  I thought the
->> resolution on it was:
->> 1. It would not use the DMA engine API.
->> 2. It would not live in arch/arm.
->> 3. It would be placed nearby the USB driver it's associated with.
-
->> (1) because we don't use APIs just for the hell of it - think.  Do we
->> use the DMA engine API for PCI bus mastering ethernet controllers?  No.
->> Do we use it for PCI bus mastering SCSI controllers?  No.  Because the
->> DMA is integral to the rest of the device.
-
-> that's not really a fair comparison, however. MUSB is used with several
-> DMA engines.
-
-> The only DMA engine which is really coupled with MUSB is the Inventra
-> DMA engine which comes as an optional feature to the IP. Many users have
-
-   That's not quite true. At least CPPI 3.0 is coupled with MUSB as well. The
-programming interface is MUSB specific, and differs from that of the EMAC driver
-which also uses CPPI 3.0 (however, the DMA descriptor format is the same between
-both, IIRC).
-
-> opted out of it. From the top of my head we have CPPI 3.x, CPPI 4.1,
-> Inventra DMA, OMAP sDMA and ux500 DMA engines supported by the driver.
-
-> Granted, CPPI 4.1 makes some assumptions about the fact that it's
-> handling USB tranfers,
-
-   What CPPI 4.1 code makes this assumptions? MUSB DMA driver? Then it's just
-natural. Generic CPPI 4.1 support code (as was posted for both mach-dacinci/ or
-common/ placement) made no such assumptions.
-
-> but nevertheless, the IP can be, and in fact is,
-> used with many different DMA engines and driver needs to cope with it.
-
-   What IP, CPPI 4.1 or MUSB?
-
-> Current DMA abstraction is quite poor, for example there's no way to
-> compile support for multiple DMA engines. Code also makes certain, IMO
-> unnecessary, assumptions about the underlying DMA engine (abstraction is
-> poor, as said above but it we could follow MUSB's programming guide when
-> it comes to programming DMA transfers).
-
-   Don't know, I was quite content with the abstraction when writing CPPI 4.1
-driver for MUSB...
-
-> Considering all of the above, it's far better to use DMA engine and get
-> rid of all the mess.
-
-   In my eyes, getting rid of the mess doesn't justify breaking the rules that
-Russell formulated above.
-
-WBR, Sergei
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 4e6f0ce..e243451 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -40,6 +40,8 @@ CONFIG_MWIFIEX_SDIO=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_I2C=y
++CONFIG_SPI=y
++CONFIG_SPI_ORION=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_GPIOLIB=y
+-- 
+1.7.8.6
