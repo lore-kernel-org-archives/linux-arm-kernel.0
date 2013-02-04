@@ -1,81 +1,56 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 4 Feb 2013 15:40:30 +0200
-Subject: [PATCH] clocksource: tegra: move to of_clk_get
-Message-ID: <1359985230-11506-1-git-send-email-pdeschrijver@nvidia.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon, 04 Feb 2013 14:51:52 +0100
+Subject: [PATCHv2 1/2] ARM: dma-mapping: add support for CMA regions
+ placed in highmem zone
+In-Reply-To: <1359984182-6307-1-git-send-email-m.szyprowski@samsung.com>
+References: <1358350284-6972-2-git-send-email-m.szyprowski@samsung.com>
+ <1359984182-6307-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <xa1tlib4b30n.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new clockframework introduced DT IDs for each clock. To be able to remove
-the device registrations, this driver needs to be updated to use the DT IDs.
-Note that the actual removal of the clk_register_clkdev() calls will be done
-in a later series.
+On Mon, Feb 04 2013, Marek Szyprowski wrote:
+> @@ -186,13 +186,24 @@ static u64 get_coherent_dma_mask(struct device *dev)
+>  
+>  static void __dma_clear_buffer(struct page *page, size_t size)
+>  {
+> -	void *ptr;
+>  	/*
+>  	 * Ensure that the allocated pages are zeroed, and that any data
+>  	 * lurking in the kernel direct-mapped region is invalidated.
+>  	 */
+> -	ptr = page_address(page);
+> -	if (ptr) {
+> +	if (PageHighMem(page)) {
+> +		phys_addr_t base = __pfn_to_phys(page_to_pfn(page));
+> +		phys_addr_t end = base + size;
+> +		while (size > 0) {
+> +			void *ptr = kmap_atomic(page);
+> +			memset(ptr, 0, PAGE_SIZE);
+> +			dmac_flush_range(ptr, ptr + PAGE_SIZE);
+> +			kunmap_atomic(ptr);
+> +			page++;
+> +			size -= PAGE_SIZE;
+> +		}
+> +		outer_flush_range(base, end);
+> +	} else {
+> +		void *ptr = page_address(page);
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- arch/arm/boot/dts/tegra20.dtsi      |    2 ++
- arch/arm/boot/dts/tegra30.dtsi      |    2 ++
- drivers/clocksource/tegra20_timer.c |    4 ++--
- 3 files changed, 6 insertions(+), 2 deletions(-)
+There used to be a ?if (ptr)? check which is now missing.  Why is that?
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 63b0d81..6e41a4f 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -144,6 +144,7 @@
- 			      0 1 0x04
- 			      0 41 0x04
- 			      0 42 0x04>;
-+		clocks = <&tegra_car 5>;
- 	};
- 
- 	tegra_car: clock {
-@@ -308,6 +309,7 @@
- 		compatible = "nvidia,tegra20-rtc";
- 		reg = <0x7000e000 0x100>;
- 		interrupts = <0 2 0x04>;
-+		clocks = <&tegra_car 4>;
- 	};
- 
- 	i2c at 7000c000 {
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 313fa71..7bc07e6 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -147,6 +147,7 @@
- 			      0 42 0x04
- 			      0 121 0x04
- 			      0 122 0x04>;
-+		clocks = <&tegra_car 5>;
- 	};
- 
- 	tegra_car: clock {
-@@ -295,6 +296,7 @@
- 		compatible = "nvidia,tegra30-rtc", "nvidia,tegra20-rtc";
- 		reg = <0x7000e000 0x100>;
- 		interrupts = <0 2 0x04>;
-+		clocks = <&tegra_car 4>;
- 	};
- 
- 	i2c at 7000c000 {
-diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-index 5bc1429..546c537 100644
---- a/drivers/clocksource/tegra20_timer.c
-+++ b/drivers/clocksource/tegra20_timer.c
-@@ -189,7 +189,7 @@ static void __init tegra20_init_timer(void)
- 		BUG();
- 	}
- 
--	clk = clk_get_sys("timer", NULL);
-+	clk = of_clk_get(np, 0);
- 	if (IS_ERR(clk)) {
- 		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
- 		rate = 12000000;
-@@ -216,7 +216,7 @@ static void __init tegra20_init_timer(void)
- 	 * rtc registers are used by read_persistent_clock, keep the rtc clock
- 	 * enabled
- 	 */
--	clk = clk_get_sys("rtc-tegra", NULL);
-+	clk = of_clk_get(np, 0);
- 	if (IS_ERR(clk))
- 		pr_warn("Unable to get rtc-tegra clock\n");
- 	else
+>  		memset(ptr, 0, size);
+>  		dmac_flush_range(ptr, ptr + size);
+>  		outer_flush_range(__pa(ptr), __pa(ptr) + size);
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 835 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130204/c8c84ff1/attachment.sig>
