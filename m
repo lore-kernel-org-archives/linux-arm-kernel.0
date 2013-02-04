@@ -1,169 +1,274 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 4 Feb 2013 11:16:13 +0800
-Subject: [PATCH 4/9] USB: chipidea: add PTW and PTS handling
-In-Reply-To: <874nhwmc41.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1359705132-9434-1-git-send-email-s.hauer@pengutronix.de>
- <1359705132-9434-5-git-send-email-s.hauer@pengutronix.de>
- <20130201090046.GA8056@pengutronix.de>
- <874nhwmc41.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20130204031612.GA24106@nchen-desktop>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 3 Feb 2013 23:39:44 -0500 (EST)
+Subject: [PATCH v3 15/15] ARM: vexpress/dcscb: probe via device tree
+In-Reply-To: <20130131105436.GA2091@linaro.org>
+References: <1359445870-18925-1-git-send-email-nicolas.pitre@linaro.org>
+ <1359445870-18925-16-git-send-email-nicolas.pitre@linaro.org>
+ <510838AD.6040700@gmail.com> <alpine.LFD.2.02.1301291634140.6300@xanadu.home>
+ <CAMpgmWA0CCSRYxSvA1rNDYLo_RD-UavmX7coBXVpC+HEwQaBFg@mail.gmail.com>
+ <alpine.LFD.2.02.1301301239220.6300@xanadu.home>
+ <20130131105436.GA2091@linaro.org>
+Message-ID: <alpine.LFD.2.02.1302032334500.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 02:50:54PM +0200, Alexander Shishkin wrote:
-> Michael Grzeschik <mgr@pengutronix.de> writes:
-> 
-> > On Fri, Feb 01, 2013 at 08:52:07AM +0100, Sascha Hauer wrote:
-> >> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> >> 
-> >> This patch makes it possible to configure the PTW and PTS bits inside
-> >> the portsc register for host and device mode before the driver starts
-> >> and the phy can be addressed as hardware implementation is designed.
-> >> 
-> >> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> >> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> >> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> >> ---
-> >>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +++
-> >>  drivers/usb/chipidea/bits.h                        |   14 ++++++-
-> >>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
-> >>  drivers/usb/chipidea/core.c                        |   39 ++++++++++++++++++++
-> >>  include/linux/usb/chipidea.h                       |    1 +
-> >>  5 files changed, 61 insertions(+), 1 deletion(-)
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> >> index 5778b9c..dd42ccd 100644
-> >> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> >> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> >> @@ -5,6 +5,11 @@ Required properties:
-> >>  - reg: Should contain registers location and length
-> >>  - interrupts: Should contain controller interrupt
-> >>  
-> >> +Recommended properies:
-> >> +- phy_type: the type of the phy connected to the core. Should be one
-> >> +  of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
-> >> +  property the PORTSC register won't be touched
-> >> +
-> >>  Optional properties:
-> >>  - fsl,usbphy: phandler of usb phy that connects to the only one port
-> >>  - fsl,usbmisc: phandler of non-core register device, with one argument
-> >> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> >> index 050de85..d8ffc2f 100644
-> >> --- a/drivers/usb/chipidea/bits.h
-> >> +++ b/drivers/usb/chipidea/bits.h
-> >> @@ -48,10 +48,22 @@
-> >>  #define PORTSC_SUSP           BIT(7)
-> >>  #define PORTSC_HSP            BIT(9)
-> >>  #define PORTSC_PTC            (0x0FUL << 16)
-> >> +/* PTS and PTW for non lpm version only */
-> >> +#define PORTSC_PTS(d)         ((((d) & 0x3) << 30) | (((d) & 0x4) ? BIT(25) : 0))
-> >> +#define PORTSC_PTW            BIT(28)
-> >>  
-> >>  /* DEVLC */
-> >>  #define DEVLC_PSPD            (0x03UL << 25)
-> >> -#define    DEVLC_PSPD_HS      (0x02UL << 25)
-> >> +#define DEVLC_PSPD_HS         (0x02UL << 25)
-> >> +#define DEVLC_PTW             BIT(27)
-> >> +#define DEVLC_STS             BIT(28)
-> >> +#define DEVLC_PTS(d)          (((d) & 0x7) << 29)
-> >> +
-> >> +/* Encoding for DEVLC_PTS and PORTSC_PTS */
-> >> +#define PTS_UTMI              0
-> >> +#define PTS_ULPI              2
-> >> +#define PTS_SERIAL            3
-> >> +#define PTS_HSIC              4
-> >>  
-> >>  /* OTGSC */
-> >>  #define OTGSC_IDPU	      BIT(5)
-> >> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> >> index 69024e0..ebc1148 100644
-> >> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> >> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> >> @@ -21,6 +21,7 @@
-> >>  #include <linux/clk.h>
-> >>  #include <linux/regulator/consumer.h>
-> >>  #include <linux/pinctrl/consumer.h>
-> >> +#include <linux/usb/of.h>
-> >>  
-> >>  #include "ci.h"
-> >>  #include "ci13xxx_imx.h"
-> >> @@ -112,6 +113,8 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
-> >>  		       CI13XXX_PULLUP_ON_VBUS |
-> >>  		       CI13XXX_DISABLE_STREAMING;
-> >>  
-> >> +	pdata->phy_mode = of_usb_get_phy_mode(pdev->dev.of_node);
-> >> +
-> >>  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> >>  	if (!data) {
-> >>  		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
-> >> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> >> index 57cae1f..a3ec29d 100644
-> >> --- a/drivers/usb/chipidea/core.c
-> >> +++ b/drivers/usb/chipidea/core.c
-> >> @@ -67,6 +67,8 @@
-> >>  #include <linux/usb/gadget.h>
-> >>  #include <linux/usb/otg.h>
-> >>  #include <linux/usb/chipidea.h>
-> >> +#include <linux/usb/of.h>
-> >> +#include <linux/phy.h>
-> >>  
-> >>  #include "ci.h"
-> >>  #include "udc.h"
-> >> @@ -211,6 +213,41 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
-> >>  	return 0;
-> >>  }
-> >>  
-> >> +static void hw_phymode_configure(struct ci13xxx *ci)
-> >> +{
-> >> +	u32 portsc, lpm;
-> >> +
-> >> +	switch (ci->platdata->phy_mode) {
-> >> +	case USBPHY_INTERFACE_MODE_UTMI:
-> >> +		portsc = PORTSC_PTS(PTS_UTMI);
-> >> +		lpm = DEVLC_PTS(PTS_UTMI);
-> >> +		break;
-> >> +	case USBPHY_INTERFACE_MODE_UTMIW:
-> >> +		portsc = PORTSC_PTS(PTS_UTMI) | PORTSC_PTW;
-> >> +		lpm = DEVLC_PTS(PTS_UTMI) | DEVLC_PTW;
-> >> +		break;
-> >> +	case USBPHY_INTERFACE_MODE_ULPI:
-> >> +		portsc = PORTSC_PTS(PTS_ULPI);
-> >> +		lpm = DEVLC_PTS(PTS_ULPI);
-> >> +		break;
-> >> +	case USBPHY_INTERFACE_MODE_SERIAL:
-> >> +		portsc = PORTSC_PTS(PTS_SERIAL);
-> >> +		lpm = DEVLC_PTS(PTS_SERIAL);
-> >> +		break;
-> >> +	case USBPHY_INTERFACE_MODE_HSIC:
-> >> +		portsc = PORTSC_PTS(PTS_HSIC);
-> >> +		lpm = DEVLC_PTS(PTS_HSIC);
-> >> +		break;
-> >> +	default:
-> >> +		return;
-> >> +	}
-> >> +
-> >> +	if (ci->hw_bank.lpm)
-> >> +		hw_write(ci, OP_PORTSC, DEVLC_PTS(7) | DEVLC_PTW, lpm);
-> >                              ^^^^^^^^^
-> >
-> > This is probably supposed to be OP_DEVLC.
-> 
-> Looks like that. I'd like to test this code on an LPM device first.
-> Can somebody with an imx test give a Tested-by?
+On Thu, 31 Jan 2013, Dave Martin wrote:
 
-Sascha, would you like add above changes and change "int" to 
-"enum usb_dr_mode" for your [PATCH 5/9] USB chipidea: 
-introduce dual role mode pdata flags.
-Then send v4 patch, I can help to test it before
-this Tuesday (There will be 9 days Chinese New Year holiday).
-
+> On Wed, Jan 30, 2013 at 12:43:29PM -0500, Nicolas Pitre wrote:
+> > On Wed, 30 Jan 2013, Achin Gupta wrote:
+> > 
+> > > On Tue, Jan 29, 2013 at 9:41 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > > > On Tue, 29 Jan 2013, Rob Herring wrote:
+> > > >
+> > > >> On 01/29/2013 01:51 AM, Nicolas Pitre wrote:
+> > > >> > +   node = of_find_compatible_node(NULL, NULL, "arm,dcscb");
+> > > >>
+> > > >> This needs binding documentation and should be a more specific name. Not
+> > > >> knowing what dcscb is, I don't have a suggestion.
 > 
-> Regards,
-> --
-> Alex
-> 
+> The name is 100% specific.  The real problem seems to be that it's also
+> very cryptic, and undocumented.
 
--- 
+OK, here's my attempt at documenting it, folded with the latest fixes in 
+the patch that introduced DCSCB support.  ACK?
 
-Best Regards,
-Peter Chen
+---------- >8
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date: Wed, 2 May 2012 20:56:52 -0400
+Subject: [PATCH] ARM: vexpress: introduce DCSCB support
+
+This adds basic CPU and cluster reset controls on RTSM for the
+A15x4-A7x4 model configuration using the Dual Cluster System
+Configuration Block (DCSCB).
+
+The cache coherency interconnect (CCI) is not handled yet.
+
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+---
+ .../devicetree/bindings/arm/rtsm-dcscb.txt         |  19 +++
+ arch/arm/mach-vexpress/Kconfig                     |   8 +
+ arch/arm/mach-vexpress/Makefile                    |   1 +
+ arch/arm/mach-vexpress/dcscb.c                     | 162 +++++++++++++++++++++
+ 4 files changed, 190 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/rtsm-dcscb.txt b/Documentation/devicetree/bindings/arm/rtsm-dcscb.txt
+new file mode 100644
+index 0000000000..3b8fbf3c00
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/rtsm-dcscb.txt
+@@ -0,0 +1,19 @@
++ARM Dual Cluster System Configuration Block
++-------------------------------------------
++
++The Dual Cluster System Configuration Block (DCSCB) provides basic
++functionality for controlling clocks, resets and configuration pins in
++the Dual Cluster System implemented by the Real-Time System Model (RTSM).
++
++Required properties:
++
++- compatible : should be "arm,rtsm,dcscb"
++
++- reg : physical base address and the size of the registers window
++
++Example:
++
++	dcscb at 60000000 {
++		compatible = "arm,rtsm,dcscb";
++		reg = <0x60000000 0x1000>;
++	};
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 52d315b792..f3f92b120a 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -52,4 +52,12 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+ config ARCH_VEXPRESS_CA9X4
+ 	bool "Versatile Express Cortex-A9x4 tile"
+ 
++config ARCH_VEXPRESS_DCSCB
++	bool "Dual Cluster System Control Block (DCSCB) support"
++	depends on CLUSTER_PM
++	help
++	  Support for the Dual Cluster System Configuration Block (DCSCB).
++	  This is needed to provide CPU and cluster power management
++	  on RTSM.
++
+ endmenu
+diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+index 80b64971fb..2253644054 100644
+--- a/arch/arm/mach-vexpress/Makefile
++++ b/arch/arm/mach-vexpress/Makefile
+@@ -6,5 +6,6 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 
+ obj-y					:= v2m.o reset.o
+ obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
++obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o
+ obj-$(CONFIG_SMP)			+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+new file mode 100644
+index 0000000000..07e835cb72
+--- /dev/null
++++ b/arch/arm/mach-vexpress/dcscb.c
+@@ -0,0 +1,162 @@
++/*
++ * arch/arm/mach-vexpress/dcscb.c - Dual Cluster System Configuration Block
++ *
++ * Created by:	Nicolas Pitre, May 2012
++ * Copyright:	(C) 2012-2013  Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/spinlock.h>
++#include <linux/errno.h>
++#include <linux/of_address.h>
++#include <linux/vexpress.h>
++
++#include <asm/mcpm_entry.h>
++#include <asm/proc-fns.h>
++#include <asm/cacheflush.h>
++#include <asm/cputype.h>
++#include <asm/cp15.h>
++
++
++#define RST_HOLD0	0x0
++#define RST_HOLD1	0x4
++#define SYS_SWRESET	0x8
++#define RST_STAT0	0xc
++#define RST_STAT1	0x10
++#define EAG_CFG_R	0x20
++#define EAG_CFG_W	0x24
++#define KFC_CFG_R	0x28
++#define KFC_CFG_W	0x2c
++#define DCS_CFG_R	0x30
++
++/*
++ * We can't use regular spinlocks. In the switcher case, it is possible
++ * for an outbound CPU to call power_down() after its inbound counterpart
++ * is already live using the same logical CPU number which trips lockdep
++ * debugging.
++ */
++static arch_spinlock_t dcscb_lock = __ARCH_SPIN_LOCK_UNLOCKED;
++
++static void __iomem *dcscb_base;
++
++static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
++{
++	unsigned int rst_hold, cpumask = (1 << cpu);
++
++	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
++	if (cpu >= 4 || cluster >= 2)
++		return -EINVAL;
++
++	/*
++	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
++	 * variant exists, we need to disable IRQs manually here.
++	 */
++	local_irq_disable();
++	arch_spin_lock(&dcscb_lock);
++
++	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
++	if (rst_hold & (1 << 8)) {
++		/* remove cluster reset and add individual CPU's reset */
++		rst_hold &= ~(1 << 8);
++		rst_hold |= 0xf;
++	}
++	rst_hold &= ~(cpumask | (cpumask << 4));
++	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
++
++	arch_spin_unlock(&dcscb_lock);
++	local_irq_enable();
++
++	return 0;
++}
++
++static void dcscb_power_down(void)
++{
++	unsigned int mpidr, cpu, cluster, rst_hold, cpumask, last_man;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	cpumask = (1 << cpu);
++
++	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
++	BUG_ON(cpu >= 4 || cluster >= 2);
++
++	arch_spin_lock(&dcscb_lock);
++	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
++	rst_hold |= cpumask;
++	if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf)
++		rst_hold |= (1 << 8);
++	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
++	arch_spin_unlock(&dcscb_lock);
++	last_man = (rst_hold & (1 << 8));
++
++	/*
++	 * Now let's clean our L1 cache and shut ourself down.
++	 * If we're the last CPU in this cluster then clean L2 too.
++	 */
++
++	/*
++	 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
++	 * a preliminary flush here for those CPUs.  At least, that's
++	 * the theory -- without the extra flush, Linux explodes on
++	 * RTSM (maybe not needed anymore, to be investigated)..
++	 */
++	flush_cache_louis();
++	set_cr(get_cr() & ~CR_C);
++
++	if (!last_man) {
++		flush_cache_louis();
++	} else {
++		flush_cache_all();
++		outer_flush_all();
++	}
++
++	/* Disable local coherency by clearing the ACTLR "SMP" bit: */
++	set_auxcr(get_auxcr() & ~(1 << 6));
++
++	/* Now we are prepared for power-down, do it: */
++	dsb();
++	wfi();
++
++	/* Not dead@this point?  Let our caller cope. */
++}
++
++static const struct mcpm_platform_ops dcscb_power_ops = {
++	.power_up	= dcscb_power_up,
++	.power_down	= dcscb_power_down,
++};
++
++static int __init dcscb_init(void)
++{
++	struct device_node *node;
++	int ret;
++
++	node = of_find_compatible_node(NULL, NULL, "arm,rtsm,dcscb");
++	if (!node)
++		return -ENODEV;
++	dcscb_base= of_iomap(node, 0);
++	if (!dcscb_base)
++		return -EADDRNOTAVAIL;
++
++	ret = mcpm_platform_register(&dcscb_power_ops);
++	if (ret) {
++		iounmap(dcscb_base);
++		return ret;
++	}
++
++	/*
++	 * Future entries into the kernel can now go
++	 * through the cluster entry vectors.
++	 */
++	vexpress_flags_set(virt_to_phys(mcpm_entry_point));
++
++	return 0;
++}
++
++early_initcall(dcscb_init);
