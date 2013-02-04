@@ -1,30 +1,189 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Sun, 3 Feb 2013 23:24:26 -0700
-Subject: [PATCH] rtc: rtc-mv: Add support for clk to avoid lockups
-In-Reply-To: <20130203111415.GE27791@lunn.ch>
-References: <1359887453-17189-1-git-send-email-andrew@lunn.ch>
- <20130203111055.GA29236@schnuecks.de>
- <20130203111415.GE27791@lunn.ch>
-Message-ID: <20130204062426.GB7115@obsidianresearch.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Mon, 4 Feb 2013 11:58:40 +0530
+Subject: [PATCH v5 03/10] clk: tegra: Add PLL post divider table
+In-Reply-To: <1359713962-16822-4-git-send-email-pdeschrijver@nvidia.com>
+References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
+ <1359713962-16822-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <510F5518.1010307@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 03, 2013 at 12:14:15PM +0100, Andrew Lunn wrote:
-> > > +	pdata->clk = devm_clk_get(&pdev->dev, NULL);
-> > > +	/* Not all SoCs require a clock.*/
-> > > +	if (!IS_ERR(pdata->clk))
-> > > +		clk_prepare_enable(pdata->clk);
-> > > +
-> > 
-> > There are already I/O accesses to the RTC above this. Thus, you
-> > probably need to move this up.
-> 
-> Doh!
-> 
-> I was trying to keep the cleanup on error simple....
+On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
+> Some PLLs in Tegra114 don't use a power of 2 mapping for the post divider.
+> Introduce a table based approach and switch PLLU to it.
+>
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
 
-Why is this stuff in the drivers anyhow? All the other kernel power
-management seems to be done by the device core prior to probing the
-device, why is clk different?
+Looks good to me.
 
-Jason
+Reviewed-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+
+>   drivers/clk/tegra/clk-pll.c     |   38 ++++++++++++++++++++++++++++++++------
+>   drivers/clk/tegra/clk-tegra20.c |    7 +++++++
+>   drivers/clk/tegra/clk-tegra30.c |    7 +++++++
+>   drivers/clk/tegra/clk.h         |   13 +++++++++++++
+>   4 files changed, 59 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+> index 3c3a25e..87d2f34 100644
+> --- a/drivers/clk/tegra/clk-pll.c
+> +++ b/drivers/clk/tegra/clk-pll.c
+> @@ -258,6 +258,7 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
+>   		      unsigned long rate, unsigned long parent_rate)
+>   {
+>   	struct tegra_clk_pll *pll = to_clk_pll(hw);
+> +	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
+>   	unsigned long cfreq;
+>   	u32 p_div = 0;
+>   
+> @@ -291,7 +292,6 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
+>   	     cfg->output_rate <<= 1)
+>   		p_div++;
+>   
+> -	cfg->p = p_div;
+>   	cfg->m = parent_rate / cfreq;
+>   	cfg->n = cfg->output_rate / cfreq;
+>   	cfg->cpcon = OUT_OF_TABLE_CPCON;
+> @@ -304,8 +304,19 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
+>   		return -EINVAL;
+>   	}
+>   
+> -	if (pll->flags & TEGRA_PLLU)
+> -		cfg->p ^= 1;
+> +	if (p_tohw) {
+> +		p_div = 1 << p_div;
+> +		while (p_tohw->pdiv) {
+> +			if (p_div <= p_tohw->pdiv) {
+> +				cfg->p = p_tohw->hw_val;
+> +				break;
+> +			}
+> +			p_tohw++;
+> +		}
+> +		if (!p_tohw->pdiv)
+> +			return -EINVAL;
+> +	} else
+> +		cfg->p = p_div;
+>   
+>   	return 0;
+>   }
+> @@ -452,8 +463,10 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+>   {
+>   	struct tegra_clk_pll *pll = to_clk_pll(hw);
+>   	struct tegra_clk_pll_freq_table cfg;
+> +	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
+>   	u32 val;
+>   	u64 rate = parent_rate;
+> +	int pdiv;
+>   
+>   	val = pll_readl_base(pll);
+>   
+> @@ -472,10 +485,23 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+>   
+>   	_get_pll_mnp(pll, &cfg);
+>   
+> -	if (pll->flags & TEGRA_PLLU)
+> -		cfg.p ^= 1;
+> +	if (p_tohw) {
+> +		while (p_tohw->pdiv) {
+> +			if (cfg.p == p_tohw->hw_val) {
+> +				pdiv = p_tohw->pdiv;
+> +				break;
+> +			}
+> +			p_tohw++;
+> +		}
+> +
+> +		if (!p_tohw->pdiv) {
+> +			WARN_ON(1);
+> +			pdiv = 1;
+> +		}
+> +	} else
+> +		pdiv = 1 << cfg.p;
+>   
+> -	cfg.m *= 1 << cfg.p;
+> +	cfg.m *= pdiv;
+>   
+>   	rate *= cfg.n;
+>   	do_div(rate, cfg.m);
+> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+> index 30bd3fd..54c6777 100644
+> --- a/drivers/clk/tegra/clk-tegra20.c
+> +++ b/drivers/clk/tegra/clk-tegra20.c
+> @@ -440,6 +440,12 @@ static struct tegra_clk_pll_params pll_d_params = {
+>   	.lock_delay = 1000,
+>   };
+>   
+> +static struct pdiv_map pllu_p[] = {
+> +	{ .pdiv = 1, .hw_val = 1 },
+> +	{ .pdiv = 2, .hw_val = 0 },
+> +	{ .pdiv = 0, .hw_val = 0 },
+> +};
+> +
+>   static struct tegra_clk_pll_params pll_u_params = {
+>   	.input_min = 2000000,
+>   	.input_max = 40000000,
+> @@ -452,6 +458,7 @@ static struct tegra_clk_pll_params pll_u_params = {
+>   	.lock_bit_idx = PLL_BASE_LOCK,
+>   	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+>   	.lock_delay = 1000,
+> +	.pdiv_tohw = pllu_p,
+>   };
+>   
+>   static struct tegra_clk_pll_params pll_x_params = {
+> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+> index 28a2997..078f9b8 100644
+> --- a/drivers/clk/tegra/clk-tegra30.c
+> +++ b/drivers/clk/tegra/clk-tegra30.c
+> @@ -466,6 +466,12 @@ static struct tegra_clk_pll_freq_table pll_d_freq_table[] = {
+>   	{ 0, 0, 0, 0, 0, 0 },
+>   };
+>   
+> +static struct pdiv_map pllu_p[] = {
+> +	{ .pdiv = 1, .hw_val = 1 },
+> +	{ .pdiv = 2, .hw_val = 0 },
+> +	{ .pdiv = 0, .hw_val = 0 },
+> +};
+> +
+>   static struct tegra_clk_pll_freq_table pll_u_freq_table[] = {
+>   	{ 12000000, 480000000, 960, 12, 0, 12},
+>   	{ 13000000, 480000000, 960, 13, 0, 12},
+> @@ -639,6 +645,7 @@ static struct tegra_clk_pll_params pll_u_params = {
+>   	.lock_bit_idx = PLL_BASE_LOCK,
+>   	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+>   	.lock_delay = 1000,
+> +	.pdiv_tohw = pllu_p,
+>   };
+>   
+>   static struct tegra_clk_pll_params pll_x_params = {
+> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+> index 3cff1df..1b9cbcd 100644
+> --- a/drivers/clk/tegra/clk.h
+> +++ b/drivers/clk/tegra/clk.h
+> @@ -117,6 +117,17 @@ struct tegra_clk_pll_freq_table {
+>   };
+>   
+>   /**
+> + * struct pdiv_map - map post divider to hw value
+> + *
+> + * @pdiv:		post divider
+> + * @hw_val:		value to be written to the PLL hw
+> + */
+> +struct pdiv_map {
+> +	u8 pdiv;
+> +	u8 hw_val;
+> +};
+> +
+> +/**
+>    * struct clk_pll_params - PLL parameters
+>    *
+>    * @input_min:			Minimum input frequency
+> @@ -146,6 +157,8 @@ struct tegra_clk_pll_params {
+>   	u32		lock_bit_idx;
+>   	u32		lock_enable_bit_idx;
+>   	int		lock_delay;
+> +	int		max_p;
+> +	struct pdiv_map *pdiv_tohw;
+>   };
+>   
+>   /**
+>
