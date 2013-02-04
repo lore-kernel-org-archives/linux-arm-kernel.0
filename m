@@ -1,288 +1,412 @@
-From: ml@communistcode.co.uk (Jack Mitchell)
-Date: Mon, 04 Feb 2013 12:10:11 +0000
-Subject: [BUG] kernel oops in pin_request
-In-Reply-To: <510F9D44.2000700@communistcode.co.uk>
-References: <510F9D44.2000700@communistcode.co.uk>
-Message-ID: <510FA523.5090805@communistcode.co.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 04 Feb 2013 13:19:25 +0100
+Subject: [PATCH v6] cpufreq: add imx6q-cpufreq driver
+In-Reply-To: <1359956789-17918-1-git-send-email-shawn.guo@linaro.org>
+References: <1359956789-17918-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <8795375.qIWYRXDKue@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/13 11:36, Jack Mitchell wrote:
-> I am developing a driver located at [1]. The driver has two devices on 
-> a single SPI bus. When the devices are probed the pins for the SPI bus 
-> get requested twice, as so:
->
->   pinctrl = devm_pinctrl_get_select_default(&spi->dev);
->     if (IS_ERR(pinctrl))
->   {
->         pr_debug("%s: Setting pins failed: %d\n", __func__, (s32) 
-> pinctrl);
->   }
->
-> The driver is DT only, and as such gets it's pins and setup from the 
-> DT [2]. When the second request happens I get the following output the 
-> kernel log:
->
-> Jan 25 15:04:54 beaglebone user.err kernel: [   67.319188] 
-> pinctrl-single 44e10800.pinmux: pin 44e1099c already requested by 
-> 48030000.spi; cannot claim for spi2.1
-> Jan 25 15:04:54 beaglebone user.err kernel: [   67.330496] 
-> pinctrl-single 44e10800.pinmux: pin-103 (spi2.1) status -22
-> Jan 25 15:04:54 beaglebone user.err kernel: [   67.337555] 
-> pinctrl-single 44e10800.pinmux: could not request pin 103 on device 
-> pinctrl-single
->
-> Which I guess is ok as the first probe already setup the pins, 
-> everything then works as it should. Now, when I come to unload + 
-> reload the module I get an oops regarding the strmcmp() in pin_request:
->
-> Jan 25 15:13:25 beaglebone user.debug kernel: [  578.600746] 
-> r0005spi_probe: SPI Bus 2 probed
-> Jan 25 15:13:25 beaglebone user.alert kernel: [  578.605991] Unable to 
-> handle kernel NULL pointer dereference at virtual address 00000000
-> Jan 25 15:13:25 beaglebone user.alert kernel: [  578.614641] pgd = 
-> cf570000
-> Jan 25 15:13:25 beaglebone user.alert kernel: [  578.617578] 
-> [00000000] *pgd=8d93a831, *pte=00000000, *ppte=00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.624347] Internal 
-> error: Oops: 17 [#1] SMP ARM
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.629303] Modules 
-> linked in: r0005spi(O+) [last unloaded: r0005spi]
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.636135] CPU: 0    
-> Tainted: G           O  (3.8.0-rc5-00538-g2431418-dirty #7)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.644031] PC is at 
-> strcmp+0x4/0x3c
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.647807] LR is at 
-> pin_request+0xb0/0x1e8
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.652224] pc : 
-> [<c0295ac0>]    lr : [<c02a94fc>]    psr: a0000013
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.652224] sp : 
-> cf4dfd38  ip : 00000000  fp : ffffffff
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.664290] r10: 
-> 00000000  r9 : 00000000  r8 : 00000059
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.669792] r7 : 
-> cf33fe00  r6 : c08413f0  r5 : cf0bb680  r4 : cf0a2280
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.676659] r3 : 
-> 00000000  r2 : 00000000  r1 : cf33fe00  r0 : 00000000
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.683531] Flags: 
-> NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.691038] Control: 
-> 10c5387d  Table: 8f570019  DAC: 00000015
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.697087] Process 
-> insmod (pid: 566, stack limit = 0xcf4de240)
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.703318] Stack: 
-> (0xcf4dfd38 to 0xcf4e0000)
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.708307] fd20: 
-> cf0a2280 00000059
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.717039] fd40: 
-> cf33fe00 00000000 cf0a2280 cf52ebc0 c0af6010 c08413f0 00000000 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.725735] fd60: 
-> 00000001 c02a99d8 cf756e90 00000003 cf4dfda0 cf52ebc0 cf52ed0c cf756cc0
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.734427] fd80: 
-> c0af6010 cf52ed00 bf005650 c02a8018 cf5dfac0 c08411c4 cf756cc0 cf52ed00
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.743121] fda0: 
-> c0af6010 c02a8074 cf756c00 cf756cc0 cf335600 bf005218 cf335600 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.751862] fdc0: 
-> cf335600 bf005b8c bf005b8c c031e1c0 00000001 c037e678 c037e660 c031dfac
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.764322] fde0: 
-> bf005b8c cf335600 cf335600 cf335634 bf005b8c c031e228 00000000 cf4dfe08
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.773168] fe00: 
-> bf005b8c c031c53c cf0b5478 cf334880 bf005b8c bf005b8c c0852258 cf4155c0
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.781877] fe20: 
-> 00000000 c031d5c4 bf00594c cf0a2488 bf005b8c cf4dff58 00000000 bf005d3c
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.790570] fe40: 
-> 00000001 c031e71c 00000000 bf005d30 cf4dff58 00000000 bf005d3c 00000001
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.799262] fe60: 
-> bf005650 c0008878 bf005650 00000000 00000001 bf005d30 bf005d30 cf4dff58
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.817450] fe80: 
-> 00000000 bf005d3c 00000001 cf6e9880 bf005d78 c008b928 bf005d3c 00007fff
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.826624] fea0: 
-> c02a5ed0 00000053 c0875738 0000001c 00000000 c0088aac c07fab0c bf005e84
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.835756] fec0: 
-> c0534e14 d09f6970 cf4dfee4 00022008 20000013 c0753164 cf4dff14 c0529a18
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.844875] fee0: 
-> d09f9000 b6fca000 00000751 00000000 00000000 00000000 00000000 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.853984] ff00: 
-> 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.863087] ff20: 
-> 00000000 00000000 000000d2 b6fc0000 0000a7d1 00022008 00000080 c000e364
-> Jan 25 15:13:25 beaglebone user.debug kernel: [  578.600746] 
-> r0005spi_probe: SPI Bus 2 probed
-> Jan 25 15:13:25 beaglebone user.alert kernel: [  578.605991] Unable to 
-> handle kernel NULL pointer dereference at virtual address 00000000
-> Jan 25 15:13:25 beaglebone user.alert kernel: [  578.614641] pgd = 
-> cf570000
-> Jan 25 15:13:25 beaglebone user.alert kernel: [  578.617578] 
-> [00000000] *pgd=8d93a831, *pte=00000000, *ppte=00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.624347] Internal 
-> error: Oops: 17 [#1] SMP ARM
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.629303] Modules 
-> linked in: r0005spi(O+) [last unloaded: r0005spi]
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.636135] CPU: 0    
-> Tainted: G           O  (3.8.0-rc5-00538-g2431418-dirty #7)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.644031] PC is at 
-> strcmp+0x4/0x3c
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.647807] LR is at 
-> pin_request+0xb0/0x1e8
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.652224] pc : 
-> [<c0295ac0>]    lr : [<c02a94fc>]    psr: a0000013
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.652224] sp : 
-> cf4dfd38  ip : 00000000  fp : ffffffff
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.664290] r10: 
-> 00000000  r9 : 00000000  r8 : 00000059
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.669792] r7 : 
-> cf33fe00  r6 : c08413f0  r5 : cf0bb680  r4 : cf0a2280
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.676659] r3 : 
-> 00000000  r2 : 00000000  r1 : cf33fe00  r0 : 00000000
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.683531] Flags: 
-> NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.691038] Control: 
-> 10c5387d  Table: 8f570019  DAC: 00000015
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.697087] Process 
-> insmod (pid: 566, stack limit = 0xcf4de240)
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.703318] Stack: 
-> (0xcf4dfd38 to 0xcf4e0000)
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.708307] fd20: 
-> cf0a2280 00000059
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.717039] fd40: 
-> cf33fe00 00000000 cf0a2280 cf52ebc0 c0af6010 c08413f0 00000000 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.725735] fd60: 
-> 00000001 c02a99d8 cf756e90 00000003 cf4dfda0 cf52ebc0 cf52ed0c cf756cc0
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.734427] fd80: 
-> c0af6010 cf52ed00 bf005650 c02a8018 cf5dfac0 c08411c4 cf756cc0 cf52ed00
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.743121] fda0: 
-> c0af6010 c02a8074 cf756c00 cf756cc0 cf335600 bf005218 cf335600 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.751862] fdc0: 
-> cf335600 bf005b8c bf005b8c c031e1c0 00000001 c037e678 c037e660 c031dfac
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.764322] fde0: 
-> bf005b8c cf335600 cf335600 cf335634 bf005b8c c031e228 00000000 cf4dfe08
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.773168] fe00: 
-> bf005b8c c031c53c cf0b5478 cf334880 bf005b8c bf005b8c c0852258 cf4155c0
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.781877] fe20: 
-> 00000000 c031d5c4 bf00594c cf0a2488 bf005b8c cf4dff58 00000000 bf005d3c
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.790570] fe40: 
-> 00000001 c031e71c 00000000 bf005d30 cf4dff58 00000000 bf005d3c 00000001
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.799262] fe60: 
-> bf005650 c0008878 bf005650 00000000 00000001 bf005d30 bf005d30 cf4dff58
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.817450] fe80: 
-> 00000000 bf005d3c 00000001 cf6e9880 bf005d78 c008b928 bf005d3c 00007fff
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.826624] fea0: 
-> c02a5ed0 00000053 c0875738 0000001c 00000000 c0088aac c07fab0c bf005e84
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.835756] fec0: 
-> c0534e14 d09f6970 cf4dfee4 00022008 20000013 c0753164 cf4dff14 c0529a18
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.844875] fee0: 
-> d09f9000 b6fca000 00000751 00000000 00000000 00000000 00000000 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.853984] ff00: 
-> 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.863087] ff20: 
-> 00000000 00000000 000000d2 b6fc0000 0000a7d1 00022008 00000080 c000e364
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.872190] ff40: 
-> cf4de000 00000000 00000000 c008bce8 00000002 c0529780 d09ef000 0000a7d1
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.881468] ff60: 
-> d09f6420 d09f62c8 d09f92f8 00000e98 00001218 bf005bc8 0000000f 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.890834] ff80: 
-> 00000022 00000023 0000000e 00000009 00000007 00000000 00000000 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.899961] ffa0: 
-> 00022da8 c000e1e0 00000000 00000000 b6fc0000 0000a7d1 00022008 00022da8
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.909073] ffc0: 
-> 00000000 00000000 00022da8 00000080 00022098 0000a7d1 00022008 00000000
-> Jan 25 15:13:25 beaglebone user.emerg kernel: [  578.918243] ffe0: 
-> 4ff71978 bed65ba8 4ff60790 4fe2e870 60000010 b6fc0000 00000000 00000000
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.927032] 
-> [<c0295ac0>] (strcmp+0x4/0x3c) from [<c02a94fc>] (pin_request+0xb0/0x1e8)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.935371] 
-> [<c02a94fc>] (pin_request+0xb0/0x1e8) from [<c02a99d8>] 
-> (pinmux_enable_setting+0x74/0x1a4)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.945369] 
-> [<c02a99d8>] (pinmux_enable_setting+0x74/0x1a4) from [<c02a8018>] 
-> (pinctrl_select_state_locked+0xb8/0xf0)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.956637] 
-> [<c02a8018>] (pinctrl_select_state_locked+0xb8/0xf0) from [<c02a8074>] 
-> (pinctrl_select_state+0x24/0x3c)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.967743] 
-> [<c02a8074>] (pinctrl_select_state+0x24/0x3c) from [<bf005218>] 
-> (r0005spi_probe+0xfc/0x310 [r0005spi])
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.978751] 
-> [<bf005218>] (r0005spi_probe+0xfc/0x310 [r0005spi]) from [<c037e678>] 
-> (spi_drv_probe+0x18/0x1c)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.989093] 
-> [<c037e678>] (spi_drv_probe+0x18/0x1c) from [<c031dfac>] 
-> (driver_probe_device+0x11c/0x330)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  578.998970] 
-> [<c031dfac>] (driver_probe_device+0x11c/0x330) from [<c031e228>] 
-> (__driver_attach+0x68/0x8c)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  579.009125] 
-> [<c031e228>] (__driver_attach+0x68/0x8c) from [<c031c53c>] 
-> (bus_for_each_dev+0x48/0x80)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  579.018774] 
-> [<c031c53c>] (bus_for_each_dev+0x48/0x80) from [<c031d5c4>] 
-> (bus_add_driver+0xf0/0x248)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  579.028379] 
-> [<c031d5c4>] (bus_add_driver+0xf0/0x248) from [<c031e71c>] 
-> (driver_register+0x9c/0x12c)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  579.037982] 
-> [<c031e71c>] (driver_register+0x9c/0x12c) from [<c0008878>] 
-> (do_one_initcall+0x90/0x160)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  579.047681] 
-> [<c0008878>] (do_one_initcall+0x90/0x160) from [<c008b928>] 
-> (load_module+0x1b64/0x1e28)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  579.057284] 
-> [<c008b928>] (load_module+0x1b64/0x1e28) from [<c008bce8>] 
-> (sys_init_module+0xfc/0x11c)
-> Jan 25 15:13:25 beaglebone user.warn kernel: [  579.066891] 
-> [<c008bce8>] (sys_init_module+0xfc/0x11c) from [<c000e1e0>] 
-> (ret_fast_syscall+0x0/0x30)
->
-> The pin_request portion of that driver where the traceback points to 
-> is as so:
->
->   dev_dbg(pctldev->dev, "request pin %d (%s) for %s\n",
->     pin, desc->name, owner);
->
->   if (gpio_range) {
->     /* There's no need to support multiple GPIO requests */
->     if (desc->gpio_owner) {
->       dev_err(pctldev->dev,
->         "pin %s already requested by %s; cannot claim for %s\n",
->         desc->name, desc->gpio_owner, owner);
->       goto out;
->     }
->
->     desc->gpio_owner = owner;
->   } else {
->     if (desc->mux_usecount && strcmp(desc->mux_owner, owner)) {
->       dev_err(pctldev->dev,
->         "pin %s already requested by %s; cannot claim for %s\n",
->         desc->name, desc->mux_owner, owner);
->       goto out;
->     }
->
->     desc->mux_usecount++;
->     if (desc->mux_usecount > 1)
->       return 0;
->
->     desc->mux_owner = owner;
->   }
->
-> From what I can gather that means that desc->mux_owner or owner must 
-> be an invalid pointer. Is this a bug, or am I abusing the interface in 
-> some subtle way?
->
-> [1] https://pastee.org/vyaz4
-> [2] https://pastee.org/6e2nt
->
-> Regards,
-> Jack.
->
+On Monday, February 04, 2013 01:46:29 PM Shawn Guo wrote:
+> Add an imx6q-cpufreq driver for Freescale i.MX6Q SoC to handle the
+> hardware specific frequency and voltage scaling requirements.
+> 
+> The driver supports module build and is instantiated by the platform
+> device/driver mechanism, so that it will not be instantiated on other
+> platforms, as IMX is built with multiplatform support.
 
-Please ignore this, I was inadvertently re-using a pin of the spi parent 
-which was causing all the issues. Apologies for the time wasted!
+Am I supposed to take it this time? :-)
+
+Rafael
 
 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+> Changes since v5:
+>  * Update clock tranistion code to make keep use count correct
+> 
+>  drivers/cpufreq/Kconfig.arm     |    9 ++
+>  drivers/cpufreq/Makefile        |    1 +
+>  drivers/cpufreq/imx6q-cpufreq.c |  336 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 346 insertions(+)
+>  create mode 100644 drivers/cpufreq/imx6q-cpufreq.c
+> 
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index ffe55b8..c65226c 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -77,6 +77,15 @@ config ARM_EXYNOS5250_CPUFREQ
+>  	  This adds the CPUFreq driver for Samsung EXYNOS5250
+>  	  SoC.
+>  
+> +config ARM_IMX6Q_CPUFREQ
+> +	tristate "Freescale i.MX6Q cpufreq support"
+> +	depends on SOC_IMX6Q
+> +	depends on REGULATOR_ANATOP
+> +	help
+> +	  This adds cpufreq driver support for Freescale i.MX6Q SOC.
+> +
+> +	  If in doubt, say N.
+> +
+>  config ARM_SPEAR_CPUFREQ
+>  	bool "SPEAr CPUFreq support"
+>  	depends on PLAT_SPEAR
+> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> index e2a5da7..93610b2 100644
+> --- a/drivers/cpufreq/Makefile
+> +++ b/drivers/cpufreq/Makefile
+> @@ -54,6 +54,7 @@ obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
+>  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+>  obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+>  obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
+> +obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
+>  
+>  ##################################################################################
+>  # PowerPC platform drivers
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> new file mode 100644
+> index 0000000..d6b6ef3
+> --- /dev/null
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -0,0 +1,336 @@
+> +/*
+> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/opp.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+> +
+> +#define PU_SOC_VOLTAGE_NORMAL	1250000
+> +#define PU_SOC_VOLTAGE_HIGH	1275000
+> +#define FREQ_1P2_GHZ		1200000000
+> +
+> +static struct regulator *arm_reg;
+> +static struct regulator *pu_reg;
+> +static struct regulator *soc_reg;
+> +
+> +static struct clk *arm_clk;
+> +static struct clk *pll1_sys_clk;
+> +static struct clk *pll1_sw_clk;
+> +static struct clk *step_clk;
+> +static struct clk *pll2_pfd2_396m_clk;
+> +
+> +static struct device *cpu_dev;
+> +static struct cpufreq_frequency_table *freq_table;
+> +static unsigned int transition_latency;
+> +
+> +static int imx6q_verify_speed(struct cpufreq_policy *policy)
+> +{
+> +	return cpufreq_frequency_table_verify(policy, freq_table);
+> +}
+> +
+> +static unsigned int imx6q_get_speed(unsigned int cpu)
+> +{
+> +	return clk_get_rate(arm_clk) / 1000;
+> +}
+> +
+> +static int imx6q_set_target(struct cpufreq_policy *policy,
+> +			    unsigned int target_freq, unsigned int relation)
+> +{
+> +	struct cpufreq_freqs freqs;
+> +	struct opp *opp;
+> +	unsigned long freq_hz, volt, volt_old;
+> +	unsigned int index, cpu;
+> +	int ret;
+> +
+> +	ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
+> +					     relation, &index);
+> +	if (ret) {
+> +		dev_err(cpu_dev, "failed to match target frequency %d: %d\n",
+> +			target_freq, ret);
+> +		return ret;
+> +	}
+> +
+> +	freqs.new = freq_table[index].frequency;
+> +	freq_hz = freqs.new * 1000;
+> +	freqs.old = clk_get_rate(arm_clk) / 1000;
+> +
+> +	if (freqs.old == freqs.new)
+> +		return 0;
+> +
+> +	for_each_online_cpu(cpu) {
+> +		freqs.cpu = cpu;
+> +		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> +	}
+> +
+> +	rcu_read_lock();
+> +	opp = opp_find_freq_ceil(cpu_dev, &freq_hz);
+> +	if (IS_ERR(opp)) {
+> +		rcu_read_unlock();
+> +		dev_err(cpu_dev, "failed to find OPP for %ld\n", freq_hz);
+> +		return PTR_ERR(opp);
+> +	}
+> +
+> +	volt = opp_get_voltage(opp);
+> +	rcu_read_unlock();
+> +	volt_old = regulator_get_voltage(arm_reg);
+> +
+> +	dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld mV\n",
+> +		freqs.old / 1000, volt_old / 1000,
+> +		freqs.new / 1000, volt / 1000);
+> +
+> +	/* scaling up?  scale voltage before frequency */
+> +	if (freqs.new > freqs.old) {
+> +		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+> +		if (ret) {
+> +			dev_err(cpu_dev,
+> +				"failed to scale vddarm up: %d\n", ret);
+> +			return ret;
+> +		}
+> +
+> +		/*
+> +		 * Need to increase vddpu and vddsoc for safety
+> +		 * if we are about to run at 1.2 GHz.
+> +		 */
+> +		if (freqs.new == FREQ_1P2_GHZ / 1000) {
+> +			regulator_set_voltage_tol(pu_reg,
+> +					PU_SOC_VOLTAGE_HIGH, 0);
+> +			regulator_set_voltage_tol(soc_reg,
+> +					PU_SOC_VOLTAGE_HIGH, 0);
+> +		}
+> +	}
+> +
+> +	/*
+> +	 * The setpoints are selected per PLL/PDF frequencies, so we need to
+> +	 * reprogram PLL for frequency scaling.  The procedure of reprogramming
+> +	 * PLL1 is as below.
+> +	 *
+> +	 *  - Enable pll2_pfd2_396m_clk and reparent pll1_sw_clk to it
+> +	 *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
+> +	 *  - Disable pll2_pfd2_396m_clk
+> +	 */
+> +	clk_prepare_enable(pll2_pfd2_396m_clk);
+> +	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+> +	clk_set_parent(pll1_sw_clk, step_clk);
+> +	if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+> +		clk_set_rate(pll1_sys_clk, freqs.new * 1000);
+> +		/*
+> +		 * If we are leaving 396 MHz set-point, we need to enable
+> +		 * pll1_sys_clk and disable pll2_pfd2_396m_clk to keep
+> +		 * their use count correct.
+> +		 */
+> +		if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
+> +			clk_prepare_enable(pll1_sys_clk);
+> +			clk_disable_unprepare(pll2_pfd2_396m_clk);
+> +		}
+> +		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+> +		clk_disable_unprepare(pll2_pfd2_396m_clk);
+> +	} else {
+> +		/*
+> +		 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
+> +		 * to provide the frequency.
+> +		 */
+> +		clk_disable_unprepare(pll1_sys_clk);
+> +	}
+> +
+> +	/* Ensure the arm clock divider is what we expect */
+> +	ret = clk_set_rate(arm_clk, freqs.new * 1000);
+> +	if (ret) {
+> +		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+> +		regulator_set_voltage_tol(arm_reg, volt_old, 0);
+> +		return ret;
+> +	}
+> +
+> +	/* scaling down?  scale voltage after frequency */
+> +	if (freqs.new < freqs.old) {
+> +		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+> +		if (ret)
+> +			dev_warn(cpu_dev,
+> +				 "failed to scale vddarm down: %d\n", ret);
+> +
+> +		if (freqs.old == FREQ_1P2_GHZ / 1000) {
+> +			regulator_set_voltage_tol(pu_reg,
+> +					PU_SOC_VOLTAGE_NORMAL, 0);
+> +			regulator_set_voltage_tol(soc_reg,
+> +					PU_SOC_VOLTAGE_NORMAL, 0);
+> +		}
+> +	}
+> +
+> +	for_each_online_cpu(cpu) {
+> +		freqs.cpu = cpu;
+> +		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+> +{
+> +	int ret;
+> +
+> +	ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
+> +	if (ret) {
+> +		dev_err(cpu_dev, "invalid frequency table: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	policy->cpuinfo.transition_latency = transition_latency;
+> +	policy->cur = clk_get_rate(arm_clk) / 1000;
+> +	cpumask_setall(policy->cpus);
+> +	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
+> +
+> +	return 0;
+> +}
+> +
+> +static int imx6q_cpufreq_exit(struct cpufreq_policy *policy)
+> +{
+> +	cpufreq_frequency_table_put_attr(policy->cpu);
+> +	return 0;
+> +}
+> +
+> +static struct freq_attr *imx6q_cpufreq_attr[] = {
+> +	&cpufreq_freq_attr_scaling_available_freqs,
+> +	NULL,
+> +};
+> +
+> +static struct cpufreq_driver imx6q_cpufreq_driver = {
+> +	.verify = imx6q_verify_speed,
+> +	.target = imx6q_set_target,
+> +	.get = imx6q_get_speed,
+> +	.init = imx6q_cpufreq_init,
+> +	.exit = imx6q_cpufreq_exit,
+> +	.name = "imx6q-cpufreq",
+> +	.attr = imx6q_cpufreq_attr,
+> +};
+> +
+> +static int imx6q_cpufreq_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np;
+> +	struct opp *opp;
+> +	unsigned long min_volt, max_volt;
+> +	int num, ret;
+> +
+> +	cpu_dev = &pdev->dev;
+> +
+> +	np = of_find_node_by_path("/cpus/cpu at 0");
+> +	if (!np) {
+> +		dev_err(cpu_dev, "failed to find cpu0 node\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	cpu_dev->of_node = np;
+> +
+> +	arm_clk = devm_clk_get(cpu_dev, "arm");
+> +	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
+> +	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
+> +	step_clk = devm_clk_get(cpu_dev, "step");
+> +	pll2_pfd2_396m_clk = devm_clk_get(cpu_dev, "pll2_pfd2_396m");
+> +	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
+> +	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
+> +		dev_err(cpu_dev, "failed to get clocks\n");
+> +		ret = -ENOENT;
+> +		goto put_node;
+> +	}
+> +
+> +	arm_reg = devm_regulator_get(cpu_dev, "arm");
+> +	pu_reg = devm_regulator_get(cpu_dev, "pu");
+> +	soc_reg = devm_regulator_get(cpu_dev, "soc");
+> +	if (!arm_reg || !pu_reg || !soc_reg) {
+> +		dev_err(cpu_dev, "failed to get regulators\n");
+> +		ret = -ENOENT;
+> +		goto put_node;
+> +	}
+> +
+> +	/* We expect an OPP table supplied by platform */
+> +	num = opp_get_opp_count(cpu_dev);
+> +	if (num < 0) {
+> +		ret = num;
+> +		dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
+> +		goto put_node;
+> +	}
+> +
+> +	ret = opp_init_cpufreq_table(cpu_dev, &freq_table);
+> +	if (ret) {
+> +		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
+> +		goto put_node;
+> +	}
+> +
+> +	if (of_property_read_u32(np, "clock-latency", &transition_latency))
+> +		transition_latency = CPUFREQ_ETERNAL;
+> +
+> +	/*
+> +	 * OPP is maintained in order of increasing frequency, and
+> +	 * freq_table initialised from OPP is therefore sorted in the
+> +	 * same order.
+> +	 */
+> +	rcu_read_lock();
+> +	opp = opp_find_freq_exact(cpu_dev,
+> +				  freq_table[0].frequency * 1000, true);
+> +	min_volt = opp_get_voltage(opp);
+> +	opp = opp_find_freq_exact(cpu_dev,
+> +				  freq_table[--num].frequency * 1000, true);
+> +	max_volt = opp_get_voltage(opp);
+> +	rcu_read_unlock();
+> +	ret = regulator_set_voltage_time(arm_reg, min_volt, max_volt);
+> +	if (ret > 0)
+> +		transition_latency += ret * 1000;
+> +
+> +	/* Count vddpu and vddsoc latency in for 1.2 GHz support */
+> +	if (freq_table[num].frequency == FREQ_1P2_GHZ / 1000) {
+> +		ret = regulator_set_voltage_time(pu_reg, PU_SOC_VOLTAGE_NORMAL,
+> +						 PU_SOC_VOLTAGE_HIGH);
+> +		if (ret > 0)
+> +			transition_latency += ret * 1000;
+> +		ret = regulator_set_voltage_time(soc_reg, PU_SOC_VOLTAGE_NORMAL,
+> +						 PU_SOC_VOLTAGE_HIGH);
+> +		if (ret > 0)
+> +			transition_latency += ret * 1000;
+> +	}
+> +
+> +	ret = cpufreq_register_driver(&imx6q_cpufreq_driver);
+> +	if (ret) {
+> +		dev_err(cpu_dev, "failed register driver: %d\n", ret);
+> +		goto free_freq_table;
+> +	}
+> +
+> +	of_node_put(np);
+> +	return 0;
+> +
+> +free_freq_table:
+> +	opp_free_cpufreq_table(cpu_dev, &freq_table);
+> +put_node:
+> +	of_node_put(np);
+> +	return ret;
+> +}
+> +
+> +static int imx6q_cpufreq_remove(struct platform_device *pdev)
+> +{
+> +	cpufreq_unregister_driver(&imx6q_cpufreq_driver);
+> +	opp_free_cpufreq_table(cpu_dev, &freq_table);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver imx6q_cpufreq_platdrv = {
+> +	.driver = {
+> +		.name	= "imx6q-cpufreq",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe		= imx6q_cpufreq_probe,
+> +	.remove		= imx6q_cpufreq_remove,
+> +};
+> +module_platform_driver(imx6q_cpufreq_platdrv);
+> +
+> +MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
+> +MODULE_DESCRIPTION("Freescale i.MX6Q cpufreq driver");
+> +MODULE_LICENSE("GPL");
+> 
 -- 
-
-   Jack Mitchell (jack at embed.me.uk)
-   Embedded Systems Engineer
-   http://www.embed.me.uk
-
---
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
