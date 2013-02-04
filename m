@@ -1,51 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Feb 2013 14:34:33 +0000
-Subject: [PATCHv2 1/2] ARM: dma-mapping: add support for CMA regions
- placed in highmem zone
-In-Reply-To: <xa1tfw1cb1ho.fsf@mina86.com>
-References: <1358350284-6972-2-git-send-email-m.szyprowski@samsung.com>
- <1359984182-6307-1-git-send-email-m.szyprowski@samsung.com>
- <xa1tlib4b30n.fsf@mina86.com> <20130204141053.GD17786@n2100.arm.linux.org.uk>
- <xa1tfw1cb1ho.fsf@mina86.com>
-Message-ID: <20130204143433.GE17786@n2100.arm.linux.org.uk>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 4 Feb 2013 16:35:20 +0200
+Subject: [PATCH v2 09/31] USB: ehci-omap: Use devm_ioremap_resource()
+In-Reply-To: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+Message-ID: <1359988520-11996-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 03:24:51PM +0100, Michal Nazarewicz wrote:
-> On Mon, Feb 04 2013, Russell King - ARM Linux wrote:
-> > On Mon, Feb 04, 2013 at 02:51:52PM +0100, Michal Nazarewicz wrote:
-> >> On Mon, Feb 04 2013, Marek Szyprowski wrote:
-> >> > @@ -186,13 +186,24 @@ static u64 get_coherent_dma_mask(struct device *dev)
-> >> >  
-> >> >  static void __dma_clear_buffer(struct page *page, size_t size)
-> >> >  {
-> >> > -	void *ptr;
-> >> >  	/*
-> >> >  	 * Ensure that the allocated pages are zeroed, and that any data
-> >> >  	 * lurking in the kernel direct-mapped region is invalidated.
-> >> >  	 */
-> >> > -	ptr = page_address(page);
-> >> > -	if (ptr) {
-> >> > +	if (PageHighMem(page)) {
-> >> > +		phys_addr_t base = __pfn_to_phys(page_to_pfn(page));
-> >> > +		phys_addr_t end = base + size;
-> >> > +		while (size > 0) {
-> >> > +			void *ptr = kmap_atomic(page);
-> >> > +			memset(ptr, 0, PAGE_SIZE);
-> >> > +			dmac_flush_range(ptr, ptr + PAGE_SIZE);
-> >> > +			kunmap_atomic(ptr);
-> >> > +			page++;
-> >> > +			size -= PAGE_SIZE;
-> >> > +		}
-> >> > +		outer_flush_range(base, end);
-> >> > +	} else {
-> >> > +		void *ptr = page_address(page);
-> >> 
-> >> There used to be a ?if (ptr)? check which is now missing.  Why is that?
-> >
-> > Because lowmem pages always have an address.
-> 
-> Perhaps it should use lowmem_page_address() then?
+Make use of devm_ioremap_resource() and correct comment.
 
-It's well defined that page_address() will be non-NULL for lowmem pages.
-There is nothing wrong with the above.
+CC: Alan Stern <stern@rowland.harvard.edu>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ drivers/usb/host/ehci-omap.c |   21 ++++++---------------
+ 1 files changed, 6 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index 30fc482..6b088a4 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -216,23 +216,17 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 
+ 	res =  platform_get_resource_byname(pdev,
+ 				IORESOURCE_MEM, "ehci");
+-	if (!res) {
+-		dev_err(dev, "UHH EHCI get resource failed\n");
+-		return -ENODEV;
+-	}
+-
+-	regs = ioremap(res->start, resource_size(res));
+-	if (!regs) {
+-		dev_err(dev, "UHH EHCI ioremap failed\n");
+-		return -ENOMEM;
++	regs = devm_ioremap_resource(dev, res);
++	if (IS_ERR(regs)) {
++		dev_err(dev, "Resource request/ioremap failed\n");
++		return PTR_ERR(regs);
+ 	}
+ 
+ 	hcd = usb_create_hcd(&ehci_omap_hc_driver, dev,
+ 			dev_name(dev));
+ 	if (!hcd) {
+-		dev_err(dev, "failed to create hcd with err %d\n", ret);
+-		ret = -ENOMEM;
+-		goto err_io;
++		dev_err(dev, "Failed to create HCD\n");
++		return -ENOMEM;
+ 	}
+ 
+ 	hcd->rsrc_start = res->start;
+@@ -285,8 +279,6 @@ err_pm_runtime:
+ 	pm_runtime_put_sync(dev);
+ 	usb_put_hcd(hcd);
+ 
+-err_io:
+-	iounmap(regs);
+ 	return ret;
+ }
+ 
+@@ -306,7 +298,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ 
+ 	usb_remove_hcd(hcd);
+ 	disable_put_regulator(dev->platform_data);
+-	iounmap(hcd->regs);
+ 	usb_put_hcd(hcd);
+ 
+ 	pm_runtime_put_sync(dev);
+-- 
+1.7.4.1
