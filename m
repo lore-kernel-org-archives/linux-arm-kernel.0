@@ -1,24 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 4 Feb 2013 14:25:15 +0530
-Subject: [PATCHv2 0/2] add omap mcspi device tree data
-In-Reply-To: <1359967907-26645-1-git-send-email-sourav.poddar@ti.com>
-References: <1359967907-26645-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <510F7773.5060102@ti.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 04 Feb 2013 09:53:59 +0100
+Subject: [PATCH v3 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can
+ sleep
+In-Reply-To: <20130130081728.GC13568@avionic-0098.mockup.avionic-design.de>
+References: <1359381659-24454-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359381659-24454-4-git-send-email-florian.vaussard@epfl.ch>
+ <20130130081728.GC13568@avionic-0098.mockup.avionic-design.de>
+Message-ID: <510F7727.1010307@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 February 2013 02:21 PM, Sourav Poddar wrote:
-> Patch series adds omap5 evm mcspi nodes and pinctrl
-> data in omap5.dtsi and omap5-evm.dts files.
+On 01/30/2013 09:17 AM, Thierry Reding wrote:
+> On Mon, Jan 28, 2013 at 03:00:59PM +0100, Florian Vaussard wrote:
+>> Call to led_pwm_set() can happen inside atomic context, like triggers.
+>> If the PWM call can sleep, defer using a worker.
+>>
+>> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> ---
+>>   drivers/leds/leds-pwm.c |   50 +++++++++++++++++++++++++++++++++++++++-------
+>>   1 files changed, 42 insertions(+), 8 deletions(-)
 >
-> Felipe Balbi (1):
->    arm: dts: omap5: add SPI devices to OMAP5 DeviceTree file
+> Bryan, I assume that you'll be taking this? It doesn't apply cleanly to
+> my tree, probably because of Peter's recent changes that you took
+> through your tree and Florian based his patches on top of that. The
+> conflict resolution should be trivial, though.
 >
-> Sourav Poddar (1):
->    arm: dts: omap5-evm: Add mcspi data
->
->   arch/arm/boot/dts/omap5-evm.dts |   46 +++++++++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/omap5.dtsi    |   40 +++++++++++++++++++++++++++++++++
->   2 files changed, 86 insertions(+), 0 deletions(-)
->
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Thank you Thierry. Indeed, this patchset was based on linux-leds due to the
+dependancy with Peter's patches.
+
+Bryan, can you take this patch?
+
+Regards,
+
+Florian
