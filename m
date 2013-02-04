@@ -1,101 +1,88 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 4 Feb 2013 10:12:44 -0600
-Subject: [PATCHv2 for soc 4/4] arm: socfpga: Add SMP support for actual
- socfpga harware
-In-Reply-To: <20130203183641.GA30825@amd.pavel.ucw.cz>
-References: <1359651943-21752-1-git-send-email-dinguyen@altera.com>
- <1359651943-21752-5-git-send-email-dinguyen@altera.com>
- <20130201035040.GE4838@quad.lixom.net>
- <20130201104655.GA3124@amd.pavel.ucw.cz>
- <71B37E0559AC6849A68C5BA94C509FB45A63D4E47D@SJ-ITMSG02.altera.priv.altera.com>
- <20130201153152.GS23505@n2100.arm.linux.org.uk>
- <1359736762.2932.1.camel@linux-builds1>
- <20130202192409.GA17736@amd.pavel.ucw.cz>
- <71B37E0559AC6849A68C5BA94C509FB45A645BA4EA@SJ-ITMSG02.altera.priv.altera.com>
- <20130203183641.GA30825@amd.pavel.ucw.cz>
-Message-ID: <1359994364.10570.4.camel@linux-builds1>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 04 Feb 2013 20:36:38 +0300
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130204154153.GA18237@arwen.pp.htv.fi>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
+ <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
+ <20130201185820.GE29898@arwen.pp.htv.fi> <510C2A47.1090607@mvista.com>
+ <20130201205600.GA31762@arwen.pp.htv.fi>
+ <20130201213003.GW2637@n2100.arm.linux.org.uk>
+ <20130204154153.GA18237@arwen.pp.htv.fi>
+Message-ID: <510FF1A6.403@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Hello.
 
-On Sun, 2013-02-03 at 19:36 +0100, ZY - pavel wrote:
-> Hi!
-> 
-> > > > Point taken...thanks Russell.
-> > > 
-> > > Well, I don't think we normally check dtbs for validity with
-> > > user-helpful error messages, but it is relatively easy in this case.
-> > > 
-> > > ---cut here---
-> > > 
-> > > Continue booting with second core disabled if cpu1-start-addr is not
-> > > present in .dtb.
-> > > 
-> > > Signed-off-by: Pavel Machek <pavel@denx.de>
-> > > 
-> > > diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-
-> > > socfpga/platsmp.c
-> > > index 81e0da0..90facdd 100644
-> > > --- a/arch/arm/mach-socfpga/platsmp.c
-> > > +++ b/arch/arm/mach-socfpga/platsmp.c
-> > > @@ -82,6 +82,9 @@ static void __init socfpga_smp_init_cpus(void)
-> > >  		ncores = 1;
-> > >  	}
-> > >  #endif
-> > > +	if (!cpu1start_addr)
-> > > +		ncores = 1;
-> > > +
-> > 
-> > This will not work because of commit 5587164eea4aad88fcb79d9b21dc8f14fea598cd 
-> > I sent out a V3 series of this patch, CPU1 will simply fail to come online if 
-> > cpu1-start-addr is not defined.
-> 
-> Are you sure? As far as I can see you still need such a line in v3 of
-> the patch:
-> 
-> @@ -72,6 +73,11 @@ void __init socfpga_sysmgr_init(void)
->         struct device_node *np;
-> 
->         np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
-> +       
-> +       if (of_property_read_u32(np, "cpu1-start-addr",
-> +                       (u32 *) &cpu1start_addr))
-> +               pr_err("SMP: Need cpu1-start-addr in device tree.\n");
-> +
->         sys_manager_base_addr = of_iomap(np, 0);
-> 
->         np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
-> 
-> ...so cpu1-start-addr is not there, cpu1start_addr is NULL but you
-> continue booting.
-> 
->  ENTRY(secondary_trampoline)
-> -       movw    r0, #:lower16:CPU1_START_ADDR
-> -       movt  r0, #:upper16:CPU1_START_ADDR
-> +       movw    r2, #:lower16:cpu1start_addr
-> +       movt  r2, #:upper16:cpu1start_addr
-> +                       
-> +       /* The socfpga VT cannot handle a 0xC0000000 page offset when
-> loading
-> +               the cpu1start_addr, we bit clear it. Tested on HW and
-> VT. */
-> +       bic     r2, r2, #0x40000000
-> 
-> +       ldr     r0, [r2]
->         ldr     r1, [r0]
->         bx      r1
-> 
-> ...and you'll dereference the NULL pointer here, no?
+On 02/04/2013 06:41 PM, Felipe Balbi wrote:
 
-You're right, somehow my initial test did not catch this error. For v4,
-I'm just going to wrap everything in sofpga_boot_secodardy in a 
+>>>>> I guess to make the MUSB side simpler we would need musb-dma-engine glue
+>>>>> to map dmaengine to the private MUSB API. Then we would have some
+>>>>> starting point to also move inventra (and anybody else) to dmaengine
+>>>>> API.
 
-if (cpu1start_addr){}
+>>>>    Why? Inventra is a dedicated device's private DMA controller, why make
+>>>> universal DMA driver for it?
 
+>>> because it doesn't make sense to support multiple DMA APIs. We can check
+>>> from MUSB's registers if it was configured with Inventra DMA support and
+>>> based on that we can register MUSB's own DMA Engine to dmaengine API.
 
-Dinh
+>> Hang on.  This is one of the DMA implementations which is closely
+>> coupled with the USB and only the USB?  If it is...
 
-> 
-> Sorry for the noise, this really is not all that important...
-> 									Pavel
+>> I thought this had been discussed _extensively_ before.  I thought the
+>> resolution on it was:
+>> 1. It would not use the DMA engine API.
+>> 2. It would not live in arch/arm.
+>> 3. It would be placed nearby the USB driver it's associated with.
+
+>> (1) because we don't use APIs just for the hell of it - think.  Do we
+>> use the DMA engine API for PCI bus mastering ethernet controllers?  No.
+>> Do we use it for PCI bus mastering SCSI controllers?  No.  Because the
+>> DMA is integral to the rest of the device.
+
+> that's not really a fair comparison, however. MUSB is used with several
+> DMA engines.
+
+> The only DMA engine which is really coupled with MUSB is the Inventra
+> DMA engine which comes as an optional feature to the IP. Many users have
+
+   That's not quite true. At least CPPI 3.0 is coupled with MUSB as well. The
+programming interface is MUSB specific, and differs from that of the EMAC driver
+which also uses CPPI 3.0 (however, the DMA descriptor format is the same between
+both, IIRC).
+
+> opted out of it. From the top of my head we have CPPI 3.x, CPPI 4.1,
+> Inventra DMA, OMAP sDMA and ux500 DMA engines supported by the driver.
+
+> Granted, CPPI 4.1 makes some assumptions about the fact that it's
+> handling USB tranfers,
+
+   What CPPI 4.1 code makes this assumptions? MUSB DMA driver? Then it's just
+natural. Generic CPPI 4.1 support code (as was posted for both mach-dacinci/ or
+common/ placement) made no such assumptions.
+
+> but nevertheless, the IP can be, and in fact is,
+> used with many different DMA engines and driver needs to cope with it.
+
+   What IP, CPPI 4.1 or MUSB?
+
+> Current DMA abstraction is quite poor, for example there's no way to
+> compile support for multiple DMA engines. Code also makes certain, IMO
+> unnecessary, assumptions about the underlying DMA engine (abstraction is
+> poor, as said above but it we could follow MUSB's programming guide when
+> it comes to programming DMA transfers).
+
+   Don't know, I was quite content with the abstraction when writing CPPI 4.1
+driver for MUSB...
+
+> Considering all of the above, it's far better to use DMA engine and get
+> rid of all the mess.
+
+   In my eyes, getting rid of the mess doesn't justify breaking the rules that
+Russell formulated above.
+
+WBR, Sergei
