@@ -1,64 +1,74 @@
 From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Mon, 4 Feb 2013 12:09:45 +0530
-Subject: [PATCH v5 06/10] clk: tegra: Workaround for Tegra114 MSENC problem
-In-Reply-To: <1359713962-16822-7-git-send-email-pdeschrijver@nvidia.com>
+Date: Mon, 4 Feb 2013 12:15:14 +0530
+Subject: [PATCH v5 08/10] ARM: dt: Add references to tegra_car clocks
+In-Reply-To: <1359713962-16822-9-git-send-email-pdeschrijver@nvidia.com>
 References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-7-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <510F57B1.1050906@nvidia.com>
+ <1359713962-16822-9-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <510F58FA.5000101@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
-> Workaround a hardware bug in MSENC during clock enable.
+> Add references to tegra_car clocks for the basic device nodes.
 >
 > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 > ---
->   drivers/clk/tegra/clk-periph-gate.c |    9 +++++++++
->   drivers/clk/tegra/clk.h             |    1 +
->   2 files changed, 10 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
-> index 6dd5332..c9083fb 100644
-> --- a/drivers/clk/tegra/clk-periph-gate.c
-> +++ b/drivers/clk/tegra/clk-periph-gate.c
-> @@ -43,6 +43,8 @@ static DEFINE_SPINLOCK(periph_ref_lock);
->   
->   #define periph_clk_to_bit(periph) (1 << (gate->clk_num % 32))
->   
-> +#define LVL2_CLK_GATE_OVRE 0x554
-> +
->   /* Peripheral gate clock ops */
->   static int clk_periph_is_enabled(struct clk_hw *hw)
->   {
-> @@ -83,6 +85,13 @@ static int clk_periph_enable(struct clk_hw *hw)
->   		}
->   	}
->   
-> +	if (gate->flags & TEGRA_PERIPH_WAR_1005168) {
-> +		writel_relaxed(0, gate->clk_base + LVL2_CLK_GATE_OVRE);
-> +		writel_relaxed(BIT(22), gate->clk_base + LVL2_CLK_GATE_OVRE);
-> +		udelay(1);
-> +		writel_relaxed(0, gate->clk_base + LVL2_CLK_GATE_OVRE);
-> +	}
-> +
->   	spin_unlock_irqrestore(&periph_ref_lock, flags);
->   
->   	return 0;
-> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-> index 79f5e2a..8756d9f 100644
-> --- a/drivers/clk/tegra/clk.h
-> +++ b/drivers/clk/tegra/clk.h
-> @@ -371,6 +371,7 @@ struct tegra_clk_periph_gate {
->   #define TEGRA_PERIPH_NO_RESET BIT(0)
->   #define TEGRA_PERIPH_MANUAL_RESET BIT(1)
->   #define TEGRA_PERIPH_ON_APB BIT(2)
-> +#define TEGRA_PERIPH_WAR_1005168 BIT(3)
->   
-
-Comment for this flag, otherwise
 
 Reviewed-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 
->   void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert);
->   extern const struct clk_ops tegra_clk_periph_gate_ops;
+>   arch/arm/boot/dts/tegra114.dtsi |    7 ++++++-
+>   1 files changed, 6 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+> index 96a8235..1dec620 100644
+> --- a/arch/arm/boot/dts/tegra114.dtsi
+> +++ b/arch/arm/boot/dts/tegra114.dtsi
+> @@ -27,7 +27,7 @@
+>   	};
+>   
+>   	tegra_car: clock {
+> -		compatible = "nvidia,tegra114-car, nvidia,tegra30-car";
+> +		compatible = "nvidia,tegra114-car";
+>   		reg = <0x60006000 0x1000>;
+>   		#clock-cells = <1>;
+>   	};
+> @@ -43,6 +43,7 @@
+>   		reg-shift = <2>;
+>   		interrupts = <0 36 0x04>;
+>   		status = "disabled";
+> +		clocks = <&tegra_car 6>;
+>   	};
+>   
+>   	serial at 70006040 {
+> @@ -51,6 +52,7 @@
+>   		reg-shift = <2>;
+>   		interrupts = <0 37 0x04>;
+>   		status = "disabled";
+> +		clocks = <&tegra_car 192>;
+>   	};
+>   
+>   	serial at 70006200 {
+> @@ -59,6 +61,7 @@
+>   		reg-shift = <2>;
+>   		interrupts = <0 46 0x04>;
+>   		status = "disabled";
+> +		clocks = <&tegra_car 55>;
+>   	};
+>   
+>   	serial at 70006300 {
+> @@ -67,12 +70,14 @@
+>   		reg-shift = <2>;
+>   		interrupts = <0 90 0x04>;
+>   		status = "disabled";
+> +		clocks = <&tegra_car 65>;
+>   	};
+>   
+>   	rtc {
+>   		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
+>   		reg = <0x7000e000 0x100>;
+>   		interrupts = <0 2 0x04>;
+> +		clocks = <&tegra_car 4>;
+>   	};
+>   
+>   	pmc {
 >
