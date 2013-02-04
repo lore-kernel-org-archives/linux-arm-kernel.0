@@ -1,70 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Feb 2013 17:37:01 +0000
-Subject: [PATCH 2/4] ARM: mach-shmobile: r8a7779: Allow initialisation
- of GIC by DT
-In-Reply-To: <510BCE09.7050302@gmail.com>
-References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
- <1359597051-32700-3-git-send-email-horms+renesas@verge.net.au>
- <20130131123213.GB7235@e106331-lin.cambridge.arm.com>
- <20130201001119.GO10312@verge.net.au>
- <20130201003410.GA30007@verge.net.au>
- <20130201105849.GB21191@e106331-lin.cambridge.arm.com>
- <510BCE09.7050302@gmail.com>
-Message-ID: <20130204173701.GE28464@e106331-lin.cambridge.arm.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 4 Feb 2013 11:42:59 -0600
+Subject: [PATCH V2 0/7] ARM: OMAP2+: System timer updates
+Message-ID: <1359999786-8740-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 02:15:37PM +0000, Rob Herring wrote:
-> On 02/01/2013 04:58 AM, Mark Rutland wrote:
-> > On Fri, Feb 01, 2013 at 12:34:10AM +0000, Simon Horman wrote:
-> >> On Fri, Feb 01, 2013 at 09:11:19AM +0900, Simon Horman wrote:
-> >>> On Thu, Jan 31, 2013 at 12:32:13PM +0000, Mark Rutland wrote:
-> >>>> Hi Simon,
-> >>>>
-> >>>> On Thu, Jan 31, 2013 at 01:50:49AM +0000, Simon Horman wrote:
-> 
-> >>>>> +
-> >>>>> +        gic: interrupt-controller at f0001000 {
-> >>>>> +                compatible = "arm,cortex-a9-gic";
-> >>>>> +                #interrupt-cells = <3>;
-> >>>>> +                #address-cells = <1>;
-> >>>>
-> >>>> Why is #address-cells needed here (and without #size-cells)? I see it's in the
-> >>>> binding document example, but I can't figure out why.
-> >>>
-> >>> Its here because I copied the example.
-> >>> I will see about removing it from here.
-> > 
-> > Rob, Grant, do either of you know if there's a reason for this that we've
-> > missed?
-> > 
-> > The gic doesn't have any direct children, and this doesn't seem to be
-> > some decvicetree interrupt-controller magic.
-> 
-> If you look at of_irq_map_raw, there are cases that look at
-> #address-cells. Those appear to be only when you have an interrupt-map
-> though.
+This series consists mainly of clean-ups for clockevents and
+clocksource timers on OMAP2+ devices. The most significant change
+in functionality comes from the 5th patch which is changing the
+selection of the clocksource timer for OMAP3 and AM335x devices
+when gptimers are used for clocksource. This change came about from
+Vaibhav Bedia's series for AM335x [1]. See patch for more details on
+the exact nature of the change.
 
-Aah. So this is some devicetree magic after all. Thanks for looking into it.
+Boot tested with and without  device-tree on OMAP2420 H4, OMAP3430 SDP,
+OMAP3430 Beagle Board, OMAP4430 SDP and AM335x EVM (AM335x only
+supports device-tree boot). Also boot tested boards with kernel boot
+parameter "clocksource=gp_timer".
 
-> > 
-> > If this is superfluous, how about the patch below?
-> 
-> The docs probably should state #addr-cells is only required with
-> interrupt-map.
+This series is based upon ARM-SoC next branch.
 
-That'd be nice. It might limit the confusion we had here.
+V2 changes:
+- Fixed bug in patch that updates clocksource and clockevents timer
+  names to use the hwmod timer names (thanks Vaibhav Bedia!)
+- Updated patch that removes the hard-coded ID test to return an error
+  as soon as clk_set_parent fails instead of waiting for the end of the
+  function.
+- Fixed bug in patches that "simplify system timer clock definitions"
+  and "simplify system timer definitions" that was prevent omap4/5
+  boards from booting with kernel boot parameter "clocksource=gp_timer".
+- Updated changelog for patch "simplify system timer definitions" per
+  feedback received from Igor.
+- Added new patch to store the timer ID in the omap_dm_timer structure
+  to clean-up the code.
+- Added new patch to fix a sparse warning seen in ARM-SOC next.
 
-> 
-> > 
-> > I took a quick look at arch/arm/boot/dts/. Some gic nodes don't have
-> > #address-cells, some have it but not #size-cells, and some have both. These
-> > should probably be cleaned up too.
-> 
-> Some boards are using interrupt-map, so they may need #address-cells. So
-> I'm inclined to leave things alone.
+[1] https://patchwork.kernel.org/patch/1921421/
 
-That would make sense.
 
-Thanks,
-Mark.
+Jon Hunter (7):
+  ARM: OMAP2+: Fix selection of clockevent timer when using device-tree
+  ARM: OMAP2+: Display correct system timer name
+  ARM: OMAP2+: Remove hard-coded test on timer ID
+  ARM: OMAP2+: Simplify system timer clock definitions
+  ARM: OMAP2+: Simplify system timers definitions
+  ARM: OMAP2+: Store ID of system timers in timer structure
+  ARM: OMAP4+: Fix sparse warning in system timers
+
+ arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
+ arch/arm/mach-omap2/board-generic.c  |    2 +-
+ arch/arm/mach-omap2/common.h         |    3 +-
+ arch/arm/mach-omap2/timer.c          |  121 +++++++++++++++++-----------------
+ 4 files changed, 65 insertions(+), 63 deletions(-)
+
+-- 
+1.7.10.4
