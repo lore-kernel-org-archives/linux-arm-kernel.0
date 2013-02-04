@@ -1,327 +1,55 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 4 Feb 2013 11:03:55 +0800
-Subject: [PATCH v6 4/8] usb: chipidea: consolidate kinds of APIs for both roles
+Date: Mon, 4 Feb 2013 11:03:56 +0800
+Subject: [PATCH v6 5/8] usb: chipidea: udc: add pullup/pulldown dp at
+ hw_device_state
 In-Reply-To: <1359947039-23906-1-git-send-email-peter.chen@freescale.com>
 References: <1359947039-23906-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1359947039-23906-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1359947039-23906-6-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Create/destroy the gadget at udc's init and destory function
-- start/stop API are used at otg id switch and probe routine
-- Defer some gadget operations at ci's delayed work queue
+- During the connect/disconnect host, we need to pullup
+and pulldown dp
+- Make sure the dp is not pullup until the vbus is on when
+flag CI13XXX_PULLUP_ON_VBUS is set
+- Using hw_device_state when set run/stop bit
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci.h   |    1 -
- drivers/usb/chipidea/core.c |   78 +++++++++++++++++--------------------------
- drivers/usb/chipidea/host.c |    6 +++
- drivers/usb/chipidea/host.h |    4 ++-
- drivers/usb/chipidea/udc.c  |   37 +++++++++++++++-----
- drivers/usb/chipidea/udc.h  |    4 ++-
- 6 files changed, 71 insertions(+), 59 deletions(-)
+ drivers/usb/chipidea/udc.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index 325d790..3ebe87a 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -205,7 +205,6 @@ static inline void ci_role_stop(struct ci13xxx *ci)
- 
- 	ci->roles[role]->stop(ci);
- }
--
- /******************************************************************************
-  * REGISTERS
-  *****************************************************************************/
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 8857b2c..dd1fd87 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -323,27 +323,16 @@ static void ci_handle_id_switch(struct ci13xxx *ci)
- 			ci_role(ci)->name, ci->roles[role]->name);
- 
- 		/* 1. Finish the current role */
--		if (ci->role == CI_ROLE_GADGET) {
--			usb_gadget_vbus_disconnect(&ci->gadget);
--			/* host doesn't care B_SESSION_VALID event */
--			ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
--			ci_disable_otg_interrupt(ci, OTGSC_BSVIE);
--			ci->role = CI_ROLE_END;
--			/* reset controller */
--			hw_device_reset(ci, USBMODE_CM_IDLE);
--		} else if (ci->role == CI_ROLE_HOST) {
--			ci_role_stop(ci);
--			/* reset controller */
--			hw_device_reset(ci, USBMODE_CM_IDLE);
--		}
-+		ci_role_stop(ci);
-+		hw_device_reset(ci, USBMODE_CM_IDLE);
- 
- 		/* 2. Turn on/off vbus according to coming role */
--		if (ci_otg_role(ci) == CI_ROLE_GADGET) {
-+		if (role == CI_ROLE_GADGET) {
- 			otg_set_vbus(&ci->otg, false);
- 			/* wait vbus lower than OTGSC_BSV */
- 			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
- 					CI_VBUS_STABLE_TIMEOUT);
--		} else if (ci_otg_role(ci) == CI_ROLE_HOST) {
-+		} else if (role == CI_ROLE_HOST) {
- 			otg_set_vbus(&ci->otg, true);
- 			/* wait vbus higher than OTGSC_AVV */
- 			hw_wait_reg(ci, OP_OTGSC, OTGSC_AVV, OTGSC_AVV,
-@@ -351,13 +340,7 @@ static void ci_handle_id_switch(struct ci13xxx *ci)
- 		}
- 
- 		/* 3. Begin the new role */
--		if (ci_otg_role(ci) == CI_ROLE_GADGET) {
--			ci->role = role;
--			ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
--			ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
--		} else if (ci_otg_role(ci) == CI_ROLE_HOST) {
--			ci_role_start(ci, role);
--		}
-+		ci_role_start(ci, role);
- 	}
- }
- 
-@@ -396,8 +379,24 @@ static void ci_delayed_work(struct work_struct *work)
- 	struct delayed_work *dwork = to_delayed_work(work);
- 	struct ci13xxx *ci = container_of(dwork, struct ci13xxx, dwork);
- 
--	otg_set_vbus(&ci->otg, true);
-+	if (ci->role == CI_ROLE_GADGET) {
-+		/*
-+		 * if it is device mode:
-+		 * - Enable vbus detect
-+		 * - If it has already connected to host, notify udc
-+		 */
-+		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
-+		ci_handle_vbus_change(ci);
-+	} else if (ci->is_otg && (ci->role == CI_ROLE_HOST)) {
-+		/* USB Device at the MicroB to A cable */
-+		otg_set_vbus(&ci->otg, true);
-+	}
-+}
- 
-+static inline void ci_role_destroy(struct ci13xxx *ci)
-+{
-+	ci_hdrc_gadget_destroy(ci);
-+	ci_hdrc_host_destroy(ci);
- }
- 
- static ssize_t show_role(struct device *dev, struct device_attribute *attr,
-@@ -594,7 +593,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 
- 	ret = ci_hdrc_gadget_init(ci);
- 	if (ret)
--		dev_info(dev, "doesn't support gadget\n");
-+		dev_info(dev, "doesn't support gadget, ret=%d\n", ret);
- 
- 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
- 		dev_err(dev, "no supported roles\n");
-@@ -616,23 +615,9 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 			: CI_ROLE_GADGET;
- 	}
- 
--	ret = ci_role_start(ci, ci->role);
--	if (ret) {
--		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
--		ret = -ENODEV;
--		goto rm_wq;
--	}
-+	ci_role_start(ci, ci->role);
- 
- 	otgsc = hw_read(ci, OP_OTGSC, ~0);
--	/*
--	 * if it is device mode:
--	 * - Enable vbus detect
--	 * - If it has already connected to host, notify udc
--	 */
--	if (ci->role == CI_ROLE_GADGET) {
--		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
--		ci_handle_vbus_change(ci);
--	}
- 
- 	platform_set_drvdata(pdev, ci);
- 	ret = request_irq(ci->irq, ci_irq, IRQF_SHARED, ci->platdata->name,
-@@ -642,18 +627,17 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 
- 	ret = device_create_file(dev, &dev_attr_role);
- 	if (ret)
--		goto rm_attr;
-+		goto free_irq;
- 
--	/* Handle the situation that usb device at the MicroB to A cable */
--	if (ci->is_otg && !(otgsc & OTGSC_ID))
--		queue_delayed_work(ci->wq, &ci->dwork, msecs_to_jiffies(500));
-+	/* Defer some operations */
-+	queue_delayed_work(ci->wq, &ci->dwork, msecs_to_jiffies(200));
- 
- 	return ret;
- 
--rm_attr:
--	device_remove_file(dev, &dev_attr_role);
-+free_irq:
-+	free_irq(ci->irq, ci);
- stop:
--	ci_role_stop(ci);
-+	ci_role_destroy(ci);
- rm_wq:
- 	flush_workqueue(ci->wq);
- 	destroy_workqueue(ci->wq);
-@@ -669,7 +653,7 @@ static int ci_hdrc_remove(struct platform_device *pdev)
- 	destroy_workqueue(ci->wq);
- 	device_remove_file(ci->dev, &dev_attr_role);
- 	free_irq(ci->irq, ci);
--	ci_role_stop(ci);
-+	ci_role_destroy(ci);
- 
- 	return 0;
- }
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index 8e9d312..ead3158 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -105,3 +105,9 @@ int ci_hdrc_host_init(struct ci13xxx *ci)
- 
- 	return 0;
- }
-+
-+void ci_hdrc_host_destroy(struct ci13xxx *ci)
-+{
-+	if (ci->role == CI_ROLE_HOST)
-+		host_stop(ci);
-+}
-diff --git a/drivers/usb/chipidea/host.h b/drivers/usb/chipidea/host.h
-index 761fb1f..5fd03a4 100644
---- a/drivers/usb/chipidea/host.h
-+++ b/drivers/usb/chipidea/host.h
-@@ -4,13 +4,15 @@
- #ifdef CONFIG_USB_CHIPIDEA_HOST
- 
- int ci_hdrc_host_init(struct ci13xxx *ci);
--
-+void ci_hdrc_host_destroy(struct ci13xxx *ci);
- #else
- 
- static inline int ci_hdrc_host_init(struct ci13xxx *ci)
- {
- 	return -ENXIO;
- }
-+static void ci_hdrc_host_destroy(struct ci13xxx *ci)
-+{}
- 
- #endif
- 
 diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 83e54bb..e82dae4 100644
+index e82dae4..597ae64 100644
 --- a/drivers/usb/chipidea/udc.c
 +++ b/drivers/usb/chipidea/udc.c
-@@ -31,6 +31,7 @@
- 
- #include "ci.h"
- #include "udc.h"
-+#include "otg.h"
- #include "bits.h"
- #include "debug.h"
- 
-@@ -1743,7 +1744,12 @@ static int udc_start(struct ci13xxx *ci)
- 	if (!IS_ERR_OR_NULL(ci->transceiver)) {
- 		retval = otg_set_peripheral(ci->transceiver->otg,
- 						&ci->gadget);
--		if (retval)
-+		/* 
-+		 * If we implement all USB functions using chipidea drivers,
-+		 * it doesn't need to call above API, meanwhile, if we only
-+		 * use gadget function, calling above API is useless.
-+		 */
-+		if (retval && retval != -ENOTSUPP)
- 			goto remove_dbg;
+@@ -91,8 +91,10 @@ static int hw_device_state(struct ci13xxx *ci, u32 dma)
+ 		/* interrupt, error, port change, reset, sleep/suspend */
+ 		hw_write(ci, OP_USBINTR, ~0,
+ 			     USBi_UI|USBi_UEI|USBi_PCI|USBi_URI|USBi_SLI);
++		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
+ 	} else {
+ 		hw_write(ci, OP_USBINTR, ~0, 0);
++		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
  	}
- 
-@@ -1780,12 +1786,27 @@ free_qh_pool:
- 	return retval;
+ 	return 0;
  }
- 
-+static int udc_id_switch_for_device(struct ci13xxx *ci)
-+{
-+	ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
-+	ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
-+
-+	return 0;
-+}
-+
-+static void udc_id_switch_for_host(struct ci13xxx *ci)
-+{
-+	/* host doesn't care B_SESSION_VALID event */
-+	ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
-+	ci_disable_otg_interrupt(ci, OTGSC_BSVIE);
-+}
-+
- /**
-- * udc_remove: parent remove must call this to remove UDC
-+ * ci_hdrc_gadget_destroy: parent remove must call this to remove UDC
-  *
-  * No interrupts active, the IRQ has been released
-  */
--static void udc_stop(struct ci13xxx *ci)
-+void ci_hdrc_gadget_destroy(struct ci13xxx *ci)
+@@ -1424,10 +1426,14 @@ static int ci13xxx_pullup(struct usb_gadget *_gadget, int is_on)
  {
- 	if (ci == NULL)
- 		return;
-@@ -1804,15 +1825,13 @@ static void udc_stop(struct ci13xxx *ci)
- 	}
- 	dbg_remove_files(&ci->gadget.dev);
- 	device_unregister(&ci->gadget.dev);
--	/* my kobject is dynamic, I swear! */
--	memset(&ci->gadget, 0, sizeof(ci->gadget));
+ 	struct ci13xxx *ci = container_of(_gadget, struct ci13xxx, gadget);
+ 
++	if ((ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) &&
++			!ci->vbus_active)
++		return -ENOTSUPP;
++
+ 	if (is_on)
+-		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
++		hw_device_state(ci, ci->ep0out->qh.dma);
+ 	else
+-		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
++		hw_device_state(ci, 0);
+ 
+ 	return 0;
  }
- 
- /**
-  * ci_hdrc_gadget_init - initialize device related bits
-  * ci: the controller
-  *
-- * This function enables the gadget role, if the device is "device capable".
-+ * This function initializes gadget, if the device is "device capable".
-  */
- int ci_hdrc_gadget_init(struct ci13xxx *ci)
- {
-@@ -1825,11 +1844,11 @@ int ci_hdrc_gadget_init(struct ci13xxx *ci)
- 	if (!rdrv)
- 		return -ENOMEM;
- 
--	rdrv->start	= udc_start;
--	rdrv->stop	= udc_stop;
-+	rdrv->start	= udc_id_switch_for_device;
-+	rdrv->stop	= udc_id_switch_for_host;
- 	rdrv->irq	= udc_irq;
- 	rdrv->name	= "gadget";
- 	ci->roles[CI_ROLE_GADGET] = rdrv;
- 
--	return 0;
-+	return udc_start(ci);
- }
-diff --git a/drivers/usb/chipidea/udc.h b/drivers/usb/chipidea/udc.h
-index 4ff2384..6c42d49 100644
---- a/drivers/usb/chipidea/udc.h
-+++ b/drivers/usb/chipidea/udc.h
-@@ -80,6 +80,7 @@ struct ci13xxx_req {
- #ifdef CONFIG_USB_CHIPIDEA_UDC
- 
- int ci_hdrc_gadget_init(struct ci13xxx *ci);
-+void ci_hdrc_gadget_destroy(struct ci13xxx *ci);
- 
- #else
- 
-@@ -87,7 +88,8 @@ static inline int ci_hdrc_gadget_init(struct ci13xxx *ci)
- {
- 	return -ENXIO;
- }
--
-+static void ci_hdrc_gadget_destroy(struct ci13xxx *ci)
-+{}
- #endif
- 
- #endif /* __DRIVERS_USB_CHIPIDEA_UDC_H */
 -- 
 1.7.0.4
