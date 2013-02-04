@@ -1,150 +1,75 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 04 Feb 2013 14:23:02 +0100
-Subject: [PATCHv2 1/2] ARM: dma-mapping: add support for CMA regions placed in
- highmem zone
-In-Reply-To: <1358350284-6972-2-git-send-email-m.szyprowski@samsung.com>
-References: <1358350284-6972-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1359984182-6307-1-git-send-email-m.szyprowski@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon,  4 Feb 2013 14:24:32 +0100
+Subject: [PATCH 6/9] USB chipidea: introduce dual role mode pdata flags
+In-Reply-To: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1359984275-24646-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing pieces to correctly support memory pages served
-from CMA regions placed in high memory zones. Please note that the default
-global CMA area is still put into lowmem and is limited by optional
-architecture specific DMA zone. One can however put device specific CMA
-regions in high memory zone to reduce lowmem usage.
+Even if a chipidea core is otg capable the board may not. This allows
+to explicitly set the core to host/peripheral mode. Without these
+flags the driver falls back to the old behaviour.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
+ drivers/usb/chipidea/core.c  |   21 +++++++++++++++------
+ include/linux/usb/chipidea.h |    2 +-
+ 2 files changed, 16 insertions(+), 7 deletions(-)
 
-Changle log: 
-v2: restructured code and made all himem checks positive 
-    ('if (PageHighMem(page))' instead of 'if (!PageHighMem(page))')
----
- arch/arm/mm/dma-mapping.c |   53 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 40 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 076c26d..90e059b 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -186,13 +186,24 @@ static u64 get_coherent_dma_mask(struct device *dev)
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 04d68cb..c89f2aa 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -435,6 +435,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	struct resource	*res;
+ 	void __iomem	*base;
+ 	int		ret;
++	enum usb_dr_mode dr_mode;
  
- static void __dma_clear_buffer(struct page *page, size_t size)
- {
--	void *ptr;
- 	/*
- 	 * Ensure that the allocated pages are zeroed, and that any data
- 	 * lurking in the kernel direct-mapped region is invalidated.
- 	 */
--	ptr = page_address(page);
--	if (ptr) {
-+	if (PageHighMem(page)) {
-+		phys_addr_t base = __pfn_to_phys(page_to_pfn(page));
-+		phys_addr_t end = base + size;
-+		while (size > 0) {
-+			void *ptr = kmap_atomic(page);
-+			memset(ptr, 0, PAGE_SIZE);
-+			dmac_flush_range(ptr, ptr + PAGE_SIZE);
-+			kunmap_atomic(ptr);
-+			page++;
-+			size -= PAGE_SIZE;
-+		}
-+		outer_flush_range(base, end);
-+	} else {
-+		void *ptr = page_address(page);
- 		memset(ptr, 0, size);
- 		dmac_flush_range(ptr, ptr + size);
- 		outer_flush_range(__pa(ptr), __pa(ptr) + size);
-@@ -243,7 +254,8 @@ static void __dma_free_buffer(struct page *page, size_t size)
- #endif
- 
- static void *__alloc_from_contiguous(struct device *dev, size_t size,
--				     pgprot_t prot, struct page **ret_page);
-+				     pgprot_t prot, struct page **ret_page,
-+				     const void *caller);
- 
- static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
- 				 pgprot_t prot, struct page **ret_page,
-@@ -346,10 +358,11 @@ static int __init atomic_pool_init(void)
- 		goto no_pages;
- 
- 	if (IS_ENABLED(CONFIG_CMA))
--		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page);
-+		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page,
-+					      atomic_pool_init);
- 	else
- 		ptr = __alloc_remap_buffer(NULL, pool->size, GFP_KERNEL, prot,
--					   &page, NULL);
-+					   &page, atomic_pool_init);
- 	if (ptr) {
- 		int i;
- 
-@@ -542,27 +555,41 @@ static int __free_from_pool(void *start, size_t size)
- }
- 
- static void *__alloc_from_contiguous(struct device *dev, size_t size,
--				     pgprot_t prot, struct page **ret_page)
-+				     pgprot_t prot, struct page **ret_page,
-+				     const void *caller)
- {
- 	unsigned long order = get_order(size);
- 	size_t count = size >> PAGE_SHIFT;
- 	struct page *page;
-+	void *ptr;
- 
- 	page = dma_alloc_from_contiguous(dev, count, order);
- 	if (!page)
- 		return NULL;
- 
- 	__dma_clear_buffer(page, size);
--	__dma_remap(page, size, prot);
- 
-+	if (PageHighMem(page)) {
-+		ptr = __dma_alloc_remap(page, size, GFP_KERNEL, prot, caller);
-+		if (!ptr) {
-+			dma_release_from_contiguous(dev, page, count);
-+			return NULL;
-+		}
-+	} else {
-+		__dma_remap(page, size, prot);
-+		ptr = page_address(page);
-+	}
- 	*ret_page = page;
--	return page_address(page);
-+	return ptr;
- }
- 
- static void __free_from_contiguous(struct device *dev, struct page *page,
--				   size_t size)
-+				   void *cpu_addr, size_t size)
- {
--	__dma_remap(page, size, pgprot_kernel);
-+	if (PageHighMem(page))
-+		__dma_free_remap(cpu_addr, size);
-+	else
-+		__dma_remap(page, size, pgprot_kernel);
- 	dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
- }
- 
-@@ -645,7 +672,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 	else if (!IS_ENABLED(CONFIG_CMA))
- 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
- 	else
--		addr = __alloc_from_contiguous(dev, size, prot, &page);
-+		addr = __alloc_from_contiguous(dev, size, prot, &page, caller);
- 
- 	if (addr)
- 		*handle = pfn_to_dma(dev, page_to_pfn(page));
-@@ -739,7 +766,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 		 * Non-atomic allocations cannot be freed with IRQs disabled
- 		 */
- 		WARN_ON(irqs_disabled());
--		__free_from_contiguous(dev, page, size);
-+		__free_from_contiguous(dev, page, cpu_addr, size);
+ 	if (!dev->platform_data) {
+ 		dev_err(dev, "platform data missing\n");
+@@ -487,14 +488,22 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		return -ENODEV;
  	}
- }
  
++	dr_mode = ci->platdata->dr_mode;
++	if (dr_mode == USB_DR_MODE_UNKNOWN)
++		dr_mode = USB_DR_MODE_OTG;
++
+ 	/* initialize role(s) before the interrupt is requested */
+-	ret = ci_hdrc_host_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support host\n");
++	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
++		ret = ci_hdrc_host_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support host\n");
++	}
+ 
+-	ret = ci_hdrc_gadget_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support gadget\n");
++	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
++		ret = ci_hdrc_gadget_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support gadget\n");
++	}
+ 
+ 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+ 		dev_err(dev, "no supported roles\n");
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 1a2aa18..b314647 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -20,7 +20,7 @@ struct ci13xxx_platform_data {
+ #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+ #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
+ #define CI13XXX_DISABLE_STREAMING	BIT(3)
+-
++	enum usb_dr_mode	dr_mode;
+ #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
+ 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
 -- 
-1.7.9.5
+1.7.10.4
