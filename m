@@ -1,100 +1,93 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Mon, 4 Feb 2013 03:07:59 +0000
-Subject: [PATCH V2 3/6] ARM: davinci: da850: add DT node for I2C0
-In-Reply-To: <510E5CC1.8050801@ti.com>
-References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
- <1359445134-13323-4-git-send-email-manishv.b@ti.com>
- <510E5CC1.8050801@ti.com>
-Message-ID: <A4887BF146CD57468F700B415D2F4701582771@DBDE01.ent.ti.com>
+From: B13634@freescale.com (Zhang Quan-B13634)
+Date: Mon, 4 Feb 2013 03:13:40 +0000
+Subject: [PATCH 2/2] ARM: imx: set CKO1 parent clock source in imx6q
+ sabresd
+In-Reply-To: <20130203104636.GB26233@S2101-09.ap.freescale.net>
+References: <1359701217-23931-1-git-send-email-b13634@freescale.com>
+ <20130203104636.GB26233@S2101-09.ap.freescale.net>
+Message-ID: <8D894AC610DA3944965280D4097EAC4603CD2F55@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 03, 2013 at 18:19:05, Nori, Sekhar wrote:
-> 
-> 
-> On 1/29/2013 1:08 PM, Vishwanathrao Badarkhe, Manish wrote:
-> > Add I2C0 device tree node information to da850-evm.
-> > Also, add I2C0 pin muxing information in da850-evm.
-> > 
-> > Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
-> > ---
-> > Changes since V1:
-> >  - Updated i2c0 node names in dts and dtsi file.
-> >  - Removed interrupt parent from i2c0 node.
-> >  - Handled i2c0 pin mux inside i2c0 node.
-> > 
-> > :100644 100644 433027f... c9ed683... M	arch/arm/boot/dts/da850-evm.dts
-> > :100644 100644 5e0eb5c... 245ab9a... M	arch/arm/boot/dts/da850.dtsi
-> >  arch/arm/boot/dts/da850-evm.dts |    5 +++++
-> >  arch/arm/boot/dts/da850.dtsi    |   15 +++++++++++++++
-> >  2 files changed, 20 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/da850-evm.dts 
-> > b/arch/arm/boot/dts/da850-evm.dts index 433027f..c9ed683 100644
-> > --- a/arch/arm/boot/dts/da850-evm.dts
-> > +++ b/arch/arm/boot/dts/da850-evm.dts
-> > @@ -27,6 +27,11 @@
-> >  		serial2: serial at 1d0d000 {
-> >  			status = "okay";
-> >  		};
-> > +		i2c0: i2c0 at 1c22000 {
-> 
-> This should be:
-> 
-> i2c0: i2c at 1c22000
-> 
-> inline with what has been done in rest of this file.
-
-Ok, I will update this name everywhere.
-
-> 
-> > +			status = "okay";
-> > +			pinctrl-names = "default";
-> > +			pinctrl-0 = <&i2c0_pins>;
-> > +		};
-> >  	};
-> >  	nand_cs3 at 62000000 {
-> >  		status = "okay";
-> > diff --git a/arch/arm/boot/dts/da850.dtsi 
-> > b/arch/arm/boot/dts/da850.dtsi index 5e0eb5c..245ab9a 100644
-> > --- a/arch/arm/boot/dts/da850.dtsi
-> > +++ b/arch/arm/boot/dts/da850.dtsi
-> > @@ -56,6 +56,12 @@
-> >  					0x30 0x01100000  0x0ff00000
-> >  				>;
-> >  			};
-> > +			i2c0_pins: pinmux_i2c0_pins {
-> > +				pinctrl-single,bits = <
-> > +					/* I2C0_SDA,I2C0_SCL */
-> > +					0x10 0x00002200 0x0000ff00
-> > +				>;
-> > +			};
-> >  		};
-> >  		serial0: serial at 1c42000 {
-> >  			compatible = "ns16550a";
-> > @@ -81,6 +87,15 @@
-> >  			interrupts = <61>;
-> >  			status = "disabled";
-> >  		};
-> > +		i2c0: i2c0 at 1c22000 {
-> > +			compatible = "ti,davinci-i2c";
-> > +			reg = <0x22000 0x1000>;
-> > +			clock-frequency = <100000>;
-> 
-> The clock frequency is board specific. This should come from da850-evm.dts.
-
-Ok, I will add this board specific information in da850-evm.dts.
-
-> 
-> Also, I think you can merge the auxdata addition with this patch. Can you post the i2c0 support separate from this series, so it can be taken independently? Looks like other patches have some dependencies/acks needed.
-
-Sure, I will merge auxdata addition with this patch and post this patch independently from this series.
-
-> 
-> Thanks,
-> Sekhar
-> 
+Hi Shawn,
+Please see the feedback inline
 
 
-Regards, 
-Manish
+Best Regards
+Gary
+
+
+>  -----Original Message-----
+>  From: Shawn Guo [mailto:shawn.guo at linaro.org]
+>  Sent: Sunday, February 03, 2013 18:47
+>  To: Zhang Quan-B13634
+>  Cc: kernel at pengutronix.de; linux at arm.linux.org.uk; linux-arm-
+>  kernel at lists.infradead.org
+>  Subject: Re: [PATCH 2/2] ARM: imx: set CKO1 parent clock source in imx6q
+>  sabresd
+>  
+>  On Fri, Feb 01, 2013 at 02:46:57PM +0800, Gary Zhang wrote:
+>  > in imx6q sabresd board, set ahb as CKO1 parent clock sourrce
+>  >
+>  > Signed-off-by: Gary Zhang <b13634@freescale.com>
+>  > ---
+>  >  arch/arm/mach-imx/mach-imx6q.c |   15 ++++++++++++---
+>  >  1 files changed, 12 insertions(+), 3 deletions(-)
+>  >
+>  > diff --git a/arch/arm/mach-imx/mach-imx6q.c
+>  > b/arch/arm/mach-imx/mach-imx6q.c index 4eb1b3a..860e272 100644
+>  > --- a/arch/arm/mach-imx/mach-imx6q.c
+>  > +++ b/arch/arm/mach-imx/mach-imx6q.c
+>  > @@ -119,7 +119,7 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+>  >  	return 0;
+>  >  }
+>  >
+>  > -static void __init imx6q_sabrelite_cko1_setup(void)
+>  > +static void __init cko1_setup(unsigned long freq)
+>  >  {
+>  >  	struct clk *cko1_sel, *ahb, *cko1;
+>  >  	unsigned long rate;
+>  > @@ -132,8 +132,10 @@ static void __init imx6q_sabrelite_cko1_setup(void)
+>  >  		goto put_clk;
+>  >  	}
+>  >  	clk_set_parent(cko1_sel, ahb);
+>  > -	rate = clk_round_rate(cko1, 16000000);
+>  > +	rate = clk_round_rate(cko1, freq);
+>  >  	clk_set_rate(cko1, rate);
+>  > +
+>  > +	return;
+>  
+>  Why does this "return" needs to be added here?
+[Gary-b13634] because the codes below may be ignored when execute 'return' ,
+Saving cpu consumption.
+>  
+>  Shawn
+>  
+>  >  put_clk:
+>  >  	if (!IS_ERR(cko1_sel))
+>  >  		clk_put(cko1_sel);
+>  > @@ -148,7 +150,12 @@ static void __init imx6q_sabrelite_init(void)
+>  >  	if (IS_BUILTIN(CONFIG_PHYLIB))
+>  >  		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+>  >  				ksz9021rn_phy_fixup);
+>  > -	imx6q_sabrelite_cko1_setup();
+>  > +	cko1_setup(16000000);
+>  > +}
+>  > +
+>  > +static void __init imx6q_sabresd_init(void) {
+>  > +	cko1_setup(24000000);
+>  >  }
+>  >
+>  >  static void __init imx6q_1588_init(void) @@ -193,6 +200,8 @@ static
+>  > void __init imx6q_init_machine(void)  {
+>  >  	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
+>  >  		imx6q_sabrelite_init();
+>  > +	else if (of_machine_is_compatible("fsl,imx6q-sabresd"))
+>  > +		imx6q_sabresd_init();
+>  >
+>  >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  >
+>  > --
+>  > 1.7.0.4
+>  >
+>  >
