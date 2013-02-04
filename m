@@ -1,29 +1,38 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 4 Feb 2013 17:11:37 +0800
-Subject: [PATCH 1/2] mtd: gpmi: set the Golois Field bit for mx6q's BCH
-In-Reply-To: <1359966688.13791.16.camel@sauron.fi.intel.com>
-References: <1359093848-22301-1-git-send-email-b32955@freescale.com>
- <1359966688.13791.16.camel@sauron.fi.intel.com>
-Message-ID: <510F7B49.3010809@freescale.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 04 Feb 2013 10:14:19 +0100
+Subject: [PATCH 0/2] ARM: dts: omap3-overo: Add pwm-leds and audio support
+In-Reply-To: <5101273A.9090800@ti.com>
+References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
+ <5101273A.9090800@ti.com>
+Message-ID: <510F7BEB.1020408@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?02?04? 16:31, Artem Bityutskiy ??:
-> On Fri, 2013-01-25 at 14:04 +0800, Huang Shijie wrote:
->> +#define BF_BCH_FLASH0LAYOUT0_GF(v, x)				\
->> +	((GPMI_IS_MX6Q(x)&&  ((v) == 14))			\
->> +		? (((1)<<  MX6Q_BP_BCH_FLASH0LAYOUT0_GF_13_14)	\
->> +			&  MX6Q_BM_BCH_FLASH0LAYOUT0_GF_13_14)	\
->> +		: 0						\
->> +	)
-> Did you consider using static inline functions instead of macro
-These macros are only used  when the different archs have different 
-definitions about
-the some registers. Yes, it's ok to use the functions to replace them.
+Hello Benoit,
 
-I am not sure if there is still a need to add the similar macros, if it 
-does, i can change to use
-the inline functions.
+On 01/24/2013 01:21 PM, Benoit Cousson wrote:
+> + Peter who did the original PWM
+>
+> Hi Florian,
+>
+> On 01/23/2013 06:56 PM, Florian Vaussard wrote:
+>> Hello Benoit,
+>>
+>> This patchset adds some new DT supports to the Overo products. The
+>> first patch converts the PMIC LEDB output to use the pwm-leds,
+>> newly merged in your branch for_3.9/dts. The second patch adds the
+>> audio support.
+>
+> Excellent, that looks very good to me, but I'd like to get the
+> feedback from Peter before merging it.
+>
 
-thanks
-Huang Shijie
+So a patch is being merged to handle triggers in the case of pwm leds [1].
+When done, we will be able to add back the default trigger. Do you want
+to wait on it to merge this series?
+
+Regards,
+
+Florian
+
+[1] https://patchwork.kernel.org/patch/2056191/
