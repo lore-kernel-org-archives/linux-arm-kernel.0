@@ -1,46 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 04 Feb 2013 18:07:24 +0000
-Subject: [GIT PULL 4/4] mach-virt platform code for 3.9
-In-Reply-To: <1359986131-13034-4-git-send-email-will.deacon@arm.com>
-References: <1359986131-13034-1-git-send-email-will.deacon@arm.com>
- <1359986131-13034-4-git-send-email-will.deacon@arm.com>
-Message-ID: <510FF8DC.6080202@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon,  4 Feb 2013 18:08:02 +0000
+Subject: [PATCH] vexpress: Allow vexpress-sysreg to self-initialise
+Message-ID: <1360001282-25554-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/13 13:55, Will Deacon wrote:
-> NOTE: I'm not suggesting you pull this one as it stands -- see below!
-> 
-> This is the last batch from me (Marc is dealing with vgic and virtual
-> timers) and introduces support for mach-virt. This depends on:
-> 
->         - for-arm-soc/arch-timers (third pull request in this series)
->         - for-rmk/virt/psci (already pulled)
->         - irqchip/gic-vic-move (an arm-soc branch)
-> 
-> As a result, the diffstat is atrocious so it would be better if you
-> could create a branch merging the above dependendies, which I could
-> rebase onto (there's actually only two patches here).
+The vexpress_sysreg_init() is a core_initcall() already and it can
+trigger the early initialisation if a matching node is found. This patch
+allows the SoC code to avoid calling vexpress_sysreg_of_early_init()
+explicitly.
 
-The remaining of the KVM/ARM code (vgic and timer) has exactly the same
-problem, plus an additional dependency on the actual kvm/core branch
-that Russell just pulled.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+---
 
-I can either send you two pull requests that will basically look like
-this one (actually, a lot worse), or you could create a stable branch
-containing:
+Samuel, could you please merge this patch for 3.9 (based on 3.8-rc6)? It is
+needed for arm64 support (which shares the same mfd files with the 32-bit arm
+port). Thanks.
 
-	- for-rmk/virt/kvm/core (first pull request in the series)
-	- for-arm-soc/arch-timers (third pull request in the series)
-	- irqchip/gic-vic-move (already in arm-soc)
+ drivers/mfd/vexpress-sysreg.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-You could either create two stable branches (one for mach-virt and one
-for kvm-arm/{vgic,timer}), or a single one containing all the prerequisites.
-
-What do you think?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+index 77048b1..0c7c05b 100644
+--- a/drivers/mfd/vexpress-sysreg.c
++++ b/drivers/mfd/vexpress-sysreg.c
+@@ -336,14 +336,15 @@ void __init vexpress_sysreg_early_init(void __iomem *base)
+ 
+ void __init vexpress_sysreg_of_early_init(void)
+ {
+-	struct device_node *node = of_find_compatible_node(NULL, NULL,
+-			"arm,vexpress-sysreg");
++	struct device_node *node;
+ 
++	if (vexpress_sysreg_base)
++		return;
++
++	node = of_find_compatible_node(NULL, NULL, "arm,vexpress-sysreg");
+ 	if (node) {
+ 		vexpress_sysreg_base = of_iomap(node, 0);
+ 		vexpress_sysreg_setup(node);
+-	} else {
+-		pr_info("vexpress-sysreg: No Device Tree node found.");
+ 	}
+ }
+ 
+@@ -478,6 +479,7 @@ static struct platform_driver vexpress_sysreg_driver = {
+ 
+ static int __init vexpress_sysreg_init(void)
+ {
++	vexpress_sysreg_of_early_init();
+ 	return platform_driver_register(&vexpress_sysreg_driver);
+ }
+ core_initcall(vexpress_sysreg_init);
