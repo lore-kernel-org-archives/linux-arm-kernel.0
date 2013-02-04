@@ -1,26 +1,26 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 4 Feb 2013 18:34:30 +0000
-Subject: [PATCH 0/4] ASoC: atmel: fixes for working as module
-In-Reply-To: <1359604420-15171-1-git-send-email-voice.shen@atmel.com>
-References: <1359604420-15171-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20130204183430.GR4720@opensource.wolfsonmicro.com>
+Date: Mon, 4 Feb 2013 18:35:42 +0000
+Subject: [PATCH v4 1/3] ASoC: tlv320aic3x: Convert mic bias to a supply
+ widget
+In-Reply-To: <1359636786-7056-2-git-send-email-gururaja.hebbar@ti.com>
+References: <1359636786-7056-1-git-send-email-gururaja.hebbar@ti.com>
+ <1359636786-7056-2-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20130204183542.GS4720@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 11:53:36AM +0800, Bo Shen wrote:
-> The following patches fixes the audio part when working as module
+On Thu, Jan 31, 2013 at 06:23:04PM +0530, Hebbar Gururaja wrote:
+> Convert MicBias widgets to supply widget.
 > 
-> Bo Shen (4):
->   ASoC: atmel_pcm: make it buildable as module
->   ASoC: atmel_ssc_dai: remove error set private data
->   ASoC: atmel_ssc_dai: correct sequence when unload
->   ASoC: sam9g20_wm8731: disable clock and correct sequence when unload
+> On tlv320aic3x, Mic bias power on/off shares the same register bits
+> with output mic bias voltage.  So, when power on mic bias, we need
+> reclaim it to voltage value.
 
-Applied all, thanks.
+Applied, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130204/bacfbc1a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130204/e1d80052/attachment.sig>
