@@ -1,135 +1,133 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 4 Feb 2013 16:59:43 +0800
-Subject: [PATCH v7 1/8] Revert "USB: chipidea: add vbus detect for udc"
+Date: Mon, 4 Feb 2013 16:59:44 +0800
+Subject: [PATCH v7 2/8] usb: chipidea: add otg file
 In-Reply-To: <1359968390-317-1-git-send-email-peter.chen@freescale.com>
 References: <1359968390-317-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1359968390-317-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <1359968390-317-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vbus register is at otgsc, and vbus detect does not belong
-to device function. Revert this patch, and will move
-vbus detect function to drivers/usb/chipidea/udc.c
-
-This reverts commit 8c4fc031954b4eb72daf13d3c907a985a3eee208.
+Implement struct usb_otg, In that way, calling otg_set_peripheral
+will not be failed at udc.c.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci.h  |    1 -
- drivers/usb/chipidea/udc.c |   39 +--------------------------------------
- 2 files changed, 1 insertions(+), 39 deletions(-)
+ drivers/usb/chipidea/Makefile |    2 +-
+ drivers/usb/chipidea/ci.h     |    2 +
+ drivers/usb/chipidea/otg.c    |   60 +++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/chipidea/otg.h    |    6 ++++
+ 4 files changed, 69 insertions(+), 1 deletions(-)
 
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index d92ca32..11f513c 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
+ 
+ obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
+ 
+-ci_hdrc-y				:= core.o
++ci_hdrc-y				:= core.o otg.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
 diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index e25d126..d738603 100644
+index d738603..697e369 100644
 --- a/drivers/usb/chipidea/ci.h
 +++ b/drivers/usb/chipidea/ci.h
-@@ -139,7 +139,6 @@ struct ci13xxx {
- 	enum ci_role			role;
- 	bool				is_otg;
- 	struct work_struct		work;
--	struct work_struct		vbus_work;
- 	struct workqueue_struct		*wq;
+@@ -129,6 +129,7 @@ struct hw_bank {
+  * @vbus_active: is VBUS active
+  * @transceiver: pointer to USB PHY, if any
+  * @hcd: pointer to usb_hcd for ehci host driver
++ * @otg: for otg support
+  */
+ struct ci13xxx {
+ 	struct device			*dev;
+@@ -164,6 +165,7 @@ struct ci13xxx {
+ 	bool				global_phy;
+ 	struct usb_phy			*transceiver;
+ 	struct usb_hcd			*hcd;
++	struct usb_otg      		otg;
+ };
  
- 	struct dma_pool			*qh_pool;
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 2f45bba..d214448 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -305,18 +305,6 @@ static u32 hw_test_and_clear_intr_active(struct ci13xxx *ci)
- 	return reg;
- }
- 
--static void hw_enable_vbus_intr(struct ci13xxx *ci)
--{
--	hw_write(ci, OP_OTGSC, OTGSC_AVVIS, OTGSC_AVVIS);
--	hw_write(ci, OP_OTGSC, OTGSC_AVVIE, OTGSC_AVVIE);
--	queue_work(ci->wq, &ci->vbus_work);
--}
--
--static void hw_disable_vbus_intr(struct ci13xxx *ci)
--{
--	hw_write(ci, OP_OTGSC, OTGSC_AVVIE, 0);
--}
--
- /**
-  * hw_test_and_clear_setup_guard: test & clear setup guard (execute without
-  *                                interruption)
-@@ -383,16 +371,6 @@ static int hw_usb_reset(struct ci13xxx *ci)
- 	return 0;
- }
- 
--static void vbus_work(struct work_struct *work)
--{
--	struct ci13xxx *ci = container_of(work, struct ci13xxx, vbus_work);
--
--	if (hw_read(ci, OP_OTGSC, OTGSC_AVV))
--		usb_gadget_vbus_connect(&ci->gadget);
--	else
--		usb_gadget_vbus_disconnect(&ci->gadget);
--}
--
- /******************************************************************************
-  * UTIL block
-  *****************************************************************************/
-@@ -1392,7 +1370,6 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
- 		if (is_active) {
- 			pm_runtime_get_sync(&_gadget->dev);
- 			hw_device_reset(ci, USBMODE_CM_DC);
--			hw_enable_vbus_intr(ci);
- 			hw_device_state(ci, ci->ep0out->qh.dma);
- 		} else {
- 			hw_device_state(ci, 0);
-@@ -1567,10 +1544,8 @@ static int ci13xxx_start(struct usb_gadget *gadget,
- 	pm_runtime_get_sync(&ci->gadget.dev);
- 	if (ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) {
- 		if (ci->vbus_active) {
--			if (ci->platdata->flags & CI13XXX_REGS_SHARED) {
-+			if (ci->platdata->flags & CI13XXX_REGS_SHARED)
- 				hw_device_reset(ci, USBMODE_CM_DC);
--				hw_enable_vbus_intr(ci);
--			}
- 		} else {
- 			pm_runtime_put_sync(&ci->gadget.dev);
- 			goto done;
-@@ -1676,13 +1651,6 @@ static irqreturn_t udc_irq(struct ci13xxx *ci)
- 	} else {
- 		retval = IRQ_NONE;
- 	}
--
--	intr = hw_read(ci, OP_OTGSC, ~0);
--	hw_write(ci, OP_OTGSC, ~0, intr);
--
--	if (intr & (OTGSC_AVVIE & OTGSC_AVVIS))
--		queue_work(ci->wq, &ci->vbus_work);
--
- 	spin_unlock(&ci->lock);
- 
- 	return retval;
-@@ -1758,7 +1726,6 @@ static int udc_start(struct ci13xxx *ci)
- 		retval = hw_device_reset(ci, USBMODE_CM_DC);
- 		if (retval)
- 			goto put_transceiver;
--		hw_enable_vbus_intr(ci);
- 	}
- 
- 	retval = device_register(&ci->gadget.dev);
-@@ -1821,9 +1788,6 @@ static void udc_stop(struct ci13xxx *ci)
- 	if (ci == NULL)
- 		return;
- 
--	hw_disable_vbus_intr(ci);
--	cancel_work_sync(&ci->vbus_work);
--
- 	usb_del_gadget_udc(&ci->gadget);
- 
- 	destroy_eps(ci);
-@@ -1864,7 +1828,6 @@ int ci_hdrc_gadget_init(struct ci13xxx *ci)
- 	rdrv->irq	= udc_irq;
- 	rdrv->name	= "gadget";
- 	ci->roles[CI_ROLE_GADGET] = rdrv;
--	INIT_WORK(&ci->vbus_work, vbus_work);
- 
- 	return 0;
- }
+ static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+new file mode 100644
+index 0000000..7dea3b3
+--- /dev/null
++++ b/drivers/usb/chipidea/otg.c
+@@ -0,0 +1,60 @@
++/*
++ * otg.c - ChipIdea USB IP core OTG driver
++ *
++ * Copyright (C) 2012 Freescale Semiconductor, Inc.
++ *
++ * Author: Peter Chen
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/usb/gadget.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/chipidea.h>
++
++#include "ci.h"
++#include "udc.h"
++#include "bits.h"
++#include "host.h"
++#include "debug.h"
++
++static int ci_otg_set_peripheral(struct usb_otg *otg,
++		struct usb_gadget *periph)
++{
++	otg->gadget = periph;
++
++	return 0;
++}
++
++static int ci_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
++{
++	otg->host = host;
++
++	return 0;
++}
++
++/**
++ * ci_hdrc_otg_init - initialize device related bits
++ * ci: the controller
++ *
++ * This function create otg struct, if the device can switch between
++ * device and host.
++ */
++int ci_hdrc_otg_init(struct ci13xxx *ci)
++{
++	/* Useless at current */
++	ci->otg.set_peripheral = ci_otg_set_peripheral;
++	ci->otg.set_host = ci_otg_set_host;
++	if (!IS_ERR_OR_NULL(ci->transceiver))
++		ci->transceiver->otg = &ci->otg;
++
++	return 0;
++}
+diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
+new file mode 100644
+index 0000000..b4c6b3e
+--- /dev/null
++++ b/drivers/usb/chipidea/otg.h
+@@ -0,0 +1,6 @@
++#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
++#define __DRIVERS_USB_CHIPIDEA_OTG_H
++
++int ci_hdrc_otg_init(struct ci13xxx *ci);
++
++#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
 -- 
 1.7.0.4
