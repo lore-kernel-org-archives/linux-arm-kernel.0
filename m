@@ -1,53 +1,36 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 4 Feb 2013 16:32:33 +0200
-Subject: [PATCH v5 01/10] clk: tegra: Refactor PLL programming code
-In-Reply-To: <510F4FF7.3050502@nvidia.com>
+Date: Mon, 4 Feb 2013 16:34:01 +0200
+Subject: [PATCH v5 09/10] clk: tegra: Implement clocks for Tegra114
+In-Reply-To: <510F5E87.90801@nvidia.com>
 References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-2-git-send-email-pdeschrijver@nvidia.com>
- <510F4FF7.3050502@nvidia.com>
-Message-ID: <20130204143233.GV2364@tbergstrom-lnx.Nvidia.com>
+ <1359713962-16822-10-git-send-email-pdeschrijver@nvidia.com>
+ <510F5E87.90801@nvidia.com>
+Message-ID: <20130204143401.GW2364@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 07:06:47AM +0100, Prashant Gaikwad wrote:
+On Mon, Feb 04, 2013 at 08:08:55AM +0100, Prashant Gaikwad wrote:
 > On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
 
 ...
 
-> >
-> > -static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll,
-> > -                                void __iomem *lock_addr, u32 lock_bit_idx)
-> > +static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
-> >   {
-> >          int i;
-> > -       u32 val;
-> > +       u32 val, lock_bit;
-> > +       void __iomem *lock_addr;
-> >
-> >          if (!(pll->flags & TEGRA_PLL_USE_LOCK)) {
-> >                  udelay(pll->params->lock_delay);
-> >                  return 0;
-> >          }
-> >
-> > +       lock_addr = pll->clk_base + pll->params->base_reg;
-> 
-> This will not work for PLLE. Lock bit for PLLE is in misc register.
-> 
-> > +       lock_bit = BIT(pll->params->lock_bit_idx);
+> > +       /* xusb_hs_src */
+> > +       val = readl(clk_base + CLK_SOURCE_XUSB_SS_SRC);
+> > +       val |= BIT(25); /* always select PLLU_60M */
+> > +       writel(val, clk_base + CLK_SOURCE_XUSB_SS_SRC);
 > > +
-> >          for (i = 0; i < pll->params->lock_delay; i++) {
-> >                  val = readl_relaxed(lock_addr);
-> > -               if (val & BIT(lock_bit_idx)) {
-> > +               if (val & lock_bit) {
+> > +       clk = clk_register_fixed_factor(NULL, "xusb_hs_src", "pll_u_60M", 0,
+> > +                                       1, 1);
+> > +       clks[xusb_hs_src] = clk;
+> > +
 > 
-> Need to change the lock bit idx parameter for Tegra20 and Tegra30 PLLs 
-> else this patch will break those.
+> With device tree we can directly use pll_u_60M, no need to register 
+> clock with fixed factor 1.
+> Same comment for dis1-fixed, dsi2-fixed and mipi-cal-fast clocks.
 > 
 
-Looking at commit 37c26a906527b8a6a252614ca83d21ad318c4e84 and commit
-b08e8c0ecc42afa3a2e1019851af741980dd5a6b, these fields seem correctly
-initialized for both Tegra20 and Tegra30? Or am I missing something?
+Does it make sense to have separate DT IDs at all then?
 
-Thanks,
+Cheers,
 
 Peter.
