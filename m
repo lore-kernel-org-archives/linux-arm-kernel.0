@@ -1,55 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 04 Feb 2013 15:27:09 +0100
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <510C58DF.3010103@mvista.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <20130201213003.GW2637@n2100.arm.linux.org.uk> <510C58DF.3010103@mvista.com>
-Message-ID: <7655522.SvRnLo3eyU@wuerfel>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 4 Feb 2013 16:32:33 +0200
+Subject: [PATCH v5 01/10] clk: tegra: Refactor PLL programming code
+In-Reply-To: <510F4FF7.3050502@nvidia.com>
+References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
+ <1359713962-16822-2-git-send-email-pdeschrijver@nvidia.com>
+ <510F4FF7.3050502@nvidia.com>
+Message-ID: <20130204143233.GV2364@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 02 February 2013 04:07:59 Sergei Shtylyov wrote:
-> On 02-02-2013 1:30, Russell King - ARM Linux wrote:
+On Mon, Feb 04, 2013 at 07:06:47AM +0100, Prashant Gaikwad wrote:
+> On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
 
-> >> because it doesn't make sense to support multiple DMA APIs. We can check
-> >> from MUSB's registers if it was configured with Inventra DMA support and
-> >> based on that we can register MUSB's own DMA Engine to dmaengine API.
-> 
-> > Hang on.  This is one of the DMA implementations which is closely
-> > coupled with the USB and only the USB?  If it is...
-> 
-> > I thought this had been discussed _extensively_ before.  I thought the
-> > resolution on it was:
-> > 1. It would not use the DMA engine API.
-> > 2. It would not live in arch/arm.
-> > 3. It would be placed nearby the USB driver it's associated with.
-> 
-> > (1) because we don't use APIs just for the hell of it - think.  Do we
-> > use the DMA engine API for PCI bus mastering ethernet controllers?  No.
-> > Do we use it for PCI bus mastering SCSI controllers?  No.  Because the
-> > DMA is integral to the rest of the device.
-> 
-> > The DMA engine API only makes sense if the DMA engine is a shared
-> > system resource.
-> 
->     Thanks for such extensive wording in the support of my point. 
+...
 
-Actually there is another problem with the musb driver, which is that
-you can only have one DMA controller configured at build time, and
-that currently prevents us from building a kernel that supports both
-the Inventra and TUSB variants together. With multiplatform coming
-up for both ux500 and omap2, we will also have to make a decision
-about ux500 vs omap being supported in DMA mode.
+> >
+> > -static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll,
+> > -                                void __iomem *lock_addr, u32 lock_bit_idx)
+> > +static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
+> >   {
+> >          int i;
+> > -       u32 val;
+> > +       u32 val, lock_bit;
+> > +       void __iomem *lock_addr;
+> >
+> >          if (!(pll->flags & TEGRA_PLL_USE_LOCK)) {
+> >                  udelay(pll->params->lock_delay);
+> >                  return 0;
+> >          }
+> >
+> > +       lock_addr = pll->clk_base + pll->params->base_reg;
+> 
+> This will not work for PLLE. Lock bit for PLLE is in misc register.
+> 
+> > +       lock_bit = BIT(pll->params->lock_bit_idx);
+> > +
+> >          for (i = 0; i < pll->params->lock_delay; i++) {
+> >                  val = readl_relaxed(lock_addr);
+> > -               if (val & BIT(lock_bit_idx)) {
+> > +               if (val & lock_bit) {
+> 
+> Need to change the lock bit idx parameter for Tegra20 and Tegra30 PLLs 
+> else this patch will break those.
+> 
 
-I can see two ways out of this: either we extend the musb driver to
-have run-time registration of the DMA controller, which duplicates
-infrastructure that already exists in the dmaengine API, or we
-make the dmaengine back-end for musb the default and require all
-platforms to use that if they want to coexist with other platforms
-and also use DMA support in musb.
+Looking at commit 37c26a906527b8a6a252614ca83d21ad318c4e84 and commit
+b08e8c0ecc42afa3a2e1019851af741980dd5a6b, these fields seem correctly
+initialized for both Tegra20 and Tegra30? Or am I missing something?
 
-Note that the ux500_dma code in musb already uses dmaengine. It could
-probably be extended to support any platform that has a dmaengine
-driver for the DMA controller used in MUSB.
+Thanks,
 
-	Arnd
+Peter.
