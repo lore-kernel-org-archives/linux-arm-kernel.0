@@ -1,216 +1,235 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Feb 2013 16:45:57 -0600
-Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
-In-Reply-To: <51103247.2030906@ti.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
- <20130201215154.GV22517@atomide.com> <51103247.2030906@ti.com>
-Message-ID: <51103A25.9010401@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 04 Feb 2013 15:15:18 -0800
+Subject: [GIT PULL] Samsung cleanup-header for v3.9
+Message-ID: <120101ce032d$80ca0d20$825e2760$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/04/2013 04:12 PM, Jon Hunter wrote:
+Kukjin Kim wrote:
 > 
-> On 02/01/2013 03:51 PM, Tony Lindgren wrote:
+> Hi, Arnd, Olof
 > 
->> How about let's fix this properly to start with so we don't add
->> more blockers moving this code to drivers/bus?
->>
->> Looks like gpmc_mem_init() gets called from gpmc_probe() so
->> we can pass that information in pdev.
+> Here is cleanup headers for Samsung stuff.
+> AS I commented, this makes <mach/*.h> local so that they could be
+> removed.
 > 
-> I have re-worked this a bit to use platform data. I have also update
-> the logic for testing internal/external boot on omap2430 which is
-> different from omap2420 (according to the TRM). However, I have only
-> boot tested on omap2420. 
+> Please pull from:
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next/cleanup-header
 > 
-> Do you know why this was changed in the first place? See below ...
+> If any problems, please kindly let me know.
 > 
-> http://permalink.gmane.org/gmane.linux.kernel.commits.head/95931
+Hi Arnd and Olof,
+
+Probably, you guys missed this?
+Or if any problems, please kindly let me know.
+
+Thanks.
+
+- Kukjin
+
+> The following changes since commit
+> a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 > 
-> Heres what I have now ...
-
-Updated patch (I was missing a kfree()). By the way, this is based
-upon the apollon removal patch. I understand probably needs to be
-rebased on your latest gpmc series too.
-
-Jon
-
->From 643656e3754ed949d9a8af31b22ed3727e0962f6 Mon Sep 17 00:00:00 2001
-From: Jon Hunter <jon-hunter@ti.com>
-Date: Thu, 31 Jan 2013 15:56:08 -0600
-Subject: [PATCH] ARM: OMAP2: Fix GPMC memory initialisation
-
-OMAP2+ devices have an internal ROM that by default is typically mapped
-to the first 1MB of the GPMC address space (0x0).
-
-For OMAP24xx devices, GPMC chip-select 0 (CS0) may be mapped to address
-0x0 instead of the internal ROM if configured for an external boot mode.
-If configured for an internal boot mode then the internal ROM is mapped
-to 0x0.
-
-Currently, the function gpmc_mem_init() function reserves the first 1MB
-of GPMC address space for the internal OMAP ROM. This prevents any
-device (ethernet chip, flash memories, etc) from using this address
-range. This causes the GPMC probe to fail on the OMAP2420 H4 when NOR
-flash is mapped to address 0x0. Fix this by checking the SYS_BOOT pin
-setting for OMAP24xx devices, to see the device is configured for
-an internal or external boot and pass the amount of ROM mapped to
-address 0x0 to the GPMC driver via platform data.
-
-Please note that for OMAP3-5 devices, when booting from NOR or NAND
-memories connected to CS0, these memories are always mapped to address
-0x08000000 and so reserving this memory range does not present any
-problems for these devices.
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/gpmc.c |   60 ++++++++++++++++++++++++++++++++++++--------
- arch/arm/mach-omap2/gpmc.h |    5 ++++
- 2 files changed, 54 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index a124849..aa58258 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -20,6 +20,7 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/ioport.h>
-+#include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/io.h>
- #include <linux/module.h>
-@@ -32,6 +33,7 @@
- 
- #include "soc.h"
- #include "common.h"
-+#include "control.h"
- #include "omap_device.h"
- #include "gpmc.h"
- 
-@@ -87,7 +89,6 @@
- 
- #define GPMC_MEM_START		0x00000000
- #define GPMC_MEM_END		0x3FFFFFFF
--#define BOOT_ROM_SPACE		0x100000	/* 1MB */
- 
- #define GPMC_CHUNK_SHIFT	24		/* 16 MB */
- #define GPMC_SECTION_SHIFT	28		/* 128 MB */
-@@ -775,16 +776,11 @@ static void gpmc_mem_exit(void)
- 
- }
- 
--static int gpmc_mem_init(void)
-+static int gpmc_mem_init(u32 offset)
- {
- 	int cs, rc;
--	unsigned long boot_rom_space = 0;
- 
--	/* never allocate the first page, to facilitate bug detection;
--	 * even if we didn't boot from ROM.
--	 */
--	boot_rom_space = BOOT_ROM_SPACE;
--	gpmc_mem_root.start = GPMC_MEM_START + boot_rom_space;
-+	gpmc_mem_root.start = GPMC_MEM_START + offset;
- 	gpmc_mem_root.end = GPMC_MEM_END;
- 
- 	/* Reserve all regions that has been set up by bootloader */
-@@ -1124,6 +1120,12 @@ static int gpmc_probe(struct platform_device *pdev)
- 	int rc;
- 	u32 l;
- 	struct resource *res;
-+	struct gpmc_platform_data *pdata = pdev->dev.platform_data;
-+
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "%s: no platform data.\n", __func__);
-+		return -ENODEV;
-+	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (res == NULL)
-@@ -1161,7 +1163,7 @@ static int gpmc_probe(struct platform_device *pdev)
- 	dev_info(gpmc_dev, "GPMC revision %d.%d\n", GPMC_REVISION_MAJOR(l),
- 		 GPMC_REVISION_MINOR(l));
- 
--	rc = gpmc_mem_init();
-+	rc = gpmc_mem_init(pdata->gpmc_rom_space);
- 	if (IS_ERR_VALUE(rc)) {
- 		clk_disable_unprepare(gpmc_l3_clk);
- 		clk_put(gpmc_l3_clk);
-@@ -1213,18 +1215,54 @@ static int __init omap_gpmc_init(void)
- {
- 	struct omap_hwmod *oh;
- 	struct platform_device *pdev;
-+	struct gpmc_platform_data *pdata;
- 	char *oh_name = "gpmc";
- 
-+	pdata = kzalloc(sizeof(struct gpmc_platform_data), GFP_KERNEL);
-+	if (!pdata) {
-+		pr_err("%s: No memory for gpmc\n", __func__);
-+		return -ENOMEM;
-+	}
-+
-+	/*
-+	 * The first 1MB of GPMC address space is mapped to the internal
-+	 * ROM. OMAP2 devices are an exception to this where the first
-+	 * 1MB may be mapped to the GPMC. OMAP2 devices that boot from
-+	 * external memory devices, will map CS0 to the start of the
-+	 * GPMC address space (0x0). We can test this by checking the
-+	 * SYS_BOOT pins.
-+	 *
-+	 * OMAP2420 SYS_BOOT[3] = 1b, then GPMC CS0 is mapped to 0x0.
-+	 * OMAP2430 SYS_BOOT[2:1] = 00b, then GPMC CS0 is mapped to 0x0.
-+	 */
-+	pdata->gpmc_rom_space = SZ_1M;
-+
-+	if (cpu_is_omap242x()) {
-+		if (!(omap_ctrl_readl(OMAP24XX_CONTROL_STATUS) &
-+		      OMAP2_SYSBOOT_3_MASK))
-+			pdata->gpmc_rom_space = 0;
-+	} else if (cpu_is_omap243x()) {
-+		if (!(omap_ctrl_readl(OMAP24XX_CONTROL_STATUS) &
-+		      (OMAP2_SYSBOOT_2_MASK | OMAP2_SYSBOOT_1_MASK)))
-+			pdata->gpmc_rom_space = 0;
-+	}
-+
- 	oh = omap_hwmod_lookup(oh_name);
- 	if (!oh) {
- 		pr_err("Could not look up %s\n", oh_name);
- 		return -ENODEV;
- 	}
- 
--	pdev = omap_device_build(DEVICE_NAME, -1, oh, NULL, 0, NULL, 0, 0);
-+	pdev = omap_device_build(DEVICE_NAME, -1, oh, pdata, sizeof(*pdata),
-+				 NULL, 0, 0);
- 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
- 
--	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
-+	if (IS_ERR(pdev)) {
-+		kfree(pdata);
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
- }
- postcore_initcall(omap_gpmc_init);
- 
-diff --git a/arch/arm/mach-omap2/gpmc.h b/arch/arm/mach-omap2/gpmc.h
-index fe0a844..b33ef26 100644
---- a/arch/arm/mach-omap2/gpmc.h
-+++ b/arch/arm/mach-omap2/gpmc.h
-@@ -189,6 +189,11 @@ struct gpmc_device_timings {
- 	bool we_xdelay;
- };
- 
-+/* GPMC platform data */
-+struct gpmc_platform_data {
-+	u32 gpmc_rom_space;
-+};
-+
- extern int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
- 				struct gpmc_device_timings *dev_t);
- 
--- 
-1.7.10.4
+>   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next/cleanup-header
+> 
+> for you to fetch changes up to 3a71c5c375e29fc9c1493b5ead1cf36572139c3e:
+> 
+>   ARM: S3C64XX: Fix missing header error with CONFIG_CPU_IDLE enabled
+> (2013-01-10 10:45:41 -0800)
+> 
+> ----------------------------------------------------------------
+> Kukjin Kim (25):
+>       cpufreq: exynos: cleanup exynos-cpufreq header
+>       ARM: S5P64X0: remove gpiolib.c file in mach-s5p64x0
+>       ARM: S5P64X0: move i2c.h into local directory
+>       ARM: S5P64X0: move s5p64x0-clock.h into local directory
+>       ARM: S5PV210: move regs-sys.h into setup-usb-phy.c file
+>       ARM: EXYNOS: move mach/pmu.h file into common.h
+>       ARM: SAMSUNG: cleanup mach/regs-audss.h file
+>       ARM: SAMSUNG: cleanup mach/gpio-fns.h gpio-track.h and gpio-nrs.h
+>       ARM: S3C24XX: make anubis-cpld, anubis-irq and anubis-map local
+>       ARM: S3C24XX: make bast-cpld.h, bast-irq.h and bast-map.h local
+>       ARM: S3C24XX: make gta02.h local
+>       ARM: S3C24XX: make h1940.h and h1940-latch.h local
+>       ARM: S3C24XX: make osiris-cpld.h and osiris-map.h local
+>       ARM: S3C24XX: make otom-map.h local
+>       ARM: S3C24XX: make vr1000-cpld.h, vr1000-irq.h and vr1000-map.h
+local
+>       ARM: S3C2416: remove regs-s3c2416-mem.h and regs-s3c2416.h
+>       ARM: S3C2412: cleanup regs-s3c2412.h
+>       ARM: S3C24XX: remove idle.h
+>       ARM: S3C24XX: remove dsc.c and make regs-dsc.h local
+>       ARM: S3C64XX: make crag6410.h local
+>       ARM: S3C64XX: make regs-gpio-memport.h local
+>       ARM: S3C64XX: make regs-modem.h local
+>       ARM: S3C64XX: make regs-srom.h local
+>       ARM: S3C64XX: make regs-sys.h local
+>       ARM: S3C64XX: make regs-syscon-power.h local
+> 
+> Tomasz Figa (1):
+>       ARM: S3C64XX: Fix missing header error with CONFIG_CPU_IDLE enabled
+> 
+>  arch/arm/mach-exynos/common.c                      |    1 -
+>  arch/arm/mach-exynos/common.h                      |   20 +
+>  arch/arm/mach-exynos/cpuidle.c                     |    3 +-
+>  arch/arm/mach-exynos/dev-audio.c                   |    3 +-
+>  arch/arm/mach-exynos/include/mach/pmu.h            |   34 --
+>  arch/arm/mach-exynos/include/mach/regs-audss.h     |   18 -
+>  arch/arm/mach-exynos/pm.c                          |    3 +-
+>  arch/arm/mach-exynos/pmu.c                         |    3 +-
+>  arch/arm/mach-s3c2440/Makefile                     |    2 -
+>  arch/arm/mach-s3c2440/dsc.c                        |   54 ---
+>  arch/arm/mach-s3c24xx/anubis.h                     |   53 ++
+>  arch/arm/mach-s3c24xx/bast-ide.c                   |   18 +-
+>  arch/arm/mach-s3c24xx/bast-irq.c                   |   19 +-
+>  arch/arm/mach-s3c24xx/bast.h                       |  197 ++++++++
+>  arch/arm/mach-s3c24xx/{include/mach => }/gta02.h   |   14 +-
+>  arch/arm/mach-s3c24xx/h1940-bluetooth.c            |    6 +-
+>  .../{include/mach/h1940-latch.h => h1940.h}        |   22 +-
+>  arch/arm/mach-s3c24xx/include/mach/anubis-cpld.h   |   25 -
+>  arch/arm/mach-s3c24xx/include/mach/anubis-irq.h    |   21 -
+>  arch/arm/mach-s3c24xx/include/mach/anubis-map.h    |   38 --
+>  arch/arm/mach-s3c24xx/include/mach/bast-cpld.h     |   53 --
+>  arch/arm/mach-s3c24xx/include/mach/bast-irq.h      |   29 --
+>  arch/arm/mach-s3c24xx/include/mach/bast-map.h      |  146 ------
+>  arch/arm/mach-s3c24xx/include/mach/gpio-fns.h      |    1 -
+>  arch/arm/mach-s3c24xx/include/mach/gpio-nrs.h      |   97 ----
+>  arch/arm/mach-s3c24xx/include/mach/gpio-track.h    |   33 --
+>  arch/arm/mach-s3c24xx/include/mach/gpio.h          |   87 +++-
+>  arch/arm/mach-s3c24xx/include/mach/h1940.h         |   24 -
+>  arch/arm/mach-s3c24xx/include/mach/idle.h          |   24 -
+>  arch/arm/mach-s3c24xx/include/mach/osiris-cpld.h   |   30 --
+>  arch/arm/mach-s3c24xx/include/mach/regs-gpio.h     |    2 -
+>  arch/arm/mach-s3c24xx/include/mach/regs-s3c2412.h  |   23 -
+>  .../mach-s3c24xx/include/mach/regs-s3c2416-mem.h   |   30 --
+>  arch/arm/mach-s3c24xx/include/mach/regs-s3c2416.h  |   24 -
+>  arch/arm/mach-s3c24xx/include/mach/vr1000-cpld.h   |   18 -
+>  arch/arm/mach-s3c24xx/include/mach/vr1000-irq.h    |   26 -
+>  arch/arm/mach-s3c24xx/include/mach/vr1000-map.h    |  110 -----
+>  arch/arm/mach-s3c24xx/mach-anubis.c                |   13 +-
+>  arch/arm/mach-s3c24xx/mach-at2440evb.c             |    1 +
+>  arch/arm/mach-s3c24xx/mach-bast.c                  |   52 +-
+>  arch/arm/mach-s3c24xx/mach-gta02.c                 |   59 ++-
+>  arch/arm/mach-s3c24xx/mach-h1940.c                 |   37 +-
+>  arch/arm/mach-s3c24xx/mach-osiris.c                |   27 +-
+>  arch/arm/mach-s3c24xx/mach-otom.c                  |   20 +-
+>  arch/arm/mach-s3c24xx/mach-rx1950.c                |   31 +-
+>  arch/arm/mach-s3c24xx/mach-rx3715.c                |   16 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2413.c              |    1 -
+>  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    1 -
+>  arch/arm/mach-s3c24xx/mach-smdk2440.c              |    1 -
+>  arch/arm/mach-s3c24xx/mach-smdk2443.c              |    1 -
+>  arch/arm/mach-s3c24xx/mach-vr1000.c                |   37 +-
+>  arch/arm/mach-s3c24xx/mach-vstms.c                 |    1 -
+>  .../{include/mach/osiris-map.h => osiris.h}        |   23 +-
+>  .../{include/mach/otom-map.h => otom.h}            |   20 +-
+>  arch/arm/mach-s3c24xx/pm-s3c2410.c                 |    6 +-
+>  arch/arm/mach-s3c24xx/pm-s3c2412.c                 |    8 +-
+>  .../arm/mach-s3c24xx/{include/mach => }/regs-dsc.h |    0
+>  arch/arm/mach-s3c24xx/s3c2412.c                    |   29 +-
+>  arch/arm/mach-s3c24xx/s3c244x.c                    |    3 +-
+>  arch/arm/mach-s3c24xx/simtec-audio.c               |    5 +-
+>  arch/arm/mach-s3c24xx/simtec-nor.c                 |    3 +-
+>  arch/arm/mach-s3c24xx/simtec-usb.c                 |    8 +-
+>  arch/arm/mach-s3c24xx/vr1000.h                     |  118 +++++
+>  arch/arm/mach-s3c64xx/clock.c                      |    3 +-
+>  arch/arm/mach-s3c64xx/cpuidle.c                    |    4 +-
+>  .../arm/mach-s3c64xx/{include/mach => }/crag6410.h |    0
+>  arch/arm/mach-s3c64xx/dma.c                        |    4 +-
+>  arch/arm/mach-s3c64xx/include/mach/regs-sys.h      |   31 --
+>  arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+>  arch/arm/mach-s3c64xx/mach-crag6410-module.c       |    2 +-
+>  arch/arm/mach-s3c64xx/mach-crag6410.c              |    9 +-
+>  arch/arm/mach-s3c64xx/mach-mini6410.c              |    4 +-
+>  arch/arm/mach-s3c64xx/mach-real6410.c              |    4 +-
+>  arch/arm/mach-s3c64xx/mach-smartq.c                |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c              |    6 +-
+>  arch/arm/mach-s3c64xx/pm.c                         |    9 +-
+>  .../{include/mach => }/regs-gpio-memport.h         |    9 +-
+>  .../mach-s3c64xx/{include/mach => }/regs-modem.h   |   11 +-
+>  .../mach-s3c64xx/{include/mach => }/regs-srom.h    |   11 +-
+>  arch/arm/mach-s3c64xx/regs-sys.h                   |   30 ++
+>  .../{include/mach => }/regs-syscon-power.h         |    9 +-
+>  arch/arm/mach-s3c64xx/setup-usb-phy.c              |    3 +-
+>  arch/arm/mach-s5p64x0/clock-s5p6440.c              |    2 +-
+>  arch/arm/mach-s5p64x0/clock-s5p6450.c              |    2 +-
+>  .../{include/mach/s5p64x0-clock.h => clock.h}      |    9 +-
+>  arch/arm/mach-s5p64x0/gpiolib.c                    |  508
+--------------------
+>  arch/arm/mach-s5p64x0/{include/mach => }/i2c.h     |    3 +-
+>  arch/arm/mach-s5p64x0/mach-smdk6440.c              |    2 +-
+>  arch/arm/mach-s5p64x0/mach-smdk6450.c              |    2 +-
+>  arch/arm/mach-s5p64x0/setup-i2c0.c                 |    2 +-
+>  arch/arm/mach-s5p64x0/setup-i2c1.c                 |    2 +-
+>  arch/arm/mach-s5pv210/dev-audio.c                  |    3 +-
+>  arch/arm/mach-s5pv210/include/mach/regs-audss.h    |   18 -
+>  arch/arm/mach-s5pv210/include/mach/regs-sys.h      |   15 -
+>  arch/arm/mach-s5pv210/setup-usb-phy.c              |    7 +-
+>  arch/arm/plat-samsung/include/plat/gpio-core.h     |   13 +-
+>  arch/arm/plat-samsung/include/plat/gpio-fns.h      |    1 -
+>  drivers/cpufreq/exynos-cpufreq.c                   |    4 +-
+>  .../cpufreq.h => drivers/cpufreq/exynos-cpufreq.h  |    3 +-
+>  drivers/cpufreq/exynos4210-cpufreq.c               |    3 +-
+>  drivers/cpufreq/exynos4x12-cpufreq.c               |    3 +-
+>  drivers/cpufreq/exynos5250-cpufreq.c               |    3 +-
+>  drivers/gpio/gpio-samsung.c                        |    1 -
+>  sound/soc/samsung/h1940_uda1380.c                  |   13 +-
+>  sound/soc/samsung/neo1973_wm8753.c                 |    8 +-
+>  105 files changed, 836 insertions(+), 1776 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/pmu.h
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-audss.h
+>  delete mode 100644 arch/arm/mach-s3c2440/dsc.c
+>  create mode 100644 arch/arm/mach-s3c24xx/anubis.h
+>  create mode 100644 arch/arm/mach-s3c24xx/bast.h
+>  rename arch/arm/mach-s3c24xx/{include/mach => }/gta02.h (53%)
+>  rename arch/arm/mach-s3c24xx/{include/mach/h1940-latch.h => h1940.h}
+> (70%)
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/anubis-cpld.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/anubis-irq.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/anubis-map.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/bast-cpld.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/bast-irq.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/bast-map.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/gpio-fns.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/gpio-nrs.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/gpio-track.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/h1940.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/idle.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/osiris-cpld.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-s3c2412.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-s3c2416-
+> mem.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-s3c2416.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/vr1000-cpld.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/vr1000-irq.h
+>  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/vr1000-map.h
+>  rename arch/arm/mach-s3c24xx/{include/mach/osiris-map.h => osiris.h}
+> (69%)
+>  rename arch/arm/mach-s3c24xx/{include/mach/otom-map.h => otom.h}
+> (50%)
+>  rename arch/arm/mach-s3c24xx/{include/mach => }/regs-dsc.h (100%)
+>  create mode 100644 arch/arm/mach-s3c24xx/vr1000.h
+>  rename arch/arm/mach-s3c64xx/{include/mach => }/crag6410.h (100%)
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/regs-sys.h
+>  rename arch/arm/mach-s3c64xx/{include/mach => }/regs-gpio-memport.h
+> (71%)
+>  rename arch/arm/mach-s3c64xx/{include/mach => }/regs-modem.h (78%)
+>  rename arch/arm/mach-s3c64xx/{include/mach => }/regs-srom.h (90%)
+>  create mode 100644 arch/arm/mach-s3c64xx/regs-sys.h
+>  rename arch/arm/mach-s3c64xx/{include/mach => }/regs-syscon-power.h
+> (95%)
+>  rename arch/arm/mach-s5p64x0/{include/mach/s5p64x0-clock.h => clock.h}
+> (87%)
+>  delete mode 100644 arch/arm/mach-s5p64x0/gpiolib.c
+>  rename arch/arm/mach-s5p64x0/{include/mach => }/i2c.h (91%)
+>  delete mode 100644 arch/arm/mach-s5pv210/include/mach/regs-audss.h
+>  delete mode 100644 arch/arm/mach-s5pv210/include/mach/regs-sys.h
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/gpio-fns.h
+>  rename arch/arm/mach-exynos/include/mach/cpufreq.h =>
+> drivers/cpufreq/exynos-cpufreq.h (94%)
