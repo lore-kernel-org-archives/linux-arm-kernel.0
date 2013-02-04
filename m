@@ -1,59 +1,117 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 4 Feb 2013 10:00:27 +0100
-Subject: [PATCH] ARM:omap2: using strlcpy instead of strncpy
-In-Reply-To: <20130201224546.GG22517@atomide.com>
-References: <51090829.1010109@asianux.com> <20130201224546.GG22517@atomide.com>
-Message-ID: <510F78AB.4000602@ti.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 4 Feb 2013 16:59:48 +0800
+Subject: [PATCH v7 6/8] usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
+In-Reply-To: <1359968390-317-1-git-send-email-peter.chen@freescale.com>
+References: <1359968390-317-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1359968390-317-7-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+(change CI13XXX to CI13 to avoid junk email check)
+Now, we have handled vbus session in core driver when the
+vbus interrupt occurs, so our pullup operations are all
+according to vbus.
+Of cource, the software can still call .pullup when device connects
+to host if it wants to connect/disconnect with host.
 
-On 02/01/2013 11:45 PM, Tony Lindgren wrote:
-> * Chen Gang <gang.chen@asianux.com> [130130 03:50]:
->>
->>   the fields must be null-terminated:
->>   the caller may use it as null-terminted string, next.
-> 
-> Added Peter to cc on this one too, it's best that he queues
-> all the twl changes.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/chipidea/ci13xxx_imx.c |    1 -
+ drivers/usb/chipidea/ci13xxx_msm.c |    1 -
+ drivers/usb/chipidea/udc.c         |   23 ++++++++---------------
+ include/linux/usb/chipidea.h       |    1 -
+ 4 files changed, 8 insertions(+), 18 deletions(-)
 
-I can create a branch for you in our gitorious tree
-(git://gitorious.org/omap-audio/linux-audio.git) for this patch. But I think
-for now it would be best if you could take this via linux-omap (the file is
-under arch/arm/mach-omap2 anyways)
-
-Regards,
-P?ter
-
-> 
-> Tony
->  
->> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> ---
->>  arch/arm/mach-omap2/twl-common.c |    3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
->> index e49b40b..6a7aec6 100644
->> --- a/arch/arm/mach-omap2/twl-common.c
->> +++ b/arch/arm/mach-omap2/twl-common.c
->> @@ -23,6 +23,7 @@
->>  #include <linux/i2c.h>
->>  #include <linux/i2c/twl.h>
->>  #include <linux/gpio.h>
->> +#include <linux/string.h>
->>  #include <linux/regulator/machine.h>
->>  #include <linux/regulator/fixed.h>
->>  
->> @@ -56,7 +57,7 @@ void __init omap_pmic_init(int bus, u32 clkrate,
->>  			   struct twl4030_platform_data *pmic_data)
->>  {
->>  	omap_mux_init_signal("sys_nirq", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
->> -	strncpy(pmic_i2c_board_info.type, pmic_type,
->> +	strlcpy(pmic_i2c_board_info.type, pmic_type,
->>  		sizeof(pmic_i2c_board_info.type));
->>  	pmic_i2c_board_info.irq = pmic_irq;
->>  	pmic_i2c_board_info.platform_data = pmic_data;
->> -- 
->> 1.7.10.4
+diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+index 8c29122..3b91ff4 100644
+--- a/drivers/usb/chipidea/ci13xxx_imx.c
++++ b/drivers/usb/chipidea/ci13xxx_imx.c
+@@ -88,7 +88,6 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
+ static struct ci13xxx_platform_data ci13xxx_imx_platdata  = {
+ 	.name			= "ci13xxx_imx",
+ 	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+-				  CI13XXX_PULLUP_ON_VBUS |
+ 				  CI13XXX_DISABLE_STREAMING,
+ 	.capoffset		= DEF_CAPOFFSET,
+ };
+diff --git a/drivers/usb/chipidea/ci13xxx_msm.c b/drivers/usb/chipidea/ci13xxx_msm.c
+index 7d16681..5755ee8 100644
+--- a/drivers/usb/chipidea/ci13xxx_msm.c
++++ b/drivers/usb/chipidea/ci13xxx_msm.c
+@@ -49,7 +49,6 @@ static struct ci13xxx_platform_data ci13xxx_msm_platdata = {
+ 	.name			= "ci13xxx_msm",
+ 	.flags			= CI13XXX_REGS_SHARED |
+ 				  CI13XXX_REQUIRE_TRANSCEIVER |
+-				  CI13XXX_PULLUP_ON_VBUS |
+ 				  CI13XXX_DISABLE_STREAMING,
+ 
+ 	.notify_event		= ci13xxx_msm_notify_event,
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 597ae64..b57b735 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1360,9 +1360,6 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
+ 	unsigned long flags;
+ 	int gadget_ready = 0;
+ 
+-	if (!(ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS))
+-		return -EOPNOTSUPP;
+-
+ 	spin_lock_irqsave(&ci->lock, flags);
+ 	ci->vbus_active = is_active;
+ 	if (ci->driver)
+@@ -1426,8 +1423,7 @@ static int ci13xxx_pullup(struct usb_gadget *_gadget, int is_on)
+ {
+ 	struct ci13xxx *ci = container_of(_gadget, struct ci13xxx, gadget);
+ 
+-	if ((ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) &&
+-			!ci->vbus_active)
++	if (!ci->vbus_active)
+ 		return -ENOTSUPP;
+ 
+ 	if (is_on)
+@@ -1551,14 +1547,12 @@ static int ci13xxx_start(struct usb_gadget *gadget,
+ 
+ 	ci->driver = driver;
+ 	pm_runtime_get_sync(&ci->gadget.dev);
+-	if (ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) {
+-		if (ci->vbus_active) {
+-			if (ci->platdata->flags & CI13XXX_REGS_SHARED)
+-				hw_device_reset(ci, USBMODE_CM_DC);
+-		} else {
+-			pm_runtime_put_sync(&ci->gadget.dev);
+-			goto done;
+-		}
++	if (ci->vbus_active) {
++		if (ci->platdata->flags & CI13XXX_REGS_SHARED)
++			hw_device_reset(ci, USBMODE_CM_DC);
++	} else {
++		pm_runtime_put_sync(&ci->gadget.dev);
++		goto done;
+ 	}
+ 
+ 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
+@@ -1581,8 +1575,7 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
+ 
+ 	spin_lock_irqsave(&ci->lock, flags);
+ 
+-	if (!(ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) ||
+-			ci->vbus_active) {
++	if (ci->vbus_active) {
+ 		hw_device_state(ci, 0);
+ 		if (ci->platdata->notify_event)
+ 			ci->platdata->notify_event(ci,
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 544825d..37821b3 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -17,7 +17,6 @@ struct ci13xxx_platform_data {
+ 	unsigned long	 flags;
+ #define CI13XXX_REGS_SHARED		BIT(0)
+ #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+-#define CI13XXX_PULLUP_ON_VBUS		BIT(2)
+ #define CI13XXX_DISABLE_STREAMING	BIT(3)
+ 
+ #define CI13XXX_CONTROLLER_RESET_EVENT		0
+-- 
+1.7.0.4
