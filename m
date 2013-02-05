@@ -1,52 +1,170 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Feb 2013 16:00:12 +0800
-Subject: [PATCH v8 5/8] usb: chipidea: udc: add pullup/pulldown dp at
- hw_device_state
+Date: Tue, 5 Feb 2013 16:00:14 +0800
+Subject: [PATCH v8 7/8] usb: chipidea: imx: add internal vbus regulator control
 In-Reply-To: <1360051215-27722-1-git-send-email-peter.chen@freescale.com>
 References: <1360051215-27722-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1360051215-27722-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1360051215-27722-8-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- During the connect/disconnect host, we need to pullup
-and pulldown dp
-- Make sure the dp is not pullup until the vbus is on when
-flag CI13XXX_PULLUP_ON_VBUS is set
-- Using hw_device_state when set run/stop bit
+- For host, the vbus should always be on.
+- For otg, the vbus is off defaultly, the vbus needs to be
+turned on/off when usb role switches.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index e82dae4..597ae64 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -91,8 +91,10 @@ static int hw_device_state(struct ci13xxx *ci, u32 dma)
- 		/* interrupt, error, port change, reset, sleep/suspend */
- 		hw_write(ci, OP_USBINTR, ~0,
- 			     USBi_UI|USBi_UEI|USBi_PCI|USBi_URI|USBi_SLI);
-+		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
- 	} else {
- 		hw_write(ci, OP_USBINTR, ~0, 0);
-+		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
- 	}
- 	return 0;
- }
-@@ -1424,10 +1426,14 @@ static int ci13xxx_pullup(struct usb_gadget *_gadget, int is_on)
- {
- 	struct ci13xxx *ci = container_of(_gadget, struct ci13xxx, gadget);
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index 3ebe87a..bd78078 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -131,6 +131,7 @@ struct hw_bank {
+  * @hcd: pointer to usb_hcd for ehci host driver
+  * @otg: for otg support
+  * @events: events for otg, and handled at ci_role_work
++ * @reg_vbus: used to control internal vbus regulator
+  */
+ struct ci13xxx {
+ 	struct device			*dev;
+@@ -170,6 +171,7 @@ struct ci13xxx {
+ 	struct usb_otg      		otg;
+ 	bool				id_event;
+ 	bool				b_sess_valid_event;
++	struct regulator		*reg_vbus;
+ };
  
-+	if ((ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) &&
-+			!ci->vbus_active)
-+		return -ENOTSUPP;
+ static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
+diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+index 3ed119e..5499cf8 100644
+--- a/drivers/usb/chipidea/ci13xxx_imx.c
++++ b/drivers/usb/chipidea/ci13xxx_imx.c
+@@ -85,11 +85,43 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
+ 
+ /* End of common functions shared by usbmisc drivers*/
+ 
++static int ci13xxx_otg_set_vbus(struct usb_otg *otg, bool enabled)
++{
++	struct ci13xxx	*ci = container_of(otg, struct ci13xxx, otg);
++	struct regulator *reg_vbus = ci->reg_vbus;
++	int ret;
 +
- 	if (is_on)
--		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
-+		hw_device_state(ci, ci->ep0out->qh.dma);
- 	else
--		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
-+		hw_device_state(ci, 0);
++	WARN_ON(!reg_vbus);
++
++	if (reg_vbus) {
++		if (enabled) {
++			ret = regulator_enable(reg_vbus);
++			if (ret) {
++				dev_err(ci->dev,
++				"Failed to enable vbus regulator, ret=%d\n",
++				ret);
++				return ret;
++			}
++		} else {
++			ret = regulator_disable(reg_vbus);
++			if (ret) {
++				dev_err(ci->dev,
++				"Failed to disable vbus regulator, ret=%d\n",
++				ret);
++				return ret;
++			}
++		}
++	}
++
++	return 0;
++}
++
+ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ {
+ 	struct ci13xxx_imx_data *data;
+ 	struct ci13xxx_platform_data *pdata;
+ 	struct platform_device *plat_ci;
++	struct ci13xxx	*ci;
+ 	struct resource *res;
+ 	struct regulator *reg_vbus;
+ 	struct pinctrl *pinctrl;
+@@ -163,20 +195,11 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		data->phy = phy;
+ 	}
+ 
+-	/* we only support host now, so enable vbus here */
+ 	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+-	if (!IS_ERR(reg_vbus)) {
+-		ret = regulator_enable(reg_vbus);
+-		if (ret) {
+-			dev_err(&pdev->dev,
+-				"Failed to enable vbus regulator, err=%d\n",
+-				ret);
+-			goto err_clk;
+-		}
++	if (!IS_ERR(reg_vbus))
+ 		data->reg_vbus = reg_vbus;
+-	} else {
++	else
+ 		reg_vbus = NULL;
+-	}
+ 
+ 	pdata->phy = data->phy;
+ 
+@@ -186,7 +209,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		if (!pdev->dev.dma_mask) {
+ 			ret = -ENOMEM;
+ 			dev_err(&pdev->dev, "Failed to alloc dma_mask!\n");
+-			goto err;
++			goto err_clk;
+ 		}
+ 		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+ 		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
+@@ -197,7 +220,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		if (ret) {
+ 			dev_err(&pdev->dev,
+ 				"usbmisc init failed, ret=%d\n", ret);
+-			goto err;
++			goto err_clk;
+ 		}
+ 	}
+ 
+@@ -209,20 +232,39 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev,
+ 			"Can't register ci_hdrc platform device, err=%d\n",
+ 			ret);
+-		goto err;
++		goto err_clk;
+ 	}
+ 
+ 	data->ci_pdev = plat_ci;
+ 	platform_set_drvdata(pdev, data);
+ 
++	ci = platform_get_drvdata(plat_ci);
++	/*
++	 * Internal vbus on/off policy
++	 * - Always on for host only function
++	 * - Always off for gadget only function
++	 * - call otg.set_vbus to control on/off according usb role
++	 */
++
++	if (ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]
++			&& reg_vbus) {
++		ret = regulator_enable(reg_vbus);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"Failed to enable vbus regulator, ret=%d\n",
++				ret);
++			goto err_clk;
++		}
++	} else if (ci->is_otg) {
++		ci->otg.set_vbus = ci13xxx_otg_set_vbus;
++		ci->reg_vbus = data->reg_vbus;
++	}
++
+ 	pm_runtime_no_callbacks(&pdev->dev);
+ 	pm_runtime_enable(&pdev->dev);
  
  	return 0;
- }
+ 
+-err:
+-	if (reg_vbus)
+-		regulator_disable(reg_vbus);
+ err_clk:
+ 	clk_disable_unprepare(data->clk);
+ 	return ret;
 -- 
 1.7.0.4
