@@ -1,120 +1,66 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Tue, 5 Feb 2013 01:51:57 +0000
-Subject: [PATCH 2/2] ARM: davinci: da850: add wdt OF_DEV_AUXDATA entry
-In-Reply-To: <510FA09F.7030604@ti.com>
-References: <1359016695-10362-1-git-send-email-anilkumar.v@ti.com>
- <1359016695-10362-3-git-send-email-anilkumar.v@ti.com>
- <510FA09F.7030604@ti.com>
-Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412C40AE@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 5 Feb 2013 10:03:47 +0800
+Subject: [GIT PULL] imx6q cpuidle for 3.9
+In-Reply-To: <20130130131920.GD2757@S2101-09.ap.freescale.net>
+References: <20130129054635.GA21504@S2101-09.ap.freescale.net>
+ <20130129175028.GC17935@quad.lixom.net>
+ <20130130131920.GD2757@S2101-09.ap.freescale.net>
+Message-ID: <20130205020344.GA11039@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 17:20:55, Nori, Sekhar wrote:
-> Hi Anil,
-> 
-> On 1/24/2013 2:08 PM, Kumar, Anil wrote:
-> > Add OF_DEV_AUXDATA for wdt driver in da850 board dt
-> > file to use wdt clock.
+On Wed, Jan 30, 2013 at 09:19:22PM +0800, Shawn Guo wrote:
+> On Tue, Jan 29, 2013 at 09:50:28AM -0800, Olof Johansson wrote:
+> > This has some small conflicts with the cleanup branch. Can you please base it
+> > on top of cleanup so we can avoid the merge conflicts when things go upstream?
+> > It's common to have the per-soc cleanup branches as bases for some of the
+> > feature branches just for this reason.
 > > 
-> > Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
-> > ---
-> > :100644 100644 37c27af... 1b295d2... M	arch/arm/mach-davinci/da8xx-dt.c
-> >  arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
-> >  1 files changed, 7 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> > index 37c27af..1b295d2 100644
-> > --- a/arch/arm/mach-davinci/da8xx-dt.c
-> > +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> > @@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
-> >  	of_irq_init(da8xx_irq_match);
-> >  }
-> >  
-> > +struct of_dev_auxdata da850_evm_auxdata_lookup[] __initdata = {
+> Ok, done as below.
 > 
-> Auxdata is not evm specific. This can instead be called da850_auxdata_lookup[].
+Ping?
 
-ok
+Shawn
 
+> The following changes since commit 1d7180e24e22a608cc4d7e8fd425a19a9394a7ed:
 > 
-> Also, I dont think it is necessary to add auxdata in a separate patch 
-> from dt nodes. So, I fixed these issues and came up with below patch. I 
-> tested basic wdt reboot. reboot command is still broken (with or 
-> without this patch). Can you please look at that?
+>   Merge tag 'imx-cleanup-3.9' into imx6q-cpuidle (2013-01-30 21:07:14 +0800)
 > 
-
-ok, I will look into reboot command issue.
-
-> Thanks,
-> Sekhar
-> 
-> ----8<----
-> From: "Kumar, Anil" <anilkumar.v@ti.com>
-> Date: Thu, 24 Jan 2013 14:08:14 +0530
-> Subject: [PATCH 1/1] ARM: davinci: da850: add wdt DT node
-> 
-> Add da850 wdt DT node.
-> 
-> Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
->  arch/arm/boot/dts/da850-evm.dts  |    3 +++
->  arch/arm/boot/dts/da850.dtsi     |    5 +++++
->  arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
->  3 files changed, 15 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index fa04152..cc777dc 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -30,6 +30,9 @@
->  		rtc0: rtc at 1c23000 {
->  			status = "okay";
->  		};
-> +		wdt: wdt at 1c21000 {
-> +			status = "okay";
-> +		};
->  	};
->  	nand_cs3 at 62000000 {
->  		status = "okay";
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 8dd15c0..2800090 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -88,6 +88,11 @@
->  				      19>;
->  			status = "disabled";
->  		};
-> +		wdt: wdt at 1c21000 {
-> +			compatible = "ti,davinci-wdt";
-> +			reg = <0x21000 0xfff>;
-> +			status = "disabled";
-> +		};
->  	};
->  	nand_cs3 at 62000000 {
->  		compatible = "ti,davinci-nand";
-> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> index 37c27af..90c3c69 100644
-> --- a/arch/arm/mach-davinci/da8xx-dt.c
-> +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> @@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
->  	of_irq_init(da8xx_irq_match);
->  }
->  
-> +struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
-> +	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
-> +	{}
-> +};
-> +
->  #ifdef CONFIG_ARCH_DAVINCI_DA850
->  
->  static void __init da850_init_machine(void)
->  {
-> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +	of_platform_populate(NULL, of_default_bus_match_table,
-> +			     da850_auxdata_lookup, NULL);
->  
->  	da8xx_uart_clk_enable();
->  }
+> are available in the git repository at:
 > 
 > 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx6q-cpudile-3.9
+> 
+> for you to fetch changes up to e5f9dec8ff5ff3f6254412abed1f68d758f6616b:
+> 
+>   ARM: imx6q: support WAIT mode using cpuidle (2013-01-30 21:09:31 +0800)
+> 
+> ----------------------------------------------------------------
+> imx6q cpuidle support for 3.9
+> 
+>  - It's based on imx-cleanup-3.9 to avoid conflicts.
+> 
+> ----------------------------------------------------------------
+> Shawn Guo (4):
+>       ARM: imx: return zero in case next event gets a large increment
+>       ARM: imx: mask gpc interrupts initially
+>       ARM: imx: move imx6q_cpuidle_driver into a separate file
+>       ARM: imx6q: support WAIT mode using cpuidle
+> 
+>  arch/arm/mach-imx/Makefile        |    6 ++-
+>  arch/arm/mach-imx/clk-imx6q.c     |   12 +++++
+>  arch/arm/mach-imx/common.h        |    3 ++
+>  arch/arm/mach-imx/cpuidle-imx6q.c |   95 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/cpuidle.h       |    5 ++
+>  arch/arm/mach-imx/gpc.c           |    5 ++
+>  arch/arm/mach-imx/mach-imx6q.c    |   17 +++----
+>  arch/arm/mach-imx/platsmp.c       |   10 ++++
+>  arch/arm/mach-imx/time.c          |    3 +-
+>  9 files changed, 143 insertions(+), 13 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
