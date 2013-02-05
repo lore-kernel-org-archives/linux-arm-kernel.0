@@ -1,97 +1,126 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 23:37:10 +0200
-Subject: [PATCH 12/15] USB: gadget/freescale: disable non-multiplatform
- drivers
-In-Reply-To: <20130205170027.GB1081@kroah.com>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <20130121184138.GB10106@arwen.pp.htv.fi>
- <20130121185716.GA26754@kroah.com>
- <201302051627.18337.arnd@arndb.de>
- <20130205170027.GB1081@kroah.com>
-Message-ID: <20130205213710.GA3739@arwen.pp.htv.fi>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 5 Feb 2013 15:37:25 -0600
+Subject: [PATCH, RFC] default machine descriptor for multiplatform
+In-Reply-To: <1638002.UJ7zfj1Wn5@wuerfel>
+References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
+ <20130131161823.GT2637@n2100.arm.linux.org.uk>
+ <1731670.s76EGcEZ7m@wuerfel> <1638002.UJ7zfj1Wn5@wuerfel>
+Message-ID: <CAL_JsqJ2SyGeJePvNh5fREWP5LcAxnvNsiq2=kKNxKrnquyy3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/31/2013 11:51 AM, Arnd Bergmann wrote:
+> This is what I think it would look like to do a default platform
+> with an empty machine descriptor on ARM. It makes the few required
+> entries in the descriptor optional by using the new irqchip_init()
+> and clocksource_of_init() functions as defaults, and adds
+> a fallback for the DT case to customize_machine to probe all
+> the default devices.
+>
+> For the case that CONFIG_MULTIPLATFORM is enabled, it then
+> adds a machine descriptor that never matches any machine but
+> is used as a fallback if nothing else matches.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 3e3444e..8ff1d38 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -979,7 +979,6 @@ config ARCH_MULTI_V7
+>   bool "ARMv7 based platforms (Cortex-A, PJ4, Krait)"
+>   default y
+>   select ARCH_MULTI_V6_V7
+> - select ARCH_VEXPRESS
+>   select CPU_V7
+>
+>  config ARCH_MULTI_V6_V7
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index 70f1bde..e6e34ba 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -180,6 +180,13 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>   unsigned long dt_root;
+>   const char *model;
+>
+> + if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
+> + DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+> + MACHINE_END
 
-On Tue, Feb 05, 2013 at 09:00:27AM -0800, Greg Kroah-Hartman wrote:
-> On Tue, Feb 05, 2013 at 04:27:18PM +0000, Arnd Bergmann wrote:
-> > On Monday 21 January 2013, Greg Kroah-Hartman wrote:
-> > > On Mon, Jan 21, 2013 at 08:41:38PM +0200, Felipe Balbi wrote:
-> > > > Hi,
-> > > > 
-> > > > On Mon, Jan 21, 2013 at 05:16:05PM +0000, Arnd Bergmann wrote:
-> > > > > Both the fsl_mxc gadget and the imx_udc gadget drivers fail to build
-> > > > > without the mach/hardware.h file that is not available when building
-> > > > > for multiplatform. Let's disable these drivers for v3.8 in combination
-> > > > > with CONFIG_ARCH_MULTIPLATFORM, and fix them properly in v3.9 unless
-> > > > > someone has an better solution.
-> > > > > 
-> > > > > Without this patch, building allyesconfig results in:
-> > > > > 
-> > > > > drivers/usb/gadget/fsl_mxc_udc.c:21:27: fatal error: mach/hardware.h: No such file or directory
-> > > > > 
-> > > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > > > Cc: Felipe Balbi <balbi@ti.com>
-> > > > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > > > Cc: linux-usb at vger.kernel.org
-> > > > 
-> > > > NAK, I prefer to see a real fix for the problem (which in fact is
-> > > > already in my fixes branch).
-> > > 
-> > > I'll pull that branch now, sorry for the delay.
-> > 
-> > Apparently it hasn't made it into the upstream kernel yet, and it also doesn't
-> > seem to be in linux-next. Maybe this got lost while you were travelling?
-> 
-> Hm, no, I thought I got Felipe's fixes branch up into Linus's tree
-> already.  Felipe, did I miss something from you?  If so, please resend
-> or let me know, as I don't have anything pending on my side.
+I assume this works, but it looks a bit strange declared here.
 
-I don't have anything pending in my fixes branch:
+> +
+> + mdesc_best = (struct machine_desc *)&__mach_desc_GENERIC_DT;
+> + }
+> +
+>   if (!dt_phys)
+>   return NULL;
+>
+> @@ -199,7 +206,7 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>   mdesc_score = score;
+>   }
+>   }
+> - if (!mdesc_best) {
+> + if (!mdesc_best && !IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
+>   const char *prop;
+>   long size;
+>
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 8e4ef4c..df6f9a1 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/ioport.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+> +#include <linux/irqchip.h>
+>  #include <linux/random.h>
+>  #include <linux/smp.h>
+>  #include <linux/init.h>
+> @@ -114,7 +115,10 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
+>
+>  void __init init_IRQ(void)
+>  {
+> - machine_desc->init_irq();
+> + if (machine_desc->init_irq)
+> + machine_desc->init_irq();
+> + else
+> + irqchip_init();
+>  }
+>
+>  #ifdef CONFIG_MULTI_IRQ_HANDLER
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3f6cbb2..1d40c9d 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/bootmem.h>
+>  #include <linux/seq_file.h>
+>  #include <linux/screen_info.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/init.h>
+>  #include <linux/kexec.h>
+>  #include <linux/of_fdt.h>
+> @@ -640,9 +641,17 @@ struct screen_info screen_info = {
+>
+>  static int __init customize_machine(void)
+>  {
+> - /* customizes platform devices, or adds new ones */
+> + /*
+> + * customizes platform devices, or adds new ones
+> + * On DT based machines, we fall back to populating the
+> + * machine from the device tree, if no callback is provided,
+> + * otherwise we would always need an init_machine callback.
+> + */
+>   if (machine_desc->init_machine)
+>   machine_desc->init_machine();
+> + else
+> + of_platform_populate(NULL, of_default_bus_match_table,
+> + NULL, NULL);
 
-$ git log fixes ^linus/master
+Could this be unconditional? It should be safe to call multiple times
+if a platform calls this first because ordering matters or there are
+custom match tables. I would guess any ordering requirements need to
+happen before this call anyway.
 
-$ git show-branch linus/master
-[linus/master] Merge branch 'fix-max-write' of git://git.kernel.org/pub/scm/linux/kernel/git/teigland/linux-dlm
-
-It's building find for me:
-
-$ crossmake drivers/usb/gadget/fsl_udc_core.o \
-	drivers/usb/gadget/fsl_mxc_udc.o > /dev/null
-
-(crossmake is an alias to make ARCH=arm)
-
-Arnd, are you maybe missing a merge of v3.8-rc6 ?
-
-I can see that imx_udc.c is broken still, but there are no maintainers
-for that driver. I'm adding Sascha to Cc list, maybe he knows someone
-who can help, but if this driver isn't fixed in 2 merge windows, I will
-schedule for removal from tree and someone else will have to
-re-introduce it later without all the bogus includes.
-
----- build breaks ---
-
-sound/soc/fsl/imx-pcm.c: In function 'snd_imx_pcm_mmap':
-sound/soc/fsl/imx-pcm.c:28:2: error: 'KBUILD_MODNAME' undeclared (first use in this function)
-sound/soc/fsl/imx-pcm.c:28:2: note: each undeclared identifier is
-reported only once for each function it appears in
-make[3]: *** [sound/soc/fsl/imx-pcm.o] Error 1
-
-drivers/video/omap2/dss/dss.c: In function 'dss_calc_clock_div':
-drivers/video/omap2/dss/dss.c:572:20: error:
-'CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK' undeclared (first use in this function)
-drivers/video/omap2/dss/dss.c:572:20: note: each undeclared identifier
-is reported only once for each function it appears in
-make[4]: *** [drivers/video/omap2/dss/dss.o] Error 1
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/aa5f5683/attachment.sig>
+Rob
