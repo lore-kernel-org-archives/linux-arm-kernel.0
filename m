@@ -1,28 +1,20 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 05 Feb 2013 12:45:35 +0000
-Subject: [PATCH V2] mxs: spi: clear XFER_COUNT in ctrl0 field in DMA
- descriptor
-In-Reply-To: <1356500931-31861-1-git-send-email-juha.lumme@gmail.com>
-References: <1356500931-31861-1-git-send-email-juha.lumme@gmail.com>
-Message-ID: <20130205124535.D59043E0E27@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Feb 2013 12:41:20 +0000
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <51102E25.8040107@ti.com>
+References: <20130204154153.GA18237@arwen.pp.htv.fi> <510FF1A6.403@mvista.com>
+ <20130204164712.GB4269@arwen.pp.htv.fi> <510FF5C9.3030600@mvista.com>
+ <20130204170216.GC4269@arwen.pp.htv.fi> <51100A72.6030909@ti.com>
+ <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
+ <20130204203358.GX4720@opensource.wolfsonmicro.com>
+ <CACRpkdbPyZt8=pLhz-5qcaSSAk6VBn61dPTNp6teU9HksBwN2w@mail.gmail.com>
+ <51102E25.8040107@ti.com>
+Message-ID: <20130205124120.GC17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Dec 2012 14:48:51 +0900, Juha Lumme <juha.lumme@gmail.com> wrote:
-> On MX23 the XFER_COUNT part in ctrl0 field in DMA descriptor was improperly
-> OR'd during the construction of DMA descriptor chain, instead of being
-> freshly set.
-> Because of that too many bytes were being expected from SPI during the last
-> DMA cycle.
-> This caused a timeout (SSP_TIMEOUT) to happen in the processing of the last
-> DMA descriptor, and thus reads and writes were failing.
-> This is a fix for the problem, by clearing XFER_COUNT bytes in ctrl0 before
-> setting the new XFER_COUNT for DMA descriptor.
-> 
-> Cc: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+On Mon, Feb 04, 2013 at 04:54:45PM -0500, Cyril Chemparathy wrote:
+> You're assuming that cookies complete in order.  That is not necessarily  
+> true.
 
-Applied, thanks.
-
-g.
+Under what circumstances is that not true?
