@@ -1,135 +1,298 @@
-From: girishks2000@gmail.com (Girish K S)
-Date: Tue,  5 Feb 2013 15:09:43 -0800
-Subject: [PATCH 3/4] spi: s3c64xx: add gpio quirk for controller
-In-Reply-To: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
-References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
-Message-ID: <1360105784-12282-4-git-send-email-ks.giri@samsung.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Wed, 6 Feb 2013 00:11:59 +0100
+Subject: [PATCH 1/6] ARM: S3C24XX: move s3c244x irq init to common irq code
+In-Reply-To: <201302060010.53929.heiko@sntech.de>
+References: <201302060010.53929.heiko@sntech.de>
+Message-ID: <201302060011.59945.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for spi controllers with
-dedicated clk/miso/mosi/cs pins. It skips the gpio
-parsing and initialization for controllers that
-have dedicated pins.
+Base for further modifications.
 
-Signed-off-by: Girish K S <ks.giri@samsung.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/spi/spi-s3c64xx.c |   39 +++++++++++++++++++++++++++++++--------
- 1 file changed, 31 insertions(+), 8 deletions(-)
+ arch/arm/mach-s3c24xx/Makefile      |    2 +-
+ arch/arm/mach-s3c24xx/irq-s3c244x.c |  142 -----------------------------------
+ arch/arm/mach-s3c24xx/irq.c         |  105 ++++++++++++++++++++++++++
+ 3 files changed, 106 insertions(+), 143 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c244x.c
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 90770bd..f06bbee 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -36,6 +36,7 @@
+diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
+index af53d27..051b8f9 100644
+--- a/arch/arm/mach-s3c24xx/Makefile
++++ b/arch/arm/mach-s3c24xx/Makefile
+@@ -33,7 +33,7 @@ obj-$(CONFIG_S3C2416_PM)	+= pm-s3c2416.o
  
- #define MAX_SPI_PORTS		3
- #define S3C64XX_SPI_QUIRK_POLL		(1 << 0)
-+#define S3C64XX_SPI_QUIRK_GPIO		(1 << 1)
+ obj-$(CONFIG_CPU_S3C2440)	+= s3c2440.o irq-s3c2440.o clock-s3c2440.o
+ obj-$(CONFIG_CPU_S3C2442)	+= s3c2442.o
+-obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o irq-s3c244x.o clock-s3c244x.o
++obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o clock-s3c244x.o
+ obj-$(CONFIG_S3C2440_CPUFREQ)	+= cpufreq-s3c2440.o
+ obj-$(CONFIG_S3C2440_DMA)	+= dma-s3c2440.o
+ obj-$(CONFIG_S3C2440_PLL_12000000) += pll-s3c2440-12000000.o
+diff --git a/arch/arm/mach-s3c24xx/irq-s3c244x.c b/arch/arm/mach-s3c24xx/irq-s3c244x.c
+deleted file mode 100644
+index 5fe8e58..0000000
+--- a/arch/arm/mach-s3c24xx/irq-s3c244x.c
++++ /dev/null
+@@ -1,142 +0,0 @@
+-/* linux/arch/arm/plat-s3c24xx/s3c244x-irq.c
+- *
+- * Copyright (c) 2003-2004 Simtec Electronics
+- *	Ben Dooks <ben@simtec.co.uk>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+-*/
+-
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/interrupt.h>
+-#include <linux/ioport.h>
+-#include <linux/device.h>
+-#include <linux/io.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/irq.h>
+-
+-#include <asm/mach/irq.h>
+-
+-#include <mach/regs-irq.h>
+-#include <mach/regs-gpio.h>
+-
+-#include <plat/cpu.h>
+-#include <plat/pm.h>
+-#include <plat/irq.h>
+-
+-/* camera irq */
+-
+-static void s3c_irq_demux_cam(unsigned int irq,
+-			      struct irq_desc *desc)
+-{
+-	unsigned int subsrc, submsk;
+-
+-	/* read the current pending interrupts, and the mask
+-	 * for what it is available */
+-
+-	subsrc = __raw_readl(S3C2410_SUBSRCPND);
+-	submsk = __raw_readl(S3C2410_INTSUBMSK);
+-
+-	subsrc &= ~submsk;
+-	subsrc >>= 11;
+-	subsrc &= 3;
+-
+-	if (subsrc != 0) {
+-		if (subsrc & 1) {
+-			generic_handle_irq(IRQ_S3C2440_CAM_C);
+-		}
+-		if (subsrc & 2) {
+-			generic_handle_irq(IRQ_S3C2440_CAM_P);
+-		}
+-	}
+-}
+-
+-#define INTMSK_CAM (1UL << (IRQ_CAM - IRQ_EINT0))
+-
+-static void
+-s3c_irq_cam_mask(struct irq_data *data)
+-{
+-	s3c_irqsub_mask(data->irq, INTMSK_CAM, 3 << 11);
+-}
+-
+-static void
+-s3c_irq_cam_unmask(struct irq_data *data)
+-{
+-	s3c_irqsub_unmask(data->irq, INTMSK_CAM);
+-}
+-
+-static void
+-s3c_irq_cam_ack(struct irq_data *data)
+-{
+-	s3c_irqsub_maskack(data->irq, INTMSK_CAM, 3 << 11);
+-}
+-
+-static struct irq_chip s3c_irq_cam = {
+-	.irq_mask	= s3c_irq_cam_mask,
+-	.irq_unmask	= s3c_irq_cam_unmask,
+-	.irq_ack	= s3c_irq_cam_ack,
+-};
+-
+-static int s3c244x_irq_add(struct device *dev, struct subsys_interface *sif)
+-{
+-	unsigned int irqno;
+-
+-	irq_set_chip_and_handler(IRQ_NFCON, &s3c_irq_level_chip,
+-				 handle_level_irq);
+-	set_irq_flags(IRQ_NFCON, IRQF_VALID);
+-
+-	/* add chained handler for camera */
+-
+-	irq_set_chip_and_handler(IRQ_CAM, &s3c_irq_level_chip,
+-				 handle_level_irq);
+-	irq_set_chained_handler(IRQ_CAM, s3c_irq_demux_cam);
+-
+-	for (irqno = IRQ_S3C2440_CAM_C; irqno <= IRQ_S3C2440_CAM_P; irqno++) {
+-		irq_set_chip_and_handler(irqno, &s3c_irq_cam,
+-					 handle_level_irq);
+-		set_irq_flags(irqno, IRQF_VALID);
+-	}
+-
+-	return 0;
+-}
+-
+-static struct subsys_interface s3c2440_irq_interface = {
+-	.name		= "s3c2440_irq",
+-	.subsys		= &s3c2440_subsys,
+-	.add_dev	= s3c244x_irq_add,
+-};
+-
+-static int s3c2440_irq_init(void)
+-{
+-	return subsys_interface_register(&s3c2440_irq_interface);
+-}
+-
+-arch_initcall(s3c2440_irq_init);
+-
+-static struct subsys_interface s3c2442_irq_interface = {
+-	.name		= "s3c2442_irq",
+-	.subsys		= &s3c2442_subsys,
+-	.add_dev	= s3c244x_irq_add,
+-};
+-
+-
+-static int s3c2442_irq_init(void)
+-{
+-	return subsys_interface_register(&s3c2442_irq_interface);
+-}
+-
+-arch_initcall(s3c2442_irq_init);
+diff --git a/arch/arm/mach-s3c24xx/irq.c b/arch/arm/mach-s3c24xx/irq.c
+index cb9f5e0..95f971f 100644
+--- a/arch/arm/mach-s3c24xx/irq.c
++++ b/arch/arm/mach-s3c24xx/irq.c
+@@ -731,6 +731,111 @@ void __init s3c2416_init_irq(void)
  
- /* Registers and bit-fields */
+ #endif
  
-@@ -404,14 +405,16 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
- 		if (sdd->tgl_spi != spi) { /* if last mssg on diff device */
- 			/* Deselect the last toggled device */
- 			cs = sdd->tgl_spi->controller_data;
--			gpio_set_value(cs->line,
--				spi->mode & SPI_CS_HIGH ? 0 : 1);
-+			if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
-+				gpio_set_value(cs->line,
-+					spi->mode & SPI_CS_HIGH ? 0 : 1);
- 		}
- 		sdd->tgl_spi = NULL;
- 	}
- 
- 	cs = spi->controller_data;
--	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
-+	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
-+		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
- 
- 	/* Start the signals */
- 	writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
-@@ -503,7 +506,8 @@ static inline void disable_cs(struct s3c64xx_spi_driver_data *sdd,
- 	if (sdd->tgl_spi == spi)
- 		sdd->tgl_spi = NULL;
- 
--	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
-+	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
-+		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
- 
- 	/* Quiese the signals */
- 	writel(S3C64XX_SPI_SLAVE_SIG_INACT,
-@@ -842,7 +846,10 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
- 		return ERR_PTR(-ENOMEM);
- 	}
- 
--	cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
-+	/* In case of dedicated cs pin skip the gpio initialization */
-+	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
-+		cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
++#ifdef CONFIG_CPU_S3C244X
++/* camera irq */
 +
- 	if (!gpio_is_valid(cs->line)) {
- 		dev_err(&spi->dev, "chip select gpio is not specified or "
- 					"invalid\n");
-@@ -883,7 +890,7 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
- 		return -ENODEV;
- 	}
- 
--	if (!spi_get_ctldata(spi)) {
-+	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO)) {
- 		err = gpio_request_one(cs->line, GPIOF_OUT_INIT_HIGH,
- 				       dev_name(&spi->dev));
- 		if (err) {
-@@ -892,9 +899,11 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
- 				cs->line, err);
- 			goto err_gpio_req;
- 		}
--		spi_set_ctldata(spi, cs);
- 	}
- 
-+	if (!spi_get_ctldata(spi))
-+		spi_set_ctldata(spi, cs);
++static void s3c_irq_demux_cam(unsigned int irq,
++			      struct irq_desc *desc)
++{
++	unsigned int subsrc, submsk;
 +
- 	sci = sdd->cntrlr_info;
- 
- 	spin_lock_irqsave(&sdd->lock, flags);
-@@ -979,8 +988,11 @@ err_gpio_req:
- static void s3c64xx_spi_cleanup(struct spi_device *spi)
- {
- 	struct s3c64xx_spi_csinfo *cs = spi_get_ctldata(spi);
-+	struct s3c64xx_spi_driver_data *sdd;
++	/* read the current pending interrupts, and the mask
++	 * for what it is available */
 +
-+	sdd = spi_master_get_devdata(spi->master);
- 
--	if (cs) {
-+	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO) && cs) {
- 		gpio_free(cs->line);
- 		if (spi->dev.of_node)
- 			kfree(cs);
-@@ -1107,6 +1119,13 @@ static int s3c64xx_spi_parse_dt_gpio(struct s3c64xx_spi_driver_data *sdd)
- 	struct device *dev = &sdd->pdev->dev;
- 	int idx, gpio, ret;
- 
-+	/*
-+	 * If cs is not controlled by gpio, and
-+	 * the SoC uses internal dedicated pins
-+	 */
-+	if (sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO)
-+		return 0;
++	subsrc = __raw_readl(S3C2410_SUBSRCPND);
++	submsk = __raw_readl(S3C2410_INTSUBMSK);
 +
- 	/* find gpios for mosi, miso and clock lines */
- 	for (idx = 0; idx < 3; idx++) {
- 		gpio = of_get_gpio(dev->of_node, idx);
-@@ -1133,6 +1152,10 @@ free_gpio:
- static void s3c64xx_spi_dt_gpio_free(struct s3c64xx_spi_driver_data *sdd)
- {
- 	unsigned int idx;
++	subsrc &= ~submsk;
++	subsrc >>= 11;
++	subsrc &= 3;
 +
-+	if (sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO)
-+		return;
++	if (subsrc != 0) {
++		if (subsrc & 1) {
++			generic_handle_irq(IRQ_S3C2440_CAM_C);
++		}
++		if (subsrc & 2) {
++			generic_handle_irq(IRQ_S3C2440_CAM_P);
++		}
++	}
++}
 +
- 	for (idx = 0; idx < 3; idx++)
- 		gpio_free(sdd->gpios[idx]);
- }
++#define INTMSK_CAM (1UL << (IRQ_CAM - IRQ_EINT0))
++
++static void
++s3c_irq_cam_mask(struct irq_data *data)
++{
++	s3c_irqsub_mask(data->irq, INTMSK_CAM, 3 << 11);
++}
++
++static void
++s3c_irq_cam_unmask(struct irq_data *data)
++{
++	s3c_irqsub_unmask(data->irq, INTMSK_CAM);
++}
++
++static void
++s3c_irq_cam_ack(struct irq_data *data)
++{
++	s3c_irqsub_maskack(data->irq, INTMSK_CAM, 3 << 11);
++}
++
++static struct irq_chip s3c_irq_cam = {
++	.irq_mask	= s3c_irq_cam_mask,
++	.irq_unmask	= s3c_irq_cam_unmask,
++	.irq_ack	= s3c_irq_cam_ack,
++};
++
++static int s3c244x_irq_add(struct device *dev, struct subsys_interface *sif)
++{
++	unsigned int irqno;
++
++	irq_set_chip_and_handler(IRQ_NFCON, &s3c_irq_level_chip,
++				 handle_level_irq);
++	set_irq_flags(IRQ_NFCON, IRQF_VALID);
++
++	/* add chained handler for camera */
++
++	irq_set_chip_and_handler(IRQ_CAM, &s3c_irq_level_chip,
++				 handle_level_irq);
++	irq_set_chained_handler(IRQ_CAM, s3c_irq_demux_cam);
++
++	for (irqno = IRQ_S3C2440_CAM_C; irqno <= IRQ_S3C2440_CAM_P; irqno++) {
++		irq_set_chip_and_handler(irqno, &s3c_irq_cam,
++					 handle_level_irq);
++		set_irq_flags(irqno, IRQF_VALID);
++	}
++
++	return 0;
++}
++
++static struct subsys_interface s3c2440_irq_interface = {
++	.name		= "s3c2440_irq",
++	.subsys		= &s3c2440_subsys,
++	.add_dev	= s3c244x_irq_add,
++};
++
++static int s3c2440_irq_init(void)
++{
++	return subsys_interface_register(&s3c2440_irq_interface);
++}
++
++arch_initcall(s3c2440_irq_init);
++
++static struct subsys_interface s3c2442_irq_interface = {
++	.name		= "s3c2442_irq",
++	.subsys		= &s3c2442_subsys,
++	.add_dev	= s3c244x_irq_add,
++};
++
++
++static int s3c2442_irq_init(void)
++{
++	return subsys_interface_register(&s3c2442_irq_interface);
++}
++
++arch_initcall(s3c2442_irq_init);
++#endif
++
+ #ifdef CONFIG_CPU_S3C2443
+ static struct s3c_irq_data init_s3c2443base[32] = {
+ 	{ .type = S3C_IRQTYPE_EINT, }, /* EINT0 */
 -- 
-1.7.10.4
+1.7.2.3
