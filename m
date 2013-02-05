@@ -1,122 +1,143 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Feb 2013 16:21:12 +0000
-Subject: [PATCH 05/15] ASoC: fsl: fiq and dma cannot both be modules
-In-Reply-To: <20130122063331.GA1766@opensource.wolfsonmicro.com>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <20130122035028.GB29677@S2100-06.ap.freescale.net>
- <20130122063331.GA1766@opensource.wolfsonmicro.com>
-Message-ID: <201302051621.12320.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Feb 2013 17:21:48 +0100
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <5110369B.9060901@ti.com>
+References: <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
+ <20130201185820.GE29898@arwen.pp.htv.fi>
+ <510C2A47.1090607@mvista.com>
+ <20130201205600.GA31762@arwen.pp.htv.fi>
+ <20130201213003.GW2637@n2100.arm.linux.org.uk>
+ <20130204154153.GA18237@arwen.pp.htv.fi> <510FF1A6.403@mvista.com>
+ <20130204164712.GB4269@arwen.pp.htv.fi>
+ <510FF5C9.3030600@mvista.com>
+ <20130204170216.GC4269@arwen.pp.htv.fi> <51100A72.6030909@ti.com>
+ <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
+ <5110369B.9060901@ti.com>
+Message-ID: <CACRpkda8xBB35CwuBH76xXcC341TeRs1ZuwzDD0LtuXc4ifQTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 January 2013, Mark Brown wrote:
->   Show Details
->   On Tue, Jan 22, 2013 at 11:50:30AM +0800, Shawn Guo wrote:
-> > On Mon, Jan 21, 2013 at 05:15:58PM +0000, Arnd Bergmann wrote:
-> 
-> > > Without this patch, we cannot build the ARM 'allmodconfig', or
-> > > we get this error:
-> 
-> > > sound/soc/fsl/imx-pcm-dma.o: In function `init_module':
-> > > sound/soc/fsl/imx-pcm-dma.c:177: multiple definition of `init_module'
-> > > sound/soc/fsl/imx-pcm-fiq.o:sound/soc/fsl/imx-pcm-fiq.c:334: first defined here
-> > > sound/soc/fsl/imx-pcm-dma.o: In function `cleanup_module':
-> > > sound/soc/fsl/imx-pcm-dma.c:177: multiple definition of `cleanup_module'
-> > > sound/soc/fsl/imx-pcm-fiq.o:sound/soc/fsl/imx-pcm-fiq.c:334: first defined here
-> 
-> > I sent a fix [1] for that queued by Mark.
-> 
-> > Mark,
-> 
-> > Is the patch on the way to 3.8-rc?
-> 
-> Yes, should be.
->   
+On Mon, Feb 4, 2013 at 11:30 PM, Cyril Chemparathy <cyril@ti.com> wrote:
 
-Hmm, I tried building 3.8-rc again, which contains the fix to make
-'make allmodconfig' work with this code, but it broke 'make allyesconfig', which
-was working before :(
+> NAPI needs to switch between polled and interrupt driven modes of operation.
+> Further, in a given poll, it needs to be able to limit the amount of traffic
+> processed to a specified budget.
 
-8<----------
-Subject: [PATCH] ASoC: fsl: fix allyesconfig build for imx-pcm
+I don't think any of this is a problem.
 
-Patch 25b8d314 "ASoC: fsl: fix multiple definition of init_module changed
-the Makefile for imx-pcm.ko to build two modules that both contain the
-imx-pcm.c file, which nicely solves the problem of building both versions
-of the driver as modules, but it causes two new problems:
+Polling, just scan cookies. Disable or ignore the callbacks.
 
-1. Since imx-pcm.c is now used in two different modules, Kbuild no longer
-sets the KBUILD_MODNAME symbol when building the object file, which makes
-it impossible to use dynamic pr_debug code, resulting in this error
+For IRQ mode, use the completion callback to push each cookie
+to NAPI, and thus let the IRQ drive the traffic.
 
-sound/soc/fsl/imx-pcm.c: In function 'snd_imx_pcm_mmap':
-sound/soc/fsl/imx-pcm.c:28:121: error: 'KBUILD_MODNAME' undeclared (first use in this function)
-sound/soc/fsl/imx-pcm.c:28:121: note: each undeclared identifier is reported only once for each function it appears insound/soc/fsl/snd-soc-imx-pcm-dma.o: In function `imx_pcm_free':
+>> The thing you're looking for sounds more like an adapter on top
+>> of dmaengine, which can surely be constructed, some
+>> drivers/dma/dmaengine-napi.c or whatever.
+>
+> I'm not debating the possibility of duct-taping a network driver on top of
+> the dma-engine interface.  That is very much doable, and we have done this
+> already.
 
-2. If we don't use the dynamic debug code, we get a link error since we now
-try to link together the same file into built-in.o twice:
+So it seems I have a different opinion on elegance.
 
-sound/soc/fsl/imx-pcm.c:80: multiple definition of `imx_pcm_free'
-sound/soc/fsl/snd-soc-imx-pcm-fiq.o:/sound/soc/fsl/imx-pcm.c:80: first defined here
-sound/soc/fsl/snd-soc-imx-pcm-dma.o: In function `snd_imx_pcm_mmap':
-sound/soc/fsl/imx-pcm.c:21: multiple definition of `snd_imx_pcm_mmap'
-sound/soc/fsl/snd-soc-imx-pcm-fiq.o:/sound/soc/fsl/imx-pcm.c:21: first defined here
-sound/soc/fsl/snd-soc-imx-pcm-dma.o: In function `imx_pcm_new':
-sound/soc/fsl/imx-pcm.c:52: multiple definition of `imx_pcm_new'
-sound/soc/fsl/snd-soc-imx-pcm-fiq.o:/sound/soc/fsl/imx-pcm.c:52: first defined here
+I think it can be a nice little adapter, and you're talking about
+duct-tape, like it's something ugly and crude.
 
-I originally suggested disallowing the selection of both the DMA and FIQ
-code in the same kernel. That is not very nice, but it resolves the
-build error for both built-in and modular code.
+So let's get to the bottom of that.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Starting with a stock dma-engine driver, our first approach was to use
+> dmaengine_pause() and dmaengine_resume() in the network driver to throttle
+> completion callbacks per NAPI's needs.
 
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index e24e417..3f20cb7 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -122,7 +122,7 @@ config SND_SOC_IMX_AUDMUX
- config SND_MXC_SOC_WM1133_EV1
- 	tristate "Audio on the i.MX31ADS with WM1133-EV1 fitted"
- 	depends on MACH_MX31ADS_WM1133_EV1
--	depends on !SND_SOC_IMX_PCM_DMA || SND_IMX_SOC=y
-+	depends on !SND_SOC_IMX_PCM_DMA
- 	select SND_SOC_WM8350
- 	select SND_SOC_IMX_PCM_FIQ
- 	select SND_SOC_IMX_AUDMUX
-@@ -145,7 +145,7 @@ config SND_SOC_MX27VIS_AIC32X4
- config SND_SOC_PHYCORE_AC97
- 	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
- 	depends on MACH_PCM043 || MACH_PCA100
--	depends on !SND_SOC_IMX_PCM_DMA || SND_IMX_SOC=y
-+	depends on !SND_SOC_IMX_PCM_DMA
- 	select SND_SOC_AC97_BUS
- 	select SND_SOC_WM9712
- 	select SND_SOC_IMX_PCM_FIQ
-@@ -162,7 +162,7 @@ config SND_SOC_EUKREA_TLV320
- 		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
- 		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
- 	depends on I2C
--	depends on !SND_SOC_IMX_PCM_DMA || SND_IMX_SOC=y
-+	depends on !SND_SOC_IMX_PCM_DMA
- 	select SND_SOC_TLV320AIC23
- 	select SND_SOC_IMX_PCM_FIQ
- 	select SND_SOC_IMX_AUDMUX
-diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
-index ec14579..ddd9076 100644
---- a/sound/soc/fsl/Makefile
-+++ b/sound/soc/fsl/Makefile
-@@ -30,13 +30,6 @@ obj-$(CONFIG_SND_MPC52xx_SOC_EFIKA) += efika-audio-fabric.o
- # i.MX Platform Support
- snd-soc-imx-ssi-objs := imx-ssi.o
- snd-soc-imx-audmux-objs := imx-audmux.o
--snd-soc-imx-pcm-objs := imx-pcm.o
--ifneq ($(CONFIG_SND_SOC_IMX_PCM_FIQ),)
--	snd-soc-imx-pcm-objs += imx-pcm-fiq.o
--endif
--ifneq ($(CONFIG_SND_SOC_IMX_PCM_DMA),)
--	snd-soc-imx-pcm-objs += imx-pcm-dma.o
--endif
- 
- obj-$(CONFIG_SND_SOC_IMX_SSI) += snd-soc-imx-ssi.o
- obj-$(CONFIG_SND_SOC_IMX_AUDMUX) += snd-soc-imx-audmux.o
+Why? Do you really need to limit this in the middle of transfers?
+
+I'm half-guessing that one transfer is typically something like one
+packet. Pausing and starting would be something you would use
+in case you had a circular buffer with an eternal ongoing transfer,
+and you wanted to slow that down.
+
+> Having learned our lessons from the first attempt, the second step was to
+> add a separate notification callback from the dma-engine layer - a
+> notification independent of any particular descriptor.  With this callback
+> in place, we got rid of some of the state machine crap in the network
+> driver.
+>
+> The third step was to add a dmaengine_poll() call instead of constantly
+> bouncing a channel between paused and running states.  This further cleaned
+> up some of the network driver code, but now the dma-engine driver looks like
+> crap if it needs to support both the traditional and new (i.e. notify +
+> poll) modes.  This is where we are at today.
+
+I don't see why you have to modify dmaengine to do poll.
+It should be trivial as discussed to just keep track of the cookies,
+scan over them and poll out the completed work.
+
+Then to mitigate the load I guess you just do not issue
+too many dma transfers? Can you not regulate the workload
+by adjusting the number of transfer cookies you issue in
+parallel, and if they're not issued in parallel but adjacent,
+can you not just issue them so often?
+
+Or are you polling out half transfers or something, so
+that the granularity of one transfer/cookie would be
+enough?
+
+Maybe I'm not getting the picture here?
+
+Can you describe how the network stream is chopped into
+transfers in this hardware, I think that could ease our
+understanding?
+
+Especially I guess we need to know if the hardware is providing
+useful chunks like one packet or if it's just one eternal stream of
+bits that you then have to demux and put into skbufs or
+something.
+
+> Even with the addition of these extensions, the interaction between the
+> network driver and the dma-engine driver is clumsy and involves multiple
+> back and forth calls per packet.  This is not elegant, and certainly not
+> efficient.  In comparison, the virtqueue interface is a natural fit with the
+> network driver, and is free of the aforementioned problems.
+
+Yes the described approach and hacking around in dmaengine to
+do the polling seems ugly. But just a queue of cookies does not
+seem so ugly, rather the opposite.
+
+> [Russell writes]
+>>  So yes, the DMA engine API supports it.  Whether the _implementations_
+>>  themselves do is very much hit and miss (and in reality is much more
+>> miss than hit.)
+>
+> Don't these assume that the driver can determine the need for an interrupt
+> upfront at prep/submit time?  AFAICT, this assumption doesn't hold true
+> with NAPI.
+
+Yes it does. You can however stop an ongoing transfer
+(by referring to the cookie), pick out the bytes transferred so far
+and trigger a new transfer using/not using an IRQ if you want.
+
+This is an abstracted way of doing the same brutal buffer
+slaying that I hear NAPI is doing to some network drivers.
+
+For example see the RX path of this driver:
+drivers/tty/serial/amba-pl011.c
+
+There is DMA for it, but we may stop the DMA transfer on
+an IRQ, take the partial buffer out and feed it to the TTY.
+Could just as well be a network packet. Sometimes it is, if
+there is a modem on the other end.
+
+RX DMA is triggered in pl011_dma_rx_trigger_dma(),
+then either pl011_dma_rx_callback() gets called if the DMA
+transfer completes, or we get an IRQ (like a timeout) and
+endup in pl011_dma_rx_irq(), where the transfer is stopped,
+buffer emtied and then we can decide what to do next.
+
+This could just as well have been some API calling in and
+saying "give me your buffer NOW".
+
+I think we need to look at an NAPI driver that does this trick
+so we understand what you want from the API.
+
+Yours,
+Linus Walleij
