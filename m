@@ -1,41 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Feb 2013 16:27:18 +0000
-Subject: [PATCH 12/15] USB: gadget/freescale: disable non-multiplatform
- drivers
-In-Reply-To: <20130121185716.GA26754@kroah.com>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <20130121184138.GB10106@arwen.pp.htv.fi> <20130121185716.GA26754@kroah.com>
-Message-ID: <201302051627.18337.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 05 Feb 2013 17:28:15 +0100
+Subject: [PATCH] arm: mvebu: Add SPI flash on Armada XP-GP board
+In-Reply-To: <1360063473-26176-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1360063473-26176-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <5111331F.7090900@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 January 2013, Greg Kroah-Hartman wrote:
-> On Mon, Jan 21, 2013 at 08:41:38PM +0200, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Mon, Jan 21, 2013 at 05:16:05PM +0000, Arnd Bergmann wrote:
-> > > Both the fsl_mxc gadget and the imx_udc gadget drivers fail to build
-> > > without the mach/hardware.h file that is not available when building
-> > > for multiplatform. Let's disable these drivers for v3.8 in combination
-> > > with CONFIG_ARCH_MULTIPLATFORM, and fix them properly in v3.9 unless
-> > > someone has an better solution.
-> > > 
-> > > Without this patch, building allyesconfig results in:
-> > > 
-> > > drivers/usb/gadget/fsl_mxc_udc.c:21:27: fatal error: mach/hardware.h: No such file or directory
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Felipe Balbi <balbi@ti.com>
-> > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > Cc: linux-usb at vger.kernel.org
-> > 
-> > NAK, I prefer to see a real fix for the problem (which in fact is
-> > already in my fixes branch).
+Hi Ezequiel,
+
+On 02/05/2013 12:24 PM, Ezequiel Garcia wrote:
+> This patch adds an SPI master device node for Armada XP-GP board.
+> This master node is an SPI flash controller 'n25q128a13'.
 > 
-> I'll pull that branch now, sorry for the delay.
+> Since there is no 'partitions' node declared, one full sized
+> partition named as the device will be created.
+> 
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Lior Amsalem <alior@marvell.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+> This patch depends on:
+> 
+>  1. Gregory's patch for Armada XP GP board:
+>       arm: mvebu: support for the new Armada XP development board(DB-MV784MP-GP)
+> 
+>  2. My previous patch for SPI on Armada 370/XP:
+>       arm: mvebu: Add support for SPI controller in Armada 370/XP
+> 
+> And don't forget to compile the SPI flash driver, CONFIG_MTD_M25P80=y
+> 
+>  arch/arm/boot/dts/armada-xp-gp.dts |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> index 3eea531..1c8afe2 100644
+> --- a/arch/arm/boot/dts/armada-xp-gp.dts
+> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> @@ -97,5 +97,17 @@
+>  			phy = <&phy3>;
+>  			phy-mode = "rgmii-id";
+>  		};
+> +
+> +		spi0: spi at d0010600 {
+> +			status = "okay";
+> +
+> +			spi-flash at 0 {
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				compatible = "n25q128a13";
+> +				reg = <0>; /* Chip select 0 */
+> +				spi-max-frequency = <108000000>;
+> +			};
+> +		};
+>  	};
+>  };
+> 
 
-Apparently it hasn't made it into the upstream kernel yet, and it also doesn't
-seem to be in linux-next. Maybe this got lost while you were travelling?
+I applied, compiled and try this patch it worked well, at least
+for reading, I didn't try to write on the flash where my boolader
+is stored. So you can add my:
 
-	Arnd
+Tested-by: Gregory Clement <gregory.clement@free-electrons.com>
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
