@@ -1,36 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 Feb 2013 18:14:32 +0100
-Subject: [PATCH v8 03/12] gpio: find gpio base by ascend order
-In-Reply-To: <1359825953-15663-4-git-send-email-haojian.zhuang@linaro.org>
-References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
- <1359825953-15663-4-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdZbC8nrDnQEZes9XJTJ6uSfpx-DjuSs3Q6GA0=eauhdYg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Feb 2013 17:14:51 +0000
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <CACRpkdaUQ60W8Vmg3MpvP5uV+3jD3y4+9V2et4Ni+z-7k=aFTg@mail.gmail.com>
+References: <510FF1A6.403@mvista.com> <20130204164712.GB4269@arwen.pp.htv.fi>
+ <510FF5C9.3030600@mvista.com> <20130204170216.GC4269@arwen.pp.htv.fi>
+ <51100A72.6030909@ti.com>
+ <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
+ <20130204203358.GX4720@opensource.wolfsonmicro.com>
+ <CACRpkdbPyZt8=pLhz-5qcaSSAk6VBn61dPTNp6teU9HksBwN2w@mail.gmail.com>
+ <51102E25.8040107@ti.com>
+ <CACRpkdaUQ60W8Vmg3MpvP5uV+3jD3y4+9V2et4Ni+z-7k=aFTg@mail.gmail.com>
+Message-ID: <20130205171451.GE17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 2, 2013 at 6:25 PM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+On Tue, Feb 05, 2013 at 04:30:45PM +0100, Linus Walleij wrote:
+> On Mon, Feb 4, 2013 at 10:54 PM, Cyril Chemparathy <cyril@ti.com> wrote:
+> > On 02/04/2013 04:11 PM, Linus Walleij wrote:
+> 
+> >> Cyril, just stack up the cookies and take a sweep over them to see
+> >> which ones are baked when the NAPI poll comes in -> problem
+> >> solved.
+> >
+> > You're assuming that cookies complete in order.  That is not necessarily
+> > true.
+> 
+> So put them on a wait list? Surely you will have a list of pending
+> cookies and pick from the front of the queue if there isn't a hole on
+> queue position 0.
 
-> gpiochip_find_base() always tries to find valid gpio with descend order.
-> It's inconvient if gpio information is passing from DTS. Now try to find
-> valid gpio with ascend order.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Not quite.  The key is the cookie system DMA engine employs to indicate
+when a cookie is complete.
 
-This is more scary stuff.
+Cookies between the "issued sequence" and "completed sequence" are defined
+to be in progress, everything else is defined to be completed.
 
-As you know GPIO numbers are exposed to userspace.
+This means that if "completed sequence" is 1, and "issued sequence" is 5,
+then cookies with values 2, 3, 4, 5 are in progress.  You can't mark
+sequence 4 as being complete until 2 and 3 have completed.
 
-Systems with this change risk having their dynamically added
-GPIO controller enumerated in a different fashion. And
-userspace clients may be relying on these numbers.
-
-And we do not break userspace.
-
-I know this is not elegant but I'm afraid the descending search
-needs to be kept for compatibibility reasons.
-
-BTW: please CC Grant likely on all patches.
-
-Yours,
-Linus Walleij
+If we need out-of-order completion, then that's a problem for the DMA
+engine API, because you'd need to radically change the way "completion"
+is marked.
