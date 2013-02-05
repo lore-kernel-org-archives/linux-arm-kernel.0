@@ -1,62 +1,60 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 5 Feb 2013 15:23:55 +0200
-Subject: [PATCH v5 01/10] clk: tegra: Refactor PLL programming code
-In-Reply-To: <51109BB3.8000706@nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-2-git-send-email-pdeschrijver@nvidia.com>
- <510F4FF7.3050502@nvidia.com>
- <20130204143233.GV2364@tbergstrom-lnx.Nvidia.com>
- <51109BB3.8000706@nvidia.com>
-Message-ID: <20130205132355.GD3073@tbergstrom-lnx.Nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Feb 2013 13:27:59 +0000
+Subject: [GIT PULL] i.MX clock fixes for v3.8
+In-Reply-To: <201302051312.11434.arnd@arndb.de>
+References: <20130205095844.GZ1906@pengutronix.de>
+ <20130205110804.GI17786@n2100.arm.linux.org.uk>
+ <20130205112558.GA1906@pengutronix.de> <201302051312.11434.arnd@arndb.de>
+Message-ID: <20130205132759.GA17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 06:42:11AM +0100, Prashant Gaikwad wrote:
-> On Monday 04 February 2013 08:02 PM, Peter De Schrijver wrote:
-> > On Mon, Feb 04, 2013 at 07:06:47AM +0100, Prashant Gaikwad wrote:
-> >> On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
-> > ...
-> >
-> >>> -static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll,
-> >>> -                                void __iomem *lock_addr, u32 lock_bit_idx)
-> >>> +static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
-> >>>    {
-> >>>           int i;
-> >>> -       u32 val;
-> >>> +       u32 val, lock_bit;
-> >>> +       void __iomem *lock_addr;
-> >>>
-> >>>           if (!(pll->flags & TEGRA_PLL_USE_LOCK)) {
-> >>>                   udelay(pll->params->lock_delay);
-> >>>                   return 0;
-> >>>           }
-> >>>
-> >>> +       lock_addr = pll->clk_base + pll->params->base_reg;
-> >> This will not work for PLLE. Lock bit for PLLE is in misc register.
-> >>
-> >>> +       lock_bit = BIT(pll->params->lock_bit_idx);
-> >>> +
-> >>>           for (i = 0; i < pll->params->lock_delay; i++) {
-> >>>                   val = readl_relaxed(lock_addr);
-> >>> -               if (val & BIT(lock_bit_idx)) {
-> >>> +               if (val & lock_bit) {
-> >> Need to change the lock bit idx parameter for Tegra20 and Tegra30 PLLs
-> >> else this patch will break those.
-> >>
-> > Looking at commit 37c26a906527b8a6a252614ca83d21ad318c4e84 and commit
-> > b08e8c0ecc42afa3a2e1019851af741980dd5a6b, these fields seem correctly
-> > initialized for both Tegra20 and Tegra30? Or am I missing something?
+On Tue, Feb 05, 2013 at 01:12:11PM +0000, Arnd Bergmann wrote:
+> On Tuesday 05 February 2013, Sascha Hauer wrote:
+> > >        So think twice - or thrice - before sending me patches or a pull
+> > >        request for -rc7. You need to have some seriously good reasons for
+> > >        doing so, and you need to state those reasons very clearly. And I
+> > >        don't just mean for the pull request in general, I mean for every
+> > >        single patch in it.
+> > > ...
+> > >        In other words, "It fixes a bug" just isn't good enough. The bug needs
+> > >        to be something that actually matters.
+> > 
+> > At least 'ARM: i.MX25: clk: parent per5_clk to AHB clock' is a
+> > regression that causes nasty oopses. Admittedly, it wasn't introduced in
+> > the last merge window and the board requiring the fix needs out of tree
+> > patches.
+> > 
+> > I'm fine with these going into v3.9 and waiting for the first stable
+> > patch to get the fix for the above.
 > 
-> Ohh, I missed to read
+> My rules is usually: if it's important enough to have it backported
+> into a stable kernel, then it's also important enough to get sent
+> at any time during the bug fix phase.
 > 
-> lock_bit = BIT(pll->params->lock_bit_idx);
-> 
-> 
-> Am I missing something about PLLE lock_addr also?
-> 
+> The patch you  mentioned certainly fits that category. The other one
+> might as well, but the patch description does not actually say what
+> the impact of the bug is, so it is hard to tell.
 
-Ah no indeed... my bad. So we need a lock_addr field.
+Look at what Linus is saying.  Too much stuff went into -rc6.  He doesn't
+want that happening for -rc7.  He wants -rc7 to be really tiny, like
+almost _no_ changes.  Look at the description about what he wants to
+see: he doesn't want to see user visible regressions.  He wants to see
+_big_ user visible regressions only.
 
-Cheers,
+Also look at what he's saying wrt describing _every_ _single_ _patch_ in
+your pull request with a justification why it's there.  Can you do this
+for every patch you have planned to push?  Do you have sufficient
+information from those sending you these pull requests for fixes to v3.8
+to do that?  If not, you probably shouldn't be pulling them with a view
+to sending them to Linus (unless you wish to be flamed.)
 
-Peter.
+I certainly can't with the three patches I had queued for fixes before
+-rc6.  They may be fixing problems which cause a few platforms not to
+boot or oops at boot, but I can't justify them against what Linus has
+said.  So I'm going to wait for the next merge window and put them in
+with a stable CC.  There's more patches like that post-rc6: there's one
+which fixes an obscure problem with 'make' which occurs with 2G:2G VM
+split.  But I'm not pushing that one either because it's not a _big_
+enough problem (it's only had _one_ user report it.)  One user is not
+sufficient justification.
