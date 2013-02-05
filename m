@@ -1,46 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 Feb 2013 14:00:48 +0100
-Subject: [PATCH V2 1/6] pinctrl: pinctrl-single: use arch_initcall and
- module_exit
-In-Reply-To: <A4887BF146CD57468F700B415D2F47015828C7@DBDE01.ent.ti.com>
-References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
- <1359445134-13323-2-git-send-email-manishv.b@ti.com>
- <CACRpkdbf7TwrjfT2rhqQFGc3yh_Nt117RtzQO2y6g5Ddx5Ay_w@mail.gmail.com>
- <20130201170906.GE22517@atomide.com>
- <20130201171124.GF22517@atomide.com>
- <A4887BF146CD57468F700B415D2F47015828C7@DBDE01.ent.ti.com>
-Message-ID: <CACRpkdYUBGkRRF_nDbn5tGmtZC_Wucqxz_PjWo0xX_KbnQJ5cw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 05 Feb 2013 13:08:50 +0000
+Subject: [PATCH 1/2] spi: spi-gpio: Add checks for the dt properties
+In-Reply-To: <50FEB546.3090504@free-electrons.com>
+References: <1356645288-10110-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1356645288-10110-2-git-send-email-maxime.ripard@free-electrons.com>
+ <50ED2C2D.7030608@free-electrons.com> <50FEB546.3090504@free-electrons.com>
+Message-ID: <20130205130850.544353E0E27@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 5, 2013 at 7:36 AM, Vishwanathrao Badarkhe, Manish
-<manishv.b@ti.com> wrote:
+On Tue, 22 Jan 2013 16:50:30 +0100, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> On 09/01/2013 09:37, Maxime Ripard wrote:
+> > On 27/12/2012 22:54, Maxime Ripard wrote:
+> >> The bindings assumed that the gpios properties were always there, which
+> >> made the NO_TX and NO_RX mode not usable from device tree. Add extra
+> >> checks to make sure that the driver can work if either MOSI or MISO is
+> >> not used.
+> > 
+> > Can you give me your Acked-by on this, or do you have any comments on this?
+> 
+> Ping?
 
-> I made following changes, in order to update "dip->p" pointer with
-> correct value:
->
-> -       if (!dpi->p) {
-> +       if (IS_ERR_OR_NULL(dpi->p)) {
->                 dpi->p = devm_pinctrl_get(dev);
-> -               if (IS_ERR_OR_NULL(dpi->p)) {
-> -                       int ret = PTR_ERR(dpi->p);
-> -
-> -                       dev_dbg(dev, "no pinctrl handle\n");
-> -                       /* Only return deferrals */
-> -                       if (ret == -EPROBE_DEFER)
-> -                               return ret;
-> -                       return 0;
-> -               }
-> +               ret = PTR_ERR(dpi->p);
-> +               dev_dbg(dev, "no pinctrl handle\n");
-> +               /* Only return deferrals */
-> +               if (ret == -EPROBE_DEFER)
-> +                       return ret;
-> +               return 0;
+Mark has applied it and it is now in my tree.
 
-This is based on some old code that I wrote ages ago. Check the
-pinctrl tree or linux-next for the latest core pin grabbing code.
-Use that instead.
-
-Yours,
-Linus Walleij
+g.
