@@ -1,50 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 5 Feb 2013 09:00:27 -0800
-Subject: [PATCH 12/15] USB: gadget/freescale: disable non-multiplatform
- drivers
-In-Reply-To: <201302051627.18337.arnd@arndb.de>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <20130121184138.GB10106@arwen.pp.htv.fi>
- <20130121185716.GA26754@kroah.com>
- <201302051627.18337.arnd@arndb.de>
-Message-ID: <20130205170027.GB1081@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Feb 2013 18:00:56 +0100
+Subject: [PATCH 1/9] gpiolib: link all gpio_chips using a list
+In-Reply-To: <1359822572-26009-3-git-send-email-acourbot@nvidia.com>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+ <1359822572-26009-3-git-send-email-acourbot@nvidia.com>
+Message-ID: <CACRpkdZDtJ3AN+Pgxy9nNgVx_YYTC=7AuDC48w7kDbDAeqdufw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 04:27:18PM +0000, Arnd Bergmann wrote:
-> On Monday 21 January 2013, Greg Kroah-Hartman wrote:
-> > On Mon, Jan 21, 2013 at 08:41:38PM +0200, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Mon, Jan 21, 2013 at 05:16:05PM +0000, Arnd Bergmann wrote:
-> > > > Both the fsl_mxc gadget and the imx_udc gadget drivers fail to build
-> > > > without the mach/hardware.h file that is not available when building
-> > > > for multiplatform. Let's disable these drivers for v3.8 in combination
-> > > > with CONFIG_ARCH_MULTIPLATFORM, and fix them properly in v3.9 unless
-> > > > someone has an better solution.
-> > > > 
-> > > > Without this patch, building allyesconfig results in:
-> > > > 
-> > > > drivers/usb/gadget/fsl_mxc_udc.c:21:27: fatal error: mach/hardware.h: No such file or directory
-> > > > 
-> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > > Cc: Felipe Balbi <balbi@ti.com>
-> > > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > > Cc: linux-usb at vger.kernel.org
-> > > 
-> > > NAK, I prefer to see a real fix for the problem (which in fact is
-> > > already in my fixes branch).
-> > 
-> > I'll pull that branch now, sorry for the delay.
-> 
-> Apparently it hasn't made it into the upstream kernel yet, and it also doesn't
-> seem to be in linux-next. Maybe this got lost while you were travelling?
+On Sat, Feb 2, 2013 at 5:29 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
 
-Hm, no, I thought I got Felipe's fixes branch up into Linus's tree
-already.  Felipe, did I miss something from you?  If so, please resend
-or let me know, as I don't have anything pending on my side.
+> Add a list member to gpio_chip that allows all chips to be parsed
+> quickly. The current method requires parsing the entire GPIO integer
+> space, which is painfully slow. Using a list makes many chip operations
+> that involve lookup or parsing faster, and also simplifies the code. It
+> is also necessary to eventually get rid of the global gpio_desc[] array.
+>
+> The list of gpio_chips is always ordered by base GPIO number to ensure
+> chips traversal is done in the right order.
+>
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 
-thanks,
+OK!
 
-greg k-h
+> + * Return -EBUSY if the new chip overlaps with some other chip's integer
+> + * space.
+(...)
+> +       /* are we stepping on the chip right before? */
+> +       if (pos != &gpio_chips && pos->prev != &gpio_chips) {
+> +               _chip = list_entry(pos->prev, struct gpio_chip, list);
+> +               if (_chip->base + _chip->ngpio > chip->base) {
+> +                       dev_err(chip->dev,
+> +                              "GPIO integer space overlap, cannot add chip\n");
+> +                       err = -EBUSY;
+> +               }
+> +       }
+
+This robustness change on its own is a merit for merging the patch.
+And keeping a list of gpiochips available is great for stuff like
+debugfs.
+
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
