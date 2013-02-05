@@ -1,63 +1,110 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Feb 2013 10:45:53 +0100
-Subject: [PATCH v2] ARM i.MX25: clk: parent per5_clk to AHB clock
-In-Reply-To: <1359551760-28862-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1359551760-28862-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130205094553.GY1906@pengutronix.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 5 Feb 2013 10:46:21 +0100
+Subject: [GIT PULL] ARM: OMAP: Audio support via omap-twl4030 and pwm
+ support
+In-Reply-To: <20130204195251.GS22517@atomide.com>
+References: <50FE64DC.2030808@ti.com> <510788B9.9050907@ti.com>
+ <20130130220532.GA22517@atomide.com> <20130204195251.GS22517@atomide.com>
+Message-ID: <5110D4ED.6030306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 30, 2013 at 02:16:00PM +0100, Steffen Trumtrar wrote:
-> The mxc-timer on the imx25 needs to be derived from the AHB clock.
-> If a bootloader reparents this clock to the ipg_clk_highfreq, which according
-> to the datasheet is a valid operation, the system can/will produce lockups/
-> freezes after some time [1].
-> 
-> This can be forced with code like
-> 	while(1)
->                 syscall(SYS_clock_gettime, CLOCK_REALTIME, &tp);
-> 
-> This was already fixed with the commit
-> 	"i.MX25 GPT clock fix: ensure correct the clock source" [2],
-> for 3.1-rc2, but was lost, when i.MX was converted to the common clock framework
-> ("ARM i.MX25: implement clocks using common clock framework") [3]
-> 
-> [1]: http://lists.arm.linux.org.uk/lurker/message/20130129.161230.229bda17.en.html
-> [2]: 2012d9ca2a1381ae3e733330a7f0d1d2f1988bba
-> [3]: 6bbaec5676e4f475b0d78743cbd4c70a8804ce14
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Cc: stable at vger.kernel.org # v3.5+
+Hi Tony,
 
-Applied, thanks
+On 02/04/2013 08:52 PM, Tony Lindgren wrote:
+> Looks like this now adds some new section warnings:
+> 
+> WARNING: vmlinux.o(.text+0x34124): Section mismatch in reference from the function sdp3430_twl_gpio_setup() to the function .init.text:omap_twl4030_audio_init()
+> The function sdp3430_twl_gpio_setup() references
+> the function __init omap_twl4030_audio_init().
+> This is often because sdp3430_twl_gpio_setup lacks a __init 
+> annotation or the annotation of omap_twl4030_audio_init is wrong.
+> 
+> WARNING: vmlinux.o(.text+0x34b8c): Section mismatch in reference from the function zoom_twl_gpio_setup() to the function .init.text:omap_twl4030_audio_init()
+> The function zoom_twl_gpio_setup() references
+> the function __init omap_twl4030_audio_init().
+> This is often because zoom_twl_gpio_setup lacks a __init 
+> annotation or the annotation of omap_twl4030_audio_init is wrong.
 
-Sascha
+For some reason the CONFIG_DEBUG_SECTION_MISMATCH got disabled in my rolling
+kernel config...
 
-> ---
->  arch/arm/mach-imx/clk-imx25.c |    3 +++
->  1 file changed, 3 insertions(+)
+
+> These can be fixed with the following patch, but I suspect some
+> of these cannot be __init/__initdata if the driver reprobes.
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-> index 5d34f67..0e6dde6 100644
-> --- a/arch/arm/mach-imx/clk-imx25.c
-> +++ b/arch/arm/mach-imx/clk-imx25.c
-> @@ -177,6 +177,9 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
->  			pr_err("i.MX25 clk %d: register failed with %ld\n",
->  				i, PTR_ERR(clk[i]));
->  
-> +	/* Clock source for gpt must be derived from AHB */
-> +	clk_set_parent(clk[per5_sel], clk[ahb]);
-> +
->  	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
->  	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
->  
-> -- 
-> 1.7.10.4
-> 
-> 
+> Can you please check this? I'll hold on sendinf off
+> this branch until it's been checked and fixed properly.
+
+I think this is not the correct way. the *_twl_gpio_setup() is called from the
+gpio-twl4030 driver's platform_driver probe function which if I'm not mistaken
+is not __init.
+
+I think we should remove the __init from the omap_twl4030_audio_init() in
+twl-common.c
+With this change I do not have section mismatch either.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+P?ter
+
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+> --- a/arch/arm/mach-omap2/board-3430sdp.c
+> +++ b/arch/arm/mach-omap2/board-3430sdp.c
+> @@ -223,7 +223,7 @@ static struct omap_tw4030_pdata omap_twl4030_audio_data = {
+>  	.has_linein	= OMAP_TWL4030_LEFT | OMAP_TWL4030_RIGHT,
+>  };
+>  
+> -static int sdp3430_twl_gpio_setup(struct device *dev,
+> +static int __init sdp3430_twl_gpio_setup(struct device *dev,
+>  		unsigned gpio, unsigned ngpio)
+>  {
+>  	/* gpio + 0 is "mmc0_cd" (input/IRQ),
+> @@ -245,7 +245,7 @@ static int sdp3430_twl_gpio_setup(struct device *dev,
+>  	return 0;
+>  }
+>  
+> -static struct twl4030_gpio_platform_data sdp3430_gpio_data = {
+> +static struct twl4030_gpio_platform_data __initdata sdp3430_gpio_data = {
+>  	.pulldowns	= BIT(2) | BIT(6) | BIT(8) | BIT(13)
+>  				| BIT(16) | BIT(17),
+>  	.setup		= sdp3430_twl_gpio_setup,
+> @@ -374,7 +374,7 @@ static struct regulator_init_data sdp3430_vsim = {
+>  	.consumer_supplies	= sdp3430_vsim_supplies,
+>  };
+>  
+> -static struct twl4030_platform_data sdp3430_twldata = {
+> +static struct twl4030_platform_data __initdata sdp3430_twldata = {
+>  	/* platform_data for children goes here */
+>  	.gpio		= &sdp3430_gpio_data,
+>  	.keypad		= &sdp3430_kp_data,
+> --- a/arch/arm/mach-omap2/board-zoom-peripherals.c
+> +++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+> @@ -238,7 +238,7 @@ static struct omap_tw4030_pdata omap_twl4030_audio_data = {
+>  	.has_linein	= OMAP_TWL4030_LEFT | OMAP_TWL4030_RIGHT,
+>  };
+>  
+> -static int zoom_twl_gpio_setup(struct device *dev,
+> +static int __init zoom_twl_gpio_setup(struct device *dev,
+>  		unsigned gpio, unsigned ngpio)
+>  {
+>  	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
+> @@ -252,11 +252,11 @@ static int zoom_twl_gpio_setup(struct device *dev,
+>  	return 0;
+>  }
+>  
+> -static struct twl4030_gpio_platform_data zoom_gpio_data = {
+> +static struct twl4030_gpio_platform_data __initdata zoom_gpio_data = {
+>  	.setup		= zoom_twl_gpio_setup,
+>  };
+>  
+> -static struct twl4030_platform_data zoom_twldata = {
+> +static struct twl4030_platform_data __initdata zoom_twldata = {
+>  	/* platform_data for children goes here */
+>  	.gpio		= &zoom_gpio_data,
+>  	.keypad		= &zoom_kp_twl4030_data,
+> 
