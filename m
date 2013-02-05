@@ -1,65 +1,69 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 5 Feb 2013 20:48:21 +0100
-Subject: [PATCH 00/14] reform the ABx500 IRQ handling
-Message-ID: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 5 Feb 2013 20:48:26 +0100
+Subject: [PATCH 05/14] pinctrl/abx500: prevent error path from corrupting
+ returning error
+In-Reply-To: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
+References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1360093715-6348-6-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+From: Lee Jones <lee.jones@linaro.org>
 
-The AB8500/ABx500 PMIC ASICs have a real interesting way
-of handling GPIO interrupts. They can trigger both on rising
-and falling edge but will fire two different physical hwirqs
-for rising resp. falling edge.
+Prior to this patch abx500_gpio_probe() would return the return-value
+of gpiochip_remove() during its error patch regardless of what the
+actual failure was. So as long as gpiochip_remove() succeeded, probe()
+would look like it succeeded too.
 
-The complexity was kept in the abx500 pinctrl driver by
-heritage from the ab8500 GPIO driver. That one was however
-severely broken and this was part of the brokenness.
+This patch ensures the correct error value is returned and that
+mutex_destroy() is invoked if gpiochip_add_pin_range() were to fail.
 
-This series tries to decrease the complexity by moving
-the interrupt handling back into the AB8500 core and
-letting the ABx500 pinctrl driver rely on the irqdomain
-stored inside the mfd device.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-abx500.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-The basic design problem with the old driver was that it
-was modeling a *cascading* interrupt controller off the
-AB8500 core, whereas what we want is actually a *merging*
-interrupt controller, that will take two physical hwirqs
-and associate them with *one* Linux IRQ.
-
-The right place to handle this is in the AB8500 core.
-
-Lee Jones (13):
-  mfd: ab8500: prepare to handle AB8500 GPIO's IRQs correctly
-  mfd: ab8500: provide a irq_set_type() function
-  mfd: ab8500: ensure new AB8500 pinctrl driver is probed correctly
-  mfd: ab8500: allow AB9540 based devices to use ABX500 pinctrl
-  pinctrl/abx500: prevent error path from corrupting returning error
-  pinctrl/abx500: align GPIO cluster boundaries
-  pinctrl/abx500: move IRQ handling to ab8500-core
-  pinctrl/abx500: replace IRQ offsets with table read-in values
-  pinctrl/abx500: add Device Tree support
-  ARM: ux500: remove irq_base property from platform_data
-  ARM: ux500: use real AB8500 IRQ numbers instead of virtual ones
-  ARM: ux500: enable AB8500 GPIO for HREF
-  ARM: ux500: allow Snowball access to the AB8500 GPIO pins
-
-Linus Walleij (1):
-  pinctrl/abx500: use direct IRQ defines
-
- arch/arm/boot/dts/hrefprev60.dts                   |   8 +
- arch/arm/boot/dts/snowball.dts                     |   4 +
- arch/arm/mach-ux500/board-mop500.c                 |   1 -
- .../mach-ux500/include/mach/irqs-board-mop500.h    |  10 +-
- drivers/mfd/ab8500-core.c                          |  37 ++-
- drivers/pinctrl/pinctrl-ab8500.c                   |   6 +-
- drivers/pinctrl/pinctrl-ab8505.c                   |  10 +-
- drivers/pinctrl/pinctrl-ab8540.c                   |   5 +-
- drivers/pinctrl/pinctrl-ab9540.c                   |   8 +-
- drivers/pinctrl/pinctrl-abx500.c                   | 365 +++------------------
- drivers/pinctrl/pinctrl-abx500.h                   |  10 +-
- include/linux/mfd/abx500/ab8500-gpio.h             |   1 -
- 12 files changed, 120 insertions(+), 345 deletions(-)
-
+diff --git a/drivers/pinctrl/pinctrl-abx500.c b/drivers/pinctrl/pinctrl-abx500.c
+index 81ef515..9bdfcb9 100644
+--- a/drivers/pinctrl/pinctrl-abx500.c
++++ b/drivers/pinctrl/pinctrl-abx500.c
+@@ -1111,7 +1111,7 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+ 	struct abx500_gpio_platform_data *pdata;
+ 	struct abx500_pinctrl *pct;
+ 	const struct platform_device_id *platid = platform_get_device_id(pdev);
+-	int ret;
++	int ret, err;
+ 	int i;
+ 
+ 	pdata = abx500_pdata->gpio;
+@@ -1189,6 +1189,7 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+ 	if (!pct->pctldev) {
+ 		dev_err(&pdev->dev,
+ 			"could not register abx500 pinctrl driver\n");
++		ret = -EINVAL;
+ 		goto out_rem_chip;
+ 	}
+ 	dev_info(&pdev->dev, "registered pin controller\n");
+@@ -1201,7 +1202,7 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+ 					dev_name(&pdev->dev),
+ 					p->offset - 1, p->offset, p->npins);
+ 		if (ret < 0)
+-			return ret;
++			goto out_rem_chip;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, pct);
+@@ -1210,8 +1211,8 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ out_rem_chip:
+-	ret = gpiochip_remove(&pct->chip);
+-	if (ret)
++	err = gpiochip_remove(&pct->chip);
++	if (err)
+ 		dev_info(&pdev->dev, "failed to remove gpiochip\n");
+ out_rem_irq:
+ 	abx500_gpio_irq_remove(pct);
 -- 
 1.7.11.3
