@@ -1,36 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Feb 2013 12:30:55 +0000
-Subject: [GIT PULL] ARM: OMAP: Audio support via omap-twl4030 and pwm
- support
-In-Reply-To: <20130204195251.GS22517@atomide.com>
-References: <50FE64DC.2030808@ti.com> <510788B9.9050907@ti.com>
- <20130130220532.GA22517@atomide.com> <20130204195251.GS22517@atomide.com>
-Message-ID: <20130205123055.GA17852@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 Feb 2013 12:33:46 +0000
+Subject: [PATCH 08/13] USB: ehci-omap: Add device tree support and
+ binding information
+In-Reply-To: <1359993540-20780-9-git-send-email-rogerq@ti.com>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-9-git-send-email-rogerq@ti.com>
+Message-ID: <20130205123346.GB26842@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 11:52:51AM -0800, Tony Lindgren wrote:
-> @@ -245,7 +245,7 @@ static int sdp3430_twl_gpio_setup(struct device *dev,
->  	return 0;
->  }
->  
-> -static struct twl4030_gpio_platform_data sdp3430_gpio_data = {
-> +static struct twl4030_gpio_platform_data __initdata sdp3430_gpio_data = {
->  	.pulldowns	= BIT(2) | BIT(6) | BIT(8) | BIT(13)
->  				| BIT(16) | BIT(17),
->  	.setup		= sdp3430_twl_gpio_setup,
+On Mon, Feb 04, 2013 at 03:58:55PM +0000, Roger Quadros wrote:
+> Allows the OMAP EHCI controller to be specified via device tree.
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  .../devicetree/bindings/usb/omap-ehci.txt          |   34 ++++++++++++++++++
+>  drivers/usb/host/ehci-omap.c                       |   36 +++++++++++++++++++-
+>  2 files changed, 69 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/omap-ehci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/omap-ehci.txt b/Documentation/devicetree/bindings/usb/omap-ehci.txt
+> new file mode 100644
+> index 0000000..90e6e3a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/omap-ehci.txt
+> @@ -0,0 +1,34 @@
+> +OMAP HS USB EHCI controller
+> +
+> +This device is usually the child of the omap-usb-host
+> +Documentation/devicetree/bindings/mfd/omap-usb-host.txt
+> +
+> +Required properties:
+> +
+> +- compatible: should be "ti,omap-ehci"
+> +- reg: should contain one register range i.e. start and length
+> +- interrupt-parent: phandle to the interrupt controller
+> +- interrupts: description of the interrupt line
+> +
+> +Optional properties:
+> +
+> +- phy: list of phandles to PHY nodes.
+> +  This property is required if at least one of the ports are in
+> +  PHY mode i.e. OMAP_EHCI_PORT_MODE_PHY
 
-Seeing platform data marked with __initdata makes me extremely nervous.
-Are you _absolutely_ _sure_ that this data either:
+Any reason for not calling this "phys", given it's a list?
 
-(a) gets copied before use, or
-(b) is not used after kernel init
+[...]
 
-?
-
-Normally, platform data is passed via a pointer in struct device to
-drivers, and drivers either store a pointer to it, or if the driver is
-unbound/rebound, they can access it well after init time.
-
-Certainly marking a function pointed to by platform data as __init looks
-very very wrong.
+Thanks,
+Mark.
