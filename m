@@ -1,20 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Feb 2013 12:41:20 +0000
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <51102E25.8040107@ti.com>
-References: <20130204154153.GA18237@arwen.pp.htv.fi> <510FF1A6.403@mvista.com>
- <20130204164712.GB4269@arwen.pp.htv.fi> <510FF5C9.3030600@mvista.com>
- <20130204170216.GC4269@arwen.pp.htv.fi> <51100A72.6030909@ti.com>
- <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
- <20130204203358.GX4720@opensource.wolfsonmicro.com>
- <CACRpkdbPyZt8=pLhz-5qcaSSAk6VBn61dPTNp6teU9HksBwN2w@mail.gmail.com>
- <51102E25.8040107@ti.com>
-Message-ID: <20130205124120.GC17852@n2100.arm.linux.org.uk>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 5 Feb 2013 14:46:40 +0200
+Subject: [PATCH 08/13] USB: ehci-omap: Add device tree support and binding
+ information
+In-Reply-To: <20130205123346.GB26842@e106331-lin.cambridge.arm.com>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-9-git-send-email-rogerq@ti.com>
+ <20130205123346.GB26842@e106331-lin.cambridge.arm.com>
+Message-ID: <5110FF30.5050705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 04:54:45PM -0500, Cyril Chemparathy wrote:
-> You're assuming that cookies complete in order.  That is not necessarily  
-> true.
+On 02/05/2013 02:33 PM, Mark Rutland wrote:
+> On Mon, Feb 04, 2013 at 03:58:55PM +0000, Roger Quadros wrote:
+>> Allows the OMAP EHCI controller to be specified via device tree.
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  .../devicetree/bindings/usb/omap-ehci.txt          |   34 ++++++++++++++++++
+>>  drivers/usb/host/ehci-omap.c                       |   36 +++++++++++++++++++-
+>>  2 files changed, 69 insertions(+), 1 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/usb/omap-ehci.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/omap-ehci.txt b/Documentation/devicetree/bindings/usb/omap-ehci.txt
+>> new file mode 100644
+>> index 0000000..90e6e3a
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/usb/omap-ehci.txt
+>> @@ -0,0 +1,34 @@
+>> +OMAP HS USB EHCI controller
+>> +
+>> +This device is usually the child of the omap-usb-host
+>> +Documentation/devicetree/bindings/mfd/omap-usb-host.txt
+>> +
+>> +Required properties:
+>> +
+>> +- compatible: should be "ti,omap-ehci"
+>> +- reg: should contain one register range i.e. start and length
+>> +- interrupt-parent: phandle to the interrupt controller
+>> +- interrupts: description of the interrupt line
+>> +
+>> +Optional properties:
+>> +
+>> +- phy: list of phandles to PHY nodes.
+>> +  This property is required if at least one of the ports are in
+>> +  PHY mode i.e. OMAP_EHCI_PORT_MODE_PHY
+> 
+> Any reason for not calling this "phys", given it's a list?
+>
 
-Under what circumstances is that not true?
+No good reason. "phys" seems more appropriate. Thanks.
+
+cheers,
+-roger
