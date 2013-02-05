@@ -1,77 +1,76 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 11:20:01 +0200
-Subject: [PATCH v2 04/30] usb: phy: nop: Handle power supply regulator
- for the PHY
-In-Reply-To: <1359372631-8180-5-git-send-email-rogerq@ti.com>
+Date: Tue, 5 Feb 2013 11:22:47 +0200
+Subject: [PATCH v2 05/30] usb: phy: nop: Handle RESET for the PHY
+In-Reply-To: <1359372631-8180-6-git-send-email-rogerq@ti.com>
 References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <1359372631-8180-5-git-send-email-rogerq@ti.com>
-Message-ID: <20130205092001.GM32118@arwen.pp.htv.fi>
+ <1359372631-8180-6-git-send-email-rogerq@ti.com>
+Message-ID: <20130205092247.GN32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 01:30:05PM +0200, Roger Quadros wrote:
-> We use "vcc" as the supply name for the PHY's power supply.
-> The power supply will be enabled during .init() and disabled
-> during .shutdown()
+On Mon, Jan 28, 2013 at 01:30:06PM +0200, Roger Quadros wrote:
+> We expect the RESET line to be modeled as a regulator with supply
+> name "reset". The regulator should be modeled such that enabling
+> the regulator brings the PHY device out of RESET and disabling the
+> regulator holds the device in RESET.
+> 
+> They PHY will be held in RESET in .shutdown() and brought out of
+> RESET in .init().
 > 
 > Signed-off-by: Roger Quadros <rogerq@ti.com>
 
 Acked-by: Felipe Balbi <balbi@ti.com>
 
 > ---
->  drivers/usb/otg/nop-usb-xceiv.c |   18 ++++++++++++++++++
->  1 files changed, 18 insertions(+), 0 deletions(-)
+>  drivers/usb/otg/nop-usb-xceiv.c |   19 +++++++++++++++++++
+>  1 files changed, 19 insertions(+), 0 deletions(-)
 > 
 > diff --git a/drivers/usb/otg/nop-usb-xceiv.c b/drivers/usb/otg/nop-usb-xceiv.c
-> index 849eb9d..0a9628c 100644
+> index 0a9628c..3060ed0 100644
 > --- a/drivers/usb/otg/nop-usb-xceiv.c
 > +++ b/drivers/usb/otg/nop-usb-xceiv.c
-> @@ -33,11 +33,13 @@
->  #include <linux/usb/nop-usb-xceiv.h>
->  #include <linux/slab.h>
->  #include <linux/clk.h>
-> +#include <linux/regulator/consumer.h>
->  
->  struct nop_usb_xceiv {
->  	struct usb_phy		phy;
+> @@ -40,6 +40,7 @@ struct nop_usb_xceiv {
 >  	struct device		*dev;
 >  	struct clk		*clk;
-> +	struct regulator	*vcc;
+>  	struct regulator	*vcc;
+> +	struct regulator	*reset;
 >  };
 >  
 >  static struct platform_device *pd;
-> @@ -70,6 +72,11 @@ static int nop_init(struct usb_phy *phy)
->  {
->  	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
->  
-> +	if (!IS_ERR(nop->vcc)) {
-> +		if (regulator_enable(nop->vcc))
-> +			dev_err(phy->dev, "Failed to enable power\n");
-> +	}
-> +
+> @@ -80,6 +81,12 @@ static int nop_init(struct usb_phy *phy)
 >  	if (!IS_ERR(nop->clk))
 >  		clk_enable(nop->clk);
 >  
-> @@ -82,6 +89,11 @@ static void nop_shutdown(struct usb_phy *phy)
->  
->  	if (!IS_ERR(nop->clk))
->  		clk_disable(nop->clk);
-> +
-> +	if (!IS_ERR(nop->vcc)) {
-> +		if (regulator_disable(nop->vcc))
-> +			dev_err(phy->dev, "Failed to disable power\n");
+> +	if (!IS_ERR(nop->reset)) {
+> +		/* De-assert RESET */
+> +		if (regulator_enable(nop->reset))
+> +			dev_err(phy->dev, "Failed to de-assert reset\n");
 > +	}
+> +
+>  	return 0;
 >  }
 >  
->  static int nop_set_peripheral(struct usb_otg *otg, struct usb_gadget *gadget)
-> @@ -153,6 +165,12 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
->  		}
+> @@ -87,6 +94,12 @@ static void nop_shutdown(struct usb_phy *phy)
+>  {
+>  	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
+>  
+> +	if (!IS_ERR(nop->reset)) {
+> +		/* Assert RESET */
+> +		if (regulator_disable(nop->reset))
+> +			dev_err(phy->dev, "Failed to assert reset\n");
+> +	}
+> +
+>  	if (!IS_ERR(nop->clk))
+>  		clk_disable(nop->clk);
+>  
+> @@ -171,6 +184,12 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
+>  					PTR_ERR(nop->vcc));
 >  	}
 >  
-> +	nop->vcc = devm_regulator_get(&pdev->dev, "vcc");
-> +	if (IS_ERR(nop->vcc)) {
-> +		dev_dbg(&pdev->dev, "Error getting vcc regulator: %ld\n",
-> +					PTR_ERR(nop->vcc));
+> +	nop->reset = devm_regulator_get(&pdev->dev, "reset");
+> +	if (IS_ERR(nop->reset)) {
+> +		dev_dbg(&pdev->dev, "Error getting reset regulator: %ld\n",
+> +					PTR_ERR(nop->reset));
 > +	}
 > +
 >  	nop->dev		= &pdev->dev;
@@ -89,4 +88,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/65a72c17/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/c1be955c/attachment.sig>
