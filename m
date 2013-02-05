@@ -1,105 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Feb 2013 10:40:15 -0800
-Subject: [GIT PULL] ARM: OMAP: Audio support via omap-twl4030 and pwm
- support
-In-Reply-To: <5110D4ED.6030306@ti.com>
-References: <50FE64DC.2030808@ti.com> <510788B9.9050907@ti.com>
- <20130130220532.GA22517@atomide.com>
- <20130204195251.GS22517@atomide.com> <5110D4ED.6030306@ti.com>
-Message-ID: <20130205184014.GK25185@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 5 Feb 2013 10:44:19 -0800
+Subject: [GIT PULL] i.MX clock fixes for v3.8
+In-Reply-To: <20130205132759.GA17833@n2100.arm.linux.org.uk>
+References: <20130205095844.GZ1906@pengutronix.de>
+ <20130205110804.GI17786@n2100.arm.linux.org.uk>
+ <20130205112558.GA1906@pengutronix.de>
+ <201302051312.11434.arnd@arndb.de>
+ <20130205132759.GA17833@n2100.arm.linux.org.uk>
+Message-ID: <20130205184419.GA21776@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [130205 01:49]:
-> Hi Tony,
-> 
-> On 02/04/2013 08:52 PM, Tony Lindgren wrote:
-> > Looks like this now adds some new section warnings:
+On Tue, Feb 05, 2013 at 01:27:59PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 05, 2013 at 01:12:11PM +0000, Arnd Bergmann wrote:
+> > On Tuesday 05 February 2013, Sascha Hauer wrote:
+> > > >        So think twice - or thrice - before sending me patches or a pull
+> > > >        request for -rc7. You need to have some seriously good reasons for
+> > > >        doing so, and you need to state those reasons very clearly. And I
+> > > >        don't just mean for the pull request in general, I mean for every
+> > > >        single patch in it.
+> > > > ...
+> > > >        In other words, "It fixes a bug" just isn't good enough. The bug needs
+> > > >        to be something that actually matters.
+> > > 
+> > > At least 'ARM: i.MX25: clk: parent per5_clk to AHB clock' is a
+> > > regression that causes nasty oopses. Admittedly, it wasn't introduced in
+> > > the last merge window and the board requiring the fix needs out of tree
+> > > patches.
+> > > 
+> > > I'm fine with these going into v3.9 and waiting for the first stable
+> > > patch to get the fix for the above.
 > > 
-> > WARNING: vmlinux.o(.text+0x34124): Section mismatch in reference from the function sdp3430_twl_gpio_setup() to the function .init.text:omap_twl4030_audio_init()
-> > The function sdp3430_twl_gpio_setup() references
-> > the function __init omap_twl4030_audio_init().
-> > This is often because sdp3430_twl_gpio_setup lacks a __init 
-> > annotation or the annotation of omap_twl4030_audio_init is wrong.
+> > My rules is usually: if it's important enough to have it backported
+> > into a stable kernel, then it's also important enough to get sent
+> > at any time during the bug fix phase.
 > > 
-> > WARNING: vmlinux.o(.text+0x34b8c): Section mismatch in reference from the function zoom_twl_gpio_setup() to the function .init.text:omap_twl4030_audio_init()
-> > The function zoom_twl_gpio_setup() references
-> > the function __init omap_twl4030_audio_init().
-> > This is often because zoom_twl_gpio_setup lacks a __init 
-> > annotation or the annotation of omap_twl4030_audio_init is wrong.
+> > The patch you  mentioned certainly fits that category. The other one
+> > might as well, but the patch description does not actually say what
+> > the impact of the bug is, so it is hard to tell.
 > 
-> For some reason the CONFIG_DEBUG_SECTION_MISMATCH got disabled in my rolling
-> kernel config...
-
-At least gcc version 4.3.5 (Debian 4.3.5-4) shows them. What's
-the compiler you have? 
- 
-> > These can be fixed with the following patch, but I suspect some
-> > of these cannot be __init/__initdata if the driver reprobes.
-> > 
-> > Can you please check this? I'll hold on sendinf off
-> > this branch until it's been checked and fixed properly.
+> Look at what Linus is saying.  Too much stuff went into -rc6.  He doesn't
+> want that happening for -rc7.  He wants -rc7 to be really tiny, like
+> almost _no_ changes.  Look at the description about what he wants to
+> see: he doesn't want to see user visible regressions.  He wants to see
+> _big_ user visible regressions only.
 > 
-> I think this is not the correct way. the *_twl_gpio_setup() is called from the
-> gpio-twl4030 driver's platform_driver probe function which if I'm not mistaken
-> is not __init.
+> Also look at what he's saying wrt describing _every_ _single_ _patch_ in
+> your pull request with a justification why it's there.  Can you do this
+> for every patch you have planned to push?  Do you have sufficient
+> information from those sending you these pull requests for fixes to v3.8
+> to do that?  If not, you probably shouldn't be pulling them with a view
+> to sending them to Linus (unless you wish to be flamed.)
 > 
-> I think we should remove the __init from the omap_twl4030_audio_init() in
-> twl-common.c
-> With this change I do not have section mismatch either.
+> I certainly can't with the three patches I had queued for fixes before
+> -rc6.  They may be fixing problems which cause a few platforms not to
+> boot or oops at boot, but I can't justify them against what Linus has
+> said.  So I'm going to wait for the next merge window and put them in
+> with a stable CC.  There's more patches like that post-rc6: there's one
+> which fixes an obscure problem with 'make' which occurs with 2G:2G VM
+> split.  But I'm not pushing that one either because it's not a _big_
+> enough problem (it's only had _one_ user report it.)  One user is not
+> sufficient justification.
 
-Yes let's do that rather than start copying things around. I'll apply
-the following fix to the omap-for-v3.9/twl branch.
+Yeah, I was just looking at my queue here (and then came upon this thread).
+>From what we have queued up right now in arm-soc fixes, I don't see anything
+that _truly_ needs to go in for 3.8.
 
-Regards,
+If someone feels differently, let me know (with a very solid motivation) and
+I will consider sending it up. But right now I am likely going to fold the
+'fixes' branch into 'fixes-non-critical' for 3.9 instead.
 
-Tony
 
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 5 Feb 2013 10:36:21 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix twl section warnings related to omap_twl4030_audio_init
-
-With the recent twl related changes we can now get:
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0x15f88): Section mismatch in
-reference from the function sdp3430_twl_gpio_setup() to the function
-.init.text:omap_twl4030_audio_init()
-The function sdp3430_twl_gpio_setup() references
-the function __init omap_twl4030_audio_init().
-This is often because sdp3430_twl_gpio_setup lacks a __init
-annotation or the annotation of omap_twl4030_audio_init is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0x16968): Section mismatch in
-reference from the function zoom_twl_gpio_setup() to the function
-.init.text:omap_twl4030_audio_init()
-The function zoom_twl_gpio_setup() references
-the function __init omap_twl4030_audio_init().
-This is often because zoom_twl_gpio_setup lacks a __init
-annotation or the annotation of omap_twl4030_audio_init is wrong.
-
-Fix this by removing __init from omap_twl4030_audio_init() as
-suggested by Peter Ujfalusi <peter.ujfalusi@ti.com>.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -536,7 +536,7 @@ static struct platform_device audio_device = {
- 	.id		= -1,
- };
- 
--void __init omap_twl4030_audio_init(char *card_name,
-+void omap_twl4030_audio_init(char *card_name,
- 				    struct omap_tw4030_pdata *pdata)
- {
- 	if (!pdata)
-@@ -549,7 +549,7 @@ void __init omap_twl4030_audio_init(char *card_name,
- }
- 
- #else /* SOC_OMAP_TWL4030 */
--void __init omap_twl4030_audio_init(char *card_name,
-+void omap_twl4030_audio_init(char *card_name,
- 				    struct omap_tw4030_pdata *pdata)
- {
- 	return;
+-Olof
