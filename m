@@ -1,60 +1,100 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 Feb 2013 19:29:53 +0100
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130205164705.GG4720@opensource.wolfsonmicro.com>
-References: <20130201213003.GW2637@n2100.arm.linux.org.uk>
- <20130204154153.GA18237@arwen.pp.htv.fi> <510FF1A6.403@mvista.com>
- <20130204164712.GB4269@arwen.pp.htv.fi>
- <510FF5C9.3030600@mvista.com>
- <20130204170216.GC4269@arwen.pp.htv.fi> <51100A72.6030909@ti.com>
- <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
- <5110369B.9060901@ti.com>
- <CACRpkda8xBB35CwuBH76xXcC341TeRs1ZuwzDD0LtuXc4ifQTw@mail.gmail.com>
- <20130205164705.GG4720@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdbeoMO1rjPiWDAuVL0uYwMGF+9-vCxqoMiMd1uAgZm=RQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 5 Feb 2013 13:30:50 -0500
+Subject: [GIT PULL  3/4] ARM: mvebu: boards for v3.9
+In-Reply-To: <20130205182333.GA21051@quad.lixom.net>
+References: <pull-1359733919-342140> <1359733919.c3D01c3.22262@triton>
+ <20130205071010.GD13049@quad.lixom.net>
+ <20130205112104.GP14746@titan.lakedaemon.net>
+ <20130205182333.GA21051@quad.lixom.net>
+Message-ID: <20130205183050.GZ14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 5, 2013 at 5:47 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Feb 05, 2013 at 05:21:48PM +0100, Linus Walleij wrote:
->
->> For IRQ mode, use the completion callback to push each cookie
->> to NAPI, and thus let the IRQ drive the traffic.
->
-> The whole purpose of NAPI is to avoid taking interrupts for completion
-> of transfers.  Anything that generates interrupts when NAPI is in
-> polling mode is defeating the point.
+On Tue, Feb 05, 2013 at 10:23:33AM -0800, Olof Johansson wrote:
+> On Tue, Feb 05, 2013 at 06:21:04AM -0500, Jason Cooper wrote:
+> > On Mon, Feb 04, 2013 at 11:10:10PM -0800, Olof Johansson wrote:
+> > > Hi,
+> > > 
+> > > On Fri, Feb 01, 2013 at 03:51:59PM +0000, Jason Cooper wrote:
+> > > > The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+> > > > 
+> > > >   Linux 3.8-rc5
+> > > > 
+> > > > are available in the git repository at:
+> > > > 
+> > > >   git://git.infradead.org/users/jcooper/linux.git tags/boards_for_v3.9
+> > > > 
+> > > > for you to fetch changes up to c7064904895f69b2e33117b450a05746f75abf3a:
+> > > > 
+> > > >   ARM: kirkwood: convert Guruplug Server Plus to use the device tree
+> > > > 
+> > > > ----------------------------------------------------------------
+> > > > mvebu boards for v3.9
+> > > >      - Guruplug Server Plus DT board
+> > > >      - RD-A370-A1 board
+> > > >      - mvebu improved SMP support in interrupt controller
+> > > >      - update defconfigs
+> > > >      - split legacy and DT setup for dove
+> > > >      - remove some redundant clock aliases
+> > > >     
+> > > >     depends on:
+> > > >      - tags/mvebu_fixes_for_v3.8-rc6
+> > > >      - tags/cleanup_for_v3.9_round2
+> > > >      - tags/drivers_for_v3.9
+> > > >      - mmc/mmc-next up to:
+> > > >         d293875 mmc: mvsdio: add pinctrl integration
+> > > 
+> > > Hm. What do you need the mmc branch for? Is it just the removal of the
+> > > redundant SDIO clock alias?
+> > 
+> > No, it's the four patches of Thomas' to the mvsdio driver:
+> > 
+> > d293875 mmc: mvsdio: add pinctrl integration
+> > 182ce21 mmc: mvsdio: implement a Device Tree binding
+> > aa3738e mmc: mvsdio: use slot-gpio for card detect gpio
+> > 9d8b28e5 mmc: mvsdio: use slot-gpio infrastructure for write protect gpio
+> > 
+> > which mvebu/boards needs before we can activate defconfig options.
+> 
+> Yeah, those are the patches you need to bring in. What I was wondering is why
+> you need to bring them in? If it's just for defconfig updates and a couple of
+> tiny cleanups, then I would say it's not worth the overhead of adding the
+> dependency branch to do those -- defconfig updates can go in anyway and the
+> cleanups can happen in the next release.
 
-So what I was trying to get across is that when you're in polling
-mode you do not set DMA_PREP_INTERRUPT on your transfers,
-just throw the obtained struct dma_async_tx_descriptor on some
-list and then when polling use dma_async_is_tx_complete()
-on the channel and the cookie inside the descriptor.
+Well, I brought them in to mvebu/boards because of defconfig, but I
+need them in mvebu/dt (which depends on mvebu/boards) because we remove
+the legacy mvsdio init calls, and add the mvsdio dt blocks to the dts
+files.
 
-I was trying to describe that you can move from
-IRQ mode to polling mode and back again by selectively
-choosing to set/not set the DMA_PREP_INTERRUPT flag.
+Would you prefer I put all the defconfig changes into /dt since it's at
+the end of the dependency chain?
 
-If polling is all you want you never set it.
+> > > Also, it's really hard to tell where code came from when you just merge in
+> > > a hash like below:
+> > > 
+> > > > Jason Cooper (4):
+> > > >       Merge tag 'tags/mvebu_fixes_for_v3.8-rc6' into mvebu/boards
+> > > >       Merge tag 'tags/cleanup_for_v3.9_round2' into mvebu/boards
+> > > >       Merge tag 'tags/drivers_for_v3.9' into mvebu/boards
+> > > >       Merge commit 'd293875' into mvebu/boards
+> > > 
+> > > That's the mmc-next branch at that commit, but it'd be nice to have a
+> > > more descriptive summary in the shortlog.
+> > 
+> > Agreed, I started doing this after the first time I pulled in pinctrl as
+> > a dependency.  LinusW recommended pulling just up to the commit needed
+> > so that if he did have to do a rebase, the closer it was to the tip of
+> > his tree, the fewer people it would affect.
+> > 
+> > Would this be better?
+> > 
+> > "Merge mmc/mmc-next up to 'd293875' into mvebu/boards"
+> 
+> Yeah, that would have been better (but see above).
 
-Then there is the fact that the transfer needs to have
-been flagged complete and it is indeed something that needs
-to be set in some bytes somewhere. By something. But it
-doesn't have to be an interrupt from the DMA controller.
+Ok, I'll do that in the future.
 
-In such cases we use dma_async_is_tx_complete() with
-channel and cookies as parameter. This will call down into the
-driver chan->device->device_tx_status() and there we can
-actually poll the hardware to see if the transfer happens to
-be complete, and if it is flag it complete.
+thx,
 
-Which is likely what we want.
-
-No interrupts, only function calls as far as I can see.
-
-(I bet Russell will poke a hole in my reasoning, but it's worth
-a try.)
-
-Yours,
-Linus Walleij
+Jason.
