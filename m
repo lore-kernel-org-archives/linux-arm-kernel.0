@@ -1,64 +1,62 @@
-From: Frank.Li@freescale.com (Frank Li)
-Date: Tue, 5 Feb 2013 14:26:17 +0800
-Subject: [PATCH v2 2/2 net-next] net: fec: fix spin_lock dead lock
-In-Reply-To: <1360045577-6266-1-git-send-email-Frank.Li@freescale.com>
-References: <1360045577-6266-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1360045577-6266-2-git-send-email-Frank.Li@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 4 Feb 2013 23:10:10 -0800
+Subject: [GIT PULL  3/4] ARM: mvebu: boards for v3.9
+In-Reply-To: <1359733919.c3D01c3.22262@triton>
+References: <pull-1359733919-342140>
+ <1359733919.c3D01c3.22262@triton>
+Message-ID: <20130205071010.GD13049@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-=========================================================
-[ INFO: possible irq lock inversion dependency detected ]
-3.8.0-rc5+ #82 Not tainted
----------------------------------------------------------
-swapper/0/0 just changed the state of lock:
- (&(&fep->hw_lock)->rlock){..-...}, at: [<8034e2f8>] fec_enet_start_xmit+0x48/0x                      2cc
-but this lock took another, SOFTIRQ-unsafe lock in the past:
-(prepare_lock){+.+.+.}
+Hi,
 
-and interrupts could create inverse lock ordering between them.
-other info that might help us debug this:
-Possible interrupt unsafe locking scenario:
+On Fri, Feb 01, 2013 at 03:51:59PM +0000, Jason Cooper wrote:
+> The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+> 
+>   Linux 3.8-rc5
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/boards_for_v3.9
+> 
+> for you to fetch changes up to c7064904895f69b2e33117b450a05746f75abf3a:
+> 
+>   ARM: kirkwood: convert Guruplug Server Plus to use the device tree
+> 
+> ----------------------------------------------------------------
+> mvebu boards for v3.9
+>      - Guruplug Server Plus DT board
+>      - RD-A370-A1 board
+>      - mvebu improved SMP support in interrupt controller
+>      - update defconfigs
+>      - split legacy and DT setup for dove
+>      - remove some redundant clock aliases
+>     
+>     depends on:
+>      - tags/mvebu_fixes_for_v3.8-rc6
+>      - tags/cleanup_for_v3.9_round2
+>      - tags/drivers_for_v3.9
+>      - mmc/mmc-next up to:
+>         d293875 mmc: mvsdio: add pinctrl integration
 
-CPU0				CPU1
-----				----
-lock(prepare_lock);
-				local_irq_disable()
-				lock(&(&fep->hw_lock)->rlock);
-				lock(prepare_lock);
-<Interrupt>
-lock(&(&fep->hw_lock)->rlock);
+Hm. What do you need the mmc branch for? Is it just the removal of the
+redundant SDIO clock alias?
 
-*** DEADLOCK ***
+If so, I'd say let's keep that as a cleanup until 3.10 instead of bringing this
+in as a dependency. If it's something more substantial than that, then let me
+know and we'll still pull this in.
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- * fix new problem report by Jim
+Also, it's really hard to tell where code came from when you just merge in
+a hash like below:
 
- drivers/net/ethernet/freescale/fec_ptp.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+> Jason Cooper (4):
+>       Merge tag 'tags/mvebu_fixes_for_v3.8-rc6' into mvebu/boards
+>       Merge tag 'tags/cleanup_for_v3.9_round2' into mvebu/boards
+>       Merge tag 'tags/drivers_for_v3.9' into mvebu/boards
+>       Merge commit 'd293875' into mvebu/boards
 
-diff --git a/drivers/net/ethernet/freescale/fec_ptp.c b/drivers/net/ethernet/freescale/fec_ptp.c
-index c40526c..1f17ca0 100644
---- a/drivers/net/ethernet/freescale/fec_ptp.c
-+++ b/drivers/net/ethernet/freescale/fec_ptp.c
-@@ -104,7 +104,7 @@ void fec_ptp_start_cyclecounter(struct net_device *ndev)
- 	unsigned long flags;
- 	int inc;
- 
--	inc = 1000000000 / clk_get_rate(fep->clk_ptp);
-+	inc = 1000000000 / fep->cycle_speed;
- 
- 	/* grab the ptp lock */
- 	spin_lock_irqsave(&fep->tmreg_lock, flags);
-@@ -363,6 +363,8 @@ void fec_ptp_init(struct net_device *ndev, struct platform_device *pdev)
- 	fep->ptp_caps.settime = fec_ptp_settime;
- 	fep->ptp_caps.enable = fec_ptp_enable;
- 
-+	fep->cycle_speed = clk_get_rate(fep->clk_ptp);
-+
- 	spin_lock_init(&fep->tmreg_lock);
- 
- 	fec_ptp_start_cyclecounter(ndev);
--- 
-1.7.1
+That's the mmc-next branch at that commit, but it'd be nice to have a
+more descriptive summary in the shortlog.
+
+
+-Olof
