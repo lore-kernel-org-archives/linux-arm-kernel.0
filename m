@@ -1,63 +1,78 @@
-From: b13634@freescale.com (Gary Zhang)
-Date: Tue, 5 Feb 2013 09:37:58 +0800
-Subject: [PATCH V2 2/2] ARM: imx: set CKO1 parent clock source in imx6q sabresd
-Message-ID: <1360028278-25856-1-git-send-email-b13634@freescale.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Tue, 5 Feb 2013 10:40:03 +0800
+Subject: [PATCH 1/1] net: fec: fix miss init spinlock
+In-Reply-To: <kepftg$f3c$1@ger.gmane.org>
+References: <1359708986-23634-1-git-send-email-Frank.Li@freescale.com>
+ <kepftg$f3c$1@ger.gmane.org>
+Message-ID: <CAHrpEqQMZNmzRrNQK60hokR2r5S=U65YdC-5h6aHHHzAVdEWKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-in imx6q sabresd board, set ahb as CKO1 parent clock sourrce
+2013/2/5 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>:
+> On Fri, 01 Feb 2013 16:56:26 +0800, Frank Li wrote:
+>
+>> BUG: spinlock bad magic on CPU#1, swapper/0/1 lock: 0xbfae0f8c, .magic:
+>> 00000000, .owner: <none>/-1, .owner_cpu: 0 Backtrace:
+>>  [<80011d54>] (dump_backtrace+0x0/0x10c) from [<804e7800>]
+>>  (dump_stack+0x18/0x1c)
+>>  r6:bfae0000 r5:bfae0f8c r4:00000000 r3:806c1310 [<804e77e8>]
+>>  (dump_stack+0x0/0x1c) from [<804e9f20>] (spin_dump+0x80/0x94)
+>>  [<804e9ea0>] (spin_dump+0x0/0x94) from [<804e9f60>]
+>>  (spin_bug+0x2c/0x30)
+>>  r5:805f6f8c r4:bfae0f8c [<804e9f34>] (spin_bug+0x0/0x30) from
+>>  [<80257984>] (do_raw_spin_lock+0x170/0x1b0
+>>             )
+>>  r5:806b4950 r4:bfae0f8c [<80257814>] (do_raw_spin_lock+0x0/0x1b0) from
+>>  [<804ed15c>] (_raw_spin_lock_irqs
+>>    ave+0x18/0x20) [<804ed144>] (_raw_spin_lock_irqsave+0x0/0x20) from
+>>  [<8033c694>] (fec_ptp_start_
+>>  cyclecounter+0x3c/0x120)
+>>  r4:bfae0f8c r3:00000002 [<8033c658>]
+>>  (fec_ptp_start_cyclecounter+0x0/0x120) from [<80339e08>] (fec_resta
+>>                                      rt+0x56c/0x5f8) r8:00000000
+>>  r7:806e6f48 r6:00000112 r5:806b4950 r4:bfae0000 [<8033989c>]
+>>  (fec_restart+0x0/0x5f8) from [<8033b9e4>] (fec_probe+0x508/0xa48)
+>>
+>> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+>> ---
+>>  drivers/net/ethernet/freescale/fec.c |    1 +
+>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/freescale/fec.c
+>> b/drivers/net/ethernet/freescale/fec.c index 69b16b9..f900ae4 100644 ---
+>> a/drivers/net/ethernet/freescale/fec.c +++
+>> b/drivers/net/ethernet/freescale/fec.c @@ -1607,6 +1607,7 @@ static int
+>> fec_enet_init(struct net_device *ndev)
+>>       }
+>>
+>>       spin_lock_init(&fep->hw_lock);
+>> +     spin_lock_init(&fep->tmreg_lock);
+>>
+>>       fep->netdev = ndev;
+>
+> Please excuse me, if I'm wrong. I would consider this as a very wrong
+> solution:
+>
+> First, then the spin lock is initialised twice (first time in
+> fec_enet_init(), second time in fec_ptp_init()).
+>
+> Then this patch actually hides the fact that PTP part of fec
+> is accessed from fec_ptp_start_cyclecounter() way before
+> than fec_ptp_init() is called to initialize PTP).
+>
+> In my opinion the right patch should either move fec_ptp_init() call
+> before fec_restart(), or make fec_restart intelelctual about calling
+> fec_ptp_init()/fec_ptp_startcyclecounter() at proper time.
 
-Signed-off-by: Gary Zhang <b13634@freescale.com>
----
- arch/arm/mach-imx/mach-imx6q.c |   14 +++++++++++---
- 1 files changed, 11 insertions(+), 3 deletions(-)
+Yes, you are right.
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 4eb1b3a..82c67de 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -119,7 +119,7 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- 	return 0;
- }
- 
--static void __init imx6q_sabrelite_cko1_setup(void)
-+static void __init cko1_setup(unsigned long freq)
- {
- 	struct clk *cko1_sel, *ahb, *cko1;
- 	unsigned long rate;
-@@ -132,8 +132,9 @@ static void __init imx6q_sabrelite_cko1_setup(void)
- 		goto put_clk;
- 	}
- 	clk_set_parent(cko1_sel, ahb);
--	rate = clk_round_rate(cko1, 16000000);
-+	rate = clk_round_rate(cko1, freq);
- 	clk_set_rate(cko1, rate);
-+
- put_clk:
- 	if (!IS_ERR(cko1_sel))
- 		clk_put(cko1_sel);
-@@ -148,7 +149,12 @@ static void __init imx6q_sabrelite_init(void)
- 	if (IS_BUILTIN(CONFIG_PHYLIB))
- 		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
- 				ksz9021rn_phy_fixup);
--	imx6q_sabrelite_cko1_setup();
-+	cko1_setup(16000000);
-+}
-+
-+static void __init imx6q_sabresd_init(void)
-+{
-+	cko1_setup(24000000);
- }
- 
- static void __init imx6q_1588_init(void)
-@@ -193,6 +199,8 @@ static void __init imx6q_init_machine(void)
- {
- 	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
- 		imx6q_sabrelite_init();
-+	else if (of_machine_is_compatible("fsl,imx6q-sabresd"))
-+		imx6q_sabresd_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
--- 
-1.7.0.4
+>
+> --
+> With best wishes
+> Dmitry
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
