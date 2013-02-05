@@ -1,53 +1,28 @@
-From: kishon@ti.com (kishon)
-Date: Tue, 5 Feb 2013 11:54:56 +0530
-Subject: [PATCH 10/13] ARM: dts: OMAP4: Add HS USB Host IP nodes
-In-Reply-To: <1359993540-20780-11-git-send-email-rogerq@ti.com>
-References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
- <1359993540-20780-11-git-send-email-rogerq@ti.com>
-Message-ID: <5110A5B8.3030803@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 4 Feb 2013 22:25:34 -0800
+Subject: [GIT PULL] imx6q cpuidle for 3.9
+In-Reply-To: <20130205020344.GA11039@S2101-09.ap.freescale.net>
+References: <20130129054635.GA21504@S2101-09.ap.freescale.net>
+ <20130129175028.GC17935@quad.lixom.net>
+ <20130130131920.GD2757@S2101-09.ap.freescale.net>
+ <20130205020344.GA11039@S2101-09.ap.freescale.net>
+Message-ID: <20130205062534.GB13049@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 February 2013 09:28 PM, Roger Quadros wrote:
-> Adds device nodes for HS USB Host module, TLL module,
-> OHCI and EHCI controllers.
->
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->   arch/arm/boot/dts/omap4.dtsi |   30 ++++++++++++++++++++++++++++++
->   1 files changed, 30 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 739bb79..3429280 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -529,5 +529,35 @@
->   			ti,hwmods = "timer11";
->   			ti,timer-pwm;
->   		};
-> +
-> +		usbhstll: usbhstll at 0x4a062000 {
-> +			compatible = "ti,usbhs-tll";
-> +			reg = <0x4a062000 0x1000>;
-> +			interrupts = <0 78 0x4>;
-> +			ti,hwmods = "usb_tll_hs";
-> +		};
-> +
-> +		usbhshost: usbhshost at 0x4a064000 {
-> +			compatible = "ti,usbhs-host";
-> +			reg = <0x4a064000 0x800>;
-> +			ti,hwmods = "usb_host_hs";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			usbhsohci: ohci at 0x4a064800 {
-> +				compatible = "ti,omap3-ohci", "usb-ohci";
-> +				reg = <0x4a064800 0x400>;
-> +				interrupt-parent = <&gic>;
+On Tue, Feb 05, 2013 at 10:03:47AM +0800, Shawn Guo wrote:
+> On Wed, Jan 30, 2013 at 09:19:22PM +0800, Shawn Guo wrote:
+> > On Tue, Jan 29, 2013 at 09:50:28AM -0800, Olof Johansson wrote:
+> > > This has some small conflicts with the cleanup branch. Can you please base it
+> > > on top of cleanup so we can avoid the merge conflicts when things go upstream?
+> > > It's common to have the per-soc cleanup branches as bases for some of the
+> > > feature branches just for this reason.
+> > > 
+> > Ok, done as below.
+> > 
+> Ping?
 
-Just curious.. Were you facing issues if you are not having 
-interrupt-parent here? It's also missing in your dt node usbhstll.
+Yeah, sorry -- pulled now as imx/cpuidle, included in next/soc.
 
-Thanks
-Kishon
+
+-Olof
