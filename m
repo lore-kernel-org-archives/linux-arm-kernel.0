@@ -1,46 +1,94 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Feb 2013 10:58:44 +0100
-Subject: [GIT PULL] i.MX clock fixes for v3.8
-Message-ID: <20130205095844.GZ1906@pengutronix.de>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 5 Feb 2013 10:00:27 +0000
+Subject: [PATCH 2/3] mmc: davinci_mmc: add DT support
+In-Reply-To: <20130204140616.GB28464@e106331-lin.cambridge.arm.com>
+References: <1359628387-14437-1-git-send-email-prakash.pm@ti.com>
+ <1359628387-14437-3-git-send-email-prakash.pm@ti.com>
+ <20130131112303.GA7235@e106331-lin.cambridge.arm.com>
+ <A73F36158E33644199EB82C5EC81C7BC3EA46049@DBDE01.ent.ti.com>
+ <20130204140616.GB28464@e106331-lin.cambridge.arm.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA4618E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Mark,
 
-Please pull these two fixes for v3.8
+On Mon, Feb 04, 2013 at 19:36:16, Mark Rutland wrote:
+> Hi,
+> 
+> On Mon, Feb 04, 2013 at 01:28:14PM +0000, Manjunathappa, Prakash wrote:
+> > Hi Mark,
+> > 
+> > On Thu, Jan 31, 2013 at 16:53:03, Mark Rutland wrote:
+> > > Hello,
+> > >
+> > > I have a few comments on the devicetree binding and the way it's parsed.
+> > >
+> > 
+> > Thanks for review.
+> > 
+> > > On Thu, Jan 31, 2013 at 10:33:06AM +0000, Manjunathappa, Prakash wrote:
+> 
+> [...]
+[...]
+> [...]
+> 
+> > > > @@ -1156,16 +1157,75 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
+> > > >
+> > > >     mmc_davinci_reset_ctrl(host, 0);
+> > > >  }
+> > > > +#ifdef CONFIG_OF
+> > > > +static struct davinci_mmc_config
+> > > > +   *mmc_of_get_pdata(struct platform_device *pdev)
+> > > > +{
+> > > > +   struct device_node *np;
+> > > > +   struct davinci_mmc_config *pdata = NULL;
+> > > > +   u32 data;
+> > > > +   int ret;
+> > > > +
+> > > > +   pdata = pdev->dev.platform_data;
+> > > > +   if (!pdata) {
+> > > > +           pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> > > > +           if (!pdata) {
+> > > > +                   dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
+> > > > +                   goto nodata;
+> > > > +           }
+> > > > +   }
+> > >
+> > > Why do you need to conditionally allocate this? This only seems to be called
+> > > once.
+> > >
+> > 
+> > This is common function for DT and non-DT kernel(will be removing #ifdef CONFIG_OF),
+> > So above check is necessary for to allocate pdata for DT kernel.
+> 
+> Ah. Am I right in thinking if you moved the check for pdev->dev.of_node above
+> the pdata allocation, it wouldn't have to be done conditionally?
+> 
 
-Sascha
+Agreed. Will move below check up.
 
-The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+> > 
+> > > > +
+> > > > +   np = pdev->dev.of_node;
+> > > > +   if (!np)
+> > > > +           goto nodata;
+> > >
+> > > Why not just return immediately here? You do nothing special at nodata.
+> > >
+> > 
+> > Following convention to not have more than 1 return from function and have
+> > Common exit point. May not be necessary now since we have devm_* calls now.
+> > Can I still prefer to keep this goto?
+> 
+> It just looks a little odd to me. I have no strong feelings here.
+> 
+> [...]
+> 
 
-  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+After considering your inputs on moving above statement up, "return" makes sense.
 
-are available in the git repository at:
+Thanks,
+Prakash
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/arm-imx-clk-fixes
-
-for you to fetch changes up to 4b526ca5f627188425184a22ed46c91baa602d43:
-
-  ARM: i.MX25: clk: parent per5_clk to AHB clock (2013-02-05 10:54:35 +0100)
-
-----------------------------------------------------------------
-ARM: i.MX: clock fixes
-
-- fix wrong timer clock on i.MX25 leading to strange timing inconsistencies
-- fix SPI clocks for i.MX27
-
-----------------------------------------------------------------
-Gwenhael Goavec-Merou (1):
-      ARM: imx27: clk-imx27: SPI: Rename IPG clock and add PER clock
-
-Steffen Trumtrar (1):
-      ARM: i.MX25: clk: parent per5_clk to AHB clock
-
- arch/arm/mach-imx/clk-imx25.c |    3 +++
- arch/arm/mach-imx/clk-imx27.c |    9 ++++++---
- 2 files changed, 9 insertions(+), 3 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+[...]
