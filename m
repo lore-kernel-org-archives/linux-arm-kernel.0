@@ -1,178 +1,62 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 5 Feb 2013 20:51:26 +0100
-Subject: [v4 PATCH 11/12] ARM: dts: add spi nodes for atmel SoC
-In-Reply-To: <1358148877-18679-12-git-send-email-wenyou.yang@atmel.com>
-References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
- <1358148877-18679-12-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20130205195126.GB30595@game.jcrosoft.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue,  5 Feb 2013 20:55:12 +0100
+Subject: [PATCH v5 0/3] Kirkwoode cpufreq driver
+Message-ID: <1360094115-14999-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:34 Mon 14 Jan     , Wenyou Yang wrote:
-> From: Richard Genoud <richard.genoud@gmail.com>
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> [wenyou.yang at atmel.com: add spi nodes for sam9260, sam9263, sam9g45 and sam9n12]
-> [wenyou.yang at atmel.com: remove spi property "cs-gpios" to the board dts files]
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Cc: linux at arm.linux.org.uk
-> ---
->  arch/arm/boot/dts/at91sam9260.dtsi |   18 ++++++++++++++++++
->  arch/arm/boot/dts/at91sam9263.dtsi |   18 ++++++++++++++++++
->  arch/arm/boot/dts/at91sam9g45.dtsi |   18 ++++++++++++++++++
-I alreadt have some patch in queue
+This patchset adds a cpufreq driver for Marvell Kirkwood SoCs.
 
-Best Regards,
-J.
->  arch/arm/boot/dts/at91sam9n12.dtsi |   18 ++++++++++++++++++
->  arch/arm/boot/dts/at91sam9x5.dtsi  |   18 ++++++++++++++++++
->  5 files changed, 90 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> index 68bccf4..9586fe1 100644
-> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> @@ -453,6 +453,24 @@
->  				status = "disabled";
->  			};
->  
-> +			spi0: spi at fffc8000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9260-spi";
-> +				reg = <0xfffc8000 0x200>;
-> +				interrupts = <12 4 3>;
-> +				status = "disabled";
-> +			};
-> +
-> +			spi1: spi at fffcc000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9260-spi";
-> +				reg = <0xfffcc000 0x200>;
-> +				interrupts = <13 4 3>;
-> +				status = "disabled";
-> +			};
-> +
->  			adc0: adc at fffe0000 {
->  				compatible = "atmel,at91sam9260-adc";
->  				reg = <0xfffe0000 0x100>;
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index 32ec62c..636b882 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -426,6 +426,24 @@
->  				reg = <0xfffffd40 0x10>;
->  				status = "disabled";
->  			};
-> +
-> +			spi0: spi at fffa4000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9260-spi";
-> +				reg = <0xfffa4000 0x200>;
-> +				interrupts = <14 4 3>;
-> +				status = "disabled";
-> +			};
-> +
-> +			spi1: spi at fffa8000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9260-spi";
-> +				reg = <0xfffa8000 0x200>;
-> +				interrupts = <15 4 3>;
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		nand0: nand at 40000000 {
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 231858f..0100b80 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -495,6 +495,24 @@
->  				reg = <0xfffffd40 0x10>;
->  				status = "disabled";
->  			};
-> +
-> +			spi0: spi at fffa4000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9g45-spi";
-> +				reg = <0xfffa4000 0x200>;
-> +				interrupts = <14 4 3>;
-> +				status = "disabled";
-> +			};
-> +
-> +			spi1: spi at fffa8000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9g45-spi";
-> +				reg = <0xfffa8000 0x200>;
-> +				interrupts = <15 4 3>;
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		nand0: nand at 40000000 {
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index e9efb34..86d5357 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -355,6 +355,24 @@
->  				#size-cells = <0>;
->  				status = "disabled";
->  			};
-> +
-> +			spi0: spi at f0000000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9x5-spi";
-> +				reg = <0xf0000000 0x100>;
-> +				interrupts = <13 4 3>;
-> +				status = "disabled";
-> +			};
-> +
-> +			spi1: spi at f0004000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9x5-spi";
-> +				reg = <0xf0004000 0x100>;
-> +				interrupts = <14 4 3>;
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		nand0: nand at 40000000 {
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 40ac3a4..8ea2f7d 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -473,6 +473,24 @@
->  					trigger-value = <0x6>;
->  				};
->  			};
-> +
-> +			spi0: spi at f0000000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9x5-spi";
-> +				reg = <0xf0000000 0x100>;
-> +				interrupts = <13 4 3>;
-> +				status = "disabled";
-> +			};
-> +
-> +			spi1: spi at f0004000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91sam9x5-spi";
-> +				reg = <0xf0004000 0x100>;
-> +				interrupts = <14 4 3>;
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		nand0: nand at 40000000 {
-> -- 
-> 1.7.9.5
-> 
+The changes to kirkwood_defconfig enable it and set the default
+governor to ondemand.
+
+Changes since v4:
+
+Add DT cpus/cpu at 0 node with needed clocks.
+Add documentation of this DT node.
+
+Changes since v3:
+
+Check return value of of_find_compatible_node()
+Return -EADDRNOTAVAIL when devm_request_and_ioremap() fails.
+Remove default: clause.
+Made .name consistent.
+
+Changes since v2:
+
+Remove unneeded #include file left over from debugging.
+WARN_ON(1) instead of dev_err() for unexpected state
+Various blank lines removed.
+Reformat comment.
+writel -> writel_relaxed
+
+Changes since v1:
+
+tabify Kconfig.arm entry
+Sort order of include files
+Remove some unnecassary include files
+Reformat multiline comment to be coding style conform.
+
+Andrew Lunn (3):
+  cpufreq: kirkwood: Add a cpufreq driver for Marvell Kirkwood SoCs
+  arm: kirkwood: Instantiate cpufreq driver
+  arm: kirkwood: Enable cpufreq and ondemand on kirkwood_defconfig
+
+ Documentation/devicetree/bindings/arm/kirkwood.txt |   27 ++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/kirkwood.dtsi                    |   13 +
+ arch/arm/configs/kirkwood_defconfig                |    3 +
+ arch/arm/mach-kirkwood/board-dt.c                  |    3 +-
+ arch/arm/mach-kirkwood/common.c                    |   23 ++
+ arch/arm/mach-kirkwood/common.h                    |    2 +
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |    2 +
+ drivers/clk/mvebu/clk-gating-ctrl.c                |    1 +
+ drivers/cpufreq/Kconfig.arm                        |    6 +
+ drivers/cpufreq/Makefile                           |    1 +
+ drivers/cpufreq/kirkwood-cpufreq.c                 |  259 ++++++++++++++++++++
+ 12 files changed, 340 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/kirkwood.txt
+ create mode 100644 drivers/cpufreq/kirkwood-cpufreq.c
+
+-- 
+1.7.10.4
