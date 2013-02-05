@@ -1,64 +1,44 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 05 Feb 2013 10:39:27 +0200
-Subject: [PATCH V3 5/7] ARM: OMAP3: Update clocksource timer selection
-In-Reply-To: <1360007196-21350-6-git-send-email-jon-hunter@ti.com>
-References: <1360007196-21350-1-git-send-email-jon-hunter@ti.com>
- <1360007196-21350-6-git-send-email-jon-hunter@ti.com>
-Message-ID: <5110C53F.1010203@compulab.co.il>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue,  5 Feb 2013 09:33:19 +0100
+Subject: [PATCH 1/1] ARM: imx: configs: enable netfilter support
+Message-ID: <1360053199-16229-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/13 21:46, Jon Hunter wrote:
-> When booting with device-tree for OMAP3 and AM335x devices and a gptimer
-> is used as the clocksource (which is always the case for AM335x), a
-> gptimer located in a power domain that is not always-on is selected.
-> Ideally we should use a gptimer located in a power domain that is always
-> on (such as the wake-up domain) so that time can be maintained during a
-> kernel suspend without keeping on additional power domains unnecessarily.
-> 
-> In order to fix this so that we can select a gptimer located in a power
-> domain that is always-on, the following changes were made ...
-> 1. Currently, only when selecting a gptimer to use for a clockevent
->    timer, do we pass a timer property that can be used to select a
->    specific gptimer. Change this so that we can pass a property when
->    selecting a gptimer to use for a clocksource timer too.
-> 2. Currently, when selecting either a gptimer to use for a clockevent
->    timer or a clocksource timer and no timer property is passed, then
->    the first available timer is selected regardless of the properties
->    it has. Change this so that if no properties are passed, then a timer
->    that does not have additional features (such as always-on, dsp-irq,
->    pwm, and secure) is selected.
-> 
-> Please note that using a gptimer for both clocksource and clockevents
-> can have a system power impact during idle. The reason being is that
-> OMAP and AMxxx devices typically only have one gptimer in a power domain
-> that is always-on. Therefore when the kernel is idle both the clocksource
-> and clockevent timers will be active and this will keep additional power
-> domains on. During kernel suspend, only the clocksource timer is active
-> and therefore, it is better to use a gptimer in a power domain that is
-> always-on for clocksource.
+The Netfilter packet filtering framework is useful for so many
+use cases that most people will build kernels with it enabled.
 
-Hmmm...
-Do I miss something or you have forgot to update the commit message?
+So, it would probably make sense to have it enabled by default.
 
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  arch/arm/mach-omap2/timer.c |   33 +++++++++++++++++++++------------
->  1 file changed, 21 insertions(+), 12 deletions(-)
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ arch/arm/configs/imx_v6_v7_defconfig |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-[...]
-
->  #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
-> -OMAP_SYS_GP_TIMER_INIT(3, 1, "timer_sys_ck", "ti,timer-alwon",
-> -		       2, "timer_sys_ck");
-> +OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
-> +		       1, "timer_sys_ck", "ti,timer-alwon");
->  #endif
-
-[...]
-
-
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index ebbfb27..516d03f 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -61,6 +61,7 @@ CONFIG_IP_PNP_DHCP=y
+ # CONFIG_INET_LRO is not set
+ # CONFIG_INET_DIAG is not set
+ # CONFIG_IPV6 is not set
++CONFIG_NETFILTER=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 6966713..1107ae9 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -59,6 +59,7 @@ CONFIG_IP_PNP_DHCP=y
+ # CONFIG_INET_XFRM_MODE_BEET is not set
+ # CONFIG_INET_LRO is not set
+ CONFIG_IPV6=y
++CONFIG_NETFILTER=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
 -- 
-Regards,
-Igor.
+1.7.7.6
