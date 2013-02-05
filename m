@@ -1,41 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 04 Feb 2013 21:40:14 -0800
-Subject: [PATCH] ARM: dts: Adding RTC device node
-In-Reply-To: <1360025290-16278-1-git-send-email-tobetter@gmail.com>
-References: <1360025290-16278-1-git-send-email-tobetter@gmail.com>
-Message-ID: <125101ce0363$46e2fe10$d4a8fa30$@samsung.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Tue, 5 Feb 2013 11:12:11 +0530
+Subject: [PATCH v5 01/10] clk: tegra: Refactor PLL programming code
+In-Reply-To: <20130204143233.GV2364@tbergstrom-lnx.Nvidia.com>
+References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
+ <1359713962-16822-2-git-send-email-pdeschrijver@nvidia.com>
+ <510F4FF7.3050502@nvidia.com>
+ <20130204143233.GV2364@tbergstrom-lnx.Nvidia.com>
+Message-ID: <51109BB3.8000706@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dongjin Kim wrote:
-> 
-> This patch enables RTC device node defined in
-> arch/arm/boot/dts/exynos4.dtsi.
-> 
-> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
-> ---
->  arch/arm/boot/dts/exynos4412-odroidx.dts |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts
-> b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> index 54fe32f..85c958a 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> @@ -83,6 +83,10 @@
->  		regulator-boot-on;
->  	};
-> 
-> +	rtc at 10070000 {
-> +		status = "okay";
-> +	};
-> +
->  	sdhci at 12530000 {
->  		bus-width = <4>;
->  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-> --
-> 1.7.10.4
+On Monday 04 February 2013 08:02 PM, Peter De Schrijver wrote:
+> On Mon, Feb 04, 2013 at 07:06:47AM +0100, Prashant Gaikwad wrote:
+>> On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
+> ...
+>
+>>> -static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll,
+>>> -                                void __iomem *lock_addr, u32 lock_bit_idx)
+>>> +static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
+>>>    {
+>>>           int i;
+>>> -       u32 val;
+>>> +       u32 val, lock_bit;
+>>> +       void __iomem *lock_addr;
+>>>
+>>>           if (!(pll->flags & TEGRA_PLL_USE_LOCK)) {
+>>>                   udelay(pll->params->lock_delay);
+>>>                   return 0;
+>>>           }
+>>>
+>>> +       lock_addr = pll->clk_base + pll->params->base_reg;
+>> This will not work for PLLE. Lock bit for PLLE is in misc register.
+>>
+>>> +       lock_bit = BIT(pll->params->lock_bit_idx);
+>>> +
+>>>           for (i = 0; i < pll->params->lock_delay; i++) {
+>>>                   val = readl_relaxed(lock_addr);
+>>> -               if (val & BIT(lock_bit_idx)) {
+>>> +               if (val & lock_bit) {
+>> Need to change the lock bit idx parameter for Tegra20 and Tegra30 PLLs
+>> else this patch will break those.
+>>
+> Looking at commit 37c26a906527b8a6a252614ca83d21ad318c4e84 and commit
+> b08e8c0ecc42afa3a2e1019851af741980dd5a6b, these fields seem correctly
+> initialized for both Tegra20 and Tegra30? Or am I missing something?
 
-Applied, thanks.
+Ohh, I missed to read
 
-- Kukjin
+lock_bit = BIT(pll->params->lock_bit_idx);
+
+
+Am I missing something about PLLE lock_addr also?
+
+> Thanks,
+>
+> Peter.
