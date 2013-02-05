@@ -1,58 +1,36 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 5 Feb 2013 10:37:45 -0500
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130205123828.GB17852@n2100.arm.linux.org.uk>
-References: <510C2A47.1090607@mvista.com>
- <20130204203358.GX4720@opensource.wolfsonmicro.com>
- <CACRpkdbPyZt8=pLhz-5qcaSSAk6VBn61dPTNp6teU9HksBwN2w@mail.gmail.com>
- <201302042147.38407.arnd@arndb.de>
- <20130205123828.GB17852@n2100.arm.linux.org.uk>
-Message-ID: <51112749.10603@ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 5 Feb 2013 16:38:07 +0100
+Subject: [PATCH] ARM: Kirkwood: Add missing linux/i2c.h include
+In-Reply-To: <20130205153411.GV14746@titan.lakedaemon.net>
+References: <1360077025-8046-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130205153411.GV14746@titan.lakedaemon.net>
+Message-ID: <20130205153807.GA22220@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 07:38 AM, Russell King - ARM Linux wrote:
-> On Mon, Feb 04, 2013 at 09:47:38PM +0000, Arnd Bergmann wrote:
->> On Monday 04 February 2013, Linus Walleij wrote:
->>> So I think the above concerns are moot. The callback we can
->>> set on cookies is entirely optional, and it's even implemented by
->>> each DMA engine, and some may not even support it but require
->>> polling, and then it won't even be implemented by the driver.
->>
->> Just to ensure that everybody is talking about the same thing here:
->> Is it just the callback that is optional, or also the interrupt
->> coming from the hardware?
->
-> If everyone implements stuff correctly, both.  The callback most certainly
-> is optional as things stand.  The interrupt - that depends on the DMA
-> engine.
->
-> Some DMA engines you can't avoid it because you need to reprogram the
-> hardware with the next+1 transfer upon completion of an existing transfer.
-> Others may allow you to chain transfers in hardware.  That's all up to
-> how the DMA engine driver is implemented and how the hardware behaves.
->
-> Now, there's another problem here: that is, people abuse the API.  People
-> don't pass DMA_CTRL_ACK | DMA_PREP_INTERRUPT into their operations by
-> default.  People like typing '0'.
->
-> The intention of the "DMA_PREP_INTERRUPT" is significant here: it means
-> "ask the hardware to send an interrupt upon completion of this transfer".
->
-> Because soo many people like to type '0' instead in their DMA engine
-> clients, it means that this flag is utterly useless today - you have to
-> ignore it.  So there's _no_ way for client drivers to actually tell the
-> a DMA engine driver which _doesn't_ need to signal interrupts at the end
-> of every transfer not to do so.
->
-> So yes, the DMA engine API supports it.  Whether the _implementations_
-> themselves do is very much hit and miss (and in reality is much more
-> miss than hit.)
->
+On Tue, Feb 05, 2013 at 10:34:11AM -0500, Jason Cooper wrote:
+> Thierry,
+> 
+> On Tue, Feb 05, 2013 at 04:10:25PM +0100, Thierry Reding wrote:
+> > The nsa310 board uses I2C_BOARD_INFO and i2c_register_board_info(), both
+> > of which are defined in the linux/i2c.h header file.
+> > 
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > ---
+> >  arch/arm/mach-kirkwood/board-nsa310.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> 
+> What is this based against?  We're in the process of removing this whole
+> file for v3.9 (pinctrl, mv643xx_eth, and i2c)...
 
-Don't these assume that the driver can determine the need for an 
-interrupt upfront at prep/submit time?  AFAICT, this assumption doesn't 
-hold true with NAPI.
+It's based on today's linux-next, so if you're going to drop that file
+for 3.9 I guess you can ignore the patch.
 
-Thanks
--- Cyril.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/fc81f14a/attachment.sig>
