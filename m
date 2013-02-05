@@ -1,29 +1,79 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue,  5 Feb 2013 16:10:25 +0100
-Subject: [PATCH] ARM: Kirkwood: Add missing linux/i2c.h include
-Message-ID: <1360077025-8046-1-git-send-email-thierry.reding@avionic-design.de>
+From: kishon@ti.com (kishon)
+Date: Tue, 5 Feb 2013 20:54:08 +0530
+Subject: [GIT PULL] ARM part of USB patches
+Message-ID: <51112418.5020000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nsa310 board uses I2C_BOARD_INFO and i2c_register_board_info(), both
-of which are defined in the linux/i2c.h header file.
+Hi Tony,
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
----
- arch/arm/mach-kirkwood/board-nsa310.c | 1 +
- 1 file changed, 1 insertion(+)
+As discussed, I'm sending a pull request for the arch/arm part of my USB 
+patches. These patches are necessary to get MUSB functional in both dt 
+and non-dt boot. Also added dt data for dwc3 present in OMAP. This patch 
+series *depends* on some of the patches which are merged in usb-next.
 
-diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-index 61c4b18..970174a 100644
---- a/arch/arm/mach-kirkwood/board-nsa310.c
-+++ b/arch/arm/mach-kirkwood/board-nsa310.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/gpio.h>
-+#include <linux/i2c.h>
- #include <mach/kirkwood.h>
- #include <linux/of.h>
- #include "common.h"
--- 
-1.8.1.2
+Thanks
+Kishon
+
+The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+
+   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+
+are available in the git repository at:
+
+   git://gitorious.org/linux-usb/linux-usb.git arm-usb-dt
+
+for you to fetch changes up to 09084a48903c6056e20e27ae5054902958a10275:
+
+   ARM: dts: omap5: add dwc3 core dt data (2013-02-05 20:11:46 +0530)
+
+----------------------------------------------------------------
+Kishon Vijay Abraham I (12):
+       ARM: OMAP4: remove control module address space from PHY and OTG
+       ARM: OMAP: devices: create device for usb part of control module
+       ARM: OMAP2: MUSB: Specify omap4 has mailbox
+       ARM: dts: omap: Add omap control usb data
+       ARM: dts: omap: Add omap-usb2 dt data
+       ARM: dts: omap: Add usb_otg and glue data
+       ARM: OMAP: USB: Add phy binding information
+       ARM: dts: omap5: Add omap control usb data
+       ARM: dts: omap5: Add ocp2scp data
+       ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
+       ARM: dts: omap5: add dwc3 omap dt data
+       ARM: dts: omap5: add dwc3 core dt data
+
+  Documentation/devicetree/bindings/usb/omap-usb.txt |    1 +
+  arch/arm/boot/dts/omap3-beagle-xm.dts              |    6 ++++++
+  arch/arm/boot/dts/omap3-evm.dts                    |    6 ++++++
+  arch/arm/boot/dts/omap3-overo.dtsi                 |    6 ++++++
+  arch/arm/boot/dts/omap3.dtsi                       |   12 ++++++++++++
+  arch/arm/boot/dts/omap4-panda.dts                  |    6 ++++++
+  arch/arm/boot/dts/omap4-sdp.dts                    |    6 ++++++
+  arch/arm/boot/dts/omap4.dtsi                       |   26 
+++++++++++++++++++++++++++
+  arch/arm/boot/dts/omap5.dtsi                       |   48 
+++++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/boot/dts/twl4030.dtsi                     |    2 +-
+  arch/arm/mach-omap2/board-2430sdp.c                |    2 ++
+  arch/arm/mach-omap2/board-3430sdp.c                |    2 ++
+  arch/arm/mach-omap2/board-4430sdp.c                |    2 ++
+  arch/arm/mach-omap2/board-cm-t35.c                 |    2 ++
+  arch/arm/mach-omap2/board-devkit8000.c             |    2 ++
+  arch/arm/mach-omap2/board-igep0020.c               |    2 ++
+  arch/arm/mach-omap2/board-ldp.c                    |    2 ++
+  arch/arm/mach-omap2/board-omap3beagle.c            |    2 ++
+  arch/arm/mach-omap2/board-omap3evm.c               |    2 ++
+  arch/arm/mach-omap2/board-omap3logic.c             |    2 ++
+  arch/arm/mach-omap2/board-omap3pandora.c           |    2 ++
+  arch/arm/mach-omap2/board-omap3stalker.c           |    2 ++
+  arch/arm/mach-omap2/board-omap3touchbook.c         |    2 ++
+  arch/arm/mach-omap2/board-omap4panda.c             |    2 ++
+  arch/arm/mach-omap2/board-overo.c                  |    2 ++
+  arch/arm/mach-omap2/board-rm680.c                  |    2 ++
+  arch/arm/mach-omap2/board-zoom-peripherals.c       |    2 ++
+  arch/arm/mach-omap2/devices.c                      |   45 
++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   13 -------------
+  arch/arm/mach-omap2/usb-musb.c                     |    3 +++
+  include/linux/usb/musb.h                           |    2 ++
+  31 files changed, 202 insertions(+), 14 deletions(-)
