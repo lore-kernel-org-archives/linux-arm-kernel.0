@@ -1,84 +1,127 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Feb 2013 16:00:07 +0800
-Subject: [PATCH v8 0/8] Add tested id switch and vbus connect detect support
- for Chipidea
-Message-ID: <1360051215-27722-1-git-send-email-peter.chen@freescale.com>
+Date: Tue, 5 Feb 2013 16:00:09 +0800
+Subject: [PATCH v8 2/8] usb: chipidea: add otg file
+In-Reply-To: <1360051215-27722-1-git-send-email-peter.chen@freescale.com>
+References: <1360051215-27722-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1360051215-27722-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes for v7:
-- Add ci_supports_gadget helper to know if the controller
-supports gadget, if the controller supports gadget, it
-needs to read otgsc to know the vbus value, basically,
-if the controller supports gadget, it will support host
-as well [3/8]
-- At ci_hdrc_probe, it needs to add free memory at error path
-[3/8]
-- Cosolidate ci->driver = NULL at ci13xxx_stop
-[8/8]
+Implement struct usb_otg, In that way, calling otg_set_peripheral
+will not be failed at udc.c.
 
-Changes for v6:
-For Patch 8/8, we only need to set ci->driver to NULL when usb cable
-is not connected, for other changes, it will case some runtime pm
-unmatch and un-align with udc-core & composite driver problems.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-Changes for v5:
-- Add Alex comments for init/destroy function [3/8] [4/8]
-- Remove memset(&ci->gadget, 0, sizeof(ci->gadget)) at destory function [4/8]
-- Add Kishon's comment: Change the format of struct usb_otg otg at drivers/usb/chipidea/ci.h
-[1/8]
-- Add comments for CI_VBUS_STABLE_TIMEOUT [3/8]
-- Change the otg_set_peripheral return value check as the fully
-chipidea driver users don't need it. [4/8]
-- Fix one bug that the oops when re-plug in usb cable after
-rmmod gadget [8/8]
-
-Anyone who has tested this patchset, please give a tested-by, thanks.
-
-This patchset adds tested otg id switch function and
-vbus connect/disconnect detection for chipidea driver.
-The mainly design of id/vbus handling follows msm otg driver.
-I hope the msm usb maintainer can have a look of this patchset,
-and give some comments, and move the whole msm usb driver to
-chipidea framework if possible in the future.
-
-This patch is fully tested at imx6 sabrelite platform.
-My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
-which is rebased of Sascha's git
-(git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-otg-for-next)
-
-At sascha's tag, it finishes some dr_mode and phy_type patches,
-in that way, we can choose host-only and gadget-only function at
-dts file as well as we can choose different phy setting.
-
-Besides sascha's work, there are some Michael Grzeschik/Marc Kleine-Budde
-usbmisc patch, imx chipidea suspend/resume patch, and one pin control
-patch for imx6
-
-Peter Chen (8):
-  Revert "USB: chipidea: add vbus detect for udc"
-  usb: chipidea: add otg file
-  usb: chipidea: add otg id switch and vbus connect/disconnect detect
-  usb: chipidea: consolidate kinds of APIs for both roles
-  usb: chipidea: udc: add pullup/pulldown dp at hw_device_state
-  usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
-  usb: chipidea: imx: add internal vbus regulator control
-  usb: chipidea: udc: fix the oops when plugs in usb cable after rmmod
-    gadget
-
- drivers/usb/chipidea/Makefile      |    2 +-
- drivers/usb/chipidea/bits.h        |   10 ++
- drivers/usb/chipidea/ci.h          |   12 ++-
- drivers/usb/chipidea/ci13xxx_imx.c |   80 ++++++++++++----
- drivers/usb/chipidea/ci13xxx_msm.c |    1 -
- drivers/usb/chipidea/core.c        |  189 ++++++++++++++++++++++++++++++++----
- drivers/usb/chipidea/host.c        |    6 +
- drivers/usb/chipidea/host.h        |    4 +-
- drivers/usb/chipidea/otg.c         |   68 +++++++++++++
- drivers/usb/chipidea/otg.h         |    9 ++
- drivers/usb/chipidea/udc.c         |  112 ++++++++++------------
- drivers/usb/chipidea/udc.h         |    4 +-
- include/linux/usb/chipidea.h       |    1 -
- 13 files changed, 390 insertions(+), 108 deletions(-)
- create mode 100644 drivers/usb/chipidea/otg.c
- create mode 100644 drivers/usb/chipidea/otg.h
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index d92ca32..11f513c 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
+ 
+ obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
+ 
+-ci_hdrc-y				:= core.o
++ci_hdrc-y				:= core.o otg.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index d738603..697e369 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -129,6 +129,7 @@ struct hw_bank {
+  * @vbus_active: is VBUS active
+  * @transceiver: pointer to USB PHY, if any
+  * @hcd: pointer to usb_hcd for ehci host driver
++ * @otg: for otg support
+  */
+ struct ci13xxx {
+ 	struct device			*dev;
+@@ -164,6 +165,7 @@ struct ci13xxx {
+ 	bool				global_phy;
+ 	struct usb_phy			*transceiver;
+ 	struct usb_hcd			*hcd;
++	struct usb_otg      		otg;
+ };
+ 
+ static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+new file mode 100644
+index 0000000..7dea3b3
+--- /dev/null
++++ b/drivers/usb/chipidea/otg.c
+@@ -0,0 +1,60 @@
++/*
++ * otg.c - ChipIdea USB IP core OTG driver
++ *
++ * Copyright (C) 2012 Freescale Semiconductor, Inc.
++ *
++ * Author: Peter Chen
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/usb/gadget.h>
++#include <linux/usb/otg.h>
++#include <linux/usb/chipidea.h>
++
++#include "ci.h"
++#include "udc.h"
++#include "bits.h"
++#include "host.h"
++#include "debug.h"
++
++static int ci_otg_set_peripheral(struct usb_otg *otg,
++		struct usb_gadget *periph)
++{
++	otg->gadget = periph;
++
++	return 0;
++}
++
++static int ci_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
++{
++	otg->host = host;
++
++	return 0;
++}
++
++/**
++ * ci_hdrc_otg_init - initialize device related bits
++ * ci: the controller
++ *
++ * This function create otg struct, if the device can switch between
++ * device and host.
++ */
++int ci_hdrc_otg_init(struct ci13xxx *ci)
++{
++	/* Useless at current */
++	ci->otg.set_peripheral = ci_otg_set_peripheral;
++	ci->otg.set_host = ci_otg_set_host;
++	if (!IS_ERR_OR_NULL(ci->transceiver))
++		ci->transceiver->otg = &ci->otg;
++
++	return 0;
++}
+diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
+new file mode 100644
+index 0000000..b4c6b3e
+--- /dev/null
++++ b/drivers/usb/chipidea/otg.h
+@@ -0,0 +1,6 @@
++#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
++#define __DRIVERS_USB_CHIPIDEA_OTG_H
++
++int ci_hdrc_otg_init(struct ci13xxx *ci);
++
++#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
+-- 
+1.7.0.4
