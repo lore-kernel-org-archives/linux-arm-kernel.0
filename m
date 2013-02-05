@@ -1,24 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 Feb 2013 18:02:47 +0100
-Subject: [PATCH v8 02/12] gpio: fix wrong checking condition for gpio range
-In-Reply-To: <1359825953-15663-3-git-send-email-haojian.zhuang@linaro.org>
-References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
- <1359825953-15663-3-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdbeqns08GV6hybH-ww8r-xM96TL+Go0jYpEJRn03uRU7w@mail.gmail.com>
+Date: Tue, 5 Feb 2013 18:04:43 +0100
+Subject: [PATCH 2/9] gpiolib: use gpio_chips list in gpiolib_sysfs_init
+In-Reply-To: <1359822572-26009-4-git-send-email-acourbot@nvidia.com>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+ <1359822572-26009-4-git-send-email-acourbot@nvidia.com>
+Message-ID: <CACRpkdaz8h_1uKoH1q9gLmCxE0BMAxBakaq_eFfnfJr2V_Ct5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 2, 2013 at 6:25 PM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+On Sat, Feb 2, 2013 at 5:29 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
 
-> If index++ calculates from 0, the checking condition of "while
-> (index++)" fails & it doesn't check any more. It doesn't follow
-> the loop that used at here.
+> Use the small list of GPIO chips instead of parsing the whole GPIO
+> number space.
 >
-> Replace it by endless loop at here. Then it keeps parsing
-> "gpio-ranges" property until it ends.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 
 Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
