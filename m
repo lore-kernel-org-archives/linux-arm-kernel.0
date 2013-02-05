@@ -1,60 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Feb 2013 13:27:59 +0000
-Subject: [GIT PULL] i.MX clock fixes for v3.8
-In-Reply-To: <201302051312.11434.arnd@arndb.de>
-References: <20130205095844.GZ1906@pengutronix.de>
- <20130205110804.GI17786@n2100.arm.linux.org.uk>
- <20130205112558.GA1906@pengutronix.de> <201302051312.11434.arnd@arndb.de>
-Message-ID: <20130205132759.GA17833@n2100.arm.linux.org.uk>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Tue,  5 Feb 2013 14:35:10 +0100
+Subject: [PATCH 0/5] atmel_lcdfb: regression fixes and cpu_is removal
+In-Reply-To: <20130129135435.GN7360@game.jcrosoft.org>
+References: <20130129135435.GN7360@game.jcrosoft.org>
+Message-ID: <1360071315-4032-1-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 01:12:11PM +0000, Arnd Bergmann wrote:
-> On Tuesday 05 February 2013, Sascha Hauer wrote:
-> > >        So think twice - or thrice - before sending me patches or a pull
-> > >        request for -rc7. You need to have some seriously good reasons for
-> > >        doing so, and you need to state those reasons very clearly. And I
-> > >        don't just mean for the pull request in general, I mean for every
-> > >        single patch in it.
-> > > ...
-> > >        In other words, "It fixes a bug" just isn't good enough. The bug needs
-> > >        to be something that actually matters.
-> > 
-> > At least 'ARM: i.MX25: clk: parent per5_clk to AHB clock' is a
-> > regression that causes nasty oopses. Admittedly, it wasn't introduced in
-> > the last merge window and the board requiring the fix needs out of tree
-> > patches.
-> > 
-> > I'm fine with these going into v3.9 and waiting for the first stable
-> > patch to get the fix for the above.
-> 
-> My rules is usually: if it's important enough to have it backported
-> into a stable kernel, then it's also important enough to get sent
-> at any time during the bug fix phase.
-> 
-> The patch you  mentioned certainly fits that category. The other one
-> might as well, but the patch description does not actually say what
-> the impact of the bug is, so it is hard to tell.
+The first three patches are resends of two regression fixes and one clean up
+posted in December (with previous acked-bys included). The regression fixes are
+kept minimal and are tagged for stable.
 
-Look at what Linus is saying.  Too much stuff went into -rc6.  He doesn't
-want that happening for -rc7.  He wants -rc7 to be really tiny, like
-almost _no_ changes.  Look at the description about what he wants to
-see: he doesn't want to see user visible regressions.  He wants to see
-_big_ user visible regressions only.
+The last two patches replace all uses of cpu_is macros in atmel_lcdfb with a
+platform-device-id table and static configurations.
 
-Also look at what he's saying wrt describing _every_ _single_ _patch_ in
-your pull request with a justification why it's there.  Can you do this
-for every patch you have planned to push?  Do you have sufficient
-information from those sending you these pull requests for fixes to v3.8
-to do that?  If not, you probably shouldn't be pulling them with a view
-to sending them to Linus (unless you wish to be flamed.)
+Thanks,
+Johan
 
-I certainly can't with the three patches I had queued for fixes before
--rc6.  They may be fixing problems which cause a few platforms not to
-boot or oops at boot, but I can't justify them against what Linus has
-said.  So I'm going to wait for the next merge window and put them in
-with a stable CC.  There's more patches like that post-rc6: there's one
-which fixes an obscure problem with 'make' which occurs with 2G:2G VM
-split.  But I'm not pushing that one either because it's not a _big_
-enough problem (it's only had _one_ user report it.)  One user is not
-sufficient justification.
+
+Johan Hovold (5):
+  atmel_lcdfb: fix 16-bpp modes on older SOCs
+  ARM: at91/neocore926: fix LCD-wiring mode
+  atmel_lcdfb: remove unsupported 15-bpp mode
+  atmel_lcdfb: move lcdcon2 register access to compute_hozval
+  ARM: at91/avr32/atmel_lcdfb: replace cpu_is macros with device-id
+    table
+
+ arch/arm/mach-at91/at91sam9261_devices.c |   6 +-
+ arch/arm/mach-at91/at91sam9263_devices.c |   2 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c |   6 +-
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   2 +-
+ arch/arm/mach-at91/board-neocore926.c    |   2 +-
+ arch/avr32/mach-at32ap/at32ap700x.c      |   2 +
+ drivers/video/atmel_lcdfb.c              | 115 ++++++++++++++++++++++++++-----
+ include/video/atmel_lcdc.h               |   4 +-
+ 8 files changed, 116 insertions(+), 23 deletions(-)
+
+-- 
+1.8.1.1
