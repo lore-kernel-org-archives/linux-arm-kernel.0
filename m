@@ -1,30 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Feb 2013 10:27:49 -0800
-Subject: [GIT PULL] arch_decomp_wdog() cleanup for 3.9
-In-Reply-To: <20130205065850.GA16787@S2101-09.ap.freescale.net>
-References: <20130115143203.GC6574@S2101-09.ap.freescale.net>
- <20130205065850.GA16787@S2101-09.ap.freescale.net>
-Message-ID: <20130205182749.GB21051@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Feb 2013 10:28:49 -0800
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130204154153.GA18237@arwen.pp.htv.fi>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
+ <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
+ <20130201185820.GE29898@arwen.pp.htv.fi>
+ <510C2A47.1090607@mvista.com>
+ <20130201205600.GA31762@arwen.pp.htv.fi>
+ <20130201213003.GW2637@n2100.arm.linux.org.uk>
+ <20130204154153.GA18237@arwen.pp.htv.fi>
+Message-ID: <20130205182848.GJ25185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 02:58:53PM +0800, Shawn Guo wrote:
-> Ping?
+* Felipe Balbi <balbi@ti.com> [130204 07:46]:
 > 
-> On Tue, Jan 15, 2013 at 10:32:04PM +0800, Shawn Guo wrote:
-> > The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
-> > 
-> >   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/cleanup-decompwdog-3.9
-> > 
-> > for you to fetch changes up to 1ff5f55a8c7b011f818434923a93afc48de0b2ee:
-> > 
-> >   ARM: samsung: remove unused arch_decomp_wdog() code (2013-01-11 13:55:35 +0800)
+> Current DMA abstraction is quite poor, for example there's no way to
+> compile support for multiple DMA engines. Code also makes certain, IMO
+> unnecessary, assumptions about the underlying DMA engine (abstraction is
+> poor, as said above but it we could follow MUSB's programming guide when
+> it comes to programming DMA transfers).
+> 
+> Considering all of the above, it's far better to use DMA engine and get
+> rid of all the mess.
 
-Thanks for the reminder; pulled now.
+How about just disable MUSB DMA support if ARCH_MULTIPLATFORM for now?
+That way MUSB can be fixed up first to support ARCH_MULTIPLATFORM
+using PIO while sorting out the DMA related issues.
 
+Regards,
 
--Olof
+Tony
