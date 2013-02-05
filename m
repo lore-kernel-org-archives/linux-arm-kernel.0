@@ -1,43 +1,46 @@
-From: amit.virdi@st.com (Amit Virdi)
-Date: Tue, 5 Feb 2013 15:18:15 +0530
-Subject: ARM/Kernel: Problems with multiple VIC registration
-Message-ID: <5110D55F.9040509@st.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 5 Feb 2013 10:58:44 +0100
+Subject: [GIT PULL] i.MX clock fixes for v3.8
+Message-ID: <20130205095844.GZ1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Arnd, Olof,
 
-I've picked Linux kernel 3.8-rc4 and added the support for my ARM based 
-board in it.
-- The SoC has 2 VICs
-- valid_sources are 32 (~0)
-- NR_IRQS is defined as 104; => irq_desc[104]
-- I'm not populating devices thro' DT
+Please pull these two fixes for v3.8
 
-The first controller is registered throu' irq_domain_add_linear API. As 
-a result of this call, a new domain is allocated to the VIC device.
+Sascha
 
-In the next step IRQ mapping, irq_create_mapping is called and this maps 
-all the IRQs in the Linux IRQ space. However in doing so, it uses 
-irq_desc[1]...irq_desc[32]. irq_dec[0] is not used (checked using a 
-debugger)!
+The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
 
-When I'm trying to register the second VIC (it's throu' 
-irq_domain_add_legacy), I'm getting warnings since irq_get_irq_data 
-returns irq_data of irq_desc[32] which has already been mapped.
+  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
 
-In short, irq_domain_add_legacy returns with NULL irq_domain.
+are available in the git repository at:
 
-I checked that multiple VIC registration works in Linux 3.4
-Is it something that I'm missing while adapting to the new framework, or 
-there's some undetected problem?
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/arm-imx-clk-fixes
 
-I've attached the logfile generated with debug prints ON. Would 
-appreciate any help...
+for you to fetch changes up to 4b526ca5f627188425184a22ed46c91baa602d43:
 
-Thanks
-Amit Virdi
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: logfile.txt
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/e095a301/attachment-0001.txt>
+  ARM: i.MX25: clk: parent per5_clk to AHB clock (2013-02-05 10:54:35 +0100)
+
+----------------------------------------------------------------
+ARM: i.MX: clock fixes
+
+- fix wrong timer clock on i.MX25 leading to strange timing inconsistencies
+- fix SPI clocks for i.MX27
+
+----------------------------------------------------------------
+Gwenhael Goavec-Merou (1):
+      ARM: imx27: clk-imx27: SPI: Rename IPG clock and add PER clock
+
+Steffen Trumtrar (1):
+      ARM: i.MX25: clk: parent per5_clk to AHB clock
+
+ arch/arm/mach-imx/clk-imx25.c |    3 +++
+ arch/arm/mach-imx/clk-imx27.c |    9 ++++++---
+ 2 files changed, 9 insertions(+), 3 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
