@@ -1,64 +1,89 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Tue, 5 Feb 2013 06:39:20 +0000
-Subject: [PATCH 2/2] ARM: davinci: da850: add wdt OF_DEV_AUXDATA entry
-In-Reply-To: <510FA2D4.7090807@mvista.com>
-References: <1359016695-10362-1-git-send-email-anilkumar.v@ti.com>
- <1359016695-10362-3-git-send-email-anilkumar.v@ti.com>
- <510FA09F.7030604@ti.com> <510FA2D4.7090807@mvista.com>
-Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412C41F0@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 5 Feb 2013 14:58:53 +0800
+Subject: [GIT PULL] arch_decomp_wdog() cleanup for 3.9
+In-Reply-To: <20130115143203.GC6574@S2101-09.ap.freescale.net>
+References: <20130115143203.GC6574@S2101-09.ap.freescale.net>
+Message-ID: <20130205065850.GA16787@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Serqei,
+Ping?
 
-On Mon, Feb 04, 2013 at 17:30:20, Sergei Shtylyov wrote:
-> Hello.
+On Tue, Jan 15, 2013 at 10:32:04PM +0800, Shawn Guo wrote:
+> The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
 > 
-> On 04-02-2013 15:50, Sekhar Nori wrote:
+>   Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
 > 
-> > Auxdata is not evm specific. This can instead be called da850_auxdata_lookup[].
+> are available in the git repository at:
 > 
-> > Also, I dont think it is necessary to add auxdata in a separate patch
-> > from dt nodes. So, I fixed these issues and came up with below patch. I
-> > tested basic wdt reboot. reboot command is still broken (with or
-> > without this patch). Can you please look at that?
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/cleanup-decompwdog-3.9
 > 
-> > Thanks,
-> > Sekhar
+> for you to fetch changes up to 1ff5f55a8c7b011f818434923a93afc48de0b2ee:
 > 
-> > ----8<----
-> > From: "Kumar, Anil" <anilkumar.v@ti.com>
-> > Date: Thu, 24 Jan 2013 14:08:14 +0530
-> > Subject: [PATCH 1/1] ARM: davinci: da850: add wdt DT node
+>   ARM: samsung: remove unused arch_decomp_wdog() code (2013-01-11 13:55:35 +0800)
 > 
-> > Add da850 wdt DT node.
+> ----------------------------------------------------------------
+> The series cleans up ARCH_HAS_DECOMP_WDOG and arch_decomp_wdog which
+> are unused on ARM architecure.  Samsung has some code setting up wdog
+> in arch_decomp_wdog().  But since CONFIG_S3C_BOOT_WATCHDOG is defined
+> nowhere, it will not run.  Otherwise, system can not boot at all when
+> wdog is set up but no one pats it.
 > 
-> > Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
-> > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> [...]
+> ----------------------------------------------------------------
+> Shawn Guo (3):
+>       ARM: decompress: remove unused ARCH_HAS_DECOMP_WDOG
+>       ARM: remove unused arch_decomp_wdog()
+>       ARM: samsung: remove unused arch_decomp_wdog() code
 > 
-> > diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> > index 8dd15c0..2800090 100644
-> > --- a/arch/arm/boot/dts/da850.dtsi
-> > +++ b/arch/arm/boot/dts/da850.dtsi
-> > @@ -88,6 +88,11 @@
-> >   				      19>;
-> >   			status = "disabled";
-> >   		};
-> > +		wdt: wdt at 1c21000 {
-> > +			compatible = "ti,davinci-wdt";
-> > +			reg = <0x21000 0xfff>;
+>  arch/arm/boot/compressed/decompress.c              |    2 --
+>  arch/arm/mach-at91/include/mach/uncompress.h       |    2 --
+>  arch/arm/mach-bcm2835/include/mach/uncompress.h    |    1 -
+>  arch/arm/mach-clps711x/include/mach/uncompress.h   |    2 --
+>  arch/arm/mach-cns3xxx/include/mach/uncompress.h    |    1 -
+>  arch/arm/mach-davinci/include/mach/uncompress.h    |    1 -
+>  arch/arm/mach-dove/include/mach/uncompress.h       |    1 -
+>  arch/arm/mach-ebsa110/include/mach/uncompress.h    |    1 -
+>  arch/arm/mach-ep93xx/include/mach/uncompress.h     |    2 --
+>  arch/arm/mach-footbridge/include/mach/uncompress.h |    1 -
+>  arch/arm/mach-gemini/include/mach/uncompress.h     |    2 --
+>  arch/arm/mach-h720x/include/mach/uncompress.h      |    1 -
+>  arch/arm/mach-integrator/include/mach/uncompress.h |    2 --
+>  arch/arm/mach-iop13xx/include/mach/uncompress.h    |    1 -
+>  arch/arm/mach-iop32x/include/mach/uncompress.h     |    1 -
+>  arch/arm/mach-iop33x/include/mach/uncompress.h     |    1 -
+>  arch/arm/mach-ixp4xx/include/mach/uncompress.h     |    2 --
+>  arch/arm/mach-kirkwood/include/mach/uncompress.h   |    1 -
+>  arch/arm/mach-ks8695/include/mach/uncompress.h     |    1 -
+>  arch/arm/mach-lpc32xx/include/mach/uncompress.h    |    1 -
+>  arch/arm/mach-mmp/include/mach/uncompress.h        |    6 -----
+>  arch/arm/mach-msm/include/mach/uncompress.h        |    4 ---
+>  arch/arm/mach-mv78xx0/include/mach/uncompress.h    |    1 -
+>  arch/arm/mach-mxs/include/mach/uncompress.h        |    1 -
+>  arch/arm/mach-netx/include/mach/uncompress.h       |    1 -
+>  arch/arm/mach-nomadik/include/mach/uncompress.h    |    2 --
+>  arch/arm/mach-omap1/include/mach/uncompress.h      |    5 ----
+>  arch/arm/mach-omap2/include/mach/uncompress.h      |    5 ----
+>  arch/arm/mach-orion5x/include/mach/uncompress.h    |    1 -
+>  arch/arm/mach-prima2/include/mach/uncompress.h     |    2 --
+>  arch/arm/mach-pxa/include/mach/uncompress.h        |    5 ----
+>  arch/arm/mach-realview/include/mach/uncompress.h   |    1 -
+>  arch/arm/mach-rpc/include/mach/uncompress.h        |    5 ----
+>  arch/arm/mach-s5p64x0/include/mach/uncompress.h    |   28 --------------------
+>  arch/arm/mach-sa1100/include/mach/uncompress.h     |    1 -
+>  arch/arm/mach-shark/include/mach/uncompress.h      |    1 -
+>  arch/arm/mach-shmobile/include/mach/uncompress.h   |    2 --
+>  arch/arm/mach-tegra/include/mach/uncompress.h      |    4 ---
+>  arch/arm/mach-u300/include/mach/uncompress.h       |    1 -
+>  arch/arm/mach-ux500/include/mach/uncompress.h      |    2 --
+>  arch/arm/mach-versatile/include/mach/uncompress.h  |    1 -
+>  arch/arm/mach-vt8500/include/mach/uncompress.h     |    1 -
+>  arch/arm/mach-w90x900/include/mach/uncompress.h    |    2 --
+>  arch/arm/plat-samsung/include/plat/uncompress.h    |   28 --------------------
+>  arch/arm/plat-spear/include/plat/uncompress.h      |    1 -
+>  45 files changed, 138 deletions(-)
 > 
->     Not 0x1000? This is region size, not upper limit.
-
-Oh, you are right. It should be 0x1000. Thanks for correcting. 
-
-In da850 timer1 is used as wdt and according to da850 data sheet.
-
-Timer1 start address is 0x01C21000
-Timer1 end address is   0x01C21FFF 
-
-I had wrongly calculated upper limit. I will fix it. 
-
-Thanks,
-Anil
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
