@@ -1,175 +1,105 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 5 Feb 2013 14:31:58 +0800
-Subject: [PATCH V2 1/2] ARM: dts: add support for some modules in imx6q
- sabresd
-In-Reply-To: <1360028266-25826-1-git-send-email-b13634@freescale.com>
-References: <1360028266-25826-1-git-send-email-b13634@freescale.com>
-Message-ID: <20130205063156.GA30055@S2101-09.ap.freescale.net>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Tue, 5 Feb 2013 06:36:34 +0000
+Subject: [PATCH V2 1/6] pinctrl: pinctrl-single: use arch_initcall and
+ module_exit
+In-Reply-To: <20130201171124.GF22517@atomide.com>
+References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
+ <1359445134-13323-2-git-send-email-manishv.b@ti.com>
+ <CACRpkdbf7TwrjfT2rhqQFGc3yh_Nt117RtzQO2y6g5Ddx5Ay_w@mail.gmail.com>
+ <20130201170906.GE22517@atomide.com> <20130201171124.GF22517@atomide.com>
+Message-ID: <A4887BF146CD57468F700B415D2F47015828C7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 09:37:46AM +0800, Gary Zhang wrote:
-> add I2C/I2S/clk/fixed regulator/sound card and
-> other related supports in imx6q sabresd
+On Fri, Feb 01, 2013 at 22:41:24, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [130201 09:12]:
+> > * Linus Walleij <linus.walleij@linaro.org> [130129 03:03]:
+> > > On Tue, Jan 29, 2013 at 8:38 AM, Vishwanathrao Badarkhe, Manish 
+> > > <manishv.b@ti.com> wrote:
+> > > 
+> > > > Currently, I2C driver gets probed before pinctrl driver.
+> > > > To achieve I2C pin muxing via pinctrl driver before I2C probe get 
+> > > > called, register pinctrl driver in arch_initcall.
+> > > > Also, add module_exit to unregister pinctrl driver.
+> > > >
+> > > > Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+> > > 
+> > > So your I2C driver is not returning -EPROBE_DEFER if it cannot find 
+> > > its pins?
+> > > 
+> > > Hm, well I can live with this, if Tony ACKs it.
+> > 
+> > Hmm pinctrl is before i2c in drivers/Makefile.
+> > Making initcalls happen earlier and earlier is usually the wrong way 
+> > to go. Sounds like there's some other issue here that needs to be 
+> > fixed instead.
 > 
-> Signed-off-by: Gary Zhang <b13634@freescale.com>
-
-Both patches look good now.  But I do not apply them right now,
-because:
-
- - I want to see the driver part gets accepted by Mark Brown first.
- - They are a little bit late for 3.9 merge window, and I need to have
-   them rebased on 3.9-rc1 and queue them for 3.10 then.
-
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx6q-sabresd.dts |   77 +++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6q.dtsi        |   23 ++++++++++
->  2 files changed, 100 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-> index a424025..ed1cb9b 100644
-> --- a/arch/arm/boot/dts/imx6q-sabresd.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-> @@ -29,6 +29,11 @@
->  					pinctrl-0 = <&pinctrl_uart1_1>;
->  					status = "okay";
->  				};
-> +
-> +				ssi2: ssi at 0202c000 {
-> +					fsl,mode = "i2s-slave";
-> +					status = "okay";
-> +				};
->  			};
+> Let me guess: The i2c driver is wrongly set to run with arch_initcall?
 >  
->  			iomuxc at 020e0000 {
-> @@ -73,6 +78,33 @@
->  				wp-gpios = <&gpio2 1 0>;
->  				status = "okay";
->  			};
-> +
-> +			audmux at 021d8000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_audmux_2>;
-> +				status = "okay";
-> +			};
-> +
-> +			i2c at 021a0000 { /* I2C1 */
-> +				status = "okay";
-> +				clock-frequency = <100000>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_i2c1_2>;
-> +
-> +				codec: wm8962 at 1a {
-> +					compatible = "wlf,wm8962";
-> +					reg = <0x1a>;
-> +					clocks = <&clks 169>;
-> +					DCVDD-supply = <&reg_1p8v>;
-> +					DBVDD-supply = <&reg_1p8v>;
-> +					AVDD-supply = <&reg_1p8v>;
-> +					CPVDD-supply = <&reg_1p8v>;
-> +					MICVDD-supply = <&reg_3p3v>;
-> +					PLLVDD-supply = <&reg_1p8v>;
-> +					SPKVDD1-supply = <&reg_4p2v>;
-> +					SPKVDD2-supply = <&reg_4p2v>;
-> +				};
-> +			};
->  		};
->  	};
->  
-> @@ -91,4 +123,49 @@
->  			linux,code = <114>; /* KEY_VOLUMEDOWN */
->  		};
->  	};
-> +	regulators {
-> +		compatible = "simple-bus";
-> +
-> +		reg_1p8v: 1p8v {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "1P8V";
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +			regulator-always-on;
-> +			enable-active-high;
-> +		};
-> +		reg_3p3v: 3p3v {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "3P3V";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-always-on;
-> +			enable-active-high;
-> +		};
-> +		reg_4p2v: 4p2v {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "4P2V";
-> +			regulator-min-microvolt = <4200000>;
-> +			regulator-max-microvolt = <4200000>;
-> +			gpio = <&gpio4 10 0>;
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +			enable-active-high;
-> +		};
-> +	};
-> +
-> +	sound {
-> +		compatible = "fsl,imx6q-sabresd-wm8962",
-> +			     "fsl,imx-audio-wm8962";
-> +		model = "imx6q-sabresd-wm8962";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_clko_1>;
-> +		ssi-controller = <&ssi2>;
-> +		audio-codec = <&codec>;
-> +		audio-routing =
-> +			"Headphone Jack", "HPOUTL",
-> +			"Headphone Jack", "HPOUTR";
-> +		mux-int-port = <2>;
-> +		mux-ext-port = <3>;
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index d6265ca..b612269 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -582,6 +582,23 @@
->  							3    0x80000000	/* MX6Q_PAD_SD2_DAT1__AUDMUX_AUD4_TXFS */
->  						>;
->  					};
-> +
-> +					pinctrl_audmux_2: audmux-2 {
-> +						fsl,pins = <
-> +							1117 0x80000000	/* MX6Q_PAD_CSI0_DAT7__AUDMUX_AUD3_RXD */
-> +							1093 0x80000000	/* MX6Q_PAD_CSI0_DAT4__AUDMUX_AUD3_TXC */
-> +							1101 0x80000000	/* MX6Q_PAD_CSI0_DAT5__AUDMUX_AUD3_TXD */
-> +							1109 0x80000000	/* MX6Q_PAD_CSI0_DAT6__AUDMUX_AUD3_TXFS */
-> +						>;
-> +					};
-> +				};
-> +
-> +				clko {
-> +					pinctrl_clko_1: clkogrp-1 {
-> +						fsl,pins = <
-> +							953 0x130b0  /* MX6Q_PAD_GPIO_0__CCM_CLKO */
-> +						>;
-> +					};
->  				};
->  
->  				ecspi1 {
-> @@ -670,6 +687,12 @@
->  							196 0x4001b8b1	/* MX6Q_PAD_EIM_D28__I2C1_SDA */
->  						>;
->  					};
-> +					pinctrl_i2c1_2: i2c1grp-2 {
-> +						fsl,pins = <
-> +							1125 0x4001b8b1	/* MX6Q_PAD_CSI0_DAT8__I2C1_SDA */
-> +							1133 0x4001b8b1 /* MX6Q_PAD_CSI0_DAT9__I2C1_SCL */
-> +						>;
-> +					};
->  				};
->  
->  				uart1 {
-> -- 
-> 1.7.0.4
-> 
-> 
+
+Hi Tony
+
+No, Currently i2c driver is set to subsys_initcall. I have seen some
+problem while using pin control grab functionality. Please see detailed
+explanation as below.
+
+Hi Linus
+
+I am using auto grab pin control facility to do pin muxing of I2C0 
+pins and seen problem as below:
+
+Currently, probe of I2C0 driver gets called before pin control driver. 
+Hence, while calling I2C0 probe because of unavailability of  
+pin control node information, its probe get deferred giving following 
+messages:
+
+"i2c_davinci i2c_davinci.1: could not find pctldev for node /soc/pinmux at 1c14120
+/pinmux_i2c0_pins, deferring probe"
+
+As I2C0 is in deferred list (as auto grab patch handle this), its probe 
+get called once again, During this second time probe of I2C0, I have 
+observed following crash:
+
+"Unable to handle kernel paging request at virtual address fffffe07"
+
+As per code analysis of auto grab functionality, I have seen in 
+"pinctrl_bind_pin" function, pin control handle (dpi->p) is returned by 
+"devm_pinctrl_get" function.
+
+Pin control handle is assigned with error pointer during 1st time probing of 
+I2C0 (as pin control information is not available at this time). 
+During 2nd time probing (deferred probe) of I2C0, same pin control handle 
+(which was get assigned during 1st probe) is getting used instead of getting 
+updated to correct pin control handle which leads to system crash.
+
+I made following changes, in order to update "dip->p" pointer with 
+correct value:
+
+-       if (!dpi->p) {
++       if (IS_ERR_OR_NULL(dpi->p)) {
+                dpi->p = devm_pinctrl_get(dev);
+-               if (IS_ERR_OR_NULL(dpi->p)) {
+-                       int ret = PTR_ERR(dpi->p);
+-
+-                       dev_dbg(dev, "no pinctrl handle\n");
+-                       /* Only return deferrals */
+-                       if (ret == -EPROBE_DEFER)
+-                               return ret;
+-                       return 0;
+-               }
++               ret = PTR_ERR(dpi->p);
++               dev_dbg(dev, "no pinctrl handle\n");
++               /* Only return deferrals */
++               if (ret == -EPROBE_DEFER)
++                       return ret;
++               return 0;
+
+Is this intended change? or am I missing something in order to use this auto grab
+functionality?
+
+With the above change, now deferred probing is working fine and there is no need
+to register pin control driver in arch_initcall.
+
+
+Regards, 
+Manish
