@@ -1,110 +1,79 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 5 Feb 2013 10:46:21 +0100
-Subject: [GIT PULL] ARM: OMAP: Audio support via omap-twl4030 and pwm
- support
-In-Reply-To: <20130204195251.GS22517@atomide.com>
-References: <50FE64DC.2030808@ti.com> <510788B9.9050907@ti.com>
- <20130130220532.GA22517@atomide.com> <20130204195251.GS22517@atomide.com>
-Message-ID: <5110D4ED.6030306@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 5 Feb 2013 11:46:51 +0200
+Subject: [PATCH v2 4/6] ARM: dts: omap5: add dwc3 omap dt data
+In-Reply-To: <5110CBB9.5080307@ti.com>
+References: <1359112312-6918-1-git-send-email-kishon@ti.com>
+ <1359112312-6918-5-git-send-email-kishon@ti.com>
+ <510432BF.80808@mvista.com> <5110C2E6.30504@ti.com>
+ <20130205083828.GE32118@arwen.pp.htv.fi> <5110C6EC.6050606@ti.com>
+ <5110CBB9.5080307@ti.com>
+Message-ID: <20130205094650.GO32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Tue, Feb 05, 2013 at 02:37:05PM +0530, Santosh Shilimkar wrote:
+> On Tuesday 05 February 2013 02:16 PM, kishon wrote:
+> >Hi,
+> >
+> >On Tuesday 05 February 2013 02:08 PM, Felipe Balbi wrote:
+> >>On Tue, Feb 05, 2013 at 01:59:26PM +0530, kishon wrote:
+> >>>On Sunday 27 January 2013 01:17 AM, Sergei Shtylyov wrote:
+> >>>>Hello.
+> >>>>
+> >>>>On 25-01-2013 15:11, Kishon Vijay Abraham I wrote:
+> >>>>
+> >>>>>Add dwc3 omap glue data to the omap5 dt data file. The information
+> >>>>>about
+> >>>>>the dt node added here is available @
+> >>>>>Documentation/devicetree/bindings/usb/omap-usb.txt
+> >>>>
+> >>>>>Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>>>>---
+> >>>>>  arch/arm/boot/dts/omap5.dtsi |   11 +++++++++++
+> >>>>>  1 file changed, 11 insertions(+)
+> >>>>
+> >>>>>diff --git a/arch/arm/boot/dts/omap5.dtsi
+> >>>>>b/arch/arm/boot/dts/omap5.dtsi
+> >>>>>index 5f59bf2..1703a72 100644
+> >>>>>--- a/arch/arm/boot/dts/omap5.dtsi
+> >>>>>+++ b/arch/arm/boot/dts/omap5.dtsi
+> >>>>>@@ -513,6 +513,17 @@
+> >>>>>              ti,type = <2>;
+> >>>>>          };
+> >>>>>
+> >>>>>+        omap_dwc3 at 4a020000 {
+> >>>>>+            compatible = "ti,dwc3";
+> >>>>>+            ti,hwmods = "usb_otg_ss";
+> >>>>>+            reg = <0x4a020000 0x1ff>;
+> >>>>
+> >>>>    Shoudn't the "reg" length be 0x200 here? It's length, not limit.
+> >>>
+> >>>I think 0x1ff is correct. I got the data from hwmod data.
+> >>
+> >>hwmod is utterly wrong. Looking at TRM, it says the size here is 64KiB
+> >>(0x10000), so is the size for dwc3 itself. Please don't blindly trust
+> >>hwmod, make sure you read data from TRM ;-)
+> >
+> >hmm..ok. But it has only 17 registers :-D
+> >
+> As Felipe said, it should be 0x200. And if you are
+> interested in lesser space, there is no need to map entire 64 KB
+> address space if it isn't being used.
 
-On 02/04/2013 08:52 PM, Tony Lindgren wrote:
-> Looks like this now adds some new section warnings:
-> 
-> WARNING: vmlinux.o(.text+0x34124): Section mismatch in reference from the function sdp3430_twl_gpio_setup() to the function .init.text:omap_twl4030_audio_init()
-> The function sdp3430_twl_gpio_setup() references
-> the function __init omap_twl4030_audio_init().
-> This is often because sdp3430_twl_gpio_setup lacks a __init 
-> annotation or the annotation of omap_twl4030_audio_init is wrong.
-> 
-> WARNING: vmlinux.o(.text+0x34b8c): Section mismatch in reference from the function zoom_twl_gpio_setup() to the function .init.text:omap_twl4030_audio_init()
-> The function zoom_twl_gpio_setup() references
-> the function __init omap_twl4030_audio_init().
-> This is often because zoom_twl_gpio_setup lacks a __init 
-> annotation or the annotation of omap_twl4030_audio_init is wrong.
+We get really close to using all of it. For DWC3, the last address is at
+0xcc10 (a 32-bit register).
 
-For some reason the CONFIG_DEBUG_SECTION_MISMATCH got disabled in my rolling
-kernel config...
+For dwc3-wrapper, then it's correct, we don't use it, I would still map
+the whole thing to make it future proof.
 
-
-> These can be fixed with the following patch, but I suspect some
-> of these cannot be __init/__initdata if the driver reprobes.
-> 
-> Can you please check this? I'll hold on sendinf off
-> this branch until it's been checked and fixed properly.
-
-I think this is not the correct way. the *_twl_gpio_setup() is called from the
-gpio-twl4030 driver's platform_driver probe function which if I'm not mistaken
-is not __init.
-
-I think we should remove the __init from the omap_twl4030_audio_init() in
-twl-common.c
-With this change I do not have section mismatch either.
+Any draw-backs from mapping all 64K ?
 
 -- 
-P?ter
-
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> --- a/arch/arm/mach-omap2/board-3430sdp.c
-> +++ b/arch/arm/mach-omap2/board-3430sdp.c
-> @@ -223,7 +223,7 @@ static struct omap_tw4030_pdata omap_twl4030_audio_data = {
->  	.has_linein	= OMAP_TWL4030_LEFT | OMAP_TWL4030_RIGHT,
->  };
->  
-> -static int sdp3430_twl_gpio_setup(struct device *dev,
-> +static int __init sdp3430_twl_gpio_setup(struct device *dev,
->  		unsigned gpio, unsigned ngpio)
->  {
->  	/* gpio + 0 is "mmc0_cd" (input/IRQ),
-> @@ -245,7 +245,7 @@ static int sdp3430_twl_gpio_setup(struct device *dev,
->  	return 0;
->  }
->  
-> -static struct twl4030_gpio_platform_data sdp3430_gpio_data = {
-> +static struct twl4030_gpio_platform_data __initdata sdp3430_gpio_data = {
->  	.pulldowns	= BIT(2) | BIT(6) | BIT(8) | BIT(13)
->  				| BIT(16) | BIT(17),
->  	.setup		= sdp3430_twl_gpio_setup,
-> @@ -374,7 +374,7 @@ static struct regulator_init_data sdp3430_vsim = {
->  	.consumer_supplies	= sdp3430_vsim_supplies,
->  };
->  
-> -static struct twl4030_platform_data sdp3430_twldata = {
-> +static struct twl4030_platform_data __initdata sdp3430_twldata = {
->  	/* platform_data for children goes here */
->  	.gpio		= &sdp3430_gpio_data,
->  	.keypad		= &sdp3430_kp_data,
-> --- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-> +++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-> @@ -238,7 +238,7 @@ static struct omap_tw4030_pdata omap_twl4030_audio_data = {
->  	.has_linein	= OMAP_TWL4030_LEFT | OMAP_TWL4030_RIGHT,
->  };
->  
-> -static int zoom_twl_gpio_setup(struct device *dev,
-> +static int __init zoom_twl_gpio_setup(struct device *dev,
->  		unsigned gpio, unsigned ngpio)
->  {
->  	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
-> @@ -252,11 +252,11 @@ static int zoom_twl_gpio_setup(struct device *dev,
->  	return 0;
->  }
->  
-> -static struct twl4030_gpio_platform_data zoom_gpio_data = {
-> +static struct twl4030_gpio_platform_data __initdata zoom_gpio_data = {
->  	.setup		= zoom_twl_gpio_setup,
->  };
->  
-> -static struct twl4030_platform_data zoom_twldata = {
-> +static struct twl4030_platform_data __initdata zoom_twldata = {
->  	/* platform_data for children goes here */
->  	.gpio		= &zoom_gpio_data,
->  	.keypad		= &zoom_kp_twl4030_data,
-> 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/3756f02e/attachment.sig>
