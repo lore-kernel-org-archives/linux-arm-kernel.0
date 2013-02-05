@@ -1,89 +1,51 @@
 From: girishks2000@gmail.com (Girish K S)
-Date: Tue,  5 Feb 2013 15:09:41 -0800
-Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and init
+Date: Tue,  5 Feb 2013 15:09:44 -0800
+Subject: [PATCH 4/4] spi: s3c64xx: add support for exynos5440 spi
 In-Reply-To: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
 References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
-Message-ID: <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
+Message-ID: <1360105784-12282-5-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The status of the interrupt is available in the status register,
-so reading the clear pending register and writing back the same
-value will not actually clear the pending interrupts. This patch
-modifies the interrupt handler to read the status register and
-clear the corresponding pending bit in the clear pending register.
-
-Modified the hwInit function to clear all the pending interrupts.
+This patch adds support for the exynos5440 spi controller.
+The integration of the spi IP in exynos5440 is different from
+other SoC's. The I/O pins are no more configured via gpio, they
+have dedicated pins.
 
 Signed-off-by: Girish K S <ks.giri@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c |   41 +++++++++++++++++++++++++----------------
- 1 file changed, 25 insertions(+), 16 deletions(-)
+ drivers/spi/spi-s3c64xx.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index ad93231..b770f88 100644
+index f06bbee..bf26abc 100644
 --- a/drivers/spi/spi-s3c64xx.c
 +++ b/drivers/spi/spi-s3c64xx.c
-@@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
- {
- 	struct s3c64xx_spi_driver_data *sdd = data;
- 	struct spi_master *spi = sdd->master;
--	unsigned int val;
-+	unsigned int val, clr = 0;
+@@ -1547,6 +1547,15 @@ static struct s3c64xx_spi_port_config exynos4_spi_port_config = {
+ 	.clk_from_cmu	= true,
+ };
  
--	val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
-+	val = readl(sdd->regs + S3C64XX_SPI_STATUS);
- 
--	val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
--		S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
--		S3C64XX_SPI_PND_TX_OVERRUN_CLR |
--		S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
--
--	writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
--
--	if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
-+	if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
-+		clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
- 		dev_err(&spi->dev, "RX overrun\n");
--	if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
-+	}
-+	if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
-+		clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
- 		dev_err(&spi->dev, "RX underrun\n");
--	if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
-+	}
-+	if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
-+		clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
- 		dev_err(&spi->dev, "TX overrun\n");
--	if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
-+	}
-+	if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
-+		clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
- 		dev_err(&spi->dev, "TX underrun\n");
-+	}
++static struct s3c64xx_spi_port_config exynos5440_spi_port_config = {
++	.fifo_lvl_mask	= { 0xff },
++	.rx_lvl_offset	= 15,
++	.tx_st_done	= 25,
++	.high_speed	= true,
++	.clk_from_cmu	= true,
++	.quirks		= S3C64XX_SPI_QUIRK_GPIO | S3C64XX_SPI_QUIRK_POLL,
++};
 +
-+	/* Clear the pending irq by setting and then clearing it */
-+	writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
-+	writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
- 
- 	return IRQ_HANDLED;
- }
-@@ -1039,9 +1044,13 @@ static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd, int channel)
- 	writel(0, regs + S3C64XX_SPI_MODE_CFG);
- 	writel(0, regs + S3C64XX_SPI_PACKET_CNT);
- 
--	/* Clear any irq pending bits */
--	writel(readl(regs + S3C64XX_SPI_PENDING_CLR),
--				regs + S3C64XX_SPI_PENDING_CLR);
-+	/* Clear any irq pending bits, should set and clear the bits */
-+	val = S3C64XX_SPI_PND_RX_OVERRUN_CLR |
-+		S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
-+		S3C64XX_SPI_PND_TX_OVERRUN_CLR |
-+		S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
-+	writel(val, regs + S3C64XX_SPI_PENDING_CLR);
-+	writel(val & ~val, regs + S3C64XX_SPI_PENDING_CLR);
- 
- 	writel(0, regs + S3C64XX_SPI_SWAP_CFG);
- 
+ static struct platform_device_id s3c64xx_spi_driver_ids[] = {
+ 	{
+ 		.name		= "s3c2443-spi",
+@@ -1575,6 +1584,9 @@ static const struct of_device_id s3c64xx_spi_dt_match[] = {
+ 	{ .compatible = "samsung,exynos4210-spi",
+ 			.data = (void *)&exynos4_spi_port_config,
+ 	},
++	{ .compatible = "samsung,exynos5440-spi",
++			.data = (void *)&exynos5440_spi_port_config,
++	},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, s3c64xx_spi_dt_match);
 -- 
 1.7.10.4
