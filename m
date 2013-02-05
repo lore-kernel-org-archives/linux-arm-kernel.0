@@ -1,44 +1,25 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 05 Feb 2013 16:40:54 +0100
-Subject: [PATCH 2/2] ARM: mvebu: Update defconfig to select SPI support
-In-Reply-To: <1359995888-2385-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1359995888-2385-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <51112806.4000506@free-electrons.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 5 Feb 2013 10:42:21 -0500
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130205124120.GC17852@n2100.arm.linux.org.uk>
+References: <20130204154153.GA18237@arwen.pp.htv.fi> <510FF1A6.403@mvista.com>
+ <20130204164712.GB4269@arwen.pp.htv.fi> <510FF5C9.3030600@mvista.com>
+ <20130204170216.GC4269@arwen.pp.htv.fi> <51100A72.6030909@ti.com>
+ <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
+ <20130204203358.GX4720@opensource.wolfsonmicro.com>
+ <CACRpkdbPyZt8=pLhz-5qcaSSAk6VBn61dPTNp6teU9HksBwN2w@mail.gmail.com>
+ <51102E25.8040107@ti.com> <20130205124120.GC17852@n2100.arm.linux.org.uk>
+Message-ID: <5111285D.3030503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
-On 02/04/2013 05:38 PM, Ezequiel Garcia wrote:
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Lior Amsalem <alior@marvell.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/configs/mvebu_defconfig |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-> index 4e6f0ce..e243451 100644
-> --- a/arch/arm/configs/mvebu_defconfig
-> +++ b/arch/arm/configs/mvebu_defconfig
-> @@ -40,6 +40,8 @@ CONFIG_MWIFIEX_SDIO=y
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
->  CONFIG_I2C=y
-> +CONFIG_SPI=y
-> +CONFIG_SPI_ORION=y
->  CONFIG_I2C_MV64XXX=y
->  CONFIG_SERIAL_8250_DW=y
->  CONFIG_GPIOLIB=y
-> 
+On 02/05/2013 07:41 AM, Russell King - ARM Linux wrote:
+> On Mon, Feb 04, 2013 at 04:54:45PM -0500, Cyril Chemparathy wrote:
+>> You're assuming that cookies complete in order.  That is not necessarily
+>> true.
+>
+> Under what circumstances is that not true?
+>
 
-For this patch you can add my
-Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
-
-Regards,
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Notably when hardware can prioritize certain classes of traffic over 
+others, for instance with data center bridging mechanisms.
