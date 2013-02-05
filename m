@@ -1,48 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Feb 2013 14:11:25 -0800
-Subject: Latest additional build warnings
-In-Reply-To: <20130205175126.GH25185@atomide.com>
-References: <20130205142218.GB17833@n2100.arm.linux.org.uk>
- <20130205175126.GH25185@atomide.com>
-Message-ID: <20130205221125.GB13768@quad.lixom.net>
+Date: Tue, 5 Feb 2013 14:22:47 -0800
+Subject: [GIT PULL] ux500 <mach/id.h> removal
+In-Reply-To: <CACRpkdYo9AU2Wic7UNG_CemyO5NFrgFdz1UNC8ciOE8T0joZbA@mail.gmail.com>
+References: <CACRpkdY9BDyGQ-DiEhTiyHEYoxpGiL+H0baqsBYX_a-0upktUQ@mail.gmail.com>
+ <CAOesGMiKCHUz9BJ31o-4kthr0CZABuL7SuuMNEjbkUQ06KsfMw@mail.gmail.com>
+ <CACRpkdYmTTgpnAOoNM3RJiF_oADgbuGK-vw6JF8J9rPAttA5PQ@mail.gmail.com>
+ <201301302315.22357.arnd@arndb.de>
+ <CACRpkdYo9AU2Wic7UNG_CemyO5NFrgFdz1UNC8ciOE8T0joZbA@mail.gmail.com>
+Message-ID: <CAOesGMhEJi-kW8GwCM7W7bWYqWa_6=im=79GKLoXHdw5zi9pzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 09:51:26AM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130205 06:25]:
-> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: data definition has no type or storage class
-> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: type defaults to 'int' in declaration of 'omap_postcore_initcall'
-> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: parameter names (without types) in function declaration
-> > arch/arm/mach-omap2/hwspinlock.c:31:122: warning: 'hwspinlocks_init' defined but not used
-> 
-> Thanks looks like I missed that one somehow. Here's a fix for
-> it.
-> 
-> Arnd & Olof, care to apply this directly into the arm-soc multiplatform
-> branch?
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 5 Feb 2013 09:48:08 -0800
-> Subject: [PATCH] ARM: OMAP2+: Fix warning for hwspinlock omap_postcore_initcall
-> 
-> Commit 816a65ef4 (ARM: OMAP2+: Limit omap initcalls to omap only on
-> multiplatform kernels) fixed up things for multiplatform booting
-> but failed to include soc.h causing a new warning:
-> 
-> arch/arm/mach-omap2/hwspinlock.c:60:1: warning: data definition has no type or storage class
-> arch/arm/mach-omap2/hwspinlock.c:60:1: warning: type defaults to 'int' in declaration of 'omap_postcore_initcall'
-> arch/arm/mach-omap2/hwspinlock.c:60:1: warning: parameter names (without types) in function declaration
-> arch/arm/mach-omap2/hwspinlock.c:31:122: warning: 'hwspinlocks_init' defined but not used
-> 
-> Reported-by: Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Hi,
 
-Applied to next/multiplatform with the reported-by line fixed up.
+On Thu, Jan 31, 2013 at 6:40 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Jan 31, 2013 at 12:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+>> Unrelated to this: The mach/id.h removal seems to have caused a few
+>> build errors in the for-next tree with u8500_defconfig. Can you have
+>> a look at what went wrong there?
+>
+> Yes ... hm.
+>
+> I have no clue how this happened, somehow new dependencues
+> have appeared and I've somehow had a config that builds without
+> some of the drivers or something :-(
+>
+> Or I built the wrong branch and thought it was clear to go.
+>
+> Shall we just drop it until I've fixed it up?
+
+What's the expected timeline for fixup? I can revert the patch in
+for-next and we can take a fix on top of the branch that introduced
+the breakage, if that's easier.
 
 
 -Olof
