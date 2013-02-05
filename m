@@ -1,25 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Feb 2013 16:31:40 +0000
-Subject: [PATCH] OMAPDSS: enable omapdss for ARCH_MULTIPLATFORM
-In-Reply-To: <201301222153.19580.arnd@arndb.de>
-References: <1358891160-9534-1-git-send-email-robdclark@gmail.com>
- <201301222153.19580.arnd@arndb.de>
-Message-ID: <201302051631.40254.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Feb 2013 17:34:34 +0100
+Subject: [PATCH 1/3] pinctrl: sunxi: Add of_xlate function
+In-Reply-To: <1359889813-10029-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1359889813-10029-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1359889813-10029-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdYcp5_BvTdSTgHg2xhmnsdx=oT=e19oJnFHCyMaMkGT5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 January 2013, Arnd Bergmann wrote:
-> On Tuesday 22 January 2013, Rob Clark wrote:
-> > At least core omapdss does not have any build dependencies on
-> > ARCH_OMAP2PLUS, and adding this dependency in the Kconfig breaks omapdrm
-> > for ARCH_MULTIPLATFORM builds.
-> > 
-> > Signed-off-by: Rob Clark <robdclark@gmail.com>
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Sun, Feb 3, 2013 at 12:10 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-It seems nobody has applied this patch, as it has not shown up in
-linux-next or upstream. Who should take care of this? If nobody feels
-responsible, I can put it into arm-soc/fixes.
+> Since the pin controller of sunxi chips is represented as a single bank
+> in the driver.
+> Since this is neither convenient nor represented that way in the
+> datasheets, define a custom of_xlate function with the layout <bank pin
+> flag>
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-	Arnd
+Applied to my allwinner branch. I will soon lock down this branch
+and merge it into devel so I mature my devel branch for the
+merge window.
+
+Yours,
+Linus Walleij
