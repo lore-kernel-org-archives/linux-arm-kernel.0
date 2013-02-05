@@ -1,47 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Feb 2013 22:23:04 +0000
-Subject: [PATCH, RFC] default machine descriptor for multiplatform
-In-Reply-To: <CAL_JsqJ2SyGeJePvNh5fREWP5LcAxnvNsiq2=kKNxKrnquyy3Q@mail.gmail.com>
-References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <1638002.UJ7zfj1Wn5@wuerfel>
- <CAL_JsqJ2SyGeJePvNh5fREWP5LcAxnvNsiq2=kKNxKrnquyy3Q@mail.gmail.com>
-Message-ID: <201302052223.04807.arnd@arndb.de>
+Date: Tue, 5 Feb 2013 22:26:30 +0000
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130205182848.GJ25185@atomide.com>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <20130204154153.GA18237@arwen.pp.htv.fi> <20130205182848.GJ25185@atomide.com>
+Message-ID: <201302052226.30754.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 February 2013, Rob Herring wrote:
-> >
-> > + if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
-> > + DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-> > + MACHINE_END
+On Tuesday 05 February 2013, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [130204 07:46]:
+> > 
+> > Current DMA abstraction is quite poor, for example there's no way to
+> > compile support for multiple DMA engines. Code also makes certain, IMO
+> > unnecessary, assumptions about the underlying DMA engine (abstraction is
+> > poor, as said above but it we could follow MUSB's programming guide when
+> > it comes to programming DMA transfers).
+> > 
+> > Considering all of the above, it's far better to use DMA engine and get
+> > rid of all the mess.
 > 
-> I assume this works, but it looks a bit strange declared here.
+> How about just disable MUSB DMA support if ARCH_MULTIPLATFORM for now?
+> That way MUSB can be fixed up first to support ARCH_MULTIPLATFORM
+> using PIO while sorting out the DMA related issues.
 
-Yes, I was wondering whether it should be global instead, but that
-would require an #ifdef, or enabling it for all DT-based builds, not
-just those with ARCH_MULTIPLATFORM.
-
-
-> >  static int __init customize_machine(void)
-> >  {
-> > - /* customizes platform devices, or adds new ones */
-> > + /*
-> > + * customizes platform devices, or adds new ones
-> > + * On DT based machines, we fall back to populating the
-> > + * machine from the device tree, if no callback is provided,
-> > + * otherwise we would always need an init_machine callback.
-> > + */
-> >   if (machine_desc->init_machine)
-> >   machine_desc->init_machine();
-> > + else
-> > + of_platform_populate(NULL, of_default_bus_match_table,
-> > + NULL, NULL);
-> 
-> Could this be unconditional? It should be safe to call multiple times
-> if a platform calls this first because ordering matters or there are
-> custom match tables. I would guess any ordering requirements need to
-> happen before this call anyway.
-
-Yes, possible, but that needs more testing to avoid potential regressions.
+Sounds ok to me. Someone still needs to do the work to make the non-DMA
+variants of MUSB coexist in one kernel, but as we discussed erlier, that
+should be much simpler.
 
 	Arnd
