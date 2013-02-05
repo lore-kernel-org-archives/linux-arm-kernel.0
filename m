@@ -1,48 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 5 Feb 2013 17:41:13 +0000
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130205170628.GD17852@n2100.arm.linux.org.uk>
-References: <510FF1A6.403@mvista.com> <20130204164712.GB4269@arwen.pp.htv.fi>
- <510FF5C9.3030600@mvista.com>
- <20130204170216.GC4269@arwen.pp.htv.fi> <51100A72.6030909@ti.com>
- <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
- <5110369B.9060901@ti.com>
- <CACRpkda8xBB35CwuBH76xXcC341TeRs1ZuwzDD0LtuXc4ifQTw@mail.gmail.com>
- <20130205164705.GG4720@opensource.wolfsonmicro.com>
- <20130205170628.GD17852@n2100.arm.linux.org.uk>
-Message-ID: <20130205174113.GJ4720@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Feb 2013 09:51:26 -0800
+Subject: Latest additional build warnings
+In-Reply-To: <20130205142218.GB17833@n2100.arm.linux.org.uk>
+References: <20130205142218.GB17833@n2100.arm.linux.org.uk>
+Message-ID: <20130205175126.GH25185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 05:06:28PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 05, 2013 at 04:47:05PM +0000, Mark Brown wrote:
-> > On Tue, Feb 05, 2013 at 05:21:48PM +0100, Linus Walleij wrote:
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [130205 06:25]:
+> arch/arm/mach-omap2/hwspinlock.c:60:1: warning: data definition has no type or storage class
+> arch/arm/mach-omap2/hwspinlock.c:60:1: warning: type defaults to 'int' in declaration of 'omap_postcore_initcall'
+> arch/arm/mach-omap2/hwspinlock.c:60:1: warning: parameter names (without types) in function declaration
+> arch/arm/mach-omap2/hwspinlock.c:31:122: warning: 'hwspinlocks_init' defined but not used
 
-> > > For IRQ mode, use the completion callback to push each cookie
-> > > to NAPI, and thus let the IRQ drive the traffic.
+Thanks looks like I missed that one somehow. Here's a fix for
+it.
 
-> > The whole purpose of NAPI is to avoid taking interrupts for completion
-> > of transfers.  Anything that generates interrupts when NAPI is in
-> > polling mode is defeating the point.
+Arnd & Olof, care to apply this directly into the arm-soc multiplatform
+branch?
 
-> Yes, but you're missing one very important point.  If your DMA engine
-> is decoupled from the network device, and the DMA engine relies upon
-> interrupts to queue further transfers to move data into RAM, then you
-> have two options:
+Regards,
 
-> 1. Receive these interrupts so you can update the DMA engine for
->    further data transfer.
-> 2. Don't receive these interrupts, and cause the network device to
->    error out with a FIFO overrun because its DMA requests have not
->    been serviced. (which may raise an interrupt.)
+Tony
 
-There's still the third option of just implementing a non-NAPI driver,
-though I guess we've now built so much infrastructure on top of NAPI
-that it's still useful to pretend we can disable interrupts.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/3e0da619/attachment.sig>
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 5 Feb 2013 09:48:08 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix warning for hwspinlock omap_postcore_initcall
+
+Commit 816a65ef4 (ARM: OMAP2+: Limit omap initcalls to omap only on
+multiplatform kernels) fixed up things for multiplatform booting
+but failed to include soc.h causing a new warning:
+
+arch/arm/mach-omap2/hwspinlock.c:60:1: warning: data definition has no type or storage class
+arch/arm/mach-omap2/hwspinlock.c:60:1: warning: type defaults to 'int' in declaration of 'omap_postcore_initcall'
+arch/arm/mach-omap2/hwspinlock.c:60:1: warning: parameter names (without types) in function declaration
+arch/arm/mach-omap2/hwspinlock.c:31:122: warning: 'hwspinlocks_init' defined but not used
+
+Reported-by: Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/hwspinlock.c b/arch/arm/mach-omap2/hwspinlock.c
+index ce1b5b6..bcb357e 100644
+--- a/arch/arm/mach-omap2/hwspinlock.c
++++ b/arch/arm/mach-omap2/hwspinlock.c
+@@ -21,6 +21,7 @@
+ #include <linux/err.h>
+ #include <linux/hwspinlock.h>
+ 
++#include "soc.h"
+ #include "omap_hwmod.h"
+ #include "omap_device.h"
+ 
