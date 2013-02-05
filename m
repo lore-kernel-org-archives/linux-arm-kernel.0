@@ -1,18 +1,18 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 05 Feb 2013 12:43:42 +0000
-Subject: [PATCH 1/2] spi: sirf: use clk_prepare_enable and
- clk_disable_unprepare
-In-Reply-To: <1356490114-18022-1-git-send-email-Barry.Song@csr.com>
+Date: Tue, 05 Feb 2013 12:43:50 +0000
+Subject: [PATCH 2/2] spi: sirf: add support for new SiRFmarco SMP SoC
+In-Reply-To: <1356490114-18022-2-git-send-email-Barry.Song@csr.com>
 References: <1356490114-18022-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <20130205124342.EB5AC3E0E27@localhost>
+ <1356490114-18022-2-git-send-email-Barry.Song@csr.com>
+Message-ID: <20130205124351.4DDA93E0E27@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Dec 2012 10:48:33 +0800, Barry Song <Barry.Song@csr.com> wrote:
+On Wed, 26 Dec 2012 10:48:34 +0800, Barry Song <Barry.Song@csr.com> wrote:
 > From: Barry Song <Baohua.Song@csr.com>
 > 
-> Convert clk_enable/clk_disable to clk_prepare_enable/clk_disable_unprepare
-> calls as required by common clock framework.
+> the driver is also compatible with SiRFmarco except SiRFprimaII,
+> so simply add "sirf,marco-spi" to OF match table.
 > 
 > Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
@@ -21,40 +21,21 @@ Applied, thanks.
 g.
 
 > ---
->  drivers/spi/spi-sirf.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
+>  drivers/spi/spi-sirf.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
 > diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-> index e0f43a5..38a191c 100644
+> index 38a191c..09ca0e3 100644
 > --- a/drivers/spi/spi-sirf.c
 > +++ b/drivers/spi/spi-sirf.c
-> @@ -570,7 +570,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
->  		ret = -EINVAL;
->  		goto free_pin;
->  	}
-> -	clk_enable(sspi->clk);
-> +	clk_prepare_enable(sspi->clk);
->  	sspi->ctrl_freq = clk_get_rate(sspi->clk);
+> @@ -659,6 +659,7 @@ static const struct dev_pm_ops spi_sirfsoc_pm_ops = {
 >  
->  	init_completion(&sspi->done);
-> @@ -594,7 +594,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
->  	return 0;
->  
->  free_clk:
-> -	clk_disable(sspi->clk);
-> +	clk_disable_unprepare(sspi->clk);
->  	clk_put(sspi->clk);
->  free_pin:
->  	pinctrl_put(sspi->p);
-> @@ -618,7 +618,7 @@ static int  spi_sirfsoc_remove(struct platform_device *pdev)
->  		if (sspi->chipselect[i] > 0)
->  			gpio_free(sspi->chipselect[i]);
->  	}
-> -	clk_disable(sspi->clk);
-> +	clk_disable_unprepare(sspi->clk);
->  	clk_put(sspi->clk);
->  	pinctrl_put(sspi->p);
->  	spi_master_put(master);
+>  static const struct of_device_id spi_sirfsoc_of_match[] = {
+>  	{ .compatible = "sirf,prima2-spi", },
+> +	{ .compatible = "sirf,marco-spi", },
+>  	{}
+>  };
+>  MODULE_DEVICE_TABLE(of, sirfsoc_spi_of_match);
 > -- 
 > 1.7.5.4
 > 
