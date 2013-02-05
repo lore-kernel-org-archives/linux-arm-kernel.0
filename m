@@ -1,22 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 Feb 2013 19:02:29 +0100
-Subject: [PATCH 9/9] gpiolib: dynamically allocate descriptors array
-In-Reply-To: <1359822572-26009-11-git-send-email-acourbot@nvidia.com>
-References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-11-git-send-email-acourbot@nvidia.com>
-Message-ID: <CACRpkdaTF1Ca5GX-D+cx-_LrOVZyhX_mgLGRfv65dabof5-RYQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 5 Feb 2013 13:09:00 -0500
+Subject: [PATCH] arm: mvebu: Add SPI flash on Armada XP-GP board
+In-Reply-To: <20130205180705.5231effd@skate>
+References: <1360063473-26176-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130205123827.GG20242@lunn.ch>
+ <20130205124833.GS14746@titan.lakedaemon.net>
+ <20130205142720.GB2481@localhost>
+ <20130205153135.GU14746@titan.lakedaemon.net>
+ <20130205171701.4fcb1304@skate>
+ <51113132.6000500@free-electrons.com>
+ <20130205180705.5231effd@skate>
+Message-ID: <20130205180900.GY14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 2, 2013 at 5:29 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+On Tue, Feb 05, 2013 at 06:07:05PM +0100, Thomas Petazzoni wrote:
+> Of course, it doesn't make sense to have drivers for pluggable devices
+> like PCIe devices that are not soldered, USB devices and things like
+> that. But for all the rest, I would say it should be in the defconfig.
 
-> Allocate the GPIO descriptor's memory dynamically when GPIO chips are
-> added instead of using the static gpio_desc[] array. gpio_desc[] is now
-> totally unused and therefore removed.
->
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+hmmm, so for the new devboard we should set CONFIG_RAM=n? ;-)
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+thx,
 
-Yours,
-Linus Walleij
+Jason.
