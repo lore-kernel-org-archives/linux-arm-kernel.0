@@ -1,78 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 5 Feb 2013 06:21:04 -0500
-Subject: [GIT PULL  3/4] ARM: mvebu: boards for v3.9
-In-Reply-To: <20130205071010.GD13049@quad.lixom.net>
-References: <pull-1359733919-342140> <1359733919.c3D01c3.22262@triton>
- <20130205071010.GD13049@quad.lixom.net>
-Message-ID: <20130205112104.GP14746@titan.lakedaemon.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 5 Feb 2013 13:22:47 +0200
+Subject: [PATCH v8 19/22] ARM: OMAP3: clock data: get rid of unused USB
+ host clock aliases and dummies
+In-Reply-To: <alpine.DEB.2.00.1301211502190.8450@utopia.booyaka.com>
+References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
+ <1358511445-26656-20-git-send-email-rogerq@ti.com>
+ <alpine.DEB.2.00.1301182027040.19470@utopia.booyaka.com>
+ <50FD0BEF.9000007@ti.com>
+ <alpine.DEB.2.00.1301211502190.8450@utopia.booyaka.com>
+Message-ID: <5110EB87.1060704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 11:10:10PM -0800, Olof Johansson wrote:
-> Hi,
+Hi Paul,
+
+On 01/21/2013 05:03 PM, Paul Walmsley wrote:
+> Hi
 > 
-> On Fri, Feb 01, 2013 at 03:51:59PM +0000, Jason Cooper wrote:
-> > The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
-> > 
-> >   Linux 3.8-rc5
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.infradead.org/users/jcooper/linux.git tags/boards_for_v3.9
-> > 
-> > for you to fetch changes up to c7064904895f69b2e33117b450a05746f75abf3a:
-> > 
-> >   ARM: kirkwood: convert Guruplug Server Plus to use the device tree
-> > 
-> > ----------------------------------------------------------------
-> > mvebu boards for v3.9
-> >      - Guruplug Server Plus DT board
-> >      - RD-A370-A1 board
-> >      - mvebu improved SMP support in interrupt controller
-> >      - update defconfigs
-> >      - split legacy and DT setup for dove
-> >      - remove some redundant clock aliases
-> >     
-> >     depends on:
-> >      - tags/mvebu_fixes_for_v3.8-rc6
-> >      - tags/cleanup_for_v3.9_round2
-> >      - tags/drivers_for_v3.9
-> >      - mmc/mmc-next up to:
-> >         d293875 mmc: mvsdio: add pinctrl integration
+> On Mon, 21 Jan 2013, Roger Quadros wrote:
 > 
-> Hm. What do you need the mmc branch for? Is it just the removal of the
-> redundant SDIO clock alias?
-
-No, it's the four patches of Thomas' to the mvsdio driver:
-
-d293875 mmc: mvsdio: add pinctrl integration
-182ce21 mmc: mvsdio: implement a Device Tree binding
-aa3738e mmc: mvsdio: use slot-gpio for card detect gpio
-9d8b28e5 mmc: mvsdio: use slot-gpio infrastructure for write protect gpio
-
-which mvebu/boards needs before we can activate defconfig options.
-
-> Also, it's really hard to tell where code came from when you just merge in
-> a hash like below:
+>> On 01/18/2013 10:27 PM, Paul Walmsley wrote:
+>>> On Fri, 18 Jan 2013, Roger Quadros wrote:
+>>>
+>>>> We don't need multiple aliases for the OMAP USB host clocks and neither
+>>>> the dummy clocks so remove them.
+>>>>
+>>>> CC: Paul Walmsley <paul@pwsan.com>
+>>>> CC: Rajendra Nayak <rnayak@ti.com>
+>>>> CC: Benoit Cousson <b-cousson@ti.com>
+>>>> CC: Mike Turquette <mturquette@linaro.com>
+>>>>
+>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>> Reviewed-by: Felipe Balbi <balbi@ti.com>
+>>>> Acked-by: Paul Walmsley <paul@pwsan.com>
+>>>
+>>> Per Tony's earlier request, you can drop this patch and patch 20 from your 
+>>> series now.  I've got them queued for 3.10 or late 3.9 merge window.
+>>>
+>>
+>> Should have mentioned it earlier, but just this patch without the rest
+>> of the cleanup patches will break USB Host on OMAP3, as the old driver
+>> bails out if optional clock nodes are missing.
+>>
+>> Including patch 20 doesn't seem to cause a problem with OMAP4 though.
 > 
-> > Jason Cooper (4):
-> >       Merge tag 'tags/mvebu_fixes_for_v3.8-rc6' into mvebu/boards
-> >       Merge tag 'tags/cleanup_for_v3.9_round2' into mvebu/boards
-> >       Merge tag 'tags/drivers_for_v3.9' into mvebu/boards
-> >       Merge commit 'd293875' into mvebu/boards
+> I've got these two patches queued for merging after your other patches go 
+> upstream -- e.g., probably 3.10.  Do you foresee any problems with that?
 > 
-> That's the mmc-next branch at that commit, but it'd be nice to have a
-> more descriptive summary in the shortlog.
 
-Agreed, I started doing this after the first time I pulled in pinctrl as
-a dependency.  LinusW recommended pulling just up to the commit needed
-so that if he did have to do a rebase, the closer it was to the tip of
-his tree, the fewer people it would affect.
+FYI, the usbhost patches are already in linux-next.
 
-Would this be better?
-
-"Merge mmc/mmc-next up to 'd293875' into mvebu/boards"
-
-thx,
-
-Jason.
+cheers,
+-roger
