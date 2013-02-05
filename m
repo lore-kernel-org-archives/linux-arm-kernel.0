@@ -1,45 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 5 Feb 2013 14:04:15 +0800
-Subject: [GIT PULL] mxs device tree changes for 3.9
-Message-ID: <20130205060413.GE10807@S2101-09.ap.freescale.net>
+From: kishon@ti.com (kishon)
+Date: Tue, 5 Feb 2013 11:34:15 +0530
+Subject: [PATCH 04/13] mfd: omap-usb-tll: Add device tree support
+In-Reply-To: <1359993540-20780-5-git-send-email-rogerq@ti.com>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-5-git-send-email-rogerq@ti.com>
+Message-ID: <5110A0DF.7050609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a49f0d1ea3ec94fc7cf33a7c36a16343b74bd565:
+On Monday 04 February 2013 09:28 PM, Roger Quadros wrote:
+> Enable this driver to probe in device tree boot.
+>
+> CC: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>   .../devicetree/bindings/mfd/omap-usb-tll.txt       |   17 +++++++++++++++++
+>   drivers/mfd/omap-usb-tll.c                         |    9 +++++++++
+>   2 files changed, 26 insertions(+), 0 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt b/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
+> new file mode 100644
+> index 0000000..835cf4f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
+> @@ -0,0 +1,17 @@
+> +OMAP HS USB Host TLL (Transceiver-Less Interface)
+> +
+> +Required properties:
+> +
+> +- compatible : should be "ti,usbhs-tll"
+> +- reg : should contain one register range i.e. start and length
+> +- interrupts : should contain the TLL module's interrupt
+> +- ti,hwmod : must contain "usb_tll_hs"
+> +
+> +Example:
+> +
+> +	usbhstll: usbhstll at 0x4a062000 {
+The node name shouldn't have 0x. This comment applies to all your 
+patches adding device tree support.
 
-  Linux 3.8-rc1 (2012-12-21 17:19:00 -0800)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-dt-3.9
-
-for you to fetch changes up to 0943b96058c4262b4e4cd05398f42e8730d5ee08:
-
-  ARM: mxs: dts: Add rotary encoder to the CFA-10049 (2013-01-31 22:31:19 +0800)
-
-----------------------------------------------------------------
-mxs device tree changes for 3.9
-
- - Mostly cfa100xx related device tree source updates
-
-----------------------------------------------------------------
-Marek Vasut (1):
-      ARM: mxs: Enable touchscreen on m28evk
-
-Maxime Ripard (7):
-      ARM: dts: cfa10049: Add PCA9555 GPIO expander to the device tree
-      ARM: mxs: dt: Add Crystalfontz CFA-10037 device tree support
-      ARM: dts: cfa10049: Change the SPI3 bus to spi-gpio
-      ARM: dts: mxs: Add muxing options for the third PWM
-      ARM: dts: mxs: Add the LCD to the 10049 board
-      ARM: mxs: dts: Add gpio-keys for the rotary to the CFA-10049
-      ARM: mxs: dts: Add rotary encoder to the CFA-10049
-
- arch/arm/boot/dts/Makefile           |    1 +
- arch/arm/boot/dts/imx28-cfa10037.dts |   77 ++++++++++++
- arch/arm/boot/dts/imx28-cfa10049.dts |  214 +++++++++++++++++++++++++++++-----
- arch/arm/boot/dts/imx28-m28evk.dts   |    1 +
- arch/arm/boot/dts/imx28.dtsi         |   10 ++
- arch/arm/mach-mxs/mach-mxs.c         |   30 +++++
- 6 files changed, 302 insertions(+), 31 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx28-cfa10037.dts
+Thanks
+Kishon
