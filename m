@@ -1,22 +1,23 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 11:27:36 +0200
-Subject: [PATCH v2 12/30] usb: ehci-omap: Remove PHY regulator handling
- code
-In-Reply-To: <Pine.LNX.4.44L0.1301281235130.1997-100000@iolanthe.rowland.org>
-References: <1359372631-8180-13-git-send-email-rogerq@ti.com>
- <Pine.LNX.4.44L0.1301281235130.1997-100000@iolanthe.rowland.org>
-Message-ID: <20130205092736.GU32118@arwen.pp.htv.fi>
+Date: Tue, 5 Feb 2013 11:28:07 +0200
+Subject: [PATCH v2 13/30] ARM: OMAP2+: omap4panda: Provide USB Host's PHY
+ platform data
+In-Reply-To: <1359372631-8180-14-git-send-email-rogerq@ti.com>
+References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+ <1359372631-8180-14-git-send-email-rogerq@ti.com>
+Message-ID: <20130205092807.GV32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 12:35:25PM -0500, Alan Stern wrote:
-> On Mon, 28 Jan 2013, Roger Quadros wrote:
+On Mon, Jan 28, 2013 at 01:30:14PM +0200, Roger Quadros wrote:
+> Add platform device and data for 'nop-usb-xceiv'. This will be used
+> as PHY for HS USB port 1, so provide binding information for it.
 > 
-> > PHY regulator handling must be done in the PHY driver
-> > 
-> > Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Get rid of managing the PHY clock as it will be done by the PHY driver.
+> For that to work we create a clock alias that links the PHY clock name
+> to the PHY device name.
 > 
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
 Acked-by: Felipe Balbi <balbi@ti.com>
 
@@ -28,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/432c64f7/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/d298a77d/attachment.sig>
