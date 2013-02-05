@@ -1,199 +1,79 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 5 Feb 2013 11:22:52 +0100
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 05 Feb 2013 11:38:46 +0100
 Subject: [PATCH V2] clk: Add composite clock type
-In-Reply-To: <5110C3E5.2010503@nvidia.com>
-References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com><20130204.113739.2227266298512077917.hdoyu@nvidia.com><5110C3E5.2010503@nvidia.com>
-Message-ID: <20130205.122252.570646990867457667.hdoyu@nvidia.com>
+In-Reply-To: <20130205.122252.570646990867457667.hdoyu@nvidia.com>
+References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
+ <5110C3E5.2010503@nvidia.com>
+ <20130205.122252.570646990867457667.hdoyu@nvidia.com>
+Message-ID: <1554530.H35cUWvpSY@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Tue, 5 Feb 2013 09:33:41 +0100:
-
-> > The members of "clk_composite_ops" seems to be always assigned
-> > statically. Istead of dynamically allocating/assigning, can't we just
-> > have "clk_composite_ops" statically as below?
-> >
-> > static struct clk_ops clk_composite_ops = {
-> > 	.get_parent = clk_composite_get_parent;
-> > 	.set_parent = clk_composite_set_parent;
-> > 	.recalc_rate = clk_composite_recalc_rate;
-> > 	.round_rate = clk_composite_round_rate;
-> > 	.set_rate = clk_composite_set_rate;
-> > 	.is_enabled = clk_composite_is_enabled;
-> > 	.enable = clk_composite_enable;
-> > 	.disable = clk_composite_disable;
-> > };
-> >
-> > struct clk *clk_register_composite(struct device *dev, const char *name,
-> > 		       const char **parent_names, int num_parents,
-> > 		       struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
-> > 		       struct clk_hw *div_hw, const struct clk_ops *div_ops,
-> > 		       struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-> > 		       unsigned long flags)
-> > {
-> > 	.....
-> >
-> > 	init.ops = &clk_composite_ops;
+On Tuesday 05 of February 2013 11:22:52 Hiroshi Doyu wrote:
+> Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Tue, 5 Feb 2013 09:33:41 
++0100:
+> > > The members of "clk_composite_ops" seems to be always assigned
+> > > statically. Istead of dynamically allocating/assigning, can't we
+> > > just
+> > > have "clk_composite_ops" statically as below?
+> > > 
+> > > static struct clk_ops clk_composite_ops = {
+> > > 
+> > > 	.get_parent = clk_composite_get_parent;
+> > > 	.set_parent = clk_composite_set_parent;
+> > > 	.recalc_rate = clk_composite_recalc_rate;
+> > > 	.round_rate = clk_composite_round_rate;
+> > > 	.set_rate = clk_composite_set_rate;
+> > > 	.is_enabled = clk_composite_is_enabled;
+> > > 	.enable = clk_composite_enable;
+> > > 	.disable = clk_composite_disable;
+> > > 
+> > > };
+> > > 
+> > > struct clk *clk_register_composite(struct device *dev, const char
+> > > *name,> > 
+> > > 		       const char **parent_names, int num_parents,
+> > > 		       struct clk_hw *mux_hw, const struct clk_ops 
+*mux_ops,
+> > > 		       struct clk_hw *div_hw, const struct clk_ops 
+*div_ops,
+> > > 		       struct clk_hw *gate_hw, const struct clk_ops 
+*gate_ops,
+> > > 		       unsigned long flags)
+> > > 
+> > > {
+> > > 
+> > > 	.....
+> > > 	
+> > > 	init.ops = &clk_composite_ops;
+> > 
+> > No, clk_ops depends on the clocks you are using. There could be a
+> > clock
+> > with mux and gate while another one with mux and div.
 > 
-> No, clk_ops depends on the clocks you are using. There could be a clock 
-> with mux and gate while another one with mux and div.
+> You are right. What about the following? We don't have to have similar
+> copy of clk_composite_ops for each instances.
+> 
+> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> index f30fb4b..8f88805 100644
+> --- a/drivers/clk/clk-composite.c
+> +++ b/drivers/clk/clk-composite.c
+> @@ -27,6 +27,9 @@ static u8 clk_composite_get_parent(struct clk_hw *hw)
+>         const struct clk_ops *mux_ops = composite->mux_ops;
+>         struct clk_hw *mux_hw = composite->mux_hw;
+> 
+> +       if (!mux_hw->clk)
+> +	       return -EINVAL;
+> +
 
-You are right. What about the following? We don't have to have similar
-copy of clk_composite_ops for each instances.
+Or maybe even:
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index f30fb4b..8f88805 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -27,6 +27,9 @@ static u8 clk_composite_get_parent(struct clk_hw *hw)
-        const struct clk_ops *mux_ops = composite->mux_ops;
-        struct clk_hw *mux_hw = composite->mux_hw;
- 
-+       if (!mux_hw->clk)
-+	       return -EINVAL;
-+
-        mux_hw->clk = hw->clk;
- 
-        return mux_ops->get_parent(mux_hw);
-@@ -38,6 +41,9 @@ static int clk_composite_set_parent(struct clk_hw *hw, u8 index)
-        const struct clk_ops *mux_ops = composite->mux_ops;
-        struct clk_hw *mux_hw = composite->mux_hw;
- 
-+       if (!mux_hw->clk)
-+	       return -EINVAL;
-+
-        mux_hw->clk = hw->clk;
- 
-        return mux_ops->set_parent(mux_hw, index);
-@@ -50,6 +56,9 @@ static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
-        const struct clk_ops *div_ops = composite->div_ops;
-        struct clk_hw *div_hw = composite->div_hw;
- 
-+       if (!div_hw->clk)
-+	       return -EINVAL;
-+
-        div_hw->clk = hw->clk;
- 
-        return div_ops->recalc_rate(div_hw, parent_rate);
-@@ -62,6 +71,9 @@ static long clk_composite_round_rate(struct clk_hw *hw, unsigned long rate,
-        const struct clk_ops *div_ops = composite->div_ops;
-        struct clk_hw *div_hw = composite->div_hw;
- 
-+       if (!div_hw->clk)
-+	       return -EINVAL;
-+
-        div_hw->clk = hw->clk;
- 
-        return div_ops->round_rate(div_hw, rate, prate);
-@@ -74,6 +86,9 @@ static int clk_composite_set_rate(struct clk_hw *hw, unsigned long rate,
-        const struct clk_ops *div_ops = composite->div_ops;
-        struct clk_hw *div_hw = composite->div_hw;
- 
-+       if (!div_hw->clk)
-+	       return -EINVAL;
-+
-        div_hw->clk = hw->clk;
- 
-        return div_ops->set_rate(div_hw, rate, parent_rate);
-@@ -85,6 +100,9 @@ static int clk_composite_is_enabled(struct clk_hw *hw)
-        const struct clk_ops *gate_ops = composite->gate_ops;
-        struct clk_hw *gate_hw = composite->gate_hw;
- 
-+       if (!gate_hw->clk)
-+	       return -EINVAL;
-+
-        gate_hw->clk = hw->clk;
- 
-        return gate_ops->is_enabled(gate_hw);
-@@ -96,6 +114,9 @@ static int clk_composite_enable(struct clk_hw *hw)
-        const struct clk_ops *gate_ops = composite->gate_ops;
-        struct clk_hw *gate_hw = composite->gate_hw;
- 
-+       if (!gate_hw->clk)
-+	       return -EINVAL;
-+
-        gate_hw->clk = hw->clk;
- 
-        return gate_ops->enable(gate_hw);
-@@ -107,11 +128,25 @@ static void clk_composite_disable(struct clk_hw *hw)
-        const struct clk_ops *gate_ops = composite->gate_ops;
-        struct clk_hw *gate_hw = composite->gate_hw;
- 
-+       if (!gate_hw->clk)
-+	       return -EINVAL;
-+
-        gate_hw->clk = hw->clk;
- 
-        gate_ops->disable(gate_hw);
- }
- 
-+static struct clk_ops clk_composite_ops = {
-+	.get_parent = clk_composite_get_parent,
-+	.set_parent = clk_composite_set_parent,
-+	.recalc_rate = clk_composite_recalc_rate,
-+	.round_rate = clk_composite_round_rate,
-+	.set_rate = clk_composite_set_rate,
-+	.is_enabled = clk_composite_is_enabled,
-+	.enable = clk_composite_enable,
-+	.disable = clk_composite_disable,
-+};
-+
- struct clk *clk_register_composite(struct device *dev, const char *name,
-                        const char **parent_names, int num_parents,
-                        struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
-@@ -135,14 +170,6 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
-        init.parent_names = parent_names;
-        init.num_parents = num_parents;
- 
--       /* allocate the clock ops */
--       clk_composite_ops = kzalloc(sizeof(*clk_composite_ops), GFP_KERNEL);
--       if (!clk_composite_ops) {
--               pr_err("%s: could not allocate clk ops\n", __func__);
--               kfree(composite);
--               return ERR_PTR(-ENOMEM);
--       }
--
-        if (mux_hw && mux_ops) {
-                if (!mux_ops->get_parent || !mux_ops->set_parent) {
-                        clk = ERR_PTR(-EINVAL);
-@@ -151,8 +178,6 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 
-                composite->mux_hw = mux_hw;
-                composite->mux_ops = mux_ops;
--               clk_composite_ops->get_parent = clk_composite_get_parent;
--               clk_composite_ops->set_parent = clk_composite_set_parent;
-        }
- 
-        if (div_hw && div_ops) {
-@@ -164,9 +189,6 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 
-                composite->div_hw = div_hw;
-                composite->div_ops = div_ops;
--               clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
--               clk_composite_ops->round_rate = clk_composite_round_rate;
--               clk_composite_ops->set_rate = clk_composite_set_rate;
-        }
- 
-        if (gate_hw && gate_ops) {
-@@ -178,12 +200,9 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 
-                composite->gate_hw = gate_hw;
-                composite->gate_ops = gate_ops;
--               clk_composite_ops->is_enabled = clk_composite_is_enabled;
--               clk_composite_ops->enable = clk_composite_enable;
--               clk_composite_ops->disable = clk_composite_disable;
-        }
- 
--       init.ops = clk_composite_ops;
-+       init.ops = &clk_composite_ops;
-        composite->hw.init = &init;
- 
-        clk = clk_register(dev, &composite->hw);
-@@ -202,7 +221,6 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
-        return clk;
- 
- err:
--       kfree(clk_composite_ops);
-        kfree(composite);
-        return clk;
- }
+		if (!mux_ops)
+
+This would be more self-explanatory and save one dereference.
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
