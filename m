@@ -1,22 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Feb 2013 10:34:35 -0800
-Subject: [GIT PULL] imx fixes for 3.8, take 4
-In-Reply-To: <20130205081521.GA5537@S2101-09.ap.freescale.net>
-References: <20130205081521.GA5537@S2101-09.ap.freescale.net>
-Message-ID: <20130205183435.GC21449@quad.lixom.net>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Tue, 5 Feb 2013 10:37:29 -0800
+Subject: [GIT PULL] ARM part of USB patches
+In-Reply-To: <20130205181947.GI25185@atomide.com>
+References: <51112418.5020000@ti.com> <51112495.4060908@ti.com>
+ <20130205172724.GA1601@kroah.com>
+ <20130205181947.GI25185@atomide.com>
+Message-ID: <20130205183729.GA18954@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 04:15:23PM +0800, Shawn Guo wrote:
-> The following changes since commit e6b267ce14f61d9da0151b97ee26ab4d38055567:
+On Tue, Feb 05, 2013 at 10:19:47AM -0800, Tony Lindgren wrote:
+> * gregkh at linuxfoundation.org <gregkh@linuxfoundation.org> [130205 09:28]:
+> > On Tue, Feb 05, 2013 at 08:56:13PM +0530, kishon wrote:
+> > > Hi Tony, Greg,
+> > > 
+> > > On Tuesday 05 February 2013 08:54 PM, kishon wrote:
+> > > >Hi Tony,
+> > > >
+> > > >As discussed, I'm sending a pull request for the arch/arm part of my USB
+> > > >patches. These patches are necessary to get MUSB functional in both dt
+> > > >and non-dt boot. Also added dt data for dwc3 present in OMAP. This patch
+> > > >series *depends* on some of the patches which are merged in usb-next.
+> > > 
+> > > This patch series should go in only after USB. Or else it will break
+> > > compilation.
+> > 
+> > Then it probably should go through the USB tree, right?  We don't want
+> > to break bisectability.
 > 
->   video: imxfb: Do not crash on reboot (2013-01-17 16:14:29 +0800)
+> Looks like this branch needs to be based on at least 01658f0f (usb: phy:
+> add a new driver for usb part of control module) to compile. Probably
+> needs other USB patches too to make sense.
 > 
-> are available in the git repository at:
+> This branch has a high likelihood of conflicting with .dts files, so
+> Kishon, I suggest you do two branches:
 > 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.8-4
+> 1. A branch for Greg based on top of the USB changes
+> 
+>    This branch should contain:
+> 
+>    ARM: OMAP4: remove control module address space from PHY and OTG
+>    ARM: OMAP: devices: create device for usb part of control module
+>    ARM: OMAP2: MUSB: Specify omap4 has mailbox
+>    ARM: OMAP: USB: Add phy binding information
+> 
+>    Naturally please make sure they compile and boot on their own.
+>    Looks like this will only cause few trivial include merge conflicts
+>    with what I have queued up.
+> 
+>    You can add my Acked-by: Tony Lindgren <tony@atomide.com> for those.
 
+If that happens, please send me patches in email, I don't take git
+pull requests, especially for something as small as 4 patches.
 
-Pulled, thanks.
+thanks,
 
--Olof
+greg k-h
