@@ -1,56 +1,34 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Tue,  5 Feb 2013 14:35:14 +0100
-Subject: [PATCH 4/5] atmel_lcdfb: move lcdcon2 register access to
- compute_hozval
+Date: Tue,  5 Feb 2013 14:35:13 +0100
+Subject: [PATCH 3/5] atmel_lcdfb: remove unsupported 15-bpp mode
 In-Reply-To: <1360071315-4032-1-git-send-email-jhovold@gmail.com>
 References: <20130129135435.GN7360@game.jcrosoft.org>
  <1360071315-4032-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1360071315-4032-5-git-send-email-jhovold@gmail.com>
+Message-ID: <1360071315-4032-4-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass atmel_lcd_info structure to compute_hozval and only do the register
-access on SOCs that actually use it.
+Since commit 787f9fd23283 ("atmel_lcdfb: support 16bit BGR:565 mode,
+remove unsupported 15bit modes") atmel_lcdfb_check_var does not accept
+15-bpp mode so remove it from atmel_lcdfb_set_par as well.
 
-This will also simplify the removal of the cpu_is macros.
-
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 Signed-off-by: Johan Hovold <jhovold@gmail.com>
 ---
- drivers/video/atmel_lcdfb.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/video/atmel_lcdfb.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 93910e3..347bab2 100644
+index 025428e..93910e3 100644
 --- a/drivers/video/atmel_lcdfb.c
 +++ b/drivers/video/atmel_lcdfb.c
-@@ -193,14 +193,17 @@ static struct fb_fix_screeninfo atmel_lcdfb_fix __initdata = {
- 	.accel		= FB_ACCEL_NONE,
- };
- 
--static unsigned long compute_hozval(unsigned long xres, unsigned long lcdcon2)
-+static unsigned long compute_hozval(struct atmel_lcdfb_info *sinfo,
-+							unsigned long xres)
- {
-+	unsigned long lcdcon2;
- 	unsigned long value;
- 
- 	if (!(cpu_is_at91sam9261() || cpu_is_at91sam9g10()
- 		|| cpu_is_at32ap7000()))
- 		return xres;
- 
-+	lcdcon2 = lcdc_readl(sinfo, ATMEL_LCDC_LCDCON2);
- 	value = xres;
- 	if ((lcdcon2 & ATMEL_LCDC_DISTYPE) != ATMEL_LCDC_DISTYPE_TFT) {
- 		/* STN display */
-@@ -590,8 +593,7 @@ static int atmel_lcdfb_set_par(struct fb_info *info)
- 	lcdc_writel(sinfo, ATMEL_LCDC_TIM2, value);
- 
- 	/* Horizontal value (aka line size) */
--	hozval_linesz = compute_hozval(info->var.xres,
--					lcdc_readl(sinfo, ATMEL_LCDC_LCDCON2));
-+	hozval_linesz = compute_hozval(sinfo, info->var.xres);
- 
- 	/* Display size */
- 	value = (hozval_linesz - 1) << ATMEL_LCDC_HOZVAL_OFFSET;
+@@ -567,7 +567,6 @@ static int atmel_lcdfb_set_par(struct fb_info *info)
+ 		case 2: value |= ATMEL_LCDC_PIXELSIZE_2; break;
+ 		case 4: value |= ATMEL_LCDC_PIXELSIZE_4; break;
+ 		case 8: value |= ATMEL_LCDC_PIXELSIZE_8; break;
+-		case 15: /* fall through */
+ 		case 16: value |= ATMEL_LCDC_PIXELSIZE_16; break;
+ 		case 24: value |= ATMEL_LCDC_PIXELSIZE_24; break;
+ 		case 32: value |= ATMEL_LCDC_PIXELSIZE_32; break;
 -- 
 1.8.1.1
