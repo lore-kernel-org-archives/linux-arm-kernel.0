@@ -1,56 +1,64 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 10:38:28 +0200
-Subject: [PATCH v2 4/6] ARM: dts: omap5: add dwc3 omap dt data
-In-Reply-To: <5110C2E6.30504@ti.com>
-References: <1359112312-6918-1-git-send-email-kishon@ti.com>
- <1359112312-6918-5-git-send-email-kishon@ti.com>
- <510432BF.80808@mvista.com> <5110C2E6.30504@ti.com>
-Message-ID: <20130205083828.GE32118@arwen.pp.htv.fi>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 05 Feb 2013 10:39:27 +0200
+Subject: [PATCH V3 5/7] ARM: OMAP3: Update clocksource timer selection
+In-Reply-To: <1360007196-21350-6-git-send-email-jon-hunter@ti.com>
+References: <1360007196-21350-1-git-send-email-jon-hunter@ti.com>
+ <1360007196-21350-6-git-send-email-jon-hunter@ti.com>
+Message-ID: <5110C53F.1010203@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 01:59:26PM +0530, kishon wrote:
-> On Sunday 27 January 2013 01:17 AM, Sergei Shtylyov wrote:
-> >Hello.
-> >
-> >On 25-01-2013 15:11, Kishon Vijay Abraham I wrote:
-> >
-> >>Add dwc3 omap glue data to the omap5 dt data file. The information about
-> >>the dt node added here is available @
-> >>Documentation/devicetree/bindings/usb/omap-usb.txt
-> >
-> >>Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >>---
-> >>  arch/arm/boot/dts/omap5.dtsi |   11 +++++++++++
-> >>  1 file changed, 11 insertions(+)
-> >
-> >>diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> >>index 5f59bf2..1703a72 100644
-> >>--- a/arch/arm/boot/dts/omap5.dtsi
-> >>+++ b/arch/arm/boot/dts/omap5.dtsi
-> >>@@ -513,6 +513,17 @@
-> >>              ti,type = <2>;
-> >>          };
-> >>
-> >>+        omap_dwc3 at 4a020000 {
-> >>+            compatible = "ti,dwc3";
-> >>+            ti,hwmods = "usb_otg_ss";
-> >>+            reg = <0x4a020000 0x1ff>;
-> >
-> >    Shoudn't the "reg" length be 0x200 here? It's length, not limit.
+On 02/04/13 21:46, Jon Hunter wrote:
+> When booting with device-tree for OMAP3 and AM335x devices and a gptimer
+> is used as the clocksource (which is always the case for AM335x), a
+> gptimer located in a power domain that is not always-on is selected.
+> Ideally we should use a gptimer located in a power domain that is always
+> on (such as the wake-up domain) so that time can be maintained during a
+> kernel suspend without keeping on additional power domains unnecessarily.
 > 
-> I think 0x1ff is correct. I got the data from hwmod data.
+> In order to fix this so that we can select a gptimer located in a power
+> domain that is always-on, the following changes were made ...
+> 1. Currently, only when selecting a gptimer to use for a clockevent
+>    timer, do we pass a timer property that can be used to select a
+>    specific gptimer. Change this so that we can pass a property when
+>    selecting a gptimer to use for a clocksource timer too.
+> 2. Currently, when selecting either a gptimer to use for a clockevent
+>    timer or a clocksource timer and no timer property is passed, then
+>    the first available timer is selected regardless of the properties
+>    it has. Change this so that if no properties are passed, then a timer
+>    that does not have additional features (such as always-on, dsp-irq,
+>    pwm, and secure) is selected.
+> 
+> Please note that using a gptimer for both clocksource and clockevents
+> can have a system power impact during idle. The reason being is that
+> OMAP and AMxxx devices typically only have one gptimer in a power domain
+> that is always-on. Therefore when the kernel is idle both the clocksource
+> and clockevent timers will be active and this will keep additional power
+> domains on. During kernel suspend, only the clocksource timer is active
+> and therefore, it is better to use a gptimer in a power domain that is
+> always-on for clocksource.
 
-hwmod is utterly wrong. Looking at TRM, it says the size here is 64KiB
-(0x10000), so is the size for dwc3 itself. Please don't blindly trust
-hwmod, make sure you read data from TRM ;-)
+Hmmm...
+Do I miss something or you have forgot to update the commit message?
+
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer.c |   33 +++++++++++++++++++++------------
+>  1 file changed, 21 insertions(+), 12 deletions(-)
+
+[...]
+
+>  #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+> -OMAP_SYS_GP_TIMER_INIT(3, 1, "timer_sys_ck", "ti,timer-alwon",
+> -		       2, "timer_sys_ck");
+> +OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+> +		       1, "timer_sys_ck", "ti,timer-alwon");
+>  #endif
+
+[...]
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/4e925b99/attachment.sig>
+Regards,
+Igor.
