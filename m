@@ -1,77 +1,133 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Feb 2013 00:22:04 -0500
-Subject: [PATCH v4 07/15] ARM: introduce common set_auxcr/get_auxcr functions
+Date: Tue, 05 Feb 2013 00:22:02 -0500
+Subject: [PATCH v4 05/15] ARM: mcpm_head.S: vlock-based first man election
 In-Reply-To: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1360041732-17936-8-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1360041732-17936-6-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+From: Dave Martin <dave.martin@linaro.org>
 
-Move the private set_auxcr/get_auxcr functions from
-drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
+Instead of requiring the first man to be elected in advance (which
+can be suboptimal in some situations), this patch uses a per-
+cluster mutex to co-ordinate selection of the first man.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+This should also make it more feasible to reuse this code path for
+asynchronous cluster resume (as in CPUidle scenarios).
+
+We must ensure that the vlock data doesn't share a cacheline with
+anything else, or dirty cache eviction could corrupt it.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/cp15.h       | 14 ++++++++++++++
- drivers/cpuidle/cpuidle-calxeda.c | 14 --------------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ arch/arm/common/Makefile    |  2 +-
+ arch/arm/common/mcpm_head.S | 41 ++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 37 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-index 5ef4d8015a..ce4d01c03e 100644
---- a/arch/arm/include/asm/cp15.h
-+++ b/arch/arm/include/asm/cp15.h
-@@ -59,6 +59,20 @@ static inline void set_cr(unsigned int val)
- 	isb();
- }
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 23e85b1fae..c901a38c59 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -13,4 +13,4 @@ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+ obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
+-obj-$(CONFIG_CLUSTER_PM)	+= mcpm_head.o mcpm_entry.o
++obj-$(CONFIG_CLUSTER_PM)	+= mcpm_head.o mcpm_entry.o vlock.o
+diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
+index 86650d4e94..2afc8f26cb 100644
+--- a/arch/arm/common/mcpm_head.S
++++ b/arch/arm/common/mcpm_head.S
+@@ -16,6 +16,8 @@
+ #include <linux/linkage.h>
+ #include <asm/mcpm_entry.h>
  
-+static inline unsigned int get_auxcr(void)
-+{
-+	unsigned int val;
-+	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val));
-+	return val;
-+}
++#include "vlock.h"
 +
-+static inline void set_auxcr(unsigned int val)
-+{
-+	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
-+	  : : "r" (val));
-+	isb();
-+}
+ .if MCPM_SYNC_CLUSTER_CPUS
+ .error "cpus must be the first member of struct mcpm_sync_struct"
+ .endif
+@@ -69,10 +71,11 @@ ENTRY(mcpm_entry_point)
+ 	 * position independent way.
+ 	 */
+ 	adr	r5, 3f
+-	ldmia	r5, {r6, r7, r8}
++	ldmia	r5, {r6, r7, r8, r11}
+ 	add	r6, r5, r6			@ r6 = mcpm_entry_vectors
+ 	ldr	r7, [r5, r7]			@ r7 = mcpm_power_up_setup_phys
+ 	add	r8, r5, r8			@ r8 = mcpm_sync
++	add	r11, r5, r11			@ r11 = first_man_locks
+ 
+ 	mov	r0, #MCPM_SYNC_CLUSTER_SIZE
+ 	mla	r8, r0, r10, r8			@ r8 = sync cluster base
+@@ -86,13 +89,22 @@ ENTRY(mcpm_entry_point)
+ 	@ At this point, the cluster cannot unexpectedly enter the GOING_DOWN
+ 	@ state, because there is at least one active CPU (this CPU).
+ 
+-	@ Note: the following is racy as another CPU might be testing
+-	@ the same flag at the same moment.  That'll be fixed later.
++	mov	r0, #VLOCK_SIZE
++	mla	r11, r0, r10, r11		@ r11 = cluster first man lock
++	mov	r0, r11
++	mov	r1, r9				@ cpu
++	bl	vlock_trylock			@ implies DMB
 +
- #ifndef CONFIG_SMP
- extern void adjust_cr(unsigned long mask, unsigned long set);
- #endif
-diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-index e1aab38c5a..ece83d6e04 100644
---- a/drivers/cpuidle/cpuidle-calxeda.c
-+++ b/drivers/cpuidle/cpuidle-calxeda.c
-@@ -37,20 +37,6 @@ extern void *scu_base_addr;
++	cmp	r0, #0				@ failed to get the lock?
++	bne	mcpm_setup_wait		@ wait for cluster setup if so
++
+ 	ldrb	r0, [r8, #MCPM_SYNC_CLUSTER_CLUSTER]
+ 	cmp	r0, #CLUSTER_UP			@ cluster already up?
+ 	bne	mcpm_setup			@ if not, set up the cluster
  
- static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
+-	@ Otherwise, skip setup:
++	@ Otherwise, release the first man lock and skip setup:
++	mov	r0, r11
++	bl	vlock_unlock
+ 	b	mcpm_setup_complete
  
--static inline unsigned int get_auxcr(void)
--{
--	unsigned int val;
--	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
--	return val;
--}
--
--static inline void set_auxcr(unsigned int val)
--{
--	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
--	  : : "r" (val) : "cc");
--	isb();
--}
--
- static noinline void calxeda_idle_restore(void)
- {
- 	set_cr(get_cr() | CR_C);
+ mcpm_setup:
+@@ -142,6 +154,19 @@ mcpm_setup_leave:
+ 	dsb
+ 	sev
+ 
++	mov	r0, r11
++	bl	vlock_unlock	@ implies DMB
++	b	mcpm_setup_complete
++
++	@ In the contended case, non-first men wait here for cluster setup
++	@ to complete:
++mcpm_setup_wait:
++	ldrb	r0, [r8, #MCPM_SYNC_CLUSTER_CLUSTER]
++	cmp	r0, #CLUSTER_UP
++	wfene
++	bne	mcpm_setup_wait
++	dmb
++
+ mcpm_setup_complete:
+ 	@ If a platform-specific CPU setup hook is needed, it is
+ 	@ called from here.
+@@ -173,11 +198,17 @@ mcpm_entry_gated:
+ 3:	.word	mcpm_entry_vectors - .
+ 	.word	mcpm_power_up_setup_phys - 3b
+ 	.word	mcpm_sync - 3b
++	.word	first_man_locks - 3b
+ 
+ ENDPROC(mcpm_entry_point)
+ 
+ 	.bss
+-	.align	5
++
++	.align	__CACHE_WRITEBACK_ORDER
++	.type	first_man_locks, #object
++first_man_locks:
++	.space	VLOCK_SIZE * MAX_NR_CLUSTERS
++	.align	__CACHE_WRITEBACK_ORDER
+ 
+ 	.type	mcpm_entry_vectors, #object
+ ENTRY(mcpm_entry_vectors)
 -- 
 1.8.1.2
