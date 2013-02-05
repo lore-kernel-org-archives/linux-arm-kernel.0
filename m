@@ -1,95 +1,155 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Feb 2013 20:07:23 -0800
-Subject: [PATCH v8 12/12] document: devicetree: bind pinconf with pin
- single
-In-Reply-To: <1359825953-15663-13-git-send-email-haojian.zhuang@linaro.org>
-References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
- <1359825953-15663-13-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130205040721.GE25185@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 4 Feb 2013 23:08:08 -0500 (EST)
+Subject: [PATCH v5 2/3] ARM: ioremap: introduce an infrastructure for
+ static mapped area
+In-Reply-To: <1360024314-1895-3-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1360024314-1895-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1360024314-1895-3-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <alpine.LFD.2.02.1302042305140.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@linaro.org> [130202 09:32]:
-> +- pinctrl-single,drive-strength : array of value that are used to configure
-> +  drive strength in the pinmux register. They're value of drive strength
-> +  current and drive strength mask.
+On Tue, 5 Feb 2013, Joonsoo Kim wrote:
+
+> In current implementation, we used ARM-specific flag, that is,
+> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+> The purpose of static mapped area is to re-use static mapped area when
+> entire physical address range of the ioremap request can be covered
+> by this area.
+> 
+> This implementation causes needless overhead for some cases.
+> For example, assume that there is only one static mapped area and
+> vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
+> deciding whether it is matched or not. Moreover, even if there is
+> no static mapped area and vmlist has 300 areas, every time we call
+> ioremap, we check 300 areas in now.
+> 
+> If we construct a extra list for static mapped area, we can eliminate
+> above mentioned overhead.
+> With a extra list, if there is one static mapped area,
+> we just check only one area and proceed next operation quickly.
+> 
+> In fact, it is not a critical problem, because ioremap is not frequently
+> used. But reducing overhead is better idea.
+> 
+> Another reason for doing this work is for removing architecture dependency
+> on vmalloc layer. I think that vmlist and vmlist_lock is internal data
+> structure for vmalloc layer. Some codes for debugging and stat inevitably
+> use vmlist and vmlist_lock. But it is preferable that they are used
+> as least as possible in outside of vmalloc.c
+> 
+> Now, I introduce an ARM-specific infrastructure for static mapped area. In
+> the following patch, we will use this and resolve above mentioned problem.
+> 
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
+
+> 
+> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> index 88fd86c..904c15e 100644
+> --- a/arch/arm/mm/ioremap.c
+> +++ b/arch/arm/mm/ioremap.c
+> @@ -39,6 +39,70 @@
+>  #include <asm/mach/pci.h>
+>  #include "mm.h"
+>  
 > +
-> +		/* drive strength current, mask */
-> +		pinctrl-single,power-source = <0x30 0xf0>;
+> +LIST_HEAD(static_vmlist);
 > +
-
-Looks like a typo, this should probably say pinctrl-single,drive-strength
-here instead of power-source?
-
-For the cases where there's a value to be set I'm still wondering how does
-a client driver change the value if that needs to be changed dynamically?
-Can the value be passed as value + PIN_CONFIG_END?
-
-> +- pinctrl-single,bias-disable : array of value that are used to configure the
-> +  input bias disabled in the pinmux register. They're value of bias value,
-> +  match bias disabled value and bias disabled mask.
+> +static struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
+> +			size_t size, unsigned int mtype)
+> +{
+> +	struct static_vm *svm;
+> +	struct vm_struct *vm;
 > +
-> +		/* bias value, match bias disabled value, mask */
-> +		pinctrl-single,bias-disable = <2 0 3>;
+> +	list_for_each_entry(svm, &static_vmlist, list) {
+> +		vm = &svm->vm;
+> +		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+> +			continue;
+> +		if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+> +			continue;
 > +
-
-I still suggest we use "enable" naming instead of "disable" naming.
-So pinctrl-single,bias-enable instead of pinctrl-single,bias-disable.
-
-Then let's change the binding slightly to make it more readable:
-
-		/* enable value, disable value, mask */
-		pinctrl-single,bias-enable = <2 0 3>;
-
-For example, I have bit 22 cleared to enable MMC PBIAS, or bit 22
-set to disable PBIAS:
-
-		                             /* enable disable  mask */
-		pinctrl-single,bias-enable = <0x000000 0x400000 0x400000>;
-
-Then I think pretty much the only change to pinconf_get() would be:
-
-	data = pcs->read(pcs->base + offset) & func->conf[i].mask;
-
-	switch (func->conf[i].param) {
-	/* 3 parameters */
-	case PIN_CONFIG_BIAS_ENABLE:
-	case PIN_CONFIG_BIAS_PULL_DOWN:
-	case PIN_CONFIG_BIAS_PULL_UP:
-	case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
-	*config = data;
-	if (data == func->conf[i].enable)
-		res = 0;
-	else
-		res = -ENOTSUPP;
-	break;
-	...
-
-And then the client driver can always assume that if the return value
-is 0, the ENABLE value in question is set. And if -ENOTSUPP (or how about
--ENOTSET :) is returned, the ENABLE value is not set?
-
-Then regarding pinconf_set(), don't we also need pinconf_clear() in
-addition to pinconf_set()?
-
-Otherwise we need both ENABLE and DISABLE enumeration, which seems
-unnecessary to me. So rather than have both PIN_CONFIG_BIAS_ENABLE and
-PIN_CONFIG_BIAS_DISABLE, we just need PIN_CONFIG_BIAS_ENABLE.
-
-> +- pinctrl-single,bias-pullup : array of value that are used to configure the
-> +  input bias pullup in the pinmux register. They're value of bias value,
-> +  match bias pullup value and bias pullup mask.
+> +		if (vm->phys_addr > paddr ||
+> +			paddr + size - 1 > vm->phys_addr + vm->size - 1)
+> +			continue;
 > +
-> +		/* bias value, match bias pullup value, mask */
-> +		pinctrl-single,bias-pullup = <0 1 1>;
-
-It seems that you could then use same generic comment in all places
-then to make it a bit easier to read:
-
-		/* enable value, disable value, mask */
-		pinctrl-single,bias-pullup = <0 1 1>;
-...
-
-Regards,
-
-Tony
+> +		return svm;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+> +struct static_vm *find_static_vm_vaddr(void *vaddr)
+> +{
+> +	struct static_vm *svm;
+> +	struct vm_struct *vm;
+> +
+> +	list_for_each_entry(svm, &static_vmlist, list) {
+> +		vm = &svm->vm;
+> +
+> +		/* static_vmlist is ascending order */
+> +		if (vm->addr > vaddr)
+> +			break;
+> +
+> +		if (vm->addr <= vaddr && vm->addr + vm->size > vaddr)
+> +			return svm;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+> +void __init add_static_vm_early(struct static_vm *svm)
+> +{
+> +	struct static_vm *curr_svm;
+> +	struct vm_struct *vm;
+> +	void *vaddr;
+> +
+> +	vm = &svm->vm;
+> +	vm_area_add_early(vm);
+> +	vaddr = vm->addr;
+> +
+> +	list_for_each_entry(curr_svm, &static_vmlist, list) {
+> +		vm = &curr_svm->vm;
+> +
+> +		if (vm->addr > vaddr)
+> +			break;
+> +	}
+> +	list_add_tail(&svm->list, &curr_svm->list);
+> +}
+> +
+>  int ioremap_page(unsigned long virt, unsigned long phys,
+>  		 const struct mem_type *mtype)
+>  {
+> diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+> index a8ee92d..d5a4e9a 100644
+> --- a/arch/arm/mm/mm.h
+> +++ b/arch/arm/mm/mm.h
+> @@ -1,4 +1,6 @@
+>  #ifdef CONFIG_MMU
+> +#include <linux/list.h>
+> +#include <linux/vmalloc.h>
+>  
+>  /* the upper-most page table pointer */
+>  extern pmd_t *top_pmd;
+> @@ -65,6 +67,16 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
+>  /* consistent regions used by dma_alloc_attrs() */
+>  #define VM_ARM_DMA_CONSISTENT	0x20000000
+>  
+> +
+> +struct static_vm {
+> +	struct vm_struct vm;
+> +	struct list_head list;
+> +};
+> +
+> +extern struct list_head static_vmlist;
+> +extern struct static_vm *find_static_vm_vaddr(void *vaddr);
+> +extern __init void add_static_vm_early(struct static_vm *svm);
+> +
+>  #endif
+>  
+>  #ifdef CONFIG_ZONE_DMA
+> -- 
+> 1.7.9.5
+> 
