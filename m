@@ -1,53 +1,58 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Feb 2013 10:45:37 +0100
-Subject: [PATCH v2] ARM: imx: clk-imx27: Do not register peripheral clock
- for SSI
-In-Reply-To: <1359461855-27551-1-git-send-email-fabio.estevam@freescale.com>
-References: <1359461855-27551-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130205094537.GX1906@pengutronix.de>
+Date: Tue, 5 Feb 2013 10:45:53 +0100
+Subject: [PATCH v2] ARM i.MX25: clk: parent per5_clk to AHB clock
+In-Reply-To: <1359551760-28862-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1359551760-28862-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20130205094553.GY1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 10:17:35AM -0200, Fabio Estevam wrote:
-> imx ssi block has two types of clocks:
->     
-> - ipg: bus clock, the clock needed for accessing registers.
-> - per: peripheral clock, the clock needed for generating the bit rate.
+On Wed, Jan 30, 2013 at 02:16:00PM +0100, Steffen Trumtrar wrote:
+> The mxc-timer on the imx25 needs to be derived from the AHB clock.
+> If a bootloader reparents this clock to the ipg_clk_highfreq, which according
+> to the datasheet is a valid operation, the system can/will produce lockups/
+> freezes after some time [1].
 > 
-> Currently ssi driver only supports slave mode and thus need only to handle
-> the ipg clock, because the peripheral clock comes from the master codec.
+> This can be forced with code like
+> 	while(1)
+>                 syscall(SYS_clock_gettime, CLOCK_REALTIME, &tp);
 > 
-> Only register the ipg clock and do not register the peripheral clock for ssi
+> This was already fixed with the commit
+> 	"i.MX25 GPT clock fix: ensure correct the clock source" [2],
+> for 3.1-rc2, but was lost, when i.MX was converted to the common clock framework
+> ("ARM i.MX25: implement clocks using common clock framework") [3]
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> [1]: http://lists.arm.linux.org.uk/lurker/message/20130129.161230.229bda17.en.html
+> [2]: 2012d9ca2a1381ae3e733330a7f0d1d2f1988bba
+> [3]: 6bbaec5676e4f475b0d78743cbd4c70a8804ce14
+> 
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Cc: stable at vger.kernel.org # v3.5+
 
 Applied, thanks
 
 Sascha
 
 > ---
-> Changes since v1:
-> - Fix typo in email address in the From field
+>  arch/arm/mach-imx/clk-imx25.c |    3 +++
+>  1 file changed, 3 insertions(+)
 > 
->  arch/arm/mach-imx/clk-imx27.c |    2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 1ffe3b534..303d7bd 100644
-> --- a/arch/arm/mach-imx/clk-imx27.c
-> +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -274,8 +274,6 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
->  	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
->  	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
-> -	clk_register_clkdev(clk[ssi1_baud_gate], "bitrate" , "imx-ssi.0");
-> -	clk_register_clkdev(clk[ssi2_baud_gate], "bitrate" , "imx-ssi.1");
+> diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+> index 5d34f67..0e6dde6 100644
+> --- a/arch/arm/mach-imx/clk-imx25.c
+> +++ b/arch/arm/mach-imx/clk-imx25.c
+> @@ -177,6 +177,9 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
+>  			pr_err("i.MX25 clk %d: register failed with %ld\n",
+>  				i, PTR_ERR(clk[i]));
 >  
->  	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
+> +	/* Clock source for gpt must be derived from AHB */
+> +	clk_set_parent(clk[per5_sel], clk[ahb]);
+> +
+>  	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
+>  	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
 >  
 > -- 
-> 1.7.9.5
-> 
+> 1.7.10.4
 > 
 > 
 
