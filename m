@@ -1,79 +1,60 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 05 Feb 2013 11:38:46 +0100
-Subject: [PATCH V2] clk: Add composite clock type
-In-Reply-To: <20130205.122252.570646990867457667.hdoyu@nvidia.com>
-References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
- <5110C3E5.2010503@nvidia.com>
- <20130205.122252.570646990867457667.hdoyu@nvidia.com>
-Message-ID: <1554530.H35cUWvpSY@amdc1227>
+From: hdk@igel.co.jp (Hideki EIRAKU)
+Date: Tue, 05 Feb 2013 19:42:09 +0900 (JST)
+Subject: [PATCH v6 1/4] iommu/shmobile: Add iommu driver for Renesas
+ IPMMU modules
+In-Reply-To: <20130201135456.GG25591@8bytes.org>
+References: <1358765669-14567-1-git-send-email-hdk@igel.co.jp>
+ <1358765669-14567-2-git-send-email-hdk@igel.co.jp>
+ <20130201135456.GG25591@8bytes.org>
+Message-ID: <20130205.194209.52400155.hdk@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 of February 2013 11:22:52 Hiroshi Doyu wrote:
-> Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Tue, 5 Feb 2013 09:33:41 
-+0100:
-> > > The members of "clk_composite_ops" seems to be always assigned
-> > > statically. Istead of dynamically allocating/assigning, can't we
-> > > just
-> > > have "clk_composite_ops" statically as below?
-> > > 
-> > > static struct clk_ops clk_composite_ops = {
-> > > 
-> > > 	.get_parent = clk_composite_get_parent;
-> > > 	.set_parent = clk_composite_set_parent;
-> > > 	.recalc_rate = clk_composite_recalc_rate;
-> > > 	.round_rate = clk_composite_round_rate;
-> > > 	.set_rate = clk_composite_set_rate;
-> > > 	.is_enabled = clk_composite_is_enabled;
-> > > 	.enable = clk_composite_enable;
-> > > 	.disable = clk_composite_disable;
-> > > 
-> > > };
-> > > 
-> > > struct clk *clk_register_composite(struct device *dev, const char
-> > > *name,> > 
-> > > 		       const char **parent_names, int num_parents,
-> > > 		       struct clk_hw *mux_hw, const struct clk_ops 
-*mux_ops,
-> > > 		       struct clk_hw *div_hw, const struct clk_ops 
-*div_ops,
-> > > 		       struct clk_hw *gate_hw, const struct clk_ops 
-*gate_ops,
-> > > 		       unsigned long flags)
-> > > 
-> > > {
-> > > 
-> > > 	.....
-> > > 	
-> > > 	init.ops = &clk_composite_ops;
-> > 
-> > No, clk_ops depends on the clocks you are using. There could be a
-> > clock
-> > with mux and gate while another one with mux and div.
+Joerg Roedel,
+
+From: Joerg Roedel <joro@8bytes.org>
+Subject: Re: [PATCH v6 1/4] iommu/shmobile: Add iommu driver for Renesas IPMMU modules
+Date: Fri, 1 Feb 2013 14:54:57 +0100
+
+> On Mon, Jan 21, 2013 at 07:54:26PM +0900, Hideki EIRAKU wrote:
+>> This is the Renesas IPMMU driver and IOMMU API implementation.
+>> 
+>> The IPMMU module supports the MMU function and the PMB function.  The
+>> MMU function provides address translation by pagetable compatible with
+>> ARMv6.  The PMB function provides address translation including
+>> tile-linear translation.  This patch implements the MMU function.
+>> 
+>> The iommu driver does not register a platform driver directly because:
+>> - the register space of the MMU function and the PMB function
+>>   have a common register (used for settings flush), so they should ideally
+>>   have a way to appropriately share this register.
+>> - the MMU function uses the IOMMU API while the PMB function does not.
+>> - the two functions may be used independently.
+>> 
+>> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
 > 
-> You are right. What about the following? We don't have to have similar
-> copy of clk_composite_ops for each instances.
+> The patch looks good in general. Just one question inline.
 > 
-> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-> index f30fb4b..8f88805 100644
-> --- a/drivers/clk/clk-composite.c
-> +++ b/drivers/clk/clk-composite.c
-> @@ -27,6 +27,9 @@ static u8 clk_composite_get_parent(struct clk_hw *hw)
->         const struct clk_ops *mux_ops = composite->mux_ops;
->         struct clk_hw *mux_hw = composite->mux_hw;
+>> +static int pgtable_alloc(struct shmobile_iommu_domain_pgtable *pgtable,
+>> +			 struct kmem_cache *cache, size_t size)
+>> +{
+>> +	pgtable->pgtable = kmem_cache_zalloc(cache, GFP_ATOMIC);
+>> +	if (!pgtable->pgtable)
+>> +		return -ENOMEM;
+>> +	pgtable->handle = dma_map_single(NULL, pgtable->pgtable, size,
+>> +					 DMA_TO_DEVICE);
+>> +	return 0;
+>> +}
 > 
-> +       if (!mux_hw->clk)
-> +	       return -EINVAL;
-> +
+> Why is it necessary to call dma_map_single() for IOMMU page-tables?
+> usually the dma_* functions call into IOMMU drivers, so why are they
+> used inside an IOMMU driver?
 
-Or maybe even:
+I use dma_map_single() for flushing the page table to the IOMMU
+device.  The dma_map_ops set by arch/arm/mm/dma-mapping.c are
+per-device (unlike the intel-iommu).  The dma_* functions call into
+IOMMU drivers if the device is attached by arm_iommu_attach_device(),
+but I am using a NULL device here, so that shouldn't happen.
 
-		if (!mux_ops)
-
-This would be more self-explanatory and save one dereference.
-
-Best regards,
 -- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+Hideki EIRAKU <hdk@igel.co.jp>
