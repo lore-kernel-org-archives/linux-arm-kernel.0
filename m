@@ -1,57 +1,34 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 5 Feb 2013 11:12:11 +0530
-Subject: [PATCH v5 01/10] clk: tegra: Refactor PLL programming code
-In-Reply-To: <20130204143233.GV2364@tbergstrom-lnx.Nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-2-git-send-email-pdeschrijver@nvidia.com>
- <510F4FF7.3050502@nvidia.com>
- <20130204143233.GV2364@tbergstrom-lnx.Nvidia.com>
-Message-ID: <51109BB3.8000706@nvidia.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 4 Feb 2013 21:51:11 -0800
+Subject: [GIT PULL] Samsung cleanup-header for v3.9
+In-Reply-To: <120101ce032d$80ca0d20$825e2760$@samsung.com>
+References: <120101ce032d$80ca0d20$825e2760$@samsung.com>
+Message-ID: <20130205055111.GA12640@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 February 2013 08:02 PM, Peter De Schrijver wrote:
-> On Mon, Feb 04, 2013 at 07:06:47AM +0100, Prashant Gaikwad wrote:
->> On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
-> ...
->
->>> -static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll,
->>> -                                void __iomem *lock_addr, u32 lock_bit_idx)
->>> +static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
->>>    {
->>>           int i;
->>> -       u32 val;
->>> +       u32 val, lock_bit;
->>> +       void __iomem *lock_addr;
->>>
->>>           if (!(pll->flags & TEGRA_PLL_USE_LOCK)) {
->>>                   udelay(pll->params->lock_delay);
->>>                   return 0;
->>>           }
->>>
->>> +       lock_addr = pll->clk_base + pll->params->base_reg;
->> This will not work for PLLE. Lock bit for PLLE is in misc register.
->>
->>> +       lock_bit = BIT(pll->params->lock_bit_idx);
->>> +
->>>           for (i = 0; i < pll->params->lock_delay; i++) {
->>>                   val = readl_relaxed(lock_addr);
->>> -               if (val & BIT(lock_bit_idx)) {
->>> +               if (val & lock_bit) {
->> Need to change the lock bit idx parameter for Tegra20 and Tegra30 PLLs
->> else this patch will break those.
->>
-> Looking at commit 37c26a906527b8a6a252614ca83d21ad318c4e84 and commit
-> b08e8c0ecc42afa3a2e1019851af741980dd5a6b, these fields seem correctly
-> initialized for both Tegra20 and Tegra30? Or am I missing something?
+On Mon, Feb 04, 2013 at 03:15:18PM -0800, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+> > 
+> > Hi, Arnd, Olof
+> > 
+> > Here is cleanup headers for Samsung stuff.
+> > AS I commented, this makes <mach/*.h> local so that they could be
+> > removed.
+> > 
+> > Please pull from:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > next/cleanup-header
+> > 
+> > If any problems, please kindly let me know.
+> > 
+> Hi Arnd and Olof,
+> 
+> Probably, you guys missed this?
+> Or if any problems, please kindly let me know.
 
-Ohh, I missed to read
-
-lock_bit = BIT(pll->params->lock_bit_idx);
+Thanks for the reminder, missed it indeed. Pulled now, included in
+next/cleanup.
 
 
-Am I missing something about PLLE lock_addr also?
-
-> Thanks,
->
-> Peter.
+-Olof
