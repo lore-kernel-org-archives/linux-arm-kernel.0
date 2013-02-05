@@ -1,105 +1,64 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Tue, 5 Feb 2013 06:36:34 +0000
-Subject: [PATCH V2 1/6] pinctrl: pinctrl-single: use arch_initcall and
- module_exit
-In-Reply-To: <20130201171124.GF22517@atomide.com>
-References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
- <1359445134-13323-2-git-send-email-manishv.b@ti.com>
- <CACRpkdbf7TwrjfT2rhqQFGc3yh_Nt117RtzQO2y6g5Ddx5Ay_w@mail.gmail.com>
- <20130201170906.GE22517@atomide.com> <20130201171124.GF22517@atomide.com>
-Message-ID: <A4887BF146CD57468F700B415D2F47015828C7@DBDE01.ent.ti.com>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Tue, 5 Feb 2013 06:39:20 +0000
+Subject: [PATCH 2/2] ARM: davinci: da850: add wdt OF_DEV_AUXDATA entry
+In-Reply-To: <510FA2D4.7090807@mvista.com>
+References: <1359016695-10362-1-git-send-email-anilkumar.v@ti.com>
+ <1359016695-10362-3-git-send-email-anilkumar.v@ti.com>
+ <510FA09F.7030604@ti.com> <510FA2D4.7090807@mvista.com>
+Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412C41F0@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 22:41:24, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [130201 09:12]:
-> > * Linus Walleij <linus.walleij@linaro.org> [130129 03:03]:
-> > > On Tue, Jan 29, 2013 at 8:38 AM, Vishwanathrao Badarkhe, Manish 
-> > > <manishv.b@ti.com> wrote:
-> > > 
-> > > > Currently, I2C driver gets probed before pinctrl driver.
-> > > > To achieve I2C pin muxing via pinctrl driver before I2C probe get 
-> > > > called, register pinctrl driver in arch_initcall.
-> > > > Also, add module_exit to unregister pinctrl driver.
-> > > >
-> > > > Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
-> > > 
-> > > So your I2C driver is not returning -EPROBE_DEFER if it cannot find 
-> > > its pins?
-> > > 
-> > > Hm, well I can live with this, if Tony ACKs it.
-> > 
-> > Hmm pinctrl is before i2c in drivers/Makefile.
-> > Making initcalls happen earlier and earlier is usually the wrong way 
-> > to go. Sounds like there's some other issue here that needs to be 
-> > fixed instead.
+Hi Serqei,
+
+On Mon, Feb 04, 2013 at 17:30:20, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Let me guess: The i2c driver is wrongly set to run with arch_initcall?
->  
+> On 04-02-2013 15:50, Sekhar Nori wrote:
+> 
+> > Auxdata is not evm specific. This can instead be called da850_auxdata_lookup[].
+> 
+> > Also, I dont think it is necessary to add auxdata in a separate patch
+> > from dt nodes. So, I fixed these issues and came up with below patch. I
+> > tested basic wdt reboot. reboot command is still broken (with or
+> > without this patch). Can you please look at that?
+> 
+> > Thanks,
+> > Sekhar
+> 
+> > ----8<----
+> > From: "Kumar, Anil" <anilkumar.v@ti.com>
+> > Date: Thu, 24 Jan 2013 14:08:14 +0530
+> > Subject: [PATCH 1/1] ARM: davinci: da850: add wdt DT node
+> 
+> > Add da850 wdt DT node.
+> 
+> > Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
+> > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> [...]
+> 
+> > diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> > index 8dd15c0..2800090 100644
+> > --- a/arch/arm/boot/dts/da850.dtsi
+> > +++ b/arch/arm/boot/dts/da850.dtsi
+> > @@ -88,6 +88,11 @@
+> >   				      19>;
+> >   			status = "disabled";
+> >   		};
+> > +		wdt: wdt at 1c21000 {
+> > +			compatible = "ti,davinci-wdt";
+> > +			reg = <0x21000 0xfff>;
+> 
+>     Not 0x1000? This is region size, not upper limit.
 
-Hi Tony
+Oh, you are right. It should be 0x1000. Thanks for correcting. 
 
-No, Currently i2c driver is set to subsys_initcall. I have seen some
-problem while using pin control grab functionality. Please see detailed
-explanation as below.
+In da850 timer1 is used as wdt and according to da850 data sheet.
 
-Hi Linus
+Timer1 start address is 0x01C21000
+Timer1 end address is   0x01C21FFF 
 
-I am using auto grab pin control facility to do pin muxing of I2C0 
-pins and seen problem as below:
+I had wrongly calculated upper limit. I will fix it. 
 
-Currently, probe of I2C0 driver gets called before pin control driver. 
-Hence, while calling I2C0 probe because of unavailability of  
-pin control node information, its probe get deferred giving following 
-messages:
-
-"i2c_davinci i2c_davinci.1: could not find pctldev for node /soc/pinmux at 1c14120
-/pinmux_i2c0_pins, deferring probe"
-
-As I2C0 is in deferred list (as auto grab patch handle this), its probe 
-get called once again, During this second time probe of I2C0, I have 
-observed following crash:
-
-"Unable to handle kernel paging request at virtual address fffffe07"
-
-As per code analysis of auto grab functionality, I have seen in 
-"pinctrl_bind_pin" function, pin control handle (dpi->p) is returned by 
-"devm_pinctrl_get" function.
-
-Pin control handle is assigned with error pointer during 1st time probing of 
-I2C0 (as pin control information is not available at this time). 
-During 2nd time probing (deferred probe) of I2C0, same pin control handle 
-(which was get assigned during 1st probe) is getting used instead of getting 
-updated to correct pin control handle which leads to system crash.
-
-I made following changes, in order to update "dip->p" pointer with 
-correct value:
-
--       if (!dpi->p) {
-+       if (IS_ERR_OR_NULL(dpi->p)) {
-                dpi->p = devm_pinctrl_get(dev);
--               if (IS_ERR_OR_NULL(dpi->p)) {
--                       int ret = PTR_ERR(dpi->p);
--
--                       dev_dbg(dev, "no pinctrl handle\n");
--                       /* Only return deferrals */
--                       if (ret == -EPROBE_DEFER)
--                               return ret;
--                       return 0;
--               }
-+               ret = PTR_ERR(dpi->p);
-+               dev_dbg(dev, "no pinctrl handle\n");
-+               /* Only return deferrals */
-+               if (ret == -EPROBE_DEFER)
-+                       return ret;
-+               return 0;
-
-Is this intended change? or am I missing something in order to use this auto grab
-functionality?
-
-With the above change, now deferred probing is working fine and there is no need
-to register pin control driver in arch_initcall.
-
-
-Regards, 
-Manish
+Thanks,
+Anil
