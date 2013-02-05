@@ -1,84 +1,109 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 05 Feb 2013 14:57:02 +0100
-Subject: [PATCH 1/2] ARM: mvebu: Add support for SPI controller in Armada
- 370/XP
-In-Reply-To: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <51110FAE.4070700@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 5 Feb 2013 09:03:53 -0500
+Subject: [GIT PULL] ARM: mvebu fixes for v3.8-rc6 (round 2)
+In-Reply-To: <1360013837.bfC5F0.15090@triton>
+References: <1360013837.bfC5F0.15090@triton>
+Message-ID: <20130205140353.GT14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Olof, Arnd, Russell,
 
-On 02/04/2013 05:38 PM, Ezequiel Garcia wrote:
-> The Armada 370 and Armada XP SoC has an SPI controller.
-> This patch adds support for this controller in Armada 370
-> and Armada XP SoC common device tree files.
+On Mon, Feb 04, 2013 at 09:37:17PM +0000, Jason Cooper wrote:
+> The following changes since commit de27686b77f1c5c5dddf06d48fd322c52f098d51:
 > 
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Lior Amsalem <alior@marvell.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi |   22 ++++++++++++++++++++++
->  1 files changed, 22 insertions(+), 0 deletions(-)
+>   arm: mvebu: i2c come back in defconfig
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 28276fe..22340d5 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -145,6 +145,28 @@
->  			clocks = <&gateclk 17>;
->  			status = "disabled";
->  		};
-> +
-> +		spi0: spi at d0010600 {
-> +			compatible = "marvell,orion-spi";
-> +			reg = <0xd0010600 0x50>;
-
-Currently the driver only use the 5th first register. All of the other
-mvebu platform declare the last register at offset 0x28. The Armada
-370 SoC have also the last register at offset 0x28. Only for the
-Armada XP SoC there are more registers and we have a the last register
-at offset 0x50. Obviously the driver won't use these extra register.
-
-So I think that the best for now is to declare:
-			reg = <0xd0010600 0x28>;
-
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			cell-index = <0>;
-> +			interrupts = <30>;
-> +			clocks = <&coreclk 0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		spi1: spi at d0010680 {
-> +			compatible = "marvell,orion-spi";
-> +			reg = <0xd0010680 0x50>;
-and here:
-			reg = <0xd0010680 0x28>;
-
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			cell-index = <1>;
-> +			interrupts = <92>;
-> +			clocks = <&coreclk 0>;
-> +			status = "disabled";
-> +		};
->  	};
->  };
->  
+> are available in the git repository at:
 > 
+>   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.8-rc6-round2
+> 
+> for you to fetch changes up to b3fa2a0a2e3ac23415efec7ae848efd918b6b444:
+> 
+>   rtc: rtc-mv: Add support for clk to avoid lockups
+> 
+> ----------------------------------------------------------------
+> mvebu fixes for v3.8-rc6 (round 2)
+>     
+>     This series of four patches started with Simon Baatz reporting lost MAC
+>     addresses when compiling mv643xx_eth as a module.  Accompanying that, he was
+>     getting hard lockups on boot when most other drivers were compiled as modules.
+>     
+>     All of this boiled down to gated clocks.  mv643xx_eth looses it's mac address
+>     after it's clock gets gated.  The patch included in this series prevents the
+>     ge0 and ge1 clocks from being gated when doing legacy platform init of the
+>     driver.
+>     
+>     There is another patch to accompany the DT conversion of the driver which will
+>     allow reading the mac address from the devicetree.  This patch is not included
+>     here because the bindings are being added for v3.9.
+>     
+>     The hard lockups at boot were the result of many SoC IPs using the runit gate
+>     clock.  Several drivers (gpio, rtc) were not claiming the clock, and of_serial
+>     wouldn't claim the clock if clock-frequency was specified in the DT.
+>     
+>     clock-frequency was only necessary before we added proper clock support, it is
+>     now removed from all kirkwood dts files.
+>     
+>     Last, proper clock support is added to gpio-mvebu and rtc-mv.
+>     
+>     With these four fixes all drivers that can be compiled as modules can be
+>     without breaking bootup.
+> ----------------------------------------------------------------
 
-Once it will be fixed, for this patch you can add my
+In light of Russell's recent comment (re i.MX fixes) on Linus' standard
+for -rc7, I'd like to clarify the above.
 
-Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
+While only one user reported the above problems (Simon Baatz), it was
+caused by compiling v3.8-rc5 with the debian kernel config.  This config
+builds almost everything it can as a module.
 
+I'd like to do a v2 of this pull request since it was pointed out to me
+this morning that I missed a clock-frequency in
+kirkwood-ns2-common.dtsi.
 
-Regards,
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Does the above meet the metric Linus has set for -rc7?  I think so, but
+I leave that up to you guys.
+
+If so, I'll redo these four patches to explicitly say they fix boot
+problems caused when using debians default kernel config.
+
+thx,
+
+Jason.
+
+> Andrew Lunn (2):
+>       gpio: mvebu: Add clk support to prevent lockup
+>       rtc: rtc-mv: Add support for clk to avoid lockups
+> 
+> Jason Cooper (1):
+>       ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
+> 
+> Sebastian Hesselbarth (1):
+>       ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
+> 
+>  arch/arm/boot/dts/kirkwood-dns320.dts         |  2 --
+>  arch/arm/boot/dts/kirkwood-dns325.dts         |  1 -
+>  arch/arm/boot/dts/kirkwood-dockstar.dts       |  1 -
+>  arch/arm/boot/dts/kirkwood-dreamplug.dts      |  1 -
+>  arch/arm/boot/dts/kirkwood-goflexnet.dts      |  1 -
+>  arch/arm/boot/dts/kirkwood-ib62x0.dts         |  1 -
+>  arch/arm/boot/dts/kirkwood-iconnect.dts       |  1 -
+>  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts |  1 -
+>  arch/arm/boot/dts/kirkwood-km_kirkwood.dts    |  1 -
+>  arch/arm/boot/dts/kirkwood-lschlv2.dts        |  1 -
+>  arch/arm/boot/dts/kirkwood-lsxhl.dts          |  1 -
+>  arch/arm/boot/dts/kirkwood-mplcec4.dts        |  1 -
+>  arch/arm/boot/dts/kirkwood-nsa310.dts         |  1 -
+>  arch/arm/boot/dts/kirkwood-openblocks_a6.dts  |  2 --
+>  arch/arm/boot/dts/kirkwood-topkick.dts        |  1 -
+>  arch/arm/boot/dts/kirkwood.dtsi               |  5 ++--
+>  arch/arm/mach-kirkwood/board-dt.c             | 24 ++++++++++++-------
+>  drivers/gpio/gpio-mvebu.c                     |  7 ++++++
+>  drivers/rtc/rtc-mv.c                          | 28 ++++++++++++++++++----
+>  19 files changed, 49 insertions(+), 32 deletions(-)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
