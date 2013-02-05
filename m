@@ -1,52 +1,37 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 5 Feb 2013 09:07:28 +0800
-Subject: [PATCH v8 10/12] pinctrl: single: support generic pinconf
-In-Reply-To: <20130205004638.GC25185@atomide.com>
+Date: Tue, 5 Feb 2013 09:08:40 +0800
+Subject: [PATCH v8 08/12] pinctrl: generic: dump pin configuration
+In-Reply-To: <20130205003535.GB25185@atomide.com>
 References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
- <1359825953-15663-11-git-send-email-haojian.zhuang@linaro.org>
- <20130205004638.GC25185@atomide.com>
-Message-ID: <CAD6h2NR_rKe3DYHdP1-=HycL+HFgEd5yHgGPC_pKT5Dt8EBb2Q@mail.gmail.com>
+ <1359825953-15663-9-git-send-email-haojian.zhuang@linaro.org>
+ <20130205003535.GB25185@atomide.com>
+Message-ID: <CAD6h2NTjNphq0a=cssWDWtYVTaVSkjJsS2iY3D17COyHibhNJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 February 2013 08:46, Tony Lindgren <tony@atomide.com> wrote:
-> * Haojian Zhuang <haojian.zhuang@linaro.org> [130202 09:32]:
->> --- a/drivers/pinctrl/pinctrl-single.c
->> +++ b/drivers/pinctrl/pinctrl-single.c
->> @@ -22,8 +22,10 @@
+On 5 February 2013 08:35, Tony Lindgren <tony@atomide.com> wrote:
+> * Haojian Zhuang <haojian.zhuang@linaro.org> [130202 09:30]:
+>> @@ -114,4 +116,10 @@ static inline void pinconf_generic_dump_group(struct pinctrl_dev *pctldev,
+>>       return;
+>>  }
 >>
->>  #include <linux/pinctrl/pinctrl.h>
->>  #include <linux/pinctrl/pinmux.h>
->> +#include <linux/pinctrl/pinconf-generic.h>
->>
->>  #include "core.h"
->> +#include "pinconf.h"
->>
->>  #define DRIVER_NAME                  "pinctrl-single"
->>  #define PCS_MUX_PINS_NAME            "pinctrl-single,pins"
+>> +static void pinconf_generic_dump_config(struct pinctrl_dev *pctldev,
+>> +                                     struct seq_file *s,
+>> +                                     unsigned long config)
+>> +{
+>> +     return;
+>> +}
+>>  #endif
 >
-> I'm getting the following with this patch applied:
+> This needs to be static inline void to avoid the following warning:
 >
-> "pinconf_generic_dump_config" [drivers/pinctrl/pinctrl-single.ko] undefined!
->
-> This is with the following options:
->
-> CONFIG_PINCTRL=y
-> CONFIG_PINMUX=y
-> CONFIG_PINCONF=y
-> CONFIG_GENERIC_PINCONF=y
-> CONFIG_DEBUG_PINCTRL=y
-> CONFIG_PINCTRL_SINGLE=m
->
-> The includes look right, probably you're just missing
-> EXPORT_SYMBOL(pinconf_generic_dump_config) in the patch
-> adding pinconf_generic_dump_config?
+> drivers/pinctrl/pinconf.h:122: warning: ?pinconf_generic_dump_config? defined but not used
 >
 > Regards,
 >
 > Tony
 
-Thanks for your catch. I'll fix it right now.
+Thanks. I'll update it.
 
 Regards
 Haojian
