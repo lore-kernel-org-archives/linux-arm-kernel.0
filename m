@@ -1,238 +1,179 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 5 Feb 2013 14:10:23 -0300
-Subject: [PATCH v4 1/4] thermal: Add support for the thermal sensor on
- Kirkwood SoCs
-In-Reply-To: <1360005560-21945-2-git-send-email-andrew@lunn.ch>
-References: <1359946148.2250.47.camel@rzhang1-mobl4>
- <1360005560-21945-1-git-send-email-andrew@lunn.ch>
- <1360005560-21945-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20130205171022.GB2525@localhost>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 05 Feb 2013 19:10:26 +0200
+Subject: [PATCH V3 5/7] ARM: OMAP3: Update clocksource timer selection
+In-Reply-To: <51113833.2090306@ti.com>
+References: <1360007196-21350-1-git-send-email-jon-hunter@ti.com>
+ <1360007196-21350-6-git-send-email-jon-hunter@ti.com>
+ <5110C53F.1010203@compulab.co.il> <51113833.2090306@ti.com>
+Message-ID: <51113D02.2060209@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 08:19:17PM +0100, Andrew Lunn wrote:
-> From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+On 02/05/13 18:49, Jon Hunter wrote:
 > 
-> This patch adds support for Kirkwood 88F6282 and 88F6283 thermal sensor.
+> On 02/05/2013 02:39 AM, Igor Grinberg wrote:
+
+[...]
+
+>>
+>> Hmmm...
+>> Do I miss something or you have forgot to update the commit message?
 > 
-> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Ugh you are right :-(
+> 
+> Some how yesterday when rebasing the series and adding a couple more
+> patches, I royally screwed it up. How about the following ...
+
+Yep, that should do.
+Thanks!
+
+> 
+> Cheers
+> Jon
+> 
+>>From c82699e94d0255b3b1524e0d5ff4fd1f5852de69 Mon Sep 17 00:00:00 2001
+> From: Jon Hunter <jon-hunter@ti.com>
+> Date: Mon, 28 Jan 2013 17:53:57 -0600
+> Subject: [PATCH] ARM: OMAP3: Update clocksource timer selection
+> 
+> When booting with device-tree for OMAP3 and AM335x devices and a gptimer
+> is used as the clocksource (which is always the case for AM335x), a
+> gptimer located in a power domain that is not always-on is selected.
+> Ideally we should use a gptimer for clocksource that is located in a
+> power domain that is always on (such as the wake-up domain) so that time
+> can be maintained during a kernel suspend without keeping on additional
+> power domains unnecessarily.
+> 
+> In order to fix this so that we can select a gptimer located in a power
+> domain that is always-on, the following changes were made ...
+> 1. Currently, only when selecting a gptimer to use for a clockevent
+>    timer, do we pass a timer property that can be used to select a
+>    specific gptimer. Change this so that we can pass a property when
+>    selecting a gptimer to use for a clocksource timer too.
+> 2. Currently, when selecting either a gptimer to use for a clockevent
+>    timer or a clocksource timer and no timer property is passed, then
+>    the first available timer is selected regardless of the properties
+>    it has. Change this so that if no properties are passed, then a timer
+>    that does not have additional features (such as always-on, dsp-irq,
+>    pwm, and secure) is selected.
+> 
+> For OMAP3 and AM335x devices that use a gptimer for clocksource, change
+> the selection of the gptimer so that by default the gptimer located in
+> the always-on power domain is used for clocksource instead of
+> clockevents.
+> 
+> Please note that using a gptimer for both clocksource and clockevents
+> can have a system power impact during idle. The reason being is that
+> OMAP and AMxxx devices typically only have one gptimer in a power domain
+> that is always-on. Therefore when the kernel is idle both the clocksource
+> and clockevent timers will be active and this will keep additional power
+> domains on. During kernel suspend, only the clocksource timer is active
+> and therefore, it is better to use a gptimer in a power domain that is
+> always-on for clocksource.
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 > ---
->  .../bindings/thermal/kirkwood-thermal.txt          |   15 +++
->  drivers/thermal/Kconfig                            |    8 ++
->  drivers/thermal/Makefile                           |    1 +
->  drivers/thermal/kirkwood_thermal.c                 |  136 ++++++++++++++++++++
->  4 files changed, 160 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
->  create mode 100644 drivers/thermal/kirkwood_thermal.c
+>  arch/arm/mach-omap2/timer.c |   33 +++++++++++++++++++++------------
+>  1 file changed, 21 insertions(+), 12 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt b/Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
-> new file mode 100644
-> index 0000000..8c0f5eb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
-> @@ -0,0 +1,15 @@
-> +* Kirkwood Thermal
-> +
-> +This version is for Kirkwood 88F8262 & 88F6283 SoCs. Other kirkwoods
-> +don't contain a thermal sensor.
-> +
-> +Required properties:
-> +- compatible : "marvell,kirkwood-thermal"
-> +- reg : Address range of the thermal registers
-> +
-> +Example:
-> +
-> +	thermal at 10078 {
-> +		compatible = "marvell,kirkwood-thermal";
-> +		reg = <0x10078 0x4>;
-> +	};
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index c2c77d1..ff34a0a 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -93,6 +93,14 @@ config RCAR_THERMAL
->  	  Enable this to plug the R-Car thermal sensor driver into the Linux
->  	  thermal framework
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 3ad9a3b..fce495e 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -160,6 +160,12 @@ static struct device_node * __init omap_get_timer_dt(struct of_device_id *match,
+>  		if (property && !of_get_property(np, property, NULL))
+>  			continue;
 >  
-> +config KIRKWOOD_THERMAL
-> +	tristate "Temperature sensor on Marvell Kirkwood SoCs"
-> +	depends on ARCH_KIRKWOOD
-> +	depends on OF
-> +	help
-> +	  Support for the Kirkwood thermal sensor driver into the Linux thermal
-> +	  framework. Only kirkwood 88F6282 and 88F6283 have this sensor.
+> +		if (!property && (of_get_property(np, "ti,timer-alwon", NULL) ||
+> +				  of_get_property(np, "ti,timer-dsp", NULL) ||
+> +				  of_get_property(np, "ti,timer-pwm", NULL) ||
+> +				  of_get_property(np, "ti,timer-secure", NULL)))
+> +			continue;
 > +
->  config EXYNOS_THERMAL
->  	tristate "Temperature sensor on Samsung EXYNOS"
->  	depends on (ARCH_EXYNOS4 || ARCH_EXYNOS5)
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index d8da683..99026b2 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -15,6 +15,7 @@ obj-$(CONFIG_CPU_THERMAL)	+= cpu_cooling.o
->  # platform thermal drivers
->  obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
->  obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
-> +obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
->  obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
->  obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
->  obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
-> diff --git a/drivers/thermal/kirkwood_thermal.c b/drivers/thermal/kirkwood_thermal.c
-> new file mode 100644
-> index 0000000..000cfc9
-> --- /dev/null
-> +++ b/drivers/thermal/kirkwood_thermal.c
-> @@ -0,0 +1,136 @@
-> +/*
-> + * Kirkwood thermal sensor driver
-> + *
-> + * Copyright (C) 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/thermal.h>
-> +
-> +#define KIRKWOOD_THERMAL_VALID_OFFSET	9
-> +#define KIRKWOOD_THERMAL_VALID_MASK	0x1
-> +#define KIRKWOOD_THERMAL_TEMP_OFFSET	10
-> +#define KIRKWOOD_THERMAL_TEMP_MASK	0x1FF
-> +
-> +/* Kirkwood Thermal Sensor Dev Structure */
-> +struct kirkwood_thermal_priv {
-> +	void __iomem *sensor;
-> +};
-> +
-> +static int kirkwood_get_temp(struct thermal_zone_device *thermal,
-> +			  unsigned long *temp)
-> +{
-> +	unsigned long reg;
-> +	struct kirkwood_thermal_priv *priv = thermal->devdata;
-> +
-> +	reg = readl_relaxed(priv->sensor);
-> +
-> +	/* Valid check */
-> +	if (!(reg >> KIRKWOOD_THERMAL_VALID_OFFSET) &
-> +	    KIRKWOOD_THERMAL_VALID_MASK) {
-> +		dev_err(&thermal->device,
-> +			"Temperature sensor reading not valid\n");
-> +		return -EIO;
-> +	}
-> +
-> +	/*
-> +	 * Calculate temperature. See Section 8.10.1 of the 88AP510,
-> +	 * datasheet, which has the same sensor.
-> +	 * Documentation/arm/Marvell/README
-> +	 */
-> +	reg = (reg >> KIRKWOOD_THERMAL_TEMP_OFFSET) &
-> +		KIRKWOOD_THERMAL_TEMP_MASK;
-> +	*temp = ((2281638UL - (7298*reg)) / 10);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct thermal_zone_device_ops ops = {
-> +	.get_temp = kirkwood_get_temp,
-> +};
-> +
-> +static const struct of_device_id kirkwood_thermal_id_table[] = {
-> +	{ .compatible = "marvell,kirkwood-thermal" },
-> +	{}
-> +};
-> +
-> +static int kirkwood_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *thermal = NULL;
-> +	struct kirkwood_thermal_priv *priv;
-> +	struct resource *res;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv) {
-> +		dev_err(&pdev->dev, "kzalloc fail\n");
-
-Not needed, see my answer to the Dove patch.
-
-> +		return -ENOMEM;
-> +	}
-> +
-> +	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!priv->sensor) {
-> +		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
-> +		return -EADDRNOTAVAIL;
-> +	}
-> +
-> +	thermal = thermal_zone_device_register("kirkwood_thermal", 0, 0,
-> +					       priv, &ops, NULL, 0, 0);
-> +	if (IS_ERR(thermal)) {
-> +		dev_err(&pdev->dev,
-> +			"Failed to register thermal zone device\n");
-> +		return PTR_ERR(thermal);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, thermal);
-> +
-> +	return 0;
-> +}
-> +
-> +static int kirkwood_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *kirkwood_thermal =
-> +		platform_get_drvdata(pdev);
-> +
-> +	thermal_zone_device_unregister(kirkwood_thermal);
-> +	platform_set_drvdata(pdev, NULL);
-> +
-> +	return 0;
-> +}
-> +
-> +MODULE_DEVICE_TABLE(of, kirkwood_thermal_id_table);
-> +
-> +static struct platform_driver kirkwood_thermal_driver = {
-> +	.probe = kirkwood_thermal_probe,
-> +	.remove = kirkwood_thermal_exit,
-> +	.driver = {
-> +		.name = "kirkwood_thermal",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(kirkwood_thermal_id_table),
-> +	},
-> +};
-> +
-> +module_platform_driver(kirkwood_thermal_driver);
-> +
-> +MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
-> +MODULE_DESCRIPTION("kirkwood thermal driver");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 1.7.10.4
+>  		of_add_property(np, &device_disabled);
+>  		return np;
+>  	}
+> @@ -435,13 +441,14 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
+>  }
+>  
+>  static void __init omap2_gptimer_clocksource_init(int gptimer_id,
+> -						const char *fck_source)
+> +						  const char *fck_source,
+> +						  const char *property)
+>  {
+>  	int res;
+>  
+>  	clksrc.errata = omap_dm_timer_get_errata();
+>  
+> -	res = omap_dm_timer_init_one(&clksrc, gptimer_id, fck_source, NULL,
+> +	res = omap_dm_timer_init_one(&clksrc, gptimer_id, fck_source, property,
+>  				     &clocksource_gpt.name,
+>  				     OMAP_TIMER_NONPOSTED);
+>  	BUG_ON(res);
+> @@ -538,47 +545,49 @@ static inline void __init realtime_counter_init(void)
+>  #endif
+>  
+>  #define OMAP_SYS_GP_TIMER_INIT(name, clkev_nr, clkev_src, clkev_prop,	\
+> -			       clksrc_nr, clksrc_src)			\
+> +			       clksrc_nr, clksrc_src, clksrc_prop)	\
+>  void __init omap##name##_gptimer_timer_init(void)			\
+>  {									\
+>  	omap_dmtimer_init();						\
+>  	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+> -	omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src);	\
+> +	omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src,		\
+> +					clksrc_prop);			\
+>  }
+>  
+>  #define OMAP_SYS_32K_TIMER_INIT(name, clkev_nr, clkev_src, clkev_prop,	\
+> -				clksrc_nr, clksrc_src)			\
+> +				clksrc_nr, clksrc_src, clksrc_prop)	\
+>  void __init omap##name##_sync32k_timer_init(void)		\
+>  {									\
+>  	omap_dmtimer_init();						\
+>  	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+>  	/* Enable the use of clocksource="gp_timer" kernel parameter */	\
+>  	if (use_gptimer_clksrc)						\
+> -		omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src);\
+> +		omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src,	\
+> +						clksrc_prop);		\
+>  	else								\
+>  		omap2_sync32k_clocksource_init();			\
+>  }
+>  
+>  #ifdef CONFIG_ARCH_OMAP2
+>  OMAP_SYS_32K_TIMER_INIT(2, 1, "timer_32k_ck", "ti,timer-alwon",
+> -			2, "timer_sys_ck");
+> +			2, "timer_sys_ck", NULL);
+>  #endif /* CONFIG_ARCH_OMAP2 */
+>  
+>  #ifdef CONFIG_ARCH_OMAP3
+>  OMAP_SYS_32K_TIMER_INIT(3, 1, "timer_32k_ck", "ti,timer-alwon",
+> -			2, "timer_sys_ck");
+> +			2, "timer_sys_ck", NULL);
+>  OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+> -			2, "timer_sys_ck");
+> +			2, "timer_sys_ck", NULL);
+>  #endif /* CONFIG_ARCH_OMAP3 */
+>  
+>  #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+> -OMAP_SYS_GP_TIMER_INIT(3, 1, "timer_sys_ck", "ti,timer-alwon",
+> -		       2, "timer_sys_ck");
+> +OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+> +		       1, "timer_sys_ck", "ti,timer-alwon");
+>  #endif
+>  
+>  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+>  OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+> -			2, "sys_clkin_ck");
+> +			2, "sys_clkin_ck", NULL);
+>  #endif
+>  
+>  #ifdef CONFIG_ARCH_OMAP4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards,
+Igor.
