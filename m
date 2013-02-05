@@ -1,33 +1,159 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 05 Feb 2013 10:18:26 +0800
-Subject: [PATCH] ARM:omap2: using strlcpy instead of strncpy
-In-Reply-To: <20130204181844.GP22517@atomide.com>
-References: <51090829.1010109@asianux.com>
- <20130201224546.GG22517@atomide.com> <510F78AB.4000602@ti.com>
- <20130204181844.GP22517@atomide.com>
-Message-ID: <51106BF2.7080203@asianux.com>
+From: b13634@freescale.com (Gary Zhang)
+Date: Tue, 5 Feb 2013 09:37:46 +0800
+Subject: [PATCH V2 1/2] ARM: dts: add support for some modules in imx6q sabresd
+Message-ID: <1360028266-25826-1-git-send-email-b13634@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?02?05? 02:18, Tony Lindgren ??:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [130204 01:04]:
->> > Hi Tony,
->> > 
->> > I can create a branch for you in our gitorious tree
->> > (git://gitorious.org/omap-audio/linux-audio.git) for this patch. But I think
->> > for now it would be best if you could take this via linux-omap (the file is
->> > under arch/arm/mach-omap2 anyways)
-> OK thanks I'll apply with your ack to omap-for-v3.9/fixes-noncritical.
-> 
-> Tony
-> 
+add I2C/I2S/clk/fixed regulator/sound card and
+other related supports in imx6q sabresd
 
-  Does it mean: we need not sync MAINTAINERS file for twl-*, recently ?
+Signed-off-by: Gary Zhang <b13634@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-sabresd.dts |   77 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q.dtsi        |   23 ++++++++++
+ 2 files changed, 100 insertions(+), 0 deletions(-)
 
-  :-)
-
-  thanks.
+diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
+index a424025..ed1cb9b 100644
+--- a/arch/arm/boot/dts/imx6q-sabresd.dts
++++ b/arch/arm/boot/dts/imx6q-sabresd.dts
+@@ -29,6 +29,11 @@
+ 					pinctrl-0 = <&pinctrl_uart1_1>;
+ 					status = "okay";
+ 				};
++
++				ssi2: ssi at 0202c000 {
++					fsl,mode = "i2s-slave";
++					status = "okay";
++				};
+ 			};
+ 
+ 			iomuxc at 020e0000 {
+@@ -73,6 +78,33 @@
+ 				wp-gpios = <&gpio2 1 0>;
+ 				status = "okay";
+ 			};
++
++			audmux at 021d8000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_audmux_2>;
++				status = "okay";
++			};
++
++			i2c at 021a0000 { /* I2C1 */
++				status = "okay";
++				clock-frequency = <100000>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c1_2>;
++
++				codec: wm8962 at 1a {
++					compatible = "wlf,wm8962";
++					reg = <0x1a>;
++					clocks = <&clks 169>;
++					DCVDD-supply = <&reg_1p8v>;
++					DBVDD-supply = <&reg_1p8v>;
++					AVDD-supply = <&reg_1p8v>;
++					CPVDD-supply = <&reg_1p8v>;
++					MICVDD-supply = <&reg_3p3v>;
++					PLLVDD-supply = <&reg_1p8v>;
++					SPKVDD1-supply = <&reg_4p2v>;
++					SPKVDD2-supply = <&reg_4p2v>;
++				};
++			};
+ 		};
+ 	};
+ 
+@@ -91,4 +123,49 @@
+ 			linux,code = <114>; /* KEY_VOLUMEDOWN */
+ 		};
+ 	};
++	regulators {
++		compatible = "simple-bus";
++
++		reg_1p8v: 1p8v {
++			compatible = "regulator-fixed";
++			regulator-name = "1P8V";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-always-on;
++			enable-active-high;
++		};
++		reg_3p3v: 3p3v {
++			compatible = "regulator-fixed";
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++			enable-active-high;
++		};
++		reg_4p2v: 4p2v {
++			compatible = "regulator-fixed";
++			regulator-name = "4P2V";
++			regulator-min-microvolt = <4200000>;
++			regulator-max-microvolt = <4200000>;
++			gpio = <&gpio4 10 0>;
++			regulator-always-on;
++			regulator-boot-on;
++			enable-active-high;
++		};
++	};
++
++	sound {
++		compatible = "fsl,imx6q-sabresd-wm8962",
++			     "fsl,imx-audio-wm8962";
++		model = "imx6q-sabresd-wm8962";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_clko_1>;
++		ssi-controller = <&ssi2>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"Headphone Jack", "HPOUTL",
++			"Headphone Jack", "HPOUTR";
++		mux-int-port = <2>;
++		mux-ext-port = <3>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index d6265ca..b612269 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -582,6 +582,23 @@
+ 							3    0x80000000	/* MX6Q_PAD_SD2_DAT1__AUDMUX_AUD4_TXFS */
+ 						>;
+ 					};
++
++					pinctrl_audmux_2: audmux-2 {
++						fsl,pins = <
++							1117 0x80000000	/* MX6Q_PAD_CSI0_DAT7__AUDMUX_AUD3_RXD */
++							1093 0x80000000	/* MX6Q_PAD_CSI0_DAT4__AUDMUX_AUD3_TXC */
++							1101 0x80000000	/* MX6Q_PAD_CSI0_DAT5__AUDMUX_AUD3_TXD */
++							1109 0x80000000	/* MX6Q_PAD_CSI0_DAT6__AUDMUX_AUD3_TXFS */
++						>;
++					};
++				};
++
++				clko {
++					pinctrl_clko_1: clkogrp-1 {
++						fsl,pins = <
++							953 0x130b0  /* MX6Q_PAD_GPIO_0__CCM_CLKO */
++						>;
++					};
+ 				};
+ 
+ 				ecspi1 {
+@@ -670,6 +687,12 @@
+ 							196 0x4001b8b1	/* MX6Q_PAD_EIM_D28__I2C1_SDA */
+ 						>;
+ 					};
++					pinctrl_i2c1_2: i2c1grp-2 {
++						fsl,pins = <
++							1125 0x4001b8b1	/* MX6Q_PAD_CSI0_DAT8__I2C1_SDA */
++							1133 0x4001b8b1 /* MX6Q_PAD_CSI0_DAT9__I2C1_SCL */
++						>;
++					};
+ 				};
+ 
+ 				uart1 {
 -- 
-Chen Gang
-
-Asianux Corporation
+1.7.0.4
