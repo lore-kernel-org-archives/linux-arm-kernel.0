@@ -1,28 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Feb 2013 23:10:35 -0800
-Subject: [GIT PULL  2/4] ARM: mvebu: drivers for v3.9
-In-Reply-To: <1359733919.FCB62.22262@triton>
-References: <pull-1359733919-342140>
- <1359733919.FCB62.22262@triton>
-Message-ID: <20130205071035.GF13049@quad.lixom.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 05 Feb 2013 16:30:49 +0900
+Subject: [PATCH] ARM: shmobile: Register ARM architected timer
+Message-ID: <20130205073049.7576.51324.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 03:51:59PM +0000, Jason Cooper wrote:
-> The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
-> 
->   Linux 3.8-rc5
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/drivers_for_v3.9
-> 
-> for you to fetch changes up to 9cfc94eb0f4843af5d1141a37d7b7ca5d3b27220:
-> 
->   cpuidle: kirkwood: Move out of mach directory
-> 
+From: Magnus Damm <damm@opensource.se>
 
-Pulled, thanks.
+Register ARM architected timer by default for all mach-shmobile
+systems using late timer.
 
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
--Olof
+ arch/arm/mach-shmobile/timer.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+--- 0001/arch/arm/mach-shmobile/timer.c
++++ work/arch/arm/mach-shmobile/timer.c	2013-02-05 16:17:04.000000000 +0900
+@@ -20,6 +20,7 @@
+  */
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
++#include <asm/arch_timer.h>
+ #include <asm/mach/time.h>
+ #include <asm/smp_twd.h>
+ 
+@@ -62,4 +63,6 @@ void __init shmobile_earlytimer_init(voi
+ 
+ void __init shmobile_timer_init(void)
+ {
++	arch_timer_of_register();
++	arch_timer_sched_clock_init();
+ }
