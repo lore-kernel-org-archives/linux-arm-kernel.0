@@ -1,16 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 5 Feb 2013 17:15:39 +0900
-Subject: [PATCH] ARM: shmobile: Register ARM architected timer
-In-Reply-To: <20130205073049.7576.51324.sendpatchset@w520>
-References: <20130205073049.7576.51324.sendpatchset@w520>
-Message-ID: <20130205081538.GA14681@verge.net.au>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 5 Feb 2013 09:15:56 +0100
+Subject: [PATCH] vexpress: Allow vexpress-sysreg to self-initialise
+In-Reply-To: <1360001282-25554-1-git-send-email-catalin.marinas@arm.com>
+References: <1360001282-25554-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20130205081556.GL8476@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 04:30:49PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Register ARM architected timer by default for all mach-shmobile
-> systems using late timer.
+Hi Catalin,
 
-Thanks, applied to a new soc4 branch and merged into next.
+On Mon, Feb 04, 2013 at 06:08:02PM +0000, Catalin Marinas wrote:
+> The vexpress_sysreg_init() is a core_initcall() already and it can
+> trigger the early initialisation if a matching node is found. This patch
+> allows the SoC code to avoid calling vexpress_sysreg_of_early_init()
+> explicitly.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+> 
+> Samuel, could you please merge this patch for 3.9 (based on 3.8-rc6)? It is
+> needed for arm64 support (which shares the same mfd files with the 32-bit arm
+> port). Thanks.
+Applied to my for-next branch, thanks.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
