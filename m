@@ -1,194 +1,130 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 5 Feb 2013 20:48:29 +0100
-Subject: [PATCH 08/14] pinctrl/abx500: replace IRQ offsets with table read-in
- values
+Date: Tue, 5 Feb 2013 20:48:27 +0100
+Subject: [PATCH 06/14] pinctrl/abx500: align GPIO cluster boundaries
 In-Reply-To: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
 References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1360093715-6348-9-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1360093715-6348-7-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lee Jones <lee.jones@linaro.org>
 
-The ABx500 GPIO controller used to provide a set of virtual contiguous
-IRQs for use by sub-devices, but they have been removed after a request
-from Mainline Maintainers. Now the AB8500 core driver deals with almost
-all IRQ related issues instead.
+Not quite sure how this ever worked. In ab8500_gpio_to_irq() the
+GPIO for conversion is passed through as the second argument. If
+GPIO13, which is a valid GPIO for IRQ functionality, was received;
+it would be rejected by the following guard:
 
-The ABx500 GPIO driver is now only used to convert between GPIO and IRQ
-numbers which is actually quite difficult, as the ABx500 GPIO's
-associated IRQs are clustered together throughout the interrupt number
-space at irregular intervals. To solve this quandary, we have placed the
-read-in values into the existing cluster information table to use during
-conversion.
+    GPIO_IRQ_CLUSTER(5, 12, 0); /* GPIO numbers start from 1 */
+
+    if (offset >= cluster->start && offset <= cluster->end)
+        /* Valid GPIO for IRQ use */
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-[Moved irq_base removal into this patch]
+[Augmented to account for off-by-one problem]
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
  drivers/pinctrl/pinctrl-ab8500.c |  6 +++---
  drivers/pinctrl/pinctrl-ab8505.c | 10 +++++-----
- drivers/pinctrl/pinctrl-ab8540.c |  5 +++--
+ drivers/pinctrl/pinctrl-ab8540.c |  4 ++--
  drivers/pinctrl/pinctrl-ab9540.c |  8 ++++----
- drivers/pinctrl/pinctrl-abx500.c | 18 +++++++++++-------
- drivers/pinctrl/pinctrl-abx500.h | 10 ++++++----
- 6 files changed, 32 insertions(+), 25 deletions(-)
+ drivers/pinctrl/pinctrl-abx500.c |  6 ++++--
+ 5 files changed, 18 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-ab8500.c b/drivers/pinctrl/pinctrl-ab8500.c
-index 67dc942..42675ee 100644
+index 2cd424e..67dc942 100644
 --- a/drivers/pinctrl/pinctrl-ab8500.c
 +++ b/drivers/pinctrl/pinctrl-ab8500.c
 @@ -456,9 +456,9 @@ struct alternate_functions ab8500_alternate_functions[AB8500_GPIO_MAX_NUMBER + 1
   *	GPIO36 to GPIO41
   */
  struct abx500_gpio_irq_cluster ab8500_gpio_irq_cluster[] = {
--	GPIO_IRQ_CLUSTER(6, 13, 0),
--	GPIO_IRQ_CLUSTER(24, 25, 0),
--	GPIO_IRQ_CLUSTER(36, 41, 0),
-+	GPIO_IRQ_CLUSTER(6,  13, 34),
-+	GPIO_IRQ_CLUSTER(24, 25, 24),
-+	GPIO_IRQ_CLUSTER(36, 41, 14),
+-	GPIO_IRQ_CLUSTER(5, 12, 0), /* GPIO numbers start from 1 */
+-	GPIO_IRQ_CLUSTER(23, 24, 0),
+-	GPIO_IRQ_CLUSTER(35, 40, 0),
++	GPIO_IRQ_CLUSTER(6, 13, 0),
++	GPIO_IRQ_CLUSTER(24, 25, 0),
++	GPIO_IRQ_CLUSTER(36, 41, 0),
  };
  
  static struct abx500_pinctrl_soc_data ab8500_soc = {
 diff --git a/drivers/pinctrl/pinctrl-ab8505.c b/drivers/pinctrl/pinctrl-ab8505.c
-index 825710a..f8075c6 100644
+index 40dc3e1..825710a 100644
 --- a/drivers/pinctrl/pinctrl-ab8505.c
 +++ b/drivers/pinctrl/pinctrl-ab8505.c
 @@ -349,11 +349,11 @@ struct alternate_functions ab8505_alternate_functions[AB8505_GPIO_MAX_NUMBER + 1
   *	GPIO52 to GPIO53
   */
  struct abx500_gpio_irq_cluster ab8505_gpio_irq_cluster[] = {
--	GPIO_IRQ_CLUSTER(10, 11, 0),
--	GPIO_IRQ_CLUSTER(13, 13, 0),
--	GPIO_IRQ_CLUSTER(40, 41, 0),
--	GPIO_IRQ_CLUSTER(50, 50, 0),
--	GPIO_IRQ_CLUSTER(52, 53, 0),
-+	GPIO_IRQ_CLUSTER(10, 11, 34),
-+	GPIO_IRQ_CLUSTER(13, 13, 34),
-+	GPIO_IRQ_CLUSTER(40, 41, 14),
-+	GPIO_IRQ_CLUSTER(50, 50, 63),
-+	GPIO_IRQ_CLUSTER(52, 53, 63),
+-	GPIO_IRQ_CLUSTER(9, 10, 0), /* GPIO numbers start from 1 */
+-	GPIO_IRQ_CLUSTER(12, 12, 0),
+-	GPIO_IRQ_CLUSTER(39, 40, 0),
+-	GPIO_IRQ_CLUSTER(49, 49, 0),
+-	GPIO_IRQ_CLUSTER(51, 52, 0),
++	GPIO_IRQ_CLUSTER(10, 11, 0),
++	GPIO_IRQ_CLUSTER(13, 13, 0),
++	GPIO_IRQ_CLUSTER(40, 41, 0),
++	GPIO_IRQ_CLUSTER(50, 50, 0),
++	GPIO_IRQ_CLUSTER(52, 53, 0),
  };
  
  static struct abx500_pinctrl_soc_data ab8505_soc = {
 diff --git a/drivers/pinctrl/pinctrl-ab8540.c b/drivers/pinctrl/pinctrl-ab8540.c
-index 0fcd943..ac2e135 100644
+index e75310d..0fcd943 100644
 --- a/drivers/pinctrl/pinctrl-ab8540.c
 +++ b/drivers/pinctrl/pinctrl-ab8540.c
-@@ -377,8 +377,9 @@ static struct pullud ab8540_pullud = {
+@@ -377,8 +377,8 @@ static struct pullud ab8540_pullud = {
   *	GPIO51 to GPIO54
   */
  struct abx500_gpio_irq_cluster ab8540_gpio_irq_cluster[] = {
--	GPIO_IRQ_CLUSTER(43, 44, 2),
--	GPIO_IRQ_CLUSTER(51, 54, 0),
-+	GPIO_IRQ_CLUSTER(43, 43, 126),
-+	GPIO_IRQ_CLUSTER(44, 44, 127),
-+	GPIO_IRQ_CLUSTER(51, 54, 63),
+-	GPIO_IRQ_CLUSTER(42, 43, 2), /* GPIO numbers start from 1 */
+-	GPIO_IRQ_CLUSTER(50, 53, 0),
++	GPIO_IRQ_CLUSTER(43, 44, 2),
++	GPIO_IRQ_CLUSTER(51, 54, 0),
  };
  
  static struct abx500_pinctrl_soc_data ab8540_soc = {
 diff --git a/drivers/pinctrl/pinctrl-ab9540.c b/drivers/pinctrl/pinctrl-ab9540.c
-index 28dfb2e..a169e5b 100644
+index 31fec3e..28dfb2e 100644
 --- a/drivers/pinctrl/pinctrl-ab9540.c
 +++ b/drivers/pinctrl/pinctrl-ab9540.c
 @@ -455,10 +455,10 @@ struct alternate_functions ab9540alternate_functions[AB9540_GPIO_MAX_NUMBER + 1]
  };
  
  struct abx500_gpio_irq_cluster ab9540_gpio_irq_cluster[] = {
--	GPIO_IRQ_CLUSTER(10, 13, 0),
--	GPIO_IRQ_CLUSTER(24, 25, 0),
--	GPIO_IRQ_CLUSTER(40, 41, 0),
--	GPIO_IRQ_CLUSTER(50, 54, 0),
-+	GPIO_IRQ_CLUSTER(10, 13, 34),
-+	GPIO_IRQ_CLUSTER(24, 25, 24),
-+	GPIO_IRQ_CLUSTER(40, 41, 14),
-+	GPIO_IRQ_CLUSTER(50, 54, 63),
+-	GPIO_IRQ_CLUSTER(9, 12, 0), /* GPIO numbers start from 1 */
+-	GPIO_IRQ_CLUSTER(23, 24, 0),
+-	GPIO_IRQ_CLUSTER(39, 40, 0),
+-	GPIO_IRQ_CLUSTER(49, 53, 0),
++	GPIO_IRQ_CLUSTER(10, 13, 0),
++	GPIO_IRQ_CLUSTER(24, 25, 0),
++	GPIO_IRQ_CLUSTER(40, 41, 0),
++	GPIO_IRQ_CLUSTER(50, 54, 0),
  };
  
  static struct abx500_pinctrl_soc_data ab9540_soc = {
 diff --git a/drivers/pinctrl/pinctrl-abx500.c b/drivers/pinctrl/pinctrl-abx500.c
-index 716c835..ded8f21 100644
+index 9bdfcb9..a9e720f 100644
 --- a/drivers/pinctrl/pinctrl-abx500.c
 +++ b/drivers/pinctrl/pinctrl-abx500.c
-@@ -98,7 +98,6 @@ struct abx500_pinctrl {
- 	struct gpio_chip chip;
- 	struct ab8500 *parent;
- 	struct mutex lock;
--	u32 irq_base;
- 	struct abx500_gpio_irq_cluster *irq_cluster;
- 	int irq_cluster_size;
- };
-@@ -260,18 +259,24 @@ static int abx500_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+@@ -272,6 +272,8 @@ static int abx500_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+ static int abx500_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ {
  	struct abx500_pinctrl *pct = to_abx500_pinctrl(chip);
- 	/* The AB8500 GPIO numbers are off by one */
- 	int gpio = offset + 1;
--	int base = pct->irq_base;
-+	int hwirq;
++	/* The AB8500 GPIO numbers are off by one */
++	int gpio = offset + 1;
+ 	int base = pct->irq_base;
  	int i;
  
- 	for (i = 0; i < pct->irq_cluster_size; i++) {
+@@ -279,8 +281,8 @@ static int abx500_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
  		struct abx500_gpio_irq_cluster *cluster =
  			&pct->irq_cluster[i];
  
--		if (gpio >= cluster->start && gpio <= cluster->end)
--			return base + gpio - cluster->start;
-+		if (gpio >= cluster->start && gpio <= cluster->end) {
-+			/*
-+			 * The ABx500 GPIO's associated IRQs are clustered together
-+			 * throughout the interrupt numbers at irregular intervals.
-+			 * To solve this quandry, we have placed the read-in values
-+			 * into the cluster information table.
-+			 */
-+			hwirq = gpio + cluster->to_irq;
+-		if (offset >= cluster->start && offset <= cluster->end)
+-			return base + offset - cluster->start;
++		if (gpio >= cluster->start && gpio <= cluster->end)
++			return base + gpio - cluster->start;
  
--		/* Advance by the number of gpios in this cluster */
--		base += cluster->end + cluster->offset - cluster->start + 1;
-+			return irq_create_mapping(pct->parent->domain, hwirq);
-+		}
- 	}
- 
- 	return -EINVAL;
-@@ -850,7 +855,6 @@ static int abx500_gpio_probe(struct platform_device *pdev)
- 	pct->chip = abx500gpio_chip;
- 	pct->chip.dev = &pdev->dev;
- 	pct->chip.base = pdata->gpio_base;
--	pct->irq_base = pdata->irq_base;
- 
- 	/* initialize the lock */
- 	mutex_init(&pct->lock);
-diff --git a/drivers/pinctrl/pinctrl-abx500.h b/drivers/pinctrl/pinctrl-abx500.h
-index df8e0ff..eeca8f9 100644
---- a/drivers/pinctrl/pinctrl-abx500.h
-+++ b/drivers/pinctrl/pinctrl-abx500.h
-@@ -98,7 +98,7 @@ struct pullud {
- {					\
- 	.start = a,			\
- 	.end = b,			\
--	.offset = c,			\
-+	.to_irq = c,			\
- }
- 
- /**
-@@ -106,14 +106,16 @@ struct pullud {
-  *			capable
-  * @start:		The pin number of the first pin interrupt capable
-  * @end:		The pin number of the last pin interrupt capable
-- * @offset:		offset used to compute specific setting strategy of
-- *			the interrupt line
-+ * @to_irq:		The ABx500 GPIO's associated IRQs are clustered
-+ *                      together throughout the interrupt numbers at irregular
-+ *                      intervals. To solve this quandary, we will place the
-+ *                      read-in values into the cluster information table
-  */
- 
- struct abx500_gpio_irq_cluster {
- 	int start;
- 	int end;
--	int offset;
-+	int to_irq;
- };
- 
- /**
+ 		/* Advance by the number of gpios in this cluster */
+ 		base += cluster->end + cluster->offset - cluster->start + 1;
 -- 
 1.7.11.3
