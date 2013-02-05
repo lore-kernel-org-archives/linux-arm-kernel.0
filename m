@@ -1,48 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 11:41:07 +0200
-Subject: [PATCH 31/31] USB: ehci-omap: Select NOP USB transceiver driver
-In-Reply-To: <Pine.LNX.4.44L0.1302041602350.1756-100000@iolanthe.rowland.org>
-References: <1359989205-12879-1-git-send-email-rogerq@ti.com>
- <Pine.LNX.4.44L0.1302041602350.1756-100000@iolanthe.rowland.org>
-Message-ID: <20130205094107.GN32118@arwen.pp.htv.fi>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 5 Feb 2013 11:43:54 +0200
+Subject: [PATCH 02/13] USB: phy: nop: Defer probe if device needs VCC/RESET
+In-Reply-To: <20130205090920.GH32118@arwen.pp.htv.fi>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-3-git-send-email-rogerq@ti.com> <51109E95.3000307@ti.com>
+ <5110C655.3060305@ti.com> <20130205090920.GH32118@arwen.pp.htv.fi>
+Message-ID: <5110D45A.3040007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 04:03:10PM -0500, Alan Stern wrote:
-> On Mon, 4 Feb 2013, Roger Quadros wrote:
+On 02/05/2013 11:09 AM, Felipe Balbi wrote:
+> On Tue, Feb 05, 2013 at 10:44:05AM +0200, Roger Quadros wrote:
+>>>> diff --git a/include/linux/usb/nop-usb-xceiv.h b/include/linux/usb/nop-usb-xceiv.h
+>>>> index 3265b61..148d351 100644
+>>>> --- a/include/linux/usb/nop-usb-xceiv.h
+>>>> +++ b/include/linux/usb/nop-usb-xceiv.h
+>>>> @@ -6,6 +6,10 @@
+>>>>   struct nop_usb_xceiv_platform_data {
+>>>>       enum usb_phy_type type;
+>>>>       unsigned long clk_rate;
+>>>> +
+>>>> +    /* if set fails with -EPROBE_DEFER if can't get regulator */
+>>>> +    unsigned int needs_vcc:1;
+>>>> +    unsigned int needs_reset:1;
+>>>
+>>> how about u8 here?
+>>
+>> Not sure. Bitfields are usually defined as unsigned int.
 > 
-> > In PHY mode we need to have the nop-usb-xceiv transceiver
-> > driver to operate, so select it in Kconfig.
-> > 
-> > CC: Alan Stern <stern@rowland.harvard.edu>
-> > Signed-off-by: Roger Quadros <rogerq@ti.com>
-> > ---
-> >  drivers/usb/host/Kconfig |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> > index 11e102e..2d2975d 100644
-> > --- a/drivers/usb/host/Kconfig
-> > +++ b/drivers/usb/host/Kconfig
-> > @@ -157,6 +157,7 @@ config USB_EHCI_MXC
-> >  config USB_EHCI_HCD_OMAP
-> >  	tristate "EHCI support for OMAP3 and later chips"
-> >  	depends on USB_EHCI_HCD && ARCH_OMAP
-> > +	select NOP_USB_XCEIV
-> >  	default y
-> >  	---help---
-> >  	  Enables support for the on-chip EHCI controller on
+> IIRC the benefit is that compiler can try to optimize those flags. I
+> mean, if you have 32 1-bit flags, compiler will combine those in a
+> single u32. Someone correct me if I'm wrong.
 > 
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Yes you are right. Kishon was asking me to use u8 instead of unsigned int, which
+I don't think is necessary. AFAIK, it is a norm to use unsigned int when defining
+a bitfield. Compilers are known to behave funny with bitfields. I don't mind
+using bool for each.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/915373a1/attachment.sig>
+cheers,
+-roger
