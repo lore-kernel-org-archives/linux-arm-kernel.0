@@ -1,38 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Feb 2013 14:22:47 -0800
-Subject: [GIT PULL] ux500 <mach/id.h> removal
-In-Reply-To: <CACRpkdYo9AU2Wic7UNG_CemyO5NFrgFdz1UNC8ciOE8T0joZbA@mail.gmail.com>
-References: <CACRpkdY9BDyGQ-DiEhTiyHEYoxpGiL+H0baqsBYX_a-0upktUQ@mail.gmail.com>
- <CAOesGMiKCHUz9BJ31o-4kthr0CZABuL7SuuMNEjbkUQ06KsfMw@mail.gmail.com>
- <CACRpkdYmTTgpnAOoNM3RJiF_oADgbuGK-vw6JF8J9rPAttA5PQ@mail.gmail.com>
- <201301302315.22357.arnd@arndb.de>
- <CACRpkdYo9AU2Wic7UNG_CemyO5NFrgFdz1UNC8ciOE8T0joZbA@mail.gmail.com>
-Message-ID: <CAOesGMhEJi-kW8GwCM7W7bWYqWa_6=im=79GKLoXHdw5zi9pzw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Feb 2013 22:23:04 +0000
+Subject: [PATCH, RFC] default machine descriptor for multiplatform
+In-Reply-To: <CAL_JsqJ2SyGeJePvNh5fREWP5LcAxnvNsiq2=kKNxKrnquyy3Q@mail.gmail.com>
+References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
+ <1638002.UJ7zfj1Wn5@wuerfel>
+ <CAL_JsqJ2SyGeJePvNh5fREWP5LcAxnvNsiq2=kKNxKrnquyy3Q@mail.gmail.com>
+Message-ID: <201302052223.04807.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 05 February 2013, Rob Herring wrote:
+> >
+> > + if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
+> > + DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+> > + MACHINE_END
+> 
+> I assume this works, but it looks a bit strange declared here.
 
-On Thu, Jan 31, 2013 at 6:40 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Jan 31, 2013 at 12:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->
->> Unrelated to this: The mach/id.h removal seems to have caused a few
->> build errors in the for-next tree with u8500_defconfig. Can you have
->> a look at what went wrong there?
->
-> Yes ... hm.
->
-> I have no clue how this happened, somehow new dependencues
-> have appeared and I've somehow had a config that builds without
-> some of the drivers or something :-(
->
-> Or I built the wrong branch and thought it was clear to go.
->
-> Shall we just drop it until I've fixed it up?
-
-What's the expected timeline for fixup? I can revert the patch in
-for-next and we can take a fix on top of the branch that introduced
-the breakage, if that's easier.
+Yes, I was wondering whether it should be global instead, but that
+would require an #ifdef, or enabling it for all DT-based builds, not
+just those with ARCH_MULTIPLATFORM.
 
 
--Olof
+> >  static int __init customize_machine(void)
+> >  {
+> > - /* customizes platform devices, or adds new ones */
+> > + /*
+> > + * customizes platform devices, or adds new ones
+> > + * On DT based machines, we fall back to populating the
+> > + * machine from the device tree, if no callback is provided,
+> > + * otherwise we would always need an init_machine callback.
+> > + */
+> >   if (machine_desc->init_machine)
+> >   machine_desc->init_machine();
+> > + else
+> > + of_platform_populate(NULL, of_default_bus_match_table,
+> > + NULL, NULL);
+> 
+> Could this be unconditional? It should be safe to call multiple times
+> if a platform calls this first because ordering matters or there are
+> custom match tables. I would guess any ordering requirements need to
+> happen before this call anyway.
+
+Yes, possible, but that needs more testing to avoid potential regressions.
+
+	Arnd
