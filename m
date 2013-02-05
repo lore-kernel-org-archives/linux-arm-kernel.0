@@ -1,32 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  5 Feb 2013 12:47:41 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC for v3.9 #3
-Message-ID: <1360036062-3490-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue,  5 Feb 2013 12:47:42 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support
+In-Reply-To: <1360036062-3490-1-git-send-email-horms+renesas@verge.net.au>
+References: <1360036062-3490-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1360036062-3490-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+During code review it was noticed that the clock value for
+TMU01 was incorrect and the value for TMU02 was missing.
 
-The following changes since commit dc784e73b45dc055f9dcb174ea5753ea020516fc:
+For reference: As of 3.8-rc6 there are no in-tree consumes of these clocks.
 
-  ARM: mach-shmobile: sh73a0: allow unplugging of CPU0 (2013-01-30 13:07:59 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.9
-
-for you to fetch changes up to 58079fa7d54a0929d304054ee759187a2ccd3cdf:
-
-  ARM: shmobile: r8a7779: Correct TMU clock support (2013-02-05 12:31:18 +0900)
-
-----------------------------------------------------------------
-Third round of Renesas ARM-based SoC changes for v3.9
-
-A fix for r8a7779 clocks.
-
-----------------------------------------------------------------
-Simon Horman (1):
-      ARM: shmobile: r8a7779: Correct TMU clock support
-
+Reported-by: Denis Oliver Kropp <dok@directfb.org>
+Reviewed-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/clock-r8a7779.c |    3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index c019609..202370d 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -161,7 +161,8 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
+ 	CLKDEV_DEV_ID("ohci-platform.0", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
+ 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+-	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
++	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
++	CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
+ 	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
+ 	CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP029]), /* I2C1 */
+ 	CLKDEV_DEV_ID("i2c-rcar.2", &mstp_clks[MSTP028]), /* I2C2 */
+-- 
+1.7.10.4
