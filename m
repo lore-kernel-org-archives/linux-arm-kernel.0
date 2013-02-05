@@ -1,94 +1,56 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Tue,  5 Feb 2013 14:35:11 +0100
-Subject: [PATCH 1/5] atmel_lcdfb: fix 16-bpp modes on older SOCs
+Date: Tue,  5 Feb 2013 14:35:14 +0100
+Subject: [PATCH 4/5] atmel_lcdfb: move lcdcon2 register access to
+ compute_hozval
 In-Reply-To: <1360071315-4032-1-git-send-email-jhovold@gmail.com>
 References: <20130129135435.GN7360@game.jcrosoft.org>
  <1360071315-4032-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1360071315-4032-2-git-send-email-jhovold@gmail.com>
+Message-ID: <1360071315-4032-5-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix regression introduced by commit 787f9fd23283 ("atmel_lcdfb: support
-16bit BGR:565 mode, remove unsupported 15bit modes") which broke 16-bpp
-modes for older SOCs which use IBGR:555 (msb is intensity) rather
-than BGR:565.
+Pass atmel_lcd_info structure to compute_hozval and only do the register
+access on SOCs that actually use it.
 
-Use SOC-type to determine the pixel layout.
+This will also simplify the removal of the cpu_is macros.
 
-Tested on at91sam9263 and at91sam9g45.
-
-Cc: <stable@vger.kernel.org>
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 Signed-off-by: Johan Hovold <jhovold@gmail.com>
 ---
- drivers/video/atmel_lcdfb.c | 22 +++++++++++++++-------
- include/video/atmel_lcdc.h  |  1 +
- 2 files changed, 16 insertions(+), 7 deletions(-)
+ drivers/video/atmel_lcdfb.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 12cf5f3..025428e 100644
+index 93910e3..347bab2 100644
 --- a/drivers/video/atmel_lcdfb.c
 +++ b/drivers/video/atmel_lcdfb.c
-@@ -422,17 +422,22 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
- 			= var->bits_per_pixel;
- 		break;
- 	case 16:
-+		/* Older SOCs use IBGR:555 rather than BGR:565. */
-+		if (sinfo->have_intensity_bit)
-+			var->green.length = 5;
-+		else
-+			var->green.length = 6;
-+
- 		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
--			/* RGB:565 mode */
--			var->red.offset = 11;
-+			/* RGB:5X5 mode */
-+			var->red.offset = var->green.length + 5;
- 			var->blue.offset = 0;
- 		} else {
--			/* BGR:565 mode */
-+			/* BGR:5X5 mode */
- 			var->red.offset = 0;
--			var->blue.offset = 11;
-+			var->blue.offset = var->green.length + 5;
- 		}
- 		var->green.offset = 5;
--		var->green.length = 6;
- 		var->red.length = var->blue.length = 5;
- 		break;
- 	case 32:
-@@ -679,8 +684,7 @@ static int atmel_lcdfb_setcolreg(unsigned int regno, unsigned int red,
- 
- 	case FB_VISUAL_PSEUDOCOLOR:
- 		if (regno < 256) {
--			if (cpu_is_at91sam9261() || cpu_is_at91sam9263()
--			    || cpu_is_at91sam9rl()) {
-+			if (sinfo->have_intensity_bit) {
- 				/* old style I+BGR:555 */
- 				val  = ((red   >> 11) & 0x001f);
- 				val |= ((green >>  6) & 0x03e0);
-@@ -870,6 +874,10 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
- 	}
- 	sinfo->info = info;
- 	sinfo->pdev = pdev;
-+	if (cpu_is_at91sam9261() || cpu_is_at91sam9263() ||
-+							cpu_is_at91sam9rl()) {
-+		sinfo->have_intensity_bit = true;
-+	}
- 
- 	strcpy(info->fix.id, sinfo->pdev->name);
- 	info->flags = ATMEL_LCDFB_FBINFO_DEFAULT;
-diff --git a/include/video/atmel_lcdc.h b/include/video/atmel_lcdc.h
-index 28447f1..5f0e234 100644
---- a/include/video/atmel_lcdc.h
-+++ b/include/video/atmel_lcdc.h
-@@ -62,6 +62,7 @@ struct atmel_lcdfb_info {
- 	void (*atmel_lcdfb_power_control)(int on);
- 	struct fb_monspecs	*default_monspecs;
- 	u32			pseudo_palette[16];
-+	bool			have_intensity_bit;
+@@ -193,14 +193,17 @@ static struct fb_fix_screeninfo atmel_lcdfb_fix __initdata = {
+ 	.accel		= FB_ACCEL_NONE,
  };
  
- #define ATMEL_LCDC_DMABADDR1	0x00
+-static unsigned long compute_hozval(unsigned long xres, unsigned long lcdcon2)
++static unsigned long compute_hozval(struct atmel_lcdfb_info *sinfo,
++							unsigned long xres)
+ {
++	unsigned long lcdcon2;
+ 	unsigned long value;
+ 
+ 	if (!(cpu_is_at91sam9261() || cpu_is_at91sam9g10()
+ 		|| cpu_is_at32ap7000()))
+ 		return xres;
+ 
++	lcdcon2 = lcdc_readl(sinfo, ATMEL_LCDC_LCDCON2);
+ 	value = xres;
+ 	if ((lcdcon2 & ATMEL_LCDC_DISTYPE) != ATMEL_LCDC_DISTYPE_TFT) {
+ 		/* STN display */
+@@ -590,8 +593,7 @@ static int atmel_lcdfb_set_par(struct fb_info *info)
+ 	lcdc_writel(sinfo, ATMEL_LCDC_TIM2, value);
+ 
+ 	/* Horizontal value (aka line size) */
+-	hozval_linesz = compute_hozval(info->var.xres,
+-					lcdc_readl(sinfo, ATMEL_LCDC_LCDCON2));
++	hozval_linesz = compute_hozval(sinfo, info->var.xres);
+ 
+ 	/* Display size */
+ 	value = (hozval_linesz - 1) << ATMEL_LCDC_HOZVAL_OFFSET;
 -- 
 1.8.1.1
