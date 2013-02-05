@@ -1,26 +1,38 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 05 Feb 2013 13:08:50 +0000
-Subject: [PATCH 1/2] spi: spi-gpio: Add checks for the dt properties
-In-Reply-To: <50FEB546.3090504@free-electrons.com>
-References: <1356645288-10110-1-git-send-email-maxime.ripard@free-electrons.com>
- <1356645288-10110-2-git-send-email-maxime.ripard@free-electrons.com>
- <50ED2C2D.7030608@free-electrons.com> <50FEB546.3090504@free-electrons.com>
-Message-ID: <20130205130850.544353E0E27@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Feb 2013 13:12:11 +0000
+Subject: [GIT PULL] i.MX clock fixes for v3.8
+In-Reply-To: <20130205112558.GA1906@pengutronix.de>
+References: <20130205095844.GZ1906@pengutronix.de>
+ <20130205110804.GI17786@n2100.arm.linux.org.uk>
+ <20130205112558.GA1906@pengutronix.de>
+Message-ID: <201302051312.11434.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Jan 2013 16:50:30 +0100, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> On 09/01/2013 09:37, Maxime Ripard wrote:
-> > On 27/12/2012 22:54, Maxime Ripard wrote:
-> >> The bindings assumed that the gpios properties were always there, which
-> >> made the NO_TX and NO_RX mode not usable from device tree. Add extra
-> >> checks to make sure that the driver can work if either MOSI or MISO is
-> >> not used.
-> > 
-> > Can you give me your Acked-by on this, or do you have any comments on this?
+On Tuesday 05 February 2013, Sascha Hauer wrote:
+> >        So think twice - or thrice - before sending me patches or a pull
+> >        request for -rc7. You need to have some seriously good reasons for
+> >        doing so, and you need to state those reasons very clearly. And I
+> >        don't just mean for the pull request in general, I mean for every
+> >        single patch in it.
+> > ...
+> >        In other words, "It fixes a bug" just isn't good enough. The bug needs
+> >        to be something that actually matters.
 > 
-> Ping?
+> At least 'ARM: i.MX25: clk: parent per5_clk to AHB clock' is a
+> regression that causes nasty oopses. Admittedly, it wasn't introduced in
+> the last merge window and the board requiring the fix needs out of tree
+> patches.
+> 
+> I'm fine with these going into v3.9 and waiting for the first stable
+> patch to get the fix for the above.
 
-Mark has applied it and it is now in my tree.
+My rules is usually: if it's important enough to have it backported
+into a stable kernel, then it's also important enough to get sent
+at any time during the bug fix phase.
 
-g.
+The patch you  mentioned certainly fits that category. The other one
+might as well, but the patch description does not actually say what
+the impact of the bug is, so it is hard to tell.
+
+	Arnd
