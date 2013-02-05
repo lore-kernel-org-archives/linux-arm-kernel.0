@@ -1,31 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Feb 2013 22:26:30 +0000
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130205182848.GJ25185@atomide.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <20130204154153.GA18237@arwen.pp.htv.fi> <20130205182848.GJ25185@atomide.com>
-Message-ID: <201302052226.30754.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 5 Feb 2013 14:37:28 -0800
+Subject: [GIT PULL 2/4] ARM broadcast timer updates for 3.9
+In-Reply-To: <20130204152426.GG17786@n2100.arm.linux.org.uk>
+References: <1359986131-13034-1-git-send-email-will.deacon@arm.com>
+ <1359986131-13034-2-git-send-email-will.deacon@arm.com>
+ <20130204152426.GG17786@n2100.arm.linux.org.uk>
+Message-ID: <20130205223728.GA14851@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 February 2013, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [130204 07:46]:
+On Mon, Feb 04, 2013 at 03:24:26PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 04, 2013 at 01:55:29PM +0000, Will Deacon wrote:
+> > Hello again,
 > > 
-> > Current DMA abstraction is quite poor, for example there's no way to
-> > compile support for multiple DMA engines. Code also makes certain, IMO
-> > unnecessary, assumptions about the underlying DMA engine (abstraction is
-> > poor, as said above but it we could follow MUSB's programming guide when
-> > it comes to programming DMA transfers).
+> > This is the second part of the kvm-related series and moves ARM over to
+> > the generic timer broadcast implementation, currently queued by tglx in
+> > -tip.
 > > 
-> > Considering all of the above, it's far better to use DMA engine and get
-> > rid of all the mess.
+> > Please note that, due to this dependency, this branch contains mainline
+> > up to ~-rc6, so you may want to keep it on a separate branch to avoid
+> > pulling in a bunch of unrelated changes from -tip.
 > 
-> How about just disable MUSB DMA support if ARCH_MULTIPLATFORM for now?
-> That way MUSB can be fixed up first to support ARCH_MULTIPLATFORM
-> using PIO while sorting out the DMA related issues.
+> Both 1 and 2 pulled and merged.  I'll wait 24 hours before pushing this out
+> so that the nightly build can have a go at it before the new devel-stable
+> branch gets published.
 
-Sounds ok to me. Someone still needs to do the work to make the non-DMA
-variants of MUSB coexist in one kernel, but as we discussed erlier, that
-should be much simpler.
+Sounds good. I'll deal with 3 and 4 once you're happy with 1/2 and
+they're out, since we need the same as base.
 
-	Arnd
+
+-Olof
