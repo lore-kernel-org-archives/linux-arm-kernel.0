@@ -1,35 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Feb 2013 10:28:49 -0800
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130204154153.GA18237@arwen.pp.htv.fi>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com>
- <5022f635a527470dbd0be932063e9cd2@DFLE72.ent.ti.com>
- <20130201184915.GP2244@beef> <510C1D0E.6030401@mvista.com>
- <20130201185820.GE29898@arwen.pp.htv.fi>
- <510C2A47.1090607@mvista.com>
- <20130201205600.GA31762@arwen.pp.htv.fi>
- <20130201213003.GW2637@n2100.arm.linux.org.uk>
- <20130204154153.GA18237@arwen.pp.htv.fi>
-Message-ID: <20130205182848.GJ25185@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 5 Feb 2013 10:29:38 -0800
+Subject: [PATCH] ARM: nomadik: fix OF compilation regression
+In-Reply-To: <1359708725-21978-1-git-send-email-linus.walleij@stericsson.com>
+References: <1359708725-21978-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130205182938.GA21449@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [130204 07:46]:
+On Fri, Feb 01, 2013 at 09:52:05AM +0100, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Current DMA abstraction is quite poor, for example there's no way to
-> compile support for multiple DMA engines. Code also makes certain, IMO
-> unnecessary, assumptions about the underlying DMA engine (abstraction is
-> poor, as said above but it we could follow MUSB's programming guide when
-> it comes to programming DMA transfers).
+> The Nomadik Device Tree patch series accidentally
+> selected OF instead of USE_OF which led to problems
+> during compile:
 > 
-> Considering all of the above, it's far better to use DMA engine and get
-> rid of all the mess.
+> arch/arm/kernel/devtree.c: In function 'arm_dt_memblock_reserve':
+> /home/elinwal/linux-arm-soc/arch/arm/kernel/devtree.c:43:7: error: 'initial_boot_params' undeclared (first use in this function)
+> (etc).
+> 
+> This fixes it up by selecting USE_OF instead.
 
-How about just disable MUSB DMA support if ARCH_MULTIPLATFORM for now?
-That way MUSB can be fixed up first to support ARCH_MULTIPLATFORM
-using PIO while sorting out the DMA related issues.
 
-Regards,
+Applied, thanks.
 
-Tony
+
+-Olof
