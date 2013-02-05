@@ -1,125 +1,38 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 11:07:48 +0200
-Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
- information
-In-Reply-To: <5110C339.7080109@ti.com>
+Date: Tue, 5 Feb 2013 11:09:20 +0200
+Subject: [PATCH 02/13] USB: phy: nop: Defer probe if device needs VCC/RESET
+In-Reply-To: <5110C655.3060305@ti.com>
 References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
- <1359993540-20780-2-git-send-email-rogerq@ti.com>
- <20130205072637.GA32118@arwen.pp.htv.fi> <5110C339.7080109@ti.com>
-Message-ID: <20130205090748.GG32118@arwen.pp.htv.fi>
+ <1359993540-20780-3-git-send-email-rogerq@ti.com>
+ <51109E95.3000307@ti.com> <5110C655.3060305@ti.com>
+Message-ID: <20130205090920.GH32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 10:30:49AM +0200, Roger Quadros wrote:
-> On 02/05/2013 09:26 AM, Felipe Balbi wrote:
-> > Hi,
+On Tue, Feb 05, 2013 at 10:44:05AM +0200, Roger Quadros wrote:
+> >> diff --git a/include/linux/usb/nop-usb-xceiv.h b/include/linux/usb/nop-usb-xceiv.h
+> >> index 3265b61..148d351 100644
+> >> --- a/include/linux/usb/nop-usb-xceiv.h
+> >> +++ b/include/linux/usb/nop-usb-xceiv.h
+> >> @@ -6,6 +6,10 @@
+> >>   struct nop_usb_xceiv_platform_data {
+> >>       enum usb_phy_type type;
+> >>       unsigned long clk_rate;
+> >> +
+> >> +    /* if set fails with -EPROBE_DEFER if can't get regulator */
+> >> +    unsigned int needs_vcc:1;
+> >> +    unsigned int needs_reset:1;
 > > 
-> > On Mon, Feb 04, 2013 at 05:58:48PM +0200, Roger Quadros wrote:
-> >> The PHY clock, clock rate, VCC regulator and RESET regulator
-> >> can now be provided via device tree.
-> >>
-> >> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> >> ---
-> >>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
-> >>  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
-> >>  2 files changed, 65 insertions(+), 0 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> >> new file mode 100644
-> >> index 0000000..d7e2726
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> >> @@ -0,0 +1,34 @@
-> >> +USB NOP PHY
-> >> +
-> >> +Required properties:
-> >> +- compatible: should be usb-nop-xceiv
-> >> +
-> >> +Optional properties:
-> >> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
-> >> +  /bindings/clock/clock-bindings.txt
-> >> +  This property is required if clock-frequency is specified.
-> >> +
-> >> +- clock-names: Should be "main_clk"
-> >> +
-> >> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
-> >> +  be configured to.
-> >> +
-> >> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
-> >> +
-> >> +- reset-supply: phandle to the regulator that provides power to the PHY.
-> >> +
-> >> +Example:
-> >> +
-> >> +	hsusb1_phy {
-> >> +		compatible = "usb-nop-xceiv";
-> >> +		clock-frequency = <19200000>;
-> >> +		clocks = <&osc 0>;
-> >> +		clock-names = "main_clk";
-> >> +		vcc-supply = <&hsusb1_vcc_regulator>;
-> >> +		reset-supply = <&hsusb1_reset_regulator>;
-> >> +	};
-> >> +
-> >> +hsusb1_phy is a NOP USB PHY device that gets its clock from an oscillator
-> >> +and expects that clock to be configured to 19.2MHz by the NOP PHY driver.
-> >> +hsusb1_vcc_regulator provides power to the PHY and hsusb1_reset_regulator
-> >> +controls RESET.
-> >> diff --git a/drivers/usb/otg/nop-usb-xceiv.c b/drivers/usb/otg/nop-usb-xceiv.c
-> >> index ac027a1..adbb7ab 100644
-> >> --- a/drivers/usb/otg/nop-usb-xceiv.c
-> >> +++ b/drivers/usb/otg/nop-usb-xceiv.c
-> >> @@ -34,6 +34,7 @@
-> >>  #include <linux/slab.h>
-> >>  #include <linux/clk.h>
-> >>  #include <linux/regulator/consumer.h>
-> >> +#include <linux/of.h>
-> >>  
-> >>  struct nop_usb_xceiv {
-> >>  	struct usb_phy		phy;
-> >> @@ -138,8 +139,19 @@ static int nop_set_host(struct usb_otg *otg, struct usb_bus *host)
-> >>  	return 0;
-> >>  }
-> >>  
-> >> +static void nop_xeiv_get_dt_pdata(struct device *dev,
-> > 
-> > asking to remove, but xeiv != xceiv :-)
-> > 
-> >> +				struct nop_usb_xceiv_platform_data *pdata)
-> >> +{
-> >> +	struct device_node *node = dev->of_node;
-> >> +	u32 clk_rate;
-> >> +
-> >> +	if (!of_property_read_u32(node, "clock-frequency", &clk_rate))
-> >> +		pdata->clk_rate = clk_rate;
-> >> +}
-> >> +
-> >>  static int nop_usb_xceiv_probe(struct platform_device *pdev)
-> >>  {
-> >> +	struct device *dev = &pdev->dev;
-> >>  	struct nop_usb_xceiv_platform_data *pdata = pdev->dev.platform_data;
-> >>  	struct nop_usb_xceiv	*nop;
-> >>  	enum usb_phy_type	type = USB_PHY_TYPE_USB2;
-> >> @@ -153,6 +165,17 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
-> >>  	if (!nop->phy.otg)
-> >>  		return -ENOMEM;
-> >>  
-> >> +	if (dev->of_node) {
-> >> +		pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-> >> +		if (!pdata) {
-> >> +			dev_err(dev, "Memory allocation failure\n");
-> >> +			return -ENOMEM;
-> >> +		}
-> >> +		nop_xeiv_get_dt_pdata(dev, pdata);
-> > 
-> > actually, I would prefer to not create pdata at all. I mean, ideally
-> > pdata would be used to initialize fields in your own structure, so first
-> > move clk_rate to your own private structure, copy pdata's clk_rate value
-> > to that, then you don't need this hackery when using DT.
-> > 
-> OK, got it. Will revise.
+> > how about u8 here?
+> 
+> Not sure. Bitfields are usually defined as unsigned int.
 
-Cool, after that you can add my:
+IIRC the benefit is that compiler can try to optimize those flags. I
+mean, if you have 32 1-bit flags, compiler will combine those in a
+single u32. Someone correct me if I'm wrong.
+
+after you fix other comments from kishon (about of_read_bool()), you can
+add my:
 
 Acked-by: Felipe Balbi <balbi@ti.com>
 
@@ -131,4 +44,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/095e2e52/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/b6c1d677/attachment.sig>
