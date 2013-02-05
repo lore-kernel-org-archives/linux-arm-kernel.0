@@ -1,36 +1,41 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 5 Feb 2013 11:06:08 +0530
-Subject: [PATCH v5 09/10] clk: tegra: Implement clocks for Tegra114
-In-Reply-To: <20130204143401.GW2364@tbergstrom-lnx.Nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-10-git-send-email-pdeschrijver@nvidia.com>
- <510F5E87.90801@nvidia.com> <20130204143401.GW2364@tbergstrom-lnx.Nvidia.com>
-Message-ID: <51109A48.5000708@nvidia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 04 Feb 2013 21:40:14 -0800
+Subject: [PATCH] ARM: dts: Adding RTC device node
+In-Reply-To: <1360025290-16278-1-git-send-email-tobetter@gmail.com>
+References: <1360025290-16278-1-git-send-email-tobetter@gmail.com>
+Message-ID: <125101ce0363$46e2fe10$d4a8fa30$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 February 2013 08:04 PM, Peter De Schrijver wrote:
-> On Mon, Feb 04, 2013 at 08:08:55AM +0100, Prashant Gaikwad wrote:
->> On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
-> ...
->
->>> +       /* xusb_hs_src */
->>> +       val = readl(clk_base + CLK_SOURCE_XUSB_SS_SRC);
->>> +       val |= BIT(25); /* always select PLLU_60M */
->>> +       writel(val, clk_base + CLK_SOURCE_XUSB_SS_SRC);
->>> +
->>> +       clk = clk_register_fixed_factor(NULL, "xusb_hs_src", "pll_u_60M", 0,
->>> +                                       1, 1);
->>> +       clks[xusb_hs_src] = clk;
->>> +
->> With device tree we can directly use pll_u_60M, no need to register
->> clock with fixed factor 1.
->> Same comment for dis1-fixed, dsi2-fixed and mipi-cal-fast clocks.
->>
-> Does it make sense to have separate DT IDs at all then?
+Dongjin Kim wrote:
+> 
+> This patch enables RTC device node defined in
+> arch/arm/boot/dts/exynos4.dtsi.
+> 
+> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-odroidx.dts |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts
+> b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> index 54fe32f..85c958a 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
+> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> @@ -83,6 +83,10 @@
+>  		regulator-boot-on;
+>  	};
+> 
+> +	rtc at 10070000 {
+> +		status = "okay";
+> +	};
+> +
+>  	sdhci at 12530000 {
+>  		bus-width = <4>;
+>  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+> --
+> 1.7.10.4
 
-We can use same DT ID.
+Applied, thanks.
 
-> Cheers,
->
-> Peter.
+- Kukjin
