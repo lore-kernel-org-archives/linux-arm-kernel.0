@@ -1,33 +1,22 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 5 Feb 2013 22:51:16 +0100
-Subject: [PATCH] ARM: S3C24XX: let S3C2412_PM select S3C2412_PM_SLEEP
-Message-ID: <201302052251.17152.heiko@sntech.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 5 Feb 2013 14:10:10 -0800
+Subject: [GIT PULL 1/4] omap non-critical fixes for v3.9 merge window
+In-Reply-To: <511012de.a35b320a.5730.669eSMTPIN_ADDED_BROKEN@mx.google.com>
+References: <511012de.a35b320a.5730.669eSMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20130205221010.GA13768@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code to enter sleep is used by both the s3c2412 and s3c2416 and
-was thus factored out into an extra config option.
+On Mon, Feb 04, 2013 at 11:55:46AM -0800, Tony Lindgren wrote:
+> The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+> 
+>   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/fixes-non-critical-signed-v2
 
-But it seems it was forgotten to add the appropriate select to the
-s3c2412 pm option, resulting in breakage when only compiling s3c2412
-support.
+Pulled 1-4.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/mach-s3c24xx/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 5e17e1d..ac61bb7 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -301,6 +301,7 @@ config S3C2412_DMA
- 
- config S3C2412_PM
- 	bool
-+	select S3C2412_PM_SLEEP
- 	help
- 	  Internal config node to apply S3C2412 power management
- 
--- 
-1.7.10.4
+-Olof
