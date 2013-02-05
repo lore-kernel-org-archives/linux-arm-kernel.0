@@ -1,14 +1,14 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 11:31:35 +0200
-Subject: [PATCH 16/30] ARM: OMAP3: 3430SDP: Adapt to ehci-omap changes
-In-Reply-To: <1359372631-8180-17-git-send-email-rogerq@ti.com>
+Date: Tue, 5 Feb 2013 11:31:53 +0200
+Subject: [PATCH 17/30] ARM: OMAP3: 3630SDP: Adapt to ehci-omap changes
+In-Reply-To: <1359372631-8180-18-git-send-email-rogerq@ti.com>
 References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <1359372631-8180-17-git-send-email-rogerq@ti.com>
-Message-ID: <20130205093135.GY32118@arwen.pp.htv.fi>
+ <1359372631-8180-18-git-send-email-rogerq@ti.com>
+Message-ID: <20130205093153.GZ32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 01:30:17PM +0200, Roger Quadros wrote:
+On Mon, Jan 28, 2013 at 01:30:18PM +0200, Roger Quadros wrote:
 > Add 2 platform devices for 'nop-usb-xceiv'. These will be used
 > as PHYs for HS USB ports 1 and 2 so provide binding information
 > for them.
@@ -28,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/5fdfc069/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/9fec4201/attachment.sig>
