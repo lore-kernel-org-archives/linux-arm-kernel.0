@@ -1,25 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 5 Feb 2013 07:48:33 -0500
-Subject: [PATCH] arm: mvebu: Add SPI flash on Armada XP-GP board
-In-Reply-To: <20130205123827.GG20242@lunn.ch>
-References: <1360063473-26176-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130205123827.GG20242@lunn.ch>
-Message-ID: <20130205124833.GS14746@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Feb 2013 14:00:48 +0100
+Subject: [PATCH V2 1/6] pinctrl: pinctrl-single: use arch_initcall and
+ module_exit
+In-Reply-To: <A4887BF146CD57468F700B415D2F47015828C7@DBDE01.ent.ti.com>
+References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
+ <1359445134-13323-2-git-send-email-manishv.b@ti.com>
+ <CACRpkdbf7TwrjfT2rhqQFGc3yh_Nt117RtzQO2y6g5Ddx5Ay_w@mail.gmail.com>
+ <20130201170906.GE22517@atomide.com>
+ <20130201171124.GF22517@atomide.com>
+ <A4887BF146CD57468F700B415D2F47015828C7@DBDE01.ent.ti.com>
+Message-ID: <CACRpkdYUBGkRRF_nDbn5tGmtZC_Wucqxz_PjWo0xX_KbnQJ5cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Morning-ish Andrew,
+On Tue, Feb 5, 2013 at 7:36 AM, Vishwanathrao Badarkhe, Manish
+<manishv.b@ti.com> wrote:
 
-On Tue, Feb 05, 2013 at 01:38:27PM +0100, Andrew Lunn wrote:
-> > And don't forget to compile the SPI flash driver, CONFIG_MTD_M25P80=y
-> 
-> Maybe it makes sense to provide a patch to mvebu_defconfig to add 
-> CONFIG_MTD_M25P80=y ?
+> I made following changes, in order to update "dip->p" pointer with
+> correct value:
+>
+> -       if (!dpi->p) {
+> +       if (IS_ERR_OR_NULL(dpi->p)) {
+>                 dpi->p = devm_pinctrl_get(dev);
+> -               if (IS_ERR_OR_NULL(dpi->p)) {
+> -                       int ret = PTR_ERR(dpi->p);
+> -
+> -                       dev_dbg(dev, "no pinctrl handle\n");
+> -                       /* Only return deferrals */
+> -                       if (ret == -EPROBE_DEFER)
+> -                               return ret;
+> -                       return 0;
+> -               }
+> +               ret = PTR_ERR(dpi->p);
+> +               dev_dbg(dev, "no pinctrl handle\n");
+> +               /* Only return deferrals */
+> +               if (ret == -EPROBE_DEFER)
+> +                       return ret;
+> +               return 0;
 
-I thought this as well, then reconsidered when he said there was nothing
-on it.  So it's not really needed to boot.  I don't have a strong
-opinion on it though, so =y, =m, or =n.
+This is based on some old code that I wrote ages ago. Check the
+pinctrl tree or linux-next for the latest core pin grabbing code.
+Use that instead.
 
-thx,
-
-Jason.
+Yours,
+Linus Walleij
