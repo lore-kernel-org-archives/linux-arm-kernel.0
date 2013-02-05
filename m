@@ -1,45 +1,135 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Wed, 6 Feb 2013 00:10:53 +0100
-Subject: [PATCH 0/6] ARM: S3C24XX: Move s3c2440 and s3c2442 into new irq
- structure
-Message-ID: <201302060010.53929.heiko@sntech.de>
+From: girishks2000@gmail.com (Girish K S)
+Date: Tue,  5 Feb 2013 15:09:43 -0800
+Subject: [PATCH 3/4] spi: s3c64xx: add gpio quirk for controller
+In-Reply-To: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
+References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
+Message-ID: <1360105784-12282-4-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follows the formular laid out in the previous series, i.e. moving of the code,
-changing of the init and creation of the mapping structure.
+This patch adds support for spi controllers with
+dedicated clk/miso/mosi/cs pins. It skips the gpio
+parsing and initialization for controllers that
+have dedicated pins.
 
-As I lack hardware for these arches, compile tested only. But as it is similar
-to the architectures of the previous run, hopefully I didn't break anything.
+Signed-off-by: Girish K S <ks.giri@samsung.com>
+---
+ drivers/spi/spi-s3c64xx.c |   39 +++++++++++++++++++++++++++++++--------
+ 1 file changed, 31 insertions(+), 8 deletions(-)
 
-Applies to current for-next of the linux-samsung tree, which includes the move
-of irq.c to mach-s3c24xx.
-
-Heiko Stuebner (6):
-  ARM: S3C24XX: move s3c244x irq init to common irq code
-  ARM: S3C24XX: create dedicated irq init functions for s3c2440 and s3c2442
-  ARM: S3C24XX: move s3c2440 irqs to common irq code
-  ARM: S3C24XX: integrate s3c2440 irqs into common init
-  ARM: S3C24XX: transform s3c2442 irqs into new structure
-  ARM: S3C24XX: transform s3c2440 irqs into new structure
-
- arch/arm/mach-s3c24xx/Makefile         |    4 +-
- arch/arm/mach-s3c24xx/common.h         |    4 +
- arch/arm/mach-s3c24xx/irq-s3c2440.c    |  128 ---------------------------
- arch/arm/mach-s3c24xx/irq-s3c244x.c    |  142 ------------------------------
- arch/arm/mach-s3c24xx/irq.c            |  148 ++++++++++++++++++++++++++++++++
- arch/arm/mach-s3c24xx/mach-anubis.c    |    2 +-
- arch/arm/mach-s3c24xx/mach-at2440evb.c |    2 +-
- arch/arm/mach-s3c24xx/mach-gta02.c     |    2 +-
- arch/arm/mach-s3c24xx/mach-mini2440.c  |    2 +-
- arch/arm/mach-s3c24xx/mach-nexcoder.c  |    2 +-
- arch/arm/mach-s3c24xx/mach-osiris.c    |    2 +-
- arch/arm/mach-s3c24xx/mach-rx1950.c    |    2 +-
- arch/arm/mach-s3c24xx/mach-rx3715.c    |    7 +--
- arch/arm/mach-s3c24xx/mach-smdk2440.c  |    2 +-
- 14 files changed, 163 insertions(+), 286 deletions(-)
- delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2440.c
- delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c244x.c
-
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 90770bd..f06bbee 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -36,6 +36,7 @@
+ 
+ #define MAX_SPI_PORTS		3
+ #define S3C64XX_SPI_QUIRK_POLL		(1 << 0)
++#define S3C64XX_SPI_QUIRK_GPIO		(1 << 1)
+ 
+ /* Registers and bit-fields */
+ 
+@@ -404,14 +405,16 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 		if (sdd->tgl_spi != spi) { /* if last mssg on diff device */
+ 			/* Deselect the last toggled device */
+ 			cs = sdd->tgl_spi->controller_data;
+-			gpio_set_value(cs->line,
+-				spi->mode & SPI_CS_HIGH ? 0 : 1);
++			if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
++				gpio_set_value(cs->line,
++					spi->mode & SPI_CS_HIGH ? 0 : 1);
+ 		}
+ 		sdd->tgl_spi = NULL;
+ 	}
+ 
+ 	cs = spi->controller_data;
+-	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
++	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
++		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
+ 
+ 	/* Start the signals */
+ 	writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+@@ -503,7 +506,8 @@ static inline void disable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 	if (sdd->tgl_spi == spi)
+ 		sdd->tgl_spi = NULL;
+ 
+-	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
++	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
++		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
+ 
+ 	/* Quiese the signals */
+ 	writel(S3C64XX_SPI_SLAVE_SIG_INACT,
+@@ -842,7 +846,10 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+ 
+-	cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
++	/* In case of dedicated cs pin skip the gpio initialization */
++	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
++		cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
++
+ 	if (!gpio_is_valid(cs->line)) {
+ 		dev_err(&spi->dev, "chip select gpio is not specified or "
+ 					"invalid\n");
+@@ -883,7 +890,7 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 		return -ENODEV;
+ 	}
+ 
+-	if (!spi_get_ctldata(spi)) {
++	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO)) {
+ 		err = gpio_request_one(cs->line, GPIOF_OUT_INIT_HIGH,
+ 				       dev_name(&spi->dev));
+ 		if (err) {
+@@ -892,9 +899,11 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 				cs->line, err);
+ 			goto err_gpio_req;
+ 		}
+-		spi_set_ctldata(spi, cs);
+ 	}
+ 
++	if (!spi_get_ctldata(spi))
++		spi_set_ctldata(spi, cs);
++
+ 	sci = sdd->cntrlr_info;
+ 
+ 	spin_lock_irqsave(&sdd->lock, flags);
+@@ -979,8 +988,11 @@ err_gpio_req:
+ static void s3c64xx_spi_cleanup(struct spi_device *spi)
+ {
+ 	struct s3c64xx_spi_csinfo *cs = spi_get_ctldata(spi);
++	struct s3c64xx_spi_driver_data *sdd;
++
++	sdd = spi_master_get_devdata(spi->master);
+ 
+-	if (cs) {
++	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO) && cs) {
+ 		gpio_free(cs->line);
+ 		if (spi->dev.of_node)
+ 			kfree(cs);
+@@ -1107,6 +1119,13 @@ static int s3c64xx_spi_parse_dt_gpio(struct s3c64xx_spi_driver_data *sdd)
+ 	struct device *dev = &sdd->pdev->dev;
+ 	int idx, gpio, ret;
+ 
++	/*
++	 * If cs is not controlled by gpio, and
++	 * the SoC uses internal dedicated pins
++	 */
++	if (sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO)
++		return 0;
++
+ 	/* find gpios for mosi, miso and clock lines */
+ 	for (idx = 0; idx < 3; idx++) {
+ 		gpio = of_get_gpio(dev->of_node, idx);
+@@ -1133,6 +1152,10 @@ free_gpio:
+ static void s3c64xx_spi_dt_gpio_free(struct s3c64xx_spi_driver_data *sdd)
+ {
+ 	unsigned int idx;
++
++	if (sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO)
++		return;
++
+ 	for (idx = 0; idx < 3; idx++)
+ 		gpio_free(sdd->gpios[idx]);
+ }
 -- 
-1.7.2.3
+1.7.10.4
