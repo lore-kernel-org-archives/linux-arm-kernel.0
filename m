@@ -1,43 +1,48 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 5 Feb 2013 15:36:16 -0200
-Subject: [PATCH] ARM: imx: avic: Move avic_saved_mask_reg under CONFIG_PM
-Message-ID: <1360085776-31475-1-git-send-email-fabio.estevam@freescale.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 5 Feb 2013 17:41:13 +0000
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130205170628.GD17852@n2100.arm.linux.org.uk>
+References: <510FF1A6.403@mvista.com> <20130204164712.GB4269@arwen.pp.htv.fi>
+ <510FF5C9.3030600@mvista.com>
+ <20130204170216.GC4269@arwen.pp.htv.fi> <51100A72.6030909@ti.com>
+ <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
+ <5110369B.9060901@ti.com>
+ <CACRpkda8xBB35CwuBH76xXcC341TeRs1ZuwzDD0LtuXc4ifQTw@mail.gmail.com>
+ <20130205164705.GG4720@opensource.wolfsonmicro.com>
+ <20130205170628.GD17852@n2100.arm.linux.org.uk>
+Message-ID: <20130205174113.GJ4720@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a kernel with CONFIG_PM undefined, the following warning happens:
+On Tue, Feb 05, 2013 at 05:06:28PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 05, 2013 at 04:47:05PM +0000, Mark Brown wrote:
+> > On Tue, Feb 05, 2013 at 05:21:48PM +0100, Linus Walleij wrote:
 
-arch/arm/mach-imx/avic.c:57:12: warning: 'avic_saved_mask_reg' defined but not used [-Wunused-variable]
+> > > For IRQ mode, use the completion callback to push each cookie
+> > > to NAPI, and thus let the IRQ drive the traffic.
 
-Move avic_saved_mask_reg definition inside the '#ifdef CONFIG_PM' block to
-avoid the warning.
+> > The whole purpose of NAPI is to avoid taking interrupts for completion
+> > of transfers.  Anything that generates interrupts when NAPI is in
+> > polling mode is defeating the point.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/avic.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> Yes, but you're missing one very important point.  If your DMA engine
+> is decoupled from the network device, and the DMA engine relies upon
+> interrupts to queue further transfers to move data into RAM, then you
+> have two options:
 
-diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
-index 0eff23e..49c87e7 100644
---- a/arch/arm/mach-imx/avic.c
-+++ b/arch/arm/mach-imx/avic.c
-@@ -54,8 +54,6 @@
- void __iomem *avic_base;
- static struct irq_domain *domain;
- 
--static u32 avic_saved_mask_reg[2];
--
- #ifdef CONFIG_MXC_IRQ_PRIOR
- static int avic_irq_set_priority(unsigned char irq, unsigned char prio)
- {
-@@ -113,6 +111,8 @@ static struct mxc_extra_irq avic_extra_irq = {
- };
- 
- #ifdef CONFIG_PM
-+static u32 avic_saved_mask_reg[2];
-+
- static void avic_irq_suspend(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--- 
-1.7.9.5
+> 1. Receive these interrupts so you can update the DMA engine for
+>    further data transfer.
+> 2. Don't receive these interrupts, and cause the network device to
+>    error out with a FIFO overrun because its DMA requests have not
+>    been serviced. (which may raise an interrupt.)
+
+There's still the third option of just implementing a non-NAPI driver,
+though I guess we've now built so much infrastructure on top of NAPI
+that it's still useful to pretend we can disable interrupts.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/3e0da619/attachment.sig>
