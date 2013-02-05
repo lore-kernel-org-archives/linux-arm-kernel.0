@@ -1,27 +1,42 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  5 Feb 2013 21:54:53 +0100
-Subject: [PATCH 0/2] Add SPI flash for Aramda 370 and XP dev board
-Message-ID: <1360097695-32663-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue,  5 Feb 2013 21:54:54 +0100
+Subject: [PATCH 1/2] arm: mvebu: Add SPI flash on Armada XP-DB board
+In-Reply-To: <1360097695-32663-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1360097695-32663-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1360097695-32663-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch add support for the SPI flash M25P64 which is present on
+the Armada XP DB board. This flash stores the bootloader and its
+environment.
 
-Following the Ezequiel's patches this patch set add support for SPI
-data Flash for two other development board from Marvell.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp-db.dts |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-This pacthes depend on the SPI serie of Ezequiel [1], and also on the
-selection of CONFIG_MTD_M25P80=y in the config file.
-
-[1] http://thread.gmane.org/gmane.linux.kernel.spi.devel/12568
-
-Gregory CLEMENT (2):
-  arm: mvebu: Add SPI flash on Armada XP-DB board
-  arm: mvebu: Add SPI flash on Armada 370 DB board
-
- arch/arm/boot/dts/armada-370-db.dts |   11 +++++++++++
- arch/arm/boot/dts/armada-xp-db.dts  |   12 ++++++++++++
- 2 files changed, 23 insertions(+)
-
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index c7035c5..e5dfb4f 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -97,5 +97,17 @@
+ 			status = "okay";
+ 			/* No CD or WP GPIOs */
+ 		};
++
++		spi0: spi at d0010600 {
++			status = "okay";
++
++			spi-flash at 0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "m25p64";
++				reg = <0>; /* Chip select 0 */
++				spi-max-frequency = <20000000>;
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
