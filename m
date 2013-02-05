@@ -1,118 +1,51 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 09:26:37 +0200
-Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
- information
-In-Reply-To: <1359993540-20780-2-git-send-email-rogerq@ti.com>
+Date: Tue, 5 Feb 2013 09:41:41 +0200
+Subject: [PATCH 10/13] ARM: dts: OMAP4: Add HS USB Host IP nodes
+In-Reply-To: <1359993540-20780-11-git-send-email-rogerq@ti.com>
 References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
- <1359993540-20780-2-git-send-email-rogerq@ti.com>
-Message-ID: <20130205072637.GA32118@arwen.pp.htv.fi>
+ <1359993540-20780-11-git-send-email-rogerq@ti.com>
+Message-ID: <20130205074141.GB32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Feb 04, 2013 at 05:58:48PM +0200, Roger Quadros wrote:
-> The PHY clock, clock rate, VCC regulator and RESET regulator
-> can now be provided via device tree.
+On Mon, Feb 04, 2013 at 05:58:57PM +0200, Roger Quadros wrote:
+> Adds device nodes for HS USB Host module, TLL module,
+> OHCI and EHCI controllers.
 > 
 > Signed-off-by: Roger Quadros <rogerq@ti.com>
 > ---
->  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
->  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
->  2 files changed, 65 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>  arch/arm/boot/dts/omap4.dtsi |   30 ++++++++++++++++++++++++++++++
+>  1 files changed, 30 insertions(+), 0 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> new file mode 100644
-> index 0000000..d7e2726
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> @@ -0,0 +1,34 @@
-> +USB NOP PHY
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 739bb79..3429280 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -529,5 +529,35 @@
+>  			ti,hwmods = "timer11";
+>  			ti,timer-pwm;
+>  		};
 > +
-> +Required properties:
-> +- compatible: should be usb-nop-xceiv
+> +		usbhstll: usbhstll at 0x4a062000 {
+> +			compatible = "ti,usbhs-tll";
+> +			reg = <0x4a062000 0x1000>;
+> +			interrupts = <0 78 0x4>;
+> +			ti,hwmods = "usb_tll_hs";
+> +		};
 > +
-> +Optional properties:
-> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
-> +  /bindings/clock/clock-bindings.txt
-> +  This property is required if clock-frequency is specified.
+> +		usbhshost: usbhshost at 0x4a064000 {
+> +			compatible = "ti,usbhs-host";
+> +			reg = <0x4a064000 0x800>;
+> +			ti,hwmods = "usb_host_hs";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
 > +
-> +- clock-names: Should be "main_clk"
-> +
-> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
-> +  be configured to.
-> +
-> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
-> +
-> +- reset-supply: phandle to the regulator that provides power to the PHY.
-> +
-> +Example:
-> +
-> +	hsusb1_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		clock-frequency = <19200000>;
-> +		clocks = <&osc 0>;
-> +		clock-names = "main_clk";
-> +		vcc-supply = <&hsusb1_vcc_regulator>;
-> +		reset-supply = <&hsusb1_reset_regulator>;
-> +	};
-> +
-> +hsusb1_phy is a NOP USB PHY device that gets its clock from an oscillator
-> +and expects that clock to be configured to 19.2MHz by the NOP PHY driver.
-> +hsusb1_vcc_regulator provides power to the PHY and hsusb1_reset_regulator
-> +controls RESET.
-> diff --git a/drivers/usb/otg/nop-usb-xceiv.c b/drivers/usb/otg/nop-usb-xceiv.c
-> index ac027a1..adbb7ab 100644
-> --- a/drivers/usb/otg/nop-usb-xceiv.c
-> +++ b/drivers/usb/otg/nop-usb-xceiv.c
-> @@ -34,6 +34,7 @@
->  #include <linux/slab.h>
->  #include <linux/clk.h>
->  #include <linux/regulator/consumer.h>
-> +#include <linux/of.h>
->  
->  struct nop_usb_xceiv {
->  	struct usb_phy		phy;
-> @@ -138,8 +139,19 @@ static int nop_set_host(struct usb_otg *otg, struct usb_bus *host)
->  	return 0;
->  }
->  
-> +static void nop_xeiv_get_dt_pdata(struct device *dev,
+> +			usbhsohci: ohci at 0x4a064800 {
 
-asking to remove, but xeiv != xceiv :-)
+usbhsohci is a bit misleading :-)
 
-> +				struct nop_usb_xceiv_platform_data *pdata)
-> +{
-> +	struct device_node *node = dev->of_node;
-> +	u32 clk_rate;
-> +
-> +	if (!of_property_read_u32(node, "clock-frequency", &clk_rate))
-> +		pdata->clk_rate = clk_rate;
-> +}
-> +
->  static int nop_usb_xceiv_probe(struct platform_device *pdev)
->  {
-> +	struct device *dev = &pdev->dev;
->  	struct nop_usb_xceiv_platform_data *pdata = pdev->dev.platform_data;
->  	struct nop_usb_xceiv	*nop;
->  	enum usb_phy_type	type = USB_PHY_TYPE_USB2;
-> @@ -153,6 +165,17 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
->  	if (!nop->phy.otg)
->  		return -ENOMEM;
->  
-> +	if (dev->of_node) {
-> +		pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-> +		if (!pdata) {
-> +			dev_err(dev, "Memory allocation failure\n");
-> +			return -ENOMEM;
-> +		}
-> +		nop_xeiv_get_dt_pdata(dev, pdata);
-
-actually, I would prefer to not create pdata at all. I mean, ideally
-pdata would be used to initialize fields in your own structure, so first
-move clk_rate to your own private structure, copy pdata's clk_rate value
-to that, then you don't need this hackery when using DT.
+How about we stick to ohci and ehci for these nodes ? :-)
 
 -- 
 balbi
@@ -122,4 +55,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/ab80b750/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/915e0a9c/attachment.sig>
