@@ -1,26 +1,32 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 5 Feb 2013 12:30:41 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support
-In-Reply-To: <1360034939-32082-1-git-send-email-horms+renesas@verge.net.au>
-References: <1360034939-32082-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoQnt3WEm1XDOeoMy9wxfPVH47Wp+J9MFh3mReXoW+h11Q@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue,  5 Feb 2013 12:47:41 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC for v3.9 #3
+Message-ID: <1360036062-3490-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Simon,
+Hi Olof, Hi Arnd,
 
-On Tue, Feb 5, 2013 at 12:28 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> During code review it was noticed that the clock value for
-> TMU01 was incorrect and the value for TMU02 was missing.
->
-> For reference: As of 3.8-rc6 there are no in-tree consumes of these clocks.
->
-> Reported-by: Denis Oliver Kropp <dok@directfb.org>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+The following changes since commit dc784e73b45dc055f9dcb174ea5753ea020516fc:
 
-Looking good, thanks for fixing.
+  ARM: mach-shmobile: sh73a0: allow unplugging of CPU0 (2013-01-30 13:07:59 +0900)
 
-Reviewed-by: Magnus Damm <damm@opensource.se>
+are available in the git repository at:
 
-/ magnus
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.9
+
+for you to fetch changes up to 58079fa7d54a0929d304054ee759187a2ccd3cdf:
+
+  ARM: shmobile: r8a7779: Correct TMU clock support (2013-02-05 12:31:18 +0900)
+
+----------------------------------------------------------------
+Third round of Renesas ARM-based SoC changes for v3.9
+
+A fix for r8a7779 clocks.
+
+----------------------------------------------------------------
+Simon Horman (1):
+      ARM: shmobile: r8a7779: Correct TMU clock support
+
+ arch/arm/mach-shmobile/clock-r8a7779.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
