@@ -1,27 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 5 Feb 2013 10:29:38 -0800
-Subject: [PATCH] ARM: nomadik: fix OF compilation regression
-In-Reply-To: <1359708725-21978-1-git-send-email-linus.walleij@stericsson.com>
-References: <1359708725-21978-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130205182938.GA21449@quad.lixom.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Feb 2013 19:29:53 +0100
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <20130205164705.GG4720@opensource.wolfsonmicro.com>
+References: <20130201213003.GW2637@n2100.arm.linux.org.uk>
+ <20130204154153.GA18237@arwen.pp.htv.fi> <510FF1A6.403@mvista.com>
+ <20130204164712.GB4269@arwen.pp.htv.fi>
+ <510FF5C9.3030600@mvista.com>
+ <20130204170216.GC4269@arwen.pp.htv.fi> <51100A72.6030909@ti.com>
+ <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
+ <5110369B.9060901@ti.com>
+ <CACRpkda8xBB35CwuBH76xXcC341TeRs1ZuwzDD0LtuXc4ifQTw@mail.gmail.com>
+ <20130205164705.GG4720@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdbeoMO1rjPiWDAuVL0uYwMGF+9-vCxqoMiMd1uAgZm=RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 09:52:05AM +0100, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> The Nomadik Device Tree patch series accidentally
-> selected OF instead of USE_OF which led to problems
-> during compile:
-> 
-> arch/arm/kernel/devtree.c: In function 'arm_dt_memblock_reserve':
-> /home/elinwal/linux-arm-soc/arch/arm/kernel/devtree.c:43:7: error: 'initial_boot_params' undeclared (first use in this function)
-> (etc).
-> 
-> This fixes it up by selecting USE_OF instead.
+On Tue, Feb 5, 2013 at 5:47 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Feb 05, 2013 at 05:21:48PM +0100, Linus Walleij wrote:
+>
+>> For IRQ mode, use the completion callback to push each cookie
+>> to NAPI, and thus let the IRQ drive the traffic.
+>
+> The whole purpose of NAPI is to avoid taking interrupts for completion
+> of transfers.  Anything that generates interrupts when NAPI is in
+> polling mode is defeating the point.
 
+So what I was trying to get across is that when you're in polling
+mode you do not set DMA_PREP_INTERRUPT on your transfers,
+just throw the obtained struct dma_async_tx_descriptor on some
+list and then when polling use dma_async_is_tx_complete()
+on the channel and the cookie inside the descriptor.
 
-Applied, thanks.
+I was trying to describe that you can move from
+IRQ mode to polling mode and back again by selectively
+choosing to set/not set the DMA_PREP_INTERRUPT flag.
 
+If polling is all you want you never set it.
 
--Olof
+Then there is the fact that the transfer needs to have
+been flagged complete and it is indeed something that needs
+to be set in some bytes somewhere. By something. But it
+doesn't have to be an interrupt from the DMA controller.
+
+In such cases we use dma_async_is_tx_complete() with
+channel and cookies as parameter. This will call down into the
+driver chan->device->device_tx_status() and there we can
+actually poll the hardware to see if the transfer happens to
+be complete, and if it is flag it complete.
+
+Which is likely what we want.
+
+No interrupts, only function calls as far as I can see.
+
+(I bet Russell will poke a hole in my reasoning, but it's worth
+a try.)
+
+Yours,
+Linus Walleij
