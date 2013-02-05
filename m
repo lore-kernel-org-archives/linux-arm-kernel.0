@@ -1,49 +1,53 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Feb 2013 10:45:20 +0100
-Subject: [PATCH] ARM: imx27: clk-imx27: SPI: Rename IPG clock and add PER
- clock
-In-Reply-To: <1359209221-24346-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1359209221-24346-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130205094520.GW1906@pengutronix.de>
+Date: Tue, 5 Feb 2013 10:45:37 +0100
+Subject: [PATCH v2] ARM: imx: clk-imx27: Do not register peripheral clock
+ for SSI
+In-Reply-To: <1359461855-27551-1-git-send-email-fabio.estevam@freescale.com>
+References: <1359461855-27551-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130205094537.GX1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 03:07:01PM +0100, Gwenhael Goavec-Merou wrote:
-> spi-imx driver needs two clock: ipg and per. The first clock must be named and
-> the second must be added.
+On Tue, Jan 29, 2013 at 10:17:35AM -0200, Fabio Estevam wrote:
+> imx ssi block has two types of clocks:
+>     
+> - ipg: bus clock, the clock needed for accessing registers.
+> - per: peripheral clock, the clock needed for generating the bit rate.
 > 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> Currently ssi driver only supports slave mode and thus need only to handle
+> the ipg clock, because the peripheral clock comes from the master codec.
+> 
+> Only register the ipg clock and do not register the peripheral clock for ssi
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
 Applied, thanks
 
 Sascha
 
 > ---
->  arch/arm/mach-imx/clk-imx27.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
+> Changes since v1:
+> - Fix typo in email address in the From field
+> 
+>  arch/arm/mach-imx/clk-imx27.c |    2 --
+>  1 file changed, 2 deletions(-)
 > 
 > diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 4c1d1e4..c599839 100644
+> index 1ffe3b534..303d7bd 100644
 > --- a/arch/arm/mach-imx/clk-imx27.c
 > +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -228,9 +228,12 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.1");
->  	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.2");
->  	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.2");
-> -	clk_register_clkdev(clk[cspi1_ipg_gate], NULL, "imx27-cspi.0");
-> -	clk_register_clkdev(clk[cspi2_ipg_gate], NULL, "imx27-cspi.1");
-> -	clk_register_clkdev(clk[cspi3_ipg_gate], NULL, "imx27-cspi.2");
-> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.0");
-> +	clk_register_clkdev(clk[cspi1_ipg_gate], "ipg", "imx27-cspi.0");
-> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.1");
-> +	clk_register_clkdev(clk[cspi2_ipg_gate], "ipg", "imx27-cspi.1");
-> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.2");
-> +	clk_register_clkdev(clk[cspi3_ipg_gate], "ipg", "imx27-cspi.2");
->  	clk_register_clkdev(clk[per3_gate], "per", "imx21-fb.0");
->  	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx21-fb.0");
->  	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
+> @@ -274,8 +274,6 @@ int __init mx27_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
+>  	clk_register_clkdev(clk[cpu_div], "cpu", NULL);
+>  	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
+> -	clk_register_clkdev(clk[ssi1_baud_gate], "bitrate" , "imx-ssi.0");
+> -	clk_register_clkdev(clk[ssi2_baud_gate], "bitrate" , "imx-ssi.1");
+>  
+>  	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
+>  
 > -- 
-> 1.7.12.4
+> 1.7.9.5
+> 
 > 
 > 
 
