@@ -1,60 +1,19 @@
-From: hdk@igel.co.jp (Hideki EIRAKU)
-Date: Tue, 05 Feb 2013 19:42:09 +0900 (JST)
-Subject: [PATCH v6 1/4] iommu/shmobile: Add iommu driver for Renesas
- IPMMU modules
-In-Reply-To: <20130201135456.GG25591@8bytes.org>
-References: <1358765669-14567-1-git-send-email-hdk@igel.co.jp>
- <1358765669-14567-2-git-send-email-hdk@igel.co.jp>
- <20130201135456.GG25591@8bytes.org>
-Message-ID: <20130205.194209.52400155.hdk@igel.co.jp>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 5 Feb 2013 11:50:48 +0100
+Subject: [PATCH V2] clk: Add composite clock type
+In-Reply-To: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
+References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20130205.125048.1813250873129029298.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joerg Roedel,
+Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Mon, 4 Feb 2013 09:11:22 +0100:
+...
+If you want to consider the consistency for the other tegra
+clk_register(), the following comment can be added although this is a
+common function.
 
-From: Joerg Roedel <joro@8bytes.org>
-Subject: Re: [PATCH v6 1/4] iommu/shmobile: Add iommu driver for Renesas IPMMU modules
-Date: Fri, 1 Feb 2013 14:54:57 +0100
-
-> On Mon, Jan 21, 2013 at 07:54:26PM +0900, Hideki EIRAKU wrote:
->> This is the Renesas IPMMU driver and IOMMU API implementation.
->> 
->> The IPMMU module supports the MMU function and the PMB function.  The
->> MMU function provides address translation by pagetable compatible with
->> ARMv6.  The PMB function provides address translation including
->> tile-linear translation.  This patch implements the MMU function.
->> 
->> The iommu driver does not register a platform driver directly because:
->> - the register space of the MMU function and the PMB function
->>   have a common register (used for settings flush), so they should ideally
->>   have a way to appropriately share this register.
->> - the MMU function uses the IOMMU API while the PMB function does not.
->> - the two functions may be used independently.
->> 
->> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
-> 
-> The patch looks good in general. Just one question inline.
-> 
->> +static int pgtable_alloc(struct shmobile_iommu_domain_pgtable *pgtable,
->> +			 struct kmem_cache *cache, size_t size)
->> +{
->> +	pgtable->pgtable = kmem_cache_zalloc(cache, GFP_ATOMIC);
->> +	if (!pgtable->pgtable)
->> +		return -ENOMEM;
->> +	pgtable->handle = dma_map_single(NULL, pgtable->pgtable, size,
->> +					 DMA_TO_DEVICE);
->> +	return 0;
->> +}
-> 
-> Why is it necessary to call dma_map_single() for IOMMU page-tables?
-> usually the dma_* functions call into IOMMU drivers, so why are they
-> used inside an IOMMU driver?
-
-I use dma_map_single() for flushing the page table to the IOMMU
-device.  The dma_map_ops set by arch/arm/mm/dma-mapping.c are
-per-device (unlike the intel-iommu).  The dma_* functions call into
-IOMMU drivers if the device is attached by arm_iommu_attach_device(),
-but I am using a NULL device here, so that shouldn't happen.
-
--- 
-Hideki EIRAKU <hdk@igel.co.jp>
++	/* Data in .init is copied by clk_register(), so stack variable OK */
+> +       composite->hw.init = &init;
+> +
+> +       clk = clk_register(dev, &composite->hw);
