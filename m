@@ -1,41 +1,55 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 5 Feb 2013 14:22:39 +0530
-Subject: [PATCH v5 1/3] ARM: vmregion: remove vmregion code entirely
-In-Reply-To: <1360024314-1895-2-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1360024314-1895-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1360024314-1895-2-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <5110C857.6050100@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 5 Feb 2013 10:54:38 +0200
+Subject: [PATCH 10/13] ARM: dts: OMAP4: Add HS USB Host IP nodes
+In-Reply-To: <5110A5B8.3030803@ti.com>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-11-git-send-email-rogerq@ti.com> <5110A5B8.3030803@ti.com>
+Message-ID: <5110C8CE.2020606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 February 2013 06:01 AM, Joonsoo Kim wrote:
-> Now, there is no user for vmregion.
-> So remove it.
->
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->
-> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-> index 8a9c4cb..4e333fa 100644
-> --- a/arch/arm/mm/Makefile
-> +++ b/arch/arm/mm/Makefile
-> @@ -6,7 +6,7 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
->   				   iomap.o
->
->   obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
-> -				   mmap.o pgd.o mmu.o vmregion.o
-> +				   mmap.o pgd.o mmu.o
->
->   ifneq ($(CONFIG_MMU),y)
->   obj-y				+= nommu.o
-> diff --git a/arch/arm/mm/vmregion.c b/arch/arm/mm/vmregion.c
-> deleted file mode 100644
-> index a631016..0000000
-> --- a/arch/arm/mm/vmregion.c
-> +++ /dev/null
-> @@ -1,205 +0,0 @@
-You might want to use 'git format-patch -D'
-which will just generate one line for a deleted file.
+On 02/05/2013 08:24 AM, kishon wrote:
+> On Monday 04 February 2013 09:28 PM, Roger Quadros wrote:
+>> Adds device nodes for HS USB Host module, TLL module,
+>> OHCI and EHCI controllers.
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>   arch/arm/boot/dts/omap4.dtsi |   30 ++++++++++++++++++++++++++++++
+>>   1 files changed, 30 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index 739bb79..3429280 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -529,5 +529,35 @@
+>>               ti,hwmods = "timer11";
+>>               ti,timer-pwm;
+>>           };
+>> +
+>> +        usbhstll: usbhstll at 0x4a062000 {
+>> +            compatible = "ti,usbhs-tll";
+>> +            reg = <0x4a062000 0x1000>;
+>> +            interrupts = <0 78 0x4>;
+>> +            ti,hwmods = "usb_tll_hs";
+>> +        };
+>> +
+>> +        usbhshost: usbhshost at 0x4a064000 {
+>> +            compatible = "ti,usbhs-host";
+>> +            reg = <0x4a064000 0x800>;
+>> +            ti,hwmods = "usb_host_hs";
+>> +            #address-cells = <1>;
+>> +            #size-cells = <1>;
+>> +            ranges;
+>> +
+>> +            usbhsohci: ohci at 0x4a064800 {
+>> +                compatible = "ti,omap3-ohci", "usb-ohci";
+>> +                reg = <0x4a064800 0x400>;
+>> +                interrupt-parent = <&gic>;
+> 
+> Just curious.. Were you facing issues if you are not having interrupt-parent here? It's also missing in your dt node usbhstll.
 
-Regards,
-Santosh
+Yes I was. Interrupt-parent is not there in any of the children which are at the same level as usbhstll.
+
+cheers,
+-roger
