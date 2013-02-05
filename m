@@ -1,36 +1,44 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 5 Feb 2013 16:38:07 +0100
-Subject: [PATCH] ARM: Kirkwood: Add missing linux/i2c.h include
-In-Reply-To: <20130205153411.GV14746@titan.lakedaemon.net>
-References: <1360077025-8046-1-git-send-email-thierry.reding@avionic-design.de>
- <20130205153411.GV14746@titan.lakedaemon.net>
-Message-ID: <20130205153807.GA22220@avionic-0098.mockup.avionic-design.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 05 Feb 2013 16:40:54 +0100
+Subject: [PATCH 2/2] ARM: mvebu: Update defconfig to select SPI support
+In-Reply-To: <1359995888-2385-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1359995888-2385-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <51112806.4000506@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 10:34:11AM -0500, Jason Cooper wrote:
-> Thierry,
+Hi Ezequiel,
+On 02/04/2013 05:38 PM, Ezequiel Garcia wrote:
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Lior Amsalem <alior@marvell.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/configs/mvebu_defconfig |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> On Tue, Feb 05, 2013 at 04:10:25PM +0100, Thierry Reding wrote:
-> > The nsa310 board uses I2C_BOARD_INFO and i2c_register_board_info(), both
-> > of which are defined in the linux/i2c.h header file.
-> > 
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > ---
-> >  arch/arm/mach-kirkwood/board-nsa310.c | 1 +
-> >  1 file changed, 1 insertion(+)
+> diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+> index 4e6f0ce..e243451 100644
+> --- a/arch/arm/configs/mvebu_defconfig
+> +++ b/arch/arm/configs/mvebu_defconfig
+> @@ -40,6 +40,8 @@ CONFIG_MWIFIEX_SDIO=y
+>  CONFIG_SERIAL_8250=y
+>  CONFIG_SERIAL_8250_CONSOLE=y
+>  CONFIG_I2C=y
+> +CONFIG_SPI=y
+> +CONFIG_SPI_ORION=y
+>  CONFIG_I2C_MV64XXX=y
+>  CONFIG_SERIAL_8250_DW=y
+>  CONFIG_GPIOLIB=y
 > 
-> What is this based against?  We're in the process of removing this whole
-> file for v3.9 (pinctrl, mv643xx_eth, and i2c)...
 
-It's based on today's linux-next, so if you're going to drop that file
-for 3.9 I guess you can ignore the patch.
+For this patch you can add my
+Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/fc81f14a/attachment.sig>
+Regards,
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
