@@ -1,179 +1,234 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 4 Feb 2013 23:44:16 -0500 (EST)
-Subject: [PATCH v5 3/3] ARM: mm: use static_vm for managing static mapped
- areas
-In-Reply-To: <1360024314-1895-4-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1360024314-1895-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1360024314-1895-4-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <alpine.LFD.2.02.1302042308220.6300@xanadu.home>
+Date: Tue, 05 Feb 2013 00:21:59 -0500
+Subject: [PATCH v4 02/15] ARM: mcpm: introduce the CPU/cluster power API
+In-Reply-To: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1360041732-17936-3-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Feb 2013, Joonsoo Kim wrote:
+This is the basic API used to handle the powering up/down of individual
+CPUs in a (multi-)cluster system.  The platform specific backend
+implementation has the responsibility to also handle the cluster level
+power as well when the first/last CPU in a cluster is brought up/down.
 
-> A static mapped area is ARM-specific, so it is better not to use
-> generic vmalloc data structure, that is, vmlist and vmlist_lock
-> for managing static mapped area. And it causes some needless overhead and
-> reducing this overhead is better idea.
-> 
-> Now, we have newly introduced static_vm infrastructure.
-> With it, we don't need to iterate all mapped areas. Instead, we just
-> iterate static mapped areas. It helps to reduce an overhead of finding
-> matched area. And architecture dependency on vmalloc layer is removed,
-> so it will help to maintainability for vmalloc layer.
-> 
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/common/mcpm_entry.c      | 88 +++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/mcpm_entry.h | 92 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 180 insertions(+)
 
-Some comments below.
-
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index 904c15e..c7fef4b 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -261,13 +261,14 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
->  	const struct mem_type *type;
->  	int err;
->  	unsigned long addr;
-> - 	struct vm_struct * area;
-> +	struct vm_struct *area;
-> +	phys_addr_t paddr = __pfn_to_phys(pfn);
->  
->  #ifndef CONFIG_ARM_LPAE
->  	/*
->  	 * High mappings must be supersection aligned
->  	 */
-> -	if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
-> +	if (pfn >= 0x100000 && (paddr & ~SUPERSECTION_MASK))
->  		return NULL;
->  #endif
->  
-> @@ -283,24 +284,16 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
->  	/*
->  	 * Try to reuse one of the static mapping whenever possible.
->  	 */
-> -	read_lock(&vmlist_lock);
-> -	for (area = vmlist; area; area = area->next) {
-> -		if (!size || (sizeof(phys_addr_t) == 4 && pfn >= 0x100000))
-> -			break;
-> -		if (!(area->flags & VM_ARM_STATIC_MAPPING))
-> -			continue;
-> -		if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
-> -			continue;
-> -		if (__phys_to_pfn(area->phys_addr) > pfn ||
-> -		    __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
-> -			continue;
-> -		/* we can drop the lock here as we know *area is static */
-> -		read_unlock(&vmlist_lock);
-> -		addr = (unsigned long)area->addr;
-> -		addr += __pfn_to_phys(pfn) - area->phys_addr;
-> -		return (void __iomem *) (offset + addr);
-> +	if (size && !((sizeof(phys_addr_t) == 4 && pfn >= 0x100000))) {
-                     ^                                             ^
-You have a needless extra set of parents here.
-
-[...]
-
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index ce328c7..b2c0356 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -757,21 +757,24 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
->  {
->  	struct map_desc *md;
->  	struct vm_struct *vm;
-> +	struct static_vm *svm;
->  
->  	if (!nr)
->  		return;
->  
-> -	vm = early_alloc_aligned(sizeof(*vm) * nr, __alignof__(*vm));
-> +	svm = early_alloc_aligned(sizeof(*svm) * nr, __alignof__(*svm));
->  
->  	for (md = io_desc; nr; md++, nr--) {
->  		create_mapping(md);
-> +
-> +		vm = &svm->vm;
->  		vm->addr = (void *)(md->virtual & PAGE_MASK);
->  		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
->  		vm->phys_addr = __pfn_to_phys(md->pfn);
->  		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
->  		vm->flags |= VM_ARM_MTYPE(md->type);
->  		vm->caller = iotable_init;
-> -		vm_area_add_early(vm++);
-> +		add_static_vm_early(svm++);
->  	}
->  }
->  
-> @@ -779,13 +782,16 @@ void __init vm_reserve_area_early(unsigned long addr, unsigned long size,
->  				  void *caller)
->  {
->  	struct vm_struct *vm;
-> +	struct static_vm *svm;
-> +
-> +	svm = early_alloc_aligned(sizeof(*svm), __alignof__(*svm));
->  
-> -	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
-> +	vm = &svm->vm;
->  	vm->addr = (void *)addr;
->  	vm->size = size;
->  	vm->flags = VM_IOREMAP | VM_ARM_EMPTY_MAPPING;
->  	vm->caller = caller;
-> -	vm_area_add_early(vm);
-> +	add_static_vm_early(svm);
->  }
->  
->  #ifndef CONFIG_ARM_LPAE
-> @@ -810,14 +816,13 @@ static void __init pmd_empty_section_gap(unsigned long addr)
->  
->  static void __init fill_pmd_gaps(void)
->  {
-> +	struct static_vm *svm;
->  	struct vm_struct *vm;
->  	unsigned long addr, next = 0;
->  	pmd_t *pmd;
->  
-> -	/* we're still single threaded hence no lock needed here */
-> -	for (vm = vmlist; vm; vm = vm->next) {
-> -		if (!(vm->flags & (VM_ARM_STATIC_MAPPING | VM_ARM_EMPTY_MAPPING)))
-> -			continue;
-> +	list_for_each_entry(svm, &static_vmlist, list) {
-> +		vm = &svm->vm;
->  		addr = (unsigned long)vm->addr;
->  		if (addr < next)
->  			continue;
-> @@ -859,17 +864,12 @@ static void __init pci_reserve_io(void)
->  {
->  	struct vm_struct *vm;
->  	unsigned long addr;
-> +	struct static_vm *svm;
->  
-> -	/* we're still single threaded hence no lock needed here */
-> -	for (vm = vmlist; vm; vm = vm->next) {
-> -		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
-> -			continue;
-> -		addr = (unsigned long)vm->addr;
-> -		addr &= ~(SZ_2M - 1);
-> -		if (addr == PCI_IO_VIRT_BASE)
-> -			return;
-> +	svm = find_static_vm_vaddr((void *)PCI_IO_VIRT_BASE);
-> +	if (svm)
-> +		return;
-> 
-> -	}
->  
->  	vm_reserve_area_early(PCI_IO_VIRT_BASE, SZ_2M, pci_reserve_io);
->  }
-
-The replacement code is not equivalent.  I can't recall why the original 
-is as it is, but it doesn't look right to me.  The 2MB round down 
-certainly looks suspicious.
-
-The replacement code should be better.  However I'd like you to get an 
-ACK from Rob Herring as well for this patch.
-
-Once that is sorted out, you can add
-
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
-
-
-Nicolas
+diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+index 3a6d7e70fd..c8c0e2113e 100644
+--- a/arch/arm/common/mcpm_entry.c
++++ b/arch/arm/common/mcpm_entry.c
+@@ -11,11 +11,13 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/irqflags.h>
+ 
+ #include <asm/mcpm_entry.h>
+ #include <asm/barrier.h>
+ #include <asm/proc-fns.h>
+ #include <asm/cacheflush.h>
++#include <asm/idmap.h>
+ 
+ extern volatile unsigned long mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
+ 
+@@ -27,3 +29,89 @@ void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
+ 	outer_clean_range(__pa(&mcpm_entry_vectors[cluster][cpu]),
+ 			  __pa(&mcpm_entry_vectors[cluster][cpu + 1]));
+ }
++
++static const struct mcpm_platform_ops *platform_ops;
++
++int __init mcpm_platform_register(const struct mcpm_platform_ops *ops)
++{
++	if (platform_ops)
++		return -EBUSY;
++	platform_ops = ops;
++	return 0;
++}
++
++int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
++{
++	if (!platform_ops)
++		return -EUNATCH; /* try not to shadow power_up errors */
++	might_sleep();
++	return platform_ops->power_up(cpu, cluster);
++}
++
++typedef void (*phys_reset_t)(unsigned long);
++
++void mcpm_cpu_power_down(void)
++{
++	phys_reset_t phys_reset;
++
++	BUG_ON(!platform_ops);
++	BUG_ON(!irqs_disabled());
++
++	/*
++	 * Do this before calling into the power_down method,
++	 * as it might not always be safe to do afterwards.
++	 */
++	setup_mm_for_reboot();
++
++	platform_ops->power_down();
++
++	/*
++	 * It is possible for a power_up request to happen concurrently
++	 * with a power_down request for the same CPU. In this case the
++	 * power_down method might not be able to actually enter a
++	 * powered down state with the WFI instruction if the power_up
++	 * method has removed the required reset condition.  The
++	 * power_down method is then allowed to return. We must perform
++	 * a re-entry in the kernel as if the power_up method just had
++	 * deasserted reset on the CPU.
++	 *
++	 * To simplify race issues, the platform specific implementation
++	 * must accommodate for the possibility of unordered calls to
++	 * power_down and power_up with a usage count. Therefore, if a
++	 * call to power_up is issued for a CPU that is not down, then
++	 * the next call to power_down must not attempt a full shutdown
++	 * but only do the minimum (normally disabling L1 cache and CPU
++	 * coherency) and return just as if a concurrent power_up request
++	 * had happened as described above.
++	 */
++
++	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
++	phys_reset(virt_to_phys(mcpm_entry_point));
++
++	/* should never get here */
++	BUG();
++}
++
++void mcpm_cpu_suspend(u64 expected_residency)
++{
++	phys_reset_t phys_reset;
++
++	BUG_ON(!platform_ops);
++	BUG_ON(!irqs_disabled());
++
++	/* Very similar to mcpm_cpu_power_down() */
++	setup_mm_for_reboot();
++	platform_ops->suspend(expected_residency);
++	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
++	phys_reset(virt_to_phys(mcpm_entry_point));
++	BUG();
++}
++
++int mcpm_cpu_powered_up(void)
++{
++	if (!platform_ops)
++		return -EUNATCH;
++	if (platform_ops->powered_up)
++		platform_ops->powered_up();
++	return 0;
++}
+diff --git a/arch/arm/include/asm/mcpm_entry.h b/arch/arm/include/asm/mcpm_entry.h
+index cc10ebbd2e..3286d5eb91 100644
+--- a/arch/arm/include/asm/mcpm_entry.h
++++ b/arch/arm/include/asm/mcpm_entry.h
+@@ -31,5 +31,97 @@ extern void mcpm_entry_point(void);
+  */
+ void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr);
+ 
++/*
++ * CPU/cluster power operations API for higher subsystems to use.
++ */
++
++/**
++ * mcpm_cpu_power_up - make given CPU in given cluster runable
++ *
++ * @cpu: CPU number within given cluster
++ * @cluster: cluster number for the CPU
++ *
++ * The identified CPU is brought out of reset.  If the cluster was powered
++ * down then it is brought up as well, taking care not to let the other CPUs
++ * in the cluster run, and ensuring appropriate cluster setup.
++ *
++ * Caller must ensure the appropriate entry vector is initialized with
++ * mcpm_set_entry_vector() prior to calling this.
++ *
++ * This must be called in a sleepable context.  However, the implementation
++ * is strongly encouraged to return early and let the operation happen
++ * asynchronously, especially when significant delays are expected.
++ *
++ * If the operation cannot be performed then an error code is returned.
++ */
++int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster);
++
++/**
++ * mcpm_cpu_power_down - power the calling CPU down
++ *
++ * The calling CPU is powered down.
++ *
++ * If this CPU is found to be the "last man standing" in the cluster
++ * then the cluster is prepared for power-down too.
++ *
++ * This must be called with interrupts disabled.
++ *
++ * This does not return.  Re-entry in the kernel is expected via
++ * mcpm_entry_point.
++ */
++void mcpm_cpu_power_down(void);
++
++/**
++ * mcpm_cpu_suspend - bring the calling CPU in a suspended state
++ *
++ * @expected_residency: duration in microseconds the CPU is expected
++ *			to remain suspended, or 0 if unknown/infinity.
++ *
++ * The calling CPU is suspended.  The expected residency argument is used
++ * as a hint by the platform specific backend to implement the appropriate
++ * sleep state level according to the knowledge it has on wake-up latency
++ * for the given hardware.
++ *
++ * If this CPU is found to be the "last man standing" in the cluster
++ * then the cluster may be prepared for power-down too, if the expected
++ * residency makes it worthwhile.
++ *
++ * This must be called with interrupts disabled.
++ *
++ * This does not return.  Re-entry in the kernel is expected via
++ * mcpm_entry_point.
++ */
++void mcpm_cpu_suspend(u64 expected_residency);
++
++/**
++ * mcpm_cpu_powered_up - housekeeping workafter a CPU has been powered up
++ *
++ * This lets the platform specific backend code perform needed housekeeping
++ * work.  This must be called by the newly activated CPU as soon as it is
++ * fully operational in kernel space, before it enables interrupts.
++ *
++ * If the operation cannot be performed then an error code is returned.
++ */
++int mcpm_cpu_powered_up(void);
++
++/*
++ * Platform specific methods used in the implementation of the above API.
++ */
++struct mcpm_platform_ops {
++	int (*power_up)(unsigned int cpu, unsigned int cluster);
++	void (*power_down)(void);
++	void (*suspend)(u64);
++	void (*powered_up)(void);
++};
++
++/**
++ * mcpm_platform_register - register platform specific power methods
++ *
++ * @ops: mcpm_platform_ops structure to register
++ *
++ * An error is returned if the registration has been done previously.
++ */
++int __init mcpm_platform_register(const struct mcpm_platform_ops *ops);
++
+ #endif /* ! __ASSEMBLY__ */
+ #endif
+-- 
+1.8.1.2
