@@ -1,84 +1,34 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 05 Feb 2013 21:17:02 +0100
-Subject: [PATCH] arm: mvebu: Add SPI flash on Armada XP-GP board
-In-Reply-To: <5111331F.7090900@free-electrons.com>
-References: <1360063473-26176-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <5111331F.7090900@free-electrons.com>
-Message-ID: <511168BE.1000803@free-electrons.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 5 Feb 2013 21:41:48 +0100
+Subject: [PATCH 06/14] ARM: pci: Keep pci_common_init() around after init
+In-Reply-To: <1357764194-12677-7-git-send-email-thierry.reding@avionic-design.de>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <1357764194-12677-7-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20130205204147.GA29726@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 05:28 PM, Gregory CLEMENT wrote:
-> Hi Ezequiel,
+On Wed, Jan 09, 2013 at 09:43:06PM +0100, Thierry Reding wrote:
+> When using deferred driver probing, PCI host controller drivers may
+> actually require this function after the init stage.
 > 
-> On 02/05/2013 12:24 PM, Ezequiel Garcia wrote:
->> This patch adds an SPI master device node for Armada XP-GP board.
->> This master node is an SPI flash controller 'n25q128a13'.
->>
->> Since there is no 'partitions' node declared, one full sized
->> partition named as the device will be created.
->>
->> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Cc: Lior Amsalem <alior@marvell.com>
->> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->> ---
->> This patch depends on:
->>
->>  1. Gregory's patch for Armada XP GP board:
->>       arm: mvebu: support for the new Armada XP development board(DB-MV784MP-GP)
->>
->>  2. My previous patch for SPI on Armada 370/XP:
->>       arm: mvebu: Add support for SPI controller in Armada 370/XP
->>
->> And don't forget to compile the SPI flash driver, CONFIG_MTD_M25P80=y
->>
->>  arch/arm/boot/dts/armada-xp-gp.dts |   12 ++++++++++++
->>  1 files changed, 12 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
->> index 3eea531..1c8afe2 100644
->> --- a/arch/arm/boot/dts/armada-xp-gp.dts
->> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
->> @@ -97,5 +97,17 @@
->>  			phy = <&phy3>;
->>  			phy-mode = "rgmii-id";
->>  		};
->> +
->> +		spi0: spi at d0010600 {
->> +			status = "okay";
->> +
->> +			spi-flash at 0 {
->> +				#address-cells = <1>;
->> +				#size-cells = <1>;
->> +				compatible = "n25q128a13";
->> +				reg = <0>; /* Chip select 0 */
->> +				spi-max-frequency = <108000000>;
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> ---
+>  arch/arm/kernel/bios32.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 
-I had a remark about it, according to the datasheet, 108MHz is the
-maximum frequency for the all the instructions but the READ
-instruction. For the READ the maximum frequency is 54MHz. So I wonder
-if we shouldn't use 54000000 here.
+Russell,
 
+Can this patch and patch 7 (ARM: pci: Allow passing per-controller
+private data) of this series be applied for 3.9? Thomas uses them in his
+Marvell PCIe series as well and it would allow to reduce the complexity
+of the dependencies.
 
-
->> +			};
->> +		};
->>  	};
->>  };
->>
-> 
-> I applied, compiled and try this patch it worked well, at least
-> for reading, I didn't try to write on the flash where my boolader
-> is stored. So you can add my:
-> 
-> Tested-by: Gregory Clement <gregory.clement@free-electrons.com>
-> 
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/f9b71b6e/attachment.sig>
