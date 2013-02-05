@@ -1,54 +1,48 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 05 Feb 2013 12:43:50 +0000
-Subject: [PATCH 2/2] spi: sirf: add support for new SiRFmarco SMP SoC
-In-Reply-To: <1356490114-18022-2-git-send-email-Barry.Song@csr.com>
-References: <1356490114-18022-1-git-send-email-Barry.Song@csr.com>
- <1356490114-18022-2-git-send-email-Barry.Song@csr.com>
-Message-ID: <20130205124351.4DDA93E0E27@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Feb 2013 12:38:28 +0000
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <201302042147.38407.arnd@arndb.de>
+References: <510C2A47.1090607@mvista.com>
+ <20130204203358.GX4720@opensource.wolfsonmicro.com>
+ <CACRpkdbPyZt8=pLhz-5qcaSSAk6VBn61dPTNp6teU9HksBwN2w@mail.gmail.com>
+ <201302042147.38407.arnd@arndb.de>
+Message-ID: <20130205123828.GB17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Dec 2012 10:48:34 +0800, Barry Song <Barry.Song@csr.com> wrote:
-> From: Barry Song <Baohua.Song@csr.com>
+On Mon, Feb 04, 2013 at 09:47:38PM +0000, Arnd Bergmann wrote:
+> On Monday 04 February 2013, Linus Walleij wrote:
+> > So I think the above concerns are moot. The callback we can
+> > set on cookies is entirely optional, and it's even implemented by
+> > each DMA engine, and some may not even support it but require
+> > polling, and then it won't even be implemented by the driver.
 > 
-> the driver is also compatible with SiRFmarco except SiRFprimaII,
-> so simply add "sirf,marco-spi" to OF match table.
-> 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Just to ensure that everybody is talking about the same thing here:
+> Is it just the callback that is optional, or also the interrupt
+> coming from the hardware?
 
-Applied, thanks.
+If everyone implements stuff correctly, both.  The callback most certainly
+is optional as things stand.  The interrupt - that depends on the DMA
+engine.
 
-g.
+Some DMA engines you can't avoid it because you need to reprogram the
+hardware with the next+1 transfer upon completion of an existing transfer.
+Others may allow you to chain transfers in hardware.  That's all up to
+how the DMA engine driver is implemented and how the hardware behaves.
 
-> ---
->  drivers/spi/spi-sirf.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-> index 38a191c..09ca0e3 100644
-> --- a/drivers/spi/spi-sirf.c
-> +++ b/drivers/spi/spi-sirf.c
-> @@ -659,6 +659,7 @@ static const struct dev_pm_ops spi_sirfsoc_pm_ops = {
->  
->  static const struct of_device_id spi_sirfsoc_of_match[] = {
->  	{ .compatible = "sirf,prima2-spi", },
-> +	{ .compatible = "sirf,marco-spi", },
->  	{}
->  };
->  MODULE_DEVICE_TABLE(of, sirfsoc_spi_of_match);
-> -- 
-> 1.7.5.4
-> 
-> 
-> 
-> Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-> More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Now, there's another problem here: that is, people abuse the API.  People
+don't pass DMA_CTRL_ACK | DMA_PREP_INTERRUPT into their operations by
+default.  People like typing '0'.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+The intention of the "DMA_PREP_INTERRUPT" is significant here: it means
+"ask the hardware to send an interrupt upon completion of this transfer".
+
+Because soo many people like to type '0' instead in their DMA engine
+clients, it means that this flag is utterly useless today - you have to
+ignore it.  So there's _no_ way for client drivers to actually tell the
+a DMA engine driver which _doesn't_ need to signal interrupts at the end
+of every transfer not to do so.
+
+So yes, the DMA engine API supports it.  Whether the _implementations_
+themselves do is very much hit and miss (and in reality is much more
+miss than hit.)
