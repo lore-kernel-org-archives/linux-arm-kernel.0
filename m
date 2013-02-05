@@ -1,62 +1,134 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 5 Feb 2013 14:37:05 +0530
-Subject: [PATCH v2 4/6] ARM: dts: omap5: add dwc3 omap dt data
-In-Reply-To: <5110C6EC.6050606@ti.com>
-References: <1359112312-6918-1-git-send-email-kishon@ti.com>
- <1359112312-6918-5-git-send-email-kishon@ti.com> <510432BF.80808@mvista.com>
- <5110C2E6.30504@ti.com> <20130205083828.GE32118@arwen.pp.htv.fi>
- <5110C6EC.6050606@ti.com>
-Message-ID: <5110CBB9.5080307@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 5 Feb 2013 11:07:48 +0200
+Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
+ information
+In-Reply-To: <5110C339.7080109@ti.com>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-2-git-send-email-rogerq@ti.com>
+ <20130205072637.GA32118@arwen.pp.htv.fi> <5110C339.7080109@ti.com>
+Message-ID: <20130205090748.GG32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 February 2013 02:16 PM, kishon wrote:
-> Hi,
->
-> On Tuesday 05 February 2013 02:08 PM, Felipe Balbi wrote:
->> On Tue, Feb 05, 2013 at 01:59:26PM +0530, kishon wrote:
->>> On Sunday 27 January 2013 01:17 AM, Sergei Shtylyov wrote:
->>>> Hello.
->>>>
->>>> On 25-01-2013 15:11, Kishon Vijay Abraham I wrote:
->>>>
->>>>> Add dwc3 omap glue data to the omap5 dt data file. The information
->>>>> about
->>>>> the dt node added here is available @
->>>>> Documentation/devicetree/bindings/usb/omap-usb.txt
->>>>
->>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>> ---
->>>>>   arch/arm/boot/dts/omap5.dtsi |   11 +++++++++++
->>>>>   1 file changed, 11 insertions(+)
->>>>
->>>>> diff --git a/arch/arm/boot/dts/omap5.dtsi
->>>>> b/arch/arm/boot/dts/omap5.dtsi
->>>>> index 5f59bf2..1703a72 100644
->>>>> --- a/arch/arm/boot/dts/omap5.dtsi
->>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
->>>>> @@ -513,6 +513,17 @@
->>>>>               ti,type = <2>;
->>>>>           };
->>>>>
->>>>> +        omap_dwc3 at 4a020000 {
->>>>> +            compatible = "ti,dwc3";
->>>>> +            ti,hwmods = "usb_otg_ss";
->>>>> +            reg = <0x4a020000 0x1ff>;
->>>>
->>>>     Shoudn't the "reg" length be 0x200 here? It's length, not limit.
->>>
->>> I think 0x1ff is correct. I got the data from hwmod data.
->>
->> hwmod is utterly wrong. Looking at TRM, it says the size here is 64KiB
->> (0x10000), so is the size for dwc3 itself. Please don't blindly trust
->> hwmod, make sure you read data from TRM ;-)
->
-> hmm..ok. But it has only 17 registers :-D
->
-As Felipe said, it should be 0x200. And if you are
-interested in lesser space, there is no need to map entire 64 KB
-address space if it isn't being used.
+On Tue, Feb 05, 2013 at 10:30:49AM +0200, Roger Quadros wrote:
+> On 02/05/2013 09:26 AM, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Mon, Feb 04, 2013 at 05:58:48PM +0200, Roger Quadros wrote:
+> >> The PHY clock, clock rate, VCC regulator and RESET regulator
+> >> can now be provided via device tree.
+> >>
+> >> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> >> ---
+> >>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
+> >>  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
+> >>  2 files changed, 65 insertions(+), 0 deletions(-)
+> >>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+> >> new file mode 100644
+> >> index 0000000..d7e2726
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+> >> @@ -0,0 +1,34 @@
+> >> +USB NOP PHY
+> >> +
+> >> +Required properties:
+> >> +- compatible: should be usb-nop-xceiv
+> >> +
+> >> +Optional properties:
+> >> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
+> >> +  /bindings/clock/clock-bindings.txt
+> >> +  This property is required if clock-frequency is specified.
+> >> +
+> >> +- clock-names: Should be "main_clk"
+> >> +
+> >> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
+> >> +  be configured to.
+> >> +
+> >> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
+> >> +
+> >> +- reset-supply: phandle to the regulator that provides power to the PHY.
+> >> +
+> >> +Example:
+> >> +
+> >> +	hsusb1_phy {
+> >> +		compatible = "usb-nop-xceiv";
+> >> +		clock-frequency = <19200000>;
+> >> +		clocks = <&osc 0>;
+> >> +		clock-names = "main_clk";
+> >> +		vcc-supply = <&hsusb1_vcc_regulator>;
+> >> +		reset-supply = <&hsusb1_reset_regulator>;
+> >> +	};
+> >> +
+> >> +hsusb1_phy is a NOP USB PHY device that gets its clock from an oscillator
+> >> +and expects that clock to be configured to 19.2MHz by the NOP PHY driver.
+> >> +hsusb1_vcc_regulator provides power to the PHY and hsusb1_reset_regulator
+> >> +controls RESET.
+> >> diff --git a/drivers/usb/otg/nop-usb-xceiv.c b/drivers/usb/otg/nop-usb-xceiv.c
+> >> index ac027a1..adbb7ab 100644
+> >> --- a/drivers/usb/otg/nop-usb-xceiv.c
+> >> +++ b/drivers/usb/otg/nop-usb-xceiv.c
+> >> @@ -34,6 +34,7 @@
+> >>  #include <linux/slab.h>
+> >>  #include <linux/clk.h>
+> >>  #include <linux/regulator/consumer.h>
+> >> +#include <linux/of.h>
+> >>  
+> >>  struct nop_usb_xceiv {
+> >>  	struct usb_phy		phy;
+> >> @@ -138,8 +139,19 @@ static int nop_set_host(struct usb_otg *otg, struct usb_bus *host)
+> >>  	return 0;
+> >>  }
+> >>  
+> >> +static void nop_xeiv_get_dt_pdata(struct device *dev,
+> > 
+> > asking to remove, but xeiv != xceiv :-)
+> > 
+> >> +				struct nop_usb_xceiv_platform_data *pdata)
+> >> +{
+> >> +	struct device_node *node = dev->of_node;
+> >> +	u32 clk_rate;
+> >> +
+> >> +	if (!of_property_read_u32(node, "clock-frequency", &clk_rate))
+> >> +		pdata->clk_rate = clk_rate;
+> >> +}
+> >> +
+> >>  static int nop_usb_xceiv_probe(struct platform_device *pdev)
+> >>  {
+> >> +	struct device *dev = &pdev->dev;
+> >>  	struct nop_usb_xceiv_platform_data *pdata = pdev->dev.platform_data;
+> >>  	struct nop_usb_xceiv	*nop;
+> >>  	enum usb_phy_type	type = USB_PHY_TYPE_USB2;
+> >> @@ -153,6 +165,17 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
+> >>  	if (!nop->phy.otg)
+> >>  		return -ENOMEM;
+> >>  
+> >> +	if (dev->of_node) {
+> >> +		pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+> >> +		if (!pdata) {
+> >> +			dev_err(dev, "Memory allocation failure\n");
+> >> +			return -ENOMEM;
+> >> +		}
+> >> +		nop_xeiv_get_dt_pdata(dev, pdata);
+> > 
+> > actually, I would prefer to not create pdata at all. I mean, ideally
+> > pdata would be used to initialize fields in your own structure, so first
+> > move clk_rate to your own private structure, copy pdata's clk_rate value
+> > to that, then you don't need this hackery when using DT.
+> > 
+> OK, got it. Will revise.
 
-Regards,
-Santosh
+Cool, after that you can add my:
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/095e2e52/attachment.sig>
