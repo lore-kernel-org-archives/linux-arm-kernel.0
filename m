@@ -1,68 +1,56 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 5 Feb 2013 14:03:41 +0530
-Subject: [PATCH V2] clk: Add composite clock type
-In-Reply-To: <20130204.113739.2227266298512077917.hdoyu@nvidia.com>
-References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
- <20130204.113739.2227266298512077917.hdoyu@nvidia.com>
-Message-ID: <5110C3E5.2010503@nvidia.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 5 Feb 2013 10:38:28 +0200
+Subject: [PATCH v2 4/6] ARM: dts: omap5: add dwc3 omap dt data
+In-Reply-To: <5110C2E6.30504@ti.com>
+References: <1359112312-6918-1-git-send-email-kishon@ti.com>
+ <1359112312-6918-5-git-send-email-kishon@ti.com>
+ <510432BF.80808@mvista.com> <5110C2E6.30504@ti.com>
+Message-ID: <20130205083828.GE32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 February 2013 03:07 PM, Hiroshi Doyu wrote:
-> Hi Prashant,
->
-> Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Mon, 4 Feb 2013 09:11:22 +0100:
->
->> +struct clk *clk_register_composite(struct device *dev, const char *name,
->> +                       const char **parent_names, int num_parents,
->> +                       struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
->> +                       struct clk_hw *div_hw, const struct clk_ops *div_ops,
->> +                       struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
->> +                       unsigned long flags)
->> +{
->> +       struct clk *clk;
->> +       struct clk_init_data init;
->> +       struct clk_composite *composite;
->> +       struct clk_ops *clk_composite_ops;
->> +
->> +       composite = kzalloc(sizeof(*composite), GFP_KERNEL);
->> +       if (!composite) {
->> +               pr_err("%s: could not allocate composite clk\n", __func__);
->> +               return ERR_PTR(-ENOMEM);
->> +       }
->> +
->> +       init.name = name;
->> +       init.flags = flags | CLK_IS_BASIC;
->> +       init.parent_names = parent_names;
->> +       init.num_parents = num_parents;
->> +
->> +       /* allocate the clock ops */
->> +       clk_composite_ops = kzalloc(sizeof(*clk_composite_ops), GFP_KERNEL);
-> The members of "clk_composite_ops" seems to be always assigned
-> statically. Istead of dynamically allocating/assigning, can't we just
-> have "clk_composite_ops" statically as below?
->
-> static struct clk_ops clk_composite_ops = {
-> 	.get_parent = clk_composite_get_parent;
-> 	.set_parent = clk_composite_set_parent;
-> 	.recalc_rate = clk_composite_recalc_rate;
-> 	.round_rate = clk_composite_round_rate;
-> 	.set_rate = clk_composite_set_rate;
-> 	.is_enabled = clk_composite_is_enabled;
-> 	.enable = clk_composite_enable;
-> 	.disable = clk_composite_disable;
-> };
->
-> struct clk *clk_register_composite(struct device *dev, const char *name,
-> 		       const char **parent_names, int num_parents,
-> 		       struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
-> 		       struct clk_hw *div_hw, const struct clk_ops *div_ops,
-> 		       struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-> 		       unsigned long flags)
-> {
-> 	.....
->
-> 	init.ops = &clk_composite_ops;
+On Tue, Feb 05, 2013 at 01:59:26PM +0530, kishon wrote:
+> On Sunday 27 January 2013 01:17 AM, Sergei Shtylyov wrote:
+> >Hello.
+> >
+> >On 25-01-2013 15:11, Kishon Vijay Abraham I wrote:
+> >
+> >>Add dwc3 omap glue data to the omap5 dt data file. The information about
+> >>the dt node added here is available @
+> >>Documentation/devicetree/bindings/usb/omap-usb.txt
+> >
+> >>Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>---
+> >>  arch/arm/boot/dts/omap5.dtsi |   11 +++++++++++
+> >>  1 file changed, 11 insertions(+)
+> >
+> >>diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> >>index 5f59bf2..1703a72 100644
+> >>--- a/arch/arm/boot/dts/omap5.dtsi
+> >>+++ b/arch/arm/boot/dts/omap5.dtsi
+> >>@@ -513,6 +513,17 @@
+> >>              ti,type = <2>;
+> >>          };
+> >>
+> >>+        omap_dwc3 at 4a020000 {
+> >>+            compatible = "ti,dwc3";
+> >>+            ti,hwmods = "usb_otg_ss";
+> >>+            reg = <0x4a020000 0x1ff>;
+> >
+> >    Shoudn't the "reg" length be 0x200 here? It's length, not limit.
+> 
+> I think 0x1ff is correct. I got the data from hwmod data.
 
-No, clk_ops depends on the clocks you are using. There could be a clock 
-with mux and gate while another one with mux and div.
+hwmod is utterly wrong. Looking at TRM, it says the size here is 64KiB
+(0x10000), so is the size for dwc3 itself. Please don't blindly trust
+hwmod, make sure you read data from TRM ;-)
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/4e925b99/attachment.sig>
