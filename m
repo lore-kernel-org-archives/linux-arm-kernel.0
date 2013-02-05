@@ -1,42 +1,54 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 5 Feb 2013 11:43:54 +0200
-Subject: [PATCH 02/13] USB: phy: nop: Defer probe if device needs VCC/RESET
-In-Reply-To: <20130205090920.GH32118@arwen.pp.htv.fi>
-References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
- <1359993540-20780-3-git-send-email-rogerq@ti.com> <51109E95.3000307@ti.com>
- <5110C655.3060305@ti.com> <20130205090920.GH32118@arwen.pp.htv.fi>
-Message-ID: <5110D45A.3040007@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 5 Feb 2013 10:45:20 +0100
+Subject: [PATCH] ARM: imx27: clk-imx27: SPI: Rename IPG clock and add PER
+ clock
+In-Reply-To: <1359209221-24346-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1359209221-24346-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20130205094520.GW1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 11:09 AM, Felipe Balbi wrote:
-> On Tue, Feb 05, 2013 at 10:44:05AM +0200, Roger Quadros wrote:
->>>> diff --git a/include/linux/usb/nop-usb-xceiv.h b/include/linux/usb/nop-usb-xceiv.h
->>>> index 3265b61..148d351 100644
->>>> --- a/include/linux/usb/nop-usb-xceiv.h
->>>> +++ b/include/linux/usb/nop-usb-xceiv.h
->>>> @@ -6,6 +6,10 @@
->>>>   struct nop_usb_xceiv_platform_data {
->>>>       enum usb_phy_type type;
->>>>       unsigned long clk_rate;
->>>> +
->>>> +    /* if set fails with -EPROBE_DEFER if can't get regulator */
->>>> +    unsigned int needs_vcc:1;
->>>> +    unsigned int needs_reset:1;
->>>
->>> how about u8 here?
->>
->> Not sure. Bitfields are usually defined as unsigned int.
+On Sat, Jan 26, 2013 at 03:07:01PM +0100, Gwenhael Goavec-Merou wrote:
+> spi-imx driver needs two clock: ipg and per. The first clock must be named and
+> the second must be added.
 > 
-> IIRC the benefit is that compiler can try to optimize those flags. I
-> mean, if you have 32 1-bit flags, compiler will combine those in a
-> single u32. Someone correct me if I'm wrong.
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+
+Applied, thanks
+
+Sascha
+
+> ---
+>  arch/arm/mach-imx/clk-imx27.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+> index 4c1d1e4..c599839 100644
+> --- a/arch/arm/mach-imx/clk-imx27.c
+> +++ b/arch/arm/mach-imx/clk-imx27.c
+> @@ -228,9 +228,12 @@ int __init mx27_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.1");
+>  	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.2");
+>  	clk_register_clkdev(clk[sdhc2_ipg_gate], "ipg", "imx21-mmc.2");
+> -	clk_register_clkdev(clk[cspi1_ipg_gate], NULL, "imx27-cspi.0");
+> -	clk_register_clkdev(clk[cspi2_ipg_gate], NULL, "imx27-cspi.1");
+> -	clk_register_clkdev(clk[cspi3_ipg_gate], NULL, "imx27-cspi.2");
+> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.0");
+> +	clk_register_clkdev(clk[cspi1_ipg_gate], "ipg", "imx27-cspi.0");
+> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.1");
+> +	clk_register_clkdev(clk[cspi2_ipg_gate], "ipg", "imx27-cspi.1");
+> +	clk_register_clkdev(clk[per2_gate], "per", "imx27-cspi.2");
+> +	clk_register_clkdev(clk[cspi3_ipg_gate], "ipg", "imx27-cspi.2");
+>  	clk_register_clkdev(clk[per3_gate], "per", "imx21-fb.0");
+>  	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx21-fb.0");
+>  	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
+> -- 
+> 1.7.12.4
+> 
 > 
 
-Yes you are right. Kishon was asking me to use u8 instead of unsigned int, which
-I don't think is necessary. AFAIK, it is a norm to use unsigned int when defining
-a bitfield. Compilers are known to behave funny with bitfields. I don't mind
-using bool for each.
-
-cheers,
--roger
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
