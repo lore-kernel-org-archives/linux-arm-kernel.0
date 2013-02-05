@@ -1,65 +1,47 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Feb 2013 13:54:57 +0800
-Subject: [PATCH v4] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130205055456.GA6234@nchen-desktop>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 5 Feb 2013 13:58:23 +0800
+Subject: [GIT PULL] mxs soc changes for 3.9
+Message-ID: <20130205055822.GD10807@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 02:24:26PM +0100, Sascha Hauer wrote:
-> 4th round of patches.
-> 
-> Peter, I would be glad if you could test them before your holiday. I rebased
-> your last round of Chipidea OTG patches onto this series which you can pull
-> here:
-> 
-> git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-otg-for-next
-> 
-> I couldn't really test the otg patches since my current hardware does not have
-> the ID pin connected, but I can verify that my usecase still works with your
-> patches applied.
+Arnd, Olof,
 
-Sascha, I have tested your patchset, it works after adding a few of changes
-at my otg patchset (we still need to read otgsc for gadget-only function).
-I use my mx6q sabrelite board to test.
+Here are mxs soc changes for 3.9.  I have the pull request based on
+arm-soc/clocksource/cleanup to save conflict.  Please pull, thanks.
 
-I have tested all roles with below diff:
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 49527d7..cdbf2ec 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -72,6 +72,10 @@
- 				pinctrl-0 = <&pinctrl_usbotg_1>;
- 				disable-over-current;
- 				otg_id_pin_select_change;
-+				/* dr_mode = "peripheral"; */
-+				/* dr_mode = "host"; */
-+				dr_mode = "otg";
-+				phy_type = "utmi_wide";
- 				status = "okay";
- 			};
+Shawn
 
-So, feel free to add my Tested-by: Peter Chen <peter.chen@freescale.com>
+The following changes since commit 77cc982f6a3b33a5aa058ad3b20cda8866db2948:
 
-Besides, if you have a mx51 bbg board, you can test id-switch function.
-For mx5x, you may need a phy driver.
+  clocksource: use clockevents_config_and_register() where possible (2013-01-14 10:12:42 -0800)
 
-My git: https://github.com/hzpeterchen/linux-usb.git master
+are available in the git repository at:
 
-It is based on your tag, and add latest otg patch.
-Besides, it has Michael Grzeschik/Marc Kleine-Budde
-usb misc patch as well as my platform changes for mx6q board.
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-soc-3.9
 
-> 
-> Alex, should the patches work for you and are fine otherwise, could you apply
-> them for v3.9?
-> 
-> Sascha
-> 
-> 
--- 
+for you to fetch changes up to e1ab0056df613662929290f385590da2cccb8c19:
 
-Best Regards,
-Peter Chen
+  ARM: mxs_defconfig: Select CONFIG_DEVTMPFS_MOUNT (2013-02-05 11:28:28 +0800)
+
+----------------------------------------------------------------
+mxs soc changes for 3.9
+
+ - A couple of optimization on timer
+ - Some updates on mxs_defconfig
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: mxs_defconfig: Select CONFIG_DEVTMPFS_MOUNT
+
+Marek Vasut (1):
+      ARM: mxs: Update mxs_defconfig
+
+Torben Hohn (2):
+      ARM: mxs: use apbx bus clock to drive the timers on timrotv2
+      ARM: mxs: decrease mxs_clockevent_device.min_delta_ns to 2 clock cycles
+
+ arch/arm/configs/mxs_defconfig |   64 +++++++++++++++++++---------------------
+ arch/arm/mach-mxs/timer.c      |   12 ++++----
+ drivers/clk/mxs/clk-imx28.c    |    2 +-
+ 3 files changed, 39 insertions(+), 39 deletions(-)
