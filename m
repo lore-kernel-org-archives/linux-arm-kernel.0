@@ -1,234 +1,239 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Feb 2013 00:21:59 -0500
-Subject: [PATCH v4 02/15] ARM: mcpm: introduce the CPU/cluster power API
+Date: Tue, 05 Feb 2013 00:21:58 -0500
+Subject: [PATCH v4 01/15] ARM: multi-cluster PM: secondary kernel entry code
 In-Reply-To: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1360041732-17936-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1360041732-17936-2-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the basic API used to handle the powering up/down of individual
-CPUs in a (multi-)cluster system.  The platform specific backend
-implementation has the responsibility to also handle the cluster level
-power as well when the first/last CPU in a cluster is brought up/down.
+CPUs in cluster based systems, such as big.LITTLE, have special needs
+when entering the kernel due to a hotplug event, or when resuming from
+a deep sleep mode.
+
+This is vectorized so multiple CPUs can enter the kernel in parallel
+without serialization.
+
+The mcpm prefix stands for "multi cluster power management", however
+this is usable on single cluster systems as well.  Only the basic
+structure is introduced here.  This will be extended with later patches.
+
+In order not to complexify things more than they currently have to,
+the planned work to make runtime adjusted MPIDR based indexing and
+dynamic memory allocation for cluster states is postponed to a later
+cycle. The MAX_NR_CLUSTERS and MAX_CPUS_PER_CLUSTER static definitions
+should be sufficient for those systems expected to be available in the
+near future.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/common/mcpm_entry.c      | 88 +++++++++++++++++++++++++++++++++++++
- arch/arm/include/asm/mcpm_entry.h | 92 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 180 insertions(+)
+ arch/arm/Kconfig                  |  8 ++++
+ arch/arm/common/Makefile          |  1 +
+ arch/arm/common/mcpm_entry.c      | 29 +++++++++++++
+ arch/arm/common/mcpm_head.S       | 86 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/mcpm_entry.h | 35 ++++++++++++++++
+ 5 files changed, 159 insertions(+)
+ create mode 100644 arch/arm/common/mcpm_entry.c
+ create mode 100644 arch/arm/common/mcpm_head.S
+ create mode 100644 arch/arm/include/asm/mcpm_entry.h
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 67874b82a4..200f559c1c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1584,6 +1584,14 @@ config HAVE_ARM_TWD
+ 	help
+ 	  This options enables support for the ARM timer and watchdog unit
+ 
++config CLUSTER_PM
++	bool "Cluster Power Management Infrastructure"
++	depends on CPU_V7 && SMP
++	help
++	  This option provides the common power management infrastructure
++	  for (multi-)cluster based systems, such as big.LITTLE based
++	  systems.
++
+ choice
+ 	prompt "Memory split"
+ 	default VMSPLIT_3G
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index e8a4e58f1b..23e85b1fae 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -13,3 +13,4 @@ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+ obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
++obj-$(CONFIG_CLUSTER_PM)	+= mcpm_head.o mcpm_entry.o
 diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-index 3a6d7e70fd..c8c0e2113e 100644
---- a/arch/arm/common/mcpm_entry.c
+new file mode 100644
+index 0000000000..3a6d7e70fd
+--- /dev/null
 +++ b/arch/arm/common/mcpm_entry.c
-@@ -11,11 +11,13 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/irqflags.h>
- 
- #include <asm/mcpm_entry.h>
- #include <asm/barrier.h>
- #include <asm/proc-fns.h>
- #include <asm/cacheflush.h>
-+#include <asm/idmap.h>
- 
- extern volatile unsigned long mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
- 
-@@ -27,3 +29,89 @@ void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
- 	outer_clean_range(__pa(&mcpm_entry_vectors[cluster][cpu]),
- 			  __pa(&mcpm_entry_vectors[cluster][cpu + 1]));
- }
+@@ -0,0 +1,29 @@
++/*
++ * arch/arm/common/mcpm_entry.c -- entry point for multi-cluster PM
++ *
++ * Created by:  Nicolas Pitre, March 2012
++ * Copyright:   (C) 2012-2013  Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+static const struct mcpm_platform_ops *platform_ops;
++#include <linux/kernel.h>
++#include <linux/init.h>
 +
-+int __init mcpm_platform_register(const struct mcpm_platform_ops *ops)
++#include <asm/mcpm_entry.h>
++#include <asm/barrier.h>
++#include <asm/proc-fns.h>
++#include <asm/cacheflush.h>
++
++extern volatile unsigned long mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
++
++void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
 +{
-+	if (platform_ops)
-+		return -EBUSY;
-+	platform_ops = ops;
-+	return 0;
++	unsigned long val = ptr ? virt_to_phys(ptr) : 0;
++	mcpm_entry_vectors[cluster][cpu] = val;
++	__cpuc_flush_dcache_area((void *)&mcpm_entry_vectors[cluster][cpu], 4);
++	outer_clean_range(__pa(&mcpm_entry_vectors[cluster][cpu]),
++			  __pa(&mcpm_entry_vectors[cluster][cpu + 1]));
 +}
+diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
+new file mode 100644
+index 0000000000..cda65f200b
+--- /dev/null
++++ b/arch/arm/common/mcpm_head.S
+@@ -0,0 +1,86 @@
++/*
++ * arch/arm/common/mcpm_head.S -- kernel entry point for multi-cluster PM
++ *
++ * Created by:  Nicolas Pitre, March 2012
++ * Copyright:   (C) 2012-2013  Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
-+{
-+	if (!platform_ops)
-+		return -EUNATCH; /* try not to shadow power_up errors */
-+	might_sleep();
-+	return platform_ops->power_up(cpu, cluster);
-+}
++#include <linux/linkage.h>
++#include <asm/mcpm_entry.h>
 +
-+typedef void (*phys_reset_t)(unsigned long);
++	.macro	pr_dbg	string
++#if defined(CONFIG_DEBUG_LL) && defined(DEBUG)
++	b	1901f
++1902:	.asciz	"CPU"
++1903:	.asciz	" cluster"
++1904:	.asciz	": \string"
++	.align
++1901:	adr	r0, 1902b
++	bl	printascii
++	mov	r0, r9
++	bl	printhex8
++	adr	r0, 1903b
++	bl	printascii
++	mov	r0, r10
++	bl	printhex8
++	adr	r0, 1904b
++	bl	printascii
++#endif
++	.endm
 +
-+void mcpm_cpu_power_down(void)
-+{
-+	phys_reset_t phys_reset;
++	.arm
++	.align
 +
-+	BUG_ON(!platform_ops);
-+	BUG_ON(!irqs_disabled());
++ENTRY(mcpm_entry_point)
++
++ THUMB(	adr	r12, BSYM(1f)	)
++ THUMB(	bx	r12		)
++ THUMB(	.thumb			)
++1:
++	mrc	p15, 0, r0, c0, c0, 5		@ MPIDR
++	ubfx	r9, r0, #0, #8			@ r9 = cpu
++	ubfx	r10, r0, #8, #8			@ r10 = cluster
++	mov	r3, #MAX_CPUS_PER_CLUSTER
++	mla	r4, r3, r10, r9			@ r4 = canonical CPU index
++	cmp	r4, #(MAX_CPUS_PER_CLUSTER * MAX_NR_CLUSTERS)
++	blo	2f
++
++	/* We didn't expect this CPU.  Try to cheaply make it quiet. */
++1:	wfi
++	wfe
++	b	1b
++
++2:	pr_dbg	"kernel mcpm_entry_point\n"
 +
 +	/*
-+	 * Do this before calling into the power_down method,
-+	 * as it might not always be safe to do afterwards.
++	 * MMU is off so we need to get to mcpm_entry_vectors in a
++	 * position independent way.
 +	 */
-+	setup_mm_for_reboot();
++	adr	r5, 3f
++	ldr	r6, [r5]
++	add	r6, r5, r6			@ r6 = mcpm_entry_vectors
 +
-+	platform_ops->power_down();
++mcpm_entry_gated:
++	ldr	r5, [r6, r4, lsl #2]		@ r5 = CPU entry vector
++	cmp	r5, #0
++	wfeeq
++	beq	mcpm_entry_gated
++	pr_dbg	"released\n"
++	bx	r5
 +
-+	/*
-+	 * It is possible for a power_up request to happen concurrently
-+	 * with a power_down request for the same CPU. In this case the
-+	 * power_down method might not be able to actually enter a
-+	 * powered down state with the WFI instruction if the power_up
-+	 * method has removed the required reset condition.  The
-+	 * power_down method is then allowed to return. We must perform
-+	 * a re-entry in the kernel as if the power_up method just had
-+	 * deasserted reset on the CPU.
-+	 *
-+	 * To simplify race issues, the platform specific implementation
-+	 * must accommodate for the possibility of unordered calls to
-+	 * power_down and power_up with a usage count. Therefore, if a
-+	 * call to power_up is issued for a CPU that is not down, then
-+	 * the next call to power_down must not attempt a full shutdown
-+	 * but only do the minimum (normally disabling L1 cache and CPU
-+	 * coherency) and return just as if a concurrent power_up request
-+	 * had happened as described above.
-+	 */
++	.align	2
 +
-+	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-+	phys_reset(virt_to_phys(mcpm_entry_point));
++3:	.word	mcpm_entry_vectors - .
 +
-+	/* should never get here */
-+	BUG();
-+}
++ENDPROC(mcpm_entry_point)
 +
-+void mcpm_cpu_suspend(u64 expected_residency)
-+{
-+	phys_reset_t phys_reset;
++	.bss
++	.align	5
 +
-+	BUG_ON(!platform_ops);
-+	BUG_ON(!irqs_disabled());
-+
-+	/* Very similar to mcpm_cpu_power_down() */
-+	setup_mm_for_reboot();
-+	platform_ops->suspend(expected_residency);
-+	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-+	phys_reset(virt_to_phys(mcpm_entry_point));
-+	BUG();
-+}
-+
-+int mcpm_cpu_powered_up(void)
-+{
-+	if (!platform_ops)
-+		return -EUNATCH;
-+	if (platform_ops->powered_up)
-+		platform_ops->powered_up();
-+	return 0;
-+}
++	.type	mcpm_entry_vectors, #object
++ENTRY(mcpm_entry_vectors)
++	.space	4 * MAX_NR_CLUSTERS * MAX_CPUS_PER_CLUSTER
 diff --git a/arch/arm/include/asm/mcpm_entry.h b/arch/arm/include/asm/mcpm_entry.h
-index cc10ebbd2e..3286d5eb91 100644
---- a/arch/arm/include/asm/mcpm_entry.h
+new file mode 100644
+index 0000000000..cc10ebbd2e
+--- /dev/null
 +++ b/arch/arm/include/asm/mcpm_entry.h
-@@ -31,5 +31,97 @@ extern void mcpm_entry_point(void);
-  */
- void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr);
- 
+@@ -0,0 +1,35 @@
 +/*
-+ * CPU/cluster power operations API for higher subsystems to use.
++ * arch/arm/include/asm/mcpm_entry.h
++ *
++ * Created by:  Nicolas Pitre, April 2012
++ * Copyright:   (C) 2012-2013  Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+/**
-+ * mcpm_cpu_power_up - make given CPU in given cluster runable
-+ *
-+ * @cpu: CPU number within given cluster
-+ * @cluster: cluster number for the CPU
-+ *
-+ * The identified CPU is brought out of reset.  If the cluster was powered
-+ * down then it is brought up as well, taking care not to let the other CPUs
-+ * in the cluster run, and ensuring appropriate cluster setup.
-+ *
-+ * Caller must ensure the appropriate entry vector is initialized with
-+ * mcpm_set_entry_vector() prior to calling this.
-+ *
-+ * This must be called in a sleepable context.  However, the implementation
-+ * is strongly encouraged to return early and let the operation happen
-+ * asynchronously, especially when significant delays are expected.
-+ *
-+ * If the operation cannot be performed then an error code is returned.
-+ */
-+int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster);
++#ifndef MCPM_ENTRY_H
++#define MCPM_ENTRY_H
 +
-+/**
-+ * mcpm_cpu_power_down - power the calling CPU down
-+ *
-+ * The calling CPU is powered down.
-+ *
-+ * If this CPU is found to be the "last man standing" in the cluster
-+ * then the cluster is prepared for power-down too.
-+ *
-+ * This must be called with interrupts disabled.
-+ *
-+ * This does not return.  Re-entry in the kernel is expected via
-+ * mcpm_entry_point.
-+ */
-+void mcpm_cpu_power_down(void);
++#define MAX_CPUS_PER_CLUSTER	4
++#define MAX_NR_CLUSTERS		2
 +
-+/**
-+ * mcpm_cpu_suspend - bring the calling CPU in a suspended state
-+ *
-+ * @expected_residency: duration in microseconds the CPU is expected
-+ *			to remain suspended, or 0 if unknown/infinity.
-+ *
-+ * The calling CPU is suspended.  The expected residency argument is used
-+ * as a hint by the platform specific backend to implement the appropriate
-+ * sleep state level according to the knowledge it has on wake-up latency
-+ * for the given hardware.
-+ *
-+ * If this CPU is found to be the "last man standing" in the cluster
-+ * then the cluster may be prepared for power-down too, if the expected
-+ * residency makes it worthwhile.
-+ *
-+ * This must be called with interrupts disabled.
-+ *
-+ * This does not return.  Re-entry in the kernel is expected via
-+ * mcpm_entry_point.
-+ */
-+void mcpm_cpu_suspend(u64 expected_residency);
-+
-+/**
-+ * mcpm_cpu_powered_up - housekeeping workafter a CPU has been powered up
-+ *
-+ * This lets the platform specific backend code perform needed housekeeping
-+ * work.  This must be called by the newly activated CPU as soon as it is
-+ * fully operational in kernel space, before it enables interrupts.
-+ *
-+ * If the operation cannot be performed then an error code is returned.
-+ */
-+int mcpm_cpu_powered_up(void);
++#ifndef __ASSEMBLY__
 +
 +/*
-+ * Platform specific methods used in the implementation of the above API.
++ * Platform specific code should use this symbol to set up secondary
++ * entry location for processors to use when released from reset.
 + */
-+struct mcpm_platform_ops {
-+	int (*power_up)(unsigned int cpu, unsigned int cluster);
-+	void (*power_down)(void);
-+	void (*suspend)(u64);
-+	void (*powered_up)(void);
-+};
++extern void mcpm_entry_point(void);
 +
-+/**
-+ * mcpm_platform_register - register platform specific power methods
-+ *
-+ * @ops: mcpm_platform_ops structure to register
-+ *
-+ * An error is returned if the registration has been done previously.
++/*
++ * This is used to indicate where the given CPU from given cluster should
++ * branch once it is ready to re-enter the kernel using ptr, or NULL if it
++ * should be gated.  A gated CPU is held in a WFE loop until its vector
++ * becomes non NULL.
 + */
-+int __init mcpm_platform_register(const struct mcpm_platform_ops *ops);
++void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr);
 +
- #endif /* ! __ASSEMBLY__ */
- #endif
++#endif /* ! __ASSEMBLY__ */
++#endif
 -- 
 1.8.1.2
