@@ -1,212 +1,36 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 11:11:45 +0200
-Subject: [PATCH 01/30] USB: EHCI: split ehci-omap out to a separate driver
-In-Reply-To: <1359372631-8180-2-git-send-email-rogerq@ti.com>
-References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <1359372631-8180-2-git-send-email-rogerq@ti.com>
-Message-ID: <20130205091145.GI32118@arwen.pp.htv.fi>
+Date: Tue, 5 Feb 2013 11:13:54 +0200
+Subject: [PATCH v3 10/30] USB: ehci-omap: Use PHY APIs to get the PHY
+ device and put it out of suspend
+In-Reply-To: <Pine.LNX.4.44L0.1301291026020.1507-100000@iolanthe.rowland.org>
+References: <1359453032-20604-1-git-send-email-rogerq@ti.com>
+ <Pine.LNX.4.44L0.1301291026020.1507-100000@iolanthe.rowland.org>
+Message-ID: <20130205091354.GJ32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 01:30:02PM +0200, Roger Quadros wrote:
-> From: Alan Stern <stern@rowland.harvard.edu>
+On Tue, Jan 29, 2013 at 10:30:05AM -0500, Alan Stern wrote:
+> On Tue, 29 Jan 2013, Roger Quadros wrote:
 > 
-> This patch (as1645) converts ehci-omap over to the new "ehci-hcd is a
-> library" approach, so that it can coexist peacefully with other EHCI
-> platform drivers and can make use of the private area allocated at
-> the end of struct ehci_hcd.
+> > For each port that is in PHY mode we obtain a PHY device using the USB PHY
+> > library and put it out of suspend.
+> > 
+> > It is up to platform code to associate the PHY to the controller's
+> > port and it is upto the PHY driver to manage the PHY's resources.
 > 
-> Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
-
-for ehci-omap:
+> s/upto/up to/
+> 
+> > Also remove wired spacing around declarations we come across.
+> 
+> s/wired/weird/ -- not that people care about misspellings in the 
+> Changelog.  You don't have to resubmit the patch just to fix these two 
+> items.
+> 
+> > Signed-off-by: Roger Quadros <rogerq@ti.com>
+> 
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
 Acked-by: Felipe Balbi <balbi@ti.com>
-
-> ---
->  drivers/usb/host/Kconfig     |    2 +-
->  drivers/usb/host/Makefile    |    1 +
->  drivers/usb/host/ehci-hcd.c  |    6 +---
->  drivers/usb/host/ehci-omap.c |   76 +++++++++++++++++++-----------------------
->  4 files changed, 37 insertions(+), 48 deletions(-)
-> 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 3a21c5d..11e102e 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -155,7 +155,7 @@ config USB_EHCI_MXC
->  	  Variation of ARC USB block used in some Freescale chips.
->  
->  config USB_EHCI_HCD_OMAP
-> -	bool "EHCI support for OMAP3 and later chips"
-> +	tristate "EHCI support for OMAP3 and later chips"
->  	depends on USB_EHCI_HCD && ARCH_OMAP
->  	default y
->  	---help---
-> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-> index 001fbff..56de410 100644
-> --- a/drivers/usb/host/Makefile
-> +++ b/drivers/usb/host/Makefile
-> @@ -27,6 +27,7 @@ obj-$(CONFIG_USB_EHCI_HCD)	+= ehci-hcd.o
->  obj-$(CONFIG_USB_EHCI_PCI)	+= ehci-pci.o
->  obj-$(CONFIG_USB_EHCI_HCD_PLATFORM)	+= ehci-platform.o
->  obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
-> +obj-$(CONFIG_USB_EHCI_HCD_OMAP)	+= ehci-omap.o
->  
->  obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
->  obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
-> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-> index 09537b2..5a35246 100644
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -1251,11 +1251,6 @@ MODULE_LICENSE ("GPL");
->  #define PLATFORM_DRIVER		ehci_hcd_sh_driver
->  #endif
->  
-> -#ifdef CONFIG_USB_EHCI_HCD_OMAP
-> -#include "ehci-omap.c"
-> -#define        PLATFORM_DRIVER         ehci_hcd_omap_driver
-> -#endif
-> -
->  #ifdef CONFIG_PPC_PS3
->  #include "ehci-ps3.c"
->  #define	PS3_SYSTEM_BUS_DRIVER	ps3_ehci_driver
-> @@ -1345,6 +1340,7 @@ MODULE_LICENSE ("GPL");
->  	!IS_ENABLED(CONFIG_USB_EHCI_HCD_PLATFORM) && \
->  	!IS_ENABLED(CONFIG_USB_CHIPIDEA_HOST) && \
->  	!IS_ENABLED(CONFIG_USB_EHCI_MXC) && \
-> +	!IS_ENABLED(CONFIG_USB_EHCI_HCD_OMAP) && \
->  	!defined(PLATFORM_DRIVER) && \
->  	!defined(PS3_SYSTEM_BUS_DRIVER) && \
->  	!defined(OF_PLATFORM_DRIVER) && \
-> diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-> index b96a4bf..30fc482 100644
-> --- a/drivers/usb/host/ehci-omap.c
-> +++ b/drivers/usb/host/ehci-omap.c
-> @@ -36,6 +36,9 @@
->   *	- convert to use hwmod and runtime PM
->   */
->  
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/io.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  #include <linux/usb/ulpi.h>
-> @@ -43,6 +46,10 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/gpio.h>
->  #include <linux/clk.h>
-> +#include <linux/usb.h>
-> +#include <linux/usb/hcd.h>
-> +
-> +#include "ehci.h"
->  
->  #include <linux/platform_data/usb-omap.h>
->  
-> @@ -57,9 +64,11 @@
->  #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
->  #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
->  
-> -/*-------------------------------------------------------------------------*/
-> +#define DRIVER_DESC "OMAP-EHCI Host Controller driver"
->  
-> -static const struct hc_driver ehci_omap_hc_driver;
-> +static const char hcd_name[] = "ehci-omap";
-> +
-> +/*-------------------------------------------------------------------------*/
->  
->  
->  static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
-> @@ -166,6 +175,12 @@ static void disable_put_regulator(
->  /* configure so an HC device and id are always provided */
->  /* always called with process context; sleeping is OK */
->  
-> +static struct hc_driver __read_mostly ehci_omap_hc_driver;
-> +
-> +static const struct ehci_driver_overrides ehci_omap_overrides __initdata = {
-> +	.reset =		omap_ehci_init,
-> +};
-> +
->  /**
->   * ehci_hcd_omap_probe - initialize TI-based HCDs
->   *
-> @@ -315,56 +330,33 @@ static struct platform_driver ehci_hcd_omap_driver = {
->  	/*.suspend		= ehci_hcd_omap_suspend, */
->  	/*.resume		= ehci_hcd_omap_resume, */
->  	.driver = {
-> -		.name		= "ehci-omap",
-> +		.name		= hcd_name,
->  	}
->  };
->  
->  /*-------------------------------------------------------------------------*/
->  
-> -static const struct hc_driver ehci_omap_hc_driver = {
-> -	.description		= hcd_name,
-> -	.product_desc		= "OMAP-EHCI Host Controller",
-> -	.hcd_priv_size		= sizeof(struct ehci_hcd),
-> -
-> -	/*
-> -	 * generic hardware linkage
-> -	 */
-> -	.irq			= ehci_irq,
-> -	.flags			= HCD_MEMORY | HCD_USB2,
-> -
-> -	/*
-> -	 * basic lifecycle operations
-> -	 */
-> -	.reset			= omap_ehci_init,
-> -	.start			= ehci_run,
-> -	.stop			= ehci_stop,
-> -	.shutdown		= ehci_shutdown,
-> -
-> -	/*
-> -	 * managing i/o requests and associated device resources
-> -	 */
-> -	.urb_enqueue		= ehci_urb_enqueue,
-> -	.urb_dequeue		= ehci_urb_dequeue,
-> -	.endpoint_disable	= ehci_endpoint_disable,
-> -	.endpoint_reset		= ehci_endpoint_reset,
-> +static int __init ehci_omap_init(void)
-> +{
-> +	if (usb_disabled())
-> +		return -ENODEV;
->  
-> -	/*
-> -	 * scheduling support
-> -	 */
-> -	.get_frame_number	= ehci_get_frame,
-> +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
->  
-> -	/*
-> -	 * root hub support
-> -	 */
-> -	.hub_status_data	= ehci_hub_status_data,
-> -	.hub_control		= ehci_hub_control,
-> -	.bus_suspend		= ehci_bus_suspend,
-> -	.bus_resume		= ehci_bus_resume,
-> +	ehci_init_driver(&ehci_omap_hc_driver, &ehci_omap_overrides);
-> +	return platform_driver_register(&ehci_hcd_omap_driver);
-> +}
-> +module_init(ehci_omap_init);
->  
-> -	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
-> -};
-> +static void __exit ehci_omap_cleanup(void)
-> +{
-> +	platform_driver_unregister(&ehci_hcd_omap_driver);
-> +}
-> +module_exit(ehci_omap_cleanup);
->  
->  MODULE_ALIAS("platform:omap-ehci");
->  MODULE_AUTHOR("Texas Instruments, Inc.");
->  MODULE_AUTHOR("Felipe Balbi <felipe.balbi@nokia.com>");
->  
-> +MODULE_DESCRIPTION(DRIVER_DESC);
-> +MODULE_LICENSE("GPL");
-> -- 
-> 1.7.4.1
-> 
 
 -- 
 balbi
@@ -216,4 +40,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/23a0edf8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/010fe60b/attachment-0001.sig>
