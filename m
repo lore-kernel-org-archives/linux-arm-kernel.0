@@ -1,43 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue,  5 Feb 2013 13:14:30 -0800
-Subject: [PATCH] ARM: tegra: remove empty tegra_smp_init_cpus()
-Message-ID: <1360098870-24818-1-git-send-email-olof@lixom.net>
+Date: Tue, 5 Feb 2013 13:24:37 -0800
+Subject: [PATCH 1/2] ARM: tegra: Fix build error for gic update
+In-Reply-To: <1359976100-28871-1-git-send-email-hdoyu@nvidia.com>
+References: <1359976100-28871-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20130205212437.GA23108@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on two separate cleanup branches, it's now empty and can be removed.
+On Mon, Feb 04, 2013 at 01:08:18PM +0200, Hiroshi Doyu wrote:
+> Fix build error in board-dt-tegra114.c(next-20130204)
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> Reported-by: Sami Liedes<sliedes@nvidia.com>
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
----
+Applied to arm-soc next/soc, after t114 support.
 
-(Already applied on arm-soc, just posting for posterity)
 
- arch/arm/mach-tegra/platsmp.c | 5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index f06fc51..2c6b3d5 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -176,10 +176,6 @@ done:
- 	return status;
- }
- 
--static void __init tegra_smp_init_cpus(void)
--{
--}
--
- static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	/* Always mark the boot CPU (CPU0) as initialized. */
-@@ -190,7 +186,6 @@ static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
- }
- 
- struct smp_operations tegra_smp_ops __initdata = {
--	.smp_init_cpus		= tegra_smp_init_cpus,
- 	.smp_prepare_cpus	= tegra_smp_prepare_cpus,
- 	.smp_secondary_init	= tegra_secondary_init,
- 	.smp_boot_secondary	= tegra_boot_secondary,
--- 
-1.8.1.192.gc4361b8
+-Olof
