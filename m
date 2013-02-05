@@ -1,87 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 05 Feb 2013 13:12:51 -0600
-Subject: [PATCH v5 3/3] ARM: mm: use static_vm for managing static mapped
- areas
-In-Reply-To: <alpine.LFD.2.02.1302051304530.6300@xanadu.home>
-References: <1360024314-1895-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1360024314-1895-4-git-send-email-iamjoonsoo.kim@lge.com>
- <alpine.LFD.2.02.1302042308220.6300@xanadu.home> <51114134.4070503@gmail.com>
- <alpine.LFD.2.02.1302051304530.6300@xanadu.home>
-Message-ID: <511159B3.8020000@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 5 Feb 2013 11:15:31 -0800
+Subject: [GIT PULL] i.MX clock fixes for v3.8
+In-Reply-To: <20130205132759.GA17833@n2100.arm.linux.org.uk>
+References: <20130205095844.GZ1906@pengutronix.de>
+ <20130205110804.GI17786@n2100.arm.linux.org.uk>
+ <20130205112558.GA1906@pengutronix.de>
+ <201302051312.11434.arnd@arndb.de>
+ <20130205132759.GA17833@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMimVynmZeBnLdQa8r2J1B8fM8zvcuhZ9MxxK2Fx95oCpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 12:13 PM, Nicolas Pitre wrote:
-> On Tue, 5 Feb 2013, Rob Herring wrote:
-> 
->> On 02/04/2013 10:44 PM, Nicolas Pitre wrote:
->>> On Tue, 5 Feb 2013, Joonsoo Kim wrote:
->>>
->>>> A static mapped area is ARM-specific, so it is better not to use
->>>> generic vmalloc data structure, that is, vmlist and vmlist_lock
->>>> for managing static mapped area. And it causes some needless overhead and
->>>> reducing this overhead is better idea.
->>>>
->>>> Now, we have newly introduced static_vm infrastructure.
->>>> With it, we don't need to iterate all mapped areas. Instead, we just
->>>> iterate static mapped areas. It helps to reduce an overhead of finding
->>>> matched area. And architecture dependency on vmalloc layer is removed,
->>>> so it will help to maintainability for vmalloc layer.
->>>>
->>>> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->>
->> [snip]
->>
->>>> @@ -859,17 +864,12 @@ static void __init pci_reserve_io(void)
->>>>  {
->>>>  	struct vm_struct *vm;
->>>>  	unsigned long addr;
->>>> +	struct static_vm *svm;
->>>>  
->>>> -	/* we're still single threaded hence no lock needed here */
->>>> -	for (vm = vmlist; vm; vm = vm->next) {
->>>> -		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
->>>> -			continue;
->>>> -		addr = (unsigned long)vm->addr;
->>>> -		addr &= ~(SZ_2M - 1);
->>>> -		if (addr == PCI_IO_VIRT_BASE)
->>>> -			return;
->>>> +	svm = find_static_vm_vaddr((void *)PCI_IO_VIRT_BASE);
->>>> +	if (svm)
->>>> +		return;
->>>>
->>>> -	}
->>>>  
->>>>  	vm_reserve_area_early(PCI_IO_VIRT_BASE, SZ_2M, pci_reserve_io);
->>>>  }
->>>
->>> The replacement code is not equivalent.  I can't recall why the original 
->>> is as it is, but it doesn't look right to me.  The 2MB round down 
->>> certainly looks suspicious.
->>
->> The PCI mapping is at a fixed, aligned 2MB mapping. If we find any
->> virtual address within that region already mapped, it is an error.
-> 
-> Ah, OK.  This wasn't clear looking at the code.
-> 
->> We probably should have had a WARN here.
-> 
-> Indeed.
-> 
->>>
->>> The replacement code should be better.  However I'd like you to get an 
->>> ACK from Rob Herring as well for this patch.
->>
->> It doesn't appear to me the above case is handled. The virt addr is
->> checked whether it is within an existing mapping, but not whether the
->> new mapping would overlap an existing mapping. It would be good to check
->> for this generically rather than specifically for the PCI i/o mapping.
-> 
-> Agreed.  However that is checked already in vm_area_add_early().  
-> Therefore the overlap test here is redundant.
+On Tue, Feb 5, 2013 at 5:27 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Ah, right. In that case:
+> There's more patches like that post-rc6: there's one
+> which fixes an obscure problem with 'make' which occurs with 2G:2G VM
+> split.  But I'm not pushing that one either because it's not a _big_
+> enough problem (it's only had _one_ user report it.)  One user is not
+> sufficient justification.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Can you please make sure that one is marked for stable though? We're
+running Chrome OS in 2:2 on ARM, and we're likely going to move to 3.8
+at some point.
 
-Rob
+
+-Olof
