@@ -1,26 +1,82 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 5 Feb 2013 13:09:00 -0500
-Subject: [PATCH] arm: mvebu: Add SPI flash on Armada XP-GP board
-In-Reply-To: <20130205180705.5231effd@skate>
-References: <1360063473-26176-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130205123827.GG20242@lunn.ch>
- <20130205124833.GS14746@titan.lakedaemon.net>
- <20130205142720.GB2481@localhost>
- <20130205153135.GU14746@titan.lakedaemon.net>
- <20130205171701.4fcb1304@skate>
- <51113132.6000500@free-electrons.com>
- <20130205180705.5231effd@skate>
-Message-ID: <20130205180900.GY14746@titan.lakedaemon.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 5 Feb 2013 13:13:06 -0500 (EST)
+Subject: [PATCH v5 3/3] ARM: mm: use static_vm for managing static mapped
+ areas
+In-Reply-To: <51114134.4070503@gmail.com>
+References: <1360024314-1895-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1360024314-1895-4-git-send-email-iamjoonsoo.kim@lge.com>
+ <alpine.LFD.2.02.1302042308220.6300@xanadu.home> <51114134.4070503@gmail.com>
+Message-ID: <alpine.LFD.2.02.1302051304530.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 06:07:05PM +0100, Thomas Petazzoni wrote:
-> Of course, it doesn't make sense to have drivers for pluggable devices
-> like PCIe devices that are not soldered, USB devices and things like
-> that. But for all the rest, I would say it should be in the defconfig.
+On Tue, 5 Feb 2013, Rob Herring wrote:
 
-hmmm, so for the new devboard we should set CONFIG_RAM=n? ;-)
+> On 02/04/2013 10:44 PM, Nicolas Pitre wrote:
+> > On Tue, 5 Feb 2013, Joonsoo Kim wrote:
+> > 
+> >> A static mapped area is ARM-specific, so it is better not to use
+> >> generic vmalloc data structure, that is, vmlist and vmlist_lock
+> >> for managing static mapped area. And it causes some needless overhead and
+> >> reducing this overhead is better idea.
+> >>
+> >> Now, we have newly introduced static_vm infrastructure.
+> >> With it, we don't need to iterate all mapped areas. Instead, we just
+> >> iterate static mapped areas. It helps to reduce an overhead of finding
+> >> matched area. And architecture dependency on vmalloc layer is removed,
+> >> so it will help to maintainability for vmalloc layer.
+> >>
+> >> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> 
+> [snip]
+> 
+> >> @@ -859,17 +864,12 @@ static void __init pci_reserve_io(void)
+> >>  {
+> >>  	struct vm_struct *vm;
+> >>  	unsigned long addr;
+> >> +	struct static_vm *svm;
+> >>  
+> >> -	/* we're still single threaded hence no lock needed here */
+> >> -	for (vm = vmlist; vm; vm = vm->next) {
+> >> -		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+> >> -			continue;
+> >> -		addr = (unsigned long)vm->addr;
+> >> -		addr &= ~(SZ_2M - 1);
+> >> -		if (addr == PCI_IO_VIRT_BASE)
+> >> -			return;
+> >> +	svm = find_static_vm_vaddr((void *)PCI_IO_VIRT_BASE);
+> >> +	if (svm)
+> >> +		return;
+> >>
+> >> -	}
+> >>  
+> >>  	vm_reserve_area_early(PCI_IO_VIRT_BASE, SZ_2M, pci_reserve_io);
+> >>  }
+> > 
+> > The replacement code is not equivalent.  I can't recall why the original 
+> > is as it is, but it doesn't look right to me.  The 2MB round down 
+> > certainly looks suspicious.
+> 
+> The PCI mapping is at a fixed, aligned 2MB mapping. If we find any
+> virtual address within that region already mapped, it is an error.
 
-thx,
+Ah, OK.  This wasn't clear looking at the code.
 
-Jason.
+> We probably should have had a WARN here.
+
+Indeed.
+
+> > 
+> > The replacement code should be better.  However I'd like you to get an 
+> > ACK from Rob Herring as well for this patch.
+> 
+> It doesn't appear to me the above case is handled. The virt addr is
+> checked whether it is within an existing mapping, but not whether the
+> new mapping would overlap an existing mapping. It would be good to check
+> for this generically rather than specifically for the PCI i/o mapping.
+
+Agreed.  However that is checked already in vm_area_add_early().  
+Therefore the overlap test here is redundant.
+
+
+Nicolas
