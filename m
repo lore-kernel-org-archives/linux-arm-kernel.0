@@ -1,25 +1,36 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 5 Feb 2013 10:42:21 -0500
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <20130205124120.GC17852@n2100.arm.linux.org.uk>
-References: <20130204154153.GA18237@arwen.pp.htv.fi> <510FF1A6.403@mvista.com>
- <20130204164712.GB4269@arwen.pp.htv.fi> <510FF5C9.3030600@mvista.com>
- <20130204170216.GC4269@arwen.pp.htv.fi> <51100A72.6030909@ti.com>
- <CACRpkdZihnp3_Df==QRWxQupgi7W_YXZxc-MxkusVH6J+Vx56A@mail.gmail.com>
- <20130204203358.GX4720@opensource.wolfsonmicro.com>
- <CACRpkdbPyZt8=pLhz-5qcaSSAk6VBn61dPTNp6teU9HksBwN2w@mail.gmail.com>
- <51102E25.8040107@ti.com> <20130205124120.GC17852@n2100.arm.linux.org.uk>
-Message-ID: <5111285D.3030503@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 5 Feb 2013 10:52:14 -0500
+Subject: [PATCH] ARM: Kirkwood: Add missing linux/i2c.h include
+In-Reply-To: <20130205153807.GA22220@avionic-0098.mockup.avionic-design.de>
+References: <1360077025-8046-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130205153411.GV14746@titan.lakedaemon.net>
+ <20130205153807.GA22220@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130205155214.GW14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 07:41 AM, Russell King - ARM Linux wrote:
-> On Mon, Feb 04, 2013 at 04:54:45PM -0500, Cyril Chemparathy wrote:
->> You're assuming that cookies complete in order.  That is not necessarily
->> true.
->
-> Under what circumstances is that not true?
->
+On Tue, Feb 05, 2013 at 04:38:07PM +0100, Thierry Reding wrote:
+> On Tue, Feb 05, 2013 at 10:34:11AM -0500, Jason Cooper wrote:
+> > Thierry,
+> > 
+> > On Tue, Feb 05, 2013 at 04:10:25PM +0100, Thierry Reding wrote:
+> > > The nsa310 board uses I2C_BOARD_INFO and i2c_register_board_info(), both
+> > > of which are defined in the linux/i2c.h header file.
+> > > 
+> > > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > > ---
+> > >  arch/arm/mach-kirkwood/board-nsa310.c | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > 
+> > What is this based against?  We're in the process of removing this whole
+> > file for v3.9 (pinctrl, mv643xx_eth, and i2c)...
+> 
+> It's based on today's linux-next, so if you're going to drop that file
+> for 3.9 I guess you can ignore the patch.
 
-Notably when hardware can prioritize certain classes of traffic over 
-others, for instance with data center bridging mechanisms.
+ok, thanks.
+
+Jason.
+
+> 
+> Thierry
