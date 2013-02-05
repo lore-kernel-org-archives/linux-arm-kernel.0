@@ -1,71 +1,29 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 05 Feb 2013 11:28:20 -0600
-Subject: [PATCH v5 3/3] ARM: mm: use static_vm for managing static mapped
- areas
-In-Reply-To: <alpine.LFD.2.02.1302042308220.6300@xanadu.home>
-References: <1360024314-1895-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1360024314-1895-4-git-send-email-iamjoonsoo.kim@lge.com>
- <alpine.LFD.2.02.1302042308220.6300@xanadu.home>
-Message-ID: <51114134.4070503@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 5 Feb 2013 18:32:21 +0100
+Subject: [PATCH v4 3/4] Thermal: Dove: Add Themal sensor support for Dove.
+In-Reply-To: <20130205170908.GA2525@localhost>
+References: <1359946148.2250.47.camel@rzhang1-mobl4>
+ <1360005560-21945-1-git-send-email-andrew@lunn.ch>
+ <1360005560-21945-4-git-send-email-andrew@lunn.ch>
+ <20130205170908.GA2525@localhost>
+Message-ID: <20130205173221.GB20212@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2013 10:44 PM, Nicolas Pitre wrote:
-> On Tue, 5 Feb 2013, Joonsoo Kim wrote:
+On Tue, Feb 05, 2013 at 02:09:09PM -0300, Ezequiel Garcia wrote:
+> Hi Andrew,
 > 
->> A static mapped area is ARM-specific, so it is better not to use
->> generic vmalloc data structure, that is, vmlist and vmlist_lock
->> for managing static mapped area. And it causes some needless overhead and
->> reducing this overhead is better idea.
->>
->> Now, we have newly introduced static_vm infrastructure.
->> With it, we don't need to iterate all mapped areas. Instead, we just
->> iterate static mapped areas. It helps to reduce an overhead of finding
->> matched area. And architecture dependency on vmalloc layer is removed,
->> so it will help to maintainability for vmalloc layer.
->>
->> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-
-[snip]
-
->> @@ -859,17 +864,12 @@ static void __init pci_reserve_io(void)
->>  {
->>  	struct vm_struct *vm;
->>  	unsigned long addr;
->> +	struct static_vm *svm;
->>  
->> -	/* we're still single threaded hence no lock needed here */
->> -	for (vm = vmlist; vm; vm = vm->next) {
->> -		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
->> -			continue;
->> -		addr = (unsigned long)vm->addr;
->> -		addr &= ~(SZ_2M - 1);
->> -		if (addr == PCI_IO_VIRT_BASE)
->> -			return;
->> +	svm = find_static_vm_vaddr((void *)PCI_IO_VIRT_BASE);
->> +	if (svm)
->> +		return;
->>
->> -	}
->>  
->>  	vm_reserve_area_early(PCI_IO_VIRT_BASE, SZ_2M, pci_reserve_io);
->>  }
+> Nice work!
 > 
-> The replacement code is not equivalent.  I can't recall why the original 
-> is as it is, but it doesn't look right to me.  The 2MB round down 
-> certainly looks suspicious.
+> Do you also intend to work
+> on thermal support for Armada family?
 
-The PCI mapping is at a fixed, aligned 2MB mapping. If we find any
-virtual address within that region already mapped, it is an error. We
-probably should have had a WARN here.
+Hi Ezequiel
 
-> 
-> The replacement code should be better.  However I'd like you to get an 
-> ACK from Rob Herring as well for this patch.
+I don't have enough information about Armada 370/XP to write a driver
+for them. Once a datasheet becomes available i will have a go.
 
-It doesn't appear to me the above case is handled. The virt addr is
-checked whether it is within an existing mapping, but not whether the
-new mapping would overlap an existing mapping. It would be good to check
-for this generically rather than specifically for the PCI i/o mapping.
+Thanks for the comment about kzalloc(). I will remove the dev_err()
+call.
 
-Rob
+    Andrew
