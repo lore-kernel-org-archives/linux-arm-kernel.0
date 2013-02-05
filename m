@@ -1,84 +1,85 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Feb 2013 15:21:10 -0800
-Subject: [PATCH v8 12/12] document: devicetree: bind pinconf with pin
- single
-In-Reply-To: <CAN1soZytx7w8a1C=-C7924_MW6FPH5b=gsvSH=BpDU4ZhJia4w@mail.gmail.com>
-References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
- <1359825953-15663-13-git-send-email-haojian.zhuang@linaro.org>
- <20130205040721.GE25185@atomide.com>
- <CAN1soZytx7w8a1C=-C7924_MW6FPH5b=gsvSH=BpDU4ZhJia4w@mail.gmail.com>
-Message-ID: <20130205232109.GP25185@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 5 Feb 2013 15:26:04 -0800
+Subject: [GIT PULL  3/4] ARM: mvebu: boards for v3.9
+In-Reply-To: <20130205183050.GZ14746@titan.lakedaemon.net>
+References: <pull-1359733919-342140> <1359733919.c3D01c3.22262@triton>
+ <20130205071010.GD13049@quad.lixom.net>
+ <20130205112104.GP14746@titan.lakedaemon.net>
+ <20130205182333.GA21051@quad.lixom.net>
+ <20130205183050.GZ14746@titan.lakedaemon.net>
+Message-ID: <20130205232604.GB14851@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@gmail.com> [130205 00:09]:
-> On Tue, Feb 5, 2013 at 12:07 PM, Tony Lindgren <tony@atomide.com> wrote:
+On Tue, Feb 05, 2013 at 01:30:50PM -0500, Jason Cooper wrote:
+> On Tue, Feb 05, 2013 at 10:23:33AM -0800, Olof Johansson wrote:
+> > On Tue, Feb 05, 2013 at 06:21:04AM -0500, Jason Cooper wrote:
+> > > On Mon, Feb 04, 2013 at 11:10:10PM -0800, Olof Johansson wrote:
+> > > > Hi,
+> > > > 
+> > > > On Fri, Feb 01, 2013 at 03:51:59PM +0000, Jason Cooper wrote:
+> > > > > The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+> > > > > 
+> > > > >   Linux 3.8-rc5
+> > > > > 
+> > > > > are available in the git repository at:
+> > > > > 
+> > > > >   git://git.infradead.org/users/jcooper/linux.git tags/boards_for_v3.9
+> > > > > 
+> > > > > for you to fetch changes up to c7064904895f69b2e33117b450a05746f75abf3a:
+> > > > > 
+> > > > >   ARM: kirkwood: convert Guruplug Server Plus to use the device tree
+> > > > > 
+> > > > > ----------------------------------------------------------------
+> > > > > mvebu boards for v3.9
+> > > > >      - Guruplug Server Plus DT board
+> > > > >      - RD-A370-A1 board
+> > > > >      - mvebu improved SMP support in interrupt controller
+> > > > >      - update defconfigs
+> > > > >      - split legacy and DT setup for dove
+> > > > >      - remove some redundant clock aliases
+> > > > >     
+> > > > >     depends on:
+> > > > >      - tags/mvebu_fixes_for_v3.8-rc6
+> > > > >      - tags/cleanup_for_v3.9_round2
+> > > > >      - tags/drivers_for_v3.9
+> > > > >      - mmc/mmc-next up to:
+> > > > >         d293875 mmc: mvsdio: add pinctrl integration
+> > > > 
+> > > > Hm. What do you need the mmc branch for? Is it just the removal of the
+> > > > redundant SDIO clock alias?
+> > > 
+> > > No, it's the four patches of Thomas' to the mvsdio driver:
+> > > 
+> > > d293875 mmc: mvsdio: add pinctrl integration
+> > > 182ce21 mmc: mvsdio: implement a Device Tree binding
+> > > aa3738e mmc: mvsdio: use slot-gpio for card detect gpio
+> > > 9d8b28e5 mmc: mvsdio: use slot-gpio infrastructure for write protect gpio
+> > > 
+> > > which mvebu/boards needs before we can activate defconfig options.
+> > 
+> > Yeah, those are the patches you need to bring in. What I was wondering is why
+> > you need to bring them in? If it's just for defconfig updates and a couple of
+> > tiny cleanups, then I would say it's not worth the overhead of adding the
+> > dependency branch to do those -- defconfig updates can go in anyway and the
+> > cleanups can happen in the next release.
 > 
-> > For the cases where there's a value to be set I'm still wondering how does
-> > a client driver change the value if that needs to be changed dynamically?
-> > Can the value be passed as value + PIN_CONFIG_END?
-> >
-> pinconf_to_config_packed() can help to bind param & argument into config
-> variable.
-
-OK good to hear you've looked into that.
-...
- 
-> And I think that we need four parameters with your format.
->       <user setting on bias enable/disable, expected enable value,
-> expected disable value, mask */
-> Otherwise, how could we know user's setting? Especially, we need to
-> configure pullup.
-> In your case, expected pullup enable & expected pullup disable are set
-> in bias-pullup property.
-> >                 /* enable value, disable value, mask */
-> >                 pinctrl-single,bias-pullup = <0 1 1>;
+> Well, I brought them in to mvebu/boards because of defconfig, but I
+> need them in mvebu/dt (which depends on mvebu/boards) because we remove
+> the legacy mvsdio init calls, and add the mvsdio dt blocks to the dts
+> files.
 > 
-> Actually, I'm OK to use enable value. And it needs 4 parameters since
-> disable value may not be zero.
+> Would you prefer I put all the defconfig changes into /dt since it's at
+> the end of the dependency chain?
 
-OK. Four values makes sense to me so we can configure the default
-pinconf value like we already do for pinmux.
- 
-> By the way, bias property would be the format in below with 4 parameters.
-> * Without bias enable/disable bit.
->           bias-enable = <0, 0, 0, set of both pullup and pulldown mask>;
-> 
-> * With bias enable/disable bit.
->           bias-enable = <user setting, expected enable, expected
-> disable, mask of only enable/disable bit>;
-> 
-> Behavior of pinconf_clear():
->      - call bias-disable
->      - call the expected bias setting.
+The defconfig changes can go in either branch. They end up selecting
+new options that will be silently turned off unless the driver change
+is also in the same tree, but that's not a big deal since things will
+eventually converge.
 
-Hmm I was thinking pinconf_clear() would get passed the same parameters
-as pinconf_set() except it just does the opposite. But maybe I'm not
-following you here.
- 
-> DISABLE --> PULLUP, user call config BIAS_PULLUP without additional argument.
-> PULLUP --> PULLDOWN, user call with config BIAS_PULLDOWN without
-> additional argument.
-> PULLUP --> DISABLE, user call with config BIAS_ENABLE and 0 for argument.
-> 
-> The switch from PULLUP to DISABLE is a little strange since we have to
-> call BIAS_ENABLE.
-> Is it good for you?
+What makes sense is to hold off the patches that adds dts entries and
+removes the platform device registrations to the next release to avoid
+this dependency.
 
-I'm not sure I follow your example here, but sounds like the PULLUP to
-DISABLE case can be maybe handled by covering both bits in the mask?
- 
-> > Then regarding pinconf_set(), don't we also need pinconf_clear() in
-> > addition to pinconf_set()?
-> >
-> > Otherwise we need both ENABLE and DISABLE enumeration, which seems
-> > unnecessary to me. So rather than have both PIN_CONFIG_BIAS_ENABLE and
-> > PIN_CONFIG_BIAS_DISABLE, we just need PIN_CONFIG_BIAS_ENABLE.
-> I can append pinconf_clear() to handle it.
- 
-OK great, I guess then we should have everything in place to make it
-usable from client drivers also.
 
-Regards,
-
-Tony
+-Olof
