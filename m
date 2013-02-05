@@ -1,41 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  5 Feb 2013 21:54:55 +0100
-Subject: [PATCH 2/2] arm: mvebu: Add SPI flash on Armada 370 DB board
-In-Reply-To: <1360097695-32663-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1360097695-32663-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1360097695-32663-3-git-send-email-gregory.clement@free-electrons.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue,  5 Feb 2013 13:14:30 -0800
+Subject: [PATCH] ARM: tegra: remove empty tegra_smp_init_cpus()
+Message-ID: <1360098870-24818-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for the SPI flash MX25l25635E which is present
-on the Armada 370 DB board. This flash stores the bootloader and its
-environment.
+Based on two separate cleanup branches, it's now empty and can be removed.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
 ---
- arch/arm/boot/dts/armada-370-db.dts |   11 +++++++++++
- 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 8e66a7c..d3ff947 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -74,5 +74,16 @@
- 			status = "disabled";
- 			/* No CD or WP GPIOs */
- 		};
-+		spi0: spi at d0010600 {
-+			status = "okay";
-+
-+			spi-flash at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "mx25l25635e";
-+				reg = <0>; /* Chip select 0 */
-+				spi-max-frequency = <50000000>;
-+			};
-+		};
- 	};
- };
+(Already applied on arm-soc, just posting for posterity)
+
+ arch/arm/mach-tegra/platsmp.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index f06fc51..2c6b3d5 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -176,10 +176,6 @@ done:
+ 	return status;
+ }
+ 
+-static void __init tegra_smp_init_cpus(void)
+-{
+-}
+-
+ static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	/* Always mark the boot CPU (CPU0) as initialized. */
+@@ -190,7 +186,6 @@ static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
+ }
+ 
+ struct smp_operations tegra_smp_ops __initdata = {
+-	.smp_init_cpus		= tegra_smp_init_cpus,
+ 	.smp_prepare_cpus	= tegra_smp_prepare_cpus,
+ 	.smp_secondary_init	= tegra_secondary_init,
+ 	.smp_boot_secondary	= tegra_boot_secondary,
 -- 
-1.7.9.5
+1.8.1.192.gc4361b8
