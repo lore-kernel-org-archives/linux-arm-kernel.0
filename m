@@ -1,133 +1,126 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 05 Feb 2013 00:22:02 -0500
-Subject: [PATCH v4 05/15] ARM: mcpm_head.S: vlock-based first man election
+Date: Tue, 05 Feb 2013 00:22:03 -0500
+Subject: [PATCH v4 06/15] ARM: mcpm: generic SMP secondary bringup and hotplug
+ support
 In-Reply-To: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1360041732-17936-6-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1360041732-17936-7-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Martin <dave.martin@linaro.org>
+Now that the cluster power API is in place, we can use it for SMP secondary
+bringup and CPU hotplug in a generic fashion.
 
-Instead of requiring the first man to be elected in advance (which
-can be suboptimal in some situations), this patch uses a per-
-cluster mutex to co-ordinate selection of the first man.
-
-This should also make it more feasible to reuse this code path for
-asynchronous cluster resume (as in CPUidle scenarios).
-
-We must ensure that the vlock data doesn't share a cacheline with
-anything else, or dirty cache eviction could corrupt it.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/common/Makefile    |  2 +-
- arch/arm/common/mcpm_head.S | 41 ++++++++++++++++++++++++++++++++++++-----
- 2 files changed, 37 insertions(+), 6 deletions(-)
+ arch/arm/common/Makefile       |  2 +-
+ arch/arm/common/mcpm_platsmp.c | 86 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 87 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/common/mcpm_platsmp.c
 
 diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-index 23e85b1fae..c901a38c59 100644
+index c901a38c59..e1c9db45de 100644
 --- a/arch/arm/common/Makefile
 +++ b/arch/arm/common/Makefile
 @@ -13,4 +13,4 @@ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
  obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
--obj-$(CONFIG_CLUSTER_PM)	+= mcpm_head.o mcpm_entry.o
-+obj-$(CONFIG_CLUSTER_PM)	+= mcpm_head.o mcpm_entry.o vlock.o
-diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
-index 86650d4e94..2afc8f26cb 100644
---- a/arch/arm/common/mcpm_head.S
-+++ b/arch/arm/common/mcpm_head.S
-@@ -16,6 +16,8 @@
- #include <linux/linkage.h>
- #include <asm/mcpm_entry.h>
- 
-+#include "vlock.h"
+-obj-$(CONFIG_CLUSTER_PM)	+= mcpm_head.o mcpm_entry.o vlock.o
++obj-$(CONFIG_CLUSTER_PM)	+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
+diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
+new file mode 100644
+index 0000000000..e81e73d0f8
+--- /dev/null
++++ b/arch/arm/common/mcpm_platsmp.c
+@@ -0,0 +1,86 @@
++/*
++ * linux/arch/arm/mach-vexpress/mcpm_platsmp.c
++ *
++ * Created by:  Nicolas Pitre, November 2012
++ * Copyright:   (C) 2012-2013  Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Code to handle secondary CPU bringup and hotplug for the cluster power API.
++ */
 +
- .if MCPM_SYNC_CLUSTER_CPUS
- .error "cpus must be the first member of struct mcpm_sync_struct"
- .endif
-@@ -69,10 +71,11 @@ ENTRY(mcpm_entry_point)
- 	 * position independent way.
- 	 */
- 	adr	r5, 3f
--	ldmia	r5, {r6, r7, r8}
-+	ldmia	r5, {r6, r7, r8, r11}
- 	add	r6, r5, r6			@ r6 = mcpm_entry_vectors
- 	ldr	r7, [r5, r7]			@ r7 = mcpm_power_up_setup_phys
- 	add	r8, r5, r8			@ r8 = mcpm_sync
-+	add	r11, r5, r11			@ r11 = first_man_locks
- 
- 	mov	r0, #MCPM_SYNC_CLUSTER_SIZE
- 	mla	r8, r0, r10, r8			@ r8 = sync cluster base
-@@ -86,13 +89,22 @@ ENTRY(mcpm_entry_point)
- 	@ At this point, the cluster cannot unexpectedly enter the GOING_DOWN
- 	@ state, because there is at least one active CPU (this CPU).
- 
--	@ Note: the following is racy as another CPU might be testing
--	@ the same flag at the same moment.  That'll be fixed later.
-+	mov	r0, #VLOCK_SIZE
-+	mla	r11, r0, r10, r11		@ r11 = cluster first man lock
-+	mov	r0, r11
-+	mov	r1, r9				@ cpu
-+	bl	vlock_trylock			@ implies DMB
++#include <linux/init.h>
++#include <linux/smp.h>
 +
-+	cmp	r0, #0				@ failed to get the lock?
-+	bne	mcpm_setup_wait		@ wait for cluster setup if so
++#include <asm/mcpm_entry.h>
++#include <asm/smp.h>
++#include <asm/smp_plat.h>
++#include <asm/hardware/gic.h>
 +
- 	ldrb	r0, [r8, #MCPM_SYNC_CLUSTER_CLUSTER]
- 	cmp	r0, #CLUSTER_UP			@ cluster already up?
- 	bne	mcpm_setup			@ if not, set up the cluster
- 
--	@ Otherwise, skip setup:
-+	@ Otherwise, release the first man lock and skip setup:
-+	mov	r0, r11
-+	bl	vlock_unlock
- 	b	mcpm_setup_complete
- 
- mcpm_setup:
-@@ -142,6 +154,19 @@ mcpm_setup_leave:
- 	dsb
- 	sev
- 
-+	mov	r0, r11
-+	bl	vlock_unlock	@ implies DMB
-+	b	mcpm_setup_complete
++static void __init simple_smp_init_cpus(void)
++{
++	set_smp_cross_call(gic_raise_softirq);
++}
 +
-+	@ In the contended case, non-first men wait here for cluster setup
-+	@ to complete:
-+mcpm_setup_wait:
-+	ldrb	r0, [r8, #MCPM_SYNC_CLUSTER_CLUSTER]
-+	cmp	r0, #CLUSTER_UP
-+	wfene
-+	bne	mcpm_setup_wait
-+	dmb
++static int __cpuinit mcpm_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	unsigned int mpidr, pcpu, pcluster, ret;
++	extern void secondary_startup(void);
 +
- mcpm_setup_complete:
- 	@ If a platform-specific CPU setup hook is needed, it is
- 	@ called from here.
-@@ -173,11 +198,17 @@ mcpm_entry_gated:
- 3:	.word	mcpm_entry_vectors - .
- 	.word	mcpm_power_up_setup_phys - 3b
- 	.word	mcpm_sync - 3b
-+	.word	first_man_locks - 3b
- 
- ENDPROC(mcpm_entry_point)
- 
- 	.bss
--	.align	5
++	mpidr = cpu_logical_map(cpu);
++	pcpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	pcluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	pr_debug("%s: logical CPU %d is physical CPU %d cluster %d\n",
++		 __func__, cpu, pcpu, pcluster);
 +
-+	.align	__CACHE_WRITEBACK_ORDER
-+	.type	first_man_locks, #object
-+first_man_locks:
-+	.space	VLOCK_SIZE * MAX_NR_CLUSTERS
-+	.align	__CACHE_WRITEBACK_ORDER
- 
- 	.type	mcpm_entry_vectors, #object
- ENTRY(mcpm_entry_vectors)
++	mcpm_set_entry_vector(pcpu, pcluster, NULL);
++	ret = mcpm_cpu_power_up(pcpu, pcluster);
++	if (ret)
++		return ret;
++	mcpm_set_entry_vector(pcpu, pcluster, secondary_startup);
++	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
++	dsb_sev();
++	return 0;
++}
++
++static void __cpuinit mcpm_secondary_init(unsigned int cpu)
++{
++	mcpm_cpu_powered_up();
++	gic_secondary_init(0);
++}
++
++#ifdef CONFIG_HOTPLUG_CPU
++
++static int mcpm_cpu_disable(unsigned int cpu)
++{
++	/*
++	 * We assume all CPUs may be shut down.
++	 * This would be the hook to use for eventual Secure
++	 * OS migration requests as described in the PSCI spec.
++	 */
++	return 0;
++}
++
++static void mcpm_cpu_die(unsigned int cpu)
++{
++	unsigned int mpidr, pcpu, pcluster;
++	mpidr = read_cpuid_mpidr();
++	pcpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	pcluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	mcpm_set_entry_vector(pcpu, pcluster, NULL);
++	mcpm_cpu_power_down();
++}
++
++#endif
++
++struct smp_operations __initdata mcpm_smp_ops = {
++	.smp_init_cpus		= simple_smp_init_cpus,
++	.smp_boot_secondary	= mcpm_boot_secondary,
++	.smp_secondary_init	= mcpm_secondary_init,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_disable		= mcpm_cpu_disable,
++	.cpu_die		= mcpm_cpu_die,
++#endif
++};
 -- 
 1.8.1.2
