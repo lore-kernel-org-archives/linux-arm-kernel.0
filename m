@@ -1,54 +1,55 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 5 Feb 2013 13:22:47 +0200
-Subject: [PATCH v8 19/22] ARM: OMAP3: clock data: get rid of unused USB
- host clock aliases and dummies
-In-Reply-To: <alpine.DEB.2.00.1301211502190.8450@utopia.booyaka.com>
-References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
- <1358511445-26656-20-git-send-email-rogerq@ti.com>
- <alpine.DEB.2.00.1301182027040.19470@utopia.booyaka.com>
- <50FD0BEF.9000007@ti.com>
- <alpine.DEB.2.00.1301211502190.8450@utopia.booyaka.com>
-Message-ID: <5110EB87.1060704@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue,  5 Feb 2013 08:24:33 -0300
+Subject: [PATCH] arm: mvebu: Add SPI flash on Armada XP-GP board
+Message-ID: <1360063473-26176-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+This patch adds an SPI master device node for Armada XP-GP board.
+This master node is an SPI flash controller 'n25q128a13'.
 
-On 01/21/2013 05:03 PM, Paul Walmsley wrote:
-> Hi
-> 
-> On Mon, 21 Jan 2013, Roger Quadros wrote:
-> 
->> On 01/18/2013 10:27 PM, Paul Walmsley wrote:
->>> On Fri, 18 Jan 2013, Roger Quadros wrote:
->>>
->>>> We don't need multiple aliases for the OMAP USB host clocks and neither
->>>> the dummy clocks so remove them.
->>>>
->>>> CC: Paul Walmsley <paul@pwsan.com>
->>>> CC: Rajendra Nayak <rnayak@ti.com>
->>>> CC: Benoit Cousson <b-cousson@ti.com>
->>>> CC: Mike Turquette <mturquette@linaro.com>
->>>>
->>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>> Reviewed-by: Felipe Balbi <balbi@ti.com>
->>>> Acked-by: Paul Walmsley <paul@pwsan.com>
->>>
->>> Per Tony's earlier request, you can drop this patch and patch 20 from your 
->>> series now.  I've got them queued for 3.10 or late 3.9 merge window.
->>>
->>
->> Should have mentioned it earlier, but just this patch without the rest
->> of the cleanup patches will break USB Host on OMAP3, as the old driver
->> bails out if optional clock nodes are missing.
->>
->> Including patch 20 doesn't seem to cause a problem with OMAP4 though.
-> 
-> I've got these two patches queued for merging after your other patches go 
-> upstream -- e.g., probably 3.10.  Do you foresee any problems with that?
-> 
+Since there is no 'partitions' node declared, one full sized
+partition named as the device will be created.
 
-FYI, the usbhost patches are already in linux-next.
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+This patch depends on:
 
-cheers,
--roger
+ 1. Gregory's patch for Armada XP GP board:
+      arm: mvebu: support for the new Armada XP development board(DB-MV784MP-GP)
+
+ 2. My previous patch for SPI on Armada 370/XP:
+      arm: mvebu: Add support for SPI controller in Armada 370/XP
+
+And don't forget to compile the SPI flash driver, CONFIG_MTD_M25P80=y
+
+ arch/arm/boot/dts/armada-xp-gp.dts |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 3eea531..1c8afe2 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -97,5 +97,17 @@
+ 			phy = <&phy3>;
+ 			phy-mode = "rgmii-id";
+ 		};
++
++		spi0: spi at d0010600 {
++			status = "okay";
++
++			spi-flash at 0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "n25q128a13";
++				reg = <0>; /* Chip select 0 */
++				spi-max-frequency = <108000000>;
++			};
++		};
+ 	};
+ };
+-- 
+1.7.8.6
