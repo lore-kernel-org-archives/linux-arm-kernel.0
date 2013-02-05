@@ -1,183 +1,84 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 5 Feb 2013 21:51:48 +0800
-Subject: [PATCH v8 12/12] document: devicetree: bind pinconf with pin
- single
-In-Reply-To: <CAN1soZytx7w8a1C=-C7924_MW6FPH5b=gsvSH=BpDU4ZhJia4w@mail.gmail.com>
-References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
- <1359825953-15663-13-git-send-email-haojian.zhuang@linaro.org>
- <20130205040721.GE25185@atomide.com>
- <CAN1soZytx7w8a1C=-C7924_MW6FPH5b=gsvSH=BpDU4ZhJia4w@mail.gmail.com>
-Message-ID: <CAN1soZy0g3kWRm-d3gB4LmobrNTR6WVia38maS_fXbp4qmFayA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 05 Feb 2013 14:57:02 +0100
+Subject: [PATCH 1/2] ARM: mvebu: Add support for SPI controller in Armada
+ 370/XP
+In-Reply-To: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1359995888-2385-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <51110FAE.4070700@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 5, 2013 at 4:06 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> On Tue, Feb 5, 2013 at 12:07 PM, Tony Lindgren <tony@atomide.com> wrote:
->> * Haojian Zhuang <haojian.zhuang@linaro.org> [130202 09:32]:
->>> +- pinctrl-single,drive-strength : array of value that are used to configure
->>> +  drive strength in the pinmux register. They're value of drive strength
->>> +  current and drive strength mask.
->>> +
->>> +             /* drive strength current, mask */
->>> +             pinctrl-single,power-source = <0x30 0xf0>;
->>> +
->>
->> Looks like a typo, this should probably say pinctrl-single,drive-strength
->> here instead of power-source?
->>
-> Yes, I should update it to drive strength.
->
->> For the cases where there's a value to be set I'm still wondering how does
->> a client driver change the value if that needs to be changed dynamically?
->> Can the value be passed as value + PIN_CONFIG_END?
->>
-> pinconf_to_config_packed() can help to bind param & argument into config
-> variable.
->
->>> +- pinctrl-single,bias-disable : array of value that are used to configure the
->>> +  input bias disabled in the pinmux register. They're value of bias value,
->>> +  match bias disabled value and bias disabled mask.
->>> +
->>> +             /* bias value, match bias disabled value, mask */
->>> +             pinctrl-single,bias-disable = <2 0 3>;
->>> +
->>
->> I still suggest we use "enable" naming instead of "disable" naming.
->> So pinctrl-single,bias-enable instead of pinctrl-single,bias-disable.
->>
->> Then let's change the binding slightly to make it more readable:
->>
->>                 /* enable value, disable value, mask */
->>                 pinctrl-single,bias-enable = <2 0 3>;
->>
->> For example, I have bit 22 cleared to enable MMC PBIAS, or bit 22
->> set to disable PBIAS:
->>
->>                                              /* enable disable  mask */
->>                 pinctrl-single,bias-enable = <0x000000 0x400000 0x400000>;
->>
-> In Hi3620 SoC, the bias could only be configured pull up or pull down. There's
-> no any bit for controlling bias enable or bias disable. But user may need to
-> remove both pullup and pulldown at runtime. In this case, I set bias disable
-> if there's no pullup & pulldown.
->
-> * Without bias enable/disable bit.
->             bias-disable = <user input value, expected disable value, mask>;
->             bias-pullup = <user input value, expected pullup value, mask>;
->       "expected disable value" is the set of not pullup bit and not
-> pull down bit.
->       "expected pullup value" is the set of pullup bit.
->
-> * With bias enable/disable bit.
->       "expected disable value" is the set of disable bit, NOT pullup
-> bit and NOT pulldown bit.
->       "expected pullup value" is the set of NOT disable bit & pullup bit.
->
-> PULLUP --> DISABLE: only need to set the expected disable value in
-> bias-disable property.
-> DISABLE --> PULLUP: only need to set the expected pullup value in
-> bias-pullup property.
-> PULLUP --> PULLDOWN: set the expected pulldown value. So both pullup
-> and pulldown
-> bits are enabled unless user call DISABLE first.. Maybe it's not
-> right. I can fix it and keep
-> either pullup or pulldown enabled. It's ok to add pinconf_clear() for
-> bias as you mentioned.
->
-> And I think that we need four parameters with your format.
->       <user setting on bias enable/disable, expected enable value,
-> expected disable value, mask */
-> Otherwise, how could we know user's setting? Especially, we need to
-> configure pullup.
-> In your case, expected pullup enable & expected pullup disable are set
-> in bias-pullup property.
->>                 /* enable value, disable value, mask */
->>                 pinctrl-single,bias-pullup = <0 1 1>;
->
-> Actually, I'm OK to use enable value. And it needs 4 parameters since
-> disable value may not be zero.
->
-> By the way, bias property would be the format in below with 4 parameters.
-> * Without bias enable/disable bit.
->           bias-enable = <0, 0, 0, set of both pullup and pulldown mask>;
->
-> * With bias enable/disable bit.
->           bias-enable = <user setting, expected enable, expected
-> disable, mask of only enable/disable bit>;
->
-> Behavior of pinconf_clear():
->      - call bias-disable
->      - call the expected bias setting.
->
-> DISABLE --> PULLUP, user call config BIAS_PULLUP without additional argument.
-> PULLUP --> PULLDOWN, user call with config BIAS_PULLDOWN without
-> additional argument.
-> PULLUP --> DISABLE, user call with config BIAS_ENABLE and 0 for argument.
->
-> The switch from PULLUP to DISABLE is a little strange since we have to
-> call BIAS_ENABLE.
-> Is it good for you?
->
+Hi Ezequiel,
 
-Maybe it didn't cover your case. It seems that there's only one bit
-for bias in your case.
-You can control MMC BIAS enable or disable. And there's neither pullup
-nor pulldown.
-Is it right?
+On 02/04/2013 05:38 PM, Ezequiel Garcia wrote:
+> The Armada 370 and Armada XP SoC has an SPI controller.
+> This patch adds support for this controller in Armada 370
+> and Armada XP SoC common device tree files.
+> 
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Lior Amsalem <alior@marvell.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi |   22 ++++++++++++++++++++++
+>  1 files changed, 22 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index 28276fe..22340d5 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -145,6 +145,28 @@
+>  			clocks = <&gateclk 17>;
+>  			status = "disabled";
+>  		};
+> +
+> +		spi0: spi at d0010600 {
+> +			compatible = "marvell,orion-spi";
+> +			reg = <0xd0010600 0x50>;
 
-If so, how about this?
+Currently the driver only use the 5th first register. All of the other
+mvebu platform declare the last register at offset 0x28. The Armada
+370 SoC have also the last register at offset 0x28. Only for the
+Armada XP SoC there are more registers and we have a the last register
+at offset 0x50. Obviously the driver won't use these extra register.
 
-* Without pullup & pulldown bias. With bias enable & disable bit.
-(Your MMC bias)
-     1) 3 params
-           bias-disable = <user setting of bias value, expected bias
-disable value, mask>;
-           bias-enable = <user setting of bias value, expected bias
-enable value, mask>;
-     or 2) 4 params
-           bias-enable = <user setting of bias value, expected bias
-enable value, expected bias disable value, mask>;
+So I think that the best for now is to declare:
+			reg = <0xd0010600 0x28>;
 
-     So I will need both config BIAS_ENABLE & config BIAS_DISABLE.
-Driver switches between BIAS_ENABLE & BIAS_DISABLE.
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			cell-index = <0>;
+> +			interrupts = <30>;
+> +			clocks = <&coreclk 0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		spi1: spi at d0010680 {
+> +			compatible = "marvell,orion-spi";
+> +			reg = <0xd0010680 0x50>;
+and here:
+			reg = <0xd0010680 0x28>;
 
-* Without bias enable & disable bit. With bias pullup & pulldown bit.
-(Hi3620 bias)
-     1) 3 params
-           bias-disable = <user setting of bias value, expected
-disable value (w/o pullup & pulldown), mask (pullup & pulldown)>;
-           bias-pullup = <user setting of bias value, expected bias
-pullup value, mask of pullup>;
-           bias-pulldown ...
-     or 2) 4 params
-           bias-enable = <user setting of bias value, expected enable
-value (w pullup & pulldown), expected disable value (w/o pullup &
-pulldown), mask (pullup & pulldown)>;
-           bias-pullup = <user setting of bias value, expected bias
-pullup value, expected bias pullup disable value, mask of pullup>;
-           bias-pulldown ...
-     Driver switches among BIAS_DISABLE, BIAS_PULLDOWN, BIAS_PULLUP.
-It seems that BIAS_ENABLE is redundant operation at here.
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			cell-index = <1>;
+> +			interrupts = <92>;
+> +			clocks = <&coreclk 0>;
+> +			status = "disabled";
+> +		};
+>  	};
+>  };
+>  
+> 
 
-* With bias enable & disable bit. With bias pullup & pulldown bit.
-(MMP/PXA bias)
-     1) 3 params
-          bias-disable = <user setting of bias value, expected disable
-value (single bit), mask (enable/disable)>;
-          bias-pullup = <user setting of bias value, expected pullup
-value, mask (pullup)>;
-          bias-pulldown ...
-     or 2) 4 params
-          bias-enable = <user setting of bias value, expected enable
-value, expected disable value, mask>;
-          bias-pullup = <user setting of bias value, expected bias
-pullup value, expected bias pullup disable value, mask of pullup>;
-          bias-pulldown ...
-     Driver switches among BIAS_DISABLE, BIAS_PULLDOWN, BIAS_PULLUP.
-It seems that BIAS_ENABLE is redundant operation at here. Because user
-won't only enable bias without pullup or pulldown.
+Once it will be fixed, for this patch you can add my
 
-There're two usage for all three cases. Which one do you like?
+Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
 
-Best Regards
-Haojian
+
+Regards,
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
