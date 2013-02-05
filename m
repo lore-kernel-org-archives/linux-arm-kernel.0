@@ -1,45 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Feb 2013 10:44:18 -0800
-Subject: [GIT PULL] ARM: OMAP: Audio support via omap-twl4030 and pwm
- support
-In-Reply-To: <20130205123055.GA17852@n2100.arm.linux.org.uk>
-References: <50FE64DC.2030808@ti.com> <510788B9.9050907@ti.com>
- <20130130220532.GA22517@atomide.com>
- <20130204195251.GS22517@atomide.com>
- <20130205123055.GA17852@n2100.arm.linux.org.uk>
-Message-ID: <20130205184418.GL25185@atomide.com>
+Date: Tue, 5 Feb 2013 10:56:48 -0800
+Subject: [PATCH] ARM:omap2: using strlcpy instead of strncpy
+In-Reply-To: <51106BF2.7080203@asianux.com>
+References: <51090829.1010109@asianux.com> <20130201224546.GG22517@atomide.com>
+ <510F78AB.4000602@ti.com> <20130204181844.GP22517@atomide.com>
+ <51106BF2.7080203@asianux.com>
+Message-ID: <20130205185648.GM25185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [130205 04:34]:
-> On Mon, Feb 04, 2013 at 11:52:51AM -0800, Tony Lindgren wrote:
-> > @@ -245,7 +245,7 @@ static int sdp3430_twl_gpio_setup(struct device *dev,
-> >  	return 0;
-> >  }
-> >  
-> > -static struct twl4030_gpio_platform_data sdp3430_gpio_data = {
-> > +static struct twl4030_gpio_platform_data __initdata sdp3430_gpio_data = {
-> >  	.pulldowns	= BIT(2) | BIT(6) | BIT(8) | BIT(13)
-> >  				| BIT(16) | BIT(17),
-> >  	.setup		= sdp3430_twl_gpio_setup,
+* Chen Gang <gang.chen@asianux.com> [130204 18:22]:
+> ? 2013?02?05? 02:18, Tony Lindgren ??:
+> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [130204 01:04]:
+> >> > Hi Tony,
+> >> > 
+> >> > I can create a branch for you in our gitorious tree
+> >> > (git://gitorious.org/omap-audio/linux-audio.git) for this patch. But I think
+> >> > for now it would be best if you could take this via linux-omap (the file is
+> >> > under arch/arm/mach-omap2 anyways)
+> > OK thanks I'll apply with your ack to omap-for-v3.9/fixes-noncritical.
+> > 
+> > Tony
+> > 
 > 
-> Seeing platform data marked with __initdata makes me extremely nervous.
-> Are you _absolutely_ _sure_ that this data either:
+>   Does it mean: we need not sync MAINTAINERS file for twl-*, recently ?
 > 
-> (a) gets copied before use, or
-> (b) is not used after kernel init
-> 
-> ?
+>   :-)
 
-No, and that's why I said "I suspect some of these cannot be
-__init/__initdata" and asked Peter to verify it :)
- 
-> Normally, platform data is passed via a pointer in struct device to
-> drivers, and drivers either store a pointer to it, or if the driver is
-> unbound/rebound, they can access it well after init time.
-
-Yes it's not worth adding any copying of it in the twl-common.c.
-
-Regards,
+No we should still do it.
 
 Tony
