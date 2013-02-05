@@ -1,78 +1,48 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Tue, 5 Feb 2013 10:40:03 +0800
-Subject: [PATCH 1/1] net: fec: fix miss init spinlock
-In-Reply-To: <kepftg$f3c$1@ger.gmane.org>
-References: <1359708986-23634-1-git-send-email-Frank.Li@freescale.com>
- <kepftg$f3c$1@ger.gmane.org>
-Message-ID: <CAHrpEqQMZNmzRrNQK60hokR2r5S=U65YdC-5h6aHHHzAVdEWKw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 5 Feb 2013 10:43:56 +0800
+Subject: [GIT PULL] imx soc changes for 3.9
+Message-ID: <20130205024354.GB10807@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/2/5 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>:
-> On Fri, 01 Feb 2013 16:56:26 +0800, Frank Li wrote:
->
->> BUG: spinlock bad magic on CPU#1, swapper/0/1 lock: 0xbfae0f8c, .magic:
->> 00000000, .owner: <none>/-1, .owner_cpu: 0 Backtrace:
->>  [<80011d54>] (dump_backtrace+0x0/0x10c) from [<804e7800>]
->>  (dump_stack+0x18/0x1c)
->>  r6:bfae0000 r5:bfae0f8c r4:00000000 r3:806c1310 [<804e77e8>]
->>  (dump_stack+0x0/0x1c) from [<804e9f20>] (spin_dump+0x80/0x94)
->>  [<804e9ea0>] (spin_dump+0x0/0x94) from [<804e9f60>]
->>  (spin_bug+0x2c/0x30)
->>  r5:805f6f8c r4:bfae0f8c [<804e9f34>] (spin_bug+0x0/0x30) from
->>  [<80257984>] (do_raw_spin_lock+0x170/0x1b0
->>             )
->>  r5:806b4950 r4:bfae0f8c [<80257814>] (do_raw_spin_lock+0x0/0x1b0) from
->>  [<804ed15c>] (_raw_spin_lock_irqs
->>    ave+0x18/0x20) [<804ed144>] (_raw_spin_lock_irqsave+0x0/0x20) from
->>  [<8033c694>] (fec_ptp_start_
->>  cyclecounter+0x3c/0x120)
->>  r4:bfae0f8c r3:00000002 [<8033c658>]
->>  (fec_ptp_start_cyclecounter+0x0/0x120) from [<80339e08>] (fec_resta
->>                                      rt+0x56c/0x5f8) r8:00000000
->>  r7:806e6f48 r6:00000112 r5:806b4950 r4:bfae0000 [<8033989c>]
->>  (fec_restart+0x0/0x5f8) from [<8033b9e4>] (fec_probe+0x508/0xa48)
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> ---
->>  drivers/net/ethernet/freescale/fec.c |    1 +
->>  1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/freescale/fec.c
->> b/drivers/net/ethernet/freescale/fec.c index 69b16b9..f900ae4 100644 ---
->> a/drivers/net/ethernet/freescale/fec.c +++
->> b/drivers/net/ethernet/freescale/fec.c @@ -1607,6 +1607,7 @@ static int
->> fec_enet_init(struct net_device *ndev)
->>       }
->>
->>       spin_lock_init(&fep->hw_lock);
->> +     spin_lock_init(&fep->tmreg_lock);
->>
->>       fep->netdev = ndev;
->
-> Please excuse me, if I'm wrong. I would consider this as a very wrong
-> solution:
->
-> First, then the spin lock is initialised twice (first time in
-> fec_enet_init(), second time in fec_ptp_init()).
->
-> Then this patch actually hides the fact that PTP part of fec
-> is accessed from fec_ptp_start_cyclecounter() way before
-> than fec_ptp_init() is called to initialize PTP).
->
-> In my opinion the right patch should either move fec_ptp_init() call
-> before fec_restart(), or make fec_restart intelelctual about calling
-> fec_ptp_init()/fec_ptp_startcyclecounter() at proper time.
+Arnd, Olof,
 
-Yes, you are right.
+Here are the imx soc patches I queued for 3.9.  I have the branch based
+on imx-cleanup-3.9 to resolve one conflict.  Please pull.  Thanks.
 
->
-> --
-> With best wishes
-> Dmitry
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Shawn
+
+The following changes since commit f662f52a91742f2aec738492eab87b937216d89f:
+
+  Merge tag 'imx-cleanup-3.9' into imx/soc (2013-02-05 10:14:40 +0800)
+
+are available in the git repository at:
+
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.9
+
+for you to fetch changes up to 26246919329c045d8c1bd70dfebd44c54a5cf657:
+
+  ARM: imx_v6_v7_defconfig: enable anatop regulator and snvs rtc (2013-02-05 10:14:55 +0800)
+
+----------------------------------------------------------------
+imx soc changes for 3.9
+
+ - Sort out imx DEBUG_LL uart port selection
+ - A couple of imx_v6_v7_defconfig updates
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: imx_v6_v7_defconfig: Select IPUV3 driver
+
+Shawn Guo (3):
+      ARM: imx: use separated debug uart symbol for imx31 and imx35
+      ARM: imx: support DEBUG_LL uart port selection for all i.MX SoCs
+      ARM: imx_v6_v7_defconfig: enable anatop regulator and snvs rtc
+
+ arch/arm/Kconfig.debug               |   31 ++++++++----
+ arch/arm/configs/imx_v6_v7_defconfig |    7 +++
+ arch/arm/include/debug/imx-uart.h    |   88 ++++++++++++++++++++++++++++++++++
+ arch/arm/include/debug/imx.S         |   29 +----------
+ 4 files changed, 118 insertions(+), 37 deletions(-)
+ create mode 100644 arch/arm/include/debug/imx-uart.h
