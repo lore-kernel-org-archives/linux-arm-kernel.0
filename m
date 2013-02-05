@@ -1,19 +1,20 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 5 Feb 2013 11:31:26 +0200
-Subject: [PATCH 15/30] ARM: OMAP3: Beagle: Adapt to ehci-omap changes
-In-Reply-To: <1359372631-8180-16-git-send-email-rogerq@ti.com>
+Date: Tue, 5 Feb 2013 11:31:35 +0200
+Subject: [PATCH 16/30] ARM: OMAP3: 3430SDP: Adapt to ehci-omap changes
+In-Reply-To: <1359372631-8180-17-git-send-email-rogerq@ti.com>
 References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <1359372631-8180-16-git-send-email-rogerq@ti.com>
-Message-ID: <20130205093126.GX32118@arwen.pp.htv.fi>
+ <1359372631-8180-17-git-send-email-rogerq@ti.com>
+Message-ID: <20130205093135.GY32118@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 01:30:16PM +0200, Roger Quadros wrote:
-> Add platform device for 'nop-usb-xceiv'. This will be used as a
-> PHY for HS USB Port 2, so provide binding information for it.
+On Mon, Jan 28, 2013 at 01:30:17PM +0200, Roger Quadros wrote:
+> Add 2 platform devices for 'nop-usb-xceiv'. These will be used
+> as PHYs for HS USB ports 1 and 2 so provide binding information
+> for them.
 > 
-> Model RESET and Power for HS USB Port 2 as GPIO fixed regulators
-> and link them to the 'nop-usb-xceiv' PHY.
+> Model RESET for HS USB Ports 1 and 2 as GPIO fixed regulators and
+> link them to the 2 PHYs we just created.
 > 
 > Signed-off-by: Roger Quadros <rogerq@ti.com>
 
@@ -27,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/77215d47/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130205/5fdfc069/attachment.sig>
