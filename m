@@ -1,61 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 5 Feb 2013 06:13:07 -0500
-Subject: [PATCH] ARM: kirkwood: of_serial: fix clock gating by removing
- clock-frequency
-In-Reply-To: <20130205105431.GI652@kw.sim.vm.gnt>
-References: <1359493774-27627-1-git-send-email-jason@lakedaemon.net>
- <20130205105431.GI652@kw.sim.vm.gnt>
-Message-ID: <20130205111307.GO14746@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Feb 2013 11:08:04 +0000
+Subject: [GIT PULL] i.MX clock fixes for v3.8
+In-Reply-To: <20130205095844.GZ1906@pengutronix.de>
+References: <20130205095844.GZ1906@pengutronix.de>
+Message-ID: <20130205110804.GI17786@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 11:54:31AM +0100, Simon Guinot wrote:
-> On Tue, Jan 29, 2013 at 09:09:34PM +0000, Jason Cooper wrote:
-> > When DT support for kirkwood was first introduced, there was no clock
-> > infrastructure.  As a result, we had to manually pass the
-> > clock-frequency to the driver from the device node.
-> > 
-> > Unfortunately, on kirkwood, with minimal config or all module configs,
-> > clock-frequency breaks booting because of_serial doesn't consume the
-> > gate_clk when clock-frequency is defined.
-> > 
-> > The end result on kirkwood is that runit gets gated, and then the boot
-> > fails when the kernel tries to write to the serial port.
-> > 
-> > Fix the issue by removing the clock-frequency parameter from all
-> > kirkwood dts files.
-> > 
-> > Booted on dreamplug without earlyprintk and successfully logged in via
-> > ttyS0.
-> > 
-> > Reported-by: Simon Baatz <gmbnomis@gmail.com>
-> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > ---
-> >  arch/arm/boot/dts/kirkwood-dns320.dts         | 2 --
-> >  arch/arm/boot/dts/kirkwood-dns325.dts         | 1 -
-> >  arch/arm/boot/dts/kirkwood-dockstar.dts       | 1 -
-> >  arch/arm/boot/dts/kirkwood-dreamplug.dts      | 1 -
-> >  arch/arm/boot/dts/kirkwood-goflexnet.dts      | 1 -
-> >  arch/arm/boot/dts/kirkwood-ib62x0.dts         | 1 -
-> >  arch/arm/boot/dts/kirkwood-iconnect.dts       | 1 -
-> >  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts | 1 -
-> >  arch/arm/boot/dts/kirkwood-km_kirkwood.dts    | 1 -
-> >  arch/arm/boot/dts/kirkwood-lschlv2.dts        | 1 -
-> >  arch/arm/boot/dts/kirkwood-lsxhl.dts          | 1 -
-> >  arch/arm/boot/dts/kirkwood-mplcec4.dts        | 1 -
-> >  arch/arm/boot/dts/kirkwood-nsa310.dts         | 1 -
-> >  arch/arm/boot/dts/kirkwood-openblocks_a6.dts  | 2 --
-> >  arch/arm/boot/dts/kirkwood-topkick.dts        | 1 -
-> >  arch/arm/boot/dts/kirkwood.dtsi               | 2 --
+On Tue, Feb 05, 2013 at 10:58:44AM +0100, Sascha Hauer wrote:
+> Hi Arnd, Olof,
 > 
-> Hi Jason,
-> 
-> Maybe you could also remove the clock-frequency parameter from
-> kirkwood-ns2-common.dtsi ?
+> Please pull these two fixes for v3.8
 
-Good catch, I must've been grepping through kirkwood*.dts and missed the
-dtsi.  I'll do a followup patch.
+If you haven't heard, Linus wants each and every patch going into v3.8
+meeting this criteria:
 
-thx,
+       fix major security issues, big user-reported regressions, or nasty
+       oopses.
 
-Jason.
+and individually justified:
+
+       So think twice - or thrice - before sending me patches or a pull
+       request for -rc7. You need to have some seriously good reasons for
+       doing so, and you need to state those reasons very clearly. And I
+       don't just mean for the pull request in general, I mean for every
+       single patch in it.
+...
+       In other words, "It fixes a bug" just isn't good enough. The bug needs
+       to be something that actually matters.
