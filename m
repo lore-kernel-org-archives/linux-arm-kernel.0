@@ -1,60 +1,52 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 5 Feb 2013 17:55:11 -0800
-Subject: [PATCH 12/15] USB: gadget/freescale: disable non-multiplatform
- drivers
-In-Reply-To: <201302052254.00426.arnd@arndb.de>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <20130205170027.GB1081@kroah.com>
- <20130205213710.GA3739@arwen.pp.htv.fi>
- <201302052254.00426.arnd@arndb.de>
-Message-ID: <20130206015511.GC1073@kroah.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 6 Feb 2013 09:59:29 +0800
+Subject: [PATCH v8 03/12] gpio: find gpio base by ascend order
+In-Reply-To: <CACRpkdZbC8nrDnQEZes9XJTJ6uSfpx-DjuSs3Q6GA0=eauhdYg@mail.gmail.com>
+References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
+ <1359825953-15663-4-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdZbC8nrDnQEZes9XJTJ6uSfpx-DjuSs3Q6GA0=eauhdYg@mail.gmail.com>
+Message-ID: <CAD6h2NRVem_yeizXzt1r2L4_WXAdqw9p_P3vMysskOYdJUkDzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 10:54:00PM +0000, Arnd Bergmann wrote:
-> On Tuesday 05 February 2013, Felipe Balbi wrote:
-> > [linus/master] Merge branch 'fix-max-write' of git://git.kernel.org/pub/scm/linux/kernel/git/teigland/linux-dlm
-> > 
-> > It's building find for me:
-> > 
-> > $ crossmake drivers/usb/gadget/fsl_udc_core.o \
-> >         drivers/usb/gadget/fsl_mxc_udc.o > /dev/null
-> > 
-> > (crossmake is an alias to make ARCH=arm)
-> > 
-> > Arnd, are you maybe missing a merge of v3.8-rc6 ?
-> >
-> > I can see that imx_udc.c is broken still, but there are no maintainers
-> > for that driver. I'm adding Sascha to Cc list, maybe he knows someone
-> > who can help, but if this driver isn't fixed in 2 merge windows, I will
-> > schedule for removal from tree and someone else will have to
-> > re-introduce it later without all the bogus includes.
-> 
-> Ah, I see what happened now: I submitted a patch that lumped together
-> two patches, disabling both fsl_mxc_udc and imx_udc. You already had
-> a fix for the first one, so I dropped my patch, but now I see the
-> build error for the second one that my patch was avoiding.
-> 
-> The last patch to imx_udc that seems to have seen more than just
-> build testing was probably "USB: gadget: imx_udc: don't queue more
-> data when zlp is to be sent", while fsl_mxc_udc looks actively
-> maintained. It's not completely clear to me whether these
-> are actually two drivers for the same hardware, of whether
-> imx_udc is the i.mx1 variant and fsl_mxc_udc is the i.mx2 variant.
-> 
-> What I can say is that no platform in the kernel currently defines
-> an "imx_udc" platform_device, so it is certainly unused, and has
-> been since at least e08300043e in 2010.
-> 
-> I would suggest that we mark the imx_udc driver as 'depends on
-> BROKEN' right away, since no in-tree user needs it, and any
-> out of tree user is already broken in 3.8. I also wouldn't
-> mind removing the driver unless the imx maintainers have
-> a plan for it.
+On 6 February 2013 01:14, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Feb 2, 2013 at 6:25 PM, Haojian Zhuang
+> <haojian.zhuang@linaro.org> wrote:
+>
+>> gpiochip_find_base() always tries to find valid gpio with descend order.
+>> It's inconvient if gpio information is passing from DTS. Now try to find
+>> valid gpio with ascend order.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>
+> This is more scary stuff.
+>
+> As you know GPIO numbers are exposed to userspace.
+>
+> Systems with this change risk having their dynamically added
+> GPIO controller enumerated in a different fashion. And
+> userspace clients may be relying on these numbers.
+>
+> And we do not break userspace.
+>
+> I know this is not elegant but I'm afraid the descending search
+> needs to be kept for compatibibility reasons.
+>
+> BTW: please CC Grant likely on all patches.
+>
+> Yours,
+> Linus Walleij
 
-Sure, someone just send me a patch for that and I'll be glad to mark it
-BROKEN.
+But descending search isn't good for reading.
 
-thanks,
+I try to allocate all gpio numbers in Hi3620 from gpiochip_find_base().
+If it's descending search, GPIO0~7 is mapped to gpio248~255;
+GPIO8~GPIO15 is mapped to gpio240~gpio247. It's not easy to read,
+and it breaks the knowledge of gpio number on schematic & datasheet.
 
-greg k-h
+Unless we don't use allocating gpio numbers dynamically and add
+a common property to parse gpio base of each chip in DTS file.
+It's also OK to me add a common property.
+
+Regards
+Haojian
