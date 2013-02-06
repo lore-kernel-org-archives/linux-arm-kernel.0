@@ -1,82 +1,53 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 6 Feb 2013 16:15:57 +0200
-Subject: [PATCH] OMAPDSS: enable omapdss for ARCH_MULTIPLATFORM
-In-Reply-To: <201302051631.40254.arnd@arndb.de>
-References: <1358891160-9534-1-git-send-email-robdclark@gmail.com>
- <201301222153.19580.arnd@arndb.de> <201302051631.40254.arnd@arndb.de>
-Message-ID: <5112659D.50808@ti.com>
+From: philippe.retornaz@epfl.ch (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
+Date: Wed, 06 Feb 2013 15:26:43 +0100
+Subject: [PATCH 0/2] ARM: dts: omap3-overo: Add pwm-leds and audio support
+In-Reply-To: <51125AFC.10704@ti.com>
+References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
+ <5101273A.9090800@ti.com> <510F7BEB.1020408@epfl.ch> <51125AFC.10704@ti.com>
+Message-ID: <51126823.6070605@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Rob,
+Hi all !
 
-On 2013-02-05 18:31, Arnd Bergmann wrote:
-> On Tuesday 22 January 2013, Arnd Bergmann wrote:
->> On Tuesday 22 January 2013, Rob Clark wrote:
->>> At least core omapdss does not have any build dependencies on
->>> ARCH_OMAP2PLUS, and adding this dependency in the Kconfig breaks omapdrm
->>> for ARCH_MULTIPLATFORM builds.
->>>
->>> Signed-off-by: Rob Clark <robdclark@gmail.com>
+Le 06/02/2013 14:30, Benoit Cousson a ?crit :
+> Salut Florian,
+>
+> On 02/04/2013 10:14 AM, Florian Vaussard wrote:
+>> Hello Benoit,
 >>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> It seems nobody has applied this patch, as it has not shown up in
-> linux-next or upstream. Who should take care of this? If nobody feels
-> responsible, I can put it into arm-soc/fixes.
+>> On 01/24/2013 01:21 PM, Benoit Cousson wrote:
+>>> + Peter who did the original PWM
+>>>
+>>> Hi Florian,
+>>>
+>>> On 01/23/2013 06:56 PM, Florian Vaussard wrote:
+>>>> Hello Benoit,
+>>>>
+>>>> This patchset adds some new DT supports to the Overo products.
+>>>> The first patch converts the PMIC LEDB output to use the
+>>>> pwm-leds, newly merged in your branch for_3.9/dts. The second
+>>>> patch adds the audio support.
+>>>
+>>> Excellent, that looks very good to me, but I'd like to get the
+>>> feedback from Peter before merging it.
+>>>
+>>
+>> So a patch is being merged to handle triggers in the case of pwm
+>> leds [1]. When done, we will be able to add back the default
+>> trigger. Do you want to wait on it to merge this series?
+>
+> What kind of dependency do we have between these two series? I mean
+> what will happen if the DTS is merged before the pwm subsystem?
+>
+> If that does not generate any regression / crash, then it is OK, if
+> not, we should take care of the order.
 
-That would normally be me, but I've been on a long leave, and just came
-back. It'll take me some time to get back on track.
+Florian is on holiday the next two weeks.
 
-I don't think it makes sense to add ARCH_MULTIPLATFORM only for omapdss,
-like this patch does. I think we should add it for omapfb and the panel
-drivers also.
+AFAIK if the PWM/leds subsystem patches are not merged before this one
+then the kernel will panic if a trigger is used to change the led status.
 
-I did get a report of an omapdss build-break with allyesconfig. It seems
-to happen because omapdrm and omap_vout use "select" to enable omapdss,
-instead of depending on omapdss. This causes an illegal config to be
-created. Perhaps this is the problem that Rob mentions in his patch?
+Regards,
 
-Adding ARCH_MULTIPLATFORM for omapdss, as this patch does, removes
-(well, hides) the above mentioned problem and allyesconfig works ok. You
-can still break the config, but you need to manually select the Kconfig
-options the wrong way.
-
-I have patches to add the ARCH_MULTIPLATFORM for omapdss, and to fix the
-omap_vout and omapdrm Kconfig files. Each of them changes only one line.
-Arnd, are you ok with queuing those patches via arm-soc/fixes? Or should
-I send them individually to respective maintainers?
-
-I can send the patches properly for review, but I've also attached them
-here so Rob can test.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-OMAPDSS-add-support-for-ARCH_MULTIPLATFORM.patch
-Type: text/x-patch
-Size: 1019 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130206/6eef4ee4/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-omap_vout-fix-the-dependency-on-OMAPDSS.patch
-Type: text/x-patch
-Size: 1211 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130206/6eef4ee4/attachment-0001.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-omapdrm-fix-the-dependency-on-OMAPDSS.patch
-Type: text/x-patch
-Size: 1097 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130206/6eef4ee4/attachment-0002.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130206/6eef4ee4/attachment.sig>
+Philippe
