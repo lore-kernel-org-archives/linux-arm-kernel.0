@@ -1,223 +1,49 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 6 Feb 2013 10:40:49 +0100
-Subject: [v4 PATCH 11/12] ARM: dts: add spi nodes for atmel SoC
-In-Reply-To: <B256D81BAE5131468A838E5D7A2436413A086C1E@penmbx02>
-References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
- <1358148877-18679-12-git-send-email-wenyou.yang@atmel.com>
- <20130205195126.GB30595@game.jcrosoft.org>
- <B256D81BAE5131468A838E5D7A2436413A086C1E@penmbx02>
-Message-ID: <51122521.2090506@atmel.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 6 Feb 2013 11:49:36 +0200
+Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
+In-Reply-To: <20130205171743.GG25185@atomide.com>
+References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+ <5110ECF3.7010908@ti.com> <20130205165851.GA1081@kroah.com>
+ <20130205171743.GG25185@atomide.com>
+Message-ID: <51122730.5030801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2013 02:35 AM, Yang, Wenyou :
-> 
-> 
->> -----Original Message-----
->> From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
->> Sent: 2013?2?6? 3:51
->> To: Yang, Wenyou
->> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ferre,
->> Nicolas; richard.genoud at gmail.com; Lin, JM; linux at arm.linux.org.uk
->> Subject: Re: [v4 PATCH 11/12] ARM: dts: add spi nodes for atmel SoC
+On 02/05/2013 07:17 PM, Tony Lindgren wrote:
+> * Greg KH <gregkh@linuxfoundation.org> [130205 09:00]:
+>> On Tue, Feb 05, 2013 at 01:28:51PM +0200, Roger Quadros wrote:
+>>> Hi Tony & Greg,
+>>>
+>>> What's the best way to get these patches in?
+>>>
+>>> All patches have been acked by respective maintainers.
+>>>
+>>> If Tony can Ack the arch/arm/mach-omap2 stuff then should I send a
+>>> pull request directly to Greg? or the other way round?
+>>>
+>>> Tony, 
+>>> fyi, these patches should not interfere with the dw3c/musb stuff
+>>> sent by Felipe & Kishon.
 >>
->> On 15:34 Mon 14 Jan     , Wenyou Yang wrote:
->>> From: Richard Genoud <richard.genoud@gmail.com>
->>>
->>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->>> [wenyou.yang at atmel.com: add spi nodes for sam9260, sam9263, sam9g45
->> and sam9n12]
->>> [wenyou.yang at atmel.com: remove spi property "cs-gpios" to the board dts
->> files]
->>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
->>> Cc: linux at arm.linux.org.uk
->>> ---
->>>  arch/arm/boot/dts/at91sam9260.dtsi |   18 ++++++++++++++++++
->>>  arch/arm/boot/dts/at91sam9263.dtsi |   18 ++++++++++++++++++
->>>  arch/arm/boot/dts/at91sam9g45.dtsi |   18 ++++++++++++++++++
->> I alreadt have some patch in queue
->>
-> Thanks
-> I will remove this patch in the next version.
-
-Well, I am not sure:
-Jean Christophe, if the patches are in your own queue, I do not see why
-this series has to be modified.
-
-The "I already have a patch to address this" type of comment is not a
-proper comment:
-1/ either you already have submitted the patch (and the new series has
-to take it into
-   account, obviously)
-2/ or the patch is not public yet and you now have to deal with this
-series posted before
-   your own one.
-There is no a third way...
-
-Best regards,
-
->>>  arch/arm/boot/dts/at91sam9n12.dtsi |   18 ++++++++++++++++++
->>>  arch/arm/boot/dts/at91sam9x5.dtsi  |   18 ++++++++++++++++++
->>>  5 files changed, 90 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi
->> b/arch/arm/boot/dts/at91sam9260.dtsi
->>> index 68bccf4..9586fe1 100644
->>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
->>> @@ -453,6 +453,24 @@
->>>  				status = "disabled";
->>>  			};
->>>
->>> +			spi0: spi at fffc8000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9260-spi";
->>> +				reg = <0xfffc8000 0x200>;
->>> +				interrupts = <12 4 3>;
->>> +				status = "disabled";
->>> +			};
->>> +
->>> +			spi1: spi at fffcc000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9260-spi";
->>> +				reg = <0xfffcc000 0x200>;
->>> +				interrupts = <13 4 3>;
->>> +				status = "disabled";
->>> +			};
->>> +
->>>  			adc0: adc at fffe0000 {
->>>  				compatible = "atmel,at91sam9260-adc";
->>>  				reg = <0xfffe0000 0x100>;
->>> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi
->> b/arch/arm/boot/dts/at91sam9263.dtsi
->>> index 32ec62c..636b882 100644
->>> --- a/arch/arm/boot/dts/at91sam9263.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
->>> @@ -426,6 +426,24 @@
->>>  				reg = <0xfffffd40 0x10>;
->>>  				status = "disabled";
->>>  			};
->>> +
->>> +			spi0: spi at fffa4000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9260-spi";
->>> +				reg = <0xfffa4000 0x200>;
->>> +				interrupts = <14 4 3>;
->>> +				status = "disabled";
->>> +			};
->>> +
->>> +			spi1: spi at fffa8000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9260-spi";
->>> +				reg = <0xfffa8000 0x200>;
->>> +				interrupts = <15 4 3>;
->>> +				status = "disabled";
->>> +			};
->>>  		};
->>>
->>>  		nand0: nand at 40000000 {
->>> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi
->> b/arch/arm/boot/dts/at91sam9g45.dtsi
->>> index 231858f..0100b80 100644
->>> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
->>> @@ -495,6 +495,24 @@
->>>  				reg = <0xfffffd40 0x10>;
->>>  				status = "disabled";
->>>  			};
->>> +
->>> +			spi0: spi at fffa4000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9g45-spi";
->>> +				reg = <0xfffa4000 0x200>;
->>> +				interrupts = <14 4 3>;
->>> +				status = "disabled";
->>> +			};
->>> +
->>> +			spi1: spi at fffa8000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9g45-spi";
->>> +				reg = <0xfffa8000 0x200>;
->>> +				interrupts = <15 4 3>;
->>> +				status = "disabled";
->>> +			};
->>>  		};
->>>
->>>  		nand0: nand at 40000000 {
->>> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi
->> b/arch/arm/boot/dts/at91sam9n12.dtsi
->>> index e9efb34..86d5357 100644
->>> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
->>> @@ -355,6 +355,24 @@
->>>  				#size-cells = <0>;
->>>  				status = "disabled";
->>>  			};
->>> +
->>> +			spi0: spi at f0000000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9x5-spi";
->>> +				reg = <0xf0000000 0x100>;
->>> +				interrupts = <13 4 3>;
->>> +				status = "disabled";
->>> +			};
->>> +
->>> +			spi1: spi at f0004000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9x5-spi";
->>> +				reg = <0xf0004000 0x100>;
->>> +				interrupts = <14 4 3>;
->>> +				status = "disabled";
->>> +			};
->>>  		};
->>>
->>>  		nand0: nand at 40000000 {
->>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi
->> b/arch/arm/boot/dts/at91sam9x5.dtsi
->>> index 40ac3a4..8ea2f7d 100644
->>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->>> @@ -473,6 +473,24 @@
->>>  					trigger-value = <0x6>;
->>>  				};
->>>  			};
->>> +
->>> +			spi0: spi at f0000000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9x5-spi";
->>> +				reg = <0xf0000000 0x100>;
->>> +				interrupts = <13 4 3>;
->>> +				status = "disabled";
->>> +			};
->>> +
->>> +			spi1: spi at f0004000 {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +				compatible = "atmel,at91sam9x5-spi";
->>> +				reg = <0xf0004000 0x100>;
->>> +				interrupts = <14 4 3>;
->>> +				status = "disabled";
->>> +			};
->>>  		};
->>>
->>>  		nand0: nand at 40000000 {
->>> --
->>> 1.7.9.5
->>>
+>> I'm fine with Tony just taking them all if he wants to.
 > 
-> Best Regards,
-> Wenyou Yang
+> OK. Roger, can you please do me a pull request with these
+> against v3.8-rc6?
 > 
 
+Tony,
 
--- 
-Nicolas Ferre
+Since this depends on [1] and [2] which are both in linux-next, should
+I base it on linux-next?
+
+Another option is to defer this to 3.10 merge window, along with the
+DT adaptation for OMAP USB Host.
+
+cheers,
+-roger
+
+[1] [PATCH v9 00/20] OMAP USB Host cleanup
+https://lkml.org/lkml/2013/1/23/155
+
+[2] [PATCH v2 0/6] USB: Add support for multiple PHYs of same type
+https://lkml.org/lkml/2013/1/24/876
