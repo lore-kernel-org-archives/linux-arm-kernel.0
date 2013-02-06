@@ -1,53 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 06 Feb 2013 15:29:52 +0100
-Subject: [PATCH] OMAPDSS: enable omapdss for ARCH_MULTIPLATFORM
-In-Reply-To: <5112659D.50808@ti.com>
-References: <1358891160-9534-1-git-send-email-robdclark@gmail.com>
- <201302051631.40254.arnd@arndb.de> <5112659D.50808@ti.com>
-Message-ID: <3969096.QosOfOb9QT@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Feb 2013 17:31:24 +0100
+Subject: [PATCH 1/2] tty: serial: remove __init on pl011 console ops
+In-Reply-To: <CAD6h2NSpo74UXUgH2OJniW=wzkxGeshta05AGgCpn26SCUSjYg@mail.gmail.com>
+References: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
+ <20130206115219.GE17833@n2100.arm.linux.org.uk>
+ <CAD6h2NSpo74UXUgH2OJniW=wzkxGeshta05AGgCpn26SCUSjYg@mail.gmail.com>
+Message-ID: <CACRpkdZX-YF+jzg453Vmfxo_2LLuASvZyQqLommaM4Xd3LpwfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 February 2013 16:15:57 Tomi Valkeinen wrote:
-> 
-> That would normally be me, but I've been on a long leave, and just came
-> back. It'll take me some time to get back on track.
-> 
-> I don't think it makes sense to add ARCH_MULTIPLATFORM only for omapdss,
-> like this patch does. I think we should add it for omapfb and the panel
-> drivers also.
-> 
-> I did get a report of an omapdss build-break with allyesconfig. It seems
-> to happen because omapdrm and omap_vout use "select" to enable omapdss,
-> instead of depending on omapdss. This causes an illegal config to be
-> created. Perhaps this is the problem that Rob mentions in his patch?
+On Wed, Feb 6, 2013 at 1:31 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-Yes, that is the one. It is one of three remaining build errors
-we get for ARM allyesconfig, and the other two also have fixes
-on their way into 3.8.
+CC Grant on this issue...
 
-> Adding ARCH_MULTIPLATFORM for omapdss, as this patch does, removes
-> (well, hides) the above mentioned problem and allyesconfig works ok. You
-> can still break the config, but you need to manually select the Kconfig
-> options the wrong way.
-> 
-> I have patches to add the ARCH_MULTIPLATFORM for omapdss, and to fix the
-> omap_vout and omapdrm Kconfig files. Each of them changes only one line.
-> Arnd, are you ok with queuing those patches via arm-soc/fixes? Or should
-> I send them individually to respective maintainers?
+> On 6 February 2013 19:52, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Wed, Feb 06, 2013 at 07:47:14PM +0800, Haojian Zhuang wrote:
+>>> If uart driver is probed defer, console_setup will be called later
+>>> after __init && __initdata sections destroyed. And amba_console isn't
+>>> defined in __init or __initdata section. So we needn't define
+>>> pl011_console_setup() && pl011_console_get_options() in __init section.
+>>
+>> It sounds like there's a deeper problem here - if this driver being
+>> deferred, why isn't it being retried after the pinctrl stuff gets
+>> its driver registered?
+>>
+>> We've had bugs in this deferred probing before, I wouldn't be surprised
+>> if there's more... and we should not be "fixing" drivers because of bugs
+>> elsewhere.
 >
-> I can send the patches properly for review, but I've also attached them
-> here so Rob can test.
+> It retried if driver is being deferred. But those console setup
+> functions are released
+> since they're declared in __init section.
+>
+> rest_init()
+>    --> creates kernel_init thread that could free __init section memory
+>
+> deferred_probe_initicall() creates a workqueue that is used to retry
+> deferred probe
+> function.
+>
+> I think that these two threads are competing.
 
-The second and third attachment in your mail seem to contain identical
-patches. I suggested a similar patch myself, but Rob thought his
-version was nicer to give better build coverage. We only need either
-Rob's patch or yours, but not both, as far as I can tell.
+Now that is the *real* problem. The __init sections surely should
+not be discarded until *after* all deferred probes are complete
+and the deferral workqueue terminates.
 
-Olof can correct me, but I think we currently don't have any other
-patches queued in arm-soc for 3.8 (after Linus announced he did
-not want any of the less urgent ones), so I think it would be more
-fitting if you send one of the patches to Linus, rather than having
-an arm-soc pull request that only contains one patch in your domain.
+How about writing a patch to fix that instead? (If possible...)
 
-	Arnd
+Yours,
+Linus Walleij
