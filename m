@@ -1,40 +1,34 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 Feb 2013 14:12:27 -0500 (EST)
-Subject: [GIT PULL] Multi Cluster Power Management infrastructure
-Message-ID: <alpine.LFD.2.02.1302061343360.6300@xanadu.home>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 6 Feb 2013 20:16:35 +0100
+Subject: [PATCH 1/1] memory: tegra_ahb_enable_smmu() depends on
+ TEGRA_IOMMU_SMMU
+In-Reply-To: <5112A642.1020800@wwwdotorg.org>
+References: <1360175666-8377-1-git-send-email-hdoyu@nvidia.com><5112A642.1020800@wwwdotorg.org>
+Message-ID: <20130206.211635.744922728615926717.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, would you please pull the following:
+Hi Russell,
 
-	git://git.linaro.org/people/nico/linux mcpm
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 6 Feb 2013 19:51:46 +0100:
 
-This contains the basic infrastructure needed to support CPU hotplug, 
-deep CPU idle and secondary CPU bringup in a cluster based system such 
-as, but not limited to, those based on the big.LITTLE architecture.
+> On 02/06/2013 11:34 AM, Hiroshi Doyu wrote:
+> > New SoC, Tegra114 also uses SMMU. Change tegra_ahb_enable_smmu()'s
+> > dependency from ARCH_TEGRA_3x_SOC to TEGRA_IOMMU_SMMU. No need to edit
+> > whenever a new Tegra SoC comes.
+> > 
+> > The following combination caused build error, which this patch fixes.
+> > 
+> > CONFIG_ARCH_TEGRA_2x_SOC=y
+> > \# CONFIG_ARCH_TEGRA_3x_SOC is not set
+> > CONFIG_ARCH_TEGRA_114_SOC=y
+> > 
+> > drivers/iommu/tegra-smmu.c:485: undefined reference to 'tegra_ahb_enable_smmu'
+> 
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> 
+> Russell, I assume Hiroshi should upload this to your patch tracker? It's
+> needed for 3.9.
 
-Several rounds of reviews took place on the list and all comments were 
-addressed.
-
-Included is the core infrastructure only.  That already represents a 
-significant chunk of code on its own.  I'm hoping to be able to send a 
-second pull request containing platform support for RTSM if the CCI 
-device tree bindings get sorted out in time.  Platform support for TC2 
-does exist but more cleanups are needed there which are very unlikely to 
-make it in time for the 3.9 merge window.
-
-Here's the diffstat for this pull request:
- Documentation/arm/cluster-pm-race-avoidance.txt | 498 ++++++++++++++++++
- Documentation/arm/vlocks.txt                    | 211 ++++++++
- arch/arm/Kconfig                                |   8 +
- arch/arm/common/Makefile                        |   1 +
- arch/arm/common/mcpm_entry.c                    | 314 +++++++++++
- arch/arm/common/mcpm_head.S                     | 219 ++++++++
- arch/arm/common/mcpm_platsmp.c                  |  86 +++
- arch/arm/common/vlock.S                         | 108 ++++
- arch/arm/common/vlock.h                         |  29 +
- arch/arm/include/asm/mcpm_entry.h               | 190 +++++++
- 10 files changed, 1664 insertions(+)
-
-
-Nicolas
+FYI: Submitted as:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7640/1
