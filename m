@@ -1,68 +1,36 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Wed,  6 Feb 2013 14:21:16 +0900
-Subject: [PATCH RESEND] ARM: sched: correct update_sched_clock()
-Message-ID: <1360128076-8555-1-git-send-email-iamjoonsoo.kim@lge.com>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
+Date: Wed, 6 Feb 2013 10:58:56 +0530
+Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
+In-Reply-To: <CAD=FV=VQywwQ3YAFb=1qFmd3UEW39Xu=ok6fdjhvBXdwOQOa1Q@mail.gmail.com>
+References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAD=FV=VQywwQ3YAFb=1qFmd3UEW39Xu=ok6fdjhvBXdwOQOa1Q@mail.gmail.com>
+Message-ID: <CAKuRcOKx4VLcmhwi8VWHKNOizgiVsE5f0v-CGmK5+bH=BjJAPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we want load epoch_cyc and epoch_ns atomically,
-we should update epoch_cyc_copy first of all.
-This notify reader that updating is in progress.
+On Wed, Feb 6, 2013 at 5:48 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Yavaraj,
+>
+> On Mon, Feb 4, 2013 at 1:03 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com>
+> wrote:
+>>
+>> This RFC patch is w.r.t multimaster bus arbitration which is already
+>> being discussing in the mainline.
+>> This patch provides hooks for the i2c multimaster bus arbitration
+>> and to have the arbitration parameters.
+>
+>
+> I may have missed something in all the threads, but my recollection was that
+> the request was that this should be implemented without touching the i2c
+> core code.  Your patch modifies the i2c core code.
+   Different i2c devices will directly talk to i2c core using i2c_transfer().
+   If we put this out of the i2c core,the i2c devices like tpsxxxx and etc
+   should be registered through the bridge/mux .
+>
+> My impression was that the best solution was to use the infrastructure in
+> place for i2c multiplexing.  ...but in your case you would only multiplex
+> one thing.  This was suggested by Grant Likely and seems the cleanest...
+   I agree that Grants idea was the cleanest but we may end up in change in
 
-If we update epoch_cyc first like as current implementation,
-there is subtle error case.
-Look at the below example.
-
-<Initial Condition>
-cyc = 9
-ns = 900
-cyc_copy = 9
-
-== CASE 1 ==
-<CPU A = reader>           <CPU B = updater>
-                           write cyc = 10
-read cyc = 10
-read ns = 900
-                           write ns = 1000
-                           write cyc_copy = 10
-read cyc_copy = 10
-
-output = (10, 900)
-
-== CASE 2 ==
-<CPU A = reader>           <CPU B = updater>
-read cyc = 9
-                           write cyc = 10
-                           write ns = 1000
-read ns = 1000
-read cyc_copy = 9
-                           write cyc_copy = 10
-output = (9, 1000)
-
-If atomic read is ensured, output should be (9, 900) or (10, 1000).
-But, output in example case are not.
-
-So, change updating sequence in order to correct this problem.
-
-Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index fc6692e..bd6f56b 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -93,11 +93,11 @@ static void notrace update_sched_clock(void)
- 	 * detectable in cyc_to_fixed_sched_clock().
- 	 */
- 	raw_local_irq_save(flags);
--	cd.epoch_cyc = cyc;
-+	cd.epoch_cyc_copy = cyc;
- 	smp_wmb();
- 	cd.epoch_ns = ns;
- 	smp_wmb();
--	cd.epoch_cyc_copy = cyc;
-+	cd.epoch_cyc = cyc;
- 	raw_local_irq_restore(flags);
- }
- 
--- 
-1.7.9.5
+>
+> -Doug
