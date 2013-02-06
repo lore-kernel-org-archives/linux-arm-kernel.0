@@ -1,106 +1,223 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Wed, 6 Feb 2013 15:06:22 +0530
-Subject: [PATCH] ARM: davinci: da850: add DT node for I2C0
-Message-ID: <1360143382-24607-1-git-send-email-manishv.b@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 6 Feb 2013 10:40:49 +0100
+Subject: [v4 PATCH 11/12] ARM: dts: add spi nodes for atmel SoC
+In-Reply-To: <B256D81BAE5131468A838E5D7A2436413A086C1E@penmbx02>
+References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+ <1358148877-18679-12-git-send-email-wenyou.yang@atmel.com>
+ <20130205195126.GB30595@game.jcrosoft.org>
+ <B256D81BAE5131468A838E5D7A2436413A086C1E@penmbx02>
+Message-ID: <51122521.2090506@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2C0 device tree and pin muxing information to da850-evm.
-Also, add OF_DEV_AUXDATA for I2C0 controller driver in da850
-board dt file to use I2C0 clock.
-Verified i2c0 node gets created in sys class interface as
-"/sys/class/i2c-dev/i2c-0/subsystem/i2c-0".
+On 02/06/2013 02:35 AM, Yang, Wenyou :
+> 
+> 
+>> -----Original Message-----
+>> From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
+>> Sent: 2013?2?6? 3:51
+>> To: Yang, Wenyou
+>> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ferre,
+>> Nicolas; richard.genoud at gmail.com; Lin, JM; linux at arm.linux.org.uk
+>> Subject: Re: [v4 PATCH 11/12] ARM: dts: add spi nodes for atmel SoC
+>>
+>> On 15:34 Mon 14 Jan     , Wenyou Yang wrote:
+>>> From: Richard Genoud <richard.genoud@gmail.com>
+>>>
+>>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>>> [wenyou.yang at atmel.com: add spi nodes for sam9260, sam9263, sam9g45
+>> and sam9n12]
+>>> [wenyou.yang at atmel.com: remove spi property "cs-gpios" to the board dts
+>> files]
+>>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+>>> Cc: linux at arm.linux.org.uk
+>>> ---
+>>>  arch/arm/boot/dts/at91sam9260.dtsi |   18 ++++++++++++++++++
+>>>  arch/arm/boot/dts/at91sam9263.dtsi |   18 ++++++++++++++++++
+>>>  arch/arm/boot/dts/at91sam9g45.dtsi |   18 ++++++++++++++++++
+>> I alreadt have some patch in queue
+>>
+> Thanks
+> I will remove this patch in the next version.
 
-Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
----
-Applies on top of v3.8-rc6 of linus tree.
-Depends on
- - drivers/pinctrl: grab default handles from device core
-   http://www.gossamer-threads.com/lists/linux/kernel/1665411
- - ARM: davinci: da850: add interrupt-parent property in soc node
-   https://patchwork.kernel.org/patch/2044101/
- - ARM: davinci: da850: add pinctrl support
-   http://comments.gmane.org/gmane.linux.davinci/25993
+Well, I am not sure:
+Jean Christophe, if the patches are in your own queue, I do not see why
+this series has to be modified.
 
-:100644 100644 433027f... 738d5d4... M	arch/arm/boot/dts/da850-evm.dts
-:100644 100644 4b02167... a0072aa... M	arch/arm/boot/dts/da850.dtsi
-:100644 100644 37c27af... 95ca4e9... M	arch/arm/mach-davinci/da8xx-dt.c
- arch/arm/boot/dts/da850-evm.dts  |    6 ++++++
- arch/arm/boot/dts/da850.dtsi     |   14 ++++++++++++++
- arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
- 3 files changed, 27 insertions(+), 1 deletions(-)
+The "I already have a patch to address this" type of comment is not a
+proper comment:
+1/ either you already have submitted the patch (and the new series has
+to take it into
+   account, obviously)
+2/ or the patch is not public yet and you now have to deal with this
+series posted before
+   your own one.
+There is no a third way...
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 433027f..738d5d4 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -27,6 +27,12 @@
- 		serial2: serial at 1d0d000 {
- 			status = "okay";
- 		};
-+		i2c0: i2c at 1c22000 {
-+			status = "okay";
-+			clock-frequency = <100000>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins>;
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 4b02167..a0072aa 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -56,6 +56,12 @@
- 					0x30 0x01100000  0x0ff00000
- 				>;
- 			};
-+			i2c0_pins: pinmux_i2c0_pins {
-+				pinctrl-single,bits = <
-+					/* I2C0_SDA,I2C0_SCL */
-+					0x10 0x00002200 0x0000ff00
-+				>;
-+			};
- 		};
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
-@@ -81,6 +87,14 @@
- 			interrupts = <61>;
- 			status = "disabled";
- 		};
-+		i2c0: i2c at 1c22000 {
-+			compatible = "ti,davinci-i2c";
-+			reg = <0x22000 0x1000>;
-+			interrupts = <15>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 37c27af..95ca4e9 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
- 	of_irq_init(da8xx_irq_match);
- }
- 
-+struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
-+	{}
-+};
-+
- #ifdef CONFIG_ARCH_DAVINCI_DA850
- 
- static void __init da850_init_machine(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+				da850_auxdata_lookup, NULL);
- 
- 	da8xx_uart_clk_enable();
- }
+Best regards,
+
+>>>  arch/arm/boot/dts/at91sam9n12.dtsi |   18 ++++++++++++++++++
+>>>  arch/arm/boot/dts/at91sam9x5.dtsi  |   18 ++++++++++++++++++
+>>>  5 files changed, 90 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi
+>> b/arch/arm/boot/dts/at91sam9260.dtsi
+>>> index 68bccf4..9586fe1 100644
+>>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+>>> @@ -453,6 +453,24 @@
+>>>  				status = "disabled";
+>>>  			};
+>>>
+>>> +			spi0: spi at fffc8000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9260-spi";
+>>> +				reg = <0xfffc8000 0x200>;
+>>> +				interrupts = <12 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>> +
+>>> +			spi1: spi at fffcc000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9260-spi";
+>>> +				reg = <0xfffcc000 0x200>;
+>>> +				interrupts = <13 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>> +
+>>>  			adc0: adc at fffe0000 {
+>>>  				compatible = "atmel,at91sam9260-adc";
+>>>  				reg = <0xfffe0000 0x100>;
+>>> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi
+>> b/arch/arm/boot/dts/at91sam9263.dtsi
+>>> index 32ec62c..636b882 100644
+>>> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+>>> @@ -426,6 +426,24 @@
+>>>  				reg = <0xfffffd40 0x10>;
+>>>  				status = "disabled";
+>>>  			};
+>>> +
+>>> +			spi0: spi at fffa4000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9260-spi";
+>>> +				reg = <0xfffa4000 0x200>;
+>>> +				interrupts = <14 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>> +
+>>> +			spi1: spi at fffa8000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9260-spi";
+>>> +				reg = <0xfffa8000 0x200>;
+>>> +				interrupts = <15 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>>  		};
+>>>
+>>>  		nand0: nand at 40000000 {
+>>> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi
+>> b/arch/arm/boot/dts/at91sam9g45.dtsi
+>>> index 231858f..0100b80 100644
+>>> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+>>> @@ -495,6 +495,24 @@
+>>>  				reg = <0xfffffd40 0x10>;
+>>>  				status = "disabled";
+>>>  			};
+>>> +
+>>> +			spi0: spi at fffa4000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9g45-spi";
+>>> +				reg = <0xfffa4000 0x200>;
+>>> +				interrupts = <14 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>> +
+>>> +			spi1: spi at fffa8000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9g45-spi";
+>>> +				reg = <0xfffa8000 0x200>;
+>>> +				interrupts = <15 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>>  		};
+>>>
+>>>  		nand0: nand at 40000000 {
+>>> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi
+>> b/arch/arm/boot/dts/at91sam9n12.dtsi
+>>> index e9efb34..86d5357 100644
+>>> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+>>> @@ -355,6 +355,24 @@
+>>>  				#size-cells = <0>;
+>>>  				status = "disabled";
+>>>  			};
+>>> +
+>>> +			spi0: spi at f0000000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9x5-spi";
+>>> +				reg = <0xf0000000 0x100>;
+>>> +				interrupts = <13 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>> +
+>>> +			spi1: spi at f0004000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9x5-spi";
+>>> +				reg = <0xf0004000 0x100>;
+>>> +				interrupts = <14 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>>  		};
+>>>
+>>>  		nand0: nand at 40000000 {
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi
+>> b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> index 40ac3a4..8ea2f7d 100644
+>>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> @@ -473,6 +473,24 @@
+>>>  					trigger-value = <0x6>;
+>>>  				};
+>>>  			};
+>>> +
+>>> +			spi0: spi at f0000000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9x5-spi";
+>>> +				reg = <0xf0000000 0x100>;
+>>> +				interrupts = <13 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>> +
+>>> +			spi1: spi at f0004000 {
+>>> +				#address-cells = <1>;
+>>> +				#size-cells = <0>;
+>>> +				compatible = "atmel,at91sam9x5-spi";
+>>> +				reg = <0xf0004000 0x100>;
+>>> +				interrupts = <14 4 3>;
+>>> +				status = "disabled";
+>>> +			};
+>>>  		};
+>>>
+>>>  		nand0: nand at 40000000 {
+>>> --
+>>> 1.7.9.5
+>>>
+> 
+> Best Regards,
+> Wenyou Yang
+> 
+
+
 -- 
-1.7.4.1
+Nicolas Ferre
