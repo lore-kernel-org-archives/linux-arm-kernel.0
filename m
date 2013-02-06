@@ -1,20 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 07 Feb 2013 02:20:05 +0100
-Subject: [PATCH 06/14] ARM: pci: Keep pci_common_init() around after init
-In-Reply-To: <CACRpkdYGgdMTi0ZeMeCk5UmrndD451Pyz8L_XE=y9SPXfGGdew@mail.gmail.com>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <9348609.HjKCmL9u9S@wuerfel>
- <CACRpkdYGgdMTi0ZeMeCk5UmrndD451Pyz8L_XE=y9SPXfGGdew@mail.gmail.com>
-Message-ID: <2957343.pp7RNnqk54@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Feb 2013 09:28:18 -0800
+Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
+In-Reply-To: <5111A251.9020400@ti.com>
+References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
+ <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
+ <20130201215154.GV22517@atomide.com> <51103247.2030906@ti.com>
+ <51103A25.9010401@ti.com> <20130205233407.GR25185@atomide.com>
+ <5111A251.9020400@ti.com>
+Message-ID: <20130206172818.GB25185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 February 2013 18:07:53 Linus Walleij wrote:
-> However it leaves the question of how much __init, __initdata
-> and __initconst we have littering around. Oh, well, we'll see
-> I guess.
+* Jon Hunter <jon-hunter@ti.com> [130205 16:26]:
+> 
+> Actually, let me look into this a bit more. It appears that for all
+> omap2+ devices NOR should be mapped to CS0 at 0x08000000. So I am
+> wondering if the boot-loader is re-mapping the CS0 space. If it is then
+> may be we can avoid having such hacks in the kernel by fixing the
+> bootloader. To date only the apollon board has really had this problem
+> and I need to check what I have on my H4 (which has been hacked by me ;-)
 
-Actually, kbuild is pretty good at warning around the
-bugs there.
+OK. Yeah sorry I don't remember the history of why the different
+mappings were needed. It could be it was just needed to keep some
+devices working that were only initialized in the bootloader like
+you're suspecting.
 
-	Arnd
+Tony
