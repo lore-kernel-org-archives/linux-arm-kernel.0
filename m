@@ -1,90 +1,76 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed,  6 Feb 2013 02:23:43 -0500
-Subject: [V6 PATCH 08/16] arm: ttc_dkb: add usb support
+Date: Wed,  6 Feb 2013 02:23:45 -0500
+Subject: [V6 PATCH 10/16] arm: mmp: remove usb devices from pxa168
 In-Reply-To: <1360135431-27280-1-git-send-email-chao.xie@marvell.com>
 References: <1360135431-27280-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1360135431-27280-9-git-send-email-chao.xie@marvell.com>
+Message-ID: <1360135431-27280-11-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for ttc_dkb board, add udc/otg/ehci support
-
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/ttc_dkb.c |   30 +++++++++++++++++++-----------
- 1 files changed, 19 insertions(+), 11 deletions(-)
+ arch/arm/mach-mmp/pxa168.c |   42 ------------------------------------------
+ 1 files changed, 0 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index ce55fd8..0962791 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -27,7 +27,6 @@
- #include <mach/mfp-pxa910.h>
- #include <mach/pxa910.h>
- #include <mach/irqs.h>
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index b7f074f..dd3a68b 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -28,7 +28,6 @@
+ #include <mach/mfp.h>
+ #include <linux/dma-mapping.h>
+ #include <mach/pxa168.h>
 -#include <mach/regs-usb.h>
  
  #include "common.h"
- 
-@@ -158,20 +157,24 @@ static struct i2c_board_info ttc_dkb_i2c_info[] = {
+ #include "clock.h"
+@@ -135,47 +134,6 @@ struct platform_device pxa168_device_gpio = {
+ 	.resource	= pxa168_resource_gpio,
  };
  
- #ifdef CONFIG_USB_SUPPORT
--#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
- 
- static char *pxa910_usb_clock_name[] = {
--	[0] = "U2OCLK",
-+	[0] = "usb_clk",
-+};
-+
-+static struct mv_usb_phy_platform_data ttc_usb_phy_pdata = {
-+	.clknum		= 1,
-+	.clkname	= pxa910_usb_clock_name,
- };
- 
-+#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
-+
- static struct mv_usb_platform_data ttc_usb_pdata = {
- 	.clknum		= 1,
- 	.clkname	= pxa910_usb_clock_name,
- 	.vbus		= NULL,
- 	.mode		= MV_USB_MODE_OTG,
- 	.otg_force_a_bus_req = 1,
--	.phy_init	= pxa_usb_phy_init,
--	.phy_deinit	= pxa_usb_phy_deinit,
- 	.set_vbus	= NULL,
- };
- #endif
-@@ -198,19 +201,24 @@ static void __init ttc_dkb_init(void)
- 	pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
- 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
- 
-+#ifdef CONFIG_USB_SUPPORT
-+	pxa_register_device(&pxa910_device_u2ophy, &ttc_usb_phy_pdata,
-+				sizeof(ttc_usb_phy_pdata));
-+#endif
-+
- #ifdef CONFIG_USB_MV_UDC
--	pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
--	platform_device_register(&pxa168_device_u2o);
-+	pxa_register_device(&pxa910_device_u2o, &ttc_usb_pdata,
-+				sizeof(ttc_usb_pdata));
- #endif
- 
- #ifdef CONFIG_USB_EHCI_MV_U2O
--	pxa168_device_u2oehci.dev.platform_data = &ttc_usb_pdata;
--	platform_device_register(&pxa168_device_u2oehci);
-+	pxa_register_device(&pxa910_device_u2oehci, &ttc_usb_pdata,
-+				sizeof(ttc_usb_pdata));
- #endif
- 
- #ifdef CONFIG_USB_MV_OTG
--	pxa168_device_u2ootg.dev.platform_data = &ttc_usb_pdata;
--	platform_device_register(&pxa168_device_u2ootg);
-+	pxa_register_device(&pxa910_device_u2ootg, &ttc_usb_pdata,
-+				sizeof(ttc_usb_pdata));
- #endif
- }
- 
+-struct resource pxa168_usb_host_resources[] = {
+-	/* USB Host conroller register base */
+-	[0] = {
+-		.start	= PXA168_U2H_REGBASE + U2x_CAPREGS_OFFSET,
+-		.end	= PXA168_U2H_REGBASE + USB_REG_RANGE,
+-		.flags	= IORESOURCE_MEM,
+-		.name	= "capregs",
+-	},
+-	/* USB PHY register base */
+-	[1] = {
+-		.start	= PXA168_U2H_PHYBASE,
+-		.end	= PXA168_U2H_PHYBASE + USB_PHY_RANGE,
+-		.flags	= IORESOURCE_MEM,
+-		.name	= "phyregs",
+-	},
+-	[2] = {
+-		.start	= IRQ_PXA168_USB2,
+-		.end	= IRQ_PXA168_USB2,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static u64 pxa168_usb_host_dmamask = DMA_BIT_MASK(32);
+-struct platform_device pxa168_device_usb_host = {
+-	.name = "pxa-sph",
+-	.id   = -1,
+-	.dev  = {
+-		.dma_mask = &pxa168_usb_host_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-
+-	.num_resources = ARRAY_SIZE(pxa168_usb_host_resources),
+-	.resource      = pxa168_usb_host_resources,
+-};
+-
+-int __init pxa168_add_usb_host(struct mv_usb_platform_data *pdata)
+-{
+-	pxa168_device_usb_host.dev.platform_data = pdata;
+-	return platform_device_register(&pxa168_device_usb_host);
+-}
+-
+ void pxa168_restart(char mode, const char *cmd)
+ {
+ 	soft_restart(0xffff0000);
 -- 
 1.7.4.1
