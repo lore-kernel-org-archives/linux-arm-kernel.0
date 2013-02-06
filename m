@@ -1,83 +1,37 @@
 From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Wed,  6 Feb 2013 18:13:27 +0900
-Subject: [PATCH v6 0/3] introduce static_vm for ARM-specific static mapped area
-Message-ID: <1360142010-10598-1-git-send-email-iamjoonsoo.kim@lge.com>
+Date: Wed,  6 Feb 2013 18:13:28 +0900
+Subject: [PATCH v6 1/3] ARM: vmregion: remove vmregion code entirely
+In-Reply-To: <1360142010-10598-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1360142010-10598-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <1360142010-10598-2-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In current implementation, we used ARM-specific flag, that is,
-VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
-The purpose of static mapped area is to re-use static mapped area when
-entire physical address range of the ioremap request can be covered
-by this area.
+Now, there is no user for vmregion.
+So remove it.
 
-This implementation causes needless overhead for some cases.
-For example, assume that there is only one static mapped area and
-vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
-deciding whether it is matched or not. Moreover, even if there is
-no static mapped area and vmlist has 300 areas, every time we call
-ioremap, we check 300 areas in now.
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-If we construct a extra list for static mapped area, we can eliminate
-above mentioned overhead.
-With a extra list, if there is one static mapped area,
-we just check only one area and proceed next operation quickly.
-
-In fact, it is not a critical problem, because ioremap is not frequently
-used. But reducing overhead is better idea.
-
-Another reason for doing this work is for removing vm_struct list management,
-entirely. For more information, look at the following link.
-http://lkml.org/lkml/2012/12/6/184
-
-Changelog
-v5->v6:
-  Add Ack-by, Reviewed-by, Tested-by tags
-  [3/3]: Change from Nicolas' suggestion
-  	 - remove redundant parenthesis
-
-v4->v5:
-  [2/3]: Changes from Nicolas' suggestion
-  	 - don't use separate flags for static_vm
-  	 - remove a lock
-  	 - declare add_static_vm_early() as __init
-  [3/3]: Changes from Nicolas' suggestion
-  	 - add / leave comments
-
-v3->v4:
-  [2/3]: Changes from Nicolas' suggestion
-         - embed static_vm code in ioremap.c
-         - simplify struct static_vm
-         - remove init_static_vm, instead, add_static_vm_early() init static_vm
-         Use generic list for list management of static_vm
-         Convert spin_lock to rw_lock
-         Modify static_vm's flags bits
-  [3/3]: Rework according to [2/3] change
-  Rebased on v3.8-rc5
-
-v2->v3:
-  coverletter: refer a link related to this work
-  [2/3]: drop @flags of find_static_vm_vaddr
-  Rebased on v3.8-rc4
-
-v1->v2: 
-  [2/3]: patch description is improved.
-  Rebased on v3.7-rc7
-
-Joonsoo Kim (3):
-  ARM: vmregion: remove vmregion code entirely
-  ARM: ioremap: introduce an infrastructure for static mapped area
-  ARM: mm: use static_vm for managing static mapped areas
-
- arch/arm/mm/Makefile   |    2 +-
- arch/arm/mm/ioremap.c  |  135 +++++++++++++++++++++----------
- arch/arm/mm/mm.h       |   12 +++
- arch/arm/mm/mmu.c      |   34 ++++----
- arch/arm/mm/vmregion.c |  205 ------------------------------------------------
- arch/arm/mm/vmregion.h |   31 --------
- 6 files changed, 123 insertions(+), 296 deletions(-)
- delete mode 100644 arch/arm/mm/vmregion.c
- delete mode 100644 arch/arm/mm/vmregion.h
-
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 8a9c4cb..4e333fa 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -6,7 +6,7 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
+ 				   iomap.o
+ 
+ obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
+-				   mmap.o pgd.o mmu.o vmregion.o
++				   mmap.o pgd.o mmu.o
+ 
+ ifneq ($(CONFIG_MMU),y)
+ obj-y				+= nommu.o
+diff --git a/arch/arm/mm/vmregion.c b/arch/arm/mm/vmregion.c
+deleted file mode 100644
+index a631016..0000000
+diff --git a/arch/arm/mm/vmregion.h b/arch/arm/mm/vmregion.h
+deleted file mode 100644
+index 0f5a5f2..0000000
 -- 
 1.7.9.5
