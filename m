@@ -1,25 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Feb 2013 17:06:38 +0000
-Subject: kernel 3.8 make problem
-In-Reply-To: <20130206180305.3bbc2d4d@armhf>
-References: <ttxj4oytvg02pxivwnruketi.1359554350723@email.android.com>
- <20130130150729.4aae5409@armhf> <51093541.3020309@openwrt.org>
- <20130206180305.3bbc2d4d@armhf>
-Message-ID: <20130206170638.GJ17833@n2100.arm.linux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 6 Feb 2013 10:09:03 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130206175128.1b64196d@skate>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <2776630.gp5gC9tvLk@wuerfel>
+ <20130131180249.GA30869@obsidianresearch.com>
+ <201301312046.22560.arnd@arndb.de>
+ <20130131224459.GA11846@obsidianresearch.com>
+ <20130206175128.1b64196d@skate>
+Message-ID: <20130206170903.GA28198@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 06:03:05PM +0100, Jean-Francois Moine wrote:
-> On Wed, 30 Jan 2013 15:59:13 +0100
-> Florian Fainelli <florian@openwrt.org> wrote:
-> 
-> > Are you using make 3.82 by chance?
-> 
-> I moved to make 3.82 and also libc6 2.17 (my Cubox runs Debian armhf
-> with kernel 3.8-rc6), and I can now make some programs (with make 2.81,
-> I was getting a seg fault of the child after the first vfork), but I
-> get the same errors when building a kernel. Does anybody have such a
-> problem?
+On Wed, Feb 06, 2013 at 05:51:28PM +0100, Thomas Petazzoni wrote:
 
-Are you using a 2G:2G VM split?  If so, don't (really no reason to use
-that on the cubox.)
+> > So you'd end up with a MMU mapping something like:
+> >   PCI_IO_VIRT_BASE    MBUS_IO_PHYS_BASE
+> >     0->4k          => 0      -> 4k             // 4k assigned to link0
+> >     4k->8k         => 64k+4k -> 64k+8k         // 4k assigned to link1
+> >     8k->24k        => 128k+8k -> 128k+24k      // 8k assigned to link2
+> 
+> I am not sure to understand your example, starting at the second line.
+> Shouldn't the second line have been
+> 
+>       4k->8k         => 64k -> 64k+4k
+
+No..
+ 
+> as you suggested, then when the device driver will do an inl(0x4) on
+> this device, the device will receive the equivalent of an inl(0x1004),
+> no?
+
+Link 0 translates like:
+
+- Linux driver does inl(0x4)
+- ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x4
+- The CPU TLB converts that into a read from CPU physical
+  0xc0000000 + 0x4
+- The MBUS window remap register converts that into a read from IO
+  space 0x4
+- The address 0x4 is placed in the PCI-E IO transaction of link 0
+
+Link 1 translates like:
+
+- Linux driver does inl(0x1004)
+- ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x1004
+- The CPU TLB converts that into a read from CPU physical
+  0xc0000000 + 0x11004 (ie the mbus window for the link 1)
+- The MBUS window remap register converts that into a read from IO
+  space 0x1004
+- The address 0x1004 is placed in the PCI-E IO transaction of link 1
+
+Noting that in both instances the IO address passed to inl is what
+eventually appears on the PCI-E link after all the translation is
+completed.
+
+The CPU MMU is being used used to route 4k aligned ranges to the
+correct link.
+
+> I understand that I have two choices here:
+> 
+>  * First one is to make the I/O regions of all PCIe links fit below the
+>    default IO_SPACE_LIMIT (0xffff) by doing the mapping trick you
+>    described above.
+> 
+>  * Second one is to have one 64 KB block for each PCIe link, which
+>    would require raising the IO_SPACE_LIMIT on this platform.
+
+Yes, however, AFIAK this is the environment you should be running in:
+
+#define IO_SPACE_LIMIT  ((resource_size_t)0xfffff)
+
+Which is 5 f's not 4.
+
+> > Though, there is still a problem with the MMIO mbus window
+> > alignment. mbus windows are aligned to a multiple of their size, PCI
+> > MMIO bridge windows are always aligned to 1M...
+> 
+> Can't this be solved using the window_alignement() hook we've been
+> discussing separately? Just like we teach the Linux PCI core about our
+> alignment requirements of 64K for the I/O regions, we could teach it
+> about our alignment requirement on memory regions as well. No?
+
+Hopefully :) As long as it can adjust the start and length you should
+be fine.
+
+Jason
