@@ -1,41 +1,56 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  6 Feb 2013 22:10:28 +0400
-Subject: [PATCH] ARM: smdk2410: Fix compile breakage
-Message-ID: <1360174228-29950-1-git-send-email-shc_work@mail.ru>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 06 Feb 2013 11:22:35 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130206175019.GA24248@obsidianresearch.com>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <2776630.gp5gC9tvLk@wuerfel> <20130131180249.GA30869@obsidianresearch.com>
+ <201301312046.22560.arnd@arndb.de>
+ <20130131224459.GA11846@obsidianresearch.com> <20130206175128.1b64196d@skate>
+ <20130206170903.GA28198@obsidianresearch.com> <20130206181852.4eca53e3@skate>
+ <20130206175019.GA24248@obsidianresearch.com>
+Message-ID: <51129F6B.1050709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Symbol S3C_DEV_USB_HOST should be defined to avoid this problem.
-  LINK    vmlinux
-  LD      vmlinux.o
-  MODPOST vmlinux.o
-WARNING: modpost: Found 2 section mismatch(es).
-To see full details build your kernel with:
-'make CONFIG_DEBUG_SECTION_MISMATCH=y'
-  GEN     .version
-  CHK     include/generated/compile.h
-  UPD     include/generated/compile.h
-  CC      init/version.o
-  LD      init/built-in.o
-arch/arm/mach-s3c24xx/built-in.o:(.init.data+0x660): undefined reference to `s3c_device_ohci'
-make: *** [vmlinux] Error 1
+On 02/06/2013 10:50 AM, Jason Gunthorpe wrote:
+> On Wed, Feb 06, 2013 at 06:18:52PM +0100, Thomas Petazzoni wrote:
+>> Dear Jason Gunthorpe,
+>>
+>> On Wed, 6 Feb 2013 10:09:03 -0700, Jason Gunthorpe wrote:
+>>
+>>> Link 0 translates like:
+>>>
+>>> - Linux driver does inl(0x4)
+>>> - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x4
+>>> - The CPU TLB converts that into a read from CPU physical
+>>>   0xc0000000 + 0x4
+>>> - The MBUS window remap register converts that into a read from IO
+>>>   space 0x4
+>>> - The address 0x4 is placed in the PCI-E IO transaction of link 0
+>>>
+>>> Link 1 translates like:
+>>>
+>>> - Linux driver does inl(0x1004)
+>>> - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x1004
+>>> - The CPU TLB converts that into a read from CPU physical
+>>>   0xc0000000 + 0x11004 (ie the mbus window for the link 1)
+>>> - The MBUS window remap register converts that into a read from IO
+>>>   space 0x1004
+>>> - The address 0x1004 is placed in the PCI-E IO transaction of link 1
+>>
+>> This last step is exactly what I thought would not work. If the PCIe
+>> device has say 64 bytes of I/O space, then this 0x1004 PCI-E
+>> transaction will be out of bounds, no?
+> 
+> No.. PCI end devices are required to decode all 32 bits of address,
+> less the bits requires for their allocation. So a device with 64 bytes
+> of IO will match bits 31:6 and then use bits 5:0 for the internal
+> register.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-s3c24xx/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index ba6c501..8080dc1 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -350,6 +350,7 @@ config MACH_QT2410
- config ARCH_SMDK2410
- 	bool "SMDK2410/A9M2410"
- 	select S3C24XX_SMDK
-+	select S3C_DEV_USB_HOST
- 	help
- 	  Say Y here if you are using the SMDK2410 or the derived module A9M2410
- 	  <http://www.fsforth.de>
--- 
-1.7.12.4
+Didn't Arnd say (earlier this thread) that PCI devices using IO BARs
+were probably fairly legacy and hence might be buggy and might not obey
+that rule? Now, I'd guess it's safe within the first 64k of IO space
+though, so perhaps he was only talking about IO BAR bases >= 64k being
+dubious? That would imply a device might only use bits 15:6 for matching
+the BAR base and 5:0 for the internal register for a 64-byte BAR.
