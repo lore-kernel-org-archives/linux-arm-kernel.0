@@ -1,50 +1,83 @@
-From: david.woodhouse@intel.com (Woodhouse, David)
-Date: Wed, 6 Feb 2013 09:02:04 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130205210436.670c62e26d2121330e87af35@freescale.com>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
-Message-ID: <1360141322.6066.4.camel@shinybook.infradead.org>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Wed,  6 Feb 2013 18:13:27 +0900
+Subject: [PATCH v6 0/3] introduce static_vm for ARM-specific static mapped area
+Message-ID: <1360142010-10598-1-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-02-05 at 21:04 -0600, Kim Phillips wrote:
-> gcc -Os emits calls to __bswapsi2 on those platforms to save space
-> because they don't have the single rev byte swap instruction.
+In current implementation, we used ARM-specific flag, that is,
+VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+The purpose of static mapped area is to re-use static mapped area when
+entire physical address range of the ioremap request can be covered
+by this area.
 
-Is that the right thing for GCC to do in that situation?
+This implementation causes needless overhead for some cases.
+For example, assume that there is only one static mapped area and
+vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
+deciding whether it is matched or not. Moreover, even if there is
+no static mapped area and vmlist has 300 areas, every time we call
+ioremap, we check 300 areas in now.
 
-If so, perhaps we should be *providing* __bswap[sd]i2 functions for it
-to use?
+If we construct a extra list for static mapped area, we can eliminate
+above mentioned overhead.
+With a extra list, if there is one static mapped area,
+we just check only one area and proceed next operation quickly.
 
-If not, perhaps there should be a PR filed?
+In fact, it is not a critical problem, because ioremap is not frequently
+used. But reducing overhead is better idea.
 
-Or is our use case justifiably different to the general case of '-Os'?
-If so, why?
+Another reason for doing this work is for removing vm_struct list management,
+entirely. For more information, look at the following link.
+http://lkml.org/lkml/2012/12/6/184
+
+Changelog
+v5->v6:
+  Add Ack-by, Reviewed-by, Tested-by tags
+  [3/3]: Change from Nicolas' suggestion
+  	 - remove redundant parenthesis
+
+v4->v5:
+  [2/3]: Changes from Nicolas' suggestion
+  	 - don't use separate flags for static_vm
+  	 - remove a lock
+  	 - declare add_static_vm_early() as __init
+  [3/3]: Changes from Nicolas' suggestion
+  	 - add / leave comments
+
+v3->v4:
+  [2/3]: Changes from Nicolas' suggestion
+         - embed static_vm code in ioremap.c
+         - simplify struct static_vm
+         - remove init_static_vm, instead, add_static_vm_early() init static_vm
+         Use generic list for list management of static_vm
+         Convert spin_lock to rw_lock
+         Modify static_vm's flags bits
+  [3/3]: Rework according to [2/3] change
+  Rebased on v3.8-rc5
+
+v2->v3:
+  coverletter: refer a link related to this work
+  [2/3]: drop @flags of find_static_vm_vaddr
+  Rebased on v3.8-rc4
+
+v1->v2: 
+  [2/3]: patch description is improved.
+  Rebased on v3.7-rc7
+
+Joonsoo Kim (3):
+  ARM: vmregion: remove vmregion code entirely
+  ARM: ioremap: introduce an infrastructure for static mapped area
+  ARM: mm: use static_vm for managing static mapped areas
+
+ arch/arm/mm/Makefile   |    2 +-
+ arch/arm/mm/ioremap.c  |  135 +++++++++++++++++++++----------
+ arch/arm/mm/mm.h       |   12 +++
+ arch/arm/mm/mmu.c      |   34 ++++----
+ arch/arm/mm/vmregion.c |  205 ------------------------------------------------
+ arch/arm/mm/vmregion.h |   31 --------
+ 6 files changed, 123 insertions(+), 296 deletions(-)
+ delete mode 100644 arch/arm/mm/vmregion.c
+ delete mode 100644 arch/arm/mm/vmregion.h
 
 -- 
-                   Sent with MeeGo's ActiveSync support.
-
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130206/b6a82cd6/attachment-0001.bin>
+1.7.9.5
