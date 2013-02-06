@@ -1,49 +1,104 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 6 Feb 2013 11:49:36 +0200
-Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
-In-Reply-To: <20130205171743.GG25185@atomide.com>
-References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
- <5110ECF3.7010908@ti.com> <20130205165851.GA1081@kroah.com>
- <20130205171743.GG25185@atomide.com>
-Message-ID: <51122730.5030801@ti.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Wed, 6 Feb 2013 15:22:54 +0530
+Subject: [PATCH V2] clk: Add composite clock type
+In-Reply-To: <20130206.081048.71241785637713947.hdoyu@nvidia.com>
+References: <5110C3E5.2010503@nvidia.com><20130205.122252.570646990867457667.hdoyu@nvidia.com><5111C604.8070104@nvidia.com>
+ <20130206.081048.71241785637713947.hdoyu@nvidia.com>
+Message-ID: <511227F6.3050601@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 07:17 PM, Tony Lindgren wrote:
-> * Greg KH <gregkh@linuxfoundation.org> [130205 09:00]:
->> On Tue, Feb 05, 2013 at 01:28:51PM +0200, Roger Quadros wrote:
->>> Hi Tony & Greg,
->>>
->>> What's the best way to get these patches in?
->>>
->>> All patches have been acked by respective maintainers.
->>>
->>> If Tony can Ack the arch/arm/mach-omap2 stuff then should I send a
->>> pull request directly to Greg? or the other way round?
->>>
->>> Tony, 
->>> fyi, these patches should not interfere with the dw3c/musb stuff
->>> sent by Felipe & Kishon.
+On Wednesday 06 February 2013 11:40 AM, Hiroshi Doyu wrote:
+> Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Wed, 6 Feb 2013 03:55:00 +0100:
+>
+>>>> No, clk_ops depends on the clocks you are using. There could be a clock
+>>>> with mux and gate while another one with mux and div.
+>>> You are right. What about the following? We don't have to have similar
+>>> copy of clk_composite_ops for each instances.
+>> Clock framework takes decision depending on the ops availability and it
+>> does not know if the clock is mux or gate.
 >>
->> I'm fine with Tony just taking them all if he wants to.
-> 
-> OK. Roger, can you please do me a pull request with these
-> against v3.8-rc6?
-> 
+>> For example,
+>>
+>>                   if (clk->ops->enable) {
+>>                           ret = clk->ops->enable(clk->hw);
+>>                           if (ret) {
+>>                                   __clk_disable(clk->parent);
+>>                                   return ret;
+>>                           }
+>>                   }
+>>
+>> in above case if clk_composite does not have gate clock then as per your
+>> suggestion if it returns error value then it will fail and it is wrong.
+> Ok, now I understand. Thank you for explanation.
+>
+> We always need to allocate clk_composite_ops for each clk_composite,
+> right? If so what about having "struct clk_ops ops" in "struct
+> clk_composite"?
+>
+> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> index f30fb4b..5240e24 100644
+> --- a/drivers/clk/clk-composite.c
+> +++ b/drivers/clk/clk-composite.c
+> @@ -129,20 +129,13 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>                  pr_err("%s: could not allocate composite clk\n", __func__);
+>                  return ERR_PTR(-ENOMEM);
+>          }
+> +       clk_composite_ops = &composite->ops;
+>   
+>          init.name = name;
+>          init.flags = flags | CLK_IS_BASIC;
+>          init.parent_names = parent_names;
+>          init.num_parents = num_parents;
+>   
+> -       /* allocate the clock ops */
+> -       clk_composite_ops = kzalloc(sizeof(*clk_composite_ops), GFP_KERNEL);
+> -       if (!clk_composite_ops) {
+> -               pr_err("%s: could not allocate clk ops\n", __func__);
+> -               kfree(composite);
+> -               return ERR_PTR(-ENOMEM);
+> -       }
+> -
+>          if (mux_hw && mux_ops) {
+>                  if (!mux_ops->get_parent || !mux_ops->set_parent) {
+>                          clk = ERR_PTR(-EINVAL);
+> @@ -202,7 +195,6 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>          return clk;
+>   
+>   err:
+> -       kfree(clk_composite_ops);
+>          kfree(composite);
+>          return clk;
+>   }
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index f0ac818..bb5d36a 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -346,6 +346,8 @@ struct clk_composite {
+>          const struct clk_ops    *mux_ops;
+>          const struct clk_ops    *div_ops;
+>          const struct clk_ops    *gate_ops;
+> +
+> +       const struct clk_ops    ops;
+>   };
+>   
+>   struct clk *clk_register_composite(struct device *dev, const char *name,
 
-Tony,
+This will work, but there is no harm in allocating dynamically. What is 
+preferred?
 
-Since this depends on [1] and [2] which are both in linux-next, should
-I base it on linux-next?
-
-Another option is to defer this to 3.10 merge window, along with the
-DT adaptation for OMAP USB Host.
-
-cheers,
--roger
-
-[1] [PATCH v9 00/20] OMAP USB Host cleanup
-https://lkml.org/lkml/2013/1/23/155
-
-[2] [PATCH v2 0/6] USB: Add support for multiple PHYs of same type
-https://lkml.org/lkml/2013/1/24/876
+>
+>>> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+>>> index f30fb4b..8f88805 100644
+>>> --- a/drivers/clk/clk-composite.c
+>>> +++ b/drivers/clk/clk-composite.c
+>>> @@ -27,6 +27,9 @@ static u8 clk_composite_get_parent(struct clk_hw *hw)
+>>>           const struct clk_ops *mux_ops = composite->mux_ops;
+>>>           struct clk_hw *mux_hw = composite->mux_hw;
+>>>    
+>>> +       if (!mux_hw->clk)
+>>> +	       return -EINVAL;
+>>> +
+>>>           mux_hw->clk = hw->clk;
+>> It is wrong.
+> Will the above "mux_hw->clk = hw->clk" be removed from the original?
