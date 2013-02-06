@@ -1,90 +1,90 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed,  6 Feb 2013 02:23:42 -0500
-Subject: [V6 PATCH 07/16] arm: brownstone: add usb support for the board
+Date: Wed,  6 Feb 2013 02:23:43 -0500
+Subject: [V6 PATCH 08/16] arm: ttc_dkb: add usb support
 In-Reply-To: <1360135431-27280-1-git-send-email-chao.xie@marvell.com>
 References: <1360135431-27280-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1360135431-27280-8-git-send-email-chao.xie@marvell.com>
+Message-ID: <1360135431-27280-9-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for brownstone board, add the udc/otg/ehci support
+for ttc_dkb board, add udc/otg/ehci support
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/brownstone.c |   47 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 47 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/ttc_dkb.c |   30 +++++++++++++++++++-----------
+ 1 files changed, 19 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index 5cb769c..90c0340 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -18,6 +18,7 @@
- #include <linux/regulator/max8649.h>
- #include <linux/regulator/fixed.h>
- #include <linux/mfd/max8925.h>
-+#include <linux/platform_data/mv_usb.h>
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index ce55fd8..0962791 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -27,7 +27,6 @@
+ #include <mach/mfp-pxa910.h>
+ #include <mach/pxa910.h>
+ #include <mach/irqs.h>
+-#include <mach/regs-usb.h>
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -195,6 +196,31 @@ static struct sram_platdata mmp2_isram_platdata = {
- 	.granularity	= SRAM_GRANULARITY,
+ #include "common.h"
+ 
+@@ -158,20 +157,24 @@ static struct i2c_board_info ttc_dkb_i2c_info[] = {
  };
  
-+#ifdef CONFIG_USB_SUPPORT
-+
-+static char *mmp2_usb_clock_name[] = {
+ #ifdef CONFIG_USB_SUPPORT
+-#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
+ 
+ static char *pxa910_usb_clock_name[] = {
+-	[0] = "U2OCLK",
 +	[0] = "usb_clk",
 +};
 +
-+static struct mv_usb_phy_platform_data brownstone_usb_phy_pdata = {
++static struct mv_usb_phy_platform_data ttc_usb_phy_pdata = {
 +	.clknum		= 1,
-+	.clkname	= mmp2_usb_clock_name,
-+};
-+
++	.clkname	= pxa910_usb_clock_name,
+ };
+ 
 +#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
 +
-+static struct mv_usb_platform_data brownstone_usb_pdata = {
-+	.clknum		= 1,
-+	.clkname	= mmp2_usb_clock_name,
-+	.vbus		= NULL,
-+	.mode		= MV_USB_MODE_OTG,
-+	.otg_force_a_bus_req = 1,
-+	.set_vbus	= NULL,
-+};
-+#endif
-+#endif
-+
-+
- static void __init brownstone_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
-@@ -211,6 +237,27 @@ static void __init brownstone_init(void)
+ static struct mv_usb_platform_data ttc_usb_pdata = {
+ 	.clknum		= 1,
+ 	.clkname	= pxa910_usb_clock_name,
+ 	.vbus		= NULL,
+ 	.mode		= MV_USB_MODE_OTG,
+ 	.otg_force_a_bus_req = 1,
+-	.phy_init	= pxa_usb_phy_init,
+-	.phy_deinit	= pxa_usb_phy_deinit,
+ 	.set_vbus	= NULL,
+ };
+ #endif
+@@ -198,19 +201,24 @@ static void __init ttc_dkb_init(void)
+ 	pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
+ 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
  
- 	/* enable 5v regulator */
- 	platform_device_register(&brownstone_v_5vp_device);
-+
 +#ifdef CONFIG_USB_SUPPORT
-+	pxa_register_device(&mmp2_device_u2ophy, &brownstone_usb_phy_pdata,
-+				sizeof(brownstone_usb_phy_pdata));
++	pxa_register_device(&pxa910_device_u2ophy, &ttc_usb_phy_pdata,
++				sizeof(ttc_usb_phy_pdata));
 +#endif
 +
-+#ifdef CONFIG_USB_MV_UDC
-+	pxa_register_device(&mmp2_device_u2o, &brownstone_usb_pdata,
-+				sizeof(brownstone_usb_pdata));
-+#endif
-+
-+#ifdef CONFIG_USB_EHCI_MV_U2O
-+	pxa_register_device(&mmp2_device_u2oehci, &brownstone_usb_pdata,
-+				sizeof(brownstone_usb_pdata));
-+#endif
-+
-+#ifdef CONFIG_USB_MV_OTG
-+	pxa_register_device(&mmp2_device_u2ootg, &brownstone_usb_pdata,
-+				sizeof(brownstone_usb_pdata));
-+#endif
-+
+ #ifdef CONFIG_USB_MV_UDC
+-	pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2o);
++	pxa_register_device(&pxa910_device_u2o, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
+ 
+ #ifdef CONFIG_USB_EHCI_MV_U2O
+-	pxa168_device_u2oehci.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2oehci);
++	pxa_register_device(&pxa910_device_u2oehci, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
+ 
+ #ifdef CONFIG_USB_MV_OTG
+-	pxa168_device_u2ootg.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2ootg);
++	pxa_register_device(&pxa910_device_u2ootg, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
  }
  
- MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
 -- 
 1.7.4.1
