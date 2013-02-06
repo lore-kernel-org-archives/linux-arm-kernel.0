@@ -1,38 +1,73 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 6 Feb 2013 10:08:35 +0800
-Subject: [PATCH v2 00/10] rework pxa gpio driver for pinctrl
-In-Reply-To: <CACRpkdbNZ4g-beSw=p3v7-QCtLO8sLg__XmhpPLvpvfqDnRLFw@mail.gmail.com>
-References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdbNZ4g-beSw=p3v7-QCtLO8sLg__XmhpPLvpvfqDnRLFw@mail.gmail.com>
-Message-ID: <CAD6h2NSBaQ2SBiqUaxD+oTh9T_UnLKjcGjaqi8n=rts8mOmHmg@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Wed, 6 Feb 2013 11:09:42 +0900
+Subject: [PATCH v5 0/3] introduce static_vm for ARM-specific static
+ mapped area
+In-Reply-To: <5110CA8E.5020606@ti.com>
+References: <1360024314-1895-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <5110CA8E.5020606@ti.com>
+Message-ID: <20130206020942.GD4325@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 February 2013 00:44, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sun, Feb 3, 2013 at 11:15 AM, Haojian Zhuang
-> <haojian.zhuang@linaro.org> wrote:
->
->> v2:
->> * Fix the build issue without CONFIG_OF
->> * Append to check PINCTRL_SINGLE because of arch pxa not moved to DT
->> * Use bool for inverted, ed_mask, gafr variable
->
-> Haojian, does this series depend on the changes for DT in pinctrl-single,
-> or can I merge it on its own?
->
-> The amount of patches makes me confused you know ... :-)
->
-> Yours,
-> Linus Walleij
+Hello, Santosh.
 
-I'm waiting for Igor's test on PXA.
-This patch series is used to support DT better. And the driver still works
-without DT support since there's no DT in PXA chips.
+On Tue, Feb 05, 2013 at 02:32:06PM +0530, Santosh Shilimkar wrote:
+> On Tuesday 05 February 2013 06:01 AM, Joonsoo Kim wrote:
+> >In current implementation, we used ARM-specific flag, that is,
+> >VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+> >The purpose of static mapped area is to re-use static mapped area when
+> >entire physical address range of the ioremap request can be covered
+> >by this area.
+> >
+> >This implementation causes needless overhead for some cases.
+> >For example, assume that there is only one static mapped area and
+> >vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
+> >deciding whether it is matched or not. Moreover, even if there is
+> >no static mapped area and vmlist has 300 areas, every time we call
+> >ioremap, we check 300 areas in now.
+> >
+> >If we construct a extra list for static mapped area, we can eliminate
+> >above mentioned overhead.
+> >With a extra list, if there is one static mapped area,
+> >we just check only one area and proceed next operation quickly.
+> >
+> >In fact, it is not a critical problem, because ioremap is not frequently
+> >used. But reducing overhead is better idea.
+> >
+> >Another reason for doing this work is for removing vm_struct list management,
+> >entirely. For more information, look at the following link.
+> >http://lkml.org/lkml/2012/12/6/184
+> >
+> 
+> [..]
+> 
+> >
+> >Joonsoo Kim (3):
+> >   ARM: vmregion: remove vmregion code entirely
+> >   ARM: ioremap: introduce an infrastructure for static mapped area
+> >   ARM: mm: use static_vm for managing static mapped areas
+> >
+> >  arch/arm/mm/Makefile   |    2 +-
+> >  arch/arm/mm/ioremap.c  |  135 +++++++++++++++++++++----------
+> >  arch/arm/mm/mm.h       |   12 +++
+> >  arch/arm/mm/mmu.c      |   34 ++++----
+> >  arch/arm/mm/vmregion.c |  205 ------------------------------------------------
+> >  arch/arm/mm/vmregion.h |   31 --------
+> >  6 files changed, 123 insertions(+), 296 deletions(-)
+> >  delete mode 100644 arch/arm/mm/vmregion.c
+> >  delete mode 100644 arch/arm/mm/vmregion.h
+> >
+> Nice Clean-up. I tested this series on OMAP which uses few static
+> mappings. Feel free to add,
+> 
+> Tested-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
 
-Only the 9th & 10th patches are related to pinctrl-single driver. You could
-skip them and I can move them into the pinctrl-single patch series.
+I will re-send v6 with your Tested-by.
 
-Yes, these patches make people confusing. :) I'm sorry on inconvenience.
+Thanks for testing this.
 
-Regards
-Haojian
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
