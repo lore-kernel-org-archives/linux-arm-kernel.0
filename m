@@ -1,27 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Feb 2013 17:38:20 +0100
-Subject: [PATCH 06/14] ARM: pci: Keep pci_common_init() around after init
-In-Reply-To: <1357764194-12677-7-git-send-email-thierry.reding@avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <1357764194-12677-7-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <CACRpkdYV5w6BksUjXvXs=88BovUyXgRt-vXSD0twjRpzbZcvFQ@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 06 Feb 2013 16:38:38 +0000
+Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP
+ operation if required
+In-Reply-To: <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1360168718.4045.18.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 9, 2013 at 9:43 PM, Thierry Reding
-<thierry.reding@avionic-design.de> wrote:
+On Tue, 2013-02-05 at 05:22 +0000, Nicolas Pitre wrote:
+> From: Jon Medhurst <tixy@linaro.org>
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-vexpress/core.h    |  2 ++
+>  arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
+>  arch/arm/mach-vexpress/v2m.c     |  2 +-
+>  3 files changed, 15 insertions(+), 1 deletion(-)
 
-> When using deferred driver probing, PCI host controller drivers may
-> actually require this function after the init stage.
->
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+For this and the other "ARM: vexpress" patches in the series:
 
-There seem to be a proliferation of these patches now.
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-Isn't this just papering over the real problem? The discarding
-of __init sections need to happen *after* all deferred probes
-are complete, lest we have to remove *all* __init sections from
-*all* drivers in the kernel, don't we?
+Thanks!
 
-Yours,
-Linus Walleij
+Pawel
