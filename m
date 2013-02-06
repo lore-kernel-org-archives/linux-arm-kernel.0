@@ -1,24 +1,88 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 6 Feb 2013 09:36:42 +0100
-Subject: [PATCH 06/14] ARM: pci: Keep pci_common_init() around after init
-In-Reply-To: <1357764194-12677-7-git-send-email-thierry.reding@avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <1357764194-12677-7-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20130206093642.32c91724@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Feb 2013 09:44:34 +0100
+Subject: [PATCH v8 03/12] gpio: find gpio base by ascend order
+In-Reply-To: <CAD6h2NRVem_yeizXzt1r2L4_WXAdqw9p_P3vMysskOYdJUkDzQ@mail.gmail.com>
+References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
+ <1359825953-15663-4-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdZbC8nrDnQEZes9XJTJ6uSfpx-DjuSs3Q6GA0=eauhdYg@mail.gmail.com>
+ <CAD6h2NRVem_yeizXzt1r2L4_WXAdqw9p_P3vMysskOYdJUkDzQ@mail.gmail.com>
+Message-ID: <CACRpkdZO-=pcPx0pddhKibheAn7r6nJ5Cdh4ee4H+zUe8D+2hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
+On Wed, Feb 6, 2013 at 2:59 AM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
+> On 6 February 2013 01:14, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-On Wed,  9 Jan 2013 21:43:06 +0100, Thierry Reding wrote:
-> When using deferred driver probing, PCI host controller drivers may
-> actually require this function after the init stage.
-> 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>> This is more scary stuff.
+>>
+>> As you know GPIO numbers are exposed to userspace.
+>>
+>> Systems with this change risk having their dynamically added
+>> GPIO controller enumerated in a different fashion. And
+>> userspace clients may be relying on these numbers.
+>>
+>> And we do not break userspace.
+>>
+>> I know this is not elegant but I'm afraid the descending search
+>> needs to be kept for compatibibility reasons.
+>>
+>> BTW: please CC Grant likely on all patches.
+>>
+>> Yours,
+>> Linus Walleij
+>
+> But descending search isn't good for reading.
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+But you may be breaking userspace.
+
+When I, as a subsystem maintainer merge a patch that break
+userspace interfaces, things like this happen:
+
+https://lkml.org/lkml/2012/12/23/75
+http://developers.slashdot.org/story/12/12/29/018234/linus-chews-up-kernel-maintainer-for-introducing-userspace-bug
+
+You can argue all you want about wanting to change things
+that affect userspace for internal kernel refactoring or fit
+with device tree or whatever, it's just not going to happen,
+because the Big Penguin has installed a culture of fear
+around breaking userspace.
+
+If you want the policy changed you can talk to Torvalds.
+
+> I try to allocate all gpio numbers in Hi3620 from gpiochip_find_base().
+> If it's descending search, GPIO0~7 is mapped to gpio248~255;
+> GPIO8~GPIO15 is mapped to gpio240~gpio247. It's not easy to read,
+> and it breaks the knowledge of gpio number on schematic & datasheet.
+
+It may make things elegant and nice on your (new) system but
+break everyone else's, and they were first in the kernel, they may
+have userspace clients and so, we cannot change this.
+
+> Unless we don't use allocating gpio numbers dynamically and add
+> a common property to parse gpio base of each chip in DTS file.
+> It's also OK to me add a common property.
+
+As explained elsewhere, global GPIO numbers don't belong
+in the device tree, as it is a Linux-specific pecularity.
+If this approach was chosen anyway, it would be named
+something like linux,gpio-base-offset
+
+One compromise would be to add global setting like
+gpio_add_dynamic_gpios_ascendingly() that will change
+the behaviour on a *specific* system, or maybe on all
+device tree systems, and keep both code paths.
+Yes, it is ugly and unelegant, but with the userspace
+contract, what can we do? We do all sort of ugliness
+for userspace.
+
+After reading this you may be on the clear why I am so
+hesitant about Roland Stigge's blocked GPIOs as well,
+that will become one more userspace ABI set in stone
+FOREVER.
+
+I'd like Grant's input on this... he has the big view on
+GPIO plus device tree.
+
+Yours,
+Linus Walleij
