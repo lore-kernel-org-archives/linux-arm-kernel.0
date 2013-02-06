@@ -1,49 +1,78 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  6 Feb 2013 07:35:27 +0100
-Subject: [PATCH v5 4/4] Dove: Thermal: Add DT node and enable in defconfig
-In-Reply-To: <1360132527-22860-1-git-send-email-andrew@lunn.ch>
-References: <1360132527-22860-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1360132527-22860-5-git-send-email-andrew@lunn.ch>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 6 Feb 2013 14:54:15 +0800
+Subject: [PATCH v5 1/3] cpufreq: kirkwood: Add a cpufreq driver for
+ Marvell Kirkwood SoCs
+In-Reply-To: <20130206062055.GD20212@lunn.ch>
+References: <1360094115-14999-1-git-send-email-andrew@lunn.ch>
+ <1360094115-14999-2-git-send-email-andrew@lunn.ch>
+ <20130206034427.GE16787@S2101-09.ap.freescale.net>
+ <20130206062055.GD20212@lunn.ch>
+Message-ID: <20130206065412.GA20885@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device tree node to instantiate the dove thermal driver.
-Enable the driver and the thermal framework in dove_defconfig.
+On Wed, Feb 06, 2013 at 07:20:55AM +0100, Andrew Lunn wrote:
+> On Wed, Feb 06, 2013 at 11:44:31AM +0800, Shawn Guo wrote:
+> > On Tue, Feb 05, 2013 at 08:55:13PM +0100, Andrew Lunn wrote:
+> > > +#include <linux/kernel.h>
+> > > +#include <linux/module.h>
+> > > +#include <linux/clk.h>
+> > > +#include <linux/clk-provider.h>
+> > 
+> > Again, why do you need this header?  It's supposed to only be included
+> > by clock drivers who provide clocks.
+> 
+> I already answered this a few times....
+> 
+> http://permalink.gmane.org/gmane.linux.kernel.cpufreq/9008
+> http://permalink.gmane.org/gmane.linux.kernel.cpufreq/9011
+> 
+Sorry, I missed those.  Well, it's clearly a layering violation to
+clk subsystem.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/dove.dtsi     |    5 +++++
- arch/arm/configs/dove_defconfig |    2 ++
- 2 files changed, 7 insertions(+)
+> > > +static int kirkwood_cpufreq_probe(struct platform_device *pdev)
+> > > +{
+> > > +	struct device_node *np;
+> > > +	struct resource *res;
+> > > +	int err;
+> > > +
+> > > +	priv.dev = &pdev->dev;
+> > > +
+> > > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > +	if (!res) {
+> > > +		dev_err(&pdev->dev, "Cannot get memory resource\n");
+> > > +		return -ENODEV;
+> > > +	}
+> > > +	priv.base = devm_request_and_ioremap(&pdev->dev, res);
+> > > +	if (!priv.base) {
+> > > +		dev_err(&pdev->dev, "Cannot ioremap\n");
+> > > +		return -EADDRNOTAVAIL;
+> > > +	}
+> > > +
+> > > +	np = of_find_node_by_path("/cpus/cpu at 0");
+> > > +	if (!np)
+> > > +		return -ENODEV;
+> > 
+> > 	pdev->dev.of_node = np;
+> > 
+> > > +
+> > > +	priv.cpu_clk = of_clk_get_by_name(np, "cpu_clk");
+> > 
+> > Then, devm_clk_get(pdev->dev, "cpu_clk") should just work for you.
+> > You are really hating to use devm_clk_get()?
+> 
+> What i don't like is it gives the idea the driver is using its own DT
+> node. Its not, the driver does not have a node in the tree, it is
+> using some other node from within the tree. What assumptions are made
+> about pdev->dev.of_node? e.g. of_find_device_by_node() would now
+> return this driver if somebody was to lookup the cpu at 0 node. You could
+> imaging in the future a thermal driver using this node, a voltage
+> scaling driver, etc.
+> 
+Well, we are just manipulating pdev->dev.of_node to get resources from
+device tree with standard API (unified between DT and non-DT), and we
+can even set it back to NULL when we're done here.
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 42eac1f..3584a00 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -50,6 +50,11 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		thermal: thermal at d001c {
-+			compatible = "marvell,dove-thermal";
-+			reg = <0xd001c 0x0c>, <0xd005c 0x08>;
-+		};
-+
- 		uart0: serial at 12000 {
- 			compatible = "ns16550a";
- 			reg = <0x12000 0x100>;
-diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
-index 0b7ee92..9713b5b 100644
---- a/arch/arm/configs/dove_defconfig
-+++ b/arch/arm/configs/dove_defconfig
-@@ -80,6 +80,8 @@ CONFIG_I2C_MV64XXX=y
- CONFIG_SPI=y
- CONFIG_SPI_ORION=y
- # CONFIG_HWMON is not set
-+CONFIG_THERMAL=y
-+CONFIG_DOVE_THERMAL=y
- CONFIG_USB=y
- CONFIG_USB_DEVICEFS=y
- CONFIG_USB_EHCI_HCD=y
--- 
-1.7.10.4
+But I shut up my mouth now, since you seem strongly against that.
+
+Shawn
