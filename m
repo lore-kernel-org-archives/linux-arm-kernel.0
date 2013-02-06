@@ -1,53 +1,31 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 5 Feb 2013 18:22:41 -0600
-Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
-In-Reply-To: <20130205233407.GR25185@atomide.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
- <20130201215154.GV22517@atomide.com> <51103247.2030906@ti.com>
- <51103A25.9010401@ti.com> <20130205233407.GR25185@atomide.com>
-Message-ID: <5111A251.9020400@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 5 Feb 2013 16:23:41 -0800
+Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
+In-Reply-To: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
+References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <CAD=FV=W+rCOADrSYoP9wzXuq1ftLYqbbSUT1KKgEc7WfVMojMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Yavaraj,
 
-On 02/05/2013 05:34 PM, Tony Lindgren wrote:
-> * Jon Hunter <jon-hunter@ti.com> [130204 14:49]:
->>
->> On 02/04/2013 04:12 PM, Jon Hunter wrote:
->>>
->>> On 02/01/2013 03:51 PM, Tony Lindgren wrote:
->>>
->>>> How about let's fix this properly to start with so we don't add
->>>> more blockers moving this code to drivers/bus?
->>>>
->>>> Looks like gpmc_mem_init() gets called from gpmc_probe() so
->>>> we can pass that information in pdev.
->>>
->>> I have re-worked this a bit to use platform data. I have also update
->>> the logic for testing internal/external boot on omap2430 which is
->>> different from omap2420 (according to the TRM). However, I have only
->>> boot tested on omap2420. 
->>>
->>> Do you know why this was changed in the first place? See below ...
->>>
->>> http://permalink.gmane.org/gmane.linux.kernel.commits.head/95931
->>>
->>> Heres what I have now ...
->>
->> Updated patch (I was missing a kfree()). By the way, this is based
->> upon the apollon removal patch. I understand probably needs to be
->> rebased on your latest gpmc series too.
-> 
-> Yeah makes sense to me thanks. I'll figure out where to apply this
-> so we don't get too many dependencies.
+On Mon, Feb 4, 2013 at 1:03 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>
+> This RFC patch is w.r.t multimaster bus arbitration which is already
+> being discussing in the mainline.
+> This patch provides hooks for the i2c multimaster bus arbitration
+> and to have the arbitration parameters.
 
-Actually, let me look into this a bit more. It appears that for all
-omap2+ devices NOR should be mapped to CS0 at 0x08000000. So I am
-wondering if the boot-loader is re-mapping the CS0 space. If it is then
-may be we can avoid having such hacks in the kernel by fixing the
-bootloader. To date only the apollon board has really had this problem
-and I need to check what I have on my H4 (which has been hacked by me ;-)
+I may have missed something in all the threads, but my recollection
+was that the request was that this should be implemented without
+touching the i2c core code.  Your patch modifies the i2c core code.
 
-Cheers
-Jon
+My impression was that the best solution was to use the infrastructure
+in place for i2c multiplexing.  ...but in your case you would only
+multiplex one thing.  This was suggested by Grant Likely and seems the
+cleanest...
+
+
+[apologies for double-email; darn gmail and HTML email]
+
+-Doug
