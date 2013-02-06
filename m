@@ -1,88 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Feb 2013 09:44:34 +0100
-Subject: [PATCH v8 03/12] gpio: find gpio base by ascend order
-In-Reply-To: <CAD6h2NRVem_yeizXzt1r2L4_WXAdqw9p_P3vMysskOYdJUkDzQ@mail.gmail.com>
-References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
- <1359825953-15663-4-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdZbC8nrDnQEZes9XJTJ6uSfpx-DjuSs3Q6GA0=eauhdYg@mail.gmail.com>
- <CAD6h2NRVem_yeizXzt1r2L4_WXAdqw9p_P3vMysskOYdJUkDzQ@mail.gmail.com>
-Message-ID: <CACRpkdZO-=pcPx0pddhKibheAn7r6nJ5Cdh4ee4H+zUe8D+2hg@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 6 Feb 2013 10:56:39 +0200
+Subject: [PATCH 09/13] mfd: omap-usb-host: Add device tree support and
+ binding information
+In-Reply-To: <20130205161141.GD26842@e106331-lin.cambridge.arm.com>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-10-git-send-email-rogerq@ti.com>
+ <20130205142049.GC26842@e106331-lin.cambridge.arm.com>
+ <51111A41.4050607@ti.com>
+ <20130205161141.GD26842@e106331-lin.cambridge.arm.com>
+Message-ID: <51121AC7.6070107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 6, 2013 at 2:59 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
-> On 6 February 2013 01:14, Linus Walleij <linus.walleij@linaro.org> wrote:
-
->> This is more scary stuff.
+On 02/05/2013 06:11 PM, Mark Rutland wrote:
+> [...]
+> 
+>>>> +
+>>>> +- single_ulpi_bypass: Must be present if the controller contains a single
+>>>> +  ULPI bypass control bit. e.g. OMAP3 silicon <= ES2.1
+>>>
+>>> Again it would be nicer to have '-' rather than '_' here. It might be worth
+>>> prefixing this "ti,".
 >>
->> As you know GPIO numbers are exposed to userspace.
->>
->> Systems with this change risk having their dynamically added
->> GPIO controller enumerated in a different fashion. And
->> userspace clients may be relying on these numbers.
->>
->> And we do not break userspace.
->>
->> I know this is not elegant but I'm afraid the descending search
->> needs to be kept for compatibibility reasons.
->>
->> BTW: please CC Grant likely on all patches.
->>
->> Yours,
->> Linus Walleij
->
-> But descending search isn't good for reading.
+>> Is prefixing with "ti" really required? how does it better?
+> 
+> I thought single-ulpi-bypass sounded rather generic, but it probably is
+> specific enough as-is. I don't know enough about USB hardware to have strong
+> feelings either way.
+> 
 
-But you may be breaking userspace.
+Yes, it is specific to the TI silicon. I'll leave it as it is then.
 
-When I, as a subsystem maintainer merge a patch that break
-userspace interfaces, things like this happen:
-
-https://lkml.org/lkml/2012/12/23/75
-http://developers.slashdot.org/story/12/12/29/018234/linus-chews-up-kernel-maintainer-for-introducing-userspace-bug
-
-You can argue all you want about wanting to change things
-that affect userspace for internal kernel refactoring or fit
-with device tree or whatever, it's just not going to happen,
-because the Big Penguin has installed a culture of fear
-around breaking userspace.
-
-If you want the policy changed you can talk to Torvalds.
-
-> I try to allocate all gpio numbers in Hi3620 from gpiochip_find_base().
-> If it's descending search, GPIO0~7 is mapped to gpio248~255;
-> GPIO8~GPIO15 is mapped to gpio240~gpio247. It's not easy to read,
-> and it breaks the knowledge of gpio number on schematic & datasheet.
-
-It may make things elegant and nice on your (new) system but
-break everyone else's, and they were first in the kernel, they may
-have userspace clients and so, we cannot change this.
-
-> Unless we don't use allocating gpio numbers dynamically and add
-> a common property to parse gpio base of each chip in DTS file.
-> It's also OK to me add a common property.
-
-As explained elsewhere, global GPIO numbers don't belong
-in the device tree, as it is a Linux-specific pecularity.
-If this approach was chosen anyway, it would be named
-something like linux,gpio-base-offset
-
-One compromise would be to add global setting like
-gpio_add_dynamic_gpios_ascendingly() that will change
-the behaviour on a *specific* system, or maybe on all
-device tree systems, and keep both code paths.
-Yes, it is ugly and unelegant, but with the userspace
-contract, what can we do? We do all sort of ugliness
-for userspace.
-
-After reading this you may be on the clear why I am so
-hesitant about Roland Stigge's blocked GPIOs as well,
-that will become one more userspace ABI set in stone
-FOREVER.
-
-I'd like Grant's input on this... he has the big view on
-GPIO plus device tree.
-
-Yours,
-Linus Walleij
+cheers,
+-roger
