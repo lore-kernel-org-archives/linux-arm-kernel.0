@@ -1,95 +1,49 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 06 Feb 2013 11:48:48 +0530
-Subject: [PATCH V3 4/5] ARM: dts: Add #dma-cells for generic dma binding
- support
+Date: Wed, 06 Feb 2013 11:48:47 +0530
+Subject: [PATCH V3 3/5] DMA: PL330: Register the DMA controller with the
+ generic DMA helpers
 In-Reply-To: <1360131529-2847-1-git-send-email-padma.v@samsung.com>
 References: <1360131529-2847-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1360131529-2847-5-git-send-email-padma.v@samsung.com>
+Message-ID: <1360131529-2847-4-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds #dma-cells property to PL330 DMA controller
-nodes for supporting generic dma dt bindings on samsung
-exynos5250 platform.
+This patch registers the pl330 dma controller driver with the generic
+device tree dma helper functions.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- .../devicetree/bindings/dma/arm-pl330.txt          |   15 +++++++++++----
- arch/arm/boot/dts/exynos5250.dtsi                  |    4 ++++
- 2 files changed, 15 insertions(+), 4 deletions(-)
+ drivers/dma/pl330.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-index 36e27d5..1fdbff6 100644
---- a/Documentation/devicetree/bindings/dma/arm-pl330.txt
-+++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-@@ -8,6 +8,8 @@ Required properties:
-   - reg: physical base address of the controller and length of memory mapped
-     region.
-   - interrupts: interrupt number to the cpu.
-+  - #dma-cells: must be <1>. used to represent the number of integer
-+    cells in the dmas property of client device.
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index e68c83b..3fca247 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2999,6 +2999,14 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
+ 		pi->pcfg.num_peri, pi->pcfg.num_events);
  
- Optional properties:
- - dma-coherent      : Present if dma operations are coherent
-@@ -18,16 +20,21 @@ Example:
- 		compatible = "arm,pl330", "arm,primecell";
- 		reg = <0x12680000 0x1000>;
- 		interrupts = <99>;
-+		#dma-cells = <1>;
- 	};
++	ret = of_dma_controller_register(adev->dev.of_node,
++					 of_dma_pl330_xlate, pdmac);
++	if (ret) {
++		dev_err(&adev->dev,
++		"unable to register DMA to the generic DT DMA helpers\n");
++		goto probe_err2;
++	}
++
+ 	return 0;
  
- Client drivers (device nodes requiring dma transfers from dev-to-mem or
--mem-to-dev) should specify the DMA channel numbers using a two-value pair
-+mem-to-dev) should specify the DMA channel numbers and dma channel names
- as shown below.
+ probe_err4:
+@@ -3025,6 +3033,8 @@ static int pl330_remove(struct amba_device *adev)
+ 	if (!pdmac)
+ 		return 0;
  
-   [property name]  = <[phandle of the dma controller] [dma request id]>;
-+  [property name]  = <[dma channel name]>
++	of_dma_controller_free(adev->dev.of_node);
++
+ 	amba_set_drvdata(adev, NULL);
  
-       where 'dma request id' is the dma request number which is connected
--      to the client controller. The 'property name' is recommended to be
--      of the form <name>-dma-channel.
-+      to the client controller. The 'property name' 'dmas' and 'dma-names'
-+      as required by the generic dma device tree binding helpers. The dma
-+      names correspond 1:1 with the dma request ids in the dmas property.
- 
--  Example:  tx-dma-channel = <&pdma0 12>;
-+  Example:  dmas = <&pdma0 12
-+		    &pdma1 11>;
-+	    dma-names = "tx", "rx";
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index f50b4e8..724f5bd 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -312,24 +312,28 @@
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x121A0000 0x1000>;
- 			interrupts = <0 34 0>;
-+			#dma-cells = <1>;
- 		};
- 
- 		pdma1: pdma at 121B0000 {
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x121B0000 0x1000>;
- 			interrupts = <0 35 0>;
-+			#dma-cells = <1>;
- 		};
- 
- 		mdma0: mdma at 10800000 {
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x10800000 0x1000>;
- 			interrupts = <0 33 0>;
-+			#dma-cells = <1>;
- 		};
- 
- 		mdma1: mdma at 11C10000 {
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x11C10000 0x1000>;
- 			interrupts = <0 124 0>;
-+			#dma-cells = <1>;
- 		};
- 	};
- 
+ 	/* Idle the DMAC */
 -- 
 1.7.4.4
