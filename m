@@ -1,50 +1,120 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Feb 2013 17:46:50 +0100
-Subject: [PATCH 1/2] tty: serial: remove __init on pl011 console ops
-In-Reply-To: <20130206163811.GI17833@n2100.arm.linux.org.uk>
-References: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
- <20130206115219.GE17833@n2100.arm.linux.org.uk>
- <CAD6h2NSpo74UXUgH2OJniW=wzkxGeshta05AGgCpn26SCUSjYg@mail.gmail.com>
- <CACRpkdZX-YF+jzg453Vmfxo_2LLuASvZyQqLommaM4Xd3LpwfQ@mail.gmail.com>
- <20130206163811.GI17833@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZDks681kDBrNcztWw_vr-5azWxsuDQaDa36Ze=0+B2Kg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 6 Feb 2013 17:51:28 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130131224459.GA11846@obsidianresearch.com>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <2776630.gp5gC9tvLk@wuerfel>
+ <20130131180249.GA30869@obsidianresearch.com>
+ <201301312046.22560.arnd@arndb.de>
+ <20130131224459.GA11846@obsidianresearch.com>
+Message-ID: <20130206175128.1b64196d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 6, 2013 at 5:38 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Dear Jason Gunthorpe,
 
-> However, I'm just wondering if this shows that we _do_ need to get rid
-> of a pile of __init marked functions as well as fixing this, thanks to
-> the deferred probing we now have (maybe the whole __init thing becomes
-> useless with deferred probing?)
+On Thu, 31 Jan 2013 15:44:59 -0700, Jason Gunthorpe wrote:
 
-And all __initdata and __initconst as well.
+> > For the primary bus, yes, but there are still two options for the
+> > second one: you can either start at 0 again or you can continue
+> 
+> No, for *all* links. You use a mmap scheme with 4k granularity, I
+> explained in a past email, but to quickly review..
+> 
+> - Each link gets 64k of reserved physical address space for IO,
+>   this is just set aside, no MBUS windows are permantently assigned.
+> - Linux is told to use a 64k IO range with bus IO address 0->0xFFFF
+> - When the IO base/limit register in the link PCI-PCI bridge is programmed
+>   the driver gets a 4k aligned region somewhere from 0->0xFFFF and then:
+>     - Allocates a 64k MBUS window that translates physical address
+>       0xZZZZxxxx to IO bus address 0x0000xxxx (goes in the TLP) for
+>       that link
+>     - Uses pci_ioremap_io to map the fraction of the link's 64k MBUS window
+>       allocated to that bridge to the correct offset in the 
+>       PCI_IO_VIRT_BASE region
 
-> There's nothing really to guarantee
-> that the pinctrl stuff will be available by the time the init sections
-> are discarded (it could be in a loadable module?) or indeed any other
-> resources that might be necessary.
+This, I think I now understand.
 
-I don't dare to guess how deferred probing is supposed to work
-with loadable modules. When I start to think of it my mind
-boggles. But I think maybe all drivers that support module loading
-are tagging things wrong. Shouldn't they all be using
-__init_or_module, __initdata_or_module, __initconst_or_module
-so they only get discarded unless compiled as modules?
+> So you'd end up with a MMU mapping something like:
+>   PCI_IO_VIRT_BASE    MBUS_IO_PHYS_BASE
+>     0->4k          => 0      -> 4k             // 4k assigned to link0
+>     4k->8k         => 64k+4k -> 64k+8k         // 4k assigned to link1
+>     8k->24k        => 128k+8k -> 128k+24k      // 8k assigned to link2
 
-As far as I can tell from <linux/init.h> that is the intention.
+I am not sure to understand your example, starting at the second line.
+Shouldn't the second line have been
 
-Talk about can of worms :-(
+      4k->8k         => 64k -> 64k+4k
 
-> I think in this regard, deferred probing has opened a similar can of
-> worms which hotplug devices created (which eventually ended up with
-> killing the __dev* marking).
+ ?
 
-I'm afraid you're right.
+If you do:
 
-Pinctrl core grabbing of pins seems to trigger the problem more
-often on platforms that are using it.
+      4k->8k         => 64k+4k -> 64k+8k
 
-Yours,
-Linus Walleij
+as you suggested, then when the device driver will do an inl(0x4) on
+this device, the device will receive the equivalent of an inl(0x1004),
+no?
+
+I understand that I have two choices here:
+
+ * First one is to make the I/O regions of all PCIe links fit below the
+   default IO_SPACE_LIMIT (0xffff) by doing the mapping trick you
+   described above.
+
+ * Second one is to have one 64 KB block for each PCIe link, which
+   would require raising the IO_SPACE_LIMIT on this platform.
+
+Is this correct?
+
+If so, then what I don't understand is that Kirkwood does the second
+thing (from arch/arm/mach-kirkwood/pcie.c) :
+
+        switch (index) {
+        case 0:
+		[...]
+		/* Here the code is mapping 0 -> 64k */
+                pci_ioremap_io(SZ_64K * sys->busnr, KIRKWOOD_PCIE_IO_PHYS_BASE);
+                break;
+        case 1:
+		[...]
+		/* And here 64k -> 128k */
+                pci_ioremap_io(SZ_64K * sys->busnr,
+                               KIRKWOOD_PCIE1_IO_PHYS_BASE);
+                break;
+
+So it has PCI I/O space from 0 to 128k, but still it seems to use the
+default IO_SPACE_LIMIT of 0xffff. How can this work? Maybe nobody every
+used a device on the second PCIe link that required I/O accesses.
+
+> Where the physical mbus window for each link starts on each 64k block.
+> 
+> Thomas: This solves the need to have alignment of the IO regions, and
+> gets rid of any trouble with 32 bit IO addreses, however you'll need
+> to allocate the remap capable mbus windows separately for use by IO
+> mappings..
+> 
+> Though, there is still a problem with the MMIO mbus window
+> alignment. mbus windows are aligned to a multiple of their size, PCI
+> MMIO bridge windows are always aligned to 1M...
+
+Can't this be solved using the window_alignement() hook we've been
+discussing separately? Just like we teach the Linux PCI core about our
+alignment requirements of 64K for the I/O regions, we could teach it
+about our alignment requirement on memory regions as well. No?
+
+> Though, it is my hope that Thomas's driver will work on Kirkwood as
+> well...
+
+Yes, my plan is to have it working on Kirkwood. This WE, I was given a
+Kirkwood based machine that has a usable PCIe device.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
