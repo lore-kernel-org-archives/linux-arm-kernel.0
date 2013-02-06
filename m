@@ -1,56 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 05 Feb 2013 17:22:23 -0700
-Subject: [PATCH v3 1/3] drm/exynos: Get HDMI version from device tree
-In-Reply-To: <1360107777-17490-2-git-send-email-seanpaul@chromium.org>
-References: <1360107777-17490-1-git-send-email-seanpaul@chromium.org>
- <1360107777-17490-2-git-send-email-seanpaul@chromium.org>
-Message-ID: <5111A23F.50300@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 5 Feb 2013 18:22:41 -0600
+Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
+In-Reply-To: <20130205233407.GR25185@atomide.com>
+References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
+ <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
+ <20130201215154.GV22517@atomide.com> <51103247.2030906@ti.com>
+ <51103A25.9010401@ti.com> <20130205233407.GR25185@atomide.com>
+Message-ID: <5111A251.9020400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-n 02/05/2013 04:42 PM, Sean Paul wrote:
-> Use the compatible string in the device tree to determine which
-> registers/functions to use in the HDMI driver. Also changes the
-> references from v13 to 4210 and v14 to 4212 to reflect the IP
-> block version instead of the HDMI version.
 
-> diff --git a/Documentation/devicetree/bindings/drm/exynos/hdmi.txt b/Documentation/devicetree/bindings/drm/exynos/hdmi.txt
+On 02/05/2013 05:34 PM, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [130204 14:49]:
+>>
+>> On 02/04/2013 04:12 PM, Jon Hunter wrote:
+>>>
+>>> On 02/01/2013 03:51 PM, Tony Lindgren wrote:
+>>>
+>>>> How about let's fix this properly to start with so we don't add
+>>>> more blockers moving this code to drivers/bus?
+>>>>
+>>>> Looks like gpmc_mem_init() gets called from gpmc_probe() so
+>>>> we can pass that information in pdev.
+>>>
+>>> I have re-worked this a bit to use platform data. I have also update
+>>> the logic for testing internal/external boot on omap2430 which is
+>>> different from omap2420 (according to the TRM). However, I have only
+>>> boot tested on omap2420. 
+>>>
+>>> Do you know why this was changed in the first place? See below ...
+>>>
+>>> http://permalink.gmane.org/gmane.linux.kernel.commits.head/95931
+>>>
+>>> Heres what I have now ...
+>>
+>> Updated patch (I was missing a kfree()). By the way, this is based
+>> upon the apollon removal patch. I understand probably needs to be
+>> rebased on your latest gpmc series too.
+> 
+> Yeah makes sense to me thanks. I'll figure out where to apply this
+> so we don't get too many dependencies.
 
-Binding looks sane to me.
+Actually, let me look into this a bit more. It appears that for all
+omap2+ devices NOR should be mapped to CS0 at 0x08000000. So I am
+wondering if the boot-loader is re-mapping the CS0 space. If it is then
+may be we can avoid having such hacks in the kernel by fixing the
+bootloader. To date only the apollon board has really had this problem
+and I need to check what I have on my H4 (which has been hacked by me ;-)
 
-> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-
->  #ifdef CONFIG_OF
->  static struct of_device_id hdmi_match_types[] = {
->  	{
-> -		.compatible = "samsung,exynos5-hdmi",
-> -		.data	= (void	*)HDMI_TYPE14,
-> +		.compatible = "samsung,exynos4-hdmi",
->  	}, {
->  		/* end node */
->  	}
-
-Why not fill in all the "base" compatible values there (I think you need
-this anyway so that DTs don't all have to be compatible with
-samsung,exynos4-hdmi), with .data containing the HDMI_VER_EXYNOS*
-values, then ...
-
-> @@ -2218,17 +2217,18 @@ static int hdmi_probe(struct platform_device *pdev)
-
-> +
-> +	if (of_device_is_compatible(dev->of_node, "samsung,exynos4210-hdmi"))
-> +		hdata->version |= HDMI_VER_EXYNOS4210;
-> +	if (of_device_is_compatible(dev->of_node, "samsung,exynos4212-hdmi"))
-> +		hdata->version |= HDMI_VER_EXYNOS4212;
-> +	if (of_device_is_compatible(dev->of_node, "samsung,exynos5250-hdmi"))
-> +		hdata->version |= HDMI_VER_EXYNOS5250;
-
-Instead of that, do roughly:
-
-    match = of_match_device(hdmi_match_types, &pdev->dev);
-    if (match)
-        hdata->version |= (int)match->data;
-
-That way, it's all table-based. Any future additions to
-hdmi_match_types[] won't require another if statement to be added to
-probe().
+Cheers
+Jon
