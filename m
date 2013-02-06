@@ -1,47 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 6 Feb 2013 13:03:55 +0200
-Subject: [PATCH 3/5] ARM: OMAP2: MUSB: Specify omap4 has mailbox
-In-Reply-To: <20130206105713.GF17852@n2100.arm.linux.org.uk>
-References: <1360130294-5976-1-git-send-email-kishon@ti.com>
- <1360130294-5976-4-git-send-email-kishon@ti.com>
- <20130206105713.GF17852@n2100.arm.linux.org.uk>
-Message-ID: <20130206110355.GH22064@arwen.pp.htv.fi>
+From: rachna@ti.com (Patil, Rachna)
+Date: Wed, 6 Feb 2013 11:17:23 +0000
+Subject: [PATCH v4 5/8] MFD: ti_am335x_tscadc: Add DT support
+References: <1358999112-31192-1-git-send-email-rachna@ti.com>
+ <1358999112-31192-6-git-send-email-rachna@ti.com>
+ <A9839AA2-ABCD-4642-9766-D56824AC27AD@dominion.thruhere.net>
+ <4CE347531D4CA947960AF71FF095B9323E9B1EE9@DBDE01.ent.ti.com>
+ <79CD15C6BA57404B839C016229A409A83EBEFAE8@DBDE01.ent.ti.com>
+Message-ID: <4CE347531D4CA947960AF71FF095B9323E9B44E9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Koen,
 
-On Wed, Feb 06, 2013 at 10:57:13AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 06, 2013 at 11:28:11AM +0530, Kishon Vijay Abraham I wrote:
-> > Added has_mailbox to the musb platform data to specify that omap uses
-> > an external mailbox (in control module) to communicate with the musb
-> > core during device connect and disconnect.
+> <SNIP>
+> > > > Since AM335x is DT only, why is there a platform data codepath and why is it the first branch it tries? And I guess the next question is related to the first: why doesn't it work when used with DT? When I copy over the nodes from the evm.dts to my board I get "tsc tsc: Missing platform data" in dmesg.
+> > > 
+> > > This IP came up 1st on AM335x, but it is not platform dependent. The driver can be used on other platforms where-in DT is not supported.
+> > > According to the maintainers platform data takes precedence over DT. Hence the order.
+> > > 
+> > 
+> > Rachana,
+> > 
+> > I see no point adding support for platform_data when you know that none of older platforms are going to use this driver and all future platforms _must_ follow device-tree model.
+> > 
+> > So I agree that you should remove board file dependency from the driver.
 > 
-> So, I've been through your five patches looking for any other users of
-> "has_mailbox" and I can find none.  You introduce this in this patch,
-> and you set it.  But I don't see anything that uses it.
+> Ok. I will remove support for platform data in the next version of patches.
 > 
-> Write only variables are not useful.
+> > 
+> > 
+> > > I do not see "Missing platform data" error msg in the latest driver. I am not able to trace from where this got populated.
+> > > 
+> > 
+> > Can you share the branch which you have tested?
+> 
+> https://github.com/patilrachna/linux/tree/v3.8_rc3_MFD_TSCADC_DT-v2
 
-looking back at what I sent Greg this was probably my fault. When taking
-Kishon's patches (in particular $SUBJECT) I removed some of arch/arm/
-code and ended up forgetting to add the include file which introduces
-has_mailbox.
+Did you get a chance to test this branch?
+And can you also share your branch, on which you observed the issue.
 
-This means that my lack of attention has introduced a compile break on
-Greg's tree. Oh well, s**t happens. In any case, the user is already in
-Greg's tree and there's no way Greg will rebase his tree to amend
-$SUBJECT there, so it will have to go separately.
-
-I didn't even notice this before because I had the diff in my tree, just
-forgot to git add and/or git reset. Too late now
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130206/d47e6068/attachment.sig>
+Regards,
+Rachna
