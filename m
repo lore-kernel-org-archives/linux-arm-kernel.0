@@ -1,24 +1,37 @@
-From: amit.virdi@st.com (Amit Virdi)
-Date: Wed, 6 Feb 2013 09:22:39 +0530
-Subject: ARM/Kernel: Problems with multiple VIC registration
-In-Reply-To: <CACRpkdZX4OyfYbcc2-sdf5LLJmBrGTa27_8swvcZ-rBP6-+1CQ@mail.gmail.com>
-References: <5110D55F.9040509@st.com>
- <CACRpkdZX4OyfYbcc2-sdf5LLJmBrGTa27_8swvcZ-rBP6-+1CQ@mail.gmail.com>
-Message-ID: <5111D387.9040803@st.com>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Wed, 6 Feb 2013 09:30:02 +0530
+Subject: [PATCH V2 0/2] ARM: davinci: da850: add wdt DT node
+Message-ID: <1360123204-9978-1-git-send-email-anilkumar.v@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/5/2013 9:57 PM, Linus Walleij wrote:
-> On Tue, Feb 5, 2013 at 10:48 AM, Amit Virdi<amit.virdi@st.com>  wrote:
->
->> The first controller is registered throu' irq_domain_add_linear API. As a
->> result of this call, a new domain is allocated to the VIC device.
->
-> This is a bug. Do you have this patch in your tree:
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7611/1
->
+Add wdt DT node and OF_DEV_AUXDATA for wdt driver in
+da850 board dt file to use wdt clock.
 
-Yes, I have this patch (from rc2) and still the bug!
+This is tested on da850 EVM.
 
-Regards
-Amit Virdi
+Test Procedure:
+
+$watchdog -F /dev/watchdog (Device should not reboot)
+ After wdt heartbeat timeout(DEFAULT_HEARTBEAT is 60 sec)
+$ctr + c   (Device should reboot after heartbeat timeout)
+
+Changes since V1:
+
+ - Rebase changes on top of v3.8-rc6.
+ - Make single patch for wdt DT node and its OF_DEV_AUXDATA entry changes.
+ - Fix wdt to machine restart with DT.
+
+Kumar, Anil (2):
+  ARM: davinci: da850: add wdt DT node
+  ARM: davinci: restart: fix wdt to machine restart with DT
+
+ arch/arm/boot/dts/da850-evm.dts            |    3 +++
+ arch/arm/boot/dts/da850.dtsi               |    5 +++++
+ arch/arm/mach-davinci/da8xx-dt.c           |    8 +++++++-
+ arch/arm/mach-davinci/devices-da8xx.c      |   14 ++++++++++++--
+ arch/arm/mach-davinci/include/mach/da8xx.h |    1 -
+ 5 files changed, 27 insertions(+), 4 deletions(-)
+
+-- 
+1.7.4.1
