@@ -1,30 +1,40 @@
 From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Wed,  6 Feb 2013 11:39:20 -0800
-Subject: [PATCH 1/3] cpufreq: exynos: Remove error return even if no soc found
-Message-ID: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
+Date: Wed,  6 Feb 2013 11:39:22 -0800
+Subject: [PATCH 3/3] dts: Add cpufreq controller node for Exynos5440 SoC
+In-Reply-To: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
+References: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <1360179562-19950-3-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change is needed for adding different type of cpufreq driver
-and support single binary image.
+Add cpufreq controller device node for Exynos5440 SoC for passing
+parameters like controller base address, interrupt and cpufreq
+table.
 
 Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 ---
- drivers/cpufreq/exynos-cpufreq.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5440.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index 7012ea8..9d3690a 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -272,7 +272,7 @@ static int __init exynos_cpufreq_init(void)
- 	else if (soc_is_exynos5250())
- 		ret = exynos5250_cpufreq_init(exynos_info);
- 	else
--		pr_err("%s: CPU type not found\n", __func__);
-+		return 0;
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index 024269d..b20b517 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -63,6 +63,15 @@
  
- 	if (ret)
- 		goto err_vdd_arm;
+ 	};
+ 
++	cpufreq at 160000 {
++		compatible = "samsung,exynos5440-cpufreq";
++		reg = <0x160000 0x1000>;
++		interrupts = <0 57 0>;
++		cpufreq_tbl = <	1200000 1025000
++				1000000 975000
++				800000  925000 >;
++	};
++
+ 	serial at B0000 {
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0xB0000 0x1000>;
 -- 
 1.7.10.4
