@@ -1,103 +1,46 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 6 Feb 2013 07:10:48 +0100
-Subject: [PATCH V2] clk: Add composite clock type
-In-Reply-To: <5111C604.8070104@nvidia.com>
-References: <5110C3E5.2010503@nvidia.com><20130205.122252.570646990867457667.hdoyu@nvidia.com><5111C604.8070104@nvidia.com>
-Message-ID: <20130206.081048.71241785637713947.hdoyu@nvidia.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 06 Feb 2013 11:48:44 +0530
+Subject: [PATCH V3 0/5] Add generic DMA DT binding support
+Message-ID: <1360131529-2847-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prashant Gaikwad <pgaikwad@nvidia.com> wrote @ Wed, 6 Feb 2013 03:55:00 +0100:
+Changes since V2:
+	- Add new filter function for DT case as suggested by Arnd
+	- Add xlate as static function
+	- Use newly added filter function in xlate.
+	- Add Acked-by for some of the patches
 
-> >> No, clk_ops depends on the clocks you are using. There could be a clock
-> >> with mux and gate while another one with mux and div.
-> > You are right. What about the following? We don't have to have similar
-> > copy of clk_composite_ops for each instances.
-> 
-> Clock framework takes decision depending on the ops availability and it 
-> does not know if the clock is mux or gate.
-> 
-> For example,
-> 
->                  if (clk->ops->enable) {
->                          ret = clk->ops->enable(clk->hw);
->                          if (ret) {
->                                  __clk_disable(clk->parent);
->                                  return ret;
->                          }
->                  }
-> 
-> in above case if clk_composite does not have gate clock then as per your 
-> suggestion if it returns error value then it will fail and it is wrong.
+Changes since V1:
+        - Address the review comments by Arnd Bergmann as below
+        - Wording of the properties.
+        - Pass pdmac as third parameter to of_dma_controller_register
+        - Filter the dma channel based on channel number and dma_device
 
-Ok, now I understand. Thank you for explanation.
+This patch set adds support for generic dma device tree bindings for
+Samsung platforms and is dependent on the following patches from
+Vinod Koul next branch
+1)of: Add generic device tree DMA helpers
+2)dmaengine: add helper function to request a slave DMA channel
 
-We always need to allocate clk_composite_ops for each clk_composite,
-right? If so what about having "struct clk_ops ops" in "struct
-clk_composite"?
+This patch set is made based Mark Brown next branch
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index f30fb4b..5240e24 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -129,20 +129,13 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
-                pr_err("%s: could not allocate composite clk\n", __func__);
-                return ERR_PTR(-ENOMEM);
-        }
-+       clk_composite_ops = &composite->ops;
- 
-        init.name = name;
-        init.flags = flags | CLK_IS_BASIC;
-        init.parent_names = parent_names;
-        init.num_parents = num_parents;
- 
--       /* allocate the clock ops */
--       clk_composite_ops = kzalloc(sizeof(*clk_composite_ops), GFP_KERNEL);
--       if (!clk_composite_ops) {
--               pr_err("%s: could not allocate clk ops\n", __func__);
--               kfree(composite);
--               return ERR_PTR(-ENOMEM);
--       }
--
-        if (mux_hw && mux_ops) {
-                if (!mux_ops->get_parent || !mux_ops->set_parent) {
-                        clk = ERR_PTR(-EINVAL);
-@@ -202,7 +195,6 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
-        return clk;
- 
- err:
--       kfree(clk_composite_ops);
-        kfree(composite);
-        return clk;
- }
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index f0ac818..bb5d36a 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -346,6 +346,8 @@ struct clk_composite {
-        const struct clk_ops    *mux_ops;
-        const struct clk_ops    *div_ops;
-        const struct clk_ops    *gate_ops;
-+
-+       const struct clk_ops    ops;
- };
- 
- struct clk *clk_register_composite(struct device *dev, const char *name,
+Padmavathi Venna (5):
+  DMA: PL330: Add new pl330 filter for DT case.
+  DMA: PL330: Add xlate function
+  DMA: PL330: Register the DMA controller with the generic DMA helpers
+  ARM: dts: Add #dma-cells for generic dma binding support
+  ARM: SAMSUNG: dma: Remove unnecessary code
 
+ .../devicetree/bindings/dma/arm-pl330.txt          |   15 ++++-
+ arch/arm/boot/dts/exynos5250.dtsi                  |    4 +
+ arch/arm/mach-s3c24xx/include/mach/dma.h           |    1 -
+ arch/arm/mach-s3c64xx/include/mach/dma.h           |    1 -
+ arch/arm/plat-samsung/dma-ops.c                    |   10 +---
+ arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 -
+ arch/arm/plat-samsung/include/plat/dma-pl330.h     |    1 -
+ drivers/dma/pl330.c                                |   64 +++++++++++++++----
+ 8 files changed, 66 insertions(+), 31 deletions(-)
 
-> > diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-> > index f30fb4b..8f88805 100644
-> > --- a/drivers/clk/clk-composite.c
-> > +++ b/drivers/clk/clk-composite.c
-> > @@ -27,6 +27,9 @@ static u8 clk_composite_get_parent(struct clk_hw *hw)
-> >          const struct clk_ops *mux_ops = composite->mux_ops;
-> >          struct clk_hw *mux_hw = composite->mux_hw;
-> >   
-> > +       if (!mux_hw->clk)
-> > +	       return -EINVAL;
-> > +
-> >          mux_hw->clk = hw->clk;
->
-> It is wrong.
-
-Will the above "mux_hw->clk = hw->clk" be removed from the original?
+-- 
+1.7.4.4
