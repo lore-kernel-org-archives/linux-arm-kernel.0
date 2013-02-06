@@ -1,28 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 6 Feb 2013 12:02:14 +0800
-Subject: [PATCH] ASoC: fsl: fix allyesconfig build for imx-pcm
-In-Reply-To: <201302051642.25361.arnd@arndb.de>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <20130122063331.GA1766@opensource.wolfsonmicro.com>
- <201302051621.12320.arnd@arndb.de>
- <201302051642.25361.arnd@arndb.de>
-Message-ID: <20130206040212.GA18613@S2101-09.ap.freescale.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed,  6 Feb 2013 09:44:15 +0530
+Subject: [PATCH] ARM: SPEAr13xx: Enable CONFIG_ARCH_HAS_CPUFREQ
+Message-ID: <07186d8f30c387aa3f47be8c98d34678ca4b5ba9.1360123662.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 04:42:25PM +0000, Arnd Bergmann wrote:
-> Patch 25b8d314 "ASoC: fsl: fix multiple definition of init_module changed
-> the Makefile for imx-pcm.ko to build two modules that both contain the
-> imx-pcm.c file, which nicely solves the problem of building both versions
-> of the driver as modules, but it causes two new problems:
-> 
-It's my fault, Arnd.  The patch 25b8d314 is a crap.  Instead of making
-the Kconfig even complexer, I chose to revert the patch and do a little
-surgery on the code to make it match the Kconfig rational.  The fix[1]
-should be on the way to mainline now.
+SPEAr13xx supports cpufreq and has an upstreamed driver for it. This patch
+enables cpufreq configs for SPEAr13xx.
 
-I'm sorry for messing thing up during -rc time.
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/plat-spear/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Shawn
-
-[1] http://thread.gmane.org/gmane.linux.alsa.devel/105018
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index 87dbd81..739d016 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -10,6 +10,7 @@ choice
+ 
+ config ARCH_SPEAR13XX
+ 	bool "ST SPEAr13xx with Device Tree"
++	select ARCH_HAVE_CPUFREQ
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select GPIO_SPEAR_SPICS
+-- 
+1.7.12.rc2.18.g61b472e
