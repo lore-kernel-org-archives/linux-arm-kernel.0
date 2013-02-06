@@ -1,43 +1,73 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Wed, 6 Feb 2013 19:29:20 +0530
-Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
- addresses
-In-Reply-To: <20130206123307.GE26454@arm.com>
-References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
- <20130201162631.GG5151@arm.com>
- <CANOGCgOp=kSatDu8fL7grk+bXLQ2pgKAEvEK6LoG8Ba4mqUH=w@mail.gmail.com>
- <20130201163722.GH5151@arm.com>
- <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
- <20130201174246.GJ5151@arm.com> <510F3BA8.8070700@ti.com>
- <510F3CA3.7080604@ti.com> <20130206121523.GD26454@arm.com>
- <20130206122213.GF17833@n2100.arm.linux.org.uk>
- <20130206123307.GE26454@arm.com>
-Message-ID: <511261B8.3010403@ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 06 Feb 2013 16:11:42 +0200
+Subject: [PATCH v2 09/10] gpio: pxa: bind to pinctrl by request
+In-Reply-To: <1359886551-20950-10-git-send-email-haojian.zhuang@linaro.org>
+References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
+ <1359886551-20950-10-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <5112649E.6060800@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 February 2013 06:03 PM, Catalin Marinas wrote:
-> On Wed, Feb 06, 2013 at 12:22:13PM +0000, Russell King - ARM Linux wrote:
->> On Wed, Feb 06, 2013 at 12:15:23PM +0000, Catalin Marinas wrote:
->>> The problem with the classic MMU is that if we have a 1MB range we can
->>> end up with just page mappings. The code is currently buggy since if we
->>> have create_mapping() for a 1MB range and later create_mapping() for a
->>> 4KB in the next MB, the first 1MB is removed.
->>
->> And that is where we rely on people calling create_mapping() - who
->> will be the SoC porters - not to be idiotic and do that kind of thing.
->> That's worked fine for the last 10+ years so there's no need to make
->> the code any more complex by trying to fix something that really isn't
->> a problem.
->>
->> I wouldn't be surprised if we have some mappings which are created by
->> 4K page tables, and then one half of the page table is overwritten by
->> a section mapping - so trying to fix this _may_ be risky.
->
-> If the 4K is called first, it should be fine. But some WARN_ON() calls
-> wouldn't hurt, just to be sure. It's not a fast path anyway.
->
-Just to understand, wont we hit pmd_bad already in this case ?
+On 02/03/13 12:15, Haojian Zhuang wrote:
+> While gpio pins is requested, request the pin of pinctrl driver first.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  drivers/gpio/gpio-pxa.c |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+> index 5c39db3..c9cc636 100644
+> --- a/drivers/gpio/gpio-pxa.c
+> +++ b/drivers/gpio/gpio-pxa.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pinctrl/consumer.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/syscore_ops.h>
+>  #include <linux/slab.h>
+> @@ -159,6 +160,23 @@ int pxa_irq_to_gpio(struct irq_data *d)
+>  	return gpio;
+>  }
+>  
+> +static int pxa_gpio_request(struct gpio_chip *gc, unsigned offset)
+> +{
+> +	/*
+> +	 * Map back to global GPIO space and request muxing, the direction
+> +	 * parameter does not matter for this controller.
+> +	 */
+> +	int gpio = gc->base + offset;
+> +
+> +	/*
+> +	 * Platforms in ARCH_PXA doesn't move to device tree yet,
+> +	 * and PINCTRL_SINGLE is depend on device tree.
+> +	 */ 
 
+If this is interesting, git am says:
+patch:32: trailing whitespace.
+         */ 
+warning: 1 line adds whitespace errors.
+
+> +	if (IS_ENABLED(CONFIG_PINCTRL_SINGLE))
+> +		return pinctrl_request_gpio(gpio);
+> +	return 0;
+> +}
+> +
+>  static int pxa_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
+>  {
+>  	struct pxa_gpio_chip *chip = NULL;
+> @@ -471,6 +489,7 @@ static int pxa_init_gpio_chip(struct platform_device *pdev, int gpio_end,
+>  		gc->base  = gpio;
+>  		gc->label = chips[i].label;
+>  
+> +		gc->request = pxa_gpio_request;
+>  		gc->direction_input  = pxa_gpio_direction_input;
+>  		gc->direction_output = pxa_gpio_direction_output;
+>  		gc->get = pxa_gpio_get;
+> 
+
+-- 
 Regards,
-  Sricharan
+Igor.
