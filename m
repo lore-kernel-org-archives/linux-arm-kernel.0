@@ -1,47 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Feb 2013 18:07:53 +0100
-Subject: [PATCH 06/14] ARM: pci: Keep pci_common_init() around after init
-In-Reply-To: <9348609.HjKCmL9u9S@wuerfel>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <1357764194-12677-7-git-send-email-thierry.reding@avionic-design.de>
- <CACRpkdYV5w6BksUjXvXs=88BovUyXgRt-vXSD0twjRpzbZcvFQ@mail.gmail.com>
- <9348609.HjKCmL9u9S@wuerfel>
-Message-ID: <CACRpkdYGgdMTi0ZeMeCk5UmrndD451Pyz8L_XE=y9SPXfGGdew@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Feb 2013 09:16:07 -0800
+Subject: [PATCH v8 12/12] document: devicetree: bind pinconf with pin
+ single
+In-Reply-To: <CAD6h2NSwnMk9c_vVq51ccv3PART0ZVAnm3v3kFLwz+S+nrOK2w@mail.gmail.com>
+References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
+ <1359825953-15663-13-git-send-email-haojian.zhuang@linaro.org>
+ <20130205040721.GE25185@atomide.com>
+ <CAN1soZytx7w8a1C=-C7924_MW6FPH5b=gsvSH=BpDU4ZhJia4w@mail.gmail.com>
+ <CAN1soZy0g3kWRm-d3gB4LmobrNTR6WVia38maS_fXbp4qmFayA@mail.gmail.com>
+ <20130205233045.GQ25185@atomide.com>
+ <CAD6h2NSwnMk9c_vVq51ccv3PART0ZVAnm3v3kFLwz+S+nrOK2w@mail.gmail.com>
+Message-ID: <20130206171607.GZ25185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 7, 2013 at 1:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 06 February 2013 17:38:20 Linus Walleij wrote:
->> On Wed, Jan 9, 2013 at 9:43 PM, Thierry Reding
->> <thierry.reding@avionic-design.de> wrote:
->>
->> > When using deferred driver probing, PCI host controller drivers may
->> > actually require this function after the init stage.
->> >
->> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->>
->> There seem to be a proliferation of these patches now.
->>
->> Isn't this just papering over the real problem? The discarding
->> of __init sections need to happen *after* all deferred probes
->> are complete, lest we have to remove *all* __init sections from
->> *all* drivers in the kernel, don't we?
->
-> No, I think it's not quite that bad. I think the rule is still
-> just that .probe() functions and anything called from them must
-> not be __init. They used to be __devinit, which would cause
-> problems with deferred probing on !HOTPLUG systems but that's
-> gone in 3.9.
->
-> Thierry's patch is just necessary because pci_common_init used
-> to be called only from actual __init functions, and not it
-> gets called from a .probe() function for the first time.
+* Haojian Zhuang <haojian.zhuang@linaro.org> [130206 07:11]:
+> On 6 February 2013 07:30, Tony Lindgren <tony@atomide.com> wrote:
+> > * Haojian Zhuang <haojian.zhuang@gmail.com> [130205 05:55]:
+> >>
+> >> Maybe it didn't cover your case. It seems that there's only one bit
+> >> for bias in your case.
+> >> You can control MMC BIAS enable or disable. And there's neither pullup
+> >> nor pulldown.
+> >> Is it right?
+> >
+> > Yes for this register there are no pulls. But I there are others that
+> > have pull bits.
+> >
+> >>      So I will need both config BIAS_ENABLE & config BIAS_DISABLE.
+> >> Driver switches between BIAS_ENABLE & BIAS_DISABLE.
+> >
+> > I'd like to avoid mapping both enable and disable for everything
+> > which seems bloated..
+> >
+> 
+> pinctrl-coh901 driver already uses PIN_CONFIG_BIAS_DISABLE without argument.
+> 
+> I think that it's better to use both BIAS_ENABLE & BIAS_DISABLE. Otherwise,
+> I need to update pinctrl-coh901 driver with updating the interface.
+> The work is a little
+> large.
 
-Aha OK, then it feels much better now.
+Well how about just let's keep the existing PIN_CONFIG_BIAS_DISABLE
+and PIN_CONFIG_BIAS_ENABLE for compability, but let's still standardize
+on PIN_CONFIG_XXX_ENABLE for all the new ones to avoid bloat?
 
-However it leaves the question of how much __init, __initdata
-and __initconst we have littering around. Oh, well, we'll see
-I guess.
+> Maybe we can use another name, PIN_CONFIG_BIAS_AUTOPULL. Then we can
+> distinguish it from PULL_UP & PULL_DOWN without any confusion. What's your
+> opinion?
 
-Thanks,
-Linus Walleij
+Sounds OK to me if you need that.
+
+Regards,
+
+Tony
