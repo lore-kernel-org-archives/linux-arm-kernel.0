@@ -1,5 +1,5 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 6 Feb 2013 11:39:49 -0700
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 6 Feb 2013 19:42:22 +0100
 Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
  systems
 In-Reply-To: <51129F6B.1050709@wwwdotorg.org>
@@ -13,11 +13,13 @@ References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
  <20130206181852.4eca53e3@skate>
  <20130206175019.GA24248@obsidianresearch.com>
  <51129F6B.1050709@wwwdotorg.org>
-Message-ID: <20130206183949.GA7055@obsidianresearch.com>
+Message-ID: <20130206194222.27db0d90@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 11:22:35AM -0700, Stephen Warren wrote:
+Dear Stephen Warren,
+
+On Wed, 06 Feb 2013 11:22:35 -0700, Stephen Warren wrote:
 
 > > No.. PCI end devices are required to decode all 32 bits of address,
 > > less the bits requires for their allocation. So a device with 64 bytes
@@ -31,23 +33,22 @@ On Wed, Feb 06, 2013 at 11:22:35AM -0700, Stephen Warren wrote:
 > dubious? That would imply a device might only use bits 15:6 for matching
 > the BAR base and 5:0 for the internal register for a 64-byte BAR.
 
-Right, that is what I was referring to when I said:
+The thing is that the existing PCIe support for earlier Marvell SoC
+families already use more than the first 64 KB to map the I/O BARs, and
+this hasn't apparently caused any problems. We're talking about PCIe
+support, not PCI, so I guess a lot of the very legacy devices are
+simply not part of the equation.
 
-> - Some devices are broken because x86 only uses the low 64k.
+Can't we simply agree on having a first implementation that does the
+simple thing, like the existing PCIe implementation for earlier Marvell
+SoC families, and improve that if it happens to be needed, depending on
+user feedback?
 
-Fortunately on PCI-E IO TLPs will be fully routed before they are sent
-down a link, so downstream of a PCI-E link we will never see aliasing
-of the low 16 bits.
+Best regards,
 
-This means if you do bridge to legacy PCI, and you do use devices that
-don't decode the upper 16 bits that it will still work OK, because the
-low 16 bits on the legacy PCI bus will still be unique in each device
-on that bus.
-
-That doesn't save you from weird legacy ISA stuff, or stuff that
-doesn't respect the BARs, or other crazyness..
-
-My personal hope would be that nobody using a PCI-E ARM SOC ever has
-to deal with anything to do with IO space ;)
-
-Jason
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
