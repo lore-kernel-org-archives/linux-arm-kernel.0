@@ -1,125 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Feb 2013 11:19:23 -0800
-Subject: [PATCH v2 1/2] ARM: OMAP2+: SoC name and revision unification
-In-Reply-To: <1360177196-18196-2-git-send-email-ruslan.bilovol@ti.com>
-References: <1360177196-18196-1-git-send-email-ruslan.bilovol@ti.com>
- <1360177196-18196-2-git-send-email-ruslan.bilovol@ti.com>
-Message-ID: <20130206191923.GE25185@atomide.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 6 Feb 2013 20:35:21 +0100
+Subject: [PATCH 06/14] ARM: pci: Keep pci_common_init() around after init
+In-Reply-To: <20130206163041.GG17833@n2100.arm.linux.org.uk>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <1357764194-12677-7-git-send-email-thierry.reding@avionic-design.de>
+ <20130205204147.GA29726@avionic-0098.mockup.avionic-design.de>
+ <20130206163041.GG17833@n2100.arm.linux.org.uk>
+Message-ID: <20130206193521.GA455@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-* Ruslan Bilovol <ruslan.bilovol@ti.com> [130206 11:03]:
-> This is a long story where for each new generation of
-> OMAP we used different approaches for creating
-> strings for SoCs names and revisions that this patch
-> fixes. It makes future exporting of this information
-> to SoC infrastructure easier.
+On Wed, Feb 06, 2013 at 04:30:41PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 05, 2013 at 09:41:48PM +0100, Thierry Reding wrote:
+> > On Wed, Jan 09, 2013 at 09:43:06PM +0100, Thierry Reding wrote:
+> > > When using deferred driver probing, PCI host controller drivers may
+> > > actually require this function after the init stage.
+> > > 
+> > > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > > ---
+> > >  arch/arm/kernel/bios32.c | 6 +++---
+> > >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > 
+> > Russell,
+> > 
+> > Can this patch and patch 7 (ARM: pci: Allow passing per-controller
+> > private data) of this series be applied for 3.9? Thomas uses them in his
+> > Marvell PCIe series as well and it would allow to reduce the complexity
+> > of the dependencies.
 > 
-> Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
-> ---
->  arch/arm/mach-omap2/id.c |   89 ++++++++++++++++++++++++++--------------------
->  1 file changed, 51 insertions(+), 38 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 8a68f1e..b16a432 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -31,8 +31,11 @@
->  #define OMAP4_SILICON_TYPE_STANDARD		0x01
->  #define OMAP4_SILICON_TYPE_PERFORMANCE		0x02
->  
-> +#define OMAP_SOC_MAX_NAME_LENGTH		16
-> +
->  static unsigned int omap_revision;
-> -static const char *cpu_rev;
-> +static char soc_name[OMAP_SOC_MAX_NAME_LENGTH];
-> +static char soc_rev[OMAP_SOC_MAX_NAME_LENGTH];
->  u32 omap_features;
->  
->  unsigned int omap_rev(void)
+> It'll need to go into the patch system in that case...
 
-Sorry I was not clear earlier with what I meant, but if
-you remove static const char *cpu_rev here and use
-soc_name and soc_rev here..
+Alright, I'll submit them to the patch system. Thanks.
 
-> @@ -181,8 +187,7 @@ void __init omap2xxx_check_revision(void)
->  
->  static void __init omap3_cpuinfo(void)
->  {
-> -	const char *cpu_name;
-> -
-> +	const char *omap3_soc_name;
->  	/*
->  	 * OMAP3430 and OMAP3530 are assumed to be same.
->  	 *
-
-..then no need to replace cpu_name with omap3_soc_name here?
-
-> @@ -191,28 +196,30 @@ static void __init omap3_cpuinfo(void)
->  	 * and CPU class bits.
->  	 */
->  	if (cpu_is_omap3630()) {
-> -		cpu_name = "OMAP3630";
-> +		omap3_soc_name = "OMAP3630";
->  	} else if (soc_is_am35xx()) {
-> -		cpu_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
-> +		omap3_soc_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
->  	} else if (cpu_is_ti816x()) {
-> -		cpu_name = "TI816X";
-> +		omap3_soc_name = "TI816X";
->  	} else if (soc_is_am335x()) {
-> -		cpu_name =  "AM335X";
-> +		omap3_soc_name =  "AM335X";
-...
-
-Or here?
-
->  void __init omap3xxx_check_revision(void)
->  {
-> +	const char *omap3_soc_rev;
->  	u32 cpuid, idcode;
->  	u16 hawkeye;
->  	u8 rev;
-
-Then here if you just make it a local cpu_rev..
-
-> @@ -303,7 +311,7 @@ void __init omap3xxx_check_revision(void)
->  	cpuid = read_cpuid(CPUID_ID);
->  	if ((((cpuid >> 4) & 0xfff) == 0xc08) && ((cpuid & 0xf) == 0x0)) {
->  		omap_revision = OMAP3430_REV_ES1_0;
-> -		cpu_rev = "1.0";
-> +		omap3_soc_rev = "ES1.0";
->  		return;
->  	}
->  
-> @@ -324,26 +332,26 @@ void __init omap3xxx_check_revision(void)
->  		case 0: /* Take care of early samples */
->  		case 1:
->  			omap_revision = OMAP3430_REV_ES2_0;
-> -			cpu_rev = "2.0";
-> +			omap3_soc_rev = "ES2.0";
->  			break;
->  		case 2:
->  			omap_revision = OMAP3430_REV_ES2_1;
-> -			cpu_rev = "2.1";
-> +			omap3_soc_rev = "ES2.1";
->  			break;
->  		case 3:
->  			omap_revision = OMAP3430_REV_ES3_0;
-> -			cpu_rev = "3.0";
-> +			omap3_soc_rev = "ES3.0";
->  			break;
->  		case 4:
->  			omap_revision = OMAP3430_REV_ES3_1;
-> -			cpu_rev = "3.1";
-> +			omap3_soc_rev = "ES3.1";
->  			break;
-
-..no need to replace cpu_rev with omap3_soc_rev all over the
-place?
-
-Regards,
-
-Tony
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130206/820a32aa/attachment.sig>
