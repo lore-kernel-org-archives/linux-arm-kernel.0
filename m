@@ -1,45 +1,47 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 6 Feb 2013 20:26:42 +0530
-Subject: [PATCH 6/8] ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
-In-Reply-To: <1360162604-14320-1-git-send-email-kishon@ti.com>
-References: <1360162604-14320-1-git-send-email-kishon@ti.com>
-Message-ID: <1360162604-14320-7-git-send-email-kishon@ti.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 6 Feb 2013 23:07:50 +0800
+Subject: [PATCH v8 12/12] document: devicetree: bind pinconf with pin
+ single
+In-Reply-To: <20130205233045.GQ25185@atomide.com>
+References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
+ <1359825953-15663-13-git-send-email-haojian.zhuang@linaro.org>
+ <20130205040721.GE25185@atomide.com>
+ <CAN1soZytx7w8a1C=-C7924_MW6FPH5b=gsvSH=BpDU4ZhJia4w@mail.gmail.com>
+ <CAN1soZy0g3kWRm-d3gB4LmobrNTR6WVia38maS_fXbp4qmFayA@mail.gmail.com>
+ <20130205233045.GQ25185@atomide.com>
+Message-ID: <CAD6h2NSwnMk9c_vVq51ccv3PART0ZVAnm3v3kFLwz+S+nrOK2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap-usb3 and omap-usb2 data node in omap5 device tree file.
-The information for the node added here is available @
-Documentation/devicetree/bindings/usb/usb-phy.txt
+On 6 February 2013 07:30, Tony Lindgren <tony@atomide.com> wrote:
+> * Haojian Zhuang <haojian.zhuang@gmail.com> [130205 05:55]:
+>>
+>> Maybe it didn't cover your case. It seems that there's only one bit
+>> for bias in your case.
+>> You can control MMC BIAS enable or disable. And there's neither pullup
+>> nor pulldown.
+>> Is it right?
+>
+> Yes for this register there are no pulls. But I there are others that
+> have pull bits.
+>
+>>      So I will need both config BIAS_ENABLE & config BIAS_DISABLE.
+>> Driver switches between BIAS_ENABLE & BIAS_DISABLE.
+>
+> I'd like to avoid mapping both enable and disable for everything
+> which seems bloated..
+>
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+pinctrl-coh901 driver already uses PIN_CONFIG_BIAS_DISABLE without argument.
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 230b779..bd73257 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -511,6 +511,20 @@
- 			#size-cells = <1>;
- 			ranges;
- 			ti,hwmods = "ocp2scp1";
-+			usb2_phy: usb2phy at 4a084000 {
-+				compatible = "ti,omap-usb2";
-+				reg = <0x4a084000 0x7c>;
-+				ctrl-module = <&omap_control_usb>;
-+			};
-+
-+			usb3_phy: usb3phy at 4a084400 {
-+				compatible = "ti,omap-usb3";
-+				reg = <0x4a084400 0x80>,
-+				      <0x4a084800 0x64>,
-+				      <0x4a084c00 0x40>;
-+				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-+				ctrl-module = <&omap_control_usb>;
-+			};
- 		};
- 	};
- };
--- 
-1.7.10.4
+I think that it's better to use both BIAS_ENABLE & BIAS_DISABLE. Otherwise,
+I need to update pinctrl-coh901 driver with updating the interface.
+The work is a little
+large.
+
+Maybe we can use another name, PIN_CONFIG_BIAS_AUTOPULL. Then we can
+distinguish it from PULL_UP & PULL_DOWN without any confusion. What's your
+opinion?
+
+Regards
+Haojian
