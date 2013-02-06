@@ -1,34 +1,36 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Wed, 6 Feb 2013 11:38:57 +0000
-Subject: [PATCH 1/4] arch: arm: gpmc: gpmc migration support
-In-Reply-To: <20130201220510.GY22517@atomide.com>
-References: <1358933176-12409-1-git-send-email-avinashphilip@ti.com>
- <1358933176-12409-2-git-send-email-avinashphilip@ti.com>
- <20130201220510.GY22517@atomide.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA6E6A3@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Feb 2013 11:36:56 +0000
+Subject: [PATCH 3/5] ARM: OMAP2: MUSB: Specify omap4 has mailbox
+In-Reply-To: <20130206112231.GI22064@arwen.pp.htv.fi>
+References: <1360130294-5976-1-git-send-email-kishon@ti.com>
+ <1360130294-5976-4-git-send-email-kishon@ti.com>
+ <20130206105713.GF17852@n2100.arm.linux.org.uk>
+ <20130206110355.GH22064@arwen.pp.htv.fi>
+ <20130206112231.GI22064@arwen.pp.htv.fi>
+Message-ID: <20130206113656.GG17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 02, 2013 at 03:35:10, Tony Lindgren wrote:
-> * Philip Avinash <avinashphilip@ti.com> [130123 01:28]:
-> > With recent GPMC driver conversion, usage of gpmc_save/restore_context
-> > can done from gpmc driver itself. Hence removes the usage from pm34xx.c.
-> > Also removes the conditional compilation primitives ARCH_OMAP3 for
-> > gpmc_save/restore_context.
+On Wed, Feb 06, 2013 at 01:22:31PM +0200, Felipe Balbi wrote:
+> there's a little more to it. When running allmodconfig,
+> CONFIG_ARCH_MULTIPLATFORM is set but none of the other ARCHes
+> (ARCH_OMAP, ARCH_AT91, ARCH_VERSATILE, etc) are set, so it turned out
+> that the driver wasn't even included on my build test.
 > 
-> Hmm I think this will break GPMC for deeper idle modes. Note that we
-> need to save and restore the context every time hitting off-idle, not
-> just for suspend and resume. Or am I missing something here?
+> Russell, is this expected (the MULTIPLATFORM thing) ? Just so I fix my
+> build test scripts to use another defconfig instead of allmod and
+> allyes.
 
-I understand dependency on idle modes. So I will send a second version
-with this patch eliminated so that user initiated suspend/resume work
-for am335x platforms.
+Don't know.  Most of that logic is sitting in arm-soc.  Nothing obvious
+stands out as to why that's happening.
 
-Thanks
-Avinash
+The first thing to check is which of the CONFIG_ARCH_MULTI_* options are
+set.  It should be ARCH_MULTI_V7 and ARCH_MULTI_V6_V7.  This should then
+allow ARCH_OMAP2PLUS to be set.
 
-> 
-> Regards,
-> 
-> Tony
-> 
+However, I've said this before, and I'll say it again: if you want to use
+the all* targets, it's better to seed the configuration so that you end
+up with the platform you're targetting selected.  I've always done this
+with the build system, and even before it when I've wanted to use the all*
+targets, because generally I want that behaviour, but I want it for a
+particular platform.
