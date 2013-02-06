@@ -1,69 +1,159 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Feb 2013 22:41:14 +0000
-Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
- for Armada XP
-In-Reply-To: <1359399397-29729-23-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-23-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <201302062241.14444.arnd@arndb.de>
+From: nerv@dawncrow.de (=?ISO-8859-15?Q?Andr=E9_Hentschel?=)
+Date: Wed, 06 Feb 2013 23:43:10 +0100
+Subject: [PATCH] arm: Preserve TPIDRURW on context switch
+Message-ID: <5112DC7E.4020108@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 January 2013, Thomas Petazzoni wrote:
-> +
-> +               /*
-> +                * MV78230 has 2 PCIe units Gen2.0: One unit can be
-> +                * configured as x4 or quad x1 lanes. One unit is
-> +                * x4/x1.
-> +                */
-> +               pcie-controller {
-> +                       compatible = "marvell,armada-370-xp-pcie";
-> +                       status = "disabled";
-> +
-> +                       #address-cells = <3>;
-> +                       #size-cells = <2>;
-> +
-> +
-> +                       bus-range = <0x00 0xff>;
-> +
-> +                       ranges = <0x00000800 0 0xd0040000 0xd0040000 0 0x00002000   /* port 0.0 registers */
-> +                                 0x00004800 0 0xd0042000 0xd0042000 0 0x00002000   /* port 2.0 registers */
-> +                                 0x00001000 0 0xd0044000 0xd0044000 0 0x00002000   /* port 0.1 registers */
-> +                                 0x00001800 0 0xd0048000 0xd0048000 0 0x00002000   /* port 0.2 registers */
-> +                                 0x00002000 0 0xd004C000 0xd004C000 0 0x00002000   /* port 0.3 registers */
-> +                                 0x81000000 0 0          0xc0000000 0 0x00010000   /* downstream I/O */
-> +                                 0x82000000 0 0          0xc1000000 0 0x08000000>; /* non-prefetchable memory */
-> +
+There are more and more applications coming to WinRT, Wine could support them,
+but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
+This register must be preserved per thread instead of being cleared.
 
-I've been thinking some more about this, and I wonder if it would
-make more sense to describe the address remapping correctly as
-a node on top of the pcie-controller node.
+This patch is against 0944c0a03465718909ba8e800a5230528aeabafb
 
-This would mean that rather than putting the mapped physical address
-(0xc0000000, 0xc1000000, ...) in here, you would actually have 64-bit
-address as the destination as well, in whatever format the
-address map hardware uses, I assume using a numbered 32 bit
-address space for each object that can be remapped.
+I could only test it with kernel 3.4.6
 
-This would also let you do the PCI memory address assignment for
-each port separately, starting at bus address 0, followed by
-finding a location in the CPU address space and passing
-the start as the sys->mem_offset argument to
-pci_add_resource_offset.
+Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
+Date: Wed, 6 Feb 2013 23:24:54 +0100
+Subject: [PATCH] arm: Preserve TPIDRURW on context switch
 
-> +                       pcie at 0,0 {
-> +                               device_type = "pciex";
-> +                               reg = <0x0800 0 0xd0040000 0 0x2000>;
-> +                               #address-cells = <3>;
-> +                               #size-cells = <2>;
-> +                               marvell,pcie-port = <0>;
-> +                               marvell,pcie-lane = <0>;
-> +                               interrupts = <1>;
-> +                               clocks = <&gateclk 5>;
-> +                               status = "disabled";
-> +                       };
+---
+ arch/arm/include/asm/thread_info.h |  1 +
+ arch/arm/include/asm/tls.h         | 43 ++++++++++++++++++++++++++++++++++----
+ arch/arm/kernel/asm-offsets.c      |  1 +
+ arch/arm/kernel/entry-armv.S       |  7 +++++++
+ 4 files changed, 48 insertions(+), 4 deletions(-)
 
-I think you are missing a "ranges" property here, at least an empty
-one, which is required by the standard but not currently enforced
-in the code.
-	Arnd
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index cddda1f..948525c 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -59,6 +59,7 @@ struct thread_info {
+ 	__u32			syscall;	/* syscall number */
+ 	__u8			used_cp[16];	/* thread used copro */
+ 	unsigned long		tp_value;
++	unsigned long		tp2_value;	/* userspace read/write thread id register (2) */
+ #ifdef CONFIG_CRUNCH
+ 	struct crunch_state	crunchstate;
+ #endif
+diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+index 73409e6..3230cf2 100644
+--- a/arch/arm/include/asm/tls.h
++++ b/arch/arm/include/asm/tls.h
+@@ -7,8 +7,6 @@
+ 
+ 	.macro set_tls_v6k, tp, tmp1, tmp2
+ 	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
+-	mov	\tmp1, #0
+-	mcr	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+ 	.endm
+ 
+ 	.macro set_tls_v6, tp, tmp1, tmp2
+@@ -17,8 +15,6 @@
+ 	mov	\tmp2, #0xffff0fff
+ 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+ 	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+-	movne	\tmp1, #0
+-	mcrne	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+ 	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+ 	.endm
+ 
+@@ -26,24 +22,63 @@
+ 	mov	\tmp1, #0xffff0fff
+ 	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
+ 	.endm
++
++	.macro set_tls2_none, tp2, tmp1, tmp2
++	.endm
++
++	.macro set_tls2_v6k, tp2, tmp1, tmp2
++	mcr	p15, 0, \tp2, c13, c0, 2		@ set TPIDRURW register
++	.endm
++
++	.macro set_tls2_v6, tp2, tmp1, tmp2
++	ldr	\tmp1, =elf_hwcap
++	ldr	\tmp1, [\tmp1, #0]
++	mov	\tmp2, #0xffff0fff
++	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
++	mcrne	p15, 0, \tp2, c13, c0, 2		@ yes, set TPIDRURW register
++	.endm
++
++	.macro get_tls2_none, tp2, tmp1, tmp2
++	.endm
++
++	.macro get_tls2_v6k, tp2, tmp1, tmp2
++	mrc	p15, 0, \tp2, c13, c0, 2		@ get TPIDRURW register
++	.endm
++
++	.macro get_tls2_v6, tp2, tmp1, tmp2
++	ldr	\tmp1, =elf_hwcap
++	ldr	\tmp1, [\tmp1, #0]
++	mov	\tmp2, #0xffff0fff
++	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
++	mrcne	p15, 0, \tp2, c13, c0, 2		@ yes, get TPIDRURW register
++	.endm
++
+ #endif
+ 
+ #ifdef CONFIG_TLS_REG_EMUL
+ #define tls_emu		1
+ #define has_tls_reg		1
+ #define set_tls		set_tls_none
++#define set_tls2	set_tls2_none
++#define get_tls2	get_tls2_none
+ #elif defined(CONFIG_CPU_V6)
+ #define tls_emu		0
+ #define has_tls_reg		(elf_hwcap & HWCAP_TLS)
+ #define set_tls		set_tls_v6
++#define set_tls2	set_tls2_v6
++#define get_tls2	get_tls2_v6
+ #elif defined(CONFIG_CPU_32v6K)
+ #define tls_emu		0
+ #define has_tls_reg		1
+ #define set_tls		set_tls_v6k
++#define set_tls2	set_tls2_v6k
++#define get_tls2	get_tls2_v6k
+ #else
+ #define tls_emu		0
+ #define has_tls_reg		0
+ #define set_tls		set_tls_software
++#define set_tls2	set_tls2_none
++#define get_tls2	get_tls2_none
+ #endif
+ 
+ #endif	/* __ASMARM_TLS_H */
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index c985b48..2563f29 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -58,6 +58,7 @@ int main(void)
+   DEFINE(TI_CPU_SAVE,		offsetof(struct thread_info, cpu_context));
+   DEFINE(TI_USED_CP,		offsetof(struct thread_info, used_cp));
+   DEFINE(TI_TP_VALUE,		offsetof(struct thread_info, tp_value));
++  DEFINE(TI_TP2_VALUE,		offsetof(struct thread_info, tp2_value));
+   DEFINE(TI_FPSTATE,		offsetof(struct thread_info, fpstate));
+ #ifdef CONFIG_VFP
+   DEFINE(TI_VFPSTATE,		offsetof(struct thread_info, vfpstate));
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 0f82098..39de843 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -737,6 +737,13 @@ ENTRY(__switch_to)
+ 	ldr	r6, [r2, #TI_CPU_DOMAIN]
+ #endif
+ 	set_tls	r3, r4, r5
++
++	@ preserve TPIDRURW register state
++	get_tls2	r3, r4, r5
++	str	r3, [r1, #TI_TP2_VALUE]
++	ldr	r3, [r2, #TI_TP2_VALUE]
++	set_tls2	r3, r4, r5
++
+ #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+ 	ldr	r7, [r2, #TI_TASK]
+ 	ldr	r8, =__stack_chk_guard
+-- 
+1.8.0
+
+Best Regards, Andr? Hentschel
