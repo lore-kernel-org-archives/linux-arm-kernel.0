@@ -1,71 +1,329 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 06 Feb 2013 16:11:42 +0200
-Subject: [PATCH v2 09/10] gpio: pxa: bind to pinctrl by request
-In-Reply-To: <1359886551-20950-10-git-send-email-haojian.zhuang@linaro.org>
+Date: Wed, 06 Feb 2013 16:12:08 +0200
+Subject: [PATCH v2 10/10] ARM: dts: support pinmux in pxa910
+In-Reply-To: <1359886551-20950-11-git-send-email-haojian.zhuang@linaro.org>
 References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
- <1359886551-20950-10-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <5112649E.6060800@compulab.co.il>
+ <1359886551-20950-11-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <511264B8.6080606@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
 On 02/03/13 12:15, Haojian Zhuang wrote:
-> While gpio pins is requested, request the pin of pinctrl driver first.
+> Add gpio range, pinmux settings in pxa910 dkb DTS file.
 > 
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 > ---
->  drivers/gpio/gpio-pxa.c |   19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+>  arch/arm/boot/dts/pxa910-dkb.dts |  264 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/pxa910.dtsi    |   29 ++++-
+>  2 files changed, 291 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-> index 5c39db3..c9cc636 100644
-> --- a/drivers/gpio/gpio-pxa.c
-> +++ b/drivers/gpio/gpio-pxa.c
-> @@ -23,6 +23,7 @@
->  #include <linux/io.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/pinctrl/consumer.h>
->  #include <linux/platform_device.h>
->  #include <linux/syscore_ops.h>
->  #include <linux/slab.h>
-> @@ -159,6 +160,23 @@ int pxa_irq_to_gpio(struct irq_data *d)
->  	return gpio;
->  }
->  
-> +static int pxa_gpio_request(struct gpio_chip *gc, unsigned offset)
-> +{
-> +	/*
-> +	 * Map back to global GPIO space and request muxing, the direction
-> +	 * parameter does not matter for this controller.
-> +	 */
-> +	int gpio = gc->base + offset;
-> +
-> +	/*
-> +	 * Platforms in ARCH_PXA doesn't move to device tree yet,
-> +	 * and PINCTRL_SINGLE is depend on device tree.
-> +	 */ 
+> diff --git a/arch/arm/boot/dts/pxa910-dkb.dts b/arch/arm/boot/dts/pxa910-dkb.dts
+> index 595492a..72eb6bc 100644
+> --- a/arch/arm/boot/dts/pxa910-dkb.dts
+> +++ b/arch/arm/boot/dts/pxa910-dkb.dts
+> @@ -170,6 +170,270 @@
 
-If this is interesting, git am says:
-patch:32: trailing whitespace.
-         */ 
+[...]
+
+> +			pmx: pinmux at d401e000 {
+> +				/* pin base, nr pins & gpio function */
+> +				pinctrl-single,gpio-range = <
+> +					/*
+> +					 * GPIO number is hardcoded for range at here.
+> +					 * In gpio chip, GPIO number is not hardcoded for range.
+> +					 * Since one gpio pin may be routed to multiple pins,
+> +					 * define these gpio range in pxa910-dkb.dts not pxa910.dtsi.
+> +					 */
+> +						&range 55 55 0	/* GPIO0 ~ GPIO54 */
+> +						&range 188 5 1	/* GPIO55 ~ GPIO59 */ 
+
+If this is interesting git am says:
+patch:66: trailing whitespace.
+                                                &range 188 5 1  /* GPIO55 ~ GPIO59 */ 
 warning: 1 line adds whitespace errors.
 
-> +	if (IS_ENABLED(CONFIG_PINCTRL_SINGLE))
-> +		return pinctrl_request_gpio(gpio);
-> +	return 0;
-> +}
+> +						&range 193 7 0	/* GPIO60 ~ GPIO66 */
+> +						&range 110 43 0	/* GPIO67 ~ GPIO109 */
+> +						&range 166 7 0	/* GPIO110 ~ GPIO116 */
+> +						&range 45 4 0	/* GPIO117 ~ GPIO120 */
+> +						&range 50 2 1	/* GPIO122 ~ GPIO123 */
+> +						&range 203 1 0	/* GPIO121 */
+> +						&range 52 1 0	/* GPIO124 */
+> +						&range 53 1 1	/* GPIO125 */
+> +						&range 27 2 0	/* GPIO126 ~ GPIO127 */
+> +					>;
 > +
->  static int pxa_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
->  {
->  	struct pxa_gpio_chip *chip = NULL;
-> @@ -471,6 +489,7 @@ static int pxa_init_gpio_chip(struct platform_device *pdev, int gpio_end,
->  		gc->base  = gpio;
->  		gc->label = chips[i].label;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&keypad_pmx_func>;
+> +
+> +				uart1_pmx_func: pinmux_uart1_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x198 0x6	/* GPIO47_UART1_RXD */
+> +						0x19c 0x6	/* GPIO48_UART1_TXD */
+> +					>;
+> +					/* slew rate set value, mask */
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					/* bias set value, match, mask */
+> +					pinctrl-single,bias-disable = <0x8000 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x4000 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					/* input schmitt set value, mask */
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					/* input schmitt disable value, match, mask */
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				uart2_pmx_func: pinmux_uart2_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x150 0x4	/* GPIO29_UART2_CTS */
+> +						0x154 0x4	/* GPIO30_UART2_RTS */
+> +						0x158 0x4	/* GPIO31_UART2_TXD */
+> +						0x15c 0x4	/* GPIO32_UART2_RXD */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				uart3_pmx_func: pinmux_uart3_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x188 0x7	/* GPIO43_UART3_RXD */
+> +						0x18c 0x7	/* GPIO44_UART3_TXD */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				twsi1_pmx_func: pinmux_twsi1_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x1b0 0x2	/* GPIO53_TWSI_SCL */
+> +						0x1b4 0x2	/* GPIO54_TWSI_SDA */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				nand_pmx_func: pinmux_nand_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x040 0x0	/* ND_IO0 */
+> +						0x03c 0x0	/* ND_IO1 */
+> +						0x038 0x0	/* ND_IO2 */
+> +						0x034 0x0	/* ND_IO3 */
+> +						0x030 0x0	/* ND_IO4 */
+> +						0x02c 0x0	/* ND_IO5 */
+> +						0x028 0x0	/* ND_IO6 */
+> +						0x024 0x0	/* ND_IO7 */
+> +						0x020 0x0	/* ND_IO8 */
+> +						0x01c 0x0	/* ND_IO9 */
+> +						0x018 0x0	/* ND_IO10 */
+> +						0x014 0x0	/* ND_IO11 */
+> +						0x010 0x0	/* ND_IO12 */
+> +						0x00c 0x0	/* ND_IO13 */
+> +						0x008 0x0	/* ND_IO14 */
+> +						0x004 0x0	/* ND_IO15 */
+> +						0x044 0x0	/* ND_nCS0 */
+> +						0x060 0x1	/* ND_ALE */
+> +						0x05c 0x0	/* ND_CLE */
+> +						0x054 0x1	/* ND_nWE */
+> +						0x058 0x1	/* ND_nRE */
+> +						0x068 0x0	/* ND_RDY0 */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				mmc1_pmx_func1: pinmux_mmc1_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x0a0 0x0	/* MMC1_DATA0 */
+> +						0x09c 0x0	/* MMC1_DATA1 */
+> +						0x098 0x0	/* MMC1_DATA2 */
+> +						0x094 0x0	/* MMC1_DATA3 */
+> +						0x090 0x0	/* MMC1_DATA4 */
+> +						0x08c 0x0	/* MMC1_DATA5 */
+> +						0x088 0x0	/* MMC1_DATA6 */
+> +						0x084 0x0	/* MMC1_DATA7 */
+> +						0x0a4 0x0	/* MMC1_CMD */
+> +						0x0a8 0x0	/* MMC1_CLK */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1800 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				mmc1_pmx_func2: pinmux_mmc1_pins at 1 {
+> +					pinctrl-single,pins = <
+> +						0x0ac 0x0	/* MMC1_CD */
+> +						0x0b0 0x0	/* MMC1_WP */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				mmc2_pmx_func: pinmux_mmc2_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x180 0x1	/* MMC2_CMD */
+> +						0x184 0x1	/* MMC2_CLK */
+> +						0x17c 0x1	/* MMC2_DATA0 */
+> +						0x178 0x1	/* MMC2_DATA1 */
+> +						0x174 0x1	/* MMC2_DATA2 */
+> +						0x170 0x1	/* MMC2_DATA3 */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				ssp1_pmx_func: pinmux_ssp1_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x130 0x1	/* GPIO21_SSP1_SCLK */
+> +						0x134 0x1	/* GPIO22_SSP1_FRM */
+> +						0x138 0x1	/* GPIO23_SSP1_TXD */
+> +						0x13c 0x1	/* GPIO24_SSP1_RXD */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				keypad_pmx_func: pinmux_keypad_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x0dc 0x1	/* GPIO0_MKIN0 */
+> +						0x0e0 0x1	/* GPIO1_MKOUT0 */
+> +						0x0e4 0x1	/* GPIO2_MKIN1 */
+> +						0x0e8 0x1	/* GPIO3_MKOUT1 */
+> +						0x0ec 0x1	/* GPIO4_MKIN2 */
+> +						0x0f0 0x1	/* GPIO5_MKOUT2 */
+> +						0x0f4 0x1	/* GPIO6_MKIN3 */
+> +						0x0f8 0x1	/* GPIO7_MKOUT3 */
+> +						0x0fc 0x1	/* GPIO8_MKIN4 */
+> +						0x100 0x1	/* GPIO9_MKOUT4 */
+> +						0x10c 0x1	/* GPIO12_MKIN6 */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x8000 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x2000 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				nfc_pmx_func: pinmux_nfc_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x120 0x0	/* GPIO17 */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +				wlan_pmx_func: pinmux_wlan_pins at 0 {
+> +					pinctrl-single,pins = <
+> +						0x114 0x0	/* GPIO14 */
+> +						0x12c 0x0	/* GPIO20 */
+> +						0x160 0x0	/* GPIO33 */
+> +						0x164 0x0	/* GPIO34 */
+> +						0x168 0x0	/* GPIO35 */
+> +						0x16c 0x0	/* GPIO36 */
+> +					>;
+> +					pinctrl-single,slew-rate = <0x1000 0x1800>;
+> +					pinctrl-single,bias-disable = <0x0 0x0 0x8000>;
+> +					pinctrl-single,bias-pullup = <0x0 0x4000 0x4000>;
+> +					pinctrl-single,bias-pulldown = <0x0 0x2000 0x2000>;
+> +					pinctrl-single,input-schmitt = <0x40 0x70>;
+> +					pinctrl-single,input-schmitt-disable = <0x40 0x40 0x70>;
+> +				};
+> +			};
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/pxa910.dtsi b/arch/arm/boot/dts/pxa910.dtsi
+> index 825aaca..20a3418 100644
+> --- a/arch/arm/boot/dts/pxa910.dtsi
+> +++ b/arch/arm/boot/dts/pxa910.dtsi
+> @@ -93,28 +93,37 @@
+>  				#address-cells = <1>;
+>  				#size-cells = <1>;
+>  				reg = <0xd4019000 0x1000>;
+> -				gpio-controller;
+> -				#gpio-cells = <2>;
+> +				marvell,gpio-ed-mask = <1>;
+> +				marvell,nr-gpios = <128>;
+>  				interrupts = <49>;
+>  				interrupt-names = "gpio_mux";
+>  				interrupt-controller;
+>  				#interrupt-cells = <1>;
+> +				status = "disabled";
+>  				ranges;
 >  
-> +		gc->request = pxa_gpio_request;
->  		gc->direction_input  = pxa_gpio_direction_input;
->  		gc->direction_output = pxa_gpio_direction_output;
->  		gc->get = pxa_gpio_get;
+>  				gcb0: gpio at d4019000 {
+>  					reg = <0xd4019000 0x4>;
+> +					gpio-controller;
+> +					#gpio-cells = <2>;
+>  				};
+>  
+>  				gcb1: gpio at d4019004 {
+>  					reg = <0xd4019004 0x4>;
+> +					gpio-controller;
+> +					#gpio-cells = <2>;
+>  				};
+>  
+>  				gcb2: gpio at d4019008 {
+>  					reg = <0xd4019008 0x4>;
+> +					gpio-controller;
+> +					#gpio-cells = <2>;
+>  				};
+>  
+>  				gcb3: gpio at d4019100 {
+>  					reg = <0xd4019100 0x4>;
+> +					gpio-controller;
+> +					#gpio-cells = <2>;
+>  				};
+>  			};
+>  
+> @@ -144,6 +153,22 @@
+>  				interrupt-names = "rtc 1Hz", "rtc alarm";
+>  				status = "disabled";
+>  			};
+> +
+> +			pmx: pinmux at d401e000 {
+> +				compatible = "pinconf-single";
+> +				reg = <0xd401e000 0x330>;
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				#gpio-range-cells = <3>;
+> +				ranges;
+> +
+> +				pinctrl-single,register-width = <32>;
+> +				pinctrl-single,function-mask = <7>;
+> +
+> +				range: gpio-range {
+> +					#pinctrl-single,gpio-range-cells = <3>;
+> +				};
+> +			};
+>  		};
+>  	};
+>  };
 > 
 
 -- 
