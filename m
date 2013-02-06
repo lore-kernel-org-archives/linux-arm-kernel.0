@@ -1,54 +1,73 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Wed, 6 Feb 2013 06:04:22 +0000
-Subject: [PATCH V2 1/6] pinctrl: pinctrl-single: use arch_initcall and
- module_exit
-In-Reply-To: <20130205112731.GK17786@n2100.arm.linux.org.uk>
-References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
- <1359445134-13323-2-git-send-email-manishv.b@ti.com>
- <CACRpkdbf7TwrjfT2rhqQFGc3yh_Nt117RtzQO2y6g5Ddx5Ay_w@mail.gmail.com>
- <20130201170906.GE22517@atomide.com> <20130201171124.GF22517@atomide.com>
- <A4887BF146CD57468F700B415D2F47015828C7@DBDE01.ent.ti.com>
- <20130205112731.GK17786@n2100.arm.linux.org.uk>
-Message-ID: <A4887BF146CD57468F700B415D2F4701583209@DBDE01.ent.ti.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 6 Feb 2013 14:10:43 +0800
+Subject: [PATCH 1/1] ARM: dts: imx6q-sabresd: Add USB support
+Message-ID: <1360131043-10631-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Add USB support for imx6q sabresd board
 
-On Tue, Feb 05, 2013 at 16:57:31, Russell King - ARM Linux wrote:
-> On Tue, Feb 05, 2013 at 06:36:34AM +0000, Vishwanathrao Badarkhe, Manish wrote:
-> > I made following changes, in order to update "dip->p" pointer with 
-> > correct value:
-> > 
-> > -       if (!dpi->p) {
-> > +       if (IS_ERR_OR_NULL(dpi->p)) {
-> >                 dpi->p = devm_pinctrl_get(dev);
-> > -               if (IS_ERR_OR_NULL(dpi->p)) {
-> > -                       int ret = PTR_ERR(dpi->p);
-> > -
-> > -                       dev_dbg(dev, "no pinctrl handle\n");
-> > -                       /* Only return deferrals */
-> > -                       if (ret == -EPROBE_DEFER)
-> > -                               return ret;
-> > -                       return 0;
-> > -               }
-> > +               ret = PTR_ERR(dpi->p);
-> > +               dev_dbg(dev, "no pinctrl handle\n");
-> > +               /* Only return deferrals */
-> > +               if (ret == -EPROBE_DEFER)
-> > +                       return ret;
-> > +               return 0;
-> > 
-> > Is this intended change?
-> 
-> The above looks totally broken to me.
-> 
-> Oh, it's using IS_ERR_OR_NULL(), so it's bound to be broken.
-> 
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-sabresd.dts |   24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q.dtsi        |    5 +++++
+ 2 files changed, 29 insertions(+), 0 deletions(-)
 
-I went through discussion in community on usage of "IS_ERR_OR_NULL".
-https://patchwork.kernel.org/patch/1953271/
-Will take care not use this in future.
-
-Thanks,
-Manish
+diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
+index a424025..b0f5049 100644
+--- a/arch/arm/boot/dts/imx6q-sabresd.dts
++++ b/arch/arm/boot/dts/imx6q-sabresd.dts
+@@ -51,6 +51,18 @@
+ 		};
+ 
+ 		aips-bus at 02100000 { /* AIPS2 */
++			usb at 02184000 { /* USB OTG */
++				vbus-supply = <&reg_usb_otg_vbus>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usbotg_2>;
++				disable-over-current;
++				status = "okay";
++			};
++
++			usb at 02184200 { /* USB1 */
++				status = "okay";
++			};
++
+ 			ethernet at 02188000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_enet_1>;
+@@ -91,4 +103,16 @@
+ 			linux,code = <114>; /* KEY_VOLUMEDOWN */
+ 		};
+ 	};
++
++	regulators {
++		compatible = "simple-bus";
++		reg_usb_otg_vbus: usb_otg_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 22 0>;
++			enable-active-high;
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index d6265ca..9619ff8 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -705,6 +705,11 @@
+ 							1592 0x17059	/* MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID */
+ 						>;
+ 					};
++					pinctrl_usbotg_2: usbotggrp-2 {
++						fsl,pins = <
++							1591 0x17059	/* MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID */
++						>;
++					};
+ 				};
+ 
+ 				usdhc2 {
+-- 
+1.7.0.4
