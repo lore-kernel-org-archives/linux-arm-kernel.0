@@ -1,90 +1,34 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 6 Feb 2013 10:50:19 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130206181852.4eca53e3@skate>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <2776630.gp5gC9tvLk@wuerfel>
- <20130131180249.GA30869@obsidianresearch.com>
- <201301312046.22560.arnd@arndb.de>
- <20130131224459.GA11846@obsidianresearch.com>
- <20130206175128.1b64196d@skate>
- <20130206170903.GA28198@obsidianresearch.com>
- <20130206181852.4eca53e3@skate>
-Message-ID: <20130206175019.GA24248@obsidianresearch.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 6 Feb 2013 12:55:03 -0500 (EST)
+Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP operation
+ if required
+In-Reply-To: <1360168718.4045.18.camel@hornet>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
+ <1360168718.4045.18.camel@hornet>
+Message-ID: <alpine.LFD.2.02.1302061254370.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 06:18:52PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Gunthorpe,
-> 
-> On Wed, 6 Feb 2013 10:09:03 -0700, Jason Gunthorpe wrote:
-> 
-> > Link 0 translates like:
+On Wed, 6 Feb 2013, Pawel Moll wrote:
+
+> On Tue, 2013-02-05 at 05:22 +0000, Nicolas Pitre wrote:
+> > From: Jon Medhurst <tixy@linaro.org>
 > > 
-> > - Linux driver does inl(0x4)
-> > - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x4
-> > - The CPU TLB converts that into a read from CPU physical
-> >   0xc0000000 + 0x4
-> > - The MBUS window remap register converts that into a read from IO
-> >   space 0x4
-> > - The address 0x4 is placed in the PCI-E IO transaction of link 0
-> > 
-> > Link 1 translates like:
-> > 
-> > - Linux driver does inl(0x1004)
-> > - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x1004
-> > - The CPU TLB converts that into a read from CPU physical
-> >   0xc0000000 + 0x11004 (ie the mbus window for the link 1)
-> > - The MBUS window remap register converts that into a read from IO
-> >   space 0x1004
-> > - The address 0x1004 is placed in the PCI-E IO transaction of link 1
+> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > ---
+> >  arch/arm/mach-vexpress/core.h    |  2 ++
+> >  arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
+> >  arch/arm/mach-vexpress/v2m.c     |  2 +-
+> >  3 files changed, 15 insertions(+), 1 deletion(-)
 > 
-> This last step is exactly what I thought would not work. If the PCIe
-> device has say 64 bytes of I/O space, then this 0x1004 PCI-E
-> transaction will be out of bounds, no?
-
-No.. PCI end devices are required to decode all 32 bits of address,
-less the bits requires for their allocation. So a device with 64 bytes
-of IO will match bits 31:6 and then use bits 5:0 for the internal
-register.
-
-So a full 32 bit address is technically fine, according to the spec,
-however:
- - The 32 bit decode is an optional feature on bridges
- - Some devices are broken because x86 only uses the low 64k.
-
-So for best compatibility it is ideal to put everything in the low
-64k.
-
-However, IO space really should not be used by anything except very
-legacy devices, so if the MMU business is a hassle for some reason I'd
-just go with the 64k aligned method.
-
-> > > Can't this be solved using the window_alignement() hook we've been
-> > > discussing separately? Just like we teach the Linux PCI core about our
-> > > alignment requirements of 64K for the I/O regions, we could teach it
-> > > about our alignment requirement on memory regions as well. No?
-> > 
-> > Hopefully :) As long as it can adjust the start and length you should
-> > be fine.
+> For this and the other "ARM: vexpress" patches in the series:
 > 
-> Why would you need to adjust the length? If Linux allocates a 2 MB
-> resource on a 1 MB boundary, we simply increase the start address to
-> the next 2 MB boundary, and that's it. Why would the length need to
-> change?
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-Well, lets say 3MB is the example. A 3mb region needs to fit inside a
-4mb MBUS window. If you align the start to 4mb then the pci-e core
-needs to know that it can't use the extra 1mb covered by the mbus
-window. mbus windows must not overlap.
+Thanks.
 
-Adjusting the bridge window length to be 4mb communicates that dead
-space to the PCI core, and presumably this shows up in lspci and
-whatnot.
 
-I suppose if you align the end to 4mb (thus creating the gap before,
-not after) things should work out OK, but the information that the gap
-is routed to a specific PCI link is lost..
-
-Jason
+Nicolas
