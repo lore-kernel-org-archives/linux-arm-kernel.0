@@ -1,86 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 6 Feb 2013 18:18:52 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130206170903.GA28198@obsidianresearch.com>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <2776630.gp5gC9tvLk@wuerfel>
- <20130131180249.GA30869@obsidianresearch.com>
- <201301312046.22560.arnd@arndb.de>
- <20130131224459.GA11846@obsidianresearch.com>
- <20130206175128.1b64196d@skate>
- <20130206170903.GA28198@obsidianresearch.com>
-Message-ID: <20130206181852.4eca53e3@skate>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Feb 2013 09:25:00 -0800
+Subject: [GIT PULL] omap twl platform init changes for v3.9 merge window
+Message-ID: <20130206172500.GA25185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
+The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
 
-On Wed, 6 Feb 2013 10:09:03 -0700, Jason Gunthorpe wrote:
+  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
 
-> Link 0 translates like:
-> 
-> - Linux driver does inl(0x4)
-> - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x4
-> - The CPU TLB converts that into a read from CPU physical
->   0xc0000000 + 0x4
-> - The MBUS window remap register converts that into a read from IO
->   space 0x4
-> - The address 0x4 is placed in the PCI-E IO transaction of link 0
-> 
-> Link 1 translates like:
-> 
-> - Linux driver does inl(0x1004)
-> - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x1004
-> - The CPU TLB converts that into a read from CPU physical
->   0xc0000000 + 0x11004 (ie the mbus window for the link 1)
-> - The MBUS window remap register converts that into a read from IO
->   space 0x1004
-> - The address 0x1004 is placed in the PCI-E IO transaction of link 1
+are available in the git repository at:
 
-This last step is exactly what I thought would not work. If the PCIe
-device has say 64 bytes of I/O space, then this 0x1004 PCI-E
-transaction will be out of bounds, no?
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/twl-signed-v2
 
-Sorry, still learning how PCI works...
+for you to fetch changes up to 6689c87555839d90f2a0b76d1f982713487a11d2:
 
-> > I understand that I have two choices here:
-> > 
-> >  * First one is to make the I/O regions of all PCIe links fit below the
-> >    default IO_SPACE_LIMIT (0xffff) by doing the mapping trick you
-> >    described above.
-> > 
-> >  * Second one is to have one 64 KB block for each PCIe link, which
-> >    would require raising the IO_SPACE_LIMIT on this platform.
-> 
-> Yes, however, AFIAK this is the environment you should be running in:
-> 
-> #define IO_SPACE_LIMIT  ((resource_size_t)0xfffff)
-> 
-> Which is 5 f's not 4.
+  ARM: OMAP2+: Fix twl section warnings related to omap_twl4030_audio_init (2013-02-05 10:36:21 -0800)
 
-Aaah, you're right. My eyes got the number of f wrong. So I have 16
-times 64 KB. So why would I bother doing the MMU trick if I can just
-nicely remap 64 KB for each PCIe link ?
+----------------------------------------------------------------
+OMAP TWL updates from Peter Ujfalusi <peter.ujfalusi@ti.com>:
 
-> > Can't this be solved using the window_alignement() hook we've been
-> > discussing separately? Just like we teach the Linux PCI core about our
-> > alignment requirements of 64K for the I/O regions, we could teach it
-> > about our alignment requirement on memory regions as well. No?
-> 
-> Hopefully :) As long as it can adjust the start and length you should
-> be fine.
+Update for audio support via omap-twl4030 and pwm updates in board level,
+and zoom-peripherals update to not request the TWL GPIO7.
 
-Why would you need to adjust the length? If Linux allocates a 2 MB
-resource on a 1 MB boundary, we simply increase the start address to
-the next 2 MB boundary, and that's it. Why would the length need to
-change?
+----------------------------------------------------------------
+Peter Ujfalusi (9):
+      ARM: OMAP: 3430sdp: Enable extmute functionality for audio
+      ARM: OMAP: zoom: Zoom2 does not have extmute functionality
+      ARM: OMAP2+: twl-common: Add default twl4030 audio configuration
+      ARM: OMAP2+: twl-common: Allow boards to customize the twl4030 audio setup
+      ARM: OMAP: zoom: Audio support via the common omap-twl4030 machine driver
+      ARM: OMAP: sdp3430: Audio support via the common omap-twl4030 machine driver
+      ARM: OMAP: board-4430sdp: Proper support for TWL6030 PWM LED/Backlight
+      ARM: OMAP: omap3beagle: Use the pwm_leds driver to control the PMU_STAT led
+      ARM: board-zoom: Do not request LCD panel enable GPIO from twl4030
 
-Thanks,
+Tony Lindgren (2):
+      Merge branch 'peter/for-tony' of git://gitorious.org/omap-audio/linux-audio into omap-for-v3.9/twl
+      ARM: OMAP2+: Fix twl section warnings related to omap_twl4030_audio_init
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ arch/arm/mach-omap2/board-3430sdp.c          | 20 ++++++++++++++
+ arch/arm/mach-omap2/board-4430sdp.c          | 30 +++++++++++++++++++-
+ arch/arm/mach-omap2/board-cm-t35.c           |  2 +-
+ arch/arm/mach-omap2/board-devkit8000.c       |  2 +-
+ arch/arm/mach-omap2/board-igep0020.c         |  2 +-
+ arch/arm/mach-omap2/board-omap3beagle.c      | 41 ++++++++++++++++++++++------
+ arch/arm/mach-omap2/board-omap3evm.c         |  2 +-
+ arch/arm/mach-omap2/board-overo.c            |  2 +-
+ arch/arm/mach-omap2/board-zoom-peripherals.c | 39 ++++++++++++++------------
+ arch/arm/mach-omap2/twl-common.c             | 17 ++++++++----
+ arch/arm/mach-omap2/twl-common.h             |  3 +-
+ 11 files changed, 120 insertions(+), 40 deletions(-)
