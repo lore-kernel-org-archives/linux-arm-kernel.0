@@ -1,28 +1,52 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 6 Feb 2013 07:22:37 +0100
-Subject: [PATCH v5 1/3] cpufreq: kirkwood: Add a cpufreq driver for
- Marvell Kirkwood SoCs
-In-Reply-To: <1592206.QUWhA9cOzT@vostro.rjw.lan>
-References: <1360094115-14999-1-git-send-email-andrew@lunn.ch>
- <1360094115-14999-2-git-send-email-andrew@lunn.ch>
- <1592206.QUWhA9cOzT@vostro.rjw.lan>
-Message-ID: <20130206062237.GE20212@lunn.ch>
+Date: Wed,  6 Feb 2013 07:35:23 +0100
+Subject: [PATCH v5 0/4] Kirkwood and Dove Thermal drivers
+Message-ID: <1360132527-22860-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 10:45:38PM +0100, Rafael J. Wysocki wrote:
-> On Tuesday, February 05, 2013 08:55:13 PM Andrew Lunn wrote:
-> > The Marvell Kirkwood SoCs have simple cpufreq support in hardware. The
-> > CPU can either use the a high speed cpu clock, or the slower DDR
-> > clock. Add a driver to swap between these two clock sources.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> 
-> This has been ACKed by Viresh already IIRC, right?
+This patchset adds thermal support for Kirkwood and Dove SoCs.
 
-Yes, it has. Also the ARM parts have been asked by Jason Cooper.
+Changes since v4
+* Remove redundant dev_err() after devm_kzalloc() failure. 
 
-However, the changes to the clocks are not that small....
+Changes since v3
+* Added dependency on OF
 
-	 Andrew
+Changes since v2
+* More marvel -> marvell
+* Dove driver. Debugged by Sebastian Hesselbarth
+
+Changes since v1
+* Temperature Reading in milligrad
+* marvel -> marvell
+* generalized to Orion
+* Compatibility string marvell,kirkwood-thermal
+* Arithmetic using unsigned long
+
+Andrew Lunn (2):
+  Thermal: Dove: Add Themal sensor support for Dove.
+  Dove: Thermal: Add DT node and enable in defconfig
+
+Nobuhiro Iwamatsu (2):
+  thermal: Add support for the thermal sensor on Kirkwood SoCs
+  ARM: Kirkwood: Add support thermal sensor for 88F6282 and 88F6283
+
+ .../devicetree/bindings/thermal/dove-thermal.txt   |   18 ++
+ .../bindings/thermal/kirkwood-thermal.txt          |   15 ++
+ arch/arm/boot/dts/dove.dtsi                        |    5 +
+ arch/arm/boot/dts/kirkwood-6282.dtsi               |    6 +
+ arch/arm/configs/dove_defconfig                    |    2 +
+ arch/arm/configs/kirkwood_defconfig                |    2 +
+ drivers/thermal/Kconfig                            |   16 ++
+ drivers/thermal/Makefile                           |    2 +
+ drivers/thermal/dove_thermal.c                     |  209 ++++++++++++++++++++
+ drivers/thermal/kirkwood_thermal.c                 |  134 +++++++++++++
+ 10 files changed, 409 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/dove-thermal.txt
+ create mode 100644 Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
+ create mode 100644 drivers/thermal/dove_thermal.c
+ create mode 100644 drivers/thermal/kirkwood_thermal.c
+
+-- 
+1.7.10.4
