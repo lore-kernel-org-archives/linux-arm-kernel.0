@@ -1,60 +1,86 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Feb 2013 18:17:27 +0100
-Subject: [PATCH 2/2] tty: serial: use module_init on pl011_init
-In-Reply-To: <1360151235-11980-2-git-send-email-haojian.zhuang@linaro.org>
-References: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
- <1360151235-11980-2-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdZ8L88pBvshavWM3gVjG=pka+R9iX+k6mfnCNNUGpXJ3A@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 6 Feb 2013 18:18:52 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130206170903.GA28198@obsidianresearch.com>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <2776630.gp5gC9tvLk@wuerfel>
+ <20130131180249.GA30869@obsidianresearch.com>
+ <201301312046.22560.arnd@arndb.de>
+ <20130131224459.GA11846@obsidianresearch.com>
+ <20130206175128.1b64196d@skate>
+ <20130206170903.GA28198@obsidianresearch.com>
+Message-ID: <20130206181852.4eca53e3@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please include Russell on patches to this driver.
+Dear Jason Gunthorpe,
 
-On Wed, Feb 6, 2013 at 12:47 PM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
-> If amba serial driver is probed defer, amba serial driver may be
-> probed after init process. So the error log shows in below.
->
-> [    0.389403] Warning: unable to open an initial console.
-> [    0.390107] Freeing init memory: 2328K
->
-> It results in serial console not enabled. So replace arch_initcall
-> by module_init on pl011_init(). The boot sequence is changed in below.
->
->   pinctrl driver --> amba serial driver --> init process
+On Wed, 6 Feb 2013 10:09:03 -0700, Jason Gunthorpe wrote:
 
-ONLY on systems using pinctrl, nota bene.
+> Link 0 translates like:
+> 
+> - Linux driver does inl(0x4)
+> - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x4
+> - The CPU TLB converts that into a read from CPU physical
+>   0xc0000000 + 0x4
+> - The MBUS window remap register converts that into a read from IO
+>   space 0x4
+> - The address 0x4 is placed in the PCI-E IO transaction of link 0
+> 
+> Link 1 translates like:
+> 
+> - Linux driver does inl(0x1004)
+> - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x1004
+> - The CPU TLB converts that into a read from CPU physical
+>   0xc0000000 + 0x11004 (ie the mbus window for the link 1)
+> - The MBUS window remap register converts that into a read from IO
+>   space 0x1004
+> - The address 0x1004 is placed in the PCI-E IO transaction of link 1
 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Cc: Alan Cox <alan@linux.intel.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-serial at vger.kernel.org
-> ---
->  drivers/tty/serial/amba-pl011.c |    6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
->
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index d43d530..8b7dacb 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2129,11 +2129,7 @@ static void __exit pl011_exit(void)
->         uart_unregister_driver(&amba_reg);
->  }
->
-> -/*
-> - * While this can be a module, if builtin it's most likely the console
-> - * So let's leave module_exit but move module_init to an earlier place
-> - */
-> -arch_initcall(pl011_init);
-> +module_init(pl011_init);
+This last step is exactly what I thought would not work. If the PCIe
+device has say 64 bytes of I/O space, then this 0x1004 PCI-E
+transaction will be out of bounds, no?
 
-Hm. PL011 is actually the only serial driver that gets called as
-arch_initcall().
+Sorry, still learning how PCI works...
 
-Alessandro Rubini changed this in 2009.
+> > I understand that I have two choices here:
+> > 
+> >  * First one is to make the I/O regions of all PCIe links fit below the
+> >    default IO_SPACE_LIMIT (0xffff) by doing the mapping trick you
+> >    described above.
+> > 
+> >  * Second one is to have one 64 KB block for each PCIe link, which
+> >    would require raising the IO_SPACE_LIMIT on this platform.
+> 
+> Yes, however, AFIAK this is the environment you should be running in:
+> 
+> #define IO_SPACE_LIMIT  ((resource_size_t)0xfffff)
+> 
+> Which is 5 f's not 4.
 
-Alessandro, can you explain? Is the sole purpose to get the
-console up early?
+Aaah, you're right. My eyes got the number of f wrong. So I have 16
+times 64 KB. So why would I bother doing the MMU trick if I can just
+nicely remap 64 KB for each PCIe link ?
 
-Yours,
-Linus Walleij
+> > Can't this be solved using the window_alignement() hook we've been
+> > discussing separately? Just like we teach the Linux PCI core about our
+> > alignment requirements of 64K for the I/O regions, we could teach it
+> > about our alignment requirement on memory regions as well. No?
+> 
+> Hopefully :) As long as it can adjust the start and length you should
+> be fine.
+
+Why would you need to adjust the length? If Linux allocates a 2 MB
+resource on a 1 MB boundary, we simply increase the start address to
+the next 2 MB boundary, and that's it. Why would the length need to
+change?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
