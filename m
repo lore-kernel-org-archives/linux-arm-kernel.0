@@ -1,56 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Feb 2013 09:16:07 -0800
-Subject: [PATCH v8 12/12] document: devicetree: bind pinconf with pin
- single
-In-Reply-To: <CAD6h2NSwnMk9c_vVq51ccv3PART0ZVAnm3v3kFLwz+S+nrOK2w@mail.gmail.com>
-References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
- <1359825953-15663-13-git-send-email-haojian.zhuang@linaro.org>
- <20130205040721.GE25185@atomide.com>
- <CAN1soZytx7w8a1C=-C7924_MW6FPH5b=gsvSH=BpDU4ZhJia4w@mail.gmail.com>
- <CAN1soZy0g3kWRm-d3gB4LmobrNTR6WVia38maS_fXbp4qmFayA@mail.gmail.com>
- <20130205233045.GQ25185@atomide.com>
- <CAD6h2NSwnMk9c_vVq51ccv3PART0ZVAnm3v3kFLwz+S+nrOK2w@mail.gmail.com>
-Message-ID: <20130206171607.GZ25185@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Feb 2013 18:17:27 +0100
+Subject: [PATCH 2/2] tty: serial: use module_init on pl011_init
+In-Reply-To: <1360151235-11980-2-git-send-email-haojian.zhuang@linaro.org>
+References: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
+ <1360151235-11980-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdZ8L88pBvshavWM3gVjG=pka+R9iX+k6mfnCNNUGpXJ3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@linaro.org> [130206 07:11]:
-> On 6 February 2013 07:30, Tony Lindgren <tony@atomide.com> wrote:
-> > * Haojian Zhuang <haojian.zhuang@gmail.com> [130205 05:55]:
-> >>
-> >> Maybe it didn't cover your case. It seems that there's only one bit
-> >> for bias in your case.
-> >> You can control MMC BIAS enable or disable. And there's neither pullup
-> >> nor pulldown.
-> >> Is it right?
-> >
-> > Yes for this register there are no pulls. But I there are others that
-> > have pull bits.
-> >
-> >>      So I will need both config BIAS_ENABLE & config BIAS_DISABLE.
-> >> Driver switches between BIAS_ENABLE & BIAS_DISABLE.
-> >
-> > I'd like to avoid mapping both enable and disable for everything
-> > which seems bloated..
-> >
-> 
-> pinctrl-coh901 driver already uses PIN_CONFIG_BIAS_DISABLE without argument.
-> 
-> I think that it's better to use both BIAS_ENABLE & BIAS_DISABLE. Otherwise,
-> I need to update pinctrl-coh901 driver with updating the interface.
-> The work is a little
-> large.
+Please include Russell on patches to this driver.
 
-Well how about just let's keep the existing PIN_CONFIG_BIAS_DISABLE
-and PIN_CONFIG_BIAS_ENABLE for compability, but let's still standardize
-on PIN_CONFIG_XXX_ENABLE for all the new ones to avoid bloat?
+On Wed, Feb 6, 2013 at 12:47 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
+> If amba serial driver is probed defer, amba serial driver may be
+> probed after init process. So the error log shows in below.
+>
+> [    0.389403] Warning: unable to open an initial console.
+> [    0.390107] Freeing init memory: 2328K
+>
+> It results in serial console not enabled. So replace arch_initcall
+> by module_init on pl011_init(). The boot sequence is changed in below.
+>
+>   pinctrl driver --> amba serial driver --> init process
 
-> Maybe we can use another name, PIN_CONFIG_BIAS_AUTOPULL. Then we can
-> distinguish it from PULL_UP & PULL_DOWN without any confusion. What's your
-> opinion?
+ONLY on systems using pinctrl, nota bene.
 
-Sounds OK to me if you need that.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Cc: Alan Cox <alan@linux.intel.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-serial at vger.kernel.org
+> ---
+>  drivers/tty/serial/amba-pl011.c |    6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index d43d530..8b7dacb 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2129,11 +2129,7 @@ static void __exit pl011_exit(void)
+>         uart_unregister_driver(&amba_reg);
+>  }
+>
+> -/*
+> - * While this can be a module, if builtin it's most likely the console
+> - * So let's leave module_exit but move module_init to an earlier place
+> - */
+> -arch_initcall(pl011_init);
+> +module_init(pl011_init);
 
-Regards,
+Hm. PL011 is actually the only serial driver that gets called as
+arch_initcall().
 
-Tony
+Alessandro Rubini changed this in 2009.
+
+Alessandro, can you explain? Is the sole purpose to get the
+console up early?
+
+Yours,
+Linus Walleij
