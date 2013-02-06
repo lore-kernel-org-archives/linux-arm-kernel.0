@@ -1,30 +1,51 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Wed, 6 Feb 2013 13:48:19 +0900
-Subject: [PATCH 5/9] gpiolib: use gpio_chips list in gpiochip_find_base
-In-Reply-To: <CACRpkdYT4p8uez8DHTSsjKFb=KmWbtCXJQtyXLAJkCC7fKaErw@mail.gmail.com>
-References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-7-git-send-email-acourbot@nvidia.com>
- <CACRpkdYT4p8uez8DHTSsjKFb=KmWbtCXJQtyXLAJkCC7fKaErw@mail.gmail.com>
-Message-ID: <5111E093.4060600@nvidia.com>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Wed, 6 Feb 2013 04:57:25 +0000
+Subject: [PATCH V2 1/6] pinctrl: pinctrl-single: use arch_initcall and
+ module_exit
+In-Reply-To: <CACRpkdYUBGkRRF_nDbn5tGmtZC_Wucqxz_PjWo0xX_KbnQJ5cw@mail.gmail.com>
+References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
+ <1359445134-13323-2-git-send-email-manishv.b@ti.com>
+ <CACRpkdbf7TwrjfT2rhqQFGc3yh_Nt117RtzQO2y6g5Ddx5Ay_w@mail.gmail.com>
+ <20130201170906.GE22517@atomide.com>	<20130201171124.GF22517@atomide.com>
+ <A4887BF146CD57468F700B415D2F47015828C7@DBDE01.ent.ti.com>
+ <CACRpkdYUBGkRRF_nDbn5tGmtZC_Wucqxz_PjWo0xX_KbnQJ5cw@mail.gmail.com>
+Message-ID: <A4887BF146CD57468F700B415D2F47015831F0@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2013 02:21 AM, Linus Walleij wrote:
-> This looks like it is preserving this userspace-sensitive semantic
-> so that dynamically added chips will still get the same assigned
-> numbers.
+Hi Linus
 
-It does (it should, at least), the assigned ranges should be strictly 
-identical to the previous version. While testing I also made sure all 
-chips had the same GPIO range.
+On Tue, Feb 05, 2013 at 18:30:48, Linus Walleij wrote:
+> On Tue, Feb 5, 2013 at 7:36 AM, Vishwanathrao Badarkhe, Manish <manishv.b@ti.com> wrote:
+> 
+> > I made following changes, in order to update "dip->p" pointer with 
+> > correct value:
+> >
+> > -       if (!dpi->p) {
+> > +       if (IS_ERR_OR_NULL(dpi->p)) {
+> >                 dpi->p = devm_pinctrl_get(dev);
+> > -               if (IS_ERR_OR_NULL(dpi->p)) {
+> > -                       int ret = PTR_ERR(dpi->p);
+> > -
+> > -                       dev_dbg(dev, "no pinctrl handle\n");
+> > -                       /* Only return deferrals */
+> > -                       if (ret == -EPROBE_DEFER)
+> > -                               return ret;
+> > -                       return 0;
+> > -               }
+> > +               ret = PTR_ERR(dpi->p);
+> > +               dev_dbg(dev, "no pinctrl handle\n");
+> > +               /* Only return deferrals */
+> > +               if (ret == -EPROBE_DEFER)
+> > +                       return ret;
+> > +               return 0;
+> 
+> This is based on some old code that I wrote ages ago. Check the pinctrl tree or linux-next for the latest core pin grabbing code.
+> Use that instead.
 
-> But I want some guarantees, so state clearly in the commit
-> that any dynamically assigned chip will get the same base
-> address after this change as it got before it, and please take
-> this opportunity to add a comment stating that this search
-> method is vital for userspace ABIs, and must be preserved.
+Thanks for your reply.
+I have checked with your latest changes regarding pinctrl 
+in linux-next tree and these changes are working fine for me.
 
-Done. I will take the blame if something goes wrong. :)
-
-Thanks,
-Alex.
+Regards
+Manish Badarkhe
