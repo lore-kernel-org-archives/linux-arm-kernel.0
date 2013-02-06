@@ -1,53 +1,56 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 6 Feb 2013 11:28:09 +0530
-Subject: [PATCH 1/5] ARM: OMAP4: remove control module address space from PHY
- and OTG
-In-Reply-To: <1360130294-5976-1-git-send-email-kishon@ti.com>
-References: <1360130294-5976-1-git-send-email-kishon@ti.com>
-Message-ID: <1360130294-5976-2-git-send-email-kishon@ti.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Tue, 5 Feb 2013 22:00:04 -0800
+Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
+In-Reply-To: <CAKuRcOK1B-iNACQntZ2LsTTXaKULwZvOWDVCQF_vz8ym_JeG2g@mail.gmail.com>
+References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAD=FV=VQywwQ3YAFb=1qFmd3UEW39Xu=ok6fdjhvBXdwOQOa1Q@mail.gmail.com>
+ <CAKuRcOKx4VLcmhwi8VWHKNOizgiVsE5f0v-CGmK5+bH=BjJAPg@mail.gmail.com>
+ <CAKuRcOK1B-iNACQntZ2LsTTXaKULwZvOWDVCQF_vz8ym_JeG2g@mail.gmail.com>
+Message-ID: <CAPnjgZ1DG2Txh41r8PsfqfZMaUem5ScTijMP+==3ATFK0Q1=Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a separate driver for the control module,
-stop populating the control module device data in other modules
-(PHY and OTG) device info.
+Hi,
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   13 -------------
- 1 file changed, 13 deletions(-)
+On Tue, Feb 5, 2013 at 9:33 PM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
+> On Wed, Feb 6, 2013 at 10:58 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
+>> On Wed, Feb 6, 2013 at 5:48 AM, Doug Anderson <dianders@chromium.org> wrote:
+>>> Yavaraj,
+>>>
+>>> On Mon, Feb 4, 2013 at 1:03 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com>
+>>> wrote:
+>>>>
+>>>> This RFC patch is w.r.t multimaster bus arbitration which is already
+>>>> being discussing in the mainline.
+>>>> This patch provides hooks for the i2c multimaster bus arbitration
+>>>> and to have the arbitration parameters.
+>>>
+>>>
+>>> I may have missed something in all the threads, but my recollection was that
+>>> the request was that this should be implemented without touching the i2c
+>>> core code.  Your patch modifies the i2c core code.
+>
+>    Different i2c devices will directly talk to i2c core using i2c_transfer().
+>     If we put this out of the i2c core,the i2c devices like tpsxxxx and etc
+>     should be registered through the bridge/mux .
+>
+>>>
+>>> My impression was that the best solution was to use the infrastructure in
+>>> place for i2c multiplexing.  ...but in your case you would only multiplex
+>>> one thing.  This was suggested by Grant Likely and seems the cleanest...
+>>
+>      I agree that Grants idea was the cleanest but we may end up in change in
+>       i2c device probe to register through mux/bridge.(for the
+> device's connected on that
+>      particular bus which requires arbitration).
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 793f54a..624a7e8 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2702,13 +2702,6 @@ static struct resource omap44xx_usb_phy_and_pll_addrs[] = {
- 		.end		= 0x4a0ae000,
- 		.flags		= IORESOURCE_MEM,
- 	},
--	{
--		/* XXX: Remove this once control module driver is in place */
--		.name		= "ctrl_dev",
--		.start		= 0x4a002300,
--		.end		= 0x4a002303,
--		.flags		= IORESOURCE_MEM,
--	},
- 	{ }
- };
- 
-@@ -6156,12 +6149,6 @@ static struct omap_hwmod_addr_space omap44xx_usb_otg_hs_addrs[] = {
- 		.pa_end		= 0x4a0ab7ff,
- 		.flags		= ADDR_TYPE_RT
- 	},
--	{
--		/* XXX: Remove this once control module driver is in place */
--		.pa_start	= 0x4a00233c,
--		.pa_end		= 0x4a00233f,
--		.flags		= ADDR_TYPE_RT
--	},
- 	{ }
- };
- 
--- 
-1.7.10.4
+Does the device tree not handle that case automatically? How are
+muxes/bridges done in that case? It's not problem to adjust the device
+tree file accordingly if Grant's approach is the cleanest method.
+
+Regards,
+Simon
+
+>>
+>>>
+>>> -Doug
