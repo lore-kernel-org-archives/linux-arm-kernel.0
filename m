@@ -1,140 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 6 Feb 2013 11:01:55 -0800
-Subject: [PATCH v3 1/3] drm/exynos: Get HDMI version from device tree
-In-Reply-To: <5111C67B.3060909@samsung.com>
-References: <1360107777-17490-1-git-send-email-seanpaul@chromium.org>
- <1360107777-17490-2-git-send-email-seanpaul@chromium.org>
- <5111A23F.50300@wwwdotorg.org>
- <CAOw6vb+W3phFDJXp3gCx7y0N7mF4o2DpEfTGuNT1pGdKqiCGTg@mail.gmail.com>
- <5111A6D9.7090700@wwwdotorg.org>
- <CAOw6vbKhsWp7VnqgvECd-P4e5okX6dwKn3P8+phfpG29rA+h7g@mail.gmail.com>
- <5111C67B.3060909@samsung.com>
-Message-ID: <CAOesGMjBF0yk69BhA1ffduLNHtYiEEy5dAvrrbj0Nz4kRdQn_g@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 06 Feb 2013 12:04:19 -0700
+Subject: [PATCH v2 2/2] ARM: uncompress debug support for multiplatform
+ build
+In-Reply-To: <20130206093236.GD17833@n2100.arm.linux.org.uk>
+References: <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
+ <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
+ <20130204160133.GH17786@n2100.arm.linux.org.uk>
+ <20130206093236.GD17833@n2100.arm.linux.org.uk>
+Message-ID: <5112A933.4090108@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 5, 2013 at 6:56 PM, ??? <sw0312.kim@samsung.com> wrote:
->
->
-> On 2013? 02? 06? 09:56, Sean Paul wrote:
->> On Tue, Feb 5, 2013 at 4:42 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 02/05/2013 05:37 PM, Sean Paul wrote:
->>>> On Tue, Feb 5, 2013 at 4:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>>> n 02/05/2013 04:42 PM, Sean Paul wrote:
->>>>>> Use the compatible string in the device tree to determine which
->>>>>> registers/functions to use in the HDMI driver. Also changes the
->>>>>> references from v13 to 4210 and v14 to 4212 to reflect the IP
->>>>>> block version instead of the HDMI version.
->>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/drm/exynos/hdmi.txt b/Documentation/devicetree/bindings/drm/exynos/hdmi.txt
->>>>>
->>>>> Binding looks sane to me.
->>>>>
->>>>>> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
->>>>>
->>>>>>  #ifdef CONFIG_OF
->>>>>>  static struct of_device_id hdmi_match_types[] = {
->>>>>>       {
->>>>>> -             .compatible = "samsung,exynos5-hdmi",
->>>>>> -             .data   = (void *)HDMI_TYPE14,
->>>>>> +             .compatible = "samsung,exynos4-hdmi",
->>>>>>       }, {
->>>>>>               /* end node */
->>>>>>       }
->>>>>
->>>>> Why not fill in all the "base" compatible values there (I think you need
->>>>> this anyway so that DTs don't all have to be compatible with
->>>>> samsung,exynos4-hdmi), with .data containing the HDMI_VER_EXYNOS*
->>>>> values, then ...
->>>>>
->>>>
->>>> At the moment, all DTs have to be compatible with exynos4-hdmi since
->>>> it provides the base for the current driver. The driver uses 4210 and
->>>> 4212 to differentiate between different register addresses and
->>>> features, but most things are just exynos4-hdmi compatible.
+On 02/06/2013 02:32 AM, Russell King - ARM Linux wrote:
+> On Mon, Feb 04, 2013 at 04:01:33PM +0000, Russell King - ARM Linux wrote:
+>> On Fri, Jan 18, 2013 at 10:45:20AM +0800, Shawn Guo wrote:
+>>> Instead of giving zero support of uncompress debug for multiplatform
+>>> build, the patch turns uncompress debug into one part of DEBUG_LL
+>>> support.  When DEBUG_LL is turned on for a particular platform,
+>>> uncompress debug works too for that platform.
 >>>
->>> The DT nodes should include only the compatible values that the HW is
->>> actually compatible with. If the HW isn't compatible with exynos4-hdmi,
->>> that value shouldn't be in the compatible property, but instead whatever
->>> the "base" value that the HW really is compatible with. The driver can
->>> support multiple "base" compatible values from this table.
->>>
+>>> It reuses the platform DEBUG_LL macros by creating a simple
+>>> arch/arm/boot/compressed/debug.S with CONFIG_DEBUG_LL_INCLUDE
+>>> included there, and implements a generic putc() using those macros.
 >>
->> All devices that use this driver are compatible, at some level, with
->> exynos4-hdmi, so I think its usage is correct here.
+>> Ok, I've applied this on the previso that _no one_ in future whinges if
+>> the debug infrastructure doesn't quite meet their expectation.  The
+>> debug infrastructure remains first and foremost that: a simple debug
+>> infrastructure suitable for use in the early assembly and the like.
 >>
->>>>>> @@ -2218,17 +2217,18 @@ static int hdmi_probe(struct platform_device *pdev)
->>>>>
->>>>>> +
->>>>>> +     if (of_device_is_compatible(dev->of_node, "samsung,exynos4210-hdmi"))
->>>>>> +             hdata->version |= HDMI_VER_EXYNOS4210;
->>>>>> +     if (of_device_is_compatible(dev->of_node, "samsung,exynos4212-hdmi"))
->>>>>> +             hdata->version |= HDMI_VER_EXYNOS4212;
->>>>>> +     if (of_device_is_compatible(dev->of_node, "samsung,exynos5250-hdmi"))
->>>>>> +             hdata->version |= HDMI_VER_EXYNOS5250;
->>>>>
->>>>> Instead of that, do roughly:
->>>>>
->>>>>     match = of_match_device(hdmi_match_types, &pdev->dev);
->>>>>     if (match)
->>>>>         hdata->version |= (int)match->data;
->>>>>
->>>>> That way, it's all table-based. Any future additions to
->>>>> hdmi_match_types[] won't require another if statement to be added to
->>>>> probe().
->>>>
->>>> I don't think it's that easy. of_match_device returns the first match
->>>> from the device table, so I'd still need to iterate through the
->>>> matches. I could still break this out into a table, but I don't think
->>>> of_match_device is the right way to probe it.
->>>
->>> You shouldn't have to iterate over multiple matches. of_match_device()
->>> is supposed to return the match for the first entry in the compatible
->>> property, then if there was no match, move on to looking at the next
->>> entry in the compatible property, etc. In practice, I think it's still
->>> not implemented quite correctly for this, but you can make it work by
->>> putting the newest compatible value first in the match table.
->>
->> I think the only way that works is if you hardcode the compatible
->> versions in the driver, like this:
->>
->> static struct of_device_id hdmi_match_types[] = {
->>         {
->>                 .compatible = "samsung,exynos5250-hdmi",
->>                 .data = (void *)(HDMI_VER_EXYNOS5250 | HDMI_VER_EXYNOS4212);
->>         }, {
->>                 .compatible = "samsung,exynos4212-hdmi",
->>                 .data = (void *)HDMI_VER_EXYNOS4212;
->>         }, {
->>                 .compatible = "samsung,exynos4210-hdmi",
->>                 .data = (void *)HDMI_VER_EXYNOS4210;
->>         }, {
->>                 /* end node */
->>         }
->> };
->
-> Actually, I can't understand why there is HDMI_VER_EXYNOS5250 because it
-> is not used anywhere in your patch. I'm not sure I missed something from
-> your v2 patch thread, but to me, just hdmi version or hdmi ip version
-> can be used as data field of struct of_device_id as like your v2 patch
-> set. and then of_match_device() can be used without | in data field.
->
-> If I have missed some point from v2 thread, please let me know.
+>> That is its primary concern and trumps any requirements from consoles,
+>> early printk, decompressor output, and the like.
+> 
+> ... and now I've dropped the two patches because it causes build failures
+> for all OMAP and PXA platforms.
 
+It also breaks tegra_defconfig. For reference, the (or perhaps just a)
+reason here is that arch/arm/include/debug/tegra.S references symbol
+tegra_uart_config, which is declared in arch/arm/mach-tegra/common.c,
+which isn't part of the decompressor build. Tegra's uncompress.h doesn't
+touch this symbol, hence avoids this problem.
 
-Exactly. I think that's causing some of this confusion. It'd be easier
-to just leave any 5250 reference out of this patch. The _only_ place
-5250 should be used now is in the 5250 dtsi file, as the most specific
-compatible field. Compatible there should be, in order:
+I'd guess OMAP is broken for similar reasons, since when I created the
+tegra_uart_config symbol I was inspired by the OMAP DEBUG_LL code.
 
-5250, 4212, 4
-
-(or maybe not 4 at all, if the driver can't successfully drive the
-hardware in degraded mode using the HDMI 1.3 register maps, etc).
-
-... But there's no need to reference it in the driver. It might be
-useful in the future to set some quirk or feature bits, but until then
-it's just there in case.
-
-
--Olof
+Perhaps the patch can be re-cast to only affect multi-platform kernels,
+and leave unconverted platforms using uncompress.h (at least, I assume
+that must be the problem).
