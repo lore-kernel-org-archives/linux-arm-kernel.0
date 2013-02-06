@@ -1,128 +1,67 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 06 Feb 2013 13:31:23 +0100
-Subject: [PATCH] arm: mvebu: Add SPI flash on Armada XP-GP board
-In-Reply-To: <20130206105431.GA21764@localhost>
-References: <1360063473-26176-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <5111331F.7090900@free-electrons.com> <511168BE.1000803@free-electrons.com>
- <20130206105431.GA21764@localhost>
-Message-ID: <51124D1B.9030508@free-electrons.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 6 Feb 2013 14:32:22 +0200
+Subject: [PATCH v5 01/10] clk: tegra: Refactor PLL programming code
+In-Reply-To: <20130205132355.GD3073@tbergstrom-lnx.Nvidia.com>
+References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
+ <1359713962-16822-2-git-send-email-pdeschrijver@nvidia.com>
+ <510F4FF7.3050502@nvidia.com>
+ <20130204143233.GV2364@tbergstrom-lnx.Nvidia.com>
+ <51109BB3.8000706@nvidia.com>
+ <20130205132355.GD3073@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20130206123222.GI3073@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2013 11:54 AM, Ezequiel Garcia wrote:
-> Hi Gregory,
+On Tue, Feb 05, 2013 at 02:23:55PM +0100, Peter De Schrijver wrote:
+> On Tue, Feb 05, 2013 at 06:42:11AM +0100, Prashant Gaikwad wrote:
+> > On Monday 04 February 2013 08:02 PM, Peter De Schrijver wrote:
+> > > On Mon, Feb 04, 2013 at 07:06:47AM +0100, Prashant Gaikwad wrote:
+> > >> On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
+> > > ...
+> > >
+> > >>> -static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll,
+> > >>> -                                void __iomem *lock_addr, u32 lock_bit_idx)
+> > >>> +static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
+> > >>>    {
+> > >>>           int i;
+> > >>> -       u32 val;
+> > >>> +       u32 val, lock_bit;
+> > >>> +       void __iomem *lock_addr;
+> > >>>
+> > >>>           if (!(pll->flags & TEGRA_PLL_USE_LOCK)) {
+> > >>>                   udelay(pll->params->lock_delay);
+> > >>>                   return 0;
+> > >>>           }
+> > >>>
+> > >>> +       lock_addr = pll->clk_base + pll->params->base_reg;
+> > >> This will not work for PLLE. Lock bit for PLLE is in misc register.
+> > >>
+> > >>> +       lock_bit = BIT(pll->params->lock_bit_idx);
+> > >>> +
+> > >>>           for (i = 0; i < pll->params->lock_delay; i++) {
+> > >>>                   val = readl_relaxed(lock_addr);
+> > >>> -               if (val & BIT(lock_bit_idx)) {
+> > >>> +               if (val & lock_bit) {
+> > >> Need to change the lock bit idx parameter for Tegra20 and Tegra30 PLLs
+> > >> else this patch will break those.
+> > >>
+> > > Looking at commit 37c26a906527b8a6a252614ca83d21ad318c4e84 and commit
+> > > b08e8c0ecc42afa3a2e1019851af741980dd5a6b, these fields seem correctly
+> > > initialized for both Tegra20 and Tegra30? Or am I missing something?
+> > 
+> > Ohh, I missed to read
+> > 
+> > lock_bit = BIT(pll->params->lock_bit_idx);
+> > 
+> > 
+> > Am I missing something about PLLE lock_addr also?
+> > 
 > 
-> On Tue, Feb 05, 2013 at 09:17:02PM +0100, Gregory CLEMENT wrote:
->> On 02/05/2013 05:28 PM, Gregory CLEMENT wrote:
->>> Hi Ezequiel,
->>>
->>> On 02/05/2013 12:24 PM, Ezequiel Garcia wrote:
->>>> This patch adds an SPI master device node for Armada XP-GP board.
->>>> This master node is an SPI flash controller 'n25q128a13'.
->>>>
->>>> Since there is no 'partitions' node declared, one full sized
->>>> partition named as the device will be created.
->>>>
->>>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->>>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>>> Cc: Lior Amsalem <alior@marvell.com>
->>>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->>>> ---
->>>> This patch depends on:
->>>>
->>>>  1. Gregory's patch for Armada XP GP board:
->>>>       arm: mvebu: support for the new Armada XP development board(DB-MV784MP-GP)
->>>>
->>>>  2. My previous patch for SPI on Armada 370/XP:
->>>>       arm: mvebu: Add support for SPI controller in Armada 370/XP
->>>>
->>>> And don't forget to compile the SPI flash driver, CONFIG_MTD_M25P80=y
->>>>
->>>>  arch/arm/boot/dts/armada-xp-gp.dts |   12 ++++++++++++
->>>>  1 files changed, 12 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
->>>> index 3eea531..1c8afe2 100644
->>>> --- a/arch/arm/boot/dts/armada-xp-gp.dts
->>>> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
->>>> @@ -97,5 +97,17 @@
->>>>  			phy = <&phy3>;
->>>>  			phy-mode = "rgmii-id";
->>>>  		};
->>>> +
->>>> +		spi0: spi at d0010600 {
->>>> +			status = "okay";
->>>> +
->>>> +			spi-flash at 0 {
->>>> +				#address-cells = <1>;
->>>> +				#size-cells = <1>;
->>>> +				compatible = "n25q128a13";
->>>> +				reg = <0>; /* Chip select 0 */
->>>> +				spi-max-frequency = <108000000>;
->>
->> I had a remark about it, according to the datasheet, 108MHz is the
->> maximum frequency for the all the instructions but the READ
->> instruction. For the READ the maximum frequency is 54MHz. So I wonder
->> if we shouldn't use 54000000 here.
->>
+> Ah no indeed... my bad. So we need a lock_addr field.
 > 
-> Mmm... nice catch.
-> 
-> The mtd driver for the spi flash (m25p80) will use FAST_READ opcode
-> if CONFIG_M25PXX_USE_FAST_READ is selected, and this option
-> is selected by default.
 
-OK I didn't notice that thre wre a FAST_READ which was supported by
-Linux. So I think we can keep 108000000 as spi-max-frequency.
+Or a flag. Flag seems less invasive for now.
 
-> However we cannot count on this option being selected, of course.
-> 
-> On the other side, after some testing with spi-max-frequency = 50 MHz
-> and also with spi-max-frequency = 108 MHz I'm seeing the flash often
-> (not always) stalls when trying to read the full device through dd:
-> 
-> / # dd if=/dev/mtd0ro of=/dev/null
-> 
-> This happens regardless of CONFIG_M25PXX_USE_FAST_READ, and regardless
-> of spi-max-frequency = 50 MHz or 54 MHz or 108 MHz.
-> 
-> Note that setting 108 MHz is useless in our case, because there's
-> an upper limit of 62.5 MHz set by the core clock of the SoC.
-> 
-> Using a read block size of 1M, the read completes OK -- always:
-> 
-> / # dd if=/dev/mtd0 of=/dev/null bs=1M
-> 16+0 records in
-> 16+0 records out
-> 16777216 bytes (16.0MB) copied, 27.306048 seconds, 600.0KB/s
-> 
-> Moreover, when the read completes, the achieved bandwidth
-> is the same for 40, 50, 54, or 108 MHz.
-> 
-> If we set spi-max-frequency to 27 MHz (108 MHz / 4), it looks like the stalling
-> disappear and the read always completes OK, at almost half the speed:
-> 
-> / # dd if=/dev/mtd0ro of=/dev/null
-> 32768+0 records in
-> 32768+0 records out
-> 16777216 bytes (16.0MB) copied, 49.005122 seconds, 334.3KB/s
-> 
-> So according to this analysis, we whould set 27 MHz as the max
-> frequency, based on nothing but in these tests.
-> 
-> I'm not sure the stalling is due to the clocking or due to
-> some driver bug (I don't like the tricks pulled by the busy loop
-> in orion_spi_wait_till_ready() but probably this is completely unrelated).
-> 
-> Adding some SPI people in Cc, hoping they can shed a light on this.
-> 
-> What do you think?
+Cheers,
 
-We have just seen this on IRC, so it seemed it was actually a problem in
-userspace not in kernel space.
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Peter.
