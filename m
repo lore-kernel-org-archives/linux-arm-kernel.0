@@ -1,94 +1,116 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 06 Feb 2013 10:26:28 +0000
-Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
- init
-In-Reply-To: <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
+Date: Wed, 06 Feb 2013 10:35:39 +0000
+Subject: [PATCH 2/4] spi: s3c64xx: added support for polling mode
+In-Reply-To: <1360105784-12282-3-git-send-email-ks.giri@samsung.com>
 References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
- <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
-Message-ID: <20130206102628.5E7413E1510@localhost>
+ <1360105784-12282-3-git-send-email-ks.giri@samsung.com>
+Message-ID: <20130206103539.B3B283E1510@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S <girishks2000@gmail.com> wrote:
-> The status of the interrupt is available in the status register,
-> so reading the clear pending register and writing back the same
-> value will not actually clear the pending interrupts. This patch
-> modifies the interrupt handler to read the status register and
-> clear the corresponding pending bit in the clear pending register.
+On Tue,  5 Feb 2013 15:09:42 -0800, Girish K S <girishks2000@gmail.com> wrote:
+> The 64xx spi driver supports partial polling mode.
+> Only the last chunk of the transfer length is transferred
+> or recieved in polling mode.
 > 
-> Modified the hwInit function to clear all the pending interrupts.
+> Some SoC's that adopt this controller might not have have dma
+> interface. This patch adds support for complete polling mode
+> and gives flexibity for the user to select poll/dma mode.
 > 
 > Signed-off-by: Girish K S <ks.giri@samsung.com>
 > ---
->  drivers/spi/spi-s3c64xx.c |   41 +++++++++++++++++++++++++----------------
->  1 file changed, 25 insertions(+), 16 deletions(-)
+>  drivers/spi/spi-s3c64xx.c |   65 +++++++++++++++++++++------------------------
+>  1 file changed, 30 insertions(+), 35 deletions(-)
 > 
 > diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index ad93231..b770f88 100644
+> index b770f88..90770bd 100644
 > --- a/drivers/spi/spi-s3c64xx.c
 > +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
->  {
->  	struct s3c64xx_spi_driver_data *sdd = data;
->  	struct spi_master *spi = sdd->master;
-> -	unsigned int val;
-> +	unsigned int val, clr = 0;
+> @@ -345,19 +348,7 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
 >  
-> -	val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
-> +	val = readl(sdd->regs + S3C64XX_SPI_STATUS);
+>  	chcfg = readl(regs + S3C64XX_SPI_CH_CFG);
+>  	chcfg &= ~S3C64XX_SPI_CH_TXCH_ON;
+> -
+> -	if (dma_mode) {
+>  		chcfg &= ~S3C64XX_SPI_CH_RXCH_ON;
+> -	} else {
+> -		/* Always shift in data in FIFO, even if xfer is Tx only,
+> -		 * this helps setting PCKT_CNT value for generating clocks
+> -		 * as exactly needed.
+> -		 */
+> -		chcfg |= S3C64XX_SPI_CH_RXCH_ON;
+> -		writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
+> -					| S3C64XX_SPI_PACKET_CNT_EN,
+> -					regs + S3C64XX_SPI_PACKET_CNT);
+> -	}
+
+The removes a block of code, but leaves the modification of chcfg where
+it is without fixing the indentation. I could also use some help
+understanding why this particular else block is moved down in the
+function.
+
+>  	if (xfer->tx_buf != NULL) {
+>  		sdd->state |= TXBUSY;
+> @@ -385,6 +376,10 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
 >  
-> -	val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
-> -		S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
-> -		S3C64XX_SPI_PND_TX_OVERRUN_CLR |
-> -		S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
-> -
-> -	writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
-> -
-> -	if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
-> +	if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
-> +		clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
->  		dev_err(&spi->dev, "RX overrun\n");
-> -	if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
-> +	}
-> +	if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
-> +		clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
->  		dev_err(&spi->dev, "RX underrun\n");
-> -	if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
-> +	}
-> +	if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
-> +		clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
->  		dev_err(&spi->dev, "TX overrun\n");
-> -	if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
-> +	}
-> +	if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
-> +		clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->  		dev_err(&spi->dev, "TX underrun\n");
-> +	}
+>  	if (xfer->rx_buf != NULL) {
+>  		sdd->state |= RXBUSY;
+> +		chcfg |= S3C64XX_SPI_CH_RXCH_ON;
+> +		writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
+> +				| S3C64XX_SPI_PACKET_CNT_EN,
+> +				regs + S3C64XX_SPI_PACKET_CNT);
+>  
+>  		if (sdd->port_conf->high_speed && sdd->cur_speed >= 30000000UL
+>  					&& !(sdd->cur_mode & SPI_CPHA))
+> @@ -392,10 +387,6 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+>  
+>  		if (dma_mode) {
+>  			modecfg |= S3C64XX_SPI_MODE_RXDMA_ON;
+> -			chcfg |= S3C64XX_SPI_CH_RXCH_ON;
+> -			writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
+> -					| S3C64XX_SPI_PACKET_CNT_EN,
+> -					regs + S3C64XX_SPI_PACKET_CNT);
+>  			prepare_dma(&sdd->rx_dma, xfer->len, xfer->rx_dma);
+>  		}
+>  	}
+> @@ -421,6 +412,9 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
+>  
+>  	cs = spi->controller_data;
+>  	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
 > +
-> +	/* Clear the pending irq by setting and then clearing it */
-> +	writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
-> +	writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
-
-Wait, what?  clr & ~clr == 0   Always.  What are you actually trying to do here?
-
->  
->  	return IRQ_HANDLED;
+> +	/* Start the signals */
+> +	writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
 >  }
-> @@ -1039,9 +1044,13 @@ static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd, int channel)
->  	writel(0, regs + S3C64XX_SPI_MODE_CFG);
->  	writel(0, regs + S3C64XX_SPI_PACKET_CNT);
 >  
-> -	/* Clear any irq pending bits */
-> -	writel(readl(regs + S3C64XX_SPI_PENDING_CLR),
-> -				regs + S3C64XX_SPI_PENDING_CLR);
-> +	/* Clear any irq pending bits, should set and clear the bits */
-> +	val = S3C64XX_SPI_PND_RX_OVERRUN_CLR |
-> +		S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
-> +		S3C64XX_SPI_PND_TX_OVERRUN_CLR |
-> +		S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
-> +	writel(val, regs + S3C64XX_SPI_PENDING_CLR);
-> +	writel(val & ~val, regs + S3C64XX_SPI_PENDING_CLR);
+>  static int wait_for_xfer(struct s3c64xx_spi_driver_data *sdd,
+> @@ -480,16 +474,19 @@ static int wait_for_xfer(struct s3c64xx_spi_driver_data *sdd,
+>  
+>  		switch (sdd->cur_bpw) {
+>  		case 32:
+> -			ioread32_rep(regs + S3C64XX_SPI_RX_DATA,
+> -				xfer->rx_buf, xfer->len / 4);
+> +			for (val = 0; val < (xfer->len / 4); val++)
+> +				*((u32 *)xfer->rx_buf + val) =
+> +					ioread32(regs + S3C64XX_SPI_RX_DATA);
+>  			break;
+>  		case 16:
+> -			ioread16_rep(regs + S3C64XX_SPI_RX_DATA,
+> -				xfer->rx_buf, xfer->len / 2);
+> +			for (val = 0; val < (xfer->len / 2); val++)
+> +				*((u16 *)xfer->rx_buf + val) =
+> +					ioread16(regs + S3C64XX_SPI_RX_DATA);
+>  			break;
+>  		default:
+> -			ioread8_rep(regs + S3C64XX_SPI_RX_DATA,
+> -				xfer->rx_buf, xfer->len);
+> +			for (val = 0; val < xfer->len; val++)
+> +				*((u8 *)xfer->rx_buf + val) =
+> +					ioread8(regs + S3C64XX_SPI_RX_DATA);
 
-Ditto.
+What are all of the above lines changed? That seems to have nothing to
+do with making the driver be albe to do polling transfers. Nor is it
+described in the patch description.
 
-g.
+I think this patch needs some more work. It certainly need to be
+described better, and it appears that some of the changes really should be
+in a separate patch.
