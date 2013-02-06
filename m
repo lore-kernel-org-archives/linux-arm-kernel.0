@@ -1,63 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  6 Feb 2013 19:28:59 -0200
-Subject: [PATCH] ARM: mxs: Select ARM_CPU_SUSPEND
-Message-ID: <1360186139-22784-1-git-send-email-festevam@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 6 Feb 2013 22:00:56 +0000 (UTC)
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ECFA0FC@DBDE01.ent.ti.com>
+References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+ <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
+ <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+ <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
+ <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+ <B5906170F1614E41A8A28DE3B8D121433ECFA0FC@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1302062141480.12769@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Vaibhav,
 
-Select ARM_CPU_SUSPEND so that suspend/resume can be tested on mxs platforms.
+On Thu, 24 Jan 2013, Bedia, Vaibhav wrote:
 
-Tested on a mx28evk board:
+> I could not track down U-Boot that you were using
 
-$ echo enabled > /sys/devices/80000000.apb/80040000.apbx/80074000.serial/tty/ttyAMA0/power/wakeup
-$ echo mem > /sys/power/state
-[  507.040000] PM: Syncing filesystems ... done.
-[  507.060000] mmc0: card e624 removed
-[  507.160000] Freezing user space processes ... (elapsed 0.01 seconds) done.
-[  507.180000] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
-[  507.200000] Suspending console(s) (use no_console_suspend to debug)
+It's posted now at:
 
-(Then send any character via AUART to wakeup the system).
+http://www.pwsan.com/omap/bootloaders/beaglebone/u-boot/2011.09-00009-gcf6e04d__20120803171543/
 
-[  507.220000] PM: suspend of devices complete after 10.468 msecs
-[  507.220000] PM: late suspend of devices complete after 3.531 msecs
-[  507.230000] PM: noirq suspend of devices complete after 5.187 msecs
-[  507.230000] PM: noirq resume of devices complete after 2.312 msecs
-[  507.230000] PM: early resume of devices complete after 2.437 msecs
-[  507.320000] PM: resume of devices complete after 81.312 msecs
-[  507.360000] Restarting tasks ... done.
-[  507.530000] mmc0: new SDHC card at address e624
-[  507.550000] mmcblk0: mmc0:e624 SU04G 3.69 GiB
-[  507.560000]  mmcblk0: p1 p2 p3
-[  509.240000] libphy: 800f0000.etherne:01 - Link is Down
-[  511.240000] libphy: 800f0000.etherne:01 - Link is Up
+Care to try it?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mxs/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+> However, using your build configs for v3.7 and v3.8-rcX I got the same
+> observations i.e. v3.7 boots but others don't.
+> 
+> One difference that I found was that post v3.7 the configs that you are using have
+> CONFIG_EARLY_PRINTK set. Once I disabled that I was able to bootup v3.8-rc1/4
+> (didn't try rc2/3 but I suspect early_printk was the culprit there too).
+> 
+> I checked with Santosh on this and he mentioned that for DT-only boot, which AM335x is,
+> that's expected behavior.
+> 
+> Can you update your AM335x-only config to disable CONFIG_EARLY_PRINTK
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index ecc4319..c4495a1 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -3,6 +3,7 @@ if ARCH_MXS
- config SOC_IMX23
- 	bool
- 	select ARM_AMBA
-+	select ARM_CPU_SUSPEND if PM
- 	select CPU_ARM926T
- 	select HAVE_PWM
- 	select PINCTRL_IMX23
-@@ -10,6 +11,7 @@ config SOC_IMX23
- config SOC_IMX28
- 	bool
- 	select ARM_AMBA
-+	select ARM_CPU_SUSPEND if PM
- 	select CPU_ARM926T
- 	select HAVE_CAN_FLEXCAN if CAN
- 	select HAVE_PWM
--- 
-1.7.9.5
+Setting CONFIG_EARLY_PRINTK=n doesn't fix the problem I'm seeing.
+
+I also tried building a v3.8-rc6 kernel with the old v3.7-rc config that 
+was used before; no luck.
+
+> or just skip earlyprintk option in the bootargs for now?
+
+Haven't tried this one yet.
+
+> If you still have issues booting can you update your U-Boot to v2013.01 since things
+> seem to be working fine at this point.
+
+Let's try to identify and get rid of bootloader dependencies in the 
+kernel.  They indicate that the kernel isn't initializing something 
+appropriately, which could cause strange problems later.
+
+
+- Paul
