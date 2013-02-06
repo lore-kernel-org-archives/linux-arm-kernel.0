@@ -1,34 +1,125 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 6 Feb 2013 20:16:35 +0100
-Subject: [PATCH 1/1] memory: tegra_ahb_enable_smmu() depends on
- TEGRA_IOMMU_SMMU
-In-Reply-To: <5112A642.1020800@wwwdotorg.org>
-References: <1360175666-8377-1-git-send-email-hdoyu@nvidia.com><5112A642.1020800@wwwdotorg.org>
-Message-ID: <20130206.211635.744922728615926717.hdoyu@nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Feb 2013 11:19:23 -0800
+Subject: [PATCH v2 1/2] ARM: OMAP2+: SoC name and revision unification
+In-Reply-To: <1360177196-18196-2-git-send-email-ruslan.bilovol@ti.com>
+References: <1360177196-18196-1-git-send-email-ruslan.bilovol@ti.com>
+ <1360177196-18196-2-git-send-email-ruslan.bilovol@ti.com>
+Message-ID: <20130206191923.GE25185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 6 Feb 2013 19:51:46 +0100:
-
-> On 02/06/2013 11:34 AM, Hiroshi Doyu wrote:
-> > New SoC, Tegra114 also uses SMMU. Change tegra_ahb_enable_smmu()'s
-> > dependency from ARCH_TEGRA_3x_SOC to TEGRA_IOMMU_SMMU. No need to edit
-> > whenever a new Tegra SoC comes.
-> > 
-> > The following combination caused build error, which this patch fixes.
-> > 
-> > CONFIG_ARCH_TEGRA_2x_SOC=y
-> > \# CONFIG_ARCH_TEGRA_3x_SOC is not set
-> > CONFIG_ARCH_TEGRA_114_SOC=y
-> > 
-> > drivers/iommu/tegra-smmu.c:485: undefined reference to 'tegra_ahb_enable_smmu'
+* Ruslan Bilovol <ruslan.bilovol@ti.com> [130206 11:03]:
+> This is a long story where for each new generation of
+> OMAP we used different approaches for creating
+> strings for SoCs names and revisions that this patch
+> fixes. It makes future exporting of this information
+> to SoC infrastructure easier.
 > 
-> Tested-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+> ---
+>  arch/arm/mach-omap2/id.c |   89 ++++++++++++++++++++++++++--------------------
+>  1 file changed, 51 insertions(+), 38 deletions(-)
 > 
-> Russell, I assume Hiroshi should upload this to your patch tracker? It's
-> needed for 3.9.
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 8a68f1e..b16a432 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -31,8 +31,11 @@
+>  #define OMAP4_SILICON_TYPE_STANDARD		0x01
+>  #define OMAP4_SILICON_TYPE_PERFORMANCE		0x02
+>  
+> +#define OMAP_SOC_MAX_NAME_LENGTH		16
+> +
+>  static unsigned int omap_revision;
+> -static const char *cpu_rev;
+> +static char soc_name[OMAP_SOC_MAX_NAME_LENGTH];
+> +static char soc_rev[OMAP_SOC_MAX_NAME_LENGTH];
+>  u32 omap_features;
+>  
+>  unsigned int omap_rev(void)
 
-FYI: Submitted as:
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7640/1
+Sorry I was not clear earlier with what I meant, but if
+you remove static const char *cpu_rev here and use
+soc_name and soc_rev here..
+
+> @@ -181,8 +187,7 @@ void __init omap2xxx_check_revision(void)
+>  
+>  static void __init omap3_cpuinfo(void)
+>  {
+> -	const char *cpu_name;
+> -
+> +	const char *omap3_soc_name;
+>  	/*
+>  	 * OMAP3430 and OMAP3530 are assumed to be same.
+>  	 *
+
+..then no need to replace cpu_name with omap3_soc_name here?
+
+> @@ -191,28 +196,30 @@ static void __init omap3_cpuinfo(void)
+>  	 * and CPU class bits.
+>  	 */
+>  	if (cpu_is_omap3630()) {
+> -		cpu_name = "OMAP3630";
+> +		omap3_soc_name = "OMAP3630";
+>  	} else if (soc_is_am35xx()) {
+> -		cpu_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
+> +		omap3_soc_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
+>  	} else if (cpu_is_ti816x()) {
+> -		cpu_name = "TI816X";
+> +		omap3_soc_name = "TI816X";
+>  	} else if (soc_is_am335x()) {
+> -		cpu_name =  "AM335X";
+> +		omap3_soc_name =  "AM335X";
+...
+
+Or here?
+
+>  void __init omap3xxx_check_revision(void)
+>  {
+> +	const char *omap3_soc_rev;
+>  	u32 cpuid, idcode;
+>  	u16 hawkeye;
+>  	u8 rev;
+
+Then here if you just make it a local cpu_rev..
+
+> @@ -303,7 +311,7 @@ void __init omap3xxx_check_revision(void)
+>  	cpuid = read_cpuid(CPUID_ID);
+>  	if ((((cpuid >> 4) & 0xfff) == 0xc08) && ((cpuid & 0xf) == 0x0)) {
+>  		omap_revision = OMAP3430_REV_ES1_0;
+> -		cpu_rev = "1.0";
+> +		omap3_soc_rev = "ES1.0";
+>  		return;
+>  	}
+>  
+> @@ -324,26 +332,26 @@ void __init omap3xxx_check_revision(void)
+>  		case 0: /* Take care of early samples */
+>  		case 1:
+>  			omap_revision = OMAP3430_REV_ES2_0;
+> -			cpu_rev = "2.0";
+> +			omap3_soc_rev = "ES2.0";
+>  			break;
+>  		case 2:
+>  			omap_revision = OMAP3430_REV_ES2_1;
+> -			cpu_rev = "2.1";
+> +			omap3_soc_rev = "ES2.1";
+>  			break;
+>  		case 3:
+>  			omap_revision = OMAP3430_REV_ES3_0;
+> -			cpu_rev = "3.0";
+> +			omap3_soc_rev = "ES3.0";
+>  			break;
+>  		case 4:
+>  			omap_revision = OMAP3430_REV_ES3_1;
+> -			cpu_rev = "3.1";
+> +			omap3_soc_rev = "ES3.1";
+>  			break;
+
+..no need to replace cpu_rev with omap3_soc_rev all over the
+place?
+
+Regards,
+
+Tony
