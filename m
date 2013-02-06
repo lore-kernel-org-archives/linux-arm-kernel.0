@@ -1,56 +1,73 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 06 Feb 2013 11:22:35 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130206175019.GA24248@obsidianresearch.com>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <2776630.gp5gC9tvLk@wuerfel> <20130131180249.GA30869@obsidianresearch.com>
- <201301312046.22560.arnd@arndb.de>
- <20130131224459.GA11846@obsidianresearch.com> <20130206175128.1b64196d@skate>
- <20130206170903.GA28198@obsidianresearch.com> <20130206181852.4eca53e3@skate>
- <20130206175019.GA24248@obsidianresearch.com>
-Message-ID: <51129F6B.1050709@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Feb 2013 18:25:12 +0000
+Subject: [PATCH 6/6] ARM: integrator: ensure ap_syscon_base is
+ initialised when !CONFIG_MMU
+In-Reply-To: <201302042149.44727.arnd@arndb.de>
+References: <1359556069-28289-1-git-send-email-will.deacon@arm.com>
+ <20130131225630.GB26523@quad.lixom.net>
+ <20130203114847.GB27474@mudshark.cambridge.arm.com>
+ <201302042149.44727.arnd@arndb.de>
+Message-ID: <20130206182512.GB28640@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2013 10:50 AM, Jason Gunthorpe wrote:
-> On Wed, Feb 06, 2013 at 06:18:52PM +0100, Thomas Petazzoni wrote:
->> Dear Jason Gunthorpe,
->>
->> On Wed, 6 Feb 2013 10:09:03 -0700, Jason Gunthorpe wrote:
->>
->>> Link 0 translates like:
->>>
->>> - Linux driver does inl(0x4)
->>> - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x4
->>> - The CPU TLB converts that into a read from CPU physical
->>>   0xc0000000 + 0x4
->>> - The MBUS window remap register converts that into a read from IO
->>>   space 0x4
->>> - The address 0x4 is placed in the PCI-E IO transaction of link 0
->>>
->>> Link 1 translates like:
->>>
->>> - Linux driver does inl(0x1004)
->>> - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x1004
->>> - The CPU TLB converts that into a read from CPU physical
->>>   0xc0000000 + 0x11004 (ie the mbus window for the link 1)
->>> - The MBUS window remap register converts that into a read from IO
->>>   space 0x1004
->>> - The address 0x1004 is placed in the PCI-E IO transaction of link 1
->>
->> This last step is exactly what I thought would not work. If the PCIe
->> device has say 64 bytes of I/O space, then this 0x1004 PCI-E
->> transaction will be out of bounds, no?
+On Mon, Feb 04, 2013 at 09:49:44PM +0000, Arnd Bergmann wrote:
+> On Sunday 03 February 2013, Will Deacon wrote:
+> > I think it's been broken for a little while as it only affects !MMU
+> > configurations, which aren't especially popular. My guess is that
+> > 83feba511e5d ("ARM: integrator: remove static AP syscon mapping") is what
+> > caused the breakage.
+> > 
+> > The fix should apply against mainline.
 > 
-> No.. PCI end devices are required to decode all 32 bits of address,
-> less the bits requires for their allocation. So a device with 64 bytes
-> of IO will match bits 31:6 and then use bits 5:0 for the internal
-> register.
+> Sounds like a candidate for stable as well then. I'm not sure if anyone
+> cares about !MMU stable kernels, but it's totally possible with the
+> LTSI kernels.
 
-Didn't Arnd say (earlier this thread) that PCI devices using IO BARs
-were probably fairly legacy and hence might be buggy and might not obey
-that rule? Now, I'd guess it's safe within the first 64k of IO space
-though, so perhaps he was only talking about IO BAR bases >= 64k being
-dubious? That would imply a device might only use bits 15:6 for matching
-the BAR base and 5:0 for the internal register for a 64-byte BAR.
+Agreed. I've lost where we've got to, so here's the patch against -rc5 with
+the CC stable and Linus' ack.
+
+Will
+
+--->8
+
+>From b6eafe04b20997b968df4903a4ca6039a3f224be Mon Sep 17 00:00:00 2001
+From: Will Deacon <will.deacon@arm.com>
+Date: Wed, 30 Jan 2013 14:02:46 +0000
+Subject: [PATCH] ARM: integrator: ensure ap_syscon_base is initialised when !CONFIG_MMU
+
+When running on Integrator/AP using atags, ap_syscon_base is initialised
+in ->map_io, which isn't called for !MMU platforms.
+
+Instead, initialise the pointer in ->machine_init, as we do when booting
+with device-tree.
+
+Cc: <stable@vger.kernel.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-integrator/integrator_ap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 11e2a41..26762bf 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -613,7 +613,6 @@ static struct map_desc ap_io_desc_atag[] __initdata = {
+ static void __init ap_map_io_atag(void)
+ {
+ 	iotable_init(ap_io_desc_atag, ARRAY_SIZE(ap_io_desc_atag));
+-	ap_syscon_base = __io_address(INTEGRATOR_SC_BASE);
+ 	ap_map_io();
+ }
+ 
+@@ -685,6 +684,7 @@ static void __init ap_init(void)
+ 
+ 	platform_device_register(&cfi_flash_device);
+ 
++	ap_syscon_base = __io_address(INTEGRATOR_SC_BASE);
+ 	sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
+ 	for (i = 0; i < 4; i++) {
+ 		struct lm_device *lmdev;
+-- 
+1.8.0
