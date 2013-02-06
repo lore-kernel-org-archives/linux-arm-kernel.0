@@ -1,22 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Feb 2013 16:33:55 +0000
-Subject: [PATCH RESEND] ARM: sched: correct update_sched_clock()
-In-Reply-To: <CACRpkdbwoExxKbbvBKpt_Wh9KsgCXQW566N-0BaeL3oGY8pvLg@mail.gmail.com>
-References: <1360128076-8555-1-git-send-email-iamjoonsoo.kim@lge.com>
- <CACRpkdbwoExxKbbvBKpt_Wh9KsgCXQW566N-0BaeL3oGY8pvLg@mail.gmail.com>
-Message-ID: <20130206163355.GH17833@n2100.arm.linux.org.uk>
+From: johannes.d.braun@gmail.com (Johannes Braun)
+Date: Wed, 6 Feb 2013 17:43:20 +0100
+Subject: Freescale imx35 kernel 3.6, no kernel boot messages
+Message-ID: <20130206174320.0ac0c863@jobraun>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 10:33:53AM +0100, Linus Walleij wrote:
-> On Wed, Feb 6, 2013 at 6:21 AM, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
-> 
-> > If we want load epoch_cyc and epoch_ns atomically,
-> > we should update epoch_cyc_copy first of all.
-> > This notify reader that updating is in progress.
-> 
-> If you think the patch is finished, put it into Russell's patch tracker:
-> http://www.arm.linux.org.uk/developer/patches/
+Dear mailing list,
 
-Yea, this patch looks like the right thing... and yes, into the patch
-system please.
+currently I`m trying to port the DENX 3.6 stable kernel for the flea3
+board from carmedialabs. The board is based on a Freescale imx35
+processor. Therefore I had a look at Stefano Bacics fork in the DENX
+git repo, where I found a branch for the flea3 board. Compiling the
+kernel required a modification of arch/arm/mach-imx/mach-flea3.c where
+I had to replace .boot_params against .atag_offset in MACHINE_START.
+Know my problem is that I can't see kernel boot messages. The boot uart
+is uart2. So it has to be ttymxc2. 
+
+The machine id is also added to arch/arm/tools/mach-types.h
++flea3 MACH_FLEA3 FLEA3 3668
+
+After the message:
+Uncompressing Kernel Image ... OK
+the board is completly silent and I can`t see any boot messages.
+
+But the kernel does not hang. I checked it with a bdi3000. When I step
+through the start_kernel() function, there are some printk outputs.
+These outputs are reached, but nothing is show via uart2.
+
+As I read, newer kernels like 3.6 are using the common clk framework.
+Do I have to enable the clock for the uart2 in
+arch/arm/mach-imx/clk-imx35.c via clk_prepare_enable(clk[uart2_gate])?
+I checked this, but had no success. 
+
+DEBUG_LL is disabled.
+
+In uboot I didn`t change anything. ttymxc2 is configured in the
+bootparams. All the parameters are the same as with the 3.0.0 kernel.
+
+Did someone had success running a kernel greater than 3.0 on a
+freescale imx35 board?
+
+Best regards
+Johannes
