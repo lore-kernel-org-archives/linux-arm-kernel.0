@@ -1,34 +1,69 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 Feb 2013 12:55:03 -0500 (EST)
-Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP operation
- if required
-In-Reply-To: <1360168718.4045.18.camel@hornet>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
- <1360168718.4045.18.camel@hornet>
-Message-ID: <alpine.LFD.2.02.1302061254370.6300@xanadu.home>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 6 Feb 2013 19:02:53 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130206175019.GA24248@obsidianresearch.com>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <2776630.gp5gC9tvLk@wuerfel>
+ <20130131180249.GA30869@obsidianresearch.com>
+ <201301312046.22560.arnd@arndb.de>
+ <20130131224459.GA11846@obsidianresearch.com>
+ <20130206175128.1b64196d@skate>
+ <20130206170903.GA28198@obsidianresearch.com>
+ <20130206181852.4eca53e3@skate>
+ <20130206175019.GA24248@obsidianresearch.com>
+Message-ID: <20130206190253.6583de6a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Feb 2013, Pawel Moll wrote:
+Dear Jason Gunthorpe,
 
-> On Tue, 2013-02-05 at 05:22 +0000, Nicolas Pitre wrote:
-> > From: Jon Medhurst <tixy@linaro.org>
-> > 
-> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > ---
-> >  arch/arm/mach-vexpress/core.h    |  2 ++
-> >  arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
-> >  arch/arm/mach-vexpress/v2m.c     |  2 +-
-> >  3 files changed, 15 insertions(+), 1 deletion(-)
+On Wed, 6 Feb 2013 10:50:19 -0700, Jason Gunthorpe wrote:
+
+> No.. PCI end devices are required to decode all 32 bits of address,
+> less the bits requires for their allocation. So a device with 64 bytes
+> of IO will match bits 31:6 and then use bits 5:0 for the internal
+> register.
 > 
-> For this and the other "ARM: vexpress" patches in the series:
+> So a full 32 bit address is technically fine, according to the spec,
+> however:
+>  - The 32 bit decode is an optional feature on bridges
+>  - Some devices are broken because x86 only uses the low 64k.
+
+Thanks again for the great explanation, it is now clear to me.
+
+> So for best compatibility it is ideal to put everything in the low
+> 64k.
 > 
-> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> However, IO space really should not be used by anything except very
+> legacy devices, so if the MMU business is a hassle for some reason I'd
+> just go with the 64k aligned method.
 
-Thanks.
+Me too :-)
 
+It's what is done on Kirkwood since a long time, and apparently hasn't
+caused any trouble so far.
 
-Nicolas
+> > Why would you need to adjust the length? If Linux allocates a 2 MB
+> > resource on a 1 MB boundary, we simply increase the start address to
+> > the next 2 MB boundary, and that's it. Why would the length need to
+> > change?
+> 
+> Well, lets say 3MB is the example. A 3mb region needs to fit inside a
+> 4mb MBUS window. If you align the start to 4mb then the pci-e core
+> needs to know that it can't use the extra 1mb covered by the mbus
+> window. mbus windows must not overlap.
+
+Grumble, grumble, you're right. I now understand. Need to think of it,
+because the current pcibios_window_alignment() thing only allows to
+adjust the start address if I'm correct. But I'll have a more detailed
+look. Or maybe Russell can comment on this specific topic?
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
