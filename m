@@ -1,42 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 05 Feb 2013 17:26:14 -0700
-Subject: [GIT PULL 8/8] ARM: tegra: defconfig update
-In-Reply-To: <20130205212604.GA30719@quad.lixom.net>
-References: <1359582159-28816-1-git-send-email-swarren@wwwdotorg.org>
- <1359582159-28816-8-git-send-email-swarren@wwwdotorg.org>
- <20130205212604.GA30719@quad.lixom.net>
-Message-ID: <5111A326.5050500@wwwdotorg.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 6 Feb 2013 09:38:40 +0900
+Subject: [PATCH v6 0/4] Renesas IPMMU driver for sh7372, sh73a0 and r8a7740
+In-Reply-To: <20130201140927.GA12216@linux-sh.org>
+References: <1358765669-14567-1-git-send-email-hdk@igel.co.jp>
+ <20130201135633.GH25591@8bytes.org>
+ <20130201140927.GA12216@linux-sh.org>
+Message-ID: <20130206003840.GA20881@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 02:26 PM, Olof Johansson wrote:
-> On Wed, Jan 30, 2013 at 02:42:39PM -0700, Stephen Warren wrote:
->> Various new features are enabled on Tegra:
->> * RTC_DRV_TPS6586X to enable the RTC on many boards, such as Harmony
->>   and Ventana.
->> * POWER_RESET_GPIO to provide a power off driver for TrimSlice.
->> * Tegra KBC controller support, for Seaboard, Harmony, and Whistler.
->> * Tegra high-speed UART driver, for Cardhu Bluetooth.
->> * kexec support.
->>
->> This pull request is based on v3.8-rc3.
->>
->> ----------------------------------------------------------------
->>
->> The following changes since commit 9931faca02c604c22335f5a935a501bb2ace6e20:
->>
->>   Linux 3.8-rc3
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.9-defconfig
+On Fri, Feb 01, 2013 at 11:09:28PM +0900, Paul Mundt wrote:
+> On Fri, Feb 01, 2013 at 02:56:33PM +0100, Joerg Roedel wrote:
+> > On Mon, Jan 21, 2013 at 07:54:25PM +0900, Hideki EIRAKU wrote:
+> > > Hideki EIRAKU (4):
+> > >   iommu/shmobile: Add iommu driver for Renesas IPMMU modules
+> > >   ARM: mach-shmobile: sh7372: Add IPMMU device
+> > >   ARM: mach-shmobile: sh73a0: Add IPMMU device
+> > >   ARM: mach-shmobile: r8a7740: Add IPMMU device
+> > 
+> > Paul, Magnus, any opinions on patches 2-4? Can you ACK them when they
+> > are ok for you?
+> > 
+> No strong opinions one way or the other, patches 2-4 don't really do
+> anything of significance.
 > 
-> Pulled in 1-4,6-8 (since 6 contains 5 and saved some conflicts).
+> Acked-by: Paul Mundt <lethal@linux-sh.org>
 
-Thanks.
+Likewise. shmobile patches:
 
-> There were a handful of conflicts during merge, please sanity-check the
-> contents in arm-soc.
-
-The merges look good, and the resultant arm-soc for-next branch works
-fine on Tegra20 at least.
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
