@@ -1,39 +1,38 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 6 Feb 2013 20:26:36 +0530
-Subject: [PATCH 0/8] ARM: dts: omap: Add dts data for USB
-Message-ID: <1360162604-14320-1-git-send-email-kishon@ti.com>
+Date: Wed, 6 Feb 2013 20:26:38 +0530
+Subject: [PATCH 2/8] ARM: dts: omap: Add omap-usb2 dt data
+In-Reply-To: <1360162604-14320-1-git-send-email-kishon@ti.com>
+References: <1360162604-14320-1-git-send-email-kishon@ti.com>
+Message-ID: <1360162604-14320-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Add omap-usb2 data node in omap4 device tree file. Since omap-usb2 is
+connected to ocp2scp, omap-usb2 dt data is added as a child node
+of ocp2scp. The information about this data node is availabe @
+Documentation/devicetree/bindings/usb/usb-phy.txt
 
-Here are the dt data patches to get usb device functional in OMAP platforms.
-This series applies cleanly in both for_3.9/dts and 3.8-rc6.
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-All the patches deal with modifying arch/arm/boot except one which modifies
-Documentation/../usb/omap-usb.txt
-
-Kishon Vijay Abraham I (8):
-  ARM: dts: omap: Add omap control usb data
-  ARM: dts: omap: Add omap-usb2 dt data
-  ARM: dts: omap: Add usb_otg and glue data
-  ARM: dts: omap5: Add omap control usb data
-  ARM: dts: omap5: Add ocp2scp data
-  ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
-  ARM: dts: omap5: add dwc3 omap dt data
-  ARM: dts: omap5: add dwc3 core dt data
-
- Documentation/devicetree/bindings/usb/omap-usb.txt |    1 +
- arch/arm/boot/dts/omap3-beagle-xm.dts              |    6 +++
- arch/arm/boot/dts/omap3-evm.dts                    |    6 +++
- arch/arm/boot/dts/omap3-overo.dtsi                 |    6 +++
- arch/arm/boot/dts/omap3.dtsi                       |   12 +++++
- arch/arm/boot/dts/omap4-panda.dts                  |    6 +++
- arch/arm/boot/dts/omap4-sdp.dts                    |    6 +++
- arch/arm/boot/dts/omap4.dtsi                       |   26 +++++++++++
- arch/arm/boot/dts/omap5.dtsi                       |   48 ++++++++++++++++++++
- arch/arm/boot/dts/twl4030.dtsi                     |    2 +-
- 10 files changed, 118 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index ffc7352..c829d7e 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -438,6 +438,11 @@
+ 			#size-cells = <1>;
+ 			ranges;
+ 			ti,hwmods = "ocp2scp_usb_phy";
++			usb2_phy: usb2phy at 4a0ad080 {
++				compatible = "ti,omap-usb2";
++				reg = <0x4a0ad080 0x58>;
++				ctrl-module = <&omap_control_usb>;
++			};
+ 		};
+ 
+ 		timer1: timer at 4a318000 {
 -- 
 1.7.10.4
