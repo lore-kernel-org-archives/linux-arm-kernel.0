@@ -1,55 +1,38 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Wed, 6 Feb 2013 11:08:27 +0900
-Subject: [PATCH v5 1/3] ARM: vmregion: remove vmregion code entirely
-In-Reply-To: <5110C857.6050100@ti.com>
-References: <1360024314-1895-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1360024314-1895-2-git-send-email-iamjoonsoo.kim@lge.com>
- <5110C857.6050100@ti.com>
-Message-ID: <20130206020827.GC4325@lge.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 6 Feb 2013 10:08:35 +0800
+Subject: [PATCH v2 00/10] rework pxa gpio driver for pinctrl
+In-Reply-To: <CACRpkdbNZ4g-beSw=p3v7-QCtLO8sLg__XmhpPLvpvfqDnRLFw@mail.gmail.com>
+References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdbNZ4g-beSw=p3v7-QCtLO8sLg__XmhpPLvpvfqDnRLFw@mail.gmail.com>
+Message-ID: <CAD6h2NSBaQ2SBiqUaxD+oTh9T_UnLKjcGjaqi8n=rts8mOmHmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Santosh.
+On 6 February 2013 00:44, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sun, Feb 3, 2013 at 11:15 AM, Haojian Zhuang
+> <haojian.zhuang@linaro.org> wrote:
+>
+>> v2:
+>> * Fix the build issue without CONFIG_OF
+>> * Append to check PINCTRL_SINGLE because of arch pxa not moved to DT
+>> * Use bool for inverted, ed_mask, gafr variable
+>
+> Haojian, does this series depend on the changes for DT in pinctrl-single,
+> or can I merge it on its own?
+>
+> The amount of patches makes me confused you know ... :-)
+>
+> Yours,
+> Linus Walleij
 
-On Tue, Feb 05, 2013 at 02:22:39PM +0530, Santosh Shilimkar wrote:
-> On Tuesday 05 February 2013 06:01 AM, Joonsoo Kim wrote:
-> >Now, there is no user for vmregion.
-> >So remove it.
-> >
-> >Acked-by: Nicolas Pitre <nico@linaro.org>
-> >Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> >
-> >diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-> >index 8a9c4cb..4e333fa 100644
-> >--- a/arch/arm/mm/Makefile
-> >+++ b/arch/arm/mm/Makefile
-> >@@ -6,7 +6,7 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
-> >  				   iomap.o
-> >
-> >  obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
-> >-				   mmap.o pgd.o mmu.o vmregion.o
-> >+				   mmap.o pgd.o mmu.o
-> >
-> >  ifneq ($(CONFIG_MMU),y)
-> >  obj-y				+= nommu.o
-> >diff --git a/arch/arm/mm/vmregion.c b/arch/arm/mm/vmregion.c
-> >deleted file mode 100644
-> >index a631016..0000000
-> >--- a/arch/arm/mm/vmregion.c
-> >+++ /dev/null
-> >@@ -1,205 +0,0 @@
-> You might want to use 'git format-patch -D'
-> which will just generate one line for a deleted file.
+I'm waiting for Igor's test on PXA.
+This patch series is used to support DT better. And the driver still works
+without DT support since there's no DT in PXA chips.
 
-Nice tip!
-Thanks.
+Only the 9th & 10th patches are related to pinctrl-single driver. You could
+skip them and I can move them into the pinctrl-single patch series.
 
-> Regards,
-> Santosh
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Yes, these patches make people confusing. :) I'm sorry on inconvenience.
+
+Regards
+Haojian
