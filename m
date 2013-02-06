@@ -1,44 +1,50 @@
-From: johannes.d.braun@gmail.com (Johannes Braun)
-Date: Wed, 6 Feb 2013 17:43:20 +0100
-Subject: Freescale imx35 kernel 3.6, no kernel boot messages
-Message-ID: <20130206174320.0ac0c863@jobraun>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Feb 2013 17:46:50 +0100
+Subject: [PATCH 1/2] tty: serial: remove __init on pl011 console ops
+In-Reply-To: <20130206163811.GI17833@n2100.arm.linux.org.uk>
+References: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
+ <20130206115219.GE17833@n2100.arm.linux.org.uk>
+ <CAD6h2NSpo74UXUgH2OJniW=wzkxGeshta05AGgCpn26SCUSjYg@mail.gmail.com>
+ <CACRpkdZX-YF+jzg453Vmfxo_2LLuASvZyQqLommaM4Xd3LpwfQ@mail.gmail.com>
+ <20130206163811.GI17833@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZDks681kDBrNcztWw_vr-5azWxsuDQaDa36Ze=0+B2Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear mailing list,
+On Wed, Feb 6, 2013 at 5:38 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-currently I`m trying to port the DENX 3.6 stable kernel for the flea3
-board from carmedialabs. The board is based on a Freescale imx35
-processor. Therefore I had a look at Stefano Bacics fork in the DENX
-git repo, where I found a branch for the flea3 board. Compiling the
-kernel required a modification of arch/arm/mach-imx/mach-flea3.c where
-I had to replace .boot_params against .atag_offset in MACHINE_START.
-Know my problem is that I can't see kernel boot messages. The boot uart
-is uart2. So it has to be ttymxc2. 
+> However, I'm just wondering if this shows that we _do_ need to get rid
+> of a pile of __init marked functions as well as fixing this, thanks to
+> the deferred probing we now have (maybe the whole __init thing becomes
+> useless with deferred probing?)
 
-The machine id is also added to arch/arm/tools/mach-types.h
-+flea3 MACH_FLEA3 FLEA3 3668
+And all __initdata and __initconst as well.
 
-After the message:
-Uncompressing Kernel Image ... OK
-the board is completly silent and I can`t see any boot messages.
+> There's nothing really to guarantee
+> that the pinctrl stuff will be available by the time the init sections
+> are discarded (it could be in a loadable module?) or indeed any other
+> resources that might be necessary.
 
-But the kernel does not hang. I checked it with a bdi3000. When I step
-through the start_kernel() function, there are some printk outputs.
-These outputs are reached, but nothing is show via uart2.
+I don't dare to guess how deferred probing is supposed to work
+with loadable modules. When I start to think of it my mind
+boggles. But I think maybe all drivers that support module loading
+are tagging things wrong. Shouldn't they all be using
+__init_or_module, __initdata_or_module, __initconst_or_module
+so they only get discarded unless compiled as modules?
 
-As I read, newer kernels like 3.6 are using the common clk framework.
-Do I have to enable the clock for the uart2 in
-arch/arm/mach-imx/clk-imx35.c via clk_prepare_enable(clk[uart2_gate])?
-I checked this, but had no success. 
+As far as I can tell from <linux/init.h> that is the intention.
 
-DEBUG_LL is disabled.
+Talk about can of worms :-(
 
-In uboot I didn`t change anything. ttymxc2 is configured in the
-bootparams. All the parameters are the same as with the 3.0.0 kernel.
+> I think in this regard, deferred probing has opened a similar can of
+> worms which hotplug devices created (which eventually ended up with
+> killing the __dev* marking).
 
-Did someone had success running a kernel greater than 3.0 on a
-freescale imx35 board?
+I'm afraid you're right.
 
-Best regards
-Johannes
+Pinctrl core grabbing of pins seems to trigger the problem more
+often on platforms that are using it.
+
+Yours,
+Linus Walleij
