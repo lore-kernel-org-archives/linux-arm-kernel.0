@@ -1,53 +1,90 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed,  6 Feb 2013 02:23:41 -0500
-Subject: [V6 PATCH 06/16] arm: pxa910: change the defintion of usb devices
+Date: Wed,  6 Feb 2013 02:23:42 -0500
+Subject: [V6 PATCH 07/16] arm: brownstone: add usb support for the board
 In-Reply-To: <1360135431-27280-1-git-send-email-chao.xie@marvell.com>
 References: <1360135431-27280-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1360135431-27280-7-git-send-email-chao.xie@marvell.com>
+Message-ID: <1360135431-27280-8-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-because phy is seperated from the usb controller driver,
-we can use the common pxa_device_desc for device register.
+for brownstone board, add the udc/otg/ehci support
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/include/mach/pxa910.h |    7 ++++---
- arch/arm/mach-mmp/pxa910.c              |    4 ++++
- 2 files changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/mach-mmp/brownstone.c |   47 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 47 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
-index 3b58a3b..26ea4fe 100644
---- a/arch/arm/mach-mmp/include/mach/pxa910.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa910.h
-@@ -20,9 +20,10 @@ extern struct pxa_device_desc pxa910_device_pwm2;
- extern struct pxa_device_desc pxa910_device_pwm3;
- extern struct pxa_device_desc pxa910_device_pwm4;
- extern struct pxa_device_desc pxa910_device_nand;
--extern struct platform_device pxa168_device_u2o;
--extern struct platform_device pxa168_device_u2ootg;
--extern struct platform_device pxa168_device_u2oehci;
-+extern struct pxa_device_desc pxa910_device_u2o;
-+extern struct pxa_device_desc pxa910_device_u2ootg;
-+extern struct pxa_device_desc pxa910_device_u2oehci;
-+extern struct pxa_device_desc pxa910_device_u2ophy;
+diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+index 5cb769c..90c0340 100644
+--- a/arch/arm/mach-mmp/brownstone.c
++++ b/arch/arm/mach-mmp/brownstone.c
+@@ -18,6 +18,7 @@
+ #include <linux/regulator/max8649.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/mfd/max8925.h>
++#include <linux/platform_data/mv_usb.h>
  
- extern struct platform_device pxa910_device_gpio;
- extern struct platform_device pxa910_device_rtc;
-diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-index 8b1e16f..65174f7 100644
---- a/arch/arm/mach-mmp/pxa910.c
-+++ b/arch/arm/mach-mmp/pxa910.c
-@@ -138,6 +138,10 @@ PXA910_DEVICE(pwm2, "pxa910-pwm", 1, NONE, 0xd401a400, 0x10);
- PXA910_DEVICE(pwm3, "pxa910-pwm", 2, NONE, 0xd401a800, 0x10);
- PXA910_DEVICE(pwm4, "pxa910-pwm", 3, NONE, 0xd401ac00, 0x10);
- PXA910_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x80, 97, 99);
-+PXA910_DEVICE(u2ophy, "pxa910-usb-phy", -1, NONE, 0xd4207000, 0x1ff);
-+PXA910_DEVICE(u2o, "mv-udc", -1, USB1, 0xd4208100, 0x1ff);
-+PXA910_DEVICE(u2ootg, "mv-otg", -1, USB1, 0xd4208100, 0x1ff);
-+PXA910_DEVICE(u2oehci, "mv-ehci", -1, USB1, 0xd4208100, 0x1ff);
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -195,6 +196,31 @@ static struct sram_platdata mmp2_isram_platdata = {
+ 	.granularity	= SRAM_GRANULARITY,
+ };
  
- struct resource pxa910_resource_gpio[] = {
- 	{
++#ifdef CONFIG_USB_SUPPORT
++
++static char *mmp2_usb_clock_name[] = {
++	[0] = "usb_clk",
++};
++
++static struct mv_usb_phy_platform_data brownstone_usb_phy_pdata = {
++	.clknum		= 1,
++	.clkname	= mmp2_usb_clock_name,
++};
++
++#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
++
++static struct mv_usb_platform_data brownstone_usb_pdata = {
++	.clknum		= 1,
++	.clkname	= mmp2_usb_clock_name,
++	.vbus		= NULL,
++	.mode		= MV_USB_MODE_OTG,
++	.otg_force_a_bus_req = 1,
++	.set_vbus	= NULL,
++};
++#endif
++#endif
++
++
+ static void __init brownstone_init(void)
+ {
+ 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
+@@ -211,6 +237,27 @@ static void __init brownstone_init(void)
+ 
+ 	/* enable 5v regulator */
+ 	platform_device_register(&brownstone_v_5vp_device);
++
++#ifdef CONFIG_USB_SUPPORT
++	pxa_register_device(&mmp2_device_u2ophy, &brownstone_usb_phy_pdata,
++				sizeof(brownstone_usb_phy_pdata));
++#endif
++
++#ifdef CONFIG_USB_MV_UDC
++	pxa_register_device(&mmp2_device_u2o, &brownstone_usb_pdata,
++				sizeof(brownstone_usb_pdata));
++#endif
++
++#ifdef CONFIG_USB_EHCI_MV_U2O
++	pxa_register_device(&mmp2_device_u2oehci, &brownstone_usb_pdata,
++				sizeof(brownstone_usb_pdata));
++#endif
++
++#ifdef CONFIG_USB_MV_OTG
++	pxa_register_device(&mmp2_device_u2ootg, &brownstone_usb_pdata,
++				sizeof(brownstone_usb_pdata));
++#endif
++
+ }
+ 
+ MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
 -- 
 1.7.4.1
