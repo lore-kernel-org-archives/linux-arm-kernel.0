@@ -1,41 +1,159 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 6 Feb 2013 12:39:56 +0200
-Subject: how to specify an OMAP clock in device tree?
-In-Reply-To: <51122EC0.3040804@ti.com>
-References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
- <1359993540-20780-12-git-send-email-rogerq@ti.com> <5110D229.1000808@ti.com>
- <5110E9C4.9000301@ti.com> <51110D4B.50904@ti.com> <51111371.6050502@ti.com>
- <511114C1.4050809@ti.com> <5111157D.7040803@ti.com> <51111739.2050805@ti.com>
- <511118FE.7020405@ti.com> <51111CC4.1060004@ti.com> <51122EC0.3040804@ti.com>
-Message-ID: <511232FC.6040402@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 06 Feb 2013 10:40:00 +0000
+Subject: [PATCH 3/4] spi: s3c64xx: add gpio quirk for controller
+In-Reply-To: <1360105784-12282-4-git-send-email-ks.giri@samsung.com>
+References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
+ <1360105784-12282-4-git-send-email-ks.giri@samsung.com>
+Message-ID: <20130206104000.98E803E1510@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2013 12:21 PM, Rajendra Nayak wrote:
-> On Tuesday 05 February 2013 08:22 PM, Roger Quadros wrote:
->> Doesn't look very elegant to me, but I wouldn't mind if there is no better option.
->> Even then, we can't rely on the device name as its index can change based on where it is
+On Tue,  5 Feb 2013 15:09:43 -0800, Girish K S <girishks2000@gmail.com> wrote:
+> This patch adds support for spi controllers with
+> dedicated clk/miso/mosi/cs pins. It skips the gpio
+> parsing and initialization for controllers that
+> have dedicated pins.
 > 
-> Well, thats what I said in the first mail, that *if* you are able to
-> fix the device name, *then* we could use clkdev the way its used in
-> non-DT case. But then you came back saying 'Fixing the device name
-> doesn't really solve the problem.' :)
+> Signed-off-by: Girish K S <ks.giri@samsung.com>
 
-It does, yes, but depending on fixed device names is not so great for DT, is it?
-Doesn't solve the problem in the right sense :)
+Instead of making this a quirk, you should use the presence/absense of a
+cs-gpios property to determin whether or not a gpio is used to
+manipulate the CS signal.
 
+Also, are you certain that you want to make this change? Most SPI
+controllers are actually unfriendly in that they insist on deasserting the
+CS line if the FIFO runs empty. Does this driver correctly keep the CS
+signal asserted when there are multiple transfers in a message?
+
+g.
+
+> ---
+>  drivers/spi/spi-s3c64xx.c |   39 +++++++++++++++++++++++++++++++--------
+>  1 file changed, 31 insertions(+), 8 deletions(-)
 > 
->> located in the dts file. e.g. in the beginning it may be named phy.8, and if a device
->> node is added before it, it will get changed to phy.9
+> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> index 90770bd..f06bbee 100644
+> --- a/drivers/spi/spi-s3c64xx.c
+> +++ b/drivers/spi/spi-s3c64xx.c
+> @@ -36,6 +36,7 @@
+>  
+>  #define MAX_SPI_PORTS		3
+>  #define S3C64XX_SPI_QUIRK_POLL		(1 << 0)
+> +#define S3C64XX_SPI_QUIRK_GPIO		(1 << 1)
+>  
+>  /* Registers and bit-fields */
+>  
+> @@ -404,14 +405,16 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
+>  		if (sdd->tgl_spi != spi) { /* if last mssg on diff device */
+>  			/* Deselect the last toggled device */
+>  			cs = sdd->tgl_spi->controller_data;
+> -			gpio_set_value(cs->line,
+> -				spi->mode & SPI_CS_HIGH ? 0 : 1);
+> +			if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
+> +				gpio_set_value(cs->line,
+> +					spi->mode & SPI_CS_HIGH ? 0 : 1);
+>  		}
+>  		sdd->tgl_spi = NULL;
+>  	}
+>  
+>  	cs = spi->controller_data;
+> -	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
+> +	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
+> +		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
+>  
+>  	/* Start the signals */
+>  	writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+> @@ -503,7 +506,8 @@ static inline void disable_cs(struct s3c64xx_spi_driver_data *sdd,
+>  	if (sdd->tgl_spi == spi)
+>  		sdd->tgl_spi = NULL;
+>  
+> -	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
+> +	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
+> +		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
+>  
+>  	/* Quiese the signals */
+>  	writel(S3C64XX_SPI_SLAVE_SIG_INACT,
+> @@ -842,7 +846,10 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+>  		return ERR_PTR(-ENOMEM);
+>  	}
+>  
+> -	cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
+> +	/* In case of dedicated cs pin skip the gpio initialization */
+> +	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
+> +		cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
+> +
+>  	if (!gpio_is_valid(cs->line)) {
+>  		dev_err(&spi->dev, "chip select gpio is not specified or "
+>  					"invalid\n");
+> @@ -883,7 +890,7 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+>  		return -ENODEV;
+>  	}
+>  
+> -	if (!spi_get_ctldata(spi)) {
+> +	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO)) {
+>  		err = gpio_request_one(cs->line, GPIOF_OUT_INIT_HIGH,
+>  				       dev_name(&spi->dev));
+>  		if (err) {
+> @@ -892,9 +899,11 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+>  				cs->line, err);
+>  			goto err_gpio_req;
+>  		}
+> -		spi_set_ctldata(spi, cs);
+>  	}
+>  
+> +	if (!spi_get_ctldata(spi))
+> +		spi_set_ctldata(spi, cs);
+> +
+>  	sci = sdd->cntrlr_info;
+>  
+>  	spin_lock_irqsave(&sdd->lock, flags);
+> @@ -979,8 +988,11 @@ err_gpio_req:
+>  static void s3c64xx_spi_cleanup(struct spi_device *spi)
+>  {
+>  	struct s3c64xx_spi_csinfo *cs = spi_get_ctldata(spi);
+> +	struct s3c64xx_spi_driver_data *sdd;
+> +
+> +	sdd = spi_master_get_devdata(spi->master);
+>  
+> -	if (cs) {
+> +	if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO) && cs) {
+>  		gpio_free(cs->line);
+>  		if (spi->dev.of_node)
+>  			kfree(cs);
+> @@ -1107,6 +1119,13 @@ static int s3c64xx_spi_parse_dt_gpio(struct s3c64xx_spi_driver_data *sdd)
+>  	struct device *dev = &sdd->pdev->dev;
+>  	int idx, gpio, ret;
+>  
+> +	/*
+> +	 * If cs is not controlled by gpio, and
+> +	 * the SoC uses internal dedicated pins
+> +	 */
+> +	if (sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO)
+> +		return 0;
+> +
+>  	/* find gpios for mosi, miso and clock lines */
+>  	for (idx = 0; idx < 3; idx++) {
+>  		gpio = of_get_gpio(dev->of_node, idx);
+> @@ -1133,6 +1152,10 @@ free_gpio:
+>  static void s3c64xx_spi_dt_gpio_free(struct s3c64xx_spi_driver_data *sdd)
+>  {
+>  	unsigned int idx;
+> +
+> +	if (sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO)
+> +		return;
+> +
+>  	for (idx = 0; idx < 3; idx++)
+>  		gpio_free(sdd->gpios[idx]);
+>  }
+> -- 
+> 1.7.10.4
 > 
-> If you provide a phandle to the PHY node in the board node, for which
-> you need to add the clk alias, you can always extract the device (using
-> of_find_device_by_node() ) and hence its name, so it doesn't matter if
-> its phy.8 or phy.9.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Right, I'll come up with something on these lines.
-
-Thanks for the suggestions :).
-
-cheers,
--roger
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
