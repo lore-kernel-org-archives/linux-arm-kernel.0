@@ -1,49 +1,101 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 06 Feb 2013 11:48:47 +0530
-Subject: [PATCH V3 3/5] DMA: PL330: Register the DMA controller with the
- generic DMA helpers
+Date: Wed, 06 Feb 2013 11:48:49 +0530
+Subject: [PATCH V3 5/5] ARM: SAMSUNG: dma: Remove unnecessary code
 In-Reply-To: <1360131529-2847-1-git-send-email-padma.v@samsung.com>
 References: <1360131529-2847-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1360131529-2847-4-git-send-email-padma.v@samsung.com>
+Message-ID: <1360131529-2847-6-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the pl330 dma controller driver with the generic
-device tree dma helper functions.
+This patch removes the usage of DMACH_DT_PROP and dt_dmach_prop
+from dma code as the new generic dma dt binding support has been
+added.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/dma/pl330.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c24xx/include/mach/dma.h       |    1 -
+ arch/arm/mach-s3c64xx/include/mach/dma.h       |    1 -
+ arch/arm/plat-samsung/dma-ops.c                |   10 +---------
+ arch/arm/plat-samsung/include/plat/dma-ops.h   |    1 -
+ arch/arm/plat-samsung/include/plat/dma-pl330.h |    1 -
+ 5 files changed, 1 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index e68c83b..3fca247 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2999,6 +2999,14 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
- 		pi->pcfg.num_peri, pi->pcfg.num_events);
+diff --git a/arch/arm/mach-s3c24xx/include/mach/dma.h b/arch/arm/mach-s3c24xx/include/mach/dma.h
+index 6b72d5a..b55da1d 100644
+--- a/arch/arm/mach-s3c24xx/include/mach/dma.h
++++ b/arch/arm/mach-s3c24xx/include/mach/dma.h
+@@ -24,7 +24,6 @@
+ */
  
-+	ret = of_dma_controller_register(adev->dev.of_node,
-+					 of_dma_pl330_xlate, pdmac);
-+	if (ret) {
-+		dev_err(&adev->dev,
-+		"unable to register DMA to the generic DT DMA helpers\n");
-+		goto probe_err2;
-+	}
-+
- 	return 0;
+ enum dma_ch {
+-	DMACH_DT_PROP = -1,	/* not yet supported, do not use */
+ 	DMACH_XD0 = 0,
+ 	DMACH_XD1,
+ 	DMACH_SDI,
+diff --git a/arch/arm/mach-s3c64xx/include/mach/dma.h b/arch/arm/mach-s3c64xx/include/mach/dma.h
+index 57b1ff4..fe1a98c 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/dma.h
++++ b/arch/arm/mach-s3c64xx/include/mach/dma.h
+@@ -21,7 +21,6 @@
+  */
+ enum dma_ch {
+ 	/* DMA0/SDMA0 */
+-	DMACH_DT_PROP = -1, /* not yet supported, do not use */
+ 	DMACH_UART0 = 0,
+ 	DMACH_UART0_SRC2,
+ 	DMACH_UART1,
+diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
+index 71d58dd..ec0d731 100644
+--- a/arch/arm/plat-samsung/dma-ops.c
++++ b/arch/arm/plat-samsung/dma-ops.c
+@@ -23,23 +23,15 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
+ 				struct device *dev, char *ch_name)
+ {
+ 	dma_cap_mask_t mask;
+-	void *filter_param;
  
- probe_err4:
-@@ -3025,6 +3033,8 @@ static int pl330_remove(struct amba_device *adev)
- 	if (!pdmac)
- 		return 0;
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(param->cap, mask);
  
-+	of_dma_controller_free(adev->dev.of_node);
-+
- 	amba_set_drvdata(adev, NULL);
+-	/*
+-	 * If a dma channel property of a device node from device tree is
+-	 * specified, use that as the fliter parameter.
+-	 */
+-	filter_param = (dma_ch == DMACH_DT_PROP) ?
+-		(void *)param->dt_dmach_prop : (void *)dma_ch;
+-
+ 	if (dev->of_node)
+ 		return (unsigned)dma_request_slave_channel(dev, ch_name);
+ 	else
+ 		return (unsigned)dma_request_channel(mask, pl330_filter,
+-							filter_param);
++							(void *)dma_ch);
+ }
  
- 	/* Idle the DMAC */
+ static int samsung_dmadev_release(unsigned ch, void *param)
+diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
+index 1141782..ce6d763 100644
+--- a/arch/arm/plat-samsung/include/plat/dma-ops.h
++++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
+@@ -18,7 +18,6 @@
+ 
+ struct samsung_dma_req {
+ 	enum dma_transaction_type cap;
+-	struct property *dt_dmach_prop;
+ 	struct s3c2410_dma_client *client;
+ };
+ 
+diff --git a/arch/arm/plat-samsung/include/plat/dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
+index d384a80..abe07fa 100644
+--- a/arch/arm/plat-samsung/include/plat/dma-pl330.h
++++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
+@@ -21,7 +21,6 @@
+  * use these just as IDs.
+  */
+ enum dma_ch {
+-	DMACH_DT_PROP = -1,
+ 	DMACH_UART0_RX = 0,
+ 	DMACH_UART0_TX,
+ 	DMACH_UART1_RX,
 -- 
 1.7.4.4
