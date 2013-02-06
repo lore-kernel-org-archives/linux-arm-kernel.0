@@ -1,66 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 7 Feb 2013 00:07:15 +0100
-Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
- for Armada XP
-In-Reply-To: <201302062241.14444.arnd@arndb.de>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-23-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302062241.14444.arnd@arndb.de>
-Message-ID: <20130207000715.0b3d662d@skate>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 6 Feb 2013 23:19:05 +0000 (UTC)
+Subject: OMAP baseline test results for v3.8-rc5
+In-Reply-To: <20130126084604.GB8754@arwen.pp.htv.fi>
+References: <alpine.DEB.2.00.1301260838300.19277@utopia.booyaka.com>
+ <20130126084604.GB8754@arwen.pp.htv.fi>
+Message-ID: <alpine.DEB.2.00.1302062318450.12769@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On Sat, 26 Jan 2013, Felipe Balbi wrote:
 
-On Wed, 6 Feb 2013 22:41:14 +0000, Arnd Bergmann wrote:
-
-> I've been thinking some more about this, and I wonder if it would
-> make more sense to describe the address remapping correctly as
-> a node on top of the pcie-controller node.
+> Hi,
 > 
-> This would mean that rather than putting the mapped physical address
-> (0xc0000000, 0xc1000000, ...) in here, you would actually have 64-bit
-> address as the destination as well, in whatever format the
-> address map hardware uses, I assume using a numbered 32 bit
-> address space for each object that can be remapped.
+> On Sat, Jan 26, 2013 at 08:40:07AM +0000, Paul Walmsley wrote:
+> > Boot tests:
+> > 
+> > * am335xbone: hangs after "Starting kernel"
+> >   - Cause unknown; may be due to CONFIG_EARLY_PRINTK=y?
+> >   - http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82297.html
+> >   - http://marc.info/?l=linux-omap&m=135903184512238&w=2
 > 
-> This would also let you do the PCI memory address assignment for
-> each port separately, starting at bus address 0, followed by
-> finding a location in the CPU address space and passing
-> the start as the sys->mem_offset argument to
-> pci_add_resource_offset.
+> FYI, I don't think it's related to CONFIG_EARLY_PRINTK. Tested with and
+> without it, also removed CONFIG_DEBUG_LL completely and nothing seemed
+> to help my bone, no matter if I had appended DTB or not.
 
-Hum, good you give a skeleton example, because I'm not sure to
-understand your suggestion.
+Thanks, I've adjusted the (upcoming) message for v3.8-rc6 accordingly.
 
 
-> 
-> > +                       pcie at 0,0 {
-> > +                               device_type = "pciex";
-> > +                               reg = <0x0800 0 0xd0040000 0
-> > 0x2000>;
-> > +                               #address-cells = <3>;
-> > +                               #size-cells = <2>;
-> > +                               marvell,pcie-port = <0>;
-> > +                               marvell,pcie-lane = <0>;
-> > +                               interrupts = <1>;
-> > +                               clocks = <&gateclk 5>;
-> > +                               status = "disabled";
-> > +                       };
-> 
-> I think you are missing a "ranges" property here, at least an empty
-> one, which is required by the standard but not currently enforced
-> in the code.
-
-Is it really wise to have DT properties that are not used by anything,
-and therefore have a very high chance of either being incorrect, or
-becoming incorrect?
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+- Paul
