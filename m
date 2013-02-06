@@ -1,67 +1,39 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 6 Feb 2013 14:32:22 +0200
-Subject: [PATCH v5 01/10] clk: tegra: Refactor PLL programming code
-In-Reply-To: <20130205132355.GD3073@tbergstrom-lnx.Nvidia.com>
-References: <1359713962-16822-1-git-send-email-pdeschrijver@nvidia.com>
- <1359713962-16822-2-git-send-email-pdeschrijver@nvidia.com>
- <510F4FF7.3050502@nvidia.com>
- <20130204143233.GV2364@tbergstrom-lnx.Nvidia.com>
- <51109BB3.8000706@nvidia.com>
- <20130205132355.GD3073@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20130206123222.GI3073@tbergstrom-lnx.Nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 6 Feb 2013 12:33:07 +0000
+Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for
+ unaligned addresses
+In-Reply-To: <20130206122213.GF17833@n2100.arm.linux.org.uk>
+References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
+ <20130201162631.GG5151@arm.com>
+ <CANOGCgOp=kSatDu8fL7grk+bXLQ2pgKAEvEK6LoG8Ba4mqUH=w@mail.gmail.com>
+ <20130201163722.GH5151@arm.com>
+ <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
+ <20130201174246.GJ5151@arm.com> <510F3BA8.8070700@ti.com>
+ <510F3CA3.7080604@ti.com> <20130206121523.GD26454@arm.com>
+ <20130206122213.GF17833@n2100.arm.linux.org.uk>
+Message-ID: <20130206123307.GE26454@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 02:23:55PM +0100, Peter De Schrijver wrote:
-> On Tue, Feb 05, 2013 at 06:42:11AM +0100, Prashant Gaikwad wrote:
-> > On Monday 04 February 2013 08:02 PM, Peter De Schrijver wrote:
-> > > On Mon, Feb 04, 2013 at 07:06:47AM +0100, Prashant Gaikwad wrote:
-> > >> On Friday 01 February 2013 03:48 PM, Peter De Schrijver wrote:
-> > > ...
-> > >
-> > >>> -static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll,
-> > >>> -                                void __iomem *lock_addr, u32 lock_bit_idx)
-> > >>> +static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
-> > >>>    {
-> > >>>           int i;
-> > >>> -       u32 val;
-> > >>> +       u32 val, lock_bit;
-> > >>> +       void __iomem *lock_addr;
-> > >>>
-> > >>>           if (!(pll->flags & TEGRA_PLL_USE_LOCK)) {
-> > >>>                   udelay(pll->params->lock_delay);
-> > >>>                   return 0;
-> > >>>           }
-> > >>>
-> > >>> +       lock_addr = pll->clk_base + pll->params->base_reg;
-> > >> This will not work for PLLE. Lock bit for PLLE is in misc register.
-> > >>
-> > >>> +       lock_bit = BIT(pll->params->lock_bit_idx);
-> > >>> +
-> > >>>           for (i = 0; i < pll->params->lock_delay; i++) {
-> > >>>                   val = readl_relaxed(lock_addr);
-> > >>> -               if (val & BIT(lock_bit_idx)) {
-> > >>> +               if (val & lock_bit) {
-> > >> Need to change the lock bit idx parameter for Tegra20 and Tegra30 PLLs
-> > >> else this patch will break those.
-> > >>
-> > > Looking at commit 37c26a906527b8a6a252614ca83d21ad318c4e84 and commit
-> > > b08e8c0ecc42afa3a2e1019851af741980dd5a6b, these fields seem correctly
-> > > initialized for both Tegra20 and Tegra30? Or am I missing something?
-> > 
-> > Ohh, I missed to read
-> > 
-> > lock_bit = BIT(pll->params->lock_bit_idx);
-> > 
-> > 
-> > Am I missing something about PLLE lock_addr also?
-> > 
+On Wed, Feb 06, 2013 at 12:22:13PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 06, 2013 at 12:15:23PM +0000, Catalin Marinas wrote:
+> > The problem with the classic MMU is that if we have a 1MB range we can
+> > end up with just page mappings. The code is currently buggy since if we
+> > have create_mapping() for a 1MB range and later create_mapping() for a
+> > 4KB in the next MB, the first 1MB is removed.
 > 
-> Ah no indeed... my bad. So we need a lock_addr field.
+> And that is where we rely on people calling create_mapping() - who
+> will be the SoC porters - not to be idiotic and do that kind of thing.
+> That's worked fine for the last 10+ years so there's no need to make
+> the code any more complex by trying to fix something that really isn't
+> a problem.
 > 
+> I wouldn't be surprised if we have some mappings which are created by
+> 4K page tables, and then one half of the page table is overwritten by
+> a section mapping - so trying to fix this _may_ be risky.
 
-Or a flag. Flag seems less invasive for now.
+If the 4K is called first, it should be fine. But some WARN_ON() calls
+wouldn't hurt, just to be sure. It's not a fast path anyway.
 
-Cheers,
-
-Peter.
+-- 
+Catalin
