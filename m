@@ -1,34 +1,94 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 6 Feb 2013 11:23:50 +0100
-Subject: [PATCH v6 1/4] iommu/shmobile: Add iommu driver for Renesas
- IPMMU modules
-In-Reply-To: <20130205.194209.52400155.hdk@igel.co.jp>
-References: <1358765669-14567-1-git-send-email-hdk@igel.co.jp>
- <1358765669-14567-2-git-send-email-hdk@igel.co.jp>
- <20130201135456.GG25591@8bytes.org>
- <20130205.194209.52400155.hdk@igel.co.jp>
-Message-ID: <20130206102348.GA2634@8bytes.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 06 Feb 2013 10:26:28 +0000
+Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
+ init
+In-Reply-To: <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
+References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
+ <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
+Message-ID: <20130206102628.5E7413E1510@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 07:42:09PM +0900, Hideki EIRAKU wrote:
-> From: Joerg Roedel <joro@8bytes.org>
-
-> > Why is it necessary to call dma_map_single() for IOMMU page-tables?
-> > usually the dma_* functions call into IOMMU drivers, so why are they
-> > used inside an IOMMU driver?
+On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S <girishks2000@gmail.com> wrote:
+> The status of the interrupt is available in the status register,
+> so reading the clear pending register and writing back the same
+> value will not actually clear the pending interrupts. This patch
+> modifies the interrupt handler to read the status register and
+> clear the corresponding pending bit in the clear pending register.
 > 
-> I use dma_map_single() for flushing the page table to the IOMMU
-> device.  The dma_map_ops set by arch/arm/mm/dma-mapping.c are
-> per-device (unlike the intel-iommu).  The dma_* functions call into
-> IOMMU drivers if the device is attached by arm_iommu_attach_device(),
-> but I am using a NULL device here, so that shouldn't happen.
+> Modified the hwInit function to clear all the pending interrupts.
+> 
+> Signed-off-by: Girish K S <ks.giri@samsung.com>
+> ---
+>  drivers/spi/spi-s3c64xx.c |   41 +++++++++++++++++++++++++----------------
+>  1 file changed, 25 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> index ad93231..b770f88 100644
+> --- a/drivers/spi/spi-s3c64xx.c
+> +++ b/drivers/spi/spi-s3c64xx.c
+> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
+>  {
+>  	struct s3c64xx_spi_driver_data *sdd = data;
+>  	struct spi_master *spi = sdd->master;
+> -	unsigned int val;
+> +	unsigned int val, clr = 0;
+>  
+> -	val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
+> +	val = readl(sdd->regs + S3C64XX_SPI_STATUS);
+>  
+> -	val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
+> -		S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
+> -		S3C64XX_SPI_PND_TX_OVERRUN_CLR |
+> -		S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+> -
+> -	writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+> -
+> -	if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
+> +	if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
+> +		clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
+>  		dev_err(&spi->dev, "RX overrun\n");
+> -	if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
+> +	}
+> +	if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
+> +		clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
+>  		dev_err(&spi->dev, "RX underrun\n");
+> -	if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
+> +	}
+> +	if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
+> +		clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
+>  		dev_err(&spi->dev, "TX overrun\n");
+> -	if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
+> +	}
+> +	if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
+> +		clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+>  		dev_err(&spi->dev, "TX underrun\n");
+> +	}
+> +
+> +	/* Clear the pending irq by setting and then clearing it */
+> +	writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+> +	writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
 
-Okay, I applied the patches to a new arm/shmobile branch. Will push them
-out soon. The use of the dma_* functions is dangerous anyway (but it
-works for now). Please send a follow-on patch to replace the use of the
-dma_* functions in the driver with explicit flushing routines. This
-protects the code from any future changes in the dma-api implementation.
+Wait, what?  clr & ~clr == 0   Always.  What are you actually trying to do here?
 
+>  
+>  	return IRQ_HANDLED;
+>  }
+> @@ -1039,9 +1044,13 @@ static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd, int channel)
+>  	writel(0, regs + S3C64XX_SPI_MODE_CFG);
+>  	writel(0, regs + S3C64XX_SPI_PACKET_CNT);
+>  
+> -	/* Clear any irq pending bits */
+> -	writel(readl(regs + S3C64XX_SPI_PENDING_CLR),
+> -				regs + S3C64XX_SPI_PENDING_CLR);
+> +	/* Clear any irq pending bits, should set and clear the bits */
+> +	val = S3C64XX_SPI_PND_RX_OVERRUN_CLR |
+> +		S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
+> +		S3C64XX_SPI_PND_TX_OVERRUN_CLR |
+> +		S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+> +	writel(val, regs + S3C64XX_SPI_PENDING_CLR);
+> +	writel(val & ~val, regs + S3C64XX_SPI_PENDING_CLR);
 
-	Joerg
+Ditto.
+
+g.
