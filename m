@@ -1,31 +1,90 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 6 Feb 2013 17:52:22 +0000
-Subject: [PATCH 1/2] ARM: netx: bump IRQ offset to 64
-In-Reply-To: <1360168530-20337-1-git-send-email-linus.walleij@linaro.org>
-References: <1360168530-20337-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130206175222.GG6473@sycamore.jamieiles.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 6 Feb 2013 10:50:19 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130206181852.4eca53e3@skate>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <2776630.gp5gC9tvLk@wuerfel>
+ <20130131180249.GA30869@obsidianresearch.com>
+ <201301312046.22560.arnd@arndb.de>
+ <20130131224459.GA11846@obsidianresearch.com>
+ <20130206175128.1b64196d@skate>
+ <20130206170903.GA28198@obsidianresearch.com>
+ <20130206181852.4eca53e3@skate>
+Message-ID: <20130206175019.GA24248@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Wed, Feb 06, 2013 at 05:35:30PM +0100, Linus Walleij wrote:
-> The Netx IRQs offset from zero, which is illegal, since Linux
-> IRQ 0 is NO_IRQ.
+On Wed, Feb 06, 2013 at 06:18:52PM +0100, Thomas Petazzoni wrote:
+> Dear Jason Gunthorpe,
 > 
-> Cc: Jamie Iles <jamie@jamieiles.com>
+> On Wed, 6 Feb 2013 10:09:03 -0700, Jason Gunthorpe wrote:
+> 
+> > Link 0 translates like:
+> > 
+> > - Linux driver does inl(0x4)
+> > - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x4
+> > - The CPU TLB converts that into a read from CPU physical
+> >   0xc0000000 + 0x4
+> > - The MBUS window remap register converts that into a read from IO
+> >   space 0x4
+> > - The address 0x4 is placed in the PCI-E IO transaction of link 0
+> > 
+> > Link 1 translates like:
+> > 
+> > - Linux driver does inl(0x1004)
+> > - ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x1004
+> > - The CPU TLB converts that into a read from CPU physical
+> >   0xc0000000 + 0x11004 (ie the mbus window for the link 1)
+> > - The MBUS window remap register converts that into a read from IO
+> >   space 0x1004
+> > - The address 0x1004 is placed in the PCI-E IO transaction of link 1
+> 
+> This last step is exactly what I thought would not work. If the PCIe
+> device has say 64 bytes of I/O space, then this 0x1004 PCI-E
+> transaction will be out of bounds, no?
 
-Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+No.. PCI end devices are required to decode all 32 bits of address,
+less the bits requires for their allocation. So a device with 64 bytes
+of IO will match bits 31:6 and then use bits 5:0 for the internal
+register.
 
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Jamie, Sascha: are you actually booting this machine from time
-> to time? I think this has been broken for a while. I hope HEAD
-> plus this patch will make it work anyway.
+So a full 32 bit address is technically fine, according to the spec,
+however:
+ - The 32 bit decode is an optional feature on bridges
+ - Some devices are broken because x86 only uses the low 64k.
 
-No, I've never had a netx machine and have only been able to compile 
-test in the past.  Perhaps it's my memory, but I seem to recall someone 
-(Russell maybe?) suggesting deleting netx at some point in the past.
+So for best compatibility it is ideal to put everything in the low
+64k.
 
-Jamie
+However, IO space really should not be used by anything except very
+legacy devices, so if the MMU business is a hassle for some reason I'd
+just go with the 64k aligned method.
+
+> > > Can't this be solved using the window_alignement() hook we've been
+> > > discussing separately? Just like we teach the Linux PCI core about our
+> > > alignment requirements of 64K for the I/O regions, we could teach it
+> > > about our alignment requirement on memory regions as well. No?
+> > 
+> > Hopefully :) As long as it can adjust the start and length you should
+> > be fine.
+> 
+> Why would you need to adjust the length? If Linux allocates a 2 MB
+> resource on a 1 MB boundary, we simply increase the start address to
+> the next 2 MB boundary, and that's it. Why would the length need to
+> change?
+
+Well, lets say 3MB is the example. A 3mb region needs to fit inside a
+4mb MBUS window. If you align the start to 4mb then the pci-e core
+needs to know that it can't use the extra 1mb covered by the mbus
+window. mbus windows must not overlap.
+
+Adjusting the bridge window length to be 4mb communicates that dead
+space to the PCI core, and presumably this shows up in lspci and
+whatnot.
+
+I suppose if you align the end to 4mb (thus creating the gap before,
+not after) things should work out OK, but the information that the gap
+is routed to a specific PCI link is lost..
+
+Jason
