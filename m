@@ -1,34 +1,47 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Wed,  6 Feb 2013 02:23:51 -0500
-Subject: [V6 PATCH 16/16] arm: mmp: add extern chip support for ttc_dkb
-In-Reply-To: <1360135431-27280-1-git-send-email-chao.xie@marvell.com>
-References: <1360135431-27280-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1360135431-27280-17-git-send-email-chao.xie@marvell.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 6 Feb 2013 09:45:08 +0200
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <201302052226.30754.arnd@arndb.de>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <20130204154153.GA18237@arwen.pp.htv.fi>
+ <20130205182848.GJ25185@atomide.com>
+ <201302052226.30754.arnd@arndb.de>
+Message-ID: <20130206074508.GB22064@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the board support for usb as extern chip is supported
-in marvell usb PHY driver.
+On Tue, Feb 05, 2013 at 10:26:30PM +0000, Arnd Bergmann wrote:
+> On Tuesday 05 February 2013, Tony Lindgren wrote:
+> > * Felipe Balbi <balbi@ti.com> [130204 07:46]:
+> > > 
+> > > Current DMA abstraction is quite poor, for example there's no way to
+> > > compile support for multiple DMA engines. Code also makes certain, IMO
+> > > unnecessary, assumptions about the underlying DMA engine (abstraction is
+> > > poor, as said above but it we could follow MUSB's programming guide when
+> > > it comes to programming DMA transfers).
+> > > 
+> > > Considering all of the above, it's far better to use DMA engine and get
+> > > rid of all the mess.
+> > 
+> > How about just disable MUSB DMA support if ARCH_MULTIPLATFORM for now?
+> > That way MUSB can be fixed up first to support ARCH_MULTIPLATFORM
+> > using PIO while sorting out the DMA related issues.
+> 
+> Sounds ok to me. Someone still needs to do the work to make the non-DMA
+> variants of MUSB coexist in one kernel, but as we discussed erlier, that
+> should be much simpler.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/mach-mmp/ttc_dkb.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+Yeah, I'm cooking some patches to at least make it buildable. Dropping
+unnecessary dependencies and marking da8xx and davinci as depending on
+BROKEN seems to be the easiest way; those two glues hasn't seen a real
+patch since 2010 or so.
 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 0962791..eb34608 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -172,10 +172,8 @@ static struct mv_usb_phy_platform_data ttc_usb_phy_pdata = {
- static struct mv_usb_platform_data ttc_usb_pdata = {
- 	.clknum		= 1,
- 	.clkname	= pxa910_usb_clock_name,
--	.vbus		= NULL,
- 	.mode		= MV_USB_MODE_OTG,
- 	.otg_force_a_bus_req = 1,
--	.set_vbus	= NULL,
- };
- #endif
- #endif
 -- 
-1.7.4.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130206/c82248bc/attachment.sig>
