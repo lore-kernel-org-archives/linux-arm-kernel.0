@@ -1,117 +1,60 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 06 Feb 2013 10:48:21 +0900
-Subject: [PATCH v3 1/3] drm/exynos: Get HDMI version from device tree
-In-Reply-To: <CAOw6vbKhsWp7VnqgvECd-P4e5okX6dwKn3P8+phfpG29rA+h7g@mail.gmail.com>
-References: <1360107777-17490-1-git-send-email-seanpaul@chromium.org>
- <1360107777-17490-2-git-send-email-seanpaul@chromium.org>
- <5111A23F.50300@wwwdotorg.org>
- <CAOw6vb+W3phFDJXp3gCx7y0N7mF4o2DpEfTGuNT1pGdKqiCGTg@mail.gmail.com>
- <5111A6D9.7090700@wwwdotorg.org>
- <CAOw6vbKhsWp7VnqgvECd-P4e5okX6dwKn3P8+phfpG29rA+h7g@mail.gmail.com>
-Message-ID: <5111B665.7000006@samsung.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 5 Feb 2013 17:55:11 -0800
+Subject: [PATCH 12/15] USB: gadget/freescale: disable non-multiplatform
+ drivers
+In-Reply-To: <201302052254.00426.arnd@arndb.de>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <20130205170027.GB1081@kroah.com>
+ <20130205213710.GA3739@arwen.pp.htv.fi>
+ <201302052254.00426.arnd@arndb.de>
+Message-ID: <20130206015511.GC1073@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2013 09:56 AM, Sean Paul wrote:
-> On Tue, Feb 5, 2013 at 4:42 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 02/05/2013 05:37 PM, Sean Paul wrote:
->>> On Tue, Feb 5, 2013 at 4:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> n 02/05/2013 04:42 PM, Sean Paul wrote:
->>>>> Use the compatible string in the device tree to determine which
->>>>> registers/functions to use in the HDMI driver. Also changes the
->>>>> references from v13 to 4210 and v14 to 4212 to reflect the IP
->>>>> block version instead of the HDMI version.
->>>>> diff --git a/Documentation/devicetree/bindings/drm/exynos/hdmi.txt b/Documentation/devicetree/bindings/drm/exynos/hdmi.txt
->>>> Binding looks sane to me.
->>>>
->>>>> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
->>>>>   #ifdef CONFIG_OF
->>>>>   static struct of_device_id hdmi_match_types[] = {
->>>>>        {
->>>>> -             .compatible = "samsung,exynos5-hdmi",
->>>>> -             .data   = (void *)HDMI_TYPE14,
->>>>> +             .compatible = "samsung,exynos4-hdmi",
->>>>>        }, {
->>>>>                /* end node */
->>>>>        }
->>>> Why not fill in all the "base" compatible values there (I think you need
->>>> this anyway so that DTs don't all have to be compatible with
->>>> samsung,exynos4-hdmi), with .data containing the HDMI_VER_EXYNOS*
->>>> values, then ...
->>>>
->>> At the moment, all DTs have to be compatible with exynos4-hdmi since
->>> it provides the base for the current driver. The driver uses 4210 and
->>> 4212 to differentiate between different register addresses and
->>> features, but most things are just exynos4-hdmi compatible.
->> The DT nodes should include only the compatible values that the HW is
->> actually compatible with. If the HW isn't compatible with exynos4-hdmi,
->> that value shouldn't be in the compatible property, but instead whatever
->> the "base" value that the HW really is compatible with. The driver can
->> support multiple "base" compatible values from this table.
->>
-> All devices that use this driver are compatible, at some level, with
-> exynos4-hdmi, so I think its usage is correct here.
->
->>>>> @@ -2218,17 +2217,18 @@ static int hdmi_probe(struct platform_device *pdev)
->>>>> +
->>>>> +     if (of_device_is_compatible(dev->of_node, "samsung,exynos4210-hdmi"))
->>>>> +             hdata->version |= HDMI_VER_EXYNOS4210;
->>>>> +     if (of_device_is_compatible(dev->of_node, "samsung,exynos4212-hdmi"))
->>>>> +             hdata->version |= HDMI_VER_EXYNOS4212;
->>>>> +     if (of_device_is_compatible(dev->of_node, "samsung,exynos5250-hdmi"))
->>>>> +             hdata->version |= HDMI_VER_EXYNOS5250;
+On Tue, Feb 05, 2013 at 10:54:00PM +0000, Arnd Bergmann wrote:
+> On Tuesday 05 February 2013, Felipe Balbi wrote:
+> > [linus/master] Merge branch 'fix-max-write' of git://git.kernel.org/pub/scm/linux/kernel/git/teigland/linux-dlm
+> > 
+> > It's building find for me:
+> > 
+> > $ crossmake drivers/usb/gadget/fsl_udc_core.o \
+> >         drivers/usb/gadget/fsl_mxc_udc.o > /dev/null
+> > 
+> > (crossmake is an alias to make ARCH=arm)
+> > 
+> > Arnd, are you maybe missing a merge of v3.8-rc6 ?
+> >
+> > I can see that imx_udc.c is broken still, but there are no maintainers
+> > for that driver. I'm adding Sascha to Cc list, maybe he knows someone
+> > who can help, but if this driver isn't fixed in 2 merge windows, I will
+> > schedule for removal from tree and someone else will have to
+> > re-introduce it later without all the bogus includes.
+> 
+> Ah, I see what happened now: I submitted a patch that lumped together
+> two patches, disabling both fsl_mxc_udc and imx_udc. You already had
+> a fix for the first one, so I dropped my patch, but now I see the
+> build error for the second one that my patch was avoiding.
+> 
+> The last patch to imx_udc that seems to have seen more than just
+> build testing was probably "USB: gadget: imx_udc: don't queue more
+> data when zlp is to be sent", while fsl_mxc_udc looks actively
+> maintained. It's not completely clear to me whether these
+> are actually two drivers for the same hardware, of whether
+> imx_udc is the i.mx1 variant and fsl_mxc_udc is the i.mx2 variant.
+> 
+> What I can say is that no platform in the kernel currently defines
+> an "imx_udc" platform_device, so it is certainly unused, and has
+> been since at least e08300043e in 2010.
+> 
+> I would suggest that we mark the imx_udc driver as 'depends on
+> BROKEN' right away, since no in-tree user needs it, and any
+> out of tree user is already broken in 3.8. I also wouldn't
+> mind removing the driver unless the imx maintainers have
+> a plan for it.
 
-But this way can make unnecessary combinations, e.g. exynos4210-hdmi + 
-exynos5250-hdmi.
+Sure, someone just send me a patch for that and I'll be glad to mark it
+BROKEN.
 
->>>> Instead of that, do roughly:
->>>>
->>>>      match = of_match_device(hdmi_match_types, &pdev->dev);
->>>>      if (match)
->>>>          hdata->version |= (int)match->data;
->>>>
->>>> That way, it's all table-based. Any future additions to
->>>> hdmi_match_types[] won't require another if statement to be added to
->>>> probe().
->>> I don't think it's that easy. of_match_device returns the first match
->>> from the device table, so I'd still need to iterate through the
->>> matches. I could still break this out into a table, but I don't think
->>> of_match_device is the right way to probe it.
->> You shouldn't have to iterate over multiple matches. of_match_device()
->> is supposed to return the match for the first entry in the compatible
->> property, then if there was no match, move on to looking at the next
->> entry in the compatible property, etc. In practice, I think it's still
->> not implemented quite correctly for this, but you can make it work by
->> putting the newest compatible value first in the match table.
-> I think the only way that works is if you hardcode the compatible
-> versions in the driver, like this:
->
-> static struct of_device_id hdmi_match_types[] = {
->          {
->                  .compatible = "samsung,exynos5250-hdmi",
->                  .data = (void *)(HDMI_VER_EXYNOS5250 | HDMI_VER_EXYNOS4212);
->          }, {
->                  .compatible = "samsung,exynos4212-hdmi",
->                  .data = (void *)HDMI_VER_EXYNOS4212;
->          }, {
->                  .compatible = "samsung,exynos4210-hdmi",
->                  .data = (void *)HDMI_VER_EXYNOS4210;
->          }, {
->                  /* end node */
->          }
-> };
+thanks,
 
-I think this makes driver more clearly. We just see device tables and we 
-can know device uses which version.
-
->
-> In that case, it eliminates the benefit of using device tree to
-> determine the compatible bits. I hope I'm just being thick and missing
-> something.
->
-> Sean
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
->
+greg k-h
