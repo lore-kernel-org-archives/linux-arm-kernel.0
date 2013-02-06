@@ -1,56 +1,54 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Tue, 5 Feb 2013 22:00:04 -0800
-Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
-In-Reply-To: <CAKuRcOK1B-iNACQntZ2LsTTXaKULwZvOWDVCQF_vz8ym_JeG2g@mail.gmail.com>
-References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
- <CAD=FV=VQywwQ3YAFb=1qFmd3UEW39Xu=ok6fdjhvBXdwOQOa1Q@mail.gmail.com>
- <CAKuRcOKx4VLcmhwi8VWHKNOizgiVsE5f0v-CGmK5+bH=BjJAPg@mail.gmail.com>
- <CAKuRcOK1B-iNACQntZ2LsTTXaKULwZvOWDVCQF_vz8ym_JeG2g@mail.gmail.com>
-Message-ID: <CAPnjgZ1DG2Txh41r8PsfqfZMaUem5ScTijMP+==3ATFK0Q1=Dw@mail.gmail.com>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Wed, 6 Feb 2013 06:04:22 +0000
+Subject: [PATCH V2 1/6] pinctrl: pinctrl-single: use arch_initcall and
+ module_exit
+In-Reply-To: <20130205112731.GK17786@n2100.arm.linux.org.uk>
+References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
+ <1359445134-13323-2-git-send-email-manishv.b@ti.com>
+ <CACRpkdbf7TwrjfT2rhqQFGc3yh_Nt117RtzQO2y6g5Ddx5Ay_w@mail.gmail.com>
+ <20130201170906.GE22517@atomide.com> <20130201171124.GF22517@atomide.com>
+ <A4887BF146CD57468F700B415D2F47015828C7@DBDE01.ent.ti.com>
+ <20130205112731.GK17786@n2100.arm.linux.org.uk>
+Message-ID: <A4887BF146CD57468F700B415D2F4701583209@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Russell,
 
-On Tue, Feb 5, 2013 at 9:33 PM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
-> On Wed, Feb 6, 2013 at 10:58 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
->> On Wed, Feb 6, 2013 at 5:48 AM, Doug Anderson <dianders@chromium.org> wrote:
->>> Yavaraj,
->>>
->>> On Mon, Feb 4, 2013 at 1:03 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com>
->>> wrote:
->>>>
->>>> This RFC patch is w.r.t multimaster bus arbitration which is already
->>>> being discussing in the mainline.
->>>> This patch provides hooks for the i2c multimaster bus arbitration
->>>> and to have the arbitration parameters.
->>>
->>>
->>> I may have missed something in all the threads, but my recollection was that
->>> the request was that this should be implemented without touching the i2c
->>> core code.  Your patch modifies the i2c core code.
->
->    Different i2c devices will directly talk to i2c core using i2c_transfer().
->     If we put this out of the i2c core,the i2c devices like tpsxxxx and etc
->     should be registered through the bridge/mux .
->
->>>
->>> My impression was that the best solution was to use the infrastructure in
->>> place for i2c multiplexing.  ...but in your case you would only multiplex
->>> one thing.  This was suggested by Grant Likely and seems the cleanest...
->>
->      I agree that Grants idea was the cleanest but we may end up in change in
->       i2c device probe to register through mux/bridge.(for the
-> device's connected on that
->      particular bus which requires arbitration).
+On Tue, Feb 05, 2013 at 16:57:31, Russell King - ARM Linux wrote:
+> On Tue, Feb 05, 2013 at 06:36:34AM +0000, Vishwanathrao Badarkhe, Manish wrote:
+> > I made following changes, in order to update "dip->p" pointer with 
+> > correct value:
+> > 
+> > -       if (!dpi->p) {
+> > +       if (IS_ERR_OR_NULL(dpi->p)) {
+> >                 dpi->p = devm_pinctrl_get(dev);
+> > -               if (IS_ERR_OR_NULL(dpi->p)) {
+> > -                       int ret = PTR_ERR(dpi->p);
+> > -
+> > -                       dev_dbg(dev, "no pinctrl handle\n");
+> > -                       /* Only return deferrals */
+> > -                       if (ret == -EPROBE_DEFER)
+> > -                               return ret;
+> > -                       return 0;
+> > -               }
+> > +               ret = PTR_ERR(dpi->p);
+> > +               dev_dbg(dev, "no pinctrl handle\n");
+> > +               /* Only return deferrals */
+> > +               if (ret == -EPROBE_DEFER)
+> > +                       return ret;
+> > +               return 0;
+> > 
+> > Is this intended change?
+> 
+> The above looks totally broken to me.
+> 
+> Oh, it's using IS_ERR_OR_NULL(), so it's bound to be broken.
+> 
 
-Does the device tree not handle that case automatically? How are
-muxes/bridges done in that case? It's not problem to adjust the device
-tree file accordingly if Grant's approach is the cleanest method.
+I went through discussion in community on usage of "IS_ERR_OR_NULL".
+https://patchwork.kernel.org/patch/1953271/
+Will take care not use this in future.
 
-Regards,
-Simon
-
->>
->>>
->>> -Doug
+Thanks,
+Manish
