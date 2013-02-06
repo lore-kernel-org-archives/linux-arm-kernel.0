@@ -1,130 +1,34 @@
-From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Thu, 7 Feb 2013 00:12:46 +0200
-Subject: [PATCH v2 1/2] ARM: OMAP2+: SoC name and revision unification
-In-Reply-To: <20130206191923.GE25185@atomide.com>
-References: <1360177196-18196-1-git-send-email-ruslan.bilovol@ti.com>
- <1360177196-18196-2-git-send-email-ruslan.bilovol@ti.com>
- <20130206191923.GE25185@atomide.com>
-Message-ID: <CAB=otbRp_DFCdUv0+GN5MYWaKPVRvgeBj1Q1-zXCf=2ThfNLFw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 6 Feb 2013 22:20:36 +0000 (UTC)
+Subject: OMAP baseline test results for v3.8-rc4
+In-Reply-To: <alpine.DEB.2.00.1302062141480.12769@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1301202136290.31667@utopia.booyaka.com>
+ <50FD6D8D.6030106@mimc.co.uk> <20130121164510.GA18905@kahuna>
+ <f36acfaf128c4844b8f696ea4440e253@DLEE74.ent.ti.com>
+ <20130121182419.GE10020@beef> <87boci9str.fsf@dell.be.48ers.dk>
+ <alpine.DEB.2.00.1301220213390.25789@utopia.booyaka.com>
+ <B5906170F1614E41A8A28DE3B8D121433ECFA0FC@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302062141480.12769@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1302062218580.12769@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 6, 2013 at 9:19 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Ruslan Bilovol <ruslan.bilovol@ti.com> [130206 11:03]:
->> This is a long story where for each new generation of
->> OMAP we used different approaches for creating
->> strings for SoCs names and revisions that this patch
->> fixes. It makes future exporting of this information
->> to SoC infrastructure easier.
->>
->> Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
->> ---
->>  arch/arm/mach-omap2/id.c |   89 ++++++++++++++++++++++++++--------------------
->>  1 file changed, 51 insertions(+), 38 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
->> index 8a68f1e..b16a432 100644
->> --- a/arch/arm/mach-omap2/id.c
->> +++ b/arch/arm/mach-omap2/id.c
->> @@ -31,8 +31,11 @@
->>  #define OMAP4_SILICON_TYPE_STANDARD          0x01
->>  #define OMAP4_SILICON_TYPE_PERFORMANCE               0x02
->>
->> +#define OMAP_SOC_MAX_NAME_LENGTH             16
->> +
->>  static unsigned int omap_revision;
->> -static const char *cpu_rev;
->> +static char soc_name[OMAP_SOC_MAX_NAME_LENGTH];
->> +static char soc_rev[OMAP_SOC_MAX_NAME_LENGTH];
->>  u32 omap_features;
->>
->>  unsigned int omap_rev(void)
->
-> Sorry I was not clear earlier with what I meant, but if
-> you remove static const char *cpu_rev here and use
-> soc_name and soc_rev here..
->
->> @@ -181,8 +187,7 @@ void __init omap2xxx_check_revision(void)
->>
->>  static void __init omap3_cpuinfo(void)
->>  {
->> -     const char *cpu_name;
->> -
->> +     const char *omap3_soc_name;
->>       /*
->>        * OMAP3430 and OMAP3530 are assumed to be same.
->>        *
->
-> ..then no need to replace cpu_name with omap3_soc_name here?
->
->> @@ -191,28 +196,30 @@ static void __init omap3_cpuinfo(void)
->>        * and CPU class bits.
->>        */
->>       if (cpu_is_omap3630()) {
->> -             cpu_name = "OMAP3630";
->> +             omap3_soc_name = "OMAP3630";
->>       } else if (soc_is_am35xx()) {
->> -             cpu_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
->> +             omap3_soc_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
->>       } else if (cpu_is_ti816x()) {
->> -             cpu_name = "TI816X";
->> +             omap3_soc_name = "TI816X";
->>       } else if (soc_is_am335x()) {
->> -             cpu_name =  "AM335X";
->> +             omap3_soc_name =  "AM335X";
-> ...
->
-> Or here?
->
->>  void __init omap3xxx_check_revision(void)
->>  {
->> +     const char *omap3_soc_rev;
->>       u32 cpuid, idcode;
->>       u16 hawkeye;
->>       u8 rev;
->
-> Then here if you just make it a local cpu_rev..
->
->> @@ -303,7 +311,7 @@ void __init omap3xxx_check_revision(void)
->>       cpuid = read_cpuid(CPUID_ID);
->>       if ((((cpuid >> 4) & 0xfff) == 0xc08) && ((cpuid & 0xf) == 0x0)) {
->>               omap_revision = OMAP3430_REV_ES1_0;
->> -             cpu_rev = "1.0";
->> +             omap3_soc_rev = "ES1.0";
->>               return;
->>       }
->>
->> @@ -324,26 +332,26 @@ void __init omap3xxx_check_revision(void)
->>               case 0: /* Take care of early samples */
->>               case 1:
->>                       omap_revision = OMAP3430_REV_ES2_0;
->> -                     cpu_rev = "2.0";
->> +                     omap3_soc_rev = "ES2.0";
->>                       break;
->>               case 2:
->>                       omap_revision = OMAP3430_REV_ES2_1;
->> -                     cpu_rev = "2.1";
->> +                     omap3_soc_rev = "ES2.1";
->>                       break;
->>               case 3:
->>                       omap_revision = OMAP3430_REV_ES3_0;
->> -                     cpu_rev = "3.0";
->> +                     omap3_soc_rev = "ES3.0";
->>                       break;
->>               case 4:
->>                       omap_revision = OMAP3430_REV_ES3_1;
->> -                     cpu_rev = "3.1";
->> +                     omap3_soc_rev = "ES3.1";
->>                       break;
->
-> ..no need to replace cpu_rev with omap3_soc_rev all over the
-> place?
+On Wed, 6 Feb 2013, Paul Walmsley wrote:
 
-Okay, I understood what do you mean here. Will fix it in next patchset..
+> Setting CONFIG_EARLY_PRINTK=n doesn't fix the problem I'm seeing.
 
->
-> Regards,
->
-> Tony
+And just tried this with u-boot v2013.01 on a BeagleBoard A6a, does not 
+fix it.
+
+> > If you still have issues booting can you update your U-Boot to v2013.01 since things
+> > seem to be working fine at this point.
+> 
+> Let's try to identify and get rid of bootloader dependencies in the 
+> kernel.  They indicate that the kernel isn't initializing something 
+> appropriately, which could cause strange problems later.
+
+Oh and it's worth noting that parts of u-boot v2013.01 don't work 
+correctly on earlier BeagleBones, i.e. Ethernet booting.
+
+
+- Paul
