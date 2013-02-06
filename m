@@ -1,44 +1,28 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 6 Feb 2013 14:30:36 +0100
-Subject: [PATCH 0/2] ARM: dts: omap3-overo: Add pwm-leds and audio support
-In-Reply-To: <510F7BEB.1020408@epfl.ch>
-References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
- <5101273A.9090800@ti.com> <510F7BEB.1020408@epfl.ch>
-Message-ID: <51125AFC.10704@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 6 Feb 2013 08:20:15 -0500
+Subject: [GIT PULL  3/4] ARM: mvebu: boards for v3.9
+In-Reply-To: <20130205232604.GB14851@quad.lixom.net>
+References: <pull-1359733919-342140> <1359733919.c3D01c3.22262@triton>
+ <20130205071010.GD13049@quad.lixom.net>
+ <20130205112104.GP14746@titan.lakedaemon.net>
+ <20130205182333.GA21051@quad.lixom.net>
+ <20130205183050.GZ14746@titan.lakedaemon.net>
+ <20130205232604.GB14851@quad.lixom.net>
+Message-ID: <20130206132015.GB14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Florian,
+On Tue, Feb 05, 2013 at 03:26:04PM -0800, Olof Johansson wrote:
+> What makes sense is to hold off the patches that adds dts entries and
+> removes the platform device registrations to the next release to avoid
+> this dependency.
 
-On 02/04/2013 10:14 AM, Florian Vaussard wrote:
-> Hello Benoit,
-> 
-> On 01/24/2013 01:21 PM, Benoit Cousson wrote:
->> + Peter who did the original PWM
->>
->> Hi Florian,
->>
->> On 01/23/2013 06:56 PM, Florian Vaussard wrote:
->>> Hello Benoit,
->>>
->>> This patchset adds some new DT supports to the Overo products. The
->>> first patch converts the PMIC LEDB output to use the pwm-leds,
->>> newly merged in your branch for_3.9/dts. The second patch adds the
->>> audio support.
->>
->> Excellent, that looks very good to me, but I'd like to get the
->> feedback from Peter before merging it.
->>
-> 
-> So a patch is being merged to handle triggers in the case of pwm leds [1].
-> When done, we will be able to add back the default trigger. Do you want
-> to wait on it to merge this series?
+Hmm, this makes life a *lot* simpler, but it also really slows things
+down.  I'll go ahead and do this from now on.
 
-What kind of dependency do we have between these two series? I mean what
-will happen if the DTS is merged before the pwm subsystem?
+Would you like me to redo /boards and /dt in light of this, or just do
+it from here forward?
 
-If that does not generate any regression / crash, then it is OK, if not,
-we should take care of the order.
+thx,
 
-Thanks,
-Benoit
+Jason.
