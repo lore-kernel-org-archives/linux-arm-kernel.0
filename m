@@ -1,35 +1,36 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 6 Feb 2013 10:56:39 +0200
-Subject: [PATCH 09/13] mfd: omap-usb-host: Add device tree support and
- binding information
-In-Reply-To: <20130205161141.GD26842@e106331-lin.cambridge.arm.com>
-References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
- <1359993540-20780-10-git-send-email-rogerq@ti.com>
- <20130205142049.GC26842@e106331-lin.cambridge.arm.com>
- <51111A41.4050607@ti.com>
- <20130205161141.GD26842@e106331-lin.cambridge.arm.com>
-Message-ID: <51121AC7.6070107@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Feb 2013 08:58:31 +0000
+Subject: [PATCH] ASoC: fsl: fix allyesconfig build for imx-pcm
+In-Reply-To: <20130206040212.GA18613@S2101-09.ap.freescale.net>
+References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
+ <201302051642.25361.arnd@arndb.de>
+ <20130206040212.GA18613@S2101-09.ap.freescale.net>
+Message-ID: <201302060858.31510.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 06:11 PM, Mark Rutland wrote:
-> [...]
+On Wednesday 06 February 2013, Shawn Guo wrote:
+> On Tue, Feb 05, 2013 at 04:42:25PM +0000, Arnd Bergmann wrote:
+> > Patch 25b8d314 "ASoC: fsl: fix multiple definition of init_module changed
+> > the Makefile for imx-pcm.ko to build two modules that both contain the
+> > imx-pcm.c file, which nicely solves the problem of building both versions
+> > of the driver as modules, but it causes two new problems:
+> > 
+> It's my fault, Arnd.  The patch 25b8d314 is a crap.  Instead of making
+> the Kconfig even complexer, I chose to revert the patch and do a little
+> surgery on the code to make it match the Kconfig rational.  The fix[1]
+> should be on the way to mainline now.
 > 
->>>> +
->>>> +- single_ulpi_bypass: Must be present if the controller contains a single
->>>> +  ULPI bypass control bit. e.g. OMAP3 silicon <= ES2.1
->>>
->>> Again it would be nicer to have '-' rather than '_' here. It might be worth
->>> prefixing this "ti,".
->>
->> Is prefixing with "ti" really required? how does it better?
+> I'm sorry for messing thing up during -rc time.
 > 
-> I thought single-ulpi-bypass sounded rather generic, but it probably is
-> specific enough as-is. I don't know enough about USB hardware to have strong
-> feelings either way.
+> Shawn
+> 
+> [1] http://thread.gmane.org/gmane.linux.alsa.devel/105018
 > 
 
-Yes, it is specific to the TI silicon. I'll leave it as it is then.
+Ok, again you were faster than I was at finding a solution, and the
+new one looks good to me.
 
-cheers,
--roger
+Thanks for taking care of this already,
+
+	Arnd
