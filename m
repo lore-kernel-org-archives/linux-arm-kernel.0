@@ -1,41 +1,128 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 6 Feb 2013 20:31:34 +0800
-Subject: [PATCH 1/2] tty: serial: remove __init on pl011 console ops
-In-Reply-To: <20130206115219.GE17833@n2100.arm.linux.org.uk>
-References: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
- <20130206115219.GE17833@n2100.arm.linux.org.uk>
-Message-ID: <CAD6h2NSpo74UXUgH2OJniW=wzkxGeshta05AGgCpn26SCUSjYg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 06 Feb 2013 13:31:23 +0100
+Subject: [PATCH] arm: mvebu: Add SPI flash on Armada XP-GP board
+In-Reply-To: <20130206105431.GA21764@localhost>
+References: <1360063473-26176-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <5111331F.7090900@free-electrons.com> <511168BE.1000803@free-electrons.com>
+ <20130206105431.GA21764@localhost>
+Message-ID: <51124D1B.9030508@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 February 2013 19:52, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Feb 06, 2013 at 07:47:14PM +0800, Haojian Zhuang wrote:
->> If uart driver is probed defer, console_setup will be called later
->> after __init && __initdata sections destroyed. And amba_console isn't
->> defined in __init or __initdata section. So we needn't define
->> pl011_console_setup() && pl011_console_get_options() in __init section.
->
-> It sounds like there's a deeper problem here - if this driver being
-> deferred, why isn't it being retried after the pinctrl stuff gets
-> its driver registered?
->
-> We've had bugs in this deferred probing before, I wouldn't be surprised
-> if there's more... and we should not be "fixing" drivers because of bugs
-> elsewhere.
+On 02/06/2013 11:54 AM, Ezequiel Garcia wrote:
+> Hi Gregory,
+> 
+> On Tue, Feb 05, 2013 at 09:17:02PM +0100, Gregory CLEMENT wrote:
+>> On 02/05/2013 05:28 PM, Gregory CLEMENT wrote:
+>>> Hi Ezequiel,
+>>>
+>>> On 02/05/2013 12:24 PM, Ezequiel Garcia wrote:
+>>>> This patch adds an SPI master device node for Armada XP-GP board.
+>>>> This master node is an SPI flash controller 'n25q128a13'.
+>>>>
+>>>> Since there is no 'partitions' node declared, one full sized
+>>>> partition named as the device will be created.
+>>>>
+>>>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+>>>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>>> Cc: Lior Amsalem <alior@marvell.com>
+>>>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>>> ---
+>>>> This patch depends on:
+>>>>
+>>>>  1. Gregory's patch for Armada XP GP board:
+>>>>       arm: mvebu: support for the new Armada XP development board(DB-MV784MP-GP)
+>>>>
+>>>>  2. My previous patch for SPI on Armada 370/XP:
+>>>>       arm: mvebu: Add support for SPI controller in Armada 370/XP
+>>>>
+>>>> And don't forget to compile the SPI flash driver, CONFIG_MTD_M25P80=y
+>>>>
+>>>>  arch/arm/boot/dts/armada-xp-gp.dts |   12 ++++++++++++
+>>>>  1 files changed, 12 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+>>>> index 3eea531..1c8afe2 100644
+>>>> --- a/arch/arm/boot/dts/armada-xp-gp.dts
+>>>> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+>>>> @@ -97,5 +97,17 @@
+>>>>  			phy = <&phy3>;
+>>>>  			phy-mode = "rgmii-id";
+>>>>  		};
+>>>> +
+>>>> +		spi0: spi at d0010600 {
+>>>> +			status = "okay";
+>>>> +
+>>>> +			spi-flash at 0 {
+>>>> +				#address-cells = <1>;
+>>>> +				#size-cells = <1>;
+>>>> +				compatible = "n25q128a13";
+>>>> +				reg = <0>; /* Chip select 0 */
+>>>> +				spi-max-frequency = <108000000>;
+>>
+>> I had a remark about it, according to the datasheet, 108MHz is the
+>> maximum frequency for the all the instructions but the READ
+>> instruction. For the READ the maximum frequency is 54MHz. So I wonder
+>> if we shouldn't use 54000000 here.
+>>
+> 
+> Mmm... nice catch.
+> 
+> The mtd driver for the spi flash (m25p80) will use FAST_READ opcode
+> if CONFIG_M25PXX_USE_FAST_READ is selected, and this option
+> is selected by default.
 
-It retried if driver is being deferred. But those console setup
-functions are released
-since they're declared in __init section.
+OK I didn't notice that thre wre a FAST_READ which was supported by
+Linux. So I think we can keep 108000000 as spi-max-frequency.
 
-rest_init()
-   --> creates kernel_init thread that could free __init section memory
+> However we cannot count on this option being selected, of course.
+> 
+> On the other side, after some testing with spi-max-frequency = 50 MHz
+> and also with spi-max-frequency = 108 MHz I'm seeing the flash often
+> (not always) stalls when trying to read the full device through dd:
+> 
+> / # dd if=/dev/mtd0ro of=/dev/null
+> 
+> This happens regardless of CONFIG_M25PXX_USE_FAST_READ, and regardless
+> of spi-max-frequency = 50 MHz or 54 MHz or 108 MHz.
+> 
+> Note that setting 108 MHz is useless in our case, because there's
+> an upper limit of 62.5 MHz set by the core clock of the SoC.
+> 
+> Using a read block size of 1M, the read completes OK -- always:
+> 
+> / # dd if=/dev/mtd0 of=/dev/null bs=1M
+> 16+0 records in
+> 16+0 records out
+> 16777216 bytes (16.0MB) copied, 27.306048 seconds, 600.0KB/s
+> 
+> Moreover, when the read completes, the achieved bandwidth
+> is the same for 40, 50, 54, or 108 MHz.
+> 
+> If we set spi-max-frequency to 27 MHz (108 MHz / 4), it looks like the stalling
+> disappear and the read always completes OK, at almost half the speed:
+> 
+> / # dd if=/dev/mtd0ro of=/dev/null
+> 32768+0 records in
+> 32768+0 records out
+> 16777216 bytes (16.0MB) copied, 49.005122 seconds, 334.3KB/s
+> 
+> So according to this analysis, we whould set 27 MHz as the max
+> frequency, based on nothing but in these tests.
+> 
+> I'm not sure the stalling is due to the clocking or due to
+> some driver bug (I don't like the tricks pulled by the busy loop
+> in orion_spi_wait_till_ready() but probably this is completely unrelated).
+> 
+> Adding some SPI people in Cc, hoping they can shed a light on this.
+> 
+> What do you think?
 
-deferred_probe_initicall() creates a workqueue that is used to retry
-deferred probe
-function.
+We have just seen this on IRC, so it seemed it was actually a problem in
+userspace not in kernel space.
 
-I think that these two threads are competing.
-
-Best Regards
-Haojian
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
