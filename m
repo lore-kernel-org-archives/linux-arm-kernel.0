@@ -1,28 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Feb 2013 09:28:18 -0800
-Subject: [PATCH 2/2] ARM: OMAP2: Fix GPMC memory initialisation
-In-Reply-To: <5111A251.9020400@ti.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-3-git-send-email-jon-hunter@ti.com>
- <20130201215154.GV22517@atomide.com> <51103247.2030906@ti.com>
- <51103A25.9010401@ti.com> <20130205233407.GR25185@atomide.com>
- <5111A251.9020400@ti.com>
-Message-ID: <20130206172818.GB25185@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 6 Feb 2013 09:48:09 -0800
+Subject: [GIT PULL] ux500 DT related fixes and platform enhancements
+In-Reply-To: <20130206135911.GB7519@gmail.com>
+References: <20130131115552.GG5301@gmail.com> <20130206135911.GB7519@gmail.com>
+Message-ID: <CAOesGMiJTcjdEJzSDkpdV-ZCqN24uVmfjM-HOt+ojErS=98TmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130205 16:26]:
-> 
-> Actually, let me look into this a bit more. It appears that for all
-> omap2+ devices NOR should be mapped to CS0 at 0x08000000. So I am
-> wondering if the boot-loader is re-mapping the CS0 space. If it is then
-> may be we can avoid having such hacks in the kernel by fixing the
-> bootloader. To date only the apollon board has really had this problem
-> and I need to check what I have on my H4 (which has been hacked by me ;-)
+Hi,
 
-OK. Yeah sorry I don't remember the history of why the different
-mappings were needed. It could be it was just needed to keep some
-devices working that were only initialized in the bootloader like
-you're suspecting.
+On Wed, Feb 6, 2013 at 5:59 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Tony
+> Lee Jones (14):
+>       ARM: ux500: Change IRQ from low-to-high edge triggered to high-to-low
+>       ARM: ux500: Include the PRCMU's Secure Registers in DB8500's DT
+>       ARM: ux500: Provide a means to obtain the SMSC9115 clock when DT is enabled
+>       clk: ux500: Ensure the FMSC clock is obtainable
+>       clk: ux500: Provide an alias for the SMSC911x Ethernet chip
+>       net/smsc911x: Provide common clock functionality
+>       mmc: mmci: Move ios_handler functionality into the driver
+
+This patch lacks acks from MMC maintainers. Actually, it should just
+be submitted like any other MMC patches; to Chris Ball and the MMC
+list.
+
+>       ARM: ux500: Set correct MMCI regulator voltages in the ux5x0 Device Tree
+>       ARM: ux500: Specify the ux5x0 MMCI regulator's on/off GPIO as high-enable
+>       ARM: ux500: Specify which IOS regulator to use for MMCI
+>       ARM: ux500: Use the correct name when supplying a GPIO enable pin
+>       ARM: ux500: Setup correct settling time for the MMCI regulator
+>       ARM: ux500: Use the GPIO regulator framework for SDI0's 'en' and 'vsel'
+>       ARM: ux500: Remove traces of the ios_handler from platform code
+
+So, the most of these patches really are just ux500 platform patches.
+Please start queuing these through the ux500 maintainers, i.e. Linus
+and Srinidhi. We've had cases in the past where you and him step on
+each others toes (as with the mach/id.h removal), due to lack of
+coordination. It's definitely easier for everyone if the patches come
+through (and get acked by) one entity.
+
+The obvious way of doing this is to make sure that Linus (and
+Srinidhi) are in control of what's going in and when, so they can
+resolve conflicts and not have them break the whole platform for
+everybody due to changes they have been unaware of.
+
+
+-Olof
