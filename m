@@ -1,140 +1,354 @@
-From: sw0312.kim@samsung.com (=?UTF-8?B?6rmA7Iq57Jqw?=)
-Date: Wed, 06 Feb 2013 11:56:59 +0900
-Subject: [PATCH v3 1/3] drm/exynos: Get HDMI version from device tree
-In-Reply-To: <CAOw6vbKhsWp7VnqgvECd-P4e5okX6dwKn3P8+phfpG29rA+h7g@mail.gmail.com>
-References: <1360107777-17490-1-git-send-email-seanpaul@chromium.org>
- <1360107777-17490-2-git-send-email-seanpaul@chromium.org>
- <5111A23F.50300@wwwdotorg.org>
- <CAOw6vb+W3phFDJXp3gCx7y0N7mF4o2DpEfTGuNT1pGdKqiCGTg@mail.gmail.com>
- <5111A6D9.7090700@wwwdotorg.org>
- <CAOw6vbKhsWp7VnqgvECd-P4e5okX6dwKn3P8+phfpG29rA+h7g@mail.gmail.com>
-Message-ID: <5111C67B.3060909@samsung.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Wed, 6 Feb 2013 08:34:32 +0530
+Subject: [PATCH V2] clk: Add composite clock type
+In-Reply-To: <2204463.8bhhYZbxqK@amdc1227>
+References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
+ <2204463.8bhhYZbxqK@amdc1227>
+Message-ID: <5111C840.3000003@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2013? 02? 06? 09:56, Sean Paul wrote:
-> On Tue, Feb 5, 2013 at 4:42 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 02/05/2013 05:37 PM, Sean Paul wrote:
->>> On Tue, Feb 5, 2013 at 4:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> n 02/05/2013 04:42 PM, Sean Paul wrote:
->>>>> Use the compatible string in the device tree to determine which
->>>>> registers/functions to use in the HDMI driver. Also changes the
->>>>> references from v13 to 4210 and v14 to 4212 to reflect the IP
->>>>> block version instead of the HDMI version.
->>>>
->>>>> diff --git a/Documentation/devicetree/bindings/drm/exynos/hdmi.txt b/Documentation/devicetree/bindings/drm/exynos/hdmi.txt
->>>>
->>>> Binding looks sane to me.
->>>>
->>>>> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
->>>>
->>>>>  #ifdef CONFIG_OF
->>>>>  static struct of_device_id hdmi_match_types[] = {
->>>>>       {
->>>>> -             .compatible = "samsung,exynos5-hdmi",
->>>>> -             .data   = (void *)HDMI_TYPE14,
->>>>> +             .compatible = "samsung,exynos4-hdmi",
->>>>>       }, {
->>>>>               /* end node */
->>>>>       }
->>>>
->>>> Why not fill in all the "base" compatible values there (I think you need
->>>> this anyway so that DTs don't all have to be compatible with
->>>> samsung,exynos4-hdmi), with .data containing the HDMI_VER_EXYNOS*
->>>> values, then ...
->>>>
->>>
->>> At the moment, all DTs have to be compatible with exynos4-hdmi since
->>> it provides the base for the current driver. The driver uses 4210 and
->>> 4212 to differentiate between different register addresses and
->>> features, but most things are just exynos4-hdmi compatible.
+On Tuesday 05 February 2013 03:45 PM, Tomasz Figa wrote:
+> Hi Prashant,
+>
+> Thank you for your patch. Please see some comments inline.
+>
+> On Monday 04 of February 2013 13:41:22 Prashant Gaikwad wrote:
+>> Not all clocks are required to be decomposed into basic clock
+>> types but at the same time want to use the functionality
+>> provided by these basic clock types instead of duplicating.
 >>
->> The DT nodes should include only the compatible values that the HW is
->> actually compatible with. If the HW isn't compatible with exynos4-hdmi,
->> that value shouldn't be in the compatible property, but instead whatever
->> the "base" value that the HW really is compatible with. The driver can
->> support multiple "base" compatible values from this table.
+>> For example, Tegra SoC has ~100 clocks which can be decomposed
+>> into Mux -> Div -> Gate clock types making the clock count to
+>> ~300. Also, parent change operation can not be performed on gate
+>> clock which forces to use mux clock in driver if want to change
+>> the parent.
 >>
-> 
-> All devices that use this driver are compatible, at some level, with
-> exynos4-hdmi, so I think its usage is correct here.
-> 
->>>>> @@ -2218,17 +2217,18 @@ static int hdmi_probe(struct platform_device *pdev)
->>>>
->>>>> +
->>>>> +     if (of_device_is_compatible(dev->of_node, "samsung,exynos4210-hdmi"))
->>>>> +             hdata->version |= HDMI_VER_EXYNOS4210;
->>>>> +     if (of_device_is_compatible(dev->of_node, "samsung,exynos4212-hdmi"))
->>>>> +             hdata->version |= HDMI_VER_EXYNOS4212;
->>>>> +     if (of_device_is_compatible(dev->of_node, "samsung,exynos5250-hdmi"))
->>>>> +             hdata->version |= HDMI_VER_EXYNOS5250;
->>>>
->>>> Instead of that, do roughly:
->>>>
->>>>     match = of_match_device(hdmi_match_types, &pdev->dev);
->>>>     if (match)
->>>>         hdata->version |= (int)match->data;
->>>>
->>>> That way, it's all table-based. Any future additions to
->>>> hdmi_match_types[] won't require another if statement to be added to
->>>> probe().
->>>
->>> I don't think it's that easy. of_match_device returns the first match
->>> from the device table, so I'd still need to iterate through the
->>> matches. I could still break this out into a table, but I don't think
->>> of_match_device is the right way to probe it.
+>> Instead aggregate the basic clock types functionality into one
+>> clock and just use this clock for all operations. This clock
+>> type re-uses the functionality of basic clock types and not
+>> limited to basic clock types but any hardware-specific
+>> implementation.
 >>
->> You shouldn't have to iterate over multiple matches. of_match_device()
->> is supposed to return the match for the first entry in the compatible
->> property, then if there was no match, move on to looking at the next
->> entry in the compatible property, etc. In practice, I think it's still
->> not implemented quite correctly for this, but you can make it work by
->> putting the newest compatible value first in the match table.
-> 
-> I think the only way that works is if you hardcode the compatible
-> versions in the driver, like this:
-> 
-> static struct of_device_id hdmi_match_types[] = {
->         {
->                 .compatible = "samsung,exynos5250-hdmi",
->                 .data = (void *)(HDMI_VER_EXYNOS5250 | HDMI_VER_EXYNOS4212);
->         }, {
->                 .compatible = "samsung,exynos4212-hdmi",
->                 .data = (void *)HDMI_VER_EXYNOS4212;
->         }, {
->                 .compatible = "samsung,exynos4210-hdmi",
->                 .data = (void *)HDMI_VER_EXYNOS4210;
->         }, {
->                 /* end node */
->         }
-> };
+>> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+>> ---
+>>
+>> Changes from V1:
+>> - 2nd patch dropped as the concept is acked by Mike.
+>> - Fixed comments from Stephen.
+>>
+>> ---
+>>   drivers/clk/Makefile         |    1 +
+>>   drivers/clk/clk-composite.c  |  208
+>> ++++++++++++++++++++++++++++++++++++++++++ include/linux/clk-provider.h
+>> |   30 ++++++
+>>   3 files changed, 239 insertions(+), 0 deletions(-)
+>>   create mode 100644 drivers/clk/clk-composite.c
+>>
+>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+>> index ce77077..2287848 100644
+>> --- a/drivers/clk/Makefile
+>> +++ b/drivers/clk/Makefile
+>> @@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK)      += clk-fixed-factor.o
+>>   obj-$(CONFIG_COMMON_CLK)     += clk-fixed-rate.o
+>>   obj-$(CONFIG_COMMON_CLK)     += clk-gate.o
+>>   obj-$(CONFIG_COMMON_CLK)     += clk-mux.o
+>> +obj-$(CONFIG_COMMON_CLK)     += clk-composite.o
+>>
+>>   # SoCs specific
+>>   obj-$(CONFIG_ARCH_BCM2835)   += clk-bcm2835.o
+>> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+>> new file mode 100644
+>> index 0000000..5a6587f
+>> --- /dev/null
+>> +++ b/drivers/clk/clk-composite.c
+>> @@ -0,0 +1,208 @@
+>> +/*
+>> + * Copyright (c) 2013 NVIDIA CORPORATION.  All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> it + * under the terms and conditions of the GNU General Public
+>> License, + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but
+>> WITHOUT + * ANY WARRANTY; without even the implied warranty of
+>> MERCHANTABILITY or + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>> General Public License for + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see
+>> <http://www.gnu.org/licenses/>. + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/err.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#define to_clk_composite(_hw) container_of(_hw, struct clk_composite,
+>> hw) +
+>> +static u8 clk_composite_get_parent(struct clk_hw *hw)
+>> +{
+>> +     struct clk_composite *composite = to_clk_composite(hw);
+>> +     const struct clk_ops *mux_ops = composite->mux_ops;
+>> +     struct clk_hw *mux_hw = composite->mux_hw;
+>> +
+>> +     mux_hw->clk = hw->clk;
+> Why is this needed? Looks like this filed is already being initialized in
+> clk_register_composite.
 
-Actually, I can't understand why there is HDMI_VER_EXYNOS5250 because it
-is not used anywhere in your patch. I'm not sure I missed something from
-your v2 patch thread, but to me, just hdmi version or hdmi ip version
-can be used as data field of struct of_device_id as like your v2 patch
-set. and then of_match_device() can be used without | in data field.
+Some ops will get called during clk_init where this clk is not populated 
+hence doing here. I have done it for all ops to make sure that any 
+future change in clock framework don't break this clock.
+Now, why duplicate it in clk_register_composite? It is possible that 
+none of these ops get called in clk_init.
+For example, recalc_rate is called during init and this ops is supported 
+by div clock type, but what if div clock is not added.
 
-If I have missed some point from v2 thread, please let me know.
+I hope this explains the need.
 
-Best Regards,
-- Seung-Woo Kim
-
-> 
-> In that case, it eliminates the benefit of using device tree to
-> determine the compatible bits. I hope I'm just being thick and missing
-> something.
-> 
-> Sean
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
-> 
-
--- 
-Seung-Woo Kim
-Samsung Software R&D Center
---
+>> +
+>> +     return mux_ops->get_parent(mux_hw);
+>> +}
+>> +
+>> +static int clk_composite_set_parent(struct clk_hw *hw, u8 index)
+>> +{
+>> +     struct clk_composite *composite = to_clk_composite(hw);
+>> +     const struct clk_ops *mux_ops = composite->mux_ops;
+>> +     struct clk_hw *mux_hw = composite->mux_hw;
+>> +
+>> +     mux_hw->clk = hw->clk;
+> Ditto.
+>
+>> +
+>> +     return mux_ops->set_parent(mux_hw, index);
+>> +}
+>> +
+>> +static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
+>> +                                         unsigned long parent_rate)
+>> +{
+>> +     struct clk_composite *composite = to_clk_composite(hw);
+>> +     const struct clk_ops *div_ops = composite->div_ops;
+>> +     struct clk_hw *div_hw = composite->div_hw;
+>> +
+>> +     div_hw->clk = hw->clk;
+> Ditto.
+>
+>> +
+>> +     return div_ops->recalc_rate(div_hw, parent_rate);
+>> +}
+>> +
+>> +static long clk_composite_round_rate(struct clk_hw *hw, unsigned long
+>> rate, +                                 unsigned long *prate)
+>> +{
+>> +     struct clk_composite *composite = to_clk_composite(hw);
+>> +     const struct clk_ops *div_ops = composite->div_ops;
+>> +     struct clk_hw *div_hw = composite->div_hw;
+>> +
+>> +     div_hw->clk = hw->clk;
+> Ditto.
+>
+>> +
+>> +     return div_ops->round_rate(div_hw, rate, prate);
+>> +}
+>> +
+>> +static int clk_composite_set_rate(struct clk_hw *hw, unsigned long
+>> rate, +                              unsigned long parent_rate)
+>> +{
+>> +     struct clk_composite *composite = to_clk_composite(hw);
+>> +     const struct clk_ops *div_ops = composite->div_ops;
+>> +     struct clk_hw *div_hw = composite->div_hw;
+>> +
+>> +     div_hw->clk = hw->clk;
+> Ditto.
+>
+>> +
+>> +     return div_ops->set_rate(div_hw, rate, parent_rate);
+>> +}
+>> +
+>> +static int clk_composite_is_enabled(struct clk_hw *hw)
+>> +{
+>> +     struct clk_composite *composite = to_clk_composite(hw);
+>> +     const struct clk_ops *gate_ops = composite->gate_ops;
+>> +     struct clk_hw *gate_hw = composite->gate_hw;
+>> +
+>> +     gate_hw->clk = hw->clk;
+> Ditto.
+>
+>> +
+>> +     return gate_ops->is_enabled(gate_hw);
+>> +}
+>> +
+>> +static int clk_composite_enable(struct clk_hw *hw)
+>> +{
+>> +     struct clk_composite *composite = to_clk_composite(hw);
+>> +     const struct clk_ops *gate_ops = composite->gate_ops;
+>> +     struct clk_hw *gate_hw = composite->gate_hw;
+>> +
+>> +     gate_hw->clk = hw->clk;
+> Ditto.
+>
+>> +
+>> +     return gate_ops->enable(gate_hw);
+>> +}
+>> +
+>> +static void clk_composite_disable(struct clk_hw *hw)
+>> +{
+>> +     struct clk_composite *composite = to_clk_composite(hw);
+>> +     const struct clk_ops *gate_ops = composite->gate_ops;
+>> +     struct clk_hw *gate_hw = composite->gate_hw;
+>> +
+>> +     gate_hw->clk = hw->clk;
+> Ditto.
+>
+>> +
+>> +     gate_ops->disable(gate_hw);
+>> +}
+>> +
+>> +struct clk *clk_register_composite(struct device *dev, const char
+>> *name, +                      const char **parent_names, int num_parents,
+>> +                     struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+>> +                     struct clk_hw *div_hw, const struct clk_ops *div_ops,
+>> +                     struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+>> +                     unsigned long flags)
+>> +{
+>> +     struct clk *clk;
+>> +     struct clk_init_data init;
+>> +     struct clk_composite *composite;
+>> +     struct clk_ops *clk_composite_ops;
+>> +
+>> +     composite = kzalloc(sizeof(*composite), GFP_KERNEL);
+>> +     if (!composite) {
+>> +             pr_err("%s: could not allocate composite clk\n", __func__);
+>> +             return ERR_PTR(-ENOMEM);
+>> +     }
+>> +
+>> +     init.name = name;
+>> +     init.flags = flags | CLK_IS_BASIC;
+>> +     init.parent_names = parent_names;
+>> +     init.num_parents = num_parents;
+>> +
+>> +     /* allocate the clock ops */
+>> +     clk_composite_ops = kzalloc(sizeof(*clk_composite_ops), GFP_KERNEL);
+>> +     if (!clk_composite_ops) {
+>> +             pr_err("%s: could not allocate clk ops\n", __func__);
+>> +             kfree(composite);
+>> +             return ERR_PTR(-ENOMEM);
+>> +     }
+> Maybe it would be better to embed this struct clk_ops inside struct
+> clk_composite? This would allow to get rid of this allocation.
+>
+>> +
+>> +     if (mux_hw && mux_ops) {
+>> +             if (!mux_ops->get_parent || !mux_ops->set_parent) {
+>> +                     clk = ERR_PTR(-EINVAL);
+>> +                     goto err;
+>> +             }
+>> +
+>> +             composite->mux_hw = mux_hw;
+>> +             composite->mux_ops = mux_ops;
+>> +             clk_composite_ops->get_parent = clk_composite_get_parent;
+>> +             clk_composite_ops->set_parent = clk_composite_set_parent;
+>> +     }
+>> +
+>> +     if (div_hw && div_ops) {
+>> +             if (!div_ops->recalc_rate || !div_ops->round_rate ||
+>> +                 !div_ops->set_rate) {
+>> +                     clk = ERR_PTR(-EINVAL);
+>> +                     goto err;
+>> +             }
+>> +
+>> +             composite->div_hw = div_hw;
+>> +             composite->div_ops = div_ops;
+>> +             clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+>> +             clk_composite_ops->round_rate = clk_composite_round_rate;
+>> +             clk_composite_ops->set_rate = clk_composite_set_rate;
+>> +     }
+>> +
+>> +     if (gate_hw && gate_ops) {
+>> +             if (!gate_ops->is_enabled || !gate_ops->enable ||
+>> +                 !gate_ops->disable) {
+>> +                     clk = ERR_PTR(-EINVAL);
+>> +                     goto err;
+>> +             }
+>> +
+>> +             composite->gate_hw = gate_hw;
+>> +             composite->gate_ops = gate_ops;
+>> +             clk_composite_ops->is_enabled = clk_composite_is_enabled;
+>> +             clk_composite_ops->enable = clk_composite_enable;
+>> +             clk_composite_ops->disable = clk_composite_disable;
+>> +     }
+>> +
+>> +     init.ops = clk_composite_ops;
+>> +     composite->hw.init = &init;
+>> +
+>> +     clk = clk_register(dev, &composite->hw);
+>> +     if (IS_ERR(clk))
+>> +             goto err;
+>> +
+>> +     if (composite->mux_hw)
+>> +             composite->mux_hw->clk = clk;
+>> +
+>> +     if (composite->div_hw)
+>> +             composite->div_hw->clk = clk;
+>> +
+>> +     if (composite->gate_hw)
+>> +             composite->gate_hw->clk = clk;
+>> +
+>> +     return clk;
+>> +
+>> +err:
+>> +     kfree(clk_composite_ops);
+>> +     kfree(composite);
+>> +     return clk;
+>> +}
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index 7f197d7..f1a36aa 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+>> @@ -325,6 +325,36 @@ struct clk *clk_register_fixed_factor(struct device
+>> *dev, const char *name, const char *parent_name, unsigned long flags,
+>>                unsigned int mult, unsigned int div);
+>>
+>> +/***
+>> + * struct clk_composite - aggregate clock of mux, divider and gate
+>> clocks + *
+>> + * @hw:              handle between common and hardware-specific interfaces
+>> + * @mux_hw:  handle between composite and hardware-specifix mux clock
+>> + * @div_hw:  handle between composite and hardware-specifix divider
+>> clock + * @gate_hw:   handle between composite and hardware-specifix gate
+>> clock + * @mux_ops:   clock ops for mux
+>> + * @div_ops: clock ops for divider
+>> + * @gate_ops:        clock ops for gate
+>> + */
+>> +struct clk_composite {
+>> +     struct clk_hw   hw;
+> As I suggested above:
+>
+>          struct clk_ops  ops;
+>
+>> +
+>> +     struct clk_hw   *mux_hw;
+>> +     struct clk_hw   *div_hw;
+>> +     struct clk_hw   *gate_hw;
+>> +
+>> +     const struct clk_ops    *mux_ops;
+>> +     const struct clk_ops    *div_ops;
+>> +     const struct clk_ops    *gate_ops;
+>> +};
+>> +
+>> +struct clk *clk_register_composite(struct device *dev, const char
+>> *name, +              const char **parent_names, int num_parents,
+>> +             struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+>> +             struct clk_hw *div_hw, const struct clk_ops *div_ops,
+>> +             struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+>> +             unsigned long flags);
+>> +
+>>   /**
+>>    * clk_register - allocate a new clock, register it and return an
+>> opaque cookie * @dev: device that is registering this clock
+> Best regards,
+> --
+> Tomasz Figa
+> Samsung Poland R&D Center
+> SW Solution Development, Linux Platform
+>
