@@ -1,354 +1,237 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Wed, 6 Feb 2013 08:34:32 +0530
-Subject: [PATCH V2] clk: Add composite clock type
-In-Reply-To: <2204463.8bhhYZbxqK@amdc1227>
-References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
- <2204463.8bhhYZbxqK@amdc1227>
-Message-ID: <5111C840.3000003@nvidia.com>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Tue, 5 Feb 2013 21:04:36 -0600
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <1359703995.23531.6.camel@shinybook.infradead.org>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129083522.GA14302@pd.tnic>
+ <1359478014.3529.157.camel@shinybook.infradead.org>
+ <20130129174249.GB25415@pd.tnic>
+ <1359482147.3529.161.camel@shinybook.infradead.org>
+ <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <20130201011712.GF23505@n2100.arm.linux.org.uk>
+ <1359703995.23531.6.camel@shinybook.infradead.org>
+Message-ID: <20130205210436.670c62e26d2121330e87af35@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 February 2013 03:45 PM, Tomasz Figa wrote:
-> Hi Prashant,
->
-> Thank you for your patch. Please see some comments inline.
->
-> On Monday 04 of February 2013 13:41:22 Prashant Gaikwad wrote:
->> Not all clocks are required to be decomposed into basic clock
->> types but at the same time want to use the functionality
->> provided by these basic clock types instead of duplicating.
->>
->> For example, Tegra SoC has ~100 clocks which can be decomposed
->> into Mux -> Div -> Gate clock types making the clock count to
->> ~300. Also, parent change operation can not be performed on gate
->> clock which forces to use mux clock in driver if want to change
->> the parent.
->>
->> Instead aggregate the basic clock types functionality into one
->> clock and just use this clock for all operations. This clock
->> type re-uses the functionality of basic clock types and not
->> limited to basic clock types but any hardware-specific
->> implementation.
->>
->> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
->> ---
->>
->> Changes from V1:
->> - 2nd patch dropped as the concept is acked by Mike.
->> - Fixed comments from Stephen.
->>
->> ---
->>   drivers/clk/Makefile         |    1 +
->>   drivers/clk/clk-composite.c  |  208
->> ++++++++++++++++++++++++++++++++++++++++++ include/linux/clk-provider.h
->> |   30 ++++++
->>   3 files changed, 239 insertions(+), 0 deletions(-)
->>   create mode 100644 drivers/clk/clk-composite.c
->>
->> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
->> index ce77077..2287848 100644
->> --- a/drivers/clk/Makefile
->> +++ b/drivers/clk/Makefile
->> @@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK)      += clk-fixed-factor.o
->>   obj-$(CONFIG_COMMON_CLK)     += clk-fixed-rate.o
->>   obj-$(CONFIG_COMMON_CLK)     += clk-gate.o
->>   obj-$(CONFIG_COMMON_CLK)     += clk-mux.o
->> +obj-$(CONFIG_COMMON_CLK)     += clk-composite.o
->>
->>   # SoCs specific
->>   obj-$(CONFIG_ARCH_BCM2835)   += clk-bcm2835.o
->> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
->> new file mode 100644
->> index 0000000..5a6587f
->> --- /dev/null
->> +++ b/drivers/clk/clk-composite.c
->> @@ -0,0 +1,208 @@
->> +/*
->> + * Copyright (c) 2013 NVIDIA CORPORATION.  All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> it + * under the terms and conditions of the GNU General Public
->> License, + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but
->> WITHOUT + * ANY WARRANTY; without even the implied warranty of
->> MERCHANTABILITY or + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> General Public License for + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see
->> <http://www.gnu.org/licenses/>. + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/err.h>
->> +#include <linux/slab.h>
->> +
->> +#define to_clk_composite(_hw) container_of(_hw, struct clk_composite,
->> hw) +
->> +static u8 clk_composite_get_parent(struct clk_hw *hw)
->> +{
->> +     struct clk_composite *composite = to_clk_composite(hw);
->> +     const struct clk_ops *mux_ops = composite->mux_ops;
->> +     struct clk_hw *mux_hw = composite->mux_hw;
->> +
->> +     mux_hw->clk = hw->clk;
-> Why is this needed? Looks like this filed is already being initialized in
-> clk_register_composite.
+On Fri, 1 Feb 2013 07:33:17 +0000
+"Woodhouse, David" <david.woodhouse@intel.com> wrote:
 
-Some ops will get called during clk_init where this clk is not populated 
-hence doing here. I have done it for all ops to make sure that any 
-future change in clock framework don't break this clock.
-Now, why duplicate it in clk_register_composite? It is possible that 
-none of these ops get called in clk_init.
-For example, recalc_rate is called during init and this ops is supported 
-by div clock type, but what if div clock is not added.
+> On Fri, 2013-02-01 at 01:17 +0000, Russell King - ARM Linux wrote:
+> > 
+> > > I've tried both gcc 4.6.3 [1] and 4.6.4 [2].  If you can point me to
+> > > a 4.5.x, I'll try that, too, but as it stands now, if one moves the
+> > > code added to swab.h below outside of its armv6 protection,
+> > > gcc adds calls to __bswapsi2.
+> > 
+> > Take a look at the message I sent on the 29th towards the beginning of
+> > this thread for details of gcc 4.5.4 behaviour.
+> 
+> I'd like to see a comment (with PR# if appropriate) explaining clearly
+> *why* it isn't enabled for <ARMv6 even with a bleeding-edge compiler.
 
-I hope this explains the need.
+ok I think I've figured it out: the difference in the defconfigs that
+fail (at91_dt, at91sam9g45, and lpc32xx) is that they are ARM9's
+(armv4/5), have CC_OPTIMIZE_FOR_SIZE set, and have code with
+multiple swaps ready for space optimization: gcc -Os emits calls
+to __bswapsi2 on those platforms to save space because they don't
+have the single rev byte swap instruction.
 
->> +
->> +     return mux_ops->get_parent(mux_hw);
->> +}
->> +
->> +static int clk_composite_set_parent(struct clk_hw *hw, u8 index)
->> +{
->> +     struct clk_composite *composite = to_clk_composite(hw);
->> +     const struct clk_ops *mux_ops = composite->mux_ops;
->> +     struct clk_hw *mux_hw = composite->mux_hw;
->> +
->> +     mux_hw->clk = hw->clk;
-> Ditto.
->
->> +
->> +     return mux_ops->set_parent(mux_hw, index);
->> +}
->> +
->> +static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
->> +                                         unsigned long parent_rate)
->> +{
->> +     struct clk_composite *composite = to_clk_composite(hw);
->> +     const struct clk_ops *div_ops = composite->div_ops;
->> +     struct clk_hw *div_hw = composite->div_hw;
->> +
->> +     div_hw->clk = hw->clk;
-> Ditto.
->
->> +
->> +     return div_ops->recalc_rate(div_hw, parent_rate);
->> +}
->> +
->> +static long clk_composite_round_rate(struct clk_hw *hw, unsigned long
->> rate, +                                 unsigned long *prate)
->> +{
->> +     struct clk_composite *composite = to_clk_composite(hw);
->> +     const struct clk_ops *div_ops = composite->div_ops;
->> +     struct clk_hw *div_hw = composite->div_hw;
->> +
->> +     div_hw->clk = hw->clk;
-> Ditto.
->
->> +
->> +     return div_ops->round_rate(div_hw, rate, prate);
->> +}
->> +
->> +static int clk_composite_set_rate(struct clk_hw *hw, unsigned long
->> rate, +                              unsigned long parent_rate)
->> +{
->> +     struct clk_composite *composite = to_clk_composite(hw);
->> +     const struct clk_ops *div_ops = composite->div_ops;
->> +     struct clk_hw *div_hw = composite->div_hw;
->> +
->> +     div_hw->clk = hw->clk;
-> Ditto.
->
->> +
->> +     return div_ops->set_rate(div_hw, rate, parent_rate);
->> +}
->> +
->> +static int clk_composite_is_enabled(struct clk_hw *hw)
->> +{
->> +     struct clk_composite *composite = to_clk_composite(hw);
->> +     const struct clk_ops *gate_ops = composite->gate_ops;
->> +     struct clk_hw *gate_hw = composite->gate_hw;
->> +
->> +     gate_hw->clk = hw->clk;
-> Ditto.
->
->> +
->> +     return gate_ops->is_enabled(gate_hw);
->> +}
->> +
->> +static int clk_composite_enable(struct clk_hw *hw)
->> +{
->> +     struct clk_composite *composite = to_clk_composite(hw);
->> +     const struct clk_ops *gate_ops = composite->gate_ops;
->> +     struct clk_hw *gate_hw = composite->gate_hw;
->> +
->> +     gate_hw->clk = hw->clk;
-> Ditto.
->
->> +
->> +     return gate_ops->enable(gate_hw);
->> +}
->> +
->> +static void clk_composite_disable(struct clk_hw *hw)
->> +{
->> +     struct clk_composite *composite = to_clk_composite(hw);
->> +     const struct clk_ops *gate_ops = composite->gate_ops;
->> +     struct clk_hw *gate_hw = composite->gate_hw;
->> +
->> +     gate_hw->clk = hw->clk;
-> Ditto.
->
->> +
->> +     gate_ops->disable(gate_hw);
->> +}
->> +
->> +struct clk *clk_register_composite(struct device *dev, const char
->> *name, +                      const char **parent_names, int num_parents,
->> +                     struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
->> +                     struct clk_hw *div_hw, const struct clk_ops *div_ops,
->> +                     struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
->> +                     unsigned long flags)
->> +{
->> +     struct clk *clk;
->> +     struct clk_init_data init;
->> +     struct clk_composite *composite;
->> +     struct clk_ops *clk_composite_ops;
->> +
->> +     composite = kzalloc(sizeof(*composite), GFP_KERNEL);
->> +     if (!composite) {
->> +             pr_err("%s: could not allocate composite clk\n", __func__);
->> +             return ERR_PTR(-ENOMEM);
->> +     }
->> +
->> +     init.name = name;
->> +     init.flags = flags | CLK_IS_BASIC;
->> +     init.parent_names = parent_names;
->> +     init.num_parents = num_parents;
->> +
->> +     /* allocate the clock ops */
->> +     clk_composite_ops = kzalloc(sizeof(*clk_composite_ops), GFP_KERNEL);
->> +     if (!clk_composite_ops) {
->> +             pr_err("%s: could not allocate clk ops\n", __func__);
->> +             kfree(composite);
->> +             return ERR_PTR(-ENOMEM);
->> +     }
-> Maybe it would be better to embed this struct clk_ops inside struct
-> clk_composite? This would allow to get rid of this allocation.
->
->> +
->> +     if (mux_hw && mux_ops) {
->> +             if (!mux_ops->get_parent || !mux_ops->set_parent) {
->> +                     clk = ERR_PTR(-EINVAL);
->> +                     goto err;
->> +             }
->> +
->> +             composite->mux_hw = mux_hw;
->> +             composite->mux_ops = mux_ops;
->> +             clk_composite_ops->get_parent = clk_composite_get_parent;
->> +             clk_composite_ops->set_parent = clk_composite_set_parent;
->> +     }
->> +
->> +     if (div_hw && div_ops) {
->> +             if (!div_ops->recalc_rate || !div_ops->round_rate ||
->> +                 !div_ops->set_rate) {
->> +                     clk = ERR_PTR(-EINVAL);
->> +                     goto err;
->> +             }
->> +
->> +             composite->div_hw = div_hw;
->> +             composite->div_ops = div_ops;
->> +             clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
->> +             clk_composite_ops->round_rate = clk_composite_round_rate;
->> +             clk_composite_ops->set_rate = clk_composite_set_rate;
->> +     }
->> +
->> +     if (gate_hw && gate_ops) {
->> +             if (!gate_ops->is_enabled || !gate_ops->enable ||
->> +                 !gate_ops->disable) {
->> +                     clk = ERR_PTR(-EINVAL);
->> +                     goto err;
->> +             }
->> +
->> +             composite->gate_hw = gate_hw;
->> +             composite->gate_ops = gate_ops;
->> +             clk_composite_ops->is_enabled = clk_composite_is_enabled;
->> +             clk_composite_ops->enable = clk_composite_enable;
->> +             clk_composite_ops->disable = clk_composite_disable;
->> +     }
->> +
->> +     init.ops = clk_composite_ops;
->> +     composite->hw.init = &init;
->> +
->> +     clk = clk_register(dev, &composite->hw);
->> +     if (IS_ERR(clk))
->> +             goto err;
->> +
->> +     if (composite->mux_hw)
->> +             composite->mux_hw->clk = clk;
->> +
->> +     if (composite->div_hw)
->> +             composite->div_hw->clk = clk;
->> +
->> +     if (composite->gate_hw)
->> +             composite->gate_hw->clk = clk;
->> +
->> +     return clk;
->> +
->> +err:
->> +     kfree(clk_composite_ops);
->> +     kfree(composite);
->> +     return clk;
->> +}
->> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->> index 7f197d7..f1a36aa 100644
->> --- a/include/linux/clk-provider.h
->> +++ b/include/linux/clk-provider.h
->> @@ -325,6 +325,36 @@ struct clk *clk_register_fixed_factor(struct device
->> *dev, const char *name, const char *parent_name, unsigned long flags,
->>                unsigned int mult, unsigned int div);
->>
->> +/***
->> + * struct clk_composite - aggregate clock of mux, divider and gate
->> clocks + *
->> + * @hw:              handle between common and hardware-specific interfaces
->> + * @mux_hw:  handle between composite and hardware-specifix mux clock
->> + * @div_hw:  handle between composite and hardware-specifix divider
->> clock + * @gate_hw:   handle between composite and hardware-specifix gate
->> clock + * @mux_ops:   clock ops for mux
->> + * @div_ops: clock ops for divider
->> + * @gate_ops:        clock ops for gate
->> + */
->> +struct clk_composite {
->> +     struct clk_hw   hw;
-> As I suggested above:
->
->          struct clk_ops  ops;
->
->> +
->> +     struct clk_hw   *mux_hw;
->> +     struct clk_hw   *div_hw;
->> +     struct clk_hw   *gate_hw;
->> +
->> +     const struct clk_ops    *mux_ops;
->> +     const struct clk_ops    *div_ops;
->> +     const struct clk_ops    *gate_ops;
->> +};
->> +
->> +struct clk *clk_register_composite(struct device *dev, const char
->> *name, +              const char **parent_names, int num_parents,
->> +             struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
->> +             struct clk_hw *div_hw, const struct clk_ops *div_ops,
->> +             struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
->> +             unsigned long flags);
->> +
->>   /**
->>    * clk_register - allocate a new clock, register it and return an
->> opaque cookie * @dev: device that is registering this clock
-> Best regards,
-> --
-> Tomasz Figa
-> Samsung Poland R&D Center
-> SW Solution Development, Linux Platform
->
+> Russell's test also seemed to indicate that the 32-bit and 64-bit swap
+> support was present and functional in GCC 4.5.4 (as indeed it should
+> have been since 4.4), so I'm still not quite sure why you require 4.6
+> for that.
+
+initially it was based at looking at gcc commit history for the
+'rev' instruction implementation, but now I've got 4.4, 4.5, 4.6 and
+4.7 compilers to perform Russell's test:
+
+$ for cc in 4.4 4.5 4.6 4.7; do \
+    arm-linux-gnueabi-gcc-$cc --version | grep gcc ; \
+    for a in armv3 armv4 armv4t armv5t armv5te armv6k armv6 armv7-a; do \
+      echo -n $a:; \
+      for f in 16 32 64; do \
+         echo 'unsigned foo(unsigned val) { return __builtin_bswap'$f'(val); }' | arm-linux-gnueabi-gcc-$cc -w -x c -S -o - - -march=$a | grep 'bl'; \
+      done; \
+    done; \
+done
+
+whose output is:
+
+arm-linux-gnueabi-gcc-4.4 (Ubuntu/Linaro 4.4.7-1ubuntu2) 4.4.7
+armv3:   	bl	__builtin_bswap16
+	bl	__bswapsi2
+	bl	__bswapdi2
+armv4:   	bl	__builtin_bswap16
+	bl	__bswapsi2
+	bl	__bswapdi2
+armv4t:   	bl	__builtin_bswap16
+	bl	__bswapsi2
+	bl	__bswapdi2
+armv5t:   	bl	__builtin_bswap16
+	bl	__bswapsi2
+	bl	__bswapdi2
+armv5te:   	bl	__builtin_bswap16
+	bl	__bswapsi2
+	bl	__bswapdi2
+armv6k:   	bl	__builtin_bswap16
+	bl	__bswapsi2
+	bl	__bswapdi2
+armv6:   	bl	__builtin_bswap16
+	bl	__bswapsi2
+	bl	__bswapdi2
+armv7-a:   	bl	__builtin_bswap16
+	bl	__bswapsi2
+	bl	__bswapdi2
+arm-linux-gnueabi-gcc-4.5 (Ubuntu/Linaro 4.5.3-12ubuntu2) 4.5.3
+armv3:   	bl	__builtin_bswap16
+armv4:   	bl	__builtin_bswap16
+armv4t:   	bl	__builtin_bswap16
+armv5t:   	bl	__builtin_bswap16
+armv5te:   	bl	__builtin_bswap16
+armv6k:   	bl	__builtin_bswap16
+armv6:   	bl	__builtin_bswap16
+armv7-a:   	bl	__builtin_bswap16
+arm-linux-gnueabi-gcc-4.6 (Ubuntu/Linaro 4.6.3-8ubuntu1) 4.6.3 20120624 (prerelease)
+armv3:   	bl	__builtin_bswap16
+armv4:   	bl	__builtin_bswap16
+armv4t:   	bl	__builtin_bswap16
+armv5t:   	bl	__builtin_bswap16
+armv5te:   	bl	__builtin_bswap16
+armv6k:   	bl	__builtin_bswap16
+armv6:   	bl	__builtin_bswap16
+armv7-a:   	bl	__builtin_bswap16
+arm-linux-gnueabi-gcc-4.7 (Ubuntu/Linaro 4.7.2-1ubuntu1) 4.7.2
+armv3:   	bl	__builtin_bswap16
+armv4:   	bl	__builtin_bswap16
+armv4t:   	bl	__builtin_bswap16
+armv5t:   	bl	__builtin_bswap16
+armv5te:   	bl	__builtin_bswap16
+armv6k:   	bl	__builtin_bswap16
+armv6:   	bl	__builtin_bswap16
+armv7-a:   	bl	__builtin_bswap16
+
+So 4.4 should be exempt from using the built-ins because it always
+emits __bswapsi2 calls: it doesn't matter whether or not -Os or -O2
+are added as options in the test.
+
+gcc 4.5, 4.6, and 4.7 all support 32 & 64-bit versions, so we
+should check for gcc >= 4.5 instead of gcc >= 4.6.
+
+I've added a new check for !CC_OPTIMIZE_FOR_SIZE and build-tested all
+defconfigs with gcc 4.6.3 - here's v5:
+
+>From 11aa942a84fe94d204424a19b6b13fdb2b359ee6 Mon Sep 17 00:00:00 2001
+From: Kim Phillips <kim.phillips@freescale.com>
+Date: Mon, 28 Jan 2013 19:30:33 -0600
+Subject: [PATCH] arm: use built-in byte swap function
+
+Enable the compiler intrinsic for byte swapping on arch ARM.  This
+allows the compiler to detect and be able to optimize out byte
+swappings.
+
+__builtin_bswap{32,64} support was added in gcc 4.4, but until
+gcc 4.5, it emitted calls to libgcc's __bswap[sd]i2 (even
+with -O2).
+
+All gcc versions tested (4.[4567]) emit calls to __bswap[sd]i2 when
+optimizing for size, so we add the !CC_OPTIMIZE_FOR_SIZE check.
+
+Support for 16-bit built-ins will be in gcc version 4.8.
+
+This has a tiny benefit on vmlinux text size (gcc 4.6.4):
+
+multi_v7_defconfig:
+   text    data     bss     dec     hex filename
+3135208  188396  203344 3526948  35d124 vmlinux
+multi_v7_defconfig with builtin_bswap:
+   text    data     bss     dec     hex filename
+3135112  188396  203344 3526852  35d0c4 vmlinux
+
+exynos_defconfig:
+   text    data     bss     dec     hex filename
+4286605  360564  223172 4870341  4a50c5 vmlinux
+exynos_defconfig with builtin_bswap:
+   text    data     bss     dec     hex filename
+4286405  360564  223172 4870141  4a4ffd vmlinux
+
+The savings come mostly from device-tree related code, and some
+from drivers.
+
+Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
+---
+akin to: http://comments.gmane.org/gmane.linux.kernel.cross-arch/16016
+
+based on linux-next-20130128.  Depends on commit "compiler-gcc{3,4}.h:
+Use GCC_VERSION macro" by Daniel Santos <daniel.santos@pobox.com>,
+currently in the akpm branch.
+
+v5: re-work based on new gcc version test data:
+  - moved outside armv6 protection
+  - check for gcc 4.6+ demoted to gcc 4.5+ with:
+    !defined(CONFIG_CC_OPTIMIZE_FOR_SIZE)
+
+v4:
+- undo v2-2's addition of ARCH_DEFINES_BUILTIN_BSWAP per Boris
+  and David - object is to find arches that define _HAVE_BSWAP
+  and clean it up in the future: patch is much less intrusive. :)
+
+v3:
+- moved out of uapi swab.h into arch/arm/include/asm/swab.h
+- moved ARCH_DEFINES_BUILTIN_BSWAP help text into commit message
+- moved GCC_VERSION >= 40800 ifdef into GCC_VERSION >= 40600 block
+
+v2:
+- at91 and lpd270 builds fixed by limiting to ARMv6 and above
+  (i.e., ARM cores that have support for the 'rev' instruction).
+  Otherwise, the compiler emits calls to libgcc's __bswapsi2 on
+  these ARMv4/v5 builds (and arch ARM doesn't link with libgcc).
+  All ARM defconfigs now have the same build status as they did
+  without this patch (some are broken on linux-next).
+
+- move ARM check from generic compiler.h to arch ARM's swab.h.
+  - pretty sure it should be limited to __KERNEL__ builds
+
+- add new ARCH_DEFINES_BUILTIN_BSWAP (see Kconfig help).
+  - if set, generic compiler header does not set HAVE_BUILTIN_BSWAPxx
+  - not too sure about this having to be a new CONFIG_, but it's hard
+    to find a place for it given linux/compiler.h doesn't include any
+    arch-specific files.
+
+- move new selects to end of CONFIG_ARM's Kconfig select list,
+  as is done in David Woodhouse's original patchseries for ppc/x86.
+
+ arch/arm/include/asm/swab.h |    9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/include/asm/swab.h b/arch/arm/include/asm/swab.h
+index 537fc9b..159ab16 100644
+--- a/arch/arm/include/asm/swab.h
++++ b/arch/arm/include/asm/swab.h
+@@ -35,4 +35,13 @@ static inline __attribute_const__ __u32 __arch_swab32(__u32 x)
+ #define __arch_swab32 __arch_swab32
+ 
+ #endif
++
++#if !defined(CONFIG_CC_OPTIMIZE_FOR_SIZE) && GCC_VERSION >= 40500
++#define __HAVE_BUILTIN_BSWAP32__
++#define __HAVE_BUILTIN_BSWAP64__
++#if GCC_VERSION >= 40800
++#define __HAVE_BUILTIN_BSWAP16__
++#endif
++#endif
++
+ #endif
+-- 
+1.7.9.7
+
+Thanks,
+
+Kim
+
+[1] http://gcc.gnu.org/bugzilla/show_bug.cgi?id=44392
+[2] http://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html#Other-Builtins
