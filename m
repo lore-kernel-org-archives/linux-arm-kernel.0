@@ -1,26 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Feb 2013 22:51:50 +0000
+From: nerv@dawncrow.de (=?ISO-8859-1?Q?Andr=E9_Hentschel?=)
+Date: Thu, 07 Feb 2013 00:01:23 +0100
 Subject: [PATCH] arm: Preserve TPIDRURW on context switch
-In-Reply-To: <5112DC7E.4020108@dawncrow.de>
+In-Reply-To: <20130206225150.GL17833@n2100.arm.linux.org.uk>
 References: <5112DC7E.4020108@dawncrow.de>
-Message-ID: <20130206225150.GL17833@n2100.arm.linux.org.uk>
+ <20130206225150.GL17833@n2100.arm.linux.org.uk>
+Message-ID: <5112E0C3.1080706@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 11:43:10PM +0100, Andr? Hentschel wrote:
-> There are more and more applications coming to WinRT, Wine could support them,
-> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
-> This register must be preserved per thread instead of being cleared.
+Am 06.02.2013 23:51, schrieb Russell King - ARM Linux:
+> On Wed, Feb 06, 2013 at 11:43:10PM +0100, Andr? Hentschel wrote:
+>> There are more and more applications coming to WinRT, Wine could support them,
+>> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
+>> This register must be preserved per thread instead of being cleared.
+> 
+> I'd prefer this was done a little more sensitively to those CPUs where
+> loads/stores are expensive, namely:
+> 
+>> +
+>> +	@ preserve TPIDRURW register state
+>> +	get_tls2	r3, r4, r5
+>> +	str	r3, [r1, #TI_TP2_VALUE]
+>> +	ldr	r3, [r2, #TI_TP2_VALUE]
+>> +	set_tls2	r3, r4, r5
+> 
+> those two loads/stores get omitted from the thread switching if the CPU
+> doesn't support it.  Do you think that's something you could do?
 
-I'd prefer this was done a little more sensitively to those CPUs where
-loads/stores are expensive, namely:
+No, i'm not sure how to improve this. How does the process can continue, can you or someone else fix that and add his Signed-off-by?
 
-> +
-> +	@ preserve TPIDRURW register state
-> +	get_tls2	r3, r4, r5
-> +	str	r3, [r1, #TI_TP2_VALUE]
-> +	ldr	r3, [r2, #TI_TP2_VALUE]
-> +	set_tls2	r3, r4, r5
 
-those two loads/stores get omitted from the thread switching if the CPU
-doesn't support it.  Do you think that's something you could do?
+-- 
+
+Best Regards, Andr? Hentschel
