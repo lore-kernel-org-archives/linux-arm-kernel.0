@@ -1,47 +1,22 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed,  6 Feb 2013 19:47:15 +0800
-Subject: [PATCH 2/2] tty: serial: use module_init on pl011_init
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Feb 2013 11:52:19 +0000
+Subject: [PATCH 1/2] tty: serial: remove __init on pl011 console ops
 In-Reply-To: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1360151235-11980-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130206115219.GE17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If amba serial driver is probed defer, amba serial driver may be
-probed after init process. So the error log shows in below.
+On Wed, Feb 06, 2013 at 07:47:14PM +0800, Haojian Zhuang wrote:
+> If uart driver is probed defer, console_setup will be called later
+> after __init && __initdata sections destroyed. And amba_console isn't
+> defined in __init or __initdata section. So we needn't define
+> pl011_console_setup() && pl011_console_get_options() in __init section.
 
-[    0.389403] Warning: unable to open an initial console.
-[    0.390107] Freeing init memory: 2328K
+It sounds like there's a deeper problem here - if this driver being
+deferred, why isn't it being retried after the pinctrl stuff gets
+its driver registered?
 
-It results in serial console not enabled. So replace arch_initcall
-by module_init on pl011_init(). The boot sequence is changed in below.
-
-  pinctrl driver --> amba serial driver --> init process
-
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-Cc: Alan Cox <alan@linux.intel.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-serial at vger.kernel.org
----
- drivers/tty/serial/amba-pl011.c |    6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index d43d530..8b7dacb 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2129,11 +2129,7 @@ static void __exit pl011_exit(void)
- 	uart_unregister_driver(&amba_reg);
- }
- 
--/*
-- * While this can be a module, if builtin it's most likely the console
-- * So let's leave module_exit but move module_init to an earlier place
-- */
--arch_initcall(pl011_init);
-+module_init(pl011_init);
- module_exit(pl011_exit);
- 
- MODULE_AUTHOR("ARM Ltd/Deep Blue Solutions Ltd");
--- 
-1.7.10.4
+We've had bugs in this deferred probing before, I wouldn't be surprised
+if there's more... and we should not be "fixing" drivers because of bugs
+elsewhere.
