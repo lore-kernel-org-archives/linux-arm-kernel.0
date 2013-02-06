@@ -1,49 +1,44 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 6 Feb 2013 18:58:49 +0530
-Subject: [PATCH v2 3/5] ARM: OMAP2: MUSB: Specify omap4 has mailbox
-In-Reply-To: <1360157331-9048-1-git-send-email-kishon@ti.com>
-References: <1360157331-9048-1-git-send-email-kishon@ti.com>
-Message-ID: <1360157331-9048-4-git-send-email-kishon@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 6 Feb 2013 14:30:36 +0100
+Subject: [PATCH 0/2] ARM: dts: omap3-overo: Add pwm-leds and audio support
+In-Reply-To: <510F7BEB.1020408@epfl.ch>
+References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
+ <5101273A.9090800@ti.com> <510F7BEB.1020408@epfl.ch>
+Message-ID: <51125AFC.10704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added has_mailbox to the musb platform data to specify that omap uses
-an external mailbox (in control module) to communicate with the musb
-core during device connect and disconnect.
+Salut Florian,
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/usb-musb.c |    3 +++
- include/linux/usb/musb.h       |    2 ++
- 2 files changed, 5 insertions(+)
+On 02/04/2013 10:14 AM, Florian Vaussard wrote:
+> Hello Benoit,
+> 
+> On 01/24/2013 01:21 PM, Benoit Cousson wrote:
+>> + Peter who did the original PWM
+>>
+>> Hi Florian,
+>>
+>> On 01/23/2013 06:56 PM, Florian Vaussard wrote:
+>>> Hello Benoit,
+>>>
+>>> This patchset adds some new DT supports to the Overo products. The
+>>> first patch converts the PMIC LEDB output to use the pwm-leds,
+>>> newly merged in your branch for_3.9/dts. The second patch adds the
+>>> audio support.
+>>
+>> Excellent, that looks very good to me, but I'd like to get the
+>> feedback from Peter before merging it.
+>>
+> 
+> So a patch is being merged to handle triggers in the case of pwm leds [1].
+> When done, we will be able to add back the default trigger. Do you want
+> to wait on it to merge this series?
 
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index 7b33b37..9d27e3f 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -85,6 +85,9 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
- 	musb_plat.mode = board_data->mode;
- 	musb_plat.extvbus = board_data->extvbus;
- 
-+	if (cpu_is_omap44xx())
-+		musb_plat.has_mailbox = true;
-+
- 	if (soc_is_am35xx()) {
- 		oh_name = "am35x_otg_hs";
- 		name = "musb-am35x";
-diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
-index eb50525..053c268 100644
---- a/include/linux/usb/musb.h
-+++ b/include/linux/usb/musb.h
-@@ -99,6 +99,8 @@ struct musb_hdrc_platform_data {
- 	/* MUSB_HOST, MUSB_PERIPHERAL, or MUSB_OTG */
- 	u8		mode;
- 
-+	u8		has_mailbox:1;
-+
- 	/* for clk_get() */
- 	const char	*clock;
- 
--- 
-1.7.10.4
+What kind of dependency do we have between these two series? I mean what
+will happen if the DTS is merged before the pwm subsystem?
+
+If that does not generate any regression / crash, then it is OK, if not,
+we should take care of the order.
+
+Thanks,
+Benoit
