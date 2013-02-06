@@ -1,31 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Feb 2013 12:22:13 +0000
-Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for
- unaligned addresses
-In-Reply-To: <20130206121523.GD26454@arm.com>
-References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
- <20130201162631.GG5151@arm.com>
- <CANOGCgOp=kSatDu8fL7grk+bXLQ2pgKAEvEK6LoG8Ba4mqUH=w@mail.gmail.com>
- <20130201163722.GH5151@arm.com>
- <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
- <20130201174246.GJ5151@arm.com> <510F3BA8.8070700@ti.com>
- <510F3CA3.7080604@ti.com> <20130206121523.GD26454@arm.com>
-Message-ID: <20130206122213.GF17833@n2100.arm.linux.org.uk>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 6 Feb 2013 20:31:34 +0800
+Subject: [PATCH 1/2] tty: serial: remove __init on pl011 console ops
+In-Reply-To: <20130206115219.GE17833@n2100.arm.linux.org.uk>
+References: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
+ <20130206115219.GE17833@n2100.arm.linux.org.uk>
+Message-ID: <CAD6h2NSpo74UXUgH2OJniW=wzkxGeshta05AGgCpn26SCUSjYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 12:15:23PM +0000, Catalin Marinas wrote:
-> The problem with the classic MMU is that if we have a 1MB range we can
-> end up with just page mappings. The code is currently buggy since if we
-> have create_mapping() for a 1MB range and later create_mapping() for a
-> 4KB in the next MB, the first 1MB is removed.
+On 6 February 2013 19:52, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Feb 06, 2013 at 07:47:14PM +0800, Haojian Zhuang wrote:
+>> If uart driver is probed defer, console_setup will be called later
+>> after __init && __initdata sections destroyed. And amba_console isn't
+>> defined in __init or __initdata section. So we needn't define
+>> pl011_console_setup() && pl011_console_get_options() in __init section.
+>
+> It sounds like there's a deeper problem here - if this driver being
+> deferred, why isn't it being retried after the pinctrl stuff gets
+> its driver registered?
+>
+> We've had bugs in this deferred probing before, I wouldn't be surprised
+> if there's more... and we should not be "fixing" drivers because of bugs
+> elsewhere.
 
-And that is where we rely on people calling create_mapping() - who
-will be the SoC porters - not to be idiotic and do that kind of thing.
-That's worked fine for the last 10+ years so there's no need to make
-the code any more complex by trying to fix something that really isn't
-a problem.
+It retried if driver is being deferred. But those console setup
+functions are released
+since they're declared in __init section.
 
-I wouldn't be surprised if we have some mappings which are created by
-4K page tables, and then one half of the page table is overwritten by
-a section mapping - so trying to fix this _may_ be risky.
+rest_init()
+   --> creates kernel_init thread that could free __init section memory
+
+deferred_probe_initicall() creates a workqueue that is used to retry
+deferred probe
+function.
+
+I think that these two threads are competing.
+
+Best Regards
+Haojian
