@@ -1,89 +1,61 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 6 Feb 2013 10:09:03 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130206175128.1b64196d@skate>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <2776630.gp5gC9tvLk@wuerfel>
- <20130131180249.GA30869@obsidianresearch.com>
- <201301312046.22560.arnd@arndb.de>
- <20130131224459.GA11846@obsidianresearch.com>
- <20130206175128.1b64196d@skate>
-Message-ID: <20130206170903.GA28198@obsidianresearch.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Feb 2013 09:11:54 -0800
+Subject: [PATCH v2 00/30] USB: omap-ehci: Move PHY management to PHY driver
+In-Reply-To: <51122730.5030801@ti.com>
+References: <1359372631-8180-1-git-send-email-rogerq@ti.com>
+ <5110ECF3.7010908@ti.com> <20130205165851.GA1081@kroah.com>
+ <20130205171743.GG25185@atomide.com> <51122730.5030801@ti.com>
+Message-ID: <20130206171153.GY25185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 05:51:28PM +0100, Thomas Petazzoni wrote:
-
-> > So you'd end up with a MMU mapping something like:
-> >   PCI_IO_VIRT_BASE    MBUS_IO_PHYS_BASE
-> >     0->4k          => 0      -> 4k             // 4k assigned to link0
-> >     4k->8k         => 64k+4k -> 64k+8k         // 4k assigned to link1
-> >     8k->24k        => 128k+8k -> 128k+24k      // 8k assigned to link2
+* Roger Quadros <rogerq@ti.com> [130206 01:53]:
+> On 02/05/2013 07:17 PM, Tony Lindgren wrote:
+> > * Greg KH <gregkh@linuxfoundation.org> [130205 09:00]:
+> >> On Tue, Feb 05, 2013 at 01:28:51PM +0200, Roger Quadros wrote:
+> >>> Hi Tony & Greg,
+> >>>
+> >>> What's the best way to get these patches in?
+> >>>
+> >>> All patches have been acked by respective maintainers.
+> >>>
+> >>> If Tony can Ack the arch/arm/mach-omap2 stuff then should I send a
+> >>> pull request directly to Greg? or the other way round?
+> >>>
+> >>> Tony, 
+> >>> fyi, these patches should not interfere with the dw3c/musb stuff
+> >>> sent by Felipe & Kishon.
+> >>
+> >> I'm fine with Tony just taking them all if he wants to.
+> > 
+> > OK. Roger, can you please do me a pull request with these
+> > against v3.8-rc6?
+> > 
 > 
-> I am not sure to understand your example, starting at the second line.
-> Shouldn't the second line have been
+> Tony,
 > 
->       4k->8k         => 64k -> 64k+4k
+> Since this depends on [1] and [2] which are both in linux-next, should
+> I base it on linux-next?
 
-No..
+Maybe you can base it on some commit in Greg's USB tree?
+Just check with Greg that whatever you use as a base is an
+immutable commit and OK to use as a base.
  
-> as you suggested, then when the device driver will do an inl(0x4) on
-> this device, the device will receive the equivalent of an inl(0x1004),
-> no?
+> Another option is to defer this to 3.10 merge window, along with the
+> DT adaptation for OMAP USB Host.
 
-Link 0 translates like:
+Once you have a branch ready that builds and boots, let's see how
+badly that conflicts with other branches we have queued up. If it's
+trivial only, then maybe Greg can pick up the patches. If not, we
+can still try to merge it in later on during the merge window as
+it would be nice to get USB to usable point with DT.
 
-- Linux driver does inl(0x4)
-- ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x4
-- The CPU TLB converts that into a read from CPU physical
-  0xc0000000 + 0x4
-- The MBUS window remap register converts that into a read from IO
-  space 0x4
-- The address 0x4 is placed in the PCI-E IO transaction of link 0
+Regards,
 
-Link 1 translates like:
-
-- Linux driver does inl(0x1004)
-- ARM layer converts that into a read from PCI_IO_VIRT_BASE + 0x1004
-- The CPU TLB converts that into a read from CPU physical
-  0xc0000000 + 0x11004 (ie the mbus window for the link 1)
-- The MBUS window remap register converts that into a read from IO
-  space 0x1004
-- The address 0x1004 is placed in the PCI-E IO transaction of link 1
-
-Noting that in both instances the IO address passed to inl is what
-eventually appears on the PCI-E link after all the translation is
-completed.
-
-The CPU MMU is being used used to route 4k aligned ranges to the
-correct link.
-
-> I understand that I have two choices here:
+Tony
+ 
+> [1] [PATCH v9 00/20] OMAP USB Host cleanup
+> https://lkml.org/lkml/2013/1/23/155
 > 
->  * First one is to make the I/O regions of all PCIe links fit below the
->    default IO_SPACE_LIMIT (0xffff) by doing the mapping trick you
->    described above.
-> 
->  * Second one is to have one 64 KB block for each PCIe link, which
->    would require raising the IO_SPACE_LIMIT on this platform.
-
-Yes, however, AFIAK this is the environment you should be running in:
-
-#define IO_SPACE_LIMIT  ((resource_size_t)0xfffff)
-
-Which is 5 f's not 4.
-
-> > Though, there is still a problem with the MMIO mbus window
-> > alignment. mbus windows are aligned to a multiple of their size, PCI
-> > MMIO bridge windows are always aligned to 1M...
-> 
-> Can't this be solved using the window_alignement() hook we've been
-> discussing separately? Just like we teach the Linux PCI core about our
-> alignment requirements of 64K for the I/O regions, we could teach it
-> about our alignment requirement on memory regions as well. No?
-
-Hopefully :) As long as it can adjust the start and length you should
-be fine.
-
-Jason
+> [2] [PATCH v2 0/6] USB: Add support for multiple PHYs of same type
+> https://lkml.org/lkml/2013/1/24/876
