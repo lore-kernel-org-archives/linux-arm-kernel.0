@@ -1,35 +1,66 @@
-From: nerv@dawncrow.de (=?ISO-8859-1?Q?Andr=E9_Hentschel?=)
-Date: Thu, 07 Feb 2013 00:01:23 +0100
-Subject: [PATCH] arm: Preserve TPIDRURW on context switch
-In-Reply-To: <20130206225150.GL17833@n2100.arm.linux.org.uk>
-References: <5112DC7E.4020108@dawncrow.de>
- <20130206225150.GL17833@n2100.arm.linux.org.uk>
-Message-ID: <5112E0C3.1080706@dawncrow.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 7 Feb 2013 00:07:15 +0100
+Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
+ for Armada XP
+In-Reply-To: <201302062241.14444.arnd@arndb.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-23-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302062241.14444.arnd@arndb.de>
+Message-ID: <20130207000715.0b3d662d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.02.2013 23:51, schrieb Russell King - ARM Linux:
-> On Wed, Feb 06, 2013 at 11:43:10PM +0100, Andr? Hentschel wrote:
->> There are more and more applications coming to WinRT, Wine could support them,
->> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
->> This register must be preserved per thread instead of being cleared.
-> 
-> I'd prefer this was done a little more sensitively to those CPUs where
-> loads/stores are expensive, namely:
-> 
->> +
->> +	@ preserve TPIDRURW register state
->> +	get_tls2	r3, r4, r5
->> +	str	r3, [r1, #TI_TP2_VALUE]
->> +	ldr	r3, [r2, #TI_TP2_VALUE]
->> +	set_tls2	r3, r4, r5
-> 
-> those two loads/stores get omitted from the thread switching if the CPU
-> doesn't support it.  Do you think that's something you could do?
+Dear Arnd Bergmann,
 
-No, i'm not sure how to improve this. How does the process can continue, can you or someone else fix that and add his Signed-off-by?
+On Wed, 6 Feb 2013 22:41:14 +0000, Arnd Bergmann wrote:
+
+> I've been thinking some more about this, and I wonder if it would
+> make more sense to describe the address remapping correctly as
+> a node on top of the pcie-controller node.
+> 
+> This would mean that rather than putting the mapped physical address
+> (0xc0000000, 0xc1000000, ...) in here, you would actually have 64-bit
+> address as the destination as well, in whatever format the
+> address map hardware uses, I assume using a numbered 32 bit
+> address space for each object that can be remapped.
+> 
+> This would also let you do the PCI memory address assignment for
+> each port separately, starting at bus address 0, followed by
+> finding a location in the CPU address space and passing
+> the start as the sys->mem_offset argument to
+> pci_add_resource_offset.
+
+Hum, good you give a skeleton example, because I'm not sure to
+understand your suggestion.
 
 
+> 
+> > +                       pcie at 0,0 {
+> > +                               device_type = "pciex";
+> > +                               reg = <0x0800 0 0xd0040000 0
+> > 0x2000>;
+> > +                               #address-cells = <3>;
+> > +                               #size-cells = <2>;
+> > +                               marvell,pcie-port = <0>;
+> > +                               marvell,pcie-lane = <0>;
+> > +                               interrupts = <1>;
+> > +                               clocks = <&gateclk 5>;
+> > +                               status = "disabled";
+> > +                       };
+> 
+> I think you are missing a "ranges" property here, at least an empty
+> one, which is required by the standard but not currently enforced
+> in the code.
+
+Is it really wise to have DT properties that are not used by anything,
+and therefore have a very high chance of either being incorrect, or
+becoming incorrect?
+
+Best regards,
+
+Thomas
 -- 
-
-Best Regards, Andr? Hentschel
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
