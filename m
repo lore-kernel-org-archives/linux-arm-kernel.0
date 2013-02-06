@@ -1,105 +1,77 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 06 Feb 2013 09:24:26 -0600
-Subject: [PATCH V3 4/5] ARM: dts: Add #dma-cells for generic dma binding
- support
-In-Reply-To: <1360131529-2847-5-git-send-email-padma.v@samsung.com>
-References: <1360131529-2847-1-git-send-email-padma.v@samsung.com>
- <1360131529-2847-5-git-send-email-padma.v@samsung.com>
-Message-ID: <511275AA.1070006@gmail.com>
+From: r.sricharan@ti.com (R Sricharan)
+Date: Wed, 6 Feb 2013 20:55:19 +0530
+Subject: [PATCH v4] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
+ addresses
+In-Reply-To: <20130206151638.GG26454@arm.com>
+References: <1359472036-7613-1-git-send-email-r.sricharan@ti.com>
+ <20130201162631.GG5151@arm.com>
+ <CANOGCgOp=kSatDu8fL7grk+bXLQ2pgKAEvEK6LoG8Ba4mqUH=w@mail.gmail.com>
+ <20130201163722.GH5151@arm.com>
+ <CANOGCgMbzEWpJQE8PH2nS9_wa0DP_14E4=whGgKxWGJ_HpwomQ@mail.gmail.com>
+ <20130201174246.GJ5151@arm.com> <510F3BA8.8070700@ti.com>
+ <510F3CA3.7080604@ti.com> <20130206121523.GD26454@arm.com>
+ <511260FC.2090002@ti.com> <20130206151638.GG26454@arm.com>
+Message-ID: <511275DF.1030002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2013 12:18 AM, Padmavathi Venna wrote:
-> This patch adds #dma-cells property to PL330 DMA controller
-> nodes for supporting generic dma dt bindings on samsung
-> exynos5250 platform.
+On Wednesday 06 February 2013 08:46 PM, Catalin Marinas wrote:
+> On Wed, Feb 06, 2013 at 01:56:12PM +0000, R Sricharan wrote:
+>> On Wednesday 06 February 2013 05:45 PM, Catalin Marinas wrote:
+>>> On Mon, Feb 04, 2013 at 04:44:19AM +0000, R Sricharan wrote:
+>>>>      I did a similar kind of patch in my V1 [1].
+>>>>       I should be using PMD_MASK instead of SECTION_MASK there, and
+>>>>      updated it in the next version.
+>>>>
+>>>>       [1] https://patchwork.kernel.org/patch/1272991/
+>>>
+>>> With regards to your current patch, I really don't think looping over
+>>> pmd in alloc_init_pte() is the right fix. The alloc_init_pte() function
+>>> gets a pmd argument and it is supposed to make it point to a pte and
+>>> populate that pte rather than populate a number of pmds.
+>>>
+>>> create_mapping() loops over pgds. alloc_init_pud() loops over puds
+>>> (well, we don't have any but we have the function for consistency).
+>>> alloc_init_section() should loop over pmds (we can even change the name
+>>> to alloc_init_pmd()).
+>>>
+>>> Your original patch from August was better as it kept the looping
+>>> consistent but as you said, it should be using pmd_addr_end(). We can
+>>> use something simpler like alloc_init_pmd() on arm64 and instead of
+>>> set_pmd() there just call a separate map_init_section() which for
+>>> 2-levels it sets both entries. This may address Russell's comment that
+>>> the resulting code was ugly.
+>>
+>>    Thanks. So just to understand, you mean alloc_init_pmd loops over
+>>    map_init_section. map_init_section populates either one pmd
+>>    or calls alloc_init_pte. correct ? . I can send a v5 for this.
+>
+> alloc_init_pmd() loops over pmd (similar to alloc_init_pud). If
+> (type->prot_sect && ((addr | next | phys) & ~SECTION_MASK) == 0) you
+> call a map_init_section (whatever name you think is better) function
+> which contains the current section code from alloc_init_section().
+> Something like below (easier than explaining):
+>
+> static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+> 				    unsigned long end, phys_addr_t phys,
+> 				    const struct mem_type *type)
+> {
+> #ifndef CONFIG_ARM_LPAE
+> 	if (addr & SECTION_SIZE)
+> 		pmd++;
+> #endif
+>
+> 	do {
+> 		*pmd = __pmd(phys | type->prot_sect);
+> 		phys += SECTION_SIZE;
+> 	} while (pmd++, addr += SECTION_SIZE, addr != end);
+>
+> 	flush_pmd_entry(p);
+> }
+>
+> Pretty much avoiding the indentation level in alloc_init_section() with
+> multiple loops.
+Thanks for explaining. will post V5 for this.
 
-The subject doesn't reflect this is for pl330.
-
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  .../devicetree/bindings/dma/arm-pl330.txt          |   15 +++++++++++----
->  arch/arm/boot/dts/exynos5250.dtsi                  |    4 ++++
->  2 files changed, 15 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-> index 36e27d5..1fdbff6 100644
-> --- a/Documentation/devicetree/bindings/dma/arm-pl330.txt
-> +++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-> @@ -8,6 +8,8 @@ Required properties:
->    - reg: physical base address of the controller and length of memory mapped
->      region.
->    - interrupts: interrupt number to the cpu.
-> +  - #dma-cells: must be <1>. used to represent the number of integer
-> +    cells in the dmas property of client device.
-
-This should be optional in the case of platforms supporting only memory
-to memory xfers.
-
-Rob
-
->  
->  Optional properties:
->  - dma-coherent      : Present if dma operations are coherent
-> @@ -18,16 +20,21 @@ Example:
->  		compatible = "arm,pl330", "arm,primecell";
->  		reg = <0x12680000 0x1000>;
->  		interrupts = <99>;
-> +		#dma-cells = <1>;
->  	};
->  
->  Client drivers (device nodes requiring dma transfers from dev-to-mem or
-> -mem-to-dev) should specify the DMA channel numbers using a two-value pair
-> +mem-to-dev) should specify the DMA channel numbers and dma channel names
->  as shown below.
->  
->    [property name]  = <[phandle of the dma controller] [dma request id]>;
-> +  [property name]  = <[dma channel name]>
->  
->        where 'dma request id' is the dma request number which is connected
-> -      to the client controller. The 'property name' is recommended to be
-> -      of the form <name>-dma-channel.
-> +      to the client controller. The 'property name' 'dmas' and 'dma-names'
-> +      as required by the generic dma device tree binding helpers. The dma
-> +      names correspond 1:1 with the dma request ids in the dmas property.
->  
-> -  Example:  tx-dma-channel = <&pdma0 12>;
-> +  Example:  dmas = <&pdma0 12
-> +		    &pdma1 11>;
-> +	    dma-names = "tx", "rx";
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index f50b4e8..724f5bd 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -312,24 +312,28 @@
->  			compatible = "arm,pl330", "arm,primecell";
->  			reg = <0x121A0000 0x1000>;
->  			interrupts = <0 34 0>;
-> +			#dma-cells = <1>;
->  		};
->  
->  		pdma1: pdma at 121B0000 {
->  			compatible = "arm,pl330", "arm,primecell";
->  			reg = <0x121B0000 0x1000>;
->  			interrupts = <0 35 0>;
-> +			#dma-cells = <1>;
->  		};
->  
->  		mdma0: mdma at 10800000 {
->  			compatible = "arm,pl330", "arm,primecell";
->  			reg = <0x10800000 0x1000>;
->  			interrupts = <0 33 0>;
-> +			#dma-cells = <1>;
->  		};
->  
->  		mdma1: mdma at 11C10000 {
->  			compatible = "arm,pl330", "arm,primecell";
->  			reg = <0x11C10000 0x1000>;
->  			interrupts = <0 124 0>;
-> +			#dma-cells = <1>;
->  		};
->  	};
->  
-> 
+Regards,
+  Sricharan
