@@ -1,44 +1,73 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 06 Feb 2013 21:35:46 -0500
-Subject: [GIT PULL] ux500 DT related fixes and platform enhancements
-In-Reply-To: <CACRpkdZ-Z2y6djnQsBZ0tY+zAuX7E1v=+TvF1CYc0CZc8QnWWQ@mail.gmail.com>
- (Linus Walleij's message of "Wed, 6 Feb 2013 23:28:01 +0100")
-References: <20130131115552.GG5301@gmail.com> <20130206135911.GB7519@gmail.com>
- <CAOesGMiJTcjdEJzSDkpdV-ZCqN24uVmfjM-HOt+ojErS=98TmQ@mail.gmail.com>
- <CACRpkdZ-Z2y6djnQsBZ0tY+zAuX7E1v=+TvF1CYc0CZc8QnWWQ@mail.gmail.com>
-Message-ID: <874nhoetq5.fsf@octavius.laptop.org>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 07 Feb 2013 11:04:49 +0800
+Subject: [PATCH 0/5 v3] at91: PMECC: enable PMECC in dt for at91sam9x5ek,
+ at91sam9n12ek
+In-Reply-To: <1358945232-2282-1-git-send-email-josh.wu@atmel.com>
+References: <1358945232-2282-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <511319D1.8090505@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Feb 06 2013, Linus Walleij wrote:
-> On Wed, Feb 6, 2013 at 6:48 PM, Olof Johansson <olof@lixom.net> wrote:
+Just a ping. Any feedback for this v3 patch?
+
+Best Regards,
+Josh Wu
+
+On 1/23/2013 8:47 PM, Josh Wu wrote:
+> Those patches will enable PMECC in dt parameters for at91sam9x5ek and
+> at91sam9n12ek.
 >
->>>       mmc: mmci: Move ios_handler functionality into the driver
->>
->> This patch lacks acks from MMC maintainers. Actually, it should just
->> be submitted like any other MMC patches; to Chris Ball and the MMC
->> list.
+> The PMECC driver will check minimum required ecc on ONFI parameter from NAND
+> flash.
 >
-> Actually this one driver usually goes through Russell's tree.
-> He was OK with Lee pushing it this way, although I don't know if
-> he got a formal ACK?
+> If pmecc-cap, pmecc-sector-size in dts file is specified, use those two.
+> otherwise, set those according to NAND flash ONFI parameters.
 >
-> It doesn't hurt to have Chris' ACK on it too though.
-
-Yeah, I've been pointing MMCI patches towards Russell's patch tracker,
-but taking everything else through mmc-next.  Sorry for having a
-confusing policy.  In this case the patch went into Russell's
-tracker and then came back out again for ordering reasons.
-
-Since Russell's happy with it:
-
-Acked-by: Chris Ball <cjb@laptop.org>
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> If the pmecc-cap, pmecc-sector-size in dts are different with ecc requirement
+> in ONFI, print out a warning.
+>
+>
+> For the following compile error:
+>    ERROR (phandle_references): Reference to non-existent node or label "pinctrl_ssc0_tx"
+>
+>    ERROR: Input tree has errors, aborting (use -f to force output)
+>    make[2]: *** [arch/arm/boot/dts/at91sam9g20ek.dtb] Error 2
+>
+> the fixes are already merged in Linux mainline in v3.8-rc4.
+> you can find in:
+>   544ae6b2e676c3c37fb8c93ef9327932fc2e5bc2 (ARM: at91/dts: add pinctrl support for SSC peripheral)
+>   ea03c81521bde526570e1dec96eaa21fe5ac84a2 (ASoC: atmel-ssc: add pinctrl selection to driver)
+>
+>
+> Change logs:
+> v2: rebase to v3.8-rc3. And wrapped the commit message.
+>
+> v3: big chages:
+>    1. reduce the PMECC lookup table mapping. Just the lookup table not whole
+>       ROM code according to J.C's suggestion.
+>    2. use simpler strategy to handle pmecc-cap, pmecc-sector-size:
+>       * make pmecc-cap, pmecc-sector-size optional.
+>       * If pmecc-cap, pmecc-sector-size are not set, use ONFI ecc parameters.
+>         otherwise, use those in DTS file.
+>       * print out a warning if PMECC use different ecc bits or sector size
+>         from ONFI ecc parameters.
+>
+> Josh Wu (5):
+>    MTD: atmel_nand: avoid to report an error when lookup table offset is
+>      0.
+>    ARM: at91: at91sam9x5: add DT parameters to enable PMECC
+>    ARM: at91: at91sam9n12: add DT parameters to enable PMECC
+>    MTD: atmel_nand: make pmecc-cap, pmecc-sector-size in dts is
+>      optional.
+>    MTD: at91: atmel_nand: for PMECC, add code to check the ONFI
+>      parameter ECC requirement.
+>
+>   arch/arm/boot/dts/at91sam9n12.dtsi  |    3 +-
+>   arch/arm/boot/dts/at91sam9n12ek.dts |    5 +-
+>   arch/arm/boot/dts/at91sam9x5.dtsi   |    4 +
+>   arch/arm/boot/dts/at91sam9x5cm.dtsi |    5 +-
+>   drivers/mtd/nand/atmel_nand.c       |  141 +++++++++++++++++++++++++++++------
+>   5 files changed, 131 insertions(+), 27 deletions(-)
+>
