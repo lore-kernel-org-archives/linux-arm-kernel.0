@@ -1,31 +1,31 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 06 Feb 2013 17:13:45 -0700
-Subject: [PATCH 09/14] pinctrl/abx500: use direct IRQ defines
-In-Reply-To: <1360093715-6348-10-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 06 Feb 2013 17:17:08 -0700
+Subject: [PATCH 13/14] ARM: ux500: enable AB8500 GPIO for HREF
+In-Reply-To: <1360093715-6348-14-git-send-email-linus.walleij@stericsson.com>
 References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
- <1360093715-6348-10-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <5112F1B9.6010700@wwwdotorg.org>
+ <1360093715-6348-14-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <5112F284.3040002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/05/2013 12:48 PM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+> From: Lee Jones <lee.jones@linaro.org>
 > 
-> Make it harder to do mistakes by introducing the actual
-> defined ABx500 IRQ number into the IRQ cluster definitions.
-> Deduct cluster offset from the GPIO offset to make each
-> cluster coherent.
+> The AB8500 GPIO driver has been un-BROKEN and rewritten as a pinctrl
+> driver. Now that it's back in use, let's ensure that it's available
+> when booting HREF with Device Tree enabled.
 
-Shouldn't this patch be squashed into the previous patch to avoid churn?
+> diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
 
->  static struct abx500_pinctrl_soc_data ab9540_soc = {
+>  	soc-u9500 {
+> +		prcmu at 80157000 {
+> +			ab8500 at 5 {
+> +				ab8500-gpio {
+> +					compatible = "stericsson,ab8500-gpio";
 
-> @@ -273,8 +273,7 @@ static int abx500_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-
-> -			hwirq = gpio + cluster->to_irq;
-> -
-> +			hwirq = gpio - cluster->start + cluster->to_irq;
->  			return irq_create_mapping(pct->parent->domain, hwirq);
-
-In particular, this change implies that the previous patch was simply
-incorrect, although I haven't really thought about it in detail.
+The MFDs I've looked at (which admittedly might not be that many) all
+have the top-level chip described in device tree, but not all the
+component sub-devices, since they're all a static part of the top-level
+chip. Instead, the top-level MFD instantiates all the sub-devices
+itself. I'm curious why this MFD device works differently - do many work
+like this?
