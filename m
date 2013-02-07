@@ -1,37 +1,18 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Feb 2013 20:10:38 +0100
-Subject: [PATCH 09/14] pinctrl/abx500: use direct IRQ defines
-In-Reply-To: <CAF2Aj3jHe+mP0dU_BHThBV-va_iJLcFQedmWQOTaYafAZM1Yxg@mail.gmail.com>
-References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
- <1360093715-6348-10-git-send-email-linus.walleij@stericsson.com>
- <5112F1B9.6010700@wwwdotorg.org>
- <CAF2Aj3jHe+mP0dU_BHThBV-va_iJLcFQedmWQOTaYafAZM1Yxg@mail.gmail.com>
-Message-ID: <CACRpkdYCqU0srgiboJnOTaOiG+9BCk-Kbe0-jscMMcnyKnVUDw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 07 Feb 2013 12:14:38 -0700
+Subject: [PATCH] clk: tegra30: fix wrong clock index between se to
+ sata_cold
+In-Reply-To: <1360213631-16893-1-git-send-email-josephl@nvidia.com>
+References: <1360213631-16893-1-git-send-email-josephl@nvidia.com>
+Message-ID: <5113FD1E.9020801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 7, 2013 at 10:01 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On 02/06/2013 10:07 PM, Joseph Lo wrote:
+> The index of se should be 127. And the previous clock index was 125. So
+> we need to set up the index for se to get the correct index between se
+> to sata_cold.
 
-> I don't see myself on cc. Was that intentional?
-
-No, it was my mistake...
-
-> I quite like the idea of this.
-
-Can I take it as an ACK? :-)
-
-> Stephen,
->
-> It doesn't mean the other patch was wrong, it just transfers the math.
->
-> I wouldn't squash it into mine. I like the transition and the possibility to
-> revert it if there's been some mistake.
->
-> (not to say there is one, but just in case.)
-
-I don't think it's wrong, just different. I changed
-it after trying to subtract the offset in my head back
-and forth a few times and screwed up the maths.
-
-Yours,
-Linus Walleij
+I've applied this to Tegra's for-3.9/soc-ccf-fixes branch, on the
+assumption Mike is OK with it. I'll hold a pull request for his ack, and
+probably for a day or too in case any more clk-related fixes show up.
