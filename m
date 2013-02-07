@@ -1,39 +1,72 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 7 Feb 2013 11:15:59 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <CAErSpo797rhH=xt2x7eqdu7Vwf43FXoXQVcypvHM8-54LRC0wQ@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <5106F9F9.3010905@wwwdotorg.org> <20130129094143.1aad9377@skate>
- <20130129092006.GA16377@avionic-0098.mockup.avionic-design.de>
- <20130207112459.5f382ad4@skate>
- <CAErSpo7UOTGH7kjYBADymDdgmHwPxbXqczeXm1BH9C+XViQDRQ@mail.gmail.com>
- <20130207170020.289bac08@skate>
- <CAErSpo797rhH=xt2x7eqdu7Vwf43FXoXQVcypvHM8-54LRC0wQ@mail.gmail.com>
-Message-ID: <20130207181559.GA31508@obsidianresearch.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 7 Feb 2013 23:45:53 +0530
+Subject: [PATCH V2 2/2] ARM: davinci: restart: fix wdt to machine restart
+ with DT
+In-Reply-To: <1360123204-9978-3-git-send-email-anilkumar.v@ti.com>
+References: <1360123204-9978-1-git-send-email-anilkumar.v@ti.com>
+ <1360123204-9978-3-git-send-email-anilkumar.v@ti.com>
+Message-ID: <5113EF59.80508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 11:08:45AM -0700, Bjorn Helgaas wrote:
- 
-> I think the way you'll have to fix this in the meantime is to use
-> pci_create_root_bus() directly so you can do things in this sequence:
+
+On 2/6/2013 9:30 AM, Kumar, Anil wrote:
+> In non DT case da8xx_register_watchdog() is called to register platform device
+> "da8xx_wdt_device" by board file. But in DT case it is not called and wdt
+> device get registered via wdt DT node.
 > 
->   pci_create_root_bus
->   pci_scan_child_bus
->   pci_bus_assign_resources
->   pci_bus_add_devices
+> Currently code is passing platform device "da8xx_wdt_device" in
+> "davinci_watchdog_reset" function in both DT and non DT case and that
+> leads to crash in DT boot.
 > 
-> dino_probe() is an example of similar code that does this.
+> Update restart function to make it generic DaVinci machine restart
 
-Erm, but isn't this problem going to strike any system that doesn't
-have resources assigned by the firmware?
+s/DaVinci/da8xx. Also, subject can simply be "ARM: davinci: da850 DT:
+add support for machine reboot" since reboot never worked with DT
+before, "fix" isn't really appropriate.
 
-If so, a common 'pci_scan_bus_from_scratch' would at least highlight
-the problem and centralize the work around until it is fixed...
+> in case of DT and non DT boot.
+> 
+> Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
+> ---
+> :100644 100644 2d5502d... 1df68fd... M	arch/arm/mach-davinci/devices-da8xx.c
+> :100644 100644 700d311... ef9f70e... M	arch/arm/mach-davinci/include/mach/da8xx.h
+>  arch/arm/mach-davinci/devices-da8xx.c      |   14 ++++++++++++--
+>  arch/arm/mach-davinci/include/mach/da8xx.h |    1 -
+>  2 files changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index 2d5502d..1df68fd 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -359,7 +359,7 @@ static struct resource da8xx_watchdog_resources[] = {
+>  	},
+>  };
+>  
+> -struct platform_device da8xx_wdt_device = {
+> +static struct platform_device da8xx_wdt_device = {
 
-Many embedded systems will require this..
+Making of da8xx_wdt_device static should find a mention in description.
 
-Regards,
-Jason
+>  	.name		= "watchdog",
+>  	.id		= -1,
+>  	.num_resources	= ARRAY_SIZE(da8xx_watchdog_resources),
+> @@ -368,7 +368,17 @@ struct platform_device da8xx_wdt_device = {
+>  
+>  void da8xx_restart(char mode, const char *cmd)
+>  {
+> -	davinci_watchdog_reset(&da8xx_wdt_device);
+> +	struct device *dev = NULL;
+> +	struct platform_device *wdt_device = NULL;
+
+No need to initialize these variables here.
+
+> +
+> +	dev = bus_find_device_by_name(&platform_bus_type, NULL, "watchdog");
+> +	if (!dev) {
+> +		pr_err("wdt device not found to machine reboot\n");
+
+Rather: "%s: failed to find watchdog device", __func__
+
+Thanks,
+Sekhar
