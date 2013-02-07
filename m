@@ -1,42 +1,39 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Thu, 7 Feb 2013 10:04:21 +0100
-Subject: [PATCH 1/2] clocksource: dbx500-prcmu: use relaxed readl variant
-In-Reply-To: <CACRpkdacW89oq+yyjayY2674UGPdnnHS5veQsn2DaZ4-nao1Pg@mail.gmail.com>
-References: <1358770172-30125-1-git-send-email-fabio.baltieri@linaro.org>
- <20130121122203.GA30289@balto.lan>
- <CACRpkdacW89oq+yyjayY2674UGPdnnHS5veQsn2DaZ4-nao1Pg@mail.gmail.com>
-Message-ID: <20130207090421.GA21658@balto.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 7 Feb 2013 09:09:26 +0000
+Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
+ for Armada XP
+In-Reply-To: <20130207094556.423de279@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302070804.12256.arnd@arndb.de> <20130207094556.423de279@skate>
+Message-ID: <201302070909.26701.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 11:16:19AM +0100, Linus Walleij wrote:
-> On Mon, Jan 21, 2013 at 1:22 PM, Fabio Baltieri
-> <fabio.baltieri@linaro.org> wrote:
-> > On Mon, Jan 21, 2013 at 01:09:31PM +0100, Fabio Baltieri wrote:
-> >> From: Rabin Vincent <rabin.vincent@stericsson.com>
-> >>
-> >> Modify clksrc_dbx500_prcmu_read to replace readl() with readl_relaxed().
-> >> This speeds up calls to the function by about 40%.
-> >
-> > Hello John,
-> >
-> > these two patches may go in the existing ux500 clksrc branch
-> > together with the nomadik-mtu's patches queued up some time ago.
-> >
-> > Can I have your Acked-by for that?
+On Thursday 07 February 2013, Thomas Petazzoni wrote:
+> Unfortunately, this means the windows are statically defined in the DT,
+> which is simply not possible for PCIe, as we have already explained
+> several times in this thread.
 > 
-> Actually now when I look at it these changes are fully orthogonal
-> to the other stuff, so these two should just go in through John's
-> timer tree as usual.
+> Any solution where the PCIe windows are statically described is
+> simply not acceptable.
 > 
-> John?
+> We have 10 PCIe interfaces, each requiring up to two windows, and we
+> have on the system a total of 20 windows. Doing static assignments of
+> windows is simply not an option.
+> 
+> Of course, you'll tell me that it's up to each board .dts to have a
+> number of windows that matches the number of actually existing PCIe
+> interface. But it means that each and every developer adding the
+> support for a new board must understand this complex problem, which is
+> something we do not want. We have a solution that makes all of this
+> PCIe window assignment dynamic, so it surprises me that we have to
+> continue to explain why a static solution is not appropriate.
 
-Hi John,
+No, the idea here was actually to leave out any of the dynamic mappings
+from the device tree and do the PCI bus probe for each port based
+on a local bus address starting at 0 for each port. After all
+BARs are assigned, you can then map each port to a convenient physical
+address and register it by passing the start offset so that the
+pci resources are adapted correctly.
 
-any feedback from this two patches?
-
-Thanks,
-Fabio
-
--- 
-Fabio Baltieri
+	Arnd
