@@ -1,39 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Feb 2013 09:09:26 +0000
-Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
- for Armada XP
-In-Reply-To: <20130207094556.423de279@skate>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302070804.12256.arnd@arndb.de> <20130207094556.423de279@skate>
-Message-ID: <201302070909.26701.arnd@arndb.de>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 07 Feb 2013 15:10:27 +0530
+Subject: [PATCH 1/5] ARM: dts: exynos5250-arndale: Add node entry for
+ gpio-buttons
+In-Reply-To: <CAKrE-Ke1WZt-PqVReGdNwcD+R_-4iHKPhgkgtgS-LQAPbx34mQ@mail.gmail.com>
+References: <1360214129-4096-1-git-send-email-tushar.behera@linaro.org>
+ <F3DBB1B3EF102E4994C89758CFCA32412C4E1A@DBDE01.ent.ti.com>
+ <51134907.1050803@linaro.org>
+ <CAKDJKT5xE9WWOC0pM8h1UWrF=OOtSr1D2WKPww9F6bhcO7VM_w@mail.gmail.com>
+ <5113501D.5060603@linaro.org>
+ <CAKrE-Ke1WZt-PqVReGdNwcD+R_-4iHKPhgkgtgS-LQAPbx34mQ@mail.gmail.com>
+Message-ID: <5113768B.90102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 February 2013, Thomas Petazzoni wrote:
-> Unfortunately, this means the windows are statically defined in the DT,
-> which is simply not possible for PCIe, as we have already explained
-> several times in this thread.
-> 
-> Any solution where the PCIe windows are statically described is
-> simply not acceptable.
-> 
-> We have 10 PCIe interfaces, each requiring up to two windows, and we
-> have on the system a total of 20 windows. Doing static assignments of
-> windows is simply not an option.
-> 
-> Of course, you'll tell me that it's up to each board .dts to have a
-> number of windows that matches the number of actually existing PCIe
-> interface. But it means that each and every developer adding the
-> support for a new board must understand this complex problem, which is
-> something we do not want. We have a solution that makes all of this
-> PCIe window assignment dynamic, so it surprises me that we have to
-> continue to explain why a static solution is not appropriate.
++CC: David Jander <david@protonic.nl>
++CC: Dmitry Torokhov <dtor@mail.ru>
 
-No, the idea here was actually to leave out any of the dynamic mappings
-from the device tree and do the PCI bus probe for each port based
-on a local bus address starting at 0 for each port. After all
-BARs are assigned, you can then map each port to a convenient physical
-address and register it by passing the start offset so that the
-pci resources are adapted correctly.
+On 02/07/2013 01:13 PM, Girish KS wrote:
+>>>>>> +
+>>>>>> +    gpio_keys {
+>>>>>> +            compatible = "gpio-keys";
+>>>>>> +            #address-cells = <1>;
+>>>>>> +            #size-cells = <0>;
+>>>>>
+>>>>> Just want to understand why these properties are here?
+>>>>> As these properties are for child dt node. But have not seen
+>>>>> anyone is using here.
+>>>>>
+>>>>
+>>>> That is how gpio_keys node entries are defined in other .dts files.
+>>>
+>>> I have gone through example for address-cells and size-cells in following link:
+>>> http://devicetree.org/mediawiki/index.php?title=Device_Tree_Usage&stable=1#CPU_addressing
+>>>
+>>> which indicates that these fields are for child "reg".
+>>> I think, here in child node there is no "reg". so there is no use
+>>> of address-cells and size-cells propeties.
+>>>
+>>
+>> Please check Documentation/devicetree/bindings/gpio/gpio_keys.txt
+>>
+>> And whether these properties are required or not, I will let device tree
+>> experts to comment on that.
+>>
+>> As such, currently all node entries for gpio_keys use these properties.
+> you can just verify by a simple test.
+> delete the 2 lines. address-cells and size cells.
+> this will have no affect.
+> now with these 2 lines deleted lines add a dummy reg property with
+> address and cell. dtb compiler will warn.
+> So I think what manish reffered is right.
+> There is also a reference of smdk4210 for kepads.
 
-	Arnd
+Right. Compilation is ok even after removing the address-cell and
+size-cell properties.
+
+But since this is used across all the instances, I would like to know
+the view of the authors on this.
+
+David, Dimitry,
+
+Can you please let us know your opinion on this? If these properties are
+not required, then we can remove them from the documentation and from
+node entries in several other dts files.
+
+>>
+>> --
+>> Tushar Behera
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Tushar Behera
