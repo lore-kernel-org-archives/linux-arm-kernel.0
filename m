@@ -1,80 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Feb 2013 23:25:23 +0000
+Date: Thu, 7 Feb 2013 23:27:52 +0000
 Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
  systems
-In-Reply-To: <20130207182153.GB24688@obsidianresearch.com>
-References: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130207183743.5c97d8b8@skate> <20130207182153.GB24688@obsidianresearch.com>
-Message-ID: <201302072325.23483.arnd@arndb.de>
+In-Reply-To: <CAPcvp5EC=e8TbX9s88hF9uKMzTc6655k9=mgdEc0szP_phhbXQ@mail.gmail.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130207183743.5c97d8b8@skate>
+ <CAPcvp5EC=e8TbX9s88hF9uKMzTc6655k9=mgdEc0szP_phhbXQ@mail.gmail.com>
+Message-ID: <201302072327.52328.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 February 2013, Jason Gunthorpe wrote:
-> On Thu, Feb 07, 2013 at 06:37:43PM +0100, Thomas Petazzoni wrote:
-
-> Right, someday you can have all 40 interrupts :)
+On Thursday 07 February 2013, Andrew Murray wrote:
+> I'm not sure if the device pin part of the map is correct (I always
+> forget how this works) - but I know this would definately work:
 > 
-> This interrupt-map stuff is ugly, I looks like it was designed as a
-> way for the firmware to communicate the per-device interrupt
-> assignment to the OS - using it to describe a HW setup is a bit more
-> tortured for sure..
+>                          interrupt-map-mask = <0xf800 0 0 7>
+>                          interrupt-map = <0x0800 0 0 1 &mpic 58
+>                                           0x0800 0 0 2 &mpic 58
+>                                           0x0800 0 0 3 &mpic 58
+>                                           0x0800 0 0 4 &mpic 58
+>                                           0x1000 0 0 1 &mpic 59
+>                                           0x1000 0 0 2 &mpic 59
+>                                           0x1000 0 0 3 &mpic 59
+>                                           0x1000 0 0 4 &mpic 59
+>                                           ....
 
-It is usually used for PCI (non-PCIe) systems, where you can have
-multiple slots on the same bus and each slot has its own four
-interrupt lines routed to an upstream interrupt controller, not
-necessarily the same one for each slot.
-
-> Frankly, I think it should not be used in PCI-E drivers *at all*
-> beacuse there is no need for an external interrupt routing
-> description. [1]
-> 
-> PCI-E *only* has inband interrupt delivery, so the host driver has
-> 100% of the information it needs to convert a INTx signal received on
-> a link to a Linux interrupt number.
-> 
-> So in a PCI-E world translation should look like this:
->  - Start at the source device INTx
->  - Traverse up bridges performing INTx swizzling according to the
->    PCI-E spec
->  - When the host bridge is reached call into the host driver and pass
->    - The INTx number
->    - The bus/device/function of last bridge traversed
->  - The host bridge driver returns a Linux interrupt number.
-
-It's the same as on PCI, except that there you stop when you reach
-the slot that is physically connected to the interrupt controller.
-
-> This *always* works for (compliant) PCI-E. An OF interrupt map is
-> never, ever, needed. Providing a common mechanism can remove this
-> complex OF stuff and ultimately help everyone :)
-> 
-> However, if interrupt-map is used, I strongly suspect it should be
-> placed on each bridge node (as Andrew mentioned), and it should be
-> very simple:
-> 
-> link at 0 {
-> reg = <0x800 0 0  0 0>; // Bus 0, Dev 0x10, Fn 0
-> interrupt-mask = <0x0 0 0 7>;
-> interrupt-map = <0x0000 0 0 1 &mpic 58 // INTA
->                  0x0000 0 0 2 &mpic 58 // INTB
->                  0x0000 0 0 3 &mpic 58 // INTC
->                  0x0000 0 0 4 &mpic 58>; // INTD
-> }
-
-The interrupt-map property only makes sense for the host bridge,
-not for bridges below it, which don't normally get represented
-in the device tree.
-
-> Jason
-> 1 - For PCI/PCI-X the physical INTx interrupt pins on any device,
->     anywhere in the system could by physically tied to any interrupt
->     ingress in the system. Even if they are behind bridges. It is a
->     total free for all.
-
-I would not be surprised to see system that have a PCIe to
-PCI bridge and slots behind that which are directly connected
-to an upstream interrupt controller. In fact, I believe I have
-worked on a system like that (IBM QS21 and QS22), and thankfully
-the interrupt-map property did let us model this correctly.
+If all the pins are routed to the same interrupt, you can leave
+the pin out of the map-mask and save a bunch of lines in the
+interrupt-map, at least  by the spec. I have not looked at the
+source code to see if that is how Linux implements the lookup,
+but that can be fixed if necessary.
 
 	Arnd
