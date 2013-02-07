@@ -1,34 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Feb 2013 11:01:29 +0100
-Subject: [PATCH 02/14] mfd: ab8500: provide a irq_set_type() function
-In-Reply-To: <CAF2Aj3iO+6j+T5C0X2Hh6TsvT4yaJ2cai6cC9DaiRAwL9n-dVw@mail.gmail.com>
-References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
- <1360093715-6348-3-git-send-email-linus.walleij@stericsson.com>
- <5112F043.6040700@wwwdotorg.org>
- <CAF2Aj3iO+6j+T5C0X2Hh6TsvT4yaJ2cai6cC9DaiRAwL9n-dVw@mail.gmail.com>
-Message-ID: <CACRpkdb1W8HWV+ZTcA5EyjT8pEnnLUaB4rsiyCLpJiff-0=5-Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Feb 2013 10:02:39 +0000
+Subject: [GIT PULL 4/4] mach-virt platform code for 3.9
+In-Reply-To: <5112D75A.1000900@gmail.com>
+References: <1359986131-13034-1-git-send-email-will.deacon@arm.com>
+ <1359986131-13034-4-git-send-email-will.deacon@arm.com>
+ <5112D75A.1000900@gmail.com>
+Message-ID: <20130207100239.GA15387@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 7, 2013 at 10:08 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wed, Feb 06, 2013 at 10:21:14PM +0000, Rob Herring wrote:
+> On 02/04/2013 07:55 AM, Will Deacon wrote:
+> > NOTE: I'm not suggesting you pull this one as it stands -- see below!
+> >
+> > This is the last batch from me (Marc is dealing with vgic and virtual
+> > timers) and introduces support for mach-virt. This depends on:
+> >
+> >       - for-arm-soc/arch-timers (third pull request in this series)
+> >       - for-rmk/virt/psci (already pulled)
+> >       - irqchip/gic-vic-move (an arm-soc branch)
+> >
+> > As a result, the diffstat is atrocious so it would be better if you
+> > could create a branch merging the above dependendies, which I could
+> > rebase onto (there's actually only two patches here).
+> 
+> It would be good to see this based on Arnd's patch to make some of the
+> mach function ptrs optional and "xen,xenvm" moved from VExpress to this.
 
-> Great spot/idea. But then this won't work at all until I can write a fixup.
->
-> Will you allow me to write a follow-up patch please?
+I'm not sure what state that patch is in, but I'm happy to fix mach-virt up
+once Arnd's patch is queued.
 
-For me a sequel is OK, especially given that this thing doesn't make
-things any worse than they are already, but actually checking supported
-types will not be trivial, because...
+> This will also break with the sys_timer removal, so yet another dependency.
 
->> > +static int ab8500_irq_set_type(struct irq_data *data, unsigned int
->> > type)
->> > +{
->> > +     return 0;
->> > +}
+Indeed... what I could really do with is an arm-soc branch with all the
+dependencies, then I can just rebase onto that and fix things up appropriately.
 
-This applies to *ALL* AB8500 IRQs, and some of them actually support
-rising/falling, apart from the GPIO ones, so it's not enough to just handle
-the GPIO IRQs here.
-
-Yours,
-Linus Walleij
+Will
