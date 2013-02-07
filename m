@@ -1,203 +1,63 @@
-From: manjunath.goudar@linaro.org (manjunath.goudar at linaro.org)
-Date: Thu,  7 Feb 2013 23:04:07 +0530
-Subject: [PATCH 10/10] USB: EHCI: make ehci-w90X900 a separate driver
-In-Reply-To: <1360258447-27247-1-git-send-email-yes>
-References: <yes>
- <1360258447-27247-1-git-send-email-yes>
-Message-ID: <5113e637.c84e420a.08c3.ffffbf20@mx.google.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 7 Feb 2013 18:37:43 +0100
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130207172934.GA2811@arm.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130129132204.GA23886@arm.com> <20130207153750.0fef1192@skate>
+ <20130207155117.GA19666@arm.com> <20130207171904.70270598@skate>
+ <20130207174040.3a345770@skate> <20130207165347.GA31995@arm.com>
+ <20130207181418.3753b007@skate> <20130207172934.GA2811@arm.com>
+Message-ID: <20130207183743.5c97d8b8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Manjunath Goudar <manjunath.goudar@linaro.org>
+Dear Andrew Murray,
 
-Separate the Nuvoton On-Chip host controller driver from ehci-hcd host code
-into its own driver module.
+On Thu, 7 Feb 2013 17:29:34 +0000, Andrew Murray wrote:
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Greg KH <greg@kroah.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Wan ZongShun <mcuos.com@gmail.com>
-Cc: linux-usb at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/usb/host/Kconfig        |    2 +-
- drivers/usb/host/Makefile       |    1 +
- drivers/usb/host/ehci-hcd.c     |    6 +--
- drivers/usb/host/ehci-w90x900.c |   90 +++++++++++++++++----------------------
- 4 files changed, 43 insertions(+), 56 deletions(-)
+> > So if I ignore the bus number, how could the PCI code find what is the
+> > matching interrupt?
+> 
+> Apologies if I've missed information about your hardware in the other
+> discussion (I've tried to keep up) - does your hardware raise a single host
+> interrupt for each pin regardless to which bridge they come in on - or do you
+> separate A,B,C,D host interrupts for each bridge?
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 8d18a6c..1b5e30b 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -245,7 +245,7 @@ config USB_EHCI_MV
- 	  only be EHCI host. OTG is controller that can switch to host mode.
- 
- config USB_W90X900_EHCI
--	bool "W90X900(W90P910) EHCI support"
-+	 tristate "W90X900(W90P910) EHCI support"
- 	depends on USB_EHCI_HCD && ARCH_W90X900
- 	---help---
- 		Enables support for the W90X900 USB controller
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 6c1d0e0..74db4d4 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -36,6 +36,7 @@ obj-$(CONFIG_USB_EHCI_S5P)      += ehci-s5p.o
- obj-$(CONFIG_USB_EHCI_MV)       += ehci-mv.o
- obj-$(CONFIG_USB_EHCI_HCD_VT8500)+= ehci-vt8500.o
- obj-$(CONFIG_USB_EHCI_MSM)      += ehci-msm.o
-+obj-$(CONFIG_USB_W90X900_EHCI)  += ehci-w90x900.o
- obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
- obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
- obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index d44115b..84ed7d7 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1267,11 +1267,6 @@ MODULE_LICENSE ("GPL");
- #define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
- #endif
- 
--#ifdef CONFIG_USB_W90X900_EHCI
--#include "ehci-w90x900.c"
--#define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
--#endif
--
- #ifdef CONFIG_USB_OCTEON_EHCI
- #include "ehci-octeon.c"
- #define PLATFORM_DRIVER		ehci_octeon_driver
-@@ -1314,6 +1309,7 @@ MODULE_LICENSE ("GPL");
- 	!IS_ENABLED(CONFIG_USB_EHCI_MV) && \
- 	!IS_ENABLED(CONFIG_ARCH_VT8500) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_MSM) && \
-+	!IS_ENABLED(CONFIG_USB_W90X900_EHCI) && \
- 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
- 	!defined(OF_PLATFORM_DRIVER) && \
- 	!defined(XILINX_OF_PLATFORM_DRIVER)
-diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
-index 59e0e24..0b677ec 100644
---- a/drivers/usb/host/ehci-w90x900.c
-+++ b/drivers/usb/host/ehci-w90x900.c
-@@ -13,11 +13,31 @@
- 
- #include <linux/platform_device.h>
- 
-+#include <linux/dma-mapping.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+#include <linux/io.h>
-+#include "ehci.h"
-+
- /* enable phy0 and phy1 for w90p910 */
- #define	ENPHY		(0x01<<8)
- #define PHY0_CTR	(0xA4)
- #define PHY1_CTR	(0xA8)
- 
-+#define DRIVER_DESC "Nuvoton w90x900 On-Chip EHCI Host driver"
-+
-+static const char hcd_name[] = "ehci-w90x900";
-+
-+static struct hc_driver __read_mostly ehci_w90x900_hc_driver;
-+
-+static const struct ehci_driver_overrides ehci_w90X900_overrides __initdata = {
-+	.reset = ehci_setup,
-+};
-+
- static int usb_w90x900_probe(const struct hc_driver *driver,
- 		      struct platform_device *pdev)
- {
-@@ -99,54 +119,6 @@ void usb_w90x900_remove(struct usb_hcd *hcd, struct platform_device *pdev)
- 	usb_put_hcd(hcd);
- }
- 
--static const struct hc_driver ehci_w90x900_hc_driver = {
--	.description = hcd_name,
--	.product_desc = "Nuvoton w90x900 EHCI Host Controller",
--	.hcd_priv_size = sizeof(struct ehci_hcd),
--
--	/*
--	 * generic hardware linkage
--	 */
--	.irq = ehci_irq,
--	.flags = HCD_USB2|HCD_MEMORY,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset = ehci_setup,
--	.start = ehci_run,
--
--	.stop = ehci_stop,
--	.shutdown = ehci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue = ehci_urb_enqueue,
--	.urb_dequeue = ehci_urb_dequeue,
--	.endpoint_disable = ehci_endpoint_disable,
--	.endpoint_reset = ehci_endpoint_reset,
--
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number = ehci_get_frame,
--
--	/*
--	 * root hub support
--	 */
--	.hub_status_data = ehci_hub_status_data,
--	.hub_control = ehci_hub_control,
--#ifdef	CONFIG_PM
--	.bus_suspend = ehci_bus_suspend,
--	.bus_resume = ehci_bus_resume,
--#endif
--	.relinquish_port	= ehci_relinquish_port,
--	.port_handed_over	= ehci_port_handed_over,
--
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
--};
--
- static int ehci_w90x900_probe(struct platform_device *pdev)
- {
- 	if (usb_disabled())
-@@ -168,12 +140,30 @@ static struct platform_driver ehci_hcd_w90x900_driver = {
- 	.probe  = ehci_w90x900_probe,
- 	.remove = ehci_w90x900_remove,
- 	.driver = {
--		.name = "w90x900-ehci",
-+		.name = hcd_name,
- 		.owner = THIS_MODULE,
- 	},
- };
- 
-+static int __init ehci_w90X900_init(void)
-+{
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+
-+	ehci_init_driver(&ehci_w90x900_hc_driver, &ehci_w90X900_overrides);
-+	return platform_driver_register(&ehci_hcd_w90x900_driver);
-+}
-+module_init(ehci_w90X900_init);
-+
-+static void __exit ehci_w90X900_cleanup(void)
-+{
-+	platform_driver_unregister(&ehci_hcd_w90x900_driver);
-+}
-+module_exit(ehci_w90X900_cleanup);
-+
- MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
--MODULE_DESCRIPTION("w90p910 usb ehci driver!");
-+MODULE_DESCRIPTION(DRIVER_DESC);
- MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:w90p910-ehci");
+There are separate A,B,C,D interrupts for each PCIe interface, and each
+PCIe interface is represented by an emulated PCI-to-PCI bridge. See my
+interrupt-map:
+
+			interrupt-map = <0x0800 0 0 1 &mpic 58
+				         0x1000 0 0 1 &mpic 59
+					 0x1800 0 0 1 &mpic 60
+					 0x2000 0 0 1 &mpic 61
+					 0x2800 0 0 1 &mpic 62
+				         0x3000 0 0 1 &mpic 63
+					 0x3800 0 0 1 &mpic 64
+					 0x4000 0 0 1 &mpic 65
+					 0x4800 0 0 1 &mpic 99
+					 0x5000 0 0 1 &mpic 103>;
+
+Here I have 10 PCIe interfaces, and therefore 10 interrupts.
+
+There is only one interrupt per PCIe interface, and for now, I don't
+distinguish A,B,C,D (I will do it later, it requires reading a register
+to know if the interrupt came from A, B, C or D, but that's a different
+problem).
+
+> If you have only 4 interrupt sources for legacy interrupts then you shouldn't
+> need to care which bus/device/function they were generated on (of_pci_map_irq
+> takes care of this for you).
+
+No, I have interrupts per PCIe interface, so I really need to take care
+of the relation between the PCIe device and the PCIe interface it is
+connected to.
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
