@@ -1,56 +1,47 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Thu,  7 Feb 2013 16:31:57 +0100
-Subject: [PATCH v2 2/3] atmel_lcdfb: move lcdcon2 register access to
- compute_hozval
-In-Reply-To: <1360251118-12715-1-git-send-email-jhovold@gmail.com>
-References: <20130205201145.GE30595@game.jcrosoft.org>
- <1360251118-12715-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1360251118-12715-3-git-send-email-jhovold@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 7 Feb 2013 08:46:06 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130207112459.5f382ad4@skate>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5106F9F9.3010905@wwwdotorg.org> <20130129094143.1aad9377@skate>
+ <20130129092006.GA16377@avionic-0098.mockup.avionic-design.de>
+ <20130207112459.5f382ad4@skate>
+Message-ID: <CAErSpo7UOTGH7kjYBADymDdgmHwPxbXqczeXm1BH9C+XViQDRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass atmel_lcd_info structure to compute_hozval and only do the register
-access on SOCs that actually use it.
+On Thu, Feb 7, 2013 at 3:24 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Thierry Reding,
+>
+> On Tue, 29 Jan 2013 10:20:06 +0100, Thierry Reding wrote:
+>
+>> > I didn't test recently, but with my first version of the patch set,
+>> > having an initialization as late as module_init() was too late. Some
+>> > PCI fixup code was being executed *before* we get the opportunity of
+>> > initializing the PCI driver, and it was crashing the kernel. I can
+>> > provide more details if you want.
+>>
+>> Does this patch perhaps fix this crash?
+>>
+>>       http://patchwork.ozlabs.org/patch/210870/
+>
+> I investigated a bit more, and managed to reproduce my crash even with
+> your patch applied. And indeed, my crash is really unrelated to the
+> pcibios function disappearing. Here is the kernel panic (and a short
+> analysis afterwards) :
 
-This will also simplify the removal of the cpu_is macros.
+Hi Thomas,
 
-Signed-off-by: Johan Hovold <jhovold@gmail.com>
----
- drivers/video/atmel_lcdfb.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Can you post the entire dmesg log, ideally with CONFIG_PCI_DEBUG=y?
+That should have more information about the enumeration process,
+including what we think the XHCI BARs are and the apertures leading to
+them.
 
-diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 86cafae..c707130 100644
---- a/drivers/video/atmel_lcdfb.c
-+++ b/drivers/video/atmel_lcdfb.c
-@@ -193,14 +193,17 @@ static struct fb_fix_screeninfo atmel_lcdfb_fix __initdata = {
- 	.accel		= FB_ACCEL_NONE,
- };
- 
--static unsigned long compute_hozval(unsigned long xres, unsigned long lcdcon2)
-+static unsigned long compute_hozval(struct atmel_lcdfb_info *sinfo,
-+							unsigned long xres)
- {
-+	unsigned long lcdcon2;
- 	unsigned long value;
- 
- 	if (!(cpu_is_at91sam9261() || cpu_is_at91sam9g10()
- 		|| cpu_is_at32ap7000()))
- 		return xres;
- 
-+	lcdcon2 = lcdc_readl(sinfo, ATMEL_LCDC_LCDCON2);
- 	value = xres;
- 	if ((lcdcon2 & ATMEL_LCDC_DISTYPE) != ATMEL_LCDC_DISTYPE_TFT) {
- 		/* STN display */
-@@ -590,8 +593,7 @@ static int atmel_lcdfb_set_par(struct fb_info *info)
- 	lcdc_writel(sinfo, ATMEL_LCDC_TIM2, value);
- 
- 	/* Horizontal value (aka line size) */
--	hozval_linesz = compute_hozval(info->var.xres,
--					lcdc_readl(sinfo, ATMEL_LCDC_LCDCON2));
-+	hozval_linesz = compute_hozval(sinfo, info->var.xres);
- 
- 	/* Display size */
- 	value = (hozval_linesz - 1) << ATMEL_LCDC_HOZVAL_OFFSET;
--- 
-1.8.1.1
+The PCI core assumes that we know the host bridge apertures up front,
+and I'm not sure that is true on your platform, so maybe we'll need
+some changes to accommodate that.
+
+Bjorn
