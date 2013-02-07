@@ -1,40 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Feb 2013 08:56:16 -0800
-Subject: [GIT PULL] ARM: OMAP: Audio support via omap-twl4030 and pwm
- support
-In-Reply-To: <51120494.6020407@ti.com>
-References: <50FE64DC.2030808@ti.com> <510788B9.9050907@ti.com>
- <20130130220532.GA22517@atomide.com>
- <20130204195251.GS22517@atomide.com> <5110D4ED.6030306@ti.com>
- <20130205184014.GK25185@atomide.com> <51120494.6020407@ti.com>
-Message-ID: <20130206165616.GW25185@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 07 Feb 2013 01:54:22 +0100
+Subject: [PATCH 06/14] ARM: pci: Keep pci_common_init() around after init
+In-Reply-To: <CACRpkdYV5w6BksUjXvXs=88BovUyXgRt-vXSD0twjRpzbZcvFQ@mail.gmail.com>
+References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
+ <1357764194-12677-7-git-send-email-thierry.reding@avionic-design.de>
+ <CACRpkdYV5w6BksUjXvXs=88BovUyXgRt-vXSD0twjRpzbZcvFQ@mail.gmail.com>
+Message-ID: <9348609.HjKCmL9u9S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [130205 23:25]:
-> On 02/05/2013 07:40 PM, Tony Lindgren wrote:
-> >> For some reason the CONFIG_DEBUG_SECTION_MISMATCH got disabled in my rolling
-> >> kernel config...
-> > 
-> > At least gcc version 4.3.5 (Debian 4.3.5-4) shows them. What's
-> > the compiler you have? 
+On Wednesday 06 February 2013 17:38:20 Linus Walleij wrote:
+> On Wed, Jan 9, 2013 at 9:43 PM, Thierry Reding
+> <thierry.reding@avionic-design.de> wrote:
 > 
-> It show for me as well now that I have enabled the
-> CONFIG_DEBUG_SECTION_MISMATCH in my config.
-
-Maybe update your build scripts to always just:
-$ ARCH=arm CONFIG_DEBUG_SECTION_MISMATCH=y make ...
- 
-> My GCC is:
-> armv7a-hardfloat-linux-gnueabi-gcc (Gentoo 4.7.2 p1.3, pie-0.5.5) 4.7.2
+> > When using deferred driver probing, PCI host controller drivers may
+> > actually require this function after the init stage.
+> >
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 > 
-> > Yes let's do that rather than start copying things around. I'll apply
-> > the following fix to the omap-for-v3.9/twl branch.
+> There seem to be a proliferation of these patches now.
 > 
-> Cool, thanks Tony. I will drop my patch and pick the one from omap-for-v3.9/twl.
+> Isn't this just papering over the real problem? The discarding
+> of __init sections need to happen *after* all deferred probes
+> are complete, lest we have to remove *all* __init sections from
+> *all* drivers in the kernel, don't we?
 
-OK will send that off today then.
+No, I think it's not quite that bad. I think the rule is still
+just that .probe() functions and anything called from them must
+not be __init. They used to be __devinit, which would cause
+problems with deferred probing on !HOTPLUG systems but that's
+gone in 3.9.
 
-Regards,
+Thierry's patch is just necessary because pci_common_init used
+to be called only from actual __init functions, and not it
+gets called from a .probe() function for the first time.
 
-Tony
+	Arnd
