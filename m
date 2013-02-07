@@ -1,62 +1,127 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 7 Feb 2013 17:39:49 +0000
-Subject: [PATCH] ARM: dts: add minimal DT support for DevKit8000
-In-Reply-To: <1360246297-5500-1-git-send-email-anilk4.v@gmail.com>
-References: <1360246297-5500-1-git-send-email-anilk4.v@gmail.com>
-Message-ID: <20130207173949.GA21723@e106331-lin.cambridge.arm.com>
+From: girishks2000@gmail.com (Girish KS)
+Date: Thu, 7 Feb 2013 09:46:58 -0800
+Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
+ init
+In-Reply-To: <1585017.derjdP1mHL@amdc1227>
+References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
+ <20130206102628.5E7413E1510@localhost>
+ <CAKrE-KdX+Nxk0X4xdz6Dx3WVtOpV+ms+gPB-Dq-MwZwetyZ5Nw@mail.gmail.com>
+ <1585017.derjdP1mHL@amdc1227>
+Message-ID: <CAKrE-KfyGCi_+FozSpGTy0A0VJP=Jq-1SHmvKJU02iJKWHcvLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Feb 7, 2013 at 3:09 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Girish,
+>
+> On Wednesday 06 of February 2013 12:12:29 Girish KS wrote:
+>> On Wed, Feb 6, 2013 at 2:26 AM, Grant Likely <grant.likely@secretlab.ca>
+> wrote:
+>> > On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S
+> <girishks2000@gmail.com> wrote:
+>> >> The status of the interrupt is available in the status register,
+>> >> so reading the clear pending register and writing back the same
+>> >> value will not actually clear the pending interrupts. This patch
+>> >> modifies the interrupt handler to read the status register and
+>> >> clear the corresponding pending bit in the clear pending register.
+>> >>
+>> >> Modified the hwInit function to clear all the pending interrupts.
+>> >>
+>> >> Signed-off-by: Girish K S <ks.giri@samsung.com>
+>> >> ---
+>> >>
+>> >>  drivers/spi/spi-s3c64xx.c |   41
+>> >>  +++++++++++++++++++++++++---------------- 1 file changed, 25
+>> >>  insertions(+), 16 deletions(-)
+>> >>
+>> >> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+>> >> index ad93231..b770f88 100644
+>> >> --- a/drivers/spi/spi-s3c64xx.c
+>> >> +++ b/drivers/spi/spi-s3c64xx.c
+>> >> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq,
+>> >> void *data)>>
+>> >>  {
+>> >>
+>> >>       struct s3c64xx_spi_driver_data *sdd = data;
+>> >>       struct spi_master *spi = sdd->master;
+>> >>
+>> >> -     unsigned int val;
+>> >> +     unsigned int val, clr = 0;
+>> >>
+>> >> -     val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>> >> +     val = readl(sdd->regs + S3C64XX_SPI_STATUS);
+>> >>
+>> >> -     val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
+>> >> -             S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
+>> >> -             S3C64XX_SPI_PND_TX_OVERRUN_CLR |
+>> >> -             S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+>> >> -
+>> >> -     writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>> >> -
+>> >> -     if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
+>> >> +     if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
+>> >> +             clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
+>> >>
+>> >>               dev_err(&spi->dev, "RX overrun\n");
+>> >>
+>> >> -     if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
+>> >> +     }
+>> >> +     if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
+>> >> +             clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
+>> >>
+>> >>               dev_err(&spi->dev, "RX underrun\n");
+>> >>
+>> >> -     if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
+>> >> +     }
+>> >> +     if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
+>> >> +             clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
+>> >>
+>> >>               dev_err(&spi->dev, "TX overrun\n");
+>> >>
+>> >> -     if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
+>> >> +     }
+>> >> +     if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
+>> >> +             clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+>> >>
+>> >>               dev_err(&spi->dev, "TX underrun\n");
+>> >>
+>> >> +     }
+>> >> +
+>> >> +     /* Clear the pending irq by setting and then clearing it */
+>> >> +     writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>> >> +     writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>> >
+>> > Wait, what?  clr & ~clr == 0   Always.  What are you actually trying
+>> > to do here?
+>> The user manual says, wirting 1 to the pending clear register clears
+>> the interrupt (its not auto clear to 0). so i need to explicitly reset
+>> those bits thats what the 2nd write does
+>
+> I have looked through user's manuals of different Samsung SoCs. All of
+> them said that writing 1 to a bit clears the corresponding interrupt, but
+> none of them contain any note that it must be manually cleared to 0.
+What i meant was the clear pending bit will not clear automatically.
+When I set the
+clear pending bit, it remains set. This is a problem for the next
+interrupt cycle.
+> In addition the expression
+>
+> clr & ~clr
+>
+> makes no sense, because it is equal to 0.
+It makes sense, because we are not disturbing the interrupt pending
+bit at position 0, which is a trailing clr bit.
+>
+> If you really need to clear those bits manually (and I don't think so),
+> you should replace this expression with 0.
+since we are not enabling (was not enabled in previous implementation)
+trailing byte interrupt, and not handling the same in handler
+we cannot write 0.
 
-I have a couple of minor comments.
-
-On Thu, Feb 07, 2013 at 02:11:37PM +0000, Anil Kumar wrote:
-> DevKit8000 is a beagle board clone from Timll, sold by
-> armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
-> S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
-> JTAG interface.
-> 
-> This patch adds the basic DT support for devkit8000. At this time, Information
-> of twl4030, MMC1, I2C1, leds and there pim mux information are added.
-> 
-> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
-> Tested-by: Thomas Weber <thomas@tomweber.eu>
-> ---
-> 
->  -This patch is based on top of kernel 3.8-rc5.
-> 
->  -Tested on Devkit8000.
-> 
-
-[...]
-
-> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-> new file mode 100644
-> index 0000000..9864fd7
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-> @@ -0,0 +1,125 @@
-> +/*
-> + * Anil Kumar <anilk4.v@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +/include/ "omap3.dtsi"
-> +/ {
-> +	model = "TI OMAP3 Devkit8000";
-
-Should this not be "TimLL Devkit8000" ?
-
-> +	compatible = "ti,omap3-devkit8000", "ti,omap3";
-
-"timll,devkit8000" ?
-
-[...]
-
-Thanks,
-Mark.
+>
+> Best regards,
+> --
+> Tomasz Figa
+> Samsung Poland R&D Center
+> SW Solution Development, Linux Platform
+>
