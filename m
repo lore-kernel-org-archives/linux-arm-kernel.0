@@ -1,35 +1,61 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 7 Feb 2013 11:12:06 +0100
-Subject: kernel 3.8 make problem
-In-Reply-To: <20130206170638.GJ17833@n2100.arm.linux.org.uk>
-References: <ttxj4oytvg02pxivwnruketi.1359554350723@email.android.com>
- <20130130150729.4aae5409@armhf> <51093541.3020309@openwrt.org>
- <20130206180305.3bbc2d4d@armhf>
- <20130206170638.GJ17833@n2100.arm.linux.org.uk>
-Message-ID: <20130207111206.153df673@armhf>
+From: will.newton@gmail.com (Will Newton)
+Date: Thu, 7 Feb 2013 10:19:05 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129083522.GA14302@pd.tnic>
+ <1359478014.3529.157.camel@shinybook.infradead.org>
+ <20130129174249.GB25415@pd.tnic>
+ <1359482147.3529.161.camel@shinybook.infradead.org>
+ <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <20130201011712.GF23505@n2100.arm.linux.org.uk>
+ <1359703995.23531.6.camel@shinybook.infradead.org>
+ <20130205210436.670c62e26d2121330e87af35@freescale.com>
+ <1360141322.6066.4.camel@shinybook.infradead.org>
+ <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+Message-ID: <CAFbHwiTCN5sFadXX7z7Smwd17tEZ7WmfKhG_6b3psu0bx228ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Feb 2013 17:06:38 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Thu, Feb 7, 2013 at 1:19 AM, Kim Phillips <kim.phillips@freescale.com> wrote:
+> On Wed, 6 Feb 2013 09:02:04 +0000
+> "Woodhouse, David" <david.woodhouse@intel.com> wrote:
+>
+>> On Tue, 2013-02-05 at 21:04 -0600, Kim Phillips wrote:
+>> > gcc -Os emits calls to __bswapsi2 on those platforms to save space
+>> > because they don't have the single rev byte swap instruction.
+>>
+>> Is that the right thing for GCC to do in that situation?
+>
+> if it saves space, why wouldn't it be?
+>
+> "Many of these functions are only optimized in certain cases; if they
+> are not optimized in a particular case, a call to the library
+> function is emitted." [1]
+>
+> I see "(arm_arch6 || !optimize_size)" in gcc's define_expand
+> "bswapsi2" source, so GCC considers size optimization as a
+> legitimate one of those cases.
+>
+>> If so, perhaps we should be *providing* __bswap[sd]i2 functions for it
+>> to use?
+>
+> either that, or link with libgcc - why does arch/arm64 do this and
+> arch/arm not?  It's not obvious from git log.
 
-> On Wed, Feb 06, 2013 at 06:03:05PM +0100, Jean-Francois Moine wrote:
-> > I moved to make 3.82 and also libc6 2.17 (my Cubox runs Debian armhf
-> > with kernel 3.8-rc6), and I can now make some programs (with make 2.81,
-> > I was getting a seg fault of the child after the first vfork), but I
-> > get the same errors when building a kernel. Does anybody have such a
-> > problem?
-> 
-> Are you using a 2G:2G VM split?  If so, don't (really no reason to use
-> that on the cubox.)
+One reason I have found, I don't know if it is the canonical one, is
+that linking with libgcc allows people to use all intrinsics e.g. soft
+float routines in the kernel without noticing it. If you limit the
+intrinsics to the ones linked into the kernel explicitly then this
+cannot happen.
 
-With 3/1 VM split, you cannot use at least 128Mb.
+I have also seen cases where the libgcc intrinsics are improved over
+time, having the code in the kernel allows these improvements to be
+rolled into the kernel even if the user has an older toolchain.
 
-But, thanks, you are right: 'make' works with 3/1, but not with 2/2 nor 1/3.
-The strangest thing is that all other programs seem to work fine.
-
-What is the devil with make?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+A number of ports link against libgcc and a roughly equal number do
+not, so it isn't clear that there's any consensus on the issue.
