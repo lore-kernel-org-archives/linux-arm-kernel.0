@@ -1,83 +1,83 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 07 Feb 2013 10:59:39 -0700
-Subject: [PATCH 09/14] pinctrl/abx500: use direct IRQ defines
-In-Reply-To: <CAF2Aj3jHe+mP0dU_BHThBV-va_iJLcFQedmWQOTaYafAZM1Yxg@mail.gmail.com>
-References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
- <1360093715-6348-10-git-send-email-linus.walleij@stericsson.com>
- <5112F1B9.6010700@wwwdotorg.org>
- <CAF2Aj3jHe+mP0dU_BHThBV-va_iJLcFQedmWQOTaYafAZM1Yxg@mail.gmail.com>
-Message-ID: <5113EB8B.4060002@wwwdotorg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 7 Feb 2013 16:04:58 -0200
+Subject: mx28evk does not boot with linux-next 20130207
+In-Reply-To: <20130207125801.GA19091@S2101-09.ap.freescale.net>
+References: <CAOMZO5Ar1T3Lg2KRvSLK-gjNAaAFAf39f6KqaYeF03w5bNj6EQ@mail.gmail.com>
+ <20130207125801.GA19091@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5D5ipAF0JOUOFezGz4Zr66M4bRm819ZurAfwPOrduBo5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2013 02:01 AM, Lee Jones wrote:
-> I don't see myself on cc. Was that intentional?
+On Thu, Feb 7, 2013 at 10:58 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Feb 07, 2013 at 09:47:58AM -0200, Fabio Estevam wrote:
+>> Hi,
+>>
+>> When booting linux-next 20130207 I get no kernel console output on a
+>> mx28evk. After selecting earlyprintk and CONFIG_DEBUG_LL=y support I
+>> get:
+>>
+>>   LD      vmlinux
+>>   SORTEX  vmlinux
+>> sort done marker at 514bcc
+>>   SYSMAP  System.map
+>>   OBJCOPY arch/arm/boot/Image
+>>   Kernel: arch/arm/boot/Image is ready
+>>   GZIP    arch/arm/boot/compressed/piggy.gzip
+>>   AS      arch/arm/boot/compressed/debug.o
+>> arch/arm/boot/compressed/debug.S: Assembler messages:
+>> arch/arm/boot/compressed/debug.S:6: Error: garbage following
+>> instruction -- `ldr
+>> r2,=IOMEM((0xf4000000+((((0x80000000+0x074000))&0x80000000)>>7)+((((0x80000000+0x074000))&0x000fffff))))'
+>>
+>> Is this a known issue?
+>>
+> Yes.  The following change should fix the problem.
 
-The original patch was that way; I assume git send-email only CC'd you
-on patches written by you.
+Yes, it fixes the build issue and now I get:
 
-> I quite like the idea of this.
-> 
-> Stephen,
-> 
-> It doesn't mean the other patch was wrong, it just transfers the math.
-
-Ah, I see. The issue is that the code below clearly calculates the hwirq
-differently, and it wasn't immediately obvious that this part of the
-patch for example:
-
->  struct abx500_gpio_irq_cluster ab8500_gpio_irq_cluster[] = {
-> -	GPIO_IRQ_CLUSTER(6,  13, 34),
-> -	GPIO_IRQ_CLUSTER(24, 25, 24),
-> -	GPIO_IRQ_CLUSTER(36, 41, 14),
-> +	GPIO_IRQ_CLUSTER(6,  13, AB8500_INT_GPIO6R),
-> +	GPIO_IRQ_CLUSTER(24, 25, AB8500_INT_GPIO24R),
-> +	GPIO_IRQ_CLUSTER(36, 41, AB8500_INT_GPIO36R),
->  };
-
-... actually changes the values in the table (AB8500_INT_GPIO6R is 40,
-so when using that value, you need to subtract of the value 6 for the
-base to get the original 34).
-
-> I wouldn't squash it into mine. I like the transition and the
-> possibility to revert it if there's been some mistake.
-> 
-> (not to say there is one, but just in case.)
-> 
-> Sent from my mobile Linux device.
-> 
-> On Feb 7, 2013 12:14 AM, "Stephen Warren" <swarren@wwwdotorg.org
-> <mailto:swarren@wwwdotorg.org>> wrote:
-> 
->     On 02/05/2013 12:48 PM, Linus Walleij wrote:
->     > From: Linus Walleij <linus.walleij@linaro.org
->     <mailto:linus.walleij@linaro.org>>
->     >
->     > Make it harder to do mistakes by introducing the actual
->     > defined ABx500 IRQ number into the IRQ cluster definitions.
->     > Deduct cluster offset from the GPIO offset to make each
->     > cluster coherent.
-> 
->     Shouldn't this patch be squashed into the previous patch to avoid churn?
-> 
->     >  static struct abx500_pinctrl_soc_data ab9540_soc = {
-> 
->     > @@ -273,8 +273,7 @@ static int abx500_gpio_to_irq(struct gpio_chip
->     *chip, unsigned offset)
-> 
->     > -                     hwirq = gpio + cluster->to_irq;
->     > -
->     > +                     hwirq = gpio - cluster->start + cluster->to_irq;
->     >                       return
->     irq_create_mapping(pct->parent->domain, hwirq);
-> 
->     In particular, this change implies that the previous patch was simply
->     incorrect, although I haven't really thought about it in detail.
->     --
->     To unsubscribe from this list: send the line "unsubscribe
->     linux-kernel" in
->     the body of a message to majordomo at vger.kernel.org
->     <mailto:majordomo@vger.kernel.org>
->     More majordomo info at  http://vger.kernel.org/majordomo-info.html
->     Please read the FAQ at  http://www.tux.org/lkml/
-> 
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 3.8.0-rc6-next-20130207-dirty
+(fabio at fabio-Latitude-E6410) (gcc version 4.4.4 (4.4.4_09.06.2010) )
+#1062
+Thu Feb 7 16:00:51 BRST 2013
+[    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+[    0.000000] CPU: VIVT data cache, VIVT instruction cache
+[    0.000000] Machine: Freescale i.MX28 (Device Tree), model:
+Freescale i.MX28 Evaluation Kit
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] Memory policy: ECC disabled, Data cache writeback
+[    0.000000] Internal error: Oops - undefined instruction: 0 [#1] ARM
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0    Not tainted  (3.8.0-rc6-next-20130207-dirty #1062)
+[    0.000000] PC is at paging_init+0x63c/0x6fc
+[    0.000000] LR is at paging_init+0x614/0x6fc
+[    0.000000] pc : [<c04fc48c>]    lr : [<c04fc464>]    psr: 600000d3
+[    0.000000] sp : c051df60  ip : 00100000  fp : 000000cf
+[    0.000000] r10: 0000000f  r9 : 000001cf  r8 : 00000009
+[    0.000000] r7 : c051df68  r6 : c0531f20  r5 : f5100000  r4 : 00000000
+[    0.000000] r3 : 20000001  r2 : f5200000  r1 : f5100000  r0 : c7ffdfa0
+[    0.000000] Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM
+Segment kernel
+[    0.000000] Control: 0005317f  Table: 40004000  DAC: 00000017
+[    0.000000] Process swapper (pid: 0, stack limit = 0xc051c1b8)
+[    0.000000] Stack: (0xc051df60 to 0xc051e000)
+[    0.000000] df60: 00000000 c0513270 ffff0000 00047fff 00001000
+00000008 41069265 c0513270
+[    0.000000] df80: c0558534 40008000 c05141e0 c051dfdc 41069265
+4051323c 00000000 c04f9d34
+[    0.000000] dfa0: 00000000 00053177 00000001 c052403c c05141dc
+c05278bc 40004000 41069265
+[    0.000000] dfc0: 4051323c c04f8630 00000000 00000000 00000000
+00000000 00000000 c05141e0
+[    0.000000] dfe0: 00000000 00053175 c052403c c05141dc c05278bc
+40008040 00000000 00000000
+[    0.000000] [<c04fc48c>] (paging_init+0x63c/0x6fc) from
+[<c04f9d34>] (setup_arch+0x340/0x5b4)
+[    0.000000] [<c04f9d34>] (setup_arch+0x340/0x5b4) from [<c04f8630>]
+(start_kernel+0x74/0x298)
+[    0.000000] [<c04f8630>] (start_kernel+0x74/0x298) from
+[<40008040>] (0x40008040)
+[    0.000000] Code: 1affffd9 ee074f9a ee084f16 ee084f15 (ee074fd5)
+[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
+[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
