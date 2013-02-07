@@ -1,52 +1,22 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 7 Feb 2013 09:51:11 -0600
-Subject: [PATCH 2/2] dmaengine: OMAP: Register SDMA controller with Device
- Tree DMA driver
-In-Reply-To: <201302071439.13720.arnd@arndb.de>
-References: <1360184596-1603-1-git-send-email-jon-hunter@ti.com>
- <1360184596-1603-3-git-send-email-jon-hunter@ti.com>
- <201302071439.13720.arnd@arndb.de>
-Message-ID: <5113CD6F.3060108@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Feb 2013 16:52:16 +0100
+Subject: [PATCH v2 00/10] rework pxa gpio driver for pinctrl
+In-Reply-To: <5113C921.5060502@compulab.co.il>
+References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdbNZ4g-beSw=p3v7-QCtLO8sLg__XmhpPLvpvfqDnRLFw@mail.gmail.com>
+ <CAD6h2NSBaQ2SBiqUaxD+oTh9T_UnLKjcGjaqi8n=rts8mOmHmg@mail.gmail.com>
+ <5113C921.5060502@compulab.co.il>
+Message-ID: <CACRpkda2H4SCYkWgQeokG3BqE3GrC+xVn9qgRXNgFSyTF91zvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 7, 2013 at 4:32 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
 
-On 02/07/2013 08:39 AM, Arnd Bergmann wrote:
-> On Wednesday 06 February 2013, Jon Hunter wrote:
->> +static struct of_dma_filter_info info;
-> 
-> Both members of this structure are constant, so you can just initialize it here,
-> and it would be nice to give it a more descriptive name, such as omap_dmadev_info.
-> 
->>  static struct platform_driver omap_dma_driver = {
->>  	.probe	= omap_dma_probe,
->>  	.remove	= omap_dma_remove,
->>  	.driver = {
->>  		.name = "omap-dma-engine",
->>  		.owner = THIS_MODULE,
->> +		.of_match_table = of_match_ptr(omap_dma_match)
->>  	},
->>  };
-> 
-> please end the new line with a comma.
+> Wait a moment, I have a problem with NFS root:
+(...)
+> So, please, wait on merging this!
 
-Ok.
+OK holding back this patch set for now.
 
->> @@ -673,7 +702,7 @@ static int omap_dma_init(void)
->>  {
->>  	int rc = platform_driver_register(&omap_dma_driver);
->>  
->> -	if (rc == 0) {
->> +	if ((rc == 0) && (!of_have_populated_dt())) {
->>  		pdev = platform_device_register_full(&omap_dma_dev_info);
->>  		if (IS_ERR(pdev)) {
->>  			platform_driver_unregister(&omap_dma_driver);
-> 
-> There is already a patch in linux-next that makes this obsolete.
-> The device is now registered in arch/arm/mach-omap2/dma.c, so
-> I guess you have to change that location now.
-
-Thanks. Will rebase on top of linux-next.
-
-Cheers
-Jon
+Yours,
+Linus Walleij
