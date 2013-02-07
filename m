@@ -1,77 +1,74 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 7 Feb 2013 10:00:00 -0700
-Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
- for Armada XP
-In-Reply-To: <201302070824.51125.arnd@arndb.de>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302062241.14444.arnd@arndb.de>
- <20130207010502.GA7435@obsidianresearch.com>
- <201302070824.51125.arnd@arndb.de>
-Message-ID: <20130207170000.GA10834@obsidianresearch.com>
+From: dirac3000@gmail.com (dirac3000)
+Date: Thu, 07 Feb 2013 18:08:35 +0100
+Subject: [PATCH 1/1] DMA: PL330: allow submitting 2 requests at a time
+In-Reply-To: <CABb+yY2o2eWj4KY3immegSB26QcEYAykbpjJohL3ri1+8RPQFA@mail.gmail.com>
+References: <1360233523-20825-1-git-send-email-dirac3000@gmail.com>
+ <CABb+yY3iPoXBFpKgmdTijeee71Xz9dkwjcay8keu+vsdWtDfXw@mail.gmail.com>
+ <5113B03D.5010206@gmail.com>
+ <CABb+yY2o2eWj4KY3immegSB26QcEYAykbpjJohL3ri1+8RPQFA@mail.gmail.com>
+Message-ID: <5113DF93.3080401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 08:24:50AM +0000, Arnd Bergmann wrote:
+On 02/07/2013 03:12 PM, Jassi Brar wrote:
 
-> Yes, but the mbus-matrix node in the example would need a ranges property
-> to map the addresses according to how the windows are set up.
+> On Thu, Feb 7, 2013 at 7:16 PM, dirac3000<dirac3000@gmail.com>  wrote:
+>> On 02/07/2013 12:31 PM, Jassi Brar wrote:
+>>
+>>> On Thu, Feb 7, 2013 at 4:08 PM, Alvaro Moran<dirac3000@gmail.com>   wrote:
+>>>>
+>>>> Due to the original driver design, only one request was processed at a
+>>>> time by the driver, even if the low-level part of the driver was able to
+>>>> handle 2 requests.
+>>>> With this patch we are able to create 2 microcodes per thread and to
+>>>> launch the second transfer on the interrupt handler of the first one,
+>>>> instead of having to wait for the tasklet to generate the microcode.
+>>>>
+>>> The following seems more appropriate and complete. Does it fix your
+>>> problem?
+>>>
+>>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>>> index 758122f..a821d71 100644
+>>> --- a/drivers/dma/pl330.c
+>>> +++ b/drivers/dma/pl330.c
+>>> @@ -2292,13 +2292,12 @@ static inline void fill_queue(struct
+>>> dma_pl330_chan *pch)
+>>>
+>>>                  /* If already submitted */
+>>>                  if (desc->status == BUSY)
+>>> -                       break;
+>>> +                       continue;
+>>>
+>>>                  ret = pl330_submit_req(pch->pl330_chid,
+>>>                                                  &desc->req);
+>>>                  if (!ret) {
+>>>                          desc->status = BUSY;
+>>> -                       break;
+>>>                  } else if (ret == -EAGAIN) {
+>>>                          /* QFull or DMAC Dying */
+>>>                          break;
+>>
+>>
+>>
+>> Actually that isn't good enough. With your patch it will keep on looping on
+>> the pch->work_list entries, but it will call pl330_submit_req the first time
+>> only. I want it to call the function twice, so it will generate 2 microcodes
+>> (one per available request) and it will be ready the moment we get into the
+>> interrupt handler.
+>
+> Why would it "keep on looping"? It's a for loop that will exit after
+> iterating over the list once or when the lower layer indicates QFull -
+> whichever comes first. Practically it achieves the same effect only
+> without introducing a new local variable 'busy_reqs'
+> Did you actually test the patch? If yes and it didn't work, please
+> share some log suitable log.
+> thnx.
 
-I'll hang on to this for next time the moving windows config to DT
-discussion comes up..
 
+Oh, my fault, you are right, I didn't read it carefully!
+Now I actually tested the patch, so I am 100% sure it works and it 
+increases the performance of the requests when they are correctly queued.
 
-> > Maybe.. according to the standard the ranges in this stanza should
-> > reflect the bridge configuration, but that isn't known when the DT is
-> > written. An empty ranges means identity and that isn't really right
-> > either.
-> 
-> Ok, I thought it was an identity mapping here.
-> 
-> > Also, what should 'reg' be so that the PCI core binds the OF nodes
-> > properly?  The standard says reg should have the configuration space
-> > address of the bridge, and I noticed Thierry was using something that
-> > almost looked like a config space address in his driver..
-> 
-> Well, that assumes that a bridge is addressed using configuration space,
-> which IIRC is normally the case but not here.
+Thanks,
 
-With Thomas's driver each link has a PCI-PCI bridge in config space, and
-'configuration space address' is that wonky format OF defines for
-encoding the bus/device/function number into the 3 dword address. So
-the correct thing is to put the bus/device/function of the PCI-PCI
-bridge for the link in the reg value.
-
-> I never really understood the 'assigned-addresses' property, but it looks
-> sensible.
-
-assigned-addresses does the same thing as reg in simple bus, but
-handles all the wonky PCI address translation
- 
-> >  - The CPU physical address window to use for the IO space
-> >    is set via io-cpu-window, not much choice here, the PCI
-> >    format ranges must be 0 based.
-> 
-> I don't think I understand this part. Why can't you put this into
-> ranges as before?
-> 
-> -       0x81000000 0x00000000 0x00000000  0x00000000  0x0 0xa0000
-> +	0x81000000 0x00000000 0x00000000  0xc0000000  0x0 0xa0000
-
-The OF PCI core translates 0x81000000 IO space addresess into a 'struct
-resource' tagged with IORESOURCE_IO.
-
-But 0xc0000000 is not an IORESOURCE_IO address, it is an
-IORESOURCE_MEM address..
-
-So, I think with the current OF code this has to be 0, otherwise your
-IORESOURCE_IO's end up starting at 0xc000000 - but maybe there is some
-trickyness to work with in here? (Although none of this matters when
-Linux does resource assignment, the OF translation code is never
-enganged)
-
-But I agree, 0xc0000000 seems much better...
-
-To think about it from a different angle, what would you put in the
-4th dword on x86? How do you describe the IO numberspace in DT on x86?
-
-Jason
+-Alvaro
