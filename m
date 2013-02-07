@@ -1,30 +1,26 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Thu, 07 Feb 2013 14:44:27 +1030
-Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
-In-Reply-To: <510FBC01.2030405@linux.vnet.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <510FBC01.2030405@linux.vnet.ibm.com>
-Message-ID: <87haloiwv0.fsf@rustcorp.com.au>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Wed, 6 Feb 2013 23:27:10 -0500
+Subject: DMAEngine and channel pairs
+Message-ID: <CAKON4Oxmvc3ShbFVoeGH5ftcDNPSi9TN0bLp0bL9GF6yyTwF1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com> writes:
-> On 01/22/2013 01:03 PM, Srivatsa S. Bhat wrote:
->                  Avg. latency of 1 CPU offline (ms) [stop-cpu/stop-m/c latency]
->
-> # online CPUs    Mainline (with stop-m/c)       This patchset (no stop-m/c)
->
->       8                 17.04                          7.73
->
->      16                 18.05                          6.44
->
->      32                 17.31                          7.39
->
->      64                 32.40                          9.28
->
->     128                 98.23                          7.35
+The CPU I'm working on uses two sequential DMA channels to implement
+scatter-gather.  How do you handle this in the channel allocator? If
+scatter-gather is not requested the two channels work fine as normal
+DMA channels.
 
-Nice!  I wonder how the ARM guys feel with their quad-cpu systems...
+So when a scatter-gather channel is requested my driver needs to fail
+the dma_alloc_chan_resources() requests until a sequential pair is
+located? Plus I need to track what channels are used in my driver so
+that I know where sequential pairs are. Is there a better way to do
+this?
 
-Thanks!
-Rusty.
+Another solution might be to statically allocate some channels as
+being scatter/gather capable and others as not being able to do it. I
+would just report fewer available channels to dmaengine and hide those
+secondary channels from it. I have 12 channels to work with.
+
+--
+Jon Smirl
+jonsmirl at gmail.com
