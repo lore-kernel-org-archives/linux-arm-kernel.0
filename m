@@ -1,44 +1,79 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Feb 2013 13:21:46 +0800
-Subject: [PATCH v2] ARM: mxs: Select ARM_CPU_SUSPEND
-In-Reply-To: <1360201645-2456-1-git-send-email-festevam@gmail.com>
-References: <1360201645-2456-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130207052145.GC7697@S2101-09.ap.freescale.net>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu,  7 Feb 2013 10:45:25 +0530
+Subject: [PATCH 1/5] ARM: dts: exynos5250-arndale: Add node entry for
+ gpio-buttons
+Message-ID: <1360214129-4096-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 11:47:25PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Select ARM_CPU_SUSPEND so that suspend/resume can be tested on mxs platforms.
-> 
-> Tested on a mx28evk board:
-> 
-> $ echo enabled > /sys/devices/80000000.apb/80040000.apbx/80074000.serial/tty/ttyAMA0/power/wakeup
-> $ echo mem > /sys/power/state
-> [  507.040000] PM: Syncing filesystems ... done.
-> [  507.060000] mmc0: card e624 removed
-> [  507.160000] Freezing user space processes ... (elapsed 0.01 seconds) done.
-> [  507.180000] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
-> [  507.200000] Suspending console(s) (use no_console_suspend to debug)
-> 
-> (Then send any character via DUART to wakeup the system).
-> 
-> [  507.220000] PM: suspend of devices complete after 10.468 msecs
-> [  507.220000] PM: late suspend of devices complete after 3.531 msecs
-> [  507.230000] PM: noirq suspend of devices complete after 5.187 msecs
-> [  507.230000] PM: noirq resume of devices complete after 2.312 msecs
-> [  507.230000] PM: early resume of devices complete after 2.437 msecs
-> [  507.320000] PM: resume of devices complete after 81.312 msecs
-> [  507.360000] Restarting tasks ... done.
-> [  507.530000] mmc0: new SDHC card at address e624
-> [  507.550000] mmcblk0: mmc0:e624 SU04G 3.69 GiB
-> [  507.560000]  mmcblk0: p1 p2 p3
-> [  509.240000] libphy: 800f0000.etherne:01 - Link is Down
-> [  511.240000] libphy: 800f0000.etherne:01 - Link is Up
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Added GPIO buttons DT node to Arndale board file.
 
-It's late for 3.9, so queued it for 3.10.
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+This series is based on for-next branch of Kukjin Kim's tree
+and added on top of the below patch:
+https://patchwork.kernel.org/patch/2042451/
+---
+ arch/arm/boot/dts/exynos5250-arndale.dts |   48 ++++++++++++++++++++++++++++++
+ 1 files changed, 48 insertions(+), 0 deletions(-)
 
-Shawn
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index 63572f9..9ce40df 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -119,4 +119,52 @@
+ 	spi_2: spi at 12d40000 {
+ 		status = "disabled";
+ 	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		menu {
++			label = "SW-TACT2";
++			gpios = <&gpx1 4 0 0x10000 2>;
++			linux,code = <139>;
++			gpio-key,wakeup;
++		};
++
++		home {
++			label = "SW-TACT3";
++			gpios = <&gpx1 5 0 0x10000 2>;
++			linux,code = <102>;
++			gpio-key,wakeup;
++		};
++
++		up {
++			label = "SW-TACT4";
++			gpios = <&gpx1 6 0 0x10000 2>;
++			linux,code = <103>;
++			gpio-key,wakeup;
++		};
++
++		down {
++			label = "SW-TACT5";
++			gpios = <&gpx1 7 0 0x10000 2>;
++			linux,code = <108>;
++			gpio-key,wakeup;
++		};
++
++		back {
++			label = "SW-TACT6";
++			gpios = <&gpx2 0 0 0x10000 2>;
++			linux,code = <158>;
++			gpio-key,wakeup;
++		};
++
++		wakeup {
++			label = "SW-TACT7";
++			gpios = <&gpx2 1 0 0x10000 2>;
++			linux,code = <143>;
++			gpio-key,wakeup;
++		};
++	};
+ };
+-- 
+1.7.4.1
