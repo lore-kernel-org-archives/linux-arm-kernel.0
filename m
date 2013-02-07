@@ -1,29 +1,28 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 7 Feb 2013 10:32:17 +0200
-Subject: OMAP baseline test results for v3.8-rc6
-In-Reply-To: <alpine.DEB.2.00.1302062333270.12769@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1302062333270.12769@utopia.booyaka.com>
-Message-ID: <20130207083217.GA15462@arwen.pp.htv.fi>
+Date: Thu, 7 Feb 2013 10:39:46 +0200
+Subject: [PATCH 0/2] ARM: dts: Add DT bindings for OMAP SDMA
+In-Reply-To: <1360184596-1603-1-git-send-email-jon-hunter@ti.com>
+References: <1360184596-1603-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20130207083946.GB15462@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Feb 06, 2013 at 11:34:32PM +0000, Paul Walmsley wrote:
-> Boot tests:
+On Wed, Feb 06, 2013 at 03:03:14PM -0600, Jon Hunter wrote:
+> Adds device-tree bindings from SDMA on OMAP2+ devices. DMA client
+> bindings are also added for devices that have SPI and MMC bindings
+> populated. Client binding data is based upon existing HWMOD data for
+> OMAP and has been checked against OMAP documentation.
 > 
-> * am335xbone: hangs after "Starting kernel"
->   - Cause unknown
->   - http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82297.html
->   - http://marc.info/?l=linux-omap&m=135903184512238&w=2
->   - http://www.mail-archive.com/linux-omap at vger.kernel.org/msg83942.html
+> Testing includes ...
+> 1. Boot tested on OMAP3430 Beagle board, OMAP4430 Panda board and
+>    OMAP4460 Panda board with and without device-tree present.
+> 2. Testing of MMC1 with SD card on OMAP3430 Beagle board, OMAP4430
+>    Panda board and OMAP4460 Panda board with and without device-tree
+>    present.
 
-After testing quite a lot and having help from other folks, the problem
-(for me at least) was missing fdt_high in u-boot environment.
+looks alright to me:
 
-setenv fdt_high 0xffffffff
-
-fixed everything.
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
 -- 
 balbi
@@ -33,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130207/2a1c0bf4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130207/0b15cb2a/attachment.sig>
