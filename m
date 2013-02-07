@@ -1,53 +1,56 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 7 Feb 2013 12:22:53 +0000
-Subject: [RFC PATCH] ARM: Export the CPU logical map to modules
-In-Reply-To: <1359394444-16610-1-git-send-email-dave.martin@linaro.org>
-References: <1359394444-16610-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20130207122253.GA2309@linaro.org>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 7 Feb 2013 14:30:27 +0200
+Subject: [PATCH] OMAPDSS: enable omapdss for ARCH_MULTIPLATFORM
+In-Reply-To: <201302071155.12565.arnd@arndb.de>
+References: <1358891160-9534-1-git-send-email-robdclark@gmail.com>
+ <3969096.QosOfOb9QT@wuerfel> <511392B0.4040409@ti.com>
+ <201302071155.12565.arnd@arndb.de>
+Message-ID: <51139E63.2030302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2013-02-07 13:55, Arnd Bergmann wrote:
 
-Does anyone have a comment on this?
+> omapdrm still has the 'select' statement in it if you only send the
+> first patch, so it should not be possible to disable omapdss when
+> it is actually needed.
 
-Cheers
----Dave
+Yes, you're right. After adding ARCH_MULTIPLATFORM, the kconfig enables
+omapdss fully even if enabled by select. So select is only a problem if
+omapdss is enabled when omapdss's dependencies are missing.
 
-On Mon, Jan 28, 2013 at 05:34:04PM +0000, Dave Martin wrote:
-> It is reasonable for loadable modules to be CPU topology aware
-> (particular examples include cpufreq and cpuidle drivers).
-> 
-> This patch exports __cpu_logical_map, so that modules can use the
-> cpu_logical_map() interface declared in <asm/smp_plat.h>.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
-> If anyone has a strong view on whether this should be
-> EXPORT_SYMBOL_GPL(), I don't have a problem with changing
-> that.  I'm not sure of the precise etiquette here.
-> Certainly this does not feel like a very "public" interface.
-> 
-> Perhaps we should wrap this in a real function for export
-> to modules, rather than encouraging them to poke the
-> __cpu_logical_map[] array (albeit via a predefined macro).
-> 
-> 
->  arch/arm/kernel/setup.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 3f6cbb2..1b9e5bf 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -428,6 +428,7 @@ void cpu_init(void)
->  }
->  
->  int __cpu_logical_map[NR_CPUS];
-> +EXPORT_SYMBOL(__cpu_logical_map);
->  
->  void __init smp_setup_processor_id(void)
->  {
-> -- 
-> 1.7.4.1
-> 
+> I suggested doing only the minimum that is needed to unbreak the
+> allyesconfig build, which is to enable just omapdss but not omapfb
+> and the displays, in case they don't actually build on anything else.
+
+omapfb and the displays build also fine on all platforms. But it's true
+that they are not needed to fix allyesconfig.
+
+> I would suggest only the first patch, since Linus quite specifically
+> asked only for serious bug fixes. I think an allyesconfig build
+> breakage is serious enough, but doing multiple patches for one
+> bug should not be necessary and is much harder to justify.
+
+Well, as I see, the bug is omapdrm using "select", not "depends on". So
+if I'd have to pick one patch, I'd send 0003. That would fix allyesconfig.
+
+Applying only 0003 means that omapdrm (and omapdss) won't be built on
+ARCH_MULTIPLATFORM, but building omapdrm on ARCH_MULTIPLATFORM is a
+feature added in this merge window, so leaving it out is not a regression.
+
+But I'm not sure if I'm being overly pedantic here. Patch 0001 would fix
+allyesconfig, and allow building omapdrm with ARCH_MULTIPLATFORM.
+However, the fixing there happens as a side effect, and so the 0001
+patch isn't even called a "fix" in its subject. That's the reason I'm a
+bit reluctant with the 0001 patch as a fix.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130207/8ad26331/attachment.sig>
