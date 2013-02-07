@@ -1,208 +1,99 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 7 Feb 2013 15:57:32 +0900
-Subject: [PATCH 6/9] gpiolib: use descriptors internally
-In-Reply-To: <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
-References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
- <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
-Message-ID: <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 7 Feb 2013 08:28:24 +0100
+Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
+ for Armada XP
+In-Reply-To: <20130207010502.GA7435@obsidianresearch.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-23-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302062241.14444.arnd@arndb.de>
+ <20130207010502.GA7435@obsidianresearch.com>
+Message-ID: <20130207072824.GA24827@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 6, 2013 at 2:53 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sat, Feb 2, 2013 at 5:29 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
->
->> Make sure gpiolib works internally with descriptors and (chip, offset)
->> pairs instead of using the global integer namespace. This prepares the
->
-> Its a numberspace not a namespace right?
+On Wed, Feb 06, 2013 at 06:05:02PM -0700, Jason Gunthorpe wrote:
+[...]
+> Also, what should 'reg' be so that the PCI core binds the OF nodes
+> properly?  The standard says reg should have the configuration space
+> address of the bridge, and I noticed Thierry was using something that
+> almost looked like a config space address in his driver..
+> 
+> But that seems overly tricky.. When using the link stanzas, shouldn't
+> this scheme be more like this:
+> 
+> // The PCI-E host bridge
+> pex at 0 {
+>    device_type = "pciex"; // <<-- Important!!
 
-Yes, absolutely.
+That might actually work but is somewhat dangerous. I originally tried
+to trick the OF code into parsing the ranges properly by setting this to
+"pci". However that breaks horribly because of_bus_pci_match() in
+drivers/of/address.c will cause the parent bus of the pex@0 controller
+to be PCI, which will cause #address-cells == 3 and #size-cells == 2,
+and thus messing up the address translation because you actually have
+#address-cells == 1 and #size-cells == 1.
 
->> +/*
->> + * Internal gpiod_* API using descriptors instead of the integer namespace.
->> + * Most of this should eventually go public.
->> + */
->> +static int gpiod_request(struct gpio_desc *desc, const char *label);
->> +static void gpiod_free(struct gpio_desc *desc);
->> +static int gpiod_direction_input(struct gpio_desc *desc);
->> +static int gpiod_direction_output(struct gpio_desc *desc, int value);
->> +static int gpiod_set_debounce(struct gpio_desc *desc, unsigned debounce);
->> +static int gpiod_get_value_cansleep(struct gpio_desc *desc);
->> +static void gpiod_set_value_cansleep(struct gpio_desc *desc, int value);
->> +static int gpiod_get_value(struct gpio_desc *desc);
->> +static void gpiod_set_value(struct gpio_desc *desc, int value);
->> +static int gpiod_cansleep(struct gpio_desc *desc);
->> +static int gpiod_to_irq(struct gpio_desc *desc);
->> +static int gpiod_export(struct gpio_desc *desc, bool direction_may_change);
->> +static int gpiod_export_link(struct device *dev, const char *name,
->> +                            struct gpio_desc *desc);
->> +static int gpiod_sysfs_set_active_low(struct gpio_desc *desc, int value);
->> +static void gpiod_unexport(struct gpio_desc *desc);
->
-> Usually I don't like these upfrons forward-declarations, but in this
-> case I *do* because they are here for a reason, to later become
-> extern. So I like it!
+The code doesn't seem to match on "pciex", so you might get away with
+it, but I don't see why exactly it would be necessary. For one it is
+actually wrong as the device isn't a PCI device but a platform device.
+What I did to solve the ranges parsing problem is to use of_find_bus()
+instead of of_match_bus() in of_pci_process_ranges(), so that the cell
+count is correct.
 
-Yeah, you know how the movie is going to end already. ;) Maybe it
-would make sense to append the gpiod patches to this series and not
-end up with these declarations?
+>    ranges = <
+>       // Driver internal control registers in MMIO space
+>       0x82000000 0x10000000 0xd0040000  0xd0040000  0x0 0x8000000
 
->> +/*
->> + * Return the GPIO number of the passed descriptor relative to its chip
->> + */
->> +static int gpio_chip_hwgpio(const struct gpio_desc *desc)
->> +{
->> +       return (desc - &gpio_desc[0]) - desc->chip->base;
->> +}
->
-> That was a scary method. But it works as long as the
-> descriptors are in a static array I guess...
+I'm not sure I understand what you're doing here. Where does the
+0x10000000 in cell 2 come from?
 
-Yes, and it's becomes less scary when the static array goes away.
+I also just noticed that I used 0x00000800 in the first cell, maybe that
+should be 0x02000800, though I think that didn't quite work for some
+reason. I'll need to check that. The odd part about this is that the
+address is in fact not within PCI MMIO space at all, so I'm not sure
+this is even a correct way to represent it. However I find it quite
+intuitive to do so and it is really the only way to make the translation
+from the PCI-PCI bridge's reg property work while at the same time
+having a proper PCI address for the port.
 
->> +/**
->> + * Convert a GPIO number to its descriptor
->> + */
->> +static struct gpio_desc *gpio_to_desc(unsigned gpio)
->> +{
->> +       if (WARN(!gpio_is_valid(gpio), "invalid GPIO %d\n", gpio))
->> +               return NULL;
->
-> Don't we want to return ERR_PTR(-EINVAL); here?
->
-> Then you can use IS_ERR() on the pointers later.
->
-> This is the approach taken by the external API for clk
-> and pins.
+Note that 0x82000800 would probably not be correct as it'd indicate that
+the address is relocatable, which it really isn't.
 
-Yes, that completely makes sense.
+>       // CPU 0xe0000000 -> e8000000 bridged to PCI MMIO
+>       0x82000000 0x00000000 0xe0000000  0xe0000000  0x0 0x8000000
+>       // CPU IO bus 0x0000000 -> 0xa0000 bridged to PCI IO
+>       0x81000000 0x00000000 0x00000000  0x00000000  0x0 0xa0000
+>       // CPU 0xe8000000 -> f0000000 bridged to PCI MMIO, prefetchable
+>       0xC2000000 0x00000000 0xe8000000  0xe8000000  0x0 0x8000000
+>       >;
 
->>  /* caller holds gpio_lock *OR* gpio is marked as requested */
->
-> That comment should be above the *next* function right?
->
-> Strictly speaking it does not apply to gpiod_to_chip() if
-> I read it right.
+These look good.
 
-That's right. On a related topic there are actually a whole set of
-comments that are not in the right place (because the function that
-follows them has been switched to the gpiod prefix). I left them here
-because once the gpiod interface becomes public they will be updated
-to apply to them, and moving comments back and forth in such a short
-time would only make the patches confusing.
+>    // PCI-PCI bridge to Physical link 0
+>    pcie at 0,0 {
+>      device_type = "pciex";
+>      // The configuration space address of the PCI-PCI bridge required by OF
+>      reg = <0x80 0 0  0 0>; // Bus 0, Dev 0x10, Fn 0
 
->>  static ssize_t gpio_direction_show(struct device *dev,
->>                 struct device_attribute *attr, char *buf)
->>  {
->> -       const struct gpio_desc  *desc = dev_get_drvdata(dev);
->> -       unsigned                gpio = desc - gpio_desc;
->> +       struct gpio_desc        *desc = dev_get_drvdata(dev);
->
-> Why not const anymore?
->
-> (Applies to all these similar cases in the patch.)
->
-> consting is nice. Especially in subsystem code.
-> I know it is hard to get compilation right without warnings
-> at times. But it pays off.
->
-> In the pinctrl subsystem I spend endless hours reading this
-> wiki page:
->
-> http://en.wikipedia.org/wiki/Const-correctness
->
-> I still don't quite get it. And it also wears off. But I like to use it.
+I think the first cell should be 0x800.
 
-Oh I do share your love for const-correctness (look at the parameters
-for gpio_chip_hwgpio() and desc_to_gpio()). Only here I could not
-preserve it AFAICT.
+> 
+>      /* The 'bar' on the PCI-PCI bridge, maps to internal control
+>         registers, required by the driver. */
+>      assigned-addresses = <0x82000000 0x10000000 0xd0040000  0 0x2000>;
+>      // ..
+>   }
 
-The previous version of the function was only using desc locally and
-relied on GPIO numbers to do the dirty job. Here however, we pass desc
-to gpiod_get_direction(). So you will tell me, that as it only returns
-the direction its parameter could also be const and that's true -
-excepted when it tries to clear some bits in desc->flags, there we
-definitely cannot claim it is const anymore. Maybe we could cast the
-pointer given to clear_bit/set_bit, but I'm not sure that's more
-elegant. Ideally gpiod_get_direction() should not modify its parameter
-at all.
+The PCI DT binding says that each entry in the assigned-addresses
+property is to correspond to one of the PCI device's base address
+registers. So unless this is actually the value that ends up being
+written to one of the BARs I don't think this is correct.
 
->> @@ -594,29 +647,32 @@ static ssize_t export_store(struct class *class,
->> +       desc = gpio_to_desc(gpio);
->
-> I hope you have tested this hunk of the patch from userspace?
->
->> @@ -637,17 +694,18 @@ static ssize_t unexport_store(struct class *class,
->
-> This too?
->
-> (etc for the userspace interfaces)
-
-Yes. Side-question: should I explicitly add my "Tested-by" in this
-cases? I thought that the author's Signed-off implied that the patch
-has been properly tested, but your question tend to suggest it's not
-*that* obvious... ;)
-
->> +       if (status) {
->> +               int gpio = -1;
->> +               if (desc)
->> +                       gpio = desc_to_gpio(desc);
->>                 pr_debug("%s: gpio-%d status %d\n",
->>                         __func__, gpio, status);
->> +       }
->>         return status;
->>  }
->
-> So using ERR_PTR/PTR_ERR helps you propagate
-> errors in situations like these.
->
-> Just:
->
-> if (IS_ERR(desc))
->     status = PTR_ERR(desc);
-
-Yes, that would make these blocks look much better.
-
->>         /* Open drain pin should not be driven to 1 */
->>         if (value && test_bit(FLAG_OPEN_DRAIN,  &desc->flags))
->> -               return gpio_direction_input(gpio);
->> +               return gpiod_direction_input(desc);
->>
->>         /* Open source pin should not be driven to 0 */
->>         if (!value && test_bit(FLAG_OPEN_SOURCE,  &desc->flags))
->> -               return gpio_direction_input(gpio);
->> +               return gpiod_direction_input(desc);
->>
->>         spin_lock_irqsave(&gpio_lock, flags);
->>
->> -       if (!gpio_is_valid(gpio))
->> +       if (!desc)
->
-> if (IS_ERR(desc)) ?
-
-It's worse actually, we potentially access desc right before checking
-it it's not NULL... Makes no sense at all. Thanks for pointing this.
-
->> +       offset = gpio_chip_hwgpio(desc);
->
-> Maybe rename to hwgpio? Or is that done later?
->
-> We should stick with either hwgpio or offset everywhere or
-> it will be a mess.
-
-Will replace all these "offset" by "hwgpio" for consistency.
-
-> Basically the patch is very nice but I'd like you to iron out and proofread
-> as per above so we have strong consistency, strong const:ing,
-> and stringent naming (offset vs hwgpio come to mind).
-
-Yes, there are some inconsistencies (and "inconstistencies") that
-remains, e.g. automatically converting calls to gpio_is_valid() into a
-check that the descriptor is not NULL was not the best idea. I will
-fix the patch according to your comments and then check the whole file
-to make sure I have not missed anything. Might do some random
-unrelated catches in the process.
-
-Thanks for the review!
-Alex.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130207/5e9430fb/attachment.sig>
