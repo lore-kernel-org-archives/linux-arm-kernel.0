@@ -1,116 +1,45 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 7 Feb 2013 15:21:13 +0530
-Subject: [PATCH] ARM: davinci: da850: add DT node for I2C0
-In-Reply-To: <1360143382-24607-1-git-send-email-manishv.b@ti.com>
-References: <1360143382-24607-1-git-send-email-manishv.b@ti.com>
-Message-ID: <51137911.8080303@ti.com>
+From: jjo.braun@gmail.com (Johannes Braun)
+Date: Thu, 7 Feb 2013 11:00:56 +0100
+Subject: Freescale imx35 kernel 3.6, no kernel boot messages
+In-Reply-To: <20130206174320.0ac0c863@jobraun>
+References: <20130206174320.0ac0c863@jobraun>
+Message-ID: <CADwvPCsj0jbjS448bvJLb0jsLp+Uafw7VPwB7=TBcRRAchXA3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/6/2013 3:06 PM, Vishwanathrao Badarkhe, Manish wrote:
-> Add I2C0 device tree and pin muxing information to da850-evm.
-> Also, add OF_DEV_AUXDATA for I2C0 controller driver in da850
-> board dt file to use I2C0 clock.
-> Verified i2c0 node gets created in sys class interface as
-> "/sys/class/i2c-dev/i2c-0/subsystem/i2c-0".
+> currently I`m trying to port the DENX 3.6 stable kernel for the flea3
+> board from carmedialabs. The board is based on a Freescale imx35
+> processor. Therefore I had a look at Stefano Bacics fork in the DENX
+> git repo, where I found a branch for the flea3 board. Compiling the
+> kernel required a modification of arch/arm/mach-imx/mach-flea3.c where
+> I had to replace .boot_params against .atag_offset in MACHINE_START.
+> Know my problem is that I can't see kernel boot messages. The boot uart
+> is uart2. So it has to be ttymxc2.
+>
+> The machine id is also added to arch/arm/tools/mach-types.h
+> +flea3 MACH_FLEA3 FLEA3 3668
+>
+> After the message:
+> Uncompressing Kernel Image ... OK
+> the board is completly silent and I can`t see any boot messages.
+>
+> But the kernel does not hang. I checked it with a bdi3000. When I step
+> through the start_kernel() function, there are some printk outputs.
+> These outputs are reached, but nothing is show via uart2.
+>
+> As I read, newer kernels like 3.6 are using the common clk framework.
+> Do I have to enable the clock for the uart2 in
+> arch/arm/mach-imx/clk-imx35.c via clk_prepare_enable(clk[uart2_gate])?
+> I checked this, but had no success.
+>
+> DEBUG_LL is disabled.
+>
+> In uboot I didn`t change anything. ttymxc2 is configured in the
+> bootparams. All the parameters are the same as with the 3.0.0 kernel.
+>
+> Did someone had success running a kernel greater than 3.0 on a
+> freescale imx35 board?
 
-That's not enough testing! (I know this would have gotten more testing
-as part of the bigger series you posted earlier). I tested on da850 evm
-with i2cdetect and i2cdump and it works fine.
-
-> 
-> Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
-> ---
-> Applies on top of v3.8-rc6 of linus tree.
-> Depends on
->  - drivers/pinctrl: grab default handles from device core
->    http://www.gossamer-threads.com/lists/linux/kernel/1665411
->  - ARM: davinci: da850: add interrupt-parent property in soc node
->    https://patchwork.kernel.org/patch/2044101/
->  - ARM: davinci: da850: add pinctrl support
->    http://comments.gmane.org/gmane.linux.davinci/25993
-> 
-> :100644 100644 433027f... 738d5d4... M	arch/arm/boot/dts/da850-evm.dts
-> :100644 100644 4b02167... a0072aa... M	arch/arm/boot/dts/da850.dtsi
-> :100644 100644 37c27af... 95ca4e9... M	arch/arm/mach-davinci/da8xx-dt.c
->  arch/arm/boot/dts/da850-evm.dts  |    6 ++++++
->  arch/arm/boot/dts/da850.dtsi     |   14 ++++++++++++++
->  arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
->  3 files changed, 27 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index 433027f..738d5d4 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -27,6 +27,12 @@
->  		serial2: serial at 1d0d000 {
->  			status = "okay";
->  		};
-> +		i2c0: i2c at 1c22000 {
-> +			status = "okay";
-> +			clock-frequency = <100000>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c0_pins>;
-> +		};
->  	};
->  	nand_cs3 at 62000000 {
->  		status = "okay";
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 4b02167..a0072aa 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -56,6 +56,12 @@
->  					0x30 0x01100000  0x0ff00000
->  				>;
->  			};
-> +			i2c0_pins: pinmux_i2c0_pins {
-> +				pinctrl-single,bits = <
-> +					/* I2C0_SDA,I2C0_SCL */
-> +					0x10 0x00002200 0x0000ff00
-> +				>;
-> +			};
->  		};
->  		serial0: serial at 1c42000 {
->  			compatible = "ns16550a";
-> @@ -81,6 +87,14 @@
->  			interrupts = <61>;
->  			status = "disabled";
->  		};
-> +		i2c0: i2c at 1c22000 {
-> +			compatible = "ti,davinci-i2c";
-> +			reg = <0x22000 0x1000>;
-> +			interrupts = <15>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
->  	};
->  	nand_cs3 at 62000000 {
->  		compatible = "ti,davinci-nand";
-> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> index 37c27af..95ca4e9 100644
-> --- a/arch/arm/mach-davinci/da8xx-dt.c
-> +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> @@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
->  	of_irq_init(da8xx_irq_match);
->  }
->  
-> +struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
-> +	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
-> +	{}
-> +};
-> +
->  #ifdef CONFIG_ARCH_DAVINCI_DA850
->  
->  static void __init da850_init_machine(void)
->  {
-> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +	of_platform_populate(NULL, of_default_bus_match_table,
-> +				da850_auxdata_lookup, NULL);
-
-'checkpatch --strict' complains here of improper alignment. I fixed it
-locally. I am planning to send this to upstreams and see if this can
-make it for v3.9, but its pretty late already and it depends..
-
-Thanks,
-Sekhar
+I found the issue. There was a parameter missing in MACHINE_START. I
+added .handle_irq = imx35_handle_irq and now I can see the boot output
+over uart2.
