@@ -1,84 +1,31 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Feb 2013 23:48:38 +0000
-Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
- init
-In-Reply-To: <CAKrE-KdX+Nxk0X4xdz6Dx3WVtOpV+ms+gPB-Dq-MwZwetyZ5Nw@mail.gmail.com>
-References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
- <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
- <20130206102628.5E7413E1510@localhost>
- <CAKrE-KdX+Nxk0X4xdz6Dx3WVtOpV+ms+gPB-Dq-MwZwetyZ5Nw@mail.gmail.com>
-Message-ID: <CACxGe6uOaoRbtuovEsA87d-MtCbGNd3KZCeHXbBQaEpp6NZ7fA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 06 Feb 2013 17:07:31 -0700
+Subject: [PATCH 02/14] mfd: ab8500: provide a irq_set_type() function
+In-Reply-To: <1360093715-6348-3-git-send-email-linus.walleij@stericsson.com>
+References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
+ <1360093715-6348-3-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <5112F043.6040700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 6, 2013 at 8:12 PM, Girish KS <girishks2000@gmail.com> wrote:
-> On Wed, Feb 6, 2013 at 2:26 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S <girishks2000@gmail.com> wrote:
->>> The status of the interrupt is available in the status register,
->>> so reading the clear pending register and writing back the same
->>> value will not actually clear the pending interrupts. This patch
->>> modifies the interrupt handler to read the status register and
->>> clear the corresponding pending bit in the clear pending register.
->>>
->>> Modified the hwInit function to clear all the pending interrupts.
->>>
->>> Signed-off-by: Girish K S <ks.giri@samsung.com>
->>> ---
->>>  drivers/spi/spi-s3c64xx.c |   41 +++++++++++++++++++++++++----------------
->>>  1 file changed, 25 insertions(+), 16 deletions(-)
->>>
->>> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
->>> index ad93231..b770f88 100644
->>> --- a/drivers/spi/spi-s3c64xx.c
->>> +++ b/drivers/spi/spi-s3c64xx.c
->>> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
->>>  {
->>>       struct s3c64xx_spi_driver_data *sdd = data;
->>>       struct spi_master *spi = sdd->master;
->>> -     unsigned int val;
->>> +     unsigned int val, clr = 0;
->>>
->>> -     val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>> +     val = readl(sdd->regs + S3C64XX_SPI_STATUS);
->>>
->>> -     val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
->>> -             S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
->>> -             S3C64XX_SPI_PND_TX_OVERRUN_CLR |
->>> -             S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->>> -
->>> -     writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>> -
->>> -     if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
->>> +     if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
->>> +             clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
->>>               dev_err(&spi->dev, "RX overrun\n");
->>> -     if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
->>> +     }
->>> +     if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
->>> +             clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
->>>               dev_err(&spi->dev, "RX underrun\n");
->>> -     if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
->>> +     }
->>> +     if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
->>> +             clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
->>>               dev_err(&spi->dev, "TX overrun\n");
->>> -     if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
->>> +     }
->>> +     if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
->>> +             clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->>>               dev_err(&spi->dev, "TX underrun\n");
->>> +     }
->>> +
->>> +     /* Clear the pending irq by setting and then clearing it */
->>> +     writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>> +     writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>
->> Wait, what?  clr & ~clr == 0   Always.  What are you actually trying to do here?
-> The user manual says, wirting 1 to the pending clear register clears
-> the interrupt (its not auto clear to 0). so i need to explicitly reset
-> those bits thats what the 2nd write does
+On 02/05/2013 12:48 PM, Linus Walleij wrote:
+> From: Lee Jones <lee.jones@linaro.org>
+> 
+> In the AB8500 IRQ mask and unmask functions, we rely on testing for
+> IRQ_TYPE_EDGE_RISING and IRQ_TYPE_EDGE_FALLING interrupts to
+> physically mask and unmask the correct interrupt lines. In order
+> for us to do that, the trigger needs to be set in the associated
+> flags. However, unless a irq_set_type() function pointer is passed
+> when registering the IRQ chip, the IRQ subsystem will refuse to do
+> it. For that reason, we're providing one.
 
-Then write 0. That's the result of what the code does anyway, but the
-code as-written is nonsensical.
+> diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
 
-g.
+> +static int ab8500_irq_set_type(struct irq_data *data, unsigned int type)
+> +{
+> +	return 0;
+> +}
+
+I think patch 0 implied that only rising/falling edges can be detected,
+not levels? If so, should that function validate that the requested type
+can be supported?
