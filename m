@@ -1,50 +1,27 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Feb 2013 13:56:08 -0500 (EST)
-Subject: [PATCH v4 08/15] ARM: vexpress: introduce DCSCB support
-In-Reply-To: <20130207181404.GC14528@arm.com>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-9-git-send-email-nicolas.pitre@linaro.org>
- <20130207181404.GC14528@arm.com>
-Message-ID: <alpine.LFD.2.02.1302071355010.6300@xanadu.home>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 07 Feb 2013 11:05:01 -0800
+Subject: [PATCH 09/10] USB: EHCI: make ehci-msm a separate driver
+In-Reply-To: <5113e62e.c84e420a.08c3.ffffbf14@mx.google.com> (manjunath
+ goudar's message of "Thu, 7 Feb 2013 23:04:06 +0530")
+References: <5113e62e.c84e420a.08c3.ffffbf14@mx.google.com>
+Message-ID: <8yaa9rglzc2.fsf@huya.quicinc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Feb 2013, Catalin Marinas wrote:
+manjunath.goudar at linaro.org writes:
 
-> Hi Nico,
-> 
-> On Tue, Feb 05, 2013 at 05:22:05AM +0000, Nicolas Pitre wrote:
-> > +static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
-> > +{
-> > +	unsigned int rst_hold, cpumask = (1 << cpu);
-> > +
-> > +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> > +	if (cpu >= 4 || cluster >= 2)
-> > +		return -EINVAL;
-> > +
-> > +	/*
-> > +	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
-> > +	 * variant exists, we need to disable IRQs manually here.
-> > +	 */
-> > +	local_irq_disable();
-> > +	arch_spin_lock(&dcscb_lock);
-> > +
-> > +	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-> > +	if (rst_hold & (1 << 8)) {
-> > +		/* remove cluster reset and add individual CPU's reset */
-> > +		rst_hold &= ~(1 << 8);
-> > +		rst_hold |= 0xf;
-> > +	}
-> > +	rst_hold &= ~(cpumask | (cpumask << 4));
-> > +	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-> 
-> Why do you mix relaxed and non-relaxed I/O accessors here? Do you need
-> the barriers implied by writel()?
+> +MODULE_DESCRIPTION(DRIVER_DESC);
+> +MODULE_ALIAS("platform:omap-msm");
+> +MODULE_LICENSE("GPL");
 
-Most likely not.  I'll change that.
+omap-msm?  I think you mean msm-ehci.
 
-For the record, this patch is not part of the pull request I sent 
-recently.
+I don't have any hardware to test this on, so hopefully someone can
+chime in after testing it.
 
+David
 
-Nicolas
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
