@@ -1,33 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 7 Feb 2013 11:55:47 +0000
-Subject: [PATCH 3/4] spi: s3c64xx: add gpio quirk for controller
-In-Reply-To: <1360105784-12282-4-git-send-email-ks.giri@samsung.com>
-References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
- <1360105784-12282-4-git-send-email-ks.giri@samsung.com>
-Message-ID: <20130207115546.GA3801@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Feb 2013 12:15:43 +0000
+Subject: [GIT PULL 2/4] ARM broadcast timer updates for 3.9
+In-Reply-To: <20130205223728.GA14851@quad.lixom.net>
+References: <1359986131-13034-1-git-send-email-will.deacon@arm.com>
+ <1359986131-13034-2-git-send-email-will.deacon@arm.com>
+ <20130204152426.GG17786@n2100.arm.linux.org.uk>
+ <20130205223728.GA14851@quad.lixom.net>
+Message-ID: <20130207121543.GF15387@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 03:09:43PM -0800, Girish K S wrote:
-> This patch adds support for spi controllers with
-> dedicated clk/miso/mosi/cs pins. It skips the gpio
-> parsing and initialization for controllers that
-> have dedicated pins.
+Hi Olof,
 
->  		if (sdd->tgl_spi != spi) { /* if last mssg on diff device */
->  			/* Deselect the last toggled device */
->  			cs = sdd->tgl_spi->controller_data;
-> -			gpio_set_value(cs->line,
-> -				spi->mode & SPI_CS_HIGH ? 0 : 1);
-> +			if (!(sdd->port_conf->quirks & S3C64XX_SPI_QUIRK_GPIO))
-> +				gpio_set_value(cs->line,
-> +					spi->mode & SPI_CS_HIGH ? 0 : 1);
->  		}
+On Tue, Feb 05, 2013 at 10:37:28PM +0000, Olof Johansson wrote:
+> On Mon, Feb 04, 2013 at 03:24:26PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Feb 04, 2013 at 01:55:29PM +0000, Will Deacon wrote:
+> > > This is the second part of the kvm-related series and moves ARM over to
+> > > the generic timer broadcast implementation, currently queued by tglx in
+> > > -tip.
+> > > 
+> > > Please note that, due to this dependency, this branch contains mainline
+> > > up to ~-rc6, so you may want to keep it on a separate branch to avoid
+> > > pulling in a bunch of unrelated changes from -tip.
+> > 
+> > Both 1 and 2 pulled and merged.  I'll wait 24 hours before pushing this out
+> > so that the nightly build can have a go at it before the new devel-stable
+> > branch gets published.
+> 
+> Sounds good. I'll deal with 3 and 4 once you're happy with 1/2 and
+> they're out, since we need the same as base.
 
-This isn't going to work with system designs which ignore the /CS line
-the controller has and just use a GPIO instead.  This is very common,
-for example when connecting multiple devices to the same SPI bus.
+1 and 2 are now in rmk's devel-stable branch, so we should be good to go
+with the third series. As highlighted by me and Rob, the fourth set likely
+needs a new base in arm-soc to minimise both the diffstat and number of
+merge conflicts.
 
-It seems like there's really two changes here.  One change is making the
-provision of pinmux information optional, the other is allowing the user
-to use the controller /CS management rather than using GPIO.
+Cheers,
+
+Will
