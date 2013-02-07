@@ -1,63 +1,75 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Wed, 6 Feb 2013 19:19:05 -0600
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <1360141322.6066.4.camel@shinybook.infradead.org>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
-Message-ID: <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Thu, 7 Feb 2013 08:59:58 +0800
+Subject: [PATCH v3 1/2 net-next] net: fec: correct fix method about miss init
+ spinlock
+Message-ID: <1360198799-25173-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Feb 2013 09:02:04 +0000
-"Woodhouse, David" <david.woodhouse@intel.com> wrote:
+Old method will cause init spinlock twice.
+New method will avoid init spinlock twice and fix miss init spinlock
+at fec_restart.
 
-> On Tue, 2013-02-05 at 21:04 -0600, Kim Phillips wrote:
-> > gcc -Os emits calls to __bswapsi2 on those platforms to save space
-> > because they don't have the single rev byte swap instruction.
-> 
-> Is that the right thing for GCC to do in that situation?
+BUG: spinlock bad magic on CPU#1, swapper/0/1
+lock: 0xbfae0f8c, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
+Backtrace:
+ [<80011d54>] (dump_backtrace+0x0/0x10c) from [<804e7800>] (dump_stack+0x18/0x1c)
+ r6:bfae0000 r5:bfae0f8c r4:00000000 r3:806c1310
+ [<804e77e8>] (dump_stack+0x0/0x1c) from [<804e9f20>] (spin_dump+0x80/0x94)
+ [<804e9ea0>] (spin_dump+0x0/0x94) from [<804e9f60>] (spin_bug+0x2c/0x30)
+ r5:805f6f8c r4:bfae0f8c
+ [<804e9f34>] (spin_bug+0x0/0x30) from [<80257984>] (do_raw_spin_lock+0x170/0x1b0                                         )
+ r5:806b4950 r4:bfae0f8c
+ [<80257814>] (do_raw_spin_lock+0x0/0x1b0) from [<804ed15c>] (_raw_spin_lock_irqs                                         ave+0x18/0x20)
+ [<804ed144>] (_raw_spin_lock_irqsave+0x0/0x20) from [<8033c694>] (fec_ptp_start_                                         cyclecounter+0x3c/0x120)
+ r4:bfae0f8c r3:00000002
+ [<8033c658>] (fec_ptp_start_cyclecounter+0x0/0x120) from [<80339e08>] (fec_resta                                         rt+0x56c/0x5f8)
+ r8:00000000 r7:806e6f48 r6:00000112 r5:806b4950 r4:bfae0000
+ [<8033989c>] (fec_restart+0x0/0x5f8) from [<8033b9e4>] (fec_probe+0x508/0xa48)
 
-if it saves space, why wouldn't it be?
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+Change from v2 to v3.
+ * rebase to net-next
+ * revert old fix
 
-"Many of these functions are only optimized in certain cases; if they
-are not optimized in a particular case, a call to the library
-function is emitted." [1]
+Change from v2 to v1.
+ * avoid reinit hwreg_lock twice
 
-I see "(arm_arch6 || !optimize_size)" in gcc's define_expand
-"bswapsi2" source, so GCC considers size optimization as a
-legitimate one of those cases.
+ drivers/net/ethernet/freescale/fec.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
 
-> If so, perhaps we should be *providing* __bswap[sd]i2 functions for it
-> to use?
-
-either that, or link with libgcc - why does arch/arm64 do this and
-arch/arm not?  It's not obvious from git log.
-
-> If not, perhaps there should be a PR filed?
-> 
-> Or is our use case justifiably different to the general case of '-Os'?
-> If so, why?
-
-shouldn't be - a patch, such as this, that claims to reduce code
-size, and that only turns on the new built-in when
-CC_OPTIMIZE_FOR_SIZE is off, is generally not good :)
-
-OTOH, the target here is armv6+ performance - not armv4,5 code
-density - the OPTIMIZE_FOR_SIZE protection prevents armv4,5 build
-breakage.
-
-Kim
-
-[1] http://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html#Other-Builtins
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 51215e1..0fe68c4 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -1609,7 +1609,6 @@ static int fec_enet_init(struct net_device *ndev)
+ 	}
+ 
+ 	spin_lock_init(&fep->hw_lock);
+-	spin_lock_init(&fep->tmreg_lock);
+ 
+ 	fep->netdev = ndev;
+ 
+@@ -1841,6 +1840,9 @@ fec_probe(struct platform_device *pdev)
+ 
+ 	fec_reset_phy(pdev);
+ 
++	if (fep->bufdesc_ex)
++		fec_ptp_init(ndev, pdev);
++
+ 	ret = fec_enet_init(ndev);
+ 	if (ret)
+ 		goto failed_init;
+@@ -1856,9 +1858,6 @@ fec_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto failed_register;
+ 
+-	if (fep->bufdesc_ex)
+-		fec_ptp_init(ndev, pdev);
+-
+ 	return 0;
+ 
+ failed_register:
+-- 
+1.7.1
