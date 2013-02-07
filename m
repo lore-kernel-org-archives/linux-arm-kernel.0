@@ -1,53 +1,36 @@
-From: avinashphilip@ti.com (Philip Avinash)
-Date: Thu, 7 Feb 2013 18:06:58 +0530
-Subject: [PATCH v2 4/4] mtd: nand: omap2: Low power transition support
-In-Reply-To: <1360240618-11094-1-git-send-email-avinashphilip@ti.com>
-References: <1360240618-11094-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1360240618-11094-5-git-send-email-avinashphilip@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 7 Feb 2013 12:50:39 +0000
+Subject: [PATCH] OMAPDSS: enable omapdss for ARCH_MULTIPLATFORM
+In-Reply-To: <51139E63.2030302@ti.com>
+References: <1358891160-9534-1-git-send-email-robdclark@gmail.com>
+ <201302071155.12565.arnd@arndb.de> <51139E63.2030302@ti.com>
+Message-ID: <201302071250.39923.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Low power transition support in nand driver. Also
-ensures the current transaction finishes before going to low power mode
-with _suspend support in mtd layer.
+On Thursday 07 February 2013, Tomi Valkeinen wrote:
+> > I would suggest only the first patch, since Linus quite specifically
+> > asked only for serious bug fixes. I think an allyesconfig build
+> > breakage is serious enough, but doing multiple patches for one
+> > bug should not be necessary and is much harder to justify.
+> 
+> Well, as I see, the bug is omapdrm using "select", not "depends on". So
+> if I'd have to pick one patch, I'd send 0003. That would fix allyesconfig.
+> 
+> Applying only 0003 means that omapdrm (and omapdss) won't be built on
+> ARCH_MULTIPLATFORM, but building omapdrm on ARCH_MULTIPLATFORM is a
+> feature added in this merge window, so leaving it out is not a regression.
+> 
+> But I'm not sure if I'm being overly pedantic here. Patch 0001 would fix
+> allyesconfig, and allow building omapdrm with ARCH_MULTIPLATFORM.
+> However, the fixing there happens as a side effect, and so the 0001
+> patch isn't even called a "fix" in its subject. That's the reason I'm a
+> bit reluctant with the 0001 patch as a fix.
 
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
----
- drivers/mtd/nand/omap2.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Makes sense. I suggested the same initially, but Rob preferred enabling
+DSS on multiplatform as well, since he wants to see broad build coverage
+for the DRM part. We should probably do that in 3.9, but for 3.8,
+just changing DRM to depend on DSS seems like the least intrusive
+choice.
 
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 8e820dd..790215b 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -2103,9 +2103,28 @@ static int omap_nand_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int omap_nand_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct mtd_info *mtd = platform_get_drvdata(pdev);
-+
-+	mtd->_suspend(mtd);
-+	return 0;
-+}
-+
-+static int omap_nand_resume(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+#endif
-+
- static struct platform_driver omap_nand_driver = {
- 	.probe		= omap_nand_probe,
- 	.remove		= omap_nand_remove,
-+#ifdef CONFIG_PM
-+	.suspend	= omap_nand_suspend,
-+	.resume		= omap_nand_resume,
-+#endif
- 	.driver		= {
- 		.name	= DRIVER_NAME,
- 		.owner	= THIS_MODULE,
--- 
-1.7.9.5
+	Arnd
