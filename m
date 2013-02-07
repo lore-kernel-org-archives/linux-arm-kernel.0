@@ -1,92 +1,89 @@
 From: manjunath.goudar@linaro.org (manjunath.goudar at linaro.org)
-Date: Thu,  7 Feb 2013 23:04:03 +0530
-Subject: [PATCH 06/10] USB: EHCI: make ehci-s5p a separate driver
+Date: Thu,  7 Feb 2013 23:04:04 +0530
+Subject: [PATCH 07/10] USB: EHCI: make ehci-mv a separate driver
 In-Reply-To: <1360258447-27247-1-git-send-email-yes>
 References: <yes>
  <1360258447-27247-1-git-send-email-yes>
-Message-ID: <5113e616.c84e420a.08c3.ffffbeed@mx.google.com>
+Message-ID: <5113e61e.c84e420a.08c3.ffffbefa@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Manjunath Goudar <manjunath.goudar@linaro.org>
 
-Separate the s5p host controller driver from ehci-hcd host code
+Separate the mv(marvell) host controller driver from ehci-hcd host code
 into its own driver module.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
 Cc: Greg KH <greg@kroah.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: linux-usb at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
 ---
  drivers/usb/host/Kconfig    |    2 +-
  drivers/usb/host/Makefile   |    1 +
  drivers/usb/host/ehci-hcd.c |    6 +---
- drivers/usb/host/ehci-s5p.c |   69 +++++++++++++++++++++++--------------------
- 4 files changed, 40 insertions(+), 38 deletions(-)
+ drivers/usb/host/ehci-mv.c  |   81 ++++++++++++++++++++-----------------------
+ 4 files changed, 40 insertions(+), 50 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 5a13f9d..f2e0ed3 100644
+index f2e0ed3..e7c3ce0 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -221,7 +221,7 @@ config USB_EHCI_SH
- 	  If you use the PCI EHCI controller, this option is not necessary.
- 
- config USB_EHCI_S5P
--       boolean "S5P EHCI support"
-+       tristate "S5P EHCI support"
-        depends on USB_EHCI_HCD && PLAT_S5P
-        help
+@@ -227,7 +227,7 @@ config USB_EHCI_S5P
  	 Enable support for the S5P SOC's on-chip EHCI controller.
+ 
+ config USB_EHCI_MV
+-	bool "EHCI support for Marvell on-chip controller"
++	tristate "EHCI support for Marvell on-chip controller"
+ 	depends on USB_EHCI_HCD && (ARCH_PXA || ARCH_MMP)
+ 	select USB_EHCI_ROOT_HUB_TT
+ 	---help---
 diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 96b4839..5c4f5e1 100644
+index 5c4f5e1..677f1d3 100644
 --- a/drivers/usb/host/Makefile
 +++ b/drivers/usb/host/Makefile
-@@ -32,6 +32,7 @@ obj-$(CONFIG_USB_EHCI_HCD_SPEAR)+= ehci-spear.o
- obj-$(CONFIG_USB_EHCI_HCD_ORION)+= ehci-orion.o
+@@ -33,6 +33,7 @@ obj-$(CONFIG_USB_EHCI_HCD_ORION)+= ehci-orion.o
  obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
  obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
-+obj-$(CONFIG_USB_EHCI_S5P)      += ehci-s5p.o
+ obj-$(CONFIG_USB_EHCI_S5P)      += ehci-s5p.o
++obj-$(CONFIG_USB_EHCI_MV)       += ehci-mv.o
  obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
  obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
  obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
 diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 628ed139..36557e3 100644
+index 36557e3..e636719 100644
 --- a/drivers/usb/host/ehci-hcd.c
 +++ b/drivers/usb/host/ehci-hcd.c
-@@ -1297,11 +1297,6 @@ MODULE_LICENSE ("GPL");
- #define	PLATFORM_DRIVER		ehci_hcd_msp_driver
+@@ -1307,11 +1307,6 @@ MODULE_LICENSE ("GPL");
+ #define PLATFORM_DRIVER		ehci_grlib_driver
  #endif
  
--#ifdef CONFIG_USB_EHCI_TEGRA
--#include "ehci-tegra.c"
--#define PLATFORM_DRIVER		tegra_ehci_driver
+-#ifdef CONFIG_USB_EHCI_MV
+-#include "ehci-mv.c"
+-#define        PLATFORM_DRIVER         ehci_mv_driver
 -#endif
 -
- #ifdef CONFIG_USB_EHCI_S5P
- #include "ehci-s5p.c"
- #define PLATFORM_DRIVER		s5p_ehci_driver
-@@ -1330,6 +1325,7 @@ MODULE_LICENSE ("GPL");
- 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_OMAP) && \
+ #ifdef CONFIG_MIPS_SEAD3
+ #include "ehci-sead3.c"
+ #define	PLATFORM_DRIVER		ehci_hcd_sead3_driver
+@@ -1326,6 +1321,7 @@ MODULE_LICENSE ("GPL");
  	!IS_ENABLED(CONFIG_PLAT_SPEAR) && \
  	!IS_ENABLED(CONFIG_ARCH_AT91) && \
-+	!IS_ENABLED(CONFIG_USB_EHCI_S5P) && \
+ 	!IS_ENABLED(CONFIG_USB_EHCI_S5P) && \
++	!IS_ENABLED(CONFIG_USB_EHCI_MV) && \
  	!defined(PS3_SYSTEM_BUS_DRIVER) && \
  	!defined(OF_PLATFORM_DRIVER) && \
  	!defined(XILINX_OF_PLATFORM_DRIVER)
-diff --git a/drivers/usb/host/ehci-s5p.c b/drivers/usb/host/ehci-s5p.c
-index 319dcfa..653e096 100644
---- a/drivers/usb/host/ehci-s5p.c
-+++ b/drivers/usb/host/ehci-s5p.c
-@@ -18,6 +18,16 @@
- #include <linux/of_gpio.h>
- #include <linux/platform_data/usb-ehci-s5p.h>
- #include <plat/usb-phy.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 6c56297..67de419 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -17,7 +17,18 @@
+ #include <linux/usb/otg.h>
+ #include <linux/platform_data/mv_usb.h>
+ 
 +#include <linux/usb.h>
 +#include <linux/usb/hcd.h>
 +#include <linux/io.h>
@@ -94,86 +91,105 @@ index 319dcfa..653e096 100644
 +
 +#include "ehci.h"
 +
-+#define DRIVER_DESC "EHCI s5p driver"
- 
- #define EHCI_INSNREG00(base)			(base + 0x90)
- #define EHCI_INSNREG00_ENA_INCR16		(0x1 << 25)
-@@ -28,43 +38,16 @@
- 	(EHCI_INSNREG00_ENA_INCR16 | EHCI_INSNREG00_ENA_INCR8 |	\
- 	 EHCI_INSNREG00_ENA_INCR4 | EHCI_INSNREG00_ENA_INCRX_ALIGN)
- 
-+static const char hcd_name[] = "ehci-s5p";
-+static struct hc_driver __read_mostly s5p_ehci_hc_driver;
++#define DRIVER_DESC "EHCI mv driver"
 +
-+
- struct s5p_ehci_hcd {
- 	struct device *dev;
+ #define CAPLENGTH_MASK         (0xff)
++static const char hcd_name[] = "ehci-mv";
++static struct hc_driver __read_mostly mv_ehci_hc_driver;
+ 
+ struct ehci_hcd_mv {
  	struct usb_hcd *hcd;
- 	struct clk *clk;
- };
+@@ -95,48 +106,6 @@ static int mv_ehci_reset(struct usb_hcd *hcd)
+ 	return retval;
+ }
  
--static const struct hc_driver s5p_ehci_hc_driver = {
--	.description		= hcd_name,
--	.product_desc		= "S5P EHCI Host Controller",
--	.hcd_priv_size		= sizeof(struct ehci_hcd),
+-static const struct hc_driver mv_ehci_hc_driver = {
+-	.description = hcd_name,
+-	.product_desc = "Marvell EHCI",
+-	.hcd_priv_size = sizeof(struct ehci_hcd),
 -
--	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
+-	/*
+-	 * generic hardware linkage
+-	 */
+-	.irq = ehci_irq,
+-	.flags = HCD_MEMORY | HCD_USB2,
 -
--	.reset			= ehci_setup,
--	.start			= ehci_run,
--	.stop			= ehci_stop,
--	.shutdown		= ehci_shutdown,
+-	/*
+-	 * basic lifecycle operations
+-	 */
+-	.reset = mv_ehci_reset,
+-	.start = ehci_run,
+-	.stop = ehci_stop,
+-	.shutdown = ehci_shutdown,
 -
--	.get_frame_number	= ehci_get_frame,
+-	/*
+-	 * managing i/o requests and associated device resources
+-	 */
+-	.urb_enqueue = ehci_urb_enqueue,
+-	.urb_dequeue = ehci_urb_dequeue,
+-	.endpoint_disable = ehci_endpoint_disable,
+-	.endpoint_reset = ehci_endpoint_reset,
+-	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
 -
--	.urb_enqueue		= ehci_urb_enqueue,
--	.urb_dequeue		= ehci_urb_dequeue,
--	.endpoint_disable	= ehci_endpoint_disable,
--	.endpoint_reset		= ehci_endpoint_reset,
+-	/*
+-	 * scheduling support
+-	 */
+-	.get_frame_number = ehci_get_frame,
 -
--	.hub_status_data	= ehci_hub_status_data,
--	.hub_control		= ehci_hub_control,
--	.bus_suspend		= ehci_bus_suspend,
--	.bus_resume		= ehci_bus_resume,
--
--	.relinquish_port	= ehci_relinquish_port,
--	.port_handed_over	= ehci_port_handed_over,
--
--	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
+-	/*
+-	 * root hub support
+-	 */
+-	.hub_status_data = ehci_hub_status_data,
+-	.hub_control = ehci_hub_control,
+-	.bus_suspend = ehci_bus_suspend,
+-	.bus_resume = ehci_bus_resume,
 -};
 -
- static void s5p_setup_vbus_gpio(struct platform_device *pdev)
+ static int mv_ehci_probe(struct platform_device *pdev)
  {
- 	int err;
-@@ -283,5 +266,27 @@ static struct platform_driver s5p_ehci_driver = {
- 		.of_match_table = of_match_ptr(exynos_ehci_match),
- 	}
+ 	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
+@@ -302,7 +271,6 @@ static int mv_ehci_remove(struct platform_device *pdev)
+ {
+ 	struct ehci_hcd_mv *ehci_mv = platform_get_drvdata(pdev);
+ 	struct usb_hcd *hcd = ehci_mv->hcd;
+-	int clk_i;
+ 
+ 	if (hcd->rh_registered)
+ 		usb_remove_hcd(hcd);
+@@ -351,8 +319,33 @@ static struct platform_driver ehci_mv_driver = {
+ 	.remove = mv_ehci_remove,
+ 	.shutdown = mv_ehci_shutdown,
+ 	.driver = {
+-		   .name = "mv-ehci",
++		   .name = hcd_name,
+ 		   .bus = &platform_bus_type,
+ 		   },
+ 	.id_table = ehci_id_table,
  };
-+static const struct ehci_driver_overrides s5p_overrides __initdata = {
-+	.reset = ehci_setup,
++static const struct ehci_driver_overrides mv_overrides __initdata = {
++	.reset = mv_ehci_reset,
 +};
 +
-+static int __init ehci_s5p_init(void)
++static int __init ehci_mv_init(void)
 +{
 +	if (usb_disabled())
 +		return -ENODEV;
 +
 +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+	ehci_init_driver(&s5p_ehci_hc_driver, &s5p_overrides);
-+	return platform_driver_register(&s5p_ehci_driver);
++	ehci_init_driver(&mv_ehci_hc_driver, &mv_overrides);
++	return platform_driver_register(&ehci_mv_driver);
 +}
-+module_init(ehci_s5p_init);
++module_init(ehci_mv_init);
 +
-+static void __exit ehci_s5p_cleanup(void)
++static void __exit ehci_mv_cleanup(void)
 +{
-+	platform_driver_unregister(&s5p_ehci_driver);
++	platform_driver_unregister(&ehci_mv_driver);
 +}
-+module_exit(ehci_s5p_cleanup);
- 
--MODULE_ALIAS("platform:s5p-ehci");
++module_exit(ehci_mv_cleanup);
++
 +MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_ALIAS("platform:ehci-s5p");
++MODULE_ALIAS("platform:ehci-mv");
++MODULE_AUTHOR("Marvell");
 +MODULE_LICENSE("GPL");
 -- 
 1.7.9.5
