@@ -1,63 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 7 Feb 2013 18:37:43 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130207172934.GA2811@arm.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130129132204.GA23886@arm.com> <20130207153750.0fef1192@skate>
- <20130207155117.GA19666@arm.com> <20130207171904.70270598@skate>
- <20130207174040.3a345770@skate> <20130207165347.GA31995@arm.com>
- <20130207181418.3753b007@skate> <20130207172934.GA2811@arm.com>
-Message-ID: <20130207183743.5c97d8b8@skate>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 7 Feb 2013 17:39:49 +0000
+Subject: [PATCH] ARM: dts: add minimal DT support for DevKit8000
+In-Reply-To: <1360246297-5500-1-git-send-email-anilk4.v@gmail.com>
+References: <1360246297-5500-1-git-send-email-anilk4.v@gmail.com>
+Message-ID: <20130207173949.GA21723@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Murray,
+Hello,
 
-On Thu, 7 Feb 2013 17:29:34 +0000, Andrew Murray wrote:
+I have a couple of minor comments.
 
-> > So if I ignore the bus number, how could the PCI code find what is the
-> > matching interrupt?
+On Thu, Feb 07, 2013 at 02:11:37PM +0000, Anil Kumar wrote:
+> DevKit8000 is a beagle board clone from Timll, sold by
+> armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
+> S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
+> JTAG interface.
 > 
-> Apologies if I've missed information about your hardware in the other
-> discussion (I've tried to keep up) - does your hardware raise a single host
-> interrupt for each pin regardless to which bridge they come in on - or do you
-> separate A,B,C,D host interrupts for each bridge?
+> This patch adds the basic DT support for devkit8000. At this time, Information
+> of twl4030, MMC1, I2C1, leds and there pim mux information are added.
+> 
+> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+> Tested-by: Thomas Weber <thomas@tomweber.eu>
+> ---
+> 
+>  -This patch is based on top of kernel 3.8-rc5.
+> 
+>  -Tested on Devkit8000.
+> 
 
-There are separate A,B,C,D interrupts for each PCIe interface, and each
-PCIe interface is represented by an emulated PCI-to-PCI bridge. See my
-interrupt-map:
+[...]
 
-			interrupt-map = <0x0800 0 0 1 &mpic 58
-				         0x1000 0 0 1 &mpic 59
-					 0x1800 0 0 1 &mpic 60
-					 0x2000 0 0 1 &mpic 61
-					 0x2800 0 0 1 &mpic 62
-				         0x3000 0 0 1 &mpic 63
-					 0x3800 0 0 1 &mpic 64
-					 0x4000 0 0 1 &mpic 65
-					 0x4800 0 0 1 &mpic 99
-					 0x5000 0 0 1 &mpic 103>;
+> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+> new file mode 100644
+> index 0000000..9864fd7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+> @@ -0,0 +1,125 @@
+> +/*
+> + * Anil Kumar <anilk4.v@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +/include/ "omap3.dtsi"
+> +/ {
+> +	model = "TI OMAP3 Devkit8000";
 
-Here I have 10 PCIe interfaces, and therefore 10 interrupts.
+Should this not be "TimLL Devkit8000" ?
 
-There is only one interrupt per PCIe interface, and for now, I don't
-distinguish A,B,C,D (I will do it later, it requires reading a register
-to know if the interrupt came from A, B, C or D, but that's a different
-problem).
+> +	compatible = "ti,omap3-devkit8000", "ti,omap3";
 
-> If you have only 4 interrupt sources for legacy interrupts then you shouldn't
-> need to care which bus/device/function they were generated on (of_pci_map_irq
-> takes care of this for you).
+"timll,devkit8000" ?
 
-No, I have interrupts per PCIe interface, so I really need to take care
-of the relation between the PCIe device and the PCIe interface it is
-connected to.
+[...]
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks,
+Mark.
