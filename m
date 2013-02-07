@@ -1,188 +1,62 @@
-From: anilk4.v@gmail.com (Anil Kumar)
-Date: Thu,  7 Feb 2013 19:41:37 +0530
-Subject: [PATCH] ARM: dts: add minimal DT support for DevKit8000
-Message-ID: <1360246297-5500-1-git-send-email-anilk4.v@gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 7 Feb 2013 19:42:25 +0530
+Subject: [PATCH 1/1] DMA: PL330: allow submitting 2 requests at a time
+In-Reply-To: <5113B03D.5010206@gmail.com>
+References: <1360233523-20825-1-git-send-email-dirac3000@gmail.com>
+ <CABb+yY3iPoXBFpKgmdTijeee71Xz9dkwjcay8keu+vsdWtDfXw@mail.gmail.com>
+ <5113B03D.5010206@gmail.com>
+Message-ID: <CABb+yY2o2eWj4KY3immegSB26QcEYAykbpjJohL3ri1+8RPQFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DevKit8000 is a beagle board clone from Timll, sold by
-armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
-S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
-JTAG interface.
+On Thu, Feb 7, 2013 at 7:16 PM, dirac3000 <dirac3000@gmail.com> wrote:
+> On 02/07/2013 12:31 PM, Jassi Brar wrote:
+>
+>> On Thu, Feb 7, 2013 at 4:08 PM, Alvaro Moran<dirac3000@gmail.com>  wrote:
+>>>
+>>> Due to the original driver design, only one request was processed at a
+>>> time by the driver, even if the low-level part of the driver was able to
+>>> handle 2 requests.
+>>> With this patch we are able to create 2 microcodes per thread and to
+>>> launch the second transfer on the interrupt handler of the first one,
+>>> instead of having to wait for the tasklet to generate the microcode.
+>>>
+>> The following seems more appropriate and complete. Does it fix your
+>> problem?
+>>
+>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>> index 758122f..a821d71 100644
+>> --- a/drivers/dma/pl330.c
+>> +++ b/drivers/dma/pl330.c
+>> @@ -2292,13 +2292,12 @@ static inline void fill_queue(struct
+>> dma_pl330_chan *pch)
+>>
+>>                 /* If already submitted */
+>>                 if (desc->status == BUSY)
+>> -                       break;
+>> +                       continue;
+>>
+>>                 ret = pl330_submit_req(pch->pl330_chid,
+>>                                                 &desc->req);
+>>                 if (!ret) {
+>>                         desc->status = BUSY;
+>> -                       break;
+>>                 } else if (ret == -EAGAIN) {
+>>                         /* QFull or DMAC Dying */
+>>                         break;
+>
+>
+>
+> Actually that isn't good enough. With your patch it will keep on looping on
+> the pch->work_list entries, but it will call pl330_submit_req the first time
+> only. I want it to call the function twice, so it will generate 2 microcodes
+> (one per available request) and it will be ready the moment we get into the
+> interrupt handler.
 
-This patch adds the basic DT support for devkit8000. At this time, Information
-of twl4030, MMC1, I2C1, leds and there pim mux information are added.
-
-Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
-Tested-by: Thomas Weber <thomas@tomweber.eu>
----
-
- -This patch is based on top of kernel 3.8-rc5.
-
- -Tested on Devkit8000.
-
-:100644 100644 5ebb44f... 22ebc76... M	arch/arm/boot/dts/Makefile
-:000000 100644 0000000... 9864fd7... A	arch/arm/boot/dts/omap3-devkit8000.dts
-:100644 100644 53cb380b.. 6e2cef6... M	arch/arm/mach-omap2/board-generic.c
- arch/arm/boot/dts/Makefile             |    1 +
- arch/arm/boot/dts/omap3-devkit8000.dts |  125 ++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/board-generic.c    |    1 +
- 3 files changed, 127 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5ebb44f..22ebc76 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -102,6 +102,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
- 	imx28-tx28.dtb
- dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-beagle.dtb \
-+	omap3-devkit8000.dtb \
- 	omap3-beagle-xm.dtb \
- 	omap3-evm.dtb \
- 	omap3-tobi.dtb \
-diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-new file mode 100644
-index 0000000..9864fd7
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-@@ -0,0 +1,125 @@
-+/*
-+ * Anil Kumar <anilk4.v@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+/include/ "omap3.dtsi"
-+/ {
-+	model = "TI OMAP3 Devkit8000";
-+	compatible = "ti,omap3-devkit8000", "ti,omap3";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>;	/* 256 MB */
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_pins>;
-+
-+		heartbeat {
-+			label = "devkit8000::led1";
-+			gpios = <&gpio6 26 0>;	/* 186 -> LED1 */
-+			default-state = "on";
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		mmc {
-+			label = "devkit8000::led2";
-+			gpios = <&gpio6 3 0>;	/* 163 -> LED2 */
-+			default-state = "on";
-+			linux,default-trigger = "none";
-+		};
-+
-+		usr {
-+			label = "devkit8000::led3";
-+			gpios = <&gpio6 4 0>;	/* 164 -> LED3 */
-+			default-state = "on";
-+			linux,default-trigger = "usr";
-+                };
-+
-+	};
-+};
-+
-+&omap3_pmx_core {
-+	leds_pins: pinmux_led_pins {
-+		pinctrl-single,pins = <
-+			0x168 0x4	/* GPIO_163 */
-+			0x16c 0x4	/* GPIO_164 */
-+			0x1b0 0x4	/* GPIO_186 */
-+
-+		>;
-+	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			0x188 0x118	/* I2C1_SCL */
-+			0x18c 0x118	/* I2C1_SDA */
-+                >;
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+	clock-frequency = <2600000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>;	/* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+	};
-+};
-+
-+&i2c2 {
-+	status = "disabled";
-+};
-+
-+&i2c3 {
-+	status = "disabled";
-+};
-+
-+/include/ "twl4030.dtsi"
-+
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	vmmc_aux-supply = <&vsim>;
-+	bus-width = <8>;
-+};
-+
-+&mmc2 {
-+	status = "disabled";
-+};
-+
-+&mmc3 {
-+	status = "disabled";
-+};
-+
-+&wdt2 {
-+	status = "disabled";
-+};
-+
-+&mcbsp1 {
-+	status = "disabled";
-+};
-+
-+&mcbsp2 {
-+	status = "disabled";
-+};
-+
-+&mcbsp3 {
-+	status = "disabled";
-+};
-+
-+&mcbsp4 {
-+	status = "disabled";
-+};
-+
-+&mcbsp5 {
-+	status = "disabled";
-+};
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 53cb380..6e2cef6 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -110,6 +110,7 @@ MACHINE_END
- 
- static const char *omap3_gp_boards_compat[] __initdata = {
- 	"ti,omap3-beagle",
-+	"ti,omap3-devkit8000",
- 	NULL,
- };
- 
--- 
-1.7.0.4
+Why would it "keep on looping"? It's a for loop that will exit after
+iterating over the list once or when the lower layer indicates QFull -
+whichever comes first. Practically it achieves the same effect only
+without introducing a new local variable 'busy_reqs'
+Did you actually test the patch? If yes and it didn't work, please
+share some log suitable log.
+thnx.
