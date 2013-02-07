@@ -1,144 +1,119 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 7 Feb 2013 10:46:56 +0000
-Subject: [PATCH v2 2/3] mmc: davinci_mmc: add DT support
-In-Reply-To: <1360223825-23929-3-git-send-email-prakash.pm@ti.com>
-References: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
- <1360223825-23929-3-git-send-email-prakash.pm@ti.com>
-Message-ID: <20130207104656.GE16987@e106331-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 7 Feb 2013 11:56:32 +0100
+Subject: [PATCH v4] USB: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130207105632.GB9183@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Alexander,
 
-I have a couple of comments on the dt bindings and the way it's parsed.
+Did you have a chance to look at this series? Development of this driver
+has stalled for too long now, I don't want to miss the next merge
+window.
 
-On Thu, Feb 07, 2013 at 07:57:04AM +0000, Manjunathappa, Prakash wrote:
-> Adds device tree support for davinci_mmc. Also add binding documentation.
-> Tested in non-dma PIO mode and without GPIO card_detect/write_protect
-> option because of dependencies on EDMA and GPIO module DT support.
+Thanks
+ Sascha
+
+On Mon, Feb 04, 2013 at 02:24:26PM +0100, Sascha Hauer wrote:
+> 4th round of patches.
 > 
-> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> Cc: linux-mmc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: cjb at laptop.org
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: mporter at ti.com
-> ---
-> Since v1:
-> Modified DT parse function to take default values and accomodate controller
-> version in compatible field.
+> Peter, I would be glad if you could test them before your holiday. I rebased
+> your last round of Chipidea OTG patches onto this series which you can pull
+> here:
 > 
->  .../devicetree/bindings/mmc/davinci_mmc.txt        |   30 ++++++++
->  drivers/mmc/host/davinci_mmc.c                     |   70 +++++++++++++++++++-
->  2 files changed, 99 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-otg-for-next
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-> new file mode 100644
-> index 0000000..6717ab1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-> @@ -0,0 +1,30 @@
-> +* TI Highspeed MMC host controller for DaVinci
-> +
-> +The Highspeed MMC Host Controller on TI DaVinci family
-> +provides an interface for MMC, SD and SDIO types of memory cards.
-> +
-> +This file documents the properties used by the davinci_mmc driver.
-> +
-> +Required properties:
-> +- compatible:
-> + Should be "ti,davinci-mmc-da830": for da830, da850, dm365
-> + Should be "ti,davinci-mmc-dm355": for dm355, dm644x
-> +
-> +Optional properties:
-> +- bus-width: Number of data lines, can be <4>, or <8>, default <1>
-> +- max-frequency: Maximum operating clock frequency, default 25MHz.
-> +- mmc-cap-mmc-highspeed: Indicates support for MMC in high speed mode
-> +- mmc-cap-sd-highspeed: Indicates support for SD in high speed mode
+> I couldn't really test the otg patches since my current hardware does not have
+> the ID pin connected, but I can verify that my usecase still works with your
+> patches applied.
+> 
+> Alex, should the patches work for you and are fine otherwise, could you apply
+> them for v3.9?
+> 
+> Sascha
+> 
+> 
+> 
+> changes since v3:
+> 
+> - add phy patches (which were accidently already part of v2)
+> - Use OP_DEVLC instead of OP_PORTSC for lpm case
+> - Use enum usb_dr_mode ub ci_hdrc_probe()
+> 
+> changes since v2:
+> 
+> - fix adding of GPL Header was in wrong patch
+> - add missing hunk for new file of.c
+> 
+> changes since v1:
+> - move phy specific of helper to drivers/usb/phy/of.c
+> - use strcmp instead of strcasecmp for matching property values
+> - change usb_phy_dr_mode to usb_dr_mode
+> - change USBPHY_INTERFACE_MODE_NA to USBPHY_INTERFACE_MODE_UNKNOWN
+> - add copyright header to new files
+> - chipidea: drop mdelay at end of PTS/PTW setup
+> - chipidea: implement lpm core type handling for PTS/PTW
+> 
+> 
+> The following changes since commit 2f0760774711c957c395b31131b848043af98edf:
+> 
+>   USB: GADGET: optionally force full-speed for net2280 UDC (2013-01-31 10:09:19 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-for-next
+> 
+> for you to fetch changes up to 25682afd7be85f1462647d8530dca1bf848074fc:
+> 
+>   USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy (2013-02-04 12:28:53 +0100)
+> 
+> ----------------------------------------------------------------
+> USB: chipidea patches for v3.9
+> 
+> These add OF helpers for handling the dr_mode and phy_type property
+> and makes use of them in the chipidea driver.
+> 
+> ----------------------------------------------------------------
+> Marc Kleine-Budde (1):
+>       usb: otg: use try_module_get in all usb_get_phy functions and add missing module_put
+> 
+> Michael Grzeschik (3):
+>       USB: add devicetree helpers for determining dr_mode and phy_type
+>       USB: chipidea: ci13xxx-imx: create dynamic platformdata
+>       USB: chipidea: add PTW and PTS handling
+> 
+> Sascha Hauer (5):
+>       USB: move bulk of otg/otg.c to phy/phy.c
+>       USB chipidea: introduce dual role mode pdata flags
+>       USB chipidea i.MX: introduce dr_mode property
+>       USB mxs-phy: Register phy with framework
+>       USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
+> 
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 +
+>  drivers/usb/chipidea/bits.h                        |   14 +-
+>  drivers/usb/chipidea/ci13xxx_imx.c                 |   68 +--
+>  drivers/usb/chipidea/core.c                        |   60 ++-
+>  drivers/usb/otg/mxs-phy.c                          |    9 +
+>  drivers/usb/otg/otg.c                              |  423 -------------------
+>  drivers/usb/phy/Makefile                           |    2 +
+>  drivers/usb/phy/of.c                               |   47 +++
+>  drivers/usb/phy/phy.c                              |  438 ++++++++++++++++++++
+>  drivers/usb/usb-common.c                           |   36 ++
+>  include/linux/usb/chipidea.h                       |    3 +-
+>  include/linux/usb/of.h                             |   27 ++
+>  include/linux/usb/otg.h                            |    7 +
+>  include/linux/usb/phy.h                            |    9 +
+>  14 files changed, 687 insertions(+), 462 deletions(-)
+>  create mode 100644 drivers/usb/phy/of.c
+>  create mode 100644 drivers/usb/phy/phy.c
+>  create mode 100644 include/linux/usb/of.h
+> 
 
-I thought the last two were derivable from max-frequency?
-
-https://lkml.org/lkml/2012/10/15/231
-
-[...]
-
-> +static struct davinci_mmc_config
-> +	*mmc_parse_pdata(struct platform_device *pdev)
->  {
-> +	struct device_node *np;
->  	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
-> +	const struct of_device_id *match =
-> +		of_match_device(of_match_ptr(davinci_mmc_dt_ids), &pdev->dev);
-> +	u32 data;
-> +
-> +	np = pdev->dev.of_node;
-> +	if (!np)
-> +		return pdata;
-> +
-> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata) {
-> +		dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
-> +		goto nodata;
-> +	}
-> +
-> +	if (match->data)
-> +		pdata->version = (u8)((int)match->data);
-> +
-> +	of_property_read_u32(np, "max-frequency", &pdata->max_freq);
-> +	if (!pdata->max_freq)
-> +		dev_info(&pdev->dev, "'max-frequency' property not specified, defaulting to 25MHz\n");
-> +
-> +	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
-> +		pdata->caps |= MMC_CAP_MMC_HIGHSPEED;
-> +	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
-> +		pdata->caps |= MMC_CAP_SD_HIGHSPEED;
-
-If these aren't derivable from max-frequency, you could use
-of_property_read_bool to make this clearer.
-
-> +
-> +	of_property_read_u32(np, "bus-width", &data);
-> +	switch (data) {
-> +	case 0:
-
-Judging by the binding doc, should this be 1 rather than 0?
-
-> +	case 4:
-> +	case 8:
-> +		pdata->wires = data;
-> +		break;
-> +	default:
-> +		pdata->wires = 1;
-> +		dev_info(&pdev->dev, "Unsupported buswidth, defaulting to 1 bit\n");
-> +	}
-> +nodata:
-> +	return pdata;
-> +}
-> +
-> +static int __init davinci_mmcsd_probe(struct platform_device *pdev)
-> +{
-> +	struct davinci_mmc_config *pdata = NULL;
->  	struct mmc_davinci_host *host = NULL;
->  	struct mmc_host *mmc = NULL;
->  	struct resource *r, *mem = NULL;
->  	int ret = 0, irq = 0;
->  	size_t mem_size;
->  
-> +	pdata = mmc_parse_pdata(pdev);
-> +	if (pdata == NULL) {
-> +		dev_err(&pdev->dev, "Can not get platform data\n");
-> +		return -ENOENT;
-> +	}
-> +
->  	/* REVISIT:  when we're fully converted, fail if pdata is NULL */
-
-This comment can presumably disappear judging by the lines above?
-
-[...]
-
-Thanks,
-Mark.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
