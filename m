@@ -1,41 +1,67 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 7 Feb 2013 11:30:32 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130207181559.GA31508@obsidianresearch.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <5106F9F9.3010905@wwwdotorg.org> <20130129094143.1aad9377@skate>
- <20130129092006.GA16377@avionic-0098.mockup.avionic-design.de>
- <20130207112459.5f382ad4@skate>
- <CAErSpo7UOTGH7kjYBADymDdgmHwPxbXqczeXm1BH9C+XViQDRQ@mail.gmail.com>
- <20130207170020.289bac08@skate>
- <CAErSpo797rhH=xt2x7eqdu7Vwf43FXoXQVcypvHM8-54LRC0wQ@mail.gmail.com>
- <20130207181559.GA31508@obsidianresearch.com>
-Message-ID: <CAErSpo58wLV6JXKrVdVH4X=p6X=U=o0czDSAtqWCtxvJbosaEQ@mail.gmail.com>
+From: amit.kachhap@gmail.com (amit kachhap)
+Date: Thu, 7 Feb 2013 10:33:07 -0800
+Subject: [PATCH 3/3] dts: Add cpufreq controller node for Exynos5440 SoC
+In-Reply-To: <CAG17yqTSxjoTDcGg+6rt+gnDyJBO7j3MBP_g5B=vYZqa1qaD+g@mail.gmail.com>
+References: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
+ <1360179562-19950-3-git-send-email-amit.daniel@samsung.com>
+ <CAG17yqTSxjoTDcGg+6rt+gnDyJBO7j3MBP_g5B=vYZqa1qaD+g@mail.gmail.com>
+Message-ID: <CADGdYn44okjQHQo-W9Y-pFFHzO9-3HL-ZB36aVvfzMRp098ZtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 7, 2013 at 11:15 AM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Thu, Feb 07, 2013 at 11:08:45AM -0700, Bjorn Helgaas wrote:
->
->> I think the way you'll have to fix this in the meantime is to use
->> pci_create_root_bus() directly so you can do things in this sequence:
+On Wed, Feb 6, 2013 at 8:49 PM, Inderpal Singh
+<inderpal.singh@linaro.org> wrote:
+> On 7 February 2013 01:09, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+>> Add cpufreq controller device node for Exynos5440 SoC for passing
+>> parameters like controller base address, interrupt and cpufreq
+>> table.
 >>
->>   pci_create_root_bus
->>   pci_scan_child_bus
->>   pci_bus_assign_resources
->>   pci_bus_add_devices
+>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5440.dtsi |    9 +++++++++
+>>  1 file changed, 9 insertions(+)
 >>
->> dino_probe() is an example of similar code that does this.
+>> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+>> index 024269d..b20b517 100644
+>> --- a/arch/arm/boot/dts/exynos5440.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+>> @@ -63,6 +63,15 @@
+>>
+>>         };
+>>
+>> +       cpufreq at 160000 {
+>> +               compatible = "samsung,exynos5440-cpufreq";
+>> +               reg = <0x160000 0x1000>;
+>> +               interrupts = <0 57 0>;
+>> +               cpufreq_tbl = < 1200000 1025000
+>> +                               1000000 975000
+>> +                               800000  925000 >;
+>> +       };
+>> +
 >
-> Erm, but isn't this problem going to strike any system that doesn't
-> have resources assigned by the firmware?
->
-> If so, a common 'pci_scan_bus_from_scratch' would at least highlight
-> the problem and centralize the work around until it is fixed...
->
-> Many embedded systems will require this..
+> I think cpufreq_tbl should be part of the cpu node as it's the
+> property of the cpu.
+> Please refer cpufreq-cpu0 and spear-cpufreq.
 
-Yep, agreed on all counts.
+http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/15364.
+In this thread same discussion followed. I am not sure what is the
+correct way but looks like Kukjin concluded this with a timer node
+separate from the CPU code.
+
+Thanks,
+Amit Daniel
+>
+>>         serial at B0000 {
+>>                 compatible = "samsung,exynos4210-uart";
+>>                 reg = <0xB0000 0x1000>;
+>> --
+>> 1.7.10.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
