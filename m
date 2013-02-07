@@ -1,61 +1,91 @@
-From: will.newton@gmail.com (Will Newton)
-Date: Thu, 7 Feb 2013 10:19:05 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130206191905.ac8eb6743e69425f30888704@freescale.com>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
-Message-ID: <CAFbHwiTCN5sFadXX7z7Smwd17tEZ7WmfKhG_6b3psu0bx228ew@mail.gmail.com>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Thu, 7 Feb 2013 10:21:09 +0000
+Subject: [PATCH V2 5/6] ARM: regulator: add tps6507x device tree data
+In-Reply-To: <1359445134-13323-6-git-send-email-manishv.b@ti.com>
+References: <1359445134-13323-1-git-send-email-manishv.b@ti.com>
+ <1359445134-13323-6-git-send-email-manishv.b@ti.com>
+Message-ID: <A4887BF146CD57468F700B415D2F4701583311@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 7, 2013 at 1:19 AM, Kim Phillips <kim.phillips@freescale.com> wrote:
-> On Wed, 6 Feb 2013 09:02:04 +0000
-> "Woodhouse, David" <david.woodhouse@intel.com> wrote:
->
->> On Tue, 2013-02-05 at 21:04 -0600, Kim Phillips wrote:
->> > gcc -Os emits calls to __bswapsi2 on those platforms to save space
->> > because they don't have the single rev byte swap instruction.
->>
->> Is that the right thing for GCC to do in that situation?
->
-> if it saves space, why wouldn't it be?
->
-> "Many of these functions are only optimized in certain cases; if they
-> are not optimized in a particular case, a call to the library
-> function is emitted." [1]
->
-> I see "(arm_arch6 || !optimize_size)" in gcc's define_expand
-> "bswapsi2" source, so GCC considers size optimization as a
-> legitimate one of those cases.
->
->> If so, perhaps we should be *providing* __bswap[sd]i2 functions for it
->> to use?
->
-> either that, or link with libgcc - why does arch/arm64 do this and
-> arch/arm not?  It's not obvious from git log.
+Hi Mark,
 
-One reason I have found, I don't know if it is the canonical one, is
-that linking with libgcc allows people to use all intrinsics e.g. soft
-float routines in the kernel without noticing it. If you limit the
-intrinsics to the ones linked into the kernel explicitly then this
-cannot happen.
+On Tue, Jan 29, 2013 at 13:08:53, Vishwanathrao Badarkhe, Manish wrote:
+> Add device tree data for tps6507x regulator by adding all tps6507x regulator nodes. Regulators are initialized based on compatible name provided in tps6507x DT file.
+> 
+> All tps6507x PMIC regulator device tree nodes are placed in a separate device tree include file (tps6507x.dtsi).
+> tps6507x.dtsi file is created using datasheet http://www.ti.com/lit/ds/symlink/tps65070.pdf
+> 
+> Tested on da850-evm.
+> 
+> Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+> ---
+> Changes since V1:
+>  - Updated Copyright information.
+> 
+> :000000 100644 0000000... 4c326e5... A	arch/arm/boot/dts/tps6507x.dtsi
+>  arch/arm/boot/dts/tps6507x.dtsi |   47 +++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 47 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/tps6507x.dtsi b/arch/arm/boot/dts/tps6507x.dtsi new file mode 100644 index 0000000..4c326e5
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/tps6507x.dtsi
+> @@ -0,0 +1,47 @@
+> +/*
+> + * Copyright (C) 2013 Texas Instruments Incorporated - 
+> +http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/*
+> + * Integrated Power Management Chip
+> + * http://www.ti.com/lit/ds/symlink/tps65070.pdf
+> + */
+> +
+> +&tps {
+> +	compatible = "ti,tps6507x";
+> +
+> +	regulators {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		vdcdc1_reg: regulator at 0 {
+> +			reg = <0>;
+> +			regulator-compatible = "VDCDC1";
+> +		};
+> +
+> +		vdcdc2_reg: regulator at 1 {
+> +			reg = <1>;
+> +			regulator-compatible = "VDCDC2";
+> +		};
+> +
+> +		vdcdc3_reg: regulator at 2 {
+> +			reg = <2>;
+> +			regulator-compatible = "VDCDC3";
+> +		};
+> +
+> +		ldo1_reg: regulator at 3 {
+> +			reg = <3>;
+> +			regulator-compatible = "LDO1";
+> +		};
+> +
+> +		ldo2_reg: regulator at 4 {
+> +			reg = <4>;
+> +			regulator-compatible = "LDO2";
+> +		};
+> +
+> +	};
+> +};
+> --
+> 1.7.4.1
+> 
+> 
 
-I have also seen cases where the libgcc intrinsics are improved over
-time, having the code in the kernel allows these improvements to be
-rolled into the kernel even if the user has an older toolchain.
+If there are not any comments on this patch, Could you please 
+accept this patch?
 
-A number of ports link against libgcc and a roughly equal number do
-not, so it isn't clear that there's any consensus on the issue.
+Regards, 
+Manish
