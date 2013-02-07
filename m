@@ -1,72 +1,39 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 7 Feb 2013 23:45:53 +0530
-Subject: [PATCH V2 2/2] ARM: davinci: restart: fix wdt to machine restart
- with DT
-In-Reply-To: <1360123204-9978-3-git-send-email-anilkumar.v@ti.com>
-References: <1360123204-9978-1-git-send-email-anilkumar.v@ti.com>
- <1360123204-9978-3-git-send-email-anilkumar.v@ti.com>
-Message-ID: <5113EF59.80508@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Feb 2013 18:13:15 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+References: <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <20130201011712.GF23505@n2100.arm.linux.org.uk>
+ <1359703995.23531.6.camel@shinybook.infradead.org>
+ <20130205210436.670c62e26d2121330e87af35@freescale.com>
+ <1360141322.6066.4.camel@shinybook.infradead.org>
+ <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+Message-ID: <20130207181315.GM17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 06, 2013 at 07:19:05PM -0600, Kim Phillips wrote:
+> either that, or link with libgcc - why does arch/arm64 do this and
+> arch/arm not?  It's not obvious from git log.
 
-On 2/6/2013 9:30 AM, Kumar, Anil wrote:
-> In non DT case da8xx_register_watchdog() is called to register platform device
-> "da8xx_wdt_device" by board file. But in DT case it is not called and wdt
-> device get registered via wdt DT node.
-> 
-> Currently code is passing platform device "da8xx_wdt_device" in
-> "davinci_watchdog_reset" function in both DT and non DT case and that
-> leads to crash in DT boot.
-> 
-> Update restart function to make it generic DaVinci machine restart
+We want to be in control of what code the kernel runs, and that means
+not using libgcc.  libgcc can do all sorts of stuff because it makes
+assumptions about the environment which it is executing in (glibc).
 
-s/DaVinci/da8xx. Also, subject can simply be "ARM: davinci: da850 DT:
-add support for machine reboot" since reboot never worked with DT
-before, "fix" isn't really appropriate.
+For example, it assumes there may be a GOT, and that it can issue SWI
+calls...
 
-> in case of DT and non DT boot.
-> 
-> Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
-> ---
-> :100644 100644 2d5502d... 1df68fd... M	arch/arm/mach-davinci/devices-da8xx.c
-> :100644 100644 700d311... ef9f70e... M	arch/arm/mach-davinci/include/mach/da8xx.h
->  arch/arm/mach-davinci/devices-da8xx.c      |   14 ++++++++++++--
->  arch/arm/mach-davinci/include/mach/da8xx.h |    1 -
->  2 files changed, 12 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-> index 2d5502d..1df68fd 100644
-> --- a/arch/arm/mach-davinci/devices-da8xx.c
-> +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> @@ -359,7 +359,7 @@ static struct resource da8xx_watchdog_resources[] = {
->  	},
->  };
->  
-> -struct platform_device da8xx_wdt_device = {
-> +static struct platform_device da8xx_wdt_device = {
+However, the biggest reason not to use libgcc is that we want to control
+what gets used in the kernel - for example, no floating point, and no
+use of 64 x 64bit division.
 
-Making of da8xx_wdt_device static should find a mention in description.
+So all round, using libgcc in AArch32 would bring us a number of issues
+that we don't get with the current approach.
 
->  	.name		= "watchdog",
->  	.id		= -1,
->  	.num_resources	= ARRAY_SIZE(da8xx_watchdog_resources),
-> @@ -368,7 +368,17 @@ struct platform_device da8xx_wdt_device = {
->  
->  void da8xx_restart(char mode, const char *cmd)
->  {
-> -	davinci_watchdog_reset(&da8xx_wdt_device);
-> +	struct device *dev = NULL;
-> +	struct platform_device *wdt_device = NULL;
-
-No need to initialize these variables here.
-
-> +
-> +	dev = bus_find_device_by_name(&platform_bus_type, NULL, "watchdog");
-> +	if (!dev) {
-> +		pr_err("wdt device not found to machine reboot\n");
-
-Rather: "%s: failed to find watchdog device", __func__
-
-Thanks,
-Sekhar
+AArch64 uses it because it's maintained entirely separately and the
+decision has been made by other people - and some of these concerns do
+not exist on a 64-bit architecture.
