@@ -1,84 +1,131 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 7 Feb 2013 12:35:36 +0100
-Subject: [PATCH v4 0/8] watchdog/at91sam9_wdt: Convert to use the new
- framework
-In-Reply-To: <1359702386-21284-1-git-send-email-wenyou.yang@atmel.com>
-References: <1359702386-21284-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <51139188.8030601@atmel.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 7 Feb 2013 17:10:24 +0530
+Subject: [PATCHv3 4/4] arm: Add generic timer broadcast support
+In-Reply-To: <20130207100403.GD16987@e106331-lin.cambridge.arm.com>
+References: <1358183124-28461-1-git-send-email-mark.rutland@arm.com>
+ <1358183124-28461-5-git-send-email-mark.rutland@arm.com>
+ <5112C25F.6000508@wwwdotorg.org>
+ <20130207100403.GD16987@e106331-lin.cambridge.arm.com>
+Message-ID: <511392A8.9010905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2013 08:06 AM, Wenyou Yang :
-> Hi, All
-> 
-> The purpose of the patch series is to convert at91sam9_wdt to use the watchdog framework,
->  
-> Because the Watchdog Mode Register(WDT_MR) which WDDIS bit to disable or disable the watchdog
-> can be written only once after reset. so if you want to use the watchdog in the kernel, 
-> you must be sure the watchdog doesn't be disabled in the at91bootstrap.
-> 
-> It is tested on at91sam9m10g45ek both DT and non-DT support, at91sam9g25ek with DT support
-> by building Documentation/watchdog/src/watchdog-simple.c.
-> 
-> It is based on v3.8-rc6 + Arnd Bergmann's at91_wdt_dt_ids cannot be __init
-> 			+ Fabio Porcedda's add timeout-sec property binding
+Mark,
 
-On my side, I give my acknowledgement to the whole patch series:
+On Thursday 07 February 2013 03:34 PM, Mark Rutland wrote:
+> Hi Stephen,
+>
+> Sorry about this; I'm to blame for the bug.
+>
+> On Wed, Feb 06, 2013 at 08:51:43PM +0000, Stephen Warren wrote:
+>> On 01/14/2013 10:05 AM, Mark Rutland wrote:
+>>> Implement timer_broadcast for the arm architecture, allowing for the use
+>>> of clock_event_device_drivers decoupled from the timer tick broadcast
+>>> mechanism.
+>>
+>> Mark, this patch is now in next-20130206 and causes a crash during boot
+>> on Tegra. The reason appears to be because of:
+>>
+>>> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+>>
+>>> @@ -524,7 +524,6 @@ static void __cpuinit percpu_timer_setup(void)
+>>>   	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
+>>>
+>>>   	evt->cpumask = cpumask_of(cpu);
+>>> -	evt->broadcast = smp_timer_broadcast;
+>>
+>> After that change, evt->broadcast is never assigned, and hence is NULL.
+>> Yet elsewhere in kernel/time/tick-broadcast.c it's used unconditionally:
+>>
+>> static void tick_do_broadcast(struct cpumask *mask)
+>> ...
+>> 	if (!cpumask_empty(mask)) {
+>> ...
+>> 		td = &per_cpu(tick_cpu_device, cpumask_first(mask));
+>> 		td->evtdev->broadcast(mask);
+>>
+>> Now perhaps the Tegra timer driver simply isn't being set up correctly,
+>> so the bug is there... But the only other place I can find where
+>> ->broadcast is assigned is in tick_device_uses_broadcast() which only
+>> does it for "non-functional" timers, which doesn't apply to Tegra's timer.
+>>
+>
+> The intent of 12ad100046: "clockevents: Add generic timer broadcast function"
+> was to setup the broadcast function both for non-functional/dummy timers and
+> those that stop in low-power states (CLOCK_EVT_FEAT_C3STOP). I missed the
+> CLOCK_EVT_FEAT_C3STOP case.
+>
+I am not sure this exactly the case. Because in my testing, the C3STOP 
+path was exercised already. And if the C3STOP is used then notifiers
+calls are expected for switching of clock-events to broadcast mode.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+And dummy broad-cast hook should come into picture only if the per CPU
+local timer clock-event are not registered.
 
-I hope that once Fabio Porcedda's series is merged, this series can be
-applied on top of it seamlessly and quickly.
+I just tried "next-20130207" on OMAP and I see the broad-cast mechanism
+works and didn't observe any crash.
 
-Wim,
-Tell us if you need that we resend this series or rebase it on top of
-another git tree.
+------------------------------
+Tick Device: mode:     1
+Broadcast device
+Clock Event Device: gp_timer
+  max_delta_ns:   131071523464981
+  min_delta_ns:   91552
+  mult:           70369
+  shift:          31
+  mode:           3
+  next_event:     89984375000 nsecs
+  set_next_event: omap2_gp_timer_set_next_event
+  set_mode:       omap2_gp_timer_set_mode
+  event_handler:  tick_handle_oneshot_broadcast
+  retries:        0
 
-Thanks for your work and for your reviews.
-
-Best regards,
-
-> ChangeLog 
-> v4:
->   - remove the patch: Use module_platform_driver().
->   - add tested on at91sam9m10g45ek both DT and non-DT support.
->   - rebase on v3.8-rc6 
-> 
-> v3:
->   - The helper function 'watchdog_is_open' is moved to include/linux/watchdog.h
->   - Remove '__init' annotation from the function 'at91wdt_probe'
->   - Rebase on v3.8-rc2
-> 
-> v2:
->   - Remove the patches to add devive tree support which Fabio Porcedda has applied.
->   - Replace __raw_readl, __raw_writel with readl_relaxed, writel_relaxed.
->   - Rebase on v3.7-rc8.
-> 
-> Best Regards
-> Wenyou Yang
-> 
-> Wenyou Yang (8):
->   watchdog: add the function watchdog_is_open
->   watchdog/at91sam9_wdt: Remove at91wdt_private and add at91wdt_drvdata
->     struct
->   watchdog/at91sam9_wdt: Convert to use the watchdog framework
->   watchdog/at91sam9_wdt: Adjust the options of watchdog_info
->   watchdog/at91sam9_wdt: Add nowayout helpers to Watchdog Timer Driver
->     Kernel API
->   watchdog/at91sam9_wdt: Remove the __initdata of at91wdt_wdd
->   ARM: dts: add the watchdog nodes for at91sam9x5 and at91sam9n12 SoC
->   ARM: dts: add the watchdog nodes for at91sam9g25ek and
->     at91sam9m10g45ek boards
-> 
->  arch/arm/boot/dts/at91sam9m10g45ek.dts |    4 +
->  arch/arm/boot/dts/at91sam9n12.dtsi     |    6 +
->  arch/arm/boot/dts/at91sam9x5.dtsi      |    6 +
->  arch/arm/boot/dts/at91sam9x5ek.dtsi    |    4 +
->  drivers/watchdog/at91sam9_wdt.c        |  272 +++++++++++++-------------------
->  include/linux/watchdog.h               |    8 +
->  6 files changed, 140 insertions(+), 160 deletions(-)
-> 
+tick_broadcast_mask: 00000003
+tick_broadcast_oneshot_mask: 00000000
 
 
--- 
-Nicolas Ferre
+Tick Device: mode:     1
+Per CPU device: 0
+Clock Event Device: local_timer
+  max_delta_ns:   10737418240
+  min_delta_ns:   1000
+  mult:           858993459
+  shift:          31
+  mode:           3
+  next_event:     125250000000 nsecs
+  set_next_event: twd_set_next_event
+  set_mode:       twd_set_mode
+  event_handler:  hrtimer_interrupt
+  retries:        346
+
+Tick Device: mode:     1
+Per CPU device: 1
+Clock Event Device: local_timer
+  max_delta_ns:   10737418240
+  min_delta_ns:   1000
+  mult:           858993459
+  shift:          31
+  mode:           3
+  next_event:     89921875000 nsecs
+  set_next_event: twd_set_next_event
+  set_mode:       twd_set_mode
+  event_handler:  hrtimer_interrupt
+  retries:        258
+
+#
+
+------------------------------
+
+> I believe the patch below will fix this for Tegra and any other platforms where
+> broadcast is required in low power states.
+>
+Am not sure you really need that patch unless and until am missing a
+scenario in my test.
+
+Stephan,
+
+Do we have crash log seen on Tegra ? Which tegra CPUIDLE driver
+is being used when crash is seen ?
+
+Regards
+Santosh
