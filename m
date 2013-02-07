@@ -1,38 +1,96 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Thu, 07 Feb 2013 11:41:34 +0530
-Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
-In-Reply-To: <87haloiwv0.fsf@rustcorp.com.au>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <510FBC01.2030405@linux.vnet.ibm.com> <87haloiwv0.fsf@rustcorp.com.au>
-Message-ID: <51134596.4080106@linux.vnet.ibm.com>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Thu, 7 Feb 2013 06:17:05 +0000
+Subject: [PATCH 1/5] ARM: dts: exynos5250-arndale: Add node entry for
+ gpio-buttons
+In-Reply-To: <1360214129-4096-1-git-send-email-tushar.behera@linaro.org>
+References: <1360214129-4096-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412C4E1A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2013 09:44 AM, Rusty Russell wrote:
-> "Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com> writes:
->> On 01/22/2013 01:03 PM, Srivatsa S. Bhat wrote:
->>                  Avg. latency of 1 CPU offline (ms) [stop-cpu/stop-m/c latency]
->>
->> # online CPUs    Mainline (with stop-m/c)       This patchset (no stop-m/c)
->>
->>       8                 17.04                          7.73
->>
->>      16                 18.05                          6.44
->>
->>      32                 17.31                          7.39
->>
->>      64                 32.40                          9.28
->>
->>     128                 98.23                          7.35
+On Thu, Feb 07, 2013 at 10:45:25, Tushar Behera wrote:
+> Added GPIO buttons DT node to Arndale board file.
 > 
-> Nice!
-
-Thank you :-)
-
->  I wonder how the ARM guys feel with their quad-cpu systems...
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+> This series is based on for-next branch of Kukjin Kim's tree
+> and added on top of the below patch:
+> https://patchwork.kernel.org/patch/2042451/
+> ---
+>  arch/arm/boot/dts/exynos5250-arndale.dts |   48 ++++++++++++++++++++++++++++++
+>  1 files changed, 48 insertions(+), 0 deletions(-)
 > 
+> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+> index 63572f9..9ce40df 100644
+> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+> @@ -119,4 +119,52 @@
+>  	spi_2: spi at 12d40000 {
+>  		status = "disabled";
+>  	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 
-That would be definitely interesting to know :-)
+Just want to understand why these properties are here?  
+As these properties are for child dt node. But have not seen
+anyone is using here.
 
-Regards,
-Srivatsa S. Bhat
+Sorry if I have misunderstood. 
+
+> +
+> +		menu {
+> +			label = "SW-TACT2";
+> +			gpios = <&gpx1 4 0 0x10000 2>;
+> +			linux,code = <139>;
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		home {
+> +			label = "SW-TACT3";
+> +			gpios = <&gpx1 5 0 0x10000 2>;
+> +			linux,code = <102>;
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		up {
+> +			label = "SW-TACT4";
+> +			gpios = <&gpx1 6 0 0x10000 2>;
+> +			linux,code = <103>;
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		down {
+> +			label = "SW-TACT5";
+> +			gpios = <&gpx1 7 0 0x10000 2>;
+> +			linux,code = <108>;
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		back {
+> +			label = "SW-TACT6";
+> +			gpios = <&gpx2 0 0 0x10000 2>;
+> +			linux,code = <158>;
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		wakeup {
+> +			label = "SW-TACT7";
+> +			gpios = <&gpx2 1 0 0x10000 2>;
+> +			linux,code = <143>;
+> +			gpio-key,wakeup;
+> +		};
+> +	};
+>  };
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
