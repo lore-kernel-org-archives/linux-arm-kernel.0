@@ -1,55 +1,75 @@
-From: dirac3000@gmail.com (Alvaro Moran)
-Date: Thu,  7 Feb 2013 11:38:43 +0100
-Subject: [PATCH 1/1] DMA: PL330: allow submitting 2 requests at a time
-Message-ID: <1360233523-20825-1-git-send-email-dirac3000@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 7 Feb 2013 10:43:03 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <CAFbHwiTCN5sFadXX7z7Smwd17tEZ7WmfKhG_6b3psu0bx228ew@mail.gmail.com>
+References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
+ <20130129083522.GA14302@pd.tnic>
+ <1359478014.3529.157.camel@shinybook.infradead.org>
+ <20130129174249.GB25415@pd.tnic>
+ <1359482147.3529.161.camel@shinybook.infradead.org>
+ <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <20130201011712.GF23505@n2100.arm.linux.org.uk>
+ <1359703995.23531.6.camel@shinybook.infradead.org>
+ <20130205210436.670c62e26d2121330e87af35@freescale.com>
+ <1360141322.6066.4.camel@shinybook.infradead.org>
+ <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+ <CAFbHwiTCN5sFadXX7z7Smwd17tEZ7WmfKhG_6b3psu0bx228ew@mail.gmail.com>
+Message-ID: <CAHkRjk4P4C_5c39ftBeGs9X+vWoKJi6Yx3B=_b5iOcc771bRiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the original driver design, only one request was processed at a
-time by the driver, even if the low-level part of the driver was able to
-handle 2 requests.
-With this patch we are able to create 2 microcodes per thread and to
-launch the second transfer on the interrupt handler of the first one,
-instead of having to wait for the tasklet to generate the microcode.
+On 7 February 2013 10:19, Will Newton <will.newton@gmail.com> wrote:
+> On Thu, Feb 7, 2013 at 1:19 AM, Kim Phillips <kim.phillips@freescale.com> wrote:
+>> On Wed, 6 Feb 2013 09:02:04 +0000
+>> "Woodhouse, David" <david.woodhouse@intel.com> wrote:
+>>
+>>> On Tue, 2013-02-05 at 21:04 -0600, Kim Phillips wrote:
+>>> > gcc -Os emits calls to __bswapsi2 on those platforms to save space
+>>> > because they don't have the single rev byte swap instruction.
+>>>
+>>> Is that the right thing for GCC to do in that situation?
+>>
+>> if it saves space, why wouldn't it be?
+>>
+>> "Many of these functions are only optimized in certain cases; if they
+>> are not optimized in a particular case, a call to the library
+>> function is emitted." [1]
+>>
+>> I see "(arm_arch6 || !optimize_size)" in gcc's define_expand
+>> "bswapsi2" source, so GCC considers size optimization as a
+>> legitimate one of those cases.
+>>
+>>> If so, perhaps we should be *providing* __bswap[sd]i2 functions for it
+>>> to use?
+>>
+>> either that, or link with libgcc - why does arch/arm64 do this and
+>> arch/arm not?  It's not obvious from git log.
+>
+> One reason I have found, I don't know if it is the canonical one, is
+> that linking with libgcc allows people to use all intrinsics e.g. soft
+> float routines in the kernel without noticing it. If you limit the
+> intrinsics to the ones linked into the kernel explicitly then this
+> cannot happen.
 
-Signed-off-by: Alvaro Moran <dirac3000@gmail.com>
----
- drivers/dma/pl330.c |   11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+For arm64 we explicitly pass -mgeneral-regs-only to avoid any floating
+point generation. Soft-float is excluded by the ABI automatically. But
+we use other compiler intrinsics like __ffs and while they are
+currently generated inline, you can't guarantee, hence the linking
+with libgcc.
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 80680ee..7814f8e 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -486,6 +486,8 @@ struct pl330_thread {
- 	/* Index of the last submitted request or -1 if the DMA is stopped */
- 	int req_running;
- };
-+/* We handle two requests at a time */
-+#define NR_MAX_REQUESTS	2
- 
- enum pl330_dmac_state {
- 	UNINIT,
-@@ -2276,13 +2278,18 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
- static inline void fill_queue(struct dma_pl330_chan *pch)
- {
- 	struct dma_pl330_desc *desc;
-+	int busy_reqs = 0;
- 	int ret;
- 
- 	list_for_each_entry(desc, &pch->work_list, node) {
- 
- 		/* If already submitted */
--		if (desc->status == BUSY)
--			break;
-+		if (desc->status == BUSY) {
-+			busy_reqs++;
-+			if (busy_reqs == NR_MAX_REQUESTS)
-+				break;
-+			continue;
-+		}
- 
- 		ret = pl330_submit_req(pch->pl330_chid,
- 						&desc->req);
+> I have also seen cases where the libgcc intrinsics are improved over
+> time, having the code in the kernel allows these improvements to be
+> rolled into the kernel even if the user has an older toolchain.
+
+Indeed, the gcc guys do a lot benchmarking/optimisations on a wide
+range of processors, so we can take advantage of that in the kernel.
+But it's much easier on arm64 since the architecture is stable. On
+32-bit arm we have to cope with a range of architecture versions with
+variations to the instruction set.
+
 -- 
-1.7.10.4
+Catalin
