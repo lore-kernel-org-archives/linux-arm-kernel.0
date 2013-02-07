@@ -1,100 +1,55 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 07 Feb 2013 11:30:49 +0100
-Subject: [PATCH 1/5] ARM: dts: exynos5250-arndale: Add node entry for
- gpio-buttons
-In-Reply-To: <1360214129-4096-1-git-send-email-tushar.behera@linaro.org>
-References: <1360214129-4096-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <8299289.2GSO3WcaG5@amdc1227>
+From: dirac3000@gmail.com (Alvaro Moran)
+Date: Thu,  7 Feb 2013 11:38:43 +0100
+Subject: [PATCH 1/1] DMA: PL330: allow submitting 2 requests at a time
+Message-ID: <1360233523-20825-1-git-send-email-dirac3000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Due to the original driver design, only one request was processed at a
+time by the driver, even if the low-level part of the driver was able to
+handle 2 requests.
+With this patch we are able to create 2 microcodes per thread and to
+launch the second transfer on the interrupt handler of the first one,
+instead of having to wait for the tasklet to generate the microcode.
 
-I'm wondering why Exynos5250 has not been migrated to use pinctrl yet.
+Signed-off-by: Alvaro Moran <dirac3000@gmail.com>
+---
+ drivers/dma/pl330.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-Support for it in pinctrl-samsung driver has been already merged, but I 
-don't see any pinctrl nodes in exynos5250.dtsi.
-
-This is important because the legacy gpio-samsung support is going to be 
-dropped, as it already happened in case of Exynos 4.
-
-CC'ing Thomas Abraham as he might know something.
-
-Best regards,
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 80680ee..7814f8e 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -486,6 +486,8 @@ struct pl330_thread {
+ 	/* Index of the last submitted request or -1 if the DMA is stopped */
+ 	int req_running;
+ };
++/* We handle two requests at a time */
++#define NR_MAX_REQUESTS	2
+ 
+ enum pl330_dmac_state {
+ 	UNINIT,
+@@ -2276,13 +2278,18 @@ static inline void handle_cyclic_desc_list(struct list_head *list)
+ static inline void fill_queue(struct dma_pl330_chan *pch)
+ {
+ 	struct dma_pl330_desc *desc;
++	int busy_reqs = 0;
+ 	int ret;
+ 
+ 	list_for_each_entry(desc, &pch->work_list, node) {
+ 
+ 		/* If already submitted */
+-		if (desc->status == BUSY)
+-			break;
++		if (desc->status == BUSY) {
++			busy_reqs++;
++			if (busy_reqs == NR_MAX_REQUESTS)
++				break;
++			continue;
++		}
+ 
+ 		ret = pl330_submit_req(pch->pl330_chid,
+ 						&desc->req);
 -- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
-
-On Thursday 07 of February 2013 10:45:25 Tushar Behera wrote:
-> Added GPIO buttons DT node to Arndale board file.
-> 
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
-> This series is based on for-next branch of Kukjin Kim's tree
-> and added on top of the below patch:
-> https://patchwork.kernel.org/patch/2042451/
-> ---
->  arch/arm/boot/dts/exynos5250-arndale.dts |   48
-> ++++++++++++++++++++++++++++++ 1 files changed, 48 insertions(+), 0
-> deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts
-> b/arch/arm/boot/dts/exynos5250-arndale.dts index 63572f9..9ce40df
-> 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -119,4 +119,52 @@
->  	spi_2: spi at 12d40000 {
->  		status = "disabled";
->  	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		menu {
-> +			label = "SW-TACT2";
-> +			gpios = <&gpx1 4 0 0x10000 2>;
-> +			linux,code = <139>;
-> +			gpio-key,wakeup;
-> +		};
-> +
-> +		home {
-> +			label = "SW-TACT3";
-> +			gpios = <&gpx1 5 0 0x10000 2>;
-> +			linux,code = <102>;
-> +			gpio-key,wakeup;
-> +		};
-> +
-> +		up {
-> +			label = "SW-TACT4";
-> +			gpios = <&gpx1 6 0 0x10000 2>;
-> +			linux,code = <103>;
-> +			gpio-key,wakeup;
-> +		};
-> +
-> +		down {
-> +			label = "SW-TACT5";
-> +			gpios = <&gpx1 7 0 0x10000 2>;
-> +			linux,code = <108>;
-> +			gpio-key,wakeup;
-> +		};
-> +
-> +		back {
-> +			label = "SW-TACT6";
-> +			gpios = <&gpx2 0 0 0x10000 2>;
-> +			linux,code = <158>;
-> +			gpio-key,wakeup;
-> +		};
-> +
-> +		wakeup {
-> +			label = "SW-TACT7";
-> +			gpios = <&gpx2 1 0 0x10000 2>;
-> +			linux,code = <143>;
-> +			gpio-key,wakeup;
-> +		};
-> +	};
->  };
+1.7.10.4
