@@ -1,67 +1,35 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 7 Feb 2013 17:13:56 -0300
-Subject: [PATCH 00/10] usb: ehci: more bus glues as separate modules
-In-Reply-To: <5113e5b1.c84e420a.08c3.ffffbe1b@mx.google.com>
-References: <yes>
- <5113e5b1.c84e420a.08c3.ffffbe1b@mx.google.com>
-Message-ID: <20130207201355.GA17509@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Feb 2013 21:19:04 +0100
+Subject: [PATCH 2/5] spi: pl022: use generic DMA slave configuration if
+ possible
+In-Reply-To: <201302071942.54642.arnd@arndb.de>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <201301291313.03511.arnd@arndb.de>
+ <CACRpkdZNpCJwp-uaH6feTcaPesNouwpHt-hO-M9v52G=Ux+Hqw@mail.gmail.com>
+ <201302071942.54642.arnd@arndb.de>
+Message-ID: <CACRpkdbunPGtR4p_kY4q8WEb8iwkEbdo_icDyrLZwKrCe0wXqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manjunath,
+On Thu, Feb 7, 2013 at 8:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 07 February 2013, Linus Walleij wrote:
 
-Nice work.
+>> Actually I once read about a feature where the kernel provides
+>> a static page full of zeroes or something like this, that would be
+>> ideal to use in cases like this, then all of this dummy page
+>> allocation and freeing can be deleted.
+>
+> You mean empty_zero_page? That only works if this page is
+> read-only from the perspective of the DMA controller, but
+> then it would be a good fit, yes.
 
-On Thu, Feb 07, 2013 at 11:03:57PM +0530, manjunath.goudar at linaro.org wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
-> 
-> 
-> Separate the SOC On-Chip host controller driver from ehci-hcd
-> host code into its own driver module.
+That's actually how it's used.
 
-Perhaps you could add a few lines explaining why you're doing this.
+SPI is symmetric, and in the DMA case we're not poking
+data into the buffers from the CPU so the controller need
+something - anything - to stream to the block.
 
-> 
-> Manjunath Goudar (10):
->   USB:Changed omap2plus_defconfig to support OMAP USB static driver
->   USB: EHCI: make ehci-omap a separate driver
->   USB: EHCI: make ehci-spear a separate driver
->   USB: EHCI: make ehci-orion a separate driver
->   USB: EHCI: make ehci-atmel a separate driver
->   USB: EHCI: make ehci-s5p a separate driver
->   USB: EHCI: make ehci-mv a separate driver
->   USB: EHCI: make ehci-vt8500 a separate driver
->   USB: EHCI: make ehci-msm a separate driver
->   USB: EHCI: make ehci-w90X900 a separate driver
-> 
->  arch/arm/configs/omap2plus_defconfig |    4 ++
->  drivers/usb/host/Kconfig             |   43 ++++++++++++---
->  drivers/usb/host/Makefile            |   10 +++-
->  drivers/usb/host/ehci-atmel.c        |   78 ++++++++++++++-------------
->  drivers/usb/host/ehci-hcd.c          |   75 +++++++-------------------
->  drivers/usb/host/ehci-msm.c          |   84 +++++++++++++----------------
->  drivers/usb/host/ehci-mv.c           |   81 +++++++++++++---------------
->  drivers/usb/host/ehci-omap.c         |   69 ++++++++++--------------
->  drivers/usb/host/ehci-orion.c        |   98 +++++++++++++++++-----------------
->  drivers/usb/host/ehci-s5p.c          |   69 +++++++++++++-----------
->  drivers/usb/host/ehci-spear.c        |   77 +++++++++++++-------------
->  drivers/usb/host/ehci-vt8500.c       |   73 ++++++++++++-------------
->  drivers/usb/host/ehci-w90x900.c      |   90 ++++++++++++++-----------------
->  13 files changed, 415 insertions(+), 436 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+If we can use that page we'll even save a few remaps.
 
-
-Thanks,
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
