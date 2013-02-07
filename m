@@ -1,128 +1,83 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 7 Feb 2013 10:49:39 -0700
-Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
- for Armada XP
-In-Reply-To: <20130207072824.GA24827@avionic-0098.mockup.avionic-design.de>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-23-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302062241.14444.arnd@arndb.de>
- <20130207010502.GA7435@obsidianresearch.com>
- <20130207072824.GA24827@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130207174939.GA24688@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 07 Feb 2013 10:59:39 -0700
+Subject: [PATCH 09/14] pinctrl/abx500: use direct IRQ defines
+In-Reply-To: <CAF2Aj3jHe+mP0dU_BHThBV-va_iJLcFQedmWQOTaYafAZM1Yxg@mail.gmail.com>
+References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
+ <1360093715-6348-10-git-send-email-linus.walleij@stericsson.com>
+ <5112F1B9.6010700@wwwdotorg.org>
+ <CAF2Aj3jHe+mP0dU_BHThBV-va_iJLcFQedmWQOTaYafAZM1Yxg@mail.gmail.com>
+Message-ID: <5113EB8B.4060002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 08:28:24AM +0100, Thierry Reding wrote:
-> On Wed, Feb 06, 2013 at 06:05:02PM -0700, Jason Gunthorpe wrote:
-> [...]
-> > Also, what should 'reg' be so that the PCI core binds the OF nodes
-> > properly?  The standard says reg should have the configuration space
-> > address of the bridge, and I noticed Thierry was using something that
-> > almost looked like a config space address in his driver..
-> > 
-> > But that seems overly tricky.. When using the link stanzas, shouldn't
-> > this scheme be more like this:
-> > 
-> > // The PCI-E host bridge
-> > pex at 0 {
-> >    device_type = "pciex"; // <<-- Important!!
+On 02/07/2013 02:01 AM, Lee Jones wrote:
+> I don't see myself on cc. Was that intentional?
+
+The original patch was that way; I assume git send-email only CC'd you
+on patches written by you.
+
+> I quite like the idea of this.
 > 
-> That might actually work but is somewhat dangerous. I originally tried
-> to trick the OF code into parsing the ranges properly by setting this to
-> "pci". However that breaks horribly because of_bus_pci_match() in
-> drivers/of/address.c will cause the parent bus of the pex at 0 controller
-> to be PCI, which will cause #address-cells == 3 and #size-cells == 2,
-> and thus messing up the address translation because you actually have
-> #address-cells == 1 and #size-cells == 1.
-
-Oh right, yes, I ment it to be "pci", specifically to engage that
-code. Ditto for the other instance.
-
-Not sure about the side effect you are talking about, I am using that
-pattern in my DT and it is OK, but the PEX node is off the root node
-directly.. It shouldn't affect the parent. Other DT examples using
-device_type = pci (ie in PPC) also put it on the top PCI node and have
-that node buried, so it should be correct, but all the stuff below has
-to be correct first..
- 
-> >    ranges = <
-> >       // Driver internal control registers in MMIO space
-> >       0x82000000 0x10000000 0xd0040000  0xd0040000  0x0 0x8000000
+> Stephen,
 > 
-> I'm not sure I understand what you're doing here. Where does the
-> 0x10000000 in cell 2 come from?
+> It doesn't mean the other patch was wrong, it just transfers the math.
 
-It is just a marker to keep the internal regs distinct from the PCI
-MMIO window. I don't really like it, but something is necessary to
-pass the non-PCI items into the link stanza. It would probably be
-better to just place them outside the link as I did in my other
-example..
+Ah, I see. The issue is that the code below clearly calculates the hwirq
+differently, and it wasn't immediately obvious that this part of the
+patch for example:
 
-> I also just noticed that I used 0x00000800 in the first cell, maybe that
-> should be 0x02000800, though I think that didn't quite work for some
-> reason. I'll need to check that. The odd part about this is that the
+>  struct abx500_gpio_irq_cluster ab8500_gpio_irq_cluster[] = {
+> -	GPIO_IRQ_CLUSTER(6,  13, 34),
+> -	GPIO_IRQ_CLUSTER(24, 25, 24),
+> -	GPIO_IRQ_CLUSTER(36, 41, 14),
+> +	GPIO_IRQ_CLUSTER(6,  13, AB8500_INT_GPIO6R),
+> +	GPIO_IRQ_CLUSTER(24, 25, AB8500_INT_GPIO24R),
+> +	GPIO_IRQ_CLUSTER(36, 41, AB8500_INT_GPIO36R),
+>  };
 
-I think that is the trickyness you have, 0x00000800 is probably the
-correct config space address number for your root port bridge. You are
-overriding it to be both a config space address and something that
-translates back to a CPU MMIO address.
+... actually changes the values in the table (AB8500_INT_GPIO6R is 40,
+so when using that value, you need to subtract of the value 6 for the
+base to get the original 34).
 
-If you use 0x02000800 then it is no longer a config space address, it is
-an MMIO address and your 'reg' won't match anymore.
-
-> address is in fact not within PCI MMIO space at all, so I'm not sure
-> this is even a correct way to represent it. However I find it quite
-> intuitive to do so and it is really the only way to make the translation
-> from the PCI-PCI bridge's reg property work while at the same time
-> having a proper PCI address for the port.
-
-Your problem is that in PCI devices 'reg' is not supposed to be
-translated to a CPU address. It is the config space address of the PCI
-device followed by the *sizes* of all the BARs.
-
-assigned-addresses is the MMIO location (and size) of the 'BARs', and
-is intended to be translated to a CPU address.
-
-When the bus is properly in PCI mode the OF address code automatically
-uses assigned-addresses instead of regs, that is why you need
-device_type = pci
-
-> >    // PCI-PCI bridge to Physical link 0
-> >    pcie at 0,0 {
-> >      device_type = "pciex";
-> >      // The configuration space address of the PCI-PCI bridge required by OF
-> >      reg = <0x80 0 0  0 0>; // Bus 0, Dev 0x10, Fn 0
+> I wouldn't squash it into mine. I like the transition and the
+> possibility to revert it if there's been some mistake.
 > 
-> I think the first cell should be 0x800.
-
-Right.
-
-> >      /* The 'bar' on the PCI-PCI bridge, maps to internal control
-> >         registers, required by the driver. */
-> >      assigned-addresses = <0x82000000 0x10000000 0xd0040000  0 0x2000>;
-> >      // ..
-> >   }
+> (not to say there is one, but just in case.)
 > 
-> The PCI DT binding says that each entry in the assigned-addresses
-> property is to correspond to one of the PCI device's base address
-> registers. So unless this is actually the value that ends up being
-> written to one of the BARs I don't think this is correct.
-
-Yes, but, it is a compromise, of sorts. DT has no way to pass a
-non-PCI described resource into this stanza. It would ideal if the
-driver didn't require that at all, but if it does I think it has to be
-through assigned-addresses...
-
-Now, perhaps this is better:
-
-assigned-addresses = <0 0 0  0 0 // BAR 0 of the bridge, unused
-                      0 0 0  0 0 // BAR 1 of the bridge, unused
-                      0x82000000 0x10000000 0xd0040000  0 0x2000>; // Extended
-
-Mark the only two BARs in the bridge as unused and put your non-BAR
-registers after them.
-
-Certainly, trying to use reg to convey that the link has an internal
-MMIO region at CPU address 0xd0040000 would be even worse..
-
-Jason
+> Sent from my mobile Linux device.
+> 
+> On Feb 7, 2013 12:14 AM, "Stephen Warren" <swarren@wwwdotorg.org
+> <mailto:swarren@wwwdotorg.org>> wrote:
+> 
+>     On 02/05/2013 12:48 PM, Linus Walleij wrote:
+>     > From: Linus Walleij <linus.walleij@linaro.org
+>     <mailto:linus.walleij@linaro.org>>
+>     >
+>     > Make it harder to do mistakes by introducing the actual
+>     > defined ABx500 IRQ number into the IRQ cluster definitions.
+>     > Deduct cluster offset from the GPIO offset to make each
+>     > cluster coherent.
+> 
+>     Shouldn't this patch be squashed into the previous patch to avoid churn?
+> 
+>     >  static struct abx500_pinctrl_soc_data ab9540_soc = {
+> 
+>     > @@ -273,8 +273,7 @@ static int abx500_gpio_to_irq(struct gpio_chip
+>     *chip, unsigned offset)
+> 
+>     > -                     hwirq = gpio + cluster->to_irq;
+>     > -
+>     > +                     hwirq = gpio - cluster->start + cluster->to_irq;
+>     >                       return
+>     irq_create_mapping(pct->parent->domain, hwirq);
+> 
+>     In particular, this change implies that the previous patch was simply
+>     incorrect, although I haven't really thought about it in detail.
+>     --
+>     To unsubscribe from this list: send the line "unsubscribe
+>     linux-kernel" in
+>     the body of a message to majordomo at vger.kernel.org
+>     <mailto:majordomo@vger.kernel.org>
+>     More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>     Please read the FAQ at  http://www.tux.org/lkml/
+> 
