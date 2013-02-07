@@ -1,92 +1,219 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Wed, 6 Feb 2013 16:33:42 -0800
-Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
- init
-In-Reply-To: <CACxGe6uOaoRbtuovEsA87d-MtCbGNd3KZCeHXbBQaEpp6NZ7fA@mail.gmail.com>
-References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
- <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
- <20130206102628.5E7413E1510@localhost>
- <CAKrE-KdX+Nxk0X4xdz6Dx3WVtOpV+ms+gPB-Dq-MwZwetyZ5Nw@mail.gmail.com>
- <CACxGe6uOaoRbtuovEsA87d-MtCbGNd3KZCeHXbBQaEpp6NZ7fA@mail.gmail.com>
-Message-ID: <CAKrE-Keyxqr_q=a-1pHjSVfeAte08JOdjwaT-0PbmZjgZWysNw@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 6 Feb 2013 18:05:02 -0700
+Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
+ for Armada XP
+In-Reply-To: <201302062241.14444.arnd@arndb.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-23-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302062241.14444.arnd@arndb.de>
+Message-ID: <20130207010502.GA7435@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 6, 2013 at 3:48 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Feb 6, 2013 at 8:12 PM, Girish KS <girishks2000@gmail.com> wrote:
->> On Wed, Feb 6, 2013 at 2:26 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>> On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S <girishks2000@gmail.com> wrote:
->>>> The status of the interrupt is available in the status register,
->>>> so reading the clear pending register and writing back the same
->>>> value will not actually clear the pending interrupts. This patch
->>>> modifies the interrupt handler to read the status register and
->>>> clear the corresponding pending bit in the clear pending register.
->>>>
->>>> Modified the hwInit function to clear all the pending interrupts.
->>>>
->>>> Signed-off-by: Girish K S <ks.giri@samsung.com>
->>>> ---
->>>>  drivers/spi/spi-s3c64xx.c |   41 +++++++++++++++++++++++++----------------
->>>>  1 file changed, 25 insertions(+), 16 deletions(-)
->>>>
->>>> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
->>>> index ad93231..b770f88 100644
->>>> --- a/drivers/spi/spi-s3c64xx.c
->>>> +++ b/drivers/spi/spi-s3c64xx.c
->>>> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
->>>>  {
->>>>       struct s3c64xx_spi_driver_data *sdd = data;
->>>>       struct spi_master *spi = sdd->master;
->>>> -     unsigned int val;
->>>> +     unsigned int val, clr = 0;
->>>>
->>>> -     val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>>> +     val = readl(sdd->regs + S3C64XX_SPI_STATUS);
->>>>
->>>> -     val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
->>>> -             S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
->>>> -             S3C64XX_SPI_PND_TX_OVERRUN_CLR |
->>>> -             S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->>>> -
->>>> -     writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>>> -
->>>> -     if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
->>>> +     if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
->>>> +             clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
->>>>               dev_err(&spi->dev, "RX overrun\n");
->>>> -     if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
->>>> +     }
->>>> +     if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
->>>> +             clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
->>>>               dev_err(&spi->dev, "RX underrun\n");
->>>> -     if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
->>>> +     }
->>>> +     if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
->>>> +             clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
->>>>               dev_err(&spi->dev, "TX overrun\n");
->>>> -     if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
->>>> +     }
->>>> +     if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
->>>> +             clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->>>>               dev_err(&spi->dev, "TX underrun\n");
->>>> +     }
->>>> +
->>>> +     /* Clear the pending irq by setting and then clearing it */
->>>> +     writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>>> +     writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>>
->>> Wait, what?  clr & ~clr == 0   Always.  What are you actually trying to do here?
->> The user manual says, wirting 1 to the pending clear register clears
->> the interrupt (its not auto clear to 0). so i need to explicitly reset
->> those bits thats what the 2nd write does
->
-> Then write 0. That's the result of what the code does anyway, but the
-> code as-written is nonsensical.
-Just writing 0 doest clear the status bit. The status bit in the
-status register is cleared only when the corresponding bit in clear
-pending register is set.
-If not cleared after setting. On the next Interrupt, writing 1 to a
-previously set bit will not clear the status bit.
-Hope its clear
->
-> g.
+On Wed, Feb 06, 2013 at 10:41:14PM +0000, Arnd Bergmann wrote:
+
+> This would mean that rather than putting the mapped physical address
+> (0xc0000000, 0xc1000000, ...) in here, you would actually have 64-bit
+> address as the destination as well, in whatever format the
+> address map hardware uses, I assume using a numbered 32 bit
+> address space for each object that can be remapped.
+
+Do you mean like:
+
+mbus_matrix {
+   /* At this level addresses are
+       <32 bit MBUS target ID> <32 bit target address offset>
+      target_id is an internal MBUS specification
+     */
+   #address-cells = <2>;
+   #size-cells = <1>;
+
+   pex0 {
+       ranges = <
+      // CPU window bridged to PCI MMIO
+      0x82000000 0x00000000 0x00000000  0x<target_id> 0x0 0x0 0x8000000
+      // CPU IO window bridged to PCI IO
+      0x81000000 0x00000000 0x00000000  0x<target_id> 0x0  0x0 0xa0000
+      ...>;
+   }
+
+   nand {
+       reg = <0x<target_id> 0 0x200>;
+   };
+
+   internal_regs {
+       ranges = <0 0x<target_id> 0 0x10000>;
+
+       timer {
+           reg = <0x20300 0x20>;
+      };
+   };
+}
+
+?
+
+I think the big issue would go back to how to pool all the link
+decoders together in a way that fits OF and Linux's PCI core will
+understand?
+
+How does of_translate_address work in a world like this?
+
+> This would also let you do the PCI memory address assignment for
+> each port separately, starting at bus address 0, followed by
+> finding a location in the CPU address space and passing
+> the start as the sys->mem_offset argument to
+> pci_add_resource_offset.
+
+That goes back to the original problem - the goal is to have only one
+pci_sys_data, not one for every link.
+
+The host driver would have to request a large region of physical
+address space and still dole it out on a link by link basis. Not sure
+how to model that in DT??
+
+In any event, changing how all the dynamic windows are configured in
+DT is a big job (there was another thread about this) it seems
+orthogonal to the PCI host driver..
+
+> > +                       pcie at 0,0 {
+> > +                               device_type = "pciex";
+> > +                               reg = <0x0800 0 0xd0040000 0 0x2000>;
+> > +                               #address-cells = <3>;
+> > +                               #size-cells = <2>;
+> > +                               marvell,pcie-port = <0>;
+> > +                               marvell,pcie-lane = <0>;
+> > +                               interrupts = <1>;
+> > +                               clocks = <&gateclk 5>;
+> > +                               status = "disabled";
+> > +                       };
+> 
+> I think you are missing a "ranges" property here, at least an empty
+> one, which is required by the standard but not currently enforced
+> in the code.
+
+Maybe.. according to the standard the ranges in this stanza should
+reflect the bridge configuration, but that isn't known when the DT is
+written. An empty ranges means identity and that isn't really right
+either.
+
+Also, what should 'reg' be so that the PCI core binds the OF nodes
+properly?  The standard says reg should have the configuration space
+address of the bridge, and I noticed Thierry was using something that
+almost looked like a config space address in his driver..
+
+But that seems overly tricky.. When using the link stanzas, shouldn't
+this scheme be more like this:
+
+// The PCI-E host bridge
+pex at 0 {
+   device_type = "pciex"; // <<-- Important!!
+
+   ranges = <
+      // Driver internal control registers in MMIO space
+      0x82000000 0x10000000 0xd0040000  0xd0040000  0x0 0x8000000
+
+      // CPU 0xe0000000 -> e8000000 bridged to PCI MMIO
+      0x82000000 0x00000000 0xe0000000  0xe0000000  0x0 0x8000000
+      // CPU IO bus 0x0000000 -> 0xa0000 bridged to PCI IO
+      0x81000000 0x00000000 0x00000000  0x00000000  0x0 0xa0000
+      // CPU 0xe8000000 -> f0000000 bridged to PCI MMIO, prefetchable
+      0xC2000000 0x00000000 0xe8000000  0xe8000000  0x0 0x8000000
+      >;
+
+   //...
+
+   // PCI-PCI bridge to Physical link 0
+   pcie at 0,0 {
+     device_type = "pciex";
+     // The configuration space address of the PCI-PCI bridge required by OF
+     reg = <0x80 0 0  0 0>; // Bus 0, Dev 0x10, Fn 0
+
+     /* The 'bar' on the PCI-PCI bridge, maps to internal control
+        registers, required by the driver. */
+     assigned-addresses = <0x82000000 0x10000000 0xd0040000  0 0x2000>;
+     // ..
+  }
+}
+
+Thierry, what do you think?
+
+I struggled with this particular area of the OF system recently and
+Grant Likely was very helpful - the above is based on that
+discussion..
+
+======
+
+Thomas, here is one possible alternate idea, not sure on the merit,
+just including it because it is close to what I've got in my DT right
+now..:
+
+// The entire multi-lane controller and PCI root bus
+pex at 0 {
+   device_type = "pciex";
+
+   /* This section configures the Linux PCI host driver. Each line is a
+      physical PCI-Link. (Erorrs included :) */
+   compatible = "marvell,armada-370-xp-pcie";
+   regs = <0xd0040000 0x00002000   // port 0.0
+           0xd0042000 0x00002000   // port 2.0
+           0xd0044000 0x00002000   // port 0.1
+           0xd0048000 0x00002000   // port 0.2
+           0xd004C000 0x00002000>; // port 0.3
+   io-cpu-window = <0xc0000000 0xa0000>;
+   interrupts = <58 59 60 61 99>;
+   clocks = <&gateclk 5
+             &gateclk 6
+             &gateclk 7
+             &gateclk 8
+             &gateclk 26>
+   marvell,port-lane <0 0
+                      0 1
+                      0 2
+                      0 3
+                      2 0>;
+
+   /* Below here configures the aggregate PCI bus the PEX0 stanza
+      describes */
+
+   #address-cells = <3>;
+   #size-cells = <2>;
+
+   // CPU resources allocated to this PCI host bridge
+   bus-range = <0x00 0xff>;
+   ranges = <
+      // CPU 0xe0000000 -> e8000000 bridged to PCI MMIO
+      0x82000000 0x00000000 0xe0000000  0xe0000000  0x0 0x8000000
+      // CPU IO bus 0x0000000 -> 0xa0000 bridged to PCI IO
+      0x81000000 0x00000000 0x00000000  0x00000000  0x0 0xa0000
+      // CPU 0xe8000000 -> f0000000 bridged to PCI MMIO, prefetchable
+      0xC2000000 0x00000000 0xe8000000  0xe8000000  0x0 0x8000000
+      >;
+
+   /* Any PCI devices associated with this bus go here, relative to
+      the above ranges. As example: */
+   link at 0 {
+   	device_type = "pciex";
+        // Root port at bus 0, device 0x10, function 0
+	reg = <0x00000080 0 0  0 0>;
+
+       ep {
+   	 device_type = "pciex";
+         // End port on bus 1, device 0, function 0
+	 reg = <0x00000100 0 0  0 0>;
+       } 
+   }
+}
+
+Thoughts:
+ - 'regs' in the main stanza, keep to CPU addresses instead of
+   confusing translated fake ranges address
+ - each regs line is matches to an interrupt, clock and port-lane
+   line to describe a link. The above describes 5 links.
+ - The CPU physical address window to use for the IO space
+   is set via io-cpu-window, not much choice here, the PCI
+   format ranges must be 0 based.
+ - It is not necessary to have per-root port stanzas at all
+   with the above.
+ - There is only one PCI bus stanza, the top level.
+
+Jason
