@@ -1,85 +1,33 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 7 Feb 2013 13:27:05 +0530
-Subject: [PATCH v2 3/3] ARM: davinci: da850: add mmc DT entries
-In-Reply-To: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
-References: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1360223825-23929-4-git-send-email-prakash.pm@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 7 Feb 2013 08:58:36 +0100
+Subject: [PATCH 0/2] ARM: dts: omap3-overo: Add pwm-leds and audio support
+In-Reply-To: <51125AFC.10704@ti.com>
+References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
+ <5101273A.9090800@ti.com> <510F7BEB.1020408@epfl.ch> <51125AFC.10704@ti.com>
+Message-ID: <51135EAC.7010406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT entry for MMC. Also add entry for pinmux information.
-Tested on da850-evm without card detect and EDMA support as
-DT support for GPIO and EDMA are yet come.
+Hi,
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: cjb at laptop.org
-Cc: Sekhar Nori <nsekhar@ti.com>
----
-Since v1:
-Removed bitfields for specifying the device capabilty and accomodate
-controller revision in compatible field.
+On 02/06/2013 02:30 PM, Benoit Cousson wrote:
+>> So a patch is being merged to handle triggers in the case of pwm leds [1].
+>> When done, we will be able to add back the default trigger. Do you want
+>> to wait on it to merge this series?
+> 
+> What kind of dependency do we have between these two series? I mean what
+> will happen if the DTS is merged before the pwm subsystem?
+> 
+> If that does not generate any regression / crash, then it is OK, if not,
+> we should take care of the order.
 
- arch/arm/boot/dts/da850-evm.dts |    9 +++++++++
- arch/arm/boot/dts/da850.dtsi    |   15 +++++++++++++++
- 2 files changed, 24 insertions(+), 0 deletions(-)
+In this series the 'linux,default-trigger' property is not added to the
+pwm-leds node, so it is safe to take this series.
+I'm sure Florian will send the update to add this flag back for 3.10 or for
+3.9-rc (the needed patches for PWM and leds-pwm will be in 3.9).
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index fa04152..78a6fb7 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -30,6 +30,15 @@
- 		rtc0: rtc at 1c23000 {
- 			status = "okay";
- 		};
-+		mmc0: mmc at 1c40000 {
-+			max-frequency = <50000000>;
-+			mmc-cap-sd-highspeed;
-+			mmc-cap-mmc-highspeed;
-+			bus-width = <4>;
-+			status = "okay";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins>;
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 099c81e..3ef9c22 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -56,6 +56,15 @@
- 					0x30 0x01100000  0x0ff00000
- 				>;
- 			};
-+			mmc0_pins: pinmux_mmc_pins {
-+				pinctrl-single,bits = <
-+					/* MMCSD0_DAT[3] MMCSD0_DAT[2]
-+					 * MMCSD0_DAT[1] MMCSD0_DAT[0]
-+					 * MMCSD0_CMD    MMCSD0_CLK
-+					 */
-+					0x28 0x00222222  0x00ffffff
-+				>;
-+			};
- 		};
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
-@@ -88,6 +97,12 @@
- 				      19>;
- 			status = "disabled";
- 		};
-+		mmc0: mmc at 1c40000 {
-+			compatible = "ti,davinci-mmc-da830";
-+			reg = <0x40000 0x1000>;
-+			interrupts = <16>;
-+			status = "disabled";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
+I'm also waiting for 3.9-rc1 so I can finish up some of the pending things
+regarding to PWMs.
+
 -- 
-1.7.4.1
+P?ter
