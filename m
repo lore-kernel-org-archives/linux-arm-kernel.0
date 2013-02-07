@@ -1,56 +1,42 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 7 Feb 2013 14:30:27 +0200
-Subject: [PATCH] OMAPDSS: enable omapdss for ARCH_MULTIPLATFORM
-In-Reply-To: <201302071155.12565.arnd@arndb.de>
-References: <1358891160-9534-1-git-send-email-robdclark@gmail.com>
- <3969096.QosOfOb9QT@wuerfel> <511392B0.4040409@ti.com>
- <201302071155.12565.arnd@arndb.de>
-Message-ID: <51139E63.2030302@ti.com>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Thu, 7 Feb 2013 18:06:54 +0530
+Subject: [PATCH v2 0/4] suspend/resume support for OMAP nand driver
+Message-ID: <1360240618-11094-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-02-07 13:55, Arnd Bergmann wrote:
+This patch series adds low power transition support for OMAP NAND driver.
+With recent driver conversion of GPMC to platform_driver, pm_runtime calls
+can be used to handle module enable & disable of GPMC. This is taken care
+patch #1.
 
-> omapdrm still has the 'select' statement in it if you only send the
-> first patch, so it should not be possible to disable omapdss when
-> it is actually needed.
+patch #2 is for GPMC suspend/resume support.
 
-Yes, you're right. After adding ARCH_MULTIPLATFORM, the kconfig enables
-omapdss fully even if enabled by select. So select is only a problem if
-omapdss is enabled when omapdss's dependencies are missing.
+This includes low power transition support of
+- GPMC module
+- ELM module
+- OMAP2 NAND driver
 
-> I suggested doing only the minimum that is needed to unbreak the
-> allyesconfig build, which is to enable just omapdss but not omapfb
-> and the displays, in case they don't actually build on anything else.
+User initiated suspend/resume sequence tested on am335x-evm with NAND
+flash support. Also tested in omap3-evm for user initiated
+suspend/resume sequence with NAND flash.
+This patch series based on [1] and is present in [2].
 
-omapfb and the displays build also fine on all platforms. But it's true
-that they are not needed to fix allyesconfig.
-
-> I would suggest only the first patch, since Linus quite specifically
-> asked only for serious bug fixes. I think an allyesconfig build
-> breakage is serious enough, but doing multiple patches for one
-> bug should not be necessary and is much harder to justify.
-
-Well, as I see, the bug is omapdrm using "select", not "depends on". So
-if I'd have to pick one patch, I'd send 0003. That would fix allyesconfig.
-
-Applying only 0003 means that omapdrm (and omapdss) won't be built on
-ARCH_MULTIPLATFORM, but building omapdrm on ARCH_MULTIPLATFORM is a
-feature added in this merge window, so leaving it out is not a regression.
-
-But I'm not sure if I'm being overly pedantic here. Patch 0001 would fix
-allyesconfig, and allow building omapdrm with ARCH_MULTIPLATFORM.
-However, the fixing there happens as a side effect, and so the 0001
-patch isn't even called a "fix" in its subject. That's the reason I'm a
-bit reluctant with the 0001 patch as a fix.
-
- Tomi
+1. ARM: OMAP2+: AM33XX: Add suspend-resume support
+   http://comments.gmane.org/gmane.linux.ports.arm.omap/91405
+2. https://github.com/avinashphilip/am335x_linux/commits/NAND_supend_resume_support
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130207/8ad26331/attachment.sig>
+Philip Avinash (4):
+  arm: gpmc: Converts GPMC driver to pm_runtime capable
+  arm: gpmc: Low power transition support
+  mtd: devices: elm: Low power transition support
+  mtd: nand: omap2: Low power transition support
+
+ arch/arm/mach-omap2/gpmc.c |   30 +++++++++++++++++++++++++++---
+ drivers/mtd/devices/elm.c  |   40 ++++++++++++++++++++++++++++++++++++++++
+ drivers/mtd/nand/omap2.c   |   19 +++++++++++++++++++
+ 3 files changed, 86 insertions(+), 3 deletions(-)
+
+-- 
+1.7.9.5
