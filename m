@@ -1,100 +1,40 @@
-From: arnd@linaro.org (Arnd Bergmann)
-Date: Thu, 7 Feb 2013 19:41:22 +0000
-Subject: [PATCH 04/10] USB: EHCI: make ehci-orion a separate driver
-In-Reply-To: <5113e5f0.c84e420a.08c3.ffffbe9a@mx.google.com>
-References: <yes> <1360258447-27247-1-git-send-email-yes>
- <5113e5f0.c84e420a.08c3.ffffbe9a@mx.google.com>
-Message-ID: <201302071941.22422.arnd@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 7 Feb 2013 19:42:54 +0000
+Subject: [PATCH 2/5] spi: pl022: use generic DMA slave configuration if
+ possible
+In-Reply-To: <CACRpkdZNpCJwp-uaH6feTcaPesNouwpHt-hO-M9v52G=Ux+Hqw@mail.gmail.com>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <201301291313.03511.arnd@arndb.de>
+ <CACRpkdZNpCJwp-uaH6feTcaPesNouwpHt-hO-M9v52G=Ux+Hqw@mail.gmail.com>
+Message-ID: <201302071942.54642.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 February 2013, manjunath.goudar at linaro.org wrote:
-> @@ -155,7 +155,7 @@ static inline unsigned ehci_read_frame_index(struct ehci_hcd *ehci)
->   * before driver shutdown. But it also seems to be caused by bugs in cardbus
->   * bridge shutdown:  shutting down the bridge before the devices using it.
->   */
-> -static int handshake (struct ehci_hcd *ehci, void __iomem *ptr,
-> +int handshake(struct ehci_hcd *ehci, void __iomem *ptr,
->                       u32 mask, u32 done, int usec)
->  {
->         u32     result;
+On Thursday 07 February 2013, Linus Walleij wrote:
+> On Tue, Jan 29, 2013 at 2:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 29 January 2013, Andy Shevchenko wrote:
+> 
+> >> > +   pl022->dummypage = kmalloc(PAGE_SIZE, GFP_KERNEL);
+> >>
+> >> Where this memory will be freed?
+> >> In dependence of the answer could you consider to use
+> >> devm_kmalloc or __get_free_page?
+> >
+> > There is another function like this called pl022_dma_probe()
+> > that has the same allocation, and it gets freed in the same place.
+> >
+> > It's probably worth changing this into something different, but
+> > I felt that it didn't belong into this patch. I was also not
+> > sure if the best option would be dmam_alloc_coherent, dev_kzalloc,
+> > or __get_free_page.
+> 
+> Actually I once read about a feature where the kernel provides
+> a static page full of zeroes or something like this, that would be
+> ideal to use in cases like this, then all of this dummy page
+> allocation and freeing can be deleted.
 
-I had not noticed this before, but apparently it belongs into the
-tegra patch that you dropped, rather than this patch.
-
-Same thing for all the changes below.
-
-> @@ -172,9 +172,9 @@ static int handshake (struct ehci_hcd *ehci, void __iomem *ptr,
->         } while (usec > 0);
->         return -ETIMEDOUT;
->  }
-> -
-> +EXPORT_SYMBOL_GPL(handshake);
->  /* check TDI/ARC silicon is in host mode */
-> -static int tdi_in_host_mode (struct ehci_hcd *ehci)
-> +static int tdi_in_host_mode(struct ehci_hcd *ehci)
->  {
->         u32             tmp;
->  
-> @@ -186,7 +186,7 @@ static int tdi_in_host_mode (struct ehci_hcd *ehci)
->   * Force HC to halt state from unknown (EHCI spec section 2.3).
->   * Must be called with interrupts enabled and the lock not held.
->   */
-> -static int ehci_halt (struct ehci_hcd *ehci)
-> +int ehci_halt(struct ehci_hcd *ehci)
->  {
->         u32     temp;
->  
-> @@ -215,9 +215,9 @@ static int ehci_halt (struct ehci_hcd *ehci)
->         return handshake(ehci, &ehci->regs->status,
->                           STS_HALT, STS_HALT, 16 * 125);
->  }
-> -
-> +EXPORT_SYMBOL_GPL(ehci_halt);
->  /* put TDI/ARC silicon into EHCI mode */
-> -static void tdi_reset (struct ehci_hcd *ehci)
-> +void tdi_reset(struct ehci_hcd *ehci)
->  {
->         u32             tmp;
->  
-> @@ -231,12 +231,12 @@ static void tdi_reset (struct ehci_hcd *ehci)
->                 tmp |= USBMODE_BE;
->         ehci_writel(ehci, tmp, &ehci->regs->usbmode);
->  }
-> -
-> +EXPORT_SYMBOL_GPL(tdi_reset);
->  /*
->   * Reset a non-running (STS_HALT == 1) controller.
->   * Must be called with interrupts enabled and the lock not held.
->   */
-> -static int ehci_reset (struct ehci_hcd *ehci)
-> +int ehci_reset(struct ehci_hcd *ehci)
->  {
->         int     retval;
->         u32     command = ehci_readl(ehci, &ehci->regs->command);
-> @@ -272,7 +272,7 @@ static int ehci_reset (struct ehci_hcd *ehci)
->                         ehci->resuming_ports = 0;
->         return retval;
->  }
-> -
-> +EXPORT_SYMBOL_GPL(ehci_reset);
->  /*
->   * Idle the controller (turn off the schedules).
->   * Must be called with interrupts enabled and the lock not held.
-> @@ -352,7 +352,7 @@ static void ehci_silence_controller(struct ehci_hcd *ehci)
->   * This forcibly disables dma and IRQs, helping kexec and other cases
->   * where the next system software may expect clean state.
->   */
-> -static void ehci_shutdown(struct usb_hcd *hcd)
-> +void ehci_shutdown(struct usb_hcd *hcd)
->  {
->         struct ehci_hcd *ehci = hcd_to_ehci(hcd);
->  
-> @@ -366,7 +366,7 @@ static void ehci_shutdown(struct usb_hcd *hcd)
->  
->         hrtimer_cancel(&ehci->hrtimer);
->  }
-> -
-> +EXPORT_SYMBOL_GPL(ehci_shutdown);
+You mean empty_zero_page? That only works if this page is
+read-only from the perspective of the DMA controller, but
+then it would be a good fit, yes.
 
 	Arnd
