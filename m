@@ -1,36 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Feb 2013 12:50:39 +0000
-Subject: [PATCH] OMAPDSS: enable omapdss for ARCH_MULTIPLATFORM
-In-Reply-To: <51139E63.2030302@ti.com>
-References: <1358891160-9534-1-git-send-email-robdclark@gmail.com>
- <201302071155.12565.arnd@arndb.de> <51139E63.2030302@ti.com>
-Message-ID: <201302071250.39923.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 7 Feb 2013 20:58:03 +0800
+Subject: mx28evk does not boot with linux-next 20130207
+In-Reply-To: <CAOMZO5Ar1T3Lg2KRvSLK-gjNAaAFAf39f6KqaYeF03w5bNj6EQ@mail.gmail.com>
+References: <CAOMZO5Ar1T3Lg2KRvSLK-gjNAaAFAf39f6KqaYeF03w5bNj6EQ@mail.gmail.com>
+Message-ID: <20130207125801.GA19091@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 February 2013, Tomi Valkeinen wrote:
-> > I would suggest only the first patch, since Linus quite specifically
-> > asked only for serious bug fixes. I think an allyesconfig build
-> > breakage is serious enough, but doing multiple patches for one
-> > bug should not be necessary and is much harder to justify.
+On Thu, Feb 07, 2013 at 09:47:58AM -0200, Fabio Estevam wrote:
+> Hi,
 > 
-> Well, as I see, the bug is omapdrm using "select", not "depends on". So
-> if I'd have to pick one patch, I'd send 0003. That would fix allyesconfig.
+> When booting linux-next 20130207 I get no kernel console output on a
+> mx28evk. After selecting earlyprintk and CONFIG_DEBUG_LL=y support I
+> get:
 > 
-> Applying only 0003 means that omapdrm (and omapdss) won't be built on
-> ARCH_MULTIPLATFORM, but building omapdrm on ARCH_MULTIPLATFORM is a
-> feature added in this merge window, so leaving it out is not a regression.
+>   LD      vmlinux
+>   SORTEX  vmlinux
+> sort done marker at 514bcc
+>   SYSMAP  System.map
+>   OBJCOPY arch/arm/boot/Image
+>   Kernel: arch/arm/boot/Image is ready
+>   GZIP    arch/arm/boot/compressed/piggy.gzip
+>   AS      arch/arm/boot/compressed/debug.o
+> arch/arm/boot/compressed/debug.S: Assembler messages:
+> arch/arm/boot/compressed/debug.S:6: Error: garbage following
+> instruction -- `ldr
+> r2,=IOMEM((0xf4000000+((((0x80000000+0x074000))&0x80000000)>>7)+((((0x80000000+0x074000))&0x000fffff))))'
 > 
-> But I'm not sure if I'm being overly pedantic here. Patch 0001 would fix
-> allyesconfig, and allow building omapdrm with ARCH_MULTIPLATFORM.
-> However, the fixing there happens as a side effect, and so the 0001
-> patch isn't even called a "fix" in its subject. That's the reason I'm a
-> bit reluctant with the 0001 patch as a fix.
+> Is this a known issue?
+> 
+Yes.  The following change should fix the problem.
 
-Makes sense. I suggested the same initially, but Rob preferred enabling
-DSS on multiplatform as well, since he wants to see broad build coverage
-for the DRM part. We should probably do that in 3.9, but for 3.8,
-just changing DRM to depend on DSS seems like the least intrusive
-choice.
+Shawn
 
-	Arnd
+diff --git a/arch/arm/boot/compressed/debug.S
+b/arch/arm/boot/compressed/debug.S
+index bdb0e25..6e8382d 100644
+--- a/arch/arm/boot/compressed/debug.S
++++ b/arch/arm/boot/compressed/debug.S
+@@ -1,4 +1,5 @@
+ #include <linux/linkage.h>
++#include <asm/assembler.h>
+
+ #include CONFIG_DEBUG_LL_INCLUDE
