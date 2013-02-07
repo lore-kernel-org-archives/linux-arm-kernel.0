@@ -1,64 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu,  7 Feb 2013 14:43:23 -0700
-Subject: [PATCH 1/2] ARM: tegra: enable ARCH_REQUIRE_GPIOLIB for Tegra114
-Message-ID: <1360273404-32397-1-git-send-email-swarren@wwwdotorg.org>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Thu, 7 Feb 2013 22:49:03 +0100
+Subject: [PATCH 0/2] ARM: S3C24XX: make s3c24XX.h header content local
+Message-ID: <201302072249.04263.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+This series moves the contents of the plat/s3c24XX.h headers into
+common.h, as their content does not need to be global anymore, now that
+everything lives in mach-s3c24xx.
 
-CONFIG_ARCH_TEGRA_114_SOC doesn't currently enable gpiolib, which causes
-numerous build problems building a Tegra kernel with only Tegra114
-enabled, and not Tegra20 or Tegra30. Enable ARCH_REQUIRE_GPIOLIB to
-solve this. However, all Tegra will use gpiolib, so select this option
-from ARCH_TEGRA rather than each individual ARCH_TEGRA_*_SOC, to
-prevent this problem for any future chips.
+Heiko Stuebner (2):
+  ARM: S3C24XX: move plat-samsung/s3c24XX headers to local common.h
+  ARM: S3C24XX: cleanup the included soc init functions in common.h
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-Olof, Arnd, These two patches can be applied on top of Tegra's previous
-tegra-for-3.9-soc-t114 branch.
+ arch/arm/mach-s3c24xx/clock-s3c2410.c        |    1 -
+ arch/arm/mach-s3c24xx/clock-s3c2412.c        |    1 -
+ arch/arm/mach-s3c24xx/clock-s3c2416.c        |    1 -
+ arch/arm/mach-s3c24xx/clock-s3c2443.c        |    1 -
+ arch/arm/mach-s3c24xx/common.c               |    7 +--
+ arch/arm/mach-s3c24xx/common.h               |   90 +++++++++++++++++++++++++-
+ arch/arm/mach-s3c24xx/mach-jive.c            |    2 +-
+ arch/arm/mach-s3c24xx/mach-n30.c             |    1 -
+ arch/arm/mach-s3c24xx/mach-nexcoder.c        |    2 -
+ arch/arm/mach-s3c24xx/mach-otom.c            |    1 -
+ arch/arm/mach-s3c24xx/mach-smdk2413.c        |    4 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c        |    3 +-
+ arch/arm/mach-s3c24xx/mach-smdk2440.c        |    2 -
+ arch/arm/mach-s3c24xx/mach-smdk2443.c        |    4 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c           |    4 +-
+ arch/arm/mach-s3c24xx/pm-s3c2412.c           |    1 -
+ arch/arm/mach-s3c24xx/s3c2410.c              |    1 -
+ arch/arm/mach-s3c24xx/s3c2412.c              |    1 -
+ arch/arm/mach-s3c24xx/s3c2416.c              |    1 -
+ arch/arm/mach-s3c24xx/s3c2440.c              |    1 -
+ arch/arm/mach-s3c24xx/s3c2442.c              |    1 -
+ arch/arm/mach-s3c24xx/s3c2443.c              |    1 -
+ arch/arm/mach-s3c24xx/s3c244x.c              |    2 -
+ arch/arm/plat-samsung/include/plat/s3c2410.h |   31 ---------
+ arch/arm/plat-samsung/include/plat/s3c2412.h |   32 ---------
+ arch/arm/plat-samsung/include/plat/s3c2416.h |   37 -----------
+ arch/arm/plat-samsung/include/plat/s3c2443.h |   36 ----------
+ arch/arm/plat-samsung/include/plat/s3c244x.h |   42 ------------
+ 28 files changed, 99 insertions(+), 212 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2410.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2412.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2416.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2443.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c244x.h
 
-I think this (coupled with Hiroshi's "ARM: tegra: Fix build error w/
-ARCH_TEGRA_114_SOC w/o ARCH_TEGRA_3x_SOC" is it for build failure fixes,
-although I'm queueing up a number of clock driver patches for which I'll
-send a pull request in the next few days.
-
- arch/arm/Kconfig            |    1 +
- arch/arm/mach-tegra/Kconfig |    2 --
- 2 files changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4265a26..7ea0866 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -643,6 +643,7 @@ config ARCH_LPC32XX
- config ARCH_TEGRA
- 	bool "NVIDIA Tegra"
- 	select ARCH_HAS_CPUFREQ
-+	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 	select CLKSRC_OF
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index bde8197..8654324 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -5,7 +5,6 @@ comment "NVIDIA Tegra options"
- config ARCH_TEGRA_2x_SOC
- 	bool "Enable support for Tegra20 family"
- 	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
--	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_742230 if SMP
- 	select ARM_ERRATA_751472
-@@ -27,7 +26,6 @@ config ARCH_TEGRA_2x_SOC
- 
- config ARCH_TEGRA_3x_SOC
- 	bool "Enable support for Tegra30 family"
--	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_ERRATA_743622
- 	select ARM_ERRATA_751472
- 	select ARM_ERRATA_754322
 -- 
-1.7.10.4
+1.7.2.3
