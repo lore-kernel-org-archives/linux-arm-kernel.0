@@ -1,71 +1,105 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 7 Feb 2013 18:02:47 +0200
-Subject: [PATCH v2 07/14] USB: ohci-omap3: Add device tree support and binding
+Date: Thu, 7 Feb 2013 18:02:48 +0200
+Subject: [PATCH v2 08/14] USB: ehci-omap: Add device tree support and binding
  information
 In-Reply-To: <1360252974-7912-1-git-send-email-rogerq@ti.com>
 References: <1360252974-7912-1-git-send-email-rogerq@ti.com>
-Message-ID: <1360252974-7912-8-git-send-email-rogerq@ti.com>
+Message-ID: <1360252974-7912-9-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allows the OHCI controller found in OMAP3 and later chips to
-be specified via device tree.
+Allows the OMAP EHCI controller to be specified via device tree.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- .../devicetree/bindings/usb/omap3-ohci.txt         |   17 +++++++++++++++++
- drivers/usb/host/ohci-omap3.c                      |   19 +++++++++++++++++++
- 2 files changed, 36 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/omap3-ohci.txt
+ .../devicetree/bindings/usb/omap-ehci.txt          |   34 ++++++++++++++++++
+ drivers/usb/host/ehci-omap.c                       |   36 +++++++++++++++++++-
+ 2 files changed, 69 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/omap-ehci.txt
 
-diff --git a/Documentation/devicetree/bindings/usb/omap3-ohci.txt b/Documentation/devicetree/bindings/usb/omap3-ohci.txt
+diff --git a/Documentation/devicetree/bindings/usb/omap-ehci.txt b/Documentation/devicetree/bindings/usb/omap-ehci.txt
 new file mode 100644
-index 0000000..ad2ace0
+index 0000000..b00a654
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/omap3-ohci.txt
-@@ -0,0 +1,17 @@
-+OMAP HS USB OHCI controller (OMAP3 and later)
++++ b/Documentation/devicetree/bindings/usb/omap-ehci.txt
+@@ -0,0 +1,34 @@
++OMAP HS USB EHCI controller
++
++This device is usually the child of the omap-usb-host
++Documentation/devicetree/bindings/mfd/omap-usb-host.txt
 +
 +Required properties:
 +
-+- compatible: should be "ti,ohci-omap3"
++- compatible: should be "ti,ehci-omap"
 +- reg: should contain one register range i.e. start and length
 +- interrupt-parent: phandle to the interrupt controller
 +- interrupts: description of the interrupt line
 +
++Optional properties:
++
++- phys: list of phandles to PHY nodes.
++  This property is required if at least one of the ports are in
++  PHY mode i.e. OMAP_EHCI_PORT_MODE_PHY
++
++To specify the port mode, see
++Documentation/devicetree/bindings/mfd/omap-usb-host.txt
++
 +Example for OMAP4:
 +
-+usbhsohci: ohci at 4a064800 {
-+	compatible = "ti,ohci-omap3", "usb-ohci";
-+	reg = <0x4a064800 0x400>;
++usbhsehci: ehci at 4a064c00 {
++	compatible = "ti,ehci-omap", "usb-ehci";
++	reg = <0x4a064c00 0x400>;
 +	interrupt-parent = <&gic>;
-+	interrupts = <0 76 0x4>;
++	interrupts = <0 77 0x4>;
 +};
-diff --git a/drivers/usb/host/ohci-omap3.c b/drivers/usb/host/ohci-omap3.c
-index 5ed28c5..ddfc314 100644
---- a/drivers/usb/host/ohci-omap3.c
-+++ b/drivers/usb/host/ohci-omap3.c
-@@ -31,6 +31,8 @@
- 
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
++
++&usbhsehci {
++	phys = <&hsusb1_phy 0 &hsusb3_phy>;
++};
++
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index 02a7893..a8ce10d 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -48,6 +48,8 @@
+ #include <linux/clk.h>
+ #include <linux/usb.h>
+ #include <linux/usb/hcd.h>
 +#include <linux/of.h>
 +#include <linux/dma-mapping.h>
  
- /*-------------------------------------------------------------------------*/
+ #include "ehci.h"
  
-@@ -112,6 +114,8 @@ static const struct hc_driver ohci_omap3_hc_driver = {
+@@ -121,6 +123,8 @@ static const struct ehci_driver_overrides ehci_omap_overrides __initdata = {
+ 	.extra_priv_size = sizeof(struct omap_hcd),
+ };
  
- /*-------------------------------------------------------------------------*/
- 
-+static u64 omap_ohci_dma_mask = DMA_BIT_MASK(32);
++static u64 omap_ehci_dma_mask = DMA_BIT_MASK(32);
 +
- /*
-  * configure so an HC device and id are always provided
-  * always called with process context; sleeping is OK
-@@ -159,6 +163,13 @@ static int ohci_hcd_omap3_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+ /**
+  * ehci_hcd_omap_probe - initialize TI-based HCDs
+  *
+@@ -148,6 +152,17 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	/* For DT boot, get platform data from parent. i.e. usbhshost */
++	if (dev->of_node) {
++		pdata = dev->parent->platform_data;
++		dev->platform_data = pdata;
++	}
++
++	if (!pdata) {
++		dev_err(dev, "Missing platform data\n");
++		return -ENODEV;
++	}
++
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(dev, "EHCI irq failed\n");
+@@ -161,6 +176,14 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 		return -EADDRNOTAVAIL;
  	}
  
 +	/*
@@ -74,29 +108,43 @@ index 5ed28c5..ddfc314 100644
 +	 * Once we have dma capability bindings this can go away.
 +	 */
 +	if (!pdev->dev.dma_mask)
-+		pdev->dev.dma_mask = &omap_ohci_dma_mask;
- 
- 	hcd = usb_create_hcd(&ohci_omap3_hc_driver, dev,
++		pdev->dev.dma_mask = &omap_ehci_dma_mask;
++
+ 	hcd = usb_create_hcd(&ehci_omap_hc_driver, dev,
  			dev_name(dev));
-@@ -228,12 +239,20 @@ static void ohci_hcd_omap3_shutdown(struct platform_device *pdev)
+ 	if (!hcd) {
+@@ -185,7 +208,10 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
+ 			continue;
+ 
+ 		/* get the PHY device */
+-		phy = devm_usb_get_phy_dev(dev, i);
++		if (dev->of_node)
++			phy = devm_usb_get_phy_by_phandle(dev, "phys", i);
++		else
++			phy = devm_usb_get_phy_dev(dev, i);
+ 		if (IS_ERR(phy) || !phy) {
+ 			ret = IS_ERR(phy) ? PTR_ERR(phy) : -ENODEV;
+ 			dev_err(dev, "Can't get PHY device for port %d: %d\n",
+@@ -275,6 +301,13 @@ static void ehci_hcd_omap_shutdown(struct platform_device *pdev)
  		hcd->driver->shutdown(hcd);
  }
  
-+static const struct of_device_id omap_ohci_dt_ids[] = {
-+	{ .compatible = "ti,ohci-omap3" },
++static const struct of_device_id omap_ehci_dt_ids[] = {
++	{ .compatible = "ti,ehci-omap" },
 +	{ }
 +};
 +
-+MODULE_DEVICE_TABLE(of, omap_ohci_dt_ids);
++MODULE_DEVICE_TABLE(of, omap_ehci_dt_ids);
 +
- static struct platform_driver ohci_hcd_omap3_driver = {
- 	.probe		= ohci_hcd_omap3_probe,
- 	.remove		= ohci_hcd_omap3_remove,
- 	.shutdown	= ohci_hcd_omap3_shutdown,
- 	.driver		= {
- 		.name	= "ohci-omap3",
-+		.of_match_table = of_match_ptr(omap_ohci_dt_ids),
- 	},
+ static struct platform_driver ehci_hcd_omap_driver = {
+ 	.probe			= ehci_hcd_omap_probe,
+ 	.remove			= ehci_hcd_omap_remove,
+@@ -283,6 +316,7 @@ static struct platform_driver ehci_hcd_omap_driver = {
+ 	/*.resume		= ehci_hcd_omap_resume, */
+ 	.driver = {
+ 		.name		= hcd_name,
++		.of_match_table = of_match_ptr(omap_ehci_dt_ids),
+ 	}
  };
  
 -- 
