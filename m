@@ -1,67 +1,70 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 07 Feb 2013 17:17:31 +0200
-Subject: [PATCH v2 07/10] gpio: pxa: remove arch related macro
-In-Reply-To: <1359886551-20950-8-git-send-email-haojian.zhuang@linaro.org>
+Date: Thu, 07 Feb 2013 17:17:35 +0200
+Subject: [PATCH v2 09/10] gpio: pxa: bind to pinctrl by request
+In-Reply-To: <1359886551-20950-10-git-send-email-haojian.zhuang@linaro.org>
 References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
- <1359886551-20950-8-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <5113C58B.7030901@compulab.co.il>
+ <1359886551-20950-10-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <5113C58F.1080207@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 02/03/13 12:15, Haojian Zhuang wrote:
-> Remove macro CONFIG_ARCH_PXA.
+> While gpio pins is requested, request the pin of pinctrl driver first.
 > 
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
 Tested-by: Igor Grinberg <grinberg@compulab.co.il>
 
 > ---
->  drivers/gpio/gpio-pxa.c |   30 +++++++++++++++---------------
->  1 file changed, 15 insertions(+), 15 deletions(-)
+>  drivers/gpio/gpio-pxa.c |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
 > diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-> index 95561d6..8130e3b 100644
+> index 5c39db3..c9cc636 100644
 > --- a/drivers/gpio/gpio-pxa.c
 > +++ b/drivers/gpio/gpio-pxa.c
-> @@ -568,21 +568,21 @@ static int pxa_gpio_probe(struct platform_device *pdev)
->  	}
+> @@ -23,6 +23,7 @@
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pinctrl/consumer.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/syscore_ops.h>
+>  #include <linux/slab.h>
+> @@ -159,6 +160,23 @@ int pxa_irq_to_gpio(struct irq_data *d)
+>  	return gpio;
+>  }
 >  
->  	if (!use_of) {
-> -#ifdef CONFIG_ARCH_PXA
-> -		irq = gpio_to_irq(0);
-> -		irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
-> -					 handle_edge_irq);
-> -		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-> -		irq_set_chained_handler(IRQ_GPIO0, pxa_gpio_demux_handler);
-> -
-> -		irq = gpio_to_irq(1);
-> -		irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
-> -					 handle_edge_irq);
-> -		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-> -		irq_set_chained_handler(IRQ_GPIO1, pxa_gpio_demux_handler);
-> -#endif
-> -
-> -		for (irq  = gpio_to_irq(gpio_offset);
-> +		if (irq0 > 0) {
-> +			irq = gpio_to_irq(0);
-> +			irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
-> +						 handle_edge_irq);
-> +			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-> +			irq_set_chained_handler(irq0, pxa_gpio_demux_handler);
-> +		}
-> +		if (irq1 > 0) {
-> +			irq = gpio_to_irq(1);
-> +			irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
-> +						 handle_edge_irq);
-> +			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-> +			irq_set_chained_handler(irq1, pxa_gpio_demux_handler);
-> +		}
-> +		for (irq = gpio_to_irq(gpio_offset);
->  			irq <= gpio_to_irq(pxa_last_gpio); irq++) {
->  			irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
->  						 handle_edge_irq);
+> +static int pxa_gpio_request(struct gpio_chip *gc, unsigned offset)
+> +{
+> +	/*
+> +	 * Map back to global GPIO space and request muxing, the direction
+> +	 * parameter does not matter for this controller.
+> +	 */
+> +	int gpio = gc->base + offset;
+> +
+> +	/*
+> +	 * Platforms in ARCH_PXA doesn't move to device tree yet,
+> +	 * and PINCTRL_SINGLE is depend on device tree.
+> +	 */ 
+> +	if (IS_ENABLED(CONFIG_PINCTRL_SINGLE))
+> +		return pinctrl_request_gpio(gpio);
+> +	return 0;
+> +}
+> +
+>  static int pxa_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
+>  {
+>  	struct pxa_gpio_chip *chip = NULL;
+> @@ -471,6 +489,7 @@ static int pxa_init_gpio_chip(struct platform_device *pdev, int gpio_end,
+>  		gc->base  = gpio;
+>  		gc->label = chips[i].label;
+>  
+> +		gc->request = pxa_gpio_request;
+>  		gc->direction_input  = pxa_gpio_direction_input;
+>  		gc->direction_output = pxa_gpio_direction_output;
+>  		gc->get = pxa_gpio_get;
 > 
 
 -- 
