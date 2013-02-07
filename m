@@ -1,104 +1,61 @@
-From: kishon@ti.com (kishon)
-Date: Thu, 7 Feb 2013 12:01:59 +0530
-Subject: [PATCH 3/8] ARM: dts: omap: Add usb_otg and glue data
-In-Reply-To: <511347E8.2030604@ti.com>
-References: <1360162604-14320-1-git-send-email-kishon@ti.com>
- <1360162604-14320-4-git-send-email-kishon@ti.com> <511347E8.2030604@ti.com>
-Message-ID: <51134A5F.1090707@ti.com>
+From: badarkhe.manish@gmail.com (Manish Badarkhe)
+Date: Thu, 7 Feb 2013 12:06:25 +0530
+Subject: [PATCH 1/5] ARM: dts: exynos5250-arndale: Add node entry for
+ gpio-buttons
+In-Reply-To: <51134907.1050803@linaro.org>
+References: <1360214129-4096-1-git-send-email-tushar.behera@linaro.org>
+ <F3DBB1B3EF102E4994C89758CFCA32412C4E1A@DBDE01.ent.ti.com>
+ <51134907.1050803@linaro.org>
+Message-ID: <CAKDJKT5xE9WWOC0pM8h1UWrF=OOtSr1D2WKPww9F6bhcO7VM_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tushar
 
-On Thursday 07 February 2013 11:51 AM, Rajendra Nayak wrote:
-> []...
->
+On Thu, Feb 7, 2013 at 11:56 AM, Tushar Behera <tushar.behera@linaro.org> wrote:
+> On 02/07/2013 11:47 AM, Kumar, Anil wrote:
+>> On Thu, Feb 07, 2013 at 10:45:25, Tushar Behera wrote:
+>>> Added GPIO buttons DT node to Arndale board file.
+>>>
+>>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>>> ---
+>>> This series is based on for-next branch of Kukjin Kim's tree
+>>> and added on top of the below patch:
+>>> https://patchwork.kernel.org/patch/2042451/
+>>> ---
+>>>  arch/arm/boot/dts/exynos5250-arndale.dts |   48 ++++++++++++++++++++++++++++++
+>>>  1 files changed, 48 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+>>> index 63572f9..9ce40df 100644
+>>> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+>>> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+>>> @@ -119,4 +119,52 @@
+>>>      spi_2: spi at 12d40000 {
+>>>              status = "disabled";
+>>>      };
+>>> +
+>>> +    gpio_keys {
+>>> +            compatible = "gpio-keys";
+>>> +            #address-cells = <1>;
+>>> +            #size-cells = <0>;
 >>
->> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt
->> b/Documentation/devicetree/bindings/usb/omap-usb.txt
->> index 29a043e..4688265 100644
->> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
->> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
->> @@ -15,6 +15,7 @@ OMAP MUSB GLUE
->>      represents PERIPHERAL.
->>    - power : Should be "50". This signifies the controller can supply
->> upto
->>      100mA when operating in host mode.
->> + - usb-phy : the phandle for the PHY device
+>> Just want to understand why these properties are here?
+>> As these properties are for child dt node. But have not seen
+>> anyone is using here.
 >>
->>   SOC specific device node entry
->>   usb_otg_hs: usb_otg_hs at 4a0ab000 {
->> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts
->> b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> index 3705a81..cb07583 100644
->> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
->> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> @@ -107,3 +107,9 @@
->>        */
->>       ti,pulldowns = <0x03a1c4>;
->>   };
->> +
->> +&usb_otg_hs {
->> +    interface_type = <0>;
->> +    mode = <3>;
->> +    power = <50>;
->> +};
->> diff --git a/arch/arm/boot/dts/omap3-evm.dts
->> b/arch/arm/boot/dts/omap3-evm.dts
->> index e8ba1c2..afb9ba9 100644
->> --- a/arch/arm/boot/dts/omap3-evm.dts
->> +++ b/arch/arm/boot/dts/omap3-evm.dts
->> @@ -59,3 +59,9 @@
->>   &twl_gpio {
->>       ti,use-leds;
->>   };
->> +
->> +&usb_otg_hs {
->> +    interface_type = <0>;
->> +    mode = <3>;
->> +    power = <50>;
->> +};
->> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi
->> b/arch/arm/boot/dts/omap3-overo.dtsi
->> index 89808ce..4b3d157 100644
->> --- a/arch/arm/boot/dts/omap3-overo.dtsi
->> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
->> @@ -55,3 +55,9 @@
->>   &twl_gpio {
->>       ti,use-leds;
->>   };
->> +
->> +&usb_otg_hs {
->> +    interface_type = <0>;
->> +    mode = <3>;
->> +    power = <50>;
->> +};
->> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
->> index 1acc261..b6472f7 100644
->> --- a/arch/arm/boot/dts/omap3.dtsi
->> +++ b/arch/arm/boot/dts/omap3.dtsi
->> @@ -397,5 +397,17 @@
->>               ti,timer-alwon;
->>               ti,timer-secure;
->>           };
->> +
->> +        usb_otg_hs: usb_otg_hs at 480ab000 {
->> +            compatible = "ti,omap3-musb";
->> +            reg = <0x480ab000 0x1000>;
->> +            interrupts = <0 92 0x4>, <0 93 0x4>;
->> +            interrupt-names = "mc", "dma";
->> +            ti,hwmods = "usb_otg_hs";
->> +            usb-phy = <&usb2_phy>;
->> +            multipoint = <1>;
->> +            num_eps = <16>;
->> +            ram_bits = <12>;
 >
-> Where are these bindings documented? The general convention is to use
-> a '-' for property names and not '_'
+> That is how gpio_keys node entries are defined in other .dts files.
 
-It's documented in Documentation/devicetree/bindings/usb/omap-usb.txt
-Actually the documentation and the drivers got merged with this binding 
-long back.
+I have gone through example for address-cells and size-cells in following link:
+http://devicetree.org/mediawiki/index.php?title=Device_Tree_Usage&stable=1#CPU_addressing
+
+which indicates that these fields are for child "reg".
+I think, here in child node there is no "reg". so there is no use
+of address-cells and size-cells propeties.
+
+Correct me if I am wrong here?
 
 Thanks
-Kishon
+Manish Badarkhe
