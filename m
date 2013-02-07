@@ -1,32 +1,67 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 7 Feb 2013 21:05:04 +0100
-Subject: [PATCH 4/4] clocksource: tegra20: use the device_node pointer
- passed to init
-In-Reply-To: <511402FC.50807@wwwdotorg.org>
-References: <1360264144-20714-1-git-send-email-robherring2@gmail.com><1360264144-20714-5-git-send-email-robherring2@gmail.com><511402FC.50807@wwwdotorg.org>
-Message-ID: <20130207.220504.79003148683176035.hdoyu@nvidia.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 7 Feb 2013 17:13:56 -0300
+Subject: [PATCH 00/10] usb: ehci: more bus glues as separate modules
+In-Reply-To: <5113e5b1.c84e420a.08c3.ffffbe1b@mx.google.com>
+References: <yes>
+ <5113e5b1.c84e420a.08c3.ffffbe1b@mx.google.com>
+Message-ID: <20130207201355.GA17509@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Thu, 7 Feb 2013 20:39:40 +0100:
+Hi Manjunath,
 
-> On 02/07/2013 12:09 PM, Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > We've already matched the node, so use the node pointer passed in. The rtc
-> > init was intermingled with the timer init, so split this out to a separate
-> > init function.
-> 
-> The series,
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> 
-> Patches 1,4:
-> Tested-by: Stephen Warren <swarren@nvidia.com>
-> 
-> One thing I wonder re: patch 4 - I know someone (I think Hiroshi, now
-> CC'd) planned to refactor drivers/clocksource/tegra20_timer.c to enhance
-> it for Tegra114. I'd like to check with him that the refactoring in this
-> patch won't impede that at all.
+Nice work.
 
-Actually this covers RTC part. I'll rework mine for the rest on the
-top of this.
+On Thu, Feb 07, 2013 at 11:03:57PM +0530, manjunath.goudar at linaro.org wrote:
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+> 
+> 
+> Separate the SOC On-Chip host controller driver from ehci-hcd
+> host code into its own driver module.
+
+Perhaps you could add a few lines explaining why you're doing this.
+
+> 
+> Manjunath Goudar (10):
+>   USB:Changed omap2plus_defconfig to support OMAP USB static driver
+>   USB: EHCI: make ehci-omap a separate driver
+>   USB: EHCI: make ehci-spear a separate driver
+>   USB: EHCI: make ehci-orion a separate driver
+>   USB: EHCI: make ehci-atmel a separate driver
+>   USB: EHCI: make ehci-s5p a separate driver
+>   USB: EHCI: make ehci-mv a separate driver
+>   USB: EHCI: make ehci-vt8500 a separate driver
+>   USB: EHCI: make ehci-msm a separate driver
+>   USB: EHCI: make ehci-w90X900 a separate driver
+> 
+>  arch/arm/configs/omap2plus_defconfig |    4 ++
+>  drivers/usb/host/Kconfig             |   43 ++++++++++++---
+>  drivers/usb/host/Makefile            |   10 +++-
+>  drivers/usb/host/ehci-atmel.c        |   78 ++++++++++++++-------------
+>  drivers/usb/host/ehci-hcd.c          |   75 +++++++-------------------
+>  drivers/usb/host/ehci-msm.c          |   84 +++++++++++++----------------
+>  drivers/usb/host/ehci-mv.c           |   81 +++++++++++++---------------
+>  drivers/usb/host/ehci-omap.c         |   69 ++++++++++--------------
+>  drivers/usb/host/ehci-orion.c        |   98 +++++++++++++++++-----------------
+>  drivers/usb/host/ehci-s5p.c          |   69 +++++++++++++-----------
+>  drivers/usb/host/ehci-spear.c        |   77 +++++++++++++-------------
+>  drivers/usb/host/ehci-vt8500.c       |   73 ++++++++++++-------------
+>  drivers/usb/host/ehci-w90x900.c      |   90 ++++++++++++++-----------------
+>  13 files changed, 415 insertions(+), 436 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+Thanks,
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
