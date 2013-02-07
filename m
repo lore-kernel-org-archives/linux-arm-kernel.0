@@ -1,45 +1,34 @@
-From: jjo.braun@gmail.com (Johannes Braun)
-Date: Thu, 7 Feb 2013 11:00:56 +0100
-Subject: Freescale imx35 kernel 3.6, no kernel boot messages
-In-Reply-To: <20130206174320.0ac0c863@jobraun>
-References: <20130206174320.0ac0c863@jobraun>
-Message-ID: <CADwvPCsj0jbjS448bvJLb0jsLp+Uafw7VPwB7=TBcRRAchXA3Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Feb 2013 11:01:29 +0100
+Subject: [PATCH 02/14] mfd: ab8500: provide a irq_set_type() function
+In-Reply-To: <CAF2Aj3iO+6j+T5C0X2Hh6TsvT4yaJ2cai6cC9DaiRAwL9n-dVw@mail.gmail.com>
+References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
+ <1360093715-6348-3-git-send-email-linus.walleij@stericsson.com>
+ <5112F043.6040700@wwwdotorg.org>
+ <CAF2Aj3iO+6j+T5C0X2Hh6TsvT4yaJ2cai6cC9DaiRAwL9n-dVw@mail.gmail.com>
+Message-ID: <CACRpkdb1W8HWV+ZTcA5EyjT8pEnnLUaB4rsiyCLpJiff-0=5-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> currently I`m trying to port the DENX 3.6 stable kernel for the flea3
-> board from carmedialabs. The board is based on a Freescale imx35
-> processor. Therefore I had a look at Stefano Bacics fork in the DENX
-> git repo, where I found a branch for the flea3 board. Compiling the
-> kernel required a modification of arch/arm/mach-imx/mach-flea3.c where
-> I had to replace .boot_params against .atag_offset in MACHINE_START.
-> Know my problem is that I can't see kernel boot messages. The boot uart
-> is uart2. So it has to be ttymxc2.
->
-> The machine id is also added to arch/arm/tools/mach-types.h
-> +flea3 MACH_FLEA3 FLEA3 3668
->
-> After the message:
-> Uncompressing Kernel Image ... OK
-> the board is completly silent and I can`t see any boot messages.
->
-> But the kernel does not hang. I checked it with a bdi3000. When I step
-> through the start_kernel() function, there are some printk outputs.
-> These outputs are reached, but nothing is show via uart2.
->
-> As I read, newer kernels like 3.6 are using the common clk framework.
-> Do I have to enable the clock for the uart2 in
-> arch/arm/mach-imx/clk-imx35.c via clk_prepare_enable(clk[uart2_gate])?
-> I checked this, but had no success.
->
-> DEBUG_LL is disabled.
->
-> In uboot I didn`t change anything. ttymxc2 is configured in the
-> bootparams. All the parameters are the same as with the 3.0.0 kernel.
->
-> Did someone had success running a kernel greater than 3.0 on a
-> freescale imx35 board?
+On Thu, Feb 7, 2013 at 10:08 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I found the issue. There was a parameter missing in MACHINE_START. I
-added .handle_irq = imx35_handle_irq and now I can see the boot output
-over uart2.
+> Great spot/idea. But then this won't work at all until I can write a fixup.
+>
+> Will you allow me to write a follow-up patch please?
+
+For me a sequel is OK, especially given that this thing doesn't make
+things any worse than they are already, but actually checking supported
+types will not be trivial, because...
+
+>> > +static int ab8500_irq_set_type(struct irq_data *data, unsigned int
+>> > type)
+>> > +{
+>> > +     return 0;
+>> > +}
+
+This applies to *ALL* AB8500 IRQs, and some of them actually support
+rising/falling, apart from the GPIO ones, so it's not enough to just handle
+the GPIO IRQs here.
+
+Yours,
+Linus Walleij
