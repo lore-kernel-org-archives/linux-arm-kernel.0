@@ -1,10 +1,10 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  7 Feb 2013 13:09:02 -0600
-Subject: [PATCH 2/4] clocksource: bcm2835: use the device_node pointer passed
+Date: Thu,  7 Feb 2013 13:09:03 -0600
+Subject: [PATCH 3/4] clocksource: vt8500: use the device_node pointer passed
  to init
 In-Reply-To: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
 References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1360264144-20714-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1360264144-20714-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,41 +13,39 @@ From: Rob Herring <rob.herring@calxeda.com>
 We've already matched the node, so use the node pointer passed in.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
 Cc: John Stultz <johnstul@us.ibm.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/clocksource/bcm2835_timer.c |   12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/clocksource/vt8500_timer.c |   14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
 
-diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
-index 50c68fe..766611d 100644
---- a/drivers/clocksource/bcm2835_timer.c
-+++ b/drivers/clocksource/bcm2835_timer.c
-@@ -95,23 +95,13 @@ static irqreturn_t bcm2835_time_interrupt(int irq, void *dev_id)
- 	}
- }
+diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
+index 8efc86b..2422552 100644
+--- a/drivers/clocksource/vt8500_timer.c
++++ b/drivers/clocksource/vt8500_timer.c
+@@ -129,22 +129,10 @@ static struct irqaction irq = {
+ 	.dev_id  = &clockevent,
+ };
  
--static struct of_device_id bcm2835_time_match[] __initconst = {
--	{ .compatible = "brcm,bcm2835-system-timer" },
--	{}
+-static struct of_device_id vt8500_timer_ids[] = {
+-	{ .compatible = "via,vt8500-timer" },
+-	{ }
 -};
 -
--static void __init bcm2835_timer_init(void)
-+static void __init bcm2835_timer_init(struct device_node *node)
+-static void __init vt8500_timer_init(void)
++static void __init vt8500_timer_init(struct device_node *np)
  {
--	struct device_node *node;
- 	void __iomem *base;
- 	u32 freq;
- 	int irq;
- 	struct bcm2835_timer *timer;
+-	struct device_node *np;
+ 	int timer_irq;
  
--	node = of_find_matching_node(NULL, bcm2835_time_match);
--	if (!node)
--		panic("No bcm2835 timer node");
--
- 	base = of_iomap(node, 0);
- 	if (!base)
- 		panic("Can't remap registers");
+-	np = of_find_matching_node(NULL, vt8500_timer_ids);
+-	if (!np) {
+-		pr_err("%s: Timer description missing from Device Tree\n",
+-								__func__);
+-		return;
+-	}
+ 	regbase = of_iomap(np, 0);
+ 	if (!regbase) {
+ 		pr_err("%s: Missing iobase description in Device Tree\n",
 -- 
 1.7.10.4
