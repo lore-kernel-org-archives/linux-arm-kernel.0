@@ -1,47 +1,77 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Thu, 7 Feb 2013 16:53:47 +0000
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <20130207174040.3a345770@skate>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 7 Feb 2013 10:00:00 -0700
+Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
+ for Armada XP
+In-Reply-To: <201302070824.51125.arnd@arndb.de>
 References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130129132204.GA23886@arm.com> <20130207153750.0fef1192@skate>
- <20130207155117.GA19666@arm.com> <20130207171904.70270598@skate>
- <20130207174040.3a345770@skate>
-Message-ID: <20130207165347.GA31995@arm.com>
+ <201302062241.14444.arnd@arndb.de>
+ <20130207010502.GA7435@obsidianresearch.com>
+ <201302070824.51125.arnd@arndb.de>
+Message-ID: <20130207170000.GA10834@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 04:40:40PM +0000, Thomas Petazzoni wrote:
-> Dear Thomas Petazzoni,
-> 
-> On Thu, 7 Feb 2013 17:19:04 +0100, Thomas Petazzoni wrote:
-> 
-> > Unfortunately, I don't quite agree with any of your three solutions. I
-> > still do believe the root problem is that pdev->dev.of_node should be
-> > NULL for the PCIe endpoints, since those devices are not probed with
-> > the Device Tree.
-> 
-> Looking more at this, the pdev->dev.of_node is in fact NULL, but the
-> code uses the of_node of the parent PCI device.
-> 
-> So in fact the problem is indeed that the subnodes pcie0,0 and pcie1,0
-> are seen as corresponding to the PCI-to-PCI bridges.
+On Thu, Feb 07, 2013 at 08:24:50AM +0000, Arnd Bergmann wrote:
 
-I would suggest changing the interrupt-mask to match any bus number. (Don't
-forget that the secondary bus number of each of your emulated bridges will
-vary depending on how many devices are detected underneath each root port,
-assuming you don't try and partition bus numbers or use domains between ports).
+> Yes, but the mbus-matrix node in the example would need a ranges property
+> to map the addresses according to how the windows are set up.
 
-Andrew Murray
+I'll hang on to this for next time the moving windows config to DT
+discussion comes up..
 
+
+> > Maybe.. according to the standard the ranges in this stanza should
+> > reflect the bridge configuration, but that isn't known when the DT is
+> > written. An empty ranges means identity and that isn't really right
+> > either.
 > 
-> Thanks,
+> Ok, I thought it was an identity mapping here.
 > 
-> Thomas
-> -- 
-> Thomas Petazzoni, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+> > Also, what should 'reg' be so that the PCI core binds the OF nodes
+> > properly?  The standard says reg should have the configuration space
+> > address of the bridge, and I noticed Thierry was using something that
+> > almost looked like a config space address in his driver..
 > 
+> Well, that assumes that a bridge is addressed using configuration space,
+> which IIRC is normally the case but not here.
+
+With Thomas's driver each link has a PCI-PCI bridge in config space, and
+'configuration space address' is that wonky format OF defines for
+encoding the bus/device/function number into the 3 dword address. So
+the correct thing is to put the bus/device/function of the PCI-PCI
+bridge for the link in the reg value.
+
+> I never really understood the 'assigned-addresses' property, but it looks
+> sensible.
+
+assigned-addresses does the same thing as reg in simple bus, but
+handles all the wonky PCI address translation
+ 
+> >  - The CPU physical address window to use for the IO space
+> >    is set via io-cpu-window, not much choice here, the PCI
+> >    format ranges must be 0 based.
+> 
+> I don't think I understand this part. Why can't you put this into
+> ranges as before?
+> 
+> -       0x81000000 0x00000000 0x00000000  0x00000000  0x0 0xa0000
+> +	0x81000000 0x00000000 0x00000000  0xc0000000  0x0 0xa0000
+
+The OF PCI core translates 0x81000000 IO space addresess into a 'struct
+resource' tagged with IORESOURCE_IO.
+
+But 0xc0000000 is not an IORESOURCE_IO address, it is an
+IORESOURCE_MEM address..
+
+So, I think with the current OF code this has to be 0, otherwise your
+IORESOURCE_IO's end up starting at 0xc000000 - but maybe there is some
+trickyness to work with in here? (Although none of this matters when
+Linux does resource assignment, the OF translation code is never
+enganged)
+
+But I agree, 0xc0000000 seems much better...
+
+To think about it from a different angle, what would you put in the
+4th dword on x86? How do you describe the IO numberspace in DT on x86?
+
+Jason
