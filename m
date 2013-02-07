@@ -1,47 +1,24 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 08 Feb 2013 07:54:18 +1300
-Subject: [PATCH 08/10] USB: EHCI: make ehci-vt8500 a separate driver
-In-Reply-To: <5113e626.c84e420a.08c3.ffffbf07@mx.google.com>
-References: <yes> <1360258447-27247-1-git-send-email-yes>
- <5113e626.c84e420a.08c3.ffffbf07@mx.google.com>
-Message-ID: <1360263258.25382.4.camel@gitbox>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Feb 2013 19:54:59 +0100
+Subject: [GIT PULL] ux500 DT related fixes and platform enhancements
+In-Reply-To: <CAF2Aj3gaFtPs7gLd3snzVr1a8Px5A_RN1vz=M+U_LZ3MBpyqqw@mail.gmail.com>
+References: <20130131115552.GG5301@gmail.com> <20130206135911.GB7519@gmail.com>
+ <CAOesGMiJTcjdEJzSDkpdV-ZCqN24uVmfjM-HOt+ojErS=98TmQ@mail.gmail.com>
+ <CAF2Aj3gaFtPs7gLd3snzVr1a8Px5A_RN1vz=M+U_LZ3MBpyqqw@mail.gmail.com>
+Message-ID: <CACRpkdaTajxS6YbjyyGPQ=qWiAkLaPySU6WncQ2E8HoAtGXqjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-02-07 at 23:04 +0530, manjunath.goudar at linaro.org wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
-> 
-> Separate the vt8500 host controller driver from ehci-hcd host code
-> into its own driver module.
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Tony Prisk <linux@prisktech.co.nz>
-> Cc: Alexey Charkov <alchark@gmail.com>
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/usb/host/Kconfig       |    8 +++++
->  drivers/usb/host/Makefile      |    1 +
->  drivers/usb/host/ehci-hcd.c    |    5 ---
->  drivers/usb/host/ehci-vt8500.c |   73 ++++++++++++++++++----------------------
->  4 files changed, 42 insertions(+), 45 deletions(-)
-> 
-...
-> diff --git a/drivers/usb/host/ehci-vt8500.c b/drivers/usb/host/ehci-vt8500.c
-> index 11695d5..ff4e3ae 100644
-> --- a/drivers/usb/host/ehci-vt8500.c
-> +++ b/drivers/usb/host/ehci-vt8500.c
-> @@ -16,52 +16,25 @@
-...
-> +MODULE_DESCRIPTION(DRIVER_DESC);
-> +MODULE_AUTHOR("Alexey Charkov");
-> +MODULE_LICENSE("GPL");
-Should be "GPL v2" as per the license header.
+On Thu, Feb 7, 2013 at 10:24 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
->  MODULE_ALIAS("platform:vt8500-ehci");
->  MODULE_DEVICE_TABLE(of, vt8500_ehci_ids);
+> I can do that. The reason I was submitting myself was due to the massive
+> amount of ux500 DT patches I was pushing. Now that's stopped, I'm happy for
+> Linus to handle it all.
 
-Regards
-Tony Prisk
+OK so what about I pull this branch into my ux500 git and
+call it a devicetree branch, and then we can optionally
+merge a few of those ARM: ux500: * patches that
+was sent for the regulator stuff on top of that as well?
+
+Yours,
+Linus Walleij
