@@ -1,78 +1,116 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 07 Feb 2013 15:10:27 +0530
-Subject: [PATCH 1/5] ARM: dts: exynos5250-arndale: Add node entry for
- gpio-buttons
-In-Reply-To: <CAKrE-Ke1WZt-PqVReGdNwcD+R_-4iHKPhgkgtgS-LQAPbx34mQ@mail.gmail.com>
-References: <1360214129-4096-1-git-send-email-tushar.behera@linaro.org>
- <F3DBB1B3EF102E4994C89758CFCA32412C4E1A@DBDE01.ent.ti.com>
- <51134907.1050803@linaro.org>
- <CAKDJKT5xE9WWOC0pM8h1UWrF=OOtSr1D2WKPww9F6bhcO7VM_w@mail.gmail.com>
- <5113501D.5060603@linaro.org>
- <CAKrE-Ke1WZt-PqVReGdNwcD+R_-4iHKPhgkgtgS-LQAPbx34mQ@mail.gmail.com>
-Message-ID: <5113768B.90102@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 7 Feb 2013 15:21:13 +0530
+Subject: [PATCH] ARM: davinci: da850: add DT node for I2C0
+In-Reply-To: <1360143382-24607-1-git-send-email-manishv.b@ti.com>
+References: <1360143382-24607-1-git-send-email-manishv.b@ti.com>
+Message-ID: <51137911.8080303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+CC: David Jander <david@protonic.nl>
-+CC: Dmitry Torokhov <dtor@mail.ru>
+On 2/6/2013 3:06 PM, Vishwanathrao Badarkhe, Manish wrote:
+> Add I2C0 device tree and pin muxing information to da850-evm.
+> Also, add OF_DEV_AUXDATA for I2C0 controller driver in da850
+> board dt file to use I2C0 clock.
+> Verified i2c0 node gets created in sys class interface as
+> "/sys/class/i2c-dev/i2c-0/subsystem/i2c-0".
 
-On 02/07/2013 01:13 PM, Girish KS wrote:
->>>>>> +
->>>>>> +    gpio_keys {
->>>>>> +            compatible = "gpio-keys";
->>>>>> +            #address-cells = <1>;
->>>>>> +            #size-cells = <0>;
->>>>>
->>>>> Just want to understand why these properties are here?
->>>>> As these properties are for child dt node. But have not seen
->>>>> anyone is using here.
->>>>>
->>>>
->>>> That is how gpio_keys node entries are defined in other .dts files.
->>>
->>> I have gone through example for address-cells and size-cells in following link:
->>> http://devicetree.org/mediawiki/index.php?title=Device_Tree_Usage&stable=1#CPU_addressing
->>>
->>> which indicates that these fields are for child "reg".
->>> I think, here in child node there is no "reg". so there is no use
->>> of address-cells and size-cells propeties.
->>>
->>
->> Please check Documentation/devicetree/bindings/gpio/gpio_keys.txt
->>
->> And whether these properties are required or not, I will let device tree
->> experts to comment on that.
->>
->> As such, currently all node entries for gpio_keys use these properties.
-> you can just verify by a simple test.
-> delete the 2 lines. address-cells and size cells.
-> this will have no affect.
-> now with these 2 lines deleted lines add a dummy reg property with
-> address and cell. dtb compiler will warn.
-> So I think what manish reffered is right.
-> There is also a reference of smdk4210 for kepads.
+That's not enough testing! (I know this would have gotten more testing
+as part of the bigger series you posted earlier). I tested on da850 evm
+with i2cdetect and i2cdump and it works fine.
 
-Right. Compilation is ok even after removing the address-cell and
-size-cell properties.
+> 
+> Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+> ---
+> Applies on top of v3.8-rc6 of linus tree.
+> Depends on
+>  - drivers/pinctrl: grab default handles from device core
+>    http://www.gossamer-threads.com/lists/linux/kernel/1665411
+>  - ARM: davinci: da850: add interrupt-parent property in soc node
+>    https://patchwork.kernel.org/patch/2044101/
+>  - ARM: davinci: da850: add pinctrl support
+>    http://comments.gmane.org/gmane.linux.davinci/25993
+> 
+> :100644 100644 433027f... 738d5d4... M	arch/arm/boot/dts/da850-evm.dts
+> :100644 100644 4b02167... a0072aa... M	arch/arm/boot/dts/da850.dtsi
+> :100644 100644 37c27af... 95ca4e9... M	arch/arm/mach-davinci/da8xx-dt.c
+>  arch/arm/boot/dts/da850-evm.dts  |    6 ++++++
+>  arch/arm/boot/dts/da850.dtsi     |   14 ++++++++++++++
+>  arch/arm/mach-davinci/da8xx-dt.c |    8 +++++++-
+>  3 files changed, 27 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> index 433027f..738d5d4 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -27,6 +27,12 @@
+>  		serial2: serial at 1d0d000 {
+>  			status = "okay";
+>  		};
+> +		i2c0: i2c at 1c22000 {
+> +			status = "okay";
+> +			clock-frequency = <100000>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c0_pins>;
+> +		};
+>  	};
+>  	nand_cs3 at 62000000 {
+>  		status = "okay";
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index 4b02167..a0072aa 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -56,6 +56,12 @@
+>  					0x30 0x01100000  0x0ff00000
+>  				>;
+>  			};
+> +			i2c0_pins: pinmux_i2c0_pins {
+> +				pinctrl-single,bits = <
+> +					/* I2C0_SDA,I2C0_SCL */
+> +					0x10 0x00002200 0x0000ff00
+> +				>;
+> +			};
+>  		};
+>  		serial0: serial at 1c42000 {
+>  			compatible = "ns16550a";
+> @@ -81,6 +87,14 @@
+>  			interrupts = <61>;
+>  			status = "disabled";
+>  		};
+> +		i2c0: i2c at 1c22000 {
+> +			compatible = "ti,davinci-i2c";
+> +			reg = <0x22000 0x1000>;
+> +			interrupts = <15>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+>  	};
+>  	nand_cs3 at 62000000 {
+>  		compatible = "ti,davinci-nand";
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> index 37c27af..95ca4e9 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -37,11 +37,17 @@ static void __init da8xx_init_irq(void)
+>  	of_irq_init(da8xx_irq_match);
+>  }
+>  
+> +struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+> +	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+> +	{}
+> +};
+> +
+>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+>  
+>  static void __init da850_init_machine(void)
+>  {
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +	of_platform_populate(NULL, of_default_bus_match_table,
+> +				da850_auxdata_lookup, NULL);
 
-But since this is used across all the instances, I would like to know
-the view of the authors on this.
+'checkpatch --strict' complains here of improper alignment. I fixed it
+locally. I am planning to send this to upstreams and see if this can
+make it for v3.9, but its pretty late already and it depends..
 
-David, Dimitry,
-
-Can you please let us know your opinion on this? If these properties are
-not required, then we can remove them from the documentation and from
-node entries in several other dts files.
-
->>
->> --
->> Tushar Behera
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
--- 
-Tushar Behera
+Thanks,
+Sekhar
