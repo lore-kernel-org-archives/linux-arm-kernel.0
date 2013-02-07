@@ -1,23 +1,30 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 6 Feb 2013 23:09:23 -0500 (EST)
-Subject: [PATCH v6 0/3] introduce static_vm for ARM-specific static mapped
- area
-In-Reply-To: <1360142010-10598-1-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1360142010-10598-1-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <alpine.LFD.2.02.1302062304490.6300@xanadu.home>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Thu, 07 Feb 2013 14:44:27 +1030
+Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
+In-Reply-To: <510FBC01.2030405@linux.vnet.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <510FBC01.2030405@linux.vnet.ibm.com>
+Message-ID: <87haloiwv0.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Feb 2013, Joonsoo Kim wrote:
+"Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com> writes:
+> On 01/22/2013 01:03 PM, Srivatsa S. Bhat wrote:
+>                  Avg. latency of 1 CPU offline (ms) [stop-cpu/stop-m/c latency]
+>
+> # online CPUs    Mainline (with stop-m/c)       This patchset (no stop-m/c)
+>
+>       8                 17.04                          7.73
+>
+>      16                 18.05                          6.44
+>
+>      32                 17.31                          7.39
+>
+>      64                 32.40                          9.28
+>
+>     128                 98.23                          7.35
 
-> Changelog
-> v5->v6:
->   Add Ack-by, Reviewed-by, Tested-by tags
->   [3/3]: Change from Nicolas' suggestion
->   	 - remove redundant parenthesis
+Nice!  I wonder how the ARM guys feel with their quad-cpu systems...
 
-This looks all fine now.  Please submit your patches here for RMK to 
-merge: http://www.arm.linux.org.uk/developer/patches/
-
-
-Nicolas
+Thanks!
+Rusty.
