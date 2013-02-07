@@ -1,75 +1,144 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 7 Feb 2013 10:43:03 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <CAFbHwiTCN5sFadXX7z7Smwd17tEZ7WmfKhG_6b3psu0bx228ew@mail.gmail.com>
-References: <20130128193033.8a0b0a871150c99247f05a95@freescale.com>
- <20130129083522.GA14302@pd.tnic>
- <1359478014.3529.157.camel@shinybook.infradead.org>
- <20130129174249.GB25415@pd.tnic>
- <1359482147.3529.161.camel@shinybook.infradead.org>
- <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
- <CAFbHwiTCN5sFadXX7z7Smwd17tEZ7WmfKhG_6b3psu0bx228ew@mail.gmail.com>
-Message-ID: <CAHkRjk4P4C_5c39ftBeGs9X+vWoKJi6Yx3B=_b5iOcc771bRiA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 7 Feb 2013 10:46:56 +0000
+Subject: [PATCH v2 2/3] mmc: davinci_mmc: add DT support
+In-Reply-To: <1360223825-23929-3-git-send-email-prakash.pm@ti.com>
+References: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
+ <1360223825-23929-3-git-send-email-prakash.pm@ti.com>
+Message-ID: <20130207104656.GE16987@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 February 2013 10:19, Will Newton <will.newton@gmail.com> wrote:
-> On Thu, Feb 7, 2013 at 1:19 AM, Kim Phillips <kim.phillips@freescale.com> wrote:
->> On Wed, 6 Feb 2013 09:02:04 +0000
->> "Woodhouse, David" <david.woodhouse@intel.com> wrote:
->>
->>> On Tue, 2013-02-05 at 21:04 -0600, Kim Phillips wrote:
->>> > gcc -Os emits calls to __bswapsi2 on those platforms to save space
->>> > because they don't have the single rev byte swap instruction.
->>>
->>> Is that the right thing for GCC to do in that situation?
->>
->> if it saves space, why wouldn't it be?
->>
->> "Many of these functions are only optimized in certain cases; if they
->> are not optimized in a particular case, a call to the library
->> function is emitted." [1]
->>
->> I see "(arm_arch6 || !optimize_size)" in gcc's define_expand
->> "bswapsi2" source, so GCC considers size optimization as a
->> legitimate one of those cases.
->>
->>> If so, perhaps we should be *providing* __bswap[sd]i2 functions for it
->>> to use?
->>
->> either that, or link with libgcc - why does arch/arm64 do this and
->> arch/arm not?  It's not obvious from git log.
->
-> One reason I have found, I don't know if it is the canonical one, is
-> that linking with libgcc allows people to use all intrinsics e.g. soft
-> float routines in the kernel without noticing it. If you limit the
-> intrinsics to the ones linked into the kernel explicitly then this
-> cannot happen.
+Hello,
 
-For arm64 we explicitly pass -mgeneral-regs-only to avoid any floating
-point generation. Soft-float is excluded by the ABI automatically. But
-we use other compiler intrinsics like __ffs and while they are
-currently generated inline, you can't guarantee, hence the linking
-with libgcc.
+I have a couple of comments on the dt bindings and the way it's parsed.
 
-> I have also seen cases where the libgcc intrinsics are improved over
-> time, having the code in the kernel allows these improvements to be
-> rolled into the kernel even if the user has an older toolchain.
+On Thu, Feb 07, 2013 at 07:57:04AM +0000, Manjunathappa, Prakash wrote:
+> Adds device tree support for davinci_mmc. Also add binding documentation.
+> Tested in non-dma PIO mode and without GPIO card_detect/write_protect
+> option because of dependencies on EDMA and GPIO module DT support.
+> 
+> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: cjb at laptop.org
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: mporter at ti.com
+> ---
+> Since v1:
+> Modified DT parse function to take default values and accomodate controller
+> version in compatible field.
+> 
+>  .../devicetree/bindings/mmc/davinci_mmc.txt        |   30 ++++++++
+>  drivers/mmc/host/davinci_mmc.c                     |   70 +++++++++++++++++++-
+>  2 files changed, 99 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> new file mode 100644
+> index 0000000..6717ab1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> @@ -0,0 +1,30 @@
+> +* TI Highspeed MMC host controller for DaVinci
+> +
+> +The Highspeed MMC Host Controller on TI DaVinci family
+> +provides an interface for MMC, SD and SDIO types of memory cards.
+> +
+> +This file documents the properties used by the davinci_mmc driver.
+> +
+> +Required properties:
+> +- compatible:
+> + Should be "ti,davinci-mmc-da830": for da830, da850, dm365
+> + Should be "ti,davinci-mmc-dm355": for dm355, dm644x
+> +
+> +Optional properties:
+> +- bus-width: Number of data lines, can be <4>, or <8>, default <1>
+> +- max-frequency: Maximum operating clock frequency, default 25MHz.
+> +- mmc-cap-mmc-highspeed: Indicates support for MMC in high speed mode
+> +- mmc-cap-sd-highspeed: Indicates support for SD in high speed mode
 
-Indeed, the gcc guys do a lot benchmarking/optimisations on a wide
-range of processors, so we can take advantage of that in the kernel.
-But it's much easier on arm64 since the architecture is stable. On
-32-bit arm we have to cope with a range of architecture versions with
-variations to the instruction set.
+I thought the last two were derivable from max-frequency?
 
--- 
-Catalin
+https://lkml.org/lkml/2012/10/15/231
+
+[...]
+
+> +static struct davinci_mmc_config
+> +	*mmc_parse_pdata(struct platform_device *pdev)
+>  {
+> +	struct device_node *np;
+>  	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
+> +	const struct of_device_id *match =
+> +		of_match_device(of_match_ptr(davinci_mmc_dt_ids), &pdev->dev);
+> +	u32 data;
+> +
+> +	np = pdev->dev.of_node;
+> +	if (!np)
+> +		return pdata;
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata) {
+> +		dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
+> +		goto nodata;
+> +	}
+> +
+> +	if (match->data)
+> +		pdata->version = (u8)((int)match->data);
+> +
+> +	of_property_read_u32(np, "max-frequency", &pdata->max_freq);
+> +	if (!pdata->max_freq)
+> +		dev_info(&pdev->dev, "'max-frequency' property not specified, defaulting to 25MHz\n");
+> +
+> +	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
+> +		pdata->caps |= MMC_CAP_MMC_HIGHSPEED;
+> +	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
+> +		pdata->caps |= MMC_CAP_SD_HIGHSPEED;
+
+If these aren't derivable from max-frequency, you could use
+of_property_read_bool to make this clearer.
+
+> +
+> +	of_property_read_u32(np, "bus-width", &data);
+> +	switch (data) {
+> +	case 0:
+
+Judging by the binding doc, should this be 1 rather than 0?
+
+> +	case 4:
+> +	case 8:
+> +		pdata->wires = data;
+> +		break;
+> +	default:
+> +		pdata->wires = 1;
+> +		dev_info(&pdev->dev, "Unsupported buswidth, defaulting to 1 bit\n");
+> +	}
+> +nodata:
+> +	return pdata;
+> +}
+> +
+> +static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+> +{
+> +	struct davinci_mmc_config *pdata = NULL;
+>  	struct mmc_davinci_host *host = NULL;
+>  	struct mmc_host *mmc = NULL;
+>  	struct resource *r, *mem = NULL;
+>  	int ret = 0, irq = 0;
+>  	size_t mem_size;
+>  
+> +	pdata = mmc_parse_pdata(pdev);
+> +	if (pdata == NULL) {
+> +		dev_err(&pdev->dev, "Can not get platform data\n");
+> +		return -ENOENT;
+> +	}
+> +
+>  	/* REVISIT:  when we're fully converted, fail if pdata is NULL */
+
+This comment can presumably disappear judging by the lines above?
+
+[...]
+
+Thanks,
+Mark.
