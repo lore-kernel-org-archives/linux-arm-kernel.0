@@ -1,95 +1,73 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 7 Feb 2013 19:43:28 +0100
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <CAErSpo797rhH=xt2x7eqdu7Vwf43FXoXQVcypvHM8-54LRC0wQ@mail.gmail.com>
-References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <5106F9F9.3010905@wwwdotorg.org> <20130129094143.1aad9377@skate>
- <20130129092006.GA16377@avionic-0098.mockup.avionic-design.de>
- <20130207112459.5f382ad4@skate>
- <CAErSpo7UOTGH7kjYBADymDdgmHwPxbXqczeXm1BH9C+XViQDRQ@mail.gmail.com>
- <20130207170020.289bac08@skate>
- <CAErSpo797rhH=xt2x7eqdu7Vwf43FXoXQVcypvHM8-54LRC0wQ@mail.gmail.com>
-Message-ID: <20130207184328.GA2931@avionic-0098.mockup.avionic-design.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 7 Feb 2013 19:43:42 +0100
+Subject: [PATCH] pinctrl: exynos5440: remove erroneous __init
+Message-ID: <1360262622-23616-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 11:08:45AM -0700, Bjorn Helgaas wrote:
-> On Thu, Feb 7, 2013 at 9:00 AM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > Dear Bjorn Helgaas,
-> >
-> > On Thu, 7 Feb 2013 08:46:06 -0700, Bjorn Helgaas wrote:
-> >
-> >> Can you post the entire dmesg log, ideally with CONFIG_PCI_DEBUG=y?
-> >> That should have more information about the enumeration process,
-> >> including what we think the XHCI BARs are and the apertures leading to
-> >> them.
-> >
-> > Sure, see below.
-> >
-> >> The PCI core assumes that we know the host bridge apertures up front,
-> >> and I'm not sure that is true on your platform, so maybe we'll need
-> >> some changes to accommodate that.
-> >
-> > In this hardware, we need to set up the address decoding windows. So
-> > there shouldn't be any access to a PCI device memory or I/O region
-> > until the addresses have been assigned in the PCI-to-PCI bridge.
-> 
-> I think this is the path where the crash happens (this is the same as
-> the backtrace you included below):
-> 
->     mvebu_pcie_scan_bus
->       pci_scan_root_bus
->         pci_create_root_bus
->         pci_scan_child_bus
->         pci_bus_add_devices
->           pci_bus_add_device
->             pci_fixup_device(pci_fixup_final)
->               quirk_usb_early_handoff           # pci_fixup_final
->                 quirk_usb_handoff_xhci
-> 
-> The problem is that we haven't assigned resources anywhere.  Normally
-> this is done by pci_bus_assign_resources() or
-> pci_assign_unassigned_bus_resources(), but I don't think there's
-> anything in the path above that does this.
-> 
-> This is not really a problem in your code; it's a generic PCI core
-> problem.  pci_scan_root_bus() does everything including creating the
-> root bus, scanning it, and adding the devices we find.  At the point
-> where we add a device (pci_bus_add_device()), it should be ready for a
-> driver to claim it -- all resource assignment should already be done.
-> 
-> I don't think it's completely trivial to fix this in the PCI core yet
-> (but we're moving in that direction) because we have some boot-time
-> ordering issues, e.g., x86 scans the root buses before we know about
-> the address space consumed by ACPI devices, so we can't just assign
-> the resources when we scan the bus.
-> 
-> I think the way you'll have to fix this in the meantime is to use
-> pci_create_root_bus() directly so you can do things in this sequence:
-> 
->   pci_create_root_bus
->   pci_scan_child_bus
->   pci_bus_assign_resources
->   pci_bus_add_devices
+From: Linus Walleij <linus.walleij@linaro.org>
 
-The last two are already done by ARM's pci_common_init(). On Tegra I've
-got by having a custom .scan_bus() implementation that does the first
-two. Back when I used the pci_scan_root_bus() we were seeing some issues
-with resource conflicts and such and there was a similar discussion at
-that time.
+This removes the __init notation from some of the
+the exynos 5440 pin controller set-up functions. These
+functions are called from probe() and as such may be
+discarded before probe() completes.
 
-Thomas, have you tried using the same .scan_bus() that I use on Tegra?
-It should be easy to port it to Marvell, the only Tegra-specific bit is
-how to get at the struct tegra_pcie.
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-exynos5440.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130207/d1055f0b/attachment.sig>
+diff --git a/drivers/pinctrl/pinctrl-exynos5440.c b/drivers/pinctrl/pinctrl-exynos5440.c
+index de05b64..1427299 100644
+--- a/drivers/pinctrl/pinctrl-exynos5440.c
++++ b/drivers/pinctrl/pinctrl-exynos5440.c
+@@ -599,7 +599,7 @@ static int exynos5440_gpio_direction_output(struct gpio_chip *gc, unsigned offse
+ }
+ 
+ /* parse the pin numbers listed in the 'samsung,exynos5440-pins' property */
+-static int __init exynos5440_pinctrl_parse_dt_pins(struct platform_device *pdev,
++static int exynos5440_pinctrl_parse_dt_pins(struct platform_device *pdev,
+ 			struct device_node *cfg_np, unsigned int **pin_list,
+ 			unsigned int *npins)
+ {
+@@ -630,7 +630,7 @@ static int __init exynos5440_pinctrl_parse_dt_pins(struct platform_device *pdev,
+  * Parse the information about all the available pin groups and pin functions
+  * from device node of the pin-controller.
+  */
+-static int __init exynos5440_pinctrl_parse_dt(struct platform_device *pdev,
++static int exynos5440_pinctrl_parse_dt(struct platform_device *pdev,
+ 				struct exynos5440_pinctrl_priv_data *priv)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -723,7 +723,7 @@ static int __init exynos5440_pinctrl_parse_dt(struct platform_device *pdev,
+ }
+ 
+ /* register the pinctrl interface with the pinctrl subsystem */
+-static int __init exynos5440_pinctrl_register(struct platform_device *pdev,
++static int exynos5440_pinctrl_register(struct platform_device *pdev,
+ 				struct exynos5440_pinctrl_priv_data *priv)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -798,7 +798,7 @@ static int __init exynos5440_pinctrl_register(struct platform_device *pdev,
+ }
+ 
+ /* register the gpiolib interface with the gpiolib subsystem */
+-static int __init exynos5440_gpiolib_register(struct platform_device *pdev,
++static int exynos5440_gpiolib_register(struct platform_device *pdev,
+ 				struct exynos5440_pinctrl_priv_data *priv)
+ {
+ 	struct gpio_chip *gc;
+@@ -831,7 +831,7 @@ static int __init exynos5440_gpiolib_register(struct platform_device *pdev,
+ }
+ 
+ /* unregister the gpiolib interface with the gpiolib subsystem */
+-static int __init exynos5440_gpiolib_unregister(struct platform_device *pdev,
++static int exynos5440_gpiolib_unregister(struct platform_device *pdev,
+ 				struct exynos5440_pinctrl_priv_data *priv)
+ {
+ 	int ret = gpiochip_remove(priv->gc);
+-- 
+1.7.11.3
