@@ -1,84 +1,52 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 7 Feb 2013 15:48:28 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the iommu tree
-Message-ID: <20130207154828.57604e8aaeee23878c15c177@canb.auug.org.au>
+From: inderpal.singh@linaro.org (Inderpal Singh)
+Date: Thu, 7 Feb 2013 10:19:16 +0530
+Subject: [PATCH 3/3] dts: Add cpufreq controller node for Exynos5440 SoC
+In-Reply-To: <1360179562-19950-3-git-send-email-amit.daniel@samsung.com>
+References: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
+ <1360179562-19950-3-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAG17yqTSxjoTDcGg+6rt+gnDyJBO7j3MBP_g5B=vYZqa1qaD+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 7 February 2013 01:09, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+> Add cpufreq controller device node for Exynos5440 SoC for passing
+> parameters like controller base address, interrupt and cpufreq
+> table.
+>
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5440.dtsi |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+> index 024269d..b20b517 100644
+> --- a/arch/arm/boot/dts/exynos5440.dtsi
+> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> @@ -63,6 +63,15 @@
+>
+>         };
+>
+> +       cpufreq at 160000 {
+> +               compatible = "samsung,exynos5440-cpufreq";
+> +               reg = <0x160000 0x1000>;
+> +               interrupts = <0 57 0>;
+> +               cpufreq_tbl = < 1200000 1025000
+> +                               1000000 975000
+> +                               800000  925000 >;
+> +       };
+> +
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-shmobile/setup-sh73a0.c between commit 9a27dee73f55 ("ARM:
-mach-shmobile: sh73a0: Add IPMMU device") from the iommu tree and commit
-486095331af0 ("ARM: mach-shmobile: sh73a0: Minimal setup using DT") from
-the arm-soc tree.
+I think cpufreq_tbl should be part of the cpu node as it's the
+property of the cpu.
+Please refer cpufreq-cpu0 and spear-cpufreq.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-shmobile/setup-sh73a0.c
-index 36c2b2e,2ecd668..0000000
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@@ -755,36 -780,7 +781,36 @@@ static struct platform_device pmu_devic
-  	.resource	= pmu_resources,
-  };
-  
- +/* an IPMMU module for ICB */
- +static struct resource ipmmu_resources[] = {
- +	[0] = {
- +		.name	= "IPMMU",
- +		.start	= 0xfe951000,
- +		.end	= 0xfe9510ff,
- +		.flags	= IORESOURCE_MEM,
- +	},
- +};
- +
- +static const char * const ipmmu_dev_names[] = {
- +	"sh_mobile_lcdc_fb.0",
- +};
- +
- +static struct shmobile_ipmmu_platform_data ipmmu_platform_data = {
- +	.dev_names = ipmmu_dev_names,
- +	.num_dev_names = ARRAY_SIZE(ipmmu_dev_names),
- +};
- +
- +static struct platform_device ipmmu_device = {
- +	.name           = "ipmmu",
- +	.id             = -1,
- +	.dev = {
- +		.platform_data = &ipmmu_platform_data,
- +	},
- +	.resource       = ipmmu_resources,
- +	.num_resources  = ARRAY_SIZE(ipmmu_resources),
- +};
- +
-- static struct platform_device *sh73a0_early_devices[] __initdata = {
-+ static struct platform_device *sh73a0_early_devices_dt[] __initdata = {
-  	&scif0_device,
-  	&scif1_device,
-  	&scif2_device,
-@@@ -795,9 -791,11 +821,12 @@@
-  	&scif7_device,
-  	&scif8_device,
-  	&cmt10_device,
-+ };
-+ 
-+ static struct platform_device *sh73a0_early_devices[] __initdata = {
-  	&tmu00_device,
-  	&tmu01_device,
- +	&ipmmu_device,
-  };
-  
-  static struct platform_device *sh73a0_late_devices[] __initdata = {
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130207/25be4564/attachment.sig>
+>         serial at B0000 {
+>                 compatible = "samsung,exynos4210-uart";
+>                 reg = <0xB0000 0x1000>;
+> --
+> 1.7.10.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
