@@ -1,194 +1,307 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 07 Feb 2013 17:17:09 +0200
-Subject: [PATCH v2 04/10] gpio: pxa: remove gpio_type
-In-Reply-To: <1359886551-20950-5-git-send-email-haojian.zhuang@linaro.org>
-References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
- <1359886551-20950-5-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <5113C575.2050606@compulab.co.il>
+Date: Thu, 07 Feb 2013 17:17:13 +0200
+Subject: [PATCH v2 05/11] gpio: pxa: define nr gpios in platform data
+In-Reply-To: <1359903638-27590-1-git-send-email-haojian.zhuang@linaro.org>
+References: <510E639A.7070600@compulab.co.il>
+ <1359903638-27590-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <5113C579.3010803@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 02/03/13 12:15, Haojian Zhuang wrote:
-> Since gpio_type is used to check whether gafr register is valid. So
-> move it into platform data.
+On 02/03/13 17:00, Haojian Zhuang wrote:
+> Avoid to define gpio numbers in gpio driver. Define it in platform data
+> instead.
 > 
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
 Tested-by: Igor Grinberg <grinberg@compulab.co.il>
 
 > ---
->  arch/arm/mach-pxa/pxa25x.c |    1 +
->  arch/arm/mach-pxa/pxa27x.c |    1 +
->  drivers/gpio/gpio-pxa.c    |   43 ++++++-------------------------------------
->  include/linux/gpio-pxa.h   |    1 +
->  4 files changed, 9 insertions(+), 37 deletions(-)
+>  arch/arm/mach-mmp/aspenite.c      |    1 +
+>  arch/arm/mach-mmp/avengers_lite.c |    1 +
+>  arch/arm/mach-mmp/brownstone.c    |    1 +
+>  arch/arm/mach-mmp/flint.c         |    1 +
+>  arch/arm/mach-mmp/gplugd.c        |    1 +
+>  arch/arm/mach-mmp/tavorevb.c      |    1 +
+>  arch/arm/mach-mmp/teton_bga.c     |    1 +
+>  arch/arm/mach-mmp/ttc_dkb.c       |    1 +
+>  arch/arm/mach-pxa/pxa25x.c        |    3 +++
+>  arch/arm/mach-pxa/pxa27x.c        |    1 +
+>  arch/arm/mach-pxa/pxa3xx.c        |   17 +++++++++++--
+>  drivers/gpio/gpio-pxa.c           |   48 +++++++------------------------------
+>  include/linux/gpio-pxa.h          |    1 +
+>  13 files changed, 36 insertions(+), 42 deletions(-)
 > 
+> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+> index 36f5781..a3e42dc 100644
+> --- a/arch/arm/mach-mmp/aspenite.c
+> +++ b/arch/arm/mach-mmp/aspenite.c
+> @@ -112,6 +112,7 @@ static unsigned long common_pin_config[] __initdata = {
+>  };
+>  
+>  static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
+> +	.nr_gpios	= 128,
+>  	.ed_mask	= true,
+>  };
+>  
+> diff --git a/arch/arm/mach-mmp/avengers_lite.c b/arch/arm/mach-mmp/avengers_lite.c
+> index b8fe447..1ea6502 100644
+> --- a/arch/arm/mach-mmp/avengers_lite.c
+> +++ b/arch/arm/mach-mmp/avengers_lite.c
+> @@ -34,6 +34,7 @@ static unsigned long avengers_lite_pin_config_V16F[] __initdata = {
+>  };
+>  
+>  static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
+> +	.nr_gpios	= 128,
+>  	.ed_mask	= true,
+>  };
+>  
+> diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+> index d6ea5c4..a32156f 100644
+> --- a/arch/arm/mach-mmp/brownstone.c
+> +++ b/arch/arm/mach-mmp/brownstone.c
+> @@ -106,6 +106,7 @@ static unsigned long brownstone_pin_config[] __initdata = {
+>  };
+>  
+>  static struct pxa_gpio_platform_data mmp2_gpio_pdata = {
+> +	.nr_gpios	= 192,
+>  	.ed_mask	= true,
+>  };
+>  
+> diff --git a/arch/arm/mach-mmp/flint.c b/arch/arm/mach-mmp/flint.c
+> index 0955f44..3f301b5 100644
+> --- a/arch/arm/mach-mmp/flint.c
+> +++ b/arch/arm/mach-mmp/flint.c
+> @@ -79,6 +79,7 @@ static unsigned long flint_pin_config[] __initdata = {
+>  };
+>  
+>  static struct pxa_gpio_platform_data mmp2_gpio_pdata = {
+> +	.nr_gpios	= 192,
+>  	.ed_mask	= true,
+>  };
+>  
+> diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+> index 2315cce..019b178 100644
+> --- a/arch/arm/mach-mmp/gplugd.c
+> +++ b/arch/arm/mach-mmp/gplugd.c
+> @@ -129,6 +129,7 @@ static unsigned long gplugd_pin_config[] __initdata = {
+>  };
+>  
+>  static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
+> +	.nr_gpios	= 128,
+>  	.ed_mask	= true,
+>  };
+>  
+> diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
+> index eaec649..6e8cf80 100644
+> --- a/arch/arm/mach-mmp/tavorevb.c
+> +++ b/arch/arm/mach-mmp/tavorevb.c
+> @@ -62,6 +62,7 @@ static unsigned long tavorevb_pin_config[] __initdata = {
+>  };
+>  
+>  static struct pxa_gpio_platform_data ttc_dkb_gpio_pdata = {
+> +	.nr_gpios	= 128,
+>  	.ed_mask	= true,
+>  };
+>  
+> diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
+> index 6682100..b5146bb 100644
+> --- a/arch/arm/mach-mmp/teton_bga.c
+> +++ b/arch/arm/mach-mmp/teton_bga.c
+> @@ -51,6 +51,7 @@ static unsigned long teton_bga_pin_config[] __initdata = {
+>  };
+>  
+>  static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
+> +	.nr_gpios	= 128,
+>  	.ed_mask	= true,
+>  };
+>  
+> diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+> index 984d902..123a0bf 100644
+> --- a/arch/arm/mach-mmp/ttc_dkb.c
+> +++ b/arch/arm/mach-mmp/ttc_dkb.c
+> @@ -75,6 +75,7 @@ static unsigned long ttc_dkb_pin_config[] __initdata = {
+>  };
+>  
+>  static struct pxa_gpio_platform_data ttc_dkb_gpio_pdata = {
+> +	.nr_gpios	= 128,
+>  	.ed_mask	= true,
+>  };
+>  
 > diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-> index 66dafb7..3460de1 100644
+> index 3460de1..ff91660 100644
 > --- a/arch/arm/mach-pxa/pxa25x.c
 > +++ b/arch/arm/mach-pxa/pxa25x.c
-> @@ -343,6 +343,7 @@ static struct pxa_gpio_platform_data pxa25x_gpio_info __initdata = {
+> @@ -342,6 +342,9 @@ void __init pxa25x_map_io(void)
+>  static struct pxa_gpio_platform_data pxa25x_gpio_info __initdata = {
 >  #ifdef CONFIG_CPU_PXA26x
 >  	.inverted = true,
+> +	.nr_gpios = 90,
+> +#else
+> +	.nr_gpios = 85,
 >  #endif
-> +	.gafr = true,
+>  	.gafr = true,
 >  	.gpio_set_wake = gpio_set_wake,
->  };
->  
 > diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-> index 67f5fd2..999d681 100644
+> index 999d681..4de9572 100644
 > --- a/arch/arm/mach-pxa/pxa27x.c
 > +++ b/arch/arm/mach-pxa/pxa27x.c
-> @@ -430,6 +430,7 @@ void __init pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info)
->  }
+> @@ -431,6 +431,7 @@ void __init pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info)
 >  
 >  static struct pxa_gpio_platform_data pxa27x_gpio_info __initdata = {
-> +	.gafr = true,
+>  	.gafr = true,
+> +	.nr_gpios = 121,
 >  	.gpio_set_wake = gpio_set_wake,
 >  };
 >  
+> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> index 656a1bb..f6bff16 100644
+> --- a/arch/arm/mach-pxa/pxa3xx.c
+> +++ b/arch/arm/mach-pxa/pxa3xx.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/module.h>
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+> +#include <linux/gpio-pxa.h>
+>  #include <linux/pm.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/irq.h>
+> @@ -435,6 +436,10 @@ void __init pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info)
+>  	pxa_register_device(&pxa3xx_device_i2c_power, info);
+>  }
+>  
+> +static struct pxa_gpio_platform_data pxa3xx_gpio_info __initdata = {
+> +	.nr_gpios = 128,
+> +};
+> +
+>  static struct platform_device *devices[] __initdata = {
+>  	&pxa_device_gpio,
+>  	&pxa27x_device_udc,
+> @@ -482,8 +487,16 @@ static int __init pxa3xx_init(void)
+>  		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
+>  		register_syscore_ops(&pxa3xx_clock_syscore_ops);
+>  
+> -		if (!of_have_populated_dt())
+> -			ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+> +		if (!of_have_populated_dt()) {
+> +			if (cpu_is_pxa93x())
+> +				pxa3xx_gpio_info.nr_gpios = 192;
+> +			ret = platform_device_add_data(&pxa_device_gpio,
+> +					&pxa3xx_gpio_info,
+> +					sizeof(struct pxa_gpio_platform_data));
+> +			if (!ret)
+> +				ret = platform_add_devices(devices,
+> +							   ARRAY_SIZE(devices));
+> +		}
+>  	}
+>  
+>  	return ret;
 > diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-> index 1f8dfc8..6c6e21c 100644
+> index 6c6e21c..8fbf4c6 100644
 > --- a/drivers/gpio/gpio-pxa.c
 > +++ b/drivers/gpio/gpio-pxa.c
-> @@ -72,6 +72,7 @@ struct pxa_gpio_chip {
->  	void __iomem	*regbase;
->  	unsigned int	irq_base;
->  	bool		inverted;
-> +	bool		gafr;
->  	char label[10];
->  
->  	unsigned long	irq_mask;
-> @@ -87,18 +88,8 @@ struct pxa_gpio_chip {
->  #endif
+> @@ -380,36 +380,6 @@ static struct irq_chip pxa_muxed_gpio_chip = {
+>  	.irq_set_wake	= pxa_gpio_set_wake,
 >  };
 >  
-> -enum {
-> -	PXA25X_GPIO = 0,
-> -	PXA26X_GPIO,
-> -	PXA27X_GPIO,
-> -	PXA3XX_GPIO,
-> -	PXA93X_GPIO,
-> -	MMP_GPIO = 0x10,
-> -};
-> -
->  static DEFINE_SPINLOCK(gpio_lock);
->  static struct pxa_gpio_chip *pxa_gpio_chips;
-> -static int gpio_type;
->  static void __iomem *gpio_reg_base;
->  
->  #define for_each_gpio_chip(i, c)			\
-> @@ -114,16 +105,6 @@ static inline struct pxa_gpio_chip *gpio_to_pxachip(unsigned gpio)
->  	return &pxa_gpio_chips[gpio_to_bank(gpio)];
->  }
->  
-> -static inline int gpio_is_pxa_type(int type)
+> -static int pxa_gpio_nums(void)
 > -{
-> -	return (type & MMP_GPIO) == 0;
+> -	int count = 0;
+> -
+> -#ifdef CONFIG_ARCH_PXA
+> -	if (cpu_is_pxa25x()) {
+> -#ifdef CONFIG_CPU_PXA26x
+> -		count = 89;
+> -#elif defined(CONFIG_PXA25x)
+> -		count = 84;
+> -#endif /* CONFIG_CPU_PXA26x */
+> -	} else if (cpu_is_pxa27x()) {
+> -		count = 120;
+> -	} else if (cpu_is_pxa93x()) {
+> -		count = 191;
+> -	} else if (cpu_is_pxa3xx()) {
+> -		count = 127;
+> -	}
+> -#endif /* CONFIG_ARCH_PXA */
+> -
+> -#ifdef CONFIG_ARCH_MMP
+> -	if (cpu_is_pxa168() || cpu_is_pxa910()) {
+> -		count = 127;
+> -	} else if (cpu_is_mmp2()) {
+> -		count = 191;
+> -	}
+> -#endif /* CONFIG_ARCH_MMP */
+> -	return count;
 > -}
 > -
-> -static inline int gpio_is_mmp_type(int type)
-> -{
-> -	return (type & MMP_GPIO) != 0;
-> -}
-> -
->  /* GPIO86/87/88/89 on PXA26x have their direction bits in PXA_GPDR(2 inverted,
->   * as well as their Alternate Function value being '1' for GPIO in GAFRx.
->   */
-> @@ -149,10 +130,7 @@ static inline int __gpio_is_occupied(struct pxa_gpio_chip *chip, unsigned gpio)
->  	base = gpio_chip_base(&chip->chip);
->  	gpdr = readl_relaxed(base + GPDR_OFFSET);
+>  static int pxa_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>  			      irq_hw_number_t hw)
+>  {
+> @@ -433,7 +403,7 @@ static struct of_device_id pxa_gpio_dt_ids[] = {
 >  
-> -	switch (gpio_type) {
-> -	case PXA25X_GPIO:
-> -	case PXA26X_GPIO:
-> -	case PXA27X_GPIO:
-> +	if (chip->gafr) {
->  		gafr = readl_relaxed(base + GAFR_OFFSET);
->  		af = (gafr >> ((gpio & 0xf) * 2)) & 0x3;
->  		dir = gpdr & GPIO_bit(gpio);
-> @@ -161,10 +139,8 @@ static inline int __gpio_is_occupied(struct pxa_gpio_chip *chip, unsigned gpio)
->  			ret = (af != 1) || (dir == 0);
->  		else
->  			ret = (af != 0) || (dir != 0);
-> -		break;
-> -	default:
-> +	} else {
->  		ret = gpdr & GPIO_bit(gpio);
-> -		break;
->  	}
->  	return ret;
->  }
-> @@ -412,30 +388,23 @@ static int pxa_gpio_nums(void)
->  	if (cpu_is_pxa25x()) {
->  #ifdef CONFIG_CPU_PXA26x
->  		count = 89;
-> -		gpio_type = PXA26X_GPIO;
->  #elif defined(CONFIG_PXA25x)
->  		count = 84;
-> -		gpio_type = PXA26X_GPIO;
->  #endif /* CONFIG_CPU_PXA26x */
->  	} else if (cpu_is_pxa27x()) {
->  		count = 120;
-> -		gpio_type = PXA27X_GPIO;
->  	} else if (cpu_is_pxa93x()) {
->  		count = 191;
-> -		gpio_type = PXA93X_GPIO;
->  	} else if (cpu_is_pxa3xx()) {
->  		count = 127;
-> -		gpio_type = PXA3XX_GPIO;
->  	}
->  #endif /* CONFIG_ARCH_PXA */
->  
->  #ifdef CONFIG_ARCH_MMP
->  	if (cpu_is_pxa168() || cpu_is_pxa910()) {
->  		count = 127;
-> -		gpio_type = MMP_GPIO;
->  	} else if (cpu_is_mmp2()) {
->  		count = 191;
-> -		gpio_type = MMP_GPIO;
->  	}
->  #endif /* CONFIG_ARCH_MMP */
->  	return count;
-> @@ -458,7 +427,7 @@ static const struct irq_domain_ops pxa_irq_domain_ops = {
->  #ifdef CONFIG_OF
->  static struct of_device_id pxa_gpio_dt_ids[] = {
->  	{ .compatible = "mrvl,pxa-gpio" },
-> -	{ .compatible = "mrvl,mmp-gpio", .data = (void *)MMP_GPIO },
-> +	{ .compatible = "mrvl,mmp-gpio" },
->  	{}
->  };
->  
-> @@ -484,7 +453,6 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
+>  static int pxa_gpio_probe_dt(struct platform_device *pdev)
+>  {
+> -	int ret, nr_banks, nr_gpios;
+> +	int ret, nr_banks;
+>  	struct pxa_gpio_platform_data *pdata;
+>  	struct device_node *prev, *next, *np = pdev->dev.of_node;
+>  	const struct of_device_id *of_id =
+> @@ -451,6 +421,11 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
+>  	/* It's only valid for PXA26x */
+>  	if (of_find_property(np, "marvell,gpio-inverted", NULL))
 >  		pdata->inverted = true;
+> +	ret = of_property_read_u32(np, "marvell,nr-gpios", &pdata->nr_gpios);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "nr-gpios isn't specified\n");
+> +		return -ENOTSUPP;
+> +	}
 >  	/* set the platform data */
 >  	pdev->dev.platform_data = pdata;
-> -	gpio_type = (int)of_id->data;
 >  
->  	next = of_get_next_child(np, NULL);
->  	prev = next;
-> @@ -624,8 +592,9 @@ static int pxa_gpio_probe(struct platform_device *pdev)
->  		/* unmask GPIO edge detect for AP side */
->  		if (info->ed_mask)
->  			writel_relaxed(~0, c->regbase + ED_MASK_OFFSET);
-> -		/* update for gpio inverted */
-> +		/* update for gpio inverted & gafr */
->  		c->inverted = info->inverted;
-> +		c->gafr = info->gafr;
+> @@ -468,8 +443,6 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
+>  		prev = next;
 >  	}
+>  	of_node_put(prev);
+> -	nr_gpios = nr_banks << 5;
+> -	pxa_last_gpio = nr_gpios - 1;
 >  
->  	if (!use_of) {
+>  	return 0;
+>  err:
+> @@ -540,14 +513,8 @@ static int pxa_gpio_probe(struct platform_device *pdev)
+>  	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
+>  
+>  	ret = pxa_gpio_probe_dt(pdev);
+> -	if (ret < 0) {
+> -		pxa_last_gpio = pxa_gpio_nums();
+> -	} else {
+> +	if (!ret)
+>  		use_of = 1;
+> -	}
+> -
+> -	if (!pxa_last_gpio)
+> -		return -EINVAL;
+>  
+>  	irq0 = platform_get_irq_byname(pdev, "gpio0");
+>  	irq1 = platform_get_irq_byname(pdev, "gpio1");
+> @@ -581,6 +548,7 @@ static int pxa_gpio_probe(struct platform_device *pdev)
+>  
+>  	/* Initialize GPIO chips */
+>  	info = dev_get_platdata(&pdev->dev);
+> +	pxa_last_gpio = info->nr_gpios - 1;
+>  	pxa_init_gpio_chip(pdev, pxa_last_gpio,
+>  			   info ? info->gpio_set_wake : NULL);
+>  
 > diff --git a/include/linux/gpio-pxa.h b/include/linux/gpio-pxa.h
-> index 0c212a1..80e0322 100644
+> index 80e0322..b357fdc 100644
 > --- a/include/linux/gpio-pxa.h
 > +++ b/include/linux/gpio-pxa.h
-> @@ -18,6 +18,7 @@ extern int pxa_irq_to_gpio(struct irq_data *d);
->  struct pxa_gpio_platform_data {
+> @@ -19,6 +19,7 @@ struct pxa_gpio_platform_data {
 >  	bool ed_mask;	/* true means that ed_mask reg is available */
 >  	bool inverted;	/* only valid for PXA26x */
-> +	bool gafr;	/* only valid for PXA25x/PXA26x/PXA27x */
+>  	bool gafr;	/* only valid for PXA25x/PXA26x/PXA27x */
+> +	unsigned nr_gpios;
 >  	int (*gpio_set_wake)(unsigned int gpio, unsigned int on);
 >  };
 >  
