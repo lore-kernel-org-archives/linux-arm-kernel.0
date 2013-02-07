@@ -1,18 +1,28 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 07 Feb 2013 12:14:38 -0700
-Subject: [PATCH] clk: tegra30: fix wrong clock index between se to
- sata_cold
-In-Reply-To: <1360213631-16893-1-git-send-email-josephl@nvidia.com>
-References: <1360213631-16893-1-git-send-email-josephl@nvidia.com>
-Message-ID: <5113FD1E.9020801@wwwdotorg.org>
+Date: Thu, 07 Feb 2013 12:39:40 -0700
+Subject: [PATCH 4/4] clocksource: tegra20: use the device_node pointer
+ passed to init
+In-Reply-To: <1360264144-20714-5-git-send-email-robherring2@gmail.com>
+References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
+ <1360264144-20714-5-git-send-email-robherring2@gmail.com>
+Message-ID: <511402FC.50807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2013 10:07 PM, Joseph Lo wrote:
-> The index of se should be 127. And the previous clock index was 125. So
-> we need to set up the index for se to get the correct index between se
-> to sata_cold.
+On 02/07/2013 12:09 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> We've already matched the node, so use the node pointer passed in. The rtc
+> init was intermingled with the timer init, so split this out to a separate
+> init function.
 
-I've applied this to Tegra's for-3.9/soc-ccf-fixes branch, on the
-assumption Mike is OK with it. I'll hold a pull request for his ack, and
-probably for a day or too in case any more clk-related fixes show up.
+The series,
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+
+Patches 1,4:
+Tested-by: Stephen Warren <swarren@nvidia.com>
+
+One thing I wonder re: patch 4 - I know someone (I think Hiroshi, now
+CC'd) planned to refactor drivers/clocksource/tegra20_timer.c to enhance
+it for Tegra114. I'd like to check with him that the refactoring in this
+patch won't impede that at all.
