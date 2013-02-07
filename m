@@ -1,40 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Feb 2013 12:15:43 +0000
-Subject: [GIT PULL 2/4] ARM broadcast timer updates for 3.9
-In-Reply-To: <20130205223728.GA14851@quad.lixom.net>
-References: <1359986131-13034-1-git-send-email-will.deacon@arm.com>
- <1359986131-13034-2-git-send-email-will.deacon@arm.com>
- <20130204152426.GG17786@n2100.arm.linux.org.uk>
- <20130205223728.GA14851@quad.lixom.net>
-Message-ID: <20130207121543.GF15387@mudshark.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 7 Feb 2013 12:22:53 +0000
+Subject: [RFC PATCH] ARM: Export the CPU logical map to modules
+In-Reply-To: <1359394444-16610-1-git-send-email-dave.martin@linaro.org>
+References: <1359394444-16610-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20130207122253.GA2309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi,
 
-On Tue, Feb 05, 2013 at 10:37:28PM +0000, Olof Johansson wrote:
-> On Mon, Feb 04, 2013 at 03:24:26PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Feb 04, 2013 at 01:55:29PM +0000, Will Deacon wrote:
-> > > This is the second part of the kvm-related series and moves ARM over to
-> > > the generic timer broadcast implementation, currently queued by tglx in
-> > > -tip.
-> > > 
-> > > Please note that, due to this dependency, this branch contains mainline
-> > > up to ~-rc6, so you may want to keep it on a separate branch to avoid
-> > > pulling in a bunch of unrelated changes from -tip.
-> > 
-> > Both 1 and 2 pulled and merged.  I'll wait 24 hours before pushing this out
-> > so that the nightly build can have a go at it before the new devel-stable
-> > branch gets published.
+Does anyone have a comment on this?
+
+Cheers
+---Dave
+
+On Mon, Jan 28, 2013 at 05:34:04PM +0000, Dave Martin wrote:
+> It is reasonable for loadable modules to be CPU topology aware
+> (particular examples include cpufreq and cpuidle drivers).
 > 
-> Sounds good. I'll deal with 3 and 4 once you're happy with 1/2 and
-> they're out, since we need the same as base.
-
-1 and 2 are now in rmk's devel-stable branch, so we should be good to go
-with the third series. As highlighted by me and Rob, the fourth set likely
-needs a new base in arm-soc to minimise both the diffstat and number of
-merge conflicts.
-
-Cheers,
-
-Will
+> This patch exports __cpu_logical_map, so that modules can use the
+> cpu_logical_map() interface declared in <asm/smp_plat.h>.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+> If anyone has a strong view on whether this should be
+> EXPORT_SYMBOL_GPL(), I don't have a problem with changing
+> that.  I'm not sure of the precise etiquette here.
+> Certainly this does not feel like a very "public" interface.
+> 
+> Perhaps we should wrap this in a real function for export
+> to modules, rather than encouraging them to poke the
+> __cpu_logical_map[] array (albeit via a predefined macro).
+> 
+> 
+>  arch/arm/kernel/setup.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3f6cbb2..1b9e5bf 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -428,6 +428,7 @@ void cpu_init(void)
+>  }
+>  
+>  int __cpu_logical_map[NR_CPUS];
+> +EXPORT_SYMBOL(__cpu_logical_map);
+>  
+>  void __init smp_setup_processor_id(void)
+>  {
+> -- 
+> 1.7.4.1
+> 
