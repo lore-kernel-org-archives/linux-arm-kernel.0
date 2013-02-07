@@ -1,127 +1,128 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Thu, 7 Feb 2013 09:46:58 -0800
-Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
- init
-In-Reply-To: <1585017.derjdP1mHL@amdc1227>
-References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
- <20130206102628.5E7413E1510@localhost>
- <CAKrE-KdX+Nxk0X4xdz6Dx3WVtOpV+ms+gPB-Dq-MwZwetyZ5Nw@mail.gmail.com>
- <1585017.derjdP1mHL@amdc1227>
-Message-ID: <CAKrE-KfyGCi_+FozSpGTy0A0VJP=Jq-1SHmvKJU02iJKWHcvLQ@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 7 Feb 2013 10:49:39 -0700
+Subject: [PATCH v2 22/27] arm: mvebu: add PCIe Device Tree informations
+ for Armada XP
+In-Reply-To: <20130207072824.GA24827@avionic-0098.mockup.avionic-design.de>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-23-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302062241.14444.arnd@arndb.de>
+ <20130207010502.GA7435@obsidianresearch.com>
+ <20130207072824.GA24827@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130207174939.GA24688@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 7, 2013 at 3:09 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Girish,
->
-> On Wednesday 06 of February 2013 12:12:29 Girish KS wrote:
->> On Wed, Feb 6, 2013 at 2:26 AM, Grant Likely <grant.likely@secretlab.ca>
-> wrote:
->> > On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S
-> <girishks2000@gmail.com> wrote:
->> >> The status of the interrupt is available in the status register,
->> >> so reading the clear pending register and writing back the same
->> >> value will not actually clear the pending interrupts. This patch
->> >> modifies the interrupt handler to read the status register and
->> >> clear the corresponding pending bit in the clear pending register.
->> >>
->> >> Modified the hwInit function to clear all the pending interrupts.
->> >>
->> >> Signed-off-by: Girish K S <ks.giri@samsung.com>
->> >> ---
->> >>
->> >>  drivers/spi/spi-s3c64xx.c |   41
->> >>  +++++++++++++++++++++++++---------------- 1 file changed, 25
->> >>  insertions(+), 16 deletions(-)
->> >>
->> >> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
->> >> index ad93231..b770f88 100644
->> >> --- a/drivers/spi/spi-s3c64xx.c
->> >> +++ b/drivers/spi/spi-s3c64xx.c
->> >> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq,
->> >> void *data)>>
->> >>  {
->> >>
->> >>       struct s3c64xx_spi_driver_data *sdd = data;
->> >>       struct spi_master *spi = sdd->master;
->> >>
->> >> -     unsigned int val;
->> >> +     unsigned int val, clr = 0;
->> >>
->> >> -     val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
->> >> +     val = readl(sdd->regs + S3C64XX_SPI_STATUS);
->> >>
->> >> -     val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
->> >> -             S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
->> >> -             S3C64XX_SPI_PND_TX_OVERRUN_CLR |
->> >> -             S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->> >> -
->> >> -     writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->> >> -
->> >> -     if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
->> >> +     if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
->> >> +             clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
->> >>
->> >>               dev_err(&spi->dev, "RX overrun\n");
->> >>
->> >> -     if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
->> >> +     }
->> >> +     if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
->> >> +             clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
->> >>
->> >>               dev_err(&spi->dev, "RX underrun\n");
->> >>
->> >> -     if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
->> >> +     }
->> >> +     if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
->> >> +             clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
->> >>
->> >>               dev_err(&spi->dev, "TX overrun\n");
->> >>
->> >> -     if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
->> >> +     }
->> >> +     if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
->> >> +             clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->> >>
->> >>               dev_err(&spi->dev, "TX underrun\n");
->> >>
->> >> +     }
->> >> +
->> >> +     /* Clear the pending irq by setting and then clearing it */
->> >> +     writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->> >> +     writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->> >
->> > Wait, what?  clr & ~clr == 0   Always.  What are you actually trying
->> > to do here?
->> The user manual says, wirting 1 to the pending clear register clears
->> the interrupt (its not auto clear to 0). so i need to explicitly reset
->> those bits thats what the 2nd write does
->
-> I have looked through user's manuals of different Samsung SoCs. All of
-> them said that writing 1 to a bit clears the corresponding interrupt, but
-> none of them contain any note that it must be manually cleared to 0.
-What i meant was the clear pending bit will not clear automatically.
-When I set the
-clear pending bit, it remains set. This is a problem for the next
-interrupt cycle.
-> In addition the expression
->
-> clr & ~clr
->
-> makes no sense, because it is equal to 0.
-It makes sense, because we are not disturbing the interrupt pending
-bit at position 0, which is a trailing clr bit.
->
-> If you really need to clear those bits manually (and I don't think so),
-> you should replace this expression with 0.
-since we are not enabling (was not enabled in previous implementation)
-trailing byte interrupt, and not handling the same in handler
-we cannot write 0.
+On Thu, Feb 07, 2013 at 08:28:24AM +0100, Thierry Reding wrote:
+> On Wed, Feb 06, 2013 at 06:05:02PM -0700, Jason Gunthorpe wrote:
+> [...]
+> > Also, what should 'reg' be so that the PCI core binds the OF nodes
+> > properly?  The standard says reg should have the configuration space
+> > address of the bridge, and I noticed Thierry was using something that
+> > almost looked like a config space address in his driver..
+> > 
+> > But that seems overly tricky.. When using the link stanzas, shouldn't
+> > this scheme be more like this:
+> > 
+> > // The PCI-E host bridge
+> > pex at 0 {
+> >    device_type = "pciex"; // <<-- Important!!
+> 
+> That might actually work but is somewhat dangerous. I originally tried
+> to trick the OF code into parsing the ranges properly by setting this to
+> "pci". However that breaks horribly because of_bus_pci_match() in
+> drivers/of/address.c will cause the parent bus of the pex at 0 controller
+> to be PCI, which will cause #address-cells == 3 and #size-cells == 2,
+> and thus messing up the address translation because you actually have
+> #address-cells == 1 and #size-cells == 1.
 
->
-> Best regards,
-> --
-> Tomasz Figa
-> Samsung Poland R&D Center
-> SW Solution Development, Linux Platform
->
+Oh right, yes, I ment it to be "pci", specifically to engage that
+code. Ditto for the other instance.
+
+Not sure about the side effect you are talking about, I am using that
+pattern in my DT and it is OK, but the PEX node is off the root node
+directly.. It shouldn't affect the parent. Other DT examples using
+device_type = pci (ie in PPC) also put it on the top PCI node and have
+that node buried, so it should be correct, but all the stuff below has
+to be correct first..
+ 
+> >    ranges = <
+> >       // Driver internal control registers in MMIO space
+> >       0x82000000 0x10000000 0xd0040000  0xd0040000  0x0 0x8000000
+> 
+> I'm not sure I understand what you're doing here. Where does the
+> 0x10000000 in cell 2 come from?
+
+It is just a marker to keep the internal regs distinct from the PCI
+MMIO window. I don't really like it, but something is necessary to
+pass the non-PCI items into the link stanza. It would probably be
+better to just place them outside the link as I did in my other
+example..
+
+> I also just noticed that I used 0x00000800 in the first cell, maybe that
+> should be 0x02000800, though I think that didn't quite work for some
+> reason. I'll need to check that. The odd part about this is that the
+
+I think that is the trickyness you have, 0x00000800 is probably the
+correct config space address number for your root port bridge. You are
+overriding it to be both a config space address and something that
+translates back to a CPU MMIO address.
+
+If you use 0x02000800 then it is no longer a config space address, it is
+an MMIO address and your 'reg' won't match anymore.
+
+> address is in fact not within PCI MMIO space at all, so I'm not sure
+> this is even a correct way to represent it. However I find it quite
+> intuitive to do so and it is really the only way to make the translation
+> from the PCI-PCI bridge's reg property work while at the same time
+> having a proper PCI address for the port.
+
+Your problem is that in PCI devices 'reg' is not supposed to be
+translated to a CPU address. It is the config space address of the PCI
+device followed by the *sizes* of all the BARs.
+
+assigned-addresses is the MMIO location (and size) of the 'BARs', and
+is intended to be translated to a CPU address.
+
+When the bus is properly in PCI mode the OF address code automatically
+uses assigned-addresses instead of regs, that is why you need
+device_type = pci
+
+> >    // PCI-PCI bridge to Physical link 0
+> >    pcie at 0,0 {
+> >      device_type = "pciex";
+> >      // The configuration space address of the PCI-PCI bridge required by OF
+> >      reg = <0x80 0 0  0 0>; // Bus 0, Dev 0x10, Fn 0
+> 
+> I think the first cell should be 0x800.
+
+Right.
+
+> >      /* The 'bar' on the PCI-PCI bridge, maps to internal control
+> >         registers, required by the driver. */
+> >      assigned-addresses = <0x82000000 0x10000000 0xd0040000  0 0x2000>;
+> >      // ..
+> >   }
+> 
+> The PCI DT binding says that each entry in the assigned-addresses
+> property is to correspond to one of the PCI device's base address
+> registers. So unless this is actually the value that ends up being
+> written to one of the BARs I don't think this is correct.
+
+Yes, but, it is a compromise, of sorts. DT has no way to pass a
+non-PCI described resource into this stanza. It would ideal if the
+driver didn't require that at all, but if it does I think it has to be
+through assigned-addresses...
+
+Now, perhaps this is better:
+
+assigned-addresses = <0 0 0  0 0 // BAR 0 of the bridge, unused
+                      0 0 0  0 0 // BAR 1 of the bridge, unused
+                      0x82000000 0x10000000 0xd0040000  0 0x2000>; // Extended
+
+Mark the only two BARs in the bridge as unused and put your non-BAR
+registers after them.
+
+Certainly, trying to use reg to convey that the link has an internal
+MMIO region at CPU address 0xd0040000 would be even worse..
+
+Jason
