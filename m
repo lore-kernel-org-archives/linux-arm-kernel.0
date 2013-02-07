@@ -1,52 +1,108 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 7 Feb 2013 17:03:23 +0100
-Subject: [GIT PULL] at91: Device Tree related material for 3.9
-Message-ID: <5113D04B.2060101@atmel.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 7 Feb 2013 18:02:53 +0200
+Subject: [PATCH v2 13/14] ARM: dts: omap3-beagle: Add USB Host support
+In-Reply-To: <1360252974-7912-1-git-send-email-rogerq@ti.com>
+References: <1360252974-7912-1-git-send-email-rogerq@ti.com>
+Message-ID: <1360252974-7912-14-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Provide RESET and Power regulators for the USB PHY,
+the USB Host port mode and the PHY device.
 
-Here is a pull request for AT91 Device Tree material. It is pretty small and
-mostly related to at91rm9200 work done by Joachim.
+Also provide pin multiplexer information for USB host
+pins.
 
-This one can go on top of the GIT PULL request that I sent two days ago:
-"[GIT PULL] at91: fixes for 3.9-rc1". But actually it is not related...
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle.dts |   71 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 71 insertions(+), 0 deletions(-)
 
-
-The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
-
-  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-dt
-
-for you to fetch changes up to ce3b2630fd4737a3f9aa9119d40647a9ac7baa38:
-
-  ARM: at91: add EMAC bindings to RM9200 DT (2013-02-07 16:40:09 +0100)
-
-----------------------------------------------------------------
-Update to DT files for AT91:
-- adding the watchdog to Animeo IP board
-- some more DT support for at91rm9200 peripherals
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      ARM: at91: Animeo IP: enable watchdog support
-
-Joachim Eastwood (3):
-      ARM: at91: add MMC bindings to RM9200 DT
-      ARM: at91: add SSC bindings to RM9200 DT
-      ARM: at91: add EMAC bindings to RM9200 DT
-
- arch/arm/boot/dts/animeo_ip.dts    |   4 +
- arch/arm/boot/dts/at91rm9200.dtsi  | 158 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91rm9200ek.dts |   5 ++
- arch/arm/mach-at91/at91rm9200.c    |   2 +
- 4 files changed, 169 insertions(+)
-
-
-Thanks best regards,
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index f624dc8..02d23f1 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -38,6 +38,57 @@
+ 		};
+ 	};
+ 
++	/* HS USB Port 2 RESET */
++	hsusb2_reset: hsusb2_reset_reg {
++		compatible = "regulator-fixed";
++		regulator-name = "hsusb2_reset";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio5 19 0>;	/* gpio_147 */
++		startup-delay-us = <70000>;
++		enable-active-high;
++	};
++
++	/* HS USB Port 2 Power */
++	hsusb2_power: hsusb2_power_reg {
++		compatible = "regulator-fixed";
++		regulator-name = "hsusb2_vbus";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
++		startup-delay-us = <70000>;
++	};
++
++	/* HS USB Host PHY on PORT 2 */
++	hsusb2_phy: hsusb2_phy {
++		compatible = "usb-nop-xceiv";
++		reset-supply = <&hsusb2_reset>;
++		vcc-supply = <&hsusb2_power>;
++	};
++};
++
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++			&hsusbb2_pins
++	>;
++
++	hsusbb2_pins: pinmux_hsusbb2_pins {
++		pinctrl-single,pins = <
++			0x5c0 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk OUTPUT */
++			0x5c2 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp OUTPUT */
++			0x5c4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir INPUT | PULLDOWN */
++			0x5c6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt INPUT | PULLDOWN */
++			0x5c8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 INPUT | PULLDOWN */
++			0x5cA 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 INPUT | PULLDOWN */
++			0x1a4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 INPUT | PULLDOWN */
++			0x1a6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 INPUT | PULLDOWN */
++			0x1a8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 INPUT | PULLDOWN */
++			0x1aa 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 INPUT | PULLDOWN */
++			0x1ac 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 INPUT | PULLDOWN */
++			0x1ae 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -65,3 +116,23 @@
+ &mmc3 {
+ 	status = "disabled";
+ };
++
++&usbhshost {
++	port2-mode = "ehci-phy";
++};
++
++&usbhsehci {
++	phys = <0 &hsusb2_phy>;
++};
++
++&twl_gpio {
++	ti,use-leds;
++	/* pullups: BIT(1) */
++	ti,pullups = <0x000002>;
++	/*
++	 * pulldowns:
++	 * BIT(2), BIT(6), BIT(7), BIT(8), BIT(13)
++	 * BIT(15), BIT(16), BIT(17)
++	 */
++	ti,pulldowns = <0x03a1c4>;
++};
 -- 
-Nicolas Ferre
+1.7.4.1
