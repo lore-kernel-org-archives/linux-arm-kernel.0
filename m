@@ -1,69 +1,208 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 07 Feb 2013 12:26:29 +0530
-Subject: [PATCH 1/5] ARM: dts: exynos5250-arndale: Add node entry for
- gpio-buttons
-In-Reply-To: <CAKDJKT5xE9WWOC0pM8h1UWrF=OOtSr1D2WKPww9F6bhcO7VM_w@mail.gmail.com>
-References: <1360214129-4096-1-git-send-email-tushar.behera@linaro.org>
- <F3DBB1B3EF102E4994C89758CFCA32412C4E1A@DBDE01.ent.ti.com>
- <51134907.1050803@linaro.org>
- <CAKDJKT5xE9WWOC0pM8h1UWrF=OOtSr1D2WKPww9F6bhcO7VM_w@mail.gmail.com>
-Message-ID: <5113501D.5060603@linaro.org>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 7 Feb 2013 15:57:32 +0900
+Subject: [PATCH 6/9] gpiolib: use descriptors internally
+In-Reply-To: <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+ <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
+ <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
+Message-ID: <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2013 12:06 PM, Manish Badarkhe wrote:
-> Hi Tushar
-> 
-> On Thu, Feb 7, 2013 at 11:56 AM, Tushar Behera <tushar.behera@linaro.org> wrote:
->> On 02/07/2013 11:47 AM, Kumar, Anil wrote:
->>> On Thu, Feb 07, 2013 at 10:45:25, Tushar Behera wrote:
->>>> Added GPIO buttons DT node to Arndale board file.
->>>>
->>>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->>>> ---
->>>> This series is based on for-next branch of Kukjin Kim's tree
->>>> and added on top of the below patch:
->>>> https://patchwork.kernel.org/patch/2042451/
->>>> ---
->>>>  arch/arm/boot/dts/exynos5250-arndale.dts |   48 ++++++++++++++++++++++++++++++
->>>>  1 files changed, 48 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
->>>> index 63572f9..9ce40df 100644
->>>> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
->>>> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
->>>> @@ -119,4 +119,52 @@
->>>>      spi_2: spi at 12d40000 {
->>>>              status = "disabled";
->>>>      };
->>>> +
->>>> +    gpio_keys {
->>>> +            compatible = "gpio-keys";
->>>> +            #address-cells = <1>;
->>>> +            #size-cells = <0>;
->>>
->>> Just want to understand why these properties are here?
->>> As these properties are for child dt node. But have not seen
->>> anyone is using here.
->>>
+On Wed, Feb 6, 2013 at 2:53 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Feb 2, 2013 at 5:29 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+>
+>> Make sure gpiolib works internally with descriptors and (chip, offset)
+>> pairs instead of using the global integer namespace. This prepares the
+>
+> Its a numberspace not a namespace right?
+
+Yes, absolutely.
+
+>> +/*
+>> + * Internal gpiod_* API using descriptors instead of the integer namespace.
+>> + * Most of this should eventually go public.
+>> + */
+>> +static int gpiod_request(struct gpio_desc *desc, const char *label);
+>> +static void gpiod_free(struct gpio_desc *desc);
+>> +static int gpiod_direction_input(struct gpio_desc *desc);
+>> +static int gpiod_direction_output(struct gpio_desc *desc, int value);
+>> +static int gpiod_set_debounce(struct gpio_desc *desc, unsigned debounce);
+>> +static int gpiod_get_value_cansleep(struct gpio_desc *desc);
+>> +static void gpiod_set_value_cansleep(struct gpio_desc *desc, int value);
+>> +static int gpiod_get_value(struct gpio_desc *desc);
+>> +static void gpiod_set_value(struct gpio_desc *desc, int value);
+>> +static int gpiod_cansleep(struct gpio_desc *desc);
+>> +static int gpiod_to_irq(struct gpio_desc *desc);
+>> +static int gpiod_export(struct gpio_desc *desc, bool direction_may_change);
+>> +static int gpiod_export_link(struct device *dev, const char *name,
+>> +                            struct gpio_desc *desc);
+>> +static int gpiod_sysfs_set_active_low(struct gpio_desc *desc, int value);
+>> +static void gpiod_unexport(struct gpio_desc *desc);
+>
+> Usually I don't like these upfrons forward-declarations, but in this
+> case I *do* because they are here for a reason, to later become
+> extern. So I like it!
+
+Yeah, you know how the movie is going to end already. ;) Maybe it
+would make sense to append the gpiod patches to this series and not
+end up with these declarations?
+
+>> +/*
+>> + * Return the GPIO number of the passed descriptor relative to its chip
+>> + */
+>> +static int gpio_chip_hwgpio(const struct gpio_desc *desc)
+>> +{
+>> +       return (desc - &gpio_desc[0]) - desc->chip->base;
+>> +}
+>
+> That was a scary method. But it works as long as the
+> descriptors are in a static array I guess...
+
+Yes, and it's becomes less scary when the static array goes away.
+
+>> +/**
+>> + * Convert a GPIO number to its descriptor
+>> + */
+>> +static struct gpio_desc *gpio_to_desc(unsigned gpio)
+>> +{
+>> +       if (WARN(!gpio_is_valid(gpio), "invalid GPIO %d\n", gpio))
+>> +               return NULL;
+>
+> Don't we want to return ERR_PTR(-EINVAL); here?
+>
+> Then you can use IS_ERR() on the pointers later.
+>
+> This is the approach taken by the external API for clk
+> and pins.
+
+Yes, that completely makes sense.
+
+>>  /* caller holds gpio_lock *OR* gpio is marked as requested */
+>
+> That comment should be above the *next* function right?
+>
+> Strictly speaking it does not apply to gpiod_to_chip() if
+> I read it right.
+
+That's right. On a related topic there are actually a whole set of
+comments that are not in the right place (because the function that
+follows them has been switched to the gpiod prefix). I left them here
+because once the gpiod interface becomes public they will be updated
+to apply to them, and moving comments back and forth in such a short
+time would only make the patches confusing.
+
+>>  static ssize_t gpio_direction_show(struct device *dev,
+>>                 struct device_attribute *attr, char *buf)
+>>  {
+>> -       const struct gpio_desc  *desc = dev_get_drvdata(dev);
+>> -       unsigned                gpio = desc - gpio_desc;
+>> +       struct gpio_desc        *desc = dev_get_drvdata(dev);
+>
+> Why not const anymore?
+>
+> (Applies to all these similar cases in the patch.)
+>
+> consting is nice. Especially in subsystem code.
+> I know it is hard to get compilation right without warnings
+> at times. But it pays off.
+>
+> In the pinctrl subsystem I spend endless hours reading this
+> wiki page:
+>
+> http://en.wikipedia.org/wiki/Const-correctness
+>
+> I still don't quite get it. And it also wears off. But I like to use it.
+
+Oh I do share your love for const-correctness (look at the parameters
+for gpio_chip_hwgpio() and desc_to_gpio()). Only here I could not
+preserve it AFAICT.
+
+The previous version of the function was only using desc locally and
+relied on GPIO numbers to do the dirty job. Here however, we pass desc
+to gpiod_get_direction(). So you will tell me, that as it only returns
+the direction its parameter could also be const and that's true -
+excepted when it tries to clear some bits in desc->flags, there we
+definitely cannot claim it is const anymore. Maybe we could cast the
+pointer given to clear_bit/set_bit, but I'm not sure that's more
+elegant. Ideally gpiod_get_direction() should not modify its parameter
+at all.
+
+>> @@ -594,29 +647,32 @@ static ssize_t export_store(struct class *class,
+>> +       desc = gpio_to_desc(gpio);
+>
+> I hope you have tested this hunk of the patch from userspace?
+>
+>> @@ -637,17 +694,18 @@ static ssize_t unexport_store(struct class *class,
+>
+> This too?
+>
+> (etc for the userspace interfaces)
+
+Yes. Side-question: should I explicitly add my "Tested-by" in this
+cases? I thought that the author's Signed-off implied that the patch
+has been properly tested, but your question tend to suggest it's not
+*that* obvious... ;)
+
+>> +       if (status) {
+>> +               int gpio = -1;
+>> +               if (desc)
+>> +                       gpio = desc_to_gpio(desc);
+>>                 pr_debug("%s: gpio-%d status %d\n",
+>>                         __func__, gpio, status);
+>> +       }
+>>         return status;
+>>  }
+>
+> So using ERR_PTR/PTR_ERR helps you propagate
+> errors in situations like these.
+>
+> Just:
+>
+> if (IS_ERR(desc))
+>     status = PTR_ERR(desc);
+
+Yes, that would make these blocks look much better.
+
+>>         /* Open drain pin should not be driven to 1 */
+>>         if (value && test_bit(FLAG_OPEN_DRAIN,  &desc->flags))
+>> -               return gpio_direction_input(gpio);
+>> +               return gpiod_direction_input(desc);
 >>
->> That is how gpio_keys node entries are defined in other .dts files.
-> 
-> I have gone through example for address-cells and size-cells in following link:
-> http://devicetree.org/mediawiki/index.php?title=Device_Tree_Usage&stable=1#CPU_addressing
-> 
-> which indicates that these fields are for child "reg".
-> I think, here in child node there is no "reg". so there is no use
-> of address-cells and size-cells propeties.
-> 
+>>         /* Open source pin should not be driven to 0 */
+>>         if (!value && test_bit(FLAG_OPEN_SOURCE,  &desc->flags))
+>> -               return gpio_direction_input(gpio);
+>> +               return gpiod_direction_input(desc);
+>>
+>>         spin_lock_irqsave(&gpio_lock, flags);
+>>
+>> -       if (!gpio_is_valid(gpio))
+>> +       if (!desc)
+>
+> if (IS_ERR(desc)) ?
 
-Please check Documentation/devicetree/bindings/gpio/gpio_keys.txt
+It's worse actually, we potentially access desc right before checking
+it it's not NULL... Makes no sense at all. Thanks for pointing this.
 
-And whether these properties are required or not, I will let device tree
-experts to comment on that.
+>> +       offset = gpio_chip_hwgpio(desc);
+>
+> Maybe rename to hwgpio? Or is that done later?
+>
+> We should stick with either hwgpio or offset everywhere or
+> it will be a mess.
 
-As such, currently all node entries for gpio_keys use these properties.
+Will replace all these "offset" by "hwgpio" for consistency.
 
--- 
-Tushar Behera
+> Basically the patch is very nice but I'd like you to iron out and proofread
+> as per above so we have strong consistency, strong const:ing,
+> and stringent naming (offset vs hwgpio come to mind).
+
+Yes, there are some inconsistencies (and "inconstistencies") that
+remains, e.g. automatically converting calls to gpio_is_valid() into a
+check that the descriptor is not NULL was not the best idea. I will
+fix the patch according to your comments and then check the whole file
+to make sure I have not missed anything. Might do some random
+unrelated catches in the process.
+
+Thanks for the review!
+Alex.
