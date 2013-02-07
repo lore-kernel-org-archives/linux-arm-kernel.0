@@ -1,307 +1,191 @@
 From: manjunath.goudar@linaro.org (manjunath.goudar at linaro.org)
-Date: Thu,  7 Feb 2013 23:04:01 +0530
-Subject: [PATCH 04/10] USB: EHCI: make ehci-orion a separate driver
+Date: Thu,  7 Feb 2013 23:04:02 +0530
+Subject: [PATCH 05/10] USB: EHCI: make ehci-atmel a separate driver
 In-Reply-To: <1360258447-27247-1-git-send-email-yes>
 References: <yes>
  <1360258447-27247-1-git-send-email-yes>
-Message-ID: <5113e5f0.c84e420a.08c3.ffffbe9a@mx.google.com>
+Message-ID: <5113e60e.c84e420a.08c3.ffffbeda@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Manjunath Goudar <manjunath.goudar@linaro.org>
 
-Separate the Marvell Orion host controller driver from ehci-hcd host code
+Separate the Atmel host controller driver from ehci-hcd host code
 into its own driver module.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Greg KH <greg@kroah.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
+Cc: Greg KH <greg@kroah.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: linux-usb at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/usb/host/Kconfig      |    7 +++
+ drivers/usb/host/Kconfig      |    7 ++++
  drivers/usb/host/Makefile     |    1 +
- drivers/usb/host/ehci-hcd.c   |   27 +++++-------
- drivers/usb/host/ehci-orion.c |   98 +++++++++++++++++++++--------------------
- 4 files changed, 69 insertions(+), 64 deletions(-)
+ drivers/usb/host/ehci-atmel.c |   78 ++++++++++++++++++++++-------------------
+ drivers/usb/host/ehci-hcd.c   |    6 +---
+ 4 files changed, 51 insertions(+), 41 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 4413075..3689b7b 100644
+index 3689b7b..5a13f9d 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -169,6 +169,13 @@ config USB_EHCI_HCD_SPEAR
+@@ -176,6 +176,13 @@ config USB_EHCI_HCD_ORION
          ---help---
            Enables support for the on-chip EHCI controller on
-           ST spear chips.
-+config USB_EHCI_HCD_ORION
-+        tristate  "Support for Marvell Orion on-chip EHCI USB controller"
-+        depends on USB_EHCI_HCD && PLAT_ORION
+           Morvell Orion chips.
++config USB_EHCI_HCD_AT91
++        tristate  "Support for Atmel on-chip EHCI USB controller"
++        depends on USB_EHCI_HCD && ARCH_AT91
 +        default y
 +        ---help---
 +          Enables support for the on-chip EHCI controller on
-+          Morvell Orion chips.
++          Atmel chips.
  
  config USB_EHCI_MSM
  	bool "Support for MSM on-chip EHCI USB controller"
 diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index c97f4ab..23b07dd 100644
+index 23b07dd..96b4839 100644
 --- a/drivers/usb/host/Makefile
 +++ b/drivers/usb/host/Makefile
-@@ -29,6 +29,7 @@ obj-$(CONFIG_USB_EHCI_HCD_PLATFORM)	+= ehci-platform.o
- obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
- obj-$(CONFIG_USB_EHCI_HCD_OMAP) += ehci-omap.o
+@@ -31,6 +31,7 @@ obj-$(CONFIG_USB_EHCI_HCD_OMAP) += ehci-omap.o
  obj-$(CONFIG_USB_EHCI_HCD_SPEAR)+= ehci-spear.o
-+obj-$(CONFIG_USB_EHCI_HCD_ORION)+= ehci-orion.o
+ obj-$(CONFIG_USB_EHCI_HCD_ORION)+= ehci-orion.o
  obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
++obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
  obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
  obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 68cea63..5a19a57 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -155,7 +155,7 @@ static inline unsigned ehci_read_frame_index(struct ehci_hcd *ehci)
-  * before driver shutdown. But it also seems to be caused by bugs in cardbus
-  * bridge shutdown:  shutting down the bridge before the devices using it.
-  */
--static int handshake (struct ehci_hcd *ehci, void __iomem *ptr,
-+int handshake(struct ehci_hcd *ehci, void __iomem *ptr,
- 		      u32 mask, u32 done, int usec)
- {
- 	u32	result;
-@@ -172,9 +172,9 @@ static int handshake (struct ehci_hcd *ehci, void __iomem *ptr,
- 	} while (usec > 0);
- 	return -ETIMEDOUT;
- }
--
-+EXPORT_SYMBOL_GPL(handshake);
- /* check TDI/ARC silicon is in host mode */
--static int tdi_in_host_mode (struct ehci_hcd *ehci)
-+static int tdi_in_host_mode(struct ehci_hcd *ehci)
- {
- 	u32		tmp;
- 
-@@ -186,7 +186,7 @@ static int tdi_in_host_mode (struct ehci_hcd *ehci)
-  * Force HC to halt state from unknown (EHCI spec section 2.3).
-  * Must be called with interrupts enabled and the lock not held.
-  */
--static int ehci_halt (struct ehci_hcd *ehci)
-+int ehci_halt(struct ehci_hcd *ehci)
- {
- 	u32	temp;
- 
-@@ -215,9 +215,9 @@ static int ehci_halt (struct ehci_hcd *ehci)
- 	return handshake(ehci, &ehci->regs->status,
- 			  STS_HALT, STS_HALT, 16 * 125);
- }
--
-+EXPORT_SYMBOL_GPL(ehci_halt);
- /* put TDI/ARC silicon into EHCI mode */
--static void tdi_reset (struct ehci_hcd *ehci)
-+void tdi_reset(struct ehci_hcd *ehci)
- {
- 	u32		tmp;
- 
-@@ -231,12 +231,12 @@ static void tdi_reset (struct ehci_hcd *ehci)
- 		tmp |= USBMODE_BE;
- 	ehci_writel(ehci, tmp, &ehci->regs->usbmode);
- }
--
-+EXPORT_SYMBOL_GPL(tdi_reset);
- /*
-  * Reset a non-running (STS_HALT == 1) controller.
-  * Must be called with interrupts enabled and the lock not held.
-  */
--static int ehci_reset (struct ehci_hcd *ehci)
-+int ehci_reset(struct ehci_hcd *ehci)
- {
- 	int	retval;
- 	u32	command = ehci_readl(ehci, &ehci->regs->command);
-@@ -272,7 +272,7 @@ static int ehci_reset (struct ehci_hcd *ehci)
- 			ehci->resuming_ports = 0;
- 	return retval;
- }
--
-+EXPORT_SYMBOL_GPL(ehci_reset);
- /*
-  * Idle the controller (turn off the schedules).
-  * Must be called with interrupts enabled and the lock not held.
-@@ -352,7 +352,7 @@ static void ehci_silence_controller(struct ehci_hcd *ehci)
-  * This forcibly disables dma and IRQs, helping kexec and other cases
-  * where the next system software may expect clean state.
-  */
--static void ehci_shutdown(struct usb_hcd *hcd)
-+void ehci_shutdown(struct usb_hcd *hcd)
- {
- 	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
- 
-@@ -366,7 +366,7 @@ static void ehci_shutdown(struct usb_hcd *hcd)
- 
- 	hrtimer_cancel(&ehci->hrtimer);
- }
--
-+EXPORT_SYMBOL_GPL(ehci_shutdown);
- /*-------------------------------------------------------------------------*/
- 
- /*
-@@ -1267,11 +1267,6 @@ MODULE_LICENSE ("GPL");
- #define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
- #endif
- 
--#ifdef CONFIG_PLAT_ORION
--#include "ehci-orion.c"
--#define	PLATFORM_DRIVER		ehci_orion_driver
--#endif
--
- #ifdef CONFIG_USB_W90X900_EHCI
- #include "ehci-w90x900.c"
- #define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index 914a3ec..de4dde2 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -8,6 +8,17 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
+ obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
+diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+index 27639487..2f06711 100644
+--- a/drivers/usb/host/ehci-atmel.c
++++ b/drivers/usb/host/ehci-atmel.c
+@@ -15,6 +15,19 @@
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
 +#include <linux/usb.h>
 +#include <linux/usb/hcd.h>
 +#include <linux/io.h>
-+
-+#include <linux/slab.h>
-+#include <linux/usb/ulpi.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/gpio.h>
-+
-+
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-@@ -17,6 +28,9 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/of_irq.h>
 +#include <linux/dma-mapping.h>
++
 +#include "ehci.h"
 +
++#define DRIVER_DESC "EHCI atmel driver"
++
++static const char hcd_name[] = "ehci-atmel";
++static struct hc_driver __read_mostly ehci_atmel_hc_driver;
  
- #define rdl(off)	__raw_readl(hcd->regs + (off))
- #define wrl(off, val)	__raw_writel((val), hcd->regs + (off))
-@@ -34,6 +48,17 @@
- #define USB_PHY_IVREF_CTRL	0x440
- #define USB_PHY_TST_GRP_CTRL	0x450
- 
-+#define DRIVER_DESC "EHCI orion driver"
-+
-+static const char hcd_name[] = "ehci-orion";
-+
-+static struct hc_driver __read_mostly ehci_orion_hc_driver;
-+
-+static const struct ehci_driver_overrides orion_overrides __initdata = {
-+	.reset = ehci_setup,
-+};
-+
-+
- /*
-  * Implement Orion USB controller specification guidelines
-  */
-@@ -104,51 +129,6 @@ static void orion_usb_phy_v1_setup(struct usb_hcd *hcd)
- 	wrl(USB_MODE, 0x13);
+ /* interface and function clocks */
+ static struct clk *iclk, *fclk;
+@@ -60,41 +73,6 @@ static int ehci_atmel_setup(struct usb_hcd *hcd)
+ 	return ehci_setup(hcd);
  }
  
--static const struct hc_driver ehci_orion_hc_driver = {
--	.description = hcd_name,
--	.product_desc = "Marvell Orion EHCI",
--	.hcd_priv_size = sizeof(struct ehci_hcd),
+-static const struct hc_driver ehci_atmel_hc_driver = {
+-	.description		= hcd_name,
+-	.product_desc		= "Atmel EHCI UHP HS",
+-	.hcd_priv_size		= sizeof(struct ehci_hcd),
 -
--	/*
--	 * generic hardware linkage
--	 */
--	.irq = ehci_irq,
--	.flags = HCD_MEMORY | HCD_USB2,
+-	/* generic hardware linkage */
+-	.irq			= ehci_irq,
+-	.flags			= HCD_MEMORY | HCD_USB2,
 -
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset = ehci_setup,
--	.start = ehci_run,
--	.stop = ehci_stop,
--	.shutdown = ehci_shutdown,
+-	/* basic lifecycle operations */
+-	.reset			= ehci_atmel_setup,
+-	.start			= ehci_run,
+-	.stop			= ehci_stop,
+-	.shutdown		= ehci_shutdown,
 -
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue = ehci_urb_enqueue,
--	.urb_dequeue = ehci_urb_dequeue,
--	.endpoint_disable = ehci_endpoint_disable,
--	.endpoint_reset = ehci_endpoint_reset,
+-	/* managing i/o requests and associated device resources */
+-	.urb_enqueue		= ehci_urb_enqueue,
+-	.urb_dequeue		= ehci_urb_dequeue,
+-	.endpoint_disable	= ehci_endpoint_disable,
+-	.endpoint_reset		= ehci_endpoint_reset,
 -
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number = ehci_get_frame,
+-	/* scheduling support */
+-	.get_frame_number	= ehci_get_frame,
 -
--	/*
--	 * root hub support
--	 */
--	.hub_status_data = ehci_hub_status_data,
--	.hub_control = ehci_hub_control,
--	.bus_suspend = ehci_bus_suspend,
--	.bus_resume = ehci_bus_resume,
--	.relinquish_port = ehci_relinquish_port,
--	.port_handed_over = ehci_port_handed_over,
+-	/* root hub support */
+-	.hub_status_data	= ehci_hub_status_data,
+-	.hub_control		= ehci_hub_control,
+-	.bus_suspend		= ehci_bus_suspend,
+-	.bus_resume		= ehci_bus_resume,
+-	.relinquish_port	= ehci_relinquish_port,
+-	.port_handed_over	= ehci_port_handed_over,
 -
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
+-	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
 -};
 -
- static void
- ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
- 			     const struct mbus_dram_target_info *dram)
-@@ -323,8 +303,6 @@ static int __exit ehci_orion_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
+ static u64 at91_ehci_dma_mask = DMA_BIT_MASK(32);
  
--MODULE_ALIAS("platform:orion-ehci");
--
- static const struct of_device_id ehci_orion_dt_ids[] = {
- 	{ .compatible = "marvell,orion-ehci", },
- 	{},
-@@ -336,8 +314,32 @@ static struct platform_driver ehci_orion_driver = {
- 	.remove		= __exit_p(ehci_orion_drv_remove),
+ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+@@ -210,7 +188,35 @@ static struct platform_driver ehci_atmel_driver = {
+ 	.remove		= ehci_atmel_drv_remove,
  	.shutdown	= usb_hcd_platform_shutdown,
- 	.driver = {
--		.name	= "orion-ehci",
+ 	.driver		= {
+-		.name	= "atmel-ehci",
 +		.name	= hcd_name,
- 		.owner  = THIS_MODULE,
- 		.of_match_table = of_match_ptr(ehci_orion_dt_ids),
+ 		.of_match_table	= of_match_ptr(atmel_ehci_dt_ids),
  	},
  };
 +
-+static int __init ehci_orion_init(void)
++static const struct ehci_driver_overrides atmel_overrides __initdata = {
++	.reset = ehci_atmel_setup,
++};
++
++static int __init ehci_atmel_init(void)
 +{
 +	if (usb_disabled())
 +		return -ENODEV;
 +
 +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+
-+	ehci_init_driver(&ehci_orion_hc_driver, &orion_overrides);
-+	return platform_driver_register(&ehci_orion_driver);
++	ehci_init_driver(&ehci_atmel_hc_driver, &atmel_overrides);
++	return platform_driver_register(&ehci_atmel_driver);
 +}
-+module_init(ehci_orion_init);
++module_init(ehci_atmel_init);
 +
-+static void __exit ehci_orion_cleanup(void)
++static void __exit ehci_atmel_cleanup(void)
 +{
-+	platform_driver_unregister(&ehci_orion_driver);
++	platform_driver_unregister(&ehci_atmel_driver);
 +}
-+module_exit(ehci_orion_cleanup);
++module_exit(ehci_atmel_cleanup);
 +
 +MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_ALIAS("platform:ehci-orion");
-+MODULE_AUTHOR("Tzachi Perelstein");
++
++MODULE_ALIAS("platform:ehci-atmel");
++MODULE_AUTHOR("Nicolas Ferre");
 +MODULE_LICENSE("GPL");
 +
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 5a19a57..628ed139 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1272,11 +1272,6 @@ MODULE_LICENSE ("GPL");
+ #define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
+ #endif
+ 
+-#ifdef CONFIG_ARCH_AT91
+-#include "ehci-atmel.c"
+-#define	PLATFORM_DRIVER		ehci_atmel_driver
+-#endif
+-
+ #ifdef CONFIG_USB_OCTEON_EHCI
+ #include "ehci-octeon.c"
+ #define PLATFORM_DRIVER		ehci_octeon_driver
+@@ -1334,6 +1329,7 @@ MODULE_LICENSE ("GPL");
+ 	!defined(PLATFORM_DRIVER) && \
+ 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_OMAP) && \
+ 	!IS_ENABLED(CONFIG_PLAT_SPEAR) && \
++	!IS_ENABLED(CONFIG_ARCH_AT91) && \
+ 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
+ 	!defined(OF_PLATFORM_DRIVER) && \
+ 	!defined(XILINX_OF_PLATFORM_DRIVER)
 -- 
 1.7.9.5
