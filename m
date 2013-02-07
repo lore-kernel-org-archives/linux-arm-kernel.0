@@ -1,42 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 7 Feb 2013 18:14:04 +0000
-Subject: [PATCH v4 08/15] ARM: vexpress: introduce DCSCB support
-In-Reply-To: <1360041732-17936-9-git-send-email-nicolas.pitre@linaro.org>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-9-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130207181404.GC14528@arm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 7 Feb 2013 11:15:59 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <CAErSpo797rhH=xt2x7eqdu7Vwf43FXoXQVcypvHM8-54LRC0wQ@mail.gmail.com>
+References: <1359399397-29729-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5106F9F9.3010905@wwwdotorg.org> <20130129094143.1aad9377@skate>
+ <20130129092006.GA16377@avionic-0098.mockup.avionic-design.de>
+ <20130207112459.5f382ad4@skate>
+ <CAErSpo7UOTGH7kjYBADymDdgmHwPxbXqczeXm1BH9C+XViQDRQ@mail.gmail.com>
+ <20130207170020.289bac08@skate>
+ <CAErSpo797rhH=xt2x7eqdu7Vwf43FXoXQVcypvHM8-54LRC0wQ@mail.gmail.com>
+Message-ID: <20130207181559.GA31508@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nico,
+On Thu, Feb 07, 2013 at 11:08:45AM -0700, Bjorn Helgaas wrote:
+ 
+> I think the way you'll have to fix this in the meantime is to use
+> pci_create_root_bus() directly so you can do things in this sequence:
+> 
+>   pci_create_root_bus
+>   pci_scan_child_bus
+>   pci_bus_assign_resources
+>   pci_bus_add_devices
+> 
+> dino_probe() is an example of similar code that does this.
 
-On Tue, Feb 05, 2013 at 05:22:05AM +0000, Nicolas Pitre wrote:
-> +static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
-> +{
-> +	unsigned int rst_hold, cpumask = (1 << cpu);
-> +
-> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> +	if (cpu >= 4 || cluster >= 2)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
-> +	 * variant exists, we need to disable IRQs manually here.
-> +	 */
-> +	local_irq_disable();
-> +	arch_spin_lock(&dcscb_lock);
-> +
-> +	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-> +	if (rst_hold & (1 << 8)) {
-> +		/* remove cluster reset and add individual CPU's reset */
-> +		rst_hold &= ~(1 << 8);
-> +		rst_hold |= 0xf;
-> +	}
-> +	rst_hold &= ~(cpumask | (cpumask << 4));
-> +	writel(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
+Erm, but isn't this problem going to strike any system that doesn't
+have resources assigned by the firmware?
 
-Why do you mix relaxed and non-relaxed I/O accessors here? Do you need
-the barriers implied by writel()?
+If so, a common 'pci_scan_bus_from_scratch' would at least highlight
+the problem and centralize the work around until it is fixed...
 
--- 
-Catalin
+Many embedded systems will require this..
+
+Regards,
+Jason
