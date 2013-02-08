@@ -1,45 +1,44 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 8 Feb 2013 14:32:03 +0000
-Subject: [PATCH] ARM: Allow modules to read cpu_logical_map
-In-Reply-To: <20130208122604.GO17833@n2100.arm.linux.org.uk>
-References: <1360325980-19089-1-git-send-email-dave.martin@linaro.org>
- <20130208122604.GO17833@n2100.arm.linux.org.uk>
-Message-ID: <20130208143203.GB1973@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 8 Feb 2013 09:33:12 -0500
+Subject: [PATCH v3 2/4] ARM: Kirkwood: Add support thermal sensor for
+ 88F6282 and 88F6283
+In-Reply-To: <1360308685.2242.16.camel@rzhang1-mobl4>
+References: <1359815749-27705-1-git-send-email-andrew@lunn.ch>
+ <1359815749-27705-3-git-send-email-andrew@lunn.ch>
+ <1359947693.2250.50.camel@rzhang1-mobl4>
+ <20130204141943.GL14746@titan.lakedaemon.net>
+ <1360308685.2242.16.camel@rzhang1-mobl4>
+Message-ID: <20130208143312.GF14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 08, 2013 at 12:26:04PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 08, 2013 at 12:19:40PM +0000, Dave Martin wrote:
-> > It is reasonable for loadable modules to be CPU topology aware
-> > (particular examples include cpufreq and cpuidle drivers).
-> > 
-> > This patch exports a new function cpu_get_hwid(cpu) to provide
-> > suitable read-only access outside vmlinux.
+On Fri, Feb 08, 2013 at 03:31:25PM +0800, Zhang Rui wrote:
+> Hi, Jason,
 > 
-> And we have an export with no user... where are the patches which
-> illustrate its usage?
+> On Mon, 2013-02-04 at 09:19 -0500, Jason Cooper wrote:
+> > On Mon, Feb 04, 2013 at 11:14:53AM +0800, Zhang Rui wrote:
+> > > On Sat, 2013-02-02 at 15:35 +0100, Andrew Lunn wrote:
+> > > > From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> > > > 
+> > > > Kirkwood 88F6282 and 88F6283 have a thermal sensor.
+> > > > This patch adds a DT node and enables the driver in the kernel config.
+> > > > 
+> > > > Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> > > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > 
+> > > I can take this one but I need ACK from ARM experts first.
+> > 
+> > If you don't mind, I prefer to take patches 2 and 4.  If you could take
+> > 1 and 3 and let me know what tree/branch you place them in, then I'll
+> > depend on them when I push them up.
+> > 
+> great.
+> patch 1/4, 3/4 in V5 have been applied to thermal tree -next branch.
+> git://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux.git
+> 
+> but I'll put all the 3.9 candidates in thermal -release branch before
+> next merge window opened. does this still work for you?
 
-That's a fair point.
+great, thanks.
 
-The background is that ARM have an out-of-tree profiling driver,
-which may need to look at cpu_logical_map in the presence of the
-big.LITTLE in-kernel switcher code.
-
-Although there is no in-tree code using this yet, the usage seems
-legitimate.
-
-If there are outstanding concerns about this, this patch could stay
-out-of-tree too, but said driver would only work with a modified
-kernel in that case.
-
-If this is not considered relevant to the kernel proper yet, then
-it could be posted via the big.LITTLE in-kernel switcher series
-when those are finally published, since it is this that causes
-cpu_logical_map to change in ways that a few specialised drivers
-may need to respond to.  Without the switcher, no code should need
-to look at cpu_logical_map (the present situation).
-
-(Nico, please shout if you have any concerns about that approach.)
-
-Cheers
----Dave
+Jason.
