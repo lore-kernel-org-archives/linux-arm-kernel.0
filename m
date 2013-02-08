@@ -1,106 +1,67 @@
-From: sangsu4u.park@samsung.com (Sangsu Park)
-Date: Fri, 08 Feb 2013 18:05:58 +0900
-Subject: [PATCH V3] ARM: EXYNOS: Add clocks for EXYNOS I2S and PCM I/F
-Message-ID: <011201ce05db$82ae97e0$880bc7a0$@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 8 Feb 2013 14:58:18 +0530
+Subject: [PATCH V2 0/2] ARM: dts: Add DT bindings for OMAP SDMA
+In-Reply-To: <1360285506-22354-1-git-send-email-jon-hunter@ti.com>
+References: <1360285506-22354-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <5114C532.1050506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Audio Subsystem has own clocks for I2S0 and PCM0 in all EXYNOS series.
-This patch add clocks for I2S0 and PCM0 I/F.
-
-Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
----
- arch/arm/mach-exynos/Makefile      |    1 +
- arch/arm/mach-exynos/clock-audss.c |   68 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 69 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos/clock-audss.c
-
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 7e53a3a..5b6c7c0 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -13,6 +13,7 @@ obj-				:=
- # Core
- 
- obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
-+obj-$(CONFIG_ARCH_EXYNOS)	+= clock-audss.o
- obj-$(CONFIG_ARCH_EXYNOS4)	+= clock-exynos4.o
- obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
- obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
-diff --git a/arch/arm/mach-exynos/clock-audss.c
-b/arch/arm/mach-exynos/clock-audss.c
-new file mode 100644
-index 0000000..31d01c3
---- /dev/null
-+++ b/arch/arm/mach-exynos/clock-audss.c
-@@ -0,0 +1,68 @@
-+/*
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Clock support for EXYNOS Audio Subsystem
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+
-+#include <plat/clock.h>
-+#include <plat/s5p-clock.h>
-+
-+#define EXYNOS_PA_AUDSS	(0x03810000)
-+
-+/* IP Clock Gate 0 Registers */
-+#define EXYNOS_AUDSS_CLKGATE_I2SBUS	(1<<2)
-+#define EXYNOS_AUDSS_CLKGATE_I2SSPECIAL	(1<<3)
-+#define EXYNOS_AUDSS_CLKGATE_PCMBUS	(1<<4)
-+#define EXYNOS_AUDSS_CLKGATE_PCMSPECIAL	(1<<5)
-+#define EXYNOS_AUDSS_CLKGATE_GPIO	(1<<6)
-+
-+static void __iomem *clk_audss_base;
-+
-+static int exynos_clk_audss_ctrl(struct clk *clk, int enable)
-+{
-+	if (!clk_audss_base)
-+		return -ENOMEM;
-+
-+	return s5p_gatectrl(clk_audss_base, clk, enable);
-+}
-+
-+static struct clk exynos_init_audss_clocks[] = {
-+	{
-+		.name		= "iis",
-+		.devname	= "samsung-i2s.0",
-+		.enable		= exynos_clk_audss_ctrl,
-+		.ctrlbit	= EXYNOS_AUDSS_CLKGATE_I2SSPECIAL
-+				| EXYNOS_AUDSS_CLKGATE_I2SBUS
-+				| EXYNOS_AUDSS_CLKGATE_GPIO,
-+	}, {
-+		.name		= "pcm",
-+		.devname	= "samsung-pcm.0",
-+		.enable		= exynos_clk_audss_ctrl,
-+		.ctrlbit	= EXYNOS_AUDSS_CLKGATE_PCMSPECIAL
-+				| EXYNOS_AUDSS_CLKGATE_PCMBUS
-+				| EXYNOS_AUDSS_CLKGATE_GPIO,
-+	},
-+};
-+
-+void __init exynos_register_audss_clocks(void)
-+{
-+	clk_audss_base = ioremap(EXYNOS_PA_AUDSS, SZ_4K);
-+	if (clk_audss_base == NULL) {
-+		pr_err("unable to ioremap for audss base\n");
-+		return;
-+	}
-+
-+	s3c_register_clocks(exynos_init_audss_clocks,
-+			    ARRAY_SIZE(exynos_init_audss_clocks));
-+	s3c_disable_clocks(exynos_init_audss_clocks,
-+			   ARRAY_SIZE(exynos_init_audss_clocks));
-+}
--- 
-1.7.4.1
+On Friday 08 February 2013 06:35 AM, Jon Hunter wrote:
+> Adds device-tree bindings from SDMA on OMAP2+ devices. DMA client
+> bindings are also added for devices that have SPI and MMC bindings
+> populated. Client binding data is based upon existing HWMOD data for
+> OMAP and has been checked against OMAP documentation.
+>
+> Please note that the underlying (legacy) OMAP SDMA driver has not been
+> ported over to DT and this still needs to be done. However, this allows
+> DMA clients to look-up the DMA resource information via device-tree.
+>
+> Testing includes ...
+> 1. Boot tested on OMAP3430 Beagle board, OMAP4430 Panda board and
+>     OMAP4460 Panda board with and without device-tree present.
+> 2. Testing of MMC1 with SD card on OMAP3430 Beagle board, OMAP4430
+>     Panda board and OMAP4460 Panda board with and without device-tree
+>     present.
+>
+> Testing branch available here [1].
+>
+> Series is based upon Tony Lindgren's omap-for-v3.9/multiplatform-v2
+> branch [2] on top of the following ...
+> - Vinod's topic/dmaengine_dt branch [3]
+> - Matt Porter's series "DMA Engine support for AM33XX" [4]
+> - Matt Porter's series "omap_hsmmc DT DMA Client support" [5]
+> - Sourav Poddar's series "add omap mcspi device tree data" [6]
+>
+> V2 changes:
+> - Updated to Tony's omap-for-v3.9/multiplatform-v2 branch to pull in
+>    DMA changes for v3.9
+> - Added comma to omap_dma_driver structure as pointed out by Arnd.
+> - Updated OMAP SDMA DT binding compatible strings to indicate which
+>    devices are bit compatible with each other with respect to the SDMA
+>    controller. Grant had mentioned in the past that he wants the
+>    compatible string to be based upon a particular device and not
+>    something generic like "ti,omap-sdma".
+>
+> [1] https://github.com/jonhunter/linux/commits/dev-dt-dma
+> [2] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git omap-for-v3.9/multiplatform-v2
+> [3] http://git.infradead.org/users/vkoul/slave-dma.git/shortlog/refs/heads/topic/dmaengine_dt
+> [4] http://permalink.gmane.org/gmane.linux.kernel.spi.devel/12508
+> [5] http://permalink.gmane.org/gmane.linux.ports.arm.omap/93165
+> [6] http://permalink.gmane.org/gmane.linux.kernel/1435002
+>
+> Jon Hunter (2):
+>    ARM: dts: OMAP2+: Add SDMA controller bindings and nodes
+>    dmaengine: OMAP: Register SDMA controller with Device Tree DMA driver
+>
+>   .../devicetree/bindings/dma/omap-sdma.txt          |   51 ++++++++++++++++++++
+>   arch/arm/boot/dts/omap2.dtsi                       |   12 +++++
+>   arch/arm/boot/dts/omap3.dtsi                       |   40 +++++++++++++++
+>   arch/arm/boot/dts/omap4.dtsi                       |   41 ++++++++++++++++
+>   arch/arm/boot/dts/omap5.dtsi                       |   41 ++++++++++++++++
+>   arch/arm/mach-omap2/dma.c                          |    4 ++
+>   drivers/dma/omap-dma.c                             |   37 +++++++++++++-
+>   7 files changed, 224 insertions(+), 2 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/dma/omap-sdma.txt
+>
+Acked-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
