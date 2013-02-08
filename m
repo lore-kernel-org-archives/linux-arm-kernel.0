@@ -1,40 +1,42 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 08 Feb 2013 17:51:42 +1300
-Subject: [PATCH 0/4] Improve CLKSRC_OF matching
-In-Reply-To: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
-References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1360299102.31290.1.camel@gitbox>
+Date: Fri,  8 Feb 2013 18:18:03 +1300
+Subject: [PATCH] arm: vt8500: Update MAINTAINERS entry for arch-vt8500
+Message-ID: <1360300683-31779-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-02-07 at 13:09 -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> In the recently added support for OF based clocksource init, a device node
-> will be matched twice. We can fix this by passing the device node to the
-> init functions and removing the match functions within the init functions.
-> 
-> This is based on arm-soc for-next branch and commit "of: fix incorrect
-> return value of of_find_matching_node_and_match()" in my DT for-next
-> branch.
-> 
-> Rob
-> 
-> Rob Herring (4):
->   clocksource: pass DT node pointer to init functions
->   clocksource: bcm2835: use the device_node pointer passed to init
->   clocksource: vt8500: use the device_node pointer passed to init
->   clocksource: tegra20: use the device_node pointer passed to init
-> 
->  drivers/clocksource/bcm2835_timer.c |   12 +-----
->  drivers/clocksource/clksrc-of.c     |    4 +-
->  drivers/clocksource/tegra20_timer.c |   70 ++++++++++++++---------------------
->  drivers/clocksource/vt8500_timer.c  |   14 +------
->  4 files changed, 31 insertions(+), 69 deletions(-)
-> 
+Sort the VT8500 entries in alphabetical order and add missing entries
+for the files.
 
-Looks fine, although I didn't get a CC for the vt8500 patch so I had to
-go hunting for it :)
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ MAINTAINERS |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-For patches 1 & 3:
-Acked-by: Tony Prisk <linux@prisktech.co.nz>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 212c255..2641425 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1248,12 +1248,17 @@ M:	Tony Prisk <linux@prisktech.co.nz>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-vt8500/
++F:	drivers/clocksource/vt8500_timer.c
++F:	drivers/gpio/gpio-vt8500.c
++F:	drivers/mmc/host/wmt-sdmmc.c
++F:	drivers/pwm/pwm-vt8500.c
++F:	drivers/rtc/rtc-vt8500.c
++F:	drivers/tty/serial/vt8500_serial.c
++F:	drivers/usb/host/ehci-vt8500.c
++F:	drivers/usb/host/uhci-platform.c
+ F:	drivers/video/vt8500lcdfb.*
+ F:	drivers/video/wm8505fb*
+ F:	drivers/video/wmt_ge_rops.*
+-F:	drivers/tty/serial/vt8500_serial.c
+-F:	drivers/rtc/rtc-vt8500.c
+-F:	drivers/mmc/host/wmt-sdmmc.c
+ 
+ ARM/ZIPIT Z2 SUPPORT
+ M:	Marek Vasut <marek.vasut@gmail.com>
+-- 
+1.7.9.5
