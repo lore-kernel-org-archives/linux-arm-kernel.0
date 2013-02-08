@@ -1,299 +1,217 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Fri, 08 Feb 2013 15:25:07 +0800
-Subject: [PATCH v5 3/4] Thermal: Dove: Add Themal sensor support for Dove.
-In-Reply-To: <1360132527-22860-4-git-send-email-andrew@lunn.ch>
-References: <1360132527-22860-1-git-send-email-andrew@lunn.ch>
- <1360132527-22860-4-git-send-email-andrew@lunn.ch>
-Message-ID: <1360308307.2242.10.camel@rzhang1-mobl4>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 8 Feb 2013 09:29:31 +0200
+Subject: [PATCH 1/4] ARM: tegra: Unify tegra{20,30,114}_init_early()
+In-Reply-To: <1360308574-19658-1-git-send-email-hdoyu@nvidia.com>
+References: <1360308574-19658-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1360308574-19658-2-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-02-06 at 07:35 +0100, Andrew Lunn wrote:
-> The Marvell Dove SoC has a thermal sensor. Add a driver using the
-> thermal framework.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Refactored tegra{20,30,114}_init_early() so that we have the unified
+tegra_init_early().
 
-applied to thermal -next.
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/mach-tegra/board-dt-tegra114.c |    2 +-
+ arch/arm/mach-tegra/board-dt-tegra20.c  |    2 +-
+ arch/arm/mach-tegra/board-dt-tegra30.c  |    4 ++--
+ arch/arm/mach-tegra/board.h             |    4 +---
+ arch/arm/mach-tegra/common.c            |   26 ++------------------------
+ arch/arm/mach-tegra/hotplug.c           |   31 +++++++++++++++++--------------
+ arch/arm/mach-tegra/sleep.h             |   10 +++++-----
+ 7 files changed, 29 insertions(+), 50 deletions(-)
 
-thanks,
-rui
-> ---
->  .../devicetree/bindings/thermal/dove-thermal.txt   |   18 ++
->  drivers/thermal/Kconfig                            |    8 +
->  drivers/thermal/Makefile                           |    1 +
->  drivers/thermal/dove_thermal.c                     |  209 ++++++++++++++++++++
->  4 files changed, 236 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/dove-thermal.txt
->  create mode 100644 drivers/thermal/dove_thermal.c
-> 
-> diff --git a/Documentation/devicetree/bindings/thermal/dove-thermal.txt b/Documentation/devicetree/bindings/thermal/dove-thermal.txt
-> new file mode 100644
-> index 0000000..6f47467
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/dove-thermal.txt
-> @@ -0,0 +1,18 @@
-> +* Dove Thermal
-> +
-> +This driver is for Dove SoCs which contain a thermal sensor.
-> +
-> +Required properties:
-> +- compatible : "marvell,dove-thermal"
-> +- reg : Address range of the thermal registers
-> +
-> +The reg properties should contain two ranges. The first is for the
-> +three Thermal Manager registers, while the second range contains the
-> +Thermal Diode Control Registers.
-> +
-> +Example:
-> +
-> +	thermal at 10078 {
-> +		compatible = "marvell,dove-thermal";
-> +		reg = <0xd001c 0x0c>, <0xd005c 0x08>;
-> +	};
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index ff34a0a..342fd81 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -109,6 +109,14 @@ config EXYNOS_THERMAL
->  	  If you say yes here you get support for TMU (Thermal Management
->  	  Unit) on SAMSUNG EXYNOS series of SoC.
->  
-> +config DOVE_THERMAL
-> +	tristate "Temperature sensor on Marvell Dove SoCs"
-> +	depends on ARCH_DOVE
-> +	depends on OF
-> +	help
-> +	  Support for the Dove thermal sensor driver in the Linux thermal
-> +	  framework.
-> +
->  config DB8500_THERMAL
->  	bool "DB8500 thermal management"
->  	depends on ARCH_U8500
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index 99026b2..5ed357e 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -17,5 +17,6 @@ obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
->  obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
->  obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
->  obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
-> +obj-$(CONFIG_DOVE_THERMAL)  	+= dove_thermal.o
->  obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
->  obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
-> diff --git a/drivers/thermal/dove_thermal.c b/drivers/thermal/dove_thermal.c
-> new file mode 100644
-> index 0000000..7b0bfa0
-> --- /dev/null
-> +++ b/drivers/thermal/dove_thermal.c
-> @@ -0,0 +1,209 @@
-> +/*
-> + * Dove thermal sensor driver
-> + *
-> + * Copyright (C) 2013 Andrew Lunn <andrew@lunn.ch>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/thermal.h>
-> +
-> +#define DOVE_THERMAL_TEMP_OFFSET	1
-> +#define DOVE_THERMAL_TEMP_MASK		0x1FF
-> +
-> +/* Dove Thermal Manager Control and Status Register */
-> +#define PMU_TM_DISABLE_OFFS		0
-> +#define PMU_TM_DISABLE_MASK		(0x1 << PMU_TM_DISABLE_OFFS)
-> +
-> +/* Dove Theraml Diode Control 0 Register */
-> +#define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
-> +#define PMU_TDC0_SEL_VCAL_OFFS		5
-> +#define PMU_TDC0_SEL_VCAL_MASK		(0x3 << PMU_TDC0_SEL_VCAL_OFFS)
-> +#define PMU_TDC0_REF_CAL_CNT_OFFS	11
-> +#define PMU_TDC0_REF_CAL_CNT_MASK	(0x1FF << PMU_TDC0_REF_CAL_CNT_OFFS)
-> +#define PMU_TDC0_AVG_NUM_OFFS		25
-> +#define PMU_TDC0_AVG_NUM_MASK		(0x7 << PMU_TDC0_AVG_NUM_OFFS)
-> +
-> +/* Dove Thermal Diode Control 1 Register */
-> +#define PMU_TEMP_DIOD_CTRL1_REG		0x04
-> +#define PMU_TDC1_TEMP_VALID_MASK	(0x1 << 10)
-> +
-> +/* Dove Thermal Sensor Dev Structure */
-> +struct dove_thermal_priv {
-> +	void __iomem *sensor;
-> +	void __iomem *control;
-> +};
-> +
-> +static int dove_init_sensor(const struct dove_thermal_priv *priv)
-> +{
-> +	u32 reg;
-> +	u32 i;
-> +
-> +	/* Configure the Diode Control Register #0 */
-> +	reg = readl_relaxed(priv->control);
-> +
-> +	/* Use average of 2 */
-> +	reg &= ~PMU_TDC0_AVG_NUM_MASK;
-> +	reg |= (0x1 << PMU_TDC0_AVG_NUM_OFFS);
-> +
-> +	/* Reference calibration value */
-> +	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-> +	reg |= (0x0F1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-> +
-> +	/* Set the high level reference for calibration */
-> +	reg &= ~PMU_TDC0_SEL_VCAL_MASK;
-> +	reg |= (0x2 << PMU_TDC0_SEL_VCAL_OFFS);
-> +	writel(reg, priv->control);
-> +
-> +	/* Reset the sensor */
-> +	reg = readl_relaxed(priv->control);
-> +	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
-> +	writel(reg, priv->control);
-> +
-> +	/* Enable the sensor */
-> +	reg = readl_relaxed(priv->sensor);
-> +	reg &= ~PMU_TM_DISABLE_MASK;
-> +	writel(reg, priv->sensor);
-> +
-> +	/* Poll the sensor for the first reading */
-> +	for (i = 0; i < 1000000; i++) {
-> +		reg = readl_relaxed(priv->sensor);
-> +		if (reg & DOVE_THERMAL_TEMP_MASK)
-> +			break;
-> +	}
-> +
-> +	if (i == 1000000)
-> +		return -EIO;
-> +
-> +	return 0;
-> +}
-> +
-> +static int dove_get_temp(struct thermal_zone_device *thermal,
-> +			  unsigned long *temp)
-> +{
-> +	unsigned long reg;
-> +	struct dove_thermal_priv *priv = thermal->devdata;
-> +
-> +	/* Valid check */
-> +	reg = readl_relaxed(priv->control + PMU_TEMP_DIOD_CTRL1_REG);
-> +	if ((reg & PMU_TDC1_TEMP_VALID_MASK) == 0x0) {
-> +		dev_err(&thermal->device,
-> +			"Temperature sensor reading not valid\n");
-> +		return -EIO;
-> +	}
-> +
-> +	/*
-> +	 * Calculate temperature. See Section 8.10.1 of 88AP510,
-> +	 * Documentation/arm/Marvell/README
-> +	 */
-> +	reg = readl_relaxed(priv->sensor);
-> +	reg = (reg >> DOVE_THERMAL_TEMP_OFFSET) & DOVE_THERMAL_TEMP_MASK;
-> +	*temp = ((2281638UL - (7298*reg)) / 10);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct thermal_zone_device_ops ops = {
-> +	.get_temp = dove_get_temp,
-> +};
-> +
-> +static const struct of_device_id dove_thermal_id_table[] = {
-> +	{ .compatible = "marvell,dove-thermal" },
-> +	{}
-> +};
-> +
-> +static int dove_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *thermal = NULL;
-> +	struct dove_thermal_priv *priv;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!priv->sensor) {
-> +		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
-> +		return -EADDRNOTAVAIL;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> +		return -ENODEV;
-> +	}
-> +	priv->control = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!priv->control) {
-> +		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
-> +		return -EADDRNOTAVAIL;
-> +	}
-> +
-> +	ret = dove_init_sensor(priv);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to initialize sensor\n");
-> +		return ret;
-> +	}
-> +
-> +	thermal = thermal_zone_device_register("dove_thermal", 0, 0,
-> +					       priv, &ops, NULL, 0, 0);
-> +	if (IS_ERR(thermal)) {
-> +		dev_err(&pdev->dev,
-> +			"Failed to register thermal zone device\n");
-> +		return PTR_ERR(thermal);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, thermal);
-> +
-> +	return 0;
-> +}
-> +
-> +static int dove_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *dove_thermal =
-> +		platform_get_drvdata(pdev);
-> +
-> +	thermal_zone_device_unregister(dove_thermal);
-> +	platform_set_drvdata(pdev, NULL);
-> +
-> +	return 0;
-> +}
-> +
-> +MODULE_DEVICE_TABLE(of, dove_thermal_id_table);
-> +
-> +static struct platform_driver dove_thermal_driver = {
-> +	.probe = dove_thermal_probe,
-> +	.remove = dove_thermal_exit,
-> +	.driver = {
-> +		.name = "dove_thermal",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(dove_thermal_id_table),
-> +	},
-> +};
-> +
-> +module_platform_driver(dove_thermal_driver);
-> +
-> +MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
-> +MODULE_DESCRIPTION("Dove thermal driver");
-> +MODULE_LICENSE("GPL");
+diff --git a/arch/arm/mach-tegra/board-dt-tegra114.c b/arch/arm/mach-tegra/board-dt-tegra114.c
+index 085d636..08e8294 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra114.c
++++ b/arch/arm/mach-tegra/board-dt-tegra114.c
+@@ -36,7 +36,7 @@ static const char * const tegra114_dt_board_compat[] = {
+ DT_MACHINE_START(TEGRA114_DT, "NVIDIA Tegra114 (Flattened Device Tree)")
+ 	.smp		= smp_ops(tegra_smp_ops),
+ 	.map_io		= tegra_map_common_io,
+-	.init_early	= tegra114_init_early,
++	.init_early	= tegra_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.init_time	= clocksource_of_init,
+ 	.init_machine	= tegra114_dt_init,
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index a0edf25..fca18e9 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -145,7 +145,7 @@ static const char *tegra20_dt_board_compat[] = {
+ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
+ 	.map_io		= tegra_map_common_io,
+ 	.smp		= smp_ops(tegra_smp_ops),
+-	.init_early	= tegra20_init_early,
++	.init_early	= tegra_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.init_time	= clocksource_of_init,
+ 	.init_machine	= tegra_dt_init,
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index bf68567..63f8139 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -3,7 +3,7 @@
+  *
+  * NVIDIA Tegra30 device tree board support
+  *
+- * Copyright (C) 2011 NVIDIA Corporation
++ * Copyright (C) 2011, 2013, NVIDIA Corporation
+  *
+  * Derived from:
+  *
+@@ -50,7 +50,7 @@ static const char *tegra30_dt_board_compat[] = {
+ DT_MACHINE_START(TEGRA30_DT, "NVIDIA Tegra30 (Flattened Device Tree)")
+ 	.smp		= smp_ops(tegra_smp_ops),
+ 	.map_io		= tegra_map_common_io,
+-	.init_early	= tegra30_init_early,
++	.init_early	= tegra_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.init_time	= clocksource_of_init,
+ 	.init_machine	= tegra30_dt_init,
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index 86851c8..60431de 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -26,9 +26,7 @@
+ 
+ void tegra_assert_system_reset(char mode, const char *cmd);
+ 
+-void __init tegra20_init_early(void);
+-void __init tegra30_init_early(void);
+-void __init tegra114_init_early(void);
++void __init tegra_init_early(void);
+ void __init tegra_map_common_io(void);
+ void __init tegra_init_irq(void);
+ void __init tegra_dt_init_irq(void);
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 5449a3f..f0315c9 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -94,7 +94,7 @@ static void __init tegra_init_cache(void)
+ 
+ }
+ 
+-static void __init tegra_init_early(void)
++void __init tegra_init_early(void)
+ {
+ 	tegra_cpu_reset_handler_init();
+ 	tegra_apb_io_init();
+@@ -102,31 +102,9 @@ static void __init tegra_init_early(void)
+ 	tegra_init_cache();
+ 	tegra_pmc_init();
+ 	tegra_powergate_init();
++	tegra_hotplug_init();
+ }
+ 
+-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+-void __init tegra20_init_early(void)
+-{
+-	tegra_init_early();
+-	tegra20_hotplug_init();
+-}
+-#endif
+-
+-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+-void __init tegra30_init_early(void)
+-{
+-	tegra_init_early();
+-	tegra30_hotplug_init();
+-}
+-#endif
+-
+-#ifdef CONFIG_ARCH_TEGRA_114_SOC
+-void __init tegra114_init_early(void)
+-{
+-	tegra_init_early();
+-}
+-#endif
+-
+ void __init tegra_init_late(void)
+ {
+ 	tegra_powergate_debugfs_init();
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index a599f6e..9bcecb8 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -1,8 +1,7 @@
+ /*
+- *
+  *  Copyright (C) 2002 ARM Ltd.
+  *  All Rights Reserved
+- *  Copyright (c) 2010, 2012 NVIDIA Corporation. All rights reserved.
++ *  Copyright (c) 2010, 2012-2013, NVIDIA Corporation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -15,6 +14,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ 
++#include "fuse.h"
+ #include "sleep.h"
+ 
+ static void (*tegra_hotplug_shutdown)(void);
+@@ -56,18 +56,21 @@ int tegra_cpu_disable(unsigned int cpu)
+ 	return cpu == 0 ? -EPERM : 0;
+ }
+ 
+-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+-extern void tegra20_hotplug_shutdown(void);
+-void __init tegra20_hotplug_init(void)
++void __init tegra_hotplug_init(void)
+ {
+-	tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
+-}
++	switch (tegra_chip_id) {
++#ifdef CONFIG_ARCH_TEGRA_2x_SOC
++	case TEGRA20:
++		tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
++		break;
+ #endif
+-
+-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+-extern void tegra30_hotplug_shutdown(void);
+-void __init tegra30_hotplug_init(void)
+-{
+-	tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
+-}
++#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
++	case TEGRA30:
++		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
++		break;
+ #endif
++	default:
++		BUG_ON(IS_ENABLED(CONFIG_HOTPLUG_CPU));
++		break;
++	}
++}
+diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+index 4ffae54..970ebd5 100644
+--- a/arch/arm/mach-tegra/sleep.h
++++ b/arch/arm/mach-tegra/sleep.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2010-2012, NVIDIA Corporation. All rights reserved.
++ * Copyright (c) 2010-2013, NVIDIA Corporation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms and conditions of the GNU General Public License,
+@@ -124,11 +124,11 @@ int tegra_sleep_cpu_finish(unsigned long);
+ void tegra_disable_clean_inv_dcache(void);
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-void tegra20_hotplug_init(void);
+-void tegra30_hotplug_init(void);
++void tegra20_hotplug_shutdown(void);
++void tegra30_hotplug_shutdown(void);
++void tegra_hotplug_init(void);
+ #else
+-static inline void tegra20_hotplug_init(void) {}
+-static inline void tegra30_hotplug_init(void) {}
++static inline void tegra_hotplug_init(void) {}
+ #endif
+ 
+ void tegra20_cpu_shutdown(int cpu);
+-- 
+1.7.9.5
