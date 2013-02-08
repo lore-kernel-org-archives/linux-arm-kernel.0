@@ -1,40 +1,40 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 07 Feb 2013 23:37:08 -0500 (EST)
-Subject: [PATCH v3 2/2 net-next] net: fec: fix spin_lock dead lock
-In-Reply-To: <1360198799-25173-2-git-send-email-Frank.Li@freescale.com>
-References: <1360198799-25173-1-git-send-email-Frank.Li@freescale.com>
- <1360198799-25173-2-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20130207.233708.2170335376726433338.davem@davemloft.net>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 08 Feb 2013 17:51:42 +1300
+Subject: [PATCH 0/4] Improve CLKSRC_OF matching
+In-Reply-To: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
+References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1360299102.31290.1.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
-Date: Thu, 7 Feb 2013 08:59:59 +0800
+On Thu, 2013-02-07 at 13:09 -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> In the recently added support for OF based clocksource init, a device node
+> will be matched twice. We can fix this by passing the device node to the
+> init functions and removing the match functions within the init functions.
+> 
+> This is based on arm-soc for-next branch and commit "of: fix incorrect
+> return value of of_find_matching_node_and_match()" in my DT for-next
+> branch.
+> 
+> Rob
+> 
+> Rob Herring (4):
+>   clocksource: pass DT node pointer to init functions
+>   clocksource: bcm2835: use the device_node pointer passed to init
+>   clocksource: vt8500: use the device_node pointer passed to init
+>   clocksource: tegra20: use the device_node pointer passed to init
+> 
+>  drivers/clocksource/bcm2835_timer.c |   12 +-----
+>  drivers/clocksource/clksrc-of.c     |    4 +-
+>  drivers/clocksource/tegra20_timer.c |   70 ++++++++++++++---------------------
+>  drivers/clocksource/vt8500_timer.c  |   14 +------
+>  4 files changed, 31 insertions(+), 69 deletions(-)
+> 
 
-> =========================================================
-> [ INFO: possible irq lock inversion dependency detected ]
-> 3.8.0-rc5+ #82 Not tainted
-> ---------------------------------------------------------
-> swapper/0/0 just changed the state of lock:
->  (&(&fep->hw_lock)->rlock){..-...}, at: [<8034e2f8>] fec_enet_start_xmit+0x48/0x                      2cc
-> but this lock took another, SOFTIRQ-unsafe lock in the past:
-> (prepare_lock){+.+.+.}
-> 
-> and interrupts could create inverse lock ordering between them.
-> other info that might help us debug this:
-> Possible interrupt unsafe locking scenario:
-> 
-> CPU0				CPU1
-> ----				----
-> lock(prepare_lock);
-> 				local_irq_disable()
-> 				lock(&(&fep->hw_lock)->rlock);
-> 				lock(prepare_lock);
-> <Interrupt>
-> lock(&(&fep->hw_lock)->rlock);
-> 
-> *** DEADLOCK ***
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Looks fine, although I didn't get a CC for the vt8500 patch so I had to
+go hunting for it :)
 
-Applied.
+For patches 1 & 3:
+Acked-by: Tony Prisk <linux@prisktech.co.nz>
