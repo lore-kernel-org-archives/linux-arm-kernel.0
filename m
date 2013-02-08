@@ -1,49 +1,49 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 08 Feb 2013 11:47:40 +0100
-Subject: [PATCH] ARM: DMA-mapping: fix memory leak in IOMMU dma-mapping
- implementation
-Message-ID: <1360320460-17246-1-git-send-email-m.szyprowski@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 8 Feb 2013 16:20:29 +0530
+Subject: [PATCH 1/3] SPEAr13xx_defconfig: Enable Memory split 2G/2G needed
+In-Reply-To: <6cebd9755011670ecaeec7930b3fa7ed0f16b3b6.1360317993.git.vijay.kumar@st.com>
+References: <cover.1360317993.git.vijay.kumar@st.com>
+ <6cebd9755011670ecaeec7930b3fa7ed0f16b3b6.1360317993.git.vijay.kumar@st.com>
+Message-ID: <CAKohpokPhHtuDDBPUYp9YPOrEnaaKxthjiAemq74qfour_3aYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes page_address() usage in IOMMU-aware dma-mapping
-implementation and replaced it with direct use of the cpu virtual address
-provided by the caller. page_address() returned incorrect address for
-pages remapped in atomic pool, what caused memory leak.
+Hi Vijay,
 
-Reported-by: Hiroshi Doyu <hdoyu@nvidia.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/mm/dma-mapping.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+By mistake you have added an ST internal list in cc, fixed it now.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 6b2fb87..8c38378 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1255,11 +1255,11 @@ err_mapping:
- 	return NULL;
- }
- 
--static void __iommu_free_atomic(struct device *dev, struct page **pages,
-+static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
- 				dma_addr_t handle, size_t size)
- {
- 	__iommu_remove_mapping(dev, handle, size);
--	__free_from_pool(page_address(pages[0]), size);
-+	__free_from_pool(cpu_addr, size);
- }
- 
- static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
-@@ -1342,7 +1342,7 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 	}
- 
- 	if (__in_atomic_pool(cpu_addr, size)) {
--		__iommu_free_atomic(dev, pages, handle, size);
-+		__iommu_free_atomic(dev, cpu_addr, handle, size);
- 		return;
- 	}
- 
--- 
-1.7.9.5
+Subject should be:
+
+ARM: SPEAr13xx: Enable 2G/2G Memory split in defconfig
+
+On 8 February 2013 16:16, Vijay Kumar Mishra <vijay.kumar@st.com> wrote:
+> Memory split 2G/2G is enabled as needed for SPEAr1310 RevC board to boot.
+> Before enabling this option the boot was hanging at uncompressing linux.
+> ---
+>  arch/arm/configs/spear13xx_defconfig |    4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+> index 1fdb826..1b5ceff 100644
+> --- a/arch/arm/configs/spear13xx_defconfig
+> +++ b/arch/arm/configs/spear13xx_defconfig
+> @@ -14,13 +14,13 @@ CONFIG_MACH_SPEAR1340=y
+>  CONFIG_SMP=y
+>  # CONFIG_SMP_ON_UP is not set
+>  # CONFIG_ARM_CPU_TOPOLOGY is not set
+> +CONFIG_VMSPLIT_2G=y
+>  CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_BINFMT_MISC=y
+>  CONFIG_NET=y
+>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+>  CONFIG_MTD=y
+
+> -CONFIG_MTD_OF_PARTS=y
+> -# CONFIG_HID_SUPPORT is not set
+> -# CONFIG_USB_DEVICE_CLASS is not set
+
+Unrelated chages. Don't get them in next time. In case they
+just got added automatically because you did and make savedefconfig,
+do a make savedefconfig before any of these patches to make things
+stable for all SPEAr SoCs. And then add these patches.
