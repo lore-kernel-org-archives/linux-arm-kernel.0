@@ -1,54 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 08 Feb 2013 14:45:28 -0800
-Subject: [PATCH] ARM: S3C24XX: osiris: add missing platform_device.h
- include
-In-Reply-To: <201302052250.18818.heiko@sntech.de>
-References: <201302052250.18818.heiko@sntech.de>
-Message-ID: <1a5a01ce064d$ff75c600$fe615200$@samsung.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 08 Feb 2013 17:47:33 -0500 (EST)
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <1360363233.6066.283.camel@shinybook.infradead.org>
+References: <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <20130201011712.GF23505@n2100.arm.linux.org.uk>
+ <1359703995.23531.6.camel@shinybook.infradead.org>
+ <20130205210436.670c62e26d2121330e87af35@freescale.com>
+ <1360141322.6066.4.camel@shinybook.infradead.org>
+ <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+ <20130207181315.GM17833@n2100.arm.linux.org.uk>
+ <1360344301.6066.263.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
+ <1360363233.6066.283.camel@shinybook.infradead.org>
+Message-ID: <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> The missing include led to a implcit declaration warning.
-> 
-Yes, this fixes following:
+On Fri, 8 Feb 2013, Woodhouse, David wrote:
 
-In file included from arch/arm/mach-s3c24xx/mach-osiris.c:34:0:
-include/linux/platform_data/i2c-s3c2410.h:37:26: warning: 'struct platform_device' declared inside parameter list [enabled by default]
-include/linux/platform_data/i2c-s3c2410.h:37:26: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-include/linux/platform_data/i2c-s3c2410.h:66:38: warning: 'struct platform_device' declared inside parameter list [enabled by default]
-include/linux/platform_data/i2c-s3c2410.h:67:38: warning: 'struct platform_device' declared inside parameter list [enabled by default]
-include/linux/platform_data/i2c-s3c2410.h:68:38: warning: 'struct platform_device' declared inside parameter list [enabled by default]
-include/linux/platform_data/i2c-s3c2410.h:69:38: warning: 'struct platform_device' declared inside parameter list [enabled by default]
-include/linux/platform_data/i2c-s3c2410.h:70:38: warning: 'struct platform_device' declared inside parameter list [enabled by default]
-include/linux/platform_data/i2c-s3c2410.h:71:38: warning: 'struct platform_device' declared inside parameter list [enabled by default]
-include/linux/platform_data/i2c-s3c2410.h:72:38: warning: 'struct platform_device' declared inside parameter list [enabled by default]
-include/linux/platform_data/i2c-s3c2410.h:73:38: warning: 'struct platform_device' declared inside parameter list [enabled by default]
-
-Applied with adding fixed warning message.
-
-Thanks.
-
-- Kukjin
-
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/mach-s3c24xx/mach-osiris.c |    1 +
->  1 file changed, 1 insertion(+)
+> On Fri, 2013-02-08 at 15:04 -0500, Nicolas Pitre wrote:
+> > On Fri, 8 Feb 2013, Woodhouse, David wrote:
+> > 
+> > > On Thu, 2013-02-07 at 18:13 +0000, Russell King - ARM Linux wrote:
+> > > > 
+> > > > However, the biggest reason not to use libgcc is that we want to control
+> > > > what gets used in the kernel - for example, no floating point, and no
+> > > > use of 64 x 64bit division.
+> > > 
+> > > Which is all very sensible. But there's no particular reason we couldn't
+> > > add a __bswap[sd]i2 to the kernel's version of libgcc if we wanted to.
+> > 
+> > Absolutely.
 > 
-> diff --git a/arch/arm/mach-s3c24xx/mach-osiris.c b/arch/arm/mach-
-> s3c24xx/mach-osiris.c
-> index c2dc032..7d73626 100644
-> --- a/arch/arm/mach-s3c24xx/mach-osiris.c
-> +++ b/arch/arm/mach-s3c24xx/mach-osiris.c
-> @@ -21,6 +21,7 @@
->  #include <linux/clk.h>
->  #include <linux/i2c.h>
->  #include <linux/io.h>
-> +#include <linux/platform_device.h>
-> 
->  #include <linux/i2c/tps65010.h>
-> 
-> --
-> 1.7.10.4
+> And then ARM can just set ARCH_USE_BUILTIN_BSWAP like other
+> architectures do, right?
+
+If that turns out to be beneficial over what we have now, then yes.
+I didn't read back the whole thread to form an opinion though.
+
+
+Nicolas
