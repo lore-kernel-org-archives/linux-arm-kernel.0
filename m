@@ -1,46 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 08 Feb 2013 16:21:23 -0700
-Subject: [PATCH v4 02/10] s5p-fimc: Add device tree support for FIMC
- devices
-In-Reply-To: <5115874A.6050406@gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 09 Feb 2013 00:26:49 +0100
+Subject: [PATCH v4 05/10] s5p-fimc: Add device tree based sensors
+ registration
+In-Reply-To: <5112EA60.6090209@wwwdotorg.org>
 References: <1359745771-23684-1-git-send-email-s.nawrocki@samsung.com>
- <1359745771-23684-3-git-send-email-s.nawrocki@samsung.com>
- <5112E9EF.8090908@wwwdotorg.org> <5115874A.6050406@gmail.com>
-Message-ID: <51158873.3060508@wwwdotorg.org>
+ <1359745771-23684-6-git-send-email-s.nawrocki@samsung.com>
+ <5112EA60.6090209@wwwdotorg.org>
+Message-ID: <511589B9.7030007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2013 04:16 PM, Sylwester Nawrocki wrote:
-> On 02/07/2013 12:40 AM, Stephen Warren wrote:
->>> diff --git
->>> a/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
->>> b/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
->>
->>> +Samsung S5P/EXYNOS SoC Camera Subsystem (FIMC)
->>> +----------------------------------------------
-...
->>> +For every fimc node a numbered alias should be present in the
->>> aliases node.
->>> +Aliases are of the form fimc<n>, where<n>  is an integer (0...N)
->>> specifying
->>> +the IP's instance index.
->>
->> Why? Isn't it up to the DT author whether they care if each fimc node is
->> assigned a specific identification v.s. whether identification is
->> assigned automatically?
-> 
-> There are at least three different kinds of IPs that come in multiple
-> instances in an SoC. To activate data links between them each instance
-> needs to be clearly identified. There are also differences between
-> instances of same device. Hence it's important these aliases don't have
-> random values.
-> 
-> Some more details about the SoC can be found at [1]. The aliases are
-> also already used in the Exynos5 GScaler bindings [2] in a similar way.
+On 02/07/2013 12:42 AM, Stephen Warren wrote:
+> On 02/01/2013 12:09 PM, Sylwester Nawrocki wrote:
+>> The sensor (I2C and/or SPI client) devices are instantiated by their
+>> corresponding control bus drivers. Since the I2C client's master clock
+>> is often provided by a video bus receiver (host interface) or other
+>> than I2C/SPI controller device, the drivers of those client devices
+>> are not accessing hardware in their driver's probe() callback. Instead,
+>> after enabling clock, the host driver calls back into a sub-device
+>> when it wants to activate them. This pattern is used by some in-tree
+>> drivers and this patch also uses it for DT case. This patch is intended
+>> as a first step for adding device tree support to the S5P/Exynos SoC
+>> camera drivers. The second one is adding support for asynchronous
+>> sub-devices registration and clock control from sub-device driver
+>> level. The bindings shall not change when asynchronous probing support
+>> is added.
+>
+>> diff --git a/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt b/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
+>
+>> +The sensor device nodes should be added as their control bus controller
+>
+> I think "as" should be "to"?
 
-Hmmm. I'd expect explicit DT properties to represent the
-instance-specific "configuration", or even different compatible values.
-Relying on the alias ID seems rather indirect; what if in e.g.
-Exynos6/... the mapping from instance/alias ID to feature set changes.
-With explicit DT properties, that'd just be a .dts change, whereas by
-requiring alias IDs now, you'd need a driver change to support this.
+Yes, something is wrong here. Hopefully this is more correct:
+
+The sensor device nodes should be added to their control bus controller
+(e.g. I2C0) nodes and linked to a port node in the csis or parallel-ports
+
+>> +(e.g. I2C0) child nodes and linked to a port node in the csis or parallel-ports
+>> +node, using common the common video interfaces bindings, i.e. port/endpoint
+                ^^^^^^^^
+And this needs correction too.
+
+>> +node pairs. The implementation of this binding requires clock-frequency
+>> +property to be present in the sensor device nodes.
