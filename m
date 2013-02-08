@@ -1,89 +1,145 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 8 Feb 2013 09:33:13 +0100
-Subject: [PATCH 0/4] clk: Provide option to unprepare unused clocks at
- late init
-In-Reply-To: <CAPDyKFqgaw=9rfVQPyGNVMC4F+_dLKBzNqi4vwD9JwM1qDytDw@mail.gmail.com>
-References: <1359045956-30741-1-git-send-email-ulf.hansson@stericsson.com>
- <20130124184944.10623.20870@quantum>
- <CAPDyKFqgaw=9rfVQPyGNVMC4F+_dLKBzNqi4vwD9JwM1qDytDw@mail.gmail.com>
-Message-ID: <CAPDyKFpCqQG80_3y3zQUyK4cTXbrai2wOsJsaB6OZmBRFcmnnw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 08 Feb 2013 09:33:08 +0100
+Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
+ init
+In-Reply-To: <CAKrE-KfyGCi_+FozSpGTy0A0VJP=Jq-1SHmvKJU02iJKWHcvLQ@mail.gmail.com>
+References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
+ <1585017.derjdP1mHL@amdc1227>
+ <CAKrE-KfyGCi_+FozSpGTy0A0VJP=Jq-1SHmvKJU02iJKWHcvLQ@mail.gmail.com>
+Message-ID: <2723874.KAatFKgahz@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 January 2013 21:41, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Hi Mike,
->
-> On 24 January 2013 19:49, Mike Turquette <mturquette@linaro.org> wrote:
->> Quoting Ulf Hansson (2013-01-24 08:45:52)
->>> From: Ulf Hansson <ulf.hansson@linaro.org>
->>>
->>> The disable_unused sequence executed at late init, is already handling the
->>> fast unused ungated clocks to be gated. This patchset extends this sequence to
->>> include the slow unused prepared clocks to be unprepared.
->>>
->>> The default behavior will not change in this patchset. To unprepare unused
->>> clocks during the disable_unused sequence, the clk_hw needs to implement
->>> the new optional callback, is_prepared.
->>>
->>> The motivation for this patchset is to save power. Clocks that is from
->>> bootloaders prepared|enabled, but not used should be unprepared|disabled.
->>>
->>> Patch 4 is specific for ux500, which implements the is_prepared callback
->>> for it's PRMCU clocks.
->>>
->>> Note that patch 1-3 has been sent earlier, but since a proof of concept
->>> patch could be useful, as patch 4 is, the hole patchset is resent.
->>>
->>
->> Hi Ulf,
->>
->> I had some minor discussion in patch #1.  Otherwise patches #2 & #3 look
->> good to me.
->>
->> Patch #4 is a bit interesting.  There is nothing wrong with it per se,
->> but the general layering of the prcmu power stuff is the opposite of how
->> I had envisioned things.  Your .prepare callback is making calls to some
->> pm_qos api but a quick grep did not reveal any definitions for those
->> functions, just some stubs in include/linux/mfd/dbx500-prcmu.h.
->>
->> Do these functions scale voltage?  I had figured that some day
->> per-device pm qos apis would call the clk api, not the other way around.
->
-> You are right, these scale voltages. I would like to keep the code as
-> is, just as a reminder that some devices using some clocks will
-> requires these kind of operations.
-> On our internal STE development track this is how it is used but we a
-> are moving towards newer APIs.
->
-> So I am definitely sharing the same thought as you do and my plan is
-> to remove this code along the road, once drivers is adapted properly.
->
->>
->> Anyways that is just food for thought and no reason to block patch #4.
->>
->> Regards,
->> Mike
->>
->>> Ulf Hansson (4):
->>>   clk: Introduce optional is_prepared callback
->>>   clk: Unprepare the unused prepared slow clocks at late init
->>>   clk: Introduce optional unprepare_unused callback
->>>   clk: ux500: Support is_prepared callback for clk-prcmu
->>>
->>>  drivers/clk/clk.c             |   53 ++++++++++++++++
->>>  drivers/clk/ux500/clk-prcmu.c |  134 ++++++++++++++++++++++++-----------------
->>>  include/linux/clk-provider.h  |   11 ++++
->>>  3 files changed, 144 insertions(+), 54 deletions(-)
->>>
->>> --
->>> 1.7.10
->
-> Thanks for the review comments!
->
-> Kind regards
-> Ulf Hansson
+On Thursday 07 of February 2013 09:46:58 Girish KS wrote:
+> On Thu, Feb 7, 2013 at 3:09 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Hi Girish,
+> > 
+> > On Wednesday 06 of February 2013 12:12:29 Girish KS wrote:
+> >> On Wed, Feb 6, 2013 at 2:26 AM, Grant Likely
+> >> <grant.likely@secretlab.ca>> 
+> > wrote:
+> >> > On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S
+> > 
+> > <girishks2000@gmail.com> wrote:
+> >> >> The status of the interrupt is available in the status register,
+> >> >> so reading the clear pending register and writing back the same
+> >> >> value will not actually clear the pending interrupts. This patch
+> >> >> modifies the interrupt handler to read the status register and
+> >> >> clear the corresponding pending bit in the clear pending register.
+> >> >> 
+> >> >> Modified the hwInit function to clear all the pending interrupts.
+> >> >> 
+> >> >> Signed-off-by: Girish K S <ks.giri@samsung.com>
+> >> >> ---
+> >> >> 
+> >> >>  drivers/spi/spi-s3c64xx.c |   41
+> >> >>  +++++++++++++++++++++++++---------------- 1 file changed, 25
+> >> >>  insertions(+), 16 deletions(-)
+> >> >> 
+> >> >> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> >> >> index ad93231..b770f88 100644
+> >> >> --- a/drivers/spi/spi-s3c64xx.c
+> >> >> +++ b/drivers/spi/spi-s3c64xx.c
+> >> >> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq,
+> >> >> void *data)>>
+> >> >> 
+> >> >>  {
+> >> >>  
+> >> >>       struct s3c64xx_spi_driver_data *sdd = data;
+> >> >>       struct spi_master *spi = sdd->master;
+> >> >> 
+> >> >> -     unsigned int val;
+> >> >> +     unsigned int val, clr = 0;
+> >> >> 
+> >> >> -     val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
+> >> >> +     val = readl(sdd->regs + S3C64XX_SPI_STATUS);
+> >> >> 
+> >> >> -     val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
+> >> >> -             S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
+> >> >> -             S3C64XX_SPI_PND_TX_OVERRUN_CLR |
+> >> >> -             S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+> >> >> -
+> >> >> -     writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+> >> >> -
+> >> >> -     if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
+> >> >> +     if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
+> >> >> +             clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
+> >> >> 
+> >> >>               dev_err(&spi->dev, "RX overrun\n");
+> >> >> 
+> >> >> -     if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
+> >> >> +     }
+> >> >> +     if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
+> >> >> +             clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
+> >> >> 
+> >> >>               dev_err(&spi->dev, "RX underrun\n");
+> >> >> 
+> >> >> -     if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
+> >> >> +     }
+> >> >> +     if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
+> >> >> +             clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
+> >> >> 
+> >> >>               dev_err(&spi->dev, "TX overrun\n");
+> >> >> 
+> >> >> -     if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
+> >> >> +     }
+> >> >> +     if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
+> >> >> +             clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+> >> >> 
+> >> >>               dev_err(&spi->dev, "TX underrun\n");
+> >> >> 
+> >> >> +     }
+> >> >> +
+> >> >> +     /* Clear the pending irq by setting and then clearing it */
+> >> >> +     writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+> >> >> +     writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+> >> > 
+> >> > Wait, what?  clr & ~clr == 0   Always.  What are you actually
+> >> > trying
+> >> > to do here?
+> >> 
+> >> The user manual says, wirting 1 to the pending clear register clears
+> >> the interrupt (its not auto clear to 0). so i need to explicitly
+> >> reset
+> >> those bits thats what the 2nd write does
+> > 
+> > I have looked through user's manuals of different Samsung SoCs. All of
+> > them said that writing 1 to a bit clears the corresponding interrupt,
+> > but none of them contain any note that it must be manually cleared to
+> > 0.
+> What i meant was the clear pending bit will not clear automatically.
+> When I set the
+> clear pending bit, it remains set. This is a problem for the next
+> interrupt cycle.
 
-Ping, on this. Any issues merging this for 3.9?
+How did you check that it does not clear automatically?
 
-Kind regards
-Ulf Hansson
+> > In addition the expression
+> > 
+> > clr & ~clr
+> > 
+> > makes no sense, because it is equal to 0.
+> 
+> It makes sense, because we are not disturbing the interrupt pending
+> bit at position 0, which is a trailing clr bit.
+
+You either seem to misunderstand the problem I'm mentioning or not 
+understanding it at all.
+
+If you take a variable named clr, no matter what value it is set to, and 
+you AND it with bitwise negation of the same variable, you will get 0.
+
+See on this example:
+
+Bits:     7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
+         -------------------------------
+Values:   1 | 1 | 0 | 0 | 1 | 0 | 0 | 1
+         -------------------------------
+Negation: 0 | 0 | 1 | 1 | 0 | 1 | 1 | 0
+         -------------------------------
+AND:      0 | 0 | 0 | 0 | 0 | 0 | 0 | 0
+
+Now, can you see that (clr & ~clr) is the same as (0)?
+
+Best regards,
+Tomasz
