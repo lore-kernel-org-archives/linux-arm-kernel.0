@@ -1,97 +1,145 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 8 Feb 2013 09:29:33 +0200
-Subject: [PATCH 3/4] ARM: tegra: Unify board-dt-tegra{20,30}.c to tegra.c
+Date: Fri, 8 Feb 2013 09:29:34 +0200
+Subject: [PATCH 4/4] ARM: tegra: Restore USB/PCIE info in new DT board file
 In-Reply-To: <1360308574-19658-1-git-send-email-hdoyu@nvidia.com>
 References: <1360308574-19658-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1360308574-19658-4-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1360308574-19658-5-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refactored that Tegra{20,30,114} use the same board file.
+Mainly for the compatibility for the existing driver.
+This would be removed once new USB/PCIE DT supports come.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/mach-tegra/Makefile                       |    5 ++--
- .../arm/mach-tegra/{board-dt-tegra30.c => tegra.c} |   27 ++++++++++----------
- 2 files changed, 15 insertions(+), 17 deletions(-)
- rename arch/arm/mach-tegra/{board-dt-tegra30.c => tegra.c} (71%)
+ arch/arm/mach-tegra/tegra.c |   92 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 90 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 1a08ecd..ee866337 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -27,9 +27,8 @@ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
- obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
- obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
- 
--obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-dt-tegra20.o
--obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
--obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= board-dt-tegra30.o
-+obj-y					+= tegra.o
-+
- ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= cpuidle-tegra114.o
- endif
-diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/tegra.c
-similarity index 71%
-rename from arch/arm/mach-tegra/board-dt-tegra30.c
-rename to arch/arm/mach-tegra/tegra.c
-index 82cd85c..62ae39a 100644
---- a/arch/arm/mach-tegra/board-dt-tegra30.c
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index 62ae39a..82fea64 100644
+--- a/arch/arm/mach-tegra/tegra.c
 +++ b/arch/arm/mach-tegra/tegra.c
-@@ -1,14 +1,7 @@
- /*
-- * arch/arm/mach-tegra/board-dt-tegra30.c
-- *
-- * NVIDIA Tegra30 device tree board support
-+ * NVIDIA Tegra SoC device tree board support
-  *
-  * Copyright (C) 2011, 2013, NVIDIA Corporation
-- *
-- * Derived from:
-- *
-- * arch/arm/mach-tegra/board-dt-tegra20.c
-- *
-  * Copyright (C) 2010 Secret Lab Technologies, Ltd.
-  * Copyright (C) 2010 Google, Inc.
-  *
-@@ -37,25 +30,31 @@
+@@ -23,6 +23,8 @@
+ #include <linux/of_fdt.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_data/tegra_usb.h>
++#include <linux/usb/tegra_usb_phy.h>
+ 
+ #include <asm/mach/arch.h>
+ 
+@@ -30,9 +32,63 @@
  #include "common.h"
  #include "iomap.h"
  
--static void __init tegra30_dt_init(void)
-+static struct of_dev_auxdata tegra_auxdata_lookup[] __initdata = {
-+	{},
++#ifdef USB_EHCI_TEGRA
++static struct tegra_ulpi_config tegra_ehci2_ulpi_phy_config = {
++	.reset_gpio = -1,
++	.clk = "cdev2",
 +};
 +
-+static void __init tegra_dt_init(void)
++static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
++	{
++		.operating_mode = TEGRA_USB_OTG,
++		.power_down_on_bus_suspend = 1,
++		.vbus_gpio = -1,
++	},
++	{
++		.operating_mode = TEGRA_USB_HOST,
++		.power_down_on_bus_suspend = 1,
++		.vbus_gpio = -1,
++		.phy_config = &tegra_ehci2_ulpi_phy_config,
++	},
++	{
++		.operating_mode = TEGRA_USB_HOST,
++		.power_down_on_bus_suspend = 1,
++		.vbus_gpio = -1,
++	},
++};
++
+ static struct of_dev_auxdata tegra_auxdata_lookup[] __initdata = {
+-	{},
++	OF_DEV_AUXDATA("nvidia,tegra20-ehci", 0xc5000000, "tegra-ehci.0", &tegra_ehci_pdata[0]),
++	OF_DEV_AUXDATA("nvidia,tegra20-ehci", 0xc5004000, "tegra-ehci.1", &tegra_ehci_pdata[1]),
++	OF_DEV_AUXDATA("nvidia,tegra20-ehci", 0xC5008000, "tegra-ehci.2", &tegra_ehci_pdata[2]),
++	{}
+ };
++#else
++#define tegra_auxdata_lookup	NULL
++#endif
++
++#if defined(CONFIG_TEGRA_PCI) && defined(CONFIG_ARCH_TEGRA_2x_SOC)
++static void __init trimslice_init(void)
++{
++	int err;
++
++	err = tegra_pcie_init(true, true);
++	if (err)
++		pr_err("%s failed: %d\n", __func__, err);
++}
++static void __init harmony_init(void)
++{
++	harmony_pcie_init();
++}
++static void __init paz00_init(void)
++{
++	tegra_paz00_wifikill_init();
++}
++#else
++#define trimslice_init	NULL
++#define harmony_init	NULL
++#define paz00_init	NULL
++#endif
+ 
+ static void __init tegra_dt_init(void)
  {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     tegra_auxdata_lookup, NULL);
+@@ -40,6 +96,38 @@ static void __init tegra_dt_init(void)
+ 			     tegra_auxdata_lookup, NULL);
  }
  
--static const char *tegra30_dt_board_compat[] = {
-+static const char * const tegra_dt_board_compat[] = {
-+	"nvidia,tegra20",
++static void __init tegra_dt_init_late(void)
++{
++	int i;
++	struct {
++		const char *name;
++		void (*init)(void);
++	} board[] = {
++		{
++			.name = "compulab,trimslice",
++			.init = trimslice_init,
++		},
++		{
++			.name = "nvidia,harmony",
++			.init = harmony_init,
++		},
++		{
++			.name = "compal,paz00",
++			.init = paz00_init
++		},
++	};
++
++	tegra_init_late();
++
++	for (i = 0; i < ARRAY_SIZE(board); i++) {
++		if (of_machine_is_compatible(board[i].name)) {
++			if (board[i].init)
++				board[i].init();
++			break;
++		}
++	}
++}
++
+ static const char * const tegra_dt_board_compat[] = {
+ 	"nvidia,tegra20",
  	"nvidia,tegra30",
- 	"nvidia,tegra114",
- 	NULL
- };
- 
--DT_MACHINE_START(TEGRA30_DT, "NVIDIA Tegra30/114 (Flattened Device Tree)")
-+DT_MACHINE_START(TEGRA_DT, "NVIDIA Tegra SoC (Flattened Device Tree)")
- 	.smp		= smp_ops(tegra_smp_ops),
- 	.map_io		= tegra_map_common_io,
- 	.init_early	= tegra_init_early,
+@@ -54,7 +142,7 @@ DT_MACHINE_START(TEGRA_DT, "NVIDIA Tegra SoC (Flattened Device Tree)")
  	.init_irq	= tegra_dt_init_irq,
  	.init_time	= clocksource_of_init,
--	.init_machine	= tegra30_dt_init,
-+	.init_machine	= tegra_dt_init,
- 	.init_late	= tegra_init_late,
+ 	.init_machine	= tegra_dt_init,
+-	.init_late	= tegra_init_late,
++	.init_late	= tegra_dt_init_late,
  	.restart	= tegra_assert_system_reset,
--	.dt_compat	= tegra30_dt_board_compat,
-+	.dt_compat	= tegra_dt_board_compat,
+ 	.dt_compat	= tegra_dt_board_compat,
  MACHINE_END
 -- 
 1.7.9.5
