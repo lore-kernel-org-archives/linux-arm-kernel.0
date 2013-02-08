@@ -1,53 +1,50 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 8 Feb 2013 16:25:32 +0530
-Subject: [PATCH 3/3] SPEAr13xx_defconfig: Enable compilation using the
- latest
-In-Reply-To: <4d1cdf05ed312af2d8004496765f8fc82c27f2c1.1360317993.git.vijay.kumar@st.com>
-References: <cover.1360317993.git.vijay.kumar@st.com>
- <4d1cdf05ed312af2d8004496765f8fc82c27f2c1.1360317993.git.vijay.kumar@st.com>
-Message-ID: <CAKohponiqtj9zpox6qoTDpA3Fmw9tX7mpyJPv0S5mcTrrd=P3w@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 08 Feb 2013 12:06:44 +0100
+Subject: Build error: OMAP randconfig / mvebu
+In-Reply-To: <2213733.Wbjy3dFgom@wuerfel>
+References: <20130208100813.GN17833@n2100.arm.linux.org.uk>
+ <2213733.Wbjy3dFgom@wuerfel>
+Message-ID: <5114DC44.7000107@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 February 2013 16:16, Vijay Kumar Mishra <vijay.kumar@st.com> wrote:
-> This Patch is to enable CONFIG_AEABI option in kernel. Which basically adds
-> support for latest ARMABI (EABI).
->
-> It also include support for changes the kernel syscall calling convention to
+On 02/08/2013 11:45 AM, Arnd Bergmann wrote:
+> On Friday 08 February 2013 10:08:13 Russell King - ARM Linux wrote:
+>> Last night's OMAP4430SDP randconfig build failed with:
+>>
+>> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_smp_init_cpus':
+>> hotplug.c:(.init.text+0x70): undefined reference to `coherency_get_cpu_count'
+>> hotplug.c:(.init.text+0xb4): undefined reference to `armada_mpic_send_doorbell'
+>> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_smp_prepare_cpus':
+>> hotplug.c:(.init.text+0x254): undefined reference to `set_cpu_coherent'
+>> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_boot_secondary':
+>> hotplug.c:(.cpuinit.text+0x10): undefined reference to `armada_xp_boot_cpu'
+>> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_secondary_init':
+>> hotplug.c:(.cpuinit.text+0x2c): undefined reference to `armada_xp_mpic_smp_cpu_init'
+>> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_secondary_startup':
+>> hotplug.c:(.cpuinit.text+0x40): undefined reference to `ll_set_cpu_coherent'
+>>
+>> This seems to be because we ended up with CONFIG_ARCH_MVEBU=y but without
+>> CONFIG_MACH_ARMADA_370_XP being set - and because of OMAP, we have SMP
+>> and hotplug CPU enabled.
+>>
+>> Usual configs/logs available via the website.
+> 
+> Ok, I see. I suspect we are going to see a lot more randconfig failures
+> now with all the platforms that are becoming part of multiplatform.
+> 
+> mvebu maintainers: this one should be easy enough to fix. Anyone
+> submitting a patch?
 
-                                            changing
+I don't know what to do here, there is no point to build any of the files
+in mach-mvebu if no SoCs are selected. So either we force to have at least
+one SoCS selected if ARCH_MVEBU is selected, or we unselect  ARCH_MVEB if
+no SoCs are selected.
 
-> disambiguate both ABIs and allow for backward compatibility support.
->
-> Without this option the kernel crashes. Crash log is below:
->
-> Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000004
-> Exception stack(0xbf873f64 to 0xbf873fac)
-> 3f60:          00000020 804725b4 00000001 00000000 bf872000 80498684 803308bc
-> 3f80: 80474fe8 bf872000 412fc091 00000000 bf873fb8 bf873fbc bf873fac 80009c50
-> 3fa0: 80009c54 60000113 ffffffff
->  r7:bf873f98 r6:ffffffff r5:60000113 r4:80009c54
-> [<80009c24>] (default_idle+0x0/0x38) from [<80009e24>] (cpu_idle+0xac/0xf0)
-> [<80009d78>] (cpu_idle+0x0/0xf0) from [<803277ec>]
-> (secondary_start_kernel+0xec/0x10c)
->  r8:0000406a r7:80498950 r6:10c03c7d r5:00000001 r4:80478bd0
-> [<80327700>] (secondary_start_kernel+0x0/0x10c) from [<00326dc8>] (0x326dc8)
->  r5:0
-> ---
->  arch/arm/configs/spear13xx_defconfig |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
-> index 1b5ceff..4e2866d 100644
-> --- a/arch/arm/configs/spear13xx_defconfig
-> +++ b/arch/arm/configs/spear13xx_defconfig
-> @@ -15,6 +15,7 @@ CONFIG_SMP=y
->  # CONFIG_SMP_ON_UP is not set
->  # CONFIG_ARM_CPU_TOPOLOGY is not set
->  CONFIG_VMSPLIT_2G=y
-> +CONFIG_AEABI=y
->  CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_ARM_ATAG_DTB_COMPAT=y
->  CONFIG_BINFMT_MISC=y
+Gregory
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
