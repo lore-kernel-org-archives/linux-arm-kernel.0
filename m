@@ -1,29 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Feb 2013 18:32:24 +0000 (UTC)
-Subject: OMAP baseline test results for v3.8-rc6
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC071DC@DBDE01.ent.ti.com>
-References: <alpine.DEB.2.00.1302062333270.12769@utopia.booyaka.com>
- <20130207083217.GA15462@arwen.pp.htv.fi>
- <79CD15C6BA57404B839C016229A409A83EC06CEA@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1302081306230.11464@utopia.booyaka.com>
- <alpine.DEB.2.00.1302081332200.11464@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EC071DC@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1302081830310.28008@utopia.booyaka.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 8 Feb 2013 13:40:10 -0500 (EST)
+Subject: [PATCH RESEND] ARM: sched: correct update_sched_clock()
+In-Reply-To: <20130208150317.GT17833@n2100.arm.linux.org.uk>
+References: <1360128076-8555-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <CACRpkdbwoExxKbbvBKpt_Wh9KsgCXQW566N-0BaeL3oGY8pvLg@mail.gmail.com>
+ <20130206163355.GH17833@n2100.arm.linux.org.uk>
+ <20130208065125.GA20440@lge.com>
+ <20130208150317.GT17833@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1302081331000.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 8 Feb 2013, Russell King - ARM Linux wrote:
 
-By the way, here's what I used for v3.7-rc8, which seemed to work okay:
+> On Fri, Feb 08, 2013 at 03:51:25PM +0900, Joonsoo Kim wrote:
+> > I try to put it into patch tracker, but I fail to put it.
+> > I use following command.
+> > 
+> > git send-email --to patches at arm.linux.org.uk 0001-ARM-sched-correct~~~~~
+> > 
+> > Am I wrong?
+> > Could you teach me how to put patch into your patch tracker?
+> > I already read "help" on your website, but I can't find any stuff for
+> > "git send-email".
+> 
+> I've never used git to send email, so I'm afraid I can't help with that.
+> Maybe someone with more experience with sending email from git can
+> comment?
 
-http://www.pwsan.com/omap/testlogs/test_v3.7-rc8/20121204220128/build/am33xx_only/
+The commit text for the patch needs to contain the following 2 lines at 
+the very bottom in order to match the patch system's expectations:
 
-and here's the boot log:
+PATCH FOLLOWS
+KernelVersion: v3.8
 
-http://www.pwsan.com/omap/testlogs/test_v3.7-rc8/20121204220128/boot/am335xbone/am335xbone_log.txt
+The KernelVersion value needs to be adjusted of course.
 
-Note of course that there are some Kconfig changes between v3.7-rc8 and 
-v3.8-rcX, so it's possible that the problem could be in those changes, of 
-course.
+Note: I never tried it myself but it ought to work.
 
-
-- Paul
+Nicolas
