@@ -1,88 +1,92 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 08 Feb 2013 10:58:40 +0800
-Subject: [PATCH 05/10] USB: EHCI: make ehci-atmel a separate driver
-In-Reply-To: <5113e60e.c84e420a.08c3.ffffbeda@mx.google.com>
-References: <yes> <1360258447-27247-1-git-send-email-yes>
- <5113e60e.c84e420a.08c3.ffffbeda@mx.google.com>
-Message-ID: <511469E0.1020307@atmel.com>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Fri, 8 Feb 2013 03:04:08 +0000
+Subject: [PATCH V2 2/2] ARM: davinci: restart: fix wdt to machine
+ restart with DT
+In-Reply-To: <5113EF59.80508@ti.com>
+References: <1360123204-9978-1-git-send-email-anilkumar.v@ti.com>
+ <1360123204-9978-3-git-send-email-anilkumar.v@ti.com> <5113EF59.80508@ti.com>
+Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412C59EA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manjunath Goudar,
-   I test this patch based on linux master branch, the commit id is: 
-6bacaa9ddacb71c691d32c678d37bc59ffc71fac. (I am not sure this is the 
-right place for testing).
-   First, it has an compile error as following. After fix it, and 
-tested, the EHCI doesn't work.
----<8---
-drivers/usb/host/ehci-atmel.c: In function 'ehci_atmel_drv_remove':
-drivers/usb/host/ehci-atmel.c:167: error: implicit declaration of 
-function 'ehci_shutdown'
---->8---
+Hi Sekhar,
 
-And a little code style comments as following.
+Thanks for the review.
 
-On 2/8/2013 1:34, manjunath.goudar at linaro.org wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
->
-> Separate the Atmel host controller driver from ehci-hcd host code
-> into its own driver module.
->
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Andrew Victor <linux@maxim.org.za>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->   drivers/usb/host/Kconfig      |    7 ++++
->   drivers/usb/host/Makefile     |    1 +
->   drivers/usb/host/ehci-atmel.c |   78 ++++++++++++++++++++++-------------------
->   drivers/usb/host/ehci-hcd.c   |    6 +---
->   4 files changed, 51 insertions(+), 41 deletions(-)
->
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 3689b7b..5a13f9d 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -176,6 +176,13 @@ config USB_EHCI_HCD_ORION
->           ---help---
->             Enables support for the on-chip EHCI controller on
->             Morvell Orion chips.
+On Thu, Feb 07, 2013 at 23:45:53, Nori, Sekhar wrote:
+> 
+> On 2/6/2013 9:30 AM, Kumar, Anil wrote:
+> > In non DT case da8xx_register_watchdog() is called to register platform device
+> > "da8xx_wdt_device" by board file. But in DT case it is not called and wdt
+> > device get registered via wdt DT node.
+> > 
+> > Currently code is passing platform device "da8xx_wdt_device" in
+> > "davinci_watchdog_reset" function in both DT and non DT case and that
+> > leads to crash in DT boot.
+> > 
+> > Update restart function to make it generic DaVinci machine restart
+> 
+> s/DaVinci/da8xx. Also, subject can simply be "ARM: davinci: da850 DT:
+> add support for machine reboot" since reboot never worked with DT
+> before, "fix" isn't really appropriate.
 
-Need blank line here.
+ok
 
-> +config USB_EHCI_HCD_AT91
-> +        tristate  "Support for Atmel on-chip EHCI USB controller"
-> +        depends on USB_EHCI_HCD && ARCH_AT91
-> +        default y
-> +        ---help---
-> +          Enables support for the on-chip EHCI controller on
-> +          Atmel chips.
->
->   config USB_EHCI_MSM
->   	bool "Support for MSM on-chip EHCI USB controller"
+> 
+> > in case of DT and non DT boot.
+> > 
+> > Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
+> > ---
+> > :100644 100644 2d5502d... 1df68fd... M	arch/arm/mach-davinci/devices-da8xx.c
+> > :100644 100644 700d311... ef9f70e... M	arch/arm/mach-davinci/include/mach/da8xx.h
+> >  arch/arm/mach-davinci/devices-da8xx.c      |   14 ++++++++++++--
+> >  arch/arm/mach-davinci/include/mach/da8xx.h |    1 -
+> >  2 files changed, 12 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> > index 2d5502d..1df68fd 100644
+> > --- a/arch/arm/mach-davinci/devices-da8xx.c
+> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> > @@ -359,7 +359,7 @@ static struct resource da8xx_watchdog_resources[] = {
+> >  	},
+> >  };
+> >  
+> > -struct platform_device da8xx_wdt_device = {
+> > +static struct platform_device da8xx_wdt_device = {
+> 
+> Making of da8xx_wdt_device static should find a mention in description.
 
-[snip]
+Ok, 
+I made da8xx_wdt_device structure static as it is used only
+in file. I will update description for this.
 
-> +static void __exit ehci_atmel_cleanup(void)
-> +{
-> +	platform_driver_unregister(&ehci_atmel_driver);
-> +}
-> +module_exit(ehci_atmel_cleanup);
-> +
-> +MODULE_DESCRIPTION(DRIVER_DESC);
-> +
-> +MODULE_ALIAS("platform:ehci-atmel");
-> +MODULE_AUTHOR("Nicolas Ferre");
-> +MODULE_LICENSE("GPL");
-> +
+> 
+> >  	.name		= "watchdog",
+> >  	.id		= -1,
+> >  	.num_resources	= ARRAY_SIZE(da8xx_watchdog_resources),
+> > @@ -368,7 +368,17 @@ struct platform_device da8xx_wdt_device = {
+> >  
+> >  void da8xx_restart(char mode, const char *cmd)
+> >  {
+> > -	davinci_watchdog_reset(&da8xx_wdt_device);
+> > +	struct device *dev = NULL;
+> > +	struct platform_device *wdt_device = NULL;
+> 
+> No need to initialize these variables here.
 
-Remove the blank line here. As to it is the EOF.
+Ok,
+I think no need to define wdt_device, can be used as
 
-Best Regards,
-Bo Shen
+davinci_watchdog_reset(to_platform_device(dev));
+
+> 
+> > +
+> > +	dev = bus_find_device_by_name(&platform_bus_type, NULL, "watchdog");
+> > +	if (!dev) {
+> > +		pr_err("wdt device not found to machine reboot\n");
+> 
+> Rather: "%s: failed to find watchdog device", __func__
+
+ok
+Thanks,
+Anil
