@@ -1,113 +1,160 @@
-From: dbrignoli@audioscience.com (Delio Brignoli)
-Date: Fri,  8 Feb 2013 10:44:24 +0100
-Subject: [PATCH 1/1] ARM: OMAP: ASI1230: Create board support and enable build
- for ASI1230
-In-Reply-To: <1360316664-17210-1-git-send-email-dbrignoli@audioscience.com>
-References: <1360316664-17210-1-git-send-email-dbrignoli@audioscience.com>
-Message-ID: <1360316664-17210-2-git-send-email-dbrignoli@audioscience.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Fri, 8 Feb 2013 10:04:04 +0000
+Subject: [PATCH v2 2/3] mmc: davinci_mmc: add DT support
+In-Reply-To: <20130208093754.GA27859@e106331-lin.cambridge.arm.com>
+References: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
+ <1360223825-23929-3-git-send-email-prakash.pm@ti.com>
+ <20130207104656.GE16987@e106331-lin.cambridge.arm.com>
+ <A73F36158E33644199EB82C5EC81C7BC3EA465FE@DBDE01.ent.ti.com>
+ <20130208093754.GA27859@e106331-lin.cambridge.arm.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA466AF@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds minimal support and build configuration for ASI1230
+Hi,
 
-Signed-off-by: Delio Brignoli <dbrignoli@audioscience.com>
----
- arch/arm/mach-omap2/Kconfig                   |    5 +++
- arch/arm/mach-omap2/Makefile                  |    1 +
- arch/arm/mach-omap2/board-asi1230.c           |   44 +++++++++++++++++++++++++
- arch/arm/mach-omap2/include/mach/uncompress.h |    1 +
- 4 files changed, 51 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/board-asi1230.c
+On Fri, Feb 08, 2013 at 15:07:54, Mark Rutland wrote:
+> Hi,
+> 
+> [...]
+> 
+> > > > diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> > > > new file mode 100644
+> > > > index 0000000..6717ab1
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> > > > @@ -0,0 +1,30 @@
+> > > > +* TI Highspeed MMC host controller for DaVinci
+> > > > +
+> > > > +The Highspeed MMC Host Controller on TI DaVinci family
+> > > > +provides an interface for MMC, SD and SDIO types of memory cards.
+> > > > +
+> > > > +This file documents the properties used by the davinci_mmc driver.
+> > > > +
+> > > > +Required properties:
+> > > > +- compatible:
+> > > > + Should be "ti,davinci-mmc-da830": for da830, da850, dm365
+> > > > + Should be "ti,davinci-mmc-dm355": for dm355, dm644x
+> > > > +
+> > > > +Optional properties:
+> > > > +- bus-width: Number of data lines, can be <4>, or <8>, default <1>
+> > > > +- max-frequency: Maximum operating clock frequency, default 25MHz.
+> > > > +- mmc-cap-mmc-highspeed: Indicates support for MMC in high speed mode
+> > > > +- mmc-cap-sd-highspeed: Indicates support for SD in high speed mode
+> 
+> [...]
+> 
+> 
+> > > > +static struct davinci_mmc_config
+> > > > +	*mmc_parse_pdata(struct platform_device *pdev)
+> > > >  {
+> > > > +	struct device_node *np;
+> > > >  	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
+> > > > +	const struct of_device_id *match =
+> > > > +		of_match_device(of_match_ptr(davinci_mmc_dt_ids), &pdev->dev);
+> > > > +	u32 data;
+> > > > +
+> > > > +	np = pdev->dev.of_node;
+> > > > +	if (!np)
+> > > > +		return pdata;
+> > > > +
+> > > > +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> > > > +	if (!pdata) {
+> > > > +		dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
+> > > > +		goto nodata;
+> > > > +	}
+> > > > +
+> > > > +	if (match->data)
+> > > > +		pdata->version = (u8)((int)match->data);
+> > > > +
+> > > > +	of_property_read_u32(np, "max-frequency", &pdata->max_freq);
+> > > > +	if (!pdata->max_freq)
+> > > > +		dev_info(&pdev->dev, "'max-frequency' property not specified, defaulting to 25MHz\n");
+> > > > +
+> > > > +	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
+> > > > +		pdata->caps |= MMC_CAP_MMC_HIGHSPEED;
+> > > > +	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
+> > > > +		pdata->caps |= MMC_CAP_SD_HIGHSPEED;
+> > > 
+> > > If these aren't derivable from max-frequency, you could use
+> > > of_property_read_bool to make this clearer.
+> > > 
+> > 
+> > Correct, I will decide these based on max-frequency.
+> > 
+> > > > +
+> > > > +	of_property_read_u32(np, "bus-width", &data);
+> > > > +	switch (data) {
+> > > > +	case 0:
+> > > 
+> > > Judging by the binding doc, should this be 1 rather than 0?
+> > > 
+> > 
+> > By default driver comes up in 4 bit mode when bus-width is not specified.
+> > Bus-width is set to 1 bit for invalid bus-widths. Below are the cases
+> > when bus-width 0 or 4, bus-width is set to 4bit mode
+> > When bus-width is 8, bus-width is set to 8 bit mode
+> 
+> Why is 0 a special value that means 4? Why not just use 4?
+> 
+> Here you just assign 0 to pdata->wires.
+> 
+> I see the current version of the driver handles this specially in
+> davinci_mmcsd_probe, but I don't see why this should leak into the binding.
+> 
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 41b581f..68cc25b 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -359,6 +359,11 @@ config MACH_TI8148EVM
- 	depends on SOC_TI81XX
- 	default y
- 
-+config MACH_ASI1230
-+	bool "AudioScience ASI1230"
-+	depends on SOC_TI81XX
-+	default y
-+
- config MACH_OMAP_4430SDP
- 	bool "OMAP 4430 SDP board"
- 	default y
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 947cafe..7f164f4 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -261,6 +261,7 @@ obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
- obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o
- obj-$(CONFIG_MACH_TI8168EVM)		+= board-ti8168evm.o
- obj-$(CONFIG_MACH_TI8148EVM)		+= board-ti8168evm.o
-+obj-$(CONFIG_MACH_ASI1230)		+= board-asi1230.o
- 
- # Platform specific device init code
- 
-diff --git a/arch/arm/mach-omap2/board-asi1230.c b/arch/arm/mach-omap2/board-asi1230.c
-new file mode 100644
-index 0000000..3de1cd8
---- /dev/null
-+++ b/arch/arm/mach-omap2/board-asi1230.c
-@@ -0,0 +1,44 @@
-+/*
-+ * board-asi1230.c (ASI1230)
-+ *
-+ * Copyright (C) 2013 AudioScience, Inc. - http://www.audioscience.com/
-+ * Author: Delio Brignoli <dbrignoli@audioscience.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/usb/musb.h>
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+
-+#include "common.h"
-+
-+static void __init asi1230_init(void)
-+{
-+	omap_serial_init();
-+}
-+
-+MACHINE_START(ASI1230, "asi1230")
-+	/* Maintainer: AudioScience Inc */
-+	.atag_offset	= 0x100,
-+	.map_io		= ti81xx_map_io,
-+	.init_early	= ti81xx_init_early,
-+	.init_irq	= ti81xx_init_irq,
-+	.timer		= &omap3_timer,
-+	.init_machine	= asi1230_init,
-+	.init_late	= ti81xx_init_late,
-+	.restart	= omap44xx_restart,
-+MACHINE_END
-diff --git a/arch/arm/mach-omap2/include/mach/uncompress.h b/arch/arm/mach-omap2/include/mach/uncompress.h
-index 8e3546d..9c5aad6 100644
---- a/arch/arm/mach-omap2/include/mach/uncompress.h
-+++ b/arch/arm/mach-omap2/include/mach/uncompress.h
-@@ -164,6 +164,7 @@ static inline void arch_decomp_setup(void)
- 
- 		/* TI8148 base boards using UART1 */
- 		DEBUG_LL_TI81XX(1, ti8148evm);
-+		DEBUG_LL_TI81XX(1, asi1230);
- 
- 		/* AM33XX base boards using UART1 */
- 		DEBUG_LL_AM33XX(1, am335xevm);
--- 
-1.7.0.4
+Yes, I was trying to push in current driver behavior into binding documentation.
+
+> What I was originally trying to get at is that the binding says 8, 4, and 1 are
+> acceptable values, but you check the cases 8, 4, or 0. So you're accepting
+> something not documented, and producing a warning in a valid case (1).
+> 
+
+Valid point.
+
+> > 
+> > I thought that if somebody specifies bus-width as 2, 3, 5, 6, 7..., then
+> > it should be defaulted to 1 bit mode, so I specified it as 1 bit in binding doc.
+> 
+> If they specify something invalid, falling back to a sane value with a warning
+> sounds good.
+> 
+
+True.
+
+> > But I feel that a person who is editing dts file will not make such a mistake.
+> > I will change binding document to default as 4 bit mode.
+> 
+> There have been and inevitably will be plenty of errors in dts files. I think
+> it'd be good to provide a warning and either use a value that's guaranteed to
+> work, or bail out if that can't be done.
+> 
+> If it's always valid to use 1 data line even if the hardware has more, I think
+> falling back to 1 makes more sense, as it'd be guaranteed to work.
+> 
+
+I completely agree with you, thanks for your inputs.
+Will add valid case 1:
+
+Thanks,
+Prakash
+
+> > 
+> > > > +	case 4:
+> > > > +	case 8:
+> > > > +		pdata->wires = data;
+> > > > +		break;
+> > > > +	default:
+> > > > +		pdata->wires = 1;
+> > > > +		dev_info(&pdev->dev, "Unsupported buswidth, defaulting to 1 bit\n");
+> > > > +	}
+> > > > +nodata:
+> > > > +	return pdata;
+> > > > +}
+> 
+> With the first case changed to "case 1:", this block makes sense to me.
+> 
+> Thanks,
+> Mark.
+> 
+> 
