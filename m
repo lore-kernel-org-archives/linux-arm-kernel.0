@@ -1,92 +1,122 @@
 From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Fri, 8 Feb 2013 03:04:08 +0000
-Subject: [PATCH V2 2/2] ARM: davinci: restart: fix wdt to machine
- restart with DT
-In-Reply-To: <5113EF59.80508@ti.com>
-References: <1360123204-9978-1-git-send-email-anilkumar.v@ti.com>
- <1360123204-9978-3-git-send-email-anilkumar.v@ti.com> <5113EF59.80508@ti.com>
-Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412C59EA@DBDE01.ent.ti.com>
+Date: Fri, 8 Feb 2013 03:19:20 +0000
+Subject: [PATCH 3/3] ARM: at91: add MPA 1600 DT board
+In-Reply-To: <1360286756-29705-4-git-send-email-manabian@gmail.com>
+References: <1360286756-29705-1-git-send-email-manabian@gmail.com>
+ <1360286756-29705-4-git-send-email-manabian@gmail.com>
+Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412C5A08@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
-
-Thanks for the review.
-
-On Thu, Feb 07, 2013 at 23:45:53, Nori, Sekhar wrote:
+On Fri, Feb 08, 2013 at 06:55:56, Joachim Eastwood wrote:
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile    |  1 +
+>  arch/arm/boot/dts/mpa1600.dts | 71 +++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 72 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mpa1600.dts
 > 
-> On 2/6/2013 9:30 AM, Kumar, Anil wrote:
-> > In non DT case da8xx_register_watchdog() is called to register platform device
-> > "da8xx_wdt_device" by board file. But in DT case it is not called and wdt
-> > device get registered via wdt DT node.
-> > 
-> > Currently code is passing platform device "da8xx_wdt_device" in
-> > "davinci_watchdog_reset" function in both DT and non DT case and that
-> > leads to crash in DT boot.
-> > 
-> > Update restart function to make it generic DaVinci machine restart
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 5ebb44f..8bfb5f3 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -3,6 +3,7 @@ ifeq ($(CONFIG_OF),y)
+>  # Keep at91 dtb files sorted alphabetically for each SoC
+>  # rm9200
+>  dtb-$(CONFIG_ARCH_AT91) += at91rm9200ek.dtb
+> +dtb-$(CONFIG_ARCH_AT91) += mpa1600.dtb
+>  # sam9260
+>  dtb-$(CONFIG_ARCH_AT91) += animeo_ip.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += aks-cdu.dtb
+> diff --git a/arch/arm/boot/dts/mpa1600.dts b/arch/arm/boot/dts/mpa1600.dts
+> new file mode 100644
+> index 0000000..927972a
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mpa1600.dts
+> @@ -0,0 +1,71 @@
+> +/*
+> + * mpa1600.dts - Device Tree file for Phontech MPA 1600
+> + *
+> + *  Copyright (C) 2013 Joachim Eastwood <manabian@gmail.com>
+> + *
+> + * Licensed under GPLv2 only
+> + */
+> +/dts-v1/;
+> +/include/ "at91rm9200.dtsi"
+> +
+> +/ {
+> +	model = "Phontech MPA 1600";
+> +	compatible = "phontech,mpa1600", "atmel,at91rm9200";
+> +
+> +	memory {
+> +		reg = <0x20000000 0x4000000>;
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		main_clock: clock at 0 {
+> +			compatible = "atmel,osc", "fixed-clock";
+> +			clock-frequency = <18432000>;
+> +		};
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			dbgu: serial at fffff200 {
+> +				status = "okay";
+> +			};
+> +
+> +			macb0: ethernet at fffbc000 {
+> +				phy-mode = "rmii";
+> +				status = "okay";
+> +			};
+> +
+> +			ssc0: ssc at fffd0000 {
+> +				status = "okay";
+> +			};
+> +
+> +			ssc1: ssc at fffd4000 {
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		usb0: ohci at 00300000 {
+> +			num-ports = <1>;
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	i2c at 0 {
+> +		status = "okay";
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+
+No need to use these address-cells and size-cells properties as 
+child DT node is not Using. Please see the discussion on link
+
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg15590.html 
+
+> +
+> +		monitor_mute {
+> +			label = "Monitor mute";
+> +			gpios = <&pioC 1 1>;
+> +			linux,code = <113>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.0
 > 
-> s/DaVinci/da8xx. Also, subject can simply be "ARM: davinci: da850 DT:
-> add support for machine reboot" since reboot never worked with DT
-> before, "fix" isn't really appropriate.
-
-ok
-
 > 
-> > in case of DT and non DT boot.
-> > 
-> > Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
-> > ---
-> > :100644 100644 2d5502d... 1df68fd... M	arch/arm/mach-davinci/devices-da8xx.c
-> > :100644 100644 700d311... ef9f70e... M	arch/arm/mach-davinci/include/mach/da8xx.h
-> >  arch/arm/mach-davinci/devices-da8xx.c      |   14 ++++++++++++--
-> >  arch/arm/mach-davinci/include/mach/da8xx.h |    1 -
-> >  2 files changed, 12 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-> > index 2d5502d..1df68fd 100644
-> > --- a/arch/arm/mach-davinci/devices-da8xx.c
-> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> > @@ -359,7 +359,7 @@ static struct resource da8xx_watchdog_resources[] = {
-> >  	},
-> >  };
-> >  
-> > -struct platform_device da8xx_wdt_device = {
-> > +static struct platform_device da8xx_wdt_device = {
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> Making of da8xx_wdt_device static should find a mention in description.
-
-Ok, 
-I made da8xx_wdt_device structure static as it is used only
-in file. I will update description for this.
-
-> 
-> >  	.name		= "watchdog",
-> >  	.id		= -1,
-> >  	.num_resources	= ARRAY_SIZE(da8xx_watchdog_resources),
-> > @@ -368,7 +368,17 @@ struct platform_device da8xx_wdt_device = {
-> >  
-> >  void da8xx_restart(char mode, const char *cmd)
-> >  {
-> > -	davinci_watchdog_reset(&da8xx_wdt_device);
-> > +	struct device *dev = NULL;
-> > +	struct platform_device *wdt_device = NULL;
-> 
-> No need to initialize these variables here.
-
-Ok,
-I think no need to define wdt_device, can be used as
-
-davinci_watchdog_reset(to_platform_device(dev));
-
-> 
-> > +
-> > +	dev = bus_find_device_by_name(&platform_bus_type, NULL, "watchdog");
-> > +	if (!dev) {
-> > +		pr_err("wdt device not found to machine reboot\n");
-> 
-> Rather: "%s: failed to find watchdog device", __func__
-
-ok
-Thanks,
-Anil
