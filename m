@@ -1,25 +1,76 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 8 Feb 2013 09:53:56 +0200
-Subject: [PATCH V2 1/2] ARM: dts: OMAP2+: Add SDMA controller bindings
- and nodes
-In-Reply-To: <1360285506-22354-2-git-send-email-jon-hunter@ti.com>
+Date: Fri, 8 Feb 2013 09:55:52 +0200
+Subject: [PATCH V2 2/2] dmaengine: OMAP: Register SDMA controller with
+ Device Tree DMA driver
+In-Reply-To: <1360285506-22354-3-git-send-email-jon-hunter@ti.com>
 References: <1360285506-22354-1-git-send-email-jon-hunter@ti.com>
- <1360285506-22354-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <20130208075356.GC21879@arwen.pp.htv.fi>
+ <1360285506-22354-3-git-send-email-jon-hunter@ti.com>
+Message-ID: <20130208075552.GD21879@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 07:05:05PM -0600, Jon Hunter wrote:
-> Add SDMA controller binding for OMAP2+ devices and populate DMA client
-> information for SPI and MMC periperhal on OMAP3+ devices. Please note
-> that OMAP24xx devices do not have SPI and MMC bindings available yet and
-> so DMA client information is not populated.
+Hi,
+
+On Thu, Feb 07, 2013 at 07:05:06PM -0600, Jon Hunter wrote:
+> If the device-tree blob is present during boot, then register the SDMA
+> controller with the device-tree DMA driver so that we can use device-tree
+> to look-up DMA client information.
 > 
 > Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
-already given before, but here you go:
+single comment below, other than that:
 
 Reviewed-by: Felipe Balbi <balbi@ti.com>
+
+> ---
+>  arch/arm/mach-omap2/dma.c |    4 ++++
+>  drivers/dma/omap-dma.c    |   37 +++++++++++++++++++++++++++++++++++--
+>  2 files changed, 39 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
+> index 5cd8d76..71dadff 100644
+> --- a/arch/arm/mach-omap2/dma.c
+> +++ b/arch/arm/mach-omap2/dma.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/init.h>
+>  #include <linux/device.h>
+>  #include <linux/dma-mapping.h>
+> +#include <linux/of.h>
+>  #include <linux/omap-dma.h>
+>  
+>  #include "soc.h"
+> @@ -304,6 +305,9 @@ static int __init omap2_system_dma_init(void)
+>  	if (res)
+>  		return res;
+>  
+> +	if (of_have_populated_dt())
+> +		return res;
+> +
+>  	pdev = platform_device_register_full(&omap_dma_dev_info);
+>  	if (IS_ERR(pdev))
+>  		return PTR_ERR(pdev);
+> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> index c4b4fd2..0067bd0 100644
+> --- a/drivers/dma/omap-dma.c
+> +++ b/drivers/dma/omap-dma.c
+> @@ -16,6 +16,8 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/spinlock.h>
+> +#include <linux/of_dma.h>
+> +#include <linux/of_device.h>
+>  
+>  #include "virt-dma.h"
+>  
+> @@ -67,6 +69,8 @@ static const unsigned es_bytes[] = {
+>  	[OMAP_DMA_DATA_TYPE_S32] = 4,
+>  };
+>  
+> +static struct of_dma_filter_info info;
+
+Arnd also mentioned that since all fields belonging to this are
+constant, you could statically initialize them here. He also mentioned
+you should call this by a more descriptive name:
 
 -- 
 balbi
@@ -29,4 +80,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/5b822ef6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/40ae99ac/attachment.sig>
