@@ -1,897 +1,284 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Fri, 8 Feb 2013 14:41:49 -0300
-Subject: [PATCH 1/3] clk: arm: sunxi: Add a new clock driver for sunxi SOCs
-In-Reply-To: <5114E27E.2020404@free-electrons.com>
-References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
- <1358835176-7197-2-git-send-email-emilio@elopez.com.ar>
- <5114E27E.2020404@free-electrons.com>
-Message-ID: <BLU0-SMTP6274B9C7079757BC8006988A050@phx.gbl>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 8 Feb 2013 17:42:13 +0000 (UTC)
+Subject: [PATCH 03/15] ARM: OMAP3xxx: hwmod: Convert SHAM crypto device
+ data to hwmod
+In-Reply-To: <1356107295-11121-4-git-send-email-mgreer@animalcreek.com>
+References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
+ <1356107295-11121-4-git-send-email-mgreer@animalcreek.com>
+Message-ID: <alpine.DEB.2.00.1302081630150.28008@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Gregory,
+Hi Mark,
 
-El 08/02/13 08:33, Gregory CLEMENT escribi?:
-> Hi Emilio,
+On Fri, 21 Dec 2012, Mark A. Greer wrote:
+
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
 > 
-> This is the last part of my review, I didn't takt time to review the
-> whole patch the last time. As usual, my comments are inline
+> Convert the device data for the OMAP3 SHAM2 (SHA1/MD5) crypto IP
+> from explicit platform_data to hwmod.
 > 
-> On 01/22/2013 07:12 AM, Emilio L?pez wrote:
-> 
->> This commit implements the base CPU clocks for sunxi devices. It has
->> been tested using a slightly modified cpufreq driver from the
->> linux-sunxi 3.0 tree.
->>
->> Additionally, document the new bindings introduced by this patch, and drop
->> the (now unused) old sunxi clock driver.
->>
->> Idling:
->>     / # find /sys/kernel/debug/clk -name clk_rate -print -exec cat {} \;
->>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/ahb/apb0/clk_rate
->>     30000000
->>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/ahb/clk_rate
->>     60000000
->>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/clk_rate
->>     60000000
->>     /sys/kernel/debug/clk/osc24M/pll1/cpu/clk_rate
->>     60000000
->>     /sys/kernel/debug/clk/osc24M/pll1/clk_rate
->>     60000000
->>     /sys/kernel/debug/clk/osc24M/clk_rate
->>     24000000
->>     /sys/kernel/debug/clk/osc32k/clk_rate
->>     32768
->>
->> After "yes >/dev/null &":
->>     / # find /sys/kernel/debug/clk -name clk_rate -print -exec cat {} \;
->>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/ahb/apb0/clk_rate
->>     84000000
->>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/ahb/clk_rate
->>     168000000
->>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/clk_rate
->>     336000000
->>     /sys/kernel/debug/clk/osc24M/pll1/cpu/clk_rate
->>     1008000000
->>     /sys/kernel/debug/clk/osc24M/pll1/clk_rate
->>     1008000000
->>     /sys/kernel/debug/clk/osc24M/clk_rate
->>     24000000
->>     /sys/kernel/debug/clk/osc32k/clk_rate
->>     32768
->>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt |  47 ++++
->>  drivers/clk/Makefile                              |   2 +-
->>  drivers/clk/clk-sunxi.c                           |  30 ---
->>  drivers/clk/sunxi/Makefile                        |   5 +
->>  drivers/clk/sunxi/clk-factors.c                   | 175 ++++++++++++++
->>  drivers/clk/sunxi/clk-factors.h                   |  25 ++
->>  drivers/clk/sunxi/clk-fixed-gate.c                | 152 +++++++++++++
->>  drivers/clk/sunxi/clk-fixed-gate.h                |  13 ++
->>  drivers/clk/sunxi/clk-sunxi.c                     | 265 ++++++++++++++++++++++
->>  9 files changed, 683 insertions(+), 31 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/sunxi.txt
->>  delete mode 100644 drivers/clk/clk-sunxi.c
->>  create mode 100644 drivers/clk/sunxi/Makefile
->>  create mode 100644 drivers/clk/sunxi/clk-factors.c
->>  create mode 100644 drivers/clk/sunxi/clk-factors.h
->>  create mode 100644 drivers/clk/sunxi/clk-fixed-gate.c
->>  create mode 100644 drivers/clk/sunxi/clk-fixed-gate.h
->>  create mode 100644 drivers/clk/sunxi/clk-sunxi.c
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> new file mode 100644
->> index 0000000..446c5ca
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -0,0 +1,47 @@
->> +Device Tree Clock bindings for arch-sunxi
->> +
->> +This binding uses the common clock binding[1].
->> +
->> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->> +
->> +Required properties:
->> +- compatible : shall be one of the following:
->> +	"allwinner,sunxi-osc-clk" - for a gatable oscillator
->> +	"allwinner,sunxi-pll1-clk" - for the main PLL clock
->> +	"allwinner,sunxi-cpu-clk" - for the CPU multiplexer clock
->> +	"allwinner,sunxi-axi-clk" - for the sunxi AXI clock
->> +	"allwinner,sunxi-ahb-clk" - for the sunxi AHB clock
->> +	"allwinner,sunxi-apb0-clk" - for the sunxi APB0 clock
->> +
->> +Required properties for all clocks:
->> +- reg : shall be the control register address for the clock.
->> +- clocks : shall be the input parent clock(s) phandle for the clock, except for
->> +	the root gatable oscillator clock where it is not present
->> +- #clock-cells : from common clock binding; shall be set to 0.
->> +
->> +Additionally, the gatable oscillator clock requires:
->> +- clock-frequency : shall be the frequency of the oscillator.
->> +
->> +
->> +For example:
->> +
->> +osc24M: osc24M {
->> +	#clock-cells = <0>;
->> +	compatible = "allwinner,sunxi-osc-clk";
->> +	reg = <0x01c20050 0x4>;
->> +	clock-frequency = <24000000>;
->> +};
->> +
->> +pll1: pll1 at 01c20000 {
->> +	#clock-cells = <0>;
->> +	compatible = "allwinner,sunxi-pll1-clk";
->> +	reg = <0x01c20000 0x4>;
->> +	clocks = <&osc24M>;
->> +};
->> +
->> +cpu: cpu at 01c20054 {
->> +	#clock-cells = <0>;
->> +	compatible = "allwinner,sunxi-cpu-clk";
->> +	reg = <0x01c20054 0x4>;
->> +	clocks = <&osc32k>, <&osc24M>, <&pll1>;
->> +};
->> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
->> index ee90e87..129afed 100644
->> --- a/drivers/clk/Makefile
->> +++ b/drivers/clk/Makefile
->> @@ -20,7 +20,7 @@ endif
->>  obj-$(CONFIG_MACH_LOONGSON1)	+= clk-ls1x.o
->>  obj-$(CONFIG_ARCH_U8500)	+= ux500/
->>  obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
->> -obj-$(CONFIG_ARCH_SUNXI)	+= clk-sunxi.o
->> +obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
->>  obj-$(CONFIG_ARCH_ZYNQ)		+= clk-zynq.o
->>  
->>  # Chip specific
->> diff --git a/drivers/clk/clk-sunxi.c b/drivers/clk/clk-sunxi.c
->> deleted file mode 100644
->> index 0e831b5..0000000
->> --- a/drivers/clk/clk-sunxi.c
->> +++ /dev/null
->> @@ -1,30 +0,0 @@
->> -/*
->> - * Copyright 2012 Maxime Ripard
->> - *
->> - * Maxime Ripard <maxime.ripard@free-electrons.com>
->> - *
->> - * This program is free software; you can redistribute it and/or modify
->> - * it under the terms of the GNU General Public License as published by
->> - * the Free Software Foundation; either version 2 of the License, or
->> - * (at your option) any later version.
->> - *
->> - * This program is distributed in the hope that it will be useful,
->> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> - * GNU General Public License for more details.
->> - */
->> -
->> -#include <linux/clk-provider.h>
->> -#include <linux/clkdev.h>
->> -#include <linux/clk/sunxi.h>
->> -#include <linux/of.h>
->> -
->> -static const __initconst struct of_device_id clk_match[] = {
->> -	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
->> -	{}
->> -};
->> -
->> -void __init sunxi_init_clocks(void)
->> -{
->> -	of_clk_init(clk_match);
->> -}
->> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
->> new file mode 100644
->> index 0000000..8e773be
->> --- /dev/null
->> +++ b/drivers/clk/sunxi/Makefile
->> @@ -0,0 +1,5 @@
->> +#
->> +# Makefile for sunxi specific clk
->> +#
->> +
->> +obj-y += clk-sunxi.o clk-factors.o clk-fixed-gate.o
->> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
->> new file mode 100644
->> index 0000000..428b47d
->> --- /dev/null
->> +++ b/drivers/clk/sunxi/clk-factors.c
->> @@ -0,0 +1,175 @@
->> +/*
->> + * Copyright (C) 2013 Emilio L?pez <emilio@elopez.com.ar>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * Adjustable factor-based clock implementation
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/module.h>
->> +#include <linux/slab.h>
->> +#include <linux/io.h>
->> +#include <linux/err.h>
->> +#include <linux/string.h>
->> +
->> +#include <linux/delay.h>
->> +
->> +#include "clk-factors.h"
->> +
->> +/*
->> + * DOC: basic adjustable factor-based clock that cannot gate
->> + *
->> + * Traits of this clock:
->> + * prepare - clk_prepare only ensures that parents are prepared
->> + * enable - clk_enable only ensures that parents are enabled
->> + * rate - rate is adjustable.
->> + *        clk->rate = (parent->rate * N * (K + 1) >> P) / (M + 1)
->> + * parent - fixed parent.  No clk_set_parent support
->> + */
->> +
->> +struct clk_factors {
->> +	struct clk_hw hw;
->> +	void __iomem *reg;
->> +	struct clk_factors_config *config;
->> +	void (*get_factors) (u32 *rate, u8 *n, u8 *k, u8 *m, u8 *p);
->> +	spinlock_t *lock;
->> +};
->> +
->> +#define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
->> +
->> +#define SETMASK(len, pos)		(((-1U) >> (31-len))  << (pos))
->> +#define CLRMASK(len, pos)		(~(SETMASK(len, pos)))
->> +#define FACTOR_GET(bit, len, reg)	(((reg) & SETMASK(len, bit)) >> (bit))
->> +
->> +#define FACTOR_SET(bit, len, reg, val) \
->> +	(((reg) & CLRMASK(len, bit)) | (val << (bit)))
->> +
->> +static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
->> +					     unsigned long parent_rate)
->> +{
->> +	u8 n, k, p, m;
->> +	u32 reg;
->> +	unsigned long rate;
->> +	struct clk_factors *factors = to_clk_factors(hw);
->> +	struct clk_factors_config *config = factors->config;
->> +
->> +	/* Fetch the register value */
->> +	reg = readl(factors->reg);
->> +
->> +	/* Get each individual factor */
->> +	n = FACTOR_GET(config->nshift, config->nwidth, reg);
->> +	k = FACTOR_GET(config->kshift, config->kwidth, reg);
->> +	m = FACTOR_GET(config->mshift, config->mwidth, reg);
->> +	p = FACTOR_GET(config->pshift, config->pwidth, reg);
->> +
->> +	/* Calculate the rate */
->> +	rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
->> +
->> +	return rate;
->> +}
->> +
->> +static long clk_factors_round_rate(struct clk_hw *hw, unsigned long rate,
->> +				   unsigned long *parent_rate)
->> +{
->> +	struct clk_factors *factors = to_clk_factors(hw);
->> +	factors->get_factors((u32 *)&rate, NULL, NULL, NULL, NULL);
->> +
->> +	return rate;
->> +}
->> +
->> +static int clk_factors_set_rate(struct clk_hw *hw, unsigned long rate,
->> +				unsigned long parent_rate)
->> +{
->> +	u8 n, k, m, p;
->> +	u32 reg;
->> +	struct clk_factors *factors = to_clk_factors(hw);
->> +	struct clk_factors_config *config = factors->config;
->> +	unsigned long flags = 0;
->> +
->> +	factors->get_factors((u32 *)&rate, &n, &k, &m, &p);
->> +
->> +	if (factors->lock)
->> +		spin_lock_irqsave(factors->lock, flags);
->> +
->> +	/* Fetch the register value */
->> +	reg = readl(factors->reg);
->> +
->> +	/* Set up the new factors */
->> +	reg = FACTOR_SET(config->nshift, config->nwidth, reg, n);
->> +	reg = FACTOR_SET(config->kshift, config->kwidth, reg, k);
->> +	reg = FACTOR_SET(config->mshift, config->mwidth, reg, m);
->> +	reg = FACTOR_SET(config->pshift, config->pwidth, reg, p);
->> +
->> +	/* Apply them now */
->> +	writel(reg, factors->reg);
->> +
->> +	/* delay 500us so pll stabilizes */
->> +	__delay((rate >> 20) * 500 / 2);
->> +
->> +	if (factors->lock)
->> +		spin_unlock_irqrestore(factors->lock, flags);
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct clk_ops clk_factors_ops = {
->> +	.recalc_rate = clk_factors_recalc_rate,
->> +	.round_rate = clk_factors_round_rate,
->> +	.set_rate = clk_factors_set_rate,
->> +};
->> +
->> +/**
->> + * clk_register_factors - register a factors clock with
->> + * the clock framework
->> + * @dev: device registering this clock
->> + * @name: name of this clock
->> + * @parent_name: name of clock's parent
->> + * @flags: framework-specific flags
->> + * @reg: register address to adjust factors
->> + * @config: shift and width of factors n, k, m and p
->> + * @get_factors: function to calculate the factors for a given frequency
->> + * @lock: shared register lock for this clock
->> + */
-> 
-> Do you have other "factors" clock than sunxi-pll1-clk?
-> On your patch I only see this clock using this, and the way
-> you pass a function  and a the config struct seems to me
-> overcomplicated for a sinlge clock.
+> CC: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 
-Yes, there are other "factors" clocks on sunxi hardware; I have not
-added them to the driver yet, but having the factors implementation
-there makes it trivial to represent them on a future patchset.
+This one has been updated here to split the OMAP3xxx GP hwmod lists, as we 
+discussed.  Updated patch follows.
 
-> 
->> +struct clk *clk_register_factors(struct device *dev, const char *name,
->> +				 const char *parent_name,
->> +				 unsigned long flags, void __iomem *reg,
->> +				 struct clk_factors_config *config,
->> +				 void (*get_factors) (u32 *rate, u8 *n, u8 *k,
->> +						      u8 *m, u8 *p),
->> +				 spinlock_t *lock)
->> +{
->> +	struct clk_factors *factors;
->> +	struct clk *clk;
->> +	struct clk_init_data init;
->> +
->> +	/* allocate the factors */
->> +	factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
->> +	if (!factors) {
->> +		pr_err("%s: could not allocate factors clk\n", __func__);
->> +		return ERR_PTR(-ENOMEM);
->> +	}
->> +
->> +	init.name = name;
->> +	init.ops = &clk_factors_ops;
->> +	init.flags = flags;
->> +	init.parent_names = (parent_name ? &parent_name : NULL);
->> +	init.num_parents = (parent_name ? 1 : 0);
->> +
->> +	/* struct clk_factors assignments */
->> +	factors->reg = reg;
->> +	factors->config = config;
->> +	factors->lock = lock;
->> +	factors->hw.init = &init;
->> +	factors->get_factors = get_factors;
->> +
->> +	/* register the clock */
->> +	clk = clk_register(dev, &factors->hw);
->> +
->> +	if (IS_ERR(clk))
->> +		kfree(factors);
->> +
->> +	return clk;
->> +}
->> diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
->> new file mode 100644
->> index 0000000..a24c889
->> --- /dev/null
->> +++ b/drivers/clk/sunxi/clk-factors.h
->> @@ -0,0 +1,25 @@
->> +#ifndef __MACH_SUNXI_CLK_FACTORS_H
->> +#define __MACH_SUNXI_CLK_FACTORS_H
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +
->> +struct clk_factors_config {
->> +	u8 nshift;
->> +	u8 nwidth;
->> +	u8 kshift;
->> +	u8 kwidth;
->> +	u8 mshift;
->> +	u8 mwidth;
->> +	u8 pshift;
->> +	u8 pwidth;
->> +};
->> +
->> +struct clk *clk_register_factors(struct device *dev, const char *name,
->> +				 const char *parent_name,
->> +				 unsigned long flags, void __iomem *reg,
->> +				 struct clk_factors_config *config,
->> +				 void (*get_factors) (u32 *rate, u8 *n, u8 *k,
->> +						      u8 *m, u8 *p),
->> +				 spinlock_t *lock);
->> +#endif
->> diff --git a/drivers/clk/sunxi/clk-fixed-gate.c b/drivers/clk/sunxi/clk-fixed-gate.c
->> new file mode 100644
->> index 0000000..b16eda5
->> --- /dev/null
->> +++ b/drivers/clk/sunxi/clk-fixed-gate.c
->> @@ -0,0 +1,152 @@
->> +/*
->> + * Copyright (C) 2013 Emilio L?pez <emilio@elopez.com.ar>
->> + *
->> + * Based on drivers/clk/clk-gate.c,
->> + *
->> + * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
->> + * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * Fixed rate, gated clock implementation
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/module.h>
->> +#include <linux/slab.h>
->> +#include <linux/io.h>
->> +#include <linux/err.h>
->> +#include <linux/string.h>
->> +
->> +#include "clk-fixed-gate.h"
->> +
->> +/**
->> + * DOC: fixed rate clock which can gate and ungate it's ouput
->> + *
->> + * Traits of this clock:
->> + * prepare - clk_(un)prepare only ensures parent is (un)prepared
->> + * enable - clk_enable and clk_disable are functional & control gating
->> + * rate - rate is always a fixed value.  No clk_set_rate support
->> + * parent - fixed parent.  No clk_set_parent support
->> + */
->> +
->> +struct clk_fixed_gate {
->> +	struct clk_hw hw;
->> +	u8            bit_idx;
->> +	u8            flags;
->> +	unsigned long fixed_rate;
->> +	void __iomem  *reg;
->> +	spinlock_t    *lock;
->> +};
->> +
->> +#define to_clk_fixed_gate(_hw) container_of(_hw, struct clk_fixed_gate, hw)
->> +
->> +static void clk_fixed_gate_endisable(struct clk_hw *hw, int enable)
->> +{
->> +	struct clk_fixed_gate *gate = to_clk_fixed_gate(hw);
->> +	unsigned long flags = 0;
->> +	u32 reg;
->> +
->> +	if (gate->lock)
->> +		spin_lock_irqsave(gate->lock, flags);
->> +
->> +	reg = readl(gate->reg);
->> +
->> +	if (enable)
->> +		reg |= BIT(gate->bit_idx);
->> +	else
->> +		reg &= ~BIT(gate->bit_idx);
->> +
->> +	writel(reg, gate->reg);
->> +
->> +	if (gate->lock)
->> +		spin_unlock_irqrestore(gate->lock, flags);
->> +}
->> +
->> +static int clk_fixed_gate_enable(struct clk_hw *hw)
->> +{
->> +	clk_fixed_gate_endisable(hw, 1);
->> +
->> +	return 0;
->> +}
->> +
->> +static void clk_fixed_gate_disable(struct clk_hw *hw)
->> +{
->> +	clk_fixed_gate_endisable(hw, 0);
->> +}
->> +
->> +static int clk_fixed_gate_is_enabled(struct clk_hw *hw)
->> +{
->> +	u32 reg;
->> +	struct clk_fixed_gate *gate = to_clk_fixed_gate(hw);
->> +
->> +	reg = readl(gate->reg);
->> +
->> +	reg &= BIT(gate->bit_idx);
->> +
->> +	return reg ? 1 : 0;
->> +}
->> +
->> +static unsigned long clk_fixed_gate_recalc_rate(struct clk_hw *hw,
->> +						unsigned long parent_rate)
->> +{
->> +	return to_clk_fixed_gate(hw)->fixed_rate;
->> +}
->> +
->> +static const struct clk_ops clk_fixed_gate_ops = {
->> +	.enable = clk_fixed_gate_enable,
->> +	.disable = clk_fixed_gate_disable,
->> +	.is_enabled = clk_fixed_gate_is_enabled,
->> +	.recalc_rate = clk_fixed_gate_recalc_rate,
->> +};
->> +
->> +/**
->> + * clk_register_fixed_gate - register a fixed rate,
->> + * gate clock with the clock framework
->> + * @dev: device that is registering this clock
->> + * @name: name of this clock
->> + * @parent_name: name of this clock's parent
->> + * @flags: framework-specific flags for this clock
->> + * @reg: register address to control gating of this clock
->> + * @bit_idx: which bit in the register controls gating of this clock
->> + * @lock: shared register lock for this clock
->> + */
->> +struct clk *clk_register_fixed_gate(struct device *dev, const char *name,
->> +				    const char *parent_name,
->> +				    unsigned long flags, void __iomem *reg,
->> +				    u8 bit_idx, unsigned long fixed_rate,
->> +				    spinlock_t *lock)
->> +{
->> +	struct clk_fixed_gate *gate;
->> +	struct clk *clk;
->> +	struct clk_init_data init;
->> +
->> +	/* allocate the gate */
->> +	gate = kzalloc(sizeof(struct clk_fixed_gate), GFP_KERNEL);
->> +	if (!gate) {
->> +		pr_err("%s: could not allocate fixed gated clk\n", __func__);
->> +		return ERR_PTR(-ENOMEM);
->> +	}
->> +
->> +	init.name = name;
->> +	init.ops = &clk_fixed_gate_ops;
->> +	init.flags = flags | CLK_IS_BASIC;
->> +	init.parent_names = (parent_name ? &parent_name : NULL);
->> +	init.num_parents = (parent_name ? 1 : 0);
->> +
->> +	/* struct clk_fixed_gate assignments */
->> +	gate->fixed_rate = fixed_rate;
->> +	gate->reg = reg;
->> +	gate->bit_idx = bit_idx;
->> +	gate->lock = lock;
->> +	gate->hw.init = &init;
->> +
->> +	clk = clk_register(dev, &gate->hw);
->> +
->> +	if (IS_ERR(clk))
->> +		kfree(gate);
->> +
->> +	return clk;
->> +}
->> diff --git a/drivers/clk/sunxi/clk-fixed-gate.h b/drivers/clk/sunxi/clk-fixed-gate.h
->> new file mode 100644
->> index 0000000..29d9ed3
->> --- /dev/null
->> +++ b/drivers/clk/sunxi/clk-fixed-gate.h
->> @@ -0,0 +1,13 @@
->> +#ifndef __MACH_SUNXI_CLK_FIXED_GATE_H
->> +#define __MACH_SUNXI_CLK_FIXED_GATE_H
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +
->> +struct clk *clk_register_fixed_gate(struct device *dev, const char *name,
->> +				    const char *parent_name,
->> +				    unsigned long flags, void __iomem *reg,
->> +				    u8 bit_idx, unsigned long fixed_rate,
->> +				    spinlock_t *lock);
->> +
->> +#endif
->> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
->> new file mode 100644
->> index 0000000..cb587a0
->> --- /dev/null
->> +++ b/drivers/clk/sunxi/clk-sunxi.c
->> @@ -0,0 +1,265 @@
->> +/*
->> + * Copyright 2013 Emilio L?pez
->> + *
->> + * Emilio L?pez <emilio@elopez.com.ar>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +#include <linux/clk/sunxi.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +
->> +#include "clk-factors.h"
->> +#include "clk-fixed-gate.h"
->> +
->> +static DEFINE_SPINLOCK(clk_lock);
->> +
->> +/**
->> + * sunxi_osc_clk_setup() - Setup function for gatable oscillator
->> + */
->> +
->> +#define SUNXI_OSC24M_GATE	0
->> +
->> +static void __init sunxi_osc_clk_setup(struct device_node *node)
->> +{
->> +	struct clk *clk;
->> +	const char *clk_name = node->name;
->> +	void *reg;
->> +	u32 rate;
->> +
->> +	reg = of_iomap(node, 0);
->> +
->> +	if (of_property_read_u32(node, "clock-frequency", &rate))
->> +		return;
->> +
->> +	clk = clk_register_fixed_gate(NULL, clk_name, NULL,
->> +				      CLK_IS_ROOT | CLK_IGNORE_UNUSED,
->> +				      reg, SUNXI_OSC24M_GATE, rate, &clk_lock);
->> +
->> +	if (clk) {
->> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
->> +		clk_register_clkdev(clk, clk_name, NULL);
->> +	}
->> +}
->> +
->> +
->> +
->> +/**
->> + * sunxi_get_pll1_factors() - calculates n, k, m, p factors for PLL1
->> + * PLL1 rate is calculated as follows
->> + * rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
->> + * parent_rate is always 24Mhz
->> + */
->> +
->> +static void sunxi_get_pll1_factors(u32 *freq, u8 *n, u8 *k, u8 *m, u8 *p)
->> +{
->> +	u8 div;
->> +
->> +	/* Normalize value to a 6M multiple */
->> +	div = *freq / 6000000;
->> +	*freq = 6000000 * div;
->> +
->> +	/* we were called to round the frequency, we can now return */
->> +	if (n == NULL)
->> +		return;
->> +
->> +	/* m is always zero for pll1 */
->> +	*m = 0;
->> +
->> +	/* k is 1 only on these cases */
->> +	if (*freq >= 768000000 || *freq == 42000000 || *freq == 54000000)
->> +		*k = 1;
->> +	else
->> +		*k = 0;
->> +
->> +	/* p will be 3 for divs under 10 */
->> +	if (div < 10)
->> +		*p = 3;
->> +
->> +	/* p will be 2 for divs between 10 - 20 and odd divs under 32 */
->> +	else if (div < 20 || (div < 32 && (div & 1)))
->> +		*p = 2;
->> +
->> +	/* p will be 1 for even divs under 32, divs under 40 and odd pairs
->> +	 * of divs between 40-62 */
->> +	else if (div < 40 || (div < 64 && (div & 2)))
->> +		*p = 1;
->> +
->> +	/* any other entries have p = 0 */
->> +	else
->> +		*p = 0;
->> +
->> +	/* calculate a suitable n based on k and p */
->> +	div <<= *p;
->> +	div /= (*k + 1);
->> +	*n = div / 4;
->> +}
->> +
->> +/**
->> + * sunxi_pll1_clk_setup() - Setup function for PLL1 clock
->> + */
->> +
->> +struct clk_factors_config pll1_config = {
->> +	.nshift = 8,
->> +	.nwidth = 5,
->> +	.kshift = 4,
->> +	.kwidth = 2,
->> +	.mshift = 0,
->> +	.mwidth = 2,
->> +	.pshift = 16,
->> +	.pwidth = 2,
->> +};
->> +
->> +static void __init sunxi_pll1_clk_setup(struct device_node *node)
->> +{
->> +	struct clk *clk;
->> +	const char *clk_name = node->name;
->> +	const char *parent;
->> +	void *reg;
->> +
->> +	reg = of_iomap(node, 0);
->> +
->> +	parent = of_clk_get_parent_name(node, 0);
->> +
->> +	clk = clk_register_factors(NULL, clk_name, parent, CLK_IGNORE_UNUSED,
->> +				   reg, &pll1_config, sunxi_get_pll1_factors,
->> +				   &clk_lock);
->> +
->> +	if (clk) {
->> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
->> +		clk_register_clkdev(clk, clk_name, NULL);
->> +	}
->> +}
->> +
->> +
->> +
->> +/**
->> + * sunxi_cpu_clk_setup() - Setup function for CPU mux
->> + */
->> +
->> +#define SUNXI_CPU_GATE		16
->> +#define SUNXI_CPU_GATE_WIDTH	2
->> +
->> +static void __init sunxi_cpu_clk_setup(struct device_node *node)
->> +{
->> +	struct clk *clk;
->> +	const char *clk_name = node->name;
->> +	const char **parents = kmalloc(sizeof(char *) * 5, GFP_KERNEL);
->> +	void *reg;
->> +	int i = 0;
->> +
->> +	reg = of_iomap(node, 0);
->> +
->> +	while (i < 5 && (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
->> +		i++;
->> +
->> +	clk = clk_register_mux(NULL, clk_name, parents, i, 0, reg,
->> +			       SUNXI_CPU_GATE, SUNXI_CPU_GATE_WIDTH,
->> +			       0, &clk_lock);
->> +
->> +	if (clk) {
->> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
->> +		clk_register_clkdev(clk, clk_name, NULL);
->> +	}
->> +}
->> +
->> +
->> +
->> +/**
->> + * sunxi_divider_clk_setup() - Setup function for simple divider clocks
->> + */
->> +
->> +#define SUNXI_DIVISOR_WIDTH	2
->> +
->> +struct div_data {
->> +	u8 div;
->> +	u8 pow;
->> +};
->> +
->> +static const __initconst struct div_data axi_data = {
->> +	.div = 0,
->> +	.pow = 0,
->> +};
->> +
->> +static const __initconst struct div_data ahb_data = {
->> +	.div = 4,
->> +	.pow = 1,
->> +};
->> +
->> +static const __initconst struct div_data apb0_data = {
->> +	.div = 8,
->> +	.pow = 1,
->> +};
-> 
-> Can't you read this from a register?
+- Paul
 
-I don't understand your question. "div" is the shift in the register
-where the divisor gets configured. width is always 2 as indicated by the
-compiler macro above.
+From: "Mark A. Greer" <mgreer@animalcreek.com>
+Date: Fri, 21 Dec 2012 09:28:03 -0700
+Subject: [PATCH] ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data to
+ hwmod
 
-> 
-> If not then this 3 clocks are good candidates for my patch:
-> "clk: add DT fixed-factor-clock binding support"
-> http://www.spinics.net/lists/arm-kernel/msg191522.html
+Convert the device data for the OMAP3 SHAM2 (SHA1/MD5) crypto IP
+from explicit platform_data to hwmod.
 
-These are configurable dividers; fixed-factor appears to be for clocks
-where div and mult are fixed values.
+CC: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+[paul at pwsan.com: updated to use per-SoC registration lists for GP-only hwmods;
+ fixed lines causing sparse warnings]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/cclock3xxx_data.c      |    1 +
+ arch/arm/mach-omap2/devices.c              |   41 +----------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  107 +++++++++++++++++++++++++---
+ 3 files changed, 101 insertions(+), 48 deletions(-)
 
-> 
-> It was not merged by lack of user, but it will be pretty simple to me
-> to rebase it on top of 3.8-rc6
-> 
-> So if it is really an informatilon you can only get from the datasheet,
-> you will be able to just declare it in the DTS.
-> 
->> +
->> +static void __init sunxi_divider_clk_setup(struct device_node *node, u8 shift,
->> +					   u8 power_of_two)
-
-See here, .div is shift and .pow is power_of_two
-
->> +{
->> +	struct clk *clk;
->> +	const char *clk_name = node->name;
->> +	const char *clk_parent;
->> +	void *reg;
->> +
->> +	reg = of_iomap(node, 0);
->> +
->> +	clk_parent = of_clk_get_parent_name(node, 0);
->> +
->> +	clk = clk_register_divider(NULL, clk_name, clk_parent, 0,
->> +				   reg, shift, SUNXI_DIVISOR_WIDTH,
->> +				   power_of_two ? CLK_DIVIDER_POWER_OF_TWO : 0,
->> +				   &clk_lock);
->> +	if (clk) {
->> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
->> +		clk_register_clkdev(clk, clk_name, NULL);
->> +	}
->> +}
->> +
->> +
->> +/* Matches for of_clk_init */
->> +static const __initconst struct of_device_id clk_match[] = {
->> +	{.compatible = "fixed-clock", .data = of_fixed_clk_setup,},
->> +	{.compatible = "allwinner,sunxi-osc-clk", .data = sunxi_osc_clk_setup,},
->> +	{.compatible = "allwinner,sunxi-pll1-clk", .data = sunxi_pll1_clk_setup,},
->> +	{.compatible = "allwinner,sunxi-cpu-clk", .data = sunxi_cpu_clk_setup,},
->> +	{}
->> +};
->> +
->> +/* Matches for divider clocks */
->> +static const __initconst struct of_device_id clk_div_match[] = {
->> +	{.compatible = "allwinner,sunxi-axi-clk", .data = &axi_data,},
->> +	{.compatible = "allwinner,sunxi-ahb-clk", .data = &ahb_data,},
->> +	{.compatible = "allwinner,sunxi-apb0-clk", .data = &apb0_data,},
->> +	{}
->> +};
->> +
->> +static void __init of_sunxi_divider_clock_setup(void)
->> +{
->> +	struct device_node *np;
->> +	const struct div_data *data;
->> +	const struct of_device_id *match;
->> +
->> +	for_each_matching_node(np, clk_div_match) {
->> +		match = of_match_node(clk_div_match, np);
->> +		data = match->data;
->> +		sunxi_divider_clk_setup(np, data->div, data->pow);
->> +	}
->> +}
->> +
->> +void __init sunxi_init_clocks(void)
->> +{
->> +	/* Register all the simple sunxi clocks on DT */
->> +	of_clk_init(clk_match);
->> +
->> +	/* Register divider clocks */
->> +	of_sunxi_divider_clock_setup();
->> +}
->>
-
-Thanks for the review :)
-
-Emilio
+diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+index 6ef8758..2853d72 100644
+--- a/arch/arm/mach-omap2/cclock3xxx_data.c
++++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+@@ -3336,6 +3336,7 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"icr_ick",	&icr_ick,	CK_34XX | CK_36XX),
+ 	CLK("omap-aes",	"ick",	&aes2_ick,	CK_34XX | CK_36XX),
+ 	CLK("omap-sham",	"ick",	&sha12_ick,	CK_34XX | CK_36XX),
++	CLK(NULL,	"sha12_ick",	&sha12_ick,	CK_34XX | CK_36XX),
+ 	CLK(NULL,	"des2_ick",	&des2_ick,	CK_34XX | CK_36XX),
+ 	CLK("omap_hsmmc.1",	"ick",	&mmchs2_ick,	CK_3XXX),
+ 	CLK("omap_hsmmc.0",	"ick",	&mmchs1_ick,	CK_3XXX),
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index b3f6818..8afc592 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -464,38 +464,9 @@ static void omap_init_rng(void)
+ 	WARN(IS_ERR(pdev), "Can't build omap_device for omap_rng\n");
+ }
+ 
+-#if defined(CONFIG_CRYPTO_DEV_OMAP_SHAM) || defined(CONFIG_CRYPTO_DEV_OMAP_SHAM_MODULE)
+-
+-#ifdef CONFIG_ARCH_OMAP3
+-static struct resource omap3_sham_resources[] = {
+-	{
+-		.start	= OMAP34XX_SEC_SHA1MD5_BASE,
+-		.end	= OMAP34XX_SEC_SHA1MD5_BASE + 0x64,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= 49 + OMAP_INTC_START,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	{
+-		.start	= OMAP34XX_DMA_SHA1MD5_RX,
+-		.flags	= IORESOURCE_DMA,
+-	}
+-};
+-static int omap3_sham_resources_sz = ARRAY_SIZE(omap3_sham_resources);
+-#else
+-#define omap3_sham_resources		NULL
+-#define omap3_sham_resources_sz		0
+-#endif
+-
+-static struct platform_device sham_device = {
+-	.name		= "omap-sham",
+-	.id		= -1,
+-};
+-
+-static void omap_init_sham(void)
++static void __init omap_init_sham(void)
+ {
+-	if (cpu_is_omap24xx()) {
++	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+ 		struct omap_hwmod *oh;
+ 		struct platform_device *pdev;
+ 
+@@ -506,18 +477,10 @@ static void omap_init_sham(void)
+ 		pdev = omap_device_build("omap-sham", -1, oh, NULL, 0, NULL,
+ 					 0, 0);
+ 		WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+-	} else if (cpu_is_omap34xx()) {
+-		sham_device.resource = omap3_sham_resources;
+-		sham_device.num_resources = omap3_sham_resources_sz;
+-		platform_device_register(&sham_device);
+ 	} else {
+ 		pr_err("%s: platform not supported\n", __func__);
+-		return;
+ 	}
+ }
+-#else
+-static inline void omap_init_sham(void) { }
+-#endif
+ 
+ #if defined(CONFIG_CRYPTO_DEV_OMAP_AES) || defined(CONFIG_CRYPTO_DEV_OMAP_AES_MODULE)
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 8bb2628..8f54564 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3540,6 +3540,71 @@ static struct omap_hwmod_ocp_if omap3xxx_l3_main__gpmc = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l4_core -> SHAM2 (SHA1/MD5) (similar to omap24xx) */
++static struct omap_hwmod_sysc_fields omap3_sham_sysc_fields = {
++	.sidle_shift	= 4,
++	.srst_shift	= 1,
++	.autoidle_shift	= 0,
++};
++
++static struct omap_hwmod_class_sysconfig omap3_sham_sysc = {
++	.rev_offs	= 0x5c,
++	.sysc_offs	= 0x60,
++	.syss_offs	= 0x64,
++	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
++			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
++	.sysc_fields	= &omap3_sham_sysc_fields,
++};
++
++static struct omap_hwmod_class omap3xxx_sham_class = {
++	.name	= "sham",
++	.sysc	= &omap3_sham_sysc,
++};
++
++static struct omap_hwmod_irq_info omap3_sham_mpu_irqs[] = {
++	{ .irq = 49 + OMAP_INTC_START, },
++	{ .irq = -1 }
++};
++
++static struct omap_hwmod_dma_info omap3_sham_sdma_reqs[] = {
++	{ .name = "rx", .dma_req = OMAP34XX_DMA_SHA1MD5_RX, },
++	{ .dma_req = -1 }
++};
++
++static struct omap_hwmod omap3xxx_sham_hwmod = {
++	.name		= "sham",
++	.mpu_irqs	= omap3_sham_mpu_irqs,
++	.sdma_reqs	= omap3_sham_sdma_reqs,
++	.main_clk	= "sha12_ick",
++	.prcm		= {
++		.omap2 = {
++			.module_offs = CORE_MOD,
++			.prcm_reg_id = 1,
++			.module_bit = OMAP3430_EN_SHA12_SHIFT,
++			.idlest_reg_id = 1,
++			.idlest_idle_bit = OMAP3430_ST_SHA12_SHIFT,
++		},
++	},
++	.class		= &omap3xxx_sham_class,
++};
++
++static struct omap_hwmod_addr_space omap3xxx_sham_addrs[] = {
++	{
++		.pa_start	= 0x480c3000,
++		.pa_end		= 0x480c3000 + 0x64 - 1,
++		.flags		= ADDR_TYPE_RT
++	},
++	{ }
++};
++
++static struct omap_hwmod_ocp_if omap3xxx_l4_core__sham = {
++	.master		= &omap3xxx_l4_core_hwmod,
++	.slave		= &omap3xxx_sham_hwmod,
++	.clk		= "sha12_ick",
++	.addr		= omap3xxx_sham_addrs,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap3xxx_l3_main__l4_core,
+ 	&omap3xxx_l3_main__l4_per,
+@@ -3591,8 +3656,28 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
+ };
+ 
+ /* GP-only hwmod links */
+-static struct omap_hwmod_ocp_if *omap3xxx_gp_hwmod_ocp_ifs[] __initdata = {
++static struct omap_hwmod_ocp_if *omap34xx_gp_hwmod_ocp_ifs[] __initdata = {
++	&omap3xxx_l4_sec__timer12,
++	&omap3xxx_l4_core__sham,
++	NULL
++};
++
++static struct omap_hwmod_ocp_if *omap36xx_gp_hwmod_ocp_ifs[] __initdata = {
+ 	&omap3xxx_l4_sec__timer12,
++	&omap3xxx_l4_core__sham,
++	NULL
++};
++
++static struct omap_hwmod_ocp_if *am35xx_gp_hwmod_ocp_ifs[] __initdata = {
++	&omap3xxx_l4_sec__timer12,
++	/*
++	 * Apparently the SHA/MD5 accelerator IP block is only present
++	 * on some AM35xx chips, and no one knows which ones.  See
++	 * http://www.spinics.net/lists/arm-kernel/msg215466.html So
++	 * if you need this IP block on an AM35xx, try uncommenting
++	 * the next line.
++	 */
++	/* &omap3xxx_l4_core__sham, */
+ 	NULL
+ };
+ 
+@@ -3699,7 +3784,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_dss_hwmod_ocp_ifs[] __initdata = {
+ int __init omap3xxx_hwmod_init(void)
+ {
+ 	int r;
+-	struct omap_hwmod_ocp_if **h = NULL;
++	struct omap_hwmod_ocp_if **h = NULL, **h_gp = NULL;
+ 	unsigned int rev;
+ 
+ 	omap_hwmod_init();
+@@ -3709,13 +3794,6 @@ int __init omap3xxx_hwmod_init(void)
+ 	if (r < 0)
+ 		return r;
+ 
+-	/* Register GP-only hwmod links. */
+-	if (omap_type() == OMAP2_DEVICE_TYPE_GP) {
+-		r = omap_hwmod_register_links(omap3xxx_gp_hwmod_ocp_ifs);
+-		if (r < 0)
+-			return r;
+-	}
+-
+ 	rev = omap_rev();
+ 
+ 	/*
+@@ -3727,11 +3805,14 @@ int __init omap3xxx_hwmod_init(void)
+ 	    rev == OMAP3430_REV_ES2_1 || rev == OMAP3430_REV_ES3_0 ||
+ 	    rev == OMAP3430_REV_ES3_1 || rev == OMAP3430_REV_ES3_1_2) {
+ 		h = omap34xx_hwmod_ocp_ifs;
++		h_gp = omap34xx_gp_hwmod_ocp_ifs;
+ 	} else if (rev == AM35XX_REV_ES1_0 || rev == AM35XX_REV_ES1_1) {
+ 		h = am35xx_hwmod_ocp_ifs;
++		h_gp = am35xx_gp_hwmod_ocp_ifs;
+ 	} else if (rev == OMAP3630_REV_ES1_0 || rev == OMAP3630_REV_ES1_1 ||
+ 		   rev == OMAP3630_REV_ES1_2) {
+ 		h = omap36xx_hwmod_ocp_ifs;
++		h_gp = omap36xx_gp_hwmod_ocp_ifs;
+ 	} else {
+ 		WARN(1, "OMAP3 hwmod family init: unknown chip type\n");
+ 		return -EINVAL;
+@@ -3741,6 +3822,14 @@ int __init omap3xxx_hwmod_init(void)
+ 	if (r < 0)
+ 		return r;
+ 
++	/* Register GP-only hwmod links. */
++	if (h_gp && omap_type() == OMAP2_DEVICE_TYPE_GP) {
++		r = omap_hwmod_register_links(h_gp);
++		if (r < 0)
++			return r;
++	}
++
++
+ 	/*
+ 	 * Register hwmod links specific to certain ES levels of a
+ 	 * particular family of silicon (e.g., 34xx ES1.0)
+-- 
+1.7.10.4
