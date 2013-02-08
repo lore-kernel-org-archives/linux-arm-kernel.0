@@ -1,49 +1,48 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:36 +0000
-Subject: [PATCH 06/17] ARM: fixup head for atag verification
+Date: Fri,  8 Feb 2013 23:17:35 +0000
+Subject: [PATCH 05/17] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-7-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-6-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we booted LE but running BE8, ensure we read ATAGs data from head code
-in the correct mode.
+The fixup_pv_table assumes that the instructions are in the same
+endian configuration as the data, but when the CPU is running in
+BE8 the instructions stay in little-endian format.
+
+Make sure if CONFIG_CPU_ENDIAN_BE8 is set that we do all the
+alterations to the instructions taking in to account the LDR/STR
+will be swapping the data endian-ness.
+
+Since the code is only modifying a byte, we avoid dual-swapping
+the data, and just change the bits we clear and ORR in.
+
+Note, not tested against an actual bug, it looked wrong.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/head-common.S |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/kernel/head.S |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-index 854bd22..4eb53b2 100644
---- a/arch/arm/kernel/head-common.S
-+++ b/arch/arm/kernel/head-common.S
-@@ -21,6 +21,12 @@
- #define OF_DT_MAGIC 0xedfe0dd0 /* 0xd00dfeed in big-endian */
- #endif
- 
-+#ifdef CONFIG_CPU_BE8_BOOT_LE
-+#define BE8_LE(x...)	x
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index f1ab279..aafb151 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -579,8 +579,14 @@ __fixup_a_pv_table:
+ #else
+ 	b	2f
+ 1:	ldr	ip, [r7, r3]
++#ifdef CONFIG_CPU_ENDIAN_BE8
++	@ in BE8, we load data in BE, but instructions still in LE
++	bic	ip, ip, #0xff000000
++	orr	ip, ip, r6, lsl#24
 +#else
-+#define BE8_LE(x...)
+ 	bic	ip, ip, #0x000000ff
+ 	orr	ip, ip, r6	@ mask in offset bits 31-24
 +#endif
-+
- /*
-  * Exception handling.  Something went wrong and we can't proceed.  We
-  * ought to tell the user, but since we don't have any guarantee that
-@@ -53,10 +59,12 @@ __vet_atags:
- 	cmp	r5, r6
- 	beq	2f
- #endif
-+BE8_LE(	rev	r5, r5 )
- 	cmp	r5, #ATAG_CORE_SIZE		@ is first tag ATAG_CORE?
- 	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
- 	bne	1f
- 	ldr	r5, [r2, #4]
-+BE8_LE(	rev	r5, r5 )
- 	ldr	r6, =ATAG_CORE
- 	cmp	r5, r6
- 	bne	1f
+ 	str	ip, [r7, r3]
+ 2:	cmp	r4, r5
+ 	ldrcc	r7, [r4], #4	@ use branch for delay slot
 -- 
 1.7.10.4
