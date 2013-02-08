@@ -1,50 +1,26 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 08 Feb 2013 12:06:44 +0100
-Subject: Build error: OMAP randconfig / mvebu
-In-Reply-To: <2213733.Wbjy3dFgom@wuerfel>
-References: <20130208100813.GN17833@n2100.arm.linux.org.uk>
- <2213733.Wbjy3dFgom@wuerfel>
-Message-ID: <5114DC44.7000107@free-electrons.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 8 Feb 2013 11:15:25 +0000
+Subject: [PATCH] regulator: anatop: improve precision of delay time
+In-Reply-To: <1359944492-23130-1-git-send-email-shawn.guo@linaro.org>
+References: <1359944492-23130-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130208111525.GH8879@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2013 11:45 AM, Arnd Bergmann wrote:
-> On Friday 08 February 2013 10:08:13 Russell King - ARM Linux wrote:
->> Last night's OMAP4430SDP randconfig build failed with:
->>
->> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_smp_init_cpus':
->> hotplug.c:(.init.text+0x70): undefined reference to `coherency_get_cpu_count'
->> hotplug.c:(.init.text+0xb4): undefined reference to `armada_mpic_send_doorbell'
->> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_smp_prepare_cpus':
->> hotplug.c:(.init.text+0x254): undefined reference to `set_cpu_coherent'
->> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_boot_secondary':
->> hotplug.c:(.cpuinit.text+0x10): undefined reference to `armada_xp_boot_cpu'
->> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_secondary_init':
->> hotplug.c:(.cpuinit.text+0x2c): undefined reference to `armada_xp_mpic_smp_cpu_init'
->> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_secondary_startup':
->> hotplug.c:(.cpuinit.text+0x40): undefined reference to `ll_set_cpu_coherent'
->>
->> This seems to be because we ended up with CONFIG_ARCH_MVEBU=y but without
->> CONFIG_MACH_ARMADA_370_XP being set - and because of OMAP, we have SMP
->> and hotplug CPU enabled.
->>
->> Usual configs/logs available via the website.
-> 
-> Ok, I see. I suspect we are going to see a lot more randconfig failures
-> now with all the platforms that are becoming part of multiplatform.
-> 
-> mvebu maintainers: this one should be easy enough to fix. Anyone
-> submitting a patch?
+On Mon, Feb 04, 2013 at 10:21:32AM +0800, Shawn Guo wrote:
+> For cpufreq example, it takes 13 steps (25 mV for one step) to increase
+> vddcore from 0.95 V to 1.275 V, and the time of 64 clock cycles at
+> 24 MHz for one step is ~2.67 uS, so the total delay time would be
+> ~34.71 uS.  But the current calculation in the driver gives 39 uS.
+> Change the formula to have the addition of 1 be the last step, so that
+> we can get a more precise delay time.  For example above, the new
+> formula will give 35 uS.
 
-I don't know what to do here, there is no point to build any of the files
-in mach-mvebu if no SoCs are selected. So either we force to have at least
-one SoCS selected if ARCH_MVEBU is selected, or we unselect  ARCH_MVEB if
-no SoCs are selected.
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/71daea00/attachment.sig>
