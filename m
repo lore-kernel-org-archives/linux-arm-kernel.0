@@ -1,176 +1,47 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 08 Feb 2013 21:48:46 +0000
-Subject: [PATCH] i2c: add bcm2835 driver
-In-Reply-To: <1357191978-11038-1-git-send-email-swarren@wwwdotorg.org>
-References: <1357191978-11038-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130208214846.35F2D3E2C27@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 8 Feb 2013 22:56:48 +0100
+Subject: [PATCH 2/2] ARM: ep93xx: bump IRQ offset to 64
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020809EF8DDB@AUSP01VMBX24.collaborationhost.net>
+References: <1360168544-20376-1-git-send-email-linus.walleij@linaro.org>
+ <51149648.80402@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F0020809EF8DDB@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <CACRpkdb-vy8noy+8f5EmvG2qiSajCg-FqaJim3LK7-3tBm5S1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  2 Jan 2013 22:46:18 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> This implements a very basic I2C host driver for the BCM2835 SoC. Missing
-> features so far are:
-> 
-> * Clock rate adjustment.
-> * 10-bit addressing.
-> * DMA.
-> 
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
->  .../devicetree/bindings/i2c/brcm,bcm2835-i2c.txt   |   20 ++
->  drivers/i2c/busses/Kconfig                         |   12 +
->  drivers/i2c/busses/Makefile                        |    1 +
->  drivers/i2c/busses/i2c-bcm2835.c                   |  331 ++++++++++++++++++++
->  4 files changed, 364 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt
->  create mode 100644 drivers/i2c/busses/i2c-bcm2835.c
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt
-> new file mode 100644
-> index 0000000..e9de375
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt
-> @@ -0,0 +1,20 @@
-> +Broadcom BCM2835 I2C controller
-> +
-> +Required properties:
-> +- compatible : Should be "brcm,bcm2835-i2c".
-> +- reg: Should contain register location and length.
-> +- interrupts: Should contain interrupt.
-> +- clocks : The clock feeding the I2C controller.
-> +
-> +Recommended properties:
-> +- clock-frequency : desired I2C bus clock frequency in Hz.
-> +
-> +Example:
-> +
-> +i2c at 20205000 {
-> +	compatible = "brcm,bcm2835-i2c";
-> +	reg = <0x7e205000 0x1000>;
-> +	interrupts = <2 21>;
-> +	clocks = <&clk_i2c>;
-> +	clock-frequency = <100000>;
-> +};
+On Fri, Feb 8, 2013 at 6:38 PM, H Hartley Sweeten
+<hartleys@visionengravers.com> wrote:
 
-Looks good.
+> I would rather not have this applied.
+>
+> If you look at the EP93XX_VIC1_VALID_IRQ_MASK you will see that IRQ 0
+> (and 1) is not valid. So on EP93xx IRQ 0 is a NO_IRQ.
 
-> +static int __devinit bcm2835_i2c_probe(struct platform_device *pdev)
-> +{
-> +	struct bcm2835_i2c_dev *i2c_dev;
-> +	struct resource *mem, *requested, *irq;
-> +	int ret;
-> +	struct i2c_adapter *adap;
-> +
-> +	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
-> +	if (!i2c_dev) {
-> +		dev_err(&pdev->dev, "Cannot allocate i2c_dev\n");
-> +		return -ENOMEM;
-> +	}
-> +	platform_set_drvdata(pdev, i2c_dev);
-> +	i2c_dev->dev = &pdev->dev;
-> +	init_completion(&i2c_dev->completion);
-> +
-> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!mem) {
-> +		dev_err(&pdev->dev, "No mem resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	requested = devm_request_mem_region(&pdev->dev, mem->start,
-> +					    resource_size(mem),
-> +					    dev_name(&pdev->dev));
-> +	if (!requested) {
-> +		dev_err(&pdev->dev, "Could not claim register region\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	i2c_dev->regs = devm_ioremap(&pdev->dev, mem->start,
-> +				     resource_size(mem));
-> +	if (!i2c_dev->regs) {
-> +		dev_err(&pdev->dev, "Could not map registers\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> +	if (!irq) {
-> +		dev_err(&pdev->dev, "No IRQ resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	ret = devm_request_irq(&pdev->dev, irq->start, bcm2835_i2c_isr,
-> +			       IRQF_SHARED, dev_name(&pdev->dev), i2c_dev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Could not request IRQ\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	adap = &i2c_dev->adapter;
-> +	i2c_set_adapdata(adap, i2c_dev);
-> +	adap->owner = THIS_MODULE;
-> +	adap->class = I2C_CLASS_HWMON;
-> +	strlcpy(adap->name, "bcm2835 I2C adapter", sizeof(adap->name));
-> +	adap->algo = &bcm2835_i2c_algo;
-> +	adap->dev.parent = &pdev->dev;
-> +	adap->nr = -1;
-> +
-> +	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
-> +
-> +	ret = i2c_add_numbered_adapter(adap);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Could not add adapter\n");
-> +		return ret;
-> +	}
-> +
-> +	return 0;
+That the hardware IRQ 0 happens to be unused has nothing to do with
+whether or not Linux IRQ 0 is valid.
 
-The driver core will print a message if things fail here. The above 6
-lines can be replaced with simply:
+I rather think it's rather good to bump them up a bit, so that
+the reader understands that these are two different number
+spaces.
 
-	return i2c_add_numbered_adapter(adap);
+> With VIC1 having a base IRQ of 0 and VIC2 having a base IRQ of 32, the Linux
+> irq numbers match the numbers in the EP93xx datasheet. It makes debugging
+> a bit easier without having to deal with the offsets.
 
-> +}
-> +
-> +static int bcm2835_i2c_remove(struct platform_device *pdev)
-> +{
-> +	struct bcm2835_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
-> +
-> +	i2c_del_adapter(&i2c_dev->adapter);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id bcm2835_i2c_of_match[] = {
-> +	{ .compatible = "brcm,bcm2835-i2c" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, bcm2835_i2c_of_match);
-> +
-> +static struct platform_driver bcm2835_i2c_driver = {
-> +	.probe		= bcm2835_i2c_probe,
-> +	.remove		= bcm2835_i2c_remove,
-> +	.driver		= {
-> +		.name	= "i2c-bcm2835",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = bcm2835_i2c_of_match,
-> +	},
-> +};
-> +
-> +static int __init bcm2835_i2c_init_driver(void)
-> +{
-> +	return platform_driver_register(&bcm2835_i2c_driver);
-> +}
-> +module_init(bcm2835_i2c_init_driver);
-> +
-> +static void __exit bcm2835_i2c_exit_driver(void)
-> +{
-> +	platform_driver_unregister(&bcm2835_i2c_driver);
-> +}
-> +module_exit(bcm2835_i2c_exit_driver);
+This is not the design path chosen by Linux, for good or for bad.
 
-Nit: module_platform_driver()
+If you check /proc/interrupts, you should look for the name of
+the user, not the number.
 
-Otherwise looks pretty tight.
+This is why the case where you nail down number offsets
+in the VICs irqdomain is called a "legacy domain". And we
+don't necessarily want to keep legacy around.
 
-Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+Grant even wanted to get rid of them altogether and only use
+descriptors without numbers for IRQs IIRC.
 
-g.
+I put the ARM maintainers on the To: line so they can beat me
+up if I'm talking rubbish now...
+
+Yours,
+Linus Walleij
