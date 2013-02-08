@@ -1,51 +1,45 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:32 +0000
-Subject: [PATCH 02/17] ARM: set BE8 if LE in head code
+Date: Fri,  8 Feb 2013 23:17:39 +0000
+Subject: [PATCH 09/17] ARM: add atag32_to_cpu() function
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-10-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are booting in LE and compiled for BE8, then change the processor
-state in the head code. Since the instruction stream is always LE, we
-do not need to do anything special.
-
-Also ensure that the secondary processors are started in the same mode.
+Add atag32_to_cpu() function to allow code manipulating ATAGs to deal
+with the case where the boot-loader was in little-endian and Linux is
+running big-endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/boot/compressed/head.S |    3 +++
- arch/arm/kernel/head.S          |    3 +++
- 2 files changed, 6 insertions(+)
+ arch/arm/include/uapi/asm/setup.h |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index fe4d9c3..39940a7 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -134,6 +134,9 @@ start:
- 		.word	_edata			@ zImage end address
-  THUMB(		.thumb			)
- 1:
+diff --git a/arch/arm/include/uapi/asm/setup.h b/arch/arm/include/uapi/asm/setup.h
+index 979ff40..d74a417 100644
+--- a/arch/arm/include/uapi/asm/setup.h
++++ b/arch/arm/include/uapi/asm/setup.h
+@@ -175,13 +175,18 @@ struct tagtable {
+ 
+ #define tag_member_present(tag,member)				\
+ 	((unsigned long)(&((struct tag *)0L)->member + 1)	\
+-		<= (tag)->hdr.size * 4)
++		<= atag32_to_cpu((tag)->hdr.size) * 4)
+ 
+-#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
++#define tag_next(t)	((struct tag *)((__u32 *)(t) + atag32_to_cpu((t)->hdr.size)))
+ #define tag_size(type)	((sizeof(struct tag_header) + sizeof(struct type)) >> 2)
+ 
+ #define for_each_tag(t,base)		\
+ 	for (t = base; t->hdr.size; t = tag_next(t))
+ 
 +#ifdef CONFIG_CPU_BE8_BOOT_LE
-+		setend	be			@ go BE-8 if we booted LE / no-op if already BE-8
++#define atag32_to_cpu(x)	le32_to_cpu(x)
++#else
++#define atag32_to_cpu(x)	x
 +#endif
- 		mrs	r9, cpsr
- #ifdef CONFIG_ARM_VIRT_EXT
- 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 486a15a..f1ab279 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -333,6 +333,9 @@ ENTRY(secondary_startup)
- 	 * the processor type - there is no need to check the machine type
- 	 * as it has already been validated by the primary processor.
- 	 */
-+#ifdef CONFIG_CPU_BE8_BOOT_LE
-+	setend	be				@ if system starts LE, go to BE-8
-+#endif
- #ifdef CONFIG_ARM_VIRT_EXT
- 	bl	__hyp_stub_install_secondary
- #endif
+ 
+ #endif /* _UAPI__ASMARM_SETUP_H */
 -- 
 1.7.10.4
