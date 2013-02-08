@@ -1,28 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 8 Feb 2013 13:17:05 +0000
-Subject: [PATCH 3/4] spi: s3c64xx: add gpio quirk for controller
-In-Reply-To: <CAKrE-KfrWdOxm+DJyWqZn1Ye509E_LjzmDb5FMq55SF9-Sua0A@mail.gmail.com>
-References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
- <1360105784-12282-4-git-send-email-ks.giri@samsung.com>
- <20130207115546.GA3801@sirena.org.uk>
- <CAKrE-KfrWdOxm+DJyWqZn1Ye509E_LjzmDb5FMq55SF9-Sua0A@mail.gmail.com>
-Message-ID: <20130208131705.GZ8879@opensource.wolfsonmicro.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 8 Feb 2013 13:34:04 +0000 (UTC)
+Subject: OMAP baseline test results for v3.8-rc6
+In-Reply-To: <alpine.DEB.2.00.1302081306230.11464@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1302062333270.12769@utopia.booyaka.com>
+ <20130207083217.GA15462@arwen.pp.htv.fi>
+ <79CD15C6BA57404B839C016229A409A83EC06CEA@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302081306230.11464@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1302081332200.11464@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 10:54:01AM -0800, Girish KS wrote:
+On Fri, 8 Feb 2013, Paul Walmsley wrote:
 
-> As suggested i would make two changes.
-> 1. would parse the "gpios"  property and make decision whether to use
-> gpios/dedicated pins for miso/miso/clk.
-> 2.would parse "cs-gpio"  property from dts node to handle the chip select
-> correct me if my understanding is wrong
+> The point is to try to minimize bootloader dependencies.
 
-I think that's probably OK.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/03d4eeab/attachment.sig>
+Also if there are weird bootloader dependendencies that no one can track 
+down, we should document them somewhere, maybe underneath 
+Documentation/arm/OMAP.
+
+
+- Paul
