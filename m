@@ -1,153 +1,106 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Fri, 8 Feb 2013 00:58:59 -0800
-Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
- init
-In-Reply-To: <2723874.KAatFKgahz@flatron>
-References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
- <1585017.derjdP1mHL@amdc1227>
- <CAKrE-KfyGCi_+FozSpGTy0A0VJP=Jq-1SHmvKJU02iJKWHcvLQ@mail.gmail.com>
- <2723874.KAatFKgahz@flatron>
-Message-ID: <CAKrE-Kd-mNv=_YkM7GjicgDx=0hqbp5B6qwEvcRzhuSibRNaZA@mail.gmail.com>
+From: sangsu4u.park@samsung.com (Sangsu Park)
+Date: Fri, 08 Feb 2013 18:05:58 +0900
+Subject: [PATCH V3] ARM: EXYNOS: Add clocks for EXYNOS I2S and PCM I/F
+Message-ID: <011201ce05db$82ae97e0$880bc7a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 8, 2013 at 12:33 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On Thursday 07 of February 2013 09:46:58 Girish KS wrote:
->> On Thu, Feb 7, 2013 at 3:09 AM, Tomasz Figa <t.figa@samsung.com> wrote:
->> > Hi Girish,
->> >
->> > On Wednesday 06 of February 2013 12:12:29 Girish KS wrote:
->> >> On Wed, Feb 6, 2013 at 2:26 AM, Grant Likely
->> >> <grant.likely@secretlab.ca>>
->> > wrote:
->> >> > On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S
->> >
->> > <girishks2000@gmail.com> wrote:
->> >> >> The status of the interrupt is available in the status register,
->> >> >> so reading the clear pending register and writing back the same
->> >> >> value will not actually clear the pending interrupts. This patch
->> >> >> modifies the interrupt handler to read the status register and
->> >> >> clear the corresponding pending bit in the clear pending register.
->> >> >>
->> >> >> Modified the hwInit function to clear all the pending interrupts.
->> >> >>
->> >> >> Signed-off-by: Girish K S <ks.giri@samsung.com>
->> >> >> ---
->> >> >>
->> >> >>  drivers/spi/spi-s3c64xx.c |   41
->> >> >>  +++++++++++++++++++++++++---------------- 1 file changed, 25
->> >> >>  insertions(+), 16 deletions(-)
->> >> >>
->> >> >> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
->> >> >> index ad93231..b770f88 100644
->> >> >> --- a/drivers/spi/spi-s3c64xx.c
->> >> >> +++ b/drivers/spi/spi-s3c64xx.c
->> >> >> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq,
->> >> >> void *data)>>
->> >> >>
->> >> >>  {
->> >> >>
->> >> >>       struct s3c64xx_spi_driver_data *sdd = data;
->> >> >>       struct spi_master *spi = sdd->master;
->> >> >>
->> >> >> -     unsigned int val;
->> >> >> +     unsigned int val, clr = 0;
->> >> >>
->> >> >> -     val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
->> >> >> +     val = readl(sdd->regs + S3C64XX_SPI_STATUS);
->> >> >>
->> >> >> -     val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
->> >> >> -             S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
->> >> >> -             S3C64XX_SPI_PND_TX_OVERRUN_CLR |
->> >> >> -             S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->> >> >> -
->> >> >> -     writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->> >> >> -
->> >> >> -     if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
->> >> >> +     if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
->> >> >> +             clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
->> >> >>
->> >> >>               dev_err(&spi->dev, "RX overrun\n");
->> >> >>
->> >> >> -     if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
->> >> >> +     }
->> >> >> +     if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
->> >> >> +             clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
->> >> >>
->> >> >>               dev_err(&spi->dev, "RX underrun\n");
->> >> >>
->> >> >> -     if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
->> >> >> +     }
->> >> >> +     if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
->> >> >> +             clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
->> >> >>
->> >> >>               dev_err(&spi->dev, "TX overrun\n");
->> >> >>
->> >> >> -     if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
->> >> >> +     }
->> >> >> +     if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
->> >> >> +             clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->> >> >>
->> >> >>               dev_err(&spi->dev, "TX underrun\n");
->> >> >>
->> >> >> +     }
->> >> >> +
->> >> >> +     /* Clear the pending irq by setting and then clearing it */
->> >> >> +     writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->> >> >> +     writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->> >> >
->> >> > Wait, what?  clr & ~clr == 0   Always.  What are you actually
->> >> > trying
->> >> > to do here?
->> >>
->> >> The user manual says, wirting 1 to the pending clear register clears
->> >> the interrupt (its not auto clear to 0). so i need to explicitly
->> >> reset
->> >> those bits thats what the 2nd write does
->> >
->> > I have looked through user's manuals of different Samsung SoCs. All of
->> > them said that writing 1 to a bit clears the corresponding interrupt,
->> > but none of them contain any note that it must be manually cleared to
->> > 0.
->> What i meant was the clear pending bit will not clear automatically.
->> When I set the
->> clear pending bit, it remains set. This is a problem for the next
->> interrupt cycle.
->
-> How did you check that it does not clear automatically?
-I checked it with trace32 debugger. Also  confirmed with the IP
-validation engineer.
->
->> > In addition the expression
->> >
->> > clr & ~clr
->> >
->> > makes no sense, because it is equal to 0.
->>
->> It makes sense, because we are not disturbing the interrupt pending
->> bit at position 0, which is a trailing clr bit.
->
-> You either seem to misunderstand the problem I'm mentioning or not
-> understanding it at all.
->
-> If you take a variable named clr, no matter what value it is set to, and
-> you AND it with bitwise negation of the same variable, you will get 0.
->
-> See on this example:
->
-> Bits:     7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
->          -------------------------------
-> Values:   1 | 1 | 0 | 0 | 1 | 0 | 0 | 1
->          -------------------------------
-> Negation: 0 | 0 | 1 | 1 | 0 | 1 | 1 | 0
->          -------------------------------
-> AND:      0 | 0 | 0 | 0 | 0 | 0 | 0 | 0
->
-> Now, can you see that (clr & ~clr) is the same as (0)?
+Audio Subsystem has own clocks for I2S0 and PCM0 in all EXYNOS series.
+This patch add clocks for I2S0 and PCM0 I/F.
 
-Already apolozised for the same: will resubmit.
+Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+---
+ arch/arm/mach-exynos/Makefile      |    1 +
+ arch/arm/mach-exynos/clock-audss.c |   68 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/clock-audss.c
 
->
-> Best regards,
-> Tomasz
->
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 7e53a3a..5b6c7c0 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -13,6 +13,7 @@ obj-				:=
+ # Core
+ 
+ obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
++obj-$(CONFIG_ARCH_EXYNOS)	+= clock-audss.o
+ obj-$(CONFIG_ARCH_EXYNOS4)	+= clock-exynos4.o
+ obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
+ obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
+diff --git a/arch/arm/mach-exynos/clock-audss.c
+b/arch/arm/mach-exynos/clock-audss.c
+new file mode 100644
+index 0000000..31d01c3
+--- /dev/null
++++ b/arch/arm/mach-exynos/clock-audss.c
+@@ -0,0 +1,68 @@
++/*
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Clock support for EXYNOS Audio Subsystem
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/err.h>
++#include <linux/io.h>
++
++#include <plat/clock.h>
++#include <plat/s5p-clock.h>
++
++#define EXYNOS_PA_AUDSS	(0x03810000)
++
++/* IP Clock Gate 0 Registers */
++#define EXYNOS_AUDSS_CLKGATE_I2SBUS	(1<<2)
++#define EXYNOS_AUDSS_CLKGATE_I2SSPECIAL	(1<<3)
++#define EXYNOS_AUDSS_CLKGATE_PCMBUS	(1<<4)
++#define EXYNOS_AUDSS_CLKGATE_PCMSPECIAL	(1<<5)
++#define EXYNOS_AUDSS_CLKGATE_GPIO	(1<<6)
++
++static void __iomem *clk_audss_base;
++
++static int exynos_clk_audss_ctrl(struct clk *clk, int enable)
++{
++	if (!clk_audss_base)
++		return -ENOMEM;
++
++	return s5p_gatectrl(clk_audss_base, clk, enable);
++}
++
++static struct clk exynos_init_audss_clocks[] = {
++	{
++		.name		= "iis",
++		.devname	= "samsung-i2s.0",
++		.enable		= exynos_clk_audss_ctrl,
++		.ctrlbit	= EXYNOS_AUDSS_CLKGATE_I2SSPECIAL
++				| EXYNOS_AUDSS_CLKGATE_I2SBUS
++				| EXYNOS_AUDSS_CLKGATE_GPIO,
++	}, {
++		.name		= "pcm",
++		.devname	= "samsung-pcm.0",
++		.enable		= exynos_clk_audss_ctrl,
++		.ctrlbit	= EXYNOS_AUDSS_CLKGATE_PCMSPECIAL
++				| EXYNOS_AUDSS_CLKGATE_PCMBUS
++				| EXYNOS_AUDSS_CLKGATE_GPIO,
++	},
++};
++
++void __init exynos_register_audss_clocks(void)
++{
++	clk_audss_base = ioremap(EXYNOS_PA_AUDSS, SZ_4K);
++	if (clk_audss_base == NULL) {
++		pr_err("unable to ioremap for audss base\n");
++		return;
++	}
++
++	s3c_register_clocks(exynos_init_audss_clocks,
++			    ARRAY_SIZE(exynos_init_audss_clocks));
++	s3c_disable_clocks(exynos_init_audss_clocks,
++			   ARRAY_SIZE(exynos_init_audss_clocks));
++}
+-- 
+1.7.4.1
