@@ -1,40 +1,49 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:34 +0000
-Subject: [PATCH 04/17] ARM: Add ARCH_SUPPORTS_BIG_ENDIAN
+Date: Fri,  8 Feb 2013 23:17:36 +0000
+Subject: [PATCH 06/17] ARM: fixup head for atag verification
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-5-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-7-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARCH_SUPPORTS_BIG_ENDIAN define to arch/arm/Kconfig. Since it used
-to live in arch/arm/mach-ixp4xx/Kconfig we move it up to the ARM one
-as the next best place for it.
-
-It may be that it could be moved to a more generic location, with the
-other ARCH_SUPPORT functions.
+If we booted LE but running BE8, ensure we read ATAGs data from head code
+in the correct mode.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/Kconfig |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/kernel/head-common.S |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d3f6c4f..8dfa634 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -152,6 +152,12 @@ config ARCH_HAS_CPUFREQ
- 	  and that the relevant menu configurations are displayed for
- 	  it.
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 854bd22..4eb53b2 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -21,6 +21,12 @@
+ #define OF_DT_MAGIC 0xedfe0dd0 /* 0xd00dfeed in big-endian */
+ #endif
  
-+config ARCH_SUPPORTS_BIG_ENDIAN
-+	bool
-+	help
-+	  Internal node to specify the architecture can run in Big Endian
-+	  mode.
++#ifdef CONFIG_CPU_BE8_BOOT_LE
++#define BE8_LE(x...)	x
++#else
++#define BE8_LE(x...)
++#endif
 +
- config GENERIC_HWEIGHT
- 	bool
- 	default y
+ /*
+  * Exception handling.  Something went wrong and we can't proceed.  We
+  * ought to tell the user, but since we don't have any guarantee that
+@@ -53,10 +59,12 @@ __vet_atags:
+ 	cmp	r5, r6
+ 	beq	2f
+ #endif
++BE8_LE(	rev	r5, r5 )
+ 	cmp	r5, #ATAG_CORE_SIZE		@ is first tag ATAG_CORE?
+ 	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
+ 	bne	1f
+ 	ldr	r5, [r2, #4]
++BE8_LE(	rev	r5, r5 )
+ 	ldr	r6, =ATAG_CORE
+ 	cmp	r5, r6
+ 	bne	1f
 -- 
 1.7.10.4
