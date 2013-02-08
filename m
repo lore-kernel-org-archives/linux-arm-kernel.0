@@ -1,93 +1,114 @@
-From: amit.kachhap@gmail.com (amit kachhap)
-Date: Thu, 7 Feb 2013 19:26:53 -0800
-Subject: [PATCH 2/3] cpufreq: exynos: Adding cpufreq driver for exynos5440
-In-Reply-To: <CAKohpon1J+7ZQu+Nevz_KBXpVa2Kus--DxR3cOhb97o-scB0fw@mail.gmail.com>
-References: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
- <1360179562-19950-2-git-send-email-amit.daniel@samsung.com>
- <CAOh2x=kYM8n8XipvQ0-3H5f=B2TwAeFSa0DP=hy+SWQvPXJh6Q@mail.gmail.com>
- <CADGdYn7+U1fvFdHkAikoH9P-owF0ZKk6ZSgrPfY+16S3vO=S3A@mail.gmail.com>
- <CAKohpon1J+7ZQu+Nevz_KBXpVa2Kus--DxR3cOhb97o-scB0fw@mail.gmail.com>
-Message-ID: <CADGdYn7FHa0Gnntpjs-K6T421=F0rZEhjyg-mkcsb_YDA6SZWQ@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 7 Feb 2013 21:21:57 -0700
+Subject: Giving special alignment/size constraints to the Linux PCI core?
+In-Reply-To: <20130207165009.73b1f340@skate>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <2776630.gp5gC9tvLk@wuerfel> <20130131180249.GA30869@obsidianresearch.com>
+ <201301312046.22560.arnd@arndb.de>
+ <20130131224459.GA11846@obsidianresearch.com>
+ <20130206175128.1b64196d@skate> <20130206170903.GA28198@obsidianresearch.com>
+ <20130206181852.4eca53e3@skate> <20130206175019.GA24248@obsidianresearch.com>
+ <20130207165009.73b1f340@skate>
+Message-ID: <CAErSpo7hwG89LTO+4+eqT_Gb+yUn1XKHYJ8CnnZcf_FPo-Kpyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 7, 2013 at 6:42 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 8 February 2013 00:38, amit kachhap <amit.kachhap@gmail.com> wrote:
->> Hi Viresh,
+On Thu, Feb 7, 2013 at 8:50 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Bjorn,
+>
+> I guess I need your advice on the below problem, but here is a summary.
+>
+> Basically, the PCI-to-PCI bridge specifications require that the memory
+> address assigned to a PCI-to-PCI bridge is aligned on a 1 MB boundary.
+>
+> Unfortunately, on Marvell hardware, we can only create address decoding
+> windows that are aligned on a multiple of their size (a 1 MB window
+> must be 1 MB aligned, a 2 MB window must be 2 MB aligned, etc.).
+>
+> How can we teach the Linux PCI core about this requirement, so that it
+> does a proper assignment of addresses at the PCI-to-PCI bridge level?
+> For the I/O addresses, Russell suggested the pcibios_window_alignment()
+> hook, but it doesn't receive the size of the resource, so we can't
+> determine what alignment is needed.
+>
+> As Jason points out below, we need to be able to tell the PCI core that
+> a given memory area needs some alignment, but also that its size is
+> larger than what the PCIe device claims, because we cannot create
+> address decoding windows of an arbitrary size. For example, an address
+> decoding window of 3 MB is not possible, so if a device wants 3 MB,
+> then we would need to extend this memory area to 4 MB so that the next
+> device doesn't get an address decoding window that overlaps with the
+> previous one.
+>
+> I was hoping that the emulated PCI-to-PCI bridge could, by its
+> behavior, teach the Linux PCI core about these special constraints.
+> However, reading the PCI-to-PCI bridge specification, I don't see how
+> to achieve that.
+>
+> Do you have some suggestions?
+
+Huh.  That hardware looks less and less like a P2P bridge all the time
+:(  You can't configure it via standard PCI config accesses, and the
+aperture alignment and size constraints sound completely non-standard.
+ Are the specs for this thing public?
+
+I could imagine changing pcibios_window_alignment() to take the
+resource, so it could deal with the alignment question (though I
+haven't looked in detail and there might be some implementation issue
+with that).
+
+With regard to the size issue (3MB window using 4MB of address space),
+I can't think of a reasonable way to teach the PCI core about both
+sizes.  But is there any reason to program the bridge for a 3MB window
+instead of a 4MB window, given that there's nothing else we can do
+with the extra 1MB anyway?  Is a 3MB window even possible?  I would
+think something that must be aligned on its size would be restricted
+to power-of-2 sizes anyway, just like PCI BARs are.  Maybe you can
+just always round up window sizes to a power of 2?
+
+Bjorn
+
+> On Wed, 6 Feb 2013 10:50:19 -0700, Jason Gunthorpe wrote:
+>
+>> > > > Can't this be solved using the window_alignement() hook we've
+>> > > > been discussing separately? Just like we teach the Linux PCI
+>> > > > core about our alignment requirements of 64K for the I/O
+>> > > > regions, we could teach it about our alignment requirement on
+>> > > > memory regions as well. No?
+>> > >
+>> > > Hopefully :) As long as it can adjust the start and length you
+>> > > should be fine.
+>> >
+>> > Why would you need to adjust the length? If Linux allocates a 2 MB
+>> > resource on a 1 MB boundary, we simply increase the start address to
+>> > the next 2 MB boundary, and that's it. Why would the length need to
+>> > change?
 >>
->> Thanks for the detailed review. Will try to handle them in the next version,
+>> Well, lets say 3MB is the example. A 3mb region needs to fit inside a
+>> 4mb MBUS window. If you align the start to 4mb then the pci-e core
+>> needs to know that it can't use the extra 1mb covered by the mbus
+>> window. mbus windows must not overlap.
+>>
+>> Adjusting the bridge window length to be 4mb communicates that dead
+>> space to the PCI core, and presumably this shows up in lspci and
+>> whatnot.
+>>
+>> I suppose if you align the end to 4mb (thus creating the gap before,
+>> not after) things should work out OK, but the information that the gap
+>> is routed to a specific PCI link is lost..
+>>
+>> Jason
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
-> np. I haven't seen reply to few questions, you missed them or accept them.
-
-Many of your comments were apt so I agreed to most of them :)
-
 >
-> General tip: Leave a blank line before and after your comment, it makes it more
-> readable. :)
 >
->> On Thu, Feb 7, 2013 at 3:17 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->>> On Thu, Feb 7, 2013 at 1:09 AM, Amit Daniel Kachhap
->>>> +Required properties:
->>>> +- interrupts: Interrupt to know the completion of cpu frequency change.
->>>> +- cpufreq_tbl: Table of frequencies and voltage CPU could be transitioned into,
->>>
->>> This has to be "operating-points" as in cpufreq-cpu0 driver.
->> Yes I will check if opp table is beneficial. In my case it is just one
->> time parsing of cpufreq table and those values(freq, volt) are not
->> used later so did not use opp libraries.
->
-> Its one time parsing for everybody, nobody do it twice :)
-
-By every time I mean like using the opp table and getting voltage from
-there and then doing set_voltage. For me if I use opp table it is just
-once during initializations so i didn't use it.
-
->
->>>> +       for (old_index = 0;
->>>> +               freq_table[old_index].frequency != CPUFREQ_TABLE_END;
->>>> +               old_index++)
->>>> +               if (freq_table[old_index].frequency == freqs.old)
->>>> +                       break;
->>>> +
->>>> +       if (freq_table[old_index].frequency == CPUFREQ_TABLE_END) {
->>>
->>> How can this be true?
->> This is error scenario
->
-> We have given cpufreq core a valid table and it has to set frequency from
-> this table only. How can cpu have any other freq here ? And you have done
-> something similar in your init() too, where you check if cpu has freq from the
-> table or not.
-
-Yes agreed this is repetition.
-
->
->>>> +       dvfs_info = kzalloc(sizeof(struct exynos_dvfs_data), GFP_KERNEL);
->>>
->>> sizeof(*dvfs_info) ?? why don't make it static too, as you have other
->>> stuff too.. ?
->>> The better option for single image solution to allocate everything
->>> dynamically, so that
->>> unused drivers don't occupy any space.
->
-> ?
->
->>>> +       if ((len == 0) || (len / 2 > CPUFREQ_LEVEL_END)) {
->>>
->>> I really didn't like this limit you have put at the number of dvfs
->>> points. Better
->>> would be to use:
->
->>>> +       dvfs_info->dvfs_init = true;
->>>
->>> why do you need this ?
->> This is added to synchronize the interrupts.
->
-> How? You are setting it once in init() and not touching it afterwards. :)
-
-Yes but during init also if interrupts starts arriving before complete
-initialization so to protect that case it is there. I suppose there
-are other ways. Will check them
-
-Thanks,
-Amit Daniel
+> --
+> Thomas Petazzoni, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
