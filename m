@@ -1,41 +1,53 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 8 Feb 2013 16:23:41 +0530
-Subject: [PATCH 2/3] ARM:dts:SPEAr1310:Correct the clcd pin group name
-In-Reply-To: <4854ebf7198ff341d699372cf569210a6f0b363b.1360317993.git.vijay.kumar@st.com>
+Date: Fri, 8 Feb 2013 16:25:32 +0530
+Subject: [PATCH 3/3] SPEAr13xx_defconfig: Enable compilation using the
+ latest
+In-Reply-To: <4d1cdf05ed312af2d8004496765f8fc82c27f2c1.1360317993.git.vijay.kumar@st.com>
 References: <cover.1360317993.git.vijay.kumar@st.com>
- <4854ebf7198ff341d699372cf569210a6f0b363b.1360317993.git.vijay.kumar@st.com>
-Message-ID: <CAKohpo=rvp8b0QhjyXiKZ9vezTZKZG6moc85JAFi3NES0+WvDA@mail.gmail.com>
+ <4d1cdf05ed312af2d8004496765f8fc82c27f2c1.1360317993.git.vijay.kumar@st.com>
+Message-ID: <CAKohponiqtj9zpox6qoTDpA3Fmw9tX7mpyJPv0S5mcTrrd=P3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove "the" from subject.
-
 On 8 February 2013 16:16, Vijay Kumar Mishra <vijay.kumar@st.com> wrote:
-> This patch is to correct clcd pin group name "clcd_high_res" to
-> "clcd_high_res_grp" to avoid kernel boot hang as with following error message.
+> This Patch is to enable CONFIG_AEABI option in kernel. Which basically adds
+> support for latest ARMABI (EABI).
 >
-> spear1310-pinmux e0700000.pinmux: invalid group "clcd_high_res" for function
-> "clcd".
+> It also include support for changes the kernel syscall calling convention to
 
-Write it as:
+                                            changing
 
-Incorrect pin group name "clcd_high_res" is passed from DT, which causes boot
-failure. Fix it by replacing it with "clcd_high_res_grp".
-
+> disambiguate both ABIs and allow for backward compatibility support.
+>
+> Without this option the kernel crashes. Crash log is below:
+>
+> Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000004
+> Exception stack(0xbf873f64 to 0xbf873fac)
+> 3f60:          00000020 804725b4 00000001 00000000 bf872000 80498684 803308bc
+> 3f80: 80474fe8 bf872000 412fc091 00000000 bf873fb8 bf873fbc bf873fac 80009c50
+> 3fa0: 80009c54 60000113 ffffffff
+>  r7:bf873f98 r6:ffffffff r5:60000113 r4:80009c54
+> [<80009c24>] (default_idle+0x0/0x38) from [<80009e24>] (cpu_idle+0xac/0xf0)
+> [<80009d78>] (cpu_idle+0x0/0xf0) from [<803277ec>]
+> (secondary_start_kernel+0xec/0x10c)
+>  r8:0000406a r7:80498950 r6:10c03c7d r5:00000001 r4:80478bd0
+> [<80327700>] (secondary_start_kernel+0x0/0x10c) from [<00326dc8>] (0x326dc8)
+>  r5:0
 > ---
->  arch/arm/boot/dts/spear1310-evb.dts |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/configs/spear13xx_defconfig |    1 +
+>  1 file changed, 1 insertion(+)
 >
-> diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
-> index b56a801..6fd4c36 100644
-> --- a/arch/arm/boot/dts/spear1310-evb.dts
-> +++ b/arch/arm/boot/dts/spear1310-evb.dts
-> @@ -47,7 +47,7 @@
->                                         st,function = "arm_gpio";
->                                 };
->                                 clcd {
-> -                                       st,pins = "clcd_grp" , "clcd_high_res";
-> +                                       st,pins = "clcd_grp", "clcd_high_res_grp";
->                                         st,function = "clcd";
->                                 };
->                                 eth {
+> diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+> index 1b5ceff..4e2866d 100644
+> --- a/arch/arm/configs/spear13xx_defconfig
+> +++ b/arch/arm/configs/spear13xx_defconfig
+> @@ -15,6 +15,7 @@ CONFIG_SMP=y
+>  # CONFIG_SMP_ON_UP is not set
+>  # CONFIG_ARM_CPU_TOPOLOGY is not set
+>  CONFIG_VMSPLIT_2G=y
+> +CONFIG_AEABI=y
+>  CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_BINFMT_MISC=y
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
