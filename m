@@ -1,37 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 8 Feb 2013 08:31:21 +0000
-Subject: [GIT PULL] ux500 DT related fixes and platform enhancements
-In-Reply-To: <CACRpkdaTajxS6YbjyyGPQ=qWiAkLaPySU6WncQ2E8HoAtGXqjA@mail.gmail.com>
-References: <20130131115552.GG5301@gmail.com> <20130206135911.GB7519@gmail.com>
- <CAOesGMiJTcjdEJzSDkpdV-ZCqN24uVmfjM-HOt+ojErS=98TmQ@mail.gmail.com>
- <CAF2Aj3gaFtPs7gLd3snzVr1a8Px5A_RN1vz=M+U_LZ3MBpyqqw@mail.gmail.com>
- <CACRpkdaTajxS6YbjyyGPQ=qWiAkLaPySU6WncQ2E8HoAtGXqjA@mail.gmail.com>
-Message-ID: <20130208083121.GG7519@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 8 Feb 2013 09:33:13 +0100
+Subject: [PATCH 0/4] clk: Provide option to unprepare unused clocks at
+ late init
+In-Reply-To: <CAPDyKFqgaw=9rfVQPyGNVMC4F+_dLKBzNqi4vwD9JwM1qDytDw@mail.gmail.com>
+References: <1359045956-30741-1-git-send-email-ulf.hansson@stericsson.com>
+ <20130124184944.10623.20870@quantum>
+ <CAPDyKFqgaw=9rfVQPyGNVMC4F+_dLKBzNqi4vwD9JwM1qDytDw@mail.gmail.com>
+Message-ID: <CAPDyKFpCqQG80_3y3zQUyK4cTXbrai2wOsJsaB6OZmBRFcmnnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 07 Feb 2013, Linus Walleij wrote:
+On 24 January 2013 21:41, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Hi Mike,
+>
+> On 24 January 2013 19:49, Mike Turquette <mturquette@linaro.org> wrote:
+>> Quoting Ulf Hansson (2013-01-24 08:45:52)
+>>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>>>
+>>> The disable_unused sequence executed at late init, is already handling the
+>>> fast unused ungated clocks to be gated. This patchset extends this sequence to
+>>> include the slow unused prepared clocks to be unprepared.
+>>>
+>>> The default behavior will not change in this patchset. To unprepare unused
+>>> clocks during the disable_unused sequence, the clk_hw needs to implement
+>>> the new optional callback, is_prepared.
+>>>
+>>> The motivation for this patchset is to save power. Clocks that is from
+>>> bootloaders prepared|enabled, but not used should be unprepared|disabled.
+>>>
+>>> Patch 4 is specific for ux500, which implements the is_prepared callback
+>>> for it's PRMCU clocks.
+>>>
+>>> Note that patch 1-3 has been sent earlier, but since a proof of concept
+>>> patch could be useful, as patch 4 is, the hole patchset is resent.
+>>>
+>>
+>> Hi Ulf,
+>>
+>> I had some minor discussion in patch #1.  Otherwise patches #2 & #3 look
+>> good to me.
+>>
+>> Patch #4 is a bit interesting.  There is nothing wrong with it per se,
+>> but the general layering of the prcmu power stuff is the opposite of how
+>> I had envisioned things.  Your .prepare callback is making calls to some
+>> pm_qos api but a quick grep did not reveal any definitions for those
+>> functions, just some stubs in include/linux/mfd/dbx500-prcmu.h.
+>>
+>> Do these functions scale voltage?  I had figured that some day
+>> per-device pm qos apis would call the clk api, not the other way around.
+>
+> You are right, these scale voltages. I would like to keep the code as
+> is, just as a reminder that some devices using some clocks will
+> requires these kind of operations.
+> On our internal STE development track this is how it is used but we a
+> are moving towards newer APIs.
+>
+> So I am definitely sharing the same thought as you do and my plan is
+> to remove this code along the road, once drivers is adapted properly.
+>
+>>
+>> Anyways that is just food for thought and no reason to block patch #4.
+>>
+>> Regards,
+>> Mike
+>>
+>>> Ulf Hansson (4):
+>>>   clk: Introduce optional is_prepared callback
+>>>   clk: Unprepare the unused prepared slow clocks at late init
+>>>   clk: Introduce optional unprepare_unused callback
+>>>   clk: ux500: Support is_prepared callback for clk-prcmu
+>>>
+>>>  drivers/clk/clk.c             |   53 ++++++++++++++++
+>>>  drivers/clk/ux500/clk-prcmu.c |  134 ++++++++++++++++++++++++-----------------
+>>>  include/linux/clk-provider.h  |   11 ++++
+>>>  3 files changed, 144 insertions(+), 54 deletions(-)
+>>>
+>>> --
+>>> 1.7.10
+>
+> Thanks for the review comments!
+>
+> Kind regards
+> Ulf Hansson
 
-> On Thu, Feb 7, 2013 at 10:24 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > I can do that. The reason I was submitting myself was due to the massive
-> > amount of ux500 DT patches I was pushing. Now that's stopped, I'm happy for
-> > Linus to handle it all.
-> 
-> OK so what about I pull this branch into my ux500 git and
-> call it a devicetree branch, and then we can optionally
-> merge a few of those ARM: ux500: * patches that
-> was sent for the regulator stuff on top of that as well?
+Ping, on this. Any issues merging this for 3.9?
 
-There are two reasons why I don't like that idea: 1) As Olof pointed
-out, a lot of these patches aren't actually DT related, and 2) I
-really want all of the regulator stuff to stay together. Each of the
-changes in the platform code are directly dependent on the ones
-happening in the regulator driver, and visa versa. It would be best if
-they continued to be taken though Marks tree.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Kind regards
+Ulf Hansson
