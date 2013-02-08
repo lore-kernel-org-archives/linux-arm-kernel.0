@@ -1,214 +1,64 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 8 Feb 2013 01:51:09 +0000
-Subject: [v4 PATCH 12/12] ARM: dts: add spi nodes for the atmel boards
-References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
- <1358148877-18679-13-git-send-email-wenyou.yang@atmel.com>
- <20130205195008.GA30595@game.jcrosoft.org>
-Message-ID: <B256D81BAE5131468A838E5D7A2436413A0875A3@penmbx02>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Feb 2013 17:44:02 -0800
+Subject: [PATCH 2/2] dmaengine: OMAP: Register SDMA controller with
+ Device Tree DMA driver
+In-Reply-To: <51144C3E.7070603@ti.com>
+References: <1360184596-1603-1-git-send-email-jon-hunter@ti.com>
+ <201302071439.13720.arnd@arndb.de> <5113CD6F.3060108@ti.com>
+ <10081370.NaeII8M1Pj@wuerfel> <51144C3E.7070603@ti.com>
+Message-ID: <20130208014402.GA7556@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, JC
+* Jon Hunter <jon-hunter@ti.com> [130207 16:55]:
+> 
+> Ugh, looks like linux-next is broken for omap2+ boards at the moment
+> and is panic'ing in the twl i2c code ... some else to look into ...
+> 
+> Peter have you seen this on linux-next? I am seeing this on omap2-4 boards.
 
-> -----Original Message-----
-> From: Yang, Wenyou
-> Sent: 2013?2?6? 9:35
-> To: 'Jean-Christophe PLAGNIOL-VILLARD'
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ferre,
-> Nicolas; richard.genoud at gmail.com; Lin, JM; linux at arm.linux.org.uk
-> Subject: RE: [v4 PATCH 12/12] ARM: dts: add spi nodes for the atmel boards
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
-> > Sent: 2013?2?6? 3:50
-> > To: Yang, Wenyou
-> > Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> Ferre,
-> > Nicolas; richard.genoud at gmail.com; Lin, JM; linux at arm.linux.org.uk
-> > Subject: Re: [v4 PATCH 12/12] ARM: dts: add spi nodes for the atmel boards
-> >
-> > On 15:34 Mon 14 Jan     , Wenyou Yang wrote:
-> > > From: Richard Genoud <richard.genoud@gmail.com>
-> > >
-> > > Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> > > [wenyou.yang at atmel.com: added spi nodes for the sam9263ek,
-> sam9g20ek,
-> > sam9m10g45ek and sam9n12ek boards]
-> > > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > > Cc: linux at arm.linux.org.uk
-> > > ---
-> > >  arch/arm/boot/dts/at91sam9263ek.dts         |   14
-> > ++++++++++++++
-> > >  arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   14
-> > ++++++++++++++
-> > >  arch/arm/boot/dts/at91sam9m10g45ek.dts      |   14
-> > ++++++++++++++
-> > >  arch/arm/boot/dts/at91sam9n12ek.dts         |   14
-> > ++++++++++++++
-> > >  arch/arm/boot/dts/at91sam9x5ek.dtsi         |   14
-> ++++++++++++++
-> > >  5 files changed, 70 insertions(+)
-> > >
-> > > diff --git a/arch/arm/boot/dts/at91sam9263ek.dts
-> > b/arch/arm/boot/dts/at91sam9263ek.dts
-> > > index 1eb0872..63ba57b 100644
-> > > --- a/arch/arm/boot/dts/at91sam9263ek.dts
-> > > +++ b/arch/arm/boot/dts/at91sam9263ek.dts
-> > > @@ -79,6 +79,20 @@
-> > >  					};
-> > >  				};
-> > >  			};
-> > > +
-> > > +			spi0: spi at fffa4000 {
-> > > +				status = "okay";
-> > > +				cs-gpios = <&pioA 5 0
-> > > +					    &pioA 3 0
-> > > +					    &pioA 4 0
-> > > +					    &pioB 11 0
-> > NACK
-> >
-> > we no use that much as cs-gpios on this hw
-> 
-> Thanks for your feedback.
-> 
-> Listing the all choices for cs-gpios, one cs-gpio is selected by reg value.
-> Maybe listing one cs-gpio is OK.
-> I will try it.
-> 
-> I am going to dig the feasibility of removing cs-gpios.
+Does not happen with arm-soc/for-next, probably related to the
+drivers/mfd/*twl* changes?
 
-I need remain the list of cs-gpios, because "master->num_chipselect" is got from the number of item of this list.
-If this list is removed, only the cs-gpio for used chip-select is provided , it works for CS0 chip-select, but it fails to work for other than CS0, e.g. CS1.
-
-Could you give me some idea?
-Thank you in advance.
-
+Tony
+ 
+> [    2.286132] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> [    2.294738] pgd = c0004000
+> [    2.297576] [00000000] *pgd=00000000
+> [    2.301361] Internal error: Oops: 5 [#1] SMP ARM
+> [    2.306243] Modules linked in:
+> [    2.309448] CPU: 0    Not tainted  (3.8.0-rc6-next-20130207-00016-g735c237 #35)
+> [    2.317169] PC is at twl_i2c_read+0x3c/0xec
+> [    2.321563] LR is at twl_i2c_read+0x1c/0xec
+> [    2.325988] pc : [<c0333950>]    lr : [<c0333930>]    psr: 80000153
+> [    2.325988] sp : c702fed0  ip : 00000000  fp : 00000000
+> [    2.338043] r10: c702e000  r9 : c06e84e8  r8 : c06e51c8
+> [    2.343536] r7 : 00000001  r6 : 00000006  r5 : c702fef6  r4 : 00000004
+> [    2.350402] r3 : c129508c  r2 : 00000006  r1 : c702fef6  r0 : 0000000e
+> [    2.357269] Flags: Nzcv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+> [    2.365051] Control: 10c5387d  Table: 80004019  DAC: 00000017
+> [    2.371093] Process swapper/0 (pid: 1, stack limit = 0xc702e240)
+> [    2.377410] Stack: (0xc702fed0 to 0xc7030000)
+> [    2.382019] fec0:                                     c0d42180 c0d429d0 c70a7640 c07354c4
+> [    2.390624] fee0: 00000001 c0719798 c0d42180 c06f2cc0 c04e76cc c06ee1ac 00000000 c07354c4
+> [    2.399230] ff00: 00000007 c06f2d64 00000017 c06fb308 00000000 c06f07a4 c0cb8580 c06edee0
+> [    2.407836] ff20: c06eded4 c06e8504 c0d42180 c0008768 0000009e c00611b4 00000001 00000000
+> [    2.416442] ff40: c061994c c06b7548 00000007 00000007 00000000 c07354c4 00000007 c0719798
+> [    2.425048] ff60: c0d42180 c06e51c8 c07197a0 0000009e 00000000 c06e590c 00000007 00000007
+> [    2.433654] ff80: c06e51c8 00000000 00000000 c04d26ec 00000000 00000000 00000000 00000000
+> [    2.442260] ffa0: 00000000 c04d26f4 00000000 c00137b0 00000000 00000000 00000000 00000000
+> [    2.450866] ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> [    2.459472] ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 80fb6c10 71bbcd20
+> [    2.468078] [<c0333950>] (twl_i2c_read+0x3c/0xec) from [<c06f2cc0>] (omap3_twl_set_sr_bit+0x3c/0xb4)
+> [    2.477722] [<c06f2cc0>] (omap3_twl_set_sr_bit+0x3c/0xb4) from [<c06f2d64>] (omap3_twl_init+0x2c/0x70)
+> [    2.487518] [<c06f2d64>] (omap3_twl_init+0x2c/0x70) from [<c06fb308>] (omap_pmic_late_init+0x18/0x24)
+> [    2.497222] [<c06fb308>] (omap_pmic_late_init+0x18/0x24) from [<c06f07a4>] (omap2_common_pm_late_init+0x18/0xd0)
+> [    2.507934] [<c06f07a4>] (omap2_common_pm_late_init+0x18/0xd0) from [<c06edee0>] (omap3_init_late+0xc/0x18)
+> [    2.518188] [<c06edee0>] (omap3_init_late+0xc/0x18) from [<c06e8504>] (init_machine_late+0x1c/0x28)
+> [    2.527740] [<c06e8504>] (init_machine_late+0x1c/0x28) from [<c0008768>] (do_one_initcall+0x100/0x16c)
+> [    2.537536] [<c0008768>] (do_one_initcall+0x100/0x16c) from [<c06e590c>] (kernel_init_freeable+0xfc/0x1c8)
+> [    2.547698] [<c06e590c>] (kernel_init_freeable+0xfc/0x1c8) from [<c04d26f4>] (kernel_init+0x8/0xe4)
+> [    2.557250] [<c04d26f4>] (kernel_init+0x8/0xe4) from [<c00137b0>] (ret_from_fork+0x14/0x24)
 > 
-> > > +					   >;
-> > > +				mtd_dataflash at 0 {
-> > > +					compatible = "atmel,at45", "atmel,dataflash";
-> > > +					spi-max-frequency = <50000000>;
-> > > +					reg = <0>;
-> > > +				};
-> > > +			};
-> > >  		};
-> > >
-> > >  		nand0: nand at 40000000 {
-> > > diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-> > b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-> > > index da15e83..49ad49e 100644
-> > > --- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-> > > +++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-> > > @@ -96,6 +96,20 @@
-> > >  				status = "okay";
-> > >  				pinctrl-0 = <&pinctrl_ssc0_tx>;
-> > >  			};
-> > > +
-> > > +			spi0: spi at fffc8000 {
-> > > +				status = "okay";
-> > > +				cs-gpios = <&pioA 3 0
-> > > +					    &pioC 11 0
-> > > +					    &pioC 16 0
-> > > +					    &pioC 17 0
-> > ditto and so on
-> >
-> > you must only provife the gpio use by the hw
-> > > +					   >;
-> > > +				mtd_dataflash at 0 {
-> > > +					compatible = "atmel,at45", "atmel,dataflash";
-> > > +					spi-max-frequency = <50000000>;
-> > > +					reg = <1>;
-> > > +				};
-> > > +			};
-> > >  		};
-> > >
-> > >  		nand0: nand at 40000000 {
-> > > diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> > b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> > > index 20c3191..275f22d 100644
-> > > --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> > > +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> > > @@ -102,6 +102,20 @@
-> > >  					};
-> > >  				};
-> > >  			};
-> > > +
-> > > +			spi0: spi at fffa4000{
-> > > +				status = "okay";
-> > > +				cs-gpios = <&pioB 3 0
-> > > +					    &pioB 18 0
-> > > +					    &pioB 19 0
-> > > +					    &pioD 27 0
-> > > +					   >;
-> > > +				mtd_dataflash at 0 {
-> > > +					compatible = "atmel,at45", "atmel,dataflash";
-> > > +					spi-max-frequency = <13000000>;
-> > > +					reg = <0>;
-> > > +				};
-> > > +			};
-> > >  		};
-> > >
-> > >  		nand0: nand at 40000000 {
-> > > diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts
-> > b/arch/arm/boot/dts/at91sam9n12ek.dts
-> > > index 0376bf4..4eeca7b 100644
-> > > --- a/arch/arm/boot/dts/at91sam9n12ek.dts
-> > > +++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-> > > @@ -67,6 +67,20 @@
-> > >  					};
-> > >  				};
-> > >  			};
-> > > +
-> > > +			spi0: spi at f0000000 {
-> > > +				status = "okay";
-> > > +				cs-gpios = <&pioA 14 0
-> > > +					    &pioA 7 0
-> > > +					    &pioA 1 0
-> > > +					    &pioB 3 0
-> > > +					   >;
-> > > +				m25p80 at 0 {
-> > > +					compatible = "atmel,at25df321a";
-> > > +					spi-max-frequency = <50000000>;
-> > > +					reg = <0>;
-> > > +				};
-> > > +			};
-> > >  		};
-> > >
-> > >  		nand0: nand at 40000000 {
-> > > diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> > b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> > > index 8a7cf1d..ca0a056 100644
-> > > --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> > > +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> > > @@ -84,6 +84,20 @@
-> > >  					};
-> > >  				};
-> > >  			};
-> > > +
-> > > +			spi0: spi at f0000000 {
-> > > +				status = "okay";
-> > > +				cs-gpios = <&pioA 14 0
-> > > +					    &pioA 7 0
-> > > +					    &pioA 1 0
-> > > +					    &pioB 3 0
-> > > +					   >;
-> > > +				m25p80 at 0 {
-> > > +					compatible = "atmel,at25df321a";
-> > > +					spi-max-frequency = <50000000>;
-> > > +					reg = <0>;
-> > > +				};
-> > > +			};
-> > >  		};
-> > >
-> > >  		usb0: ohci at 00600000 {
-> > > --
-> > > 1.7.9.5
-> > >
-> 
-> Best Regards,
-> Wenyou Yang
-
-Best Regards,
-Wenyou Yang
+> Cheers
+> Jon
