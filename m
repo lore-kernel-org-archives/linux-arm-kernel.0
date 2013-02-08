@@ -1,41 +1,38 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Fri, 08 Feb 2013 15:31:25 +0800
-Subject: [PATCH v3 2/4] ARM: Kirkwood: Add support thermal sensor for
- 88F6282 and 88F6283
-In-Reply-To: <20130204141943.GL14746@titan.lakedaemon.net>
-References: <1359815749-27705-1-git-send-email-andrew@lunn.ch>
- <1359815749-27705-3-git-send-email-andrew@lunn.ch>
- <1359947693.2250.50.camel@rzhang1-mobl4>
- <20130204141943.GL14746@titan.lakedaemon.net>
-Message-ID: <1360308685.2242.16.camel@rzhang1-mobl4>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 8 Feb 2013 09:42:29 +0200
+Subject: [PATCH 02/10] USB: EHCI: make ehci-omap a separate driver
+In-Reply-To: <5113e5db.c84e420a.08c3.ffffbe6b@mx.google.com>
+References: <yes> <1360258447-27247-1-git-send-email-yes>
+ <5113e5db.c84e420a.08c3.ffffbe6b@mx.google.com>
+Message-ID: <20130208074229.GA21879@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Jason,
+HI,
 
-On Mon, 2013-02-04 at 09:19 -0500, Jason Cooper wrote:
-> On Mon, Feb 04, 2013 at 11:14:53AM +0800, Zhang Rui wrote:
-> > On Sat, 2013-02-02 at 15:35 +0100, Andrew Lunn wrote:
-> > > From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > > 
-> > > Kirkwood 88F6282 and 88F6283 have a thermal sensor.
-> > > This patch adds a DT node and enables the driver in the kernel config.
-> > > 
-> > > Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > 
-> > I can take this one but I need ACK from ARM experts first.
+On Thu, Feb 07, 2013 at 11:03:59PM +0530, manjunath.goudar at linaro.org wrote:
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
 > 
-> If you don't mind, I prefer to take patches 2 and 4.  If you could take
-> 1 and 3 and let me know what tree/branch you place them in, then I'll
-> depend on them when I push them up.
+> Separate the OMAP host controller driver from ehci-hcd host code
+> into its own driver module.
 > 
-great.
-patch 1/4, 3/4 in V5 have been applied to thermal tree -next branch.
-git://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux.git
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@linaro.org>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Greg KH <greg@kroah.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: linux-usb at vger.kernel.org
+> Cc: Tony Lindgren <tony@atomide.com>
 
-but I'll put all the 3.9 candidates in thermal -release branch before
-next merge window opened. does this still work for you?
+Alan and Roger have already been working on this for ehci-omap. Their
+patches might already be in Greg's queue...
 
-thanks,
-rui
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/736d8670/attachment.sig>
