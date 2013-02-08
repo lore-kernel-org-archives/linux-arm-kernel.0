@@ -1,83 +1,208 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Feb 2013 17:27:42 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: clean up and standardize WFI handling for 3.9
-Message-ID: <alpine.DEB.2.00.1302081726480.28008@utopia.booyaka.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 8 Feb 2013 11:38:05 -0600
+Subject: [PATCH 2/2] ARM: ep93xx: bump IRQ offset to 64
+In-Reply-To: <51149648.80402@gmail.com>
+References: <1360168544-20376-1-git-send-email-linus.walleij@linaro.org>
+ <51149648.80402@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020809EF8DDB@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Thursday, February 07, 2013 11:08 PM, Ryan Mallon wrote:
+>
+> Hi Linus,
+>
+> The patch looks okay to me. My ep93xx hardware isn't setup at the
+> moment. I've Cc'ed Hartley, who might be able to test this. If not, I'll
+> try and find some time to drag my board out and give it a test over the
+> weekend.
+>
+> ~Ryan
+>
+>> On 07/02/13 03:35, Linus Walleij wrote:
+>> The EP93XX IRQs offset from zero, which is illegal, since Linux
+>> IRQ 0 is NO_IRQ.
+>> 
+>> Cc: Florian Fainelli <florian@openwrt.org>
+>> Cc: Ryan Mallon <rmallon@gmail.com>
+>> Cc: Todor Colov <todorcolov@gmail.com>
+>> Cc: Rafal Prylowski <prylowski@metasoft.pl>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> It'd be nice if someone using the EP93xx could test this patch
+>> on top of the latest v3.8 RC.
 
-Hi,
+Linus,
 
-The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+I would rather not have this applied.
 
-  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+If you look at the EP93XX_VIC1_VALID_IRQ_MASK you will see that IRQ 0
+(and 1) is not valid. So on EP93xx IRQ 0 is a NO_IRQ.
 
-are available in the git repository at:
+With VIC1 having a base IRQ of 0 and VIC2 having a base IRQ of 32, the Linux
+irq numbers match the numbers in the EP93xx datasheet. It makes debugging
+a bit easier without having to deal with the offsets.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-b-for-3.9
+Regards,
+Hartley
 
-for you to fetch changes up to 814a18a5d026464f56b3616704b985f9942b29a6:
-
-  ARM: OMAP AM3517/05: hwmod data: block WFI when EMAC active (2013-02-06 13:48:56 -0700)
-
-- ----------------------------------------------------------------
-On OMAP2+ devices, standardize and clean up WFI entry and WFI blocking.
-
-Basic test logs are available here:
-
-   http://www.pwsan.com/omap/testlogs/wfi_devel_a_3.9/20130208085027/
-
-- ----------------------------------------------------------------
-vmlinux object size
-(delta in bytes from test_v3.8-rc6 (88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7)):
-   text     data      bss    total  kernel
-    +64        0        0      +64  am33xx_only
-    -64        0        0      -64  n800_multi_omap2xxx
-    -64        0        0      -64  n800_only_a
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-      0        0        0        0  omap1_defconfig_5912osk_only
-    -40       +8        0      -32  omap2plus_defconfig
-    -64        0        0      -64  omap2plus_defconfig_2430sdp_only
-    -40       +8        0      -32  omap2plus_defconfig_cpupm
-   -104       +8        0      -96  omap2plus_defconfig_no_pm
-    -40       +8        0      -32  omap2plus_defconfig_omap2_4_only
-    +64        0        0      +64  omap2plus_defconfig_omap3_4_only
-   -116       +8      +44      -64  rmk_omap3430_ldp_allnoconfig
-    +64        0        0      +64  rmk_omap3430_ldp_oldconfig
-   -116       +8      +44      -64  rmk_omap4430_sdp_allnoconfig
-    +64        0        0      +64  rmk_omap4430_sdp_oldconfig
-
-
-Paul Walmsley (4):
-      ARM: OMAP2xxx: PM: enter WFI via inline asm if CORE stays active
-      ARM: OMAP2+: hwmod: add support for blocking WFI when a device is active
-      ARM: OMAP2420: hwmod data/PM: use hwmod to block WFI when I2C active
-      ARM: OMAP AM3517/05: hwmod data: block WFI when EMAC active
-
- arch/arm/mach-omap2/omap_hwmod.c           |    8 ++++++++
- arch/arm/mach-omap2/omap_hwmod.h           |    9 +++++++++
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    7 ++++++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    7 ++++++-
- arch/arm/mach-omap2/pm24xx.c               |   23 +++++------------------
- arch/arm/mach-omap2/sleep24xx.S            |   19 -------------------
- 6 files changed, 34 insertions(+), 39 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.12 (GNU/Linux)
-
-iQIcBAEBAgAGBQJRFTVMAAoJEMePsQ0LvSpLIFgP/0jbDcII8oox7kf2QrNrgtZq
-2OXWuO6r8QNzIV0/YsZXhGWtpqOPjt64nkirgo0uo5jYnbKjSeels5o1rlz1wlSe
-o+GVZ6K+F1bHqEK8F1dLLrss1WbtnewTrDG8Fmm0KcXk6TJENZIuk55A0gn2fLN1
-iIpKoD4sw2l45fWaZokn7Ka6wPmKXvxWX+u1Rsyj5k9jCNoTUQxGg8LOPnhaw1s+
-LG9u9RulRm5WRPIKL69/5/H+fCxUgStvaIbX/+WYyVb39noqzgd0OGysE1US2KGS
-XMD7EFz3W1fQPpShrZym8wnG1O4ZSbNo93GGa70Y5xolFmrAu9uG5yjx8XSFQEOC
-zyWRbWNeePj5HmttrsizPEt+Lqi3jZo+0gF/6cLgfCET2nq0NuQxJTmdhT/rhWLv
-+idhr2f34XdokTVU4zpjT+tnUdnAFPIQPrcMmwPF2+fs92KdO1RoSq+sHkEaFvwN
-Wo8TPXxhRK4QRT8sSMBNg1HLiLFKz5nHDfzWokH5OEfByoEzSwYa79N1ORfSo84+
-grg+PewKe/wuQtRAR6mwe2xvaGVmtJKdflSasc2D1FXKiPtdajT8p5MqxM3nZ1o5
-8EzXiEF5iIYAW+RQhGBFt10ruHZWMWMpqjBk6CjU+O6G12qE3aF5qiexawQkU0Ew
-rp2PD3gzB1QITrtsBhxV
-=ejwV
------END PGP SIGNATURE-----
+>> ---
+>>  arch/arm/mach-ep93xx/core.c              |   6 +-
+>>  arch/arm/mach-ep93xx/include/mach/irqs.h | 122 ++++++++++++++++---------------
+>>  2 files changed, 67 insertions(+), 61 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+>> index e85bf17..4490b04 100644
+>> --- a/arch/arm/mach-ep93xx/core.c
+>> +++ b/arch/arm/mach-ep93xx/core.c
+>> @@ -179,8 +179,10 @@ struct sys_timer ep93xx_timer = {
+>>   *************************************************************************/
+>>  void __init ep93xx_init_irq(void)
+>>  {
+>> -	vic_init(EP93XX_VIC1_BASE, 0, EP93XX_VIC1_VALID_IRQ_MASK, 0);
+>> -	vic_init(EP93XX_VIC2_BASE, 32, EP93XX_VIC2_VALID_IRQ_MASK, 0);
+>> +	vic_init(EP93XX_VIC1_BASE, EP93XX_VIC1_IRQ_BASE,
+>> +		 EP93XX_VIC1_VALID_IRQ_MASK, 0);
+>> +	vic_init(EP93XX_VIC2_BASE, EP93XX_VIC2_IRQ_BASE,
+>> +		 EP93XX_VIC2_VALID_IRQ_MASK, 0);
+>>  }
+>>  
+>>  
+>> diff --git a/arch/arm/mach-ep93xx/include/mach/irqs.h b/arch/arm/mach-ep93xx/include/mach/irqs.h
+>> index ff98390..a96c50e 100644
+>> --- a/arch/arm/mach-ep93xx/include/mach/irqs.h
+>> +++ b/arch/arm/mach-ep93xx/include/mach/irqs.h
+>> @@ -5,69 +5,73 @@
+>>  #ifndef __ASM_ARCH_IRQS_H
+>>  #define __ASM_ARCH_IRQS_H
+>>  
+>> -#define IRQ_EP93XX_COMMRX		2
+>> -#define IRQ_EP93XX_COMMTX		3
+>> -#define IRQ_EP93XX_TIMER1		4
+>> -#define IRQ_EP93XX_TIMER2		5
+>> -#define IRQ_EP93XX_AACINTR		6
+>> -#define IRQ_EP93XX_DMAM2P0		7
+>> -#define IRQ_EP93XX_DMAM2P1		8
+>> -#define IRQ_EP93XX_DMAM2P2		9
+>> -#define IRQ_EP93XX_DMAM2P3		10
+>> -#define IRQ_EP93XX_DMAM2P4		11
+>> -#define IRQ_EP93XX_DMAM2P5		12
+>> -#define IRQ_EP93XX_DMAM2P6		13
+>> -#define IRQ_EP93XX_DMAM2P7		14
+>> -#define IRQ_EP93XX_DMAM2P8		15
+>> -#define IRQ_EP93XX_DMAM2P9		16
+>> -#define IRQ_EP93XX_DMAM2M0		17
+>> -#define IRQ_EP93XX_DMAM2M1		18
+>> -#define IRQ_EP93XX_GPIO0MUX		19
+>> -#define IRQ_EP93XX_GPIO1MUX		20
+>> -#define IRQ_EP93XX_GPIO2MUX		21
+>> -#define IRQ_EP93XX_GPIO3MUX		22
+>> -#define IRQ_EP93XX_UART1RX		23
+>> -#define IRQ_EP93XX_UART1TX		24
+>> -#define IRQ_EP93XX_UART2RX		25
+>> -#define IRQ_EP93XX_UART2TX		26
+>> -#define IRQ_EP93XX_UART3RX		27
+>> -#define IRQ_EP93XX_UART3TX		28
+>> -#define IRQ_EP93XX_KEY			29
+>> -#define IRQ_EP93XX_TOUCH		30
+>> +#define EP93XX_VIC1_IRQ_BASE		64
+>> +#define EP93XX_VIC2_IRQ_BASE		(EP93XX_VIC1_IRQ_BASE + 32)
+>> +#define EP93XX_VIC2_IRQ_END		(EP93XX_VIC2_IRQ_BASE + 32)
+>> +
+>> +#define IRQ_EP93XX_COMMRX		(EP93XX_VIC1_IRQ_BASE + 2)
+>> +#define IRQ_EP93XX_COMMTX		(EP93XX_VIC1_IRQ_BASE + 3)
+>> +#define IRQ_EP93XX_TIMER1		(EP93XX_VIC1_IRQ_BASE + 4)
+>> +#define IRQ_EP93XX_TIMER2		(EP93XX_VIC1_IRQ_BASE + 5)
+>> +#define IRQ_EP93XX_AACINTR		(EP93XX_VIC1_IRQ_BASE + 6)
+>> +#define IRQ_EP93XX_DMAM2P0		(EP93XX_VIC1_IRQ_BASE + 7)
+>> +#define IRQ_EP93XX_DMAM2P1		(EP93XX_VIC1_IRQ_BASE + 8)
+>> +#define IRQ_EP93XX_DMAM2P2		(EP93XX_VIC1_IRQ_BASE + 9)
+>> +#define IRQ_EP93XX_DMAM2P3		(EP93XX_VIC1_IRQ_BASE + 10)
+>> +#define IRQ_EP93XX_DMAM2P4		(EP93XX_VIC1_IRQ_BASE + 11)
+>> +#define IRQ_EP93XX_DMAM2P5		(EP93XX_VIC1_IRQ_BASE + 12)
+>> +#define IRQ_EP93XX_DMAM2P6		(EP93XX_VIC1_IRQ_BASE + 13)
+>> +#define IRQ_EP93XX_DMAM2P7		(EP93XX_VIC1_IRQ_BASE + 14)
+>> +#define IRQ_EP93XX_DMAM2P8		(EP93XX_VIC1_IRQ_BASE + 15)
+>> +#define IRQ_EP93XX_DMAM2P9		(EP93XX_VIC1_IRQ_BASE + 16)
+>> +#define IRQ_EP93XX_DMAM2M0		(EP93XX_VIC1_IRQ_BASE + 17)
+>> +#define IRQ_EP93XX_DMAM2M1		(EP93XX_VIC1_IRQ_BASE + 18)
+>> +#define IRQ_EP93XX_GPIO0MUX		(EP93XX_VIC1_IRQ_BASE + 19)
+>> +#define IRQ_EP93XX_GPIO1MUX		(EP93XX_VIC1_IRQ_BASE + 20)
+>> +#define IRQ_EP93XX_GPIO2MUX		(EP93XX_VIC1_IRQ_BASE + 21)
+>> +#define IRQ_EP93XX_GPIO3MUX		(EP93XX_VIC1_IRQ_BASE + 22)
+>> +#define IRQ_EP93XX_UART1RX		(EP93XX_VIC1_IRQ_BASE + 23)
+>> +#define IRQ_EP93XX_UART1TX		(EP93XX_VIC1_IRQ_BASE + 24)
+>> +#define IRQ_EP93XX_UART2RX		(EP93XX_VIC1_IRQ_BASE + 25)
+>> +#define IRQ_EP93XX_UART2TX		(EP93XX_VIC1_IRQ_BASE + 26)
+>> +#define IRQ_EP93XX_UART3RX		(EP93XX_VIC1_IRQ_BASE + 27)
+>> +#define IRQ_EP93XX_UART3TX		(EP93XX_VIC1_IRQ_BASE + 28)
+>> +#define IRQ_EP93XX_KEY			(EP93XX_VIC1_IRQ_BASE + 29)
+>> +#define IRQ_EP93XX_TOUCH		(EP93XX_VIC1_IRQ_BASE + 30)
+>>  #define EP93XX_VIC1_VALID_IRQ_MASK	0x7ffffffc
+>>  
+>> -#define IRQ_EP93XX_EXT0			32
+>> -#define IRQ_EP93XX_EXT1			33
+>> -#define IRQ_EP93XX_EXT2			34
+>> -#define IRQ_EP93XX_64HZ			35
+>> -#define IRQ_EP93XX_WATCHDOG		36
+>> -#define IRQ_EP93XX_RTC			37
+>> -#define IRQ_EP93XX_IRDA			38
+>> -#define IRQ_EP93XX_ETHERNET		39
+>> -#define IRQ_EP93XX_EXT3			40
+>> -#define IRQ_EP93XX_PROG			41
+>> -#define IRQ_EP93XX_1HZ			42
+>> -#define IRQ_EP93XX_VSYNC		43
+>> -#define IRQ_EP93XX_VIDEO_FIFO		44
+>> -#define IRQ_EP93XX_SSP1RX		45
+>> -#define IRQ_EP93XX_SSP1TX		46
+>> -#define IRQ_EP93XX_GPIO4MUX		47
+>> -#define IRQ_EP93XX_GPIO5MUX		48
+>> -#define IRQ_EP93XX_GPIO6MUX		49
+>> -#define IRQ_EP93XX_GPIO7MUX		50
+>> -#define IRQ_EP93XX_TIMER3		51
+>> -#define IRQ_EP93XX_UART1		52
+>> -#define IRQ_EP93XX_SSP			53
+>> -#define IRQ_EP93XX_UART2		54
+>> -#define IRQ_EP93XX_UART3		55
+>> -#define IRQ_EP93XX_USB			56
+>> -#define IRQ_EP93XX_ETHERNET_PME		57
+>> -#define IRQ_EP93XX_DSP			58
+>> -#define IRQ_EP93XX_GPIO_AB		59
+>> -#define IRQ_EP93XX_SAI			60
+>> +#define IRQ_EP93XX_EXT0			(EP93XX_VIC2_IRQ_BASE + 0)
+>> +#define IRQ_EP93XX_EXT1			(EP93XX_VIC2_IRQ_BASE + 1)
+>> +#define IRQ_EP93XX_EXT2			(EP93XX_VIC2_IRQ_BASE + 2)
+>> +#define IRQ_EP93XX_64HZ			(EP93XX_VIC2_IRQ_BASE + 3)
+>> +#define IRQ_EP93XX_WATCHDOG		(EP93XX_VIC2_IRQ_BASE + 4)
+>> +#define IRQ_EP93XX_RTC			(EP93XX_VIC2_IRQ_BASE + 5)
+>> +#define IRQ_EP93XX_IRDA			(EP93XX_VIC2_IRQ_BASE + 6)
+>> +#define IRQ_EP93XX_ETHERNET		(EP93XX_VIC2_IRQ_BASE + 7)
+>> +#define IRQ_EP93XX_EXT3			(EP93XX_VIC2_IRQ_BASE + 8)
+>> +#define IRQ_EP93XX_PROG			(EP93XX_VIC2_IRQ_BASE + 9)
+>> +#define IRQ_EP93XX_1HZ			(EP93XX_VIC2_IRQ_BASE + 10)
+>> +#define IRQ_EP93XX_VSYNC		(EP93XX_VIC2_IRQ_BASE + 11)
+>> +#define IRQ_EP93XX_VIDEO_FIFO		(EP93XX_VIC2_IRQ_BASE + 12)
+>> +#define IRQ_EP93XX_SSP1RX		(EP93XX_VIC2_IRQ_BASE + 13)
+>> +#define IRQ_EP93XX_SSP1TX		(EP93XX_VIC2_IRQ_BASE + 14)
+>> +#define IRQ_EP93XX_GPIO4MUX		(EP93XX_VIC2_IRQ_BASE + 15)
+>> +#define IRQ_EP93XX_GPIO5MUX		(EP93XX_VIC2_IRQ_BASE + 16)
+>> +#define IRQ_EP93XX_GPIO6MUX		(EP93XX_VIC2_IRQ_BASE + 17)
+>> +#define IRQ_EP93XX_GPIO7MUX		(EP93XX_VIC2_IRQ_BASE + 18)
+>> +#define IRQ_EP93XX_TIMER3		(EP93XX_VIC2_IRQ_BASE + 19)
+>> +#define IRQ_EP93XX_UART1		(EP93XX_VIC2_IRQ_BASE + 20)
+>> +#define IRQ_EP93XX_SSP			(EP93XX_VIC2_IRQ_BASE + 21)
+>> +#define IRQ_EP93XX_UART2		(EP93XX_VIC2_IRQ_BASE + 22)
+>> +#define IRQ_EP93XX_UART3		(EP93XX_VIC2_IRQ_BASE + 23)
+>> +#define IRQ_EP93XX_USB			(EP93XX_VIC2_IRQ_BASE + 24)
+>> +#define IRQ_EP93XX_ETHERNET_PME		(EP93XX_VIC2_IRQ_BASE + 25)
+>> +#define IRQ_EP93XX_DSP			(EP93XX_VIC2_IRQ_BASE + 26)
+>> +#define IRQ_EP93XX_GPIO_AB		(EP93XX_VIC2_IRQ_BASE + 27)
+>> +#define IRQ_EP93XX_SAI			(EP93XX_VIC2_IRQ_BASE + 28)
+>>  #define EP93XX_VIC2_VALID_IRQ_MASK	0x1fffffff
+>>  
+>> -#define NR_EP93XX_IRQS			(64 + 24)
+>> +#define NR_EP93XX_IRQS			(EP93XX_VIC2_IRQ_END + 24)
+>>  
+>>  #define EP93XX_BOARD_IRQ(x)		(NR_EP93XX_IRQS + (x))
+>>  #define EP93XX_BOARD_IRQS		32
+>> 
