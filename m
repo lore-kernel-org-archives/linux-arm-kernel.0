@@ -1,90 +1,88 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 7 Feb 2013 18:52:14 -0600
-Subject: [PATCH 2/2] dmaengine: OMAP: Register SDMA controller with Device
- Tree DMA driver
-In-Reply-To: <10081370.NaeII8M1Pj@wuerfel>
-References: <1360184596-1603-1-git-send-email-jon-hunter@ti.com>
- <201302071439.13720.arnd@arndb.de> <5113CD6F.3060108@ti.com>
- <10081370.NaeII8M1Pj@wuerfel>
-Message-ID: <51144C3E.7070603@ti.com>
+From: girishks2000@gmail.com (Girish KS)
+Date: Thu, 7 Feb 2013 17:04:08 -0800
+Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
+ init
+In-Reply-To: <CACxGe6uOaoRbtuovEsA87d-MtCbGNd3KZCeHXbBQaEpp6NZ7fA@mail.gmail.com>
+References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
+ <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
+ <20130206102628.5E7413E1510@localhost>
+ <CAKrE-KdX+Nxk0X4xdz6Dx3WVtOpV+ms+gPB-Dq-MwZwetyZ5Nw@mail.gmail.com>
+ <CACxGe6uOaoRbtuovEsA87d-MtCbGNd3KZCeHXbBQaEpp6NZ7fA@mail.gmail.com>
+Message-ID: <CAKrE-KfvywLa4xTwCGzan9OfevzBdY8Z2EO2Mc2VaFm5y0XEzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/07/2013 10:07 AM, Arnd Bergmann wrote:
-> On Thursday 07 February 2013 09:51:11 Jon Hunter wrote:
->>>> @@ -673,7 +702,7 @@ static int omap_dma_init(void)
+On Wed, Feb 6, 2013 at 3:48 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Wed, Feb 6, 2013 at 8:12 PM, Girish KS <girishks2000@gmail.com> wrote:
+>> On Wed, Feb 6, 2013 at 2:26 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>> On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S <girishks2000@gmail.com> wrote:
+>>>> The status of the interrupt is available in the status register,
+>>>> so reading the clear pending register and writing back the same
+>>>> value will not actually clear the pending interrupts. This patch
+>>>> modifies the interrupt handler to read the status register and
+>>>> clear the corresponding pending bit in the clear pending register.
+>>>>
+>>>> Modified the hwInit function to clear all the pending interrupts.
+>>>>
+>>>> Signed-off-by: Girish K S <ks.giri@samsung.com>
+>>>> ---
+>>>>  drivers/spi/spi-s3c64xx.c |   41 +++++++++++++++++++++++++----------------
+>>>>  1 file changed, 25 insertions(+), 16 deletions(-)
+>>>>
+>>>> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+>>>> index ad93231..b770f88 100644
+>>>> --- a/drivers/spi/spi-s3c64xx.c
+>>>> +++ b/drivers/spi/spi-s3c64xx.c
+>>>> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
 >>>>  {
->>>>      int rc = platform_driver_register(&omap_dma_driver);
->>>>  
->>>> -    if (rc == 0) {
->>>> +    if ((rc == 0) && (!of_have_populated_dt())) {
->>>>              pdev = platform_device_register_full(&omap_dma_dev_info);
->>>>              if (IS_ERR(pdev)) {
->>>>                      platform_driver_unregister(&omap_dma_driver);
+>>>>       struct s3c64xx_spi_driver_data *sdd = data;
+>>>>       struct spi_master *spi = sdd->master;
+>>>> -     unsigned int val;
+>>>> +     unsigned int val, clr = 0;
+>>>>
+>>>> -     val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>>>> +     val = readl(sdd->regs + S3C64XX_SPI_STATUS);
+>>>>
+>>>> -     val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
+>>>> -             S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
+>>>> -             S3C64XX_SPI_PND_TX_OVERRUN_CLR |
+>>>> -             S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+>>>> -
+>>>> -     writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>>>> -
+>>>> -     if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
+>>>> +     if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
+>>>> +             clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
+>>>>               dev_err(&spi->dev, "RX overrun\n");
+>>>> -     if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
+>>>> +     }
+>>>> +     if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
+>>>> +             clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
+>>>>               dev_err(&spi->dev, "RX underrun\n");
+>>>> -     if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
+>>>> +     }
+>>>> +     if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
+>>>> +             clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
+>>>>               dev_err(&spi->dev, "TX overrun\n");
+>>>> -     if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
+>>>> +     }
+>>>> +     if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
+>>>> +             clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+>>>>               dev_err(&spi->dev, "TX underrun\n");
+>>>> +     }
+>>>> +
+>>>> +     /* Clear the pending irq by setting and then clearing it */
+>>>> +     writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>>>> +     writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
 >>>
->>> There is already a patch in linux-next that makes this obsolete.
->>> The device is now registered in arch/arm/mach-omap2/dma.c, so
->>> I guess you have to change that location now.
->>
->> Thanks. Will rebase on top of linux-next.
-> 
-> Actually, there is another problem with that, because then
-> you may get into the situation where nobody can apply your
-> patch.
-
-Yes Tony mentioned always using a proper branch for pulls. I will base
-upon his omap-for-v3.9/multiplatform-v2 (per your inputs, thanks!).
- 
-> You should never build work on top of linux-next, because
-> then your base gets rebuilt every day. Instead, you should
-> /test/ your branch merged with linux-next to ensure it works
-> with all the other things in place, and when you see conflicts
-> like this, you have to find out what they are and then decide
-> whether you need to rebase it, and to what.
-
-Ugh, looks like linux-next is broken for omap2+ boards at the moment
-and is panic'ing in the twl i2c code ... some else to look into ...
-
-Peter have you seen this on linux-next? I am seeing this on omap2-4 boards.
-
-[    2.286132] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-[    2.294738] pgd = c0004000
-[    2.297576] [00000000] *pgd=00000000
-[    2.301361] Internal error: Oops: 5 [#1] SMP ARM
-[    2.306243] Modules linked in:
-[    2.309448] CPU: 0    Not tainted  (3.8.0-rc6-next-20130207-00016-g735c237 #35)
-[    2.317169] PC is at twl_i2c_read+0x3c/0xec
-[    2.321563] LR is at twl_i2c_read+0x1c/0xec
-[    2.325988] pc : [<c0333950>]    lr : [<c0333930>]    psr: 80000153
-[    2.325988] sp : c702fed0  ip : 00000000  fp : 00000000
-[    2.338043] r10: c702e000  r9 : c06e84e8  r8 : c06e51c8
-[    2.343536] r7 : 00000001  r6 : 00000006  r5 : c702fef6  r4 : 00000004
-[    2.350402] r3 : c129508c  r2 : 00000006  r1 : c702fef6  r0 : 0000000e
-[    2.357269] Flags: Nzcv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-[    2.365051] Control: 10c5387d  Table: 80004019  DAC: 00000017
-[    2.371093] Process swapper/0 (pid: 1, stack limit = 0xc702e240)
-[    2.377410] Stack: (0xc702fed0 to 0xc7030000)
-[    2.382019] fec0:                                     c0d42180 c0d429d0 c70a7640 c07354c4
-[    2.390624] fee0: 00000001 c0719798 c0d42180 c06f2cc0 c04e76cc c06ee1ac 00000000 c07354c4
-[    2.399230] ff00: 00000007 c06f2d64 00000017 c06fb308 00000000 c06f07a4 c0cb8580 c06edee0
-[    2.407836] ff20: c06eded4 c06e8504 c0d42180 c0008768 0000009e c00611b4 00000001 00000000
-[    2.416442] ff40: c061994c c06b7548 00000007 00000007 00000000 c07354c4 00000007 c0719798
-[    2.425048] ff60: c0d42180 c06e51c8 c07197a0 0000009e 00000000 c06e590c 00000007 00000007
-[    2.433654] ff80: c06e51c8 00000000 00000000 c04d26ec 00000000 00000000 00000000 00000000
-[    2.442260] ffa0: 00000000 c04d26f4 00000000 c00137b0 00000000 00000000 00000000 00000000
-[    2.450866] ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-[    2.459472] ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 80fb6c10 71bbcd20
-[    2.468078] [<c0333950>] (twl_i2c_read+0x3c/0xec) from [<c06f2cc0>] (omap3_twl_set_sr_bit+0x3c/0xb4)
-[    2.477722] [<c06f2cc0>] (omap3_twl_set_sr_bit+0x3c/0xb4) from [<c06f2d64>] (omap3_twl_init+0x2c/0x70)
-[    2.487518] [<c06f2d64>] (omap3_twl_init+0x2c/0x70) from [<c06fb308>] (omap_pmic_late_init+0x18/0x24)
-[    2.497222] [<c06fb308>] (omap_pmic_late_init+0x18/0x24) from [<c06f07a4>] (omap2_common_pm_late_init+0x18/0xd0)
-[    2.507934] [<c06f07a4>] (omap2_common_pm_late_init+0x18/0xd0) from [<c06edee0>] (omap3_init_late+0xc/0x18)
-[    2.518188] [<c06edee0>] (omap3_init_late+0xc/0x18) from [<c06e8504>] (init_machine_late+0x1c/0x28)
-[    2.527740] [<c06e8504>] (init_machine_late+0x1c/0x28) from [<c0008768>] (do_one_initcall+0x100/0x16c)
-[    2.537536] [<c0008768>] (do_one_initcall+0x100/0x16c) from [<c06e590c>] (kernel_init_freeable+0xfc/0x1c8)
-[    2.547698] [<c06e590c>] (kernel_init_freeable+0xfc/0x1c8) from [<c04d26f4>] (kernel_init+0x8/0xe4)
-[    2.557250] [<c04d26f4>] (kernel_init+0x8/0xe4) from [<c00137b0>] (ret_from_fork+0x14/0x24)
-
-Cheers
-Jon
+>>> Wait, what?  clr & ~clr == 0   Always.  What are you actually trying to do here?
+>> The user manual says, wirting 1 to the pending clear register clears
+>> the interrupt (its not auto clear to 0). so i need to explicitly reset
+>> those bits thats what the 2nd write does
+>
+> Then write 0. That's the result of what the code does anyway, but the
+> code as-written is nonsensical.
+i cannot write 0. because the 0th bit is trailing byte interrupt clear
+pending bit, which is not being handled in the handler.
+>
+> g.
