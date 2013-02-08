@@ -1,107 +1,44 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 8 Feb 2013 14:47:42 -0800
-Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <87ip6gutsq.fsf@sejong.aot.lge.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
- <20130123185522.GG2373@mtj.dyndns.org>
- <51003B20.2060506@linux.vnet.ibm.com>
- <20130123195740.GI2373@mtj.dyndns.org>
- <5100B8CC.4080406@linux.vnet.ibm.com>
- <87ip6gutsq.fsf@sejong.aot.lge.com>
-Message-ID: <20130208224742.GJ2666@linux.vnet.ibm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 08 Feb 2013 14:47:50 -0800
+Subject: [PATCH] ARM: S3C24XX: let S3C2412_PM select S3C2412_PM_SLEEP
+In-Reply-To: <201302052251.17152.heiko@sntech.de>
+References: <201302052251.17152.heiko@sntech.de>
+Message-ID: <1a5f01ce064e$53fc1c10$fbf45430$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 08:12:37PM +0900, Namhyung Kim wrote:
-> On Thu, 24 Jan 2013 10:00:04 +0530, Srivatsa S. Bhat wrote:
-> > On 01/24/2013 01:27 AM, Tejun Heo wrote:
-> >> On Thu, Jan 24, 2013 at 01:03:52AM +0530, Srivatsa S. Bhat wrote:
-> >>> CPU 0                          CPU 1
-> >>>
-> >>> read_lock(&rwlock)
-> >>>
-> >>>                               write_lock(&rwlock) //spins, because CPU 0
-> >>>                               //has acquired the lock for read
-> >>>
-> >>> read_lock(&rwlock)
-> >>>    ^^^^^
-> >>> What happens here? Does CPU 0 start spinning (and hence deadlock) or will
-> >>> it continue realizing that it already holds the rwlock for read?
-> >> 
-> >> I don't think rwlock allows nesting write lock inside read lock.
-> >> read_lock(); write_lock() will always deadlock.
-> >> 
-> >
-> > Sure, I understand that :-) My question was, what happens when *two* CPUs
-> > are involved, as in, the read_lock() is invoked only on CPU 0 whereas the
-> > write_lock() is invoked on CPU 1.
-> >
-> > For example, the same scenario shown above, but with slightly different
-> > timing, will NOT result in a deadlock:
-> >
-> > Scenario 2:
-> >   CPU 0                                CPU 1
-> >
-> > read_lock(&rwlock)
-> >
-> >
-> > read_lock(&rwlock) //doesn't spin
-> >
-> >                                     write_lock(&rwlock) //spins, because CPU 0
-> >                                     //has acquired the lock for read
-> >
-> >
-> > So I was wondering whether the "fairness" logic of rwlocks would cause
-> > the second read_lock() to spin (in the first scenario shown above) because
-> > a writer is already waiting (and hence new readers should spin) and thus
-> > cause a deadlock.
+Heiko St?bner wrote:
 > 
-> In my understanding, current x86 rwlock does basically this (of course,
-> in an atomic fashion):
+> The code to enter sleep is used by both the s3c2412 and s3c2416 and
+> was thus factored out into an extra config option.
 > 
+> But it seems it was forgotten to add the appropriate select to the
+> s3c2412 pm option, resulting in breakage when only compiling s3c2412
+> support.
 > 
-> #define RW_LOCK_BIAS 0x10000
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  arch/arm/mach-s3c24xx/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> rwlock_init(rwlock)
-> {
-> 	rwlock->lock = RW_LOCK_BIAS;
-> }
+> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-
+> s3c24xx/Kconfig
+> index 5e17e1d..ac61bb7 100644
+> --- a/arch/arm/mach-s3c24xx/Kconfig
+> +++ b/arch/arm/mach-s3c24xx/Kconfig
+> @@ -301,6 +301,7 @@ config S3C2412_DMA
 > 
-> arch_read_lock(rwlock)
-> {
-> retry:
-> 	if (--rwlock->lock >= 0)
-> 		return;
+>  config S3C2412_PM
+>  	bool
+> +	select S3C2412_PM_SLEEP
+>  	help
+>  	  Internal config node to apply S3C2412 power management
 > 
->         rwlock->lock++;
->         while (rwlock->lock < 1)
->         	continue;
-> 
->         goto retry;
-> }
-> 
-> arch_write_lock(rwlock)
-> {
-> retry:
-> 	if ((rwlock->lock -= RW_LOCK_BIAS) == 0)
->         	return;
-> 
->         rwlock->lock += RW_LOCK_BIAS;
-> 	while (rwlock->lock != RW_LOCK_BIAS)
-> 		continue;
-> 
->         goto retry;
-> }
-> 
-> 
-> So I can't find where the 'fairness' logic comes from..
+> --
+> 1.7.10.4
 
-I looked through several of the rwlock implementations, and in all of
-them the writer backs off if it sees readers -- or refrains from asserting
-ownership of the lock to begin with.
+Looks good to me, applied.
 
-So it should be OK to use rwlock as shown in the underlying patch.
+Thanks
 
-							Thanx, Paul
+- Kukjin
