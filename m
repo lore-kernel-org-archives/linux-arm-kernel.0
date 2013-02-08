@@ -1,60 +1,43 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 8 Feb 2013 20:41:44 +0530
-Subject: [PATCH] ARM: OMAP2+: PM: Fix the dt return condition in pm_late_init()
-Message-ID: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 8 Feb 2013 20:41:46 +0530
+Subject: [PATCH] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for all
+ CPU power states except off
+In-Reply-To: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1416408d {ARM: OMAP2+: PM: share some suspend-related functions
-across OMAP2, 3, 4} moved suspend code to common place but now with
-that change, for DT build on OMAP4, suspend hooks are not getting
-registered which results in no suspend support.
+Current CPU PM code code make use of common cpu_suspend() path for all the
+CPU power states which is not optimal. In fact cpu_suspend() path is needed
+only when we put CPU power domain to off state where the CPU context is lost.
 
-The DT return condition is limited to PMIC and smartreflex
-initialization and hence restrict it so that suspend ops gets
-registered.
+Update the code accordingly so that the expensive cpu_suspend() path
+can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
 
-Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
 
+Reported-by: Richard Woodruff <r-woodruff2@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/pm.c |   20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index f4b3143..1ec4299 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -345,19 +345,19 @@ int __init omap2_common_pm_late_init(void)
- 	 * a completely different mechanism.
- 	 * Disable this part if a DT blob is available.
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index aac46bf..abdd0f6 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -276,7 +276,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	/*
+ 	 * Call low level function  with targeted low power state.
  	 */
--	if (of_have_populated_dt())
--		return 0;
-+	if (!of_have_populated_dt()) {
+-	cpu_suspend(save_state, omap4_finish_suspend);
++	if (save_state)
++		cpu_suspend(save_state, omap4_finish_suspend);
++	else
++		omap4_finish_suspend(save_state);
  
--	/* Init the voltage layer */
--	omap_pmic_late_init();
--	omap_voltage_late_init();
-+		/* Init the voltage layer */
-+		omap_pmic_late_init();
-+		omap_voltage_late_init();
- 
--	/* Initialize the voltages */
--	omap3_init_voltages();
--	omap4_init_voltages();
-+		/* Initialize the voltages */
-+		omap3_init_voltages();
-+		omap4_init_voltages();
- 
--	/* Smartreflex device init */
--	omap_devinit_smartreflex();
-+		/* Smartreflex device init */
-+		omap_devinit_smartreflex();
-+	}
- 
- #ifdef CONFIG_SUSPEND
- 	suspend_set_ops(&omap_pm_ops);
+ 	/*
+ 	 * Restore the CPUx power state to ON otherwise CPUx
 -- 
 1.7.9.5
