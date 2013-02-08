@@ -1,78 +1,74 @@
-From: anilk4.v@gmail.com (AnilKumar)
-Date: Fri, 8 Feb 2013 19:05:32 +0530
-Subject: [PATCH] ARM: dts: add minimal DT support for DevKit8000
-In-Reply-To: <20130207173949.GA21723@e106331-lin.cambridge.arm.com>
-References: <1360246297-5500-1-git-send-email-anilk4.v@gmail.com>
- <20130207173949.GA21723@e106331-lin.cambridge.arm.com>
-Message-ID: <007b01ce0601$2f46b4e0$8dd41ea0$@gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 8 Feb 2013 15:36:40 +0200
+Subject: [PATCH v6 08/10] ARM: dt: Add references to tegra_car clocks
+In-Reply-To: <1360330602-30472-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1360330602-30472-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1360330602-30472-9-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Add references to tegra_car clocks for the basic device nodes.
 
-Thanks for the review comments. Please find my comments inline.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/boot/dts/tegra114.dtsi |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-On Thu, Feb 07, 2013 at 23:09:49, Mark Rutland wrote:
-> Hello,
-> 
-> I have a couple of minor comments.
-> 
-> On Thu, Feb 07, 2013 at 02:11:37PM +0000, Anil Kumar wrote:
-> > DevKit8000 is a beagle board clone from Timll, sold by armkits.com.
-> > The DevKit8000 has RS232 serial port, LCD, DVI-D, S-Video, Ethernet, 
-> > SD/MMC, keyboard, camera, SPI, I2C, USB and JTAG interface.
-> >
-> > This patch adds the basic DT support for devkit8000. At this time, 
-> > Information of twl4030, MMC1, I2C1, leds and there pim mux 
-> > information are
-> added.
-> >
-> > Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
-> > Tested-by: Thomas Weber <thomas@tomweber.eu>
-> > ---
-> >
-> >  -This patch is based on top of kernel 3.8-rc5.
-> >
-> >  -Tested on Devkit8000.
-> >
-> 
-> [...]
-> 
-> > diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts
-> > b/arch/arm/boot/dts/omap3-devkit8000.dts
-> > new file mode 100644
-> > index 0000000..9864fd7
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-> > @@ -0,0 +1,125 @@
-> > +/*
-> > + * Anil Kumar <anilk4.v@gmail.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or 
-> > +modify
-> > + * it under the terms of the GNU General Public License version 2 
-> > +as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +/dts-v1/;
-> > +
-> > +/include/ "omap3.dtsi"
-> > +/ {
-> > +	model = "TI OMAP3 Devkit8000";
-> 
-> Should this not be "TimLL Devkit8000" ?
-
-Hmm..  I think it will be better as  "TimLL OMAP3 Devkit8000"  as this board
-is omap3 based.
-
-> 
-> > +	compatible = "ti,omap3-devkit8000", "ti,omap3";
-> 
-> "timll,devkit8000" ?
-
-I think it will be better  as  "timll,omap3-devkit8000"  as this board is
-omap3 based.
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 96a8235..6b0a01e 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -24,10 +24,11 @@
+ 			      0 42 0x04
+ 			      0 121 0x04
+ 			      0 122 0x04>;
++		clocks = <&tegra_car 5>;
+ 	};
  
-Thanks,
-Anil
-[...]
+ 	tegra_car: clock {
+-		compatible = "nvidia,tegra114-car, nvidia,tegra30-car";
++		compatible = "nvidia,tegra114-car";
+ 		reg = <0x60006000 0x1000>;
+ 		#clock-cells = <1>;
+ 	};
+@@ -43,6 +44,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <0 36 0x04>;
+ 		status = "disabled";
++		clocks = <&tegra_car 6>;
+ 	};
+ 
+ 	serial at 70006040 {
+@@ -51,6 +53,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <0 37 0x04>;
+ 		status = "disabled";
++		clocks = <&tegra_car 192>;
+ 	};
+ 
+ 	serial at 70006200 {
+@@ -59,6 +62,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <0 46 0x04>;
+ 		status = "disabled";
++		clocks = <&tegra_car 55>;
+ 	};
+ 
+ 	serial at 70006300 {
+@@ -67,12 +71,14 @@
+ 		reg-shift = <2>;
+ 		interrupts = <0 90 0x04>;
+ 		status = "disabled";
++		clocks = <&tegra_car 65>;
+ 	};
+ 
+ 	rtc {
+ 		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
+ 		reg = <0x7000e000 0x100>;
+ 		interrupts = <0 2 0x04>;
++		clocks = <&tegra_car 4>;
+ 	};
+ 
+ 	pmc {
+-- 
+1.7.1
