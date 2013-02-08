@@ -1,33 +1,35 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 8 Feb 2013 10:23:31 -0500 (EST)
-Subject: [PATCH 00/10] usb: ehci: more bus glues as separate modules
-In-Reply-To: <5113e5b1.c84e420a.08c3.ffffbe1b@mx.google.com>
-Message-ID: <Pine.LNX.4.44L0.1302081022280.1171-100000@iolanthe.rowland.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 8 Feb 2013 17:26:08 +0200
+Subject: [PATCH] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for
+ all CPU power states except off
+In-Reply-To: <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
+ <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130208152607.GJ23979@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Feb 2013 manjunath.goudar at linaro.org wrote:
-
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+On Fri, Feb 08, 2013 at 08:41:46PM +0530, Santosh Shilimkar wrote:
+> Current CPU PM code code make use of common cpu_suspend() path for all the
+> CPU power states which is not optimal. In fact cpu_suspend() path is needed
+> only when we put CPU power domain to off state where the CPU context is lost.
 > 
+> Update the code accordingly so that the expensive cpu_suspend() path
+> can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
 > 
-> Separate the SOC On-Chip host controller driver from ehci-hcd
-> host code into its own driver module.
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
 > 
-> Manjunath Goudar (10):
->   USB:Changed omap2plus_defconfig to support OMAP USB static driver
->   USB: EHCI: make ehci-omap a separate driver
->   USB: EHCI: make ehci-spear a separate driver
->   USB: EHCI: make ehci-orion a separate driver
->   USB: EHCI: make ehci-atmel a separate driver
->   USB: EHCI: make ehci-s5p a separate driver
->   USB: EHCI: make ehci-mv a separate driver
->   USB: EHCI: make ehci-vt8500 a separate driver
->   USB: EHCI: make ehci-msm a separate driver
->   USB: EHCI: make ehci-w90X900 a separate driver
+> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-I'm going on vacation for a week, so I won't be able to review these 
-right away.  If you want to submit updated patches based on feedback 
-from other people, go right ahead.
+some numbers showing the benefit would be cool...
 
-Alan Stern
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/e0a56f93/attachment.sig>
