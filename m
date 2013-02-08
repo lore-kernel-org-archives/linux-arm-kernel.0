@@ -1,79 +1,105 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Fri, 08 Feb 2013 23:39:54 +0530
-Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
-In-Reply-To: <51152B81.2050501@linux.vnet.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <510FBC01.2030405@linux.vnet.ibm.com> <87haloiwv0.fsf@rustcorp.com.au>
- <51134596.4080106@linux.vnet.ibm.com>
- <20130208154113.GV17833@n2100.arm.linux.org.uk>
- <51152B81.2050501@linux.vnet.ibm.com>
-Message-ID: <51153F72.1060005@linux.vnet.ibm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 8 Feb 2013 18:13:00 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP4: PM fixes and AESS integration for 3.9
+Message-ID: <alpine.DEB.2.00.1302081812040.28008@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2013 10:14 PM, Srivatsa S. Bhat wrote:
-> On 02/08/2013 09:11 PM, Russell King - ARM Linux wrote:
->> On Thu, Feb 07, 2013 at 11:41:34AM +0530, Srivatsa S. Bhat wrote:
->>> On 02/07/2013 09:44 AM, Rusty Russell wrote:
->>>> "Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com> writes:
->>>>> On 01/22/2013 01:03 PM, Srivatsa S. Bhat wrote:
->>>>>                  Avg. latency of 1 CPU offline (ms) [stop-cpu/stop-m/c latency]
->>>>>
->>>>> # online CPUs    Mainline (with stop-m/c)       This patchset (no stop-m/c)
->>>>>
->>>>>       8                 17.04                          7.73
->>>>>
->>>>>      16                 18.05                          6.44
->>>>>
->>>>>      32                 17.31                          7.39
->>>>>
->>>>>      64                 32.40                          9.28
->>>>>
->>>>>     128                 98.23                          7.35
->>>>
->>>> Nice!
->>>
->>> Thank you :-)
->>>
->>>>  I wonder how the ARM guys feel with their quad-cpu systems...
->>>>
->>>
->>> That would be definitely interesting to know :-)
->>
->> That depends what exactly you'd like tested (and how) and whether you'd
->> like it to be a test-chip based quad core, or an OMAP dual-core SoC.
->>
-> 
-> The effect of stop_machine() doesn't really depend on the CPU architecture
-> used underneath or the platform. It depends only on the _number_ of
-> _logical_ CPUs used.
-> 
-> And stop_machine() has 2 noticeable drawbacks:
-> 1. It makes the hotplug operation itself slow
-> 2. and it causes disruptions to the workloads running on the other
-> CPUs by hijacking the entire machine for significant amounts of time.
-> 
-> In my experiments (mentioned above), I tried to measure how my patchset
-> improves (reduces) the duration of hotplug (CPU offline) itself. Which is
-> also slightly indicative of the impact it has on the rest of the system.
-> 
-> But what would be nice to test, is a setup where the workloads running on
-> the rest of the system are latency-sensitive, and measure the impact of
-> CPU offline on them, with this patchset applied. That would tell us how
-> far is this useful in making CPU hotplug less disruptive on the system.
-> 
-> Of course, it would be nice to also see whether we observe any reduction
-> in hotplug duration itself (point 1 above) on ARM platforms with lot
-> of CPUs. [This could potentially speed up suspend/resume, which is used
-> rather heavily on ARM platforms].
-> 
-> The benefits from this patchset over mainline (both in terms of points
-> 1 and 2 above) is expected to increase, with increasing number of CPUs in
-> the system.
-> 
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Adding Vincent to CC, who had previously evaluated the performance and
-latency implications of CPU hotplug on ARM platforms, IIRC.
+Hi Tony,
 
-Regards,
-Srivatsa S. Bhat
+The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+
+  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-d-for-3.9
+
+for you to fetch changes up to 0d30ee5a33ae65371f935b64715aa6ca9c9972a5:
+
+  Merge branches 'sg_aess_reset_devel_3.9' and 'omap4_pm_fixes_a_3.9' into omap4_prcm_devel_a_3.9 (2013-02-08 09:45:12 -0700)
+
+- ----------------------------------------------------------------
+
+Some OMAP4 power management fixes and audio device integration
+patches.
+
+Basic test logs are available at:
+
+    http://www.pwsan.com/omap/testlogs/omap4_prcm_devel_a_3.9/20130208094531/
+
+- ----------------------------------------------------------------
+vmlinux object size
+(delta in bytes from test_v3.8-rc6 (88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7)):
+   text     data      bss    total  kernel
+    +92     +128        0     +220  am33xx_only
+    +96      +96        0     +192  n800_multi_omap2xxx
+    +96      +96        0     +192  n800_only_a
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+   +148    +1176        0    +1324  omap2plus_defconfig
+   +124      +96        0     +220  omap2plus_defconfig_2430sdp_only
+   +148    +1104        0    +1252  omap2plus_defconfig_cpupm
+    +84    +1176        0    +1260  omap2plus_defconfig_no_pm
+   +156     +912        0    +1068  omap2plus_defconfig_omap2_4_only
+   +148    +1112        0    +1260  omap2plus_defconfig_omap3_4_only
+   +452    +1104    +3784    +5340  rmk_omap3430_ldp_allnoconfig
+    +96     +256        0     +352  rmk_omap3430_ldp_oldconfig
+   +452    +1104    +3784    +5340  rmk_omap4430_sdp_allnoconfig
+   +140     +920        0    +1060  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.8-rc6 (88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7))
+  avail  rsrvd   high  freed  board          kconfig
+     8k    -8k      .      .  4430es2panda   omap2plus_defconfig
+   -12k    12k      .      .  4460pandaes    omap2plus_defconfig
+
+
+Paul Walmsley (4):
+      ARM: OMAP2+: hwmod: add enable_preprogram hook
+      ASoC: TI AESS: add autogating-enable function, callable from architecture code
+      ARM: OMAP4+: AESS: enable internal auto-gating during initial setup
+      Merge branches 'sg_aess_reset_devel_3.9' and 'omap4_pm_fixes_a_3.9' into omap4_prcm_devel_a_3.9
+
+Rajendra Nayak (1):
+      ARM: OMAP4: PM: Warn users about usage of older bootloaders
+
+Santosh Shilimkar (1):
+      ARM: OMAP2+: PM: Fix the dt return condition in pm_late_init()
+
+Sebastien Guiriec (2):
+      ARM: OMAP4: hwmod data: Enable AESS hwmod device
+      ARM: OMAP4: hwmod data: Update AESS data with memory bank area
+
+ arch/arm/mach-omap2/Makefile               |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.c           |   18 ++++++++++
+ arch/arm/mach-omap2/omap_hwmod.h           |    8 +++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   49 +++++++++++++++++++++++--
+ arch/arm/mach-omap2/omap_hwmod_reset.c     |   52 +++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm.c                   |   20 +++++------
+ arch/arm/mach-omap2/pm44xx.c               |   21 +++++++++--
+ include/sound/aess.h                       |   53 ++++++++++++++++++++++++++++
+ 8 files changed, 207 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_reset.c
+ create mode 100644 include/sound/aess.h
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJRFT+rAAoJEMePsQ0LvSpL+xQQAJlGtg5EPd+d4YZXzddunI06
+S4X4964WNaIdrZpIDMq34fG5e5pyWglK8F3UEJzHQqG0bsw5EhdvVx+BeDkqcbvg
+8q2uHfd3YNzcIKA9l4R2iJdzy6AcnJC4MQjZsSDSWPoOI5NjBtADUjosBjOBMydj
+8knTQ7YIyT+gjrcu2qi6CM2jTF0AcHFG6qHuUTJVHyrdeARHISziutaGsD8cy0Bd
+tPb9u4E4NGztG0ygi6cuLzThnYLQVtpxrFxArgCDI97snbtOq+vHGW89FsVzRcz4
+v0tOnG5+MDFEoHG5FwHRJKKAEKQmHlWmd+/fqnMGJE+dk6B1Q4jtmkyAEhbZE4Xw
+FEDqiYi/y+aIg84To2yJtJ7divBo14CwAfLI86etkJflLFQfyAW9zUhwUyTbWhGJ
+8DedXVd7kC5s8roMU51L3WLVHYvEDGvQwdg8zYZnnBmMJMq7Q3PIyPwYOFjDnS1D
+yVFKX+45bSUyN+7YhQ3+/BS1HnsrPj2f3Tk15feKsgu+Ngn6nlrvUi74vR+kzzaq
+iXrxTOSHXpE9jseIrt734ew8iVNuj4nEvwkATKMjfuR5Ay8gn/Os7p4FtgIVBOxK
+tg77JTRr4hx3orq5u7ObqJMw7GBrAn0R+nRMwrFcvQ1JPOrFU3V9oPWxG2sYrolp
+gpnAa6krsZkmJvqHOISK
+=WipK
+-----END PGP SIGNATURE-----
