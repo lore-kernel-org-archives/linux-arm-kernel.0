@@ -1,5 +1,5 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Feb 2013 18:29:39 +0000 (UTC)
+Date: Fri, 8 Feb 2013 18:32:24 +0000 (UTC)
 Subject: OMAP baseline test results for v3.8-rc6
 In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC071DC@DBDE01.ent.ti.com>
 References: <alpine.DEB.2.00.1302062333270.12769@utopia.booyaka.com>
@@ -8,51 +8,22 @@ References: <alpine.DEB.2.00.1302062333270.12769@utopia.booyaka.com>
  <alpine.DEB.2.00.1302081306230.11464@utopia.booyaka.com>
  <alpine.DEB.2.00.1302081332200.11464@utopia.booyaka.com>
  <79CD15C6BA57404B839C016229A409A83EC071DC@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1302081827280.28008@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1302081830310.28008@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
 
-On Fri, 8 Feb 2013, Hiremath, Vaibhav wrote:
+By the way, here's what I used for v3.7-rc8, which seemed to work okay:
 
-> On Fri, Feb 08, 2013 at 20:40:22, Hiremath, Vaibhav wrote:
-> > On Fri, Feb 08, 2013 at 19:04:04, Paul Walmsley wrote:
-> > > On Fri, 8 Feb 2013, Paul Walmsley wrote:
-> > > 
-> > > > The point is to try to minimize bootloader dependencies.
-> > > 
-> > > Also if there are weird bootloader dependendencies that no one can track 
-> > > down, we should document them somewhere, maybe underneath 
-> > > Documentation/arm/OMAP.
-> > > 
-> > 
-> 
-> 
-> 
-> Paul,
-> 
-> Have you enabled below options in your defconfig,
-> 
-> CONFIG_ARM_APPENDED_DTB=y
-> CONFIG_ARM_ATAG_DTB_COMPAT=y
-> CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+http://www.pwsan.com/omap/testlogs/test_v3.7-rc8/20121204220128/build/am33xx_only/
 
-For v3.8-rc6, the .config that I'm using is available here:
+and here's the boot log:
 
-http://www.pwsan.com/omap/testlogs/test_v3.8-rc6/20130206155004/build/am33xx_only/am33xx_only
+http://www.pwsan.com/omap/testlogs/test_v3.7-rc8/20121204220128/boot/am335xbone/am335xbone_log.txt
 
-The kernel + appended DTB is available here:
+Note of course that there are some Kconfig changes between v3.7-rc8 and 
+v3.8-rcX, so it's possible that the problem could be in those changes, of 
+course.
 
-http://www.pwsan.com/omap/testlogs/test_v3.8-rc6/20130206155004/build/am33xx_only/uImage-dtb.am335x-bone
-
-The bootlog is available here:
-
-http://www.pwsan.com/omap/testlogs/test_v3.8-rc6/20130206155004/boot/am335xbone/am335xbone_log.txt
-
-> I am sure you must have already enabled it, but still would like to clarify 
-> Here.
-
-No problem, thanks for asking.
 
 - Paul
