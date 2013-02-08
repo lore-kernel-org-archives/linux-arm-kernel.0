@@ -1,65 +1,34 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 7 Feb 2013 19:05:04 -0600
-Subject: [PATCH V2 0/2] ARM: dts: Add DT bindings for OMAP SDMA
-Message-ID: <1360285506-22354-1-git-send-email-jon-hunter@ti.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri,  8 Feb 2013 02:25:53 +0100
+Subject: [PATCH 0/3] RM9200 DT i2c bindings and MPA 1600 support
+Message-ID: <1360286756-29705-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds device-tree bindings from SDMA on OMAP2+ devices. DMA client
-bindings are also added for devices that have SPI and MMC bindings
-populated. Client binding data is based upon existing HWMOD data for
-OMAP and has been checked against OMAP documentation.
+Hi,
 
-Please note that the underlying (legacy) OMAP SDMA driver has not been
-ported over to DT and this still needs to be done. However, this allows
-DMA clients to look-up the DMA resource information via device-tree.
+1st patch adds bindings for hardware i2c on RM9200. This also includes
+pinctrl setup.
 
-Testing includes ...
-1. Boot tested on OMAP3430 Beagle board, OMAP4430 Panda board and
-   OMAP4460 Panda board with and without device-tree present.
-2. Testing of MMC1 with SD card on OMAP3430 Beagle board, OMAP4430
-   Panda board and OMAP4460 Panda board with and without device-tree
-   present.
+2nd patch adds pinctrl nodes to i2c-gpio which is need since the gpio
+pins must be set to open drain. I suspect that this should be done in
+other AT91 dtsi files as well, unless we want to rely on the
+bootloader doing it.
 
-Testing branch available here [1].
+3rd patch adds a new RM9200 DT board. This is minimal DT file with a 
+lot of stuff missing. The plan is to add the ASoC stuff next.
 
-Series is based upon Tony Lindgren's omap-for-v3.9/multiplatform-v2
-branch [2] on top of the following ...
-- Vinod's topic/dmaengine_dt branch [3]
-- Matt Porter's series "DMA Engine support for AM33XX" [4]
-- Matt Porter's series "omap_hsmmc DT DMA Client support" [5]
-- Sourav Poddar's series "add omap mcspi device tree data" [6]
+Joachim Eastwood (3):
+  ARM: at91: add TWI bindings to RM9200 DT
+  ARM: at91: add pinctrl nodes to i2c-gpio on RM92000 DT
+  ARM: at91: add MPA 1600 DT board
 
-V2 changes:
-- Updated to Tony's omap-for-v3.9/multiplatform-v2 branch to pull in
-  DMA changes for v3.9
-- Added comma to omap_dma_driver structure as pointed out by Arnd.
-- Updated OMAP SDMA DT binding compatible strings to indicate which
-  devices are bit compatible with each other with respect to the SDMA
-  controller. Grant had mentioned in the past that he wants the
-  compatible string to be based upon a particular device and not
-  something generic like "ti,omap-sdma".
-
-[1] https://github.com/jonhunter/linux/commits/dev-dt-dma
-[2] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git omap-for-v3.9/multiplatform-v2
-[3] http://git.infradead.org/users/vkoul/slave-dma.git/shortlog/refs/heads/topic/dmaengine_dt
-[4] http://permalink.gmane.org/gmane.linux.kernel.spi.devel/12508
-[5] http://permalink.gmane.org/gmane.linux.ports.arm.omap/93165
-[6] http://permalink.gmane.org/gmane.linux.kernel/1435002
-
-Jon Hunter (2):
-  ARM: dts: OMAP2+: Add SDMA controller bindings and nodes
-  dmaengine: OMAP: Register SDMA controller with Device Tree DMA driver
-
- .../devicetree/bindings/dma/omap-sdma.txt          |   51 ++++++++++++++++++++
- arch/arm/boot/dts/omap2.dtsi                       |   12 +++++
- arch/arm/boot/dts/omap3.dtsi                       |   40 +++++++++++++++
- arch/arm/boot/dts/omap4.dtsi                       |   41 ++++++++++++++++
- arch/arm/boot/dts/omap5.dtsi                       |   41 ++++++++++++++++
- arch/arm/mach-omap2/dma.c                          |    4 ++
- drivers/dma/omap-dma.c                             |   37 +++++++++++++-
- 7 files changed, 224 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/omap-sdma.txt
+ arch/arm/boot/dts/Makefile        |  1 +
+ arch/arm/boot/dts/at91rm9200.dtsi | 28 +++++++++++++++
+ arch/arm/boot/dts/mpa1600.dts     | 71 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/at91rm9200.c   |  1 +
+ 4 files changed, 101 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mpa1600.dts
 
 -- 
-1.7.10.4
+1.8.0
