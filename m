@@ -1,46 +1,83 @@
-From: david.woodhouse@intel.com (Woodhouse, David)
-Date: Fri, 8 Feb 2013 17:25:17 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130207181315.GM17833@n2100.arm.linux.org.uk>
-References: <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
- <20130207181315.GM17833@n2100.arm.linux.org.uk>
-Message-ID: <1360344301.6066.263.camel@shinybook.infradead.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 8 Feb 2013 17:27:42 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: clean up and standardize WFI handling for 3.9
+Message-ID: <alpine.DEB.2.00.1302081726480.28008@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-02-07 at 18:13 +0000, Russell King - ARM Linux wrote:
-> 
-> However, the biggest reason not to use libgcc is that we want to control
-> what gets used in the kernel - for example, no floating point, and no
-> use of 64 x 64bit division.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Which is all very sensible. But there's no particular reason we couldn't
-add a __bswap[sd]i2 to the kernel's version of libgcc if we wanted to.
+Hi,
 
-If we're compiling with -Os  on platforms without 'rev' and that's the
-thing that makes most sense, then we should make it work.
+The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
 
--- 
-                   Sent with MeeGo's ActiveSync support.
+  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-b-for-3.9
+
+for you to fetch changes up to 814a18a5d026464f56b3616704b985f9942b29a6:
+
+  ARM: OMAP AM3517/05: hwmod data: block WFI when EMAC active (2013-02-06 13:48:56 -0700)
+
+- ----------------------------------------------------------------
+On OMAP2+ devices, standardize and clean up WFI entry and WFI blocking.
+
+Basic test logs are available here:
+
+   http://www.pwsan.com/omap/testlogs/wfi_devel_a_3.9/20130208085027/
+
+- ----------------------------------------------------------------
+vmlinux object size
+(delta in bytes from test_v3.8-rc6 (88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7)):
+   text     data      bss    total  kernel
+    +64        0        0      +64  am33xx_only
+    -64        0        0      -64  n800_multi_omap2xxx
+    -64        0        0      -64  n800_only_a
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+    -40       +8        0      -32  omap2plus_defconfig
+    -64        0        0      -64  omap2plus_defconfig_2430sdp_only
+    -40       +8        0      -32  omap2plus_defconfig_cpupm
+   -104       +8        0      -96  omap2plus_defconfig_no_pm
+    -40       +8        0      -32  omap2plus_defconfig_omap2_4_only
+    +64        0        0      +64  omap2plus_defconfig_omap3_4_only
+   -116       +8      +44      -64  rmk_omap3430_ldp_allnoconfig
+    +64        0        0      +64  rmk_omap3430_ldp_oldconfig
+   -116       +8      +44      -64  rmk_omap4430_sdp_allnoconfig
+    +64        0        0      +64  rmk_omap4430_sdp_oldconfig
 
 
+Paul Walmsley (4):
+      ARM: OMAP2xxx: PM: enter WFI via inline asm if CORE stays active
+      ARM: OMAP2+: hwmod: add support for blocking WFI when a device is active
+      ARM: OMAP2420: hwmod data/PM: use hwmod to block WFI when I2C active
+      ARM: OMAP AM3517/05: hwmod data: block WFI when EMAC active
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/5ac63cff/attachment.bin>
+ arch/arm/mach-omap2/omap_hwmod.c           |    8 ++++++++
+ arch/arm/mach-omap2/omap_hwmod.h           |    9 +++++++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    7 ++++++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    7 ++++++-
+ arch/arm/mach-omap2/pm24xx.c               |   23 +++++------------------
+ arch/arm/mach-omap2/sleep24xx.S            |   19 -------------------
+ 6 files changed, 34 insertions(+), 39 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJRFTVMAAoJEMePsQ0LvSpLIFgP/0jbDcII8oox7kf2QrNrgtZq
+2OXWuO6r8QNzIV0/YsZXhGWtpqOPjt64nkirgo0uo5jYnbKjSeels5o1rlz1wlSe
+o+GVZ6K+F1bHqEK8F1dLLrss1WbtnewTrDG8Fmm0KcXk6TJENZIuk55A0gn2fLN1
+iIpKoD4sw2l45fWaZokn7Ka6wPmKXvxWX+u1Rsyj5k9jCNoTUQxGg8LOPnhaw1s+
+LG9u9RulRm5WRPIKL69/5/H+fCxUgStvaIbX/+WYyVb39noqzgd0OGysE1US2KGS
+XMD7EFz3W1fQPpShrZym8wnG1O4ZSbNo93GGa70Y5xolFmrAu9uG5yjx8XSFQEOC
+zyWRbWNeePj5HmttrsizPEt+Lqi3jZo+0gF/6cLgfCET2nq0NuQxJTmdhT/rhWLv
++idhr2f34XdokTVU4zpjT+tnUdnAFPIQPrcMmwPF2+fs92KdO1RoSq+sHkEaFvwN
+Wo8TPXxhRK4QRT8sSMBNg1HLiLFKz5nHDfzWokH5OEfByoEzSwYa79N1ORfSo84+
+grg+PewKe/wuQtRAR6mwe2xvaGVmtJKdflSasc2D1FXKiPtdajT8p5MqxM3nZ1o5
+8EzXiEF5iIYAW+RQhGBFt10ruHZWMWMpqjBk6CjU+O6G12qE3aF5qiexawQkU0Ew
+rp2PD3gzB1QITrtsBhxV
+=ejwV
+-----END PGP SIGNATURE-----
