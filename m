@@ -1,48 +1,72 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 08 Feb 2013 21:40:24 +0000
-Subject: [PATCH 1/2] ARM: DT: tegra: Add Tegra30 Beaver board support
-In-Reply-To: <50E478AF.2040406@nvidia.com>
-References: <1356032489-27619-1-git-send-email-pengw@nvidia.com>
- <50DDC743.2080606@gmail.com> <50DE3146.6090001@nvidia.com>
- <CAOesGMgW890K4Wo2-SFE4YFn5f8T950BTZ82rkCQfwpV+bsRyQ@mail.gmail.com>
- <50E478AF.2040406@nvidia.com>
-Message-ID: <20130208214024.9467E3E2C27@localhost>
+Date: Fri, 08 Feb 2013 21:41:36 +0000
+Subject: [PATCH v3 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
+In-Reply-To: <CAD=FV=X=GRz0ZuFSqEHPy6i2ULtHk==M2_gaCvdmd=81YMNmMg@mail.gmail.com>
+References: <1355416562-25539-1-git-send-email-gautam.vivek@samsung.com>
+ <1355416562-25539-2-git-send-email-gautam.vivek@samsung.com>
+ <20121215072312.EBCAA3E0C06@localhost>
+ <CAFp+6iHoS4XJWHNrsyVsQS4bYZs1PUNEGsRr=EqAS7kpm2XGMQ@mail.gmail.com>
+ <CAFp+6iFSZjfVJp23j2dEz0hRap07RMo68GJpsQM7YqOMBCbqsQ@mail.gmail.com>
+ <CAD=FV=X=GRz0ZuFSqEHPy6i2ULtHk==M2_gaCvdmd=81YMNmMg@mail.gmail.com>
+Message-ID: <20130208214137.05F7D3E2C27@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Jan 2013 10:13:03 -0800, Peng Wu <pengw@nvidia.com> wrote:
-> On 12/28/2012 08:43 PM, Olof Johansson wrote:
-> > On Fri, Dec 28, 2012 at 3:54 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> >> On 12/28/2012 09:22 AM, Rob Herring wrote:
-> >>> On 12/20/2012 01:41 PM, Bryan Wu wrote:
-> >>>> This patch adds support for Tegra30 Beaver board in upstream kernel.
-> >>>> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
-> >>>> +/ {
-> >>>> +    model = "NVIDIA Tegra30 Beaver evaluation board";
-> >>>> +    compatible = "nvidia,beaver", "nvidia,tegra30";
-> >>> nvidia,beaver needs to be documented.
-> >> Hmmm. I guess we've managed not to document /any/ of the Tegra
-> >> board-level compatible values. Bryan, could you make a separate patch to
-> >> add all the existing board compatible values to
-> >> Documentation/devicetree/bindings/arm/tegra.txt. The Beaver addition to
-> >> that file can still be part of the Beaver-specific patch though.
-> > Does it need to be documented? Then the "support a new platform only
-> > through DTS update" is no longer true. :)
-> >
-> > In the past, I don't think we've strictly documented all derivative
-> > platform compatible values, just some of the reference ones?
-> >
-> >
-> > -Olof
+On Fri, 21 Dec 2012 10:13:50 -0800, Doug Anderson <dianders@chromium.org> wrote:
+> Vivek,
 > 
-> Actually in every Tegra board dts file, there is a model string to 
-> describe this machine as well as a compatible board string, just like 
-> the "nvidia,beaver". So do we still need put this duplicated information 
-> in a document file? Or if this is the requirement of DeviceTree. I will 
-> do that. I think we have 12 boards need to add such document currently.
+> 
+> On Fri, Dec 21, 2012 at 12:16 AM, Vivek Gautam
+> <gautamvivek1987@gmail.com> wrote:
+> > Hi all,
+> >
+> >
+> > On Wed, Dec 19, 2012 at 7:20 PM, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
+> >> CC: Doug Anderson
+> >>
+> >>
+> >> On Sat, Dec 15, 2012 at 12:53 PM, Grant Likely
+> >> <grant.likely@secretlab.ca> wrote:
+> >>> On Thu, 13 Dec 2012 22:06:01 +0530, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> >>>> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> >>>> index 462e5ac..b3b9af1 100644
+> >>>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> >>>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> >>>> @@ -110,6 +110,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+> >>>>                               "samsung-i2s.1", NULL),
+> >>>>       OF_DEV_AUXDATA("samsung,samsung-i2s", 0x12D70000,
+> >>>>                               "samsung-i2s.2", NULL),
+> >>>> +     OF_DEV_AUXDATA("samsung,exynos4210-ehci", EXYNOS5_PA_EHCI,
+> >>>> +                             "s5p-ehci", NULL),
+> >>>
+> >>> I'm assuming the above change is temporary. What is left to be done to
+> >>> drop the auxdata in theses two patches?
+> >>>
+> >>> Otherwise the patch looks fine.
+> >>>
+> >>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> >
+> > Any more thought about this patch?
+> > Or does this change seems fine?
+> 
+> I'm fairly certain we can just drop the OF_DEV_AUXDATA entry here.  I
+> haven't been following this as closely as I should, but I know that
+> the comment for this table says that the whole purpose is to override
+> device names and that it should be temporary.  We don't need to do any
+> overriding of device names here, do we?
+> 
+> When I drop this (and the ohci and phy) entries from my table I can
+> still boot and still can use USB.  The big difference is what shows up
+> in dmesg
+> 
+> [    1.605000] s5p-ehci s5p-ehci: S5P EHCI Host Controller
+> 
+> Becomes:
+> 
+> [    1.550000] s5p-ehci 12110000.usb: S5P EHCI Host Controller
+> 
+> ...and some sysfs paths change.
 
-The model string is intended to be human-friendly, where as compatible
-is primarily the matching mechanism.
+Right. Drop the AUXDATA then.  :-)
 
-I don't think it is stricly necessary to document top level compatible
-strings unless there is something quirky that begs to be documented.
+g.
