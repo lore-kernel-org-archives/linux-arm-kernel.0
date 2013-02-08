@@ -1,45 +1,39 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:39 +0000
-Subject: [PATCH 09/17] ARM: add atag32_to_cpu() function
+Date: Fri,  8 Feb 2013 23:17:42 +0000
+Subject: [PATCH 12/17] ARM: fix magic for bootloader in BE8
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-13-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add atag32_to_cpu() function to allow code manipulating ATAGs to deal
-with the case where the boot-loader was in little-endian and Linux is
-running big-endian.
+If the boot-loader is running little endian and the kernel is compiled
+big endian then it will not verify the magic number of the front of the
+kernel.
+
+Note, do we need to also reverse the two values after the magic, or are
+they used later on in the kernel decompressor?
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/uapi/asm/setup.h |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/boot/compressed/head.S |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/include/uapi/asm/setup.h b/arch/arm/include/uapi/asm/setup.h
-index 979ff40..d74a417 100644
---- a/arch/arm/include/uapi/asm/setup.h
-+++ b/arch/arm/include/uapi/asm/setup.h
-@@ -175,13 +175,18 @@ struct tagtable {
- 
- #define tag_member_present(tag,member)				\
- 	((unsigned long)(&((struct tag *)0L)->member + 1)	\
--		<= (tag)->hdr.size * 4)
-+		<= atag32_to_cpu((tag)->hdr.size) * 4)
- 
--#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
-+#define tag_next(t)	((struct tag *)((__u32 *)(t) + atag32_to_cpu((t)->hdr.size)))
- #define tag_size(type)	((sizeof(struct tag_header) + sizeof(struct type)) >> 2)
- 
- #define for_each_tag(t,base)		\
- 	for (t = base; t->hdr.size; t = tag_next(t))
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 39940a7..b6c7ec8 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -129,7 +129,11 @@ start:
+  THUMB(		adr	r12, BSYM(1f)	)
+  THUMB(		bx	r12		)
  
 +#ifdef CONFIG_CPU_BE8_BOOT_LE
-+#define atag32_to_cpu(x)	le32_to_cpu(x)
++		.word	0x18286f01
 +#else
-+#define atag32_to_cpu(x)	x
+ 		.word	0x016f2818		@ Magic numbers to help the loader
 +#endif
- 
- #endif /* _UAPI__ASMARM_SETUP_H */
+ 		.word	start			@ absolute load/run zImage address
+ 		.word	_edata			@ zImage end address
+  THUMB(		.thumb			)
 -- 
 1.7.10.4
