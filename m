@@ -1,53 +1,62 @@
-From: david.woodhouse@intel.com (Woodhouse, David)
-Date: Fri, 8 Feb 2013 22:40:40 +0000
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
-References: <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
- <20130207181315.GM17833@n2100.arm.linux.org.uk>
- <1360344301.6066.263.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
-Message-ID: <1360363233.6066.283.camel@shinybook.infradead.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 08 Feb 2013 14:42:01 -0800
+Subject: [PATCH 0/2] ARM: S3C24XX: make s3c24XX.h header content local
+In-Reply-To: <201302072249.04263.heiko@sntech.de>
+References: <201302072249.04263.heiko@sntech.de>
+Message-ID: <1a5701ce064d$840dd2f0$8c2978d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-02-08 at 15:04 -0500, Nicolas Pitre wrote:
-> On Fri, 8 Feb 2013, Woodhouse, David wrote:
+Heiko St?bner wrote:
 > 
-> > On Thu, 2013-02-07 at 18:13 +0000, Russell King - ARM Linux wrote:
-> > > 
-> > > However, the biggest reason not to use libgcc is that we want to control
-> > > what gets used in the kernel - for example, no floating point, and no
-> > > use of 64 x 64bit division.
-> > 
-> > Which is all very sensible. But there's no particular reason we couldn't
-> > add a __bswap[sd]i2 to the kernel's version of libgcc if we wanted to.
+> This series moves the contents of the plat/s3c24XX.h headers into
+> common.h, as their content does not need to be global anymore, now that
+> everything lives in mach-s3c24xx.
 > 
-> Absolutely.
+> Heiko Stuebner (2):
+>   ARM: S3C24XX: move plat-samsung/s3c24XX headers to local common.h
+>   ARM: S3C24XX: cleanup the included soc init functions in common.h
+> 
+>  arch/arm/mach-s3c24xx/clock-s3c2410.c        |    1 -
+>  arch/arm/mach-s3c24xx/clock-s3c2412.c        |    1 -
+>  arch/arm/mach-s3c24xx/clock-s3c2416.c        |    1 -
+>  arch/arm/mach-s3c24xx/clock-s3c2443.c        |    1 -
+>  arch/arm/mach-s3c24xx/common.c               |    7 +--
+>  arch/arm/mach-s3c24xx/common.h               |   90
+> +++++++++++++++++++++++++-
+>  arch/arm/mach-s3c24xx/mach-jive.c            |    2 +-
+>  arch/arm/mach-s3c24xx/mach-n30.c             |    1 -
+>  arch/arm/mach-s3c24xx/mach-nexcoder.c        |    2 -
+>  arch/arm/mach-s3c24xx/mach-otom.c            |    1 -
+>  arch/arm/mach-s3c24xx/mach-smdk2413.c        |    4 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2416.c        |    3 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2440.c        |    2 -
+>  arch/arm/mach-s3c24xx/mach-smdk2443.c        |    4 +-
+>  arch/arm/mach-s3c24xx/mach-vstms.c           |    4 +-
+>  arch/arm/mach-s3c24xx/pm-s3c2412.c           |    1 -
+>  arch/arm/mach-s3c24xx/s3c2410.c              |    1 -
+>  arch/arm/mach-s3c24xx/s3c2412.c              |    1 -
+>  arch/arm/mach-s3c24xx/s3c2416.c              |    1 -
+>  arch/arm/mach-s3c24xx/s3c2440.c              |    1 -
+>  arch/arm/mach-s3c24xx/s3c2442.c              |    1 -
+>  arch/arm/mach-s3c24xx/s3c2443.c              |    1 -
+>  arch/arm/mach-s3c24xx/s3c244x.c              |    2 -
+>  arch/arm/plat-samsung/include/plat/s3c2410.h |   31 ---------
+>  arch/arm/plat-samsung/include/plat/s3c2412.h |   32 ---------
+>  arch/arm/plat-samsung/include/plat/s3c2416.h |   37 -----------
+>  arch/arm/plat-samsung/include/plat/s3c2443.h |   36 ----------
+>  arch/arm/plat-samsung/include/plat/s3c244x.h |   42 ------------
+>  28 files changed, 99 insertions(+), 212 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2410.h
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2412.h
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2416.h
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2443.h
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c244x.h
+> 
+> --
 
-And then ARM can just set ARCH_USE_BUILTIN_BSWAP like other
-architectures do, right?
+Yeah, looks good to me, applied this series.
 
--- 
-                   Sent with MeeGo's ActiveSync support.
+Thanks.
 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/06d7a8f0/attachment.bin>
+- Kukjin
