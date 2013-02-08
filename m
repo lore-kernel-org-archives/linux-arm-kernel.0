@@ -1,68 +1,103 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:38 +0000
-Subject: [PATCH 08/17] ARM: smp_scu: data endian fixes
+Date: Fri,  8 Feb 2013 23:17:37 +0000
+Subject: [PATCH 07/17] ARM: twd: data endian fix
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-9-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-8-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The smp_scu driver needs to use the relaxed readl/write accessors
-to avoid any issues with the endian mode the processor core is in.
+Ensure the twd driver uses the correct calls to access the hardware
+to ensure that we do not end up with data in the wrong endian format.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/smp_scu.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/kernel/smp_twd.c |   24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 45eac87..0fcd0ce 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -28,7 +28,7 @@
-  */
- unsigned int __init scu_get_core_count(void __iomem *scu_base)
- {
--	unsigned int ncores = __raw_readl(scu_base + SCU_CONFIG);
-+	unsigned int ncores = readl_relaxed(scu_base + SCU_CONFIG);
- 	return (ncores & 0x03) + 1;
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 49f335d..3756f42 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -46,7 +46,7 @@ static void twd_set_mode(enum clock_event_mode mode,
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
+ 			| TWD_TIMER_CONTROL_PERIODIC;
+-		__raw_writel(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
++		writel_relaxed(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
+ 			twd_base + TWD_TIMER_LOAD);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+@@ -59,18 +59,18 @@ static void twd_set_mode(enum clock_event_mode mode,
+ 		ctrl = 0;
+ 	}
+ 
+-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
++	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
  }
  
-@@ -42,19 +42,19 @@ void scu_enable(void __iomem *scu_base)
- #ifdef CONFIG_ARM_ERRATA_764369
- 	/* Cortex-A9 only */
- 	if ((read_cpuid(CPUID_ID) & 0xff0ffff0) == 0x410fc090) {
--		scu_ctrl = __raw_readl(scu_base + 0x30);
-+		scu_ctrl = readl_relaxed(scu_base + 0x30);
- 		if (!(scu_ctrl & 1))
--			__raw_writel(scu_ctrl | 0x1, scu_base + 0x30);
-+			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
- 	}
- #endif
+ static int twd_set_next_event(unsigned long evt,
+ 			struct clock_event_device *unused)
+ {
+-	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
++	unsigned long ctrl = readl_relaxed(twd_base + TWD_TIMER_CONTROL);
  
--	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
-+	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
- 	/* already enabled? */
- 	if (scu_ctrl & 1)
- 		return;
+ 	ctrl |= TWD_TIMER_CONTROL_ENABLE;
  
- 	scu_ctrl |= 1;
--	__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
-+	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
- 
- 	/*
- 	 * Ensure that the data accessed by CPU0 before the SCU was
-@@ -80,9 +80,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
- 	if (mode > 3 || mode == 1 || cpu > 3)
- 		return -EINVAL;
- 
--	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
-+	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
- 	val |= mode;
--	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
-+	writeb_relaxed(val, scu_base + SCU_CPU_STATUS + cpu);
+-	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
+-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
++	writel_relaxed(evt, twd_base + TWD_TIMER_COUNTER);
++	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
  
  	return 0;
  }
+@@ -83,8 +83,8 @@ static int twd_set_next_event(unsigned long evt,
+  */
+ static int twd_timer_ack(void)
+ {
+-	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
+-		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
++	if (readl_relaxed(twd_base + TWD_TIMER_INTSTAT)) {
++		writel_relaxed(1, twd_base + TWD_TIMER_INTSTAT);
+ 		return 1;
+ 	}
+ 
+@@ -210,15 +210,15 @@ static void __cpuinit twd_calibrate_rate(void)
+ 		waitjiffies += 5;
+ 
+ 				 /* enable, no interrupt or reload */
+-		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
++		writel_relaxed(0x1, twd_base + TWD_TIMER_CONTROL);
+ 
+ 				 /* maximum value */
+-		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
++		writel_relaxed(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
+ 
+ 		while (get_jiffies_64() < waitjiffies)
+ 			udelay(10);
+ 
+-		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
++		count = readl_relaxed(twd_base + TWD_TIMER_COUNTER);
+ 
+ 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+ 
+@@ -273,7 +273,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	 * bother with the below.
+ 	 */
+ 	if (per_cpu(percpu_setup_called, cpu)) {
+-		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
++		writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
+ 		clockevents_register_device(*__this_cpu_ptr(twd_evt));
+ 		enable_percpu_irq(clk->irq, 0);
+ 		return 0;
+@@ -305,7 +305,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	 * The following is done once per CPU the first time .setup() is
+ 	 * called.
+ 	 */
+-	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
++	writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
+ 
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
 -- 
 1.7.10.4
