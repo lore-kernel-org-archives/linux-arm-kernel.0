@@ -1,20 +1,21 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 08 Feb 2013 15:56:53 +0000
-Subject: vexpress_sysreg_probe section mismatch with 3.8-rc6
-In-Reply-To: <20130208120648.GB3495@mudshark.cambridge.arm.com>
-References: <20130208120648.GB3495@mudshark.cambridge.arm.com>
-Message-ID: <1360339013.4045.53.camel@hornet>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Feb 2013 16:20:31 +0000
+Subject: [PATCH 2/5] spi: pl022: use generic DMA slave configuration if
+ possible
+In-Reply-To: <CACRpkdZNpCJwp-uaH6feTcaPesNouwpHt-hO-M9v52G=Ux+Hqw@mail.gmail.com>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <1359410300-26113-3-git-send-email-arnd@arndb.de>
+ <1359445794.31148.34.camel@smile> <201301291313.03511.arnd@arndb.de>
+ <CACRpkdZNpCJwp-uaH6feTcaPesNouwpHt-hO-M9v52G=Ux+Hqw@mail.gmail.com>
+Message-ID: <20130208162031.GX17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-02-08 at 12:06 +0000, Will Deacon wrote:
-> My guess is that you don't want the __init annotation on
-> vexpress_sysreg_setup; patch below.
+On Thu, Feb 07, 2013 at 07:29:17PM +0100, Linus Walleij wrote:
+> Actually I once read about a feature where the kernel provides
+> a static page full of zeroes or something like this, that would be
+> ideal to use in cases like this, then all of this dummy page
+> allocation and freeing can be deleted.
 
-It's already fixed in arm-soc:
-
-http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commitdiff;h=e065d3d417274bafed162b3dffd2e03a5128623c
-
-Cheers!
-
-Pawel
+I think you're thinking of empty_zero_page which is used to provide the
+initial BSS pages for user apps.
