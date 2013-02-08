@@ -1,35 +1,55 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 08 Feb 2013 15:04:19 -0500 (EST)
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <1360344301.6066.263.camel@shinybook.infradead.org>
-References: <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
- <20130207181315.GM17833@n2100.arm.linux.org.uk>
- <1360344301.6066.263.camel@shinybook.infradead.org>
-Message-ID: <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 08 Feb 2013 13:19:17 -0800
+Subject: [PATCH] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for
+ all CPU power states except off
+In-Reply-To: <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
+ (Santosh Shilimkar's message of "Fri, 8 Feb 2013 20:41:46 +0530")
+References: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
+ <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87d2wazep6.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Feb 2013, Woodhouse, David wrote:
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-> On Thu, 2013-02-07 at 18:13 +0000, Russell King - ARM Linux wrote:
-> > 
-> > However, the biggest reason not to use libgcc is that we want to control
-> > what gets used in the kernel - for example, no floating point, and no
-> > use of 64 x 64bit division.
-> 
-> Which is all very sensible. But there's no particular reason we couldn't
-> add a __bswap[sd]i2 to the kernel's version of libgcc if we wanted to.
+> Current CPU PM code code make use of common cpu_suspend() path for all the
+> CPU power states which is not optimal. In fact cpu_suspend() path is needed
+> only when we put CPU power domain to off state where the CPU context is lost.
+>
+> Update the code accordingly so that the expensive cpu_suspend() path
+> can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
+>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>
+> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Absolutely.
+Looks OK at first glance, but are you sure this is right for the
+various ways both clusters might idle using coupled CPUidle?
 
+Some description of the testing would be helpful here.
 
-Nicolas
+Thanks,
+
+Kevin
+
+> ---
+>  arch/arm/mach-omap2/omap-mpuss-lowpower.c |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> index aac46bf..abdd0f6 100644
+> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> @@ -276,7 +276,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+>  	/*
+>  	 * Call low level function  with targeted low power state.
+>  	 */
+> -	cpu_suspend(save_state, omap4_finish_suspend);
+> +	if (save_state)
+> +		cpu_suspend(save_state, omap4_finish_suspend);
+> +	else
+> +		omap4_finish_suspend(save_state);
+>  
+>  	/*
+>  	 * Restore the CPUx power state to ON otherwise CPUx
