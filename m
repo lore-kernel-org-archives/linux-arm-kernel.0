@@ -1,41 +1,33 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 8 Feb 2013 10:56:32 +0200
-Subject: [PATCH 02/10] USB: EHCI: make ehci-omap a separate driver
-In-Reply-To: <20130208074229.GA21879@arwen.pp.htv.fi>
-References: <yes> <1360258447-27247-1-git-send-email-yes>
- <5113e5db.c84e420a.08c3.ffffbe6b@mx.google.com>
- <20130208074229.GA21879@arwen.pp.htv.fi>
-Message-ID: <5114BDC0.5060307@ti.com>
+From: sangsu4u.park@samsung.com (Sangsu Park)
+Date: Fri, 08 Feb 2013 17:57:08 +0900
+Subject: [RESEND][PATCH] ARM: EXYNOS: Add clocks for EXYNOS I2S and PCM I/F
+In-Reply-To: <CAAgF-Be1UKyyX0VBkdy7GbhxH4mZmsVwskr2Yj3TM54qjs6dEQ@mail.gmail.com>
+References: <003201ce0429$c15e8350$441b89f0$@samsung.com>
+ <CAAgF-Be1UKyyX0VBkdy7GbhxH4mZmsVwskr2Yj3TM54qjs6dEQ@mail.gmail.com>
+Message-ID: <011101ce05da$46be7760$d43b6620$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2013 09:42 AM, Felipe Balbi wrote:
-> HI,
+On Fri, Feb 8, 2013 at 13:23 PM, Padma Venkat <padma.kvr@gmail.com> wrote:
+> On Wed, Feb 6, 2013 at 10:51 AM, Sangsu Park <sangsu4u.park@samsung.com>
+wrote:
+> > +void __init exynos_register_audss_clocks(void)
+> > +{
+> > +       clk_audss_base = ioremap(EXYNOS_PA_AUDSS, SZ_4K);
+> > +       if (clk_audss_base == NULL) {
 > 
-> On Thu, Feb 07, 2013 at 11:03:59PM +0530, manjunath.goudar at linaro.org wrote:
->> From: Manjunath Goudar <manjunath.goudar@linaro.org>
->>
->> Separate the OMAP host controller driver from ehci-hcd host code
->> into its own driver module.
->>
->> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
->> Signed-off-by: Arnd Bergmann <arnd@linaro.org>
->> Cc: Felipe Balbi <balbi@ti.com>
->> Cc: Greg KH <greg@kroah.com>
->> Cc: Alan Stern <stern@rowland.harvard.edu>
->> Cc: linux-usb at vger.kernel.org
->> Cc: Tony Lindgren <tony@atomide.com>
+> Please run checkpatch. There should be space after if.
+
+I mistakenly forgot checking patch with checkpatch.
+I can find some errors and warnings about this patch.
+I'll fix them. Thank you for your comment.
+
 > 
-> Alan and Roger have already been working on this for ehci-omap. Their
-> patches might already be in Greg's queue...
+> > +               pr_err("unable to ioremap for gpio_base1\n");
 > 
+> Please fix the err message.
 
-Manjunath,
+I'll change it. :)
 
-ehci-omap will be taken care of so in [1] so you can please skip it
-from your patches. Thanks.
-
-cheers,
--roger
-
-[1] https://patchwork.kernel.org/patch/2055131/
+Thanks.
+Sangsu Park
