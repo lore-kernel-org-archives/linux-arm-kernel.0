@@ -1,116 +1,214 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 07 Feb 2013 17:29:33 -0800
-Subject: [PATCH] ARM: OMAP4: PM: Warn users about usage of older
- bootloaders
-In-Reply-To: <alpine.DEB.2.00.1302062343230.12769@utopia.booyaka.com> (Paul
- Walmsley's message of "Wed, 6 Feb 2013 23:44:34 +0000 (UTC)")
-References: <1359980683-12079-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1302062343230.12769@utopia.booyaka.com>
-Message-ID: <87liazzj7m.fsf@linaro.org>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Fri, 8 Feb 2013 01:51:09 +0000
+Subject: [v4 PATCH 12/12] ARM: dts: add spi nodes for the atmel boards
+References: <1358148877-18679-1-git-send-email-wenyou.yang@atmel.com>
+ <1358148877-18679-13-git-send-email-wenyou.yang@atmel.com>
+ <20130205195008.GA30595@game.jcrosoft.org>
+Message-ID: <B256D81BAE5131468A838E5D7A2436413A0875A3@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+Hello, JC
 
-> On Mon, 4 Feb 2013, Rajendra Nayak wrote:
->
->> OMAP4 CHIP level PM works only with newer bootloaders. The
->> dependency on the bootloader comes from the fact that the
->> kernel is missing reset and initialization code for some
->> devices.
->> 
->> While the right thing to do is to add reset and init code in
->> the kernel, for some co-processor IP blocks like DSP and IVA
->> it means downloading firmware into each one of them to execute
->> idle instructions.
->> 
->> While a feasible solution is worked upon on how such IP blocks
->> can be better handled in the kernel, in the interim, to avoid
->> any further frustration to users testing PM on OMAP4 and finding
->> it broken, warn them about the bootloader being a possible
->> cause.
->> 
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> Cc: Tero Kristo <t-kristo@ti.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: R Sricharan <r.sricharan@ti.com>
->
-> Thanks Rajendra, I appreciate the patch.  I've tweaked it slightly and the 
-> following is what's queued here; hopefully it can go in for v3.9.
->
->
-> - Paul
->
-> From: Rajendra Nayak <rnayak@ti.com>
-> Date: Mon, 4 Feb 2013 17:54:43 +0530
-> Subject: [PATCH] ARM: OMAP4: PM: Warn users about usage of older bootloaders
->
-> OMAP4 CHIP level PM works only with newer bootloaders. The
-> dependency on the bootloader comes from the fact that the
-> kernel is missing reset and initialization code for some
-> devices.
->
-> While the right thing to do is to add reset and init code in
-> the kernel, for some co-processor IP blocks like DSP and IVA
-> it means downloading firmware into each one of them to execute
-> idle instructions.
->
-> While a feasible solution is worked upon on how such IP blocks
-> can be better handled in the kernel, in the interim, to avoid
-> any further frustration to users testing PM on OMAP4 and finding
-> it broken, warn them about the bootloader being a possible
-> cause.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: R Sricharan <r.sricharan@ti.com>
-> [paul at pwsan.com: tweaked warning messages and comments slightly]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> -----Original Message-----
+> From: Yang, Wenyou
+> Sent: 2013?2?6? 9:35
+> To: 'Jean-Christophe PLAGNIOL-VILLARD'
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Ferre,
+> Nicolas; richard.genoud at gmail.com; Lin, JM; linux at arm.linux.org.uk
+> Subject: RE: [v4 PATCH 12/12] ARM: dts: add spi nodes for the atmel boards
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
+> > Sent: 2013?2?6? 3:50
+> > To: Yang, Wenyou
+> > Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> Ferre,
+> > Nicolas; richard.genoud at gmail.com; Lin, JM; linux at arm.linux.org.uk
+> > Subject: Re: [v4 PATCH 12/12] ARM: dts: add spi nodes for the atmel boards
+> >
+> > On 15:34 Mon 14 Jan     , Wenyou Yang wrote:
+> > > From: Richard Genoud <richard.genoud@gmail.com>
+> > >
+> > > Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> > > [wenyou.yang at atmel.com: added spi nodes for the sam9263ek,
+> sam9g20ek,
+> > sam9m10g45ek and sam9n12ek boards]
+> > > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > > Cc: linux at arm.linux.org.uk
+> > > ---
+> > >  arch/arm/boot/dts/at91sam9263ek.dts         |   14
+> > ++++++++++++++
+> > >  arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   14
+> > ++++++++++++++
+> > >  arch/arm/boot/dts/at91sam9m10g45ek.dts      |   14
+> > ++++++++++++++
+> > >  arch/arm/boot/dts/at91sam9n12ek.dts         |   14
+> > ++++++++++++++
+> > >  arch/arm/boot/dts/at91sam9x5ek.dtsi         |   14
+> ++++++++++++++
+> > >  5 files changed, 70 insertions(+)
+> > >
+> > > diff --git a/arch/arm/boot/dts/at91sam9263ek.dts
+> > b/arch/arm/boot/dts/at91sam9263ek.dts
+> > > index 1eb0872..63ba57b 100644
+> > > --- a/arch/arm/boot/dts/at91sam9263ek.dts
+> > > +++ b/arch/arm/boot/dts/at91sam9263ek.dts
+> > > @@ -79,6 +79,20 @@
+> > >  					};
+> > >  				};
+> > >  			};
+> > > +
+> > > +			spi0: spi at fffa4000 {
+> > > +				status = "okay";
+> > > +				cs-gpios = <&pioA 5 0
+> > > +					    &pioA 3 0
+> > > +					    &pioA 4 0
+> > > +					    &pioB 11 0
+> > NACK
+> >
+> > we no use that much as cs-gpios on this hw
+> 
+> Thanks for your feedback.
+> 
+> Listing the all choices for cs-gpios, one cs-gpio is selected by reg value.
+> Maybe listing one cs-gpio is OK.
+> I will try it.
+> 
+> I am going to dig the feasibility of removing cs-gpios.
 
-FWIW
+I need remain the list of cs-gpios, because "master->num_chipselect" is got from the number of item of this list.
+If this list is removed, only the cs-gpio for used chip-select is provided , it works for CS0 chip-select, but it fails to work for other than CS0, e.g. CS1.
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+Could you give me some idea?
+Thank you in advance.
 
-> ---
->  arch/arm/mach-omap2/pm44xx.c |   19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-> index aa6fd98..502ed9b 100644
-> --- a/arch/arm/mach-omap2/pm44xx.c
-> +++ b/arch/arm/mach-omap2/pm44xx.c
-> @@ -77,8 +77,18 @@ static int omap4_pm_suspend(void)
->  		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
->  		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->saved_logic_state);
->  	}
-> -	if (ret)
-> +	if (ret) {
->  		pr_crit("Could not enter target state in pm_suspend\n");
-> +		/*
-> +		 * OMAP4 chip PM currently works only with certain (newer)
-> +		 * versions of bootloaders. This is due to missing code in the
-> +		 * kernel to properly reset and initialize some devices.
-> +		 * Warn the user about the bootloader version being one of the
-> +		 * possible causes.
-> +		 * http://www.spinics.net/lists/arm-kernel/msg218641.html
-> +		 */
-> +		pr_warn("A possible cause could be an old bootloader - try u-boot >= v2012.07\n");
-> +	}
->  	else
->  		pr_info("Successfully put all powerdomains to target state\n");
->  
-> @@ -146,6 +156,13 @@ int __init omap4_pm_init(void)
->  	}
->  
->  	pr_err("Power Management for TI OMAP4.\n");
-> +	/*
-> +	 * OMAP4 chip PM currently works only with certain (newer)
-> +	 * versions of bootloaders. This is due to missing code in the
-> +	 * kernel to properly reset and initialize some devices.
-> +	 * http://www.spinics.net/lists/arm-kernel/msg218641.html
-> +	 */
-> +	pr_warn("u-boot >= v2012.07 is required for full PM support\n");
->  
->  	ret = pwrdm_for_each(pwrdms_setup, NULL);
->  	if (ret) {
+> 
+> > > +					   >;
+> > > +				mtd_dataflash at 0 {
+> > > +					compatible = "atmel,at45", "atmel,dataflash";
+> > > +					spi-max-frequency = <50000000>;
+> > > +					reg = <0>;
+> > > +				};
+> > > +			};
+> > >  		};
+> > >
+> > >  		nand0: nand at 40000000 {
+> > > diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+> > b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+> > > index da15e83..49ad49e 100644
+> > > --- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+> > > +++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+> > > @@ -96,6 +96,20 @@
+> > >  				status = "okay";
+> > >  				pinctrl-0 = <&pinctrl_ssc0_tx>;
+> > >  			};
+> > > +
+> > > +			spi0: spi at fffc8000 {
+> > > +				status = "okay";
+> > > +				cs-gpios = <&pioA 3 0
+> > > +					    &pioC 11 0
+> > > +					    &pioC 16 0
+> > > +					    &pioC 17 0
+> > ditto and so on
+> >
+> > you must only provife the gpio use by the hw
+> > > +					   >;
+> > > +				mtd_dataflash at 0 {
+> > > +					compatible = "atmel,at45", "atmel,dataflash";
+> > > +					spi-max-frequency = <50000000>;
+> > > +					reg = <1>;
+> > > +				};
+> > > +			};
+> > >  		};
+> > >
+> > >  		nand0: nand at 40000000 {
+> > > diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> > b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> > > index 20c3191..275f22d 100644
+> > > --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> > > +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> > > @@ -102,6 +102,20 @@
+> > >  					};
+> > >  				};
+> > >  			};
+> > > +
+> > > +			spi0: spi at fffa4000{
+> > > +				status = "okay";
+> > > +				cs-gpios = <&pioB 3 0
+> > > +					    &pioB 18 0
+> > > +					    &pioB 19 0
+> > > +					    &pioD 27 0
+> > > +					   >;
+> > > +				mtd_dataflash at 0 {
+> > > +					compatible = "atmel,at45", "atmel,dataflash";
+> > > +					spi-max-frequency = <13000000>;
+> > > +					reg = <0>;
+> > > +				};
+> > > +			};
+> > >  		};
+> > >
+> > >  		nand0: nand at 40000000 {
+> > > diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts
+> > b/arch/arm/boot/dts/at91sam9n12ek.dts
+> > > index 0376bf4..4eeca7b 100644
+> > > --- a/arch/arm/boot/dts/at91sam9n12ek.dts
+> > > +++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+> > > @@ -67,6 +67,20 @@
+> > >  					};
+> > >  				};
+> > >  			};
+> > > +
+> > > +			spi0: spi at f0000000 {
+> > > +				status = "okay";
+> > > +				cs-gpios = <&pioA 14 0
+> > > +					    &pioA 7 0
+> > > +					    &pioA 1 0
+> > > +					    &pioB 3 0
+> > > +					   >;
+> > > +				m25p80 at 0 {
+> > > +					compatible = "atmel,at25df321a";
+> > > +					spi-max-frequency = <50000000>;
+> > > +					reg = <0>;
+> > > +				};
+> > > +			};
+> > >  		};
+> > >
+> > >  		nand0: nand at 40000000 {
+> > > diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> > b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> > > index 8a7cf1d..ca0a056 100644
+> > > --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> > > +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> > > @@ -84,6 +84,20 @@
+> > >  					};
+> > >  				};
+> > >  			};
+> > > +
+> > > +			spi0: spi at f0000000 {
+> > > +				status = "okay";
+> > > +				cs-gpios = <&pioA 14 0
+> > > +					    &pioA 7 0
+> > > +					    &pioA 1 0
+> > > +					    &pioB 3 0
+> > > +					   >;
+> > > +				m25p80 at 0 {
+> > > +					compatible = "atmel,at25df321a";
+> > > +					spi-max-frequency = <50000000>;
+> > > +					reg = <0>;
+> > > +				};
+> > > +			};
+> > >  		};
+> > >
+> > >  		usb0: ohci at 00600000 {
+> > > --
+> > > 1.7.9.5
+> > >
+> 
+> Best Regards,
+> Wenyou Yang
+
+Best Regards,
+Wenyou Yang
