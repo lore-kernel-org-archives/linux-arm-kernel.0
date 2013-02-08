@@ -1,72 +1,176 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 08 Feb 2013 21:41:36 +0000
-Subject: [PATCH v3 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
-In-Reply-To: <CAD=FV=X=GRz0ZuFSqEHPy6i2ULtHk==M2_gaCvdmd=81YMNmMg@mail.gmail.com>
-References: <1355416562-25539-1-git-send-email-gautam.vivek@samsung.com>
- <1355416562-25539-2-git-send-email-gautam.vivek@samsung.com>
- <20121215072312.EBCAA3E0C06@localhost>
- <CAFp+6iHoS4XJWHNrsyVsQS4bYZs1PUNEGsRr=EqAS7kpm2XGMQ@mail.gmail.com>
- <CAFp+6iFSZjfVJp23j2dEz0hRap07RMo68GJpsQM7YqOMBCbqsQ@mail.gmail.com>
- <CAD=FV=X=GRz0ZuFSqEHPy6i2ULtHk==M2_gaCvdmd=81YMNmMg@mail.gmail.com>
-Message-ID: <20130208214137.05F7D3E2C27@localhost>
+Date: Fri, 08 Feb 2013 21:48:46 +0000
+Subject: [PATCH] i2c: add bcm2835 driver
+In-Reply-To: <1357191978-11038-1-git-send-email-swarren@wwwdotorg.org>
+References: <1357191978-11038-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130208214846.35F2D3E2C27@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Dec 2012 10:13:50 -0800, Doug Anderson <dianders@chromium.org> wrote:
-> Vivek,
+On Wed,  2 Jan 2013 22:46:18 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> This implements a very basic I2C host driver for the BCM2835 SoC. Missing
+> features so far are:
 > 
+> * Clock rate adjustment.
+> * 10-bit addressing.
+> * DMA.
 > 
-> On Fri, Dec 21, 2012 at 12:16 AM, Vivek Gautam
-> <gautamvivek1987@gmail.com> wrote:
-> > Hi all,
-> >
-> >
-> > On Wed, Dec 19, 2012 at 7:20 PM, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
-> >> CC: Doug Anderson
-> >>
-> >>
-> >> On Sat, Dec 15, 2012 at 12:53 PM, Grant Likely
-> >> <grant.likely@secretlab.ca> wrote:
-> >>> On Thu, 13 Dec 2012 22:06:01 +0530, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> >>>> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> >>>> index 462e5ac..b3b9af1 100644
-> >>>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> >>>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> >>>> @@ -110,6 +110,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
-> >>>>                               "samsung-i2s.1", NULL),
-> >>>>       OF_DEV_AUXDATA("samsung,samsung-i2s", 0x12D70000,
-> >>>>                               "samsung-i2s.2", NULL),
-> >>>> +     OF_DEV_AUXDATA("samsung,exynos4210-ehci", EXYNOS5_PA_EHCI,
-> >>>> +                             "s5p-ehci", NULL),
-> >>>
-> >>> I'm assuming the above change is temporary. What is left to be done to
-> >>> drop the auxdata in theses two patches?
-> >>>
-> >>> Otherwise the patch looks fine.
-> >>>
-> >>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> >
-> > Any more thought about this patch?
-> > Or does this change seems fine?
+> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+>  .../devicetree/bindings/i2c/brcm,bcm2835-i2c.txt   |   20 ++
+>  drivers/i2c/busses/Kconfig                         |   12 +
+>  drivers/i2c/busses/Makefile                        |    1 +
+>  drivers/i2c/busses/i2c-bcm2835.c                   |  331 ++++++++++++++++++++
+>  4 files changed, 364 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt
+>  create mode 100644 drivers/i2c/busses/i2c-bcm2835.c
 > 
-> I'm fairly certain we can just drop the OF_DEV_AUXDATA entry here.  I
-> haven't been following this as closely as I should, but I know that
-> the comment for this table says that the whole purpose is to override
-> device names and that it should be temporary.  We don't need to do any
-> overriding of device names here, do we?
-> 
-> When I drop this (and the ohci and phy) entries from my table I can
-> still boot and still can use USB.  The big difference is what shows up
-> in dmesg
-> 
-> [    1.605000] s5p-ehci s5p-ehci: S5P EHCI Host Controller
-> 
-> Becomes:
-> 
-> [    1.550000] s5p-ehci 12110000.usb: S5P EHCI Host Controller
-> 
-> ...and some sysfs paths change.
+> diff --git a/Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt
+> new file mode 100644
+> index 0000000..e9de375
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/brcm,bcm2835-i2c.txt
+> @@ -0,0 +1,20 @@
+> +Broadcom BCM2835 I2C controller
+> +
+> +Required properties:
+> +- compatible : Should be "brcm,bcm2835-i2c".
+> +- reg: Should contain register location and length.
+> +- interrupts: Should contain interrupt.
+> +- clocks : The clock feeding the I2C controller.
+> +
+> +Recommended properties:
+> +- clock-frequency : desired I2C bus clock frequency in Hz.
+> +
+> +Example:
+> +
+> +i2c at 20205000 {
+> +	compatible = "brcm,bcm2835-i2c";
+> +	reg = <0x7e205000 0x1000>;
+> +	interrupts = <2 21>;
+> +	clocks = <&clk_i2c>;
+> +	clock-frequency = <100000>;
+> +};
 
-Right. Drop the AUXDATA then.  :-)
+Looks good.
+
+> +static int __devinit bcm2835_i2c_probe(struct platform_device *pdev)
+> +{
+> +	struct bcm2835_i2c_dev *i2c_dev;
+> +	struct resource *mem, *requested, *irq;
+> +	int ret;
+> +	struct i2c_adapter *adap;
+> +
+> +	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
+> +	if (!i2c_dev) {
+> +		dev_err(&pdev->dev, "Cannot allocate i2c_dev\n");
+> +		return -ENOMEM;
+> +	}
+> +	platform_set_drvdata(pdev, i2c_dev);
+> +	i2c_dev->dev = &pdev->dev;
+> +	init_completion(&i2c_dev->completion);
+> +
+> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!mem) {
+> +		dev_err(&pdev->dev, "No mem resource\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	requested = devm_request_mem_region(&pdev->dev, mem->start,
+> +					    resource_size(mem),
+> +					    dev_name(&pdev->dev));
+> +	if (!requested) {
+> +		dev_err(&pdev->dev, "Could not claim register region\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	i2c_dev->regs = devm_ioremap(&pdev->dev, mem->start,
+> +				     resource_size(mem));
+> +	if (!i2c_dev->regs) {
+> +		dev_err(&pdev->dev, "Could not map registers\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (!irq) {
+> +		dev_err(&pdev->dev, "No IRQ resource\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	ret = devm_request_irq(&pdev->dev, irq->start, bcm2835_i2c_isr,
+> +			       IRQF_SHARED, dev_name(&pdev->dev), i2c_dev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Could not request IRQ\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	adap = &i2c_dev->adapter;
+> +	i2c_set_adapdata(adap, i2c_dev);
+> +	adap->owner = THIS_MODULE;
+> +	adap->class = I2C_CLASS_HWMON;
+> +	strlcpy(adap->name, "bcm2835 I2C adapter", sizeof(adap->name));
+> +	adap->algo = &bcm2835_i2c_algo;
+> +	adap->dev.parent = &pdev->dev;
+> +	adap->nr = -1;
+> +
+> +	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
+> +
+> +	ret = i2c_add_numbered_adapter(adap);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Could not add adapter\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+
+The driver core will print a message if things fail here. The above 6
+lines can be replaced with simply:
+
+	return i2c_add_numbered_adapter(adap);
+
+> +}
+> +
+> +static int bcm2835_i2c_remove(struct platform_device *pdev)
+> +{
+> +	struct bcm2835_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
+> +
+> +	i2c_del_adapter(&i2c_dev->adapter);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id bcm2835_i2c_of_match[] = {
+> +	{ .compatible = "brcm,bcm2835-i2c" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, bcm2835_i2c_of_match);
+> +
+> +static struct platform_driver bcm2835_i2c_driver = {
+> +	.probe		= bcm2835_i2c_probe,
+> +	.remove		= bcm2835_i2c_remove,
+> +	.driver		= {
+> +		.name	= "i2c-bcm2835",
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = bcm2835_i2c_of_match,
+> +	},
+> +};
+> +
+> +static int __init bcm2835_i2c_init_driver(void)
+> +{
+> +	return platform_driver_register(&bcm2835_i2c_driver);
+> +}
+> +module_init(bcm2835_i2c_init_driver);
+> +
+> +static void __exit bcm2835_i2c_exit_driver(void)
+> +{
+> +	platform_driver_unregister(&bcm2835_i2c_driver);
+> +}
+> +module_exit(bcm2835_i2c_exit_driver);
+
+Nit: module_platform_driver()
+
+Otherwise looks pretty tight.
+
+Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
 
 g.
