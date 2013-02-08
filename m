@@ -1,114 +1,124 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 7 Feb 2013 21:21:57 -0700
-Subject: Giving special alignment/size constraints to the Linux PCI core?
-In-Reply-To: <20130207165009.73b1f340@skate>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <2776630.gp5gC9tvLk@wuerfel> <20130131180249.GA30869@obsidianresearch.com>
- <201301312046.22560.arnd@arndb.de>
- <20130131224459.GA11846@obsidianresearch.com>
- <20130206175128.1b64196d@skate> <20130206170903.GA28198@obsidianresearch.com>
- <20130206181852.4eca53e3@skate> <20130206175019.GA24248@obsidianresearch.com>
- <20130207165009.73b1f340@skate>
-Message-ID: <CAErSpo7hwG89LTO+4+eqT_Gb+yUn1XKHYJ8CnnZcf_FPo-Kpyw@mail.gmail.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Fri, 8 Feb 2013 09:52:44 +0530
+Subject: [RESEND][PATCH] ARM: EXYNOS: Add clocks for EXYNOS I2S and PCM I/F
+In-Reply-To: <003201ce0429$c15e8350$441b89f0$@samsung.com>
+References: <003201ce0429$c15e8350$441b89f0$@samsung.com>
+Message-ID: <CAAgF-Be1UKyyX0VBkdy7GbhxH4mZmsVwskr2Yj3TM54qjs6dEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 7, 2013 at 8:50 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Bjorn,
+On Wed, Feb 6, 2013 at 10:51 AM, Sangsu Park <sangsu4u.park@samsung.com> wrote:
+> Audio Subsystem has own clocks for I2S0 and PCM0 in all EXYNOS series.
+> This patch add clocks for I2S0 and PCM0 I/F.
 >
-> I guess I need your advice on the below problem, but here is a summary.
+> Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Makefile      |    1 +
+>  arch/arm/mach-exynos/clock-audss.c |   64 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 65 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos/clock-audss.c
 >
-> Basically, the PCI-to-PCI bridge specifications require that the memory
-> address assigned to a PCI-to-PCI bridge is aligned on a 1 MB boundary.
+> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+> index 7e53a3a..5b6c7c0 100644
+> --- a/arch/arm/mach-exynos/Makefile
+> +++ b/arch/arm/mach-exynos/Makefile
+> @@ -13,6 +13,7 @@ obj-                          :=
+>  # Core
 >
-> Unfortunately, on Marvell hardware, we can only create address decoding
-> windows that are aligned on a multiple of their size (a 1 MB window
-> must be 1 MB aligned, a 2 MB window must be 2 MB aligned, etc.).
->
-> How can we teach the Linux PCI core about this requirement, so that it
-> does a proper assignment of addresses at the PCI-to-PCI bridge level?
-> For the I/O addresses, Russell suggested the pcibios_window_alignment()
-> hook, but it doesn't receive the size of the resource, so we can't
-> determine what alignment is needed.
->
-> As Jason points out below, we need to be able to tell the PCI core that
-> a given memory area needs some alignment, but also that its size is
-> larger than what the PCIe device claims, because we cannot create
-> address decoding windows of an arbitrary size. For example, an address
-> decoding window of 3 MB is not possible, so if a device wants 3 MB,
-> then we would need to extend this memory area to 4 MB so that the next
-> device doesn't get an address decoding window that overlaps with the
-> previous one.
->
-> I was hoping that the emulated PCI-to-PCI bridge could, by its
-> behavior, teach the Linux PCI core about these special constraints.
-> However, reading the PCI-to-PCI bridge specification, I don't see how
-> to achieve that.
->
-> Do you have some suggestions?
+>  obj-$(CONFIG_ARCH_EXYNOS)      += common.o
+> +obj-$(CONFIG_ARCH_EXYNOS)      += clock-audss.o
+>  obj-$(CONFIG_ARCH_EXYNOS4)     += clock-exynos4.o
+>  obj-$(CONFIG_CPU_EXYNOS4210)   += clock-exynos4210.o
+>  obj-$(CONFIG_SOC_EXYNOS4212)   += clock-exynos4212.o
+> diff --git a/arch/arm/mach-exynos/clock-audss.c
+> b/arch/arm/mach-exynos/clock-audss.c
+> new file mode 100644
+> index 0000000..8260185
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos/clock-audss.c
+> @@ -0,0 +1,64 @@
+> +/*
+> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> + *             http://www.samsung.com
+> + *
+> + * Clock support for EXYNOS Audio Subsystem
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +
+> +#include <plat/clock.h>
+> +#include <plat/s5p-clock.h>
+> +
+> +#define EXYNOS_PA_AUDSS        (0x03810000)
+> +
+> +/* IP Clock Gate 0 Registers */
+> +#define EXYNOS_AUDSS_CLKGATE_I2SBUS    (1<<2)
+> +#define EXYNOS_AUDSS_CLKGATE_I2SSPECIAL        (1<<3)
+> +#define EXYNOS_AUDSS_CLKGATE_PCMBUS    (1<<4)
+> +#define EXYNOS_AUDSS_CLKGATE_PCMSPECIAL        (1<<5)
+> +#define EXYNOS_AUDSS_CLKGATE_GPIO      (1<<6)
+> +
+> +static void __iomem *clk_audss_base = 0;
+> +
+> +static int exynos_clk_audss_ctrl(struct clk *clk, int enable)
+> +{
+> +       if (!clk_audss_base)
+> +               return ENOMEM;
+> +
+> +       return s5p_gatectrl(clk_audss_base, clk, enable);
+> +}
+> +
+> +static struct clk exynos_init_audss_clocks[] = {
+> +       {
+> +               .name           = "iis",
+> +               .devname        = "samsung-i2s.0",
+> +               .enable         = exynos_clk_audss_ctrl,
+> +               .ctrlbit        = EXYNOS_AUDSS_CLKGATE_I2SSPECIAL |
+> EXYNOS_AUDSS_CLKGATE_I2SBUS
+> +                               | EXYNOS_AUDSS_CLKGATE_GPIO,
+> +       }, {
+> +               .name           = "pcm",
+> +               .devname        = "samsung-pcm.0",
+> +               .enable         = exynos_clk_audss_ctrl,
+> +               .ctrlbit        = EXYNOS_AUDSS_CLKGATE_PCMSPECIAL |
+> EXYNOS_AUDSS_CLKGATE_PCMBUS
+> +                               | EXYNOS_AUDSS_CLKGATE_GPIO,
+> +       },
+> +};
+> +
+> +void __init exynos_register_audss_clocks(void)
+> +{
+> +       clk_audss_base = ioremap(EXYNOS_PA_AUDSS, SZ_4K);
+> +       if (clk_audss_base == NULL) {
 
-Huh.  That hardware looks less and less like a P2P bridge all the time
-:(  You can't configure it via standard PCI config accesses, and the
-aperture alignment and size constraints sound completely non-standard.
- Are the specs for this thing public?
+Please run checkpatch. There should be space after if.
 
-I could imagine changing pcibios_window_alignment() to take the
-resource, so it could deal with the alignment question (though I
-haven't looked in detail and there might be some implementation issue
-with that).
+> +               pr_err("unable to ioremap for gpio_base1\n");
 
-With regard to the size issue (3MB window using 4MB of address space),
-I can't think of a reasonable way to teach the PCI core about both
-sizes.  But is there any reason to program the bridge for a 3MB window
-instead of a 4MB window, given that there's nothing else we can do
-with the extra 1MB anyway?  Is a 3MB window even possible?  I would
-think something that must be aligned on its size would be restricted
-to power-of-2 sizes anyway, just like PCI BARs are.  Maybe you can
-just always round up window sizes to a power of 2?
+Please fix the err message.
 
-Bjorn
-
-> On Wed, 6 Feb 2013 10:50:19 -0700, Jason Gunthorpe wrote:
->
->> > > > Can't this be solved using the window_alignement() hook we've
->> > > > been discussing separately? Just like we teach the Linux PCI
->> > > > core about our alignment requirements of 64K for the I/O
->> > > > regions, we could teach it about our alignment requirement on
->> > > > memory regions as well. No?
->> > >
->> > > Hopefully :) As long as it can adjust the start and length you
->> > > should be fine.
->> >
->> > Why would you need to adjust the length? If Linux allocates a 2 MB
->> > resource on a 1 MB boundary, we simply increase the start address to
->> > the next 2 MB boundary, and that's it. Why would the length need to
->> > change?
->>
->> Well, lets say 3MB is the example. A 3mb region needs to fit inside a
->> 4mb MBUS window. If you align the start to 4mb then the pci-e core
->> needs to know that it can't use the extra 1mb covered by the mbus
->> window. mbus windows must not overlap.
->>
->> Adjusting the bridge window length to be 4mb communicates that dead
->> space to the PCI core, and presumably this shows up in lspci and
->> whatnot.
->>
->> I suppose if you align the end to 4mb (thus creating the gap before,
->> not after) things should work out OK, but the information that the gap
->> is routed to a specific PCI link is lost..
->>
->> Jason
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> +               return;
+> +       }
+> +
+> +       s3c_register_clocks(exynos_init_audss_clocks,
+> ARRAY_SIZE(exynos_init_audss_clocks));
+> +       s3c_disable_clocks(exynos_init_audss_clocks,
+> ARRAY_SIZE(exynos_init_audss_clocks));
+> +}
+> --
+> 1.7.4.1
 >
 >
 > --
-> Thomas Petazzoni, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks
+Padma
