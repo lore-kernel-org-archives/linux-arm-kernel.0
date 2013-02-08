@@ -1,47 +1,64 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:47 +0000
-Subject: [PATCH 17/17] mvebu: support running big-endian
+Date: Fri,  8 Feb 2013 23:17:46 +0000
+Subject: [PATCH 16/17] xgmac: replace __raw with relaxed IO
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-18-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-17-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add indication we can run these cores in BE mode, and ensure that the
-secondary CPU is set to big-endian mode in the initialisation code as
-the initial code runs little-endian.
+The xgmac driver is using __raw read and write functions, where it
+should be using readl_relaxed and writel_relaxed to avoid any issues
+with which endian mode the CPU is running in.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/mach-mvebu/Kconfig   |    1 +
- arch/arm/mach-mvebu/headsmp.S |    4 ++++
- 2 files changed, 5 insertions(+)
+ drivers/net/ethernet/calxeda/xgmac.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 440b13e..2afa026 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -1,5 +1,6 @@
- config ARCH_MVEBU
- 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select CLKSRC_MMIO
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-index a06e0ed..8b09f8d 100644
---- a/arch/arm/mach-mvebu/headsmp.S
-+++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -36,6 +36,10 @@
-  */
- ENTRY(armada_xp_secondary_startup)
+diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
+index f91d9b2..08a6f9e 100644
+--- a/drivers/net/ethernet/calxeda/xgmac.c
++++ b/drivers/net/ethernet/calxeda/xgmac.c
+@@ -1202,7 +1202,7 @@ static int xgmac_poll(struct napi_struct *napi, int budget)
  
-+#ifdef CONFIG_CPU_BE8_BOOT_LE
-+	setend	be
-+#endif
-+
- 	/* Read CPU id */
- 	mrc     p15, 0, r1, c0, c0, 5
- 	and     r1, r1, #0xF
+ 	if (work_done < budget) {
+ 		napi_complete(napi);
+-		__raw_writel(DMA_INTR_DEFAULT_MASK, priv->base + XGMAC_DMA_INTR_ENA);
++		writel_relaxed(DMA_INTR_DEFAULT_MASK, priv->base + XGMAC_DMA_INTR_ENA);
+ 	}
+ 	return work_done;
+ }
+@@ -1347,7 +1347,7 @@ static irqreturn_t xgmac_pmt_interrupt(int irq, void *dev_id)
+ 	struct xgmac_priv *priv = netdev_priv(dev);
+ 	void __iomem *ioaddr = priv->base;
+ 
+-	intr_status = __raw_readl(ioaddr + XGMAC_INT_STAT);
++	intr_status = readl_relaxed(ioaddr + XGMAC_INT_STAT);
+ 	if (intr_status & XGMAC_INT_STAT_PMT) {
+ 		netdev_dbg(priv->dev, "received Magic frame\n");
+ 		/* clear the PMT bits 5 and 6 by reading the PMT */
+@@ -1365,9 +1365,9 @@ static irqreturn_t xgmac_interrupt(int irq, void *dev_id)
+ 	struct xgmac_extra_stats *x = &priv->xstats;
+ 
+ 	/* read the status register (CSR5) */
+-	intr_status = __raw_readl(priv->base + XGMAC_DMA_STATUS);
+-	intr_status &= __raw_readl(priv->base + XGMAC_DMA_INTR_ENA);
+-	__raw_writel(intr_status, priv->base + XGMAC_DMA_STATUS);
++	intr_status = readl_relaxed(priv->base + XGMAC_DMA_STATUS);
++	intr_status &= readl_relaxed(priv->base + XGMAC_DMA_INTR_ENA);
++	writel_relaxed(intr_status, priv->base + XGMAC_DMA_STATUS);
+ 
+ 	/* It displays the DMA process states (CSR5 register) */
+ 	/* ABNORMAL interrupts */
+@@ -1403,7 +1403,7 @@ static irqreturn_t xgmac_interrupt(int irq, void *dev_id)
+ 
+ 	/* TX/RX NORMAL interrupts */
+ 	if (intr_status & (DMA_STATUS_RI | DMA_STATUS_TU | DMA_STATUS_TI)) {
+-		__raw_writel(DMA_INTR_ABNORMAL, priv->base + XGMAC_DMA_INTR_ENA);
++		writel_relaxed(DMA_INTR_ABNORMAL, priv->base + XGMAC_DMA_INTR_ENA);
+ 		napi_schedule(&priv->napi);
+ 	}
+ 
 -- 
 1.7.10.4
