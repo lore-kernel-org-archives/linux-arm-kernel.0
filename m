@@ -1,61 +1,109 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 08 Feb 2013 14:42:01 -0800
-Subject: [PATCH 0/2] ARM: S3C24XX: make s3c24XX.h header content local
-In-Reply-To: <201302072249.04263.heiko@sntech.de>
-References: <201302072249.04263.heiko@sntech.de>
-Message-ID: <1a5701ce064d$840dd2f0$8c2978d0$@samsung.com>
+Date: Fri, 08 Feb 2013 14:44:05 -0800
+Subject: [PATCH RESEND v2] ARM: EXYNOS: dts: Set up power domain for MFC
+ and G-scaler
+In-Reply-To: <1359521344-17189-1-git-send-email-prasanna.ps@samsung.com>
+References: <06e301cdfe51$f11b59c0$d3520d40$@samsung.com>
+ <1359521344-17189-1-git-send-email-prasanna.ps@samsung.com>
+Message-ID: <1a5801ce064d$cddb41b0$6991c510$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+Prasanna Kumar wrote:
 > 
-> This series moves the contents of the plat/s3c24XX.h headers into
-> common.h, as their content does not need to be global anymore, now that
-> everything lives in mach-s3c24xx.
+> This patch adds device tree nodes for MFC and G-scaler power
+> domains of exynos5250.It binds these power-domain nodes to repsective
+> device tree nodes
 > 
-> Heiko Stuebner (2):
->   ARM: S3C24XX: move plat-samsung/s3c24XX headers to local common.h
->   ARM: S3C24XX: cleanup the included soc init functions in common.h
+> It also adds support to enable PM generic domains for exynos5250.
 > 
->  arch/arm/mach-s3c24xx/clock-s3c2410.c        |    1 -
->  arch/arm/mach-s3c24xx/clock-s3c2412.c        |    1 -
->  arch/arm/mach-s3c24xx/clock-s3c2416.c        |    1 -
->  arch/arm/mach-s3c24xx/clock-s3c2443.c        |    1 -
->  arch/arm/mach-s3c24xx/common.c               |    7 +--
->  arch/arm/mach-s3c24xx/common.h               |   90
-> +++++++++++++++++++++++++-
->  arch/arm/mach-s3c24xx/mach-jive.c            |    2 +-
->  arch/arm/mach-s3c24xx/mach-n30.c             |    1 -
->  arch/arm/mach-s3c24xx/mach-nexcoder.c        |    2 -
->  arch/arm/mach-s3c24xx/mach-otom.c            |    1 -
->  arch/arm/mach-s3c24xx/mach-smdk2413.c        |    4 +-
->  arch/arm/mach-s3c24xx/mach-smdk2416.c        |    3 +-
->  arch/arm/mach-s3c24xx/mach-smdk2440.c        |    2 -
->  arch/arm/mach-s3c24xx/mach-smdk2443.c        |    4 +-
->  arch/arm/mach-s3c24xx/mach-vstms.c           |    4 +-
->  arch/arm/mach-s3c24xx/pm-s3c2412.c           |    1 -
->  arch/arm/mach-s3c24xx/s3c2410.c              |    1 -
->  arch/arm/mach-s3c24xx/s3c2412.c              |    1 -
->  arch/arm/mach-s3c24xx/s3c2416.c              |    1 -
->  arch/arm/mach-s3c24xx/s3c2440.c              |    1 -
->  arch/arm/mach-s3c24xx/s3c2442.c              |    1 -
->  arch/arm/mach-s3c24xx/s3c2443.c              |    1 -
->  arch/arm/mach-s3c24xx/s3c244x.c              |    2 -
->  arch/arm/plat-samsung/include/plat/s3c2410.h |   31 ---------
->  arch/arm/plat-samsung/include/plat/s3c2412.h |   32 ---------
->  arch/arm/plat-samsung/include/plat/s3c2416.h |   37 -----------
->  arch/arm/plat-samsung/include/plat/s3c2443.h |   36 ----------
->  arch/arm/plat-samsung/include/plat/s3c244x.h |   42 ------------
->  28 files changed, 99 insertions(+), 212 deletions(-)
->  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2410.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2412.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2416.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2443.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/s3c244x.h
+> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi |   16 ++++++++++++++++
+>  arch/arm/mach-exynos/Kconfig      |    1 +
+>  2 files changed, 17 insertions(+), 0 deletions(-)
 > 
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> index 30485de..e282fde 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -46,6 +46,16 @@
+>  		i2c8 = &i2c_8;
+>  	};
+> 
+> +	pd_gsc: gsc-power-domain at 0x10044000 {
+> +		compatible = "samsung,exynos4210-pd";
+> +		reg = <0x10044000 0x20>;
+> +	};
+> +
+> +	pd_mfc: mfc-power-domain at 0x10044040 {
+> +		compatible = "samsung,exynos4210-pd";
+> +		reg = <0x10044040 0x20>;
+> +	};
+> +
+>  	gic:interrupt-controller at 10481000 {
+>  		compatible = "arm,cortex-a9-gic";
+>  		#interrupt-cells = <3>;
+> @@ -85,6 +95,7 @@
+>  		compatible = "samsung,mfc-v6";
+>  		reg = <0x11000000 0x10000>;
+>  		interrupts = <0 96 0>;
+> +		samsung,power-domain = <&pd_mfc>;
+>  	};
+> 
+>  	rtc {
+> @@ -554,28 +565,33 @@
+>  		};
+>  	};
+> 
+> +
+>  	gsc_0:  gsc at 0x13e00000 {
+>  		compatible = "samsung,exynos5-gsc";
+>  		reg = <0x13e00000 0x1000>;
+>  		interrupts = <0 85 0>;
+> +		samsung,power-domain = <&pd_gsc>;
+>  	};
+> 
+>  	gsc_1:  gsc at 0x13e10000 {
+>  		compatible = "samsung,exynos5-gsc";
+>  		reg = <0x13e10000 0x1000>;
+>  		interrupts = <0 86 0>;
+> +		samsung,power-domain = <&pd_gsc>;
+>  	};
+> 
+>  	gsc_2:  gsc at 0x13e20000 {
+>  		compatible = "samsung,exynos5-gsc";
+>  		reg = <0x13e20000 0x1000>;
+>  		interrupts = <0 87 0>;
+> +		samsung,power-domain = <&pd_gsc>;
+>  	};
+> 
+>  	gsc_3:  gsc at 0x13e30000 {
+>  		compatible = "samsung,exynos5-gsc";
+>  		reg = <0x13e30000 0x1000>;
+>  		interrupts = <0 88 0>;
+> +		samsung,power-domain = <&pd_gsc>;
+>  	};
+> 
+>  	hdmi {
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-
+> exynos/Kconfig
+> index e103c29..96f4a9f 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -61,6 +61,7 @@ config SOC_EXYNOS5250
+>  	bool "SAMSUNG EXYNOS5250"
+>  	default y
+>  	depends on ARCH_EXYNOS5
+> +	select PM_GENERIC_DOMAINS if PM
+>  	select S5P_PM if PM
+>  	select S5P_SLEEP if PM
+>  	select S5P_DEV_MFC
 > --
+> 1.7.5.4
 
-Yeah, looks good to me, applied this series.
+Looks OK to me, applied.
 
 Thanks.
 
