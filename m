@@ -1,35 +1,51 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Fri, 8 Feb 2013 17:31:50 +0100
-Subject: Porting 3.8-rc4-nohz3 to ARM (PandaBoard)
-In-Reply-To: <20130204200238.GA16718@enea.se>
-References: <20130204200238.GA16718@enea.se>
-Message-ID: <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 8 Feb 2013 17:35:13 +0100
+Subject: [PATCH 0/5] at91: atmel_lcdfb: regression fixes and cpu_is removal
+Message-ID: <cover.1360340791.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/2/4 Mats Liljegren <mats.liljegren@enea.com>:
-> Hi Frederic,
->
-> (Sorry for the re-post, I spelled the mailing list wrong...)
->
-> I want to port dynticks patches 3.8-rc4-nohz3 to ARM architecture, and try it out on the PandaBoard. Initially this is for evaluating it, but if it looks promising I'd like to upstream this.
->
-> As far as I can see the first thing to do is to implement virtual time accounting. After an initial look at the patches done for ia64, it doesn't look too difficult.
+These patches fix a regression in 16-bpp support for older SOCs which use
+IBGR:555 rather than BGR:565 pixel layout. Use SOC-type to determine if the
+controller uses the intensity-bit and restore the old layout in that case.
 
-No that part is handled by the core code. But you need to implement
-the context tracking arch backend.
-Here is what Li Zhong did to port it on Powerpc for example:
-https://lkml.org/lkml/2013/2/1/216
+The last patch is a removal of uses of cpu_is_xxxx() macros in atmel_lcdfb with
+a platform-device-id table and static configurations.
 
-> Are there any caveats I should be aware of?
 
-The generic cputime accounting only works on 64 bits archs. We'll need
-to do some safe accessors to read the kernel_stat. In the meantime you
-can do home tests by removing the CONFIG_64BIT dependency. This
-shouldn't be dangerous
+Patches from Johan Hovold taken from:
+"[PATCH 0/3] atmel_lcdfb: fix 16-bpp regression"
+and
+"[PATCH v2 0/3] ARM: at91/avr32/atmel_lcdfb: remove cpu_is macros"
+patch series to form a clean patch series with my signature.
 
-> Has anyone else started any work in this area that I could co-operate with?
+Arnd, Olof,
+as it seems that old fbdev drivers are not so much reviewed those days, can we
+take the decision to queue this material through arm-soc with other AT91
+drivers updates?
 
-Yeah two people have been working on this. But it was several month
-ago and I haven't hear from them since then. I'm adding Geoff in Cc. I
-can't retrieve the other guy who has worked on it too.
+Best regards,
+
+Johan Hovold (5):
+  atmel_lcdfb: fix 16-bpp modes on older SOCs
+  ARM: at91/neocore926: fix LCD-wiring mode
+  ARM: at91/avr32/atmel_lcdfb: add bus-clock entry
+  atmel_lcdfb: move lcdcon2 register access to compute_hozval
+  ARM: at91/avr32/atmel_lcdfb: add platform device-id table
+
+ arch/arm/mach-at91/at91sam9261.c         |   2 +
+ arch/arm/mach-at91/at91sam9261_devices.c |   6 +-
+ arch/arm/mach-at91/at91sam9263.c         |   1 +
+ arch/arm/mach-at91/at91sam9263_devices.c |   2 +-
+ arch/arm/mach-at91/at91sam9g45.c         |   2 +
+ arch/arm/mach-at91/at91sam9g45_devices.c |   6 +-
+ arch/arm/mach-at91/at91sam9rl.c          |   1 +
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   2 +-
+ arch/arm/mach-at91/board-neocore926.c    |   2 +-
+ arch/avr32/mach-at32ap/at32ap700x.c      |   6 +-
+ drivers/video/atmel_lcdfb.c              | 130 ++++++++++++++++++++++++-------
+ include/video/atmel_lcdc.h               |   4 +-
+ 12 files changed, 127 insertions(+), 37 deletions(-)
+
+-- 
+1.8.0
