@@ -1,56 +1,82 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri,  8 Feb 2013 12:19:40 +0000
-Subject: [PATCH] ARM: Allow modules to read cpu_logical_map
-Message-ID: <1360325980-19089-1-git-send-email-dave.martin@linaro.org>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Fri, 08 Feb 2013 13:29:14 +0100
+Subject: [PATCH 1/4] ARM: tegra: Unify tegra{20,30,114}_init_early()
+In-Reply-To: <1360308574-19658-2-git-send-email-hdoyu@nvidia.com>
+References: <1360308574-19658-1-git-send-email-hdoyu@nvidia.com>
+ <1360308574-19658-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <340098510.UosBEPkrGv@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is reasonable for loadable modules to be CPU topology aware
-(particular examples include cpufreq and cpuidle drivers).
+Hiroshi,
 
-This patch exports a new function cpu_get_hwid(cpu) to provide
-suitable read-only access outside vmlinux.
+Am Freitag, 8. Februar 2013, 09:29:31 schrieb Hiroshi Doyu:
+> Refactored tegra{20,30,114}_init_early() so that we have the unified
+> tegra_init_early().
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
-Modules using this function will be arch-dependent and highly coupled to
-the kernel, so cpu_get_hwid() shouldn't be considered a stable API,
-especially while the details of kernel topology awareness are still
-under discussion: therefore, export only to GPL code for now.
+[...]
 
- arch/arm/include/asm/smp_plat.h |    3 +++
- arch/arm/kernel/setup.c         |    7 +++++++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+> index a599f6e..9bcecb8 100644
+> --- a/arch/arm/mach-tegra/hotplug.c
+> +++ b/arch/arm/mach-tegra/hotplug.c
+> @@ -1,8 +1,7 @@
+>  /*
+> - *
+>   *  Copyright (C) 2002 ARM Ltd.
+>   *  All Rights Reserved
+> - *  Copyright (c) 2010, 2012 NVIDIA Corporation. All rights reserved.
+> + *  Copyright (c) 2010, 2012-2013, NVIDIA Corporation. All rights reserved.
+> *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> @@ -15,6 +14,7 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/smp_plat.h>
+> 
+> +#include "fuse.h"
+>  #include "sleep.h"
+> 
+>  static void (*tegra_hotplug_shutdown)(void);
+> @@ -56,18 +56,21 @@ int tegra_cpu_disable(unsigned int cpu)
+>  	return cpu == 0 ? -EPERM : 0;
+>  }
+> 
+> -#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+> -extern void tegra20_hotplug_shutdown(void);
+> -void __init tegra20_hotplug_init(void)
+> +void __init tegra_hotplug_init(void)
+>  {
+> -	tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
+> -}
+> +	switch (tegra_chip_id) {
+> +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+> +	case TEGRA20:
+> +		tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
+> +		break;
+>  #endif
+> -
+> -#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> -extern void tegra30_hotplug_shutdown(void);
+> -void __init tegra30_hotplug_init(void)
+> -{
+> -	tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
+> -}
+> +#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+> +	case TEGRA30:
+> +		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
+> +		break;
+>  #endif
+> +	default:
+> +		BUG_ON(IS_ENABLED(CONFIG_HOTPLUG_CPU));
+> +		break;
+> +	}
+> +}
 
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index aaa61b6..518e466 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -66,4 +66,7 @@ static inline int get_logical_index(u32 mpidr)
- 	return -EINVAL;
- }
- 
-+/* Read-only accessor for use by modules: */
-+int cpu_get_hwid(int cpu);
-+
- #endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3f6cbb2..1ac5e8b 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -429,6 +429,13 @@ void cpu_init(void)
- 
- int __cpu_logical_map[NR_CPUS];
- 
-+/* Read-only accessor for use by modules: */
-+int cpu_get_hwid(int cpu)
-+{
-+	return cpu_logical_map(cpu);
-+}
-+EXPORT_SYMBOL_GPL(cpu_get_hwid);
-+
- void __init smp_setup_processor_id(void)
- {
- 	int i;
--- 
-1.7.4.1
+are these ifdefs really needed? Multisoc kernels will enable them all anyway 
+and there is a case structure which protects the assignments. Also the hotplug 
+functions are very tiny, so there shouldn't be a big loss.
+
+Marc
