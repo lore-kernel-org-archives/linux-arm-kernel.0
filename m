@@ -1,23 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Feb 2013 17:28:29 +0100
-Subject: [PATCH 2/5] spi: pl022: use generic DMA slave configuration if
- possible
-In-Reply-To: <20130208162248.GY17833@n2100.arm.linux.org.uk>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <3752726.iyKukyN6sF@wuerfel> <20130208162248.GY17833@n2100.arm.linux.org.uk>
-Message-ID: <11938235.WbhQmuClDR@wuerfel>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Fri, 8 Feb 2013 17:31:50 +0100
+Subject: Porting 3.8-rc4-nohz3 to ARM (PandaBoard)
+In-Reply-To: <20130204200238.GA16718@enea.se>
+References: <20130204200238.GA16718@enea.se>
+Message-ID: <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 February 2013 16:22:48 Russell King - ARM Linux wrote:
-> If it's DMA _to_ a device, then we will only ever clean the lines prior to
-> a transfer, never invalidate them.  So that's not really a concern.  (There
-> better not be any dirty cache lines associated with the empty zero page
-> either.)
+2013/2/4 Mats Liljegren <mats.liljegren@enea.com>:
+> Hi Frederic,
+>
+> (Sorry for the re-post, I spelled the mailing list wrong...)
+>
+> I want to port dynticks patches 3.8-rc4-nohz3 to ARM architecture, and try it out on the PandaBoard. Initially this is for evaluating it, but if it looks promising I'd like to upstream this.
+>
+> As far as I can see the first thing to do is to implement virtual time accounting. After an initial look at the patches done for ia64, it doesn't look too difficult.
 
-Right, makes sense. I thought I had read about a CPU that
-could not flush a cache line without also invalidating
-it, but that must have been something other than ARM,
-or maybe I'm misremembering it.
+No that part is handled by the core code. But you need to implement
+the context tracking arch backend.
+Here is what Li Zhong did to port it on Powerpc for example:
+https://lkml.org/lkml/2013/2/1/216
 
-	Arnd
+> Are there any caveats I should be aware of?
+
+The generic cputime accounting only works on 64 bits archs. We'll need
+to do some safe accessors to read the kernel_stat. In the meantime you
+can do home tests by removing the CONFIG_64BIT dependency. This
+shouldn't be dangerous
+
+> Has anyone else started any work in this area that I could co-operate with?
+
+Yeah two people have been working on this. But it was several month
+ago and I haven't hear from them since then. I'm adding Geoff in Cc. I
+can't retrieve the other guy who has worked on it too.
