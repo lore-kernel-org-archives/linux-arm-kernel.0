@@ -1,48 +1,62 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:45 +0000
-Subject: [PATCH 15/17] xgmac: fix printing of hardware version
+Date: Fri,  8 Feb 2013 23:17:40 +0000
+Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-16-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current driver attempts to print netdev_info() before registering the
-network device and allowing the name to be set. Change this print to be
-after the network deviec has been registered.
-
-Fix the following issue:
-
-calxedaxgmac fff50000.ethernet (unregistered net_device): h/w version is 0x1012
+The atag-to-fdt code can now use the conversion function we introduced
+previously to avoid it having to know about the endian-ness of the
+environment which booted the processor.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- drivers/net/ethernet/calxeda/xgmac.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/compressed/atags_to_fdt.c |   20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
-index f7f0290..f91d9b2 100644
---- a/drivers/net/ethernet/calxeda/xgmac.c
-+++ b/drivers/net/ethernet/calxeda/xgmac.c
-@@ -1715,9 +1715,6 @@ static int xgmac_probe(struct platform_device *pdev)
- 		goto err_io;
- 	}
+diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+index aabc02a..a64ec71 100644
+--- a/arch/arm/boot/compressed/atags_to_fdt.c
++++ b/arch/arm/boot/compressed/atags_to_fdt.c
+@@ -108,9 +108,9 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+ 	       return 0;
  
--	uid = readl(priv->base + XGMAC_VERSION);
--	netdev_info(ndev, "h/w version is 0x%x\n", uid);
--
- 	writel(0, priv->base + XGMAC_DMA_INTR_ENA);
- 	ndev->irq = platform_get_irq(pdev, 0);
- 	if (ndev->irq == -ENXIO) {
-@@ -1771,6 +1768,9 @@ static int xgmac_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_reg;
+ 	/* validate the ATAG */
+-	if (atag->hdr.tag != ATAG_CORE ||
+-	    (atag->hdr.size != tag_size(tag_core) &&
+-	     atag->hdr.size != 2))
++	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
++	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core)) &&
++	     atag->hdr.size != atag32_to_cpu(2)))
+ 		return 1;
  
-+	uid = readl(priv->base + XGMAC_VERSION);
-+	netdev_info(ndev, "h/w version is 0x%x\n", uid);
-+
- 	return 0;
- 
- err_reg:
+ 	/* let's give it all the room it could need */
+@@ -132,17 +132,17 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+ 			else
+ 				setprop_string(fdt, "/chosen", "bootargs",
+ 					       atag->u.cmdline.cmdline);
+-		} else if (atag->hdr.tag == ATAG_MEM) {
++		} else if (atag->hdr.tag == atag32_to_cpu(ATAG_MEM)) {
+ 			if (memcount >= sizeof(mem_reg_property)/4)
+ 				continue;
+-			if (!atag->u.mem.size)
++			if (!atag32_to_cpu(atag->u.mem.size))
+ 				continue;
+-			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.start);
+-			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.size);
+-		} else if (atag->hdr.tag == ATAG_INITRD2) {
++			mem_reg_property[memcount++] = cpu_to_fdt32(atag32_to_cpu(atag->u.mem.start));
++			mem_reg_property[memcount++] = cpu_to_fdt32(atag32_to_cpu(atag->u.mem.size));
++		} else if (atag->hdr.tag == atag32_to_cpu(ATAG_INITRD2)) {
+ 			uint32_t initrd_start, initrd_size;
+-			initrd_start = atag->u.initrd.start;
+-			initrd_size = atag->u.initrd.size;
++			initrd_start = atag32_to_cpu(atag->u.initrd.start);
++			initrd_size = atag32_to_cpu(____atag->u.initrd.size);
+ 			setprop_cell(fdt, "/chosen", "linux,initrd-start",
+ 					initrd_start);
+ 			setprop_cell(fdt, "/chosen", "linux,initrd-end",
 -- 
 1.7.10.4
