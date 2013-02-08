@@ -1,46 +1,107 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 08 Feb 2013 17:47:33 -0500 (EST)
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <1360363233.6066.283.camel@shinybook.infradead.org>
-References: <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
- <20130207181315.GM17833@n2100.arm.linux.org.uk>
- <1360344301.6066.263.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
- <1360363233.6066.283.camel@shinybook.infradead.org>
-Message-ID: <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 8 Feb 2013 14:47:42 -0800
+Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
+ Per-CPU Reader-Writer Locks
+In-Reply-To: <87ip6gutsq.fsf@sejong.aot.lge.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
+ <20130123185522.GG2373@mtj.dyndns.org>
+ <51003B20.2060506@linux.vnet.ibm.com>
+ <20130123195740.GI2373@mtj.dyndns.org>
+ <5100B8CC.4080406@linux.vnet.ibm.com>
+ <87ip6gutsq.fsf@sejong.aot.lge.com>
+Message-ID: <20130208224742.GJ2666@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Feb 2013, Woodhouse, David wrote:
-
-> On Fri, 2013-02-08 at 15:04 -0500, Nicolas Pitre wrote:
-> > On Fri, 8 Feb 2013, Woodhouse, David wrote:
-> > 
-> > > On Thu, 2013-02-07 at 18:13 +0000, Russell King - ARM Linux wrote:
-> > > > 
-> > > > However, the biggest reason not to use libgcc is that we want to control
-> > > > what gets used in the kernel - for example, no floating point, and no
-> > > > use of 64 x 64bit division.
-> > > 
-> > > Which is all very sensible. But there's no particular reason we couldn't
-> > > add a __bswap[sd]i2 to the kernel's version of libgcc if we wanted to.
-> > 
-> > Absolutely.
+On Tue, Jan 29, 2013 at 08:12:37PM +0900, Namhyung Kim wrote:
+> On Thu, 24 Jan 2013 10:00:04 +0530, Srivatsa S. Bhat wrote:
+> > On 01/24/2013 01:27 AM, Tejun Heo wrote:
+> >> On Thu, Jan 24, 2013 at 01:03:52AM +0530, Srivatsa S. Bhat wrote:
+> >>> CPU 0                          CPU 1
+> >>>
+> >>> read_lock(&rwlock)
+> >>>
+> >>>                               write_lock(&rwlock) //spins, because CPU 0
+> >>>                               //has acquired the lock for read
+> >>>
+> >>> read_lock(&rwlock)
+> >>>    ^^^^^
+> >>> What happens here? Does CPU 0 start spinning (and hence deadlock) or will
+> >>> it continue realizing that it already holds the rwlock for read?
+> >> 
+> >> I don't think rwlock allows nesting write lock inside read lock.
+> >> read_lock(); write_lock() will always deadlock.
+> >> 
+> >
+> > Sure, I understand that :-) My question was, what happens when *two* CPUs
+> > are involved, as in, the read_lock() is invoked only on CPU 0 whereas the
+> > write_lock() is invoked on CPU 1.
+> >
+> > For example, the same scenario shown above, but with slightly different
+> > timing, will NOT result in a deadlock:
+> >
+> > Scenario 2:
+> >   CPU 0                                CPU 1
+> >
+> > read_lock(&rwlock)
+> >
+> >
+> > read_lock(&rwlock) //doesn't spin
+> >
+> >                                     write_lock(&rwlock) //spins, because CPU 0
+> >                                     //has acquired the lock for read
+> >
+> >
+> > So I was wondering whether the "fairness" logic of rwlocks would cause
+> > the second read_lock() to spin (in the first scenario shown above) because
+> > a writer is already waiting (and hence new readers should spin) and thus
+> > cause a deadlock.
 > 
-> And then ARM can just set ARCH_USE_BUILTIN_BSWAP like other
-> architectures do, right?
+> In my understanding, current x86 rwlock does basically this (of course,
+> in an atomic fashion):
+> 
+> 
+> #define RW_LOCK_BIAS 0x10000
+> 
+> rwlock_init(rwlock)
+> {
+> 	rwlock->lock = RW_LOCK_BIAS;
+> }
+> 
+> arch_read_lock(rwlock)
+> {
+> retry:
+> 	if (--rwlock->lock >= 0)
+> 		return;
+> 
+>         rwlock->lock++;
+>         while (rwlock->lock < 1)
+>         	continue;
+> 
+>         goto retry;
+> }
+> 
+> arch_write_lock(rwlock)
+> {
+> retry:
+> 	if ((rwlock->lock -= RW_LOCK_BIAS) == 0)
+>         	return;
+> 
+>         rwlock->lock += RW_LOCK_BIAS;
+> 	while (rwlock->lock != RW_LOCK_BIAS)
+> 		continue;
+> 
+>         goto retry;
+> }
+> 
+> 
+> So I can't find where the 'fairness' logic comes from..
 
-If that turns out to be beneficial over what we have now, then yes.
-I didn't read back the whole thread to form an opinion though.
+I looked through several of the rwlock implementations, and in all of
+them the writer backs off if it sees readers -- or refrains from asserting
+ownership of the lock to begin with.
 
+So it should be OK to use rwlock as shown in the underlying patch.
 
-Nicolas
+							Thanx, Paul
