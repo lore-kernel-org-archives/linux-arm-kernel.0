@@ -1,190 +1,178 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Fri, 08 Feb 2013 17:08:08 +1100
-Subject: [PATCH 2/2] ARM: ep93xx: bump IRQ offset to 64
-In-Reply-To: <1360168544-20376-1-git-send-email-linus.walleij@linaro.org>
-References: <1360168544-20376-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <51149648.80402@gmail.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Fri, 8 Feb 2013 06:25:09 +0000
+Subject: [PATCH v2 2/3] mmc: davinci_mmc: add DT support
+In-Reply-To: <20130207104656.GE16987@e106331-lin.cambridge.arm.com>
+References: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
+ <1360223825-23929-3-git-send-email-prakash.pm@ti.com>
+ <20130207104656.GE16987@e106331-lin.cambridge.arm.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA465FE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Mark,
 
-The patch looks okay to me. My ep93xx hardware isn't setup at the
-moment. I've Cc'ed Hartley, who might be able to test this. If not, I'll
-try and find some time to drag my board out and give it a test over the
-weekend.
+On Thu, Feb 07, 2013 at 16:16:56, Mark Rutland wrote:
+> Hello,
+> 
+> I have a couple of comments on the dt bindings and the way it's parsed.
+> 
 
-~Ryan
+Thanks for your review comments.
 
-On 07/02/13 03:35, Linus Walleij wrote:
-> The EP93XX IRQs offset from zero, which is illegal, since Linux
-> IRQ 0 is NO_IRQ.
+> On Thu, Feb 07, 2013 at 07:57:04AM +0000, Manjunathappa, Prakash wrote:
+> > Adds device tree support for davinci_mmc. Also add binding documentation.
+> > Tested in non-dma PIO mode and without GPIO card_detect/write_protect
+> > option because of dependencies on EDMA and GPIO module DT support.
+> > 
+> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> > Cc: linux-mmc at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-kernel at vger.kernel.org
+> > Cc: davinci-linux-open-source at linux.davincidsp.com
+> > Cc: devicetree-discuss at lists.ozlabs.org
+> > Cc: cjb at laptop.org
+> > Cc: Sekhar Nori <nsekhar@ti.com>
+> > Cc: mporter at ti.com
+> > ---
+> > Since v1:
+> > Modified DT parse function to take default values and accomodate controller
+> > version in compatible field.
+> > 
+> >  .../devicetree/bindings/mmc/davinci_mmc.txt        |   30 ++++++++
+> >  drivers/mmc/host/davinci_mmc.c                     |   70 +++++++++++++++++++-
+> >  2 files changed, 99 insertions(+), 1 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> > new file mode 100644
+> > index 0000000..6717ab1
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> > @@ -0,0 +1,30 @@
+> > +* TI Highspeed MMC host controller for DaVinci
+> > +
+> > +The Highspeed MMC Host Controller on TI DaVinci family
+> > +provides an interface for MMC, SD and SDIO types of memory cards.
+> > +
+> > +This file documents the properties used by the davinci_mmc driver.
+> > +
+> > +Required properties:
+> > +- compatible:
+> > + Should be "ti,davinci-mmc-da830": for da830, da850, dm365
+> > + Should be "ti,davinci-mmc-dm355": for dm355, dm644x
+> > +
+> > +Optional properties:
+> > +- bus-width: Number of data lines, can be <4>, or <8>, default <1>
+> > +- max-frequency: Maximum operating clock frequency, default 25MHz.
+> > +- mmc-cap-mmc-highspeed: Indicates support for MMC in high speed mode
+> > +- mmc-cap-sd-highspeed: Indicates support for SD in high speed mode
 > 
-> Cc: Florian Fainelli <florian@openwrt.org>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Todor Colov <todorcolov@gmail.com>
-> Cc: Rafal Prylowski <prylowski@metasoft.pl>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> It'd be nice if someone using the EP93xx could test this patch
-> on top of the latest v3.8 RC.
-> ---
->  arch/arm/mach-ep93xx/core.c              |   6 +-
->  arch/arm/mach-ep93xx/include/mach/irqs.h | 122 ++++++++++++++++---------------
->  2 files changed, 67 insertions(+), 61 deletions(-)
+> I thought the last two were derivable from max-frequency?
 > 
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index e85bf17..4490b04 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -179,8 +179,10 @@ struct sys_timer ep93xx_timer = {
->   *************************************************************************/
->  void __init ep93xx_init_irq(void)
->  {
-> -	vic_init(EP93XX_VIC1_BASE, 0, EP93XX_VIC1_VALID_IRQ_MASK, 0);
-> -	vic_init(EP93XX_VIC2_BASE, 32, EP93XX_VIC2_VALID_IRQ_MASK, 0);
-> +	vic_init(EP93XX_VIC1_BASE, EP93XX_VIC1_IRQ_BASE,
-> +		 EP93XX_VIC1_VALID_IRQ_MASK, 0);
-> +	vic_init(EP93XX_VIC2_BASE, EP93XX_VIC2_IRQ_BASE,
-> +		 EP93XX_VIC2_VALID_IRQ_MASK, 0);
->  }
->  
->  
-> diff --git a/arch/arm/mach-ep93xx/include/mach/irqs.h b/arch/arm/mach-ep93xx/include/mach/irqs.h
-> index ff98390..a96c50e 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/irqs.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/irqs.h
-> @@ -5,69 +5,73 @@
->  #ifndef __ASM_ARCH_IRQS_H
->  #define __ASM_ARCH_IRQS_H
->  
-> -#define IRQ_EP93XX_COMMRX		2
-> -#define IRQ_EP93XX_COMMTX		3
-> -#define IRQ_EP93XX_TIMER1		4
-> -#define IRQ_EP93XX_TIMER2		5
-> -#define IRQ_EP93XX_AACINTR		6
-> -#define IRQ_EP93XX_DMAM2P0		7
-> -#define IRQ_EP93XX_DMAM2P1		8
-> -#define IRQ_EP93XX_DMAM2P2		9
-> -#define IRQ_EP93XX_DMAM2P3		10
-> -#define IRQ_EP93XX_DMAM2P4		11
-> -#define IRQ_EP93XX_DMAM2P5		12
-> -#define IRQ_EP93XX_DMAM2P6		13
-> -#define IRQ_EP93XX_DMAM2P7		14
-> -#define IRQ_EP93XX_DMAM2P8		15
-> -#define IRQ_EP93XX_DMAM2P9		16
-> -#define IRQ_EP93XX_DMAM2M0		17
-> -#define IRQ_EP93XX_DMAM2M1		18
-> -#define IRQ_EP93XX_GPIO0MUX		19
-> -#define IRQ_EP93XX_GPIO1MUX		20
-> -#define IRQ_EP93XX_GPIO2MUX		21
-> -#define IRQ_EP93XX_GPIO3MUX		22
-> -#define IRQ_EP93XX_UART1RX		23
-> -#define IRQ_EP93XX_UART1TX		24
-> -#define IRQ_EP93XX_UART2RX		25
-> -#define IRQ_EP93XX_UART2TX		26
-> -#define IRQ_EP93XX_UART3RX		27
-> -#define IRQ_EP93XX_UART3TX		28
-> -#define IRQ_EP93XX_KEY			29
-> -#define IRQ_EP93XX_TOUCH		30
-> +#define EP93XX_VIC1_IRQ_BASE		64
-> +#define EP93XX_VIC2_IRQ_BASE		(EP93XX_VIC1_IRQ_BASE + 32)
-> +#define EP93XX_VIC2_IRQ_END		(EP93XX_VIC2_IRQ_BASE + 32)
-> +
-> +#define IRQ_EP93XX_COMMRX		(EP93XX_VIC1_IRQ_BASE + 2)
-> +#define IRQ_EP93XX_COMMTX		(EP93XX_VIC1_IRQ_BASE + 3)
-> +#define IRQ_EP93XX_TIMER1		(EP93XX_VIC1_IRQ_BASE + 4)
-> +#define IRQ_EP93XX_TIMER2		(EP93XX_VIC1_IRQ_BASE + 5)
-> +#define IRQ_EP93XX_AACINTR		(EP93XX_VIC1_IRQ_BASE + 6)
-> +#define IRQ_EP93XX_DMAM2P0		(EP93XX_VIC1_IRQ_BASE + 7)
-> +#define IRQ_EP93XX_DMAM2P1		(EP93XX_VIC1_IRQ_BASE + 8)
-> +#define IRQ_EP93XX_DMAM2P2		(EP93XX_VIC1_IRQ_BASE + 9)
-> +#define IRQ_EP93XX_DMAM2P3		(EP93XX_VIC1_IRQ_BASE + 10)
-> +#define IRQ_EP93XX_DMAM2P4		(EP93XX_VIC1_IRQ_BASE + 11)
-> +#define IRQ_EP93XX_DMAM2P5		(EP93XX_VIC1_IRQ_BASE + 12)
-> +#define IRQ_EP93XX_DMAM2P6		(EP93XX_VIC1_IRQ_BASE + 13)
-> +#define IRQ_EP93XX_DMAM2P7		(EP93XX_VIC1_IRQ_BASE + 14)
-> +#define IRQ_EP93XX_DMAM2P8		(EP93XX_VIC1_IRQ_BASE + 15)
-> +#define IRQ_EP93XX_DMAM2P9		(EP93XX_VIC1_IRQ_BASE + 16)
-> +#define IRQ_EP93XX_DMAM2M0		(EP93XX_VIC1_IRQ_BASE + 17)
-> +#define IRQ_EP93XX_DMAM2M1		(EP93XX_VIC1_IRQ_BASE + 18)
-> +#define IRQ_EP93XX_GPIO0MUX		(EP93XX_VIC1_IRQ_BASE + 19)
-> +#define IRQ_EP93XX_GPIO1MUX		(EP93XX_VIC1_IRQ_BASE + 20)
-> +#define IRQ_EP93XX_GPIO2MUX		(EP93XX_VIC1_IRQ_BASE + 21)
-> +#define IRQ_EP93XX_GPIO3MUX		(EP93XX_VIC1_IRQ_BASE + 22)
-> +#define IRQ_EP93XX_UART1RX		(EP93XX_VIC1_IRQ_BASE + 23)
-> +#define IRQ_EP93XX_UART1TX		(EP93XX_VIC1_IRQ_BASE + 24)
-> +#define IRQ_EP93XX_UART2RX		(EP93XX_VIC1_IRQ_BASE + 25)
-> +#define IRQ_EP93XX_UART2TX		(EP93XX_VIC1_IRQ_BASE + 26)
-> +#define IRQ_EP93XX_UART3RX		(EP93XX_VIC1_IRQ_BASE + 27)
-> +#define IRQ_EP93XX_UART3TX		(EP93XX_VIC1_IRQ_BASE + 28)
-> +#define IRQ_EP93XX_KEY			(EP93XX_VIC1_IRQ_BASE + 29)
-> +#define IRQ_EP93XX_TOUCH		(EP93XX_VIC1_IRQ_BASE + 30)
->  #define EP93XX_VIC1_VALID_IRQ_MASK	0x7ffffffc
->  
-> -#define IRQ_EP93XX_EXT0			32
-> -#define IRQ_EP93XX_EXT1			33
-> -#define IRQ_EP93XX_EXT2			34
-> -#define IRQ_EP93XX_64HZ			35
-> -#define IRQ_EP93XX_WATCHDOG		36
-> -#define IRQ_EP93XX_RTC			37
-> -#define IRQ_EP93XX_IRDA			38
-> -#define IRQ_EP93XX_ETHERNET		39
-> -#define IRQ_EP93XX_EXT3			40
-> -#define IRQ_EP93XX_PROG			41
-> -#define IRQ_EP93XX_1HZ			42
-> -#define IRQ_EP93XX_VSYNC		43
-> -#define IRQ_EP93XX_VIDEO_FIFO		44
-> -#define IRQ_EP93XX_SSP1RX		45
-> -#define IRQ_EP93XX_SSP1TX		46
-> -#define IRQ_EP93XX_GPIO4MUX		47
-> -#define IRQ_EP93XX_GPIO5MUX		48
-> -#define IRQ_EP93XX_GPIO6MUX		49
-> -#define IRQ_EP93XX_GPIO7MUX		50
-> -#define IRQ_EP93XX_TIMER3		51
-> -#define IRQ_EP93XX_UART1		52
-> -#define IRQ_EP93XX_SSP			53
-> -#define IRQ_EP93XX_UART2		54
-> -#define IRQ_EP93XX_UART3		55
-> -#define IRQ_EP93XX_USB			56
-> -#define IRQ_EP93XX_ETHERNET_PME		57
-> -#define IRQ_EP93XX_DSP			58
-> -#define IRQ_EP93XX_GPIO_AB		59
-> -#define IRQ_EP93XX_SAI			60
-> +#define IRQ_EP93XX_EXT0			(EP93XX_VIC2_IRQ_BASE + 0)
-> +#define IRQ_EP93XX_EXT1			(EP93XX_VIC2_IRQ_BASE + 1)
-> +#define IRQ_EP93XX_EXT2			(EP93XX_VIC2_IRQ_BASE + 2)
-> +#define IRQ_EP93XX_64HZ			(EP93XX_VIC2_IRQ_BASE + 3)
-> +#define IRQ_EP93XX_WATCHDOG		(EP93XX_VIC2_IRQ_BASE + 4)
-> +#define IRQ_EP93XX_RTC			(EP93XX_VIC2_IRQ_BASE + 5)
-> +#define IRQ_EP93XX_IRDA			(EP93XX_VIC2_IRQ_BASE + 6)
-> +#define IRQ_EP93XX_ETHERNET		(EP93XX_VIC2_IRQ_BASE + 7)
-> +#define IRQ_EP93XX_EXT3			(EP93XX_VIC2_IRQ_BASE + 8)
-> +#define IRQ_EP93XX_PROG			(EP93XX_VIC2_IRQ_BASE + 9)
-> +#define IRQ_EP93XX_1HZ			(EP93XX_VIC2_IRQ_BASE + 10)
-> +#define IRQ_EP93XX_VSYNC		(EP93XX_VIC2_IRQ_BASE + 11)
-> +#define IRQ_EP93XX_VIDEO_FIFO		(EP93XX_VIC2_IRQ_BASE + 12)
-> +#define IRQ_EP93XX_SSP1RX		(EP93XX_VIC2_IRQ_BASE + 13)
-> +#define IRQ_EP93XX_SSP1TX		(EP93XX_VIC2_IRQ_BASE + 14)
-> +#define IRQ_EP93XX_GPIO4MUX		(EP93XX_VIC2_IRQ_BASE + 15)
-> +#define IRQ_EP93XX_GPIO5MUX		(EP93XX_VIC2_IRQ_BASE + 16)
-> +#define IRQ_EP93XX_GPIO6MUX		(EP93XX_VIC2_IRQ_BASE + 17)
-> +#define IRQ_EP93XX_GPIO7MUX		(EP93XX_VIC2_IRQ_BASE + 18)
-> +#define IRQ_EP93XX_TIMER3		(EP93XX_VIC2_IRQ_BASE + 19)
-> +#define IRQ_EP93XX_UART1		(EP93XX_VIC2_IRQ_BASE + 20)
-> +#define IRQ_EP93XX_SSP			(EP93XX_VIC2_IRQ_BASE + 21)
-> +#define IRQ_EP93XX_UART2		(EP93XX_VIC2_IRQ_BASE + 22)
-> +#define IRQ_EP93XX_UART3		(EP93XX_VIC2_IRQ_BASE + 23)
-> +#define IRQ_EP93XX_USB			(EP93XX_VIC2_IRQ_BASE + 24)
-> +#define IRQ_EP93XX_ETHERNET_PME		(EP93XX_VIC2_IRQ_BASE + 25)
-> +#define IRQ_EP93XX_DSP			(EP93XX_VIC2_IRQ_BASE + 26)
-> +#define IRQ_EP93XX_GPIO_AB		(EP93XX_VIC2_IRQ_BASE + 27)
-> +#define IRQ_EP93XX_SAI			(EP93XX_VIC2_IRQ_BASE + 28)
->  #define EP93XX_VIC2_VALID_IRQ_MASK	0x1fffffff
->  
-> -#define NR_EP93XX_IRQS			(64 + 24)
-> +#define NR_EP93XX_IRQS			(EP93XX_VIC2_IRQ_END + 24)
->  
->  #define EP93XX_BOARD_IRQ(x)		(NR_EP93XX_IRQS + (x))
->  #define EP93XX_BOARD_IRQS		32
+
+Yes, but I see below comment that it doesnot support MMC/SD.
+arch/arm/mach-davinci/devices.c: davinci_setup_mmc
+	   "
+         * FIXME dm6441 (no MMC/SD), dm357 (one), and dm335 (two) are
+         * not handled right here ...
+         */"
+I was wondering how do we support such platforms, so I thought it is necessary
+to have these. But I see that on da850-evm even on skipping above flags EVM is able
+to detect card, does it mean there is no way to specify "no SD/MMC" capability?
+I will remove these and decide highspeed capability based on max-frequency.
+
+> https://lkml.org/lkml/2012/10/15/231
 > 
+> [...]
+> 
+> > +static struct davinci_mmc_config
+> > +	*mmc_parse_pdata(struct platform_device *pdev)
+> >  {
+> > +	struct device_node *np;
+> >  	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
+> > +	const struct of_device_id *match =
+> > +		of_match_device(of_match_ptr(davinci_mmc_dt_ids), &pdev->dev);
+> > +	u32 data;
+> > +
+> > +	np = pdev->dev.of_node;
+> > +	if (!np)
+> > +		return pdata;
+> > +
+> > +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> > +	if (!pdata) {
+> > +		dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
+> > +		goto nodata;
+> > +	}
+> > +
+> > +	if (match->data)
+> > +		pdata->version = (u8)((int)match->data);
+> > +
+> > +	of_property_read_u32(np, "max-frequency", &pdata->max_freq);
+> > +	if (!pdata->max_freq)
+> > +		dev_info(&pdev->dev, "'max-frequency' property not specified, defaulting to 25MHz\n");
+> > +
+> > +	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
+> > +		pdata->caps |= MMC_CAP_MMC_HIGHSPEED;
+> > +	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
+> > +		pdata->caps |= MMC_CAP_SD_HIGHSPEED;
+> 
+> If these aren't derivable from max-frequency, you could use
+> of_property_read_bool to make this clearer.
+> 
+
+Correct, I will decide these based on max-frequency.
+
+> > +
+> > +	of_property_read_u32(np, "bus-width", &data);
+> > +	switch (data) {
+> > +	case 0:
+> 
+> Judging by the binding doc, should this be 1 rather than 0?
+> 
+
+By default driver comes up in 4 bit mode when bus-width is not specified.
+Bus-width is set to 1 bit for invalid bus-widths. Below are the cases
+when bus-width 0 or 4, bus-width is set to 4bit mode
+When bus-width is 8, bus-width is set to 8 bit mode
+
+I thought that if somebody specifies bus-width as 2, 3, 5, 6, 7..., then
+it should be defaulted to 1 bit mode, so I specified it as 1 bit in binding doc.
+But I feel that a person who is editing dts file will not make such a mistake.
+I will change binding document to default as 4 bit mode.
+
+> > +	case 4:
+> > +	case 8:
+> > +		pdata->wires = data;
+> > +		break;
+> > +	default:
+> > +		pdata->wires = 1;
+> > +		dev_info(&pdev->dev, "Unsupported buswidth, defaulting to 1 bit\n");
+> > +	}
+> > +nodata:
+> > +	return pdata;
+> > +}
+> > +
+> > +static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+> > +{
+> > +	struct davinci_mmc_config *pdata = NULL;
+> >  	struct mmc_davinci_host *host = NULL;
+> >  	struct mmc_host *mmc = NULL;
+> >  	struct resource *r, *mem = NULL;
+> >  	int ret = 0, irq = 0;
+> >  	size_t mem_size;
+> >  
+> > +	pdata = mmc_parse_pdata(pdev);
+> > +	if (pdata == NULL) {
+> > +		dev_err(&pdev->dev, "Can not get platform data\n");
+> > +		return -ENOENT;
+> > +	}
+> > +
+> >  	/* REVISIT:  when we're fully converted, fail if pdata is NULL */
+> 
+> This comment can presumably disappear judging by the lines above?
+> 
+
+Agreed. I will remove it.
+
+Thanks,
+Prakash
