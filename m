@@ -1,48 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 8 Feb 2013 20:45:23 +0800
-Subject: [PATCH v3 2/2] ARM: uncompress debug support for multiplatform
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Feb 2013 12:59:39 +0000
+Subject: [PATCH v2 2/2] ARM: uncompress debug support for multiplatform
  build
-In-Reply-To: <20130208122714.GP17833@n2100.arm.linux.org.uk>
-References: <20130206093236.GD17833@n2100.arm.linux.org.uk>
- <1360323892-2860-1-git-send-email-shawn.guo@linaro.org>
- <20130208122714.GP17833@n2100.arm.linux.org.uk>
-Message-ID: <20130208124521.GA2845@S2101-09.ap.freescale.net>
+In-Reply-To: <20130207050434.GA7697@S2101-09.ap.freescale.net>
+References: <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
+ <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
+ <20130204160133.GH17786@n2100.arm.linux.org.uk>
+ <20130206093236.GD17833@n2100.arm.linux.org.uk>
+ <5112A933.4090108@wwwdotorg.org>
+ <20130207050434.GA7697@S2101-09.ap.freescale.net>
+Message-ID: <20130208125939.GQ17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 08, 2013 at 12:27:14PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 08, 2013 at 07:44:52PM +0800, Shawn Guo wrote:
-> > Instead of giving zero support of uncompress debug for multiplatform
-> > build, the patch turns uncompress debug into one part of DEBUG_LL
-> > support.  When DEBUG_LL is turned on for a particular platform,
-> > uncompress debug works too for that platform.
-> > 
-> > It reuses the platform DEBUG_LL macros by creating a simple
-> > arch/arm/boot/compressed/debug.S with CONFIG_DEBUG_LL_INCLUDE
-> > included there, and implements a generic putc() using those macros.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Acked-by: Olof Johansson <olof@lixom.net>
-> > ---
-> > Changes since v2:
-> >  * Build arch/arm/boot/compressed/debug.S only for multiplatform kernel
-> >    to fix the breakage on traditional platform build
-> >  * Include asm/assembler.h in arch/arm/boot/compressed/debug.S, as it
-> >    may commonly be needed by platforms to be converted to multiplatform
-> > 
-> > Russell,
-> > 
-> > I will put it into patch system if I do not receive any comment
-> > tomorrow.
+On Thu, Feb 07, 2013 at 01:04:36PM +0800, Shawn Guo wrote:
+> === omap ===
 > 
-> This doesn't address the problem with OMAP, which is that the OMAP debug
-> code places data into the .data section, and that is not allowed in the
-> decompressor.
+>   AS      arch/arm/boot/compressed/debug.o
+>   LD      arch/arm/boot/compressed/vmlinux
+> `.data' referenced in section `.text' of arch/arm/boot/compressed/debug.o: defined in discarded section `.data' of arch/arm/boot/compressed/debug.o
+> make[3]: *** [arch/arm/boot/compressed/vmlinux] Error 1
+> 
+> The following change moving the variables out of stack section seems
+> fixing the failure, but I'm not quite sure if it works.
+> 
+> 8<---
+> diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug
+> index cfaed13..7b2877e 100644
+> --- a/arch/arm/mach-omap2/include/mach/debug-macro.S
+> +++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
+> @@ -17,11 +17,9 @@
+> 
+>  #define UART_OFFSET(addr)      ((addr) & 0x00ffffff)
+> 
+> -               .pushsection .data
+>  omap_uart_phys:        .word   0
+>  omap_uart_virt:        .word   0
+>  omap_uart_lsr: .word   0
+> -               .popsection
 
-My patches are based on v3.8-rc where OMAP hasn't been converted to
-multiplatform.  But you are right, when the patches get into linux-next
-it will cause problem for OMAP, since multiplatform is enabled for OMAP
-on linux-next.  So should I base my patches on linux-next and fold a
-fix for OMAP into the series?
+No, this won't work, because now these variables are located in the text
+section which may not be writable.  I don't know what the answer is to
+this, but as things stand it's not something that can go into v3.8 until
+these problems are addressed (because if it does it _will_ cause
+regressions.)
 
-Shawn
+We're basically on the last day of -rc6, so I think it's all too late to
+try and get this sorted for this merge window.
