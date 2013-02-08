@@ -1,62 +1,47 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:40 +0000
-Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
+Date: Fri,  8 Feb 2013 23:17:47 +0000
+Subject: [PATCH 17/17] mvebu: support running big-endian
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-18-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atag-to-fdt code can now use the conversion function we introduced
-previously to avoid it having to know about the endian-ness of the
-environment which booted the processor.
+Add indication we can run these cores in BE mode, and ensure that the
+secondary CPU is set to big-endian mode in the initialisation code as
+the initial code runs little-endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/boot/compressed/atags_to_fdt.c |   20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/mach-mvebu/Kconfig   |    1 +
+ arch/arm/mach-mvebu/headsmp.S |    4 ++++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index aabc02a..a64ec71 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -108,9 +108,9 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 	       return 0;
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 440b13e..2afa026 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -1,5 +1,6 @@
+ config ARCH_MVEBU
+ 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index a06e0ed..8b09f8d 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -36,6 +36,10 @@
+  */
+ ENTRY(armada_xp_secondary_startup)
  
- 	/* validate the ATAG */
--	if (atag->hdr.tag != ATAG_CORE ||
--	    (atag->hdr.size != tag_size(tag_core) &&
--	     atag->hdr.size != 2))
-+	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
-+	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core)) &&
-+	     atag->hdr.size != atag32_to_cpu(2)))
- 		return 1;
- 
- 	/* let's give it all the room it could need */
-@@ -132,17 +132,17 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 			else
- 				setprop_string(fdt, "/chosen", "bootargs",
- 					       atag->u.cmdline.cmdline);
--		} else if (atag->hdr.tag == ATAG_MEM) {
-+		} else if (atag->hdr.tag == atag32_to_cpu(ATAG_MEM)) {
- 			if (memcount >= sizeof(mem_reg_property)/4)
- 				continue;
--			if (!atag->u.mem.size)
-+			if (!atag32_to_cpu(atag->u.mem.size))
- 				continue;
--			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.start);
--			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.size);
--		} else if (atag->hdr.tag == ATAG_INITRD2) {
-+			mem_reg_property[memcount++] = cpu_to_fdt32(atag32_to_cpu(atag->u.mem.start));
-+			mem_reg_property[memcount++] = cpu_to_fdt32(atag32_to_cpu(atag->u.mem.size));
-+		} else if (atag->hdr.tag == atag32_to_cpu(ATAG_INITRD2)) {
- 			uint32_t initrd_start, initrd_size;
--			initrd_start = atag->u.initrd.start;
--			initrd_size = atag->u.initrd.size;
-+			initrd_start = atag32_to_cpu(atag->u.initrd.start);
-+			initrd_size = atag32_to_cpu(____atag->u.initrd.size);
- 			setprop_cell(fdt, "/chosen", "linux,initrd-start",
- 					initrd_start);
- 			setprop_cell(fdt, "/chosen", "linux,initrd-end",
++#ifdef CONFIG_CPU_BE8_BOOT_LE
++	setend	be
++#endif
++
+ 	/* Read CPU id */
+ 	mrc     p15, 0, r1, c0, c0, 5
+ 	and     r1, r1, #0xF
 -- 
 1.7.10.4
