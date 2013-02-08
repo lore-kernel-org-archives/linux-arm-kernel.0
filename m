@@ -1,96 +1,55 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Fri,  8 Feb 2013 15:01:17 +0000
-Subject: [PATCH 0/6] ARM: mm: HugeTLB + THP support.
-Message-ID: <1360335683-7755-1-git-send-email-steve.capper@arm.com>
+Date: Fri,  8 Feb 2013 15:01:18 +0000
+Subject: [PATCH 1/6] ARM: mm: correct pte_same behaviour for LPAE.
+In-Reply-To: <1360335683-7755-1-git-send-email-steve.capper@arm.com>
+References: <1360335683-7755-1-git-send-email-steve.capper@arm.com>
+Message-ID: <1360335683-7755-2-git-send-email-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-The following patches bring both HugeTLB support and Transparent
-HugePage (THP) support to ARM.
+For 3 levels of paging the PTE_EXT_NG bit will be set for user
+address ptes that are written to a page table but not for ptes
+created with mk_pte.
 
-These are not intended for 3.9.
+This can cause some comparison tests made by pte_same to fail
+spuriously and lead to other problems.
 
-Both short descriptors (non-LPAE) and long descriptors (LPAE) are
-supported.
+To correct this behaviour, we mask off PTE_EXT_NG for any pte that
+is present before running the comparison.
 
-The non-LPAE HugeTLB code is based on patches by Bill Carson [1],
-but instead of allocating extra memory to store "Linux PTEs", it
-re-purposes the domain bits of section descriptors and constructs
-huge Linux PTEs on demand.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+---
+ arch/arm/include/asm/pgtable-3level.h |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-As PMDs are walked directly by the kernel THP functions (there are
-no huge_pmd_offset style functions), any "linux PMD"/"hardware PMD"
-distinction would require some re-working of the ARM PMD/PTE code.
-Use of the domain bits allows for a more straightforward THP
-implementation.
-
-Some general HugeTLB code relating to huge page migration on memory
-failure (CONFIG_MEMORY_FAILURE) de-references huge pte_t *s directly
-rather than use the huge_ptep_get and set_huge_pte_at functions.
-Thus this config option is incompatible with non-LPAE hugepages. At
-the moment I can only see x86 using CONFIG_MEMORY_FAILURE though.
-
-Non-LPAE code was tested on an Arndale board (Exynos 5250) and a
-Tegra 2 TrimSlice.
-
-The LPAE code manipulates the hardware page tables directly as the
-long descriptors are wide enough to contain all the Linux PTE
-information.
-
-The LPAE code has been tested on an Arndale board (Exynos 5250).
-
-This patch set is based on 3.8-rc6.
-
-Major changes since the RFC:
- * huge pmd sharing removed from the 3-level code as this was
-   found to be very rarely, if ever?, used. This allowed for some
-   code simplification.
-
- * hardware pmd bits for 2-levels of paging are now taken from
-   mmu.c. Also the mapping code now uses pte/pmd bit helper
-   functions rather than the custom pre-processor logic.
-
-Cheers,
--- 
-Steve
-
-[1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/084359.html
-
-Catalin Marinas (2):
-  ARM: mm: HugeTLB support for LPAE systems.
-  ARM: mm: Transparent huge page support for LPAE systems.
-
-Steve Capper (4):
-  ARM: mm: correct pte_same behaviour for LPAE.
-  ARM: mm: Add support for flushing HugeTLB pages.
-  ARM: mm: HugeTLB support for non-LPAE systems.
-  ARM: mm: Transparent huge page support for non-LPAE systems.
-
- arch/arm/Kconfig                            |    8 ++
- arch/arm/include/asm/hugetlb-2level.h       |  121 +++++++++++++++++++++
- arch/arm/include/asm/hugetlb-3level.h       |   61 +++++++++++
- arch/arm/include/asm/hugetlb.h              |   87 +++++++++++++++
- arch/arm/include/asm/pgtable-2level.h       |  151 +++++++++++++++++++++++++++
- arch/arm/include/asm/pgtable-3level-hwdef.h |    2 +
- arch/arm/include/asm/pgtable-3level.h       |   83 +++++++++++++++
- arch/arm/include/asm/pgtable.h              |   13 ++-
- arch/arm/include/asm/tlb.h                  |   16 ++-
- arch/arm/include/asm/tlbflush.h             |    2 +
- arch/arm/kernel/head.S                      |   10 +-
- arch/arm/mm/Makefile                        |    1 +
- arch/arm/mm/dma-mapping.c                   |    2 +-
- arch/arm/mm/fault.c                         |   11 --
- arch/arm/mm/flush.c                         |   26 +++--
- arch/arm/mm/fsr-2level.c                    |    4 +-
- arch/arm/mm/fsr-3level.c                    |    4 +-
- arch/arm/mm/hugetlbpage.c                   |  100 ++++++++++++++++++
- arch/arm/mm/mmu.c                           |   27 +++++
- 19 files changed, 697 insertions(+), 32 deletions(-)
- create mode 100644 arch/arm/include/asm/hugetlb-2level.h
- create mode 100644 arch/arm/include/asm/hugetlb-3level.h
- create mode 100644 arch/arm/include/asm/hugetlb.h
- create mode 100644 arch/arm/mm/hugetlbpage.c
-
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index a3f3792..2b73b0f 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -148,6 +148,23 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ 		clean_pmd_entry(pmdp);	\
+ 	} while (0)
+ 
++/*
++ * For 3 levels of paging the PTE_EXT_NG bit will be set for user address ptes
++ * that are written to a page table but not for ptes created with mk_pte.
++ *
++ * In hugetlb_no_page, a new huge pte (new_pte) is generated and passed to
++ * hugetlb_cow, where it is compared with an entry in a page table.
++ * This comparison test fails erroneously leading ultimately to a memory leak.
++ *
++ * To correct this behaviour, we mask off PTE_EXT_NG for any pte that is
++ * present before running the comparison.
++ */
++#define __HAVE_ARCH_PTE_SAME
++#define pte_same(pte_a,pte_b)	((pte_present(pte_a) ? pte_val(pte_a) & ~PTE_EXT_NG	\
++					: pte_val(pte_a))				\
++				== (pte_present(pte_b) ? pte_val(pte_b) & ~PTE_EXT_NG	\
++					: pte_val(pte_b)))
++
+ #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,__pte(pte_val(pte)|(ext)))
+ 
+ #endif /* __ASSEMBLY__ */
 -- 
 1.7.9.5
