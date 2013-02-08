@@ -1,52 +1,95 @@
-From: mats.liljegren@enea.com (Mats Liljegren)
-Date: Fri, 8 Feb 2013 20:10:23 +0100
-Subject: Porting 3.8-rc4-nohz3 to ARM (PandaBoard)
-In-Reply-To: <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
-References: <20130204200238.GA16718@enea.se>
- <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
-Message-ID: <20130208191023.GB30150@enea.se>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 8 Feb 2013 19:23:42 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: miscellaneous clock fixes for 3.9
+Message-ID: <alpine.DEB.2.00.1302081922440.28008@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frederic Weisbecker wrote:
-> 2013/2/4 Mats Liljegren <mats.liljegren@enea.com>:
-> > Hi Frederic,
-> >
-> > (Sorry for the re-post, I spelled the mailing list wrong...)
-> >
-> > I want to port dynticks patches 3.8-rc4-nohz3 to ARM architecture, and try it out on the PandaBoard. Initially this is for evaluating it, but if it looks promising I'd like to upstream this.
-> >
-> > As far as I can see the first thing to do is to implement virtual time accounting. After an initial look at the patches done for ia64, it doesn't look too difficult.
-> 
-> No that part is handled by the core code. But you need to implement
-> the context tracking arch backend.
-> Here is what Li Zhong did to port it on Powerpc for example:
-> https://lkml.org/lkml/2013/2/1/216
-> 
-> > Are there any caveats I should be aware of?
-> 
-> The generic cputime accounting only works on 64 bits archs. We'll need
-> to do some safe accessors to read the kernel_stat. In the meantime you
-> can do home tests by removing the CONFIG_64BIT dependency. This
-> shouldn't be dangerous
-> 
-> > Has anyone else started any work in this area that I could co-operate with?
-> 
-> Yeah two people have been working on this. But it was several month
-> ago and I haven't hear from them since then. I'm adding Geoff in Cc. I
-> can't retrieve the other guy who has worked on it too.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Thanks for the hints! They helped me along the way.
+Hi Tony,
 
-I have now managed to boot Linux without getting RCU complaints with RCU
-checking enabled. I enabled virtual CPU accounting by ignoring 64BIT
-dependency, as you suggested. I had to add an __aeabi_uldivmod function to
-get it to compile though.
+The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
 
-It boots without RCU complaints when CONFIG_PROVE_RCU is enabled.
+  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
 
-Next step will be to figure out those boot parameters to enable full
-dynticks mode, and see whether I forgot something... ;-) I'll do so on Monday.
+are available in the git repository at:
 
-Regards
-Mats Liljegren
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-e-for-3.9
+
+for you to fetch changes up to b5596a89412053aa0e18b59f40dc3a3e53917937:
+
+  Merge branch 'clock_misc_devel_a_3.9', remote-tracking branch 'remotes/pinchart/omap3isp/clock' into clock_devel_a_3.9 (2013-02-08 12:00:39 -0700)
+
+- ----------------------------------------------------------------
+
+Some miscellaneous OMAP2+ clock fixes, mostly related to the recent
+common clock framework conversion.
+
+Basic test logs are available here:
+
+    http://www.pwsan.com/omap/testlogs/clock_devel_a_3.9/20130208120108/
+
+- ----------------------------------------------------------------
+vmlinux object size
+(delta in bytes from test_v3.8-rc6 (88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7)):
+   text     data      bss    total  kernel
+      0        0        0        0  am33xx_only
+      0        0        0        0  n800_multi_omap2xxx
+      0        0        0        0  n800_only_a
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+      0        0        0        0  omap2plus_defconfig
+      0        0        0        0  omap2plus_defconfig_2430sdp_only
+      0        0        0        0  omap2plus_defconfig_cpupm
+      0        0        0        0  omap2plus_defconfig_no_pm
+      0        0        0        0  omap2plus_defconfig_omap2_4_only
+      0        0        0        0  omap2plus_defconfig_omap3_4_only
+    +96        0      -96        0  rmk_omap3430_ldp_allnoconfig
+    +32        0        0      +32  rmk_omap3430_ldp_oldconfig
+    +96        0      -96        0  rmk_omap4430_sdp_allnoconfig
+    +32        0        0      +32  rmk_omap4430_sdp_oldconfig
+
+
+Afzal Mohammed (3):
+      ARM: OMAP2+: dpll: am335x - avoid freqsel
+      ARM: OMAP2+: clock data: add DEFINE_STRUCT_CLK_FLAGS helper
+      ARM: OMAP AM33XX: clock data: SET_RATE_PARENT in lcd path
+
+Laurent Pinchart (2):
+      ARM: OMAP3: clock: Back-propagate rate change from cam_mclk to dpll4_m5
+      omap3isp: Set cam_mclk rate directly
+
+Paul Walmsley (1):
+      Merge branch 'clock_misc_devel_a_3.9', remote-tracking branch 'remotes/pinchart/omap3isp/clock' into clock_devel_a_3.9
+
+Rajendra Nayak (1):
+      ARM: OMAP4: clock data: Add missing clkdm association for dpll_usb
+
+ arch/arm/mach-omap2/cclock33xx_data.c |   10 ++++++----
+ arch/arm/mach-omap2/cclock3xxx_data.c |   10 +++++++++-
+ arch/arm/mach-omap2/cclock44xx_data.c |   13 ++++++++++++-
+ arch/arm/mach-omap2/clock.h           |   11 +++++++++++
+ arch/arm/mach-omap2/dpll3xxx.c        |    5 +++--
+ drivers/media/platform/omap3isp/isp.c |   18 ++----------------
+ drivers/media/platform/omap3isp/isp.h |    8 +++-----
+ 7 files changed, 46 insertions(+), 29 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJRFVBsAAoJEMePsQ0LvSpLt+AQAIV8Jno8rsTfMO2Fswen4KbY
+UrWhWSJxl5U7Gs529cYEgvey63DnD4f1hMVDTl2szosB/JLa3K2/xuFSKcbr/ZPA
+H3487iDJgov75wfg2s3nbB3fA2bObC6TeJBVWmz5AeIsZlp2ScCdsUSXHARMiTAZ
+EsZ6Vmi238Y5Ho5SkWTq6P8Jq6ZwMQhA4SCWrzmJL8DfHDxZ/zk6lxUaWiZ2G31a
+wkP8x+2gVVQEPsibh+oTaRFcxh8idI/JJ0B6QYisFLuojcRT9WCKOLEUqgBso0lS
+k9AfPWZWdSkikTCsiZTUrIP7y5Fzcvq7hHRKrfySOVcb1mZqRXUqBFWLp472IRJY
+lraqkYPq/lwyTOl9p8sd16GG7dbhWgqOjqRdmElG5QfrT13HoqpSOlUjduMG04/o
+9cVu+k2e0YvhSGjBvxfDIX4a+DQ79OM5oob9XUI3Ws8FAWo20KhspGppP6zzQF+w
+mdg4wa0y9C7OMouJuXfJ7Vrlg6OWUPsgRRrhKnIJ53aYr+DPG7VuxC2yI41qhM+8
+lsIvqcKcTcfxIvYyTiwzMK6bSoA1l57L074KCWueBjrDoKaYOlBUaw8shfCwOfBR
+xnyybR9WgqbC+Qdz6UiPIOYISQSvoNvdSzGCkHkhUXTBvVHZEFm65KTAKmRn2whJ
+UsnfwMjcBUnnN3iIFSQu
+=MPaC
+-----END PGP SIGNATURE-----
