@@ -1,208 +1,897 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 8 Feb 2013 11:38:05 -0600
-Subject: [PATCH 2/2] ARM: ep93xx: bump IRQ offset to 64
-In-Reply-To: <51149648.80402@gmail.com>
-References: <1360168544-20376-1-git-send-email-linus.walleij@linaro.org>
- <51149648.80402@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020809EF8DDB@AUSP01VMBX24.collaborationhost.net>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Fri, 8 Feb 2013 14:41:49 -0300
+Subject: [PATCH 1/3] clk: arm: sunxi: Add a new clock driver for sunxi SOCs
+In-Reply-To: <5114E27E.2020404@free-electrons.com>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+ <1358835176-7197-2-git-send-email-emilio@elopez.com.ar>
+ <5114E27E.2020404@free-electrons.com>
+Message-ID: <BLU0-SMTP6274B9C7079757BC8006988A050@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 07, 2013 11:08 PM, Ryan Mallon wrote:
->
-> Hi Linus,
->
-> The patch looks okay to me. My ep93xx hardware isn't setup at the
-> moment. I've Cc'ed Hartley, who might be able to test this. If not, I'll
-> try and find some time to drag my board out and give it a test over the
-> weekend.
->
-> ~Ryan
->
->> On 07/02/13 03:35, Linus Walleij wrote:
->> The EP93XX IRQs offset from zero, which is illegal, since Linux
->> IRQ 0 is NO_IRQ.
->> 
->> Cc: Florian Fainelli <florian@openwrt.org>
->> Cc: Ryan Mallon <rmallon@gmail.com>
->> Cc: Todor Colov <todorcolov@gmail.com>
->> Cc: Rafal Prylowski <prylowski@metasoft.pl>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hello Gregory,
+
+El 08/02/13 08:33, Gregory CLEMENT escribi?:
+> Hi Emilio,
+> 
+> This is the last part of my review, I didn't takt time to review the
+> whole patch the last time. As usual, my comments are inline
+> 
+> On 01/22/2013 07:12 AM, Emilio L?pez wrote:
+> 
+>> This commit implements the base CPU clocks for sunxi devices. It has
+>> been tested using a slightly modified cpufreq driver from the
+>> linux-sunxi 3.0 tree.
+>>
+>> Additionally, document the new bindings introduced by this patch, and drop
+>> the (now unused) old sunxi clock driver.
+>>
+>> Idling:
+>>     / # find /sys/kernel/debug/clk -name clk_rate -print -exec cat {} \;
+>>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/ahb/apb0/clk_rate
+>>     30000000
+>>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/ahb/clk_rate
+>>     60000000
+>>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/clk_rate
+>>     60000000
+>>     /sys/kernel/debug/clk/osc24M/pll1/cpu/clk_rate
+>>     60000000
+>>     /sys/kernel/debug/clk/osc24M/pll1/clk_rate
+>>     60000000
+>>     /sys/kernel/debug/clk/osc24M/clk_rate
+>>     24000000
+>>     /sys/kernel/debug/clk/osc32k/clk_rate
+>>     32768
+>>
+>> After "yes >/dev/null &":
+>>     / # find /sys/kernel/debug/clk -name clk_rate -print -exec cat {} \;
+>>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/ahb/apb0/clk_rate
+>>     84000000
+>>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/ahb/clk_rate
+>>     168000000
+>>     /sys/kernel/debug/clk/osc24M/pll1/cpu/axi/clk_rate
+>>     336000000
+>>     /sys/kernel/debug/clk/osc24M/pll1/cpu/clk_rate
+>>     1008000000
+>>     /sys/kernel/debug/clk/osc24M/pll1/clk_rate
+>>     1008000000
+>>     /sys/kernel/debug/clk/osc24M/clk_rate
+>>     24000000
+>>     /sys/kernel/debug/clk/osc32k/clk_rate
+>>     32768
+>>
+>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 >> ---
->> It'd be nice if someone using the EP93xx could test this patch
->> on top of the latest v3.8 RC.
-
-Linus,
-
-I would rather not have this applied.
-
-If you look at the EP93XX_VIC1_VALID_IRQ_MASK you will see that IRQ 0
-(and 1) is not valid. So on EP93xx IRQ 0 is a NO_IRQ.
-
-With VIC1 having a base IRQ of 0 and VIC2 having a base IRQ of 32, the Linux
-irq numbers match the numbers in the EP93xx datasheet. It makes debugging
-a bit easier without having to deal with the offsets.
-
-Regards,
-Hartley
-
->> ---
->>  arch/arm/mach-ep93xx/core.c              |   6 +-
->>  arch/arm/mach-ep93xx/include/mach/irqs.h | 122 ++++++++++++++++---------------
->>  2 files changed, 67 insertions(+), 61 deletions(-)
->> 
->> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
->> index e85bf17..4490b04 100644
->> --- a/arch/arm/mach-ep93xx/core.c
->> +++ b/arch/arm/mach-ep93xx/core.c
->> @@ -179,8 +179,10 @@ struct sys_timer ep93xx_timer = {
->>   *************************************************************************/
->>  void __init ep93xx_init_irq(void)
->>  {
->> -	vic_init(EP93XX_VIC1_BASE, 0, EP93XX_VIC1_VALID_IRQ_MASK, 0);
->> -	vic_init(EP93XX_VIC2_BASE, 32, EP93XX_VIC2_VALID_IRQ_MASK, 0);
->> +	vic_init(EP93XX_VIC1_BASE, EP93XX_VIC1_IRQ_BASE,
->> +		 EP93XX_VIC1_VALID_IRQ_MASK, 0);
->> +	vic_init(EP93XX_VIC2_BASE, EP93XX_VIC2_IRQ_BASE,
->> +		 EP93XX_VIC2_VALID_IRQ_MASK, 0);
->>  }
->>  
->>  
->> diff --git a/arch/arm/mach-ep93xx/include/mach/irqs.h b/arch/arm/mach-ep93xx/include/mach/irqs.h
->> index ff98390..a96c50e 100644
->> --- a/arch/arm/mach-ep93xx/include/mach/irqs.h
->> +++ b/arch/arm/mach-ep93xx/include/mach/irqs.h
->> @@ -5,69 +5,73 @@
->>  #ifndef __ASM_ARCH_IRQS_H
->>  #define __ASM_ARCH_IRQS_H
->>  
->> -#define IRQ_EP93XX_COMMRX		2
->> -#define IRQ_EP93XX_COMMTX		3
->> -#define IRQ_EP93XX_TIMER1		4
->> -#define IRQ_EP93XX_TIMER2		5
->> -#define IRQ_EP93XX_AACINTR		6
->> -#define IRQ_EP93XX_DMAM2P0		7
->> -#define IRQ_EP93XX_DMAM2P1		8
->> -#define IRQ_EP93XX_DMAM2P2		9
->> -#define IRQ_EP93XX_DMAM2P3		10
->> -#define IRQ_EP93XX_DMAM2P4		11
->> -#define IRQ_EP93XX_DMAM2P5		12
->> -#define IRQ_EP93XX_DMAM2P6		13
->> -#define IRQ_EP93XX_DMAM2P7		14
->> -#define IRQ_EP93XX_DMAM2P8		15
->> -#define IRQ_EP93XX_DMAM2P9		16
->> -#define IRQ_EP93XX_DMAM2M0		17
->> -#define IRQ_EP93XX_DMAM2M1		18
->> -#define IRQ_EP93XX_GPIO0MUX		19
->> -#define IRQ_EP93XX_GPIO1MUX		20
->> -#define IRQ_EP93XX_GPIO2MUX		21
->> -#define IRQ_EP93XX_GPIO3MUX		22
->> -#define IRQ_EP93XX_UART1RX		23
->> -#define IRQ_EP93XX_UART1TX		24
->> -#define IRQ_EP93XX_UART2RX		25
->> -#define IRQ_EP93XX_UART2TX		26
->> -#define IRQ_EP93XX_UART3RX		27
->> -#define IRQ_EP93XX_UART3TX		28
->> -#define IRQ_EP93XX_KEY			29
->> -#define IRQ_EP93XX_TOUCH		30
->> +#define EP93XX_VIC1_IRQ_BASE		64
->> +#define EP93XX_VIC2_IRQ_BASE		(EP93XX_VIC1_IRQ_BASE + 32)
->> +#define EP93XX_VIC2_IRQ_END		(EP93XX_VIC2_IRQ_BASE + 32)
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |  47 ++++
+>>  drivers/clk/Makefile                              |   2 +-
+>>  drivers/clk/clk-sunxi.c                           |  30 ---
+>>  drivers/clk/sunxi/Makefile                        |   5 +
+>>  drivers/clk/sunxi/clk-factors.c                   | 175 ++++++++++++++
+>>  drivers/clk/sunxi/clk-factors.h                   |  25 ++
+>>  drivers/clk/sunxi/clk-fixed-gate.c                | 152 +++++++++++++
+>>  drivers/clk/sunxi/clk-fixed-gate.h                |  13 ++
+>>  drivers/clk/sunxi/clk-sunxi.c                     | 265 ++++++++++++++++++++++
+>>  9 files changed, 683 insertions(+), 31 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/sunxi.txt
+>>  delete mode 100644 drivers/clk/clk-sunxi.c
+>>  create mode 100644 drivers/clk/sunxi/Makefile
+>>  create mode 100644 drivers/clk/sunxi/clk-factors.c
+>>  create mode 100644 drivers/clk/sunxi/clk-factors.h
+>>  create mode 100644 drivers/clk/sunxi/clk-fixed-gate.c
+>>  create mode 100644 drivers/clk/sunxi/clk-fixed-gate.h
+>>  create mode 100644 drivers/clk/sunxi/clk-sunxi.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> new file mode 100644
+>> index 0000000..446c5ca
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -0,0 +1,47 @@
+>> +Device Tree Clock bindings for arch-sunxi
 >> +
->> +#define IRQ_EP93XX_COMMRX		(EP93XX_VIC1_IRQ_BASE + 2)
->> +#define IRQ_EP93XX_COMMTX		(EP93XX_VIC1_IRQ_BASE + 3)
->> +#define IRQ_EP93XX_TIMER1		(EP93XX_VIC1_IRQ_BASE + 4)
->> +#define IRQ_EP93XX_TIMER2		(EP93XX_VIC1_IRQ_BASE + 5)
->> +#define IRQ_EP93XX_AACINTR		(EP93XX_VIC1_IRQ_BASE + 6)
->> +#define IRQ_EP93XX_DMAM2P0		(EP93XX_VIC1_IRQ_BASE + 7)
->> +#define IRQ_EP93XX_DMAM2P1		(EP93XX_VIC1_IRQ_BASE + 8)
->> +#define IRQ_EP93XX_DMAM2P2		(EP93XX_VIC1_IRQ_BASE + 9)
->> +#define IRQ_EP93XX_DMAM2P3		(EP93XX_VIC1_IRQ_BASE + 10)
->> +#define IRQ_EP93XX_DMAM2P4		(EP93XX_VIC1_IRQ_BASE + 11)
->> +#define IRQ_EP93XX_DMAM2P5		(EP93XX_VIC1_IRQ_BASE + 12)
->> +#define IRQ_EP93XX_DMAM2P6		(EP93XX_VIC1_IRQ_BASE + 13)
->> +#define IRQ_EP93XX_DMAM2P7		(EP93XX_VIC1_IRQ_BASE + 14)
->> +#define IRQ_EP93XX_DMAM2P8		(EP93XX_VIC1_IRQ_BASE + 15)
->> +#define IRQ_EP93XX_DMAM2P9		(EP93XX_VIC1_IRQ_BASE + 16)
->> +#define IRQ_EP93XX_DMAM2M0		(EP93XX_VIC1_IRQ_BASE + 17)
->> +#define IRQ_EP93XX_DMAM2M1		(EP93XX_VIC1_IRQ_BASE + 18)
->> +#define IRQ_EP93XX_GPIO0MUX		(EP93XX_VIC1_IRQ_BASE + 19)
->> +#define IRQ_EP93XX_GPIO1MUX		(EP93XX_VIC1_IRQ_BASE + 20)
->> +#define IRQ_EP93XX_GPIO2MUX		(EP93XX_VIC1_IRQ_BASE + 21)
->> +#define IRQ_EP93XX_GPIO3MUX		(EP93XX_VIC1_IRQ_BASE + 22)
->> +#define IRQ_EP93XX_UART1RX		(EP93XX_VIC1_IRQ_BASE + 23)
->> +#define IRQ_EP93XX_UART1TX		(EP93XX_VIC1_IRQ_BASE + 24)
->> +#define IRQ_EP93XX_UART2RX		(EP93XX_VIC1_IRQ_BASE + 25)
->> +#define IRQ_EP93XX_UART2TX		(EP93XX_VIC1_IRQ_BASE + 26)
->> +#define IRQ_EP93XX_UART3RX		(EP93XX_VIC1_IRQ_BASE + 27)
->> +#define IRQ_EP93XX_UART3TX		(EP93XX_VIC1_IRQ_BASE + 28)
->> +#define IRQ_EP93XX_KEY			(EP93XX_VIC1_IRQ_BASE + 29)
->> +#define IRQ_EP93XX_TOUCH		(EP93XX_VIC1_IRQ_BASE + 30)
->>  #define EP93XX_VIC1_VALID_IRQ_MASK	0x7ffffffc
+>> +This binding uses the common clock binding[1].
+>> +
+>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +
+>> +Required properties:
+>> +- compatible : shall be one of the following:
+>> +	"allwinner,sunxi-osc-clk" - for a gatable oscillator
+>> +	"allwinner,sunxi-pll1-clk" - for the main PLL clock
+>> +	"allwinner,sunxi-cpu-clk" - for the CPU multiplexer clock
+>> +	"allwinner,sunxi-axi-clk" - for the sunxi AXI clock
+>> +	"allwinner,sunxi-ahb-clk" - for the sunxi AHB clock
+>> +	"allwinner,sunxi-apb0-clk" - for the sunxi APB0 clock
+>> +
+>> +Required properties for all clocks:
+>> +- reg : shall be the control register address for the clock.
+>> +- clocks : shall be the input parent clock(s) phandle for the clock, except for
+>> +	the root gatable oscillator clock where it is not present
+>> +- #clock-cells : from common clock binding; shall be set to 0.
+>> +
+>> +Additionally, the gatable oscillator clock requires:
+>> +- clock-frequency : shall be the frequency of the oscillator.
+>> +
+>> +
+>> +For example:
+>> +
+>> +osc24M: osc24M {
+>> +	#clock-cells = <0>;
+>> +	compatible = "allwinner,sunxi-osc-clk";
+>> +	reg = <0x01c20050 0x4>;
+>> +	clock-frequency = <24000000>;
+>> +};
+>> +
+>> +pll1: pll1 at 01c20000 {
+>> +	#clock-cells = <0>;
+>> +	compatible = "allwinner,sunxi-pll1-clk";
+>> +	reg = <0x01c20000 0x4>;
+>> +	clocks = <&osc24M>;
+>> +};
+>> +
+>> +cpu: cpu at 01c20054 {
+>> +	#clock-cells = <0>;
+>> +	compatible = "allwinner,sunxi-cpu-clk";
+>> +	reg = <0x01c20054 0x4>;
+>> +	clocks = <&osc32k>, <&osc24M>, <&pll1>;
+>> +};
+>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+>> index ee90e87..129afed 100644
+>> --- a/drivers/clk/Makefile
+>> +++ b/drivers/clk/Makefile
+>> @@ -20,7 +20,7 @@ endif
+>>  obj-$(CONFIG_MACH_LOONGSON1)	+= clk-ls1x.o
+>>  obj-$(CONFIG_ARCH_U8500)	+= ux500/
+>>  obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
+>> -obj-$(CONFIG_ARCH_SUNXI)	+= clk-sunxi.o
+>> +obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
+>>  obj-$(CONFIG_ARCH_ZYNQ)		+= clk-zynq.o
 >>  
->> -#define IRQ_EP93XX_EXT0			32
->> -#define IRQ_EP93XX_EXT1			33
->> -#define IRQ_EP93XX_EXT2			34
->> -#define IRQ_EP93XX_64HZ			35
->> -#define IRQ_EP93XX_WATCHDOG		36
->> -#define IRQ_EP93XX_RTC			37
->> -#define IRQ_EP93XX_IRDA			38
->> -#define IRQ_EP93XX_ETHERNET		39
->> -#define IRQ_EP93XX_EXT3			40
->> -#define IRQ_EP93XX_PROG			41
->> -#define IRQ_EP93XX_1HZ			42
->> -#define IRQ_EP93XX_VSYNC		43
->> -#define IRQ_EP93XX_VIDEO_FIFO		44
->> -#define IRQ_EP93XX_SSP1RX		45
->> -#define IRQ_EP93XX_SSP1TX		46
->> -#define IRQ_EP93XX_GPIO4MUX		47
->> -#define IRQ_EP93XX_GPIO5MUX		48
->> -#define IRQ_EP93XX_GPIO6MUX		49
->> -#define IRQ_EP93XX_GPIO7MUX		50
->> -#define IRQ_EP93XX_TIMER3		51
->> -#define IRQ_EP93XX_UART1		52
->> -#define IRQ_EP93XX_SSP			53
->> -#define IRQ_EP93XX_UART2		54
->> -#define IRQ_EP93XX_UART3		55
->> -#define IRQ_EP93XX_USB			56
->> -#define IRQ_EP93XX_ETHERNET_PME		57
->> -#define IRQ_EP93XX_DSP			58
->> -#define IRQ_EP93XX_GPIO_AB		59
->> -#define IRQ_EP93XX_SAI			60
->> +#define IRQ_EP93XX_EXT0			(EP93XX_VIC2_IRQ_BASE + 0)
->> +#define IRQ_EP93XX_EXT1			(EP93XX_VIC2_IRQ_BASE + 1)
->> +#define IRQ_EP93XX_EXT2			(EP93XX_VIC2_IRQ_BASE + 2)
->> +#define IRQ_EP93XX_64HZ			(EP93XX_VIC2_IRQ_BASE + 3)
->> +#define IRQ_EP93XX_WATCHDOG		(EP93XX_VIC2_IRQ_BASE + 4)
->> +#define IRQ_EP93XX_RTC			(EP93XX_VIC2_IRQ_BASE + 5)
->> +#define IRQ_EP93XX_IRDA			(EP93XX_VIC2_IRQ_BASE + 6)
->> +#define IRQ_EP93XX_ETHERNET		(EP93XX_VIC2_IRQ_BASE + 7)
->> +#define IRQ_EP93XX_EXT3			(EP93XX_VIC2_IRQ_BASE + 8)
->> +#define IRQ_EP93XX_PROG			(EP93XX_VIC2_IRQ_BASE + 9)
->> +#define IRQ_EP93XX_1HZ			(EP93XX_VIC2_IRQ_BASE + 10)
->> +#define IRQ_EP93XX_VSYNC		(EP93XX_VIC2_IRQ_BASE + 11)
->> +#define IRQ_EP93XX_VIDEO_FIFO		(EP93XX_VIC2_IRQ_BASE + 12)
->> +#define IRQ_EP93XX_SSP1RX		(EP93XX_VIC2_IRQ_BASE + 13)
->> +#define IRQ_EP93XX_SSP1TX		(EP93XX_VIC2_IRQ_BASE + 14)
->> +#define IRQ_EP93XX_GPIO4MUX		(EP93XX_VIC2_IRQ_BASE + 15)
->> +#define IRQ_EP93XX_GPIO5MUX		(EP93XX_VIC2_IRQ_BASE + 16)
->> +#define IRQ_EP93XX_GPIO6MUX		(EP93XX_VIC2_IRQ_BASE + 17)
->> +#define IRQ_EP93XX_GPIO7MUX		(EP93XX_VIC2_IRQ_BASE + 18)
->> +#define IRQ_EP93XX_TIMER3		(EP93XX_VIC2_IRQ_BASE + 19)
->> +#define IRQ_EP93XX_UART1		(EP93XX_VIC2_IRQ_BASE + 20)
->> +#define IRQ_EP93XX_SSP			(EP93XX_VIC2_IRQ_BASE + 21)
->> +#define IRQ_EP93XX_UART2		(EP93XX_VIC2_IRQ_BASE + 22)
->> +#define IRQ_EP93XX_UART3		(EP93XX_VIC2_IRQ_BASE + 23)
->> +#define IRQ_EP93XX_USB			(EP93XX_VIC2_IRQ_BASE + 24)
->> +#define IRQ_EP93XX_ETHERNET_PME		(EP93XX_VIC2_IRQ_BASE + 25)
->> +#define IRQ_EP93XX_DSP			(EP93XX_VIC2_IRQ_BASE + 26)
->> +#define IRQ_EP93XX_GPIO_AB		(EP93XX_VIC2_IRQ_BASE + 27)
->> +#define IRQ_EP93XX_SAI			(EP93XX_VIC2_IRQ_BASE + 28)
->>  #define EP93XX_VIC2_VALID_IRQ_MASK	0x1fffffff
->>  
->> -#define NR_EP93XX_IRQS			(64 + 24)
->> +#define NR_EP93XX_IRQS			(EP93XX_VIC2_IRQ_END + 24)
->>  
->>  #define EP93XX_BOARD_IRQ(x)		(NR_EP93XX_IRQS + (x))
->>  #define EP93XX_BOARD_IRQS		32
->> 
+>>  # Chip specific
+>> diff --git a/drivers/clk/clk-sunxi.c b/drivers/clk/clk-sunxi.c
+>> deleted file mode 100644
+>> index 0e831b5..0000000
+>> --- a/drivers/clk/clk-sunxi.c
+>> +++ /dev/null
+>> @@ -1,30 +0,0 @@
+>> -/*
+>> - * Copyright 2012 Maxime Ripard
+>> - *
+>> - * Maxime Ripard <maxime.ripard@free-electrons.com>
+>> - *
+>> - * This program is free software; you can redistribute it and/or modify
+>> - * it under the terms of the GNU General Public License as published by
+>> - * the Free Software Foundation; either version 2 of the License, or
+>> - * (at your option) any later version.
+>> - *
+>> - * This program is distributed in the hope that it will be useful,
+>> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> - * GNU General Public License for more details.
+>> - */
+>> -
+>> -#include <linux/clk-provider.h>
+>> -#include <linux/clkdev.h>
+>> -#include <linux/clk/sunxi.h>
+>> -#include <linux/of.h>
+>> -
+>> -static const __initconst struct of_device_id clk_match[] = {
+>> -	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+>> -	{}
+>> -};
+>> -
+>> -void __init sunxi_init_clocks(void)
+>> -{
+>> -	of_clk_init(clk_match);
+>> -}
+>> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+>> new file mode 100644
+>> index 0000000..8e773be
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/Makefile
+>> @@ -0,0 +1,5 @@
+>> +#
+>> +# Makefile for sunxi specific clk
+>> +#
+>> +
+>> +obj-y += clk-sunxi.o clk-factors.o clk-fixed-gate.o
+>> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+>> new file mode 100644
+>> index 0000000..428b47d
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-factors.c
+>> @@ -0,0 +1,175 @@
+>> +/*
+>> + * Copyright (C) 2013 Emilio L?pez <emilio@elopez.com.ar>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * Adjustable factor-based clock implementation
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/io.h>
+>> +#include <linux/err.h>
+>> +#include <linux/string.h>
+>> +
+>> +#include <linux/delay.h>
+>> +
+>> +#include "clk-factors.h"
+>> +
+>> +/*
+>> + * DOC: basic adjustable factor-based clock that cannot gate
+>> + *
+>> + * Traits of this clock:
+>> + * prepare - clk_prepare only ensures that parents are prepared
+>> + * enable - clk_enable only ensures that parents are enabled
+>> + * rate - rate is adjustable.
+>> + *        clk->rate = (parent->rate * N * (K + 1) >> P) / (M + 1)
+>> + * parent - fixed parent.  No clk_set_parent support
+>> + */
+>> +
+>> +struct clk_factors {
+>> +	struct clk_hw hw;
+>> +	void __iomem *reg;
+>> +	struct clk_factors_config *config;
+>> +	void (*get_factors) (u32 *rate, u8 *n, u8 *k, u8 *m, u8 *p);
+>> +	spinlock_t *lock;
+>> +};
+>> +
+>> +#define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
+>> +
+>> +#define SETMASK(len, pos)		(((-1U) >> (31-len))  << (pos))
+>> +#define CLRMASK(len, pos)		(~(SETMASK(len, pos)))
+>> +#define FACTOR_GET(bit, len, reg)	(((reg) & SETMASK(len, bit)) >> (bit))
+>> +
+>> +#define FACTOR_SET(bit, len, reg, val) \
+>> +	(((reg) & CLRMASK(len, bit)) | (val << (bit)))
+>> +
+>> +static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+>> +					     unsigned long parent_rate)
+>> +{
+>> +	u8 n, k, p, m;
+>> +	u32 reg;
+>> +	unsigned long rate;
+>> +	struct clk_factors *factors = to_clk_factors(hw);
+>> +	struct clk_factors_config *config = factors->config;
+>> +
+>> +	/* Fetch the register value */
+>> +	reg = readl(factors->reg);
+>> +
+>> +	/* Get each individual factor */
+>> +	n = FACTOR_GET(config->nshift, config->nwidth, reg);
+>> +	k = FACTOR_GET(config->kshift, config->kwidth, reg);
+>> +	m = FACTOR_GET(config->mshift, config->mwidth, reg);
+>> +	p = FACTOR_GET(config->pshift, config->pwidth, reg);
+>> +
+>> +	/* Calculate the rate */
+>> +	rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
+>> +
+>> +	return rate;
+>> +}
+>> +
+>> +static long clk_factors_round_rate(struct clk_hw *hw, unsigned long rate,
+>> +				   unsigned long *parent_rate)
+>> +{
+>> +	struct clk_factors *factors = to_clk_factors(hw);
+>> +	factors->get_factors((u32 *)&rate, NULL, NULL, NULL, NULL);
+>> +
+>> +	return rate;
+>> +}
+>> +
+>> +static int clk_factors_set_rate(struct clk_hw *hw, unsigned long rate,
+>> +				unsigned long parent_rate)
+>> +{
+>> +	u8 n, k, m, p;
+>> +	u32 reg;
+>> +	struct clk_factors *factors = to_clk_factors(hw);
+>> +	struct clk_factors_config *config = factors->config;
+>> +	unsigned long flags = 0;
+>> +
+>> +	factors->get_factors((u32 *)&rate, &n, &k, &m, &p);
+>> +
+>> +	if (factors->lock)
+>> +		spin_lock_irqsave(factors->lock, flags);
+>> +
+>> +	/* Fetch the register value */
+>> +	reg = readl(factors->reg);
+>> +
+>> +	/* Set up the new factors */
+>> +	reg = FACTOR_SET(config->nshift, config->nwidth, reg, n);
+>> +	reg = FACTOR_SET(config->kshift, config->kwidth, reg, k);
+>> +	reg = FACTOR_SET(config->mshift, config->mwidth, reg, m);
+>> +	reg = FACTOR_SET(config->pshift, config->pwidth, reg, p);
+>> +
+>> +	/* Apply them now */
+>> +	writel(reg, factors->reg);
+>> +
+>> +	/* delay 500us so pll stabilizes */
+>> +	__delay((rate >> 20) * 500 / 2);
+>> +
+>> +	if (factors->lock)
+>> +		spin_unlock_irqrestore(factors->lock, flags);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct clk_ops clk_factors_ops = {
+>> +	.recalc_rate = clk_factors_recalc_rate,
+>> +	.round_rate = clk_factors_round_rate,
+>> +	.set_rate = clk_factors_set_rate,
+>> +};
+>> +
+>> +/**
+>> + * clk_register_factors - register a factors clock with
+>> + * the clock framework
+>> + * @dev: device registering this clock
+>> + * @name: name of this clock
+>> + * @parent_name: name of clock's parent
+>> + * @flags: framework-specific flags
+>> + * @reg: register address to adjust factors
+>> + * @config: shift and width of factors n, k, m and p
+>> + * @get_factors: function to calculate the factors for a given frequency
+>> + * @lock: shared register lock for this clock
+>> + */
+> 
+> Do you have other "factors" clock than sunxi-pll1-clk?
+> On your patch I only see this clock using this, and the way
+> you pass a function  and a the config struct seems to me
+> overcomplicated for a sinlge clock.
+
+Yes, there are other "factors" clocks on sunxi hardware; I have not
+added them to the driver yet, but having the factors implementation
+there makes it trivial to represent them on a future patchset.
+
+> 
+>> +struct clk *clk_register_factors(struct device *dev, const char *name,
+>> +				 const char *parent_name,
+>> +				 unsigned long flags, void __iomem *reg,
+>> +				 struct clk_factors_config *config,
+>> +				 void (*get_factors) (u32 *rate, u8 *n, u8 *k,
+>> +						      u8 *m, u8 *p),
+>> +				 spinlock_t *lock)
+>> +{
+>> +	struct clk_factors *factors;
+>> +	struct clk *clk;
+>> +	struct clk_init_data init;
+>> +
+>> +	/* allocate the factors */
+>> +	factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
+>> +	if (!factors) {
+>> +		pr_err("%s: could not allocate factors clk\n", __func__);
+>> +		return ERR_PTR(-ENOMEM);
+>> +	}
+>> +
+>> +	init.name = name;
+>> +	init.ops = &clk_factors_ops;
+>> +	init.flags = flags;
+>> +	init.parent_names = (parent_name ? &parent_name : NULL);
+>> +	init.num_parents = (parent_name ? 1 : 0);
+>> +
+>> +	/* struct clk_factors assignments */
+>> +	factors->reg = reg;
+>> +	factors->config = config;
+>> +	factors->lock = lock;
+>> +	factors->hw.init = &init;
+>> +	factors->get_factors = get_factors;
+>> +
+>> +	/* register the clock */
+>> +	clk = clk_register(dev, &factors->hw);
+>> +
+>> +	if (IS_ERR(clk))
+>> +		kfree(factors);
+>> +
+>> +	return clk;
+>> +}
+>> diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
+>> new file mode 100644
+>> index 0000000..a24c889
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-factors.h
+>> @@ -0,0 +1,25 @@
+>> +#ifndef __MACH_SUNXI_CLK_FACTORS_H
+>> +#define __MACH_SUNXI_CLK_FACTORS_H
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clkdev.h>
+>> +
+>> +struct clk_factors_config {
+>> +	u8 nshift;
+>> +	u8 nwidth;
+>> +	u8 kshift;
+>> +	u8 kwidth;
+>> +	u8 mshift;
+>> +	u8 mwidth;
+>> +	u8 pshift;
+>> +	u8 pwidth;
+>> +};
+>> +
+>> +struct clk *clk_register_factors(struct device *dev, const char *name,
+>> +				 const char *parent_name,
+>> +				 unsigned long flags, void __iomem *reg,
+>> +				 struct clk_factors_config *config,
+>> +				 void (*get_factors) (u32 *rate, u8 *n, u8 *k,
+>> +						      u8 *m, u8 *p),
+>> +				 spinlock_t *lock);
+>> +#endif
+>> diff --git a/drivers/clk/sunxi/clk-fixed-gate.c b/drivers/clk/sunxi/clk-fixed-gate.c
+>> new file mode 100644
+>> index 0000000..b16eda5
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-fixed-gate.c
+>> @@ -0,0 +1,152 @@
+>> +/*
+>> + * Copyright (C) 2013 Emilio L?pez <emilio@elopez.com.ar>
+>> + *
+>> + * Based on drivers/clk/clk-gate.c,
+>> + *
+>> + * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
+>> + * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * Fixed rate, gated clock implementation
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/io.h>
+>> +#include <linux/err.h>
+>> +#include <linux/string.h>
+>> +
+>> +#include "clk-fixed-gate.h"
+>> +
+>> +/**
+>> + * DOC: fixed rate clock which can gate and ungate it's ouput
+>> + *
+>> + * Traits of this clock:
+>> + * prepare - clk_(un)prepare only ensures parent is (un)prepared
+>> + * enable - clk_enable and clk_disable are functional & control gating
+>> + * rate - rate is always a fixed value.  No clk_set_rate support
+>> + * parent - fixed parent.  No clk_set_parent support
+>> + */
+>> +
+>> +struct clk_fixed_gate {
+>> +	struct clk_hw hw;
+>> +	u8            bit_idx;
+>> +	u8            flags;
+>> +	unsigned long fixed_rate;
+>> +	void __iomem  *reg;
+>> +	spinlock_t    *lock;
+>> +};
+>> +
+>> +#define to_clk_fixed_gate(_hw) container_of(_hw, struct clk_fixed_gate, hw)
+>> +
+>> +static void clk_fixed_gate_endisable(struct clk_hw *hw, int enable)
+>> +{
+>> +	struct clk_fixed_gate *gate = to_clk_fixed_gate(hw);
+>> +	unsigned long flags = 0;
+>> +	u32 reg;
+>> +
+>> +	if (gate->lock)
+>> +		spin_lock_irqsave(gate->lock, flags);
+>> +
+>> +	reg = readl(gate->reg);
+>> +
+>> +	if (enable)
+>> +		reg |= BIT(gate->bit_idx);
+>> +	else
+>> +		reg &= ~BIT(gate->bit_idx);
+>> +
+>> +	writel(reg, gate->reg);
+>> +
+>> +	if (gate->lock)
+>> +		spin_unlock_irqrestore(gate->lock, flags);
+>> +}
+>> +
+>> +static int clk_fixed_gate_enable(struct clk_hw *hw)
+>> +{
+>> +	clk_fixed_gate_endisable(hw, 1);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void clk_fixed_gate_disable(struct clk_hw *hw)
+>> +{
+>> +	clk_fixed_gate_endisable(hw, 0);
+>> +}
+>> +
+>> +static int clk_fixed_gate_is_enabled(struct clk_hw *hw)
+>> +{
+>> +	u32 reg;
+>> +	struct clk_fixed_gate *gate = to_clk_fixed_gate(hw);
+>> +
+>> +	reg = readl(gate->reg);
+>> +
+>> +	reg &= BIT(gate->bit_idx);
+>> +
+>> +	return reg ? 1 : 0;
+>> +}
+>> +
+>> +static unsigned long clk_fixed_gate_recalc_rate(struct clk_hw *hw,
+>> +						unsigned long parent_rate)
+>> +{
+>> +	return to_clk_fixed_gate(hw)->fixed_rate;
+>> +}
+>> +
+>> +static const struct clk_ops clk_fixed_gate_ops = {
+>> +	.enable = clk_fixed_gate_enable,
+>> +	.disable = clk_fixed_gate_disable,
+>> +	.is_enabled = clk_fixed_gate_is_enabled,
+>> +	.recalc_rate = clk_fixed_gate_recalc_rate,
+>> +};
+>> +
+>> +/**
+>> + * clk_register_fixed_gate - register a fixed rate,
+>> + * gate clock with the clock framework
+>> + * @dev: device that is registering this clock
+>> + * @name: name of this clock
+>> + * @parent_name: name of this clock's parent
+>> + * @flags: framework-specific flags for this clock
+>> + * @reg: register address to control gating of this clock
+>> + * @bit_idx: which bit in the register controls gating of this clock
+>> + * @lock: shared register lock for this clock
+>> + */
+>> +struct clk *clk_register_fixed_gate(struct device *dev, const char *name,
+>> +				    const char *parent_name,
+>> +				    unsigned long flags, void __iomem *reg,
+>> +				    u8 bit_idx, unsigned long fixed_rate,
+>> +				    spinlock_t *lock)
+>> +{
+>> +	struct clk_fixed_gate *gate;
+>> +	struct clk *clk;
+>> +	struct clk_init_data init;
+>> +
+>> +	/* allocate the gate */
+>> +	gate = kzalloc(sizeof(struct clk_fixed_gate), GFP_KERNEL);
+>> +	if (!gate) {
+>> +		pr_err("%s: could not allocate fixed gated clk\n", __func__);
+>> +		return ERR_PTR(-ENOMEM);
+>> +	}
+>> +
+>> +	init.name = name;
+>> +	init.ops = &clk_fixed_gate_ops;
+>> +	init.flags = flags | CLK_IS_BASIC;
+>> +	init.parent_names = (parent_name ? &parent_name : NULL);
+>> +	init.num_parents = (parent_name ? 1 : 0);
+>> +
+>> +	/* struct clk_fixed_gate assignments */
+>> +	gate->fixed_rate = fixed_rate;
+>> +	gate->reg = reg;
+>> +	gate->bit_idx = bit_idx;
+>> +	gate->lock = lock;
+>> +	gate->hw.init = &init;
+>> +
+>> +	clk = clk_register(dev, &gate->hw);
+>> +
+>> +	if (IS_ERR(clk))
+>> +		kfree(gate);
+>> +
+>> +	return clk;
+>> +}
+>> diff --git a/drivers/clk/sunxi/clk-fixed-gate.h b/drivers/clk/sunxi/clk-fixed-gate.h
+>> new file mode 100644
+>> index 0000000..29d9ed3
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-fixed-gate.h
+>> @@ -0,0 +1,13 @@
+>> +#ifndef __MACH_SUNXI_CLK_FIXED_GATE_H
+>> +#define __MACH_SUNXI_CLK_FIXED_GATE_H
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clkdev.h>
+>> +
+>> +struct clk *clk_register_fixed_gate(struct device *dev, const char *name,
+>> +				    const char *parent_name,
+>> +				    unsigned long flags, void __iomem *reg,
+>> +				    u8 bit_idx, unsigned long fixed_rate,
+>> +				    spinlock_t *lock);
+>> +
+>> +#endif
+>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+>> new file mode 100644
+>> index 0000000..cb587a0
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+>> @@ -0,0 +1,265 @@
+>> +/*
+>> + * Copyright 2013 Emilio L?pez
+>> + *
+>> + * Emilio L?pez <emilio@elopez.com.ar>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clkdev.h>
+>> +#include <linux/clk/sunxi.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +
+>> +#include "clk-factors.h"
+>> +#include "clk-fixed-gate.h"
+>> +
+>> +static DEFINE_SPINLOCK(clk_lock);
+>> +
+>> +/**
+>> + * sunxi_osc_clk_setup() - Setup function for gatable oscillator
+>> + */
+>> +
+>> +#define SUNXI_OSC24M_GATE	0
+>> +
+>> +static void __init sunxi_osc_clk_setup(struct device_node *node)
+>> +{
+>> +	struct clk *clk;
+>> +	const char *clk_name = node->name;
+>> +	void *reg;
+>> +	u32 rate;
+>> +
+>> +	reg = of_iomap(node, 0);
+>> +
+>> +	if (of_property_read_u32(node, "clock-frequency", &rate))
+>> +		return;
+>> +
+>> +	clk = clk_register_fixed_gate(NULL, clk_name, NULL,
+>> +				      CLK_IS_ROOT | CLK_IGNORE_UNUSED,
+>> +				      reg, SUNXI_OSC24M_GATE, rate, &clk_lock);
+>> +
+>> +	if (clk) {
+>> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>> +		clk_register_clkdev(clk, clk_name, NULL);
+>> +	}
+>> +}
+>> +
+>> +
+>> +
+>> +/**
+>> + * sunxi_get_pll1_factors() - calculates n, k, m, p factors for PLL1
+>> + * PLL1 rate is calculated as follows
+>> + * rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
+>> + * parent_rate is always 24Mhz
+>> + */
+>> +
+>> +static void sunxi_get_pll1_factors(u32 *freq, u8 *n, u8 *k, u8 *m, u8 *p)
+>> +{
+>> +	u8 div;
+>> +
+>> +	/* Normalize value to a 6M multiple */
+>> +	div = *freq / 6000000;
+>> +	*freq = 6000000 * div;
+>> +
+>> +	/* we were called to round the frequency, we can now return */
+>> +	if (n == NULL)
+>> +		return;
+>> +
+>> +	/* m is always zero for pll1 */
+>> +	*m = 0;
+>> +
+>> +	/* k is 1 only on these cases */
+>> +	if (*freq >= 768000000 || *freq == 42000000 || *freq == 54000000)
+>> +		*k = 1;
+>> +	else
+>> +		*k = 0;
+>> +
+>> +	/* p will be 3 for divs under 10 */
+>> +	if (div < 10)
+>> +		*p = 3;
+>> +
+>> +	/* p will be 2 for divs between 10 - 20 and odd divs under 32 */
+>> +	else if (div < 20 || (div < 32 && (div & 1)))
+>> +		*p = 2;
+>> +
+>> +	/* p will be 1 for even divs under 32, divs under 40 and odd pairs
+>> +	 * of divs between 40-62 */
+>> +	else if (div < 40 || (div < 64 && (div & 2)))
+>> +		*p = 1;
+>> +
+>> +	/* any other entries have p = 0 */
+>> +	else
+>> +		*p = 0;
+>> +
+>> +	/* calculate a suitable n based on k and p */
+>> +	div <<= *p;
+>> +	div /= (*k + 1);
+>> +	*n = div / 4;
+>> +}
+>> +
+>> +/**
+>> + * sunxi_pll1_clk_setup() - Setup function for PLL1 clock
+>> + */
+>> +
+>> +struct clk_factors_config pll1_config = {
+>> +	.nshift = 8,
+>> +	.nwidth = 5,
+>> +	.kshift = 4,
+>> +	.kwidth = 2,
+>> +	.mshift = 0,
+>> +	.mwidth = 2,
+>> +	.pshift = 16,
+>> +	.pwidth = 2,
+>> +};
+>> +
+>> +static void __init sunxi_pll1_clk_setup(struct device_node *node)
+>> +{
+>> +	struct clk *clk;
+>> +	const char *clk_name = node->name;
+>> +	const char *parent;
+>> +	void *reg;
+>> +
+>> +	reg = of_iomap(node, 0);
+>> +
+>> +	parent = of_clk_get_parent_name(node, 0);
+>> +
+>> +	clk = clk_register_factors(NULL, clk_name, parent, CLK_IGNORE_UNUSED,
+>> +				   reg, &pll1_config, sunxi_get_pll1_factors,
+>> +				   &clk_lock);
+>> +
+>> +	if (clk) {
+>> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>> +		clk_register_clkdev(clk, clk_name, NULL);
+>> +	}
+>> +}
+>> +
+>> +
+>> +
+>> +/**
+>> + * sunxi_cpu_clk_setup() - Setup function for CPU mux
+>> + */
+>> +
+>> +#define SUNXI_CPU_GATE		16
+>> +#define SUNXI_CPU_GATE_WIDTH	2
+>> +
+>> +static void __init sunxi_cpu_clk_setup(struct device_node *node)
+>> +{
+>> +	struct clk *clk;
+>> +	const char *clk_name = node->name;
+>> +	const char **parents = kmalloc(sizeof(char *) * 5, GFP_KERNEL);
+>> +	void *reg;
+>> +	int i = 0;
+>> +
+>> +	reg = of_iomap(node, 0);
+>> +
+>> +	while (i < 5 && (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
+>> +		i++;
+>> +
+>> +	clk = clk_register_mux(NULL, clk_name, parents, i, 0, reg,
+>> +			       SUNXI_CPU_GATE, SUNXI_CPU_GATE_WIDTH,
+>> +			       0, &clk_lock);
+>> +
+>> +	if (clk) {
+>> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>> +		clk_register_clkdev(clk, clk_name, NULL);
+>> +	}
+>> +}
+>> +
+>> +
+>> +
+>> +/**
+>> + * sunxi_divider_clk_setup() - Setup function for simple divider clocks
+>> + */
+>> +
+>> +#define SUNXI_DIVISOR_WIDTH	2
+>> +
+>> +struct div_data {
+>> +	u8 div;
+>> +	u8 pow;
+>> +};
+>> +
+>> +static const __initconst struct div_data axi_data = {
+>> +	.div = 0,
+>> +	.pow = 0,
+>> +};
+>> +
+>> +static const __initconst struct div_data ahb_data = {
+>> +	.div = 4,
+>> +	.pow = 1,
+>> +};
+>> +
+>> +static const __initconst struct div_data apb0_data = {
+>> +	.div = 8,
+>> +	.pow = 1,
+>> +};
+> 
+> Can't you read this from a register?
+
+I don't understand your question. "div" is the shift in the register
+where the divisor gets configured. width is always 2 as indicated by the
+compiler macro above.
+
+> 
+> If not then this 3 clocks are good candidates for my patch:
+> "clk: add DT fixed-factor-clock binding support"
+> http://www.spinics.net/lists/arm-kernel/msg191522.html
+
+These are configurable dividers; fixed-factor appears to be for clocks
+where div and mult are fixed values.
+
+> 
+> It was not merged by lack of user, but it will be pretty simple to me
+> to rebase it on top of 3.8-rc6
+> 
+> So if it is really an informatilon you can only get from the datasheet,
+> you will be able to just declare it in the DTS.
+> 
+>> +
+>> +static void __init sunxi_divider_clk_setup(struct device_node *node, u8 shift,
+>> +					   u8 power_of_two)
+
+See here, .div is shift and .pow is power_of_two
+
+>> +{
+>> +	struct clk *clk;
+>> +	const char *clk_name = node->name;
+>> +	const char *clk_parent;
+>> +	void *reg;
+>> +
+>> +	reg = of_iomap(node, 0);
+>> +
+>> +	clk_parent = of_clk_get_parent_name(node, 0);
+>> +
+>> +	clk = clk_register_divider(NULL, clk_name, clk_parent, 0,
+>> +				   reg, shift, SUNXI_DIVISOR_WIDTH,
+>> +				   power_of_two ? CLK_DIVIDER_POWER_OF_TWO : 0,
+>> +				   &clk_lock);
+>> +	if (clk) {
+>> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>> +		clk_register_clkdev(clk, clk_name, NULL);
+>> +	}
+>> +}
+>> +
+>> +
+>> +/* Matches for of_clk_init */
+>> +static const __initconst struct of_device_id clk_match[] = {
+>> +	{.compatible = "fixed-clock", .data = of_fixed_clk_setup,},
+>> +	{.compatible = "allwinner,sunxi-osc-clk", .data = sunxi_osc_clk_setup,},
+>> +	{.compatible = "allwinner,sunxi-pll1-clk", .data = sunxi_pll1_clk_setup,},
+>> +	{.compatible = "allwinner,sunxi-cpu-clk", .data = sunxi_cpu_clk_setup,},
+>> +	{}
+>> +};
+>> +
+>> +/* Matches for divider clocks */
+>> +static const __initconst struct of_device_id clk_div_match[] = {
+>> +	{.compatible = "allwinner,sunxi-axi-clk", .data = &axi_data,},
+>> +	{.compatible = "allwinner,sunxi-ahb-clk", .data = &ahb_data,},
+>> +	{.compatible = "allwinner,sunxi-apb0-clk", .data = &apb0_data,},
+>> +	{}
+>> +};
+>> +
+>> +static void __init of_sunxi_divider_clock_setup(void)
+>> +{
+>> +	struct device_node *np;
+>> +	const struct div_data *data;
+>> +	const struct of_device_id *match;
+>> +
+>> +	for_each_matching_node(np, clk_div_match) {
+>> +		match = of_match_node(clk_div_match, np);
+>> +		data = match->data;
+>> +		sunxi_divider_clk_setup(np, data->div, data->pow);
+>> +	}
+>> +}
+>> +
+>> +void __init sunxi_init_clocks(void)
+>> +{
+>> +	/* Register all the simple sunxi clocks on DT */
+>> +	of_clk_init(clk_match);
+>> +
+>> +	/* Register divider clocks */
+>> +	of_sunxi_divider_clock_setup();
+>> +}
+>>
+
+Thanks for the review :)
+
+Emilio
