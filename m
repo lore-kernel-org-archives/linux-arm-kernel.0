@@ -1,45 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Feb 2013 13:13:17 +0000 (UTC)
-Subject: OMAP baseline test results for v3.8-rc6
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC06CEA@DBDE01.ent.ti.com>
-References: <alpine.DEB.2.00.1302062333270.12769@utopia.booyaka.com>
- <20130207083217.GA15462@arwen.pp.htv.fi>
- <79CD15C6BA57404B839C016229A409A83EC06CEA@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1302081306230.11464@utopia.booyaka.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 8 Feb 2013 13:17:05 +0000
+Subject: [PATCH 3/4] spi: s3c64xx: add gpio quirk for controller
+In-Reply-To: <CAKrE-KfrWdOxm+DJyWqZn1Ye509E_LjzmDb5FMq55SF9-Sua0A@mail.gmail.com>
+References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
+ <1360105784-12282-4-git-send-email-ks.giri@samsung.com>
+ <20130207115546.GA3801@sirena.org.uk>
+ <CAKrE-KfrWdOxm+DJyWqZn1Ye509E_LjzmDb5FMq55SF9-Sua0A@mail.gmail.com>
+Message-ID: <20130208131705.GZ8879@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
+On Thu, Feb 07, 2013 at 10:54:01AM -0800, Girish KS wrote:
 
-On Fri, 8 Feb 2013, Hiremath, Vaibhav wrote:
+> As suggested i would make two changes.
+> 1. would parse the "gpios"  property and make decision whether to use
+> gpios/dedicated pins for miso/miso/clk.
+> 2.would parse "cs-gpio"  property from dts node to handle the chip select
+> correct me if my understanding is wrong
 
-> Sorry for not following up on this for long, I have tested v3.8-rc6 
-> (with latest u-boot)on both BeageBone platoforms and I have pasted the logs 
-> below as well for reference.
-> 
-> 
-> Paul,
-> I have used your MLO & u-boot.img images and tried at my end, and as 
-> expected it didn't boot for me. I debugged it further and found that your 
-> u-boot doesn't enable support for FDT and that's is the reason it fails to 
-> boot.
-
-This MLO & u-boot.img is the one that TI originally shipped on the 
-BeagleBone that I received, and it worked fine with an appended DTB on 
-v3.7-rc8:
-
-http://www.pwsan.com/omap/testlogs/test_v3.7-rc8/20121204220128/boot/am335xbone/am335xbone_log.txt
-
-So what I'd like to know is why it doesn't work with >= v3.8-rc1
-with an appended DTB:
-
-http://www.pwsan.com/omap/testlogs/test_v3.8-rc1/20121228031713/boot/am335xbone/am335xbone_log.txt
-
-The point is to try to minimize bootloader dependencies.
-
-Haven't had the chance to try Felipe's suggestion yet re fdt_high.
-
-Also, this is using BeagleBone whites here.
-
-
-- Paul
+I think that's probably OK.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/03d4eeab/attachment.sig>
