@@ -1,45 +1,116 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri,  8 Feb 2013 02:25:55 +0100
-Subject: [PATCH 2/3] ARM: at91: add pinctrl nodes to i2c-gpio on RM92000 DT
-In-Reply-To: <1360286756-29705-1-git-send-email-manabian@gmail.com>
-References: <1360286756-29705-1-git-send-email-manabian@gmail.com>
-Message-ID: <1360286756-29705-3-git-send-email-manabian@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 07 Feb 2013 17:29:33 -0800
+Subject: [PATCH] ARM: OMAP4: PM: Warn users about usage of older
+ bootloaders
+In-Reply-To: <alpine.DEB.2.00.1302062343230.12769@utopia.booyaka.com> (Paul
+ Walmsley's message of "Wed, 6 Feb 2013 23:44:34 +0000 (UTC)")
+References: <1359980683-12079-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1302062343230.12769@utopia.booyaka.com>
+Message-ID: <87liazzj7m.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO pins used by i2c-gpio must be set to multi drive
-(open drain) to work properly.
+Paul Walmsley <paul@pwsan.com> writes:
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/boot/dts/at91rm9200.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> On Mon, 4 Feb 2013, Rajendra Nayak wrote:
+>
+>> OMAP4 CHIP level PM works only with newer bootloaders. The
+>> dependency on the bootloader comes from the fact that the
+>> kernel is missing reset and initialization code for some
+>> devices.
+>> 
+>> While the right thing to do is to add reset and init code in
+>> the kernel, for some co-processor IP blocks like DSP and IVA
+>> it means downloading firmware into each one of them to execute
+>> idle instructions.
+>> 
+>> While a feasible solution is worked upon on how such IP blocks
+>> can be better handled in the kernel, in the interim, to avoid
+>> any further frustration to users testing PM on OMAP4 and finding
+>> it broken, warn them about the bootloader being a possible
+>> cause.
+>> 
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Tero Kristo <t-kristo@ti.com>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: R Sricharan <r.sricharan@ti.com>
+>
+> Thanks Rajendra, I appreciate the patch.  I've tweaked it slightly and the 
+> following is what's queued here; hopefully it can go in for v3.9.
+>
+>
+> - Paul
+>
+> From: Rajendra Nayak <rnayak@ti.com>
+> Date: Mon, 4 Feb 2013 17:54:43 +0530
+> Subject: [PATCH] ARM: OMAP4: PM: Warn users about usage of older bootloaders
+>
+> OMAP4 CHIP level PM works only with newer bootloaders. The
+> dependency on the bootloader comes from the fact that the
+> kernel is missing reset and initialization code for some
+> devices.
+>
+> While the right thing to do is to add reset and init code in
+> the kernel, for some co-processor IP blocks like DSP and IVA
+> it means downloading firmware into each one of them to execute
+> idle instructions.
+>
+> While a feasible solution is worked upon on how such IP blocks
+> can be better handled in the kernel, in the interim, to avoid
+> any further frustration to users testing PM on OMAP4 and finding
+> it broken, warn them about the bootloader being a possible
+> cause.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: R Sricharan <r.sricharan@ti.com>
+> [paul at pwsan.com: tweaked warning messages and comments slightly]
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index a7031c6..5d3ed5a 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -383,6 +383,12 @@
- 							<0 25 0x1 0x2	/* PA25 periph A with multi drive */
- 							 0 26 0x1 0x2>;	/* PA26 periph A with multi drive */
- 					};
-+
-+					pinctrl_twi_gpio: twi_gpio-0 {
-+						atmel,pins =
-+							<0 25 0x0 0x2	/* PA25 GPIO with multi drive */
-+							 0 26 0x0 0x2>;	/* PA26 GPIO with multi drive */
-+					};
- 				};
- 
- 				pioA: gpio at fffff400 {
-@@ -520,6 +526,8 @@
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
- 		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_twi_gpio>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
--- 
-1.8.0
+FWIW
+
+Acked-by: Kevin Hilman <khilman@linaro.org>
+
+> ---
+>  arch/arm/mach-omap2/pm44xx.c |   19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> index aa6fd98..502ed9b 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@ -77,8 +77,18 @@ static int omap4_pm_suspend(void)
+>  		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
+>  		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->saved_logic_state);
+>  	}
+> -	if (ret)
+> +	if (ret) {
+>  		pr_crit("Could not enter target state in pm_suspend\n");
+> +		/*
+> +		 * OMAP4 chip PM currently works only with certain (newer)
+> +		 * versions of bootloaders. This is due to missing code in the
+> +		 * kernel to properly reset and initialize some devices.
+> +		 * Warn the user about the bootloader version being one of the
+> +		 * possible causes.
+> +		 * http://www.spinics.net/lists/arm-kernel/msg218641.html
+> +		 */
+> +		pr_warn("A possible cause could be an old bootloader - try u-boot >= v2012.07\n");
+> +	}
+>  	else
+>  		pr_info("Successfully put all powerdomains to target state\n");
+>  
+> @@ -146,6 +156,13 @@ int __init omap4_pm_init(void)
+>  	}
+>  
+>  	pr_err("Power Management for TI OMAP4.\n");
+> +	/*
+> +	 * OMAP4 chip PM currently works only with certain (newer)
+> +	 * versions of bootloaders. This is due to missing code in the
+> +	 * kernel to properly reset and initialize some devices.
+> +	 * http://www.spinics.net/lists/arm-kernel/msg218641.html
+> +	 */
+> +	pr_warn("u-boot >= v2012.07 is required for full PM support\n");
+>  
+>  	ret = pwrdm_for_each(pwrdms_setup, NULL);
+>  	if (ret) {
