@@ -1,54 +1,48 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 08 Feb 2013 21:34:40 +0000
-Subject: [PATCH] cpuidle: kirkwood: Move out of mach directory, add DT.
-In-Reply-To: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
-References: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20130208213441.014343E2C27@localhost>
+Date: Fri, 08 Feb 2013 21:40:24 +0000
+Subject: [PATCH 1/2] ARM: DT: tegra: Add Tegra30 Beaver board support
+In-Reply-To: <50E478AF.2040406@nvidia.com>
+References: <1356032489-27619-1-git-send-email-pengw@nvidia.com>
+ <50DDC743.2080606@gmail.com> <50DE3146.6090001@nvidia.com>
+ <CAOesGMgW890K4Wo2-SFE4YFn5f8T950BTZ82rkCQfwpV+bsRyQ@mail.gmail.com>
+ <50E478AF.2040406@nvidia.com>
+Message-ID: <20130208214024.9467E3E2C27@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Dec 2012 13:47:24 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
-> Move the Kirkwood cpuidle driver out of arch/arm/mach-kirkwood and
-> into drivers/cpuidle. Convert the driver into a platform driver and
-> add a device tree binding. Add a DT node to instantiate the driver for
-> boards converted to DT, and a platform data for old style boards.
+On Wed, 2 Jan 2013 10:13:03 -0800, Peng Wu <pengw@nvidia.com> wrote:
+> On 12/28/2012 08:43 PM, Olof Johansson wrote:
+> > On Fri, Dec 28, 2012 at 3:54 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> >> On 12/28/2012 09:22 AM, Rob Herring wrote:
+> >>> On 12/20/2012 01:41 PM, Bryan Wu wrote:
+> >>>> This patch adds support for Tegra30 Beaver board in upstream kernel.
+> >>>> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
+> >>>> +/ {
+> >>>> +    model = "NVIDIA Tegra30 Beaver evaluation board";
+> >>>> +    compatible = "nvidia,beaver", "nvidia,tegra30";
+> >>> nvidia,beaver needs to be documented.
+> >> Hmmm. I guess we've managed not to document /any/ of the Tegra
+> >> board-level compatible values. Bryan, could you make a separate patch to
+> >> add all the existing board compatible values to
+> >> Documentation/devicetree/bindings/arm/tegra.txt. The Beaver addition to
+> >> that file can still be part of the Beaver-specific patch though.
+> > Does it need to be documented? Then the "support a new platform only
+> > through DTS update" is no longer true. :)
+> >
+> > In the past, I don't think we've strictly documented all derivative
+> > platform compatible values, just some of the reference ones?
+> >
+> >
+> > -Olof
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  .../devicetree/bindings/power/qnap-poweroff.txt    |   14 +++
->  arch/arm/boot/dts/kirkwood.dtsi                    |    5 +
->  arch/arm/configs/kirkwood_defconfig                |    1 +
->  arch/arm/mach-kirkwood/Makefile                    |    1 -
->  arch/arm/mach-kirkwood/common.c                    |   23 ++++
->  arch/arm/mach-kirkwood/cpuidle.c                   |   73 -------------
->  arch/arm/mach-kirkwood/include/mach/kirkwood.h     |    3 +-
->  drivers/cpuidle/Kconfig                            |    6 ++
->  drivers/cpuidle/Makefile                           |    1 +
->  drivers/cpuidle/cpuidle-kirkwood.c                 |  114 ++++++++++++++++++++
->  10 files changed, 166 insertions(+), 75 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/qnap-poweroff.txt
->  delete mode 100644 arch/arm/mach-kirkwood/cpuidle.c
->  create mode 100644 drivers/cpuidle/cpuidle-kirkwood.c
-> 
-> diff --git a/Documentation/devicetree/bindings/power/qnap-poweroff.txt b/Documentation/devicetree/bindings/power/qnap-poweroff.txt
-> new file mode 100644
-> index 0000000..e15a334
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/qnap-poweroff.txt
-> @@ -0,0 +1,14 @@
-> +* QNAP Power Off
-> +
-> +QNAP NAS devices have a microcontroller controlling the main power
-> +supply. This microcontroller is connected to UART1 of the Kirkwood and
-> +Orion5x SoCs. Sending the charactor 'A', at 19200 baud, tells the
-> +microcontroller to turn the power off. This driver adds a handler to
-> +pm_power_off which is called to turn the power off.
-> +
-> +Required Properties:
-> +- compatibile: Should be "qnap,power-off"
+> Actually in every Tegra board dts file, there is a model string to 
+> describe this machine as well as a compatible board string, just like 
+> the "nvidia,beaver". So do we still need put this duplicated information 
+> in a document file? Or if this is the requirement of DeviceTree. I will 
+> do that. I think we have 12 boards need to add such document currently.
 
-It would do well to have the model number embedded into this compatible
-string since it is unlikely that every single QNAP device will use the
-same controller interface.
+The model string is intended to be human-friendly, where as compatible
+is primarily the matching mechanism.
 
-g.
+I don't think it is stricly necessary to document top level compatible
+strings unless there is something quirky that begs to be documented.
