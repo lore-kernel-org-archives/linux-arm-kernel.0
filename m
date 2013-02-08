@@ -1,55 +1,73 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Fri,  8 Feb 2013 15:01:18 +0000
-Subject: [PATCH 1/6] ARM: mm: correct pte_same behaviour for LPAE.
+Date: Fri,  8 Feb 2013 15:01:19 +0000
+Subject: [PATCH 2/6] ARM: mm: Add support for flushing HugeTLB pages.
 In-Reply-To: <1360335683-7755-1-git-send-email-steve.capper@arm.com>
 References: <1360335683-7755-1-git-send-email-steve.capper@arm.com>
-Message-ID: <1360335683-7755-2-git-send-email-steve.capper@arm.com>
+Message-ID: <1360335683-7755-3-git-send-email-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For 3 levels of paging the PTE_EXT_NG bit will be set for user
-address ptes that are written to a page table but not for ptes
-created with mk_pte.
+On ARM we use the __flush_dcache_page function to flush the dcache
+of pages when needed; usually when the PG_dcache_clean bit is unset
+and we are setting a PTE.
 
-This can cause some comparison tests made by pte_same to fail
-spuriously and lead to other problems.
+A HugeTLB page is represented as a compound page consisting of an
+array of pages. Thus to flush the dcache of a HugeTLB page, one must
+flush more than a single page.
 
-To correct this behaviour, we mask off PTE_EXT_NG for any pte that
-is present before running the comparison.
+This patch modifies __flush_dcache_page such that all constituent
+pages of a HugeTLB page are flushed.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 ---
- arch/arm/include/asm/pgtable-3level.h |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/mm/flush.c |   26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index a3f3792..2b73b0f 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -148,6 +148,23 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- 		clean_pmd_entry(pmdp);	\
- 	} while (0)
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 1c8f7f5..7f32f96 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -17,6 +17,7 @@
+ #include <asm/highmem.h>
+ #include <asm/smp_plat.h>
+ #include <asm/tlbflush.h>
++#include <linux/hugetlb.h>
  
-+/*
-+ * For 3 levels of paging the PTE_EXT_NG bit will be set for user address ptes
-+ * that are written to a page table but not for ptes created with mk_pte.
-+ *
-+ * In hugetlb_no_page, a new huge pte (new_pte) is generated and passed to
-+ * hugetlb_cow, where it is compared with an entry in a page table.
-+ * This comparison test fails erroneously leading ultimately to a memory leak.
-+ *
-+ * To correct this behaviour, we mask off PTE_EXT_NG for any pte that is
-+ * present before running the comparison.
-+ */
-+#define __HAVE_ARCH_PTE_SAME
-+#define pte_same(pte_a,pte_b)	((pte_present(pte_a) ? pte_val(pte_a) & ~PTE_EXT_NG	\
-+					: pte_val(pte_a))				\
-+				== (pte_present(pte_b) ? pte_val(pte_b) & ~PTE_EXT_NG	\
-+					: pte_val(pte_b)))
-+
- #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,__pte(pte_val(pte)|(ext)))
+ #include "mm.h"
  
- #endif /* __ASSEMBLY__ */
+@@ -168,17 +169,22 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
+ 	 * coherent with the kernels mapping.
+ 	 */
+ 	if (!PageHighMem(page)) {
+-		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
++		size_t page_size = PAGE_SIZE << compound_order(page);
++		__cpuc_flush_dcache_area(page_address(page), page_size);
+ 	} else {
+-		void *addr = kmap_high_get(page);
+-		if (addr) {
+-			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+-			kunmap_high(page);
+-		} else if (cache_is_vipt()) {
+-			/* unmapped pages might still be cached */
+-			addr = kmap_atomic(page);
+-			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+-			kunmap_atomic(addr);
++		unsigned long i;
++		for(i = 0; i < (1 << compound_order(page)); i++) {
++			struct page *cpage = page + i;
++			void *addr = kmap_high_get(cpage);
++			if (addr) {
++				__cpuc_flush_dcache_area(addr, PAGE_SIZE);
++				kunmap_high(cpage);
++			} else if (cache_is_vipt()) {
++				/* unmapped pages might still be cached */
++				addr = kmap_atomic(cpage);
++				__cpuc_flush_dcache_area(addr, PAGE_SIZE);
++				kunmap_atomic(addr);
++			}
+ 		}
+ 	}
+ 
 -- 
 1.7.9.5
