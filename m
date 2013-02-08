@@ -1,49 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Feb 2013 12:59:39 +0000
-Subject: [PATCH v2 2/2] ARM: uncompress debug support for multiplatform
- build
-In-Reply-To: <20130207050434.GA7697@S2101-09.ap.freescale.net>
-References: <1358436119-30808-3-git-send-email-shawn.guo@linaro.org>
- <1358477120-19673-1-git-send-email-shawn.guo@linaro.org>
- <20130204160133.GH17786@n2100.arm.linux.org.uk>
- <20130206093236.GD17833@n2100.arm.linux.org.uk>
- <5112A933.4090108@wwwdotorg.org>
- <20130207050434.GA7697@S2101-09.ap.freescale.net>
-Message-ID: <20130208125939.GQ17833@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 08 Feb 2013 07:07:50 -0600
+Subject: [PATCH 0/4] Improve CLKSRC_OF matching
+In-Reply-To: <1360299102.31290.1.camel@gitbox>
+References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
+ <1360299102.31290.1.camel@gitbox>
+Message-ID: <5114F8A6.60105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 01:04:36PM +0800, Shawn Guo wrote:
-> === omap ===
+On 02/07/2013 10:51 PM, Tony Prisk wrote:
+> On Thu, 2013-02-07 at 13:09 -0600, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> In the recently added support for OF based clocksource init, a device node
+>> will be matched twice. We can fix this by passing the device node to the
+>> init functions and removing the match functions within the init functions.
+>>
+>> This is based on arm-soc for-next branch and commit "of: fix incorrect
+>> return value of of_find_matching_node_and_match()" in my DT for-next
+>> branch.
+>>
+>> Rob
+>>
+>> Rob Herring (4):
+>>   clocksource: pass DT node pointer to init functions
+>>   clocksource: bcm2835: use the device_node pointer passed to init
+>>   clocksource: vt8500: use the device_node pointer passed to init
+>>   clocksource: tegra20: use the device_node pointer passed to init
+>>
+>>  drivers/clocksource/bcm2835_timer.c |   12 +-----
+>>  drivers/clocksource/clksrc-of.c     |    4 +-
+>>  drivers/clocksource/tegra20_timer.c |   70 ++++++++++++++---------------------
+>>  drivers/clocksource/vt8500_timer.c  |   14 +------
+>>  4 files changed, 31 insertions(+), 69 deletions(-)
+>>
 > 
->   AS      arch/arm/boot/compressed/debug.o
->   LD      arch/arm/boot/compressed/vmlinux
-> `.data' referenced in section `.text' of arch/arm/boot/compressed/debug.o: defined in discarded section `.data' of arch/arm/boot/compressed/debug.o
-> make[3]: *** [arch/arm/boot/compressed/vmlinux] Error 1
-> 
-> The following change moving the variables out of stack section seems
-> fixing the failure, but I'm not quite sure if it works.
-> 
-> 8<---
-> diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug
-> index cfaed13..7b2877e 100644
-> --- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-> +++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-> @@ -17,11 +17,9 @@
-> 
->  #define UART_OFFSET(addr)      ((addr) & 0x00ffffff)
-> 
-> -               .pushsection .data
->  omap_uart_phys:        .word   0
->  omap_uart_virt:        .word   0
->  omap_uart_lsr: .word   0
-> -               .popsection
+> Looks fine, although I didn't get a CC for the vt8500 patch so I had to
+> go hunting for it :)
 
-No, this won't work, because now these variables are located in the text
-section which may not be writable.  I don't know what the answer is to
-this, but as things stand it's not something that can go into v3.8 until
-these problems are addressed (because if it does it _will_ cause
-regressions.)
+Since it got moved to drivers/clocksource, did MAINTAINERS get updated?
+I just ran get_maintainers.pl.
 
-We're basically on the last day of -rc6, so I think it's all too late to
-try and get this sorted for this merge window.
+Stephen also needs to add himself to Tegra as I had to add him manually.
+
+Rob
+
+> 
+> For patches 1 & 3:
+> Acked-by: Tony Prisk <linux@prisktech.co.nz>
+> 
