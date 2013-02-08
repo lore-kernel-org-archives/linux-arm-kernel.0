@@ -1,37 +1,28 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 8 Feb 2013 14:02:54 +0000
-Subject: OMAP baseline test results for v3.8-rc6
-In-Reply-To: <87ehgqlxca.fsf@dell.be.48ers.dk>
-References: <alpine.DEB.2.00.1302062333270.12769@utopia.booyaka.com>
- <20130207083217.GA15462@arwen.pp.htv.fi>
- <79CD15C6BA57404B839C016229A409A83EC06CEA@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1302081306230.11464@utopia.booyaka.com>
- <87ehgqlxca.fsf@dell.be.48ers.dk>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC06EB2@DBDE01.ent.ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 8 Feb 2013 16:03:02 +0200
+Subject: [PATCH v6 08/10] ARM: dt: Add references to tegra_car clocks
+In-Reply-To: <1360330602-30472-9-git-send-email-pdeschrijver@nvidia.com>
+References: <1360330602-30472-1-git-send-email-pdeschrijver@nvidia.com>
+ <1360330602-30472-9-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20130208140301.GA23979@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 08, 2013 at 19:30:21, Peter Korsgaard wrote:
-> >>>>> "Paul" == Paul Walmsley <paul@pwsan.com> writes:
-> 
-> Hi,
-> 
->  Paul> So what I'd like to know is why it doesn't work with >= v3.8-rc1
->  Paul> with an appended DTB:
-> 
->  Paul> http://www.pwsan.com/omap/testlogs/test_v3.8-rc1/20121228031713/boot/am335xbone/am335xbone_log.txt
-> 
->  Paul> The point is to try to minimize bootloader dependencies.
-> 
->  Paul> Haven't had the chance to try Felipe's suggestion yet re fdt_high.
-> 
-> That shouldn't matter when using appended dtb.
-> 
+Hi,
 
-That's correct, relocating dtb should not matter for appended DTB kernel 
-image.
+On Fri, Feb 08, 2013 at 03:36:40PM +0200, Peter De Schrijver wrote:
+>  	tegra_car: clock {
+> -		compatible = "nvidia,tegra114-car, nvidia,tegra30-car";
+> +		compatible = "nvidia,tegra114-car";
 
-I am trying now with appended DTB, 
+trailing change or intentional ?
 
-Thanks,
-Vaibhav
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130208/202974d2/attachment.sig>
