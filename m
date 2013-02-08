@@ -1,88 +1,37 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 08 Feb 2013 11:38:02 +0100
-Subject: [PATCH 04/10] USB: EHCI: make ehci-orion a separate driver
-In-Reply-To: <5113e5f0.c84e420a.08c3.ffffbe9a@mx.google.com>
-References: <yes> <1360258447-27247-1-git-send-email-yes>
- <5113e5f0.c84e420a.08c3.ffffbe9a@mx.google.com>
-Message-ID: <5114D58A.1030903@openwrt.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 Feb 2013 11:45:30 +0100
+Subject: Build error: OMAP randconfig / mvebu
+In-Reply-To: <20130208100813.GN17833@n2100.arm.linux.org.uk>
+References: <20130208100813.GN17833@n2100.arm.linux.org.uk>
+Message-ID: <2213733.Wbjy3dFgom@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Manjunath,
+On Friday 08 February 2013 10:08:13 Russell King - ARM Linux wrote:
+> Last night's OMAP4430SDP randconfig build failed with:
+> 
+> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_smp_init_cpus':
+> hotplug.c:(.init.text+0x70): undefined reference to `coherency_get_cpu_count'
+> hotplug.c:(.init.text+0xb4): undefined reference to `armada_mpic_send_doorbell'
+> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_smp_prepare_cpus':
+> hotplug.c:(.init.text+0x254): undefined reference to `set_cpu_coherent'
+> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_boot_secondary':
+> hotplug.c:(.cpuinit.text+0x10): undefined reference to `armada_xp_boot_cpu'
+> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_secondary_init':
+> hotplug.c:(.cpuinit.text+0x2c): undefined reference to `armada_xp_mpic_smp_cpu_init'
+> arch/arm/mach-mvebu/built-in.o: In function `armada_xp_secondary_startup':
+> hotplug.c:(.cpuinit.text+0x40): undefined reference to `ll_set_cpu_coherent'
+> 
+> This seems to be because we ended up with CONFIG_ARCH_MVEBU=y but without
+> CONFIG_MACH_ARMADA_370_XP being set - and because of OMAP, we have SMP
+> and hotplug CPU enabled.
+> 
+> Usual configs/logs available via the website.
 
-On 02/07/2013 06:34 PM, manjunath.goudar at linaro.org wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
->
-> Separate the Marvell Orion host controller driver from ehci-hcd host code
-> into its own driver module.
->
-[snip]
+Ok, I see. I suspect we are going to see a lot more randconfig failures
+now with all the platforms that are becoming part of multiplatform.
 
-The changes you introduce in ehci-hcd.c would certainly deserve their 
-own preliminary patch in this serie and not be squashed into this one imho.
+mvebu maintainers: this one should be easy enough to fix. Anyone
+submitting a patch?
 
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -155,7 +155,7 @@ static inline unsigned ehci_read_frame_index(struct ehci_hcd *ehci)
->    * before driver shutdown. But it also seems to be caused by bugs in cardbus
->    * bridge shutdown:  shutting down the bridge before the devices using it.
->    */
-> -static int handshake (struct ehci_hcd *ehci, void __iomem *ptr,
-> +int handshake(struct ehci_hcd *ehci, void __iomem *ptr,
->   		      u32 mask, u32 done, int usec)
->   {
->   	u32	result;
-> @@ -172,9 +172,9 @@ static int handshake (struct ehci_hcd *ehci, void __iomem *ptr,
->   	} while (usec > 0);
->   	return -ETIMEDOUT;
->   }
-> -
-> +EXPORT_SYMBOL_GPL(handshake);
-
-This sounds way too generic as a name to be exported as is, so please 
-namespace this with ehci_hcd_ at least.
-
->   /* check TDI/ARC silicon is in host mode */
-> -static int tdi_in_host_mode (struct ehci_hcd *ehci)
-> +static int tdi_in_host_mode(struct ehci_hcd *ehci)
-
-Looks unrelated to the goals of your patches.
-
->   {
->   	u32		tmp;
->
-> @@ -186,7 +186,7 @@ static int tdi_in_host_mode (struct ehci_hcd *ehci)
->    * Force HC to halt state from unknown (EHCI spec section 2.3).
->    * Must be called with interrupts enabled and the lock not held.
->    */
-> -static int ehci_halt (struct ehci_hcd *ehci)
-> +int ehci_halt(struct ehci_hcd *ehci)
->   {
->   	u32	temp;
->
-> @@ -215,9 +215,9 @@ static int ehci_halt (struct ehci_hcd *ehci)
->   	return handshake(ehci, &ehci->regs->status,
->   			  STS_HALT, STS_HALT, 16 * 125);
->   }
-> -
-> +EXPORT_SYMBOL_GPL(ehci_halt);
-
-I would rename this to ehci_hcd_halt to express the fact that it takes 
-an ehci_hcd structure pointer as parameter, can be addressed later.
-
->   /* put TDI/ARC silicon into EHCI mode */
-> -static void tdi_reset (struct ehci_hcd *ehci)
-> +void tdi_reset(struct ehci_hcd *ehci)
->   {
->   	u32		tmp;
->
-> @@ -231,12 +231,12 @@ static void tdi_reset (struct ehci_hcd *ehci)
->   		tmp |= USBMODE_BE;
->   	ehci_writel(ehci, tmp, &ehci->regs->usbmode);
->   }
-> -
-> +EXPORT_SYMBOL_GPL(tdi_reset);
-
-Same here, way too generic to be exported as is as a symbol name.
---
-Florian
+	Arnd
