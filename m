@@ -1,55 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Feb 2013 17:45:57 +0000 (UTC)
-Subject: [PATCH 00/15] OMAP SHAM & AES Crypto Updates
-In-Reply-To: <20130201201824.GA6326@animalcreek.com>
-References: <1356107295-11121-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1212230836160.16045@utopia.booyaka.com>
- <20130108203853.GB1876@animalcreek.com>
- <alpine.DEB.2.00.1301171904070.14118@utopia.booyaka.com>
- <20130117222728.GA32446@animalcreek.com>
- <20130128191635.GA14158@animalcreek.com>
- <alpine.DEB.2.00.1302011722070.10853@utopia.booyaka.com>
- <20130201201824.GA6326@animalcreek.com>
-Message-ID: <alpine.DEB.2.00.1302081744100.28008@utopia.booyaka.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 8 Feb 2013 12:49:22 -0500 (EST)
+Subject: [PATCH 1/3] SPEAr13xx_defconfig: Enable Memory split 2G/2G needed
+In-Reply-To: <CAKohpokPhHtuDDBPUYp9YPOrEnaaKxthjiAemq74qfour_3aYQ@mail.gmail.com>
+References: <cover.1360317993.git.vijay.kumar@st.com>
+ <6cebd9755011670ecaeec7930b3fa7ed0f16b3b6.1360317993.git.vijay.kumar@st.com>
+ <CAKohpokPhHtuDDBPUYp9YPOrEnaaKxthjiAemq74qfour_3aYQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1302081243400.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 8 Feb 2013, Viresh Kumar wrote:
 
-Hi Mark,
+> Hi Vijay,
+> 
+> By mistake you have added an ST internal list in cc, fixed it now.
+> 
+> Subject should be:
+> 
+> ARM: SPEAr13xx: Enable 2G/2G Memory split in defconfig
+> 
+> On 8 February 2013 16:16, Vijay Kumar Mishra <vijay.kumar@st.com> wrote:
+> > Memory split 2G/2G is enabled as needed for SPEAr1310 RevC board to boot.
+> > Before enabling this option the boot was hanging at uncompressing linux.
 
-just FYI, these patches caused several warnings from sparse:
+I disagree.  The subject could have been "put our head in the sand and 
+paper over bugs".
 
-> arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c:141:30: warning: 
-symbol 'omap2xxx_sham_addrs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c:150:30: warning: 
-symbol 'omap2xxx_aes_addrs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c:884:28: warning: 
-symbol 'omap2_sham_mpu_irqs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c:889:28: warning: 
-symbol 'omap2_sham_sdma_chs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c:927:28: warning: 
-symbol 'omap2_aes_sdma_chs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_33xx_data.c:540:28: warning: symbol 
-'am33xx_aes0_edma_reqs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_33xx_data.c:579:28: warning: symbol 
-'am33xx_sha0_edma_reqs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_3xxx_data.c:3564:28: warning: symbol 
-'omap3_sham_mpu_irqs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_3xxx_data.c:3569:28: warning: symbol 
-'omap3_sham_sdma_reqs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_3xxx_data.c:3574:19: warning: symbol 
-'omap3xxx_sham_hwmod' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_3xxx_data.c:3630:28: warning: symbol 
-'omap3_aes_sdma_reqs' was not declared. Should it be static?
-> arch/arm/mach-omap2/omap_hwmod_3xxx_data.c:3636:19: warning: symbol 
-'omap3xxx_aes_hwmod' was not declared. Should it be static?
+Please don't do that.  There is no reason for any machine not to boot 
+way past "Uncompressing Linux" with the default split.  The likely 
+reason it works with the 2G:2G split is because in that case the virtual 
+and physical RAM addresses in the kernel are the same, and therefore 
+missing p2v or v2p conversions are invisible.
 
 
-I've fixed them up here, but please don't forget to make sure that patches 
-don't add any sparse warnings.  sparse info is here:
-
-https://sparse.wiki.kernel.org/index.php/Main_Page
-
-regards,
-
-- Paul
+Nicolas
