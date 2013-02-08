@@ -1,40 +1,96 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 8 Feb 2013 20:19:08 +0530
-Subject: [PATCH V5] ARM: LPAE: Fix mapping in alloc_init_section for
- unaligned addresses
-In-Reply-To: <CANOGCgMEdae53GGGNxU6eHqrNLOhZ1wUyXfADEooLkmZ3bC7Og@mail.gmail.com>
-References: <1360323019-30139-1-git-send-email-r.sricharan@ti.com>
- <CANOGCgMEdae53GGGNxU6eHqrNLOhZ1wUyXfADEooLkmZ3bC7Og@mail.gmail.com>
-Message-ID: <51151064.6050400@ti.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Fri,  8 Feb 2013 15:01:17 +0000
+Subject: [PATCH 0/6] ARM: mm: HugeTLB + THP support.
+Message-ID: <1360335683-7755-1-git-send-email-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 February 2013 08:13 PM, Christoffer Dall wrote:
-> On Fri, Feb 8, 2013 at 6:30 AM, R Sricharan <r.sricharan@ti.com> wrote:
->> With LPAE enabled, alloc_init_section() does not map the entire
->> address space for unaligned addresses.
->>
->> The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
->> with page granularity mappings during boot. alloc_init_pte()
->> is called and out of 16MB, only 2MB gets mapped and rest remains
->> unaccessible.
->>
->> Because of this OMAP5 boot is broken with CMA + LPAE enabled.
->> Fix the issue by ensuring that the entire addresses are
->> mapped.
->>
->> Signed-off-by: R Sricharan <r.sricharan@ti.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Christoffer Dall <chris@cloudcar.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Tested-by: Christoffer Dall <chris@cloudcar.com>
->
-> I don't think that I've tested this version of the patch, but ok.
->
-Indeed. Neither I have acke'd the updated version ;)
-Tags from old patch doesn't apply anymore when patch
-is completely revamped.
+Hello,
+The following patches bring both HugeTLB support and Transparent
+HugePage (THP) support to ARM.
 
-Regards,
-Santosh
+These are not intended for 3.9.
+
+Both short descriptors (non-LPAE) and long descriptors (LPAE) are
+supported.
+
+The non-LPAE HugeTLB code is based on patches by Bill Carson [1],
+but instead of allocating extra memory to store "Linux PTEs", it
+re-purposes the domain bits of section descriptors and constructs
+huge Linux PTEs on demand.
+
+As PMDs are walked directly by the kernel THP functions (there are
+no huge_pmd_offset style functions), any "linux PMD"/"hardware PMD"
+distinction would require some re-working of the ARM PMD/PTE code.
+Use of the domain bits allows for a more straightforward THP
+implementation.
+
+Some general HugeTLB code relating to huge page migration on memory
+failure (CONFIG_MEMORY_FAILURE) de-references huge pte_t *s directly
+rather than use the huge_ptep_get and set_huge_pte_at functions.
+Thus this config option is incompatible with non-LPAE hugepages. At
+the moment I can only see x86 using CONFIG_MEMORY_FAILURE though.
+
+Non-LPAE code was tested on an Arndale board (Exynos 5250) and a
+Tegra 2 TrimSlice.
+
+The LPAE code manipulates the hardware page tables directly as the
+long descriptors are wide enough to contain all the Linux PTE
+information.
+
+The LPAE code has been tested on an Arndale board (Exynos 5250).
+
+This patch set is based on 3.8-rc6.
+
+Major changes since the RFC:
+ * huge pmd sharing removed from the 3-level code as this was
+   found to be very rarely, if ever?, used. This allowed for some
+   code simplification.
+
+ * hardware pmd bits for 2-levels of paging are now taken from
+   mmu.c. Also the mapping code now uses pte/pmd bit helper
+   functions rather than the custom pre-processor logic.
+
+Cheers,
+-- 
+Steve
+
+[1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/084359.html
+
+Catalin Marinas (2):
+  ARM: mm: HugeTLB support for LPAE systems.
+  ARM: mm: Transparent huge page support for LPAE systems.
+
+Steve Capper (4):
+  ARM: mm: correct pte_same behaviour for LPAE.
+  ARM: mm: Add support for flushing HugeTLB pages.
+  ARM: mm: HugeTLB support for non-LPAE systems.
+  ARM: mm: Transparent huge page support for non-LPAE systems.
+
+ arch/arm/Kconfig                            |    8 ++
+ arch/arm/include/asm/hugetlb-2level.h       |  121 +++++++++++++++++++++
+ arch/arm/include/asm/hugetlb-3level.h       |   61 +++++++++++
+ arch/arm/include/asm/hugetlb.h              |   87 +++++++++++++++
+ arch/arm/include/asm/pgtable-2level.h       |  151 +++++++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |    2 +
+ arch/arm/include/asm/pgtable-3level.h       |   83 +++++++++++++++
+ arch/arm/include/asm/pgtable.h              |   13 ++-
+ arch/arm/include/asm/tlb.h                  |   16 ++-
+ arch/arm/include/asm/tlbflush.h             |    2 +
+ arch/arm/kernel/head.S                      |   10 +-
+ arch/arm/mm/Makefile                        |    1 +
+ arch/arm/mm/dma-mapping.c                   |    2 +-
+ arch/arm/mm/fault.c                         |   11 --
+ arch/arm/mm/flush.c                         |   26 +++--
+ arch/arm/mm/fsr-2level.c                    |    4 +-
+ arch/arm/mm/fsr-3level.c                    |    4 +-
+ arch/arm/mm/hugetlbpage.c                   |  100 ++++++++++++++++++
+ arch/arm/mm/mmu.c                           |   27 +++++
+ 19 files changed, 697 insertions(+), 32 deletions(-)
+ create mode 100644 arch/arm/include/asm/hugetlb-2level.h
+ create mode 100644 arch/arm/include/asm/hugetlb-3level.h
+ create mode 100644 arch/arm/include/asm/hugetlb.h
+ create mode 100644 arch/arm/mm/hugetlbpage.c
+
+-- 
+1.7.9.5
