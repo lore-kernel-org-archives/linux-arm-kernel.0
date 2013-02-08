@@ -1,93 +1,90 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 7 Feb 2013 17:44:14 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <201302072325.23483.arnd@arndb.de>
-References: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130207183743.5c97d8b8@skate>
- <20130207182153.GB24688@obsidianresearch.com>
- <201302072325.23483.arnd@arndb.de>
-Message-ID: <20130208004414.GA32245@obsidianresearch.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 7 Feb 2013 18:52:14 -0600
+Subject: [PATCH 2/2] dmaengine: OMAP: Register SDMA controller with Device
+ Tree DMA driver
+In-Reply-To: <10081370.NaeII8M1Pj@wuerfel>
+References: <1360184596-1603-1-git-send-email-jon-hunter@ti.com>
+ <201302071439.13720.arnd@arndb.de> <5113CD6F.3060108@ti.com>
+ <10081370.NaeII8M1Pj@wuerfel>
+Message-ID: <51144C3E.7070603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 11:25:23PM +0000, Arnd Bergmann wrote:
-> > link at 0 {
-> > reg = <0x800 0 0  0 0>; // Bus 0, Dev 0x10, Fn 0
-> > interrupt-mask = <0x0 0 0 7>;
-> > interrupt-map = <0x0000 0 0 1 &mpic 58 // INTA
-> >                  0x0000 0 0 2 &mpic 58 // INTB
-> >                  0x0000 0 0 3 &mpic 58 // INTC
-> >                  0x0000 0 0 4 &mpic 58>; // INTD
-> > }
+
+On 02/07/2013 10:07 AM, Arnd Bergmann wrote:
+> On Thursday 07 February 2013 09:51:11 Jon Hunter wrote:
+>>>> @@ -673,7 +702,7 @@ static int omap_dma_init(void)
+>>>>  {
+>>>>      int rc = platform_driver_register(&omap_dma_driver);
+>>>>  
+>>>> -    if (rc == 0) {
+>>>> +    if ((rc == 0) && (!of_have_populated_dt())) {
+>>>>              pdev = platform_device_register_full(&omap_dma_dev_info);
+>>>>              if (IS_ERR(pdev)) {
+>>>>                      platform_driver_unregister(&omap_dma_driver);
+>>>
+>>> There is already a patch in linux-next that makes this obsolete.
+>>> The device is now registered in arch/arm/mach-omap2/dma.c, so
+>>> I guess you have to change that location now.
+>>
+>> Thanks. Will rebase on top of linux-next.
 > 
-> The interrupt-map property only makes sense for the host bridge,
-> not for bridges below it, which don't normally get represented
-> in the device tree.
+> Actually, there is another problem with that, because then
+> you may get into the situation where nobody can apply your
+> patch.
 
-Linux scans up the PCI bus until it finds a PCI device with a matching
-OF node. It then constructs an interrupt map 'laddr' (ie the
-bus:dev.fn) for the child device of this OF node.
+Yes Tony mentioned always using a proper branch for pulls. I will base
+upon his omap-for-v3.9/multiplatform-v2 (per your inputs, thanks!).
+ 
+> You should never build work on top of linux-next, because
+> then your base gets rebuilt every day. Instead, you should
+> /test/ your branch merged with linux-next to ensure it works
+> with all the other things in place, and when you see conflicts
+> like this, you have to find out what they are and then decide
+> whether you need to rebase it, and to what.
 
-If you don't have any DT PCI nodes then this should always fold down
-to doing a lookup with bus=0, and device representing the 'slot' in
-legacy PCI.
+Ugh, looks like linux-next is broken for omap2+ boards at the moment
+and is panic'ing in the twl i2c code ... some else to look into ...
 
-However, as soon as you provide a node for a bridge in DT this halts
-the 'fold down' and goes to the interrupt-map with a device on the
-subordinate bus number of the bridge.
+Peter have you seen this on linux-next? I am seeing this on omap2-4 boards.
 
-This makes *lots* of sense, if you have bridges providing bus slots
-then you include the bridge in DT to stop the 'fold down' at that
-known bridge, giving you a chance to see the interrupt wiring behind
-the bridge.
+[    2.286132] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+[    2.294738] pgd = c0004000
+[    2.297576] [00000000] *pgd=00000000
+[    2.301361] Internal error: Oops: 5 [#1] SMP ARM
+[    2.306243] Modules linked in:
+[    2.309448] CPU: 0    Not tainted  (3.8.0-rc6-next-20130207-00016-g735c237 #35)
+[    2.317169] PC is at twl_i2c_read+0x3c/0xec
+[    2.321563] LR is at twl_i2c_read+0x1c/0xec
+[    2.325988] pc : [<c0333950>]    lr : [<c0333930>]    psr: 80000153
+[    2.325988] sp : c702fed0  ip : 00000000  fp : 00000000
+[    2.338043] r10: c702e000  r9 : c06e84e8  r8 : c06e51c8
+[    2.343536] r7 : 00000001  r6 : 00000006  r5 : c702fef6  r4 : 00000004
+[    2.350402] r3 : c129508c  r2 : 00000006  r1 : c702fef6  r0 : 0000000e
+[    2.357269] Flags: Nzcv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+[    2.365051] Control: 10c5387d  Table: 80004019  DAC: 00000017
+[    2.371093] Process swapper/0 (pid: 1, stack limit = 0xc702e240)
+[    2.377410] Stack: (0xc702fed0 to 0xc7030000)
+[    2.382019] fec0:                                     c0d42180 c0d429d0 c70a7640 c07354c4
+[    2.390624] fee0: 00000001 c0719798 c0d42180 c06f2cc0 c04e76cc c06ee1ac 00000000 c07354c4
+[    2.399230] ff00: 00000007 c06f2d64 00000017 c06fb308 00000000 c06f07a4 c0cb8580 c06edee0
+[    2.407836] ff20: c06eded4 c06e8504 c0d42180 c0008768 0000009e c00611b4 00000001 00000000
+[    2.416442] ff40: c061994c c06b7548 00000007 00000007 00000000 c07354c4 00000007 c0719798
+[    2.425048] ff60: c0d42180 c06e51c8 c07197a0 0000009e 00000000 c06e590c 00000007 00000007
+[    2.433654] ff80: c06e51c8 00000000 00000000 c04d26ec 00000000 00000000 00000000 00000000
+[    2.442260] ffa0: 00000000 c04d26f4 00000000 c00137b0 00000000 00000000 00000000 00000000
+[    2.450866] ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[    2.459472] ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 80fb6c10 71bbcd20
+[    2.468078] [<c0333950>] (twl_i2c_read+0x3c/0xec) from [<c06f2cc0>] (omap3_twl_set_sr_bit+0x3c/0xb4)
+[    2.477722] [<c06f2cc0>] (omap3_twl_set_sr_bit+0x3c/0xb4) from [<c06f2d64>] (omap3_twl_init+0x2c/0x70)
+[    2.487518] [<c06f2d64>] (omap3_twl_init+0x2c/0x70) from [<c06fb308>] (omap_pmic_late_init+0x18/0x24)
+[    2.497222] [<c06fb308>] (omap_pmic_late_init+0x18/0x24) from [<c06f07a4>] (omap2_common_pm_late_init+0x18/0xd0)
+[    2.507934] [<c06f07a4>] (omap2_common_pm_late_init+0x18/0xd0) from [<c06edee0>] (omap3_init_late+0xc/0x18)
+[    2.518188] [<c06edee0>] (omap3_init_late+0xc/0x18) from [<c06e8504>] (init_machine_late+0x1c/0x28)
+[    2.527740] [<c06e8504>] (init_machine_late+0x1c/0x28) from [<c0008768>] (do_one_initcall+0x100/0x16c)
+[    2.537536] [<c0008768>] (do_one_initcall+0x100/0x16c) from [<c06e590c>] (kernel_init_freeable+0xfc/0x1c8)
+[    2.547698] [<c06e590c>] (kernel_init_freeable+0xfc/0x1c8) from [<c04d26f4>] (kernel_init+0x8/0xe4)
+[    2.557250] [<c04d26f4>] (kernel_init+0x8/0xe4) from [<c00137b0>] (ret_from_fork+0x14/0x24)
 
-This matches the design of PCI - if you know how interrupts are hooked
-up then use that information, otherwise assume the INTx interrupts
-swizzle and search upward. This is how add-in cards with PCI bridges
-are supported.
-
-This behavior seems complex, but sane to me. I wouldn't change it as
-Andrew suggested.
-
-Thomas's problem is the presence of the static DT node for the root
-port bridge. Since the node is static you can't know what the runtime
-determined subordinate bus numbers will be, so there is no possible
-way to write an interrupt-map at the host bridge.
-
-Putting the map in the bridge's DT node seems elegant and correct to
-me - the map is describing the actual hardware - the root port bridge
-is actually terminating INTx from downstream devices and converting
-them to CPU interrupts. (FWIW discrete HT to PCIe bridges do something
-similar)
-
-If you imagine the case you alluded to, a PCI-E root port, connected
-to a PCI-E to PCI bridge, with 2 physical PCI bus slots. The
-interrupts for the 2 slots are routed to the CPU directly:
-
-link at 0 {
- reg = </* Bus 0, Dev 0x10, Fn 0 */>; // Root Port bridge
-
-  // Match on INTx (not used since the pci-bridge doesn't create inband INTx)
-  interrupt-mask = <0x0 0 0 7>;
-  interrupt-map = <0x0000 0 0 1 &pic 0  // Inband INTA
-                   0x0000 0 0 2 &pic 1  // Inband INTB
-		   ..
- pci_bridge@0 {
-    reg = </* Bus 1, Dev 0x10, Fn 0 */>; // PCIe to PCI bridge
-  
-    // Match on the device/slot and INTx pin
-    interrupt-mask = <0x7f 0 0 7>;
-    interrupt-map = <0x00xx 0 0 1 &pic 2 // Slot 0 physical INTA
-                     0x00xx 0 0 1 &pic 3 // Slot 1 physical INTA
-                     ..
- }
-}
-
-To me, this seems to be a much more accurate description of how the
-hardware is constructed then trying to cram all this information into
-the host bridge's interrupt map. It shows clearly where inband INTA
-messages arriving@the root port are directed as well as where the
-slot by slot out-of-band interrupt wires on the PCI bus are directed.
-
-Jason
+Cheers
+Jon
