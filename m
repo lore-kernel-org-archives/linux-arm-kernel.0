@@ -1,37 +1,52 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 8 Feb 2013 18:58:31 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP: Clock: Remove CK_* flags
-In-Reply-To: <alpine.DEB.2.00.1302081805450.28008@utopia.booyaka.com>
-References: <1359966525-7603-1-git-send-email-j-keerthy@ti.com>
- <alpine.DEB.2.00.1302080248550.8539@utopia.booyaka.com>
- <DC88CAD03C0052499C1907B327FC63229B92FF@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1302081805450.28008@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1302081855370.28008@utopia.booyaka.com>
+From: mats.liljegren@enea.com (Mats Liljegren)
+Date: Fri, 8 Feb 2013 20:10:23 +0100
+Subject: Porting 3.8-rc4-nohz3 to ARM (PandaBoard)
+In-Reply-To: <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
+References: <20130204200238.GA16718@enea.se>
+ <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
+Message-ID: <20130208191023.GB30150@enea.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Keerthy,
-
-On Fri, 8 Feb 2013, Paul Walmsley wrote:
-
-> On Fri, 8 Feb 2013, J, KEERTHY wrote:
+Frederic Weisbecker wrote:
+> 2013/2/4 Mats Liljegren <mats.liljegren@enea.com>:
+> > Hi Frederic,
+> >
+> > (Sorry for the re-post, I spelled the mailing list wrong...)
+> >
+> > I want to port dynticks patches 3.8-rc4-nohz3 to ARM architecture, and try it out on the PandaBoard. Initially this is for evaluating it, but if it looks promising I'd like to upstream this.
+> >
+> > As far as I can see the first thing to do is to implement virtual time accounting. After an initial look at the patches done for ia64, it doesn't look too difficult.
 > 
-> > Thanks for updating. Yes renaming the 'omap_clocks_register_links()
-> > Is fine. I had blindly followed the hwmod function naming convention.
-> > The new name makes sense.
+> No that part is handled by the core code. But you need to implement
+> the context tracking arch backend.
+> Here is what Li Zhong did to port it on Powerpc for example:
+> https://lkml.org/lkml/2013/2/1/216
 > 
-> OK great.  BTW don't forget to cc the linux-arm-kernel mailing list for 
-> all patches, otherwise we won't be able to merge the patches.  Taking care 
-> of it now in this case.
+> > Are there any caveats I should be aware of?
+> 
+> The generic cputime accounting only works on 64 bits archs. We'll need
+> to do some safe accessors to read the kernel_stat. In the meantime you
+> can do home tests by removing the CONFIG_64BIT dependency. This
+> shouldn't be dangerous
+> 
+> > Has anyone else started any work in this area that I could co-operate with?
+> 
+> Yeah two people have been working on this. But it was several month
+> ago and I haven't hear from them since then. I'm adding Geoff in Cc. I
+> can't retrieve the other guy who has worked on it too.
 
-Just noticed during final testing of this patch that it causes some problems
-with power management on OMAP4460: (see the suspend/resume messages)
+Thanks for the hints! They helped me along the way.
 
-http://www.pwsan.com/omap/testlogs/jk_clock_flags_cleanup_3.9/20130207183613/pm/4460pandaes/4460pandaes_log.txt
+I have now managed to boot Linux without getting RCU complaints with RCU
+checking enabled. I enabled virtual CPU accounting by ignoring 64BIT
+dependency, as you suggested. I had to add an __aeabi_uldivmod function to
+get it to compile though.
 
-Could you please take a look at this and see what happened?  I suspect that
-I screwed something up as I was rebasing the patch.  Unfortunately I don't
-have the time to debug it further.
+It boots without RCU complaints when CONFIG_PROVE_RCU is enabled.
 
+Next step will be to figure out those boot parameters to enable full
+dynticks mode, and see whether I forgot something... ;-) I'll do so on Monday.
 
-- Paul
+Regards
+Mats Liljegren
