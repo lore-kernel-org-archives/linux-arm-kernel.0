@@ -1,88 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 8 Feb 2013 19:44:52 +0800
-Subject: [PATCH v3 2/2] ARM: uncompress debug support for multiplatform build
-In-Reply-To: <20130206093236.GD17833@n2100.arm.linux.org.uk>
-References: <20130206093236.GD17833@n2100.arm.linux.org.uk>
-Message-ID: <1360323892-2860-1-git-send-email-shawn.guo@linaro.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri,  8 Feb 2013 12:19:40 +0000
+Subject: [PATCH] ARM: Allow modules to read cpu_logical_map
+Message-ID: <1360325980-19089-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of giving zero support of uncompress debug for multiplatform
-build, the patch turns uncompress debug into one part of DEBUG_LL
-support.  When DEBUG_LL is turned on for a particular platform,
-uncompress debug works too for that platform.
+It is reasonable for loadable modules to be CPU topology aware
+(particular examples include cpufreq and cpuidle drivers).
 
-It reuses the platform DEBUG_LL macros by creating a simple
-arch/arm/boot/compressed/debug.S with CONFIG_DEBUG_LL_INCLUDE
-included there, and implements a generic putc() using those macros.
+This patch exports a new function cpu_get_hwid(cpu) to provide
+suitable read-only access outside vmlinux.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
-Changes since v2:
- * Build arch/arm/boot/compressed/debug.S only for multiplatform kernel
-   to fix the breakage on traditional platform build
- * Include asm/assembler.h in arch/arm/boot/compressed/debug.S, as it
-   may commonly be needed by platforms to be converted to multiplatform
+Modules using this function will be arch-dependent and highly coupled to
+the kernel, so cpu_get_hwid() shouldn't be considered a stable API,
+especially while the details of kernel topology awareness are still
+under discussion: therefore, export only to GPL code for now.
 
-Russell,
+ arch/arm/include/asm/smp_plat.h |    3 +++
+ arch/arm/kernel/setup.c         |    7 +++++++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
-I will put it into patch system if I do not receive any comment
-tomorrow.
-
-Shawn
-
- arch/arm/boot/compressed/Makefile   |    5 +++++
- arch/arm/boot/compressed/debug.S    |   12 ++++++++++++
- arch/arm/include/debug/uncompress.h |    4 ++++
- 3 files changed, 21 insertions(+)
- create mode 100644 arch/arm/boot/compressed/debug.S
-
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 5cad8a6..13bdd10 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -24,6 +24,11 @@ endif
- AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
- HEAD	= head.o
- OBJS	+= misc.o decompress.o
-+ifeq ($(CONFIG_ARCH_MULTIPLATFORM),y)
-+ifeq ($(CONFIG_DEBUG_LL),y)
-+OBJS	+= debug.o
-+endif
-+endif
- FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index aaa61b6..518e466 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -66,4 +66,7 @@ static inline int get_logical_index(u32 mpidr)
+ 	return -EINVAL;
+ }
  
- # string library code (-Os is enforced to keep it much smaller)
-diff --git a/arch/arm/boot/compressed/debug.S b/arch/arm/boot/compressed/debug.S
-new file mode 100644
-index 0000000..6e8382d
---- /dev/null
-+++ b/arch/arm/boot/compressed/debug.S
-@@ -0,0 +1,12 @@
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
++/* Read-only accessor for use by modules: */
++int cpu_get_hwid(int cpu);
 +
-+#include CONFIG_DEBUG_LL_INCLUDE
+ #endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 3f6cbb2..1ac5e8b 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -429,6 +429,13 @@ void cpu_init(void)
+ 
+ int __cpu_logical_map[NR_CPUS];
+ 
++/* Read-only accessor for use by modules: */
++int cpu_get_hwid(int cpu)
++{
++	return cpu_logical_map(cpu);
++}
++EXPORT_SYMBOL_GPL(cpu_get_hwid);
 +
-+ENTRY(putc)
-+	addruart r1, r2, r3
-+	waituart r3, r1
-+	senduart r0, r1
-+	busyuart r3, r1
-+	mov	 pc, lr
-+ENDPROC(putc)
-diff --git a/arch/arm/include/debug/uncompress.h b/arch/arm/include/debug/uncompress.h
-index e19955d..9aa5314 100644
---- a/arch/arm/include/debug/uncompress.h
-+++ b/arch/arm/include/debug/uncompress.h
-@@ -1,3 +1,7 @@
-+#ifdef CONFIG_DEBUG_LL
-+extern void putc(int c);
-+#else
- static inline void putc(int c) {}
-+#endif
- static inline void flush(void) {}
- static inline void arch_decomp_setup(void) {}
+ void __init smp_setup_processor_id(void)
+ {
+ 	int i;
 -- 
-1.7.9.5
+1.7.4.1
