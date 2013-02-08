@@ -1,75 +1,94 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 8 Feb 2013 09:14:20 +0100
-Subject: Giving special alignment/size constraints to the Linux PCI core?
-In-Reply-To: <CAErSpo7hwG89LTO+4+eqT_Gb+yUn1XKHYJ8CnnZcf_FPo-Kpyw@mail.gmail.com>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <2776630.gp5gC9tvLk@wuerfel>
- <20130131180249.GA30869@obsidianresearch.com>
- <201301312046.22560.arnd@arndb.de>
- <20130131224459.GA11846@obsidianresearch.com>
- <20130206175128.1b64196d@skate>
- <20130206170903.GA28198@obsidianresearch.com>
- <20130206181852.4eca53e3@skate>
- <20130206175019.GA24248@obsidianresearch.com>
- <20130207165009.73b1f340@skate>
- <CAErSpo7hwG89LTO+4+eqT_Gb+yUn1XKHYJ8CnnZcf_FPo-Kpyw@mail.gmail.com>
-Message-ID: <20130208091420.703a39b4@skate>
+From: girishks2000@gmail.com (Girish KS)
+Date: Fri, 8 Feb 2013 00:16:34 -0800
+Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
+ init
+In-Reply-To: <CAKrE-KfvywLa4xTwCGzan9OfevzBdY8Z2EO2Mc2VaFm5y0XEzg@mail.gmail.com>
+References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
+ <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
+ <20130206102628.5E7413E1510@localhost>
+ <CAKrE-KdX+Nxk0X4xdz6Dx3WVtOpV+ms+gPB-Dq-MwZwetyZ5Nw@mail.gmail.com>
+ <CACxGe6uOaoRbtuovEsA87d-MtCbGNd3KZCeHXbBQaEpp6NZ7fA@mail.gmail.com>
+ <CAKrE-KfvywLa4xTwCGzan9OfevzBdY8Z2EO2Mc2VaFm5y0XEzg@mail.gmail.com>
+Message-ID: <CAKrE-Kc1mdzeYp+X6xvP4anVegcPdpYKKqtp6b-z-cmtJ-O0GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+On Thu, Feb 7, 2013 at 5:04 PM, Girish KS <girishks2000@gmail.com> wrote:
+> On Wed, Feb 6, 2013 at 3:48 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> On Wed, Feb 6, 2013 at 8:12 PM, Girish KS <girishks2000@gmail.com> wrote:
+>>> On Wed, Feb 6, 2013 at 2:26 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>>> On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S <girishks2000@gmail.com> wrote:
+>>>>> The status of the interrupt is available in the status register,
+>>>>> so reading the clear pending register and writing back the same
+>>>>> value will not actually clear the pending interrupts. This patch
+>>>>> modifies the interrupt handler to read the status register and
+>>>>> clear the corresponding pending bit in the clear pending register.
+>>>>>
+>>>>> Modified the hwInit function to clear all the pending interrupts.
+>>>>>
+>>>>> Signed-off-by: Girish K S <ks.giri@samsung.com>
+>>>>> ---
+>>>>>  drivers/spi/spi-s3c64xx.c |   41 +++++++++++++++++++++++++----------------
+>>>>>  1 file changed, 25 insertions(+), 16 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+>>>>> index ad93231..b770f88 100644
+>>>>> --- a/drivers/spi/spi-s3c64xx.c
+>>>>> +++ b/drivers/spi/spi-s3c64xx.c
+>>>>> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
+>>>>>  {
+>>>>>       struct s3c64xx_spi_driver_data *sdd = data;
+>>>>>       struct spi_master *spi = sdd->master;
+>>>>> -     unsigned int val;
+>>>>> +     unsigned int val, clr = 0;
+>>>>>
+>>>>> -     val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>>>>> +     val = readl(sdd->regs + S3C64XX_SPI_STATUS);
+>>>>>
+>>>>> -     val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
+>>>>> -             S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
+>>>>> -             S3C64XX_SPI_PND_TX_OVERRUN_CLR |
+>>>>> -             S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+>>>>> -
+>>>>> -     writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>>>>> -
+>>>>> -     if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
+>>>>> +     if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
+>>>>> +             clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
+>>>>>               dev_err(&spi->dev, "RX overrun\n");
+>>>>> -     if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
+>>>>> +     }
+>>>>> +     if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
+>>>>> +             clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
+>>>>>               dev_err(&spi->dev, "RX underrun\n");
+>>>>> -     if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
+>>>>> +     }
+>>>>> +     if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
+>>>>> +             clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
+>>>>>               dev_err(&spi->dev, "TX overrun\n");
+>>>>> -     if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
+>>>>> +     }
+>>>>> +     if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
+>>>>> +             clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+>>>>>               dev_err(&spi->dev, "TX underrun\n");
+>>>>> +     }
+>>>>> +
+>>>>> +     /* Clear the pending irq by setting and then clearing it */
+>>>>> +     writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>>>>> +     writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+>>>>
+>>>> Wait, what?  clr & ~clr == 0   Always.  What are you actually trying to do here?
+>>> The user manual says, wirting 1 to the pending clear register clears
+>>> the interrupt (its not auto clear to 0). so i need to explicitly reset
+>>> those bits thats what the 2nd write does
+>>
+>> Then write 0. That's the result of what the code does anyway, but the
+>> code as-written is nonsensical.
+> i cannot write 0. because the 0th bit is trailing byte interrupt clear
+> pending bit, which is not being handled in the handler.
 
-On Thu, 7 Feb 2013 21:21:57 -0700, Bjorn Helgaas wrote:
+Sorry, Writing 0  will still be valid after code for trainling byte is added..
+will change and resubmit
 
-> Huh.  That hardware looks less and less like a P2P bridge all the time
-> :(  You can't configure it via standard PCI config accesses, and the
-> aperture alignment and size constraints sound completely non-standard.
->  Are the specs for this thing public?
-
-The specs for the Armada XP are not yet public, but the one for earlier
-Marvell SoC families are, and the PCIe stuff works basically the same.
-The main difference between the Kirkwood family and Armada XP is that
-Kirkwood had only 2 PCIe interfaces, so we could perfectly fine do a
-static allocation of address decoding windows (see the four PCIe windows
-in arch/arm/mach-kirkwood/addr-map.c:addr_map_info[]), while the Armada
-XP has 10 PCIe interfaces, which makes the static allocation solution
-unreasonable.
-
-The list of publicly available specifications for Marvell EBU SoC is
-available at Documentation/arm/Marvell/README. For Kirkwood, I would
-recommend
-http://www.marvell.com/embedded-processors/kirkwood/assets/FS_88F6180_9x_6281_OpenSource.pdf.
-See chapter 2.3:
-
-  The PCI Express address decoding scheme restricts the address window
-  to a size of 2^n, and to a start address that is aligned to the window
-  size.
-
-> I could imagine changing pcibios_window_alignment() to take the
-> resource, so it could deal with the alignment question (though I
-> haven't looked in detail and there might be some implementation issue
-> with that).
-> 
-> With regard to the size issue (3MB window using 4MB of address space),
-> I can't think of a reasonable way to teach the PCI core about both
-> sizes.  But is there any reason to program the bridge for a 3MB window
-> instead of a 4MB window, given that there's nothing else we can do
-> with the extra 1MB anyway?  Is a 3MB window even possible?  I would
-> think something that must be aligned on its size would be restricted
-> to power-of-2 sizes anyway, just like PCI BARs are.  Maybe you can
-> just always round up window sizes to a power of 2?
-
-The window sizes are power of two sizes. I didn't realize that it was
-also the case for PCI BARs. Then there is no problem with the size I
-guess, and only a problem of alignment. Having the possibility to
-get the resource and return a fixed up start address would solve the
-problem I'd say.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>>
+>> g.
