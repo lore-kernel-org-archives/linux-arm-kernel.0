@@ -1,64 +1,54 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:46 +0000
-Subject: [PATCH 16/17] xgmac: replace __raw with relaxed IO
+Date: Fri,  8 Feb 2013 23:17:43 +0000
+Subject: [PATCH 13/17] ARM: pl01x debug code endian fix
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-17-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-14-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The xgmac driver is using __raw read and write functions, where it
-should be using readl_relaxed and writel_relaxed to avoid any issues
-with which endian mode the CPU is running in.
+The PL01X debug code needs to take into account which endian mode the
+processor is running in. If it is big-endian, ensure the data is swapped
+appropriately.
+
+Note, we could do this slightly more efficiently if we have an macro to
+do the necessary swap for the bits used by test.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- drivers/net/ethernet/calxeda/xgmac.c |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/hardware/debug-pl01x.S |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
-index f91d9b2..08a6f9e 100644
---- a/drivers/net/ethernet/calxeda/xgmac.c
-+++ b/drivers/net/ethernet/calxeda/xgmac.c
-@@ -1202,7 +1202,7 @@ static int xgmac_poll(struct napi_struct *napi, int budget)
+diff --git a/arch/arm/include/asm/hardware/debug-pl01x.S b/arch/arm/include/asm/hardware/debug-pl01x.S
+index f9fd083..6f3a003 100644
+--- a/arch/arm/include/asm/hardware/debug-pl01x.S
++++ b/arch/arm/include/asm/hardware/debug-pl01x.S
+@@ -12,18 +12,26 @@
+ */
+ #include <linux/amba/serial.h>
  
- 	if (work_done < budget) {
- 		napi_complete(napi);
--		__raw_writel(DMA_INTR_DEFAULT_MASK, priv->base + XGMAC_DMA_INTR_ENA);
-+		writel_relaxed(DMA_INTR_DEFAULT_MASK, priv->base + XGMAC_DMA_INTR_ENA);
- 	}
- 	return work_done;
- }
-@@ -1347,7 +1347,7 @@ static irqreturn_t xgmac_pmt_interrupt(int irq, void *dev_id)
- 	struct xgmac_priv *priv = netdev_priv(dev);
- 	void __iomem *ioaddr = priv->base;
++#ifdef __ARMEB__
++#define ARM_BE(x...) x
++#else
++#define ARM_BE(x..)
++#endif
++
+ 		.macro	senduart,rd,rx
+ 		strb	\rd, [\rx, #UART01x_DR]
+ 		.endm
  
--	intr_status = __raw_readl(ioaddr + XGMAC_INT_STAT);
-+	intr_status = readl_relaxed(ioaddr + XGMAC_INT_STAT);
- 	if (intr_status & XGMAC_INT_STAT_PMT) {
- 		netdev_dbg(priv->dev, "received Magic frame\n");
- 		/* clear the PMT bits 5 and 6 by reading the PMT */
-@@ -1365,9 +1365,9 @@ static irqreturn_t xgmac_interrupt(int irq, void *dev_id)
- 	struct xgmac_extra_stats *x = &priv->xstats;
+ 		.macro	waituart,rd,rx
+ 1001:		ldr	\rd, [\rx, #UART01x_FR]
++  ARM_BE(	rev	\rd, \rd )
+ 		tst	\rd, #UART01x_FR_TXFF
+ 		bne	1001b
+ 		.endm
  
- 	/* read the status register (CSR5) */
--	intr_status = __raw_readl(priv->base + XGMAC_DMA_STATUS);
--	intr_status &= __raw_readl(priv->base + XGMAC_DMA_INTR_ENA);
--	__raw_writel(intr_status, priv->base + XGMAC_DMA_STATUS);
-+	intr_status = readl_relaxed(priv->base + XGMAC_DMA_STATUS);
-+	intr_status &= readl_relaxed(priv->base + XGMAC_DMA_INTR_ENA);
-+	writel_relaxed(intr_status, priv->base + XGMAC_DMA_STATUS);
- 
- 	/* It displays the DMA process states (CSR5 register) */
- 	/* ABNORMAL interrupts */
-@@ -1403,7 +1403,7 @@ static irqreturn_t xgmac_interrupt(int irq, void *dev_id)
- 
- 	/* TX/RX NORMAL interrupts */
- 	if (intr_status & (DMA_STATUS_RI | DMA_STATUS_TU | DMA_STATUS_TI)) {
--		__raw_writel(DMA_INTR_ABNORMAL, priv->base + XGMAC_DMA_INTR_ENA);
-+		writel_relaxed(DMA_INTR_ABNORMAL, priv->base + XGMAC_DMA_INTR_ENA);
- 		napi_schedule(&priv->napi);
- 	}
- 
+ 		.macro	busyuart,rd,rx
+ 1001:		ldr	\rd, [\rx, #UART01x_FR]
++  ARM_BE(	rev	\rd, \rd )
+ 		tst	\rd, #UART01x_FR_BUSY
+ 		bne	1001b
+ 		.endm
 -- 
 1.7.10.4
