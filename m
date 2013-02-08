@@ -1,94 +1,94 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Fri, 8 Feb 2013 00:16:34 -0800
-Subject: [PATCH 1/4] spi: s3c64xx: modified error interrupt handling and
- init
-In-Reply-To: <CAKrE-KfvywLa4xTwCGzan9OfevzBdY8Z2EO2Mc2VaFm5y0XEzg@mail.gmail.com>
-References: <1360105784-12282-1-git-send-email-ks.giri@samsung.com>
- <1360105784-12282-2-git-send-email-ks.giri@samsung.com>
- <20130206102628.5E7413E1510@localhost>
- <CAKrE-KdX+Nxk0X4xdz6Dx3WVtOpV+ms+gPB-Dq-MwZwetyZ5Nw@mail.gmail.com>
- <CACxGe6uOaoRbtuovEsA87d-MtCbGNd3KZCeHXbBQaEpp6NZ7fA@mail.gmail.com>
- <CAKrE-KfvywLa4xTwCGzan9OfevzBdY8Z2EO2Mc2VaFm5y0XEzg@mail.gmail.com>
-Message-ID: <CAKrE-Kc1mdzeYp+X6xvP4anVegcPdpYKKqtp6b-z-cmtJ-O0GA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 8 Feb 2013 08:25:36 +0000
+Subject: [PATCH 09/14] pinctrl/abx500: use direct IRQ defines
+In-Reply-To: <5113EB8B.4060002@wwwdotorg.org>
+References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
+ <1360093715-6348-10-git-send-email-linus.walleij@stericsson.com>
+ <5112F1B9.6010700@wwwdotorg.org>
+ <CAF2Aj3jHe+mP0dU_BHThBV-va_iJLcFQedmWQOTaYafAZM1Yxg@mail.gmail.com>
+ <5113EB8B.4060002@wwwdotorg.org>
+Message-ID: <20130208082536.GF7519@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 7, 2013 at 5:04 PM, Girish KS <girishks2000@gmail.com> wrote:
-> On Wed, Feb 6, 2013 at 3:48 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Wed, Feb 6, 2013 at 8:12 PM, Girish KS <girishks2000@gmail.com> wrote:
->>> On Wed, Feb 6, 2013 at 2:26 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>>> On Tue,  5 Feb 2013 15:09:41 -0800, Girish K S <girishks2000@gmail.com> wrote:
->>>>> The status of the interrupt is available in the status register,
->>>>> so reading the clear pending register and writing back the same
->>>>> value will not actually clear the pending interrupts. This patch
->>>>> modifies the interrupt handler to read the status register and
->>>>> clear the corresponding pending bit in the clear pending register.
->>>>>
->>>>> Modified the hwInit function to clear all the pending interrupts.
->>>>>
->>>>> Signed-off-by: Girish K S <ks.giri@samsung.com>
->>>>> ---
->>>>>  drivers/spi/spi-s3c64xx.c |   41 +++++++++++++++++++++++++----------------
->>>>>  1 file changed, 25 insertions(+), 16 deletions(-)
->>>>>
->>>>> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
->>>>> index ad93231..b770f88 100644
->>>>> --- a/drivers/spi/spi-s3c64xx.c
->>>>> +++ b/drivers/spi/spi-s3c64xx.c
->>>>> @@ -997,25 +997,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
->>>>>  {
->>>>>       struct s3c64xx_spi_driver_data *sdd = data;
->>>>>       struct spi_master *spi = sdd->master;
->>>>> -     unsigned int val;
->>>>> +     unsigned int val, clr = 0;
->>>>>
->>>>> -     val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>>>> +     val = readl(sdd->regs + S3C64XX_SPI_STATUS);
->>>>>
->>>>> -     val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
->>>>> -             S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
->>>>> -             S3C64XX_SPI_PND_TX_OVERRUN_CLR |
->>>>> -             S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->>>>> -
->>>>> -     writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>>>> -
->>>>> -     if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
->>>>> +     if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
->>>>> +             clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
->>>>>               dev_err(&spi->dev, "RX overrun\n");
->>>>> -     if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
->>>>> +     }
->>>>> +     if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
->>>>> +             clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
->>>>>               dev_err(&spi->dev, "RX underrun\n");
->>>>> -     if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
->>>>> +     }
->>>>> +     if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
->>>>> +             clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
->>>>>               dev_err(&spi->dev, "TX overrun\n");
->>>>> -     if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
->>>>> +     }
->>>>> +     if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
->>>>> +             clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
->>>>>               dev_err(&spi->dev, "TX underrun\n");
->>>>> +     }
->>>>> +
->>>>> +     /* Clear the pending irq by setting and then clearing it */
->>>>> +     writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>>>> +     writel(clr & ~clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
->>>>
->>>> Wait, what?  clr & ~clr == 0   Always.  What are you actually trying to do here?
->>> The user manual says, wirting 1 to the pending clear register clears
->>> the interrupt (its not auto clear to 0). so i need to explicitly reset
->>> those bits thats what the 2nd write does
->>
->> Then write 0. That's the result of what the code does anyway, but the
->> code as-written is nonsensical.
-> i cannot write 0. because the 0th bit is trailing byte interrupt clear
-> pending bit, which is not being handled in the handler.
+On Thu, 07 Feb 2013, Stephen Warren wrote:
 
-Sorry, Writing 0  will still be valid after code for trainling byte is added..
-will change and resubmit
+> On 02/07/2013 02:01 AM, Lee Jones wrote:
+> > I don't see myself on cc. Was that intentional?
+> 
+> The original patch was that way; I assume git send-email only CC'd you
+> on patches written by you.
 
->>
->> g.
+No, I didn't send this patch at all.
+
+I was asking Linus if he ment to CC me, as I thought I should have been.
+
+> > I quite like the idea of this.
+> > 
+> > Stephen,
+> > 
+> > It doesn't mean the other patch was wrong, it just transfers the math.
+> 
+> Ah, I see. The issue is that the code below clearly calculates the hwirq
+> differently, and it wasn't immediately obvious that this part of the
+> patch for example:
+> 
+> >  struct abx500_gpio_irq_cluster ab8500_gpio_irq_cluster[] = {
+> > -	GPIO_IRQ_CLUSTER(6,  13, 34),
+> > -	GPIO_IRQ_CLUSTER(24, 25, 24),
+> > -	GPIO_IRQ_CLUSTER(36, 41, 14),
+> > +	GPIO_IRQ_CLUSTER(6,  13, AB8500_INT_GPIO6R),
+> > +	GPIO_IRQ_CLUSTER(24, 25, AB8500_INT_GPIO24R),
+> > +	GPIO_IRQ_CLUSTER(36, 41, AB8500_INT_GPIO36R),
+> >  };
+> 
+> ... actually changes the values in the table (AB8500_INT_GPIO6R is 40,
+> so when using that value, you need to subtract of the value 6 for the
+> base to get the original 34).
+
+Yes, I see how that may of looked if you didn't see the other change.
+
+So you're happy?
+
+> > I wouldn't squash it into mine. I like the transition and the
+> > possibility to revert it if there's been some mistake.
+> > 
+> > (not to say there is one, but just in case.)
+> > 
+> > Sent from my mobile Linux device.
+> > 
+> > On Feb 7, 2013 12:14 AM, "Stephen Warren" <swarren@wwwdotorg.org
+> > <mailto:swarren@wwwdotorg.org>> wrote:
+> > 
+> >     On 02/05/2013 12:48 PM, Linus Walleij wrote:
+> >     > From: Linus Walleij <linus.walleij@linaro.org
+> >     <mailto:linus.walleij@linaro.org>>
+> >     >
+> >     > Make it harder to do mistakes by introducing the actual
+> >     > defined ABx500 IRQ number into the IRQ cluster definitions.
+> >     > Deduct cluster offset from the GPIO offset to make each
+> >     > cluster coherent.
+> > 
+> >     Shouldn't this patch be squashed into the previous patch to avoid churn?
+> > 
+> >     >  static struct abx500_pinctrl_soc_data ab9540_soc = {
+> > 
+> >     > @@ -273,8 +273,7 @@ static int abx500_gpio_to_irq(struct gpio_chip
+> >     *chip, unsigned offset)
+> > 
+> >     > -                     hwirq = gpio + cluster->to_irq;
+> >     > -
+> >     > +                     hwirq = gpio - cluster->start + cluster->to_irq;
+> >     >                       return
+> >     irq_create_mapping(pct->parent->domain, hwirq);
+> > 
+> >     In particular, this change implies that the previous patch was simply
+> >     incorrect, although I haven't really thought about it in detail.
+> > 
+> 
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
