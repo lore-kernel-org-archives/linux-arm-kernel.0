@@ -1,41 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  8 Feb 2013 13:04:51 -0700
-Subject: [PATCH] MAINTAINERS: add keyword "tegra" to Tegra section
-Message-ID: <1360353891-24210-1-git-send-email-swarren@wwwdotorg.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 08 Feb 2013 15:04:19 -0500 (EST)
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <1360344301.6066.263.camel@shinybook.infradead.org>
+References: <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <20130201011712.GF23505@n2100.arm.linux.org.uk>
+ <1359703995.23531.6.camel@shinybook.infradead.org>
+ <20130205210436.670c62e26d2121330e87af35@freescale.com>
+ <1360141322.6066.4.camel@shinybook.infradead.org>
+ <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+ <20130207181315.GM17833@n2100.arm.linux.org.uk>
+ <1360344301.6066.263.camel@shinybook.infradead.org>
+Message-ID: <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Fri, 8 Feb 2013, Woodhouse, David wrote:
 
-The intent is to ensure that all Tegra-related patches are sent to the
-linux-tegra@ mailing list, so people can keep up-to-date on all misc
-driver changes.
+> On Thu, 2013-02-07 at 18:13 +0000, Russell King - ARM Linux wrote:
+> > 
+> > However, the biggest reason not to use libgcc is that we want to control
+> > what gets used in the kernel - for example, no floating point, and no
+> > use of 64 x 64bit division.
+> 
+> Which is all very sensible. But there's no particular reason we couldn't
+> add a __bswap[sd]i2 to the kernel's version of libgcc if we wanted to.
 
-Doing this with a keyword is far simpler and more compact than listing
-all Tegra-related drivers, even if wildcards were used.
+Absolutely.
 
-Words such as integrate or integrator are common. Use a negative look-
-behind assertion to make sure the keyword doesn't match those.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- MAINTAINERS |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 972fd51..ebd3c64 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7850,9 +7850,7 @@ L:	linux-tegra at vger.kernel.org
- Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
- S:	Supported
--F:	arch/arm/mach-tegra
--F:	arch/arm/boot/dts/tegra*
--F:	arch/arm/configs/tegra_defconfig
-+K:	(?<!in)tegra
- 
- TEHUTI ETHERNET DRIVER
- M:	Andy Gospodarek <andy@greyhouse.net>
--- 
-1.7.10.4
+Nicolas
