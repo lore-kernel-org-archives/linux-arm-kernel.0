@@ -1,55 +1,54 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 08 Feb 2013 13:19:17 -0800
-Subject: [PATCH] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for
- all CPU power states except off
-In-Reply-To: <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Fri, 8 Feb 2013 20:41:46 +0530")
-References: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
- <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87d2wazep6.fsf@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 08 Feb 2013 21:34:40 +0000
+Subject: [PATCH] cpuidle: kirkwood: Move out of mach directory, add DT.
+In-Reply-To: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
+References: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130208213441.014343E2C27@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-
-> Current CPU PM code code make use of common cpu_suspend() path for all the
-> CPU power states which is not optimal. In fact cpu_suspend() path is needed
-> only when we put CPU power domain to off state where the CPU context is lost.
->
-> Update the code accordingly so that the expensive cpu_suspend() path
-> can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
->
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->
-> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-Looks OK at first glance, but are you sure this is right for the
-various ways both clusters might idle using coupled CPUidle?
-
-Some description of the testing would be helpful here.
-
-Thanks,
-
-Kevin
-
+On Fri, 28 Dec 2012 13:47:24 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
+> Move the Kirkwood cpuidle driver out of arch/arm/mach-kirkwood and
+> into drivers/cpuidle. Convert the driver into a platform driver and
+> add a device tree binding. Add a DT node to instantiate the driver for
+> boards converted to DT, and a platform data for old style boards.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c |    5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> index aac46bf..abdd0f6 100644
-> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> @@ -276,7 +276,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->  	/*
->  	 * Call low level function  with targeted low power state.
->  	 */
-> -	cpu_suspend(save_state, omap4_finish_suspend);
-> +	if (save_state)
-> +		cpu_suspend(save_state, omap4_finish_suspend);
-> +	else
-> +		omap4_finish_suspend(save_state);
->  
->  	/*
->  	 * Restore the CPUx power state to ON otherwise CPUx
+>  .../devicetree/bindings/power/qnap-poweroff.txt    |   14 +++
+>  arch/arm/boot/dts/kirkwood.dtsi                    |    5 +
+>  arch/arm/configs/kirkwood_defconfig                |    1 +
+>  arch/arm/mach-kirkwood/Makefile                    |    1 -
+>  arch/arm/mach-kirkwood/common.c                    |   23 ++++
+>  arch/arm/mach-kirkwood/cpuidle.c                   |   73 -------------
+>  arch/arm/mach-kirkwood/include/mach/kirkwood.h     |    3 +-
+>  drivers/cpuidle/Kconfig                            |    6 ++
+>  drivers/cpuidle/Makefile                           |    1 +
+>  drivers/cpuidle/cpuidle-kirkwood.c                 |  114 ++++++++++++++++++++
+>  10 files changed, 166 insertions(+), 75 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/qnap-poweroff.txt
+>  delete mode 100644 arch/arm/mach-kirkwood/cpuidle.c
+>  create mode 100644 drivers/cpuidle/cpuidle-kirkwood.c
+> 
+> diff --git a/Documentation/devicetree/bindings/power/qnap-poweroff.txt b/Documentation/devicetree/bindings/power/qnap-poweroff.txt
+> new file mode 100644
+> index 0000000..e15a334
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/qnap-poweroff.txt
+> @@ -0,0 +1,14 @@
+> +* QNAP Power Off
+> +
+> +QNAP NAS devices have a microcontroller controlling the main power
+> +supply. This microcontroller is connected to UART1 of the Kirkwood and
+> +Orion5x SoCs. Sending the charactor 'A', at 19200 baud, tells the
+> +microcontroller to turn the power off. This driver adds a handler to
+> +pm_power_off which is called to turn the power off.
+> +
+> +Required Properties:
+> +- compatibile: Should be "qnap,power-off"
+
+It would do well to have the model number embedded into this compatible
+string since it is unlikely that every single QNAP device will use the
+same controller interface.
+
+g.
