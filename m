@@ -1,54 +1,28 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Feb 2013 23:17:43 +0000
-Subject: [PATCH 13/17] ARM: pl01x debug code endian fix
+Date: Fri,  8 Feb 2013 23:17:44 +0000
+Subject: [PATCH 14/17] highbank: enable big-endian
 In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360365467-25056-14-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360365467-25056-15-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PL01X debug code needs to take into account which endian mode the
-processor is running in. If it is big-endian, ensure the data is swapped
-appropriately.
-
-Note, we could do this slightly more efficiently if we have an macro to
-do the necessary swap for the bits used by test.
+Apart from a xgmac driver issue, the highbank seems to work correctly in
+big-endian mode. Allow the selection of big-endian in the system.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/asm/hardware/debug-pl01x.S |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-highbank/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/hardware/debug-pl01x.S b/arch/arm/include/asm/hardware/debug-pl01x.S
-index f9fd083..6f3a003 100644
---- a/arch/arm/include/asm/hardware/debug-pl01x.S
-+++ b/arch/arm/include/asm/hardware/debug-pl01x.S
-@@ -12,18 +12,26 @@
- */
- #include <linux/amba/serial.h>
- 
-+#ifdef __ARMEB__
-+#define ARM_BE(x...) x
-+#else
-+#define ARM_BE(x..)
-+#endif
-+
- 		.macro	senduart,rd,rx
- 		strb	\rd, [\rx, #UART01x_DR]
- 		.endm
- 
- 		.macro	waituart,rd,rx
- 1001:		ldr	\rd, [\rx, #UART01x_FR]
-+  ARM_BE(	rev	\rd, \rd )
- 		tst	\rd, #UART01x_FR_TXFF
- 		bne	1001b
- 		.endm
- 
- 		.macro	busyuart,rd,rx
- 1001:		ldr	\rd, [\rx, #UART01x_FR]
-+  ARM_BE(	rev	\rd, \rd )
- 		tst	\rd, #UART01x_FR_BUSY
- 		bne	1001b
- 		.endm
+diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+index 551c97e..9373571 100644
+--- a/arch/arm/mach-highbank/Kconfig
++++ b/arch/arm/mach-highbank/Kconfig
+@@ -13,3 +13,4 @@ config ARCH_HIGHBANK
+ 	select HAVE_SMP
+ 	select SPARSE_IRQ
+ 	select USE_OF
++	select ARCH_SUPPORTS_BIG_ENDIAN
 -- 
 1.7.10.4
