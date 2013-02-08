@@ -1,52 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Feb 2013 12:06:48 +0000
-Subject: vexpress_sysreg_probe section mismatch with 3.8-rc6
-Message-ID: <20130208120648.GB3495@mudshark.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  8 Feb 2013 13:36:41 -0200
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+Message-ID: <1360337803-19858-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I'm not sure if you're aware of this (I couldn't find anything on the list)
-but I get the following section mismatch building for TC2 with mainline:
+Provide 'lradc-touchscreen-wires' property to the LRADC driver, so that 
+touchscreen can be functional.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx28-evk.dts |    1 +
+ 1 file changed, 1 insertion(+)
 
-WARNING: drivers/mfd/built-in.o(.text+0xce4): Section mismatch in reference from the function vexpress_sysreg_probe() to the function .init.text:vexpress_sysreg_setup()
-The function vexpress_sysreg_probe() references
-the function __init vexpress_sysreg_setup().
-This is often because vexpress_sysreg_probe lacks a __init 
-annotation or the annotation of vexpress_sysreg_setup is wrong.
-
-WARNING: drivers/built-in.o(.text+0x3ee1c): Section mismatch in reference from the function vexpress_sysreg_probe() to the function .init.text:vexpress_sysreg_setup()
-The function vexpress_sysreg_probe() references
-the function __init vexpress_sysreg_setup().
-This is often because vexpress_sysreg_probe lacks a __init 
-annotation or the annotation of vexpress_sysreg_setup is wrong.
-
-WARNING: vmlinux.o(.text+0x2031b0): Section mismatch in reference from the function vexpress_sysreg_probe() to the function .init.text:vexpress_sysreg_setup()
-The function vexpress_sysreg_probe() references
-the function __init vexpress_sysreg_setup().
-This is often because vexpress_sysreg_probe lacks a __init 
-annotation or the annotation of vexpress_sysreg_setup is wrong.
-
-
-My guess is that you don't want the __init annotation on
-vexpress_sysreg_setup; patch below.
-
-Will
-
---->8
-
-diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-index 77048b1..558c292 100644
---- a/drivers/mfd/vexpress-sysreg.c
-+++ b/drivers/mfd/vexpress-sysreg.c
-@@ -313,7 +313,7 @@ static void vexpress_sysreg_config_complete(unsigned long data)
- }
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 2da316e..5960578 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -155,6 +155,7 @@
+ 			};
  
+ 			lradc at 80050000 {
++				fsl,lradc-touchscreen-wires = <4>;
+ 				status = "okay";
+ 			};
  
--void __init vexpress_sysreg_setup(struct device_node *node)
-+void vexpress_sysreg_setup(struct device_node *node)
- {
-        if (WARN_ON(!vexpress_sysreg_base))
-                return;
+-- 
+1.7.9.5
