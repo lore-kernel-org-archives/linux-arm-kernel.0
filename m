@@ -1,82 +1,18 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Fri, 08 Feb 2013 13:29:14 +0100
-Subject: [PATCH 1/4] ARM: tegra: Unify tegra{20,30,114}_init_early()
-In-Reply-To: <1360308574-19658-2-git-send-email-hdoyu@nvidia.com>
-References: <1360308574-19658-1-git-send-email-hdoyu@nvidia.com>
- <1360308574-19658-2-git-send-email-hdoyu@nvidia.com>
-Message-ID: <340098510.UosBEPkrGv@fb07-iapwap2>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Feb 2013 12:26:04 +0000
+Subject: [PATCH] ARM: Allow modules to read cpu_logical_map
+In-Reply-To: <1360325980-19089-1-git-send-email-dave.martin@linaro.org>
+References: <1360325980-19089-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20130208122604.GO17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hiroshi,
-
-Am Freitag, 8. Februar 2013, 09:29:31 schrieb Hiroshi Doyu:
-> Refactored tegra{20,30,114}_init_early() so that we have the unified
-> tegra_init_early().
+On Fri, Feb 08, 2013 at 12:19:40PM +0000, Dave Martin wrote:
+> It is reasonable for loadable modules to be CPU topology aware
+> (particular examples include cpufreq and cpuidle drivers).
 > 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> This patch exports a new function cpu_get_hwid(cpu) to provide
+> suitable read-only access outside vmlinux.
 
-[...]
-
-> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-> index a599f6e..9bcecb8 100644
-> --- a/arch/arm/mach-tegra/hotplug.c
-> +++ b/arch/arm/mach-tegra/hotplug.c
-> @@ -1,8 +1,7 @@
->  /*
-> - *
->   *  Copyright (C) 2002 ARM Ltd.
->   *  All Rights Reserved
-> - *  Copyright (c) 2010, 2012 NVIDIA Corporation. All rights reserved.
-> + *  Copyright (c) 2010, 2012-2013, NVIDIA Corporation. All rights reserved.
-> *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -15,6 +14,7 @@
->  #include <asm/cacheflush.h>
->  #include <asm/smp_plat.h>
-> 
-> +#include "fuse.h"
->  #include "sleep.h"
-> 
->  static void (*tegra_hotplug_shutdown)(void);
-> @@ -56,18 +56,21 @@ int tegra_cpu_disable(unsigned int cpu)
->  	return cpu == 0 ? -EPERM : 0;
->  }
-> 
-> -#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-> -extern void tegra20_hotplug_shutdown(void);
-> -void __init tegra20_hotplug_init(void)
-> +void __init tegra_hotplug_init(void)
->  {
-> -	tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
-> -}
-> +	switch (tegra_chip_id) {
-> +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-> +	case TEGRA20:
-> +		tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
-> +		break;
->  #endif
-> -
-> -#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-> -extern void tegra30_hotplug_shutdown(void);
-> -void __init tegra30_hotplug_init(void)
-> -{
-> -	tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
-> -}
-> +#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
-> +	case TEGRA30:
-> +		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
-> +		break;
->  #endif
-> +	default:
-> +		BUG_ON(IS_ENABLED(CONFIG_HOTPLUG_CPU));
-> +		break;
-> +	}
-> +}
-
-are these ifdefs really needed? Multisoc kernels will enable them all anyway 
-and there is a case structure which protects the assignments. Also the hotplug 
-functions are very tiny, so there shouldn't be a big loss.
-
-Marc
+And we have an export with no user... where are the patches which
+illustrate its usage?
