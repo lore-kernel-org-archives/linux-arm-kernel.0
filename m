@@ -1,73 +1,88 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 8 Feb 2013 08:12:25 +0530
-Subject: [PATCH 2/3] cpufreq: exynos: Adding cpufreq driver for exynos5440
-In-Reply-To: <CADGdYn7+U1fvFdHkAikoH9P-owF0ZKk6ZSgrPfY+16S3vO=S3A@mail.gmail.com>
-References: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
- <1360179562-19950-2-git-send-email-amit.daniel@samsung.com>
- <CAOh2x=kYM8n8XipvQ0-3H5f=B2TwAeFSa0DP=hy+SWQvPXJh6Q@mail.gmail.com>
- <CADGdYn7+U1fvFdHkAikoH9P-owF0ZKk6ZSgrPfY+16S3vO=S3A@mail.gmail.com>
-Message-ID: <CAKohpon1J+7ZQu+Nevz_KBXpVa2Kus--DxR3cOhb97o-scB0fw@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 08 Feb 2013 10:58:40 +0800
+Subject: [PATCH 05/10] USB: EHCI: make ehci-atmel a separate driver
+In-Reply-To: <5113e60e.c84e420a.08c3.ffffbeda@mx.google.com>
+References: <yes> <1360258447-27247-1-git-send-email-yes>
+ <5113e60e.c84e420a.08c3.ffffbeda@mx.google.com>
+Message-ID: <511469E0.1020307@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 February 2013 00:38, amit kachhap <amit.kachhap@gmail.com> wrote:
-> Hi Viresh,
+Hi Manjunath Goudar,
+   I test this patch based on linux master branch, the commit id is: 
+6bacaa9ddacb71c691d32c678d37bc59ffc71fac. (I am not sure this is the 
+right place for testing).
+   First, it has an compile error as following. After fix it, and 
+tested, the EHCI doesn't work.
+---<8---
+drivers/usb/host/ehci-atmel.c: In function 'ehci_atmel_drv_remove':
+drivers/usb/host/ehci-atmel.c:167: error: implicit declaration of 
+function 'ehci_shutdown'
+--->8---
+
+And a little code style comments as following.
+
+On 2/8/2013 1:34, manjunath.goudar at linaro.org wrote:
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
 >
-> Thanks for the detailed review. Will try to handle them in the next version,
+> Separate the Atmel host controller driver from ehci-hcd host code
+> into its own driver module.
+>
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg KH <greg@kroah.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: linux-usb at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>   drivers/usb/host/Kconfig      |    7 ++++
+>   drivers/usb/host/Makefile     |    1 +
+>   drivers/usb/host/ehci-atmel.c |   78 ++++++++++++++++++++++-------------------
+>   drivers/usb/host/ehci-hcd.c   |    6 +---
+>   4 files changed, 51 insertions(+), 41 deletions(-)
+>
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 3689b7b..5a13f9d 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -176,6 +176,13 @@ config USB_EHCI_HCD_ORION
+>           ---help---
+>             Enables support for the on-chip EHCI controller on
+>             Morvell Orion chips.
 
-np. I haven't seen reply to few questions, you missed them or accept them.
+Need blank line here.
 
-General tip: Leave a blank line before and after your comment, it makes it more
-readable. :)
+> +config USB_EHCI_HCD_AT91
+> +        tristate  "Support for Atmel on-chip EHCI USB controller"
+> +        depends on USB_EHCI_HCD && ARCH_AT91
+> +        default y
+> +        ---help---
+> +          Enables support for the on-chip EHCI controller on
+> +          Atmel chips.
+>
+>   config USB_EHCI_MSM
+>   	bool "Support for MSM on-chip EHCI USB controller"
 
-> On Thu, Feb 7, 2013 at 3:17 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> On Thu, Feb 7, 2013 at 1:09 AM, Amit Daniel Kachhap
->>> +Required properties:
->>> +- interrupts: Interrupt to know the completion of cpu frequency change.
->>> +- cpufreq_tbl: Table of frequencies and voltage CPU could be transitioned into,
->>
->> This has to be "operating-points" as in cpufreq-cpu0 driver.
-> Yes I will check if opp table is beneficial. In my case it is just one
-> time parsing of cpufreq table and those values(freq, volt) are not
-> used later so did not use opp libraries.
+[snip]
 
-Its one time parsing for everybody, nobody do it twice :)
+> +static void __exit ehci_atmel_cleanup(void)
+> +{
+> +	platform_driver_unregister(&ehci_atmel_driver);
+> +}
+> +module_exit(ehci_atmel_cleanup);
+> +
+> +MODULE_DESCRIPTION(DRIVER_DESC);
+> +
+> +MODULE_ALIAS("platform:ehci-atmel");
+> +MODULE_AUTHOR("Nicolas Ferre");
+> +MODULE_LICENSE("GPL");
+> +
 
->>> +       for (old_index = 0;
->>> +               freq_table[old_index].frequency != CPUFREQ_TABLE_END;
->>> +               old_index++)
->>> +               if (freq_table[old_index].frequency == freqs.old)
->>> +                       break;
->>> +
->>> +       if (freq_table[old_index].frequency == CPUFREQ_TABLE_END) {
->>
->> How can this be true?
-> This is error scenario
+Remove the blank line here. As to it is the EOF.
 
-We have given cpufreq core a valid table and it has to set frequency from
-this table only. How can cpu have any other freq here ? And you have done
-something similar in your init() too, where you check if cpu has freq from the
-table or not.
-
->>> +       dvfs_info = kzalloc(sizeof(struct exynos_dvfs_data), GFP_KERNEL);
->>
->> sizeof(*dvfs_info) ?? why don't make it static too, as you have other
->> stuff too.. ?
->> The better option for single image solution to allocate everything
->> dynamically, so that
->> unused drivers don't occupy any space.
-
-?
-
->>> +       if ((len == 0) || (len / 2 > CPUFREQ_LEVEL_END)) {
->>
->> I really didn't like this limit you have put at the number of dvfs
->> points. Better
->> would be to use:
-
->>> +       dvfs_info->dvfs_init = true;
->>
->> why do you need this ?
-> This is added to synchronize the interrupts.
-
-How? You are setting it once in init() and not touching it afterwards. :)
+Best Regards,
+Bo Shen
