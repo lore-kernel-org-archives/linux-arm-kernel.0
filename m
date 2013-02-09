@@ -1,38 +1,132 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sat, 09 Feb 2013 22:03:52 +0000
-Subject: [PATCH 16/17] xgmac: replace =?UTF-8?Q?=5F=5Fraw=20with=20rel?=
- =?UTF-8?Q?axed=20IO?=
-In-Reply-To: <5116B8CB.40007@gmail.com>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-17-git-send-email-ben.dooks@codethink.co.uk>
- <5116B8CB.40007@gmail.com>
-Message-ID: <1db4ff62c8a498edd0c1593a8f7bd6d8@codethink.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 9 Feb 2013 22:23:11 +0000
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <20130208004414.GA32245@obsidianresearch.com>
+References: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302072325.23483.arnd@arndb.de>
+ <20130208004414.GA32245@obsidianresearch.com>
+Message-ID: <201302092223.11796.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2013 20:59, Rob Herring wrote:
-> On 02/08/2013 05:17 PM, Ben Dooks wrote:
->> The xgmac driver is using __raw read and write functions, where it
->> should be using readl_relaxed and writel_relaxed to avoid any issues
->> with which endian mode the CPU is running in.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> ---
->>  drivers/net/ethernet/calxeda/xgmac.c |   12 ++++++------
->>  1 file changed, 6 insertions(+), 6 deletions(-)
->
-> This will break on arches which don't have the _relaxed variants. 
-> David
-> Miller will reject restricting this to build on ARM only. See this:
->
-> http://www.spinics.net/lists/netdev/msg215457.html
+On Friday 08 February 2013, Jason Gunthorpe wrote:
+> On Thu, Feb 07, 2013 at 11:25:23PM +0000, Arnd Bergmann wrote:
+> > > link at 0 {
+> > > reg = <0x800 0 0  0 0>; // Bus 0, Dev 0x10, Fn 0
+> > > interrupt-mask = <0x0 0 0 7>;
+> > > interrupt-map = <0x0000 0 0 1 &mpic 58 // INTA
+> > >                  0x0000 0 0 2 &mpic 58 // INTB
+> > >                  0x0000 0 0 3 &mpic 58 // INTC
+> > >                  0x0000 0 0 4 &mpic 58>; // INTD
+> > > }
+> > 
+> > The interrupt-map property only makes sense for the host bridge,
+> > not for bridges below it, which don't normally get represented
+> > in the device tree.
+> 
+> Linux scans up the PCI bus until it finds a PCI device with a matching
+> OF node. It then constructs an interrupt map 'laddr' (ie the
+> bus:dev.fn) for the child device of this OF node.
+> 
+> If you don't have any DT PCI nodes then this should always fold down
+> to doing a lookup with bus=0, and device representing the 'slot' in
+> legacy PCI.
+> 
+> However, as soon as you provide a node for a bridge in DT this halts
+> the 'fold down' and goes to the interrupt-map with a device on the
+> subordinate bus number of the bridge.
+> 
+> This makes *lots* of sense, if you have bridges providing bus slots
+> then you include the bridge in DT to stop the 'fold down' at that
+> known bridge, giving you a chance to see the interrupt wiring behind
+> the bridge.
 
-I was considering changing it anyway to keep the __raw functions
-and simply swapping the endian-ness of the data when necessary
-as we don't need about three rev instructions in there where one
-will do.
+I would argue that it matters not so much what Linux does but what
+the standard says, but it seems they both agree with you in this
+case: http://www.openfirmware.org/1275/practice/imap/imap0_9d.pdf
+defines that "At any level in the interrupt tree, a mapping may
+need to take place between the child interrupt domain and the
+parent?s. This is represented by a new property called 'interrupt-map'".
 
-Will sort out looking at this when I am back in the office on Monday.
+> This matches the design of PCI - if you know how interrupts are hooked
+> up then use that information, otherwise assume the INTx interrupts
+> swizzle and search upward. This is how add-in cards with PCI bridges
+> are supported.
 
--- 
-Ben
+Note that the implicit swizzling was not part of the original PCI
+binding, which assumed that all devices were explicitly represented
+in the device tree, and we don't normally do that any more because
+PCI can be probed easily, and we cannot assume that all PCI BARs
+have been correctly assigned by the firmware before the OS
+is booting. Having the interrupt-map at PCI host controller
+node is convenient because it lets us define unit interrupt
+specifiers for devices that are not represented in the device
+tree themselves.
+
+I think the key question here is whether there is just one interrupt
+domain across all bridges because the hardware requires the unit
+address to be unique, or whether each PCIe port has its own
+unit address space, and thereby interrupt domain that requires
+its own interrupt-map.
+
+If there is just one domain, we have the choice whether to have
+one interrupt-map for the entire domain, or to have one
+interrupt map per PCIe port for the devices under that port.
+I would consider it more logical to have a single interrupt-map
+for the interrupt domain, because that is essentially what
+lets us describe the interrupt daomain as a whole.
+
+Of course, if each port has its own domain, we have to have
+a separate interrupt map for each one.
+
+> Thomas's problem is the presence of the static DT node for the root
+> port bridge. Since the node is static you can't know what the runtime
+> determined subordinate bus numbers will be, so there is no possible
+> way to write an interrupt-map at the host bridge.
+
+Right, that is a problem if there are additional bridges. I guess
+we could represent all devices on bus 0 easily because their
+address would be fixed,  but can't uniquely identify anything
+below them.
+
+> If you imagine the case you alluded to, a PCI-E root port, connected
+> to a PCI-E to PCI bridge, with 2 physical PCI bus slots. The
+> interrupts for the 2 slots are routed to the CPU directly:
+> 
+> link at 0 {
+>  reg = </* Bus 0, Dev 0x10, Fn 0 */>; // Root Port bridge
+> 
+>   // Match on INTx (not used since the pci-bridge doesn't create inband INTx)
+>   interrupt-mask = <0x0 0 0 7>;
+>   interrupt-map = <0x0000 0 0 1 &pic 0  // Inband INTA
+>                    0x0000 0 0 2 &pic 1  // Inband INTB
+
+What are these two interrupts in the example then?
+
+>  pci_bridge at 0 {
+>     reg = </* Bus 1, Dev 0x10, Fn 0 */>; // PCIe to PCI bridge
+
+The device would be "pci at 10", right?
+
+>     // Match on the device/slot and INTx pin
+>     interrupt-mask = <0x7f 0 0 7>;
+>     interrupt-map = <0x00xx 0 0 1 &pic 2 // Slot 0 physical INTA
+>                      0x00xx 0 0 1 &pic 3 // Slot 1 physical INTA
+>                      ..
+>  }
+> }
+
+You are accidentally matching the on the register number, not the
+device number here, right? The interrupt-map-mask should be
+<0xf800 0 0 7> to match the device.
+
+> To me, this seems to be a much more accurate description of how the
+> hardware is constructed then trying to cram all this information into
+> the host bridge's interrupt map. It shows clearly where inband INTA
+> messages arriving at the root port are directed as well as where the
+> slot by slot out-of-band interrupt wires on the PCI bus are directed.
+
+Yes, I guess you're right.
+
+	Arnd
