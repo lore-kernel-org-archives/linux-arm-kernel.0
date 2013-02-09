@@ -1,80 +1,79 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat,  9 Feb 2013 21:44:31 +0100
-Subject: [PATCH RFC 7/7] ARM: dts: omap3-igep0020: Add SMSC911x LAN chip
- support
-In-Reply-To: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1360442671-15216-8-git-send-email-javier.martinez@collabora.co.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Sat, 9 Feb 2013 22:56:52 +0200
+Subject: [PATCH 3/7] ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
+In-Reply-To: <20130209181432.GD32349@localhost>
+References: <1360427896-12004-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1360427896-12004-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130209165335.GA13338@arwen.pp.htv.fi>
+ <20130209181432.GD32349@localhost>
+Message-ID: <20130209205632.GA14543@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IGEPv2 boards has an SMSC LAN9221i ethernet chip connected to
-the OMAP3 processor though the General-Purpose Memory Controller.
+Hi,
 
-This patch adds a device node for the ethernet chip so the GPMC
-driver will call the gpmc-smsc911x setup code.
+On Sat, Feb 09, 2013 at 03:14:33PM -0300, Ezequiel Garcia wrote:
+> > >  static int gpmc_cs_reserved(int cs)
+> > >  {
+> > >  	if (cs > GPMC_CS_NUM)
+> > >  		return -ENODEV;
+> > >  
+> > > -	return gpmc_cs_map & (1 << cs);
+> > > +	if (gpmc_cs_map & (1 << cs))
+> > > +		return -EBUSY;
+> > > +
+> > > +	return 0;
+> > 
+> > you could use a ternary operator here:
+> > 
+> > bit = gpmc_cs_map & (1 << cs);
+> > 
+> > return bit ? -EBUSY : 0;
+> > 
+> > But to be frank, I'm not sure this makes that much sense, I'd expect
+> > gpmc_cs_reserved() to return 0 or 1 depending on the state (just as it
+> > was before). The name of the method asks for a boolean return value.
+> > 
+> 
+> Well, we can change the return value to a boolean.
+> 
+> However, note that the function 'as it was before' was somewhat inconsistent:
+> gpmc_cs_reserved returned -ENODEV if the given 'cs' was out of range and
+> a non-negative integer otherwise, 0 if the cs is available and positive
+> integer otherwise.
+> 
+> So, what I'm doing here is fixing this by returning an appropriate error
+> condition or 0 if the CS is available.
+> 
+> If we change it to return a boolean, we won't be able to distinguish
+> between EBUSY and ENODEV.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/boot/dts/omap3-igep.dtsi    |    6 ++++++
- arch/arm/boot/dts/omap3-igep0020.dts |   24 ++++++++++++++++++++++++
- 2 files changed, 30 insertions(+), 0 deletions(-)
+that's the thing. IMO this should return 1 if it is available and 0 if
+it's not. The method looks like a yes/no question:
 
-diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-index 100eb41..2f02581 100644
---- a/arch/arm/boot/dts/omap3-igep.dtsi
-+++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -48,6 +48,12 @@
- 			0x126 0x0100	/* sdmmc1_dat7.sdmmc1_dat7 INPUT | MODE 0 */
- 		>;
- 	};
-+
-+        smsc911x_pins: pinmux_smsc911x_pins {
-+                pinctrl-single,pins = <
-+                        0x1a2 0x0104    /* mcspi1_cs2.gpio_176 INPUT | MODE4 */
-+                >;
-+        };
- };
- 
- &i2c1 {
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index e2b9849..68b7cf3 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -40,6 +40,18 @@
- 			gpios = <&twl_gpio 19 1>;
- 		};
- 	};
-+
-+        vddvario: regulator-vddvario {
-+                compatible = "regulator-fixed";
-+                regulator-name = "vddvario";
-+                regulator-always-on;
-+        };
-+
-+        vdd33a: regulator-vdd33a {
-+                compatible = "regulator-fixed";
-+                regulator-name = "vdd33a";
-+                regulator-always-on;
-+        };
- };
- 
- &i2c3 {
-@@ -54,3 +66,15 @@
- 		reg = <0x50>;
- 	};
- };
-+
-+&gpmc {
-+	gpmc_smsc911x at 0 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&smsc911x_pins>;
-+		gpmc,cs = <5>; /* IGEP2_SMSC911X_CS */
-+		gpmc,gpio_irq = <176>; /* IGEP2_SMSC911X_GPIO */
-+		gpmc,flags = <18>; /* SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS */
-+		vmmc-supply = <&vddvario>;
-+		vmmc_aux-supply = <&vdd33a>;
-+      };
-+};
+Q: Is this GPMC CS reserved ?
+A: Yes (1)
+
+or
+
+A: No (0)
+
+then it's als far easier to use, just as code was before:
+
+if (gpmc_cs_reserved(cs)) {
+	dev_dbg(dev, "Oops, CS #%d is busy\n", cs);
+	return -EBUSY;
+} else {
+	dev_dbg(dev, "Hurray!\n");
+	return 0;
+}
+
 -- 
-1.7.7.6
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130209/77b5416f/attachment.sig>
