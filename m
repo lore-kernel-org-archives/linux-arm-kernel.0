@@ -1,286 +1,65 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 09 Feb 2013 09:48:31 -0500 (EST)
-Subject: [PATCH] [RFC] arm: fix memset-related crashes caused by recent GCC
- (4.7.2) optimizations
-In-Reply-To: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
-References: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
-Message-ID: <alpine.LFD.2.02.1302090943440.6300@xanadu.home>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat,  9 Feb 2013 16:54:26 +0100
+Subject: [PATCH 0/2] RM9200 EBI write/read interface
+Message-ID: <1360425268-29060-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2 Feb 2013, Ivan Djelic wrote:
+Hi,
 
-> Recent GCC versions (e.g. GCC-4.7.2) perform optimizations based on
-> assumptions about the implementation of memset and similar functions.
-> The current ARM optimized memset code does not return the value of
-> its first argument, as is usually expected from standard implementations.
-> 
-> For instance in the following function:
-> 
-> void debug_mutex_lock_common(struct mutex *lock, struct mutex_waiter *waiter)
-> {
-> 	memset(waiter, MUTEX_DEBUG_INIT, sizeof(*waiter));
-> 	waiter->magic = waiter;
-> 	INIT_LIST_HEAD(&waiter->list);
-> }
-> 
-> compiled as:
-> 
-> 800554d0 <debug_mutex_lock_common>:
-> 800554d0:       e92d4008        push    {r3, lr}
-> 800554d4:       e1a00001        mov     r0, r1
-> 800554d8:       e3a02010        mov     r2, #16 ; 0x10
-> 800554dc:       e3a01011        mov     r1, #17 ; 0x11
-> 800554e0:       eb04426e        bl      80165ea0 <memset>
-> 800554e4:       e1a03000        mov     r3, r0
-> 800554e8:       e583000c        str     r0, [r3, #12]
-> 800554ec:       e5830000        str     r0, [r3]
-> 800554f0:       e5830004        str     r0, [r3, #4]
-> 800554f4:       e8bd8008        pop     {r3, pc}
-> 
-> GCC assumes memset returns the value of pointer 'waiter' in register r0; causing
-> register/memory corruptions.
-> 
-> This patch fixes the return value of the assembly version of memset.
-> Could you please review, or suggest better alternatives ?
-> 
-> Thanks,
-> 
-> --
-> Ivan
-> 
-> (this is a shorter and (hopefully) clearer repost of
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/144916.html)
-> 
-> The patch adds a 'mov' instruction and merges an additional load+store into
-> existing load/store instructions.
-> For ease of review, here is a breakdown of the patch into 4 simple steps:
-> 
-> Step 1
-> ======
-> Perform the following substitutions:
-> ip -> r8, then
-> r0 -> ip,
-> and insert 'mov ip, r0' as the first statement of the function.
-> At this point, we have a memset() implementation returning the proper result,
-> but corrupting r8 on some paths (the ones that were using ip).
-> 
-> Step 2
-> ======
-> Make sure r8 is saved and restored when (! CALGN(1)+0) == 1:
-> 
-> save r8:
-> -       str     lr, [sp, #-4]!
-> +       stmfd   sp!, {r8, lr}
-> 
-> and restore r8 on both exit paths:
-> -       ldmeqfd sp!, {pc}               @ Now <64 bytes to go.
-> +       ldmeqfd sp!, {r8, pc}           @ Now <64 bytes to go.
-> (...)
->         tst     r2, #16
->         stmneia ip!, {r1, r3, r8, lr}
-> -       ldr     lr, [sp], #4
-> +       ldmfd   sp!, {r8, lr}
-> 
-> Step 3
-> ======
-> Make sure r8 is saved and restored when (! CALGN(1)+0) == 0:
-> 
-> save r8:
-> -       stmfd   sp!, {r4-r7, lr}
-> +       stmfd   sp!, {r4-r8, lr}
-> 
-> and restore r8 on both exit paths:
->         bgt     3b
-> -       ldmeqfd sp!, {r4-r7, pc}
-> +       ldmeqfd sp!, {r4-r8, pc}
-> (...)
->         tst     r2, #16
->         stmneia ip!, {r4-r7}
-> -       ldmfd   sp!, {r4-r7, lr}
-> +       ldmfd   sp!, {r4-r8, lr}
-> 
-> Step 4
-> ======
-> Rewrite register list "r4-r7, r8" as "r4-r8".
-> 
-> Signed-off-by: Ivan Djelic <ivan.djelic@parrot.com>
+This patch introduces a EBI (External Bus Interface) read/write
+interface for RM9200. This allow to use the real base address
+for the SDRAMC on RM9200 and share SDRAMC headers for RM9200
+and SAM9.
 
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
+In the process at91_ramc can now be made private to mach-at91
+since the at91_cf driver will use at91_ebi instead.
 
-This is good for the stable tree as well.
+The ultimate goal is to create a EBI driver for RM9200. This
+will make it possible to setup EBI and SMC for external chips.
 
-Please include in your official commit text the above breakdown 
-explanation as well.
+My board has octal USART which needs SMC to be setup correctly
+and this is not currently possible when using DT. Boards with
+NOR and NAND flash where SMC is not setup by bootloader will
+also benefit from such a driver.
+
+I'm working this EBI driver and its DT bindings right now but
+would like some comments on this before I proceed.
 
 
+Joachim Eastwood (2):
+  ARM: at91: create ebi read/write interface for RM9200
+  ARM: at91: move at91_ramc.h and clean up includes
 
+ arch/arm/boot/dts/at91rm9200.dtsi                  |  4 +-
+ arch/arm/mach-at91/at91_ramc.h                     | 31 +++++++++++
+ arch/arm/mach-at91/at91rm9200.c                    |  3 +-
+ arch/arm/mach-at91/at91rm9200_devices.c            | 14 ++---
+ arch/arm/mach-at91/at91sam9_alt_reset.S            |  2 +-
+ arch/arm/mach-at91/at91sam9g45_reset.S             |  2 +-
+ arch/arm/mach-at91/board-cpuat91.c                 |  2 -
+ arch/arm/mach-at91/board-eco920.c                  |  6 +--
+ arch/arm/mach-at91/board-kb9202.c                  |  2 -
+ arch/arm/mach-at91/board-picotux200.c              |  3 --
+ arch/arm/mach-at91/board-rm9200dk.c                |  2 -
+ arch/arm/mach-at91/board-rm9200ek.c                |  2 -
+ arch/arm/mach-at91/board-yl-9200.c                 |  4 +-
+ arch/arm/mach-at91/generic.h                       |  3 ++
+ arch/arm/mach-at91/include/mach/at91_ebi.h         | 20 +++++++
+ arch/arm/mach-at91/include/mach/at91_ramc.h        | 32 -----------
+ arch/arm/mach-at91/include/mach/at91rm9200.h       |  1 +
+ .../arm/mach-at91/include/mach/at91rm9200_sdramc.h | 63 ----------------------
+ arch/arm/mach-at91/include/mach/at91sam9_sdramc.h  |  2 +
+ arch/arm/mach-at91/pm.c                            |  2 +-
+ arch/arm/mach-at91/pm.h                            |  9 ++--
+ arch/arm/mach-at91/pm_slowclock.S                  |  2 +-
+ arch/arm/mach-at91/setup.c                         | 10 ++++
+ drivers/pcmcia/at91_cf.c                           |  6 +--
+ 24 files changed, 94 insertions(+), 133 deletions(-)
+ create mode 100644 arch/arm/mach-at91/at91_ramc.h
+ create mode 100644 arch/arm/mach-at91/include/mach/at91_ebi.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_ramc.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
 
-
-> ---
->  arch/arm/lib/memset.S |   85 +++++++++++++++++++++++++------------------------
->  1 file changed, 44 insertions(+), 41 deletions(-)
-> 
-> diff --git a/arch/arm/lib/memset.S b/arch/arm/lib/memset.S
-> index 650d592..eafd5ee 100644
-> --- a/arch/arm/lib/memset.S
-> +++ b/arch/arm/lib/memset.S
-> @@ -19,9 +19,9 @@
->  1:	subs	r2, r2, #4		@ 1 do we have enough
->  	blt	5f			@ 1 bytes to align with?
->  	cmp	r3, #2			@ 1
-> -	strltb	r1, [r0], #1		@ 1
-> -	strleb	r1, [r0], #1		@ 1
-> -	strb	r1, [r0], #1		@ 1
-> +	strltb	r1, [ip], #1		@ 1
-> +	strleb	r1, [ip], #1		@ 1
-> +	strb	r1, [ip], #1		@ 1
->  	add	r2, r2, r3		@ 1 (r2 = r2 - (4 - r3))
->  /*
->   * The pointer is now aligned and the length is adjusted.  Try doing the
-> @@ -29,10 +29,14 @@
->   */
->  
->  ENTRY(memset)
-> -	ands	r3, r0, #3		@ 1 unaligned?
-> +/*
-> + * Preserve the contents of r0 for the return value.
-> + */
-> +	mov	ip, r0
-> +	ands	r3, ip, #3		@ 1 unaligned?
->  	bne	1b			@ 1
->  /*
-> - * we know that the pointer in r0 is aligned to a word boundary.
-> + * we know that the pointer in ip is aligned to a word boundary.
->   */
->  	orr	r1, r1, r1, lsl #8
->  	orr	r1, r1, r1, lsl #16
-> @@ -43,29 +47,28 @@ ENTRY(memset)
->  #if ! CALGN(1)+0
->  
->  /*
-> - * We need an extra register for this loop - save the return address and
-> - * use the LR
-> + * We need an 2 extra registers for this loop - use r8 and the LR
->   */
-> -	str	lr, [sp, #-4]!
-> -	mov	ip, r1
-> +	stmfd	sp!, {r8, lr}
-> +	mov	r8, r1
->  	mov	lr, r1
->  
->  2:	subs	r2, r2, #64
-> -	stmgeia	r0!, {r1, r3, ip, lr}	@ 64 bytes at a time.
-> -	stmgeia	r0!, {r1, r3, ip, lr}
-> -	stmgeia	r0!, {r1, r3, ip, lr}
-> -	stmgeia	r0!, {r1, r3, ip, lr}
-> +	stmgeia	ip!, {r1, r3, r8, lr}	@ 64 bytes at a time.
-> +	stmgeia	ip!, {r1, r3, r8, lr}
-> +	stmgeia	ip!, {r1, r3, r8, lr}
-> +	stmgeia	ip!, {r1, r3, r8, lr}
->  	bgt	2b
-> -	ldmeqfd	sp!, {pc}		@ Now <64 bytes to go.
-> +	ldmeqfd	sp!, {r8, pc}		@ Now <64 bytes to go.
->  /*
->   * No need to correct the count; we're only testing bits from now on
->   */
->  	tst	r2, #32
-> -	stmneia	r0!, {r1, r3, ip, lr}
-> -	stmneia	r0!, {r1, r3, ip, lr}
-> +	stmneia	ip!, {r1, r3, r8, lr}
-> +	stmneia	ip!, {r1, r3, r8, lr}
->  	tst	r2, #16
-> -	stmneia	r0!, {r1, r3, ip, lr}
-> -	ldr	lr, [sp], #4
-> +	stmneia	ip!, {r1, r3, r8, lr}
-> +	ldmfd	sp!, {r8, lr}
->  
->  #else
->  
-> @@ -74,54 +77,54 @@ ENTRY(memset)
->   * whole cache lines at once.
->   */
->  
-> -	stmfd	sp!, {r4-r7, lr}
-> +	stmfd	sp!, {r4-r8, lr}
->  	mov	r4, r1
->  	mov	r5, r1
->  	mov	r6, r1
->  	mov	r7, r1
-> -	mov	ip, r1
-> +	mov	r8, r1
->  	mov	lr, r1
->  
->  	cmp	r2, #96
-> -	tstgt	r0, #31
-> +	tstgt	ip, #31
->  	ble	3f
->  
-> -	and	ip, r0, #31
-> -	rsb	ip, ip, #32
-> -	sub	r2, r2, ip
-> -	movs	ip, ip, lsl #(32 - 4)
-> -	stmcsia	r0!, {r4, r5, r6, r7}
-> -	stmmiia	r0!, {r4, r5}
-> -	tst	ip, #(1 << 30)
-> -	mov	ip, r1
-> -	strne	r1, [r0], #4
-> +	and	r8, ip, #31
-> +	rsb	r8, r8, #32
-> +	sub	r2, r2, r8
-> +	movs	r8, r8, lsl #(32 - 4)
-> +	stmcsia	ip!, {r4, r5, r6, r7}
-> +	stmmiia	ip!, {r4, r5}
-> +	tst	r8, #(1 << 30)
-> +	mov	r8, r1
-> +	strne	r1, [ip], #4
->  
->  3:	subs	r2, r2, #64
-> -	stmgeia	r0!, {r1, r3-r7, ip, lr}
-> -	stmgeia	r0!, {r1, r3-r7, ip, lr}
-> +	stmgeia	ip!, {r1, r3-r8, lr}
-> +	stmgeia	ip!, {r1, r3-r8, lr}
->  	bgt	3b
-> -	ldmeqfd	sp!, {r4-r7, pc}
-> +	ldmeqfd	sp!, {r4-r8, pc}
->  
->  	tst	r2, #32
-> -	stmneia	r0!, {r1, r3-r7, ip, lr}
-> +	stmneia	ip!, {r1, r3-r8, lr}
->  	tst	r2, #16
-> -	stmneia	r0!, {r4-r7}
-> -	ldmfd	sp!, {r4-r7, lr}
-> +	stmneia	ip!, {r4-r7}
-> +	ldmfd	sp!, {r4-r8, lr}
->  
->  #endif
->  
->  4:	tst	r2, #8
-> -	stmneia	r0!, {r1, r3}
-> +	stmneia	ip!, {r1, r3}
->  	tst	r2, #4
-> -	strne	r1, [r0], #4
-> +	strne	r1, [ip], #4
->  /*
->   * When we get here, we've got less than 4 bytes to zero.  We
->   * may have an unaligned pointer as well.
->   */
->  5:	tst	r2, #2
-> -	strneb	r1, [r0], #1
-> -	strneb	r1, [r0], #1
-> +	strneb	r1, [ip], #1
-> +	strneb	r1, [ip], #1
->  	tst	r2, #1
-> -	strneb	r1, [r0], #1
-> +	strneb	r1, [ip], #1
->  	mov	pc, lr
->  ENDPROC(memset)
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+1.8.0
