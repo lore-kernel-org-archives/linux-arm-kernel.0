@@ -1,61 +1,21 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 08 Feb 2013 22:40:57 -0500 (EST)
-Subject: [PATCH 05/17] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
-In-Reply-To: <1360365467-25056-6-git-send-email-ben.dooks@codethink.co.uk>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-6-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <alpine.LFD.2.02.1302082237590.6300@xanadu.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 08 Feb 2013 20:47:36 -0700
+Subject: [PATCH 2/4] clocksource: bcm2835: use the device_node pointer
+ passed to init
+In-Reply-To: <1360264144-20714-3-git-send-email-robherring2@gmail.com>
+References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
+ <1360264144-20714-3-git-send-email-robherring2@gmail.com>
+Message-ID: <5115C6D8.5040404@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Feb 2013, Ben Dooks wrote:
+On 02/07/2013 12:09 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> We've already matched the node, so use the node pointer passed in.
 
-> The fixup_pv_table assumes that the instructions are in the same
-> endian configuration as the data, but when the CPU is running in
-> BE8 the instructions stay in little-endian format.
-> 
-> Make sure if CONFIG_CPU_ENDIAN_BE8 is set that we do all the
-> alterations to the instructions taking in to account the LDR/STR
-> will be swapping the data endian-ness.
-> 
-> Since the code is only modifying a byte, we avoid dual-swapping
-> the data, and just change the bits we clear and ORR in.
-> 
-> Note, not tested against an actual bug, it looked wrong.
+Patches 1 & 2,
 
-You are missing the CONFIG_THUMB2_KERNEL counterpart.
+Tested-by: Stephen Warren <swarren@wwwdotorg.org>
 
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  arch/arm/kernel/head.S |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index f1ab279..aafb151 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -579,8 +579,14 @@ __fixup_a_pv_table:
->  #else
->  	b	2f
->  1:	ldr	ip, [r7, r3]
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +	@ in BE8, we load data in BE, but instructions still in LE
-> +	bic	ip, ip, #0xff000000
-> +	orr	ip, ip, r6, lsl#24
-> +#else
->  	bic	ip, ip, #0x000000ff
->  	orr	ip, ip, r6	@ mask in offset bits 31-24
-> +#endif
->  	str	ip, [r7, r3]
->  2:	cmp	r4, r5
->  	ldrcc	r7, [r4], #4	@ use branch for delay slot
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+(i.e. with my bcm2835 hat on:-)
