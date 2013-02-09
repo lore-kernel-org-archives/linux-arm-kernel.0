@@ -1,29 +1,33 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 09 Feb 2013 09:22:32 +0000
-Subject: [PATCH 2/9] gpiolib: use gpio_chips list in gpiolib_sysfs_init
-In-Reply-To: <CACRpkdaz8h_1uKoH1q9gLmCxE0BMAxBakaq_eFfnfJr2V_Ct5w@mail.gmail.com>
+Date: Sat, 09 Feb 2013 09:47:53 +0000
+Subject: [PATCH 5/9] gpiolib: use gpio_chips list in gpiochip_find_base
+In-Reply-To: <5111E093.4060600@nvidia.com>
 References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-4-git-send-email-acourbot@nvidia.com>
- <CACRpkdaz8h_1uKoH1q9gLmCxE0BMAxBakaq_eFfnfJr2V_Ct5w@mail.gmail.com>
-Message-ID: <20130209092232.64D0A3E2C01@localhost>
+ <1359822572-26009-7-git-send-email-acourbot@nvidia.com>
+ <CACRpkdYT4p8uez8DHTSsjKFb=KmWbtCXJQtyXLAJkCC7fKaErw@mail.gmail.com>
+ <5111E093.4060600@nvidia.com>
+Message-ID: <20130209094753.555F03E2C66@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Feb 2013 18:04:43 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sat, Feb 2, 2013 at 5:29 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+On Wed, 6 Feb 2013 13:48:19 +0900, Alex Courbot <acourbot@nvidia.com> wrote:
+> On 02/06/2013 02:21 AM, Linus Walleij wrote:
+> > This looks like it is preserving this userspace-sensitive semantic
+> > so that dynamically added chips will still get the same assigned
+> > numbers.
 > 
-> > Use the small list of GPIO chips instead of parsing the whole GPIO
-> > number space.
-> >
-> > Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> It does (it should, at least), the assigned ranges should be strictly 
+> identical to the previous version. While testing I also made sure all 
+> chips had the same GPIO range.
 > 
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> > But I want some guarantees, so state clearly in the commit
+> > that any dynamically assigned chip will get the same base
+> > address after this change as it got before it, and please take
+> > this opportunity to add a comment stating that this search
+> > method is vital for userspace ABIs, and must be preserved.
 > 
+> Done. I will take the blame if something goes wrong. :)
 
-Applied, thanks.
+Applied, thanks
 
 g.
-
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
