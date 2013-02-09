@@ -1,51 +1,59 @@
-From: js1304@gmail.com (JoonSoo Kim)
-Date: Sat, 9 Feb 2013 13:57:39 +0900
-Subject: [PATCH RESEND] ARM: sched: correct update_sched_clock()
-In-Reply-To: <alpine.LFD.2.02.1302081331000.6300@xanadu.home>
-References: <1360128076-8555-1-git-send-email-iamjoonsoo.kim@lge.com>
- <CACRpkdbwoExxKbbvBKpt_Wh9KsgCXQW566N-0BaeL3oGY8pvLg@mail.gmail.com>
- <20130206163355.GH17833@n2100.arm.linux.org.uk>
- <20130208065125.GA20440@lge.com>
- <20130208150317.GT17833@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1302081331000.6300@xanadu.home>
-Message-ID: <CAAmzW4OG9GhPViqSyw9sN4wtUAU0YPjcPz-kT3MQhqZwnPdORQ@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat,  9 Feb 2013 12:05:10 +0400
+Subject: [PATCH] ARM: Fix compiler warning when CONFIG_ATAGS is not set
+Message-ID: <1360397110-3480-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/2/9 Nicolas Pitre <nicolas.pitre@linaro.org>:
-> On Fri, 8 Feb 2013, Russell King - ARM Linux wrote:
->
->> On Fri, Feb 08, 2013 at 03:51:25PM +0900, Joonsoo Kim wrote:
->> > I try to put it into patch tracker, but I fail to put it.
->> > I use following command.
->> >
->> > git send-email --to patches at arm.linux.org.uk 0001-ARM-sched-correct~~~~~
->> >
->> > Am I wrong?
->> > Could you teach me how to put patch into your patch tracker?
->> > I already read "help" on your website, but I can't find any stuff for
->> > "git send-email".
->>
->> I've never used git to send email, so I'm afraid I can't help with that.
->> Maybe someone with more experience with sending email from git can
->> comment?
->
-> The commit text for the patch needs to contain the following 2 lines at
-> the very bottom in order to match the patch system's expectations:
->
-> PATCH FOLLOWS
-> KernelVersion: v3.8
->
-> The KernelVersion value needs to be adjusted of course.
->
-> Note: I never tried it myself but it ought to work.
+This patch fix following compiler warning:
 
-Yes!!!! It works!
-Thanks!!!
+  CC      arch/arm/kernel/setup.o
+  In file included from arch/arm/kernel/setup.c:58:
+  arch/arm/kernel/atags.h: In function 'setup_machine_tags':
+  arch/arm/kernel/atags.h:18: warning: no return statement in function returning non-void
 
-> Nicolas
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/kernel/atags.h | 8 --------
+ arch/arm/kernel/setup.c | 8 +++++++-
+ 2 files changed, 7 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/kernel/atags.h b/arch/arm/kernel/atags.h
+index 9edc969..9d95c77 100644
+--- a/arch/arm/kernel/atags.h
++++ b/arch/arm/kernel/atags.h
+@@ -8,12 +8,4 @@ void convert_to_tag_list(struct tag *tags);
+ 
+ #ifdef CONFIG_ATAGS
+ struct machine_desc *setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr);
+-#else
+-static inline struct machine_desc *
+-setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
+-{
+-	early_print("no ATAGS support: can't continue\n");
+-	while (true);
+-	unreachable();
+-}
+ #endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 1cc9e17..1dcb989 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -732,8 +732,14 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	setup_processor();
+ 	mdesc = setup_machine_fdt(__atags_pointer);
+-	if (!mdesc)
++	if (!mdesc) {
++#ifdef CONFIG_ATAGS
+ 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
++#else
++		early_print("no ATAGS support: can't continue\n");
++		while (1);
++#endif
++	}
+ 	machine_desc = mdesc;
+ 	machine_name = mdesc->name;
+ 
+-- 
+1.7.12.4
