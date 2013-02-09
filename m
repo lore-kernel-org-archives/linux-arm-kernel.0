@@ -1,48 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 9 Feb 2013 12:18:41 +0000
-Subject: [PATCH 1/4] ARM: tegra: Unify tegra{20,30,114}_init_early()
-In-Reply-To: <20130208.100942.592982910310763762.hdoyu@nvidia.com>
-References: <1360308574-19658-1-git-send-email-hdoyu@nvidia.com>
- <20130208074720.GB21879@arwen.pp.htv.fi>
- <20130208.100942.592982910310763762.hdoyu@nvidia.com>
-Message-ID: <201302091218.41699.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 09 Feb 2013 13:37:27 +0100
+Subject: [GIT PULL 4/4] mach-virt platform code for 3.9
+In-Reply-To: <510FF8DC.6080202@arm.com>
+References: <1359986131-13034-1-git-send-email-will.deacon@arm.com>
+ <1359986131-13034-4-git-send-email-will.deacon@arm.com>
+ <510FF8DC.6080202@arm.com>
+Message-ID: <0696c7229c3499755984da15b64a877a@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 February 2013, Hiroshi Doyu wrote:
-> > > +#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
-> >
-> > how about using:
-> >
-> > #if IS_BUILTIN(CONFIG_ARCH_TEGRA_3x_SOC)
-> >
-> > instead ?
+On Mon, 04 Feb 2013 18:07:24 +0000, Marc Zyngier <marc.zyngier@arm.com>
+wrote:
+> On 04/02/13 13:55, Will Deacon wrote:
+>> NOTE: I'm not suggesting you pull this one as it stands -- see below!
+>> 
+>> This is the last batch from me (Marc is dealing with vgic and virtual
+>> timers) and introduces support for mach-virt. This depends on:
+>> 
+>>         - for-arm-soc/arch-timers (third pull request in this series)
+>>         - for-rmk/virt/psci (already pulled)
+>>         - irqchip/gic-vic-move (an arm-soc branch)
+>> 
+>> As a result, the diffstat is atrocious so it would be better if you
+>> could create a branch merging the above dependendies, which I could
+>> rebase onto (there's actually only two patches here).
 > 
-> Why is IS_BUILTIN() prefered?
+> The remaining of the KVM/ARM code (vgic and timer) has exactly the same
+> problem, plus an additional dependency on the actual kvm/core branch
+> that Russell just pulled.
 > 
+> I can either send you two pull requests that will basically look like
+> this one (actually, a lot worse), or you could create a stable branch
+> containing:
+> 
+> 	- for-rmk/virt/kvm/core (first pull request in the series)
+> 	- for-arm-soc/arch-timers (third pull request in the series)
+> 	- irqchip/gic-vic-move (already in arm-soc)
+> 
+> You could either create two stable branches (one for mach-virt and one
+> for kvm-arm/{vgic,timer}), or a single one containing all the
+> prerequisites.
+> 
+> What do you think?
 
-Inside of a function, if(IS_ENABLED(CONFIG_FOO)) or the respective IS_BUILTIN is
-preferred over #ifdef because it provides better compile coverage and better
-readability. Also, IS_ENABLED() is nice when you want to check if something
-is builtin or module, without having to write a complex expression.
+Arnd, Olof,
 
-If you just replace the #ifdef with #if IS_BUILTIN as Felipe suggested, I see
-no real benefit, but it would be nice to write this as
+Any hope we can get branches for these? Now that the KVM core code is in
+Russell's devel-stable branch, it would be a shame not to have the complete
+thing...
 
+Thanks,
 
-void __init tegra_hotplug_init(void)
-{
-	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
-		return;
-	
-	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC)) && tegra_chip_id == TEGRA20)
-		tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
-	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC)) && tegra_chip_id == TEGRA30)
-		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
-}
-
-which completely avoids all preprocessor conditionals and replaces them
-with compile-time choices based on constant expressions to eliminate the
-code paths for disabled platforms.
-
-	Arnd
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
