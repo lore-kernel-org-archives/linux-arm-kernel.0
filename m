@@ -1,41 +1,54 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 09 Feb 2013 15:33:22 -0600
-Subject: [PATCH 14/17] highbank: enable big-endian
-In-Reply-To: <1360365467-25056-15-git-send-email-ben.dooks@codethink.co.uk>
+Date: Sat, 09 Feb 2013 15:35:40 -0600
+Subject: [PATCH 15/17] xgmac: fix printing of hardware version
+In-Reply-To: <1360365467-25056-16-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-15-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <5116C0A2.7030508@gmail.com>
+ <1360365467-25056-16-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <5116C12C.90506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/08/2013 05:17 PM, Ben Dooks wrote:
-> Apart from a xgmac driver issue, the highbank seems to work correctly in
-> big-endian mode. Allow the selection of big-endian in the system.
+> The current driver attempts to print netdev_info() before registering the
+> network device and allowing the name to be set. Change this print to be
+> after the network deviec has been registered.
+> 
+> Fix the following issue:
+> 
+> calxedaxgmac fff50000.ethernet (unregistered net_device): h/w version is 0x1012
 > 
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > ---
->  arch/arm/mach-highbank/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-> index 551c97e..9373571 100644
-> --- a/arch/arm/mach-highbank/Kconfig
-> +++ b/arch/arm/mach-highbank/Kconfig
-> @@ -13,3 +13,4 @@ config ARCH_HIGHBANK
->  	select HAVE_SMP
->  	select SPARSE_IRQ
->  	select USE_OF
-> +	select ARCH_SUPPORTS_BIG_ENDIAN
 
-Considering that there is nothing highbank specific to enable BE support
-and all the support is within the A9 core (as BE support was never an
-intended feature), I wonder if this is really the right place for this
-option. All this really says is BE has been tested on this platform and
-presumably it would work on other platforms ignoring raw vs. relaxed
-accessors.
-
-In any case:
+Please post to netdev list.
 
 Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Rob
+>  drivers/net/ethernet/calxeda/xgmac.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
+> index f7f0290..f91d9b2 100644
+> --- a/drivers/net/ethernet/calxeda/xgmac.c
+> +++ b/drivers/net/ethernet/calxeda/xgmac.c
+> @@ -1715,9 +1715,6 @@ static int xgmac_probe(struct platform_device *pdev)
+>  		goto err_io;
+>  	}
+>  
+> -	uid = readl(priv->base + XGMAC_VERSION);
+> -	netdev_info(ndev, "h/w version is 0x%x\n", uid);
+> -
+>  	writel(0, priv->base + XGMAC_DMA_INTR_ENA);
+>  	ndev->irq = platform_get_irq(pdev, 0);
+>  	if (ndev->irq == -ENXIO) {
+> @@ -1771,6 +1768,9 @@ static int xgmac_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_reg;
+>  
+> +	uid = readl(priv->base + XGMAC_VERSION);
+> +	netdev_info(ndev, "h/w version is 0x%x\n", uid);
+> +
+>  	return 0;
+>  
+>  err_reg:
+> 
