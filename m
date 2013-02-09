@@ -1,68 +1,62 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sat, 09 Feb 2013 16:47:33 +0000
-Subject: [PATCH 02/17] ARM: set BE8 if LE in head code
-In-Reply-To: <alpine.LFD.2.02.1302082230390.6300@xanadu.home>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-3-git-send-email-ben.dooks@codethink.co.uk>
- <alpine.LFD.2.02.1302082230390.6300@xanadu.home>
-Message-ID: <72d13b1916bab6716f6fa5029242ace0@codethink.co.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Sat, 9 Feb 2013 18:53:35 +0200
+Subject: [PATCH 3/7] ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
+In-Reply-To: <1360427896-12004-4-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1360427896-12004-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1360427896-12004-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130209165335.GA13338@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2013 03:33, Nicolas Pitre wrote:
-> On Fri, 8 Feb 2013, Ben Dooks wrote:
->
->> If we are booting in LE and compiled for BE8, then change the 
->> processor
->> state in the head code. Since the instruction stream is always LE, 
->> we
->> do not need to do anything special.
->>
->> Also ensure that the secondary processors are started in the same 
->> mode.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> ---
->>  arch/arm/boot/compressed/head.S |    3 +++
->>  arch/arm/kernel/head.S          |    3 +++
->>  2 files changed, 6 insertions(+)
->>
->> diff --git a/arch/arm/boot/compressed/head.S 
->> b/arch/arm/boot/compressed/head.S
->> index fe4d9c3..39940a7 100644
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -134,6 +134,9 @@ start:
->>  		.word	_edata			@ zImage end address
->>   THUMB(		.thumb			)
->>  1:
->> +#ifdef CONFIG_CPU_BE8_BOOT_LE
->> +		setend	be			@ go BE-8 if we booted LE / no-op if already BE-8
->> +#endif
->>  		mrs	r9, cpsr
->>  #ifdef CONFIG_ARM_VIRT_EXT
->>  		bl	__hyp_stub_install	@ get into SVC mode, reversibly
->> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
->> index 486a15a..f1ab279 100644
->> --- a/arch/arm/kernel/head.S
->> +++ b/arch/arm/kernel/head.S
->> @@ -333,6 +333,9 @@ ENTRY(secondary_startup)
->>  	 * the processor type - there is no need to check the machine type
->>  	 * as it has already been validated by the primary processor.
->>  	 */
->> +#ifdef CONFIG_CPU_BE8_BOOT_LE
->> +	setend	be				@ if system starts LE, go to BE-8
->> +#endif
->>  #ifdef CONFIG_ARM_VIRT_EXT
->>  	bl	__hyp_stub_install_secondary
->>  #endif
->
-> For consistency, you should add a setend on the primary CPU entry 
-> path
-> in kernel/head.S and not rely on the decompressor.  Some people don't
-> use the compressed image.
+On Sat, Feb 09, 2013 at 01:38:12PM -0300, Ezequiel Garcia wrote:
+> Fix gpmc_cs_reserved() so it returns 0 if the chip select
+> is available (not reserved) or an error otherwise.
+> This allows to use the return value directly and return a proper error code.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/mach-omap2/gpmc.c |   12 ++++++++----
+>  1 files changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index bd3bc93..604c1eb 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -452,12 +452,16 @@ static int gpmc_cs_set_reserved(int cs, int reserved)
+>  	return 0;
+>  }
+>  
+> +/* Returns 0 if CS is available (not reseverd) or an error otherwise */
 
-Thank you for spotting this, will sort it out for the next round.
+s/reseverd/reserved/
+
+>  static int gpmc_cs_reserved(int cs)
+>  {
+>  	if (cs > GPMC_CS_NUM)
+>  		return -ENODEV;
+>  
+> -	return gpmc_cs_map & (1 << cs);
+> +	if (gpmc_cs_map & (1 << cs))
+> +		return -EBUSY;
+> +
+> +	return 0;
+
+you could use a ternary operator here:
+
+bit = gpmc_cs_map & (1 << cs);
+
+return bit ? -EBUSY : 0;
+
+But to be frank, I'm not sure this makes that much sense, I'd expect
+gpmc_cs_reserved() to return 0 or 1 depending on the state (just as it
+was before). The name of the method asks for a boolean return value.
 
 -- 
-Ben
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130209/5a458fb9/attachment.sig>
