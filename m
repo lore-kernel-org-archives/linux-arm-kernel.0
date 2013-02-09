@@ -1,47 +1,50 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 08 Feb 2013 23:06:55 -0500 (EST)
-Subject: [PATCH 12/17] ARM: fix magic for bootloader in BE8
-In-Reply-To: <1360365467-25056-13-git-send-email-ben.dooks@codethink.co.uk>
+Date: Fri, 08 Feb 2013 23:10:04 -0500 (EST)
+Subject: [PATCH 01/17] ARM: add CPU_BE8_BOOT_LE configuration
+In-Reply-To: <1360365467-25056-2-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-13-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <alpine.LFD.2.02.1302082304410.6300@xanadu.home>
+ <1360365467-25056-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <alpine.LFD.2.02.1302082228160.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 8 Feb 2013, Ben Dooks wrote:
 
-> If the boot-loader is running little endian and the kernel is compiled
-> big endian then it will not verify the magic number of the front of the
-> kernel.
+> Add configuration for booting a BE8 system from a LE boot environment.
 > 
-> Note, do we need to also reverse the two values after the magic, or are
-> they used later on in the kernel decompressor?
-
-Those value instances are not used by the code.  So for consistency they 
-would have to be reversed, yes.  Given those are variable and determined 
-by the linker, I don't know how you could manage it.
-
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > ---
->  arch/arm/boot/compressed/head.S |    4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/mm/Kconfig |    7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 39940a7..b6c7ec8 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -129,7 +129,11 @@ start:
->   THUMB(		adr	r12, BSYM(1f)	)
->   THUMB(		bx	r12		)
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 3fd629d..70e2ad9 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -688,6 +688,13 @@ config CPU_ENDIAN_BE8
+>  	help
+>  	  Support for the BE-8 (big-endian) mode on ARMv6 and ARMv7 processors.
 >  
-> +#ifdef CONFIG_CPU_BE8_BOOT_LE
-> +		.word	0x18286f01
-> +#else
->  		.word	0x016f2818		@ Magic numbers to help the loader
-> +#endif
->  		.word	start			@ absolute load/run zImage address
->  		.word	_edata			@ zImage end address
->   THUMB(		.thumb			)
+> +config CPU_BE8_BOOT_LE
+> +	bool "Boot BE system from LE loader"
+> +	depends on CPU_ENDIAN_BE8
+> +	help
+> +	  Support for running BE-8 (big-endian) from a boot environment that is
+> +	  running in LE mode.
+> +
+
+This looks strange to have a patch that only adds a config symbol with 
+no user.  Could you move it later in the series, or fold it with, say, 
+patch #4?
+
+
+
+
+
+
+>  config CPU_ENDIAN_BE32
+>  	bool
+>  	depends on CPU_BIG_ENDIAN
 > -- 
 > 1.7.10.4
 > 
