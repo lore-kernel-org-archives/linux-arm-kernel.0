@@ -1,57 +1,30 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 09 Feb 2013 14:20:14 +0000
-Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
-In-Reply-To: <20130131014801.09c81e1826a2fb234de85550@canb.auug.org.au>
-References: <20130131014801.09c81e1826a2fb234de85550@canb.auug.org.au>
-Message-ID: <20130209142014.208ED3E30EC@localhost>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Sat, 9 Feb 2013 23:21:56 +0900
+Subject: [PATCH 8/9] gpiolib: use gpio_chips list in gpio_to_desc
+In-Reply-To: <20130209095803.61C653E2CF2@localhost>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+ <1359822572-26009-10-git-send-email-acourbot@nvidia.com>
+ <20130209095803.61C653E2CF2@localhost>
+Message-ID: <CAAVeFuK39k322MeQuzLDibGDSdidrhzqwstSWOPWwCy41Ehg-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Jan 2013 01:48:01 +1100, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Kukjin,
-> 
-> Today's linux-next merge of the samsung tree got a conflict in
-> drivers/gpio/gpio-samsung.c between commits f69254328793 ("ARM: dts: Fix
-> compatible value of pinctrl module on EXYNOS5440") and b533c8685b16
-> ("ARM: dts: fix compatible value for exynos pinctrl") from the arm-soc
-> tree and commit bda7f6d4e198 ("gpio: samsung: skip gpiolib registration
-> if pinctrl support is enabled for exynos5250") from the samsung tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+On Sat, Feb 9, 2013 at 6:58 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> I'm actually going to NAK this one. This is a hot path. Having a O(1)
+> lookup from gpio number to gpio desc is important. I know you want to be
+> rid of the gpio_desc table entirely, but in this case I think it is
+> warranted. However, you can change the gpio_desc table to be a table of
+> pointers to gpio_descs instead of a table of gpio_descs. That would save
+> a lot of memory since unused GPIOs wouldn't have gpio_descs associated
+> with them. It is also the mechanism used by the IRQ subsystem.
 
-Thanks Stephen.
+That would work - what I don't like is that it still ends being a
+fixed-size static array that is not necessarily tailored to the
+platform's needs. But I understand you don't want to punish the users
+of the integer-based API, even though the penalty should really be
+neglectable here.
 
-g.
+Well, maybe I can try to come again with this once everybody uses GPIO
+descriptors instead of integers. ;)
 
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc drivers/gpio/gpio-samsung.c
-> index b2016ed,0d46db6..0000000
-> --- a/drivers/gpio/gpio-samsung.c
-> +++ b/drivers/gpio/gpio-samsung.c
-> @@@ -3023,9 -3023,9 +3022,10 @@@ static __init int samsung_gpiolib_init(
->   	*/
->   	struct device_node *pctrl_np;
->   	static const struct of_device_id exynos_pinctrl_ids[] = {
->  -		{ .compatible = "samsung,pinctrl-exynos4210", },
->  -		{ .compatible = "samsung,pinctrl-exynos4x12", },
->  -		{ .compatible = "samsung,pinctrl-exynos5250", },
->  +		{ .compatible = "samsung,exynos4210-pinctrl", },
->  +		{ .compatible = "samsung,exynos4x12-pinctrl", },
-> ++		{ .compatible = "samsung,exynos5250-pinctrl", },
->  +		{ .compatible = "samsung,exynos5440-pinctrl", },
->   	};
->   	for_each_matching_node(pctrl_np, exynos_pinctrl_ids)
->   		if (pctrl_np && of_device_is_available(pctrl_np))
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+Alex.
