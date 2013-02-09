@@ -1,65 +1,59 @@
 From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 8 Feb 2013 16:16:49 -0800
-Subject: [PATCH v5 45/45] Documentation/cpu-hotplug: Remove references to
+Date: Fri, 8 Feb 2013 16:14:39 -0800
+Subject: [PATCH v5 14/45] rcu, CPU hotplug: Fix comment referring to
  stop_machine()
-In-Reply-To: <20130122074543.13822.44724.stgit@srivatsabhat.in.ibm.com>
+In-Reply-To: <20130122073630.13822.99359.stgit@srivatsabhat.in.ibm.com>
 References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122074543.13822.44724.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20130209001649.GS2666@linux.vnet.ibm.com>
+ <20130122073630.13822.99359.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20130209001439.GQ2666@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 01:15:48PM +0530, Srivatsa S. Bhat wrote:
-> Since stop_machine() is no longer used in the CPU offline path, we cannot
-> disable CPU hotplug using preempt_disable()/local_irq_disable() etc. We
-> need to use the newly introduced get/put_online_cpus_atomic() APIs.
-> Reflect this in the documentation.
+On Tue, Jan 22, 2013 at 01:06:34PM +0530, Srivatsa S. Bhat wrote:
+> Don't refer to stop_machine() in the CPU hotplug path, since we are going
+> to get rid of it. Also, move the comment referring to callback adoption
+> to the CPU_DEAD case, because that's where it happens now.
 > 
-> Cc: Rob Landley <rob@landley.net>
-> Cc: linux-doc at vger.kernel.org
 > Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 
-Reviewed-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Ouch!  That comment is indeed obsolete and must die.
+
+I queued this to -rcu with your Signed-off-by.  However, I omitted
+the added comment, as it is imcomplete -- it is easy to look at
+rcu_cleanup_dead_cpu() to see what it does.
+
+							Thanx, Paul
 
 > ---
 > 
->  Documentation/cpu-hotplug.txt |   17 +++++++++++------
->  1 file changed, 11 insertions(+), 6 deletions(-)
+>  kernel/rcutree.c |    9 ++++-----
+>  1 file changed, 4 insertions(+), 5 deletions(-)
 > 
-> diff --git a/Documentation/cpu-hotplug.txt b/Documentation/cpu-hotplug.txt
-> index 9f40135..7f907ec 100644
-> --- a/Documentation/cpu-hotplug.txt
-> +++ b/Documentation/cpu-hotplug.txt
-> @@ -113,13 +113,15 @@ Never use anything other than cpumask_t to represent bitmap of CPUs.
->  	#include <linux/cpu.h>
->  	get_online_cpus() and put_online_cpus():
-> 
-> -The above calls are used to inhibit cpu hotplug operations. While the
-> +The above calls are used to inhibit cpu hotplug operations, when invoked from
-> +non-atomic context (because the above functions can sleep). While the
->  cpu_hotplug.refcount is non zero, the cpu_online_mask will not change.
-> -If you merely need to avoid cpus going away, you could also use
-> -preempt_disable() and preempt_enable() for those sections.
-> -Just remember the critical section cannot call any
-> -function that can sleep or schedule this process away. The preempt_disable()
-> -will work as long as stop_machine_run() is used to take a cpu down.
-> +
-> +However, if you are executing in atomic context (ie., you can't afford to
-> +sleep), and you merely need to avoid cpus going offline, you can use
-> +get_online_cpus_atomic() and put_online_cpus_atomic() for those sections.
-> +Just remember the critical section cannot call any function that can sleep or
-> +schedule this process away.
-> 
->  CPU Hotplug - Frequently Asked Questions.
-> 
-> @@ -360,6 +362,9 @@ A: There are two ways.  If your code can be run in interrupt context, use
->  		return err;
->  	}
-> 
-> +   If my_func_on_cpu() itself cannot block, use get/put_online_cpus_atomic()
-> +   instead of get/put_online_cpus() to prevent CPUs from going offline.
-> +
->  Q: How do we determine how many CPUs are available for hotplug.
->  A: There is no clear spec defined way from ACPI that can give us that
->     information today. Based on some input from Natalie of Unisys,
+> diff --git a/kernel/rcutree.c b/kernel/rcutree.c
+> index e441b77..ac94474 100644
+> --- a/kernel/rcutree.c
+> +++ b/kernel/rcutree.c
+> @@ -2827,11 +2827,6 @@ static int __cpuinit rcu_cpu_notify(struct notifier_block *self,
+>  		break;
+>  	case CPU_DYING:
+>  	case CPU_DYING_FROZEN:
+> -		/*
+> -		 * The whole machine is "stopped" except this CPU, so we can
+> -		 * touch any data without introducing corruption. We send the
+> -		 * dying CPU's callbacks to an arbitrarily chosen online CPU.
+> -		 */
+>  		for_each_rcu_flavor(rsp)
+>  			rcu_cleanup_dying_cpu(rsp);
+>  		rcu_cleanup_after_idle(cpu);
+> @@ -2840,6 +2835,10 @@ static int __cpuinit rcu_cpu_notify(struct notifier_block *self,
+>  	case CPU_DEAD_FROZEN:
+>  	case CPU_UP_CANCELED:
+>  	case CPU_UP_CANCELED_FROZEN:
+> +		/*
+> +		 * We send the dead CPU's callbacks to an arbitrarily chosen
+> +		 * online CPU.
+> +		 */
+>  		for_each_rcu_flavor(rsp)
+>  			rcu_cleanup_dead_cpu(cpu, rsp);
+>  		break;
 > 
