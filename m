@@ -1,51 +1,68 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sat, 09 Feb 2013 16:46:26 +0000
-Subject: [PATCH 01/17] ARM: add =?UTF-8?Q?CPU=5FBE=38=5FBOOT=5FLE=20co?=
- =?UTF-8?Q?nfiguration?=
-In-Reply-To: <alpine.LFD.2.02.1302082228160.6300@xanadu.home>
+Date: Sat, 09 Feb 2013 16:47:33 +0000
+Subject: [PATCH 02/17] ARM: set BE8 if LE in head code
+In-Reply-To: <alpine.LFD.2.02.1302082230390.6300@xanadu.home>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-2-git-send-email-ben.dooks@codethink.co.uk>
- <alpine.LFD.2.02.1302082228160.6300@xanadu.home>
-Message-ID: <0e242c77d74978de24f65afb2033b02a@codethink.co.uk>
+ <1360365467-25056-3-git-send-email-ben.dooks@codethink.co.uk>
+ <alpine.LFD.2.02.1302082230390.6300@xanadu.home>
+Message-ID: <72d13b1916bab6716f6fa5029242ace0@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2013 04:10, Nicolas Pitre wrote:
+On 09/02/2013 03:33, Nicolas Pitre wrote:
 > On Fri, 8 Feb 2013, Ben Dooks wrote:
 >
->> Add configuration for booting a BE8 system from a LE boot 
->> environment.
+>> If we are booting in LE and compiled for BE8, then change the 
+>> processor
+>> state in the head code. Since the instruction stream is always LE, 
+>> we
+>> do not need to do anything special.
+>>
+>> Also ensure that the secondary processors are started in the same 
+>> mode.
 >>
 >> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 >> ---
->>  arch/arm/mm/Kconfig |    7 +++++++
->>  1 file changed, 7 insertions(+)
+>>  arch/arm/boot/compressed/head.S |    3 +++
+>>  arch/arm/kernel/head.S          |    3 +++
+>>  2 files changed, 6 insertions(+)
 >>
->> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
->> index 3fd629d..70e2ad9 100644
->> --- a/arch/arm/mm/Kconfig
->> +++ b/arch/arm/mm/Kconfig
->> @@ -688,6 +688,13 @@ config CPU_ENDIAN_BE8
->>  	help
->>  	  Support for the BE-8 (big-endian) mode on ARMv6 and ARMv7 
->> processors.
->>
->> +config CPU_BE8_BOOT_LE
->> +	bool "Boot BE system from LE loader"
->> +	depends on CPU_ENDIAN_BE8
->> +	help
->> +	  Support for running BE-8 (big-endian) from a boot environment 
->> that is
->> +	  running in LE mode.
->> +
+>> diff --git a/arch/arm/boot/compressed/head.S 
+>> b/arch/arm/boot/compressed/head.S
+>> index fe4d9c3..39940a7 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -134,6 +134,9 @@ start:
+>>  		.word	_edata			@ zImage end address
+>>   THUMB(		.thumb			)
+>>  1:
+>> +#ifdef CONFIG_CPU_BE8_BOOT_LE
+>> +		setend	be			@ go BE-8 if we booted LE / no-op if already BE-8
+>> +#endif
+>>  		mrs	r9, cpsr
+>>  #ifdef CONFIG_ARM_VIRT_EXT
+>>  		bl	__hyp_stub_install	@ get into SVC mode, reversibly
+>> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+>> index 486a15a..f1ab279 100644
+>> --- a/arch/arm/kernel/head.S
+>> +++ b/arch/arm/kernel/head.S
+>> @@ -333,6 +333,9 @@ ENTRY(secondary_startup)
+>>  	 * the processor type - there is no need to check the machine type
+>>  	 * as it has already been validated by the primary processor.
+>>  	 */
+>> +#ifdef CONFIG_CPU_BE8_BOOT_LE
+>> +	setend	be				@ if system starts LE, go to BE-8
+>> +#endif
+>>  #ifdef CONFIG_ARM_VIRT_EXT
+>>  	bl	__hyp_stub_install_secondary
+>>  #endif
 >
-> This looks strange to have a patch that only adds a config symbol 
-> with
-> no user.  Could you move it later in the series, or fold it with, 
-> say,
-> patch #4?
+> For consistency, you should add a setend on the primary CPU entry 
+> path
+> in kernel/head.S and not rely on the decompressor.  Some people don't
+> use the compressed image.
 
-Yes, will look at folding it in.
+Thank you for spotting this, will sort it out for the next round.
 
 -- 
 Ben
