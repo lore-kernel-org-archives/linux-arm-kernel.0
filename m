@@ -1,49 +1,58 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sat, 09 Feb 2013 21:56:29 +0000
-Subject: [PATCH 02/17] ARM: set BE8 if LE in head code
-In-Reply-To: <5116C1DD.1070906@gmail.com>
+Date: Sat, 09 Feb 2013 22:00:51 +0000
+Subject: [PATCH 14/17] highbank: enable big-endian
+In-Reply-To: <5116C0A2.7030508@gmail.com>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-3-git-send-email-ben.dooks@codethink.co.uk>
- <5116C1DD.1070906@gmail.com>
-Message-ID: <6f283e2a929e7d58a9cac86ac59d2f63@codethink.co.uk>
+ <1360365467-25056-15-git-send-email-ben.dooks@codethink.co.uk>
+ <5116C0A2.7030508@gmail.com>
+Message-ID: <4d2a1c1c4e6df18881390c8549aa3108@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2013 21:38, Rob Herring wrote:
+On 09/02/2013 21:33, Rob Herring wrote:
 > On 02/08/2013 05:17 PM, Ben Dooks wrote:
->> If we are booting in LE and compiled for BE8, then change the 
->> processor
->> state in the head code. Since the instruction stream is always LE, 
->> we
->> do not need to do anything special.
->>
->> Also ensure that the secondary processors are started in the same 
->> mode.
+>> Apart from a xgmac driver issue, the highbank seems to work 
+>> correctly in
+>> big-endian mode. Allow the selection of big-endian in the system.
 >>
 >> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 >> ---
->>  arch/arm/boot/compressed/head.S |    3 +++
->>  arch/arm/kernel/head.S          |    3 +++
->>  2 files changed, 6 insertions(+)
+>>  arch/arm/mach-highbank/Kconfig |    1 +
+>>  1 file changed, 1 insertion(+)
 >>
->> diff --git a/arch/arm/boot/compressed/head.S 
->> b/arch/arm/boot/compressed/head.S
->> index fe4d9c3..39940a7 100644
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -134,6 +134,9 @@ start:
->>  		.word	_edata			@ zImage end address
->>   THUMB(		.thumb			)
->>  1:
->> +#ifdef CONFIG_CPU_BE8_BOOT_LE
+>> diff --git a/arch/arm/mach-highbank/Kconfig 
+>> b/arch/arm/mach-highbank/Kconfig
+>> index 551c97e..9373571 100644
+>> --- a/arch/arm/mach-highbank/Kconfig
+>> +++ b/arch/arm/mach-highbank/Kconfig
+>> @@ -13,3 +13,4 @@ config ARCH_HIGHBANK
+>>  	select HAVE_SMP
+>>  	select SPARSE_IRQ
+>>  	select USE_OF
+>> +	select ARCH_SUPPORTS_BIG_ENDIAN
 >
-> Can't you use CONFIG_CPU_BIG_ENDIAN here rather than a new config 
-> option?
+> Considering that there is nothing highbank specific to enable BE 
+> support
+> and all the support is within the A9 core (as BE support was never an
+> intended feature), I wonder if this is really the right place for 
+> this
+> option. All this really says is BE has been tested on this platform 
+> and
+> presumably it would work on other platforms ignoring raw vs. relaxed
+> accessors.
 
-For this, we can probably do this as it is a no-op, however other parts
-of the patch series do need this to allow it to boot from a little 
-endian
-booting environment.
+ From reading previous ARM documentation, I believe that the big endian
+is not a requirement for ARMv7 and can be compiled out of the core if
+the implementor does not want it. However, we've yet to find any of the
+cores out there with it removed.
 
--- 
-Ben
+As such, we still have to test on Freescale and OMAP devices.
+
+If anyone else objects to this, or feels it would be better moved
+to the V7 cpu selection, or removed entirely then let me know.
+
+> In any case:
+>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>
+> Rob
