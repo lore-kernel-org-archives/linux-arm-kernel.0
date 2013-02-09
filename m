@@ -1,49 +1,82 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 09 Feb 2013 09:20:38 +0000
-Subject: [PATCH 1/9] gpiolib: link all gpio_chips using a list
-In-Reply-To: <CACRpkdZDtJ3AN+Pgxy9nNgVx_YYTC=7AuDC48w7kDbDAeqdufw@mail.gmail.com>
+Date: Sat, 09 Feb 2013 09:58:03 +0000
+Subject: [PATCH 8/9] gpiolib: use gpio_chips list in gpio_to_desc
+In-Reply-To: <1359822572-26009-10-git-send-email-acourbot@nvidia.com>
 References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-3-git-send-email-acourbot@nvidia.com>
- <CACRpkdZDtJ3AN+Pgxy9nNgVx_YYTC=7AuDC48w7kDbDAeqdufw@mail.gmail.com>
-Message-ID: <20130209092039.0C5D23E2548@localhost>
+ <1359822572-26009-10-git-send-email-acourbot@nvidia.com>
+Message-ID: <20130209095803.61C653E2CF2@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Feb 2013 18:00:56 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sat, Feb 2, 2013 at 5:29 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+On Sun,  3 Feb 2013 01:29:31 +0900, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> Parse the list of chips to find the descriptor corresponding to a GPIO
+> number instead of directly picking the entry of the global gpio_desc[]
+> array, which is due to be removed.
 > 
-> > Add a list member to gpio_chip that allows all chips to be parsed
-> > quickly. The current method requires parsing the entire GPIO integer
-> > space, which is painfully slow. Using a list makes many chip operations
-> > that involve lookup or parsing faster, and also simplifies the code. It
-> > is also necessary to eventually get rid of the global gpio_desc[] array.
-> >
-> > The list of gpio_chips is always ordered by base GPIO number to ensure
-> > chips traversal is done in the right order.
-> >
-> > Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> This turns the complexity of converting a GPIO number into a descriptor
+> from O(1) to O(n) where n is the number of GPIO chips in the system.
+> Since n is ought to be small anyway, there should be no noticeable
+> performance impact. Moreover, GPIO users who care for speed already have
+> implemented their own gpio_get_value() and gpio_set_value() with a
+> fast path for the GPIO numbers that matter and this change does not
+> affect such use cases.
 > 
-> OK!
-> 
-> > + * Return -EBUSY if the new chip overlaps with some other chip's integer
-> > + * space.
-> (...)
-> > +       /* are we stepping on the chip right before? */
-> > +       if (pos != &gpio_chips && pos->prev != &gpio_chips) {
-> > +               _chip = list_entry(pos->prev, struct gpio_chip, list);
-> > +               if (_chip->base + _chip->ngpio > chip->base) {
-> > +                       dev_err(chip->dev,
-> > +                              "GPIO integer space overlap, cannot add chip\n");
-> > +                       err = -EBUSY;
-> > +               }
-> > +       }
-> 
-> This robustness change on its own is a merit for merging the patch.
-> And keeping a list of gpiochips available is great for stuff like
-> debugfs.
-> 
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> The descriptor-based GPIO API, due to be introduced soon, will make this
+> lookup unnecessary.
 
-Applied, thanks.
+I'm actually going to NAK this one. This is a hot path. Having a O(1)
+lookup from gpio number to gpio desc is important. I know you want to be
+rid of the gpio_desc table entirely, but in this case I think it is
+warranted. However, you can change the gpio_desc table to be a table of
+pointers to gpio_descs instead of a table of gpio_descs. That would save
+a lot of memory since unused GPIOs wouldn't have gpio_descs associated
+with them. It is also the mechanism used by the IRQ subsystem.
+
+So, it makes sense for the primary gpio_chip lookup to be the list, but
+the table needs to stick around as a secondary lookup.
 
 g.
+
+> 
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+>  drivers/gpio/gpiolib.c | 19 +++++++++++++++----
+>  1 file changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> index 9599b9a..0247c48 100644
+> --- a/drivers/gpio/gpiolib.c
+> +++ b/drivers/gpio/gpiolib.c
+> @@ -122,10 +122,21 @@ static int gpio_chip_hwgpio(const struct gpio_desc *desc)
+>   */
+>  static struct gpio_desc *gpio_to_desc(unsigned gpio)
+>  {
+> -	if (WARN(!gpio_is_valid(gpio), "invalid GPIO %d\n", gpio))
+> -		return NULL;
+> -	else
+> -		return &gpio_desc[gpio];
+> +	struct gpio_chip *chip;
+> +
+> +	list_for_each_entry(chip, &gpio_chips, list) {
+> +		int gpio_min = chip->base;
+> +		int gpio_max = gpio_min + chip->ngpio;
+> +		if (gpio >= gpio_min && gpio < gpio_max)
+> +			return &chip->desc[gpio - gpio_min];
+> +		else if (gpio < gpio_min)
+> +			/* gpio_chips are ordered by base, so we won't get any
+> +			 * hit if we arrive here... */
+> +			break;
+> +	}
+> +
+> +	pr_warn("%s: no registered chip to handle GPIO %d\n", __func__, gpio);
+> +	return NULL;
+>  }
+>  
+>  /**
+> -- 
+> 1.8.1.1
+> 
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
