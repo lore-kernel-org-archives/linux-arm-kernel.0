@@ -1,78 +1,136 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sun, 10 Feb 2013 01:22:59 +0800
-Subject: [PATCH 1/2] tty: serial: remove __init on pl011 console ops
-In-Reply-To: <20130206163811.GI17833@n2100.arm.linux.org.uk>
-References: <1360151235-11980-1-git-send-email-haojian.zhuang@linaro.org>
- <20130206115219.GE17833@n2100.arm.linux.org.uk>
- <CAD6h2NSpo74UXUgH2OJniW=wzkxGeshta05AGgCpn26SCUSjYg@mail.gmail.com>
- <CACRpkdZX-YF+jzg453Vmfxo_2LLuASvZyQqLommaM4Xd3LpwfQ@mail.gmail.com>
- <20130206163811.GI17833@n2100.arm.linux.org.uk>
-Message-ID: <CAD6h2NS6bJS1KZfZ-3SGy6AR68Vn4fkR=TgwTEu50G_edfCP1w@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 9 Feb 2013 22:53:05 +0530
+Subject: [PATCH V2 2/2] ARM: davinci: restart: fix wdt to machine restart
+ with DT
+In-Reply-To: <F3DBB1B3EF102E4994C89758CFCA32412C59EA@DBDE01.ent.ti.com>
+References: <1360123204-9978-1-git-send-email-anilkumar.v@ti.com>
+ <1360123204-9978-3-git-send-email-anilkumar.v@ti.com> <5113EF59.80508@ti.com>
+ <F3DBB1B3EF102E4994C89758CFCA32412C59EA@DBDE01.ent.ti.com>
+Message-ID: <511685F9.5080507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 February 2013 00:38, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Feb 06, 2013 at 05:31:24PM +0100, Linus Walleij wrote:
->> On Wed, Feb 6, 2013 at 1:31 PM, Haojian Zhuang
->> <haojian.zhuang@linaro.org> wrote:
->>
->> CC Grant on this issue...
->>
->> > On 6 February 2013 19:52, Russell King - ARM Linux
->> > <linux@arm.linux.org.uk> wrote:
->> >> On Wed, Feb 06, 2013 at 07:47:14PM +0800, Haojian Zhuang wrote:
->> >>> If uart driver is probed defer, console_setup will be called later
->> >>> after __init && __initdata sections destroyed. And amba_console isn't
->> >>> defined in __init or __initdata section. So we needn't define
->> >>> pl011_console_setup() && pl011_console_get_options() in __init section.
->> >>
->> >> It sounds like there's a deeper problem here - if this driver being
->> >> deferred, why isn't it being retried after the pinctrl stuff gets
->> >> its driver registered?
->> >>
->> >> We've had bugs in this deferred probing before, I wouldn't be surprised
->> >> if there's more... and we should not be "fixing" drivers because of bugs
->> >> elsewhere.
->> >
->> > It retried if driver is being deferred. But those console setup
->> > functions are released
->> > since they're declared in __init section.
->> >
->> > rest_init()
->> >    --> creates kernel_init thread that could free __init section memory
->> >
->> > deferred_probe_initicall() creates a workqueue that is used to retry
->> > deferred probe
->> > function.
->> >
->> > I think that these two threads are competing.
->>
->> Now that is the *real* problem. The __init sections surely should
->> not be discarded until *after* all deferred probes are complete
->> and the deferral workqueue terminates.
->>
->> How about writing a patch to fix that instead? (If possible...)
->
-> Well, we have the facilities to flush workqueues, so it should be possible.
->
-> However, I'm just wondering if this shows that we _do_ need to get rid
-> of a pile of __init marked functions as well as fixing this, thanks to
-> the deferred probing we now have (maybe the whole __init thing becomes
-> useless with deferred probing?)  There's nothing really to guarantee
-> that the pinctrl stuff will be available by the time the init sections
-> are discarded (it could be in a loadable module?) or indeed any other
-> resources that might be necessary.
->
-> I think in this regard, deferred probing has opened a similar can of
-> worms which hotplug devices created (which eventually ended up with
-> killing the __dev* marking).
+On 2/8/2013 8:34 AM, Kumar, Anil wrote:
 
-At first, I considered to remove those __init functions. But it may seem
-unreasonable.
+> On Thu, Feb 07, 2013 at 23:45:53, Nori, Sekhar wrote:
 
-Now I'm trying to reuse wait_for_device_probe() after do_initcalls(). Please
-help to review.
+>> On 2/6/2013 9:30 AM, Kumar, Anil wrote:
 
-Thanks
-Haojian
+>>> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+>>> index 2d5502d..1df68fd 100644
+>>> --- a/arch/arm/mach-davinci/devices-da8xx.c
+>>> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+>>> @@ -359,7 +359,7 @@ static struct resource da8xx_watchdog_resources[] = {
+>>>  	},
+>>>  };
+>>>  
+>>> -struct platform_device da8xx_wdt_device = {
+>>> +static struct platform_device da8xx_wdt_device = {
+>>
+>> Making of da8xx_wdt_device static should find a mention in description.
+> 
+> Ok, 
+> I made da8xx_wdt_device structure static as it is used only
+> in file. I will update description for this.
+> 
+>>
+>>>  	.name		= "watchdog",
+>>>  	.id		= -1,
+>>>  	.num_resources	= ARRAY_SIZE(da8xx_watchdog_resources),
+>>> @@ -368,7 +368,17 @@ struct platform_device da8xx_wdt_device = {
+>>>  
+>>>  void da8xx_restart(char mode, const char *cmd)
+>>>  {
+>>> -	davinci_watchdog_reset(&da8xx_wdt_device);
+>>> +	struct device *dev = NULL;
+>>> +	struct platform_device *wdt_device = NULL;
+>>
+>> No need to initialize these variables here.
+> 
+> Ok,
+> I think no need to define wdt_device, can be used as
+> 
+> davinci_watchdog_reset(to_platform_device(dev));
+> 
+>>
+>>> +
+>>> +	dev = bus_find_device_by_name(&platform_bus_type, NULL, "watchdog");
+>>> +	if (!dev) {
+>>> +		pr_err("wdt device not found to machine reboot\n");
+>>
+>> Rather: "%s: failed to find watchdog device", __func__
+> 
+> ok
+
+Since time is short and I really want to be able to reboot
+when using DT in v3.9, I went ahead and fixed these comments.
+Updated patch follows. I tested it on DA850 EVM.
+
+Thanks,
+Sekhar
+
+----8<----
+>From 19c7c0d81a9b1fe7342d0208b629b5e085e4f3ae Mon Sep 17 00:00:00 2001
+From: "Kumar, Anil" <anilkumar.v@ti.com>
+Date: Wed, 6 Feb 2013 09:30:04 +0530
+Subject: [PATCH 3/3] ARM: davinci: da850 DT: add support for machine reboot
+
+Update the da8xx_restart() function to support machine reboot
+when booting using DT. Have the function search for the watchdog
+platform device instead of always using "da8xx_wdt_device" which
+is never registered in DT case.
+
+While at it, also make da8xx_wdt_device static since there is no need
+for it to be globally visible.
+
+Tested machine reboot with both DT and non-DT boot on DA850 EVM.
+
+Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/devices-da8xx.c      |   12 ++++++++++--
+ arch/arm/mach-davinci/include/mach/da8xx.h |    1 -
+ 2 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 2d5502d..cc6916d 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -359,7 +359,7 @@ static struct resource da8xx_watchdog_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device da8xx_wdt_device = {
++static struct platform_device da8xx_wdt_device = {
+ 	.name		= "watchdog",
+ 	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(da8xx_watchdog_resources),
+@@ -368,7 +368,15 @@ struct platform_device da8xx_wdt_device = {
+ 
+ void da8xx_restart(char mode, const char *cmd)
+ {
+-	davinci_watchdog_reset(&da8xx_wdt_device);
++	struct device *dev;
++
++	dev = bus_find_device_by_name(&platform_bus_type, NULL, "watchdog");
++	if (!dev) {
++		pr_err("%s: failed to find watchdog device\n", __func__);
++		return;
++	}
++
++	davinci_watchdog_reset(to_platform_device(dev));
+ }
+ 
+ int __init da8xx_register_watchdog(void)
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index 700d311..ef9f70e 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -112,7 +112,6 @@ extern struct da8xx_lcdc_platform_data sharp_lcd035q3dg01_pdata;
+ extern struct da8xx_lcdc_platform_data sharp_lk043t1dg01_pdata;
+ extern struct davinci_spi_platform_data da8xx_spi_pdata[];
+ 
+-extern struct platform_device da8xx_wdt_device;
+ 
+ extern const short da830_emif25_pins[];
+ extern const short da830_spi0_pins[];
