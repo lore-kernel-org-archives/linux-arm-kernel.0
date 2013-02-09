@@ -1,40 +1,44 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sat, 09 Feb 2013 16:55:27 +0000
-Subject: [PATCH 04/17] ARM: Add =?UTF-8?Q?ARCH=5FSUPPORTS=5FBIG=5FENDI?=
- =?UTF-8?Q?AN?=
-In-Reply-To: <20130209115519.GB17833@n2100.arm.linux.org.uk>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-5-git-send-email-ben.dooks@codethink.co.uk>
- <20130209115519.GB17833@n2100.arm.linux.org.uk>
-Message-ID: <76480fe39adbb8e1538bc80aa9d6458e@codethink.co.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Sat, 9 Feb 2013 18:55:32 +0200
+Subject: [PATCH 7/7] ARM: omap2: gpmc-onenand: Replace printk KERN_ERR
+ with dev_warn()
+In-Reply-To: <1360427896-12004-8-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1360427896-12004-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1360427896-12004-8-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130209165532.GB13338@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2013 11:55, Russell King - ARM Linux wrote:
-> On Fri, Feb 08, 2013 at 11:17:34PM +0000, Ben Dooks wrote:
->> Add ARCH_SUPPORTS_BIG_ENDIAN define to arch/arm/Kconfig. Since it 
->> used
->> to live in arch/arm/mach-ixp4xx/Kconfig we move it up to the ARM one
->> as the next best place for it.
->>
->> It may be that it could be moved to a more generic location, with 
->> the
->> other ARCH_SUPPORT functions.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->
-> So in patch 3, you remove this option (which removes it from the 
-> generated
-> configs) and add it back in in the following patch.  This makes this 
-> series
-> non-bisectable.  Please roll this into patch 3 and update the patch
-> description accordingly.
->
-> I'd also suggest moving it to arch/arm/mm/Kconfig rather than
-> arch/arm/Kconfig, just before its only user, CPU_BIG_ENDIAN.
+Hi,
 
-I was wondering if it should go elsewhere for other archs to use,
-but arch/arm/mmk/Kconfig seems reasonable. We always move it later.
+On Sat, Feb 09, 2013 at 01:38:16PM -0300, Ezequiel Garcia wrote:
+> Since the condition is not an error but a warning, replace
+> printk KERN_ERR with dev_warn.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/mach-omap2/gpmc-onenand.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+> index 4771945..fd6e35b 100644
+> --- a/arch/arm/mach-omap2/gpmc-onenand.c
+> +++ b/arch/arm/mach-omap2/gpmc-onenand.c
+> @@ -367,7 +367,7 @@ void gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
+>  
+>  	if (cpu_is_omap24xx() &&
+>  			(gpmc_onenand_data->flags & ONENAND_SYNC_READWRITE)) {
+> -		printk(KERN_ERR "Onenand using only SYNC_READ on 24xx\n");
+> +		dev_warn(dev, "OneNAND using only SYNC_READ on 24xx\n");
+
+it would seem more natural to use dev_err() instead.
 
 -- 
-Ben
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130209/3367ddbe/attachment.sig>
