@@ -1,54 +1,55 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 09 Feb 2013 15:35:40 -0600
-Subject: [PATCH 15/17] xgmac: fix printing of hardware version
-In-Reply-To: <1360365467-25056-16-git-send-email-ben.dooks@codethink.co.uk>
+Date: Sat, 09 Feb 2013 15:38:37 -0600
+Subject: [PATCH 02/17] ARM: set BE8 if LE in head code
+In-Reply-To: <1360365467-25056-3-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-16-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <5116C12C.90506@gmail.com>
+ <1360365467-25056-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <5116C1DD.1070906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/08/2013 05:17 PM, Ben Dooks wrote:
-> The current driver attempts to print netdev_info() before registering the
-> network device and allowing the name to be set. Change this print to be
-> after the network deviec has been registered.
+> If we are booting in LE and compiled for BE8, then change the processor
+> state in the head code. Since the instruction stream is always LE, we
+> do not need to do anything special.
 > 
-> Fix the following issue:
-> 
-> calxedaxgmac fff50000.ethernet (unregistered net_device): h/w version is 0x1012
+> Also ensure that the secondary processors are started in the same mode.
 > 
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > ---
-
-Please post to netdev list.
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
->  drivers/net/ethernet/calxeda/xgmac.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  arch/arm/boot/compressed/head.S |    3 +++
+>  arch/arm/kernel/head.S          |    3 +++
+>  2 files changed, 6 insertions(+)
 > 
-> diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
-> index f7f0290..f91d9b2 100644
-> --- a/drivers/net/ethernet/calxeda/xgmac.c
-> +++ b/drivers/net/ethernet/calxeda/xgmac.c
-> @@ -1715,9 +1715,6 @@ static int xgmac_probe(struct platform_device *pdev)
->  		goto err_io;
->  	}
->  
-> -	uid = readl(priv->base + XGMAC_VERSION);
-> -	netdev_info(ndev, "h/w version is 0x%x\n", uid);
-> -
->  	writel(0, priv->base + XGMAC_DMA_INTR_ENA);
->  	ndev->irq = platform_get_irq(pdev, 0);
->  	if (ndev->irq == -ENXIO) {
-> @@ -1771,6 +1768,9 @@ static int xgmac_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto err_reg;
->  
-> +	uid = readl(priv->base + XGMAC_VERSION);
-> +	netdev_info(ndev, "h/w version is 0x%x\n", uid);
-> +
->  	return 0;
->  
->  err_reg:
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index fe4d9c3..39940a7 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -134,6 +134,9 @@ start:
+>  		.word	_edata			@ zImage end address
+>   THUMB(		.thumb			)
+>  1:
+> +#ifdef CONFIG_CPU_BE8_BOOT_LE
+
+Can't you use CONFIG_CPU_BIG_ENDIAN here rather than a new config option?
+
+> +		setend	be			@ go BE-8 if we booted LE / no-op if already BE-8
+> +#endif
+>  		mrs	r9, cpsr
+>  #ifdef CONFIG_ARM_VIRT_EXT
+>  		bl	__hyp_stub_install	@ get into SVC mode, reversibly
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 486a15a..f1ab279 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -333,6 +333,9 @@ ENTRY(secondary_startup)
+>  	 * the processor type - there is no need to check the machine type
+>  	 * as it has already been validated by the primary processor.
+>  	 */
+> +#ifdef CONFIG_CPU_BE8_BOOT_LE
+> +	setend	be				@ if system starts LE, go to BE-8
+> +#endif
+>  #ifdef CONFIG_ARM_VIRT_EXT
+>  	bl	__hyp_stub_install_secondary
+>  #endif
 > 
