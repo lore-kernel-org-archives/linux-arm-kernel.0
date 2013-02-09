@@ -1,59 +1,61 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 08 Feb 2013 22:33:33 -0500 (EST)
-Subject: [PATCH 02/17] ARM: set BE8 if LE in head code
-In-Reply-To: <1360365467-25056-3-git-send-email-ben.dooks@codethink.co.uk>
+Date: Fri, 08 Feb 2013 22:40:57 -0500 (EST)
+Subject: [PATCH 05/17] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
+In-Reply-To: <1360365467-25056-6-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-3-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <alpine.LFD.2.02.1302082230390.6300@xanadu.home>
+ <1360365467-25056-6-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <alpine.LFD.2.02.1302082237590.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 8 Feb 2013, Ben Dooks wrote:
 
-> If we are booting in LE and compiled for BE8, then change the processor
-> state in the head code. Since the instruction stream is always LE, we
-> do not need to do anything special.
+> The fixup_pv_table assumes that the instructions are in the same
+> endian configuration as the data, but when the CPU is running in
+> BE8 the instructions stay in little-endian format.
 > 
-> Also ensure that the secondary processors are started in the same mode.
+> Make sure if CONFIG_CPU_ENDIAN_BE8 is set that we do all the
+> alterations to the instructions taking in to account the LDR/STR
+> will be swapping the data endian-ness.
+> 
+> Since the code is only modifying a byte, we avoid dual-swapping
+> the data, and just change the bits we clear and ORR in.
+> 
+> Note, not tested against an actual bug, it looked wrong.
+
+You are missing the CONFIG_THUMB2_KERNEL counterpart.
+
 > 
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > ---
->  arch/arm/boot/compressed/head.S |    3 +++
->  arch/arm/kernel/head.S          |    3 +++
->  2 files changed, 6 insertions(+)
+>  arch/arm/kernel/head.S |    6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index fe4d9c3..39940a7 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -134,6 +134,9 @@ start:
->  		.word	_edata			@ zImage end address
->   THUMB(		.thumb			)
->  1:
-> +#ifdef CONFIG_CPU_BE8_BOOT_LE
-> +		setend	be			@ go BE-8 if we booted LE / no-op if already BE-8
-> +#endif
->  		mrs	r9, cpsr
->  #ifdef CONFIG_ARM_VIRT_EXT
->  		bl	__hyp_stub_install	@ get into SVC mode, reversibly
 > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 486a15a..f1ab279 100644
+> index f1ab279..aafb151 100644
 > --- a/arch/arm/kernel/head.S
 > +++ b/arch/arm/kernel/head.S
-> @@ -333,6 +333,9 @@ ENTRY(secondary_startup)
->  	 * the processor type - there is no need to check the machine type
->  	 * as it has already been validated by the primary processor.
->  	 */
-> +#ifdef CONFIG_CPU_BE8_BOOT_LE
-> +	setend	be				@ if system starts LE, go to BE-8
+> @@ -579,8 +579,14 @@ __fixup_a_pv_table:
+>  #else
+>  	b	2f
+>  1:	ldr	ip, [r7, r3]
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	@ in BE8, we load data in BE, but instructions still in LE
+> +	bic	ip, ip, #0xff000000
+> +	orr	ip, ip, r6, lsl#24
+> +#else
+>  	bic	ip, ip, #0x000000ff
+>  	orr	ip, ip, r6	@ mask in offset bits 31-24
 > +#endif
->  #ifdef CONFIG_ARM_VIRT_EXT
->  	bl	__hyp_stub_install_secondary
->  #endif
-
-For consistency, you should add a setend on the primary CPU entry path 
-in kernel/head.S and not rely on the decompressor.  Some people don't 
-use the compressed image.
-
-
-Nicolas
+>  	str	ip, [r7, r3]
+>  2:	cmp	r4, r5
+>  	ldrcc	r7, [r4], #4	@ use branch for delay slot
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
