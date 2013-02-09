@@ -1,52 +1,70 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 08 Feb 2013 22:57:05 -0500 (EST)
-Subject: [PATCH 09/17] ARM: add atag32_to_cpu() function
-In-Reply-To: <1360365467-25056-10-git-send-email-ben.dooks@codethink.co.uk>
+Date: Fri, 08 Feb 2013 22:57:44 -0500 (EST)
+Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
+In-Reply-To: <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-10-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <alpine.LFD.2.02.1302082256370.6300@xanadu.home>
+ <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <alpine.LFD.2.02.1302082257190.6300@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 8 Feb 2013, Ben Dooks wrote:
 
-> Add atag32_to_cpu() function to allow code manipulating ATAGs to deal
-> with the case where the boot-loader was in little-endian and Linux is
-> running big-endian.
+> The atag-to-fdt code can now use the conversion function we introduced
+> previously to avoid it having to know about the endian-ness of the
+> environment which booted the processor.
 > 
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
 Acked-by: Nicolas Pitre <nico@linaro.org>
 
+
 > ---
->  arch/arm/include/uapi/asm/setup.h |    9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
+>  arch/arm/boot/compressed/atags_to_fdt.c |   20 ++++++++++----------
+>  1 file changed, 10 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm/include/uapi/asm/setup.h b/arch/arm/include/uapi/asm/setup.h
-> index 979ff40..d74a417 100644
-> --- a/arch/arm/include/uapi/asm/setup.h
-> +++ b/arch/arm/include/uapi/asm/setup.h
-> @@ -175,13 +175,18 @@ struct tagtable {
+> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+> index aabc02a..a64ec71 100644
+> --- a/arch/arm/boot/compressed/atags_to_fdt.c
+> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
+> @@ -108,9 +108,9 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  	       return 0;
 >  
->  #define tag_member_present(tag,member)				\
->  	((unsigned long)(&((struct tag *)0L)->member + 1)	\
-> -		<= (tag)->hdr.size * 4)
-> +		<= atag32_to_cpu((tag)->hdr.size) * 4)
+>  	/* validate the ATAG */
+> -	if (atag->hdr.tag != ATAG_CORE ||
+> -	    (atag->hdr.size != tag_size(tag_core) &&
+> -	     atag->hdr.size != 2))
+> +	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
+> +	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core)) &&
+> +	     atag->hdr.size != atag32_to_cpu(2)))
+>  		return 1;
 >  
-> -#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
-> +#define tag_next(t)	((struct tag *)((__u32 *)(t) + atag32_to_cpu((t)->hdr.size)))
->  #define tag_size(type)	((sizeof(struct tag_header) + sizeof(struct type)) >> 2)
->  
->  #define for_each_tag(t,base)		\
->  	for (t = base; t->hdr.size; t = tag_next(t))
->  
-> +#ifdef CONFIG_CPU_BE8_BOOT_LE
-> +#define atag32_to_cpu(x)	le32_to_cpu(x)
-> +#else
-> +#define atag32_to_cpu(x)	x
-> +#endif
->  
->  #endif /* _UAPI__ASMARM_SETUP_H */
+>  	/* let's give it all the room it could need */
+> @@ -132,17 +132,17 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  			else
+>  				setprop_string(fdt, "/chosen", "bootargs",
+>  					       atag->u.cmdline.cmdline);
+> -		} else if (atag->hdr.tag == ATAG_MEM) {
+> +		} else if (atag->hdr.tag == atag32_to_cpu(ATAG_MEM)) {
+>  			if (memcount >= sizeof(mem_reg_property)/4)
+>  				continue;
+> -			if (!atag->u.mem.size)
+> +			if (!atag32_to_cpu(atag->u.mem.size))
+>  				continue;
+> -			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.start);
+> -			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.size);
+> -		} else if (atag->hdr.tag == ATAG_INITRD2) {
+> +			mem_reg_property[memcount++] = cpu_to_fdt32(atag32_to_cpu(atag->u.mem.start));
+> +			mem_reg_property[memcount++] = cpu_to_fdt32(atag32_to_cpu(atag->u.mem.size));
+> +		} else if (atag->hdr.tag == atag32_to_cpu(ATAG_INITRD2)) {
+>  			uint32_t initrd_start, initrd_size;
+> -			initrd_start = atag->u.initrd.start;
+> -			initrd_size = atag->u.initrd.size;
+> +			initrd_start = atag32_to_cpu(atag->u.initrd.start);
+> +			initrd_size = atag32_to_cpu(____atag->u.initrd.size);
+>  			setprop_cell(fdt, "/chosen", "linux,initrd-start",
+>  					initrd_start);
+>  			setprop_cell(fdt, "/chosen", "linux,initrd-end",
 > -- 
 > 1.7.10.4
 > 
