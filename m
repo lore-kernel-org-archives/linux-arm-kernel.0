@@ -1,62 +1,170 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 09 Feb 2013 01:05:08 +0100
-Subject: [PATCH v4 02/10] s5p-fimc: Add device tree support for FIMC
- devices
-In-Reply-To: <51158873.3060508@wwwdotorg.org>
-References: <1359745771-23684-1-git-send-email-s.nawrocki@samsung.com>
- <1359745771-23684-3-git-send-email-s.nawrocki@samsung.com>
- <5112E9EF.8090908@wwwdotorg.org> <5115874A.6050406@gmail.com>
- <51158873.3060508@wwwdotorg.org>
-Message-ID: <511592B4.5050406@gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 8 Feb 2013 16:07:17 -0800
+Subject: [PATCH v5 09/45] smp, cpu hotplug: Fix smp_call_function_*() to
+ prevent CPU offline properly
+In-Reply-To: <20130122073508.13822.12784.stgit@srivatsabhat.in.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122073508.13822.12784.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20130209000717.GP2666@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2013 12:21 AM, Stephen Warren wrote:
-> On 02/08/2013 04:16 PM, Sylwester Nawrocki wrote:
->> On 02/07/2013 12:40 AM, Stephen Warren wrote:
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
->>>> b/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
->>>
->>>> +Samsung S5P/EXYNOS SoC Camera Subsystem (FIMC)
->>>> +----------------------------------------------
-> ...
->>>> +For every fimc node a numbered alias should be present in the
->>>> aliases node.
->>>> +Aliases are of the form fimc<n>, where<n>   is an integer (0...N)
->>>> specifying
->>>> +the IP's instance index.
->>>
->>> Why? Isn't it up to the DT author whether they care if each fimc node is
->>> assigned a specific identification v.s. whether identification is
->>> assigned automatically?
->>
->> There are at least three different kinds of IPs that come in multiple
->> instances in an SoC. To activate data links between them each instance
->> needs to be clearly identified. There are also differences between
->> instances of same device. Hence it's important these aliases don't have
->> random values.
->>
->> Some more details about the SoC can be found at [1]. The aliases are
->> also already used in the Exynos5 GScaler bindings [2] in a similar way.
->
-> Hmmm. I'd expect explicit DT properties to represent the
-> instance-specific "configuration", or even different compatible values.
-> Relying on the alias ID seems rather indirect; what if in e.g.
-> Exynos6/... the mapping from instance/alias ID to feature set changes.
-> With explicit DT properties, that'd just be a .dts change, whereas by
-> requiring alias IDs now, you'd need a driver change to support this.
+On Tue, Jan 22, 2013 at 01:05:10PM +0530, Srivatsa S. Bhat wrote:
+> Once stop_machine() is gone from the CPU offline path, we won't be able to
+> depend on preempt_disable() to prevent CPUs from going offline from under us.
+> 
+> Use the get/put_online_cpus_atomic() APIs to prevent CPUs from going offline,
+> while invoking from atomic context.
+> 
+> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 
-In the initial version of this patch series I used cell-index property,
-but then Grant pointed out in some other mail thread it should be
-avoided. Hence I used the node aliases.
+Would it make sense for get_online_cpus_atomic() to return the current
+CPU number?  Looks good otherwise.
 
-Different compatible values might not work, when for example there
-are 3 IPs out of 4 of one type and the fourth one of another type.
-It wouldn't even by really different types, just quirks/little
-differences between them, e.g. no data path routed to one of other IPs.
+							Thanx, Paul
 
-Then to connect e.g. MIPI-CSIS.0 to FIMC.2 at run time an index of the
-MIPI-CSIS needs to be written to the FIMC.2 data input control register.
-Even though MIPI-CSIS.N are same in terms of hardware structure they still
-need to be distinguished as separate instances.
+> ---
+> 
+>  kernel/smp.c |   40 ++++++++++++++++++++++++++--------------
+>  1 file changed, 26 insertions(+), 14 deletions(-)
+> 
+> diff --git a/kernel/smp.c b/kernel/smp.c
+> index 29dd40a..f421bcc 100644
+> --- a/kernel/smp.c
+> +++ b/kernel/smp.c
+> @@ -310,7 +310,8 @@ int smp_call_function_single(int cpu, smp_call_func_t func, void *info,
+>  	 * prevent preemption and reschedule on another processor,
+>  	 * as well as CPU removal
+>  	 */
+> -	this_cpu = get_cpu();
+> +	get_online_cpus_atomic();
+> +	this_cpu = smp_processor_id();
+> 
+>  	/*
+>  	 * Can deadlock when called with interrupts disabled.
+> @@ -342,7 +343,7 @@ int smp_call_function_single(int cpu, smp_call_func_t func, void *info,
+>  		}
+>  	}
+> 
+> -	put_cpu();
+> +	put_online_cpus_atomic();
+> 
+>  	return err;
+>  }
+> @@ -371,8 +372,10 @@ int smp_call_function_any(const struct cpumask *mask,
+>  	const struct cpumask *nodemask;
+>  	int ret;
+> 
+> +	get_online_cpus_atomic();
+>  	/* Try for same CPU (cheapest) */
+> -	cpu = get_cpu();
+> +	cpu = smp_processor_id();
+> +
+>  	if (cpumask_test_cpu(cpu, mask))
+>  		goto call;
+> 
+> @@ -388,7 +391,7 @@ int smp_call_function_any(const struct cpumask *mask,
+>  	cpu = cpumask_any_and(mask, cpu_online_mask);
+>  call:
+>  	ret = smp_call_function_single(cpu, func, info, wait);
+> -	put_cpu();
+> +	put_online_cpus_atomic();
+>  	return ret;
+>  }
+>  EXPORT_SYMBOL_GPL(smp_call_function_any);
+> @@ -409,25 +412,28 @@ void __smp_call_function_single(int cpu, struct call_single_data *data,
+>  	unsigned int this_cpu;
+>  	unsigned long flags;
+> 
+> -	this_cpu = get_cpu();
+> +	get_online_cpus_atomic();
+> +
+> +	this_cpu = smp_processor_id();
+> +
+>  	/*
+>  	 * Can deadlock when called with interrupts disabled.
+>  	 * We allow cpu's that are not yet online though, as no one else can
+>  	 * send smp call function interrupt to this cpu and as such deadlocks
+>  	 * can't happen.
+>  	 */
+> -	WARN_ON_ONCE(cpu_online(smp_processor_id()) && wait && irqs_disabled()
+> +	WARN_ON_ONCE(cpu_online(this_cpu) && wait && irqs_disabled()
+>  		     && !oops_in_progress);
+> 
+>  	if (cpu == this_cpu) {
+>  		local_irq_save(flags);
+>  		data->func(data->info);
+>  		local_irq_restore(flags);
+> -	} else {
+> +	} else if ((unsigned)cpu < nr_cpu_ids && cpu_online(cpu)) {
+>  		csd_lock(data);
+>  		generic_exec_single(cpu, data, wait);
+>  	}
+> -	put_cpu();
+> +	put_online_cpus_atomic();
+>  }
+> 
+>  /**
+> @@ -451,6 +457,8 @@ void smp_call_function_many(const struct cpumask *mask,
+>  	unsigned long flags;
+>  	int refs, cpu, next_cpu, this_cpu = smp_processor_id();
+> 
+> +	get_online_cpus_atomic();
+> +
+>  	/*
+>  	 * Can deadlock when called with interrupts disabled.
+>  	 * We allow cpu's that are not yet online though, as no one else can
+> @@ -467,17 +475,18 @@ void smp_call_function_many(const struct cpumask *mask,
+> 
+>  	/* No online cpus?  We're done. */
+>  	if (cpu >= nr_cpu_ids)
+> -		return;
+> +		goto out_unlock;
+> 
+>  	/* Do we have another CPU which isn't us? */
+>  	next_cpu = cpumask_next_and(cpu, mask, cpu_online_mask);
+>  	if (next_cpu == this_cpu)
+> -		next_cpu = cpumask_next_and(next_cpu, mask, cpu_online_mask);
+> +		next_cpu = cpumask_next_and(next_cpu, mask,
+> +						cpu_online_mask);
+> 
+>  	/* Fastpath: do that cpu by itself. */
+>  	if (next_cpu >= nr_cpu_ids) {
+>  		smp_call_function_single(cpu, func, info, wait);
+> -		return;
+> +		goto out_unlock;
+>  	}
+> 
+>  	data = &__get_cpu_var(cfd_data);
+> @@ -523,7 +532,7 @@ void smp_call_function_many(const struct cpumask *mask,
+>  	/* Some callers race with other cpus changing the passed mask */
+>  	if (unlikely(!refs)) {
+>  		csd_unlock(&data->csd);
+> -		return;
+> +		goto out_unlock;
+>  	}
+> 
+>  	raw_spin_lock_irqsave(&call_function.lock, flags);
+> @@ -554,6 +563,9 @@ void smp_call_function_many(const struct cpumask *mask,
+>  	/* Optionally wait for the CPUs to complete */
+>  	if (wait)
+>  		csd_lock_wait(&data->csd);
+> +
+> +out_unlock:
+> +	put_online_cpus_atomic();
+>  }
+>  EXPORT_SYMBOL(smp_call_function_many);
+> 
+> @@ -574,9 +586,9 @@ EXPORT_SYMBOL(smp_call_function_many);
+>   */
+>  int smp_call_function(smp_call_func_t func, void *info, int wait)
+>  {
+> -	preempt_disable();
+> +	get_online_cpus_atomic();
+>  	smp_call_function_many(cpu_online_mask, func, info, wait);
+> -	preempt_enable();
+> +	put_online_cpus_atomic();
+> 
+>  	return 0;
+>  }
+> 
