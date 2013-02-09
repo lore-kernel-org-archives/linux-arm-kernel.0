@@ -1,23 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Feb 2013 20:08:50 +0000
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <511673E1.7000908@ti.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com> <511673E1.7000908@ti.com>
-Message-ID: <20130209200850.GK17852@n2100.arm.linux.org.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat,  9 Feb 2013 21:44:24 +0100
+Subject: [PATCH RFC 0/7] ARM: OMAP: add DT binding for gpmc-smsc911x
+Message-ID: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 09:35:53PM +0530, Sekhar Nori wrote:
-> On 2/1/2013 11:52 PM, Matt Porter wrote:
-> > +	ret = of_address_to_resource(node, 1, &res);
-> 
-> of_address_to_resource() needs <linux/of_address.h>
-> 
-> > +	if (IS_ERR_VALUE(ret))
-> 
-> This needs <linux/err.h>
+Hello,
 
-More importantly, is this the correct way to check for errors from
-of_address_to_resource() ?  Grepping the source shows that either less
-than 0 or non-zero are the commonly used conditions here.
+This is an RFC to add Device Tree support for SMSC LAN chips connected
+to OMAP processors though its General-Purpose Memory Controller.
+
+The patch-set is composed of the following patches:
+
+[PATCH RFC 1/7] platform: add a device node
+[PATCH RFC 2/7] net: smsc911x: add pinctrl support
+[PATCH RFC 3/7] ARM: OMAP: gpmc-smsc911x: add DT dev node init function
+[PATCH RFC 4/7] ARM: OMAP: gpmc-smsc911x: pass a dev node to platform
+[PATCH RFC 5/7] ARM: OMAP: gpmc: add support for gpmc-smsc911x child
+[PATCH RFC 6/7] ARM: dts: OMAP: Add an GPMC node for OMAP3
+[PATCH RFC 7/7] ARM: dts: omap3-igep0020: Add SMSC911x LAN chip support
+
+It is an RFC because I had to modify the platform_device_register_resndata()
+platform device registration function to allow passing a device node and
+associate to the platform device after allocation. The patch-set updates all
+current users and this shouldn't have a function effect on them.
+
+I think that the need for platform code to pass the DT device node to the
+platform registration infraestructure will be needed for other devices too
+whose probe function needs to access the device node associated with the
+device.
+
+The binding has been tested on an TI OMAP3 based board (IGEPv2) and added
+support is included on the RFC as an example.
+
+It is based on Linus' latest master branch + linux-omap/omap-for-v3.9/gpmc
++ linux-omap-dt/for_3.9/dts
+
+Thanks a lot and best regards,
+Javier
