@@ -1,57 +1,73 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Sat, 9 Feb 2013 22:58:31 +0200
-Subject: [PATCH 7/7] ARM: omap2: gpmc-onenand: Replace printk KERN_ERR
- with dev_warn()
-In-Reply-To: <20130209180530.GC32349@localhost>
-References: <1360427896-12004-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1360427896-12004-8-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130209165532.GB13338@arwen.pp.htv.fi>
- <20130209180530.GC32349@localhost>
-Message-ID: <20130209205831.GB14543@arwen.pp.htv.fi>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 09 Feb 2013 14:59:55 -0600
+Subject: [PATCH 16/17] xgmac: replace __raw with relaxed IO
+In-Reply-To: <1360365467-25056-17-git-send-email-ben.dooks@codethink.co.uk>
+References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1360365467-25056-17-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <5116B8CB.40007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 03:05:31PM -0300, Ezequiel Garcia wrote:
-> On Sat, Feb 09, 2013 at 06:55:32PM +0200, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Sat, Feb 09, 2013 at 01:38:16PM -0300, Ezequiel Garcia wrote:
-> > > Since the condition is not an error but a warning, replace
-> > > printk KERN_ERR with dev_warn.
-> > > 
-> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > ---
-> > >  arch/arm/mach-omap2/gpmc-onenand.c |    2 +-
-> > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-> > > index 4771945..fd6e35b 100644
-> > > --- a/arch/arm/mach-omap2/gpmc-onenand.c
-> > > +++ b/arch/arm/mach-omap2/gpmc-onenand.c
-> > > @@ -367,7 +367,7 @@ void gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
-> > >  
-> > >  	if (cpu_is_omap24xx() &&
-> > >  			(gpmc_onenand_data->flags & ONENAND_SYNC_READWRITE)) {
-> > > -		printk(KERN_ERR "Onenand using only SYNC_READ on 24xx\n");
-> > > +		dev_warn(dev, "OneNAND using only SYNC_READ on 24xx\n");
-> > 
-> > it would seem more natural to use dev_err() instead.
-> > 
+On 02/08/2013 05:17 PM, Ben Dooks wrote:
+> The xgmac driver is using __raw read and write functions, where it
+> should be using readl_relaxed and writel_relaxed to avoid any issues
+> with which endian mode the CPU is running in.
 > 
-> Are you sure? The error seems more a warning to me,
-> although I guess it's arguable.
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  drivers/net/ethernet/calxeda/xgmac.c |   12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+
+This will break on arches which don't have the _relaxed variants. David
+Miller will reject restricting this to build on ARM only. See this:
+
+http://www.spinics.net/lists/netdev/msg215457.html
+
+Rob
+
 > 
-> Let me know and I'll fix it in v2.
-
-my bad, should've read the code more carefuly. Indeed it looks more like
-a warning as we continue to try to use the IP. My bad.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130209/3e00d098/attachment.sig>
+> diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
+> index f91d9b2..08a6f9e 100644
+> --- a/drivers/net/ethernet/calxeda/xgmac.c
+> +++ b/drivers/net/ethernet/calxeda/xgmac.c
+> @@ -1202,7 +1202,7 @@ static int xgmac_poll(struct napi_struct *napi, int budget)
+>  
+>  	if (work_done < budget) {
+>  		napi_complete(napi);
+> -		__raw_writel(DMA_INTR_DEFAULT_MASK, priv->base + XGMAC_DMA_INTR_ENA);
+> +		writel_relaxed(DMA_INTR_DEFAULT_MASK, priv->base + XGMAC_DMA_INTR_ENA);
+>  	}
+>  	return work_done;
+>  }
+> @@ -1347,7 +1347,7 @@ static irqreturn_t xgmac_pmt_interrupt(int irq, void *dev_id)
+>  	struct xgmac_priv *priv = netdev_priv(dev);
+>  	void __iomem *ioaddr = priv->base;
+>  
+> -	intr_status = __raw_readl(ioaddr + XGMAC_INT_STAT);
+> +	intr_status = readl_relaxed(ioaddr + XGMAC_INT_STAT);
+>  	if (intr_status & XGMAC_INT_STAT_PMT) {
+>  		netdev_dbg(priv->dev, "received Magic frame\n");
+>  		/* clear the PMT bits 5 and 6 by reading the PMT */
+> @@ -1365,9 +1365,9 @@ static irqreturn_t xgmac_interrupt(int irq, void *dev_id)
+>  	struct xgmac_extra_stats *x = &priv->xstats;
+>  
+>  	/* read the status register (CSR5) */
+> -	intr_status = __raw_readl(priv->base + XGMAC_DMA_STATUS);
+> -	intr_status &= __raw_readl(priv->base + XGMAC_DMA_INTR_ENA);
+> -	__raw_writel(intr_status, priv->base + XGMAC_DMA_STATUS);
+> +	intr_status = readl_relaxed(priv->base + XGMAC_DMA_STATUS);
+> +	intr_status &= readl_relaxed(priv->base + XGMAC_DMA_INTR_ENA);
+> +	writel_relaxed(intr_status, priv->base + XGMAC_DMA_STATUS);
+>  
+>  	/* It displays the DMA process states (CSR5 register) */
+>  	/* ABNORMAL interrupts */
+> @@ -1403,7 +1403,7 @@ static irqreturn_t xgmac_interrupt(int irq, void *dev_id)
+>  
+>  	/* TX/RX NORMAL interrupts */
+>  	if (intr_status & (DMA_STATUS_RI | DMA_STATUS_TU | DMA_STATUS_TI)) {
+> -		__raw_writel(DMA_INTR_ABNORMAL, priv->base + XGMAC_DMA_INTR_ENA);
+> +		writel_relaxed(DMA_INTR_ABNORMAL, priv->base + XGMAC_DMA_INTR_ENA);
+>  		napi_schedule(&priv->napi);
+>  	}
+>  
+> 
