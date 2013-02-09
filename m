@@ -1,82 +1,23 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 9 Feb 2013 15:14:33 -0300
-Subject: [PATCH 3/7] ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
-In-Reply-To: <20130209165335.GA13338@arwen.pp.htv.fi>
-References: <1360427896-12004-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1360427896-12004-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130209165335.GA13338@arwen.pp.htv.fi>
-Message-ID: <20130209181432.GD32349@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Feb 2013 20:08:50 +0000
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <511673E1.7000908@ti.com>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com> <511673E1.7000908@ti.com>
+Message-ID: <20130209200850.GK17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On Sat, Feb 09, 2013 at 06:53:35PM +0200, Felipe Balbi wrote:
-> On Sat, Feb 09, 2013 at 01:38:12PM -0300, Ezequiel Garcia wrote:
-> > Fix gpmc_cs_reserved() so it returns 0 if the chip select
-> > is available (not reserved) or an error otherwise.
-> > This allows to use the return value directly and return a proper error code.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/mach-omap2/gpmc.c |   12 ++++++++----
-> >  1 files changed, 8 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> > index bd3bc93..604c1eb 100644
-> > --- a/arch/arm/mach-omap2/gpmc.c
-> > +++ b/arch/arm/mach-omap2/gpmc.c
-> > @@ -452,12 +452,16 @@ static int gpmc_cs_set_reserved(int cs, int reserved)
-> >  	return 0;
-> >  }
-> >  
-> > +/* Returns 0 if CS is available (not reseverd) or an error otherwise */
+On Sat, Feb 09, 2013 at 09:35:53PM +0530, Sekhar Nori wrote:
+> On 2/1/2013 11:52 PM, Matt Porter wrote:
+> > +	ret = of_address_to_resource(node, 1, &res);
 > 
-> s/reseverd/reserved/
+> of_address_to_resource() needs <linux/of_address.h>
 > 
-
-Indeed.
-
-> >  static int gpmc_cs_reserved(int cs)
-> >  {
-> >  	if (cs > GPMC_CS_NUM)
-> >  		return -ENODEV;
-> >  
-> > -	return gpmc_cs_map & (1 << cs);
-> > +	if (gpmc_cs_map & (1 << cs))
-> > +		return -EBUSY;
-> > +
-> > +	return 0;
+> > +	if (IS_ERR_VALUE(ret))
 > 
-> you could use a ternary operator here:
-> 
-> bit = gpmc_cs_map & (1 << cs);
-> 
-> return bit ? -EBUSY : 0;
-> 
-> But to be frank, I'm not sure this makes that much sense, I'd expect
-> gpmc_cs_reserved() to return 0 or 1 depending on the state (just as it
-> was before). The name of the method asks for a boolean return value.
-> 
+> This needs <linux/err.h>
 
-Well, we can change the return value to a boolean.
-
-However, note that the function 'as it was before' was somewhat inconsistent:
-gpmc_cs_reserved returned -ENODEV if the given 'cs' was out of range and
-a non-negative integer otherwise, 0 if the cs is available and positive
-integer otherwise.
-
-So, what I'm doing here is fixing this by returning an appropriate error
-condition or 0 if the CS is available.
-
-If we change it to return a boolean, we won't be able to distinguish
-between EBUSY and ENODEV.
-
-Let me know what you prefer and I'll fix it on v2.
-
-Thanks for the review,
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+More importantly, is this the correct way to check for errors from
+of_address_to_resource() ?  Grepping the source shows that either less
+than 0 or non-zero are the commonly used conditions here.
