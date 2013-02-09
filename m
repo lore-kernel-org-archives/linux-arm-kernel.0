@@ -1,56 +1,51 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 08 Feb 2013 23:10:04 -0500 (EST)
-Subject: [PATCH 01/17] ARM: add CPU_BE8_BOOT_LE configuration
-In-Reply-To: <1360365467-25056-2-git-send-email-ben.dooks@codethink.co.uk>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-2-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <alpine.LFD.2.02.1302082228160.6300@xanadu.home>
+From: js1304@gmail.com (JoonSoo Kim)
+Date: Sat, 9 Feb 2013 13:57:39 +0900
+Subject: [PATCH RESEND] ARM: sched: correct update_sched_clock()
+In-Reply-To: <alpine.LFD.2.02.1302081331000.6300@xanadu.home>
+References: <1360128076-8555-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <CACRpkdbwoExxKbbvBKpt_Wh9KsgCXQW566N-0BaeL3oGY8pvLg@mail.gmail.com>
+ <20130206163355.GH17833@n2100.arm.linux.org.uk>
+ <20130208065125.GA20440@lge.com>
+ <20130208150317.GT17833@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1302081331000.6300@xanadu.home>
+Message-ID: <CAAmzW4OG9GhPViqSyw9sN4wtUAU0YPjcPz-kT3MQhqZwnPdORQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Feb 2013, Ben Dooks wrote:
+2013/2/9 Nicolas Pitre <nicolas.pitre@linaro.org>:
+> On Fri, 8 Feb 2013, Russell King - ARM Linux wrote:
+>
+>> On Fri, Feb 08, 2013 at 03:51:25PM +0900, Joonsoo Kim wrote:
+>> > I try to put it into patch tracker, but I fail to put it.
+>> > I use following command.
+>> >
+>> > git send-email --to patches at arm.linux.org.uk 0001-ARM-sched-correct~~~~~
+>> >
+>> > Am I wrong?
+>> > Could you teach me how to put patch into your patch tracker?
+>> > I already read "help" on your website, but I can't find any stuff for
+>> > "git send-email".
+>>
+>> I've never used git to send email, so I'm afraid I can't help with that.
+>> Maybe someone with more experience with sending email from git can
+>> comment?
+>
+> The commit text for the patch needs to contain the following 2 lines at
+> the very bottom in order to match the patch system's expectations:
+>
+> PATCH FOLLOWS
+> KernelVersion: v3.8
+>
+> The KernelVersion value needs to be adjusted of course.
+>
+> Note: I never tried it myself but it ought to work.
 
-> Add configuration for booting a BE8 system from a LE boot environment.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  arch/arm/mm/Kconfig |    7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 3fd629d..70e2ad9 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -688,6 +688,13 @@ config CPU_ENDIAN_BE8
->  	help
->  	  Support for the BE-8 (big-endian) mode on ARMv6 and ARMv7 processors.
->  
-> +config CPU_BE8_BOOT_LE
-> +	bool "Boot BE system from LE loader"
-> +	depends on CPU_ENDIAN_BE8
-> +	help
-> +	  Support for running BE-8 (big-endian) from a boot environment that is
-> +	  running in LE mode.
-> +
+Yes!!!! It works!
+Thanks!!!
 
-This looks strange to have a patch that only adds a config symbol with 
-no user.  Could you move it later in the series, or fold it with, say, 
-patch #4?
-
-
-
-
-
-
->  config CPU_ENDIAN_BE32
->  	bool
->  	depends on CPU_BIG_ENDIAN
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Nicolas
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
