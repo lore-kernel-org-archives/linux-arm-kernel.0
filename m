@@ -1,56 +1,52 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat,  9 Feb 2013 21:44:28 +0100
-Subject: [PATCH RFC 4/7] ARM: OMAP: gpmc-smsc911x: pass a dev node to platform
- registration
+Date: Sat,  9 Feb 2013 21:44:29 +0100
+Subject: [PATCH RFC 5/7] ARM: OMAP: gpmc: add support for gpmc-smsc911x child
+ nodes
 In-Reply-To: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1360442671-15216-5-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1360442671-15216-6-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The smsc911x driver needs the GPMC smsc911x associated device
-node to set the OMAP mux pins using the pinctrl framework.
+Besides being used to interface with external memory devices,
+the General-Purpose Memory Controller can be used to connect
+Pseudo-SRAM devices to the OMAP processor that use the GPMC
+as a data bus. One of these devices is the smsc911x LAN chip.
+
+This patch allows an smsc911x LAN pheripheral to be defined
+as an GPMC child node an call its corresponding setup function.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/mach-omap2/gpmc-smsc911x.c |    5 ++++-
- arch/arm/mach-omap2/gpmc-smsc911x.h |    1 +
- 2 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/gpmc.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-index 59a2ee4..9f3b0a5 100644
---- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-+++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
-@@ -83,7 +83,8 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *gpmc_cfg)
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index f55b504..fd22c62 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -40,6 +40,7 @@
+ #include "gpmc.h"
+ #include "gpmc-nand.h"
+ #include "gpmc-onenand.h"
++#include "gpmc-smsc911x.h"
  
- 	pdev = platform_device_register_resndata(NULL, "smsc911x", gpmc_cfg->id,
- 		 gpmc_smsc911x_resources, ARRAY_SIZE(gpmc_smsc911x_resources),
--		 &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config), NULL);
-+		 &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config),
-+		 gpmc_cfg->of_node);
- 	if (!pdev) {
- 		pr_err("Unable to register platform device\n");
- 		gpio_free(gpmc_cfg->gpio_reset);
-@@ -107,6 +108,8 @@ int gpmc_smsc911x_init_dt(struct device_node *node)
- 	if (WARN_ON(!node))
- 		return -ENODEV;
+ #define	DEVICE_NAME		"omap-gpmc"
  
-+	gpmc_cfg.of_node = node;
+@@ -1320,6 +1321,14 @@ static int gpmc_probe_dt(struct platform_device *pdev)
+ 			return ret;
+ 		}
+ 	}
 +
- 	if (of_property_read_u32(node, "gpmc,cs", &gpmc_cfg.cs)) {
- 		pr_err("Unable to get GPMC smsc911x chip select\n");
- 		return -EINVAL;
-diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.h b/arch/arm/mach-omap2/gpmc-smsc911x.h
-index bbcb8bc..32a7df0 100644
---- a/arch/arm/mach-omap2/gpmc-smsc911x.h
-+++ b/arch/arm/mach-omap2/gpmc-smsc911x.h
-@@ -19,6 +19,7 @@ struct omap_smsc911x_platform_data {
- 	int	gpio_irq;
- 	int	gpio_reset;
- 	u32	flags;
-+	struct device_node *of_node;
- };
- 
- #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)
++	for_each_node_by_name(child, "gpmc_smsc911x") {
++		ret = gpmc_smsc911x_init_dt(child);
++		if (ret < 0) {
++			of_node_put(child);
++			return ret;
++		}
++	}
+ 	return 0;
+ }
+ #else
 -- 
 1.7.7.6
