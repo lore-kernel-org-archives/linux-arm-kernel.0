@@ -1,72 +1,50 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Sat, 9 Feb 2013 22:56:52 +0200
-Subject: [PATCH 3/7] ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
-In-Reply-To: <20130209181432.GD32349@localhost>
+Date: Sat, 9 Feb 2013 22:58:31 +0200
+Subject: [PATCH 7/7] ARM: omap2: gpmc-onenand: Replace printk KERN_ERR
+ with dev_warn()
+In-Reply-To: <20130209180530.GC32349@localhost>
 References: <1360427896-12004-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1360427896-12004-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130209165335.GA13338@arwen.pp.htv.fi>
- <20130209181432.GD32349@localhost>
-Message-ID: <20130209205632.GA14543@arwen.pp.htv.fi>
+ <1360427896-12004-8-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130209165532.GB13338@arwen.pp.htv.fi>
+ <20130209180530.GC32349@localhost>
+Message-ID: <20130209205831.GB14543@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, Feb 09, 2013 at 03:14:33PM -0300, Ezequiel Garcia wrote:
-> > >  static int gpmc_cs_reserved(int cs)
-> > >  {
-> > >  	if (cs > GPMC_CS_NUM)
-> > >  		return -ENODEV;
+On Sat, Feb 09, 2013 at 03:05:31PM -0300, Ezequiel Garcia wrote:
+> On Sat, Feb 09, 2013 at 06:55:32PM +0200, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Sat, Feb 09, 2013 at 01:38:16PM -0300, Ezequiel Garcia wrote:
+> > > Since the condition is not an error but a warning, replace
+> > > printk KERN_ERR with dev_warn.
+> > > 
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > ---
+> > >  arch/arm/mach-omap2/gpmc-onenand.c |    2 +-
+> > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+> > > index 4771945..fd6e35b 100644
+> > > --- a/arch/arm/mach-omap2/gpmc-onenand.c
+> > > +++ b/arch/arm/mach-omap2/gpmc-onenand.c
+> > > @@ -367,7 +367,7 @@ void gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
 > > >  
-> > > -	return gpmc_cs_map & (1 << cs);
-> > > +	if (gpmc_cs_map & (1 << cs))
-> > > +		return -EBUSY;
-> > > +
-> > > +	return 0;
+> > >  	if (cpu_is_omap24xx() &&
+> > >  			(gpmc_onenand_data->flags & ONENAND_SYNC_READWRITE)) {
+> > > -		printk(KERN_ERR "Onenand using only SYNC_READ on 24xx\n");
+> > > +		dev_warn(dev, "OneNAND using only SYNC_READ on 24xx\n");
 > > 
-> > you could use a ternary operator here:
-> > 
-> > bit = gpmc_cs_map & (1 << cs);
-> > 
-> > return bit ? -EBUSY : 0;
-> > 
-> > But to be frank, I'm not sure this makes that much sense, I'd expect
-> > gpmc_cs_reserved() to return 0 or 1 depending on the state (just as it
-> > was before). The name of the method asks for a boolean return value.
+> > it would seem more natural to use dev_err() instead.
 > > 
 > 
-> Well, we can change the return value to a boolean.
+> Are you sure? The error seems more a warning to me,
+> although I guess it's arguable.
 > 
-> However, note that the function 'as it was before' was somewhat inconsistent:
-> gpmc_cs_reserved returned -ENODEV if the given 'cs' was out of range and
-> a non-negative integer otherwise, 0 if the cs is available and positive
-> integer otherwise.
-> 
-> So, what I'm doing here is fixing this by returning an appropriate error
-> condition or 0 if the CS is available.
-> 
-> If we change it to return a boolean, we won't be able to distinguish
-> between EBUSY and ENODEV.
+> Let me know and I'll fix it in v2.
 
-that's the thing. IMO this should return 1 if it is available and 0 if
-it's not. The method looks like a yes/no question:
-
-Q: Is this GPMC CS reserved ?
-A: Yes (1)
-
-or
-
-A: No (0)
-
-then it's als far easier to use, just as code was before:
-
-if (gpmc_cs_reserved(cs)) {
-	dev_dbg(dev, "Oops, CS #%d is busy\n", cs);
-	return -EBUSY;
-} else {
-	dev_dbg(dev, "Hurray!\n");
-	return 0;
-}
+my bad, should've read the code more carefuly. Indeed it looks more like
+a warning as we continue to try to use the IP. My bad.
 
 -- 
 balbi
@@ -76,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130209/77b5416f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130209/3e00d098/attachment.sig>
