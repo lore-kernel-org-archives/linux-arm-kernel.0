@@ -1,62 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Sat, 9 Feb 2013 18:53:35 +0200
-Subject: [PATCH 3/7] ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
-In-Reply-To: <1360427896-12004-4-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1360427896-12004-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1360427896-12004-4-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130209165335.GA13338@arwen.pp.htv.fi>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Sat, 09 Feb 2013 16:55:27 +0000
+Subject: [PATCH 04/17] ARM: Add =?UTF-8?Q?ARCH=5FSUPPORTS=5FBIG=5FENDI?=
+ =?UTF-8?Q?AN?=
+In-Reply-To: <20130209115519.GB17833@n2100.arm.linux.org.uk>
+References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1360365467-25056-5-git-send-email-ben.dooks@codethink.co.uk>
+ <20130209115519.GB17833@n2100.arm.linux.org.uk>
+Message-ID: <76480fe39adbb8e1538bc80aa9d6458e@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 01:38:12PM -0300, Ezequiel Garcia wrote:
-> Fix gpmc_cs_reserved() so it returns 0 if the chip select
-> is available (not reserved) or an error otherwise.
-> This allows to use the return value directly and return a proper error code.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |   12 ++++++++----
->  1 files changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index bd3bc93..604c1eb 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -452,12 +452,16 @@ static int gpmc_cs_set_reserved(int cs, int reserved)
->  	return 0;
->  }
->  
-> +/* Returns 0 if CS is available (not reseverd) or an error otherwise */
+On 09/02/2013 11:55, Russell King - ARM Linux wrote:
+> On Fri, Feb 08, 2013 at 11:17:34PM +0000, Ben Dooks wrote:
+>> Add ARCH_SUPPORTS_BIG_ENDIAN define to arch/arm/Kconfig. Since it 
+>> used
+>> to live in arch/arm/mach-ixp4xx/Kconfig we move it up to the ARM one
+>> as the next best place for it.
+>>
+>> It may be that it could be moved to a more generic location, with 
+>> the
+>> other ARCH_SUPPORT functions.
+>>
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>
+> So in patch 3, you remove this option (which removes it from the 
+> generated
+> configs) and add it back in in the following patch.  This makes this 
+> series
+> non-bisectable.  Please roll this into patch 3 and update the patch
+> description accordingly.
+>
+> I'd also suggest moving it to arch/arm/mm/Kconfig rather than
+> arch/arm/Kconfig, just before its only user, CPU_BIG_ENDIAN.
 
-s/reseverd/reserved/
-
->  static int gpmc_cs_reserved(int cs)
->  {
->  	if (cs > GPMC_CS_NUM)
->  		return -ENODEV;
->  
-> -	return gpmc_cs_map & (1 << cs);
-> +	if (gpmc_cs_map & (1 << cs))
-> +		return -EBUSY;
-> +
-> +	return 0;
-
-you could use a ternary operator here:
-
-bit = gpmc_cs_map & (1 << cs);
-
-return bit ? -EBUSY : 0;
-
-But to be frank, I'm not sure this makes that much sense, I'd expect
-gpmc_cs_reserved() to return 0 or 1 depending on the state (just as it
-was before). The name of the method asks for a boolean return value.
+I was wondering if it should go elsewhere for other archs to use,
+but arch/arm/mmk/Kconfig seems reasonable. We always move it later.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130209/5a458fb9/attachment.sig>
+Ben
