@@ -1,47 +1,62 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 8 Feb 2013 15:51:22 -0800
-Subject: [PATCH v5 08/45] CPU hotplug: Convert preprocessor macros to
- static inline functions
-In-Reply-To: <20130122073500.13822.11469.stgit@srivatsabhat.in.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073500.13822.11469.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20130208235122.GO2666@linux.vnet.ibm.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 09 Feb 2013 01:05:08 +0100
+Subject: [PATCH v4 02/10] s5p-fimc: Add device tree support for FIMC
+ devices
+In-Reply-To: <51158873.3060508@wwwdotorg.org>
+References: <1359745771-23684-1-git-send-email-s.nawrocki@samsung.com>
+ <1359745771-23684-3-git-send-email-s.nawrocki@samsung.com>
+ <5112E9EF.8090908@wwwdotorg.org> <5115874A.6050406@gmail.com>
+ <51158873.3060508@wwwdotorg.org>
+Message-ID: <511592B4.5050406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 01:05:02PM +0530, Srivatsa S. Bhat wrote:
-> On 12/05/2012 06:10 AM, Andrew Morton wrote:
-> "static inline C functions would be preferred if possible.  Feel free to
-> fix up the wrong crufty surrounding code as well ;-)"
-> 
-> Convert the macros in the CPU hotplug code to static inline C functions.
-> 
-> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+On 02/09/2013 12:21 AM, Stephen Warren wrote:
+> On 02/08/2013 04:16 PM, Sylwester Nawrocki wrote:
+>> On 02/07/2013 12:40 AM, Stephen Warren wrote:
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
+>>>> b/Documentation/devicetree/bindings/media/soc/samsung-fimc.txt
+>>>
+>>>> +Samsung S5P/EXYNOS SoC Camera Subsystem (FIMC)
+>>>> +----------------------------------------------
+> ...
+>>>> +For every fimc node a numbered alias should be present in the
+>>>> aliases node.
+>>>> +Aliases are of the form fimc<n>, where<n>   is an integer (0...N)
+>>>> specifying
+>>>> +the IP's instance index.
+>>>
+>>> Why? Isn't it up to the DT author whether they care if each fimc node is
+>>> assigned a specific identification v.s. whether identification is
+>>> assigned automatically?
+>>
+>> There are at least three different kinds of IPs that come in multiple
+>> instances in an SoC. To activate data links between them each instance
+>> needs to be clearly identified. There are also differences between
+>> instances of same device. Hence it's important these aliases don't have
+>> random values.
+>>
+>> Some more details about the SoC can be found at [1]. The aliases are
+>> also already used in the Exynos5 GScaler bindings [2] in a similar way.
+>
+> Hmmm. I'd expect explicit DT properties to represent the
+> instance-specific "configuration", or even different compatible values.
+> Relying on the alias ID seems rather indirect; what if in e.g.
+> Exynos6/... the mapping from instance/alias ID to feature set changes.
+> With explicit DT properties, that'd just be a .dts change, whereas by
+> requiring alias IDs now, you'd need a driver change to support this.
 
-Reviewed-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+In the initial version of this patch series I used cell-index property,
+but then Grant pointed out in some other mail thread it should be
+avoided. Hence I used the node aliases.
 
-> ---
-> 
->  include/linux/cpu.h |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-> index cf24da1..eb79f47 100644
-> --- a/include/linux/cpu.h
-> +++ b/include/linux/cpu.h
-> @@ -198,10 +198,10 @@ static inline void cpu_hotplug_driver_unlock(void)
-> 
->  #else		/* CONFIG_HOTPLUG_CPU */
-> 
-> -#define get_online_cpus()	do { } while (0)
-> -#define put_online_cpus()	do { } while (0)
-> -#define get_online_cpus_atomic()	do { } while (0)
-> -#define put_online_cpus_atomic()	do { } while (0)
-> +static inline void get_online_cpus(void) {}
-> +static inline void put_online_cpus(void) {}
-> +static inline void get_online_cpus_atomic(void) {}
-> +static inline void put_online_cpus_atomic(void) {}
->  #define hotcpu_notifier(fn, pri)	do { (void)(fn); } while (0)
->  /* These aren't inline functions due to a GCC bug. */
->  #define register_hotcpu_notifier(nb)	({ (void)(nb); 0; })
-> 
+Different compatible values might not work, when for example there
+are 3 IPs out of 4 of one type and the fourth one of another type.
+It wouldn't even by really different types, just quirks/little
+differences between them, e.g. no data path routed to one of other IPs.
+
+Then to connect e.g. MIPI-CSIS.0 to FIMC.2 at run time an index of the
+MIPI-CSIS needs to be written to the FIMC.2 data input control register.
+Even though MIPI-CSIS.N are same in terms of hardware structure they still
+need to be distinguished as separate instances.
