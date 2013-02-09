@@ -1,29 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Feb 2013 12:05:25 +0000
-Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
-In-Reply-To: <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
+Date: Sat, 9 Feb 2013 12:06:31 +0000
+Subject: [PATCH 11/17] ARM: fixup atags to be endian agnostic
+In-Reply-To: <1360365467-25056-12-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130209120525.GD17833@n2100.arm.linux.org.uk>
+ <1360365467-25056-12-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130209120631.GE17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 08, 2013 at 11:17:40PM +0000, Ben Dooks wrote:
-> -	if (atag->hdr.tag != ATAG_CORE ||
-> -	    (atag->hdr.size != tag_size(tag_core) &&
-> -	     atag->hdr.size != 2))
-> +	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
-> +	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core)) &&
-> +	     atag->hdr.size != atag32_to_cpu(2)))
+On Fri, Feb 08, 2013 at 11:17:41PM +0000, Ben Dooks wrote:
+> +	{ atag32_to_cpu(tag_size(tag_core)), atag32_to_cpu(ATAG_CORE) },
+> +	{ atag32_to_cpu(1), atag32_to_cpu(PAGE_SIZE), atag32_to_cpu(0xff) },
+> +	{ atag32_to_cpu(tag_size(tag_mem32)), atag32_to_cpu(ATAG_MEM) },
+> +	{ atag32_to_cpu(MEM_SIZE) },
+> +	{ atag32_to_cpu(0), atag32_to_cpu(ATAG_NONE) }
 
-This is wrong.  You're saying that "ATAG_CORE" is in LE32 format.  It
-isn't.  It's in CPU endian format.  If you want to do this kind of thing,
-you also need to define cpu_to_atag32() macros as well, otherwise this
-will cause sparse warnings.
+Again, this needs to be cpu_to_atag32().
 
-> -			initrd_start = atag->u.initrd.start;
-> -			initrd_size = atag->u.initrd.size;
-> +			initrd_start = atag32_to_cpu(atag->u.initrd.start);
-> +			initrd_size = atag32_to_cpu(____atag->u.initrd.size);
-
-Where did those four underscores come from?  Has this been built?
+Pay attention to what you're converting from and to.  Consider them
+totally separate types that just happen to be integers, and ensure
+that you match the types in your functions.
