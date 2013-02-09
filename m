@@ -1,33 +1,69 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sat, 09 Feb 2013 17:09:42 +0000
-Subject: [PATCH 06/17] ARM: fixup head for atag verification
-In-Reply-To: <alpine.LFD.2.02.1302082246400.6300@xanadu.home>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-7-git-send-email-ben.dooks@codethink.co.uk>
- <alpine.LFD.2.02.1302082246400.6300@xanadu.home>
-Message-ID: <aa110730c75b32e6594dcaa251668a33@codethink.co.uk>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sat, 9 Feb 2013 18:11:05 +0100
+Subject: [PATCH v2 00/10] ARM: S3C24XX: irq rework for S3C2412,
+ S3C2440 and S3C2442
+Message-ID: <201302091811.05437.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2013 03:51, Nicolas Pitre wrote:
-> On Fri, 8 Feb 2013, Ben Dooks wrote:
->
->> If we booted LE but running BE8, ensure we read ATAGs data from head 
->> code
->> in the correct mode.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->
-> You must be working on some recent platform, right?  Your cover 
-> letter
-> mention highbank.  Strange that you don't address the DT pointer
-> validation as well.
+This series finishes the irq rework by moving the irqs for s3c2412, s3c2440
+and s3c2442 into the new structure.
 
-I am using highbank for my main tests, I believe the DT pointer is
-correct as the data is always guaranteed to be BE and the kernel
-is doing the correct thing to test for it.
+Now the only open point is the different handling of the eint0 to eint3
+interrupts on the s3c2412. On this SoC these interrupts are represented
+in both the main register and the eint register and also need to be handled
+in both.
 
-I will re-check this, but it all looked fine when I went through it.
+As this should be handlable via the new structure, I'm still investigating
+the right way to do it. Therefore the override of the eint0 to eint3
+interrupts will still remain for a bit.
+
+As I lack the relevant hardware, this series is compile tested only, but as
+the used mechanisms are the same as with the s3c2416, there shouldn't be
+any complications.
+
+This series applies on top of the moved s3c24XX.h headers into the common.h
+file in mach-s3c24xx.
+
+changes since v1:
+- included the changes for the s3c2412
+
+Heiko Stuebner (10):
+  ARM: S3C24XX: move s3c244x irq init to common irq code
+  ARM: S3C24XX: create dedicated irq init functions for s3c2440 and s3c2442
+  ARM: S3C24XX: move s3c2440 irqs to common irq code
+  ARM: S3C24XX: integrate s3c2440 irqs into common init
+  ARM: S3C24XX: transform s3c2442 irqs into new structure
+  ARM: S3C24XX: transform s3c2440 irqs into new structure
+  ARM: S3C24XX: use samsung_sync_wakemask in s3c2412 pm
+  ARM: S3C24XX: move s3c2412 irq init to common code
+  ARM: S3C24XX: modify s3c2412 irq init to initialize all irqs
+  ARM: S3C24XX: transform s3c2412 irqs into new structure
+
+ arch/arm/mach-s3c24xx/Kconfig          |    1 +
+ arch/arm/mach-s3c24xx/Makefile         |    6 +-
+ arch/arm/mach-s3c24xx/common.h         |    3 +
+ arch/arm/mach-s3c24xx/irq-s3c2412.c    |  215 -----------------------
+ arch/arm/mach-s3c24xx/irq-s3c2440.c    |  128 --------------
+ arch/arm/mach-s3c24xx/irq-s3c244x.c    |  142 ---------------
+ arch/arm/mach-s3c24xx/irq.c            |  299 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-s3c24xx/mach-anubis.c    |    2 +-
+ arch/arm/mach-s3c24xx/mach-at2440evb.c |    2 +-
+ arch/arm/mach-s3c24xx/mach-gta02.c     |    2 +-
+ arch/arm/mach-s3c24xx/mach-jive.c      |    2 +-
+ arch/arm/mach-s3c24xx/mach-mini2440.c  |    2 +-
+ arch/arm/mach-s3c24xx/mach-nexcoder.c  |    2 +-
+ arch/arm/mach-s3c24xx/mach-osiris.c    |    2 +-
+ arch/arm/mach-s3c24xx/mach-rx1950.c    |    2 +-
+ arch/arm/mach-s3c24xx/mach-rx3715.c    |    7 +-
+ arch/arm/mach-s3c24xx/mach-smdk2413.c  |    6 +-
+ arch/arm/mach-s3c24xx/mach-smdk2440.c  |    2 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c     |    2 +-
+ arch/arm/mach-s3c24xx/pm-s3c2412.c     |    8 +
+ 20 files changed, 328 insertions(+), 507 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2412.c
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2440.c
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c244x.c
 
 -- 
-Ben
+1.7.2.3
