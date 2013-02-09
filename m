@@ -1,23 +1,47 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 09 Feb 2013 09:25:25 +0000
-Subject: [PATCH 3/9] gpiolib: use gpio_chips list in gpiochip_find
-In-Reply-To: <CACRpkdaVwjv2DwSx667sgVkHqx-tHsy6A0mP-kvq6h9nDDBrGA@mail.gmail.com>
+Date: Sat, 09 Feb 2013 09:20:38 +0000
+Subject: [PATCH 1/9] gpiolib: link all gpio_chips using a list
+In-Reply-To: <CACRpkdZDtJ3AN+Pgxy9nNgVx_YYTC=7AuDC48w7kDbDAeqdufw@mail.gmail.com>
 References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-5-git-send-email-acourbot@nvidia.com>
- <CACRpkdaVwjv2DwSx667sgVkHqx-tHsy6A0mP-kvq6h9nDDBrGA@mail.gmail.com>
-Message-ID: <20130209092525.9F9A23E2C48@localhost>
+ <1359822572-26009-3-git-send-email-acourbot@nvidia.com>
+ <CACRpkdZDtJ3AN+Pgxy9nNgVx_YYTC=7AuDC48w7kDbDAeqdufw@mail.gmail.com>
+Message-ID: <20130209092039.0C5D23E2548@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Feb 2013 18:05:32 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Tue, 5 Feb 2013 18:00:56 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
 > On Sat, Feb 2, 2013 at 5:29 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
 > 
-> > Using the GPIO chips list is much faster than parsing the entire GPIO
-> > number space.
+> > Add a list member to gpio_chip that allows all chips to be parsed
+> > quickly. The current method requires parsing the entire GPIO integer
+> > space, which is painfully slow. Using a list makes many chip operations
+> > that involve lookup or parsing faster, and also simplifies the code. It
+> > is also necessary to eventually get rid of the global gpio_desc[] array.
+> >
+> > The list of gpio_chips is always ordered by base GPIO number to ensure
+> > chips traversal is done in the right order.
 > >
 > > Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 > 
-> You don't say :-)
+> OK!
+> 
+> > + * Return -EBUSY if the new chip overlaps with some other chip's integer
+> > + * space.
+> (...)
+> > +       /* are we stepping on the chip right before? */
+> > +       if (pos != &gpio_chips && pos->prev != &gpio_chips) {
+> > +               _chip = list_entry(pos->prev, struct gpio_chip, list);
+> > +               if (_chip->base + _chip->ngpio > chip->base) {
+> > +                       dev_err(chip->dev,
+> > +                              "GPIO integer space overlap, cannot add chip\n");
+> > +                       err = -EBUSY;
+> > +               }
+> > +       }
+> 
+> This robustness change on its own is a merit for merging the patch.
+> And keeping a list of gpiochips available is great for stuff like
+> debugfs.
+> 
 > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Applied, thanks.
