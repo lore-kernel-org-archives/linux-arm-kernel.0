@@ -1,17 +1,43 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sun, 10 Feb 2013 15:05:11 +0000
-Subject: [PATCH 2/2] ARM: mm: mm->context.id fix for big-endian
-In-Reply-To: <1360508248-25252-3-git-send-email-ben.dooks@codethink.co.uk>
-References: <1360508248-25252-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360508248-25252-3-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <fbfc1a2851f5dd690ed4d98fc9de3030@codethink.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 10 Feb 2013 16:08:15 +0100
+Subject: [GIT PULL] ux500 DT related fixes and platform enhancements
+In-Reply-To: <20130208083121.GG7519@gmail.com>
+References: <20130131115552.GG5301@gmail.com> <20130206135911.GB7519@gmail.com>
+ <CAOesGMiJTcjdEJzSDkpdV-ZCqN24uVmfjM-HOt+ojErS=98TmQ@mail.gmail.com>
+ <CAF2Aj3gaFtPs7gLd3snzVr1a8Px5A_RN1vz=M+U_LZ3MBpyqqw@mail.gmail.com>
+ <CACRpkdaTajxS6YbjyyGPQ=qWiAkLaPySU6WncQ2E8HoAtGXqjA@mail.gmail.com>
+ <20130208083121.GG7519@gmail.com>
+Message-ID: <CACRpkdYChVn6RMnbckR0UiPZC+WdqZjWKvMyoPf=oJifCEgAgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2013 14:57, Ben Dooks wrote:
-> Since the new ASID code in [b5466f8728527a05a493cc4abe9e6f034a1bbaab]
-> was changed to use 64bit operations it has broken the BE operation 
-> due
-> to an issue with the MM code accessing sub-fields of mm->context.id.
+On Fri, Feb 8, 2013 at 9:31 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 07 Feb 2013, Linus Walleij wrote:
+>>
+>> OK so what about I pull this branch into my ux500 git and
+>> call it a devicetree branch, and then we can optionally
+>> merge a few of those ARM: ux500: * patches that
+>> was sent for the regulator stuff on top of that as well?
+>
+> There are two reasons why I don't like that idea: 1) As Olof pointed
+> out, a lot of these patches aren't actually DT related, and 2) I
+> really want all of the regulator stuff to stay together. Each of the
+> changes in the platform code are directly dependent on the ones
+> happening in the regulator driver, and visa versa. It would be best if
+> they continued to be taken though Marks tree.
 
-Fixed the ref, new patch pushed to git.
+I understand this and I'm fully aligned for the non-DT parts.
+
+But I'm worrying about a plethora or merge conflicts
+under arch/arm/boot/dts/*
+
+I already pulled some of the pinctrl device tree patches over to
+my Linux-stericsson tree to avoid clashes between ARM SoC
+and pinctrl.
+
+Rationale: I don't want arch/arm/boot/dts to become the new
+boardfile-type merge-clash point. That will just invoke the
+wrath of the Big Penguin.
+
+Yours,
+Linus Walleij
