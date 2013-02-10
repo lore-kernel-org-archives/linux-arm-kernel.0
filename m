@@ -1,47 +1,36 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sun, 10 Feb 2013 01:10:02 +0000
-Subject: [PATCH 2/2] ARM: mm: mm->context.id fix for big-endian
-In-Reply-To: <1360451709-19740-3-git-send-email-ben.dooks@codethink.co.uk>
-References: <1360451709-19740-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360451709-19740-3-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <a1bfc188774f0bff0452d3a3ab5b2624@codethink.co.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 9 Feb 2013 17:27:07 -0800
+Subject: [GIT PULL] DaVinci DT updates for v3.9 (part 2)
+In-Reply-To: <51168E50.1010709@ti.com>
+References: <51168E50.1010709@ti.com>
+Message-ID: <20130210012707.GL16278@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2013 23:15, Ben Dooks wrote:
-> Since the new ASID code introduced in
-> b5466f8728527a05a493cc4abe9e6f034a1bbaab
-> uses 64bit operations, when running in BE mode we see the values in
-> mm->context.id swapped around as the lowest word is being stored in
-> mm->context.id + 4, instead of + 0.
+On Sat, Feb 09, 2013 at 11:28:40PM +0530, Sekhar Nori wrote:
+> Hi Arnd, Olof,
+> 
+> Can you please pull the following changes for v3.9?
+> 
+> Thanks,
+> Sekhar
+> 
+> The following changes since commit 1661636d362b6d1a6c2bab210f2ab363a69deccc:
+> 
+>   ARM: davinci: da850: add RTC DT entries (2013-01-28 21:28:11 +0530)
+> 
+> are available in the git repository at:
+> 
+>   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-for-v3.9/dt-2
 
-The one thing I have just realised with this is that we are no-longer
-going to be storing the mm->context.id data in the sat was a pre the
-ASID changes, which could confuse debuggers which assume they can read
-the data.
+Pulled, but:
 
-Should we fix this the easy way below, or go and change the code
-in arch/arm/mm/context.c to deal with re-arranging the atomic64
-accesses when in big-endian mode?
+> Kumar, Anil (2):
+>       ARM: davinci: da850 DT: add support for machine reboot
 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  arch/arm/mm/proc-macros.S |    4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-> index eb6aa73..5a6a347 100644
-> --- a/arch/arm/mm/proc-macros.S
-> +++ b/arch/arm/mm/proc-macros.S
-> @@ -40,7 +40,11 @@
->   * mmid - get context id from mm pointer (mm->context.id)
->   */
->  	.macro	mmid, rd, rn
-> +#ifdef __ARMEB__
-> +	ldr	\rd, [\rn, #MM_CONTEXT_ID + 4 ]
-> +#else
->  	ldr	\rd, [\rn, #MM_CONTEXT_ID]
-> +#endif
->  	.endm
->
->  /*
+Looking at this patch, looking for any device named "watchdog" seems a
+bit fragile.  It's an unfortunate device name to have it that generic
+in the davinci_wdt driver.
+
+
+-Olof
