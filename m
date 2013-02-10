@@ -1,51 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 10 Feb 2013 16:05:20 -0500
-Subject: [GIT PULL  3/4] ARM: mvebu: boards for v3.9
-In-Reply-To: <20130210003113.GB16278@quad.lixom.net>
-References: <pull-1359733919-342140> <1359733919.c3D01c3.22262@triton>
- <20130205071010.GD13049@quad.lixom.net>
- <20130205112104.GP14746@titan.lakedaemon.net>
- <20130205182333.GA21051@quad.lixom.net>
- <20130205183050.GZ14746@titan.lakedaemon.net>
- <20130205232604.GB14851@quad.lixom.net>
- <20130206132015.GB14746@titan.lakedaemon.net>
- <20130210003113.GB16278@quad.lixom.net>
-Message-ID: <20130210210520.GI14746@titan.lakedaemon.net>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Sun, 10 Feb 2013 22:16:14 +0100
+Subject: [PATCH 1/4] ARM: tegra: Unify tegra{20,30,114}_init_early()
+In-Reply-To: <51180121.6040803@wwwdotorg.org>
+References: <1360308574-19658-1-git-send-email-hdoyu@nvidia.com>
+ <2499199.srlLvkihNZ@ax5200p> <51180121.6040803@wwwdotorg.org>
+Message-ID: <1828614.u7HcYf891a@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 04:31:13PM -0800, Olof Johansson wrote:
-> On Wed, Feb 06, 2013 at 08:20:15AM -0500, Jason Cooper wrote:
-> > On Tue, Feb 05, 2013 at 03:26:04PM -0800, Olof Johansson wrote:
-> > > What makes sense is to hold off the patches that adds dts entries and
-> > > removes the platform device registrations to the next release to avoid
-> > > this dependency.
-> > 
-> > Hmm, this makes life a *lot* simpler, but it also really slows things
-> > down.  I'll go ahead and do this from now on.
-> > 
-> > Would you like me to redo /boards and /dt in light of this, or just do
-> > it from here forward?
+On Sunday 10 February 2013 13:20:49 Stephen Warren wrote:
+> 1On 02/10/2013 10:28 AM, Marc Dietrich wrote:
+> > On Friday 08 February 2013 10:09:10 Stephen Warren wrote:
+> >> On 02/08/2013 05:29 AM, Marc Dietrich wrote:
+> >>> Hiroshi,
+> >>> 
+> >>> Am Freitag, 8. Februar 2013, 09:29:31 schrieb Hiroshi Doyu:
+> >>>> Refactored tegra{20,30,114}_init_early() so that we have the unified
+> >>>> tegra_init_early().
 > 
-> It doesn't necessarily slow things down -- it increases latency though. I.e.
-> you'll end up building a pipeline over time.
+> ...
+> 
+> >>> are these ifdefs really needed? Multisoc kernels will enable them all
+> >>> anyway and there is a case structure which protects the assignments.
+> >>> Also
+> >>> the hotplug functions are very tiny, so there shouldn't be a big loss.
+> >> 
+> >> The files that contain/implement those functions are separate for each
+> >> SoC and only included in the build when the individual SoCs are enabled.
+> >> 
+> >> While multi-platform SoCs do make sense for distros, we also very
+> >> specifically want to support the case where only Tegra, and only a
+> >> single Tegra SoC, is enabled, hence this separation.
+> > 
+> > Huh? so tegra_defconfig is not supported?
+> > 
+> > grep "TEGRA_.*_SOC" tegra_defconfig:
+> > 
+> > CONFIG_ARCH_TEGRA_2x_SOC=y
+> > CONFIG_ARCH_TEGRA_3x_SOC=y
+> 
+> I don't understand the question.
+> 
+> But to be clear. There are now 3 variants of Tegra supported. (Tegra20,
+> Tegra30, Tegra114). We want to be able to build a minimal-size kernel
+> (e.g. for embedded applications) that supports just one, any combination
+> of two, or all three Tegra variants.
 
-Yes, that's not a problem.
+ah, ok - I just skipped the "also" in your sentence above. But still, the 
+#ifdefs look strange to me and save only a few byte of code. Just me few 
+cents.
 
-> I agree that we're not entirely clear on this, and we're also going back and
-> forth a bit on how much of this we push back on and not. I don't think we've
-> found quite a good balance of this yet. Hm.
-
-Well, it appears to me the crux of it is: How hard is it to merge and
-re-merge branches with dependencies on driver trees?  If it's a PITA,
-then let's do as you've suggested.  A sane, but slower process will
-incur fewer mistakes.
-
-Also, we can sit down an go ever this (with a few beers) at ELC.  ;-)
-
-I'll redo as you've suggested for this go-around, and we can hash it out
-in a few weeks.
-
-thx,
-
-Jason.
+Marc
