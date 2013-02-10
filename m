@@ -1,42 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 9 Feb 2013 18:42:19 -0800
-Subject: [PATCH 11/14] ARM: ux500: remove irq_base property from
- platform_data
-In-Reply-To: <1360093715-6348-12-git-send-email-linus.walleij@stericsson.com>
-References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
- <1360093715-6348-12-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130210024141.GE25302@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 9 Feb 2013 18:42:28 -0800
+Subject: [GIT PULL] omap twl platform init changes for v3.9 merge window
+In-Reply-To: <20130210005824.GJ16278@quad.lixom.net>
+References: <20130206172500.GA25185@atomide.com>
+ <20130210005824.GJ16278@quad.lixom.net>
+Message-ID: <20130210024228.GA4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 08:48:32PM +0100, Linus Walleij wrote:
-> From: Lee Jones <lee.jones@linaro.org>
+* Olof Johansson <olof@lixom.net> [130209 17:01]:
+> On Wed, Feb 06, 2013 at 09:25:00AM -0800, Tony Lindgren wrote:
+> > The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+> > 
+> >   Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/twl-signed-v2
 > 
-> AB8500 GPIO no longer handles its GPIO IRQs. Instead, the AB8500
-> core driver has taken back the responsibility. Prior to this
-> happening, the AB8500 GPIO driver provided a set of virtual IRQs
-> which were used as a pass-through. These virtual IRQs had a base
-> of MOP500_AB8500_VIR_GPIO_IRQ_BASE, which was passed though pdata.
-> We don't need to do this anymore, so we're pulling out the
-> property from the structure.
-> 
-> Cc: arm at kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Requesting an ACK from the ARM SoC maintainers on this patch.
+> <standard complaint>
+> It would be nice to see TI enabling device-tree on these platforms/drivers
+> instead of adding to legacy board files.
+> </standard complaint>
 
-This patch on its own doesn't apply cleanly at all to arm-soc, I'm guessing
-because I need the rest of the series. With the presumption that you're not
-going to cause grief from sfr due to excessive conflicts. I.e. please try
-merging with arm-soc for-next to see how bad it is:
+I believe it already has at least for audio, but we cannot yet drop
+the legacy support. Currently am33xx is DT only, omap4 is pretty close
+to be flipped over to be DT only.
+ 
+> Pulled into next/boards.
 
-patch 11-14:
+Thanks,
 
-Acked-by: Olof Johansson <olof@lixom.net>
-
-If it's conflict-heavy, we'll stage a topic branch that we can both
-pull in.  I'm guessing/hoping that won't be the case though.
-
-
--Olof
+Tony
