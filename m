@@ -1,59 +1,36 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sun, 10 Feb 2013 14:57:28 +0000
-Subject: [PATCH 2/2] ARM: mm: mm->context.id fix for big-endian
-In-Reply-To: <1360508248-25252-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1360508248-25252-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360508248-25252-3-git-send-email-ben.dooks@codethink.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 10 Feb 2013 16:01:54 +0100
+Subject: [PATCH 11/14] ARM: ux500: remove irq_base property from
+ platform_data
+In-Reply-To: <20130210024141.GE25302@quad.lixom.net>
+References: <1360093715-6348-1-git-send-email-linus.walleij@stericsson.com>
+ <1360093715-6348-12-git-send-email-linus.walleij@stericsson.com>
+ <20130210024141.GE25302@quad.lixom.net>
+Message-ID: <CACRpkdYfG35UUGZZ=N4GQEkEEV_xEK9dhrz3YQ+kS7DaOSOjGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the new ASID code in [b5466f8728527a05a493cc4abe9e6f034a1bbaab]
-was changed to use 64bit operations it has broken the BE operation due
-to an issue with the MM code accessing sub-fields of mm->context.id.
+On Sun, Feb 10, 2013 at 3:42 AM, Olof Johansson <olof@lixom.net> wrote:
 
-When running in BE mode we see the values in mm->context.id are stored
-with the highest value first, so the LDR in the arch/arm/mm/proc-macros.S
-reads the wrong part of this field. To resolve this, change the LDR in
-the mmid macro to load from +4.
+> This patch on its own doesn't apply cleanly at all to arm-soc, I'm guessing
+> because I need the rest of the series. With the presumption that you're not
+> going to cause grief from sfr due to excessive conflicts. I.e. please try
+> merging with arm-soc for-next to see how bad it is:
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/mm/context.c     |    3 +++
- arch/arm/mm/proc-macros.S |    5 +++++
- 2 files changed, 8 insertions(+)
+OK, there were bad conflicts with two device tree patches.
 
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index bc4a5e9..7a05111 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -34,6 +34,9 @@
-  * The ASID is used to tag entries in the CPU caches and TLBs.
-  * The context ID is used by debuggers and trace logic, and
-  * should be unique within all running processes.
-+ *
-+ * In big endian operation, the two 32 bit words are swapped if accesed by
-+ * non 64-bit operations.
-  */
- #define ASID_FIRST_VERSION	(1ULL << ASID_BITS)
- #define NUM_USER_ASIDS		(ASID_FIRST_VERSION - 1)
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index eb6aa73..f9a0aa7 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -38,9 +38,14 @@
- 
- /*
-  * mmid - get context id from mm pointer (mm->context.id)
-+ * note, this field is 64bit, so in big-endian the two words are swapped too.
-  */
- 	.macro	mmid, rd, rn
-+#ifdef __ARMEB__
-+	ldr	\rd, [\rn, #MM_CONTEXT_ID + 4 ]
-+#else
- 	ldr	\rd, [\rn, #MM_CONTEXT_ID]
-+#endif
- 	.endm
- 
- /*
--- 
-1.7.10.4
+So I'm going to take that stuff out and funnel through ARM SoC
+instead.
+
+I have a number of DT patches from Lee on a queues pull request
+anyway, so I'll just stack these on top of that and then hopefully things
+will fix themselves up.
+
+> patch 11-14:
+> Acked-by: Olof Johansson <olof@lixom.net>
+
+Thanks, I took only 11, 12 into the pinctrl tree. It's better off
+like this.
+
+Yours,
+Linus Walleij
