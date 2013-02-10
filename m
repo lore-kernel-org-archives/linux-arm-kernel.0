@@ -1,35 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 9 Feb 2013 16:47:40 -0800
-Subject: [PATCH 0/5] at91: atmel_lcdfb: regression fixes and cpu_is removal
-In-Reply-To: <cover.1360340791.git.nicolas.ferre@atmel.com>
-References: <cover.1360340791.git.nicolas.ferre@atmel.com>
-Message-ID: <20130210004740.GH16278@quad.lixom.net>
+Date: Sat, 9 Feb 2013 16:50:12 -0800
+Subject: [GIT PULL] Renesas ARM-based SoC for v3.9 #4
+In-Reply-To: <1360116201-9362-1-git-send-email-horms+renesas@verge.net.au>
+References: <1360116201-9362-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130210005012.GI16278@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 08, 2013 at 05:35:13PM +0100, Nicolas Ferre wrote:
-> These patches fix a regression in 16-bpp support for older SOCs which use
-> IBGR:555 rather than BGR:565 pixel layout. Use SOC-type to determine if the
-> controller uses the intensity-bit and restore the old layout in that case.
+On Wed, Feb 06, 2013 at 11:03:20AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> The last patch is a removal of uses of cpu_is_xxxx() macros in atmel_lcdfb with
-> a platform-device-id table and static configurations.
+> The following changes since commit 58079fa7d54a0929d304054ee759187a2ccd3cdf:
 > 
+>   ARM: shmobile: r8a7779: Correct TMU clock support (2013-02-05 12:31:18 +0900)
 > 
-> Patches from Johan Hovold taken from:
-> "[PATCH 0/3] atmel_lcdfb: fix 16-bpp regression"
-> and
-> "[PATCH v2 0/3] ARM: at91/avr32/atmel_lcdfb: remove cpu_is macros"
-> patch series to form a clean patch series with my signature.
+> are available in the git repository at:
 > 
-> Arnd, Olof,
-> as it seems that old fbdev drivers are not so much reviewed those days, can we
-> take the decision to queue this material through arm-soc with other AT91
-> drivers updates?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc4-for-v3.9
+> 
+> for you to fetch changes up to dbe1c3defb3844772634446492ea6c13882596ec:
+> 
+>   ARM: shmobile: Register ARM architected timer (2013-02-05 17:13:55 +0900)
 
-It would be beneficial to get an ack from Florian. Was he involved in the
-review of the code that regressed 16-bpp support in the first place? When was
-the regression introduced?
+
+Pulled, thanks.
 
 
 -Olof
