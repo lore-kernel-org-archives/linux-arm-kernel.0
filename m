@@ -1,36 +1,71 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 9 Feb 2013 17:27:07 -0800
-Subject: [GIT PULL] DaVinci DT updates for v3.9 (part 2)
-In-Reply-To: <51168E50.1010709@ti.com>
-References: <51168E50.1010709@ti.com>
-Message-ID: <20130210012707.GL16278@quad.lixom.net>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sun, 10 Feb 2013 02:49:21 +0100
+Subject: [PATCH RFC 1/7] platform: add a device node
+In-Reply-To: <20130210010246.GA1455@kroah.com>
+References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1360442671-15216-2-git-send-email-javier.martinez@collabora.co.uk>
+ <20130210010246.GA1455@kroah.com>
+Message-ID: <5116FCA1.40703@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 11:28:40PM +0530, Sekhar Nori wrote:
-> Hi Arnd, Olof,
-> 
-> Can you please pull the following changes for v3.9?
-> 
-> Thanks,
-> Sekhar
-> 
-> The following changes since commit 1661636d362b6d1a6c2bab210f2ab363a69deccc:
-> 
->   ARM: davinci: da850: add RTC DT entries (2013-01-28 21:28:11 +0530)
-> 
-> are available in the git repository at:
-> 
->   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-for-v3.9/dt-2
+Hi Greg,
 
-Pulled, but:
+Thanks a lot for your feedback.
 
-> Kumar, Anil (2):
->       ARM: davinci: da850 DT: add support for machine reboot
+On 02/10/2013 02:02 AM, Greg Kroah-Hartman wrote:
+> On Sat, Feb 09, 2013 at 09:44:25PM +0100, Javier Martinez Canillas wrote:
+>> When using Device Trees, it is necessary to associate a
+>> device node with a platform device.
+>> 
+>> Usually this device node has to used in the device probe
+>> function (e.g: to initizalize the pinctrl pads assocaited
+>> with the device).
+>> 
+>> So, platform code needs to pass a device node as a platform
+>> device info to the platform device registration function.
+> 
+> Really?  We don't already have enough other pointers in the platform
+> device structure that we need another one?
+>
 
-Looking at this patch, looking for any device named "watchdog" seems a
-bit fragile.  It's an unfortunate device name to have it that generic
-in the davinci_wdt driver.
+I knew this would be controversial and that's why I didn't mean it to be a patch
+but a RFC :)
 
+The problem basically is that you have to associate the platform device with its
+corresponding DT device node because it can be used in the driver probe function.
 
--Olof
+But you can't do this before calling platform_device_register_resndata() since
+the platform_device has not been allocated yet and you can't do it after since
+by then the driver probe function has been executed already.
+
+You could certainly pass the device node as a platform device resource by for
+example storing the dev node pointer in the struct resource .start member or by
+adding it to the structure (struct smsc911x_platform_config in this case) that
+gets copied to the struct platform_device_info void *data.
+
+Then in the driver probe function you could get the device node from either the
+platform_data or a dev->resource.
+
+But I expect most users of platform_device_register_resndata() will have a
+similar issue as more and more platform drivers are migrated to DT.
+
+So, to avoid each driver to do the same (encode and decode the DT device node
+using platform_data or a device resource) I thought that it could make sense to
+add yet another pointer to the struct platform_device_info structure and set:
+
+pdev->dev.of_node = pdevinfo->of_node
+
+inside platform_device_register_full().
+
+> I don't buy it, sorry.  Any reason you didn't run this by Grant as well?
+> 
+
+No reason at all, it is just me being goofy. I thought that Grant was cc'ed
+already and I just realized that he wasn't. cc'ing him as well.
+
+> greg k-h
+> 
+
+Thanks a lot and best regards,
+Javier
