@@ -1,34 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 9 Feb 2013 17:52:35 -0800
-Subject: [PATCH 1/2] ARM: tegra: enable ARCH_REQUIRE_GPIOLIB for Tegra114
-In-Reply-To: <1360273404-32397-1-git-send-email-swarren@wwwdotorg.org>
-References: <1360273404-32397-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130210015235.GA25302@quad.lixom.net>
+Date: Sat, 9 Feb 2013 18:25:14 -0800
+Subject: [GIT PULL] imx device tree changes for 3.9
+In-Reply-To: <20130205080642.GD16787@S2101-09.ap.freescale.net>
+References: <20130205030250.GC10807@S2101-09.ap.freescale.net>
+ <20130205080642.GD16787@S2101-09.ap.freescale.net>
+Message-ID: <20130210022514.GB25302@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 07, 2013 at 02:43:23PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Tue, Feb 05, 2013 at 04:06:44PM +0800, Shawn Guo wrote:
+> Arnd, Olof,
 > 
-> CONFIG_ARCH_TEGRA_114_SOC doesn't currently enable gpiolib, which causes
-> numerous build problems building a Tegra kernel with only Tegra114
-> enabled, and not Tegra20 or Tegra30. Enable ARCH_REQUIRE_GPIOLIB to
-> solve this. However, all Tegra will use gpiolib, so select this option
-> from ARCH_TEGRA rather than each individual ARCH_TEGRA_*_SOC, to
-> prevent this problem for any future chips.
+> On Tue, Feb 05, 2013 at 11:02:52AM +0800, Shawn Guo wrote:
+> > Martin Fuzzey (5):
+> >       W1: Add device tree support to MXC onewire master.
+> >       W1: Convert MXC onewire master to devm_ functions.
+> >       W1: Add pinctrl support to MXC onewire master.
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Olof, Arnd, These two patches can be applied on top of Tegra's previous
-> tegra-for-3.9-soc-t114 branch.
+> I just dropped these two patches as they are not needed now.
 > 
-> I think this (coupled with Hiroshi's "ARM: tegra: Fix build error w/
-> ARCH_TEGRA_114_SOC w/o ARCH_TEGRA_3x_SOC" is it for build failure fixes,
-> although I'm queueing up a number of clock driver patches for which I'll
-> send a pull request in the next few days.
+> The refreshed request is as below.
+> 
+> Shawn
+> 
+> The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+> 
+>   Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-dt-3.9
 
-Thanks, applied both to the tegra/t114 branch (together with the above
-mentioned fix).
+So, this has two merge conflicts. One with the cpuidle branch. Fine, that's
+easy to resolve.
 
+The one that's a real pain though, is the one with a fixes branch you
+sent in, which changes _one property_, but throws a _HUGE_ merge conflict.
+
+Why? Because you chose to do the churn on all the dtsi files. And this
+is a conflict that would percolate all the way up so Linus sees it the way it
+is now.
+
+Please resolve this on your own and send out a new pull request. There's
+a couple of ways to do it, either merge in your fixes branch, or rebase
+on top of it.
+
+
+Thanks,
 
 -Olof
