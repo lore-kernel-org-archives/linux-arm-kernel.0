@@ -1,137 +1,196 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 10 Feb 2013 23:47:17 +0800
-Subject: [GIT PULL] imx device tree changes for 3.9
-In-Reply-To: <20130210022514.GB25302@quad.lixom.net>
-References: <20130205030250.GC10807@S2101-09.ap.freescale.net>
- <20130205080642.GD16787@S2101-09.ap.freescale.net>
- <20130210022514.GB25302@quad.lixom.net>
-Message-ID: <20130210154715.GB3983@S2101-09.ap.freescale.net>
+From: anilk4.v@gmail.com (Anil Kumar)
+Date: Sun, 10 Feb 2013 21:35:53 +0530
+Subject: [PATCH V2] ARM: dts: add minimal DT support for DevKit8000
+Message-ID: <1360512354-3804-1-git-send-email-anilk4.v@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 06:25:14PM -0800, Olof Johansson wrote:
-> So, this has two merge conflicts. One with the cpuidle branch. Fine, that's
-> easy to resolve.
-> 
-> The one that's a real pain though, is the one with a fixes branch you
-> sent in, which changes _one property_, but throws a _HUGE_ merge conflict.
-> 
-> Why? Because you chose to do the churn on all the dtsi files. And this
-> is a conflict that would percolate all the way up so Linus sees it the way it
-> is now.
-> 
-Sorry, I forgot testing the merging between this and the last fixes tag.
+DevKit8000 is a beagle board clone from Timll, sold by
+armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
+S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
+JTAG interface.
 
-> Please resolve this on your own and send out a new pull request. There's
-> a couple of ways to do it, either merge in your fixes branch, or rebase
-> on top of it.
-> 
-Done.  Please pull the refreshed tag below.
+This patch adds the basic DT support for devkit8000. At this time, Information
+of twl4030, MMC1, I2C1, leds and there pim mux information are added.
 
-Shawn
+Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+Tested-by: Thomas Weber <thomas@tomweber.eu>
+---
 
+ -This patch is based on top of kernel 3.8-rc5.
 
-The following changes since commit d441667c7838d56bcace9a2465f0c1ff677bf2c0:
+ -Tested on Devkit8000.
 
-  Merge tag 'imx-fixes-3.8-4' into imx/dt (2013-02-10 23:23:47 +0800)
+For V2:
 
-are available in the git repository at:
+ -Change model name as "TimLL OMAP3 Devkit8000"
+ -Change compatible as "timll,omap3-devkit8000"
+ -Doing i2c1 pinmux default with pinctrl-single driver instead of i2c1
+  driver probe time.
 
+:100644 100644 5ebb44f... 22ebc76... M	arch/arm/boot/dts/Makefile
+:000000 100644 0000000... dc59272... A	arch/arm/boot/dts/omap3-devkit8000.dts
+:100644 100644 53cb380b.. ccecb76... M	arch/arm/mach-omap2/board-generic.c
+ arch/arm/boot/dts/Makefile             |    1 +
+ arch/arm/boot/dts/omap3-devkit8000.dts |  126 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/board-generic.c    |    1 +
+ 3 files changed, 128 insertions(+), 0 deletions(-)
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-dt-3.9
-
-for you to fetch changes up to 7c1da5854f3a4af7e44c059fdde750119c05f1a4:
-
-  ARM: dts: add dtsi for imx6q and imx6dl (2013-02-10 23:25:47 +0800)
-
-----------------------------------------------------------------
-imx device tree changes for 3.9
-
- - Some tweaking and updates on device tree sources
- - Enable imx6q-cpufreq support for device tree boot
- - IMX/MXC onewire driver device tree conversion.  Onewire maintainer
-   Evgeniy Polyakov gives his ACK to bless it go via arm-soc tree.
-
-----------------------------------------------------------------
-Anson Huang (1):
-      ARM: dts: i.MX6: Add regulator delay support
-
-Fabio Estevam (5):
-      ARM: dts: imx27-3ds: Rename it to imx27-pdk
-      ARM: boot: dts: Add an entry for imx27-pdk.dtb
-      ARM: mx25pdk: Add device tree support
-      ARM: dts: imx25-karo-tx25: Put status entry in the end
-      ARM: dts: imx6q: Remove silicon version from SDMA firmware
-
-Laurent Cans (1):
-      ARM: dts: Add apf51 basic support
-
-Liu Ying (2):
-      ARM: dts: imx: Add imx51 KPP entry
-      ARM i.MX51 babbage: Add keypad support
-
-Martin Fuzzey (3):
-      W1: Add device tree support to MXC onewire master.
-      ARM: i.MX53: Add clocks for i.mx53 onewire master.
-      ARM: dts: Add device tree entry for onewire master on i.MX53
-
-Peter Chen (1):
-      ARM i.MX6: change mxs usbphy clock usage
-
-Sascha Hauer (1):
-      ARM i.MX53: add dts for the TQ tqma53 module
-
-Shawn Guo (5):
-      ARM: dts: add missing imx dtb targets
-      ARM: dts: imx: use nodes label in board dts
-      ARM: imx: enable imx6q-cpufreq support
-      ARM: dts: rename imx6q.dtsi to imx6qdl.dtsi
-      ARM: dts: add dtsi for imx6q and imx6dl
-
-Steffen Trumtrar (2):
-      ARM: dts: imx53: pinctrl update
-      ARM i.MX53: dts: add oftree for MBa53 baseboard
-
- Documentation/devicetree/bindings/arm/armadeus.txt |    6 +
- Documentation/devicetree/bindings/arm/fsl.txt      |    8 +
- .../devicetree/bindings/clock/imx5-clock.txt       |    1 +
- .../devicetree/bindings/clock/imx6q-clock.txt      |    2 +
- .../devicetree/bindings/w1/fsl-imx-owire.txt       |   19 +
- arch/arm/boot/dts/Makefile                         |   10 +-
- arch/arm/boot/dts/imx25-karo-tx25.dts              |   30 +-
- arch/arm/boot/dts/imx25-pdk.dts                    |   36 +
- arch/arm/boot/dts/imx25.dtsi                       |    2 +-
- arch/arm/boot/dts/imx27-apf27.dts                  |   82 +-
- arch/arm/boot/dts/{imx27-3ds.dts => imx27-pdk.dts} |   24 +-
- arch/arm/boot/dts/imx31-bug.dts                    |   12 +-
- arch/arm/boot/dts/imx51-apf51.dts                  |   52 ++
- arch/arm/boot/dts/imx51-babbage.dts                |  478 ++++++------
- arch/arm/boot/dts/imx51.dtsi                       |   53 ++
- arch/arm/boot/dts/imx53-ard.dts                    |  126 ++-
- arch/arm/boot/dts/imx53-evk.dts                    |  194 +++--
- arch/arm/boot/dts/imx53-mba53.dts                  |  130 ++++
- arch/arm/boot/dts/imx53-qsb.dts                    |  380 +++++-----
- arch/arm/boot/dts/imx53-smd.dts                    |  294 ++++---
- arch/arm/boot/dts/imx53-tqma53.dtsi                |  172 +++++
- arch/arm/boot/dts/imx53.dtsi                       |   68 ++
- arch/arm/boot/dts/imx6dl.dtsi                      |   59 ++
- arch/arm/boot/dts/imx6q-arm2.dts                   |  124 ++-
- arch/arm/boot/dts/imx6q-sabreauto.dts              |   64 +-
- arch/arm/boot/dts/imx6q-sabrelite.dts              |  216 +++---
- arch/arm/boot/dts/imx6q-sabresd.dts                |  102 ++-
- arch/arm/boot/dts/imx6q.dtsi                       |  796 +------------------
- arch/arm/boot/dts/imx6qdl.dtsi                     |  800 ++++++++++++++++++++
- arch/arm/mach-imx/clk-imx51-imx53.c                |    4 +-
- arch/arm/mach-imx/clk-imx6q.c                      |   26 +-
- arch/arm/mach-imx/mach-imx6q.c                     |   65 ++
- drivers/w1/masters/mxc_w1.c                        |    9 +-
- 33 files changed, 2560 insertions(+), 1884 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/armadeus.txt
- create mode 100644 Documentation/devicetree/bindings/w1/fsl-imx-owire.txt
- create mode 100644 arch/arm/boot/dts/imx25-pdk.dts
- rename arch/arm/boot/dts/{imx27-3ds.dts => imx27-pdk.dts} (59%)
- create mode 100644 arch/arm/boot/dts/imx51-apf51.dts
- create mode 100644 arch/arm/boot/dts/imx53-mba53.dts
- create mode 100644 arch/arm/boot/dts/imx53-tqma53.dtsi
- create mode 100644 arch/arm/boot/dts/imx6dl.dtsi
- create mode 100644 arch/arm/boot/dts/imx6qdl.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5ebb44f..22ebc76 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -102,6 +102,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx28-tx28.dtb
+ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-beagle.dtb \
++	omap3-devkit8000.dtb \
+ 	omap3-beagle-xm.dtb \
+ 	omap3-evm.dtb \
+ 	omap3-tobi.dtb \
+diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+new file mode 100644
+index 0000000..dc59272
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+@@ -0,0 +1,126 @@
++/*
++ * Author: Anil Kumar <anilk4.v@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++/include/ "omap3.dtsi"
++/ {
++	model = "TimLL OMAP3 Devkit8000";
++	compatible = "timll,omap3-devkit8000", "ti,omap3";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>;	/* 256 MB */
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&leds_pins>;
++
++		heartbeat {
++			label = "devkit8000::led1";
++			gpios = <&gpio6 26 0>;	/* 186 -> LED1 */
++			default-state = "on";
++			linux,default-trigger = "heartbeat";
++		};
++
++		mmc {
++			label = "devkit8000::led2";
++			gpios = <&gpio6 3 0>;	/* 163 -> LED2 */
++			default-state = "on";
++			linux,default-trigger = "none";
++		};
++
++		usr {
++			label = "devkit8000::led3";
++			gpios = <&gpio6 4 0>;	/* 164 -> LED3 */
++			default-state = "on";
++			linux,default-trigger = "usr";
++                };
++
++	};
++};
++
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++
++	leds_pins: pinmux_led_pins {
++		pinctrl-single,pins = <
++			0x168 0x4	/* GPIO_163 */
++			0x16c 0x4	/* GPIO_164 */
++			0x1b0 0x4	/* GPIO_186 */
++
++		>;
++	};
++
++	i2c1_pins: pinmux_i2c1_pins {
++		pinctrl-single,pins = <
++			0x188 0x118	/* I2C1_SCL */
++			0x18c 0x118	/* I2C1_SDA */
++                >;
++	};
++};
++
++&i2c1 {
++	clock-frequency = <2600000>;
++
++	twl: twl at 48 {
++		reg = <0x48>;
++		interrupts = <7>;	/* SYS_NIRQ cascaded to intc */
++		interrupt-parent = <&intc>;
++	};
++};
++
++&i2c2 {
++	status = "disabled";
++};
++
++&i2c3 {
++	status = "disabled";
++};
++
++/include/ "twl4030.dtsi"
++
++&mmc1 {
++	vmmc-supply = <&vmmc1>;
++	vmmc_aux-supply = <&vsim>;
++	bus-width = <8>;
++};
++
++&mmc2 {
++	status = "disabled";
++};
++
++&mmc3 {
++	status = "disabled";
++};
++
++&wdt2 {
++	status = "disabled";
++};
++
++&mcbsp1 {
++	status = "disabled";
++};
++
++&mcbsp2 {
++	status = "disabled";
++};
++
++&mcbsp3 {
++	status = "disabled";
++};
++
++&mcbsp4 {
++	status = "disabled";
++};
++
++&mcbsp5 {
++	status = "disabled";
++};
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 53cb380..ccecb76 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -110,6 +110,7 @@ MACHINE_END
+ 
+ static const char *omap3_gp_boards_compat[] __initdata = {
+ 	"ti,omap3-beagle",
++	"timll,omap3-devkit8000",
+ 	NULL,
+ };
+ 
+-- 
+1.7.0.4
