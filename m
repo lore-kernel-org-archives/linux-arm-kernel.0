@@ -1,194 +1,108 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 10 Feb 2013 14:20:23 +0100
-Subject: [PATCH 12/12] clocksource: samsung-time: Add Device Tree support
-In-Reply-To: <1360502423-2246-1-git-send-email-tomasz.figa@gmail.com>
-References: <1360502423-2246-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1360502423-2246-13-git-send-email-tomasz.figa@gmail.com>
+Date: Sun, 10 Feb 2013 14:20:11 +0100
+Subject: [PATCH 00/12] ARM: samsung-time: Prepare for multiplatform support
+Message-ID: <1360502423-2246-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for parsing all platform-specific data from
-Device Tree and instantiation using clocksource_of_init to samsung-time
-clocksource driver.
+This series is an attempt to make the samsung-time clocksource driver ready
+for multiplatform kernels. It moves the driver to drivers/clocksource, cleans
+it up from uses of static platform-specific definitions, simplifies timer
+interrupt handling and adds Device Tree support.
 
-Cc: devicetree-discuss at lists.ozlabs.org
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- .../devicetree/bindings/arm/samsung-timer.txt      |  32 +++++++
- drivers/clocksource/samsung-time.c                 | 102 ++++++++++++++++++++-
- 2 files changed, 131 insertions(+), 3 deletions(-)
+Tested on a Tiny6410 board (Mini6410-compatible) both with and without Devicee
+Tree (with my DT patches for S3C64xx). Compile tested for other related archs.
+
+Tomasz Figa (12):
+  ARM: SAMSUNG: Move samsung-time to drivers/clocksource
+  clocksource: samsung-time: Set platform-specific parameters at runtime
+  clocksource: samsung-time: Drop useless defines from public header
+  clocksource: samsung-time: Move samsung-time.h header to include/linux
+  clocksource: samsung-time: Use local register definitions
+  clocksource: samsung-time: Remove use of static register mapping
+  clocksource: samsung-time: Use clk_get_sys for getting clocks
+  ARM: SAMSUNG: devs: Drop unnecessary IRQ resources of timer devices
+  clocksource: samsung-time: Do not use static IRQ definition
+  clocksource: samsung-time: Move IRQ mask/ack handling to the driver
+  ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
+  clocksource: samsung-time: Add Device Tree support
+
+ .../devicetree/bindings/arm/samsung-timer.txt      |  32 ++
+ arch/arm/Kconfig                                   |   1 -
+ arch/arm/mach-exynos/include/mach/irqs.h           |   3 +-
+ arch/arm/mach-exynos/mach-universal_c210.c         |  15 +-
+ arch/arm/mach-s3c24xx/common.c                     |  14 +
+ arch/arm/mach-s3c24xx/mach-amlm5900.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-anubis.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-at2440evb.c             |   2 +-
+ arch/arm/mach-s3c24xx/mach-bast.c                  |   2 +-
+ arch/arm/mach-s3c24xx/mach-gta02.c                 |   2 +-
+ arch/arm/mach-s3c24xx/mach-h1940.c                 |   2 +-
+ arch/arm/mach-s3c24xx/mach-jive.c                  |   2 +-
+ arch/arm/mach-s3c24xx/mach-mini2440.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-n30.c                   |   2 +-
+ arch/arm/mach-s3c24xx/mach-nexcoder.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-osiris.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-otom.c                  |   2 +-
+ arch/arm/mach-s3c24xx/mach-qt2410.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-rx1950.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-rx3715.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2410.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2413.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2440.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2443.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-tct_hammer.c            |   2 +-
+ arch/arm/mach-s3c24xx/mach-vr1000.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c                 |   2 +-
+ arch/arm/mach-s3c64xx/common.c                     |  19 +-
+ arch/arm/mach-s3c64xx/include/mach/irqs.h          |   8 -
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |   2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |   2 +-
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |   2 +-
+ arch/arm/mach-s3c64xx/mach-real6410.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-smartq.c                |   2 +-
+ arch/arm/mach-s3c64xx/mach-smartq5.c               |   2 +-
+ arch/arm/mach-s3c64xx/mach-smartq7.c               |   2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6400.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |   2 +-
+ arch/arm/mach-s5p64x0/common.c                     |  15 +
+ arch/arm/mach-s5p64x0/include/mach/irqs.h          |   2 -
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |   2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |   2 +-
+ arch/arm/mach-s5pc100/common.c                     |  15 +
+ arch/arm/mach-s5pc100/include/mach/irqs.h          |   2 -
+ arch/arm/mach-s5pc100/mach-smdkc100.c              |   2 +-
+ arch/arm/mach-s5pv210/common.c                     |  15 +
+ arch/arm/mach-s5pv210/include/mach/irqs.h          |   2 -
+ arch/arm/mach-s5pv210/mach-aquila.c                |   2 +-
+ arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+ arch/arm/mach-s5pv210/mach-smdkc110.c              |   2 +-
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+ arch/arm/mach-s5pv210/mach-torbreck.c              |   2 +-
+ arch/arm/plat-samsung/Kconfig                      |  14 -
+ arch/arm/plat-samsung/Makefile                     |   2 -
+ arch/arm/plat-samsung/devs.c                       |  28 +-
+ arch/arm/plat-samsung/include/plat/irq-vic-timer.h |  13 -
+ arch/arm/plat-samsung/include/plat/irqs.h          |   9 -
+ arch/arm/plat-samsung/include/plat/samsung-time.h  |  51 --
+ arch/arm/plat-samsung/irq-vic-timer.c              |  98 ----
+ arch/arm/plat-samsung/s5p-irq.c                    |   3 -
+ arch/arm/plat-samsung/samsung-time.c               | 394 -------------
+ drivers/clocksource/Kconfig                        |   7 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/samsung-time.c                 | 624 +++++++++++++++++++++
+ include/linux/samsung-time.h                       |  44 ++
+ 68 files changed, 847 insertions(+), 668 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/arm/samsung-timer.txt
+ delete mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/samsung-time.h
+ delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
+ delete mode 100644 arch/arm/plat-samsung/samsung-time.c
+ create mode 100644 drivers/clocksource/samsung-time.c
+ create mode 100644 include/linux/samsung-time.h
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung-timer.txt b/Documentation/devicetree/bindings/arm/samsung-timer.txt
-new file mode 100644
-index 0000000..8eb7030
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/samsung-timer.txt
-@@ -0,0 +1,32 @@
-+* Samsung PWM timer
-+
-+Samsung SoCs contain PWM timer blocks which can be used for system clock source
-+and clock event timers.
-+
-+Be aware that this configuration is supported only on uniprocessor platforms.
-+For SMP SoCs, SMP-aware timers should be used, like MCT.
-+
-+Required properties:
-+- compatible : should be one of following:
-+    samsung,s3c24xx-pwm-timer - for 16-bit timers present on S3C24xx
-+    samsung,s3c64xx-pwm-timer - for 32-bit timers present on S3C64xx and newer
-+- reg: base address and size of register area
-+- interrupts: interrupt list for all five PWM timers.
-+- samsung,source-timer: index of timer to be used as clocksource
-+- samsung,event-timer: index of timer to be used as clock event
-+
-+Optional properties:
-+- samsung,prescale: PWM prescaler divisor (from 1 to 256)
-+- samsung,divisor: PWM main divider divisor (1, 2, 4, 8 or 16)
-+
-+Example:
-+	timer at 7f006000 {
-+		compatible = "samsung,s3c64xx-pwm-timer";
-+		reg = <0x7f006000 0x1000>;
-+		interrupt-parent = <&vic0>;
-+		interrupts = <23>, <24>, <25>, <27>, <28>;
-+		samsung,source-timer = <4>;
-+		samsung,event-timer = <3>;
-+		samsung,prescale = <2>;
-+		samsung,divisor = <1>;
-+	};
-diff --git a/drivers/clocksource/samsung-time.c b/drivers/clocksource/samsung-time.c
-index 19a1c8a..63d2992 100644
---- a/drivers/clocksource/samsung-time.c
-+++ b/drivers/clocksource/samsung-time.c
-@@ -14,6 +14,9 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/clockchips.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- #include <linux/platform_device.h>
- #include <linux/samsung-time.h>
- 
-@@ -479,9 +482,11 @@ static void __init samsung_timer_resources(void)
- 	unsigned long source_id = timer_source.source_id;
- 	char devname[15];
- 
--	timer_base = ioremap_nocache(timer_variant.reg_base, SZ_4K);
--	if (!timer_base)
--		panic("failed to map timer registers");
-+	if (!timer_base) {
-+		timer_base = ioremap_nocache(timer_variant.reg_base, SZ_4K);
-+		if (!timer_base)
-+			panic("failed to map timer registers");
-+	}
- 
- 	timerclk = clk_get(NULL, "timers");
- 	if (IS_ERR(timerclk))
-@@ -514,8 +519,92 @@ static void __init samsung_timer_resources(void)
- 	clk_enable(tin_source);
- }
- 
-+enum {
-+	TYPE_S3C24XX,
-+	TYPE_S3C64XX,
-+};
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id samsung_timer_ids[] = {
-+	{ .compatible = "samsung,s3c24xx-pwm-timer",
-+					.data = (void *)TYPE_S3C24XX, },
-+	{ .compatible = "samsung,s3c64xx-pwm-timer",
-+					.data = (void *)TYPE_S3C64XX, },
-+	{},
-+};
-+
-+static void samsung_timer_parse_dt(struct device_node *np,
-+					const struct of_device_id *match)
-+{
-+	int i;
-+	u32 val;
-+
-+	if (of_property_read_u32(np, "samsung,source-timer", &val))
-+		panic("no samsung,source-timer property provided");
-+	if (val > ARRAY_SIZE(timer_variant.irqs))
-+		panic("samsung,source-timer property out of range");
-+	timer_source.source_id = val;
-+
-+	if (of_property_read_u32(np, "samsung,event-timer", &val))
-+		panic("no samsung,event-timer property provided");
-+	if (val > ARRAY_SIZE(timer_variant.irqs))
-+		panic("samsung,event-timer property out of range");
-+	timer_source.event_id = val;
-+
-+	timer_base = of_iomap(np, 0);
-+	if (!timer_base)
-+		panic("failed to map timer registers");
-+
-+	for (i = 0; i < ARRAY_SIZE(timer_variant.irqs); ++i)
-+		timer_variant.irqs[i] = irq_of_parse_and_map(np, i);
-+
-+	if (!timer_variant.irqs[timer_source.event_id])
-+		panic("no clock event irq provided");
-+
-+	switch ((unsigned int)match->data) {
-+	case TYPE_S3C24XX:
-+		timer_variant.bits = 16;
-+		timer_variant.prescale = 25;
-+		timer_variant.prescale = 50;
-+		timer_variant.has_tint_cstat = false;
-+		break;
-+	case TYPE_S3C64XX:
-+		timer_variant.bits = 32;
-+		timer_variant.prescale = 2;
-+		timer_variant.divisor = 2;
-+		timer_variant.has_tint_cstat = true;
-+		break;
-+	}
-+
-+	if (!of_property_read_u32(np, "samsung,prescale", &val)) {
-+		if (val < 1 || val > 256)
-+			panic("prescale must be from 1 to 256 range");
-+		timer_variant.prescale = val;
-+	}
-+
-+	if (!of_property_read_u32(np, "samsung,divisor", &val)) {
-+		if (val > 16 || (1 << (fls(val) - 1)) != val)
-+			panic("divsor must be 1, 2, 4, 8 or 16");
-+		timer_variant.divisor = timer_variant.prescale * val;
-+	}
-+}
-+#endif
-+
- void __init samsung_timer_init(void)
- {
-+#ifdef CONFIG_OF
-+	struct device_node *np;
-+	const struct of_device_id *match;
-+
-+	if (of_have_populated_dt()) {
-+		np = of_find_matching_node_and_match(NULL,
-+						samsung_timer_ids, &match);
-+		if (!np)
-+			panic("timer node not found");
-+
-+		samsung_timer_parse_dt(np, match);
-+	}
-+#endif
- 	if (!timer_source.source_id && !timer_source.event_id)
- 		panic("timer sources not set (see samsung_set_timer_source)!\n");
- 
-@@ -526,3 +615,10 @@ void __init samsung_timer_init(void)
- 	samsung_clockevent_init();
- 	samsung_clocksource_init();
- }
-+
-+#ifdef CONFIG_OF
-+CLOCKSOURCE_OF_DECLARE(s3c24xx_timer,
-+			"samsung,s3c24xx-pwm-timer", samsung_timer_init)
-+CLOCKSOURCE_OF_DECLARE(s3c64xx_timer,
-+			"samsung,s3c64xx-pwm-timer", samsung_timer_init)
-+#endif
 -- 
 1.8.1.2
