@@ -1,27 +1,31 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 9 Feb 2013 17:02:46 -0800
-Subject: [PATCH RFC 1/7] platform: add a device node
-In-Reply-To: <1360442671-15216-2-git-send-email-javier.martinez@collabora.co.uk>
-References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
- <1360442671-15216-2-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20130210010246.GA1455@kroah.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 9 Feb 2013 17:04:02 -0800
+Subject: [GIT PULL] at91: Device Tree related material for 3.9
+In-Reply-To: <5113D04B.2060101@atmel.com>
+References: <5113D04B.2060101@atmel.com>
+Message-ID: <20130210010402.GK16278@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 09:44:25PM +0100, Javier Martinez Canillas wrote:
-> When using Device Trees, it is necessary to associate a
-> device node with a platform device.
+On Thu, Feb 07, 2013 at 05:03:23PM +0100, Nicolas Ferre wrote:
+> Arnd, Olof,
 > 
-> Usually this device node has to used in the device probe
-> function (e.g: to initizalize the pinctrl pads assocaited
-> with the device).
+> Here is a pull request for AT91 Device Tree material. It is pretty small and
+> mostly related to at91rm9200 work done by Joachim.
 > 
-> So, platform code needs to pass a device node as a platform
-> device info to the platform device registration function.
+> This one can go on top of the GIT PULL request that I sent two days ago:
+> "[GIT PULL] at91: fixes for 3.9-rc1". But actually it is not related...
+> 
+> 
+> The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+> 
+>   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt
 
-Really?  We don't already have enough other pointers in the platform
-device structure that we need another one?
+Pulled into next/dt, thanks.
 
-I don't buy it, sorry.  Any reason you didn't run this by Grant as well?
 
-greg k-h
+-Olof
