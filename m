@@ -1,31 +1,55 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 9 Feb 2013 16:33:06 -0800
-Subject: [GIT PULL] ARM: mvebu fixes for v3.8-rc6 (round 2)
-In-Reply-To: <2785183.WbVPeMzV9Q@wuerfel>
-References: <1360013837.bfC5F0.15090@triton>
- <20130205140353.GT14746@titan.lakedaemon.net>
- <20130205185758.GB21776@quad.lixom.net>
- <2785183.WbVPeMzV9Q@wuerfel>
-Message-ID: <20130210003306.GC16278@quad.lixom.net>
+Date: Sat, 9 Feb 2013 16:40:10 -0800
+Subject: [PATCH 0/5 v3] at91: PMECC: enable PMECC in dt for at91sam9x5ek,
+ at91sam9n12ek
+In-Reply-To: <5113D347.8050409@atmel.com>
+References: <1358945232-2282-1-git-send-email-josh.wu@atmel.com>
+ <5113D347.8050409@atmel.com>
+Message-ID: <20130210004010.GE16278@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 08:09:27PM +0100, Arnd Bergmann wrote:
-> On Tuesday 05 February 2013 10:57:58 Olof Johansson wrote:
-> > > 
-> > > While only one user reported the above problems (Simon Baatz), it was
-> > > caused by compiling v3.8-rc5 with the debian kernel config.  This config
-> > > builds almost everything it can as a module.
+On Thu, Feb 07, 2013 at 05:16:07PM +0100, Nicolas Ferre wrote:
+> On 01/23/2013 01:47 PM, Josh Wu :
+> > Those patches will enable PMECC in dt parameters for at91sam9x5ek and 
+> > at91sam9n12ek.
 > > 
-> > Is debian planning on shipping 3.8 on these platforms, or is it just one user
-> > that tried to build it for his own use?
+> > The PMECC driver will check minimum required ecc on ONFI parameter from NAND 
+> > flash.
+> > 
+> > If pmecc-cap, pmecc-sector-size in dts file is specified, use those two.
+> > otherwise, set those according to NAND flash ONFI parameters.
+> > 
+> > If the pmecc-cap, pmecc-sector-size in dts are different with ecc requirement
+> > in ONFI, print out a warning.
+> > 
+> > 
+> > For the following compile error:
+> >   ERROR (phandle_references): Reference to non-existent node or label "pinctrl_ssc0_tx"
+> > 
+> >   ERROR: Input tree has errors, aborting (use -f to force output)
+> >   make[2]: *** [arch/arm/boot/dts/at91sam9g20ek.dtb] Error 2
+> > 
+> > the fixes are already merged in Linux mainline in v3.8-rc4.
+> > you can find in: 
+> >  544ae6b2e676c3c37fb8c93ef9327932fc2e5bc2 (ARM: at91/dts: add pinctrl support for SSC peripheral)
+> >  ea03c81521bde526570e1dec96eaa21fe5ac84a2 (ASoC: atmel-ssc: add pinctrl selection to driver) 
 > 
-> I believe there is quite an active community around kirkwood running Debian,
-> since the combination is used on a lot of home NAS systems.
+> Artem,
+> 
+> I propose to take patches 2 and 3/5 of this series via arm-soc git tree.
+> I will specify to merge them at the end of the merge-window so that the
+> Device Tree properties will not be out-of-sync with driver modifications
+> (may not cause big issues anyway).
 
-Yeah, but the real question is how many of them are building their own mainline
-kernels (with this specific config), and how many are just using whatever the
-distro of their choice is providing.
+I'm not cc:d on the patches, but if it's just new properties then there's
+no reason to hold off to "late in the merge window". There's actually no
+way for you to hold that off yourself, since we won't accept new patches
+to arm-soc that late.
+
+I don't see any cc to devicetree-discuss of the device tree bindings
+though, and no update of Documentation/device-tree/bindings/, so the
+patches are not ready to go in yet.
 
 
 -Olof
