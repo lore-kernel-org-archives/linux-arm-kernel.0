@@ -1,78 +1,58 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 10 Feb 2013 16:32:32 -0600
-Subject: [PATCH 2/2] net: calexdaxgmac: fixup endian issues after __raw
- IO function change
-In-Reply-To: <1360510721-17860-3-git-send-email-ben.dooks@codethink.co.uk>
+Date: Sun, 10 Feb 2013 16:34:52 -0600
+Subject: [PATCH 1/2] net: calexdaxgmac: fix printing of hardware version
+In-Reply-To: <1360510721-17860-2-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360510721-17860-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360510721-17860-3-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <51182000.7090004@gmail.com>
+ <1360510721-17860-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <5118208C.7010109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/10/2013 09:38 AM, Ben Dooks wrote:
-> When changing to __raw acccessors in 0ec6d343f7bcf9e0944aa9ff65287b987ec00c0f
-> ("net: calxedaxgmac: use raw i/o accessors in rx and tx paths"), the driver
-> is now broken on big endian systems as the readl/writel have an implict
-> endian swap in them.
+> The current driver attempts to print netdev_info() before registering the
+> network device and allowing the name to be set. Change this print to be
+> after the network deviec has been registered, and thus has been allocated
+
+You missed the typo pointed out on the first version sent to lakml.
+
+> a network device name.
 > 
-> Change all the places where the __raw calls are used to correctly convert
-> the constants in big endian format to the little endian data that the
-> peripheral expects to see.
-
-This is a bit ugly. The correct fix is really to enable the _relaxed
-accessors on more arches.
-
-Perhaps a local definition of readl_relaxed and writel_relaxed would be
-a cleaner temporary solution.
-
-Rob
-
+> Fix the following issue:
+> 
+> calxedaxgmac fff50000.ethernet (unregistered net_device): h/w version is 0x1012
 > 
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+
+Otherwise,
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
 > ---
->  drivers/net/ethernet/calxeda/xgmac.c |   10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
+>  drivers/net/ethernet/calxeda/xgmac.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
 > diff --git a/drivers/net/ethernet/calxeda/xgmac.c b/drivers/net/ethernet/calxeda/xgmac.c
-> index f91d9b2..96fd538 100644
+> index f7f0290..f91d9b2 100644
 > --- a/drivers/net/ethernet/calxeda/xgmac.c
 > +++ b/drivers/net/ethernet/calxeda/xgmac.c
-> @@ -1202,7 +1202,8 @@ static int xgmac_poll(struct napi_struct *napi, int budget)
->  
->  	if (work_done < budget) {
->  		napi_complete(napi);
-> -		__raw_writel(DMA_INTR_DEFAULT_MASK, priv->base + XGMAC_DMA_INTR_ENA);
-> +		__raw_writel(le32_to_cpu((__force __le32)DMA_INTR_DEFAULT_MASK),
-> +			     priv->base + XGMAC_DMA_INTR_ENA);
+> @@ -1715,9 +1715,6 @@ static int xgmac_probe(struct platform_device *pdev)
+>  		goto err_io;
 >  	}
->  	return work_done;
->  }
-> @@ -1348,7 +1349,7 @@ static irqreturn_t xgmac_pmt_interrupt(int irq, void *dev_id)
->  	void __iomem *ioaddr = priv->base;
 >  
->  	intr_status = __raw_readl(ioaddr + XGMAC_INT_STAT);
-> -	if (intr_status & XGMAC_INT_STAT_PMT) {
-> +	if (intr_status & le32_to_cpu((__force __le32)XGMAC_INT_STAT_PMT)) {
->  		netdev_dbg(priv->dev, "received Magic frame\n");
->  		/* clear the PMT bits 5 and 6 by reading the PMT */
->  		readl(ioaddr + XGMAC_PMT);
-> @@ -1369,6 +1370,8 @@ static irqreturn_t xgmac_interrupt(int irq, void *dev_id)
->  	intr_status &= __raw_readl(priv->base + XGMAC_DMA_INTR_ENA);
->  	__raw_writel(intr_status, priv->base + XGMAC_DMA_STATUS);
+> -	uid = readl(priv->base + XGMAC_VERSION);
+> -	netdev_info(ndev, "h/w version is 0x%x\n", uid);
+> -
+>  	writel(0, priv->base + XGMAC_DMA_INTR_ENA);
+>  	ndev->irq = platform_get_irq(pdev, 0);
+>  	if (ndev->irq == -ENXIO) {
+> @@ -1771,6 +1768,9 @@ static int xgmac_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_reg;
 >  
-> +	intr_status = (__force u32)cpu_to_le32(intr_status);
+> +	uid = readl(priv->base + XGMAC_VERSION);
+> +	netdev_info(ndev, "h/w version is 0x%x\n", uid);
 > +
->  	/* It displays the DMA process states (CSR5 register) */
->  	/* ABNORMAL interrupts */
->  	if (unlikely(intr_status & DMA_STATUS_AIS)) {
-> @@ -1403,7 +1406,8 @@ static irqreturn_t xgmac_interrupt(int irq, void *dev_id)
+>  	return 0;
 >  
->  	/* TX/RX NORMAL interrupts */
->  	if (intr_status & (DMA_STATUS_RI | DMA_STATUS_TU | DMA_STATUS_TI)) {
-> -		__raw_writel(DMA_INTR_ABNORMAL, priv->base + XGMAC_DMA_INTR_ENA);
-> +		__raw_writel(le32_to_cpu((__force __le32)DMA_INTR_ABNORMAL),
-> +			     priv->base + XGMAC_DMA_INTR_ENA);
->  		napi_schedule(&priv->napi);
->  	}
->  
+>  err_reg:
 > 
