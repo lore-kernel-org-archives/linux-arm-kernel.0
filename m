@@ -1,34 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 9 Feb 2013 18:42:28 -0800
-Subject: [GIT PULL] omap twl platform init changes for v3.9 merge window
-In-Reply-To: <20130210005824.GJ16278@quad.lixom.net>
-References: <20130206172500.GA25185@atomide.com>
- <20130210005824.GJ16278@quad.lixom.net>
-Message-ID: <20130210024228.GA4801@atomide.com>
+Date: Sat, 9 Feb 2013 18:52:26 -0800
+Subject: [PATCH 1/1] ARM: OMAP4: Add OMAP4 Blaze Tablet support
+In-Reply-To: <1360352269-14922-2-git-send-email-ruslan.bilovol@ti.com>
+References: <1360352269-14922-1-git-send-email-ruslan.bilovol@ti.com>
+ <1360352269-14922-2-git-send-email-ruslan.bilovol@ti.com>
+Message-ID: <20130210025225.GB4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [130209 17:01]:
-> On Wed, Feb 06, 2013 at 09:25:00AM -0800, Tony Lindgren wrote:
-> > The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
-> > 
-> >   Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/twl-signed-v2
+Hi,
+
+* Ruslan Bilovol <ruslan.bilovol@ti.com> [130208 11:41]:
+> The OMAP4 Blaze Tablet is TI OMAP4 processor-based
+> development platform in a tablet formfactor.
+> The platform contains many of the features found in
+> present-day handsets (such as audio, video, wireless
+> functions and user interfaces) and in addition
+> contains features for software development and test.
 > 
-> <standard complaint>
-> It would be nice to see TI enabling device-tree on these platforms/drivers
-> instead of adding to legacy board files.
-> </standard complaint>
+> This patch adds initial support for the OMAP4 Blaze
+> Tablet development platform. Additional functionality
+> depends on different drivers and code modifications that
+> are not upstreamed yet so will be added later.
 
-I believe it already has at least for audio, but we cannot yet drop
-the legacy support. Currently am33xx is DT only, omap4 is pretty close
-to be flipped over to be DT only.
- 
-> Pulled into next/boards.
+Nice that you have it working, however, we're not adding
+any more board-*.c files as we're moving things to device
+tree based booting.
 
-Thanks,
+Care to try to get the basic .dts file done for this?
+You will probably need to add CONFIG_ARM_APPENDED_DTB=y
+and CONFIG_ARM_ATAG_DTB_COMPAT=y to omap2plus_defconfig
+and append the .dtb file to zImage and run mkimage then
+manually to boot it. But you should get serial and MMC
+at least working to start with :)
+
+Regards,
 
 Tony
