@@ -1,38 +1,29 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 9 Feb 2013 18:52:26 -0800
-Subject: [PATCH 1/1] ARM: OMAP4: Add OMAP4 Blaze Tablet support
-In-Reply-To: <1360352269-14922-2-git-send-email-ruslan.bilovol@ti.com>
-References: <1360352269-14922-1-git-send-email-ruslan.bilovol@ti.com>
- <1360352269-14922-2-git-send-email-ruslan.bilovol@ti.com>
-Message-ID: <20130210025225.GB4801@atomide.com>
+Date: Sat, 9 Feb 2013 19:00:33 -0800
+Subject: Latest additional build warnings
+In-Reply-To: <20130209114918.GJ17852@n2100.arm.linux.org.uk>
+References: <20130205142218.GB17833@n2100.arm.linux.org.uk>
+ <20130209114918.GJ17852@n2100.arm.linux.org.uk>
+Message-ID: <20130210030032.GC4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-* Ruslan Bilovol <ruslan.bilovol@ti.com> [130208 11:41]:
-> The OMAP4 Blaze Tablet is TI OMAP4 processor-based
-> development platform in a tablet formfactor.
-> The platform contains many of the features found in
-> present-day handsets (such as audio, video, wireless
-> functions and user interfaces) and in addition
-> contains features for software development and test.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [130209 03:53]:
+> On Tue, Feb 05, 2013 at 02:22:18PM +0000, Russell King - ARM Linux wrote:
+> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: data definition has no type or storage class
+> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: type defaults to 'int' in declaration of 'omap_postcore_initcall'
+> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: parameter names (without types) in function declaration
+> > arch/arm/mach-omap2/hwspinlock.c:31:122: warning: 'hwspinlocks_init' defined but not used
 > 
-> This patch adds initial support for the OMAP4 Blaze
-> Tablet development platform. Additional functionality
-> depends on different drivers and code modifications that
-> are not upstreamed yet so will be added later.
+> I'm still seeing the above in the build of Friday's merge.  I'm also
+> seeing additional warnings in the randconfig similar to the above for
+> arch/arm/mach-omap2/omap-iommu.c.
 
-Nice that you have it working, however, we're not adding
-any more board-*.c files as we're moving things to device
-tree based booting.
+Thanks for letting me know about the omap-iommu.c one. Looks like
+there's also one patch for drm.c.
 
-Care to try to get the basic .dts file done for this?
-You will probably need to add CONFIG_ARM_APPENDED_DTB=y
-and CONFIG_ARM_ATAG_DTB_COMPAT=y to omap2plus_defconfig
-and append the .dtb file to zImage and run mkimage then
-manually to boot it. But you should get serial and MMC
-at least working to start with :)
+Olof, if you did not yet apply the hwspinlock.c warning fix, I'll
+just do a branch with all three of them for you.
 
 Regards,
 
