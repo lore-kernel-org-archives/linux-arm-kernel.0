@@ -1,36 +1,25 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 10 Feb 2013 19:58:12 +0100
-Subject: [PATCH] cpuidle: kirkwood: Move out of mach directory, add DT.
-In-Reply-To: <20130208213441.014343E2C27@localhost>
-References: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
- <20130208213441.014343E2C27@localhost>
-Message-ID: <20130210185812.GI20212@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 10 Feb 2013 20:03:13 +0100
+Subject: [PATCH v8 01/12] gpio: add gpio offset in gpio range cells
+ property
+In-Reply-To: <1359825953-15663-2-git-send-email-haojian.zhuang@linaro.org>
+References: <1359825953-15663-1-git-send-email-haojian.zhuang@linaro.org>
+ <1359825953-15663-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdagbSMkvsdSrQakUsoSXy7gu0Fu1an09GBD_CizN0FDTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +* QNAP Power Off
-> > +
-> > +QNAP NAS devices have a microcontroller controlling the main power
-> > +supply. This microcontroller is connected to UART1 of the Kirkwood and
-> > +Orion5x SoCs. Sending the charactor 'A', at 19200 baud, tells the
-> > +microcontroller to turn the power off. This driver adds a handler to
-> > +pm_power_off which is called to turn the power off.
-> > +
-> > +Required Properties:
-> > +- compatibile: Should be "qnap,power-off"
-> 
-> It would do well to have the model number embedded into this compatible
-> string since it is unlikely that every single QNAP device will use the
-> same controller interface.
+On Sat, Feb 2, 2013 at 6:25 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-Hi Grant
+> Add gpio offset into "gpio-range-cells" property. It's used to support
+> sparse pinctrl range in gpio chip.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-All QNAP devices known to mainline use this same controller interface.
+Can't decide on this thing, no reply from Shiraz.
 
-So that would be ts109, ts209, ts409, ts119, ts219, ts419, plus a few
-other models which we don't differentiate, like ts219P and ts219P+.
+Viresh, what is your opinion?
 
-Any suggestions what to use in the compatible string?
-
-    Thanks
-	Andrew
+Yours,
+Linus Walleij
