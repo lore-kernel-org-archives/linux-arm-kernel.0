@@ -1,82 +1,138 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 10 Feb 2013 14:20:14 +0100
-Subject: [PATCH 03/12] clocksource: samsung-time: Drop useless defines from
- public header
+Date: Sun, 10 Feb 2013 14:20:16 +0100
+Subject: [PATCH 05/12] clocksource: samsung-time: Use local register
+ definitions
 In-Reply-To: <1360502423-2246-1-git-send-email-tomasz.figa@gmail.com>
 References: <1360502423-2246-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1360502423-2246-4-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1360502423-2246-6-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up public header from useless definitions.
+This patch copies PWM timer register definitions to samsung-time.c. The
+original header in plat is being kept for now, since it is also used by
+other code that also needs to be reworked to be multiplatform-friendly.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/plat-samsung/include/plat/samsung-time.h |  6 ------
- drivers/clocksource/samsung-time.c                | 10 +++++-----
- 2 files changed, 5 insertions(+), 11 deletions(-)
+ drivers/clocksource/samsung-time.c | 106 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 105 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/samsung-time.h b/arch/arm/plat-samsung/include/plat/samsung-time.h
-index ba7246e..68432af 100644
---- a/arch/arm/plat-samsung/include/plat/samsung-time.h
-+++ b/arch/arm/plat-samsung/include/plat/samsung-time.h
-@@ -33,12 +33,6 @@ struct samsung_timer_variant {
- 	u16 divisor;
- };
- 
--/* Be able to sleep for atleast 4 seconds (usually more) */
--#define SAMSUNG_TIMER_MIN_RANGE	4
--
--#define NON_PERIODIC		0
--#define PERIODIC		1
--
- extern void __init samsung_set_timer_source(enum samsung_timer_mode event,
- 					enum samsung_timer_mode source);
- extern void __init samsung_timer_set_variant(
 diff --git a/drivers/clocksource/samsung-time.c b/drivers/clocksource/samsung-time.c
-index 3017203..a6af801 100644
+index 9c0626f..985086e 100644
 --- a/drivers/clocksource/samsung-time.c
 +++ b/drivers/clocksource/samsung-time.c
-@@ -183,7 +183,7 @@ static int samsung_set_next_event(unsigned long cycles,
- 				struct clock_event_device *evt)
- {
- 	samsung_time_setup(timer_source.event_id, cycles);
--	samsung_time_start(timer_source.event_id, NON_PERIODIC);
-+	samsung_time_start(timer_source.event_id, false);
+@@ -25,7 +25,111 @@
  
- 	return 0;
- }
-@@ -196,7 +196,7 @@ static void samsung_set_mode(enum clock_event_mode mode,
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		samsung_time_setup(timer_source.event_id, clock_count_per_tick);
--		samsung_time_start(timer_source.event_id, PERIODIC);
-+		samsung_time_start(timer_source.event_id, true);
- 		break;
+ #include <mach/map.h>
+ #include <plat/devs.h>
+-#include <plat/regs-timer.h>
++
++#define S3C_TIMERREG(x) (S3C_VA_TIMER + (x))
++#define S3C_TIMERREG2(tmr,reg) S3C_TIMERREG((reg)+0x0c+((tmr)*0x0c))
++
++#define S3C2410_TCFG0	      S3C_TIMERREG(0x00)
++#define S3C2410_TCFG1	      S3C_TIMERREG(0x04)
++#define S3C2410_TCON	      S3C_TIMERREG(0x08)
++
++#define S3C64XX_TINT_CSTAT    S3C_TIMERREG(0x44)
++
++#define S3C2410_TCFG_PRESCALER0_MASK (255<<0)
++#define S3C2410_TCFG_PRESCALER1_MASK (255<<8)
++#define S3C2410_TCFG_PRESCALER1_SHIFT (8)
++#define S3C2410_TCFG_DEADZONE_MASK   (255<<16)
++#define S3C2410_TCFG_DEADZONE_SHIFT  (16)
++
++#define S3C2410_TCFG1_MUX4_DIV2	  (0<<16)
++#define S3C2410_TCFG1_MUX4_DIV4	  (1<<16)
++#define S3C2410_TCFG1_MUX4_DIV8	  (2<<16)
++#define S3C2410_TCFG1_MUX4_DIV16  (3<<16)
++#define S3C2410_TCFG1_MUX4_TCLK1  (4<<16)
++#define S3C2410_TCFG1_MUX4_MASK	  (15<<16)
++#define S3C2410_TCFG1_MUX4_SHIFT  (16)
++
++#define S3C2410_TCFG1_MUX3_DIV2	  (0<<12)
++#define S3C2410_TCFG1_MUX3_DIV4	  (1<<12)
++#define S3C2410_TCFG1_MUX3_DIV8	  (2<<12)
++#define S3C2410_TCFG1_MUX3_DIV16  (3<<12)
++#define S3C2410_TCFG1_MUX3_TCLK1  (4<<12)
++#define S3C2410_TCFG1_MUX3_MASK	  (15<<12)
++
++
++#define S3C2410_TCFG1_MUX2_DIV2	  (0<<8)
++#define S3C2410_TCFG1_MUX2_DIV4	  (1<<8)
++#define S3C2410_TCFG1_MUX2_DIV8	  (2<<8)
++#define S3C2410_TCFG1_MUX2_DIV16  (3<<8)
++#define S3C2410_TCFG1_MUX2_TCLK1  (4<<8)
++#define S3C2410_TCFG1_MUX2_MASK	  (15<<8)
++
++
++#define S3C2410_TCFG1_MUX1_DIV2	  (0<<4)
++#define S3C2410_TCFG1_MUX1_DIV4	  (1<<4)
++#define S3C2410_TCFG1_MUX1_DIV8	  (2<<4)
++#define S3C2410_TCFG1_MUX1_DIV16  (3<<4)
++#define S3C2410_TCFG1_MUX1_TCLK0  (4<<4)
++#define S3C2410_TCFG1_MUX1_MASK	  (15<<4)
++
++#define S3C2410_TCFG1_MUX0_DIV2	  (0<<0)
++#define S3C2410_TCFG1_MUX0_DIV4	  (1<<0)
++#define S3C2410_TCFG1_MUX0_DIV8	  (2<<0)
++#define S3C2410_TCFG1_MUX0_DIV16  (3<<0)
++#define S3C2410_TCFG1_MUX0_TCLK0  (4<<0)
++#define S3C2410_TCFG1_MUX0_MASK	  (15<<0)
++
++#define S3C2410_TCFG1_MUX_DIV2	  (0<<0)
++#define S3C2410_TCFG1_MUX_DIV4	  (1<<0)
++#define S3C2410_TCFG1_MUX_DIV8	  (2<<0)
++#define S3C2410_TCFG1_MUX_DIV16   (3<<0)
++#define S3C2410_TCFG1_MUX_TCLK    (4<<0)
++#define S3C2410_TCFG1_MUX_MASK	  (15<<0)
++
++#define S3C64XX_TCFG1_MUX_DIV1	  (0<<0)
++#define S3C64XX_TCFG1_MUX_DIV2	  (1<<0)
++#define S3C64XX_TCFG1_MUX_DIV4	  (2<<0)
++#define S3C64XX_TCFG1_MUX_DIV8    (3<<0)
++#define S3C64XX_TCFG1_MUX_DIV16   (4<<0)
++#define S3C64XX_TCFG1_MUX_TCLK    (5<<0)  /* 3 sets of TCLK */
++#define S3C64XX_TCFG1_MUX_MASK	  (15<<0)
++
++#define S3C2410_TCFG1_SHIFT(x)	  ((x) * 4)
++
++/* for each timer, we have an count buffer, an compare buffer and
++ * an observation buffer
++*/
++
++/* WARNING - timer 4 has no buffer reg, and it's observation is@+4 */
++
++#define S3C2410_TCNTB(tmr)    S3C_TIMERREG2(tmr, 0x00)
++#define S3C2410_TCMPB(tmr)    S3C_TIMERREG2(tmr, 0x04)
++#define S3C2410_TCNTO(tmr)    S3C_TIMERREG2(tmr, (((tmr) == 4) ? 0x04 : 0x08))
++
++#define S3C2410_TCON_T4RELOAD	  (1<<22)
++#define S3C2410_TCON_T4MANUALUPD  (1<<21)
++#define S3C2410_TCON_T4START	  (1<<20)
++
++#define S3C2410_TCON_T3RELOAD	  (1<<19)
++#define S3C2410_TCON_T3INVERT	  (1<<18)
++#define S3C2410_TCON_T3MANUALUPD  (1<<17)
++#define S3C2410_TCON_T3START	  (1<<16)
++
++#define S3C2410_TCON_T2RELOAD	  (1<<15)
++#define S3C2410_TCON_T2INVERT	  (1<<14)
++#define S3C2410_TCON_T2MANUALUPD  (1<<13)
++#define S3C2410_TCON_T2START	  (1<<12)
++
++#define S3C2410_TCON_T1RELOAD	  (1<<11)
++#define S3C2410_TCON_T1INVERT	  (1<<10)
++#define S3C2410_TCON_T1MANUALUPD  (1<<9)
++#define S3C2410_TCON_T1START	  (1<<8)
++
++#define S3C2410_TCON_T0DEADZONE	  (1<<4)
++#define S3C2410_TCON_T0RELOAD	  (1<<3)
++#define S3C2410_TCON_T0INVERT	  (1<<2)
++#define S3C2410_TCON_T0MANUALUPD  (1<<1)
++#define S3C2410_TCON_T0START	  (1<<0)
  
- 	case CLOCK_EVT_MODE_ONESHOT:
-@@ -220,11 +220,11 @@ static void samsung_timer_resume(void)
- 
- 	/* event timer restart */
- 	samsung_time_setup(timer_source.event_id, clock_count_per_tick);
--	samsung_time_start(timer_source.event_id, PERIODIC);
-+	samsung_time_start(timer_source.event_id, true);
- 
- 	/* source timer restart */
- 	samsung_time_setup(timer_source.source_id, tcnt_max);
--	samsung_time_start(timer_source.source_id, PERIODIC);
-+	samsung_time_start(timer_source.source_id, true);
- }
- 
- void __init samsung_set_timer_source(enum samsung_timer_mode event,
-@@ -350,7 +350,7 @@ static void __init samsung_clocksource_init(void)
- 	clock_rate = clk_get_rate(tin_source);
- 
- 	samsung_time_setup(timer_source.source_id, tcnt_max);
--	samsung_time_start(timer_source.source_id, PERIODIC);
-+	samsung_time_start(timer_source.source_id, true);
- 
- 	setup_sched_clock(samsung_read_sched_clock,
- 						timer_variant.bits, clock_rate);
+ static struct clk *tin_event;
+ static struct clk *tin_source;
 -- 
 1.8.1.2
