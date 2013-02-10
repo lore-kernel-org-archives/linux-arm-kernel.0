@@ -1,65 +1,108 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Sun, 10 Feb 2013 18:28:14 +0100
-Subject: [PATCH 1/4] ARM: tegra: Unify tegra{20,30,114}_init_early()
-In-Reply-To: <51153136.7010705@wwwdotorg.org>
-References: <1360308574-19658-1-git-send-email-hdoyu@nvidia.com>
- <340098510.UosBEPkrGv@fb07-iapwap2> <51153136.7010705@wwwdotorg.org>
-Message-ID: <2499199.srlLvkihNZ@ax5200p>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Sun, 10 Feb 2013 19:06:07 +0100
+Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
+ Per-CPU Reader-Writer Locks
+In-Reply-To: <20130208231017.GK2666@linux.vnet.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
+ <20130208231017.GK2666@linux.vnet.ibm.com>
+Message-ID: <20130210180607.GA1375@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 February 2013 10:09:10 Stephen Warren wrote:
-> On 02/08/2013 05:29 AM, Marc Dietrich wrote:
-> > Hiroshi,
-> > 
-> > Am Freitag, 8. Februar 2013, 09:29:31 schrieb Hiroshi Doyu:
-> >> Refactored tegra{20,30,114}_init_early() so that we have the unified
-> >> tegra_init_early().
-> >> 
-> >> diff --git a/arch/arm/mach-tegra/hotplug.c
-> >> b/arch/arm/mach-tegra/hotplug.c
-> >> 
-> >> +void __init tegra_hotplug_init(void)
-> >> 
-> >>  {
-> >> 
-> >> +	switch (tegra_chip_id) {
-> >> +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-> >> +	case TEGRA20:
-> >> +		tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
-> >> +		break;
-> >> 
-> >>  #endif
-> >> 
-> >> +#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
-> >> +	case TEGRA30:
-> >> +		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
-> >> +		break;
-> >> 
-> >>  #endif
-> >> 
-> >> +	default:
-> >> +		BUG_ON(IS_ENABLED(CONFIG_HOTPLUG_CPU));
-> >> +		break;
-> >> +	}
-> >> +}
-> > 
-> > are these ifdefs really needed? Multisoc kernels will enable them all
-> > anyway and there is a case structure which protects the assignments. Also
-> > the hotplug functions are very tiny, so there shouldn't be a big loss.
-> 
-> The files that contain/implement those functions are separate for each
-> SoC and only included in the build when the individual SoCs are enabled.
-> 
-> While multi-platform SoCs do make sense for distros, we also very
-> specifically want to support the case where only Tegra, and only a
-> single Tegra SoC, is enabled, hence this separation.
+On 02/08, Paul E. McKenney wrote:
+>
+> On Tue, Jan 22, 2013 at 01:03:53PM +0530, Srivatsa S. Bhat wrote:
+> >
+> >  void percpu_read_unlock(struct percpu_rwlock *pcpu_rwlock)
+> >  {
+> > -	read_unlock(&pcpu_rwlock->global_rwlock);
+>
+> We need an smp_mb() here to keep the critical section ordered before the
+> this_cpu_dec() below.  Otherwise, if a writer shows up just after we
+> exit the fastpath, that writer is not guaranteed to see the effects of
+> our critical section.  Equivalently, the prior read-side critical section
+> just might see some of the writer's updates, which could be a bit of
+> a surprise to the reader.
 
-Huh? so tegra_defconfig is not supported?
+Agreed, we should not assume that a "reader" doesn't write. And we should
+ensure that this "read" section actually completes before this_cpu_dec().
 
-grep "TEGRA_.*_SOC" tegra_defconfig:
+> > +	/*
+> > +	 * We never allow heterogeneous nesting of readers. So it is trivial
+> > +	 * to find out the kind of reader we are, and undo the operation
+> > +	 * done by our corresponding percpu_read_lock().
+> > +	 */
+> > +	if (__this_cpu_read(*pcpu_rwlock->reader_refcnt)) {
+> > +		this_cpu_dec(*pcpu_rwlock->reader_refcnt);
+> > +		smp_wmb(); /* Paired with smp_rmb() in sync_reader() */
+>
+> Given an smp_mb() above, I don't understand the need for this smp_wmb().
+> Isn't the idea that if the writer sees ->reader_refcnt decremented to
+> zero, it also needs to see the effects of the corresponding reader's
+> critical section?
 
-CONFIG_ARCH_TEGRA_2x_SOC=y
-CONFIG_ARCH_TEGRA_3x_SOC=y
+I am equally confused ;)
 
-Marc
+OTOH, we can probably aboid any barrier if reader_nested_percpu() == T.
+
+
+> > +static void announce_writer_inactive(struct percpu_rwlock *pcpu_rwlock)
+> > +{
+> > +   unsigned int cpu;
+> > +
+> > +   drop_writer_signal(pcpu_rwlock, smp_processor_id());
+>
+> Why do we drop ourselves twice?  More to the point, why is it important to
+> drop ourselves first?
+
+And don't we need mb() _before_ we clear ->writer_signal ?
+
+> > +static inline void sync_reader(struct percpu_rwlock *pcpu_rwlock,
+> > +			       unsigned int cpu)
+> > +{
+> > +	smp_rmb(); /* Paired with smp_[w]mb() in percpu_read_[un]lock() */
+>
+> As I understand it, the purpose of this memory barrier is to ensure
+> that the stores in drop_writer_signal() happen before the reads from
+> ->reader_refcnt in reader_uses_percpu_refcnt(), thus preventing the
+> race between a new reader attempting to use the fastpath and this writer
+> acquiring the lock.  Unless I am confused, this must be smp_mb() rather
+> than smp_rmb().
+
+And note that before sync_reader() we call announce_writer_active() which
+already adds mb() before sync_all_readers/sync_reader, so this rmb() looks
+unneeded.
+
+But, at the same time, could you confirm that we do not need another mb()
+after sync_all_readers() in percpu_write_lock() ? I mean, without mb(),
+can't this reader_uses_percpu_refcnt() LOAD leak into the critical section
+protected by ->global_rwlock? Then this LOAD can be re-ordered with other
+memory operations done by the writer.
+
+
+
+Srivatsa, I think that the code would be more understandable if you kill
+the helpers like sync_reader/raise_writer_signal. Perhaps even all "write"
+helpers, I am not sure. At least, it seems to me that all barriers should
+be moved to percpu_write_lock/unlock. But I won't insist of course, up to
+you.
+
+And cosmetic nit... How about
+
+	struct xxx {
+		unsigned long	reader_refcnt;
+		bool		writer_signal;
+	}
+
+	struct percpu_rwlock {
+		struct xxx __percpu	*xxx;
+		rwlock_t		global_rwlock;
+	};
+
+?
+
+This saves one alloc_percpu() and ensures that reader_refcnt/writer_signal
+are always in the same cache-line.
+
+Oleg.
