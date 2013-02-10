@@ -1,29 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 9 Feb 2013 16:50:12 -0800
-Subject: [GIT PULL] Renesas ARM-based SoC for v3.9 #4
-In-Reply-To: <1360116201-9362-1-git-send-email-horms+renesas@verge.net.au>
-References: <1360116201-9362-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130210005012.GI16278@quad.lixom.net>
+Date: Sat, 9 Feb 2013 16:58:24 -0800
+Subject: [GIT PULL] omap twl platform init changes for v3.9 merge window
+In-Reply-To: <20130206172500.GA25185@atomide.com>
+References: <20130206172500.GA25185@atomide.com>
+Message-ID: <20130210005824.GJ16278@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 11:03:20AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+On Wed, Feb 06, 2013 at 09:25:00AM -0800, Tony Lindgren wrote:
+> The following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
 > 
-> The following changes since commit 58079fa7d54a0929d304054ee759187a2ccd3cdf:
-> 
->   ARM: shmobile: r8a7779: Correct TMU clock support (2013-02-05 12:31:18 +0900)
+>   Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc4-for-v3.9
-> 
-> for you to fetch changes up to dbe1c3defb3844772634446492ea6c13882596ec:
-> 
->   ARM: shmobile: Register ARM architected timer (2013-02-05 17:13:55 +0900)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/twl-signed-v2
 
+<standard complaint>
+It would be nice to see TI enabling device-tree on these platforms/drivers
+instead of adding to legacy board files.
+</standard complaint>
 
-Pulled, thanks.
+Pulled into next/boards.
 
 
 -Olof
