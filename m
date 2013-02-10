@@ -1,53 +1,74 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 10 Feb 2013 14:54:39 +0100
-Subject: [PATCH v2 0/4] Initial Device Tree support for S3C64xx
-Message-ID: <1360504483-3465-1-git-send-email-tomasz.figa@gmail.com>
+Date: Sun, 10 Feb 2013 14:54:40 +0100
+Subject: [PATCH v2 1/4] ARM: common: vic: Parse interrupt and resume masks
+ from device tree
+In-Reply-To: <1360504483-3465-1-git-send-email-tomasz.figa@gmail.com>
+References: <1360504483-3465-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1360504483-3465-2-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds Device Tree support for Samsung S3C64xx SoC series.
+This patch extends vic_of_init to parse valid interrupt sources
+and resume sources masks from device tree.
 
-It fixes several problems preventing from booting an S3C64xx-based system
-using Device Tree, adds all the infrastructure for Device Tree-based board
-support, including mach-s3c64xx-dt and dts include files for S3C64xx SoCs, and
-(very) basic device tree source for FriendlyARM Mini6410 board.
+If mask values are not specified in device tree, all sources
+are assumed to be valid, as before this patch.
 
-Current support is very limited and allows only basic bootup with UART and
-SDHCI, but should be fine as a start and will be extended in future, hopefully
-with help of S3C64xx board maintainers.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/vic.txt | 6 ++++++
+ arch/arm/common/vic.c                         | 7 ++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-This series depends on my other series reworking samsung-time for multiplatform:
-[PATCH 00/12] ARM: samsung-time: Prepare for multiplatform support
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16005
-
-Changes since v1:
- - Dropped two VIC-related patches that are no longer necessary
- - Added Device Tree-based instantation of system timers
- - Corrected VIC interrupt specifiers
- - Adjusted CPU compatible values and dropped @id
-
-Tomasz Figa (4):
-  ARM: common: vic: Parse interrupt and resume masks from device tree
-  ARM: s3c64xx: Add board file for boot using Device Tree
-  ARM: dts: Add basic dts include files for Samsung S3C64xx SoCs
-  ARM: dts: Add dts file for S3C6410-based Mini6410 board
-
- Documentation/devicetree/bindings/arm/vic.txt |   6 ++
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/s3c6400.dtsi                |  33 ++++++++
- arch/arm/boot/dts/s3c6410-mini6410.dts        |  50 ++++++++++++
- arch/arm/boot/dts/s3c6410.dtsi                |  33 ++++++++
- arch/arm/boot/dts/s3c64xx.dtsi                | 108 ++++++++++++++++++++++++++
- arch/arm/common/vic.c                         |   7 +-
- arch/arm/mach-s3c64xx/Kconfig                 |  14 ++++
- arch/arm/mach-s3c64xx/Makefile                |   1 +
- arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c       |  94 ++++++++++++++++++++++
- 10 files changed, 346 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/s3c6400.dtsi
- create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
- create mode 100644 arch/arm/boot/dts/s3c6410.dtsi
- create mode 100644 arch/arm/boot/dts/s3c64xx.dtsi
- create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
-
+diff --git a/Documentation/devicetree/bindings/arm/vic.txt b/Documentation/devicetree/bindings/arm/vic.txt
+index 266716b..bb7137c 100644
+--- a/Documentation/devicetree/bindings/arm/vic.txt
++++ b/Documentation/devicetree/bindings/arm/vic.txt
+@@ -18,6 +18,9 @@ Required properties:
+ Optional properties:
+ 
+ - interrupts : Interrupt source for parent controllers if the VIC is nested.
++- interrupt-mask : Bit mask of valid interrupt sources (defaults to all valid)
++- wakeup-mask : Bit mask of interrupt sources that can wake up the system
++  (defaults to all allowed)
+ 
+ Example:
+ 
+@@ -26,4 +29,7 @@ Example:
+ 		interrupt-controller;
+ 		#interrupt-cells = <1>;
+ 		reg = <0x60000 0x1000>;
++
++		interrupt-mask = <0xffffff7f>;
++		wakeup-mask = <0x0000ff7f>;
+ 	};
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index 8f324b9..676a938 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -412,6 +412,8 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *regs;
++	u32 interrupt_mask = ~0;
++	u32 wakeup_mask = ~0;
+ 
+ 	if (WARN(parent, "non-root VICs are not supported"))
+ 		return -EINVAL;
+@@ -420,10 +422,13 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ 	if (WARN_ON(!regs))
+ 		return -EIO;
+ 
++	of_property_read_u32(node, "interrupt-mask", &interrupt_mask);
++	of_property_read_u32(node, "wakeup-mask", &wakeup_mask);
++
+ 	/*
+ 	 * Passing 0 as first IRQ makes the simple domain allocate descriptors
+ 	 */
+-	__vic_init(regs, 0, ~0, ~0, node);
++	__vic_init(regs, 0, interrupt_mask, wakeup_mask, node);
+ 
+ 	return 0;
+ }
 -- 
 1.8.1.2
