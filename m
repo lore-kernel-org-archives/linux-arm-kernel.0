@@ -1,54 +1,39 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Mon, 11 Feb 2013 01:50:10 +0530
-Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <20130210201312.GB6236@redhat.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
- <20130208231017.GK2666@linux.vnet.ibm.com>
- <5117F0C0.2030605@linux.vnet.ibm.com> <20130210201312.GB6236@redhat.com>
-Message-ID: <511800FA.1060007@linux.vnet.ibm.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Sun, 10 Feb 2013 22:45:59 +0200
+Subject: [PATCH 0/6] ARM: mm: HugeTLB + THP support.
+In-Reply-To: <1360335683-7755-1-git-send-email-steve.capper@arm.com>
+References: <1360335683-7755-1-git-send-email-steve.capper@arm.com>
+Message-ID: <CANOLnONh3rtqLXZ7LrEW9ML-Dzpr0=xmkeqnTVVzt3iq2sNyhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 01:43 AM, Oleg Nesterov wrote:
-> On 02/11, Srivatsa S. Bhat wrote:
->>
->> On 02/09/2013 04:40 AM, Paul E. McKenney wrote:
->>>> +static void announce_writer_inactive(struct percpu_rwlock *pcpu_rwlock)
->>>> +{
->>>> +	unsigned int cpu;
->>>> +
->>>> +	drop_writer_signal(pcpu_rwlock, smp_processor_id());
->>>
->>> Why do we drop ourselves twice?  More to the point, why is it important to
->>> drop ourselves first?
->>>
->>
->> I don't see where we are dropping ourselves twice. Note that we are no longer
->> in the cpu_online_mask, so the 'for' loop below won't include us. So we need
->> to manually drop ourselves. It doesn't matter whether we drop ourselves first
->> or later.
-> 
-> Yes, but this just reflects its usage in cpu-hotplug. cpu goes away under
-> _write_lock.
-> 
+On Fri, Feb 8, 2013 at 5:01 PM, Steve Capper <steve.capper@arm.com> wrote:
+> Hello,
+> The following patches bring both HugeTLB support and Transparent
+> HugePage (THP) support to ARM.
+>
+> These are not intended for 3.9.
 
-Ah, right. I guess the code still has remnants from the older version in which
-this locking scheme wasn't generic and was tied to cpu-hotplug alone..
+I've tested this on 3.2 with this series and dependencies (LPAE and
+some others) backported because I currently only have full board
+support on 3.2. This was done on OMAP3/CortexA8 pandora board running
+PSX emulator that renders graphics to 16bpp 1024x512 framebuffer
+(sometimes 2048x1024 in "enhanced" mode). Here are some average frames
+per second counter readings without huge pages and with them:
 
-> Perhaps _write_lock/unlock shoud use for_each_possible_cpu() instead?
-> 
+(not showing games as they are irrelevant here)
+no hugetlb / hugetlb
+game1: ~52 / 57
+game2: ~67 / 77
+game3: 21 / 26
+game4: 22 / 25
 
-Hmm, that wouldn't be too bad.
+As it can be seen here huge pages are very useful for this kind of
+load, so I'm really looking forward for this to get merged.
 
-> Hmm... I think this makes sense anyway. Otherwise, in theory,
-> percpu_write_lock(random_non_hotplug_lock) can race with cpu_up?
-> 
+FWIW:
+Tested-by: Grazvydas Ignotas <notasas@gmail.com>
 
-Yeah, makes sense. Will change it to for_each_possible_cpu().
-And I had previously fixed such races with lglocks with a complicated scheme (to
-avoid the costly for_each_possible loop), which was finally rewritten to use
-for_each_possible_cpu() for the sake of simplicity..
-Regards,
-Srivatsa S. Bhat
+
+-- 
+Gra?vydas
