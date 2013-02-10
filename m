@@ -1,35 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 9 Feb 2013 16:29:29 -0800
-Subject: [PATCH 6/6] ARM: integrator: ensure ap_syscon_base is
- initialised when !CONFIG_MMU
-In-Reply-To: <20130206182512.GB28640@mudshark.cambridge.arm.com>
-References: <1359556069-28289-1-git-send-email-will.deacon@arm.com>
- <20130131225630.GB26523@quad.lixom.net>
- <20130203114847.GB27474@mudshark.cambridge.arm.com>
- <201302042149.44727.arnd@arndb.de>
- <20130206182512.GB28640@mudshark.cambridge.arm.com>
-Message-ID: <20130210002929.GA16278@quad.lixom.net>
+Date: Sat, 9 Feb 2013 16:31:13 -0800
+Subject: [GIT PULL  3/4] ARM: mvebu: boards for v3.9
+In-Reply-To: <20130206132015.GB14746@titan.lakedaemon.net>
+References: <pull-1359733919-342140> <1359733919.c3D01c3.22262@triton>
+ <20130205071010.GD13049@quad.lixom.net>
+ <20130205112104.GP14746@titan.lakedaemon.net>
+ <20130205182333.GA21051@quad.lixom.net>
+ <20130205183050.GZ14746@titan.lakedaemon.net>
+ <20130205232604.GB14851@quad.lixom.net>
+ <20130206132015.GB14746@titan.lakedaemon.net>
+Message-ID: <20130210003113.GB16278@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 06:25:12PM +0000, Will Deacon wrote:
-> On Mon, Feb 04, 2013 at 09:49:44PM +0000, Arnd Bergmann wrote:
-> > On Sunday 03 February 2013, Will Deacon wrote:
-> > > I think it's been broken for a little while as it only affects !MMU
-> > > configurations, which aren't especially popular. My guess is that
-> > > 83feba511e5d ("ARM: integrator: remove static AP syscon mapping") is what
-> > > caused the breakage.
-> > > 
-> > > The fix should apply against mainline.
-> > 
-> > Sounds like a candidate for stable as well then. I'm not sure if anyone
-> > cares about !MMU stable kernels, but it's totally possible with the
-> > LTSI kernels.
+On Wed, Feb 06, 2013 at 08:20:15AM -0500, Jason Cooper wrote:
+> On Tue, Feb 05, 2013 at 03:26:04PM -0800, Olof Johansson wrote:
+> > What makes sense is to hold off the patches that adds dts entries and
+> > removes the platform device registrations to the next release to avoid
+> > this dependency.
 > 
-> Agreed. I've lost where we've got to, so here's the patch against -rc5 with
-> the CC stable and Linus' ack.
+> Hmm, this makes life a *lot* simpler, but it also really slows things
+> down.  I'll go ahead and do this from now on.
+> 
+> Would you like me to redo /boards and /dt in light of this, or just do
+> it from here forward?
 
-Applied to fixes-non-critical for 3.9.
+It doesn't necessarily slow things down -- it increases latency though. I.e.
+you'll end up building a pipeline over time.
+
+I agree that we're not entirely clear on this, and we're also going back and
+forth a bit on how much of this we push back on and not. I don't think we've
+found quite a good balance of this yet. Hm.
 
 
 -Olof
