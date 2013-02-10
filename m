@@ -1,62 +1,59 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sun, 10 Feb 2013 14:57:27 +0000
-Subject: [PATCH 1/2] ARM: mm: replace direct access to mm->context.id with new
- macro
+Date: Sun, 10 Feb 2013 14:57:28 +0000
+Subject: [PATCH 2/2] ARM: mm: mm->context.id fix for big-endian
 In-Reply-To: <1360508248-25252-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360508248-25252-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360508248-25252-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360508248-25252-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmid macro is meant to be used to get the mm->context.id data
-from the mm structure, but it seems to have been missed in a cuple
-of files.
+Since the new ASID code in [b5466f8728527a05a493cc4abe9e6f034a1bbaab]
+was changed to use 64bit operations it has broken the BE operation due
+to an issue with the MM code accessing sub-fields of mm->context.id.
+
+When running in BE mode we see the values in mm->context.id are stored
+with the highest value first, so the LDR in the arch/arm/mm/proc-macros.S
+reads the wrong part of this field. To resolve this, change the LDR in
+the mmid macro to load from +4.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/mm/proc-v6.S        |    2 +-
- arch/arm/mm/proc-v7-2level.S |    2 +-
- arch/arm/mm/proc-v7-3level.S |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mm/context.c     |    3 +++
+ arch/arm/mm/proc-macros.S |    5 +++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index 09c5233..bcaaa8d 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -101,7 +101,7 @@ ENTRY(cpu_v6_dcache_clean_area)
- ENTRY(cpu_v6_switch_mm)
- #ifdef CONFIG_MMU
- 	mov	r2, #0
--	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
-+	mmid	r1, r1				@ get mm->context.id
- 	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
- 	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
- 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index 6d98c13..78f520b 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -40,7 +40,7 @@
- ENTRY(cpu_v7_switch_mm)
- #ifdef CONFIG_MMU
- 	mov	r2, #0
--	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
-+	mmid	r1, r1				@ get mm->context.id
- 	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
- 	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
- #ifdef CONFIG_ARM_ERRATA_430973
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 7b56386..50bf1da 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -47,7 +47,7 @@
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index bc4a5e9..7a05111 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -34,6 +34,9 @@
+  * The ASID is used to tag entries in the CPU caches and TLBs.
+  * The context ID is used by debuggers and trace logic, and
+  * should be unique within all running processes.
++ *
++ * In big endian operation, the two 32 bit words are swapped if accesed by
++ * non 64-bit operations.
   */
- ENTRY(cpu_v7_switch_mm)
- #ifdef CONFIG_MMU
--	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
-+	mmid	r1, r1				@ get mm->context.id
- 	and	r3, r1, #0xff
- 	mov	r3, r3, lsl #(48 - 32)		@ ASID
- 	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
+ #define ASID_FIRST_VERSION	(1ULL << ASID_BITS)
+ #define NUM_USER_ASIDS		(ASID_FIRST_VERSION - 1)
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index eb6aa73..f9a0aa7 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -38,9 +38,14 @@
+ 
+ /*
+  * mmid - get context id from mm pointer (mm->context.id)
++ * note, this field is 64bit, so in big-endian the two words are swapped too.
+  */
+ 	.macro	mmid, rd, rn
++#ifdef __ARMEB__
++	ldr	\rd, [\rn, #MM_CONTEXT_ID + 4 ]
++#else
+ 	ldr	\rd, [\rn, #MM_CONTEXT_ID]
++#endif
+ 	.endm
+ 
+ /*
 -- 
 1.7.10.4
