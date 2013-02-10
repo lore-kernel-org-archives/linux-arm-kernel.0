@@ -1,121 +1,135 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Feb 2013 19:19:09 +0000 (UTC)
-Subject: [PATCH v2 5/5] OMAP4: hwmod data: Update AESS data with memory
- bank area
-In-Reply-To: <1357743792-13917-6-git-send-email-s-guiriec@ti.com>
-References: <1357743792-13917-1-git-send-email-s-guiriec@ti.com>
- <1357743792-13917-6-git-send-email-s-guiriec@ti.com>
-Message-ID: <alpine.DEB.2.00.1302101917260.2672@utopia.booyaka.com>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Mon, 11 Feb 2013 00:54:51 +0530
+Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
+ Per-CPU Reader-Writer Locks
+In-Reply-To: <20130210180607.GA1375@redhat.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
+ <20130208231017.GK2666@linux.vnet.ibm.com> <20130210180607.GA1375@redhat.com>
+Message-ID: <5117F403.1050300@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Wed, 9 Jan 2013, Sebastien Guiriec wrote:
-
-> Add AESS memory bank data in hwmod in order to provide memory
-> address information to the driver.
+On 02/10/2013 11:36 PM, Oleg Nesterov wrote:
+> On 02/08, Paul E. McKenney wrote:
+>>
+>> On Tue, Jan 22, 2013 at 01:03:53PM +0530, Srivatsa S. Bhat wrote:
+>>>
+>>>  void percpu_read_unlock(struct percpu_rwlock *pcpu_rwlock)
+>>>  {
+>>> -	read_unlock(&pcpu_rwlock->global_rwlock);
+>>
+>> We need an smp_mb() here to keep the critical section ordered before the
+>> this_cpu_dec() below.  Otherwise, if a writer shows up just after we
+>> exit the fastpath, that writer is not guaranteed to see the effects of
+>> our critical section.  Equivalently, the prior read-side critical section
+>> just might see some of the writer's updates, which could be a bit of
+>> a surprise to the reader.
 > 
-> Signed-off-by: sebastien Guiriec <s-guiriec@ti.com>
+> Agreed, we should not assume that a "reader" doesn't write. And we should
+> ensure that this "read" section actually completes before this_cpu_dec().
+>
 
-Due to the cleanup of the CLKCTRL leaf clocks, this one has been updated 
-to change the AESS main clock to be aess_fclk, and it's also been moved to 
-precede the patch that enables the AESS hwmod.
-
-
-- Paul
-
-
-From: Sebastien Guiriec <s-guiriec@ti.com>
-Date: Sun, 10 Feb 2013 11:22:24 -0700
-Subject: [PATCH] ARM: OMAP4: hwmod data: Update AESS data with memory bank
- area
-
-Add AESS memory bank data in hwmod in order to provide memory address
-information to the driver.
-
-This version also changes the AESS main clock to use a
-non-CLKCTRL-based functional clock.  These are being removed from the
-clock data, since they should be handled by the IP block integration
-code.  Without this change, the kernel crashes during boot.  Thanks to
-Tony Lindgren for reporting this during a test merge.
-
-Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
-[paul at pwsan.com: updated to change the AESS main_clk]
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   44 +++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index c9c251e..a30c113 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -349,7 +349,7 @@ static struct omap_hwmod omap44xx_aess_hwmod = {
- 	.clkdm_name	= "abe_clkdm",
- 	.mpu_irqs	= omap44xx_aess_irqs,
- 	.sdma_reqs	= omap44xx_aess_sdma_reqs,
--	.main_clk	= "aess_fck",
-+	.main_clk	= "aess_fclk",
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP4_CM1_ABE_AESS_CLKCTRL_OFFSET,
-@@ -4250,6 +4250,27 @@ static struct omap_hwmod_ocp_if omap44xx_l4_cfg__ocp_wp_noc = {
+Right, will fix.
  
- static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
- 	{
-+		.name		= "dmem",
-+		.pa_start	= 0x40180000,
-+		.pa_end		= 0x4018ffff
-+	},
-+	{
-+		.name		= "cmem",
-+		.pa_start	= 0x401a0000,
-+		.pa_end		= 0x401a1fff
-+	},
-+	{
-+		.name		= "smem",
-+		.pa_start	= 0x401c0000,
-+		.pa_end		= 0x401c5fff
-+	},
-+	{
-+		.name		= "pmem",
-+		.pa_start	= 0x401e0000,
-+		.pa_end		= 0x401e1fff
-+	},
-+	{
-+		.name		= "mpu",
- 		.pa_start	= 0x401f1000,
- 		.pa_end		= 0x401f13ff,
- 		.flags		= ADDR_TYPE_RT
-@@ -4268,6 +4289,27 @@ static struct omap_hwmod_ocp_if __maybe_unused omap44xx_l4_abe__aess = {
- 
- static struct omap_hwmod_addr_space omap44xx_aess_dma_addrs[] = {
- 	{
-+		.name		= "dmem_dma",
-+		.pa_start	= 0x49080000,
-+		.pa_end		= 0x4908ffff
-+	},
-+	{
-+		.name		= "cmem_dma",
-+		.pa_start	= 0x490a0000,
-+		.pa_end		= 0x490a1fff
-+	},
-+	{
-+		.name		= "smem_dma",
-+		.pa_start	= 0x490c0000,
-+		.pa_end		= 0x490c5fff
-+	},
-+	{
-+		.name		= "pmem_dma",
-+		.pa_start	= 0x490e0000,
-+		.pa_end		= 0x490e1fff
-+	},
-+	{
-+		.name		= "dma",
- 		.pa_start	= 0x490f1000,
- 		.pa_end		= 0x490f13ff,
- 		.flags		= ADDR_TYPE_RT
--- 
-1.7.10.4
+>>> +	/*
+>>> +	 * We never allow heterogeneous nesting of readers. So it is trivial
+>>> +	 * to find out the kind of reader we are, and undo the operation
+>>> +	 * done by our corresponding percpu_read_lock().
+>>> +	 */
+>>> +	if (__this_cpu_read(*pcpu_rwlock->reader_refcnt)) {
+>>> +		this_cpu_dec(*pcpu_rwlock->reader_refcnt);
+>>> +		smp_wmb(); /* Paired with smp_rmb() in sync_reader() */
+>>
+>> Given an smp_mb() above, I don't understand the need for this smp_wmb().
+>> Isn't the idea that if the writer sees ->reader_refcnt decremented to
+>> zero, it also needs to see the effects of the corresponding reader's
+>> critical section?
+> 
+> I am equally confused ;)
+> 
+> OTOH, we can probably aboid any barrier if reader_nested_percpu() == T.
+> 
+
+Good point! Will add that optimization, thank you!
+
+> 
+>>> +static void announce_writer_inactive(struct percpu_rwlock *pcpu_rwlock)
+>>> +{
+>>> +   unsigned int cpu;
+>>> +
+>>> +   drop_writer_signal(pcpu_rwlock, smp_processor_id());
+>>
+>> Why do we drop ourselves twice?  More to the point, why is it important to
+>> drop ourselves first?
+> 
+> And don't we need mb() _before_ we clear ->writer_signal ?
+> 
+
+Oh, right! Or, how about moving announce_writer_inactive() to _after_
+write_unlock()?
+
+>>> +static inline void sync_reader(struct percpu_rwlock *pcpu_rwlock,
+>>> +			       unsigned int cpu)
+>>> +{
+>>> +	smp_rmb(); /* Paired with smp_[w]mb() in percpu_read_[un]lock() */
+>>
+>> As I understand it, the purpose of this memory barrier is to ensure
+>> that the stores in drop_writer_signal() happen before the reads from
+>> ->reader_refcnt in reader_uses_percpu_refcnt(), thus preventing the
+>> race between a new reader attempting to use the fastpath and this writer
+>> acquiring the lock.  Unless I am confused, this must be smp_mb() rather
+>> than smp_rmb().
+> 
+> And note that before sync_reader() we call announce_writer_active() which
+> already adds mb() before sync_all_readers/sync_reader, so this rmb() looks
+> unneeded.
+> 
+
+My intention was to help the writer see the ->reader_refcnt drop to zero
+ASAP; hence I used smp_wmb() at reader and smp_rmb() here at the writer.
+Please correct me if my understanding of memory barriers is wrong here..
+
+> But, at the same time, could you confirm that we do not need another mb()
+> after sync_all_readers() in percpu_write_lock() ? I mean, without mb(),
+> can't this reader_uses_percpu_refcnt() LOAD leak into the critical section
+> protected by ->global_rwlock? Then this LOAD can be re-ordered with other
+> memory operations done by the writer.
+> 
+
+Hmm.. it appears that we need a smp_mb() there.
+
+> 
+> 
+> Srivatsa, I think that the code would be more understandable if you kill
+> the helpers like sync_reader/raise_writer_signal. Perhaps even all "write"
+> helpers, I am not sure. At least, it seems to me that all barriers should
+> be moved to percpu_write_lock/unlock. But I won't insist of course, up to
+> you.
+> 
+
+Sure, sure. Even Tejun pointed out that those helpers are getting in the way
+of readability. I'll get rid of them in the next version.
+
+> And cosmetic nit... How about
+> 
+> 	struct xxx {
+> 		unsigned long	reader_refcnt;
+> 		bool		writer_signal;
+> 	}
+> 
+> 	struct percpu_rwlock {
+> 		struct xxx __percpu	*xxx;
+> 		rwlock_t		global_rwlock;
+> 	};
+> 
+> ?
+> 
+> This saves one alloc_percpu() and ensures that reader_refcnt/writer_signal
+> are always in the same cache-line.
+>
+
+Ok, that sounds better. Will make that change. Thanks a lot Oleg!
+
+Regards,
+Srivatsa S. Bhat
