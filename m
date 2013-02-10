@@ -1,42 +1,42 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 10 Feb 2013 17:32:39 +0100
-Subject: [PATCH 1/2] drivers/cpufreq: delete dangling include
-Message-ID: <1360513959-31695-1-git-send-email-linus.walleij@stericsson.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 10 Feb 2013 09:07:24 -0800
+Subject: [GIT PULL] ARM: OMAP AM33xx: fixes and IP block integration
+ support for 3.9
+In-Reply-To: <alpine.DEB.2.00.1302081720360.28008@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1302081720360.28008@utopia.booyaka.com>
+Message-ID: <20130210170724.GJ4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+* Paul Walmsley <paul@pwsan.com> [130208 09:25]:
+> Hi Tony,
+> 
+> The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+> 
+>   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-a-for-3.9
+> 
+> for you to fetch changes up to 169c82a294e3722eb1e82b7dac58b35fe2119b80:
+> 
+>   ARM: OMAP2: am33xx-hwmod: Fix "register offset NULL check" bug (2013-02-08 08:21:13 -0700)
+> 
+> ----------------------------------------------------------------
+> Fixes and IP block support for the TI AM33xx family of SoCs.  These
+> are prerequisites for power management and some PWM driver changes.
+> 
+> Basic test logs are available from:
+> 
+>    http://www.pwsan.com/omap/testlogs/am33xx_fixes_a_3.9/20130208084835/
+> 
+> although it must be noted that I am unable to test these patches on
+> AM33xx due to an unknown problem with v3.8-rc kernels:
+> 
+>    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg83525.html
+> 
 
-There was a dangling #include <mach/id.h> in the cpufreq
-file missing from commit
-7a4f26097d389c16c9956bc03b81532698d97d64
-"ARM: ux500: de-globalize <mach/id.h>"
+Thanks pulled into omap-for-v3.9/am33xx.
 
-Causing build regressions when building with cpufreq
-support.
-
-Cc: arm at kernel.org
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC: please merge this patch directly to the
-next/cleanup branch once Rafael ACK it or you think it's
-taken too long (the patch is pretty obvious).
----
- drivers/cpufreq/db8500-cpufreq.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
-index 523c940..87130e2 100644
---- a/drivers/cpufreq/db8500-cpufreq.c
-+++ b/drivers/cpufreq/db8500-cpufreq.c
-@@ -15,7 +15,6 @@
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
--#include <mach/id.h>
- 
- static struct cpufreq_frequency_table *freq_table;
- static struct clk *armss_clk;
--- 
-1.7.11.3
+Tony
