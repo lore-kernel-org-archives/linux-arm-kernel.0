@@ -1,73 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 9 Feb 2013 19:22:34 -0800
-Subject: Latest additional build warnings
-In-Reply-To: <CAOesGMgvEVsB7OWs43EWjgsR8af2_RZS9Dod3PURu6Tvdi4QJw@mail.gmail.com>
-References: <20130205142218.GB17833@n2100.arm.linux.org.uk>
- <20130209114918.GJ17852@n2100.arm.linux.org.uk>
- <20130210030032.GC4801@atomide.com>
- <CAOesGMgvEVsB7OWs43EWjgsR8af2_RZS9Dod3PURu6Tvdi4QJw@mail.gmail.com>
-Message-ID: <20130210032234.GE4801@atomide.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 10 Feb 2013 04:28:53 +0100
+Subject: mx28evk does not boot with linux-next 20130207
+In-Reply-To: <CAOMZO5CbJfpVwqHM1RSYdEQH4n1EL67Kt2_tC9TNPxZGMsPevQ@mail.gmail.com>
+References: <CAOMZO5Ar1T3Lg2KRvSLK-gjNAaAFAf39f6KqaYeF03w5bNj6EQ@mail.gmail.com>
+ <20130208164858.GA32318@mudshark.cambridge.arm.com>
+ <CAOMZO5CbJfpVwqHM1RSYdEQH4n1EL67Kt2_tC9TNPxZGMsPevQ@mail.gmail.com>
+Message-ID: <201302100428.54061.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [130209 19:08]:
-> On Sat, Feb 9, 2013 at 7:00 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [130209 03:53]:
-> >> On Tue, Feb 05, 2013 at 02:22:18PM +0000, Russell King - ARM Linux wrote:
-> >> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: data definition has no type or storage class
-> >> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: type defaults to 'int' in declaration of 'omap_postcore_initcall'
-> >> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: parameter names (without types) in function declaration
-> >> > arch/arm/mach-omap2/hwspinlock.c:31:122: warning: 'hwspinlocks_init' defined but not used
-> >>
-> >> I'm still seeing the above in the build of Friday's merge.  I'm also
-> >> seeing additional warnings in the randconfig similar to the above for
-> >> arch/arm/mach-omap2/omap-iommu.c.
-> >
-> > Thanks for letting me know about the omap-iommu.c one. Looks like
-> > there's also one patch for drm.c.
-> >
-> > Olof, if you did not yet apply the hwspinlock.c warning fix, I'll
-> > just do a branch with all three of them for you.
+Dear Fabio Estevam,
+
+> On Fri, Feb 8, 2013 at 2:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > From dc381a5dff9663901a61fe0dd86c986add382281 Mon Sep 17 00:00:00 2001
+> > From: Will Deacon <will.deacon@arm.com>
+> > Date: Fri, 8 Feb 2013 16:41:19 +0000
+> > Subject: [PATCH] ARM: tlb: fix branch predictor maintenance for ARMv6
+> > 
+> > The BPIALL operation is not available on all CPUs, so ensure that we
+> > only execute it on processors implementing the instruction.
+> > 
+> > Reported-by: Fabio Estevam <festevam@gmail.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> I haven't (must have missed it), so please just send a branch.
+> Thanks, Will.
+> 
+> This makes the kernel to boot again on my mx28evk, so:
+> 
+> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> There are still other issues, which seem to be unrelated to this fix
+> though:
+> 
+> I can see the Linux logo and LED activity on my board, but no serial
+> console.
+> 
+> Applying Shawn's patch:
+> 
+> diff --git a/arch/arm/boot/compressed/debug.S
+> b/arch/arm/boot/compressed/debug.S
+> index bdb0e25..6e8382d 100644
+> --- a/arch/arm/boot/compressed/debug.S
+> +++ b/arch/arm/boot/compressed/debug.S
+> @@ -1,4 +1,5 @@
+>  #include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> 
+>  #include CONFIG_DEBUG_LL_INCLUDE
+> 
+> and turning on earlyprintk I see kernel booting and it stops at:
+> 
+> [    5.311281] TCP: cubic registered
+> [    5.315000] NET: Registered protocol family 17
+> [    5.320843] Key type dns_resolver registered
+> [    5.325750] turn off boot console earlycon0
 
-OK will do. Probably you started fixing up the bad Reported-by
-line in my patch and then got disrupted :)
+Is the amba-pl011 driver maybe broken ?
 
-Found one more after some grepping, after the following patch they
-should be all fixed up. Pull request coming shortly.
+So far, Wills' and Shawns' patches got me further too, thanks!
 
-Tony
-
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Sat, 9 Feb 2013 19:20:57 -0800
-Subject: [PATCH] ARCH: OMAP2+: Make sure files with omap initcalls include soc.h
-
-Looks like there are few more places that I missed that can cause
-compiler warnings. After grepping for omap initcall, all files
-needing soc.h should now have it.
-
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/omap-iommu.c
-+++ b/arch/arm/mach-omap2/omap-iommu.c
-@@ -16,6 +16,7 @@
- #include <linux/slab.h>
- 
- #include <linux/platform_data/iommu-omap.h>
-+#include "soc.h"
- #include "omap_hwmod.h"
- #include "omap_device.h"
- 
---- a/arch/arm/mach-omap2/smartreflex-class3.c
-+++ b/arch/arm/mach-omap2/smartreflex-class3.c
-@@ -12,6 +12,7 @@
-  */
- 
- #include <linux/power/smartreflex.h>
-+#include "soc.h"
- #include "voltage.h"
- 
- static int sr_class3_enable(struct omap_sr *sr)
+Best regards,
+Marek Vasut
