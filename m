@@ -1,53 +1,97 @@
-From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Sun, 10 Feb 2013 23:42:35 +0200
-Subject: [PATCH 1/1] ARM: OMAP4: Add OMAP4 Blaze Tablet support
-In-Reply-To: <20130210025225.GB4801@atomide.com>
-References: <1360352269-14922-1-git-send-email-ruslan.bilovol@ti.com>
- <1360352269-14922-2-git-send-email-ruslan.bilovol@ti.com>
- <20130210025225.GB4801@atomide.com>
-Message-ID: <CAB=otbQ5kWw-tcocwT6TZGpxmCV_JS4H3xN6_CewxZpMBNErug@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Sun, 10 Feb 2013 14:13:57 -0800
+Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
+ Per-CPU Reader-Writer Locks
+In-Reply-To: <5117FE74.4020000@linux.vnet.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
+ <20130208231017.GK2666@linux.vnet.ibm.com>
+ <20130210180607.GA1375@redhat.com>
+ <5117F403.1050300@linux.vnet.ibm.com>
+ <20130210195042.GA6236@redhat.com>
+ <5117FE74.4020000@linux.vnet.ibm.com>
+Message-ID: <20130210221357.GN2666@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Feb 11, 2013 at 01:39:24AM +0530, Srivatsa S. Bhat wrote:
+> On 02/11/2013 01:20 AM, Oleg Nesterov wrote:
+> > On 02/11, Srivatsa S. Bhat wrote:
+> >>
+> >> On 02/10/2013 11:36 PM, Oleg Nesterov wrote:
+> >>>>> +static void announce_writer_inactive(struct percpu_rwlock *pcpu_rwlock)
+> >>>>> +{
+> >>>>> +   unsigned int cpu;
+> >>>>> +
+> >>>>> +   drop_writer_signal(pcpu_rwlock, smp_processor_id());
+> >>>>
+> >>>> Why do we drop ourselves twice?  More to the point, why is it important to
+> >>>> drop ourselves first?
+> >>>
+> >>> And don't we need mb() _before_ we clear ->writer_signal ?
+> >>>
+> >>
+> >> Oh, right! Or, how about moving announce_writer_inactive() to _after_
+> >> write_unlock()?
+> > 
+> > Not sure this will help... but, either way it seems we have another
+> > problem...
+> > 
+> > percpu_rwlock tries to be "generic". This means we should "ignore" its
+> > usage in hotplug, and _write_lock should not race with _write_unlock.
+> > 
+> 
+> Yes, good point!
+> 
+> > IOW. Suppose that _write_unlock clears ->writer_signal. We need to ensure
+> > that this can't race with another write which wants to set this flag.
+> > Perhaps it should be counter as well, and it should be protected by
+> > the same ->global_rwlock, but _write_lock() should drop it before
+> > sync_all_readers() and then take it again?
+> 
+> Hmm, or we could just add an extra mb() like you suggested, and keep it
+> simple...
+> 
+> > 
+> >>>>> +static inline void sync_reader(struct percpu_rwlock *pcpu_rwlock,
+> >>>>> +			       unsigned int cpu)
+> >>>>> +{
+> >>>>> +	smp_rmb(); /* Paired with smp_[w]mb() in percpu_read_[un]lock() */
+> >>>>
+> >>>> As I understand it, the purpose of this memory barrier is to ensure
+> >>>> that the stores in drop_writer_signal() happen before the reads from
+> >>>> ->reader_refcnt in reader_uses_percpu_refcnt(), thus preventing the
+> >>>> race between a new reader attempting to use the fastpath and this writer
+> >>>> acquiring the lock.  Unless I am confused, this must be smp_mb() rather
+> >>>> than smp_rmb().
+> >>>
+> >>> And note that before sync_reader() we call announce_writer_active() which
+> >>> already adds mb() before sync_all_readers/sync_reader, so this rmb() looks
+> >>> unneeded.
+> >>>
+> >>
+> >> My intention was to help the writer see the ->reader_refcnt drop to zero
+> >> ASAP; hence I used smp_wmb() at reader and smp_rmb() here at the writer.
+> > 
+> > Hmm, interesting... Not sure, but can't really comment. However I can
+> > answer your next question:
+> 
+> Paul told me in another mail that I was expecting too much out of memory
+> barriers, like increasing the speed of electrons and what not ;-)
+> [ It would have been cool though, if it had such magical powers :P ]
 
-On Sun, Feb 10, 2013 at 4:52 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Ruslan Bilovol <ruslan.bilovol@ti.com> [130208 11:41]:
->> The OMAP4 Blaze Tablet is TI OMAP4 processor-based
->> development platform in a tablet formfactor.
->> The platform contains many of the features found in
->> present-day handsets (such as audio, video, wireless
->> functions and user interfaces) and in addition
->> contains features for software development and test.
->>
->> This patch adds initial support for the OMAP4 Blaze
->> Tablet development platform. Additional functionality
->> depends on different drivers and code modifications that
->> are not upstreamed yet so will be added later.
->
-> Nice that you have it working, however, we're not adding
-> any more board-*.c files as we're moving things to device
-> tree based booting.
+"But because you have used the special mb_tachyonic instruction, the
+speed of light is 600,000 km/s for the next five clock cycles"...  ;-)
 
-Hmm.. I though at this time we require boardfile + DT support..
-Probably lot of boardfiles confused me - any plan to delete them?
-Anyway, the whole era of boardfiles has gone.. (Where to place board-specific
-hacks now? :) )
+							Thanx, Paul
 
->
-> Care to try to get the basic .dts file done for this?
-> You will probably need to add CONFIG_ARM_APPENDED_DTB=y
-> and CONFIG_ARM_ATAG_DTB_COMPAT=y to omap2plus_defconfig
-> and append the .dtb file to zImage and run mkimage then
-> manually to boot it. But you should get serial and MMC
-> at least working to start with :)
-
-Yes, this is a second part of this board' upstreaming.
-Thanks for advice and please expect DT-part only of board soon..
-
->
+> >> Please correct me if my understanding of memory barriers is wrong here..
+> > 
+> > Who? Me??? No we have paulmck for that ;)
+> >
+> 
+> Haha ;-)
+> 
 > Regards,
->
-> Tony
+> Srivatsa S. Bhat
+> 
