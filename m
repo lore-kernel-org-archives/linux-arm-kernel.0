@@ -1,37 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 9 Feb 2013 20:35:22 -0800
-Subject: [GIT PULL] omap multiplatform warning fixes for v3.9 merge window
-In-Reply-To: <CAOesGMjC2NVOuY1D3HK33esJpWa65Nbgj90LoD=6ALcsePeWmA@mail.gmail.com>
-References: <20130210041949.GG4801@atomide.com>
- <CAOesGMjC2NVOuY1D3HK33esJpWa65Nbgj90LoD=6ALcsePeWmA@mail.gmail.com>
-Message-ID: <20130210043522.GH4801@atomide.com>
+From: lenb@kernel.org (Len Brown)
+Date: Sun, 10 Feb 2013 00:58:14 -0500
+Subject: [PATCH 07/16] ARM64 idle: delete pm_idle
+In-Reply-To: <1360475903-30007-1-git-send-email-lenb@kernel.org>
+References: <1360475903-30007-1-git-send-email-lenb@kernel.org>
+Message-ID: <c09e2c0f2928cfe6173bcafe0d906bf87287d5c2.1360475150.git.len.brown@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [130209 20:31]:
-> Hi,
-> 
-> 
-> On Sat, Feb 9, 2013 at 8:19 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > The following changes since commit ad1bb1b4e01c5ecbe32133ce6921d0e76cb76dcf:
-> >
-> >   ARM: OMAP2+: Remove now obsolete uncompress.h and debug-macro.S (2013-01-11 11:24:20 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/multiplatform-fixes-signed-v2
-> 
-> Sorry for the confusion on this; I obviously already had the
-> hwspinlock patch but I hadn't pushed it out.
-> 
-> So, to make things a little easier I just cherry-picked over the two I
-> didn't have. Thanks for staging them though. :)
+From: Len Brown <len.brown@intel.com>
 
-OK no problem. 
+pm_idle() on arm64 was a synonym for default_idle(),
+so remove it and invoke default_idle() directly.
+
+Signed-off-by: Len Brown <len.brown@intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm64/kernel/process.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index cb0956b..c7002d4 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -97,14 +97,9 @@ static void default_idle(void)
+ 	local_irq_enable();
+ }
  
-> They're all in next/multiplatform now. I'll push out shortly as soon
-> as my test build completes.
-
-Thanks
-
-Tony
+-void (*pm_idle)(void) = default_idle;
+-EXPORT_SYMBOL_GPL(pm_idle);
+-
+ /*
+- * The idle thread, has rather strange semantics for calling pm_idle,
+- * but this is what x86 does and we need to do the same, so that
+- * things like cpuidle get called in the same way.  The only difference
+- * is that we always respect 'hlt_counter' to prevent low power idle.
++ * The idle thread.
++ * We always respect 'hlt_counter' to prevent low power idle.
+  */
+ void cpu_idle(void)
+ {
+@@ -122,10 +117,10 @@ void cpu_idle(void)
+ 			local_irq_disable();
+ 			if (!need_resched()) {
+ 				stop_critical_timings();
+-				pm_idle();
++				default_idle();
+ 				start_critical_timings();
+ 				/*
+-				 * pm_idle functions should always return
++				 * default_idle functions should always return
+ 				 * with IRQs enabled.
+ 				 */
+ 				WARN_ON(irqs_disabled());
+-- 
+1.8.1.3.535.ga923c31
