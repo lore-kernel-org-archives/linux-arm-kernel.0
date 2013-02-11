@@ -1,27 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 11 Feb 2013 17:07:52 +0100
-Subject: [PATCH 1/2] ARM: OMAP2+: Allow clock alias provision from device
- tree
-In-Reply-To: <1360597464-8491-1-git-send-email-rogerq@ti.com>
-References: <1360597464-8491-1-git-send-email-rogerq@ti.com>
-Message-ID: <20130211160752.GG1906@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Feb 2013 16:11:25 +0000
+Subject: [PATCH 06/16] ARM idle: delete pm_idle
+In-Reply-To: <20130211160229.GB5676@MacBook-Pro.local>
+References: <2b219d07e0f287c2c713f5465fc8646158fa986e.1360475150.git.len.brown@intel.com>
+ <9838a4aeee256adeaef90efe56df2c9988206982.1360475150.git.len.brown@intel.com>
+ <20130211160229.GB5676@MacBook-Pro.local>
+Message-ID: <20130211161125.GM17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 11, 2013 at 05:44:23PM +0200, Roger Quadros wrote:
-> Currently on OMAP, it is not possible to specify a clock consumer
-> to any of the OMAP generated clocks using the device tree. This can pose
-> a problem for external devices that run off an OMAP clock as we
-> can't reliably provide a reference to the clock in the device tree.
+On Mon, Feb 11, 2013 at 04:02:30PM +0000, Catalin Marinas wrote:
+> On Sun, Feb 10, 2013 at 05:58:13AM +0000, Len Brown wrote:
+> > pm_idle() on ARM was a synonym for default_idle(),
+> > so simply invoke default_idle() directly.
+> 
+> The clean-up looks fine as we already have an arm_pm_idle but longer
+> term I was thinking about having a common declaration similar to
+> pm_power_off that code under drivers/power/(reset/) can override (and
+> such driver may be shared by multiple architectures). OTOH, if you get
+> rid of the generic linux/pm.h declaration architectures can use a common
+> pm_idle name and type (though I think having it in the common header
+> would be better). For ARM this would mean s/arm_pm_idle/pm_idle/ on top
+> if your patch.
 
-There is an established way of providing clocks in the devicetree using
-the clocks/clock-names properties. Wouldn't it be better using this
-for OMAP aswell?
+pm_idle() was that common declaration - but it had the side effect that
+it was defined to be called with interrupts disabled, but return with
+interrupts enabled.
 
-Sascha
+arm_pm_idle() "fixed" that weirdness such that it's now expected to
+return with IRQs in the same state that it was called.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+pm_power_off() is a cross-arch hook already.
