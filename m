@@ -1,56 +1,67 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 11 Feb 2013 09:58:52 +0200
-Subject: [PATCH v7 01/22] mfd: omap-usb-host: Consolidate OMAP USB-HS
- platform data
-In-Reply-To: <CAOesGMhVeSPX2qWb+3Efo14Qbqmhrqpg1XRDnAfznHfAis-Fsg@mail.gmail.com>
-References: <1358422231-24736-2-git-send-email-rogerq@ti.com>
- <Pine.LNX.4.44L0.1301171016090.1339-100000@iolanthe.rowland.org>
- <20130117165943.GI14149@atomide.com>
- <CAOesGMhVeSPX2qWb+3Efo14Qbqmhrqpg1XRDnAfznHfAis-Fsg@mail.gmail.com>
-Message-ID: <5118A4BC.2020003@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 11 Feb 2013 09:16:32 +0100
+Subject: [PATCH RFC 1/7] platform: add a device node
+In-Reply-To: <CAAwP0s0fCJmUfTJweGhXj5bXsQ0Gov9JbUJtqYMwL7duNLZv_Q@mail.gmail.com>
+References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1360442671-15216-2-git-send-email-javier.martinez@collabora.co.uk>
+ <20130210010246.GA1455@kroah.com> <5116FCA1.40703@collabora.co.uk>
+ <20130210093708.GL17852@n2100.arm.linux.org.uk>
+ <CAAwP0s0fCJmUfTJweGhXj5bXsQ0Gov9JbUJtqYMwL7duNLZv_Q@mail.gmail.com>
+Message-ID: <20130211081632.GI1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 08:46 AM, Olof Johansson wrote:
-> On Thu, Jan 17, 2013 at 8:59 AM, Tony Lindgren <tony@atomide.com> wrote:
->> * Alan Stern <stern@rowland.harvard.edu> [130117 07:19]:
->>> On Thu, 17 Jan 2013, Roger Quadros wrote:
->>>
->>>> Let's have a single platform data structure for the OMAP's High-Speed
->>>> USB host subsystem instead of having 3 separate ones i.e. one for
->>>> board data, one for USB Host (UHH) module and one for USB-TLL module.
->>>>
->>>> This makes the code much simpler and avoids creating multiple copies of
->>>> platform data.
->>>>
->>>> CC: Alan Stern <stern@rowland.harvard.edu>
->>>>
->>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>
->>> For the ehci-omap.c part:
->>>
->>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
->>
->> If Samuel acks this patch, I can apply just this patch alone on v3.8-rc3
->> into an immutable branch omap-for-v3.9/board-usb so we all merge it in
->> as needed.
+On Sun, Feb 10, 2013 at 12:35:43PM +0100, Javier Martinez Canillas wrote:
+> On Sun, Feb 10, 2013 at 10:37 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Sun, Feb 10, 2013 at 02:49:21AM +0100, Javier Martinez Canillas wrote:
+> >> I knew this would be controversial and that's why I didn't mean it to be a patch
+> >> but a RFC :)
+> >>
+> >> The problem basically is that you have to associate the platform device with its
+> >> corresponding DT device node because it can be used in the driver probe function.
+> >
+> > When DT is being used, doesn't DT create the platform devices for you,
+> > with the device node already set correctly?
+> >
 > 
-> So, that didn't happen; Samuel applied it from the mailing list and
-> sfr just hit merge conflicts due to it.
+> Well they usually do but not always just like usually you have a
+> platform_device in your board code and call platform_device_register().
 > 
-> Sigh.
+> But in some configurations you can't just define the platform_device
+> required resources (I/O memory, IRQ, etc) as static platform data.
+> In some cases you need a level of indirection.
 > 
-> This patch (touching arch/arm/mach-omap2) didn't have acks from Tony either.
+> In this particular case a SMSC ethernet chip is connected to an
+> OMAP3 processor through its General-Purpose Memory Controller.
+> 
+> You can't just define the I/O memory used by the device since you first
+> need to request that address to the GPMC. The same happens with the
+> IRQ line since a OMAP GPIO pin is used so you have to first configure
+> the GPIO line as input.
 
-Oops, this is my bad :(. Should have flagged Samuel about it. Will be more careful
-next time.
+For the gpio interrupt you can use, example taken from omap4-var-som.dts:
 
-> 
-> Samuel, Tony, can you sort this out with a stable short topic branch
-> as Tony suggested? It'd be nice to avoid the merge conflict by a
-> little coordination here. :(
-> 
->
+	interrupt-parent = <&gpio6>;
+	interrupts = <11>; /* gpio line 171 */
 
-cheers,
--roger
+Other architectures allow to specify the edge/level hi/low active
+parameters from the devicetree aswell. The gpio direction should be
+handled by the gpio driver as necessary, at least that's what done on
+other architectures.
+
+If the SMSC hangs on the GPMC then the SMSC should be a child node of
+the GPMC. The GPMC would then act as a bus driver and configure the
+chipselects and timings for its children automatically, maybe based
+on timing information from the devicetree. I've never tried this before,
+but I think that's the way things should be.
+
+No need to manually create platform devices from the devicetree.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
