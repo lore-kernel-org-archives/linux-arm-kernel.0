@@ -1,23 +1,60 @@
-From: arnd@linaro.org (Arnd Bergmann)
-Date: Mon, 11 Feb 2013 15:12:32 +0000
-Subject: [PATCH V2] usb: ehci: more bus glues as separate modules
-In-Reply-To: <5118e529.4439440a.3347.ffffdc7d@mx.google.com>
-References: <y> <5118e529.4439440a.3347.ffffdc7d@mx.google.com>
-Message-ID: <201302111512.32900.arnd@linaro.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 11 Feb 2013 17:14:26 +0200
+Subject: [PATCH v2 01/14] usb: phy: nop: Add device tree support and
+ binding information
+In-Reply-To: <20130211114040.GA2726@e106331-lin.cambridge.arm.com>
+References: <1360252974-7912-1-git-send-email-rogerq@ti.com>
+ <1360252974-7912-2-git-send-email-rogerq@ti.com>
+ <20130211114040.GA2726@e106331-lin.cambridge.arm.com>
+Message-ID: <51190AD2.3030006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 February 2013, manjunath.goudar at linaro.org wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+On 02/11/2013 01:40 PM, Mark Rutland wrote:
+> Hello,
 > 
-> Separate the SOC On-Chip host controller driver from ehci-hcd
-> host code into its own driver module
+> On Thu, Feb 07, 2013 at 04:02:41PM +0000, Roger Quadros wrote:
+>> The PHY clock, clock rate, VCC regulator and RESET regulator
+>> can now be provided via device tree.
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> Acked-by: Felipe Balbi <balbi@ti.com>
+>> ---
+>>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++
+>>  drivers/usb/otg/nop-usb-xceiv.c                    |   36 +++++++++++++++----
+>>  2 files changed, 62 insertions(+), 8 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>> new file mode 100644
+>> index 0000000..d7e2726
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>> @@ -0,0 +1,34 @@
+>> +USB NOP PHY
+>> +
+>> +Required properties:
+>> +- compatible: should be usb-nop-xceiv
+> 
+> This might be better as "linux,usb-no-xceiv", given this is a Linux-specific
+> 'device'.
+> 
+> Saying that, I'm not sure I understand why this device needs to be instantiated
+> from devicetree. As I understand it from looking at the driver, it's purely a
+> Linux implementation detail used in the case of autonomous PHYs, and not an
+> actual piece of hardware or firmware system. I must admit to being unfamiliar
+> with this area of hardware, have I misunderstood somethign here?
 
-Hi Manjunath,
+The PHY is a physical device and may need resources like power and clock to be functional.
+The only reason that driver is named NOP is that many USB controllers know how to talk to
+the standard PHYs and don't need any interface/management software.
 
-Please include in your next version of this a more verbose
-description of why this is all done, as  Ezequiel Garcia
-suggested. It would also be helpful to have a list of the
-changes from the previous version here.
+The PHY driver you are looking at most likely doesn't have the recent changes I wrote to
+manage the PHY clock/reset/power. i.e. patches 3, 4 and 5 in the series
+ https://lkml.org/lkml/2013/1/28/275
 
-	Arnd
+Before this, the ehci-omap driver was trying to manage the PHY power and reset, which was
+wrong.
+
+regards,
+-roger
