@@ -1,34 +1,28 @@
-From: s.shirish@samsung.com (Shirish S)
-Date: Mon, 11 Feb 2013 05:21:13 -0500
-Subject: [PATCH] ARM: dts: exynos4x12-pinctrl: Correct pin configuration of SD
- 4
-Message-ID: <1360578073-16207-1-git-send-email-s.shirish@samsung.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 11 Feb 2013 12:03:10 +0200
+Subject: [PATCH v6 08/10] ARM: dt: Add references to tegra_car clocks
+In-Reply-To: <20130208140301.GA23979@arwen.pp.htv.fi>
+References: <1360330602-30472-1-git-send-email-pdeschrijver@nvidia.com>
+ <1360330602-30472-9-git-send-email-pdeschrijver@nvidia.com>
+ <20130208140301.GA23979@arwen.pp.htv.fi>
+Message-ID: <20130211100310.GZ3073@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects the pin function value of sd4_bus8 from 3
-to 4.
-This is verified on origen board for testing eMMC on
-dw_mci controller.
+On Fri, Feb 08, 2013 at 03:03:02PM +0100, Felipe Balbi wrote:
+> * PGP Signed by an unknown key
+> 
+> Hi,
+> 
+> On Fri, Feb 08, 2013 at 03:36:40PM +0200, Peter De Schrijver wrote:
+> >  	tegra_car: clock {
+> > -		compatible = "nvidia,tegra114-car, nvidia,tegra30-car";
+> > +		compatible = "nvidia,tegra114-car";
+> 
+> trailing change or intentional ?
 
-Signed-off-by: Shirish S <s.shirish@samsung.com>
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- arch/arm/boot/dts/exynos4x12-pinctrl.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+No, the Tegra30 car driver shouldn't be used for Tegra114.
 
-diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-index 8e6115a..099cec7 100644
---- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-@@ -661,7 +661,7 @@
- 
- 		sd4_bus8: sd4-bus-width8 {
- 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
--			samsung,pin-function = <3>;
-+			samsung,pin-function = <4>;
- 			samsung,pin-pud = <4>;
- 			samsung,pin-drv = <3>;
- 		};
--- 
-1.8.0
+Cheers,
+
+Peter.
