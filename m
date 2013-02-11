@@ -1,43 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 11 Feb 2013 10:42:52 -0800
-Subject: [GIT PULL 4/4] mach-virt platform code for 3.9
-In-Reply-To: <20130211174731.GO9801@mudshark.cambridge.arm.com>
-References: <1359986131-13034-1-git-send-email-will.deacon@arm.com>
- <1359986131-13034-4-git-send-email-will.deacon@arm.com>
- <20130211172747.GA23212@quad.lixom.net>
- <20130211174731.GO9801@mudshark.cambridge.arm.com>
-Message-ID: <20130211184252.GA30668@quad.lixom.net>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 11 Feb 2013 18:45:19 +0000
+Subject: [PATCH 0/8] usb: ehci: more bus glues as separate modules
+In-Reply-To: <5117edda.860e440a.097c.3507@mx.google.com>
+References: <y> <5117edda.860e440a.097c.3507@mx.google.com>
+Message-ID: <51193C3F.6000908@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 11, 2013 at 05:47:31PM +0000, Will Deacon wrote:
-> On Mon, Feb 11, 2013 at 05:27:47PM +0000, Olof Johansson wrote:
-> > On Mon, Feb 04, 2013 at 01:55:31PM +0000, Will Deacon wrote:
-> > > NOTE: I'm not suggesting you pull this one as it stands -- see below!
-> > > 
-> > > This is the last batch from me (Marc is dealing with vgic and virtual
-> > > timers) and introduces support for mach-virt. This depends on:
-> > > 
-> > > 	- for-arm-soc/arch-timers (third pull request in this series)
-> > > 	- for-rmk/virt/psci (already pulled)
-> > > 	- irqchip/gic-vic-move (an arm-soc branch)
-> > > 
-> > > As a result, the diffstat is atrocious so it would be better if you
-> > > could create a branch merging the above dependendies, which I could
-> > > rebase onto (there's actually only two patches here).
-> > 
-> > So, while the diffstats below look pretty bad, the actual new code is small and
-> > easy to get an overview when I pull them in.
-> > 
-> > I've staged this in a separate branch (next/virt), that pulls in all the
-> > dependencies first, then 3/4 and 4/4. It merges cleanly into our for-next as
-> > well, so this is looking great. It needs a fixup for sys_timer setup before I
-> > actually push it out merged though, so please send a patch over.
-> 
-> Great, thanks Olof. I've included a small patch to fix the sys_timer stuff
-> below.
+On 10/02/13 18:58, manjunath.goudar at linaro.org wrote:
+> From: Manjunath Goudar<manjunath.goudar@linaro.org>
+>
+> Separate the SOC On-Chip host controller driver from ehci-hcd
+> host code into its own driver module
+>
+> Manjunath Goudar (8):
+>    USB: EHCI: make ehci-spear a separate driver
+>    USB: EHCI: make ehci-atmel a separate driver
+>    USB: EHCI: make ehci-s5p a separate driver
+>    USB: EHCI: make ehci-mv a separate driver
+>    USB: EHCI: make ehci-vt8500 a separate driver
+>    USB: EHCI: make ehci-msm a separate driver
+>    USB: EHCI: make ehci-w90X900 a separate driver
+>    USB: EHCI: make ehci-orion a separate driver
+>
+>   drivers/usb/host/Kconfig        |   42 +++++++++++--
+>   drivers/usb/host/Makefile       |    9 ++-
+>   drivers/usb/host/ehci-atmel.c   |   77 ++++++++++++-----------
+>   drivers/usb/host/ehci-hcd.c     |   52 +++-------------
+>   drivers/usb/host/ehci-msm.c     |   85 +++++++++++--------------
+>   drivers/usb/host/ehci-mv.c      |   80 +++++++++++-------------
+>   drivers/usb/host/ehci-orion.c   |   91 +++++++++++++--------------
+>   drivers/usb/host/ehci-s5p.c     |   69 ++++++++++++---------
+>   drivers/usb/host/ehci-spear.c   |  131 ++++++++++++++++++++-------------------
+>   drivers/usb/host/ehci-vt8500.c  |   73 ++++++++++------------
+>   drivers/usb/host/ehci-w90x900.c |   90 ++++++++++++---------------
+>   drivers/usb/host/ehci.h         |    2 +-
+>   12 files changed, 392 insertions(+), 409 deletions(-)
 
-Thanks, applied and I have now merged mach/virt into for-next.
+Having looked at this, we will end up with a number of modules,
+each having very similar code in them.#
 
+How about we add drivers/usb/host/ehci-platform.c for all
+the platform based drivers.
 
--Olof
+I think it is possible to remove all the specific names, as
+we certainly don't need the driver advertising itself for each
+system. Also, does anyone rely on the name field in the HC info,
+or can it just be "Platform EHCI" ?
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
