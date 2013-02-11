@@ -1,37 +1,70 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 11 Feb 2013 19:16:17 +0000
-Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
-In-Reply-To: <20130209120525.GD17833@n2100.arm.linux.org.uk>
+Date: Mon, 11 Feb 2013 19:17:33 +0000
+Subject: [PATCH 12/17] ARM: fix magic for bootloader in BE8
+In-Reply-To: <alpine.LFD.2.02.1302082304410.6300@xanadu.home>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
- <20130209120525.GD17833@n2100.arm.linux.org.uk>
-Message-ID: <51194381.9030505@codethink.co.uk>
+ <1360365467-25056-13-git-send-email-ben.dooks@codethink.co.uk>
+ <alpine.LFD.2.02.1302082304410.6300@xanadu.home>
+Message-ID: <511943CD.6010305@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/13 12:05, Russell King - ARM Linux wrote:
-> On Fri, Feb 08, 2013 at 11:17:40PM +0000, Ben Dooks wrote:
->> -	if (atag->hdr.tag != ATAG_CORE ||
->> -	    (atag->hdr.size != tag_size(tag_core)&&
->> -	     atag->hdr.size != 2))
->> +	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
->> +	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core))&&
->> +	     atag->hdr.size != atag32_to_cpu(2)))
+On 09/02/13 04:06, Nicolas Pitre wrote:
+> On Fri, 8 Feb 2013, Ben Dooks wrote:
 >
-> This is wrong.  You're saying that "ATAG_CORE" is in LE32 format.  It
-> isn't.  It's in CPU endian format.  If you want to do this kind of thing,
-> you also need to define cpu_to_atag32() macros as well, otherwise this
-> will cause sparse warnings.
+>> If the boot-loader is running little endian and the kernel is compiled
+>> big endian then it will not verify the magic number of the front of the
+>> kernel.
+>>
+>> Note, do we need to also reverse the two values after the magic, or are
+>> they used later on in the kernel decompressor?
 >
->> -			initrd_start = atag->u.initrd.start;
->> -			initrd_size = atag->u.initrd.size;
->> +			initrd_start = atag32_to_cpu(atag->u.initrd.start);
->> +			initrd_size = atag32_to_cpu(____atag->u.initrd.size);
->
-> Where did those four underscores come from?  Has this been built?
+> Those value instances are not used by the code.  So for consistency they
+> would have to be reversed, yes.  Given those are variable and determined
+> by the linker, I don't know how you could manage it.
 
-I probably missed building this one. I've been mostly testing with DT
-based systems.
+By breaking it down into parts I think...
+
+I think this patch should be re-worked depending on the outcome of
+re-doing the whole ATAG endian configuration so that these are in
+the same endian-ness as we expect the ATAGs to be in.
+
+>> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
+>> ---
+>>   arch/arm/boot/compressed/head.S |    4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>> index 39940a7..b6c7ec8 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -129,7 +129,11 @@ start:
+>>    THUMB(		adr	r12, BSYM(1f)	)
+>>    THUMB(		bx	r12		)
+>>
+>> +#ifdef CONFIG_CPU_BE8_BOOT_LE
+>> +		.word	0x18286f01
+>> +#else
+>>   		.word	0x016f2818		@ Magic numbers to help the loader
+>> +#endif
+>>   		.word	start			@ absolute load/run zImage address
+>>   		.word	_edata			@ zImage end address
+>>    THUMB(		.thumb			)
+>> --
+>> 1.7.10.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 
 -- 
 Ben Dooks				http://www.codethink.co.uk/
