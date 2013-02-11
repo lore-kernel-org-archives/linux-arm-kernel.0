@@ -1,54 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Feb 2013 08:32:49 +0000
-Subject: [GIT PULL] ux500 DT related fixes and platform enhancements
-In-Reply-To: <CACRpkdYChVn6RMnbckR0UiPZC+WdqZjWKvMyoPf=oJifCEgAgw@mail.gmail.com>
-References: <20130131115552.GG5301@gmail.com> <20130206135911.GB7519@gmail.com>
- <CAOesGMiJTcjdEJzSDkpdV-ZCqN24uVmfjM-HOt+ojErS=98TmQ@mail.gmail.com>
- <CAF2Aj3gaFtPs7gLd3snzVr1a8Px5A_RN1vz=M+U_LZ3MBpyqqw@mail.gmail.com>
- <CACRpkdaTajxS6YbjyyGPQ=qWiAkLaPySU6WncQ2E8HoAtGXqjA@mail.gmail.com>
- <20130208083121.GG7519@gmail.com>
- <CACRpkdYChVn6RMnbckR0UiPZC+WdqZjWKvMyoPf=oJifCEgAgw@mail.gmail.com>
-Message-ID: <20130211083249.GA3469@gmail.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Mon, 11 Feb 2013 14:08:20 +0530
+Subject: [PATCH V4 0/5] Add generic DMA DT binding support
+Message-ID: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 10 Feb 2013, Linus Walleij wrote:
+Changes since V3:
+	- Make dma-cells property optional as suggested by Rob Herring
+	- Add dma-requests and dma-channels properties to DMA controller
+	  as suggested by Arnd for future-proof
+	- Add Acked-by for some of the patches
 
-> On Fri, Feb 8, 2013 at 9:31 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Thu, 07 Feb 2013, Linus Walleij wrote:
-> >>
-> >> OK so what about I pull this branch into my ux500 git and
-> >> call it a devicetree branch, and then we can optionally
-> >> merge a few of those ARM: ux500: * patches that
-> >> was sent for the regulator stuff on top of that as well?
-> >
-> > There are two reasons why I don't like that idea: 1) As Olof pointed
-> > out, a lot of these patches aren't actually DT related, and 2) I
-> > really want all of the regulator stuff to stay together. Each of the
-> > changes in the platform code are directly dependent on the ones
-> > happening in the regulator driver, and visa versa. It would be best if
-> > they continued to be taken though Marks tree.
-> 
-> I understand this and I'm fully aligned for the non-DT parts.
-> 
-> But I'm worrying about a plethora or merge conflicts
-> under arch/arm/boot/dts/*
+Changes since V2:
+        - Add new filter function for DT case as suggested by Arnd
+        - Add xlate as static function
+        - Use newly added filter function in xlate.
+        - Add Acked-by for some of the patches
 
-Oh no, do as you please with these.
+Changes since V1:
+        - Address the review comments by Arnd Bergmann as below
+        - Wording of the properties.
+        - Pass pdmac as third parameter to of_dma_controller_register
+        - Filter the dma channel based on channel number and dma_device
 
-> I already pulled some of the pinctrl device tree patches over to
-> my Linux-stericsson tree to avoid clashes between ARM SoC
-> and pinctrl.
-> 
-> Rationale: I don't want arch/arm/boot/dts to become the new
-> boardfile-type merge-clash point. That will just invoke the
-> wrath of the Big Penguin.
-> 
-> Yours,
-> Linus Walleij
+This patch set adds support for generic dma device tree bindings for
+Samsung platforms and is dependent on the following patches from
+Vinod Koul next branch
+1)of: Add generic device tree DMA helpers
+2)dmaengine: add helper function to request a slave DMA channel
+
+This patch set is made based Mark Brown next branch
+
+Padmavathi Venna (5):
+  DMA: PL330: Add new pl330 filter for DT case.
+  DMA: PL330: Add xlate function
+  DMA: PL330: Register the DMA controller with the generic DMA helpers
+  ARM: dts: pl330: Add #dma-cells for generic dma binding support
+  ARM: SAMSUNG: dma: Remove unnecessary code
+
+ .../devicetree/bindings/dma/arm-pl330.txt          |   21 +++++--
+ arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++
+ arch/arm/mach-s3c24xx/include/mach/dma.h           |    1 -
+ arch/arm/mach-s3c64xx/include/mach/dma.h           |    1 -
+ arch/arm/plat-samsung/dma-ops.c                    |   10 +---
+ arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 -
+ arch/arm/plat-samsung/include/plat/dma-pl330.h     |    1 -
+ drivers/dma/pl330.c                                |   64 +++++++++++++++----
+ 8 files changed, 79 insertions(+), 32 deletions(-)
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.4.4
