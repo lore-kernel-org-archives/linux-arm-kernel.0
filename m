@@ -1,37 +1,96 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 11 Feb 2013 15:53:59 -0800
-Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
-In-Reply-To: <20130210181710.GB12760@nekote.pengutronix.de>
-References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
- <20130210181710.GB12760@nekote.pengutronix.de>
-Message-ID: <CAD=FV=XzfseMEHK4KutgYYoU4kEFPq7qoFoJtaBrh6QJUa1Y_w@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Feb 2013 16:54:03 -0700
+Subject: [v2 3/3] ARM: tegra: Unify Device tree board files
+In-Reply-To: <1360562743-21689-3-git-send-email-hdoyu@nvidia.com>
+References: <1360562743-21689-1-git-send-email-hdoyu@nvidia.com>
+ <1360562743-21689-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <5119849B.1070300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram,
+On 02/10/2013 11:05 PM, Hiroshi Doyu wrote:
+> Unify board-dt-tegra{30,114} to the Tegra20 DT board file, "tegra.c".
 
-On Sun, Feb 10, 2013 at 10:17 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> On Mon, Feb 04, 2013 at 02:33:15PM +0530, Yuvaraj Kumar C D wrote:
->> This RFC patch is w.r.t multimaster bus arbitration which is already
->> being discussing in the mainline.
->> This patch provides hooks for the i2c multimaster bus arbitration
->> and to have the arbitration parameters.
->
-> I still haven't understood why the arbitration specified in the I2C
-> standard is not enough for you. Or what you would need to make use of
-> it.
+> diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
 
-At the moment perhaps the strongest argument for why this particular
-arbitration scheme is needed is that's what the EC (embedded
-controller) on the ARM Chromebook uses.  There have been several
-arguments in-house about whether this was the most ideal way to
-structure things, but that's what we shipped with.  Thus, if we want
-to be able to talk to i2c devices on this bus (contains the keyboard,
-battery, and a bunch of power switches) we need something in the
-system that implements this arbitration scheme.
+>  obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
+>  obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
+>  
+> -obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra.o
+> -obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
+> -obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= board-dt-tegra114.o
+> +obj-y					+= tegra.o
+> +
 
-As a side note: I'm trying to code up a quick arbitrator now using the
-muxing framework as Grant suggested.  I will play with this and post
-it if I can get it to work.  It's quite short so far.
+I think I'd be tempted to move that line together with all the others
+that don't depend on some config option.
 
--Doug
+> diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+
+> -static struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+> +static struct of_dev_auxdata tegra_auxdata_lookup[] __initdata = {
+> +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+>  	OF_DEV_AUXDATA("nvidia,tegra20-ehci", 0xC5000000, "tegra-ehci.0",
+>  		       &tegra_ehci1_pdata),
+>  	OF_DEV_AUXDATA("nvidia,tegra20-ehci", 0xC5004000, "tegra-ehci.1",
+>  		       &tegra_ehci2_pdata),
+>  	OF_DEV_AUXDATA("nvidia,tegra20-ehci", 0xC5008000, "tegra-ehci.2",
+>  		       &tegra_ehci3_pdata),
+> +#endif
+>  	{}
+>  };
+
+Why ifdef? This is certainly small enough that it shouldn't matter for
+any Tegra30- or Tegra114-kernel, and it's hopefully going away very
+soon, so I'd prefer to drop the addition of the ifdefs to avoid any
+conflicts with any other changes to that table.
+
+>  static void __init trimslice_init(void)
+>  {
+> -#ifdef CONFIG_TEGRA_PCI
+>  	int ret;
+>  
+>  	ret = tegra_pcie_init(true, true);
+>  	if (ret)
+>  		pr_err("tegra_pci_init() failed: %d\n", ret);
+> -#endif
+>  }
+>  
+>  static void __init harmony_init(void)
+>  {
+> -#ifdef CONFIG_TEGRA_PCI
+>  	int ret;
+>  
+>  	ret = harmony_pcie_init();
+>  	if (ret)
+>  		pr_err("harmony_pcie_init() failed: %d\n", ret);
+> -#endif
+>  }
+
+Why drop those ifdefs? Does the code still compile (link) if built for
+Tegra30-only or Tegra114-only, where the Tegra PCI driver won't be
+enabled, and hence those functions don't exist?
+
+>  static void __init paz00_init(void)
+> @@ -129,6 +128,9 @@ static void __init tegra_dt_init_late(void)
+>  
+>  	tegra_init_late();
+>  
+> +	if (IS_ENABLED(CONFIG_PCI) && IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
+> +		return;
+
+I don't think that's going to help any link issues, so I'd drop it and
+keep this function simple. After all, what if someone wants to add some
+non-PCI-related entry into board_init_funcs[]?
+
+> -static const char *tegra20_dt_board_compat[] = {
+> +static const char * const tegra_dt_board_compat[] = {
+>  	"nvidia,tegra20",
+> +	"nvidia,tegra30",
+> +	"nvidia,tegra114",
+>  	NULL
+>  };
+
+It'd be best to add the newer values first. It shouldn't matter, but
+currently does at least for device compatible matching, so we may as
+well be consistent here.
