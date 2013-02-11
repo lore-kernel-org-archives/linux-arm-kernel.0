@@ -1,37 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Feb 2013 15:09:21 +0100
-Subject: [PATCH 6/9] gpiolib: use descriptors internally
-In-Reply-To: <20130209091729.978C73E1A18@localhost>
-References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
- <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
- <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
- <20130209091729.978C73E1A18@localhost>
-Message-ID: <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
+Date: Mon, 11 Feb 2013 15:23:38 +0100
+Subject: [PATCH RFC 2/7] net: smsc911x: add pinctrl support
+In-Reply-To: <1360442671-15216-3-git-send-email-javier.martinez@collabora.co.uk>
+References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1360442671-15216-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CACRpkdY8FBoMCO1hjEOhCir=5mNJpiY7sG3PMvKeXJ-hHXXmjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 9, 2013 at 10:17 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+On Sat, Feb 9, 2013 at 9:44 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
 
-> The ERR_PTR()/IS_ERR() is a horrible pattern for code
-> readability because it breaks the expectations that programmers have for
-> what is and is not a bad pointer. There are decades of history where the
-> test for a bad pointer is 'if (!ptr)'. Not only does ERR_PTR make make
-> that test not work, but the compiler won't tell you when you get it
-> wrong.
+> If no pinctrl is available just report a warning since
+> it may not needed in some cases (e.g: non-DT kernels).
 >
-> There are places where ERR_PTR makes sense. Particularly when
-> communicating with userspace where error codes have very specific
-> meanings, but I don't want it in the GPIO subsystem.
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+(...)
+> +       struct pinctrl *pinctrl;
+(...)
+> +       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +       if (IS_ERR(pinctrl)) {
+> +               retval = PTR_ERR(pinctrl);
+> +               if (retval == -EPROBE_DEFER)
+> +                       goto out_0;
+> +
+> +               dev_warn(&pdev->dev, "No pinctrl provided\n");
+> +       }
 
-OK I disagree but you get to decide.
+NACK.
 
-However if you take this all the way to the descriptor API
-it will make the consumer (driver) API for GPIO descriptors deviate
-from what is today used for clocks, regulators and pins.
+This will be handled from the device core after the v3.9 merge
+window.
 
-With all the resulting confusion for users.
-I've seen worse subsystem deviations though.
+See:
+http://marc.info/?l=linux-kernel&m=135887740715083&w=2
 
 Yours,
 Linus Walleij
