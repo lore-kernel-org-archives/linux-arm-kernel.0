@@ -1,63 +1,92 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Feb 2013 13:33:49 -0800
-Subject: [PATCH] pinctrl/pinconfig: add debug interface
-In-Reply-To: <51196161.7020901@wwwdotorg.org>
-References: <1360527070-18430-1-git-send-email-linus.walleij@stericsson.com>
- <51195A63.7080706@wwwdotorg.org>
- <20130211210041.GW4801@atomide.com>
- <51195F00.4020309@wwwdotorg.org>
- <20130211212105.GX4801@atomide.com>
- <51196161.7020901@wwwdotorg.org>
-Message-ID: <20130211213348.GY4801@atomide.com>
+From: ivan.djelic@parrot.com (Ivan Djelic)
+Date: Mon, 11 Feb 2013 22:39:25 +0100
+Subject: [PATCH] [RFC] arm: fix memset-related crashes caused by recent
+ GCC (4.7.2) optimizations
+In-Reply-To: <511935BC.8060105@codethink.co.uk>
+References: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
+ <511935BC.8060105@codethink.co.uk>
+Message-ID: <20130211213925.GA30998@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [130211 13:27]:
-> On 02/11/2013 02:21 PM, Tony Lindgren wrote:
-> > * Stephen Warren <swarren@wwwdotorg.org> [130211 13:17]:
-> >> On 02/11/2013 02:00 PM, Tony Lindgren wrote:
-> >>> * Stephen Warren <swarren@wwwdotorg.org> [130211 12:57]:
-> >>>> On 02/10/2013 01:11 PM, Linus Walleij wrote:
-> >>>>> From: Laurent Meunier <laurent.meunier@st.com>
-> >>>>>
-> >>>>> This update adds a debugfs interface to modify a pin configuration
-> >>>>> for a given state in the pinctrl map. This allows to modify the
-> >>>>> configuration for a non-active state, typically sleep state.
-> >>>>> This configuration is not applied right away, but only when the state
-> >>>>> will be entered.
-> >>>>>
-> >>>>> This solution is mandated for us by HW validation: in order
-> >>>>> to test and verify several pin configurations during sleep without
-> >>>>> recompiling the software.
-> >>>>
-> >>>> I never understood why HW engineers can't just recompile the kernel.
-> >>>> Besides, it's just a device tree change these days - no recompile even
-> >>>> required, right?
-> >>>
-> >>> Typically when bringing up a new board you do not have the driver
-> >>> specific mux settings verified. For developers, it's easiest to tweak
-> >>> the muxing during runtime do the drivers as a loadable module, then
-> >>> export the verified mux configuration into a .dts file.
-> >>
-> >> Well HW engineers typically just write to the HW registers directly
-> >> rather than screwing around with the Linux pinctrl tables and
-> >> unloading/reloading drivers.
-> > 
-> > I've seen cases where most of the mux register configuration are
-> > done correctly by HW engineers.. But there's always been some pieces
-> > of the pin configuration wrong initially and that needs to be fixed by
-> > the driver people to get things working.
-> > 
-> > Being able to set the mux configuration via debugfs is also very
-> > useful for the case of adding external devices to your proto boards
-> > like beagle etc.
+On Mon, Feb 11, 2013 at 06:17:32PM +0000, Ben Dooks wrote:
+> On 02/02/13 08:33, Ivan Djelic wrote:
+> > Recent GCC versions (e.g. GCC-4.7.2) perform optimizations based on
+> > assumptions about the implementation of memset and similar functions.
+> > The current ARM optimized memset code does not return the value of
+> > its first argument, as is usually expected from standard implementations.
+> >
+> > For instance in the following function:
+> >
+> > void debug_mutex_lock_common(struct mutex *lock, struct mutex_waiter *waiter)
+> > {
+> > 	memset(waiter, MUTEX_DEBUG_INIT, sizeof(*waiter));
+> > 	waiter->magic = waiter;
+> > 	INIT_LIST_HEAD(&waiter->list);
+> > }
+> >
+> > compiled as:
+> >
+> > 800554d0<debug_mutex_lock_common>:
+> > 800554d0:       e92d4008        push    {r3, lr}
+> > 800554d4:       e1a00001        mov     r0, r1
+> > 800554d8:       e3a02010        mov     r2, #16 ; 0x10
+> > 800554dc:       e3a01011        mov     r1, #17 ; 0x11
+> > 800554e0:       eb04426e        bl      80165ea0<memset>
+> > 800554e4:       e1a03000        mov     r3, r0
+> > 800554e8:       e583000c        str     r0, [r3, #12]
+> > 800554ec:       e5830000        str     r0, [r3]
+> > 800554f0:       e5830004        str     r0, [r3, #4]
+> > 800554f4:       e8bd8008        pop     {r3, pc}
+> >
+> > GCC assumes memset returns the value of pointer 'waiter' in register r0; causing
+> > register/memory corruptions.
 > 
-> This patch won't work for that, since it doesn't support adding new
-> entries to the mux table, just editing existing entries.
+> 
+> > @@ -43,29 +47,28 @@ ENTRY(memset)
+> >   #if ! CALGN(1)+0
+> >
+> >   /*
+> > - * We need an extra register for this loop - save the return address and
+> > - * use the LR
+> > + * We need an 2 extra registers for this loop - use r8 and the LR
+> >    */
+> > -	str	lr, [sp, #-4]!
+> > -	mov	ip, r1
+> > +	stmfd	sp!, {r8, lr}
+> > +	mov	r8, r1
+> >   	mov	lr, r1
+> 
+> Out of interest, why not save {r0, lr} and avoid having to
+> re-write the entirety of the inner loop?
 
-Being able to change the existing mux entries still helps developers to
-debug things like pull values needed for i2c device impedance etc.
+Because at the inner loop entry, r0 no longer contains the current write pointer: ip is
+the current pointer, possibly different from r0 because of the unaligned fixup code.
+The idea was to avoid introducing an extra load+store on load/store-free paths; thereby
+using a register other than r0 for the current pointer...
 
-Regards,
+BR,
+--
+Ivan
 
-Tony
+
+
+> 
+> >
+> >   2:	subs	r2, r2, #64
+> > -	stmgeia	r0!, {r1, r3, ip, lr}	@ 64 bytes at a time.
+> > -	stmgeia	r0!, {r1, r3, ip, lr}
+> > -	stmgeia	r0!, {r1, r3, ip, lr}
+> > -	stmgeia	r0!, {r1, r3, ip, lr}
+> > +	stmgeia	ip!, {r1, r3, r8, lr}	@ 64 bytes at a time.
+> > +	stmgeia	ip!, {r1, r3, r8, lr}
+> > +	stmgeia	ip!, {r1, r3, r8, lr}
+> > +	stmgeia	ip!, {r1, r3, r8, lr}
+> >   	bgt	2b
+> > -	ldmeqfd	sp!, {pc}		@ Now<64 bytes to go.
+> > +	ldmeqfd	sp!, {r8, pc}		@ Now<64 bytes to go.
+> 
+> 
+> -- 
+> Ben Dooks				http://www.codethink.co.uk/
+> Senior Engineer				Codethink - Providing Genius
