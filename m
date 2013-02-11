@@ -1,29 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 11 Feb 2013 16:02:30 +0000
-Subject: [PATCH 06/16] ARM idle: delete pm_idle
-In-Reply-To: <9838a4aeee256adeaef90efe56df2c9988206982.1360475150.git.len.brown@intel.com>
-References: <2b219d07e0f287c2c713f5465fc8646158fa986e.1360475150.git.len.brown@intel.com>
- <9838a4aeee256adeaef90efe56df2c9988206982.1360475150.git.len.brown@intel.com>
-Message-ID: <20130211160229.GB5676@MacBook-Pro.local>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 11 Feb 2013 17:07:52 +0100
+Subject: [PATCH 1/2] ARM: OMAP2+: Allow clock alias provision from device
+ tree
+In-Reply-To: <1360597464-8491-1-git-send-email-rogerq@ti.com>
+References: <1360597464-8491-1-git-send-email-rogerq@ti.com>
+Message-ID: <20130211160752.GG1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 10, 2013 at 05:58:13AM +0000, Len Brown wrote:
-> pm_idle() on ARM was a synonym for default_idle(),
-> so simply invoke default_idle() directly.
+On Mon, Feb 11, 2013 at 05:44:23PM +0200, Roger Quadros wrote:
+> Currently on OMAP, it is not possible to specify a clock consumer
+> to any of the OMAP generated clocks using the device tree. This can pose
+> a problem for external devices that run off an OMAP clock as we
+> can't reliably provide a reference to the clock in the device tree.
 
-The clean-up looks fine as we already have an arm_pm_idle but longer
-term I was thinking about having a common declaration similar to
-pm_power_off that code under drivers/power/(reset/) can override (and
-such driver may be shared by multiple architectures). OTOH, if you get
-rid of the generic linux/pm.h declaration architectures can use a common
-pm_idle name and type (though I think having it in the common header
-would be better). For ARM this would mean s/arm_pm_idle/pm_idle/ on top
-if your patch.
+There is an established way of providing clocks in the devicetree using
+the clocks/clock-names properties. Wouldn't it be better using this
+for OMAP aswell?
 
-Do you have any plans with pm_power_off as well?
-
-Thanks.
+Sascha
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
