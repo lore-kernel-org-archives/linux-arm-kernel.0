@@ -1,25 +1,70 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Feb 2013 10:37:01 -0700
-Subject: [PATCH 6/8] USB: EHCI: make ehci-msm a separate driver
-In-Reply-To: <5117ee12.860e440a.097c.3521@mx.google.com>
-References: <y> <1360522697-22902-1-git-send-email-y>
- <5117ee12.860e440a.097c.3521@mx.google.com>
-Message-ID: <51192C3D.5050403@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Feb 2013 09:37:32 -0800
+Subject: [GIT PULL] ARM: OMAP2+: clean up and standardize WFI handling
+ for 3.9
+In-Reply-To: <alpine.DEB.2.00.1302101726020.2672@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1302081726480.28008@utopia.booyaka.com>
+ <20130210170827.GK4801@atomide.com>
+ <alpine.DEB.2.00.1302101726020.2672@utopia.booyaka.com>
+Message-ID: <20130211173731.GO4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2013 11:58 AM, manjunath.goudar at linaro.org wrote:
-> Separate the Qualcomm On-Chip host controller driver from ehci-hcd host code
+* Paul Walmsley <paul@pwsan.com> [130210 09:31]:
+> Hi Tony
+> 
+> On Sun, 10 Feb 2013, Tony Lindgren wrote:
+> 
+> > * Paul Walmsley <paul@pwsan.com> [130208 09:31]:
+> > > 
+> > > ----------------------------------------------------------------
+> > > On OMAP2+ devices, standardize and clean up WFI entry and WFI blocking.
+> > > 
+> > > Basic test logs are available here:
+> > > 
+> > >    http://www.pwsan.com/omap/testlogs/wfi_devel_a_3.9/20130208085027/
+> > 
+> > Thanks pulled into omap-for-v3.9/pm-wfi. While merging this into
+> > omap-for-v3.9/tmp-merge, got the following merge conlict. Maybe
+> > take a look if it's correct merge?
+> 
+> ...
+> 
+> >   	}
+> >   
+> > - 	omap2_sram_idle();
+> > - 
+> > - 	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
+> > + 	/* WFI */
+> > + 	asm("mcr p15, 0, %0, c7, c0, 4" : : "r" (zero) : "memory", "cc");
+> >   }
+> 
+> The inline asm is intended to replace the omap2_sram_idle() call.  I'd 
+> suggest:
+> 
+>         }
+> 
+>         /* WFI */
+>         asm("mcr p15, 0, %0, c7, c0, 4" : : "r" (zero) : "memory", "cc");
+> 
+>         pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
+>  }
+> 
+> as the end product.
 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+OK thanks.
 
-> @@ -203,7 +203,7 @@ config USB_EHCI_TEGRA
->         boolean "NVIDIA Tegra HCD support"
->         depends on USB_EHCI_HCD && ARCH_TEGRA
->         select USB_EHCI_ROOT_HUB_TT
-> -       help
-> +      --- help---
->           This driver enables support for the internal USB Host Controllers
->           found in NVIDIA Tegra SoCs. The controllers are EHCI compliant.
+This branch should probably have been based on your earlier PM branch
+based on v3.8-rc5 that was already merged as omap-for-v3.9/pm-signed into
+arm-soc for-next.
 
-I still don't think that's correct.
+Now merging this branch based on v3.8-rc6 requires me to create a merge
+base by merging the earlier branch with v3.8-rc6 and then resolving
+the self-inflicted merge conflict in order for me to generate a pull request
+without a non-trivial merge conflict. Just a bunch of extra hassle to
+deal with with additional risk of merging things wrong. Anyways merging
+into omap-for-v3.9/pm-wfi-take2.
+
+Regards,
+
+Tony
