@@ -1,39 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 11 Feb 2013 15:18:43 -0800
-Subject: [PATCH] arm: arch_timer: add missing inline in stub function
-Message-ID: <1360624723-10749-1-git-send-email-olof@lixom.net>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Mon, 11 Feb 2013 17:30:29 -0600
+Subject: [PATCHv5 for soc 0/4] Enabling socfpga on hardware 
+Message-ID: <1360625433-28067-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes:
+From: Dinh Nguyen <dinguyen@altera.com>
 
-In file included from arch/arm/include/asm/arch_timer.h:10:0,
-                 from arch/arm/mach-shmobile/timer.c:23:
-include/clocksource/arm_arch_timer.h:56:28: warning: 'arch_timer_get_timecounter' defined but not used [-Wunused-function]
+V5:
+- Renamed v7_secondary_startup to socfpga_secondary_startup to avoid
+a namespace conflict with imx for multiplatform
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
+V4:
+- Check for cpu1start_addr is valid in socfpga_boot_secondary()
+- Add Reviewed-by: Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com> for 3/4
 
-Will, Mark, Marc,
+V3:
+- Addressed comments from Olof Johansson and Russell King
+- Received Acked-by and Tested-by Stephen Warren
+- Received Signed-off-by Pavel Machek
 
-I've applied this on next/virt already since it started spewing pretty heavily
-on a lot of defconfig builds. Just posting FYI.
+V2:
+- Remove patch that adds clock entries in the socfpga.dtsi as this
+should accompany a rework in drivers/clk and will done in a different
+patch series.
+- Removed I-cache invalidate from v7_invalidate_l1
+- Defined cpu1-start-addr as a device tree entry
+- Removed the need to use CONFIG_VMSPLIT_2G
 
- include/clocksource/arm_arch_timer.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index b61f996..2603267 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -53,7 +53,7 @@ static inline u64 arch_timer_read_counter(void)
- 	return 0;
- }
- 
--static struct timecounter *arch_timer_get_timecounter(void)
-+static inline struct timecounter *arch_timer_get_timecounter(void)
- {
- 	return NULL;
- }
+Dinh Nguyen (4):
+  arm: socfpga: Add new device tree source for actual socfpga HW
+  arm: socfpga: Add entries to enable make dtbs socfpga
+  arm: Add v7_invalidate_l1 to cache-v7.S
+  arm: socfpga: Add SMP support for actual socfpga harware
+
+ .../bindings/arm/altera/socfpga-system.txt         |    2 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/socfpga.dtsi                     |   22 +++----
+ arch/arm/boot/dts/socfpga_cyclone5.dts             |   34 ++++++++++-
+ arch/arm/boot/dts/socfpga_vt.dts                   |   64 ++++++++++++++++++++
+ arch/arm/mach-imx/headsmp.S                        |   47 --------------
+ arch/arm/mach-shmobile/headsmp.S                   |   48 ---------------
+ arch/arm/mach-socfpga/core.h                       |    4 +-
+ arch/arm/mach-socfpga/headsmp.S                    |   16 +++--
+ arch/arm/mach-socfpga/platsmp.c                    |   17 +++---
+ arch/arm/mach-socfpga/socfpga.c                    |    7 ++-
+ arch/arm/mach-tegra/headsmp.S                      |   43 -------------
+ arch/arm/mm/cache-v7.S                             |   46 ++++++++++++++
+ 13 files changed, 187 insertions(+), 165 deletions(-)
+ create mode 100644 arch/arm/boot/dts/socfpga_vt.dts
+
 -- 
-1.8.1.192.gc4361b8
+1.7.9.5
