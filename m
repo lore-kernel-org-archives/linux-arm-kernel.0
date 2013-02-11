@@ -1,46 +1,24 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Mon, 11 Feb 2013 18:53:28 +0530
-Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for
- unaligned addresses
-In-Reply-To: <20130211131230.GA5676@MacBook-Pro.local>
-References: <1360574009-12429-1-git-send-email-r.sricharan@ti.com>
- <20130211131230.GA5676@MacBook-Pro.local>
-Message-ID: <5118F0D0.60101@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 Feb 2013 11:30:54 -0200
+Subject: mx28evk does not boot with linux-next 20130207
+In-Reply-To: <201302100428.54061.marex@denx.de>
+References: <CAOMZO5Ar1T3Lg2KRvSLK-gjNAaAFAf39f6KqaYeF03w5bNj6EQ@mail.gmail.com>
+ <20130208164858.GA32318@mudshark.cambridge.arm.com>
+ <CAOMZO5CbJfpVwqHM1RSYdEQH4n1EL67Kt2_tC9TNPxZGMsPevQ@mail.gmail.com>
+ <201302100428.54061.marex@denx.de>
+Message-ID: <CAOMZO5Bkq0aK06LaiyPQ6+nJQRfzhuwVfxa3u9nzO8X2rqJDbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 February 2013 06:42 PM, Catalin Marinas wrote:
-> On Mon, Feb 11, 2013 at 09:13:29AM +0000, R Sricharan wrote:
->> +static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
->> +				      unsigned long end, phys_addr_t phys,
->> +				      const struct mem_type *type)
->> +{
->> +	pmd_t *pmd = pmd_offset(pud, addr);
->> +	unsigned long next;
->> +
->> +	do {
->>   		/*
->> -		 * No need to loop; pte's aren't interested in the
->> -		 * individual L1 entries.
->> +		 * With LPAE, we must loop over to map
->> +		 * all the pmds for the given range.
->>   		 */
->> -		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
->> -	}
->> +		next = pmd_addr_end(addr, end);
->> +
->> +		/*
->> +		 * Try a section mapping - end, addr and phys must all be
->> +		 * aligned to a section boundary.
->> +		 */
->
-> Should this read "next, addr and phys" instead of "end..."?
->
-  hmm, correct. will change it now
-> Otherwise:
->
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->
+On Sun, Feb 10, 2013 at 1:28 AM, Marek Vasut <marex@denx.de> wrote:
 
-Regards,
-  Sricharan
+> Is the amba-pl011 driver maybe broken ?
+
+Running Linus' git I get:
+
+[    0.189156] Serial: AMBA PL011 UART driver
+[    0.191187] 80074000.serial: ttyAMA0 at MMIO 0x80074000 (irq = 221)
+is a PL011 rev2
+[    0.487625] console [ttyAMA0] enabled
+
+,but when I run linux-next only the first line shows up.
