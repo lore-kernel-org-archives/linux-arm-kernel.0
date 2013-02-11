@@ -1,166 +1,65 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 12 Feb 2013 01:10:48 +0800
-Subject: [PATCH v8 01/12] gpio: add gpio offset in gpio range cells property
-In-Reply-To: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1360602659-4774-2-git-send-email-haojian.zhuang@linaro.org>
+Date: Tue, 12 Feb 2013 01:10:47 +0800
+Subject: [PATCH v8 00/12] bind pinconf with pinctrl single
+Message-ID: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio offset into "gpio-range-cells" property. It's used to support
-sparse pinctrl range in gpio chip.
+Changelog:
+v8:
+1. Update allocate irq dynamically in gpio-pl061.
+2. Update bias-pullup/bias-pulldown as 4 parameters.
+3. Remove bias-disable.
+4. Add bias-autopull.
+5. Rename input-schmitt-disable to input-schmitt-enable.
+6. Discard allocating global gpio number in ascending order.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- Documentation/devicetree/bindings/gpio/gpio.txt |    6 +++---
- arch/arm/boot/dts/spear1310.dtsi                |    4 ++--
- arch/arm/boot/dts/spear1340.dtsi                |    4 ++--
- arch/arm/boot/dts/spear310.dtsi                 |    4 ++--
- arch/arm/boot/dts/spear320.dtsi                 |    4 ++--
- drivers/gpio/gpiolib-of.c                       |   15 ++-------------
- 6 files changed, 13 insertions(+), 24 deletions(-)
+v7:
+1. Discard the method of adding gpio range from pinctrl-single driver.
+Use gpiolib driver to support gpio range from DTS instead.
+2. Add gpio request function to claim pin in gpio pl061 driver.
+3. Adjust the initcall level in gpio pl061 driver.
+4. Allocate gpio number from lowest gpio number to highest. The original
+implementation is inverted. It's hard to use since it inverted the sequence
+of gpio number.
+5. Remove the support of pxa910 temporarily since gpio pxa driver need to
+be updated for supporting this solution.
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio.txt b/Documentation/devicetree/bindings/gpio/gpio.txt
-index a336287..d933af3 100644
---- a/Documentation/devicetree/bindings/gpio/gpio.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio.txt
-@@ -98,7 +98,7 @@ announce the pinrange to the pin ctrl subsystem. For example,
- 		compatible = "fsl,qe-pario-bank-e", "fsl,qe-pario-bank";
- 		reg = <0x1460 0x18>;
- 		gpio-controller;
--		gpio-ranges = <&pinctrl1 20 10>, <&pinctrl2 50 20>;
-+		gpio-ranges = <&pinctrl1 0 20 10>, <&pinctrl2 10 50 20>;
- 
-     }
- 
-@@ -107,8 +107,8 @@ where,
- 
-    Next values specify the base pin and number of pins for the range
-    handled by 'qe_pio_e' gpio. In the given example from base pin 20 to
--   pin 29 under pinctrl1 and pin 50 to pin 69 under pinctrl2 is handled
--   by this gpio controller.
-+   pin 29 under pinctrl1 with gpio offset 0 and pin 50 to pin 69 under
-+   pinctrl2 with gpio offset 10 is handled by this gpio controller.
- 
- The pinctrl node must have "#gpio-range-cells" property to show number of
- arguments to pass with phandle from gpio controllers node.
-diff --git a/arch/arm/boot/dts/spear1310.dtsi b/arch/arm/boot/dts/spear1310.dtsi
-index 1513c19..122ae94 100644
---- a/arch/arm/boot/dts/spear1310.dtsi
-+++ b/arch/arm/boot/dts/spear1310.dtsi
-@@ -89,7 +89,7 @@
- 		pinmux: pinmux at e0700000 {
- 			compatible = "st,spear1310-pinmux";
- 			reg = <0xe0700000 0x1000>;
--			#gpio-range-cells = <2>;
-+			#gpio-range-cells = <3>;
- 		};
- 
- 		apb {
-@@ -212,7 +212,7 @@
- 				interrupt-controller;
- 				gpio-controller;
- 				#gpio-cells = <2>;
--				gpio-ranges = <&pinmux 0 246>;
-+				gpio-ranges = <&pinmux 0 0 246>;
- 				status = "disabled";
- 
- 				st-plgpio,ngpio = <246>;
-diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
-index b2d41b7..7ec1eb8 100644
---- a/arch/arm/boot/dts/spear1340.dtsi
-+++ b/arch/arm/boot/dts/spear1340.dtsi
-@@ -63,7 +63,7 @@
- 		pinmux: pinmux at e0700000 {
- 			compatible = "st,spear1340-pinmux";
- 			reg = <0xe0700000 0x1000>;
--			#gpio-range-cells = <2>;
-+			#gpio-range-cells = <3>;
- 		};
- 
- 		pwm: pwm at e0180000 {
-@@ -146,7 +146,7 @@
- 				interrupt-controller;
- 				gpio-controller;
- 				#gpio-cells = <2>;
--				gpio-ranges = <&pinmux 0 252>;
-+				gpio-ranges = <&pinmux 0 0 252>;
- 				status = "disabled";
- 
- 				st-plgpio,ngpio = <250>;
-diff --git a/arch/arm/boot/dts/spear310.dtsi b/arch/arm/boot/dts/spear310.dtsi
-index ab45b8c..9537208 100644
---- a/arch/arm/boot/dts/spear310.dtsi
-+++ b/arch/arm/boot/dts/spear310.dtsi
-@@ -25,7 +25,7 @@
- 		pinmux: pinmux at b4000000 {
- 			compatible = "st,spear310-pinmux";
- 			reg = <0xb4000000 0x1000>;
--			#gpio-range-cells = <2>;
-+			#gpio-range-cells = <3>;
- 		};
- 
- 		fsmc: flash at 44000000 {
-@@ -102,7 +102,7 @@
- 				interrupt-controller;
- 				gpio-controller;
- 				#gpio-cells = <2>;
--				gpio-ranges = <&pinmux 0 102>;
-+				gpio-ranges = <&pinmux 0 0 102>;
- 				status = "disabled";
- 
- 				st-plgpio,ngpio = <102>;
-diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
-index caa5520..ffea342 100644
---- a/arch/arm/boot/dts/spear320.dtsi
-+++ b/arch/arm/boot/dts/spear320.dtsi
-@@ -24,7 +24,7 @@
- 		pinmux: pinmux at b3000000 {
- 			compatible = "st,spear320-pinmux";
- 			reg = <0xb3000000 0x1000>;
--			#gpio-range-cells = <2>;
-+			#gpio-range-cells = <3>;
- 		};
- 
- 		clcd at 90000000 {
-@@ -130,7 +130,7 @@
- 				interrupt-controller;
- 				gpio-controller;
- 				#gpio-cells = <2>;
--				gpio-ranges = <&pinmux 0 102>;
-+				gpio-ranges = <&pinmux 0 0 102>;
- 				status = "disabled";
- 
- 				st-plgpio,ngpio = <102>;
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index 25b1dbe..380f84e 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -238,22 +238,11 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
- 		if (!pctldev)
- 			break;
- 
--		/*
--		 * This assumes that the n GPIO pins are consecutive in the
--		 * GPIO number space, and that the pins are also consecutive
--		 * in their local number space. Currently it is not possible
--		 * to add different ranges for one and the same GPIO chip,
--		 * as the code assumes that we have one consecutive range
--		 * on both, mapping 1-to-1.
--		 *
--		 * TODO: make the OF bindings handle multiple sparse ranges
--		 * on the same GPIO chip.
--		 */
- 		ret = gpiochip_add_pin_range(chip,
- 					     pinctrl_dev_get_devname(pctldev),
--					     0, /* offset in gpiochip */
- 					     pinspec.args[0],
--					     pinspec.args[1]);
-+					     pinspec.args[1],
-+					     pinspec.args[2]);
- 
- 		if (ret)
- 			break;
--- 
-1.7.10.4
+v6:
+1. Two configuration array will be created for each pin group.
+This first array is stored in pcs_function structure. The 32-bit
+configruation argument is stored in this array. Driver stores
+data while parsing DTS file, and loads these config array if
+function selector is indicated.
+The second array is stored in pinctrl_map structure. Driver won't
+use it directly. So we could avoid to append lookup pinctrl map
+method that is introduced in v5.
+
+v5:
+1. Move the properties of pinconf into pin group. So those mask
+properties could be merged with other pinconf properties.
+2. Append lookup pinctrl map method.
+3. Append input schmitt disable config parameter.
+4. Clean code.
+
+v4:
+1. Define gpio range as sub-node, not label. And remove
+pinctrl-single,gpio-ranges property.
+2. Use new two properties in sub-node, reg &
+pinctrl-single,gpio. GPIO number & GPIO function are listed in
+the pinctrl-single,gpio property.
+3. Reference the names like pinctrl-single,bias.
+4. Add compatible name "pinconf-single". If the compatible name is
+"pinctrl-single", there's no pinconf. If the compatible name is
+"pinconf-single", there's the generic pinconf in pinctrl-single.
+5. Update documents.
+
+v3:
+1. Add more comments in document.
+2. Replace pcs_readl() & pcs_writel() by pcs->read() & pcs->write().
+3. Clean code.
+
+v2:
+1. Remove "pinctrl-single,gpio-mask". Since GPIO function is one of the
+mux function in the pinmux register of both OMAP and PXA/MMP silicons.
+Use "pinctrl-single,function-mask" instead.
