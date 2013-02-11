@@ -1,611 +1,188 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 12 Feb 2013 01:10:58 +0800
-Subject: [PATCH v8 11/12] pinctrl: single: support generic pinconf
+Date: Tue, 12 Feb 2013 01:10:59 +0800
+Subject: [PATCH v8 12/12] document: devicetree: bind pinconf with pin single
 In-Reply-To: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1360602659-4774-12-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1360602659-4774-13-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the operation of generic pinconf. The supported config arguments
-are INPUT_SCHMITT, INPUT_SCHMITT_ENABLE, DRIVE_STRENGHT, BIAS_DISABLE,
-BIAS_AUTOPULL, BIAS_PULLUP, BIAS_PULLDOWN, SLEW_RATE.
+From: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Add comments with pinconf & gpio range in the document of
+pinctrl-single.
+
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- drivers/pinctrl/Kconfig          |    1 +
- drivers/pinctrl/pinctrl-single.c |  411 +++++++++++++++++++++++++++++++++++++-
- 2 files changed, 405 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/pinctrl/pinctrl-single.txt |  118 +++++++++++++++++++-
+ 1 file changed, 117 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 34f51d2..5a690ce 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -166,6 +166,7 @@ config PINCTRL_SINGLE
- 	depends on OF
- 	select PINMUX
- 	select PINCONF
-+	select GENERIC_PINCONF
- 	help
- 	  This selects the device tree based generic pinctrl driver.
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+index 2c81e45..ac63d87 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+@@ -1,7 +1,9 @@
+ One-register-per-pin type device tree based pinctrl driver
  
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index fe8f321..eda8a38 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -22,8 +22,10 @@
+ Required properties:
+-- compatible : "pinctrl-single"
++- compatible : "pinctrl-single" or "pinconf-single".
++  "pinctrl-single" means that pinconf isn't supported.
++  "pinconf-single" means that generic pinconf is supported.
  
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/pinmux.h>
-+#include <linux/pinctrl/pinconf-generic.h>
+ - reg : offset and length of the register set for the mux registers
  
- #include "core.h"
-+#include "pinconf.h"
+@@ -14,9 +16,72 @@ Optional properties:
+ - pinctrl-single,function-off : function off mode for disabled state if
+   available and same for all registers; if not specified, disabling of
+   pin functions is ignored
++
+ - pinctrl-single,bit-per-mux : boolean to indicate that one register controls
+   more than one pin
  
- #define DRIVER_NAME			"pinctrl-single"
- #define PCS_MUX_PINS_NAME		"pinctrl-single,pins"
-@@ -59,6 +61,33 @@ struct pcs_func_vals {
- };
++- pinctrl-single,drive-strength : array of value that are used to configure
++  drive strength in the pinmux register. They're value of drive strength
++  current and drive strength mask.
++
++		/* drive strength current, mask */
++		pinctrl-single,power-source = <0x30 0xf0>;
++
++- pinctrl-single,bias-pullup : array of value that are used to configure the
++  input bias pullup in the pinmux register.
++
++		/* input, enabled pullup bits, disabled pullup bits, mask */
++		pinctrl-single,bias-pullup = <0 1 0 1>;
++
++- pinctrl-single,bias-pulldown : array of value that are used to configure the
++  input bias pulldown in the pinmux register.
++
++		/* input, enabled pulldown bits, disabled pulldown bits, mask */
++		pinctrl-single,bias-pulldown = <2 2 0 2>;
++
++- pinctrl-single,bias-autopull : array of value that are used to configure the
++  input bias autopull.
++
++		/* input, enabled autopull bits, disabled autopull bits, mask */
++		pinctrl-single,bias-autopull = <1 1 0 1>;
++
++  bias-pullup & bias-pulldown should be used together without bias-autoupll,
++  vice visa.
++
++  * Only one bit to control input bias enable or disable: User should use
++    pinctrl-single,bias-autoupll property at here.
++  * Two bits to control input bias pullup and pulldown: User should use
++    pinctrl-single,bias-pullup & pinctrl-single,bias-pulldown. One bit means
++    pullup, and the other one bit means pulldown.
++  * Three bits to control input bias enable, pullup and pulldown. User should
++    use pinctrl-single,bias-pullup & pinctrl-single,bias-pulldown. Input bias
++    enable bit should be included in pullup or pulldown bits.
++  * Although driver could set PIN_CONFIG_BIAS_DISABLE, there's no property as
++    pinctrl-single,bias-disable. Because pinctrl single driver could implement
++    it by calling pulldown, pullup, autopull disabled.
++
++- pinctrl-single,input-schmitt : array of value that are used to configure
++  input schmitt in the pinmux register. In some silicons, there're two input
++  schmitt value (rising-edge & falling-edge) in the pinmux register.
++
++		/* input schmitt value, mask */
++		pinctrl-single,input-schmitt = <0x30 0x70>;
++
++- pinctrl-single,input-schmitt-enable : array of value that are used to
++  configure input schmitt enable or disable in the pinmux register.
++
++		/* input, enable bits, disable bits, mask */
++		pinctrl-single,input-schmitt-enable = <0x30 0x40 0 0x70>;
++
++- pinctrl-single,gpio-range : list of value that are used to configure a GPIO
++  range. They're value of subnode phandle, pin base in pinctrl device, pin
++  number in this range, GPIO function value of this GPIO range.
++  The number of parameters is depend on #pinctrl-single,gpio-range-cells
++  property.
++
++		/* pin base, nr pins & gpio function */
++		pinctrl-single,gpio-range = <&range 0 3 0 &range 3 9 1>;
++
+ This driver assumes that there is only one register for each pin (unless the
+ pinctrl-single,bit-per-mux is set), and uses the common pinctrl bindings as
+ specified in the pinctrl-bindings.txt document in this directory.
+@@ -42,6 +107,20 @@ Where 0xdc is the offset from the pinctrl register base address for the
+ device pinctrl register, 0x18 is the desired value, and 0xff is the sub mask to
+ be used when applying this change to the register.
  
- /**
-+ * struct pcs_conf_vals - pinconf parameter, pinconf register offset
-+ * and value, enable, disable, mask
-+ * @param:	config parameter
-+ * @val:	user input bits in the pinconf register
-+ * @enable:	enable bits in the pinconf register
-+ * @disable:	disable bits in the pinconf register
-+ * @mask:	mask bits in the register value
-+ */
-+struct pcs_conf_vals {
-+	enum pin_config_param param;
-+	unsigned val;
-+	unsigned enable;
-+	unsigned disable;
-+	unsigned mask;
-+};
 +
-+/**
-+ * struct pcs_conf_type - pinconf property name, pinconf param pair
-+ * @name:	property name in DTS file
-+ * @param:	config parameter
-+ */
-+struct pcs_conf_type {
-+	const char *name;
-+	enum pin_config_param param;
-+};
++Optional sub-node: In case some pins could be configured as GPIO in the pinmux
++register, those pins could be defined as a GPIO range. This sub-node is required
++by pinctrl-single,gpio-range property.
 +
-+/**
-  * struct pcs_function - pinctrl function
-  * @name:	pinctrl function name
-  * @vals:	register and vals array
-@@ -73,6 +102,8 @@ struct pcs_function {
- 	unsigned nvals;
- 	const char **pgnames;
- 	int npgnames;
-+	struct pcs_conf_vals *conf;
-+	int nconfs;
- 	struct list_head node;
- };
- 
-@@ -131,6 +162,7 @@ struct pcs_name {
-  * @fshift:	function register shift
-  * @foff:	value to turn mux off
-  * @fmax:	max number of functions in fmask
-+ * @is_pinconf:	whether supports pinconf
-  * @names:	array of register names for pins
-  * @pins:	physical pins on the SoC
-  * @pgtree:	pingroup index radix tree
-@@ -157,6 +189,7 @@ struct pcs_device {
- 	unsigned foff;
- 	unsigned fmax;
- 	bool bits_per_mux;
-+	bool is_pinconf;
- 	struct pcs_name *names;
- 	struct pcs_data pins;
- 	struct radix_tree_root pgtree;
-@@ -171,6 +204,17 @@ struct pcs_device {
- 	void (*write)(unsigned val, void __iomem *reg);
- };
- 
-+static int pcs_pinconf_get(struct pinctrl_dev *pctldev, unsigned pin,
-+			   unsigned long *config);
-+static int pcs_pinconf_set(struct pinctrl_dev *pctldev, unsigned pin,
-+			   unsigned long config);
++Required properties in sub-node:
++- #pinctrl-single,gpio-range-cells : the number of parameters after phandle in
++  pinctrl-single,gpio-range property.
 +
-+static enum pin_config_param pcs_bias[] = {
-+	PIN_CONFIG_BIAS_AUTO_PULL,
-+	PIN_CONFIG_BIAS_PULL_DOWN,
-+	PIN_CONFIG_BIAS_PULL_UP,
-+};
-+
- /*
-  * REVISIT: Reads and writes could eventually use regmap or something
-  * generic. But at least on omaps, some mux registers are performance
-@@ -342,6 +386,28 @@ static int pcs_get_function_groups(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
-+static int pcs_get_function(struct pinctrl_dev *pctldev, unsigned pin,
-+			    struct pcs_function **func)
-+{
-+	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
-+	struct pin_desc *pdesc = pin_desc_get(pctldev, pin);
-+	const struct pinctrl_setting_mux *setting;
-+	unsigned fselector;
-+
-+	/* If pin is not described in DTS & enabled, mux_setting is NULL. */
-+	setting = pdesc->mux_setting;
-+	if (!setting)
-+		return -ENOTSUPP;
-+	fselector = setting->func;
-+	*func = radix_tree_lookup(&pcs->ftree, fselector);
-+	if (!(*func)) {
-+		dev_err(pcs->dev, "%s could not find function%i\n",
-+			__func__, fselector);
-+		return -ENOTSUPP;
-+	}
-+	return 0;
-+}
-+
- static int pcs_enable(struct pinctrl_dev *pctldev, unsigned fselector,
- 	unsigned group)
- {
-@@ -461,32 +527,192 @@ static struct pinmux_ops pcs_pinmux_ops = {
- 	.gpio_request_enable = pcs_request_gpio,
- };
- 
-+/* Clear BIAS value */
-+static void pcs_pinconf_clear_bias(struct pinctrl_dev *pctldev, unsigned pin)
-+{
-+	unsigned long config;
-+	int i;
-+	for (i = 0; i < ARRAY_SIZE(pcs_bias); i++) {
-+		config = pinconf_to_config_packed(pcs_bias[i], 0);
-+		pcs_pinconf_set(pctldev, pin, config);
-+	}
-+}
-+
-+/*
-+ * Check whether PIN_CONFIG_BIAS_DISABLE is valid.
-+ * It's depend on that AUTO_PULL, PULL_DOWN & PULL_UP configs are all invalid.
-+ */
-+static bool pcs_pinconf_bias_disable(struct pinctrl_dev *pctldev, unsigned pin)
-+{
-+	unsigned long config;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(pcs_bias); i++) {
-+		config = pinconf_to_config_packed(pcs_bias[i], 0);
-+		if (!pcs_pinconf_get(pctldev, pin, &config))
-+			goto out;
-+	}
-+	return true;
-+out:
-+	return false;
-+}
-+
- static int pcs_pinconf_get(struct pinctrl_dev *pctldev,
- 				unsigned pin, unsigned long *config)
- {
-+	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
-+	struct pcs_function *func;
-+	enum pin_config_param param;
-+	unsigned offset = 0, data = 0, i, j, ret;
-+
-+	ret = pcs_get_function(pctldev, pin, &func);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < func->nconfs; i++) {
-+		param = pinconf_to_config_param(*config);
-+		if (param == PIN_CONFIG_BIAS_DISABLE) {
-+			if (pcs_pinconf_bias_disable(pctldev, pin)) {
-+				*config = 0;
-+				return 0;
-+			} else {
-+				return -ENOTSUPP;
-+			}
-+		} else if (param != func->conf[i].param) {
-+			continue;
-+		}
-+
-+		offset = pin * (pcs->width / BITS_PER_BYTE);
-+		data = pcs->read(pcs->base + offset) & func->conf[i].mask;
-+		switch (func->conf[i].param) {
-+		/* 4 parameters */
-+		case PIN_CONFIG_BIAS_AUTO_PULL:
-+		case PIN_CONFIG_BIAS_PULL_DOWN:
-+		case PIN_CONFIG_BIAS_PULL_UP:
-+		case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
-+			if ((data != func->conf[i].enable) ||
-+			    (data == func->conf[i].disable))
-+				return -ENOTSUPP;
-+			*config = 0;
-+			break;
-+		/* 2 parameters */
-+		case PIN_CONFIG_INPUT_SCHMITT:
-+			for (j = 0; j < func->nconfs; j++) {
-+				switch (func->conf[j].param) {
-+				case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
-+					if (data != func->conf[j].enable)
-+						return -ENOTSUPP;
-+					break;
-+				default:
-+					break;
-+				}
-+			}
-+			*config = data;
-+			break;
-+		case PIN_CONFIG_DRIVE_STRENGTH:
-+		case PIN_CONFIG_SLEW_RATE:
-+		default:
-+			*config = data;
-+			break;
-+		}
-+		return 0;
-+	}
- 	return -ENOTSUPP;
- }
- 
- static int pcs_pinconf_set(struct pinctrl_dev *pctldev,
- 				unsigned pin, unsigned long config)
- {
-+	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
-+	struct pcs_function *func;
-+	unsigned offset = 0, shift = 0, arg = 0, i, data, ret;
-+	u16 argument;
-+
-+	ret = pcs_get_function(pctldev, pin, &func);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < func->nconfs; i++) {
-+		if (pinconf_to_config_param(config) == func->conf[i].param) {
-+			offset = pin * (pcs->width / BITS_PER_BYTE);
-+			data = pcs->read(pcs->base + offset);
-+			argument = pinconf_to_config_argument(config);
-+			switch (func->conf[i].param) {
-+			/* 2 parameters */
-+			case PIN_CONFIG_INPUT_SCHMITT:
-+			case PIN_CONFIG_DRIVE_STRENGTH:
-+			case PIN_CONFIG_SLEW_RATE:
-+				shift = ffs(func->conf[i].mask) - 1;
-+				arg = pinconf_to_config_argument(config);
-+				data &= ~func->conf[i].mask;
-+				data |= (arg << shift) & func->conf[i].mask;
-+				break;
-+			/* 4 parameters */
-+			case PIN_CONFIG_BIAS_DISABLE:
-+				pcs_pinconf_clear_bias(pctldev, pin);
-+				break;
-+			case PIN_CONFIG_BIAS_PULL_DOWN:
-+			case PIN_CONFIG_BIAS_PULL_UP:
-+				if (argument)
-+					pcs_pinconf_clear_bias(pctldev, pin);
-+				/* fall through */
-+			case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
-+				data &= ~func->conf[i].mask;
-+				if (argument)
-+					data |= func->conf[i].enable;
-+				else
-+					data |= func->conf[i].disable;
-+				break;
-+			default:
-+				return -ENOTSUPP;
-+			}
-+			pcs->write(data, pcs->base + offset);
-+			return 0;
-+		}
-+	}
- 	return -ENOTSUPP;
- }
- 
- static int pcs_pinconf_group_get(struct pinctrl_dev *pctldev,
- 				unsigned group, unsigned long *config)
- {
--	return -ENOTSUPP;
-+	const unsigned *pins;
-+	unsigned npins, old = 0;
-+	int i, ret;
-+
-+	ret = pcs_get_group_pins(pctldev, group, &pins, &npins);
-+	if (ret)
-+		return ret;
-+	for (i = 0; i < npins; i++) {
-+		if (pcs_pinconf_get(pctldev, pins[i], config))
-+			return -ENOTSUPP;
-+		/* configs do not match between two pins */
-+		if (i && (old != *config))
-+			return -ENOTSUPP;
-+		old = *config;
-+	}
-+	return 0;
- }
- 
- static int pcs_pinconf_group_set(struct pinctrl_dev *pctldev,
- 				unsigned group, unsigned long config)
- {
--	return -ENOTSUPP;
-+	const unsigned *pins;
-+	unsigned npins;
-+	int i, ret;
-+
-+	ret = pcs_get_group_pins(pctldev, group, &pins, &npins);
-+	if (ret)
-+		return ret;
-+	for (i = 0; i < npins; i++) {
-+		if (pcs_pinconf_set(pctldev, pins[i], config))
-+			return -ENOTSUPP;
-+	}
-+	return 0;
- }
- 
- static void pcs_pinconf_dbg_show(struct pinctrl_dev *pctldev,
--				struct seq_file *s, unsigned offset)
-+				struct seq_file *s, unsigned pin)
- {
- }
- 
-@@ -495,6 +721,13 @@ static void pcs_pinconf_group_dbg_show(struct pinctrl_dev *pctldev,
- {
- }
- 
-+static void pcs_pinconf_config_dbg_show(struct pinctrl_dev *pctldev,
-+					struct seq_file *s,
-+					unsigned long config)
-+{
-+	pinconf_generic_dump_config(pctldev, s, config);
-+}
-+
- static struct pinconf_ops pcs_pinconf_ops = {
- 	.pin_config_get = pcs_pinconf_get,
- 	.pin_config_set = pcs_pinconf_set,
-@@ -502,6 +735,7 @@ static struct pinconf_ops pcs_pinconf_ops = {
- 	.pin_config_group_set = pcs_pinconf_group_set,
- 	.pin_config_dbg_show = pcs_pinconf_dbg_show,
- 	.pin_config_group_dbg_show = pcs_pinconf_group_dbg_show,
-+	.pin_config_config_dbg_show = pcs_pinconf_config_dbg_show,
- };
- 
- /**
-@@ -692,11 +926,158 @@ static int pcs_get_pin_by_offset(struct pcs_device *pcs, unsigned offset)
- 	return index;
- }
- 
-+/*
-+ * check whether data matches enable bits or disable bits
-+ * Return value: 1 for matching enable bits, 0 for matching disable bits,
-+ *               and negative value for matching failure.
-+ */
-+static int pcs_config_match(unsigned data, unsigned enable, unsigned disable)
-+{
-+	int ret = -EINVAL;
-+
-+	if (data == enable)
-+		ret = 1;
-+	else if (data == disable)
-+		ret = 0;
-+	return ret;
-+}
-+
-+static void add_config(struct pcs_conf_vals **conf, enum pin_config_param param,
-+		       unsigned value, unsigned enable, unsigned disable,
-+		       unsigned mask)
-+{
-+	(*conf)->param = param;
-+	(*conf)->val = value;
-+	(*conf)->enable = enable;
-+	(*conf)->disable = disable;
-+	(*conf)->mask = mask;
-+	(*conf)++;
-+}
-+
-+static void add_setting(unsigned long **setting, enum pin_config_param param,
-+			unsigned arg)
-+{
-+	**setting = pinconf_to_config_packed(param, arg);
-+	(*setting)++;
-+}
-+
-+/* add pinconf setting with 2 parameters */
-+static void pcs_add_conf2(struct pcs_device *pcs, struct device_node *np,
-+			  const char *name, enum pin_config_param param,
-+			  struct pcs_conf_vals **conf, unsigned long **settings)
-+{
-+	unsigned value[2];
-+	int ret;
-+
-+	ret = of_property_read_u32_array(np, name, value, 2);
-+	if (ret)
-+		return;
-+	/* set value & mask */
-+	value[0] &= value[1];
-+	/* skip enable & disable */
-+	add_config(conf, param, value[0], 0, 0, value[1]);
-+	add_setting(settings, param, value[0]);
-+}
-+
-+/* add pinconf setting with 4 parameters */
-+static void pcs_add_conf4(struct pcs_device *pcs, struct device_node *np,
-+			  const char *name, enum pin_config_param param,
-+			  struct pcs_conf_vals **conf, unsigned long **settings)
-+{
-+	unsigned value[4];
-+	int ret;
-+
-+	/* value to set, enable, disable, mask */
-+	ret = of_property_read_u32_array(np, name, value, 4);
-+	if (ret)
-+		return;
-+	if (!value[3]) {
-+		dev_err(pcs->dev, "mask field of the property can't be 0\n");
-+		return;
-+	}
-+	value[0] &= value[3];
-+	value[1] &= value[3];
-+	value[2] &= value[3];
-+	ret = pcs_config_match(value[0], value[1], value[2]);
-+	if (ret < 0)
-+		dev_dbg(pcs->dev, "failed to match enable or disable bits\n");
-+	add_config(conf, param, value[0], value[1], value[2], value[3]);
-+	add_setting(settings, param, ret);
-+}
-+
-+static int pcs_parse_pinconf(struct pcs_device *pcs, struct device_node *np,
-+			     struct pcs_function *func,
-+			     struct pinctrl_map **map)
-+
-+{
-+	struct pinctrl_map *m = *map;
-+	int i = 0, nconfs = 0;
-+	unsigned long *settings = NULL, *s = NULL;
-+	struct pcs_conf_vals *conf = NULL;
-+	struct pcs_conf_type prop2[] = {
-+		{ "pinctrl-single,drive-strength", PIN_CONFIG_DRIVE_STRENGTH, },
-+		{ "pinctrl-single,slew-rate", PIN_CONFIG_SLEW_RATE, },
-+		{ "pinctrl-single,input-schmitt", PIN_CONFIG_INPUT_SCHMITT, },
-+	};
-+	struct pcs_conf_type prop4[] = {
-+		{ "pinctrl-single,bias-autopull", PIN_CONFIG_BIAS_AUTO_PULL, },
-+		{ "pinctrl-single,bias-pullup", PIN_CONFIG_BIAS_PULL_UP, },
-+		{ "pinctrl-single,bias-pulldown", PIN_CONFIG_BIAS_PULL_DOWN, },
-+		{ "pinctrl-single,input-schmitt-enable",
-+			PIN_CONFIG_INPUT_SCHMITT_ENABLE, },
++	range: gpio-range {
++		#pinctrl-single,gpio-range-cells = <3>;
 +	};
 +
-+	/* If pinconf isn't supported, don't parse properties in below. */
-+	if (!pcs->is_pinconf)
-+		return 0;
 +
-+	/* cacluate how much properties are supported in current node */
-+	for (i = 0; i < ARRAY_SIZE(prop2); i++) {
-+		if (of_find_property(np, prop2[i].name, NULL))
-+			nconfs++;
-+	}
-+	for (i = 0; i < ARRAY_SIZE(prop4); i++) {
-+		if (of_find_property(np, prop4[i].name, NULL))
-+			nconfs++;
-+	}
-+	if (!nconfs)
-+		return 0;
-+
-+	func->conf = devm_kzalloc(pcs->dev,
-+				  sizeof(struct pcs_conf_vals) * nconfs,
-+				  GFP_KERNEL);
-+	if (!func->conf)
-+		return -ENOMEM;
-+	func->nconfs = nconfs;
-+	conf = &(func->conf[0]);
-+	m++;
-+	settings = devm_kzalloc(pcs->dev, sizeof(unsigned long) * nconfs,
-+				GFP_KERNEL);
-+	if (!settings)
-+		return -ENOMEM;
-+	s = &settings[0];
-+
-+	for (i = 0; i < ARRAY_SIZE(prop2); i++)
-+		pcs_add_conf2(pcs, np, prop2[i].name, prop2[i].param,
-+			      &conf, &s);
-+	for (i = 0; i < ARRAY_SIZE(prop4); i++)
-+		pcs_add_conf4(pcs, np, prop4[i].name, prop4[i].param,
-+			      &conf, &s);
-+	m->type = PIN_MAP_TYPE_CONFIGS_GROUP;
-+	m->data.configs.group_or_pin = np->name;
-+	m->data.configs.configs = settings;
-+	m->data.configs.num_configs = nconfs;
-+	return 0;
-+}
-+
-+static void pcs_free_pingroups(struct pcs_device *pcs);
-+
- /**
-  * smux_parse_one_pinctrl_entry() - parses a device tree mux entry
-  * @pcs: pinctrl driver instance
-  * @np: device node of the mux entry
-  * @map: map entry
-+ * @num_maps: number of map
-  * @pgnames: pingroup names
-  *
-  * Note that this binding currently supports only sets of one register + value.
-@@ -713,6 +1094,7 @@ static int pcs_get_pin_by_offset(struct pcs_device *pcs, unsigned offset)
- static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
- 						struct device_node *np,
- 						struct pinctrl_map **map,
-+						unsigned *num_maps,
- 						const char **pgnames)
- {
- 	struct pcs_func_vals *vals;
-@@ -785,8 +1167,18 @@ static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
- 	(*map)->data.mux.group = np->name;
- 	(*map)->data.mux.function = np->name;
+ Example:
  
-+	if (pcs->is_pinconf) {
-+		if (pcs_parse_pinconf(pcs, np, function, map))
-+			goto free_pingroups;
-+		*num_maps = 2;
-+	} else {
-+		*num_maps = 1;
-+	}
- 	return 0;
- 
-+free_pingroups:
-+	pcs_free_pingroups(pcs);
-+	*num_maps = 1;
- free_function:
- 	pcs_remove_function(pcs, function);
- 
-@@ -815,7 +1207,8 @@ static int pcs_dt_node_to_map(struct pinctrl_dev *pctldev,
- 
- 	pcs = pinctrl_dev_get_drvdata(pctldev);
- 
--	*map = devm_kzalloc(pcs->dev, sizeof(**map), GFP_KERNEL);
-+	/* create 2 maps. One is for pinmux, and the other is for pinconf. */
-+	*map = devm_kzalloc(pcs->dev, sizeof(**map) * 2, GFP_KERNEL);
- 	if (!*map)
- 		return -ENOMEM;
- 
-@@ -827,13 +1220,13 @@ static int pcs_dt_node_to_map(struct pinctrl_dev *pctldev,
- 		goto free_map;
- 	}
- 
--	ret = pcs_parse_one_pinctrl_entry(pcs, np_config, map, pgnames);
-+	ret = pcs_parse_one_pinctrl_entry(pcs, np_config, map, num_maps,
-+					  pgnames);
- 	if (ret < 0) {
- 		dev_err(pcs->dev, "no pins entries for %s\n",
- 			np_config->name);
- 		goto free_pgnames;
- 	}
--	*num_maps = 1;
- 
- 	return 0;
- 
-@@ -976,6 +1369,7 @@ static int pcs_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&pcs->pingroups);
- 	INIT_LIST_HEAD(&pcs->functions);
- 	INIT_LIST_HEAD(&pcs->gpiofuncs);
-+	pcs->is_pinconf = match->data;
- 
- 	PCS_GET_PROP_U32("pinctrl-single,register-width", &pcs->width,
- 			 "register width not specified\n");
-@@ -1046,6 +1440,8 @@ static int pcs_probe(struct platform_device *pdev)
- 	pcs->desc.pmxops = &pcs_pinmux_ops;
- 	pcs->desc.confops = &pcs_pinconf_ops;
- 	pcs->desc.owner = THIS_MODULE;
-+	if (match->data)
-+		pcs_pinconf_ops.is_generic = true;
- 
- 	ret = pcs_allocate_pin_table(pcs);
- 	if (ret < 0)
-@@ -1086,7 +1482,8 @@ static int pcs_remove(struct platform_device *pdev)
- }
- 
- static struct of_device_id pcs_of_match[] = {
--	{ .compatible = DRIVER_NAME, },
-+	{ .compatible = "pinctrl-single", .data = (void *)false },
-+	{ .compatible = "pinconf-single", .data = (void *)true },
- 	{ },
+ /* SoC common file */
+@@ -76,6 +155,29 @@ control_devconf0: pinmux at 48002274 {
+ 	pinctrl-single,function-mask = <0x5F>;
  };
- MODULE_DEVICE_TABLE(of, pcs_of_match);
+ 
++/* third controller instance for pins in gpio domain */
++pmx_gpio: pinmux at d401e000 {
++	compatible = "pinconf-single";
++	reg = <0xd401e000 0x0330>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++
++	pinctrl-single,register-width = <32>;
++	pinctrl-single,function-mask = <7>;
++
++	/* sparse GPIO range could be supported */
++	pinctrl-single,gpio-range = <&range 0 3 0 &range 3 9 1
++				&range 12 1 0 &range 13 29 1
++				&range 43 1 0 &range 44 49 1
++				&range 94 1 1 &range 96 2 1>;
++
++	range: gpio-range {
++		#pinctrl-single,gpio-range-cells = <3>;
++	};
++};
++
++
+ /* board specific .dts file */
+ 
+ &pmx_core {
+@@ -96,6 +198,15 @@ control_devconf0: pinmux at 48002274 {
+ 		>;
+ 	};
+ 
++	uart0_pins: pinmux_uart0_pins {
++		pinctrl-single,pins = <
++			0x208 0		/* UART0_RXD (IOCFG138) */
++			0x20c 0		/* UART0_TXD (IOCFG139) */
++		>;
++		pinctrl-single,bias-pulldown = <0 2 2>;
++		pinctrl-single,bias-pullup = <0 1 1>;
++	};
++
+ 	/* map uart2 pins */
+ 	uart2_pins: pinmux_uart2_pins {
+ 		pinctrl-single,pins = <
+@@ -122,6 +233,11 @@ control_devconf0: pinmux@48002274 {
+ 
+ };
+ 
++&uart1 {
++       pinctrl-names = "default";
++       pinctrl-0 = <&uart0_pins>;
++};
++
+ &uart2 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&uart2_pins>;
 -- 
 1.7.10.4
