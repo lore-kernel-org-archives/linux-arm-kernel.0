@@ -1,75 +1,64 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Mon, 11 Feb 2013 14:08:21 +0530
-Subject: [PATCH V4 1/5] DMA: PL330: Add new pl330 filter for DT case.
+Date: Mon, 11 Feb 2013 14:08:22 +0530
+Subject: [PATCH V4 2/5] DMA: PL330: Add xlate function
 In-Reply-To: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
 References: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1360571905-15285-2-git-send-email-padma.v@samsung.com>
+Message-ID: <1360571905-15285-3-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new pl330_dt_filter for DT case to filter the
-required channel based on the new filter params and modifies the
-old filter only for non-DT case as suggested by Arnd Bergmann.
+Add xlate to translate the device-tree binding information into
+the appropriate format. The filter function requires the dma
+controller device and dma channel number as filter_params.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/dma/pl330.c |   29 +++++++++++++++--------------
- 1 files changed, 15 insertions(+), 14 deletions(-)
+ drivers/dma/pl330.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 80680ee..87110f2 100644
+index 87110f2..e68c83b 100644
 --- a/drivers/dma/pl330.c
 +++ b/drivers/dma/pl330.c
-@@ -606,6 +606,11 @@ struct dma_pl330_desc {
- 	struct dma_pl330_chan *pchan;
- };
+@@ -25,6 +25,7 @@
+ #include <linux/amba/pl330.h>
+ #include <linux/scatterlist.h>
+ #include <linux/of.h>
++#include <linux/of_dma.h>
  
-+struct dma_pl330_filter_args {
-+	struct dma_pl330_dmac *pdmac;
-+	unsigned int chan_id;
-+};
-+
- static inline void _callback(struct pl330_req *r, enum pl330_op_err err)
- {
- 	if (r && r->xfer_cb)
-@@ -2352,6 +2357,16 @@ static void dma_pl330_rqcb(void *token, enum pl330_op_err err)
- 	tasklet_schedule(&pch->task);
+ #include "dmaengine.h"
+ #define PL330_MAX_CHAN		8
+@@ -2379,6 +2380,30 @@ bool pl330_filter(struct dma_chan *chan, void *param)
  }
+ EXPORT_SYMBOL(pl330_filter);
  
-+static bool pl330_dt_filter(struct dma_chan *chan, void *param)
++static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
++						struct of_dma *ofdma)
 +{
-+	struct dma_pl330_filter_args *fargs = param;
++	int count = dma_spec->args_count;
++	struct dma_pl330_dmac *pdmac = ofdma->of_dma_data;
++	struct dma_pl330_filter_args fargs;
++	dma_cap_mask_t cap;
 +
-+	if (chan->device != &fargs->pdmac->ddma)
-+		return false;
++	if (!pdmac)
++		return NULL;
 +
-+	return (chan->chan_id == fargs->chan_id);
++	if (count != 1)
++		return NULL;
++
++	fargs.pdmac = pdmac;
++	fargs.chan_id = dma_spec->args[0];
++
++	dma_cap_zero(cap);
++	dma_cap_set(DMA_SLAVE, cap);
++	dma_cap_set(DMA_CYCLIC, cap);
++
++	return dma_request_channel(cap, pl330_dt_filter, &fargs);
 +}
 +
- bool pl330_filter(struct dma_chan *chan, void *param)
+ static int pl330_alloc_chan_resources(struct dma_chan *chan)
  {
- 	u8 *peri_id;
-@@ -2359,20 +2374,6 @@ bool pl330_filter(struct dma_chan *chan, void *param)
- 	if (chan->device->dev->driver != &pl330_driver.drv)
- 		return false;
- 
--#ifdef CONFIG_OF
--	if (chan->device->dev->of_node) {
--		const __be32 *prop_value;
--		phandle phandle;
--		struct device_node *node;
--
--		prop_value = ((struct property *)param)->value;
--		phandle = be32_to_cpup(prop_value++);
--		node = of_find_node_by_phandle(phandle);
--		return ((chan->private == node) &&
--				(chan->chan_id == be32_to_cpup(prop_value)));
--	}
--#endif
--
- 	peri_id = chan->private;
- 	return *peri_id == (unsigned)param;
- }
+ 	struct dma_pl330_chan *pch = to_pchan(chan);
 -- 
 1.7.4.4
