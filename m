@@ -1,51 +1,55 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 11 Feb 2013 15:33:23 -0800
-Subject: [RFC v2 07/18] ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod
- with the right flags
-In-Reply-To: <1356959231-17335-8-git-send-email-vaibhav.bedia@ti.com> (Vaibhav
- Bedia's message of "Mon, 31 Dec 2012 18:37:00 +0530")
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-8-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <87fw12xw70.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Feb 2013 16:40:15 -0700
+Subject: [PATCH V3 1/2] get_maintainer: allow keywords to match filenames
+Message-ID: <1360626016-23332-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Bedia <vaibhav.bedia@ti.com> writes:
+From: Stephen Warren <swarren@nvidia.com>
 
-> TPTC0 needs to be idled and put to standby under SW control.
+Allow K: entries in MAINTAINERS to match directly against filenames;
+either those extracted from patch +++ or --- lines, or those specified
+on the command-line using the -f option.
 
-Please elaborate about why (e.g. HW support not available, HW support
-broken/buggy, etc.) since these blocks are not well documented in the
-docs that I have (spruh73f.)
+This potentially allows fewer lines in a MAINTAINERS entry, if all the
+relevant files are scattered throughout the whole kernel tree, yet
+contain some common keyword. An example would be using an ARM SoC name
+as the keyword to catch all related drivers.
 
-Thanks,
+I don't think setting exact_pattern_match_hash would be appropriate here;
+at least for intended Tegra use case, this feature is to ensure that all
+Tegra-related driver changes get Cc'd to the Tegra mailing list. Setting
+exact_pattern_match_hash would prevent git history parsing for e.g. S-o-b
+tags, which still seems like it would be useful. Hence, this flag isn't
+set.
 
-Kevin
+The value in $hash{$tvi} doesn't seem relevant, so I just assign 0.
 
-> Add the appropriate flags in the TPTC0 hwmod entry.
->
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-> ---
-> v1->v2:
-> 	No change
->
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> index 5e50e68..5c34d4b 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> @@ -1823,6 +1823,7 @@ static struct omap_hwmod am33xx_tptc0_hwmod = {
->  	.class		= &am33xx_tptc_hwmod_class,
->  	.clkdm_name	= "l3_clkdm",
->  	.mpu_irqs	= am33xx_tptc0_irqs,
-> +	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
->  	.main_clk	= "l3_gclk",
->  	.prcm		= {
->  		.omap4	= {
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+V3: New patch.
+
+Joe, I'm not sure if you care where this gets merged; could it go through
+arm-soc together with patch 2/2? A quick look at git history of the
+script in linux-next indicates there won't be conflicts doing that.
+
+ scripts/get_maintainer.pl |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/scripts/get_maintainer.pl b/scripts/get_maintainer.pl
+index 18d4ab5..96cf92a 100755
+--- a/scripts/get_maintainer.pl
++++ b/scripts/get_maintainer.pl
+@@ -611,6 +611,10 @@ sub get_maintainers {
+ 				    $hash{$tvi} = $value_pd;
+ 				}
+ 			    }
++			} elsif ($type eq "K") {
++			    if ($file =~ m/$value/x) {
++				$hash{$tvi} = 0;
++			    }
+ 			}
+ 		    }
+ 		}
+-- 
+1.7.10.4
