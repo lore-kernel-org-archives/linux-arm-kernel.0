@@ -1,121 +1,38 @@
-From: ivan.djelic@parrot.com (Ivan Djelic)
-Date: Mon, 11 Feb 2013 13:35:33 +0100
-Subject: [PATCH] [RFC] arm: fix memset-related crashes caused by recent
- GCC (4.7.2) optimizations
-In-Reply-To: <alpine.LFD.2.02.1302090943440.6300@xanadu.home>
-References: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
- <alpine.LFD.2.02.1302090943440.6300@xanadu.home>
-Message-ID: <20130211123533.GB28067@parrot.com>
+From: dhowells@redhat.com (David Howells)
+Date: Mon, 11 Feb 2013 12:41:31 +0000
+Subject: [PATCH v5 01/45] percpu_rwlock: Introduce the global
+ reader-writer lock backend
+In-Reply-To: <20130122073315.13822.27093.stgit@srivatsabhat.in.ibm.com>
+References: <20130122073315.13822.27093.stgit@srivatsabhat.in.ibm.com>
+ <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <30708.1360586491@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 02:48:31PM +0000, Nicolas Pitre wrote:
-> On Sat, 2 Feb 2013, Ivan Djelic wrote:
-> 
-> > Recent GCC versions (e.g. GCC-4.7.2) perform optimizations based on
-> > assumptions about the implementation of memset and similar functions.
-> > The current ARM optimized memset code does not return the value of
-> > its first argument, as is usually expected from standard implementations.
-> > 
-> > For instance in the following function:
-> > 
-> > void debug_mutex_lock_common(struct mutex *lock, struct mutex_waiter *waiter)
-> > {
-> > 	memset(waiter, MUTEX_DEBUG_INIT, sizeof(*waiter));
-> > 	waiter->magic = waiter;
-> > 	INIT_LIST_HEAD(&waiter->list);
-> > }
-> > 
-> > compiled as:
-> > 
-> > 800554d0 <debug_mutex_lock_common>:
-> > 800554d0:       e92d4008        push    {r3, lr}
-> > 800554d4:       e1a00001        mov     r0, r1
-> > 800554d8:       e3a02010        mov     r2, #16 ; 0x10
-> > 800554dc:       e3a01011        mov     r1, #17 ; 0x11
-> > 800554e0:       eb04426e        bl      80165ea0 <memset>
-> > 800554e4:       e1a03000        mov     r3, r0
-> > 800554e8:       e583000c        str     r0, [r3, #12]
-> > 800554ec:       e5830000        str     r0, [r3]
-> > 800554f0:       e5830004        str     r0, [r3, #4]
-> > 800554f4:       e8bd8008        pop     {r3, pc}
-> > 
-> > GCC assumes memset returns the value of pointer 'waiter' in register r0; causing
-> > register/memory corruptions.
-> > 
-> > This patch fixes the return value of the assembly version of memset.
-> > Could you please review, or suggest better alternatives ?
-> > 
-> > Thanks,
-> > 
-> > --
-> > Ivan
-> > 
-> > (this is a shorter and (hopefully) clearer repost of
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/144916.html)
-> > 
-> > The patch adds a 'mov' instruction and merges an additional load+store into
-> > existing load/store instructions.
-> > For ease of review, here is a breakdown of the patch into 4 simple steps:
-> > 
-> > Step 1
-> > ======
-> > Perform the following substitutions:
-> > ip -> r8, then
-> > r0 -> ip,
-> > and insert 'mov ip, r0' as the first statement of the function.
-> > At this point, we have a memset() implementation returning the proper result,
-> > but corrupting r8 on some paths (the ones that were using ip).
-> > 
-> > Step 2
-> > ======
-> > Make sure r8 is saved and restored when (! CALGN(1)+0) == 1:
-> > 
-> > save r8:
-> > -       str     lr, [sp, #-4]!
-> > +       stmfd   sp!, {r8, lr}
-> > 
-> > and restore r8 on both exit paths:
-> > -       ldmeqfd sp!, {pc}               @ Now <64 bytes to go.
-> > +       ldmeqfd sp!, {r8, pc}           @ Now <64 bytes to go.
-> > (...)
-> >         tst     r2, #16
-> >         stmneia ip!, {r1, r3, r8, lr}
-> > -       ldr     lr, [sp], #4
-> > +       ldmfd   sp!, {r8, lr}
-> > 
-> > Step 3
-> > ======
-> > Make sure r8 is saved and restored when (! CALGN(1)+0) == 0:
-> > 
-> > save r8:
-> > -       stmfd   sp!, {r4-r7, lr}
-> > +       stmfd   sp!, {r4-r8, lr}
-> > 
-> > and restore r8 on both exit paths:
-> >         bgt     3b
-> > -       ldmeqfd sp!, {r4-r7, pc}
-> > +       ldmeqfd sp!, {r4-r8, pc}
-> > (...)
-> >         tst     r2, #16
-> >         stmneia ip!, {r4-r7}
-> > -       ldmfd   sp!, {r4-r7, lr}
-> > +       ldmfd   sp!, {r4-r8, lr}
-> > 
-> > Step 4
-> > ======
-> > Rewrite register list "r4-r7, r8" as "r4-r8".
-> > 
-> > Signed-off-by: Ivan Djelic <ivan.djelic@parrot.com>
-> 
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
-> 
-> This is good for the stable tree as well.
-> 
-> Please include in your official commit text the above breakdown 
-> explanation as well.
+Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com> wrote:
 
-OK, will do.
-Thanks a lot for reviewing,
---
-Ivan
+> We can use global rwlocks as shown below safely, without fear of deadlocks:
+> 
+> Readers:
+> 
+>          CPU 0                                CPU 1
+>          ------                               ------
+> 
+> 1.    spin_lock(&random_lock);             read_lock(&my_rwlock);
+> 
+> 
+> 2.    read_lock(&my_rwlock);               spin_lock(&random_lock);
+
+The lock order on CPU 0 is unsafe if CPU2 can do:
+
+	write_lock(&my_rwlock);
+	spin_lock(&random_lock);
+
+and on CPU 1 if CPU2 can do:
+
+	spin_lock(&random_lock);
+	write_lock(&my_rwlock);
+
+I presume you were specifically excluding these situations?
+
+David
