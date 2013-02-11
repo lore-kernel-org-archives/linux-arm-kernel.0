@@ -1,24 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Feb 2013 10:40:08 -0700
-Subject: [PATCH 3/8] USB: EHCI: make ehci-s5p a separate driver
-In-Reply-To: <5117edfb.860e440a.097c.3516@mx.google.com>
-References: <y> <1360522697-22902-1-git-send-email-y>
- <5117edfb.860e440a.097c.3516@mx.google.com>
-Message-ID: <51192CF8.30603@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 11 Feb 2013 17:45:09 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: clean up and standardize WFI handling
+ for 3.9
+In-Reply-To: <20130211173731.GO4801@atomide.com>
+References: <alpine.DEB.2.00.1302081726480.28008@utopia.booyaka.com>
+ <20130210170827.GK4801@atomide.com>
+ <alpine.DEB.2.00.1302101726020.2672@utopia.booyaka.com>
+ <20130211173731.GO4801@atomide.com>
+Message-ID: <alpine.DEB.2.00.1302111743520.8260@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2013 11:58 AM, manjunath.goudar at linaro.org wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+On Mon, 11 Feb 2013, Tony Lindgren wrote:
+
+> This branch should probably have been based on your earlier PM branch
+> based on v3.8-rc5 that was already merged as omap-for-v3.9/pm-signed into
+> arm-soc for-next.
 > 
-> Separate the s5p host controller driver from ehci-hcd host code
-> into its own driver module.
+> Now merging this branch based on v3.8-rc6 requires me to create a merge
+> base by merging the earlier branch with v3.8-rc6 and then resolving
+> the self-inflicted merge conflict in order for me to generate a pull request
+> without a non-trivial merge conflict. Just a bunch of extra hassle to
+> deal with with additional risk of merging things wrong. Anyways merging
+> into omap-for-v3.9/pm-wfi-take2.
 
-> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+Sorry about that.  Will try to find better merge bases for future 
+branches.  
 
-> -#ifdef CONFIG_USB_EHCI_TEGRA
-> -#include "ehci-tegra.c"
-> -#define PLATFORM_DRIVER		tegra_ehci_driver
-> -#endif
-
-That's also still wrong.
+- Paul
