@@ -1,35 +1,34 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 Feb 2013 12:01:47 -0200
-Subject: [PATCH 2/3] ARM: mxs: icoll: Fix sparse warning
+Date: Mon, 11 Feb 2013 12:01:48 -0200
+Subject: [PATCH 3/3] ARM: mxs: ocotp: Fix sparse warning
 In-Reply-To: <1360591308-7482-1-git-send-email-festevam@gmail.com>
 References: <1360591308-7482-1-git-send-email-festevam@gmail.com>
-Message-ID: <1360591308-7482-2-git-send-email-festevam@gmail.com>
+Message-ID: <1360591308-7482-3-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Fix the following sparse warning:
+Include <mach/common.h> header to fix the following sparse warning:
 
-arch/arm/mach-mxs/icoll.c:103:13: warning: symbol 'icoll_of_init' was not declared. Should it be static?
+arch/arm/mach-mxs/ocotp.c:33:11: warning: symbol 'mxs_get_ocotp' was not declared. Should it be static?
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-mxs/icoll.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-mxs/ocotp.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
-index 8fb23af..e26eeba 100644
---- a/arch/arm/mach-mxs/icoll.c
-+++ b/arch/arm/mach-mxs/icoll.c
-@@ -100,7 +100,7 @@ static struct irq_domain_ops icoll_irq_domain_ops = {
- 	.xlate = irq_domain_xlate_onecell,
- };
+diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
+index 54add60..1dff467 100644
+--- a/arch/arm/mach-mxs/ocotp.c
++++ b/arch/arm/mach-mxs/ocotp.c
+@@ -19,6 +19,7 @@
+ #include <asm/processor.h>	/* for cpu_relax() */
  
--void __init icoll_of_init(struct device_node *np,
-+static void __init icoll_of_init(struct device_node *np,
- 			  struct device_node *interrupt_parent)
- {
- 	/*
+ #include <mach/mxs.h>
++#include <mach/common.h>
+ 
+ #define OCOTP_WORD_OFFSET		0x20
+ #define OCOTP_WORD_COUNT		0x20
 -- 
 1.7.9.5
