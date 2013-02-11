@@ -1,70 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Feb 2013 09:37:32 -0800
-Subject: [GIT PULL] ARM: OMAP2+: clean up and standardize WFI handling
- for 3.9
-In-Reply-To: <alpine.DEB.2.00.1302101726020.2672@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1302081726480.28008@utopia.booyaka.com>
- <20130210170827.GK4801@atomide.com>
- <alpine.DEB.2.00.1302101726020.2672@utopia.booyaka.com>
-Message-ID: <20130211173731.GO4801@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Feb 2013 10:39:17 -0700
+Subject: [PATCH 6/9] gpiolib: use descriptors internally
+In-Reply-To: <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+ <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
+ <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
+ <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
+ <20130209091729.978C73E1A18@localhost>
+ <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
+Message-ID: <51192CC5.9060300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130210 09:31]:
-> Hi Tony
+On 02/11/2013 07:09 AM, Linus Walleij wrote:
+> On Sat, Feb 9, 2013 at 10:17 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
 > 
-> On Sun, 10 Feb 2013, Tony Lindgren wrote:
+>> The ERR_PTR()/IS_ERR() is a horrible pattern for code
+>> readability because it breaks the expectations that programmers have for
+>> what is and is not a bad pointer. There are decades of history where the
+>> test for a bad pointer is 'if (!ptr)'. Not only does ERR_PTR make make
+>> that test not work, but the compiler won't tell you when you get it
+>> wrong.
+>>
+>> There are places where ERR_PTR makes sense. Particularly when
+>> communicating with userspace where error codes have very specific
+>> meanings, but I don't want it in the GPIO subsystem.
 > 
-> > * Paul Walmsley <paul@pwsan.com> [130208 09:31]:
-> > > 
-> > > ----------------------------------------------------------------
-> > > On OMAP2+ devices, standardize and clean up WFI entry and WFI blocking.
-> > > 
-> > > Basic test logs are available here:
-> > > 
-> > >    http://www.pwsan.com/omap/testlogs/wfi_devel_a_3.9/20130208085027/
-> > 
-> > Thanks pulled into omap-for-v3.9/pm-wfi. While merging this into
-> > omap-for-v3.9/tmp-merge, got the following merge conlict. Maybe
-> > take a look if it's correct merge?
+> OK I disagree but you get to decide.
 > 
-> ...
+> However if you take this all the way to the descriptor API
+> it will make the consumer (driver) API for GPIO descriptors deviate
+> from what is today used for clocks, regulators and pins.
 > 
-> >   	}
-> >   
-> > - 	omap2_sram_idle();
-> > - 
-> > - 	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
-> > + 	/* WFI */
-> > + 	asm("mcr p15, 0, %0, c7, c0, 4" : : "r" (zero) : "memory", "cc");
-> >   }
-> 
-> The inline asm is intended to replace the omap2_sram_idle() call.  I'd 
-> suggest:
-> 
->         }
-> 
->         /* WFI */
->         asm("mcr p15, 0, %0, c7, c0, 4" : : "r" (zero) : "memory", "cc");
-> 
->         pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
->  }
-> 
-> as the end product.
+> With all the resulting confusion for users.
+> I've seen worse subsystem deviations though.
 
-OK thanks.
-
-This branch should probably have been based on your earlier PM branch
-based on v3.8-rc5 that was already merged as omap-for-v3.9/pm-signed into
-arm-soc for-next.
-
-Now merging this branch based on v3.8-rc6 requires me to create a merge
-base by merging the earlier branch with v3.8-rc6 and then resolving
-the self-inflicted merge conflict in order for me to generate a pull request
-without a non-trivial merge conflict. Just a bunch of extra hassle to
-deal with with additional risk of merging things wrong. Anyways merging
-into omap-for-v3.9/pm-wfi-take2.
-
-Regards,
-
-Tony
+Sorry I haven't looked at the specific APIs this discussion refers to,
+but clients of the GPIO descriptor API are going to need to distinguish
+"fail" from "deferred probe", so at least some initial get-like API will
+need to pass back some error detail...
