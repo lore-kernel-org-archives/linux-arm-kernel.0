@@ -1,51 +1,156 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Tue, 12 Feb 2013 00:40:29 +0900
-Subject: [PATCH 6/9] gpiolib: use descriptors internally
-In-Reply-To: <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
-References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
- <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
- <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
- <20130209091729.978C73E1A18@localhost>
- <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
-Message-ID: <20130211154028.GB6088@linux-sh.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 11 Feb 2013 17:44:23 +0200
+Subject: [PATCH 1/2] ARM: OMAP2+: Allow clock alias provision from device tree
+Message-ID: <1360597464-8491-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 11, 2013 at 03:09:21PM +0100, Linus Walleij wrote:
-> On Sat, Feb 9, 2013 at 10:17 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> 
-> > The ERR_PTR()/IS_ERR() is a horrible pattern for code
-> > readability because it breaks the expectations that programmers have for
-> > what is and is not a bad pointer. There are decades of history where the
-> > test for a bad pointer is 'if (!ptr)'. Not only does ERR_PTR make make
-> > that test not work, but the compiler won't tell you when you get it
-> > wrong.
-> >
-> > There are places where ERR_PTR makes sense. Particularly when
-> > communicating with userspace where error codes have very specific
-> > meanings, but I don't want it in the GPIO subsystem.
-> 
-> OK I disagree but you get to decide.
-> 
-> However if you take this all the way to the descriptor API
-> it will make the consumer (driver) API for GPIO descriptors deviate
-> from what is today used for clocks, regulators and pins.
-> 
-> With all the resulting confusion for users.
-> I've seen worse subsystem deviations though.
-> 
-I've always considered it to be more of a complexity issue. If an
-interface can fail for half a dozen different reasons, it's useful to be
-able to encapsulate this and pass it down the line to the consumer
-(particularly in cases where no useful debug output is provided, and the
-first thing someone is going to do is go and instrument the registration
-path with printks to figure out where things went wrong). In the case
-where the work to do is relatively straightforward and there's not much
-complexity, NULL is clearly the way to go.
+Currently on OMAP, it is not possible to specify a clock consumer
+to any of the OMAP generated clocks using the device tree. This can pose
+a problem for external devices that run off an OMAP clock as we
+can't reliably provide a reference to the clock in the device tree.
 
-There are already quite a few cases today converting NULLs over to
-arbitrary ERR_PTR values or IS_ERR cases wrapping back to NULL, so it's
-clear that both have to be supported interacting with one another
-regardless. Then there's that whole IS_ERR_OR_NULL case which everyone
-seems to get wrong, but that's another issue entirely.
+This patch allows device trees to provide a node that contains the
+clock identifier, clock alias and the device phandle. The board
+initialization code then creates a clock alias to this clock id,
+and associates it with the device whose phandle was supplied.
+
+Discussion
+http://www.spinics.net/lists/linux-omap/msg86241.html
+
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Rajendra Nayak <rnayak@ti.com>
+CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ .../devicetree/bindings/clock/ti-clock-alias.txt   |   26 ++++++++
+ arch/arm/mach-omap2/board-generic.c                |   67 ++++++++++++++++++++
+ 2 files changed, 93 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti-clock-alias.txt
+
+diff --git a/Documentation/devicetree/bindings/clock/ti-clock-alias.txt b/Documentation/devicetree/bindings/clock/ti-clock-alias.txt
+new file mode 100644
+index 0000000..87ef4c3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti-clock-alias.txt
+@@ -0,0 +1,26 @@
++* Clock alias provision for TI OMAP2+ boards
++
++This binding allows the board's device tree file to specify a clock name,
++device phandle and clock alias so that that clock can be associated
++to the device with the alias.
++
++This is required in cases where an external device is clocked by an
++OMAP generated clock and needs to be assocated to it.
++
++NOTE: The node's name should be clock_alias
++
++Required properties
++- clock-name: The clock identifier string. Should be one of the
++  clock ids defined in OMAP common clock data.
++- clock-alias: A string specifying the alias that must be created to the clock.
++- device: A phandle to the device this clock should be associated to.
++
++e.g. On the OMAP4 Panda board, the USB PHY device is clocked by the
++FREF_CLK3 (auxclk3_ck) from the OMAP. The PHY driver expexts the clock to
++be named "main_clk". This binding can be provided like so
++
++clock_alias {
++	clock-name = "auxclk3_ck";
++	clock-alias = "main_clk";
++	device = <&hsusb1_phy>;
++};
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 53cb380b..a4b8813 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -15,6 +15,9 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/irqdomain.h>
++#include <linux/clk.h>
++#include <linux/string.h>
++#include <linux/slab.h>
+ 
+ #include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+@@ -36,12 +39,76 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
+ 	{ }
+ };
+ 
++static int __init omap_create_clk_alias(struct device_node *np)
++{
++	int ret = 0;
++	const char *s, *alias;
++	char *clk_id;
++	struct device_node *dev_np;
++	struct platform_device *pdev;
++
++	of_property_read_string(np, "clock-name", &s);
++	if (!s) {
++		pr_err("%s: couldn't find clock-name property in node %s\n",
++				__func__, np->name);
++		return -ENODEV;
++	}
++
++	clk_id = kstrdup(s, GFP_KERNEL);
++	if (!clk_id)
++		return -ENOMEM;
++
++	dev_np = of_parse_phandle(np, "device", 0);
++	if (!dev_np) {
++		pr_err("%s: couldn't find device phandle for \'%s\'\n",
++				__func__, clk_id);
++		ret = -ENODEV;
++		goto exit;
++	}
++
++	pdev = of_find_device_by_node(dev_np);
++	if (!pdev) {
++		pr_err("%s: couldn't find device for clock \'%s\'\n",
++				__func__, clk_id);
++		ret = -ENODEV;
++		goto exit;
++	}
++
++	ret = of_property_read_string(np, "clock-alias", &alias);
++	if (ret) {
++		pr_err("%s: couldn't find alias for clock \'%s\'\n",
++				__func__, clk_id);
++		ret = -ENODEV;
++		goto exit;
++	}
++
++	ret = clk_add_alias(alias, dev_name(&pdev->dev), clk_id, NULL);
++	if (ret) {
++		pr_err("%s: couldn't add alias \'%s\' to clock \'%s\'\n",
++				__func__, alias, clk_id);
++		ret = -ENODEV;
++		goto exit;
++	}
++
++exit:
++	kfree(clk_id);
++	return ret;
++}
++
+ static void __init omap_generic_init(void)
+ {
++	struct device_node *np;
++
+ 	omap_sdrc_init(NULL, NULL);
+ 
+ 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+ 
++	/* create clock aliases based on 'clock_alias' nodes */
++	for_each_node_by_name(np, "clock_alias") {
++		omap_create_clk_alias(np);
++		of_node_put(np);
++	}
++
+ 	/*
+ 	 * HACK: call display setup code for selected boards to enable omapdss.
+ 	 * This will be removed when omapdss supports DT.
+-- 
+1.7.4.1
