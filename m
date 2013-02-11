@@ -1,34 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 11 Feb 2013 09:27:47 -0800
-Subject: [GIT PULL 4/4] mach-virt platform code for 3.9
-In-Reply-To: <1359986131-13034-4-git-send-email-will.deacon@arm.com>
-References: <1359986131-13034-1-git-send-email-will.deacon@arm.com>
- <1359986131-13034-4-git-send-email-will.deacon@arm.com>
-Message-ID: <20130211172747.GA23212@quad.lixom.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 11 Feb 2013 18:30:34 +0100
+Subject: [PATCH 1/1] memory: tegra_ahb_enable_smmu() depends on
+ TEGRA_IOMMU_SMMU
+In-Reply-To: <20130206.211635.744922728615926717.hdoyu@nvidia.com>
+References: <1360175666-8377-1-git-send-email-hdoyu@nvidia.com><5112A642.1020800@wwwdotorg.org><20130206.211635.744922728615926717.hdoyu@nvidia.com>
+Message-ID: <20130211.193034.1346903263789032239.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 01:55:31PM +0000, Will Deacon wrote:
-> NOTE: I'm not suggesting you pull this one as it stands -- see below!
+Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Wed, 06 Feb 2013 21:16:35 +0200 (EET):
+
+> Hi Russell,
 > 
-> This is the last batch from me (Marc is dealing with vgic and virtual
-> timers) and introduces support for mach-virt. This depends on:
+> Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 6 Feb 2013 19:51:46 +0100:
 > 
-> 	- for-arm-soc/arch-timers (third pull request in this series)
-> 	- for-rmk/virt/psci (already pulled)
-> 	- irqchip/gic-vic-move (an arm-soc branch)
+> > On 02/06/2013 11:34 AM, Hiroshi Doyu wrote:
+> > > New SoC, Tegra114 also uses SMMU. Change tegra_ahb_enable_smmu()'s
+> > > dependency from ARCH_TEGRA_3x_SOC to TEGRA_IOMMU_SMMU. No need to edit
+> > > whenever a new Tegra SoC comes.
+> > > 
+> > > The following combination caused build error, which this patch fixes.
+> > > 
+> > > CONFIG_ARCH_TEGRA_2x_SOC=y
+> > > \# CONFIG_ARCH_TEGRA_3x_SOC is not set
+> > > CONFIG_ARCH_TEGRA_114_SOC=y
+> > > 
+> > > drivers/iommu/tegra-smmu.c:485: undefined reference to 'tegra_ahb_enable_smmu'
+> > 
+> > Tested-by: Stephen Warren <swarren@nvidia.com>
+> > 
+> > Russell, I assume Hiroshi should upload this to your patch tracker? It's
+> > needed for 3.9.
 > 
-> As a result, the diffstat is atrocious so it would be better if you
-> could create a branch merging the above dependendies, which I could
-> rebase onto (there's actually only two patches here).
+> FYI: Submitted as:
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7640/1
 
-So, while the diffstats below look pretty bad, the actual new code is small and
-easy to get an overview when I pull them in.
+Russell,
 
-I've staged this in a separate branch (next/virt), that pulls in all the
-dependencies first, then 3/4 and 4/4. It merges cleanly into our for-next as
-well, so this is looking great. It needs a fixup for sys_timer setup before I
-actually push it out merged though, so please send a patch over.
-
-
--Olof
+Is the above ok for you?
+Please let me know if still I need to do something.
