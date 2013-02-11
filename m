@@ -1,46 +1,31 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Mon, 11 Feb 2013 09:20:14 +0530
-Subject: [PATCH 1/3] SPEAr13xx_defconfig: Enable Memory split 2G/2G needed
-In-Reply-To: <alpine.LFD.2.02.1302081243400.6300@xanadu.home>
-References: <cover.1360317993.git.vijay.kumar@st.com>
- <6cebd9755011670ecaeec7930b3fa7ed0f16b3b6.1360317993.git.vijay.kumar@st.com>
- <CAKohpokPhHtuDDBPUYp9YPOrEnaaKxthjiAemq74qfour_3aYQ@mail.gmail.com>
- <alpine.LFD.2.02.1302081243400.6300@xanadu.home>
-Message-ID: <20130211035014.GA3303@localhost.localdomain>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 11 Feb 2013 05:18:40 +0100
+Subject: [PATCH 1/4] ARM: tegra: Unify tegra{20,30,114}_init_early()
+In-Reply-To: <1828614.u7HcYf891a@ax5200p>
+References: <2499199.srlLvkihNZ@ax5200p><51180121.6040803@wwwdotorg.org><1828614.u7HcYf891a@ax5200p>
+Message-ID: <20130211.061840.516448986332629268.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Marc,
 
-On Fri, Feb 08, 2013 at 12:49:22PM -0500, Nicolas Pitre wrote:
-> On Fri, 8 Feb 2013, Viresh Kumar wrote:
-> > 
-> > By mistake you have added an ST internal list in cc, fixed it now.
-> > 
-> > Subject should be:
-> > 
-> > ARM: SPEAr13xx: Enable 2G/2G Memory split in defconfig
-> > 
-> > On 8 February 2013 16:16, Vijay Kumar Mishra <vijay.kumar@st.com> wrote:
-> > > Memory split 2G/2G is enabled as needed for SPEAr1310 RevC board to boot.
-> > > Before enabling this option the boot was hanging at uncompressing linux.
-> 
-> I disagree.  The subject could have been "put our head in the sand and 
-> paper over bugs".
-> 
-> Please don't do that.  There is no reason for any machine not to boot 
-> way past "Uncompressing Linux" with the default split.  The likely 
-> reason it works with the 2G:2G split is because in that case the virtual 
-> and physical RAM addresses in the kernel are the same, and therefore 
-> missing p2v or v2p conversions are invisible.
+Marc Dietrich <marvin24@gmx.de> wrote @ Sun, 10 Feb 2013 22:16:14 +0100:
 
-I agree. Actually the details are misleading. SPEAr13xx chose this
-option just for its own preference over high memory support.
+> ah, ok - I just skipped the "also" in your sentence above. But still, the 
+> #ifdefs look strange to me and save only a few byte of code. Just me few 
+> cents.
 
-@Vijay,
-I think you should drop this patch and just enable high memory support
-rather, if SPEAr13xx doesn't have any problem with that.
+What about the following as Arnd suggested[1]?
 
---
-regards
-Shiraz
+void __init tegra_hotplug_init(void)
+{
+	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
+	   return;
+	   
+	   if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC)) && tegra_chip_id == TEGRA20)
+	      tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
+	      if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC)) && tegra_chip_id == TEGRA30)
+	      	 tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
+}
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148632.html
