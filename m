@@ -1,64 +1,210 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 10 Feb 2013 21:46:32 -0800
-Subject: [PATCH] clk: add si5351 i2c common clock driver
-In-Reply-To: <1360414772-12232-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1360414772-12232-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130211054632.11471.24295@quantum>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 11 Feb 2013 08:05:41 +0200
+Subject: [v2 1/3] ARM: tegra: Unify tegra{20,30,114}_init_early()
+Message-ID: <1360562743-21689-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Hesselbarth (2013-02-09 04:59:32)
-> This patch adds a common clock driver for Silicon Labs Si5351a/b/c
-> i2c programmable clock generators. Currently, the driver supports
-> DT kernels only and VXCO feature of si5351b is not implemented. DT
-> bindings selectively allow to overwrite stored Si5351 configuration
-> which is very helpful for clock generators with empty eeprom
-> configuration. Corresponding device tree binding documentation is
-> also added.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Notes:
-> - During development I used a debugfs clock consumer that I can also
->   post if there is interest in it.
+Refactored tegra{20,30,114}_init_early() so that we have the unified
+tegra_init_early().
 
-Please do.  I have a set of patches that implement a fake clock subtree
-for testing the core framework.  I've been thinking of pushing this to
-the list once it is more presentable and your work might fit into that
-nicely.
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+Update:
+Used IS_ENABLED() instead of ifdefs as Arnd/Felipe suggested.
+---
+ arch/arm/mach-tegra/board-dt-tegra114.c |    2 +-
+ arch/arm/mach-tegra/board-dt-tegra20.c  |    2 +-
+ arch/arm/mach-tegra/board-dt-tegra30.c  |    4 ++--
+ arch/arm/mach-tegra/board.h             |    4 +---
+ arch/arm/mach-tegra/common.c            |   26 ++------------------------
+ arch/arm/mach-tegra/hotplug.c           |   23 +++++++++--------------
+ arch/arm/mach-tegra/sleep.h             |   10 +++++-----
+ 7 files changed, 21 insertions(+), 50 deletions(-)
 
-> - With current (3.8-rc6) common clock framework there is two (minor)
->   issues:
->   * although clocks are registered with devm_clk_register they are not
->     removed from the clock tree on unloading. That makes reloading of
->     clk-si5351 as module impossible.
-
-This is a known issue.  clk_unregister is a NOP and defining it has
-always been deferred until the day that someone needed it.  Care to
-take a crack at it?
-
->   * potentially there could be more than one different external si5351
->     generators but clocks are registered with names that do not refer
->     to e.g. the device name. Maybe common clock framework should
->     prepend the device name for each registered clock, i.e. 0-0060.clk0.
->     That would also avoid name collisions with same clock names from
->     different drivers (clk0 is likely to be used by others ;))
-
-More unfinished work, just like clk_unregister above.  I'm sure you are
-aware that clk_register takes struct device *dev as input, but does
-nothing with it.  It wouldn't take much to concatenate the device name
-and clock name if dev is present.  However a complication here is that
-the registration code takes a parent string name to match parents up for
-discrete subtrees; how could statically defined data know about the
-device name ahead of time?
-
-The above design decision took place before the big DT push we have
-today and was short-sighted.  It would be better to change the framework
-to rely less on string name lookups and DT is one way out of that.
-
-3.8-rc7 is already out and I don't plan to take anything that hasn't
-already been submitted for 3.9 now.  Can you resubmit this after 3.9-rc1
-comes out?
-
-Thanks,
-Mike
+diff --git a/arch/arm/mach-tegra/board-dt-tegra114.c b/arch/arm/mach-tegra/board-dt-tegra114.c
+index 085d636..08e8294 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra114.c
++++ b/arch/arm/mach-tegra/board-dt-tegra114.c
+@@ -36,7 +36,7 @@ static const char * const tegra114_dt_board_compat[] = {
+ DT_MACHINE_START(TEGRA114_DT, "NVIDIA Tegra114 (Flattened Device Tree)")
+ 	.smp		= smp_ops(tegra_smp_ops),
+ 	.map_io		= tegra_map_common_io,
+-	.init_early	= tegra114_init_early,
++	.init_early	= tegra_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.init_time	= clocksource_of_init,
+ 	.init_machine	= tegra114_dt_init,
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index a0edf25..fca18e9 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -145,7 +145,7 @@ static const char *tegra20_dt_board_compat[] = {
+ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
+ 	.map_io		= tegra_map_common_io,
+ 	.smp		= smp_ops(tegra_smp_ops),
+-	.init_early	= tegra20_init_early,
++	.init_early	= tegra_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.init_time	= clocksource_of_init,
+ 	.init_machine	= tegra_dt_init,
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index bf68567..63f8139 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -3,7 +3,7 @@
+  *
+  * NVIDIA Tegra30 device tree board support
+  *
+- * Copyright (C) 2011 NVIDIA Corporation
++ * Copyright (C) 2011, 2013, NVIDIA Corporation
+  *
+  * Derived from:
+  *
+@@ -50,7 +50,7 @@ static const char *tegra30_dt_board_compat[] = {
+ DT_MACHINE_START(TEGRA30_DT, "NVIDIA Tegra30 (Flattened Device Tree)")
+ 	.smp		= smp_ops(tegra_smp_ops),
+ 	.map_io		= tegra_map_common_io,
+-	.init_early	= tegra30_init_early,
++	.init_early	= tegra_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.init_time	= clocksource_of_init,
+ 	.init_machine	= tegra30_dt_init,
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index 86851c8..60431de 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -26,9 +26,7 @@
+ 
+ void tegra_assert_system_reset(char mode, const char *cmd);
+ 
+-void __init tegra20_init_early(void);
+-void __init tegra30_init_early(void);
+-void __init tegra114_init_early(void);
++void __init tegra_init_early(void);
+ void __init tegra_map_common_io(void);
+ void __init tegra_init_irq(void);
+ void __init tegra_dt_init_irq(void);
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 5449a3f..f0315c9 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -94,7 +94,7 @@ static void __init tegra_init_cache(void)
+ 
+ }
+ 
+-static void __init tegra_init_early(void)
++void __init tegra_init_early(void)
+ {
+ 	tegra_cpu_reset_handler_init();
+ 	tegra_apb_io_init();
+@@ -102,31 +102,9 @@ static void __init tegra_init_early(void)
+ 	tegra_init_cache();
+ 	tegra_pmc_init();
+ 	tegra_powergate_init();
++	tegra_hotplug_init();
+ }
+ 
+-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+-void __init tegra20_init_early(void)
+-{
+-	tegra_init_early();
+-	tegra20_hotplug_init();
+-}
+-#endif
+-
+-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+-void __init tegra30_init_early(void)
+-{
+-	tegra_init_early();
+-	tegra30_hotplug_init();
+-}
+-#endif
+-
+-#ifdef CONFIG_ARCH_TEGRA_114_SOC
+-void __init tegra114_init_early(void)
+-{
+-	tegra_init_early();
+-}
+-#endif
+-
+ void __init tegra_init_late(void)
+ {
+ 	tegra_powergate_debugfs_init();
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index a599f6e..8da9f78 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -1,8 +1,7 @@
+ /*
+- *
+  *  Copyright (C) 2002 ARM Ltd.
+  *  All Rights Reserved
+- *  Copyright (c) 2010, 2012 NVIDIA Corporation. All rights reserved.
++ *  Copyright (c) 2010, 2012-2013, NVIDIA Corporation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -15,6 +14,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ 
++#include "fuse.h"
+ #include "sleep.h"
+ 
+ static void (*tegra_hotplug_shutdown)(void);
+@@ -56,18 +56,13 @@ int tegra_cpu_disable(unsigned int cpu)
+ 	return cpu == 0 ? -EPERM : 0;
+ }
+ 
+-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+-extern void tegra20_hotplug_shutdown(void);
+-void __init tegra20_hotplug_init(void)
++void __init tegra_hotplug_init(void)
+ {
+-	tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
+-}
+-#endif
++	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
++		return;
+ 
+-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+-extern void tegra30_hotplug_shutdown(void);
+-void __init tegra30_hotplug_init(void)
+-{
+-	tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
++	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC) && tegra_chip_id == TEGRA20)
++		tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
++	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) && tegra_chip_id == TEGRA30)
++		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
+ }
+-#endif
+diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+index 4ffae54..970ebd5 100644
+--- a/arch/arm/mach-tegra/sleep.h
++++ b/arch/arm/mach-tegra/sleep.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2010-2012, NVIDIA Corporation. All rights reserved.
++ * Copyright (c) 2010-2013, NVIDIA Corporation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms and conditions of the GNU General Public License,
+@@ -124,11 +124,11 @@ int tegra_sleep_cpu_finish(unsigned long);
+ void tegra_disable_clean_inv_dcache(void);
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-void tegra20_hotplug_init(void);
+-void tegra30_hotplug_init(void);
++void tegra20_hotplug_shutdown(void);
++void tegra30_hotplug_shutdown(void);
++void tegra_hotplug_init(void);
+ #else
+-static inline void tegra20_hotplug_init(void) {}
+-static inline void tegra30_hotplug_init(void) {}
++static inline void tegra_hotplug_init(void) {}
+ #endif
+ 
+ void tegra20_cpu_shutdown(int cpu);
+-- 
+1.7.9.5
