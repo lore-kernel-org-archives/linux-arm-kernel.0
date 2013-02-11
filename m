@@ -1,73 +1,96 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 11 Feb 2013 05:10:36 +0000
-Subject: [PATCH v3 9/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <alpine.DEB.2.00.1302081415540.11464@utopia.booyaka.com>
-References: <1359458108-8489-1-git-send-email-vaibhav.bedia@ti.com>
- <1359458108-8489-10-git-send-email-vaibhav.bedia@ti.com>
- <alpine.DEB.2.00.1302081415540.11464@utopia.booyaka.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED12D23@DBDE01.ent.ti.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Mon, 11 Feb 2013 05:31:47 +0000
+Subject: [PATCH v2 2/3] mmc: davinci_mmc: add DT support
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA465FE@DBDE01.ent.ti.com>
+References: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
+ <1360223825-23929-3-git-send-email-prakash.pm@ti.com>
+ <20130207104656.GE16987@e106331-lin.cambridge.arm.com>
+ <A73F36158E33644199EB82C5EC81C7BC3EA465FE@DBDE01.ent.ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA46794@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Mark,
 
-On Fri, Feb 08, 2013 at 19:47:04, Paul Walmsley wrote:
-> Hi Vaibhav,
+On Fri, Feb 08, 2013 at 11:55:09, Manjunathappa, Prakash wrote:
+> Hi Mark,
 > 
-> a comment on this one:
-> 
-> On Tue, 29 Jan 2013, Vaibhav Bedia wrote:
-> 
-> > Add minimal APIs for writing to the IPC and the M3_TXEV registers
-> > in the Control module. These will be used in a subsequent patch which
-> > adds suspend-resume support for AM33XX.
+> On Thu, Feb 07, 2013 at 16:16:56, Mark Rutland wrote:
+> > Hello,
 > > 
-> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-> > ---
-> > v3: Add Peter's Acked-by
-> > v2: No change
+> > I have a couple of comments on the dt bindings and the way it's parsed.
 > > 
-> >  arch/arm/mach-omap2/control.c | 20 ++++++++++++++++++++
-> >  arch/arm/mach-omap2/control.h | 41 +++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 61 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-> > index 2adb268..c5d54ae 100644
-> > --- a/arch/arm/mach-omap2/control.c
-> > +++ b/arch/arm/mach-omap2/control.c
-> > @@ -604,3 +604,23 @@ int omap3_ctrl_save_padconf(void)
-> >  }
-> >  
-> >  #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
-> > +
-> > +#if defined(CONFIG_SOC_AM33XX) && defined(CONFIG_PM)
-> > +void am33xx_txev_eoi(void)
-> > +{
-> > +	omap_ctrl_writel(AM33XX_M3_TXEV_ACK, AM33XX_CONTROL_M3_TXEV_EOI);
-> > +}
-> > +
-> > +void am33xx_txev_enable(void)
-> > +{
-> > +	omap_ctrl_writel(AM33XX_M3_TXEV_ENABLE, AM33XX_CONTROL_M3_TXEV_EOI);
-> > +}
-> > +
-> > +void am33xx_wkup_m3_ipc_cmd(struct am33xx_ipc_data *data)
-> > +{
-> > +	omap_ctrl_writel(data->resume_addr, AM33XX_CONTROL_IPC_MSG_REG0);
-> > +	omap_ctrl_writel(data->sleep_mode, AM33XX_CONTROL_IPC_MSG_REG1);
-> > +	omap_ctrl_writel(data->param1, AM33XX_CONTROL_IPC_MSG_REG2);
-> > +	omap_ctrl_writel(data->param2, AM33XX_CONTROL_IPC_MSG_REG3);
-> > +}
 > 
-> Could you please add some kerneldoc-style comments to these functions so 
-> others can understand what they're intended to do, any side-effects they 
-> have, any prerequisites, etc.?
+> Thanks for your review comments.
+> 
+> > On Thu, Feb 07, 2013 at 07:57:04AM +0000, Manjunathappa, Prakash wrote:
+> > > Adds device tree support for davinci_mmc. Also add binding documentation.
+> > > Tested in non-dma PIO mode and without GPIO card_detect/write_protect
+> > > option because of dependencies on EDMA and GPIO module DT support.
+> > > 
+> > > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> > > Cc: linux-mmc at vger.kernel.org
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > Cc: linux-kernel at vger.kernel.org
+> > > Cc: davinci-linux-open-source at linux.davincidsp.com
+> > > Cc: devicetree-discuss at lists.ozlabs.org
+> > > Cc: cjb at laptop.org
+> > > Cc: Sekhar Nori <nsekhar@ti.com>
+> > > Cc: mporter at ti.com
+> > > ---
+> > > Since v1:
+> > > Modified DT parse function to take default values and accomodate controller
+> > > version in compatible field.
+> > > 
+> > >  .../devicetree/bindings/mmc/davinci_mmc.txt        |   30 ++++++++
+> > >  drivers/mmc/host/davinci_mmc.c                     |   70 +++++++++++++++++++-
+> > >  2 files changed, 99 insertions(+), 1 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> > > new file mode 100644
+> > > index 0000000..6717ab1
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> > > @@ -0,0 +1,30 @@
+> > > +* TI Highspeed MMC host controller for DaVinci
+> > > +
+> > > +The Highspeed MMC Host Controller on TI DaVinci family
+> > > +provides an interface for MMC, SD and SDIO types of memory cards.
+> > > +
+> > > +This file documents the properties used by the davinci_mmc driver.
+> > > +
+> > > +Required properties:
+> > > +- compatible:
+> > > + Should be "ti,davinci-mmc-da830": for da830, da850, dm365
+> > > + Should be "ti,davinci-mmc-dm355": for dm355, dm644x
+> > > +
+> > > +Optional properties:
+> > > +- bus-width: Number of data lines, can be <4>, or <8>, default <1>
+> > > +- max-frequency: Maximum operating clock frequency, default 25MHz.
+> > > +- mmc-cap-mmc-highspeed: Indicates support for MMC in high speed mode
+> > > +- mmc-cap-sd-highspeed: Indicates support for SD in high speed mode
+> > 
+> > I thought the last two were derivable from max-frequency?
+> > 
+> 
+> Yes, but I see below comment that it doesnot support MMC/SD.
+> arch/arm/mach-davinci/devices.c: davinci_setup_mmc
+> 	   "
+>          * FIXME dm6441 (no MMC/SD), dm357 (one), and dm335 (two) are
+>          * not handled right here ...
+>          */"
+> I was wondering how do we support such platforms, so I thought it is necessary
+> to have these. But I see that on da850-evm even on skipping above flags EVM is able
+> to detect card, does it mean there is no way to specify "no SD/MMC" capability?
+> I will remove these and decide highspeed capability based on max-frequency.
 > 
 
-Sure. Will do that in the next version and post it separately.
+Since this comment also applies for existing non-DT driver, I will plan to take
+up activity later. For now I will submit next version of DT support patch
+excluding highspeed card capability.
 
 Thanks,
-Vaibhav
+Prakash
+
+[...]
