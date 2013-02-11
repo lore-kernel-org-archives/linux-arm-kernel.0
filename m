@@ -1,48 +1,84 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 11 Feb 2013 10:50:27 +0100
-Subject: [PATCH] ARM: dts: Correct the pin configuration for eMMC
-In-Reply-To: <1360576888-19778-1-git-send-email-s.shirish@samsung.com>
-References: <1360576888-19778-1-git-send-email-s.shirish@samsung.com>
-Message-ID: <2396356.72tj37zBOq@amdc1227>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 11 Feb 2013 10:52:10 +0100
+Subject: [PATCH] clk: add si5351 i2c common clock driver
+In-Reply-To: <20130211054632.11471.24295@quantum>
+References: <1360414772-12232-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130211054632.11471.24295@quantum>
+Message-ID: <5118BF4A.1060608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shirish,
+On 02/11/2013 06:46 AM, Mike Turquette wrote:
+> Quoting Sebastian Hesselbarth (2013-02-09 04:59:32)
+>> This patch adds a common clock driver for Silicon Labs Si5351a/b/c
+>> i2c programmable clock generators. Currently, the driver supports
+>> DT kernels only and VXCO feature of si5351b is not implemented. DT
+>> bindings selectively allow to overwrite stored Si5351 configuration
+>> which is very helpful for clock generators with empty eeprom
+>> configuration. Corresponding device tree binding documentation is
+>> also added.
+>>
+>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+>> ---
+>> Notes:
+>> - During development I used a debugfs clock consumer that I can also
+>>    post if there is interest in it.
+>
+> Please do.  I have a set of patches that implement a fake clock subtree
+> for testing the core framework.  I've been thinking of pushing this to
+> the list once it is more presentable and your work might fit into that
+> nicely.
 
-On Monday 11 of February 2013 05:01:28 Shirish S wrote:
-> This patch corrects the pin function value of sd4_bus8 from 3
-> to 4.
-> This is verified on origen board for testing eMMC on
-> dw_mci controller.
-> 
-> Signed-off-by: Shirish S <s.shirish@samsung.com>
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi index 8e6115a..099cec7
-> 100644
-> --- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> @@ -661,7 +661,7 @@
-> 
->  		sd4_bus8: sd4-bus-width8 {
->  			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
-> -			samsung,pin-function = <3>;
-> +			samsung,pin-function = <4>;
->  			samsung,pin-pud = <4>;
->  			samsung,pin-drv = <3>;
->  		};
+Mike,
 
-IMHO name of the patch is a bit misleading, as on many Exynos4x12-based 
-boards sdhci-s3c is used for eMMC. I think following would be better:
+then I will clean the debugfs driver and post it together with this
+patch for 3.9-rc1 as an individual patch.
 
-ARM: dts: exynos4x12-pinctrl: Correct pin configuration of SD 4
+>> - With current (3.8-rc6) common clock framework there is two (minor)
+>>    issues:
+>>    * although clocks are registered with devm_clk_register they are not
+>>      removed from the clock tree on unloading. That makes reloading of
+>>      clk-si5351 as module impossible.
+>
+> This is a known issue.  clk_unregister is a NOP and defining it has
+> always been deferred until the day that someone needed it.  Care to
+> take a crack at it?
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+Ok. I can have a look at it and propose a patch but that will take a
+while as other stuff came in between. But IMHO, preparing/enabling
+clocks by clock consumers should increase reference count so referenced
+modules cannot be unloaded.. but that I have never had a look at, yet ;)
+
+>>    * potentially there could be more than one different external si5351
+>>      generators but clocks are registered with names that do not refer
+>>      to e.g. the device name. Maybe common clock framework should
+>>      prepend the device name for each registered clock, i.e. 0-0060.clk0.
+>>      That would also avoid name collisions with same clock names from
+>>      different drivers (clk0 is likely to be used by others ;))
+>
+> More unfinished work, just like clk_unregister above.  I'm sure you are
+> aware that clk_register takes struct device *dev as input, but does
+> nothing with it.  It wouldn't take much to concatenate the device name
+> and clock name if dev is present.  However a complication here is that
+> the registration code takes a parent string name to match parents up for
+> discrete subtrees; how could statically defined data know about the
+> device name ahead of time?
+
+I see. Wrt the above comment about spare time, would prepending DT
+clocks be sufficient? Or/And use a fallback mechanism that first tries
+a full match, full match with own device name, and relaxed match for
+clock name as it is now?
+
+> The above design decision took place before the big DT push we have
+> today and was short-sighted.  It would be better to change the framework
+> to rely less on string name lookups and DT is one way out of that.
+>
+> 3.8-rc7 is already out and I don't plan to take anything that hasn't
+> already been submitted for 3.9 now.  Can you resubmit this after 3.9-rc1
+> comes out?
+
+Sure, but I'll be not available next 2 weeks or so. If 3.8 falls
+within that time, I will re-post it later. It is ok for me, if it has
+to go in after 3.9 also.
+
+Sebastian
