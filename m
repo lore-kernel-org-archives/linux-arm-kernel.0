@@ -1,70 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 11 Feb 2013 11:06:27 -0800
-Subject: Latest additional build warnings
-In-Reply-To: <20130211190513.GU4801@atomide.com>
-References: <20130205142218.GB17833@n2100.arm.linux.org.uk>
- <20130209114918.GJ17852@n2100.arm.linux.org.uk>
- <20130210030032.GC4801@atomide.com>
- <CAOesGMgvEVsB7OWs43EWjgsR8af2_RZS9Dod3PURu6Tvdi4QJw@mail.gmail.com>
- <20130210032234.GE4801@atomide.com>
- <CAOesGMjQEJesfDqSHoV727=pTHjQ4CE+La2QWikG0r4gZ9iSjA@mail.gmail.com>
- <20130211190513.GU4801@atomide.com>
-Message-ID: <CAOesGMiEt9fmkL+fyhQKAD-qu_KRFcAds8EtMTx1i0TwhkO3Rg@mail.gmail.com>
+Date: Mon, 11 Feb 2013 11:08:38 -0800
+Subject: linux-next: manual merge of the arm-soc tree with the mfd tree
+In-Reply-To: <20130211185221.GR4801@atomide.com>
+References: <20130211170616.73fd9fd30bb10c27a698ad4d@canb.auug.org.au>
+ <20130211185221.GR4801@atomide.com>
+Message-ID: <CAOesGMi5xCahJ=5emwxiXeKEZkK4yhctcTddPZNQXO5wzcdQwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 11, 2013 at 11:05 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Olof Johansson <olof@lixom.net> [130209 20:25]:
->> On Sat, Feb 9, 2013 at 7:22 PM, Tony Lindgren <tony@atomide.com> wrote:
->> > * Olof Johansson <olof@lixom.net> [130209 19:08]:
->> >> On Sat, Feb 9, 2013 at 7:00 PM, Tony Lindgren <tony@atomide.com> wrote:
->> >> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [130209 03:53]:
->> >> >> On Tue, Feb 05, 2013 at 02:22:18PM +0000, Russell King - ARM Linux wrote:
->> >> >> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: data definition has no type or storage class
->> >> >> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: type defaults to 'int' in declaration of 'omap_postcore_initcall'
->> >> >> > arch/arm/mach-omap2/hwspinlock.c:60:1: warning: parameter names (without types) in function declaration
->> >> >> > arch/arm/mach-omap2/hwspinlock.c:31:122: warning: 'hwspinlocks_init' defined but not used
->> >> >>
->> >> >> I'm still seeing the above in the build of Friday's merge.  I'm also
->> >> >> seeing additional warnings in the randconfig similar to the above for
->> >> >> arch/arm/mach-omap2/omap-iommu.c.
->> >> >
->> >> > Thanks for letting me know about the omap-iommu.c one. Looks like
->> >> > there's also one patch for drm.c.
->> >> >
->> >> > Olof, if you did not yet apply the hwspinlock.c warning fix, I'll
->> >> > just do a branch with all three of them for you.
->> >>
->> >> I haven't (must have missed it), so please just send a branch.
->> >
->> > OK will do. Probably you started fixing up the bad Reported-by
->> > line in my patch and then got disrupted :)
->> >
->> > Found one more after some grepping, after the following patch they
->> > should be all fixed up. Pull request coming shortly.
+On Mon, Feb 11, 2013 at 10:52 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Stephen Rothwell <sfr@canb.auug.org.au> [130210 22:11]:
+>> Hi all,
 >>
->> Oh wait -- I got confused there for a bit (this came in right as I had
->> to step out for a while).
+>> Today's linux-next merge of the arm-soc tree got a conflict in
+>> arch/arm/mach-omap2/usb-host.c between commit 8a89e93237e1 ("mfd:
+>> omap-usb-host: Consolidate OMAP USB-HS platform data") from the mfd tree
+>> and commit c1d1cd597fc7 ("ARM: OMAP2+: omap_device: remove obsolete
+>> pm_lats and early_device code") from the arm-soc tree.
 >>
->> I definitely picked up the hwspinlock patch, and it's there in my
->> local for-next. Looks like I missed pushing it out though. That
->> explains why Russell didn't see the fix. :(
->>
->>
->> So, the hwspinlock patch is already applied. The soc.h one is not, and
->> I'm not sure what the third one is?
+>> I fixed it up (see below) and can carry the fix as necessary (no action
+>> is required).
 >
-> Maybe check that you have these in your multiplatform branch:
+> Thanks again.
 >
-> 09cee18dbced86b27c6c7d4501126cf2a287d089 ARM: OMAP2+: Make sure files with omap initcalls include soc.h
-> b9a30021abeaf9687640c13ef8006346736dc29f ARM: OMAP2+: Include soc.h to drm.c to fix compiling
-> f3533403b5a8ac970f6159664d145cb88b1aa6bf ARM: OMAP2+: Fix warning for hwspinlock omap_postcore_initcall
->
-> You can cherry pick the missing ones from my omap-for-v3.9/multiplatform-fixes
-> branch.
+> Samuel, up to you, but I suggest you just drop these patches for
+> now if still possible unless other patches are based on these.
 
-Yeah, that email was from before I had cherry-picked in from your last
-pull request. Sorry for the confusion. :)
+Yes, as I replied on the original patch series last night, please sort
+this out so we can avoid these nagging merge conflicts. Tony's steps
+in the previous email is the right way to handle these kind of things.
 
 
 -Olof
