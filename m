@@ -1,117 +1,71 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 11 Feb 2013 17:24:31 +0200
-Subject: [PATCH v2 09/14] mfd: omap-usb-host: Add device tree support
- and binding information
-In-Reply-To: <20130211120026.GD2726@e106331-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Feb 2013 15:31:13 +0000
+Subject: [PATCH v2 01/14] usb: phy: nop: Add device tree support and
+ binding information
+In-Reply-To: <51190AD2.3030006@ti.com>
 References: <1360252974-7912-1-git-send-email-rogerq@ti.com>
- <1360252974-7912-10-git-send-email-rogerq@ti.com>
- <20130211120026.GD2726@e106331-lin.cambridge.arm.com>
-Message-ID: <51190D2F.70306@ti.com>
+ <1360252974-7912-2-git-send-email-rogerq@ti.com>
+ <20130211114040.GA2726@e106331-lin.cambridge.arm.com>
+ <51190AD2.3030006@ti.com>
+Message-ID: <20130211153112.GA15013@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 02:00 PM, Mark Rutland wrote:
-> On Thu, Feb 07, 2013 at 04:02:49PM +0000, Roger Quadros wrote:
->> Allows the OMAP HS USB host controller to be specified
->> via device tree.
->>
->> CC: Samuel Ortiz <sameo@linux.intel.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>  .../devicetree/bindings/mfd/omap-usb-host.txt      |   80 ++++++++++
->>  drivers/mfd/omap-usb-host.c                        |  160 +++++++++++++++++++-
->>  2 files changed, 234 insertions(+), 6 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/omap-usb-host.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
->> new file mode 100644
->> index 0000000..b381fa6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
->> @@ -0,0 +1,80 @@
->> +OMAP HS USB Host
->> +
->> +Required properties:
->> +
->> +- compatible: should be "ti,usbhs-host"
->> +- reg: should contain one register range i.e. start and length
->> +- ti,hwmods: must contain "usb_host_hs"
->> +
->> +Optional properties:
->> +
->> +- num-ports: number of USB ports. Usually this is automatically detected
->> +  from the IP's revision register but can be overridden by specifying
->> +  this property. A maximum of 3 ports are supported at the moment.
->> +
->> +- portN-mode: String specifying the port mode for port N, where N can be
->> +  from 1 to 3. If the port mode is not specified, that port is treated
->> +  as unused. When specified, it must be one of the following.
->> +	"ehci-phy",
->> +        "ehci-tll",
->> +        "ehci-hsic",
->> +        "ohci-phy-6pin-datse0",
->> +        "ohci-phy-6pin-dpdm",
->> +        "ohci-phy-3pin-datse0",
->> +        "ohci-phy-4pin-dpdm",
->> +        "ohci-tll-6pin-datse0",
->> +        "ohci-tll-6pin-dpdm",
->> +        "ohci-tll-3pin-datse0",
->> +        "ohci-tll-4pin-dpdm",
->> +        "ohci-tll-2pin-datse0",
->> +        "ohci-tll-2pin-dpdm",
->> +
-> 
-> [...]
-> 
->> +/**
->> + * Map 'enum usbhs_omap_port_mode' found in <linux/platform_data/usb-omap.h>
->> + * to the device tree binding portN-mode found in
->> + * 'Documentation/devicetree/bindings/mfd/omap-usb-host.txt'
->> + */
->> +static const char *port_modes[] = {
->> +	[OMAP_USBHS_PORT_MODE_UNUSED]	= "",
->> +	[OMAP_EHCI_PORT_MODE_PHY]	= "ehci-phy",
->> +	[OMAP_EHCI_PORT_MODE_TLL]	= "ehci-tll",
->> +	[OMAP_EHCI_PORT_MODE_HSIC]	= "ehci-hsic",
->> +	[OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0]	= "ohci-phy-6pin-datse0",
->> +	[OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM]	= "ohci-phy-6pin-dpdm",
->> +	[OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0]	= "ohci-phy-3pin-datse0",
->> +	[OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM]	= "ohci-phy-4pin-dpdm",
->> +	[OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0]	= "ohci-tll-6pin-datse0",
->> +	[OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM]	= "ohci-tll-6pin-dpdm",
->> +	[OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0]	= "ohci-tll-3pin-datse0",
->> +	[OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM]	= "ohci-tll-4pin-dpdm",
->> +	[OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0]	= "ohci-tll-2pin-datse0",
->> +	[OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM]	= "ohci-tll-2pin-dpdm",
->> +};
->> +
->> +/**
->> + * omap_usbhs_get_dt_port_mode - Get the 'enum usbhs_omap_port_mode'
->> + * from the port mode string.
->> + * @mode: The port mode string, usually obtained from device tree.
->> + *
->> + * The function returns the 'enum usbhs_omap_port_mode' that matches the
->> + * provided port mode string as per the port_modes table.
->> + * If no match is found it returns -ENODEV
->> + */
->> +static const int omap_usbhs_get_dt_port_mode(const char *mode)
->> +{
->> +	int i;
->> +
->> +	for (i = 0; i < ARRAY_SIZE(port_modes); i++) {
->> +		if (!strcasecmp(mode, port_modes[i]))
->> +			return i;
->> +	}
-> 
-> Any reason for using strcasecmp rather than strcmp? The binding only specified
-> lower case versions, and this allows people to write "oHcI-PhY-6PiN-DaTsE0"
-> with impunity.
+Hi Roger,
 
-:). No specific reason. I'll change it to strcmp.
+On Mon, Feb 11, 2013 at 03:14:26PM +0000, Roger Quadros wrote:
+> On 02/11/2013 01:40 PM, Mark Rutland wrote:
+> > Hello,
+> > 
+> > On Thu, Feb 07, 2013 at 04:02:41PM +0000, Roger Quadros wrote:
+> >> The PHY clock, clock rate, VCC regulator and RESET regulator
+> >> can now be provided via device tree.
+> >>
+> >> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> >> Acked-by: Felipe Balbi <balbi@ti.com>
+> >> ---
+> >>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++
+> >>  drivers/usb/otg/nop-usb-xceiv.c                    |   36 +++++++++++++++----
+> >>  2 files changed, 62 insertions(+), 8 deletions(-)
+> >>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+> >> new file mode 100644
+> >> index 0000000..d7e2726
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+> >> @@ -0,0 +1,34 @@
+> >> +USB NOP PHY
+> >> +
+> >> +Required properties:
+> >> +- compatible: should be usb-nop-xceiv
+> > 
+> > This might be better as "linux,usb-no-xceiv", given this is a Linux-specific
+> > 'device'.
+> > 
+> > Saying that, I'm not sure I understand why this device needs to be instantiated
+> > from devicetree. As I understand it from looking at the driver, it's purely a
+> > Linux implementation detail used in the case of autonomous PHYs, and not an
+> > actual piece of hardware or firmware system. I must admit to being unfamiliar
+> > with this area of hardware, have I misunderstood somethign here?
 > 
-> Otherwise, this looks fine to me.
+> The PHY is a physical device and may need resources like power and clock to be functional.
+> The only reason that driver is named NOP is that many USB controllers know how to talk to
+> the standard PHYs and don't need any interface/management software.
 
-Thanks.
+Ok. That makes sense. Apologies for the noise.
 
-cheers,
--roger
+> 
+> The PHY driver you are looking at most likely doesn't have the recent changes I wrote to
+> manage the PHY clock/reset/power. i.e. patches 3, 4 and 5 in the series
+>  https://lkml.org/lkml/2013/1/28/275
+> 
+> Before this, the ehci-omap driver was trying to manage the PHY power and reset, which was
+> wrong.
+
+Yes. That makes a lot more sense now.
+
+Thanks for the info!
+
+Thanks,
+Mark.
