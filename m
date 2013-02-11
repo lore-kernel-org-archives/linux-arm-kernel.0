@@ -1,59 +1,51 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 11 Feb 2013 09:40:34 -0600
-Subject: [PATCHv4 for soc 0/4] Enabling socfpga on hardware
-In-Reply-To: <1360008731-17021-1-git-send-email-dinguyen@altera.com>
-References: <1360008731-17021-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1360597234.12812.3.camel@linux-builds1>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 12 Feb 2013 00:40:29 +0900
+Subject: [PATCH 6/9] gpiolib: use descriptors internally
+In-Reply-To: <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+ <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
+ <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
+ <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
+ <20130209091729.978C73E1A18@localhost>
+ <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
+Message-ID: <20130211154028.GB6088@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Mon, Feb 11, 2013 at 03:09:21PM +0100, Linus Walleij wrote:
+> On Sat, Feb 9, 2013 at 10:17 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> 
+> > The ERR_PTR()/IS_ERR() is a horrible pattern for code
+> > readability because it breaks the expectations that programmers have for
+> > what is and is not a bad pointer. There are decades of history where the
+> > test for a bad pointer is 'if (!ptr)'. Not only does ERR_PTR make make
+> > that test not work, but the compiler won't tell you when you get it
+> > wrong.
+> >
+> > There are places where ERR_PTR makes sense. Particularly when
+> > communicating with userspace where error codes have very specific
+> > meanings, but I don't want it in the GPIO subsystem.
+> 
+> OK I disagree but you get to decide.
+> 
+> However if you take this all the way to the descriptor API
+> it will make the consumer (driver) API for GPIO descriptors deviate
+> from what is today used for clocks, regulators and pins.
+> 
+> With all the resulting confusion for users.
+> I've seen worse subsystem deviations though.
+> 
+I've always considered it to be more of a complexity issue. If an
+interface can fail for half a dozen different reasons, it's useful to be
+able to encapsulate this and pass it down the line to the consumer
+(particularly in cases where no useful debug output is provided, and the
+first thing someone is going to do is go and instrument the registration
+path with printks to figure out where things went wrong). In the case
+where the work to do is relatively straightforward and there's not much
+complexity, NULL is clearly the way to go.
 
-I was wondering if you or Arnd can apply this series to the arm-soc
-branch?
-
-On Mon, 2013-02-04 at 14:12 -0600, Dinh Nguyen wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> V4:
-> - Check for cpu1start_addr is valid in socfpga_boot_secondary()
-> - Add Reviewed-by: Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com> for 3/4
-> 
-> V3:
-> - Addressed comments from Olof Johansson and Russell King
-> - Received Acked-by and Tested-by Stephen Warren
-> - Received Signed-off-by Pavel Machek
-> 
-> V2:
-> - Remove patch that adds clock entries in the socfpga.dtsi as this
-> should accompany a rework in drivers/clk and will done in a different
-> patch series.
-> - Removed I-cache invalidate from v7_invalidate_l1
-> - Defined cpu1-start-addr as a device tree entry
-> - Removed the need to use CONFIG_VMSPLIT_2G
-> 
-> Dinh Nguyen (4):
->   arm: socfpga: Add new device tree source for actual socfpga HW
->   arm: socfpga: Add entries to enable make dtbs socfpga
->   arm: Add v7_invalidate_l1 to cache-v7.S
->   arm: socfpga: Add SMP support for actual socfpga harware
-> 
->  .../bindings/arm/altera/socfpga-system.txt         |    2 +
->  arch/arm/boot/dts/Makefile                         |    2 +
->  arch/arm/boot/dts/socfpga.dtsi                     |   22 +++----
->  arch/arm/boot/dts/socfpga_cyclone5.dts             |   34 ++++++++++-
->  arch/arm/boot/dts/socfpga_vt.dts                   |   64 ++++++++++++++++++++
->  arch/arm/mach-imx/headsmp.S                        |   47 --------------
->  arch/arm/mach-shmobile/headsmp.S                   |   48 ---------------
->  arch/arm/mach-socfpga/core.h                       |    4 +-
->  arch/arm/mach-socfpga/headsmp.S                    |   16 +++--
->  arch/arm/mach-socfpga/platsmp.c                    |   19 +++---
->  arch/arm/mach-socfpga/socfpga.c                    |    7 ++-
->  arch/arm/mach-tegra/headsmp.S                      |   43 -------------
->  arch/arm/mm/cache-v7.S                             |   46 ++++++++++++++
->  13 files changed, 188 insertions(+), 166 deletions(-)
->  create mode 100644 arch/arm/boot/dts/socfpga_vt.dts
-> 
-
-Thanks,
-Dinh
+There are already quite a few cases today converting NULLs over to
+arbitrary ERR_PTR values or IS_ERR cases wrapping back to NULL, so it's
+clear that both have to be supported interacting with one another
+regardless. Then there's that whole IS_ERR_OR_NULL case which everyone
+seems to get wrong, but that's another issue entirely.
