@@ -1,28 +1,40 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 11 Feb 2013 10:19:20 -0800
-Subject: [PATCH V2] MAINTAINERS: add keyword "tegra" to Tegra section
-In-Reply-To: <51193476.8020509@wwwdotorg.org>
-References: <1360605099-7088-1-git-send-email-swarren@wwwdotorg.org>
- <1360605395.2028.28.camel@joe-AO722> <511931E8.3080802@wwwdotorg.org>
- <1360605873.2028.30.camel@joe-AO722> <51193476.8020509@wwwdotorg.org>
-Message-ID: <1360606760.2028.34.camel@joe-AO722>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 11 Feb 2013 13:20:53 -0500
+Subject: [PATCH REPOST] mmc: bcm2835: set
+ SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+In-Reply-To: <51193273.6000901@wwwdotorg.org> (Stephen Warren's message of
+ "Mon, 11 Feb 2013 11:03:31 -0700")
+References: <1360382187-26296-1-git-send-email-swarren@wwwdotorg.org>
+ <87k3qest87.fsf@octavius.laptop.org> <51193273.6000901@wwwdotorg.org>
+Message-ID: <87halipv96.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-02-11 at 11:12 -0700, Stephen Warren wrote:
-> On 02/11/2013 11:04 AM, Joe Perches wrote:
-> > ./scripts/get_maintainer.pl -f arch/arm/mach-tegra
-> > wouldn't match anything.
-> 
-> That's annoying; it kinda defeats the whole purpose of this patch then.
-> 
-> The way this patch works out with a patch is because the file-names are
-> matched against the keywords since they appear in the patch. A solution
-> to the issue you raise would be to do the same in -f mode, by adding an
-> explicit pass to check the filenames that are found against MAINTAINERS
-> too. Do you have any objection to that?
+Hi,
 
-Knock yourself out.
+On Mon, Feb 11 2013, Stephen Warren wrote:
+> On 02/11/2013 09:36 AM, Chris Ball wrote:
+>> Hi Stephen,
+>> 
+>> On Fri, Feb 08 2013, Stephen Warren wrote:
+>>> SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK does basically the same as
+>>> implementing struct sdhci_ops .get_timeout_clock, so simply set that
+>>> quirk and remove the custom code to simplify the driver.
+>>>
+>>> Reported-by: Lars-Peter Clausen <lars@metafoo.de>
+>>> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+>> 
+>> This conflicts with Lars-Peter's larger patch, which I just merged --
+>> I could merge the changes from both, which reduces your patch to this:
+>
+> Yes, that updated patch looks fine to me.
+>
+> I thought Lars-Peter was going to update his series on top of this
+> cleanup, but either way is fine.
 
-Are there any tegra related files that would not
-have tegra in the path?
+Thanks, pushed the updated patch to mmc-next for 3.9.
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
