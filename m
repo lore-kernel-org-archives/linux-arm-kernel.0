@@ -1,26 +1,48 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 11 Feb 2013 19:25:05 +1300
-Subject: Devicetree node to turn off LCD when backlight is 'disabled'
-Message-ID: <1360563905.4130.6.camel@gitbox>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 10 Feb 2013 22:46:55 -0800
+Subject: [PATCH v7 01/22] mfd: omap-usb-host: Consolidate OMAP USB-HS
+ platform data
+In-Reply-To: <20130117165943.GI14149@atomide.com>
+References: <1358422231-24736-2-git-send-email-rogerq@ti.com>
+ <Pine.LNX.4.44L0.1301171016090.1339-100000@iolanthe.rowland.org>
+ <20130117165943.GI14149@atomide.com>
+Message-ID: <CAOesGMhVeSPX2qWb+3Efo14Qbqmhrqpg1XRDnAfznHfAis-Fsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was just wondering if the following would be an acceptable way to turn
-off an lcd backlight when the pwm-backlight driver is set to level 0.
-The LCD backlight is 'powered' by the gpio.
+On Thu, Jan 17, 2013 at 8:59 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Alan Stern <stern@rowland.harvard.edu> [130117 07:19]:
+>> On Thu, 17 Jan 2013, Roger Quadros wrote:
+>>
+>> > Let's have a single platform data structure for the OMAP's High-Speed
+>> > USB host subsystem instead of having 3 separate ones i.e. one for
+>> > board data, one for USB Host (UHH) module and one for USB-TLL module.
+>> >
+>> > This makes the code much simpler and avoids creating multiple copies of
+>> > platform data.
+>> >
+>> > CC: Alan Stern <stern@rowland.harvard.edu>
+>> >
+>> > Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>
+>> For the ehci-omap.c part:
+>>
+>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+>
+> If Samuel acks this patch, I can apply just this patch alone on v3.8-rc3
+> into an immutable branch omap-for-v3.9/board-usb so we all merge it in
+> as needed.
 
-leds {
-	compatible = "gpio-leds";
-	backlight {
-		label = "lcd-power";
-		gpios = <&gpio 0 0 0>;  /* bank pin active_low */
-		linux,default-trigger = "backlight";
-		default-state = "on";
-	};
-};
+So, that didn't happen; Samuel applied it from the mailing list and
+sfr just hit merge conflicts due to it.
 
-The method has been tested by an end-user and confirmed as working - I
-just wanted to check whether it is the 'accepted' way of doing it.
+Sigh.
 
-Regards
-Tony Prisk
+This patch (touching arch/arm/mach-omap2) didn't have acks from Tony either.
+
+Samuel, Tony, can you sort this out with a stable short topic branch
+as Tony suggested? It'd be nice to avoid the merge conflict by a
+little coordination here. :(
+
+
+-Olof
