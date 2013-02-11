@@ -1,62 +1,123 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Feb 2013 14:26:19 -0600
-Subject: [PATCH] ARM: OMAP3+: Fix kernel panic on boot
-Message-ID: <1360614380-20114-1-git-send-email-jon-hunter@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Feb 2013 13:53:55 -0700
+Subject: [PATCH] pinctrl/pinconfig: add debug interface
+In-Reply-To: <1360527070-18430-1-git-send-email-linus.walleij@stericsson.com>
+References: <1360527070-18430-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <51195A63.7080706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8a6aaa3 (mfd: twl-core: Collect global variables behind one
-private structure (global)) removed the variable "inuse" that is used
-to determine if the device has been initialised and now use the
-twl_priv structure instead. This is causing the kernel to panic on
-OMAP3+ devices using the twl driver, because we try to access the
-twl_priv->ready member before checking if twl_priv is initialised. Fix
-this and move this test to the beginning of the twl_i2c_read/write
-function because twl_get_last_module() also uses the twl_priv structure.
+On 02/10/2013 01:11 PM, Linus Walleij wrote:
+> From: Laurent Meunier <laurent.meunier@st.com>
+> 
+> This update adds a debugfs interface to modify a pin configuration
+> for a given state in the pinctrl map. This allows to modify the
+> configuration for a non-active state, typically sleep state.
+> This configuration is not applied right away, but only when the state
+> will be entered.
+> 
+> This solution is mandated for us by HW validation: in order
+> to test and verify several pin configurations during sleep without
+> recompiling the software.
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/mfd/twl-core.c |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+I never understood why HW engineers can't just recompile the kernel.
+Besides, it's just a device tree change these days - no recompile even
+required, right?
 
-diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-index 557f9ee..89ab4d9 100644
---- a/drivers/mfd/twl-core.c
-+++ b/drivers/mfd/twl-core.c
-@@ -316,12 +316,12 @@ int twl_i2c_write(u8 mod_no, u8 *value, u8 reg, unsigned num_bytes)
- 	int sid;
- 	struct twl_client *twl;
- 
--	if (unlikely(mod_no >= twl_get_last_module())) {
--		pr_err("%s: invalid module number %d\n", DRIVER_NAME, mod_no);
-+	if (unlikely(!twl_priv || !twl_priv->ready)) {
-+		pr_err("%s: not initialized\n", DRIVER_NAME);
- 		return -EPERM;
- 	}
--	if (unlikely(!twl_priv->ready)) {
--		pr_err("%s: not initialized\n", DRIVER_NAME);
-+	if (unlikely(mod_no >= twl_get_last_module())) {
-+		pr_err("%s: invalid module number %d\n", DRIVER_NAME, mod_no);
- 		return -EPERM;
- 	}
- 
-@@ -355,12 +355,12 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg, unsigned num_bytes)
- 	int sid;
- 	struct twl_client *twl;
- 
--	if (unlikely(mod_no >= twl_get_last_module())) {
--		pr_err("%s: invalid module number %d\n", DRIVER_NAME, mod_no);
-+	if (unlikely(!twl_priv || !twl_priv->ready)) {
-+		pr_err("%s: not initialized\n", DRIVER_NAME);
- 		return -EPERM;
- 	}
--	if (unlikely(!twl_priv->ready)) {
--		pr_err("%s: not initialized\n", DRIVER_NAME);
-+	if (unlikely(mod_no >= twl_get_last_module())) {
-+		pr_err("%s: invalid module number %d\n", DRIVER_NAME, mod_no);
- 		return -EPERM;
- 	}
- 
--- 
-1.7.10.4
+> diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
+
+To be worth including, hadn't this feature also better also allow
+editing of pin mux settings too, and even addition/removal of entries,
+so some more core file would be a better place?
+
+> +/* 32bit read/write ressources */
+> +#define MAX_NAME_LEN 16
+> +char dbg_pinname[MAX_NAME_LEN]; /* shared: name of the state of the pin*/
+> +char dbg_state_name[MAX_NAME_LEN]; /* shared: state of the pin*/
+> +static u32 dbg_config; /* shared: config to be read/set for the pin & state*/
+
+Rather than setting pin name, state name, and config separately,
+wouldn't it be better to accept a single write() with all those
+parameters contained in it at once, so no persistent state was required.
+Say something like:
+
+modify configs_pin devicename state pinname newvalue
+
+That would allow "add", "delete" to be implemented in addition to modify
+later if desired.
+
+> +static int pinconf_dbg_pinname_write(struct file *file,
+> +	const char __user *user_buf, size_t count, loff_t *ppos)
+> +{
+> +	int err;
+> +
+> +	if (count > MAX_NAME_LEN)
+> +		return -EINVAL;
+> +
+> +	err = sscanf(user_buf, "%15s", dbg_pinname);
+
+That %15 had better somehow be related to MAX_NAME_LEN.
+
+I'd suggest making MAX_NAME_LEN 15, and the variable declarations above
+use MAX_NAME_LEN + 1, so that MAX_NAME_LEN can be used as part of the
+scanf parameter here.
+
+> +/**
+> + * pinconf_dbg_config_write() - overwrite the pinctrl config in thepinctrl
+> + * map, of a pin/state pair based on pinname and state that have been
+> + * selected with the debugfs entries pinconf-name and pinconf-state
+> + */
+> +static int pinconf_dbg_config_write(struct file *file,
+> +	const char __user *user_buf, size_t count, loff_t *ppos)
+> +{
+> +	int err;
+> +	unsigned long config;
+> +	struct pinctrl_maps *maps_node;
+> +	struct pinctrl_map const *map;
+> +	int i, j;
+> +
+> +	err = kstrtoul_from_user(user_buf, count, 0, &config);
+> +
+> +	if (err)
+> +		return err;
+> +
+> +	dbg_config = config;
+
+That assumes that pin config values are a plain u32. While this is
+commonly true in existing pinctrl drivers, it certainly isn't something
+that the pinctrl core mandates; that's the whole point of
+dt_node_to_map() for example, to allow the individual pinctrl drivers to
+use whatever type (scalar, pointer-to-struct, ...) they want to
+represent their config values.
+
+> +
+> +	mutex_lock(&pinctrl_mutex);
+> +
+> +	/* Parse the pinctrl map and look for the selected pin/state */
+> +	for_each_maps(maps_node, i, map) {
+> +		if (map->type != PIN_MAP_TYPE_CONFIGS_PIN)
+> +			continue;
+> +
+> +		if (strncmp(map->name, dbg_state_name, MAX_NAME_LEN) > 0)
+> +			continue;
+
+What about the device name; this changes that state in every device's
+map table entry.
+
+> +
+> +		/*  we found the right pin / state, so overwrite config */
+> +		for (j = 0; j < map->data.configs.num_configs; j++) {
+> +			if (strncmp(map->data.configs.group_or_pin, dbg_pinname,
+> +						MAX_NAME_LEN) == 0)
+
+Why compare this inside the per-config loop;
+map->data.configs.group_or_pin is something "global" to the entire
+struct, and not specific to each configs[] entry.
+
+> +				map->data.configs.configs[j] = dbg_config;
+
+Given that dbg_config is written to by this function, then used by this
+function, why even make it a global? The only other use is
+pinconf_dbg_config_print(), which can also make it a local variable.
+
+Overall, I'm not convinced of the utility of this patch upstream. Sorry.
