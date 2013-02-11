@@ -1,53 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Feb 2013 11:40:40 +0000
-Subject: [PATCH v2 01/14] usb: phy: nop: Add device tree support and
- binding information
-In-Reply-To: <1360252974-7912-2-git-send-email-rogerq@ti.com>
-References: <1360252974-7912-1-git-send-email-rogerq@ti.com>
- <1360252974-7912-2-git-send-email-rogerq@ti.com>
-Message-ID: <20130211114040.GA2726@e106331-lin.cambridge.arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 11 Feb 2013 11:41:40 +0000
+Subject: [PATCH] cpuidle: kirkwood: Move out of mach directory, add DT.
+In-Reply-To: <20130210185812.GI20212@lunn.ch>
+References: <1356698844-4220-1-git-send-email-andrew@lunn.ch>
+ <20130208213441.014343E2C27@localhost> <20130210185812.GI20212@lunn.ch>
+Message-ID: <20130211114140.D47AF3E1E7B@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Feb 07, 2013 at 04:02:41PM +0000, Roger Quadros wrote:
-> The PHY clock, clock rate, VCC regulator and RESET regulator
-> can now be provided via device tree.
+On Sun, 10 Feb 2013 19:58:12 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
+> > > +* QNAP Power Off
+> > > +
+> > > +QNAP NAS devices have a microcontroller controlling the main power
+> > > +supply. This microcontroller is connected to UART1 of the Kirkwood and
+> > > +Orion5x SoCs. Sending the charactor 'A', at 19200 baud, tells the
+> > > +microcontroller to turn the power off. This driver adds a handler to
+> > > +pm_power_off which is called to turn the power off.
+> > > +
+> > > +Required Properties:
+> > > +- compatibile: Should be "qnap,power-off"
+> > 
+> > It would do well to have the model number embedded into this compatible
+> > string since it is unlikely that every single QNAP device will use the
+> > same controller interface.
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> ---
->  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++
->  drivers/usb/otg/nop-usb-xceiv.c                    |   36 +++++++++++++++----
->  2 files changed, 62 insertions(+), 8 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+> Hi Grant
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> new file mode 100644
-> index 0000000..d7e2726
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> @@ -0,0 +1,34 @@
-> +USB NOP PHY
-> +
-> +Required properties:
-> +- compatible: should be usb-nop-xceiv
+> All QNAP devices known to mainline use this same controller interface.
+> 
+> So that would be ts109, ts209, ts409, ts119, ts219, ts419, plus a few
+> other models which we don't differentiate, like ts219P and ts219P+.
+> 
+> Any suggestions what to use in the compatible string?
 
-This might be better as "linux,usb-no-xceiv", given this is a Linux-specific
-'device'.
+for the ts109: compatible = "qnap,ts109-poweroff";
+for the others: compatible = "qnap,ts[model]-poweroff", "qnap,ts109-poweroff";
 
-Saying that, I'm not sure I understand why this device needs to be instantiated
-from devicetree. As I understand it from looking at the driver, it's purely a
-Linux implementation detail used in the case of autonomous PHYs, and not an
-actual piece of hardware or firmware system. I must admit to being unfamiliar
-with this area of hardware, have I misunderstood somethign here?
+That is the usual way things are done. The newer model claims
+compatibility with the older. Some have also tried to use a 'generic'
+value for claiming compatibility (ie. "qnap,tsxxx-poweroff") but I don't
+recommend that because generic values aren't 'anchored' to any real
+piece of hardware.
 
-Can we not have drivers for autonomous PHYs initialise/register nop-usb-xceiv?
-That way we don't leak Linux implementation details to the outside world, and
-the dt can describe purely what's actually present in the system.
+Instead 'qnap,ts109-poweroff' is used as the 'generic' version with the
+advantage that when new hardware appears that doesn't conform you simply
+drop the string for the older version.
 
-[...]
+It is also recommended to also include the specific model number simply
+as a mechanism to test for quirks if ever needed... not critical though
+for system level devices since the top level system model property can
+also be used for that.
 
-Thanks,
-Mark.
+g.
