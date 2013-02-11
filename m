@@ -1,34 +1,76 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 11 Feb 2013 11:08:38 -0800
-Subject: linux-next: manual merge of the arm-soc tree with the mfd tree
-In-Reply-To: <20130211185221.GR4801@atomide.com>
-References: <20130211170616.73fd9fd30bb10c27a698ad4d@canb.auug.org.au>
- <20130211185221.GR4801@atomide.com>
-Message-ID: <CAOesGMi5xCahJ=5emwxiXeKEZkK4yhctcTddPZNQXO5wzcdQwQ@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 11 Feb 2013 19:11:58 +0000
+Subject: [PATCH 05/17] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
+In-Reply-To: <alpine.LFD.2.02.1302082237590.6300@xanadu.home>
+References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1360365467-25056-6-git-send-email-ben.dooks@codethink.co.uk>
+ <alpine.LFD.2.02.1302082237590.6300@xanadu.home>
+Message-ID: <5119427E.3000502@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 11, 2013 at 10:52 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Stephen Rothwell <sfr@canb.auug.org.au> [130210 22:11]:
->> Hi all,
->>
->> Today's linux-next merge of the arm-soc tree got a conflict in
->> arch/arm/mach-omap2/usb-host.c between commit 8a89e93237e1 ("mfd:
->> omap-usb-host: Consolidate OMAP USB-HS platform data") from the mfd tree
->> and commit c1d1cd597fc7 ("ARM: OMAP2+: omap_device: remove obsolete
->> pm_lats and early_device code") from the arm-soc tree.
->>
->> I fixed it up (see below) and can carry the fix as necessary (no action
->> is required).
+On 09/02/13 03:40, Nicolas Pitre wrote:
+> On Fri, 8 Feb 2013, Ben Dooks wrote:
 >
-> Thanks again.
+>> The fixup_pv_table assumes that the instructions are in the same
+>> endian configuration as the data, but when the CPU is running in
+>> BE8 the instructions stay in little-endian format.
+>>
+>> Make sure if CONFIG_CPU_ENDIAN_BE8 is set that we do all the
+>> alterations to the instructions taking in to account the LDR/STR
+>> will be swapping the data endian-ness.
+>>
+>> Since the code is only modifying a byte, we avoid dual-swapping
+>> the data, and just change the bits we clear and ORR in.
+>>
+>> Note, not tested against an actual bug, it looked wrong.
 >
-> Samuel, up to you, but I suggest you just drop these patches for
-> now if still possible unless other patches are based on these.
+> You are missing the CONFIG_THUMB2_KERNEL counterpart.
 
-Yes, as I replied on the original patch series last night, please sort
-this out so we can avoid these nagging merge conflicts. Tony's steps
-in the previous email is the right way to handle these kind of things.
+Sorry, I will have a look into that, although I may need
+some help on that as I don't have any experience with
+CONFIG_THUMB2_KERNEL or a userland to test with.
+
+>> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
+>> ---
+>>   arch/arm/kernel/head.S |    6 ++++++
+>>   1 file changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+>> index f1ab279..aafb151 100644
+>> --- a/arch/arm/kernel/head.S
+>> +++ b/arch/arm/kernel/head.S
+>> @@ -579,8 +579,14 @@ __fixup_a_pv_table:
+>>   #else
+>>   	b	2f
+>>   1:	ldr	ip, [r7, r3]
+>> +#ifdef CONFIG_CPU_ENDIAN_BE8
+>> +	@ in BE8, we load data in BE, but instructions still in LE
+>> +	bic	ip, ip, #0xff000000
+>> +	orr	ip, ip, r6, lsl#24
+>> +#else
+>>   	bic	ip, ip, #0x000000ff
+>>   	orr	ip, ip, r6	@ mask in offset bits 31-24
+>> +#endif
+>>   	str	ip, [r7, r3]
+>>   2:	cmp	r4, r5
+>>   	ldrcc	r7, [r4], #4	@ use branch for delay slot
+>> --
+>> 1.7.10.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
--Olof
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
