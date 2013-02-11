@@ -1,47 +1,61 @@
-From: lenb@kernel.org (Len Brown)
-Date: Mon, 11 Feb 2013 17:42:55 -0500
-Subject: [PATCH 06/16] ARM idle: delete pm_idle
-In-Reply-To: <20130211161125.GM17833@n2100.arm.linux.org.uk>
-References: <2b219d07e0f287c2c713f5465fc8646158fa986e.1360475150.git.len.brown@intel.com>
- <9838a4aeee256adeaef90efe56df2c9988206982.1360475150.git.len.brown@intel.com>
- <20130211160229.GB5676@MacBook-Pro.local>
- <20130211161125.GM17833@n2100.arm.linux.org.uk>
-Message-ID: <511973EF.8080007@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Feb 2013 14:46:00 -0800
+Subject: [PATCH] ARM: OMAP1: Fix build related to kgdb.h no longer
+ including serial_8250.h
+Message-ID: <20130211224600.GB4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 11:11 AM, Russell King - ARM Linux wrote:
-> On Mon, Feb 11, 2013 at 04:02:30PM +0000, Catalin Marinas wrote:
->> On Sun, Feb 10, 2013 at 05:58:13AM +0000, Len Brown wrote:
->>> pm_idle() on ARM was a synonym for default_idle(),
->>> so simply invoke default_idle() directly.
->>
->> The clean-up looks fine as we already have an arm_pm_idle but longer
->> term I was thinking about having a common declaration similar to
->> pm_power_off that code under drivers/power/(reset/) can override (and
->> such driver may be shared by multiple architectures). OTOH, if you get
->> rid of the generic linux/pm.h declaration architectures can use a common
->> pm_idle name and type (though I think having it in the common header
->> would be better). For ARM this would mean s/arm_pm_idle/pm_idle/ on top
->> if your patch.
-> 
-> pm_idle() was that common declaration - but it had the side effect that
-> it was defined to be called with interrupts disabled, but return with
-> interrupts enabled.
+Commit 16559ae4 (kgdb: remove #include <linux/serial_8250.h> from kgdb.h)
+had a side effect of breaking omap1_defconfig build as some headers
+were included indirectly:
 
-Yeah, I expect that grew out of the x86 idiom "STI;HLT",
-which dictated default_idle(), which in-turn dictated pm_idle().
-x86's MWAIT instruction now has more flexibility WRT interrupts,
-but the cast was already set...
+arch/arm/mach-omap1/board-h2.c:249: error: ?INT_KEYBOARD? undeclared here (not in a function)
+...
 
-Please let me know if you Ack the patch as is,
-or would like it changed.
+This worked earlier as linux/serial_8250.h included linux/serial_core.h,
+via linux/serial_8250.h from linux/kgdb.h. Fix this by including the
+necessary headers directly.
 
-thanks,
--Len Brown, Intel Open Source Technology Center
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-> arm_pm_idle() "fixed" that weirdness such that it's now expected to
-> return with IRQs in the same state that it was called.
-> 
-> pm_power_off() is a cross-arch hook already.
-> 
+---
+
+Arnd & Olof, can you please apply this to your non-critical fixes
+or some other branch that gets merged early on during the merge
+window?
+
+--- a/arch/arm/mach-omap1/common.h
++++ b/arch/arm/mach-omap1/common.h
+@@ -31,6 +31,8 @@
+ 
+ #include <plat/i2c.h>
+ 
++#include <mach/irqs.h>
++
+ #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+ void omap7xx_map_io(void);
+ #else
+--- a/drivers/video/omap/lcd_ams_delta.c
++++ b/drivers/video/omap/lcd_ams_delta.c
+@@ -27,6 +27,7 @@
+ #include <linux/lcd.h>
+ #include <linux/gpio.h>
+ 
++#include <mach/hardware.h>
+ #include <mach/board-ams-delta.h>
+ 
+ #include "omapfb.h"
+--- a/drivers/video/omap/lcd_osk.c
++++ b/drivers/video/omap/lcd_osk.c
+@@ -24,7 +24,10 @@
+ #include <linux/platform_device.h>
+ 
+ #include <asm/gpio.h>
++
++#include <mach/hardware.h>
+ #include <mach/mux.h>
++
+ #include "omapfb.h"
+ 
+ static int osk_panel_init(struct lcd_panel *panel, struct omapfb_device *fbdev)
