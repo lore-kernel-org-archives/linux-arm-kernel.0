@@ -1,49 +1,35 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Mon, 11 Feb 2013 14:08:23 +0530
-Subject: [PATCH V4 3/5] DMA: PL330: Register the DMA controller with the
- generic DMA helpers
-In-Reply-To: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
-References: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1360571905-15285-4-git-send-email-padma.v@samsung.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 11 Feb 2013 10:00:54 +0100
+Subject: [PATCH] Added support for pogoplug e02 (pink/gray)
+In-Reply-To: <1360540418-14133-1-git-send-email-ottxor@gentoo.org>
+References: <1360540418-14133-1-git-send-email-ottxor@gentoo.org>
+Message-ID: <20130211100054.1049246c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the pl330 dma controller driver with the generic
-device tree dma helper functions.
+Dear Christoph Junghans,
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/dma/pl330.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+On Sun, 10 Feb 2013 16:53:38 -0700, Christoph Junghans wrote:
+> The pogoplug differs from the SheevaPlug only by a
+> few details, but especially in the led assignments.
+> This patch was tested under Gentoo Linux.
+> A version of this patch was included in Arch Linux
+> on Arm since Jan 2012:
+>    https://github.com/archlinuxarm/PKGBUILDs/pull/124
+> A similar patch is available for OpenWrt:
+>   http://patchwork.openwrt.org/patch/1412/
+> 
+> Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index e68c83b..3fca247 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2999,6 +2999,14 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
- 		pi->pcfg.num_peri, pi->pcfg.num_events);
- 
-+	ret = of_dma_controller_register(adev->dev.of_node,
-+					 of_dma_pl330_xlate, pdmac);
-+	if (ret) {
-+		dev_err(&adev->dev,
-+		"unable to register DMA to the generic DT DMA helpers\n");
-+		goto probe_err2;
-+	}
-+
- 	return 0;
- 
- probe_err4:
-@@ -3025,6 +3033,8 @@ static int pl330_remove(struct amba_device *adev)
- 	if (!pdmac)
- 		return 0;
- 
-+	of_dma_controller_free(adev->dev.of_node);
-+
- 	amba_set_drvdata(adev, NULL);
- 
- 	/* Idle the DMAC */
+All new platforms should be supported by adding a Device Tree source
+file, rather than using old-style C board files. Could you convert this
+to the Device Tree and resubmit?
+
+Thanks!
+
+Thomas
 -- 
-1.7.4.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
