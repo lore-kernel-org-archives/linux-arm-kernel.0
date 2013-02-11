@@ -1,44 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Feb 2013 10:52:22 -0800
-Subject: linux-next: manual merge of the arm-soc tree with the mfd tree
-In-Reply-To: <20130211170616.73fd9fd30bb10c27a698ad4d@canb.auug.org.au>
-References: <20130211170616.73fd9fd30bb10c27a698ad4d@canb.auug.org.au>
-Message-ID: <20130211185221.GR4801@atomide.com>
+Date: Mon, 11 Feb 2013 11:00:11 -0800
+Subject: [PATCH 1/1] ARM: OMAP4: Add OMAP4 Blaze Tablet support
+In-Reply-To: <51193DE1.6080704@ti.com>
+References: <1360352269-14922-1-git-send-email-ruslan.bilovol@ti.com>
+ <1360352269-14922-2-git-send-email-ruslan.bilovol@ti.com>
+ <20130210025225.GB4801@atomide.com> <51193DE1.6080704@ti.com>
+Message-ID: <20130211190011.GS4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Rothwell <sfr@canb.auug.org.au> [130210 22:11]:
-> Hi all,
+* Jon Hunter <jon-hunter@ti.com> [130211 10:58]:
 > 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-omap2/usb-host.c between commit 8a89e93237e1 ("mfd:
-> omap-usb-host: Consolidate OMAP USB-HS platform data") from the mfd tree
-> and commit c1d1cd597fc7 ("ARM: OMAP2+: omap_device: remove obsolete
-> pm_lats and early_device code") from the arm-soc tree.
+> Please note that the blaze is derived from the omap4-sdp board and so I
+> would hope that we can use the existing for sdp dts and board file for
+> blaze. In fact this is what I do today for basic booting.
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+> So unless there is some feature on the blaze that is not compatible with
+> the original sdp, we should just use the sdp dts.
 
-Thanks again.
+Sounds like we need some common .dts file and separate files
+for sdp, blaze and tablet that include the common .dts file?
 
-Samuel, up to you, but I suggest you just drop these patches for
-now if still possible unless other patches are based on these.
-
-All OMAP USB people, doing these things should be pretty trivial,
-just follow these steps:
-
-1. Do all the platform data and header changes first so we can
-   put them into a shared minimal topic branch either in the
-   USB tree or arm-soc tree
-
-2. Modify the USB driver(s) based on #1 and have them merged into
-   the USB tree
-
-3. Add new arch/arm related pdata and .dts entries based on #1
-   so we can merge it via arm-soc tree
-
-4. Remove all the old crap later on to avoid extra dependencies
-   between these branches
+There's a different LCD panel at least between blaze and the
+tablet.
 
 Regards,
 
