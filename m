@@ -1,39 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Feb 2013 09:48:26 -0800
-Subject: [GIT PULL v2] ARM: OMAP4: PM fixes and AESS integration for 3.9
-In-Reply-To: <alpine.DEB.2.00.1302101901530.2672@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1302101901530.2672@utopia.booyaka.com>
-Message-ID: <20130211174825.GP4801@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Feb 2013 10:51:39 -0700
+Subject: [PATCH V2] MAINTAINERS: add keyword "tegra" to Tegra section
+Message-ID: <1360605099-7088-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130210 11:18]:
-> Hi Tony
-> 
-> The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
-> 
->   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-d2-for-3.9
-> 
-> for you to fetch changes up to a5a8c31d9f7587b601ecf0106c8abeabe3da24c3:
-> 
->   Merge branches 'sg_aess_reset_devel_3.9' and 'omap4_pm_fixes_a_3.9' into omap4_prcm_devel_a_3.9 (2013-02-10 11:27:02 -0700)
-> 
-> ----------------------------------------------------------------
-> 
-> Some OMAP4 power management fixes and audio device integration
-> patches.  This pull request contains a fix for an issue discovered during
-> branch integration.
-> 
-> Basic test logs are available at:
-> 
->     http://www.pwsan.com/omap/testlogs/omap4_prcm_devel_a_3.9/20130210112717/
+From: Stephen Warren <swarren@nvidia.com>
 
-Thanks for updating this, pulled now into omap-for-v3.9/pm-omap4.
+The intent is to ensure that all Tegra-related patches are sent to the
+linux-tegra@ mailing list, so people can keep up-to-date on all misc
+driver changes.
 
-Regards,
+Doing this with a keyword is far simpler and more compact than listing
+all Tegra-related drivers, even if wildcards were used.
 
-Tony
+Words such as integrate or integrator are common. Ensure the character
+right before "tegra" isn't a-z (case-insensitive), to make sure the
+keyword doesn't match those.
+
+Cc: Joe Perches <joe@perches.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ MAINTAINERS |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b98c89b..10e9b31 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7829,9 +7829,7 @@ L:	linux-tegra at vger.kernel.org
+ Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+ S:	Supported
+-F:	arch/arm/mach-tegra
+-F:	arch/arm/boot/dts/tegra*
+-F:	arch/arm/configs/tegra_defconfig
++K:	(?i)[^a-z]tegra
+ 
+ TEHUTI ETHERNET DRIVER
+ M:	Andy Gospodarek <andy@greyhouse.net>
+-- 
+1.7.10.4
