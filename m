@@ -1,28 +1,99 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Feb 2013 11:19:14 +0000
-Subject: [PATCH 1/8] USB: EHCI: make ehci-spear a separate driver
-In-Reply-To: <5117ede3.860e440a.097c.3508@mx.google.com>
-References: <y> <1360522697-22902-1-git-send-email-y>
- <5117ede3.860e440a.097c.3508@mx.google.com>
-Message-ID: <20130211111914.GD32455@e106331-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 11 Feb 2013 12:24:59 +0100
+Subject: [PATCH RFC 1/7] platform: add a device node
+In-Reply-To: <CAAwP0s0_HivRRDuBAEi4TJMB6DnbicDy1FiT7G3NcNs996V7qA@mail.gmail.com>
+References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1360442671-15216-2-git-send-email-javier.martinez@collabora.co.uk>
+ <20130210010246.GA1455@kroah.com> <5116FCA1.40703@collabora.co.uk>
+ <20130210093708.GL17852@n2100.arm.linux.org.uk>
+ <CAAwP0s0fCJmUfTJweGhXj5bXsQ0Gov9JbUJtqYMwL7duNLZv_Q@mail.gmail.com>
+ <20130211081632.GI1906@pengutronix.de>
+ <CAAwP0s0_HivRRDuBAEi4TJMB6DnbicDy1FiT7G3NcNs996V7qA@mail.gmail.com>
+Message-ID: <20130211112459.GA1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Feb 11, 2013 at 11:33:19AM +0100, Javier Martinez Canillas wrote:
+> On Mon, Feb 11, 2013 at 9:16 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Sun, Feb 10, 2013 at 12:35:43PM +0100, Javier Martinez Canillas wrote:
+> >> On Sun, Feb 10, 2013 at 10:37 AM, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > On Sun, Feb 10, 2013 at 02:49:21AM +0100, Javier Martinez Canillas wrote:
+> >> >> I knew this would be controversial and that's why I didn't mean it to be a patch
+> >> >> but a RFC :)
+> >> >>
+> >> >> The problem basically is that you have to associate the platform device with its
+> >> >> corresponding DT device node because it can be used in the driver probe function.
+> >> >
+> >> > When DT is being used, doesn't DT create the platform devices for you,
+> >> > with the device node already set correctly?
+> >> >
+> >>
+> >> Well they usually do but not always just like usually you have a
+> >> platform_device in your board code and call platform_device_register().
+> >>
+> >> But in some configurations you can't just define the platform_device
+> >> required resources (I/O memory, IRQ, etc) as static platform data.
+> >> In some cases you need a level of indirection.
+> >>
+> >> In this particular case a SMSC ethernet chip is connected to an
+> >> OMAP3 processor through its General-Purpose Memory Controller.
+> >>
+> >> You can't just define the I/O memory used by the device since you first
+> >> need to request that address to the GPMC. The same happens with the
+> >> IRQ line since a OMAP GPIO pin is used so you have to first configure
+> >> the GPIO line as input.
+> >
+> > For the gpio interrupt you can use, example taken from omap4-var-som.dts:
+> >
+> >         interrupt-parent = <&gpio6>;
+> >         interrupts = <11>; /* gpio line 171 */
+> >
+> > Other architectures allow to specify the edge/level hi/low active
+> > parameters from the devicetree aswell. The gpio direction should be
+> > handled by the gpio driver as necessary, at least that's what done on
+> > other architectures.
+> >
+> > If the SMSC hangs on the GPMC then the SMSC should be a child node of
+> > the GPMC. The GPMC would then act as a bus driver and configure the
+> > chipselects and timings for its children automatically, maybe based
+> > on timing information from the devicetree. I've never tried this before,
+> > but I think that's the way things should be.
+> >
+> 
+> Hi Sasha,
+> 
+> The SMSC is already a child node of the GPMC in the device tree but instead
+> using the generic SMSC binding I added a GPMC-specific SMSC binding.
+> 
+> Since the SMSC binding doesn't have a chip select property and it expects
+> the I/O memory address to be explicitly defined in the reg property while
+> the GPMC needs to request this memory according to the chip select used.
 
-[...]
+So you probably have this:
 
-> -static struct of_device_id spear_ehci_id_table[] = {
-> -       { .compatible = "st,spear600-ehci", },
-> +static struct of_device_id SPEAr_ehci_id_table[] = {
-> +       { .compatible = "st,SPEAr600-ehci", },
->         { },
->  };
+	gpmc {
+		compatible = "ti,gpmc", "simple-bus";
+		ranges;
 
-This will break anyone using the documented binding, and anyone with an
-existing dt will suddenly find their usb support broken.
+		smsc911x {
+			compatible = "smsc,91x";
+		}
+	}
 
-Please don't change this.
+If you remove the simple-bus property the gpmc devices would not be
+probed. If then you add a driver which matches "ti,gpmc" you can
+configure the chip selects in its probe callback. After this you
+can call of_platform_populate() starting from the gpmc device node
+to instantiate the gpmc child devices.
 
-Thanks,
-Mark.
+Please somebody interrupt me if I'm talking total rubbish here. I never
+tried this and only assume it should work like this.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
