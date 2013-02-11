@@ -1,26 +1,27 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Feb 2013 19:49:12 +0000 (UTC)
-Subject: [PATCH v8 19/22] ARM: OMAP3: clock data: get rid of unused USB
- host clock aliases and dummies
-In-Reply-To: <5110EB87.1060704@ti.com>
-References: <1358511445-26656-1-git-send-email-rogerq@ti.com>
- <1358511445-26656-20-git-send-email-rogerq@ti.com>
- <alpine.DEB.2.00.1301182027040.19470@utopia.booyaka.com>
- <50FD0BEF.9000007@ti.com>
- <alpine.DEB.2.00.1301211502190.8450@utopia.booyaka.com>
- <5110EB87.1060704@ti.com>
-Message-ID: <alpine.DEB.2.00.1302111948320.8260@utopia.booyaka.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Tue, 12 Feb 2013 01:22:17 +0530
+Subject: [PATCH 0/3] Dual EMAC mode implementation of CPSW
+Message-ID: <1360612340-9266-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+This patch series implements Dual EMAC mode implementation of CPSW
+which acts as two standalone EMAC by segregating the switch using VIDs
+and port VLAN
 
-On Tue, 5 Feb 2013, Roger Quadros wrote:
+Mugunthan V N (3):
+  driver: net: ethernet: davinci_cpdma: add support for directed packet
+    and source port detection
+  driver: net: ethernet: cpsw: make cpts as pointer
+  driver: net: ethernet: cpsw: dual emac interface implementation
 
-> FYI, the usbhost patches are already in linux-next.
+ Documentation/devicetree/bindings/net/cpsw.txt |    2 +
+ drivers/net/ethernet/ti/cpsw.c                 |  387 +++++++++++++++++++-----
+ drivers/net/ethernet/ti/davinci_cpdma.c        |   17 +-
+ drivers/net/ethernet/ti/davinci_cpdma.h        |    4 +-
+ drivers/net/ethernet/ti/davinci_emac.c         |    6 +-
+ include/linux/platform_data/cpsw.h             |    3 +
+ 6 files changed, 338 insertions(+), 81 deletions(-)
 
-Thanks, I think I'll wait for 3.10 cleanup to send the clock cleanup 
-patches, they seem non-critical...
-
-
-- Paul
+-- 
+1.7.9.5
