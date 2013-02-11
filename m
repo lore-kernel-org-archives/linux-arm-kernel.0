@@ -1,24 +1,59 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Feb 2013 15:39:56 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP: Clock: Remove CK_* flags
-In-Reply-To: <DC88CAD03C0052499C1907B327FC63229B966E@DBDE01.ent.ti.com>
-References: <1359966525-7603-1-git-send-email-j-keerthy@ti.com>
- <alpine.DEB.2.00.1302080248550.8539@utopia.booyaka.com>
- <DC88CAD03C0052499C1907B327FC63229B92FF@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1302081805450.28008@utopia.booyaka.com>
- <alpine.DEB.2.00.1302081855370.28008@utopia.booyaka.com>
- <DC88CAD03C0052499C1907B327FC63229B966E@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1302111538430.8260@utopia.booyaka.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Mon, 11 Feb 2013 09:40:34 -0600
+Subject: [PATCHv4 for soc 0/4] Enabling socfpga on hardware
+In-Reply-To: <1360008731-17021-1-git-send-email-dinguyen@altera.com>
+References: <1360008731-17021-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1360597234.12812.3.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Feb 2013, J, KEERTHY wrote:
+Hi Olof,
 
-> Can I pull the other patches and rebase this patch on top of them?
-> I need the branch where I can pull the other clock related patches.
-> I will rebase this patch on top, Verify the PM suspend on OMAP4460
-> And post it.
+I was wondering if you or Arnd can apply this series to the arm-soc
+branch?
 
-It's based on Tony's omap-for-v3.9/pm branch.
+On Mon, 2013-02-04 at 14:12 -0600, Dinh Nguyen wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> V4:
+> - Check for cpu1start_addr is valid in socfpga_boot_secondary()
+> - Add Reviewed-by: Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com> for 3/4
+> 
+> V3:
+> - Addressed comments from Olof Johansson and Russell King
+> - Received Acked-by and Tested-by Stephen Warren
+> - Received Signed-off-by Pavel Machek
+> 
+> V2:
+> - Remove patch that adds clock entries in the socfpga.dtsi as this
+> should accompany a rework in drivers/clk and will done in a different
+> patch series.
+> - Removed I-cache invalidate from v7_invalidate_l1
+> - Defined cpu1-start-addr as a device tree entry
+> - Removed the need to use CONFIG_VMSPLIT_2G
+> 
+> Dinh Nguyen (4):
+>   arm: socfpga: Add new device tree source for actual socfpga HW
+>   arm: socfpga: Add entries to enable make dtbs socfpga
+>   arm: Add v7_invalidate_l1 to cache-v7.S
+>   arm: socfpga: Add SMP support for actual socfpga harware
+> 
+>  .../bindings/arm/altera/socfpga-system.txt         |    2 +
+>  arch/arm/boot/dts/Makefile                         |    2 +
+>  arch/arm/boot/dts/socfpga.dtsi                     |   22 +++----
+>  arch/arm/boot/dts/socfpga_cyclone5.dts             |   34 ++++++++++-
+>  arch/arm/boot/dts/socfpga_vt.dts                   |   64 ++++++++++++++++++++
+>  arch/arm/mach-imx/headsmp.S                        |   47 --------------
+>  arch/arm/mach-shmobile/headsmp.S                   |   48 ---------------
+>  arch/arm/mach-socfpga/core.h                       |    4 +-
+>  arch/arm/mach-socfpga/headsmp.S                    |   16 +++--
+>  arch/arm/mach-socfpga/platsmp.c                    |   19 +++---
+>  arch/arm/mach-socfpga/socfpga.c                    |    7 ++-
+>  arch/arm/mach-tegra/headsmp.S                      |   43 -------------
+>  arch/arm/mm/cache-v7.S                             |   46 ++++++++++++++
+>  13 files changed, 188 insertions(+), 166 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/socfpga_vt.dts
+> 
 
-- Paul
+Thanks,
+Dinh
