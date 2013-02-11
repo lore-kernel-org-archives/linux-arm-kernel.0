@@ -1,58 +1,20 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Feb 2013 16:40:16 -0700
-Subject: [PATCH V3 2/2] MAINTAINERS: update Tegra section to capture all Tegra
- files
-In-Reply-To: <1360626016-23332-1-git-send-email-swarren@wwwdotorg.org>
-References: <1360626016-23332-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1360626016-23332-2-git-send-email-swarren@wwwdotorg.org>
+Date: Mon, 11 Feb 2013 16:45:32 -0700
+Subject: [PATCH 1/2] pinctrl: tegra: add clfvs function to Tegra114 support
+In-Reply-To: <1360621513-18814-1-git-send-email-rklein@nvidia.com>
+References: <1360621513-18814-1-git-send-email-rklein@nvidia.com>
+Message-ID: <5119829C.20400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 02/11/2013 03:25 PM, Rhyland Klein wrote:
+> This patch adds the definition for the cldvfs function for Tegra114 pinctrl
+> support. This is based on work by Pritesh Raithatha.
 
-The intent is to ensure that all Tegra-related patches are sent to the
-linux-tegra@ mailing list, so people can keep up-to-date on all misc
-driver changes.
+Sorry I forgot about this before, but
+Documentation/devicetree/bindings/pinctrl/nvidia,tegra114-pinmux.txt
+needs to be updated too.
 
-Doing this with a keyword is far simpler and more compact than listing
-all Tegra-related drivers, even if wildcards were used.
+Aside from that,
 
-Words such as integrate or integrator are common. Ensure the character
-right before "tegra" isn't a-z (case-insensitive), to make sure the
-keyword doesn't match those.
-
-The only files that the keyword doesn't match are the NVEC driver. Add
-the linux-tegra mailing list to the NVEC entry to solve this.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-V2: Edit NVEC entry too.
-
- MAINTAINERS |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b98c89b..0cfb670 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7531,6 +7531,7 @@ STAGING - NVIDIA COMPLIANT EMBEDDED CONTROLLER INTERFACE (nvec)
- M:	Julian Andres Klode <jak@jak-linux.org>
- M:	Marc Dietrich <marvin24@gmx.de>
- L:	ac100 at lists.launchpad.net (moderated for non-subscribers)
-+L:	linux-tegra at vger.kernel.org
- S:	Maintained
- F:	drivers/staging/nvec/
- 
-@@ -7829,9 +7830,7 @@ L:	linux-tegra at vger.kernel.org
- Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
- S:	Supported
--F:	arch/arm/mach-tegra
--F:	arch/arm/boot/dts/tegra*
--F:	arch/arm/configs/tegra_defconfig
-+K:	(?i)[^a-z]tegra
- 
- TEHUTI ETHERNET DRIVER
- M:	Andy Gospodarek <andy@greyhouse.net>
--- 
-1.7.10.4
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
