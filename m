@@ -1,31 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Feb 2013 11:03:31 -0700
-Subject: [PATCH REPOST] mmc: bcm2835: set
- SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
-In-Reply-To: <87k3qest87.fsf@octavius.laptop.org>
-References: <1360382187-26296-1-git-send-email-swarren@wwwdotorg.org>
- <87k3qest87.fsf@octavius.laptop.org>
-Message-ID: <51193273.6000901@wwwdotorg.org>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 11 Feb 2013 10:04:33 -0800
+Subject: [PATCH V2] MAINTAINERS: add keyword "tegra" to Tegra section
+In-Reply-To: <511931E8.3080802@wwwdotorg.org>
+References: <1360605099-7088-1-git-send-email-swarren@wwwdotorg.org>
+ <1360605395.2028.28.camel@joe-AO722> <511931E8.3080802@wwwdotorg.org>
+Message-ID: <1360605873.2028.30.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 09:36 AM, Chris Ball wrote:
-> Hi Stephen,
+On Mon, 2013-02-11 at 11:01 -0700, Stephen Warren wrote:
+> On 02/11/2013 10:56 AM, Joe Perches wrote:
+> > On Mon, 2013-02-11 at 10:51 -0700, Stephen Warren wrote:
+> >> From: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> The intent is to ensure that all Tegra-related patches are sent to the
+> >> linux-tegra@ mailing list, so people can keep up-to-date on all misc
+> >> driver changes.
+> >>
+> >> Doing this with a keyword is far simpler and more compact than listing
+> >> all Tegra-related drivers, even if wildcards were used.
+> >>
+> >> Words such as integrate or integrator are common. Ensure the character
+> >> right before "tegra" isn't a-z (case-insensitive), to make sure the
+> >> keyword doesn't match those.
+> >>
+> >> Cc: Joe Perches <joe@perches.com>
+> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >> ---
+> >>  MAINTAINERS |    4 +---
+> >>  1 file changed, 1 insertion(+), 3 deletions(-)
+> >>
+> >> diff --git a/MAINTAINERS b/MAINTAINERS
+> >> index b98c89b..10e9b31 100644
+> >> --- a/MAINTAINERS
+> >> +++ b/MAINTAINERS
+> >> @@ -7829,9 +7829,7 @@ L:	linux-tegra at vger.kernel.org
+> >>  Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
+> >>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+> >>  S:	Supported
+> >> -F:	arch/arm/mach-tegra
+> >> -F:	arch/arm/boot/dts/tegra*
+> >> -F:	arch/arm/configs/tegra_defconfig
+> >> +K:	(?i)[^a-z]tegra
+> >>  
+> >>  TEHUTI ETHERNET DRIVER
+> >>  M:	Andy Gospodarek <andy@greyhouse.net>
+> > 
+> > It's probably not a good idea to remove
+> > any of the F: lines as there are files
+> > that could get modified in those paths
+> > without any tegra word in the patch.
 > 
-> On Fri, Feb 08 2013, Stephen Warren wrote:
->> SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK does basically the same as
->> implementing struct sdhci_ops .get_timeout_clock, so simply set that
->> quirk and remove the custom code to simplify the driver.
->>
->> Reported-by: Lars-Peter Clausen <lars@metafoo.de>
->> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> At least for those F: lines that exist already and are removed above,
+> the keyword will match their filename, so there's no issue here.
 > 
-> This conflicts with Lars-Peter's larger patch, which I just merged --
-> I could merge the changes from both, which reduces your patch to this:
 
-Yes, that updated patch looks fine to me.
+Not every use of get_maintainers is by patch.
 
-I thought Lars-Peter was going to update his series on top of this
-cleanup, but either way is fine.
+./scripts/get_maintainer.pl -f arch/arm/mach-tegra
 
-Thanks.
+wouldn't match anything.
