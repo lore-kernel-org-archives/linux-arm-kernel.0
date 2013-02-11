@@ -1,35 +1,147 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 11 Feb 2013 10:00:54 +0100
-Subject: [PATCH] Added support for pogoplug e02 (pink/gray)
-In-Reply-To: <1360540418-14133-1-git-send-email-ottxor@gentoo.org>
-References: <1360540418-14133-1-git-send-email-ottxor@gentoo.org>
-Message-ID: <20130211100054.1049246c@skate>
+From: r.sricharan@ti.com (R Sricharan)
+Date: Mon, 11 Feb 2013 14:38:53 +0530
+Subject: [PATCH] ARM: LPAE: Fix mapping in alloc_init_section for unaligned
+ addresses
+Message-ID: <1360573733-12239-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Christoph Junghans,
+With LPAE enabled, alloc_init_section() does not map the entire
+address space for unaligned addresses.
 
-On Sun, 10 Feb 2013 16:53:38 -0700, Christoph Junghans wrote:
-> The pogoplug differs from the SheevaPlug only by a
-> few details, but especially in the led assignments.
-> This patch was tested under Gentoo Linux.
-> A version of this patch was included in Arch Linux
-> on Arm since Jan 2012:
->    https://github.com/archlinuxarm/PKGBUILDs/pull/124
-> A similar patch is available for OpenWrt:
->   http://patchwork.openwrt.org/patch/1412/
-> 
-> Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
+The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
+with page granularity mappings during boot. alloc_init_pte()
+is called and out of 16MB, only 2MB gets mapped and rest remains
+unaccessible.
 
-All new platforms should be supported by adding a Device Tree source
-file, rather than using old-style C board files. Could you convert this
-to the Device Tree and resubmit?
+Because of this OMAP5 boot is broken with CMA + LPAE enabled.
+Fix the issue by ensuring that the entire addresses are
+mapped.
 
-Thanks!
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Christoffer Dall <chris@cloudcar.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ [V2] Moved the loop to alloc_init_pte as per Russell's
+     feedback and changed the subject accordingly.
+     Using PMD_XXX instead of SECTION_XXX to avoid
+     different loop increments with/without LPAE.
 
-Thomas
+ [v3] Removed the dummy variable phys and updated
+      the commit log for CMA case.
+
+ [v4] Resending with updated change log and
+      updating the tags.
+
+ [v5] Renamed alloc_init_section to alloc_init_pmd
+      and moved the loop back there. Also introduced
+      map_init_section as per Catalin's comments.
+
+ [v6] Corrected tags and updated the comments for code.
+
+ arch/arm/mm/mmu.c |   73 ++++++++++++++++++++++++++++++++++-------------------
+ 1 file changed, 47 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index ce328c7..73aebcb 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -576,39 +576,60 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ }
+ 
+-static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+-				      unsigned long end, phys_addr_t phys,
+-				      const struct mem_type *type)
++static void __init map_init_section(pmd_t *pmd, unsigned long addr,
++			unsigned long end, phys_addr_t phys,
++			const struct mem_type *type)
+ {
+-	pmd_t *pmd = pmd_offset(pud, addr);
+-
++#ifndef CONFIG_ARM_LPAE
+ 	/*
+-	 * Try a section mapping - end, addr and phys must all be aligned
+-	 * to a section boundary.  Note that PMDs refer to the individual
+-	 * L1 entries, whereas PGDs refer to a group of L1 entries making
+-	 * up one logical pointer to an L2 table.
++	 * In classic MMU format, puds and pmds are folded in to
++	 * the pgds. pmd_offset gives the PGD entry. PGDs refer to a
++	 * group of L1 entries making up one logical pointer to
++	 * an L2 table (2MB), where as PMDs refer to the individual
++	 * L1 entries (1MB). Hence increment to get the correct
++	 * offset for odd 1MB sections.
++	 * (See arch/arm/include/asm/pgtable-2level.h)
+ 	 */
+-	if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
+-		pmd_t *p = pmd;
+-
+-#ifndef CONFIG_ARM_LPAE
+-		if (addr & SECTION_SIZE)
+-			pmd++;
++	if (addr & SECTION_SIZE)
++		pmd++;
+ #endif
++	do {
++		*pmd = __pmd(phys | type->prot_sect);
++		phys += SECTION_SIZE;
++	} while (pmd++, addr += SECTION_SIZE, addr != end);
+ 
+-		do {
+-			*pmd = __pmd(phys | type->prot_sect);
+-			phys += SECTION_SIZE;
+-		} while (pmd++, addr += SECTION_SIZE, addr != end);
++	flush_pmd_entry(pmd);
++}
+ 
+-		flush_pmd_entry(p);
+-	} else {
++static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
++				      unsigned long end, phys_addr_t phys,
++				      const struct mem_type *type)
++{
++	pmd_t *pmd = pmd_offset(pud, addr);
++	unsigned long next;
++
++	do {
+ 		/*
+-		 * No need to loop; pte's aren't interested in the
+-		 * individual L1 entries.
++		 * With LPAE, we must loop over to map
++		 * all the pmds for the given range.
+ 		 */
+-		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+-	}
++		next = pmd_addr_end(addr, end);
++
++		/*
++		 * Try a section mapping - end, addr and phys must all be
++		 * aligned to a section boundary.
++		 */
++		if (type->prot_sect &&
++				((addr | next | phys) & ~SECTION_MASK) == 0) {
++			map_init_section(pmd, addr, next, phys, type);
++		} else {
++			alloc_init_pte(pmd, addr, next,
++						__phys_to_pfn(phys), type);
++		}
++
++		phys += next - addr;
++
++	} while (pmd++, addr = next, addr != end);
+ }
+ 
+ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+@@ -619,7 +640,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+ 
+ 	do {
+ 		next = pud_addr_end(addr, end);
+-		alloc_init_section(pud, addr, next, phys, type);
++		alloc_init_pmd(pud, addr, next, phys, type);
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
+ }
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
