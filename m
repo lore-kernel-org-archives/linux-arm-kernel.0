@@ -1,72 +1,78 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Feb 2013 11:12:06 -0700
-Subject: [PATCH V2] MAINTAINERS: add keyword "tegra" to Tegra section
-In-Reply-To: <1360605873.2028.30.camel@joe-AO722>
-References: <1360605099-7088-1-git-send-email-swarren@wwwdotorg.org>
- <1360605395.2028.28.camel@joe-AO722> <511931E8.3080802@wwwdotorg.org>
- <1360605873.2028.30.camel@joe-AO722>
-Message-ID: <51193476.8020509@wwwdotorg.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 11 Feb 2013 18:17:32 +0000
+Subject: [PATCH] [RFC] arm: fix memset-related crashes caused by recent
+ GCC (4.7.2) optimizations
+In-Reply-To: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
+References: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
+Message-ID: <511935BC.8060105@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 11:04 AM, Joe Perches wrote:
-> On Mon, 2013-02-11 at 11:01 -0700, Stephen Warren wrote:
->> On 02/11/2013 10:56 AM, Joe Perches wrote:
->>> On Mon, 2013-02-11 at 10:51 -0700, Stephen Warren wrote:
->>>> From: Stephen Warren <swarren@nvidia.com>
->>>>
->>>> The intent is to ensure that all Tegra-related patches are sent to the
->>>> linux-tegra@ mailing list, so people can keep up-to-date on all misc
->>>> driver changes.
->>>>
->>>> Doing this with a keyword is far simpler and more compact than listing
->>>> all Tegra-related drivers, even if wildcards were used.
->>>>
->>>> Words such as integrate or integrator are common. Ensure the character
->>>> right before "tegra" isn't a-z (case-insensitive), to make sure the
->>>> keyword doesn't match those.
->>>>
->>>> Cc: Joe Perches <joe@perches.com>
->>>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->>>> ---
->>>>  MAINTAINERS |    4 +---
->>>>  1 file changed, 1 insertion(+), 3 deletions(-)
->>>>
->>>> diff --git a/MAINTAINERS b/MAINTAINERS
->>>> index b98c89b..10e9b31 100644
->>>> --- a/MAINTAINERS
->>>> +++ b/MAINTAINERS
->>>> @@ -7829,9 +7829,7 @@ L:	linux-tegra at vger.kernel.org
->>>>  Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
->>>>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
->>>>  S:	Supported
->>>> -F:	arch/arm/mach-tegra
->>>> -F:	arch/arm/boot/dts/tegra*
->>>> -F:	arch/arm/configs/tegra_defconfig
->>>> +K:	(?i)[^a-z]tegra
->>>>  
->>>>  TEHUTI ETHERNET DRIVER
->>>>  M:	Andy Gospodarek <andy@greyhouse.net>
->>>
->>> It's probably not a good idea to remove
->>> any of the F: lines as there are files
->>> that could get modified in those paths
->>> without any tegra word in the patch.
->>
->> At least for those F: lines that exist already and are removed above,
->> the keyword will match their filename, so there's no issue here.
->>
-> 
-> Not every use of get_maintainers is by patch.
-> 
-> ./scripts/get_maintainer.pl -f arch/arm/mach-tegra
-> 
-> wouldn't match anything.
+On 02/02/13 08:33, Ivan Djelic wrote:
+> Recent GCC versions (e.g. GCC-4.7.2) perform optimizations based on
+> assumptions about the implementation of memset and similar functions.
+> The current ARM optimized memset code does not return the value of
+> its first argument, as is usually expected from standard implementations.
+>
+> For instance in the following function:
+>
+> void debug_mutex_lock_common(struct mutex *lock, struct mutex_waiter *waiter)
+> {
+> 	memset(waiter, MUTEX_DEBUG_INIT, sizeof(*waiter));
+> 	waiter->magic = waiter;
+> 	INIT_LIST_HEAD(&waiter->list);
+> }
+>
+> compiled as:
+>
+> 800554d0<debug_mutex_lock_common>:
+> 800554d0:       e92d4008        push    {r3, lr}
+> 800554d4:       e1a00001        mov     r0, r1
+> 800554d8:       e3a02010        mov     r2, #16 ; 0x10
+> 800554dc:       e3a01011        mov     r1, #17 ; 0x11
+> 800554e0:       eb04426e        bl      80165ea0<memset>
+> 800554e4:       e1a03000        mov     r3, r0
+> 800554e8:       e583000c        str     r0, [r3, #12]
+> 800554ec:       e5830000        str     r0, [r3]
+> 800554f0:       e5830004        str     r0, [r3, #4]
+> 800554f4:       e8bd8008        pop     {r3, pc}
+>
+> GCC assumes memset returns the value of pointer 'waiter' in register r0; causing
+> register/memory corruptions.
 
-That's annoying; it kinda defeats the whole purpose of this patch then.
 
-The way this patch works out with a patch is because the file-names are
-matched against the keywords since they appear in the patch. A solution
-to the issue you raise would be to do the same in -f mode, by adding an
-explicit pass to check the filenames that are found against MAINTAINERS
-too. Do you have any objection to that?
+> @@ -43,29 +47,28 @@ ENTRY(memset)
+>   #if ! CALGN(1)+0
+>
+>   /*
+> - * We need an extra register for this loop - save the return address and
+> - * use the LR
+> + * We need an 2 extra registers for this loop - use r8 and the LR
+>    */
+> -	str	lr, [sp, #-4]!
+> -	mov	ip, r1
+> +	stmfd	sp!, {r8, lr}
+> +	mov	r8, r1
+>   	mov	lr, r1
+
+Out of interest, why not save {r0, lr} and avoid having to
+re-write the entirety of the inner loop?
+
+>
+>   2:	subs	r2, r2, #64
+> -	stmgeia	r0!, {r1, r3, ip, lr}	@ 64 bytes at a time.
+> -	stmgeia	r0!, {r1, r3, ip, lr}
+> -	stmgeia	r0!, {r1, r3, ip, lr}
+> -	stmgeia	r0!, {r1, r3, ip, lr}
+> +	stmgeia	ip!, {r1, r3, r8, lr}	@ 64 bytes at a time.
+> +	stmgeia	ip!, {r1, r3, r8, lr}
+> +	stmgeia	ip!, {r1, r3, r8, lr}
+> +	stmgeia	ip!, {r1, r3, r8, lr}
+>   	bgt	2b
+> -	ldmeqfd	sp!, {pc}		@ Now<64 bytes to go.
+> +	ldmeqfd	sp!, {r8, pc}		@ Now<64 bytes to go.
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
