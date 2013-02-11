@@ -1,24 +1,26 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 Feb 2013 11:30:54 -0200
-Subject: mx28evk does not boot with linux-next 20130207
-In-Reply-To: <201302100428.54061.marex@denx.de>
-References: <CAOMZO5Ar1T3Lg2KRvSLK-gjNAaAFAf39f6KqaYeF03w5bNj6EQ@mail.gmail.com>
- <20130208164858.GA32318@mudshark.cambridge.arm.com>
- <CAOMZO5CbJfpVwqHM1RSYdEQH4n1EL67Kt2_tC9TNPxZGMsPevQ@mail.gmail.com>
- <201302100428.54061.marex@denx.de>
-Message-ID: <CAOMZO5Bkq0aK06LaiyPQ6+nJQRfzhuwVfxa3u9nzO8X2rqJDbQ@mail.gmail.com>
+Date: Mon, 11 Feb 2013 11:38:21 -0200
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Add VPU support
+In-Reply-To: <20130207125926.GB19091@S2101-09.ap.freescale.net>
+References: <1359474553-8949-1-git-send-email-fabio.estevam@freescale.com>
+ <1359474553-8949-2-git-send-email-fabio.estevam@freescale.com>
+ <20130130130453.GC2757@S2101-09.ap.freescale.net>
+ <20130131095446.GP1906@pengutronix.de>
+ <20130131122850.GB2735@S2101-09.ap.freescale.net>
+ <CAOMZO5CW9D_vv9+xqsFEu-5Ep2gK0_DVW0hfE2JgRbPd-0hvcg@mail.gmail.com>
+ <20130207125926.GB19091@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5Bn+OJo64nkdVJyUqUnjA4XznK08XWdX4g93Tgg8x72nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 10, 2013 at 1:28 AM, Marek Vasut <marex@denx.de> wrote:
+Sascha,
 
-> Is the amba-pl011 driver maybe broken ?
+On Thu, Feb 7, 2013 at 10:59 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Running Linus' git I get:
+>> Ok, but was the imx_v4_v5_defconfig applied?
+>
+> I already sent my 3.9 material, and assumed that Sascha will pick it
+> up.
 
-[    0.189156] Serial: AMBA PL011 UART driver
-[    0.191187] 80074000.serial: ttyAMA0 at MMIO 0x80074000 (irq = 221)
-is a PL011 rev2
-[    0.487625] console [ttyAMA0] enabled
-
-,but when I run linux-next only the first line shows up.
+Do you plan to pick the imx_v4_v5_defconfig patch, so that we can have
+build coverage for the VPU driver?
