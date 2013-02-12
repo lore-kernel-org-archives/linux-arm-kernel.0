@@ -1,30 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 13 Feb 2013 07:16:23 +0900
-Subject: [PATCH 00/06] ARM: shmobile: Trivial SMP cleanups
-In-Reply-To: <20130212154438.13067.77359.sendpatchset@w520>
-References: <20130212154438.13067.77359.sendpatchset@w520>
-Message-ID: <20130212221622.GA24325@verge.net.au>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 12 Feb 2013 14:23:56 -0800
+Subject: [PATCH] ARM: OMAP2+: SmartReflex: soc.h is needed for omap initcalls
+Message-ID: <1360707836-2545-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 12:44:38AM +0900, Magnus Damm wrote:
-> ARM: shmobile: Trivial SMP cleanups
-> 
-> [PATCH 01/06] ARM: shmobile: Remove unused headers from hotplug.c
-> [PATCH 02/06] ARM: shmobile: Remove partial CPU Hotplug from EMEV2
-> [PATCH 03/06] ARM: shmobile: Move EMEV2 CPU boot vector setup code
-> [PATCH 04/06] ARM: shmobile: Remove sh73a0_get_core_count()
-> [PATCH 05/06] ARM: shmobile: Remove r8a7779_get_core_count()
-> [PATCH 06/06] ARM: shmobile: Remove emev2_get_core_count()
-> 
-> This series contains random trivial SMP cleanups for mach-shmobile.
-> 
-> The patches are known to build for sh73a0, r8a7779 and EMEV2,
-> and on top of that they also work well on the KZM9D/EMEV2 board.
+commit aa4f99638b (ARM: OMAP2+: Use omap initcalls) converted
+the initcalls here, but did not #include "soc.h" where the omap
+inicalls are defined.
 
-Thanks, I have applied these to a new soc5 branch,
-based on the soc4 branch which has been merged into arm-soc.
+To fix, #include <soc.h>
 
-I have also updated next and topic/all+next with these changes.
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+Tony, the patch that broke this was introduced in your
+omap-for-v3.9/multiplatform-enable-signed branch, and this problem was
+found only when compiling with PM (specifically, SmartReflex) enabled.
 
-I anticipate these changes will appear upstream in 3.10.
+ arch/arm/mach-omap2/smartreflex-class3.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
+index 80f3acb..b2dcbd3 100644
+--- a/arch/arm/mach-omap2/smartreflex-class3.c
++++ b/arch/arm/mach-omap2/smartreflex-class3.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/power/smartreflex.h>
+ #include "voltage.h"
++#include "soc.h"
+ 
+ static int sr_class3_enable(struct omap_sr *sr)
+ {
+-- 
+1.8.1.2
