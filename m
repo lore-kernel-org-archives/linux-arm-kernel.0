@@ -1,65 +1,71 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 11 Feb 2013 22:57:05 -0600
-Subject: [PATCH v2 06/13] mailbox: change protection mechanisms
+Date: Mon, 11 Feb 2013 22:57:12 -0600
+Subject: [PATCH v2 13/13] mailbox: call request_irq after mbox queues are
+ allocated
 In-Reply-To: <1360645032-9668-1-git-send-email-s-anna@ti.com>
 References: <1360645032-9668-1-git-send-email-s-anna@ti.com>
-Message-ID: <1360645032-9668-7-git-send-email-s-anna@ti.com>
+Message-ID: <1360645032-9668-14-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Loic Pallardy <loic.pallardy@st.com>
+The mailbox startup code is enabling the interrupt even before
+any of the associated mailbox queues are allocated. Any pending
+received mailbox message could cause a kernel panic as soon as
+the interrupt is enabled due to the dereferencing of non-existing
+mailbox queues within the ISR.
 
-TX: replace spin by mutex to release CPU
-during wait on mailbox resource.
-
-Signed-off-by: Loic Pallardy <loic.pallardy@st.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Fernando Guzman Lugo <lugo.fernando@gmail.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- drivers/mailbox/mailbox.c          | 5 +++--
- drivers/mailbox/mailbox_internal.h | 1 +
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/mailbox/mailbox.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index 6b43e7c..ff6595a 100644
+index c38241a..5fea5c2 100644
 --- a/drivers/mailbox/mailbox.c
 +++ b/drivers/mailbox/mailbox.c
-@@ -94,7 +94,7 @@ int mailbox_msg_send(struct mailbox *mbox, struct mailbox_msg *msg)
- 	struct mailbox_queue *mq = mbox->txq;
- 	int ret = 0, len;
+@@ -377,14 +377,6 @@ static int mailbox_startup(struct mailbox *mbox)
+ 	}
  
--	spin_lock_bh(&mq->lock);
-+	mutex_lock(&mq->mlock);
+ 	if (!mbox->use_count++) {
+-		ret = request_irq(mbox->irq, mbox_interrupt,
+-				IRQF_SHARED | IRQF_NO_SUSPEND,
+-				mbox->name, mbox);
+-		if (unlikely(ret)) {
+-			pr_err("failed to register mailbox interrupt:%d\n",
+-					ret);
+-			goto fail_request_irq;
+-		}
+ 		mq = mbox_queue_alloc(mbox, NULL, mbox_tx_tasklet);
+ 		if (!mq) {
+ 			ret = -ENOMEM;
+@@ -399,17 +391,25 @@ static int mailbox_startup(struct mailbox *mbox)
+ 		}
+ 		mbox->rxq = mq;
+ 		mq->mbox = mbox;
++		ret = request_irq(mbox->irq, mbox_interrupt,
++				IRQF_SHARED | IRQF_NO_SUSPEND,
++				mbox->name, mbox);
++		if (unlikely(ret)) {
++			pr_err("failed to register mailbox interrupt:%d\n",
++					ret);
++			goto fail_request_irq;
++		}
  
- 	if (kfifo_avail(&mq->fifo) < (sizeof(msg) + msg->size)) {
- 		ret = -ENOMEM;
-@@ -118,7 +118,7 @@ int mailbox_msg_send(struct mailbox *mbox, struct mailbox_msg *msg)
- 	tasklet_schedule(&mbox->txq->tasklet);
+ 		mailbox_enable_irq(mbox, IRQ_RX);
+ 	}
+ 	mutex_unlock(&mbox_configured_lock);
+ 	return 0;
  
- out:
--	spin_unlock_bh(&mq->lock);
-+	mutex_unlock(&mq->mlock);
- 	return ret;
- }
- EXPORT_SYMBOL(mailbox_msg_send);
-@@ -289,6 +289,7 @@ static struct mailbox_queue *mbox_queue_alloc(struct mailbox *mbox,
- 		return NULL;
- 
- 	spin_lock_init(&mq->lock);
-+	mutex_init(&mq->mlock);
- 
- 	if (kfifo_alloc(&mq->fifo, mbox_kfifo_size, GFP_KERNEL))
- 		goto error;
-diff --git a/drivers/mailbox/mailbox_internal.h b/drivers/mailbox/mailbox_internal.h
-index ba03910..04f83bf 100644
---- a/drivers/mailbox/mailbox_internal.h
-+++ b/drivers/mailbox/mailbox_internal.h
-@@ -45,6 +45,7 @@ struct mailbox_ops {
- 
- struct mailbox_queue {
- 	spinlock_t              lock;
-+	struct mutex		mlock;
- 	struct kfifo            fifo;
- 	struct work_struct      work;
- 	struct tasklet_struct   tasklet;
++fail_request_irq:
++	mbox_queue_free(mbox->rxq);
+ fail_alloc_rxq:
+ 	mbox_queue_free(mbox->txq);
+ fail_alloc_txq:
+-	free_irq(mbox->irq, mbox);
+-fail_request_irq:
+ 	if (mbox->ops->shutdown)
+ 		mbox->ops->shutdown(mbox);
+ 	mbox->use_count--;
 -- 
 1.8.1.2
