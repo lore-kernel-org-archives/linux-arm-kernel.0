@@ -1,54 +1,42 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 12 Feb 2013 19:58:16 +0100
-Subject: [PATCH 05/32] lib: devres: don't enclose pcim_*() functions in
- CONFIG_HAS_IOPORT
-In-Reply-To: <201302121800.48723.arnd@arndb.de>
+Date: Tue, 12 Feb 2013 20:01:18 +0100
+Subject: [PATCH 06/32] arm: pci: add a align_resource hook
+In-Reply-To: <201302121803.12660.arnd@arndb.de>
 References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1360686546-24277-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302121800.48723.arnd@arndb.de>
-Message-ID: <20130212195816.6e34b3ce@skate>
+ <1360686546-24277-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302121803.12660.arnd@arndb.de>
+Message-ID: <20130212200118.531cda2e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Arnd Bergmann,
 
-On Tue, 12 Feb 2013 18:00:48 +0000, Arnd Bergmann wrote:
+On Tue, 12 Feb 2013 18:03:12 +0000, Arnd Bergmann wrote:
 > On Tuesday 12 February 2013, Thomas Petazzoni wrote:
-> > The pcim_*() functions are used by the libata-sff subsystem, and
-> > this subsystem is used for many SATA drivers on ARM platforms that
-> > do not necessarily have I/O ports.
+> > The PCI specifications says that an I/O region must be aligned on a
+> > 4 KB boundary, and a memory region aligned on a 1 MB boundary.
 > > 
-> > Signed-off-by: Thomas Petazzoni
-> > <thomas.petazzoni@free-electrons.com> Cc: Paul Gortmaker
-> > <paul.gortmaker@windriver.com> Cc: Jesse Barnes
-> > <jbarnes@virtuousgeek.org> Cc: Yinghai Lu <yinghai@kernel.org>
-> > Cc: linux-kernel at vger.kernel.org
+> > However, the Marvell PCIe interfaces rely on address decoding
+> > windows (which allow to associate a range of physical addresses
+> > with a given device), and those have special requirements compared
+> > to the standard PCI-to-PCI bridge specifications.
 > 
-> Sorry, but this patch is still incorrect.
+> I'm not convince that we should add this complexity yet, until
+> everyone agrees on the basic approach taken.
 
-I know, but the discussion was so huge on the first posting that it was
-basically impossible to draw a conclusion out of it.
+Regardless of whether we choose to have the emulated PCI-to-PCI bridges
+or not, we still need this align_resource() hook.
 
-> Any driver that requires a
-> linear mapping of I/O ports to __iomem pointers must depend
-> CONFIG_HAS_IOPORT with the current definition of that symbol (as
-> mentioned before, we should really rename that to
-> CONFIG_HAS_IOPORT_MAP). Having these functions not defined is a
-> compile time check that is necessary to ensure that all drivers have
-> the correct annotation.
+In the solution you propose, where each PCIe interface is represented
+as a separate PCIe domain, we still need the kernel to dynamically
+assign ranges of address to each memory BAR and I/O BAR of each PCIe
+device. And those range of address must comply with the address
+decoding windows requirements, otherwise, we don't be able to create
+those address decoding windows, and the devices will be unaccessible.
 
-I have the feeling that the problem is more complex than that. My
-understanding is that the pcim_iomap_regions() function used by
-drivers/ata/libata-sff.c can perfectly be used to map memory BARs, and
-not necessarily I/O BARs. Therefore, this driver can perfectly be used
-in an architecture where CONFIG_NO_IOPORT is selected.
-
-The thing is that pcim_iomap_regions() transparently allows to remap an
-I/O BAR is such a BAR is passed as argument, or a memory BAR if such a
-BAR is passed as argument.
-
-Therefore, I continue to believe that the pcim_*() functions are useful
-even if the platform doesn't have CONFIG_HAS_IOPORT.
+Of course, if you have an alternate solution to do a _dynamic_
+assignment of address ranges to the different PCIe devices, I'm
+entirely open to suggestions.
 
 Best regards,
 
