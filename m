@@ -1,49 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Feb 2013 15:58:01 +0000
-Subject: [PATCH] [RFC] arm: fix memset-related crashes caused by recent
- GCC (4.7.2) optimizations
-In-Reply-To: <20130212140008.GB4123@mudshark.cambridge.arm.com>
-References: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
- <20130211184114.GP9801@mudshark.cambridge.arm.com>
- <20130211194225.GK29329@parrot.com>
- <20130212140008.GB4123@mudshark.cambridge.arm.com>
-Message-ID: <20130212155801.GQ17833@n2100.arm.linux.org.uk>
+Date: Tue, 12 Feb 2013 15:55:16 +0000
+Subject: [PATCH] HACK: ARM: Fix generic timer broadcast for TWD
+In-Reply-To: <1360684194-10894-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1360684194-10894-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20130212155516.GP17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 02:00:08PM +0000, Will Deacon wrote:
-> On Mon, Feb 11, 2013 at 07:42:25PM +0000, Ivan Djelic wrote:
-> > On Mon, Feb 11, 2013 at 06:41:14PM +0000, Will Deacon wrote:
-> > > On Sat, Feb 02, 2013 at 08:33:08AM +0000, Ivan Djelic wrote:
-> > > > Recent GCC versions (e.g. GCC-4.7.2) perform optimizations based on
-> > > > assumptions about the implementation of memset and similar functions.
-> > > > The current ARM optimized memset code does not return the value of
-> > > > its first argument, as is usually expected from standard implementations.
-> > > 
-> > > How does GCC do this? By strcmping the function name and assuming that
-> > > memset is a libc implementation?
-> > > 
-> > > If so, maybe passing something like -ffreestanding would make sense to turn
-> > > this behaviour off in the compiler (otherwise we should also vet the rest of
-> > > the standard string functions).
-> > 
-> > In theory, yes; but there is actually a short list of libc functions that GCC
-> > always requires from the environment, even when -ffreestanding is used: memcpy,
-> > memmove, memset and memcmp (see [1] below).
+On Tue, Feb 12, 2013 at 04:49:54PM +0100, Thierry Reding wrote:
+> Note that I have close to no clue what I'm doing, so the patch might be
+> the completely wrong thing to do. An alternative I had initially thought
+> about was to check for NULL before calling the clock_event_device's
+> .broadcast() function.
 > 
-> Interesting... the GCC documentation also states that ffreestanding implies
-> fno-builtin, so memset and co shouldn't be targetted for this sort of
-> optimisation by GCC. Have you observed this problem even when passing this
-> option?
+> The reason why I chose to always assign .broadcast instead is that a
+> previous patch (3d06770: Add generic timer broadcast support) aims at
+> generically implementing broadcast support on ARM and providing a
+> tick_broadcast() implementation for this purpose so it seemed like the
+> right thing to do.
+> 
+> The above-mentioned patch for some reason removed the assignment to the
+> .broadcast() member for apparently no reason, so maybe that was just
+> done by mistake?
 
-Rather than wondering whether we should be using -ffreestanding or not
-(which, x86 people have strongly resisted) I suggest that we just fix
-our memset() implementation to be compliant.
+This is now supposed to be handled by the timer core stuff.  It
+looks to me like 3d06770eef43eaad606e77246bfcc7e82b1d9fb4
+(arm: Add generic timer broadcast support) is slightly busted in
+that it doesn't deal with the #else case you identified below.
 
-The reason it's not compliant is that I saw no reason for it to be
-compliant back in the gcc 2.7.x days, and it's persisted like that for
-the last 19-ish years.  If GCC is now making use of the return value,
-then we need to fix that and undo the "optimization" in our string.h.
+Certainly, initializing evt->broadcast after the setup is not the
+right solution - it must be done before, but this was removed by
+the above commit.
 
-So let's just bite the bullet, make the asm memset() compliant, and
-clean up string.h.
+So, things to be done here:
+1. Fix the #else part of the code.
+2. Fix the reported oops.
+
+I think this falls to Mark, being the last one to touch this and cause
+this breakage. :)
