@@ -1,25 +1,31 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 13 Feb 2013 01:13:54 +0200
-Subject: [PATCH] ARM: OMAP1: fix USB host on 1710
-In-Reply-To: <alpine.DEB.2.00.1301250809500.471@utopia.booyaka.com>
-References: <1359066295-20382-1-git-send-email-aaro.koskinen@iki.fi>
- <alpine.DEB.2.00.1301250809500.471@utopia.booyaka.com>
-Message-ID: <20130212231353.GA9991@blackmetal.musicnaut.iki.fi>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 12 Feb 2013 15:25:22 -0800
+Subject: [PATCH] ARM: S3C24XX: remove plat-samsung/irq.h
+In-Reply-To: <201302122042.32471.heiko@sntech.de>
+References: <201302122042.32471.heiko@sntech.de>
+Message-ID: <1dc701ce0978$3c127090$b43751b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jan 25, 2013 at 08:10:05AM +0000, Paul Walmsley wrote:
-> On Fri, 25 Jan 2013, Aaro Koskinen wrote:
+Heiko St?bner wrote:
 > 
-> > There is a long-standing bug that OHCI USB host controller does
-> > not respond on 1710, because of wrong clock definitions. See e.g.
-> > http://marc.info/?l=linux-omap&m=119634441229321&w=2. All register reads
-> > return just zeroes:
+> plat-samsung/irq.h did only contain functions for handling the spread out
+> subirqs on s3c24xx arches, which are not needed anymore.
 > 
-> Thanks, queued for v3.8-rc fixes.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Sorry for bringing this separate submission, but I just remembered
+> it this evening.
+> 
+> This applies on top of all the other s3c24xx irq changes and
+> I think this patch will mark the end of the irq-cleanup for now.
+> 
+>  arch/arm/mach-s3c24xx/irq-pm.c           |    7 ++-
+>  arch/arm/mach-s3c24xx/irq.c              |    8 +--
+>  arch/arm/plat-samsung/include/plat/irq.h |  116 ------------------------------
+>  3 files changed, 9 insertions(+), 122 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/irq.h
+> 
+Applied, thanks :-)
 
-What happened to this patch? Will it go to 3.9?
-
-A.
+- Kukjin
