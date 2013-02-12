@@ -1,50 +1,56 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 11 Feb 2013 22:17:55 -0800
-Subject: [PATCH V4 1/2] get_maintainer: allow keywords to match filenames
-In-Reply-To: <1360629574-23989-1-git-send-email-swarren@wwwdotorg.org>
-References: <1360629574-23989-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1360649875.5128.18.camel@joe-AO722>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 12 Feb 2013 06:20:24 +0000
+Subject: [PATCH v2 1/3] ARM: davinci: da850: override mmc DT node device
+ name
+In-Reply-To: <5119D72D.3010605@ti.com>
+References: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
+ <1360223825-23929-2-git-send-email-prakash.pm@ti.com>
+ <5119D72D.3010605@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA4685E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-02-11 at 17:39 -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Tue, Feb 12, 2013 at 11:16:21, Nori, Sekhar wrote:
+> On 2/7/2013 1:27 PM, Manjunathappa, Prakash wrote:
+> > Populate OF_DEV_AUXDATA with desired device name expected by
+> > davinci_mmc driver. Without this clk_get of davinci_mmc DT driver
+> > fails.
 > 
-> Allow K: entries in MAINTAINERS to match directly against filenames;
-> either those extracted from patch +++ or --- lines, or those specified
-> on the command-line using the -f option.
-[]
-> diff --git a/MAINTAINERS b/MAINTAINERS
-[]
-> @@ -97,12 +97,12 @@ Descriptions of section entries:
->  	   X:	net/ipv6/
->  	   matches all files in and below net excluding net/ipv6/
->  	K: Keyword perl extended regex pattern to match content in a
-> -	   patch or file.  For instance:
-> +	   patch, or an affected filename.  For instance:
+> But there is no mmc DT support for DaVinci at this time. This patch
+> should come after the driver DT support and .dts addition patches.
+> 
 
-The removal of file isn't correct.
+Agreed, I will bring it up in the series.
 
-This should read "patch, file or filename".
+> > diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> > index 37c27af..3362ca4 100644
+> > --- a/arch/arm/mach-davinci/da8xx-dt.c
+> > +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> > @@ -39,9 +39,16 @@ static void __init da8xx_init_irq(void)
+> >  
+> >  #ifdef CONFIG_ARCH_DAVINCI_DA850
+> >  
+> > +static const struct of_dev_auxdata da8xx_auxdata[] __initconst = {
+> > +	OF_DEV_AUXDATA("ti,davinci-mmc-da830", 0x01c40000, "davinci_mmc.0",
+> > +			NULL),
+> > +	{},
+> > +};
+> > +
+> >  static void __init da850_init_machine(void)
+> >  {
+> > -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > +	of_platform_populate(NULL, of_default_bus_match_table, da8xx_auxdata,
+> > +			NULL);
+> 
+> This needs to be rebased on by v3.9/dt-2 branch. There are conflicts
+> with the code already present.
+> 
 
-If the -f pattern is a single file,
-get_maintainer reads that file content and then
-matches any K: patterns.
+Yes, I will send it after rebasing on new branch.
 
-When the -f pattern is a directory, it doesn't.
+Thanks,
+Prakash
 
->  	   K: of_get_profile
-> -	      matches patches or files that contain "of_get_profile"
-> +	      matches patches or filenames that contain "of_get_profile"
-
-here too.
-
->  	   K: \b(printk|pr_(info|err))\b
-> -	      matches patches or files that contain one or more of the words
-> -	      printk, pr_info or pr_err
-> +	      matches patches or filenames that contain one or more of
-> +	      the words printk, pr_info or pr_err
-
-three.
-
-cheers, Joe
+> Thanks,
+> Sekhar
+> 
