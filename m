@@ -1,15 +1,44 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 11 Feb 2013 16:16:12 -0800
-Subject: [PATCH V3 1/2] get_maintainer: allow keywords to match filenames
-In-Reply-To: <5119880C.8010602@wwwdotorg.org>
-References: <1360626016-23332-1-git-send-email-swarren@wwwdotorg.org>
- <1360627226.4707.6.camel@joe-AO722> <5119880C.8010602@wwwdotorg.org>
-Message-ID: <1360628172.4707.10.camel@joe-AO722>
+From: sjg@google.com (Simon Glass)
+Date: Mon, 11 Feb 2013 16:17:16 -0800
+Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
+In-Reply-To: <CAD=FV=XzfseMEHK4KutgYYoU4kEFPq7qoFoJtaBrh6QJUa1Y_w@mail.gmail.com>
+References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
+ <20130210181710.GB12760@nekote.pengutronix.de>
+ <CAD=FV=XzfseMEHK4KutgYYoU4kEFPq7qoFoJtaBrh6QJUa1Y_w@mail.gmail.com>
+Message-ID: <CAPnjgZ3HnXDp9ErsbZEfpc-NexuAt1C5cUWbFn=BW2TMGiMJEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-02-11 at 17:08 -0700, Stephen Warren wrote:
-> Does "that" above mean "not setting exact_pattern_match_hash", or
-> "changing the patch so that it does set exact_pattern_match_hash". Sorry...
+On Mon, Feb 11, 2013 at 3:53 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Wolfram,
+>
+> On Sun, Feb 10, 2013 at 10:17 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+>> On Mon, Feb 04, 2013 at 02:33:15PM +0530, Yuvaraj Kumar C D wrote:
+>>> This RFC patch is w.r.t multimaster bus arbitration which is already
+>>> being discussing in the mainline.
+>>> This patch provides hooks for the i2c multimaster bus arbitration
+>>> and to have the arbitration parameters.
+>>
+>> I still haven't understood why the arbitration specified in the I2C
+>> standard is not enough for you. Or what you would need to make use of
+>> it.
+>
+> At the moment perhaps the strongest argument for why this particular
+> arbitration scheme is needed is that's what the EC (embedded
+> controller) on the ARM Chromebook uses.  There have been several
+> arguments in-house about whether this was the most ideal way to
+> structure things, but that's what we shipped with.  Thus, if we want
+> to be able to talk to i2c devices on this bus (contains the keyboard,
+> battery, and a bunch of power switches) we need something in the
+> system that implements this arbitration scheme.
+>
 
-I think what you have is fine.
+There was some discussion about using the built-in I2C multi-master
+support but no one had had a good experience getting it to work
+reliably in a real system so we ended up deciding not to rely on this.
+
+> As a side note: I'm trying to code up a quick arbitrator now using the
+> muxing framework as Grant suggested.  I will play with this and post
+> it if I can get it to work.  It's quite short so far.
+>
+> -Doug
