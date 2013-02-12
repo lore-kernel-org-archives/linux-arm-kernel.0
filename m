@@ -1,55 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Feb 2013 20:39:22 -0700
-Subject: [PATCH V4] ARM: bcm281xx: Add timer driver
-In-Reply-To: <5119B62E.9020901@broadcom.com>
-References: <1360626279-26701-1-git-send-email-csd@broadcom.com>
- <5119B041.9040007@wwwdotorg.org> <5119B62E.9020901@broadcom.com>
-Message-ID: <5119B96A.7060202@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 11 Feb 2013 19:47:16 -0800
+Subject: [PATCH] ARM: omap: board-h4: remove warning for is_gpmc_muxed
+Message-ID: <1360640836-18792-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 08:25 PM, Christian Daudt wrote:
-> On 13-02-11 07:00 PM, Stephen Warren wrote:
->> On 02/11/2013 04:44 PM, Christian Daudt wrote:
->>> This adds support for the Broadcom timer, used in the following SoCs:
->>> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
->>> diff --git a/drivers/clocksource/bcm_kona_timer.c
->>> b/drivers/clocksource/bcm_kona_timer.c
->>> +static const struct of_device_id bcm_timer_ids[] __initconst = {
->>> +    {.compatible = "bcm,kona-timer"},
->>> +    {},
->>> +};
->>> +
->>> +static void __init kona_timers_init(void)
->>> +{
->>> +    struct device_node *node;
->>> +    u32 freq;
->>> +
->>> +    node = of_find_matching_node(NULL, bcm_timer_ids);
->>> +
->>> +    if (!node)
->>> +        panic("No timer");
->> I assume this is for 3.10 now.
-> Oh. I missed 3.9 window ? Got busy with other stuff. Oh well, try again.
->> Can you rework this to remove
->> bcm_timer_ids[] and that of_find_matching_node() call, and replace it
->> with e.g.:
->>
->> CLOCKSOURCE_OF_DECLARE(kona, "bcm,kona-timer", kona_timer_init);
->
-> where can I find an example ? I looked throught armsoc/for-next and the
-> code there has CLOCKSOURCE_OF_DECLARE but it still has
-> of_find_matching_node calls in the init fns - is it still in the process
-> of being removed ?
+If the ethernet driver is not selected, you otherwise get:
 
-It looks like Rob's patches that would allow you to eliminate the
-of_find_matching_node() call aren't checked in yet; I'm not sure if
-they'll make 3.9 or not. I has assumed so, but even if not, I imagine
-they will be available as a dependency branch for you to build on top of
-in 3.10. Those are:
+arch/arm/mach-omap2/board-h4.c:237:12: warning: 'is_gpmc_muxed' defined but not used [-Wunused-function]
 
-https://lkml.org/lkml/2013/2/7/417
+I guess it could be argued that the device setup should/could always
+be done even if the driver isn't enabled, but hopefully the board files
+will all go away some day so let's stick to the smaller delta.
 
-However, you could still convert to CLOCKSOURCE_OF_DECLARE right now;
-the patches to enable that should be in arm-soc's for-next; see
-drivers/clocksource/tegra20_timer.c there for example.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-omap2/board-h4.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
+index 812c829..e34541d 100644
+--- a/arch/arm/mach-omap2/board-h4.c
++++ b/arch/arm/mach-omap2/board-h4.c
+@@ -229,6 +229,8 @@ static u32 get_sysboot_value(void)
+ 		 OMAP2_SYSBOOT_1_MASK | OMAP2_SYSBOOT_0_MASK));
+ }
+ 
++#if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91x_MODULE)
++
+ /* H4-2420's always used muxed mode, H4-2422's always use non-muxed
+  *
+  * Note: OMAP-GIT doesn't correctly do is_cpu_omap2422 and is_cpu_omap2423
+@@ -246,8 +248,6 @@ static u32 is_gpmc_muxed(void)
+ 		return 0;
+ }
+ 
+-#if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91x_MODULE)
+-
+ static struct omap_smc91x_platform_data board_smc91x_data = {
+ 	.cs		= 1,
+ 	.gpio_irq	= 92,
+-- 
+1.8.1.192.gc4361b8
