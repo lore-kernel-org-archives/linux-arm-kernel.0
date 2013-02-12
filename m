@@ -1,44 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 12 Feb 2013 18:08:58 +0100
-Subject: ARM big-endian on current kernels for linux-3.8
-In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130212180858.289c3efa@skate>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Feb 2013 09:11:57 -0800
+Subject: [PATCH] ARM: OMAP2+: fix some omap_device_build() calls that
+ aren't compiled by default
+In-Reply-To: <alpine.DEB.2.00.1302120358130.14983@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1302120358130.14983@utopia.booyaka.com>
+Message-ID: <20130212171156.GH4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
+* Paul Walmsley <paul@pwsan.com> [130211 20:02]:
+> 
+> Commit c1d1cd597fc77af3086470f8627d77f52f7f8b6c ("ARM: OMAP2+:
+> omap_device: remove obsolete pm_lats and early_device code") missed a
+> few omap_device_build() calls that aren't included as part of the default
+> OMAP2+ Kconfig, omap2plus_defconfig.
+> 
+> Ideally, all devices that are present on the SoC should be created by
+> default, and only the corresponding device driver should be configured
+> or deconfigured in Kconfig.  This allows drivers to be built as
+> modules and loaded later, even if they weren't part of the original
+> kernel build.  Unfortunately, we're not quite there yet.
+> 
+> Thanks to Tony Lindgren for reporting this, found during his
+> randconfig tests.
 
-On Fri,  8 Feb 2013 23:17:30 +0000, Ben Dooks wrote:
-> I have been working on getting big-endian kernels working, mainly from
-> little-endian boot envrionments. The following patch series is what I
-> have been working on, mainly on the highbank and axp systems.
+Thanks, I'll apply this into omap-for-v3.9/pm-wfi as the breaking
+commit is already in arm-soc/for-next.
 
-Nice!
-
-> Feedback and testing is welcome.
-
-I've tested your patch set on Armada XP. The kernel boots fine, but it
-fails to bring up the secondary CPUs:
-
-Booting CPU 1
-CPU1: failed to come online
-Booting CPU 2
-CPU2: failed to come online
-Booting CPU 3
-CPU3: failed to come online
-Brought up 1 CPUs
-SMP: Total of 1 processors activated (1332.01 BogoMIPS).
-
-The other problem is that I've not been able to build a working armeb
-userspace (I tried only very quickly with a Crosstool-NG toolchain I
-built for armeb). Do you have a known working armeb toolchain around?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
