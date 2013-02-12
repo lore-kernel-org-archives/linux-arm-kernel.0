@@ -1,39 +1,123 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 11 Feb 2013 16:48:03 -0800
-Subject: [PATCH v3 0/2] Add automatic bus number support for i2c busses with
- device tree
-Message-ID: <1360630085-26874-1-git-send-email-dianders@chromium.org>
+Date: Mon, 11 Feb 2013 16:48:04 -0800
+Subject: [PATCH v3 1/2] i2c-core: dt: Pick i2c bus number from i2c alias if
+ present
+In-Reply-To: <1360630085-26874-1-git-send-email-dianders@chromium.org>
+References: <1360630085-26874-1-git-send-email-dianders@chromium.org>
+Message-ID: <1360630085-26874-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was suggested by Mark Brown in response to a patch for adding
-this functionality only for the s3c2410 bus:
-  https://lkml.org/lkml/2012/11/20/681
+This allows you to get the equivalent functionality of
+i2c_add_numbered_adapter() with all data in the device tree and no
+special case code in your driver.  This is a common device tree
+technique.
 
-I have also modified the i2c-pxa driver to use this new functionality.
-The i2c-pxa driver changes have only been compile-tested and are just
-for cleanup purposes.
+For quick reference, the FDT syntax for using an alias to provide an
+ID looks like:
+  aliases {
+    i2c0 = &i2c_0;
+    i2c1 = &i2c_1;
+  };
 
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+
+---
 Changes in v3:
 - Addressed Wolfram's feedback; rebased atop idr-cleanup series.
 
-Changes in v2:
-- No longer tweak pdev->id as per Sylwester Nawrocki.
-- No longer add the dev ID to the adap.name.  Other drivers don't
-  include the device ID here and it doesn't make sense with
-  dynamically (or automatically) allocated IDs.
-- Use dev_name(&dev->dev) to register for the IRQ; this matches what
-  the i2c-s3c2410.c does and handles dynamically allocated IDs.
-- This change was only compile-tested (corgi_defconfig), since I don't
-  have access to a board that uses this driver.
+Changes in v2: None
 
-Doug Anderson (2):
-  i2c-core: dt: Pick i2c bus number from i2c alias if present
-  i2c: pxa: Use i2c-core to get bus number now
+ drivers/i2c/i2c-core.c | 54 +++++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 40 insertions(+), 14 deletions(-)
 
- drivers/i2c/busses/i2c-pxa.c | 20 ++++++++--------
- drivers/i2c/i2c-core.c       | 54 ++++++++++++++++++++++++++++++++------------
- 2 files changed, 49 insertions(+), 25 deletions(-)
-
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index 0b599f2..5204818 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -921,13 +921,41 @@ out_list:
+ }
+ 
+ /**
++ * __i2c_add_numbered_adapter - i2c_add_numbered_adapter where nr is never -1
++ * @adap: the adapter to register (with adap->nr initialized)
++ * Context: can sleep
++ *
++ * See i2c_add_numbered_adapter() for details.
++ */
++static int __i2c_add_numbered_adapter(struct i2c_adapter *adap)
++{
++	int	id;
++
++	/* Handled by wrappers */
++	if (WARN_ON(adap->nr == -1))
++		return -EINVAL;
++
++	if (adap->nr & ~MAX_IDR_MASK)
++		return -EINVAL;
++
++	mutex_lock(&core_lock);
++	id = idr_alloc(&i2c_adapter_idr, adap, adap->nr, adap->nr + 1,
++		       GFP_KERNEL);
++	mutex_unlock(&core_lock);
++	if (id < 0)
++		return id == -ENOSPC ? -EBUSY : id;
++	return i2c_register_adapter(adap);
++}
++
++/**
+  * i2c_add_adapter - declare i2c adapter, use dynamic bus number
+  * @adapter: the adapter to add
+  * Context: can sleep
+  *
+  * This routine is used to declare an I2C adapter when its bus number
+- * doesn't matter.  Examples: for I2C adapters dynamically added by
+- * USB links or PCI plugin cards.
++ * doesn't matter or when its bus number is specified by an dt alias.
++ * Examples of bases when the bus number doesn't matter: I2C adapters
++ * dynamically added by USB links or PCI plugin cards.
+  *
+  * When this returns zero, a new bus number was allocated and stored
+  * in adap->nr, and the specified adapter became available for clients.
+@@ -935,8 +963,17 @@ out_list:
+  */
+ int i2c_add_adapter(struct i2c_adapter *adapter)
+ {
++	struct device *dev = &adapter->dev;
+ 	int res;
+ 
++	if (dev->of_node) {
++		res = of_alias_get_id(dev->of_node, "i2c");
++		if (res >= 0) {
++			adapter->nr = res;
++			return __i2c_add_numbered_adapter(adapter);
++		}
++	}
++
+ 	mutex_lock(&core_lock);
+ 	res = idr_alloc(&i2c_adapter_idr, adapter,
+ 			__i2c_first_dynamic_bus_num, 0, GFP_KERNEL);
+@@ -974,20 +1011,9 @@ EXPORT_SYMBOL(i2c_add_adapter);
+  */
+ int i2c_add_numbered_adapter(struct i2c_adapter *adap)
+ {
+-	int	id;
+-
+ 	if (adap->nr == -1) /* -1 means dynamically assign bus id */
+ 		return i2c_add_adapter(adap);
+-	if (adap->nr & ~MAX_IDR_MASK)
+-		return -EINVAL;
+-
+-	mutex_lock(&core_lock);
+-	id = idr_alloc(&i2c_adapter_idr, adap, adap->nr, adap->nr + 1,
+-		       GFP_KERNEL);
+-	mutex_unlock(&core_lock);
+-	if (id < 0)
+-		return id == -ENOSPC ? -EBUSY : id;
+-	return i2c_register_adapter(adap);
++	return __i2c_add_numbered_adapter(adap);
+ }
+ EXPORT_SYMBOL_GPL(i2c_add_numbered_adapter);
+ 
 -- 
 1.8.1
