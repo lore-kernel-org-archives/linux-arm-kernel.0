@@ -1,86 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 12 Feb 2013 19:46:36 +0100
-Subject: [PATCH 09/17] ARM: add atag32_to_cpu() function
-In-Reply-To: <51194347.9090501@codethink.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 12 Feb 2013 19:49:42 +0100
+Subject: ARM big-endian on current kernels for linux-3.8
+In-Reply-To: <511A7B14.1020107@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-10-git-send-email-ben.dooks@codethink.co.uk>
- <20130209120331.GC17833@n2100.arm.linux.org.uk>
- <51194347.9090501@codethink.co.uk>
-Message-ID: <20130212184636.GJ30595@game.jcrosoft.org>
+ <20130212180858.289c3efa@skate> <511A7B14.1020107@codethink.co.uk>
+Message-ID: <20130212194942.1ec29bf4@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:15 Mon 11 Feb     , Ben Dooks wrote:
-> On 09/02/13 12:03, Russell King - ARM Linux wrote:
-> >On Fri, Feb 08, 2013 at 11:17:39PM +0000, Ben Dooks wrote:
-> >>Add atag32_to_cpu() function to allow code manipulating ATAGs to deal
-> >>with the case where the boot-loader was in little-endian and Linux is
-> >>running big-endian.
-> >...
-> >>+#ifdef CONFIG_CPU_BE8_BOOT_LE
-> >>+#define atag32_to_cpu(x)	le32_to_cpu(x)
-> >>+#else
-> >>+#define atag32_to_cpu(x)	x
-> >>+#endif
-> >
-> >Actually, with a LE kernel, le32_to_cpu() ends up being a no-op too.  So
-> >I'm wondering if we should do this a different way...
-> >
-> >Also, this will cause sparse to complain - le32_to_cpu() takes a le32
-> >type not a u32 type.
-> 
-> Yes, you're right on that.
-> 
-> >This brings up a whole load of difficulties though: what format are the
-> >ATAGs on older BE hardware - I bet it's CPU-endian format there.  So,
-> >I'm wondering if we should do this:
-> 
-> It isn't defined, and I have failed to find any information on
-> it online. I have no idea if the IXP devices ran their boot-loader
-> in big-endian or little-endian format?
-> 
-> Input welcome from anyone who can remember.
-I run the ixp in be
+Dear Ben Dooks,
 
-and pass the atag in be
+On Tue, 12 Feb 2013 17:25:40 +0000, Ben Dooks wrote:
 
-Best Regards,
-J.
-> 
-> >1. define all tags using a new __atagXX, etc types.
-> >2. always use atagXX_to_cpu() to read these.
-> >3. Implement:
+> >> Feedback and testing is welcome.
 > >
-> >#if defined(CONFIG_ATAG_LE)
-> >typedef __le32 __atag32;
-> >...
-> >#define atag32_to_cpu(x) le32_to_cpu(x)
-> >...
-> >#elif defined(CONFIG_ATAG_BE)
-> >typedef __be32 __atag32;
-> >...
-> >#define atag32_to_cpu(x) be32_to_cpu(x)
-> >...
-> >#elif defined(CONFIG_ATAG_NE)
-> >typedef __u32 __atag32;
-> >...
-> >#define atag32_to_cpu(x) x
-> >...
-> >#endif
-> >
-> >and select the appropriate definition.  Obviously, this is a fundamental
-> >configuration just like the overall BE/LE configuration of the kernel.
+> > I've tested your patch set on Armada XP. The kernel boots fine, but
+> > it fails to bring up the secondary CPUs:
 > 
-> Ok, should I sort out doing that for the next round of patches?
+> Yes, missed updating the coherency_ll.S patch.
 > 
-> Should the ATAG_xx configurations go into arch/arm/Kconfig or
-> is there somewhere better for them to go?
-> 
-> -- 
-> Ben Dooks				http://www.codethink.co.uk/
-> Senior Engineer				Codethink - Providing Genius
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Attached new patch
+
+Thanks, I'll test this one tomorrow. Any pointer for a known-working
+armeb toolchain?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
