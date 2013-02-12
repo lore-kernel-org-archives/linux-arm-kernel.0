@@ -1,110 +1,71 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 12 Feb 2013 11:27:14 -0800
-Subject: [PATCH] arm: plat-samsung: check soc ids before l2x0 cache
- restoration in resume
-In-Reply-To: <1358843109-11072-1-git-send-email-inderpal.singh@linaro.org>
-References: <1358843109-11072-1-git-send-email-inderpal.singh@linaro.org>
-Message-ID: <1d9501ce0956$f7ce4150$e76ac3f0$@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Feb 2013 12:34:02 -0700
+Subject: [PATCH] clk: tegra: fix driver to match DT binding
+Message-ID: <1360697642-22620-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inderpal Singh wrote:
-> 
-> Only exynos4 based platforms have l2x0 cache controller. Hence check
-> the same before restoring the cache in resume.
-> 
-I think, the code can determine by checking ARM main ID cp15 register
-instead of Chip ID. Because if so, we don't need to do something for ahother
-EXYNOS4 SoCs next time.
+From: Stephen Warren <swarren@nvidia.com>
 
-> This is needed for single kernel image.
-> 
-> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
-> ---
->  arch/arm/mach-exynos/common.c           |    2 ++
->  arch/arm/plat-samsung/include/plat/pm.h |    1 +
->  arch/arm/plat-samsung/s5p-sleep.S       |   28
-> ++++++++++++++++++++++++++++
->  3 files changed, 31 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-
-> exynos/common.c
-> index cdaa55f..ab7ca00 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -796,6 +796,8 @@ static int __init exynos4_l2x0_cache_init(void)
->  	if (soc_is_exynos5250() || soc_is_exynos5440())
->  		return 0;
-> 
-> +	s5p_cpu = samsung_cpu_id & EXYNOS4_CPU_MASK;
-> +
->  	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
->  	if (!ret) {
->  		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
-> diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-
-> samsung/include/plat/pm.h
-> index 887a0c9..285c8c8 100644
-> --- a/arch/arm/plat-samsung/include/plat/pm.h
-> +++ b/arch/arm/plat-samsung/include/plat/pm.h
-> @@ -190,3 +190,4 @@ extern void samsung_pm_save_gpios(void);
-> 
->  extern void s3c_pm_save_core(void);
->  extern void s3c_pm_restore_core(void);
-> +extern unsigned long s5p_cpu;
-> diff --git a/arch/arm/plat-samsung/s5p-sleep.S b/arch/arm/plat-
-> samsung/s5p-sleep.S
-> index bdf6dad..006d35f 100644
-> --- a/arch/arm/plat-samsung/s5p-sleep.S
-> +++ b/arch/arm/plat-samsung/s5p-sleep.S
-> @@ -25,6 +25,15 @@
->  #include <asm/asm-offsets.h>
->  #include <asm/hardware/cache-l2x0.h>
-> 
-> +#define EXYNOS4210_CPU_ID	0x43210000
-> +#define EXYNOS4212_CPU_ID	0x43220000
-> +#define EXYNOS4412_CPU_ID	0xE4412200
-> +#define EXYNOS4_CPU_MASK	0xFFFE0000
-> +
-> +#define EXYNOS4210_CPU		(EXYNOS4210_CPU_ID &
-> EXYNOS4_CPU_MASK)
-> +#define EXYNOS4212_CPU		(EXYNOS4212_CPU_ID &
-> EXYNOS4_CPU_MASK)
-> +#define EXYNOS4412_CPU		(EXYNOS4412_CPU_ID &
-> EXYNOS4_CPU_MASK)
-> +
->  /*
->   *	 The following code is located into the .data section. This is to
->   *	 allow l2x0_regs_phys to be accessed with a relative load while we
-> @@ -51,6 +60,22 @@
-> 
->  ENTRY(s3c_cpu_resume)
->  #ifdef CONFIG_CACHE_L2X0
-> +	adr	r0, s5p_cpu
-> +	ldr	r1, [r0]
-> +
-> +	ldr	r0, =EXYNOS4210_CPU
-> +	cmp	r1, r0
-> +	beq	continue
-> +
-> +	ldr	r0, =EXYNOS4212_CPU
-> +	cmp	r1, r0
-> +	beq	continue
-> +
-> +	ldr	r0, =EXYNOS4412_CPU
-> +	cmp	r1, r0
-> +	bne	resume_l2on
-> +
-> +continue:
->  	adr	r0, l2x0_regs_phys
->  	ldr	r0, [r0]
->  	ldr	r1, [r0, #L2X0_R_PHY_BASE]
-> @@ -77,4 +102,7 @@ ENDPROC(s3c_cpu_resume)
->  	.globl l2x0_regs_phys
->  l2x0_regs_phys:
->  	.long	0
-> +	.globl s5p_cpu
-> +s5p_cpu:
-> +	.long	0
->  #endif
-> --
-> 1.7.9.5
+enum tegra*_clk is intended to match the IDs listed in the Tegra clock
+bindings. There are a few mismatches, which this patch fixes:
+
+1) pll_s and cop were left out of the Tegra20 enum.
+
+2) spdif_in and spdif_out were swapped relative to the Tegra30 binding.
+
+3) i2cslow was misnamed as i2c_slow, and a duplicate i2cslow clock added
+   to the Tegra30 enum.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ drivers/clk/tegra/clk-tegra20.c |    4 ++--
+ drivers/clk/tegra/clk-tegra30.c |    6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index 8b5241e..143ce1f 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -240,8 +240,8 @@ enum tegra20_clk {
+ 	uartb = 96, vfir, spdif_in, spdif_out, vi, vi_sensor, tvo, cve,
+ 	osc, clk_32k, clk_m, sclk, cclk, hclk, pclk, blink, pll_a, pll_a_out0,
+ 	pll_c, pll_c_out1, pll_d, pll_d_out0, pll_e, pll_m, pll_m_out1,
+-	pll_p, pll_p_out1, pll_p_out2, pll_p_out3, pll_p_out4, pll_u,
+-	pll_x, audio, pll_ref, twd, clk_max,
++	pll_p, pll_p_out1, pll_p_out2, pll_p_out3, pll_p_out4, pll_s, pll_u,
++	pll_x, cop, audio, pll_ref, twd, clk_max,
+ };
+ 
+ static struct clk *clks[clk_max];
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index 56925e1..32c61cb 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -328,13 +328,13 @@ enum tegra30_clk {
+ 	kbc = 36, statmon, pmc, kfuse = 40, sbc1, nor, sbc2 = 44, sbc3 = 46,
+ 	i2c5, dsia, mipi = 50, hdmi, csi, tvdac, i2c2, uartc, emc = 57, usb2,
+ 	usb3, mpe, vde, bsea, bsev, speedo, uartd, uarte, i2c3, sbc4, sdmmc3,
+-	pcie, owr, afi, csite, pciex, avpucq, la, dtv = 79, ndspeed, i2c_slow,
++	pcie, owr, afi, csite, pciex, avpucq, la, dtv = 79, ndspeed, i2cslow,
+ 	dsib, irama = 84, iramb, iramc, iramd, cram2, audio_2x = 90, csus = 92,
+ 	cdev1, cdev2, cpu_g = 96, cpu_lp, gr3d2, mselect, tsensor, i2s3, i2s4,
+ 	i2c4, sbc5, sbc6, d_audio, apbif, dam0, dam1, dam2, hda2codec_2x,
+ 	atomics, audio0_2x, audio1_2x, audio2_2x, audio3_2x, audio4_2x,
+ 	spdif_2x, actmon, extern1, extern2, extern3, sata_oob, sata, hda,
+-	se = 127, hda2hdmi, sata_cold, uartb = 160, vfir, spdif_out, spdif_in,
++	se = 127, hda2hdmi, sata_cold, uartb = 160, vfir, spdif_in, spdif_out,
+ 	vi, vi_sensor, fuse, fuse_burn, cve, tvo, clk_32k, clk_m, clk_m_div2,
+ 	clk_m_div4, pll_ref, pll_c, pll_c_out1, pll_m, pll_m_out1, pll_p,
+ 	pll_p_out1, pll_p_out2, pll_p_out3, pll_p_out4, pll_a, pll_a_out0,
+@@ -342,7 +342,7 @@ enum tegra30_clk {
+ 	spdif_in_sync, i2s0_sync, i2s1_sync, i2s2_sync, i2s3_sync, i2s4_sync,
+ 	vimclk_sync, audio0, audio1, audio2, audio3, audio4, spdif, clk_out_1,
+ 	clk_out_2, clk_out_3, sclk, blink, cclk_g, cclk_lp, twd, cml0, cml1,
+-	i2cslow, hclk, pclk, clk_out_1_mux = 300, clk_max
++	hclk, pclk, clk_out_1_mux = 300, clk_max
+ };
+ 
+ static struct clk *clks[clk_max];
+-- 
+1.7.10.4
