@@ -1,129 +1,67 @@
-From: loic.pallardy@st.com (Loic PALLARDY)
-Date: Tue, 12 Feb 2013 21:01:05 +0100
-Subject: [PATCH v2 10/13] mailbox: create dbx500 mailbox driver
-In-Reply-To: <20130212103949.GA826@e106331-lin.cambridge.arm.com>
-References: <1360645032-9668-1-git-send-email-s-anna@ti.com>
- <1360645032-9668-11-git-send-email-s-anna@ti.com>
- <20130212103949.GA826@e106331-lin.cambridge.arm.com>
-Message-ID: <511A9F81.1040608@st.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 12 Feb 2013 21:24:14 +0100
+Subject: [GIT PULL] <mach/id.h> fixup of fallouts
+In-Reply-To: <CACRpkdYHS+2d7h76CdmX-Ah+_fzOhjLheT_5vNxUWxLd-K0Kww@mail.gmail.com>
+References: <CACRpkdYHS+2d7h76CdmX-Ah+_fzOhjLheT_5vNxUWxLd-K0Kww@mail.gmail.com>
+Message-ID: <2226128.gmkuCV4E15@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tuesday, February 12, 2013 01:10:19 PM Linus Walleij wrote:
+> Hi ARM SoC guys,
+> 
+> this is a pull request for fixing the fallout from the <mach/id.h> removal.
+> 
+> I've pulled it into your next/cleanup branch as a test, and it magically
+> works.
+> 
+> Rafael still has not ACKed the first oneliner, I don't think he'd mind, and
+> I have an ACK from Sam on the MFD portions.
 
-Thanks for your comments.
+It's OK, no objections from me.
 
-On 02/12/2013 11:39 AM, Mark Rutland wrote:
-> Hello,
->
-> I have a few comments on the devicetree binding and the way it's parsed.
->
->> +static const struct of_device_id dbx500_mailbox_match[] = {
->> +       { .compatible = "stericsson,db8500-mailbox",
->> +               .data = (void *)db8500_mboxes,
->> +       },
->> +       { .compatible = "stericsson,db9540-mailbox",
->> +               .data = (void *)dbx540_mboxes,
->> +       },
->> +       { /* sentinel */}
->> +};
->> +
->
-> The binding for the compatible strings above and property parsing below should
-> be documented.
->
-Yes you're right. I will add a description in 
-Documentation/devicetree/bindings/mailbox/...
+Thanks,
+Rafael
 
->> +static int dbx500_mbox_probe(struct platform_device *pdev)
->> +{
->> +       const struct platform_device_id *platid = platform_get_device_id(pdev);
->> +       struct resource *mem;
->> +       int ret, i, legacy_offset = 0, upap_offset;
->> +       struct mailbox **list;
->> +       int irq;
->> +       struct dbx500_plat_data *pdata = dev_get_platdata(&pdev->dev);
->> +       struct device_node *np = pdev->dev.of_node;
->> +
->> +       if (!pdata) {
->> +               if (np) {
->> +                       of_property_read_u32(np, "legacy-offset",
->> +&legacy_offset);
->
-> I see that legacy_offset is initialised to 0, and there's no check on the
-> return value of of_property_read_u32. Does that mean this is an optional
-> property? This needs to be documented.
->
-Correct, I'll add a check. This offset must be compared to shared memory 
-size.
 
->> +                       of_property_read_u32(np, "upap-offset",&upap_offset);
->
-> However, upap_offset isn't initialised, but there's no check on the return
-> value. If "upap-offset" isn't defined in the dt, upap_offset won't have been
-> initialised.
-Should be documented too. upap_offset is optional since not supported by 
-all STE platforms.
-Anyway, value must be checked when used.
->
-> Is there no basic sanity checking that could be done here? I assume there's a
-> maximum offset we expect that's less than 4GB?
->
-> Additionally, of_property_read_u32 takes a *u32, not *int. It would be nice to
-> be consistent with the interface.
-OK
->
-> I'm not familiar with the hardware. What's the difference between the legacy
-> and upap cases?
-Same HW, but different way to access and manage shared memory.
-Link to coprocessor firmware version.
->
->> +                       list = (struct mailbox **)of_match_device(
->> +                                       dbx500_mailbox_match,&pdev->dev)->data;
->> +                       if (!list) {
->> +                               /* No mailbox configuration */
->> +                               dev_err(&pdev->dev, "No configuration found\n");
->> +                               return -ENODEV;
->> +                       }
->> +               } else {
->> +                       /* No mailbox configuration */
->> +                       dev_err(&pdev->dev, "No configuration found\n");
->> +                       return -ENODEV;
->> +               }
->> +       } else {
->> +               list = (struct mailbox **)platid->driver_data;
->> +               legacy_offset = pdata->legacy_offset;
->> +               upap_offset = pdata->upap_offset;
->> +       }
->> +
->> +       mem = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcm_reg");
->
-> Does this work for dt? I wasn't aware we got anything more than anonymous
-> memory and interrupts.
->
-Yes this is working with and without dt.
-dt declaration will be the following
-mailbox {
-	compatible = "stericsson,db8500-mailbox";
-	reg = <0x80157000 0x1000>, <0x801B8000 0x2000>;
-	reg-names = "prcm-reg", "prcmu-tcdm";
-	interrupts = <0 47 0x4>;
-	interrupt-names = "irq";
-	legacy-offset = <0xdd4>;
-};
-
->> +       mbox_base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
->> +       if (!mbox_base) {
->> +               ret = -ENOMEM;
->> +               goto out;
->> +       }
->> +
->> +       mem = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu_tcdm");
->
-> Same here.
->
-> Thanks,
-> Mark.
->
-Regards,
-Loic
+> Please pull this in (unless you applied the individual patches instead).
+> 
+> After this the ux500 compiles and boots just fine.
+> 
+> Yours,
+> Linus Walleij
+> 
+> 
+> The following changes since commit 7a4f26097d389c16c9956bc03b81532698d97d64:
+> 
+>   ARM: ux500: de-globalize <mach/id.h> (2013-01-29 18:47:37 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/for-arm-soc-cleanup
+> 
+> for you to fetch changes up to 05ec260edecaf3dc214cff49d43b1ad9b2cbb710:
+> 
+>   mfd: db8500-prcmu: update resource passing (2013-02-12 12:44:27 +0100)
+> 
+> ----------------------------------------------------------------
+> Two fixes for broken <mach/id.h> cleanup.
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (2):
+>       drivers/db8500-cpufreq: delete dangling include
+>       mfd: db8500-prcmu: update resource passing
+> 
+>  arch/arm/mach-ux500/board-mop500.c   |   5 +-
+>  arch/arm/mach-ux500/cpu-db8500.c     |   7 +-
+>  arch/arm/mach-ux500/devices-db8500.c |  44 +++++++++++++
+>  arch/arm/mach-ux500/devices-db8500.h |   5 ++
+>  drivers/cpufreq/db8500-cpufreq.c     |   1 -
+>  drivers/mfd/db8500-prcmu.c           | 122 +++++++++++++++++++++++------------
+>  include/linux/mfd/db8500-prcmu.h     |  14 ----
+>  include/linux/mfd/dbx500-prcmu.h     |  46 +++++++++++++
+>  8 files changed, 180 insertions(+), 64 deletions(-)
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
