@@ -1,48 +1,76 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 12 Feb 2013 12:38:48 -0700
-Subject: Giving special alignment/size constraints to the Linux PCI core?
-In-Reply-To: <201302121902.14276.arnd@arndb.de>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <201302121600.08434.arnd@arndb.de>
- <20130212184127.GA1471@obsidianresearch.com>
- <201302121902.14276.arnd@arndb.de>
-Message-ID: <20130212193848.GE1471@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Feb 2013 12:39:34 -0700
+Subject: [PATCH V5] get_maintainer: allow keywords to match filenames
+Message-ID: <1360697974-23257-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 07:02:14PM +0000, Arnd Bergmann wrote:
-> On Tuesday 12 February 2013, Jason Gunthorpe wrote:
-> > > My feeling is that an easier solution would be to keep separate
-> > > root buses for each port, which then behaves completely PCIe
-> > > compliant, but add a hook in the procedure above to set up the
-> > > address translation windows between the pci_bus_size_bridges()
-> > > and the pci_bus_assign_resources() calls.
-> > 
-> > This process is only done during driver initialization. How would you
-> > support PCI-E device hotplug (my systems rely on this)? Hotplug works
-> > today with the existing Marvell driver, however that relies on
-> > pre-allocated windows.
-> 
-> I did not expect hotplug to work with either approach. How does
-> it work with the existing driver? From my understanding, you still
-> assign all the top-level P2P bridge resources at bootup, and only
-> if that happens to have some space left before the next bridge,
-> it would be possible to fit in a hotplug device.
+From: Stephen Warren <swarren@nvidia.com>
 
-PCI-E hotplug can be supported through the generic /sys/bus/pci/rescan
-mechanism, which forces a rediscovery/re-evaluation of all the buses
-in the system. The PCI core is smart enough to know what it can/can
-not reassign and can move the bridge windows around (IIRC most of the
-issues here are resolved these days?).
+Allow K: entries in MAINTAINERS to match directly against filenames;
+either those extracted from patch +++ or --- lines, or those specified
+on the command-line using the -f option.
 
-For PCI-E, the root port bridge can be placed anywhere in the host
-aperture, so as long as the host aperture isn't filled the core can
-allocate a memory region for the now active port.
+This potentially allows fewer lines in a MAINTAINERS entry, if all the
+relevant files are scattered throughout the whole kernel tree, yet
+contain some common keyword. An example would be using an ARM SoC name
+as the keyword to catch all related drivers.
 
-Thomas's driver should support this as the regions and windows are all
-properly dynamic.
+I don't think setting exact_pattern_match_hash would be appropriate here;
+at least for intended Tegra use case, this feature is to ensure that all
+Tegra-related driver changes get Cc'd to the Tegra mailing list. Setting
+exact_pattern_match_hash would prevent git history parsing for e.g. S-o-b
+tags, which still seems like it would be useful. Hence, this flag isn't
+set.
 
-This is one reason why re-using the PCI core code is so desirable, it
-handles all these complexities.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+V5: Add back "file content" into list of things affected by K: entries.
+V4:
+* Updated documentation at the start of MAINTAINERS to mention filename
+  matching.
+* s/"/'/ in if check for type 'K'.
+---
+ MAINTAINERS               |    9 +++++----
+ scripts/get_maintainer.pl |    4 ++++
+ 2 files changed, 9 insertions(+), 4 deletions(-)
 
-Jason
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1d0651e..ce35ee2 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -97,12 +97,13 @@ Descriptions of section entries:
+ 	   X:	net/ipv6/
+ 	   matches all files in and below net excluding net/ipv6/
+ 	K: Keyword perl extended regex pattern to match content in a
+-	   patch or file.  For instance:
++	   patch or file, or an affected filename.  For instance:
+ 	   K: of_get_profile
+-	      matches patches or files that contain "of_get_profile"
++	      matches patch or file content, or filenames, that contain
++	      "of_get_profile"
+ 	   K: \b(printk|pr_(info|err))\b
+-	      matches patches or files that contain one or more of the words
+-	      printk, pr_info or pr_err
++	      matches patch or file content, or filenames, that contain one or
++	      more of the words printk, pr_info or pr_err
+ 	   One regex pattern per line.  Multiple K: lines acceptable.
+ 
+ Note: For the hard of thinking, this list is meant to remain in alphabetical
+diff --git a/scripts/get_maintainer.pl b/scripts/get_maintainer.pl
+index 18d4ab5..ce4cc83 100755
+--- a/scripts/get_maintainer.pl
++++ b/scripts/get_maintainer.pl
+@@ -611,6 +611,10 @@ sub get_maintainers {
+ 				    $hash{$tvi} = $value_pd;
+ 				}
+ 			    }
++			} elsif ($type eq 'K') {
++			    if ($file =~ m/$value/x) {
++				$hash{$tvi} = 0;
++			    }
+ 			}
+ 		    }
+ 		}
+-- 
+1.7.10.4
