@@ -1,49 +1,35 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 12 Feb 2013 07:18:14 -0800
-Subject: [PATCH] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for
- all CPU power states except off
-In-Reply-To: <5119CB2D.9040001@ti.com> (Santosh Shilimkar's message of "Tue,
- 12 Feb 2013 10:25:09 +0530")
-References: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
- <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
- <87d2wazep6.fsf@linaro.org> <5119CB2D.9040001@ti.com>
-Message-ID: <87bobpwog9.fsf@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 12 Feb 2013 12:18:19 -0300
+Subject: [PATCH v2 2/8] ARM: omap2: gpmc: Remove unused
+ gpmc_round_ns_to_ticks() function
+In-Reply-To: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1360682305-20935-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/mach-omap2/gpmc.c |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
-> On Saturday 09 February 2013 02:49 AM, Kevin Hilman wrote:
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
->>> Current CPU PM code code make use of common cpu_suspend() path for all the
->>> CPU power states which is not optimal. In fact cpu_suspend() path is needed
->>> only when we put CPU power domain to off state where the CPU context is lost.
->>>
->>> Update the code accordingly so that the expensive cpu_suspend() path
->>> can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
->>>
->>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->>>
->>> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
->>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>
->> Looks OK at first glance, but are you sure this is right for the
->> various ways both clusters might idle using coupled CPUidle?
->>
-> Yes it is perfectly safe from all C-states. This patch has been part of
-> the OMAP4/OMAP5 product port for some time. I forgot to send it upstream
-> some how :(
->
->> Some description of the testing would be helpful here.
->>
-> Sorry. Should have mentioned it in first place.
-> Patch is being tested on OMAP4430 (idle/suspend) and OMAP5 with
-> few out of tree patches.
-
-OK, please update changelog with a brief description of how it was
-tested, and on which platforms.
-
-Thanks,
-
-Kevin
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index ffe3e1e..bd3bc93 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -230,13 +230,6 @@ unsigned int gpmc_ticks_to_ns(unsigned int ticks)
+ 	return ticks * gpmc_get_fclk_period() / 1000;
+ }
+ 
+-static unsigned int gpmc_round_ns_to_ticks(unsigned int time_ns)
+-{
+-	unsigned long ticks = gpmc_ns_to_ticks(time_ns);
+-
+-	return ticks * gpmc_get_fclk_period() / 1000;
+-}
+-
+ static unsigned int gpmc_ticks_to_ps(unsigned int ticks)
+ {
+ 	return ticks * gpmc_get_fclk_period();
+-- 
+1.7.8.6
