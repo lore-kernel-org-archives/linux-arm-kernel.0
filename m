@@ -1,77 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Feb 2013 09:35:56 -0700
-Subject: [v2 3/3] ARM: tegra: Unify Device tree board files
-In-Reply-To: <201302121350.15683.arnd@arndb.de>
-References: <5119849B.1070300@wwwdotorg.org> <5119C958.1030304@wwwdotorg.org>
- <20130212.070456.532657136988541923.hdoyu@nvidia.com>
- <201302121350.15683.arnd@arndb.de>
-Message-ID: <511A6F6C.8090205@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Feb 2013 16:36:45 +0000
+Subject: [PATCH] [RFC] arm: fix memset-related crashes caused by recent
+ GCC (4.7.2) optimizations
+In-Reply-To: <20130212155801.GQ17833@n2100.arm.linux.org.uk>
+References: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
+ <20130211184114.GP9801@mudshark.cambridge.arm.com>
+ <20130211194225.GK29329@parrot.com>
+ <20130212140008.GB4123@mudshark.cambridge.arm.com>
+ <20130212155801.GQ17833@n2100.arm.linux.org.uk>
+Message-ID: <20130212163645.GI4123@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2013 06:50 AM, Arnd Bergmann wrote:
-> On Tuesday 12 February 2013, Hiroshi Doyu wrote:
->>>>>>  static void __init paz00_init(void)
->>>>>> @@ -129,6 +128,9 @@ static void __init tegra_dt_init_late(void)
->>>>>>  
->>>>>>   tegra_init_late();
->>>>>>  
->>>>>> + if (IS_ENABLED(CONFIG_PCI) && IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
->>>>>> +         return;
->>>>>
->>>>> I don't think that's going to help any link issues, so I'd drop it and
->>>>> keep this function simple.
->>>>
->>>> As explained in the above, a complier will drop unnecessary functions
->>>> automatically with this IS_ENABLED(), which could save many ifdefs.
->>>
->>> That sounds extremely brittle. Have you validated this on a wide variety
->>> of compiler versions?
->>
->> I verified with gcc-4.6.
->> IIRC, that's the point of IS_ENABLED() being introduced. Arnd?
+On Tue, Feb 12, 2013 at 03:58:01PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 12, 2013 at 02:00:08PM +0000, Will Deacon wrote:
+> > Interesting... the GCC documentation also states that ffreestanding implies
+> > fno-builtin, so memset and co shouldn't be targetted for this sort of
+> > optimisation by GCC. Have you observed this problem even when passing this
+> > option?
 > 
-> It's certainly expected to work with all compilers, yes. If a compiler
-> cannot remove conditional function calls that depend on a constant
-> expression, we have a lot of other problems alredy.
-
-Removing the function calls isn't guaranteed to remove the body of the
-functions though. Those functions aren't implemented in some separate
-file that's optionally included, but rather are implemented in the same
-object file, now unconditionally, and they in turn reference (with no
-IS_ENABLED logic) other functions that are implemented in conditionally
-linked files.
-
-> However, from what I see above, you have the logic reversed (it
-> should return if neither TEGRA_2x nor PCI are enabled, rather
-> than return if one of them is enabled). and it becomes a little
-> confusing to read.
+> Rather than wondering whether we should be using -ffreestanding or not
+> (which, x86 people have strongly resisted) I suggest that we just fix
+> our memset() implementation to be compliant.
 > 
-> If you want to get rid of the #ifdef here, I would suggest you put those
-> into the functions directly, like
+> The reason it's not compliant is that I saw no reason for it to be
+> compliant back in the gcc 2.7.x days, and it's persisted like that for
+> the last 19-ish years.  If GCC is now making use of the return value,
+> then we need to fix that and undo the "optimization" in our string.h.
 > 
-> static void __init harmony_init(void)
-> {
->         int ret = 0;
-> 
->         if (IS_ENABLED(CONFIG_PCI) && IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
-> 		ret = harmony_pcie_init();
->         if (ret)
->                 pr_err("harmony_pcie_init() failed: %d\n", ret);
-> }
-> 
-> which will turn into an empty function if one of the two is disabled.
+> So let's just bite the bullet, make the asm memset() compliant, and
+> clean up string.h.
 
-That would work.
+That would be the ideal thing to do, because it allows the compiler to
+optimise around these functions, however it does mean we need to check/fix
+*all* of the string functions at least (if we don't pass -fno-builtin then
+any builtin function is up for optimisation, including strcpy etc).
 
-However I'd like to avoid changing the body of those two functions at
-all if possible, since I hope the PCIe driver rework will be merged in
-3.10, and that will allow the Harmony and TrimSlice init functions to be
-removed entirely. I'd rather not have conflicts with the removal patch.
-
-> Since we are not going to add any other board specfic init functions, you
-> can also unroll the loop and put everything into tegra_dt_init_late:
-
-That's not necessarily true. While we certainly don't plan to, I don't
-think we can rule it out; after all, we don't have rfkill bindings and
-yet other boards will need them.
+Will
