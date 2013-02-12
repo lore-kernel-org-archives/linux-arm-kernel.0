@@ -1,120 +1,49 @@
-From: anilk4.v@gmail.com (Anil Kumar)
-Date: Tue, 12 Feb 2013 17:51:57 +0530
-Subject: [PATCH] ARM: dts: omap3-devkit8000: Enable audio support
-Message-ID: <1360671717-32050-1-git-send-email-anilk4.v@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 Feb 2013 13:29:10 +0100
+Subject: [PATCH 6/9] gpiolib: use descriptors internally
+In-Reply-To: <51192CC5.9060300@wwwdotorg.org>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+ <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
+ <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
+ <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
+ <20130209091729.978C73E1A18@localhost>
+ <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
+ <51192CC5.9060300@wwwdotorg.org>
+Message-ID: <CACRpkdaHuv7CXCy15-o94G0r0+2BStsi34ZVbBAhyGj=U3xgOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the needed sections to enable audio support and related pin mux on
-Devkit8000 when booted with DT blob.
+On Mon, Feb 11, 2013 at 6:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 02/11/2013 07:09 AM, Linus Walleij wrote:
 
-Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
----
-This patch is based on top of kernel 3.8-rc5 and
-the following patches.
+>> However if you take this all the way to the descriptor API
+>> it will make the consumer (driver) API for GPIO descriptors deviate
+>> from what is today used for clocks, regulators and pins.
+>>
+>> With all the resulting confusion for users.
+>> I've seen worse subsystem deviations though.
+>
+> Sorry I haven't looked at the specific APIs this discussion refers to,
+> but clients of the GPIO descriptor API are going to need to distinguish
+> "fail" from "deferred probe", so at least some initial get-like API will
+> need to pass back some error detail...
 
-Peter Ujfalusi:-
-ASoC: twl4030: Correct the support for Voice port
-ASoC: twl4030: Convert MICBIAS to SUPPLY widget
-ASoC: omap-twl4030: Add support for routing, voice port and jack detect
+Right, so in some other patch I stated that this would lead
+to a GPIO descriptor fetch interface such as this:
 
-Anil Kumar:-
-ARM: dts: add minimal DT support for DevKit8000
-https://patchwork.kernel.org/patch/2122461/
+int gpiod_get(struct gpiod_desc **gpiod, struct device *dev, const char *name);
 
--Tested for playback and capture on Devkit8000.
+Rather than the more established:
 
- Test process:-
+struct gpio_desc *gpiod_get(struct device *dev, const char *name);
 
- #amixer set 'PredriveR Mixer AudioR2' on
- #amixer set 'PredriveL Mixer AudioL2' on
- #amixer set PreDriv 100 unmute
- #amixer set 'DAC2 Digital Fine' 100
- #amixer cset numid=27 1
- #arecord | aplay
+And I'm worried about the lack of consistency.
 
-:100644 100644 dc59272... 1e2c931... M	arch/arm/boot/dts/omap3-devkit8000.dts
- arch/arm/boot/dts/omap3-devkit8000.dts |   43 ++++++++++++++++++++++++++++---
- 1 files changed, 38 insertions(+), 5 deletions(-)
+While I do get the point... I chatted with Grant about it and
+I want to talk to some toolchain people about this to see if
+pointers containing potential error codes can somehow be
+"flagged" by the compiler so we can enforce error checking on
+them. (It may sound a bit utopic...)
 
-diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-index dc59272..1e2c931 100644
---- a/arch/arm/boot/dts/omap3-devkit8000.dts
-+++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-@@ -44,11 +44,27 @@
-                 };
- 
- 	};
-+
-+	sound {
-+		compatible = "ti,omap-twl4030";
-+		ti,model = "devkit8000";
-+
-+		ti,mcbsp = <&mcbsp2>;
-+		ti,codec = <&twl_audio>;
-+		ti,audio-routing =
-+			"Ext Spk", "PREDRIVEL",
-+			"Ext Spk", "PREDRIVER",
-+			"MAINMIC", "Main Mic",
-+			"Main Mic", "Mic Bias 1";
-+	};
- };
- 
- &omap3_pmx_core {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&i2c1_pins>;
-+	pinctrl-0 = <
-+			&i2c1_pins
-+			&mcbsp2_pins
-+		>;
- 
- 	leds_pins: pinmux_led_pins {
- 		pinctrl-single,pins = <
-@@ -65,6 +81,21 @@
- 			0x18c 0x118	/* I2C1_SDA */
-                 >;
- 	};
-+
-+	mcbsp2_pins: pinmux_mcbsp2_pins {
-+                pinctrl-single,pins = <
-+			/*
-+			 * MCBSP2_FSX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT,
-+			 * MCBSP2_CLKX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT
-+			 */
-+			0x10c 0x01000100
-+			/*
-+			 * MCBSP2_DR, OMAP_MUX_MODE0 | OMAP_PIN_INPUT,
-+			 * MCBSP2_DX, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT
-+			 */
-+			0x110 0x00000100
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -74,6 +105,12 @@
- 		reg = <0x48>;
- 		interrupts = <7>;	/* SYS_NIRQ cascaded to intc */
- 		interrupt-parent = <&intc>;
-+
-+		twl_audio: audio {
-+			compatible = "ti,twl4030-audio";
-+			codec {
-+			};
-+		};
- 	};
- };
- 
-@@ -109,10 +146,6 @@
- 	status = "disabled";
- };
- 
--&mcbsp2 {
--	status = "disabled";
--};
--
- &mcbsp3 {
- 	status = "disabled";
- };
--- 
-1.7.0.4
+Yours,
+Linus Walleij
