@@ -1,56 +1,27 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 11 Feb 2013 16:00:26 -0800
-Subject: [PATCH V3 1/2] get_maintainer: allow keywords to match filenames
-In-Reply-To: <1360626016-23332-1-git-send-email-swarren@wwwdotorg.org>
-References: <1360626016-23332-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1360627226.4707.6.camel@joe-AO722>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 12 Feb 2013 01:02:03 +0100
+Subject: [PATCH 0/3] ARM: S3C24XX: integrate special s3c2412 eint handling
+Message-ID: <201302120102.03511.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-02-11 at 16:40 -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Allow K: entries in MAINTAINERS to match directly against filenames;
-> either those extracted from patch +++ or --- lines, or those specified
-> on the command-line using the -f option.
-[]
-> I don't think setting exact_pattern_match_hash would be appropriate here;
-> at least for intended Tegra use case, this feature is to ensure that all
-> Tegra-related driver changes get Cc'd to the Tegra mailing list. Setting
-> exact_pattern_match_hash would prevent git history parsing for e.g. S-o-b
-> tags, which still seems like it would be useful. Hence, this flag isn't
-> set.
+This series is meant to go on top of the recent basic integration of the
+s3c2412, s3c2440 and s3c2442 and implements the last necessary change by
+making the overrides of the eints 0 to 3 on the s3c2412 unnecessary.
 
-And I don't think that's necessary because for filenames,
-you could add the appropriate control to the MAINTAINERS
+After this everything is handled using the new structure.
 
-"K:	^pattern$"
 
-> The value in $hash{$tvi} doesn't seem relevant, so I just assign 0.
+Heiko Stuebner (3):
+  ARM: S3C24XX: include first 4 bits of the eint register in irq mapping
+  ARM: S3C24XX: add soc_is_s3c2412 option
+  ARM: S3C24XX: handle s3c2412 eints using new infrastructure
 
-0 is good.
+ arch/arm/mach-s3c24xx/include/mach/irqs.h |   58 +++++++------
+ arch/arm/mach-s3c24xx/irq.c               |  127 +++++++++--------------------
+ arch/arm/plat-samsung/include/plat/cpu.h  |   10 +++
+ drivers/gpio/gpio-samsung.c               |    5 +-
+ 4 files changed, 83 insertions(+), 117 deletions(-)
 
-It would be relevant if --pattern-depth was set.
-
-> Joe, I'm not sure if you care where this gets merged; could it go through
-> arm-soc together with patch 2/2? A quick look at git history of the
-> script in linux-next indicates there won't be conflicts doing that.
-
-I don't care how it gets merged.
-
-Andrew Morton typically picks these up but
-if you want to get it merged separately,
-I don't see a problem.
-
-trivial comment below:
-
-> diff --git a/scripts/get_maintainer.pl b/scripts/get_maintainer.pl
-[]
-> @@ -611,6 +611,10 @@ sub get_maintainers {
->  				    $hash{$tvi} = $value_pd;
->  				}
->  			    }
-> +			} elsif ($type eq "K") {
-
-This should probably be 'K' to match the other
-'F' use above it.
+-- 
+1.7.2.3
