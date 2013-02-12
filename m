@@ -1,56 +1,73 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 12 Feb 2013 09:28:53 +0530
-Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
-In-Reply-To: <20130211190852.GA5695@linux.vnet.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <510FBC01.2030405@linux.vnet.ibm.com> <87haloiwv0.fsf@rustcorp.com.au>
- <51134596.4080106@linux.vnet.ibm.com>
- <20130208154113.GV17833@n2100.arm.linux.org.uk>
- <51152B81.2050501@linux.vnet.ibm.com> <51153F72.1060005@linux.vnet.ibm.com>
- <CAKfTPtCe+cD7LLkb+D6pqG1SwG2V08ws=4XO3ttHEHV2qgmqPg@mail.gmail.com>
- <5118E2CD.90401@linux.vnet.ibm.com>
- <20130211190852.GA5695@linux.vnet.ibm.com>
-Message-ID: <5119BDFD.1000909@linux.vnet.ibm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 12 Feb 2013 05:12:40 +0100
+Subject: [v2 3/3] ARM: tegra: Unify Device tree board files
+In-Reply-To: <5119849B.1070300@wwwdotorg.org>
+References: <1360562743-21689-1-git-send-email-hdoyu@nvidia.com><1360562743-21689-3-git-send-email-hdoyu@nvidia.com><5119849B.1070300@wwwdotorg.org>
+Message-ID: <20130212.061240.2083183700176617607.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2013 12:38 AM, Paul E. McKenney wrote:
-> On Mon, Feb 11, 2013 at 05:53:41PM +0530, Srivatsa S. Bhat wrote:
->> On 02/11/2013 05:28 PM, Vincent Guittot wrote:
->>> On 8 February 2013 19:09, Srivatsa S. Bhat
->>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
-> 
-> [ . . . ]
-> 
->>>> Adding Vincent to CC, who had previously evaluated the performance and
->>>> latency implications of CPU hotplug on ARM platforms, IIRC.
->>>>
->>>
->>> Hi Srivatsa,
->>>
->>> I can try to run some of our stress tests on your patches.
->>
->> Great!
->>
->>> Have you
->>> got a git tree that i can pull ?
->>>
->>
->> Unfortunately, no, none at the moment..  :-(
-> 
-> You do need to create an externally visible git tree.
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 12 Feb 2013 00:54:03 +0100:
 
-Ok, I'll do that soon.
-
->  In the meantime,
-> I have added your series at rcu/bhat.2013.01.21a on -rcu:
+> > -obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra.o
+> > -obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
+> > -obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= board-dt-tegra114.o
+> > +obj-y					+= tegra.o
+> > +
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git
+> I think I'd be tempted to move that line together with all the others
+> that don't depend on some config option.
+
+In arch/arm/mach-tegra/Makefile, we have:
+
+obj-y                                   += common.o
+obj-y                                   += io.o
+obj-y                                   += irq.o
+obj-y					+= fuse.o
+obj-y					+= pmc.o
+.....
+
+Should we have a single entry for them as well?
+
+obj-y:= common.o io.o irq.o fuse.o pmc.o flowctrl.o powergate.o apbio.o pm.o \
+	reset.o reset-handler.o sleep.o tegra.o
+
+I think that this moval could be done another patch.
+
+> >  static void __init harmony_init(void)
+> >  {
+> > -#ifdef CONFIG_TEGRA_PCI
+> >  	int ret;
+> >  
+> >  	ret = harmony_pcie_init();
+> >  	if (ret)
+> >  		pr_err("harmony_pcie_init() failed: %d\n", ret);
+> > -#endif
+> >  }
 > 
-> This should appear soon on a kernel.org mirror near you.  ;-)
->
+> Why drop those ifdefs? Does the code still compile (link) if built for
+> Tegra30-only or Tegra114-only, where the Tegra PCI driver won't be
+> enabled, and hence those functions don't exist?
 
-Thank you very much, Paul! :-)
+This function itself will be dropped by the following IS_ENABLED().
 
-Regards,
-Srivatsa S. Bhat
+> >  static void __init paz00_init(void)
+> > @@ -129,6 +128,9 @@ static void __init tegra_dt_init_late(void)
+> >  
+> >  	tegra_init_late();
+> >  
+> > +	if (IS_ENABLED(CONFIG_PCI) && IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
+> > +		return;
+> 
+> I don't think that's going to help any link issues, so I'd drop it and
+> keep this function simple.
+
+As explained in the above, a complier will drop unnecessary functions
+automatically with this IS_ENABLED(), which could save many ifdefs.
+
+> After all, what if someone wants to add some
+> non-PCI-related entry into board_init_funcs[]?
+
+I originally thought that one should try to solve those board specific
+problems with DT basically and this tegra specific board_init_funcs[]
+was left only for the legacy support during DT transition.
