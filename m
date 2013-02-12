@@ -1,79 +1,57 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 12 Feb 2013 15:35:11 -0700
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Feb 2013 22:36:37 +0000
+Subject: [PATCH 05/32] lib: devres: don't enclose pcim_*() functions in
+ CONFIG_HAS_IOPORT
+In-Reply-To: <20130212195816.6e34b3ce@skate>
 References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130212223511.GB31555@obsidianresearch.com>
+ <201302121800.48723.arnd@arndb.de> <20130212195816.6e34b3ce@skate>
+Message-ID: <201302122236.37491.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 05:28:58PM +0100, Thomas Petazzoni wrote:
-> +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-[..]
-> +pcie-controller {
-> +	compatible = "marvell,armada-370-xp-pcie";
-> +	status = "disabled";
-> +
-> +	#address-cells = <3>;
-> +	#size-cells = <2>;
-> +
-> +	bus-range = <0x00 0xff>;
-> +
-> +	ranges = <0x00000800 0 0xd0040000 0xd0040000 0 0x00002000   /* port 0.0 registers */
-> +	          0x00004800 0 0xd0042000 0xd0042000 0 0x00002000   /* port 2.0 registers */
-> +	          0x00001000 0 0xd0044000 0xd0044000 0 0x00002000   /* port 0.1 registers */
-> +	          0x00001800 0 0xd0048000 0xd0048000 0 0x00002000   /* port 0.2 registers */
-> +	          0x00002000 0 0xd004C000 0xd004C000 0 0x00002000   /* port 0.3 registers */
-> +		  0x00002800 0 0xd0080000 0xd0080000 0 0x00002000   /* port 1.0 registers */
-> +	          0x00005000 0 0xd0082000 0xd0082000 0 0x00002000   /* port 3.0 registers */
-> +		  0x00003000 0 0xd0084000 0xd0084000 0 0x00002000   /* port 1.1 registers */
-> +		  0x00003800 0 0xd0088000 0xd0088000 0 0x00002000   /* port 1.2 registers */
-> +		  0x00004000 0 0xd008C000 0xd008C000 0 0x00002000   /* port 1.3 registers */
-> +		  0x81000000 0 0	  0xc0000000 0 0x00100000   /* downstream I/O */
-> +		  0x82000000 0 0	  0xc1000000 0 0x08000000>; /* non-prefetchable memory */
-> +
-> +	#interrupt-cells = <1>;
-> +	interrupt-map-mask = <0xf800 0 0 1>;
-> +	interrupt-map = <0x0800 0 0 1 &mpic 58
-> +		         0x1000 0 0 1 &mpic 59
-> +			 0x1800 0 0 1 &mpic 60
-> +			 0x2000 0 0 1 &mpic 61
-> +			 0x2800 0 0 1 &mpic 62
-> +		         0x3000 0 0 1 &mpic 63
-> +			 0x3800 0 0 1 &mpic 64
-> +			 0x4000 0 0 1 &mpic 65
-> +			 0x4800 0 0 1 &mpic 99
-> +			 0x5000 0 0 1 &mpic 103>;
+On Tuesday 12 February 2013, Thomas Petazzoni wrote:
+> > Any driver that requires a
+> > linear mapping of I/O ports to __iomem pointers must depend
+> > CONFIG_HAS_IOPORT with the current definition of that symbol (as
+> > mentioned before, we should really rename that to
+> > CONFIG_HAS_IOPORT_MAP). Having these functions not defined is a
+> > compile time check that is necessary to ensure that all drivers have
+> > the correct annotation.
+> 
+> I have the feeling that the problem is more complex than that. My
+> understanding is that the pcim_iomap_regions() function used by
+> drivers/ata/libata-sff.c can perfectly be used to map memory BARs, and
+> not necessarily I/O BARs. Therefore, this driver can perfectly be used
+> in an architecture where CONFIG_NO_IOPORT is selected.
 
-This is out of date now?
+That is correct.
 
-> +	pcie at 0,0 {
-> +		device_type = "pciex";
-> +		reg = <0x0800 0 0xd0040000 0 0x2000>;
+> The thing is that pcim_iomap_regions() transparently allows to remap an
+> I/O BAR is such a BAR is passed as argument, or a memory BAR if such a
+> BAR is passed as argument.
+> 
+> Therefore, I continue to believe that the pcim_*() functions are useful
+> even if the platform doesn't have CONFIG_HAS_IOPORT.
 
-It would be great to get this sorted as per my prior comments.. Maybe
-like this is easy?
+Yes, the pcim_ functions are useful in principle, but it falls back
+to the __pci_ioport_map() for IORESOURCE_IO, and that needs to
+return an error if CONFIG_HAS_IOPORT is not set.
+I think it would be correct if you add this hunk:
 
-pcie-controller {
- compatible = "marvell,armada-370-xp-pcie";
+diff --git a/lib/pci_iomap.c b/lib/pci_iomap.c
+index 0d83ea8..f9b6387 100644
+--- a/lib/pci_iomap.c
++++ b/lib/pci_iomap.c
+@@ -33,7 +33,7 @@ void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen)
+                return NULL;
+        if (maxlen && len > maxlen)
+                len = maxlen;
+-       if (flags & IORESOURCE_IO)
++       if (IS_ENABLED(CONFIG_HAS_IOPORT) && (flags & IORESOURCE_IO))
+                return __pci_ioport_map(dev, start, len);
+        if (flags & IORESOURCE_MEM) {
+                if (flags & IORESOURCE_CACHEABLE)
 
- // Index by marvell,pcie-port ?
- regs = <0xd0040000 0x00002000
-         0xd0080000 0x00002000>;
+in order to prevent a link error when CONFIG_HAS_IOPORT is unset.
 
- ranges = <0x81000000 0 0  0xc0000000  0 0x00010000   /* downstream I/O */
-           0x82000000 0 0  0xc1000000  0 0x08000000>; /* non-prefetchable memory */
-
- pcie at 0,0 {
-      device_type = "pci";
-      reg = <0x0800 0 0 0>; // 00:01.0  (????)
-      marvell,pcie-port = <0>;
- };
-}
-
-It is abusive to map the device internal per-port registers through
-'0x00000800 0 0xd0040000' and 'reg' - that is not really the intent of
-the OF spec.
-
-Jason
+	Arnd
