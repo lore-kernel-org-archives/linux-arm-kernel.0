@@ -1,46 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 11 Feb 2013 17:42:54 -0800
-Subject: [PATCH 03/19] ARM: msm: proc_comm_boot_wait should not be __init
-In-Reply-To: <8yak3r15ds0.fsf@huya.qualcomm.com>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <1359123276-15833-4-git-send-email-arnd@arndb.de>
- <8yak3r15ds0.fsf@huya.qualcomm.com>
-Message-ID: <20130212014254.GA6952@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Feb 2013 19:24:16 -0700
+Subject: [PATCH V3] i2c: add bcm2835 driver
+In-Reply-To: <20130211225208.GA9893@nekote.pengutronix.de>
+References: <1360381978-26092-1-git-send-email-swarren@wwwdotorg.org>
+ <20130211225208.GA9893@nekote.pengutronix.de>
+Message-ID: <5119A7D0.20000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 25, 2013 at 10:16:31AM -0800, David Brown wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+On 02/11/2013 03:52 PM, Wolfram Sang wrote:
+> Hi Stephen,
 > 
-> > msm_smd_probe is a driver probe function and may get
-> > called after the __init time, so it must not call
-> > any __init function, as the link-time warning reports.
-> > Take away the __init annotation on proc_comm_boot_wait
-> > to fix this.
-> >
-> > Without this patch, building msm_defconfig results in:
-> >
-> > WARNING: vmlinux.o(.text+0xb048): Section mismatch in reference from the function msm_smd_probe() to the function .init.text:proc_comm_boot_wait()
-> > The function msm_smd_probe() references
-> > the function __init proc_comm_boot_wait().
-> > This is often because msm_smd_probe lacks a __init
-> > annotation or the annotation of proc_comm_boot_wait is wrong.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: David Brown <davidb@codeaurora.org>
-> > Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> > Cc: Daniel Walker <c_dwalke@quicinc.com>
-> > Cc: linux-arm-msm at vger.kernel.org
-> > ---
-> >  arch/arm/mach-msm/proc_comm.h | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> On Fri, Feb 08, 2013 at 08:52:58PM -0700, Stephen Warren wrote:
+>> This implements a very basic I2C host driver for the BCM2835 SoC. Missing
+>> features so far are:
+>>
+>> * 10-bit addressing.
+>> * DMA.
+...
+>> +	ret = wait_for_completion_timeout(&i2c_dev->completion,
+>> +					  BCM2835_I2C_TIMEOUT);
+>> +	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
+>> +	if (WARN_ON(ret == 0)) {
+>> +		dev_err(i2c_dev->dev, "i2c transfer timed out\n");
+>> +		return -ETIMEDOUT;
+>> +	}
 > 
-> Arnd, you're welcome to pull this into your tree:
-> Acked-by: David Brown <davidb@codeaurora.org>
+> I'd suggest to skip the WARN_ON. Timeout is the expected case when you
+> want to read from an EEPROM which is just in the process of
+> erasing/writing data from the previous command.
+
+I copied that from Tegra. Should that driver be changed too?
+
+>> +	adap = &i2c_dev->adapter;
+>> +	i2c_set_adapdata(adap, i2c_dev);
+>> +	adap->owner = THIS_MODULE;
+>> +	adap->class = I2C_CLASS_HWMON;
 > 
-> I don't forsee any conflicts with upcoming patches.
+> Do you really need the class?
 
-Applied.
+If I grep for I2C_CLASS_HWMON, I see a ton of hits. I think I'll keep it
+unless you strongly object, since it seems typical.
 
-
--Olof
+I'll fix up the other points you mentioned.
