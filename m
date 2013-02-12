@@ -1,35 +1,36 @@
-From: wolfram@the-dreams.de (Wolfram Sang)
-Date: Tue, 12 Feb 2013 11:03:35 +0100
-Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
-In-Reply-To: <CAPnjgZ3HnXDp9ErsbZEfpc-NexuAt1C5cUWbFn=BW2TMGiMJEg@mail.gmail.com>
-References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
- <20130210181710.GB12760@nekote.pengutronix.de>
- <CAD=FV=XzfseMEHK4KutgYYoU4kEFPq7qoFoJtaBrh6QJUa1Y_w@mail.gmail.com>
- <CAPnjgZ3HnXDp9ErsbZEfpc-NexuAt1C5cUWbFn=BW2TMGiMJEg@mail.gmail.com>
-Message-ID: <20130212100335.GA5490@nekote.pengutronix.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 12 Feb 2013 11:07:47 +0100
+Subject: [PATCH] ARM: OMAP3+: Fix kernel panic on boot
+In-Reply-To: <1360614380-20114-1-git-send-email-jon-hunter@ti.com>
+References: <1360614380-20114-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20130212100747.GA20996@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jon,
 
-> > At the moment perhaps the strongest argument for why this particular
-> > arbitration scheme is needed is that's what the EC (embedded
-> > controller) on the ARM Chromebook uses.  There have been several
-> > arguments in-house about whether this was the most ideal way to
-> > structure things, but that's what we shipped with.  Thus, if we want
-> > to be able to talk to i2c devices on this bus (contains the keyboard,
-> > battery, and a bunch of power switches) we need something in the
-> > system that implements this arbitration scheme.
-> >
+On Mon, Feb 11, 2013 at 02:26:19PM -0600, Jon Hunter wrote:
+> Commit 8a6aaa3 (mfd: twl-core: Collect global variables behind one
+> private structure (global)) removed the variable "inuse" that is used
+> to determine if the device has been initialised and now use the
+> twl_priv structure instead. This is causing the kernel to panic on
+> OMAP3+ devices using the twl driver, because we try to access the
+> twl_priv->ready member before checking if twl_priv is initialised. Fix
+> this and move this test to the beginning of the twl_i2c_read/write
+> function because twl_get_last_module() also uses the twl_priv structure.
 > 
-> There was some discussion about using the built-in I2C multi-master
-> support but no one had had a good experience getting it to work
-> reliably in a real system so we ended up deciding not to rely on this.
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/mfd/twl-core.c |   16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+Patch applied, thanks.
+I fixed the subject as it's codewise not ARM or OMAP3 related, but rather mfd
+and twl-core.
 
-So, were there no experiences at all or bad experiences when trying? I
-am interested in hearing what I2C multi master restrictions might exist
-in practice.
+Cheers,
+Samuel.
 
-Thanks,
-
-   Wolfram
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
