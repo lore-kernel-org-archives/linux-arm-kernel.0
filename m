@@ -1,46 +1,57 @@
-From: nerv@dawncrow.de (=?ISO-8859-1?Q?Andr=E9_Hentschel?=)
-Date: Tue, 12 Feb 2013 15:14:42 +0100
-Subject: [PATCH] arm: Preserve TPIDRURW on context switch
-In-Reply-To: <20130212140950.GC4123@mudshark.cambridge.arm.com>
-References: <5112DC7E.4020108@dawncrow.de>
- <20130206225150.GL17833@n2100.arm.linux.org.uk>
- <5112E0C3.1080706@dawncrow.de>
- <20130208154809.GF3495@mudshark.cambridge.arm.com>
- <511A4B93.1000700@dawncrow.de>
- <20130212140950.GC4123@mudshark.cambridge.arm.com>
-Message-ID: <511A4E52.4070909@dawncrow.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 12 Feb 2013 16:46:51 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the mfd tree
+In-Reply-To: <20130211185221.GR4801@atomide.com>
+References: <20130211170616.73fd9fd30bb10c27a698ad4d@canb.auug.org.au>
+ <20130211185221.GR4801@atomide.com>
+Message-ID: <511A55DB.7040808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.02.2013 15:09, schrieb Will Deacon:
-> Hi Andre,
-> 
-> On Tue, Feb 12, 2013 at 02:02:59PM +0000, Andr? Hentschel wrote:
->> Am 08.02.2013 16:48, schrieb Will Deacon:
->>> On Wed, Feb 06, 2013 at 11:01:23PM +0000, Andr? Hentschel wrote:
->>>> No, i'm not sure how to improve this. How does the process can continue, can you or someone else fix that and add his Signed-off-by?
->>>
->>> How about something like the (completely untested) diff below?
->>>
->>> Andre: if this works for you, I'm happy to write a commit message etc.
+On 02/11/2013 08:52 PM, Tony Lindgren wrote:
+> * Stephen Rothwell <sfr@canb.auug.org.au> [130210 22:11]:
+>> Hi all,
 >>
->> Thx for your effort, but it doesn't work, at least not with my 3.4.6 suse kernel.
->> Be free to have another try, i'll be happy to test it.
+>> Today's linux-next merge of the arm-soc tree got a conflict in
+>> arch/arm/mach-omap2/usb-host.c between commit 8a89e93237e1 ("mfd:
+>> omap-usb-host: Consolidate OMAP USB-HS platform data") from the mfd tree
+>> and commit c1d1cd597fc7 ("ARM: OMAP2+: omap_device: remove obsolete
+>> pm_lats and early_device code") from the arm-soc tree.
+>>
+>> I fixed it up (see below) and can carry the fix as necessary (no action
+>> is required).
 > 
-> Well, cheers for testing. Can you be more specific about what goes wrong
-> please? What do you see in TPIDRURW?
+> Thanks again.
 > 
-> Will
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arch" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Samuel, up to you, but I suggest you just drop these patches for
+> now if still possible unless other patches are based on these.
 > 
 
-Hi Will,
+Samuel, please feel free to drop the 20 patches you pulled from me recently.
 
-it's 0x00000000 again.
+I have another set patches that would depend on them and I think it is better if
+both sets go through usb and arm-soc trees. This would avoid some confusion.
 
--- 
+Once you confirm I can add your Acked-by's to them and send fresh pull requests
+to Tony & Greg. Thanks.
 
-Best Regards, Andr? Hentschel
+> All OMAP USB people, doing these things should be pretty trivial,
+> just follow these steps:
+> 
+> 1. Do all the platform data and header changes first so we can
+>    put them into a shared minimal topic branch either in the
+>    USB tree or arm-soc tree
+> 
+> 2. Modify the USB driver(s) based on #1 and have them merged into
+>    the USB tree
+> 
+> 3. Add new arch/arm related pdata and .dts entries based on #1
+>    so we can merge it via arm-soc tree
+> 
+> 4. Remove all the old crap later on to avoid extra dependencies
+>    between these branches
+> 
+Thanks Tony.
+
+cheers,
+-roger
