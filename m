@@ -1,63 +1,129 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Feb 2013 19:49:49 +0000
-Subject: [PATCH 06/32] arm: pci: add a align_resource hook
-In-Reply-To: <20130212200118.531cda2e@skate>
-References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1360686546-24277-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302121803.12660.arnd@arndb.de> <20130212200118.531cda2e@skate>
-Message-ID: <20130212194949.GV17833@n2100.arm.linux.org.uk>
+From: loic.pallardy@st.com (Loic PALLARDY)
+Date: Tue, 12 Feb 2013 21:01:05 +0100
+Subject: [PATCH v2 10/13] mailbox: create dbx500 mailbox driver
+In-Reply-To: <20130212103949.GA826@e106331-lin.cambridge.arm.com>
+References: <1360645032-9668-1-git-send-email-s-anna@ti.com>
+ <1360645032-9668-11-git-send-email-s-anna@ti.com>
+ <20130212103949.GA826@e106331-lin.cambridge.arm.com>
+Message-ID: <511A9F81.1040608@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 08:01:18PM +0100, Thomas Petazzoni wrote:
-> Dear Arnd Bergmann,
-> 
-> On Tue, 12 Feb 2013 18:03:12 +0000, Arnd Bergmann wrote:
-> > On Tuesday 12 February 2013, Thomas Petazzoni wrote:
-> > > The PCI specifications says that an I/O region must be aligned on a
-> > > 4 KB boundary, and a memory region aligned on a 1 MB boundary.
-> > > 
-> > > However, the Marvell PCIe interfaces rely on address decoding
-> > > windows (which allow to associate a range of physical addresses
-> > > with a given device), and those have special requirements compared
-> > > to the standard PCI-to-PCI bridge specifications.
-> > 
-> > I'm not convince that we should add this complexity yet, until
-> > everyone agrees on the basic approach taken.
-> 
-> Regardless of whether we choose to have the emulated PCI-to-PCI bridges
-> or not, we still need this align_resource() hook.
-> 
-> In the solution you propose, where each PCIe interface is represented
-> as a separate PCIe domain, we still need the kernel to dynamically
-> assign ranges of address to each memory BAR and I/O BAR of each PCIe
-> device. And those range of address must comply with the address
-> decoding windows requirements, otherwise, we don't be able to create
-> those address decoding windows, and the devices will be unaccessible.
+Hi Mark,
 
-I think what Arnd is suggesting is that you treat each of your busses
-as a separate root bus.
+Thanks for your comments.
 
-This then means that you register each bus separately via
-pci_common_init() (this can take 0..N root buses and scan them.)
+On 02/12/2013 11:39 AM, Mark Rutland wrote:
+> Hello,
+>
+> I have a few comments on the devicetree binding and the way it's parsed.
+>
+>> +static const struct of_device_id dbx500_mailbox_match[] = {
+>> +       { .compatible = "stericsson,db8500-mailbox",
+>> +               .data = (void *)db8500_mboxes,
+>> +       },
+>> +       { .compatible = "stericsson,db9540-mailbox",
+>> +               .data = (void *)dbx540_mboxes,
+>> +       },
+>> +       { /* sentinel */}
+>> +};
+>> +
+>
+> The binding for the compatible strings above and property parsing below should
+> be documented.
+>
+Yes you're right. I will add a description in 
+Documentation/devicetree/bindings/mailbox/...
 
-We can then size each bus (which means, totalling up the amount of space
-each bus requires).
+>> +static int dbx500_mbox_probe(struct platform_device *pdev)
+>> +{
+>> +       const struct platform_device_id *platid = platform_get_device_id(pdev);
+>> +       struct resource *mem;
+>> +       int ret, i, legacy_offset = 0, upap_offset;
+>> +       struct mailbox **list;
+>> +       int irq;
+>> +       struct dbx500_plat_data *pdata = dev_get_platdata(&pdev->dev);
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +
+>> +       if (!pdata) {
+>> +               if (np) {
+>> +                       of_property_read_u32(np, "legacy-offset",
+>> +&legacy_offset);
+>
+> I see that legacy_offset is initialised to 0, and there's no check on the
+> return value of of_property_read_u32. Does that mean this is an optional
+> property? This needs to be documented.
+>
+Correct, I'll add a check. This offset must be compared to shared memory 
+size.
 
-At that point, we know how much memory and IO space each bus requires,
-and platform code can then setup the appropriate bridge windows.  The
-alignment of the bases is something that platform code can deal with
-in its allocation mechanism, and the resulting allocated resources
-can then be assigned to each PCI bus.
+>> +                       of_property_read_u32(np, "upap-offset",&upap_offset);
+>
+> However, upap_offset isn't initialised, but there's no check on the return
+> value. If "upap-offset" isn't defined in the dt, upap_offset won't have been
+> initialised.
+Should be documented too. upap_offset is optional since not supported by 
+all STE platforms.
+Anyway, value must be checked when used.
+>
+> Is there no basic sanity checking that could be done here? I assume there's a
+> maximum offset we expect that's less than 4GB?
+>
+> Additionally, of_property_read_u32 takes a *u32, not *int. It would be nice to
+> be consistent with the interface.
+OK
+>
+> I'm not familiar with the hardware. What's the difference between the legacy
+> and upap cases?
+Same HW, but different way to access and manage shared memory.
+Link to coprocessor firmware version.
+>
+>> +                       list = (struct mailbox **)of_match_device(
+>> +                                       dbx500_mailbox_match,&pdev->dev)->data;
+>> +                       if (!list) {
+>> +                               /* No mailbox configuration */
+>> +                               dev_err(&pdev->dev, "No configuration found\n");
+>> +                               return -ENODEV;
+>> +                       }
+>> +               } else {
+>> +                       /* No mailbox configuration */
+>> +                       dev_err(&pdev->dev, "No configuration found\n");
+>> +                       return -ENODEV;
+>> +               }
+>> +       } else {
+>> +               list = (struct mailbox **)platid->driver_data;
+>> +               legacy_offset = pdata->legacy_offset;
+>> +               upap_offset = pdata->upap_offset;
+>> +       }
+>> +
+>> +       mem = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcm_reg");
+>
+> Does this work for dt? I wasn't aware we got anything more than anonymous
+> memory and interrupts.
+>
+Yes this is working with and without dt.
+dt declaration will be the following
+mailbox {
+	compatible = "stericsson,db8500-mailbox";
+	reg = <0x80157000 0x1000>, <0x801B8000 0x2000>;
+	reg-names = "prcm-reg", "prcmu-tcdm";
+	interrupts = <0 47 0x4>;
+	interrupt-names = "irq";
+	legacy-offset = <0xdd4>;
+};
 
-Once that's done, we can then call pci_bus_assign_resources() to setup
-the resources for each bus, which will use our allocated resources.
-
-There's a downside to this though: the pci core doesn't size root buses,
-because:
-(a) it assumes that they're fixed size.
-(b) root buses don't have a P2P 'bridge' to be sized.
-
-I'm wondering if we could come up with a way to refactor
-__pci_bus_size_bridges() so that we can get this information out of it.
-That's more a question for PCI people though.
+>> +       mbox_base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
+>> +       if (!mbox_base) {
+>> +               ret = -ENOMEM;
+>> +               goto out;
+>> +       }
+>> +
+>> +       mem = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu_tcdm");
+>
+> Same here.
+>
+> Thanks,
+> Mark.
+>
+Regards,
+Loic
