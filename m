@@ -1,63 +1,73 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 12 Feb 2013 14:56:01 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the metag tree
-Message-ID: <20130212145601.09b536bef18ae4f3c8d3b3cc@canb.auug.org.au>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 12 Feb 2013 03:58:35 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: fix some omap_device_build() calls that aren't
+ compiled by default
+Message-ID: <alpine.DEB.2.00.1302120358130.14983@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
 
-Today's linux-next merge of the arm-soc tree got conflicts in
-drivers/clocksource/Makefile and drivers/clocksource/Kconfig between
-commit 3fedb0674fbc ("metag: Time keeping") from the metag tree and
-commits 8a4da6e36c58 ("arm: arch_timer: move core to
-drivers/clocksource") and  ("arm64: move from arm_generic to
-arm_arch_timer") from the arm-soc tree.
+Commit c1d1cd597fc77af3086470f8627d77f52f7f8b6c ("ARM: OMAP2+:
+omap_device: remove obsolete pm_lats and early_device code") missed a
+few omap_device_build() calls that aren't included as part of the default
+OMAP2+ Kconfig, omap2plus_defconfig.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Ideally, all devices that are present on the SoC should be created by
+default, and only the corresponding device driver should be configured
+or deconfigured in Kconfig.  This allows drivers to be built as
+modules and loaded later, even if they weren't part of the original
+kernel build.  Unfortunately, we're not quite there yet.
 
+Thanks to Tony Lindgren for reporting this, found during his
+randconfig tests.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/am35xx-emac.c |    3 +--
+ arch/arm/mach-omap2/devices.c     |    2 +-
+ arch/arm/mach-omap2/sr_device.c   |    2 +-
+ 3 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/am35xx-emac.c b/arch/arm/mach-omap2/am35xx-emac.c
+index a00d391..25b79a2 100644
+--- a/arch/arm/mach-omap2/am35xx-emac.c
++++ b/arch/arm/mach-omap2/am35xx-emac.c
+@@ -62,8 +62,7 @@ static int __init omap_davinci_emac_dev_init(struct omap_hwmod *oh,
+ {
+ 	struct platform_device *pdev;
+ 
+-	pdev = omap_device_build(oh->class->name, 0, oh, pdata, pdata_len,
+-				 false);
++	pdev = omap_device_build(oh->class->name, 0, oh, pdata, pdata_len);
+ 	if (IS_ERR(pdev)) {
+ 		WARN(1, "Can't build omap_device for %s:%s.\n",
+ 		     oh->class->name, oh->name);
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index d8a0cc3..6ecc89a 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -382,7 +382,7 @@ static void __init omap_init_hdmi_audio(void)
+ 		return;
+ 	}
+ 
+-	pdev = omap_device_build("omap-hdmi-audio-dai", -1, oh, NULL, 0, 0);
++	pdev = omap_device_build("omap-hdmi-audio-dai", -1, oh, NULL, 0);
+ 	WARN(IS_ERR(pdev),
+ 	     "Can't build omap_device for omap-hdmi-audio-dai.\n");
+ 
+diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+index bb829e0..d7bc33f 100644
+--- a/arch/arm/mach-omap2/sr_device.c
++++ b/arch/arm/mach-omap2/sr_device.c
+@@ -152,7 +152,7 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
+ 
+ 	sr_data->enable_on_init = sr_enable_on_init;
+ 
+-	pdev = omap_device_build(name, i, oh, sr_data, sizeof(*sr_data), 0);
++	pdev = omap_device_build(name, i, oh, sr_data, sizeof(*sr_data));
+ 	if (IS_ERR(pdev))
+ 		pr_warning("%s: Could not build omap_device for %s: %s.\n\n",
+ 			__func__, name, oh->name);
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/clocksource/Kconfig
-index 75bc752,e920cbe..0000000
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@@ -54,12 -60,5 +60,10 @@@ config CLKSRC_DBX500_PRCMU_SCHED_CLOC
-  	help
-  	  Use the always on PRCMU Timer as sched_clock
-  
-- config CLKSRC_ARM_GENERIC
-- 	def_bool y if ARM64
-- 	help
-- 	  This option enables support for the ARM generic timer.
-+ config ARM_ARCH_TIMER
-+ 	bool
- +
- +config CLKSRC_METAG_GENERIC
- +	def_bool y if METAG
- +	help
- +	  This option enables support for the Meta per-thread timers.
-diff --cc drivers/clocksource/Makefile
-index 09dcd49,7d671b8..0000000
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@@ -16,6 -17,7 +17,8 @@@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= cl
-  obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
-  obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
-  obj-$(CONFIG_SUNXI_TIMER)	+= sunxi_timer.o
-+ obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
-+ obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
-  
-- obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
-+ obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- +obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130212/b983361c/attachment.sig>
+1.7.10.4
