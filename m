@@ -1,112 +1,49 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 12 Feb 2013 12:18:18 -0300
-Subject: [PATCH v2 1/8] ARM: omap2: gpmc: Mark local scoped functions static
-In-Reply-To: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1360682305-20935-2-git-send-email-ezequiel.garcia@free-electrons.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 12 Feb 2013 07:18:14 -0800
+Subject: [PATCH] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for
+ all CPU power states except off
+In-Reply-To: <5119CB2D.9040001@ti.com> (Santosh Shilimkar's message of "Tue,
+ 12 Feb 2013 10:25:09 +0530")
+References: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
+ <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
+ <87d2wazep6.fsf@linaro.org> <5119CB2D.9040001@ti.com>
+Message-ID: <87bobpwog9.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch marks a bunch of functions that are local
-to gpmc.c file only as static.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/mach-omap2/gpmc.c |   14 +++++++-------
- arch/arm/mach-omap2/gpmc.h |    7 -------
- 2 files changed, 7 insertions(+), 14 deletions(-)
+> On Saturday 09 February 2013 02:49 AM, Kevin Hilman wrote:
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>>
+>>> Current CPU PM code code make use of common cpu_suspend() path for all the
+>>> CPU power states which is not optimal. In fact cpu_suspend() path is needed
+>>> only when we put CPU power domain to off state where the CPU context is lost.
+>>>
+>>> Update the code accordingly so that the expensive cpu_suspend() path
+>>> can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
+>>>
+>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>>>
+>>> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>
+>> Looks OK at first glance, but are you sure this is right for the
+>> various ways both clusters might idle using coupled CPUidle?
+>>
+> Yes it is perfectly safe from all C-states. This patch has been part of
+> the OMAP4/OMAP5 product port for some time. I forgot to send it upstream
+> some how :(
+>
+>> Some description of the testing would be helpful here.
+>>
+> Sorry. Should have mentioned it in first place.
+> Patch is being tested on OMAP4430 (idle/suspend) and OMAP5 with
+> few out of tree patches.
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 1e8bcb4..ffe3e1e 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -181,7 +181,7 @@ void gpmc_cs_write_reg(int cs, int idx, u32 val)
- 	__raw_writel(val, reg_addr);
- }
- 
--u32 gpmc_cs_read_reg(int cs, int idx)
-+static u32 gpmc_cs_read_reg(int cs, int idx)
- {
- 	void __iomem *reg_addr;
- 
-@@ -190,7 +190,7 @@ u32 gpmc_cs_read_reg(int cs, int idx)
- }
- 
- /* TODO: Add support for gpmc_fck to clock framework and use it */
--unsigned long gpmc_get_fclk_period(void)
-+static unsigned long gpmc_get_fclk_period(void)
- {
- 	unsigned long rate = clk_get_rate(gpmc_l3_clk);
- 
-@@ -205,7 +205,7 @@ unsigned long gpmc_get_fclk_period(void)
- 	return rate;
- }
- 
--unsigned int gpmc_ns_to_ticks(unsigned int time_ns)
-+static unsigned int gpmc_ns_to_ticks(unsigned int time_ns)
- {
- 	unsigned long tick_ps;
- 
-@@ -215,7 +215,7 @@ unsigned int gpmc_ns_to_ticks(unsigned int time_ns)
- 	return (time_ns * 1000 + tick_ps - 1) / tick_ps;
- }
- 
--unsigned int gpmc_ps_to_ticks(unsigned int time_ps)
-+static unsigned int gpmc_ps_to_ticks(unsigned int time_ps)
- {
- 	unsigned long tick_ps;
- 
-@@ -230,7 +230,7 @@ unsigned int gpmc_ticks_to_ns(unsigned int ticks)
- 	return ticks * gpmc_get_fclk_period() / 1000;
- }
- 
--unsigned int gpmc_round_ns_to_ticks(unsigned int time_ns)
-+static unsigned int gpmc_round_ns_to_ticks(unsigned int time_ns)
- {
- 	unsigned long ticks = gpmc_ns_to_ticks(time_ns);
- 
-@@ -448,7 +448,7 @@ static int gpmc_cs_mem_enabled(int cs)
- 	return l & GPMC_CONFIG7_CSVALID;
- }
- 
--int gpmc_cs_set_reserved(int cs, int reserved)
-+static int gpmc_cs_set_reserved(int cs, int reserved)
- {
- 	if (cs > GPMC_CS_NUM)
- 		return -ENODEV;
-@@ -459,7 +459,7 @@ int gpmc_cs_set_reserved(int cs, int reserved)
- 	return 0;
- }
- 
--int gpmc_cs_reserved(int cs)
-+static int gpmc_cs_reserved(int cs)
- {
- 	if (cs > GPMC_CS_NUM)
- 		return -ENODEV;
-diff --git a/arch/arm/mach-omap2/gpmc.h b/arch/arm/mach-omap2/gpmc.h
-index fe0a844..b79e35c 100644
---- a/arch/arm/mach-omap2/gpmc.h
-+++ b/arch/arm/mach-omap2/gpmc.h
-@@ -195,20 +195,13 @@ extern int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
- extern void gpmc_update_nand_reg(struct gpmc_nand_regs *reg, int cs);
- extern int gpmc_get_client_irq(unsigned irq_config);
- 
--extern unsigned int gpmc_ns_to_ticks(unsigned int time_ns);
--extern unsigned int gpmc_ps_to_ticks(unsigned int time_ps);
- extern unsigned int gpmc_ticks_to_ns(unsigned int ticks);
--extern unsigned int gpmc_round_ns_to_ticks(unsigned int time_ns);
--extern unsigned long gpmc_get_fclk_period(void);
- 
- extern void gpmc_cs_write_reg(int cs, int idx, u32 val);
--extern u32 gpmc_cs_read_reg(int cs, int idx);
- extern int gpmc_calc_divider(unsigned int sync_clk);
- extern int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t);
- extern int gpmc_cs_request(int cs, unsigned long size, unsigned long *base);
- extern void gpmc_cs_free(int cs);
--extern int gpmc_cs_set_reserved(int cs, int reserved);
--extern int gpmc_cs_reserved(int cs);
- extern void omap3_gpmc_save_context(void);
- extern void omap3_gpmc_restore_context(void);
- extern int gpmc_cs_configure(int cs, int cmd, int wval);
--- 
-1.7.8.6
+OK, please update changelog with a brief description of how it was
+tested, and on which platforms.
+
+Thanks,
+
+Kevin
