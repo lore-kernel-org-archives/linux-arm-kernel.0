@@ -1,35 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 12 Feb 2013 15:04:58 -0800
-Subject: [GIT PULL] at91: fixes for 3.9-rc1
-In-Reply-To: <5119FE2A.5040108@atmel.com>
-References: <5110DCDE.1080403@atmel.com>
- <5119FE2A.5040108@atmel.com>
-Message-ID: <20130212230458.GA24673@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Feb 2013 23:05:28 +0000
+Subject: Giving special alignment/size constraints to the Linux PCI core?
+In-Reply-To: <20130212193848.GE1471@obsidianresearch.com>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <201302121902.14276.arnd@arndb.de>
+ <20130212193848.GE1471@obsidianresearch.com>
+Message-ID: <201302122305.28467.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 09:32:42AM +0100, Nicolas Ferre wrote:
-> On 02/05/2013 11:20 AM, Nicolas Ferre :
-> > Arnd, Olof,
-> > 
-> > As I realized reading Linus' email that it was not possible to queue more
-> > fixes for 3.8, I took my time to send this tiny pull request. But now that
-> > the merge window is approaching, I prefer not to wait for more material.
-> > So, here is a "fixes" pull-request embedding a single patch. I have placed this
-> > one on top of material that you already have from me in your "fixes" and
-> > "for-next" branches.
+On Tuesday 12 February 2013, Jason Gunthorpe wrote:
+> PCI-E hotplug can be supported through the generic /sys/bus/pci/rescan
+> mechanism, which forces a rediscovery/re-evaluation of all the buses
+> in the system. The PCI core is smart enough to know what it can/can
+> not reassign and can move the bridge windows around (IIRC most of the
+> issues here are resolved these days?).
 > 
-> Olof,
+> For PCI-E, the root port bridge can be placed anywhere in the host
+> aperture, so as long as the host aperture isn't filled the core can
+> allocate a memory region for the now active port.
 > 
-> Ping?
-> 
-> As the other AT91 related branches have been pulled in, I suspect this
-> little pull-request had been forgotten.
+> Thomas's driver should support this as the regions and windows are all
+> properly dynamic.
 
-Yeah, due to the hold-off on fixes in general I let this one sit for a bit
-while I sorted out what we were going to send to Linus. I've pulled it in now.
+Ah, so you only allow hotplugging into the root ports, but not behind
+additional bridges that have active devices on them, right?
 
-Thanks for the reminder.
+I guess that is a common limitation for PCIe hotplugging.
+ 
+> This is one reason why re-using the PCI core code is so desirable, it
+> handles all these complexities.
 
+Ok, I'm starting to understand what the entire discussion is about ;)
 
--Olof
+	Arnd
