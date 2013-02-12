@@ -1,65 +1,56 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 12 Feb 2013 09:02:42 +0100
-Subject: [GIT PULL] i.MX clock fixes for v3.8
-In-Reply-To: <20130205095844.GZ1906@pengutronix.de>
-References: <20130205095844.GZ1906@pengutronix.de>
-Message-ID: <20130212080242.GA23554@pengutronix.de>
+Date: Tue, 12 Feb 2013 09:09:53 +0100
+Subject: [PATCH 1/1] ARM: imx: configs: enable netfilter support
+In-Reply-To: <1360053199-16229-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1360053199-16229-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20130212080953.GQ1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Tue, Feb 05, 2013 at 09:33:19AM +0100, Javier Martinez Canillas wrote:
+> The Netfilter packet filtering framework is useful for so many
+> use cases that most people will build kernels with it enabled.
+> 
+> So, it would probably make sense to have it enabled by default.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-What's the status of this? I assume you haven't pulled it for -rc since
-it's not important enough, but could you pull it for -next then?
+Applied, thanks
 
-Thanks
- Sascha
+Sascha
 
-On Tue, Feb 05, 2013 at 10:58:44AM +0100, Sascha Hauer wrote:
-> Hi Arnd, Olof,
+> ---
+>  arch/arm/configs/imx_v4_v5_defconfig |    1 +
+>  arch/arm/configs/imx_v6_v7_defconfig |    1 +
+>  2 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> Please pull these two fixes for v3.8
-> 
-> Sascha
-> 
-> The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
-> 
->   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/arm-imx-clk-fixes
-> 
-> for you to fetch changes up to 4b526ca5f627188425184a22ed46c91baa602d43:
-> 
->   ARM: i.MX25: clk: parent per5_clk to AHB clock (2013-02-05 10:54:35 +0100)
-> 
-> ----------------------------------------------------------------
-> ARM: i.MX: clock fixes
-> 
-> - fix wrong timer clock on i.MX25 leading to strange timing inconsistencies
-> - fix SPI clocks for i.MX27
-> 
-> ----------------------------------------------------------------
-> Gwenhael Goavec-Merou (1):
->       ARM: imx27: clk-imx27: SPI: Rename IPG clock and add PER clock
-> 
-> Steffen Trumtrar (1):
->       ARM: i.MX25: clk: parent per5_clk to AHB clock
-> 
->  arch/arm/mach-imx/clk-imx25.c |    3 +++
->  arch/arm/mach-imx/clk-imx27.c |    9 ++++++---
->  2 files changed, 9 insertions(+), 3 deletions(-)
+> diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+> index ebbfb27..516d03f 100644
+> --- a/arch/arm/configs/imx_v4_v5_defconfig
+> +++ b/arch/arm/configs/imx_v4_v5_defconfig
+> @@ -61,6 +61,7 @@ CONFIG_IP_PNP_DHCP=y
+>  # CONFIG_INET_LRO is not set
+>  # CONFIG_INET_DIAG is not set
+>  # CONFIG_IPV6 is not set
+> +CONFIG_NETFILTER=y
+>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+>  CONFIG_DEVTMPFS=y
+>  CONFIG_DEVTMPFS_MOUNT=y
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index 6966713..1107ae9 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -59,6 +59,7 @@ CONFIG_IP_PNP_DHCP=y
+>  # CONFIG_INET_XFRM_MODE_BEET is not set
+>  # CONFIG_INET_LRO is not set
+>  CONFIG_IPV6=y
+> +CONFIG_NETFILTER=y
+>  # CONFIG_WIRELESS is not set
+>  CONFIG_DEVTMPFS=y
+>  CONFIG_DEVTMPFS_MOUNT=y
 > -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 1.7.7.6
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
 
 -- 
