@@ -1,39 +1,21 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 12 Feb 2013 17:25:40 +0000
-Subject: ARM big-endian on current kernels for linux-3.8
-In-Reply-To: <20130212180858.289c3efa@skate>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <20130212180858.289c3efa@skate>
-Message-ID: <511A7B14.1020107@codethink.co.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 12 Feb 2013 17:26:40 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: fix some omap_device_build() calls that
+ aren't compiled by default
+In-Reply-To: <20130212171156.GH4801@atomide.com>
+References: <alpine.DEB.2.00.1302120358130.14983@utopia.booyaka.com>
+ <20130212171156.GH4801@atomide.com>
+Message-ID: <alpine.DEB.2.00.1302121726110.29149@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/13 17:08, Thomas Petazzoni wrote:
-> Dear Ben Dooks,
->
-> On Fri,  8 Feb 2013 23:17:30 +0000, Ben Dooks wrote:
->> I have been working on getting big-endian kernels working, mainly from
->> little-endian boot envrionments. The following patch series is what I
->> have been working on, mainly on the highbank and axp systems.
->
-> Nice!
->
->> Feedback and testing is welcome.
->
-> I've tested your patch set on Armada XP. The kernel boots fine, but it
-> fails to bring up the secondary CPUs:
+On Tue, 12 Feb 2013, Tony Lindgren wrote:
 
-Yes, missed updating the coherency_ll.S patch.
+> Thanks, I'll apply this into omap-for-v3.9/pm-wfi as the breaking
+> commit is already in arm-soc/for-next.
 
-Attached new patch
+OK thanks.  Looks like I'll have one more fix for one of the commits in 
+arm-soc/for-next; working on it now.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: mvebu-be2.patch
-Type: text/x-patch
-Size: 1777 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130212/01874b7e/attachment.bin>
+
+- Paul
