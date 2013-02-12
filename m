@@ -1,31 +1,24 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 12 Feb 2013 15:25:22 -0800
-Subject: [PATCH] ARM: S3C24XX: remove plat-samsung/irq.h
-In-Reply-To: <201302122042.32471.heiko@sntech.de>
-References: <201302122042.32471.heiko@sntech.de>
-Message-ID: <1dc701ce0978$3c127090$b43751b0$@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 12 Feb 2013 15:37:16 -0800
+Subject: [GIT PULL 1/5] omap SoC related late changes for v3.9 merge window
+In-Reply-To: <511a85b9.8473dc0a.41ed.ffffa70dSMTPIN_ADDED_BROKEN@mx.google.com>
+References: <511a85b9.8473dc0a.41ed.ffffa70dSMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20130212233716.GA5498@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+On Tue, Feb 12, 2013 at 10:11:01AM -0800, Tony Lindgren wrote:
+> The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
 > 
-> plat-samsung/irq.h did only contain functions for handling the spread out
-> subirqs on s3c24xx arches, which are not needed anymore.
+>   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> Sorry for bringing this separate submission, but I just remembered
-> it this evening.
+> are available in the git repository at:
 > 
-> This applies on top of all the other s3c24xx irq changes and
-> I think this patch will mark the end of the irq-cleanup for now.
-> 
->  arch/arm/mach-s3c24xx/irq-pm.c           |    7 ++-
->  arch/arm/mach-s3c24xx/irq.c              |    8 +--
->  arch/arm/plat-samsung/include/plat/irq.h |  116 ------------------------------
->  3 files changed, 9 insertions(+), 122 deletions(-)
->  delete mode 100644 arch/arm/plat-samsung/include/plat/irq.h
-> 
-Applied, thanks :-)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/soc-signed
 
-- Kukjin
+Pulled 1-5 into a late/omap branch. As usual with late branches, there's no
+commitment that we'll be able to merge it, but we'll do best-effort depending
+on how the merge window turns out.
+
+
+-Olof
