@@ -1,67 +1,94 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 12 Feb 2013 21:24:14 +0100
-Subject: [GIT PULL] <mach/id.h> fixup of fallouts
-In-Reply-To: <CACRpkdYHS+2d7h76CdmX-Ah+_fzOhjLheT_5vNxUWxLd-K0Kww@mail.gmail.com>
-References: <CACRpkdYHS+2d7h76CdmX-Ah+_fzOhjLheT_5vNxUWxLd-K0Kww@mail.gmail.com>
-Message-ID: <2226128.gmkuCV4E15@vostro.rjw.lan>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 12 Feb 2013 20:28:12 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP4: PM: fix PM regression introduced by recent clock
+ cleanup
+Message-ID: <alpine.DEB.2.00.1302122026530.29149@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 12, 2013 01:10:19 PM Linus Walleij wrote:
-> Hi ARM SoC guys,
-> 
-> this is a pull request for fixing the fallout from the <mach/id.h> removal.
-> 
-> I've pulled it into your next/cleanup branch as a test, and it magically
-> works.
-> 
-> Rafael still has not ACKed the first oneliner, I don't think he'd mind, and
-> I have an ACK from Sam on the MFD portions.
 
-It's OK, no objections from me.
+Commit 17b7e7d33530e2bbd3bdc90f4db09b91cfdde2bb ("ARM: OMAP4:
+clock/hwmod data: start to remove some IP block control "clocks"")
+introduced a regression preventing the L3INIT clockdomain of OMAP4
+systems from entering idle.  This in turn prevented these systems from
+entering full chip clock-stop.
 
-Thanks,
-Rafael
+The regression was caused by the incorrect removal of a so-called
+"optional functional clock" from the OMAP4 clock data.  This wasn't
+caught for two reasons.  First, I missed the retention entry failure
+in the branch test logs:
 
+http://www.pwsan.com/omap/testlogs/cleanup_a_3.9/20130126014242/pm/4460pandaes/4460pandaes_log.txt
 
-> Please pull this in (unless you applied the individual patches instead).
-> 
-> After this the ux500 compiles and boots just fine.
-> 
-> Yours,
-> Linus Walleij
-> 
-> 
-> The following changes since commit 7a4f26097d389c16c9956bc03b81532698d97d64:
-> 
->   ARM: ux500: de-globalize <mach/id.h> (2013-01-29 18:47:37 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/for-arm-soc-cleanup
-> 
-> for you to fetch changes up to 05ec260edecaf3dc214cff49d43b1ad9b2cbb710:
-> 
->   mfd: db8500-prcmu: update resource passing (2013-02-12 12:44:27 +0100)
-> 
-> ----------------------------------------------------------------
-> Two fixes for broken <mach/id.h> cleanup.
-> 
-> ----------------------------------------------------------------
-> Linus Walleij (2):
->       drivers/db8500-cpufreq: delete dangling include
->       mfd: db8500-prcmu: update resource passing
-> 
->  arch/arm/mach-ux500/board-mop500.c   |   5 +-
->  arch/arm/mach-ux500/cpu-db8500.c     |   7 +-
->  arch/arm/mach-ux500/devices-db8500.c |  44 +++++++++++++
->  arch/arm/mach-ux500/devices-db8500.h |   5 ++
->  drivers/cpufreq/db8500-cpufreq.c     |   1 -
->  drivers/mfd/db8500-prcmu.c           | 122 +++++++++++++++++++++++------------
->  include/linux/mfd/db8500-prcmu.h     |  14 ----
->  include/linux/mfd/dbx500-prcmu.h     |  46 +++++++++++++
->  8 files changed, 180 insertions(+), 64 deletions(-)
+Second, the integration data for the OCP2SCP PHY IP block, added by
+commit 0c6688753f9912c6a7013549ec31c8844020bbc1 ("ARM: OMAP4: hwmod
+data: add remaining USB-related IP blocks"), should have associated this
+clock with the IP block, but did not.
+
+Fix by adding back the so-called "optional" functional clock to the
+clock data, and by linking that clock to the OCP2SCP PHY IP block
+integration hwmod data.
+
+The problem patch was discovered by J, Keerthy <j-keerthy@ti.com>.
+
+Cc: Keerthy <j-keerthy@ti.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+
+It'd be nice, but certainly not necessary, to get this in for the v3.9 
+merge window.  Otherwise, will send it for -rc1.
+
+ arch/arm/mach-omap2/cclock44xx_data.c      |    5 +++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    6 ++++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+index cebe2b3..54ebb89 100644
+--- a/arch/arm/mach-omap2/cclock44xx_data.c
++++ b/arch/arm/mach-omap2/cclock44xx_data.c
+@@ -1000,6 +1000,10 @@ DEFINE_CLK_OMAP_MUX(hsmmc2_fclk, "l3_init_clkdm", hsmmc1_fclk_sel,
+ 		    OMAP4430_CM_L3INIT_MMC2_CLKCTRL, OMAP4430_CLKSEL_MASK,
+ 		    hsmmc1_fclk_parents, func_dmic_abe_gfclk_ops);
+ 
++DEFINE_CLK_GATE(ocp2scp_usb_phy_phy_48m, "func_48m_fclk", &func_48m_fclk, 0x0,
++		OMAP4430_CM_L3INIT_USBPHYOCP2SCP_CLKCTRL,
++		OMAP4430_OPTFCLKEN_PHY_48M_SHIFT, 0x0, NULL);
++
+ DEFINE_CLK_GATE(sha2md5_fck, "l3_div_ck", &l3_div_ck, 0x0,
+ 		OMAP4430_CM_L4SEC_SHA2MD51_CLKCTRL,
+ 		OMAP4430_MODULEMODE_SWCTRL_SHIFT, 0x0, NULL);
+@@ -1527,6 +1531,7 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK(NULL,	"per_mcbsp4_gfclk",			&per_mcbsp4_gfclk,	CK_443X),
+ 	CLK(NULL,	"hsmmc1_fclk",			&hsmmc1_fclk,	CK_443X),
+ 	CLK(NULL,	"hsmmc2_fclk",			&hsmmc2_fclk,	CK_443X),
++	CLK(NULL,	"ocp2scp_usb_phy_phy_48m",	&ocp2scp_usb_phy_phy_48m,	CK_443X),
+ 	CLK(NULL,	"sha2md5_fck",			&sha2md5_fck,	CK_443X),
+ 	CLK(NULL,	"slimbus1_fclk_1",		&slimbus1_fclk_1,	CK_443X),
+ 	CLK(NULL,	"slimbus1_fclk_0",		&slimbus1_fclk_0,	CK_443X),
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index a1849a8..d55c769 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2720,6 +2720,10 @@ static struct omap_ocp2scp_dev ocp2scp_dev_attr[] = {
+ 	{ }
+ };
+ 
++static struct omap_hwmod_opt_clk ocp2scp_usb_phy_opt_clks[] = {
++	{ .role = "48mhz", .clk = "ocp2scp_usb_phy_phy_48m" },
++};
++
+ /* ocp2scp_usb_phy */
+ static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
+ 	.name		= "ocp2scp_usb_phy",
+@@ -2734,6 +2738,8 @@ static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
+ 		},
+ 	},
+ 	.dev_attr	= ocp2scp_dev_attr,
++	.opt_clks	= ocp2scp_usb_phy_opt_clks,
++	.opt_clks_cnt	= ARRAY_SIZE(ocp2scp_usb_phy_opt_clks),
+ };
+ 
+ /*
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.7.10.4
