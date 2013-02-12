@@ -1,59 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Feb 2013 17:39:33 -0700
-Subject: [PATCH V4 2/2] MAINTAINERS: update Tegra section to capture all Tegra
- files
-In-Reply-To: <1360629574-23989-1-git-send-email-swarren@wwwdotorg.org>
-References: <1360629574-23989-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1360629574-23989-2-git-send-email-swarren@wwwdotorg.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 11 Feb 2013 16:48:03 -0800
+Subject: [PATCH v3 0/2] Add automatic bus number support for i2c busses with
+ device tree
+Message-ID: <1360630085-26874-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+This was suggested by Mark Brown in response to a patch for adding
+this functionality only for the s3c2410 bus:
+  https://lkml.org/lkml/2012/11/20/681
 
-The intent is to ensure that all Tegra-related patches are sent to the
-linux-tegra@ mailing list, so people can keep up-to-date on all misc
-driver changes.
+I have also modified the i2c-pxa driver to use this new functionality.
+The i2c-pxa driver changes have only been compile-tested and are just
+for cleanup purposes.
 
-Doing this with a keyword is far simpler and more compact than listing
-all Tegra-related drivers, even if wildcards were used.
+Changes in v3:
+- Addressed Wolfram's feedback; rebased atop idr-cleanup series.
 
-Words such as integrate or integrator are common. Ensure the character
-right before "tegra" isn't a-z (case-insensitive), to make sure the
-keyword doesn't match those.
+Changes in v2:
+- No longer tweak pdev->id as per Sylwester Nawrocki.
+- No longer add the dev ID to the adap.name.  Other drivers don't
+  include the device ID here and it doesn't make sense with
+  dynamically (or automatically) allocated IDs.
+- Use dev_name(&dev->dev) to register for the IRQ; this matches what
+  the i2c-s3c2410.c does and handles dynamically allocated IDs.
+- This change was only compile-tested (corgi_defconfig), since I don't
+  have access to a board that uses this driver.
 
-The only files that the keyword doesn't match are the NVEC driver. Add
-the linux-tegra mailing list to the NVEC entry to solve this.
+Doug Anderson (2):
+  i2c-core: dt: Pick i2c bus number from i2c alias if present
+  i2c: pxa: Use i2c-core to get bus number now
 
-Cc: Joe Perches <joe@perches.com>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-V4: No change.
----
- MAINTAINERS |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-pxa.c | 20 ++++++++--------
+ drivers/i2c/i2c-core.c       | 54 ++++++++++++++++++++++++++++++++------------
+ 2 files changed, 49 insertions(+), 25 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index fbba896..f42f82f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7566,6 +7566,7 @@ STAGING - NVIDIA COMPLIANT EMBEDDED CONTROLLER INTERFACE (nvec)
- M:	Julian Andres Klode <jak@jak-linux.org>
- M:	Marc Dietrich <marvin24@gmx.de>
- L:	ac100 at lists.launchpad.net (moderated for non-subscribers)
-+L:	linux-tegra at vger.kernel.org
- S:	Maintained
- F:	drivers/staging/nvec/
- 
-@@ -7864,9 +7865,7 @@ L:	linux-tegra at vger.kernel.org
- Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
- S:	Supported
--F:	arch/arm/mach-tegra
--F:	arch/arm/boot/dts/tegra*
--F:	arch/arm/configs/tegra_defconfig
-+K:	(?i)[^a-z]tegra
- 
- TEHUTI ETHERNET DRIVER
- M:	Andy Gospodarek <andy@greyhouse.net>
 -- 
-1.7.10.4
+1.8.1
