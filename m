@@ -1,41 +1,41 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 12 Feb 2013 17:29:04 +0100
-Subject: [PATCH 30/32] arm: mvebu: PCIe Device Tree informations for Armada
- 370 Mirabox
+Date: Tue, 12 Feb 2013 17:29:05 +0100
+Subject: [PATCH 31/32] arm: mvebu: PCIe Device Tree informations for Armada
+ 370 DB
 In-Reply-To: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1360686546-24277-31-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1360686546-24277-32-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Globalscale Mirabox platform uses one PCIe interface for an
-available mini-PCIe slot, and the other PCIe interface for an internal
-USB 3.0 controller. We add the necessary Device Tree informations to
-enable those two interfaces.
+The Marvell evaluation board (DB) for the Armada 370 SoC has 2
+physical full-size PCIe slots, so we enable the corresponding PCIe
+interfaces in the Device Tree.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-mirabox.dts |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/armada-370-db.dts |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index 3b40713..591068a 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -52,5 +52,19 @@
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index 9b82fac..fba3e8e 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -59,5 +59,20 @@
  			phy = <&phy1>;
  			phy-mode = "rgmii-id";
  		};
 +
 +		pcie-controller {
 +			status = "okay";
-+
-+			/* Internal mini-PCIe connector */
++			/*
++			 * The two PCIe units are accessible through
++			 * both standard PCIe slots and mini-PCIe
++			 * slots on the board.
++			 */
 +			pcie at 0,0 {
 +				status = "okay";
 +			};
-+
-+			/* Connected on the PCB to a USB 3.0 XHCI controller */
 +			pcie at 1,0 {
 +				status = "okay";
 +			};
