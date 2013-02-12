@@ -1,55 +1,33 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 12 Feb 2013 17:28:57 +0100
-Subject: [PATCH 23/32] pci: infrastructure to add drivers in drivers/pci/host
+Date: Tue, 12 Feb 2013 17:28:59 +0100
+Subject: [PATCH 25/32] arm: mvebu: PCIe support is now available on mvebu
 In-Reply-To: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1360686546-24277-24-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1360686546-24277-26-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As agreed by the community, PCI host drivers will now be stored in
-drivers/pci/host. This commit adds this directory and the related
-Kconfig/Makefile changes to allow new drivers to be added in this
-directory.
+Now that the PCIe driver for mvebu has been integrated and all its
+relevant dependencies, we can mark the ARCH_MVEBU platform has
+MIGHT_HAVE_PCI, which allows to select the PCI bus support if needed.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/Kconfig      |    2 ++
- drivers/pci/Makefile     |    3 +++
- drivers/pci/host/Kconfig |    4 ++++
- 3 files changed, 9 insertions(+)
- create mode 100644 drivers/pci/host/Kconfig
+ arch/arm/mach-mvebu/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-index 6d51aa6..ac45398 100644
---- a/drivers/pci/Kconfig
-+++ b/drivers/pci/Kconfig
-@@ -119,3 +119,5 @@ config PCI_IOAPIC
- config PCI_LABEL
- 	def_bool y if (DMI || ACPI)
- 	select NLS
-+
-+source "drivers/pci/host/Kconfig"
-diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
-index 0c3efcf..6ebf5bf 100644
---- a/drivers/pci/Makefile
-+++ b/drivers/pci/Makefile
-@@ -67,3 +67,6 @@ obj-$(CONFIG_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
- obj-$(CONFIG_OF) += of.o
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 440b13e..f12e475 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -13,6 +13,8 @@ config ARCH_MVEBU
+ 	select MVEBU_CLK_CORE
+ 	select MVEBU_CLK_CPU
+ 	select MVEBU_CLK_GATING
++	select MIGHT_HAVE_PCI
++	select PCI_QUIRKS if PCI
  
- ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG
-+
-+# PCI host controller drivers
-+obj-y += host/
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-new file mode 100644
-index 0000000..cc3a1af
---- /dev/null
-+++ b/drivers/pci/host/Kconfig
-@@ -0,0 +1,4 @@
-+menu "PCI host controller drivers"
-+	depends on PCI
-+
-+endmenu
+ if ARCH_MVEBU
+ 
 -- 
 1.7.9.5
