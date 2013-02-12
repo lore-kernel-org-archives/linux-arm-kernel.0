@@ -1,33 +1,44 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue, 12 Feb 2013 11:02:11 +0530
-Subject: [PATCH] ARM: EXYNOS: update secondary startup code to use 24 bits of
- MPIDR
-Message-ID: <1360647131-18461-1-git-send-email-chander.kashyap@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 12 Feb 2013 11:16:21 +0530
+Subject: [PATCH v2 1/3] ARM: davinci: da850: override mmc DT node device
+ name
+In-Reply-To: <1360223825-23929-2-git-send-email-prakash.pm@ti.com>
+References: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
+ <1360223825-23929-2-git-send-email-prakash.pm@ti.com>
+Message-ID: <5119D72D.3010605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a0ae0240507... "ARM: kernel: add device tree init map function" started
-using 24 LSBs of MPIDR to calculate the cpu_logical_map. Hence update the same
-in exynos_secondary_startup code.
+On 2/7/2013 1:27 PM, Manjunathappa, Prakash wrote:
+> Populate OF_DEV_AUXDATA with desired device name expected by
+> davinci_mmc driver. Without this clk_get of davinci_mmc DT driver
+> fails.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
----
- arch/arm/mach-exynos/headsmp.S |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+But there is no mmc DT support for DaVinci at this time. This patch
+should come after the driver DT support and .dts addition patches.
 
-diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
-index 5364d4b..5c1c24a 100644
---- a/arch/arm/mach-exynos/headsmp.S
-+++ b/arch/arm/mach-exynos/headsmp.S
-@@ -22,7 +22,7 @@
-  */
- ENTRY(exynos4_secondary_startup)
- 	mrc	p15, 0, r0, c0, c0, 5
--	and	r0, r0, #15
-+	and	r0, r0, #0xffffff
- 	adr	r4, 1f
- 	ldmia	r4, {r5, r6}
- 	sub	r4, r4, r5
--- 
-1.7.9.5
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> index 37c27af..3362ca4 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -39,9 +39,16 @@ static void __init da8xx_init_irq(void)
+>  
+>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+>  
+> +static const struct of_dev_auxdata da8xx_auxdata[] __initconst = {
+> +	OF_DEV_AUXDATA("ti,davinci-mmc-da830", 0x01c40000, "davinci_mmc.0",
+> +			NULL),
+> +	{},
+> +};
+> +
+>  static void __init da850_init_machine(void)
+>  {
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +	of_platform_populate(NULL, of_default_bus_match_table, da8xx_auxdata,
+> +			NULL);
+
+This needs to be rebased on by v3.9/dt-2 branch. There are conflicts
+with the code already present.
+
+Thanks,
+Sekhar
