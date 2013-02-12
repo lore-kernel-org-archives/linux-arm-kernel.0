@@ -1,90 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Feb 2013 17:41:31 +0000
-Subject: Getting your opinion about the best place to put one specific
- device driver...
-In-Reply-To: <511A6D1E.50705@stericsson.com>
-References: <511A0F11.1050608@stericsson.com>
- <201302121454.10231.arnd@arndb.de> <511A6D1E.50705@stericsson.com>
-Message-ID: <201302121741.31494.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Feb 2013 10:43:45 -0700
+Subject: [PATCH] ARM: tegra: remove clock-frequency properties from serial
+ nodes
+Message-ID: <1360691025-8393-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 February 2013, Jean-Nicolas GRAUX wrote:
-> Le 02/12/2013 03:54 PM, Arnd Bergmann a ?crit :
-> > On Tuesday 12 February 2013, Jean-Nicolas GRAUX wrote:
-> > I think I need some more information to understand what that interface
-> > you are driving is actually about, since that is not clear from your
-> > description or from reading the source code.
-> >
-> > Why are there exactly 18 wires?
-> As you can imagine, this module is very specific to the ux500 digital 
-> baseband family.
-> So, ux500 SoCs simply provide 18 external IOs that may be used to 
-> observe some critical hardware signals.
-> Depending on what has been configured in the hwobs control registers, we 
-> are able to observe
-> signals from the modem, the ddr controllers, the prcmu, the gfx ip, the 
-> clock tree, ...
+From: Stephen Warren <swarren@nvidia.com>
 
-Ah, so these are signals that are internal to the SoC and that normally
-don't need to get routed to a pad unless you want to monitor them, right?
+Currently, the serial nodes define both a clock-frequency and a clocks
+property. We should not provide both, since they might conflict.
 
-> > What is the protocol that is used on these wires (i2c, spi, rs232, ...)
-> There is no specific devices connected behind those wires. So, no 
-> protocol used.
-> Usually, once the required configuration has been set thanks to the 
-> debugfs interface,
-> we directly monitor the signals by connecting the wires to a 
-> oscilloscope or a digital analyser...
+In practice, this also causes problems since the of_serial driver uses
+the clock-frequency property in preference to the clocks property, and
+hence doesn't clk_prepare_enable() the clock, which may then leave it
+with no known users, and hence the common clock framework will disable
+it, thus breaking the port, which is usually the console.
 
-Ok.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20.dtsi |    5 -----
+ arch/arm/boot/dts/tegra30.dtsi |    5 -----
+ 2 files changed, 10 deletions(-)
 
-> > Why do you actually need run-time configuration in the kernel?
-> Main aim of this driver is just to provide a user interface to 
-> configure/enable the hardware observer
-> so that we may easily select the required signals to observe. Having 
-> that at run time is mandatory for us.
-> This is mainly used by software/hardware teams to debug and verify 
-> modem/ape power states.
-
-Ok, I see.
-
-> > It does look however like this code is related to the PRCMU, so maybe
-> > it should be part of the prcmu driver rather than a separate device?
->
-> It is true that the hardware observer registers are located in the 
-> "PRCM" unit.
-> But to my mind, it has no real link with the dbx500-prcmu driver itself yet.
-> (dbx500-prcmu driver is dedicated to the handling of the communication
-> between the kernel and the firmware that run inside PRCMU xp70 controller.)
-> Moreover, I think we should keep a separate device for the harware observer
-> since it need to acquire its own pinctrl state.
-> That said, we might consider moving it to the mfd folder ?
-> 
-> To be honest, in my initial patch, i was aiming to put the ux500_hwobs.* 
-> files in the "misc" folder.
-> But Linus told me that this was probably not the good place ;)
-
-Correct, I try my best to avoid adding random stuff in there that might
-need a generic interface later. Tony already pointed out the similarity
-to the OMAP specific hwopbs feature, and whatever user interface we
-introduce for one should be generic enough to work on the other one as
-well, and ideally also on future ones to the degree that we can anticipate
-them today.
-
-I like the idea of making the in-kernel configuration part of this a
-pinctrl driver, which would already allow you to configure it through
-a custom device tree and no user interface at all.
-
-If a more dynamic user interface is needed, I think it would be good
-to have a generic mechanism in the pinctrl subsystem to reroute pins
-like these, which can work for all pins in the system (or at least
-those that have not been claimed by another device). I don't know if
-that interface already exists, but Linus would be the right person
-to answer that.
-
-If there is a generic way to configure pinmux from user space, you
-can essentially move this driver into an application running outside
-of the kernel.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index cdb8da0..9a42893 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -247,7 +247,6 @@
+ 		reg = <0x70006000 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 36 0x04>;
+-		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 8>;
+ 		clocks = <&tegra_car 6>;
+ 		status = "disabled";
+@@ -258,7 +257,6 @@
+ 		reg = <0x70006040 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 37 0x04>;
+-		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 9>;
+ 		clocks = <&tegra_car 96>;
+ 		status = "disabled";
+@@ -269,7 +267,6 @@
+ 		reg = <0x70006200 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 46 0x04>;
+-		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 10>;
+ 		clocks = <&tegra_car 55>;
+ 		status = "disabled";
+@@ -280,7 +277,6 @@
+ 		reg = <0x70006300 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 90 0x04>;
+-		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 19>;
+ 		clocks = <&tegra_car 65>;
+ 		status = "disabled";
+@@ -291,7 +287,6 @@
+ 		reg = <0x70006400 0x100>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 91 0x04>;
+-		clock-frequency = <216000000>;
+ 		nvidia,dma-request-selector = <&apbdma 20>;
+ 		clocks = <&tegra_car 66>;
+ 		status = "disabled";
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 572a45b..767803e 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -234,7 +234,6 @@
+ 		reg = <0x70006000 0x40>;
+ 		reg-shift = <2>;
+ 		interrupts = <0 36 0x04>;
+-		clock-frequency = <408000000>;
+ 		nvidia,dma-request-selector = <&apbdma 8>;
+ 		clocks = <&tegra_car 6>;
+ 		status = "disabled";
+@@ -244,7 +243,6 @@
+ 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+ 		reg = <0x70006040 0x40>;
+ 		reg-shift = <2>;
+-		clock-frequency = <408000000>;
+ 		interrupts = <0 37 0x04>;
+ 		nvidia,dma-request-selector = <&apbdma 9>;
+ 		clocks = <&tegra_car 160>;
+@@ -255,7 +253,6 @@
+ 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+ 		reg = <0x70006200 0x100>;
+ 		reg-shift = <2>;
+-		clock-frequency = <408000000>;
+ 		interrupts = <0 46 0x04>;
+ 		nvidia,dma-request-selector = <&apbdma 10>;
+ 		clocks = <&tegra_car 55>;
+@@ -266,7 +263,6 @@
+ 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+ 		reg = <0x70006300 0x100>;
+ 		reg-shift = <2>;
+-		clock-frequency = <408000000>;
+ 		interrupts = <0 90 0x04>;
+ 		nvidia,dma-request-selector = <&apbdma 19>;
+ 		clocks = <&tegra_car 65>;
+@@ -277,7 +273,6 @@
+ 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
+ 		reg = <0x70006400 0x100>;
+ 		reg-shift = <2>;
+-		clock-frequency = <408000000>;
+ 		interrupts = <0 91 0x04>;
+ 		nvidia,dma-request-selector = <&apbdma 20>;
+ 		clocks = <&tegra_car 66>;
+-- 
+1.7.10.4
