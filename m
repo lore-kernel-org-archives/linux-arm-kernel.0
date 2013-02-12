@@ -1,42 +1,48 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 12 Feb 2013 16:45:34 -0500 (EST)
-Subject: [PATCH 05/17] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
-In-Reply-To: <5119427E.3000502@codethink.co.uk>
+Date: Tue, 12 Feb 2013 16:53:26 -0500 (EST)
+Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
+In-Reply-To: <51194381.9030505@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-6-git-send-email-ben.dooks@codethink.co.uk>
- <alpine.LFD.2.02.1302082237590.6300@xanadu.home>
- <5119427E.3000502@codethink.co.uk>
-Message-ID: <alpine.LFD.2.03.1302121643440.1242@fluxnic.net>
+ <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
+ <20130209120525.GD17833@n2100.arm.linux.org.uk>
+ <51194381.9030505@codethink.co.uk>
+Message-ID: <alpine.LFD.2.03.1302121646380.1242@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 11 Feb 2013, Ben Dooks wrote:
 
-> On 09/02/13 03:40, Nicolas Pitre wrote:
-> > On Fri, 8 Feb 2013, Ben Dooks wrote:
+> On 09/02/13 12:05, Russell King - ARM Linux wrote:
+> > On Fri, Feb 08, 2013 at 11:17:40PM +0000, Ben Dooks wrote:
+> > > -	if (atag->hdr.tag != ATAG_CORE ||
+> > > -	    (atag->hdr.size != tag_size(tag_core)&&
+> > > -	     atag->hdr.size != 2))
+> > > +	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
+> > > +	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core))&&
+> > > +	     atag->hdr.size != atag32_to_cpu(2)))
 > > 
-> > > The fixup_pv_table assumes that the instructions are in the same
-> > > endian configuration as the data, but when the CPU is running in
-> > > BE8 the instructions stay in little-endian format.
-> > > 
-> > > Make sure if CONFIG_CPU_ENDIAN_BE8 is set that we do all the
-> > > alterations to the instructions taking in to account the LDR/STR
-> > > will be swapping the data endian-ness.
-> > > 
-> > > Since the code is only modifying a byte, we avoid dual-swapping
-> > > the data, and just change the bits we clear and ORR in.
-> > > 
-> > > Note, not tested against an actual bug, it looked wrong.
+> > This is wrong.  You're saying that "ATAG_CORE" is in LE32 format.  It
+> > isn't.  It's in CPU endian format.  If you want to do this kind of thing,
+> > you also need to define cpu_to_atag32() macros as well, otherwise this
+> > will cause sparse warnings.
 > > 
-> > You are missing the CONFIG_THUMB2_KERNEL counterpart.
+> > > -			initrd_start = atag->u.initrd.start;
+> > > -			initrd_size = atag->u.initrd.size;
+> > > +			initrd_start = atag32_to_cpu(atag->u.initrd.start);
+> > > +			initrd_size = atag32_to_cpu(____atag->u.initrd.size);
+> > 
+> > Where did those four underscores come from?  Has this been built?
 > 
-> Sorry, I will have a look into that, although I may need
-> some help on that as I don't have any experience with
-> CONFIG_THUMB2_KERNEL or a userland to test with.
+> I probably missed building this one. I've been mostly testing with DT
+> based systems.
 
-You don't need to change your userland.  The kernel may be compiled 
-using the Thumb2 instruction set even if userland is traditional ARM 
-mode.
+Is this BE8 mode available on old systems?  Or, will those BE8 
+capable old systems have BE userland compiled for them?
+
+Where I want to get to is: do we need to support BE8 mode for ATAG based 
+systems at all, given that most if not all the modern ones should be DT 
+based now?  Making the ATAG code BE8 aware is looking to be quite 
+invasive for potentially no users at all.
 
 
 Nicolas
