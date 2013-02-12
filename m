@@ -1,30 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 12 Feb 2013 15:00:48 -0800
-Subject: [GIT PULL] <mach/id.h> fixup of fallouts
-In-Reply-To: <2226128.gmkuCV4E15@vostro.rjw.lan>
-References: <CACRpkdYHS+2d7h76CdmX-Ah+_fzOhjLheT_5vNxUWxLd-K0Kww@mail.gmail.com>
- <2226128.gmkuCV4E15@vostro.rjw.lan>
-Message-ID: <20130212230048.GB24096@quad.lixom.net>
+Date: Tue, 12 Feb 2013 15:04:58 -0800
+Subject: [GIT PULL] at91: fixes for 3.9-rc1
+In-Reply-To: <5119FE2A.5040108@atmel.com>
+References: <5110DCDE.1080403@atmel.com>
+ <5119FE2A.5040108@atmel.com>
+Message-ID: <20130212230458.GA24673@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 09:24:14PM +0100, Rafael J. Wysocki wrote:
-> On Tuesday, February 12, 2013 01:10:19 PM Linus Walleij wrote:
-> > Hi ARM SoC guys,
+On Tue, Feb 12, 2013 at 09:32:42AM +0100, Nicolas Ferre wrote:
+> On 02/05/2013 11:20 AM, Nicolas Ferre :
+> > Arnd, Olof,
 > > 
-> > this is a pull request for fixing the fallout from the <mach/id.h> removal.
-> > 
-> > I've pulled it into your next/cleanup branch as a test, and it magically
-> > works.
-> > 
-> > Rafael still has not ACKed the first oneliner, I don't think he'd mind, and
-> > I have an ACK from Sam on the MFD portions.
+> > As I realized reading Linus' email that it was not possible to queue more
+> > fixes for 3.8, I took my time to send this tiny pull request. But now that
+> > the merge window is approaching, I prefer not to wait for more material.
+> > So, here is a "fixes" pull-request embedding a single patch. I have placed this
+> > one on top of material that you already have from me in your "fixes" and
+> > "for-next" branches.
 > 
-> It's OK, no objections from me.
+> Olof,
+> 
+> Ping?
+> 
+> As the other AT91 related branches have been pulled in, I suspect this
+> little pull-request had been forgotten.
 
+Yeah, due to the hold-off on fixes in general I let this one sit for a bit
+while I sorted out what we were going to send to Linus. I've pulled it in now.
 
-Pulled.
+Thanks for the reminder.
 
-Thanks,
 
 -Olof
