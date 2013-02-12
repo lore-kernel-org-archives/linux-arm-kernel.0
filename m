@@ -1,48 +1,42 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 12 Feb 2013 16:53:26 -0500 (EST)
-Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
-In-Reply-To: <51194381.9030505@codethink.co.uk>
+Date: Tue, 12 Feb 2013 16:57:34 -0500 (EST)
+Subject: [PATCH 12/17] ARM: fix magic for bootloader in BE8
+In-Reply-To: <511943CD.6010305@codethink.co.uk>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
- <20130209120525.GD17833@n2100.arm.linux.org.uk>
- <51194381.9030505@codethink.co.uk>
-Message-ID: <alpine.LFD.2.03.1302121646380.1242@fluxnic.net>
+ <1360365467-25056-13-git-send-email-ben.dooks@codethink.co.uk>
+ <alpine.LFD.2.02.1302082304410.6300@xanadu.home>
+ <511943CD.6010305@codethink.co.uk>
+Message-ID: <alpine.LFD.2.03.1302121654080.1242@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 11 Feb 2013, Ben Dooks wrote:
 
-> On 09/02/13 12:05, Russell King - ARM Linux wrote:
-> > On Fri, Feb 08, 2013 at 11:17:40PM +0000, Ben Dooks wrote:
-> > > -	if (atag->hdr.tag != ATAG_CORE ||
-> > > -	    (atag->hdr.size != tag_size(tag_core)&&
-> > > -	     atag->hdr.size != 2))
-> > > +	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
-> > > +	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core))&&
-> > > +	     atag->hdr.size != atag32_to_cpu(2)))
+> On 09/02/13 04:06, Nicolas Pitre wrote:
+> > On Fri, 8 Feb 2013, Ben Dooks wrote:
 > > 
-> > This is wrong.  You're saying that "ATAG_CORE" is in LE32 format.  It
-> > isn't.  It's in CPU endian format.  If you want to do this kind of thing,
-> > you also need to define cpu_to_atag32() macros as well, otherwise this
-> > will cause sparse warnings.
+> > > If the boot-loader is running little endian and the kernel is compiled
+> > > big endian then it will not verify the magic number of the front of the
+> > > kernel.
+> > > 
+> > > Note, do we need to also reverse the two values after the magic, or are
+> > > they used later on in the kernel decompressor?
 > > 
-> > > -			initrd_start = atag->u.initrd.start;
-> > > -			initrd_size = atag->u.initrd.size;
-> > > +			initrd_start = atag32_to_cpu(atag->u.initrd.start);
-> > > +			initrd_size = atag32_to_cpu(____atag->u.initrd.size);
-> > 
-> > Where did those four underscores come from?  Has this been built?
+> > Those value instances are not used by the code.  So for consistency they
+> > would have to be reversed, yes.  Given those are variable and determined
+> > by the linker, I don't know how you could manage it.
 > 
-> I probably missed building this one. I've been mostly testing with DT
-> based systems.
+> By breaking it down into parts I think...
+> 
+> I think this patch should be re-worked depending on the outcome of
+> re-doing the whole ATAG endian configuration so that these are in
+> the same endian-ness as we expect the ATAGs to be in.
 
-Is this BE8 mode available on old systems?  Or, will those BE8 
-capable old systems have BE userland compiled for them?
+I don't think this is related to ATAGS at all.
 
-Where I want to get to is: do we need to support BE8 mode for ATAG based 
-systems at all, given that most if not all the modern ones should be DT 
-based now?  Making the ATAG code BE8 aware is looking to be quite 
-invasive for potentially no users at all.
+Those values are making a header for bootloaders to use in identifying 
+an ARM Linux zImage binary.  If you want to boot from a LE environment, 
+the header must look like if this is a LE kernel.
 
 
 Nicolas
