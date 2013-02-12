@@ -1,27 +1,69 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 12 Feb 2013 09:47:40 +0200
-Subject: [PATCH 1/2] ARM: OMAP2+: Allow clock alias provision from device
- tree
-In-Reply-To: <20130211160752.GG1906@pengutronix.de>
-References: <1360597464-8491-1-git-send-email-rogerq@ti.com>
- <20130211160752.GG1906@pengutronix.de>
-Message-ID: <5119F39C.2080206@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 12 Feb 2013 09:02:42 +0100
+Subject: [GIT PULL] i.MX clock fixes for v3.8
+In-Reply-To: <20130205095844.GZ1906@pengutronix.de>
+References: <20130205095844.GZ1906@pengutronix.de>
+Message-ID: <20130212080242.GA23554@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 06:07 PM, Sascha Hauer wrote:
-> On Mon, Feb 11, 2013 at 05:44:23PM +0200, Roger Quadros wrote:
->> Currently on OMAP, it is not possible to specify a clock consumer
->> to any of the OMAP generated clocks using the device tree. This can pose
->> a problem for external devices that run off an OMAP clock as we
->> can't reliably provide a reference to the clock in the device tree.
-> 
-> There is an established way of providing clocks in the devicetree using
-> the clocks/clock-names properties. Wouldn't it be better using this
-> for OMAP aswell?
-> 
-I agree with you, but I'm not sure when this migration will be done.
-Rajendra/Santosh might know better.
+Arnd, Olof,
 
-regards,
--roger
+What's the status of this? I assume you haven't pulled it for -rc since
+it's not important enough, but could you pull it for -next then?
+
+Thanks
+ Sascha
+
+On Tue, Feb 05, 2013 at 10:58:44AM +0100, Sascha Hauer wrote:
+> Hi Arnd, Olof,
+> 
+> Please pull these two fixes for v3.8
+> 
+> Sascha
+> 
+> The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+> 
+>   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/arm-imx-clk-fixes
+> 
+> for you to fetch changes up to 4b526ca5f627188425184a22ed46c91baa602d43:
+> 
+>   ARM: i.MX25: clk: parent per5_clk to AHB clock (2013-02-05 10:54:35 +0100)
+> 
+> ----------------------------------------------------------------
+> ARM: i.MX: clock fixes
+> 
+> - fix wrong timer clock on i.MX25 leading to strange timing inconsistencies
+> - fix SPI clocks for i.MX27
+> 
+> ----------------------------------------------------------------
+> Gwenhael Goavec-Merou (1):
+>       ARM: imx27: clk-imx27: SPI: Rename IPG clock and add PER clock
+> 
+> Steffen Trumtrar (1):
+>       ARM: i.MX25: clk: parent per5_clk to AHB clock
+> 
+>  arch/arm/mach-imx/clk-imx25.c |    3 +++
+>  arch/arm/mach-imx/clk-imx27.c |    9 ++++++---
+>  2 files changed, 9 insertions(+), 3 deletions(-)
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
