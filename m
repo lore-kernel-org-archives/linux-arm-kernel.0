@@ -1,59 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Feb 2013 08:57:13 -0800
-Subject: Getting your opinion about the best place to put one specific
- device driver...
-In-Reply-To: <511A6D1E.50705@stericsson.com>
-References: <511A0F11.1050608@stericsson.com>
- <201302121454.10231.arnd@arndb.de> <511A6D1E.50705@stericsson.com>
-Message-ID: <20130212165713.GG4801@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Feb 2013 09:57:28 -0700
+Subject: [PATCH] pinctrl/pinconfig: add debug interface
+In-Reply-To: <CACRpkdZu0+maCE2GjuZcQPZPZbw=Fz0DUHYY8FXPdZEH0PeViQ@mail.gmail.com>
+References: <1360527070-18430-1-git-send-email-linus.walleij@stericsson.com>
+ <51195A63.7080706@wwwdotorg.org>
+ <CACRpkdZu0+maCE2GjuZcQPZPZbw=Fz0DUHYY8FXPdZEH0PeViQ@mail.gmail.com>
+Message-ID: <511A7478.8040506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-* Jean-Nicolas GRAUX <jean-nicolas.graux@stericsson.com> [130212 08:33]:
-> Arnd, here are my answers below.
+On 02/12/2013 05:54 AM, Linus Walleij wrote:
+> On Mon, Feb 11, 2013 at 9:53 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 02/10/2013 01:11 PM, Linus Walleij wrote:
+>>> From: Laurent Meunier <laurent.meunier@st.com>
+>>>
+>>> This update adds a debugfs interface to modify a pin configuration
+>>> for a given state in the pinctrl map. This allows to modify the
+>>> configuration for a non-active state, typically sleep state.
+>>> This configuration is not applied right away, but only when the state
+>>> will be entered.
+>>>
+>>> This solution is mandated for us by HW validation: in order
+>>> to test and verify several pin configurations during sleep without
+>>> recompiling the software.
+...
+>>> +/**
+>>> + * pinconf_dbg_config_write() - overwrite the pinctrl config in thepinctrl
+>>> + * map, of a pin/state pair based on pinname and state that have been
+>>> + * selected with the debugfs entries pinconf-name and pinconf-state
+>>> + */
+>>> +static int pinconf_dbg_config_write(struct file *file,
+>>> +     const char __user *user_buf, size_t count, loff_t *ppos)
+>>> +{
+>>> +     int err;
+>>> +     unsigned long config;
+>>> +     struct pinctrl_maps *maps_node;
+>>> +     struct pinctrl_map const *map;
+>>> +     int i, j;
+>>> +
+>>> +     err = kstrtoul_from_user(user_buf, count, 0, &config);
+>>> +
+>>> +     if (err)
+>>> +             return err;
+>>> +
+>>> +     dbg_config = config;
+>>
+>> That assumes that pin config values are a plain u32. While this is
+>> commonly true in existing pinctrl drivers, it certainly isn't something
+>> that the pinctrl core mandates;
 > 
-> Le 02/12/2013 03:54 PM, Arnd Bergmann a ?crit :
-> >On Tuesday 12 February 2013, Jean-Nicolas GRAUX wrote:
-> >>ello, Arnd, Olof. First, let me introduce myself quickly.
-> >>I am working in Stericsson and i am a colleague of Linus Walleij.
-> >>We are currently doing some cleaning in our mach-ux500 ARM machine.
-> >>
-> >>Among other things, the U8500 SoC and its derivatives embed one small IP
-> >>called the "hardware observer".
-> >>This is used for hardware debug purpose and it provides the ability to
-> >>output some
-> >>modem, power, clocking, ..., hardware signals on 18 external wires.
-> >>
-> >>We did one small platform device driver to handle this piece of hardware.
-> >>In the patch attached to this file, we kept the code in the mach-ux500
-> >>machine folder.
-> >>But we are wondering where is the best place to put that stuff.
-> >>So, the question is: where should we put this code in the kernel tree ?
-> >Hi Jean-Nicolas,
-> >
-> >I think I need some more information to understand what that interface
-> >you are driving is actually about, since that is not clear from your
-> >description or from reading the source code.
-> >
-> >Why are there exactly 18 wires?
-> As you can imagine, this module is very specific to the ux500
-> digital baseband family.
-> So, ux500 SoCs simply provide 18 external IOs that may be used to
-> observe some critical hardware signals.
-> Depending on what has been configured in the hwobs control
-> registers, we are able to observe
-> signals from the modem, the ddr controllers, the prcmu, the gfx ip,
-> the clock tree, ...
+> So there is this unsigned long and it has a value.
+> 
+> The interface should support altering that unsigned long not
+> really caring for what it contains. It seems pretty straight-forward
+> to me.
 
-Sounds very similar to what we have on omaps as hwobs. AFAIK that
-module is just multiplexing signals. So maybe take a look how it
-would fit into drivers/pinctrl?
+But it's not an unsigned long - it's an opaque value that just happens
+to be stored in an unsigned long.
 
-At least the omap hwobs could in theory already be handled by
-pinctrl-single.c.
+> Of course, if this unsigned long is a pointer, this is just a
+> fantastic recipe for shooting oneself in the foot, but again
+> debugfs is just one big gun aimed at ones foot anyway, that's
+> the whole point of debugfs.
 
-Regards,
+But it'd be possible to handle this if the code to modify the map called
+into the individual pinctrl driver to convert the data the user wrote
+into the value to store in the map, just like it does for DT.
 
-Tony
+Then, it'd work in all cases.
+
+Plus, it could convert e.g. "pull up" to 0x10001 rather than requiring
+the user to manually encode the 0x10001 themselves; much more useful.
+
+>> that's the whole point of
+>> dt_node_to_map() for example, to allow the individual pinctrl drivers to
+>> use whatever type (scalar, pointer-to-struct, ...) they want to
+>> represent their config values.
+> 
+> Yes. But it is an unsigned long, and we support altering it.
+> 
+> And the whole point of debugfs is to do crazy stuff like that.
+
+Well to some extent, but there's little point in creating a debugfs file
+that makes different assumptions about what its doing than any other
+code that uses the same data structures.
