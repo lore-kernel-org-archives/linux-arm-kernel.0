@@ -1,207 +1,146 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 12 Feb 2013 20:22:52 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <201302121830.11375.arnd@arndb.de>
-References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302121830.11375.arnd@arndb.de>
-Message-ID: <20130212202252.3a9ee3d0@skate>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 12 Feb 2013 12:26:15 -0700
+Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
+ systems
+In-Reply-To: <201302092223.11796.arnd@arndb.de>
+References: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302072325.23483.arnd@arndb.de>
+ <20130208004414.GA32245@obsidianresearch.com>
+ <201302092223.11796.arnd@arndb.de>
+Message-ID: <20130212192615.GC1471@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On Sat, Feb 09, 2013 at 10:23:11PM +0000, Arnd Bergmann wrote:
 
-On Tue, 12 Feb 2013 18:30:11 +0000, Arnd Bergmann wrote:
-> On Tuesday 12 February 2013, Thomas Petazzoni wrote:
-> > diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-> > new file mode 100644
-> > index 0000000..3ad563f
-> > --- /dev/null
-> > +++ b/drivers/pci/host/Makefile
-> > @@ -0,0 +1,4 @@
-> > +obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
-> > +CFLAGS_pci-mvebu.o += \
-> > +	-I$(srctree)/arch/arm/plat-orion/include \
-> > +	-I$(srctree)/arch/arm/mach-mvebu/include
+> > This makes *lots* of sense, if you have bridges providing bus slots
+> > then you include the bridge in DT to stop the 'fold down' at that
+> > known bridge, giving you a chance to see the interrupt wiring behind
+> > the bridge.
+>
+> I would argue that it matters not so much what Linux does but what
+> the standard says, but it seems they both agree with you in this
+> case: http://www.openfirmware.org/1275/practice/imap/imap0_9d.pdf
+> defines that "At any level in the interrupt tree, a mapping may
+> need to take place between the child interrupt domain and the
+> parent???s. This is represented by a new property called 'interrupt-map'".
+
+Right, the standard (and Linux) allows the property in any node.
+
+> > This matches the design of PCI - if you know how interrupts are hooked
+> > up then use that information, otherwise assume the INTx interrupts
+> > swizzle and search upward. This is how add-in cards with PCI bridges
+> > are supported.
 > 
-> This does not seem like a good idea to me. We should not include
-> architecture specific directories from a driver directory.
+> Note that the implicit swizzling was not part of the original PCI
+> binding, which assumed that all devices were explicitly represented
+> in the device tree, and we don't normally do that any more because
+
+Yes, if the tree includes all PCI devices then you don't need
+interrupt-map, just place an interrupt property directly on the end
+nodes.
+
+However the implicit swizzling and 'fold down' is pretty much
+essential to support the PCI standards for hot plug behind bridges.
+
+> PCI can be probed easily, and we cannot assume that all PCI BARs
+> have been correctly assigned by the firmware before the OS
+> is booting. Having the interrupt-map at PCI host controller
+> node is convenient because it lets us define unit interrupt
+> specifiers for devices that are not represented in the device
+> tree themselves.
+
+Right, interrupt-map is actually only needed when the DT is
+incomplete, or to support hot pluggable ports.
+
+> I think the key question here is whether there is just one interrupt
+> domain across all bridges because the hardware requires the unit
+> address to be unique, or whether each PCIe port has its own
+> unit address space, and thereby interrupt domain that requires
+> its own interrupt-map.
+
+IMHO, the interrupt domains should describe the underlying hardware,
+and in many cases the HW is designed so that every PCI bus bridge has
+it's own downstream interrupt layout - and thus is an interrupt domain.
+
+> > If you imagine the case you alluded to, a PCI-E root port, connected
+> > to a PCI-E to PCI bridge, with 2 physical PCI bus slots. The
+> > interrupts for the 2 slots are routed to the CPU directly:
+> > 
+> > link at 0 {
+> >  reg = </* Bus 0, Dev 0x10, Fn 0 */>; // Root Port bridge
+> > 
+> >   // Match on INTx (not used since the pci-bridge doesn't create inband INTx)
+> >   interrupt-mask = <0x0 0 0 7>;
+> >   interrupt-map = <0x0000 0 0 1 &pic 0  // Inband INTA
+> >                    0x0000 0 0 2 &pic 1  // Inband INTB
 > 
-> What are the header files you need here? 
+> What are these two interrupts in the example then?
 
->From the patch itself:
+This shows that the HW block 'link at 0' - which is a PCI Express root
+port bridge - accepts inband INTx messages and converts them to CPU
+interrupts pic 0/1/...
 
-+#include <plat/pcie.h>
-+#include <mach/addr-map.h>
+Since this is a general function, and fully self contained, it can be
+placed in the general SOC's dtsi.
 
-<plat/pcie.h> is needed for a few PCIe functions shared with earlier
-families of Marvell SoC. My plan is that once this PCI driver gets
-accepted, I work on migrating the earlier Marvell SoC families to using
-this PCI driver, and therefore those functions would ultimately move in
-the driver in drivers/pci/host/, which would remove the <plat/pcie.h>.
+However, the board has a hard-wired PCIe to PCI bridge with PCI slots,
+and never generates inband INTx. We can then describe that chip via
+the following stanza in the board specific dts:
 
-The <mach/addr-map.h> is here to access the address decoding windows
-allocation/free API. And for this, there is no other long term plan
-than having an API provided by the platform code in arch/arm/, and used
-by drivers. Some other drivers may have to use this API as well in the
-future.
-
-I think that completely preventing <mach/> and <plat/> includes from
-drivers is not possible. Some sub-architectures will also have some
-bizarre mechanism to handle (in our case the address decoding windows),
-for which there is no kernel-wide API and kernel-wide subsystem to
-handle it. In such cases, a sub-architecture specific solution is
-really the only reasonable way, and in this case, we have to include
-the sub-architecture headers.
-
-Note that I have been careful to use CFLAGS_pci-mvebu.o, so that those
-include paths only apply to *this* driver. I added a separate dummy
-driver in drivers/pci/host/, and verified that those include paths are
-not used when building this other driver. So those special CFLAGS are
-still compatible with the multiplatform kernel.
-
-> > +/*
-> > + * This product ID is registered by Marvell, and used when the
-> > Marvell
-> > + * SoC is not the root complex, but an endpoint on the PCIe bus.
-> > It is
-> > + * therefore safe to re-use this PCI ID for our emulated PCI-to-PCI
-> > + * bridge.
-> > + */
-> > +#define MARVELL_EMULATED_PCI_PCI_BRIDGE_ID 0x7846
+> >  pci_bridge at 0 {
+> >     reg = </* Bus 1, Dev 0x10, Fn 0 */>; // PCIe to PCI bridge
 > 
-> Just a side note: What happens if you have two of these systems and
-> connect them over PCIe, putting one of them into host mode and the
-> other into endpoint mode?
+> The device would be "pci at 10", right?
 
-I am not a PCI expert, but I don't think it would cause issues. Maybe
-Jason Gunthorpe can comment on this, as he originally suggested to
-re-use this PCI ID.
+Probably best to use the hex version of the regs value /* Bus 1, Dev
+0x10, Fn 0 */, but nothing inspects that, right?
 
-> > +static void mvebu_pcie_setup_io_window(struct mvebu_pcie_port
-> > *port,
-> > +				       int enable)
-> > +{
-> > +	unsigned long iobase, iolimit;
-> > +
-> > +	if (port->bridge.iolimit < port->bridge.iobase)
-> > +		return;
-> > +
-> > +	iolimit = 0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
-> > +		(port->bridge.iolimitupper << 16);
-> > +	iobase = ((port->bridge.iobase & 0xF0) << 8) |
-> > +		(port->bridge.iobaseupper << 16);
+> >     // Match on the device/slot and INTx pin
+> >     interrupt-mask = <0x7f 0 0 7>;
+> >     interrupt-map = <0x00xx 0 0 1 &pic 2 // Slot 0 physical INTA
+> >                      0x00xx 0 0 1 &pic 3 // Slot 1 physical INTA
+> >                      ..
+> >  }
+> > }
 > 
-> I don't understand this code with the masks and shifts. Could you
-> add a comment here for readers like me?
+> You are accidentally matching the on the register number, not the
+> device number here, right? The interrupt-map-mask should be
+> <0xf800 0 0 7> to match the device.
 
-Sure, will do.
+Right, only match the device, ignore the bus.
 
-It basically comes from the PCI-to-PCI bridge specification, which
-explains how the I/O address and I/O limit is split into two 16 bits
-registers, with those bizarre shifts and hardcoded values. I'll put a
-reference to the relevant section of the PCI-to-PCI bridge
-specification here.
+There is also another variant, if the PCIe to PCI bridge provides its
+own interrupt pins and converts those to inband PCIe INTx messages,
+then the PCB can wire up the PCI bus slots to the bridge's INTx pins
+according to some pattern and describe that pattern in DT:
 
-> > +
-> > +/*
-> > + * Initialize the configuration space of the PCI-to-PCI bridge
-> > + * associated with the given PCIe interface.
-> > + */
-> > +static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
-> > +{
-> 
-> As mentioned, I'm still skeptical of the sw_pci_bridge approach,
-> so I'm not commenting on the details of your implementations
-> (they seem fine on a first look though)
+pci_bridge at 0 {
+   reg = </* Bus 1, Dev 0x10, Fn 0 */>; // PCIe to PCI bridge
+   interrupt-mask = <0xf800 0 0 7>;
+   interrupt-map = <0x00xx 0 0 1 &pci_bridge0 0 0 0 1 // Slot 0 physical INTA to inband INTA
+                    0x00xx 0 0 1 &pci_bridge0 0 0 0 2 // Slot 1 physical INTA to inband INTB
+		    ...
+}
 
-Yes, I understood your were still skeptical. But as I've mentioned in
-other e-mails, I still haven't seen any other serious alternate
-proposal that takes into account the need for dynamic assignment of
-addresses.
+(minus errors, haven't tried this one, but the standard says it should
+be OK)
 
-> > +	/* Get the I/O and memory ranges from DT */
-> > +	while ((range = of_pci_process_ranges(np, &res, range)) !=
-> > NULL) {
-> > +		if (resource_type(&res) == IORESOURCE_IO) {
-> > +			memcpy(&pcie->io, &res, sizeof(res));
-> > +			memcpy(&pcie->realio, &res, sizeof(res));
-> > +			pcie->io.name = "I/O";
-> > +			pcie->realio.start &= 0xFFFFF;
-> > +			pcie->realio.end   &= 0xFFFFF;
-> > +		}
-> 
-> The bit masking seems fishy here. What exactly are you doing,
-> does this just assume you have a 1MB window at most?
+Which would be processed as:
+ - pci_bridge at 0 converts out of brand interrupts into in-band
+   interrupts according its interrupt-map, and then sends those
+   upstream.
+ - link@0 converts in band interrupts into CPU interrupts according
+   to its interrupt map.
 
-Basically, I have two resources for the I/O:
+In my experience the above is a common case.
 
- * One described in the DT, from 0xC0000000 to 0xC00FFFFF which will be
-   used to create the address decoding windows for the I/O regions of
-   the different PCIe interfaces. The PCI I/O virtual address 0xffe00000
-   will be mapped to those physical addresses. Those address decoding
-   windows are configured with the special "remap" mechanism that
-   ensures that if an access is made at 0xC0000000 + offset, it will
-   appear on the PCI bus as an I/O access at address "offset".
+Boot firmware could fold all this down to a single interrupt map, and
+hide the programming of the IOAPIC/etc from the OS, but the HW is
+still undertaking these transformations..
 
- * One covering the low addresses 0x0 -> 0xFFFFF (pcie->realio), which
-   is used to tell the Linux PCI subsystem from which address range it
-   should assign I/O addresses.
+Anyhow, it sounds like Thomas has had success using this approach, so
+it works.
 
-> Maybe something like
-> 
-> 	pcie->realio.start = 0;
-> 	pcie->realio.end = pcie->io.end - pcie->io.start;
-
-Indeed, that would result in the same values. If you find it clearer,
-I'm fine with it.
-
-> I suppose you also need to fix up pcie->io to be in IORESOURCE_MEM
-> space instead of IORESOURCE_IO, or fix the of_pci_process_ranges
-> function to return it in a different way.
-
-Ok.
-
-> > +static int mvebu_pcie_init(void)
-> > +{
-> > +	return platform_driver_probe(&mvebu_pcie_driver,
-> > +				     mvebu_pcie_probe);
-> > +}
-> > +
-> > +subsys_initcall(mvebu_pcie_init);
-> 
-> You don't have to do it, but I wonder if this could be a module
-> with unload support instead.
-
-This has already been discussed in the review of PATCHv2. Please see
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/145580.html.
-
-Basically, doing a module_init() initialization fails, because the XHCI
-USB quirks are executed before we have the chance to create the address
-decoding windows, which crashes the kernel at boot time (and we have
-one platform where an USB 3.0 XHCI controller sits on the PCIe bus).
-Bjorn Helgaas has acknowledged the problem in
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148292.html:
-
-"""
-This is not really a problem in your code; it's a generic PCI core
-problem.  pci_scan_root_bus() does everything including creating the
-root bus, scanning it, and adding the devices we find.  At the point
-where we add a device (pci_bus_add_device()), it should be ready for a
-driver to claim it -- all resource assignment should already be done.
-
-I don't think it's completely trivial to fix this in the PCI core yet
-(but we're moving in that direction) because we have some boot-time
-ordering issues, e.g., x86 scans the root buses before we know about
-the address space consumed by ACPI devices, so we can't just assign
-the resources when we scan the bus.
-"""
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Cheers,
+Jason
