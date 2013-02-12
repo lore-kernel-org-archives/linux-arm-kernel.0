@@ -1,35 +1,36 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Tue, 12 Feb 2013 13:30:30 -0500
-Subject: [PATCH 1/2] pinctrl: tegra: add clfvs function to Tegra114 support
-In-Reply-To: <511A6EE8.7010301@nvidia.com>
-References: <1360621513-18814-1-git-send-email-rklein@nvidia.com>
- <5119829C.20400@wwwdotorg.org> <511A6EE8.7010301@nvidia.com>
-Message-ID: <511A8A46.2010701@nvidia.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 12 Feb 2013 11:41:27 -0700
+Subject: Giving special alignment/size constraints to the Linux PCI core?
+In-Reply-To: <201302121600.08434.arnd@arndb.de>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo7hwG89LTO+4+eqT_Gb+yUn1XKHYJ8CnnZcf_FPo-Kpyw@mail.gmail.com>
+ <20130208091420.703a39b4@skate> <201302121600.08434.arnd@arndb.de>
+Message-ID: <20130212184127.GA1471@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/12/2013 11:33 AM, Rhyland Klein wrote:
-> On 2/11/2013 6:45 PM, Stephen Warren wrote:
->> On 02/11/2013 03:25 PM, Rhyland Klein wrote:
->>> This patch adds the definition for the cldvfs function for Tegra114 pinctrl
->>> support. This is based on work by Pritesh Raithatha.
->> Sorry I forgot about this before, but
->> Documentation/devicetree/bindings/pinctrl/nvidia,tegra114-pinmux.txt
->> needs to be updated too.
->>
->> Aside from that,
->>
->> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> thanks, I'll add that and send new rev.
->
-> --rhyland
->
-After looking, the devicetree binding doc don't seem to list the valid 
-functions. This change adds a function, and the other groups similar 
-(blink, cec, ...) don't seem to be listed either. Is there something 
-else that should be changed in the binding doc that I am missing?
+On Tue, Feb 12, 2013 at 04:00:08PM +0000, Arnd Bergmann wrote:
 
--rhyland
+> > The window sizes are power of two sizes. I didn't realize that it was
+> > also the case for PCI BARs. Then there is no problem with the size I
+> > guess, and only a problem of alignment. Having the possibility to
+> > get the resource and return a fixed up start address would solve the
+> > problem I'd say.
+> 
+> I thought that only device BARs in PCI had natural alignment, while
+> bridges don't.
 
--- 
-nvpublic
+Right
+
+> My feeling is that an easier solution would be to keep separate
+> root buses for each port, which then behaves completely PCIe
+> compliant, but add a hook in the procedure above to set up the
+> address translation windows between the pci_bus_size_bridges()
+> and the pci_bus_assign_resources() calls.
+
+This process is only done during driver initialization. How would you
+support PCI-E device hotplug (my systems rely on this)? Hotplug works
+today with the existing Marvell driver, however that relies on
+pre-allocated windows.
+
+Jason
