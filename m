@@ -1,51 +1,72 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 13 Feb 2013 00:59:28 +0900
-Subject: [PATCH 6/9] gpiolib: use descriptors internally
-In-Reply-To: <CACRpkdaHuv7CXCy15-o94G0r0+2BStsi34ZVbBAhyGj=U3xgOg@mail.gmail.com>
-References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
- <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
- <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
- <20130209091729.978C73E1A18@localhost>
- <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
- <51192CC5.9060300@wwwdotorg.org>
- <CACRpkdaHuv7CXCy15-o94G0r0+2BStsi34ZVbBAhyGj=U3xgOg@mail.gmail.com>
-Message-ID: <20130212155927.GE6088@linux-sh.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Feb 2013 16:00:08 +0000
+Subject: Giving special alignment/size constraints to the Linux PCI core?
+In-Reply-To: <20130208091420.703a39b4@skate>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo7hwG89LTO+4+eqT_Gb+yUn1XKHYJ8CnnZcf_FPo-Kpyw@mail.gmail.com>
+ <20130208091420.703a39b4@skate>
+Message-ID: <201302121600.08434.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 01:29:10PM +0100, Linus Walleij wrote:
-> On Mon, Feb 11, 2013 at 6:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> > On 02/11/2013 07:09 AM, Linus Walleij wrote:
+On Friday 08 February 2013, Thomas Petazzoni wrote:
+> Dear Bjorn Helgaas,
 > 
-> >> However if you take this all the way to the descriptor API
-> >> it will make the consumer (driver) API for GPIO descriptors deviate
-> >> from what is today used for clocks, regulators and pins.
-> >>
-> >> With all the resulting confusion for users.
-> >> I've seen worse subsystem deviations though.
-> >
-> > Sorry I haven't looked at the specific APIs this discussion refers to,
-> > but clients of the GPIO descriptor API are going to need to distinguish
-> > "fail" from "deferred probe", so at least some initial get-like API will
-> > need to pass back some error detail...
+> On Thu, 7 Feb 2013 21:21:57 -0700, Bjorn Helgaas wrote:
 > 
-> Right, so in some other patch I stated that this would lead
-> to a GPIO descriptor fetch interface such as this:
+> > Huh.  That hardware looks less and less like a P2P bridge all the time
+> > :(  You can't configure it via standard PCI config accesses, and the
+> > aperture alignment and size constraints sound completely non-standard.
+
+Right.
+
+> > I could imagine changing pcibios_window_alignment() to take the
+> > resource, so it could deal with the alignment question (though I
+> > haven't looked in detail and there might be some implementation issue
+> > with that).
+> > 
+> > With regard to the size issue (3MB window using 4MB of address space),
+> > I can't think of a reasonable way to teach the PCI core about both
+> > sizes.  But is there any reason to program the bridge for a 3MB window
+> > instead of a 4MB window, given that there's nothing else we can do
+> > with the extra 1MB anyway?  Is a 3MB window even possible?  I would
+> > think something that must be aligned on its size would be restricted
+> > to power-of-2 sizes anyway, just like PCI BARs are.  Maybe you can
+> > just always round up window sizes to a power of 2?
 > 
-> int gpiod_get(struct gpiod_desc **gpiod, struct device *dev, const char *name);
-> 
-> Rather than the more established:
-> 
-> struct gpio_desc *gpiod_get(struct device *dev, const char *name);
-> 
-> And I'm worried about the lack of consistency.
-> 
-> While I do get the point... I chatted with Grant about it and
-> I want to talk to some toolchain people about this to see if
-> pointers containing potential error codes can somehow be
-> "flagged" by the compiler so we can enforce error checking on
-> them. (It may sound a bit utopic...)
-> 
-At the very least you can __must_check annotate, although that's probably
-still a bit coarser grained than what you're after.
+> The window sizes are power of two sizes. I didn't realize that it was
+> also the case for PCI BARs. Then there is no problem with the size I
+> guess, and only a problem of alignment. Having the possibility to
+> get the resource and return a fixed up start address would solve the
+> problem I'd say.
+
+I thought that only device BARs in PCI had natural alignment, while
+bridges don't.
+
+I tried understanding the actual problem we have with the current
+procedure, which on today's kirkwood is rought implemented in ARM's
+pci_common_init() as follows:
+
+for_each_root_bus() {
+	pci_scan_root_bus();
+}
+for_each_root_bus {
+	pci_bus_size_bridges();
+	pci_bus_assign_resources();
+	pci_enable_bridges();
+	pci_bus_add_devices();
+}
+
+This is using hardcoded windows today, which are set up before calling
+pci_scan_root_bus(). With your change, there is only one root bus,
+and you intercept the pci_bus_assign_resources() stage in order to
+set up the hardware specific window configuration for each PCIe
+port of that root bus.
+
+My feeling is that an easier solution would be to keep separate
+root buses for each port, which then behaves completely PCIe
+compliant, but add a hook in the procedure above to set up the
+address translation windows between the pci_bus_size_bridges()
+and the pci_bus_assign_resources() calls.
+
+	Arnd
