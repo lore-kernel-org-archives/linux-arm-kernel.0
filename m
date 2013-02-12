@@ -1,42 +1,56 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 12 Feb 2013 14:59:19 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the usb tree
-Message-ID: <20130212145919.e1f7ba0e693b69f40f5724dd@canb.auug.org.au>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Tue, 12 Feb 2013 09:28:53 +0530
+Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
+In-Reply-To: <20130211190852.GA5695@linux.vnet.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <510FBC01.2030405@linux.vnet.ibm.com> <87haloiwv0.fsf@rustcorp.com.au>
+ <51134596.4080106@linux.vnet.ibm.com>
+ <20130208154113.GV17833@n2100.arm.linux.org.uk>
+ <51152B81.2050501@linux.vnet.ibm.com> <51153F72.1060005@linux.vnet.ibm.com>
+ <CAKfTPtCe+cD7LLkb+D6pqG1SwG2V08ws=4XO3ttHEHV2qgmqPg@mail.gmail.com>
+ <5118E2CD.90401@linux.vnet.ibm.com>
+ <20130211190852.GA5695@linux.vnet.ibm.com>
+Message-ID: <5119BDFD.1000909@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 02/12/2013 12:38 AM, Paul E. McKenney wrote:
+> On Mon, Feb 11, 2013 at 05:53:41PM +0530, Srivatsa S. Bhat wrote:
+>> On 02/11/2013 05:28 PM, Vincent Guittot wrote:
+>>> On 8 February 2013 19:09, Srivatsa S. Bhat
+>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
+> 
+> [ . . . ]
+> 
+>>>> Adding Vincent to CC, who had previously evaluated the performance and
+>>>> latency implications of CPU hotplug on ARM platforms, IIRC.
+>>>>
+>>>
+>>> Hi Srivatsa,
+>>>
+>>> I can try to run some of our stress tests on your patches.
+>>
+>> Great!
+>>
+>>> Have you
+>>> got a git tree that i can pull ?
+>>>
+>>
+>> Unfortunately, no, none at the moment..  :-(
+> 
+> You do need to create an externally visible git tree.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-omap2/board-zoom-peripherals.c between commit 51482be9dcfd
-("ARM: OMAP: USB: Add phy binding information") from the usb tree and
-commit c5913935657f ("ARM: OMAP: zoom: Audio support via the common
-omap-twl4030 machine driver") from the arm-soc tree.
+Ok, I'll do that soon.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+>  In the meantime,
+> I have added your series at rcu/bhat.2013.01.21a on -rcu:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git
+> 
+> This should appear soon on a kernel.org mirror near you.  ;-)
+>
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Thank you very much, Paul! :-)
 
-diff --cc arch/arm/mach-omap2/board-zoom-peripherals.c
-index dc5498b,0745bd9..0000000
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@@ -20,7 -20,7 +20,8 @@@
-  #include <linux/wl12xx.h>
-  #include <linux/mmc/host.h>
-  #include <linux/platform_data/gpio-omap.h>
-+ #include <linux/platform_data/omap-twl4030.h>
- +#include <linux/usb/phy.h>
-  
-  #include <asm/mach-types.h>
-  #include <asm/mach/arch.h>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130212/77b47771/attachment.sig>
+Regards,
+Srivatsa S. Bhat
