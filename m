@@ -1,36 +1,83 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 12 Feb 2013 11:41:27 -0700
-Subject: Giving special alignment/size constraints to the Linux PCI core?
-In-Reply-To: <201302121600.08434.arnd@arndb.de>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <CAErSpo7hwG89LTO+4+eqT_Gb+yUn1XKHYJ8CnnZcf_FPo-Kpyw@mail.gmail.com>
- <20130208091420.703a39b4@skate> <201302121600.08434.arnd@arndb.de>
-Message-ID: <20130212184127.GA1471@obsidianresearch.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Feb 2013 10:43:25 -0800
+Subject: [PATCH v2 0/8] ARM: omap2: GPMC cleanup
+In-Reply-To: <20130212182614.GA2574@localhost>
+References: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <511A6EA1.80301@ti.com> <20130212171253.GI4801@atomide.com>
+ <20130212182614.GA2574@localhost>
+Message-ID: <20130212184315.GJ4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 04:00:08PM +0000, Arnd Bergmann wrote:
-
-> > The window sizes are power of two sizes. I didn't realize that it was
-> > also the case for PCI BARs. Then there is no problem with the size I
-> > guess, and only a problem of alignment. Having the possibility to
-> > get the resource and return a fixed up start address would solve the
-> > problem I'd say.
+* Ezequiel Garcia <ezequiel.garcia@free-electrons.com> [130212 10:29]:
+> On Tue, Feb 12, 2013 at 09:12:53AM -0800, Tony Lindgren wrote:
+> > * Jon Hunter <jon-hunter@ti.com> [130212 08:36]:
+> > > 
+> > > On 02/12/2013 09:18 AM, Ezequiel Garcia wrote:
+> > > > This patchset is v2 of the small cleanup consisting in:
+> > > >  * mark some functions as 'static' when appropriate
+> > > >  * remove an unused function from gpmc.c
+> > > >  * improve error messages when a CS request fails
+> > > >  * migrate to dev_err and dev_warn
+> > > > 
+> > > > Changelog from v1:
+> > > >  * fix gpmc_cs_reserved to return a boolean instead
+> > > >    of an integer error code
+> > > >  * add a new patch to the patchset cleaning redundant checks
+> > > > 
+> > > > It has been tested on a IGEP v2 board with OneNAND,
+> > > > which means the gpmc-nand patch is tested by compilation only.
+> > > > 
+> > > > Altough these patchset is almost trivial,
+> > > > any feedback or testing is more than welcome.
+> > > > 
+> > > > Ezequiel Garcia (8):
+> > > >   ARM: omap2: gpmc: Mark local scoped functions static
+> > > >   ARM: omap2: gpmc: Remove unused gpmc_round_ns_to_ticks() function
+> > > >   ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
+> > > >   ARM: omap2: gpmc-nand: Print something useful on CS request failure
+> > > >   ARM: omap2: gpmc-onenand: Print something useful on CS request failure
+> > > >   ARM: omap2: gpmc-onenand: Replace pr_err() with dev_err()
+> > > >   ARM: omap2: gpmc-onenand: Replace printk KERN_ERR with dev_warn()
+> > > >   ARM: omap2: gpmc: Remove redundant chip select out of range check
+> > > > 
+> > > >  arch/arm/mach-omap2/gpmc-nand.c    |    3 ++-
+> > > >  arch/arm/mach-omap2/gpmc-onenand.c |    8 +++++---
+> > > >  arch/arm/mach-omap2/gpmc.c         |   27 ++++++---------------------
+> > > >  arch/arm/mach-omap2/gpmc.h         |    7 -------
+> > > >  4 files changed, 13 insertions(+), 32 deletions(-)
+> > > 
+> > > Looks good to me. I noticed that for some patches there is no changelog
+> > > and I understand that that is because they are some what trivial
+> > > clean-ups and the subject explains the patch. However, typically it is
+> > > good to have a changelog in the patch no matter how trivial it is. Tony
+> > > may ask you to add a changelog. Otherwise ...
+> > > 
+> > > Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+> > 
+> > Yes please add a changelog.
+> > 
 > 
-> I thought that only device BARs in PCI had natural alignment, while
-> bridges don't.
+> Patches with no changelog have no changelog ;-)
+> 
+> My usual workflow is to re-send a whole series, and only
+> add a changelog to the ones that actually change.
+> For instance, for this patchset, the only one that actually changed
+> is "ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value".
+> 
+> The rest is just the same it was in v1.
+> 
+> I like to do it this way, because I think it keeps the patches
+> together, and I hope I make maintainers life easier; of course,
+> I might be wrong.
+> 
+> So, should I use a different workflow and send only the patches
+> that change with new versions?
 
-Right
+Sorry I think there's a misunderstanding here.. Jon and I mean
+that each patch should have a description in addition to the 
+Subject line even if a trival patch :)
 
-> My feeling is that an easier solution would be to keep separate
-> root buses for each port, which then behaves completely PCIe
-> compliant, but add a hook in the procedure above to set up the
-> address translation windows between the pci_bus_size_bridges()
-> and the pci_bus_assign_resources() calls.
+Regards,
 
-This process is only done during driver initialization. How would you
-support PCI-E device hotplug (my systems rely on this)? Hotplug works
-today with the existing Marvell driver, however that relies on
-pre-allocated windows.
-
-Jason
+Tony
