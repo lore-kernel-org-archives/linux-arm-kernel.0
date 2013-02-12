@@ -1,89 +1,86 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 12 Feb 2013 15:46:52 -0300
-Subject: [PATCH v2 0/8] ARM: omap2: GPMC cleanup
-In-Reply-To: <20130212184315.GJ4801@atomide.com>
-References: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <511A6EA1.80301@ti.com> <20130212171253.GI4801@atomide.com>
- <20130212182614.GA2574@localhost>
- <20130212184315.GJ4801@atomide.com>
-Message-ID: <20130212184651.GA2955@localhost>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 12 Feb 2013 19:46:36 +0100
+Subject: [PATCH 09/17] ARM: add atag32_to_cpu() function
+In-Reply-To: <51194347.9090501@codethink.co.uk>
+References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1360365467-25056-10-git-send-email-ben.dooks@codethink.co.uk>
+ <20130209120331.GC17833@n2100.arm.linux.org.uk>
+ <51194347.9090501@codethink.co.uk>
+Message-ID: <20130212184636.GJ30595@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 10:43:25AM -0800, Tony Lindgren wrote:
-> * Ezequiel Garcia <ezequiel.garcia@free-electrons.com> [130212 10:29]:
-> > On Tue, Feb 12, 2013 at 09:12:53AM -0800, Tony Lindgren wrote:
-> > > * Jon Hunter <jon-hunter@ti.com> [130212 08:36]:
-> > > > 
-> > > > On 02/12/2013 09:18 AM, Ezequiel Garcia wrote:
-> > > > > This patchset is v2 of the small cleanup consisting in:
-> > > > >  * mark some functions as 'static' when appropriate
-> > > > >  * remove an unused function from gpmc.c
-> > > > >  * improve error messages when a CS request fails
-> > > > >  * migrate to dev_err and dev_warn
-> > > > > 
-> > > > > Changelog from v1:
-> > > > >  * fix gpmc_cs_reserved to return a boolean instead
-> > > > >    of an integer error code
-> > > > >  * add a new patch to the patchset cleaning redundant checks
-> > > > > 
-> > > > > It has been tested on a IGEP v2 board with OneNAND,
-> > > > > which means the gpmc-nand patch is tested by compilation only.
-> > > > > 
-> > > > > Altough these patchset is almost trivial,
-> > > > > any feedback or testing is more than welcome.
-> > > > > 
-> > > > > Ezequiel Garcia (8):
-> > > > >   ARM: omap2: gpmc: Mark local scoped functions static
-> > > > >   ARM: omap2: gpmc: Remove unused gpmc_round_ns_to_ticks() function
-> > > > >   ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
-> > > > >   ARM: omap2: gpmc-nand: Print something useful on CS request failure
-> > > > >   ARM: omap2: gpmc-onenand: Print something useful on CS request failure
-> > > > >   ARM: omap2: gpmc-onenand: Replace pr_err() with dev_err()
-> > > > >   ARM: omap2: gpmc-onenand: Replace printk KERN_ERR with dev_warn()
-> > > > >   ARM: omap2: gpmc: Remove redundant chip select out of range check
-> > > > > 
-> > > > >  arch/arm/mach-omap2/gpmc-nand.c    |    3 ++-
-> > > > >  arch/arm/mach-omap2/gpmc-onenand.c |    8 +++++---
-> > > > >  arch/arm/mach-omap2/gpmc.c         |   27 ++++++---------------------
-> > > > >  arch/arm/mach-omap2/gpmc.h         |    7 -------
-> > > > >  4 files changed, 13 insertions(+), 32 deletions(-)
-> > > > 
-> > > > Looks good to me. I noticed that for some patches there is no changelog
-> > > > and I understand that that is because they are some what trivial
-> > > > clean-ups and the subject explains the patch. However, typically it is
-> > > > good to have a changelog in the patch no matter how trivial it is. Tony
-> > > > may ask you to add a changelog. Otherwise ...
-> > > > 
-> > > > Reviewed-by: Jon Hunter <jon-hunter@ti.com>
-> > > 
-> > > Yes please add a changelog.
-> > > 
-> > 
-> > Patches with no changelog have no changelog ;-)
-> > 
-> > My usual workflow is to re-send a whole series, and only
-> > add a changelog to the ones that actually change.
-> > For instance, for this patchset, the only one that actually changed
-> > is "ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value".
-> > 
-> > The rest is just the same it was in v1.
-> > 
-> > I like to do it this way, because I think it keeps the patches
-> > together, and I hope I make maintainers life easier; of course,
-> > I might be wrong.
-> > 
-> > So, should I use a different workflow and send only the patches
-> > that change with new versions?
+On 19:15 Mon 11 Feb     , Ben Dooks wrote:
+> On 09/02/13 12:03, Russell King - ARM Linux wrote:
+> >On Fri, Feb 08, 2013 at 11:17:39PM +0000, Ben Dooks wrote:
+> >>Add atag32_to_cpu() function to allow code manipulating ATAGs to deal
+> >>with the case where the boot-loader was in little-endian and Linux is
+> >>running big-endian.
+> >...
+> >>+#ifdef CONFIG_CPU_BE8_BOOT_LE
+> >>+#define atag32_to_cpu(x)	le32_to_cpu(x)
+> >>+#else
+> >>+#define atag32_to_cpu(x)	x
+> >>+#endif
+> >
+> >Actually, with a LE kernel, le32_to_cpu() ends up being a no-op too.  So
+> >I'm wondering if we should do this a different way...
+> >
+> >Also, this will cause sparse to complain - le32_to_cpu() takes a le32
+> >type not a u32 type.
 > 
-> Sorry I think there's a misunderstanding here.. Jon and I mean
-> that each patch should have a description in addition to the 
-> Subject line even if a trival patch :)
+> Yes, you're right on that.
 > 
+> >This brings up a whole load of difficulties though: what format are the
+> >ATAGs on older BE hardware - I bet it's CPU-endian format there.  So,
+> >I'm wondering if we should do this:
+> 
+> It isn't defined, and I have failed to find any information on
+> it online. I have no idea if the IXP devices ran their boot-loader
+> in big-endian or little-endian format?
+> 
+> Input welcome from anyone who can remember.
+I run the ixp in be
 
-Oops, my bad! I'll re-send adding a description to each patch.
+and pass the atag in be
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Best Regards,
+J.
+> 
+> >1. define all tags using a new __atagXX, etc types.
+> >2. always use atagXX_to_cpu() to read these.
+> >3. Implement:
+> >
+> >#if defined(CONFIG_ATAG_LE)
+> >typedef __le32 __atag32;
+> >...
+> >#define atag32_to_cpu(x) le32_to_cpu(x)
+> >...
+> >#elif defined(CONFIG_ATAG_BE)
+> >typedef __be32 __atag32;
+> >...
+> >#define atag32_to_cpu(x) be32_to_cpu(x)
+> >...
+> >#elif defined(CONFIG_ATAG_NE)
+> >typedef __u32 __atag32;
+> >...
+> >#define atag32_to_cpu(x) x
+> >...
+> >#endif
+> >
+> >and select the appropriate definition.  Obviously, this is a fundamental
+> >configuration just like the overall BE/LE configuration of the kernel.
+> 
+> Ok, should I sort out doing that for the next round of patches?
+> 
+> Should the ATAG_xx configurations go into arch/arm/Kconfig or
+> is there somewhere better for them to go?
+> 
+> -- 
+> Ben Dooks				http://www.codethink.co.uk/
+> Senior Engineer				Codethink - Providing Genius
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
