@@ -1,25 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Feb 2013 17:18:48 +0000
-Subject: [PATCH 6/9] gpiolib: use descriptors internally
-In-Reply-To: <20130212155927.GE6088@linux-sh.org>
-References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <CACRpkdaHuv7CXCy15-o94G0r0+2BStsi34ZVbBAhyGj=U3xgOg@mail.gmail.com>
- <20130212155927.GE6088@linux-sh.org>
-Message-ID: <201302121718.48244.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Feb 2013 17:15:01 +0000
+Subject: [PATCH] HACK: ARM: Fix generic timer broadcast for TWD
+In-Reply-To: <20130212171217.GB13775@e106331-lin.cambridge.arm.com>
+References: <1360684194-10894-1-git-send-email-thierry.reding@avionic-design.de>
+ <20130212155516.GP17833@n2100.arm.linux.org.uk>
+ <20130212171217.GB13775@e106331-lin.cambridge.arm.com>
+Message-ID: <20130212171501.GT17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 February 2013, Paul Mundt wrote:
-> > While I do get the point... I chatted with Grant about it and
-> > I want to talk to some toolchain people about this to see if
-> > pointers containing potential error codes can somehow be
-> > "flagged" by the compiler so we can enforce error checking on
-> > them. (It may sound a bit utopic...)
-> > 
-> At the very least you can __must_check annotate, although that's probably
-> still a bit coarser grained than what you're after.
+On Tue, Feb 12, 2013 at 05:12:17PM +0000, Mark Rutland wrote:
+> [...]
+> 
+> > So, things to be done here:
+> > 1. Fix the #else part of the code.
+> > 2. Fix the reported oops.
+> 
+> I believe the patch below solves point 1. Nothing refers to smp_timer_broadcast
+> any more (as I've tested with git grep), so removing it shouldn't create any
+> additional problems.
+> 
+> Russell, are you happy for me to drop this in the patch system?
 
-There is an idea: we could have variants of __must_check for different
-classes of returns: NULL error, ERR_PTR, negative integer on error, ...
-
-	Arnd
+Yes, it might as well go into the devel-stable branch along with your
+other patches.  Thanks.
