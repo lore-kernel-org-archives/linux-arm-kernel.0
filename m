@@ -1,35 +1,49 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Tue, 12 Feb 2013 16:02:45 +0100
-Subject: [PATCH] arm: Preserve TPIDRURW on context switch
-In-Reply-To: <20130212140950.GC4123@mudshark.cambridge.arm.com>
-References: <5112DC7E.4020108@dawncrow.de>
- <20130206225150.GL17833@n2100.arm.linux.org.uk>
- <5112E0C3.1080706@dawncrow.de>
- <20130208154809.GF3495@mudshark.cambridge.arm.com>
- <511A4B93.1000700@dawncrow.de>
- <20130212140950.GC4123@mudshark.cambridge.arm.com>
-Message-ID: <511A5995.5000607@parrot.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 12 Feb 2013 06:49:50 -0800
+Subject: [PATCH V4 0/5] Add generic DMA DT binding support
+In-Reply-To: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
+References: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
+Message-ID: <20130212144950.GJ3789@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon a ?crit :
-> Hi Andre,
-> 
-> On Tue, Feb 12, 2013 at 02:02:59PM +0000, Andr? Hentschel wrote:
->> Am 08.02.2013 16:48, schrieb Will Deacon:
->>> On Wed, Feb 06, 2013 at 11:01:23PM +0000, Andr? Hentschel wrote:
->>>> No, i'm not sure how to improve this. How does the process can continue, can you or someone else fix that and add his Signed-off-by?
->>> How about something like the (completely untested) diff below?
->>>
->>> Andre: if this works for you, I'm happy to write a commit message etc.
->> Thx for your effort, but it doesn't work, at least not with my 3.4.6 suse kernel.
->> Be free to have another try, i'll be happy to test it.
-> 
-> Well, cheers for testing. Can you be more specific about what goes wrong
-> please? What do you see in TPIDRURW?
-> 
-The tls value is never saved to : thread->tp_value[1].
+On Mon, Feb 11, 2013 at 02:08:20PM +0530, Padmavathi Venna wrote:
 
-Also I don't know if you can avoid the extra ldr in the software case.
+This looks fine, I have only question. The code seems to assume that pl330 dma
+controller always uses DT. But I dont see that as dependency for pl330.
 
-Matthieu
+Something tells me withot OF the driver may not build, have you checked it?
+
+> This patch set adds support for generic dma device tree bindings for
+> Samsung platforms and is dependent on the following patches from
+> Vinod Koul next branch
+> 1)of: Add generic device tree DMA helpers
+> 2)dmaengine: add helper function to request a slave DMA channel
+> 
+> This patch set is made based Mark Brown next branch
+Is this targetted for ASoC tree, if so why? It would fail to build if applied
+there
+
+--
+~Vinod
+> 
+> Padmavathi Venna (5):
+>   DMA: PL330: Add new pl330 filter for DT case.
+>   DMA: PL330: Add xlate function
+>   DMA: PL330: Register the DMA controller with the generic DMA helpers
+>   ARM: dts: pl330: Add #dma-cells for generic dma binding support
+>   ARM: SAMSUNG: dma: Remove unnecessary code
+> 
+>  .../devicetree/bindings/dma/arm-pl330.txt          |   21 +++++--
+>  arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++
+>  arch/arm/mach-s3c24xx/include/mach/dma.h           |    1 -
+>  arch/arm/mach-s3c64xx/include/mach/dma.h           |    1 -
+>  arch/arm/plat-samsung/dma-ops.c                    |   10 +---
+>  arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 -
+>  arch/arm/plat-samsung/include/plat/dma-pl330.h     |    1 -
+>  drivers/dma/pl330.c                                |   64 +++++++++++++++----
+>  8 files changed, 79 insertions(+), 32 deletions(-)
+> 
+> -- 
+> 1.7.4.4
+> 
