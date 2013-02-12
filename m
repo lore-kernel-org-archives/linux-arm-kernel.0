@@ -1,53 +1,69 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 12 Feb 2013 08:15:30 -0800
-Subject: [PATCH v5 04/45] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <20130210195417.GK2666@linux.vnet.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <20130122073347.13822.85876.stgit@srivatsabhat.in.ibm.com>
- <20130208231017.GK2666@linux.vnet.ibm.com>
- <20130210180607.GA1375@redhat.com>
- <20130210195417.GK2666@linux.vnet.ibm.com>
-Message-ID: <20130212161530.GA9929@linux.vnet.ibm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 12 Feb 2013 15:50:07 -0200
+Subject: Building DRM for i.MX fails with linux-next 20130212
+Message-ID: <CAOMZO5CzFbSKe1dKjCgmFtzbPCjMsHu1mGzphae3jmhByCPBqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 10, 2013 at 11:54:17AM -0800, Paul E. McKenney wrote:
-> On Sun, Feb 10, 2013 at 07:06:07PM +0100, Oleg Nesterov wrote:
-> > On 02/08, Paul E. McKenney wrote:
-> 
-> [ . . . ]
-> 
-> > > > +static inline void sync_reader(struct percpu_rwlock *pcpu_rwlock,
-> > > > +			       unsigned int cpu)
-> > > > +{
-> > > > +	smp_rmb(); /* Paired with smp_[w]mb() in percpu_read_[un]lock() */
-> > >
-> > > As I understand it, the purpose of this memory barrier is to ensure
-> > > that the stores in drop_writer_signal() happen before the reads from
-> > > ->reader_refcnt in reader_uses_percpu_refcnt(), thus preventing the
-> > > race between a new reader attempting to use the fastpath and this writer
-> > > acquiring the lock.  Unless I am confused, this must be smp_mb() rather
-> > > than smp_rmb().
-> > 
-> > And note that before sync_reader() we call announce_writer_active() which
-> > already adds mb() before sync_all_readers/sync_reader, so this rmb() looks
-> > unneeded.
-> > 
-> > But, at the same time, could you confirm that we do not need another mb()
-> > after sync_all_readers() in percpu_write_lock() ? I mean, without mb(),
-> > can't this reader_uses_percpu_refcnt() LOAD leak into the critical section
-> > protected by ->global_rwlock? Then this LOAD can be re-ordered with other
-> > memory operations done by the writer.
-> 
-> As soon as I get the rest of the way through Thomas's patchset.  ;-)
+Hi,
 
-There is a memory barrier associated with write_lock(), but it is
-only required to keep the critical section inside the lock -- and is
-permitted to allow stuff outside of the lock to be reordered into the
-critical section.  So I believe we do indeed need an smp_mb() between
-sync_all_readers() and write_lock() in percpu_write_lock().
+Building imx_v6_v7_defconfig on linux-next 20130212 gives me the
+following build error:
 
-Good eyes, Oleg!
+  CC      drivers/gpu/drm/drm_pci.o
+drivers/gpu/drm/drm_pci.c: In function ?drm_pcie_get_speed_cap_mask?:
+drivers/gpu/drm/drm_pci.c:485:2: error: implicit declaration of
+function ?pcie_capability_read_dword?
+[-Werror=implicit-function-declaration]
 
-							Thanx, Paul
+Then I tried to fix it as follows:
+
+diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+index 6f58c81..6a08165 100644
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -8,7 +8,7 @@ drm-y       :=  drm_auth.o drm_buffer.o drm_bufs.o drm_cache.o \
+                drm_context.o drm_dma.o \
+                drm_drv.o drm_fops.o drm_gem.o drm_ioctl.o drm_irq.o \
+                drm_lock.o drm_memory.o drm_proc.o drm_stub.o drm_vm.o \
+-               drm_agpsupport.o drm_scatter.o drm_pci.o \
++               drm_agpsupport.o drm_scatter.o  \
+                drm_platform.o drm_sysfs.o drm_hashtab.o drm_mm.o \
+                drm_crtc.o drm_modes.o drm_edid.o \
+                drm_info.o drm_debugfs.o drm_encoder_slave.o \
+@@ -16,7 +16,7 @@ drm-y       :=        drm_auth.o drm_buffer.o
+drm_bufs.o drm_cache.o \
+
+ drm-$(CONFIG_COMPAT) += drm_ioc32.o
+ drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+-drm-$(CONFIG_PCI) += ati_pcigart.o
++drm-$(CONFIG_PCI) += ati_pcigart.o drm_pci.o
+
+ drm-usb-y   := drm_usb.o
+
+,which caused another issue:
+
+  GEN     .version
+  CHK     include/generated/compile.h
+  UPD     include/generated/compile.h
+  CC      init/version.o
+  LD      init/built-in.o
+drivers/built-in.o: In function `drm_rmmap_locked':
+clk-vexpress-osc.c:(.text+0x4f370): undefined reference to `__drm_pci_free'
+drivers/built-in.o: In function `drm_addmap_core':
+clk-vexpress-osc.c:(.text+0x4f4f4): undefined reference to `drm_pci_alloc'
+drivers/built-in.o: In function `drm_cleanup_buf_error':
+clk-vexpress-osc.c:(.text+0x4f920): undefined reference to `drm_pci_free'
+drivers/built-in.o: In function `drm_addbufs_pci':
+clk-vexpress-osc.c:(.text+0x4fc00): undefined reference to `drm_pci_alloc'
+drivers/built-in.o: In function `drm_dma_takedown':
+clk-vexpress-osc.c:(.text+0x51c84): undefined reference to `drm_pci_free'
+drivers/built-in.o: In function `drm_vm_shm_close':
+clk-vexpress-osc.c:(.text+0x57d60): undefined reference to `__drm_pci_free'
+make: *** [vmlinux] Error 1
+
+Any ideas or suggestions?
+
+Thanks,
+
+Fabio Estevam
