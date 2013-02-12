@@ -1,59 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 12 Feb 2013 17:12:17 +0000
-Subject: [PATCH] HACK: ARM: Fix generic timer broadcast for TWD
-In-Reply-To: <20130212155516.GP17833@n2100.arm.linux.org.uk>
-References: <1360684194-10894-1-git-send-email-thierry.reding@avionic-design.de>
- <20130212155516.GP17833@n2100.arm.linux.org.uk>
-Message-ID: <20130212171217.GB13775@e106331-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Feb 2013 09:12:53 -0800
+Subject: [PATCH v2 0/8] ARM: omap2: GPMC cleanup
+In-Reply-To: <511A6EA1.80301@ti.com>
+References: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <511A6EA1.80301@ti.com>
+Message-ID: <20130212171253.GI4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+* Jon Hunter <jon-hunter@ti.com> [130212 08:36]:
+> 
+> On 02/12/2013 09:18 AM, Ezequiel Garcia wrote:
+> > This patchset is v2 of the small cleanup consisting in:
+> >  * mark some functions as 'static' when appropriate
+> >  * remove an unused function from gpmc.c
+> >  * improve error messages when a CS request fails
+> >  * migrate to dev_err and dev_warn
+> > 
+> > Changelog from v1:
+> >  * fix gpmc_cs_reserved to return a boolean instead
+> >    of an integer error code
+> >  * add a new patch to the patchset cleaning redundant checks
+> > 
+> > It has been tested on a IGEP v2 board with OneNAND,
+> > which means the gpmc-nand patch is tested by compilation only.
+> > 
+> > Altough these patchset is almost trivial,
+> > any feedback or testing is more than welcome.
+> > 
+> > Ezequiel Garcia (8):
+> >   ARM: omap2: gpmc: Mark local scoped functions static
+> >   ARM: omap2: gpmc: Remove unused gpmc_round_ns_to_ticks() function
+> >   ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
+> >   ARM: omap2: gpmc-nand: Print something useful on CS request failure
+> >   ARM: omap2: gpmc-onenand: Print something useful on CS request failure
+> >   ARM: omap2: gpmc-onenand: Replace pr_err() with dev_err()
+> >   ARM: omap2: gpmc-onenand: Replace printk KERN_ERR with dev_warn()
+> >   ARM: omap2: gpmc: Remove redundant chip select out of range check
+> > 
+> >  arch/arm/mach-omap2/gpmc-nand.c    |    3 ++-
+> >  arch/arm/mach-omap2/gpmc-onenand.c |    8 +++++---
+> >  arch/arm/mach-omap2/gpmc.c         |   27 ++++++---------------------
+> >  arch/arm/mach-omap2/gpmc.h         |    7 -------
+> >  4 files changed, 13 insertions(+), 32 deletions(-)
+> 
+> Looks good to me. I noticed that for some patches there is no changelog
+> and I understand that that is because they are some what trivial
+> clean-ups and the subject explains the patch. However, typically it is
+> good to have a changelog in the patch no matter how trivial it is. Tony
+> may ask you to add a changelog. Otherwise ...
+> 
+> Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 
-> So, things to be done here:
-> 1. Fix the #else part of the code.
-> 2. Fix the reported oops.
+Yes please add a changelog.
 
-I believe the patch below solves point 1. Nothing refers to smp_timer_broadcast
-any more (as I've tested with git grep), so removing it shouldn't create any
-additional problems.
-
-Russell, are you happy for me to drop this in the patch system?
-
-Thanks,
-Mark.
-
----->8----
->From 1954a075d0ce7f5ce5466b20f7aee9a0ac044cda Mon Sep 17 00:00:00 2001
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Tue, 12 Feb 2013 16:50:18 +0000
-Subject: [PATCH] arm: remove unused smp_timer_broadcast #define
-
-The assignment of clock_event_device::broadcast can be done by timer
-core as of 12ad100046: "clockevents: Add generic timer broadcast
-function", and the arm code moved over to this as of 3d06770eef: "arm:
-Add generic timer broadcast support", but left a dangling #define when
-!CONFIG_GENERIC_TIMER_BROADCAST.
-
-This patch removes the now unused #define.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm/kernel/smp.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index b7e3b50..ab9458d 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -480,8 +480,6 @@ void tick_broadcast(const struct cpumask *mask)
- {
- 	smp_cross_call(mask, IPI_TIMER);
- }
--#else
--#define smp_timer_broadcast	NULL
- #endif
- 
- static void broadcast_timer_set_mode(enum clock_event_mode mode,
--- 
-1.8.1.1
+Tony
