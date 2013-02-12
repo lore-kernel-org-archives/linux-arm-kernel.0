@@ -1,30 +1,40 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 12 Feb 2013 11:27:56 +0000
-Subject: [PATCH] ARM: mm: fix missing use of 'asid' to get asid value from
- mm->context.id
-Message-ID: <1360668476-8525-1-git-send-email-ben.dooks@codethink.co.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 12 Feb 2013 12:43:54 +0100
+Subject: [PATCH 1/2 v2] drivers/db8500-cpufreq: delete dangling include
+Message-ID: <1360669434-21752-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix missing use of the asid macro when getting the ASID from the mm->context.id field.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+There was a dangling #include <mach/id.h> in the cpufreq
+file missing from commit
+7a4f26097d389c16c9956bc03b81532698d97d64
+"ARM: ux500: de-globalize <mach/id.h>"
+
+Causing build regressions when building with cpufreq
+support.
+
+Cc: Rafael J. Wysocki <rjw@sisk.pl>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mm/proc-v7-3level.S |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ChangeLog v1->v2:
+- introduce db8500 in the subject.
+---
+ drivers/cpufreq/db8500-cpufreq.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 50bf1da..6ffd78c 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -48,7 +48,7 @@
- ENTRY(cpu_v7_switch_mm)
- #ifdef CONFIG_MMU
- 	mmid	r1, r1				@ get mm->context.id
--	and	r3, r1, #0xff
-+	asid	r3, r1
- 	mov	r3, r3, lsl #(48 - 32)		@ ASID
- 	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
- 	isb
+diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
+index 523c940..87130e2 100644
+--- a/drivers/cpufreq/db8500-cpufreq.c
++++ b/drivers/cpufreq/db8500-cpufreq.c
+@@ -15,7 +15,6 @@
+ #include <linux/slab.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
+-#include <mach/id.h>
+ 
+ static struct cpufreq_frequency_table *freq_table;
+ static struct clk *armss_clk;
 -- 
-1.7.10.4
+1.7.11.3
