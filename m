@@ -1,33 +1,33 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 12 Feb 2013 09:19:52 -0000
-Subject: [PATCH 2/2] net: calexdaxgmac: fixup endian issues after __raw IO
- function change
-In-Reply-To: <5119382F.8000809@codethink.co.uk>
-References: <1360510721-17860-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360510721-17860-3-git-send-email-ben.dooks@codethink.co.uk>
- <1360606656.2701.18.camel@bwh-desktop.uk.solarflarecom.com>
- <5119382F.8000809@codethink.co.uk>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B7145@saturn3.aculab.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 12 Feb 2013 10:24:20 +0100
+Subject: [PATCH] arm:
+ =?UTF-8?Q?arch=5Ftimer=3A=20add=20missing=20inline=20in?=
+ =?UTF-8?Q?=20stub=20function?=
+In-Reply-To: <1360624723-10749-1-git-send-email-olof@lixom.net>
+References: <1360624723-10749-1-git-send-email-olof@lixom.net>
+Message-ID: <93ac4bc370e375a82a10abb3be46afdc@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > You are using le32_to_cpu() and cpu_to_le32() the wrong way round, and
-> > then putting casts on the wrong side, i.e. it should be:
-> >
-> > 	value = le32_to_cpu((__force __le32)__raw_readl(addr));
-> > 	__raw_writel((__force u32)cpu_to_le32(value), addr);
-> >
-> > (I do wonder why __raw I/O functions aren't declared to take/return __le
-> > types... it would avoid the need to cast altogether.)
+On Mon, 11 Feb 2013 15:18:43 -0800, Olof Johansson <olof@lixom.net> wrote:
+> Fixes:
 > 
-> Because they do things with the order the cpu is working in, the
-> read{x} and write{x} transfer cpu to bus-endian so returning an __le
-> type would not be correct.
+> In file included from arch/arm/include/asm/arch_timer.h:10:0,
+>                  from arch/arm/mach-shmobile/timer.c:23:
+> include/clocksource/arm_arch_timer.h:56:28: warning:
+> 'arch_timer_get_timecounter' defined but not used [-Wunused-function]
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+> 
+> Will, Mark, Marc,
+> 
+> I've applied this on next/virt already since it started spewing pretty
+> heavily
+> on a lot of defconfig builds. Just posting FYI.
 
-Surely you want to arrange to use the byte-swapping memory
-read/write instructions, rather than byteswapping the value.
+Ah, well spotted. Thanks Olof.
 
-Particularly on ppc which doesn't have a byteswap instruction
-but can do byteswapping memory accesses.
-
-	David
+       M.
+-- 
+Fast, cheap, reliable. Pick two.
