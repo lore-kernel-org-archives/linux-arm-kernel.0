@@ -1,44 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 11 Feb 2013 19:47:16 -0800
-Subject: [PATCH] ARM: omap: board-h4: remove warning for is_gpmc_muxed
-Message-ID: <1360640836-18792-1-git-send-email-olof@lixom.net>
+Date: Mon, 11 Feb 2013 19:50:31 -0800
+Subject: [PATCHv5 for soc 1/4] arm: socfpga: Add new device tree source
+ for actual socfpga HW
+In-Reply-To: <1360625433-28067-2-git-send-email-dinguyen@altera.com>
+References: <1360625433-28067-1-git-send-email-dinguyen@altera.com>
+ <1360625433-28067-2-git-send-email-dinguyen@altera.com>
+Message-ID: <20130212035031.GA7628@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the ethernet driver is not selected, you otherwise get:
+On Mon, Feb 11, 2013 at 05:30:30PM -0600, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Up to this point, support for socfpga has only been on a virtual
+> platform. Now that actual hardware is available, we add the appropriate
+> device tree source files.
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Tested-by: Pavel Machek <pavel@denx.de>
+> Reviewed-by: Pavel Machek <pavel@denx.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
 
-arch/arm/mach-omap2/board-h4.c:237:12: warning: 'is_gpmc_muxed' defined but not used [-Wunused-function]
+Applied 1-4. Thanks!
 
-I guess it could be argued that the device setup should/could always
-be done even if the driver isn't enabled, but hopefully the board files
-will all go away some day so let's stick to the smaller delta.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-omap2/board-h4.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-index 812c829..e34541d 100644
---- a/arch/arm/mach-omap2/board-h4.c
-+++ b/arch/arm/mach-omap2/board-h4.c
-@@ -229,6 +229,8 @@ static u32 get_sysboot_value(void)
- 		 OMAP2_SYSBOOT_1_MASK | OMAP2_SYSBOOT_0_MASK));
- }
- 
-+#if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91x_MODULE)
-+
- /* H4-2420's always used muxed mode, H4-2422's always use non-muxed
-  *
-  * Note: OMAP-GIT doesn't correctly do is_cpu_omap2422 and is_cpu_omap2423
-@@ -246,8 +248,6 @@ static u32 is_gpmc_muxed(void)
- 		return 0;
- }
- 
--#if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91x_MODULE)
--
- static struct omap_smc91x_platform_data board_smc91x_data = {
- 	.cs		= 1,
- 	.gpio_irq	= 92,
--- 
-1.8.1.192.gc4361b8
+-Olof
