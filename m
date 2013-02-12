@@ -1,80 +1,93 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 11 Feb 2013 16:48:40 -0800
-Subject: [PATCH v2 1/2] i2c-core: dt: Pick i2c bus number from i2c alias
- if present
-In-Reply-To: <20130210121901.GA15546@nekote.pengutronix.de>
-References: <1357927027-4857-2-git-send-email-dianders@chromium.org>
- <1358189602-24180-1-git-send-email-dianders@chromium.org>
- <1358189602-24180-2-git-send-email-dianders@chromium.org>
- <20130210121901.GA15546@nekote.pengutronix.de>
-Message-ID: <CAD=FV=V89FQPsZ46NF4v2--9dLLT6q4r=msqKbwNhZ57NXpVYA@mail.gmail.com>
+From: amit.kachhap@gmail.com (amit kachhap)
+Date: Mon, 11 Feb 2013 17:12:18 -0800
+Subject: [PATCH 3/3] dts: Add cpufreq controller node for Exynos5440 SoC
+In-Reply-To: <CAG17yqQBjuc9t2iXg0sjTMo=pbXcjkwuP0uRFu=YR=58+AmEmA@mail.gmail.com>
+References: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
+ <1360179562-19950-3-git-send-email-amit.daniel@samsung.com>
+ <CAG17yqTSxjoTDcGg+6rt+gnDyJBO7j3MBP_g5B=vYZqa1qaD+g@mail.gmail.com>
+ <CADGdYn44okjQHQo-W9Y-pFFHzO9-3HL-ZB36aVvfzMRp098ZtA@mail.gmail.com>
+ <CAG17yqQBjuc9t2iXg0sjTMo=pbXcjkwuP0uRFu=YR=58+AmEmA@mail.gmail.com>
+Message-ID: <CADGdYn6+yW2_pFG+mHf8F5eBgEA-2_8iQXdkJhxqp-4Eq1fGeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram,
-
-Thanks for the review.  New patch was just sent.  :)
-
-On Sun, Feb 10, 2013 at 4:19 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
->> +static int i2c_get_number_from_dt(struct i2c_adapter *adap)
+On Fri, Feb 8, 2013 at 8:49 AM, Inderpal Singh
+<inderpal.singh@linaro.org> wrote:
+> On 8 February 2013 00:03, amit kachhap <amit.kachhap@gmail.com> wrote:
+>> On Wed, Feb 6, 2013 at 8:49 PM, Inderpal Singh
+>> <inderpal.singh@linaro.org> wrote:
+>>> On 7 February 2013 01:09, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+>>>> Add cpufreq controller device node for Exynos5440 SoC for passing
+>>>> parameters like controller base address, interrupt and cpufreq
+>>>> table.
+>>>>
+>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/exynos5440.dtsi |    9 +++++++++
+>>>>  1 file changed, 9 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+>>>> index 024269d..b20b517 100644
+>>>> --- a/arch/arm/boot/dts/exynos5440.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+>>>> @@ -63,6 +63,15 @@
+>>>>
+>>>>         };
+>>>>
+>>>> +       cpufreq at 160000 {
+>>>> +               compatible = "samsung,exynos5440-cpufreq";
+>>>> +               reg = <0x160000 0x1000>;
+>>>> +               interrupts = <0 57 0>;
+>>>> +               cpufreq_tbl = < 1200000 1025000
+>>>> +                               1000000 975000
+>>>> +                               800000  925000 >;
+>>>> +       };
+>>>> +
+>>>
+>>> I think cpufreq_tbl should be part of the cpu node as it's the
+>>> property of the cpu.
+>>> Please refer cpufreq-cpu0 and spear-cpufreq.
+>>
+>> http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/15364.
+>> In this thread same discussion followed. I am not sure what is the
+>> correct way but looks like Kukjin concluded this with a timer node
+>> separate from the CPU code.
+>>
 >
-> i2c_get_id_from_dt()?
+> I am only talking about cpufreq_tbl and its nothing but operating
+> points for the cpus. It seems its agreed upon to add operating-points
+> to cpu node as being done by all other platforms like imx6q, am33xx,
+> cpufreq-cpu0 and spear.
 
-Done.
+Even timer, GIC, cpufreq tbl, pmu etc are all cpu properties. But the
+problem is whether to put them in cpu0 or repeat same information in
+all cpu nodes as it is common to all cpu's  and not just cpu0. So as
+Kukjin kim has put the timer node outside the cpu node so i also
+followed the same convention.
 
+Mr Kim,
+Any issue in this approach?
 
->> +     if (!dev->of_node)
->> +             return -1;
+Thanks,
+Amit Daniel
 >
-> -ESOMETHING?
-
-Function has been removed, as per below.
-
-
->> +
->> +     id = of_alias_get_id(dev->of_node, "i2c");
->> +     if (id < 0)
->> +             return -1;
->> +     return id;
+> Thanks,
+> Inder
 >
-> Simply 'return of_alias_get_id(...)'? Even more, since this function
-> boils down to calling of_alias_get_id only and is only used once, I'd
-> think we can implement that directly and drop this function. That
-> shouldn't hurt readability.
-
-Good point.  Done.
-
->> +/**
->> + * _i2c_add_numbered_adapter - i2c_add_numbered_adapter where nr is never -1
->> + * @adap: the adapter to register (with adap->nr initialized)
->> + * Context: can sleep
->> + *
->> + * See i2c_add_numbered_adapter() for details.
->> + */
->> +static int _i2c_add_numbered_adapter(struct i2c_adapter *adap)
->
-> All other internal functions are prefixed with '__'.
-
-Done.
-
-
->> +{
->> +     int     id;
->> +     int     status;
->> +
->> +     /* Handled by wrappers */
->> +     BUG_ON(adap->nr == -1);
->
-> Is that a reason to halt the kernel? WARN and bailing out would do IMO.
-
-Done.
-
-
->> +
->> +     if (adap->nr & ~MAX_IDR_MASK)
->> +             return -EINVAL;
->
-> Note the idr-cleanup series from Tejun Heo. Given that his series is
-> scheduled for v3.9, I'd like to have your patches on top of his.
-
-Done.
+>> Thanks,
+>> Amit Daniel
+>>>
+>>>>         serial at B0000 {
+>>>>                 compatible = "samsung,exynos4210-uart";
+>>>>                 reg = <0xB0000 0x1000>;
+>>>> --
+>>>> 1.7.10.4
+>>>>
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
