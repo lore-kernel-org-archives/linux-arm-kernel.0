@@ -1,49 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Feb 2013 13:29:10 +0100
-Subject: [PATCH 6/9] gpiolib: use descriptors internally
-In-Reply-To: <51192CC5.9060300@wwwdotorg.org>
-References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
- <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
- <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
- <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
- <20130209091729.978C73E1A18@localhost>
- <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
- <51192CC5.9060300@wwwdotorg.org>
-Message-ID: <CACRpkdaHuv7CXCy15-o94G0r0+2BStsi34ZVbBAhyGj=U3xgOg@mail.gmail.com>
+From: amit.virdi@st.com (Amit Virdi)
+Date: Tue, 12 Feb 2013 18:08:36 +0530
+Subject: ARM/Kernel: Problems with multiple VIC registration
+In-Reply-To: <CACRpkdYMwijN_eE11wH-PxVazutfszBFni31_UX3PaFDcSeoUQ@mail.gmail.com>
+References: <5110D55F.9040509@st.com>
+ <CACRpkdZX4OyfYbcc2-sdf5LLJmBrGTa27_8swvcZ-rBP6-+1CQ@mail.gmail.com>
+ <5111D387.9040803@st.com>
+ <CACRpkdYMwijN_eE11wH-PxVazutfszBFni31_UX3PaFDcSeoUQ@mail.gmail.com>
+Message-ID: <511A37CC.8030600@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 11, 2013 at 6:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 02/11/2013 07:09 AM, Linus Walleij wrote:
+Linus,
 
->> However if you take this all the way to the descriptor API
->> it will make the consumer (driver) API for GPIO descriptors deviate
->> from what is today used for clocks, regulators and pins.
+On 2/6/2013 2:45 PM, Linus Walleij wrote:
+> On Wed, Feb 6, 2013 at 4:52 AM, Amit Virdi<amit.virdi@st.com>  wrote:
+>> On 2/5/2013 9:57 PM, Linus Walleij wrote:
+>>>
+>>> On Tue, Feb 5, 2013 at 10:48 AM, Amit Virdi<amit.virdi@st.com>   wrote:
+>>>
+>>>> The first controller is registered throu' irq_domain_add_linear API. As a
+>>>> result of this call, a new domain is allocated to the VIC device.
+>>>
+>>>
+>>> This is a bug. Do you have this patch in your tree:
+>>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7611/1
 >>
->> With all the resulting confusion for users.
->> I've seen worse subsystem deviations though.
+>> Yes, I have this patch (from rc2) and still the bug!
 >
-> Sorry I haven't looked at the specific APIs this discussion refers to,
-> but clients of the GPIO descriptor API are going to need to distinguish
-> "fail" from "deferred probe", so at least some initial get-like API will
-> need to pass back some error detail...
+> You have to post your code for your SoC board support for us to help
+> out.
+>
+> There are several things you can do wrong. For example a common mistake
+> is to offset the IRQs on a new platform from zero. So that the first
+> parameter to vic_init() is zero. This is not legal because Linux IRQ 0
+> is NO_IRQ and shall not be used. If this is your problems, IRQs shall
+> offset from something like 64 so you can even use SPARSE_IRQ.
+>
 
-Right, so in some other patch I stated that this would lead
-to a GPIO descriptor fetch interface such as this:
+Yes, I was using 0 as the first offset in IRQs and my IRQs were defined 
+from 0 to n. I changed it to 1 to n+1 and I'm now not using 0. Every 
+problem seems to have resolved now.
 
-int gpiod_get(struct gpiod_desc **gpiod, struct device *dev, const char *name);
-
-Rather than the more established:
-
-struct gpio_desc *gpiod_get(struct device *dev, const char *name);
-
-And I'm worried about the lack of consistency.
-
-While I do get the point... I chatted with Grant about it and
-I want to talk to some toolchain people about this to see if
-pointers containing potential error codes can somehow be
-"flagged" by the compiler so we can enforce error checking on
-them. (It may sound a bit utopic...)
-
-Yours,
-Linus Walleij
+Thanks
+Amit Virdi
