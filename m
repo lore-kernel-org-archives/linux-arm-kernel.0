@@ -1,57 +1,59 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 12 Feb 2013 21:26:34 +1300
-Subject: Devicetree node to turn off LCD when backlight is 'disabled'
-In-Reply-To: <20130212070418.GC28850@avionic-0098.mockup.avionic-design.de>
-References: <1360563905.4130.6.camel@gitbox>
- <20130212070418.GC28850@avionic-0098.mockup.avionic-design.de>
-Message-ID: <1360657594.3878.4.camel@gitbox>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 12 Feb 2013 09:32:42 +0100
+Subject: [GIT PULL] at91: fixes for 3.9-rc1
+In-Reply-To: <5110DCDE.1080403@atmel.com>
+References: <5110DCDE.1080403@atmel.com>
+Message-ID: <5119FE2A.5040108@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-02-12 at 08:04 +0100, Thierry Reding wrote:
-> On Mon, Feb 11, 2013 at 07:25:05PM +1300, Tony Prisk wrote:
-> > I was just wondering if the following would be an acceptable way to turn
-> > off an lcd backlight when the pwm-backlight driver is set to level 0.
-> > The LCD backlight is 'powered' by the gpio.
-> > 
-> > leds {
-> > 	compatible = "gpio-leds";
-> > 	backlight {
-> > 		label = "lcd-power";
-> > 		gpios = <&gpio 0 0 0>;  /* bank pin active_low */
-> > 		linux,default-trigger = "backlight";
-> > 		default-state = "on";
-> > 	};
-> > };
-> > 
-> > The method has been tested by an end-user and confirmed as working - I
-> > just wanted to check whether it is the 'accepted' way of doing it.
+On 02/05/2013 11:20 AM, Nicolas Ferre :
+> Arnd, Olof,
 > 
-> I don't quite see how this is related to pwm-backlight. Maybe you can
-> post a more complete example? Representing the backlight power as a GPIO
-> controlled LED seems somewhat kludgy.
+> As I realized reading Linus' email that it was not possible to queue more
+> fixes for 3.8, I took my time to send this tiny pull request. But now that
+> the merge window is approaching, I prefer not to wait for more material.
+> So, here is a "fixes" pull-request embedding a single patch. I have placed this
+> one on top of material that you already have from me in your "fixes" and
+> "for-next" branches.
+
+Olof,
+
+Ping?
+
+As the other AT91 related branches have been pulled in, I suspect this
+little pull-request had been forgotten.
+
+Best regards,
+
+
+> The following changes since commit 7d4cfece23f535b60496d88a717a3d7bfca50187:
 > 
-> That said, there is currently no "accepted" way to use a GPIO to control
-> the power to the backlight in pwm-backlight. There was some work by Alex
-> (Cc'ed) to integrate this using generic power-sequences, but there was
-> some pushback on that. Your best bet currently would seem to integrate
-> this with the CDF (Common Display Framework). Unfortunately that'd mean
-> you'd need to write a whole new driver to abstract the panel. Even in
-> CDF there are ongoing discussions about how to hook it up with the
-> backlight framework. I know this doesn't give you a solution right away
-> but I think it's the best way to represent the actual hardware and it
-> takes into account a number of other aspect about displays as well.
+>   ARM: at91/at91sam9x5.dtsi: fix usart3 TXD (2013-01-30 10:09:17 +0100)
 > 
-> Thierry
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-fixes
+> 
+> for you to fetch changes up to c3f0f282d950a1e87496a2633ed9e924e275ff8c:
+> 
+>   ARM: at91/DT: remove atmel,use-dma-* from 9x5 and 9n12 USART nodes (2013-02-05 10:55:11 +0100)
+> 
+> ----------------------------------------------------------------
+> Correction of 9x5 and 9n12 USART nodes
+> 
+> ----------------------------------------------------------------
+> Nicolas Ferre (1):
+>       ARM: at91/DT: remove atmel,use-dma-* from 9x5 and 9n12 USART nodes
+> 
+>  arch/arm/boot/dts/at91sam9n12.dtsi | 8 --------
+>  arch/arm/boot/dts/at91sam9x5.dtsi  | 6 ------
+>  2 files changed, 14 deletions(-)
+> 
+> 
+> Thanks, bye,
+> 
 
 
-Just to clarify - I'm not looking for a way to do it immediately.
-
-The small snippet was sent as a patch to me by an end-user and although
-it worked, it just didn't 'feel' right so I thought I'd get a bit of
-feedback on it.
-
-Thanks for your thoughts.
-
-Regards
-Tony P
+-- 
+Nicolas Ferre
