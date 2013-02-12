@@ -1,52 +1,27 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Tue, 12 Feb 2013 16:35:56 +0900
-Subject: Devicetree node to turn off LCD when backlight is 'disabled'
-In-Reply-To: <1360563905.4130.6.camel@gitbox>
-References: <1360563905.4130.6.camel@gitbox>
-Message-ID: <5119F0DC.1010109@nvidia.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 12 Feb 2013 09:47:40 +0200
+Subject: [PATCH 1/2] ARM: OMAP2+: Allow clock alias provision from device
+ tree
+In-Reply-To: <20130211160752.GG1906@pengutronix.de>
+References: <1360597464-8491-1-git-send-email-rogerq@ti.com>
+ <20130211160752.GG1906@pengutronix.de>
+Message-ID: <5119F39C.2080206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 03:25 PM, Tony Prisk wrote:
-> I was just wondering if the following would be an acceptable way to turn
-> off an lcd backlight when the pwm-backlight driver is set to level 0.
-> The LCD backlight is 'powered' by the gpio.
->
-> leds {
-> 	compatible = "gpio-leds";
-> 	backlight {
-> 		label = "lcd-power";
-> 		gpios = <&gpio 0 0 0>;  /* bank pin active_low */
-> 		linux,default-trigger = "backlight";
-> 		default-state = "on";
-> 	};
-> };
+On 02/11/2013 06:07 PM, Sascha Hauer wrote:
+> On Mon, Feb 11, 2013 at 05:44:23PM +0200, Roger Quadros wrote:
+>> Currently on OMAP, it is not possible to specify a clock consumer
+>> to any of the OMAP generated clocks using the device tree. This can pose
+>> a problem for external devices that run off an OMAP clock as we
+>> can't reliably provide a reference to the clock in the device tree.
+> 
+> There is an established way of providing clocks in the devicetree using
+> the clocks/clock-names properties. Wouldn't it be better using this
+> for OMAP aswell?
+> 
+I agree with you, but I'm not sure when this migration will be done.
+Rajendra/Santosh might know better.
 
-This would work... for the most common case of a FB blank event (as 
-gpio-leds will be notified of it and switch your GPIO on/off according 
-to the kind of event). There are a few drawbacks however:
-
-1) You will have no control over the order of your power sequence. 
-pwm-backlight also uses FB notifications to switch the PWM on/off. Which 
-one will happen first will depend on the registration order.
-
-2) This will only work on FB blank events. For instance, if someone 
-writes "0" into the "brightness" property of your backlight's sysfs 
-node, no FB blank event will be emitted and your GPIO will remain on.
-
-Also this solution works for the simple case where you control the 
-backlight using only a GPIO. It would be good to support more complex 
-cases as well (I have to handle a GPIO and a regulator, for instance).
-
-The "correct" way of doing this would be to let the pwm-backlight driver 
-(or even the backlight framework) control the power status of the 
-backlight itself. You can do this using the platform callbacks of 
-pwm-backlight, but this will require a custom panel. Another possibility 
-would be to use the power sequence framework within the backlight 
-drivers, but I need to rewrite it first.
-
-So as an ad-hoc solution, what you propose would certainly work - 
-however I think this is a good opportunity to try and solve this problem 
-more globally. Maybe we can start discussing about Power Sequences 2.0. :)
-
-Alex.
+regards,
+-roger
