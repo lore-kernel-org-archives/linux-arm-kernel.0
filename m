@@ -1,94 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 12 Feb 2013 17:28:45 +0100
-Subject: [PATCH 11/32] arm: plat-orion: refactor the orion_disable_wins()
- function
+Date: Tue, 12 Feb 2013 17:28:46 +0100
+Subject: [PATCH 12/32] plat-orion: introduce ORION_ADDR_MAP_NO_REMAP
 In-Reply-To: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1360686546-24277-12-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1360686546-24277-13-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the address decoding code, the orion_disable_wins() function is
-used at boot time to disable all address decoding windows, before
-configuring only the ones that are needed. This allows to make sure
-that no configuration is left from the bootloader.
+Currently, the addr_map_info structure uses an "int remap" to allow
+SoC-specific code to specify whether a given address decoding window
+should be remapped, and if so, the remapping address. To do so, it
+tests if the int is less than zero (no remap) or greater than
+zero. Unfortunately, this prevents any remapping address that is
+higher than 2 GB.
 
-As a preparation for the introduction of address decoding window
-allocation/deallocation function, we refactor this function into an
-orion_disable_cpu_win() which disables a single window.
-
-The orion_config_wins() function is changed to call
-orion_disable_cpu_win() in a loop, to preserve an identical behavior.
+As a first step to fix this, we introduce ORION_ADDR_MAP_NO_REMAP
+define, that will be the "remap" value that SoC-specific code should
+pass to not have a remapping.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/plat-orion/addr-map.c |   35 +++++++++++++++++------------------
- 1 file changed, 17 insertions(+), 18 deletions(-)
+ arch/arm/plat-orion/include/plat/addr-map.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
-index 4dec3db..dd98638 100644
---- a/arch/arm/plat-orion/addr-map.c
-+++ b/arch/arm/plat-orion/addr-map.c
-@@ -95,6 +95,19 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
- 	}
- }
+diff --git a/arch/arm/plat-orion/include/plat/addr-map.h b/arch/arm/plat-orion/include/plat/addr-map.h
+index b76c065..0861b8c 100644
+--- a/arch/arm/plat-orion/include/plat/addr-map.h
++++ b/arch/arm/plat-orion/include/plat/addr-map.h
+@@ -41,6 +41,8 @@ struct orion_addr_map_info {
+ 	const int remap;
+ };
  
-+static void __init orion_disable_cpu_win(const struct orion_addr_map_cfg *cfg,
-+					 const int win)
-+{
-+	void __iomem *addr = cfg->win_cfg_base(cfg, win);
++#define ORION_ADDR_MAP_NO_REMAP (-1)
 +
-+	writel(0, addr + WIN_BASE_OFF);
-+	writel(0, addr + WIN_CTRL_OFF);
-+	if (cfg->cpu_win_can_remap(cfg, win)) {
-+		writel(0, addr + WIN_REMAP_LO_OFF);
-+		writel(0, addr + WIN_REMAP_HI_OFF);
-+	}
-+}
-+
- /*
-  * Configure a number of windows.
-  */
-@@ -108,36 +121,22 @@ static void __init orion_setup_cpu_wins(const struct orion_addr_map_cfg * cfg,
- 	}
- }
+ void __init orion_config_wins(struct orion_addr_map_cfg *cfg,
+ 			      const struct orion_addr_map_info *info);
  
--static void __init orion_disable_wins(const struct orion_addr_map_cfg * cfg)
--{
--	void __iomem *addr;
--	int i;
--
--	for (i = 0; i < cfg->num_wins; i++) {
--		addr = cfg->win_cfg_base(cfg, i);
--
--		writel(0, addr + WIN_BASE_OFF);
--		writel(0, addr + WIN_CTRL_OFF);
--		if (cfg->cpu_win_can_remap(cfg, i)) {
--			writel(0, addr + WIN_REMAP_LO_OFF);
--			writel(0, addr + WIN_REMAP_HI_OFF);
--		}
--	}
--}
--
- /*
-  * Disable, clear and configure windows.
-  */
- void __init orion_config_wins(struct orion_addr_map_cfg * cfg,
- 			      const struct orion_addr_map_info *info)
- {
-+	int win;
-+
- 	if (!cfg->cpu_win_can_remap)
- 		cfg->cpu_win_can_remap = orion_cpu_win_can_remap;
- 
- 	if (!cfg->win_cfg_base)
- 		cfg->win_cfg_base = orion_win_cfg_base;
- 
--	orion_disable_wins(cfg);
-+	for (win = 0; win < cfg->num_wins; win++)
-+		orion_disable_cpu_win(cfg, win);
- 
- 	if (info)
- 		orion_setup_cpu_wins(cfg, info);
 -- 
 1.7.9.5
