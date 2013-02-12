@@ -1,42 +1,102 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 12 Feb 2013 10:25:09 +0530
-Subject: [PATCH] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for
- all CPU power states except off
-In-Reply-To: <87d2wazep6.fsf@linaro.org>
-References: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
- <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
- <87d2wazep6.fsf@linaro.org>
-Message-ID: <5119CB2D.9040001@ti.com>
+From: inderpal.singh@linaro.org (Inderpal Singh)
+Date: Tue, 12 Feb 2013 10:30:10 +0530
+Subject: [PATCH 3/3] dts: Add cpufreq controller node for Exynos5440 SoC
+In-Reply-To: <CADGdYn6+yW2_pFG+mHf8F5eBgEA-2_8iQXdkJhxqp-4Eq1fGeg@mail.gmail.com>
+References: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
+ <1360179562-19950-3-git-send-email-amit.daniel@samsung.com>
+ <CAG17yqTSxjoTDcGg+6rt+gnDyJBO7j3MBP_g5B=vYZqa1qaD+g@mail.gmail.com>
+ <CADGdYn44okjQHQo-W9Y-pFFHzO9-3HL-ZB36aVvfzMRp098ZtA@mail.gmail.com>
+ <CAG17yqQBjuc9t2iXg0sjTMo=pbXcjkwuP0uRFu=YR=58+AmEmA@mail.gmail.com>
+ <CADGdYn6+yW2_pFG+mHf8F5eBgEA-2_8iQXdkJhxqp-4Eq1fGeg@mail.gmail.com>
+Message-ID: <CAG17yqRFaC0ZJe68SaJHjhVER_EZS8300iLwhJXwy8TC7mCj1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 09 February 2013 02:49 AM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
->> Current CPU PM code code make use of common cpu_suspend() path for all the
->> CPU power states which is not optimal. In fact cpu_suspend() path is needed
->> only when we put CPU power domain to off state where the CPU context is lost.
+On 12 February 2013 06:42, amit kachhap <amit.kachhap@gmail.com> wrote:
+> On Fri, Feb 8, 2013 at 8:49 AM, Inderpal Singh
+> <inderpal.singh@linaro.org> wrote:
+>> On 8 February 2013 00:03, amit kachhap <amit.kachhap@gmail.com> wrote:
+>>> On Wed, Feb 6, 2013 at 8:49 PM, Inderpal Singh
+>>> <inderpal.singh@linaro.org> wrote:
+>>>> On 7 February 2013 01:09, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+>>>>> Add cpufreq controller device node for Exynos5440 SoC for passing
+>>>>> parameters like controller base address, interrupt and cpufreq
+>>>>> table.
+>>>>>
+>>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>>>> ---
+>>>>>  arch/arm/boot/dts/exynos5440.dtsi |    9 +++++++++
+>>>>>  1 file changed, 9 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+>>>>> index 024269d..b20b517 100644
+>>>>> --- a/arch/arm/boot/dts/exynos5440.dtsi
+>>>>> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+>>>>> @@ -63,6 +63,15 @@
+>>>>>
+>>>>>         };
+>>>>>
+>>>>> +       cpufreq at 160000 {
+>>>>> +               compatible = "samsung,exynos5440-cpufreq";
+>>>>> +               reg = <0x160000 0x1000>;
+>>>>> +               interrupts = <0 57 0>;
+>>>>> +               cpufreq_tbl = < 1200000 1025000
+>>>>> +                               1000000 975000
+>>>>> +                               800000  925000 >;
+>>>>> +       };
+>>>>> +
+>>>>
+>>>> I think cpufreq_tbl should be part of the cpu node as it's the
+>>>> property of the cpu.
+>>>> Please refer cpufreq-cpu0 and spear-cpufreq.
+>>>
+>>> http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/15364.
+>>> In this thread same discussion followed. I am not sure what is the
+>>> correct way but looks like Kukjin concluded this with a timer node
+>>> separate from the CPU code.
+>>>
 >>
->> Update the code accordingly so that the expensive cpu_suspend() path
->> can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
->>
->> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->>
->> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> I am only talking about cpufreq_tbl and its nothing but operating
+>> points for the cpus. It seems its agreed upon to add operating-points
+>> to cpu node as being done by all other platforms like imx6q, am33xx,
+>> cpufreq-cpu0 and spear.
 >
-> Looks OK at first glance, but are you sure this is right for the
-> various ways both clusters might idle using coupled CPUidle?
->
-Yes it is perfectly safe from all C-states. This patch has been part of
-the OMAP4/OMAP5 product port for some time. I forgot to send it upstream
-some how :(
+> Even timer, GIC, cpufreq tbl, pmu etc are all cpu properties. But the
+> problem is whether to put them in cpu0 or repeat same information in
+> all cpu nodes as it is common to all cpu's  and not just cpu0. So as
 
-> Some description of the testing would be helpful here.
->
-Sorry. Should have mentioned it in first place.
-Patch is being tested on OMAP4430 (idle/suspend) and OMAP5 with
-few out of tree patches.
+You don't have to repeat the same cpufreq_tbl for all cpu nodes.
+Having table in only cpu0 node is sufficient as being done in other platforms.
 
-Regards,
-Santosh
+Thanks,
+Inder
+
+> Kukjin kim has put the timer node outside the cpu node so i also
+> followed the same convention.
+>
+> Mr Kim,
+> Any issue in this approach?
+>
+> Thanks,
+> Amit Daniel
+>>
+>> Thanks,
+>> Inder
+>>
+>>> Thanks,
+>>> Amit Daniel
+>>>>
+>>>>>         serial at B0000 {
+>>>>>                 compatible = "samsung,exynos4210-uart";
+>>>>>                 reg = <0xB0000 0x1000>;
+>>>>> --
+>>>>> 1.7.10.4
+>>>>>
+>>>>> --
+>>>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>>>> the body of a message to majordomo at vger.kernel.org
+>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
