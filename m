@@ -1,80 +1,101 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 12 Feb 2013 15:26:15 -0300
-Subject: [PATCH v2 0/8] ARM: omap2: GPMC cleanup
-In-Reply-To: <20130212171253.GI4801@atomide.com>
-References: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <511A6EA1.80301@ti.com> <20130212171253.GI4801@atomide.com>
-Message-ID: <20130212182614.GA2574@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Feb 2013 18:30:11 +0000
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201302121830.11375.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 09:12:53AM -0800, Tony Lindgren wrote:
-> * Jon Hunter <jon-hunter@ti.com> [130212 08:36]:
-> > 
-> > On 02/12/2013 09:18 AM, Ezequiel Garcia wrote:
-> > > This patchset is v2 of the small cleanup consisting in:
-> > >  * mark some functions as 'static' when appropriate
-> > >  * remove an unused function from gpmc.c
-> > >  * improve error messages when a CS request fails
-> > >  * migrate to dev_err and dev_warn
-> > > 
-> > > Changelog from v1:
-> > >  * fix gpmc_cs_reserved to return a boolean instead
-> > >    of an integer error code
-> > >  * add a new patch to the patchset cleaning redundant checks
-> > > 
-> > > It has been tested on a IGEP v2 board with OneNAND,
-> > > which means the gpmc-nand patch is tested by compilation only.
-> > > 
-> > > Altough these patchset is almost trivial,
-> > > any feedback or testing is more than welcome.
-> > > 
-> > > Ezequiel Garcia (8):
-> > >   ARM: omap2: gpmc: Mark local scoped functions static
-> > >   ARM: omap2: gpmc: Remove unused gpmc_round_ns_to_ticks() function
-> > >   ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
-> > >   ARM: omap2: gpmc-nand: Print something useful on CS request failure
-> > >   ARM: omap2: gpmc-onenand: Print something useful on CS request failure
-> > >   ARM: omap2: gpmc-onenand: Replace pr_err() with dev_err()
-> > >   ARM: omap2: gpmc-onenand: Replace printk KERN_ERR with dev_warn()
-> > >   ARM: omap2: gpmc: Remove redundant chip select out of range check
-> > > 
-> > >  arch/arm/mach-omap2/gpmc-nand.c    |    3 ++-
-> > >  arch/arm/mach-omap2/gpmc-onenand.c |    8 +++++---
-> > >  arch/arm/mach-omap2/gpmc.c         |   27 ++++++---------------------
-> > >  arch/arm/mach-omap2/gpmc.h         |    7 -------
-> > >  4 files changed, 13 insertions(+), 32 deletions(-)
-> > 
-> > Looks good to me. I noticed that for some patches there is no changelog
-> > and I understand that that is because they are some what trivial
-> > clean-ups and the subject explains the patch. However, typically it is
-> > good to have a changelog in the patch no matter how trivial it is. Tony
-> > may ask you to add a changelog. Otherwise ...
-> > 
-> > Reviewed-by: Jon Hunter <jon-hunter@ti.com>
-> 
-> Yes please add a changelog.
-> 
+On Tuesday 12 February 2013, Thomas Petazzoni wrote:
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> new file mode 100644
+> index 0000000..3ad563f
+> --- /dev/null
+> +++ b/drivers/pci/host/Makefile
+> @@ -0,0 +1,4 @@
+> +obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
+> +CFLAGS_pci-mvebu.o += \
+> +	-I$(srctree)/arch/arm/plat-orion/include \
+> +	-I$(srctree)/arch/arm/mach-mvebu/include
 
-Patches with no changelog have no changelog ;-)
+This does not seem like a good idea to me. We should not include
+architecture specific directories from a driver directory.
 
-My usual workflow is to re-send a whole series, and only
-add a changelog to the ones that actually change.
-For instance, for this patchset, the only one that actually changed
-is "ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value".
+What are the header files you need here? 
 
-The rest is just the same it was in v1.
+> +/*
+> + * This product ID is registered by Marvell, and used when the Marvell
+> + * SoC is not the root complex, but an endpoint on the PCIe bus. It is
+> + * therefore safe to re-use this PCI ID for our emulated PCI-to-PCI
+> + * bridge.
+> + */
+> +#define MARVELL_EMULATED_PCI_PCI_BRIDGE_ID 0x7846
 
-I like to do it this way, because I think it keeps the patches
-together, and I hope I make maintainers life easier; of course,
-I might be wrong.
+Just a side note: What happens if you have two of these systems and connect
+them over PCIe, putting one of them into host mode and the other into
+endpoint mode?
 
-So, should I use a different workflow and send only the patches
-that change with new versions?
+> +static void mvebu_pcie_setup_io_window(struct mvebu_pcie_port *port,
+> +				       int enable)
+> +{
+> +	unsigned long iobase, iolimit;
+> +
+> +	if (port->bridge.iolimit < port->bridge.iobase)
+> +		return;
+> +
+> +	iolimit = 0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+> +		(port->bridge.iolimitupper << 16);
+> +	iobase = ((port->bridge.iobase & 0xF0) << 8) |
+> +		(port->bridge.iobaseupper << 16);
 
-Thanks,
+I don't understand this code with the masks and shifts. Could you
+add a comment here for readers like me?
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> +
+> +/*
+> + * Initialize the configuration space of the PCI-to-PCI bridge
+> + * associated with the given PCIe interface.
+> + */
+> +static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
+> +{
+
+As mentioned, I'm still skeptical of the sw_pci_bridge approach,
+so I'm not commenting on the details of your implementations
+(they seem fine on a first look though)
+
+> +	/* Get the I/O and memory ranges from DT */
+> +	while ((range = of_pci_process_ranges(np, &res, range)) != NULL) {
+> +		if (resource_type(&res) == IORESOURCE_IO) {
+> +			memcpy(&pcie->io, &res, sizeof(res));
+> +			memcpy(&pcie->realio, &res, sizeof(res));
+> +			pcie->io.name = "I/O";
+> +			pcie->realio.start &= 0xFFFFF;
+> +			pcie->realio.end   &= 0xFFFFF;
+> +		}
+
+The bit masking seems fishy here. What exactly are you doing,
+does this just assume you have a 1MB window at most?
+
+Maybe something like
+
+	pcie->realio.start = 0;
+	pcie->realio.end = pcie->io.end - pcie->io.start;
+
+I suppose you also need to fix up pcie->io to be in IORESOURCE_MEM
+space instead of IORESOURCE_IO, or fix the of_pci_process_ranges
+function to return it in a different way.
+
+> +static int mvebu_pcie_init(void)
+> +{
+> +	return platform_driver_probe(&mvebu_pcie_driver,
+> +				     mvebu_pcie_probe);
+> +}
+> +
+> +subsys_initcall(mvebu_pcie_init);
+
+You don't have to do it, but I wonder if this could be a module
+with unload support instead.
+
+	Arnd
