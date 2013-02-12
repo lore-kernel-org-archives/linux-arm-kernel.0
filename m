@@ -1,102 +1,125 @@
-From: inderpal.singh@linaro.org (Inderpal Singh)
-Date: Tue, 12 Feb 2013 10:30:10 +0530
-Subject: [PATCH 3/3] dts: Add cpufreq controller node for Exynos5440 SoC
-In-Reply-To: <CADGdYn6+yW2_pFG+mHf8F5eBgEA-2_8iQXdkJhxqp-4Eq1fGeg@mail.gmail.com>
-References: <1360179562-19950-1-git-send-email-amit.daniel@samsung.com>
- <1360179562-19950-3-git-send-email-amit.daniel@samsung.com>
- <CAG17yqTSxjoTDcGg+6rt+gnDyJBO7j3MBP_g5B=vYZqa1qaD+g@mail.gmail.com>
- <CADGdYn44okjQHQo-W9Y-pFFHzO9-3HL-ZB36aVvfzMRp098ZtA@mail.gmail.com>
- <CAG17yqQBjuc9t2iXg0sjTMo=pbXcjkwuP0uRFu=YR=58+AmEmA@mail.gmail.com>
- <CADGdYn6+yW2_pFG+mHf8F5eBgEA-2_8iQXdkJhxqp-4Eq1fGeg@mail.gmail.com>
-Message-ID: <CAG17yqRFaC0ZJe68SaJHjhVER_EZS8300iLwhJXwy8TC7mCj1A@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 11 Feb 2013 22:56:59 -0600
+Subject: [PATCH v2 00/13] drivers: mailbox: framework creation
+Message-ID: <1360645032-9668-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2013 06:42, amit kachhap <amit.kachhap@gmail.com> wrote:
-> On Fri, Feb 8, 2013 at 8:49 AM, Inderpal Singh
-> <inderpal.singh@linaro.org> wrote:
->> On 8 February 2013 00:03, amit kachhap <amit.kachhap@gmail.com> wrote:
->>> On Wed, Feb 6, 2013 at 8:49 PM, Inderpal Singh
->>> <inderpal.singh@linaro.org> wrote:
->>>> On 7 February 2013 01:09, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
->>>>> Add cpufreq controller device node for Exynos5440 SoC for passing
->>>>> parameters like controller base address, interrupt and cpufreq
->>>>> table.
->>>>>
->>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>>>> ---
->>>>>  arch/arm/boot/dts/exynos5440.dtsi |    9 +++++++++
->>>>>  1 file changed, 9 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
->>>>> index 024269d..b20b517 100644
->>>>> --- a/arch/arm/boot/dts/exynos5440.dtsi
->>>>> +++ b/arch/arm/boot/dts/exynos5440.dtsi
->>>>> @@ -63,6 +63,15 @@
->>>>>
->>>>>         };
->>>>>
->>>>> +       cpufreq at 160000 {
->>>>> +               compatible = "samsung,exynos5440-cpufreq";
->>>>> +               reg = <0x160000 0x1000>;
->>>>> +               interrupts = <0 57 0>;
->>>>> +               cpufreq_tbl = < 1200000 1025000
->>>>> +                               1000000 975000
->>>>> +                               800000  925000 >;
->>>>> +       };
->>>>> +
->>>>
->>>> I think cpufreq_tbl should be part of the cpu node as it's the
->>>> property of the cpu.
->>>> Please refer cpufreq-cpu0 and spear-cpufreq.
->>>
->>> http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/15364.
->>> In this thread same discussion followed. I am not sure what is the
->>> correct way but looks like Kukjin concluded this with a timer node
->>> separate from the CPU code.
->>>
->>
->> I am only talking about cpufreq_tbl and its nothing but operating
->> points for the cpus. It seems its agreed upon to add operating-points
->> to cpu node as being done by all other platforms like imx6q, am33xx,
->> cpufreq-cpu0 and spear.
->
-> Even timer, GIC, cpufreq tbl, pmu etc are all cpu properties. But the
-> problem is whether to put them in cpu0 or repeat same information in
-> all cpu nodes as it is common to all cpu's  and not just cpu0. So as
+Hi,
 
-You don't have to repeat the same cpufreq_tbl for all cpu nodes.
-Having table in only cpu0 node is sufficient as being done in other platforms.
+Please find below the updated patch series for mailbox framework creation.
+After commit e8d3d47 (ARM: OMAP2+: Drop plat/cpu.h for omap2plus), the
+cpu_is_xxx() checks for OMAP are restricted to arch/arm/mach-omap2. The
+series includes 4 new patches, first patch removes these earch specific
+calls of OMAP mailbox driver code (dependencies with soc.h), and the last
+three patches include minor fixes in mailbox driver code. 
 
-Thanks,
-Inder
+This series is based on v3.8-rc7 and includes the necessary updates/fixes
+required for validating remoteproc on OMAP4 and tidspbridge on OMAP3. The
+series is an updated version of [2], a branch created with build fixes
+for [1] based on offline reviews.
 
-> Kukjin kim has put the timer node outside the cpu node so i also
-> followed the same convention.
->
-> Mr Kim,
-> Any issue in this approach?
->
-> Thanks,
-> Amit Daniel
->>
->> Thanks,
->> Inder
->>
->>> Thanks,
->>> Amit Daniel
->>>>
->>>>>         serial at B0000 {
->>>>>                 compatible = "samsung,exynos4210-uart";
->>>>>                 reg = <0xB0000 0x1000>;
->>>>> --
->>>>> 1.7.10.4
->>>>>
->>>>> --
->>>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->>>>> the body of a message to majordomo at vger.kernel.org
->>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Other changes include:
+- adaptations to remoteproc and tidspbridge to use the new mailbox
+  api, and relying on the pdata field in the mailbox_msg structure
+  instead of the previous header field (addressing review comments)
+- ST-Ericsson driver update
+- Kconfig fixes to fix build errors and choose proper ARCH dependencies
+- 3 new patches for minor fixes in mailbox driver code
+- rebased to include the devinit/devexit cleanup changes
+- checkpatch errors/warnings fixes
+
+I have hosted the series at [3].
+
+v1:
+OMAP and ST-Ericsson platforms are both using mailbox to communicate
+with some coprocessors.
+Based on OMAP existing mailbox framework, this series proposes a
+generic framework, living under drivers/mailbox.
+
+This series:
+- moves omap-mailbox framework to a newly drivers/mailbox folder
+  (part of plat-omap code cleaning)
+- creates API header file
+- replaces "omap" prefix by "mailbox"
+- opens interface and make framework independent from omap HW
+- adapts existing omap1 and omap2 drivers to new changes
+- creates dbx500 mailbox driver for ST-Ericsson platforms
+
+[1] http://git.kernel.org/?p=linux/kernel/git/linusw/linux-stericsson.git;a=shortlog;h=refs/heads/dbx500-prcmu-mailbox
+[2] https://github.com/sumananna/mailbox/commits/mailbox-3.8-rc5
+[3] https://github.com/sumananna/mailbox/commits/dbx500-prcmu-mailbox
+
+Loic Pallardy (7):
+  mailbox: rename omap_mbox in mailbox
+  mailbox: create opened message type
+  mailbox: change protection mechanisms
+  mailbox: add shared memory mailbox type
+  mailbox: add IRQF_NO_SUSPEND flag
+  mailbox: add no_irq send message
+  mailbox: create dbx500 mailbox driver
+
+Omar Ramirez Luna (2):
+  mailbox: OMAP: introduce mailbox framework
+  mailbox: split internal header from API header
+
+Suman Anna (4):
+  ARM: OMAP2+: mbox: remove dependencies with soc.h
+  mailbox/omap: check iomem resource before dereferencing it
+  mailbox: check for NULL nb in mailbox_put
+  mailbox: call request_irq after mbox queues are allocated
+
+ arch/arm/configs/omap1_defconfig                   |   3 +-
+ arch/arm/mach-omap1/Makefile                       |   4 -
+ arch/arm/mach-omap1/mailbox.c                      | 199 -------
+ arch/arm/mach-omap2/Makefile                       |   3 -
+ arch/arm/mach-omap2/devices.c                      |  17 +-
+ arch/arm/mach-omap2/mailbox.c                      | 430 ---------------
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  12 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  11 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  11 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  13 +
+ arch/arm/plat-omap/Kconfig                         |  16 -
+ arch/arm/plat-omap/Makefile                        |   3 -
+ arch/arm/plat-omap/include/plat/mailbox.h          | 105 ----
+ arch/arm/plat-omap/mailbox.c                       | 435 ---------------
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/mailbox/Kconfig                            |  52 ++
+ drivers/mailbox/Makefile                           |   5 +
+ drivers/mailbox/mailbox-dbx500.c                   | 611 +++++++++++++++++++++
+ drivers/mailbox/mailbox-omap1.c                    | 229 ++++++++
+ drivers/mailbox/mailbox-omap2.c                    | 368 +++++++++++++
+ drivers/mailbox/mailbox.c                          | 552 +++++++++++++++++++
+ drivers/mailbox/mailbox_internal.h                 |  72 +++
+ drivers/remoteproc/Kconfig                         |   3 +-
+ drivers/remoteproc/omap_remoteproc.c               |  36 +-
+ drivers/staging/tidspbridge/Kconfig                |   3 +-
+ drivers/staging/tidspbridge/core/_tiomap.h         |   2 +-
+ drivers/staging/tidspbridge/core/chnl_sm.c         |   8 +-
+ drivers/staging/tidspbridge/core/io_sm.c           |   5 +-
+ drivers/staging/tidspbridge/core/tiomap3430.c      |   6 +-
+ drivers/staging/tidspbridge/core/tiomap3430_pwr.c  |   6 +-
+ drivers/staging/tidspbridge/core/tiomap_io.c       |   9 +-
+ .../tidspbridge/include/dspbridge/host_os.h        |   2 +-
+ include/linux/mailbox.h                            |  43 ++
+ include/linux/platform_data/mailbox-dbx500.h       |  12 +
+ include/linux/platform_data/mailbox-omap.h         |  53 ++
+ 36 files changed, 2109 insertions(+), 1233 deletions(-)
+ delete mode 100644 arch/arm/mach-omap1/mailbox.c
+ delete mode 100644 arch/arm/mach-omap2/mailbox.c
+ delete mode 100644 arch/arm/plat-omap/include/plat/mailbox.h
+ delete mode 100644 arch/arm/plat-omap/mailbox.c
+ create mode 100644 drivers/mailbox/Kconfig
+ create mode 100644 drivers/mailbox/Makefile
+ create mode 100644 drivers/mailbox/mailbox-dbx500.c
+ create mode 100644 drivers/mailbox/mailbox-omap1.c
+ create mode 100644 drivers/mailbox/mailbox-omap2.c
+ create mode 100644 drivers/mailbox/mailbox.c
+ create mode 100644 drivers/mailbox/mailbox_internal.h
+ create mode 100644 include/linux/mailbox.h
+ create mode 100644 include/linux/platform_data/mailbox-dbx500.h
+ create mode 100644 include/linux/platform_data/mailbox-omap.h
+
+-- 
+1.8.1.2
