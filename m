@@ -1,36 +1,22 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 12 Feb 2013 14:23:56 -0800
-Subject: [PATCH] ARM: OMAP2+: SmartReflex: soc.h is needed for omap initcalls
-Message-ID: <1360707836-2545-1-git-send-email-khilman@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Feb 2013 22:25:58 +0000
+Subject: [v2 3/3] ARM: tegra: Unify Device tree board files
+In-Reply-To: <511AAB81.4000306@wwwdotorg.org>
+References: <5119849B.1070300@wwwdotorg.org>
+ <201302121732.14960.arnd@arndb.de> <511AAB81.4000306@wwwdotorg.org>
+Message-ID: <201302122225.58322.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit aa4f99638b (ARM: OMAP2+: Use omap initcalls) converted
-the initcalls here, but did not #include "soc.h" where the omap
-inicalls are defined.
+On Tuesday 12 February 2013, Stephen Warren wrote:
+> I believe U-Boot enabled -ffunction-sections -fdata-sections or similar
+> (recently?) to get this kind of behaviour. I wonder why the kernel
+> didn't need that. Perhaps -O2 is more aggressive (within a file at
+> least) than I thought.
 
-To fix, #include <soc.h>
+-ffunction-sections works across files, while the trick I described
+only works on file static symbols. David Woodhouse at some point
+had a working kernel build with -ffunction-sections but for some
+reason that never got merged.
 
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-Tony, the patch that broke this was introduced in your
-omap-for-v3.9/multiplatform-enable-signed branch, and this problem was
-found only when compiling with PM (specifically, SmartReflex) enabled.
-
- arch/arm/mach-omap2/smartreflex-class3.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
-index 80f3acb..b2dcbd3 100644
---- a/arch/arm/mach-omap2/smartreflex-class3.c
-+++ b/arch/arm/mach-omap2/smartreflex-class3.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/power/smartreflex.h>
- #include "voltage.h"
-+#include "soc.h"
- 
- static int sr_class3_enable(struct omap_sr *sr)
- {
--- 
-1.8.1.2
+	Arnd
