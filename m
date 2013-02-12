@@ -1,21 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Feb 2013 17:13:10 +0000
-Subject: ARM big-endian on current kernels for linux-3.8
-In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130212171310.GS17833@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Feb 2013 17:18:48 +0000
+Subject: [PATCH 6/9] gpiolib: use descriptors internally
+In-Reply-To: <20130212155927.GE6088@linux-sh.org>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+ <CACRpkdaHuv7CXCy15-o94G0r0+2BStsi34ZVbBAhyGj=U3xgOg@mail.gmail.com>
+ <20130212155927.GE6088@linux-sh.org>
+Message-ID: <201302121718.48244.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 08, 2013 at 11:17:30PM +0000, Ben Dooks wrote:
-> I have been working on getting big-endian kernels working, mainly from
-> little-endian boot envrionments. The following patch series is what I
-> have been working on, mainly on the highbank and axp systems.
+On Tuesday 12 February 2013, Paul Mundt wrote:
+> > While I do get the point... I chatted with Grant about it and
+> > I want to talk to some toolchain people about this to see if
+> > pointers containing potential error codes can somehow be
+> > "flagged" by the compiler so we can enforce error checking on
+> > them. (It may sound a bit utopic...)
+> > 
+> At the very least you can __must_check annotate, although that's probably
+> still a bit coarser grained than what you're after.
 
-What is missing from this is the justification about why we need this
-additional pain, given that all the supporting userspaces today are all
-LE based.
+There is an idea: we could have variants of __must_check for different
+classes of returns: NULL error, ERR_PTR, negative integer on error, ...
 
-Sure, I know that telcos have an endless love of big endian and don't
-understand anything else, but getting this working on non-telco socs
-seems to be a little odd.
+	Arnd
