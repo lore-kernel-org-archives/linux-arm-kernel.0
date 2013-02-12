@@ -1,56 +1,107 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 12 Feb 2013 06:20:24 +0000
-Subject: [PATCH v2 1/3] ARM: davinci: da850: override mmc DT node device
- name
-In-Reply-To: <5119D72D.3010605@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 12 Feb 2013 11:51:34 +0530
+Subject: [PATCH v2 2/3] mmc: davinci_mmc: add DT support
+In-Reply-To: <1360223825-23929-3-git-send-email-prakash.pm@ti.com>
 References: <1360223825-23929-1-git-send-email-prakash.pm@ti.com>
- <1360223825-23929-2-git-send-email-prakash.pm@ti.com>
- <5119D72D.3010605@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA4685E@DBDE01.ent.ti.com>
+ <1360223825-23929-3-git-send-email-prakash.pm@ti.com>
+Message-ID: <5119DF6E.9080501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 11:16:21, Nori, Sekhar wrote:
-> On 2/7/2013 1:27 PM, Manjunathappa, Prakash wrote:
-> > Populate OF_DEV_AUXDATA with desired device name expected by
-> > davinci_mmc driver. Without this clk_get of davinci_mmc DT driver
-> > fails.
+On 2/7/2013 1:27 PM, Manjunathappa, Prakash wrote:
+> Adds device tree support for davinci_mmc. Also add binding documentation.
+> Tested in non-dma PIO mode and without GPIO card_detect/write_protect
+> option because of dependencies on EDMA and GPIO module DT support.
 > 
-> But there is no mmc DT support for DaVinci at this time. This patch
-> should come after the driver DT support and .dts addition patches.
+> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: cjb at laptop.org
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: mporter at ti.com
+> ---
+> Since v1:
+> Modified DT parse function to take default values and accomodate controller
+> version in compatible field.
 > 
+>  .../devicetree/bindings/mmc/davinci_mmc.txt        |   30 ++++++++
+>  drivers/mmc/host/davinci_mmc.c                     |   70 +++++++++++++++++++-
+>  2 files changed, 99 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> new file mode 100644
+> index 0000000..6717ab1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+> @@ -0,0 +1,30 @@
+> +* TI Highspeed MMC host controller for DaVinci
+> +
+> +The Highspeed MMC Host Controller on TI DaVinci family
+> +provides an interface for MMC, SD and SDIO types of memory cards.
+> +
+> +This file documents the properties used by the davinci_mmc driver.
+> +
+> +Required properties:
+> +- compatible:
+> + Should be "ti,davinci-mmc-da830": for da830, da850, dm365
+> + Should be "ti,davinci-mmc-dm355": for dm355, dm644x
+> +
+> +Optional properties:
+> +- bus-width: Number of data lines, can be <4>, or <8>, default <1>
+> +- max-frequency: Maximum operating clock frequency, default 25MHz.
+> +- mmc-cap-mmc-highspeed: Indicates support for MMC in high speed mode
+> +- mmc-cap-sd-highspeed: Indicates support for SD in high speed mode
+> +
+> +Example:
+> +	mmc0: mmc at 1c40000 {
+> +		compatible = "ti,davinci-mmc-da830",
+> +		reg = <0x40000 0x1000>;
+> +		interrupts = <16>;
+> +		status = "okay";
+> +		bus-width = <4>;
+> +		max-frequency = <50000000>;
+> +		mmc-cap-sd-highspeed;
+> +		mmc-cap-mmc-highspeed;
+> +	};
+> +
+> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+> index 27123f8..3f90316 100644
+> --- a/drivers/mmc/host/davinci_mmc.c
+> +++ b/drivers/mmc/host/davinci_mmc.c
+> @@ -34,6 +34,8 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/edma.h>
+>  #include <linux/mmc/mmc.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <linux/platform_data/mmc-davinci.h>
+>  
+> @@ -1157,15 +1159,80 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
+>  	mmc_davinci_reset_ctrl(host, 0);
+>  }
+>  
+> -static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+> +static const struct of_device_id davinci_mmc_dt_ids[] = {
+> +	{
+> +		.compatible = "ti,davinci-mmc-dm355",
+> +		.data = (void *)MMC_CTLR_VERSION_1,
+> +	},
+> +	{
+> +		.compatible = "ti,davinci-mmc-da830",
+> +		.data = (void *)MMC_CTLR_VERSION_2,
+> +	},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, davinci_mmc_dt_ids);
 
-Agreed, I will bring it up in the series.
-
-> > diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> > index 37c27af..3362ca4 100644
-> > --- a/arch/arm/mach-davinci/da8xx-dt.c
-> > +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> > @@ -39,9 +39,16 @@ static void __init da8xx_init_irq(void)
-> >  
-> >  #ifdef CONFIG_ARCH_DAVINCI_DA850
-> >  
-> > +static const struct of_dev_auxdata da8xx_auxdata[] __initconst = {
-> > +	OF_DEV_AUXDATA("ti,davinci-mmc-da830", 0x01c40000, "davinci_mmc.0",
-> > +			NULL),
-> > +	{},
-> > +};
-> > +
-> >  static void __init da850_init_machine(void)
-> >  {
-> > -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > +	of_platform_populate(NULL, of_default_bus_match_table, da8xx_auxdata,
-> > +			NULL);
-> 
-> This needs to be rebased on by v3.9/dt-2 branch. There are conflicts
-> with the code already present.
-> 
-
-Yes, I will send it after rebasing on new branch.
+If you are doing this why not also kill passing IP version through
+platform data using a platform_device_id table? Look at what Afzal did
+for drivers/rtc/rtc-omap.c
 
 Thanks,
-Prakash
-
-> Thanks,
-> Sekhar
-> 
+Sekhar
