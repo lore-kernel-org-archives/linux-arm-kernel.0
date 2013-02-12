@@ -1,56 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 12 Feb 2013 08:52:16 -0800
-Subject: [PATCH v4 09/19] ARM: use common irqchip_init for GIC init
-In-Reply-To: <50E6008B.7050303@gmail.com>
-References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
- <1357235668-9450-10-git-send-email-robherring2@gmail.com>
- <201301032141.19568.arnd@arndb.de> <50E6008B.7050303@gmail.com>
-Message-ID: <CAD=FV=XmvnbHBL4pZtA0zgxAmfuY+FkZcx_8sxt2uAxnQdPTRA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Feb 2013 08:57:13 -0800
+Subject: Getting your opinion about the best place to put one specific
+ device driver...
+In-Reply-To: <511A6D1E.50705@stericsson.com>
+References: <511A0F11.1050608@stericsson.com>
+ <201302121454.10231.arnd@arndb.de> <511A6D1E.50705@stericsson.com>
+Message-ID: <20130212165713.GG4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+Hi,
 
+* Jean-Nicolas GRAUX <jean-nicolas.graux@stericsson.com> [130212 08:33]:
+> Arnd, here are my answers below.
+> 
+> Le 02/12/2013 03:54 PM, Arnd Bergmann a ?crit :
+> >On Tuesday 12 February 2013, Jean-Nicolas GRAUX wrote:
+> >>ello, Arnd, Olof. First, let me introduce myself quickly.
+> >>I am working in Stericsson and i am a colleague of Linus Walleij.
+> >>We are currently doing some cleaning in our mach-ux500 ARM machine.
+> >>
+> >>Among other things, the U8500 SoC and its derivatives embed one small IP
+> >>called the "hardware observer".
+> >>This is used for hardware debug purpose and it provides the ability to
+> >>output some
+> >>modem, power, clocking, ..., hardware signals on 18 external wires.
+> >>
+> >>We did one small platform device driver to handle this piece of hardware.
+> >>In the patch attached to this file, we kept the code in the mach-ux500
+> >>machine folder.
+> >>But we are wondering where is the best place to put that stuff.
+> >>So, the question is: where should we put this code in the kernel tree ?
+> >Hi Jean-Nicolas,
+> >
+> >I think I need some more information to understand what that interface
+> >you are driving is actually about, since that is not clear from your
+> >description or from reading the source code.
+> >
+> >Why are there exactly 18 wires?
+> As you can imagine, this module is very specific to the ux500
+> digital baseband family.
+> So, ux500 SoCs simply provide 18 external IOs that may be used to
+> observe some critical hardware signals.
+> Depending on what has been configured in the hwobs control
+> registers, we are able to observe
+> signals from the modem, the ddr controllers, the prcmu, the gfx ip,
+> the clock tree, ...
 
-On Thu, Jan 3, 2013 at 2:04 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 01/03/2013 03:41 PM, Arnd Bergmann wrote:
->> On Thursday 03 January 2013, Rob Herring wrote:
->>> @@ -637,8 +638,6 @@ static int __init combiner_of_init(struct device_node *np,
->>>  }
->>>
->>>  static const struct of_device_id exynos_dt_irq_match[] = {
->>> -       { .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
->>> -       { .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
->>>         { .compatible = "samsung,exynos4210-combiner",
->>>                         .data = combiner_of_init, },
->>>         {},
->>> @@ -654,8 +653,10 @@ void __init exynos4_init_irq(void)
->>>         if (!of_have_populated_dt())
->>>                 gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU, gic_bank_offset, NULL);
->>>  #ifdef CONFIG_OF
->>> -       else
->>> +       else {
->>> +               irqchip_init();
->>>                 of_irq_init(exynos_dt_irq_match);
->>> +       }
->>>  #endif
->>
->> Is this an equivalent change? I thought you are supposed to call of_irq_init
->> only once so it can see the entire hierarchy. Or is it ok as long as the
->> top-level controllers are probed first?
->
-> Yes, it is equivalent as the GIC will be initialized first. Ideally,
-> this the exynos controller needs to be moved to drivers/irqchip as well
-> and this can be removed, but I can't have all the fun.
+Sounds very similar to what we have on omaps as hwobs. AFAIK that
+module is just multiplexing signals. So maybe take a look how it
+would fit into drivers/pinctrl?
 
-My ARM Chromebook that no longer boots on linux-next begs to differ.
-I tracked it down to this change.  If I hack it so that the exynos
-combiner is registered with irqchip or if I revert just the exynos
-part of this patch then things work again.
+At least the omap hwobs could in theory already be handled by
+pinctrl-single.c.
 
-Is anyone from Samsung working to move the exynos-combiner into IRQ
-Chip?  Until that happens (or this change is partly reverted) any
-exynos boards won't boot.  ...and tracking the problem down to this
-change is a bit of a pain since there's no nice crash.
+Regards,
 
--Doug
+Tony
