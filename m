@@ -1,47 +1,43 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 12 Feb 2013 15:53:36 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the mfd tree
-In-Reply-To: <511A55DB.7040808@ti.com>
-References: <20130211170616.73fd9fd30bb10c27a698ad4d@canb.auug.org.au>
- <20130211185221.GR4801@atomide.com> <511A55DB.7040808@ti.com>
-Message-ID: <20130212145336.GI20996@sortiz-mobl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Feb 2013 14:54:10 +0000
+Subject: Getting your opinion about the best place to put one specific
+ device driver...
+In-Reply-To: <511A0F11.1050608@stericsson.com>
+References: <511A0F11.1050608@stericsson.com>
+Message-ID: <201302121454.10231.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
-
-On Tue, Feb 12, 2013 at 04:46:51PM +0200, Roger Quadros wrote:
-> On 02/11/2013 08:52 PM, Tony Lindgren wrote:
-> > * Stephen Rothwell <sfr@canb.auug.org.au> [130210 22:11]:
-> >> Hi all,
-> >>
-> >> Today's linux-next merge of the arm-soc tree got a conflict in
-> >> arch/arm/mach-omap2/usb-host.c between commit 8a89e93237e1 ("mfd:
-> >> omap-usb-host: Consolidate OMAP USB-HS platform data") from the mfd tree
-> >> and commit c1d1cd597fc7 ("ARM: OMAP2+: omap_device: remove obsolete
-> >> pm_lats and early_device code") from the arm-soc tree.
-> >>
-> >> I fixed it up (see below) and can carry the fix as necessary (no action
-> >> is required).
-> > 
-> > Thanks again.
-> > 
-> > Samuel, up to you, but I suggest you just drop these patches for
-> > now if still possible unless other patches are based on these.
-> > 
+On Tuesday 12 February 2013, Jean-Nicolas GRAUX wrote:
+> ello, Arnd, Olof. First, let me introduce myself quickly.
+> I am working in Stericsson and i am a colleague of Linus Walleij.
+> We are currently doing some cleaning in our mach-ux500 ARM machine.
 > 
-> Samuel, please feel free to drop the 20 patches you pulled from me recently.
+> Among other things, the U8500 SoC and its derivatives embed one small IP 
+> called the "hardware observer".
+> This is used for hardware debug purpose and it provides the ability to 
+> output some
+> modem, power, clocking, ..., hardware signals on 18 external wires.
 > 
-> I have another set patches that would depend on them and I think it is better if
-> both sets go through usb and arm-soc trees. This would avoid some confusion.
-> 
-> Once you confirm I can add your Acked-by's to them and send fresh pull requests
-> to Tony & Greg. Thanks.
-I dropped all those patches from my mfd for-next tree now.
+> We did one small platform device driver to handle this piece of hardware.
+> In the patch attached to this file, we kept the code in the mach-ux500 
+> machine folder.
+> But we are wondering where is the best place to put that stuff.
+> So, the question is: where should we put this code in the kernel tree ?
+ 
+Hi Jean-Nicolas,
 
-Cheers,
-Samuel.
+I think I need some more information to understand what that interface
+you are driving is actually about, since that is not clear from your
+description or from reading the source code.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Why are there exactly 18 wires?
+
+What is the protocol that is used on these wires (i2c, spi, rs232, ...)
+
+Why do you actually need run-time configuration in the kernel? 
+
+It does look however like this code is related to the PRCMU, so maybe
+it should be part of the prcmu driver rather than a separate device?
+
+	Arnd
