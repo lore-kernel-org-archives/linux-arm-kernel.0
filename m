@@ -1,62 +1,86 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Mon, 11 Feb 2013 20:44:21 -0800
-Subject: [PATCH V4] ARM: bcm281xx: Add timer driver
-In-Reply-To: <5119B96A.7060202@wwwdotorg.org>
-References: <1360626279-26701-1-git-send-email-csd@broadcom.com>
- <5119B041.9040007@wwwdotorg.org> <5119B62E.9020901@broadcom.com>
- <5119B96A.7060202@wwwdotorg.org>
-Message-ID: <5119C8A5.8040305@broadcom.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Feb 2013 21:47:20 -0700
+Subject: [v2 3/3] ARM: tegra: Unify Device tree board files
+In-Reply-To: <20130212.061240.2083183700176617607.hdoyu@nvidia.com>
+References: <1360562743-21689-1-git-send-email-hdoyu@nvidia.com><1360562743-21689-3-git-send-email-hdoyu@nvidia.com><5119849B.1070300@wwwdotorg.org>
+ <20130212.061240.2083183700176617607.hdoyu@nvidia.com>
+Message-ID: <5119C958.1030304@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-02-11 07:39 PM, Stephen Warren wrote:
-> On 02/11/2013 08:25 PM, Christian Daudt wrote:
->> On 13-02-11 07:00 PM, Stephen Warren wrote:
->>> On 02/11/2013 04:44 PM, Christian Daudt wrote:
->>>> This adds support for the Broadcom timer, used in the following SoCs:
->>>> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
->>>> diff --git a/drivers/clocksource/bcm_kona_timer.c
->>>> b/drivers/clocksource/bcm_kona_timer.c
->>>> +static const struct of_device_id bcm_timer_ids[] __initconst = {
->>>> +    {.compatible = "bcm,kona-timer"},
->>>> +    {},
->>>> +};
->>>> +
->>>> +static void __init kona_timers_init(void)
->>>> +{
->>>> +    struct device_node *node;
->>>> +    u32 freq;
->>>> +
->>>> +    node = of_find_matching_node(NULL, bcm_timer_ids);
->>>> +
->>>> +    if (!node)
->>>> +        panic("No timer");
->>> I assume this is for 3.10 now.
->> Oh. I missed 3.9 window ? Got busy with other stuff. Oh well, try again.
->>> Can you rework this to remove
->>> bcm_timer_ids[] and that of_find_matching_node() call, and replace it
->>> with e.g.:
->>>
->>> CLOCKSOURCE_OF_DECLARE(kona, "bcm,kona-timer", kona_timer_init);
->> where can I find an example ? I looked throught armsoc/for-next and the
->> code there has CLOCKSOURCE_OF_DECLARE but it still has
->> of_find_matching_node calls in the init fns - is it still in the process
->> of being removed ?
-> It looks like Rob's patches that would allow you to eliminate the
-> of_find_matching_node() call aren't checked in yet; I'm not sure if
-> they'll make 3.9 or not. I has assumed so, but even if not, I imagine
-> they will be available as a dependency branch for you to build on top of
-> in 3.10. Those are:
->
-> https://lkml.org/lkml/2013/2/7/417
->
-> However, you could still convert to CLOCKSOURCE_OF_DECLARE right now;
-> the patches to enable that should be in arm-soc's for-next; see
-> drivers/clocksource/tegra20_timer.c there for example.
-Ok, I've added the CLOCKSOURCE_OF_DECLARE and switched to 
-clocksource_of_init in board_bcm, following what is in for-next. If this 
-can't make it to 3.9 then I'll add the of_find_matching_node elimination 
-in the next patch.
+On 02/11/2013 09:12 PM, Hiroshi Doyu wrote:
+> Stephen Warren <swarren@wwwdotorg.org> wrote @ Tue, 12 Feb 2013 00:54:03 +0100:
+> 
+>>> -obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra.o
+>>> -obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
+>>> -obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= board-dt-tegra114.o
+>>> +obj-y					+= tegra.o
+>>> +
+>>
+>> I think I'd be tempted to move that line together with all the others
+>> that don't depend on some config option.
+> 
+> In arch/arm/mach-tegra/Makefile, we have:
+> 
+> obj-y                                   += common.o
+> obj-y                                   += io.o
+> obj-y                                   += irq.o
+> obj-y					+= fuse.o
+> obj-y					+= pmc.o
+> .....
+> 
+> Should we have a single entry for them as well?
+> 
+> obj-y:= common.o io.o irq.o fuse.o pmc.o flowctrl.o powergate.o apbio.o pm.o \
+> 	reset.o reset-handler.o sleep.o tegra.o
+> 
+> I think that this moval could be done another patch.
 
-  Thanks,
-    csd
+I just meant put the lines next to each-other. We definitely shouldn't
+merge the lines together or it'll make it more painful to change the
+list of files later.
+
+>>>  static void __init harmony_init(void)
+>>>  {
+>>> -#ifdef CONFIG_TEGRA_PCI
+>>>  	int ret;
+>>>  
+>>>  	ret = harmony_pcie_init();
+>>>  	if (ret)
+>>>  		pr_err("harmony_pcie_init() failed: %d\n", ret);
+>>> -#endif
+>>>  }
+>>
+>> Why drop those ifdefs? Does the code still compile (link) if built for
+>> Tegra30-only or Tegra114-only, where the Tegra PCI driver won't be
+>> enabled, and hence those functions don't exist?
+> 
+> This function itself will be dropped by the following IS_ENABLED().
+> 
+>>>  static void __init paz00_init(void)
+>>> @@ -129,6 +128,9 @@ static void __init tegra_dt_init_late(void)
+>>>  
+>>>  	tegra_init_late();
+>>>  
+>>> +	if (IS_ENABLED(CONFIG_PCI) && IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
+>>> +		return;
+>>
+>> I don't think that's going to help any link issues, so I'd drop it and
+>> keep this function simple.
+> 
+> As explained in the above, a complier will drop unnecessary functions
+> automatically with this IS_ENABLED(), which could save many ifdefs.
+
+That sounds extremely brittle. Have you validated this on a wide variety
+of compiler versions?
+
+>> After all, what if someone wants to add some
+>> non-PCI-related entry into board_init_funcs[]?
+> 
+> I originally thought that one should try to solve those board specific
+> problems with DT basically and this tegra specific board_init_funcs[]
+> was left only for the legacy support during DT transition.
+
+That's the intent right now, but who knows what else might end up
+getting added there. It seems simplest just to maintain the ifdefs since
+they're already there.
