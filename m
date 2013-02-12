@@ -1,75 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Feb 2013 17:32:14 +0000
-Subject: [v2 3/3] ARM: tegra: Unify Device tree board files
-In-Reply-To: <511A6F6C.8090205@wwwdotorg.org>
-References: <5119849B.1070300@wwwdotorg.org>
- <201302121350.15683.arnd@arndb.de> <511A6F6C.8090205@wwwdotorg.org>
-Message-ID: <201302121732.14960.arnd@arndb.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 12 Feb 2013 17:33:31 +0000
+Subject: ARM big-endian on current kernels for linux-3.8
+In-Reply-To: <20130212171310.GS17833@n2100.arm.linux.org.uk>
+References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20130212171310.GS17833@n2100.arm.linux.org.uk>
+Message-ID: <511A7CEB.9000006@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 February 2013, Stephen Warren wrote:
-> >>>>> I don't think that's going to help any link issues, so I'd drop it and
-> >>>>> keep this function simple.
-> >>>>
-> >>>> As explained in the above, a complier will drop unnecessary functions
-> >>>> automatically with this IS_ENABLED(), which could save many ifdefs.
-> >>>
-> >>> That sounds extremely brittle. Have you validated this on a wide variety
-> >>> of compiler versions?
-> >>
-> >> I verified with gcc-4.6.
-> >> IIRC, that's the point of IS_ENABLED() being introduced. Arnd?
-> > 
-> > It's certainly expected to work with all compilers, yes. If a compiler
-> > cannot remove conditional function calls that depend on a constant
-> > expression, we have a lot of other problems alredy.
-> 
-> Removing the function calls isn't guaranteed to remove the body of the
-> functions though. Those functions aren't implemented in some separate
-> file that's optionally included, but rather are implemented in the same
-> object file, now unconditionally, and they in turn reference (with no
-> IS_ENABLED logic) other functions that are implemented in conditionally
-> linked files.
+On 12/02/13 17:13, Russell King - ARM Linux wrote:
+> On Fri, Feb 08, 2013 at 11:17:30PM +0000, Ben Dooks wrote:
+>> I have been working on getting big-endian kernels working, mainly from
+>> little-endian boot envrionments. The following patch series is what I
+>> have been working on, mainly on the highbank and axp systems.
+>
+> What is missing from this is the justification about why we need this
+> additional pain, given that all the supporting userspaces today are all
+> LE based.
+>
+> Sure, I know that telcos have an endless love of big endian and don't
+> understand anything else, but getting this working on non-telco socs
+> seems to be a little odd.
 
-I think gcc should remove all of that in this case, since board_init_funcs
-becomes unused when the only code that references it cannot be reached,
-and when that array is gone, the now unused functions would be removed
-as well.
+Our problem is we have some code that works on a lot of big endian data
+but is not easy to re-build to work on ARM little endian. The current 
+solution is to change to running the system big endian.
 
-We have had bugs with prerelease gcc versions that did not handle cases
-like this in the way we want it, but I think all releases get it right.
-I don't think it's mandated anywhere in the C99 standard that this is
-what happens, but we do rely on it anyway AFAIK.
+Unfortunately we cannot just run user-space big endian as the MMU is
+fetched in the same endian mode as the processor's data.
 
-> > static void __init harmony_init(void)
-> > {
-> >         int ret = 0;
-> > 
-> >         if (IS_ENABLED(CONFIG_PCI) && IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
-> >               ret = harmony_pcie_init();
-> >         if (ret)
-> >                 pr_err("harmony_pcie_init() failed: %d\n", ret);
-> > }
-> > 
-> > which will turn into an empty function if one of the two is disabled.
-> 
-> That would work.
-> 
-> However I'd like to avoid changing the body of those two functions at
-> all if possible, since I hope the PCIe driver rework will be merged in
-> 3.10, and that will allow the Harmony and TrimSlice init functions to be
-> removed entirely. I'd rather not have conflicts with the removal patch.
+If we ignore the ATAG issue, then most of the support is currently in
+the kernel to do this and there's not a lot of changes. I think
+that some of the boot changes could be dealt with by a post-process
+of the zImage (such as the zImage magic) which would make this
+series less intrusive to the kernel.
 
-Yes, makes sense.
+I will send a new series in a day or so and see what people think.
 
-> > Since we are not going to add any other board specfic init functions, you
-> > can also unroll the loop and put everything into tegra_dt_init_late:
-> 
-> That's not necessarily true. While we certainly don't plan to, I don't
-> think we can rule it out; after all, we don't have rfkill bindings and
-> yet other boards will need them.
-
-Ok.
-
-	Arnd
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
