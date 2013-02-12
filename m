@@ -1,41 +1,35 @@
-From: jean-nicolas.graux@stericsson.com (Jean-Nicolas GRAUX)
-Date: Tue, 12 Feb 2013 10:44:49 +0100
-Subject: Getting your opinion about the best place to put one specific device
- driver...
-Message-ID: <511A0F11.1050608@stericsson.com>
+From: wolfram@the-dreams.de (Wolfram Sang)
+Date: Tue, 12 Feb 2013 11:03:35 +0100
+Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
+In-Reply-To: <CAPnjgZ3HnXDp9ErsbZEfpc-NexuAt1C5cUWbFn=BW2TMGiMJEg@mail.gmail.com>
+References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
+ <20130210181710.GB12760@nekote.pengutronix.de>
+ <CAD=FV=XzfseMEHK4KutgYYoU4kEFPq7qoFoJtaBrh6QJUa1Y_w@mail.gmail.com>
+ <CAPnjgZ3HnXDp9ErsbZEfpc-NexuAt1C5cUWbFn=BW2TMGiMJEg@mail.gmail.com>
+Message-ID: <20130212100335.GA5490@nekote.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Arnd, Olof. First, let me introduce myself quickly.
-I am working in Stericsson and i am a colleague of Linus Walleij.
-We are currently doing some cleaning in our mach-ux500 ARM machine.
+Hi,
 
-Among other things, the U8500 SoC and its derivatives embed one small IP 
-called the "hardware observer".
-This is used for hardware debug purpose and it provides the ability to 
-output some
-modem, power, clocking, ..., hardware signals on 18 external wires.
+> > At the moment perhaps the strongest argument for why this particular
+> > arbitration scheme is needed is that's what the EC (embedded
+> > controller) on the ARM Chromebook uses.  There have been several
+> > arguments in-house about whether this was the most ideal way to
+> > structure things, but that's what we shipped with.  Thus, if we want
+> > to be able to talk to i2c devices on this bus (contains the keyboard,
+> > battery, and a bunch of power switches) we need something in the
+> > system that implements this arbitration scheme.
+> >
+> 
+> There was some discussion about using the built-in I2C multi-master
+> support but no one had had a good experience getting it to work
+> reliably in a real system so we ended up deciding not to rely on this.
 
-We did one small platform device driver to handle this piece of hardware.
-In the patch attached to this file, we kept the code in the mach-ux500 
-machine folder.
-But we are wondering where is the best place to put that stuff.
-So, the question is: where should we put this code in the kernel tree ?
+So, were there no experiences at all or bad experiences when trying? I
+am interested in hearing what I2C multi master restrictions might exist
+in practice.
 
-Thanks in advance for your advises.
-Regards. Jean-Nicolas.
+Thanks,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-ux500-introduce-hardware-observer-platform-drive.patch
-Type: text/x-diff
-Size: 27999 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130212/4c348ce9/attachment-0002.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-ARM-ux500-remove-hardware-observer-machine-code.patch
-Type: text/x-diff
-Size: 25978 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130212/4c348ce9/attachment-0003.bin>
+   Wolfram
