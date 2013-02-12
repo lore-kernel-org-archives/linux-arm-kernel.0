@@ -1,50 +1,97 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Feb 2013 08:04:18 +0100
-Subject: Devicetree node to turn off LCD when backlight is 'disabled'
-In-Reply-To: <1360563905.4130.6.camel@gitbox>
-References: <1360563905.4130.6.camel@gitbox>
-Message-ID: <20130212070418.GC28850@avionic-0098.mockup.avionic-design.de>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Tue, 12 Feb 2013 13:02:56 +0530
+Subject: [PATCH v2] ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK
+Message-ID: <1360654376-27057-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 11, 2013 at 07:25:05PM +1300, Tony Prisk wrote:
-> I was just wondering if the following would be an acceptable way to turn
-> off an lcd backlight when the pwm-backlight driver is set to level 0.
-> The LCD backlight is 'powered' by the gpio.
-> 
-> leds {
-> 	compatible = "gpio-leds";
-> 	backlight {
-> 		label = "lcd-power";
-> 		gpios = <&gpio 0 0 0>;  /* bank pin active_low */
-> 		linux,default-trigger = "backlight";
-> 		default-state = "on";
-> 	};
-> };
-> 
-> The method has been tested by an end-user and confirmed as working - I
-> just wanted to check whether it is the 'accepted' way of doing it.
+From: "Philip, Avinash" <avinashphilip@ti.com>
 
-I don't quite see how this is related to pwm-backlight. Maybe you can
-post a more complete example? Representing the backlight power as a GPIO
-controlled LED seems somewhat kludgy.
+EHRPWM module requires explicit clock gating of TBCLK from control
+module. Hence add TBCLK clock node in clock tree for EHRPWM modules.
 
-That said, there is currently no "accepted" way to use a GPIO to control
-the power to the backlight in pwm-backlight. There was some work by Alex
-(Cc'ed) to integrate this using generic power-sequences, but there was
-some pushback on that. Your best bet currently would seem to integrate
-this with the CDF (Common Display Framework). Unfortunately that'd mean
-you'd need to write a whole new driver to abstract the panel. Even in
-CDF there are ongoing discussions about how to hook it up with the
-backlight framework. I know this doesn't give you a solution right away
-but I think it's the best way to represent the actual hardware and it
-takes into account a number of other aspect about displays as well.
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+---
+Changes since v1:
+	- Remove sparse warnings
+	arch/arm/mach-omap2/cclock33xx_data.c:844:1: warning: Using plain
+	integer as NULL pointer
+	arch/arm/mach-omap2/cclock33xx_data.c:850:1: warning: Using plain 
+	integer as NULL pointer
+	arch/arm/mach-omap2/cclock33xx_data.c:856:1: warning: Using plain 
+	integer as NULL pointer
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130212/4bd63fdd/attachment-0001.sig>
+
+ arch/arm/mach-omap2/cclock33xx_data.c |   30 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/control.h         |    8 ++++++++
+ 2 files changed, 38 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
+index ea64ad6..22387fa 100644
+--- a/arch/arm/mach-omap2/cclock33xx_data.c
++++ b/arch/arm/mach-omap2/cclock33xx_data.c
+@@ -832,6 +832,33 @@ static struct clk_hw_omap wdt1_fck_hw = {
+ 
+ DEFINE_STRUCT_CLK(wdt1_fck, wdt_ck_parents, gpio_fck_ops);
+ 
++static const char *pwmss_clk_parents[] = {
++	"dpll_per_m2_ck",
++};
++
++static const struct clk_ops ehrpwm_tbclk_ops = {
++	.enable		= &omap2_dflt_clk_enable,
++	.disable	= &omap2_dflt_clk_disable,
++};
++
++DEFINE_CLK_OMAP_MUX_GATE(ehrpwm0_tbclk, "l4ls_clkdm",
++			 NULL, NULL, 0,
++			 AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
++			 AM33XX_PWMSS0_TBCLKEN_SHIFT,
++			 NULL, pwmss_clk_parents, ehrpwm_tbclk_ops);
++
++DEFINE_CLK_OMAP_MUX_GATE(ehrpwm1_tbclk, "l4ls_clkdm",
++			 NULL, NULL, 0,
++			 AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
++			 AM33XX_PWMSS1_TBCLKEN_SHIFT,
++			 NULL, pwmss_clk_parents, ehrpwm_tbclk_ops);
++
++DEFINE_CLK_OMAP_MUX_GATE(ehrpwm2_tbclk, "l4ls_clkdm",
++			 NULL, NULL, 0,
++			 AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
++			 AM33XX_PWMSS2_TBCLKEN_SHIFT,
++			 NULL, pwmss_clk_parents, ehrpwm_tbclk_ops);
++
+ /*
+  * clkdev
+  */
+@@ -910,6 +937,9 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"clkout2_div_ck",	&clkout2_div_ck,	CK_AM33XX),
+ 	CLK(NULL,	"timer_32k_ck",		&clkdiv32k_ick,	CK_AM33XX),
+ 	CLK(NULL,	"timer_sys_ck",		&sys_clkin_ck,	CK_AM33XX),
++	CLK("48300200.ehrpwm",	"tbclk",	&ehrpwm0_tbclk,	CK_AM33XX),
++	CLK("48302200.ehrpwm",	"tbclk",	&ehrpwm1_tbclk,	CK_AM33XX),
++	CLK("48304200.ehrpwm",	"tbclk",	&ehrpwm2_tbclk,	CK_AM33XX),
+ };
+ 
+ 
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index 4b05eb9..2fe2812 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -389,6 +389,14 @@
+ #define AM33XX_DDR_DATA0_IOCTRL		0x1440
+ #define AM33XX_DDR_DATA1_IOCTRL		0x1444
+ 
++/* AM33XX PWMSS Control register */
++#define AM33XX_PWMSS_TBCLK_CLKCTRL			0x664
++
++/* AM33XX  PWMSS Control bitfields */
++#define AM33XX_PWMSS0_TBCLKEN_SHIFT			0
++#define AM33XX_PWMSS1_TBCLKEN_SHIFT			1
++#define AM33XX_PWMSS2_TBCLKEN_SHIFT			2
++
+ /* CONTROL OMAP STATUS register to identify OMAP3 features */
+ #define OMAP3_CONTROL_OMAP_STATUS	0x044c
+ 
+-- 
+1.7.9.5
