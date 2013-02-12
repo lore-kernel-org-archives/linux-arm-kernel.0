@@ -1,40 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Feb 2013 15:55:16 +0000
-Subject: [PATCH] HACK: ARM: Fix generic timer broadcast for TWD
-In-Reply-To: <1360684194-10894-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1360684194-10894-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20130212155516.GP17833@n2100.arm.linux.org.uk>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Wed, 13 Feb 2013 00:59:28 +0900
+Subject: [PATCH 6/9] gpiolib: use descriptors internally
+In-Reply-To: <CACRpkdaHuv7CXCy15-o94G0r0+2BStsi34ZVbBAhyGj=U3xgOg@mail.gmail.com>
+References: <1359822572-26009-1-git-send-email-acourbot@nvidia.com>
+ <1359822572-26009-8-git-send-email-acourbot@nvidia.com>
+ <CACRpkdbib-+pvMiLQN=f6d-1dhK2OK3znJeGoL7rDxDQYuJRuA@mail.gmail.com>
+ <CAAVeFu+phNtzzj7rw96g9iH8sj9gGqd5SfAqtkDHvu3PeL_oQA@mail.gmail.com>
+ <20130209091729.978C73E1A18@localhost>
+ <CACRpkdagLssOG3FW8Qr1zqFabGMgdupADwg1=c0eQ7e76_XM5A@mail.gmail.com>
+ <51192CC5.9060300@wwwdotorg.org>
+ <CACRpkdaHuv7CXCy15-o94G0r0+2BStsi34ZVbBAhyGj=U3xgOg@mail.gmail.com>
+Message-ID: <20130212155927.GE6088@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 04:49:54PM +0100, Thierry Reding wrote:
-> Note that I have close to no clue what I'm doing, so the patch might be
-> the completely wrong thing to do. An alternative I had initially thought
-> about was to check for NULL before calling the clock_event_device's
-> .broadcast() function.
+On Tue, Feb 12, 2013 at 01:29:10PM +0100, Linus Walleij wrote:
+> On Mon, Feb 11, 2013 at 6:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > On 02/11/2013 07:09 AM, Linus Walleij wrote:
 > 
-> The reason why I chose to always assign .broadcast instead is that a
-> previous patch (3d06770: Add generic timer broadcast support) aims at
-> generically implementing broadcast support on ARM and providing a
-> tick_broadcast() implementation for this purpose so it seemed like the
-> right thing to do.
+> >> However if you take this all the way to the descriptor API
+> >> it will make the consumer (driver) API for GPIO descriptors deviate
+> >> from what is today used for clocks, regulators and pins.
+> >>
+> >> With all the resulting confusion for users.
+> >> I've seen worse subsystem deviations though.
+> >
+> > Sorry I haven't looked at the specific APIs this discussion refers to,
+> > but clients of the GPIO descriptor API are going to need to distinguish
+> > "fail" from "deferred probe", so at least some initial get-like API will
+> > need to pass back some error detail...
 > 
-> The above-mentioned patch for some reason removed the assignment to the
-> .broadcast() member for apparently no reason, so maybe that was just
-> done by mistake?
-
-This is now supposed to be handled by the timer core stuff.  It
-looks to me like 3d06770eef43eaad606e77246bfcc7e82b1d9fb4
-(arm: Add generic timer broadcast support) is slightly busted in
-that it doesn't deal with the #else case you identified below.
-
-Certainly, initializing evt->broadcast after the setup is not the
-right solution - it must be done before, but this was removed by
-the above commit.
-
-So, things to be done here:
-1. Fix the #else part of the code.
-2. Fix the reported oops.
-
-I think this falls to Mark, being the last one to touch this and cause
-this breakage. :)
+> Right, so in some other patch I stated that this would lead
+> to a GPIO descriptor fetch interface such as this:
+> 
+> int gpiod_get(struct gpiod_desc **gpiod, struct device *dev, const char *name);
+> 
+> Rather than the more established:
+> 
+> struct gpio_desc *gpiod_get(struct device *dev, const char *name);
+> 
+> And I'm worried about the lack of consistency.
+> 
+> While I do get the point... I chatted with Grant about it and
+> I want to talk to some toolchain people about this to see if
+> pointers containing potential error codes can somehow be
+> "flagged" by the compiler so we can enforce error checking on
+> them. (It may sound a bit utopic...)
+> 
+At the very least you can __must_check annotate, although that's probably
+still a bit coarser grained than what you're after.
