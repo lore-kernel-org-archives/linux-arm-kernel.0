@@ -1,92 +1,137 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 12 Feb 2013 17:28:52 +0100
-Subject: [PATCH 18/32] arm: plat-orion: remove __init from addr-map functions
- needed after boot time
+Date: Tue, 12 Feb 2013 17:28:53 +0100
+Subject: [PATCH 19/32] arm: plat-orion: introduce orion_{alloc,
+ free}_cpu_win() functions
 In-Reply-To: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1360686546-24277-19-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1360686546-24277-20-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I/O and memory windows of PCIe interfaces will now be configurable
-dynamically, while the system runs, so we need to keep some the
-plat-orion/addr-map.c functions around even after the system
-initialization has completed.
+In the address decoding code, we implement two new functions:
+orion_alloc_cpu_win() and orion_free_cpu_win(). The first function
+finds an unused address decoding window, and configures it according
+to the given arguments (in terms of base address, size, target,
+attributes). The second function frees an address decoding window,
+given a physical base address.
+
+Those two new functions will be used by the PCIe code, which needs to
+dynamically register address decoding windows depending on the PCIe
+devices that are detected.
+
+The orion_free_cpu_win() function is only here to handle error cases
+in the PCIe devices initialization, in the normal case, address
+decoding windows are never freed.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/plat-orion/addr-map.c              |   18 +++++++++---------
- arch/arm/plat-orion/include/plat/addr-map.h |    8 ++++----
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/plat-orion/addr-map.c              |   75 +++++++++++++++++++++++++++
+ arch/arm/plat-orion/include/plat/addr-map.h |    7 +++
+ 2 files changed, 82 insertions(+)
 
 diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
-index b1d4806..a187524 100644
+index a187524..a7bdc21 100644
 --- a/arch/arm/plat-orion/addr-map.c
 +++ b/arch/arm/plat-orion/addr-map.c
-@@ -48,7 +48,7 @@ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
- /*
-  * Default implementation
-  */
--static void __init __iomem *
-+static void __iomem *
- orion_win_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
- {
- 	return cfg->bridge_virt_base + (win << 4);
-@@ -57,8 +57,8 @@ orion_win_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
- /*
-  * Default implementation
-  */
--static int __init orion_cpu_win_can_remap(const struct orion_addr_map_cfg *cfg,
--					  const int win)
-+static int orion_cpu_win_can_remap(const struct orion_addr_map_cfg *cfg,
-+				   const int win)
- {
- 	if (win < cfg->remappable_wins)
- 		return 1;
-@@ -66,10 +66,10 @@ static int __init orion_cpu_win_can_remap(const struct orion_addr_map_cfg *cfg,
- 	return 0;
- }
- 
--void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
--				const int win, const u32 base,
--				const u32 size, const u8 target,
--				const u8 attr, const u32 remap)
-+void orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
-+			 const int win, const u32 base,
-+			 const u32 size, const u8 target,
-+			 const u8 attr, const u32 remap)
- {
- 	void __iomem *addr = cfg->win_cfg_base(cfg, win);
- 	u32 ctrl, base_high, remap_addr;
-@@ -95,8 +95,8 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
+@@ -108,6 +108,81 @@ static void orion_disable_cpu_win(const struct orion_addr_map_cfg *cfg,
  	}
  }
  
--static void __init orion_disable_cpu_win(const struct orion_addr_map_cfg *cfg,
--					 const int win)
-+static void orion_disable_cpu_win(const struct orion_addr_map_cfg *cfg,
-+				  const int win)
- {
- 	void __iomem *addr = cfg->win_cfg_base(cfg, win);
- 
++static int orion_window_is_free(const struct orion_addr_map_cfg *cfg,
++				const int win)
++{
++	void __iomem *addr = cfg->win_cfg_base(cfg, win);
++	u32 ctrl = readl(addr + WIN_CTRL_OFF);
++	return !(ctrl & WIN_CTRL_ENABLE);
++}
++
++/*
++ * Find an unused address decoding window, and enable it according to
++ * the arguments passed (base, size, target, attributes, remap).
++ */
++int orion_alloc_cpu_win(const struct orion_addr_map_cfg *cfg,
++			const u32 base, const u32 size,
++			const u8 target, const u8 attr, const u32 remap)
++{
++	int win;
++
++	/*
++	 * If we don't need to remap, try to first allocate a window
++	 * that doesn't have remapping capabilities, since those are
++	 * pretty limited in number.
++	 */
++	if (remap == ORION_ADDR_MAP_NO_REMAP) {
++		for (win = cfg->remappable_wins; win < cfg->num_wins; win++)
++			if (orion_window_is_free(cfg, win))
++				break;
++
++		if (win < cfg->num_wins) {
++			orion_setup_cpu_win(cfg, win, base, size, target, attr, remap);
++			return 0;
++		}
++	}
++
++	/*
++	 * We need a remap window, or we haven't found a non-remap
++	 * capable window.
++	 */
++	for (win = 0; win < cfg->num_wins; win++)
++		if (orion_window_is_free(cfg, win))
++			break;
++
++	if (win < cfg->num_wins) {
++		orion_setup_cpu_win(cfg, win, base, size, target, attr, remap);
++		return 0;
++	}
++
++	/* No window found */
++	return -ENOMEM;
++}
++
++/*
++ * Free an address decoding window, given its base address.
++ */
++int orion_free_cpu_win(const struct orion_addr_map_cfg *cfg,
++		       const u32 base)
++{
++	int win;
++
++	for (win = 0; win < cfg->num_wins; win++) {
++		void __iomem *addr = cfg->win_cfg_base(cfg, win);
++		u32 winbase = readl(addr + WIN_BASE_OFF);
++
++		if (orion_window_is_free(cfg, win))
++			continue;
++
++		if (winbase == (base & 0xffff0000)) {
++			orion_disable_cpu_win(cfg, win);
++			return 0;
++		}
++	}
++
++	return -EINVAL;
++}
++
+ /*
+  * Configure a number of windows.
+  */
 diff --git a/arch/arm/plat-orion/include/plat/addr-map.h b/arch/arm/plat-orion/include/plat/addr-map.h
-index 6533c47..a5b21a9 100644
+index a5b21a9..fc46878 100644
 --- a/arch/arm/plat-orion/include/plat/addr-map.h
 +++ b/arch/arm/plat-orion/include/plat/addr-map.h
-@@ -46,10 +46,10 @@ struct orion_addr_map_info {
- void __init orion_config_wins(struct orion_addr_map_cfg *cfg,
- 			      const struct orion_addr_map_info *info);
+@@ -51,6 +51,13 @@ void orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
+ 			 const u32 size, const u8 target,
+ 			 const u8 attr, const u32 remap);
  
--void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
--				const int win, const u32 base,
--				const u32 size, const u8 target,
--				const u8 attr, const u32 remap);
-+void orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
-+			 const int win, const u32 base,
-+			 const u32 size, const u8 target,
-+			 const u8 attr, const u32 remap);
- 
++int orion_alloc_cpu_win(const struct orion_addr_map_cfg *cfg,
++			const u32 base, const u32 size,
++			const u8 target, const u8 attr, const u32 remap);
++
++int orion_free_cpu_win(const struct orion_addr_map_cfg *cfg,
++		       const u32 base);
++
  void __init orion_setup_cpu_mbus_target(const struct orion_addr_map_cfg *cfg,
  					const void __iomem *ddr_window_cpu_base);
+ #endif
 -- 
 1.7.9.5
