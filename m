@@ -1,61 +1,44 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 12 Feb 2013 08:38:38 -0800
-Subject: [PATCH v7 07/10] dmaengine: add dma_request_slave_channel_compat()
-In-Reply-To: <1359742975-10421-8-git-send-email-mporter@ti.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-8-git-send-email-mporter@ti.com>
-Message-ID: <20130212163838.GR3789@intel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 12 Feb 2013 18:08:58 +0100
+Subject: ARM big-endian on current kernels for linux-3.8
+In-Reply-To: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130212180858.289c3efa@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 01, 2013 at 01:22:52PM -0500, Matt Porter wrote:
-> Adds a dma_request_slave_channel_compat() wrapper which accepts
-> both the arguments from dma_request_channel() and
-> dma_request_slave_channel(). Based on whether the driver is
-> instantiated via DT, the appropriate channel request call will be
-> made.
-> 
-> This allows for a much cleaner migration of drivers to the
-> dmaengine DT API as platforms continue to be mixed between those
-> that boot using DT and those that do not.
-> 
-> Suggested-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+Dear Ben Dooks,
 
-> ---
->  include/linux/dmaengine.h |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index bfcdecb..17d8ffd 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -1001,6 +1001,22 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
->  struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
->  struct dma_chan *net_dma_find_channel(void);
->  #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
-> +#define dma_request_slave_channel_compat(mask, x, y, dev, name) \
-> +	__dma_request_slave_channel_compat(&(mask), x, y, dev, name)
-> +
-> +static inline struct dma_chan
-> +*__dma_request_slave_channel_compat(dma_cap_mask_t *mask, dma_filter_fn fn,
-> +				  void *fn_param, struct device *dev,
-> +				  char *name)
-> +{
-> +	struct dma_chan *chan;
-> +
-> +	chan = dma_request_slave_channel(dev, name);
-> +	if (chan)
-> +		return chan;
-> +
-> +	return __dma_request_channel(mask, fn, fn_param);
-> +}
->  
->  /* --- Helper iov-locking functions --- */
->  
-> -- 
-> 1.7.9.5
-> 
+On Fri,  8 Feb 2013 23:17:30 +0000, Ben Dooks wrote:
+> I have been working on getting big-endian kernels working, mainly from
+> little-endian boot envrionments. The following patch series is what I
+> have been working on, mainly on the highbank and axp systems.
+
+Nice!
+
+> Feedback and testing is welcome.
+
+I've tested your patch set on Armada XP. The kernel boots fine, but it
+fails to bring up the secondary CPUs:
+
+Booting CPU 1
+CPU1: failed to come online
+Booting CPU 2
+CPU2: failed to come online
+Booting CPU 3
+CPU3: failed to come online
+Brought up 1 CPUs
+SMP: Total of 1 processors activated (1332.01 BogoMIPS).
+
+The other problem is that I've not been able to build a working armeb
+userspace (I tried only very quickly with a Crosstool-NG toolchain I
+built for armeb). Do you have a known working armeb toolchain around?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
