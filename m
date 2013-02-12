@@ -1,97 +1,52 @@
-From: avinashphilip@ti.com (Philip Avinash)
-Date: Tue, 12 Feb 2013 13:02:56 +0530
-Subject: [PATCH v2] ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK
-Message-ID: <1360654376-27057-1-git-send-email-avinashphilip@ti.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Tue, 12 Feb 2013 16:35:56 +0900
+Subject: Devicetree node to turn off LCD when backlight is 'disabled'
+In-Reply-To: <1360563905.4130.6.camel@gitbox>
+References: <1360563905.4130.6.camel@gitbox>
+Message-ID: <5119F0DC.1010109@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Philip, Avinash" <avinashphilip@ti.com>
+On 02/11/2013 03:25 PM, Tony Prisk wrote:
+> I was just wondering if the following would be an acceptable way to turn
+> off an lcd backlight when the pwm-backlight driver is set to level 0.
+> The LCD backlight is 'powered' by the gpio.
+>
+> leds {
+> 	compatible = "gpio-leds";
+> 	backlight {
+> 		label = "lcd-power";
+> 		gpios = <&gpio 0 0 0>;  /* bank pin active_low */
+> 		linux,default-trigger = "backlight";
+> 		default-state = "on";
+> 	};
+> };
 
-EHRPWM module requires explicit clock gating of TBCLK from control
-module. Hence add TBCLK clock node in clock tree for EHRPWM modules.
+This would work... for the most common case of a FB blank event (as 
+gpio-leds will be notified of it and switch your GPIO on/off according 
+to the kind of event). There are a few drawbacks however:
 
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
----
-Changes since v1:
-	- Remove sparse warnings
-	arch/arm/mach-omap2/cclock33xx_data.c:844:1: warning: Using plain
-	integer as NULL pointer
-	arch/arm/mach-omap2/cclock33xx_data.c:850:1: warning: Using plain 
-	integer as NULL pointer
-	arch/arm/mach-omap2/cclock33xx_data.c:856:1: warning: Using plain 
-	integer as NULL pointer
+1) You will have no control over the order of your power sequence. 
+pwm-backlight also uses FB notifications to switch the PWM on/off. Which 
+one will happen first will depend on the registration order.
 
+2) This will only work on FB blank events. For instance, if someone 
+writes "0" into the "brightness" property of your backlight's sysfs 
+node, no FB blank event will be emitted and your GPIO will remain on.
 
- arch/arm/mach-omap2/cclock33xx_data.c |   30 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/control.h         |    8 ++++++++
- 2 files changed, 38 insertions(+)
+Also this solution works for the simple case where you control the 
+backlight using only a GPIO. It would be good to support more complex 
+cases as well (I have to handle a GPIO and a regulator, for instance).
 
-diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
-index ea64ad6..22387fa 100644
---- a/arch/arm/mach-omap2/cclock33xx_data.c
-+++ b/arch/arm/mach-omap2/cclock33xx_data.c
-@@ -832,6 +832,33 @@ static struct clk_hw_omap wdt1_fck_hw = {
- 
- DEFINE_STRUCT_CLK(wdt1_fck, wdt_ck_parents, gpio_fck_ops);
- 
-+static const char *pwmss_clk_parents[] = {
-+	"dpll_per_m2_ck",
-+};
-+
-+static const struct clk_ops ehrpwm_tbclk_ops = {
-+	.enable		= &omap2_dflt_clk_enable,
-+	.disable	= &omap2_dflt_clk_disable,
-+};
-+
-+DEFINE_CLK_OMAP_MUX_GATE(ehrpwm0_tbclk, "l4ls_clkdm",
-+			 NULL, NULL, 0,
-+			 AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
-+			 AM33XX_PWMSS0_TBCLKEN_SHIFT,
-+			 NULL, pwmss_clk_parents, ehrpwm_tbclk_ops);
-+
-+DEFINE_CLK_OMAP_MUX_GATE(ehrpwm1_tbclk, "l4ls_clkdm",
-+			 NULL, NULL, 0,
-+			 AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
-+			 AM33XX_PWMSS1_TBCLKEN_SHIFT,
-+			 NULL, pwmss_clk_parents, ehrpwm_tbclk_ops);
-+
-+DEFINE_CLK_OMAP_MUX_GATE(ehrpwm2_tbclk, "l4ls_clkdm",
-+			 NULL, NULL, 0,
-+			 AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
-+			 AM33XX_PWMSS2_TBCLKEN_SHIFT,
-+			 NULL, pwmss_clk_parents, ehrpwm_tbclk_ops);
-+
- /*
-  * clkdev
-  */
-@@ -910,6 +937,9 @@ static struct omap_clk am33xx_clks[] = {
- 	CLK(NULL,	"clkout2_div_ck",	&clkout2_div_ck,	CK_AM33XX),
- 	CLK(NULL,	"timer_32k_ck",		&clkdiv32k_ick,	CK_AM33XX),
- 	CLK(NULL,	"timer_sys_ck",		&sys_clkin_ck,	CK_AM33XX),
-+	CLK("48300200.ehrpwm",	"tbclk",	&ehrpwm0_tbclk,	CK_AM33XX),
-+	CLK("48302200.ehrpwm",	"tbclk",	&ehrpwm1_tbclk,	CK_AM33XX),
-+	CLK("48304200.ehrpwm",	"tbclk",	&ehrpwm2_tbclk,	CK_AM33XX),
- };
- 
- 
-diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-index 4b05eb9..2fe2812 100644
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -389,6 +389,14 @@
- #define AM33XX_DDR_DATA0_IOCTRL		0x1440
- #define AM33XX_DDR_DATA1_IOCTRL		0x1444
- 
-+/* AM33XX PWMSS Control register */
-+#define AM33XX_PWMSS_TBCLK_CLKCTRL			0x664
-+
-+/* AM33XX  PWMSS Control bitfields */
-+#define AM33XX_PWMSS0_TBCLKEN_SHIFT			0
-+#define AM33XX_PWMSS1_TBCLKEN_SHIFT			1
-+#define AM33XX_PWMSS2_TBCLKEN_SHIFT			2
-+
- /* CONTROL OMAP STATUS register to identify OMAP3 features */
- #define OMAP3_CONTROL_OMAP_STATUS	0x044c
- 
--- 
-1.7.9.5
+The "correct" way of doing this would be to let the pwm-backlight driver 
+(or even the backlight framework) control the power status of the 
+backlight itself. You can do this using the platform callbacks of 
+pwm-backlight, but this will require a custom panel. Another possibility 
+would be to use the power sequence framework within the backlight 
+drivers, but I need to rewrite it first.
+
+So as an ad-hoc solution, what you propose would certainly work - 
+however I think this is a good opportunity to try and solve this problem 
+more globally. Maybe we can start discussing about Power Sequences 2.0. :)
+
+Alex.
