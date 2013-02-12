@@ -1,81 +1,62 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 12 Feb 2013 11:13:29 -0800
-Subject: [PATCH v2 00/10] ARM: S3C24XX: irq rework for S3C2412,
- S3C2440 and S3C2442
-In-Reply-To: <201302091811.05437.heiko@sntech.de>
-References: <201302091811.05437.heiko@sntech.de>
-Message-ID: <1d8801ce0955$0bef8600$23ce9200$@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 12 Feb 2013 13:20:54 -0600
+Subject: [PATCH v4 09/19] ARM: use common irqchip_init for GIC init
+In-Reply-To: <CAD=FV=XmvnbHBL4pZtA0zgxAmfuY+FkZcx_8sxt2uAxnQdPTRA@mail.gmail.com>
+References: <1357235668-9450-1-git-send-email-robherring2@gmail.com>
+ <1357235668-9450-10-git-send-email-robherring2@gmail.com>
+ <201301032141.19568.arnd@arndb.de> <50E6008B.7050303@gmail.com>
+ <CAD=FV=XmvnbHBL4pZtA0zgxAmfuY+FkZcx_8sxt2uAxnQdPTRA@mail.gmail.com>
+Message-ID: <511A9616.9060207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+On 02/12/2013 10:52 AM, Doug Anderson wrote:
+> Rob,
 > 
-> This series finishes the irq rework by moving the irqs for s3c2412, s3c2440
-> and s3c2442 into the new structure.
 > 
-> Now the only open point is the different handling of the eint0 to eint3
-> interrupts on the s3c2412. On this SoC these interrupts are represented
-> in both the main register and the eint register and also need to be handled
-> in both.
+> On Thu, Jan 3, 2013 at 2:04 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 01/03/2013 03:41 PM, Arnd Bergmann wrote:
+>>> On Thursday 03 January 2013, Rob Herring wrote:
+>>>> @@ -637,8 +638,6 @@ static int __init combiner_of_init(struct device_node *np,
+>>>>  }
+>>>>
+>>>>  static const struct of_device_id exynos_dt_irq_match[] = {
+>>>> -       { .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+>>>> -       { .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
+>>>>         { .compatible = "samsung,exynos4210-combiner",
+>>>>                         .data = combiner_of_init, },
+>>>>         {},
+>>>> @@ -654,8 +653,10 @@ void __init exynos4_init_irq(void)
+>>>>         if (!of_have_populated_dt())
+>>>>                 gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU, gic_bank_offset, NULL);
+>>>>  #ifdef CONFIG_OF
+>>>> -       else
+>>>> +       else {
+>>>> +               irqchip_init();
+>>>>                 of_irq_init(exynos_dt_irq_match);
+>>>> +       }
+>>>>  #endif
+>>>
+>>> Is this an equivalent change? I thought you are supposed to call of_irq_init
+>>> only once so it can see the entire hierarchy. Or is it ok as long as the
+>>> top-level controllers are probed first?
+>>
+>> Yes, it is equivalent as the GIC will be initialized first. Ideally,
+>> this the exynos controller needs to be moved to drivers/irqchip as well
+>> and this can be removed, but I can't have all the fun.
 > 
-> As this should be handlable via the new structure, I'm still investigating
-> the right way to do it. Therefore the override of the eint0 to eint3
-> interrupts will still remain for a bit.
+> My ARM Chromebook that no longer boots on linux-next begs to differ.
+> I tracked it down to this change.  If I hack it so that the exynos
+> combiner is registered with irqchip or if I revert just the exynos
+> part of this patch then things work again.
 > 
-> As I lack the relevant hardware, this series is compile tested only, but as
-> the used mechanisms are the same as with the s3c2416, there shouldn't be
-> any complications.
-> 
-> This series applies on top of the moved s3c24XX.h headers into the
-> common.h
-> file in mach-s3c24xx.
-> 
-> changes since v1:
-> - included the changes for the s3c2412
-> 
-> Heiko Stuebner (10):
->   ARM: S3C24XX: move s3c244x irq init to common irq code
->   ARM: S3C24XX: create dedicated irq init functions for s3c2440 and s3c2442
->   ARM: S3C24XX: move s3c2440 irqs to common irq code
->   ARM: S3C24XX: integrate s3c2440 irqs into common init
->   ARM: S3C24XX: transform s3c2442 irqs into new structure
->   ARM: S3C24XX: transform s3c2440 irqs into new structure
->   ARM: S3C24XX: use samsung_sync_wakemask in s3c2412 pm
->   ARM: S3C24XX: move s3c2412 irq init to common code
->   ARM: S3C24XX: modify s3c2412 irq init to initialize all irqs
->   ARM: S3C24XX: transform s3c2412 irqs into new structure
-> 
->  arch/arm/mach-s3c24xx/Kconfig          |    1 +
->  arch/arm/mach-s3c24xx/Makefile         |    6 +-
->  arch/arm/mach-s3c24xx/common.h         |    3 +
->  arch/arm/mach-s3c24xx/irq-s3c2412.c    |  215 -----------------------
->  arch/arm/mach-s3c24xx/irq-s3c2440.c    |  128 --------------
->  arch/arm/mach-s3c24xx/irq-s3c244x.c    |  142 ---------------
->  arch/arm/mach-s3c24xx/irq.c            |  299
-> ++++++++++++++++++++++++++++++++
->  arch/arm/mach-s3c24xx/mach-anubis.c    |    2 +-
->  arch/arm/mach-s3c24xx/mach-at2440evb.c |    2 +-
->  arch/arm/mach-s3c24xx/mach-gta02.c     |    2 +-
->  arch/arm/mach-s3c24xx/mach-jive.c      |    2 +-
->  arch/arm/mach-s3c24xx/mach-mini2440.c  |    2 +-
->  arch/arm/mach-s3c24xx/mach-nexcoder.c  |    2 +-
->  arch/arm/mach-s3c24xx/mach-osiris.c    |    2 +-
->  arch/arm/mach-s3c24xx/mach-rx1950.c    |    2 +-
->  arch/arm/mach-s3c24xx/mach-rx3715.c    |    7 +-
->  arch/arm/mach-s3c24xx/mach-smdk2413.c  |    6 +-
->  arch/arm/mach-s3c24xx/mach-smdk2440.c  |    2 +-
->  arch/arm/mach-s3c24xx/mach-vstms.c     |    2 +-
->  arch/arm/mach-s3c24xx/pm-s3c2412.c     |    8 +
->  20 files changed, 328 insertions(+), 507 deletions(-)
->  delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2412.c
->  delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2440.c
->  delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c244x.c
-> 
-> --
-> 1.7.2.3
+> Is anyone from Samsung working to move the exynos-combiner into IRQ
+> Chip?  Until that happens (or this change is partly reverted) any
+> exynos boards won't boot.  ...and tracking the problem down to this
+> change is a bit of a pain since there's no nice crash.
 
-Applied, this whole series and integration 2412 eint handling.
+Actually, I was mistaken and of_irq_init can't really be called twice.
+The parents need to be in the match list as well. I will fix this and
+there's probably a few others broken as well.
 
-Thanks for your time and support.
-
-- Kukjin
+Rob
