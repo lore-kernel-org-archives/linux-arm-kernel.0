@@ -1,86 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Feb 2013 09:57:28 -0700
-Subject: [PATCH] pinctrl/pinconfig: add debug interface
-In-Reply-To: <CACRpkdZu0+maCE2GjuZcQPZPZbw=Fz0DUHYY8FXPdZEH0PeViQ@mail.gmail.com>
-References: <1360527070-18430-1-git-send-email-linus.walleij@stericsson.com>
- <51195A63.7080706@wwwdotorg.org>
- <CACRpkdZu0+maCE2GjuZcQPZPZbw=Fz0DUHYY8FXPdZEH0PeViQ@mail.gmail.com>
-Message-ID: <511A7478.8040506@wwwdotorg.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 12 Feb 2013 08:38:38 -0800
+Subject: [PATCH v7 07/10] dmaengine: add dma_request_slave_channel_compat()
+In-Reply-To: <1359742975-10421-8-git-send-email-mporter@ti.com>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-8-git-send-email-mporter@ti.com>
+Message-ID: <20130212163838.GR3789@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2013 05:54 AM, Linus Walleij wrote:
-> On Mon, Feb 11, 2013 at 9:53 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 02/10/2013 01:11 PM, Linus Walleij wrote:
->>> From: Laurent Meunier <laurent.meunier@st.com>
->>>
->>> This update adds a debugfs interface to modify a pin configuration
->>> for a given state in the pinctrl map. This allows to modify the
->>> configuration for a non-active state, typically sleep state.
->>> This configuration is not applied right away, but only when the state
->>> will be entered.
->>>
->>> This solution is mandated for us by HW validation: in order
->>> to test and verify several pin configurations during sleep without
->>> recompiling the software.
-...
->>> +/**
->>> + * pinconf_dbg_config_write() - overwrite the pinctrl config in thepinctrl
->>> + * map, of a pin/state pair based on pinname and state that have been
->>> + * selected with the debugfs entries pinconf-name and pinconf-state
->>> + */
->>> +static int pinconf_dbg_config_write(struct file *file,
->>> +     const char __user *user_buf, size_t count, loff_t *ppos)
->>> +{
->>> +     int err;
->>> +     unsigned long config;
->>> +     struct pinctrl_maps *maps_node;
->>> +     struct pinctrl_map const *map;
->>> +     int i, j;
->>> +
->>> +     err = kstrtoul_from_user(user_buf, count, 0, &config);
->>> +
->>> +     if (err)
->>> +             return err;
->>> +
->>> +     dbg_config = config;
->>
->> That assumes that pin config values are a plain u32. While this is
->> commonly true in existing pinctrl drivers, it certainly isn't something
->> that the pinctrl core mandates;
+On Fri, Feb 01, 2013 at 01:22:52PM -0500, Matt Porter wrote:
+> Adds a dma_request_slave_channel_compat() wrapper which accepts
+> both the arguments from dma_request_channel() and
+> dma_request_slave_channel(). Based on whether the driver is
+> instantiated via DT, the appropriate channel request call will be
+> made.
 > 
-> So there is this unsigned long and it has a value.
+> This allows for a much cleaner migration of drivers to the
+> dmaengine DT API as platforms continue to be mixed between those
+> that boot using DT and those that do not.
 > 
-> The interface should support altering that unsigned long not
-> really caring for what it contains. It seems pretty straight-forward
-> to me.
+> Suggested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-But it's not an unsigned long - it's an opaque value that just happens
-to be stored in an unsigned long.
-
-> Of course, if this unsigned long is a pointer, this is just a
-> fantastic recipe for shooting oneself in the foot, but again
-> debugfs is just one big gun aimed at ones foot anyway, that's
-> the whole point of debugfs.
-
-But it'd be possible to handle this if the code to modify the map called
-into the individual pinctrl driver to convert the data the user wrote
-into the value to store in the map, just like it does for DT.
-
-Then, it'd work in all cases.
-
-Plus, it could convert e.g. "pull up" to 0x10001 rather than requiring
-the user to manually encode the 0x10001 themselves; much more useful.
-
->> that's the whole point of
->> dt_node_to_map() for example, to allow the individual pinctrl drivers to
->> use whatever type (scalar, pointer-to-struct, ...) they want to
->> represent their config values.
+> ---
+>  include/linux/dmaengine.h |   16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 > 
-> Yes. But it is an unsigned long, and we support altering it.
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index bfcdecb..17d8ffd 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -1001,6 +1001,22 @@ void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
+>  struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
+>  struct dma_chan *net_dma_find_channel(void);
+>  #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
+> +#define dma_request_slave_channel_compat(mask, x, y, dev, name) \
+> +	__dma_request_slave_channel_compat(&(mask), x, y, dev, name)
+> +
+> +static inline struct dma_chan
+> +*__dma_request_slave_channel_compat(dma_cap_mask_t *mask, dma_filter_fn fn,
+> +				  void *fn_param, struct device *dev,
+> +				  char *name)
+> +{
+> +	struct dma_chan *chan;
+> +
+> +	chan = dma_request_slave_channel(dev, name);
+> +	if (chan)
+> +		return chan;
+> +
+> +	return __dma_request_channel(mask, fn, fn_param);
+> +}
+>  
+>  /* --- Helper iov-locking functions --- */
+>  
+> -- 
+> 1.7.9.5
 > 
-> And the whole point of debugfs is to do crazy stuff like that.
-
-Well to some extent, but there's little point in creating a debugfs file
-that makes different assumptions about what its doing than any other
-code that uses the same data structures.
