@@ -1,42 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 12 Feb 2013 17:48:11 +0100
-Subject: [RFC] i2c: Providing hooks for i2c multimaster bus arbitration.
-In-Reply-To: <511A1E39.5000304@codethink.co.uk>
-References: <1359968595-21291-1-git-send-email-yuvaraj.cd@samsung.com>
- <20130210181710.GB12760@nekote.pengutronix.de>
- <511A1E39.5000304@codethink.co.uk>
-Message-ID: <20130212164811.GV8668@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Feb 2013 08:49:11 -0800
+Subject: [PATCH] ARM: omap: board-h4: remove warning for is_gpmc_muxed
+In-Reply-To: <1360640836-18792-1-git-send-email-olof@lixom.net>
+References: <1360640836-18792-1-git-send-email-olof@lixom.net>
+Message-ID: <20130212164910.GF4801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ben,
-
-On Tue, Feb 12, 2013 at 10:49:29AM +0000, Ben Dooks wrote:
-> On 10/02/13 18:17, Wolfram Sang wrote:
-> >On Mon, Feb 04, 2013 at 02:33:15PM +0530, Yuvaraj Kumar C D wrote:
-> >>This RFC patch is w.r.t multimaster bus arbitration which is already
-> >>being discussing in the mainline.
-> >>This patch provides hooks for the i2c multimaster bus arbitration
-> >>and to have the arbitration parameters.
-> >
-> >I still haven't understood why the arbitration specified in the I2C
-> >standard is not enough for you. Or what you would need to make use of
-> >it.
+* Olof Johansson <olof@lixom.net> [130211 19:51]:
+> If the ethernet driver is not selected, you otherwise get:
 > 
-> I am a little concerned as there is no way to actually lock a bus to
-> stop another master from transmitting. You can get collisions in a
-> multi-master environment. Drivers need fixing to deal with collisions
-> and let the sender know the operation has failed.
-In theory everything should just work. If a master send a Start, the bus
-is actually locked and other masters must wait until Stop. If two
-masters start concurrently one master just looses arbitration and the
-winning master's transfer isn't corrupted. So client drivers don't need
-adaption and master drivers "only" need to handle arbitration and
-synchronization (which they should already now :-)
+> arch/arm/mach-omap2/board-h4.c:237:12: warning: 'is_gpmc_muxed' defined but not used [-Wunused-function]
+> 
+> I guess it could be argued that the device setup should/could always
+> be done even if the driver isn't enabled, but hopefully the board files
+> will all go away some day so let's stick to the smaller delta.
 
-Best regards
-Uwe
+Looks right to me. The only thing stopping us from removing board-h4.c
+is the GPMC + smc91x DT binding for NFS root. I doubt anybody is using
+H4 for anything else.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  arch/arm/mach-omap2/board-h4.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
+> index 812c829..e34541d 100644
+> --- a/arch/arm/mach-omap2/board-h4.c
+> +++ b/arch/arm/mach-omap2/board-h4.c
+> @@ -229,6 +229,8 @@ static u32 get_sysboot_value(void)
+>  		 OMAP2_SYSBOOT_1_MASK | OMAP2_SYSBOOT_0_MASK));
+>  }
+>  
+> +#if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91x_MODULE)
+> +
+>  /* H4-2420's always used muxed mode, H4-2422's always use non-muxed
+>   *
+>   * Note: OMAP-GIT doesn't correctly do is_cpu_omap2422 and is_cpu_omap2423
+> @@ -246,8 +248,6 @@ static u32 is_gpmc_muxed(void)
+>  		return 0;
+>  }
+>  
+> -#if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91x_MODULE)
+> -
+>  static struct omap_smc91x_platform_data board_smc91x_data = {
+>  	.cs		= 1,
+>  	.gpio_irq	= 92,
+> -- 
+> 1.8.1.192.gc4361b8
+> 
