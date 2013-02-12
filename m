@@ -1,53 +1,34 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 12 Feb 2013 16:22:22 -0300
-Subject: [PATCH v3 6/8] ARM: omap2: gpmc-onenand: Replace pr_err() with
- dev_err()
+Date: Tue, 12 Feb 2013 16:22:23 -0300
+Subject: [PATCH v3 7/8] ARM: omap2: gpmc-onenand: Replace printk KERN_ERR with
+ dev_warn()
 In-Reply-To: <1360696944-3371-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1360696944-3371-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1360696944-3371-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1360696944-3371-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do this becasue dev_err() is preferred over pr_err() and because
-it will match gpmc-nand, thus the code shows looks more consistent.
+Since the condition is not an error but a warning, replace
+printk KERN_ERR with dev_warn.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/gpmc-onenand.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/gpmc-onenand.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-index 0ee5317..4771945 100644
+index 4771945..fd6e35b 100644
 --- a/arch/arm/mach-omap2/gpmc-onenand.c
 +++ b/arch/arm/mach-omap2/gpmc-onenand.c
-@@ -359,6 +359,7 @@ static int gpmc_onenand_setup(void __iomem *onenand_base, int *freq_ptr)
- void gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
- {
- 	int err;
-+	struct device *dev = &gpmc_onenand_device.dev;
+@@ -367,7 +367,7 @@ void gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
  
- 	gpmc_onenand_data = _onenand_data;
- 	gpmc_onenand_data->onenand_setup = gpmc_onenand_setup;
-@@ -379,8 +380,8 @@ void gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
- 	err = gpmc_cs_request(gpmc_onenand_data->cs, ONENAND_IO_SIZE,
- 				(unsigned long *)&gpmc_onenand_resource.start);
- 	if (err < 0) {
--		pr_err("%s: Cannot request GPMC CS %d, error %d\n",
--		       __func__, gpmc_onenand_data->cs, err);
-+		dev_err(dev, "Cannot request GPMC CS %d, error %d\n",
-+			gpmc_onenand_data->cs, err);
- 		return;
- 	}
- 
-@@ -388,7 +389,7 @@ void gpmc_onenand_init(struct omap_onenand_platform_data *_onenand_data)
- 							ONENAND_IO_SIZE - 1;
- 
- 	if (platform_device_register(&gpmc_onenand_device) < 0) {
--		pr_err("%s: Unable to register OneNAND device\n", __func__);
-+		dev_err(dev, "Unable to register OneNAND device\n");
- 		gpmc_cs_free(gpmc_onenand_data->cs);
- 		return;
+ 	if (cpu_is_omap24xx() &&
+ 			(gpmc_onenand_data->flags & ONENAND_SYNC_READWRITE)) {
+-		printk(KERN_ERR "Onenand using only SYNC_READ on 24xx\n");
++		dev_warn(dev, "OneNAND using only SYNC_READ on 24xx\n");
+ 		gpmc_onenand_data->flags &= ~ONENAND_SYNC_READWRITE;
+ 		gpmc_onenand_data->flags |= ONENAND_SYNC_READ;
  	}
 -- 
 1.7.8.6
