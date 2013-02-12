@@ -1,41 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 12 Feb 2013 06:39:28 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP: Clock: Remove CK_* flags
-In-Reply-To: <DC88CAD03C0052499C1907B327FC63229B989B@DBDE01.ent.ti.com>
-References: <1359966525-7603-1-git-send-email-j-keerthy@ti.com>
- <alpine.DEB.2.00.1302080248550.8539@utopia.booyaka.com>
- <DC88CAD03C0052499C1907B327FC63229B92FF@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1302081805450.28008@utopia.booyaka.com>
- <alpine.DEB.2.00.1302081855370.28008@utopia.booyaka.com>
- <DC88CAD03C0052499C1907B327FC63229B966E@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1302111538430.8260@utopia.booyaka.com>
- <DC88CAD03C0052499C1907B327FC63229B989B@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1302120638580.14983@utopia.booyaka.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Tue, 12 Feb 2013 06:55:18 +0000
+Subject: [PATCH 4/7] ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK
+In-Reply-To: <alpine.DEB.2.00.1302081505350.28008@utopia.booyaka.com>
+References: <1357133094-30806-1-git-send-email-avinashphilip@ti.com>
+ <1357133094-30806-5-git-send-email-avinashphilip@ti.com>
+ <alpine.DEB.2.00.1302081505350.28008@utopia.booyaka.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA73534@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Feb 2013, J, KEERTHY wrote:
-
-> > -----Original Message-----
-> > From: Paul Walmsley [mailto:paul at pwsan.com]
-> > Sent: Monday, February 11, 2013 9:10 PM
-> > To: J, KEERTHY
-> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Subject: RE: [PATCH] ARM: OMAP: Clock: Remove CK_* flags
-> > 
-> > On Mon, 11 Feb 2013, J, KEERTHY wrote:
-> > 
-> > > Can I pull the other patches and rebase this patch on top of them?
-> > > I need the branch where I can pull the other clock related patches.
-> > > I will rebase this patch on top, Verify the PM suspend on OMAP4460
-> > > And post it.
-> > 
-> > It's based on Tony's omap-for-v3.9/pm branch.
-> > 
+On Fri, Feb 08, 2013 at 20:36:53, Paul Walmsley wrote:
+> Hi,
 > 
-> I am on the above branch. I am not seeing retention with/without the patch.
+> On Wed, 2 Jan 2013, Philip Avinash wrote:
+> 
+> > EHRPWM module requires explicit clock gating of TBCLK from control
+> > module. Hence add TBCLK clock node in clock tree for EHRPWM modules.
+> > 
+> > Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> 
+> This patch adds some sparse[1] warnings:
+> 
+> > arch/arm/mach-omap2/cclock33xx_data.c:844:1: warning: Using plain 
+> integer as NULL pointer
+> > arch/arm/mach-omap2/cclock33xx_data.c:850:1: warning: Using plain 
+> integer as NULL pointer
+> > arch/arm/mach-omap2/cclock33xx_data.c:856:1: warning: Using plain 
+> integer as NULL pointer
+> 
+> Could you fix these, please?
 
-Sounds like you get to do some bisecting :-)
+Sorry for late response. I will send an updated version with fix for
+sparse warnings.
 
+Thanks
+Avinash
 
-- Paul
+> 
+> 
+> - Paul
+> 
+> 1. Sparse: https://sparse.wiki.kernel.org/index.php/Main_Page
+> 
+> 
