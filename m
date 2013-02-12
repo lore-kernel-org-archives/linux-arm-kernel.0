@@ -1,146 +1,110 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 12 Feb 2013 12:26:15 -0700
-Subject: [PATCH v2 19/27] pci: PCIe driver for Marvell Armada 370/XP
- systems
-In-Reply-To: <201302092223.11796.arnd@arndb.de>
-References: <1359399397-29729-20-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302072325.23483.arnd@arndb.de>
- <20130208004414.GA32245@obsidianresearch.com>
- <201302092223.11796.arnd@arndb.de>
-Message-ID: <20130212192615.GC1471@obsidianresearch.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 12 Feb 2013 11:27:14 -0800
+Subject: [PATCH] arm: plat-samsung: check soc ids before l2x0 cache
+ restoration in resume
+In-Reply-To: <1358843109-11072-1-git-send-email-inderpal.singh@linaro.org>
+References: <1358843109-11072-1-git-send-email-inderpal.singh@linaro.org>
+Message-ID: <1d9501ce0956$f7ce4150$e76ac3f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 10:23:11PM +0000, Arnd Bergmann wrote:
-
-> > This makes *lots* of sense, if you have bridges providing bus slots
-> > then you include the bridge in DT to stop the 'fold down' at that
-> > known bridge, giving you a chance to see the interrupt wiring behind
-> > the bridge.
->
-> I would argue that it matters not so much what Linux does but what
-> the standard says, but it seems they both agree with you in this
-> case: http://www.openfirmware.org/1275/practice/imap/imap0_9d.pdf
-> defines that "At any level in the interrupt tree, a mapping may
-> need to take place between the child interrupt domain and the
-> parent???s. This is represented by a new property called 'interrupt-map'".
-
-Right, the standard (and Linux) allows the property in any node.
-
-> > This matches the design of PCI - if you know how interrupts are hooked
-> > up then use that information, otherwise assume the INTx interrupts
-> > swizzle and search upward. This is how add-in cards with PCI bridges
-> > are supported.
+Inderpal Singh wrote:
 > 
-> Note that the implicit swizzling was not part of the original PCI
-> binding, which assumed that all devices were explicitly represented
-> in the device tree, and we don't normally do that any more because
-
-Yes, if the tree includes all PCI devices then you don't need
-interrupt-map, just place an interrupt property directly on the end
-nodes.
-
-However the implicit swizzling and 'fold down' is pretty much
-essential to support the PCI standards for hot plug behind bridges.
-
-> PCI can be probed easily, and we cannot assume that all PCI BARs
-> have been correctly assigned by the firmware before the OS
-> is booting. Having the interrupt-map at PCI host controller
-> node is convenient because it lets us define unit interrupt
-> specifiers for devices that are not represented in the device
-> tree themselves.
-
-Right, interrupt-map is actually only needed when the DT is
-incomplete, or to support hot pluggable ports.
-
-> I think the key question here is whether there is just one interrupt
-> domain across all bridges because the hardware requires the unit
-> address to be unique, or whether each PCIe port has its own
-> unit address space, and thereby interrupt domain that requires
-> its own interrupt-map.
-
-IMHO, the interrupt domains should describe the underlying hardware,
-and in many cases the HW is designed so that every PCI bus bridge has
-it's own downstream interrupt layout - and thus is an interrupt domain.
-
-> > If you imagine the case you alluded to, a PCI-E root port, connected
-> > to a PCI-E to PCI bridge, with 2 physical PCI bus slots. The
-> > interrupts for the 2 slots are routed to the CPU directly:
-> > 
-> > link at 0 {
-> >  reg = </* Bus 0, Dev 0x10, Fn 0 */>; // Root Port bridge
-> > 
-> >   // Match on INTx (not used since the pci-bridge doesn't create inband INTx)
-> >   interrupt-mask = <0x0 0 0 7>;
-> >   interrupt-map = <0x0000 0 0 1 &pic 0  // Inband INTA
-> >                    0x0000 0 0 2 &pic 1  // Inband INTB
+> Only exynos4 based platforms have l2x0 cache controller. Hence check
+> the same before restoring the cache in resume.
 > 
-> What are these two interrupts in the example then?
+I think, the code can determine by checking ARM main ID cp15 register
+instead of Chip ID. Because if so, we don't need to do something for ahother
+EXYNOS4 SoCs next time.
 
-This shows that the HW block 'link at 0' - which is a PCI Express root
-port bridge - accepts inband INTx messages and converts them to CPU
-interrupts pic 0/1/...
-
-Since this is a general function, and fully self contained, it can be
-placed in the general SOC's dtsi.
-
-However, the board has a hard-wired PCIe to PCI bridge with PCI slots,
-and never generates inband INTx. We can then describe that chip via
-the following stanza in the board specific dts:
-
-> >  pci_bridge at 0 {
-> >     reg = </* Bus 1, Dev 0x10, Fn 0 */>; // PCIe to PCI bridge
+> This is needed for single kernel image.
 > 
-> The device would be "pci at 10", right?
-
-Probably best to use the hex version of the regs value /* Bus 1, Dev
-0x10, Fn 0 */, but nothing inspects that, right?
-
-> >     // Match on the device/slot and INTx pin
-> >     interrupt-mask = <0x7f 0 0 7>;
-> >     interrupt-map = <0x00xx 0 0 1 &pic 2 // Slot 0 physical INTA
-> >                      0x00xx 0 0 1 &pic 3 // Slot 1 physical INTA
-> >                      ..
-> >  }
-> > }
+> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+> ---
+>  arch/arm/mach-exynos/common.c           |    2 ++
+>  arch/arm/plat-samsung/include/plat/pm.h |    1 +
+>  arch/arm/plat-samsung/s5p-sleep.S       |   28
+> ++++++++++++++++++++++++++++
+>  3 files changed, 31 insertions(+)
 > 
-> You are accidentally matching the on the register number, not the
-> device number here, right? The interrupt-map-mask should be
-> <0xf800 0 0 7> to match the device.
-
-Right, only match the device, ignore the bus.
-
-There is also another variant, if the PCIe to PCI bridge provides its
-own interrupt pins and converts those to inband PCIe INTx messages,
-then the PCB can wire up the PCI bus slots to the bridge's INTx pins
-according to some pattern and describe that pattern in DT:
-
-pci_bridge at 0 {
-   reg = </* Bus 1, Dev 0x10, Fn 0 */>; // PCIe to PCI bridge
-   interrupt-mask = <0xf800 0 0 7>;
-   interrupt-map = <0x00xx 0 0 1 &pci_bridge0 0 0 0 1 // Slot 0 physical INTA to inband INTA
-                    0x00xx 0 0 1 &pci_bridge0 0 0 0 2 // Slot 1 physical INTA to inband INTB
-		    ...
-}
-
-(minus errors, haven't tried this one, but the standard says it should
-be OK)
-
-Which would be processed as:
- - pci_bridge at 0 converts out of brand interrupts into in-band
-   interrupts according its interrupt-map, and then sends those
-   upstream.
- - link@0 converts in band interrupts into CPU interrupts according
-   to its interrupt map.
-
-In my experience the above is a common case.
-
-Boot firmware could fold all this down to a single interrupt map, and
-hide the programming of the IOAPIC/etc from the OS, but the HW is
-still undertaking these transformations..
-
-Anyhow, it sounds like Thomas has had success using this approach, so
-it works.
-
-Cheers,
-Jason
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-
+> exynos/common.c
+> index cdaa55f..ab7ca00 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -796,6 +796,8 @@ static int __init exynos4_l2x0_cache_init(void)
+>  	if (soc_is_exynos5250() || soc_is_exynos5440())
+>  		return 0;
+> 
+> +	s5p_cpu = samsung_cpu_id & EXYNOS4_CPU_MASK;
+> +
+>  	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
+>  	if (!ret) {
+>  		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+> diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-
+> samsung/include/plat/pm.h
+> index 887a0c9..285c8c8 100644
+> --- a/arch/arm/plat-samsung/include/plat/pm.h
+> +++ b/arch/arm/plat-samsung/include/plat/pm.h
+> @@ -190,3 +190,4 @@ extern void samsung_pm_save_gpios(void);
+> 
+>  extern void s3c_pm_save_core(void);
+>  extern void s3c_pm_restore_core(void);
+> +extern unsigned long s5p_cpu;
+> diff --git a/arch/arm/plat-samsung/s5p-sleep.S b/arch/arm/plat-
+> samsung/s5p-sleep.S
+> index bdf6dad..006d35f 100644
+> --- a/arch/arm/plat-samsung/s5p-sleep.S
+> +++ b/arch/arm/plat-samsung/s5p-sleep.S
+> @@ -25,6 +25,15 @@
+>  #include <asm/asm-offsets.h>
+>  #include <asm/hardware/cache-l2x0.h>
+> 
+> +#define EXYNOS4210_CPU_ID	0x43210000
+> +#define EXYNOS4212_CPU_ID	0x43220000
+> +#define EXYNOS4412_CPU_ID	0xE4412200
+> +#define EXYNOS4_CPU_MASK	0xFFFE0000
+> +
+> +#define EXYNOS4210_CPU		(EXYNOS4210_CPU_ID &
+> EXYNOS4_CPU_MASK)
+> +#define EXYNOS4212_CPU		(EXYNOS4212_CPU_ID &
+> EXYNOS4_CPU_MASK)
+> +#define EXYNOS4412_CPU		(EXYNOS4412_CPU_ID &
+> EXYNOS4_CPU_MASK)
+> +
+>  /*
+>   *	 The following code is located into the .data section. This is to
+>   *	 allow l2x0_regs_phys to be accessed with a relative load while we
+> @@ -51,6 +60,22 @@
+> 
+>  ENTRY(s3c_cpu_resume)
+>  #ifdef CONFIG_CACHE_L2X0
+> +	adr	r0, s5p_cpu
+> +	ldr	r1, [r0]
+> +
+> +	ldr	r0, =EXYNOS4210_CPU
+> +	cmp	r1, r0
+> +	beq	continue
+> +
+> +	ldr	r0, =EXYNOS4212_CPU
+> +	cmp	r1, r0
+> +	beq	continue
+> +
+> +	ldr	r0, =EXYNOS4412_CPU
+> +	cmp	r1, r0
+> +	bne	resume_l2on
+> +
+> +continue:
+>  	adr	r0, l2x0_regs_phys
+>  	ldr	r0, [r0]
+>  	ldr	r1, [r0, #L2X0_R_PHY_BASE]
+> @@ -77,4 +102,7 @@ ENDPROC(s3c_cpu_resume)
+>  	.globl l2x0_regs_phys
+>  l2x0_regs_phys:
+>  	.long	0
+> +	.globl s5p_cpu
+> +s5p_cpu:
+> +	.long	0
+>  #endif
+> --
+> 1.7.9.5
