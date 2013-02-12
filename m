@@ -1,55 +1,120 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Feb 2013 13:10:19 +0100
-Subject: [GIT PULL] <mach/id.h> fixup of fallouts
-Message-ID: <CACRpkdYHS+2d7h76CdmX-Ah+_fzOhjLheT_5vNxUWxLd-K0Kww@mail.gmail.com>
+From: anilk4.v@gmail.com (Anil Kumar)
+Date: Tue, 12 Feb 2013 17:51:57 +0530
+Subject: [PATCH] ARM: dts: omap3-devkit8000: Enable audio support
+Message-ID: <1360671717-32050-1-git-send-email-anilk4.v@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+Add the needed sections to enable audio support and related pin mux on
+Devkit8000 when booted with DT blob.
 
-this is a pull request for fixing the fallout from the <mach/id.h> removal.
+Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+---
+This patch is based on top of kernel 3.8-rc5 and
+the following patches.
 
-I've pulled it into your next/cleanup branch as a test, and it magically
-works.
+Peter Ujfalusi:-
+ASoC: twl4030: Correct the support for Voice port
+ASoC: twl4030: Convert MICBIAS to SUPPLY widget
+ASoC: omap-twl4030: Add support for routing, voice port and jack detect
 
-Rafael still has not ACKed the first oneliner, I don't think he'd mind, and
-I have an ACK from Sam on the MFD portions.
+Anil Kumar:-
+ARM: dts: add minimal DT support for DevKit8000
+https://patchwork.kernel.org/patch/2122461/
 
-Please pull this in (unless you applied the individual patches instead).
+-Tested for playback and capture on Devkit8000.
 
-After this the ux500 compiles and boots just fine.
+ Test process:-
 
-Yours,
-Linus Walleij
+ #amixer set 'PredriveR Mixer AudioR2' on
+ #amixer set 'PredriveL Mixer AudioL2' on
+ #amixer set PreDriv 100 unmute
+ #amixer set 'DAC2 Digital Fine' 100
+ #amixer cset numid=27 1
+ #arecord | aplay
 
+:100644 100644 dc59272... 1e2c931... M	arch/arm/boot/dts/omap3-devkit8000.dts
+ arch/arm/boot/dts/omap3-devkit8000.dts |   43 ++++++++++++++++++++++++++++---
+ 1 files changed, 38 insertions(+), 5 deletions(-)
 
-The following changes since commit 7a4f26097d389c16c9956bc03b81532698d97d64:
-
-  ARM: ux500: de-globalize <mach/id.h> (2013-01-29 18:47:37 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/for-arm-soc-cleanup
-
-for you to fetch changes up to 05ec260edecaf3dc214cff49d43b1ad9b2cbb710:
-
-  mfd: db8500-prcmu: update resource passing (2013-02-12 12:44:27 +0100)
-
-----------------------------------------------------------------
-Two fixes for broken <mach/id.h> cleanup.
-
-----------------------------------------------------------------
-Linus Walleij (2):
-      drivers/db8500-cpufreq: delete dangling include
-      mfd: db8500-prcmu: update resource passing
-
- arch/arm/mach-ux500/board-mop500.c   |   5 +-
- arch/arm/mach-ux500/cpu-db8500.c     |   7 +-
- arch/arm/mach-ux500/devices-db8500.c |  44 +++++++++++++
- arch/arm/mach-ux500/devices-db8500.h |   5 ++
- drivers/cpufreq/db8500-cpufreq.c     |   1 -
- drivers/mfd/db8500-prcmu.c           | 122 +++++++++++++++++++++++------------
- include/linux/mfd/db8500-prcmu.h     |  14 ----
- include/linux/mfd/dbx500-prcmu.h     |  46 +++++++++++++
- 8 files changed, 180 insertions(+), 64 deletions(-)
+diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+index dc59272..1e2c931 100644
+--- a/arch/arm/boot/dts/omap3-devkit8000.dts
++++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+@@ -44,11 +44,27 @@
+                 };
+ 
+ 	};
++
++	sound {
++		compatible = "ti,omap-twl4030";
++		ti,model = "devkit8000";
++
++		ti,mcbsp = <&mcbsp2>;
++		ti,codec = <&twl_audio>;
++		ti,audio-routing =
++			"Ext Spk", "PREDRIVEL",
++			"Ext Spk", "PREDRIVER",
++			"MAINMIC", "Main Mic",
++			"Main Mic", "Mic Bias 1";
++	};
+ };
+ 
+ &omap3_pmx_core {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&i2c1_pins>;
++	pinctrl-0 = <
++			&i2c1_pins
++			&mcbsp2_pins
++		>;
+ 
+ 	leds_pins: pinmux_led_pins {
+ 		pinctrl-single,pins = <
+@@ -65,6 +81,21 @@
+ 			0x18c 0x118	/* I2C1_SDA */
+                 >;
+ 	};
++
++	mcbsp2_pins: pinmux_mcbsp2_pins {
++                pinctrl-single,pins = <
++			/*
++			 * MCBSP2_FSX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT,
++			 * MCBSP2_CLKX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT
++			 */
++			0x10c 0x01000100
++			/*
++			 * MCBSP2_DR, OMAP_MUX_MODE0 | OMAP_PIN_INPUT,
++			 * MCBSP2_DX, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT
++			 */
++			0x110 0x00000100
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -74,6 +105,12 @@
+ 		reg = <0x48>;
+ 		interrupts = <7>;	/* SYS_NIRQ cascaded to intc */
+ 		interrupt-parent = <&intc>;
++
++		twl_audio: audio {
++			compatible = "ti,twl4030-audio";
++			codec {
++			};
++		};
+ 	};
+ };
+ 
+@@ -109,10 +146,6 @@
+ 	status = "disabled";
+ };
+ 
+-&mcbsp2 {
+-	status = "disabled";
+-};
+-
+ &mcbsp3 {
+ 	status = "disabled";
+ };
+-- 
+1.7.0.4
