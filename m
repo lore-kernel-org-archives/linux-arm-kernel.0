@@ -1,63 +1,43 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 13 Feb 2013 13:22:28 +0100
-Subject: [PATCH v8 5/7] watchdog: s3c2410_wdt: add timeout-sec property binding
+Date: Wed, 13 Feb 2013 13:22:30 +0100
+Subject: [PATCH v8 7/7] watchdog: orion_wdt: move the min_timeout
+ initialization
 In-Reply-To: <1360758150-23004-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1360758150-23004-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1360758150-23004-6-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1360758150-23004-8-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Move the min_timeout initialization inside the orion_wdt definition.
 
 Only compile tested.
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 ---
- Documentation/devicetree/bindings/watchdog/samsung-wdt.txt | 3 +++
- drivers/watchdog/s3c2410_wdt.c                             | 6 ++++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
+ drivers/watchdog/orion_wdt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt b/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
-index 79ead82..451127a 100644
---- a/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
-@@ -9,3 +9,6 @@ Required properties:
- - reg : base physical address of the controller and length of memory mapped
- 	region.
- - interrupts : interrupt number to the cpu.
-+
-+Optional properties:
-+- timeout-sec : contains the watchdog timeout in seconds.
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index 6419c61..c1a221c 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -53,7 +53,7 @@
- #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
- 
- static bool nowayout	= WATCHDOG_NOWAYOUT;
--static int tmr_margin	= CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME;
-+static int tmr_margin;
- static int tmr_atboot	= CONFIG_S3C2410_WATCHDOG_ATBOOT;
- static int soft_noboot;
- static int debug;
-@@ -226,6 +226,7 @@ static struct watchdog_ops s3c2410wdt_ops = {
- static struct watchdog_device s3c2410_wdd = {
- 	.info = &s3c2410_wdt_ident,
- 	.ops = &s3c2410wdt_ops,
-+	.timeout = CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME,
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 3022a38..da57798 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -140,6 +140,7 @@ static const struct watchdog_ops orion_wdt_ops = {
+ static struct watchdog_device orion_wdt = {
+ 	.info = &orion_wdt_info,
+ 	.ops = &orion_wdt_ops,
++	.min_timeout = 1,
  };
  
- /* interrupt handler code */
-@@ -356,7 +357,8 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
- 	/* see if we can actually set the requested timer margin, and if
- 	 * not, try the default value */
+ static int orion_wdt_probe(struct platform_device *pdev)
+@@ -164,7 +165,6 @@ static int orion_wdt_probe(struct platform_device *pdev)
  
--	if (s3c2410wdt_set_heartbeat(&s3c2410_wdd, tmr_margin)) {
-+	watchdog_init_timeout(&s3c2410_wdd, tmr_margin,  &pdev->dev);
-+	if (s3c2410wdt_set_heartbeat(&s3c2410_wdd, s3c2410_wdd.timeout)) {
- 		started = s3c2410wdt_set_heartbeat(&s3c2410_wdd,
- 					CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME);
+ 	wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
  
+-	orion_wdt.min_timeout = 1;
+ 	orion_wdt.timeout = wdt_max_duration;
+ 	orion_wdt.max_timeout = wdt_max_duration;
+ 	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
 -- 
 1.8.1.1
