@@ -1,47 +1,31 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 13 Feb 2013 15:22:18 +0100
-Subject: zynq drivers/clocksource (was: Re: [GIT PULL] arm-soc: Xilinx zynq
- timer changes for v3.9)
-Message-ID: <CAHTX3dJftmsMvK1BMupZMfz7bmTBvsUq37fZaC=vd8yanYEasw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 Feb 2013 14:21:24 +0000
+Subject: [PATCH 1/3] i2c: mxs: support non-dma mapable buffers
+In-Reply-To: <1360763336-1931-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
+References: <1360763336-1931-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
+Message-ID: <20130213142124.GB17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Feb 13, 2013 at 02:48:56PM +0100, Enrico Scholz wrote:
+> diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+> index d6abaf2..c995393 100644
+> --- a/drivers/i2c/busses/i2c-mxs.c
+> +++ b/drivers/i2c/busses/i2c-mxs.c
+> @@ -139,6 +139,13 @@ struct mxs_i2c_dev {
+>  	uint32_t			addr_data;
+>  	struct scatterlist		sg_io[2];
+>  	bool				dma_read;
+> +
+> +	/*
+> +	 * internal buffer for handling non-dma mapable buffers; when message
+> +	 * exceeds the (arbitrary) size of '8', a buffer will be kmalloc()'ed
+> +	 * instead of using this attribute
+> +	 */
+> +	unsigned char			xfer_buf[8];
 
-here is origin comment from Arnd.
-
-> Please have a look at the contents of the timer/cleanup and clocksource/cleanup
-> branches in arm-soc, and merge them into your branch. If everything still
-> works, you can add a patch on top of the merge to move your driver to
-> drivers/clocksource and use the new infrastructure introduced there.
-
-based on Arnd request I have looked at moving zynq timer code to the
-new infrastructure
-in drivers/clocksource. I have done some investigation and I am not quite
-sure if I understand the design correctly.
-
-I have looked at vt8500, tegra20 and bcm2835 drivers in arm-soc/for-next branch
-and all of them use the same pattern with expectation that only
-one timer with the same compatible property is available in the system.
-
-I have done some tests on zynq and the problem is with calling
-of_find_matching_node(NULL, .._match); which will always return the same
-device_node which end up with faults later when you try to request the same
-irq.
-
-Is there any limitation/expectation that only one clocksource driver
-should be probed?
-
-Also not sure if make sense to add of_find_matching_node for architectures
-which select CONFIG_OF or USE_OF when we can pass device_node directly from
-of_find_matching_node().
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+Beware.  Remember that DMA cache maintanence operates on a granularity of
+a cache line, and make sure that you're not going to be upset should the
+cache line be read by accessing the other members of this struct.  It's
+probably altogether safer if you kmalloc this buffer separately at driver
+init time, and make it an "unsigned char *xfer_buf".
