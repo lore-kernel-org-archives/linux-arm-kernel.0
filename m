@@ -1,60 +1,49 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 13 Feb 2013 11:27:56 +0000
-Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
-In-Reply-To: <alpine.LFD.2.03.1302121646380.1242@fluxnic.net>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
- <20130209120525.GD17833@n2100.arm.linux.org.uk>
- <51194381.9030505@codethink.co.uk>
- <alpine.LFD.2.03.1302121646380.1242@fluxnic.net>
-Message-ID: <511B78BC.7000708@codethink.co.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 13 Feb 2013 12:28:05 +0100
+Subject: [GIT PULL] at91: more DT changes related to MTD for 3.9
+Message-ID: <511B78C5.5030209@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/13 21:53, Nicolas Pitre wrote:
-> On Mon, 11 Feb 2013, Ben Dooks wrote:
->
->> On 09/02/13 12:05, Russell King - ARM Linux wrote:
->>> On Fri, Feb 08, 2013 at 11:17:40PM +0000, Ben Dooks wrote:
->>>> -	if (atag->hdr.tag != ATAG_CORE ||
->>>> -	    (atag->hdr.size != tag_size(tag_core)&&
->>>> -	     atag->hdr.size != 2))
->>>> +	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
->>>> +	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core))&&
->>>> +	     atag->hdr.size != atag32_to_cpu(2)))
->>>
->>> This is wrong.  You're saying that "ATAG_CORE" is in LE32 format.  It
->>> isn't.  It's in CPU endian format.  If you want to do this kind of thing,
->>> you also need to define cpu_to_atag32() macros as well, otherwise this
->>> will cause sparse warnings.
->>>
->>>> -			initrd_start = atag->u.initrd.start;
->>>> -			initrd_size = atag->u.initrd.size;
->>>> +			initrd_start = atag32_to_cpu(atag->u.initrd.start);
->>>> +			initrd_size = atag32_to_cpu(____atag->u.initrd.size);
->>>
->>> Where did those four underscores come from?  Has this been built?
->>
->> I probably missed building this one. I've been mostly testing with DT
->> based systems.
->
-> Is this BE8 mode available on old systems?  Or, will those BE8
-> capable old systems have BE userland compiled for them?
+Hi Olof, Arnd,
 
-BE8 is for ARMv6 and ARMv7 form of big endian. ARMv5 is BE32.
+I would like you to consider this little pull request for modification of some
+AT91 Device Tree files.
+We have had a discussion about this material earlier and now that Artem has queued
+the driver modifications for MTD, I would like to know if it is possible to
+add these two patches in your late/dt branch?
 
-> Where I want to get to is: do we need to support BE8 mode for ATAG based
-> systems at all, given that most if not all the modern ones should be DT
-> based now?  Making the ATAG code BE8 aware is looking to be quite
-> invasive for potentially no users at all.
+The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
 
-The change is only useful when using a BE8 compiled kernel with a
-boot loader environment that is LE. Even if the ATAGs do not need
-fixing up, then we have a issue with uboot checking the zImage magic.
+  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
 
-I have pushed the ATAGs issues to a new series as it is not necessary
-for the current work we are doing with highbank primarily.
+are available in the git repository at:
 
+  git://github.com/at91linux/linux-at91.git tags/at91-dt-late
+
+for you to fetch changes up to c18c6b29e0d8aa6a14ae0f254c5e7abe41a01745:
+
+  ARM: at91: at91sam9n12: add DT parameters to enable PMECC (2013-02-07 16:45:06 +0100)
+
+----------------------------------------------------------------
+More DT modifications for AT91. Now that I am sure that
+the drivers modification are picked-up by MTD.
+Changes the use ECC to hardware ECC (named PMECC) for
+SoCs that are using it and their associated Evaluation Kits:
+- at91sam9x5-ek
+- at91sam9n12-ek
+
+----------------------------------------------------------------
+Josh Wu (2):
+      ARM: at91: at91sam9x5: add DT parameters to enable PMECC
+      ARM: at91: at91sam9n12: add DT parameters to enable PMECC
+
+ arch/arm/boot/dts/at91sam9n12.dtsi  | 3 ++-
+ arch/arm/boot/dts/at91sam9n12ek.dts | 5 ++++-
+ arch/arm/boot/dts/at91sam9x5.dtsi   | 4 ++++
+ arch/arm/boot/dts/at91sam9x5cm.dtsi | 5 ++++-
+ 4 files changed, 14 insertions(+), 3 deletions(-)
+
+Thanks, best regards,
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Nicolas Ferre
