@@ -1,45 +1,42 @@
-From: amit.virdi@st.com (Amit Virdi)
-Date: Wed, 13 Feb 2013 14:48:50 +0530
-Subject: ARM/Kernel: Problems with multiple VIC registration
-In-Reply-To: <CACRpkdZ4y8o6q1djRpg_VAxn-YY1AHG2BKR1aoAOfo0Ru2Vkwg@mail.gmail.com>
-References: <5110D55F.9040509@st.com>
- <CACRpkdZX4OyfYbcc2-sdf5LLJmBrGTa27_8swvcZ-rBP6-+1CQ@mail.gmail.com>
- <5111D387.9040803@st.com>
- <CACRpkdYMwijN_eE11wH-PxVazutfszBFni31_UX3PaFDcSeoUQ@mail.gmail.com>
- <511A37CC.8030600@st.com>
- <CACRpkdZ4y8o6q1djRpg_VAxn-YY1AHG2BKR1aoAOfo0Ru2Vkwg@mail.gmail.com>
-Message-ID: <511B5A7A.1050201@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Feb 2013 09:18:56 +0000
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130213004118.GB1052@obsidianresearch.com>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302122259.54073.arnd@arndb.de>
+ <20130213004118.GB1052@obsidianresearch.com>
+Message-ID: <201302130918.56909.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/12/2013 6:41 PM, Linus Walleij wrote:
-> On Tue, Feb 12, 2013 at 1:38 PM, Amit Virdi<amit.virdi@st.com>  wrote:
->> On 2/6/2013 2:45 PM, Linus Walleij wrote:
->
->>> There are several things you can do wrong. For example a common mistake
->>> is to offset the IRQs on a new platform from zero. So that the first
->>> parameter to vic_init() is zero. This is not legal because Linux IRQ 0
->>> is NO_IRQ and shall not be used. If this is your problems, IRQs shall
->>> offset from something like 64 so you can even use SPARSE_IRQ.
->>
->> Yes, I was using 0 as the first offset in IRQs and my IRQs were defined from
->> 0 to n. I changed it to 1 to n+1 and I'm now not using 0. Every problem
->> seems to have resolved now.
->
-> 1 and n+1 is only going to work as long as you're defining
-> NR_IRQS in the platform or in the .nr_irqs member of
-> the MACHINE record.
->
-> If you use device tree or SPARSE_IRQ (which, by the way,
-> you should turn on right now) you will run into trouble.
->
-> Bump it to 64+n.
->
-> Else you will just have to fix all this when you get to
-> submitting board support upstream.
->
+On Wednesday 13 February 2013, Jason Gunthorpe wrote:
+> , Arnd Bergmann wrote:
+>  
+> > b) drivers/bus/<something>
+> > This would make a lot more sense if we followed the scheme I explained
+> > in my discussion to Jason Gunthorpe, where we basically treat this
+> > bus as a parent node in the device tree for anything that can get remapped.
+> > Without that change, it feels a little misplaced
+> 
+> Also, FWIW, recall this related discussion and other possible DT
+> binding:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg219992.html
+> 
+> drivers/bus/orion-mbus.c feels like the right option, but when I
+> looked at it, getting the DT binding, and full dynamicness setup
+> seemed like it would be best done after non-DT support was purged, and
+> that is somewhat contigent on getting the irqchip and timer stuff
+> sorted (see my first attempt at that):
+> 
+> https://patchwork.kernel.org/patch/1852011/
+> 
+> Guess it depends where you want to draw the line on cleanups before
+> something can be accepted..
 
-Okay, thanks for your support!!
+I guess as long as we agree on where we are headed with the
+address translation, it's ok to just move the code now and
+change the code later. I would like to be strict about the
+include path stuff though.
 
-Regards
-Amit Virdi
+	Arnd
