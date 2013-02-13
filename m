@@ -1,26 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Feb 2013 14:36:32 +0100
-Subject: [PATCH v2 00/13] drivers: mailbox: framework creation
-In-Reply-To: <1360645032-9668-1-git-send-email-s-anna@ti.com>
-References: <1360645032-9668-1-git-send-email-s-anna@ti.com>
-Message-ID: <CACRpkdZayg-X11ZRnh2Z0i+egBn8Fhwya-6_Yr8wcv+6s0CVqQ@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 13 Feb 2013 22:46:28 +0900
+Subject: [PATCH 00/06] ARM: shmobile: SMP Cortex-A9 SCU rework
+Message-ID: <20130213134628.12153.47120.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 5:56 AM, Suman Anna <s-anna@ti.com> wrote:
+ARM: shmobile: SMP Cortex-A9 SCU rework
 
-> I have hosted the series at [3].
-> [3] https://github.com/sumananna/mailbox/commits/dbx500-prcmu-mailbox
+[PATCH 01/06] ARM: shmobile: Kill off sh73a0 scu_base_addr() function
+[PATCH 02/06] ARM: shmobile: Kill off r8a7779 scu_base_addr() function
+[PATCH 03/06] ARM: shmobile: Rework EMEV2 scu_base variable
+[PATCH 04/06] ARM: shmobile: Move headsmp-sh73a0.S to headsmp-scu.S
+[PATCH 05/06] ARM: shmobile: Common shmobile_scu_base in headsmp-scu.S
+[PATCH 06/06] ARM: shmobile: Update EMEV2 to use scu_power_mode()
 
-Suman, I suggest you ask Stepgen Rothwell to include this
-branch into the linux-next tree, so we can get some
-rotation of this stuff in preparation for the v3.10 merge
-window. (It's not going in now anyway.)
+Rework the EMEV2 SMP code to make use of common scu_power_mode()
+code together with a shared shmobile_scu_base and early SCU
+setup code in headsmp-scu.S.
 
-If it proves to survive some smoke testing there, I suggest
-we proceed to pull this into the ARM SoC tree early in
-the v3.10 kernel cycle, since all the dependencies will be
-in ARM SoC anyway.
+The patches are known to build for sh73a0, r8a7779 and EMEV2.
 
-Yours,
-Linus Walleij
+Note that the code has only been tested on the KZM9D/EMEV2 board,
+and because of that changes to other boards have been kept at
+a minimum. Next target after this is to update the r8a7779 SMP/SCU
+code to make use of scu_base_addr(), but that requires hardware
+access for testing.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ No known dependencies apart from previous SMP cleanup series
+ "[PATCH 00/06] ARM: shmobile: Trivial SMP cleanups"
+ Written against -next in renesas.git.
+
+ arch/arm/mach-shmobile/Makefile              |    6 +-
+ arch/arm/mach-shmobile/headsmp-scu.S         |   58 +++++++++++++++++++++++++
+ arch/arm/mach-shmobile/headsmp-sh73a0.S      |   50 ----------------------
+ arch/arm/mach-shmobile/include/mach/common.h |    3 -
+ arch/arm/mach-shmobile/smp-emev2.c           |   59 +++++++-------------------
+ arch/arm/mach-shmobile/smp-r8a7779.c         |   19 +++-----
+ arch/arm/mach-shmobile/smp-sh73a0.c          |   26 +++++------
+ 7 files changed, 98 insertions(+), 123 deletions(-)
