@@ -1,93 +1,48 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 13 Feb 2013 17:03:28 +0100
-Subject: [PATCH 07/21] ARM: shmobile: kzm9g: reference: Register pinctrl
- mappings for I2C
-In-Reply-To: <1360723497-23266-8-git-send-email-horms+renesas@verge.net.au>
-References: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
- <1360723497-23266-8-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <3631209.BKvXQoUfHr@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Feb 2013 17:03:22 +0100
+Subject: ARM big-endian on current kernels for linux-3.8
+In-Reply-To: <20130213155220.GC12685@arm.com>
+References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
+ <511B768B.7000302@codethink.co.uk> <20130213155220.GC12685@arm.com>
+Message-ID: <4862574.qhIZki9ZKx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Wednesday 13 February 2013 15:52:20 Catalin Marinas wrote:
+> 
+> I had an (insane) idea once but no time to pursue. You can enable the
+> 'compat' layer for a 32-bit ARM kernel and define all the compat_* types
+> to be the same as the native ones. The compat layer has several handlers
+> for syscalls which pretty much do the conversion between compat and
+> native structures. The compat structures are read/written from/to user
+> using get_user/put_user on each member. You then need change the ARM
+> get_user/put_user code to test a new TIF_BE flag and do a 'rev' on the
+> data. At this point the native kernel structures would have the correct
+> little endianness.
+> 
+> I reckon the above would cover 70-80% of the syscalls. You need to chase
+> other syscalls and update the binfmt_elf.c to cope with BE ELF files.
+> Probably there are other issues as well.
 
-Thanks you for the patch.
+ioctl will be the biggest one by far. You would have to add compat
+handlers for every device driver and a lot of other things like
+network protocols.
 
-On Wednesday 13 February 2013 11:44:43 Simon Horman wrote:
-> Replace the GPIO-based I2C pinmux configuration by pinctrl mappings.
-> 
-> This change is for the kzm9g reference DT implementation and
-> is in keeping with a similar change for the default kzm9g implementation
-> made by Laurent Pinchart.
-> 
-> This change also adds a sh73a0_pinmux_init() call to kzm_init()
-> which was previously missing as it was not needed (or at least not
-> needed in practice) for the minimal board configuration supplied
-> by the reference DT implementation. The call to sh73a0_pinmux_init()
-> will be removed by a subsequent patch to initialise pinmus using
-> device tree.
-> 
-> Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/board-kzm9g-reference.c |   12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-> b/arch/arm/mach-shmobile/board-kzm9g-reference.c index 6a1222e..642bb7b
-> 100644
-> --- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-> +++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-> @@ -26,12 +26,18 @@
->  #include <linux/irq.h>
->  #include <linux/input.h>
->  #include <linux/of_platform.h>
-> +#include <linux/pinctrl/machine.h>
->  #include <mach/sh73a0.h>
->  #include <mach/common.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> 
-> +static const struct pinctrl_map kzm_pinctrl_map[] = {
-> +	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
-> +				  "i2c3_1", "i2c3"),
-> +};
-> +
->  static void __init kzm_init(void)
->  {
->  	/* enable SCIFA4 */
-> @@ -52,16 +58,14 @@ static void __init kzm_init(void)
->  	gpio_request(GPIO_FN_MMCD0_6_PU,	NULL);
->  	gpio_request(GPIO_FN_MMCD0_7_PU,	NULL);
-> 
-> -	/* I2C 3 */
-> -	gpio_request(GPIO_FN_PORT27_I2C_SCL3, NULL);
-> -	gpio_request(GPIO_FN_PORT28_I2C_SDA3, NULL);
-> -
->  #ifdef CONFIG_CACHE_L2X0
->  	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
->  	l2x0_init(IOMEM(0xf0100000), 0x40460000, 0x82000fff);
->  #endif
-> 
-> +	sh73a0_pinmux_init();
+Doable in theory, but also much more work than the 32 bit emulation
+on 64 bit kernels, and that was something that took a lot of work
+to get right.
 
-You should initialize pinmuxing before using any of the GPIO functions, so 
-this call should be moved near the top of kzm_init().
+However, qemu-user already has a mostly syscall emulation layer
+including ioctl that covers most of the common stuff, certainly
+enough to run most applications. The missing piece there is switching
+to native other-endian execution instead of interpreting the
+instructions. You might need to run the task in a separate process
+though and use ptrace to trap all system calls.
 
->  	sh73a0_add_standard_devices_dt();
-> +	pinctrl_register_mappings(kzm_pinctrl_map, ARRAY_SIZE(kzm_pinctrl_map));
+The part you cannot solve this way is IPC: any data that is shared
+between processes needs to match, and the only sane solution for that
+is probably to run a separate container for all the big-endian
+processes, and not let that talk to any of the little-endian tasks
+using things like AF_UNIX sockets or shared mmap.
 
-You should register mappings before initializing pinmuxing, otherwise the 
-default configurations won't be applied as they won't be registered when the 
-PFC device is registered. This call should thus be moved before the 
-sh73a0_pinmux_init() call.
-
->  }
-> 
->  static void kzm9g_restart(char mode, const char *cmd)
--- 
-Regards,
-
-Laurent Pinchart
+	Arnd
