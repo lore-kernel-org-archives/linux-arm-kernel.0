@@ -1,31 +1,94 @@
 From: girishks2000@gmail.com (Girish K S)
-Date: Wed, 13 Feb 2013 11:25:26 -0800
-Subject: [PATCH V2 0/5]  Add polling support for 64xx spi controller
-Message-ID: <1360783531-32654-1-git-send-email-ks.giri@samsung.com>
+Date: Wed, 13 Feb 2013 11:25:27 -0800
+Subject: [PATCH V2 1/5] spi: s3c64xx: modified error interrupt handling and
+ init
+In-Reply-To: <1360783531-32654-1-git-send-email-ks.giri@samsung.com>
+References: <1360783531-32654-1-git-send-email-ks.giri@samsung.com>
+Message-ID: <1360783531-32654-2-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[PATCH 1/5]: fixes the error handling in the interrupt handler
-[PATCH 2/5]: The existing driver support partial polling mode.
-	     This patch modifies the current driver to support
-	     only polling mode.
-[PATCH 3/5]: provision to support SoC's with dedicated i/o pins
-[PATCH 4/5]: provision to support dedicated cs pin
-[PATCH 5/5]: support exynos5440 SoC in polling mode
+The status of the interrupt is available in the status register,
+so reading the clear pending register and writing back the same
+value will not actually clear the pending interrupts. This patch
+modifies the interrupt handler to read the status register and
+clear the corresponding pending bit in the clear pending register.
 
-Tested this patch on exynos5250 in dma mode, and exynos5440 in
-polling mode.
+Modified the hwInit function to clear all the pending interrupts.
 
-Girish K S (5):
-  spi: s3c64xx: modified error interrupt handling and init
-  spi: s3c64xx: added support for polling mode
-  spi: s3c64xx: Added provision for non-gpio i/o's
-  spi: s3c64xx: Added provision for dedicated cs pin
-  spi: s3c64xx: Added support for exynos5440 spi
+Signed-off-by: Girish K S <ks.giri@samsung.com>
+---
+changes in v2:
+		Modified the interrupt handler to clear the pending
+		register after setting to value 1.
 
- drivers/spi/spi-s3c64xx.c                 |  216 ++++++++++++++++++++---------
- include/linux/platform_data/spi-s3c64xx.h |    3 +
- 2 files changed, 155 insertions(+), 64 deletions(-)
+ drivers/spi/spi-s3c64xx.c |   41 +++++++++++++++++++++++++----------------
+ 1 file changed, 25 insertions(+), 16 deletions(-)
 
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 8f492ed..6eba24e 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -996,25 +996,30 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
+ {
+ 	struct s3c64xx_spi_driver_data *sdd = data;
+ 	struct spi_master *spi = sdd->master;
+-	unsigned int val;
++	unsigned int val, clr = 0;
+ 
+-	val = readl(sdd->regs + S3C64XX_SPI_PENDING_CLR);
++	val = readl(sdd->regs + S3C64XX_SPI_STATUS);
+ 
+-	val &= S3C64XX_SPI_PND_RX_OVERRUN_CLR |
+-		S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
+-		S3C64XX_SPI_PND_TX_OVERRUN_CLR |
+-		S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+-
+-	writel(val, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+-
+-	if (val & S3C64XX_SPI_PND_RX_OVERRUN_CLR)
++	if (val & S3C64XX_SPI_ST_RX_OVERRUN_ERR) {
++		clr = S3C64XX_SPI_PND_RX_OVERRUN_CLR;
+ 		dev_err(&spi->dev, "RX overrun\n");
+-	if (val & S3C64XX_SPI_PND_RX_UNDERRUN_CLR)
++	}
++	if (val & S3C64XX_SPI_ST_RX_UNDERRUN_ERR) {
++		clr |= S3C64XX_SPI_PND_RX_UNDERRUN_CLR;
+ 		dev_err(&spi->dev, "RX underrun\n");
+-	if (val & S3C64XX_SPI_PND_TX_OVERRUN_CLR)
++	}
++	if (val & S3C64XX_SPI_ST_TX_OVERRUN_ERR) {
++		clr |= S3C64XX_SPI_PND_TX_OVERRUN_CLR;
+ 		dev_err(&spi->dev, "TX overrun\n");
+-	if (val & S3C64XX_SPI_PND_TX_UNDERRUN_CLR)
++	}
++	if (val & S3C64XX_SPI_ST_TX_UNDERRUN_ERR) {
++		clr |= S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
+ 		dev_err(&spi->dev, "TX underrun\n");
++	}
++
++	/* Clear the pending irq by setting and then clearing it */
++	writel(clr, sdd->regs + S3C64XX_SPI_PENDING_CLR);
++	writel(0, sdd->regs + S3C64XX_SPI_PENDING_CLR);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -1038,9 +1043,13 @@ static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd, int channel)
+ 	writel(0, regs + S3C64XX_SPI_MODE_CFG);
+ 	writel(0, regs + S3C64XX_SPI_PACKET_CNT);
+ 
+-	/* Clear any irq pending bits */
+-	writel(readl(regs + S3C64XX_SPI_PENDING_CLR),
+-				regs + S3C64XX_SPI_PENDING_CLR);
++	/* Clear any irq pending bits, should set and clear the bits */
++	val = S3C64XX_SPI_PND_RX_OVERRUN_CLR |
++		S3C64XX_SPI_PND_RX_UNDERRUN_CLR |
++		S3C64XX_SPI_PND_TX_OVERRUN_CLR |
++		S3C64XX_SPI_PND_TX_UNDERRUN_CLR;
++	writel(val, regs + S3C64XX_SPI_PENDING_CLR);
++	writel(0, regs + S3C64XX_SPI_PENDING_CLR);
+ 
+ 	writel(0, regs + S3C64XX_SPI_SWAP_CFG);
+ 
 -- 
 1.7.10.4
