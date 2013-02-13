@@ -1,90 +1,58 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 13 Feb 2013 10:06:51 -0600
-Subject: [PATCH 3/5] arm: dts: omap4-panda: Add I2c pinctrl data
-In-Reply-To: <511BB7CE.1020505@ti.com>
-References: <1360747710-1532-1-git-send-email-sourav.poddar@ti.com>
- <511BB7CE.1020505@ti.com>
-Message-ID: <511BBA1B.9050501@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 14 Feb 2013 01:21:06 +0900
+Subject: [PATCH 00/16 v1.1] SCIF, I2C and FSI pinctrl functions for sh73a0
+In-Reply-To: <1911001.oocnvCx2VX@avalon>
+References: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
+ <1911001.oocnvCx2VX@avalon>
+Message-ID: <20130213162106.GB10520@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 13, 2013 at 05:06:30PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Wednesday 13 February 2013 11:44:36 Simon Horman wrote:
+> > Hi,
+> > 
+> > this series is a follow-up to "[PATCH 00/16] SCIF, I2C and FSI pinctrl
+> > functions for sh73a0" by Laurent Pinchart. I am primarily posting it for
+> > his review.
+> > 
+> > This series differs from the series posted by Laurent in the following ways:
+> > 
+> > * Due to some slightly over-zelous git use on my part the series
+> >   is actually based on a checkout of
+> >   git://linuxtv.org/pinchartl/fbdev.git pinmux-pfc-funcs
+> > 
+> >   As such it includes several patches not included in the series posted in
+> >   via eimal as the series "[PATCH 00/16] SCIF, I2C and FSI pinctrl
+> >   functions for sh73a0". In particular it includes r8a7740 and r8a7779
+> >   patches.
+> > 
+> > * I have added the following two patches to update the KZM9G rerence code.
+> > 
+> >   ARM: shmobile: kzm9g: reference: Register pinctrl mappings for I2C
+> >   ARM: shmobile: kzm9g: reference: Register pinctrl mappings for SCIF
+> > 
+> > As implied by the second point above, this series is based on
+> > a branch that includes the kzm9g reference code. That branch is
+> > 
+> > 	git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
+> > topic/pinmux-base
+> 
+> When do you plan to push that reference code to mainline ?
 
-On 02/13/2013 09:57 AM, Jon Hunter wrote:
-> 
-> On 02/13/2013 03:28 AM, Sourav Poddar wrote:
->> Booting 3.8-rc6 on omap4 panda results in the following error
->>
->> [    0.444427] omap_i2c 48070000.i2c: did not get pins for i2c error: -19
->> [    0.445770] omap_i2c 48070000.i2c: bus 0 rev0.11 at 400 kHz
->> [    0.473937] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
->> [    0.474670] omap_i2c 48072000.i2c: bus 1 rev0.11 at 400 kHz
->> [    0.474822] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
->> [    0.476379] omap_i2c 48060000.i2c: bus 2 rev0.11 at 100 kHz
->> [    0.477294] omap_i2c 48350000.i2c: did not get pins for i2c error: -19
->> [    0.477996] omap_i2c 48350000.i2c: bus 3 rev0.11 at 400 kHz
->> [    0.483398] Switching to clocksource 32k_counter
->>
->> This happens because omap4 panda dts file is not adapted to use i2c through
->> pinctrl framework. Populating i2c pinctrl data to get rid of the error.
-> 
-> What about the panda-es and panda-a4?
-> 
->> Tested on omap4460 panda with 3.8-rc6 kernel.
->>
->> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
->> Reported-by: Luciano Coelho <coelho@ti.com>
->> ---
->>  arch/arm/boot/dts/omap4-panda.dts |   40 +++++++++++++++++++++++++++++++++++++
->>  1 files changed, 40 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
->> index 4122efe..f951e6b 100644
->> --- a/arch/arm/boot/dts/omap4-panda.dts
->> +++ b/arch/arm/boot/dts/omap4-panda.dts
->> @@ -110,9 +110,40 @@
->>  			0x58 0x10b	/* hdmi_hpd.gpio_63 INPUT PULLDOWN | MODE3 */
->>  		>;
->>  	};
->> +
->> +	i2c1_pins: pinmux_i2c1_pins {
->> +		pinctrl-single,pins = <
->> +			0xe2 0x118        /* i2c1_scl PULLUP | INPUTENABLE | MODE0 */
->> +			0xe4 0x118        /* i2c1_sda PULLUP | INPUTENABLE | MODE0 */
->> +		>;
->> +	};
->> +
->> +	i2c2_pins: pinmux_i2c2_pins {
->> +		pinctrl-single,pins = <
->> +			0xe6 0x118        /* i2c2_scl PULLUP | INPUTENABLE | MODE0 */
->> +			0xe8 0x118        /* i2c2_sda PULLUP | INPUTENABLE | MODE0 */
->> +		>;
->> +	};
->> +
->> +	i2c3_pins: pinmux_i2c3_pins {
->> +		pinctrl-single,pins = <
->> +			0xea 0x118        /* i2c3_scl PULLUP | INPUTENABLE | MODE0 */
->> +			0xec 0x118     /* i2c3_sda PULLUP | INPUTENABLE | MODE0 */
->> +		>;
->> +	};
->> +
->> +	i2c4_pins: pinmux_i2c4_pins {
->> +		pinctrl-single,pins = <
->> +			0xee 0x118        /* i2c4_scl PULLUP | INPUTENABLE | MODE0 */
->> +			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
->> +		>;
->> +	};
->>  };
-> 
-> A quick look at the data manual shows that omap4430 and omap4460 has the
-> same pin mux options for i2c. Furthermore, the data manual shows only
-> one mux option for i2c1-4. Therefore, should these mux options be placed
-> in omap4.dtsi? Boards not using specific i2c controllers can disabled
-> them in there board dts file (same way we do for mmc).
+As soon as I start pushing stuff for v3.10.
+So I am thinking in terms of before pinmux.
+But the order can be changed if need be.
 
-I guess for i2c, a given omap4 board may use external pull-ups and not
-use the internal ones and so putting this in the omap4.dtsi may not be
-desirable. However, it seems that a common omap4-panda.dtsi could be
-used here.
+> > Git and diffstat information is provided below to aid review.
+> > 
+> > Laurent, if you want to change this series in any way just let me know.
+> > I can drop patches indidually or drop the entire series and add a fresh
+> > one from you to the topic branch.
+> 
+> I will likely provide you with a new branch. Can you handle the two kzm9g-
+> reference patches, or should I include them in my branch ?
 
-Cheers
-Jon
+I can handle the kzm9g-reference patches if you prefer.
