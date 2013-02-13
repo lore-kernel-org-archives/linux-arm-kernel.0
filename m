@@ -1,45 +1,33 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Feb 2013 14:33:12 -0700
-Subject: [PATCH 3/9] ARM: dt: create a DT header for the GIC
+Date: Wed, 13 Feb 2013 14:33:13 -0700
+Subject: [PATCH 4/9] ARM: tegra: device tree whitespace cleanup
 In-Reply-To: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
 References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1360791198-29462-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1360791198-29462-5-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-The ARM GIC binding defines a few custom cells and flags for its IRQ
-specifier. Provide names for those.
+Remove white-space from empty line; triggers checkpatch.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/arm-gic.h |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 arch/arm/boot/dts/arm-gic.h
+ arch/arm/boot/dts/tegra20.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/arm-gic.h b/arch/arm/boot/dts/arm-gic.h
-new file mode 100644
-index 0000000..5b1bc85
---- /dev/null
-+++ b/arch/arm/boot/dts/arm-gic.h
-@@ -0,0 +1,17 @@
-+/*
-+ * This header provides constants for the ARM GIC.
-+ */
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index cdb8da0..f3c7681 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -207,7 +207,7 @@
+ 		compatible = "nvidia,tegra20-das";
+ 		reg = <0x70000c00 0x80>;
+ 	};
+-	
 +
-+#include "irq.h"
-+
-+/* interrupt specific cell 0 */
-+
-+#define GIC_SPI 0
-+#define GIC_PPI 1
-+
-+/*
-+ * Interrupt specifier cell 2.
-+ * The flaggs in irq.h are valid, plus those below.
-+ */
-+#define GIC_CPU_MASK_RAW(x) ((x) << 8)
-+#define GIC_CPU_MASK_SIMPLE(num) GIC_CPU_MASK_RAW((1 << (num)) - 1)
+ 	tegra_ac97: ac97 {
+ 		compatible = "nvidia,tegra20-ac97";
+ 		reg = <0x70002000 0x200>;
 -- 
 1.7.10.4
