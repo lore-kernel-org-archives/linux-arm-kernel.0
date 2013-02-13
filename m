@@ -1,51 +1,53 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 12 Feb 2013 20:56:36 -0800
-Subject: [PATCH] ARM: S3C24XX: remove plat-samsung/irq.h
-References: <201302122042.32471.heiko@sntech.de>
-Message-ID: <1df801ce09a6$81ce38c0$856aaa40$@samsung.com>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Wed, 13 Feb 2013 04:59:17 +0000
+Subject: [PATCH] ARM: OMAP: Clock: Remove CK_* flags
+In-Reply-To: <alpine.DEB.2.00.1302122028480.29149@utopia.booyaka.com>
+References: <1359966525-7603-1-git-send-email-j-keerthy@ti.com>
+ <alpine.DEB.2.00.1302080248550.8539@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B92FF@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302081805450.28008@utopia.booyaka.com>
+ <alpine.DEB.2.00.1302081855370.28008@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B966E@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302111538430.8260@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B989B@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302120638580.14983@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B98DD@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302122028480.29149@utopia.booyaka.com>
+Message-ID: <DC88CAD03C0052499C1907B327FC63229BAB0B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+
+
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Wednesday, February 13, 2013 2:19 AM
+> To: J, KEERTHY
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH] ARM: OMAP: Clock: Remove CK_* flags
 > 
-> Heiko St?bner wrote:
-> >
-> > plat-samsung/irq.h did only contain functions for handling the spread
-> > out subirqs on s3c24xx arches, which are not needed anymore.
-> >
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > Sorry for bringing this separate submission, but I just remembered it
-> > this evening.
-> >
-> > This applies on top of all the other s3c24xx irq changes and I think
-> > this patch will mark the end of the irq-cleanup for now.
-> >
-> >  arch/arm/mach-s3c24xx/irq-pm.c           |    7 ++-
-> >  arch/arm/mach-s3c24xx/irq.c              |    8 +--
-> >  arch/arm/plat-samsung/include/plat/irq.h |  116
-> > ------------------------------
-> >  3 files changed, 9 insertions(+), 122 deletions(-)  delete mode
-> > 100644 arch/arm/plat-samsung/include/plat/irq.h
-> >
-> Applied, thanks :-)
+> On Tue, 12 Feb 2013, J, KEERTHY wrote:
 > 
-Just note, happens following error:
+> > Heh :-). It narrowed down to this patch:
+> >
+> > commit 17b7e7d33530e2bbd3bdc90f4db09b91cfdde2bb
+> > Author: Paul Walmsley <paul@pwsan.com>
+> > Date:   Sat Jan 26 00:48:54 2013 -0700
+> >
+> >     ARM: OMAP4: clock/hwmod data: start to remove some IP block
+> control "clocks"
+> 
+> Thanks, this fixes it:
+> 
+> http://marc.info/?l=linux-omap&m=136070089529743&w=2
+> 
+Ok. Cool.
 
-arch/arm/mach-s3c24xx/bast-irq.c:37:22: fatal error: plat/irq.h: No such file or directory
-compilation terminated.
-...
-make[2]: *** [arch/arm/mach-s3c24xx/bast-irq.o] Error 1
-make[2]: *** Waiting for unfinished jobs....
-  CC      crypto/testmgr.o
-  CC      lib/bsearch.o
-  AS      arch/arm/lib/memcpy.o
-  AS      arch/arm/lib/memmove.o
-make[1]: *** [arch/arm/mach-s3c24xx] Error 2
-make[1]: *** Waiting for unfinished jobs....
+> But at this point, I've rescheduled your patch to the 3.10-cleanup time
+> frame, since we're pretty close to the 3.9 merge window.
+>
 
-I fixed when I applied.
+So the patch needs to be rebased after 3.9 right?
 
-Thanks.
-
-- Kukjin
+> 
+> - Paul
