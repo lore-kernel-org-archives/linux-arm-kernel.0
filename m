@@ -1,150 +1,68 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 13 Feb 2013 10:55:21 +0000
-Subject: [PATCH 3/9] ARM: asm: Add ARM_BE8() assembly helper
+Date: Wed, 13 Feb 2013 10:55:25 +0000
+Subject: [PATCH 7/9] ARM: smp_scu: data endian fixes
 In-Reply-To: <1360752927-29331-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360752927-29331-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360752927-29331-4-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360752927-29331-8-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARM_BE8() helper to wrap any code conditional on being
-compile when CONFIG_ARM_ENDIAN_BE8 is selected and convert
-existing places where this is to use it.
+The smp_scu driver needs to use the relaxed readl/write accessors
+to avoid any issues with the endian mode the processor core is in.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-
-Conflicts:
-	arch/arm/include/asm/assembler.h
 ---
- arch/arm/boot/compressed/head.S  |    8 ++------
- arch/arm/include/asm/assembler.h |    7 +++++++
- arch/arm/kernel/entry-armv.S     |    5 ++---
- arch/arm/kernel/entry-common.S   |    4 +---
- arch/arm/mm/abort-ev6.S          |    5 ++---
- arch/arm/mm/proc-v6.S            |    4 +---
- arch/arm/mm/proc-v7.S            |    4 +---
- 7 files changed, 16 insertions(+), 21 deletions(-)
+ arch/arm/kernel/smp_scu.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index fe4d9c3..15ebdd6 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -678,9 +678,7 @@ __armv4_mmu_cache_on:
- 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
- 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
- 		orr	r0, r0, #0x0030
--#ifdef CONFIG_CPU_ENDIAN_BE8
--		orr	r0, r0, #1 << 25	@ big-endian page tables
--#endif
-+ ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
- 		bl	__common_mmu_cache_on
- 		mov	r0, #0
- 		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
-@@ -707,9 +705,7 @@ __armv7_mmu_cache_on:
- 		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
- 						@ (needed for ARM1176)
- #ifdef CONFIG_MMU
--#ifdef CONFIG_CPU_ENDIAN_BE8
--		orr	r0, r0, #1 << 25	@ big-endian page tables
--#endif
-+ ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
- 		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
- 		orrne	r0, r0, #1		@ MMU enabled
- 		movne	r1, #0xfffffffd		@ domain 0 = client
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index eb87200..dbcbd08 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -53,6 +53,13 @@
- #define put_byte_3      lsl #0
- #endif
- 
-+/* Select code for any configuration running in BE8 mode */
-+#ifdef CONFIG_ARM_CPU_ENDIAN_BE8
-+#define ARM_BE8(code...) code
-+#else
-+#define ARM_BE8(code...)
-+#endif
-+
- /*
-  * Data preload for architectures that support it
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 45eac87..0fcd0ce 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -28,7 +28,7 @@
   */
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 0f82098..291d295 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -457,9 +457,8 @@ __und_usr:
- 	bne	__und_usr_thumb
- 	sub	r4, r2, #4			@ ARM instr@LR - 4
- 1:	ldrt	r0, [r4]
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	rev	r0, r0				@ little endian instruction
--#endif
-+ ARM_BE8(rev	r0, r0)				@ little endian instruction
-+
- 	@ r0 = 32-bit ARM instruction which caused the exception
- 	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
- 	@ r4 = PC value for the faulting instruction
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index a6c301e..d5988afc 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -368,9 +368,7 @@ ENTRY(vector_swi)
- #else
- 	ldr	r10, [lr, #-4]			@ get SWI instruction
- #endif
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	rev	r10, r10			@ little endian instruction
--#endif
-+ ARM_BE8(rev	r10, r10)			@ little endian instruction
+ unsigned int __init scu_get_core_count(void __iomem *scu_base)
+ {
+-	unsigned int ncores = __raw_readl(scu_base + SCU_CONFIG);
++	unsigned int ncores = readl_relaxed(scu_base + SCU_CONFIG);
+ 	return (ncores & 0x03) + 1;
+ }
  
- #elif defined(CONFIG_AEABI)
- 
-diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
-index 8074199..3815a82 100644
---- a/arch/arm/mm/abort-ev6.S
-+++ b/arch/arm/mm/abort-ev6.S
-@@ -38,9 +38,8 @@ ENTRY(v6_early_abort)
- 	bne	do_DataAbort
- 	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
- 	ldr	r3, [r4]			@ read aborted ARM instruction
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	rev	r3, r3
--#endif
-+ ARM_BE8(rev	r3, r3)
-+
- 	do_ldrd_abort tmp=ip, insn=r3
- 	tst	r3, #1 << 20			@ L = 0 -> write
- 	orreq	r1, r1, #1 << 11		@ yes.
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index bcaaa8d..2f060fa 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -220,9 +220,7 @@ __v6_setup:
- #endif /* CONFIG_MMU */
- 	adr	r5, v6_crval
- 	ldmia	r5, {r5, r6}
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	orr	r6, r6, #1 << 25		@ big-endian page tables
--#endif
-+ ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
- 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
- 	bic	r0, r0, r5			@ clear bits them
- 	orr	r0, r0, r6			@ set them
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3a3c015..d17996b 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -328,9 +328,7 @@ __v7_setup:
+@@ -42,19 +42,19 @@ void scu_enable(void __iomem *scu_base)
+ #ifdef CONFIG_ARM_ERRATA_764369
+ 	/* Cortex-A9 only */
+ 	if ((read_cpuid(CPUID_ID) & 0xff0ffff0) == 0x410fc090) {
+-		scu_ctrl = __raw_readl(scu_base + 0x30);
++		scu_ctrl = readl_relaxed(scu_base + 0x30);
+ 		if (!(scu_ctrl & 1))
+-			__raw_writel(scu_ctrl | 0x1, scu_base + 0x30);
++			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
+ 	}
  #endif
- 	adr	r5, v7_crval
- 	ldmia	r5, {r5, r6}
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	orr	r6, r6, #1 << 25		@ big-endian page tables
--#endif
-+ ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
- #ifdef CONFIG_SWP_EMULATE
- 	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
- 	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
+ 
+-	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
++	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
+ 	/* already enabled? */
+ 	if (scu_ctrl & 1)
+ 		return;
+ 
+ 	scu_ctrl |= 1;
+-	__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
++	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+ 
+ 	/*
+ 	 * Ensure that the data accessed by CPU0 before the SCU was
+@@ -80,9 +80,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ 	if (mode > 3 || mode == 1 || cpu > 3)
+ 		return -EINVAL;
+ 
+-	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
++	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
+ 	val |= mode;
+-	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
++	writeb_relaxed(val, scu_base + SCU_CPU_STATUS + cpu);
+ 
+ 	return 0;
+ }
 -- 
 1.7.10.4
