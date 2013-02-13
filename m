@@ -1,67 +1,39 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 13 Feb 2013 18:35:58 +0100
-Subject: zynq drivers/clocksource (was: Re: [GIT PULL] arm-soc: Xilinx
- zynq timer changes for v3.9)
-In-Reply-To: <511BC199.8030907@wwwdotorg.org>
-References: <CAHTX3dJftmsMvK1BMupZMfz7bmTBvsUq37fZaC=vd8yanYEasw@mail.gmail.com>
- <511BC199.8030907@wwwdotorg.org>
-Message-ID: <CAHTX3d+Aw100TCX07-Pmafk-FAbYaf+m2aFoHiTPQabSsBTU9A@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 13 Feb 2013 10:02:11 -0800
+Subject: [PATCH v1 3/4] ARM: dts: Add sbs-battery for exynos5250-snow
+In-Reply-To: <1360778532-7480-1-git-send-email-dianders@chromium.org>
+References: <1360778532-7480-1-git-send-email-dianders@chromium.org>
+Message-ID: <1360778532-7480-3-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/2/13 Stephen Warren <swarren@wwwdotorg.org>:
-> On 02/13/2013 07:22 AM, Michal Simek wrote:
->> Hi,
->>
->> here is origin comment from Arnd.
->>
->>> Please have a look at the contents of the timer/cleanup and clocksource/cleanup
->>> branches in arm-soc, and merge them into your branch. If everything still
->>> works, you can add a patch on top of the merge to move your driver to
->>> drivers/clocksource and use the new infrastructure introduced there.
->>
->> based on Arnd request I have looked at moving zynq timer code to the
->> new infrastructure
->> in drivers/clocksource. I have done some investigation and I am not quite
->> sure if I understand the design correctly.
->>
->> I have looked at vt8500, tegra20 and bcm2835 drivers in arm-soc/for-next branch
->> and all of them use the same pattern with expectation that only
->> one timer with the same compatible property is available in the system.
->
-> Oh right. When we spoke on IRC, I was thinking of multiple different
-> types of clocksource driver, rather than multiple instances of the same
-> type. Yes, my original patches wouldn't work well with multiple
-> instances (DT nodes) with the same compatible property.
+Now that we have i2c-arbitrator in place on bus 4 we can add the
+sbs-battery driver.  Future devices will be added onto bus 4 once
+drivers are in good shape.
 
-yep I meant multiple instances of the same type but also multiple different
-types of clocksource should also work.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+Changes in v1: None
 
->> I have done some tests on zynq and the problem is with calling
->> of_find_matching_node(NULL, .._match); which will always return the same
->> device_node which end up with faults later when you try to request the same
->> irq.
->>
->> Is there any limitation/expectation that only one clocksource driver
->> should be probed?
->>
->> Also not sure if make sense to add of_find_matching_node for architectures
->> which select CONFIG_OF or USE_OF when we can pass device_node directly from
->> of_find_matching_node().
->
-> ... but Rob's patches that I mentioned should solve this multiple
-> instance issue, since they do indeed pass the found DT node into the
-> timer init function.
+ arch/arm/boot/dts/exynos5250-snow.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-yep. We are talking about it in the second thread.
-
-thanks for your help,
-Michal
-
-
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 69a87a0..b651958 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -50,6 +50,12 @@
+ 			reg = <0>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++
++			battery: sbs-battery at b {
++				compatible = "sbs,sbs-battery";
++				reg = <0xb>;
++				sbs,poll-retry-count = <1>;
++			};
+ 		};
+ 	};
+ 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+1.8.1
