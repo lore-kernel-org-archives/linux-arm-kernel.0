@@ -1,127 +1,51 @@
-From: inderpal.singh@linaro.org (Inderpal Singh)
-Date: Wed, 13 Feb 2013 10:07:50 +0530
-Subject: [PATCH] arm: plat-samsung: check soc ids before l2x0 cache
- restoration in resume
-In-Reply-To: <1d9501ce0956$f7ce4150$e76ac3f0$@samsung.com>
-References: <1358843109-11072-1-git-send-email-inderpal.singh@linaro.org>
- <1d9501ce0956$f7ce4150$e76ac3f0$@samsung.com>
-Message-ID: <CAG17yqQzFBJ94ZZ=oQP+ySOhZisDu6dPSo_o+crpR_PPZBCwsQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 12 Feb 2013 20:56:36 -0800
+Subject: [PATCH] ARM: S3C24XX: remove plat-samsung/irq.h
+References: <201302122042.32471.heiko@sntech.de>
+Message-ID: <1df801ce09a6$81ce38c0$856aaa40$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Kukjin Kim wrote:
+> 
+> Heiko St?bner wrote:
+> >
+> > plat-samsung/irq.h did only contain functions for handling the spread
+> > out subirqs on s3c24xx arches, which are not needed anymore.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > Sorry for bringing this separate submission, but I just remembered it
+> > this evening.
+> >
+> > This applies on top of all the other s3c24xx irq changes and I think
+> > this patch will mark the end of the irq-cleanup for now.
+> >
+> >  arch/arm/mach-s3c24xx/irq-pm.c           |    7 ++-
+> >  arch/arm/mach-s3c24xx/irq.c              |    8 +--
+> >  arch/arm/plat-samsung/include/plat/irq.h |  116
+> > ------------------------------
+> >  3 files changed, 9 insertions(+), 122 deletions(-)  delete mode
+> > 100644 arch/arm/plat-samsung/include/plat/irq.h
+> >
+> Applied, thanks :-)
+> 
+Just note, happens following error:
 
-Thanks for reviewing the patch.
+arch/arm/mach-s3c24xx/bast-irq.c:37:22: fatal error: plat/irq.h: No such file or directory
+compilation terminated.
+...
+make[2]: *** [arch/arm/mach-s3c24xx/bast-irq.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+  CC      crypto/testmgr.o
+  CC      lib/bsearch.o
+  AS      arch/arm/lib/memcpy.o
+  AS      arch/arm/lib/memmove.o
+make[1]: *** [arch/arm/mach-s3c24xx] Error 2
+make[1]: *** Waiting for unfinished jobs....
 
-On 13 February 2013 00:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Inderpal Singh wrote:
->>
->> Only exynos4 based platforms have l2x0 cache controller. Hence check
->> the same before restoring the cache in resume.
->>
-> I think, the code can determine by checking ARM main ID cp15 register
-> instead of Chip ID. Because if so, we don't need to do something for ahother
-> EXYNOS4 SoCs next time.
->
+I fixed when I applied.
 
-Good point.
-So the idea is that only cortex a9 based samsung platforms will have
-l2x0 cache controller. Hence I should only check if its cortex a9 or
-not from main ID reg.
-Please confirm.
+Thanks.
 
-Thanks,
-Inder
-
->> This is needed for single kernel image.
->>
->> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
->> ---
->>  arch/arm/mach-exynos/common.c           |    2 ++
->>  arch/arm/plat-samsung/include/plat/pm.h |    1 +
->>  arch/arm/plat-samsung/s5p-sleep.S       |   28
->> ++++++++++++++++++++++++++++
->>  3 files changed, 31 insertions(+)
->>
->> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-
->> exynos/common.c
->> index cdaa55f..ab7ca00 100644
->> --- a/arch/arm/mach-exynos/common.c
->> +++ b/arch/arm/mach-exynos/common.c
->> @@ -796,6 +796,8 @@ static int __init exynos4_l2x0_cache_init(void)
->>       if (soc_is_exynos5250() || soc_is_exynos5440())
->>               return 0;
->>
->> +     s5p_cpu = samsung_cpu_id & EXYNOS4_CPU_MASK;
->> +
->>       ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
->>       if (!ret) {
->>               l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
->> diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-
->> samsung/include/plat/pm.h
->> index 887a0c9..285c8c8 100644
->> --- a/arch/arm/plat-samsung/include/plat/pm.h
->> +++ b/arch/arm/plat-samsung/include/plat/pm.h
->> @@ -190,3 +190,4 @@ extern void samsung_pm_save_gpios(void);
->>
->>  extern void s3c_pm_save_core(void);
->>  extern void s3c_pm_restore_core(void);
->> +extern unsigned long s5p_cpu;
->> diff --git a/arch/arm/plat-samsung/s5p-sleep.S b/arch/arm/plat-
->> samsung/s5p-sleep.S
->> index bdf6dad..006d35f 100644
->> --- a/arch/arm/plat-samsung/s5p-sleep.S
->> +++ b/arch/arm/plat-samsung/s5p-sleep.S
->> @@ -25,6 +25,15 @@
->>  #include <asm/asm-offsets.h>
->>  #include <asm/hardware/cache-l2x0.h>
->>
->> +#define EXYNOS4210_CPU_ID    0x43210000
->> +#define EXYNOS4212_CPU_ID    0x43220000
->> +#define EXYNOS4412_CPU_ID    0xE4412200
->> +#define EXYNOS4_CPU_MASK     0xFFFE0000
->> +
->> +#define EXYNOS4210_CPU               (EXYNOS4210_CPU_ID &
->> EXYNOS4_CPU_MASK)
->> +#define EXYNOS4212_CPU               (EXYNOS4212_CPU_ID &
->> EXYNOS4_CPU_MASK)
->> +#define EXYNOS4412_CPU               (EXYNOS4412_CPU_ID &
->> EXYNOS4_CPU_MASK)
->> +
->>  /*
->>   *    The following code is located into the .data section. This is to
->>   *    allow l2x0_regs_phys to be accessed with a relative load while we
->> @@ -51,6 +60,22 @@
->>
->>  ENTRY(s3c_cpu_resume)
->>  #ifdef CONFIG_CACHE_L2X0
->> +     adr     r0, s5p_cpu
->> +     ldr     r1, [r0]
->> +
->> +     ldr     r0, =EXYNOS4210_CPU
->> +     cmp     r1, r0
->> +     beq     continue
->> +
->> +     ldr     r0, =EXYNOS4212_CPU
->> +     cmp     r1, r0
->> +     beq     continue
->> +
->> +     ldr     r0, =EXYNOS4412_CPU
->> +     cmp     r1, r0
->> +     bne     resume_l2on
->> +
->> +continue:
->>       adr     r0, l2x0_regs_phys
->>       ldr     r0, [r0]
->>       ldr     r1, [r0, #L2X0_R_PHY_BASE]
->> @@ -77,4 +102,7 @@ ENDPROC(s3c_cpu_resume)
->>       .globl l2x0_regs_phys
->>  l2x0_regs_phys:
->>       .long   0
->> +     .globl s5p_cpu
->> +s5p_cpu:
->> +     .long   0
->>  #endif
->> --
->> 1.7.9.5
->
+- Kukjin
