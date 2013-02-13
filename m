@@ -1,97 +1,90 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 13 Feb 2013 11:44:38 +0900
-Subject: [PATCH 02/21] ARM: shmobile: kota2: Register pinctrl mappings for SCIF
-In-Reply-To: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
-References: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360723497-23266-3-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 13 Feb 2013 11:44:36 +0900
+Subject: [PATCH 00/16 v1.1] SCIF, I2C and FSI pinctrl functions for sh73a0
+Message-ID: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi,
 
-Replace the GPIO-based SCIF pinmux configuration by pinctrl mappings.
+this series is a follow-up to "[PATCH 00/16] SCIF, I2C and FSI pinctrl
+functions for sh73a0" by Laurent Pinchart. I am primarily posting it for
+his review.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-kota2.c |   42 +++++++++++++++++++---------------
- 1 file changed, 23 insertions(+), 19 deletions(-)
+This series differs from the series posted by Laurent in the following ways:
 
-diff --git a/arch/arm/mach-shmobile/board-kota2.c b/arch/arm/mach-shmobile/board-kota2.c
-index 2ccc860..69dd9e6 100644
---- a/arch/arm/mach-shmobile/board-kota2.c
-+++ b/arch/arm/mach-shmobile/board-kota2.c
-@@ -24,6 +24,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/pinctrl/machine.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/io.h>
-@@ -433,6 +434,26 @@ static struct platform_device *kota2_devices[] __initdata = {
- 	&sdhi1_device,
- };
- 
-+static const struct pinctrl_map kota2_pinctrl_map[] = {
-+	/* SCIFA2 (UART2) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.2", "pfc-sh73a0",
-+				  "scifa2_data_0", "scifa2"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.2", "pfc-sh73a0",
-+				  "scifa2_ctrl_0", "scifa2"),
-+	/* SCIFA4 (UART1) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
-+				  "scifa4_data", "scifa4"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
-+				  "scifa4_ctrl", "scifa4"),
-+	/* SCIFB (BT) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.8", "pfc-sh73a0",
-+				  "scifb_data_0", "scifb"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.8", "pfc-sh73a0",
-+				  "scifb_clk_0", "scifb"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.8", "pfc-sh73a0",
-+				  "scifb_ctrl_0", "scifb"),
-+};
-+
- static void __init kota2_init(void)
- {
- 	regulator_register_always_on(0, "fixed-1.8V", fixed1v8_power_consumers,
-@@ -441,20 +462,10 @@ static void __init kota2_init(void)
- 				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
- 	regulator_register_fixed(2, dummy_supplies, ARRAY_SIZE(dummy_supplies));
- 
-+	pinctrl_register_mappings(kota2_pinctrl_map,
-+				  ARRAY_SIZE(kota2_pinctrl_map));
- 	sh73a0_pinmux_init();
- 
--	/* SCIFA2 (UART2) */
--	gpio_request(GPIO_FN_SCIFA2_TXD1, NULL);
--	gpio_request(GPIO_FN_SCIFA2_RXD1, NULL);
--	gpio_request(GPIO_FN_SCIFA2_RTS1_, NULL);
--	gpio_request(GPIO_FN_SCIFA2_CTS1_, NULL);
--
--	/* SCIFA4 (UART1) */
--	gpio_request(GPIO_FN_SCIFA4_TXD, NULL);
--	gpio_request(GPIO_FN_SCIFA4_RXD, NULL);
--	gpio_request(GPIO_FN_SCIFA4_RTS_, NULL);
--	gpio_request(GPIO_FN_SCIFA4_CTS_, NULL);
--
- 	/* SMSC911X */
- 	gpio_request(GPIO_FN_D0_NAF0, NULL);
- 	gpio_request(GPIO_FN_D1_NAF1, NULL);
-@@ -518,13 +529,6 @@ static void __init kota2_init(void)
- 	gpio_request(GPIO_FN_SDHID0_1_PU, NULL);
- 	gpio_request(GPIO_FN_SDHID0_0_PU, NULL);
- 
--	/* SCIFB (BT) */
--	gpio_request(GPIO_FN_PORT159_SCIFB_SCK, NULL);
--	gpio_request(GPIO_FN_PORT160_SCIFB_TXD, NULL);
--	gpio_request(GPIO_FN_PORT161_SCIFB_CTS_, NULL);
--	gpio_request(GPIO_FN_PORT162_SCIFB_RXD, NULL);
--	gpio_request(GPIO_FN_PORT163_SCIFB_RTS_, NULL);
--
- 	/* SDHI1 (BCM4330) */
- 	gpio_request(GPIO_FN_SDHICLK1, NULL);
- 	gpio_request(GPIO_FN_SDHICMD1_PU, NULL);
--- 
-1.7.10.4
+* Due to some slightly over-zelous git use on my part the series
+  is actually based on a checkout of
+  git://linuxtv.org/pinchartl/fbdev.git pinmux-pfc-funcs
+
+  As such it includes several patches not included in the series posted in
+  via eimal as the series "[PATCH 00/16] SCIF, I2C and FSI pinctrl
+  functions for sh73a0". In particular it includes r8a7740 and r8a7779
+  patches.
+
+* I have added the following two patches to update the KZM9G rerence code.
+
+  ARM: shmobile: kzm9g: reference: Register pinctrl mappings for I2C
+  ARM: shmobile: kzm9g: reference: Register pinctrl mappings for SCIF
+
+As implied by the second point above, this series is based on
+a branch that includes the kzm9g reference code. That branch is
+
+	git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/pinmux-base
+
+Git and diffstat information is provided below to aid review.
+
+Laurent, if you want to change this series in any way just let me know.
+I can drop patches indidually or drop the entire series and add a fresh
+one from you to the topic branch.
+
+----------------------------------------------------------------
+The following changes since commit e90f8429f06947f36693fbdc083fdab15c4164b9:
+
+  ARM: shmobile: armadillo800eva: Register pinctrl mappings for LCDC0 (2013-02-13 09:15:37 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/pinmux-pfc-funcs
+
+for you to fetch changes up to da8ef3c2e6aee4da048e37c4e7a52439e6928379:
+
+  ARM: shmobile: r8a7779: Remove DU function GPIOs (2013-02-13 10:06:59 +0900)
+
+----------------------------------------------------------------
+Laurent Pinchart (19):
+      ARM: shmobile: bonito: Register pinctrl mappings for LCDC0
+      ARM: shmobile: kota2: Register pinctrl mappings for SCIF
+      ARM: shmobile: kzm9g: Register pinctrl mappings for LCD
+      ARM: shmobile: kzm9g: Register pinctrl mappings for SCIF
+      ARM: shmobile: kzm9g: Register pinctrl mappings for I2C
+      ARM: shmobile: kzm9g: Register pinctrl mappings for FSI
+      sh-pfc: sh73a0: Remove LCD and LCD2 function GPIOS
+      sh-pfc: sh73a0: Remove SCIFA and SCIFB function GPIOS
+      sh-pfc: sh73a0: Remove I2C function GPIOS
+      sh-pfc: sh73a0: Remove FSI function GPIOS
+      sh-pfc: r8a7740: Remove LCD0 and LCD1 function GPIOS
+      sh-pfc: r8a7779: Remove DU1_DOTCLKOUT1 GPIO
+      ARM: shmobile: sh73a0: Remove LCDC and LCDC2 function GPIOs
+      ARM: shmobile: sh73a0: Remove SCIFA and SCIFB function GPIOs
+      ARM: shmobile: sh73a0: Remove I2C function GPIOs
+      ARM: shmobile: sh73a0: Remove FSI function GPIOs
+      ARM: shmobile: r8a7740: Remove LCD0 and LCD1 function GPIOs
+      ARM: shmobile: r8a7779: Remove DU1_DOTCLKOUT1 GPIO
+      ARM: shmobile: r8a7779: Remove DU function GPIOs
+
+Simon Horman (2):
+      ARM: shmobile: kzm9g: reference: Register pinctrl mappings for I2C
+      ARM: shmobile: kzm9g: reference: Register pinctrl mappings for SCIF
+
+ arch/arm/mach-shmobile/board-bonito.c          |   43 ++---
+ arch/arm/mach-shmobile/board-kota2.c           |   42 +++--
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |   22 ++-
+ arch/arm/mach-shmobile/board-kzm9g.c           |   68 +++----
+ arch/arm/mach-shmobile/include/mach/r8a7740.h  |   39 ----
+ arch/arm/mach-shmobile/include/mach/r8a7779.h  |   90 ++++-----
+ arch/arm/mach-shmobile/include/mach/sh73a0.h   |  237 ++++++++++--------------
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c           |   37 ----
+ drivers/pinctrl/sh-pfc/pfc-r8a7779.c           |    9 +-
+ drivers/pinctrl/sh-pfc/pfc-sh73a0.c            |  182 ------------------
+ 10 files changed, 217 insertions(+), 552 deletions(-)
