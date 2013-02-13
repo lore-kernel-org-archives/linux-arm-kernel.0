@@ -1,63 +1,11 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Feb 2013 12:43:03 +0000
-Subject: [PATCH v2 3/4] mtd: devices: elm: Low power transition support
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EA7491C@DBDE01.ent.ti.com>
-References: <1360240618-11094-1-git-send-email-avinashphilip@ti.com>
- <1360240618-11094-4-git-send-email-avinashphilip@ti.com>
- <20130209102243.GH17852@n2100.arm.linux.org.uk>
- <518397C60809E147AF5323E0420B992E3EA7491C@DBDE01.ent.ti.com>
-Message-ID: <20130213124303.GM17852@n2100.arm.linux.org.uk>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 13 Feb 2013 22:11:40 +0900
+Subject: [PATCH 0/3 v2] ARM: mach-shmobile: defconfig REGULATOR settings
+Message-ID: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 11:42:01AM +0000, Philip, Avinash wrote:
-> On Sat, Feb 09, 2013 at 15:52:44, Russell King - ARM Linux wrote:
-> > On Thu, Feb 07, 2013 at 06:06:57PM +0530, Philip Avinash wrote:
-> > > +static int elm_suspend(struct device *dev)
-> > > +{
-> > > +	struct elm_info *info = dev_get_drvdata(dev);
-> > > +	wait_queue_head_t wq;
-> > > +	DECLARE_WAITQUEUE(wait, current);
-> > > +
-> > > +	init_waitqueue_head(&wq);
-> > > +	while (1) {
-> > > +		/* Make sure that ELM not running */
-> > > +		if (info->idle) {
-> > > +			add_wait_queue(&wq, &wait);
-> > > +			schedule();
-> > > +			remove_wait_queue(&wq, &wait);
-> > > +		} else {
-> > > +			break;
-> > > +		}
-> > > +	}
-> > 
-> > The above code looks really wrong - it will just spin endlessly with the
-> > waitqueues doing nothing useful.  What are you trying to do here?
-> 
-> The intention of waitqeue is to make the suspend process really wait till
-> the ELM module finishes current activity. Although this type of protection
-> already achieved in mtd layer using nand_suspend(), this one is particularly
-> required for ELM module to really make sure that *any pending* corrections to
-> finish really before gone to suspend.
-
-I don't think you understand what's going on with the above, and why the
-above is completely ineffective.
-
-1. Your wait queue head is declared on stack, and there's no references
-   to it outside of this function.  So _nothing_ can activate the wait
-   queue.
-2. You're not changing the current thread's status away from TASK_RUNNING,
-   so schedule() will either return immediately or it will schedule another
-   task if it's time for this one to be preempted.
-
-In other words, the above can be rewritten as:
-
-	while (info->idle)
-		schedule();
-
-and it will still have the same effect.
-
-Now, if you want to be kinder to the system, then you should use a
-wait queue properly.  Put the waitqueue head in struct elm_info.  Use
-wait_event() here.  And call wake_up() where you set info->idle to
-false.
+* Enable REGULATOR for mackerel and armadillo800eva as
+  it will be needed for MMCIF to function.
+* Do not enable REGULATOR_DUMMY for kzm9g,
+  it is only intended to be used for development and testing.
