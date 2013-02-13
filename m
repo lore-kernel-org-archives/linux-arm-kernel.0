@@ -1,89 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 13 Feb 2013 10:40:51 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <201302130929.21326.arnd@arndb.de>
-References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302122259.54073.arnd@arndb.de> <20130213092358.4991ba43@skate>
- <201302130929.21326.arnd@arndb.de>
-Message-ID: <20130213104051.07bcffe0@skate>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 13 Feb 2013 18:45:50 +0900
+Subject: [PATCH] ARM: shmobile: marzen: Include mmc/host.h
+Message-ID: <1360748750-11911-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+mmc/host.h provides MMC_CAP_SD_HIGHSPEED which is used in board-marzen.c
 
-On Wed, 13 Feb 2013 09:29:21 +0000, Arnd Bergmann wrote:
+This resolves a build problem observed when compiling with
+"mmc: tmio: remove unused and deprecated symbols" applied.
 
-> > Hum, why not, but I would definitely prefer to wait for the conversion
-> > of older platforms instead of duplicating this code. But if you feel
-> > like it's the right solution, I'll do it.
-> 
-> It's not something we do a lot, but in this case, I think it's better
-> if it lets us avoid adding the platform specific include path, which I
-> really want to avoid here.
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-marzen.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Ok.
-
-> > The arch/arm/mach-mvebu/addr-map.c depends on
-> > arch/arm/plat-orion/addr-map.c, so any change on this will affect
-> > mach-kirkwood, mach-orion5x, mach-dove and mach-mv78xx0. As you can
-> > see, we have to take into account the existing code, and I don't think
-> > it's realistic to have a perfect solution immediately.
-> 
-> Yes, I realize this. I was thinking we would move all at least the
-> file from plat-orion, and the header file. I don't care much whether
-> we also move the platform specific setup from mach-*/addr-map.c,
-> it works either way.
-
-Ok.
-
-
-> We don't need to do a complete overhaul of that code right now, but
-> if we agree on a place where it can go, then I think we should
-> move it now as just one extra patch to get rid of the header
-> dependency. In the worst case, moving just the header file to
-> include/linux would work, too.
-
-I'll try to cook something for this.
-
-> > Indeed. So maybe I should mark this resource as being IORESOURCE_MEM
-> > in the DT.
-> 
-> The DT seems fine here, just the code that interprets it is a little
-> unusual. Maybe you can change the calling convention of that function
-> to pass the type of resource you want as an argument?
-
-Erm? The type of the resource is encoded into the DT:
-
-+				  0x81000000 0 0	  0xc0000000 0 0x00010000   /* downstream I/O */
-+				  0x82000000 0 0	  0xc1000000 0 0x08000000>; /* non-prefetchable memory */
-
->From http://devicetree.org/Device_Tree_Usage#PCI_Host_Bridge:
-
-     phys.hi cell: npt000ss bbbbbbbb dddddfff rrrrrrrr
-    phys.mid cell: hhhhhhhh hhhhhhhh hhhhhhhh hhhhhhhh
-    phys.low cell: llllllll llllllll llllllll llllllll 
-
- ss: space code
-
-    00: configuration space
-    01: I/O space
-    10: 32 bit memory space
-    11: 64 bit memory space 
-
-So the 0x81 at the beginning of the first line means I/O space, the
-0x82 at the beginning of the second line means 32 bits memory space.
-The of_pci_process_ranges() function simply decodes those informations
-and fills the struct resource it returns with the appropriate resource
-type.
-
-So passing the resource type as argument to of_pci_process_ranges()
-doesn't make much sense to me.
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index 0020506..3b3554a 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -32,6 +32,7 @@
+ #include <linux/smsc911x.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/sh_hspi.h>
++#include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/mfd/tmio.h>
+ #include <linux/usb/otg.h>
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
