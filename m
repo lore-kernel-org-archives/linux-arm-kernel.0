@@ -1,14 +1,20 @@
 From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Wed, 13 Feb 2013 18:22:00 +0100
+Date: Wed, 13 Feb 2013 18:30:39 +0100
 Subject: [PATCH] ARM: net: bpf_jit: fix emit_swap16() for non ARMv6+.
-Message-ID: <1360776125-14542-1-git-send-email-nschichan@freebox.fr>
+In-Reply-To: <1360776125-14542-1-git-send-email-nschichan@freebox.fr>
+References: <1360776125-14542-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <1360776645-14726-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The original code was generating an lsl instructions using the value
 of ARM_R8 (skb_headlen, possibly uninitialized if no skb_headlen
 access was required) as a shift amount.
+
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
 ---
+Resent due to missing Signed-off-by
+
  arch/arm/net/bpf_jit_32.c |   15 +++++++++++----
  1 file changed, 11 insertions(+), 4 deletions(-)
 
