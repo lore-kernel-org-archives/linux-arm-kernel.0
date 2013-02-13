@@ -1,104 +1,70 @@
 From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Wed, 13 Feb 2013 14:58:30 +0530
-Subject: [PATCH 3/5] arm: dts: omap4-panda: Add I2c pinctrl data
-Message-ID: <1360747710-1532-1-git-send-email-sourav.poddar@ti.com>
+Date: Wed, 13 Feb 2013 14:58:36 +0530
+Subject: [PATCH 4/5] arm: dts: omap5: add SPI devices to OMAP5 DeviceTree file
+Message-ID: <1360747716-1565-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Booting 3.8-rc6 on omap4 panda results in the following error
+From: Felipe Balbi <balbi@ti.com>
 
-[    0.444427] omap_i2c 48070000.i2c: did not get pins for i2c error: -19
-[    0.445770] omap_i2c 48070000.i2c: bus 0 rev0.11 at 400 kHz
-[    0.473937] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
-[    0.474670] omap_i2c 48072000.i2c: bus 1 rev0.11 at 400 kHz
-[    0.474822] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
-[    0.476379] omap_i2c 48060000.i2c: bus 2 rev0.11 at 100 kHz
-[    0.477294] omap_i2c 48350000.i2c: did not get pins for i2c error: -19
-[    0.477996] omap_i2c 48350000.i2c: bus 3 rev0.11 at 400 kHz
-[    0.483398] Switching to clocksource 32k_counter
+Add all 4 mcspi instances to omap5.dtsi file.
 
-This happens because omap4 panda dts file is not adapted to use i2c through
-pinctrl framework. Populating i2c pinctrl data to get rid of the error.
-
-Tested on omap4460 panda with 3.8-rc6 kernel.
-
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-Reported-by: Luciano Coelho <coelho@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda.dts |   40 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap5.dtsi |   40 ++++++++++++++++++++++++++++++++++++++++
  1 files changed, 40 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 4122efe..f951e6b 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -110,9 +110,40 @@
- 			0x58 0x10b	/* hdmi_hpd.gpio_63 INPUT PULLDOWN | MODE3 */
- 		>;
- 	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			0xe2 0x118        /* i2c1_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xe4 0x118        /* i2c1_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
-+
-+	i2c2_pins: pinmux_i2c2_pins {
-+		pinctrl-single,pins = <
-+			0xe6 0x118        /* i2c2_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xe8 0x118        /* i2c2_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
-+
-+	i2c3_pins: pinmux_i2c3_pins {
-+		pinctrl-single,pins = <
-+			0xea 0x118        /* i2c3_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xec 0x118     /* i2c3_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
-+
-+	i2c4_pins: pinmux_i2c4_pins {
-+		pinctrl-single,pins = <
-+			0xee 0x118        /* i2c4_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
- };
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 790bb2a..9e182a9 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -241,6 +241,46 @@
+ 			ti,hwmods = "i2c5";
+ 		};
  
- &i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
++		mcspi1: spi at 48098000 {
++			compatible = "ti,omap4-mcspi";
++			reg = <0x48098000 0x200>;
++			interrupts = <0 65 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi1";
++			ti,spi-num-cs = <4>;
++		};
 +
- 	clock-frequency = <400000>;
- 
- 	twl: twl at 48 {
-@@ -139,10 +170,16 @@
- /include/ "twl6030.dtsi"
- 
- &i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
++		mcspi2: spi at 4809a000 {
++			compatible = "ti,omap4-mcspi";
++			reg = <0x4809a000 0x200>;
++			interrupts = <0 66 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi2";
++			ti,spi-num-cs = <2>;
++		};
 +
- 	clock-frequency = <400000>;
- };
- 
- &i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins>;
++		mcspi3: spi at 480b8000 {
++			compatible = "ti,omap4-mcspi";
++			reg = <0x480b8000 0x200>;
++			interrupts = <0 91 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi3";
++			ti,spi-num-cs = <2>;
++		};
 +
- 	clock-frequency = <100000>;
- 
- 	/*
-@@ -156,6 +193,9 @@
- };
- 
- &i2c4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c4_pins>;
++		mcspi4: spi at 480ba000 {
++			compatible = "ti,omap4-mcspi";
++			reg = <0x480ba000 0x200>;
++			interrupts = <0 48 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi4";
++			ti,spi-num-cs = <1>;
++		};
 +
- 	clock-frequency = <400000>;
- };
- 
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806a000 0x100>;
 -- 
 1.7.1
