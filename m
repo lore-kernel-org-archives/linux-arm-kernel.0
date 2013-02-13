@@ -1,42 +1,46 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 12 Feb 2013 21:29:01 -0800
-Subject: [PATCH V3] ARM: EXYNOS: Add clocks for EXYNOS I2S and PCM I/F
-In-Reply-To: <011201ce05db$82ae97e0$880bc7a0$@samsung.com>
-References: <011201ce05db$82ae97e0$880bc7a0$@samsung.com>
-Message-ID: <1e0c01ce09ab$09600b70$1c202250$@samsung.com>
+Date: Tue, 12 Feb 2013 21:33:01 -0800
+Subject: [PATCH v6 05/12] iommu/exynos: support for device tree
+In-Reply-To: <CAHQjnOP1U=LRU-fe-HuWzp=17s=KG8zPvSO3_zeVrrviEkmyHw@mail.gmail.com>
+References: <003801cde30b$d9667b90$8c3372b0$%cho@samsung.com>
+ <50E1E62B.3090501@gmail.com>
+ <CAHQjnOMav9A43m4=7=N9kzEHTHE_q_ygu8x6mzY6Cus=q0c06A@mail.gmail.com>
+ <20130201135114.GF25591@8bytes.org>
+ <CAHQjnOP1U=LRU-fe-HuWzp=17s=KG8zPvSO3_zeVrrviEkmyHw@mail.gmail.com>
+Message-ID: <1e0d01ce09ab$98eed690$cacc83b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sangsu Park wrote:
+KyongHo Cho wrote:
 > 
-> Audio Subsystem has own clocks for I2S0 and PCM0 in all EXYNOS series.
-> This patch add clocks for I2S0 and PCM0 I/F.
+> On Fri, Feb 1, 2013 at 10:51 PM, Joerg Roedel <joro@8bytes.org> wrote:
+> > Cho,
+> >
+> > On Wed, Jan 02, 2013 at 02:53:49PM +0900, KyongHo Cho wrote:
+> >> On Tuesday, January 1, 2013, Sylwester Nawrocki
+> <sylvester.nawrocki@gmail.com>
+> >
+> >> > Cc: devicetree-discuss at lists.ozlabs.org
+> >
+> > Since patch 7 of this set is already merged, do you mind to re-post the
+> > rest of this patch-set with the latest comments addressed? I can have a
+> > look at it again then and consider it for 3.9.
+> >
+> Thank you for your considerations.
 > 
-> Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/Makefile      |    1 +
->  arch/arm/mach-exynos/clock-audss.c |   68
-> ++++++++++++++++++++++++++++++++++++
->  2 files changed, 69 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-exynos/clock-audss.c
+> I also think that I need to post the patch set again with some fixes that
+are
+> addressed in the comments.
 > 
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-
-> exynos/Makefile
-> index 7e53a3a..5b6c7c0 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -13,6 +13,7 @@ obj-				:=
->  # Core
+> Due to the heavy workload in my business I have hardly had a chance to
+> handle this patch-set.
+> As soon as the business lets me handle other pending issues, I will
+> work on this patchset.
+> I think I can start to it in the next 2 weeks.
 > 
->  obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
-> +obj-$(CONFIG_ARCH_EXYNOS)	+= clock-audss.o
+OK, I see.
 
-Sorry for late response.
-
-Basically, this should be implemented with common clock stuff but its
-posting was delayed due to some reason :-( I think, you can see the patches
-from Thomas P Abraham soon, so please re-work this based on that. If any
-updates, let you know.
+Joerg, please hold this on until KyongHo's re-work, probably 3.10?
 
 Thanks.
 
