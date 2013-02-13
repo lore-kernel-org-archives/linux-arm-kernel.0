@@ -1,20 +1,45 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 13 Feb 2013 13:36:03 -0500 (EST)
-Subject: [PATCH] net/macb: fix race with RX interrupt while doing NAPI
-In-Reply-To: <1360663728-10296-1-git-send-email-nicolas.ferre@atmel.com>
-References: <50D2D7BD.3030801@erwinrol.com>
- <1360663728-10296-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130213.133603.392678696679169085.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Feb 2013 10:39:31 -0800
+Subject: [PATCH v8 06/12] pinctrl: single: create new gpio function range
+In-Reply-To: <1360602659-4774-7-git-send-email-haojian.zhuang@linaro.org>
+References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
+ <1360602659-4774-7-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130213183931.GL7144@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Tue, 12 Feb 2013 11:08:48 +0100
+* Haojian Zhuang <haojian.zhuang@linaro.org> [130211 09:15]:
+> Since gpio driver could create gpio range in DTS, it could invokes
+> pinctrl_request_gpio(). In the pinctrl-single driver, it needs to
+> configure pins with gpio function mode.
 
-> When interrupts are disabled, an RX condition can occur but
-> it is not reported when enabling interrupts again. We need to check
-> RSR and use napi_reschedule() if condition is met.
+Minor typo above: s/invokes/invoke/
+ 
+> A new gpio function range should be created in DTS file in below.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> pinctrl-single,gpio-range = <phandle pin_offset nr_pins gpio_func>;
+> 
+> range: gpio-range {
+> 	#pinctrl-single,gpio-range-cells = <3>;
+> };
+> 
+> The gpio-ranges property is used in gpio driver and the
+> pinctrl-single,gpio-range property is used in pinctrl-single driver.
+> 
+> 1. gpio-ranges = <phandle gpio_offset_in_chip pin_offset nr_pins>
+> 	gpio-ranges = < &pmx0 0 89 1 &pmx0 1 89 1 &pmx0 2 90 1
+> 			&pmx0 3 90 1 &pmx0 4 91 1 &pmx0 5 92 1>;
 
-Applied.
+I think the second gpio-ranges above should be really
+pinctr-single,gpio-range instead of gpio-ranges?
+ 
+> 2. gpio driver could get pin offset from gpio-ranges property.
+>    pinctrl-single driver could get gpio function mode from gpio_func
+>    that is stored in @gpiofuncs list in struct pcs_device.
+>    This new pinctrl-single,gpio-range is used as complement for
+>    gpio-ranges property in gpio driver.
+
+Other than that looks OK to me. Assuming the other related GPIO patches
+are fine and don't cause changes to this:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
