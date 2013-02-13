@@ -1,63 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Feb 2013 09:03:17 +0000
-Subject: [PATCH 1/2] arm: mm: Ignore memory banks which are in front of
- the kernel when HIGHMEM is ON
-In-Reply-To: <1360745925-20952-1-git-send-email-michal.simek@xilinx.com>
-References: <1360745925-20952-1-git-send-email-michal.simek@xilinx.com>
-Message-ID: <20130213090317.GY17833@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 13 Feb 2013 09:08:09 +0000
+Subject: [PATCH v2 10/13] mailbox: create dbx500 mailbox driver
+In-Reply-To: <511A9F81.1040608@st.com>
+References: <1360645032-9668-1-git-send-email-s-anna@ti.com>
+ <1360645032-9668-11-git-send-email-s-anna@ti.com>
+ <20130212103949.GA826@e106331-lin.cambridge.arm.com>
+ <511A9F81.1040608@st.com>
+Message-ID: <20130213090809.GD13775@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 09:58:44AM +0100, Michal Simek wrote:
-> Arm kernel with HIGHMEM ON will fail when dts memory node is described
-> by memory banks and the starting address is not inside the first 16MB
-> of the first memory bank. If HIGHMEM is OFF and the configuration is the same
-> then the first memory bank is ignored and the kernel boots.
+On Tue, Feb 12, 2013 at 08:01:05PM +0000, Loic PALLARDY wrote:
+> Hi Mark,
 > 
-> Here is the example of behavior:
-> dts memory reg = <0x0 0x10000000 0x10000000 0x30000000>
-> kernel load address = 0x10000000 (respectively 0x1000800)
+> Thanks for your comments.
 > 
-> Current:
-> "Machine: Xilinx Zynq Platform, model: Zynq ZC702 Development Board
-> bootconsole [earlycon0] enabled
-> Memory policy: ECC disabled, Data cache writeback
-> Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0."
-> 
-> After:
-> The kernel ignore ram 0x0-0x0fffffff because is lower than the kernel starting
-> address and the kernel bootlog contains.
-> "Ignoring RAM at 00000000-0fffffff (CONFIG_HIGHMEM)."
-> 
-> Also using mem=768M on the command line will overwrite dts memory
-> map and kernel will boot with HIGHMEM ON too.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
->  arch/arm/mm/mmu.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index ce328c7..e60f370 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -937,6 +937,15 @@ void __init sanity_check_meminfo(void)
->  			highmem = 1;
->  
->  #ifdef CONFIG_HIGHMEM
-> +		if (__va(bank->start + bank->size - 1) < (void *)PAGE_OFFSET) {
-> +			pr_notice("Ignoring RAM at %.8llx-%.8llx ",
-> +				(unsigned long long)bank->start,
-> +				(unsigned long long)bank->start
-> +							+ bank->size - 1);
-> +			pr_cont("(CONFIG_HIGHMEM).\n");
-> +			continue;
-> +		}
+> On 02/12/2013 11:39 AM, Mark Rutland wrote:
+> > Hello,
+> >
+> > I have a few comments on the devicetree binding and the way it's parsed.
+> >
+> >> +static const struct of_device_id dbx500_mailbox_match[] = {
+> >> +       { .compatible = "stericsson,db8500-mailbox",
+> >> +               .data = (void *)db8500_mboxes,
+> >> +       },
+> >> +       { .compatible = "stericsson,db9540-mailbox",
+> >> +               .data = (void *)dbx540_mboxes,
+> >> +       },
+> >> +       { /* sentinel */}
+> >> +};
+> >> +
+> >
+> > The binding for the compatible strings above and property parsing below should
+> > be documented.
+> >
+> Yes you're right. I will add a description in 
+> Documentation/devicetree/bindings/mailbox/...
 
-NAK.  __va() is only valid for memory within the kernel's direct mapping
-(iow, lowmem).  Physical addresses outside of that range are free to
-return any other value.
+Great!
 
-So, it's entirely possible that a valid highmem setup will have memory
-in highmem where __va(start + size - 1) _is_ below PAGE_OFFSET, and this
-memory should _not_ be discarded.
+[...]
+
+> >> +       mem = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcm_reg");
+> >
+> > Does this work for dt? I wasn't aware we got anything more than anonymous
+> > memory and interrupts.
+> >
+> Yes this is working with and without dt.
+> dt declaration will be the following
+> mailbox {
+> 	compatible = "stericsson,db8500-mailbox";
+> 	reg = <0x80157000 0x1000>, <0x801B8000 0x2000>;
+> 	reg-names = "prcm-reg", "prcmu-tcdm";
+> 	interrupts = <0 47 0x4>;
+> 	interrupt-names = "irq";
+> 	legacy-offset = <0xdd4>;
+> };
+
+Ah, I wasn't aware of reg-names. Thanks for the example.
+
+Thanks,
+Mark.
