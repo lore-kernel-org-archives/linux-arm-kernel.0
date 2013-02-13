@@ -1,36 +1,35 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 13 Feb 2013 09:13:27 -0600
-Subject: [RFC 1/1] ARM: omap2: gpmc: Move binding documentation to
- memory-controller
-In-Reply-To: <1360754003-3988-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1360754003-3988-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1360754003-3988-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <511BAD97.5050602@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 13 Feb 2013 16:30:31 +0100
+Subject: [PATCH v3] PCIe support for the Armada 370 and Armada XP SoCs
+In-Reply-To: <20130213162750.6797e79a@grp-cvubrugier.lacie.com>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130213162750.6797e79a@grp-cvubrugier.lacie.com>
+Message-ID: <20130213163031.42a4135d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Christophe Vu-Brugier,
 
-On 02/13/2013 05:13 AM, Ezequiel Garcia wrote:
-> GPMC stands for General Purpose Memory Controller, and it's primarily
-> used to handle memories such as NOR, NAND, SRAM.
-> Note that this controller is also used to handle network controllers
-> such as smsc911x.
+On Wed, 13 Feb 2013 16:27:50 +0100, Christophe Vu-Brugier wrote:
+> Hi Thomas,
 > 
-> This patch moves the documentation binding to memory-controllers,
-> where it belongs.
+> On Tue, 12 Feb 2013 17:28:34 +0100, Thomas Petazzoni wrote :
+> > This series of patches introduces PCIe support for the Marvell Armada
+> > 370 and Armada XP.
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  .../ti-gpmc.txt => memory-controllers/ti/gpmc.txt} |    0
->  1 files changed, 0 insertions(+), 0 deletions(-)
->  rename Documentation/devicetree/bindings/{bus/ti-gpmc.txt => memory-controllers/ti/gpmc.txt} (100%)
+> Tested on a Marvell DB-MV784MP-GP evaluation board with a Marvell 9220
+> SATA controller. Disks attached to this controller are working.
 > 
-> diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/memory-controllers/ti/gpmc.txt
-> similarity index 100%
-> rename from Documentation/devicetree/bindings/bus/ti-gpmc.txt
-> rename to Documentation/devicetree/bindings/memory-controllers/ti/gpmc.txt
+> Tested-by: Christophe Vu-Brugier <cvubrugier@lacie.com>
 
-I am fine with that. However, make sure you CC the device-tree mailing list.
+Awesome, thanks a lot again Christophe for having taken the time to
+test this patch series!
 
-Cheers
-Jon
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
