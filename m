@@ -1,147 +1,112 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 13 Feb 2013 12:26:39 +0900
-Subject: [PATCH 21/21] ARM: shmobile: r8a7779: Remove DU function GPIOs
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 13 Feb 2013 12:27:45 +0900
+Subject: [PATCH 00/21 v1.2] SCIF, I2C and FSI pinctrl functions for sh73a0
 In-Reply-To: <1360725999-14514-1-git-send-email-horms+renesas@verge.net.au>
 References: <1360725999-14514-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360725999-14514-22-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130213032742.GA14282@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Wed, Feb 13, 2013 at 12:26:18PM +0900, Simon Horman wrote:
+> Hi,
+> 
+> this series is a follow-up to "[PATCH 00/16] SCIF, I2C and FSI pinctrl
+> functions for sh73a0" by Laurent Pinchart. I am primarily posting it for
+> his review.
+> 
+> This series differs from the v1.1 series posted by me earlier today in
+> that it depends on the following update to the kzm9g reference code.
+> 
+> * ARM: shmobile: parse DT and configure pinmux early on kzm9g-reference
+> 
+> This series differs from the (v1) series posted by Laurent in the following
+> ways:
+> 
+> * Due to some slightly over-zelous git use on my part the series
+>   is actually based on a checkout of
+>   git://linuxtv.org/pinchartl/fbdev.git pinmux-pfc-funcs
+> 
+>   As such it includes several patches not included in the series posted in
+>   via eimal as the series "[PATCH 00/16] SCIF, I2C and FSI pinctrl
+>   functions for sh73a0". In particular it includes r8a7740 and r8a7779
+>   patches.
+> 
+> * I have added the following two patches to update the KZM9G rerence code.
+> 
+>   ARM: shmobile: kzm9g: reference: Register pinctrl mappings for I2C
+>   ARM: shmobile: kzm9g: reference: Register pinctrl mappings for SCIF
+> 
+> 
+> This series is based on :
+> 
+>         git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/pinmux-pinctrl
+> 
+> Which is in turn based on the following branch which
+> includes the kzm9g reference code.
+> 
+>         git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/pinmux-base
+> 
+> Laurent, if you want to change this series in any way just let me know.
+> I can drop patches individually or drop the entire series and add a fresh
+> one from you to the topic branch.
+> 
+> Git and diffstat information is provided below to aid review.
+> 
+> ----------------------------------------------------------------
+> The following changes since commit 30a6b5dc7a4c701d46cbe5c8be4ef39cf4c2d42d:
+> 
+>   ARM: shmobile: armadillo800eva: Register pinctrl mappings for LCDC0 (2013-02-13 12:08:12 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git 
 
-Those GPIOs have been deprecated by the pinctrl API. They are unused and
-unneeded, remove them.
+    git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/pinmux-pfc-funcs
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/include/mach/r8a7779.h |   88 ++++++++++++-------------
- 1 file changed, 44 insertions(+), 44 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-index badba57..e4b3cbd 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-@@ -119,76 +119,76 @@ enum {
- 	GPIO_FN_SUB_TRST, GPIO_FN_TCLK1_B, GPIO_FN_CC5_OSCOUT, GPIO_FN_HRTS0,
- 	GPIO_FN_RTS1_TANS, GPIO_FN_MDATA, GPIO_FN_TX0_C, GPIO_FN_SUB_TMS,
- 	GPIO_FN_CC5_STATE1, GPIO_FN_CC5_STATE9, GPIO_FN_CC5_STATE17,
--	GPIO_FN_CC5_STATE25, GPIO_FN_CC5_STATE33, GPIO_FN_DU0_DR0,
-+	GPIO_FN_CC5_STATE25, GPIO_FN_CC5_STATE33,
- 	GPIO_FN_LCDOUT0, GPIO_FN_DREQ0, GPIO_FN_GPS_CLK_B, GPIO_FN_AUDATA0,
--	GPIO_FN_TX5_C, GPIO_FN_DU0_DR1,	GPIO_FN_LCDOUT1, GPIO_FN_DACK0,
-+	GPIO_FN_TX5_C, GPIO_FN_LCDOUT1, GPIO_FN_DACK0,
- 	GPIO_FN_DRACK0, GPIO_FN_GPS_SIGN_B, GPIO_FN_AUDATA1, GPIO_FN_RX5_C,
--	GPIO_FN_DU0_DR2, GPIO_FN_LCDOUT2, GPIO_FN_DU0_DR3, GPIO_FN_LCDOUT3,
--	GPIO_FN_DU0_DR4, GPIO_FN_LCDOUT4, GPIO_FN_DU0_DR5, GPIO_FN_LCDOUT5,
--	GPIO_FN_DU0_DR6, GPIO_FN_LCDOUT6, GPIO_FN_DU0_DR7, GPIO_FN_LCDOUT7,
--	GPIO_FN_DU0_DG0, GPIO_FN_LCDOUT8, GPIO_FN_DREQ1, GPIO_FN_SCL2,
-+	GPIO_FN_LCDOUT2, GPIO_FN_LCDOUT3,
-+	GPIO_FN_LCDOUT4, GPIO_FN_LCDOUT5,
-+	GPIO_FN_LCDOUT6, GPIO_FN_LCDOUT7,
-+	GPIO_FN_LCDOUT8, GPIO_FN_DREQ1, GPIO_FN_SCL2,
- 	GPIO_FN_AUDATA2,
- 
- 	/* IPSR3 */
--	GPIO_FN_DU0_DG1, GPIO_FN_LCDOUT9, GPIO_FN_DACK1, GPIO_FN_SDA2,
--	GPIO_FN_AUDATA3, GPIO_FN_DU0_DG2, GPIO_FN_LCDOUT10, GPIO_FN_DU0_DG3,
--	GPIO_FN_LCDOUT11, GPIO_FN_DU0_DG4, GPIO_FN_LCDOUT12, GPIO_FN_DU0_DG5,
--	GPIO_FN_LCDOUT13, GPIO_FN_DU0_DG6, GPIO_FN_LCDOUT14, GPIO_FN_DU0_DG7,
--	GPIO_FN_LCDOUT15, GPIO_FN_DU0_DB0, GPIO_FN_LCDOUT16, GPIO_FN_EX_WAIT1,
--	GPIO_FN_SCL1, GPIO_FN_TCLK1, GPIO_FN_AUDATA4, GPIO_FN_DU0_DB1,
-+	GPIO_FN_LCDOUT9, GPIO_FN_DACK1, GPIO_FN_SDA2,
-+	GPIO_FN_AUDATA3, GPIO_FN_LCDOUT10,
-+	GPIO_FN_LCDOUT11, GPIO_FN_LCDOUT12,
-+	GPIO_FN_LCDOUT13, GPIO_FN_LCDOUT14,
-+	GPIO_FN_LCDOUT15, GPIO_FN_LCDOUT16, GPIO_FN_EX_WAIT1,
-+	GPIO_FN_SCL1, GPIO_FN_TCLK1, GPIO_FN_AUDATA4,
- 	GPIO_FN_LCDOUT17, GPIO_FN_EX_WAIT2, GPIO_FN_SDA1, GPIO_FN_GPS_MAG_B,
--	GPIO_FN_AUDATA5, GPIO_FN_SCK5_C, GPIO_FN_DU0_DB2, GPIO_FN_LCDOUT18,
--	GPIO_FN_DU0_DB3, GPIO_FN_LCDOUT19, GPIO_FN_DU0_DB4, GPIO_FN_LCDOUT20,
--	GPIO_FN_DU0_DB5, GPIO_FN_LCDOUT21, GPIO_FN_DU0_DB6, GPIO_FN_LCDOUT22,
--	GPIO_FN_DU0_DB7, GPIO_FN_LCDOUT23, GPIO_FN_DU0_DOTCLKIN,
-+	GPIO_FN_AUDATA5, GPIO_FN_SCK5_C, GPIO_FN_LCDOUT18,
-+	GPIO_FN_LCDOUT19, GPIO_FN_LCDOUT20,
-+	GPIO_FN_LCDOUT21, GPIO_FN_LCDOUT22,
-+	GPIO_FN_LCDOUT23, 
- 	GPIO_FN_QSTVA_QVS, GPIO_FN_TX3_D_IRDA_TX_D, GPIO_FN_SCL3_B,
--	GPIO_FN_DU0_DOTCLKOUT0, GPIO_FN_QCLK, GPIO_FN_DU0_DOTCLKOUT1,
-+	GPIO_FN_QCLK,
- 	GPIO_FN_QSTVB_QVE, GPIO_FN_RX3_D_IRDA_RX_D, GPIO_FN_SDA3_B,
- 	GPIO_FN_SDA2_C, GPIO_FN_DACK0_B, GPIO_FN_DRACK0_B,
--	GPIO_FN_DU0_EXHSYNC_DU0_HSYNC, GPIO_FN_QSTH_QHS,
--	GPIO_FN_DU0_EXVSYNC_DU0_VSYNC, GPIO_FN_QSTB_QHE,
--	GPIO_FN_DU0_EXODDF_DU0_ODDF_DISP_CDE, GPIO_FN_QCPV_QDE,
-+	GPIO_FN_QSTH_QHS,
-+	GPIO_FN_QSTB_QHE,
-+	GPIO_FN_QCPV_QDE,
- 	GPIO_FN_CAN1_TX, GPIO_FN_TX2_C, GPIO_FN_SCL2_C, GPIO_FN_REMOCON,
- 
- 	/* IPSR4 */
--	GPIO_FN_DU0_DISP, GPIO_FN_QPOLA, GPIO_FN_CAN_CLK_C, GPIO_FN_SCK2_C,
--	GPIO_FN_DU0_CDE, GPIO_FN_QPOLB, GPIO_FN_CAN1_RX, GPIO_FN_RX2_C,
--	GPIO_FN_DREQ0_B, GPIO_FN_SSI_SCK78_B, GPIO_FN_SCK0_B, GPIO_FN_DU1_DR0,
-+	GPIO_FN_QPOLA, GPIO_FN_CAN_CLK_C, GPIO_FN_SCK2_C,
-+	GPIO_FN_QPOLB, GPIO_FN_CAN1_RX, GPIO_FN_RX2_C,
-+	GPIO_FN_DREQ0_B, GPIO_FN_SSI_SCK78_B, GPIO_FN_SCK0_B,
- 	GPIO_FN_VI2_DATA0_VI2_B0, GPIO_FN_PWM6, GPIO_FN_SD3_CLK,
- 	GPIO_FN_TX3_E_IRDA_TX_E, GPIO_FN_AUDCK, GPIO_FN_PWMFSW0_B,
--	GPIO_FN_DU1_DR1, GPIO_FN_VI2_DATA1_VI2_B1, GPIO_FN_PWM0,
-+	GPIO_FN_VI2_DATA1_VI2_B1, GPIO_FN_PWM0,
- 	GPIO_FN_SD3_CMD, GPIO_FN_RX3_E_IRDA_RX_E, GPIO_FN_AUDSYNC,
--	GPIO_FN_CTS0_D, GPIO_FN_DU1_DR2, GPIO_FN_VI2_G0, GPIO_FN_DU1_DR3,
--	GPIO_FN_VI2_G1, GPIO_FN_DU1_DR4, GPIO_FN_VI2_G2, GPIO_FN_DU1_DR5,
--	GPIO_FN_VI2_G3, GPIO_FN_DU1_DR6, GPIO_FN_VI2_G4, GPIO_FN_DU1_DR7,
--	GPIO_FN_VI2_G5, GPIO_FN_DU1_DG0, GPIO_FN_VI2_DATA2_VI2_B2,
-+	GPIO_FN_CTS0_D, GPIO_FN_VI2_G0,
-+	GPIO_FN_VI2_G1, GPIO_FN_VI2_G2,
-+	GPIO_FN_VI2_G3, GPIO_FN_VI2_G4,
-+	GPIO_FN_VI2_G5, GPIO_FN_VI2_DATA2_VI2_B2,
- 	GPIO_FN_SCL1_B, GPIO_FN_SD3_DAT2, GPIO_FN_SCK3_E, GPIO_FN_AUDATA6,
--	GPIO_FN_TX0_D, GPIO_FN_DU1_DG1, GPIO_FN_VI2_DATA3_VI2_B3,
-+	GPIO_FN_TX0_D, GPIO_FN_VI2_DATA3_VI2_B3,
- 	GPIO_FN_SDA1_B, GPIO_FN_SD3_DAT3, GPIO_FN_SCK5, GPIO_FN_AUDATA7,
--	GPIO_FN_RX0_D, GPIO_FN_DU1_DG2,	GPIO_FN_VI2_G6, GPIO_FN_DU1_DG3,
--	GPIO_FN_VI2_G7, GPIO_FN_DU1_DG4, GPIO_FN_VI2_R0, GPIO_FN_DU1_DG5,
--	GPIO_FN_VI2_R1, GPIO_FN_DU1_DG6, GPIO_FN_VI2_R2, GPIO_FN_DU1_DG7,
--	GPIO_FN_VI2_R3, GPIO_FN_DU1_DB0, GPIO_FN_VI2_DATA4_VI2_B4,
-+	GPIO_FN_RX0_D, GPIO_FN_VI2_G6,
-+	GPIO_FN_VI2_G7, GPIO_FN_VI2_R0,
-+	GPIO_FN_VI2_R1, GPIO_FN_VI2_R2,
-+	GPIO_FN_VI2_R3, GPIO_FN_VI2_DATA4_VI2_B4,
- 	GPIO_FN_SCL2_B, GPIO_FN_SD3_DAT0, GPIO_FN_TX5, GPIO_FN_SCK0_D,
- 
- 	/* IPSR5 */
--	GPIO_FN_DU1_DB1, GPIO_FN_VI2_DATA5_VI2_B5, GPIO_FN_SDA2_B,
-+	GPIO_FN_VI2_DATA5_VI2_B5, GPIO_FN_SDA2_B,
- 	GPIO_FN_SD3_DAT1, GPIO_FN_RX5, GPIO_FN_RTS0_D_TANS_D,
--	GPIO_FN_DU1_DB2, GPIO_FN_VI2_R4, GPIO_FN_DU1_DB3, GPIO_FN_VI2_R5,
--	GPIO_FN_DU1_DB4, GPIO_FN_VI2_R6, GPIO_FN_DU1_DB5, GPIO_FN_VI2_R7,
--	GPIO_FN_DU1_DB6, GPIO_FN_SCL2_D, GPIO_FN_DU1_DB7, GPIO_FN_SDA2_D,
--	GPIO_FN_DU1_DOTCLKIN, GPIO_FN_VI2_CLKENB, GPIO_FN_HSPI_CS1,
--	GPIO_FN_SCL1_D, GPIO_FN_DU1_DOTCLKOUT, GPIO_FN_VI2_FIELD,
--	GPIO_FN_SDA1_D, GPIO_FN_DU1_EXHSYNC_DU1_HSYNC, GPIO_FN_VI2_HSYNC,
--	GPIO_FN_VI3_HSYNC, GPIO_FN_DU1_EXVSYNC_DU1_VSYNC, GPIO_FN_VI2_VSYNC,
--	GPIO_FN_VI3_VSYNC, GPIO_FN_DU1_EXODDF_DU1_ODDF_DISP_CDE,
-+	GPIO_FN_VI2_R4, GPIO_FN_VI2_R5,
-+	GPIO_FN_VI2_R6, GPIO_FN_VI2_R7,
-+	GPIO_FN_SCL2_D, GPIO_FN_SDA2_D,
-+	GPIO_FN_VI2_CLKENB, GPIO_FN_HSPI_CS1,
-+	GPIO_FN_SCL1_D, GPIO_FN_VI2_FIELD,
-+	GPIO_FN_SDA1_D, GPIO_FN_VI2_HSYNC,
-+	GPIO_FN_VI3_HSYNC, GPIO_FN_VI2_VSYNC,
-+	GPIO_FN_VI3_VSYNC, 
- 	GPIO_FN_VI2_CLK, GPIO_FN_TX3_B_IRDA_TX_B, GPIO_FN_SD3_CD,
- 	GPIO_FN_HSPI_TX1, GPIO_FN_VI1_CLKENB, GPIO_FN_VI3_CLKENB,
- 	GPIO_FN_AUDIO_CLKC, GPIO_FN_TX2_D, GPIO_FN_SPEEDIN,
--	GPIO_FN_GPS_SIGN_D, GPIO_FN_DU1_DISP, GPIO_FN_VI2_DATA6_VI2_B6,
-+	GPIO_FN_GPS_SIGN_D, GPIO_FN_VI2_DATA6_VI2_B6,
- 	GPIO_FN_TCLK0, GPIO_FN_QSTVA_B_QVS_B, GPIO_FN_HSPI_CLK1,
- 	GPIO_FN_SCK2_D, GPIO_FN_AUDIO_CLKOUT_B, GPIO_FN_GPS_MAG_D,
--	GPIO_FN_DU1_CDE, GPIO_FN_VI2_DATA7_VI2_B7, GPIO_FN_RX3_B_IRDA_RX_B,
-+	GPIO_FN_VI2_DATA7_VI2_B7, GPIO_FN_RX3_B_IRDA_RX_B,
- 	GPIO_FN_SD3_WP, GPIO_FN_HSPI_RX1, GPIO_FN_VI1_FIELD, GPIO_FN_VI3_FIELD,
- 	GPIO_FN_AUDIO_CLKOUT, GPIO_FN_RX2_D, GPIO_FN_GPS_CLK_C,
- 	GPIO_FN_GPS_CLK_D, GPIO_FN_AUDIO_CLKA, GPIO_FN_CAN_TXCLK,
--- 
-1.7.10.4
+> 
+> for you to fetch changes up to e92460f4d0ce471110d44a3dc053f0a4508f24dc:
+> 
+>   ARM: shmobile: r8a7779: Remove DU function GPIOs (2013-02-13 12:16:13 +0900)
+> 
+> ----------------------------------------------------------------
+> Laurent Pinchart (19):
+>       ARM: shmobile: bonito: Register pinctrl mappings for LCDC0
+>       ARM: shmobile: kota2: Register pinctrl mappings for SCIF
+>       ARM: shmobile: kzm9g: Register pinctrl mappings for LCD
+>       ARM: shmobile: kzm9g: Register pinctrl mappings for SCIF
+>       ARM: shmobile: kzm9g: Register pinctrl mappings for I2C
+>       ARM: shmobile: kzm9g: Register pinctrl mappings for FSI
+>       sh-pfc: sh73a0: Remove LCD and LCD2 function GPIOS
+>       sh-pfc: sh73a0: Remove SCIFA and SCIFB function GPIOS
+>       sh-pfc: sh73a0: Remove I2C function GPIOS
+>       sh-pfc: sh73a0: Remove FSI function GPIOS
+>       sh-pfc: r8a7740: Remove LCD0 and LCD1 function GPIOS
+>       sh-pfc: r8a7779: Remove DU1_DOTCLKOUT1 GPIO
+>       ARM: shmobile: sh73a0: Remove LCDC and LCDC2 function GPIOs
+>       ARM: shmobile: sh73a0: Remove SCIFA and SCIFB function GPIOs
+>       ARM: shmobile: sh73a0: Remove I2C function GPIOs
+>       ARM: shmobile: sh73a0: Remove FSI function GPIOs
+>       ARM: shmobile: r8a7740: Remove LCD0 and LCD1 function GPIOs
+>       ARM: shmobile: r8a7779: Remove DU1_DOTCLKOUT1 GPIO
+>       ARM: shmobile: r8a7779: Remove DU function GPIOs
+> 
+> Simon Horman (2):
+>       ARM: shmobile: kzm9g: reference: Register pinctrl mappings for I2C
+>       ARM: shmobile: kzm9g: reference: Register pinctrl mappings for SCIF
+> 
+>  arch/arm/mach-shmobile/board-bonito.c          |   43 ++---
+>  arch/arm/mach-shmobile/board-kota2.c           |   42 +++--
+>  arch/arm/mach-shmobile/board-kzm9g-reference.c |   21 ++-
+>  arch/arm/mach-shmobile/board-kzm9g.c           |   68 +++----
+>  arch/arm/mach-shmobile/include/mach/r8a7740.h  |   39 ----
+>  arch/arm/mach-shmobile/include/mach/r8a7779.h  |   90 ++++-----
+>  arch/arm/mach-shmobile/include/mach/sh73a0.h   |  237 ++++++++++--------------
+>  drivers/pinctrl/sh-pfc/pfc-r8a7740.c           |   37 ----
+>  drivers/pinctrl/sh-pfc/pfc-r8a7779.c           |    9 +-
+>  drivers/pinctrl/sh-pfc/pfc-sh73a0.c            |  182 ------------------
+>  10 files changed, 216 insertions(+), 552 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
