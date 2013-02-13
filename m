@@ -1,40 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 13 Feb 2013 20:51:39 +0100
-Subject: Giving special alignment/size constraints to the Linux PCI core?
-In-Reply-To: <20130213191204.GA15710@obsidianresearch.com>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <201302122305.28467.arnd@arndb.de>
- <20130213003224.GA32535@obsidianresearch.com>
- <201302131853.14617.arnd@arndb.de>
- <20130213191204.GA15710@obsidianresearch.com>
-Message-ID: <20130213205139.77c01873@skate>
+From: loic.pallardy@st.com (Loic PALLARDY)
+Date: Wed, 13 Feb 2013 21:36:39 +0100
+Subject: [PATCH v2 00/13] drivers: mailbox: framework creation
+In-Reply-To: <37C860A02101E749A747FA2D3C1E3C50476638@DLEE12.ent.ti.com>
+References: <1360645032-9668-1-git-send-email-s-anna@ti.com>
+ <CACRpkdZayg-X11ZRnh2Z0i+egBn8Fhwya-6_Yr8wcv+6s0CVqQ@mail.gmail.com>
+ <20130213134207.GN17852@n2100.arm.linux.org.uk>
+ <37C860A02101E749A747FA2D3C1E3C50476638@DLEE12.ent.ti.com>
+Message-ID: <511BF957.4010501@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
+Hi Suman,
 
-On Wed, 13 Feb 2013 12:12:04 -0700, Jason Gunthorpe wrote:
+I'll send new version of patch 11 taking into account Mark Rutland's 
+comments.
 
-> Thomas, what were your test results on your 10 slot system? Did all 10
-> P2P bridges appear in lspci? Was there any address space reservation
-> for hot plug?
+Regards,
+Loic
 
-My test system "only" has 6 PCIe slots, so I couldn't test with the
-entire 10 possible PCIe interfaces. But 6 PCIe slots is still a good
-number :-)
-
-If you look at the cover letter of the PATCHv3, you'll see the output
-of lspci -vvv. It shows that I create one PCI-to-PCI bridge for each
-PCIe interface, regardless of whether the link is here or not. And for
-those where there is nothing behind the bridge, no address space
-reservation occurs, so I am not allocating address decoding windows for
-those unused PCIe interfaces.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+On 02/13/2013 05:41 PM, Anna, Suman wrote:
+>> On Wed, Feb 13, 2013 at 02:36:32PM +0100, Linus Walleij wrote:
+>>> On Tue, Feb 12, 2013 at 5:56 AM, Suman Anna<s-anna@ti.com>  wrote:
+>>>
+>>>> I have hosted the series at [3].
+>>>> [3]
+>>>> https://github.com/sumananna/mailbox/commits/dbx500-prcmu-mailbox
+>>>
+>>> Suman, I suggest you ask Stepgen Rothwell to include this branch into
+>>> the linux-next tree, so we can get some rotation of this stuff in
+>>> preparation for the v3.10 merge window. (It's not going in now
+>>> anyway.)
+>>
+>> Best wait until after v3.9-rc1 - remember that linux-next is supposed to be a
+>> staging tree for the _next_ merge window only.
+>
+> Yes, will do. Anyway, we need a new revision of one patch (so far) to address Mark Rutland's comments.
+>
+> Thanks
+> Suman
