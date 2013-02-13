@@ -1,79 +1,102 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 13 Feb 2013 13:22:23 +0100
-Subject: [PATCH v8 0/7] watchdog: dt: add support for the timeout-sec dt
+Date: Wed, 13 Feb 2013 13:22:25 +0100
+Subject: [PATCH v8 2/7] watchdog: core: dt: add support for the timeout-sec dt
  property
-Message-ID: <1360758150-23004-1-git-send-email-fabio.porcedda@gmail.com>
+In-Reply-To: <1360758150-23004-1-git-send-email-fabio.porcedda@gmail.com>
+References: <1360758150-23004-1-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1360758150-23004-3-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patchset add the timeout-sec property to the watchdog core,
-to the at91sam9_wdt driver and on all framework enabled watchdog driver
-with dt support.
-The at91sam9_wdt is tested on evk-pr3,
-the other drivers are compile tested only.
+Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+---
+ Documentation/watchdog/watchdog-kernel-api.txt | 10 ++++++++
+ drivers/watchdog/watchdog_core.c               | 34 ++++++++++++++++++++++++++
+ include/linux/watchdog.h                       |  2 ++
+ 3 files changed, 46 insertions(+)
 
-Best regards
-Fabio Porcedda
-
-changes:
-v8:
-  - watchdog_is_valid_timeout(): export in watchdog.h
-  - watchdog_is_valid_timeout(): use in watchdog_set_timeout()
-  - watchdog_is_valid_timeout(): split patch
-  - watchdog_init_timeout(): return -EINVAL for out of range values.
-  - watchdog_init_timeout(): use struct device instead of struct device_node
-v7:
-  - rebase over v3.8-rc2
-  - remove the patch already merged
-v6:
-  - remove patch for function of_get_timeout_sec as aked by Rob Herring
-  - add Acked-by: Jason Cooper <jason@lakedaemon.net>
-  - add Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-v5:
-  - fix codestyle for compilance ti checkpatch.pl about
-    "ERROR: do not initialise statics to 0 or NULL"
-    for s3c2410_wdt.c:56 and at91sam9_wdt.c:63
-v4:
-  - add of_get_timeout_sec
-  - add s3c2410_wdt driver
-  - split driver patch
-  - fixed watchdog_init_timeout handling of min_timeout and max_timeout
-v3:
-  - rename watchdog_probe_dt_timeout ->  watchdog_init_timeout
-  - move the watchdog_init_timeout function from inline to watchdog_core.c
-  - add timeout parameter handling code to watchdog_init_timeout
-  - add timeout-sec property to the pnx4008-wdt driver
-  - add two small commit for fixup and cleanup
-v2:
-  - change "timeout" to "timeout-sec" as asked by Jean-Christophe
-  - at91sam9_wdt: use the new helper function
-  - at91sam9_wdt: add bounds checking
-  - watchdog.h: add bounds checking
-
-Fabio Porcedda (7):
-  watchdog: core: add and use watchdog_is_valid_timeout function
-  watchdog: core: dt: add support for the timeout-sec dt property
-  watchdog: orion_wdt: add timeout-sec property binding
-  watchdog: pnx4008: add timeout-sec property binding
-  watchdog: s3c2410_wdt: add timeout-sec property binding
-  watchdog: at91sam9_wdt: add timeout-sec property binding
-  watchdog: orion_wdt: move the min_timeout initialization
-
- .../devicetree/bindings/watchdog/atmel-wdt.txt     |  4 ++
- .../devicetree/bindings/watchdog/marvel.txt        |  5 +++
- .../devicetree/bindings/watchdog/pnx4008-wdt.txt   |  4 ++
- .../devicetree/bindings/watchdog/samsung-wdt.txt   |  3 ++
- Documentation/watchdog/watchdog-kernel-api.txt     | 10 +++++
- drivers/watchdog/Kconfig                           |  1 +
- drivers/watchdog/at91sam9_wdt.c                    | 16 ++++++--
- drivers/watchdog/orion_wdt.c                       | 10 ++---
- drivers/watchdog/pnx4008_wdt.c                     |  7 ++--
- drivers/watchdog/s3c2410_wdt.c                     |  6 ++-
- drivers/watchdog/watchdog_core.c                   | 48 ++++++++++++++++++++++
- drivers/watchdog/watchdog_dev.c                    |  3 +-
- include/linux/watchdog.h                           |  4 ++
- 13 files changed, 104 insertions(+), 17 deletions(-)
-
+diff --git a/Documentation/watchdog/watchdog-kernel-api.txt b/Documentation/watchdog/watchdog-kernel-api.txt
+index 086638f..44098c2 100644
+--- a/Documentation/watchdog/watchdog-kernel-api.txt
++++ b/Documentation/watchdog/watchdog-kernel-api.txt
+@@ -212,3 +212,13 @@ driver specific data to and a pointer to the data itself.
+ The watchdog_get_drvdata function allows you to retrieve driver specific data.
+ The argument of this function is the watchdog device where you want to retrieve
+ data from. The function returns the pointer to the driver specific data.
++
++To initialize the timeout field use the following function:
++
++extern void watchdog_init_timeout(struct watchdog_device *wdd,
++                                  unsigned int parm_timeout,
++                                  struct device_node *node);
++
++The watchdog_init_timeout function allows you to initialize the timeout field
++using the module timeout parameter or retrieving the timeout-sec property from
++the device tree.
+diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+index f10fa31..b9e9148 100644
+--- a/drivers/watchdog/watchdog_core.c
++++ b/drivers/watchdog/watchdog_core.c
+@@ -36,6 +36,7 @@
+ #include <linux/init.h>		/* For __init/__exit/... */
+ #include <linux/idr.h>		/* For ida_* macros */
+ #include <linux/err.h>		/* For IS_ERR macros */
++#include <linux/of.h>		/* For of_get_timeout_sec */
+ 
+ #include "watchdog_core.h"	/* For watchdog_dev_register/... */
+ 
+@@ -57,6 +58,39 @@ bool watchdog_is_valid_timeout(struct watchdog_device *wdd, uint timeout)
+ EXPORT_SYMBOL_GPL(watchdog_is_valid_timeout);
+ 
+ /**
++ * watchdog_init_timeout() - initialize the timeout field
++ * @parm: timeout module parameter, it takes precedence over the
++ *        timeout-sec property.
++ * @node: Retrieve the timeout-sec property only if the parm_timeout
++ *        is out of bounds.
++ */
++int watchdog_init_timeout(struct watchdog_device *wdd, uint parm,
++			  struct device *dev)
++{
++	uint timeout = 0;
++	int ret = 0;
++
++	if (watchdog_is_valid_timeout(wdd, parm)) {
++		wdd->timeout = parm;
++		return ret;
++	}
++	if (parm)
++		ret = -EINVAL;
++
++	/* try to get the timeout_sec property */
++	if (!dev->of_node)
++		return ret;
++	of_property_read_u32(dev->of_node, "timeout-sec", &timeout);
++	if (watchdog_is_valid_timeout(wdd, timeout))
++		wdd->timeout = timeout;
++	else
++		ret = -EINVAL;
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(watchdog_init_timeout);
++
++/**
+  * watchdog_register_device() - register a watchdog device
+  * @wdd: watchdog device
+  *
+diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+index 9ae945e..b1023dd 100644
+--- a/include/linux/watchdog.h
++++ b/include/linux/watchdog.h
+@@ -132,6 +132,8 @@ static inline void *watchdog_get_drvdata(struct watchdog_device *wdd)
+ /* drivers/watchdog/watchdog_core.c */
+ extern bool watchdog_is_valid_timeout(struct watchdog_device *wdd,
+ 				      uint timeout);
++extern int watchdog_init_timeout(struct watchdog_device *wdd,
++				  uint parm_timeout, struct device *dev);
+ extern int watchdog_register_device(struct watchdog_device *);
+ extern void watchdog_unregister_device(struct watchdog_device *);
+ 
 -- 
 1.8.1.1
