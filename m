@@ -1,62 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Feb 2013 08:54:39 -0800
-Subject: Getting your opinion about the best place to put one specific
- device driver...
-In-Reply-To: <201302131104.01793.arnd@arndb.de>
-References: <511A0F11.1050608@stericsson.com>
- <201302121741.31494.arnd@arndb.de>
- <511B59E2.5060402@stericsson.com>
- <201302131104.01793.arnd@arndb.de>
-Message-ID: <20130213165439.GH7144@atomide.com>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Wed, 13 Feb 2013 18:22:00 +0100
+Subject: [PATCH] ARM: net: bpf_jit: fix emit_swap16() for non ARMv6+.
+Message-ID: <1360776125-14542-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [130213 03:07]:
-> On Wednesday 13 February 2013, Jean-Nicolas GRAUX wrote:
-> > Le 02/12/2013 06:41 PM, Arnd Bergmann a ?crit :
-> > > On Tuesday 12 February 2013, Jean-Nicolas GRAUX wrote:
-> > > If a more dynamic user interface is needed, I think it would be good
-> > > to have a generic mechanism in the pinctrl subsystem to reroute pins
-> > > like these, which can work for all pins in the system (or at least
-> > > those that have not been claimed by another device). I don't know if
-> > > that interface already exists, but Linus would be the right person
-> > > to answer that.
-> >
-> > I think i have one colleague that recently made a patch for that purpose.
-> > But i believe this is still in progress. It consists in improving the 
-> > pinctrl
-> > debugfs interface to be able to manually change the pin muxing and
-> > the gpio configuration for debug/testing purpose.
-> 
-> Sounds good to me. Peter, Tony, do you think that would be a good enough
-> interface for other platforms as well?
+The original code was generating an lsl instructions using the value
+of ARM_R8 (skb_headlen, possibly uninitialized if no skb_headlen
+access was required) as a shift amount.
+---
+ arch/arm/net/bpf_jit_32.c |   15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-Yes debugfs is the way to go for modifying the hwobs settings.
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index a34f1e2..6828ef6 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -341,10 +341,17 @@ static void emit_load_be16(u8 cond, u8 r_res, u8 r_addr, struct jit_ctx *ctx)
  
-> > > If there is a generic way to configure pinmux from user space, you
-> > > can essentially move this driver into an application running outside
-> > > of the kernel.
-> > >
-> > The matter is that this hwobs driver do more than just changing
-> > the muxing of one pin group in the digital baseband.
-> > It also control some specific registers to configure the hwobs IP.
-> > More in details, for each of the 18 external IOs, it is possible to
-> > select one observer mode among several. We also provide some
-> > facility for the user to easily detect the pin to monitor on the
-> > output connector.
-> 
-> Hmm, I wonder if that is something that makes sense to have
-> in a generic pinctrl debugfs interface. Maybe it can instead
-> be part of the new pinctrl driver for this hw block then, which
-> should be able to create additional sysfs files in the pinctrl
-> debugfs directories. Linus, does that make sense to you?
-
-Makes sense to me.
-
-And pinctrl does not need to have any knowledge of the names of
-the hwobs signals etc. That can all be done in a user space app
-modifying the pinctrl registers via debugs.
-
-Regards,
-
-Tony
+ static inline void emit_swap16(u8 r_dst, u8 r_src, struct jit_ctx *ctx)
+ {
+-	emit(ARM_LSL_R(ARM_R1, r_src, 8), ctx);
+-	emit(ARM_ORR_S(r_dst, ARM_R1, r_src, SRTYPE_LSL, 8), ctx);
+-	emit(ARM_LSL_I(r_dst, r_dst, 8), ctx);
+-	emit(ARM_LSL_R(r_dst, r_dst, 8), ctx);
++	/* r_dst = (r_src << 8) | (r_src >> 8) */
++	emit(ARM_LSL_I(ARM_R1, r_src, 8), ctx);
++	emit(ARM_ORR_S(r_dst, ARM_R1, r_src, SRTYPE_LSR, 8), ctx);
++
++	/*
++	 * we need to mask out the bits set in r_dst[23:16] due to
++	 * the first shift instruction.
++	 *
++	 * note that 0x8ff is the encoded immediate 0x00ff0000.
++	 */
++	emit(ARM_BIC_I(r_dst, r_dst, 0x8ff), ctx);
+ }
+ 
+ #else  /* ARMv6+ */
+-- 
+1.7.10.4
