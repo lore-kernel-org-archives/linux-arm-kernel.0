@@ -1,44 +1,56 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 14 Feb 2013 00:11:33 +0100
-Subject: [PATCH 10/14] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <1357764194-12677-11-git-send-email-thierry.reding@avionic-design.de>
-References: <1357764194-12677-1-git-send-email-thierry.reding@avionic-design.de>
- <1357764194-12677-11-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20130214001133.77e6ba06@skate>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Thu, 14 Feb 2013 01:28:05 +0200
+Subject: [PATCH 1/1] ARM: OMAP4: Add OMAP4 Blaze Tablet support
+In-Reply-To: <20130211190011.GS4801@atomide.com>
+References: <1360352269-14922-1-git-send-email-ruslan.bilovol@ti.com>
+ <1360352269-14922-2-git-send-email-ruslan.bilovol@ti.com>
+ <20130210025225.GB4801@atomide.com> <51193DE1.6080704@ti.com>
+ <20130211190011.GS4801@atomide.com>
+Message-ID: <CAB=otbScyfU3PmANeLhgdeVEW=iG3yWXP46ZKwOWHaxeac1djA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Grant Likely,
+Hi Tony, Jon,
 
-On Wed, 13 Feb 2013 22:59:50 +0000, Grant Likely wrote:
+On Mon, Feb 11, 2013 at 9:00 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Jon Hunter <jon-hunter@ti.com> [130211 10:58]:
+>>
+>> Please note that the blaze is derived from the omap4-sdp board and so I
+>> would hope that we can use the existing for sdp dts and board file for
+>> blaze. In fact this is what I do today for basic booting.
+>>
+>> So unless there is some feature on the blaze that is not compatible with
+>> the original sdp, we should just use the sdp dts.
+>
+> Sounds like we need some common .dts file and separate files
+> for sdp, blaze and tablet that include the common .dts file?
+>
+> There's a different LCD panel at least between blaze and the
+> tablet.
 
-> There isn't a whole lot of value in this patch without another user.
-> I'll need to see the other patches that make use of this.
+Please note, that, although 'Blaze' board is very close to 'SDP' board,
+there are quite big differences comparing to 'Blaze Tablet' board.
+At least:
+ - LCD panels
+ - touchscreen controllers
+ - LEDs
+ - Keypad (on 'Blaze') / gpio keys (on 'Blaze Tablet')
+ - Sensors
+ - HS USB Host related stuff
+ - cameras (there is no embedded cameras on 'Blaze Tablet' board)
 
-See the proposed Marvell PCIe driver and Tegra PCIe driver:
- http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149232.html
- http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140649.html
+As per my point of view, next should be done:
+1) Add the DTS file for BlazeTablet board
+2) Figure out what is common for both and move it to some common file
+(if that makes sense)
 
-Both Thierry (doing the Tegra PCIe driver) and myself (doing the
-Marvell PCIe driver) already have fairly long patch series to add
-support for the PCIe interfaces in our respective SoC. In order to ease
-the process of getting those merged, we'd like to get some of the
-base functions we depend on to be merged first, so that our patch
-series become a bit smaller and therefore more manageable. My Marvell
-PCIe patch series already has 32 patches (including the ones we are
-currently discussing), and I will need even more patches for the
-upcoming fourth version (due to additional comments made during the
-review of the third version of the patch set).
+I'm currently working on step '#1'. So after that step #2 should not
+be an issue for us.
 
-So, it would really be helpful if this base infrastructure, for which
-users already exist in the form of submitted patches, that have already
-gone through multiple iterations, could be merged.
+Best regards,
+Ruslan
 
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>
+> Regards,
+>
+> Tony
