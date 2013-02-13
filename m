@@ -1,32 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 13 Feb 2013 09:50:25 +0100
-Subject: [PATCH v3] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <201302121812.11566.arnd@arndb.de>
-References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201302121812.11566.arnd@arndb.de>
-Message-ID: <20130213095025.079fdd89@skate>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 13 Feb 2013 14:25:24 +0530
+Subject: [PATCH v2] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for all
+ CPU power states except off
+Message-ID: <1360745724-30058-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+Current CPU PM code code make use of common cpu_suspend() path for all the
+CPU power states which is not optimal. In fact cpu_suspend() path is needed
+only when we put CPU power domain to off state where the CPU context is lost.
 
-On Tue, 12 Feb 2013 18:12:11 +0000, Arnd Bergmann wrote:
+Update the code accordingly so that the expensive cpu_suspend() path
+can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
 
-> You can add my 'Reviewed-by' tag on all paches except 5, 6, and 24.
-> 
-> I'm fine with adding the other ones to 3.9, as well as adding
-> the binding document if you split that out from patch 24. Sorry for
-> making this so hard for you.
+The patch has been tested on OMAP4430 and OMAP5430(with few out of tree patches)
+devices for suspend and CPUidle.
 
-Is this really true that some more code can be taken for 3.9 ? It
-somewhat contradicts the statement that Olof has made on LAKML just a
-few hours ago "arm-soc: No new material from 3.9, fixes only".
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 
-Thanks,
+Reported-by: Richard Woodruff <r-woodruff2@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+Update changelog to include testing details as suggested
+by Kevin Hilman.
 
-Thomas
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index aac46bf..abdd0f6 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -276,7 +276,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	/*
+ 	 * Call low level function  with targeted low power state.
+ 	 */
+-	cpu_suspend(save_state, omap4_finish_suspend);
++	if (save_state)
++		cpu_suspend(save_state, omap4_finish_suspend);
++	else
++		omap4_finish_suspend(save_state);
+ 
+ 	/*
+ 	 * Restore the CPUx power state to ON otherwise CPUx
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
