@@ -1,43 +1,72 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 13 Feb 2013 23:03:01 +0530
-Subject: [GIT PULL] DaVinci DT updates for v3.9 (part 2)
-In-Reply-To: <20130210012707.GL16278@quad.lixom.net>
-References: <51168E50.1010709@ti.com> <20130210012707.GL16278@quad.lixom.net>
-Message-ID: <511BCE4D.2060602@ti.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 13 Feb 2013 18:33:39 +0100
+Subject: [PATCH 1/4] clocksource: pass DT node pointer to init functions
+In-Reply-To: <511BC043.4030506@gmail.com>
+References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
+ <1360264144-20714-2-git-send-email-robherring2@gmail.com>
+ <CAHTX3dKLCbfhBaHKBE=fVTcRReVL6yotA9e_8S70bH+_gajL5Q@mail.gmail.com>
+ <511BC043.4030506@gmail.com>
+Message-ID: <CAHTX3d+2rGBE3ZBwiHbq7tOi+OE+5KGPh34APzp0NhRP=mBv+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+2013/2/13 Rob Herring <robherring2@gmail.com>:
+> On 02/13/2013 10:21 AM, Michal Simek wrote:
+>> 2013/2/7 Rob Herring <robherring2@gmail.com>:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> In cases where we have multiple nodes of the same type, we may need the
+>>> node pointer to know which node was matched. Passing the node pointer
+>>> also keeps the init function from having to match the node a 2nd time.
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: John Stultz <johnstul@us.ibm.com>
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> ---
+>>>  drivers/clocksource/clksrc-of.c |    4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> Tested-by: Michal Simek <michal.simek@xilinx.com>
+>>
+>> The rest is just the same as I have done. Any option to add these
+>> patches to v3.9?
+>
+> I would like to before we have more users to fix, but it will have to be
+> post rc1. If not, Arnd/Olof should be be able to provide a stable branch
+> for 3.10.
 
-On 2/10/2013 6:57 AM, Olof Johansson wrote:
-> On Sat, Feb 09, 2013 at 11:28:40PM +0530, Sekhar Nori wrote:
->> Hi Arnd, Olof,
->>
->> Can you please pull the following changes for v3.9?
->>
->> Thanks,
->> Sekhar
->>
->> The following changes since commit 1661636d362b6d1a6c2bab210f2ab363a69deccc:
->>
->>   ARM: davinci: da850: add RTC DT entries (2013-01-28 21:28:11 +0530)
->>
->> are available in the git repository at:
->>
->>   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-for-v3.9/dt-2
-> 
-> Pulled, but:
-> 
->> Kumar, Anil (2):
->>       ARM: davinci: da850 DT: add support for machine reboot
-> 
-> Looking at this patch, looking for any device named "watchdog" seems a
-> bit fragile.  It's an unfortunate device name to have it that generic
-> in the davinci_wdt driver.
+ok
 
-Yes, agreed. Ideally a future patch should fix that but I wonder if
-device name becomes part of userspace API because it gets exposed
-through sysfs and hence should not be changed?
+>> Because I need these patches for zynq timer because we have two in the soc.
+>> Is it OK to register several clock source and clockevent devices?
+>
+> If it is 1 DT node, then that should be fine.
+
+zynq is using two triple timer counter IP . There are also described by two
+different DT nodes because there are separated and uses different baseaddresses.
+
+Does it mean that if there are 2 DT nodes that it won't work?
+
+
+One more thing. Is there any rule which should describe which timer should be
+used for clockevent and for clocksource?
+
+
+>> btw: there is still one issue because you can just setup only one
+>> compatibility string.
+>
+> You can have multiple CLOCKSOURCE_OF_DECLARE statements. The gic code
+> does this for irqchips.
+
+Ok. Will look at it.
 
 Thanks,
-Sekhar
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
