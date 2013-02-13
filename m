@@ -1,58 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 14 Feb 2013 01:21:06 +0900
-Subject: [PATCH 00/16 v1.1] SCIF, I2C and FSI pinctrl functions for sh73a0
-In-Reply-To: <1911001.oocnvCx2VX@avalon>
-References: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
- <1911001.oocnvCx2VX@avalon>
-Message-ID: <20130213162106.GB10520@verge.net.au>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 13 Feb 2013 17:21:10 +0100
+Subject: [PATCH 1/4] clocksource: pass DT node pointer to init functions
+In-Reply-To: <1360264144-20714-2-git-send-email-robherring2@gmail.com>
+References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
+ <1360264144-20714-2-git-send-email-robherring2@gmail.com>
+Message-ID: <CAHTX3dKLCbfhBaHKBE=fVTcRReVL6yotA9e_8S70bH+_gajL5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 05:06:30PM +0100, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Wednesday 13 February 2013 11:44:36 Simon Horman wrote:
-> > Hi,
-> > 
-> > this series is a follow-up to "[PATCH 00/16] SCIF, I2C and FSI pinctrl
-> > functions for sh73a0" by Laurent Pinchart. I am primarily posting it for
-> > his review.
-> > 
-> > This series differs from the series posted by Laurent in the following ways:
-> > 
-> > * Due to some slightly over-zelous git use on my part the series
-> >   is actually based on a checkout of
-> >   git://linuxtv.org/pinchartl/fbdev.git pinmux-pfc-funcs
-> > 
-> >   As such it includes several patches not included in the series posted in
-> >   via eimal as the series "[PATCH 00/16] SCIF, I2C and FSI pinctrl
-> >   functions for sh73a0". In particular it includes r8a7740 and r8a7779
-> >   patches.
-> > 
-> > * I have added the following two patches to update the KZM9G rerence code.
-> > 
-> >   ARM: shmobile: kzm9g: reference: Register pinctrl mappings for I2C
-> >   ARM: shmobile: kzm9g: reference: Register pinctrl mappings for SCIF
-> > 
-> > As implied by the second point above, this series is based on
-> > a branch that includes the kzm9g reference code. That branch is
-> > 
-> > 	git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
-> > topic/pinmux-base
-> 
-> When do you plan to push that reference code to mainline ?
+2013/2/7 Rob Herring <robherring2@gmail.com>:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> In cases where we have multiple nodes of the same type, we may need the
+> node pointer to know which node was matched. Passing the node pointer
+> also keeps the init function from having to match the node a 2nd time.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: John Stultz <johnstul@us.ibm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  drivers/clocksource/clksrc-of.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-As soon as I start pushing stuff for v3.10.
-So I am thinking in terms of before pinmux.
-But the order can be changed if need be.
+Tested-by: Michal Simek <michal.simek@xilinx.com>
 
-> > Git and diffstat information is provided below to aid review.
-> > 
-> > Laurent, if you want to change this series in any way just let me know.
-> > I can drop patches indidually or drop the entire series and add a fresh
-> > one from you to the topic branch.
-> 
-> I will likely provide you with a new branch. Can you handle the two kzm9g-
-> reference patches, or should I include them in my branch ?
+The rest is just the same as I have done. Any option to add these
+patches to v3.9?
+Because I need these patches for zynq timer because we have two in the soc.
+Is it OK to register several clock source and clockevent devices?
 
-I can handle the kzm9g-reference patches if you prefer.
+btw: there is still one issue because you can just setup only one
+compatibility string.
+
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
