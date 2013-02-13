@@ -1,71 +1,63 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 13 Feb 2013 13:22:24 +0100
-Subject: [PATCH v8 1/7] watchdog: core: add and use watchdog_is_valid_timeout
- function
+Date: Wed, 13 Feb 2013 13:22:28 +0100
+Subject: [PATCH v8 5/7] watchdog: s3c2410_wdt: add timeout-sec property binding
 In-Reply-To: <1360758150-23004-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1360758150-23004-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1360758150-23004-2-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1360758150-23004-6-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
----
- drivers/watchdog/watchdog_core.c | 14 ++++++++++++++
- drivers/watchdog/watchdog_dev.c  |  3 +--
- include/linux/watchdog.h         |  2 ++
- 3 files changed, 17 insertions(+), 2 deletions(-)
+Only compile tested.
 
-diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-index 3796434..f10fa31 100644
---- a/drivers/watchdog/watchdog_core.c
-+++ b/drivers/watchdog/watchdog_core.c
-@@ -43,6 +43,20 @@ static DEFINE_IDA(watchdog_ida);
- static struct class *watchdog_class;
- 
- /**
-+ * watchdog_is_valid_timeout() - check if the timeout is within a valid range
-+ * @timeout: value to check
-+ */
-+bool watchdog_is_valid_timeout(struct watchdog_device *wdd, uint timeout)
-+{
-+	if (wdd->min_timeout < wdd->max_timeout)
-+		return (wdd->min_timeout <= timeout) &&
-+			(timeout <= wdd->max_timeout);
-+	else
-+		return (timeout > 0);
-+}
-+EXPORT_SYMBOL_GPL(watchdog_is_valid_timeout);
+Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+---
+ Documentation/devicetree/bindings/watchdog/samsung-wdt.txt | 3 +++
+ drivers/watchdog/s3c2410_wdt.c                             | 6 ++++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt b/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
+index 79ead82..451127a 100644
+--- a/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
+@@ -9,3 +9,6 @@ Required properties:
+ - reg : base physical address of the controller and length of memory mapped
+ 	region.
+ - interrupts : interrupt number to the cpu.
 +
-+/**
-  * watchdog_register_device() - register a watchdog device
-  * @wdd: watchdog device
-  *
-diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
-index ef8edec..49976f8 100644
---- a/drivers/watchdog/watchdog_dev.c
-+++ b/drivers/watchdog/watchdog_dev.c
-@@ -200,8 +200,7 @@ static int watchdog_set_timeout(struct watchdog_device *wddev,
- 	    !(wddev->info->options & WDIOF_SETTIMEOUT))
- 		return -EOPNOTSUPP;
++Optional properties:
++- timeout-sec : contains the watchdog timeout in seconds.
+diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+index 6419c61..c1a221c 100644
+--- a/drivers/watchdog/s3c2410_wdt.c
++++ b/drivers/watchdog/s3c2410_wdt.c
+@@ -53,7 +53,7 @@
+ #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
  
--	if ((wddev->max_timeout != 0) &&
--	    (timeout < wddev->min_timeout || timeout > wddev->max_timeout))
-+	if (!watchdog_is_valid_timeout(wddev, timeout))
- 		return -EINVAL;
+ static bool nowayout	= WATCHDOG_NOWAYOUT;
+-static int tmr_margin	= CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME;
++static int tmr_margin;
+ static int tmr_atboot	= CONFIG_S3C2410_WATCHDOG_ATBOOT;
+ static int soft_noboot;
+ static int debug;
+@@ -226,6 +226,7 @@ static struct watchdog_ops s3c2410wdt_ops = {
+ static struct watchdog_device s3c2410_wdd = {
+ 	.info = &s3c2410_wdt_ident,
+ 	.ops = &s3c2410wdt_ops,
++	.timeout = CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME,
+ };
  
- 	mutex_lock(&wddev->lock);
-diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-index 3a9df2f..9ae945e 100644
---- a/include/linux/watchdog.h
-+++ b/include/linux/watchdog.h
-@@ -130,6 +130,8 @@ static inline void *watchdog_get_drvdata(struct watchdog_device *wdd)
- }
+ /* interrupt handler code */
+@@ -356,7 +357,8 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+ 	/* see if we can actually set the requested timer margin, and if
+ 	 * not, try the default value */
  
- /* drivers/watchdog/watchdog_core.c */
-+extern bool watchdog_is_valid_timeout(struct watchdog_device *wdd,
-+				      uint timeout);
- extern int watchdog_register_device(struct watchdog_device *);
- extern void watchdog_unregister_device(struct watchdog_device *);
+-	if (s3c2410wdt_set_heartbeat(&s3c2410_wdd, tmr_margin)) {
++	watchdog_init_timeout(&s3c2410_wdd, tmr_margin,  &pdev->dev);
++	if (s3c2410wdt_set_heartbeat(&s3c2410_wdd, s3c2410_wdd.timeout)) {
+ 		started = s3c2410wdt_set_heartbeat(&s3c2410_wdd,
+ 					CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME);
  
 -- 
 1.8.1.1
