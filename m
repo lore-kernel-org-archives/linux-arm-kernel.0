@@ -1,36 +1,90 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Feb 2013 11:05:46 -0700
-Subject: [PATCH] arm: arch_timer: include linux/errno.h to declare ENXIO
-Message-ID: <1360778746-27809-1-git-send-email-swarren@wwwdotorg.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 13 Feb 2013 10:02:10 -0800
+Subject: [PATCH v1 2/4] ARM: dts: Add i2c-arbitrator bus for exynos5250-snow
+In-Reply-To: <1360778532-7480-1-git-send-email-dianders@chromium.org>
+References: <1360778532-7480-1-git-send-email-dianders@chromium.org>
+Message-ID: <1360778532-7480-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+We need to use the i2c-arbitrator to talk to any of the devices on i2c
+bus 4 on exynos5250-snow so that we don't confuse the embedded
+controller (EC).  Add the i2c-arbitrator to the device tree.  As we
+add future devices (keyboard, sbs, tps65090) we'll add them on top of
+this.
 
-This fixes:
-arch/arm/kernel/arch_timer.c: In function ?arch_timer_sched_clock_init?:
-arch/arm/kernel/arch_timer.c:55:11: error: ?ENXIO? undeclared (first use in this function)
+The arbitrated bus is numbered 104 simply as a convenience to make it
+easier for people poking around to guess that it might have something
+to do with the physical bus 4.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
+The addition is split between the cros5250-common and the snow device
+tree file since not all cros5250-class devices use arbitration.
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
-tegra_defconfig builds OK, but with my local change to convert Tegra to
-multi-platform, I need this fix to compile. This issue is new sometime
-after next-20130211.
+Changes in v1: None
 
- arch/arm/kernel/arch_timer.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/cros5250-common.dtsi |  5 ++++-
+ arch/arm/boot/dts/exynos5250-snow.dts  | 24 ++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 36ebcf4..8fba00f 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -8,6 +8,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/errno.h>
- #include <linux/init.h>
- #include <linux/types.h>
+diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+index 46c0980..f451375 100644
+--- a/arch/arm/boot/dts/cros5250-common.dtsi
++++ b/arch/arm/boot/dts/cros5250-common.dtsi
+@@ -58,7 +58,10 @@
+ 	};
  
+ 	i2c at 12CA0000 {
+-		status = "disabled";
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <66000>;
++		gpios = <&gpa2 0 3 3 0>,
++			<&gpa2 1 3 3 0>;
+ 	};
+ 
+ 	i2c at 12CB0000 {
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 17dd951..69a87a0 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -16,6 +16,10 @@
+ 	model = "Google Snow";
+ 	compatible = "google,snow", "samsung,exynos5250";
+ 
++	aliases {
++		i2c104 = &i2c_104;
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 
+@@ -29,6 +33,26 @@
+ 		};
+ 	};
+ 
++	i2c-arbitrator {
++		compatible = "i2c-arbitrator";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2c-parent = <&{/i2c@12CA0000}>;
++
++		bus-arbitration-gpios = <&gpf0 3 1 0 0>, <&gpe0 4 0 3 0>;
++		bus-arbitration-slew-delay-us = <10>;
++		bus-arbitration-wait-retry-us = <3000>;
++		bus-arbitration-wait-free-us = <50000>;
++
++		/* Use ID 104 as a hint that we're on physical bus 4 */
++		i2c_104: i2c at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++
+ 	/*
+ 	 * On Snow we've got SIP WiFi and so can keep drive strengths low to
+ 	 * reduce EMI.
 -- 
-1.7.10.4
+1.8.1
