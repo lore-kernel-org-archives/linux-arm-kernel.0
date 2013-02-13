@@ -1,167 +1,241 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 13 Feb 2013 18:34:27 +0100
-Subject: [PATCH v2 3/8] ARM i.MX6q: Add GPU, VPU, IPU,
- and OpenVG resets to System Reset Controller (SRC)
+Date: Wed, 13 Feb 2013 18:34:32 +0100
+Subject: [PATCH v2 8/8] reset: Add driver for gpio-controlled reset pins
 In-Reply-To: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
 References: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1360776872-18584-4-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1360776872-18584-9-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SRC has auto-deasserting reset bits that control reset lines to
-the GPU, VPU, IPU, and OpenVG IP modules. This patch adds a reset
-controller that can be controlled by those devices using the
-reset controller API.
-
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
-Changes since v1:
- - Removed .is_asserted op.
- - Added struct reset_controller_dev pointer to .reset op.
----
- .../devicetree/bindings/reset/fsl,imx-src.txt      |   49 ++++++++++++++++++
- arch/arm/mach-imx/src.c                            |   54 ++++++++++++++++++++
- 2 files changed, 103 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx-src.txt
+ drivers/reset/Kconfig      |   13 +++
+ drivers/reset/Makefile     |    1 +
+ drivers/reset/gpio-reset.c |  188 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 202 insertions(+)
+ create mode 100644 drivers/reset/gpio-reset.c
 
-diff --git a/Documentation/devicetree/bindings/reset/fsl,imx-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx-src.txt
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index 66ac385..bdf799a 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -7,3 +7,16 @@ menuconfig RESET_CONTROLLER
+ 	  via GPIOs or SoC-internal reset controller modules.
+ 
+ 	  If unsure, say no.
++
++if RESET_CONTROLLER
++
++config RESET_GPIO
++	tristate "GPIO reset controller support"
++	depends on GENERIC_GPIO
++	help
++	  This driver provides support for reset lines that are controlled
++	  directly by GPIOs.
++	  The delay between assertion and de-assertion of the reset signal
++	  can be configured.
++
++endif
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 1e2d83f..b854f20 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_RESET_CONTROLLER) += core.o
++obj-$(CONFIG_RESET_GPIO) += gpio-reset.o
+diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
 new file mode 100644
-index 0000000..1330177
+index 0000000..c7ca858
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/fsl,imx-src.txt
-@@ -0,0 +1,49 @@
-+Freescale i.MX System Reset Controller
-+======================================
-+
-+Please also refer to reset.txt in this directory for common reset
-+controller binding usage.
-+
-+Required properties:
-+- compatible: Should be "fsl,<chip>-src"
-+- reg: should be register base and length as documented in the
-+  datasheet
-+- interrupts: Should contain SRC interrupt and CPU WDOG interrupt,
-+  in this order.
-+- #reset-cells: 1, see below
-+
-+example:
-+
-+src: src at 020d8000 {
-+        compatible = "fsl,imx6q-src";
-+        reg = <0x020d8000 0x4000>;
-+        interrupts = <0 91 0x04 0 96 0x04>;
-+        #reset-cells = <1>;
-+};
-+
-+Specifying reset lines connected to IP modules
-+==============================================
-+
-+The system reset controller can be used to reset the GPU, VPU,
-+IPU, and OpenVG IP modules on i.MX5 and i.MX6 ICs. Those device
-+nodes should specify the reset line on the SRC in their resets
-+property, containing a phandle to the SRC device node and a
-+RESET_INDEX specifying which module to reset, as described in
-+reset.txt
-+
-+example:
-+
-+        ipu1: ipu at 02400000 {
-+                resets = <&src 2>;
-+        };
-+        ipu2: ipu at 02800000 {
-+                resets = <&src 4>;
-+        };
-+
-+The following RESET_INDEX values are valid for i.MX5:
-+GPU_RESET     0
-+VPU_RESET     1
-+IPU1_RESET    2
-+OPEN_VG_RESET 3
-+The following additional RESET_INDEX value is valid for i.MX6:
-+IPU2_RESET    4
-diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-index e15f155..3228484 100644
---- a/arch/arm/mach-imx/src.c
-+++ b/arch/arm/mach-imx/src.c
-@@ -14,17 +14,68 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
++++ b/drivers/reset/gpio-reset.c
+@@ -0,0 +1,188 @@
++/*
++ * Copyright 2013 Philipp Zabel, Pengutronix
++ */
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/module.h>
++#include <linux/of_gpio.h>
++#include <linux/platform_device.h>
 +#include <linux/reset-controller.h>
- #include <linux/smp.h>
- #include <asm/smp_plat.h>
- 
- #define SRC_SCR				0x000
- #define SRC_GPR1			0x020
- #define BP_SRC_SCR_WARM_RESET_ENABLE	0
-+#define BP_SRC_SCR_SW_GPU_RST		1
-+#define BP_SRC_SCR_SW_VPU_RST		2
-+#define BP_SRC_SCR_SW_IPU1_RST		3
-+#define BP_SRC_SCR_SW_OPEN_VG_RST	4
-+#define BP_SRC_SCR_SW_IPU2_RST		12
- #define BP_SRC_SCR_CORE1_RST		14
- #define BP_SRC_SCR_CORE1_ENABLE		22
- 
- static void __iomem *src_base;
- 
-+static int sw_reset_bits[5] = {
-+	BP_SRC_SCR_SW_GPU_RST,
-+	BP_SRC_SCR_SW_VPU_RST,
-+	BP_SRC_SCR_SW_IPU1_RST,
-+	BP_SRC_SCR_SW_OPEN_VG_RST,
-+	BP_SRC_SCR_SW_IPU2_RST
++
++struct gpio_reset {
++	unsigned int gpio;
++	unsigned long flags;
++	unsigned int delay_ms;
 +};
 +
-+static int imx_src_reset_module(struct reset_controller_dev *rcdev,
-+		unsigned long sw_reset_idx)
++struct gpio_reset_data {
++	struct reset_controller_dev rcdev;
++	struct gpio_reset *gpios;
++	int nr_gpios;
++};
++
++static void __gpio_reset_set(struct gpio_reset_data *drvdata,
++		unsigned long gpio_idx, int asserted)
 +{
-+	unsigned long timeout;
-+	int bit;
-+	u32 val;
++	int value = asserted;
 +
-+	if (!src_base)
-+		return -ENODEV;
++	if (drvdata->gpios[gpio_idx].flags == GPIOF_OUT_INIT_HIGH)
++		value = !value;
 +
-+	if (sw_reset_idx >= ARRAY_SIZE(sw_reset_bits))
++	gpio_set_value(drvdata->gpios[gpio_idx].gpio, value);
++}
++
++static int gpio_reset(struct reset_controller_dev *rcdev,
++		unsigned long gpio_idx)
++{
++	struct gpio_reset_data *drvdata = container_of(rcdev,
++			struct gpio_reset_data, rcdev);
++
++	if (gpio_idx >= drvdata->nr_gpios)
 +		return -EINVAL;
 +
-+	bit = 1 << sw_reset_bits[sw_reset_idx];
++	if (drvdata->gpios[gpio_idx].delay_ms < 0)
++		return -ENOSYS;
 +
-+	val = readl_relaxed(src_base + SRC_SCR);
-+	val |= bit;
-+	writel_relaxed(val, src_base + SRC_SCR);
-+
-+	timeout = jiffies + msecs_to_jiffies(1000);
-+	while (readl(src_base + SRC_SCR) & bit) {
-+		if (time_after(jiffies, timeout))
-+			return -ETIME;
-+		cpu_relax();
-+	}
++	__gpio_reset_set(drvdata, gpio_idx, 1);
++	mdelay(drvdata->gpios[gpio_idx].delay_ms);
++	__gpio_reset_set(drvdata, gpio_idx, 0);
 +
 +	return 0;
 +}
 +
-+static struct reset_control_ops imx_src_ops = {
-+	.reset = imx_src_reset_module,
++static int gpio_reset_assert(struct reset_controller_dev *rcdev,
++		unsigned long gpio_idx)
++{
++	struct gpio_reset_data *drvdata = container_of(rcdev,
++			struct gpio_reset_data, rcdev);
++
++	if (gpio_idx >= drvdata->nr_gpios)
++		return -EINVAL;
++
++	__gpio_reset_set(drvdata, gpio_idx, 1);
++
++	return 0;
++}
++
++static int gpio_reset_deassert(struct reset_controller_dev *rcdev,
++		unsigned long gpio_idx)
++{
++	struct gpio_reset_data *drvdata = container_of(rcdev,
++			struct gpio_reset_data, rcdev);
++
++	if (gpio_idx >= drvdata->nr_gpios)
++		return -EINVAL;
++
++	__gpio_reset_set(drvdata, gpio_idx, 0);
++
++	return 0;
++}
++
++static struct reset_control_ops gpio_reset_ops = {
++	.reset = gpio_reset,
++	.assert = gpio_reset_assert,
++	.deassert = gpio_reset_deassert,
 +};
 +
-+static struct reset_controller_dev imx_reset_controller = {
-+	.ops = &imx_src_ops,
++static int gpio_reset_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct gpio_reset_data *drvdata;
++	enum of_gpio_flags flags;
++	u32 *delays = NULL;
++	int ret;
++	int i;
++
++	drvdata = devm_kzalloc(&pdev->dev, sizeof(*drvdata), GFP_KERNEL);
++	if (drvdata == NULL)
++		return -ENOMEM;
++
++	drvdata->nr_gpios = of_gpio_named_count(np, "gpios");
++	if (drvdata->nr_gpios < 1)
++		return -EINVAL;
++
++	drvdata->gpios = devm_kzalloc(&pdev->dev, sizeof(struct gpio_reset) *
++			drvdata->nr_gpios, GFP_KERNEL);
++	if (drvdata->gpios == NULL)
++		return -ENOMEM;
++
++	if (of_find_property(np, "reset-delays", NULL)) {
++		delays = devm_kzalloc(&pdev->dev, sizeof(u32) *
++				drvdata->nr_gpios, GFP_KERNEL);
++		if (delays == NULL)
++			return -ENOMEM;
++
++		ret = of_property_read_u32_array(np, "reset-delays", delays,
++				drvdata->nr_gpios);
++		if (ret < 0)
++			return ret;
++	}
++
++	for (i = 0; i < drvdata->nr_gpios; i++) {
++		drvdata->gpios[i].gpio = of_get_named_gpio_flags(np, "gpios",
++				i, &flags);
++		if (drvdata->gpios[i].gpio < 0) {
++			dev_err(&pdev->dev, "invalid gpio for reset %d\n", i);
++			return drvdata->gpios[i].gpio;
++		}
++
++		/*
++		 * The flags are also used to remember whether a given GPIO
++		 * reset is active-low.
++		 */
++		if (flags & OF_GPIO_ACTIVE_LOW)
++			drvdata->gpios[i].flags = GPIOF_OUT_INIT_HIGH;
++		else
++			drvdata->gpios[i].flags = GPIOF_OUT_INIT_LOW;
++
++		ret = devm_gpio_request_one(&pdev->dev, drvdata->gpios[i].gpio,
++				drvdata->gpios[i].flags, NULL);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "failed to request gpio %d for reset %d\n",
++					drvdata->gpios[i].gpio, i);
++			return ret;
++		}
++
++		if (delays != NULL)
++			drvdata->gpios[i].delay_ms = delays[i];
++		else
++			drvdata->gpios[i].delay_ms = -1; /* .reset returns -ENOSYS */
++	}
++
++	devm_kfree(&pdev->dev, delays);
++
++	drvdata->rcdev.of_node = np;
++	drvdata->rcdev.ops = &gpio_reset_ops;
++	reset_controller_register(&drvdata->rcdev);
++
++	platform_set_drvdata(pdev, drvdata);
++
++	return 0;
++}
++
++static int gpio_reset_remove(struct platform_device *pdev)
++{
++	struct gpio_reset_data *drvdata = platform_get_drvdata(pdev);
++
++	reset_controller_unregister(&drvdata->rcdev);
++
++	return 0;
++}
++
++static struct of_device_id gpio_reset_dt_ids[] = {
++	{ .compatible = "gpio-reset" },
++	{ }
 +};
 +
- void imx_enable_cpu(int cpu, bool enable)
- {
- 	u32 mask, val;
-@@ -65,6 +116,9 @@ void __init imx_src_init(void)
- 	src_base = of_iomap(np, 0);
- 	WARN_ON(!src_base);
- 
-+	imx_reset_controller.of_node = np;
-+	reset_controller_register(&imx_reset_controller);
++static struct platform_driver gpio_reset_driver = {
++	.probe = gpio_reset_probe,
++	.remove = gpio_reset_remove,
++	.driver = {
++		.name = "gpio-reset",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(gpio_reset_dt_ids),
++	},
++};
 +
- 	/*
- 	 * force warm reset sources to generate cold reset
- 	 * for a more reliable restart
++module_platform_driver(gpio_reset_driver);
 -- 
 1.7.10.4
