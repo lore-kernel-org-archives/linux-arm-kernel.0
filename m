@@ -1,68 +1,127 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Wed, 13 Feb 2013 09:52:30 +0530
-Subject: [PATCH V4 0/5] Add generic DMA DT binding support
-In-Reply-To: <20130212144950.GJ3789@intel.com>
-References: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
- <20130212144950.GJ3789@intel.com>
-Message-ID: <CAAgF-Be1w-8yjuyXT+d8sUO8dee1x7oYFJLXHCmcJSf17eXWyw@mail.gmail.com>
+From: inderpal.singh@linaro.org (Inderpal Singh)
+Date: Wed, 13 Feb 2013 10:07:50 +0530
+Subject: [PATCH] arm: plat-samsung: check soc ids before l2x0 cache
+ restoration in resume
+In-Reply-To: <1d9501ce0956$f7ce4150$e76ac3f0$@samsung.com>
+References: <1358843109-11072-1-git-send-email-inderpal.singh@linaro.org>
+ <1d9501ce0956$f7ce4150$e76ac3f0$@samsung.com>
+Message-ID: <CAG17yqQzFBJ94ZZ=oQP+ySOhZisDu6dPSo_o+crpR_PPZBCwsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi Kukjin,
 
-On Tue, Feb 12, 2013 at 8:19 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Mon, Feb 11, 2013 at 02:08:20PM +0530, Padmavathi Venna wrote:
->
-> This looks fine, I have only question. The code seems to assume that pl330 dma
-> controller always uses DT. But I dont see that as dependency for pl330.
->
-> Something tells me withot OF the driver may not build, have you checked it?
->
->> This patch set adds support for generic dma device tree bindings for
->> Samsung platforms and is dependent on the following patches from
->> Vinod Koul next branch
->> 1)of: Add generic device tree DMA helpers
->> 2)dmaengine: add helper function to request a slave DMA channel
+Thanks for reviewing the patch.
+
+On 13 February 2013 00:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Inderpal Singh wrote:
 >>
->> This patch set is made based Mark Brown next branch
-> Is this targetted for ASoC tree, if so why? It would fail to build if applied
-> there
-
-I have done this for my testing purpose (I expected all will directly
-apply in your branch). But 3rd patch is not applied directly. I will
-resend the patches after re-basing on your tree. 5th patch has to go
-in ASoC tree because it has dependency on "ARM: SAMSUNG: Make dma
-request compatible to generic dma bindings" which is there in ASoC
-tree.
-
-Hi Mark,
-
-Can you please take the 5th patch in your tree(if there is no issue)
-or should I resend it as a separate patch?
-
+>> Only exynos4 based platforms have l2x0 cache controller. Hence check
+>> the same before restoring the cache in resume.
+>>
+> I think, the code can determine by checking ARM main ID cp15 register
+> instead of Chip ID. Because if so, we don't need to do something for ahother
+> EXYNOS4 SoCs next time.
 >
-> --
-> ~Vinod
+
+Good point.
+So the idea is that only cortex a9 based samsung platforms will have
+l2x0 cache controller. Hence I should only check if its cortex a9 or
+not from main ID reg.
+Please confirm.
+
+Thanks,
+Inder
+
+>> This is needed for single kernel image.
 >>
->> Padmavathi Venna (5):
->>   DMA: PL330: Add new pl330 filter for DT case.
->>   DMA: PL330: Add xlate function
->>   DMA: PL330: Register the DMA controller with the generic DMA helpers
->>   ARM: dts: pl330: Add #dma-cells for generic dma binding support
->>   ARM: SAMSUNG: dma: Remove unnecessary code
+>> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+>> ---
+>>  arch/arm/mach-exynos/common.c           |    2 ++
+>>  arch/arm/plat-samsung/include/plat/pm.h |    1 +
+>>  arch/arm/plat-samsung/s5p-sleep.S       |   28
+>> ++++++++++++++++++++++++++++
+>>  3 files changed, 31 insertions(+)
 >>
->>  .../devicetree/bindings/dma/arm-pl330.txt          |   21 +++++--
->>  arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++
->>  arch/arm/mach-s3c24xx/include/mach/dma.h           |    1 -
->>  arch/arm/mach-s3c64xx/include/mach/dma.h           |    1 -
->>  arch/arm/plat-samsung/dma-ops.c                    |   10 +---
->>  arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 -
->>  arch/arm/plat-samsung/include/plat/dma-pl330.h     |    1 -
->>  drivers/dma/pl330.c                                |   64 +++++++++++++++----
->>  8 files changed, 79 insertions(+), 32 deletions(-)
+>> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-
+>> exynos/common.c
+>> index cdaa55f..ab7ca00 100644
+>> --- a/arch/arm/mach-exynos/common.c
+>> +++ b/arch/arm/mach-exynos/common.c
+>> @@ -796,6 +796,8 @@ static int __init exynos4_l2x0_cache_init(void)
+>>       if (soc_is_exynos5250() || soc_is_exynos5440())
+>>               return 0;
 >>
+>> +     s5p_cpu = samsung_cpu_id & EXYNOS4_CPU_MASK;
+>> +
+>>       ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
+>>       if (!ret) {
+>>               l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+>> diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-
+>> samsung/include/plat/pm.h
+>> index 887a0c9..285c8c8 100644
+>> --- a/arch/arm/plat-samsung/include/plat/pm.h
+>> +++ b/arch/arm/plat-samsung/include/plat/pm.h
+>> @@ -190,3 +190,4 @@ extern void samsung_pm_save_gpios(void);
+>>
+>>  extern void s3c_pm_save_core(void);
+>>  extern void s3c_pm_restore_core(void);
+>> +extern unsigned long s5p_cpu;
+>> diff --git a/arch/arm/plat-samsung/s5p-sleep.S b/arch/arm/plat-
+>> samsung/s5p-sleep.S
+>> index bdf6dad..006d35f 100644
+>> --- a/arch/arm/plat-samsung/s5p-sleep.S
+>> +++ b/arch/arm/plat-samsung/s5p-sleep.S
+>> @@ -25,6 +25,15 @@
+>>  #include <asm/asm-offsets.h>
+>>  #include <asm/hardware/cache-l2x0.h>
+>>
+>> +#define EXYNOS4210_CPU_ID    0x43210000
+>> +#define EXYNOS4212_CPU_ID    0x43220000
+>> +#define EXYNOS4412_CPU_ID    0xE4412200
+>> +#define EXYNOS4_CPU_MASK     0xFFFE0000
+>> +
+>> +#define EXYNOS4210_CPU               (EXYNOS4210_CPU_ID &
+>> EXYNOS4_CPU_MASK)
+>> +#define EXYNOS4212_CPU               (EXYNOS4212_CPU_ID &
+>> EXYNOS4_CPU_MASK)
+>> +#define EXYNOS4412_CPU               (EXYNOS4412_CPU_ID &
+>> EXYNOS4_CPU_MASK)
+>> +
+>>  /*
+>>   *    The following code is located into the .data section. This is to
+>>   *    allow l2x0_regs_phys to be accessed with a relative load while we
+>> @@ -51,6 +60,22 @@
+>>
+>>  ENTRY(s3c_cpu_resume)
+>>  #ifdef CONFIG_CACHE_L2X0
+>> +     adr     r0, s5p_cpu
+>> +     ldr     r1, [r0]
+>> +
+>> +     ldr     r0, =EXYNOS4210_CPU
+>> +     cmp     r1, r0
+>> +     beq     continue
+>> +
+>> +     ldr     r0, =EXYNOS4212_CPU
+>> +     cmp     r1, r0
+>> +     beq     continue
+>> +
+>> +     ldr     r0, =EXYNOS4412_CPU
+>> +     cmp     r1, r0
+>> +     bne     resume_l2on
+>> +
+>> +continue:
+>>       adr     r0, l2x0_regs_phys
+>>       ldr     r0, [r0]
+>>       ldr     r1, [r0, #L2X0_R_PHY_BASE]
+>> @@ -77,4 +102,7 @@ ENDPROC(s3c_cpu_resume)
+>>       .globl l2x0_regs_phys
+>>  l2x0_regs_phys:
+>>       .long   0
+>> +     .globl s5p_cpu
+>> +s5p_cpu:
+>> +     .long   0
+>>  #endif
 >> --
->> 1.7.4.4
->>
-Thanks
-Padma
+>> 1.7.9.5
+>
