@@ -1,49 +1,59 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 13 Feb 2013 11:18:35 +0000
-Subject: ARM big-endian on current kernels for linux-3.8
-In-Reply-To: <511B69C7.1080200@parrot.com>
+Date: Wed, 13 Feb 2013 11:27:56 +0000
+Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
+In-Reply-To: <alpine.LFD.2.03.1302121646380.1242@fluxnic.net>
 References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <20130212171310.GS17833@n2100.arm.linux.org.uk>
- <511A7CEB.9000006@codethink.co.uk> <511B69C7.1080200@parrot.com>
-Message-ID: <511B768B.7000302@codethink.co.uk>
+ <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
+ <20130209120525.GD17833@n2100.arm.linux.org.uk>
+ <51194381.9030505@codethink.co.uk>
+ <alpine.LFD.2.03.1302121646380.1242@fluxnic.net>
+Message-ID: <511B78BC.7000708@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/02/13 10:24, Matthieu CASTET wrote:
-> Ben Dooks a ?crit :
->> On 12/02/13 17:13, Russell King - ARM Linux wrote:
->>> On Fri, Feb 08, 2013 at 11:17:30PM +0000, Ben Dooks wrote:
->>>> I have been working on getting big-endian kernels working, mainly from
->>>> little-endian boot envrionments. The following patch series is what I
->>>> have been working on, mainly on the highbank and axp systems.
->>> What is missing from this is the justification about why we need this
->>> additional pain, given that all the supporting userspaces today are all
->>> LE based.
+On 12/02/13 21:53, Nicolas Pitre wrote:
+> On Mon, 11 Feb 2013, Ben Dooks wrote:
+>
+>> On 09/02/13 12:05, Russell King - ARM Linux wrote:
+>>> On Fri, Feb 08, 2013 at 11:17:40PM +0000, Ben Dooks wrote:
+>>>> -	if (atag->hdr.tag != ATAG_CORE ||
+>>>> -	    (atag->hdr.size != tag_size(tag_core)&&
+>>>> -	     atag->hdr.size != 2))
+>>>> +	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
+>>>> +	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core))&&
+>>>> +	     atag->hdr.size != atag32_to_cpu(2)))
 >>>
->>> Sure, I know that telcos have an endless love of big endian and don't
->>> understand anything else, but getting this working on non-telco socs
->>> seems to be a little odd.
+>>> This is wrong.  You're saying that "ATAG_CORE" is in LE32 format.  It
+>>> isn't.  It's in CPU endian format.  If you want to do this kind of thing,
+>>> you also need to define cpu_to_atag32() macros as well, otherwise this
+>>> will cause sparse warnings.
+>>>
+>>>> -			initrd_start = atag->u.initrd.start;
+>>>> -			initrd_size = atag->u.initrd.size;
+>>>> +			initrd_start = atag32_to_cpu(atag->u.initrd.start);
+>>>> +			initrd_size = atag32_to_cpu(____atag->u.initrd.size);
+>>>
+>>> Where did those four underscores come from?  Has this been built?
 >>
->> Our problem is we have some code that works on a lot of big endian data
->> but is not easy to re-build to work on ARM little endian. The current
->> solution is to change to running the system big endian.
->>
->> Unfortunately we cannot just run user-space big endian as the MMU is
->> fetched in the same endian mode as the processor's data.
->>
-> Which architecture are you using ?
+>> I probably missed building this one. I've been mostly testing with DT
+>> based systems.
 >
-> On armv7 the mmu endian mode is selected by SCTLR.EE [1], but userspace can
-> change it's endian with setend instruction [2].
->
-> As the endian state is stored in cpsr, it should be preserved across context switch.
+> Is this BE8 mode available on old systems?  Or, will those BE8
+> capable old systems have BE userland compiled for them?
 
-Ah yes, I got confused as there is also an endian mode for the page
-tables that needs to match the endian mode that the kernel is doing
-loads/stores in.
+BE8 is for ARMv6 and ARMv7 form of big endian. ARMv5 is BE32.
 
-However if we had BE userland with LE kernel then things are going to
-get difficult with a BE<>LE syscall issue.
+> Where I want to get to is: do we need to support BE8 mode for ATAG based
+> systems at all, given that most if not all the modern ones should be DT
+> based now?  Making the ATAG code BE8 aware is looking to be quite
+> invasive for potentially no users at all.
+
+The change is only useful when using a BE8 compiled kernel with a
+boot loader environment that is LE. Even if the ATAGs do not need
+fixing up, then we have a issue with uboot checking the zImage magic.
+
+I have pushed the ATAGs issues to a new series as it is not necessary
+for the current work we are doing with highbank primarily.
 
 -- 
 Ben Dooks				http://www.codethink.co.uk/
