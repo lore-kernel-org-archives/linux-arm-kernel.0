@@ -1,49 +1,87 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 13 Feb 2013 18:34:28 +0100
-Subject: [PATCH v2 4/8] ARM i.MX6q: Link system reset controller (SRC) to IPU
- in DT
+Date: Wed, 13 Feb 2013 18:34:29 +0100
+Subject: [PATCH v2 5/8] staging: drm/imx: Use SRC to reset IPU
 In-Reply-To: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
 References: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1360776872-18584-5-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1360776872-18584-6-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Request the System Reset Controller to reset the IPU if
+specified via device tree phandle.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
-Changes since v1:
- - Fixed resets property in ipu2 device node.
----
- arch/arm/boot/dts/imx6q.dtsi |    3 +++
- 1 file changed, 3 insertions(+)
+ .../devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt    |    3 +++
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c                |   12 +++++++++---
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index ff1205e..03ad5d5 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -555,6 +555,7 @@
- 				compatible = "fsl,imx6q-src";
- 				reg = <0x020d8000 0x4000>;
- 				interrupts = <0 91 0x04 0 96 0x04>;
-+				#reset-cells = <1>;
- 			};
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+index 07654f0..f769857 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -8,6 +8,8 @@ Required properties:
+ - interrupts: Should contain sync interrupt and error interrupt,
+   in this order.
+ - #crtc-cells: 1, See below
++- resets: phandle pointing to the system reset controller and
++          reset line index, see reset/fsl,imx-src.txt for details
  
- 			gpc: gpc at 020dc000 {
-@@ -1046,6 +1047,7 @@
- 			interrupts = <0 6 0x4 0 5 0x4>;
- 			clocks = <&clks 130>, <&clks 131>, <&clks 132>;
- 			clock-names = "bus", "di0", "di1";
-+			resets = <&src 2>;
- 		};
+ example:
  
- 		ipu2: ipu at 02800000 {
-@@ -1055,6 +1057,7 @@
- 			interrupts = <0 8 0x4 0 7 0x4>;
- 			clocks = <&clks 133>, <&clks 134>, <&clks 137>;
- 			clock-names = "bus", "di0", "di1";
-+			resets = <&src 4>;
- 		};
- 	};
+@@ -16,6 +18,7 @@ ipu: ipu at 18000000 {
+ 	compatible = "fsl,imx53-ipu";
+ 	reg = <0x18000000 0x080000000>;
+ 	interrupts = <11 10>;
++	resets = <&src 2>;
  };
+ 
+ Parallel display support
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+index 366f259..04b8320 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+@@ -16,6 +16,7 @@
+ #include <linux/export.h>
+ #include <linux/types.h>
+ #include <linux/init.h>
++#include <linux/reset.h>
+ #include <linux/platform_device.h>
+ #include <linux/err.h>
+ #include <linux/spinlock.h>
+@@ -660,7 +661,7 @@ int ipu_idmac_disable_channel(struct ipuv3_channel *channel)
+ }
+ EXPORT_SYMBOL_GPL(ipu_idmac_disable_channel);
+ 
+-static int ipu_reset(struct ipu_soc *ipu)
++static int ipu_memory_reset(struct ipu_soc *ipu)
+ {
+ 	unsigned long timeout;
+ 
+@@ -1104,7 +1105,12 @@ static int ipu_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto out_failed_irq;
+ 
+-	ret = ipu_reset(ipu);
++	ret = device_reset(&pdev->dev);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to reset: %d\n", ret);
++		goto out_failed_reset;
++	}
++	ret = ipu_memory_reset(ipu);
+ 	if (ret)
+ 		goto out_failed_reset;
+ 
+@@ -1130,8 +1136,8 @@ static int ipu_probe(struct platform_device *pdev)
+ failed_add_clients:
+ 	ipu_submodules_exit(ipu);
+ failed_submodules_init:
+-	ipu_irq_exit(ipu);
+ out_failed_reset:
++	ipu_irq_exit(ipu);
+ out_failed_irq:
+ 	clk_disable_unprepare(ipu->clk);
+ failed_clk_get:
 -- 
 1.7.10.4
