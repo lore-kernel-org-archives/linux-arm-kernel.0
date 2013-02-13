@@ -1,54 +1,26 @@
-From: girishks2000@gmail.com (Girish K S)
-Date: Wed, 13 Feb 2013 11:25:31 -0800
-Subject: [PATCH V2 5/5] spi: s3c64xx: Added support for exynos5440 spi
-In-Reply-To: <1360783531-32654-1-git-send-email-ks.giri@samsung.com>
-References: <1360783531-32654-1-git-send-email-ks.giri@samsung.com>
-Message-ID: <1360783531-32654-6-git-send-email-ks.giri@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Feb 2013 19:33:09 +0000
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130213180439.GB1601@obsidianresearch.com>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130213095701.0d9f9f20@skate> <20130213180439.GB1601@obsidianresearch.com>
+Message-ID: <201302131933.09947.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the exynos5440 spi controller.
-The integration of the spi IP in exynos5440 is different from
-other SoC's. The I/O pins are no more configured via gpio, they
-have dedicated pins.
+On Wednesday 13 February 2013, Jason Gunthorpe wrote:
+> > You seem to propose a global regs = <...> property under
+> > pcie-controller, but indexing using marvell,pcie-port cannot work. PCIe
+> > interfaces are identified by two values (port,lane), so we have 0.0,
+> > 0.1, 0.2, 0.3, 1.0, 1.1, 1.2, 1.3, 2.0 and 3.0 on MV78460. I really
+> > would like to avoid having bizarre computations to find which entry in
+> > this big regs = <...> array correspond to a given PCIe interface.
+> 
+> Well, using the 'global' regs is an easy way to avoid the complexity with
+> address translation and 'assigned-addresses'. So some way to translate
+> between link # and regs index is necessary. How about using the PCI
+> device number? Device number 1 is regs entry 0, 2 is regs entry 1, etc.
 
-Signed-off-by: Girish K S <ks.giri@samsung.com>
----
-changes in v2:
-		the fifo mask modified to 0x1ff
+Or you could use the "reg-names" property.
 
- drivers/spi/spi-s3c64xx.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 15b7ee9..332a4df 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -1580,6 +1580,15 @@ static struct s3c64xx_spi_port_config exynos4_spi_port_config = {
- 	.clk_from_cmu	= true,
- };
- 
-+static struct s3c64xx_spi_port_config exynos5440_spi_port_config = {
-+	.fifo_lvl_mask	= { 0x1ff },
-+	.rx_lvl_offset	= 15,
-+	.tx_st_done	= 25,
-+	.high_speed	= true,
-+	.clk_from_cmu	= true,
-+	.quirks		= S3C64XX_SPI_QUIRK_POLL,
-+};
-+
- static struct platform_device_id s3c64xx_spi_driver_ids[] = {
- 	{
- 		.name		= "s3c2443-spi",
-@@ -1608,6 +1617,9 @@ static const struct of_device_id s3c64xx_spi_dt_match[] = {
- 	{ .compatible = "samsung,exynos4210-spi",
- 			.data = (void *)&exynos4_spi_port_config,
- 	},
-+	{ .compatible = "samsung,exynos5440-spi",
-+			.data = (void *)&exynos5440_spi_port_config,
-+	},
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, s3c64xx_spi_dt_match);
--- 
-1.7.10.4
+	Arnd
