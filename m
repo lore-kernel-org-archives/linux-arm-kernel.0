@@ -1,90 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 13 Feb 2013 12:26:19 +0900
-Subject: [PATCH 01/21] ARM: shmobile: bonito: Register pinctrl mappings for
- LCDC0
+Date: Wed, 13 Feb 2013 12:26:21 +0900
+Subject: [PATCH 03/21] ARM: shmobile: kzm9g: Register pinctrl mappings for LCD
 In-Reply-To: <1360725999-14514-1-git-send-email-horms+renesas@verge.net.au>
 References: <1360725999-14514-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360725999-14514-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1360725999-14514-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the GPIO-based LCDC0 pinmux configuration by pinctrl mappings.
+Replace the GPIO-based LCD pinmux configuration by pinctrl mappings.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bonito.c |   43 ++++++++++-----------------------
- 1 file changed, 13 insertions(+), 30 deletions(-)
+ arch/arm/mach-shmobile/board-kzm9g.c |   37 +++++++++-------------------------
+ 1 file changed, 10 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-bonito.c b/arch/arm/mach-shmobile/board-bonito.c
-index e50f866..a511777 100644
---- a/arch/arm/mach-shmobile/board-bonito.c
-+++ b/arch/arm/mach-shmobile/board-bonito.c
-@@ -24,6 +24,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index 1a26077..1621889 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -30,6 +30,7 @@
+ #include <linux/mmc/sh_mmcif.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/mfd/tmio.h>
 +#include <linux/pinctrl/machine.h>
  #include <linux/platform_device.h>
- #include <linux/gpio.h>
  #include <linux/regulator/fixed.h>
-@@ -288,6 +289,15 @@ static struct platform_device lcdc0_device = {
- 	},
+ #include <linux/regulator/machine.h>
+@@ -599,6 +600,13 @@ static struct platform_device *kzm_devices[] __initdata = {
+ 	&fsi_ak4648_device,
  };
  
-+static const struct pinctrl_map lcdc0_pinctrl_map[] = {
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
-+				  "lcd0_data24_1", "lcd0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
-+				  "lcd0_lclk_1", "lcd0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
-+				  "lcd0_sync", "lcd0"),
++static const struct pinctrl_map kzm_pinctrl_map[] = {
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-sh73a0",
++				  "lcd_data24", "lcd"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-sh73a0",
++				  "lcd_sync", "lcd"),
 +};
 +
  /*
-  * SMSC 9221
-  */
-@@ -430,36 +440,9 @@ static void __init bonito_init(void)
- 		 */
- 		if (BIT_ON(bsw2, 3) &&	/* S38.1 = OFF */
- 		    BIT_ON(bsw2, 2)) {	/* S38.2 = OFF */
--			gpio_request(GPIO_FN_LCDC0_SELECT,	NULL);
--			gpio_request(GPIO_FN_LCD0_D0,		NULL);
--			gpio_request(GPIO_FN_LCD0_D1,		NULL);
--			gpio_request(GPIO_FN_LCD0_D2,		NULL);
--			gpio_request(GPIO_FN_LCD0_D3,		NULL);
--			gpio_request(GPIO_FN_LCD0_D4,		NULL);
--			gpio_request(GPIO_FN_LCD0_D5,		NULL);
--			gpio_request(GPIO_FN_LCD0_D6,		NULL);
--			gpio_request(GPIO_FN_LCD0_D7,		NULL);
--			gpio_request(GPIO_FN_LCD0_D8,		NULL);
--			gpio_request(GPIO_FN_LCD0_D9,		NULL);
--			gpio_request(GPIO_FN_LCD0_D10,		NULL);
--			gpio_request(GPIO_FN_LCD0_D11,		NULL);
--			gpio_request(GPIO_FN_LCD0_D12,		NULL);
--			gpio_request(GPIO_FN_LCD0_D13,		NULL);
--			gpio_request(GPIO_FN_LCD0_D14,		NULL);
--			gpio_request(GPIO_FN_LCD0_D15,		NULL);
--			gpio_request(GPIO_FN_LCD0_D16,		NULL);
--			gpio_request(GPIO_FN_LCD0_D17,		NULL);
--			gpio_request(GPIO_FN_LCD0_D18_PORT163,	NULL);
--			gpio_request(GPIO_FN_LCD0_D19_PORT162,	NULL);
--			gpio_request(GPIO_FN_LCD0_D20_PORT161,	NULL);
--			gpio_request(GPIO_FN_LCD0_D21_PORT158,	NULL);
--			gpio_request(GPIO_FN_LCD0_D22_PORT160,	NULL);
--			gpio_request(GPIO_FN_LCD0_D23_PORT159,	NULL);
--			gpio_request(GPIO_FN_LCD0_DCK,		NULL);
--			gpio_request(GPIO_FN_LCD0_VSYN,		NULL);
--			gpio_request(GPIO_FN_LCD0_HSYN,		NULL);
--			gpio_request(GPIO_FN_LCD0_DISP,		NULL);
--			gpio_request(GPIO_FN_LCD0_LCLK_PORT165,	NULL);
-+			pinctrl_register_mappings(lcdc0_pinctrl_map,
-+						  ARRAY_SIZE(lcdc0_pinctrl_map));
-+			gpio_request(GPIO_FN_LCDC0_SELECT, NULL);
+  * FIXME
+  *
+@@ -660,6 +668,8 @@ static void __init kzm_init(void)
+ 				     ARRAY_SIZE(fixed2v8_power_consumers), 2800000);
+ 	regulator_register_fixed(2, dummy_supplies, ARRAY_SIZE(dummy_supplies));
  
- 			gpio_request_one(GPIO_PORT61, GPIOF_OUT_INIT_HIGH,
- 					 NULL); /* LCDDON */
++	pinctrl_register_mappings(kzm_pinctrl_map, ARRAY_SIZE(kzm_pinctrl_map));
++
+ 	sh73a0_pinmux_init();
+ 
+ 	/* enable SCIFA4 */
+@@ -675,33 +685,6 @@ static void __init kzm_init(void)
+ 	gpio_request_one(GPIO_PORT224, GPIOF_IN, NULL); /* IRQ3 */
+ 
+ 	/* LCDC */
+-	gpio_request(GPIO_FN_LCDD23,	NULL);
+-	gpio_request(GPIO_FN_LCDD22,	NULL);
+-	gpio_request(GPIO_FN_LCDD21,	NULL);
+-	gpio_request(GPIO_FN_LCDD20,	NULL);
+-	gpio_request(GPIO_FN_LCDD19,	NULL);
+-	gpio_request(GPIO_FN_LCDD18,	NULL);
+-	gpio_request(GPIO_FN_LCDD17,	NULL);
+-	gpio_request(GPIO_FN_LCDD16,	NULL);
+-	gpio_request(GPIO_FN_LCDD15,	NULL);
+-	gpio_request(GPIO_FN_LCDD14,	NULL);
+-	gpio_request(GPIO_FN_LCDD13,	NULL);
+-	gpio_request(GPIO_FN_LCDD12,	NULL);
+-	gpio_request(GPIO_FN_LCDD11,	NULL);
+-	gpio_request(GPIO_FN_LCDD10,	NULL);
+-	gpio_request(GPIO_FN_LCDD9,	NULL);
+-	gpio_request(GPIO_FN_LCDD8,	NULL);
+-	gpio_request(GPIO_FN_LCDD7,	NULL);
+-	gpio_request(GPIO_FN_LCDD6,	NULL);
+-	gpio_request(GPIO_FN_LCDD5,	NULL);
+-	gpio_request(GPIO_FN_LCDD4,	NULL);
+-	gpio_request(GPIO_FN_LCDD3,	NULL);
+-	gpio_request(GPIO_FN_LCDD2,	NULL);
+-	gpio_request(GPIO_FN_LCDD1,	NULL);
+-	gpio_request(GPIO_FN_LCDD0,	NULL);
+-	gpio_request(GPIO_FN_LCDDISP,	NULL);
+-	gpio_request(GPIO_FN_LCDDCK,	NULL);
+-
+ 	gpio_request_one(GPIO_PORT222, GPIOF_OUT_INIT_HIGH, NULL); /* LCDCDON */
+ 	gpio_request_one(GPIO_PORT226, GPIOF_OUT_INIT_HIGH, NULL); /* SC */
+ 
 -- 
 1.7.10.4
