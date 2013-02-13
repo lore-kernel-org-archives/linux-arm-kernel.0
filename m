@@ -1,48 +1,68 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 13 Feb 2013 10:55:20 +0000
-Subject: [PATCH 2/9] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
+Date: Wed, 13 Feb 2013 10:55:19 +0000
+Subject: [PATCH 1/9] ARM: fix ARCH_IXP4xx usage of ARCH_SUPPORTS_BIG_ENDIAN
 In-Reply-To: <1360752927-29331-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1360752927-29331-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1360752927-29331-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1360752927-29331-2-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fixup_pv_table assumes that the instructions are in the same
-endian configuration as the data, but when the CPU is running in
-BE8 the instructions stay in little-endian format.
+The Kconfig for arch/arm/mach-ixp4xx has a local definition
+of ARCH_SUPPORTS_BIG_ENDIAN which could be used elsewhere.
+This means that if IXP4xx is selected and this symbol is
+selected eleswhere then an warning is produced.
 
-Make sure if CONFIG_CPU_ENDIAN_BE8 is set that we do all the
-alterations to the instructions taking in to account the LDR/STR
-will be swapping the data endian-ness.
+Clean the following error up by making the symbol be
+selected by the main ARCH_IXP4XX definition and have a
+common definition in arch/arm/mm/Kconfig
 
-Since the code is only modifying a byte, we avoid dual-swapping
-the data, and just change the bits we clear and ORR in.
-
-Note, not tested against an actual bug, it looked wrong.
-
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
+warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
 ---
- arch/arm/kernel/head.S |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/Kconfig             |    1 +
+ arch/arm/mach-ixp4xx/Kconfig |    4 ----
+ arch/arm/mm/Kconfig          |    6 ++++++
+ 3 files changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 486a15a..cc15384 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -576,8 +576,14 @@ __fixup_a_pv_table:
- #else
- 	b	2f
- 1:	ldr	ip, [r7, r3]
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+	@ in BE8, we load data in BE, but instructions still in LE
-+	bic	ip, ip, #0xff000000
-+	orr	ip, ip, r6, lsl#24
-+#else
- 	bic	ip, ip, #0x000000ff
- 	orr	ip, ip, r6	@ mask in offset bits 31-24
-+#endif
- 	str	ip, [r7, r3]
- 2:	cmp	r4, r5
- 	ldrcc	r7, [r4], #4	@ use branch for delay slot
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 67874b8..d3f6c4f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -517,6 +517,7 @@ config ARCH_IXP4XX
+ 	bool "IXP4xx-based"
+ 	depends on MMU
+ 	select ARCH_HAS_DMA_SET_COHERENT_MASK
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKSRC_MMIO
+ 	select CPU_XSCALE
+diff --git a/arch/arm/mach-ixp4xx/Kconfig b/arch/arm/mach-ixp4xx/Kconfig
+index 73a2d90..72de05f 100644
+--- a/arch/arm/mach-ixp4xx/Kconfig
++++ b/arch/arm/mach-ixp4xx/Kconfig
+@@ -1,9 +1,5 @@
+ if ARCH_IXP4XX
+ 
+-config ARCH_SUPPORTS_BIG_ENDIAN
+-	bool
+-	default y
+-
+ menu "Intel IXP4xx Implementation Options"
+ 
+ comment "IXP4xx Platforms"
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 3fd629d..85cefb5 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -895,3 +895,9 @@ config ARCH_HAS_BARRIERS
+ 	help
+ 	  This option allows the use of custom mandatory barriers
+ 	  included via the mach/barriers.h file.
++
++config ARCH_SUPPORTS_BIG_ENDIAN
++	bool
++	help
++	  This option specifies the architecture can support big endian
++	  operation.
 -- 
 1.7.10.4
