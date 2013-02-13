@@ -1,51 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 13 Feb 2013 23:10:21 +0900
-Subject: [PATCH 1/3] ARM: mach-shmobile: mackerel: enable REGULATOR in
- defconfig
-In-Reply-To: <Pine.LNX.4.64.1302131418350.18535@axis700.grange>
-References: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
- <1360761103-17357-2-git-send-email-horms+renesas@verge.net.au>
- <Pine.LNX.4.64.1302131418350.18535@axis700.grange>
-Message-ID: <20130213141021.GC30293@verge.net.au>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Wed, 13 Feb 2013 16:17:03 +0200
+Subject: [PATCH v3 2/2] ARM: OMAP2+: Export SoC information to userspace
+In-Reply-To: <20130211175653.GQ4801@atomide.com>
+References: <1360191049-24017-1-git-send-email-ruslan.bilovol@ti.com>
+ <1360191049-24017-3-git-send-email-ruslan.bilovol@ti.com>
+ <20130211175653.GQ4801@atomide.com>
+Message-ID: <CAB=otbS6NfHYZc3B__octSM_Jc6g-hZAtcYnnrb43Pc4cx3OAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 02:21:53PM +0100, Guennadi Liakhovetski wrote:
-> Hi Simon
-> 
-> On Wed, 13 Feb 2013, Simon Horman wrote:
-> 
-> > As well as being a generally sane thing to do this
-> > is required for MMCIF to function in conjunction with
-> > " ARM: shmobile: streamline mackerel SD and MMC devices".
-> > 
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > ---
-> > 
-> > v2
-> > * Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
-> > ---
-> >  arch/arm/configs/mackerel_defconfig |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
-> > index ec8e605..9fb1189 100644
-> > --- a/arch/arm/configs/mackerel_defconfig
-> > +++ b/arch/arm/configs/mackerel_defconfig
-> > @@ -75,6 +75,7 @@ CONFIG_I2C=y
-> >  CONFIG_I2C_SH_MOBILE=y
-> >  # CONFIG_HWMON is not set
-> >  # CONFIG_MFD_SUPPORT is not set
-> > +CONFIG_REGULATOR=y
-> 
-> We really don't have to enable CONFIG_REGULATOR_GPIO and 
-> CONFIG_REGULATOR_FIXED_VOLTAGE? IIRC, CONFIG_REGULATOR_GPIO is so far only 
-> used on armadillo800eva, but the fixed regulator is required for other 
-> boards too?
+On Mon, Feb 11, 2013 at 7:56 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Ruslan Bilovol <ruslan.bilovol@ti.com> [130206 14:54]:
+>> --- a/arch/arm/mach-omap2/io.c
+>> +++ b/arch/arm/mach-omap2/io.c
+>> @@ -602,6 +602,7 @@ void __init omap4430_init_late(void)
+>>       omap2_common_pm_late_init();
+>>       omap4_pm_init();
+>>       omap2_clk_enable_autoidle_all();
+>> +     omap_soc_device_init();
+>>  }
+>>  #endif
+>
+> Looks like this should be called for all omaps instead
+> of just omap4430?
+>
+> I suggest you create omap_common_init_late() that
+> calls all the common init_late functions:
+>
+> static void __init omap_common_init_late(void)
+> {
+>         omap_mux_late_init();
+>         omap2_common_pm_late_init();
+>         omap_soc_device_init();
+> }
+>
+> Needs to be verified that these really are common to
+> all omap2+ though :)
 
-The Kconfig for MACH_ARMADILLO800EVA selects REGULATOR_FIXED_VOLTAGE is
-REGULATOR is enabled.
+Yes, you are right, currently these functions are common to all
+init_late callbacks that we have right now in io.c
+I will prepare additional patch soon...
 
-Likewise for kzm9g, mackerel and a bunch of other boards.
+>
+> Regards,
+>
+> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
