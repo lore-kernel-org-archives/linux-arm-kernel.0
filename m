@@ -1,82 +1,25 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 13 Feb 2013 09:57:02 -0600
-Subject: [PATCH 3/5] arm: dts: omap4-panda: Add I2c pinctrl data
-In-Reply-To: <1360747710-1532-1-git-send-email-sourav.poddar@ti.com>
-References: <1360747710-1532-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <511BB7CE.1020505@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 Feb 2013 15:56:55 +0000
+Subject: [PATCH 1/2] arm: mm: Ignore memory banks which are in front of
+ the kernel when HIGHMEM is ON
+In-Reply-To: <CAHTX3dJXtx5V2SN4Wd7mrnhUzMyK86vT_h_xLOzmQKGo3rcDqQ@mail.gmail.com>
+References: <1360745925-20952-1-git-send-email-michal.simek@xilinx.com>
+ <20130213090317.GY17833@n2100.arm.linux.org.uk>
+ <CAHTX3dLy=t43+oNXMrsdz1_5AGf6==z=vG7K8V6dSG0tm6U4=g@mail.gmail.com>
+ <20130213145208.GC17833@n2100.arm.linux.org.uk>
+ <CAHTX3dJXtx5V2SN4Wd7mrnhUzMyK86vT_h_xLOzmQKGo3rcDqQ@mail.gmail.com>
+Message-ID: <20130213155654.GD17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 13, 2013 at 04:52:50PM +0100, Michal Simek wrote:
+> This case should probably end up on device-tree rule (+dtc fault).
+> Not sure if memory banks should be ordered or not. Rob and Grant any thought?
 
-On 02/13/2013 03:28 AM, Sourav Poddar wrote:
-> Booting 3.8-rc6 on omap4 panda results in the following error
-> 
-> [    0.444427] omap_i2c 48070000.i2c: did not get pins for i2c error: -19
-> [    0.445770] omap_i2c 48070000.i2c: bus 0 rev0.11 at 400 kHz
-> [    0.473937] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
-> [    0.474670] omap_i2c 48072000.i2c: bus 1 rev0.11 at 400 kHz
-> [    0.474822] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
-> [    0.476379] omap_i2c 48060000.i2c: bus 2 rev0.11 at 100 kHz
-> [    0.477294] omap_i2c 48350000.i2c: did not get pins for i2c error: -19
-> [    0.477996] omap_i2c 48350000.i2c: bus 3 rev0.11 at 400 kHz
-> [    0.483398] Switching to clocksource 32k_counter
-> 
-> This happens because omap4 panda dts file is not adapted to use i2c through
-> pinctrl framework. Populating i2c pinctrl data to get rid of the error.
+They _are_ ordered by memblock, because memblock always arranges the
+banks in ascending physical address order - and it will merge
+contiguous banks together irrespective of what order they appear as.
 
-What about the panda-es and panda-a4?
-
-> Tested on omap4460 panda with 3.8-rc6 kernel.
-> 
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> Reported-by: Luciano Coelho <coelho@ti.com>
-> ---
->  arch/arm/boot/dts/omap4-panda.dts |   40 +++++++++++++++++++++++++++++++++++++
->  1 files changed, 40 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-> index 4122efe..f951e6b 100644
-> --- a/arch/arm/boot/dts/omap4-panda.dts
-> +++ b/arch/arm/boot/dts/omap4-panda.dts
-> @@ -110,9 +110,40 @@
->  			0x58 0x10b	/* hdmi_hpd.gpio_63 INPUT PULLDOWN | MODE3 */
->  		>;
->  	};
-> +
-> +	i2c1_pins: pinmux_i2c1_pins {
-> +		pinctrl-single,pins = <
-> +			0xe2 0x118        /* i2c1_scl PULLUP | INPUTENABLE | MODE0 */
-> +			0xe4 0x118        /* i2c1_sda PULLUP | INPUTENABLE | MODE0 */
-> +		>;
-> +	};
-> +
-> +	i2c2_pins: pinmux_i2c2_pins {
-> +		pinctrl-single,pins = <
-> +			0xe6 0x118        /* i2c2_scl PULLUP | INPUTENABLE | MODE0 */
-> +			0xe8 0x118        /* i2c2_sda PULLUP | INPUTENABLE | MODE0 */
-> +		>;
-> +	};
-> +
-> +	i2c3_pins: pinmux_i2c3_pins {
-> +		pinctrl-single,pins = <
-> +			0xea 0x118        /* i2c3_scl PULLUP | INPUTENABLE | MODE0 */
-> +			0xec 0x118     /* i2c3_sda PULLUP | INPUTENABLE | MODE0 */
-> +		>;
-> +	};
-> +
-> +	i2c4_pins: pinmux_i2c4_pins {
-> +		pinctrl-single,pins = <
-> +			0xee 0x118        /* i2c4_scl PULLUP | INPUTENABLE | MODE0 */
-> +			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
-> +		>;
-> +	};
->  };
-
-A quick look at the data manual shows that omap4430 and omap4460 has the
-same pin mux options for i2c. Furthermore, the data manual shows only
-one mux option for i2c1-4. Therefore, should these mux options be placed
-in omap4.dtsi? Boards not using specific i2c controllers can disabled
-them in there board dts file (same way we do for mmc).
-
-Cheers
-Jon
+So you can't do something like bank 0: 0x60000000-0x70000000, bank 1:
+0x50000000-0x60000000.  You'll end up with a single memblock entry for
+0x50000000-0x70000000.
