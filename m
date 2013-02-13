@@ -1,61 +1,107 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 13 Feb 2013 17:04:38 +0100
-Subject: [PATCH 08/21] ARM: shmobile: kzm9g: reference: Register pinctrl
- mappings for SCIF
-In-Reply-To: <1360723497-23266-9-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 13 Feb 2013 17:06:30 +0100
+Subject: [PATCH 00/16 v1.1] SCIF, I2C and FSI pinctrl functions for sh73a0
+In-Reply-To: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
 References: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
- <1360723497-23266-9-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <3345904.WES3lb9r4X@avalon>
+Message-ID: <1911001.oocnvCx2VX@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Simon,
 
-Thank you for the patch.
+On Wednesday 13 February 2013 11:44:36 Simon Horman wrote:
+> Hi,
+> 
+> this series is a follow-up to "[PATCH 00/16] SCIF, I2C and FSI pinctrl
+> functions for sh73a0" by Laurent Pinchart. I am primarily posting it for
+> his review.
+> 
+> This series differs from the series posted by Laurent in the following ways:
+> 
+> * Due to some slightly over-zelous git use on my part the series
+>   is actually based on a checkout of
+>   git://linuxtv.org/pinchartl/fbdev.git pinmux-pfc-funcs
+> 
+>   As such it includes several patches not included in the series posted in
+>   via eimal as the series "[PATCH 00/16] SCIF, I2C and FSI pinctrl
+>   functions for sh73a0". In particular it includes r8a7740 and r8a7779
+>   patches.
+> 
+> * I have added the following two patches to update the KZM9G rerence code.
+> 
+>   ARM: shmobile: kzm9g: reference: Register pinctrl mappings for I2C
+>   ARM: shmobile: kzm9g: reference: Register pinctrl mappings for SCIF
+> 
+> As implied by the second point above, this series is based on
+> a branch that includes the kzm9g reference code. That branch is
+> 
+> 	git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
+> topic/pinmux-base
 
-On Wednesday 13 February 2013 11:44:44 Simon Horman wrote:
-> Replace the GPIO-based SCIF pinmux configuration by pinctrl mappings.
-> 
-> This change is for the kzm9g reference DT implementation and
-> is in keeping with a similar change for the default kzm9g implementation
-> made by Laurent Pinchart.
-> 
-> Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+When do you plan to push that reference code to mainline ?
 
-Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Git and diffstat information is provided below to aid review.
+> 
+> Laurent, if you want to change this series in any way just let me know.
+> I can drop patches indidually or drop the entire series and add a fresh
+> one from you to the topic branch.
 
-> ---
->  arch/arm/mach-shmobile/board-kzm9g-reference.c |   10 ++++------
->  1 file changed, 4 insertions(+), 6 deletions(-)
+I will likely provide you with a new branch. Can you handle the two kzm9g-
+reference patches, or should I include them in my branch ?
+
+> ----------------------------------------------------------------
+> The following changes since commit e90f8429f06947f36693fbdc083fdab15c4164b9:
 > 
-> diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-> b/arch/arm/mach-shmobile/board-kzm9g-reference.c index 642bb7b..9d6fe22
-> 100644
-> --- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-> +++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-> @@ -36,16 +36,14 @@
->  static const struct pinctrl_map kzm_pinctrl_map[] = {
->  	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
->  				  "i2c3_1", "i2c3"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
-> +				  "scifa4_data", "scifa4"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
-> +				  "scifa4_ctrl", "scifa4"),
->  };
+>   ARM: shmobile: armadillo800eva: Register pinctrl mappings for LCDC0
+> (2013-02-13 09:15:37 +0900)
 > 
->  static void __init kzm_init(void)
->  {
-> -	/* enable SCIFA4 */
-> -	gpio_request(GPIO_FN_SCIFA4_TXD, NULL);
-> -	gpio_request(GPIO_FN_SCIFA4_RXD, NULL);
-> -	gpio_request(GPIO_FN_SCIFA4_RTS_, NULL);
-> -	gpio_request(GPIO_FN_SCIFA4_CTS_, NULL);
-> -
->  	/* enable MMCIF */
->  	gpio_request(GPIO_FN_MMCCLK0,		NULL);
->  	gpio_request(GPIO_FN_MMCCMD0_PU,	NULL);
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
+> topic/pinmux-pfc-funcs
+> 
+> for you to fetch changes up to da8ef3c2e6aee4da048e37c4e7a52439e6928379:
+> 
+>   ARM: shmobile: r8a7779: Remove DU function GPIOs (2013-02-13 10:06:59
+> +0900)
+> 
+> ----------------------------------------------------------------
+> Laurent Pinchart (19):
+>       ARM: shmobile: bonito: Register pinctrl mappings for LCDC0
+>       ARM: shmobile: kota2: Register pinctrl mappings for SCIF
+>       ARM: shmobile: kzm9g: Register pinctrl mappings for LCD
+>       ARM: shmobile: kzm9g: Register pinctrl mappings for SCIF
+>       ARM: shmobile: kzm9g: Register pinctrl mappings for I2C
+>       ARM: shmobile: kzm9g: Register pinctrl mappings for FSI
+>       sh-pfc: sh73a0: Remove LCD and LCD2 function GPIOS
+>       sh-pfc: sh73a0: Remove SCIFA and SCIFB function GPIOS
+>       sh-pfc: sh73a0: Remove I2C function GPIOS
+>       sh-pfc: sh73a0: Remove FSI function GPIOS
+>       sh-pfc: r8a7740: Remove LCD0 and LCD1 function GPIOS
+>       sh-pfc: r8a7779: Remove DU1_DOTCLKOUT1 GPIO
+>       ARM: shmobile: sh73a0: Remove LCDC and LCDC2 function GPIOs
+>       ARM: shmobile: sh73a0: Remove SCIFA and SCIFB function GPIOs
+>       ARM: shmobile: sh73a0: Remove I2C function GPIOs
+>       ARM: shmobile: sh73a0: Remove FSI function GPIOs
+>       ARM: shmobile: r8a7740: Remove LCD0 and LCD1 function GPIOs
+>       ARM: shmobile: r8a7779: Remove DU1_DOTCLKOUT1 GPIO
+>       ARM: shmobile: r8a7779: Remove DU function GPIOs
+> 
+> Simon Horman (2):
+>       ARM: shmobile: kzm9g: reference: Register pinctrl mappings for I2C
+>       ARM: shmobile: kzm9g: reference: Register pinctrl mappings for SCIF
+> 
+>  arch/arm/mach-shmobile/board-bonito.c          |   43 ++---
+>  arch/arm/mach-shmobile/board-kota2.c           |   42 +++--
+>  arch/arm/mach-shmobile/board-kzm9g-reference.c |   22 ++-
+>  arch/arm/mach-shmobile/board-kzm9g.c           |   68 +++----
+>  arch/arm/mach-shmobile/include/mach/r8a7740.h  |   39 ----
+>  arch/arm/mach-shmobile/include/mach/r8a7779.h  |   90 ++++-----
+>  arch/arm/mach-shmobile/include/mach/sh73a0.h   |  237  +++++++++-----------
+>  drivers/pinctrl/sh-pfc/pfc-r8a7740.c           |   37 ----
+>  drivers/pinctrl/sh-pfc/pfc-r8a7779.c           |    9 +-
+>  drivers/pinctrl/sh-pfc/pfc-sh73a0.c            |  182 ------------------
+>  10 files changed, 217 insertions(+), 552 deletions(-)
 -- 
 Regards,
 
