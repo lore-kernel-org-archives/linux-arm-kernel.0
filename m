@@ -1,74 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 13 Feb 2013 11:44:43 +0900
-Subject: [PATCH 07/21] ARM: shmobile: kzm9g: reference: Register pinctrl
- mappings for I2C
+Date: Wed, 13 Feb 2013 11:44:44 +0900
+Subject: [PATCH 08/21] ARM: shmobile: kzm9g: reference: Register pinctrl
+ mappings for SCIF
 In-Reply-To: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
 References: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360723497-23266-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1360723497-23266-9-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the GPIO-based I2C pinmux configuration by pinctrl mappings.
+Replace the GPIO-based SCIF pinmux configuration by pinctrl mappings.
 
 This change is for the kzm9g reference DT implementation and
 is in keeping with a similar change for the default kzm9g implementation
 made by Laurent Pinchart.
 
-This change also adds a sh73a0_pinmux_init() call to kzm_init()
-which was previously missing as it was not needed (or at least not
-needed in practice) for the minimal board configuration supplied
-by the reference DT implementation. The call to sh73a0_pinmux_init()
-will be removed by a subsequent patch to initialise pinmus using
-device tree.
-
 Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-kzm9g-reference.c |   12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |   10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index 6a1222e..642bb7b 100644
+index 642bb7b..9d6fe22 100644
 --- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
 +++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -26,12 +26,18 @@
- #include <linux/irq.h>
- #include <linux/input.h>
- #include <linux/of_platform.h>
-+#include <linux/pinctrl/machine.h>
- #include <mach/sh73a0.h>
- #include <mach/common.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+@@ -36,16 +36,14 @@
+ static const struct pinctrl_map kzm_pinctrl_map[] = {
+ 	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
+ 				  "i2c3_1", "i2c3"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
++				  "scifa4_data", "scifa4"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
++				  "scifa4_ctrl", "scifa4"),
+ };
  
-+static const struct pinctrl_map kzm_pinctrl_map[] = {
-+	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
-+				  "i2c3_1", "i2c3"),
-+};
-+
  static void __init kzm_init(void)
  {
- 	/* enable SCIFA4 */
-@@ -52,16 +58,14 @@ static void __init kzm_init(void)
- 	gpio_request(GPIO_FN_MMCD0_6_PU,	NULL);
- 	gpio_request(GPIO_FN_MMCD0_7_PU,	NULL);
- 
--	/* I2C 3 */
--	gpio_request(GPIO_FN_PORT27_I2C_SCL3, NULL);
--	gpio_request(GPIO_FN_PORT28_I2C_SDA3, NULL);
+-	/* enable SCIFA4 */
+-	gpio_request(GPIO_FN_SCIFA4_TXD, NULL);
+-	gpio_request(GPIO_FN_SCIFA4_RXD, NULL);
+-	gpio_request(GPIO_FN_SCIFA4_RTS_, NULL);
+-	gpio_request(GPIO_FN_SCIFA4_CTS_, NULL);
 -
- #ifdef CONFIG_CACHE_L2X0
- 	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
- 	l2x0_init(IOMEM(0xf0100000), 0x40460000, 0x82000fff);
- #endif
- 
-+	sh73a0_pinmux_init();
- 	sh73a0_add_standard_devices_dt();
-+	pinctrl_register_mappings(kzm_pinctrl_map, ARRAY_SIZE(kzm_pinctrl_map));
- }
- 
- static void kzm9g_restart(char mode, const char *cmd)
+ 	/* enable MMCIF */
+ 	gpio_request(GPIO_FN_MMCCLK0,		NULL);
+ 	gpio_request(GPIO_FN_MMCCMD0_PU,	NULL);
 -- 
 1.7.10.4
