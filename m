@@ -1,61 +1,48 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Wed, 13 Feb 2013 11:24:07 +0100
-Subject: ARM big-endian on current kernels for linux-3.8
-In-Reply-To: <511A7CEB.9000006@codethink.co.uk>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <20130212171310.GS17833@n2100.arm.linux.org.uk>
- <511A7CEB.9000006@codethink.co.uk>
-Message-ID: <511B69C7.1080200@parrot.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Wed, 13 Feb 2013 11:32:52 +0100
+Subject: [PATCH v7 1/6] watchdog: core: dt: add support for the
+ timeout-sec dt property
+In-Reply-To: <20130213094401.GB7867@spo001.leaseweb.com>
+References: <1357639455-21935-1-git-send-email-fabio.porcedda@gmail.com>
+ <1357639455-21935-2-git-send-email-fabio.porcedda@gmail.com>
+ <20130212230303.GA7867@spo001.leaseweb.com>
+ <CAHkwnC_XdgHSo8Vkz5Ae=DQ48BBhLPVx_hXTzLTcw+xZJaEi5A@mail.gmail.com>
+ <20130213094401.GB7867@spo001.leaseweb.com>
+Message-ID: <CAHkwnC8rA9FZL2MK_qQ8yrvK-T3nxvRqxrDACeaV6v8VpMPkxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks a ?crit :
-> On 12/02/13 17:13, Russell King - ARM Linux wrote:
->> On Fri, Feb 08, 2013 at 11:17:30PM +0000, Ben Dooks wrote:
->>> I have been working on getting big-endian kernels working, mainly from
->>> little-endian boot envrionments. The following patch series is what I
->>> have been working on, mainly on the highbank and axp systems.
->> What is missing from this is the justification about why we need this
->> additional pain, given that all the supporting userspaces today are all
->> LE based.
+On Wed, Feb 13, 2013 at 10:44 AM, Wim Van Sebroeck <wim@iguana.be> wrote:
+> Hi Fabio,
+>
+>> > I must admit that the different iterations of this patch only made it better.
+>> > I like the idea that you are proposing here (put the default timeout in the
+>> > watchdog_device struct and use a helper function to set the timeout parameter
+>> > value or the timeout-sec dt value). To be able to use other mechanism in the
+>> > future also, I think it make more sense to pass the device instead of the
+>> > device_node.
 >>
->> Sure, I know that telcos have an endless love of big endian and don't
->> understand anything else, but getting this working on non-telco socs
->> seems to be a little odd.
-> 
-> Our problem is we have some code that works on a lot of big endian data
-> but is not easy to re-build to work on ARM little endian. The current 
-> solution is to change to running the system big endian.
-> 
-> Unfortunately we cannot just run user-space big endian as the MMU is
-> fetched in the same endian mode as the processor's data.
-> 
-Which architecture are you using ?
+>> If i understand correctly you want to use "struct platform_device"
+>> instead of "struct device_node",
+>> in the function watchdog_init_timeout?
+>
+> No struct device instead of struct device_node.
+>
+>> > I also detailed your documentation a bit more and incorporated above changes
+>> > in an adjusted patch. Can you have a look at it and if OK for you I will put
+>> > it in linux-watchdog-next as your v10 :-).
+>>
+>> That's good for sure :)
+>
+> Will add it to the linux-watchdog-next tree today.
+>
 
-On armv7 the mmu endian mode is selected by SCTLR.EE [1], but userspace can
-change it's endian with setend instruction [2].
+In a few minutes I will send the v8 patch set.
 
-As the endian state is stored in cpsr, it should be preserved across context switch.
+Best regards
+--
+Fabio Porcedda
 
-
-Matthieu
-
-
-
-[1]
-Exception Endianness. This bit defines the value of the CPSR.E bit on entry to
-an exception vector,
-including reset. The possible values of this bit are:
-0           Little-endian.
-1           Big-endian.
-This bit value also defines the endianness of the translation table data for
-translation table lookups.
-In an implementation that includes the Security Extensions, this bit is Banked
-between the Secure
-and Non-secure copies of the register.
-
-[2]
-The ARM and Thumb instruction sets both include an instruction to manipulate
-ENDIANSTATE:
-SETEND BE   Sets ENDIANSTATE to 1, for big-endian operation.
-SETEND LE   Sets ENDIANSTATE to 0, for little-endian operation.
+> Kind regards,
+> Wim.
+>
