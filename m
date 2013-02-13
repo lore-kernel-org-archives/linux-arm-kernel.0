@@ -1,25 +1,54 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 13 Feb 2013 13:38:07 +0200
-Subject: [PATCH v6 08/10] ARM: dt: Add references to tegra_car clocks
-In-Reply-To: <511A7AB5.4040607@wwwdotorg.org>
-References: <1360580700-10245-1-git-send-email-pdeschrijver@nvidia.com>
- <1360580700-10245-9-git-send-email-pdeschrijver@nvidia.com>
- <511A7AB5.4040607@wwwdotorg.org>
-Message-ID: <20130213113807.GE3073@tbergstrom-lnx.Nvidia.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 13 Feb 2013 11:42:01 +0000
+Subject: [PATCH v2 3/4] mtd: devices: elm: Low power transition support
+In-Reply-To: <20130209102243.GH17852@n2100.arm.linux.org.uk>
+References: <1360240618-11094-1-git-send-email-avinashphilip@ti.com>
+ <1360240618-11094-4-git-send-email-avinashphilip@ti.com>
+ <20130209102243.GH17852@n2100.arm.linux.org.uk>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA7491C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 06:24:05PM +0100, Stephen Warren wrote:
-> On 02/11/2013 04:04 AM, Peter De Schrijver wrote:
-> > Add references to tegra_car clocks for the basic device nodes.
+On Sat, Feb 09, 2013 at 15:52:44, Russell King - ARM Linux wrote:
+> On Thu, Feb 07, 2013 at 06:06:57PM +0530, Philip Avinash wrote:
+> > +static int elm_suspend(struct device *dev)
+> > +{
+> > +	struct elm_info *info = dev_get_drvdata(dev);
+> > +	wait_queue_head_t wq;
+> > +	DECLARE_WAITQUEUE(wait, current);
+> > +
+> > +	init_waitqueue_head(&wq);
+> > +	while (1) {
+> > +		/* Make sure that ELM not running */
+> > +		if (info->idle) {
+> > +			add_wait_queue(&wq, &wait);
+> > +			schedule();
+> > +			remove_wait_queue(&wq, &wait);
+> > +		} else {
+> > +			break;
+> > +		}
+> > +	}
 > 
-> In this patch, you also need to remove the "clock-frequency" properties
-> from tegra114-*.dts board files.
+> The above code looks really wrong - it will just spin endlessly with the
+> waitqueues doing nothing useful.  What are you trying to do here?
 
-That would probably break bisectability no? I think this needs to be done
-in a separate patch. Also, the UARTD enabling in init_table[] can then be
-removed.
+The intention of waitqeue is to make the suspend process really wait till
+the ELM module finishes current activity. Although this type of protection
+already achieved in mtd layer using nand_suspend(), this one is particularly
+required for ELM module to really make sure that *any pending* corrections to
+finish really before gone to suspend.
 
-Cheers,
+If suspend activity initiated and NAND driver requested service of ELM
+module for error correction, then suspend activity has to wait till
+(info->idle == false), so that ELM module finishes activity.
 
-Peter.
+I can think of adding different states to ELM module and take action.
+I will add following states.
+
+RUNNING
+SUSPEND
+
+Thanks
+Avinash
+
+> 
