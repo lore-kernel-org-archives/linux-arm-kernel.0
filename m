@@ -1,32 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Feb 2013 08:40:05 -0800
-Subject: [PATCH 3/5] arm: dts: omap4-panda: Add I2c pinctrl data
-In-Reply-To: <511BBA1B.9050501@ti.com>
-References: <1360747710-1532-1-git-send-email-sourav.poddar@ti.com>
- <511BB7CE.1020505@ti.com> <511BBA1B.9050501@ti.com>
-Message-ID: <20130213164004.GE7144@atomide.com>
+From: s-anna@ti.com (Anna, Suman)
+Date: Wed, 13 Feb 2013 16:41:37 +0000
+Subject: [PATCH v2 00/13] drivers: mailbox: framework creation
+In-Reply-To: <20130213134207.GN17852@n2100.arm.linux.org.uk>
+References: <1360645032-9668-1-git-send-email-s-anna@ti.com>
+ <CACRpkdZayg-X11ZRnh2Z0i+egBn8Fhwya-6_Yr8wcv+6s0CVqQ@mail.gmail.com>
+ <20130213134207.GN17852@n2100.arm.linux.org.uk>
+Message-ID: <37C860A02101E749A747FA2D3C1E3C50476638@DLEE12.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130213 08:10]:
-> On 02/13/2013 09:57 AM, Jon Hunter wrote:
-> > On 02/13/2013 03:28 AM, Sourav Poddar wrote:
-> > 
-> > A quick look at the data manual shows that omap4430 and omap4460 has the
-> > same pin mux options for i2c. Furthermore, the data manual shows only
-> > one mux option for i2c1-4. Therefore, should these mux options be placed
-> > in omap4.dtsi? Boards not using specific i2c controllers can disabled
-> > them in there board dts file (same way we do for mmc).
+> On Wed, Feb 13, 2013 at 02:36:32PM +0100, Linus Walleij wrote:
+> > On Tue, Feb 12, 2013 at 5:56 AM, Suman Anna <s-anna@ti.com> wrote:
+> >
+> > > I have hosted the series at [3].
+> > > [3]
+> > > https://github.com/sumananna/mailbox/commits/dbx500-prcmu-mailbox
+> >
+> > Suman, I suggest you ask Stepgen Rothwell to include this branch into
+> > the linux-next tree, so we can get some rotation of this stuff in
+> > preparation for the v3.10 merge window. (It's not going in now
+> > anyway.)
 > 
-> I guess for i2c, a given omap4 board may use external pull-ups and not
-> use the internal ones and so putting this in the omap4.dtsi may not be
-> desirable. However, it seems that a common omap4-panda.dtsi could be
-> used here.
+> Best wait until after v3.9-rc1 - remember that linux-next is supposed to be a
+> staging tree for the _next_ merge window only.
 
-Yes the mux options need to be board specific. If something is complex
-and  common, it's best to put it into omap4-i2c1.dts file that can be
-included from the board specific .dts files as needed.
+Yes, will do. Anyway, we need a new revision of one patch (so far) to address Mark Rutland's comments.
 
-Regards,
-
-Tony
+Thanks
+Suman
