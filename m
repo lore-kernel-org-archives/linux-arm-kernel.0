@@ -1,78 +1,77 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 13 Feb 2013 12:29:17 +0900
-Subject: [PATCH 5/9] ARM: shmobile: kzm9g: Populate platform devices from
- device tree
+Date: Wed, 13 Feb 2013 12:29:18 +0900
+Subject: [PATCH 6/9] ARM: shmobile: kzm9g: reference: Populate platform
+ devices from device tree
 In-Reply-To: <1360726161-16072-1-git-send-email-horms+renesas@verge.net.au>
 References: <1360726161-16072-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360726161-16072-6-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1360726161-16072-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
 Call of_platform_populate() at machine initialization time to populate
 platform devices. Remove the explicit pinmux initialization as the PFC
 device will be instantiated from the device tree.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+This change is for the kzm9g reference DT implementation and is in keeping
+with a similar change for the default kzm9g implementation made by Laurent
+Pinchart.
+
+Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-kzm9g.c |   21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts   |   12 ++++++++++++
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |    7 ++-----
+ 2 files changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index 2b529d2..b89a9a8 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -30,6 +30,7 @@
- #include <linux/mmc/sh_mmcif.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
-+#include <linux/of_platform.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_device.h>
- #include <linux/regulator/fixed.h>
-@@ -601,23 +602,23 @@ static struct platform_device *kzm_devices[] __initdata = {
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index 06f52f9..9901caf 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -35,6 +35,18 @@
+ 	};
  };
  
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins>;
++};
++
++&gpio {
++	i2c3_pins: pfc_i2c3_pins {
++		renesas,pins = "i2c3_1";
++		renesas,function = "i2c3";
++	};
++};
++
+ &mmcif {
+ 	vmmc-supply = <&fixedregulator1v8>;
+ 	vqmmc-supply = <&fixedregulator1v8>;
+diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+index 7282048..625e337 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+@@ -34,11 +34,9 @@
+ #include <asm/mach/arch.h>
+ 
  static const struct pinctrl_map kzm_pinctrl_map[] = {
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "e6050000.pfc",
- 				  "fsia_mclk_in", "fsia"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "e6050000.pfc",
- 				  "fsia_sclk_in", "fsia"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "e6050000.pfc",
- 				  "fsia_data_in", "fsia"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "e6050000.pfc",
- 				  "fsia_data_out", "fsia"),
 -	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "e6050000.pfc",
- 				  "i2c3_1", "i2c3"),
+-				  "i2c3_1", "i2c3"),
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
 +	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "e6050000.pfc",
  				  "scifa4_data", "scifa4"),
 -	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
 +	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "e6050000.pfc",
  				  "scifa4_ctrl", "scifa4"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "e6050000.pfc",
- 				  "lcd_data24", "lcd"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "e6050000.pfc",
- 				  "lcd_sync", "lcd"),
  };
  
-@@ -684,7 +685,7 @@ static void __init kzm_init(void)
- 
+@@ -46,7 +44,6 @@ static void __init kzm_init(void)
+ {
+ 	sh73a0_add_standard_devices_dt();
  	pinctrl_register_mappings(kzm_pinctrl_map, ARRAY_SIZE(kzm_pinctrl_map));
- 
 -	sh73a0_pinmux_init();
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  
- 	/* CS4 for SMSC/USB */
- 	gpio_request(GPIO_FN_CS4_, NULL); /* CS4 */
+ 	/* enable MMCIF */
+ 	gpio_request(GPIO_FN_MMCCLK0,		NULL);
 -- 
 1.7.10.4
