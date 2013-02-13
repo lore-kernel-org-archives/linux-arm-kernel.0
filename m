@@ -1,47 +1,33 @@
-From: enrico.scholz@sigma-chemnitz.de (Enrico Scholz)
-Date: Wed, 13 Feb 2013 13:00:50 +0100
-Subject: [i2c-mxs] Broken DMA operations from within a module
-Message-ID: <lyehgkift9.fsf@ensc-virt.intern.sigma-chemnitz.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 13 Feb 2013 21:15:45 +0900
+Subject: [PATCH] ARM: mach-shmobile: armadillo800eva: enable REGULATOR in
+ defconfig
+Message-ID: <1360757745-15251-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+As well as being a generally sane thing to do this
+is required for MMCIF to function in conjunction with
+"ARM: shmobile: switch SDHI0 to GPIO regulator on armadillo800eva".
 
-the i2c-mxs driver does not work when transmit buffers are located
-within module memory.
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/armadillo800eva_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-E.g. when doing something like
-
-	struct i2c_msg xfer = {
-               .buf = "something",
-               ...
-        };
-
-        ret = i2c_transfer(client->adapter, &xfer, 1);
-
-random data will be sent because buf is not DMA mapable ("something" is
-located in the .strtab section within module memory). MXS has a memory
-layout like
-
-    vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
-    lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
-    modules : 0xbf000000 - 0xc0000000   (  16 MB)
-      .text : 0xc0008000 - 0xc04b1e8c   (4776 kB)
-      .init : 0xc04b2000 - 0xc04e61ac   ( 209 kB)
-      .data : 0xc04e8000 - 0xc051b578   ( 206 kB)
-       .bss : 0xc051b578 - 0xc05eba44   ( 834 kB)
-
-and is CONFIG_FLATMEM.  Buffers above are e.g. at 0xbf0cdaf0.
-
-You can verify the problem e.g. with the edt-ft5x06.c touch driver;
-dumping 'sg->dma_address' in mxs_dma_prep_slave_sg() shows physical
-addresses like 0x3f0cdaf0 for such strings, which are outside of valid
-memory (0x40000000-0x7fffffff).
-
-Does the i2c layer require DMA mapable buffers in its xfer structures
-(e.g. like usb), or is the problem in the generic ARM/MXS layer or in
-the mxs i2c driver?
-
-
-
-Enrico
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index 0b98100..6ceb79f 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -88,6 +88,8 @@ CONFIG_I2C=y
+ CONFIG_I2C_GPIO=y
+ CONFIG_I2C_SH_MOBILE=y
+ # CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_DUMMY=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_VIDEO_DEV=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+-- 
+1.7.10.4
