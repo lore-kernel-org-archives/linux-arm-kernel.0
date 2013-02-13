@@ -1,1288 +1,765 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Feb 2013 14:33:18 -0700
-Subject: [PATCH 9/9] ARM: tegra: convert device tree files to use IRQ defines
-In-Reply-To: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
-References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1360791198-29462-10-git-send-email-swarren@wwwdotorg.org>
+From: loic.pallardy-ext@stericsson.com (Loic Pallardy)
+Date: Wed, 13 Feb 2013 23:04:00 +0100
+Subject: [PATCH v4 10/13] mailbox: create dbx500 mailbox driver
+Message-ID: <1360793040-6770-1-git-send-email-loic.pallardy-ext@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+From: Loic Pallardy <loic.pallardy@st.com>
 
-Use the GIC and standard IRQ binding defines in all IRQ specifiers.
+Add STEriccson DBX500 PRCM mailbox support.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Loic Pallardy <loic.pallardy@st.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/tegra114.dtsip            |   55 +++++----
- arch/arm/boot/dts/tegra20-colibri-512.dtsip |    2 +-
- arch/arm/boot/dts/tegra20-harmony.dtsp      |    4 +-
- arch/arm/boot/dts/tegra20-medcom-wide.dtsp  |    2 +-
- arch/arm/boot/dts/tegra20-paz00.dtsp        |    4 +-
- arch/arm/boot/dts/tegra20-plutux.dtsp       |    2 +-
- arch/arm/boot/dts/tegra20-seaboard.dtsp     |   10 +-
- arch/arm/boot/dts/tegra20-tamonten.dtsip    |    2 +-
- arch/arm/boot/dts/tegra20-tec.dtsp          |    2 +-
- arch/arm/boot/dts/tegra20-ventana.dtsp      |    6 +-
- arch/arm/boot/dts/tegra20-whistler.dtsp     |    2 +-
- arch/arm/boot/dts/tegra20.dtsip             |  138 ++++++++++-----------
- arch/arm/boot/dts/tegra30-beaver.dtsp       |    2 +-
- arch/arm/boot/dts/tegra30-cardhu.dtsip      |    6 +-
- arch/arm/boot/dts/tegra30.dtsip             |  174 ++++++++++++++-------------
- 15 files changed, 211 insertions(+), 200 deletions(-)
+ .../devicetree/bindings/mailbox/dbx500-mailbox.txt |  27 +
+ drivers/mailbox/Kconfig                            |   7 +
+ drivers/mailbox/Makefile                           |   1 +
+ drivers/mailbox/mailbox-dbx500.c                   | 648 +++++++++++++++++++++
+ include/linux/platform_data/mailbox-dbx500.h       |  12 +
+ 5 files changed, 695 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/dbx500-mailbox.txt
+ create mode 100644 drivers/mailbox/mailbox-dbx500.c
+ create mode 100644 include/linux/platform_data/mailbox-dbx500.h
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsip b/arch/arm/boot/dts/tegra114.dtsip
-index 356a8af..52c0c03 100644
---- a/arch/arm/boot/dts/tegra114.dtsip
-+++ b/arch/arm/boot/dts/tegra114.dtsip
-@@ -1,5 +1,6 @@
- #include "skeleton.dtsi"
- #include "tegra-gpio.h"
-+#include "arm-gic.h"
- 
- / {
- 	compatible = "nvidia,tegra114";
-@@ -13,18 +14,19 @@
- 		      <0x50042000 0x1000>,
- 		      <0x50044000 0x2000>,
- 		      <0x50046000 0x2000>;
--		interrupts = <1 9 0xf04>;
-+		interrupts = <GIC_PPI 9
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
- 	timer at 60005000 {
- 		compatible = "nvidia,tegra114-timer", "nvidia,tegra20-timer";
- 		reg = <0x60005000 0x400>;
--		interrupts = <0 0 0x04
--			      0 1 0x04
--			      0 41 0x04
--			      0 42 0x04
--			      0 121 0x04
--			      0 122 0x04>;
-+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	tegra_car: clock {
-@@ -41,14 +43,14 @@
- 	gpio: gpio {
- 		compatible = "nvidia,tegra114-gpio", "nvidia,tegra30-gpio";
- 		reg = <0x6000d000 0x1000>;
--		interrupts = <0 32 0x04
--			      0 33 0x04
--			      0 34 0x04
--			      0 35 0x04
--			      0 55 0x04
--			      0 87 0x04
--			      0 89 0x04
--			      0 125 0x04>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
- 		gpio-controller;
- 		#interrupt-cells = <2>;
-@@ -65,7 +67,7 @@
- 		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
- 		reg = <0x70006000 0x40>;
- 		reg-shift = <2>;
--		interrupts = <0 36 0x04>;
-+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
-@@ -73,7 +75,7 @@
- 		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
- 		reg = <0x70006040 0x40>;
- 		reg-shift = <2>;
--		interrupts = <0 37 0x04>;
-+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
-@@ -81,7 +83,7 @@
- 		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
- 		reg = <0x70006200 0x100>;
- 		reg-shift = <2>;
--		interrupts = <0 46 0x04>;
-+		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
-@@ -89,14 +91,14 @@
- 		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
- 		reg = <0x70006300 0x100>;
- 		reg-shift = <2>;
--		interrupts = <0 90 0x04>;
-+		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
- 	rtc {
- 		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
- 		reg = <0x7000e000 0x100>;
--		interrupts = <0 2 0x04>;
-+		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	pmc {
-@@ -146,9 +148,14 @@
- 
- 	timer {
- 		compatible = "arm,armv7-timer";
--		interrupts = <1 13 0xf08>,
--			     <1 14 0xf08>,
--			     <1 11 0xf08>,
--			     <1 10 0xf08>;
-+		interrupts =
-+			<GIC_PPI 13
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			<GIC_PPI 14
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			<GIC_PPI 11
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			<GIC_PPI 10
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsip b/arch/arm/boot/dts/tegra20-colibri-512.dtsip
-index b7d8e7a..afdcd92 100644
---- a/arch/arm/boot/dts/tegra20-colibri-512.dtsip
-+++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsip
-@@ -218,7 +218,7 @@
- 		pmic: tps6586x at 34 {
- 			compatible = "ti,tps6586x";
- 			reg = <0x34>;
--			interrupts = <0 86 0x4>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			ti,system-power-controller;
- 
-diff --git a/arch/arm/boot/dts/tegra20-harmony.dtsp b/arch/arm/boot/dts/tegra20-harmony.dtsp
-index c8de58b..8513ad6 100644
---- a/arch/arm/boot/dts/tegra20-harmony.dtsp
-+++ b/arch/arm/boot/dts/tegra20-harmony.dtsp
-@@ -263,7 +263,7 @@
- 			compatible = "wlf,wm8903";
- 			reg = <0x1a>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(X, 3) 0x04>;
-+			interrupts = <TEGRA_GPIO(X, 3) IRQ_TYPE_LEVEL_HIGH>;
- 
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -291,7 +291,7 @@
- 		pmic: tps6586x at 34 {
- 			compatible = "ti,tps6586x";
- 			reg = <0x34>;
--			interrupts = <0 86 0x4>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			ti,system-power-controller;
- 
-diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dtsp b/arch/arm/boot/dts/tegra20-medcom-wide.dtsp
-index 66a5234..6837fc6 100644
---- a/arch/arm/boot/dts/tegra20-medcom-wide.dtsp
-+++ b/arch/arm/boot/dts/tegra20-medcom-wide.dtsp
-@@ -11,7 +11,7 @@
- 			compatible = "wlf,wm8903";
- 			reg = <0x1a>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(X, 3) 0x04>;
-+			interrupts = <TEGRA_GPIO(X, 3) IRQ_TYPE_LEVEL_HIGH>;
- 
- 			gpio-controller;
- 			#gpio-cells = <2>;
-diff --git a/arch/arm/boot/dts/tegra20-paz00.dtsp b/arch/arm/boot/dts/tegra20-paz00.dtsp
-index cb9bf21..e63473b 100644
---- a/arch/arm/boot/dts/tegra20-paz00.dtsp
-+++ b/arch/arm/boot/dts/tegra20-paz00.dtsp
-@@ -271,7 +271,7 @@
- 	nvec {
- 		compatible = "nvidia,nvec";
- 		reg = <0x7000c500 0x100>;
--		interrupts = <0 92 0x04>;
-+		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clock-frequency = <80000>;
-@@ -288,7 +288,7 @@
- 		pmic: tps6586x at 34 {
- 			compatible = "ti,tps6586x";
- 			reg = <0x34>;
--			interrupts = <0 86 0x4>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			#gpio-cells = <2>;
- 			gpio-controller;
-diff --git a/arch/arm/boot/dts/tegra20-plutux.dtsp b/arch/arm/boot/dts/tegra20-plutux.dtsp
-index 119c85a..29b646c 100644
---- a/arch/arm/boot/dts/tegra20-plutux.dtsp
-+++ b/arch/arm/boot/dts/tegra20-plutux.dtsp
-@@ -17,7 +17,7 @@
- 			compatible = "wlf,wm8903";
- 			reg = <0x1a>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(X, 3) 0x04>;
-+			interrupts = <TEGRA_GPIO(X, 3) IRQ_TYPE_LEVEL_HIGH>;
- 
- 			gpio-controller;
- 			#gpio-cells = <2>;
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dtsp b/arch/arm/boot/dts/tegra20-seaboard.dtsp
-index a427c57..f4da29e 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dtsp
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dtsp
-@@ -314,7 +314,7 @@
- 			compatible = "wlf,wm8903";
- 			reg = <0x1a>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(X, 3) 0x04>;
-+			interrupts = <TEGRA_GPIO(X, 3) IRQ_TYPE_LEVEL_HIGH>;
- 
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -329,14 +329,14 @@
- 			compatible = "isil,isl29018";
- 			reg = <0x44>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(Z, 2) 0x04>;
-+			interrupts = <TEGRA_GPIO(Z, 2) IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
- 		gyrometer at 68 {
- 			compatible = "invn,mpu3050";
- 			reg = <0x68>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(Z, 4) 0x04>;
-+			interrupts = <TEGRA_GPIO(Z, 4) IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 	};
- 
-@@ -389,7 +389,7 @@
- 		pmic: tps6586x at 34 {
- 			compatible = "ti,tps6586x";
- 			reg = <0x34>;
--			interrupts = <0 86 0x4>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			ti,system-power-controller;
- 
-@@ -512,7 +512,7 @@
- 			compatible = "ak,ak8975";
- 			reg = <0xc>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(N, 5) 0x04>;
-+			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsip b/arch/arm/boot/dts/tegra20-tamonten.dtsip
-index f1b44d8..43c6048 100644
---- a/arch/arm/boot/dts/tegra20-tamonten.dtsip
-+++ b/arch/arm/boot/dts/tegra20-tamonten.dtsip
-@@ -322,7 +322,7 @@
- 		pmic: tps6586x at 34 {
- 			compatible = "ti,tps6586x";
- 			reg = <0x34>;
--			interrupts = <0 86 0x4>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			ti,system-power-controller;
- 
-diff --git a/arch/arm/boot/dts/tegra20-tec.dtsp b/arch/arm/boot/dts/tegra20-tec.dtsp
-index f655aca..362b0da 100644
---- a/arch/arm/boot/dts/tegra20-tec.dtsp
-+++ b/arch/arm/boot/dts/tegra20-tec.dtsp
-@@ -17,7 +17,7 @@
- 			compatible = "wlf,wm8903";
- 			reg = <0x1a>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(X, 3) 0x04>;
-+			interrupts = <TEGRA_GPIO(X, 3) IRQ_TYPE_LEVEL_HIGH>;
- 
- 			gpio-controller;
- 			#gpio-cells = <2>;
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dtsp b/arch/arm/boot/dts/tegra20-ventana.dtsp
-index 20a27f3..eea712c 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dtsp
-+++ b/arch/arm/boot/dts/tegra20-ventana.dtsp
-@@ -311,7 +311,7 @@
- 			compatible = "wlf,wm8903";
- 			reg = <0x1a>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(X, 3) 0x04>;
-+			interrupts = <TEGRA_GPIO(X, 3) IRQ_TYPE_LEVEL_HIGH>;
- 
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -326,7 +326,7 @@
- 			compatible = "isil,isl29018";
- 			reg = <0x44>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(Z, 2) 0x04>;
-+			interrupts = <TEGRA_GPIO(Z, 2) IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 	};
- 
-@@ -372,7 +372,7 @@
- 		pmic: tps6586x at 34 {
- 			compatible = "ti,tps6586x";
- 			reg = <0x34>;
--			interrupts = <0 86 0x4>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			ti,system-power-controller;
- 
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dtsp b/arch/arm/boot/dts/tegra20-whistler.dtsp
-index c8f2314..2062780 100644
---- a/arch/arm/boot/dts/tegra20-whistler.dtsp
-+++ b/arch/arm/boot/dts/tegra20-whistler.dtsp
-@@ -282,7 +282,7 @@
- 		max8907 at 3c {
- 			compatible = "maxim,max8907";
- 			reg = <0x3c>;
--			interrupts = <0 86 0x4>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			maxim,system-power-controller;
- 
-diff --git a/arch/arm/boot/dts/tegra20.dtsip b/arch/arm/boot/dts/tegra20.dtsip
-index 1caece9..7b05f53 100644
---- a/arch/arm/boot/dts/tegra20.dtsip
-+++ b/arch/arm/boot/dts/tegra20.dtsip
-@@ -1,5 +1,6 @@
- #include "skeleton.dtsi"
- #include "tegra-gpio.h"
-+#include "arm-gic.h"
- 
- / {
- 	compatible = "nvidia,tegra20";
-@@ -16,8 +17,8 @@
- 	host1x {
- 		compatible = "nvidia,tegra20-host1x", "simple-bus";
- 		reg = <0x50000000 0x00024000>;
--		interrupts = <0 65 0x04   /* mpcore syncpt */
--			      0 67 0x04>; /* mpcore general */
-+		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>, /* syncpt */
-+			     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>; /* general */
- 		clocks = <&tegra_car 28>;
- 
- 		#address-cells = <1>;
-@@ -28,35 +29,35 @@
- 		mpe {
- 			compatible = "nvidia,tegra20-mpe";
- 			reg = <0x54040000 0x00040000>;
--			interrupts = <0 68 0x04>;
-+			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 60>;
- 		};
- 
- 		vi {
- 			compatible = "nvidia,tegra20-vi";
- 			reg = <0x54080000 0x00040000>;
--			interrupts = <0 69 0x04>;
-+			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 100>;
- 		};
- 
- 		epp {
- 			compatible = "nvidia,tegra20-epp";
- 			reg = <0x540c0000 0x00040000>;
--			interrupts = <0 70 0x04>;
-+			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 19>;
- 		};
- 
- 		isp {
- 			compatible = "nvidia,tegra20-isp";
- 			reg = <0x54100000 0x00040000>;
--			interrupts = <0 71 0x04>;
-+			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 23>;
- 		};
- 
- 		gr2d {
- 			compatible = "nvidia,tegra20-gr2d";
- 			reg = <0x54140000 0x00040000>;
--			interrupts = <0 72 0x04>;
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 21>;
- 		};
- 
-@@ -69,7 +70,7 @@
- 		dc at 54200000 {
- 			compatible = "nvidia,tegra20-dc";
- 			reg = <0x54200000 0x00040000>;
--			interrupts = <0 73 0x04>;
-+			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 27>, <&tegra_car 121>;
- 			clock-names = "disp1", "parent";
- 
-@@ -81,7 +82,7 @@
- 		dc at 54240000 {
- 			compatible = "nvidia,tegra20-dc";
- 			reg = <0x54240000 0x00040000>;
--			interrupts = <0 74 0x04>;
-+			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 26>, <&tegra_car 121>;
- 			clock-names = "disp2", "parent";
- 
-@@ -93,7 +94,7 @@
- 		hdmi {
- 			compatible = "nvidia,tegra20-hdmi";
- 			reg = <0x54280000 0x00040000>;
--			interrupts = <0 75 0x04>;
-+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 51>, <&tegra_car 117>;
- 			clock-names = "hdmi", "parent";
- 			status = "disabled";
-@@ -102,7 +103,7 @@
- 		tvo {
- 			compatible = "nvidia,tegra20-tvo";
- 			reg = <0x542c0000 0x00040000>;
--			interrupts = <0 76 0x04>;
-+			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 102>;
- 			status = "disabled";
- 		};
-@@ -118,7 +119,8 @@
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0x50040600 0x20>;
--		interrupts = <1 13 0x304>;
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
- 	intc: interrupt-controller {
-@@ -141,10 +143,10 @@
- 	timer at 60005000 {
- 		compatible = "nvidia,tegra20-timer";
- 		reg = <0x60005000 0x60>;
--		interrupts = <0 0 0x04
--			      0 1 0x04
--			      0 41 0x04
--			      0 42 0x04>;
-+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	tegra_car: clock {
-@@ -156,22 +158,22 @@
- 	apbdma: dma {
- 		compatible = "nvidia,tegra20-apbdma";
- 		reg = <0x6000a000 0x1200>;
--		interrupts = <0 104 0x04
--			      0 105 0x04
--			      0 106 0x04
--			      0 107 0x04
--			      0 108 0x04
--			      0 109 0x04
--			      0 110 0x04
--			      0 111 0x04
--			      0 112 0x04
--			      0 113 0x04
--			      0 114 0x04
--			      0 115 0x04
--			      0 116 0x04
--			      0 117 0x04
--			      0 118 0x04
--			      0 119 0x04>;
-+		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 34>;
- 	};
- 
-@@ -183,13 +185,13 @@
- 	gpio: gpio {
- 		compatible = "nvidia,tegra20-gpio";
- 		reg = <0x6000d000 0x1000>;
--		interrupts = <0 32 0x04
--			      0 33 0x04
--			      0 34 0x04
--			      0 35 0x04
--			      0 55 0x04
--			      0 87 0x04
--			      0 89 0x04>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
- 		gpio-controller;
- 		#interrupt-cells = <2>;
-@@ -212,7 +214,7 @@
- 	tegra_ac97: ac97 {
- 		compatible = "nvidia,tegra20-ac97";
- 		reg = <0x70002000 0x200>;
--		interrupts = <0 81 0x04>;
-+		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 12>;
- 		clocks = <&tegra_car 3>;
- 		status = "disabled";
-@@ -221,7 +223,7 @@
- 	tegra_i2s1: i2s at 70002800 {
- 		compatible = "nvidia,tegra20-i2s";
- 		reg = <0x70002800 0x200>;
--		interrupts = <0 13 0x04>;
-+		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 2>;
- 		clocks = <&tegra_car 11>;
- 		status = "disabled";
-@@ -230,7 +232,7 @@
- 	tegra_i2s2: i2s at 70002a00 {
- 		compatible = "nvidia,tegra20-i2s";
- 		reg = <0x70002a00 0x200>;
--		interrupts = <0 3 0x04>;
-+		interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 1>;
- 		clocks = <&tegra_car 18>;
- 		status = "disabled";
-@@ -247,7 +249,7 @@
- 		compatible = "nvidia,tegra20-uart";
- 		reg = <0x70006000 0x40>;
- 		reg-shift = <2>;
--		interrupts = <0 36 0x04>;
-+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 8>;
- 		clocks = <&tegra_car 6>;
-@@ -258,7 +260,7 @@
- 		compatible = "nvidia,tegra20-uart";
- 		reg = <0x70006040 0x40>;
- 		reg-shift = <2>;
--		interrupts = <0 37 0x04>;
-+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 9>;
- 		clocks = <&tegra_car 96>;
-@@ -269,7 +271,7 @@
- 		compatible = "nvidia,tegra20-uart";
- 		reg = <0x70006200 0x100>;
- 		reg-shift = <2>;
--		interrupts = <0 46 0x04>;
-+		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 10>;
- 		clocks = <&tegra_car 55>;
-@@ -280,7 +282,7 @@
- 		compatible = "nvidia,tegra20-uart";
- 		reg = <0x70006300 0x100>;
- 		reg-shift = <2>;
--		interrupts = <0 90 0x04>;
-+		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 19>;
- 		clocks = <&tegra_car 65>;
-@@ -291,7 +293,7 @@
- 		compatible = "nvidia,tegra20-uart";
- 		reg = <0x70006400 0x100>;
- 		reg-shift = <2>;
--		interrupts = <0 91 0x04>;
-+		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <216000000>;
- 		nvidia,dma-request-selector = <&apbdma 20>;
- 		clocks = <&tegra_car 66>;
-@@ -308,13 +310,13 @@
- 	rtc {
- 		compatible = "nvidia,tegra20-rtc";
- 		reg = <0x7000e000 0x100>;
--		interrupts = <0 2 0x04>;
-+		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	i2c at 7000c000 {
- 		compatible = "nvidia,tegra20-i2c";
- 		reg = <0x7000c000 0x100>;
--		interrupts = <0 38 0x04>;
-+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 12>, <&tegra_car 124>;
-@@ -325,7 +327,7 @@
- 	spi at 7000c380 {
- 		compatible = "nvidia,tegra20-sflash";
- 		reg = <0x7000c380 0x80>;
--		interrupts = <0 39 0x04>;
-+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 11>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -336,7 +338,7 @@
- 	i2c at 7000c400 {
- 		compatible = "nvidia,tegra20-i2c";
- 		reg = <0x7000c400 0x100>;
--		interrupts = <0 84 0x04>;
-+		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 54>, <&tegra_car 124>;
-@@ -347,7 +349,7 @@
- 	i2c at 7000c500 {
- 		compatible = "nvidia,tegra20-i2c";
- 		reg = <0x7000c500 0x100>;
--		interrupts = <0 92 0x04>;
-+		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 67>, <&tegra_car 124>;
-@@ -358,7 +360,7 @@
- 	i2c at 7000d000 {
- 		compatible = "nvidia,tegra20-i2c-dvc";
- 		reg = <0x7000d000 0x200>;
--		interrupts = <0 53 0x04>;
-+		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 47>, <&tegra_car 124>;
-@@ -369,7 +371,7 @@
- 	spi at 7000d400 {
- 		compatible = "nvidia,tegra20-slink";
- 		reg = <0x7000d400 0x200>;
--		interrupts = <0 59 0x04>;
-+		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 15>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -380,7 +382,7 @@
- 	spi at 7000d600 {
- 		compatible = "nvidia,tegra20-slink";
- 		reg = <0x7000d600 0x200>;
--		interrupts = <0 82 0x04>;
-+		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 16>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -391,7 +393,7 @@
- 	spi at 7000d800 {
- 		compatible = "nvidia,tegra20-slink";
- 		reg = <0x7000d480 0x200>;
--		interrupts = <0 83 0x04>;
-+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 17>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -402,7 +404,7 @@
- 	spi at 7000da00 {
- 		compatible = "nvidia,tegra20-slink";
- 		reg = <0x7000da00 0x200>;
--		interrupts = <0 93 0x04>;
-+		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 18>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -413,7 +415,7 @@
- 	kbc {
- 		compatible = "nvidia,tegra20-kbc";
- 		reg = <0x7000e200 0x100>;
--		interrupts = <0 85 0x04>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 36>;
- 		status = "disabled";
- 	};
-@@ -427,7 +429,7 @@
- 		compatible = "nvidia,tegra20-mc";
- 		reg = <0x7000f000 0x024
- 		       0x7000f03c 0x3c4>;
--		interrupts = <0 77 0x04>;
-+		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	iommu {
-@@ -446,7 +448,7 @@
- 	usb at c5000000 {
- 		compatible = "nvidia,tegra20-ehci", "usb-ehci";
- 		reg = <0xc5000000 0x4000>;
--		interrupts = <0 20 0x04>;
-+		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
- 		phy_type = "utmi";
- 		nvidia,has-legacy-mode;
- 		clocks = <&tegra_car 22>;
-@@ -467,7 +469,7 @@
- 	usb at c5004000 {
- 		compatible = "nvidia,tegra20-ehci", "usb-ehci";
- 		reg = <0xc5004000 0x4000>;
--		interrupts = <0 21 0x04>;
-+		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
- 		phy_type = "ulpi";
- 		clocks = <&tegra_car 58>;
- 		nvidia,phy = <&phy2>;
-@@ -485,7 +487,7 @@
- 	usb at c5008000 {
- 		compatible = "nvidia,tegra20-ehci", "usb-ehci";
- 		reg = <0xc5008000 0x4000>;
--		interrupts = <0 97 0x04>;
-+		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
- 		phy_type = "utmi";
- 		clocks = <&tegra_car 59>;
- 		nvidia,phy = <&phy3>;
-@@ -503,7 +505,7 @@
- 	sdhci at c8000000 {
- 		compatible = "nvidia,tegra20-sdhci";
- 		reg = <0xc8000000 0x200>;
--		interrupts = <0 14 0x04>;
-+		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 14>;
- 		status = "disabled";
- 	};
-@@ -511,7 +513,7 @@
- 	sdhci at c8000200 {
- 		compatible = "nvidia,tegra20-sdhci";
- 		reg = <0xc8000200 0x200>;
--		interrupts = <0 15 0x04>;
-+		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 9>;
- 		status = "disabled";
- 	};
-@@ -519,7 +521,7 @@
- 	sdhci at c8000400 {
- 		compatible = "nvidia,tegra20-sdhci";
- 		reg = <0xc8000400 0x200>;
--		interrupts = <0 19 0x04>;
-+		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 69>;
- 		status = "disabled";
- 	};
-@@ -527,7 +529,7 @@
- 	sdhci at c8000600 {
- 		compatible = "nvidia,tegra20-sdhci";
- 		reg = <0xc8000600 0x200>;
--		interrupts = <0 31 0x04>;
-+		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 15>;
- 		status = "disabled";
- 	};
-@@ -551,7 +553,7 @@
- 
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
--		interrupts = <0 56 0x04
--			      0 57 0x04>;
-+		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/tegra30-beaver.dtsp b/arch/arm/boot/dts/tegra30-beaver.dtsp
-index 6d815da..cbac057 100644
---- a/arch/arm/boot/dts/tegra30-beaver.dtsp
-+++ b/arch/arm/boot/dts/tegra30-beaver.dtsp
-@@ -133,7 +133,7 @@
- 			compatible = "ti,tps65911";
- 			reg = <0x2d>;
- 
--			interrupts = <0 86 0x4>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 			#interrupt-cells = <2>;
- 			interrupt-controller;
- 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsip b/arch/arm/boot/dts/tegra30-cardhu.dtsip
-index 4f99c5d..8079533 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsip
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsip
-@@ -146,7 +146,7 @@
- 			compatible = "isil,isl29028";
- 			reg = <0x44>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(L, 0) 0x04>;
-+			interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 	};
- 
-@@ -163,7 +163,7 @@
- 			compatible = "wlf,wm8903";
- 			reg = <0x1a>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(W, 3) 0x04>;
-+			interrupts = <TEGRA_GPIO(W, 3) IRQ_TYPE_LEVEL_HIGH>;
- 
- 			gpio-controller;
- 			#gpio-cells = <2>;
-@@ -190,7 +190,7 @@
- 			compatible = "ti,tps65911";
- 			reg = <0x2d>;
- 
--			interrupts = <0 86 0x4>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 			#interrupt-cells = <2>;
- 			interrupt-controller;
- 
-diff --git a/arch/arm/boot/dts/tegra30.dtsip b/arch/arm/boot/dts/tegra30.dtsip
-index 70b6ac7..0148459 100644
---- a/arch/arm/boot/dts/tegra30.dtsip
-+++ b/arch/arm/boot/dts/tegra30.dtsip
-@@ -1,5 +1,6 @@
- #include "skeleton.dtsi"
- #include "tegra-gpio.h"
-+#include "arm-gic.h"
- 
- / {
- 	compatible = "nvidia,tegra30";
-@@ -16,8 +17,8 @@
- 	host1x {
- 		compatible = "nvidia,tegra30-host1x", "simple-bus";
- 		reg = <0x50000000 0x00024000>;
--		interrupts = <0 65 0x04   /* mpcore syncpt */
--			      0 67 0x04>; /* mpcore general */
-+		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>, /* syncpt */
-+			     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>; /* general */
- 		clocks = <&tegra_car 28>;
- 
- 		#address-cells = <1>;
-@@ -28,35 +29,35 @@
- 		mpe {
- 			compatible = "nvidia,tegra30-mpe";
- 			reg = <0x54040000 0x00040000>;
--			interrupts = <0 68 0x04>;
-+			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 60>;
- 		};
- 
- 		vi {
- 			compatible = "nvidia,tegra30-vi";
- 			reg = <0x54080000 0x00040000>;
--			interrupts = <0 69 0x04>;
-+			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 164>;
- 		};
- 
- 		epp {
- 			compatible = "nvidia,tegra30-epp";
- 			reg = <0x540c0000 0x00040000>;
--			interrupts = <0 70 0x04>;
-+			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 19>;
- 		};
- 
- 		isp {
- 			compatible = "nvidia,tegra30-isp";
- 			reg = <0x54100000 0x00040000>;
--			interrupts = <0 71 0x04>;
-+			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 23>;
- 		};
- 
- 		gr2d {
- 			compatible = "nvidia,tegra30-gr2d";
- 			reg = <0x54140000 0x00040000>;
--			interrupts = <0 72 0x04>;
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 21>;
- 		};
- 
-@@ -70,7 +71,7 @@
- 		dc at 54200000 {
- 			compatible = "nvidia,tegra30-dc";
- 			reg = <0x54200000 0x00040000>;
--			interrupts = <0 73 0x04>;
-+			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 27>, <&tegra_car 179>;
- 			clock-names = "disp1", "parent";
- 
-@@ -82,7 +83,7 @@
- 		dc at 54240000 {
- 			compatible = "nvidia,tegra30-dc";
- 			reg = <0x54240000 0x00040000>;
--			interrupts = <0 74 0x04>;
-+			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 26>, <&tegra_car 179>;
- 			clock-names = "disp2", "parent";
- 
-@@ -94,7 +95,7 @@
- 		hdmi {
- 			compatible = "nvidia,tegra30-hdmi";
- 			reg = <0x54280000 0x00040000>;
--			interrupts = <0 75 0x04>;
-+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 51>, <&tegra_car 189>;
- 			clock-names = "hdmi", "parent";
- 			status = "disabled";
-@@ -103,7 +104,7 @@
- 		tvo {
- 			compatible = "nvidia,tegra30-tvo";
- 			reg = <0x542c0000 0x00040000>;
--			interrupts = <0 76 0x04>;
-+			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&tegra_car 169>;
- 			status = "disabled";
- 		};
-@@ -119,7 +120,8 @@
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0x50040600 0x20>;
--		interrupts = <1 13 0xf04>;
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
- 	intc: interrupt-controller {
-@@ -142,12 +144,12 @@
- 	timer at 60005000 {
- 		compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
- 		reg = <0x60005000 0x400>;
--		interrupts = <0 0 0x04
--			      0 1 0x04
--			      0 41 0x04
--			      0 42 0x04
--			      0 121 0x04
--			      0 122 0x04>;
-+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	tegra_car: clock {
-@@ -159,38 +161,38 @@
- 	apbdma: dma {
- 		compatible = "nvidia,tegra30-apbdma", "nvidia,tegra20-apbdma";
- 		reg = <0x6000a000 0x1400>;
--		interrupts = <0 104 0x04
--			      0 105 0x04
--			      0 106 0x04
--			      0 107 0x04
--			      0 108 0x04
--			      0 109 0x04
--			      0 110 0x04
--			      0 111 0x04
--			      0 112 0x04
--			      0 113 0x04
--			      0 114 0x04
--			      0 115 0x04
--			      0 116 0x04
--			      0 117 0x04
--			      0 118 0x04
--			      0 119 0x04
--			      0 128 0x04
--			      0 129 0x04
--			      0 130 0x04
--			      0 131 0x04
--			      0 132 0x04
--			      0 133 0x04
--			      0 134 0x04
--			      0 135 0x04
--			      0 136 0x04
--			      0 137 0x04
--			      0 138 0x04
--			      0 139 0x04
--			      0 140 0x04
--			      0 141 0x04
--			      0 142 0x04
--			      0 143 0x04>;
-+		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 34>;
- 	};
- 
-@@ -202,14 +204,14 @@
- 	gpio: gpio {
- 		compatible = "nvidia,tegra30-gpio";
- 		reg = <0x6000d000 0x1000>;
--		interrupts = <0 32 0x04
--			      0 33 0x04
--			      0 34 0x04
--			      0 35 0x04
--			      0 55 0x04
--			      0 87 0x04
--			      0 89 0x04
--			      0 125 0x04>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
- 		#gpio-cells = <2>;
- 		gpio-controller;
- 		#interrupt-cells = <2>;
-@@ -234,7 +236,7 @@
- 		compatible = "nvidia,tegra30-uart", "nvidia,tegra20-uart";
- 		reg = <0x70006000 0x40>;
- 		reg-shift = <2>;
--		interrupts = <0 36 0x04>;
-+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <408000000>;
- 		nvidia,dma-request-selector = <&apbdma 8>;
- 		clocks = <&tegra_car 6>;
-@@ -246,7 +248,7 @@
- 		reg = <0x70006040 0x40>;
- 		reg-shift = <2>;
- 		clock-frequency = <408000000>;
--		interrupts = <0 37 0x04>;
-+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 9>;
- 		clocks = <&tegra_car 160>;
- 		status = "disabled";
-@@ -257,7 +259,7 @@
- 		reg = <0x70006200 0x100>;
- 		reg-shift = <2>;
- 		clock-frequency = <408000000>;
--		interrupts = <0 46 0x04>;
-+		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 10>;
- 		clocks = <&tegra_car 55>;
- 		status = "disabled";
-@@ -268,7 +270,7 @@
- 		reg = <0x70006300 0x100>;
- 		reg-shift = <2>;
- 		clock-frequency = <408000000>;
--		interrupts = <0 90 0x04>;
-+		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 19>;
- 		clocks = <&tegra_car 65>;
- 		status = "disabled";
-@@ -279,7 +281,7 @@
- 		reg = <0x70006400 0x100>;
- 		reg-shift = <2>;
- 		clock-frequency = <408000000>;
--		interrupts = <0 91 0x04>;
-+		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 20>;
- 		clocks = <&tegra_car 66>;
- 		status = "disabled";
-@@ -295,13 +297,13 @@
- 	rtc {
- 		compatible = "nvidia,tegra30-rtc", "nvidia,tegra20-rtc";
- 		reg = <0x7000e000 0x100>;
--		interrupts = <0 2 0x04>;
-+		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	i2c at 7000c000 {
- 		compatible =  "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
- 		reg = <0x7000c000 0x100>;
--		interrupts = <0 38 0x04>;
-+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 12>, <&tegra_car 182>;
-@@ -312,7 +314,7 @@
- 	i2c at 7000c400 {
- 		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
- 		reg = <0x7000c400 0x100>;
--		interrupts = <0 84 0x04>;
-+		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 54>, <&tegra_car 182>;
-@@ -323,7 +325,7 @@
- 	i2c at 7000c500 {
- 		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
- 		reg = <0x7000c500 0x100>;
--		interrupts = <0 92 0x04>;
-+		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 67>, <&tegra_car 182>;
-@@ -334,7 +336,7 @@
- 	i2c at 7000c700 {
- 		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
- 		reg = <0x7000c700 0x100>;
--		interrupts = <0 120 0x04>;
-+		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 103>, <&tegra_car 182>;
-@@ -345,7 +347,7 @@
- 	i2c at 7000d000 {
- 		compatible = "nvidia,tegra30-i2c", "nvidia,tegra20-i2c";
- 		reg = <0x7000d000 0x100>;
--		interrupts = <0 53 0x04>;
-+		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&tegra_car 47>, <&tegra_car 182>;
-@@ -356,7 +358,7 @@
- 	spi at 7000d400 {
- 		compatible = "nvidia,tegra30-slink", "nvidia,tegra20-slink";
- 		reg = <0x7000d400 0x200>;
--		interrupts = <0 59 0x04>;
-+		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 15>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -367,7 +369,7 @@
- 	spi at 7000d600 {
- 		compatible = "nvidia,tegra30-slink", "nvidia,tegra20-slink";
- 		reg = <0x7000d600 0x200>;
--		interrupts = <0 82 0x04>;
-+		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 16>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -378,7 +380,7 @@
- 	spi at 7000d800 {
- 		compatible = "nvidia,tegra30-slink", "nvidia,tegra20-slink";
- 		reg = <0x7000d480 0x200>;
--		interrupts = <0 83 0x04>;
-+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 17>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -389,7 +391,7 @@
- 	spi at 7000da00 {
- 		compatible = "nvidia,tegra30-slink", "nvidia,tegra20-slink";
- 		reg = <0x7000da00 0x200>;
--		interrupts = <0 93 0x04>;
-+		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 18>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -400,7 +402,7 @@
- 	spi at 7000dc00 {
- 		compatible = "nvidia,tegra30-slink", "nvidia,tegra20-slink";
- 		reg = <0x7000dc00 0x200>;
--		interrupts = <0 94 0x04>;
-+		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 27>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -411,7 +413,7 @@
- 	spi at 7000de00 {
- 		compatible = "nvidia,tegra30-slink", "nvidia,tegra20-slink";
- 		reg = <0x7000de00 0x200>;
--		interrupts = <0 79 0x04>;
-+		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 28>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -422,7 +424,7 @@
- 	kbc {
- 		compatible = "nvidia,tegra30-kbc", "nvidia,tegra20-kbc";
- 		reg = <0x7000e200 0x100>;
--		interrupts = <0 85 0x04>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 36>;
- 		status = "disabled";
- 	};
-@@ -438,7 +440,7 @@
- 		       0x7000f03c 0x1b4
- 		       0x7000f200 0x028
- 		       0x7000f284 0x17c>;
--		interrupts = <0 77 0x04>;
-+		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
- 	iommu {
-@@ -455,7 +457,7 @@
- 		compatible = "nvidia,tegra30-ahub";
- 		reg = <0x70080000 0x200
- 		       0x70080200 0x100>;
--		interrupts = <0 103 0x04>;
-+		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 1>;
- 		clocks = <&tegra_car 106>, <&tegra_car 107>, <&tegra_car 30>,
- 			 <&tegra_car 11>, <&tegra_car 18>, <&tegra_car 101>,
-@@ -512,7 +514,7 @@
- 	sdhci at 78000000 {
- 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
- 		reg = <0x78000000 0x200>;
--		interrupts = <0 14 0x04>;
-+		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 14>;
- 		status = "disabled";
- 	};
-@@ -520,7 +522,7 @@
- 	sdhci at 78000200 {
- 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
- 		reg = <0x78000200 0x200>;
--		interrupts = <0 15 0x04>;
-+		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 9>;
- 		status = "disabled";
- 	};
-@@ -528,7 +530,7 @@
- 	sdhci at 78000400 {
- 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
- 		reg = <0x78000400 0x200>;
--		interrupts = <0 19 0x04>;
-+		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 69>;
- 		status = "disabled";
- 	};
-@@ -536,7 +538,7 @@
- 	sdhci at 78000600 {
- 		compatible = "nvidia,tegra30-sdhci", "nvidia,tegra20-sdhci";
- 		reg = <0x78000600 0x200>;
--		interrupts = <0 31 0x04>;
-+		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&tegra_car 15>;
- 		status = "disabled";
- 	};
-@@ -572,9 +574,9 @@
- 
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
--		interrupts = <0 144 0x04
--			      0 145 0x04
--			      0 146 0x04
--			      0 147 0x04>;
-+		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/mailbox/dbx500-mailbox.txt b/Documentation/devicetree/bindings/mailbox/dbx500-mailbox.txt
+new file mode 100644
+index 0000000..7a10e72
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/dbx500-mailbox.txt
+@@ -0,0 +1,27 @@
++ST-Ericsson DBx500 PRCM Mailbox Driver
++
++Required properties:
++- compatible		: Should be
++			  "stericsson,db8500-mailbox" for db8500 and db9500
++			  "stericsson,db9540-mailbox" for db9540
++- reg			: Physical base address and length of mailbox's
++			  registers and shared memory
++- reg-names		: Should contain the reg names "prcm-reg" and
++			  "prcmu-tcdm"
++- interrupts		: contains the IRQ line for the PRCM mailbox
++- interrupt-names	: Should contain the interrupt name "irq"
++- legacy-offset		: Memory offset in shared mem for legacy mailboxes
++
++Optional properties:
++- upap-offset		: Memory offset in shared mem for upap mailboxes
++
++Examples:
++
++mailbox {
++	compatible = "stericsson,db8500-mailbox";
++	reg = <0x80157000 0x1000>, <0x801B8000 0x2000>;
++	reg-names = "prcm-reg", "prcmu-tcdm";
++	interrupts = <0 47 0x4>;
++	interrupt-names = "irq";
++	legacy-offset = <0xdd4>;
++};
+diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+index c28897d..d352028 100644
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@ -24,6 +24,12 @@ config OMAP2PLUS_MBOX
+          OMAP2/3; or IPU, IVA HD and DSP in OMAP4. Say Y here if you want
+          to use OMAP2+ Mailbox framework support.
+ 
++config DBX500_MBOX
++	tristate "DBx500 Mailbox driver support"
++	depends on ARCH_U8500
++	help
++	  Say Y here if you want to use DBx500 Mailbox driver support for
++	  power coprocessor access on Ux500 and Ux540 families
+ 
+ config MBOX_KFIFO_SIZE
+        int "Mailbox kfifo default buffer size (bytes)"
+@@ -35,6 +41,7 @@ config MBOX_KFIFO_SIZE
+ 
+ config MBOX_DATA_SIZE
+ 	int "Mailbox associated data max size (bytes)"
++	default 64 if DBX500_MBOX
+ 	default 4
+ 	help
+ 	  Specify the default size of mailbox's associated data buffer
+diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+index 4085b71..c04ce79 100644
+--- a/drivers/mailbox/Makefile
++++ b/drivers/mailbox/Makefile
+@@ -2,3 +2,4 @@ obj-$(CONFIG_MAILBOX) += mailbox.o
+ 
+ obj-$(CONFIG_OMAP1_MBOX)       += mailbox-omap1.o
+ obj-$(CONFIG_OMAP2PLUS_MBOX)   += mailbox-omap2.o
++obj-$(CONFIG_DBX500_MBOX)      += mailbox-dbx500.o
+diff --git a/drivers/mailbox/mailbox-dbx500.c b/drivers/mailbox/mailbox-dbx500.c
+new file mode 100644
+index 0000000..e9d2b0a
+--- /dev/null
++++ b/drivers/mailbox/mailbox-dbx500.c
+@@ -0,0 +1,648 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2012
++ *
++ * License Terms: GNU General Public License v2
++ * Author: Loic Pallardy <loic.pallardy@st.com> for ST-Ericsson
++ * DBX500 PRCM Mailbox driver
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/platform_device.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++#include <linux/platform_data/mailbox-dbx500.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/irqdomain.h>
++
++#include "mailbox_internal.h"
++
++#define MAILBOX_LEGACY		0
++#define MAILBOX_UPAP		1
++
++enum {
++	MAILBOX_BLOCKING,
++	MAILBOX_ATOMIC,
++};
++
++/* CPU mailbox registers */
++#define PRCM_MBOX_CPU_VAL	0x0fc
++#define PRCM_MBOX_CPU_SET	0x100
++#define PRCM_MBOX_CPU_CLR	0x104
++
++#define PRCM_ARM_IT1_CLR	0x48C
++#define PRCM_ARM_IT1_VAL	0x494
++
++#define NUM_MB 8
++#define MBOX_BIT BIT
++#define ALL_MBOX_BITS (MBOX_BIT(NUM_MB) - 1)
++
++/* CPU mailbox shared memory */
++#define PRCM_MBOX_LEGACY_SIZE		0x220
++#define _PRCM_MBOX_HEADER		0x214 /* 16 bytes */
++#define PRCM_MBOX_HEADER_REQ_MB0	(_PRCM_MBOX_HEADER + 0x0)
++#define PRCM_MBOX_HEADER_REQ_MB1	(_PRCM_MBOX_HEADER + 0x1)
++#define PRCM_MBOX_HEADER_REQ_MB2	(_PRCM_MBOX_HEADER + 0x2)
++#define PRCM_MBOX_HEADER_REQ_MB3	(_PRCM_MBOX_HEADER + 0x3)
++#define PRCM_MBOX_HEADER_REQ_MB4	(_PRCM_MBOX_HEADER + 0x4)
++#define PRCM_MBOX_HEADER_REQ_MB5	(_PRCM_MBOX_HEADER + 0x5)
++#define PRCM_MBOX_HEADER_ACK_MB0	(_PRCM_MBOX_HEADER + 0x8)
++
++/* Req Mailboxes */
++#define PRCM_REQ_MB0			0x208 /* 12 bytes  */
++#define PRCM_REQ_MB1			0x1FC /* 12 bytes  */
++#define PRCM_REQ_MB2			0x1EC /* 16 bytes  */
++#define PRCM_REQ_MB3			0x78  /* 372 bytes  */
++#define PRCM_REQ_MB4			0x74  /* 4 bytes  */
++#define PRCM_REQ_MB5			0x70  /* 4 bytes  */
++#define PRCM_REQ_PASR			0x30 /* 4 bytes */
++
++/* Ack Mailboxes */
++#define PRCM_ACK_MB0			0x34 /* 52 bytes  */
++#define PRCM_ACK_MB1			0x30 /* 4 bytes */
++#define PRCM_ACK_MB2			0x2C /* 4 bytes */
++#define PRCM_ACK_MB3			0x28 /* 4 bytes */
++#define PRCM_ACK_MB4			0x24 /* 4 bytes */
++#define PRCM_ACK_MB5			0x20 /* 4 bytes */
++
++/* Ack Mailboxe sizes */
++#define PRCM_ACK_MB0_SIZE		0x24 /* 52 bytes  */
++#define PRCM_ACK_MB1_SIZE		0x4 /* 4 bytes */
++#define PRCM_ACK_MB2_SIZE		0x1 /* 1 bytes */
++#define PRCM_ACK_MB3_SIZE		0x2 /* 2 bytes */
++#define PRCM_ACK_MB4_SIZE		0x0 /* 0 bytes */
++#define PRCM_ACK_MB5_SIZE		0x4 /* 4 bytes */
++
++static void __iomem *mbox_base;
++static void __iomem *tcdm_mem_base;
++
++static u8 prcm_mbox_irq_mask; /* masked by default */
++static DEFINE_SPINLOCK(prcm_mbox_irqs_lock);
++
++struct dbx500_mbox_priv {
++	int			access_mode;
++	int			type;
++	int			header_size;
++	unsigned int		tx_header_offset;
++	unsigned int		rx_header_offset;
++	unsigned int		tx_offset;
++	unsigned int		rx_offset;
++	unsigned int		rx_size;
++	unsigned int		sw_irq;
++	bool			empty_flag;
++};
++
++static inline unsigned int mbox_read_reg(size_t ofs)
++{
++	return __raw_readl(mbox_base + ofs);
++}
++
++static inline void mbox_write_reg(u32 val, size_t ofs)
++{
++	__raw_writel(val, mbox_base + ofs);
++}
++
++/* Mailbox H/W preparations */
++static struct irq_chip dbx500_mbox_irq_chip;
++static struct irq_domain *dbx500_mbox_irq_domain;
++
++static int dbx500_mbox_startup(struct mailbox *mbox)
++{
++	/* Nothing to do */
++	return 0;
++}
++
++/* Mailbox IRQ handle functions */
++
++static void dbx500_mbox_enable_irq(struct mailbox *mbox, mailbox_irq_t irq)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&prcm_mbox_irqs_lock, flags);
++
++	prcm_mbox_irq_mask |= MBOX_BIT(mbox->id);
++
++	spin_unlock_irqrestore(&prcm_mbox_irqs_lock, flags);
++
++}
++
++static void dbx500_mbox_disable_irq(struct mailbox *mbox, mailbox_irq_t irq)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&prcm_mbox_irqs_lock, flags);
++
++	prcm_mbox_irq_mask &= ~MBOX_BIT(mbox->id);
++
++	spin_unlock_irqrestore(&prcm_mbox_irqs_lock, flags);
++
++}
++
++static void dbx500_mbox_ack_irq(struct mailbox *mbox, mailbox_irq_t irq)
++{
++	if (irq == IRQ_RX)
++		mbox_write_reg(MBOX_BIT(mbox->id), PRCM_ARM_IT1_CLR);
++}
++
++static int dbx500_mbox_is_irq(struct mailbox *mbox, mailbox_irq_t irq)
++{
++	struct dbx500_mbox_priv *priv = (struct dbx500_mbox_priv *)mbox->priv;
++
++	if (irq == IRQ_RX) {
++		if (mbox_read_reg(PRCM_ARM_IT1_VAL) & MBOX_BIT(mbox->id)) {
++			priv->empty_flag = true;
++			return 1;
++		} else {
++			return 0;
++		}
++	} else {
++		return 0;
++	}
++}
++
++/* message management */
++
++static int dbx500_mbox_is_ready(struct mailbox *mbox)
++{
++	return mbox_read_reg(PRCM_MBOX_CPU_VAL) & MBOX_BIT(mbox->id);
++}
++
++static int dbx500_mbox_write(struct mailbox *mbox,
++		struct mailbox_msg *msg)
++{
++	int j;
++	struct dbx500_mbox_priv *priv = (struct dbx500_mbox_priv *)mbox->priv;
++
++	if (msg->size && !msg->pdata)
++		return -EINVAL;
++
++	while (dbx500_mbox_is_ready(mbox))
++		cpu_relax();
++
++	/* write header */
++	if (priv->header_size)
++		writeb(msg->header, tcdm_mem_base + priv->tx_header_offset);
++
++	/* write data */
++	for (j = 0; j < msg->size; j++)
++		writeb(((unsigned char *)msg->pdata)[j],
++				tcdm_mem_base + priv->tx_offset + j);
++
++	/* send event */
++	mbox_write_reg(MBOX_BIT(mbox->id), PRCM_MBOX_CPU_SET);
++
++	return 0;
++}
++
++static void dbx500_mbox_read(struct mailbox *mbox, struct mailbox_msg *msg)
++{
++	struct dbx500_mbox_priv *priv = (struct dbx500_mbox_priv *)mbox->priv;
++
++	msg->header = readb(tcdm_mem_base + priv->rx_header_offset);
++	msg->pdata = (unsigned char *)(tcdm_mem_base + priv->rx_offset);
++
++	msg->size = priv->rx_size;
++	priv->empty_flag = false;
++}
++
++static int dbx500_mbox_empty(struct mailbox *mbox)
++{
++	struct dbx500_mbox_priv *priv = (struct dbx500_mbox_priv *)mbox->priv;
++	if (priv->empty_flag)
++		return 0;
++	else
++		return 1;
++}
++
++static int dbx500_mbox_poll_for_space(struct mailbox *mbox)
++{
++	return 0;
++}
++/*  interrupt management */
++
++/*  mask/unmask must be managed by SW */
++
++static void mbox_irq_mask(struct irq_data *d)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&prcm_mbox_irqs_lock, flags);
++
++	prcm_mbox_irq_mask &= ~MBOX_BIT(d->hwirq);
++
++	spin_unlock_irqrestore(&prcm_mbox_irqs_lock, flags);
++}
++
++static void mbox_irq_unmask(struct irq_data *d)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&prcm_mbox_irqs_lock, flags);
++
++	prcm_mbox_irq_mask |= MBOX_BIT(d->hwirq);
++
++	spin_unlock_irqrestore(&prcm_mbox_irqs_lock, flags);
++}
++
++static void mbox_irq_ack(struct irq_data *d)
++{
++	mbox_write_reg(MBOX_BIT(d->hwirq), PRCM_ARM_IT1_CLR);
++}
++
++static struct irq_chip dbx500_mbox_irq_chip = {
++	.name		= "dbx500_mbox",
++	.irq_disable	= mbox_irq_unmask,
++	.irq_ack	= mbox_irq_ack,
++	.irq_mask	= mbox_irq_mask,
++	.irq_unmask	= mbox_irq_unmask,
++};
++
++static int dbx500_mbox_irq_map(struct irq_domain *d, unsigned int irq,
++			       irq_hw_number_t hwirq)
++{
++	irq_set_chip_and_handler(irq, &dbx500_mbox_irq_chip,
++				handle_simple_irq);
++	set_irq_flags(irq, IRQF_VALID);
++
++	return 0;
++}
++
++static struct irq_domain_ops dbx500_mbox_irq_ops = {
++	.map    = dbx500_mbox_irq_map,
++	.xlate  = irq_domain_xlate_twocell,
++};
++
++static irqreturn_t dbx500_mbox_irq_handler(int irq, void *data)
++{
++	u32 bits;
++	u8 n;
++
++	bits = (mbox_read_reg(PRCM_ARM_IT1_VAL) & ALL_MBOX_BITS);
++	if (unlikely(!bits))
++		return IRQ_NONE;
++
++	bits &= prcm_mbox_irq_mask;
++
++	for (n = 0; bits; n++) {
++		if (bits & MBOX_BIT(n)) {
++			bits -= MBOX_BIT(n);
++			generic_handle_irq(
++				irq_find_mapping(dbx500_mbox_irq_domain, n));
++		}
++	}
++	return IRQ_HANDLED;
++}
++
++/* 5 mailboxes AP <--> PRCMU */
++static struct mailbox_ops dbx500_mbox_ops = {
++	.type		= MBOX_SHARED_MEM_TYPE,
++	.startup	= dbx500_mbox_startup,
++	.enable_irq	= dbx500_mbox_enable_irq,
++	.disable_irq	= dbx500_mbox_disable_irq,
++	.ack_irq	= dbx500_mbox_ack_irq,
++	.is_irq		= dbx500_mbox_is_irq,
++	.read		= dbx500_mbox_read,
++	.write		= dbx500_mbox_write,
++	.empty		= dbx500_mbox_empty,
++	.poll_for_space = dbx500_mbox_poll_for_space,
++};
++
++struct dbx500_mbox_priv mbox0_priv = {
++	.access_mode		= MAILBOX_ATOMIC,
++	.type			= MAILBOX_LEGACY,
++	.tx_header_offset	= PRCM_MBOX_HEADER_REQ_MB0,
++	.header_size		= 1,
++	.tx_offset		= PRCM_REQ_MB0,
++	.rx_header_offset	= PRCM_MBOX_HEADER_ACK_MB0,
++	.rx_offset		= PRCM_ACK_MB0,
++	.rx_size		= PRCM_ACK_MB0_SIZE,
++};
++
++struct mailbox mbox0_info = {
++	.name	= "mbox0",
++	.id	= 0,
++	.ops	= &dbx500_mbox_ops,
++	.priv	= &mbox0_priv,
++};
++
++struct dbx500_mbox_priv mbox1_priv = {
++	.access_mode		= MAILBOX_BLOCKING,
++	.type			= MAILBOX_LEGACY,
++	.tx_header_offset	= PRCM_MBOX_HEADER_REQ_MB1,
++	.header_size		= 1,
++	.tx_offset		= PRCM_REQ_MB1,
++	.rx_header_offset	= PRCM_MBOX_HEADER_REQ_MB1,
++	.rx_offset		= PRCM_ACK_MB1,
++	.rx_size		= PRCM_ACK_MB1_SIZE,
++};
++
++struct mailbox mbox1_info = {
++	.name	= "mbox1",
++	.id	= 1,
++	.ops	= &dbx500_mbox_ops,
++	.priv	= &mbox1_priv,
++};
++
++struct dbx500_mbox_priv mbox2_priv = {
++	.access_mode		= MAILBOX_BLOCKING,
++	.type			= MAILBOX_LEGACY,
++	.tx_header_offset	= PRCM_MBOX_HEADER_REQ_MB2,
++	.header_size		= 1,
++	.tx_offset		= PRCM_REQ_MB2,
++	.rx_header_offset	= PRCM_MBOX_HEADER_REQ_MB2,
++	.rx_offset		= PRCM_ACK_MB2,
++	.rx_size		= PRCM_ACK_MB2_SIZE,
++};
++
++struct mailbox mbox2_info = {
++	.name	= "mbox2",
++	.id	= 2,
++	.ops	= &dbx500_mbox_ops,
++	.priv	= &mbox2_priv,
++};
++
++struct dbx500_mbox_priv mbox3_priv = {
++	.access_mode		= MAILBOX_BLOCKING,
++	.type			= MAILBOX_LEGACY,
++	.tx_header_offset	= PRCM_MBOX_HEADER_REQ_MB3,
++	.header_size		= 1,
++	.tx_offset		= PRCM_REQ_MB3,
++	.rx_header_offset	= PRCM_MBOX_HEADER_REQ_MB3,
++	.rx_offset		= PRCM_ACK_MB3,
++	.rx_size		= PRCM_ACK_MB3_SIZE,
++};
++
++struct mailbox mbox3_info = {
++	.name	= "mbox3",
++	.id	= 3,
++	.ops	= &dbx500_mbox_ops,
++	.priv	= &mbox3_priv,
++};
++
++struct dbx500_mbox_priv mbox4_priv = {
++	.access_mode		= MAILBOX_BLOCKING,
++	.type			= MAILBOX_LEGACY,
++	.tx_header_offset	= PRCM_MBOX_HEADER_REQ_MB4,
++	.header_size		= 1,
++	.tx_offset		= PRCM_REQ_MB4,
++	.rx_header_offset	= PRCM_MBOX_HEADER_REQ_MB4,
++	.rx_offset		= PRCM_ACK_MB4,
++	.rx_size		= PRCM_ACK_MB4_SIZE,
++};
++
++struct mailbox mbox4_info = {
++	.name	= "mbox4",
++	.id	= 4,
++	.ops	= &dbx500_mbox_ops,
++	.priv	= &mbox4_priv,
++};
++
++struct dbx500_mbox_priv mbox5_priv = {
++	.access_mode		= MAILBOX_BLOCKING,
++	.type			= MAILBOX_LEGACY,
++	.tx_header_offset	= PRCM_MBOX_HEADER_REQ_MB5,
++	.header_size		= 1,
++	.tx_offset		= PRCM_REQ_MB5,
++	.rx_header_offset	= PRCM_MBOX_HEADER_REQ_MB5,
++	.rx_offset		= PRCM_ACK_MB5,
++	.rx_size		= PRCM_ACK_MB5_SIZE,
++};
++
++struct mailbox mbox5_info = {
++	.name	= "mbox5",
++	.id	= 5,
++	.ops	= &dbx500_mbox_ops,
++	.priv	= &mbox5_priv,
++};
++
++struct mailbox mbox6_info = {
++	.name	= "mbox6",
++	.id	= 6,
++	.ops	= &dbx500_mbox_ops,
++};
++
++struct mailbox mbox7_info = {
++	.name	= "mbox7",
++	.id	= 7,
++	.ops	= &dbx500_mbox_ops,
++};
++
++/* x540 mailbox definition */
++struct dbx500_mbox_priv mbox1_upap_priv = {
++	.access_mode	= MAILBOX_BLOCKING,
++	.type			= MAILBOX_UPAP,
++	.tx_header_offset	= 0,
++	.header_size	= 0,
++	.tx_offset	= 0,
++	.rx_offset	= 0, /* TODO to be replaced by dynamic detection */
++	.rx_size	= 0x40,
++};
++
++struct mailbox mbox1_upap_info = {
++	.name	= "mbox1_upap",
++	.id	= 1,
++	.ops	= &dbx500_mbox_ops,
++	.priv	= &mbox1_upap_priv,
++};
++
++struct mailbox *db8500_mboxes[] = { &mbox0_info, &mbox1_info, &mbox2_info,
++	&mbox3_info, &mbox4_info, &mbox5_info, &mbox6_info, &mbox7_info,
++	NULL };
++
++struct mailbox *dbx540_mboxes[] = { &mbox0_info, &mbox2_info,
++	&mbox3_info, &mbox4_info, &mbox5_info, &mbox6_info, &mbox7_info,
++	&mbox1_upap_info, NULL };
++
++static const struct of_device_id dbx500_mailbox_match[] = {
++	{ .compatible = "stericsson,db8500-mailbox",
++		.data = (void *)db8500_mboxes,
++	},
++	{ .compatible = "stericsson,db9540-mailbox",
++		.data = (void *)dbx540_mboxes,
++	},
++	{ /* sentinel */}
++};
++
++static int dbx500_mbox_probe(struct platform_device *pdev)
++{
++	const struct platform_device_id *platid = platform_get_device_id(pdev);
++	struct resource *mem;
++	int ret, i, irq;
++	u32 legacy_offset = 0;
++	u32 upap_offset = 0, upap_size = PRCM_MBOX_LEGACY_SIZE;
++	struct mailbox **list;
++	struct dbx500_plat_data *pdata = dev_get_platdata(&pdev->dev);
++	struct device_node *np = pdev->dev.of_node;
++	bool upap_used = false;
++
++	if (!pdata) {
++		if (np) {
++			if (of_property_read_u32(np, "legacy-offset",
++							&legacy_offset)) {
++				/* missing legacy-offset */
++				dev_err(&pdev->dev, "No legacy offset found\n");
++				return -ENODEV;
++			}
++			if (of_property_read_u32(np, "upap-offset",
++							&upap_offset)) {
++				dev_dbg(&pdev->dev, "No upap offset found\n");
++				upap_offset = -1;
++			}
++			list = (struct mailbox **)of_match_device(
++					dbx500_mailbox_match, &pdev->dev)->data;
++			if (!list) {
++				/* No mailbox configuration */
++				dev_err(&pdev->dev, "No configuration found\n");
++				return -ENODEV;
++			}
++		} else {
++			/* No mailbox configuration */
++			dev_err(&pdev->dev, "No configuration found\n");
++			return -ENODEV;
++		}
++	} else {
++		list = (struct mailbox **)platid->driver_data;
++		legacy_offset = pdata->legacy_offset;
++		upap_offset = pdata->upap_offset;
++	}
++
++	mem = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcm-reg");
++	mbox_base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
++	if (!mbox_base) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	mem = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu-tcdm");
++	tcdm_mem_base = devm_ioremap(&pdev->dev, mem->start,
++							resource_size(mem));
++	if (!tcdm_mem_base) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	/* check mailbox offset values */
++	if (legacy_offset >= (resource_size(mem) - PRCM_MBOX_LEGACY_SIZE)) {
++		dev_err(&pdev->dev, "Incorrect legacy offset value\n");
++		ret = -EINVAL;
++		goto out;
++	}
++
++	for (i = 0; list[i]; i++) {
++		struct mailbox *mbox = list[i];
++		struct dbx500_mbox_priv *priv =
++			(struct dbx500_mbox_priv *)mbox->priv;
++		if (!priv)
++			continue;
++		if (priv->type == MAILBOX_UPAP) {
++			upap_used = true;
++			upap_size += priv->rx_size;
++			break;
++		}
++	}
++
++	if (upap_used && (upap_offset >= (resource_size(mem) - upap_size))) {
++		dev_err(&pdev->dev, "Incorrect upap offset value\n");
++		ret = -EINVAL;
++		goto out;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	/* clean all mailboxes */
++	mbox_write_reg(ALL_MBOX_BITS, PRCM_ARM_IT1_CLR);
++	ret = request_irq(irq, dbx500_mbox_irq_handler,
++			IRQF_NO_SUSPEND, "db8500_mbox", NULL);
++	if (ret) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	dbx500_mbox_irq_domain = irq_domain_add_linear(
++		np, NUM_MB, &dbx500_mbox_irq_ops, NULL);
++
++	if (!dbx500_mbox_irq_domain) {
++		dev_err(&pdev->dev, "Failed to create irqdomain\n");
++		ret = -ENOSYS;
++		goto irq_free;
++	}
++
++	/*
++	 * Update mailbox shared memory buffer offset according to mailbox
++	 * type
++	 */
++	for (i = 0; list[i]; i++) {
++		struct mailbox *mbox = list[i];
++		struct dbx500_mbox_priv *priv =
++			(struct dbx500_mbox_priv *)mbox->priv;
++		if (!priv)
++			continue;
++		mbox->irq = irq_create_mapping(dbx500_mbox_irq_domain,
++								mbox->id);
++		if (priv->type == MAILBOX_LEGACY) {
++			priv->rx_offset += legacy_offset;
++			priv->rx_header_offset += legacy_offset;
++			priv->tx_offset += legacy_offset;
++			priv->tx_header_offset += legacy_offset;
++		} else if (priv->type == MAILBOX_UPAP) {
++			priv->tx_offset += upap_offset;
++			priv->rx_offset += upap_offset;
++		}
++	}
++
++	ret = mailbox_register(&pdev->dev, list);
++irq_free:
++	if (ret)
++		free_irq(irq, NULL);
++
++out:
++	return ret;
++}
++
++static int dbx500_mbox_remove(struct platform_device *pdev)
++{
++	mailbox_unregister();
++	iounmap(mbox_base);
++	return 0;
++}
++
++static const struct platform_device_id dbx500_mbox_id[] = {
++	{
++		.name = "db8500-mailbox",
++		.driver_data = (unsigned long) db8500_mboxes,
++	}, {
++		.name = "db9540-mailbox",
++		.driver_data = (unsigned long) dbx540_mboxes,
++	}, {
++		/* sentinel */
++	}
++};
++
++static struct platform_driver dbx500_mbox_driver = {
++	.probe = dbx500_mbox_probe,
++	.remove = dbx500_mbox_remove,
++	.driver = {
++		.name = "dbx500-mailbox",
++		.of_match_table = dbx500_mailbox_match,
++	},
++	.id_table = dbx500_mbox_id,
++};
++
++static int __init dbx500_mbox_init(void)
++{
++	return platform_driver_register(&dbx500_mbox_driver);
++}
++
++static void __exit dbx500_mbox_exit(void)
++{
++	platform_driver_unregister(&dbx500_mbox_driver);
++}
++
++postcore_initcall(dbx500_mbox_init);
++module_exit(dbx500_mbox_exit);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("ST-Ericsson mailbox: dbx500 architecture specific functions");
++MODULE_AUTHOR("Loic Pallardy <loic.pallardy@st.com>");
++MODULE_ALIAS("platform:dbx500-mailbox");
+diff --git a/include/linux/platform_data/mailbox-dbx500.h b/include/linux/platform_data/mailbox-dbx500.h
+new file mode 100644
+index 0000000..d5aebd9
+--- /dev/null
++++ b/include/linux/platform_data/mailbox-dbx500.h
+@@ -0,0 +1,12 @@
++/*
++ * mailbox-dbx500.h
++ *
++ * Copyright (C) ST-Ericsson SA 2012
++ * Author:  <loic.pallardy@st.com> for ST-Ericsson.
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++
++struct dbx500_plat_data {
++	unsigned int legacy_offset;
++	unsigned int upap_offset;
++};
 -- 
-1.7.10.4
+1.7.11.1
