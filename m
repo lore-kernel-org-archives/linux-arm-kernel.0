@@ -1,47 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 13 Feb 2013 10:33:07 -0600
-Subject: [PATCH 1/4] clocksource: pass DT node pointer to init functions
-In-Reply-To: <CAHTX3dKLCbfhBaHKBE=fVTcRReVL6yotA9e_8S70bH+_gajL5Q@mail.gmail.com>
-References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
- <1360264144-20714-2-git-send-email-robherring2@gmail.com>
- <CAHTX3dKLCbfhBaHKBE=fVTcRReVL6yotA9e_8S70bH+_gajL5Q@mail.gmail.com>
-Message-ID: <511BC043.4030506@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Feb 2013 09:38:49 -0700
+Subject: zynq drivers/clocksource (was: Re: [GIT PULL] arm-soc: Xilinx
+ zynq timer changes for v3.9)
+In-Reply-To: <CAHTX3dJftmsMvK1BMupZMfz7bmTBvsUq37fZaC=vd8yanYEasw@mail.gmail.com>
+References: <CAHTX3dJftmsMvK1BMupZMfz7bmTBvsUq37fZaC=vd8yanYEasw@mail.gmail.com>
+Message-ID: <511BC199.8030907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2013 10:21 AM, Michal Simek wrote:
-> 2013/2/7 Rob Herring <robherring2@gmail.com>:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> In cases where we have multiple nodes of the same type, we may need the
->> node pointer to know which node was matched. Passing the node pointer
->> also keeps the init function from having to match the node a 2nd time.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: John Stultz <johnstul@us.ibm.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> ---
->>  drivers/clocksource/clksrc-of.c |    4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
+On 02/13/2013 07:22 AM, Michal Simek wrote:
+> Hi,
 > 
-> Tested-by: Michal Simek <michal.simek@xilinx.com>
+> here is origin comment from Arnd.
 > 
-> The rest is just the same as I have done. Any option to add these
-> patches to v3.9?
+>> Please have a look at the contents of the timer/cleanup and clocksource/cleanup
+>> branches in arm-soc, and merge them into your branch. If everything still
+>> works, you can add a patch on top of the merge to move your driver to
+>> drivers/clocksource and use the new infrastructure introduced there.
+> 
+> based on Arnd request I have looked at moving zynq timer code to the
+> new infrastructure
+> in drivers/clocksource. I have done some investigation and I am not quite
+> sure if I understand the design correctly.
+> 
+> I have looked at vt8500, tegra20 and bcm2835 drivers in arm-soc/for-next branch
+> and all of them use the same pattern with expectation that only
+> one timer with the same compatible property is available in the system.
 
-I would like to before we have more users to fix, but it will have to be
-post rc1. If not, Arnd/Olof should be be able to provide a stable branch
-for 3.10.
+Oh right. When we spoke on IRC, I was thinking of multiple different
+types of clocksource driver, rather than multiple instances of the same
+type. Yes, my original patches wouldn't work well with multiple
+instances (DT nodes) with the same compatible property.
 
-> Because I need these patches for zynq timer because we have two in the soc.
-> Is it OK to register several clock source and clockevent devices?
+> I have done some tests on zynq and the problem is with calling
+> of_find_matching_node(NULL, .._match); which will always return the same
+> device_node which end up with faults later when you try to request the same
+> irq.
+> 
+> Is there any limitation/expectation that only one clocksource driver
+> should be probed?
+> 
+> Also not sure if make sense to add of_find_matching_node for architectures
+> which select CONFIG_OF or USE_OF when we can pass device_node directly from
+> of_find_matching_node().
 
-If it is 1 DT node, then that should be fine.
-
-> btw: there is still one issue because you can just setup only one
-> compatibility string.
-
-You can have multiple CLOCKSOURCE_OF_DECLARE statements. The gic code
-does this for irqchips.
-
-Rob
+... but Rob's patches that I mentioned should solve this multiple
+instance issue, since they do indeed pass the found DT node into the
+timer init function.
