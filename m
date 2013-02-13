@@ -1,49 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Feb 2013 09:38:49 -0700
-Subject: zynq drivers/clocksource (was: Re: [GIT PULL] arm-soc: Xilinx
- zynq timer changes for v3.9)
-In-Reply-To: <CAHTX3dJftmsMvK1BMupZMfz7bmTBvsUq37fZaC=vd8yanYEasw@mail.gmail.com>
-References: <CAHTX3dJftmsMvK1BMupZMfz7bmTBvsUq37fZaC=vd8yanYEasw@mail.gmail.com>
-Message-ID: <511BC199.8030907@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Feb 2013 08:40:05 -0800
+Subject: [PATCH 3/5] arm: dts: omap4-panda: Add I2c pinctrl data
+In-Reply-To: <511BBA1B.9050501@ti.com>
+References: <1360747710-1532-1-git-send-email-sourav.poddar@ti.com>
+ <511BB7CE.1020505@ti.com> <511BBA1B.9050501@ti.com>
+Message-ID: <20130213164004.GE7144@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2013 07:22 AM, Michal Simek wrote:
-> Hi,
+* Jon Hunter <jon-hunter@ti.com> [130213 08:10]:
+> On 02/13/2013 09:57 AM, Jon Hunter wrote:
+> > On 02/13/2013 03:28 AM, Sourav Poddar wrote:
+> > 
+> > A quick look at the data manual shows that omap4430 and omap4460 has the
+> > same pin mux options for i2c. Furthermore, the data manual shows only
+> > one mux option for i2c1-4. Therefore, should these mux options be placed
+> > in omap4.dtsi? Boards not using specific i2c controllers can disabled
+> > them in there board dts file (same way we do for mmc).
 > 
-> here is origin comment from Arnd.
-> 
->> Please have a look at the contents of the timer/cleanup and clocksource/cleanup
->> branches in arm-soc, and merge them into your branch. If everything still
->> works, you can add a patch on top of the merge to move your driver to
->> drivers/clocksource and use the new infrastructure introduced there.
-> 
-> based on Arnd request I have looked at moving zynq timer code to the
-> new infrastructure
-> in drivers/clocksource. I have done some investigation and I am not quite
-> sure if I understand the design correctly.
-> 
-> I have looked at vt8500, tegra20 and bcm2835 drivers in arm-soc/for-next branch
-> and all of them use the same pattern with expectation that only
-> one timer with the same compatible property is available in the system.
+> I guess for i2c, a given omap4 board may use external pull-ups and not
+> use the internal ones and so putting this in the omap4.dtsi may not be
+> desirable. However, it seems that a common omap4-panda.dtsi could be
+> used here.
 
-Oh right. When we spoke on IRC, I was thinking of multiple different
-types of clocksource driver, rather than multiple instances of the same
-type. Yes, my original patches wouldn't work well with multiple
-instances (DT nodes) with the same compatible property.
+Yes the mux options need to be board specific. If something is complex
+and  common, it's best to put it into omap4-i2c1.dts file that can be
+included from the board specific .dts files as needed.
 
-> I have done some tests on zynq and the problem is with calling
-> of_find_matching_node(NULL, .._match); which will always return the same
-> device_node which end up with faults later when you try to request the same
-> irq.
-> 
-> Is there any limitation/expectation that only one clocksource driver
-> should be probed?
-> 
-> Also not sure if make sense to add of_find_matching_node for architectures
-> which select CONFIG_OF or USE_OF when we can pass device_node directly from
-> of_find_matching_node().
+Regards,
 
-... but Rob's patches that I mentioned should solve this multiple
-instance issue, since they do indeed pass the found DT node into the
-timer init function.
+Tony
