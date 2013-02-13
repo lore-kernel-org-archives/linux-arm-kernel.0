@@ -1,29 +1,42 @@
-From: loic.pallardy@st.com (Loic PALLARDY)
-Date: Wed, 13 Feb 2013 22:00:37 +0100
-Subject: [PATCH v3 10/13] mailbox: create dbx500 mailbox driver
-In-Reply-To: <20130213205539.GA9361@kroah.com>
-References: <1360788127-4990-1-git-send-email-loic.pallardy-ext@stericsson.com>
- <20130213205539.GA9361@kroah.com>
-Message-ID: <511BFEF5.3030608@st.com>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Wed, 13 Feb 2013 13:02:51 -0800
+Subject: Giving special alignment/size constraints to the Linux PCI core?
+In-Reply-To: <20130213003224.GA32535@obsidianresearch.com>
+References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
+ <201302121902.14276.arnd@arndb.de>
+ <20130212193848.GE1471@obsidianresearch.com>
+ <201302122305.28467.arnd@arndb.de>
+ <20130213003224.GA32535@obsidianresearch.com>
+Message-ID: <CAE9FiQWPhZDQ47Wp+7LkG4H2ZvKFKcAsYZ2Xfb8E4ze7=bpN=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry my mistake, I forgot to clean this before sending.
-
-Regards,
-Loic
-
-On 02/13/2013 09:55 PM, Greg Kroah-Hartman wrote:
-> On Wed, Feb 13, 2013 at 09:42:07PM +0100, Loic Pallardy wrote:
->> From: Loic Pallardy<loic.pallardy@st.com>
+On Tue, Feb 12, 2013 at 4:32 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Tue, Feb 12, 2013 at 11:05:28PM +0000, Arnd Bergmann wrote:
 >>
->> Add STEriccson DBX500 PRCM mailbox support.
->>
->> Change-Id: I36cbef646e26469a9490d46a5e143667aa93d762
+>> Ah, so you only allow hotplugging into the root ports, but not behind
+>> additional bridges that have active devices on them, right?
 >
-> These mean nothing when submitting kernel patches, please never include
-> them.
+>> I guess that is a common limitation for PCIe hotplugging.
 >
-> thanks,
+> In all the cases I've worked with, it has been a root port hot plug,
+> but I could imagine something like ExpressCard requiring a second
+> bridge.
 >
-> greg k-h
+> The standard answer is to leave appropriate gaps. My *guess* on this
+> matter is that on x86 the gaps are left, as appropriate, by the boot
+> firmware. Eg an ExpressCard slot will always have a window assigned to
+> its bridge and Linux would typically not reassign it (or similar).
+
+Yes, x86 BIOS will leave some pad number for every pcie root port.
+
+Also with patches in
+git://git.kernel.org/pub/scm/linux/kernel/git/yinghai/linux-yinghai.git
+ for-pci-busn-alloc
+
+could realloc bus range to get big bus number.
+
+Thanks
+
+Yinghai
