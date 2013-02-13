@@ -1,45 +1,20 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Feb 2013 10:39:31 -0800
-Subject: [PATCH v8 06/12] pinctrl: single: create new gpio function range
-In-Reply-To: <1360602659-4774-7-git-send-email-haojian.zhuang@linaro.org>
+Date: Wed, 13 Feb 2013 10:40:44 -0800
+Subject: [PATCH v8 08/12] pinctrl: single: set function mask as optional
+In-Reply-To: <1360602659-4774-9-git-send-email-haojian.zhuang@linaro.org>
 References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
- <1360602659-4774-7-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130213183931.GL7144@atomide.com>
+ <1360602659-4774-9-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130213184044.GM7144@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Haojian Zhuang <haojian.zhuang@linaro.org> [130211 09:15]:
-> Since gpio driver could create gpio range in DTS, it could invokes
-> pinctrl_request_gpio(). In the pinctrl-single driver, it needs to
-> configure pins with gpio function mode.
+> Since Hisilicon's pin controller is divided into two parts. One is the
+> function mux, and the other is pin configuration. These two parts are
+> in the different memory regions. So make pinctrl-single,function-mask
+> as optional property. Then we can define pingroups without valid
+> function mux that is only used for pin configuration.
 
-Minor typo above: s/invokes/invoke/
- 
-> A new gpio function range should be created in DTS file in below.
-> 
-> pinctrl-single,gpio-range = <phandle pin_offset nr_pins gpio_func>;
-> 
-> range: gpio-range {
-> 	#pinctrl-single,gpio-range-cells = <3>;
-> };
-> 
-> The gpio-ranges property is used in gpio driver and the
-> pinctrl-single,gpio-range property is used in pinctrl-single driver.
-> 
-> 1. gpio-ranges = <phandle gpio_offset_in_chip pin_offset nr_pins>
-> 	gpio-ranges = < &pmx0 0 89 1 &pmx0 1 89 1 &pmx0 2 90 1
-> 			&pmx0 3 90 1 &pmx0 4 91 1 &pmx0 5 92 1>;
-
-I think the second gpio-ranges above should be really
-pinctr-single,gpio-range instead of gpio-ranges?
- 
-> 2. gpio driver could get pin offset from gpio-ranges property.
->    pinctrl-single driver could get gpio function mode from gpio_func
->    that is stored in @gpiofuncs list in struct pcs_device.
->    This new pinctrl-single,gpio-range is used as complement for
->    gpio-ranges property in gpio driver.
-
-Other than that looks OK to me. Assuming the other related GPIO patches
-are fine and don't cause changes to this:
+Looks OK to me:
 
 Acked-by: Tony Lindgren <tony@atomide.com>
