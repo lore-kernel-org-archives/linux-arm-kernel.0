@@ -1,42 +1,45 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Wed, 13 Feb 2013 13:02:51 -0800
-Subject: Giving special alignment/size constraints to the Linux PCI core?
-In-Reply-To: <20130213003224.GA32535@obsidianresearch.com>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <201302121902.14276.arnd@arndb.de>
- <20130212193848.GE1471@obsidianresearch.com>
- <201302122305.28467.arnd@arndb.de>
- <20130213003224.GA32535@obsidianresearch.com>
-Message-ID: <CAE9FiQWPhZDQ47Wp+7LkG4H2ZvKFKcAsYZ2Xfb8E4ze7=bpN=g@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Feb 2013 14:04:18 -0700
+Subject: [PATCH v1 2/4] ARM: dts: Add i2c-arbitrator bus for
+ exynos5250-snow
+In-Reply-To: <1360778532-7480-2-git-send-email-dianders@chromium.org>
+References: <1360778532-7480-1-git-send-email-dianders@chromium.org>
+ <1360778532-7480-2-git-send-email-dianders@chromium.org>
+Message-ID: <511BFFD2.8090102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 4:32 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Tue, Feb 12, 2013 at 11:05:28PM +0000, Arnd Bergmann wrote:
->>
->> Ah, so you only allow hotplugging into the root ports, but not behind
->> additional bridges that have active devices on them, right?
->
->> I guess that is a common limitation for PCIe hotplugging.
->
-> In all the cases I've worked with, it has been a root port hot plug,
-> but I could imagine something like ExpressCard requiring a second
-> bridge.
->
-> The standard answer is to leave appropriate gaps. My *guess* on this
-> matter is that on x86 the gaps are left, as appropriate, by the boot
-> firmware. Eg an ExpressCard slot will always have a window assigned to
-> its bridge and Linux would typically not reassign it (or similar).
+On 02/13/2013 11:02 AM, Doug Anderson wrote:
+> We need to use the i2c-arbitrator to talk to any of the devices on i2c
+> bus 4 on exynos5250-snow so that we don't confuse the embedded
+> controller (EC).  Add the i2c-arbitrator to the device tree.  As we
+> add future devices (keyboard, sbs, tps65090) we'll add them on top of
+> this.
+> 
+> The arbitrated bus is numbered 104 simply as a convenience to make it
+> easier for people poking around to guess that it might have something
+> to do with the physical bus 4.
+> 
+> The addition is split between the cros5250-common and the snow device
+> tree file since not all cros5250-class devices use arbitration.
 
-Yes, x86 BIOS will leave some pad number for every pcie root port.
+> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
 
-Also with patches in
-git://git.kernel.org/pub/scm/linux/kernel/git/yinghai/linux-yinghai.git
- for-pci-busn-alloc
+>  	i2c at 12CA0000 {
+> -		status = "disabled";
+> +		samsung,i2c-sda-delay = <100>;
+> +		samsung,i2c-max-bus-freq = <66000>;
 
-could realloc bus range to get big bus number.
+Shouldn't that use the standard clock-frequency property?
 
-Thanks
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
 
-Yinghai
+> +	i2c-arbitrator {
+> +		compatible = "i2c-arbitrator";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+
+> +		/* Use ID 104 as a hint that we're on physical bus 4 */
+> +		i2c_104: i2c at 0 {
+
+Does something use that hint? It sounds a little odd.
