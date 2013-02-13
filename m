@@ -1,49 +1,25 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Feb 2013 12:28:05 +0100
-Subject: [GIT PULL] at91: more DT changes related to MTD for 3.9
-Message-ID: <511B78C5.5030209@atmel.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 13 Feb 2013 13:38:07 +0200
+Subject: [PATCH v6 08/10] ARM: dt: Add references to tegra_car clocks
+In-Reply-To: <511A7AB5.4040607@wwwdotorg.org>
+References: <1360580700-10245-1-git-send-email-pdeschrijver@nvidia.com>
+ <1360580700-10245-9-git-send-email-pdeschrijver@nvidia.com>
+ <511A7AB5.4040607@wwwdotorg.org>
+Message-ID: <20130213113807.GE3073@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+On Tue, Feb 12, 2013 at 06:24:05PM +0100, Stephen Warren wrote:
+> On 02/11/2013 04:04 AM, Peter De Schrijver wrote:
+> > Add references to tegra_car clocks for the basic device nodes.
+> 
+> In this patch, you also need to remove the "clock-frequency" properties
+> from tegra114-*.dts board files.
 
-I would like you to consider this little pull request for modification of some
-AT91 Device Tree files.
-We have had a discussion about this material earlier and now that Artem has queued
-the driver modifications for MTD, I would like to know if it is possible to
-add these two patches in your late/dt branch?
+That would probably break bisectability no? I think this needs to be done
+in a separate patch. Also, the UARTD enabling in init_table[] can then be
+removed.
 
-The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+Cheers,
 
-  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-dt-late
-
-for you to fetch changes up to c18c6b29e0d8aa6a14ae0f254c5e7abe41a01745:
-
-  ARM: at91: at91sam9n12: add DT parameters to enable PMECC (2013-02-07 16:45:06 +0100)
-
-----------------------------------------------------------------
-More DT modifications for AT91. Now that I am sure that
-the drivers modification are picked-up by MTD.
-Changes the use ECC to hardware ECC (named PMECC) for
-SoCs that are using it and their associated Evaluation Kits:
-- at91sam9x5-ek
-- at91sam9n12-ek
-
-----------------------------------------------------------------
-Josh Wu (2):
-      ARM: at91: at91sam9x5: add DT parameters to enable PMECC
-      ARM: at91: at91sam9n12: add DT parameters to enable PMECC
-
- arch/arm/boot/dts/at91sam9n12.dtsi  | 3 ++-
- arch/arm/boot/dts/at91sam9n12ek.dts | 5 ++++-
- arch/arm/boot/dts/at91sam9x5.dtsi   | 4 ++++
- arch/arm/boot/dts/at91sam9x5cm.dtsi | 5 ++++-
- 4 files changed, 14 insertions(+), 3 deletions(-)
-
-Thanks, best regards,
--- 
-Nicolas Ferre
+Peter.
