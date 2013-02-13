@@ -1,70 +1,183 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 13 Feb 2013 11:44:49 +0900
-Subject: [PATCH 13/21] sh-pfc: r8a7740: Remove LCD0 and LCD1 function GPIOS
+Date: Wed, 13 Feb 2013 11:44:46 +0900
+Subject: [PATCH 10/21] sh-pfc: sh73a0: Remove SCIFA and SCIFB function GPIOS
 In-Reply-To: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
 References: <1360723497-23266-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360723497-23266-14-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1360723497-23266-11-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-All r8a7740 platforms now use the pinctrl API to control the LCD0 and
-LCD1 pins, the corresponding function GPIOS are unused. Remove them.
+All sh73a0 platforms now use the pinctrl API to control the SCIFA and
+SCIFB pins, the corresponding function GPIOS are unused. Remove them.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c |   37 ----------------------------------
- 1 file changed, 37 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-sh73a0.c |   58 -----------------------------------
+ 1 file changed, 58 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-index bcd1a91..d0b7165 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-@@ -2064,43 +2064,6 @@ static struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(SCIFB_RTS_PORT172),
- 	GPIO_FN(SCIFB_CTS_PORT173),
+diff --git a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+index 93432f9..fe548de 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
++++ b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+@@ -2468,19 +2468,13 @@ static struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(GPI5),
+ 	GPIO_FN(GPI6),
+ 	GPIO_FN(GPI7),
+-	GPIO_FN(SCIFA7_RXD),
+-	GPIO_FN(SCIFA7_CTS_),
+ 	GPIO_FN(GPO7), \
+ 	GPIO_FN(MFG0_OUT2),
+ 	GPIO_FN(GPO6), \
+ 	GPIO_FN(MFG1_OUT2),
+ 	GPIO_FN(GPO5), \
+-	GPIO_FN(SCIFA0_SCK), \
+ 	GPIO_FN(FSICOSLDT3), \
+ 	GPIO_FN(PORT16_VIO_CKOR),
+-	GPIO_FN(SCIFA0_TXD),
+-	GPIO_FN(SCIFA7_TXD),
+-	GPIO_FN(SCIFA7_RTS_), \
+ 	GPIO_FN(PORT19_VIO_CKO2),
+ 	GPIO_FN(GPO0),
+ 	GPIO_FN(GPO1),
+@@ -2507,11 +2501,7 @@ static struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(PORT30_VIO_CKOR),
+ 	GPIO_FN(SIM_D), \
+ 	GPIO_FN(PORT31_IROUT),
+-	GPIO_FN(SCIFA4_TXD),
+-	GPIO_FN(SCIFA4_RXD), \
+ 	GPIO_FN(XWUP),
+-	GPIO_FN(SCIFA4_RTS_),
+-	GPIO_FN(SCIFA4_CTS_),
+ 	GPIO_FN(FSIBOBT), \
+ 	GPIO_FN(FSIBIBT),
+ 	GPIO_FN(FSIBOLR), \
+@@ -2520,10 +2510,7 @@ static struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(FSIBISLD),
+ 	GPIO_FN(VACK),
+ 	GPIO_FN(XTAL1L),
+-	GPIO_FN(SCIFA0_RTS_), \
+ 	GPIO_FN(FSICOSLDT2),
+-	GPIO_FN(SCIFA0_RXD),
+-	GPIO_FN(SCIFA0_CTS_), \
+ 	GPIO_FN(FSICOSLDT1),
+ 	GPIO_FN(FSICOBT), \
+ 	GPIO_FN(FSICIBT), \
+@@ -2649,14 +2636,10 @@ static struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(BBIF2_RXD),
+ 	GPIO_FN(BBIF2_SYNC),
+ 	GPIO_FN(BBIF2_SCK),
+-	GPIO_FN(SCIFA3_CTS_), \
+ 	GPIO_FN(MFG3_IN2),
+-	GPIO_FN(SCIFA3_RXD), \
+ 	GPIO_FN(MFG3_IN1),
+ 	GPIO_FN(BBIF1_SS2), \
+-	GPIO_FN(SCIFA3_RTS_), \
+ 	GPIO_FN(MFG3_OUT1),
+-	GPIO_FN(SCIFA3_TXD),
+ 	GPIO_FN(HSI_RX_DATA), \
+ 	GPIO_FN(BBIF1_RXD),
+ 	GPIO_FN(HSI_TX_WAKE), \
+@@ -2744,37 +2727,17 @@ static struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(TPU1TO2), \
+ 	GPIO_FN(TS_SDEN3), \
+ 	GPIO_FN(PORT153_MSIOF2_SS1),
+-	GPIO_FN(SCIFA2_TXD1), \
+ 	GPIO_FN(MSIOF2_MCK0),
+-	GPIO_FN(SCIFA2_RXD1), \
+ 	GPIO_FN(MSIOF2_MCK1),
+-	GPIO_FN(SCIFA2_RTS1_), \
+ 	GPIO_FN(PORT156_MSIOF2_SS2),
+-	GPIO_FN(SCIFA2_CTS1_), \
+ 	GPIO_FN(PORT157_MSIOF2_RXD),
+ 	GPIO_FN(DINT_), \
+-	GPIO_FN(SCIFA2_SCK1), \
+ 	GPIO_FN(TS_SCK3),
+-	GPIO_FN(PORT159_SCIFB_SCK), \
+-	GPIO_FN(PORT159_SCIFA5_SCK), \
+ 	GPIO_FN(NMI),
+-	GPIO_FN(PORT160_SCIFB_TXD), \
+-	GPIO_FN(PORT160_SCIFA5_TXD),
+-	GPIO_FN(PORT161_SCIFB_CTS_), \
+-	GPIO_FN(PORT161_SCIFA5_CTS_),
+-	GPIO_FN(PORT162_SCIFB_RXD), \
+-	GPIO_FN(PORT162_SCIFA5_RXD),
+-	GPIO_FN(PORT163_SCIFB_RTS_), \
+-	GPIO_FN(PORT163_SCIFA5_RTS_), \
+ 	GPIO_FN(TPU3TO0),
+-	GPIO_FN(PORT193_SCIFA5_CTS_), \
+ 	GPIO_FN(BBIF2_TSYNC1),
+-	GPIO_FN(PORT194_SCIFA5_RTS_), \
+ 	GPIO_FN(BBIF2_TSCK1),
+-	GPIO_FN(PORT195_SCIFA5_RXD), \
+ 	GPIO_FN(BBIF2_TXD1),
+-	GPIO_FN(PORT196_SCIFA5_TXD),
+-	GPIO_FN(PORT197_SCIFA5_SCK), \
+ 	GPIO_FN(MFG2_OUT2), \
+ 	GPIO_FN(TPU2TO1),
+ 	GPIO_FN(TPU4TO1), \
+@@ -2825,26 +2788,16 @@ static struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(MSIOF0L_TXD), \
+ 	GPIO_FN(VIO2_VD3), \
  
--	/* LCD0 */
--	GPIO_FN(LCD0_D0),	GPIO_FN(LCD0_D1),	GPIO_FN(LCD0_D2),
--	GPIO_FN(LCD0_D3),	GPIO_FN(LCD0_D4),	GPIO_FN(LCD0_D5),
--	GPIO_FN(LCD0_D6),	GPIO_FN(LCD0_D7),	GPIO_FN(LCD0_D8),
--	GPIO_FN(LCD0_D9),	GPIO_FN(LCD0_D10),	GPIO_FN(LCD0_D11),
--	GPIO_FN(LCD0_D12),	GPIO_FN(LCD0_D13),	GPIO_FN(LCD0_D14),
--	GPIO_FN(LCD0_D15),	GPIO_FN(LCD0_D16),	GPIO_FN(LCD0_D17),
--	GPIO_FN(LCD0_DON),	GPIO_FN(LCD0_VCPWC),	GPIO_FN(LCD0_VEPWC),
--	GPIO_FN(LCD0_DCK),	GPIO_FN(LCD0_VSYN),
--	GPIO_FN(LCD0_HSYN),	GPIO_FN(LCD0_DISP),
--	GPIO_FN(LCD0_WR),	GPIO_FN(LCD0_RD),
--	GPIO_FN(LCD0_CS),	GPIO_FN(LCD0_RS),
--
--	GPIO_FN(LCD0_D18_PORT163),	GPIO_FN(LCD0_D19_PORT162),
--	GPIO_FN(LCD0_D20_PORT161),	GPIO_FN(LCD0_D21_PORT158),
--	GPIO_FN(LCD0_D22_PORT160),	GPIO_FN(LCD0_D23_PORT159),
--	GPIO_FN(LCD0_LCLK_PORT165),	/* MSEL5CR_6_1 */
--
--	GPIO_FN(LCD0_D18_PORT40),	GPIO_FN(LCD0_D19_PORT4),
--	GPIO_FN(LCD0_D20_PORT3),	GPIO_FN(LCD0_D21_PORT2),
--	GPIO_FN(LCD0_D22_PORT0),	GPIO_FN(LCD0_D23_PORT1),
--	GPIO_FN(LCD0_LCLK_PORT102),	/* MSEL5CR_6_0 */
--
--	/* LCD1 */
--	GPIO_FN(LCD1_D0),	GPIO_FN(LCD1_D1),	GPIO_FN(LCD1_D2),
--	GPIO_FN(LCD1_D3),	GPIO_FN(LCD1_D4),	GPIO_FN(LCD1_D5),
--	GPIO_FN(LCD1_D6),	GPIO_FN(LCD1_D7),	GPIO_FN(LCD1_D8),
--	GPIO_FN(LCD1_D9),	GPIO_FN(LCD1_D10),	GPIO_FN(LCD1_D11),
--	GPIO_FN(LCD1_D12),	GPIO_FN(LCD1_D13),	GPIO_FN(LCD1_D14),
--	GPIO_FN(LCD1_D15),	GPIO_FN(LCD1_D16),	GPIO_FN(LCD1_D17),
--	GPIO_FN(LCD1_D18),	GPIO_FN(LCD1_D19),	GPIO_FN(LCD1_D20),
--	GPIO_FN(LCD1_D21),	GPIO_FN(LCD1_D22),	GPIO_FN(LCD1_D23),
--	GPIO_FN(LCD1_RS),	GPIO_FN(LCD1_RD),	GPIO_FN(LCD1_CS),
--	GPIO_FN(LCD1_WR),	GPIO_FN(LCD1_DCK),	GPIO_FN(LCD1_DON),
--	GPIO_FN(LCD1_VCPWC),	GPIO_FN(LCD1_LCLK),	GPIO_FN(LCD1_HSYN),
--	GPIO_FN(LCD1_VSYN),	GPIO_FN(LCD1_VEPWC),	GPIO_FN(LCD1_DISP),
--
- 	/* RSPI */
- 	GPIO_FN(RSPI_SSL0_A),	GPIO_FN(RSPI_SSL1_A),	GPIO_FN(RSPI_SSL2_A),
- 	GPIO_FN(RSPI_SSL3_A),	GPIO_FN(RSPI_CK_A),	GPIO_FN(RSPI_MOSI_A),
+-	GPIO_FN(SCIFA1_TXD), \
+ 	GPIO_FN(OVCN2),
+ 	GPIO_FN(EXTLP), \
+-	GPIO_FN(SCIFA1_SCK), \
+ 	GPIO_FN(PORT226_VIO_CKO2),
+-	GPIO_FN(SCIFA1_RTS_), \
+ 	GPIO_FN(IDIN),
+-	GPIO_FN(SCIFA1_RXD),
+-	GPIO_FN(SCIFA1_CTS_), \
+ 	GPIO_FN(MFG1_IN1),
+ 	GPIO_FN(MSIOF1_TXD), \
+-	GPIO_FN(SCIFA2_TXD2),
+ 	GPIO_FN(MSIOF1_TSYNC), \
+-	GPIO_FN(SCIFA2_CTS2_),
+ 	GPIO_FN(MSIOF1_TSCK), \
+-	GPIO_FN(SCIFA2_SCK2),
+ 	GPIO_FN(MSIOF1_RXD), \
+-	GPIO_FN(SCIFA2_RXD2),
+ 	GPIO_FN(MSIOF1_RSCK), \
+-	GPIO_FN(SCIFA2_RTS2_), \
+ 	GPIO_FN(VIO2_CLK2), \
+ 	GPIO_FN(MSIOF1_RSYNC), \
+ 	GPIO_FN(MFG1_IN2), \
+@@ -2857,7 +2810,6 @@ static struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(VIO2_FIELD2), \
+ 	GPIO_FN(MSIOF1_SS2), \
+ 	GPIO_FN(VIO2_HD2), \
+-	GPIO_FN(SCIFA6_TXD),
+ 	GPIO_FN(PORT241_IRDA_OUT), \
+ 	GPIO_FN(PORT241_IROUT), \
+ 	GPIO_FN(MFG4_OUT1), \
+@@ -2866,25 +2818,15 @@ static struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(MFG4_IN2),
+ 	GPIO_FN(PORT243_IRDA_FIRSEL), \
+ 	GPIO_FN(PORT243_VIO_CKO2),
+-	GPIO_FN(PORT244_SCIFA5_CTS_), \
+ 	GPIO_FN(MFG2_IN1), \
+-	GPIO_FN(PORT244_SCIFB_CTS_), \
+ 	GPIO_FN(MSIOF2R_RXD),
+-	GPIO_FN(PORT245_SCIFA5_RTS_), \
+ 	GPIO_FN(MFG2_IN2), \
+-	GPIO_FN(PORT245_SCIFB_RTS_), \
+ 	GPIO_FN(MSIOF2R_TXD),
+-	GPIO_FN(PORT246_SCIFA5_RXD), \
+ 	GPIO_FN(MFG1_OUT1), \
+-	GPIO_FN(PORT246_SCIFB_RXD), \
+ 	GPIO_FN(TPU1TO0),
+-	GPIO_FN(PORT247_SCIFA5_TXD), \
+ 	GPIO_FN(MFG3_OUT2), \
+-	GPIO_FN(PORT247_SCIFB_TXD), \
+ 	GPIO_FN(TPU3TO1),
+-	GPIO_FN(PORT248_SCIFA5_SCK), \
+ 	GPIO_FN(MFG2_OUT1), \
+-	GPIO_FN(PORT248_SCIFB_SCK), \
+ 	GPIO_FN(TPU2TO0), \
+ 	GPIO_FN(PORT248_I2C_SCL3), \
+ 	GPIO_FN(MSIOF2R_TSCK),
 -- 
 1.7.10.4
