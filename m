@@ -1,41 +1,27 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 13 Feb 2013 09:47:20 +0900
-Subject: [PATCH 00/06] ARM: shmobile: Trivial SMP cleanups
-In-Reply-To: <20130212221622.GA24325@verge.net.au>
-References: <20130212154438.13067.77359.sendpatchset@w520>
- <20130212221622.GA24325@verge.net.au>
-Message-ID: <CANqRtoSL-qFvg+r03CRb-2k=zRoDuoiH2b4fK+uJ3uHgTgHR8A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Feb 2013 17:11:01 -0800
+Subject: [GIT PULL 1/5] omap SoC related late changes for v3.9 merge window
+In-Reply-To: <20130212233716.GA5498@quad.lixom.net>
+References: <511a85b9.8473dc0a.41ed.ffffa70dSMTPIN_ADDED_BROKEN@mx.google.com>
+ <20130212233716.GA5498@quad.lixom.net>
+Message-ID: <20130213011101.GB11362@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+* Olof Johansson <olof@lixom.net> [130212 15:40]:
+> On Tue, Feb 12, 2013 at 10:11:01AM -0800, Tony Lindgren wrote:
+> > The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+> > 
+> >   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/soc-signed
+> 
+> Pulled 1-5 into a late/omap branch. As usual with late branches, there's no
+> commitment that we'll be able to merge it, but we'll do best-effort depending
+> on how the merge window turns out.
 
-On Wed, Feb 13, 2013 at 7:16 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Feb 13, 2013 at 12:44:38AM +0900, Magnus Damm wrote:
->> ARM: shmobile: Trivial SMP cleanups
->>
->> [PATCH 01/06] ARM: shmobile: Remove unused headers from hotplug.c
->> [PATCH 02/06] ARM: shmobile: Remove partial CPU Hotplug from EMEV2
->> [PATCH 03/06] ARM: shmobile: Move EMEV2 CPU boot vector setup code
->> [PATCH 04/06] ARM: shmobile: Remove sh73a0_get_core_count()
->> [PATCH 05/06] ARM: shmobile: Remove r8a7779_get_core_count()
->> [PATCH 06/06] ARM: shmobile: Remove emev2_get_core_count()
->>
->> This series contains random trivial SMP cleanups for mach-shmobile.
->>
->> The patches are known to build for sh73a0, r8a7779 and EMEV2,
->> and on top of that they also work well on the KZM9D/EMEV2 board.
->
-> Thanks, I have applied these to a new soc5 branch,
-> based on the soc4 branch which has been merged into arm-soc.
->
-> I have also updated next and topic/all+next with these changes.
->
-> I anticipate these changes will appear upstream in 3.10.
+Thanks yes totally understood.
 
-Thanks, that is of course fine with me. I will prepare my second batch
-of SMP updates then.
-
-Cheers,
-
-/ magnus
+Tony
