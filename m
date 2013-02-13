@@ -1,50 +1,63 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 13 Feb 2013 13:27:53 +0100 (CET)
-Subject: [PATCH] ARM: mach-shmobile: mackerel: enable REGULATOR in
- defconfig
-In-Reply-To: <1360757770-15360-1-git-send-email-horms+renesas@verge.net.au>
-References: <1360757770-15360-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1302131327130.18535@axis700.grange>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 Feb 2013 12:43:03 +0000
+Subject: [PATCH v2 3/4] mtd: devices: elm: Low power transition support
+In-Reply-To: <518397C60809E147AF5323E0420B992E3EA7491C@DBDE01.ent.ti.com>
+References: <1360240618-11094-1-git-send-email-avinashphilip@ti.com>
+ <1360240618-11094-4-git-send-email-avinashphilip@ti.com>
+ <20130209102243.GH17852@n2100.arm.linux.org.uk>
+ <518397C60809E147AF5323E0420B992E3EA7491C@DBDE01.ent.ti.com>
+Message-ID: <20130213124303.GM17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Feb 2013, Simon Horman wrote:
-
-> As well as being a generally sane thing to do this
-> is required for MMCIF to function in conjunction with
-> " ARM: shmobile: streamline mackerel SD and MMC devices".
+On Wed, Feb 13, 2013 at 11:42:01AM +0000, Philip, Avinash wrote:
+> On Sat, Feb 09, 2013 at 15:52:44, Russell King - ARM Linux wrote:
+> > On Thu, Feb 07, 2013 at 06:06:57PM +0530, Philip Avinash wrote:
+> > > +static int elm_suspend(struct device *dev)
+> > > +{
+> > > +	struct elm_info *info = dev_get_drvdata(dev);
+> > > +	wait_queue_head_t wq;
+> > > +	DECLARE_WAITQUEUE(wait, current);
+> > > +
+> > > +	init_waitqueue_head(&wq);
+> > > +	while (1) {
+> > > +		/* Make sure that ELM not running */
+> > > +		if (info->idle) {
+> > > +			add_wait_queue(&wq, &wait);
+> > > +			schedule();
+> > > +			remove_wait_queue(&wq, &wait);
+> > > +		} else {
+> > > +			break;
+> > > +		}
+> > > +	}
+> > 
+> > The above code looks really wrong - it will just spin endlessly with the
+> > waitqueues doing nothing useful.  What are you trying to do here?
 > 
-> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/configs/mackerel_defconfig |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
-> index ec8e605..fdced32 100644
-> --- a/arch/arm/configs/mackerel_defconfig
-> +++ b/arch/arm/configs/mackerel_defconfig
-> @@ -75,6 +75,8 @@ CONFIG_I2C=y
->  CONFIG_I2C_SH_MOBILE=y
->  # CONFIG_HWMON is not set
->  # CONFIG_MFD_SUPPORT is not set
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_DUMMY=y
+> The intention of waitqeue is to make the suspend process really wait till
+> the ELM module finishes current activity. Although this type of protection
+> already achieved in mtd layer using nand_suspend(), this one is particularly
+> required for ELM module to really make sure that *any pending* corrections to
+> finish really before gone to suspend.
 
-Same comment, in fact, we probably need the fixed regulator, and, on 
-armadillo800eva the GPIO regulator.
+I don't think you understand what's going on with the above, and why the
+above is completely ineffective.
 
-Thanks
-Guennadi
+1. Your wait queue head is declared on stack, and there's no references
+   to it outside of this function.  So _nothing_ can activate the wait
+   queue.
+2. You're not changing the current thread's status away from TASK_RUNNING,
+   so schedule() will either return immediately or it will schedule another
+   task if it's time for this one to be preempted.
 
->  CONFIG_FB=y
->  CONFIG_FB_MODE_HELPERS=y
->  CONFIG_FB_SH_MOBILE_LCDC=y
-> -- 
-> 1.7.10.4
-> 
+In other words, the above can be rewritten as:
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+	while (info->idle)
+		schedule();
+
+and it will still have the same effect.
+
+Now, if you want to be kinder to the system, then you should use a
+wait queue properly.  Put the waitqueue head in struct elm_info.  Use
+wait_event() here.  And call wake_up() where you set info->idle to
+false.
