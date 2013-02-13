@@ -1,109 +1,105 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 13 Feb 2013 22:47:17 +0900
-Subject: [PATCH 05/06] ARM: shmobile: Common shmobile_scu_base in headsmp-scu.S
+Date: Wed, 13 Feb 2013 22:47:27 +0900
+Subject: [PATCH 06/06] ARM: shmobile: Update EMEV2 to use scu_power_mode()
 In-Reply-To: <20130213134628.12153.47120.sendpatchset@w520>
 References: <20130213134628.12153.47120.sendpatchset@w520>
-Message-ID: <20130213134717.12153.6162.sendpatchset@w520>
+Message-ID: <20130213134727.12153.64517.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Update the code in headsmp-scu.S to use a global
-shmobile_scu_base variable both for convenient SCU
-base address storage and for the early SCU setup
-code in shmobile_secondary_vector_scu.
+Update the SMP code for EMEV2 to make use of the
+shared SCU function scu_power_mode() together with
+the early setup code in shmobile_secondary_vector_scu.
 
-With this patch applied r8a7779, sh73a0 and EMEV2
-all make use of the global shmobile_scu_base
-variable. However only sh73a0 makes use of the SCU
-bring up code in shmobile_secondary_vector_scu.
+With this patch in place the secondary CPUs modify the
+SCU setting during early boot instead of letting other
+CPUs deal with the coherency setting before boot. In
+other words, we used to setup coherency before boot
+in emev2_boot_secondary() but that bit is now instead
+handled by the code in shmobile_secondary_vector_scu.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/Makefile              |    4 ++--
- arch/arm/mach-shmobile/headsmp-scu.S         |    8 +++++++-
- arch/arm/mach-shmobile/include/mach/common.h |    1 +
- arch/arm/mach-shmobile/smp-emev2.c           |    2 --
- arch/arm/mach-shmobile/smp-r8a7779.c         |    2 --
- arch/arm/mach-shmobile/smp-sh73a0.c          |    2 --
- 6 files changed, 10 insertions(+), 9 deletions(-)
+ Tested on the EMEV2/KZM9D board.
 
---- 0009/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-02-13 21:54:34.000000000 +0900
-@@ -16,8 +16,8 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.
- smp-y				:= platsmp.o headsmp.o
- smp-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o
--smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o
--smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o
-+smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o
-+smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
- 
- # IRQ objects
- obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
---- 0009/arch/arm/mach-shmobile/headsmp-scu.S
-+++ work/arch/arm/mach-shmobile/headsmp-scu.S	2013-02-13 21:54:27.000000000 +0900
-@@ -39,7 +39,8 @@ ENTRY(shmobile_secondary_vector_scu)
- 	mrc     p15, 0, r0, c0, c0, 5	@ read MIPDR
- 	and	r0, r0, #3		@ mask out cpu ID
- 	lsl	r0, r0, #3		@ we will shift by cpu_id * 8 bits
--	mov	r1, #0xf0000000		@ SCU base address
-+	ldr	r1, =shmobile_scu_base
-+	ldr	r1, [r1]		@ SCU base address
- 	ldr	r2, [r1, #8]		@ SCU Power Status Register
- 	mov	r3, #3
- 	bic	r2, r2, r3, lsl r0	@ Clear bits of our CPU (Run Mode)
-@@ -48,3 +49,8 @@ ENTRY(shmobile_secondary_vector_scu)
- 	ldr	pc, 1f
- 1:	.long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
- ENDPROC(shmobile_secondary_vector_scu)
-+
-+	.text
-+	.globl	shmobile_scu_base
-+shmobile_scu_base:
-+	.space	4
---- 0009/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-02-13 21:54:27.000000000 +0900
-@@ -96,6 +96,7 @@ extern int shmobile_cpu_is_dead(unsigned
- static inline int shmobile_cpu_is_dead(unsigned int cpu) { return 1; }
- #endif
- 
-+extern void __iomem *shmobile_scu_base;
- extern void shmobile_smp_init_cpus(unsigned int ncores);
- 
- static inline void __init shmobile_init_late(void)
---- 0008/arch/arm/mach-shmobile/smp-emev2.c
-+++ work/arch/arm/mach-shmobile/smp-emev2.c	2013-02-13 21:54:27.000000000 +0900
-@@ -32,8 +32,6 @@
+ arch/arm/mach-shmobile/smp-emev2.c |   42 ++++++------------------------------
+ 1 file changed, 8 insertions(+), 34 deletions(-)
+
+--- 0010/arch/arm/mach-shmobile/smp-emev2.c
++++ work/arch/arm/mach-shmobile/smp-emev2.c	2013-02-13 21:56:10.000000000 +0900
+@@ -28,27 +28,9 @@
+ #include <mach/emev2.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+-#include <asm/cacheflush.h>
  
  #define EMEV2_SCU_BASE 0x1e000000
  
--static void __iomem *shmobile_scu_base;
+-static DEFINE_SPINLOCK(scu_lock);
 -
- static DEFINE_SPINLOCK(scu_lock);
- 
- static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
---- 0007/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ work/arch/arm/mach-shmobile/smp-r8a7779.c	2013-02-13 21:54:27.000000000 +0900
-@@ -33,8 +33,6 @@
- #define AVECR IOMEM(0xfe700040)
- #define R8A7779_SCU_BASE IOMEM(0xf0000000)
- 
--static void __iomem *shmobile_scu_base;
+-static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
+-{
+-	unsigned long tmp;
 -
- static struct r8a7779_pm_ch r8a7779_ch_cpu1 = {
- 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
- 	.chan_bit = 1, /* ARM1 */
---- 0009/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ work/arch/arm/mach-shmobile/smp-sh73a0.c	2013-02-13 21:54:27.000000000 +0900
-@@ -41,8 +41,6 @@
- 
- #define SH73A0_SCU_BASE IOMEM(0xf0000000)
- 
--static void __iomem *shmobile_scu_base;
+-	/* we assume this code is running on a different cpu
+-	 * than the one that is changing coherency setting */
+-	spin_lock(&scu_lock);
+-	tmp = readl(shmobile_scu_base + 8);
+-	tmp &= ~clr;
+-	tmp |= set;
+-	writel(tmp, shmobile_scu_base + 8);
+-	spin_unlock(&scu_lock);
 -
- #ifdef CONFIG_HAVE_ARM_TWD
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, SH73A0_SCU_BASE + 0x600, 29);
- void __init sh73a0_register_twd(void)
+-}
+-
+ static void __cpuinit emev2_secondary_init(unsigned int cpu)
+ {
+ 	gic_secondary_init(0);
+@@ -56,36 +38,28 @@ static void __cpuinit emev2_secondary_in
+ 
+ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+-	cpu = cpu_logical_map(cpu);
+-
+-	/* enable cache coherency */
+-	modify_scu_cpu_psr(0, 3 << (cpu * 8));
+-
+-	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
++	arch_send_wakeup_ipi_mask(cpumask_of(cpu_logical_map(cpu)));
+ 	return 0;
+ }
+ 
+ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	int cpu = cpu_logical_map(0);
+-
+ 	scu_enable(shmobile_scu_base);
+ 
+-	/* Tell ROM loader about our vector (in headsmp.S) */
+-	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
++	/* Tell ROM loader about our vector (in headsmp-scu.S) */
++	emev2_set_boot_vector(__pa(shmobile_secondary_vector_scu));
+ 
+-	/* enable cache coherency on CPU0 */
+-	modify_scu_cpu_psr(0, 3 << (cpu * 8));
++	/* enable cache coherency on booting CPU */
++	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
+ }
+ 
+ static void __init emev2_smp_init_cpus(void)
+ {
+ 	unsigned int ncores;
+ 
+-	if (!shmobile_scu_base) {
+-		shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
+-		emev2_clock_init(); /* need ioremapped SMU */
+-	}
++	/* setup EMEV2 specific SCU base */
++	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
++	emev2_clock_init(); /* need ioremapped SMU */
+ 
+ 	ncores = shmobile_scu_base ? scu_get_core_count(shmobile_scu_base) : 1;
+ 
