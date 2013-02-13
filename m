@@ -1,241 +1,400 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 13 Feb 2013 18:34:32 +0100
-Subject: [PATCH v2 8/8] reset: Add driver for gpio-controlled reset pins
+Date: Wed, 13 Feb 2013 18:34:26 +0100
+Subject: [PATCH v2 2/8] reset: Add reset controller API
 In-Reply-To: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
 References: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1360776872-18584-9-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1360776872-18584-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/reset/Kconfig      |   13 +++
- drivers/reset/Makefile     |    1 +
- drivers/reset/gpio-reset.c |  188 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 202 insertions(+)
- create mode 100644 drivers/reset/gpio-reset.c
+This adds a simple API for devices to request being reset
+by separate reset controller hardware and implements the
+reset signal device tree binding.
 
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 66ac385..bdf799a 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -7,3 +7,16 @@ menuconfig RESET_CONTROLLER
- 	  via GPIOs or SoC-internal reset controller modules.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+---
+Changes since v1:
+ - Added missing header files.
+ - Fixed reset_controller_register comment.
+ - Added missing reset_controller_unregister.
+ - Made reset_control_reset/assert/deassert return -ENOSYS
+   if not implemented by the reset controller driver.
+ - Fixed reset_control_put to not access rstc after freeing it.
+ - Whitespace fixes
+---
+ drivers/Kconfig                  |    2 +
+ drivers/Makefile                 |    3 +
+ drivers/reset/Kconfig            |    9 ++
+ drivers/reset/Makefile           |    1 +
+ drivers/reset/core.c             |  238 ++++++++++++++++++++++++++++++++++++++
+ include/linux/reset-controller.h |   39 +++++++
+ include/linux/reset.h            |   17 +++
+ 7 files changed, 309 insertions(+)
+ create mode 100644 drivers/reset/Kconfig
+ create mode 100644 drivers/reset/Makefile
+ create mode 100644 drivers/reset/core.c
+ create mode 100644 include/linux/reset-controller.h
+ create mode 100644 include/linux/reset.h
+
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index 202fa6d..847f8e3 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -162,4 +162,6 @@ source "drivers/irqchip/Kconfig"
  
- 	  If unsure, say no.
+ source "drivers/ipack/Kconfig"
+ 
++source "drivers/reset/Kconfig"
 +
-+if RESET_CONTROLLER
+ endmenu
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 4af933d..682fb7c 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -42,6 +42,9 @@ ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
+ obj-y				+= clocksource/
+ endif
+ 
++# reset controllers early, since gpu drivers might rely on them to initialize
++obj-$(CONFIG_RESET_CONTROLLER)	+= reset/
 +
-+config RESET_GPIO
-+	tristate "GPIO reset controller support"
-+	depends on GENERIC_GPIO
-+	help
-+	  This driver provides support for reset lines that are controlled
-+	  directly by GPIOs.
-+	  The delay between assertion and de-assertion of the reset signal
-+	  can be configured.
-+
-+endif
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 1e2d83f..b854f20 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_RESET_CONTROLLER) += core.o
-+obj-$(CONFIG_RESET_GPIO) += gpio-reset.o
-diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
+ # tty/ comes before char/ so that the VT console is the boot-time
+ # default.
+ obj-y				+= tty/
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
 new file mode 100644
-index 0000000..c7ca858
+index 0000000..66ac385
 --- /dev/null
-+++ b/drivers/reset/gpio-reset.c
-@@ -0,0 +1,188 @@
-+/*
-+ * Copyright 2013 Philipp Zabel, Pengutronix
-+ */
-+#include <linux/delay.h>
++++ b/drivers/reset/Kconfig
+@@ -0,0 +1,9 @@
++menuconfig RESET_CONTROLLER
++	bool "Reset Controller Support"
++	help
++	  Generic Reset Controller support.
++
++	  This framework is designed to abstract reset handling of devices
++	  via GPIOs or SoC-internal reset controller modules.
++
++	  If unsure, say no.
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+new file mode 100644
+index 0000000..1e2d83f
+--- /dev/null
++++ b/drivers/reset/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_RESET_CONTROLLER) += core.o
+diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+new file mode 100644
+index 0000000..468f831
+--- /dev/null
++++ b/drivers/reset/core.c
+@@ -0,0 +1,238 @@
++#include <linux/device.h>
 +#include <linux/err.h>
-+#include <linux/gpio.h>
++#include <linux/export.h>
++#include <linux/kernel.h>
 +#include <linux/module.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/reset.h>
 +#include <linux/reset-controller.h>
++#include <linux/slab.h>
 +
-+struct gpio_reset {
-+	unsigned int gpio;
-+	unsigned long flags;
-+	unsigned int delay_ms;
++static DEFINE_MUTEX(reset_controller_list_mutex);
++static LIST_HEAD(reset_controller_list);
++
++/**
++ * struct reset_control - a reset control
++ *
++ * @id: ID of the reset controller in the reset
++ *      controller device
++ */
++struct reset_control {
++	struct reset_controller_dev *rcdev;
++	unsigned int id;
 +};
 +
-+struct gpio_reset_data {
-+	struct reset_controller_dev rcdev;
-+	struct gpio_reset *gpios;
-+	int nr_gpios;
-+};
-+
-+static void __gpio_reset_set(struct gpio_reset_data *drvdata,
-+		unsigned long gpio_idx, int asserted)
++/**
++ * reset_controller_register - register a reset controller device
++ *
++ * @rcdev: a pointer to struct reset_controller_dev
++ */
++int reset_controller_register(struct reset_controller_dev *rcdev)
 +{
-+	int value = asserted;
-+
-+	if (drvdata->gpios[gpio_idx].flags == GPIOF_OUT_INIT_HIGH)
-+		value = !value;
-+
-+	gpio_set_value(drvdata->gpios[gpio_idx].gpio, value);
-+}
-+
-+static int gpio_reset(struct reset_controller_dev *rcdev,
-+		unsigned long gpio_idx)
-+{
-+	struct gpio_reset_data *drvdata = container_of(rcdev,
-+			struct gpio_reset_data, rcdev);
-+
-+	if (gpio_idx >= drvdata->nr_gpios)
-+		return -EINVAL;
-+
-+	if (drvdata->gpios[gpio_idx].delay_ms < 0)
-+		return -ENOSYS;
-+
-+	__gpio_reset_set(drvdata, gpio_idx, 1);
-+	mdelay(drvdata->gpios[gpio_idx].delay_ms);
-+	__gpio_reset_set(drvdata, gpio_idx, 0);
++	mutex_lock(&reset_controller_list_mutex);
++	list_add(&rcdev->list, &reset_controller_list);
++	mutex_unlock(&reset_controller_list_mutex);
 +
 +	return 0;
 +}
 +
-+static int gpio_reset_assert(struct reset_controller_dev *rcdev,
-+		unsigned long gpio_idx)
++/**
++ * reset_controller_unregister - unregister a reset controller device
++ *
++ * @rcdev: a pointer to struct reset_controller_dev
++ */
++void reset_controller_unregister(struct reset_controller_dev *rcdev)
 +{
-+	struct gpio_reset_data *drvdata = container_of(rcdev,
-+			struct gpio_reset_data, rcdev);
-+
-+	if (gpio_idx >= drvdata->nr_gpios)
-+		return -EINVAL;
-+
-+	__gpio_reset_set(drvdata, gpio_idx, 1);
-+
-+	return 0;
++	mutex_lock(&reset_controller_list_mutex);
++	list_del(&rcdev->list);
++	mutex_unlock(&reset_controller_list_mutex);
 +}
 +
-+static int gpio_reset_deassert(struct reset_controller_dev *rcdev,
-+		unsigned long gpio_idx)
++/**
++ * reset_control_reset - reset the controlled device
++ * @rstc: reset controller
++ */
++int reset_control_reset(struct reset_control *rstc)
 +{
-+	struct gpio_reset_data *drvdata = container_of(rcdev,
-+			struct gpio_reset_data, rcdev);
++	if (rstc->rcdev->ops->reset)
++		return rstc->rcdev->ops->reset(rstc->rcdev, rstc->id);
 +
-+	if (gpio_idx >= drvdata->nr_gpios)
-+		return -EINVAL;
-+
-+	__gpio_reset_set(drvdata, gpio_idx, 0);
-+
-+	return 0;
++	return -ENOSYS;
 +}
++EXPORT_SYMBOL_GPL(reset_control_reset);
 +
-+static struct reset_control_ops gpio_reset_ops = {
-+	.reset = gpio_reset,
-+	.assert = gpio_reset_assert,
-+	.deassert = gpio_reset_deassert,
-+};
-+
-+static int gpio_reset_probe(struct platform_device *pdev)
++/**
++ * reset_control_assert - asserts the reset line
++ * @rstc: reset controller
++ */
++int reset_control_assert(struct reset_control *rstc)
 +{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct gpio_reset_data *drvdata;
-+	enum of_gpio_flags flags;
-+	u32 *delays = NULL;
++	if (rstc->rcdev->ops->assert)
++		return rstc->rcdev->ops->assert(rstc->rcdev, rstc->id);
++
++	return -ENOSYS;
++}
++EXPORT_SYMBOL_GPL(reset_control_assert);
++
++/**
++ * reset_control_deassert - deasserts the reset line
++ * @rstc: reset controller
++ */
++int reset_control_deassert(struct reset_control *rstc)
++{
++	if (rstc->rcdev->ops->deassert)
++		return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->id);
++
++	return -ENOSYS;
++}
++EXPORT_SYMBOL_GPL(reset_control_deassert);
++
++/**
++ * reset_control_get - Lookup and obtain a reference to a reset controller.
++ * @dev: device to be reset by the controller
++ * @id: reset line name
++ *
++ * Returns a struct reset_control or IS_ERR() condition containing errno.
++ *
++ * Use of id names is optional.
++ */
++struct reset_control *reset_control_get(struct device *dev, const char *id)
++{
++	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
++	struct reset_controller_dev *r, *rcdev;
++	struct device_node *rcdev_node;
++	struct of_phandle_args args;
++	int rcdev_index;
 +	int ret;
 +	int i;
 +
-+	drvdata = devm_kzalloc(&pdev->dev, sizeof(*drvdata), GFP_KERNEL);
-+	if (drvdata == NULL)
-+		return -ENOMEM;
++	if (!dev)
++		return ERR_PTR(-EINVAL);
 +
-+	drvdata->nr_gpios = of_gpio_named_count(np, "gpios");
-+	if (drvdata->nr_gpios < 1)
-+		return -EINVAL;
++	rcdev_node = NULL;
++	for (i = 0; rcdev_node == NULL; i++) {
++		ret = of_parse_phandle_with_args(dev->of_node, "resets",
++						 "#reset-cells", i, &args);
++		if (ret)
++			return ERR_PTR(ret);
++		of_node_put(args.np);
++		if (args.args_count <= 0)
++			return ERR_PTR(-EINVAL);
 +
-+	drvdata->gpios = devm_kzalloc(&pdev->dev, sizeof(struct gpio_reset) *
-+			drvdata->nr_gpios, GFP_KERNEL);
-+	if (drvdata->gpios == NULL)
-+		return -ENOMEM;
-+
-+	if (of_find_property(np, "reset-delays", NULL)) {
-+		delays = devm_kzalloc(&pdev->dev, sizeof(u32) *
-+				drvdata->nr_gpios, GFP_KERNEL);
-+		if (delays == NULL)
-+			return -ENOMEM;
-+
-+		ret = of_property_read_u32_array(np, "reset-delays", delays,
-+				drvdata->nr_gpios);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	for (i = 0; i < drvdata->nr_gpios; i++) {
-+		drvdata->gpios[i].gpio = of_get_named_gpio_flags(np, "gpios",
-+				i, &flags);
-+		if (drvdata->gpios[i].gpio < 0) {
-+			dev_err(&pdev->dev, "invalid gpio for reset %d\n", i);
-+			return drvdata->gpios[i].gpio;
++		if (id) {
++			const char *reset_name;
++			ret = of_property_read_string_index(dev->of_node,
++							    "reset-names", i,
++							    &reset_name);
++			if (ret)
++				return ERR_PTR(ret);
++			if (strcmp(id, reset_name) != 0)
++				continue;
 +		}
 +
-+		/*
-+		 * The flags are also used to remember whether a given GPIO
-+		 * reset is active-low.
-+		 */
-+		if (flags & OF_GPIO_ACTIVE_LOW)
-+			drvdata->gpios[i].flags = GPIOF_OUT_INIT_HIGH;
-+		else
-+			drvdata->gpios[i].flags = GPIOF_OUT_INIT_LOW;
-+
-+		ret = devm_gpio_request_one(&pdev->dev, drvdata->gpios[i].gpio,
-+				drvdata->gpios[i].flags, NULL);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "failed to request gpio %d for reset %d\n",
-+					drvdata->gpios[i].gpio, i);
-+			return ret;
-+		}
-+
-+		if (delays != NULL)
-+			drvdata->gpios[i].delay_ms = delays[i];
-+		else
-+			drvdata->gpios[i].delay_ms = -1; /* .reset returns -ENOSYS */
++		rcdev_index = args.args[0];
++		rcdev_node = args.np;
++		break;
 +	}
 +
-+	devm_kfree(&pdev->dev, delays);
++	mutex_lock(&reset_controller_list_mutex);
++	rcdev = NULL;
++	list_for_each_entry(r, &reset_controller_list, list) {
++		if (rcdev_node == r->of_node) {
++			rcdev = r;
++			break;
++		}
++	}
++	mutex_unlock(&reset_controller_list_mutex);
 +
-+	drvdata->rcdev.of_node = np;
-+	drvdata->rcdev.ops = &gpio_reset_ops;
-+	reset_controller_register(&drvdata->rcdev);
++	if (!rcdev)
++		return ERR_PTR(-ENODEV);
 +
-+	platform_set_drvdata(pdev, drvdata);
++	try_module_get(rcdev->owner);
 +
-+	return 0;
++	rstc = kzalloc(sizeof(*rstc), GFP_KERNEL);
++	if (!rstc)
++		return ERR_PTR(-ENOMEM);
++
++	rstc->rcdev = rcdev;
++	rstc->id = rcdev_index;
++
++	return rstc;
 +}
++EXPORT_SYMBOL_GPL(reset_control_get);
 +
-+static int gpio_reset_remove(struct platform_device *pdev)
++/**
++ * reset_control_put - free the reset controller
++ * @reset: reset controller
++ */
++
++void reset_control_put(struct reset_control *rstc)
 +{
-+	struct gpio_reset_data *drvdata = platform_get_drvdata(pdev);
++	if (IS_ERR(rstc))
++		return;
 +
-+	reset_controller_unregister(&drvdata->rcdev);
++	module_put(rstc->rcdev->owner);
++	kfree(rstc);
++}
++EXPORT_SYMBOL_GPL(reset_control_put);
 +
-+	return 0;
++static void devm_reset_control_release(struct device *dev, void *res)
++{
++	reset_control_put(*(struct reset_control **)res);
 +}
 +
-+static struct of_device_id gpio_reset_dt_ids[] = {
-+	{ .compatible = "gpio-reset" },
-+	{ }
++/**
++ * devm_reset_control_get - resource managed reset_control_get()
++ * @dev: device to be reset by the controller
++ * @id: reset line name
++ *
++ * Managed reset_control_get(). For reset controllers returned from this
++ * function, reset_control_put() is called automatically on driver detach.
++ * See reset_control_get() for more information.
++ */
++struct reset_control *devm_reset_control_get(struct device *dev, const char *id)
++{
++	struct reset_control **ptr, *rstc;
++
++	ptr = devres_alloc(devm_reset_control_release, sizeof(*ptr),
++			   GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	rstc = reset_control_get(dev, id);
++	if (!IS_ERR(rstc)) {
++		*ptr = rstc;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return rstc;
++}
++EXPORT_SYMBOL_GPL(devm_reset_control_get);
++
++/**
++ * device_reset - find reset controller associated with the device
++ *                and perform reset
++ * @dev: device to be reset by the controller
++ *
++ * Convenience wrapper for reset_control_get() and reset_control_reset().
++ * This is useful for the common case of devices with single, dedicated reset
++ * lines.
++ */
++int device_reset(struct device *dev)
++{
++	struct reset_control *rstc;
++	int ret;
++
++	rstc = reset_control_get(dev, NULL);
++	if (IS_ERR(rstc))
++		return PTR_ERR(rstc);
++
++	ret = reset_control_reset(rstc);
++
++	kfree(rstc);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(device_reset);
+diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+new file mode 100644
+index 0000000..4d38aa3
+--- /dev/null
++++ b/include/linux/reset-controller.h
+@@ -0,0 +1,39 @@
++#ifndef _LINUX_RESET_CONTROLLER_H_
++#define _LINUX_RESET_CONTROLLER_H_
++
++#include <linux/list.h>
++
++struct reset_controller_dev;
++
++/**
++ * struct reset_control_ops
++ *
++ * @reset: for self-deasserting resets, does all necessary
++ *         things to reset the device
++ * @assert: manually assert the reset line, if supported
++ * @deassert: manually deassert the reset line, if supported
++ */
++struct reset_control_ops {
++	int (*reset)(struct reset_controller_dev *rcdev, unsigned long id);
++	int (*assert)(struct reset_controller_dev *rcdev, unsigned long id);
++	int (*deassert)(struct reset_controller_dev *rcdev, unsigned long id);
 +};
 +
-+static struct platform_driver gpio_reset_driver = {
-+	.probe = gpio_reset_probe,
-+	.remove = gpio_reset_remove,
-+	.driver = {
-+		.name = "gpio-reset",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(gpio_reset_dt_ids),
-+	},
++struct module;
++struct device_node;
++
++/**
++ * struct reset_controller - reset controller entity that might
++ *                           provide multiple reset controls
++ */
++struct reset_controller_dev {
++	struct reset_control_ops *ops;
++	struct module *owner;
++	struct list_head list;
++	struct device_node *of_node;
 +};
 +
-+module_platform_driver(gpio_reset_driver);
++int reset_controller_register(struct reset_controller_dev *rcdev);
++void reset_controller_unregister(struct reset_controller_dev *rcdev);
++
++#endif
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+new file mode 100644
+index 0000000..c4119c5
+--- /dev/null
++++ b/include/linux/reset.h
+@@ -0,0 +1,17 @@
++#ifndef _LINUX_RESET_H_
++#define _LINUX_RESET_H_
++
++struct device;
++struct reset_control;
++
++int reset_control_reset(struct reset_control *rstc);
++int reset_control_assert(struct reset_control *rstc);
++int reset_control_deassert(struct reset_control *rstc);
++
++struct reset_control *reset_controlr_get(struct device *dev, const char *id);
++void reset_control_put(struct reset_control *rstc);
++struct reset_control *devm_reset_control_get(struct device *dev, const char *id);
++
++int device_reset(struct device *dev);
++
++#endif
 -- 
 1.7.10.4
