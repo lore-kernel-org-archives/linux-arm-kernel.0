@@ -1,51 +1,200 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 13 Feb 2013 10:35:15 +0530
-Subject: [PATCH] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for
- all CPU power states except off
-In-Reply-To: <87bobpwog9.fsf@linaro.org>
-References: <1360336306-18277-1-git-send-email-santosh.shilimkar@ti.com>
- <1360336306-18277-3-git-send-email-santosh.shilimkar@ti.com>
- <87d2wazep6.fsf@linaro.org> <5119CB2D.9040001@ti.com>
- <87bobpwog9.fsf@linaro.org>
-Message-ID: <511B1F0B.3020909@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 12 Feb 2013 21:23:36 -0800
+Subject: [PATCH v3] ARM: DTS: CROS5250: Add max77686 device tree support
+In-Reply-To: <1354677702-22669-1-git-send-email-a.kesavan@samsung.com>
+References: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
+ <1354677702-22669-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1e0801ce09aa$4779d4a0$d66d7de0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 February 2013 08:48 PM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
->> On Saturday 09 February 2013 02:49 AM, Kevin Hilman wrote:
->>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>>
->>>> Current CPU PM code code make use of common cpu_suspend() path for all the
->>>> CPU power states which is not optimal. In fact cpu_suspend() path is needed
->>>> only when we put CPU power domain to off state where the CPU context is lost.
->>>>
->>>> Update the code accordingly so that the expensive cpu_suspend() path
->>>> can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
->>>>
->>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->>>>
->>>> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
->>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>
->>> Looks OK at first glance, but are you sure this is right for the
->>> various ways both clusters might idle using coupled CPUidle?
->>>
->> Yes it is perfectly safe from all C-states. This patch has been part of
->> the OMAP4/OMAP5 product port for some time. I forgot to send it upstream
->> some how :(
->>
->>> Some description of the testing would be helpful here.
->>>
->> Sorry. Should have mentioned it in first place.
->> Patch is being tested on OMAP4430 (idle/suspend) and OMAP5 with
->> few out of tree patches.
->
-> OK, please update changelog with a brief description of how it was
-> tested, and on which platforms.
->
-Will update the changelog and post it
+Abhilash Kesavan wrote:
+> 
+> The exynos5250 based chromebooks have a max77686 pmic on i2c channel 0.
+> Add support for the pmic in the common cros5250 dts file.
+> Tested after enabling cpufreq support for exynos5250 SoC and varying the
+> arm frequency/voltage using the userspace governer.
+> 
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Acked-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes since v1:
+> * Used generic names for the regulators
+> * Changed BUCK5 as being default "ON"
+> Changes since v2:
+> * Fixed the LDO7 name from "P1.0V_LDO_OUT7" to "P1.1V_LDO_OUT7"
+> 
+>  arch/arm/boot/dts/cros5250-common.dtsi |  138
+> ++++++++++++++++++++++++++++++++
+>  1 files changed, 138 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi
+> b/arch/arm/boot/dts/cros5250-common.dtsi
+> index fddd174..8ab8394 100644
+> --- a/arch/arm/boot/dts/cros5250-common.dtsi
+> +++ b/arch/arm/boot/dts/cros5250-common.dtsi
+> @@ -24,6 +24,144 @@
+>  		samsung,i2c-max-bus-freq = <378000>;
+>  		gpios = <&gpb3 0 2 3 0>,
+>  			<&gpb3 1 2 3 0>;
+> +
+> +		max77686 at 09 {
+> +			compatible = "maxim,max77686";
+> +			reg = <0x09>;
+> +
+> +			voltage-regulators {
+> +				ldo1_reg: LDO1 {
+> +					regulator-name =
+> "P1.0V_LDO_OUT1";
+> +					regulator-min-microvolt = <1000000>;
+> +					regulator-max-microvolt = <1000000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo2_reg: LDO2 {
+> +					regulator-name =
+> "P1.8V_LDO_OUT2";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo3_reg: LDO3 {
+> +					regulator-name =
+> "P1.8V_LDO_OUT3";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo7_reg: LDO7 {
+> +					regulator-name =
+> "P1.1V_LDO_OUT7";
+> +					regulator-min-microvolt = <1100000>;
+> +					regulator-max-microvolt = <1100000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo8_reg: LDO8 {
+> +					regulator-name =
+> "P1.0V_LDO_OUT8";
+> +					regulator-min-microvolt = <1000000>;
+> +					regulator-max-microvolt = <1000000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo10_reg: LDO10 {
+> +					regulator-name =
+> "P1.8V_LDO_OUT10";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo12_reg: LDO12 {
+> +					regulator-name =
+> "P3.0V_LDO_OUT12";
+> +					regulator-min-microvolt = <3000000>;
+> +					regulator-max-microvolt = <3000000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo14_reg: LDO14 {
+> +					regulator-name =
+> "P1.8V_LDO_OUT14";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo15_reg: LDO15 {
+> +					regulator-name =
+> "P1.0V_LDO_OUT15";
+> +					regulator-min-microvolt = <1000000>;
+> +					regulator-max-microvolt = <1000000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo16_reg: LDO16 {
+> +					regulator-name =
+> "P1.8V_LDO_OUT16";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				buck1_reg: BUCK1 {
+> +					regulator-name = "vdd_mif";
+> +					regulator-min-microvolt = <950000>;
+> +					regulator-max-microvolt = <1300000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				buck2_reg: BUCK2 {
+> +					regulator-name = "vdd_arm";
+> +					regulator-min-microvolt = <850000>;
+> +					regulator-max-microvolt = <1350000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				buck3_reg: BUCK3 {
+> +					regulator-name = "vdd_int";
+> +					regulator-min-microvolt = <900000>;
+> +					regulator-max-microvolt = <1200000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				buck4_reg: BUCK4 {
+> +					regulator-name = "vdd_g3d";
+> +					regulator-min-microvolt = <850000>;
+> +					regulator-max-microvolt = <1300000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				buck5_reg: BUCK5 {
+> +					regulator-name =
+> "P1.8V_BUCK_OUT5";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				buck6_reg: BUCK6 {
+> +					regulator-name =
+> "P1.35V_BUCK_OUT6";
+> +					regulator-min-microvolt = <1350000>;
+> +					regulator-max-microvolt = <1350000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				buck7_reg: BUCK7 {
+> +					regulator-name =
+> "P2.0V_BUCK_OUT7";
+> +					regulator-min-microvolt = <2000000>;
+> +					regulator-max-microvolt = <2000000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				buck8_reg: BUCK8 {
+> +					regulator-name =
+> "P2.85V_BUCK_OUT8";
+> +					regulator-min-microvolt = <2850000>;
+> +					regulator-max-microvolt = <2850000>;
+> +					regulator-always-on;
+> +				};
+> +			};
+> +		};
+>  	};
+> 
+>  	i2c at 12C70000 {
+> --
+> 1.6.6.1
 
-Regards,
-Santosh
+Applied, thanks.
+
+- Kukjin
