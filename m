@@ -1,90 +1,55 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 13 Feb 2013 10:02:10 -0800
-Subject: [PATCH v1 2/4] ARM: dts: Add i2c-arbitrator bus for exynos5250-snow
-In-Reply-To: <1360778532-7480-1-git-send-email-dianders@chromium.org>
-References: <1360778532-7480-1-git-send-email-dianders@chromium.org>
-Message-ID: <1360778532-7480-2-git-send-email-dianders@chromium.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Feb 2013 11:32:38 -0700
+Subject: [GIT PULL] ARM: tegra: common clock framework fixes
+Message-ID: <1360780358-2866-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to use the i2c-arbitrator to talk to any of the devices on i2c
-bus 4 on exynos5250-snow so that we don't confuse the embedded
-controller (EC).  Add the i2c-arbitrator to the device tree.  As we
-add future devices (keyboard, sbs, tps65090) we'll add them on top of
-this.
+A number of small fixes are included to the new Tegra common clock
+driver. These are: Missing locking, definition of device tree clock IDs
+not matching the binding, a static cleanup, missing initialization of
+some UART clocks.
 
-The arbitrated bus is numbered 104 simply as a convenience to make it
-easier for people poking around to guess that it might have something
-to do with the physical bus 4.
+This branch is based on Tegra's previous pull request tegra-for-3.9-dt.
+This dependency is caused by the one patch that edits the device tree.
+If this causes a problem, I can drop the final two patches in this pull
+request for now, and rebase it onto previous tegra-for-3.9-soc-ccf
+instead.
 
-The addition is split between the cros5250-common and the snow device
-tree file since not all cros5250-class devices use arbitration.
+----------------------------------------------------------------
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v1: None
+The following changes since commit 3fbf07d80b40f73c304624179381f9038bd03b74:
 
- arch/arm/boot/dts/cros5250-common.dtsi |  5 ++++-
- arch/arm/boot/dts/exynos5250-snow.dts  | 24 ++++++++++++++++++++++++
- 2 files changed, 28 insertions(+), 1 deletion(-)
+  ARM: dt: tegra30: Rename "smmu" to "iommu"
 
-diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
-index 46c0980..f451375 100644
---- a/arch/arm/boot/dts/cros5250-common.dtsi
-+++ b/arch/arm/boot/dts/cros5250-common.dtsi
-@@ -58,7 +58,10 @@
- 	};
- 
- 	i2c at 12CA0000 {
--		status = "disabled";
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-max-bus-freq = <66000>;
-+		gpios = <&gpa2 0 3 3 0>,
-+			<&gpa2 1 3 3 0>;
- 	};
- 
- 	i2c at 12CB0000 {
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 17dd951..69a87a0 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -16,6 +16,10 @@
- 	model = "Google Snow";
- 	compatible = "google,snow", "samsung,exynos5250";
- 
-+	aliases {
-+		i2c104 = &i2c_104;
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
-@@ -29,6 +33,26 @@
- 		};
- 	};
- 
-+	i2c-arbitrator {
-+		compatible = "i2c-arbitrator";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c-parent = <&{/i2c@12CA0000}>;
-+
-+		bus-arbitration-gpios = <&gpf0 3 1 0 0>, <&gpe0 4 0 3 0>;
-+		bus-arbitration-slew-delay-us = <10>;
-+		bus-arbitration-wait-retry-us = <3000>;
-+		bus-arbitration-wait-free-us = <50000>;
-+
-+		/* Use ID 104 as a hint that we're on physical bus 4 */
-+		i2c_104: i2c at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
- 	/*
- 	 * On Snow we've got SIP WiFi and so can keep drive strengths low to
- 	 * reduce EMI.
--- 
-1.8.1
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.9-soc-ccf-fixes
+
+for you to fetch changes up to 527fad1bc519df8eedd397482febb51526e5d987:
+
+  clk: tegra: initialise parent of uart clocks
+
+----------------------------------------------------------------
+
+Joseph Lo (1):
+      clk: tegra: fix wrong clock index between se to sata_cold
+
+Laxman Dewangan (1):
+      clk: tegra: initialise parent of uart clocks
+
+Peter De Schrijver (3):
+      clk: tegra: Implement locking for super clock
+      clk: tegra: Add missing spinlock for hclk and pclk
+      clk: tegra: local arrays should be static
+
+Stephen Warren (2):
+      clk: tegra: fix driver to match DT binding
+      ARM: tegra: remove clock-frequency properties from serial nodes
+
+ arch/arm/boot/dts/tegra20.dtsi  |    5 ----
+ arch/arm/boot/dts/tegra30.dtsi  |    5 ----
+ drivers/clk/tegra/clk-super.c   |   18 ++++++++++---
+ drivers/clk/tegra/clk-tegra20.c |   22 ++++++++++------
+ drivers/clk/tegra/clk-tegra30.c |   47 +++++++++++++++++++---------------
+ 5 files changed, 56 insertions(+), 41 deletions(-)
