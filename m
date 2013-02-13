@@ -1,53 +1,37 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 12 Feb 2013 17:32:24 -0700
-Subject: Giving special alignment/size constraints to the Linux PCI core?
-In-Reply-To: <201302122305.28467.arnd@arndb.de>
-References: <20130130120344.GA29490@avionic-0098.mockup.avionic-design.de>
- <201302121902.14276.arnd@arndb.de>
- <20130212193848.GE1471@obsidianresearch.com>
- <201302122305.28467.arnd@arndb.de>
-Message-ID: <20130213003224.GA32535@obsidianresearch.com>
+Date: Tue, 12 Feb 2013 17:41:18 -0700
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <201302122259.54073.arnd@arndb.de>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302121830.11375.arnd@arndb.de> <20130212202252.3a9ee3d0@skate>
+ <201302122259.54073.arnd@arndb.de>
+Message-ID: <20130213004118.GB1052@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 11:05:28PM +0000, Arnd Bergmann wrote:
-> On Tuesday 12 February 2013, Jason Gunthorpe wrote:
-> > PCI-E hotplug can be supported through the generic /sys/bus/pci/rescan
-> > mechanism, which forces a rediscovery/re-evaluation of all the buses
-> > in the system. The PCI core is smart enough to know what it can/can
-> > not reassign and can move the bridge windows around (IIRC most of the
-> > issues here are resolved these days?).
-> > 
-> > For PCI-E, the root port bridge can be placed anywhere in the host
-> > aperture, so as long as the host aperture isn't filled the core can
-> > allocate a memory region for the now active port.
-> > 
-> > Thomas's driver should support this as the regions and windows are all
-> > properly dynamic.
-> 
-> Ah, so you only allow hotplugging into the root ports, but not behind
-> additional bridges that have active devices on them, right?
+On Tue, Feb 12, 2013 at 10:59:53PM +0000, Arnd Bergmann wrote:
  
-> I guess that is a common limitation for PCIe hotplugging.
+> b) drivers/bus/<something>
+> This would make a lot more sense if we followed the scheme I explained
+> in my discussion to Jason Gunthorpe, where we basically treat this
+> bus as a parent node in the device tree for anything that can get remapped.
+> Without that change, it feels a little misplaced
 
-In all the cases I've worked with, it has been a root port hot plug,
-but I could imagine something like ExpressCard requiring a second
-bridge.
+Also, FWIW, recall this related discussion and other possible DT
+binding:
 
-The standard answer is to leave appropriate gaps. My *guess* on this
-matter is that on x86 the gaps are left, as appropriate, by the boot
-firmware. Eg an ExpressCard slot will always have a window assigned to
-its bridge and Linux would typically not reassign it (or similar).
+http://www.spinics.net/lists/arm-kernel/msg219992.html
 
-PCI core support for firmware-less embedded will someday need to do
-something similar, eg via a special DT attribute on hot plug capable
-ports.
+drivers/bus/orion-mbus.c feels like the right option, but when I
+looked at it, getting the DT binding, and full dynamicness setup
+seemed like it would be best done after non-DT support was purged, and
+that is somewhat contigent on getting the irqchip and timer stuff
+sorted (see my first attempt at that):
 
-Just to circle back on this whole thread - Thomas's solution is pretty
-good, it covers pretty much all the use cases. I think it is a good
-place to start, and as the firmware-less 'drivers/pci/host' concept
-develops the right support will eventually come, as everyone is now
-aware of the need to control the host bridge aperture from the core
-PCI code.
+https://patchwork.kernel.org/patch/1852011/
 
+Guess it depends where you want to draw the line on cleanups before
+something can be accepted..
+
+Regards,
 Jason
