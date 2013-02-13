@@ -1,53 +1,41 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Wed, 13 Feb 2013 06:24:14 -0300
-Subject: [PATCH v2 0/4] ARM: mvebu: Add support for SPI flash devices in
- Armada 370/XP
-In-Reply-To: <20130206132850.GC14746@titan.lakedaemon.net>
-References: <1360155984-15397-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <511257C6.2070604@free-electrons.com>
- <20130206132850.GC14746@titan.lakedaemon.net>
-Message-ID: <CALF0-+WLh=8QGG4ob8HVq+x4oO_ArdFHd=vH1_OhucH1f9XG3A@mail.gmail.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Wed, 13 Feb 2013 14:58:00 +0530
+Subject: [PATCH 0/5] omap[4/5] I2c/Spi dts patches
+Message-ID: <1360747680-1438-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hi Tony, 
 
-On Wed, Feb 6, 2013 at 10:28 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Wed, Feb 06, 2013 at 02:16:54PM +0100, Gregory CLEMENT wrote:
->> On 02/06/2013 02:06 PM, Ezequiel Garcia wrote:
->> > This is second version of the SPI patchset for Armada 370/XP.
->> >
->> > This series first adds support for the SPI controller
->> > and then adds the SPI flash for the Armada XP GP board.
->> >
->> > This series is based on 3.8-rc5 plus:
->> >  * "arm: mvebu: support for the new Armada XP development board(DB-MV784MP-GP)"
->> >  * "arm: mvebu: i2c come back in defconfig"
->> >
->> > Feel free to test or provide any feedback!
->> >
->> Ezequiel,
->>
->> I reviewed the patches, I have nothing more to say, I can add my:
->>
->> Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
->>
->> on the patch that didn't have yet.
->>
->> Jason,
->> could you add this series in your incoming pull request?
->
-> That's the plan.  I'm waiting for a response from Olof to see If I need
-> to redo /boards and /dt.  In either case, my next round of pull requests
-> with have this and a bunch of other stuff.
->
+These patches were send as seperate ones before[1], but did not recieve any 
+comments. Resending them all as a single patch series, as some affect the same files.
+[1]: https://patchwork.kernel.org/patch/2054891/
+     https://patchwork.kernel.org/patch/2054871/ 
+     https://patchwork.kernel.org/patch/2070991/ 	
+     https://patchwork.kernel.org/patch/2089751/
+     http://www.spinics.net/lists/linux-omap/msg86137.html	 
 
-Despite we're almost closed for v3.9 new material,
-I hope you don't mind a little ping on the USB and SPI stuff.
+If you are Ok with the patch and there are no comments, Can it be picked?
+	
+The following changes since commit 6edacf05c8362f4c368991b55d85e8122cfc9a24:
 
-I'd *really* love to see these in v3.9, if at all possible.
+  Merge branch 'merge' of git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc (2013-02-04 16:58:41 +1100)
 
-Thanks,
+are available in the git repository at:
 
--- 
-    Ezequiel
+  git at gitorious.org:linux-connectivity/linux-connectivity.git spi_i2c_dev
+
+Felipe Balbi (1):
+      arm: dts: omap5: add SPI devices to OMAP5 DeviceTree file
+
+Sourav Poddar (4):
+      arm: dts: omap4-sdp: Add I2c pinctrl data
+      arm: dts: omap5-evm: Add I2c pinctrl data
+      arm: dts: omap4-panda: Add I2c pinctrl data
+      arm: dts: omap5-evm: Add mcspi data
+
+ arch/arm/boot/dts/omap4-panda.dts |   40 ++++++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts   |   40 ++++++++++++++
+ arch/arm/boot/dts/omap5-evm.dts   |  108 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap5.dtsi      |   40 ++++++++++++++
+ 4 files changed, 228 insertions(+), 0 deletions(-)
