@@ -1,39 +1,71 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 13 Feb 2013 12:29:14 +0900
-Subject: [PATCH 2/9] ARM: shmobile: r8a7740: Add pin control device in device
- tree
-In-Reply-To: <1360726161-16072-1-git-send-email-horms+renesas@verge.net.au>
-References: <1360726161-16072-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360726161-16072-3-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 13 Feb 2013 12:29:12 +0900
+Subject: [PATCH v2.1 0/9] SH pinctrl DT support
+Message-ID: <1360726161-16072-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi,
 
-Add a pfc node in the r8a7740 device tree.
+this series is a follow-up to "[PATCH v2 0/8] SH pinctrl DT support"
+by Laurent Pinchart. I am primarily posting it for his review.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7740.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+This series differs from the series posted by Laurent in that:
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 798fa35..9d7800a 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -18,4 +18,12 @@
- 			compatible = "arm,cortex-a9";
- 		};
- 	};
-+
-+	gpio: pfc at e6050000 {
-+		compatible = "renesas,pfc-r8a7740";
-+		reg = <0xe6050000 0x8000>,
-+		      <0xe605800c 0x20>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
- };
--- 
-1.7.10.4
+* I have added the following two patch to update the KZM9G reference code.
+
+  ARM: shmobile: kzm9g: reference: Populate platform devices from device tree
+
+The basis for this series is
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/pinmux-pfc-funcs
+
+  Which was posted as "[PATCH 00/21 v1.2] SCIF, I2C and FSI pinctrl
+  functions for sh73a0" a little earlier today.
+
+Laurent, if you want to change this series in any way just let me know.
+I can drop patches indidually or drop the entire series and add a fresh
+one from you to the topic branch.
+
+Git and diffstat information is provided below to aid review.
+
+----------------------------------------------------------------
+The following changes since commit e92460f4d0ce471110d44a3dc053f0a4508f24dc:
+
+  ARM: shmobile: r8a7779: Remove DU function GPIOs (2013-02-13 12:16:13 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/pinmux-dt
+
+for you to fetch changes up to 3ec7a99ff9723cafabf0eae2df9cac7df735f388:
+
+  ARM: shmobile: kzm9g: Move pinctrl mappings to device tree (2013-02-13 12:19:04 +0900)
+
+----------------------------------------------------------------
+Laurent Pinchart (8):
+      sh-pfc: Add OF support
+      ARM: shmobile: r8a7740: Add pin control device in device tree
+      ARM: shmobile: armadillo: Populate platform devices from device tree
+      ARM: shmobile: sh73a0: Add pin control device in device tree
+      ARM: shmobile: kzm9g: Populate platform devices from device tree
+      ARM: shmobile: kzm9g: Add LED1-LED4 to the device tree
+      ARM: shmobile: armadillo: Move pinctrl mappings to device tree
+      ARM: shmobile: kzm9g: Move pinctrl mappings to device tree
+
+Simon Horman (1):
+      ARM: shmobile: kzm9g: reference: Populate platform devices from device tree
+
+ .../bindings/pinctrl/renesas,pfc-pinctrl.txt       |   77 ++++++++++++++++++++
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts      |   10 +++
+ arch/arm/boot/dts/r8a7740.dtsi                     |    8 ++
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |   12 +++
+ arch/arm/boot/dts/sh73a0-kzm9g.dts                 |   26 +++++++
+ arch/arm/boot/dts/sh73a0.dtsi                      |    8 ++
+ arch/arm/mach-shmobile/board-armadillo800eva.c     |   14 +---
+ arch/arm/mach-shmobile/board-kzm9g-reference.c     |    7 +-
+ arch/arm/mach-shmobile/board-kzm9g.c               |   27 +------
+ drivers/pinctrl/sh-pfc/core.c                      |   62 +++++++++++++++-
+ drivers/pinctrl/sh-pfc/pinctrl.c                   |   54 ++++++++++++++
+ 11 files changed, 261 insertions(+), 44 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
