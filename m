@@ -1,50 +1,38 @@
-From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Wed, 13 Feb 2013 22:32:18 +0100
-Subject: [PATCH] ARM: net: bpf_jit: fix emit_swap16() for non ARMv6+.
-In-Reply-To: <1360776645-14726-1-git-send-email-nschichan@freebox.fr>
-References: <1360776125-14542-1-git-send-email-nschichan@freebox.fr>
- <1360776645-14726-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <511C0662.8010309@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Feb 2013 14:33:10 -0700
+Subject: [PATCH 1/9] ARM: dt: add header to define GPIO flags
+In-Reply-To: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
+References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1360791198-29462-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 13.02.2013 18:30, schrieb Nicolas Schichan:
-> The original code was generating an lsl instructions using the value
-> of ARM_R8 (skb_headlen, possibly uninitialized if no skb_headlen
-> access was required) as a shift amount.
-> 
-> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
-> ---
-> Resent due to missing Signed-off-by
-> 
->  arch/arm/net/bpf_jit_32.c |   15 +++++++++++----
->  1 file changed, 11 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-> index a34f1e2..6828ef6 100644
-> --- a/arch/arm/net/bpf_jit_32.c
-> +++ b/arch/arm/net/bpf_jit_32.c
-> @@ -341,10 +341,17 @@ static void emit_load_be16(u8 cond, u8 r_res, u8 r_addr, struct jit_ctx *ctx)
->  
->  static inline void emit_swap16(u8 r_dst, u8 r_src, struct jit_ctx *ctx)
->  {
-> -	emit(ARM_LSL_R(ARM_R1, r_src, 8), ctx);
-> -	emit(ARM_ORR_S(r_dst, ARM_R1, r_src, SRTYPE_LSL, 8), ctx);
-> -	emit(ARM_LSL_I(r_dst, r_dst, 8), ctx);
-> -	emit(ARM_LSL_R(r_dst, r_dst, 8), ctx);
-> +	/* r_dst = (r_src << 8) | (r_src >> 8) */
-> +	emit(ARM_LSL_I(ARM_R1, r_src, 8), ctx);
-> +	emit(ARM_ORR_S(r_dst, ARM_R1, r_src, SRTYPE_LSR, 8), ctx);
-> +
-> +	/*
-> +	 * we need to mask out the bits set in r_dst[23:16] due to
-> +	 * the first shift instruction.
-> +	 *
-> +	 * note that 0x8ff is the encoded immediate 0x00ff0000.
-> +	 */
-> +	emit(ARM_BIC_I(r_dst, r_dst, 0x8ff), ctx);
->  }
->  
->  #else  /* ARMv6+ */
+From: Stephen Warren <swarren@nvidia.com>
 
-Acked-by: Mircea Gherzan <mgherzan@gmail.com>
+Many GPIO device tree bindings use the same flags. Create a header to
+define those.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/gpio.h |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
+ create mode 100644 arch/arm/boot/dts/gpio.h
+
+diff --git a/arch/arm/boot/dts/gpio.h b/arch/arm/boot/dts/gpio.h
+new file mode 100644
+index 0000000..4c9da69
+--- /dev/null
++++ b/arch/arm/boot/dts/gpio.h
+@@ -0,0 +1,10 @@
++/*
++ * This header provides constants for most GPIO bindings.
++ *
++ * Most GPIO bindings include a flags cell as part of the GPIO specifier.
++ * In most cases, the format of the flags cell uses the standard values
++ * defined in this header.
++ */
++
++#define GPIO_ACTIVE_HIGH 0
++#define GPIO_ACTIVE_LOW 1
+-- 
+1.7.10.4
