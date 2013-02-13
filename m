@@ -1,54 +1,47 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Wed, 13 Feb 2013 11:42:01 +0000
-Subject: [PATCH v2 3/4] mtd: devices: elm: Low power transition support
-In-Reply-To: <20130209102243.GH17852@n2100.arm.linux.org.uk>
-References: <1360240618-11094-1-git-send-email-avinashphilip@ti.com>
- <1360240618-11094-4-git-send-email-avinashphilip@ti.com>
- <20130209102243.GH17852@n2100.arm.linux.org.uk>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA7491C@DBDE01.ent.ti.com>
+From: enrico.scholz@sigma-chemnitz.de (Enrico Scholz)
+Date: Wed, 13 Feb 2013 13:00:50 +0100
+Subject: [i2c-mxs] Broken DMA operations from within a module
+Message-ID: <lyehgkift9.fsf@ensc-virt.intern.sigma-chemnitz.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 15:52:44, Russell King - ARM Linux wrote:
-> On Thu, Feb 07, 2013 at 06:06:57PM +0530, Philip Avinash wrote:
-> > +static int elm_suspend(struct device *dev)
-> > +{
-> > +	struct elm_info *info = dev_get_drvdata(dev);
-> > +	wait_queue_head_t wq;
-> > +	DECLARE_WAITQUEUE(wait, current);
-> > +
-> > +	init_waitqueue_head(&wq);
-> > +	while (1) {
-> > +		/* Make sure that ELM not running */
-> > +		if (info->idle) {
-> > +			add_wait_queue(&wq, &wait);
-> > +			schedule();
-> > +			remove_wait_queue(&wq, &wait);
-> > +		} else {
-> > +			break;
-> > +		}
-> > +	}
-> 
-> The above code looks really wrong - it will just spin endlessly with the
-> waitqueues doing nothing useful.  What are you trying to do here?
+Hi,
 
-The intention of waitqeue is to make the suspend process really wait till
-the ELM module finishes current activity. Although this type of protection
-already achieved in mtd layer using nand_suspend(), this one is particularly
-required for ELM module to really make sure that *any pending* corrections to
-finish really before gone to suspend.
+the i2c-mxs driver does not work when transmit buffers are located
+within module memory.
 
-If suspend activity initiated and NAND driver requested service of ELM
-module for error correction, then suspend activity has to wait till
-(info->idle == false), so that ELM module finishes activity.
+E.g. when doing something like
 
-I can think of adding different states to ELM module and take action.
-I will add following states.
+	struct i2c_msg xfer = {
+               .buf = "something",
+               ...
+        };
 
-RUNNING
-SUSPEND
+        ret = i2c_transfer(client->adapter, &xfer, 1);
 
-Thanks
-Avinash
+random data will be sent because buf is not DMA mapable ("something" is
+located in the .strtab section within module memory). MXS has a memory
+layout like
 
-> 
+    vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
+    lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+    modules : 0xbf000000 - 0xc0000000   (  16 MB)
+      .text : 0xc0008000 - 0xc04b1e8c   (4776 kB)
+      .init : 0xc04b2000 - 0xc04e61ac   ( 209 kB)
+      .data : 0xc04e8000 - 0xc051b578   ( 206 kB)
+       .bss : 0xc051b578 - 0xc05eba44   ( 834 kB)
+
+and is CONFIG_FLATMEM.  Buffers above are e.g. at 0xbf0cdaf0.
+
+You can verify the problem e.g. with the edt-ft5x06.c touch driver;
+dumping 'sg->dma_address' in mxs_dma_prep_slave_sg() shows physical
+addresses like 0x3f0cdaf0 for such strings, which are outside of valid
+memory (0x40000000-0x7fffffff).
+
+Does the i2c layer require DMA mapable buffers in its xfer structures
+(e.g. like usb), or is the problem in the generic ARM/MXS layer or in
+the mxs i2c driver?
+
+
+
+Enrico
