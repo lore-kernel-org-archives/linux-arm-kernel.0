@@ -1,25 +1,31 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 13 Feb 2013 18:39:47 +1100
-Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
-Message-ID: <20130213183947.8f2a946f84d156272db38e8b@canb.auug.org.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 13 Feb 2013 16:49:02 +0900
+Subject: [PATCH] ARM: mach-shmobile: mackerel: enable MMCIF and SDHI in
+ defconfig
+Message-ID: <1360741742-11342-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+I'm unsure why this isn't already the case.
 
-Today's linux-next merge of the samsung tree got conflicts in quite a few
-files between commits from the arm-soc tree and commits from the samsung
-tree.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/mackerel_defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
 
-I took Olof's advice and just dropped the samsung tree for today.
-
+diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
+index 7594b3a..ec8e605 100644
+--- a/arch/arm/configs/mackerel_defconfig
++++ b/arch/arm/configs/mackerel_defconfig
+@@ -94,6 +94,9 @@ CONFIG_USB_RENESAS_USBHS=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_RENESAS_USBHS_UDC=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHI=y
++CONFIG_MMC_SH_MMCIF=y
+ CONFIG_DMADEVICES=y
+ CONFIG_SH_DMAE=y
+ CONFIG_EXT2_FS=y
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130213/ceddcbf1/attachment.sig>
+1.7.10.4
