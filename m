@@ -1,44 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Feb 2013 14:14:27 +0100
-Subject: Need advice: unable to mount filesystem
-In-Reply-To: <511B8729.8040908@st.com>
-References: <511B8729.8040908@st.com>
-Message-ID: <CACRpkdb=zgaWkzoMtaWbMZXe_wUyszwsjmRC=03iMPDpU90N4w@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 13 Feb 2013 14:21:53 +0100 (CET)
+Subject: [PATCH 1/3] ARM: mach-shmobile: mackerel: enable REGULATOR in
+ defconfig
+In-Reply-To: <1360761103-17357-2-git-send-email-horms+renesas@verge.net.au>
+References: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
+ <1360761103-17357-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <Pine.LNX.4.64.1302131418350.18535@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 1:29 PM, Amit Virdi <amit.virdi@st.com> wrote:
+Hi Simon
 
-> I have tried mounting the filesystem from DDR, that too with no success. One
-> observation is that before mounting the FS, the kernel throws a warning:
-> --
-> Warning: unable to open an initial console.
+On Wed, 13 Feb 2013, Simon Horman wrote:
 
-This is not your problem. The kernel screams that all the time, (I once
-saw that explained and some ugly workaround for).
+> As well as being a generally sane thing to do this
+> is required for MMCIF to function in conjunction with
+> " ARM: shmobile: streamline mackerel SD and MMC devices".
+> 
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> ---
+> 
+> v2
+> * Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
+> ---
+>  arch/arm/configs/mackerel_defconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
+> index ec8e605..9fb1189 100644
+> --- a/arch/arm/configs/mackerel_defconfig
+> +++ b/arch/arm/configs/mackerel_defconfig
+> @@ -75,6 +75,7 @@ CONFIG_I2C=y
+>  CONFIG_I2C_SH_MOBILE=y
+>  # CONFIG_HWMON is not set
+>  # CONFIG_MFD_SUPPORT is not set
+> +CONFIG_REGULATOR=y
 
-This (from your log) is the real problem:
+We really don't have to enable CONFIG_REGULATOR_GPIO and 
+CONFIG_REGULATOR_FIXED_VOLTAGE? IIRC, CONFIG_REGULATOR_GPIO is so far only 
+used on armadillo800eva, but the fixed regulator is required for other 
+boards too?
 
-VFS: Cannot open root device "mtdblock3" or unknown-block(31,3): error -14
-Please append a correct "root=" boot option; here are the available partitions:
-1f00              64 mtdblock0  (driver?)
-1f01             192 mtdblock1  (driver?)
-1f02            2048 mtdblock2  (driver?)
-1f03           14080 mtdblock3  (driver?)
-Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(31,3)
-[<2000cb50>] (unwind_backtrace+0x0/0xf8) from [<2018655c>] (panic+0x8c/0x1d8)
-[<2018655c>] (panic+0x8c/0x1d8) from [<201f8d58>] (mount_block_root+0x1fc/0x2b8)
-[<201f8d58>] (mount_block_root+0x1fc/0x2b8) from [<201f90c0>]
-(prepare_namespace+0x160/0x1b8)
-[<201f90c0>] (prepare_namespace+0x160/0x1b8) from [<20185984>]
-(kernel_init+0x8/0xe4)
-[<20185984>] (kernel_init+0x8/0xe4) from [<20008e98>] (ret_from_fork+0x14/0x3c)
+Thanks
+Guennadi
 
-The kernel cannot find a working filesystem at mtdblock3.
+>  CONFIG_FB=y
+>  CONFIG_FB_MODE_HELPERS=y
+>  CONFIG_FB_SH_MOBILE_LCDC=y
+> -- 
+> 1.7.10.4
 
-> I have even tried using initramfs (compiled kernel with busybox binary).
-
-And how does the boot log look when you try to do that?
-
-Yours,
-Linus Walleij
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
