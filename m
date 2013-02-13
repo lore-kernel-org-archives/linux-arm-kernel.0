@@ -1,26 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Feb 2013 19:33:09 +0000
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130213180439.GB1601@obsidianresearch.com>
-References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130213095701.0d9f9f20@skate> <20130213180439.GB1601@obsidianresearch.com>
-Message-ID: <201302131933.09947.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 13 Feb 2013 19:43:32 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP: Clock: Remove CK_* flags
+In-Reply-To: <DC88CAD03C0052499C1907B327FC63229BAB0B@DBDE01.ent.ti.com>
+References: <1359966525-7603-1-git-send-email-j-keerthy@ti.com>
+ <alpine.DEB.2.00.1302080248550.8539@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B92FF@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302081805450.28008@utopia.booyaka.com>
+ <alpine.DEB.2.00.1302081855370.28008@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B966E@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302111538430.8260@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B989B@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302120638580.14983@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B98DD@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302122028480.29149@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229BAB0B@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1302131942470.8234@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 February 2013, Jason Gunthorpe wrote:
-> > You seem to propose a global regs = <...> property under
-> > pcie-controller, but indexing using marvell,pcie-port cannot work. PCIe
-> > interfaces are identified by two values (port,lane), so we have 0.0,
-> > 0.1, 0.2, 0.3, 1.0, 1.1, 1.2, 1.3, 2.0 and 3.0 on MV78460. I really
-> > would like to avoid having bizarre computations to find which entry in
-> > this big regs = <...> array correspond to a given PCIe interface.
-> 
-> Well, using the 'global' regs is an easy way to avoid the complexity with
-> address translation and 'assigned-addresses'. So some way to translate
-> between link # and regs index is necessary. How about using the PCI
-> device number? Device number 1 is regs entry 0, 2 is regs entry 1, etc.
+On Wed, 13 Feb 2013, J, KEERTHY wrote:
 
-Or you could use the "reg-names" property.
+> So the patch needs to be rebased after 3.9 right?
 
-	Arnd
+No, I've already done that.  At this point, I don't think there's anything 
+further that you need to do with it.  Will let you know if that turns out 
+not to be true.
+
+- Paul
