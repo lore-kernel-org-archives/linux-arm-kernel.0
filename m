@@ -1,29 +1,24 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 13 Feb 2013 10:56:50 +0000
-Subject: [RFC v2 07/18] ARM: OMAP2+: AM33XX: hwmod: Update TPTC0 hwmod
- with the right flags
-In-Reply-To: <87fw12xw70.fsf@linaro.org>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-8-git-send-email-vaibhav.bedia@ti.com>
- <87fw12xw70.fsf@linaro.org>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED1CDEA@DBDE01.ent.ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 13 Feb 2013 19:59:06 +0900
+Subject: [PATCH] ARM: shmobile: marzen: Include mmc/host.h
+In-Reply-To: <Pine.LNX.4.64.1302131052140.18535@axis700.grange>
+References: <1360748750-11911-1-git-send-email-horms+renesas@verge.net.au>
+ <Pine.LNX.4.64.1302131052140.18535@axis700.grange>
+Message-ID: <20130213105905.GB22623@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On Tue, Feb 12, 2013 at 05:03:23, Kevin Hilman wrote:
-> Vaibhav Bedia <vaibhav.bedia@ti.com> writes:
+On Wed, Feb 13, 2013 at 10:52:31AM +0100, Guennadi Liakhovetski wrote:
+> On Wed, 13 Feb 2013, Simon Horman wrote:
 > 
-> > TPTC0 needs to be idled and put to standby under SW control.
+> > mmc/host.h provides MMC_CAP_SD_HIGHSPEED which is used in board-marzen.c
+> > 
+> > This resolves a build problem observed when compiling with
+> > "mmc: tmio: remove unused and deprecated symbols" applied.
+> > 
+> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Please elaborate about why (e.g. HW support not available, HW support
-> broken/buggy, etc.) since these blocks are not well documented in the
-> docs that I have (spruh73f.)
-> 
+> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-This change was picked up for v3.9. I'll submit a follow-up patch adding
-in a comment in the hwmod file for this.
-
-Regards,
-Vaibhav 
+Thanks, I have applied it to the boards3 branch.
