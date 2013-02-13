@@ -1,45 +1,61 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Feb 2013 08:52:20 -0800
+Date: Wed, 13 Feb 2013 08:54:39 -0800
 Subject: Getting your opinion about the best place to put one specific
  device driver...
-In-Reply-To: <511B6140.90801@stericsson.com>
+In-Reply-To: <201302131104.01793.arnd@arndb.de>
 References: <511A0F11.1050608@stericsson.com>
- <201302121454.10231.arnd@arndb.de> <511A6D1E.50705@stericsson.com>
  <201302121741.31494.arnd@arndb.de>
- <20130213094552.GD3073@tbergstrom-lnx.Nvidia.com>
- <511B6140.90801@stericsson.com>
-Message-ID: <20130213165219.GG7144@atomide.com>
+ <511B59E2.5060402@stericsson.com>
+ <201302131104.01793.arnd@arndb.de>
+Message-ID: <20130213165439.GH7144@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jean-Nicolas GRAUX <jean-nicolas.graux@stericsson.com> [130213 01:52]:
-> Le 02/13/2013 10:45 AM, Peter De Schrijver a ?crit :
-> >>Correct, I try my best to avoid adding random stuff in there that might
-> >>need a generic interface later. Tony already pointed out the similarity
-> >>to the OMAP specific hwopbs feature, and whatever user interface we
-> >>introduce for one should be generic enough to work on the other one as
-> >>well, and ideally also on future ones to the degree that we can anticipate
-> >>them today.
-> >>
-> >>I like the idea of making the in-kernel configuration part of this a
-> >>pinctrl driver, which would already allow you to configure it through
-> >>a custom device tree and no user interface at all.
-> >>
-> >Having done significant work with the OMAP3 hwobs feature, you really want a
-> >userinterface. At least OMAP3 has limitations on which signal can be
-> >monitored on which hwobs pin. This means that depending on the measurements
-> >you want to do, you need to change the configuration. If you want to automate
-> >several measurements, having a user interface (eg using debugfs), makes things
-> >much easier. Also when using this for debugging, you probably will have to
-> >experiment with which signals to monitor to rootcause the problem. Also then
-> >having a userinterface will be much easier than modifying the devicetree
-> >and rebooting the system.
+* Arnd Bergmann <arnd@arndb.de> [130213 03:07]:
+> On Wednesday 13 February 2013, Jean-Nicolas GRAUX wrote:
+> > Le 02/12/2013 06:41 PM, Arnd Bergmann a ?crit :
+> > > On Tuesday 12 February 2013, Jean-Nicolas GRAUX wrote:
+> > > If a more dynamic user interface is needed, I think it would be good
+> > > to have a generic mechanism in the pinctrl subsystem to reroute pins
+> > > like these, which can work for all pins in the system (or at least
+> > > those that have not been claimed by another device). I don't know if
+> > > that interface already exists, but Linus would be the right person
+> > > to answer that.
 > >
-> Yep, that's true.
+> > I think i have one colleague that recently made a patch for that purpose.
+> > But i believe this is still in progress. It consists in improving the 
+> > pinctrl
+> > debugfs interface to be able to manually change the pin muxing and
+> > the gpio configuration for debug/testing purpose.
+> 
+> Sounds good to me. Peter, Tony, do you think that would be a good enough
+> interface for other platforms as well?
 
-Yeah user space is the way to go for toggling the settings. For omap hwobs,
-that all should be pretty close doable via debugfs with pinctrl-single.c +
-the patches posted by Haojian to add debugfs write support.
+Yes debugfs is the way to go for modifying the hwobs settings.
+ 
+> > > If there is a generic way to configure pinmux from user space, you
+> > > can essentially move this driver into an application running outside
+> > > of the kernel.
+> > >
+> > The matter is that this hwobs driver do more than just changing
+> > the muxing of one pin group in the digital baseband.
+> > It also control some specific registers to configure the hwobs IP.
+> > More in details, for each of the 18 external IOs, it is possible to
+> > select one observer mode among several. We also provide some
+> > facility for the user to easily detect the pin to monitor on the
+> > output connector.
+> 
+> Hmm, I wonder if that is something that makes sense to have
+> in a generic pinctrl debugfs interface. Maybe it can instead
+> be part of the new pinctrl driver for this hw block then, which
+> should be able to create additional sysfs files in the pinctrl
+> debugfs directories. Linus, does that make sense to you?
+
+Makes sense to me.
+
+And pinctrl does not need to have any knowledge of the names of
+the hwobs signals etc. That can all be done in a user space app
+modifying the pinctrl registers via debugs.
 
 Regards,
 
