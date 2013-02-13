@@ -1,48 +1,43 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Wed, 13 Feb 2013 18:30:39 +0100
-Subject: [PATCH] ARM: net: bpf_jit: fix emit_swap16() for non ARMv6+.
-In-Reply-To: <1360776125-14542-1-git-send-email-nschichan@freebox.fr>
-References: <1360776125-14542-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1360776645-14726-1-git-send-email-nschichan@freebox.fr>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 13 Feb 2013 23:03:01 +0530
+Subject: [GIT PULL] DaVinci DT updates for v3.9 (part 2)
+In-Reply-To: <20130210012707.GL16278@quad.lixom.net>
+References: <51168E50.1010709@ti.com> <20130210012707.GL16278@quad.lixom.net>
+Message-ID: <511BCE4D.2060602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original code was generating an lsl instructions using the value
-of ARM_R8 (skb_headlen, possibly uninitialized if no skb_headlen
-access was required) as a shift amount.
+Hi Olof,
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
-Resent due to missing Signed-off-by
+On 2/10/2013 6:57 AM, Olof Johansson wrote:
+> On Sat, Feb 09, 2013 at 11:28:40PM +0530, Sekhar Nori wrote:
+>> Hi Arnd, Olof,
+>>
+>> Can you please pull the following changes for v3.9?
+>>
+>> Thanks,
+>> Sekhar
+>>
+>> The following changes since commit 1661636d362b6d1a6c2bab210f2ab363a69deccc:
+>>
+>>   ARM: davinci: da850: add RTC DT entries (2013-01-28 21:28:11 +0530)
+>>
+>> are available in the git repository at:
+>>
+>>   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-for-v3.9/dt-2
+> 
+> Pulled, but:
+> 
+>> Kumar, Anil (2):
+>>       ARM: davinci: da850 DT: add support for machine reboot
+> 
+> Looking at this patch, looking for any device named "watchdog" seems a
+> bit fragile.  It's an unfortunate device name to have it that generic
+> in the davinci_wdt driver.
 
- arch/arm/net/bpf_jit_32.c |   15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+Yes, agreed. Ideally a future patch should fix that but I wonder if
+device name becomes part of userspace API because it gets exposed
+through sysfs and hence should not be changed?
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index a34f1e2..6828ef6 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -341,10 +341,17 @@ static void emit_load_be16(u8 cond, u8 r_res, u8 r_addr, struct jit_ctx *ctx)
- 
- static inline void emit_swap16(u8 r_dst, u8 r_src, struct jit_ctx *ctx)
- {
--	emit(ARM_LSL_R(ARM_R1, r_src, 8), ctx);
--	emit(ARM_ORR_S(r_dst, ARM_R1, r_src, SRTYPE_LSL, 8), ctx);
--	emit(ARM_LSL_I(r_dst, r_dst, 8), ctx);
--	emit(ARM_LSL_R(r_dst, r_dst, 8), ctx);
-+	/* r_dst = (r_src << 8) | (r_src >> 8) */
-+	emit(ARM_LSL_I(ARM_R1, r_src, 8), ctx);
-+	emit(ARM_ORR_S(r_dst, ARM_R1, r_src, SRTYPE_LSR, 8), ctx);
-+
-+	/*
-+	 * we need to mask out the bits set in r_dst[23:16] due to
-+	 * the first shift instruction.
-+	 *
-+	 * note that 0x8ff is the encoded immediate 0x00ff0000.
-+	 */
-+	emit(ARM_BIC_I(r_dst, r_dst, 0x8ff), ctx);
- }
- 
- #else  /* ARMv6+ */
--- 
-1.7.10.4
+Thanks,
+Sekhar
