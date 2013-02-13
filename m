@@ -1,30 +1,44 @@
-From: s-anna@ti.com (Anna, Suman)
-Date: Wed, 13 Feb 2013 16:41:37 +0000
-Subject: [PATCH v2 00/13] drivers: mailbox: framework creation
-In-Reply-To: <20130213134207.GN17852@n2100.arm.linux.org.uk>
-References: <1360645032-9668-1-git-send-email-s-anna@ti.com>
- <CACRpkdZayg-X11ZRnh2Z0i+egBn8Fhwya-6_Yr8wcv+6s0CVqQ@mail.gmail.com>
- <20130213134207.GN17852@n2100.arm.linux.org.uk>
-Message-ID: <37C860A02101E749A747FA2D3C1E3C50476638@DLEE12.ent.ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Feb 2013 09:48:03 -0700
+Subject: [PATCH v6 08/10] ARM: dt: Add references to tegra_car clocks
+In-Reply-To: <20130213113807.GE3073@tbergstrom-lnx.Nvidia.com>
+References: <1360580700-10245-1-git-send-email-pdeschrijver@nvidia.com>
+ <1360580700-10245-9-git-send-email-pdeschrijver@nvidia.com>
+ <511A7AB5.4040607@wwwdotorg.org>
+ <20130213113807.GE3073@tbergstrom-lnx.Nvidia.com>
+Message-ID: <511BC3C3.6070402@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, Feb 13, 2013 at 02:36:32PM +0100, Linus Walleij wrote:
-> > On Tue, Feb 12, 2013 at 5:56 AM, Suman Anna <s-anna@ti.com> wrote:
-> >
-> > > I have hosted the series at [3].
-> > > [3]
-> > > https://github.com/sumananna/mailbox/commits/dbx500-prcmu-mailbox
-> >
-> > Suman, I suggest you ask Stepgen Rothwell to include this branch into
-> > the linux-next tree, so we can get some rotation of this stuff in
-> > preparation for the v3.10 merge window. (It's not going in now
-> > anyway.)
+On 02/13/2013 04:38 AM, Peter De Schrijver wrote:
+> On Tue, Feb 12, 2013 at 06:24:05PM +0100, Stephen Warren wrote:
+>> On 02/11/2013 04:04 AM, Peter De Schrijver wrote:
+>>> Add references to tegra_car clocks for the basic device nodes.
+>>
+>> In this patch, you also need to remove the "clock-frequency" properties
+>> from tegra114-*.dts board files.
 > 
-> Best wait until after v3.9-rc1 - remember that linux-next is supposed to be a
-> staging tree for the _next_ merge window only.
+> That would probably break bisectability no?
 
-Yes, will do. Anyway, we need a new revision of one patch (so far) to address Mark Rutland's comments.
+Oh right, I read the patch order backwards. You can fix this by moving
+this patch to the end of the series.
 
-Thanks
-Suman
+> I think this needs to be done in a separate patch.
+
+To avoid bisect issues, the clock-frequency property should be removed
+in the same patch that adds the clocks property, or after it.
+
+> Also, the UARTD enabling in init_table[] can then be removed.
+
+You still need to initialize all the UART clocks in init_table[]. This
+is required to make sure the clocks have the correct parent. Without
+this explicit initialization, on Tegra30 at least, it was found that
+UART C didn't work correctly for Bluetooth since the default parent was
+something that wasn't generating the expected frequency.
+
+Before removing the clock-frequency property, you also need to make sure
+that init_table[] forces the UART clock on, otherwise since nothing will
+clk_get()/enable() the UART clock, clk_disable_unused() will disable it.
+After removing clock-frequency property, of_serial.c will
+clk_get()/enable() the UART clock based on the clocks property, and
+hence init_table[] doesn't need to force the UART clock on.
