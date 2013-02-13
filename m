@@ -1,185 +1,89 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Wed, 13 Feb 2013 15:08:05 +0530
-Subject: [PATCH] USB: EHCI: make ehci-mv a separate driver
-In-Reply-To: <1360748285-31710-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1360748285-31710-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1360748285-31710-2-git-send-email-manjunath.goudar@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 13 Feb 2013 10:40:51 +0100
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <201302130929.21326.arnd@arndb.de>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302122259.54073.arnd@arndb.de> <20130213092358.4991ba43@skate>
+ <201302130929.21326.arnd@arndb.de>
+Message-ID: <20130213104051.07bcffe0@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the mv host controller driver from ehci-hcd host code
-into its own driver module.
+Dear Arnd Bergmann,
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Greg KH <greg@kroah.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-usb at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/usb/host/Kconfig    |    2 +-
- drivers/usb/host/Makefile   |    1 +
- drivers/usb/host/ehci-hcd.c |    6 +---
- drivers/usb/host/ehci-mv.c  |   80 ++++++++++++++++++++-----------------------
- 4 files changed, 40 insertions(+), 49 deletions(-)
+On Wed, 13 Feb 2013 09:29:21 +0000, Arnd Bergmann wrote:
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 8ffbafa..2aa4ece 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -221,7 +221,7 @@ config USB_EHCI_S5P
- 	 Enable support for the S5P SOC's on-chip EHCI controller.
- 
- config USB_EHCI_MV
--	bool "EHCI support for Marvell on-chip controller"
-+	tristate "EHCI support for Marvell on-chip controller"
- 	depends on USB_EHCI_HCD && (ARCH_PXA || ARCH_MMP)
- 	select USB_EHCI_ROOT_HUB_TT
- 	---help---
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 77e0331..d593017 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -31,6 +31,7 @@ obj-$(CONFIG_USB_EHCI_HCD_SPEAR)+= ehci-spear.o
- obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
- obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
- obj-$(CONFIG_USB_EHCI_S5P)      += ehci-s5p.o
-+obj-$(CONFIG_USB_EHCI_MV)       += ehci-mv.o
- obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
- obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
- obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index fa0e665..9cf4d73 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1317,11 +1317,6 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		ehci_grlib_driver
- #endif
- 
--#ifdef CONFIG_USB_EHCI_MV
--#include "ehci-mv.c"
--#define        PLATFORM_DRIVER         ehci_mv_driver
--#endif
--
- #ifdef CONFIG_MIPS_SEAD3
- #include "ehci-sead3.c"
- #define	PLATFORM_DRIVER		ehci_hcd_sead3_driver
-@@ -1335,6 +1330,7 @@ MODULE_LICENSE ("GPL");
- 	!defined(PLATFORM_DRIVER) && \
- 	!IS_ENABLED(CONFIG_ARCH_AT91) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_S5P) && \
-+	!IS_ENABLED(CONFIG_USB_EHCI_MV) && \
- 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
- 	!defined(OF_PLATFORM_DRIVER) && \
- 	!defined(XILINX_OF_PLATFORM_DRIVER)
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 3065809..67de419 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -17,7 +17,18 @@
- #include <linux/usb/otg.h>
- #include <linux/platform_data/mv_usb.h>
- 
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+#include <linux/io.h>
-+#include <linux/dma-mapping.h>
-+
-+#include "ehci.h"
-+
-+#define DRIVER_DESC "EHCI mv driver"
-+
- #define CAPLENGTH_MASK         (0xff)
-+static const char hcd_name[] = "ehci-mv";
-+static struct hc_driver __read_mostly mv_ehci_hc_driver;
- 
- struct ehci_hcd_mv {
- 	struct usb_hcd *hcd;
-@@ -95,48 +106,6 @@ static int mv_ehci_reset(struct usb_hcd *hcd)
- 	return retval;
- }
- 
--static const struct hc_driver mv_ehci_hc_driver = {
--	.description = hcd_name,
--	.product_desc = "Marvell EHCI",
--	.hcd_priv_size = sizeof(struct ehci_hcd),
--
--	/*
--	 * generic hardware linkage
--	 */
--	.irq = ehci_irq,
--	.flags = HCD_MEMORY | HCD_USB2,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset = mv_ehci_reset,
--	.start = ehci_run,
--	.stop = ehci_stop,
--	.shutdown = ehci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue = ehci_urb_enqueue,
--	.urb_dequeue = ehci_urb_dequeue,
--	.endpoint_disable = ehci_endpoint_disable,
--	.endpoint_reset = ehci_endpoint_reset,
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
--
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number = ehci_get_frame,
--
--	/*
--	 * root hub support
--	 */
--	.hub_status_data = ehci_hub_status_data,
--	.hub_control = ehci_hub_control,
--	.bus_suspend = ehci_bus_suspend,
--	.bus_resume = ehci_bus_resume,
--};
--
- static int mv_ehci_probe(struct platform_device *pdev)
- {
- 	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
-@@ -350,8 +319,33 @@ static struct platform_driver ehci_mv_driver = {
- 	.remove = mv_ehci_remove,
- 	.shutdown = mv_ehci_shutdown,
- 	.driver = {
--		   .name = "mv-ehci",
-+		   .name = hcd_name,
- 		   .bus = &platform_bus_type,
- 		   },
- 	.id_table = ehci_id_table,
- };
-+static const struct ehci_driver_overrides mv_overrides __initdata = {
-+	.reset = mv_ehci_reset,
-+};
-+
-+static int __init ehci_mv_init(void)
-+{
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+	ehci_init_driver(&mv_ehci_hc_driver, &mv_overrides);
-+	return platform_driver_register(&ehci_mv_driver);
-+}
-+module_init(ehci_mv_init);
-+
-+static void __exit ehci_mv_cleanup(void)
-+{
-+	platform_driver_unregister(&ehci_mv_driver);
-+}
-+module_exit(ehci_mv_cleanup);
-+
-+MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_ALIAS("platform:ehci-mv");
-+MODULE_AUTHOR("Marvell");
-+MODULE_LICENSE("GPL");
+> > Hum, why not, but I would definitely prefer to wait for the conversion
+> > of older platforms instead of duplicating this code. But if you feel
+> > like it's the right solution, I'll do it.
+> 
+> It's not something we do a lot, but in this case, I think it's better
+> if it lets us avoid adding the platform specific include path, which I
+> really want to avoid here.
+
+Ok.
+
+> > The arch/arm/mach-mvebu/addr-map.c depends on
+> > arch/arm/plat-orion/addr-map.c, so any change on this will affect
+> > mach-kirkwood, mach-orion5x, mach-dove and mach-mv78xx0. As you can
+> > see, we have to take into account the existing code, and I don't think
+> > it's realistic to have a perfect solution immediately.
+> 
+> Yes, I realize this. I was thinking we would move all at least the
+> file from plat-orion, and the header file. I don't care much whether
+> we also move the platform specific setup from mach-*/addr-map.c,
+> it works either way.
+
+Ok.
+
+
+> We don't need to do a complete overhaul of that code right now, but
+> if we agree on a place where it can go, then I think we should
+> move it now as just one extra patch to get rid of the header
+> dependency. In the worst case, moving just the header file to
+> include/linux would work, too.
+
+I'll try to cook something for this.
+
+> > Indeed. So maybe I should mark this resource as being IORESOURCE_MEM
+> > in the DT.
+> 
+> The DT seems fine here, just the code that interprets it is a little
+> unusual. Maybe you can change the calling convention of that function
+> to pass the type of resource you want as an argument?
+
+Erm? The type of the resource is encoded into the DT:
+
++				  0x81000000 0 0	  0xc0000000 0 0x00010000   /* downstream I/O */
++				  0x82000000 0 0	  0xc1000000 0 0x08000000>; /* non-prefetchable memory */
+
+>From http://devicetree.org/Device_Tree_Usage#PCI_Host_Bridge:
+
+     phys.hi cell: npt000ss bbbbbbbb dddddfff rrrrrrrr
+    phys.mid cell: hhhhhhhh hhhhhhhh hhhhhhhh hhhhhhhh
+    phys.low cell: llllllll llllllll llllllll llllllll 
+
+ ss: space code
+
+    00: configuration space
+    01: I/O space
+    10: 32 bit memory space
+    11: 64 bit memory space 
+
+So the 0x81 at the beginning of the first line means I/O space, the
+0x82 at the beginning of the second line means 32 bits memory space.
+The of_pci_process_ranges() function simply decodes those informations
+and fills the struct resource it returns with the appropriate resource
+type.
+
+So passing the resource type as argument to of_pci_process_ranges()
+doesn't make much sense to me.
+
+Best regards,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
