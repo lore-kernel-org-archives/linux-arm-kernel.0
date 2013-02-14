@@ -1,61 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 14 Feb 2013 08:25:04 -0600
-Subject: [PATCH] ARM: exynos: move exynos4210-combiner to drivers/irqchip
-In-Reply-To: <CAD=FV=WcHuW+2KBqDOGezW2Q9Fhr3Zq-ZtpX_y5qKN2LFEgMDA@mail.gmail.com>
-References: <1360706692-13622-1-git-send-email-robherring2@gmail.com>
- <20130212225227.GA24096@quad.lixom.net>
- <CAD=FV=WcHuW+2KBqDOGezW2Q9Fhr3Zq-ZtpX_y5qKN2LFEgMDA@mail.gmail.com>
-Message-ID: <511CF3C0.5010409@gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 14 Feb 2013 19:55:42 +0530
+Subject: [PATCH] DMA: PL330: allow submitting 2 requests at a time
+In-Reply-To: <1360752194-6506-1-git-send-email-jaswinder.singh@linaro.org>
+References: <1360752194-6506-1-git-send-email-jaswinder.singh@linaro.org>
+Message-ID: <20130214142542.GE29960@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2013 12:51 PM, Doug Anderson wrote:
-> Rob / Olof,
-> 
-> On Tue, Feb 12, 2013 at 2:52 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Tue, Feb 12, 2013 at 04:04:52PM -0600, Rob Herring wrote:
->>> From: Rob Herring <rob.herring@calxeda.com>
->>>
->>> Exynos boot is broken with commit 0529e315 (ARM: use common irqchip_init
->>> for GIC init). This commit split the irqchip initialization into 2 calls
->>> to of_irq_init. This does not work because of_irq_init requires interrupt
->>> parents to be in the match list.
->>>
->>> Rather than reverting exynos changes, make it do the proper thing by using
->>> IRQCHIP_DECLARE. This requires moving the combiner code to drivers/irqchip.
->>>
->>> Reported-by: Doug Anderson <dianders@chromium.org>
->>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->>> Cc: Kukjin Kim <kgene.kim@samsung.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> Cc: linux-samsung-soc at vger.kernel.org
->>> ---
->>>
->>> I thought there may be other platforms broken in the same way, but I
->>> checked and exynos is the only one.
->>>
->>> This is based on my gic/vic irqchip branch in arm-soc.
->>
->> Applied to next/cleanup.
-> 
-> I synced up to next-20130213 and the problem is fixed.  :)  ...that
-> label doesn't exactly boot but the problems are unrelated to this
-> problem now (there are problems with the OF conversions to raw
-> spinlocks)...
-> 
+On Wed, Feb 13, 2013 at 04:13:14PM +0530, Jassi Brar wrote:
+> Fix the logic to allow mc programming of second transfer after first
+> has been done, by removing immediate return upon success and iterating
+> until we detect QFull or DMAC dying.
+This is a fix, should be sent to stable too?
 
-That should be fixed, but may not be in -next yet. It is in Grant's tree.
-
-Rob
-
-> I haven't done any review of this code (I'm assuming that Olof already
-> looked it over and Samsung engineers will give it a thorough review),
-> but it's definitely tested.  :)
+--
+~Vinod
 > 
-> Tested-by: Doug Anderson <dianders@chromium.org>
+> Reported-by: Alvaro Moran <dirac3000@gmail.com>
+> Tested-by: Alvaro Moran <dirac3000@gmail.com>
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> ---
+>  drivers/dma/pl330.c |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> Thanks!
-> 
-> -Doug
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 80680ee..c1a867e 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2282,13 +2282,12 @@ static inline void fill_queue(struct dma_pl330_chan *pch)
+>  
+>  		/* If already submitted */
+>  		if (desc->status == BUSY)
+> -			break;
+> +			continue;
+>  
+>  		ret = pl330_submit_req(pch->pl330_chid,
+>  						&desc->req);
+>  		if (!ret) {
+>  			desc->status = BUSY;
+> -			break;
+>  		} else if (ret == -EAGAIN) {
+>  			/* QFull or DMAC Dying */
+>  			break;
+> -- 
+> 1.7.10.4
 > 
