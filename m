@@ -1,49 +1,88 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Thu, 14 Feb 2013 15:07:01 +0200
-Subject: [PATCH 5/9] USB: chipidea: add PTW and PTS handling
-In-Reply-To: <1359984275-24646-6-git-send-email-s.hauer@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 Feb 2013 15:10:15 +0200
+Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <20130214112449.GL1906@pengutronix.de>
 References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
- <1359984275-24646-6-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <87txpf9h8q.fsf@ashishki-desk.ger.corp.intel.com>
+ <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
+ <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
+ <511CB338.8070204@pengutronix.de>
+ <20130214095822.GD15275@arwen.pp.htv.fi>
+ <20130214100722.GK1906@pengutronix.de>
+ <20130214101510.GA15537@arwen.pp.htv.fi>
+ <20130214112449.GL1906@pengutronix.de>
+Message-ID: <20130214131015.GB27419@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+On Thu, Feb 14, 2013 at 12:24:49PM +0100, Sascha Hauer wrote:
+> On Thu, Feb 14, 2013 at 12:15:10PM +0200, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Thu, Feb 14, 2013 at 11:07:22AM +0100, Sascha Hauer wrote:
+> > > > > >> @@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
+> > > > > >>  }
+> > > > > >>  EXPORT_SYMBOL_GPL(usb_speed_string);
+> > > > > >>  
+> > > > > >> +#ifdef CONFIG_OF
+> > > > > >> +static const char *usb_dr_modes[] = {
+> > > > > >> +	[USB_DR_MODE_UNKNOWN]		= "",
+> > > > > >> +	[USB_DR_MODE_HOST]		= "host",
+> > > > > >> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
+> > > > > >> +	[USB_DR_MODE_OTG]		= "otg",
+> > > > > >> +};
+> > > > > > 
+> > > > > > It turns out this is a problem, especially since this is generic usb
+> > > > > > code: we have a chipidea controller (a patchset just arrived) that does
+> > > > > > both host and peripheral, but not otg. And I'm told now that dwc3
+> > > > > > controller can be synthesized like that too.
+> > > > 
+> > > > I wonder if this part is really necessary. Usually you would read it
+> > > > from HW's registers. For dwc3, it's quite recently that we allowed the
+> > > > driver to be built with host-only, device-only or DRD functionality.
+> > > 
+> > > We have quite some boards on which the ID pin is not wired up, so if a
+> > > core is both host and device capable there is no way to detect the
+> > > wanted mode if not given from the devicetree.
+> > 
+> > right, that's fair. But that doesn't mean board can't work as both,
+> > right. The IP is still the same, just the board is wired differently ;-)
+> 
+> Yes, it is. Usually I run kernels with both host and device support enabled.
+> Consider the IP is OTG capable, the chipidea driver will initialize
+> both roles. Now if a board only supports one role and does not have an
+> ID pin, how do I make sure the driver is in the correct mode? I need to
+> specify it somehow. Otherwise I may end up on a host-only board with the
+> driver sitting in device mode, or with a device-only board with the
+> driver sitting in host mode.
 
-> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
->
-> This patch makes it possible to configure the PTW and PTS bits inside
-> the portsc register for host and device mode before the driver starts
-> and the phy can be addressed as hardware implementation is designed.
->
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +++
->  drivers/usb/chipidea/bits.h                        |   14 ++++++-
->  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
->  drivers/usb/chipidea/core.c                        |   39 ++++++++++++++++++++
->  include/linux/usb/chipidea.h                       |    1 +
->  5 files changed, 61 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> index 5778b9c..dd42ccd 100644
-> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> @@ -5,6 +5,11 @@ Required properties:
->  - reg: Should contain registers location and length
->  - interrupts: Should contain controller interrupt
->  
-> +Recommended properies:
-> +- phy_type: the type of the phy connected to the core. Should be one
-> +  of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
-> +  property the PORTSC register won't be touched
-> +
+right.
 
-Looks like this bit belongs to patch 3/9, where you're adding devicetree
-hooks. Otherwise looks good.
+> > > > Maybe we can ignore dr_mode in host-only and device-only builds and only
+> > > > look at it for DRD builds ?
+> > > 
+> > > If something is or is not compiled in the kernel this doesn't mean the kernel
+> > > is not started on boards with a different situation.
+> > 
+> > who said kernel wouldn't start ? If you request a host-only build, you
+> > need to force your IP into working as host, since that's all you have,
+> > either that or you bail out on probe().
+> 
+> Let me clarify, I don't want to use Kconfig to specify my boards
+> capabilities. If a kernel is compiled for host mode only and the
+> devicetree specifies a port is device-only, then yes, the driver
+> should bail out on probe, maybe leaving a message that it found
+> a device for which the suitable role is not compiled in.
 
-Regards,
---
-Alex
+yeah, this is why I said we should ignore dr_mode (or bail out) when
+!OTG.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130214/49850d5d/attachment.sig>
