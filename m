@@ -1,68 +1,100 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 14:49:22 +0100
-Subject: [PATCH 06/11] ARM: integrator/versatile: fix NOMMU warnings
+Date: Thu, 14 Feb 2013 14:49:17 +0100
+Subject: [PATCH 01/11] ARM: disable virt_to_bus/virt_to_bus almost everywhere
 In-Reply-To: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
 References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360849767-1463135-7-git-send-email-arnd@arndb.de>
+Message-ID: <1360849767-1463135-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On NOMMU kernels, the io_desc variables are unused
-because we don't use the MMU to remap the MMIO
-areas.
+We are getting a number of warnings about the use of the deprecated
+bus_to_virt function in drivers using the ARM ISA DMA API:
 
-Marking these variables as __maybe_unused easily
-avoids the otherwise harmless warnings like
+drivers/parport/parport_pc.c: In function 'parport_pc_fifo_write_block_dma':
+drivers/parport/parport_pc.c:622:3: warning: 'bus_to_virt' is deprecated
+(declared at arch/arm/include/asm/memory.h:253) [-Wdeprecated-declarations]
 
-warning: 'versatile_io_desc' defined but not used
+This is only because that function gets used by the inline
+set_dma_addr() helper. We know that any driver for the ISA DMA API
+is correctly using the DMA addresses, so we can change this
+to use the __bus_to_virt() function instead, which does not warn.
+
+After this, there are no remaining drivers that are used on
+any defconfigs on ARM using virt_to_bus or bus_to_virt, with
+the exception of the OSS sound driver. That driver is only used
+on RiscPC, NetWinder and Shark, so we can set ARCH_NO_VIRT_TO_BUS
+on all other platforms and hide the deprecated functions, which
+is far more effective than marking them as deprecated, in order
+to avoid any new users of that code.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-integrator/integrator_ap.c | 2 +-
- arch/arm/mach-integrator/integrator_cp.c | 2 +-
- arch/arm/mach-versatile/core.c           | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig                 | 4 ++++
+ arch/arm/configs/shark_defconfig | 1 -
+ arch/arm/include/asm/dma.h       | 2 +-
+ arch/arm/include/asm/memory.h    | 2 ++
+ 4 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 11e2a41..11b1d21 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -94,7 +94,7 @@ void __iomem *ap_syscon_base;
-  * f1b00000	1b000000	GPIO
-  */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 67874b8..91d4aea 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1450,6 +1450,10 @@ config ISA_DMA
+ 	bool
+ 	select ISA_DMA_API
  
--static struct map_desc ap_io_desc[] __initdata = {
-+static struct map_desc ap_io_desc[] __initdata __maybe_unused = {
- 	{
- 		.virtual	= IO_ADDRESS(INTEGRATOR_HDR_BASE),
- 		.pfn		= __phys_to_pfn(INTEGRATOR_HDR_BASE),
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 7322838..01a888d 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -78,7 +78,7 @@ static void __iomem *intcp_con_base;
-  * fcb00000	cb000000	CP system control
++config ARCH_NO_VIRT_TO_BUS
++	def_bool y
++	depends on !ARCH_RPC && !ARCH_NETWINDER && !ARCH_SHARK
++
+ # Select ISA DMA interface
+ config ISA_DMA_API
+ 	bool
+diff --git a/arch/arm/configs/shark_defconfig b/arch/arm/configs/shark_defconfig
+index caa07db..e319b2c 100644
+--- a/arch/arm/configs/shark_defconfig
++++ b/arch/arm/configs/shark_defconfig
+@@ -73,7 +73,6 @@ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_NLS_CODEPAGE_437=m
+ CONFIG_NLS_CODEPAGE_850=m
+ CONFIG_NLS_ISO8859_1=m
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_SCHED_DEBUG is not set
+diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
+index 5694a0d..58b8c6a 100644
+--- a/arch/arm/include/asm/dma.h
++++ b/arch/arm/include/asm/dma.h
+@@ -105,7 +105,7 @@ extern void set_dma_sg(unsigned int chan, struct scatterlist *sg, int nr_sg);
   */
+ extern void __set_dma_addr(unsigned int chan, void *addr);
+ #define set_dma_addr(chan, addr)				\
+-	__set_dma_addr(chan, bus_to_virt(addr))
++	__set_dma_addr(chan, (void *)__bus_to_virt(addr))
  
--static struct map_desc intcp_io_desc[] __initdata = {
-+static struct map_desc intcp_io_desc[] __initdata __maybe_unused = {
- 	{
- 		.virtual	= IO_ADDRESS(INTEGRATOR_HDR_BASE),
- 		.pfn		= __phys_to_pfn(INTEGRATOR_HDR_BASE),
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 5d59294..60c092c 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -114,7 +114,7 @@ void __init versatile_init_irq(void)
- 	writel(PIC_MASK, VA_SIC_BASE + SIC_INT_PIC_ENABLE);
+ /* Set the DMA byte count for this channel
+  *
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 1c4df27..474e2e6 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -245,6 +245,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define __bus_to_pfn(x)	__phys_to_pfn(x)
+ #endif
+ 
++#ifdef CONFIG_VIRT_TO_BUS
+ static inline __deprecated unsigned long virt_to_bus(void *x)
+ {
+ 	return __virt_to_bus((unsigned long)x);
+@@ -254,6 +255,7 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+ {
+ 	return (void *)__bus_to_virt(x);
  }
++#endif
  
--static struct map_desc versatile_io_desc[] __initdata = {
-+static struct map_desc versatile_io_desc[] __initdata __maybe_unused = {
- 	{
- 		.virtual	=  IO_ADDRESS(VERSATILE_SYS_BASE),
- 		.pfn		= __phys_to_pfn(VERSATILE_SYS_BASE),
+ /*
+  * Conversion between a struct page and a physical address.
 -- 
 1.8.1.2
