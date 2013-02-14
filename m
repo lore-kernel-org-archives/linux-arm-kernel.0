@@ -1,47 +1,87 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Thu, 14 Feb 2013 23:08:54 +0100
-Subject: [PATCH 0/2] Device Tree support for CMA (Contiguous Memory
- Allocator)
-In-Reply-To: <20130214213013.GG1906@pengutronix.de>
-References: <1360845928-8107-1-git-send-email-m.szyprowski@samsung.com>
- <20130214213013.GG1906@pengutronix.de>
-Message-ID: <511D6076.9090503@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Feb 2013 14:22:47 -0800
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+References: <1360840554-26901-1-git-send-email-balbi@ti.com>
+ <1360840554-26901-2-git-send-email-balbi@ti.com>
+ <20130214171253.GC7144@atomide.com>
+ <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com>
+ <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+Message-ID: <20130214222247.GE11362@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Paul Walmsley <paul@pwsan.com> [130214 12:51]:
+> Hi,
+> 
+> On Thu, 14 Feb 2013, Tony Lindgren wrote:
+> 
+> > I don't think so as hwmod should only touch the sysconfig space
+> > when no driver has claimed it.
+> 
+> hwmod does need to touch the SYSCONFIG register during pm_runtime suspend 
+> and resume operations, and during device enable and disable operations.  
+> Here's the relevant code:
+> 
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2157
+> 
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2195
 
-On 02/14/2013 10:30 PM, Sascha Hauer wrote:
-> On Thu, Feb 14, 2013 at 01:45:26PM +0100, Marek Szyprowski wrote:
-...
->> Here is my initial proposal for device tree integration for Contiguous
->> Memory Allocator. The code is quite straightforward, however I expect
->> that the memory bindings require some discussion.
->>
->> The proposed bindings allows to define contiguous memory regions of
->> specified base address and size. Then, the defined regions can be
->> assigned to the given device(s) by adding a property with a phanle to
->> the defined contiguous memory region. From the device tree perspective
->> that's all. Once the bindings are added, all the memory allocations from
->> dma-mapping subsystem will be served from the defined contiguous memory
->> regions.
->>
->
-> I think CMA regions should not be described in the devicetre at all. The
-> devicetree is about hardware description and it should be OS agnostic,
-> but CMA is only a Linux specific implementation detail. It's not even
-> specific to a particular board, it's specific to a particular usecase of
-> a board.
+But that's triggered by runtime PM from the device driver, right?
 
-I disagree. For example, in a multiprocessor system describing the memory
-regions this way allows to assign memory to each subsystem, e.g. shared
-memory, so that the memory region constraints are satisfied.
+I think it's fine for hwmod to do that as requested by the device
+driver via runtime PM since hwmod is the bus glue making the drivers arch
+independent.
 
-CMA just happens to be an implementation of a method of assigning memory
-to each device in Linux. The constraints on the memory are real hardware
-constraints, resulting from a particular subsystem architecture.
+I think the only piece we're missing for that is for driver to run
+something like pm_runtime_init() that initializes the address space
+to hwmod. Or just bus specific ioremap like you're suggesting later
+on.
 
----
+Just to recap what we've discussed earlier, the reasons why we want
+reset and idle functions should be in the driver specific header are:
 
-Thanks,
-Sylwester
+1. There's often driver specific logic needed in addition to the
+   syconfig tinkering in the reset/idle functions.
+
+2. We need to be able to reset and idle some hardware even if the
+   driver is not compiled in.
+ 
+> Drivers shouldn't touch their IP block's SYSCONFIG registers.  They don't 
+> have anything specifically to do with the underlying device IP block, but 
+> with the SoC integration, even though they live in the device's 
+> memory-mapped address range.  It's unfortunate that TI didn't allocate a 
+> separate, small address space for these registers, translated by the bus, 
+> similar to the PCI-E Enhanced Configuration Access Mechanism:
+> 
+> http://wiki.osdev.org/PCI_Express#Extended_Configuration_Space
+> 
+> ... but that's unfortunately the reality of the OMAP hardware.
+
+Yes I think we all agree on accessing sysconfig in a standardized
+way via runtime PM triggered by the driver.
+ 
+> Regarding ioremap(), it seems reasonable for drivers to call ioremap(), as 
+> long as the implementation of ioremap() can be overridden by the device's 
+> bus.  PCI device drivers already do this -- albeit in a PCI-specific way 
+> -- with pci_ioremap_bar():
+> 
+> http://git.kernel.org/?p=linux%2Fkernel%2Fgit%2Ftorvalds%2Flinux.git&a=search&h=HEAD&st=grep&s=pci_ioremap_bar
+> 
+> So instead of something bus-specific like that, a better way would be to 
+> use something like:
+> 
+> va = dev->bus->ioremap( ... );
+> va = dev->bus->iounmap( ... );
+> 
+> Any driver using such a mechanism would be intrinsically generic. 
+> platform_bus could simply set its bus->ioremap to the existing ioremap() 
+> function, while buses like a omap_hwmod_bus could use a function that 
+> returned the address range that omap_hwmod_bus has already ioremap()ped.
+
+Yeah makes sense to me.
+
+Tony
