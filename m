@@ -1,40 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Feb 2013 17:23:37 +0100
-Subject: [PATCH 1/2] USB mxs-phy: Register phy with framework
-In-Reply-To: <20130214103729.GC15537@arwen.pp.htv.fi>
-References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
- <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
- <20130214103729.GC15537@arwen.pp.htv.fi>
-Message-ID: <20130214162337.GU1906@pengutronix.de>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 15 Feb 2013 00:25:02 +0800
+Subject: [PATCH v8 06/12] pinctrl: single: create new gpio function range
+In-Reply-To: <CACRpkdbt440_nJHzKrW=WKHyTvPQHYg3N3B-1MA=VOGBwrB44g@mail.gmail.com>
+References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
+ <1360602659-4774-7-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdbt440_nJHzKrW=WKHyTvPQHYg3N3B-1MA=VOGBwrB44g@mail.gmail.com>
+Message-ID: <CAD6h2NR7P=DedxF-qJ7cG4JeTUso1n4QrSCnuR8DeKGVYgJmgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 12:37:29PM +0200, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Jan 31, 2013 at 12:32:16PM +0100, Sascha Hauer wrote:
-> > We now have usb_add_phy_dev(), so use it to register with the framework
-> > to be able to find the phy from the USB driver.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Sascha, are you taking this through your tree or you want me to queue it
-> up ?
+On 14 February 2013 23:24, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Feb 11, 2013 at 6:10 PM, Haojian Zhuang
+> <haojian.zhuang@linaro.org> wrote:
+>
+>> Since gpio driver could create gpio range in DTS, it could invokes
+>> pinctrl_request_gpio(). In the pinctrl-single driver, it needs to
+>> configure pins with gpio function mode.
+>
+> Is it OK if I wait with patches 6-12 while we sort out the first
+> 5?
+>
+> Yours,
+> Linus Walleij
 
-I would prefer if either you could take it or Alexander Shishkin along
-with the other patches in:
+Since Tony has some comments on dropping BIAS_AUTO_PULL,
+I'll send the v9 including your comments.
 
-[PATCH v4] USB: add devicetree helpers for determining dr_mode and phy_type
-
-Could you have a look at them? Alexander is asking for an ack for 1/9,
-2/9, 3/9, 8/9. I just realized you are not on Cc for these. I could
-bounce you the patches in case you don't have them in your mailbox.
-
-Thanks
- Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Haojian
