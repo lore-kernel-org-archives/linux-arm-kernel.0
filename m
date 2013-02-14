@@ -1,134 +1,74 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Thu, 14 Feb 2013 11:36:11 +0200
-Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
-References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
- <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 Feb 2013 10:36:41 +0100
+Subject: Need advice: unable to mount filesystem
+In-Reply-To: <511C751D.9090404@st.com>
+References: <511B8729.8040908@st.com>
+ <CACRpkdb=zgaWkzoMtaWbMZXe_wUyszwsjmRC=03iMPDpU90N4w@mail.gmail.com>
+ <511C751D.9090404@st.com>
+Message-ID: <CACRpkdaNL=y7Stgd2d=FLY9Zf4iSHjT8GMK+Ch8noe=De3cWfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
-
-> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+On Thu, Feb 14, 2013 at 6:24 AM, Amit Virdi <amit.virdi@st.com> wrote:
+> On 2/13/2013 6:44 PM, Linus Walleij wrote:
+>> [Amit]
+>>> I have even tried using initramfs (compiled kernel with busybox binary).
+>>
+>> And how does the boot log look when you try to do that?
 >
-> This adds two little devicetree helper functions for determining the
-> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
-> the devicetree.
+> Almost the same:
 >
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
->  drivers/usb/phy/Makefile |    1 +
->  drivers/usb/phy/of.c     |   47 ++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/usb/usb-common.c |   36 +++++++++++++++++++++++++++++++++++
->  include/linux/usb/of.h   |   27 ++++++++++++++++++++++++++
->  include/linux/usb/otg.h  |    7 +++++++
->  include/linux/usb/phy.h  |    9 +++++++++
->  6 files changed, 127 insertions(+)
->  create mode 100644 drivers/usb/phy/of.c
->  create mode 100644 include/linux/usb/of.h
+> Kernel command line: console=ttyAMA0,115200
 >
-> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-> index 9fa6327..e1be1e8 100644
-> --- a/drivers/usb/phy/Makefile
-> +++ b/drivers/usb/phy/Makefile
-> @@ -5,6 +5,7 @@
->  ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
->  
->  obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
-> +obj-$(CONFIG_OF)			+= of.o
->  obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
->  obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
->  obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
-> diff --git a/drivers/usb/phy/of.c b/drivers/usb/phy/of.c
-> new file mode 100644
-> index 0000000..e6f3b74
-> --- /dev/null
-> +++ b/drivers/usb/phy/of.c
-> @@ -0,0 +1,47 @@
-> +/*
-> + * USB of helper code
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/usb/of.h>
-> +#include <linux/usb/otg.h>
-> +
-> +static const char *usbphy_modes[] = {
-> +	[USBPHY_INTERFACE_MODE_UNKNOWN]	= "",
-> +	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
-> +	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
-> +	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
-> +	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
-> +	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
-> +};
-> +
-> +/**
-> + * of_usb_get_phy_mode - Get phy mode for given device_node
-> + * @np:	Pointer to the given device_node
-> + *
-> + * The function gets phy interface string from property 'phy_type',
-> + * and returns the correspondig enum usb_phy_interface
-> + */
-> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
-> +{
-> +	const char *phy_type;
-> +	int err, i;
-> +
-> +	err = of_property_read_string(np, "phy_type", &phy_type);
-> +	if (err < 0)
-> +		return USBPHY_INTERFACE_MODE_UNKNOWN;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
-> +		if (!strcmp(phy_type, usbphy_modes[i]))
-> +			return i;
-> +
-> +	return USBPHY_INTERFACE_MODE_UNKNOWN;
-> +}
-> +EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
-> diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
-> index d29503e..ad4d87d 100644
-> --- a/drivers/usb/usb-common.c
-> +++ b/drivers/usb/usb-common.c
-> @@ -14,6 +14,9 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/usb/ch9.h>
-> +#include <linux/of.h>
-> +#include <linux/usb/of.h>
-> +#include <linux/usb/otg.h>
->  
->  const char *usb_speed_string(enum usb_device_speed speed)
->  {
-> @@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
->  }
->  EXPORT_SYMBOL_GPL(usb_speed_string);
->  
-> +#ifdef CONFIG_OF
-> +static const char *usb_dr_modes[] = {
-> +	[USB_DR_MODE_UNKNOWN]		= "",
-> +	[USB_DR_MODE_HOST]		= "host",
-> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
-> +	[USB_DR_MODE_OTG]		= "otg",
-> +};
+> <<snip>>
+>
+>
+> Warning: unable to open an initial console.
+> VFS: Cannot open root device "(null)" or unknown-block(0,0): error -14
+>
+> Please append a correct "root=" boot option; here are the available
+> partitions:
+> 1f00              64 mtdblock0  (driver?)
+> 1f01             192 mtdblock1  (driver?)
+> 1f02            2048 mtdblock2  (driver?)
+> 1f03           14080 mtdblock3  (driver?)
+> Kernel panic - not syncing: VFS: Unable to mount root fs on
+> unknown-block(0,0)
+>
+> [<2000cb50>] (unwind_backtrace+0x0/0xf8) from [<2018655c>]
+> (panic+0x8c/0x1d8)
+> [<2018655c>] (panic+0x8c/0x1d8) from [<201f8d60>]
+> (mount_block_root+0x1fc/0x2b8)
+> [<201f8d60>] (mount_block_root+0x1fc/0x2b8) from [<201f90c8>]
+> (prepare_namespace+0x160/0x1b8)
+> [<201f90c8>] (prepare_namespace+0x160/0x1b8) from [<20185984>]
+> (kernel_init+0x8/0xe4)
+>
+> [<20185984>] (kernel_init+0x8/0xe4) from [<20008e98>]
+> (ret_from_fork+0x14/0x3c)
 
-It turns out this is a problem, especially since this is generic usb
-code: we have a chipidea controller (a patchset just arrived) that does
-both host and peripheral, but not otg. And I'm told now that dwc3
-controller can be synthesized like that too.
+It looks like something is wrong with your initramfs. Check that
+it is really added to the kernel image.
 
-Summoning Felipe to the thread, this patch is largely his call anyway.
+I usually use:
 
-Regards,
---
-Alex
+CONFIG_BLK_DEV_INITRD
+CONFIG_INITRAMFS_SOURCE "your-ramdisk.cpio"
+CONFIG_RD_GZIP
+CONFIG_INITRAMFS_COMPRESSION_GZIP
+
+Then pass root=/dev/ram0
+
+But the last should not be necessary I think.
+
+I have a precompiled ramfs here:
+http://www.df.lth.se/~triad/krad/ux00/rootfs-u300.cpio
+
+This is for ARM9 and uses ttyAMA0 as console so it
+probably works with your system if you copy it to your
+kernel build dir and state "rootfs-u300.cpio" as
+initramfs source.
+
+Yours,
+Linus Walleij
