@@ -1,25 +1,23 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 14 Feb 2013 10:43:16 -0700
-Subject: [PATCH] clk: tegra: provide dummy cpu car ops
-In-Reply-To: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <511D2234.8000408@wwwdotorg.org>
+Date: Thu, 14 Feb 2013 10:54:28 -0700
+Subject: [PATCH 1/1] ARM: dt: add header to define tegra20 clocks
+In-Reply-To: <1360823899-17846-1-git-send-email-hdoyu@nvidia.com>
+References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
+ <1360823899-17846-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <511D24D4.6070805@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2013 07:52 AM, Peter De Schrijver wrote:
-> tegra_boot_secondary() relies on some of the car ops. This means having an
-> uninitialized tegra_cpu_car_ops will lead to an early boot panic.
-> Providing a dummy struct avoids this and makes adding Tegra114 clock support
-> in a bisectable way a lot easier.
-> 
-> --
-> 
-> Stephen,
-> 
-> Should this be a separate patch or should I make this part of new release of
-> the Tegra114 clock series?
+On 02/13/2013 11:38 PM, Hiroshi Doyu wrote:
+> To replace magic number in "clocks = <&tegra_car 28>;"
 
-I will try and remember to apply this before the Tegra114 clock series,
-although I think you're reposting that anyway, so feel free to include
-this in that series to make things simpler.
+I like the concept here; I was thinking about doing this today, but you
+beat me to it:-) Feel free to create the Tegra30 header too, and modify
+all the *.dts* files.
+
+To address other comments in this thread: Yes, I think that we will want
+to modify the clock driver to include this header to avoid
+duplication/errors (that will require adjusting Linux's include path),
+and also remove the list of IDs from the binding document; it can just
+refer the the new header by name and cause the header to *be* part of
+the binding document.
