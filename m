@@ -1,68 +1,136 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 Feb 2013 12:16:24 +0200
-Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <511CB86B.3070504@pengutronix.de>
-References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
- <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
- <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
- <511CB338.8070204@pengutronix.de>
- <20130214095822.GD15275@arwen.pp.htv.fi>
- <511CB86B.3070504@pengutronix.de>
-Message-ID: <20130214101624.GB15537@arwen.pp.htv.fi>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 14 Feb 2013 12:18:17 +0200
+Subject: [PATCH v9 02/20] mfd: omap-usb-host: Consolidate OMAP USB-HS
+ platform data
+In-Reply-To: <1358937492-8129-3-git-send-email-rogerq@ti.com>
+References: <1358937492-8129-1-git-send-email-rogerq@ti.com>
+ <1358937492-8129-3-git-send-email-rogerq@ti.com>
+Message-ID: <511CB9E9.5050804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 11:11:55AM +0100, Marc Kleine-Budde wrote:
-> >>>> @@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
-> >>>>  }
-> >>>>  EXPORT_SYMBOL_GPL(usb_speed_string);
-> >>>>  
-> >>>> +#ifdef CONFIG_OF
-> >>>> +static const char *usb_dr_modes[] = {
-> >>>> +	[USB_DR_MODE_UNKNOWN]		= "",
-> >>>> +	[USB_DR_MODE_HOST]		= "host",
-> >>>> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
-> >>>> +	[USB_DR_MODE_OTG]		= "otg",
-> >>>> +};
-> >>>
-> >>> It turns out this is a problem, especially since this is generic usb
-> >>> code: we have a chipidea controller (a patchset just arrived) that does
-> >>> both host and peripheral, but not otg. And I'm told now that dwc3
-> >>> controller can be synthesized like that too.
-> > 
-> > I wonder if this part is really necessary. Usually you would read it
-> > from HW's registers. For dwc3, it's quite recently that we allowed the
-> > driver to be built with host-only, device-only or DRD functionality.
+Hi Greg,
+
+On 01/23/2013 12:37 PM, Roger Quadros wrote:
+> Let's have a single platform data structure for the OMAP's High-Speed
+> USB host subsystem instead of having 3 separate ones i.e. one for
+> board data, one for USB Host (UHH) module and one for USB-TLL module.
 > 
-> The imx25 USB version of the chipidea IP Core get's really confused if
-> you read from the CAP_DCCPARAMS register on the host only port. In
-> freescale's documentation the register is marked as reserved. The host
-> port will not work then.
-
-heh, nicely done.
-
-> > Maybe we can ignore dr_mode in host-only and device-only builds and only
-> > look at it for DRD builds ?
-> > 
-> >> You mean a single instance of the controller (i.e. USB port) is host and
-> >> peripheral but has no otg registers. This means the mode of the port is
-> >> configured by userspace via the debugfs file? Is this possible?
-> > 
-> > yes, it is possible. Dual-Role doesn't imply OTG, but OTG implies
-> > Dual-Role.
+> This makes the code much simpler and avoids creating multiple copies of
+> platform data.
 > 
-> Thanks for the info. Then we need a fourth value for the helper code.
-> What's a sensible sting: "dual-role", "dr"?
+> CC: Alan Stern <stern@rowland.harvard.edu>
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> For the ehci-omap.c part:
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-dual-role.
+Could you please ACK the drivers/usb/host/ehci-omap.c part
+so that this can go through the MFD tree. Thanks.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130214/c09ab693/attachment.sig>
+The reason it needs to go through MFD is that it depends on
+a platform header change which Samuel and Tony have agreed to share.
+
+cheers,
+-roger
+
+> ---
+>  arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
+>  arch/arm/mach-omap2/board-3630sdp.c        |    2 +-
+>  arch/arm/mach-omap2/board-am3517crane.c    |    2 +-
+>  arch/arm/mach-omap2/board-am3517evm.c      |    2 +-
+>  arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
+>  arch/arm/mach-omap2/board-cm-t3517.c       |    2 +-
+>  arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
+>  arch/arm/mach-omap2/board-igep0020.c       |    4 +-
+>  arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
+>  arch/arm/mach-omap2/board-omap3evm.c       |    2 +-
+>  arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
+>  arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
+>  arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
+>  arch/arm/mach-omap2/board-omap4panda.c     |    2 +-
+>  arch/arm/mach-omap2/board-overo.c          |    2 +-
+>  arch/arm/mach-omap2/board-zoom.c           |    2 +-
+>  arch/arm/mach-omap2/usb-host.c             |   29 ++-----------
+>  arch/arm/mach-omap2/usb.h                  |   20 +--------
+>  drivers/mfd/omap-usb-host.c                |   63 +++++++++++----------------
+>  drivers/mfd/omap-usb-tll.c                 |   11 ++---
+>  drivers/usb/host/ehci-omap.c               |    6 +-
+>  include/linux/platform_data/usb-omap.h     |   23 ++--------
+>  22 files changed, 61 insertions(+), 125 deletions(-)
+> 
+
+<snip>
+
+> diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+> index e9d9b09..b96a4bf 100644
+> --- a/drivers/usb/host/ehci-omap.c
+> +++ b/drivers/usb/host/ehci-omap.c
+> @@ -107,7 +107,7 @@ static int omap_ehci_init(struct usb_hcd *hcd)
+>  {
+>  	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
+>  	int			rc;
+> -	struct ehci_hcd_omap_platform_data	*pdata;
+> +	struct usbhs_omap_platform_data	*pdata;
+>  
+>  	pdata = hcd->self.controller->platform_data;
+>  
+> @@ -151,7 +151,7 @@ static int omap_ehci_init(struct usb_hcd *hcd)
+>  }
+>  
+>  static void disable_put_regulator(
+> -		struct ehci_hcd_omap_platform_data *pdata)
+> +		struct usbhs_omap_platform_data *pdata)
+>  {
+>  	int i;
+>  
+> @@ -176,7 +176,7 @@ static void disable_put_regulator(
+>  static int ehci_hcd_omap_probe(struct platform_device *pdev)
+>  {
+>  	struct device				*dev = &pdev->dev;
+> -	struct ehci_hcd_omap_platform_data	*pdata = dev->platform_data;
+> +	struct usbhs_omap_platform_data		*pdata = dev->platform_data;
+>  	struct resource				*res;
+>  	struct usb_hcd				*hcd;
+>  	void __iomem				*regs;
+> diff --git a/include/linux/platform_data/usb-omap.h b/include/linux/platform_data/usb-omap.h
+> index ef65b67..04c7537 100644
+> --- a/include/linux/platform_data/usb-omap.h
+> +++ b/include/linux/platform_data/usb-omap.h
+> @@ -38,30 +38,15 @@ enum usbhs_omap_port_mode {
+>  	OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM
+>  };
+>  
+> -struct usbtll_omap_platform_data {
+> -	enum usbhs_omap_port_mode		port_mode[OMAP3_HS_USB_PORTS];
+> -};
+> -
+> -struct ehci_hcd_omap_platform_data {
+> +struct usbhs_omap_platform_data {
+>  	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
+>  	int				reset_gpio_port[OMAP3_HS_USB_PORTS];
+>  	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
+> -	unsigned			phy_reset:1;
+> -};
+> -
+> -struct ohci_hcd_omap_platform_data {
+> -	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
+> -	unsigned			es2_compatibility:1;
+> -};
+> -
+> -struct usbhs_omap_platform_data {
+> -	enum usbhs_omap_port_mode		port_mode[OMAP3_HS_USB_PORTS];
+> -
+> -	struct ehci_hcd_omap_platform_data	*ehci_data;
+> -	struct ohci_hcd_omap_platform_data	*ohci_data;
+>  
+>  	/* OMAP3 <= ES2.1 have a single ulpi bypass control bit */
+> -	unsigned				single_ulpi_bypass:1;
+> +	unsigned			single_ulpi_bypass:1;
+> +	unsigned			es2_compatibility:1;
+> +	unsigned			phy_reset:1;
+>  };
+>  
+>  /*-------------------------------------------------------------------------*/
+> 
