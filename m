@@ -1,41 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 23:26:57 +0100
-Subject: [PATCH 8/9] [media] s5p-fimc: fix s5pv210 build
-In-Reply-To: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
-References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360880818-4071454-9-git-send-email-arnd@arndb.de>
+Date: Thu, 14 Feb 2013 23:26:49 +0100
+Subject: [PATCH 0/9] linux-next ARM defconfig fixes
+Message-ID: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-56bc911 "[media] s5p-fimc: Redefine platform data structure for fimc-is"
-changed the bus_type member of struct fimc_source_info treewide, but
-got one instance wrong in mach-s5pv210, which was evidently not
-even build tested.
+I have tried building all ARM default configurations in
+linux-next today, and found a number of obvious problems
+that came in from somewhere other than the arm-soc tree
+(I have a separate series for those).
 
-This adds the missing change to get s5pv210_defconfig to build again.
-Applies on the Mauro's media tree.
+Here are the fixes I came up with. Please apply or merge
+into the original patch that broke them, or find a different
+fix that solves the problem.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Arnd Bergmann (9):
+  ARM: sa1100/assabet: include platform_device.h directly
+  fb/exynos: include platform_device.h
+  clk: sunxi: remove stale Makefile entry
+  mfd: max8925: fix trivial build warning for non-dt
+  ARM: shmobile: mark mackerel sh_mmcif_device __maybe_unused
+  drm/pci: move drm_pcie_get_speed_cap_mask inside #ifdef CONFIG_PCI
+  ARM defconfigs: add missing inclusions of linux/platform_device.h
+  [media] s5p-fimc: fix s5pv210 build
+  thermal: rcar: remove __devinitconst
+
+Cc: Dave Airlie <airlied@redhat.com>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
----
- arch/arm/mach-s5pv210/mach-goni.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
 
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 3a38f7b..e373de4 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -845,7 +845,7 @@ static struct fimc_source_info goni_camera_sensors[] = {
- 		.mux_id		= 0,
- 		.flags		= V4L2_MBUS_PCLK_SAMPLE_FALLING |
- 				  V4L2_MBUS_VSYNC_ACTIVE_LOW,
--		.bus_type	= FIMC_BUS_TYPE_ITU_601,
-+		.fimc_bus_type	= FIMC_BUS_TYPE_ITU_601,
- 		.board_info	= &noon010pc30_board_info,
- 		.i2c_bus_num	= 0,
- 		.clk_frequency	= 16000000UL,
+
+ arch/arm/mach-s5pv210/mach-goni.c               |  2 +-
+ arch/arm/mach-sa1100/assabet.c                  |  1 +
+ arch/arm/mach-shmobile/board-mackerel.c         |  2 +-
+ arch/arm/plat-samsung/include/plat/adc.h        |  1 +
+ drivers/clk/Makefile                            |  1 -
+ drivers/gpu/drm/drm_pci.c                       | 75 ++++++++++++-------------
+ drivers/thermal/rcar_thermal.c                  |  2 +-
+ drivers/video/backlight/max8925_bl.c            |  6 +-
+ drivers/video/clps711xfb.c                      |  1 +
+ drivers/video/exynos/exynos_mipi_dsi_common.c   |  1 +
+ drivers/video/exynos/exynos_mipi_dsi_lowlevel.c |  1 +
+ drivers/video/mmp/fb/mmpfb.c                    |  1 +
+ include/linux/platform_data/s3c-hsotg.h         |  2 +
+ 13 files changed, 49 insertions(+), 47 deletions(-)
+
 -- 
 1.8.1.2
