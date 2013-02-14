@@ -1,85 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Feb 2013 11:39:11 -0800
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <20130214192719.GB26679@arwen.pp.htv.fi>
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <1360840554-26901-2-git-send-email-balbi@ti.com>
- <20130214171253.GC7144@atomide.com>
- <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com>
- <20130214192719.GB26679@arwen.pp.htv.fi>
-Message-ID: <20130214193911.GD11806@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 14 Feb 2013 14:52:03 -0500
+Subject: [PATCH] ARM: kirkwood: add missing include for nsa310
+In-Reply-To: <1360850491-1463387-1-git-send-email-arnd@arndb.de>
+References: <1360850491-1463387-1-git-send-email-arnd@arndb.de>
+Message-ID: <20130214195203.GQ14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [130214 11:31]:
-> On Thu, Feb 14, 2013 at 10:12:17AM -0800, Tony Lindgren wrote:
+On Thu, Feb 14, 2013 at 03:01:30PM +0100, Arnd Bergmann wrote:
+> Patch 92cb7625 "ARM: kirkwood: nsa310: cleanup includes and
+> unneeded code" was a little too quick, since there is still
+> an I2C_BOARD_INFO left in this file at the moment. Once
+> that is gone and replaced by a DT description of the devices,
+> the inclusion can be removed again
 > 
-> > And only in the case there is no driver, hwmod can parse the address
-> > space from DT for the unclaimed hardware in the late_initcall.
+> Without this patch, building kirkwood_defconfig results in:
 > 
-> sounds good. But then it means our DTS files should be 100% complete,
-> meaning that even for the IPs which we don't have drivers at all, we
-> should still provide DTS nodes.
+> arch/arm/mach-kirkwood/board-nsa310.c:42:74: error: array type has incomplete element type
+> arch/arm/mach-kirkwood/board-nsa310.c:43:2: error: implicit declaration of function 'I2C_BOARD_INFO' [-Werror=implicit-function-declaration]
+> arch/arm/mach-kirkwood/board-nsa310.c: In function 'nsa310_gpio_init':
+> arch/arm/mach-kirkwood/board-nsa310.c:71:3: error: 'pm_power_off' undeclared (first use in this function)
+> arch/arm/mach-kirkwood/board-nsa310.c:71:3: note: each undeclared identifier is reported only once for each function it appears in
+> arch/arm/mach-kirkwood/board-nsa310.c: In function 'nsa310_init':
+> arch/arm/mach-kirkwood/board-nsa310.c:83:2: error: implicit declaration of function 'i2c_register_board_info' [-Werror=implicit-function-declaration]
+> arch/arm/mach-kirkwood/board-nsa310.c:83:121: error: negative width in bit-field '<anonymous>'
+> arch/arm/mach-kirkwood/board-nsa310.c: At top level:
+> arch/arm/mach-kirkwood/board-nsa310.c:42:74: warning: 'nsa310_i2c_info' defined but not used [-Wunused-variable]
+> cc1: some warnings being treated as errors
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  arch/arm/mach-kirkwood/board-nsa310.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> 
+> This file has been broken for a while in arm-soc,
+> so I'm applying the obvious fix directly to the
+> next/cleanup branch that introduced the problem.
 
-Yes, eventually. It's still better to have only one set of that data
-rather than number of supported SoCs times that data.. Parsing it
-should not be too bad if it's done one driver at a time during the
-driver probe.
+Thanks, Arnd.
 
-> In that case, does it make sense to teach DT about the actual structure
-> of OMAP's interconnect ? I mean:
-> 
-> ocp {
-> 	l3 at xxxxxxxx {
-> 		l4_per at xxxxxxxx {
-> 			...
-> 		};
-> 
-> 		l4_wakeup at xxxxxxxx {
-> 			...
-> 		};
-> 
-> 		...
-> 	};
-> };
-> 
-> That would mean that even interconnect PM could move to a driver under
-> drivers/bus/{l3,l4_per,l4_wakeup,..}.c
-
-Yes makes sense to me.
- 
-> > So the shared inline function should just take the __iomem * and
-> > size instead of *drv so both the driver and hwmod code can tinker
-> > with the autoidle bit.
-> 
-> Should hwmod be touching that in the long run ? It _does_ belong in the
-> device's address space
-> 
-> > > Note sure if any of those are acceptable.
-> > 
-> > Hmm what issues do you see in the above suggestion?
-> 
-> driver and hwmod accessing SYSC simultaneously for instance. Imagine
-> something like:
-> 
-> hwmod						driver
-> ------						-------
-> 1. starts device reset
-> 2. polls RESET bit with X ms timeout		X' ms later starts reset
-> 3. times out since reset restarts		polls RESET bit with X ms timeout
-> 4. error!					reset completes
-> 
-> In such cases, what do we do ? There can be many such cases, don't
-> you think ?
-
-I don't think so as hwmod should only touch the sysconfig space
-when no driver has claimed it. If hwmod sysconfig tinkering is
-only done in late_initcall, I don't think any drivers are probing
-at that time? Well there may be some deferred probe related issues
-there though, so we need some atomic way at that point to know if
-some hardware is being claimed by a driver.
-
-Regards,
-
-Tony 
+Jason.
