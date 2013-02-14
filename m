@@ -1,35 +1,127 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 Feb 2013 16:34:28 +0100
-Subject: [PATCH v2 02/10] gpio: pxa: avoid to use global irq base
-In-Reply-To: <511CDC78.2000400@compulab.co.il>
-References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
- <1359886551-20950-3-git-send-email-haojian.zhuang@linaro.org>
- <511BA0AF.8040904@compulab.co.il>
- <CAD6h2NRO6N1pRfq_=ybj5TSwC7gieYOffcQmfTyUiP5R_3fWig@mail.gmail.com>
- <511CADE4.1000007@compulab.co.il>
- <CACRpkdazd+JyKz4rrptFkJ6RrP9+2S1oM=iPnqRdGj=m21PeGw@mail.gmail.com>
- <511CDC78.2000400@compulab.co.il>
-Message-ID: <CACRpkdZSENzp+r9riK=0Kmg4t52BJO31pfOx3SKkz9vh8yu0Tw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 14 Feb 2013 17:06:55 +0100
+Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <20130214131015.GB27419@arwen.pp.htv.fi>
+References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
+ <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
+ <511CB338.8070204@pengutronix.de>
+ <20130214095822.GD15275@arwen.pp.htv.fi>
+ <20130214100722.GK1906@pengutronix.de>
+ <20130214101510.GA15537@arwen.pp.htv.fi>
+ <20130214112449.GL1906@pengutronix.de>
+ <20130214131015.GB27419@arwen.pp.htv.fi>
+Message-ID: <20130214160655.GT1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 1:45 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+On Thu, Feb 14, 2013 at 03:10:15PM +0200, Felipe Balbi wrote:
+> On Thu, Feb 14, 2013 at 12:24:49PM +0100, Sascha Hauer wrote:
+> > On Thu, Feb 14, 2013 at 12:15:10PM +0200, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Thu, Feb 14, 2013 at 11:07:22AM +0100, Sascha Hauer wrote:
+> > > > > > >> @@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
+> > > > > > >>  }
+> > > > > > >>  EXPORT_SYMBOL_GPL(usb_speed_string);
+> > > > > > >>  
+> > > > > > >> +#ifdef CONFIG_OF
+> > > > > > >> +static const char *usb_dr_modes[] = {
+> > > > > > >> +	[USB_DR_MODE_UNKNOWN]		= "",
+> > > > > > >> +	[USB_DR_MODE_HOST]		= "host",
+> > > > > > >> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
+> > > > > > >> +	[USB_DR_MODE_OTG]		= "otg",
+> > > > > > >> +};
+> > > > > > > 
+> > > > > > > It turns out this is a problem, especially since this is generic usb
+> > > > > > > code: we have a chipidea controller (a patchset just arrived) that does
+> > > > > > > both host and peripheral, but not otg. And I'm told now that dwc3
+> > > > > > > controller can be synthesized like that too.
+> > > > > 
+> > > > > I wonder if this part is really necessary. Usually you would read it
+> > > > > from HW's registers. For dwc3, it's quite recently that we allowed the
+> > > > > driver to be built with host-only, device-only or DRD functionality.
+> > > > 
+> > > > We have quite some boards on which the ID pin is not wired up, so if a
+> > > > core is both host and device capable there is no way to detect the
+> > > > wanted mode if not given from the devicetree.
+> > > 
+> > > right, that's fair. But that doesn't mean board can't work as both,
+> > > right. The IP is still the same, just the board is wired differently ;-)
+> > 
+> > Yes, it is. Usually I run kernels with both host and device support enabled.
+> > Consider the IP is OTG capable, the chipidea driver will initialize
+> > both roles. Now if a board only supports one role and does not have an
+> > ID pin, how do I make sure the driver is in the correct mode? I need to
+> > specify it somehow. Otherwise I may end up on a host-only board with the
+> > driver sitting in device mode, or with a device-only board with the
+> > driver sitting in host mode.
+> 
+> right.
+> 
+> > > > > Maybe we can ignore dr_mode in host-only and device-only builds and only
+> > > > > look at it for DRD builds ?
+> > > > 
+> > > > If something is or is not compiled in the kernel this doesn't mean the kernel
+> > > > is not started on boards with a different situation.
+> > > 
+> > > who said kernel wouldn't start ? If you request a host-only build, you
+> > > need to force your IP into working as host, since that's all you have,
+> > > either that or you bail out on probe().
+> > 
+> > Let me clarify, I don't want to use Kconfig to specify my boards
+> > capabilities. If a kernel is compiled for host mode only and the
+> > devicetree specifies a port is device-only, then yes, the driver
+> > should bail out on probe, maybe leaving a message that it found
+> > a device for which the suitable role is not compiled in.
+> 
+> yeah, this is why I said we should ignore dr_mode (or bail out) when
+> !OTG.
 
-> In order to merge this patch, we need to either remove
-> the static PXA_GPIO_TO_IRQ macros and alike, or teach the IRQ_DOMAIN
-> somehow to know about these.
-> I don't know what from the above is easier to do, as I did not looked
-> deeper into this.
+Ok, that's what the patch effectively does. We have this in chipidea/core.c:
 
-I think it's quite easy to get the irqdomain in place and working
-correctly. It's intended to solve exactly this kind of thing.
+| 	dr_mode = ci->platdata->dr_mode;
+| 	if (dr_mode == USB_DR_MODE_UNKNOWN)
+| 		dr_mode = USB_DR_MODE_OTG;
 
-> I might have some time to look into this in two weeks from now,
-> but I guess it will be too late as Haojian wants this patch set
-> to go into 3.9.
+default to otg if nothing specified.
 
-This patch as outlined by me in the previous comments, with a
-complete working irqdomain is welcome if you can get it tested.
+| 
+| 	/* initialize role(s) before the interrupt is requested */
+| 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
+| 		ret = ci_hdrc_host_init(ci);
+| 		if (ret)
+| 			dev_info(dev, "doesn't support host\n");
+| 	}
 
-Yours,
-Linus Walleij
+If we can do OTG or host, try to initialize host role,
+
+| 
+| 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
+| 		ret = ci_hdrc_gadget_init(ci);
+| 		if (ret)
+| 			dev_info(dev, "doesn't support gadget\n");
+| 	}
+
+if we can do otg or peripheral, try to initialize device role,
+
+| 
+| 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+| 		dev_err(dev, "no supported roles\n");
+| 		ret = -ENODEV;
+| 		goto rm_wq;
+| 	}
+
+If we have no roles, complain and bail out.
+
+ci_hdrc_host_init / ci_hdrc_gadget_init are static inline noops when
+gadget or host are disabled.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
