@@ -1,79 +1,71 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 13 Feb 2013 23:43:26 -0500 (EST)
-Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
-In-Reply-To: <511B78BC.7000708@codethink.co.uk>
-References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
- <20130209120525.GD17833@n2100.arm.linux.org.uk>
- <51194381.9030505@codethink.co.uk>
- <alpine.LFD.2.03.1302121646380.1242@fluxnic.net>
- <511B78BC.7000708@codethink.co.uk>
-Message-ID: <alpine.LFD.2.03.1302132336410.8736@syhkavp.arg>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 14 Feb 2013 10:17:04 +0530
+Subject: [PATCH V4 0/5] Add generic DMA DT binding support
+In-Reply-To: <CAAgF-Be1w-8yjuyXT+d8sUO8dee1x7oYFJLXHCmcJSf17eXWyw@mail.gmail.com>
+References: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
+ <20130212144950.GJ3789@intel.com>
+ <CAAgF-Be1w-8yjuyXT+d8sUO8dee1x7oYFJLXHCmcJSf17eXWyw@mail.gmail.com>
+Message-ID: <20130214044704.GE7777@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Feb 2013, Ben Dooks wrote:
-
-> On 12/02/13 21:53, Nicolas Pitre wrote:
-> > On Mon, 11 Feb 2013, Ben Dooks wrote:
-> > 
-> > > On 09/02/13 12:05, Russell King - ARM Linux wrote:
-> > > > On Fri, Feb 08, 2013 at 11:17:40PM +0000, Ben Dooks wrote:
-> > > > > -	if (atag->hdr.tag != ATAG_CORE ||
-> > > > > -	    (atag->hdr.size != tag_size(tag_core)&&
-> > > > > -	     atag->hdr.size != 2))
-> > > > > +	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
-> > > > > +	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core))&&
-> > > > > +	     atag->hdr.size != atag32_to_cpu(2)))
-> > > > 
-> > > > This is wrong.  You're saying that "ATAG_CORE" is in LE32 format.  It
-> > > > isn't.  It's in CPU endian format.  If you want to do this kind of
-> > > > thing,
-> > > > you also need to define cpu_to_atag32() macros as well, otherwise this
-> > > > will cause sparse warnings.
-> > > > 
-> > > > > -			initrd_start = atag->u.initrd.start;
-> > > > > -			initrd_size = atag->u.initrd.size;
-> > > > > +			initrd_start =
-> > > > > atag32_to_cpu(atag->u.initrd.start);
-> > > > > +			initrd_size =
-> > > > > atag32_to_cpu(____atag->u.initrd.size);
-> > > > 
-> > > > Where did those four underscores come from?  Has this been built?
-> > > 
-> > > I probably missed building this one. I've been mostly testing with DT
-> > > based systems.
-> > 
-> > Is this BE8 mode available on old systems?  Or, will those BE8
-> > capable old systems have BE userland compiled for them?
+On Wed, Feb 13, 2013 at 09:52:30AM +0530, Padma Venkat wrote:
+> Hi Vinod,
 > 
-> BE8 is for ARMv6 and ARMv7 form of big endian. ARMv5 is BE32.
+> On Tue, Feb 12, 2013 at 8:19 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Mon, Feb 11, 2013 at 02:08:20PM +0530, Padmavathi Venna wrote:
+> >
+> > This looks fine, I have only question. The code seems to assume that pl330 dma
+> > controller always uses DT. But I dont see that as dependency for pl330.
+Have you checked this?
 
-I think that by now all ARMv6+ targets should be DT enabled.  So you 
-shouldn't have to care about ATAGs at all.
-
-> > Where I want to get to is: do we need to support BE8 mode for ATAG based
-> > systems at all, given that most if not all the modern ones should be DT
-> > based now?  Making the ATAG code BE8 aware is looking to be quite
-> > invasive for potentially no users at all.
+> > Something tells me withot OF the driver may not build, have you checked it?
+> >
+> >> This patch set adds support for generic dma device tree bindings for
+> >> Samsung platforms and is dependent on the following patches from
+> >> Vinod Koul next branch
+> >> 1)of: Add generic device tree DMA helpers
+> >> 2)dmaengine: add helper function to request a slave DMA channel
+> >>
+> >> This patch set is made based Mark Brown next branch
+> > Is this targetted for ASoC tree, if so why? It would fail to build if applied
+> > there
 > 
-> The change is only useful when using a BE8 compiled kernel with a
-> boot loader environment that is LE.
-
-That's what CONFIG_ARM_ATAG_DTB_COMPAT is for.  So only that code would 
-need to swap the ATAG data.
-
-> Even if the ATAGs do not need
-> fixing up, then we have a issue with uboot checking the zImage magic.
-
-I gave you a patch for that.
-
-> I have pushed the ATAGs issues to a new series as it is not necessary
-> for the current work we are doing with highbank primarily.
-
-I don't think it is needed at all given that BE8 is available mainly on 
-targets supporting DT, and is likely to be used on targets that do 
-support only DT.
-
-
-Nicolas
+> I have done this for my testing purpose (I expected all will directly
+> apply in your branch). But 3rd patch is not applied directly. I will
+> resend the patches after re-basing on your tree. 5th patch has to go
+> in ASoC tree because it has dependency on "ARM: SAMSUNG: Make dma
+> request compatible to generic dma bindings" which is there in ASoC
+> tree.
+> 
+> Hi Mark,
+> 
+> Can you please take the 5th patch in your tree(if there is no issue)
+> or should I resend it as a separate patch?
+> 
+> >
+> > --
+> > ~Vinod
+> >>
+> >> Padmavathi Venna (5):
+> >>   DMA: PL330: Add new pl330 filter for DT case.
+> >>   DMA: PL330: Add xlate function
+> >>   DMA: PL330: Register the DMA controller with the generic DMA helpers
+> >>   ARM: dts: pl330: Add #dma-cells for generic dma binding support
+> >>   ARM: SAMSUNG: dma: Remove unnecessary code
+> >>
+> >>  .../devicetree/bindings/dma/arm-pl330.txt          |   21 +++++--
+> >>  arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++
+> >>  arch/arm/mach-s3c24xx/include/mach/dma.h           |    1 -
+> >>  arch/arm/mach-s3c64xx/include/mach/dma.h           |    1 -
+> >>  arch/arm/plat-samsung/dma-ops.c                    |   10 +---
+> >>  arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 -
+> >>  arch/arm/plat-samsung/include/plat/dma-pl330.h     |    1 -
+> >>  drivers/dma/pl330.c                                |   64 +++++++++++++++----
+> >>  8 files changed, 79 insertions(+), 32 deletions(-)
+> >>
+> >> --
+> >> 1.7.4.4
+> >>
+> Thanks
+> Padma
