@@ -1,155 +1,81 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 14 Feb 2013 10:49:44 +0100
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 Feb 2013 11:58:22 +0200
 Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
  and phy_type
-In-Reply-To: <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
+In-Reply-To: <511CB338.8070204@pengutronix.de>
 References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
  <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
  <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <511CB338.8070204@pengutronix.de>
+ <511CB338.8070204@pengutronix.de>
+Message-ID: <20130214095822.GD15275@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2013 10:36 AM, Alexander Shishkin wrote:
-> Sascha Hauer <s.hauer@pengutronix.de> writes:
-> 
->> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
->>
->> This adds two little devicetree helper functions for determining the
->> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
->> the devicetree.
->>
->> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> ---
->>  drivers/usb/phy/Makefile |    1 +
->>  drivers/usb/phy/of.c     |   47 ++++++++++++++++++++++++++++++++++++++++++++++
->>  drivers/usb/usb-common.c |   36 +++++++++++++++++++++++++++++++++++
->>  include/linux/usb/of.h   |   27 ++++++++++++++++++++++++++
->>  include/linux/usb/otg.h  |    7 +++++++
->>  include/linux/usb/phy.h  |    9 +++++++++
->>  6 files changed, 127 insertions(+)
->>  create mode 100644 drivers/usb/phy/of.c
->>  create mode 100644 include/linux/usb/of.h
->>
->> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
->> index 9fa6327..e1be1e8 100644
->> --- a/drivers/usb/phy/Makefile
->> +++ b/drivers/usb/phy/Makefile
->> @@ -5,6 +5,7 @@
->>  ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
->>  
->>  obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
->> +obj-$(CONFIG_OF)			+= of.o
->>  obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
->>  obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
->>  obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
->> diff --git a/drivers/usb/phy/of.c b/drivers/usb/phy/of.c
->> new file mode 100644
->> index 0000000..e6f3b74
->> --- /dev/null
->> +++ b/drivers/usb/phy/of.c
->> @@ -0,0 +1,47 @@
->> +/*
->> + * USB of helper code
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/usb/of.h>
->> +#include <linux/usb/otg.h>
->> +
->> +static const char *usbphy_modes[] = {
->> +	[USBPHY_INTERFACE_MODE_UNKNOWN]	= "",
->> +	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
->> +	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
->> +	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
->> +	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
->> +	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
->> +};
->> +
->> +/**
->> + * of_usb_get_phy_mode - Get phy mode for given device_node
->> + * @np:	Pointer to the given device_node
->> + *
->> + * The function gets phy interface string from property 'phy_type',
->> + * and returns the correspondig enum usb_phy_interface
->> + */
->> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
->> +{
->> +	const char *phy_type;
->> +	int err, i;
->> +
->> +	err = of_property_read_string(np, "phy_type", &phy_type);
->> +	if (err < 0)
->> +		return USBPHY_INTERFACE_MODE_UNKNOWN;
->> +
->> +	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
->> +		if (!strcmp(phy_type, usbphy_modes[i]))
->> +			return i;
->> +
->> +	return USBPHY_INTERFACE_MODE_UNKNOWN;
->> +}
->> +EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
->> diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
->> index d29503e..ad4d87d 100644
->> --- a/drivers/usb/usb-common.c
->> +++ b/drivers/usb/usb-common.c
->> @@ -14,6 +14,9 @@
->>  #include <linux/kernel.h>
->>  #include <linux/module.h>
->>  #include <linux/usb/ch9.h>
->> +#include <linux/of.h>
->> +#include <linux/usb/of.h>
->> +#include <linux/usb/otg.h>
->>  
->>  const char *usb_speed_string(enum usb_device_speed speed)
->>  {
->> @@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
->>  }
->>  EXPORT_SYMBOL_GPL(usb_speed_string);
->>  
->> +#ifdef CONFIG_OF
->> +static const char *usb_dr_modes[] = {
->> +	[USB_DR_MODE_UNKNOWN]		= "",
->> +	[USB_DR_MODE_HOST]		= "host",
->> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
->> +	[USB_DR_MODE_OTG]		= "otg",
->> +};
-> 
-> It turns out this is a problem, especially since this is generic usb
-> code: we have a chipidea controller (a patchset just arrived) that does
-> both host and peripheral, but not otg. And I'm told now that dwc3
-> controller can be synthesized like that too.
+Hi,
 
-You mean a single instance of the controller (i.e. USB port) is host and
-peripheral but has no otg registers. This means the mode of the port is
-configured by userspace via the debugfs file? Is this possible?
+On Thu, Feb 14, 2013 at 10:49:44AM +0100, Marc Kleine-Budde wrote:
+> >> diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
+> >> index d29503e..ad4d87d 100644
+> >> --- a/drivers/usb/usb-common.c
+> >> +++ b/drivers/usb/usb-common.c
+> >> @@ -14,6 +14,9 @@
+> >>  #include <linux/kernel.h>
+> >>  #include <linux/module.h>
+> >>  #include <linux/usb/ch9.h>
+> >> +#include <linux/of.h>
+> >> +#include <linux/usb/of.h>
+> >> +#include <linux/usb/otg.h>
+> >>  
+> >>  const char *usb_speed_string(enum usb_device_speed speed)
+> >>  {
+> >> @@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
+> >>  }
+> >>  EXPORT_SYMBOL_GPL(usb_speed_string);
+> >>  
+> >> +#ifdef CONFIG_OF
+> >> +static const char *usb_dr_modes[] = {
+> >> +	[USB_DR_MODE_UNKNOWN]		= "",
+> >> +	[USB_DR_MODE_HOST]		= "host",
+> >> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
+> >> +	[USB_DR_MODE_OTG]		= "otg",
+> >> +};
+> > 
+> > It turns out this is a problem, especially since this is generic usb
+> > code: we have a chipidea controller (a patchset just arrived) that does
+> > both host and peripheral, but not otg. And I'm told now that dwc3
+> > controller can be synthesized like that too.
 
-The above property describes a single port not the whole controller. If
-there is a controller with one host and one peripheral port the code in
-this patch should be sufficient, as you have a property in the DT for
-each port.
+I wonder if this part is really necessary. Usually you would read it
+from HW's registers. For dwc3, it's quite recently that we allowed the
+driver to be built with host-only, device-only or DRD functionality.
 
-Marc
+Also, this is likely to create troubles if not done correctly. Imagine
+user compiles a host-only driver and board passes dr_mode = peripheral ?
+
+Maybe we can ignore dr_mode in host-only and device-only builds and only
+look at it for DRD builds ?
+
+> You mean a single instance of the controller (i.e. USB port) is host and
+> peripheral but has no otg registers. This means the mode of the port is
+> configured by userspace via the debugfs file? Is this possible?
+
+yes, it is possible. Dual-Role doesn't imply OTG, but OTG implies
+Dual-Role.
+
+> The above property describes a single port not the whole controller. If
+> there is a controller with one host and one peripheral port the code in
+> this patch should be sufficient, as you have a property in the DT for
+> each port.
+
+I don't think you can have a single controller like that, but good that
+it supports.
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130214/5667bd71/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130214/23985ced/attachment.sig>
