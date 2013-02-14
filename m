@@ -1,43 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 23:47:45 +0100
-Subject: [PATCH 3/9] ARM: omap2: include linux/errno.h in hwmod_reset
+Date: Thu, 14 Feb 2013 23:47:49 +0100
+Subject: [PATCH 7/9] remoteproc: omap: depend on OMAP_MBOX_FWK
 In-Reply-To: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
 References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360882071-4072668-4-git-send-email-arnd@arndb.de>
+Message-ID: <1360882071-4072668-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly created omap_hwmod_reset.c is missing an
-include of linux/errno.h in commit c02060d8 "ARM:
-OMAP4+: AESS: enable internal auto-gating during
-initial setup". It still works in omap2_defconfig,
-but not in all other combinations.
+Patch a62a6e98 "ARM: OMAP2+: Disable code that currently does not work
+with multiplaform" makes the OMAP_MBOX_FWK option depend on !MULTIPLATFORM,
+which means we cannot simply select that symbol from OMAP_REMOTEPROC.
+
+Turning the 'select' into 'depends on' ensures that all dependencies
+are correct until OMAP_MBOX_FWK loses its dependency.
 
 Without this patch, building allmodconfig results in:
 
-arch/arm/mach-omap2/omap_hwmod_reset.c: In function 'omap_hwmod_aess_preprogram':
-arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: error: 'EINVAL' undeclared (first use in this function)
-arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: note: each undeclared identifier is reported only once for each function it appears in
+drivers/remoteproc/omap_remoteproc.c:31:26: fatal error: plat/mailbox.h: No such file or directory
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Sebastien Guiriec <s-guiriec@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
+Cc: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_reset.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/remoteproc/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
-index bba43fa..65e186c 100644
---- a/arch/arm/mach-omap2/omap_hwmod_reset.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
-@@ -24,6 +24,7 @@
-  * 02110-1301 USA
-  */
- #include <linux/kernel.h>
-+#include <linux/errno.h>
- 
- #include <sound/aess.h>
- 
+diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+index 0b24108..cc1f7bf 100644
+--- a/drivers/remoteproc/Kconfig
++++ b/drivers/remoteproc/Kconfig
+@@ -12,8 +12,8 @@ config OMAP_REMOTEPROC
+ 	depends on HAS_DMA
+ 	depends on ARCH_OMAP4
+ 	depends on OMAP_IOMMU
++	depends on OMAP_MBOX_FWK
+ 	select REMOTEPROC
+-	select OMAP_MBOX_FWK
+ 	select RPMSG
+ 	help
+ 	  Say y here to support OMAP's remote processors (dual M3
 -- 
 1.8.1.2
