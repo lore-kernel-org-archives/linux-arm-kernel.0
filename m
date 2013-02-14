@@ -1,41 +1,25 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 14 Feb 2013 13:36:49 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
-In-Reply-To: <87621vv7wa.wl%kuninori.morimoto.gx@renesas.com>
-References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
- <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
- <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
- <878v6rv8ij.wl%kuninori.morimoto.gx@renesas.com>
- <20130214042027.GD6036@verge.net.au>
- <87621vv7wa.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130214043648.GA4773@verge.net.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Feb 2013 21:40:39 -0700
+Subject: of_clk_get() / devm_clk_get()
+In-Reply-To: <1360815425.21991.20.camel@gitbox>
+References: <1360815425.21991.20.camel@gitbox>
+Message-ID: <511C6AC7.6010601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 08:25:45PM -0800, Kuninori Morimoto wrote:
+On 02/13/2013 09:17 PM, Tony Prisk wrote:
+> Currently we have devm_clk_get() which gives a managed-resource clk (by
+> name), or of_clk_get() which gives an unmanaged resource clk (by id).
 > 
-> Hi Simon
+> I just wanted to sound out everyone as to whether there is a need for a
+> managed version of the of_clk_get.
 > 
-> > > >>       CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
-> > > >> -     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
-> > > >> +     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
-> > > >>       CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
-> (snip)
-> > > This means that current TMU02 numbering seems doubtful too ?
-> > > How about just rever 58079fa7d54a0929d304054ee759187a2ccd3cdf ?
-> > 
-> > Perhaps that is a good idea.
-> > 
-> > The original motivation for this patch was to add the TMU02 line.
-> > And "fixing" TMU01 was an afterthought. However, I am also
-> > now doubtful about the correctness of the TMU02 line and thus
-> > the usefulness of the original patch.
-> 
-> I think this comment out is creating confusion ?
-> 
-> /* TMU00 */ -> /* TMU0 channel 0 */
-> /* TMU01 */ -> /* TMU0 channel 1 */
-> /* TMU02 */ -> /* TMU0 channel 2 */
+> My personal concern about devm_clk_get is that it requires (if I
+> understand correctly) that the DT node have the clock-names property
+> (which is optional). If the optional name is not supplied, it fails.
+> This basically makes it 'not optional' when a driver uses devm_clk_get.
+> (Please correct me if I'm wrong about this).
 
-That does make things a little clearer,
-but I for one wasn't confused by the existing comments.
+I thought supplying NULL for the name/ID simply gave you the first clock
+in the list (clocks property)? I'm sure I've seen plenty of Tegra
+drivers that end up doing that.
