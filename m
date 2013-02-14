@@ -1,35 +1,52 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Thu, 14 Feb 2013 15:22:22 +0200
-Subject: [PATCH v4] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
-References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <87obfn9gj5.fsf@ashishki-desk.ger.corp.intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Feb 2013 13:35:52 +0000
+Subject: [PATCH] arm64: fix invocation of restore_altstack
+Message-ID: <20130214133552.GB25537@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+Hello,
 
-> 4th round of patches.
->
-> Peter, I would be glad if you could test them before your holiday. I rebased
-> your last round of Chipidea OTG patches onto this series which you can pull
-> here:
->
-> git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-otg-for-next
->
-> I couldn't really test the otg patches since my current hardware does not have
-> the ID pin connected, but I can verify that my usecase still works with your
-> patches applied.
->
-> Alex, should the patches work for you and are fine otherwise, could you apply
-> them for v3.9?
+I noticed the following issue while attempting to build an arm64 kernel from
+next-20130214, and it still seems to be present in signal/for-next and
+signal/arch-arm64.
 
-Looks good in general. I just realised the comment I made on 5/9 is not
-entirely valid, but the dr_mode setting needs one extra option as was
-discussed. Also, all the phy/otg patches (1/9, 2/9, 3/9, 8/9) need
-Felipe's ack, then I can apply the series.
+It looks to be a trivial typo.
 
-Regards,
---
-Alex
+Thanks,
+Mark.
+
+---->8---
+Since e6d056c7c0: "arm64: switch to generic sigaltstack", arm64 won't
+build:
+
+arch/arm64/kernel/signal.c: In function ?sys_rt_sigreturn?:
+arch/arm64/kernel/signal.c:152:2: error: incompatible type for argument 1 of ?restore_altstack?
+In file included from arch/arm64/kernel/signal.c:21:0:
+include/linux/signal.h:434:5: note: expected ?const struct stack_t *? but argument is of type ?stack_t?
+make[1]: *** [arch/arm64/kernel/signal.o] Error 1
+make: *** [arch/arm64/kernel] Error 2
+
+This patch fixes up the call to restore_altstack to pass the correct
+type.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/kernel/signal.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index d60ad23..890a591 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -149,7 +149,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ 	if (restore_sigframe(regs, frame))
+ 		goto badframe;
+ 
+-	if (restore_altstack(frame->uc.uc_stack))
++	if (restore_altstack(&frame->uc.uc_stack))
+ 		goto badframe;
+ 
+ 	return regs->regs[0];
+-- 
+1.8.1.1
