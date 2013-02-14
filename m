@@ -1,22 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 14 Feb 2013 10:31:38 -0800
-Subject: [PATCH 6/9] ARM: tegra: use pre-processor for all device trees
-In-Reply-To: <511D21E7.5090307@gmail.com>
-References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
- <1360791198-29462-7-git-send-email-swarren@wwwdotorg.org>
- <511D21E7.5090307@gmail.com>
-Message-ID: <CAOesGMjxkwDF45vfsq8ipNa=465_A6dDF4a2zD3q17uJU8fseg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 14 Feb 2013 19:43:54 +0100
+Subject: [PATCH 1/2] USB mxs-phy: Register phy with framework
+In-Reply-To: <20130214180011.GC25891@arwen.pp.htv.fi>
+References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
+ <20130214103729.GC15537@arwen.pp.htv.fi>
+ <20130214162337.GU1906@pengutronix.de>
+ <20130214180011.GC25891@arwen.pp.htv.fi>
+Message-ID: <20130214184354.GX1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 9:41 AM, Rob Herring <robherring2@gmail.com> wrote:
+On Thu, Feb 14, 2013 at 08:00:11PM +0200, Felipe Balbi wrote:
+> Hi,
+> 
+> On Thu, Feb 14, 2013 at 05:23:37PM +0100, Sascha Hauer wrote:
+> > On Thu, Feb 14, 2013 at 12:37:29PM +0200, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Thu, Jan 31, 2013 at 12:32:16PM +0100, Sascha Hauer wrote:
+> > > > We now have usb_add_phy_dev(), so use it to register with the framework
+> > > > to be able to find the phy from the USB driver.
+> > > > 
+> > > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > 
+> > > Sascha, are you taking this through your tree or you want me to queue it
+> > > up ?
+> > 
+> > I would prefer if either you could take it or Alexander Shishkin along
+> > with the other patches in:
+> > 
+> > [PATCH v4] USB: add devicetree helpers for determining dr_mode and phy_type
+> > 
+> > Could you have a look at them? Alexander is asking for an ack for 1/9,
+> > 2/9, 3/9, 8/9. I just realized you are not on Cc for these. I could
+> > bounce you the patches in case you don't have them in your mailbox.
+> 
+> Ok, I'll look at them, no need to bounce. You _do_ realize, however,
+> that Greg has already closed all his trees for v3.9, right ? So anything
+> from now on will be queued for v3.10.
 
-> Just a reminder to use -M for git format-patch. Why -M for format-patch
-> is not the default I wonder.
+I'm fine with that. I'm just a bit insistent because the chipidea patches are
+floating around for half a year now. Once I have the warm feeling that
+the patches are handled I have time ;)
 
-Also, don't quote a huge patch just to make a 2-line comment. :-)
+Thanks
+ Sascha
 
--M is likely not the default because classic patch does not understand it.
 
-
--Olof
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
