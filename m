@@ -1,57 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 14 Feb 2013 14:34:10 -0500
-Subject: [PATCH v2 0/4] ARM: mvebu: Add support for SPI flash devices
- in Armada 370/XP
-In-Reply-To: <CALF0-+WLh=8QGG4ob8HVq+x4oO_ArdFHd=vH1_OhucH1f9XG3A@mail.gmail.com>
-References: <1360155984-15397-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <511257C6.2070604@free-electrons.com>
- <20130206132850.GC14746@titan.lakedaemon.net>
- <CALF0-+WLh=8QGG4ob8HVq+x4oO_ArdFHd=vH1_OhucH1f9XG3A@mail.gmail.com>
-Message-ID: <20130214193410.GL14746@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 14 Feb 2013 13:15:28 -0700
+Subject: [v2 1/4] ARM: tegra20: create a DT header defining CLK IDs
+In-Reply-To: <1360868369-20093-2-git-send-email-hdoyu@nvidia.com>
+References: <1360868369-20093-1-git-send-email-hdoyu@nvidia.com>
+ <1360868369-20093-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <511D45E0.1080105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 06:24:14AM -0300, Ezequiel Garcia wrote:
-> Hi Jason,
+On 02/14/2013 11:59 AM, Hiroshi Doyu wrote:
+> To replace magic number in tegra_car:
 > 
-> On Wed, Feb 6, 2013 at 10:28 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Wed, Feb 06, 2013 at 02:16:54PM +0100, Gregory CLEMENT wrote:
-> >> On 02/06/2013 02:06 PM, Ezequiel Garcia wrote:
-> >> > This is second version of the SPI patchset for Armada 370/XP.
-> >> >
-> >> > This series first adds support for the SPI controller
-> >> > and then adds the SPI flash for the Armada XP GP board.
-> >> >
-> >> > This series is based on 3.8-rc5 plus:
-> >> >  * "arm: mvebu: support for the new Armada XP development board(DB-MV784MP-GP)"
-> >> >  * "arm: mvebu: i2c come back in defconfig"
-> >> >
-> >> > Feel free to test or provide any feedback!
-> >> >
-> >> Ezequiel,
-> >>
-> >> I reviewed the patches, I have nothing more to say, I can add my:
-> >>
-> >> Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
-> >>
-> >> on the patch that didn't have yet.
-> >>
-> >> Jason,
-> >> could you add this series in your incoming pull request?
-> >
-> > That's the plan.  I'm waiting for a response from Olof to see If I need
-> > to redo /boards and /dt.  In either case, my next round of pull requests
-> > with have this and a bunch of other stuff.
-> >
-> 
-> Despite we're almost closed for v3.9 new material,
-> I hope you don't mind a little ping on the USB and SPI stuff.
-> 
-> I'd *really* love to see these in v3.9, if at all possible.
+> -               clocks = <&tegra_car 28>;
+> +               clocks = <&tegra_car CLK_HOST1X>;
 
-Yes, I got called out for a few days and just got back into things
-today.  once I've read evreything I'll do what I can.
+> diff --git a/arch/arm/boot/dts/tegra20-car.h b/arch/arm/boot/dts/tegra20-car.h
 
-thx,
+Sorry, forgot a couple small comments the last time around.
 
-Jason.
+This file should probably have some header indicating which binding it
+describes, rather like the GPIO header in my patch series.
+
+> +#define CLK_CPU 0
+
+I'd suggest naming that TEGRA20_CLK_CPU, so that the various different
+clock headers don't conflict. It's not too likely that more than one of
+the /Tegra/ clock headers will be included at once, but it doesn't seem
+that unlikely that a board file could end up having a Tegra clock header
+included plus various other clock headers for some other chip that has
+some clock outputs.
+
+Oh, and I don't think you updated e.g. nvidia,tegra20-car.txt to remove
+the list of clocks.
+
+BTW, I assume this patch includes the changes from my recent "clk:
+tegra: fix driver to match DT binding" and anything else similar that's
+in the most recent Tegra for-next?
