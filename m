@@ -1,36 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 14 Feb 2013 12:34:04 +0900
-Subject: [PATCH 00/06] ARM: shmobile: SMP Cortex-A9 SCU rework
-In-Reply-To: <20130213134628.12153.47120.sendpatchset@w520>
-References: <20130213134628.12153.47120.sendpatchset@w520>
-Message-ID: <20130214033403.GR15879@verge.net.au>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Thu, 14 Feb 2013 09:10:04 +0530
+Subject: [PATCH V4 0/4] Add generic DMA DT binding support
+Message-ID: <1360813208-9498-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 10:46:28PM +0900, Magnus Damm wrote:
-> ARM: shmobile: SMP Cortex-A9 SCU rework
-> 
-> [PATCH 01/06] ARM: shmobile: Kill off sh73a0 scu_base_addr() function
-> [PATCH 02/06] ARM: shmobile: Kill off r8a7779 scu_base_addr() function
-> [PATCH 03/06] ARM: shmobile: Rework EMEV2 scu_base variable
-> [PATCH 04/06] ARM: shmobile: Move headsmp-sh73a0.S to headsmp-scu.S
-> [PATCH 05/06] ARM: shmobile: Common shmobile_scu_base in headsmp-scu.S
-> [PATCH 06/06] ARM: shmobile: Update EMEV2 to use scu_power_mode()
-> 
-> Rework the EMEV2 SMP code to make use of common scu_power_mode()
-> code together with a shared shmobile_scu_base and early SCU
-> setup code in headsmp-scu.S.
-> 
-> The patches are known to build for sh73a0, r8a7779 and EMEV2.
->
-> Note that the code has only been tested on the KZM9D/EMEV2 board,
-> and because of that changes to other boards have been kept at
-> a minimum. Next target after this is to update the r8a7779 SMP/SCU
-> code to make use of scu_base_addr(), but that requires hardware
-> access for testing.
+Changes since V3:
+        - Make dma-cells property optional as suggested by Rob Herring
+        - Add dma-requests and dma-channels properties to DMA controller
+          as suggested by Arnd for future-proof
+        - Add Acked-by for some of the patches
 
-I have tested this on the kzm9g/sh73a0, marzen/r8a7779 and kzm9d/emev2.
+Changes since V2:
+        - Add new filter function for DT case as suggested by Arnd
+        - Add xlate as static function
+        - Use newly added filter function in xlate.
+        - Add Acked-by for some of the patches
 
-I have applied the entire series to the soc5 branch thus queued up
-for v3.10. It is also in the next branch and thus should appear
-in linux-next in the not to distant future.
+Changes since V1:
+        - Address the review comments by Arnd Bergmann as below
+        - Wording of the properties.
+        - Pass pdmac as third parameter to of_dma_controller_register
+        - Filter the dma channel based on channel number and dma_device
+
+This patch set adds support for generic dma device tree bindings for
+Samsung platforms and is dependent on the following patches from
+Vinod Koul next branch
+1)of: Add generic device tree DMA helpers
+2)dmaengine: add helper function to request a slave DMA channel
+
+This patch set is made based on Vinod Koul next branch
+
+Padmavathi Venna (4):
+  DMA: PL330: Add new pl330 filter for DT case.
+  DMA: PL330: Add xlate function
+  DMA: PL330: Register the DMA controller with the generic DMA helpers
+  ARM: dts: pl330: Add #dma-cells for generic dma binding support
+
+ .../devicetree/bindings/dma/arm-pl330.txt          |   21 +++++--
+ arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++
+ drivers/dma/pl330.c                                |   64 +++++++++++++++----
+ 3 files changed, 78 insertions(+), 19 deletions(-)
+
+-- 
+1.7.4.4
