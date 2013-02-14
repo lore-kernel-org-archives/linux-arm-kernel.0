@@ -1,25 +1,32 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Thu, 14 Feb 2013 14:40:09 +0100
-Subject: [PATCH] ARM: net: bpf_jit: fix emit_swap16() for non ARMv6+.
-In-Reply-To: <511C0662.8010309@gmail.com>
-References: <1360776125-14542-1-git-send-email-nschichan@freebox.fr>
- <1360776645-14726-1-git-send-email-nschichan@freebox.fr>
- <511C0662.8010309@gmail.com>
-Message-ID: <511CE939.5000705@freebox.fr>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 14 Feb 2013 14:42:50 +0100
+Subject: [PATCH 1/1] ARM: dt: add header to define tegra20 clocks
+In-Reply-To: <20130214101220.GI3073@tbergstrom-lnx.Nvidia.com>
+References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org><1360823899-17846-1-git-send-email-hdoyu@nvidia.com><20130214101220.GI3073@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20130214.154250.475978229890081002.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2013 10:32 PM, Mircea Gherzan wrote:
-[...]
-> Acked-by: Mircea Gherzan <mgherzan@gmail.com>
+Peter De Schrijver <pdeschrijver@nvidia.com> wrote @ Thu, 14 Feb 2013 11:12:20 +0100:
 
-Hi,
+> On Thu, Feb 14, 2013 at 07:38:17AM +0100, Hiroshi Doyu wrote:
+> > To replace magic number in "clocks = <&tegra_car 28>;"
+> > 
+> 
+> But then we should probably also remove the enum tegra20_clk and replace it
+> with this header file. We should also consider removing the list of IDs from
+> the documentation and refer to the header file instead. Otherwise we will have
+> 3 places which define the same IDs and we need to be sure they stay in sync...
 
-Thanks Mircea. Russel, David, do you have any preference as to which path this 
-patch should take (net tree or ARM tree) ?
+Actually I generate "arch/arm/boot/dts/tegra{20,30}-car.h" by parsing
+"enum tegra{20,30}_clk {..};" with a python script.
 
-Regards,
+There could be the same kind of requirement from others that both
+"dtsip" and "C-source" want to share the same header file. If we
+consider that DT is the exact H/W description, C-source should be able
+to include a DT header file.
 
--- 
-Nicolas Schichan
-Freebox SAS
+For example, a C-header file for "enum tegra{20,30}_clk" should be
+generated from "arch/arm/boot/dts/tegra{20,30}-car.h" at runtime, or
+alternatively just "drivers/clk/tegra/clk-tegra{20,30}.c" can include
+"arch/arm/boot/dts/tegra{20,30}-car.h"? The latter may be easier.
