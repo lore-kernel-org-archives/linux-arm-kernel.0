@@ -1,55 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 14:49:23 +0100
-Subject: [PATCH 07/11] ARM: integrator: fix build with INTEGRATOR_AP off
+Date: Thu, 14 Feb 2013 14:49:26 +0100
+Subject: [PATCH 10/11] ARM: s3c: i2c: add platform_device forward declaration
 In-Reply-To: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
 References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360849767-1463135-8-git-send-email-arnd@arndb.de>
+Message-ID: <1360849767-1463135-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conditional declaration of ap_uart_data is broken
-and causes this build error:
+A recent cleanup to the mach-osiris.c file is causing build errors
+because the i2c-s3c2410.h header file is included before we see
+the definition for platform_device. The fix is to make the header file
+more robust against inclusion from other places. While this should
+normally go through the i2c tree, the bug only exists in arm-soc
+at the moment, so it's easier to fix it there before it goes upstream.
 
-In file included from arch/arm/mach-integrator/core.c:35:0:
-arch/arm/mach-integrator/common.h:6:37: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+Without this patch, building s3c2410_defconfig results in:
 
-Turning the check into an constant-expression if(IS_ENABLED()) statement
-creates more readable code and solves this problem as well.
+arch/arm/mach-s3c24xx/mach-osiris.c:34:0:
+include/linux/platform_data/i2c-s3c2410.h:37:26: warning: 'struct platform_device' declared inside parameter list [enabled by default]
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-i2c at vger.kernel.org
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-integrator/common.h | 5 -----
- arch/arm/mach-integrator/core.c   | 2 +-
- 2 files changed, 1 insertion(+), 6 deletions(-)
+ include/linux/platform_data/i2c-s3c2410.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-integrator/common.h b/arch/arm/mach-integrator/common.h
-index 79197d8..72516658b 100644
---- a/arch/arm/mach-integrator/common.h
-+++ b/arch/arm/mach-integrator/common.h
-@@ -1,10 +1,5 @@
- #include <linux/amba/serial.h>
--#ifdef CONFIG_ARCH_INTEGRATOR_AP
- extern struct amba_pl010_data ap_uart_data;
--#else
--/* Not used without Integrator/AP support anyway */
--struct amba_pl010_data ap_uart_data {};
--#endif
- void integrator_init_early(void);
- int integrator_init(bool is_cp);
- void integrator_reserve(void);
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index 39c060f..81461d2 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -71,7 +71,7 @@ int __init integrator_init(bool is_cp)
- 	 * hard-code them. The Integator/CP and forward have proper cell IDs.
- 	 * Else we leave them undefined to the bus driver can autoprobe them.
- 	 */
--	if (!is_cp) {
-+	if (!is_cp && IS_ENABLED(CONFIG_ARCH_INTEGRATOR_AP)) {
- 		rtc_device.periphid	= 0x00041030;
- 		uart0_device.periphid	= 0x00041010;
- 		uart1_device.periphid	= 0x00041010;
+diff --git a/include/linux/platform_data/i2c-s3c2410.h b/include/linux/platform_data/i2c-s3c2410.h
+index 51d52e7..2a50048 100644
+--- a/include/linux/platform_data/i2c-s3c2410.h
++++ b/include/linux/platform_data/i2c-s3c2410.h
+@@ -15,6 +15,8 @@
+ 
+ #define S3C_IICFLG_FILTER	(1<<0)	/* enable s3c2440 filter */
+ 
++struct platform_device;
++
+ /**
+  *	struct s3c2410_platform_i2c - Platform data for s3c I2C.
+  *	@bus_num: The bus number to use (if possible).
 -- 
 1.8.1.2
