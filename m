@@ -1,65 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Feb 2013 14:55:27 -0800
-Subject: [PATCH 4/9] ARM: omap: add include guard for soc.h
-In-Reply-To: <1360882071-4072668-5-git-send-email-arnd@arndb.de>
+Date: Thu, 14 Feb 2013 14:55:58 -0800
+Subject: [PATCH 7/9] remoteproc: omap: depend on OMAP_MBOX_FWK
+In-Reply-To: <1360882071-4072668-8-git-send-email-arnd@arndb.de>
 References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
- <1360882071-4072668-5-git-send-email-arnd@arndb.de>
-Message-ID: <20130214225526.GH11362@atomide.com>
+ <1360882071-4072668-8-git-send-email-arnd@arndb.de>
+Message-ID: <20130214225557.GI11362@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Arnd Bergmann <arnd@arndb.de> [130214 14:51]:
-> Commit e4c060db "ARM: OMAP: Split plat/cpu.h into local soc.h for
-> mach-omap1 and mach-omap2" moved the bulk of "plat/cpu.h" into "cpu.h"
-> but did not add an include guard for the new file that was present
-> in the old one. There are cases where the file is indeed included
-> multiple times, probably by accident, but adding the include
-> guard ensures that this has no further consequences.
+> Patch a62a6e98 "ARM: OMAP2+: Disable code that currently does not work
+> with multiplaform" makes the OMAP_MBOX_FWK option depend on !MULTIPLATFORM,
+> which means we cannot simply select that symbol from OMAP_REMOTEPROC.
 > 
-> Without this patch, building allmodconfig results in lots of warnings like:
+> Turning the 'select' into 'depends on' ensures that all dependencies
+> are correct until OMAP_MBOX_FWK loses its dependency.
 > 
-> In file included from arch/arm/mach-omap2/drm.c:31:0:
-> arch/arm/mach-omap2/soc.h:206:0: warning: "cpu_is_omap24xx" redefined [enabled by default]
-> In file included from arch/arm/mach-omap2/drm.c:28:0:
-> arch/arm/mach-omap2/soc.h:227:0: note: this is the location of the previous definition
-> In file included from arch/arm/mach-omap2/drm.c:31:0:
-> arch/arm/mach-omap2/soc.h:207:0: warning: "cpu_is_omap242x" redefined [enabled by default]
-
-I left it out intentionally as these are private to mach-omap2,
-and I'd like to simplify the indirect includes there further.
-So I'd rather just remove the duplicate soc.h from drm.c.
-
-If people really think this should be applied, I have no
-objections to this patch naturally.
-
-Regards,
-
-Tony
- 
+> Without this patch, building allmodconfig results in:
+> 
+> drivers/remoteproc/omap_remoteproc.c:31:26: fatal error: plat/mailbox.h: No such file or directory
+> 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Tony Lindgren <tony@atomide.com>
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> Cc: Ohad Ben-Cohen <ohad@wizery.com>
 > ---
->  arch/arm/mach-omap2/soc.h | 3 +++
->  1 file changed, 3 insertions(+)
+>  drivers/remoteproc/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-> index c62116b..97dd373 100644
-> --- a/arch/arm/mach-omap2/soc.h
-> +++ b/arch/arm/mach-omap2/soc.h
-> @@ -24,6 +24,8 @@
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
->   *
->   */
-> +#ifndef OMAP2_SOC_H
-> +#define OMAP2_SOC_H
->  
->  #include "omap24xx.h"
->  #include "omap34xx.h"
-> @@ -497,3 +499,4 @@ level(__##fn);
->  
->  #endif	/* __ASSEMBLY__ */
->  
-> +#endif
+> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> index 0b24108..cc1f7bf 100644
+> --- a/drivers/remoteproc/Kconfig
+> +++ b/drivers/remoteproc/Kconfig
+> @@ -12,8 +12,8 @@ config OMAP_REMOTEPROC
+>  	depends on HAS_DMA
+>  	depends on ARCH_OMAP4
+>  	depends on OMAP_IOMMU
+> +	depends on OMAP_MBOX_FWK
+>  	select REMOTEPROC
+> -	select OMAP_MBOX_FWK
+>  	select RPMSG
+>  	help
+>  	  Say y here to support OMAP's remote processors (dual M3
 > -- 
 > 1.8.1.2
 > 
