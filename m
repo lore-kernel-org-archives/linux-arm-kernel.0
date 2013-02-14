@@ -1,31 +1,28 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 14 Feb 2013 10:30:39 -0700
-Subject: [PATCH v6 08/10] ARM: dt: Add references to tegra_car clocks
-In-Reply-To: <20130214100112.GH3073@tbergstrom-lnx.Nvidia.com>
-References: <1360580700-10245-1-git-send-email-pdeschrijver@nvidia.com>
- <1360580700-10245-9-git-send-email-pdeschrijver@nvidia.com>
- <511A7AB5.4040607@wwwdotorg.org>
- <20130213113807.GE3073@tbergstrom-lnx.Nvidia.com>
- <511BC3C3.6070402@wwwdotorg.org>
- <20130214100112.GH3073@tbergstrom-lnx.Nvidia.com>
-Message-ID: <511D1F3F.1020309@wwwdotorg.org>
+Date: Thu, 14 Feb 2013 10:39:40 -0700
+Subject: [PATCH] arm: arch_timer: include linux/errno.h to declare ENXIO
+In-Reply-To: <20130214121816.GA25537@e106331-lin.cambridge.arm.com>
+References: <1360778746-27809-1-git-send-email-swarren@wwwdotorg.org>
+ <20130214121816.GA25537@e106331-lin.cambridge.arm.com>
+Message-ID: <511D215C.2040807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2013 03:01 AM, Peter De Schrijver wrote:
-> On Wed, Feb 13, 2013 at 05:48:03PM +0100, Stephen Warren wrote:
-...
->> You still need to initialize all the UART clocks in init_table[]. This
-...
-> Yes. The parent relationships still need to be defined. But I think that's
-> the only thing we actually need to define still?
+On 02/14/2013 05:18 AM, Mark Rutland wrote:
+> On Wed, Feb 13, 2013 at 06:05:46PM +0000, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> This fixes:
+>> arch/arm/kernel/arch_timer.c: In function ?arch_timer_sched_clock_init?:
+>> arch/arm/kernel/arch_timer.c:55:11: error: ?ENXIO? undeclared (first use in this function)
+..
+> We should probably also add this to include/clocksource/arm_arch_timer.h and
+> drivers/clocksource/arm_arch_timer.c, as they both use errno values (though
+> currently these get included indirectly via a different path).
 
-You might want to explicitly set the rate too, if there is a divider in
-the clk module that affects it. If not, then parenting is indeed all you
-need.
+Ah yes, it should certainly be added to the header file then. Since both
+those .c files include that header, I guess there isn't much need to add
+it separately to the .c files though?
 
-> Also the parent relationships
-> can be board specific I think in some cases, so maybe we want to move those to
-> DT as well at some point?
-
-Yes, that's the plan. I think/thought Prashant was planning to work on that.
+Do you want me to respin the patch, or will you just create one to add
+the include to the header?
