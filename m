@@ -1,51 +1,80 @@
-From: amit.virdi@st.com (Amit Virdi)
-Date: Thu, 14 Feb 2013 11:04:54 +0530
-Subject: Need advice: unable to mount filesystem
-In-Reply-To: <CABYxbz4kxn-4FSMHqp4dHq1JFbaMU1AZ7r6EcHFHYD0kGtZ4Rw@mail.gmail.com>
-References: <511B8729.8040908@st.com>
- <CACRpkdb=zgaWkzoMtaWbMZXe_wUyszwsjmRC=03iMPDpU90N4w@mail.gmail.com>
- <CABYxbz4kxn-4FSMHqp4dHq1JFbaMU1AZ7r6EcHFHYD0kGtZ4Rw@mail.gmail.com>
-Message-ID: <511C777E.7030007@st.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Thu, 14 Feb 2013 11:12:51 +0530
+Subject: [PATCH V4 0/5] Add generic DMA DT binding support
+In-Reply-To: <20130214044704.GE7777@intel.com>
+References: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
+ <20130212144950.GJ3789@intel.com>
+ <CAAgF-Be1w-8yjuyXT+d8sUO8dee1x7oYFJLXHCmcJSf17eXWyw@mail.gmail.com>
+ <20130214044704.GE7777@intel.com>
+Message-ID: <CAAgF-BfAE4Qt5KOBsn1iD7HW7_1e=TSEbuxNuTk0w8X+t3i-5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/14/2013 8:27 AM, Anil Kumar wrote:
-> Hi,
->
-> On Wed, Feb 13, 2013 at 6:44 PM, Linus Walleij<linus.walleij@linaro.org>  wrote:
->> On Wed, Feb 13, 2013 at 1:29 PM, Amit Virdi<amit.virdi@st.com>  wrote:
->>
->>> I have tried mounting the filesystem from DDR, that too with no success. One
->>> observation is that before mounting the FS, the kernel throws a warning:
->>> --
->>> Warning: unable to open an initial console.
->>
->> This is not your problem. The kernel screams that all the time, (I once
->> saw that explained and some ugly workaround for).
->>
->> This (from your log) is the real problem:
->>
->> VFS: Cannot open root device "mtdblock3" or unknown-block(31,3): error -14
->> Please append a correct "root=" boot option; here are the available partitions:
->> 1f00              64 mtdblock0  (driver?)
->> 1f01             192 mtdblock1  (driver?)
->> 1f02            2048 mtdblock2  (driver?)
->> 1f03           14080 mtdblock3  (driver?)
->> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(31,3)
->> [<2000cb50>] (unwind_backtrace+0x0/0xf8) from [<2018655c>] (panic+0x8c/0x1d8)
->> [<2018655c>] (panic+0x8c/0x1d8) from [<201f8d58>] (mount_block_root+0x1fc/0x2b8)
->> [<201f8d58>] (mount_block_root+0x1fc/0x2b8) from [<201f90c0>]
->> (prepare_namespace+0x160/0x1b8)
->> [<201f90c0>] (prepare_namespace+0x160/0x1b8) from [<20185984>]
->> (kernel_init+0x8/0xe4)
->> [<20185984>] (kernel_init+0x8/0xe4) from [<20008e98>] (ret_from_fork+0x14/0x3c)
->
-> Please try with "rootwait" in bootargs.
->
+Hi Vinod,
 
-Tried... no success :-(
+On Thu, Feb 14, 2013 at 10:17 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Wed, Feb 13, 2013 at 09:52:30AM +0530, Padma Venkat wrote:
+>> Hi Vinod,
+>>
+>> On Tue, Feb 12, 2013 at 8:19 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> > On Mon, Feb 11, 2013 at 02:08:20PM +0530, Padmavathi Venna wrote:
+>> >
+>> > This looks fine, I have only question. The code seems to assume that pl330 dma
+>> > controller always uses DT. But I dont see that as dependency for pl330.
+> Have you checked this?
 
-I'll now backport to previous versions and see if it works.
+Sorry I didn't see this comment previously. I verified on SMDK6410
+board which doesn't have DT support.
+I didn't see any build error and it detected the sound card.
 
-Regards
-Amit Virdi
+>
+>> > Something tells me withot OF the driver may not build, have you checked it?
+>> >
+>> >> This patch set adds support for generic dma device tree bindings for
+>> >> Samsung platforms and is dependent on the following patches from
+>> >> Vinod Koul next branch
+>> >> 1)of: Add generic device tree DMA helpers
+>> >> 2)dmaengine: add helper function to request a slave DMA channel
+>> >>
+>> >> This patch set is made based Mark Brown next branch
+>> > Is this targetted for ASoC tree, if so why? It would fail to build if applied
+>> > there
+>>
+>> I have done this for my testing purpose (I expected all will directly
+>> apply in your branch). But 3rd patch is not applied directly. I will
+>> resend the patches after re-basing on your tree. 5th patch has to go
+>> in ASoC tree because it has dependency on "ARM: SAMSUNG: Make dma
+>> request compatible to generic dma bindings" which is there in ASoC
+>> tree.
+>>
+>> Hi Mark,
+>>
+>> Can you please take the 5th patch in your tree(if there is no issue)
+>> or should I resend it as a separate patch?
+>>
+>> >
+>> > --
+>> > ~Vinod
+>> >>
+>> >> Padmavathi Venna (5):
+>> >>   DMA: PL330: Add new pl330 filter for DT case.
+>> >>   DMA: PL330: Add xlate function
+>> >>   DMA: PL330: Register the DMA controller with the generic DMA helpers
+>> >>   ARM: dts: pl330: Add #dma-cells for generic dma binding support
+>> >>   ARM: SAMSUNG: dma: Remove unnecessary code
+>> >>
+>> >>  .../devicetree/bindings/dma/arm-pl330.txt          |   21 +++++--
+>> >>  arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++
+>> >>  arch/arm/mach-s3c24xx/include/mach/dma.h           |    1 -
+>> >>  arch/arm/mach-s3c64xx/include/mach/dma.h           |    1 -
+>> >>  arch/arm/plat-samsung/dma-ops.c                    |   10 +---
+>> >>  arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 -
+>> >>  arch/arm/plat-samsung/include/plat/dma-pl330.h     |    1 -
+>> >>  drivers/dma/pl330.c                                |   64 +++++++++++++++----
+>> >>  8 files changed, 79 insertions(+), 32 deletions(-)
+>> >>
+>> >> --
+>> >> 1.7.4.4
+>> >>
+>> Thanks
+>> Padma
