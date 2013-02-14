@@ -1,26 +1,44 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 14 Feb 2013 21:56:18 +0000 (UTC)
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod
- dependency
-In-Reply-To: <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <1360840554-26901-2-git-send-email-balbi@ti.com>
- <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
- <20130214193911.GD11806@atomide.com>
- <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1302142155520.11016@utopia.booyaka.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 14 Feb 2013 23:04:48 +0100 (CET)
+Subject: [patch 2/2] arm: Allow forced irq threading
+In-Reply-To: <20130214214931.GK17833@n2100.arm.linux.org.uk>
+References: <20130214205204.109023136@linutronix.de>
+ <20130214205304.993009840@linutronix.de>
+ <20130214214931.GK17833@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1302142256520.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Feb 2013, Paul Walmsley wrote:
+On Thu, 14 Feb 2013, Russell King - ARM Linux wrote:
 
-> va = dev->bus->iounmap( ... );
+> On Thu, Feb 14, 2013 at 08:53:53PM -0000, Thomas Gleixner wrote:
+> > All timer interrupts and the perf interrupt are marked NO_THREAD, so
+> > its safe to allow forced interrupt threading.
+> 
+> What effect does this have on IRQ latency, particularly on the slower CPUs?
+> 
+> If it adds to the IRQ latency, then it must be conditional; there are
+> platforms where IRQ latency is important for things like network devices
+> to keep up (particularly the SMC NICs).
 
-And this should simply be
+It does not affect anything unless you add "threadirqs" to the kernel
+command line. This command line argument puts the kernel into forced
+irq threading mode. Otherwise it just works as now.
 
-dev->bus->iounmap( ... );
+And yes, if enabled on the command line it adds latency due to the
+delayed invocation of the handler in the thread.
 
-I regret the error...
+Though for mainline this is primary a debug mechanism where you can
+morph the kernel explosion in the interrupt handler into a takedown of
+the handler thread instead of crashing the machine completely.
+ 
+Now on RT we force this and I can tell you that even on slow machines
+with SMC NICs the overhead seems to be in a range where these systems
+can cope with. Of course, if you tweak the scheduling params of the
+irq thread low enough you can run into problematic situations. But
+that's not an ARM specific problem, that's a general problem of
+configuring a RT system.
 
-- Paul
+Thanks,
+
+	tglx
