@@ -1,64 +1,49 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Thu, 14 Feb 2013 09:10:06 +0530
-Subject: [PATCH V4 2/4] DMA: PL330: Add xlate function
+Date: Thu, 14 Feb 2013 09:10:07 +0530
+Subject: [PATCH V4 3/4] DMA: PL330: Register the DMA controller with the
+ generic DMA helpers
 In-Reply-To: <1360813208-9498-1-git-send-email-padma.v@samsung.com>
 References: <1360813208-9498-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1360813208-9498-3-git-send-email-padma.v@samsung.com>
+Message-ID: <1360813208-9498-4-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add xlate to translate the device-tree binding information into
-the appropriate format. The filter function requires the dma
-controller device and dma channel number as filter_params.
+This patch registers the pl330 dma controller driver with the generic
+device tree dma helper functions.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/dma/pl330.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+ drivers/dma/pl330.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 40e9752..f5d47e6 100644
+index f5d47e6..fc9c800 100644
 --- a/drivers/dma/pl330.c
 +++ b/drivers/dma/pl330.c
-@@ -25,6 +25,7 @@
- #include <linux/amba/pl330.h>
- #include <linux/scatterlist.h>
- #include <linux/of.h>
-+#include <linux/of_dma.h>
+@@ -2995,6 +2995,14 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
+ 		pi->pcfg.num_peri, pi->pcfg.num_events);
  
- #include "dmaengine.h"
- #define PL330_MAX_CHAN		8
-@@ -2379,6 +2380,30 @@ bool pl330_filter(struct dma_chan *chan, void *param)
- }
- EXPORT_SYMBOL(pl330_filter);
++	ret = of_dma_controller_register(adev->dev.of_node,
++					 of_dma_pl330_xlate, pdmac);
++	if (ret) {
++		dev_err(&adev->dev,
++		"unable to register DMA to the generic DT DMA helpers\n");
++		goto probe_err2;
++	}
++
+ 	return 0;
  
-+static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
-+						struct of_dma *ofdma)
-+{
-+	int count = dma_spec->args_count;
-+	struct dma_pl330_dmac *pdmac = ofdma->of_dma_data;
-+	struct dma_pl330_filter_args fargs;
-+	dma_cap_mask_t cap;
+ probe_err2:
+@@ -3015,6 +3023,8 @@ static int __devexit pl330_remove(struct amba_device *adev)
+ 	if (!pdmac)
+ 		return 0;
+ 
++	of_dma_controller_free(adev->dev.of_node);
 +
-+	if (!pdmac)
-+		return NULL;
-+
-+	if (count != 1)
-+		return NULL;
-+
-+	fargs.pdmac = pdmac;
-+	fargs.chan_id = dma_spec->args[0];
-+
-+	dma_cap_zero(cap);
-+	dma_cap_set(DMA_SLAVE, cap);
-+	dma_cap_set(DMA_CYCLIC, cap);
-+
-+	return dma_request_channel(cap, pl330_dt_filter, &fargs);
-+}
-+
- static int pl330_alloc_chan_resources(struct dma_chan *chan)
- {
- 	struct dma_pl330_chan *pch = to_pchan(chan);
+ 	amba_set_drvdata(adev, NULL);
+ 
+ 	/* Idle the DMAC */
 -- 
 1.7.4.4
