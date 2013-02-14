@@ -1,90 +1,61 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 14 Feb 2013 08:22:52 -0600
-Subject: [PATCH 1/4] clocksource: pass DT node pointer to init functions
-In-Reply-To: <CAHTX3dKcnkjOTY5yyBSwcUH0Rxz+L9ZROeaemMYLexW50Z7Eng@mail.gmail.com>
-References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
- <1360264144-20714-2-git-send-email-robherring2@gmail.com>
- <CAHTX3dKLCbfhBaHKBE=fVTcRReVL6yotA9e_8S70bH+_gajL5Q@mail.gmail.com>
- <511BC043.4030506@gmail.com>
- <CAHTX3d+2rGBE3ZBwiHbq7tOi+OE+5KGPh34APzp0NhRP=mBv+w@mail.gmail.com>
- <511C3E32.9010709@gmail.com>
- <CAHTX3dKcnkjOTY5yyBSwcUH0Rxz+L9ZROeaemMYLexW50Z7Eng@mail.gmail.com>
-Message-ID: <511CF33C.3020402@gmail.com>
+Date: Thu, 14 Feb 2013 08:25:04 -0600
+Subject: [PATCH] ARM: exynos: move exynos4210-combiner to drivers/irqchip
+In-Reply-To: <CAD=FV=WcHuW+2KBqDOGezW2Q9Fhr3Zq-ZtpX_y5qKN2LFEgMDA@mail.gmail.com>
+References: <1360706692-13622-1-git-send-email-robherring2@gmail.com>
+ <20130212225227.GA24096@quad.lixom.net>
+ <CAD=FV=WcHuW+2KBqDOGezW2Q9Fhr3Zq-ZtpX_y5qKN2LFEgMDA@mail.gmail.com>
+Message-ID: <511CF3C0.5010409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2013 12:45 AM, Michal Simek wrote:
-> 2013/2/14 Rob Herring <robherring2@gmail.com>:
->> On 02/13/2013 11:33 AM, Michal Simek wrote:
->>> 2013/2/13 Rob Herring <robherring2@gmail.com>:
->>>> On 02/13/2013 10:21 AM, Michal Simek wrote:
->>>>> 2013/2/7 Rob Herring <robherring2@gmail.com>:
->>>>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>>>
-
-
->>> One more thing. Is there any rule which should describe which timer should be
->>> used for clockevent and for clocksource?
+On 02/13/2013 12:51 PM, Doug Anderson wrote:
+> Rob / Olof,
+> 
+> On Tue, Feb 12, 2013 at 2:52 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Tue, Feb 12, 2013 at 04:04:52PM -0600, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> Exynos boot is broken with commit 0529e315 (ARM: use common irqchip_init
+>>> for GIC init). This commit split the irqchip initialization into 2 calls
+>>> to of_irq_init. This does not work because of_irq_init requires interrupt
+>>> parents to be in the match list.
+>>>
+>>> Rather than reverting exynos changes, make it do the proper thing by using
+>>> IRQCHIP_DECLARE. This requires moving the combiner code to drivers/irqchip.
+>>>
+>>> Reported-by: Doug Anderson <dianders@chromium.org>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> Cc: linux-samsung-soc at vger.kernel.org
+>>> ---
+>>>
+>>> I thought there may be other platforms broken in the same way, but I
+>>> checked and exynos is the only one.
+>>>
+>>> This is based on my gic/vic irqchip branch in arm-soc.
 >>
->> No. This is a common problem. A simple solution is a "linux,clockevent"
->> property, but I want to avoid that.
+>> Applied to next/cleanup.
 > 
-> Let me describe it a little bit more. I am going to change current
-> mainline implementation
-> for zynq timer which uses special compatible string to define
-> clocksource and clockevent
-> device. I don't think this is right way to go because compatible
-> string shouldn't point
-> to device usage. Which is exact case you wanted to avoid.
+> I synced up to next-20130213 and the problem is fixed.  :)  ...that
+> label doesn't exactly boot but the problems are unrelated to this
+> problem now (there are problems with the OF conversions to raw
+> spinlocks)...
 > 
->> Ultimately it is some feature of the
->> h/w that makes you choose. This could be it has an interrupt or not,
->> higher frequency, has timer compare pins, gets power gated, etc. So you
->> should describe enough of the h/w properties to make this decision.
-> 
-> For different timer type, kernel should decide which timer should be
-> used. It should be easy to test
-> because I can add some timers to the programmable logic (as is done
-> for Microblaze) and check
-> how kernel decide which clocksource/clockevent device will use. I
-> believe there is any logic around.
-> 
-> 
-> For solution with two instances of the same triple timer counters it
-> is impossible
-> to specify additional h/w property because all of 6 timers are the same.
-> And also adding special parameter to IP goes against rule
-> that device-tree should describe hw not Linux usage.
-> Maybe enough to save information to driver that clocksource and
-> clockevent device is registered
-> and do not try to register another timer (and also another timer from
-> another instance).
 
-So if you don't care which one is used, then use the first one found and
-be done with it. You will have to make your init function just return on
-subsequent calls.
-
-> 
-> Or maybe it can be done via chosen property or via aliases property where
-> timer0 alias is that one who should be used for clocksource and
-> clockevent device.
-> (for my case alias to one instance of triple timer counter).
-> 
-> I saw some dtses which have aliases timer.
-> 
-> How good/bad is this option?
-
-It's best if you can avoid aliases IMO.
-
-> 
-> 
->> OMAP
->> is an example doing this with lots of timers with varying integration
->> level differences.
-> 
-> Can you point me that that omap drivers you are talking about?
-
-arch/arm/mach-omap2/timer.c. They have properties such as always on and
-secure mode.
+That should be fixed, but may not be in -next yet. It is in Grant's tree.
 
 Rob
+
+> I haven't done any review of this code (I'm assuming that Olof already
+> looked it over and Samsung engineers will give it a thorough review),
+> but it's definitely tested.  :)
+> 
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> 
+> Thanks!
+> 
+> -Doug
+> 
