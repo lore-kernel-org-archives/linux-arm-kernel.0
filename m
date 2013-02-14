@@ -1,61 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 14 Feb 2013 20:47:53 +0000 (UTC)
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod
- dependency
-In-Reply-To: <20130214193911.GD11806@atomide.com>
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <1360840554-26901-2-git-send-email-balbi@ti.com>
- <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
- <20130214193911.GD11806@atomide.com>
-Message-ID: <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 14 Feb 2013 21:48:16 +0100
+Subject: [PATCH 1/9] ARM: dt: add header to define GPIO flags
+In-Reply-To: <1360791198-29462-2-git-send-email-swarren@wwwdotorg.org>
+References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org><1360791198-29462-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130214.224816.1898594449880044716.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 13 Feb 2013 22:33:10 +0100:
 
-On Thu, 14 Feb 2013, Tony Lindgren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Many GPIO device tree bindings use the same flags. Create a header to
+> define those.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/boot/dts/gpio.h |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/gpio.h
+> 
+> diff --git a/arch/arm/boot/dts/gpio.h b/arch/arm/boot/dts/gpio.h
+> new file mode 100644
+> index 0000000..4c9da69
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/gpio.h
+> @@ -0,0 +1,10 @@
+> +/*
+> + * This header provides constants for most GPIO bindings.
+> + *
+> + * Most GPIO bindings include a flags cell as part of the GPIO specifier.
+> + * In most cases, the format of the flags cell uses the standard values
+> + * defined in this header.
+> + */
 
-> I don't think so as hwmod should only touch the sysconfig space
-> when no driver has claimed it.
+#ifdef _DTS_GPIO_H
+#define _DTS_GPIO_H
 
-hwmod does need to touch the SYSCONFIG register during pm_runtime suspend 
-and resume operations, and during device enable and disable operations.  
-Here's the relevant code:
+> +
+> +#define GPIO_ACTIVE_HIGH 0
+> +#define GPIO_ACTIVE_LOW 1
 
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2157
+#endif /* _DTS_GPIO_H */
 
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2195
-
-Drivers shouldn't touch their IP block's SYSCONFIG registers.  They don't 
-have anything specifically to do with the underlying device IP block, but 
-with the SoC integration, even though they live in the device's 
-memory-mapped address range.  It's unfortunate that TI didn't allocate a 
-separate, small address space for these registers, translated by the bus, 
-similar to the PCI-E Enhanced Configuration Access Mechanism:
-
-http://wiki.osdev.org/PCI_Express#Extended_Configuration_Space
-
-... but that's unfortunately the reality of the OMAP hardware.
-
-Regarding ioremap(), it seems reasonable for drivers to call ioremap(), as 
-long as the implementation of ioremap() can be overridden by the device's 
-bus.  PCI device drivers already do this -- albeit in a PCI-specific way 
--- with pci_ioremap_bar():
-
-http://git.kernel.org/?p=linux%2Fkernel%2Fgit%2Ftorvalds%2Flinux.git&a=search&h=HEAD&st=grep&s=pci_ioremap_bar
-
-So instead of something bus-specific like that, a better way would be to 
-use something like:
-
-va = dev->bus->ioremap( ... );
-va = dev->bus->iounmap( ... );
-
-Any driver using such a mechanism would be intrinsically generic. 
-platform_bus could simply set its bus->ioremap to the existing ioremap() 
-function, while buses like a omap_hwmod_bus could use a function that 
-returned the address range that omap_hwmod_bus has already ioremap()ped.
-
-regards,
-
-- Paul
+To avoid multple inclusion problems, do we want the above
+ifdef/define/endif for other DT header files as well?
