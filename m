@@ -1,28 +1,34 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 14 Feb 2013 16:58:02 +0200
-Subject: [PATCH 1/1] ARM: dt: add header to define tegra20 clocks
-In-Reply-To: <20130214.154250.475978229890081002.hdoyu@nvidia.com>
-References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
- <1360823899-17846-1-git-send-email-hdoyu@nvidia.com>
- <20130214101220.GI3073@tbergstrom-lnx.Nvidia.com>
- <20130214.154250.475978229890081002.hdoyu@nvidia.com>
-Message-ID: <20130214145802.GK3073@tbergstrom-lnx.Nvidia.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 14 Feb 2013 07:03:51 -0800
+Subject: [PATCH v9 02/20] mfd: omap-usb-host: Consolidate OMAP USB-HS
+ platform data
+In-Reply-To: <511CB9E9.5050804@ti.com>
+References: <1358937492-8129-1-git-send-email-rogerq@ti.com>
+ <1358937492-8129-3-git-send-email-rogerq@ti.com>
+ <511CB9E9.5050804@ti.com>
+Message-ID: <20130214150351.GD2033@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> There could be the same kind of requirement from others that both
-> "dtsip" and "C-source" want to share the same header file. If we
-> consider that DT is the exact H/W description, C-source should be able
-> to include a DT header file.
+On Thu, Feb 14, 2013 at 12:18:17PM +0200, Roger Quadros wrote:
+> Hi Greg,
 > 
-> For example, a C-header file for "enum tegra{20,30}_clk" should be
-> generated from "arch/arm/boot/dts/tegra{20,30}-car.h" at runtime, or
-> alternatively just "drivers/clk/tegra/clk-tegra{20,30}.c" can include
-> "arch/arm/boot/dts/tegra{20,30}-car.h"? The latter may be easier.
+> On 01/23/2013 12:37 PM, Roger Quadros wrote:
+> > Let's have a single platform data structure for the OMAP's High-Speed
+> > USB host subsystem instead of having 3 separate ones i.e. one for
+> > board data, one for USB Host (UHH) module and one for USB-TLL module.
+> > 
+> > This makes the code much simpler and avoids creating multiple copies of
+> > platform data.
+> > 
+> > CC: Alan Stern <stern@rowland.harvard.edu>
+> > 
+> > Signed-off-by: Roger Quadros <rogerq@ti.com>
+> > Reviewed-by: Felipe Balbi <balbi@ti.com>
+> > For the ehci-omap.c part:
+> > Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> 
+> Could you please ACK the drivers/usb/host/ehci-omap.c part
+> so that this can go through the MFD tree. Thanks.
 
-Including arch/arm/boot/dts/tegra{20,30}-car.h seems to make much more sense
-to me than generating a enum based on #defines... :)
-
-Cheers,
-
-Peter.
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
