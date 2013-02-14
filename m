@@ -1,47 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 14 Feb 2013 12:18:16 +0000
-Subject: [PATCH] arm: arch_timer: include linux/errno.h to declare ENXIO
-In-Reply-To: <1360778746-27809-1-git-send-email-swarren@wwwdotorg.org>
-References: <1360778746-27809-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130214121816.GA25537@e106331-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 Feb 2013 13:19:13 +0100
+Subject: [PATCH v2 02/10] gpio: pxa: avoid to use global irq base
+In-Reply-To: <511CADE4.1000007@compulab.co.il>
+References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
+ <1359886551-20950-3-git-send-email-haojian.zhuang@linaro.org>
+ <511BA0AF.8040904@compulab.co.il>
+ <CAD6h2NRO6N1pRfq_=ybj5TSwC7gieYOffcQmfTyUiP5R_3fWig@mail.gmail.com>
+ <511CADE4.1000007@compulab.co.il>
+Message-ID: <CACRpkdazd+JyKz4rrptFkJ6RrP9+2S1oM=iPnqRdGj=m21PeGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 06:05:46PM +0000, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> This fixes:
-> arch/arm/kernel/arch_timer.c: In function ?arch_timer_sched_clock_init?:
-> arch/arm/kernel/arch_timer.c:55:11: error: ?ENXIO? undeclared (first use in this function)
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> tegra_defconfig builds OK, but with my local change to convert Tegra to
-> multi-platform, I need this fix to compile. This issue is new sometime
-> after next-20130211.
-> 
->  arch/arm/kernel/arch_timer.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> index 36ebcf4..8fba00f 100644
-> --- a/arch/arm/kernel/arch_timer.c
-> +++ b/arch/arm/kernel/arch_timer.c
-> @@ -8,6 +8,7 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> +#include <linux/errno.h>
->  #include <linux/init.h>
->  #include <linux/types.h>
->  
-> -- 
-> 1.7.10.4
-> 
+On Thu, Feb 14, 2013 at 10:27 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
 
-We should probably also add this to include/clocksource/arm_arch_timer.h and
-drivers/clocksource/arm_arch_timer.c, as they both use errno values (though
-currently these get included indirectly via a different path).
+> It looks like I've figured this out...
+> For em-x270 as an example, if I move the IRQ resource assignment to runtime:
+>
+> diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+> index 1b64114..178cc0b 100644
+> --- a/arch/arm/mach-pxa/em-x270.c
+> +++ b/arch/arm/mach-pxa/em-x270.c
+> @@ -210,8 +210,6 @@ static struct resource em_x270_dm9000_resource[] = {
+>                 .flags = IORESOURCE_MEM,
+>         },
+>         [2] = {
+> -               .start = EM_X270_ETHIRQ,
+> -               .end   = EM_X270_ETHIRQ,
+>                 .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+>         }
+>  };
+> @@ -232,6 +230,9 @@ static struct platform_device em_x270_dm9000 = {
+>
+>  static void __init em_x270_init_dm9000(void)
+>  {
+> +       em_x270_dm9000_resource[2].start = gpio_to_irq(GPIO41_ETHIRQ);
+> +       em_x270_dm9000_resource[2].end = gpio_to_irq(GPIO41_ETHIRQ);
+> +
+>         em_x270_dm9000_platdata.flags |= dm9000_flags;
+>         platform_device_register(&em_x270_dm9000);
+>  }
+>
+> The Ethernet is alive and NFS root works fine.
+>
+> So my conclusion, is that we still need to have some work done
+> before we can switch to using IRQ_DOMAIN.
+> As you can see from above patch, we at least must deal with the
+> PXA_GPIO_TO_IRQ macros and alike that have compile time assumptions
+> which obviously get broken once you switch to the IRQ_DOMAIN.
+>
+> What do you think?
 
-Thanks,
-Mark.
+I think it seems like you should review all the IRQ assignments in that
+former GPIO range. Statically encoding IRQ numbers for GPIO things
+is usually not a good idea, it's better to always use gpio_to_irq()
+on these and only keep hard-coded GPIO numbers around (atleast
+just *one* problem to worry about).
+
+Your,
+Linus Walleij
