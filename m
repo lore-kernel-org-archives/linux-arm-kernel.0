@@ -1,57 +1,45 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 14 Feb 2013 20:13:49 +0530
-Subject: [PATCH V4 0/4] Add generic DMA DT binding support
-In-Reply-To: <1360813208-9498-1-git-send-email-padma.v@samsung.com>
-References: <1360813208-9498-1-git-send-email-padma.v@samsung.com>
-Message-ID: <20130214144349.GH29960@intel.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 14 Feb 2013 15:47:50 +0100
+Subject: i.MX6 Solo: maxcpus=1 vs. nosmp: Warning from smp_twd.c?
+In-Reply-To: <CAOMZO5CTfzZxRNQF=x5-MkM4nGBOXRd0CN7OnO1p=ahHDoT8CQ@mail.gmail.com>
+References: <511CF063.3010200@de.bosch.com>
+ <CAOMZO5CTfzZxRNQF=x5-MkM4nGBOXRd0CN7OnO1p=ahHDoT8CQ@mail.gmail.com>
+Message-ID: <511CF916.2060705@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 09:10:04AM +0530, Padmavathi Venna wrote:
+On 14.02.2013 15:40, Fabio Estevam wrote:
+> Hi Dirk,
+> 
+> On Thu, Feb 14, 2013 at 12:10 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>> Hi,
+>>
+>> working on a i.MX6 Solo SoC (one Cortex A9 core) we are usually booting with
+>> maxcpus=1 a kernel built with CONFIG_NR_CPUS=4. This is done to be able to
+>> boot the same kernel on the Solo and Quad version of that SoC.
+>>
+>> Now, we tried to switch from 'maxcpus=1' to 'nosmp'. With 'nosmp' we get the
+>> warning [1] in the boot messages. This isn't there with 'maxcpus=1'.
+> 
+> maxcpus=1 and nosmp are not equivalent as per the comment from kernel/smp.c:
+> 
+> /*
+>  * Setup routine for controlling SMP activation
+>  *
+>  * Command-line option of "nosmp" or "maxcpus=0" will disable SMP
+>  * activation entirely (the MPS table probe still happens, though).
+>  *
+>  * Command-line option of "maxcpus=<NUM>", where <NUM> is an integer
+>  * greater than 0, limits the maximum number of CPUs activated in
+>  * SMP mode to <NUM>.
+>  */
 
-Logically this should have been v5 :)
+Yes, understood that both options are not equal.
 
-Applied all, thanks
+But should both options work on a single ARM Cortex A9 SoC without a 
+warning? Or should one of the both options be preferred on a single ARM 
+Cortex A9 SoC?
 
---
-~Vinod
-> Changes since V3:
->         - Make dma-cells property optional as suggested by Rob Herring
->         - Add dma-requests and dma-channels properties to DMA controller
->           as suggested by Arnd for future-proof
->         - Add Acked-by for some of the patches
-> 
-> Changes since V2:
->         - Add new filter function for DT case as suggested by Arnd
->         - Add xlate as static function
->         - Use newly added filter function in xlate.
->         - Add Acked-by for some of the patches
-> 
-> Changes since V1:
->         - Address the review comments by Arnd Bergmann as below
->         - Wording of the properties.
->         - Pass pdmac as third parameter to of_dma_controller_register
->         - Filter the dma channel based on channel number and dma_device
-> 
-> This patch set adds support for generic dma device tree bindings for
-> Samsung platforms and is dependent on the following patches from
-> Vinod Koul next branch
-> 1)of: Add generic device tree DMA helpers
-> 2)dmaengine: add helper function to request a slave DMA channel
-> 
-> This patch set is made based on Vinod Koul next branch
-> 
-> Padmavathi Venna (4):
->   DMA: PL330: Add new pl330 filter for DT case.
->   DMA: PL330: Add xlate function
->   DMA: PL330: Register the DMA controller with the generic DMA helpers
->   ARM: dts: pl330: Add #dma-cells for generic dma binding support
-> 
->  .../devicetree/bindings/dma/arm-pl330.txt          |   21 +++++--
->  arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++
->  drivers/dma/pl330.c                                |   64 +++++++++++++++----
->  3 files changed, 78 insertions(+), 19 deletions(-)
-> 
-> -- 
-> 1.7.4.4
-> 
+Thanks
+
+Dirk
