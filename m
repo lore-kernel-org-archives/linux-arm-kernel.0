@@ -1,57 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 23:26:49 +0100
-Subject: [PATCH 0/9] linux-next ARM defconfig fixes
-Message-ID: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 14 Feb 2013 20:41:31 -0200
+Subject: [PATCH 6/9] drm/pci: move drm_pcie_get_speed_cap_mask inside
+ #ifdef CONFIG_PCI
+In-Reply-To: <1360880818-4071454-7-git-send-email-arnd@arndb.de>
+References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
+ <1360880818-4071454-7-git-send-email-arnd@arndb.de>
+Message-ID: <CAOMZO5AbTC+82KKTqWXeseahsasx2q=q-4k9u14xyBYhgm2gdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have tried building all ARM default configurations in
-linux-next today, and found a number of obvious problems
-that came in from somewhere other than the arm-soc tree
-(I have a separate series for those).
+On Thu, Feb 14, 2013 at 8:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> commit dd66cc2e1  "drm/pci: Use PCI Express Capability accessors"
+> introduced the use of the pcie_capability_read_dword function
+> in the drm_pci code, which is only defined when PCI is enabled.
+> While most of the file is already hidden away behind an #ifdef
+> CONFIG_PCI, this function is not, and that now causes a link
+> error in the ARM imx_v6_v7_defconfig configuration.
+>
+> Moving the function into the #ifdef section makes this work
+> again on IMX, which does not have PCI support, and should
+> have no impact on platforms that do.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Dave Airlie <airlied@redhat.com>
 
-Here are the fixes I came up with. Please apply or merge
-into the original patch that broke them, or find a different
-fix that solves the problem.
-
-Arnd Bergmann (9):
-  ARM: sa1100/assabet: include platform_device.h directly
-  fb/exynos: include platform_device.h
-  clk: sunxi: remove stale Makefile entry
-  mfd: max8925: fix trivial build warning for non-dt
-  ARM: shmobile: mark mackerel sh_mmcif_device __maybe_unused
-  drm/pci: move drm_pcie_get_speed_cap_mask inside #ifdef CONFIG_PCI
-  ARM defconfigs: add missing inclusions of linux/platform_device.h
-  [media] s5p-fimc: fix s5pv210 build
-  thermal: rcar: remove __devinitconst
-
-Cc: Dave Airlie <airlied@redhat.com>
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-
-
- arch/arm/mach-s5pv210/mach-goni.c               |  2 +-
- arch/arm/mach-sa1100/assabet.c                  |  1 +
- arch/arm/mach-shmobile/board-mackerel.c         |  2 +-
- arch/arm/plat-samsung/include/plat/adc.h        |  1 +
- drivers/clk/Makefile                            |  1 -
- drivers/gpu/drm/drm_pci.c                       | 75 ++++++++++++-------------
- drivers/thermal/rcar_thermal.c                  |  2 +-
- drivers/video/backlight/max8925_bl.c            |  6 +-
- drivers/video/clps711xfb.c                      |  1 +
- drivers/video/exynos/exynos_mipi_dsi_common.c   |  1 +
- drivers/video/exynos/exynos_mipi_dsi_lowlevel.c |  1 +
- drivers/video/mmp/fb/mmpfb.c                    |  1 +
- include/linux/platform_data/s3c-hsotg.h         |  2 +
- 13 files changed, 49 insertions(+), 47 deletions(-)
-
--- 
-1.8.1.2
+Bjorn has already sent a fix for this problem:
+http://www.spinics.net/lists/arm-kernel/msg224425.html
