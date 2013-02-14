@@ -1,61 +1,27 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 14 Feb 2013 08:49:34 +0100 (CET)
-Subject: [PATCH 2/3] ARM: mach-shmobile: armadillo800eva: enable REGULATOR
- in defconfig
-In-Reply-To: <20130214024847.GQ15879@verge.net.au>
-References: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
- <1360761103-17357-3-git-send-email-horms+renesas@verge.net.au>
- <20130214024847.GQ15879@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1302140847560.29693@axis700.grange>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Thu, 14 Feb 2013 09:12:10 +0100
+Subject: [PATCH v4 4/8] watchdog/at91sam9_wdt: Adjust the options of
+ watchdog_info
+In-Reply-To: <20130213231522.GH7867@spo001.leaseweb.com>
+References: <1359702386-21284-1-git-send-email-wenyou.yang@atmel.com>
+ <1359702386-21284-5-git-send-email-wenyou.yang@atmel.com>
+ <20130213231522.GH7867@spo001.leaseweb.com>
+Message-ID: <1459249.A0040oxoB3@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
+Hello,
 
-On Thu, 14 Feb 2013, Simon Horman wrote:
-
-> On Wed, Feb 13, 2013 at 10:11:42PM +0900, Simon Horman wrote:
-> > As well as being a generally sane thing to do this
-> > is required for MMCIF to function in conjunction with
-> > "ARM: shmobile: switch SDHI0 to GPIO regulator on armadillo800eva".
-> > 
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > ---
-> > 
-> > v2
-> > * Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
-> > ---
-> >  arch/arm/configs/armadillo800eva_defconfig |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
-> > index 0b98100..0cc8014 100644
-> > --- a/arch/arm/configs/armadillo800eva_defconfig
-> > +++ b/arch/arm/configs/armadillo800eva_defconfig
-> > @@ -88,6 +88,7 @@ CONFIG_I2C=y
-> >  CONFIG_I2C_GPIO=y
-> >  CONFIG_I2C_SH_MOBILE=y
-> >  # CONFIG_HWMON is not set
-> > +CONFIG_REGULATOR=y
-> >  CONFIG_MEDIA_SUPPORT=y
-> >  CONFIG_VIDEO_DEV=y
-> >  CONFIG_MEDIA_CAMERA_SUPPORT=y
+On Thursday 14 February 2013 00:15:22, Wim Van Sebroeck wrote:
+> Hi Wenyou,
 > 
-> This patch seems to break NIC initialisation.
+> > Since the Watchdog Timer Mode Register can be only written only once,
+> > so the watchdog_info shall not support WDIOF_SETTIMEOUT
+> > and WDIOF_MAGICCLOSE options, remove them.
 > 
-> smsc911x: Driver version 2008-10-21
-> smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
-> smsc911x smsc911x.0 (unregistered net_device): couldn't get regulators -517
-> platform smsc911x.0: Driver smsc911x requests probe deferral
+> Ik you keep using the timer, then you don't have to remove this.
 
-Hm? Why is smsc911x even probing on armadillo800eva for you? Only sh-eth 
-should be probing.
+Why removing especially WDIOF_MAGICCLOSE (and the timer needed for that)? This is a feature removal. Without there isn't even a need for nowayout option as it is implicitly set anyway.
+Nevertheless I would prefere keeping the timer to allow a user to let the kernel triggering the timer upon MAGICCLOSE.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Alexander
