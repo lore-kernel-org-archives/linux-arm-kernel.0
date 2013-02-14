@@ -1,96 +1,129 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Feb 2013 09:14:30 +0100
-Subject: [PATCH v9 8/8] watchdog: code: fix the alignement of some function
- declarations
-In-Reply-To: <1360829670-10418-1-git-send-email-fabio.porcedda@gmail.com>
-References: <1360829670-10418-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1360829670-10418-9-git-send-email-fabio.porcedda@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 14 Feb 2013 17:34:11 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
+In-Reply-To: <CANqRtoSbnXQhqu_-gsVdU1iAZxPo0f5t5P1S8H0CdYTO=1YGMw@mail.gmail.com>
+References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
+ <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
+ <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
+ <878v6rv8ij.wl%kuninori.morimoto.gx@renesas.com>
+ <20130214042027.GD6036@verge.net.au>
+ <87621vv7wa.wl%kuninori.morimoto.gx@renesas.com>
+ <20130214043648.GA4773@verge.net.au>
+ <20130214044221.GB4773@verge.net.au>
+ <CANqRtoSbnXQhqu_-gsVdU1iAZxPo0f5t5P1S8H0CdYTO=1YGMw@mail.gmail.com>
+Message-ID: <20130214083408.GA21198@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: linux-watchdog at vger.kernel.org
----
- drivers/watchdog/watchdog_core.c |  2 +-
- drivers/watchdog/watchdog_dev.c  | 17 ++++++-----------
- 2 files changed, 7 insertions(+), 12 deletions(-)
+On Thu, Feb 14, 2013 at 02:20:07PM +0900, Magnus Damm wrote:
+> On Thu, Feb 14, 2013 at 1:42 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Feb 14, 2013 at 01:36:49PM +0900, Simon Horman wrote:
+> >> On Wed, Feb 13, 2013 at 08:25:45PM -0800, Kuninori Morimoto wrote:
+> >> >
+> >> > Hi Simon
+> >> >
+> >> > > > >>       CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+> >> > > > >> -     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
+> >> > > > >> +     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
+> >> > > > >>       CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
+> >> > (snip)
+> >> > > > This means that current TMU02 numbering seems doubtful too ?
+> >> > > > How about just rever 58079fa7d54a0929d304054ee759187a2ccd3cdf ?
+> >> > >
+> >> > > Perhaps that is a good idea.
+> >> > >
+> >> > > The original motivation for this patch was to add the TMU02 line.
+> >> > > And "fixing" TMU01 was an afterthought. However, I am also
+> >> > > now doubtful about the correctness of the TMU02 line and thus
+> >> > > the usefulness of the original patch.
+> >> >
+> >> > I think this comment out is creating confusion ?
+> >> >
+> >> > /* TMU00 */ -> /* TMU0 channel 0 */
+> >> > /* TMU01 */ -> /* TMU0 channel 1 */
+> >> > /* TMU02 */ -> /* TMU0 channel 2 */
+> >>
+> >> That does make things a little clearer,
+> >> but I for one wasn't confused by the existing comments.
+> >
+> > Ok, now I think I see what you are getting at.
+> >
+> > MSTP016 is for channel 0..n of TMU0
+> > MSTP015 is for channel 1..n of TMU1
+> > MSTP014 is for channel 2..n of TMU2
+> >
+> > And all the TMU values set by CLKDEV_DEV_ID statements above
+> > relate to channels of TMU0.
+> >
+> > That does seem to be a valid interpretation of the documentation
+> > now that I read it again.
+> 
+> Hm, your channel assignment above seems a tad different from what I believe:
+> 
+> MSTP016 is for channel 0..n of TMU0
+> MSTP015 is for channel 0..n of TMU1
+> MSTP014 is for channel 0..n of TMU2
 
-diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-index 05d18b4..5cdd7b6 100644
---- a/drivers/watchdog/watchdog_core.c
-+++ b/drivers/watchdog/watchdog_core.c
-@@ -70,7 +70,7 @@ static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
-  * A zero is returned on success and -EINVAL for failure.
-  */
- int watchdog_init_timeout(struct watchdog_device *wdd,
--				unsigned int timeout_parm, struct device *dev)
-+			  unsigned int timeout_parm, struct device *dev)
- {
- 	unsigned int t = 0;
- 	int ret = 0;
-diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
-index 08b48bb..776341b 100644
---- a/drivers/watchdog/watchdog_dev.c
-+++ b/drivers/watchdog/watchdog_dev.c
-@@ -162,8 +162,7 @@ out_stop:
-  *	Get the watchdog's status flags.
-  */
- 
--static int watchdog_get_status(struct watchdog_device *wddev,
--							unsigned int *status)
-+static int watchdog_get_status(struct watchdog_device *wddev, uint *status)
- {
- 	int err = 0;
- 
-@@ -191,8 +190,7 @@ out_status:
-  *	@timeout: timeout to set in seconds
-  */
- 
--static int watchdog_set_timeout(struct watchdog_device *wddev,
--							unsigned int timeout)
-+static int watchdog_set_timeout(struct watchdog_device *wddev, uint timeout)
- {
- 	int err;
- 
-@@ -225,8 +223,7 @@ out_timeout:
-  *	Get the time before a watchdog will reboot (if not pinged).
-  */
- 
--static int watchdog_get_timeleft(struct watchdog_device *wddev,
--							unsigned int *timeleft)
-+static int watchdog_get_timeleft(struct watchdog_device *wddev, uint *timeleft)
- {
- 	int err = 0;
- 
-@@ -255,8 +252,7 @@ out_timeleft:
-  *	@arg: argument pointer
-  */
- 
--static int watchdog_ioctl_op(struct watchdog_device *wddev, unsigned int cmd,
--							unsigned long arg)
-+static int watchdog_ioctl_op(struct watchdog_device *wddev, uint cmd, ulong arg)
- {
- 	int err;
- 
-@@ -290,7 +286,7 @@ out_ioctl:
-  */
- 
- static ssize_t watchdog_write(struct file *file, const char __user *data,
--						size_t len, loff_t *ppos)
-+			      size_t len, loff_t *ppos)
- {
- 	struct watchdog_device *wdd = file->private_data;
- 	size_t i;
-@@ -329,8 +325,7 @@ static ssize_t watchdog_write(struct file *file, const char __user *data,
-  *	according to their available features.
-  */
- 
--static long watchdog_ioctl(struct file *file, unsigned int cmd,
--							unsigned long arg)
-+static long watchdog_ioctl(struct file *file, unsigned int cmd, ulong arg)
- {
- 	struct watchdog_device *wdd = file->private_data;
- 	void __user *argp = (void __user *)arg;
--- 
-1.8.1.1
+Yes, thats is what I wanted to say too.
+
+> Actually, you can check how the TMU channels are bundled together
+> based on the I/O memory and interrupts.
+> The TMU driver configuration in setup-sh73a0 contains these:
+> 
+> static struct sh_timer_config tmu00_platform_data = {
+> 	.name = "TMU00",
+> 	.channel_offset = 0x4,
+> 	.timer_bit = 0,
+> 	.clockevent_rating = 200,
+> };
+> 
+> static struct resource tmu00_resources[] = {
+> 	[0] = {
+> 		.name	= "TMU00",
+> 		.start	= 0xfff60008,
+> 		.end	= 0xfff60013,
+> 		.flags	= IORESOURCE_MEM,
+> 	},
+> 	[1] = {
+> 		.start	= intcs_evt2irq(0x0e80), /* TMU0_TUNI00 */
+> 		.flags	= IORESOURCE_IRQ,
+> 	},
+> };
+> 
+> and
+> 
+> static struct sh_timer_config tmu01_platform_data = {
+> 	.name = "TMU01",
+> 	.channel_offset = 0x10,
+> 	.timer_bit = 1,
+> 	.clocksource_rating = 200,
+> };
+> 
+> static struct resource tmu01_resources[] = {
+> 	[0] = {
+> 		.name	= "TMU01",
+> 		.start	= 0xfff60014,
+> 		.end	= 0xfff6001f,
+> 		.flags	= IORESOURCE_MEM,
+> 	},
+> 	[1] = {
+> 		.start	= intcs_evt2irq(0x0ea0), /* TMU0_TUNI01 */
+> 		.flags	= IORESOURCE_IRQ,
+> 	},
+> };
+> 
+> Note how the IORESOURCE_MEM ranges for tmu00 and tmu01 are closely
+> located. Also check the channel_offset platform data that point out
+> the shared start-stop register. The timer bit is the per-channel
+> start-stop bit. Another hint is in the IORESOURCE_IRQ and the
+> TMU0_TUNI00 + TMU0_TUNI01 comments that both start with TMU0_.
+> 
+> So basically, in this case both tmu00 and tmu01 should be assigned to
+> MSTP016 aka TMU00.
+> 
+> This line must be correct from my point of view:
+> 
+> CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU00 */
+
+That seems sane. But we are still left guessing about sh_tmu.2.
+Can we assume it is channel 2 or TMU0 ?
