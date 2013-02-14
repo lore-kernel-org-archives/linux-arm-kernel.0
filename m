@@ -1,74 +1,90 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 14 Feb 2013 15:10:43 +0100
-Subject: i.MX6 Solo: maxcpus=1 vs. nosmp: Warning from smp_twd.c?
-Message-ID: <511CF063.3010200@de.bosch.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 14 Feb 2013 08:22:52 -0600
+Subject: [PATCH 1/4] clocksource: pass DT node pointer to init functions
+In-Reply-To: <CAHTX3dKcnkjOTY5yyBSwcUH0Rxz+L9ZROeaemMYLexW50Z7Eng@mail.gmail.com>
+References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
+ <1360264144-20714-2-git-send-email-robherring2@gmail.com>
+ <CAHTX3dKLCbfhBaHKBE=fVTcRReVL6yotA9e_8S70bH+_gajL5Q@mail.gmail.com>
+ <511BC043.4030506@gmail.com>
+ <CAHTX3d+2rGBE3ZBwiHbq7tOi+OE+5KGPh34APzp0NhRP=mBv+w@mail.gmail.com>
+ <511C3E32.9010709@gmail.com>
+ <CAHTX3dKcnkjOTY5yyBSwcUH0Rxz+L9ZROeaemMYLexW50Z7Eng@mail.gmail.com>
+Message-ID: <511CF33C.3020402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/14/2013 12:45 AM, Michal Simek wrote:
+> 2013/2/14 Rob Herring <robherring2@gmail.com>:
+>> On 02/13/2013 11:33 AM, Michal Simek wrote:
+>>> 2013/2/13 Rob Herring <robherring2@gmail.com>:
+>>>> On 02/13/2013 10:21 AM, Michal Simek wrote:
+>>>>> 2013/2/7 Rob Herring <robherring2@gmail.com>:
+>>>>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>>>>
 
-working on a i.MX6 Solo SoC (one Cortex A9 core) we are usually booting 
-with maxcpus=1 a kernel built with CONFIG_NR_CPUS=4. This is done to be 
-able to boot the same kernel on the Solo and Quad version of that SoC.
 
-Now, we tried to switch from 'maxcpus=1' to 'nosmp'. With 'nosmp' we get 
-the warning [1] in the boot messages. This isn't there with 'maxcpus=1'.
+>>> One more thing. Is there any rule which should describe which timer should be
+>>> used for clockevent and for clocksource?
+>>
+>> No. This is a common problem. A simple solution is a "linux,clockevent"
+>> property, but I want to avoid that.
+> 
+> Let me describe it a little bit more. I am going to change current
+> mainline implementation
+> for zynq timer which uses special compatible string to define
+> clocksource and clockevent
+> device. I don't think this is right way to go because compatible
+> string shouldn't point
+> to device usage. Which is exact case you wanted to avoid.
+> 
+>> Ultimately it is some feature of the
+>> h/w that makes you choose. This could be it has an interrupt or not,
+>> higher frequency, has timer compare pins, gets power gated, etc. So you
+>> should describe enough of the h/w properties to make this decision.
+> 
+> For different timer type, kernel should decide which timer should be
+> used. It should be easy to test
+> because I can add some timers to the programmable logic (as is done
+> for Microblaze) and check
+> how kernel decide which clocksource/clockevent device will use. I
+> believe there is any logic around.
+> 
+> 
+> For solution with two instances of the same triple timer counters it
+> is impossible
+> to specify additional h/w property because all of 6 timers are the same.
+> And also adding special parameter to IP goes against rule
+> that device-tree should describe hw not Linux usage.
+> Maybe enough to save information to driver that clocksource and
+> clockevent device is registered
+> and do not try to register another timer (and also another timer from
+> another instance).
 
-Is it a good idea to use 'nosmp' instead of 'maxcpus=1' on a single 
-Cortex A9 SoC?
+So if you don't care which one is used, then use the first one found and
+be done with it. You will have to make your init function just return on
+subsequent calls.
 
-Looking into the warning, it's the result of setup_max_cpus being 0 in 
-case of 'nosmp' (and being 1 in case of 'maxcpus=1'). So with 'nosmp' 
-the function local_timer_register()
+> 
+> Or maybe it can be done via chosen property or via aliases property where
+> timer0 alias is that one who should be used for clocksource and
+> clockevent device.
+> (for my case alias to one instance of triple timer counter).
+> 
+> I saw some dtses which have aliases timer.
+> 
+> How good/bad is this option?
 
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/kernel/smp.c;h=84f4cbf652e58b3acfea846ad1cad9ddbee72d95;hb=refs/heads/master#l514
+It's best if you can avoid aliases IMO.
 
-returns -ENXIO (== -6).
+> 
+> 
+>> OMAP
+>> is an example doing this with lots of timers with varying integration
+>> level differences.
+> 
+> Can you point me that that omap drivers you are talking about?
 
-Is this the intended behaviour for 'nosmp' resulting in below boot warning?
+arch/arm/mach-omap2/timer.c. They have properties such as always on and
+secure mode.
 
-The call stack is
-
-    imx6q_timer_init()
--> twd_local_timer_of_register()()
--> twd_local_timer_common_register()
--> local_timer_register()  (returns -ENXIO due to setup_max_cpus == 0)
-
-Best regards
-
-Dirk
-
-[1]
-...
-sched_clock: 32 bits at 49MHz, resolution 20ns, wraps every 86767ms
-------------[ cut here ]------------
-WARNING: at arch/arm/kernel/smp_twd.c:345 
-twd_local_timer_of_register+0x7c/0x90()
-twd_local_timer_of_register failed (-6)
-Modules linked in:
-Backtrace:
-[<80011f14>] (dump_backtrace+0x0/0x10c) from [<8044dd30>] 
-(dump_stack+0x18/0x1c)
-  r7:805e9f58 r6:805ba84c r5:80539331 r4:00000159
-[<8044dd18>] (dump_stack+0x0/0x1c) from [<80020fbc>] 
-(warn_slowpath_common+0x54/0x6c)
-[<80020f68>] (warn_slowpath_common+0x0/0x6c) from [<80021078>] 
-(warn_slowpath_fmt+0x38/0x40)
-  r9:412fc09a r8:8fffffff r7:ffffffff r6:00000001 r5:80633b8c
-r4:80b32da8
-[<80021040>] (warn_slowpath_fmt+0x0/0x40) from [<805ba84c>] 
-(twd_local_timer_of_register+0x7c/0x90)
-  r3:fffffffa r2:8053934b
-[<805ba7d0>] (twd_local_timer_of_register+0x0/0x90) from [<805c0bec>] 
-(imx6q_timer_init+0x18/0x4c)
-  r5:80633800 r4:8053b701
-[<805c0bd4>] (imx6q_timer_init+0x0/0x4c) from [<805ba4e8>] 
-(time_init+0x28/0x38)
-  r5:80633800 r4:805dc0f4
-[<805ba4c0>] (time_init+0x0/0x38) from [<805b6854>] 
-(start_kernel+0x1a0/0x310)
-[<805b66b4>] (start_kernel+0x0/0x310) from [<10008044>] (0x10008044)
-  r8:1000406a r7:805f3f8c r6:805dc0c4 r5:805f0518 r4:10c5387d
----[ end trace 1b75b31a2719ed1c ]---
-CPU identified as i.MX6S/DL, silicon rev 1.0
-...
+Rob
