@@ -1,108 +1,33 @@
-From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Thu, 14 Feb 2013 13:55:23 +0200
-Subject: [PATCH v4 2/3] ARM: OMAP2+: SoC name and revision unification
-In-Reply-To: <1360842924-32429-1-git-send-email-ruslan.bilovol@ti.com>
-References: <1360842924-32429-1-git-send-email-ruslan.bilovol@ti.com>
-Message-ID: <1360842924-32429-3-git-send-email-ruslan.bilovol@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 14 Feb 2013 14:01:25 +0200
+Subject: [GIT PULL] common: OMAP USB Host cleanup for 3.9
+Message-ID: <511CD215.8080005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a long story where for each new generation of
-OMAP we used different approaches for creating
-strings for SoCs names and revisions that this patch
-fixes. It makes future exporting of this information
-to SoC infrastructure easier.
+Hi Tony & Samuel,
 
-Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
----
- arch/arm/mach-omap2/id.c |   30 ++++++++++++++++++++++--------
- 1 file changed, 22 insertions(+), 8 deletions(-)
+This is the common patch for the OMAP USB Host cleanup series for 3.9.
+It makes changes to platform headers only.
+The other 2 pull requests, one for each of you will be based on this.
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 8a68f1e..3737700 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -31,8 +31,11 @@
- #define OMAP4_SILICON_TYPE_STANDARD		0x01
- #define OMAP4_SILICON_TYPE_PERFORMANCE		0x02
- 
-+#define OMAP_SOC_MAX_NAME_LENGTH		16
-+
- static unsigned int omap_revision;
--static const char *cpu_rev;
-+static char soc_name[OMAP_SOC_MAX_NAME_LENGTH];
-+static char soc_rev[OMAP_SOC_MAX_NAME_LENGTH];
- u32 omap_features;
- 
- unsigned int omap_rev(void)
-@@ -169,9 +172,12 @@ void __init omap2xxx_check_revision(void)
- 		j = i;
- 	}
- 
--	pr_info("OMAP%04x", omap_rev() >> 16);
-+	sprintf(soc_name, "OMAP%04x", omap_rev() >> 16);
-+	sprintf(soc_rev, "ES%x", (omap_rev() >> 12) & 0xf);
-+
-+	pr_info("%s", soc_name);
- 	if ((omap_rev() >> 8) & 0x0f)
--		pr_info("ES%x", (omap_rev() >> 12) & 0xf);
-+		pr_info("%s", soc_rev);
- 	pr_info("\n");
- }
- 
-@@ -211,8 +217,10 @@ static void __init omap3_cpuinfo(void)
- 		cpu_name = "OMAP3503";
- 	}
- 
-+	sprintf(soc_name, "%s", cpu_name);
-+
- 	/* Print verbose information */
--	pr_info("%s ES%s (", cpu_name, cpu_rev);
-+	pr_info("%s %s (", soc_name, soc_rev);
- 
- 	OMAP3_SHOW_FEATURE(l2cache);
- 	OMAP3_SHOW_FEATURE(iva);
-@@ -291,6 +299,7 @@ void __init ti81xx_check_features(void)
- 
- void __init omap3xxx_check_revision(void)
- {
-+	const char *cpu_rev;
- 	u32 cpuid, idcode;
- 	u16 hawkeye;
- 	u8 rev;
-@@ -438,6 +447,7 @@ void __init omap3xxx_check_revision(void)
- 		cpu_rev = "1.2";
- 		pr_warn("Warning: unknown chip type; assuming OMAP3630ES1.2\n");
- 	}
-+	sprintf(soc_rev, "ES%s", cpu_rev);
- }
- 
- void __init omap4xxx_check_revision(void)
-@@ -512,8 +522,10 @@ void __init omap4xxx_check_revision(void)
- 		omap_revision = OMAP4430_REV_ES2_3;
- 	}
- 
--	pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,
--		((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
-+	sprintf(soc_name, "OMAP%04x", omap_rev() >> 16);
-+	sprintf(soc_rev, "ES%d.%d", (omap_rev() >> 12) & 0xf,
-+						(omap_rev() >> 8) & 0xf);
-+	pr_info("%s %s\n", soc_name, soc_rev);
- }
- 
- void __init omap5xxx_check_revision(void)
-@@ -547,8 +559,10 @@ void __init omap5xxx_check_revision(void)
- 		omap_revision = OMAP5430_REV_ES1_0;
- 	}
- 
--	pr_info("OMAP%04x ES%d.0\n",
--			omap_rev() >> 16, ((omap_rev() >> 12) & 0xf));
-+	sprintf(soc_name, "OMAP%04x", omap_rev() >> 16);
-+	sprintf(soc_rev, "ES%d.0", (omap_rev() >> 12) & 0xf);
-+
-+	pr_info("%s %s\n", soc_name, soc_rev);
- }
- 
- /*
--- 
-1.7.9.5
+This is based on 3.8-rc6.
+
+Please pull. Thanks.
+
+The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
+
+  Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
+
+are available in the git repository at:
+  git://github.com/rogerq/linux.git usbhost17-common
+
+Roger Quadros (1):
+      ARM: OMAP: Consolidate OMAP USB-HS platform data (part 1/3)
+
+ include/linux/platform_data/usb-omap.h |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
+
+--
+cheers,
+-roger
