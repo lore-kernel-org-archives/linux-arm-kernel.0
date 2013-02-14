@@ -1,43 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 23:47:49 +0100
-Subject: [PATCH 7/9] remoteproc: omap: depend on OMAP_MBOX_FWK
+Date: Thu, 14 Feb 2013 23:47:48 +0100
+Subject: [PATCH 6/9] net: cwdavinci_cpdma: export symbols for cpsw
 In-Reply-To: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
 References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360882071-4072668-8-git-send-email-arnd@arndb.de>
+Message-ID: <1360882071-4072668-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch a62a6e98 "ARM: OMAP2+: Disable code that currently does not work
-with multiplaform" makes the OMAP_MBOX_FWK option depend on !MULTIPLATFORM,
-which means we cannot simply select that symbol from OMAP_REMOTEPROC.
-
-Turning the 'select' into 'depends on' ensures that all dependencies
-are correct until OMAP_MBOX_FWK loses its dependency.
+With the support for ARM AM33xx in multiplatform kernels
+in 3.9, an older bug appears in ARM allmodconfig:
+When the cpsw driver is built as a module with cpdma
+support enabled, it uses symbols that the cpdma driver
+does not export.
 
 Without this patch, building allmodconfig results in:
 
-drivers/remoteproc/omap_remoteproc.c:31:26: fatal error: plat/mailbox.h: No such file or directory
+ERROR: "cpdma_ctlr_int_ctrl" [drivers/net/ethernet/ti/ti_cpsw.ko] undefined!
+ERROR: "cpdma_control_set" [drivers/net/ethernet/ti/ti_cpsw.ko] undefined!
+ERROR: "cpdma_ctlr_eoi" [drivers/net/ethernet/ti/ti_cpsw.ko] undefined!
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Ohad Ben-Cohen <ohad@wizery.com>
+Cc: Mugunthan V N <mugunthanvnm@ti.com>
+Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Richard Cochran <richardcochran@gmail.com>
+Cc: netdev at vger.kernel.org
 ---
- drivers/remoteproc/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/ti/davinci_cpdma.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-index 0b24108..cc1f7bf 100644
---- a/drivers/remoteproc/Kconfig
-+++ b/drivers/remoteproc/Kconfig
-@@ -12,8 +12,8 @@ config OMAP_REMOTEPROC
- 	depends on HAS_DMA
- 	depends on ARCH_OMAP4
- 	depends on OMAP_IOMMU
-+	depends on OMAP_MBOX_FWK
- 	select REMOTEPROC
--	select OMAP_MBOX_FWK
- 	select RPMSG
- 	help
- 	  Say y here to support OMAP's remote processors (dual M3
+diff --git a/drivers/net/ethernet/ti/davinci_cpdma.c b/drivers/net/ethernet/ti/davinci_cpdma.c
+index 7d3bffd..8eeb7c9 100644
+--- a/drivers/net/ethernet/ti/davinci_cpdma.c
++++ b/drivers/net/ethernet/ti/davinci_cpdma.c
+@@ -492,11 +492,13 @@ int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable)
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(cpdma_ctlr_int_ctrl);
+ 
+ void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr)
+ {
+ 	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, 0);
+ }
++EXPORT_SYMBOL_GPL(cpdma_ctlr_eoi);
+ 
+ struct cpdma_chan *cpdma_chan_create(struct cpdma_ctlr *ctlr, int chan_num,
+ 				     cpdma_handler_fn handler)
+@@ -1028,3 +1030,4 @@ unlock_ret:
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(cpdma_control_set);
 -- 
 1.8.1.2
