@@ -1,44 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 23:47:43 +0100
-Subject: [PATCH 1/9] ARM: arch_timer: include linux/errno.h
+Date: Thu, 14 Feb 2013 23:47:51 +0100
+Subject: [PATCH 9/9] [media] davinci: do not include mach/hardware.h
 In-Reply-To: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
 References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360882071-4072668-2-git-send-email-arnd@arndb.de>
+Message-ID: <1360882071-4072668-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 8a4da6e "arm: arch_timer: move core to drivers/clocksource"
-moved a lot of code out of arch_timer.c, but ended up deleting
-too much, which broke some configurations.
+It is now possible to build the davinci vpss code
+on multiplatform kernels, which causes a problem
+since the driver tries to incude the davinci
+platform specific mach/hardware.h file. Fortunately
+that file is not required at all in the driver,
+so we can simply remove the #include statement.
 
-Obviously, include linux/errno.h is required to return error
-values.
+Without this patch, building allyesconfig results in:
 
-Without this patch, building allmodconfig results in:
-
-arch/arm/kernel/arch_timer.c: In function 'arch_timer_sched_clock_init':
-arch/arm/kernel/arch_timer.c:55:11: error: 'ENXIO' undeclared (first use in this function)
-arch/arm/kernel/arch_timer.c:55:11: note: each undeclared identifier is reported only once for each function it appears in
+drivers/media/platform/davinci/vpss.c:28:27: fatal error: mach/hardware.h: No such file or directory
+compilation terminated.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: "Lad, Prabhakar" <prabhakar.lad@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/kernel/arch_timer.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/media/platform/davinci/vpss.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 36ebcf4..d957a51 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -10,6 +10,7 @@
-  */
- #include <linux/init.h>
- #include <linux/types.h>
-+#include <linux/errno.h>
+diff --git a/drivers/media/platform/davinci/vpss.c b/drivers/media/platform/davinci/vpss.c
+index 494d322..a19c552 100644
+--- a/drivers/media/platform/davinci/vpss.c
++++ b/drivers/media/platform/davinci/vpss.c
+@@ -25,7 +25,6 @@
+ #include <linux/spinlock.h>
+ #include <linux/compiler.h>
+ #include <linux/io.h>
+-#include <mach/hardware.h>
+ #include <media/davinci/vpss.h>
  
- #include <asm/delay.h>
- #include <asm/sched_clock.h>
+ MODULE_LICENSE("GPL");
 -- 
 1.8.1.2
