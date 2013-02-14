@@ -1,27 +1,87 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Thu, 14 Feb 2013 09:12:10 +0100
-Subject: [PATCH v4 4/8] watchdog/at91sam9_wdt: Adjust the options of
- watchdog_info
-In-Reply-To: <20130213231522.GH7867@spo001.leaseweb.com>
-References: <1359702386-21284-1-git-send-email-wenyou.yang@atmel.com>
- <1359702386-21284-5-git-send-email-wenyou.yang@atmel.com>
- <20130213231522.GH7867@spo001.leaseweb.com>
-Message-ID: <1459249.A0040oxoB3@ws-stein>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Thu, 14 Feb 2013 09:14:22 +0100
+Subject: [PATCH v9 0/8] watchdog: dt: add support for the timeout-sec dt
+ property
+Message-ID: <1360829670-10418-1-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi all,
+this patchset add the timeout-sec property to the watchdog core,
+to the at91sam9_wdt driver and on all framework enabled watchdog driver
+with dt support.
+The at91sam9_wdt is tested on evk-pr3,
+the other drivers are compile tested only.
 
-On Thursday 14 February 2013 00:15:22, Wim Van Sebroeck wrote:
-> Hi Wenyou,
-> 
-> > Since the Watchdog Timer Mode Register can be only written only once,
-> > so the watchdog_info shall not support WDIOF_SETTIMEOUT
-> > and WDIOF_MAGICCLOSE options, remove them.
-> 
-> Ik you keep using the timer, then you don't have to remove this.
+Hi Wim,
+because the first two patches are fixes for the
+patch 433bf8dc344c0eacb3ff5bbc1aea42f75b170a72 already included in 
+watchdog-next feel free to squash them.
 
-Why removing especially WDIOF_MAGICCLOSE (and the timer needed for that)? This is a feature removal. Without there isn't even a need for nowayout option as it is implicitly set anyway.
-Nevertheless I would prefere keeping the timer to allow a user to let the kernel triggering the timer upon MAGICCLOSE.
+Best regards
+Fabio Porcedda
 
-Alexander
+changes:
+v9:
+  - rebase over watchdog-next, so remove first and second patch and
+    add two commit to fix the commit already present in watchdog-next
+  - add a commit for fixing coding style
+v8:
+  - watchdog_is_valid_timeout(): export in watchdog.h
+  - watchdog_is_valid_timeout(): use in watchdog_set_timeout()
+  - watchdog_is_valid_timeout(): split patch
+  - watchdog_init_timeout(): return -EINVAL for out of range values.
+  - watchdog_init_timeout(): use struct device instead of struct device_node
+v7:
+  - rebase over v3.8-rc2
+  - remove the patch already merged
+v6:
+  - remove patch for function of_get_timeout_sec as aked by Rob Herring
+  - add Acked-by: Jason Cooper <jason@lakedaemon.net>
+  - add Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+v5:
+  - fix codestyle for compilance ti checkpatch.pl about
+    "ERROR: do not initialise statics to 0 or NULL"
+    for s3c2410_wdt.c:56 and at91sam9_wdt.c:63
+v4:
+  - add of_get_timeout_sec
+  - add s3c2410_wdt driver
+  - split driver patch
+  - fixed watchdog_init_timeout handling of min_timeout and max_timeout
+v3:
+  - rename watchdog_probe_dt_timeout ->  watchdog_init_timeout
+  - move the watchdog_init_timeout function from inline to watchdog_core.c
+  - add timeout parameter handling code to watchdog_init_timeout
+  - add timeout-sec property to the pnx4008-wdt driver
+  - add two small commit for fixup and cleanup
+v2:
+  - change "timeout" to "timeout-sec" as asked by Jean-Christophe
+  - at91sam9_wdt: use the new helper function
+  - at91sam9_wdt: add bounds checking
+  - watchdog.h: add bounds checking
+
+Fabio Porcedda (8):
+  watchdog: core: add static to watchdog_check_min_max_timeout()
+  watchdog: core: fix watchdog_check_min_max_timeout() return value
+  watchdog: orion_wdt: add timeout-sec property binding
+  watchdog: pnx4008: add timeout-sec property binding
+  watchdog: s3c2410_wdt: add timeout-sec property binding
+  watchdog: at91sam9_wdt: add timeout-sec property binding
+  watchdog: orion_wdt: move the min_timeout initialization
+  watchdog: code: fix the alignement of some function declarations
+
+ .../devicetree/bindings/watchdog/atmel-wdt.txt          |  4 ++++
+ Documentation/devicetree/bindings/watchdog/marvel.txt   |  5 +++++
+ .../devicetree/bindings/watchdog/pnx4008-wdt.txt        |  4 ++++
+ .../devicetree/bindings/watchdog/samsung-wdt.txt        |  3 +++
+ drivers/watchdog/Kconfig                                |  1 +
+ drivers/watchdog/at91sam9_wdt.c                         | 16 +++++++++++++---
+ drivers/watchdog/orion_wdt.c                            | 10 ++++------
+ drivers/watchdog/pnx4008_wdt.c                          |  7 +++----
+ drivers/watchdog/s3c2410_wdt.c                          |  6 ++++--
+ drivers/watchdog/watchdog_core.c                        | 16 +++++++++++-----
+ drivers/watchdog/watchdog_dev.c                         | 17 ++++++-----------
+ 11 files changed, 58 insertions(+), 31 deletions(-)
+
+-- 
+1.8.1.1
