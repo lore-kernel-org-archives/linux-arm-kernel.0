@@ -1,47 +1,51 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 14 Feb 2013 21:48:16 +0100
-Subject: [PATCH 1/9] ARM: dt: add header to define GPIO flags
-In-Reply-To: <1360791198-29462-2-git-send-email-swarren@wwwdotorg.org>
-References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org><1360791198-29462-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130214.224816.1898594449880044716.hdoyu@nvidia.com>
+From: syamsidhardh@gmail.com (Syam Sidhardhan)
+Date: Fri, 15 Feb 2013 02:20:51 +0530
+Subject: [PATCH 2/3] ARM: prima2: Replace include linux/module.h with
+ linux/export.h
+In-Reply-To: <5EB3BFCD089AD643B9BB63439F5FD5E9012296E17C@SHAASIEXM01.ASIA.ROOT.PRI>
+References: <1352821789-6640-1-git-send-email-s.syam@samsung.com>
+ <5EB3BFCD089AD643B9BB63439F5FD5E9012296E17C@SHAASIEXM01.ASIA.ROOT.PRI>
+Message-ID: <CAFBvHifN+oZBGwzHv5PxSZea1O1HTwKwiFa8T3udw5vvRuiMug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 13 Feb 2013 22:33:10 +0100:
+Hi,
 
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Many GPIO device tree bindings use the same flags. Create a header to
-> define those.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/boot/dts/gpio.h |   10 ++++++++++
->  1 file changed, 10 insertions(+)
->  create mode 100644 arch/arm/boot/dts/gpio.h
-> 
-> diff --git a/arch/arm/boot/dts/gpio.h b/arch/arm/boot/dts/gpio.h
-> new file mode 100644
-> index 0000000..4c9da69
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/gpio.h
-> @@ -0,0 +1,10 @@
-> +/*
-> + * This header provides constants for most GPIO bindings.
-> + *
-> + * Most GPIO bindings include a flags cell as part of the GPIO specifier.
-> + * In most cases, the format of the flags cell uses the standard values
-> + * defined in this header.
-> + */
+On Wed, Nov 14, 2012 at 8:29 AM, Barry Song <Barry.Song@csr.com> wrote:
+>> -----Original Message-----
+>> From: Syam Sidhardhan [mailto:syamsidhardh at gmail.com]
+>> Sent: Tuesday, November 13, 2012 11:50 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: Barry Song
+>> Subject: [PATCH 2/3] ARM: prima2: Replace include linux/module.h with
+>> linux/export.h
+>>
+>> include <linux/export.h> is the right to go here.
+>>
+>> Signed-off-by: Syam Sidhardhan <s.syam@samsung.com>
+>
+> Acked. Thanks!
+>> ---
+>>  arch/arm/mach-prima2/pm.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
+>> index fb5a791..f4a2270 100644
+>> --- a/arch/arm/mach-prima2/pm.c
+>> +++ b/arch/arm/mach-prima2/pm.c
+>> @@ -9,7 +9,7 @@
+>>  #include <linux/kernel.h>
+>>  #include <linux/suspend.h>
+>>  #include <linux/slab.h>
+>> -#include <linux/module.h>
+>> +#include <linux/export.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_address.h>
+>>  #include <linux/of_device.h>
 
-#ifdef _DTS_GPIO_H
-#define _DTS_GPIO_H
 
-> +
-> +#define GPIO_ACTIVE_HIGH 0
-> +#define GPIO_ACTIVE_LOW 1
+Ping,..
+It's look like this patch is not yet applied.
 
-#endif /* _DTS_GPIO_H */
-
-To avoid multple inclusion problems, do we want the above
-ifdef/define/endif for other DT header files as well?
+Regards,
+Syam
