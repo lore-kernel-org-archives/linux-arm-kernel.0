@@ -1,42 +1,34 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 14 Feb 2013 12:28:45 +0200
-Subject: Getting your opinion about the best place to put one specific
- device driver...
-In-Reply-To: <20130213165439.GH7144@atomide.com>
-References: <511A0F11.1050608@stericsson.com>
- <201302121741.31494.arnd@arndb.de>
- <511B59E2.5060402@stericsson.com>
- <201302131104.01793.arnd@arndb.de>
- <20130213165439.GH7144@atomide.com>
-Message-ID: <20130214102845.GJ3073@tbergstrom-lnx.Nvidia.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 Feb 2013 12:37:29 +0200
+Subject: [PATCH 1/2] USB mxs-phy: Register phy with framework
+In-Reply-To: <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
+References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130214103729.GC15537@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 05:54:39PM +0100, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [130213 03:07]:
-> > On Wednesday 13 February 2013, Jean-Nicolas GRAUX wrote:
-> > > Le 02/12/2013 06:41 PM, Arnd Bergmann a ?crit :
-> > > > On Tuesday 12 February 2013, Jean-Nicolas GRAUX wrote:
-> > > > If a more dynamic user interface is needed, I think it would be good
-> > > > to have a generic mechanism in the pinctrl subsystem to reroute pins
-> > > > like these, which can work for all pins in the system (or at least
-> > > > those that have not been claimed by another device). I don't know if
-> > > > that interface already exists, but Linus would be the right person
-> > > > to answer that.
-> > >
-> > > I think i have one colleague that recently made a patch for that purpose.
-> > > But i believe this is still in progress. It consists in improving the 
-> > > pinctrl
-> > > debugfs interface to be able to manually change the pin muxing and
-> > > the gpio configuration for debug/testing purpose.
-> > 
-> > Sounds good to me. Peter, Tony, do you think that would be a good enough
-> > interface for other platforms as well?
+Hi,
+
+On Thu, Jan 31, 2013 at 12:32:16PM +0100, Sascha Hauer wrote:
+> We now have usb_add_phy_dev(), so use it to register with the framework
+> to be able to find the phy from the USB driver.
 > 
-> Yes debugfs is the way to go for modifying the hwobs settings.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Agreed. debugfs would be fine.
+Sascha, are you taking this through your tree or you want me to queue it
+up ?
 
-Cheers,
+If you want to take it:
 
-Peter.
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130214/3b0a8117/attachment.sig>
