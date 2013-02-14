@@ -1,76 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 23:26:56 +0100
-Subject: [PATCH 7/9] ARM defconfigs: add missing inclusions of
- linux/platform_device.h
+Date: Thu, 14 Feb 2013 23:26:57 +0100
+Subject: [PATCH 8/9] [media] s5p-fimc: fix s5pv210 build
 In-Reply-To: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
 References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360880818-4071454-8-git-send-email-arnd@arndb.de>
+Message-ID: <1360880818-4071454-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 16559ae "kgdb: remove #include <linux/serial_8250.h> from kgdb.h"
-removed an implicit inclusion of linux/platform_device.h
-In a number of places. This adds back explicit inclusions in a few
-more places I found.
+56bc911 "[media] s5p-fimc: Redefine platform data structure for fimc-is"
+changed the bus_type member of struct fimc_source_info treewide, but
+got one instance wrong in mach-s5pv210, which was evidently not
+even build tested.
+
+This adds the missing change to get s5pv210_defconfig to build again.
+Applies on the Mauro's media tree.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
 ---
- arch/arm/plat-samsung/include/plat/adc.h | 1 +
- drivers/video/clps711xfb.c               | 1 +
- drivers/video/mmp/fb/mmpfb.c             | 1 +
- include/linux/platform_data/s3c-hsotg.h  | 2 ++
- 4 files changed, 5 insertions(+)
+ arch/arm/mach-s5pv210/mach-goni.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/adc.h b/arch/arm/plat-samsung/include/plat/adc.h
-index b258a08..2fc8931 100644
---- a/arch/arm/plat-samsung/include/plat/adc.h
-+++ b/arch/arm/plat-samsung/include/plat/adc.h
-@@ -15,6 +15,7 @@
- #define __ASM_PLAT_ADC_H __FILE__
- 
- struct s3c_adc_client;
-+struct platform_device;
- 
- extern int s3c_adc_start(struct s3c_adc_client *client,
- 			 unsigned int channel, unsigned int nr_samples);
-diff --git a/drivers/video/clps711xfb.c b/drivers/video/clps711xfb.c
-index 5a7af0d..f009806 100644
---- a/drivers/video/clps711xfb.c
-+++ b/drivers/video/clps711xfb.c
-@@ -26,6 +26,7 @@
- #include <linux/fb.h>
- #include <linux/init.h>
- #include <linux/delay.h>
-+#include <linux/platform_device.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-diff --git a/drivers/video/mmp/fb/mmpfb.c b/drivers/video/mmp/fb/mmpfb.c
-index f34a3a9..6d1fa96 100644
---- a/drivers/video/mmp/fb/mmpfb.c
-+++ b/drivers/video/mmp/fb/mmpfb.c
-@@ -21,6 +21,7 @@
-  */
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
-+#include <linux/platform_device.h>
- #include "mmpfb.h"
- 
- static int var_to_pixfmt(struct fb_var_screeninfo *var)
-diff --git a/include/linux/platform_data/s3c-hsotg.h b/include/linux/platform_data/s3c-hsotg.h
-index 8b79e09..3f1cbf9 100644
---- a/include/linux/platform_data/s3c-hsotg.h
-+++ b/include/linux/platform_data/s3c-hsotg.h
-@@ -15,6 +15,8 @@
- #ifndef __LINUX_USB_S3C_HSOTG_H
- #define __LINUX_USB_S3C_HSOTG_H
- 
-+struct platform_device;
-+
- enum s3c_hsotg_dmamode {
- 	S3C_HSOTG_DMA_NONE,	/* do not use DMA at-all */
- 	S3C_HSOTG_DMA_ONLY,	/* always use DMA */
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 3a38f7b..e373de4 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -845,7 +845,7 @@ static struct fimc_source_info goni_camera_sensors[] = {
+ 		.mux_id		= 0,
+ 		.flags		= V4L2_MBUS_PCLK_SAMPLE_FALLING |
+ 				  V4L2_MBUS_VSYNC_ACTIVE_LOW,
+-		.bus_type	= FIMC_BUS_TYPE_ITU_601,
++		.fimc_bus_type	= FIMC_BUS_TYPE_ITU_601,
+ 		.board_info	= &noon010pc30_board_info,
+ 		.i2c_bus_num	= 0,
+ 		.clk_frequency	= 16000000UL,
 -- 
 1.8.1.2
