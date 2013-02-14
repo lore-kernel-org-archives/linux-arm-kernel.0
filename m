@@ -1,40 +1,166 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 13 Feb 2013 20:25:45 -0800 (PST)
-Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
-In-Reply-To: <20130214042027.GD6036@verge.net.au>
-References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
- <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
- <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
- <878v6rv8ij.wl%kuninori.morimoto.gx@renesas.com>
- <20130214042027.GD6036@verge.net.au>
-Message-ID: <87621vv7wa.wl%kuninori.morimoto.gx@renesas.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 13 Feb 2013 23:27:38 -0500 (EST)
+Subject: [PATCH 3/9] ARM: asm: Add ARM_BE8() assembly helper
+In-Reply-To: <1360752927-29331-4-git-send-email-ben.dooks@codethink.co.uk>
+References: <1360752927-29331-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1360752927-29331-4-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <alpine.LFD.2.03.1302132326400.8736@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 13 Feb 2013, Ben Dooks wrote:
 
-Hi Simon
-
-> > >>       CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
-> > >> -     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
-> > >> +     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
-> > >>       CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
-(snip)
-> > This means that current TMU02 numbering seems doubtful too ?
-> > How about just rever 58079fa7d54a0929d304054ee759187a2ccd3cdf ?
+> Add ARM_BE8() helper to wrap any code conditional on being
+> compile when CONFIG_ARM_ENDIAN_BE8 is selected and convert
+> existing places where this is to use it.
 > 
-> Perhaps that is a good idea.
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
 > 
-> The original motivation for this patch was to add the TMU02 line.
-> And "fixing" TMU01 was an afterthought. However, I am also
-> now doubtful about the correctness of the TMU02 line and thus
-> the usefulness of the original patch.
+> Conflicts:
+> 	arch/arm/include/asm/assembler.h
 
-I think this comment out is creating confusion ?
+Don't forget to get rid of the above in your commit message.
 
-/* TMU00 */ -> /* TMU0 channel 0 */
-/* TMU01 */ -> /* TMU0 channel 1 */
-/* TMU02 */ -> /* TMU0 channel 2 */
-
-Best regards
----
-Kuninori Morimoto
+> ---
+>  arch/arm/boot/compressed/head.S  |    8 ++------
+>  arch/arm/include/asm/assembler.h |    7 +++++++
+>  arch/arm/kernel/entry-armv.S     |    5 ++---
+>  arch/arm/kernel/entry-common.S   |    4 +---
+>  arch/arm/mm/abort-ev6.S          |    5 ++---
+>  arch/arm/mm/proc-v6.S            |    4 +---
+>  arch/arm/mm/proc-v7.S            |    4 +---
+>  7 files changed, 16 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index fe4d9c3..15ebdd6 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -678,9 +678,7 @@ __armv4_mmu_cache_on:
+>  		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+>  		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
+>  		orr	r0, r0, #0x0030
+> -#ifdef CONFIG_CPU_ENDIAN_BE8
+> -		orr	r0, r0, #1 << 25	@ big-endian page tables
+> -#endif
+> + ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
+>  		bl	__common_mmu_cache_on
+>  		mov	r0, #0
+>  		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+> @@ -707,9 +705,7 @@ __armv7_mmu_cache_on:
+>  		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
+>  						@ (needed for ARM1176)
+>  #ifdef CONFIG_MMU
+> -#ifdef CONFIG_CPU_ENDIAN_BE8
+> -		orr	r0, r0, #1 << 25	@ big-endian page tables
+> -#endif
+> + ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
+>  		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
+>  		orrne	r0, r0, #1		@ MMU enabled
+>  		movne	r1, #0xfffffffd		@ domain 0 = client
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index eb87200..dbcbd08 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -53,6 +53,13 @@
+>  #define put_byte_3      lsl #0
+>  #endif
+>  
+> +/* Select code for any configuration running in BE8 mode */
+> +#ifdef CONFIG_ARM_CPU_ENDIAN_BE8
+> +#define ARM_BE8(code...) code
+> +#else
+> +#define ARM_BE8(code...)
+> +#endif
+> +
+>  /*
+>   * Data preload for architectures that support it
+>   */
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index 0f82098..291d295 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -457,9 +457,8 @@ __und_usr:
+>  	bne	__und_usr_thumb
+>  	sub	r4, r2, #4			@ ARM instr at LR - 4
+>  1:	ldrt	r0, [r4]
+> -#ifdef CONFIG_CPU_ENDIAN_BE8
+> -	rev	r0, r0				@ little endian instruction
+> -#endif
+> + ARM_BE8(rev	r0, r0)				@ little endian instruction
+> +
+>  	@ r0 = 32-bit ARM instruction which caused the exception
+>  	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
+>  	@ r4 = PC value for the faulting instruction
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index a6c301e..d5988afc 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -368,9 +368,7 @@ ENTRY(vector_swi)
+>  #else
+>  	ldr	r10, [lr, #-4]			@ get SWI instruction
+>  #endif
+> -#ifdef CONFIG_CPU_ENDIAN_BE8
+> -	rev	r10, r10			@ little endian instruction
+> -#endif
+> + ARM_BE8(rev	r10, r10)			@ little endian instruction
+>  
+>  #elif defined(CONFIG_AEABI)
+>  
+> diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
+> index 8074199..3815a82 100644
+> --- a/arch/arm/mm/abort-ev6.S
+> +++ b/arch/arm/mm/abort-ev6.S
+> @@ -38,9 +38,8 @@ ENTRY(v6_early_abort)
+>  	bne	do_DataAbort
+>  	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
+>  	ldr	r3, [r4]			@ read aborted ARM instruction
+> -#ifdef CONFIG_CPU_ENDIAN_BE8
+> -	rev	r3, r3
+> -#endif
+> + ARM_BE8(rev	r3, r3)
+> +
+>  	do_ldrd_abort tmp=ip, insn=r3
+>  	tst	r3, #1 << 20			@ L = 0 -> write
+>  	orreq	r1, r1, #1 << 11		@ yes.
+> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+> index bcaaa8d..2f060fa 100644
+> --- a/arch/arm/mm/proc-v6.S
+> +++ b/arch/arm/mm/proc-v6.S
+> @@ -220,9 +220,7 @@ __v6_setup:
+>  #endif /* CONFIG_MMU */
+>  	adr	r5, v6_crval
+>  	ldmia	r5, {r5, r6}
+> -#ifdef CONFIG_CPU_ENDIAN_BE8
+> -	orr	r6, r6, #1 << 25		@ big-endian page tables
+> -#endif
+> + ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
+>  	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+>  	bic	r0, r0, r5			@ clear bits them
+>  	orr	r0, r0, r6			@ set them
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 3a3c015..d17996b 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -328,9 +328,7 @@ __v7_setup:
+>  #endif
+>  	adr	r5, v7_crval
+>  	ldmia	r5, {r5, r6}
+> -#ifdef CONFIG_CPU_ENDIAN_BE8
+> -	orr	r6, r6, #1 << 25		@ big-endian page tables
+> -#endif
+> + ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
+>  #ifdef CONFIG_SWP_EMULATE
+>  	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
+>  	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
