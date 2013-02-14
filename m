@@ -1,45 +1,40 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 14 Feb 2013 15:47:50 +0100
-Subject: i.MX6 Solo: maxcpus=1 vs. nosmp: Warning from smp_twd.c?
-In-Reply-To: <CAOMZO5CTfzZxRNQF=x5-MkM4nGBOXRd0CN7OnO1p=ahHDoT8CQ@mail.gmail.com>
-References: <511CF063.3010200@de.bosch.com>
- <CAOMZO5CTfzZxRNQF=x5-MkM4nGBOXRd0CN7OnO1p=ahHDoT8CQ@mail.gmail.com>
-Message-ID: <511CF916.2060705@de.bosch.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 14 Feb 2013 16:52:57 +0200
+Subject: [PATCH] clk: tegra: provide dummy cpu car ops
+Message-ID: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.02.2013 15:40, Fabio Estevam wrote:
-> Hi Dirk,
-> 
-> On Thu, Feb 14, 2013 at 12:10 PM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->> Hi,
->>
->> working on a i.MX6 Solo SoC (one Cortex A9 core) we are usually booting with
->> maxcpus=1 a kernel built with CONFIG_NR_CPUS=4. This is done to be able to
->> boot the same kernel on the Solo and Quad version of that SoC.
->>
->> Now, we tried to switch from 'maxcpus=1' to 'nosmp'. With 'nosmp' we get the
->> warning [1] in the boot messages. This isn't there with 'maxcpus=1'.
-> 
-> maxcpus=1 and nosmp are not equivalent as per the comment from kernel/smp.c:
-> 
-> /*
->  * Setup routine for controlling SMP activation
->  *
->  * Command-line option of "nosmp" or "maxcpus=0" will disable SMP
->  * activation entirely (the MPS table probe still happens, though).
->  *
->  * Command-line option of "maxcpus=<NUM>", where <NUM> is an integer
->  * greater than 0, limits the maximum number of CPUs activated in
->  * SMP mode to <NUM>.
->  */
+tegra_boot_secondary() relies on some of the car ops. This means having an
+uninitialized tegra_cpu_car_ops will lead to an early boot panic.
+Providing a dummy struct avoids this and makes adding Tegra114 clock support
+in a bisectable way a lot easier.
 
-Yes, understood that both options are not equal.
+--
 
-But should both options work on a single ARM Cortex A9 SoC without a 
-warning? Or should one of the both options be preferred on a single ARM 
-Cortex A9 SoC?
+Stephen,
 
-Thanks
+Should this be a separate patch or should I make this part of new release of
+the Tegra114 clock series?
 
-Dirk
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
+index a603b9a..f6c141f 100644
+--- a/drivers/clk/tegra/clk.c
++++ b/drivers/clk/tegra/clk.c
+@@ -22,7 +22,8 @@
+ #include "clk.h"
+ 
+ /* Global data of Tegra CPU CAR ops */
+-struct tegra_cpu_car_ops *tegra_cpu_car_ops;
++static struct tegra_cpu_car_ops *dummy_car_ops;
++struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+ 
+ void __init tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
+ 				struct clk *clks[], int clk_max)
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
