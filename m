@@ -1,34 +1,47 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 14 Feb 2013 16:58:38 +0530
-Subject: [PATCH 1/1] ARM: dts: AM33XX: Add CPSW phy_id device tree data to
- am335x-evmsk
-Message-ID: <1360841318-11774-1-git-send-email-mugunthanvnm@ti.com>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Thu, 14 Feb 2013 13:55:21 +0200
+Subject: [PATCH v4 0/3] ARM: OMAP2+: Export SoC information to userspace using
+ SoC infrastructure
+Message-ID: <1360842924-32429-1-git-send-email-ruslan.bilovol@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add phy_id device tree data to am335x-evmsk device to bring up CPSW
-ethernet present on am335x starter kit.
+Hi,
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- arch/arm/boot/dts/am335x-evmsk.dts |    8 ++++++++
- 1 file changed, 8 insertions(+)
+This patch series is an attempt to export some OMAP SoC
+information (like name, revision etc.) to userspace.
+The first patch does some unification of OMAP SoC
+information representation in current sources.
+Second patch adds exactly needed changes using
+exists in Linux kernel SoC infrastructure.
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index f5a6162..f297b85 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -248,3 +248,11 @@
- 		};
- 	};
- };
-+
-+&cpsw_emac0 {
-+	phy_id = <&davinci_mdio>, <0>;
-+};
-+
-+&cpsw_emac1 {
-+	phy_id = <&davinci_mdio>, <1>;
-+};
+-----------------------------------------
+v4:
+- Moved common part of late init into common function  in additional
+  separate patch
+- rebased on top of 'omap-for-v3.9/soc' branch of tmlind/linux-omap tree
+
+-----------------------------------------
+v3:
+- reduced number of lines changed in the first patch (reusing
+  existent code)
+
+-----------------------------------------
+v2:
+- changed cpu_* -> soc_* variable names
+- rebased on top of 'omap-for-v3.9/soc' branch of tmlind/linux-omap tree
+
+
+Ruslan Bilovol (3):
+  ARM: OMAP2+: Move common part of late init into common function
+  ARM: OMAP2+: SoC name and revision unification
+  ARM: OMAP2+: Export SoC information to userspace
+
+ arch/arm/mach-omap2/common.h |    8 ++++
+ arch/arm/mach-omap2/id.c     |   95 ++++++++++++++++++++++++++++++++++++++----
+ arch/arm/mach-omap2/io.c     |   34 +++++++--------
+ arch/arm/plat-omap/Kconfig   |    1 +
+ 4 files changed, 112 insertions(+), 26 deletions(-)
+
 -- 
 1.7.9.5
