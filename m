@@ -1,55 +1,48 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 14 Feb 2013 13:42:22 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
-In-Reply-To: <20130214043648.GA4773@verge.net.au>
-References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
- <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
- <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
- <878v6rv8ij.wl%kuninori.morimoto.gx@renesas.com>
- <20130214042027.GD6036@verge.net.au>
- <87621vv7wa.wl%kuninori.morimoto.gx@renesas.com>
- <20130214043648.GA4773@verge.net.au>
-Message-ID: <20130214044221.GB4773@verge.net.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Feb 2013 21:42:39 -0700
+Subject: [PATCH v1 2/4] ARM: dts: Add i2c-arbitrator bus for
+ exynos5250-snow
+In-Reply-To: <CAD=FV=XLMYAyW7W3PtoUmROOgttuypHKNWtrcALw3t6jdyEDPw@mail.gmail.com>
+References: <1360778532-7480-1-git-send-email-dianders@chromium.org>
+ <1360778532-7480-2-git-send-email-dianders@chromium.org>
+ <511BFFD2.8090102@wwwdotorg.org>
+ <CAD=FV=XLMYAyW7W3PtoUmROOgttuypHKNWtrcALw3t6jdyEDPw@mail.gmail.com>
+Message-ID: <511C6B3F.3030206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 01:36:49PM +0900, Simon Horman wrote:
-> On Wed, Feb 13, 2013 at 08:25:45PM -0800, Kuninori Morimoto wrote:
-> > 
-> > Hi Simon
-> > 
-> > > > >>       CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
-> > > > >> -     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
-> > > > >> +     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
-> > > > >>       CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
-> > (snip)
-> > > > This means that current TMU02 numbering seems doubtful too ?
-> > > > How about just rever 58079fa7d54a0929d304054ee759187a2ccd3cdf ?
-> > > 
-> > > Perhaps that is a good idea.
-> > > 
-> > > The original motivation for this patch was to add the TMU02 line.
-> > > And "fixing" TMU01 was an afterthought. However, I am also
-> > > now doubtful about the correctness of the TMU02 line and thus
-> > > the usefulness of the original patch.
-> > 
-> > I think this comment out is creating confusion ?
-> > 
-> > /* TMU00 */ -> /* TMU0 channel 0 */
-> > /* TMU01 */ -> /* TMU0 channel 1 */
-> > /* TMU02 */ -> /* TMU0 channel 2 */
+On 02/13/2013 05:38 PM, Doug Anderson wrote:
+> Stephen,
 > 
-> That does make things a little clearer,
-> but I for one wasn't confused by the existing comments.
+> 
+> On Wed, Feb 13, 2013 at 1:04 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 02/13/2013 11:02 AM, Doug Anderson wrote:
+>>> We need to use the i2c-arbitrator to talk to any of the devices on i2c
+>>> bus 4 on exynos5250-snow so that we don't confuse the embedded
+>>> controller (EC).  Add the i2c-arbitrator to the device tree.  As we
+>>> add future devices (keyboard, sbs, tps65090) we'll add them on top of
+>>> this.
+>>>
+>>> The arbitrated bus is numbered 104 simply as a convenience to make it
+>>> easier for people poking around to guess that it might have something
+>>> to do with the physical bus 4.
+>>>
+>>> The addition is split between the cros5250-common and the snow device
+>>> tree file since not all cros5250-class devices use arbitration.
 
-Ok, now I think I see what you are getting at.
+>>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>>
+>>> +     i2c-arbitrator {
+>>> +             compatible = "i2c-arbitrator";
+>>> +             #address-cells = <1>;
+>>> +             #size-cells = <0>;
+>>
+>>> +             /* Use ID 104 as a hint that we're on physical bus 4 */
+>>> +             i2c_104: i2c at 0 {
+>>
+>> Does something use that hint? It sounds a little odd.
+> 
+> The i2c bus numbering patches will end up creating "/dev/i2c-104".
 
-MSTP016 is for channel 0..n of TMU0
-MSTP015 is for channel 1..n of TMU1
-MSTP014 is for channel 2..n of TMU2
-
-And all the TMU values set by CLKDEV_DEV_ID statements above
-relate to channels of TMU0.
-
-That does seem to be a valid interpretation of the documentation
-now that I read it again.
+Oh sorry, I see this is just the alias doing it's job. I'd misread that
+as the reg value being 104 and driving the bus ID.
