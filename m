@@ -1,71 +1,44 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 14 Feb 2013 10:17:04 +0530
-Subject: [PATCH V4 0/5] Add generic DMA DT binding support
-In-Reply-To: <CAAgF-Be1w-8yjuyXT+d8sUO8dee1x7oYFJLXHCmcJSf17eXWyw@mail.gmail.com>
-References: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
- <20130212144950.GJ3789@intel.com>
- <CAAgF-Be1w-8yjuyXT+d8sUO8dee1x7oYFJLXHCmcJSf17eXWyw@mail.gmail.com>
-Message-ID: <20130214044704.GE7777@intel.com>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Thu, 14 Feb 2013 04:54:15 +0000
+Subject: [PATCH] ARM: OMAP: Clock: Remove CK_* flags
+In-Reply-To: <alpine.DEB.2.00.1302131942470.8234@utopia.booyaka.com>
+References: <1359966525-7603-1-git-send-email-j-keerthy@ti.com>
+ <alpine.DEB.2.00.1302080248550.8539@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B92FF@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302081805450.28008@utopia.booyaka.com>
+ <alpine.DEB.2.00.1302081855370.28008@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B966E@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302111538430.8260@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B989B@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302120638580.14983@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229B98DD@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302122028480.29149@utopia.booyaka.com>
+ <DC88CAD03C0052499C1907B327FC63229BAB0B@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302131942470.8234@utopia.booyaka.com>
+Message-ID: <DC88CAD03C0052499C1907B327FC63229BAE7D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 09:52:30AM +0530, Padma Venkat wrote:
-> Hi Vinod,
-> 
-> On Tue, Feb 12, 2013 at 8:19 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Mon, Feb 11, 2013 at 02:08:20PM +0530, Padmavathi Venna wrote:
-> >
-> > This looks fine, I have only question. The code seems to assume that pl330 dma
-> > controller always uses DT. But I dont see that as dependency for pl330.
-Have you checked this?
 
-> > Something tells me withot OF the driver may not build, have you checked it?
-> >
-> >> This patch set adds support for generic dma device tree bindings for
-> >> Samsung platforms and is dependent on the following patches from
-> >> Vinod Koul next branch
-> >> 1)of: Add generic device tree DMA helpers
-> >> 2)dmaengine: add helper function to request a slave DMA channel
-> >>
-> >> This patch set is made based Mark Brown next branch
-> > Is this targetted for ASoC tree, if so why? It would fail to build if applied
-> > there
+
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Thursday, February 14, 2013 1:14 AM
+> To: J, KEERTHY
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH] ARM: OMAP: Clock: Remove CK_* flags
 > 
-> I have done this for my testing purpose (I expected all will directly
-> apply in your branch). But 3rd patch is not applied directly. I will
-> resend the patches after re-basing on your tree. 5th patch has to go
-> in ASoC tree because it has dependency on "ARM: SAMSUNG: Make dma
-> request compatible to generic dma bindings" which is there in ASoC
-> tree.
+> On Wed, 13 Feb 2013, J, KEERTHY wrote:
 > 
-> Hi Mark,
+> > So the patch needs to be rebased after 3.9 right?
 > 
-> Can you please take the 5th patch in your tree(if there is no issue)
-> or should I resend it as a separate patch?
+> No, I've already done that.  At this point, I don't think there's
+> anything
+> further that you need to do with it.  Will let you know if that turns
+> out
+> not to be true.
+
+Ok. Thanks Paul.
+
 > 
-> >
-> > --
-> > ~Vinod
-> >>
-> >> Padmavathi Venna (5):
-> >>   DMA: PL330: Add new pl330 filter for DT case.
-> >>   DMA: PL330: Add xlate function
-> >>   DMA: PL330: Register the DMA controller with the generic DMA helpers
-> >>   ARM: dts: pl330: Add #dma-cells for generic dma binding support
-> >>   ARM: SAMSUNG: dma: Remove unnecessary code
-> >>
-> >>  .../devicetree/bindings/dma/arm-pl330.txt          |   21 +++++--
-> >>  arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++
-> >>  arch/arm/mach-s3c24xx/include/mach/dma.h           |    1 -
-> >>  arch/arm/mach-s3c64xx/include/mach/dma.h           |    1 -
-> >>  arch/arm/plat-samsung/dma-ops.c                    |   10 +---
-> >>  arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 -
-> >>  arch/arm/plat-samsung/include/plat/dma-pl330.h     |    1 -
-> >>  drivers/dma/pl330.c                                |   64 +++++++++++++++----
-> >>  8 files changed, 79 insertions(+), 32 deletions(-)
-> >>
-> >> --
-> >> 1.7.4.4
-> >>
-> Thanks
-> Padma
+> - Paul
