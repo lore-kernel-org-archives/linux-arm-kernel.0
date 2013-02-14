@@ -1,42 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 23:47:47 +0100
-Subject: [PATCH 5/9] drm: export drm_vm_open_locked
+Date: Thu, 14 Feb 2013 23:47:45 +0100
+Subject: [PATCH 3/9] ARM: omap2: include linux/errno.h in hwmod_reset
 In-Reply-To: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
 References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360882071-4072668-6-git-send-email-arnd@arndb.de>
+Message-ID: <1360882071-4072668-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the exynos DRM driver can now be built as a module on
-all multiplatform configurations, an existing bug has
-become visible: The exynos driver uses the drm_vm_open_locked
-function that is not exported. The obvious solution is to
-export that symbol.
+The newly created omap_hwmod_reset.c is missing an
+include of linux/errno.h in commit c02060d8 "ARM:
+OMAP4+: AESS: enable internal auto-gating during
+initial setup". It still works in omap2_defconfig,
+but not in all other combinations.
 
-Without this patch, building ARM allmodconfig results in:
+Without this patch, building allmodconfig results in:
 
-ERROR: "drm_vm_open_locked" [drivers/gpu/drm/exynos/exynosdrm.ko] undefined!
+arch/arm/mach-omap2/omap_hwmod_reset.c: In function 'omap_hwmod_aess_preprogram':
+arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: error: 'EINVAL' undeclared (first use in this function)
+arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: note: each undeclared identifier is reported only once for each function it appears in
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Dave Airlie <airlied@redhat.com>
-Cc: Shirish S <s.shirish@samsung.com>
-Cc: Inki Dae <inki.dae@samsung.com>
-Cc: Rob Clark <rob@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Sebastien Guiriec <s-guiriec@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- drivers/gpu/drm/drm_vm.c | 1 +
+ arch/arm/mach-omap2/omap_hwmod_reset.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/drm_vm.c b/drivers/gpu/drm/drm_vm.c
-index db7bd29..1d4f7c9 100644
---- a/drivers/gpu/drm/drm_vm.c
-+++ b/drivers/gpu/drm/drm_vm.c
-@@ -422,6 +422,7 @@ void drm_vm_open_locked(struct drm_device *dev,
- 		list_add(&vma_entry->head, &dev->vmalist);
- 	}
- }
-+EXPORT_SYMBOL_GPL(drm_vm_open_locked);
+diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
+index bba43fa..65e186c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_reset.c
++++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
+@@ -24,6 +24,7 @@
+  * 02110-1301 USA
+  */
+ #include <linux/kernel.h>
++#include <linux/errno.h>
  
- static void drm_vm_open(struct vm_area_struct *vma)
- {
+ #include <sound/aess.h>
+ 
 -- 
 1.8.1.2
