@@ -1,24 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 11:27:07 +0000
-Subject: Build error: OMAP randconfig / mvebu
-In-Reply-To: <20130214111234.GB3059@localhost>
-References: <20130208100813.GN17833@n2100.arm.linux.org.uk>
- <20130214110803.GP17852@n2100.arm.linux.org.uk>
- <20130214111234.GB3059@localhost>
-Message-ID: <201302141127.07378.arnd@arndb.de>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 14 Feb 2013 16:58:38 +0530
+Subject: [PATCH 1/1] ARM: dts: AM33XX: Add CPSW phy_id device tree data to
+ am335x-evmsk
+Message-ID: <1360841318-11774-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 February 2013, Ezequiel Garcia  wrote:
-> On Thu, Feb 14, 2013 at 11:08:03AM +0000, Russell King - ARM Linux wrote:
-> > 
-> > It's all publically available via my website.
-> 
-> I'm kind of new around here, and I have no clue where that may be.
-> 
-> I hope you don't mind helping me this time.
+Add phy_id device tree data to am335x-evmsk device to bring up CPSW
+ethernet present on am335x starter kit.
 
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
+ arch/arm/boot/dts/am335x-evmsk.dts |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Please have a look at http://www.arm.linux.org.uk/developer/build/
-
-	Arnd
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index f5a6162..f297b85 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -248,3 +248,11 @@
+ 		};
+ 	};
+ };
++
++&cpsw_emac0 {
++	phy_id = <&davinci_mdio>, <0>;
++};
++
++&cpsw_emac1 {
++	phy_id = <&davinci_mdio>, <1>;
++};
+-- 
+1.7.9.5
