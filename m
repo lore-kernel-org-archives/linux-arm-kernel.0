@@ -1,47 +1,79 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Thu, 14 Feb 2013 08:52:06 +0000
-Subject: [PATCH RFC] davinci: poll for sleep completion in resume routine.
-In-Reply-To: <511C8B3F.6010200@ti.com>
-References: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
- <511C65B3.7060109@ti.com>
- <A4887BF146CD57468F700B415D2F470158374E@DBDE01.ent.ti.com>
- <511C8B3F.6010200@ti.com>
-Message-ID: <A4887BF146CD57468F700B415D2F47015837B5@DBDE01.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 Feb 2013 09:52:41 +0100
+Subject: Getting your opinion about the best place to put one specific
+ device driver...
+In-Reply-To: <201302131104.01793.arnd@arndb.de>
+References: <511A0F11.1050608@stericsson.com>
+ <201302121741.31494.arnd@arndb.de>
+ <511B59E2.5060402@stericsson.com>
+ <201302131104.01793.arnd@arndb.de>
+Message-ID: <CACRpkdbGLoXY=g_pkF42FZgH+8yRUnKafvMmab_gwqDhYpE69A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Wed, Feb 13, 2013 at 12:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 13 February 2013, Jean-Nicolas GRAUX wrote:
+>> Le 02/12/2013 06:41 PM, Arnd Bergmann a ?crit :
+>> > On Tuesday 12 February 2013, Jean-Nicolas GRAUX wrote:
+>> > If a more dynamic user interface is needed, I think it would be good
+>> > to have a generic mechanism in the pinctrl subsystem to reroute pins
+>> > like these, which can work for all pins in the system (or at least
+>> > those that have not been claimed by another device). I don't know if
+>> > that interface already exists, but Linus would be the right person
+>> > to answer that.
+>>
+>> I think i have one colleague that recently made a patch for that purpose.
+>> But i believe this is still in progress. It consists in improving the
+>> pinctrl
+>> debugfs interface to be able to manually change the pin muxing and
+>> the gpio configuration for debug/testing purpose.
+>
+> Sounds good to me. Peter, Tony, do you think that would be a good enough
+> interface for other platforms as well?
 
-On Thu, Feb 14, 2013 at 12:29:11, Nori, Sekhar wrote:
-> On 2/14/2013 10:46 AM, Vishwanathrao Badarkhe, Manish wrote:
-> > Hi Sekhar,
-> > 
-> > On Thu, Feb 14, 2013 at 09:48:59, Nori, Sekhar wrote:
-> >> Manish,
-> >>
-> >> On 1/31/2013 2:56 PM, Vishwanathrao Badarkhe, Manish wrote:
-> >>> As per OMAP-L138 TRM, Software must poll for SLEEPCOMPLETE bit until 
-> >>> it is set to 1 before clearing SLEEPENABLE bit in DEEPSLEEP register 
-> >>> in resume routine.
-> >>> Modifications are as per datasheet:
-> >>> http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
-> >>> See sections 10.10.2.2 and 11.5.21 for more detailed explanation.
-> >>
-> >> Polling for SLEEPCOMPLETE is not required in RTC controlled wake-up which is the mode currently supported (see section 10.10.2.1 of the TRM). Polling for SLEEPCOMPLETE is required for external controlled wake-up which to my knowledge has never been tested. If you have tested this with external controlled wakep-up, then I can consider this patch.
-> >> Else, I would like to take it only after externally controlled wake-up is fully tested/supported instead of taking bits and pieces.
-> > 
-> > Yes, for RTC controlled wakeup, this polling is not required as per section 10.10.2.1.
-> > But if we see in section 10.10.2.2 (Exiting Deep Sleep Mode) step 2, 
-> > When sleep count completes SLEEPCOMPLETE bit gets sets in DEEPSLEEP 
-> > register till that it's not safe to release clock to devices. So If we 
-> > don?t poll for SLEEPCOMPLETE, this delay will not come into picture 
-> > which we actually set while entering deep sleep in case of RTC controlled wakeup (Section 10.10.2.1 step 9).
-> > Please let me know, whether these understanding is correct?
-> 
-> The  delay is coming from hardware. Till SLEEPCOUNT completes, the clock to device is not provided. There is no need to poll for SLEEPCOMPLETE and indeed 10.10.2.2 does not ask for this bit to be polled.
+We're talking about this:
+http://marc.info/?l=linux-kernel&m=136052713530502&w=2
 
-Thanks for your explanation.
-Ok, I will test this patch with external controlled wakeup and update you.
+We're discussing it right now but Stephen Warren has some
+valid concerns so I'm pondering the right way forward.
 
-Regards, 
-Manish Badarkhe
+However that patch is about pin configuration, which is
+dealing with an opaque unsigned long. This usecase would
+be a debugfs interface to set up muxing and a totally different
+piece of code in drivers/pinctrl/pinmux.c. But I think it's
+a good idea!
+
+Traditionally, hardware observation and stuff like this has been
+kept out of the mainline kernel, and the fact that we're getting to
+it now is due to the fact that all the basic stuff is already quite
+nicely lined up. So it's basically a good sign.
+
+>> > If there is a generic way to configure pinmux from user space, you
+>> > can essentially move this driver into an application running outside
+>> > of the kernel.
+>> >
+>> The matter is that this hwobs driver do more than just changing
+>> the muxing of one pin group in the digital baseband.
+>> It also control some specific registers to configure the hwobs IP.
+>> More in details, for each of the 18 external IOs, it is possible to
+>> select one observer mode among several. We also provide some
+>> facility for the user to easily detect the pin to monitor on the
+>> output connector.
+>
+> Hmm, I wonder if that is something that makes sense to have
+> in a generic pinctrl debugfs interface. Maybe it can instead
+> be part of the new pinctrl driver for this hw block then, which
+> should be able to create additional sysfs files in the pinctrl
+> debugfs directories. Linus, does that make sense to you?
+
+That is one way to achieve it, like this driver spawns some
+custom debugfs entries, fine.
+
+The hardware observer already use the pinctrl interfaces from
+pinctrl-nomadik.c to set up the pins per se: i.e. to set up so
+that these pins are available to put signals on. But then we
+can plug this stuff as a front-end, and yeah.
+drivers/pinctrl/ux500-hwobs.c might be a good idea!
+
+Yours,
+Linus Walleij
