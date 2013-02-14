@@ -1,96 +1,60 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 14 Feb 2013 13:34:34 -0800
-Subject: [Linaro-mm-sig] [PATCH 2/2] drivers: dma-contiguous: add
- initialization from device tree
-In-Reply-To: <1360845928-8107-3-git-send-email-m.szyprowski@samsung.com>
+Date: Thu, 14 Feb 2013 13:37:45 -0800
+Subject: [PATCH 1/2] drivers: dma-contiguous: clean source code and prepare
+ for device tree
+In-Reply-To: <1360845928-8107-2-git-send-email-m.szyprowski@samsung.com>
 References: <1360845928-8107-1-git-send-email-m.szyprowski@samsung.com>
- <1360845928-8107-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <511D586A.5060902@codeaurora.org>
+ <1360845928-8107-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <511D5929.6060004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-
 On 2/14/2013 4:45 AM, Marek Szyprowski wrote:
-<snip>
-> +name:		an name given to the defined region.
-> +base-address:	the base address of the defined region.
-> +size:		the size of the memory region.
-> +linux,contiguous-region: property indicating that the defined memory
-> +		region is used for contiguous memory allocations,
-> +		Linux specific (optional)
-> +linux,default-contiguous-region: property indicating that the region
-> +		is the default region for all contiguous memory
-> +		allocations, Linux specific (optional)
-> +
-> +
-
-I don't see any code actually implementing the default-contiguous-region 
-binding. Currently on ARM systems we will still setup the default region 
-based on the Kconfig. Is this intentional?
-
-
+> This patch cleans the initialization of dma contiguous framework. The
+> all-in-one dma_declare_contiguous() function is now separated into
+> dma_contiguous_reserve_area() which only steals the the memory from
+> memblock allocator and dma_contiguous_add_device() function, which
+> assigns given device to the specified reserved memory area. This improves
+> the flexibility in defining contiguous memory areas and assigning device
+> to them, because now it is possible to assign more than one device to
+> the given contiguous memory area. This split in initialization is also
+> required for upcoming device tree support.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>   drivers/base/dma-contiguous.c        |  210 +++++++++++++++++++++-------------
+>   include/asm-generic/dma-contiguous.h |    4 +-
+>   include/linux/dma-contiguous.h       |   32 +++++-
+>   3 files changed, 161 insertions(+), 85 deletions(-)
+>
 > diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index 085389c..5761f73 100644
+> index 0ca5442..085389c 100644
 > --- a/drivers/base/dma-contiguous.c
 > +++ b/drivers/base/dma-contiguous.c
-> @@ -24,6 +24,9 @@
+> @@ -39,7 +39,33 @@ struct cma {
+>   	unsigned long	*bitmap;
+>   };
 >
->   #include <linux/memblock.h>
->   #include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/of_platform.h>
->   #include <linux/mm.h>
->   #include <linux/mutex.h>
->   #include <linux/page-isolation.h>
-> @@ -177,6 +180,35 @@ no_mem:
->   	return ERR_PTR(ret);
->   }
->
-> +/*****************************************************************************/
+> -struct cma *dma_contiguous_default_area;
+> +static DEFINE_MUTEX(cma_mutex);
 > +
-> +#ifdef CONFIG_OF
-> +int __init cma_fdt_scan(unsigned long node, const char *uname,
-> +				int depth, void *data)
-> +{
-> +	phys_addr_t base, size;
-> +	unsigned long len;
-> +	__be32 *prop;
+> +struct cma *dma_contiguous_def_area;
+> +phys_addr_t dma_contiguous_def_base;
 > +
-> +	if (strncmp(uname, "region@", 7) != 0 || depth != 2 ||
-> +	    !of_get_flat_dt_prop(node, "contiguous-region", NULL))
-
-The documentation says "linux,contiguous-region"
-
-
-> +#ifdef CONFIG_OF
-> +static void cma_assign_device_from_dt(struct device *dev)
-> +{
-> +	struct device_node *node;
+> +static struct cma_area {
+> +	phys_addr_t base;
+> +	unsigned long size;
 > +	struct cma *cma;
-> +	u32 value;
-> +
-> +	node = of_parse_phandle(dev->of_node, "linux,contiguous-region", 0);
-> +	if (!node)
-> +		return;
-> +	if (of_property_read_u32(node, "reg", &value) && !value)
-> +		return;
-> +	cma = cma_get_area(value);
-> +	if (!cma)
-> +		return;
-> +
-> +	dev_set_cma_area(dev, cma);
-> +	pr_info("Assigned CMA region at %lx to %s device\n", (unsigned long)value, dev_name(dev));
-> +}
+> +} cma_areas[MAX_CMA_AREAS] __initdata;
+> +static unsigned cma_area_count __initdata;
 > +
 
-This scheme of associating devices with CMA regions by base does not 
-work if you want to let CMA figure out where to place the region (base = 
-0). Can we use the name to associate the device with the region? I had 
-been working on something similar internally and that was the only 
-solution I had come up with to associate arbitrary CMA nodes with devices.
+cma_areas and cma_area_count are accessed from cma_get_area which gets 
+called from cma_assign_device_from_dt. You need to drop the __initdata 
+since the notifier can be called at anytime.
 
 Thanks,
 Laura
