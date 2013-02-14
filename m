@@ -1,28 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 Feb 2013 17:16:15 +0000
-Subject: [BUG] v7_coherent_kern_range broken on big.LITTLE
-In-Reply-To: <1360861663.3266.58.camel@linaro1.home>
-References: <1360861663.3266.58.camel@linaro1.home>
-Message-ID: <20130214171615.GH12629@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 14 Feb 2013 10:28:30 -0700
+Subject: of_clk_get() / devm_clk_get()
+In-Reply-To: <1360824133.22736.3.camel@gitbox>
+References: <1360815425.21991.20.camel@gitbox>
+ <511C6AC7.6010601@wwwdotorg.org> <1360824133.22736.3.camel@gitbox>
+Message-ID: <511D1EBE.8010806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tixy,
-
-On Thu, Feb 14, 2013 at 05:07:43PM +0000, Jon Medhurst (Tixy) wrote:
-> The function v7_coherent_kern_range uses the macro icache_line_size to
-> read the current CPUs icache line size for the purpose of invalidating
-> all cache lines in the given range.
+On 02/13/2013 11:42 PM, Tony Prisk wrote:
+> On Wed, 2013-02-13 at 21:40 -0700, Stephen Warren wrote:
+>> On 02/13/2013 09:17 PM, Tony Prisk wrote:
+>>> Currently we have devm_clk_get() which gives a managed-resource clk (by
+>>> name), or of_clk_get() which gives an unmanaged resource clk (by id).
+>>>
+>>> I just wanted to sound out everyone as to whether there is a need for a
+>>> managed version of the of_clk_get.
+>>>
+>>> My personal concern about devm_clk_get is that it requires (if I
+>>> understand correctly) that the DT node have the clock-names property
+>>> (which is optional). If the optional name is not supplied, it fails.
+>>> This basically makes it 'not optional' when a driver uses devm_clk_get.
+>>> (Please correct me if I'm wrong about this).
+>>
+>> I thought supplying NULL for the name/ID simply gave you the first clock
+>> in the list (clocks property)? I'm sure I've seen plenty of Tegra
+>> drivers that end up doing that.
+>>
 > 
-> Unfortunately, on the TC2 big.LITTLE test chip, the A15 icache line size
-> is 64 bytes, but the A7 size is only 32 bytes. So when the function
-> executes on the A15 it will miss out every alternate cache line for the
-> A7.
+> I think someone else told me that once before so it is probably correct
+> - but it doesn't solve the problem of requesting a second clock without
+> a clock-names property.
+> 
+> That leaves us in the situation of only being able to use managed clocks
+> when there is only one, or forcing dts files to include the 'optional'
+> property.
 
-There is a signal (IMINLN) to the core which allows A15 to behave as though
-it has a 32-byte line size and this should be driven correctly for big/little.
-
-Can you confirm that on your TC2 the I-line size is advertised differently
-depending on the cluster? This really shouldn't be the case.
-
-Will
+True. Writing a devm_ wrapper around of_clk_get() should be pretty
+trivial though.
