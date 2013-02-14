@@ -1,55 +1,47 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 14 Feb 2013 09:45:24 +0100 (CET)
-Subject: [PATCH 3/3] ARM: mach-shmobile: kzm9g: do not enable
- REGULATOR_DUMMY in defconfig
-In-Reply-To: <20130214083621.GA8236@verge.net.au>
-References: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
- <1360761103-17357-4-git-send-email-horms+renesas@verge.net.au>
- <20130214083621.GA8236@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1302140942250.29693@axis700.grange>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Thu, 14 Feb 2013 08:52:06 +0000
+Subject: [PATCH RFC] davinci: poll for sleep completion in resume routine.
+In-Reply-To: <511C8B3F.6010200@ti.com>
+References: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
+ <511C65B3.7060109@ti.com>
+ <A4887BF146CD57468F700B415D2F470158374E@DBDE01.ent.ti.com>
+ <511C8B3F.6010200@ti.com>
+Message-ID: <A4887BF146CD57468F700B415D2F47015837B5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Feb 2013, Simon Horman wrote:
+Hi Sekhar,
 
-> On Wed, Feb 13, 2013 at 10:11:43PM +0900, Simon Horman wrote:
-> > Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
-> > There doesn't seem to be any value in setting it here and doing
-> > so was an error on my part.
+On Thu, Feb 14, 2013 at 12:29:11, Nori, Sekhar wrote:
+> On 2/14/2013 10:46 AM, Vishwanathrao Badarkhe, Manish wrote:
+> > Hi Sekhar,
 > > 
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/configs/kzm9g_defconfig |    1 -
-> >  1 file changed, 1 deletion(-)
+> > On Thu, Feb 14, 2013 at 09:48:59, Nori, Sekhar wrote:
+> >> Manish,
+> >>
+> >> On 1/31/2013 2:56 PM, Vishwanathrao Badarkhe, Manish wrote:
+> >>> As per OMAP-L138 TRM, Software must poll for SLEEPCOMPLETE bit until 
+> >>> it is set to 1 before clearing SLEEPENABLE bit in DEEPSLEEP register 
+> >>> in resume routine.
+> >>> Modifications are as per datasheet:
+> >>> http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+> >>> See sections 10.10.2.2 and 11.5.21 for more detailed explanation.
+> >>
+> >> Polling for SLEEPCOMPLETE is not required in RTC controlled wake-up which is the mode currently supported (see section 10.10.2.1 of the TRM). Polling for SLEEPCOMPLETE is required for external controlled wake-up which to my knowledge has never been tested. If you have tested this with external controlled wakep-up, then I can consider this patch.
+> >> Else, I would like to take it only after externally controlled wake-up is fully tested/supported instead of taking bits and pieces.
 > > 
-> > diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-> > index 670c3b6..6751c02 100644
-> > --- a/arch/arm/configs/kzm9g_defconfig
-> > +++ b/arch/arm/configs/kzm9g_defconfig
-> > @@ -86,7 +86,6 @@ CONFIG_I2C_SH_MOBILE=y
-> >  CONFIG_GPIO_PCF857X=y
-> >  # CONFIG_HWMON is not set
-> >  CONFIG_REGULATOR=y
-> > -CONFIG_REGULATOR_DUMMY=y
-> >  CONFIG_FB=y
-> >  CONFIG_FB_SH_MOBILE_LCDC=y
-> >  CONFIG_FRAMEBUFFER_CONSOLE=y
+> > Yes, for RTC controlled wakeup, this polling is not required as per section 10.10.2.1.
+> > But if we see in section 10.10.2.2 (Exiting Deep Sleep Mode) step 2, 
+> > When sleep count completes SLEEPCOMPLETE bit gets sets in DEEPSLEEP 
+> > register till that it's not safe to release clock to devices. So If we 
+> > don?t poll for SLEEPCOMPLETE, this delay will not come into picture 
+> > which we actually set while entering deep sleep in case of RTC controlled wakeup (Section 10.10.2.1 step 9).
+> > Please let me know, whether these understanding is correct?
 > 
-> This patch seems to break NIC initialisation.
-> 
-> smsc911x: Driver version 2008-10-21
-> smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
-> smsc911x smsc911x.0 (unregistered net_device): couldn't get regulators -517
-> platform smsc911x.0: Driver smsc911x requests probe deferral
+> The  delay is coming from hardware. Till SLEEPCOUNT completes, the clock to device is not provided. There is no need to poll for SLEEPCOMPLETE and indeed 10.10.2.2 does not ask for this bit to be polled.
 
-Right, you need a fixed regulator similar to how I adde it here
+Thanks for your explanation.
+Ok, I will test this patch with external controlled wakeup and update you.
 
-http://www.spinics.net/lists/linux-sh/msg15713.html
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Regards, 
+Manish Badarkhe
