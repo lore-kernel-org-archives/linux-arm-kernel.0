@@ -1,194 +1,182 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 14 Feb 2013 06:22:42 +0000
-Subject: [PATCH v3 1/3] mmc: davinci_mmc: add DT support
-In-Reply-To: <20130212110048.GB826@e106331-lin.cambridge.arm.com>
-References: <1360651058-5255-1-git-send-email-prakash.pm@ti.com>
- <1360651058-5255-2-git-send-email-prakash.pm@ti.com>
- <20130212110048.GB826@e106331-lin.cambridge.arm.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA46AF9@DBDE01.ent.ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 14 Feb 2013 08:38:17 +0200
+Subject: [PATCH 1/1] ARM: dt: add header to define tegra20 clocks
+In-Reply-To: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
+References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1360823899-17846-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+To replace magic number in "clocks = <&tegra_car 28>;"
 
-On Tue, Feb 12, 2013 at 16:30:48, Mark Rutland wrote:
-> Hi Prakash,
-> 
-> I think this looks pretty good now :)
-> 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> 
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+This patch depends on:
 
-Thanks for inputs, I will add your Reviewed-by for future versions of this patch.
+  [PATCH 0/9] ARM: tegra: use new dtc+cpp feature
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149613.html
 
-Regards,
-Prakash
+This patch is the experiment for Tegra20. The same replacement can be
+done for Tegra{30,114}.
 
-> Thanks,
-> Mark.
-> 
-> On Tue, Feb 12, 2013 at 06:37:36AM +0000, Manjunathappa, Prakash wrote:
-> > Adds device tree support for davinci_mmc. Also add binding documentation.
-> > As of now in non-dma PIO mode and without GPIO card_detect/write_protect
-> > option because of dependencies on EDMA and GPIO module DT support.
-> > 
-> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> > Cc: linux-mmc at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: davinci-linux-open-source at linux.davincidsp.com
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> > Cc: cjb at laptop.org
-> > Cc: Sekhar Nori <nsekhar@ti.com>
-> > Cc: mporter at ti.com
-> > ---
-> > Since v2:
-> > Modified the default value for bus-width and removed the support for
-> > highspeed card capabilties for now.
-> > Since v1:
-> > Modified DT parse function to take default values and accomodate controller
-> > version in compatible field.
-> > 
-> >  .../devicetree/bindings/mmc/davinci_mmc.txt        |   25 ++++++++
-> >  drivers/mmc/host/davinci_mmc.c                     |   65 +++++++++++++++++++-
-> >  2 files changed, 88 insertions(+), 2 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mmc/davinci_mmc.txt b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-> > new file mode 100644
-> > index 0000000..247be0f
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mmc/davinci_mmc.txt
-> > @@ -0,0 +1,25 @@
-> > +* TI Highspeed MMC host controller for DaVinci
-> > +
-> > +The Highspeed MMC Host Controller on TI DaVinci family
-> > +provides an interface for MMC, SD and SDIO types of memory cards.
-> > +
-> > +This file documents the properties used by the davinci_mmc driver.
-> > +
-> > +Required properties:
-> > +- compatible:
-> > + Should be "ti,davinci-mmc-da830": for da830, da850, dm365
-> > + Should be "ti,davinci-mmc-dm355": for dm355, dm644x
-> > +
-> > +Optional properties:
-> > +- bus-width: Number of data lines, can be <1>, <4>, or <8>, default <1>
-> > +- max-frequency: Maximum operating clock frequency, default 25MHz.
-> > +
-> > +Example:
-> > +	mmc0: mmc at 1c40000 {
-> > +		compatible = "ti,davinci-mmc-da830",
-> > +		reg = <0x40000 0x1000>;
-> > +		interrupts = <16>;
-> > +		status = "okay";
-> > +		bus-width = <4>;
-> > +		max-frequency = <50000000>;
-> > +	};
-> > diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-> > index 27123f8..66ca6bf 100644
-> > --- a/drivers/mmc/host/davinci_mmc.c
-> > +++ b/drivers/mmc/host/davinci_mmc.c
-> > @@ -34,6 +34,8 @@
-> >  #include <linux/dma-mapping.h>
-> >  #include <linux/edma.h>
-> >  #include <linux/mmc/mmc.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_device.h>
-> >  
-> >  #include <linux/platform_data/mmc-davinci.h>
-> >  
-> > @@ -1157,16 +1159,74 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
-> >  	mmc_davinci_reset_ctrl(host, 0);
-> >  }
-> >  
-> > -static int __init davinci_mmcsd_probe(struct platform_device *pdev)
-> > +static const struct of_device_id davinci_mmc_dt_ids[] = {
-> > +	{
-> > +		.compatible = "ti,davinci-mmc-dm355",
-> > +		.data = (void *)MMC_CTLR_VERSION_1,
-> > +	},
-> > +	{
-> > +		.compatible = "ti,davinci-mmc-da830",
-> > +		.data = (void *)MMC_CTLR_VERSION_2,
-> > +	},
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, davinci_mmc_dt_ids);
-> > +
-> > +static struct davinci_mmc_config
-> > +	*mmc_parse_pdata(struct platform_device *pdev)
-> >  {
-> > +	struct device_node *np;
-> >  	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
-> > +	const struct of_device_id *match =
-> > +		of_match_device(of_match_ptr(davinci_mmc_dt_ids), &pdev->dev);
-> > +	u32 data;
-> > +
-> > +	np = pdev->dev.of_node;
-> > +	if (!np)
-> > +		return pdata;
-> > +
-> > +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> > +	if (!pdata) {
-> > +		dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
-> > +		goto nodata;
-> > +	}
-> > +
-> > +	if (match->data)
-> > +		pdata->version = (u8)((int)match->data);
-> > +
-> > +	of_property_read_u32(np, "max-frequency", &pdata->max_freq);
-> > +	if (!pdata->max_freq)
-> > +		dev_info(&pdev->dev, "'max-frequency' property not specified, defaulting to 25MHz\n");
-> > +
-> > +	of_property_read_u32(np, "bus-width", &data);
-> > +	switch (data) {
-> > +	case 1:
-> > +	case 4:
-> > +	case 8:
-> > +		pdata->wires = data;
-> > +		break;
-> > +	default:
-> > +		pdata->wires = 1;
-> > +		dev_info(&pdev->dev, "Unsupported buswidth, defaulting to 1 bit\n");
-> > +	}
-> > +nodata:
-> > +	return pdata;
-> > +}
-> > +
-> > +static int __init davinci_mmcsd_probe(struct platform_device *pdev)
-> > +{
-> > +	struct davinci_mmc_config *pdata = NULL;
-> >  	struct mmc_davinci_host *host = NULL;
-> >  	struct mmc_host *mmc = NULL;
-> >  	struct resource *r, *mem = NULL;
-> >  	int ret = 0, irq = 0;
-> >  	size_t mem_size;
-> >  
-> > -	/* REVISIT:  when we're fully converted, fail if pdata is NULL */
-> > +	pdata = mmc_parse_pdata(pdev);
-> > +	if (pdata == NULL) {
-> > +		dev_err(&pdev->dev, "Can not get platform data\n");
-> > +		return -ENOENT;
-> > +	}
-> >  
-> >  	ret = -ENODEV;
-> >  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > @@ -1408,6 +1468,7 @@ static struct platform_driver davinci_mmcsd_driver = {
-> >  		.name	= "davinci_mmc",
-> >  		.owner	= THIS_MODULE,
-> >  		.pm	= davinci_mmcsd_pm_ops,
-> > +		.of_match_table = of_match_ptr(davinci_mmc_dt_ids),
-> >  	},
-> >  	.remove		= __exit_p(davinci_mmcsd_remove),
-> >  };
-> > -- 
-> > 1.7.4.1
-> > 
-> > _______________________________________________
-> > devicetree-discuss mailing list
-> > devicetree-discuss at lists.ozlabs.org
-> > https://lists.ozlabs.org/listinfo/devicetree-discuss
-> > 
-> 
-> 
+Usage:
+	Modified arch/arm/boot/dts/tegra20.dtsip
+diff --git a/arch/arm/boot/dts/tegra20.dtsip b/arch/arm/boot/dts/tegra20.dtsip
+index 7b05f53..6edd397 100644
+--- a/arch/arm/boot/dts/tegra20.dtsip
++++ b/arch/arm/boot/dts/tegra20.dtsip
+@@ -1,6 +1,7 @@
+ #include "skeleton.dtsi"
+ #include "tegra-gpio.h"
+ #include "arm-gic.h"
++#include "tegra20-car.h"
+
+ / {
+	compatible = "nvidia,tegra20";
+@@ -19,7 +20,7 @@
+		reg = <0x50000000 0x00024000>;
+		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>, /* syncpt */
+			     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>; /* general */
+-               clocks = <&tegra_car 28>;
++               clocks = <&tegra_car CLK_HOST1X>;
+
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20-car.h |  126 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 126 insertions(+)
+ create mode 100644 arch/arm/boot/dts/tegra20-car.h
+
+diff --git a/arch/arm/boot/dts/tegra20-car.h b/arch/arm/boot/dts/tegra20-car.h
+new file mode 100644
+index 0000000..6426320
+--- /dev/null
++++ b/arch/arm/boot/dts/tegra20-car.h
+@@ -0,0 +1,126 @@
++#define CLK_CPU		0
++/* UNUSED 1 */
++/* UNUSED 2 */
++#define CLK_AC97	3
++#define CLK_RTC		4
++#define CLK_TIMER	5
++#define CLK_UARTA	6
++/* UNUSED 7 */
++#define CLK_GPIO	8
++#define CLK_SDMMC2	9
++/* UNUSED 10 */
++#define CLK_I2S1	11
++#define CLK_I2C1	12
++#define CLK_NDFLASH	13
++#define CLK_SDMMC1	14
++#define CLK_SDMMC4	15
++#define CLK_TWC		16
++#define CLK_PWM		17
++#define CLK_I2S2	18
++#define CLK_EPP		19
++/* UNUSED 20 */
++#define CLK_GR2D	21
++#define CLK_USBD	22
++#define CLK_ISP		23
++#define CLK_GR3D	24
++#define CLK_IDE		25
++#define CLK_DISP2	26
++#define CLK_DISP1	27
++#define CLK_HOST1X	28
++#define CLK_VCP		29
++/* UNUSED 30 */
++#define CLK_CACHE2	31
++#define CLK_MEM		32
++#define CLK_AHBDMA	33
++#define CLK_APBDMA	34
++/* UNUSED 35 */
++#define CLK_KBC		36
++#define CLK_STAT_MON	37
++#define CLK_PMC		38
++#define CLK_FUSE	39
++#define CLK_KFUSE	40
++#define CLK_SBC1	41
++#define CLK_NOR		42
++#define CLK_SPI		43
++#define CLK_SBC2	44
++#define CLK_XIO		45
++#define CLK_SBC3	46
++#define CLK_DVC		47
++#define CLK_DSI		48
++/* UNUSED 49 */
++#define CLK_MIPI	50
++#define CLK_HDMI	51
++#define CLK_CSI		52
++#define CLK_TVDAC	53
++#define CLK_I2C2	54
++#define CLK_UARTC	55
++/* UNUSED 56 */
++#define CLK_EMC		57
++#define CLK_USB2	58
++#define CLK_USB3	59
++#define CLK_MPE		60
++#define CLK_VDE		61
++#define CLK_BSEA	62
++#define CLK_BSEV	63
++#define CLK_SPEEDO	64
++#define CLK_UARTD	65
++#define CLK_UARTE	66
++#define CLK_I2C3	67
++#define CLK_SBC4	68
++#define CLK_SDMMC3	69
++#define CLK_PEX		70
++#define CLK_OWR		71
++#define CLK_AFI		72
++#define CLK_CSITE	73
++#define CLK_PCIE_XCLK	74
++#define CLK_AVPUCQ	75
++#define CLK_LA		76
++/* UNUSED 77-83 */
++#define CLK_IRAMA	84
++#define CLK_IRAMB	85
++#define CLK_IRAMC	86
++#define CLK_IRAMD	87
++#define CLK_CRAM2	88
++#define CLK_AUDIO_2X	89
++#define CLK_CLK_D	90
++/* UNUSED 91 */
++#define CLK_CSUS	92
++#define CLK_CDEV1	93
++#define CLK_CDEV2	94
++/* UNUSED 95 */
++#define CLK_UARTB	96
++#define CLK_VFIR	97
++#define CLK_SPDIF_IN	98
++#define CLK_SPDIF_OUT	99
++#define CLK_VI		100
++#define CLK_VI_SENSOR	101
++#define CLK_TVO		102
++#define CLK_CVE		103
++#define CLK_OSC		104
++#define CLK_CLK_32K	105
++#define CLK_CLK_M	106
++#define CLK_SCLK	107
++#define CLK_CCLK	108
++#define CLK_HCLK	109
++#define CLK_PCLK	110
++#define CLK_BLINK	111
++#define CLK_PLL_A	112
++#define CLK_PLL_A_OUT0	113
++#define CLK_PLL_C	114
++#define CLK_PLL_C_OUT1	115
++#define CLK_PLL_D	116
++#define CLK_PLL_D_OUT0	117
++#define CLK_PLL_E	118
++#define CLK_PLL_M	119
++#define CLK_PLL_M_OUT1	120
++#define CLK_PLL_P	121
++#define CLK_PLL_P_OUT1	122
++#define CLK_PLL_P_OUT2	123
++#define CLK_PLL_P_OUT3	124
++#define CLK_PLL_P_OUT4	125
++#define CLK_PLL_U	126
++#define CLK_PLL_X	127
++#define CLK_AUDIO	128
++#define CLK_PLL_REF	129
++#define CLK_TWD		130
++#define CLK_MAX		131
+-- 
+1.7.9.5
