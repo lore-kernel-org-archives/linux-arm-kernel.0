@@ -1,29 +1,40 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Fri, 15 Feb 2013 01:18:11 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
-In-Reply-To: <20130214160842.GC26810@verge.net.au>
-References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
- <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
- <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
- <20130214041651.GB6036@verge.net.au>
- <20130214091040.GG6088@linux-sh.org>
- <20130214160842.GC26810@verge.net.au>
-Message-ID: <20130214161811.GC3882@linux-sh.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 14 Feb 2013 17:23:37 +0100
+Subject: [PATCH 1/2] USB mxs-phy: Register phy with framework
+In-Reply-To: <20130214103729.GC15537@arwen.pp.htv.fi>
+References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
+ <20130214103729.GC15537@arwen.pp.htv.fi>
+Message-ID: <20130214162337.GU1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 01:08:42AM +0900, Simon Horman wrote:
-> On Thu, Feb 14, 2013 at 06:10:40PM +0900, Paul Mundt wrote:
-> > On Thu, Feb 14, 2013 at 01:16:52PM +0900, Simon Horman wrote:
-> > > Ok, so in that case the correct value for "sh_tmu.2" might actually
-> > > be MSTP016 or MSTP015 depending on the bundle size. I am unsure how to test
-> > > sh_tmu.2.
+On Thu, Feb 14, 2013 at 12:37:29PM +0200, Felipe Balbi wrote:
+> Hi,
+> 
+> On Thu, Jan 31, 2013 at 12:32:16PM +0100, Sascha Hauer wrote:
+> > We now have usb_add_phy_dev(), so use it to register with the framework
+> > to be able to find the phy from the USB driver.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> Sascha, are you taking this through your tree or you want me to queue it
+> up ?
 
-[snip]
+I would prefer if either you could take it or Alexander Shishkin along
+with the other patches in:
 
-> Getting that information correct for sh_tmu.2 on the r8a7779 problem I'm
-> not completely sure of the correct answer to. Though I now strongly suspect
-> it is MSTP016.
+[PATCH v4] USB: add devicetree helpers for determining dr_mode and phy_type
 
-Testing shouldn't be that difficult, just switch your clocksource to it
-and make sure all TMU-related MSTP bits are first cleared?
+Could you have a look at them? Alexander is asking for an ack for 1/9,
+2/9, 3/9, 8/9. I just realized you are not on Cc for these. I could
+bounce you the patches in case you don't have them in your mailbox.
+
+Thanks
+ Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
