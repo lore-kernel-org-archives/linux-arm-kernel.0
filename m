@@ -1,18 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Feb 2013 10:56:11 +0000
-Subject: [PATCH v2 8/8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <1360776872-18584-9-git-send-email-p.zabel@pengutronix.de>
-References: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
- <1360776872-18584-9-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130214105611.GG17833@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 14 Feb 2013 08:03:08 -0300
+Subject: Build error: OMAP randconfig / mvebu
+In-Reply-To: <20130214100926.GO17852@n2100.arm.linux.org.uk>
+References: <20130208100813.GN17833@n2100.arm.linux.org.uk>
+ <2213733.Wbjy3dFgom@wuerfel> <5114DC44.7000107@free-electrons.com>
+ <4351524.MQWtq16mqg@wuerfel>
+ <20130214100926.GO17852@n2100.arm.linux.org.uk>
+Message-ID: <20130214110307.GA3059@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 06:34:32PM +0100, Philipp Zabel wrote:
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+On Thu, Feb 14, 2013 at 10:09:26AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 08, 2013 at 02:33:29PM +0100, Arnd Bergmann wrote:
+> > On Friday 08 February 2013 12:06:44 Gregory CLEMENT wrote:
+> > > 
+> > > I don't know what to do here, there is no point to build any of the files
+> > > in mach-mvebu if no SoCs are selected. So either we force to have at least
+> > > one SoCS selected if ARCH_MVEBU is selected, or we unselect  ARCH_MVEB if
+> > > no SoCs are selected.
+> > 
+> > The latter does not work, because that would introduce a circular
+> > dependency in Kconfig.
+> > 
+> > I suppose rearranging the mvebu Makefile like this would do.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> This error is still present in arm-soc.  We're getting close to the next
+> merge window, so either something needs to be dropped from arm-soc, or
+> this needs to get fixed.
+> 
 
-Just be aware that PXA has a "gpio reset" facility which is used for SoC
-reset - see arch/arm/mach-pxa/reset.c
+Can you point me to where can I get the config your building with?
 
-The use of gpio-reset would be ambiguous... or maybe PXA's usage could be
-combined somehow with this?
+Thanks,
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
