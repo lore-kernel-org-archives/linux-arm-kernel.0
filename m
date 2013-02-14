@@ -1,67 +1,45 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 14 Feb 2013 09:48:59 +0530
-Subject: [PATCH RFC] davinci: poll for sleep completion in resume routine.
-In-Reply-To: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
-References: <1359624393-5898-1-git-send-email-manishv.b@ti.com>
-Message-ID: <511C65B3.7060109@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 14 Feb 2013 13:20:29 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
+In-Reply-To: <878v6rv8ij.wl%kuninori.morimoto.gx@renesas.com>
+References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
+ <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
+ <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
+ <878v6rv8ij.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130214042027.GD6036@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Manish,
-
-On 1/31/2013 2:56 PM, Vishwanathrao Badarkhe, Manish wrote:
-> As per OMAP-L138 TRM, Software must poll for
-> SLEEPCOMPLETE bit until it is set to 1 before clearing
-> SLEEPENABLE bit in DEEPSLEEP register in resume routine.
-> Modifications are as per datasheet:
-> http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
-> See sections 10.10.2.2 and 11.5.21 for more detailed
-> explanation.
-
-Polling for SLEEPCOMPLETE is not required in RTC controlled wake-up
-which is the mode currently supported (see section 10.10.2.1 of the
-TRM). Polling for SLEEPCOMPLETE is required for external controlled
-wake-up which to my knowledge has never been tested. If you have tested
-this with external controlled wakep-up, then I can consider this patch.
-Else, I would like to take it only after externally controlled wake-up
-is fully tested/supported instead of taking bits and pieces.
-
-Thanks,
-Sekhar
-
+On Wed, Feb 13, 2013 at 08:12:24PM -0800, Kuninori Morimoto wrote:
 > 
-> Tested on da850-evm.
+> Hi Magnus, Simon
 > 
-> Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
-> ---
-> :100644 100644 d4e9316... 976f096... M	arch/arm/mach-davinci/sleep.S
->  arch/arm/mach-davinci/sleep.S |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
+> Thank you for your explain
 > 
-> diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
-> index d4e9316..976f096 100644
-> --- a/arch/arm/mach-davinci/sleep.S
-> +++ b/arch/arm/mach-davinci/sleep.S
-> @@ -35,6 +35,7 @@
->  #define PLL_LOCK_CYCLES		(PLL_LOCK_TIME * 25)
->  
->  #define DEEPSLEEP_SLEEPENABLE_BIT	BIT(31)
-> +#define DEEPSLEEP_SLEEPCOMPLETE_BIT 	BIT(30)
->  
->  	.text
->  /*
-> @@ -110,6 +111,13 @@ ENTRY(davinci_cpu_suspend)
->  
->  	/* Wake up from sleep */
->  
-> +	/* wait for sleep complete */
-> +sleep_complete:
-> +	ldr 	ip, [r4]
-> +	and 	ip, ip, #DEEPSLEEP_SLEEPCOMPLETE_BIT
-> +	cmp 	ip, #DEEPSLEEP_SLEEPCOMPLETE_BIT
-> +	bne 	sleep_complete
-> +
->  	/* Clear sleep enable */
->  	ldr	ip, [r4]
->  	bic	ip, ip, #DEEPSLEEP_SLEEPENABLE_BIT
+> > >> --- a/arch/arm/mach-shmobile/clock-r8a7779.c
+> > >> +++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+> > >> @@ -161,7 +161,7 @@ static struct clk_lookup lookups[] = {
+> > >>       CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
+> > >>       CLKDEV_DEV_ID("ohci-platform.0", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
+> > >>       CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+> > >> -     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
+> > >> +     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
+> > >>       CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
+> > >>       CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
+> > >>       CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP029]), /* I2C1 */
+> > >
+> > > Really ???
+> > > Is MSTP value of TMU01 same as TMU00 ?
+> > 
+> > Usually, the TMU channels are bundled together. So TMU00 may be for
+> > channel 0->3 and TMU01 for 4->6.
 > 
+> This means that current TMU02 numbering seems doubtful too ?
+> How about just rever 58079fa7d54a0929d304054ee759187a2ccd3cdf ?
+
+Perhaps that is a good idea.
+
+The original motivation for this patch was to add the TMU02 line.
+And "fixing" TMU01 was an afterthought. However, I am also
+now doubtful about the correctness of the TMU02 line and thus
+the usefulness of the original patch.
