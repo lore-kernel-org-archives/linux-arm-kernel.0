@@ -1,24 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 22:52:06 +0000
-Subject: [PATCH 6/9] drm/pci: move drm_pcie_get_speed_cap_mask inside
- #ifdef CONFIG_PCI
-In-Reply-To: <CAOMZO5AbTC+82KKTqWXeseahsasx2q=q-4k9u14xyBYhgm2gdQ@mail.gmail.com>
-References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
- <1360880818-4071454-7-git-send-email-arnd@arndb.de>
- <CAOMZO5AbTC+82KKTqWXeseahsasx2q=q-4k9u14xyBYhgm2gdQ@mail.gmail.com>
-Message-ID: <201302142252.06878.arnd@arndb.de>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 14 Feb 2013 17:52:59 -0500 (EST)
+Subject: [PATCH 6/9] net: cwdavinci_cpdma: export symbols for cpsw
+In-Reply-To: <1360882071-4072668-7-git-send-email-arnd@arndb.de>
+References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
+ <1360882071-4072668-7-git-send-email-arnd@arndb.de>
+Message-ID: <20130214.175259.958737100257982860.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 February 2013, Fabio Estevam wrote:
-> Bjorn has already sent a fix for this problem:
-> http://www.spinics.net/lists/arm-kernel/msg224425.html
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 14 Feb 2013 23:47:48 +0100
 
-Ok, excellent.
+> With the support for ARM AM33xx in multiplatform kernels
+> in 3.9, an older bug appears in ARM allmodconfig:
+> When the cpsw driver is built as a module with cpdma
+> support enabled, it uses symbols that the cpdma driver
+> does not export.
+> 
+> Without this patch, building allmodconfig results in:
+> 
+> ERROR: "cpdma_ctlr_int_ctrl" [drivers/net/ethernet/ti/ti_cpsw.ko] undefined!
+> ERROR: "cpdma_control_set" [drivers/net/ethernet/ti/ti_cpsw.ko] undefined!
+> ERROR: "cpdma_ctlr_eoi" [drivers/net/ethernet/ti/ti_cpsw.ko] undefined!
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-The result seems to be identical, although patch is formatted
-differently.
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-for Bjorn's patch.
+Acked-by: David S. Miller <davem@davemloft.net>
