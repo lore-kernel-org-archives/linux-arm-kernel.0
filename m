@@ -1,46 +1,36 @@
-From: anilk4.v@gmail.com (Anil Kumar)
-Date: Thu, 14 Feb 2013 08:27:02 +0530
-Subject: Need advice: unable to mount filesystem
-In-Reply-To: <CACRpkdb=zgaWkzoMtaWbMZXe_wUyszwsjmRC=03iMPDpU90N4w@mail.gmail.com>
-References: <511B8729.8040908@st.com>
- <CACRpkdb=zgaWkzoMtaWbMZXe_wUyszwsjmRC=03iMPDpU90N4w@mail.gmail.com>
-Message-ID: <CABYxbz4kxn-4FSMHqp4dHq1JFbaMU1AZ7r6EcHFHYD0kGtZ4Rw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 14 Feb 2013 12:34:04 +0900
+Subject: [PATCH 00/06] ARM: shmobile: SMP Cortex-A9 SCU rework
+In-Reply-To: <20130213134628.12153.47120.sendpatchset@w520>
+References: <20130213134628.12153.47120.sendpatchset@w520>
+Message-ID: <20130214033403.GR15879@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Feb 13, 2013 at 6:44 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Feb 13, 2013 at 1:29 PM, Amit Virdi <amit.virdi@st.com> wrote:
+On Wed, Feb 13, 2013 at 10:46:28PM +0900, Magnus Damm wrote:
+> ARM: shmobile: SMP Cortex-A9 SCU rework
+> 
+> [PATCH 01/06] ARM: shmobile: Kill off sh73a0 scu_base_addr() function
+> [PATCH 02/06] ARM: shmobile: Kill off r8a7779 scu_base_addr() function
+> [PATCH 03/06] ARM: shmobile: Rework EMEV2 scu_base variable
+> [PATCH 04/06] ARM: shmobile: Move headsmp-sh73a0.S to headsmp-scu.S
+> [PATCH 05/06] ARM: shmobile: Common shmobile_scu_base in headsmp-scu.S
+> [PATCH 06/06] ARM: shmobile: Update EMEV2 to use scu_power_mode()
+> 
+> Rework the EMEV2 SMP code to make use of common scu_power_mode()
+> code together with a shared shmobile_scu_base and early SCU
+> setup code in headsmp-scu.S.
+> 
+> The patches are known to build for sh73a0, r8a7779 and EMEV2.
 >
->> I have tried mounting the filesystem from DDR, that too with no success. One
->> observation is that before mounting the FS, the kernel throws a warning:
->> --
->> Warning: unable to open an initial console.
->
-> This is not your problem. The kernel screams that all the time, (I once
-> saw that explained and some ugly workaround for).
->
-> This (from your log) is the real problem:
->
-> VFS: Cannot open root device "mtdblock3" or unknown-block(31,3): error -14
-> Please append a correct "root=" boot option; here are the available partitions:
-> 1f00              64 mtdblock0  (driver?)
-> 1f01             192 mtdblock1  (driver?)
-> 1f02            2048 mtdblock2  (driver?)
-> 1f03           14080 mtdblock3  (driver?)
-> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(31,3)
-> [<2000cb50>] (unwind_backtrace+0x0/0xf8) from [<2018655c>] (panic+0x8c/0x1d8)
-> [<2018655c>] (panic+0x8c/0x1d8) from [<201f8d58>] (mount_block_root+0x1fc/0x2b8)
-> [<201f8d58>] (mount_block_root+0x1fc/0x2b8) from [<201f90c0>]
-> (prepare_namespace+0x160/0x1b8)
-> [<201f90c0>] (prepare_namespace+0x160/0x1b8) from [<20185984>]
-> (kernel_init+0x8/0xe4)
-> [<20185984>] (kernel_init+0x8/0xe4) from [<20008e98>] (ret_from_fork+0x14/0x3c)
+> Note that the code has only been tested on the KZM9D/EMEV2 board,
+> and because of that changes to other boards have been kept at
+> a minimum. Next target after this is to update the r8a7779 SMP/SCU
+> code to make use of scu_base_addr(), but that requires hardware
+> access for testing.
 
-Please try with "rootwait" in bootargs.
+I have tested this on the kzm9g/sh73a0, marzen/r8a7779 and kzm9d/emev2.
 
-I have also faced this type issue and solved by using "rootwait" .
-
-Thanks,
-Anil
+I have applied the entire series to the soc5 branch thus queued up
+for v3.10. It is also in the next branch and thus should appear
+in linux-next in the not to distant future.
