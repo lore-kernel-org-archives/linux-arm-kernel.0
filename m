@@ -1,55 +1,53 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Feb 2013 19:43:54 +0100
-Subject: [PATCH 1/2] USB mxs-phy: Register phy with framework
-In-Reply-To: <20130214180011.GC25891@arwen.pp.htv.fi>
-References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
- <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
- <20130214103729.GC15537@arwen.pp.htv.fi>
- <20130214162337.GU1906@pengutronix.de>
- <20130214180011.GC25891@arwen.pp.htv.fi>
-Message-ID: <20130214184354.GX1906@pengutronix.de>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Thu, 14 Feb 2013 20:59:14 +0200
+Subject: [v2 0/4] ARM: tegra: convert device tree files to use CLK defines
+Message-ID: <1360868369-20093-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 08:00:11PM +0200, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Feb 14, 2013 at 05:23:37PM +0100, Sascha Hauer wrote:
-> > On Thu, Feb 14, 2013 at 12:37:29PM +0200, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Thu, Jan 31, 2013 at 12:32:16PM +0100, Sascha Hauer wrote:
-> > > > We now have usb_add_phy_dev(), so use it to register with the framework
-> > > > to be able to find the phy from the USB driver.
-> > > > 
-> > > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > 
-> > > Sascha, are you taking this through your tree or you want me to queue it
-> > > up ?
-> > 
-> > I would prefer if either you could take it or Alexander Shishkin along
-> > with the other patches in:
-> > 
-> > [PATCH v4] USB: add devicetree helpers for determining dr_mode and phy_type
-> > 
-> > Could you have a look at them? Alexander is asking for an ack for 1/9,
-> > 2/9, 3/9, 8/9. I just realized you are not on Cc for these. I could
-> > bounce you the patches in case you don't have them in your mailbox.
-> 
-> Ok, I'll look at them, no need to bounce. You _do_ realize, however,
-> that Greg has already closed all his trees for v3.9, right ? So anything
-> from now on will be queued for v3.10.
+Hi,
 
-I'm fine with that. I'm just a bit insistent because the chipidea patches are
-floating around for half a year now. Once I have the warm feeling that
-the patches are handled I have time ;)
+With new dtc+cpp feature, we can get rid of magic numbers in dts*
+files. To get rid of Tegra clock magic number, the following patches
+were created with a script run as below. This can be applied for
+Tegra114 clock as well.
 
-Thanks
- Sascha
+for x in 20 30; do
+    cat drivers/clk/tegra/clk-tegra$x.c | enum2define.py \
+    	> arch/arm/boot/dts/tegra$x-car.h 2>/tmp/tegra$x-car.sed
+    sed -i -f /tmp/tegra$x-car.sed \
+    	Documentation/devicetree/bindings/clock/nvidia\,tegra$x-car.txt \
+	arch/arm/boot/dts/*
+done
 
+We plan to share those DT header files with kernel source later[1].
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This series depends on:
+
+  [PATCH 0/9] ARM: tegra: use new dtc+cpp feature
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149613.html
+
+v1:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149672.html
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149804.html
+
+Hiroshi Doyu (4):
+  ARM: tegra20: create a DT header defining CLK IDs
+  ARM: tegra20: convert device tree files to use CLK defines
+  ARM: tegra30: create a DT header defining CLK IDs
+  ARM: tegra30: convert device tree files to use CLK defines
+
+ .../bindings/clock/nvidia,tegra20-car.txt          |    2 +-
+ .../bindings/clock/nvidia,tegra30-car.txt          |    2 +-
+ arch/arm/boot/dts/tegra20-car.h                    |  114 +++++++++++++
+ arch/arm/boot/dts/tegra20-paz00.dtsp               |    2 +-
+ arch/arm/boot/dts/tegra20.dtsip                    |   85 +++++-----
+ arch/arm/boot/dts/tegra30-car.h                    |  171 ++++++++++++++++++++
+ arch/arm/boot/dts/tegra30.dtsip                    |   87 +++++-----
+ 7 files changed, 375 insertions(+), 88 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra20-car.h
+ create mode 100644 arch/arm/boot/dts/tegra30-car.h
+
+--
+1.7.9.5
