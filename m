@@ -1,101 +1,57 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 14 Feb 2013 21:54:01 +0200
-Subject: [PATCH 2/2] ARM: tegra114: convert device tree files to use CLK
- defines
-In-Reply-To: <1360871650-25771-1-git-send-email-hdoyu@nvidia.com>
-References: <1360871650-25771-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1360871650-25771-2-git-send-email-hdoyu@nvidia.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 14 Feb 2013 14:34:10 -0500
+Subject: [PATCH v2 0/4] ARM: mvebu: Add support for SPI flash devices
+ in Armada 370/XP
+In-Reply-To: <CALF0-+WLh=8QGG4ob8HVq+x4oO_ArdFHd=vH1_OhucH1f9XG3A@mail.gmail.com>
+References: <1360155984-15397-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <511257C6.2070604@free-electrons.com>
+ <20130206132850.GC14746@titan.lakedaemon.net>
+ <CALF0-+WLh=8QGG4ob8HVq+x4oO_ArdFHd=vH1_OhucH1f9XG3A@mail.gmail.com>
+Message-ID: <20130214193410.GL14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace magic number in tegra_car:
+On Wed, Feb 13, 2013 at 06:24:14AM -0300, Ezequiel Garcia wrote:
+> Hi Jason,
+> 
+> On Wed, Feb 6, 2013 at 10:28 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Wed, Feb 06, 2013 at 02:16:54PM +0100, Gregory CLEMENT wrote:
+> >> On 02/06/2013 02:06 PM, Ezequiel Garcia wrote:
+> >> > This is second version of the SPI patchset for Armada 370/XP.
+> >> >
+> >> > This series first adds support for the SPI controller
+> >> > and then adds the SPI flash for the Armada XP GP board.
+> >> >
+> >> > This series is based on 3.8-rc5 plus:
+> >> >  * "arm: mvebu: support for the new Armada XP development board(DB-MV784MP-GP)"
+> >> >  * "arm: mvebu: i2c come back in defconfig"
+> >> >
+> >> > Feel free to test or provide any feedback!
+> >> >
+> >> Ezequiel,
+> >>
+> >> I reviewed the patches, I have nothing more to say, I can add my:
+> >>
+> >> Acked-by: Gregory Clement <gregory.clement@free-electrons.com>
+> >>
+> >> on the patch that didn't have yet.
+> >>
+> >> Jason,
+> >> could you add this series in your incoming pull request?
+> >
+> > That's the plan.  I'm waiting for a response from Olof to see If I need
+> > to redo /boards and /dt.  In either case, my next round of pull requests
+> > with have this and a bunch of other stuff.
+> >
+> 
+> Despite we're almost closed for v3.9 new material,
+> I hope you don't mind a little ping on the USB and SPI stuff.
+> 
+> I'd *really* love to see these in v3.9, if at all possible.
 
--               clocks = <&tegra_car 28>;
-+               clocks = <&tegra_car CLK_HOST1X>;
+Yes, I got called out for a few days and just got back into things
+today.  once I've read evreything I'll do what I can.
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- .../bindings/clock/nvidia,tegra114-car.txt         |    2 +-
- arch/arm/boot/dts/tegra114.dtsip                   |   13 +++++++------
- 2 files changed, 8 insertions(+), 7 deletions(-)
+thx,
 
-diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
-index 25e088d..be95f92 100644
---- a/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
-+++ b/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
-@@ -283,7 +283,7 @@ Example SoC include file:
- 	};
- 
- 	usb at c5004000 {
--		clocks = <&tegra_car 58>; /* usb2 */
-+		clocks = <&tegra_car CLK_USB2>; /* usb2 */
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/tegra114.dtsip b/arch/arm/boot/dts/tegra114.dtsip
-index df01b15..2afa559 100644
---- a/arch/arm/boot/dts/tegra114.dtsip
-+++ b/arch/arm/boot/dts/tegra114.dtsip
-@@ -1,6 +1,7 @@
- #include "skeleton.dtsi"
- #include "tegra-gpio.h"
- #include "arm-gic.h"
-+#include "tegra114-car.h"
- 
- / {
- 	compatible = "nvidia,tegra114";
-@@ -27,7 +28,7 @@
- 			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 5>;
-+		clocks = <&tegra_car CLK_TIMER>;
- 	};
- 
- 	tegra_car: clock {
-@@ -70,7 +71,7 @@
- 		reg-shift = <2>;
- 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
--		clocks = <&tegra_car 6>;
-+		clocks = <&tegra_car CLK_UARTA>;
- 	};
- 
- 	serial at 70006040 {
-@@ -79,7 +80,7 @@
- 		reg-shift = <2>;
- 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
--		clocks = <&tegra_car 192>;
-+		clocks = <&tegra_car CLK_UARTB>;
- 	};
- 
- 	serial at 70006200 {
-@@ -88,7 +89,7 @@
- 		reg-shift = <2>;
- 		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
--		clocks = <&tegra_car 55>;
-+		clocks = <&tegra_car CLK_UARTC>;
- 	};
- 
- 	serial at 70006300 {
-@@ -97,14 +98,14 @@
- 		reg-shift = <2>;
- 		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
--		clocks = <&tegra_car 65>;
-+		clocks = <&tegra_car CLK_UARTD>;
- 	};
- 
- 	rtc {
- 		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
- 		reg = <0x7000e000 0x100>;
- 		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 4>;
-+		clocks = <&tegra_car CLK_RTC>;
- 	};
- 
- 	pmc {
--- 
-1.7.9.5
+Jason.
