@@ -1,53 +1,48 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 14 Feb 2013 20:59:14 +0200
-Subject: [v2 0/4] ARM: tegra: convert device tree files to use CLK defines
-Message-ID: <1360868369-20093-1-git-send-email-hdoyu@nvidia.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Thu, 14 Feb 2013 11:25:39 -0800
+Subject: [PATCH 11/11] scripts/sortextable: silence script output
+In-Reply-To: <1360849767-1463135-12-git-send-email-arnd@arndb.de>
+References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
+ <1360849767-1463135-12-git-send-email-arnd@arndb.de>
+Message-ID: <511D3A33.20105@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/14/2013 05:49 AM, Arnd Bergmann wrote:
+> The exception table sorter outputs one line every time
+> it gets called, e.g. 'sort done marker at 66dc00', which
+> is slightly annoying when doing 'make -s' which is otherwise
+> completely silent. Since that output is not helpful to
+> most people building the kernel, turn it off by default.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: David Daney <david.daney@cavium.com>
+> Cc: "H. Peter Anvin" <hpa@zytor.com>
+> ---
+>   scripts/sortextable.h | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/scripts/sortextable.h b/scripts/sortextable.h
+> index e4fd45b..f5eb43d 100644
+> --- a/scripts/sortextable.h
+> +++ b/scripts/sortextable.h
+> @@ -182,7 +182,7 @@ do_func(Elf_Ehdr *ehdr, char const *const fname, table_sort_t custom_sort)
+>   		_r(&sort_needed_sym->st_value) -
+>   		_r(&sort_needed_sec->sh_addr);
+>
+> -#if 1
+> +#if 0
+>   	printf("sort done marker at %lx\n",
+>   	       (unsigned long)((char *)sort_done_location - (char *)ehdr));
+>   #endif
+>
 
-With new dtc+cpp feature, we can get rid of magic numbers in dts*
-files. To get rid of Tegra clock magic number, the following patches
-were created with a script run as below. This can be applied for
-Tegra114 clock as well.
+Acked-by: H. Peter Anvin <hpa@zytor.com>
 
-for x in 20 30; do
-    cat drivers/clk/tegra/clk-tegra$x.c | enum2define.py \
-    	> arch/arm/boot/dts/tegra$x-car.h 2>/tmp/tegra$x-car.sed
-    sed -i -f /tmp/tegra$x-car.sed \
-    	Documentation/devicetree/bindings/clock/nvidia\,tegra$x-car.txt \
-	arch/arm/boot/dts/*
-done
+... or just kill the printf entirely.
 
-We plan to share those DT header files with kernel source later[1].
+	-hpa
 
-This series depends on:
-
-  [PATCH 0/9] ARM: tegra: use new dtc+cpp feature
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149613.html
-
-v1:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149672.html
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149804.html
-
-Hiroshi Doyu (4):
-  ARM: tegra20: create a DT header defining CLK IDs
-  ARM: tegra20: convert device tree files to use CLK defines
-  ARM: tegra30: create a DT header defining CLK IDs
-  ARM: tegra30: convert device tree files to use CLK defines
-
- .../bindings/clock/nvidia,tegra20-car.txt          |    2 +-
- .../bindings/clock/nvidia,tegra30-car.txt          |    2 +-
- arch/arm/boot/dts/tegra20-car.h                    |  114 +++++++++++++
- arch/arm/boot/dts/tegra20-paz00.dtsp               |    2 +-
- arch/arm/boot/dts/tegra20.dtsip                    |   85 +++++-----
- arch/arm/boot/dts/tegra30-car.h                    |  171 ++++++++++++++++++++
- arch/arm/boot/dts/tegra30.dtsip                    |   87 +++++-----
- 7 files changed, 375 insertions(+), 88 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra20-car.h
- create mode 100644 arch/arm/boot/dts/tegra30-car.h
-
---
-1.7.9.5
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
