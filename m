@@ -1,88 +1,58 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 14 Feb 2013 12:04:57 +0000
-Subject: [PATCH 1/2] ARM: OMAP2+: Prevent potential crash if GPMC probe
- fails
-In-Reply-To: <20130209155547.GA5253@localhost>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-2-git-send-email-jon-hunter@ti.com>
- <20130201220804.GZ22517@atomide.com> <51158293.8010101@ti.com>
- <20130209155547.GA5253@localhost>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA754E2@DBDE01.ent.ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 14 Feb 2013 09:06:52 -0300
+Subject: Build error: OMAP randconfig / mvebu
+In-Reply-To: <201302141127.07378.arnd@arndb.de>
+References: <20130208100813.GN17833@n2100.arm.linux.org.uk>
+ <20130214110803.GP17852@n2100.arm.linux.org.uk>
+ <20130214111234.GB3059@localhost>
+ <201302141127.07378.arnd@arndb.de>
+Message-ID: <20130214120650.GA11345@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Arnd,
 
-On Sat, Feb 09, 2013 at 21:25:49, Ezequiel Garcia wrote:
-> On Fri, Feb 08, 2013 at 04:56:19PM -0600, Jon Hunter wrote:
-> > 
-> > On 02/01/2013 04:08 PM, Tony Lindgren wrote:
-> > > * Jon Hunter <jon-hunter@ti.com> [130201 08:42]:
-> > >> If the GPMC probe fails, devices that use the GPMC (such as ethernet
-> > >> chips, flash memories, etc) can still allocate a GPMC chip-select and
-> > >> register the device. On the OMAP2420 H4 board, this was causing the
-> > >> kernel to crash after the gpmc probe failed and the board attempted
-> > >> to start networking. Prevent this by marking all the chip-selects as
-> > >> reserved by default and only make them available for devices to request
-> > >> if the GPMC probe succeeds.
+On Thu, Feb 14, 2013 at 11:27:07AM +0000, Arnd Bergmann wrote:
+> On Thursday 14 February 2013, Ezequiel Garcia  wrote:
+> > On Thu, Feb 14, 2013 at 11:08:03AM +0000, Russell King - ARM Linux wrote:
 > > > 
-> > > Thanks applying into omap-for-v3.9/gpmc.
+> > > It's all publically available via my website.
 > > 
-> > Hi Tony, this one appears to be merged incorrectly. The unreserve ended 
-> > up in the gpmc_calc_timings() function. Here is a patch to fix.
+> > I'm kind of new around here, and I have no clue where that may be.
 > > 
-> > Cheers
-> > Jon
-> > 
-> > From ebc0613fb5a70f36fcb119cbe58724f9b442903a Mon Sep 17 00:00:00 2001
-> > From: Jon Hunter <jon-hunter@ti.com>
-> > Date: Fri, 8 Feb 2013 16:48:25 -0600
-> > Subject: [PATCH] ARM: OMAP2+: Fix-up gpmc merge error
-> > 
-> > Commit "ARM: OMAP2+: Prevent potential crash if GPMC probe fails" added
-> > code to ensure that GPMC chip-selects could not be requested until the
-> > device probe was successful. The chip-selects should have been
-> > unreserved at the end of the probe function, but the code to unreserve
-> > them appears to have ended up in the gpmc_calc_timings() function and
-> > hence, this is causing problems requesting chip-selects. Fix this merge
-> > error by unreserving the chip-selects at the end of the probe, but
-> > before we call the gpmc child probe functions (for device-tree) which
-> > request a chip-select.
-> > 
-> > Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> > I hope you don't mind helping me this time.
 > 
-> Without this patch, GPMC is currently broken on my igep board setup,
-> if initialized through a device tree.
 > 
-> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Please have a look at http://www.arm.linux.org.uk/developer/build/
 
-Without this patch GPMC is not working in am335x-evm.
+Okey.
 
-Tested-by: Philip Avinash <avinashphilip@ti.com>
+FYI, using the random config file for OMAP4430 and also with a manual
+config that chooses ARCH_MVEBU but doesn't choose MACH_ARMADA_XP or
+MACH_ARMADA_370, this make error is *gone* after applying your patch:
 
-See Jon's comments.
+arch/arm/mach-mvebu/built-in.o: In function `armada_xp_smp_init_cpus':
+:(.init.text+0x74): undefined reference to `coherency_get_cpu_count'
+:(.init.text+0xb8): undefined reference to `armada_mpic_send_doorbell'
+arch/arm/mach-mvebu/built-in.o: In function `armada_xp_smp_prepare_cpus':
+:(.init.text+0x250): undefined reference to `set_cpu_coherent'
+arch/arm/mach-mvebu/built-in.o: In function `armada_xp_boot_secondary':
+:(.cpuinit.text+0x10): undefined reference to `armada_xp_boot_cpu'
+arch/arm/mach-mvebu/built-in.o: In function `armada_xp_secondary_init':
+:(.cpuinit.text+0x2c): undefined reference to `armada_xp_mpic_smp_cpu_init'
+arch/arm/mach-mvebu/built-in.o: In function `armada_xp_secondary_startup':
+:(.cpuinit.text+0x40): undefined reference to `ll_set_cpu_coherent'
 
-JON >> Hi Tony, this one appears to be merged incorrectly. The unreserve ended 
-JON >> up in the gpmc_calc_timings() function. Here is a patch to fix.
+Now, using the random config there's a new error, unrelated to the
+previous one:
 
-I have tested based on linux-omap/master.
+ERROR: "twl6030_interrupt_unmask" [drivers/usb/otg/twl6030-usb.ko] undefined!
+ERROR: "twl_i2c_read_u8" [drivers/usb/otg/twl6030-usb.ko] undefined!
+ERROR: "twl_i2c_write_u8" [drivers/usb/otg/twl6030-usb.ko] undefined!
+ERROR: "twl6030_interrupt_mask" [drivers/usb/otg/twl6030-usb.ko] undefined!
 
-http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=shortlog;h=refs/heads/master
-
-Thanks
-Avinash
-
-> Without this patch, GPMC is currently broken on my igep board setup,
-> if initialized through a device tree.
-> 
-> Thanks a lot for the fix,
-> 
-> -- 
-> Ezequiel Garc?a, Free Electrons
-> Embedded Linux, Kernel and Android Engineering
-> http://free-electrons.com
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Regards,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
