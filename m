@@ -1,136 +1,46 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 14 Feb 2013 12:18:17 +0200
-Subject: [PATCH v9 02/20] mfd: omap-usb-host: Consolidate OMAP USB-HS
- platform data
-In-Reply-To: <1358937492-8129-3-git-send-email-rogerq@ti.com>
-References: <1358937492-8129-1-git-send-email-rogerq@ti.com>
- <1358937492-8129-3-git-send-email-rogerq@ti.com>
-Message-ID: <511CB9E9.5050804@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 14 Feb 2013 07:20:37 -0300
+Subject: [RFC 1/1] ARM: omap2: gpmc: Move binding documentation to
+ memory-controller
+In-Reply-To: <511BAD97.5050602@ti.com>
+References: <1360754003-3988-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1360754003-3988-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <511BAD97.5050602@ti.com>
+Message-ID: <20130214102036.GB2429@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-On 01/23/2013 12:37 PM, Roger Quadros wrote:
-> Let's have a single platform data structure for the OMAP's High-Speed
-> USB host subsystem instead of having 3 separate ones i.e. one for
-> board data, one for USB Host (UHH) module and one for USB-TLL module.
+On Wed, Feb 13, 2013 at 09:13:27AM -0600, Jon Hunter wrote:
 > 
-> This makes the code much simpler and avoids creating multiple copies of
-> platform data.
+> On 02/13/2013 05:13 AM, Ezequiel Garcia wrote:
+> > GPMC stands for General Purpose Memory Controller, and it's primarily
+> > used to handle memories such as NOR, NAND, SRAM.
+> > Note that this controller is also used to handle network controllers
+> > such as smsc911x.
+> > 
+> > This patch moves the documentation binding to memory-controllers,
+> > where it belongs.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  .../ti-gpmc.txt => memory-controllers/ti/gpmc.txt} |    0
+> >  1 files changed, 0 insertions(+), 0 deletions(-)
+> >  rename Documentation/devicetree/bindings/{bus/ti-gpmc.txt => memory-controllers/ti/gpmc.txt} (100%)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/memory-controllers/ti/gpmc.txt
+> > similarity index 100%
+> > rename from Documentation/devicetree/bindings/bus/ti-gpmc.txt
+> > rename to Documentation/devicetree/bindings/memory-controllers/ti/gpmc.txt
 > 
-> CC: Alan Stern <stern@rowland.harvard.edu>
-> 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> For the ehci-omap.c part:
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-
-Could you please ACK the drivers/usb/host/ehci-omap.c part
-so that this can go through the MFD tree. Thanks.
-
-The reason it needs to go through MFD is that it depends on
-a platform header change which Samuel and Tony have agreed to share.
-
-cheers,
--roger
-
-> ---
->  arch/arm/mach-omap2/board-3430sdp.c        |    2 +-
->  arch/arm/mach-omap2/board-3630sdp.c        |    2 +-
->  arch/arm/mach-omap2/board-am3517crane.c    |    2 +-
->  arch/arm/mach-omap2/board-am3517evm.c      |    2 +-
->  arch/arm/mach-omap2/board-cm-t35.c         |    2 +-
->  arch/arm/mach-omap2/board-cm-t3517.c       |    2 +-
->  arch/arm/mach-omap2/board-devkit8000.c     |    2 +-
->  arch/arm/mach-omap2/board-igep0020.c       |    4 +-
->  arch/arm/mach-omap2/board-omap3beagle.c    |    2 +-
->  arch/arm/mach-omap2/board-omap3evm.c       |    2 +-
->  arch/arm/mach-omap2/board-omap3pandora.c   |    2 +-
->  arch/arm/mach-omap2/board-omap3stalker.c   |    2 +-
->  arch/arm/mach-omap2/board-omap3touchbook.c |    2 +-
->  arch/arm/mach-omap2/board-omap4panda.c     |    2 +-
->  arch/arm/mach-omap2/board-overo.c          |    2 +-
->  arch/arm/mach-omap2/board-zoom.c           |    2 +-
->  arch/arm/mach-omap2/usb-host.c             |   29 ++-----------
->  arch/arm/mach-omap2/usb.h                  |   20 +--------
->  drivers/mfd/omap-usb-host.c                |   63 +++++++++++----------------
->  drivers/mfd/omap-usb-tll.c                 |   11 ++---
->  drivers/usb/host/ehci-omap.c               |    6 +-
->  include/linux/platform_data/usb-omap.h     |   23 ++--------
->  22 files changed, 61 insertions(+), 125 deletions(-)
+> I am fine with that. However, make sure you CC the device-tree mailing list.
 > 
 
-<snip>
+Sorry about that. I also forgot to put Daniel Mack in CC, who added this
+document in the first place.
 
-> diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
-> index e9d9b09..b96a4bf 100644
-> --- a/drivers/usb/host/ehci-omap.c
-> +++ b/drivers/usb/host/ehci-omap.c
-> @@ -107,7 +107,7 @@ static int omap_ehci_init(struct usb_hcd *hcd)
->  {
->  	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
->  	int			rc;
-> -	struct ehci_hcd_omap_platform_data	*pdata;
-> +	struct usbhs_omap_platform_data	*pdata;
->  
->  	pdata = hcd->self.controller->platform_data;
->  
-> @@ -151,7 +151,7 @@ static int omap_ehci_init(struct usb_hcd *hcd)
->  }
->  
->  static void disable_put_regulator(
-> -		struct ehci_hcd_omap_platform_data *pdata)
-> +		struct usbhs_omap_platform_data *pdata)
->  {
->  	int i;
->  
-> @@ -176,7 +176,7 @@ static void disable_put_regulator(
->  static int ehci_hcd_omap_probe(struct platform_device *pdev)
->  {
->  	struct device				*dev = &pdev->dev;
-> -	struct ehci_hcd_omap_platform_data	*pdata = dev->platform_data;
-> +	struct usbhs_omap_platform_data		*pdata = dev->platform_data;
->  	struct resource				*res;
->  	struct usb_hcd				*hcd;
->  	void __iomem				*regs;
-> diff --git a/include/linux/platform_data/usb-omap.h b/include/linux/platform_data/usb-omap.h
-> index ef65b67..04c7537 100644
-> --- a/include/linux/platform_data/usb-omap.h
-> +++ b/include/linux/platform_data/usb-omap.h
-> @@ -38,30 +38,15 @@ enum usbhs_omap_port_mode {
->  	OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM
->  };
->  
-> -struct usbtll_omap_platform_data {
-> -	enum usbhs_omap_port_mode		port_mode[OMAP3_HS_USB_PORTS];
-> -};
-> -
-> -struct ehci_hcd_omap_platform_data {
-> +struct usbhs_omap_platform_data {
->  	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
->  	int				reset_gpio_port[OMAP3_HS_USB_PORTS];
->  	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
-> -	unsigned			phy_reset:1;
-> -};
-> -
-> -struct ohci_hcd_omap_platform_data {
-> -	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
-> -	unsigned			es2_compatibility:1;
-> -};
-> -
-> -struct usbhs_omap_platform_data {
-> -	enum usbhs_omap_port_mode		port_mode[OMAP3_HS_USB_PORTS];
-> -
-> -	struct ehci_hcd_omap_platform_data	*ehci_data;
-> -	struct ohci_hcd_omap_platform_data	*ohci_data;
->  
->  	/* OMAP3 <= ES2.1 have a single ulpi bypass control bit */
-> -	unsigned				single_ulpi_bypass:1;
-> +	unsigned			single_ulpi_bypass:1;
-> +	unsigned			es2_compatibility:1;
-> +	unsigned			phy_reset:1;
->  };
->  
->  /*-------------------------------------------------------------------------*/
-> 
+@Daniel: what do you think?
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
