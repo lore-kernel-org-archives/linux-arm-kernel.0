@@ -1,87 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 13 Feb 2013 19:30:26 -0600
-Subject: [PATCH 1/4] clocksource: pass DT node pointer to init functions
-In-Reply-To: <CAHTX3d+2rGBE3ZBwiHbq7tOi+OE+5KGPh34APzp0NhRP=mBv+w@mail.gmail.com>
-References: <1360264144-20714-1-git-send-email-robherring2@gmail.com>
- <1360264144-20714-2-git-send-email-robherring2@gmail.com>
- <CAHTX3dKLCbfhBaHKBE=fVTcRReVL6yotA9e_8S70bH+_gajL5Q@mail.gmail.com>
- <511BC043.4030506@gmail.com>
- <CAHTX3d+2rGBE3ZBwiHbq7tOi+OE+5KGPh34APzp0NhRP=mBv+w@mail.gmail.com>
-Message-ID: <511C3E32.9010709@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 14 Feb 2013 11:48:50 +0900
+Subject: [PATCH 2/3] ARM: mach-shmobile: armadillo800eva: enable
+ REGULATOR in defconfig
+In-Reply-To: <1360761103-17357-3-git-send-email-horms+renesas@verge.net.au>
+References: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
+ <1360761103-17357-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130214024847.GQ15879@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2013 11:33 AM, Michal Simek wrote:
-> 2013/2/13 Rob Herring <robherring2@gmail.com>:
->> On 02/13/2013 10:21 AM, Michal Simek wrote:
->>> 2013/2/7 Rob Herring <robherring2@gmail.com>:
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> In cases where we have multiple nodes of the same type, we may need the
->>>> node pointer to know which node was matched. Passing the node pointer
->>>> also keeps the init function from having to match the node a 2nd time.
->>>>
->>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->>>> Cc: John Stultz <johnstul@us.ibm.com>
->>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>> ---
->>>>  drivers/clocksource/clksrc-of.c |    4 ++--
->>>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> Tested-by: Michal Simek <michal.simek@xilinx.com>
->>>
->>> The rest is just the same as I have done. Any option to add these
->>> patches to v3.9?
->>
->> I would like to before we have more users to fix, but it will have to be
->> post rc1. If not, Arnd/Olof should be be able to provide a stable branch
->> for 3.10.
+On Wed, Feb 13, 2013 at 10:11:42PM +0900, Simon Horman wrote:
+> As well as being a generally sane thing to do this
+> is required for MMCIF to function in conjunction with
+> "ARM: shmobile: switch SDHI0 to GPIO regulator on armadillo800eva".
 > 
-> ok
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> ---
+> 
+> v2
+> * Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
+> ---
+>  arch/arm/configs/armadillo800eva_defconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+> index 0b98100..0cc8014 100644
+> --- a/arch/arm/configs/armadillo800eva_defconfig
+> +++ b/arch/arm/configs/armadillo800eva_defconfig
+> @@ -88,6 +88,7 @@ CONFIG_I2C=y
+>  CONFIG_I2C_GPIO=y
+>  CONFIG_I2C_SH_MOBILE=y
+>  # CONFIG_HWMON is not set
+> +CONFIG_REGULATOR=y
+>  CONFIG_MEDIA_SUPPORT=y
+>  CONFIG_VIDEO_DEV=y
+>  CONFIG_MEDIA_CAMERA_SUPPORT=y
 
-I now see you were trying to get zynq changes in for 3.9. You could add
-this patch to your pull request. As is, it is not dependent on some DT
-code changes, but the subsequent patches are. I can send the rest after
-rc1. It's a bit of a hack with the function call prototype, but nothing
-actually breaks. I was going to combine as Arnd suggested, but either
-way is probably fine.
+This patch seems to break NIC initialisation.
 
-> 
->>> Because I need these patches for zynq timer because we have two in the soc.
->>> Is it OK to register several clock source and clockevent devices?
->>
->> If it is 1 DT node, then that should be fine.
-> 
-> zynq is using two triple timer counter IP . There are also described by two
-> different DT nodes because there are separated and uses different baseaddresses.
-> 
-> Does it mean that if there are 2 DT nodes that it won't work?
-> 
-> 
-> One more thing. Is there any rule which should describe which timer should be
-> used for clockevent and for clocksource?
-
-No. This is a common problem. A simple solution is a "linux,clockevent"
-property, but I want to avoid that. Ultimately it is some feature of the
-h/w that makes you choose. This could be it has an interrupt or not,
-higher frequency, has timer compare pins, gets power gated, etc. So you
-should describe enough of the h/w properties to make this decision. OMAP
-is an example doing this with lots of timers with varying integration
-level differences.
-
-Rob
-
-> 
-> 
->>> btw: there is still one issue because you can just setup only one
->>> compatibility string.
->>
->> You can have multiple CLOCKSOURCE_OF_DECLARE statements. The gic code
->> does this for irqchips.
-> 
-> Ok. Will look at it.
-> 
-> Thanks,
-> Michal
-> 
-> 
+smsc911x: Driver version 2008-10-21
+smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
+smsc911x smsc911x.0 (unregistered net_device): couldn't get regulators -517
+platform smsc911x.0: Driver smsc911x requests probe deferral
