@@ -1,36 +1,155 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 14 Feb 2013 15:09:57 +0530
-Subject: [PATCH V4 0/5] Add generic DMA DT binding support
-In-Reply-To: <CAAgF-BfAE4Qt5KOBsn1iD7HW7_1e=TSEbuxNuTk0w8X+t3i-5Q@mail.gmail.com>
-References: <1360571905-15285-1-git-send-email-padma.v@samsung.com>
- <20130212144950.GJ3789@intel.com>
- <CAAgF-Be1w-8yjuyXT+d8sUO8dee1x7oYFJLXHCmcJSf17eXWyw@mail.gmail.com>
- <20130214044704.GE7777@intel.com>
- <CAAgF-BfAE4Qt5KOBsn1iD7HW7_1e=TSEbuxNuTk0w8X+t3i-5Q@mail.gmail.com>
-Message-ID: <20130214093957.GB27887@intel.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 14 Feb 2013 10:49:44 +0100
+Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
+ <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <511CB338.8070204@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 11:12:51AM +0530, Padma Venkat wrote:
-> Hi Vinod,
+On 02/14/2013 10:36 AM, Alexander Shishkin wrote:
+> Sascha Hauer <s.hauer@pengutronix.de> writes:
 > 
-> On Thu, Feb 14, 2013 at 10:17 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Wed, Feb 13, 2013 at 09:52:30AM +0530, Padma Venkat wrote:
-> >> Hi Vinod,
-> >>
-> >> On Tue, Feb 12, 2013 at 8:19 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> >> > On Mon, Feb 11, 2013 at 02:08:20PM +0530, Padmavathi Venna wrote:
-> >> >
-> >> > This looks fine, I have only question. The code seems to assume that pl330 dma
-> >> > controller always uses DT. But I dont see that as dependency for pl330.
-> > Have you checked this?
+>> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>>
+>> This adds two little devicetree helper functions for determining the
+>> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
+>> the devicetree.
+>>
+>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> ---
+>>  drivers/usb/phy/Makefile |    1 +
+>>  drivers/usb/phy/of.c     |   47 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/usb/usb-common.c |   36 +++++++++++++++++++++++++++++++++++
+>>  include/linux/usb/of.h   |   27 ++++++++++++++++++++++++++
+>>  include/linux/usb/otg.h  |    7 +++++++
+>>  include/linux/usb/phy.h  |    9 +++++++++
+>>  6 files changed, 127 insertions(+)
+>>  create mode 100644 drivers/usb/phy/of.c
+>>  create mode 100644 include/linux/usb/of.h
+>>
+>> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+>> index 9fa6327..e1be1e8 100644
+>> --- a/drivers/usb/phy/Makefile
+>> +++ b/drivers/usb/phy/Makefile
+>> @@ -5,6 +5,7 @@
+>>  ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
+>>  
+>>  obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
+>> +obj-$(CONFIG_OF)			+= of.o
+>>  obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
+>>  obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
+>>  obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
+>> diff --git a/drivers/usb/phy/of.c b/drivers/usb/phy/of.c
+>> new file mode 100644
+>> index 0000000..e6f3b74
+>> --- /dev/null
+>> +++ b/drivers/usb/phy/of.c
+>> @@ -0,0 +1,47 @@
+>> +/*
+>> + * USB of helper code
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/usb/of.h>
+>> +#include <linux/usb/otg.h>
+>> +
+>> +static const char *usbphy_modes[] = {
+>> +	[USBPHY_INTERFACE_MODE_UNKNOWN]	= "",
+>> +	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
+>> +	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
+>> +	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
+>> +	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
+>> +	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
+>> +};
+>> +
+>> +/**
+>> + * of_usb_get_phy_mode - Get phy mode for given device_node
+>> + * @np:	Pointer to the given device_node
+>> + *
+>> + * The function gets phy interface string from property 'phy_type',
+>> + * and returns the correspondig enum usb_phy_interface
+>> + */
+>> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
+>> +{
+>> +	const char *phy_type;
+>> +	int err, i;
+>> +
+>> +	err = of_property_read_string(np, "phy_type", &phy_type);
+>> +	if (err < 0)
+>> +		return USBPHY_INTERFACE_MODE_UNKNOWN;
+>> +
+>> +	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
+>> +		if (!strcmp(phy_type, usbphy_modes[i]))
+>> +			return i;
+>> +
+>> +	return USBPHY_INTERFACE_MODE_UNKNOWN;
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
+>> diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
+>> index d29503e..ad4d87d 100644
+>> --- a/drivers/usb/usb-common.c
+>> +++ b/drivers/usb/usb-common.c
+>> @@ -14,6 +14,9 @@
+>>  #include <linux/kernel.h>
+>>  #include <linux/module.h>
+>>  #include <linux/usb/ch9.h>
+>> +#include <linux/of.h>
+>> +#include <linux/usb/of.h>
+>> +#include <linux/usb/otg.h>
+>>  
+>>  const char *usb_speed_string(enum usb_device_speed speed)
+>>  {
+>> @@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
+>>  }
+>>  EXPORT_SYMBOL_GPL(usb_speed_string);
+>>  
+>> +#ifdef CONFIG_OF
+>> +static const char *usb_dr_modes[] = {
+>> +	[USB_DR_MODE_UNKNOWN]		= "",
+>> +	[USB_DR_MODE_HOST]		= "host",
+>> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
+>> +	[USB_DR_MODE_OTG]		= "otg",
+>> +};
 > 
-> Sorry I didn't see this comment previously. I verified on SMDK6410
-> board which doesn't have DT support.
-> I didn't see any build error and it detected the sound card.
-Okay, sound good...
+> It turns out this is a problem, especially since this is generic usb
+> code: we have a chipidea controller (a patchset just arrived) that does
+> both host and peripheral, but not otg. And I'm told now that dwc3
+> controller can be synthesized like that too.
 
-I will try the series now.
+You mean a single instance of the controller (i.e. USB port) is host and
+peripheral but has no otg registers. This means the mode of the port is
+configured by userspace via the debugfs file? Is this possible?
 
---
-~Vinod
+The above property describes a single port not the whole controller. If
+there is a controller with one host and one peripheral port the code in
+this patch should be sufficient, as you have a property in the DT for
+each port.
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130214/5667bd71/attachment.sig>
