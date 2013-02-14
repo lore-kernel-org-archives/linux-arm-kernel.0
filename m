@@ -1,25 +1,68 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 14 Feb 2013 21:34:22 +0100
-Subject: [v2 1/4] ARM: tegra20: create a DT header defining CLK IDs
-In-Reply-To: <511D45E0.1080105@wwwdotorg.org>
-References: <1360868369-20093-1-git-send-email-hdoyu@nvidia.com><1360868369-20093-2-git-send-email-hdoyu@nvidia.com><511D45E0.1080105@wwwdotorg.org>
-Message-ID: <20130214.223422.1106350409475384652.hdoyu@nvidia.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 14 Feb 2013 15:38:29 -0500
+Subject: [PATCH] ARM: kirkwood: of_serial: fix clock gating by removing
+ clock-frequency
+In-Reply-To: <20130205111307.GO14746@titan.lakedaemon.net>
+References: <1359493774-27627-1-git-send-email-jason@lakedaemon.net>
+ <20130205105431.GI652@kw.sim.vm.gnt>
+ <20130205111307.GO14746@titan.lakedaemon.net>
+Message-ID: <20130214203829.GV14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Thu, 14 Feb 2013 21:15:28 +0100:
+On Tue, Feb 05, 2013 at 06:13:07AM -0500, Jason Cooper wrote:
+> On Tue, Feb 05, 2013 at 11:54:31AM +0100, Simon Guinot wrote:
+> > On Tue, Jan 29, 2013 at 09:09:34PM +0000, Jason Cooper wrote:
+> > > When DT support for kirkwood was first introduced, there was no clock
+> > > infrastructure.  As a result, we had to manually pass the
+> > > clock-frequency to the driver from the device node.
+> > > 
+> > > Unfortunately, on kirkwood, with minimal config or all module configs,
+> > > clock-frequency breaks booting because of_serial doesn't consume the
+> > > gate_clk when clock-frequency is defined.
+> > > 
+> > > The end result on kirkwood is that runit gets gated, and then the boot
+> > > fails when the kernel tries to write to the serial port.
+> > > 
+> > > Fix the issue by removing the clock-frequency parameter from all
+> > > kirkwood dts files.
+> > > 
+> > > Booted on dreamplug without earlyprintk and successfully logged in via
+> > > ttyS0.
+> > > 
+> > > Reported-by: Simon Baatz <gmbnomis@gmail.com>
+> > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> > > ---
+> > >  arch/arm/boot/dts/kirkwood-dns320.dts         | 2 --
+> > >  arch/arm/boot/dts/kirkwood-dns325.dts         | 1 -
+> > >  arch/arm/boot/dts/kirkwood-dockstar.dts       | 1 -
+> > >  arch/arm/boot/dts/kirkwood-dreamplug.dts      | 1 -
+> > >  arch/arm/boot/dts/kirkwood-goflexnet.dts      | 1 -
+> > >  arch/arm/boot/dts/kirkwood-ib62x0.dts         | 1 -
+> > >  arch/arm/boot/dts/kirkwood-iconnect.dts       | 1 -
+> > >  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts | 1 -
+> > >  arch/arm/boot/dts/kirkwood-km_kirkwood.dts    | 1 -
+> > >  arch/arm/boot/dts/kirkwood-lschlv2.dts        | 1 -
+> > >  arch/arm/boot/dts/kirkwood-lsxhl.dts          | 1 -
+> > >  arch/arm/boot/dts/kirkwood-mplcec4.dts        | 1 -
+> > >  arch/arm/boot/dts/kirkwood-nsa310.dts         | 1 -
+> > >  arch/arm/boot/dts/kirkwood-openblocks_a6.dts  | 2 --
+> > >  arch/arm/boot/dts/kirkwood-topkick.dts        | 1 -
+> > >  arch/arm/boot/dts/kirkwood.dtsi               | 2 --
+> > 
+> > Hi Jason,
+> > 
+> > Maybe you could also remove the clock-frequency parameter from
+> > kirkwood-ns2-common.dtsi ?
+> 
+> Good catch, I must've been grepping through kirkwood*.dts and missed the
+> dtsi.  I'll do a followup patch.
 
-> Oh, and I don't think you updated e.g. nvidia,tegra20-car.txt to remove
-> the list of clocks.
+I squashed this change into the original patch a queued it up with the
+others to go into v3.8.x once v3.8 drops.
 
-Not yet removed. I think that this could be done with the patch which
-allows kernel source to include DT header files.
+it's in mvebu-next/fixes
 
-> BTW, I assume this patch includes the changes from my recent "clk:
-> tegra: fix driver to match DT binding" and anything else similar that's
-> in the most recent Tegra for-next?
+thx,
 
-Of course not, that's a little bit too recent.
-
-I'll rerun my script against the laste Tegra for-next and post them as
-v3(inc. Tegra114)
+Jason.
