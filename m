@@ -1,28 +1,62 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 14 Feb 2013 17:07:43 +0000
-Subject: [BUG] v7_coherent_kern_range broken on big.LITTLE
-Message-ID: <1360861663.3266.58.camel@linaro1.home>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 15 Feb 2013 01:10:30 +0800
+Subject: [PATCH v8 03/12] gpio: pl061: allocate irq dynamically
+In-Reply-To: <CACRpkdaaiVzg2F2R51TTL4=nt_VDWf0bFaJF2SzysdT8FouJAQ@mail.gmail.com>
+References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
+ <1360602659-4774-4-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdaaiVzg2F2R51TTL4=nt_VDWf0bFaJF2SzysdT8FouJAQ@mail.gmail.com>
+Message-ID: <CAD6h2NTVCLR2oQEoHyWVt9rzXtbUuYaYfqaC1K8GmwRGW_AFSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function v7_coherent_kern_range uses the macro icache_line_size to
-read the current CPUs icache line size for the purpose of invalidating
-all cache lines in the given range.
+On 14 February 2013 22:04, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Feb 11, 2013 at 6:10 PM, Haojian Zhuang
+> <haojian.zhuang@linaro.org> wrote:
+>
+> We don't convert drivers to irqdomain without actually *using*
+> the irqdomain. I don't know where this pattern comes from,
+> but I'm suspicious about patch sets that just focus on enabling
+> DT functionality without considering irqdomain stuff as a concept
+> of its own.
+>
+> The biggest problem with this patch is what is missing from it:
+>
+> - irq_base shall be *deleted* from struct pl061_gpio
+> - instead a struct irqdomain  * shall be stored for offsetting IRQs
+> - everywhere chip->irq_base is referenced, use irq_find_mapping()
+> - In pl061_to_irq, irq_create_mapping() shall be used, so it will
+>   allocate a descriptor even if we're using the driver with
+>   SPARSE_IRQ and a linear domain.
+>
+> Look at e.g. gpio-langwell.c for guidance.
+>
+>> +       chip->irq_base = irq_alloc_descs(chip->irq_base, 0, PL061_GPIO_NR, 0);
+>> +       if (chip->irq_base < 0)
+>> +               return chip->irq_base;
+>> +       if (!irq_domain_add_legacy(adev->dev.of_node, PL061_GPIO_NR,
+>> +                                  chip->irq_base, 0, &pl061_domain_ops, chip))
+>>                 return -ENODEV;
+>
+> Instead of the above, please use:
+>
+> chip->irqdomain = irq_domain_add_simple(adev->dev.of_node,
+>                                          PL061_GPIO_NR,
+>                                          chip->irq_base,
+>                                          &pl061_domain_ops,
+>                                          chip);
+>
+> Notice that I don't throw the domain away after creation either...
+>
+> This call will allocate descriptors for you as long as the
+> irq_base > 0, which it should be, since 0 is NO_IRQ.
+>
+> It make things easier the day you start using a purely
+> dynamic approach.
+>
+> Yours,
+> Linus Walleij
 
-Unfortunately, on the TC2 big.LITTLE test chip, the A15 icache line size
-is 64 bytes, but the A7 size is only 32 bytes. So when the function
-executes on the A15 it will miss out every alternate cache line for the
-A7.
+Thank you. I'll update it.
 
-Presumably all the functions which use dcache_line_size are also
-potentially buggy?
-
-This problem was discovered whilst investigating why function tracer was
-crashing in an unpredictable fashion. This was discussed previously but
-the root cause misdiagnosed, see http://lkml.org/lkml/2012/12/6/261
-
--- 
-Tixy
-
-
- 
+Regards
+Haojian
