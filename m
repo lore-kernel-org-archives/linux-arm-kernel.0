@@ -1,28 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 17:41:34 +0000
-Subject: [PATCH 06/15] clk: export __clk_get_name
-In-Reply-To: <201301221543.18859.arnd@arndb.de>
-References: <1358788568-11137-1-git-send-email-arnd@arndb.de>
- <CAOMZO5AON+FhTQpTbEdjwZaEaxsPoEVLeALhH2s34biWH_EeOA@mail.gmail.com>
- <201301221543.18859.arnd@arndb.de>
-Message-ID: <201302141741.34474.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 14 Feb 2013 10:43:16 -0700
+Subject: [PATCH] clk: tegra: provide dummy cpu car ops
+In-Reply-To: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <511D2234.8000408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 January 2013, Arnd Bergmann wrote:
-> On Tuesday 22 January 2013, Fabio Estevam wrote:
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Cc: Mike Turquette <mturquette@linaro.org>
-> > 
-> > A fix from Niels de Vos has already been applied into clk-next:
-> > https://patchwork.kernel.org/patch/1871981/
+On 02/14/2013 07:52 AM, Peter De Schrijver wrote:
+> tegra_boot_secondary() relies on some of the car ops. This means having an
+> uninitialized tegra_cpu_car_ops will lead to an early boot panic.
+> Providing a dummy struct avoids this and makes adding Tegra114 clock support
+> in a bisectable way a lot easier.
 > 
-> Ok, very good. Mike, I saw that the patch is over
-> a month old. Any reason it hasn't made it into v3.8.rc yet?
+> --
 > 
+> Stephen,
+> 
+> Should this be a separate patch or should I make this part of new release of
+> the Tegra114 clock series?
 
-I guess we missed this one for 3.8 then, meaning we have no
-working allmodconfig :(
-
-	Arnd
+I will try and remember to apply this before the Tegra114 clock series,
+although I think you're reposting that anyway, so feel free to include
+this in that series to make things simpler.
