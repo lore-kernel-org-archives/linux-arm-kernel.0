@@ -1,29 +1,77 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 14 Feb 2013 13:27:07 -0500 (EST)
-Subject: [PATCH] ARM: net: bpf_jit: fix emit_swap16() for non ARMv6+.
-In-Reply-To: <20130214150925.GI17833@n2100.arm.linux.org.uk>
-References: <511C0662.8010309@gmail.com> <511CE939.5000705@freebox.fr>
- <20130214150925.GI17833@n2100.arm.linux.org.uk>
-Message-ID: <20130214.132707.316192073342955090.davem@davemloft.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 14 Feb 2013 19:30:26 +0100
+Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <20130214180444.GD25891@arwen.pp.htv.fi>
+References: <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
+ <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
+ <511CB338.8070204@pengutronix.de>
+ <20130214095822.GD15275@arwen.pp.htv.fi>
+ <20130214100722.GK1906@pengutronix.de>
+ <20130214101510.GA15537@arwen.pp.htv.fi>
+ <20130214112449.GL1906@pengutronix.de>
+ <20130214131015.GB27419@arwen.pp.htv.fi>
+ <20130214160655.GT1906@pengutronix.de>
+ <20130214180444.GD25891@arwen.pp.htv.fi>
+Message-ID: <20130214183026.GW1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Date: Thu, 14 Feb 2013 15:09:25 +0000
-
-> On Thu, Feb 14, 2013 at 02:40:09PM +0100, Nicolas Schichan wrote:
->> On 02/13/2013 10:32 PM, Mircea Gherzan wrote:
->> [...]
->>> Acked-by: Mircea Gherzan <mgherzan@gmail.com>
->>
->> Hi,
->>
->> Thanks Mircea. Russel, David, do you have any preference as to which path 
->> this patch should take (net tree or ARM tree) ?
+On Thu, Feb 14, 2013 at 08:04:44PM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> I'm happy for either - I'm under the weather at the moment, so I'd be
-> greatful if David could pick this one up this time around.
+> On Thu, Feb 14, 2013 at 05:06:55PM +0100, Sascha Hauer wrote:
+> > > > > > > Maybe we can ignore dr_mode in host-only and device-only builds and only
+> > > > > > > look at it for DRD builds ?
+> > > > > > 
+> > > > > > If something is or is not compiled in the kernel this doesn't mean the kernel
+> > > > > > is not started on boards with a different situation.
+> > > > > 
+> > > > > who said kernel wouldn't start ? If you request a host-only build, you
+> > > > > need to force your IP into working as host, since that's all you have,
+> > > > > either that or you bail out on probe().
+> > > > 
+> > > > Let me clarify, I don't want to use Kconfig to specify my boards
+> > > > capabilities. If a kernel is compiled for host mode only and the
+> > > > devicetree specifies a port is device-only, then yes, the driver
+> > > > should bail out on probe, maybe leaving a message that it found
+> > > > a device for which the suitable role is not compiled in.
+> > > 
+> > > yeah, this is why I said we should ignore dr_mode (or bail out) when
+> > > !OTG.
+> > 
+> > Ok, that's what the patch effectively does. We have this in chipidea/core.c:
+> > 
+> > | 	dr_mode = ci->platdata->dr_mode;
+> > | 	if (dr_mode == USB_DR_MODE_UNKNOWN)
+> > | 		dr_mode = USB_DR_MODE_OTG;
+> > 
+> > default to otg if nothing specified.
 > 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> you missed my point. I wanted something like:
+> 
+> dr_mode = ci->platdata->dr_mode;
+> if ((dr_mode == USB_DR_MODE_UNKNOWN) || !IS_ENABLED(CONFIG_USB_CHIPIDEA_OTG)
+> 	dr_mode = USB_DR_MODE_OTG;
 
-Applied to 'net', thanks everyone.
+So everytime the chipidea driver cannot do OTG the driver falls back to
+exactly this mode?
+
+> 
+> this copes with the situation where dr_mode == USB_DR_MODE_HOST but
+> kernel is gadget-only.
+
+When I specify dr_mode = USB_DR_MODE_HOST in the devicetree indicating
+that my board is only host capable I exactly want the driver to be in
+host mode for this device, or to bail out if the kernel does not have
+host support compiled in.
+
+Sorry, I still don't get it.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
