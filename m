@@ -1,32 +1,51 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 14 Feb 2013 14:42:50 +0100
-Subject: [PATCH 1/1] ARM: dt: add header to define tegra20 clocks
-In-Reply-To: <20130214101220.GI3073@tbergstrom-lnx.Nvidia.com>
-References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org><1360823899-17846-1-git-send-email-hdoyu@nvidia.com><20130214101220.GI3073@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20130214.154250.475978229890081002.hdoyu@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Feb 2013 14:49:16 +0100
+Subject: [PATCH 00/11] ARM warning fixes for arm-soc
+Message-ID: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver <pdeschrijver@nvidia.com> wrote @ Thu, 14 Feb 2013 11:12:20 +0100:
+This is a set of bug fixes, most of which I have posted
+at least one time before. I will add them to the
+next/fixes-non-critical branch now, unless there are
+any last-minute objections.
 
-> On Thu, Feb 14, 2013 at 07:38:17AM +0100, Hiroshi Doyu wrote:
-> > To replace magic number in "clocks = <&tegra_car 28>;"
-> > 
-> 
-> But then we should probably also remove the enum tegra20_clk and replace it
-> with this header file. We should also consider removing the list of IDs from
-> the documentation and refer to the header file instead. Otherwise we will have
-> 3 places which define the same IDs and we need to be sure they stay in sync...
+Arnd Bergmann (11):
+  ARM: disable virt_to_bus/virt_to_bus almost everywhere
+  ARM: samsung: fix assembly syntax for new gas
+  ARM: w90x900: fix legacy assembly syntax
+  ARM: shmobile: fix defconfig warning on CONFIG_USB
+  ARM: sa1100: don't warn about mach/ide.h
+  ARM: integrator/versatile: fix NOMMU warnings
+  ARM: integrator: fix build with INTEGRATOR_AP off
+  ARM: pick Versatile by default for !MMU
+  ARM: mvebu: allow selecting mvebu without Armada XP
+  ARM: s3c: i2c: add platform_device forward declaration
+  scripts/sortextable: silence script output
 
-Actually I generate "arch/arm/boot/dts/tegra{20,30}-car.h" by parsing
-"enum tegra{20,30}_clk {..};" with a python script.
+ arch/arm/Kconfig                                 |  7 ++++++-
+ arch/arm/configs/marzen_defconfig                |  1 -
+ arch/arm/configs/shark_defconfig                 |  1 -
+ arch/arm/include/asm/dma.h                       |  2 +-
+ arch/arm/include/asm/memory.h                    |  2 ++
+ arch/arm/mach-integrator/common.h                |  5 -----
+ arch/arm/mach-integrator/core.c                  |  2 +-
+ arch/arm/mach-integrator/integrator_ap.c         |  2 +-
+ arch/arm/mach-integrator/integrator_cp.c         |  2 +-
+ arch/arm/mach-mvebu/Makefile                     |  5 +++--
+ arch/arm/mach-s3c24xx/include/mach/debug-macro.S | 12 ++++++------
+ arch/arm/mach-s3c24xx/include/mach/entry-macro.S |  4 ++--
+ arch/arm/mach-s3c24xx/pm-h1940.S                 |  2 +-
+ arch/arm/mach-s3c24xx/sleep-s3c2410.S            | 12 ++++++------
+ arch/arm/mach-s3c24xx/sleep-s3c2412.S            | 12 ++++++------
+ arch/arm/mach-sa1100/lart.c                      |  3 ---
+ arch/arm/mach-versatile/Kconfig                  |  5 +++++
+ arch/arm/mach-versatile/core.c                   |  2 +-
+ arch/arm/mach-w90x900/include/mach/entry-macro.S |  4 ++--
+ arch/arm/plat-samsung/include/plat/debug-macro.S | 18 +++++++++---------
+ include/linux/platform_data/i2c-s3c2410.h        |  2 ++
+ scripts/sortextable.h                            |  2 +-
+ 22 files changed, 56 insertions(+), 51 deletions(-)
 
-There could be the same kind of requirement from others that both
-"dtsip" and "C-source" want to share the same header file. If we
-consider that DT is the exact H/W description, C-source should be able
-to include a DT header file.
-
-For example, a C-header file for "enum tegra{20,30}_clk" should be
-generated from "arch/arm/boot/dts/tegra{20,30}-car.h" at runtime, or
-alternatively just "drivers/clk/tegra/clk-tegra{20,30}.c" can include
-"arch/arm/boot/dts/tegra{20,30}-car.h"? The latter may be easier.
+-- 
+1.8.1.2
