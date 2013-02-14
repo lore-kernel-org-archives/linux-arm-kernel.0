@@ -1,36 +1,42 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 Feb 2013 19:57:19 +0200
-Subject: [RFC/NOT FOR MERGING 1/3] arm: omap: use generic implementation
- if !od
-In-Reply-To: <20130214112043.GQ17852@n2100.arm.linux.org.uk>
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <20130214112043.GQ17852@n2100.arm.linux.org.uk>
-Message-ID: <20130214175719.GB25891@arwen.pp.htv.fi>
+Date: Thu, 14 Feb 2013 20:00:11 +0200
+Subject: [PATCH 1/2] USB mxs-phy: Register phy with framework
+In-Reply-To: <20130214162337.GU1906@pengutronix.de>
+References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
+ <20130214103729.GC15537@arwen.pp.htv.fi>
+ <20130214162337.GU1906@pengutronix.de>
+Message-ID: <20130214180011.GC25891@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 11:20:43AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 14, 2013 at 01:15:52PM +0200, Felipe Balbi wrote:
-> >  	struct platform_device *pdev = to_platform_device(dev);
-> > +	struct omap_device *od = to_omap_device(pdev);
-> >  	int ret;
-> >  
-> >  	ret = pm_generic_runtime_suspend(dev);
-> >  
-> > +	if (!od)
-> > +		goto out;
-> > +
-> >  	if (!ret)
-> 
-> What's wrong with the single line change per function of:
-> 
-> -	if (!ret)
-> +	if (!ret && to_omap_device(pdev))
-> 
-> ?
+Hi,
 
-nothing, will change. Let me just check if the other folks are ok with
-the patchset.
+On Thu, Feb 14, 2013 at 05:23:37PM +0100, Sascha Hauer wrote:
+> On Thu, Feb 14, 2013 at 12:37:29PM +0200, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Thu, Jan 31, 2013 at 12:32:16PM +0100, Sascha Hauer wrote:
+> > > We now have usb_add_phy_dev(), so use it to register with the framework
+> > > to be able to find the phy from the USB driver.
+> > > 
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > Sascha, are you taking this through your tree or you want me to queue it
+> > up ?
+> 
+> I would prefer if either you could take it or Alexander Shishkin along
+> with the other patches in:
+> 
+> [PATCH v4] USB: add devicetree helpers for determining dr_mode and phy_type
+> 
+> Could you have a look at them? Alexander is asking for an ack for 1/9,
+> 2/9, 3/9, 8/9. I just realized you are not on Cc for these. I could
+> bounce you the patches in case you don't have them in your mailbox.
+
+Ok, I'll look at them, no need to bounce. You _do_ realize, however,
+that Greg has already closed all his trees for v3.9, right ? So anything
+from now on will be queued for v3.10.
 
 -- 
 balbi
@@ -40,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130214/7bc41cb4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130214/4b0d1f36/attachment.sig>
