@@ -1,68 +1,134 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 14 Feb 2013 11:27:00 +0200
-Subject: [PATCH v2 02/10] gpio: pxa: avoid to use global irq base
-In-Reply-To: <CAD6h2NRO6N1pRfq_=ybj5TSwC7gieYOffcQmfTyUiP5R_3fWig@mail.gmail.com>
-References: <1359886551-20950-1-git-send-email-haojian.zhuang@linaro.org>
- <1359886551-20950-3-git-send-email-haojian.zhuang@linaro.org>
- <511BA0AF.8040904@compulab.co.il>
- <CAD6h2NRO6N1pRfq_=ybj5TSwC7gieYOffcQmfTyUiP5R_3fWig@mail.gmail.com>
-Message-ID: <511CADE4.1000007@compulab.co.il>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Thu, 14 Feb 2013 11:36:11 +0200
+Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
+References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/13 16:55, Haojian Zhuang wrote:
-> On 13 February 2013 22:18, Igor Grinberg <grinberg@compulab.co.il> wrote:
->> On 02/03/13 12:15, Haojian Zhuang wrote:
->>> Avoid to use global irq_base in gpio-pxa driver. Define irq_base in each
->>> pxa_gpio_chip instead. Then we can avoid to use macro PXA_GPIO_TO_IRQ() &
->>> MMP_GPIO_TO_IRQ().
->>>
->>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->>
->> Ok. This patch breaks the NFS root on my PXA based systems.
->> I still haven't found the cause of the breakage.
->>
-> 
-> It's so strange. I tested it OK on pxa910 without DT. Could you help
-> to check whether your GPIO interrupt still works?
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-It looks like I've figured this out...
-For em-x270 as an example, if I move the IRQ resource assignment to runtime:
+> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>
+> This adds two little devicetree helper functions for determining the
+> dr_mode (host, peripheral, otg) and phy_type (utmi, ulpi,...) from
+> the devicetree.
+>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/usb/phy/Makefile |    1 +
+>  drivers/usb/phy/of.c     |   47 ++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/usb/usb-common.c |   36 +++++++++++++++++++++++++++++++++++
+>  include/linux/usb/of.h   |   27 ++++++++++++++++++++++++++
+>  include/linux/usb/otg.h  |    7 +++++++
+>  include/linux/usb/phy.h  |    9 +++++++++
+>  6 files changed, 127 insertions(+)
+>  create mode 100644 drivers/usb/phy/of.c
+>  create mode 100644 include/linux/usb/of.h
+>
+> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+> index 9fa6327..e1be1e8 100644
+> --- a/drivers/usb/phy/Makefile
+> +++ b/drivers/usb/phy/Makefile
+> @@ -5,6 +5,7 @@
+>  ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
+>  
+>  obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
+> +obj-$(CONFIG_OF)			+= of.o
+>  obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
+>  obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
+>  obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
+> diff --git a/drivers/usb/phy/of.c b/drivers/usb/phy/of.c
+> new file mode 100644
+> index 0000000..e6f3b74
+> --- /dev/null
+> +++ b/drivers/usb/phy/of.c
+> @@ -0,0 +1,47 @@
+> +/*
+> + * USB of helper code
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/usb/of.h>
+> +#include <linux/usb/otg.h>
+> +
+> +static const char *usbphy_modes[] = {
+> +	[USBPHY_INTERFACE_MODE_UNKNOWN]	= "",
+> +	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
+> +	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
+> +	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
+> +	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
+> +	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
+> +};
+> +
+> +/**
+> + * of_usb_get_phy_mode - Get phy mode for given device_node
+> + * @np:	Pointer to the given device_node
+> + *
+> + * The function gets phy interface string from property 'phy_type',
+> + * and returns the correspondig enum usb_phy_interface
+> + */
+> +enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
+> +{
+> +	const char *phy_type;
+> +	int err, i;
+> +
+> +	err = of_property_read_string(np, "phy_type", &phy_type);
+> +	if (err < 0)
+> +		return USBPHY_INTERFACE_MODE_UNKNOWN;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
+> +		if (!strcmp(phy_type, usbphy_modes[i]))
+> +			return i;
+> +
+> +	return USBPHY_INTERFACE_MODE_UNKNOWN;
+> +}
+> +EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
+> diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
+> index d29503e..ad4d87d 100644
+> --- a/drivers/usb/usb-common.c
+> +++ b/drivers/usb/usb-common.c
+> @@ -14,6 +14,9 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/usb/ch9.h>
+> +#include <linux/of.h>
+> +#include <linux/usb/of.h>
+> +#include <linux/usb/otg.h>
+>  
+>  const char *usb_speed_string(enum usb_device_speed speed)
+>  {
+> @@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
+>  }
+>  EXPORT_SYMBOL_GPL(usb_speed_string);
+>  
+> +#ifdef CONFIG_OF
+> +static const char *usb_dr_modes[] = {
+> +	[USB_DR_MODE_UNKNOWN]		= "",
+> +	[USB_DR_MODE_HOST]		= "host",
+> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
+> +	[USB_DR_MODE_OTG]		= "otg",
+> +};
 
-diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-index 1b64114..178cc0b 100644
---- a/arch/arm/mach-pxa/em-x270.c
-+++ b/arch/arm/mach-pxa/em-x270.c
-@@ -210,8 +210,6 @@ static struct resource em_x270_dm9000_resource[] = {
- 		.flags = IORESOURCE_MEM,
- 	},
- 	[2] = {
--		.start = EM_X270_ETHIRQ,
--		.end   = EM_X270_ETHIRQ,
- 		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
- 	}
- };
-@@ -232,6 +230,9 @@ static struct platform_device em_x270_dm9000 = {
- 
- static void __init em_x270_init_dm9000(void)
- {
-+	em_x270_dm9000_resource[2].start = gpio_to_irq(GPIO41_ETHIRQ);
-+	em_x270_dm9000_resource[2].end = gpio_to_irq(GPIO41_ETHIRQ);
-+
- 	em_x270_dm9000_platdata.flags |= dm9000_flags;
- 	platform_device_register(&em_x270_dm9000);
- }
+It turns out this is a problem, especially since this is generic usb
+code: we have a chipidea controller (a patchset just arrived) that does
+both host and peripheral, but not otg. And I'm told now that dwc3
+controller can be synthesized like that too.
 
-The Ethernet is alive and NFS root works fine.
+Summoning Felipe to the thread, this patch is largely his call anyway.
 
-So my conclusion, is that we still need to have some work done
-before we can switch to using IRQ_DOMAIN.
-As you can see from above patch, we at least must deal with the
-PXA_GPIO_TO_IRQ macros and alike that have compile time assumptions
-which obviously get broken once you switch to the IRQ_DOMAIN.
-
-What do you think?
-
--- 
 Regards,
-Igor.
+--
+Alex
