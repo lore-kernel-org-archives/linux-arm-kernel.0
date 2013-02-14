@@ -1,52 +1,78 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 14 Feb 2013 12:01:12 +0200
-Subject: [PATCH v6 08/10] ARM: dt: Add references to tegra_car clocks
-In-Reply-To: <511BC3C3.6070402@wwwdotorg.org>
-References: <1360580700-10245-1-git-send-email-pdeschrijver@nvidia.com>
- <1360580700-10245-9-git-send-email-pdeschrijver@nvidia.com>
- <511A7AB5.4040607@wwwdotorg.org>
- <20130213113807.GE3073@tbergstrom-lnx.Nvidia.com>
- <511BC3C3.6070402@wwwdotorg.org>
-Message-ID: <20130214100112.GH3073@tbergstrom-lnx.Nvidia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 14 Feb 2013 11:07:22 +0100
+Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
+ and phy_type
+In-Reply-To: <20130214095822.GD15275@arwen.pp.htv.fi>
+References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359984275-24646-4-git-send-email-s.hauer@pengutronix.de>
+ <87fw0zb5kk.fsf@ashishki-desk.ger.corp.intel.com>
+ <511CB338.8070204@pengutronix.de>
+ <20130214095822.GD15275@arwen.pp.htv.fi>
+Message-ID: <20130214100722.GK1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 05:48:03PM +0100, Stephen Warren wrote:
-> On 02/13/2013 04:38 AM, Peter De Schrijver wrote:
-> > On Tue, Feb 12, 2013 at 06:24:05PM +0100, Stephen Warren wrote:
-> >> On 02/11/2013 04:04 AM, Peter De Schrijver wrote:
-> >>> Add references to tegra_car clocks for the basic device nodes.
-> >>
-> >> In this patch, you also need to remove the "clock-frequency" properties
-> >> from tegra114-*.dts board files.
-> > 
-> > That would probably break bisectability no?
+On Thu, Feb 14, 2013 at 11:58:22AM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> Oh right, I read the patch order backwards. You can fix this by moving
-> this patch to the end of the series.
+> On Thu, Feb 14, 2013 at 10:49:44AM +0100, Marc Kleine-Budde wrote:
+> > >> diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
+> > >> index d29503e..ad4d87d 100644
+> > >> --- a/drivers/usb/usb-common.c
+> > >> +++ b/drivers/usb/usb-common.c
+> > >> @@ -14,6 +14,9 @@
+> > >>  #include <linux/kernel.h>
+> > >>  #include <linux/module.h>
+> > >>  #include <linux/usb/ch9.h>
+> > >> +#include <linux/of.h>
+> > >> +#include <linux/usb/of.h>
+> > >> +#include <linux/usb/otg.h>
+> > >>  
+> > >>  const char *usb_speed_string(enum usb_device_speed speed)
+> > >>  {
+> > >> @@ -32,4 +35,37 @@ const char *usb_speed_string(enum usb_device_speed speed)
+> > >>  }
+> > >>  EXPORT_SYMBOL_GPL(usb_speed_string);
+> > >>  
+> > >> +#ifdef CONFIG_OF
+> > >> +static const char *usb_dr_modes[] = {
+> > >> +	[USB_DR_MODE_UNKNOWN]		= "",
+> > >> +	[USB_DR_MODE_HOST]		= "host",
+> > >> +	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
+> > >> +	[USB_DR_MODE_OTG]		= "otg",
+> > >> +};
+> > > 
+> > > It turns out this is a problem, especially since this is generic usb
+> > > code: we have a chipidea controller (a patchset just arrived) that does
+> > > both host and peripheral, but not otg. And I'm told now that dwc3
+> > > controller can be synthesized like that too.
 > 
+> I wonder if this part is really necessary. Usually you would read it
+> from HW's registers. For dwc3, it's quite recently that we allowed the
+> driver to be built with host-only, device-only or DRD functionality.
 
-Probably. Need to check if this doesn't cause other problems.
+We have quite some boards on which the ID pin is not wired up, so if a
+core is both host and device capable there is no way to detect the
+wanted mode if not given from the devicetree.
 
-> > I think this needs to be done in a separate patch.
 > 
-> To avoid bisect issues, the clock-frequency property should be removed
-> in the same patch that adds the clocks property, or after it.
-> 
-> > Also, the UARTD enabling in init_table[] can then be removed.
-> 
-> You still need to initialize all the UART clocks in init_table[]. This
-> is required to make sure the clocks have the correct parent. Without
-> this explicit initialization, on Tegra30 at least, it was found that
-> UART C didn't work correctly for Bluetooth since the default parent was
-> something that wasn't generating the expected frequency.
-> 
+> Also, this is likely to create troubles if not done correctly. Imagine
+> user compiles a host-only driver and board passes dr_mode = peripheral ?
 
-Yes. The parent relationships still need to be defined. But I think that's
-the only thing we actually need to define still? Also the parent relationships
-can be board specific I think in some cases, so maybe we want to move those to
-DT as well at some point?
+Either nothing will happen or some "you messed it up" printk should show
+the user what's going on.
 
-Cheers,
+> 
+> Maybe we can ignore dr_mode in host-only and device-only builds and only
+> look at it for DRD builds ?
 
-Peter.
+If something is or is not compiled in the kernel this doesn't mean the kernel
+is not started on boards with a different situation.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
