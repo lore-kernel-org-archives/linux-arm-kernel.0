@@ -1,63 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 15:01:31 +0100
-Subject: [PATCH] ARM: prima2: fix __init section for cpu hotplug
-In-Reply-To: <1360850491-1463387-1-git-send-email-arnd@arndb.de>
-References: <1360850491-1463387-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360850491-1463387-2-git-send-email-arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 Feb 2013 15:04:12 +0100
+Subject: [PATCH v8 03/12] gpio: pl061: allocate irq dynamically
+In-Reply-To: <1360602659-4774-4-git-send-email-haojian.zhuang@linaro.org>
+References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
+ <1360602659-4774-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdaaiVzg2F2R51TTL4=nt_VDWf0bFaJF2SzysdT8FouJAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code in arch/arm/mach-prima2/headsmp.S is used for
-both boot time initialization and for cpu hotplug,
-so it must not be discarded after the initial boot
-is complete. This replaces the __INIT annotation
-with __CPUINIT, and marks the sirfsoc_cpu_die as
-__ref to annotate that it correctly uses the sections.
+On Mon, Feb 11, 2013 at 6:10 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-Without this patch, building prima2_defconfig results in:
+We don't convert drivers to irqdomain without actually *using*
+the irqdomain. I don't know where this pattern comes from,
+but I'm suspicious about patch sets that just focus on enabling
+DT functionality without considering irqdomain stuff as a concept
+of its own.
 
-WARNING: arch/arm/mach-prima2/built-in.o(.cpuinit.text+0x130): Section mismatch in reference from the function sirfsoc_boot_secondary() to the function .init.text:sirfsoc_secondary_startup()
-The function __cpuinit sirfsoc_boot_secondary() references
-a function __init sirfsoc_secondary_startup().
-If sirfsoc_secondary_startup is only used by sirfsoc_boot_secondary then
-annotate sirfsoc_secondary_startup with a matching annotation.
+The biggest problem with this patch is what is missing from it:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Barry Song <baohua.song@csr.com>
----
- arch/arm/mach-prima2/headsmp.S | 3 ++-
- arch/arm/mach-prima2/hotplug.c | 2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+- irq_base shall be *deleted* from struct pl061_gpio
+- instead a struct irqdomain  * shall be stored for offsetting IRQs
+- everywhere chip->irq_base is referenced, use irq_find_mapping()
+- In pl061_to_irq, irq_create_mapping() shall be used, so it will
+  allocate a descriptor even if we're using the driver with
+  SPARSE_IRQ and a linear domain.
 
-I'm applying this as an obvious fix directly on the next/soc
-branch that introduced the problem.
+Look at e.g. gpio-langwell.c for guidance.
 
-diff --git a/arch/arm/mach-prima2/headsmp.S b/arch/arm/mach-prima2/headsmp.S
-index 6ec19d5..ada82d0 100644
---- a/arch/arm/mach-prima2/headsmp.S
-+++ b/arch/arm/mach-prima2/headsmp.S
-@@ -9,7 +9,8 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- 
--	__INIT
-+	__CPUINIT
-+
- /*
-  * Cold boot and hardware reset show different behaviour,
-  * system will be always panic if we warm-reset the board
-diff --git a/arch/arm/mach-prima2/hotplug.c b/arch/arm/mach-prima2/hotplug.c
-index 97c1ee5..f4b17cb 100644
---- a/arch/arm/mach-prima2/hotplug.c
-+++ b/arch/arm/mach-prima2/hotplug.c
-@@ -35,7 +35,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
-  *
-  * Called with IRQs disabled
-  */
--void sirfsoc_cpu_die(unsigned int cpu)
-+void __ref sirfsoc_cpu_die(unsigned int cpu)
- {
- 	platform_do_lowpower(cpu);
- }
--- 
-1.8.1.2
+> +       chip->irq_base = irq_alloc_descs(chip->irq_base, 0, PL061_GPIO_NR, 0);
+> +       if (chip->irq_base < 0)
+> +               return chip->irq_base;
+> +       if (!irq_domain_add_legacy(adev->dev.of_node, PL061_GPIO_NR,
+> +                                  chip->irq_base, 0, &pl061_domain_ops, chip))
+>                 return -ENODEV;
+
+Instead of the above, please use:
+
+chip->irqdomain = irq_domain_add_simple(adev->dev.of_node,
+                                         PL061_GPIO_NR,
+                                         chip->irq_base,
+                                         &pl061_domain_ops,
+                                         chip);
+
+Notice that I don't throw the domain away after creation either...
+
+This call will allocate descriptors for you as long as the
+irq_base > 0, which it should be, since 0 is NO_IRQ.
+
+It make things easier the day you start using a purely
+dynamic approach.
+
+Yours,
+Linus Walleij
