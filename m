@@ -1,11 +1,13 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Feb 2013 17:14:31 +0000
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 14 Feb 2013 17:16:15 +0000
 Subject: [BUG] v7_coherent_kern_range broken on big.LITTLE
 In-Reply-To: <1360861663.3266.58.camel@linaro1.home>
 References: <1360861663.3266.58.camel@linaro1.home>
-Message-ID: <20130214171431.GJ17833@n2100.arm.linux.org.uk>
+Message-ID: <20130214171615.GH12629@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Tixy,
 
 On Thu, Feb 14, 2013 at 05:07:43PM +0000, Jon Medhurst (Tixy) wrote:
 > The function v7_coherent_kern_range uses the macro icache_line_size to
@@ -17,15 +19,10 @@ On Thu, Feb 14, 2013 at 05:07:43PM +0000, Jon Medhurst (Tixy) wrote:
 > executes on the A15 it will miss out every alternate cache line for the
 > A7.
 
-This sounds... brain dead.  So, we have a MP system with A15 and A7.  On
-A15, the cache line size reported by the cache ID registers is 64 bytes.
-On the A7, the cache line size is reported to be 32 bytes.
+There is a signal (IMINLN) to the core which allows A15 to behave as though
+it has a 32-byte line size and this should be driven correctly for big/little.
 
-When a 64-byte cache line is invalidated on an A15 core, only one of the
-two overlapping A7 cache lines gets invalidated.
+Can you confirm that on your TC2 the I-line size is advertised differently
+depending on the cluster? This really shouldn't be the case.
 
-So, to find out what cache line granularity we have to operate on, we have
-to read the cache size registers on both CPUs, and calculate the result
-from that.  That means we must boot _all_ cores and read their cache ID
-registers at kernel boot time, and then shut down the cores we don't want.
-Hardly a good idea for low power platforms...
+Will
