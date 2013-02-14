@@ -1,34 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 14 Feb 2013 07:03:51 -0800
-Subject: [PATCH v9 02/20] mfd: omap-usb-host: Consolidate OMAP USB-HS
- platform data
-In-Reply-To: <511CB9E9.5050804@ti.com>
-References: <1358937492-8129-1-git-send-email-rogerq@ti.com>
- <1358937492-8129-3-git-send-email-rogerq@ti.com>
- <511CB9E9.5050804@ti.com>
-Message-ID: <20130214150351.GD2033@kroah.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Feb 2013 15:09:25 +0000
+Subject: [PATCH] ARM: net: bpf_jit: fix emit_swap16() for non ARMv6+.
+In-Reply-To: <511CE939.5000705@freebox.fr>
+References: <1360776125-14542-1-git-send-email-nschichan@freebox.fr>
+ <1360776645-14726-1-git-send-email-nschichan@freebox.fr>
+ <511C0662.8010309@gmail.com> <511CE939.5000705@freebox.fr>
+Message-ID: <20130214150925.GI17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 12:18:17PM +0200, Roger Quadros wrote:
-> Hi Greg,
-> 
-> On 01/23/2013 12:37 PM, Roger Quadros wrote:
-> > Let's have a single platform data structure for the OMAP's High-Speed
-> > USB host subsystem instead of having 3 separate ones i.e. one for
-> > board data, one for USB Host (UHH) module and one for USB-TLL module.
-> > 
-> > This makes the code much simpler and avoids creating multiple copies of
-> > platform data.
-> > 
-> > CC: Alan Stern <stern@rowland.harvard.edu>
-> > 
-> > Signed-off-by: Roger Quadros <rogerq@ti.com>
-> > Reviewed-by: Felipe Balbi <balbi@ti.com>
-> > For the ehci-omap.c part:
-> > Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> 
-> Could you please ACK the drivers/usb/host/ehci-omap.c part
-> so that this can go through the MFD tree. Thanks.
+On Thu, Feb 14, 2013 at 02:40:09PM +0100, Nicolas Schichan wrote:
+> On 02/13/2013 10:32 PM, Mircea Gherzan wrote:
+> [...]
+>> Acked-by: Mircea Gherzan <mgherzan@gmail.com>
+>
+> Hi,
+>
+> Thanks Mircea. Russel, David, do you have any preference as to which path 
+> this patch should take (net tree or ARM tree) ?
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+I'm happy for either - I'm under the weather at the moment, so I'd be
+greatful if David could pick this one up this time around.
+
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Thanks.
