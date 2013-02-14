@@ -1,81 +1,41 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 13 Feb 2013 23:33:15 -0500 (EST)
-Subject: [PATCH 4/9] ARM: set BE8 if LE in head code
-In-Reply-To: <1360752927-29331-5-git-send-email-ben.dooks@codethink.co.uk>
-References: <1360752927-29331-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360752927-29331-5-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <alpine.LFD.2.03.1302132327540.8736@syhkavp.arg>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 14 Feb 2013 13:36:49 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
+In-Reply-To: <87621vv7wa.wl%kuninori.morimoto.gx@renesas.com>
+References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
+ <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
+ <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
+ <878v6rv8ij.wl%kuninori.morimoto.gx@renesas.com>
+ <20130214042027.GD6036@verge.net.au>
+ <87621vv7wa.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130214043648.GA4773@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Feb 2013, Ben Dooks wrote:
-
-> If we are booting in LE and compiled for BE8, then add code to
-> set the state to bE8. Since the instruction stream is always LE,
-> we do not need to do anything special to the instruction.
+On Wed, Feb 13, 2013 at 08:25:45PM -0800, Kuninori Morimoto wrote:
 > 
-> Also ensure that the secondary processors are started in the same mode.
+> Hi Simon
 > 
-> Note, we do add about 20 bytes to the kernel image, but it seems easier
-> to do this than adding another configuration to change.
+> > > >>       CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+> > > >> -     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
+> > > >> +     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
+> > > >>       CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
+> (snip)
+> > > This means that current TMU02 numbering seems doubtful too ?
+> > > How about just rever 58079fa7d54a0929d304054ee759187a2ccd3cdf ?
+> > 
+> > Perhaps that is a good idea.
+> > 
+> > The original motivation for this patch was to add the TMU02 line.
+> > And "fixing" TMU01 was an afterthought. However, I am also
+> > now doubtful about the correctness of the TMU02 line and thus
+> > the usefulness of the original patch.
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-
-Comment below.
-
-> ---
->  arch/arm/boot/compressed/head.S |    1 +
->  arch/arm/kernel/head.S          |    4 ++++
->  arch/arm/mm/proc-v7.S           |    1 +
->  3 files changed, 6 insertions(+)
+> I think this comment out is creating confusion ?
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 15ebdd6..06b0f15 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -134,6 +134,7 @@ start:
->  		.word	_edata			@ zImage end address
->   THUMB(		.thumb			)
->  1:
-> + ARM_BE8(	setend	be )			@ go BE8 if LE, no-op if BE8
->  		mrs	r9, cpsr
->  #ifdef CONFIG_ARM_VIRT_EXT
->  		bl	__hyp_stub_install	@ get into SVC mode, reversibly
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index cc15384..a112994 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -77,6 +77,7 @@
->  
->  	__HEAD
->  ENTRY(stext)
-> + ARM_BE8(setend	be )			@ ensure we are in BE8 mode
->  
->   THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
->   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-> @@ -333,6 +334,9 @@ ENTRY(secondary_startup)
->  	 * the processor type - there is no need to check the machine type
->  	 * as it has already been validated by the primary processor.
->  	 */
-> +
-> + ARM_BE8(setend	be)				@ if system starts LE, go BE8
-> +
->  #ifdef CONFIG_ARM_VIRT_EXT
->  	bl	__hyp_stub_install_secondary
->  #endif
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index d17996b..28bb018 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -109,6 +109,7 @@ ENTRY(cpu_v7_do_suspend)
->  ENDPROC(cpu_v7_do_suspend)
->  
->  ENTRY(cpu_v7_do_resume)
-> + ARM_BE8(setend	be )			@ ensure we are BE8
+> /* TMU00 */ -> /* TMU0 channel 0 */
+> /* TMU01 */ -> /* TMU0 channel 1 */
+> /* TMU02 */ -> /* TMU0 channel 2 */
 
-This is wrong.  You want to insert this in 
-arch/arm/kernel/sleep.S:cpu_resume which is the main entry point for 
-resuming.
-
-
-Nicolas
+That does make things a little clearer,
+but I for one wasn't confused by the existing comments.
