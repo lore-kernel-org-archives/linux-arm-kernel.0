@@ -1,68 +1,61 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 14 Feb 2013 15:38:29 -0500
-Subject: [PATCH] ARM: kirkwood: of_serial: fix clock gating by removing
- clock-frequency
-In-Reply-To: <20130205111307.GO14746@titan.lakedaemon.net>
-References: <1359493774-27627-1-git-send-email-jason@lakedaemon.net>
- <20130205105431.GI652@kw.sim.vm.gnt>
- <20130205111307.GO14746@titan.lakedaemon.net>
-Message-ID: <20130214203829.GV14746@titan.lakedaemon.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 14 Feb 2013 20:47:53 +0000 (UTC)
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod
+ dependency
+In-Reply-To: <20130214193911.GD11806@atomide.com>
+References: <1360840554-26901-1-git-send-email-balbi@ti.com>
+ <1360840554-26901-2-git-send-email-balbi@ti.com>
+ <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+Message-ID: <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 06:13:07AM -0500, Jason Cooper wrote:
-> On Tue, Feb 05, 2013 at 11:54:31AM +0100, Simon Guinot wrote:
-> > On Tue, Jan 29, 2013 at 09:09:34PM +0000, Jason Cooper wrote:
-> > > When DT support for kirkwood was first introduced, there was no clock
-> > > infrastructure.  As a result, we had to manually pass the
-> > > clock-frequency to the driver from the device node.
-> > > 
-> > > Unfortunately, on kirkwood, with minimal config or all module configs,
-> > > clock-frequency breaks booting because of_serial doesn't consume the
-> > > gate_clk when clock-frequency is defined.
-> > > 
-> > > The end result on kirkwood is that runit gets gated, and then the boot
-> > > fails when the kernel tries to write to the serial port.
-> > > 
-> > > Fix the issue by removing the clock-frequency parameter from all
-> > > kirkwood dts files.
-> > > 
-> > > Booted on dreamplug without earlyprintk and successfully logged in via
-> > > ttyS0.
-> > > 
-> > > Reported-by: Simon Baatz <gmbnomis@gmail.com>
-> > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > > ---
-> > >  arch/arm/boot/dts/kirkwood-dns320.dts         | 2 --
-> > >  arch/arm/boot/dts/kirkwood-dns325.dts         | 1 -
-> > >  arch/arm/boot/dts/kirkwood-dockstar.dts       | 1 -
-> > >  arch/arm/boot/dts/kirkwood-dreamplug.dts      | 1 -
-> > >  arch/arm/boot/dts/kirkwood-goflexnet.dts      | 1 -
-> > >  arch/arm/boot/dts/kirkwood-ib62x0.dts         | 1 -
-> > >  arch/arm/boot/dts/kirkwood-iconnect.dts       | 1 -
-> > >  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts | 1 -
-> > >  arch/arm/boot/dts/kirkwood-km_kirkwood.dts    | 1 -
-> > >  arch/arm/boot/dts/kirkwood-lschlv2.dts        | 1 -
-> > >  arch/arm/boot/dts/kirkwood-lsxhl.dts          | 1 -
-> > >  arch/arm/boot/dts/kirkwood-mplcec4.dts        | 1 -
-> > >  arch/arm/boot/dts/kirkwood-nsa310.dts         | 1 -
-> > >  arch/arm/boot/dts/kirkwood-openblocks_a6.dts  | 2 --
-> > >  arch/arm/boot/dts/kirkwood-topkick.dts        | 1 -
-> > >  arch/arm/boot/dts/kirkwood.dtsi               | 2 --
-> > 
-> > Hi Jason,
-> > 
-> > Maybe you could also remove the clock-frequency parameter from
-> > kirkwood-ns2-common.dtsi ?
-> 
-> Good catch, I must've been grepping through kirkwood*.dts and missed the
-> dtsi.  I'll do a followup patch.
+Hi,
 
-I squashed this change into the original patch a queued it up with the
-others to go into v3.8.x once v3.8 drops.
+On Thu, 14 Feb 2013, Tony Lindgren wrote:
 
-it's in mvebu-next/fixes
+> I don't think so as hwmod should only touch the sysconfig space
+> when no driver has claimed it.
 
-thx,
+hwmod does need to touch the SYSCONFIG register during pm_runtime suspend 
+and resume operations, and during device enable and disable operations.  
+Here's the relevant code:
 
-Jason.
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2157
+
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2195
+
+Drivers shouldn't touch their IP block's SYSCONFIG registers.  They don't 
+have anything specifically to do with the underlying device IP block, but 
+with the SoC integration, even though they live in the device's 
+memory-mapped address range.  It's unfortunate that TI didn't allocate a 
+separate, small address space for these registers, translated by the bus, 
+similar to the PCI-E Enhanced Configuration Access Mechanism:
+
+http://wiki.osdev.org/PCI_Express#Extended_Configuration_Space
+
+... but that's unfortunately the reality of the OMAP hardware.
+
+Regarding ioremap(), it seems reasonable for drivers to call ioremap(), as 
+long as the implementation of ioremap() can be overridden by the device's 
+bus.  PCI device drivers already do this -- albeit in a PCI-specific way 
+-- with pci_ioremap_bar():
+
+http://git.kernel.org/?p=linux%2Fkernel%2Fgit%2Ftorvalds%2Flinux.git&a=search&h=HEAD&st=grep&s=pci_ioremap_bar
+
+So instead of something bus-specific like that, a better way would be to 
+use something like:
+
+va = dev->bus->ioremap( ... );
+va = dev->bus->iounmap( ... );
+
+Any driver using such a mechanism would be intrinsically generic. 
+platform_bus could simply set its bus->ioremap to the existing ioremap() 
+function, while buses like a omap_hwmod_bus could use a function that 
+returned the address range that omap_hwmod_bus has already ioremap()ped.
+
+regards,
+
+- Paul
