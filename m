@@ -1,57 +1,64 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 14 Feb 2013 13:16:52 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
-In-Reply-To: <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
-References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
- <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
- <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
-Message-ID: <20130214041651.GB6036@verge.net.au>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 14 Feb 2013 17:17:05 +1300
+Subject: of_clk_get() / devm_clk_get()
+Message-ID: <1360815425.21991.20.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 01:04:35PM +0900, Magnus Damm wrote:
-> On Thu, Feb 14, 2013 at 1:03 PM, Kuninori Morimoto
-> <kuninori.morimoto.gx@renesas.com> wrote:
-> >
-> > Hi Simon
-> >
-> >> This partially reverts 58079fa7d54a0929d304054ee759187a2ccd3cdf
-> >> (ARM: shmobile: r8a7779: Correct TMU clock support) and fixes
-> >> a regression introduced by that patch.
-> >>
-> >> Although the documentation I have indicates that the patch above is
-> >> correct it appears that the change causes the Marzen board to fail to boot
-> >> as follows.
-> > (snip)
-> >> --- a/arch/arm/mach-shmobile/clock-r8a7779.c
-> >> +++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-> >> @@ -161,7 +161,7 @@ static struct clk_lookup lookups[] = {
-> >>       CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
-> >>       CLKDEV_DEV_ID("ohci-platform.0", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
-> >>       CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
-> >> -     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
-> >> +     CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
-> >>       CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
-> >>       CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
-> >>       CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP029]), /* I2C1 */
-> >
-> > Really ???
+Currently we have devm_clk_get() which gives a managed-resource clk (by
+name), or of_clk_get() which gives an unmanaged resource clk (by id).
 
-I am surprised too!
+I just wanted to sound out everyone as to whether there is a need for a
+managed version of the of_clk_get.
 
-> > Is MSTP value of TMU01 same as TMU00 ?
+My personal concern about devm_clk_get is that it requires (if I
+understand correctly) that the DT node have the clock-names property
+(which is optional). If the optional name is not supplied, it fails.
+This basically makes it 'not optional' when a driver uses devm_clk_get.
+(Please correct me if I'm wrong about this).
 
-With the patch above the board appears to boot.
-Without the patch, it doesn't.
+Everything below here is irrelevant if the above is wrong :)
 
-> Usually, the TMU channels are bundled together. So TMU00 may be for
-> channel 0->3 and TMU01 for 4->6.
 
-Ok, so in that case the correct value for "sh_tmu.2" might actually
-be MSTP016 or MSTP015 depending on the bundle size. I am unsure how to test
-sh_tmu.2.
+If the above IS correct, then couldn't we have a devm_of_clk_get which
+accepts a *id (as per devm_clk_get) AND an index (as per of_clk_get),
+with the *id given priority.
 
-However, the documentation I have seems to talk about channels
-being TMU0..TMU2 and control of them being via MSTP016..MSTP014.
-I.e. what the code currently is but not what seems to work for
-TMU1 in practice.
+Something along the lines of...
+
+struct clk *devm_of_clk_get(struct device *dev,
+			    const char *id,
+			    int index)
+{
+	struct clk **ptr, *clk = NULL;
+
+	if (id)
+		clk = devm_clk_get(dev, id);
+
+	if (!clk || IS_ERR(clk)) {
+		clk = of_clk_get(dev->of_node, index);
+		if (!IS_ERR(clk)) {
+			ptr = devres_alloc(devm_clk_release,
+					   sizeof(*ptr),
+					   GFP_KERNEL)
+			if (!ptr)
+				return ERR_PTR(-ENOMEM);
+
+			*ptr = clk;
+			devres_add(dev, ptr);
+		}
+	}
+
+	return clk;
+}
+
+This would make clock-names optional (as intended) and give a fallback
+to the index when clock-names isn't specified.
+
+One issue (which I don't know how much of an issue it is) is that this
+doesn't follow the normal pattern of normal_func -> devm_func parameter
+layout.
+
+
+Regards
+Tony Prisk
