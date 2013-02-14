@@ -1,47 +1,119 @@
 From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Thu, 14 Feb 2013 13:55:21 +0200
-Subject: [PATCH v4 0/3] ARM: OMAP2+: Export SoC information to userspace using
- SoC infrastructure
-Message-ID: <1360842924-32429-1-git-send-email-ruslan.bilovol@ti.com>
+Date: Thu, 14 Feb 2013 13:55:22 +0200
+Subject: [PATCH v4 1/3] ARM: OMAP2+: Move common part of late init into common
+ function
+In-Reply-To: <1360842924-32429-1-git-send-email-ruslan.bilovol@ti.com>
+References: <1360842924-32429-1-git-send-email-ruslan.bilovol@ti.com>
+Message-ID: <1360842924-32429-2-git-send-email-ruslan.bilovol@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+---
+ arch/arm/mach-omap2/io.c |   33 +++++++++++++++------------------
+ 1 file changed, 15 insertions(+), 18 deletions(-)
 
-This patch series is an attempt to export some OMAP SoC
-information (like name, revision etc.) to userspace.
-The first patch does some unification of OMAP SoC
-information representation in current sources.
-Second patch adds exactly needed changes using
-exists in Linux kernel SoC infrastructure.
-
------------------------------------------
-v4:
-- Moved common part of late init into common function  in additional
-  separate patch
-- rebased on top of 'omap-for-v3.9/soc' branch of tmlind/linux-omap tree
-
------------------------------------------
-v3:
-- reduced number of lines changed in the first patch (reusing
-  existent code)
-
------------------------------------------
-v2:
-- changed cpu_* -> soc_* variable names
-- rebased on top of 'omap-for-v3.9/soc' branch of tmlind/linux-omap tree
-
-
-Ruslan Bilovol (3):
-  ARM: OMAP2+: Move common part of late init into common function
-  ARM: OMAP2+: SoC name and revision unification
-  ARM: OMAP2+: Export SoC information to userspace
-
- arch/arm/mach-omap2/common.h |    8 ++++
- arch/arm/mach-omap2/id.c     |   95 ++++++++++++++++++++++++++++++++++++++----
- arch/arm/mach-omap2/io.c     |   34 +++++++--------
- arch/arm/plat-omap/Kconfig   |    1 +
- 4 files changed, 112 insertions(+), 26 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 2c3fdd6..ace87c8 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -379,6 +379,12 @@ static void __init omap_hwmod_init_postsetup(void)
+ 	omap_pm_if_early_init();
+ }
+ 
++static void __init omap_common_late_init(void)
++{
++	omap_mux_late_init();
++	omap2_common_pm_late_init();
++}
++
+ #ifdef CONFIG_SOC_OMAP2420
+ void __init omap2420_init_early(void)
+ {
+@@ -402,8 +408,7 @@ void __init omap2420_init_early(void)
+ 
+ void __init omap2420_init_late(void)
+ {
+-	omap_mux_late_init();
+-	omap2_common_pm_late_init();
++	omap_common_late_init();
+ 	omap2_pm_init();
+ 	omap2_clk_enable_autoidle_all();
+ }
+@@ -432,8 +437,7 @@ void __init omap2430_init_early(void)
+ 
+ void __init omap2430_init_late(void)
+ {
+-	omap_mux_late_init();
+-	omap2_common_pm_late_init();
++	omap_common_late_init();
+ 	omap2_pm_init();
+ 	omap2_clk_enable_autoidle_all();
+ }
+@@ -505,48 +509,42 @@ void __init ti81xx_init_early(void)
+ 
+ void __init omap3_init_late(void)
+ {
+-	omap_mux_late_init();
+-	omap2_common_pm_late_init();
++	omap_common_late_init();
+ 	omap3_pm_init();
+ 	omap2_clk_enable_autoidle_all();
+ }
+ 
+ void __init omap3430_init_late(void)
+ {
+-	omap_mux_late_init();
+-	omap2_common_pm_late_init();
++	omap_common_late_init();
+ 	omap3_pm_init();
+ 	omap2_clk_enable_autoidle_all();
+ }
+ 
+ void __init omap35xx_init_late(void)
+ {
+-	omap_mux_late_init();
+-	omap2_common_pm_late_init();
++	omap_common_late_init();
+ 	omap3_pm_init();
+ 	omap2_clk_enable_autoidle_all();
+ }
+ 
+ void __init omap3630_init_late(void)
+ {
+-	omap_mux_late_init();
+-	omap2_common_pm_late_init();
++	omap_common_late_init();
+ 	omap3_pm_init();
+ 	omap2_clk_enable_autoidle_all();
+ }
+ 
+ void __init am35xx_init_late(void)
+ {
+-	omap_mux_late_init();
+-	omap2_common_pm_late_init();
++	omap_common_late_init();
+ 	omap3_pm_init();
+ 	omap2_clk_enable_autoidle_all();
+ }
+ 
+ void __init ti81xx_init_late(void)
+ {
+-	omap_mux_late_init();
+-	omap2_common_pm_late_init();
++	omap_common_late_init();
+ 	omap3_pm_init();
+ 	omap2_clk_enable_autoidle_all();
+ }
+@@ -598,8 +596,7 @@ void __init omap4430_init_early(void)
+ 
+ void __init omap4430_init_late(void)
+ {
+-	omap_mux_late_init();
+-	omap2_common_pm_late_init();
++	omap_common_late_init();
+ 	omap4_pm_init();
+ 	omap2_clk_enable_autoidle_all();
+ }
 -- 
 1.7.9.5
