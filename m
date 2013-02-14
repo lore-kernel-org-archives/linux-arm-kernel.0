@@ -1,38 +1,49 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 14 Feb 2013 09:49:28 -0300
-Subject: Build error: OMAP randconfig / mvebu
-In-Reply-To: <201302141221.16267.arnd@arndb.de>
-References: <20130208100813.GN17833@n2100.arm.linux.org.uk>
- <201302141127.07378.arnd@arndb.de>
- <20130214120650.GA11345@localhost>
- <201302141221.16267.arnd@arndb.de>
-Message-ID: <20130214124927.GB11345@localhost>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Thu, 14 Feb 2013 15:07:01 +0200
+Subject: [PATCH 5/9] USB: chipidea: add PTW and PTS handling
+In-Reply-To: <1359984275-24646-6-git-send-email-s.hauer@pengutronix.de>
+References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359984275-24646-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <87txpf9h8q.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-On Thu, Feb 14, 2013 at 12:21:16PM +0000, Arnd Bergmann wrote:
-> On Thursday 14 February 2013, Ezequiel Garcia wrote:
-> > Now, using the random config there's a new error, unrelated to the
-> > previous one:
-> > 
-> > ERROR: "twl6030_interrupt_unmask" [drivers/usb/otg/twl6030-usb.ko] undefined!
-> > ERROR: "twl_i2c_read_u8" [drivers/usb/otg/twl6030-usb.ko] undefined!
-> > ERROR: "twl_i2c_write_u8" [drivers/usb/otg/twl6030-usb.ko] undefined!
-> > ERROR: "twl6030_interrupt_mask" [drivers/usb/otg/twl6030-usb.ko] undefined!
-> 
-> Yes, I guess that is an unrelated error. However, my patch also wasn't
-> correct because it is not allowed to have an empty list of objects.
-> 
-> There is an updated patch below, I could add that straight to the branch
-> that caused the problem if it looks ok to you.
+> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>
+> This patch makes it possible to configure the PTW and PTS bits inside
+> the portsc register for host and device mode before the driver starts
+> and the phy can be addressed as hardware implementation is designed.
+>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +++
+>  drivers/usb/chipidea/bits.h                        |   14 ++++++-
+>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
+>  drivers/usb/chipidea/core.c                        |   39 ++++++++++++++++++++
+>  include/linux/usb/chipidea.h                       |    1 +
+>  5 files changed, 61 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> index 5778b9c..dd42ccd 100644
+> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> @@ -5,6 +5,11 @@ Required properties:
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain controller interrupt
+>  
+> +Recommended properies:
+> +- phy_type: the type of the phy connected to the core. Should be one
+> +  of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
+> +  property the PORTSC register won't be touched
+> +
 
-The compile error is fixed here with this patch also.
+Looks like this bit belongs to patch 3/9, where you're adding devicetree
+hooks. Otherwise looks good.
 
-Thanks,
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards,
+--
+Alex
