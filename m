@@ -1,51 +1,93 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 14 Feb 2013 08:12:35 -0300
-Subject: Build error: OMAP randconfig / mvebu
-In-Reply-To: <20130214110803.GP17852@n2100.arm.linux.org.uk>
-References: <20130208100813.GN17833@n2100.arm.linux.org.uk>
- <2213733.Wbjy3dFgom@wuerfel> <5114DC44.7000107@free-electrons.com>
- <4351524.MQWtq16mqg@wuerfel>
- <20130214100926.GO17852@n2100.arm.linux.org.uk>
- <20130214110307.GA3059@localhost>
- <20130214110803.GP17852@n2100.arm.linux.org.uk>
-Message-ID: <20130214111234.GB3059@localhost>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 Feb 2013 13:15:52 +0200
+Subject: [RFC/NOT FOR MERGING 1/3] arm: omap: use generic implementation if !od
+Message-ID: <1360840554-26901-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 11:08:03AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 14, 2013 at 08:03:08AM -0300, Ezequiel Garcia wrote:
-> > On Thu, Feb 14, 2013 at 10:09:26AM +0000, Russell King - ARM Linux wrote:
-> > > On Fri, Feb 08, 2013 at 02:33:29PM +0100, Arnd Bergmann wrote:
-> > > > On Friday 08 February 2013 12:06:44 Gregory CLEMENT wrote:
-> > > > > 
-> > > > > I don't know what to do here, there is no point to build any of the files
-> > > > > in mach-mvebu if no SoCs are selected. So either we force to have at least
-> > > > > one SoCS selected if ARCH_MVEBU is selected, or we unselect  ARCH_MVEB if
-> > > > > no SoCs are selected.
-> > > > 
-> > > > The latter does not work, because that would introduce a circular
-> > > > dependency in Kconfig.
-> > > > 
-> > > > I suppose rearranging the mvebu Makefile like this would do.
-> > > > 
-> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > 
-> > > This error is still present in arm-soc.  We're getting close to the next
-> > > merge window, so either something needs to be dropped from arm-soc, or
-> > > this needs to get fixed.
-> > > 
-> > 
-> > Can you point me to where can I get the config your building with?
-> 
-> It's all publically available via my website.
+Eventually, we need to be able to remove
+ti,hwmods DT attribute (or at a minimum
+ignore it).
 
-I'm kind of new around here, and I have no clue where that may be.
+For new platforms, this patch could enable
+the transition by not relying on ti,hwmods
+to have functioning PM and Idle implementation.
 
-I hope you don't mind helping me this time.
+Notice that this poses no differences for
+platforms which are already supported, it
+just gives us means of dropping the relyance
+on hwmod for new platforms.
 
-Thanks,
+NYET-Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/mach-omap2/omap_device.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index e065daa..305eeb4 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -796,13 +796,18 @@ static int __init omap_early_device_register(struct platform_device *pdev)
+ static int _od_runtime_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
++	struct omap_device *od = to_omap_device(pdev);
+ 	int ret;
+ 
+ 	ret = pm_generic_runtime_suspend(dev);
+ 
++	if (!od)
++		goto out;
++
+ 	if (!ret)
+ 		omap_device_idle(pdev);
+ 
++out:
+ 	return ret;
+ }
+ 
+@@ -814,9 +819,14 @@ static int _od_runtime_idle(struct device *dev)
+ static int _od_runtime_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
++	struct omap_device *od = to_omap_device(pdev);
++
++	if (!od)
++		goto out;
+ 
+ 	omap_device_enable(pdev);
+ 
++out:
+ 	return pm_generic_runtime_resume(dev);
+ }
+ #endif
+@@ -828,6 +838,9 @@ static int _od_suspend_noirq(struct device *dev)
+ 	struct omap_device *od = to_omap_device(pdev);
+ 	int ret;
+ 
++	if (!od)
++		return pm_generic_suspend_noirq(dev);
++
+ 	/* Don't attempt late suspend on a driver that is not bound */
+ 	if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER)
+ 		return 0;
+@@ -850,6 +863,9 @@ static int _od_resume_noirq(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_device *od = to_omap_device(pdev);
+ 
++	if (!od)
++		goto out;
++
+ 	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
+ 	    !pm_runtime_status_suspended(dev)) {
+ 		od->flags &= ~OMAP_DEVICE_SUSPENDED;
+@@ -858,6 +874,7 @@ static int _od_resume_noirq(struct device *dev)
+ 		pm_generic_runtime_resume(dev);
+ 	}
+ 
++out:
+ 	return pm_generic_resume_noirq(dev);
+ }
+ #else
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.1.rc1.5.g7e0651a
