@@ -1,36 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Feb 2013 14:49:20 +0100
-Subject: [PATCH 04/11] ARM: shmobile: fix defconfig warning on CONFIG_USB
+Date: Thu, 14 Feb 2013 14:49:19 +0100
+Subject: [PATCH 03/11] ARM: w90x900: fix legacy assembly syntax
 In-Reply-To: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
 References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360849767-1463135-5-git-send-email-arnd@arndb.de>
+Message-ID: <1360849767-1463135-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent update to the marzen_defconfig introduced a
-duplicate CONFIG_USB=y line. This removes one of the
-two.
+New ARM binutils don't allow extraneous whitespace inside
+of brackets, which causes this error on all mach-w90x900
+defconfigs:
 
-arch/arm/configs/marzen_defconfig:86:warning: override: reassigning to symbol USB
+arch/arm/kernel/entry-armv.S: Assembler messages:
+arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r0,[ r6,#(0x10C)]'
+arch/arm/kernel/entry-armv.S:214: Error: ARM register expected -- `ldr r0,[ r6,#(0x110)]'
+arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r0,[ r6,#(0x10C)]'
+arch/arm/kernel/entry-armv.S:430: Error: ARM register expected -- `ldr r0,[ r6,#(0x110)]'
+
+This removes the whitespace in order to build the kernel
+again.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-Cc: linux-sh at vger.kernel.org
+Cc: Wan ZongShun <mcuos.com@gmail.com>
 ---
- arch/arm/configs/marzen_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-w90x900/include/mach/entry-macro.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 728a43c..afb17d6 100644
---- a/arch/arm/configs/marzen_defconfig
-+++ b/arch/arm/configs/marzen_defconfig
-@@ -83,7 +83,6 @@ CONFIG_USB=y
- CONFIG_USB_RCAR_PHY=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHI=y
--CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_OHCI_HCD_PLATFORM=y
+diff --git a/arch/arm/mach-w90x900/include/mach/entry-macro.S b/arch/arm/mach-w90x900/include/mach/entry-macro.S
+index e286dac..0ff612a 100644
+--- a/arch/arm/mach-w90x900/include/mach/entry-macro.S
++++ b/arch/arm/mach-w90x900/include/mach/entry-macro.S
+@@ -19,8 +19,8 @@
+ 
+ 		mov	\base, #AIC_BA
+ 
+-		ldr	\irqnr, [ \base, #AIC_IPER]
+-		ldr	\irqnr, [ \base, #AIC_ISNR]
++		ldr	\irqnr, [\base, #AIC_IPER]
++		ldr	\irqnr, [\base, #AIC_ISNR]
+ 		cmp	\irqnr, #0
+ 
+ 	.endm
 -- 
 1.8.1.2
