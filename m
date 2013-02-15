@@ -1,34 +1,39 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 15 Feb 2013 12:18:59 -0800
-Subject: [PATCH v2 1/1] drivers: net: davinci_cpdma: acknowledge
- interrupt properly
-In-Reply-To: <20130215.150506.499818568035818118.davem@davemloft.net>
-References: <1360866406-17261-1-git-send-email-mugunthanvnm@ti.com>
- <20130215.150506.499818568035818118.davem@davemloft.net>
-Message-ID: <1360959539.21068.5.camel@joe-AO722>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 15 Feb 2013 21:51:51 +0100
+Subject: [PATCH] pinctrl: Declare operation structures as const
+In-Reply-To: <1360939402-1170-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1360939402-1170-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CACRpkdaN+j+cV-=d-cDSw6aoq4Hh0Ary8wpAeYQU7wvpTAQgcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-02-15 at 15:05 -0500, David Miller wrote:
-> From: Mugunthan V N <mugunthanvnm@ti.com>
-> Date: Thu, 14 Feb 2013 23:56:46 +0530
-> 
-> > +enum {
-> > +     CPDMA_EOI_RX_THRESH = 0,
-> > +     CPDMA_EOI_RX,
-> > +     CPDMA_EOI_TX,
-> > +     CPDMA_EOI_MISC,
-> > +};
-> 
-> Do not use enumerations for hardware register values, which must be
-> exact, otherwise you are potentially going to succumb to the vagaries
-> of C language enumeration value assignment.
+On Fri, Feb 15, 2013 at 3:43 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
 
-Vagaries?
+> The pinconf, pinctrl and pinmux operation structures hold function
+> pointers that are never modified. Declare them as const.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-In what way is c enumeration (6.7.2.2) vague?
-char vs int?  Isn't smaller mostly better?
+Nice I love consting.
 
-Concern about possible future reordering given an
-insertion or deletion might be the only consideration
-I could imagine.
+> This patch hasn't been compile-tested on all the above platforms, Tested-by
+> and/or Acked-by tags would thus be welcome.
+
+I get this on all platforms after this patch:
+
+/linux-pinctrl/drivers/pinctrl/pinconf.c: In function
+'pinconf_dbg_config_print':
+/linux-pinctrl/drivers/pinctrl/pinconf.c:708:12: warning: assignment
+discards 'const' qualifier from pointer target type [enabled by
+default]
+
+Pls fix! :-)
+
+> I've left the sh-pfc driver untouched for now, it will be handled as part as
+> my next (hopefully soon to come) sh-pfc pinctrl series.
+
+Sounds like a deal.
+
+Yours,
+Linus Walleij
