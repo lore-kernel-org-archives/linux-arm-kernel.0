@@ -1,280 +1,413 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Feb 2013 19:21:49 +0100
-Subject: [PATCH 1/4] Revert "ARM: SPEAr13xx: Pass DW DMAC platform data from
- DT"
+Date: Fri, 15 Feb 2013 19:21:50 +0100
+Subject: [PATCH 2/4] dmaengine: dw_dmac: move to generic DMA binding
 In-Reply-To: <1360952512-971558-1-git-send-email-arnd@arndb.de>
 References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
-Message-ID: <1360952512-971558-2-git-send-email-arnd@arndb.de>
+Message-ID: <1360952512-971558-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit f9965aa20706860077cfa093d04a6351c0c1e940.
----
- arch/arm/boot/dts/spear1340.dtsi             | 19 ----------
- arch/arm/boot/dts/spear13xx.dtsi             | 38 -------------------
- arch/arm/mach-spear13xx/include/mach/spear.h |  2 +
- arch/arm/mach-spear13xx/spear1310.c          |  5 ++-
- arch/arm/mach-spear13xx/spear1340.c          | 33 ++++++++++++-----
- arch/arm/mach-spear13xx/spear13xx.c          | 55 ++++++++++++++++++++++++++--
- 6 files changed, 80 insertions(+), 72 deletions(-)
+The original device tree binding for this driver, from Viresh Kumar
+unfortunately conflicted with the generic DMA binding, and did not allow
+to completely seperate slave device configuration from the controller.
 
-diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
-index b2d41b7..34da11a 100644
---- a/arch/arm/boot/dts/spear1340.dtsi
-+++ b/arch/arm/boot/dts/spear1340.dtsi
-@@ -88,25 +88,6 @@
- 			status = "disabled";
- 		};
+This is an attempt to replace it with an implementation of the generic
+binding, but it is currently completely untested, because I do not have
+any hardware with this particular controller.
+
+The patch applies on top of linux-next, which contains both the base
+support for the generic DMA binding, as well as the earlier attempt from
+Viresh. Both of these are currently not merged upstream however.
+
+There are a couple of TODO items that are left remaining and are open
+for ideas from other people.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Cc: Vinod Koul <vinod.koul@linux.intel.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ Documentation/devicetree/bindings/dma/snps-dma.txt |  70 ++++++-----
+ drivers/dma/dw_dmac.c                              | 137 ++++++++++-----------
+ drivers/dma/dw_dmac_regs.h                         |   8 +-
+ include/linux/dw_dmac.h                            |   5 -
+ 4 files changed, 104 insertions(+), 116 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
+index 5bb3dfb..68783d3 100644
+--- a/Documentation/devicetree/bindings/dma/snps-dma.txt
++++ b/Documentation/devicetree/bindings/dma/snps-dma.txt
+@@ -3,59 +3,61 @@
+ Required properties:
+ - compatible: "snps,dma-spear1340"
+ - reg: Address range of the DMAC registers
+-- interrupt-parent: Should be the phandle for the interrupt controller
+-  that services interrupts for this device
+ - interrupt: Should contain the DMAC interrupt number
+-- nr_channels: Number of channels supported by hardware
+-- is_private: The device channels should be marked as private and not for by the
+-  general purpose DMA channel allocator. False if not passed.
++- dma-channels: Number of channels supported by hardware
++- dma-requests: Number of DMA request lines supported, up to 16
++- dma-masters: Number of AHB masters supported by the controller
++- #dma-cells: must be <3>
+ - chan_allocation_order: order of allocation of channel, 0 (default): ascending,
+   1: descending
+ - chan_priority: priority of channels. 0 (default): increase from chan 0->n, 1:
+   increase from chan n->0
+ - block_size: Maximum block size supported by the controller
+-- nr_masters: Number of AHB masters supported by the controller
+ - data_width: Maximum data width supported by hardware per AHB master
+   (0 - 8bits, 1 - 16bits, ..., 5 - 256bits)
+-- slave_info:
+-	- bus_id: name of this device channel, not just a device name since
+-	  devices may have more than one channel e.g. "foo_tx". For using the
+-	  dw_generic_filter(), slave drivers must pass exactly this string as
+-	  param to filter function.
+-	- cfg_hi: Platform-specific initializer for the CFG_HI register
+-	- cfg_lo: Platform-specific initializer for the CFG_LO register
+-	- src_master: src master for transfers on allocated channel.
+-	- dst_master: dest master for transfers on allocated channel.
++
++
++Optional properties:
++- interrupt-parent: Should be the phandle for the interrupt controller
++  that services interrupts for this device
++- is_private: The device channels should be marked as private and not for by the
++  general purpose DMA channel allocator. False if not passed.
  
--		dma at ea800000 {
--			slave_info {
--				uart1_tx {
--					bus_id = "uart1_tx";
--					cfg_hi = <0x6000>;	/* 0xC << 11 */
--					cfg_lo = <0>;
--					src_master = <0>;
--					dst_master = <1>;
--				};
--				uart1_tx {
--					bus_id = "uart1_tx";
--					cfg_hi = <0x680>;	/* 0xD << 7 */
--					cfg_lo = <0>;
--					src_master = <1>;
--					dst_master = <0>;
--				};
+ Example:
+ 
+-	dma at fc000000 {
++	dmahost: dma at fc000000 {
+ 		compatible = "snps,dma-spear1340";
+ 		reg = <0xfc000000 0x1000>;
+ 		interrupt-parent = <&vic1>;
+ 		interrupts = <12>;
+ 
+-		nr_channels = <8>;
++		dma-channels = <8>;
++		dma-requests = <16>;
++		dma-masters = <2>;
++		#dma-cells = <3>;
+ 		chan_allocation_order = <1>;
+ 		chan_priority = <1>;
+ 		block_size = <0xfff>;
+-		nr_masters = <2>;
+ 		data_width = <3 3 0 0>;
++	};
+ 
+-		slave_info {
+-			uart0-tx {
+-				bus_id = "uart0-tx";
+-				cfg_hi = <0x4000>;	/* 0x8 << 11 */
+-				cfg_lo = <0>;
+-				src_master = <0>;
+-				dst_master = <1>;
+-			};
+-			spi0-tx {
+-				bus_id = "spi0-tx";
+-				cfg_hi = <0x2000>;	/* 0x4 << 11 */
+-				cfg_lo = <0>;
+-				src_master = <0>;
+-				dst_master = <0>;
 -			};
 -		};
--
- 		spi1: spi at 5d400000 {
- 			compatible = "arm,pl022", "arm,primecell";
- 			reg = <0x5d400000 0x1000>;
-diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
-index 585f641..b4ca60f 100644
---- a/arch/arm/boot/dts/spear13xx.dtsi
-+++ b/arch/arm/boot/dts/spear13xx.dtsi
-@@ -105,37 +105,6 @@
- 			reg = <0xea800000 0x1000>;
- 			interrupts = <0 19 0x4>;
- 			status = "disabled";
--
--			nr_channels = <8>;
--			chan_allocation_order = <1>;
--			chan_priority = <1>;
--			block_size = <0xfff>;
--			nr_masters = <2>;
--			data_width = <3 3 0 0>;
--
--			slave_info {
--				ssp0_tx {
--					bus_id = "ssp0_tx";
--					cfg_hi = <0x2000>;	/* 0x4 << 11 */
--					cfg_lo = <0>;
--					src_master = <0>;
--					dst_master = <0>;
--				};
--				ssp0_rx {
--					bus_id = "ssp0_rx";
--					cfg_hi = <0x280>;	/* 0x5 << 7 */
--					cfg_lo = <0>;
--					src_master = <0>;
--					dst_master = <0>;
--				};
--				cf {
--					bus_id = "cf";
--					cfg_hi = <0>;
--					cfg_lo = <0>;
--					src_master = <0>;
--					dst_master = <0>;
--				};
--			};
- 		};
- 
- 		dma at eb000000 {
-@@ -143,13 +112,6 @@
- 			reg = <0xeb000000 0x1000>;
- 			interrupts = <0 59 0x4>;
- 			status = "disabled";
--
--			nr_channels = <8>;
--			chan_allocation_order = <1>;
--			chan_priority = <1>;
--			block_size = <0xfff>;
--			nr_masters = <2>;
--			data_width = <3 3 0 0>;
- 		};
- 
- 		fsmc: flash at b0000000 {
-diff --git a/arch/arm/mach-spear13xx/include/mach/spear.h b/arch/arm/mach-spear13xx/include/mach/spear.h
-index 972a151..7cfa681 100644
---- a/arch/arm/mach-spear13xx/include/mach/spear.h
-+++ b/arch/arm/mach-spear13xx/include/mach/spear.h
-@@ -43,6 +43,8 @@
- #define VA_L2CC_BASE				IOMEM(UL(0xFB000000))
- 
- /* others */
-+#define DMAC0_BASE				UL(0xEA800000)
-+#define DMAC1_BASE				UL(0xEB000000)
- #define MCIF_CF_BASE				UL(0xB2800000)
- 
- /* Debug uart for linux, will be used for debug and uncompress messages */
-diff --git a/arch/arm/mach-spear13xx/spear1310.c b/arch/arm/mach-spear13xx/spear1310.c
-index ec72c47..02f4724 100644
---- a/arch/arm/mach-spear13xx/spear1310.c
-+++ b/arch/arm/mach-spear13xx/spear1310.c
-@@ -36,7 +36,7 @@
- static struct arasan_cf_pdata cf_pdata = {
- 	.cf_if_clk = CF_IF_CLK_166M,
- 	.quirk = CF_BROKEN_UDMA,
--	.dma_priv = "cf",
-+	.dma_priv = &cf_dma_priv,
- };
- 
- /* ssp device registration */
-@@ -47,7 +47,10 @@ static struct pl022_ssp_controller ssp1_plat_data = {
- /* Add SPEAr1310 auxdata to pass platform data */
- static struct of_dev_auxdata spear1310_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, &cf_pdata),
-+	OF_DEV_AUXDATA("snps,dma-spear1340", DMAC0_BASE, NULL, &dmac_plat_data),
-+	OF_DEV_AUXDATA("snps,dma-spear1340", DMAC1_BASE, NULL, &dmac_plat_data),
- 	OF_DEV_AUXDATA("arm,pl022", SSP_BASE, NULL, &pl022_plat_data),
++DMA clients connected to the Designware DMA controller must use the format
++described in the dma.txt file, using a five-cell specifier for each channel.
++The four cells in order are:
 +
- 	OF_DEV_AUXDATA("arm,pl022", SPEAR1310_SSP1_BASE, NULL, &ssp1_plat_data),
- 	{}
- };
-diff --git a/arch/arm/mach-spear13xx/spear1340.c b/arch/arm/mach-spear13xx/spear1340.c
-index 69c8f72..081014f 100644
---- a/arch/arm/mach-spear13xx/spear1340.c
-+++ b/arch/arm/mach-spear13xx/spear1340.c
-@@ -18,9 +18,9 @@
- #include <linux/delay.h>
- #include <linux/dw_dmac.h>
- #include <linux/of_platform.h>
--#include <linux/pata_arasan_cf_data.h>
- #include <asm/hardware/gic.h>
- #include <asm/mach/arch.h>
-+#include <mach/dma.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
- 
-@@ -78,16 +78,26 @@
- 			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
- 			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
- 
--static struct amba_pl011_data uart1_data = {
--	.dma_filter = dw_dma_generic_filter,
--	.dma_tx_param = "uart1_tx",
--	.dma_rx_param = "uart1_rx",
-+static struct dw_dma_slave uart1_dma_param[] = {
-+	{
-+		/* Tx */
-+		.cfg_hi = DWC_CFGH_DST_PER(SPEAR1340_DMA_REQ_UART1_TX),
-+		.cfg_lo = 0,
-+		.src_master = DMA_MASTER_MEMORY,
-+		.dst_master = SPEAR1340_DMA_MASTER_UART1,
-+	}, {
-+		/* Rx */
-+		.cfg_hi = DWC_CFGH_SRC_PER(SPEAR1340_DMA_REQ_UART1_RX),
-+		.cfg_lo = 0,
-+		.src_master = SPEAR1340_DMA_MASTER_UART1,
-+		.dst_master = DMA_MASTER_MEMORY,
-+	}
- };
- 
--static struct arasan_cf_pdata cf_pdata = {
--	.cf_if_clk = CF_IF_CLK_166M,
--	.quirk = CF_BROKEN_UDMA,
--	.dma_priv = "cf",
-+static struct amba_pl011_data uart1_data = {
-+	.dma_filter = dw_dma_filter,
-+	.dma_tx_param = &uart1_dma_param[0],
-+	.dma_rx_param = &uart1_dma_param[1],
- };
- 
- /* SATA device registration */
-@@ -148,8 +158,11 @@ static struct ahci_platform_data sata_pdata = {
- 
- /* Add SPEAr1340 auxdata to pass platform data */
- static struct of_dev_auxdata spear1340_auxdata_lookup[] __initdata = {
--	OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, &cf_pdata),
-+	OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, &cf_dma_priv),
-+	OF_DEV_AUXDATA("snps,dma-spear1340", DMAC0_BASE, NULL, &dmac_plat_data),
-+	OF_DEV_AUXDATA("snps,dma-spear1340", DMAC1_BASE, NULL, &dmac_plat_data),
- 	OF_DEV_AUXDATA("arm,pl022", SSP_BASE, NULL, &pl022_plat_data),
++1. A phandle pointing to the DMA controller
++2. The DMA request line number
++3. Source master for transfers on allocated channel
++4. Destination master for transfers on allocated channel
 +
- 	OF_DEV_AUXDATA("snps,spear-ahci", SPEAR1340_SATA_BASE, NULL,
- 			&sata_pdata),
- 	OF_DEV_AUXDATA("arm,pl011", SPEAR1340_UART1_BASE, NULL, &uart1_data),
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index b074db8..c4af775 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -22,16 +22,63 @@
- #include <asm/hardware/gic.h>
- #include <asm/mach/map.h>
- #include <asm/smp_twd.h>
-+#include <mach/dma.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
++Example:
++	
++	serial at e0000000 {
++		compatible = "arm,pl011", "arm,primecell";
++		reg = <0xe0000000 0x1000>;
++		interrupts = <0 35 0x4>;
++		status = "disabled";
++		dmas = <&dmahost 12 0 1>,
++			<&dmahost 13 0 1 0>;
++		dma-names = "rx", "rx";
+ 	};
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index 27b8e1d..208646c 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -18,6 +18,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_dma.h>
+ #include <linux/mm.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+@@ -168,7 +169,13 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
+ 	if (dwc->initialized == true)
+ 		return;
  
-+/* common dw_dma filter routine to be used by peripherals */
-+bool dw_dma_filter(struct dma_chan *chan, void *slave)
-+{
-+	struct dw_dma_slave *dws = (struct dw_dma_slave *)slave;
+-	if (dws) {
++	if (dws && dws->cfg_hi == 0xffffffff && dws->cfg_lo == 0xffffffff) {
++		/* autoconfigure based on request line from DT */
++		if (dwc->dma_sconfig.direction == DMA_MEM_TO_DEV)
++			cfghi = DWC_CFGH_DST_PER(dwc->req);
++		else if (dwc->dma_sconfig.direction == DMA_DEV_TO_MEM)
++			cfghi = DWC_CFGH_SRC_PER(dwc->req);
++	} else if (dws) {
+ 		/*
+ 		 * We need controller-specific data to set up slave
+ 		 * transfers.
+@@ -1179,49 +1186,61 @@ static void dwc_free_chan_resources(struct dma_chan *chan)
+ 	dev_vdbg(chan2dev(chan), "%s: done\n", __func__);
+ }
+ 
+-bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
++struct dw_dma_filter_args {
++	struct dw_dma *dw;
++	u32 req;
++	u32 src;
++	u32 dst;
++};
 +
-+	if (chan->device->dev == dws->dma_dev) {
-+		chan->private = slave;
-+		return true;
-+	} else {
-+		return false;
-+	}
++static bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
+ {
++	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
+ 	struct dw_dma *dw = to_dw_dma(chan->device);
+-	static struct dw_dma *last_dw;
+-	static char *last_bus_id;
+-	int i = -1;
++	struct dw_dma_filter_args *fargs = param;
++	struct dw_dma_slave *dws = &dwc->slave;
+ 
+-	/*
+-	 * dmaengine framework calls this routine for all channels of all dma
+-	 * controller, until true is returned. If 'param' bus_id is not
+-	 * registered with a dma controller (dw), then there is no need of
+-	 * running below function for all channels of dw.
+-	 *
+-	 * This block of code does this by saving the parameters of last
+-	 * failure. If dw and param are same, i.e. trying on same dw with
+-	 * different channel, return false.
+-	 */
+-	if ((last_dw == dw) && (last_bus_id == param))
+-		return false;
+-	/*
+-	 * Return true:
+-	 * - If dw_dma's platform data is not filled with slave info, then all
+-	 *   dma controllers are fine for transfer.
+-	 * - Or if param is NULL
+-	 */
+-	if (!dw->sd || !param)
+-		return true;
++	/* both the driver and the device must match */
++        if (chan->device != &fargs->dw->dma)
++                return false;
+ 
+-	while (++i < dw->sd_count) {
+-		if (!strcmp(dw->sd[i].bus_id, param)) {
+-			chan->private = &dw->sd[i];
+-			last_dw = NULL;
+-			last_bus_id = NULL;
++	dws->dma_dev	= dw->dma.dev;
++	dws->cfg_hi	= 0xffffffff;
++	dws->cfg_lo	= 0xffffffff;
++	dws->src_master	= fargs->src;
++	dws->dst_master	= fargs->dst;
++	dwc->req	= fargs->req;
+ 
+-			return true;
+-		}
+-	}
++	chan->private = dws;
++
++	return true;
 +}
 +
- /* ssp device registration */
-+static struct dw_dma_slave ssp_dma_param[] = {
-+	{
-+		/* Tx */
-+		.cfg_hi = DWC_CFGH_DST_PER(DMA_REQ_SSP0_TX),
-+		.cfg_lo = 0,
-+		.src_master = DMA_MASTER_MEMORY,
-+		.dst_master = DMA_MASTER_SSP0,
-+	}, {
-+		/* Rx */
-+		.cfg_hi = DWC_CFGH_SRC_PER(DMA_REQ_SSP0_RX),
-+		.cfg_lo = 0,
-+		.src_master = DMA_MASTER_SSP0,
-+		.dst_master = DMA_MASTER_MEMORY,
-+	}
-+};
++static struct dma_chan *dw_dma_xlate(struct of_phandle_args *dma_spec,
++					 struct of_dma *ofdma)
++{
++	struct dw_dma *dw = ofdma->of_dma_data;
++	struct dw_dma_filter_args fargs = {
++		.dw = dw,
++	};
++	dma_cap_mask_t cap;
 +
- struct pl022_ssp_controller pl022_plat_data = {
- 	.enable_dma = 1,
--	.dma_filter = dw_dma_generic_filter,
--	.dma_rx_param = "ssp0_rx",
--	.dma_tx_param = "ssp0_tx",
--	.num_chipselect = 3,
-+	.dma_filter = dw_dma_filter,
-+	.dma_rx_param = &ssp_dma_param[1],
-+	.dma_tx_param = &ssp_dma_param[0],
-+};
++	if (dma_spec->args_count != 3)
++		return NULL;
 +
-+/* CF device registration */
-+struct dw_dma_slave cf_dma_priv = {
-+	.cfg_hi = 0,
-+	.cfg_lo = 0,
-+	.src_master = 0,
-+	.dst_master = 0,
-+};
++	fargs.req = be32_to_cpup(dma_spec->args+0);
++	fargs.src = be32_to_cpup(dma_spec->args+1);
++	fargs.dst = be32_to_cpup(dma_spec->args+2);
 +
-+/* dmac device registeration */
-+struct dw_dma_platform_data dmac_plat_data = {
-+	.nr_channels = 8,
-+	.chan_allocation_order = CHAN_ALLOCATION_DESCENDING,
-+	.chan_priority = CHAN_PRIORITY_DESCENDING,
-+	.block_size = 4095U,
-+	.nr_masters = 2,
-+	.data_width = { 3, 3, 0, 0 },
++	if (WARN_ON(fargs.req >= 16 || fargs.src >= 2 || fargs.dst >= 2))
++		return NULL;
+ 
+-	last_dw = dw;
+-	last_bus_id = param;
+-	return false;
++	dma_cap_zero(cap);
++	dma_cap_set(DMA_SLAVE, cap);
++
++	/* TODO: there should be a simpler way to do this */
++	return dma_request_channel(cap, dw_dma_generic_filter, &dma_spec->args[0]);
+ }
+-EXPORT_SYMBOL(dw_dma_generic_filter);
+ 
+ /* --------------------- Cyclic DMA API extensions -------------------- */
+ 
+@@ -1510,9 +1529,8 @@ static void dw_dma_off(struct dw_dma *dw)
+ static struct dw_dma_platform_data *
+ dw_dma_parse_dt(struct platform_device *pdev)
+ {
+-	struct device_node *sn, *cn, *np = pdev->dev.of_node;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct dw_dma_platform_data *pdata;
+-	struct dw_dma_slave *sd;
+ 	u32 tmp, arr[4];
+ 
+ 	if (!np) {
+@@ -1524,7 +1542,7 @@ dw_dma_parse_dt(struct platform_device *pdev)
+ 	if (!pdata)
+ 		return NULL;
+ 
+-	if (of_property_read_u32(np, "nr_channels", &pdata->nr_channels))
++	if (of_property_read_u32(np, "dma-channels", &pdata->nr_channels))
+ 		return NULL;
+ 
+ 	if (of_property_read_bool(np, "is_private"))
+@@ -1539,7 +1557,7 @@ dw_dma_parse_dt(struct platform_device *pdev)
+ 	if (!of_property_read_u32(np, "block_size", &tmp))
+ 		pdata->block_size = tmp;
+ 
+-	if (!of_property_read_u32(np, "nr_masters", &tmp)) {
++	if (!of_property_read_u32(np, "dma-masters", &tmp)) {
+ 		if (tmp > 4)
+ 			return NULL;
+ 
+@@ -1551,36 +1569,6 @@ dw_dma_parse_dt(struct platform_device *pdev)
+ 		for (tmp = 0; tmp < pdata->nr_masters; tmp++)
+ 			pdata->data_width[tmp] = arr[tmp];
+ 
+-	/* parse slave data */
+-	sn = of_find_node_by_name(np, "slave_info");
+-	if (!sn)
+-		return pdata;
+-
+-	/* calculate number of slaves */
+-	tmp = of_get_child_count(sn);
+-	if (!tmp)
+-		return NULL;
+-
+-	sd = devm_kzalloc(&pdev->dev, sizeof(*sd) * tmp, GFP_KERNEL);
+-	if (!sd)
+-		return NULL;
+-
+-	pdata->sd = sd;
+-	pdata->sd_count = tmp;
+-
+-	for_each_child_of_node(sn, cn) {
+-		sd->dma_dev = &pdev->dev;
+-		of_property_read_string(cn, "bus_id", &sd->bus_id);
+-		of_property_read_u32(cn, "cfg_hi", &sd->cfg_hi);
+-		of_property_read_u32(cn, "cfg_lo", &sd->cfg_lo);
+-		if (!of_property_read_u32(cn, "src_master", &tmp))
+-			sd->src_master = tmp;
+-
+-		if (!of_property_read_u32(cn, "dst_master", &tmp))
+-			sd->dst_master = tmp;
+-		sd++;
+-	}
+-
+ 	return pdata;
+ }
+ #else
+@@ -1644,8 +1632,6 @@ static int dw_probe(struct platform_device *pdev)
+ 	clk_prepare_enable(dw->clk);
+ 
+ 	dw->regs = regs;
+-	dw->sd = pdata->sd;
+-	dw->sd_count = pdata->sd_count;
+ 
+ 	/* get hardware configuration parameters */
+ 	if (autocfg) {
+@@ -1765,6 +1751,10 @@ static int dw_probe(struct platform_device *pdev)
+ 
+ 	dma_async_device_register(&dw->dma);
+ 
++	err = of_dma_controller_register(pdev->dev.of_node, dw_dma_xlate, dw);
++	if (err)
++		dev_err(&pdev->dev, "could not register of_dma_controller\n");
++
+ 	return 0;
+ }
+ 
+@@ -1773,6 +1763,7 @@ static int __devexit dw_remove(struct platform_device *pdev)
+ 	struct dw_dma		*dw = platform_get_drvdata(pdev);
+ 	struct dw_dma_chan	*dwc, *_dwc;
+ 
++	of_dma_controller_free(pdev->dev.of_node);
+ 	dw_dma_off(dw);
+ 	dma_async_device_unregister(&dw->dma);
+ 
+diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
+index 88a069f..1d17793 100644
+--- a/drivers/dma/dw_dmac_regs.h
++++ b/drivers/dma/dw_dmac_regs.h
+@@ -213,6 +213,10 @@ struct dw_dma_chan {
+ 	/* configuration passed via DMA_SLAVE_CONFIG */
+ 	struct dma_slave_config dma_sconfig;
+ 
++	/* slave configuration from DT */
++	unsigned int		req;
++	struct dw_dma_slave	slave;
++
+ 	/* backlink to dw_dma */
+ 	struct dw_dma		*dw;
+ };
+@@ -239,10 +243,6 @@ struct dw_dma {
+ 	struct tasklet_struct	tasklet;
+ 	struct clk		*clk;
+ 
+-	/* slave information */
+-	struct dw_dma_slave	*sd;
+-	unsigned int		sd_count;
+-
+ 	u8			all_chan_mask;
+ 
+ 	/* hardware configuration */
+diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
+index 41766de..481ab23 100644
+--- a/include/linux/dw_dmac.h
++++ b/include/linux/dw_dmac.h
+@@ -27,7 +27,6 @@
+  */
+ struct dw_dma_slave {
+ 	struct device		*dma_dev;
+-	const char		*bus_id;
+ 	u32			cfg_hi;
+ 	u32			cfg_lo;
+ 	u8			src_master;
+@@ -60,9 +59,6 @@ struct dw_dma_platform_data {
+ 	unsigned short	block_size;
+ 	unsigned char	nr_masters;
+ 	unsigned char	data_width[4];
+-
+-	struct dw_dma_slave *sd;
+-	unsigned int sd_count;
  };
  
- void __init spear13xx_l2x0_init(void)
+ /* bursts size */
+@@ -114,6 +110,5 @@ void dw_dma_cyclic_stop(struct dma_chan *chan);
+ dma_addr_t dw_dma_get_src_addr(struct dma_chan *chan);
+ 
+ dma_addr_t dw_dma_get_dst_addr(struct dma_chan *chan);
+-bool dw_dma_generic_filter(struct dma_chan *chan, void *param);
+ 
+ #endif /* DW_DMAC_H */
 -- 
 1.8.1.2
