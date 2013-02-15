@@ -1,40 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 15 Feb 2013 19:20:08 +0000
-Subject: [PATCH 3.9-rc1 3/3] ARM: KVM: fix compilation after removal of
- user_alloc from struct kvm_memory_slot
+Date: Fri, 15 Feb 2013 19:20:07 +0000
+Subject: [PATCH 3.9-rc1 2/3] ARM: KVM: Rename KVM_MEMORY_SLOTS ->
+ KVM_USER_MEM_SLOTS
 In-Reply-To: <1360956008-5925-1-git-send-email-marc.zyngier@arm.com>
 References: <1360956008-5925-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1360956008-5925-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1360956008-5925-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7a905b1 (KVM: Remove user_alloc from struct kvm_memory_slot)
-broke KVM/ARM by removing the user_alloc field from a public structure.
+Commit bbacc0c (KVM: Rename KVM_MEMORY_SLOTS -> KVM_USER_MEM_SLOTS)
+broke KVM/ARM by changing a global #define.
 
-As we only used this field to alert the user that we didn't support
-this operation mode, there is no harm in discarding this bit of code
-without any remorse.
+Apply the same change to fix the compilation breakage.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/mmu.c | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/include/asm/kvm_host.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index f30e131..99e07c7 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -633,11 +633,6 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	}
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index dfe9886..d1736a5 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -26,7 +26,7 @@
+ #include <asm/kvm_arch_timer.h>
  
- 	memslot = gfn_to_memslot(vcpu->kvm, gfn);
--	if (!memslot->user_alloc) {
--		kvm_err("non user-alloc memslots not supported\n");
--		ret = -EINVAL;
--		goto out_unlock;
--	}
- 
- 	ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot, fault_status);
- 	if (ret == 0)
+ #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+-#define KVM_MEMORY_SLOTS 32
++#define KVM_USER_MEM_SLOTS 32
+ #define KVM_PRIVATE_MEM_SLOTS 4
+ #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+ #define KVM_HAVE_ONE_REG
 -- 
 1.8.1.2
