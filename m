@@ -1,64 +1,102 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:45:10 +0000
-Subject: [PATCH 40/40] ab8500-charger: Do not use [delayed_]work_pending()
-In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-41-git-send-email-lee.jones@linaro.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 15 Feb 2013 14:36:41 +0200
+Subject: [PATCH v7 11/12] ARM: dt: Add references to tegra_car clocks
+In-Reply-To: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1360931849-7090-12-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to test whether a (delayed) work item is pending
-before queueing, flushing or cancelling it.  Most uses are unnecessary
-and quite a few of them are buggy.
+Add references to tegra_car clocks for the basic device nodes. Also remove
+the clock-frequency property of the serial node as the UART driver can now
+use the clock framework to obtain the frequency.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- drivers/power/ab8500_charger.c |   19 ++++++-------------
- 1 file changed, 6 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/tegra114-dalmore.dts |    1 -
+ arch/arm/boot/dts/tegra114-pluto.dts   |    1 -
+ arch/arm/boot/dts/tegra114.dtsi        |    8 +++++++-
+ 3 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index 81c9615..a558318 100644
---- a/drivers/power/ab8500_charger.c
-+++ b/drivers/power/ab8500_charger.c
-@@ -1661,8 +1661,7 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
- 		dev_dbg(di->dev, "%s Disabled USB charging\n", __func__);
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index a30aca6..1ab48f1 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -12,7 +12,6 @@
  
- 		/* Cancel any pending Vbat check work */
--		if (delayed_work_pending(&di->check_vbat_work))
--			cancel_delayed_work(&di->check_vbat_work);
-+		cancel_delayed_work(&di->check_vbat_work);
+ 	serial at 70006300 {
+ 		status = "okay";
+-		clock-frequency = <408000000>;
+ 	};
  
- 	}
- 	ab8500_power_supply_changed(di, &di->usb_chg.psy);
-@@ -3335,11 +3334,8 @@ static int ab8500_charger_resume(struct platform_device *pdev)
- 			dev_err(di->dev, "Failed to kick WD!\n");
+ 	pmc {
+diff --git a/arch/arm/boot/dts/tegra114-pluto.dts b/arch/arm/boot/dts/tegra114-pluto.dts
+index 41cd5e6..c167591 100644
+--- a/arch/arm/boot/dts/tegra114-pluto.dts
++++ b/arch/arm/boot/dts/tegra114-pluto.dts
+@@ -12,7 +12,6 @@
  
- 		/* If not already pending start a new timer */
--		if (!delayed_work_pending(
--			&di->kick_wd_work)) {
--			queue_delayed_work(di->charger_wq, &di->kick_wd_work,
--				round_jiffies(WD_KICK_INTERVAL));
--		}
-+		queue_delayed_work(di->charger_wq, &di->kick_wd_work,
-+				   round_jiffies(WD_KICK_INTERVAL));
- 	}
+ 	serial at 70006300 {
+ 		status = "okay";
+-		clock-frequency = <408000000>;
+ 	};
  
- 	/* If we still have a HW failure, schedule a new check */
-@@ -3359,12 +3355,9 @@ static int ab8500_charger_suspend(struct platform_device *pdev,
- {
- 	struct ab8500_charger *di = platform_get_drvdata(pdev);
+ 	pmc {
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 96a8235..6b0a01e 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -24,10 +24,11 @@
+ 			      0 42 0x04
+ 			      0 121 0x04
+ 			      0 122 0x04>;
++		clocks = <&tegra_car 5>;
+ 	};
  
--	/* Cancel any pending HW failure check */
--	if (delayed_work_pending(&di->check_hw_failure_work))
--		cancel_delayed_work(&di->check_hw_failure_work);
--
--	if (delayed_work_pending(&di->vbus_drop_end_work))
--		cancel_delayed_work(&di->vbus_drop_end_work);
-+	/* Cancel any pending jobs */
-+	cancel_delayed_work(&di->check_hw_failure_work);
-+	cancel_delayed_work(&di->vbus_drop_end_work);
+ 	tegra_car: clock {
+-		compatible = "nvidia,tegra114-car, nvidia,tegra30-car";
++		compatible = "nvidia,tegra114-car";
+ 		reg = <0x60006000 0x1000>;
+ 		#clock-cells = <1>;
+ 	};
+@@ -43,6 +44,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <0 36 0x04>;
+ 		status = "disabled";
++		clocks = <&tegra_car 6>;
+ 	};
  
- 	flush_delayed_work(&di->attach_work);
- 	flush_delayed_work(&di->usb_charger_attached_work);
+ 	serial at 70006040 {
+@@ -51,6 +53,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <0 37 0x04>;
+ 		status = "disabled";
++		clocks = <&tegra_car 192>;
+ 	};
+ 
+ 	serial at 70006200 {
+@@ -59,6 +62,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <0 46 0x04>;
+ 		status = "disabled";
++		clocks = <&tegra_car 55>;
+ 	};
+ 
+ 	serial at 70006300 {
+@@ -67,12 +71,14 @@
+ 		reg-shift = <2>;
+ 		interrupts = <0 90 0x04>;
+ 		status = "disabled";
++		clocks = <&tegra_car 65>;
+ 	};
+ 
+ 	rtc {
+ 		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
+ 		reg = <0x7000e000 0x100>;
+ 		interrupts = <0 2 0x04>;
++		clocks = <&tegra_car 4>;
+ 	};
+ 
+ 	pmc {
 -- 
-1.7.10.4
+1.7.1
