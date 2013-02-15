@@ -1,89 +1,188 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Feb 2013 16:35:44 -0800
-Subject: [GIT PULL] reworked omap usb pdata changes for v3.9 merge window
-Message-ID: <20130215003543.GF11806@atomide.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 14 Feb 2013 17:36:39 -0700
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAErSpo6_6bYjo5XX5tzoBfMu5Htgpa__foNCyoCnCNEHocx67Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+On Tue, Feb 12, 2013 at 9:28 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-Roger Quadros reworked the OMAP USB patches that were causing
-a conflict in Linux next and we requested to be dropped from
-Linux next and reworked to remove the dependencies between
-core SoC code and the driver code.
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -1,4 +1,10 @@
+>  menu "PCI host controller drivers"
+>         depends on PCI
+>
+> +config PCI_MVEBU
+> +       bool "Marvell EBU PCIe controller"
+> +       depends on ARCH_MVEBU
+> +       select PCI_SW_HOST_BRIDGE
+> +       select PCI_SW_PCI_PCI_BRIDGE
 
-Below is a pull request for the mach-omap2 specific parts, the
-rest is driver specific and queued by Samuel in the MFD tree
-and Greg for the USB changes.
+I think PCI_SW_HOST_BRIDGE and PCI_SW_PCI_PCI_BRIDGE are obsolete and
+can be removed, right?
 
-I've left it unresolved so you can merge it into one of your
-branches as a dependency so we can avoid the merge conflict
-in Linux next. A link to the merge resolution done by Stephen
-is in the pull request. Let me know if you want me to resolve
-it instead. 
+> --- /dev/null
+> +++ b/drivers/pci/host/pci-mvebu.c
+> ...
+> +static void mvebu_pcie_setup_io_window(struct mvebu_pcie_port *port,
+> +                                      int enable)
+> +{
+> +       unsigned long iobase, iolimit;
+> +
+> +       if (port->bridge.iolimit < port->bridge.iobase)
+> +               return;
+> +
+> +       iolimit = 0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+> +               (port->bridge.iolimitupper << 16);
+> +       iobase = ((port->bridge.iobase & 0xF0) << 8) |
+> +               (port->bridge.iobaseupper << 16);
+> +
+> +       if (enable) {
+> +               unsigned long physbase = port->pcie->io.start + iobase;
+> +               armada_370_xp_alloc_pcie_window(port->port, port->lane,
+> +                                               physbase, iobase,
+> +                                               iolimit-iobase,
+> +                                               IORESOURCE_IO);
+> +               pci_ioremap_io(iobase, physbase);
+> +       }
+> +       else
+> +               armada_370_xp_free_pcie_window(iobase);
+> +}
+> +
+> +static void mvebu_pcie_setup_mem_window(struct mvebu_pcie_port *port,
+> +                                       int enable)
+> +{
+> +       unsigned long membase, memlimit;
+> +
+> +       if (port->bridge.memlimit < port->bridge.membase)
+> +               return;
+> +
+> +       membase = ((port->bridge.membase & 0xFFF0) << 16);
+> +       memlimit = ((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF;
+> +
+> +       if (enable)
+> +               armada_370_xp_alloc_pcie_window(port->port, port->lane,
+> +                                               membase, ORION_ADDR_MAP_NO_REMAP,
+> +                                               memlimit-membase,
+> +                                               IORESOURCE_MEM);
+> +       else
+> +               armada_370_xp_free_pcie_window(membase);
+> +}
+> +
+> +static void mvebu_handle_pcie_command(struct mvebu_pcie_port *port, u16 old,
+> +                                     u16 new)
+> +{
+> +       /* Enabling an I/O window ? */
+> +       if (!(old & PCI_COMMAND_IO) && (new & PCI_COMMAND_IO))
+> +               mvebu_pcie_setup_io_window(port, 1);
+> +
+> +       /* Disabling an I/O window ? */
+> +       if ((old & PCI_COMMAND_IO) && !(new & PCI_COMMAND_IO))
+> +               mvebu_pcie_setup_io_window(port, 0);
+> +
+> +       /* Enabling a memory window ? */
+> +       if (!(old & PCI_COMMAND_MEMORY) && (new & PCI_COMMAND_MEMORY))
+> +               mvebu_pcie_setup_mem_window(port, 1);
+> +
+> +       /* Disabling a memory window ? */
+> +       if ((old & PCI_COMMAND_MEMORY) && !(new & PCI_COMMAND_MEMORY))
+> +               mvebu_pcie_setup_mem_window(port, 0);
+> +}
+> ...
+> +/* Write to the PCI-to-PCI bridge configuration space */
+> +static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+> +                                    unsigned int where, int size, u32 value)
+> +{
+> +       struct mvebu_sw_pci_bridge *bridge = &port->bridge;
+> +       u32 mask, reg;
+> +       int err;
+> +
+> +       if (size == 4)
+> +               mask = 0x0;
+> +       else if (size == 2)
+> +               mask = ~(0xffff << ((where & 3) * 8));
+> +       else if (size == 1)
+> +               mask = ~(0xff << ((where & 3) * 8));
+> +       else
+> +               return PCIBIOS_BAD_REGISTER_NUMBER;
+> +
+> +       err = mvebu_sw_pci_bridge_read(port, where & ~3, 4, &reg);
+> +       if (err)
+> +               return err;
+> +
+> +       value = (reg & mask) | value << ((where & 3) * 8);
+> +
+> +       switch (where & ~3) {
+> +       case PCI_COMMAND:
+> +               mvebu_handle_pcie_command(port, bridge->command,
+> +                                         value & 0xffff);
+> +               bridge->command = value & 0xffff;
+> +               bridge->status = value >> 16;
+> +               break;
+> +
+> +       case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+> +               bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4] = value;
+> +               break;
+> +
+> +       case PCI_IO_BASE:
+> +               /*
+> +                * We also keep bit 1 set, it is a read-only bit that
+> +                * indicates we support 32 bits addressing for the
+> +                * I/O
+> +                */
+> +               bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
+> +               bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
+> +               bridge->secondary_status = value >> 16;
+> +               break;
+> +
+> +       case PCI_MEMORY_BASE:
+> +               bridge->membase = value & 0xffff;
+> +               bridge->memlimit = value >> 16;
+> +               break;
+> +
+> +       case PCI_PREF_MEMORY_BASE:
+> +               bridge->prefmembase = value & 0xffff;
+> +               bridge->prefmemlimit = value >> 16;
+> +               break;
+> +
+> +       case PCI_PREF_BASE_UPPER32:
+> +               bridge->prefbaseupper = value;
+> +               break;
+> +
+> +       case PCI_PREF_LIMIT_UPPER32:
+> +               bridge->preflimitupper = value;
+> +               break;
 
-Regards,
+You're relying on a subsequent PCI_COMMAND write to set PCI_COMMAND_IO
+and/or PCI_COMMAND_MEMORY, and you program the bridge windows at that
+time.  It might be a good idea if the PCI core did clear those bits
+while updating the windows, but I'm not sure we do.  In any case,
+delaying the update is a difference from a standard P2P bridge that
+could cause issues later.
 
-Tony
+> +       case PCI_IO_BASE_UPPER16:
+> +               bridge->iobaseupper = value & 0xffff;
+> +               bridge->iolimitupper = value >> 16;
+> +               break;
+> +
+> +       case PCI_PRIMARY_BUS:
+> +               bridge->primary_bus             = value & 0xff;
+> +               bridge->secondary_bus           = (value >> 8) & 0xff;
+> +               bridge->subordinate_bus         = (value >> 16) & 0xff;
+> +               bridge->secondary_latency_timer = (value >> 24) & 0xff;
+> +               orion_pcie_set_local_bus_nr(port->base, bridge->secondary_bus);
+> +               break;
+> +
+> +       default:
+> +               break;
+> +       }
+> +
+> +       return PCIBIOS_SUCCESSFUL;
+> +}
 
-
-The following changes since commit 836dc9e3fbbab0c30aa6e664417225f5c1fb1c39:
-
-  Linux 3.8-rc7 (2013-02-09 08:20:39 +1100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9/usb-signed
-
-for you to fetch changes up to 64ff1673332a1109780d731ca08dcd4f8ad33097:
-
-  Merge branch 'usbhost17-for-arm-soc' of git://github.com/rogerq/linux into omap-for-v3.9/usb (2013-02-14 08:36:17 -0800)
-
-----------------------------------------------------------------
-
-These changes contain the OMAP USB related platform data changes
-that were dropped from linux next because of the merge conflicts
-as requested by me and Olof. The reason was that at this point
-we really should be able to do the arch/arm related changes
-separately from driver changes to avoid dependencies between
-branches.
-
-These patches were initially part of the USB related MFD patches.
-Based on our comments, Roger Quadros quickly reworked these
-patches into a shared branch between ARM SoC tree and the MFD
-tree, then separate patches for the OMAP platform data and
-MFD driver.
-
-Note that this branch will conflict with c1d1cd597fc7
-("ARM: OMAP2+: omap_device: remove obsolete pm_lats and
-early_device code"). Please see http://lkml.org/lkml/2013/2/11/16
-for the merge resolution.
-
-----------------------------------------------------------------
-Roger Quadros (2):
-      ARM: OMAP: Consolidate OMAP USB-HS platform data (part 1/3)
-      ARM: OMAP: Consolidate OMAP USB-HS platform data (part 3/3)
-
-Tony Lindgren (1):
-      Merge branch 'usbhost17-for-arm-soc' of git://github.com/rogerq/linux into omap-for-v3.9/usb
-
- arch/arm/mach-omap2/board-3430sdp.c        |  2 +-
- arch/arm/mach-omap2/board-3630sdp.c        |  2 +-
- arch/arm/mach-omap2/board-am3517crane.c    |  2 +-
- arch/arm/mach-omap2/board-am3517evm.c      |  2 +-
- arch/arm/mach-omap2/board-cm-t35.c         |  2 +-
- arch/arm/mach-omap2/board-cm-t3517.c       |  2 +-
- arch/arm/mach-omap2/board-devkit8000.c     |  2 +-
- arch/arm/mach-omap2/board-igep0020.c       |  4 ++--
- arch/arm/mach-omap2/board-omap3beagle.c    |  2 +-
- arch/arm/mach-omap2/board-omap3evm.c       |  2 +-
- arch/arm/mach-omap2/board-omap3pandora.c   |  2 +-
- arch/arm/mach-omap2/board-omap3stalker.c   |  2 +-
- arch/arm/mach-omap2/board-omap3touchbook.c |  2 +-
- arch/arm/mach-omap2/board-omap4panda.c     |  2 +-
- arch/arm/mach-omap2/board-overo.c          |  2 +-
- arch/arm/mach-omap2/board-zoom.c           |  2 +-
- arch/arm/mach-omap2/usb-host.c             | 29 +++++------------------------
- arch/arm/mach-omap2/usb.h                  | 20 +-------------------
- include/linux/platform_data/usb-omap.h     |  8 ++++++--
- 19 files changed, 29 insertions(+), 62 deletions(-)
+Bjorn
