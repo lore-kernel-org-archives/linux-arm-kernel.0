@@ -1,46 +1,65 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 15 Feb 2013 16:26:35 +0100
-Subject: [PATCH 3/3] ARM: S3C24XX: handle s3c2412 eints using new
- infrastructure
-In-Reply-To: <CACRpkdZ5dxyXhrNUJDEzPoDOGRn_50ZuaHW4ZpguSyApQvh7hw@mail.gmail.com>
-References: <201302120102.03511.heiko@sntech.de>
- <201302120105.45608.heiko@sntech.de>
- <CACRpkdZ5dxyXhrNUJDEzPoDOGRn_50ZuaHW4ZpguSyApQvh7hw@mail.gmail.com>
-Message-ID: <201302151626.36805.heiko@sntech.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 15 Feb 2013 07:28:22 -0800
+Subject: [RFC/NOT FOR MERGING 1/3] arm: omap: use generic implementation
+ if !od
+In-Reply-To: <1360840554-26901-1-git-send-email-balbi@ti.com> (Felipe Balbi's
+ message of "Thu, 14 Feb 2013 13:15:52 +0200")
+References: <1360840554-26901-1-git-send-email-balbi@ti.com>
+Message-ID: <871uch7g15.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 15. Februar 2013, 15:48:52 schrieb Linus Walleij:
-> On Tue, Feb 12, 2013 at 1:05 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > The s3c2412 handles the eints 0 to 3 different than all the other SoCs
-> > of the 24xx range. These eints must be acked and masked in the regular
-> > bits as well as the bits 0 to 3 of the eint registers, which are unused
-> > on the other SoCs.
-> > 
-> > This of course can be realized using the new infrastructure with the
-> > eint bits in the main register being the parent interrupts of the
-> > same bits in the eint register.
-> > 
-> > The s3c2412 therefore gets its own IRQ_EINT0 to 4 constants that
-> > reside in the newly created gap before IRQ_EINT4. gpio-samsung, as the
-> > only user of these is modified to return the correct values when
-> > handling gpio_to_irq requests on s3c2412 based machines.
-> > 
-> > Due to lack of hardware this is compile tested only, but should
-> > hopefully work as intended.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> We definately need an ACK from some Samsung maintainer for
-> this patch...
+Hi Felipe,
 
-Kukjin has already included these patches [0], but did only reply to
-the previous series (which handles s3c2440 specific stuff) that he
-included both [1].
+Felipe Balbi <balbi@ti.com> writes:
 
+> Eventually, we need to be able to remove
+> ti,hwmods DT attribute (or at a minimum
+> ignore it).
+>
+> For new platforms, this patch could enable
+> the transition by not relying on ti,hwmods
+> to have functioning PM and Idle implementation.
+>
+> Notice that this poses no differences for
+> platforms which are already supported, it
+> just gives us means of dropping the relyance
+> on hwmod for new platforms.
+>
+> NYET-Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_device.c | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> index e065daa..305eeb4 100644
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -796,13 +796,18 @@ static int __init omap_early_device_register(struct platform_device *pdev)
+>  static int _od_runtime_suspend(struct device *dev)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+> +	struct omap_device *od = to_omap_device(pdev);
+>  	int ret;
+>  
+>  	ret = pm_generic_runtime_suspend(dev);
+>  
+> +	if (!od)
+> +		goto out;
+> +
 
-Heiko
+Rather than adding a check for every function, I think you will get the
+effect by simply not hooking up the PM domain.
 
+IOW, in omap_device_build_from_dt(), conditionalize:
 
-[0] http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;a=shortlog;h=refs/heads/next/irq-s3c24xx-2
-[1] http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/16074
+	pdev->dev.pm_domain = &omap_device_pm_domain;
+
+then none of the callbacks will be called in the first place, so they
+won't need to be conditionalized.
+
+Without a PM domain, they will fallback to the bus level hooks, which in
+this case will be the platform_bus hooks, which will just call the
+pm_generic functions.
+
+Kevin
