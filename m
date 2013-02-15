@@ -1,33 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 15 Feb 2013 22:53:24 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
-In-Reply-To: <20130214161811.GC3882@linux-sh.org>
-References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
- <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
- <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
- <20130214041651.GB6036@verge.net.au>
- <20130214091040.GG6088@linux-sh.org>
- <20130214160842.GC26810@verge.net.au>
- <20130214161811.GC3882@linux-sh.org>
-Message-ID: <20130215135324.GG27724@verge.net.au>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 15 Feb 2013 15:10:01 +0100
+Subject: [PATCH] ARM: dts: imx6q: add PMU
+Message-ID: <1360937401-2442-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 01:18:11AM +0900, Paul Mundt wrote:
-> On Fri, Feb 15, 2013 at 01:08:42AM +0900, Simon Horman wrote:
-> > On Thu, Feb 14, 2013 at 06:10:40PM +0900, Paul Mundt wrote:
-> > > On Thu, Feb 14, 2013 at 01:16:52PM +0900, Simon Horman wrote:
-> > > > Ok, so in that case the correct value for "sh_tmu.2" might actually
-> > > > be MSTP016 or MSTP015 depending on the bundle size. I am unsure how to test
-> > > > sh_tmu.2.
-> 
-> [snip]
-> 
-> > Getting that information correct for sh_tmu.2 on the r8a7779 problem I'm
-> > not completely sure of the correct answer to. Though I now strongly suspect
-> > it is MSTP016.
-> 
-> Testing shouldn't be that difficult, just switch your clocksource to it
-> and make sure all TMU-related MSTP bits are first cleared?
+Add ARM Cortex A9 Performance Monitor Unit (PMU) support.
+On i.MX6 a combined interrupt on hardware line #126 is used
+(i.MX6 TRM: Performance Unit interrupt).
 
-Thanks, I will try that.
+For more details see Documentation/devicetree/bindings/arm/pmu.txt
+
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx6q.dtsi |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index d6265ca..73f9664 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -138,6 +138,11 @@
+ 			cache-level = <2>;
+ 		};
+ 
++		pmu {
++			compatible = "arm,cortex-a9-pmu";
++			interrupts = <0 94 0x04>;
++		};
++
+ 		aips-bus at 02000000 { /* AIPS1 */
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
+-- 
+1.7.0.4
