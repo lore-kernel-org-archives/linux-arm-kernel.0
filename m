@@ -1,55 +1,61 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 15 Feb 2013 06:06:35 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <CAErSpo6_6bYjo5XX5tzoBfMu5Htgpa__foNCyoCnCNEHocx67Q@mail.gmail.com>
-References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo6_6bYjo5XX5tzoBfMu5Htgpa__foNCyoCnCNEHocx67Q@mail.gmail.com>
-Message-ID: <20130215060635.43f06f71@skate>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 15 Feb 2013 10:36:53 +0530
+Subject: [PATCH 9/9] [media] davinci: do not include mach/hardware.h
+In-Reply-To: <1360882071-4072668-10-git-send-email-arnd@arndb.de>
+References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
+ <1360882071-4072668-10-git-send-email-arnd@arndb.de>
+Message-ID: <CA+V-a8twXpuy3+ScdR26pwYn0LriKVqnwR5Qgyv_vtf4dgEyGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+Hi Arnd,
 
-On Thu, 14 Feb 2013 17:36:39 -0700, Bjorn Helgaas wrote:
+Thanks for the patch.
 
-> > +config PCI_MVEBU
-> > +       bool "Marvell EBU PCIe controller"
-> > +       depends on ARCH_MVEBU
-> > +       select PCI_SW_HOST_BRIDGE
-> > +       select PCI_SW_PCI_PCI_BRIDGE
-> 
-> I think PCI_SW_HOST_BRIDGE and PCI_SW_PCI_PCI_BRIDGE are obsolete and
-> can be removed, right?
+On Fri, Feb 15, 2013 at 4:17 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> It is now possible to build the davinci vpss code
+> on multiplatform kernels, which causes a problem
+> since the driver tries to incude the davinci
+> platform specific mach/hardware.h file. Fortunately
+> that file is not required at all in the driver,
+> so we can simply remove the #include statement.
+>
+> Without this patch, building allyesconfig results in:
+>
+> drivers/media/platform/davinci/vpss.c:28:27: fatal error: mach/hardware.h: No such file or directory
+> compilation terminated.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Cc: "Lad, Prabhakar" <prabhakar.lad@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-Indeed, will fix.
+Acked-by: Lad, Prabhakar <prabhakar.lad@ti.com>
 
+Regards,
+--Prabhakar
 
-> > +       case PCI_PREF_LIMIT_UPPER32:
-> > +               bridge->preflimitupper = value;
-> > +               break;
-> 
-> You're relying on a subsequent PCI_COMMAND write to set PCI_COMMAND_IO
-> and/or PCI_COMMAND_MEMORY, and you program the bridge windows at that
-> time.
-
-Correct.
-
->  It might be a good idea if the PCI core did clear those bits
-> while updating the windows, but I'm not sure we do.  In any case,
-> delaying the update is a difference from a standard P2P bridge that
-> could cause issues later.
-
-When would you want the window assignment to occur? Directly when the
-registers containing the base/limit are being written to? There are
-multiple registers for base/limit, so I'll have to figure out a way to
-validate when the base/limit informations are valid.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> ---
+>  drivers/media/platform/davinci/vpss.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/media/platform/davinci/vpss.c b/drivers/media/platform/davinci/vpss.c
+> index 494d322..a19c552 100644
+> --- a/drivers/media/platform/davinci/vpss.c
+> +++ b/drivers/media/platform/davinci/vpss.c
+> @@ -25,7 +25,6 @@
+>  #include <linux/spinlock.h>
+>  #include <linux/compiler.h>
+>  #include <linux/io.h>
+> -#include <mach/hardware.h>
+>  #include <media/davinci/vpss.h>
+>
+>  MODULE_LICENSE("GPL");
+> --
+> 1.8.1.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
