@@ -1,137 +1,80 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:44:42 +0000
-Subject: [PATCH 12/40] pm2301-charger: Resolve I2C detection problem on ab9540
+Date: Fri, 15 Feb 2013 12:44:45 +0000
+Subject: [PATCH 15/40] pm2301-charger: Wake system when ext charger is
+ plugged-in
 In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
 References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360932310-30065-16-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mustapha Ben Zoubeir <mustapha.ben.zoubeir-nonst@stericsson.com>
+From: Rupesh Kumar <rupesh.kumar@stericsson.com>
 
-Signed-off-by: Mustapha Ben Zoubeir <mustapha.ben.zoubeir-nonst@stericsson.com>
+When in suspend state, upon plug-in of external AC charger the
+device needs to wake-up and charging operation started.
+
+Signed-off-by: Rupesh Kumar <rupesh.kumar@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Marcus COOPER <marcus.xm.cooper@stericsson.com>
 Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
-Tested-by: Olivier CLERGEAUD <olivier.clergeaud@stericsson.com>
 ---
- drivers/power/pm2301_charger.c |   35 ++++++++++++++++++++++++++---------
- 1 file changed, 26 insertions(+), 9 deletions(-)
+ drivers/power/pm2301_charger.c |   17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
-index 63f515e..4cb8f7f 100644
+index ec51026..7f82431 100644
 --- a/drivers/power/pm2301_charger.c
 +++ b/drivers/power/pm2301_charger.c
-@@ -34,6 +34,8 @@
- 
- #define to_pm2xxx_charger_ac_device_info(x) container_of((x), \
- 		struct pm2xxx_charger, ac_chg)
-+#define SLEEP_MIN		50
-+#define SLEEP_MAX		100
- 
- static int pm2xxx_interrupt_registers[] = {
- 	PM2XXX_REG_INT1,
-@@ -113,17 +115,14 @@ static const struct i2c_device_id pm2xxx_ident[] = {
- 
- static void set_lpn_pin(struct pm2xxx_charger *pm2)
- {
--	if (pm2->ac.charger_connected)
--		return;
- 	gpio_set_value(pm2->lpn_pin, 1);
-+	usleep_range(SLEEP_MIN, SLEEP_MAX);
- 
- 	return;
- }
- 
- static void clear_lpn_pin(struct pm2xxx_charger *pm2)
- {
--	if (pm2->ac.charger_connected)
--		return;
- 	gpio_set_value(pm2->lpn_pin, 0);
- 
- 	return;
-@@ -139,7 +138,6 @@ static int pm2xxx_reg_read(struct pm2xxx_charger *pm2, int reg, u8 *val)
- 	 * and receive I2C "acknowledge" from PM2301.
- 	 */
- 	mutex_lock(&pm2->lock);
--	set_lpn_pin(pm2);
- 
- 	ret = i2c_smbus_read_i2c_block_data(pm2->config.pm2xxx_i2c, reg,
- 				1, val);
-@@ -147,7 +145,6 @@ static int pm2xxx_reg_read(struct pm2xxx_charger *pm2, int reg, u8 *val)
- 		dev_err(pm2->dev, "Error reading register at 0x%x\n", reg);
- 	else
- 		ret = 0;
--	clear_lpn_pin(pm2);
- 	mutex_unlock(&pm2->lock);
- 
- 	return ret;
-@@ -163,7 +160,6 @@ static int pm2xxx_reg_write(struct pm2xxx_charger *pm2, int reg, u8 val)
- 	 * and receive I2C "acknowledge" from PM2301.
- 	 */
- 	mutex_lock(&pm2->lock);
--	set_lpn_pin(pm2);
- 
- 	ret = i2c_smbus_write_i2c_block_data(pm2->config.pm2xxx_i2c, reg,
- 				1, &val);
-@@ -171,7 +167,6 @@ static int pm2xxx_reg_write(struct pm2xxx_charger *pm2, int reg, u8 val)
- 		dev_err(pm2->dev, "Error writing register at 0x%x\n", reg);
- 	else
- 		ret = 0;
--	clear_lpn_pin(pm2);
- 	mutex_unlock(&pm2->lock);
- 
- 	return ret;
-@@ -478,7 +473,6 @@ static int pm2_int_reg5(void *pm2_data, int val)
- 	struct pm2xxx_charger *pm2 = pm2_data;
- 	int ret = 0;
- 
--
- 	if (val & (PM2XXX_INT6_ITVPWR2DROP | PM2XXX_INT6_ITVPWR1DROP)) {
- 		dev_dbg(pm2->dev, "VMPWR drop to VBAT level\n");
+@@ -1072,6 +1072,12 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
+ 		pm2xxx_charger_irq[0].name, pm2->pdata->irq_number, ret);
+ 		goto unregister_pm2xxx_charger;
  	}
-@@ -899,12 +893,34 @@ static struct pm2xxx_irq pm2xxx_charger_irq[] = {
++	/* pm interrupt can wake up system */
++	ret = enable_irq_wake(pm2->pdata->irq_number);
++	if (ret) {
++		dev_err(pm2->dev, "failed to set irq wake\n");
++		goto unregister_pm2xxx_interrupt;
++	}
  
- static int pm2xxx_wall_charger_resume(struct i2c_client *i2c_client)
- {
-+	struct pm2xxx_charger *pm2;
-+
-+	pm2 =  (struct pm2xxx_charger *)i2c_get_clientdata(i2c_client);
-+	set_lpn_pin(pm2);
-+
-+	/* If we still have a HW failure, schedule a new check */
-+	if (pm2->flags.ovv)
-+		queue_delayed_work(pm2->charger_wq,
-+				&pm2->check_hw_failure_work, 0);
-+
- 	return 0;
- }
- 
- static int pm2xxx_wall_charger_suspend(struct i2c_client *i2c_client,
- 	pm_message_t state)
- {
-+	struct pm2xxx_charger *pm2;
-+
-+	pm2 =  (struct pm2xxx_charger *)i2c_get_clientdata(i2c_client);
-+	clear_lpn_pin(pm2);
-+
-+	/* Cancel any pending HW failure check */
-+	if (delayed_work_pending(&pm2->check_hw_failure_work))
-+		cancel_delayed_work(&pm2->check_hw_failure_work);
-+
-+	flush_work(&pm2->ac_work);
-+	flush_work(&pm2->check_main_thermal_prot_work);
-+
- 	return 0;
- }
- 
-@@ -1056,6 +1072,7 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
- 		goto free_gpio;
+ 	/*Initialize lock*/
+ 	mutex_init(&pm2->lock);
+@@ -1084,7 +1090,7 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
+ 	ret = gpio_request(pm2->lpn_pin, "pm2301_lpm_gpio");
+ 	if (ret < 0) {
+ 		dev_err(pm2->dev, "pm2301_lpm_gpio request failed\n");
+-		goto unregister_pm2xxx_charger;
++		goto disable_pm2_irq_wake;
  	}
+ 	ret = gpio_direction_output(pm2->lpn_pin, 0);
+ 	if (ret < 0) {
+@@ -1115,6 +1121,11 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
  
-+	set_lpn_pin(pm2);
- 	ret = pm2xxx_charger_detection(pm2, &val);
+ free_gpio:
+ 	gpio_free(pm2->lpn_pin);
++disable_pm2_irq_wake:
++	disable_irq_wake(pm2->pdata->irq_number);
++unregister_pm2xxx_interrupt:
++	/* disable interrupt */
++	free_irq(pm2->pdata->irq_number, pm2);
+ unregister_pm2xxx_charger:
+ 	/* unregister power supply */
+ 	power_supply_unregister(&pm2->ac_chg.psy);
+@@ -1125,6 +1136,7 @@ free_charger_wq:
+ 	destroy_workqueue(pm2->charger_wq);
+ free_device_info:
+ 	kfree(pm2);
++
+ 	return ret;
+ }
  
- 	if ((ret == 0) && val) {
+@@ -1135,6 +1147,9 @@ static int __devexit pm2xxx_wall_charger_remove(struct i2c_client *i2c_client)
+ 	/* Disable AC charging */
+ 	pm2xxx_charger_ac_en(&pm2->ac_chg, false, 0, 0);
+ 
++	/* Disable wake by pm interrupt */
++	disable_irq_wake(pm2->pdata->irq_number);
++
+ 	/* Disable interrupts */
+ 	free_irq(pm2->pdata->irq_number, pm2);
+ 
 -- 
 1.7.10.4
