@@ -1,41 +1,25 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 15 Feb 2013 15:20:25 -0500 (EST)
-Subject: [PATCH v2 1/1] drivers: net: davinci_cpdma: acknowledge
- interrupt properly
-In-Reply-To: <1360959539.21068.5.camel@joe-AO722>
-References: <1360866406-17261-1-git-send-email-mugunthanvnm@ti.com>
- <20130215.150506.499818568035818118.davem@davemloft.net>
- <1360959539.21068.5.camel@joe-AO722>
-Message-ID: <20130215.152025.1605170079652952030.davem@davemloft.net>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 15 Feb 2013 15:25:17 -0500
+Subject: randconfig errors
+In-Reply-To: <201302152012.04128.arnd@arndb.de> (Arnd Bergmann's message of
+ "Fri, 15 Feb 2013 20:12:03 +0000")
+References: <511E6FA4.2000709@gmail.com>
+ <c01a8ed845054b9d9cbddb341bac5f0e@DLEE74.ent.ti.com>
+ <20130215194548.GC2244@beef> <201302152012.04128.arnd@arndb.de>
+Message-ID: <87d2w1jpea.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joe Perches <joe@perches.com>
-Date: Fri, 15 Feb 2013 12:18:59 -0800
+Hi,
 
-> On Fri, 2013-02-15 at 15:05 -0500, David Miller wrote:
->> From: Mugunthan V N <mugunthanvnm@ti.com>
->> Date: Thu, 14 Feb 2013 23:56:46 +0530
->> 
->> > +enum {
->> > +     CPDMA_EOI_RX_THRESH = 0,
->> > +     CPDMA_EOI_RX,
->> > +     CPDMA_EOI_TX,
->> > +     CPDMA_EOI_MISC,
->> > +};
->> 
->> Do not use enumerations for hardware register values, which must be
->> exact, otherwise you are potentially going to succumb to the vagaries
->> of C language enumeration value assignment.
-> 
-> Vagaries?
-> 
-> In what way is c enumeration (6.7.2.2) vague?
-> char vs int?  Isn't smaller mostly better?
-> 
-> Concern about possible future reordering given an
-> insertion or deletion might be the only consideration
-> I could imagine.
+On Fri, Feb 15 2013, Arnd Bergmann wrote:
+> I would expect him to say no them at this point though, and in that
+> case, I think it should be either the slave-dma tree or the arm-soc
+> tree.
 
-Right.  That's why you should use explicit CPP defines for
-register offsets and values.
+Agreed, these should go in someone else's tree, thanks.
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
