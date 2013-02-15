@@ -1,113 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:44:32 +0000
-Subject: [PATCH 02/40] pm2301-charger: Enable SW EOC control on the ab9540
+Date: Fri, 15 Feb 2013 12:44:33 +0000
+Subject: [PATCH 03/40] abx500-chargalg: Store the AB8500 MFD parent device for
+ platform differentiation
 In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
 References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360932310-30065-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
+Any platform can be dynamically probed for model and version number
+provided the AB8500 MFD parent device pointer is available. This
+patch obtains that pointer and stores it in a locally controlled
+struct for later use.
 
-End of charging is managed by SW.
-
-Signed-off-by: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
-Tested-by: Jonas ABERG <jonas.aberg@stericsson.com>
 ---
- drivers/power/pm2301_charger.c |   48 +++++++++++++++++++++++++++++++++++-----
- 1 file changed, 43 insertions(+), 5 deletions(-)
+ drivers/power/abx500_chargalg.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
-index ed48d75..62a172e 100644
---- a/drivers/power/pm2301_charger.c
-+++ b/drivers/power/pm2301_charger.c
-@@ -192,11 +192,22 @@ static int pm2xxx_charging_disable_mngt(struct pm2xxx_charger *pm2)
- {
- 	int ret;
- 
-+	/* Disable SW EOC ctrl */
-+	ret = pm2xxx_reg_write(pm2, PM2XXX_SW_CTRL_REG, PM2XXX_SWCTRL_HW);
-+	if (ret < 0) {
-+		dev_err(pm2->dev, "%s pm2xxx write failed\n", __func__);
-+		return ret;
-+	}
-+
- 	/* Disable charging */
- 	ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_CTRL_REG2,
- 			(PM2XXX_CH_AUTO_RESUME_DIS | PM2XXX_CHARGER_DIS));
-+	if (ret < 0) {
-+		dev_err(pm2->dev, "%s pm2xxx write failed\n", __func__);
-+		return ret;
-+	}
- 
--	return ret;
-+	return 0;
- }
- 
- static int pm2xxx_charger_batt_therm_mngt(struct pm2xxx_charger *pm2, int val)
-@@ -245,13 +256,29 @@ static int pm2xxx_charger_wd_exp_mngt(struct pm2xxx_charger *pm2, int val)
- 
- static int pm2xxx_charger_vbat_lsig_mngt(struct pm2xxx_charger *pm2, int val)
- {
-+	int ret;
-+
- 	switch (val) {
- 	case PM2XXX_INT1_ITVBATLOWR:
- 		dev_dbg(pm2->dev, "VBAT grows above VBAT_LOW level\n");
-+		/* Enable SW EOC ctrl */
-+		ret = pm2xxx_reg_write(pm2, PM2XXX_SW_CTRL_REG,
-+							PM2XXX_SWCTRL_SW);
-+		if (ret < 0) {
-+			dev_err(pm2->dev, "%s pm2xxx write failed\n", __func__);
-+			return ret;
-+		}
- 		break;
- 
- 	case PM2XXX_INT1_ITVBATLOWF:
- 		dev_dbg(pm2->dev, "VBAT drops below VBAT_LOW level\n");
-+		/* Disable SW EOC ctrl */
-+		ret = pm2xxx_reg_write(pm2, PM2XXX_SW_CTRL_REG,
-+							PM2XXX_SWCTRL_HW);
-+		if (ret < 0) {
-+			dev_err(pm2->dev, "%s pm2xxx write failed\n", __func__);
-+			return ret;
-+		}
- 		break;
- 
- 	default:
-@@ -322,16 +349,27 @@ static int pm2_int_reg0(void *pm2_data, int val)
- 	struct pm2xxx_charger *pm2 = pm2_data;
- 	int ret = 0;
- 
--	if (val & (PM2XXX_INT1_ITVBATLOWR | PM2XXX_INT1_ITVBATLOWF)) {
--		ret = pm2xxx_charger_vbat_lsig_mngt(pm2, val &
--			(PM2XXX_INT1_ITVBATLOWR | PM2XXX_INT1_ITVBATLOWF));
-+	if (val & PM2XXX_INT1_ITVBATLOWR) {
-+		ret = pm2xxx_charger_vbat_lsig_mngt(pm2,
-+						PM2XXX_INT1_ITVBATLOWR);
-+		if (ret < 0)
-+			goto out;
-+	}
-+
-+	if (val & PM2XXX_INT1_ITVBATLOWF) {
-+		ret = pm2xxx_charger_vbat_lsig_mngt(pm2,
-+						PM2XXX_INT1_ITVBATLOWF);
-+		if (ret < 0)
-+			goto out;
+diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
+index f043c08..31507bf 100644
+--- a/drivers/power/abx500_chargalg.c
++++ b/drivers/power/abx500_chargalg.c
+@@ -204,6 +204,7 @@ enum maxim_ret {
+  * @batt_data:		data of the battery
+  * @susp_status:	current charger suspension status
+  * @bm:           	Platform specific battery management information
++ * @parent:		pointer to the struct abx500
+  * @chargalg_psy:	structure that holds the battery properties exposed by
+  *			the charging algorithm
+  * @events:		structure for information about events triggered
+@@ -227,6 +228,7 @@ struct abx500_chargalg {
+ 	struct abx500_chargalg_charger_info chg_info;
+ 	struct abx500_chargalg_battery_data batt_data;
+ 	struct abx500_chargalg_suspension_status susp_status;
++	struct ab8500 *parent;
+ 	struct abx500_bm_data *bm;
+ 	struct power_supply chargalg_psy;
+ 	struct ux500_charger *ac_chg;
+@@ -1873,8 +1875,9 @@ static int abx500_chargalg_probe(struct platform_device *pdev)
+ 		}
  	}
  
- 	if (val & PM2XXX_INT1_ITVBATDISCONNECT) {
- 		ret = pm2xxx_charger_bat_disc_mngt(pm2,
- 				PM2XXX_INT1_ITVBATDISCONNECT);
-+		if (ret < 0)
-+			goto out;
- 	}
--
-+out:
- 	return ret;
- }
+-	/* get device struct */
++	/* get device struct and parent */
+ 	di->dev = &pdev->dev;
++	di->parent = dev_get_drvdata(pdev->dev.parent);
  
+ 	/* chargalg supply */
+ 	di->chargalg_psy.name = "abx500_chargalg";
 -- 
 1.7.10.4
