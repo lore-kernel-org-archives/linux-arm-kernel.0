@@ -1,64 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Feb 2013 11:17:42 +0000
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <1360918222.28241.20.camel@smile>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <1359410300-26113-2-git-send-email-arnd@arndb.de>
- <1360918222.28241.20.camel@smile>
-Message-ID: <201302151117.43187.arnd@arndb.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 15 Feb 2013 11:28:54 +0000
+Subject: [PATCH 10/17] ARM: update atag-to-fdt code to be endian agnostic
+In-Reply-To: <alpine.LFD.2.03.1302132336410.8736@syhkavp.arg>
+References: <1360365467-25056-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1360365467-25056-11-git-send-email-ben.dooks@codethink.co.uk>
+ <20130209120525.GD17833@n2100.arm.linux.org.uk>
+ <51194381.9030505@codethink.co.uk>
+ <alpine.LFD.2.03.1302121646380.1242@fluxnic.net>
+ <511B78BC.7000708@codethink.co.uk>
+ <alpine.LFD.2.03.1302132336410.8736@syhkavp.arg>
+Message-ID: <511E1BF6.90506@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 February 2013, Andy Shevchenko wrote:
-> Have one question and one comment.
-> 
-> So, what is the status of this work? Do you manage to provide something
-> for v3.9? (Oh, two questions :-) )
+On 14/02/13 04:43, Nicolas Pitre wrote:
+> On Wed, 13 Feb 2013, Ben Dooks wrote:
+>
+>> On 12/02/13 21:53, Nicolas Pitre wrote:
+>>> On Mon, 11 Feb 2013, Ben Dooks wrote:
+>>>
+>>>> On 09/02/13 12:05, Russell King - ARM Linux wrote:
+>>>>> On Fri, Feb 08, 2013 at 11:17:40PM +0000, Ben Dooks wrote:
+>>>>>> -	if (atag->hdr.tag != ATAG_CORE ||
+>>>>>> -	    (atag->hdr.size != tag_size(tag_core)&&
+>>>>>> -	     atag->hdr.size != 2))
+>>>>>> +	if (atag->hdr.tag != atag32_to_cpu(ATAG_CORE) ||
+>>>>>> +	    (atag->hdr.size != atag32_to_cpu(tag_size(tag_core))&&
+>>>>>> +	     atag->hdr.size != atag32_to_cpu(2)))
+>>>>>
+>>>>> This is wrong.  You're saying that "ATAG_CORE" is in LE32 format.  It
+>>>>> isn't.  It's in CPU endian format.  If you want to do this kind of
+>>>>> thing,
+>>>>> you also need to define cpu_to_atag32() macros as well, otherwise this
+>>>>> will cause sparse warnings.
+>>>>>
+>>>>>> -			initrd_start = atag->u.initrd.start;
+>>>>>> -			initrd_size = atag->u.initrd.size;
+>>>>>> +			initrd_start =
+>>>>>> atag32_to_cpu(atag->u.initrd.start);
+>>>>>> +			initrd_size =
+>>>>>> atag32_to_cpu(____atag->u.initrd.size);
+>>>>>
+>>>>> Where did those four underscores come from?  Has this been built?
+>>>>
+>>>> I probably missed building this one. I've been mostly testing with DT
+>>>> based systems.
+>>>
+>>> Is this BE8 mode available on old systems?  Or, will those BE8
+>>> capable old systems have BE userland compiled for them?
+>>
+>> BE8 is for ARMv6 and ARMv7 form of big endian. ARMv5 is BE32.
+>
+> I think that by now all ARMv6+ targets should be DT enabled.  So you
+> shouldn't have to care about ATAGs at all.
+>
+>>> Where I want to get to is: do we need to support BE8 mode for ATAG based
+>>> systems at all, given that most if not all the modern ones should be DT
+>>> based now?  Making the ATAG code BE8 aware is looking to be quite
+>>> invasive for potentially no users at all.
+>>
+>> The change is only useful when using a BE8 compiled kernel with a
+>> boot loader environment that is LE.
+>
+> That's what CONFIG_ARM_ATAG_DTB_COMPAT is for.  So only that code would
+> need to swap the ATAG data.
+>
+>> Even if the ATAGs do not need
+>> fixing up, then we have a issue with uboot checking the zImage magic.
+>
+> I gave you a patch for that.
+>
+>> I have pushed the ATAGs issues to a new series as it is not necessary
+>> for the current work we are doing with highbank primarily.
+>
+> I don't think it is needed at all given that BE8 is available mainly on
+> targets supporting DT, and is likely to be used on targets that do
+> support only DT.
 
-I was going to bring it up today myself. Unfortunately the patches have
-never been tested on real hardware and I have not posted a version that
-includes the feedback I got, so I don't think it's a good idea to
-use this in v3.9. However, not doing it causes problems since Vinod's
-dma-slave tree still contains Viresh's earlier patches, causing
-a few problems:
+Some devices we have still only have ATAG booting in u-boot, so it i
+possible that it may have to stick around to allow the fdt to be updated
+with any extra command line stuff...
 
-* With these patches, the spear3xx platform currently does not build.
-  (this one is easy to fix though)
-* There is a conflict between these patches and my spear multiplatform
-  series, which I have not yet queued up for 3.9 because of this,
-  since that would have meant that Stephen Rothwell would have to
-  discard either the arm-soc tree or the dma-slave tree from linux-next.
-* I really don't want the broken binding to appear in 3.9.
 
-I believe the best way out at this point is that I do an updated
-version of my patch, and Vinod first reverts the patch f9965aa20
-"ARM: SPEAr13xx: Pass DW DMAC platform data from DT" in his tree
-and then applies my update. This will give us the right DT binding
-for dw-dmac but no in-tree users, which means that nothing breaks
-if I get it wrong.
-
-I can then decide with Olof whether or not to take the spear multiplatform
-changes that no longer conflict with the dma slave tree as a "late"
-branch into 3.9 or wait until 3.10, but that is something you don't
-need to worry about then. Also the conversion of spear to use
-the new binding (patch 5 of this series) can go through the arm-soc
-tree for 3.10 after the ST folks have tested that it works.
-
-> > --- a/drivers/dma/dw_dmac.c
-> > +++ b/drivers/dma/dw_dmac.c
-> 
-> > @@ -1765,7 +1753,11 @@ static int dw_probe(struct platform_device *pdev)
-> >  
-> >       dma_async_device_register(&dw->dma);
-> >  
-> > -     return 0;
-> > +     err = of_dma_controller_register(pdev->dev.of_node, dw_dma_xlate, dw);
-> > +     if (err)
-> > +             dma_async_device_unregister(&dw->dma);
-> 
-> I don't think this is a good idea. The impossibility to register in the
-> of-dma helper is not critical. Just printing debug message is enough.
-
-Ok, makes sense. Thanks!
-
-	Arnd
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
