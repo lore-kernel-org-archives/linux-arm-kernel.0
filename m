@@ -1,47 +1,44 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 15 Feb 2013 10:04:37 +0000
-Subject: [BUG] v7_coherent_kern_range broken on big.LITTLE
-In-Reply-To: <20130214171615.GH12629@mudshark.cambridge.arm.com>
-References: <1360861663.3266.58.camel@linaro1.home>
- <20130214171615.GH12629@mudshark.cambridge.arm.com>
-Message-ID: <1360922677.4078.12.camel@linaro1.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Feb 2013 10:18:01 +0000
+Subject: [PATCH] arm: arch_timer: include linux/errno.h to declare ENXIO
+In-Reply-To: <511D215C.2040807@wwwdotorg.org>
+References: <1360778746-27809-1-git-send-email-swarren@wwwdotorg.org>
+ <20130214121816.GA25537@e106331-lin.cambridge.arm.com>
+ <511D215C.2040807@wwwdotorg.org>
+Message-ID: <20130215101801.GI25537@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-02-14 at 17:16 +0000, Will Deacon wrote:
-> Hi Tixy,
+On Thu, Feb 14, 2013 at 05:39:40PM +0000, Stephen Warren wrote:
+> On 02/14/2013 05:18 AM, Mark Rutland wrote:
+> > On Wed, Feb 13, 2013 at 06:05:46PM +0000, Stephen Warren wrote:
+> >> From: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> This fixes:
+> >> arch/arm/kernel/arch_timer.c: In function ?arch_timer_sched_clock_init?:
+> >> arch/arm/kernel/arch_timer.c:55:11: error: ?ENXIO? undeclared (first use in this function)
+> ..
+> > We should probably also add this to include/clocksource/arm_arch_timer.h and
+> > drivers/clocksource/arm_arch_timer.c, as they both use errno values (though
+> > currently these get included indirectly via a different path).
 > 
-> On Thu, Feb 14, 2013 at 05:07:43PM +0000, Jon Medhurst (Tixy) wrote:
-> > The function v7_coherent_kern_range uses the macro icache_line_size to
-> > read the current CPUs icache line size for the purpose of invalidating
-> > all cache lines in the given range.
-> > 
-> > Unfortunately, on the TC2 big.LITTLE test chip, the A15 icache line size
-> > is 64 bytes, but the A7 size is only 32 bytes. So when the function
-> > executes on the A15 it will miss out every alternate cache line for the
-> > A7.
+> Ah yes, it should certainly be added to the header file then. Since both
+> those .c files include that header, I guess there isn't much need to add
+> it separately to the .c files though?
 > 
-> There is a signal (IMINLN) to the core which allows A15 to behave as though
-> it has a 32-byte line size and this should be driven correctly for big/little.
+> Do you want me to respin the patch, or will you just create one to add
+> the include to the header?
+> 
 
-How do we set that signal? Is that something we have to set up in Linux
-or is it something that we expect the Firmware to set up?
+I think it makes sense to have the include in both the header and the .c file,
+as they both use error codes explicitly. The header (and
+drivers/clocksource/arm_arch_timer.c) seem to build for the moment, so they can
+be fixed up later.
 
-> Can you confirm that on your TC2 the I-line size is advertised differently
-> depending on the cluster?
+Arnd seems to have arrived at the same patch in his allyesconfig fix series:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149856.html
 
-Yes, I had printed out the value returned by icache_line_size when I had
-ftrace_replace_code running on an A7 and on an A15.
+I'm happy to see either version go in.
 
-The reason I suspected this was because I had tried all four
-combinations of A15 and A7 setup, and it was only when booting on A15
-with an A7 second CPU that enable function tracing kills the system.
-A15+A15, A7+A15 and A7+A7 are OK.
-
-To eliminate the kind of boot CPU as a factor I tried the A7+A15 system
-with ftrace forced to run on the A15, and the bug stil occurred. And the
-final straw was when hard coding the icache line size to 32 fixed
-things.
-
--- 
-Tixy
+Thanks,
+Mark.
