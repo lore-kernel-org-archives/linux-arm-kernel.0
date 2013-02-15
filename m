@@ -1,74 +1,74 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 15 Feb 2013 22:35:36 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
-Message-ID: <1360935336-2442-1-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 15 Feb 2013 22:39:58 +0900
+Subject: [PATCH 3/3] ARM: mach-shmobile: kzm9g: do not enable
+ REGULATOR_DUMMY in defconfig
+In-Reply-To: <Pine.LNX.4.64.1302151420480.7446@axis700.grange>
+References: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
+ <1360761103-17357-4-git-send-email-horms+renesas@verge.net.au>
+ <20130214083621.GA8236@verge.net.au>
+ <Pine.LNX.4.64.1302140942250.29693@axis700.grange>
+ <20130215131331.GA27724@verge.net.au>
+ <Pine.LNX.4.64.1302151420480.7446@axis700.grange>
+Message-ID: <20130215133957.GD27724@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Empirically it appears that "sh_tmu.1" is controlled by MSTP016
-and after discussion it appears likely the same is true for sh_tmu.2.
+On Fri, Feb 15, 2013 at 02:23:46PM +0100, Guennadi Liakhovetski wrote:
+> Hi Simon
+> 
+> On Fri, 15 Feb 2013, Simon Horman wrote:
+> 
+> > On Thu, Feb 14, 2013 at 09:45:24AM +0100, Guennadi Liakhovetski wrote:
+> > > On Thu, 14 Feb 2013, Simon Horman wrote:
+> > > 
+> > > > On Wed, Feb 13, 2013 at 10:11:43PM +0900, Simon Horman wrote:
+> > > > > Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
+> > > > > There doesn't seem to be any value in setting it here and doing
+> > > > > so was an error on my part.
+> > > > > 
+> > > > > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > > ---
+> > > > >  arch/arm/configs/kzm9g_defconfig |    1 -
+> > > > >  1 file changed, 1 deletion(-)
+> > > > > 
+> > > > > diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+> > > > > index 670c3b6..6751c02 100644
+> > > > > --- a/arch/arm/configs/kzm9g_defconfig
+> > > > > +++ b/arch/arm/configs/kzm9g_defconfig
+> > > > > @@ -86,7 +86,6 @@ CONFIG_I2C_SH_MOBILE=y
+> > > > >  CONFIG_GPIO_PCF857X=y
+> > > > >  # CONFIG_HWMON is not set
+> > > > >  CONFIG_REGULATOR=y
+> > > > > -CONFIG_REGULATOR_DUMMY=y
+> > > > >  CONFIG_FB=y
+> > > > >  CONFIG_FB_SH_MOBILE_LCDC=y
+> > > > >  CONFIG_FRAMEBUFFER_CONSOLE=y
+> > > > 
+> > > > This patch seems to break NIC initialisation.
+> > > > 
+> > > > smsc911x: Driver version 2008-10-21
+> > > > smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
+> > > > smsc911x smsc911x.0 (unregistered net_device): couldn't get regulators -517
+> > > > platform smsc911x.0: Driver smsc911x requests probe deferral
+> > > 
+> > > Right, you need a fixed regulator similar to how I adde it here
+> > > 
+> > > http://www.spinics.net/lists/linux-sh/msg15713.html
+> > 
+> > Perhaps that is the wrong link?
+> 
+> No, the link is right
+> 
+> > The code in the link seems to be the same as what is preseng
+> > in boards-kzm9g.c already
+> 
+> Indeed, that should be fine. Ah, wait, what if you add ".0" to device 
+> names in regulators like
+> 
+> 	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
+> 	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
 
-The sh_tmu.1 portion of this change resolves a regression introduced in
-58079fa7d54a0929d304054ee759187a2ccd3cdf (ARM: shmobile: r8a7779: Correct
-TMU clock support) and fixes a regression introduced by that patch. That
-patch is queued up for v3.9.
+Bingo!
 
-...
-hub 4-0:1.0: USB hub found
-hub 4-0:1.0: 2 ports detected
-INFO: rcu_sched self-detected stall on CPUINFO: rcu_sched detected stalls on
-+CPUs/tasks: { 1} (detected by 2, t=279640 jiffies, g=4294967052, c=4294967051,
-+q=38)
-Task dump for CPU 1:
-swapper/0       R running      0     1      0 0x00000002
-[<c02b8f5c>] (__schedule+0x1b0/0x4c0) from [<c013c590>] (__loop_delay+0x4/0xc)
-
- { 1}  (t=279640 jiffies g=4294967052 c=4294967052 q=37)
-[<c000ef9c>] (unwind_backtrace+0x0/0xf8) from [<c0068488>]
-+(rcu_check_callbacks+0x218/0x6b8)
-[<c0068488>] (rcu_check_callbacks+0x218/0x6b8) from [<c0026774>]
-+(update_process_times+0x38/0x4c)
-[<c0026774>] (update_process_times+0x38/0x4c) from [<c00569e0>]
-+(tick_nohz_handler+0xb4/0x11c)
-[<c00569e0>] (tick_nohz_handler+0xb4/0x11c) from [<c000e518>]
-+(twd_handler+0x34/0x44)
-[<c000e518>] (twd_handler+0x34/0x44) from [<c0063484>]
-+(handle_percpu_devid_irq+0x68/0x80)
-[<c0063484>] (handle_percpu_devid_irq+0x68/0x80) from [<c005febc>]
-+(generic_handle_irq+0x20/0x30)
-[<c005febc>] (generic_handle_irq+0x20/0x30) from [<c000a5ec>]
-+(handle_IRQ+0x40/0x90)
-[<c000a5ec>] (handle_IRQ+0x40/0x90) from [<c000934c>] (gic_handle_irq+0x2c/0x5c)
-[<c000934c>] (gic_handle_irq+0x2c/0x5c) from [<c0009a40>] (__irq_svc+0x40/0x50)
-Exception stack(0xef03ddf8 to 0xef03de40)
-dde0:                                                       000001c1 ffffffff
-de00: 000001d8 01bf01bf ef35ec40 ef35e800 ef35ec6c 0000002b ef35ec68 c013c560
-de20: c0392994 60000113 00000000 ef03de40 c01a5d40 c013c590 20000113 ffffffff
-[<c0009a40>] (__irq_svc+0x40/0x50) from [<c013c590>] (__loop_delay+0x4/0xc)
-
-Cc: Denis Oliver Kropp <dok@directfb.org>
-Cc: Magnus Damm <damm@opensource.se>
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Cc: Paul Mundt <lethal@linux-sh.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7779.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index 202370d..1db3653 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -161,8 +161,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
- 	CLKDEV_DEV_ID("ohci-platform.0", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
- 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
--	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
--	CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
-+	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
-+	CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP016]), /* TMU02 */
- 	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
- 	CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP029]), /* I2C1 */
- 	CLKDEV_DEV_ID("i2c-rcar.2", &mstp_clks[MSTP028]), /* I2C2 */
--- 
-1.7.10.4
+Thanks, I'll send a patch.
