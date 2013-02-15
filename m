@@ -1,27 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Feb 2013 18:26:28 +0530
-Subject: [RFC/RFT PATCH 1/2] ARM: OMAP2+: hwmod-data: UART IP needs
- software control of sidle modes
-In-Reply-To: <20130215125055.GA16558@arwen.pp.htv.fi>
-References: <1360930106-32005-1-git-send-email-santosh.shilimkar@ti.com>
- <20130215125055.GA16558@arwen.pp.htv.fi>
-Message-ID: <511E307C.8010600@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Feb 2013 12:55:06 +0000
+Subject: [PATCH 5/9] ARM: shmobile: mark mackerel sh_mmcif_device
+ __maybe_unused
+In-Reply-To: <20130214232426.GB30667@verge.net.au>
+References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
+ <1360880818-4071454-6-git-send-email-arnd@arndb.de>
+ <20130214232426.GB30667@verge.net.au>
+Message-ID: <201302151255.06547.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 February 2013 06:20 PM, Felipe Balbi wrote:
-> On Fri, Feb 15, 2013 at 05:38:26PM +0530, Santosh Shilimkar wrote:
->> OMAP UART IP needs manual idle modes based on state of the
->> IP. Currently this is handled by the driver with function pointers
->> implemented in platform code.
->>
->> This however breaks in case of device tree because of missing
->> idle handling. With the provided flags, idle mode handling is transparently
->> handled by runtime time pm code.
->
-> this last sentence can be improved a bit.
->
-Indeed.
+On Thursday 14 February 2013, Simon Horman wrote:
+> On Thu, Feb 14, 2013 at 11:26:54PM +0100, Arnd Bergmann wrote:
+> > Patch eac036ef9e "ARM: shmobile: streamline mackerel SD and MMC devices"
+> > made the use of the sh_mmcif_device variable for mackarel optional,
+> > but the definition is always provided, causing a build warning.
+> > 
+> > arch/arm/mach-shmobile/board-mackerel.c:1120:31: warning: 'sh_mmcif_device'
+> > 	defined but not used [-Wunused-variable]
+> > 
+> > Marking the variable as __maybe_unused will do the right thing here.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > Cc: Simon Horman <horms+renesas@verge.net.au>
+> 
+> No objections here.
+> 
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-Regards,
-Santosh
+AFAICT, the change that caused this is in linux-next only through your
+heads/boards3 branch but not through arm-soc, so please apply my patch
+on your branch.
+
+	Arnd
