@@ -1,37 +1,57 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:44:41 +0000
-Subject: [PATCH 11/40] pm2301-charger: Force main charger detect
+Date: Fri, 15 Feb 2013 12:44:44 +0000
+Subject: [PATCH 14/40] pm2301-charger: Die temp thermal protection
 In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
 References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360932310-30065-15-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Per Forlin <per.forlin@stericsson.com>
+From: Rupesh Kumar <rupesh.kumar@stericsson.com>
 
-Force main charger detect in turn on status.
+This patch adds support for die temperature thermal protection
+in pm2301 driver.
 
-Signed-off-by: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
-Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+Signed-off-by: Rupesh Kumar <rupesh.kumar@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Hakan BERG <hakan.berg@stericsson.com>
 Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
-Tested-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
 ---
- drivers/power/pm2301_charger.c |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/power/pm2301_charger.c |   22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
-index e7eb63d..63f515e 100644
+index 4cb8f7f..ec51026 100644
 --- a/drivers/power/pm2301_charger.c
 +++ b/drivers/power/pm2301_charger.c
-@@ -1067,6 +1067,8 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
- 		pm2xxx_reg_read(pm2, PM2XXX_REG_INT2, &val);
- 		pm2xxx_reg_read(pm2, PM2XXX_REG_INT4, &val);
- 		pm2->ac.charger_connected = 1;
-+		ab8500_override_turn_on_stat(~AB8500_POW_KEY_1_ON,
-+					     AB8500_MAIN_CH_DET);
- 		pm2->ac_conn = true;
- 		power_supply_changed(&pm2->ac_chg.psy);
- 		sysfs_notify(&pm2->ac_chg.psy.dev->kobj, NULL, "present");
+@@ -876,7 +876,27 @@ static void pm2xxx_charger_check_hw_failure_work(struct work_struct *work)
+ static void pm2xxx_charger_check_main_thermal_prot_work(
+ 	struct work_struct *work)
+ {
+-};
++	int ret;
++	u8 val;
++
++	struct pm2xxx_charger *pm2 = container_of(work, struct pm2xxx_charger,
++					check_main_thermal_prot_work);
++
++	/* Check if die temp warning is still active */
++	ret = pm2xxx_reg_read(pm2, PM2XXX_SRCE_REG_INT5, &val);
++	if (ret < 0) {
++		dev_err(pm2->dev, "%s pm2xxx read failed\n", __func__);
++		return;
++	}
++	if (val & (PM2XXX_INT5_S_ITTHERMALWARNINGRISE
++			| PM2XXX_INT5_S_ITTHERMALSHUTDOWNRISE))
++		pm2->flags.main_thermal_prot = true;
++	else if (val & (PM2XXX_INT5_S_ITTHERMALWARNINGFALL
++				| PM2XXX_INT5_S_ITTHERMALSHUTDOWNFALL))
++		pm2->flags.main_thermal_prot = false;
++
++	power_supply_changed(&pm2->ac_chg.psy);
++}
+ 
+ static struct pm2xxx_interrupts pm2xxx_int = {
+ 	.handler[0] = pm2_int_reg0,
 -- 
 1.7.10.4
