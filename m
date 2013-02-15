@@ -1,188 +1,207 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 14 Feb 2013 17:36:39 -0700
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAErSpo6_6bYjo5XX5tzoBfMu5Htgpa__foNCyoCnCNEHocx67Q@mail.gmail.com>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Fri, 15 Feb 2013 10:00:12 +0900
+Subject: [PATCH] arm: mm: lockless get_user_pages_fast
+Message-ID: <1360890012-4684-1-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 9:28 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+This patch adds get_user_pages_fast(old name is "fast_gup") for ARM.
+The fast_gup can walk pagetable without taking mmap_sem or any locks. If there
+is not a pte with the correct permissions for the access, we fall back to slow
+path(get_user_pages) to get remaining pages. This patch is written on reference
+the x86's gup implementation. Traversing of hugepages is excluded because ARM
+haven't supported hugepages yet[1], just only RFC.
 
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -1,4 +1,10 @@
->  menu "PCI host controller drivers"
->         depends on PCI
->
-> +config PCI_MVEBU
-> +       bool "Marvell EBU PCIe controller"
-> +       depends on ARCH_MVEBU
-> +       select PCI_SW_HOST_BRIDGE
-> +       select PCI_SW_PCI_PCI_BRIDGE
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/126382.html
 
-I think PCI_SW_HOST_BRIDGE and PCI_SW_PCI_PCI_BRIDGE are obsolete and
-can be removed, right?
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
+Cc: Inki Dae <inki.dae@samsung.com>
+---
+ arch/arm/mm/Makefile |    2 +-
+ arch/arm/mm/gup.c    |  160 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 161 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mm/gup.c
 
-> --- /dev/null
-> +++ b/drivers/pci/host/pci-mvebu.c
-> ...
-> +static void mvebu_pcie_setup_io_window(struct mvebu_pcie_port *port,
-> +                                      int enable)
-> +{
-> +       unsigned long iobase, iolimit;
-> +
-> +       if (port->bridge.iolimit < port->bridge.iobase)
-> +               return;
-> +
-> +       iolimit = 0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
-> +               (port->bridge.iolimitupper << 16);
-> +       iobase = ((port->bridge.iobase & 0xF0) << 8) |
-> +               (port->bridge.iobaseupper << 16);
-> +
-> +       if (enable) {
-> +               unsigned long physbase = port->pcie->io.start + iobase;
-> +               armada_370_xp_alloc_pcie_window(port->port, port->lane,
-> +                                               physbase, iobase,
-> +                                               iolimit-iobase,
-> +                                               IORESOURCE_IO);
-> +               pci_ioremap_io(iobase, physbase);
-> +       }
-> +       else
-> +               armada_370_xp_free_pcie_window(iobase);
-> +}
-> +
-> +static void mvebu_pcie_setup_mem_window(struct mvebu_pcie_port *port,
-> +                                       int enable)
-> +{
-> +       unsigned long membase, memlimit;
-> +
-> +       if (port->bridge.memlimit < port->bridge.membase)
-> +               return;
-> +
-> +       membase = ((port->bridge.membase & 0xFFF0) << 16);
-> +       memlimit = ((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF;
-> +
-> +       if (enable)
-> +               armada_370_xp_alloc_pcie_window(port->port, port->lane,
-> +                                               membase, ORION_ADDR_MAP_NO_REMAP,
-> +                                               memlimit-membase,
-> +                                               IORESOURCE_MEM);
-> +       else
-> +               armada_370_xp_free_pcie_window(membase);
-> +}
-> +
-> +static void mvebu_handle_pcie_command(struct mvebu_pcie_port *port, u16 old,
-> +                                     u16 new)
-> +{
-> +       /* Enabling an I/O window ? */
-> +       if (!(old & PCI_COMMAND_IO) && (new & PCI_COMMAND_IO))
-> +               mvebu_pcie_setup_io_window(port, 1);
-> +
-> +       /* Disabling an I/O window ? */
-> +       if ((old & PCI_COMMAND_IO) && !(new & PCI_COMMAND_IO))
-> +               mvebu_pcie_setup_io_window(port, 0);
-> +
-> +       /* Enabling a memory window ? */
-> +       if (!(old & PCI_COMMAND_MEMORY) && (new & PCI_COMMAND_MEMORY))
-> +               mvebu_pcie_setup_mem_window(port, 1);
-> +
-> +       /* Disabling a memory window ? */
-> +       if ((old & PCI_COMMAND_MEMORY) && !(new & PCI_COMMAND_MEMORY))
-> +               mvebu_pcie_setup_mem_window(port, 0);
-> +}
-> ...
-> +/* Write to the PCI-to-PCI bridge configuration space */
-> +static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
-> +                                    unsigned int where, int size, u32 value)
-> +{
-> +       struct mvebu_sw_pci_bridge *bridge = &port->bridge;
-> +       u32 mask, reg;
-> +       int err;
-> +
-> +       if (size == 4)
-> +               mask = 0x0;
-> +       else if (size == 2)
-> +               mask = ~(0xffff << ((where & 3) * 8));
-> +       else if (size == 1)
-> +               mask = ~(0xff << ((where & 3) * 8));
-> +       else
-> +               return PCIBIOS_BAD_REGISTER_NUMBER;
-> +
-> +       err = mvebu_sw_pci_bridge_read(port, where & ~3, 4, &reg);
-> +       if (err)
-> +               return err;
-> +
-> +       value = (reg & mask) | value << ((where & 3) * 8);
-> +
-> +       switch (where & ~3) {
-> +       case PCI_COMMAND:
-> +               mvebu_handle_pcie_command(port, bridge->command,
-> +                                         value & 0xffff);
-> +               bridge->command = value & 0xffff;
-> +               bridge->status = value >> 16;
-> +               break;
-> +
-> +       case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
-> +               bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4] = value;
-> +               break;
-> +
-> +       case PCI_IO_BASE:
-> +               /*
-> +                * We also keep bit 1 set, it is a read-only bit that
-> +                * indicates we support 32 bits addressing for the
-> +                * I/O
-> +                */
-> +               bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
-> +               bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
-> +               bridge->secondary_status = value >> 16;
-> +               break;
-> +
-> +       case PCI_MEMORY_BASE:
-> +               bridge->membase = value & 0xffff;
-> +               bridge->memlimit = value >> 16;
-> +               break;
-> +
-> +       case PCI_PREF_MEMORY_BASE:
-> +               bridge->prefmembase = value & 0xffff;
-> +               bridge->prefmemlimit = value >> 16;
-> +               break;
-> +
-> +       case PCI_PREF_BASE_UPPER32:
-> +               bridge->prefbaseupper = value;
-> +               break;
-> +
-> +       case PCI_PREF_LIMIT_UPPER32:
-> +               bridge->preflimitupper = value;
-> +               break;
-
-You're relying on a subsequent PCI_COMMAND write to set PCI_COMMAND_IO
-and/or PCI_COMMAND_MEMORY, and you program the bridge windows at that
-time.  It might be a good idea if the PCI core did clear those bits
-while updating the windows, but I'm not sure we do.  In any case,
-delaying the update is a difference from a standard P2P bridge that
-could cause issues later.
-
-> +       case PCI_IO_BASE_UPPER16:
-> +               bridge->iobaseupper = value & 0xffff;
-> +               bridge->iolimitupper = value >> 16;
-> +               break;
-> +
-> +       case PCI_PRIMARY_BUS:
-> +               bridge->primary_bus             = value & 0xff;
-> +               bridge->secondary_bus           = (value >> 8) & 0xff;
-> +               bridge->subordinate_bus         = (value >> 16) & 0xff;
-> +               bridge->secondary_latency_timer = (value >> 24) & 0xff;
-> +               orion_pcie_set_local_bus_nr(port->base, bridge->secondary_bus);
-> +               break;
-> +
-> +       default:
-> +               break;
-> +       }
-> +
-> +       return PCIBIOS_SUCCESSFUL;
-> +}
-
-Bjorn
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 8a9c4cb..1f01c0b 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -6,7 +6,7 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
+ 				   iomap.o
+ 
+ obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
+-				   mmap.o pgd.o mmu.o vmregion.o
++				   mmap.o pgd.o mmu.o vmregion.o gup.o
+ 
+ ifneq ($(CONFIG_MMU),y)
+ obj-y				+= nommu.o
+diff --git a/arch/arm/mm/gup.c b/arch/arm/mm/gup.c
+new file mode 100644
+index 0000000..ed54fd8
+--- /dev/null
++++ b/arch/arm/mm/gup.c
+@@ -0,0 +1,160 @@
++/*
++ * linux/arch/arm/mm/gup.c - Lockless get_user_pages_fast for arm
++ *
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ * Author : Chanho Park <chanho61.park@samsung.com>
++ *
++ * This code is written on reference from the x86 and PowerPC versions, by:
++ *
++ *	Copyright (C) 2008 Nick Piggin
++ *	Copyright (C) 2008 Novell Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/sched.h>
++#include <linux/mm.h>
++#include <linux/pagemap.h>
++#include <linux/rwsem.h>
++#include <asm/pgtable.h>
++
++/*
++ * The performance critical leaf functions are made noinline otherwise gcc
++ * inlines everything into a single function which results in too much
++ * register pressure.
++ */
++static noinline int gup_pte_range(pmd_t *pmdp, unsigned long addr,
++		unsigned long end, int write, struct page **pages, int *nr)
++{
++	pte_t *ptep, pte;
++
++	ptep = pte_offset_kernel(pmdp, addr);
++	do {
++		struct page *page;
++
++		pte = *ptep;
++		smp_rmb();
++
++		if (!pte_present_user(pte) || (write && !pte_write(pte)))
++			return 0;
++
++		VM_BUG_ON(!pfn_valid(pte_pfn(pte)));
++		page = pte_page(pte);
++
++		if (!page_cache_get_speculative(page))
++			return 0;
++
++		pages[*nr] = page;
++		(*nr)++;
++
++	} while (ptep++, addr += PAGE_SIZE, addr != end);
++
++	return 1;
++}
++
++static int gup_pmd_range(pud_t *pudp, unsigned long addr, unsigned long end,
++		int write, struct page **pages, int *nr)
++{
++	unsigned long next;
++	pmd_t *pmdp;
++
++	pmdp = pmd_offset(pudp, addr);
++	do {
++		next = pmd_addr_end(addr, end);
++		if (pmd_none(*pmdp))
++			return 0;
++		else if (!gup_pte_range(pmdp, addr, next, write, pages, nr))
++			return 0;
++	} while (pmdp++, addr = next, addr != end);
++
++	return 1;
++}
++
++static int gup_pud_range(pgd_t *pgdp, unsigned long addr, unsigned long end,
++		int write, struct page **pages, int *nr)
++{
++	unsigned long next;
++	pud_t *pudp;
++
++	pudp = pud_offset(pgdp, addr);
++	do {
++		next = pud_addr_end(addr, end);
++		if (pud_none(*pudp))
++			return 0;
++		else if (!gup_pmd_range(pudp, addr, next, write, pages, nr))
++			return 0;
++	} while (pudp++, addr = next, addr != end);
++
++	return 1;
++}
++
++int get_user_pages_fast(unsigned long start, int nr_pages, int write,
++			struct page **pages)
++{
++	struct mm_struct *mm = current->mm;
++	unsigned long addr, len, end;
++	unsigned long next;
++	pgd_t *pgdp;
++	int nr = 0;
++
++	start &= PAGE_MASK;
++	addr = start;
++	len = (unsigned long) nr_pages << PAGE_SHIFT;
++	end = start + len;
++
++	if (unlikely(!access_ok(write ? VERIFY_WRITE : VERIFY_READ,
++					start, len)))
++		goto slow_irqon;
++
++	/*
++	 * This doesn't prevent pagetable teardown, but does prevent
++	 * the pagetables from being freed on arm.
++	 *
++	 * So long as we atomically load page table pointers versus teardown,
++	 * we can follow the address down to the the page and take a ref on it.
++	 */
++	local_irq_disable();
++
++	pgdp = pgd_offset(mm, addr);
++	do {
++		next = pgd_addr_end(addr, end);
++		if (pgd_none(*pgdp))
++			goto slow;
++		else if (!gup_pud_range(pgdp, addr, next, write, pages, &nr))
++			goto slow;
++	} while (pgdp++, addr = next, addr != end);
++
++	local_irq_enable();
++
++	VM_BUG_ON(nr != (end - start) >> PAGE_SHIFT);
++	return nr;
++
++	{
++		int ret;
++
++slow:
++		local_irq_enable();
++slow_irqon:
++		/* Try to get the remaining pages with get_user_pages */
++		start += nr << PAGE_SHIFT;
++		pages += nr;
++
++		down_read(&mm->mmap_sem);
++		ret = get_user_pages(current, mm, start,
++			(end - start) >> PAGE_SHIFT, write, 0, pages, NULL);
++		up_read(&mm->mmap_sem);
++
++		/* Have to be a bit careful with return values */
++		if (nr > 0) {
++			if (ret < 0)
++				ret = nr;
++			else
++				ret += nr;
++		}
++
++		return ret;
++	}
++}
+-- 
+1.7.9.5
