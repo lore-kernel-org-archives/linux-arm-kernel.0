@@ -1,35 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Feb 2013 11:13:06 +0000
-Subject: [PATCH 8/9] [HACK] ARM: imx: work around v7_cpu_resume link error
-In-Reply-To: <201302151105.14253.arnd@arndb.de>
-References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
- <1360882071-4072668-9-git-send-email-arnd@arndb.de>
- <511D7701.8040809@wwwdotorg.org> <201302151105.14253.arnd@arndb.de>
-Message-ID: <20130215111306.GM17833@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Feb 2013 11:17:42 +0000
+Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <1360918222.28241.20.camel@smile>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <1359410300-26113-2-git-send-email-arnd@arndb.de>
+ <1360918222.28241.20.camel@smile>
+Message-ID: <201302151117.43187.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 11:05:14AM +0000, Arnd Bergmann wrote:
-> $ size  obj-tmp/vmlinux -A
-> obj-tmp/vmlinux  :
-> section                  size         addr
-> .head.text                504   3221258240
-> .text                32707336   3221258752
-> .text.head                  8   3253966088
+On Friday 15 February 2013, Andy Shevchenko wrote:
+> Have one question and one comment.
+> 
+> So, what is the status of this work? Do you manage to provide something
+> for v3.9? (Oh, two questions :-) )
 
-Interesting... I wonder if that should be .head.text, or maybe just .text.
-Looking at iMX, it's just the secondary startup, which is calling into
-.head.text, so it would be much safer given the size of the .text segment
-for it to be in .head.text.
+I was going to bring it up today myself. Unfortunately the patches have
+never been tested on real hardware and I have not posted a version that
+includes the feedback I got, so I don't think it's a good idea to
+use this in v3.9. However, not doing it causes problems since Vinod's
+dma-slave tree still contains Viresh's earlier patches, causing
+a few problems:
 
-> The .text section alone is just short of 32MB.
+* With these patches, the spear3xx platform currently does not build.
+  (this one is easy to fix though)
+* There is a conflict between these patches and my spear multiplatform
+  series, which I have not yet queued up for 3.9 because of this,
+  since that would have meant that Stephen Rothwell would have to
+  discard either the arm-soc tree or the dma-slave tree from linux-next.
+* I really don't want the broken binding to appear in 3.9.
 
-I suspect when it does go over that, we'll see a lot more link time
-failures due to the 'bl' instructions failing to encode their PC relative
-jumps.  The only solution then will be to switch everything to use the
-less efficient long jumps (load address from literal pool, bx) which'll
-also need much of the asm changed.  That also brings up the question
-whether we want to penalize the kernel performance just to make
-allyesconfig work... I guess we can make it a compile time option, which
-of course allyesconfig will automatically enable.  I suspect we'll see
-a lot of people mistakenly enabling it too though.
+I believe the best way out at this point is that I do an updated
+version of my patch, and Vinod first reverts the patch f9965aa20
+"ARM: SPEAr13xx: Pass DW DMAC platform data from DT" in his tree
+and then applies my update. This will give us the right DT binding
+for dw-dmac but no in-tree users, which means that nothing breaks
+if I get it wrong.
+
+I can then decide with Olof whether or not to take the spear multiplatform
+changes that no longer conflict with the dma slave tree as a "late"
+branch into 3.9 or wait until 3.10, but that is something you don't
+need to worry about then. Also the conversion of spear to use
+the new binding (patch 5 of this series) can go through the arm-soc
+tree for 3.10 after the ST folks have tested that it works.
+
+> > --- a/drivers/dma/dw_dmac.c
+> > +++ b/drivers/dma/dw_dmac.c
+> 
+> > @@ -1765,7 +1753,11 @@ static int dw_probe(struct platform_device *pdev)
+> >  
+> >       dma_async_device_register(&dw->dma);
+> >  
+> > -     return 0;
+> > +     err = of_dma_controller_register(pdev->dev.of_node, dw_dma_xlate, dw);
+> > +     if (err)
+> > +             dma_async_device_unregister(&dw->dma);
+> 
+> I don't think this is a good idea. The impossibility to register in the
+> of-dma helper is not critical. Just printing debug message is enough.
+
+Ok, makes sense. Thanks!
+
+	Arnd
