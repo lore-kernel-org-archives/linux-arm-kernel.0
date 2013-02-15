@@ -1,41 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 15 Feb 2013 21:55:04 +0100
-Subject: [PATCH v8 09/12] pinctrl: generic: add auto pull config parameter
-In-Reply-To: <20130215163755.GB5724@atomide.com>
-References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
- <1360602659-4774-10-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdYKAexLu30M2KzKcRcvRJS=xfVMB2vR+CgAXmwQ0+_ZzA@mail.gmail.com>
- <20130215163755.GB5724@atomide.com>
-Message-ID: <CACRpkdY6bsxg6FG5bSCPZKkQ4-mVyiOsCFsh-421_nLCLcasSw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 15 Feb 2013 21:56:09 +0100
+Subject: [PATCH] pinctrl: Declare operation structures as const
+In-Reply-To: <CACRpkdaN+j+cV-=d-cDSw6aoq4Hh0Ary8wpAeYQU7wvpTAQgcQ@mail.gmail.com>
+References: <1360939402-1170-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CACRpkdaN+j+cV-=d-cDSw6aoq4Hh0Ary8wpAeYQU7wvpTAQgcQ@mail.gmail.com>
+Message-ID: <1952247.y2EsDpZE5I@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 5:37 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Linus Walleij <linus.walleij@linaro.org> [130215 00:58]:
->> On Mon, Feb 11, 2013 at 6:10 PM, Haojian Zhuang
->> <haojian.zhuang@linaro.org> wrote:
->>
->> > There's only one bit to control pin bias as enabled or disabled for some
->> > pins in OMAP SoC. So append PIN_CONFIG_BIAS_AUTO_PULL for this case.
->> > User shouldn't switch pin state between AUTO_PULL and PULL_UP/PULL_DOWN,
->> > since they're similiar concepts.
->> >
->> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->>
->> Makes perfect sense.
->> Patch applied with Tony's ACK!
->
-> Sorry the conclusion was that this probably won't be needed and can
-> probably be done with just PULL_UP/PULL_DOWN.
->
-> So can you please drop or revert this AUTO_PULL one?
+Hi Linus,
 
-Sorry I was drunk or something.
+On Friday 15 February 2013 21:51:51 Linus Walleij wrote:
+> On Fri, Feb 15, 2013 at 3:43 PM, Laurent Pinchart wrote:
+> > The pinconf, pinctrl and pinmux operation structures hold function
+> > pointers that are never modified. Declare them as const.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Nice I love consting.
+> 
+> > This patch hasn't been compile-tested on all the above platforms,
+> > Tested-by and/or Acked-by tags would thus be welcome.
+> 
+> I get this on all platforms after this patch:
+> 
+> /linux-pinctrl/drivers/pinctrl/pinconf.c: In function
+> 'pinconf_dbg_config_print':
+> /linux-pinctrl/drivers/pinctrl/pinconf.c:708:12: warning: assignment
+> discards 'const' qualifier from pointer target type [enabled by
+> default]
+> 
+> Pls fix! :-)
 
-I never applied this patch, I applied the other one,
-with the title "pinctrl: generic: rename input schmitt disable".
+Hmmm... There's no pinconf_dbg_config_print() function in mainline. Where does 
+it come from ?
 
-This one stays out.
+> > I've left the sh-pfc driver untouched for now, it will be handled as part
+> > as my next (hopefully soon to come) sh-pfc pinctrl series.
+> 
+> Sounds like a deal.
 
-Yours,
-Linus Walleij
+-- 
+Regards,
+
+Laurent Pinchart
