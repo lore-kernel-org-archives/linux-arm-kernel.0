@@ -1,39 +1,68 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Fri, 15 Feb 2013 15:54:05 +0530
-Subject: [V2 0/8] usb: ehci: more bus glues as separate modules
-Message-ID: <1360923853-7875-1-git-send-email-manjunath.goudar@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Feb 2013 10:26:09 +0000
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
+References: <1360840554-26901-1-git-send-email-balbi@ti.com>
+ <1360840554-26901-2-git-send-email-balbi@ti.com>
+ <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+ <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
+Message-ID: <20130215102609.GS17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the SOC On-Chip host controller driver from ehci-hcd
-host code into its own driver module
+On Thu, Feb 14, 2013 at 09:40:29PM +0000, Paul Walmsley wrote:
+> Hi,
+> 
+> On Thu, 14 Feb 2013, Paul Walmsley wrote:
+> 
+> > So instead of something bus-specific like that, a better way would be to 
+> > use something like:
+> > 
+> > va = dev->bus->ioremap( ... );
+> > va = dev->bus->iounmap( ... );
+> 
+> Something like this is what I was thinking.  Obviously there would be more
+> patches needed, for the various arches, etc.; and I'm not convinced that
+> the function pointer init is done at the right time yet. Comments welcome.
 
-V2:
-Modified the patches, based on the first version review comments  
+Not only does this break the "ioremap caller" stuff, allowing the caller
+of ioremap() to be recorded, I believe this to be a total abonimation.
 
-Manjunath Goudar (8):
-  USB: EHCI: make ehci-spear a separate driver
-  USB: EHCI: make ehci-atmel a separate driver
-  USB: EHCI: make ehci-s5p a separate driver
-  USB: EHCI: make ehci-mv as separate static driver
-  USB: EHCI: make ehci-vt8500 a separate driver
-  USB: EHCI: make ehci-msm a separate driver
-  USB: EHCI: make ehci-w90X900 a separate driver
-  USB: EHCI: make ehci-orion a separate driver
+> This might also be useful as a generic replacement for pci_ioremap_bar().
 
- drivers/usb/host/Kconfig        |   40 +++++++++++++++--
- drivers/usb/host/Makefile       |    9 +++-
- drivers/usb/host/ehci-atmel.c   |   76 ++++++++++++++++----------------
- drivers/usb/host/ehci-hcd.c     |   52 +++++-----------------
- drivers/usb/host/ehci-msm.c     |   85 ++++++++++++++++--------------------
- drivers/usb/host/ehci-mv.c      |   78 +++++++++++++++------------------
- drivers/usb/host/ehci-orion.c   |   90 ++++++++++++++++++--------------------
- drivers/usb/host/ehci-s5p.c     |   67 +++++++++++++++-------------
- drivers/usb/host/ehci-spear.c   |   77 +++++++++++++++++----------------
- drivers/usb/host/ehci-vt8500.c  |   73 ++++++++++++++-----------------
- drivers/usb/host/ehci-w90x900.c |   91 +++++++++++++++++----------------------
- drivers/usb/host/ehci.h         |    2 +-
- 12 files changed, 358 insertions(+), 382 deletions(-)
+No it isn't.  Read the comments about why pci_ioremap_bar() was introduced
+in its original commit.  It's there to reduce the number of common errors
+with mapping a PCI bar, so it takes the PCI device and the BAR index.
 
--- 
-1.7.9.5
+It has a totally different interface to standard ioremap().  It can't be
+twisted into the standard ioremap() interface in any shape or form.
+
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index ce328c7..303dba0 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/fs.h>
+>  #include <linux/vmalloc.h>
+>  #include <linux/sizes.h>
+> +#include <linux/platform_device.h>
+>  
+>  #include <asm/cp15.h>
+>  #include <asm/cputype.h>
+> @@ -28,6 +29,7 @@
+>  #include <asm/highmem.h>
+>  #include <asm/system_info.h>
+>  #include <asm/traps.h>
+> +#include <asm/io.h>
+
+How many more bloody times do I have to tell people about using asm/io.h
+directly?  You've been around for _long_ enough that you well know this
+by now.  There is no excuse for this kind of thing other than shere
+laziness or down-right sloppyness on your part.
+
+If I make a big enough thing about it, hopefully people will become scared
+to post their un-self-reviewed patches and instead start taking a little
+more care in future.
