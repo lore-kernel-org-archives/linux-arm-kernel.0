@@ -1,49 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Feb 2013 10:16:10 +0000
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <1360840554-26901-2-git-send-email-balbi@ti.com>
- <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
- <20130214193911.GD11806@atomide.com>
- <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
-Message-ID: <20130215101610.GR17852@n2100.arm.linux.org.uk>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Fri, 15 Feb 2013 15:54:05 +0530
+Subject: [V2 0/8] usb: ehci: more bus glues as separate modules
+Message-ID: <1360923853-7875-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 08:47:53PM +0000, Paul Walmsley wrote:
-> Regarding ioremap(), it seems reasonable for drivers to call ioremap(), as 
-> long as the implementation of ioremap() can be overridden by the device's 
-> bus.  PCI device drivers already do this -- albeit in a PCI-specific way 
-> -- with pci_ioremap_bar():
+Separate the SOC On-Chip host controller driver from ehci-hcd
+host code into its own driver module
 
-Err no, that's just a helper to assist checking the resource type and
-remove all those pesky resource size mistakes - see the commit text:
+V2:
+Modified the patches, based on the first version review comments  
 
-    PCI: introduce an pci_ioremap(pdev, barnr) function
+Manjunath Goudar (8):
+  USB: EHCI: make ehci-spear a separate driver
+  USB: EHCI: make ehci-atmel a separate driver
+  USB: EHCI: make ehci-s5p a separate driver
+  USB: EHCI: make ehci-mv as separate static driver
+  USB: EHCI: make ehci-vt8500 a separate driver
+  USB: EHCI: make ehci-msm a separate driver
+  USB: EHCI: make ehci-w90X900 a separate driver
+  USB: EHCI: make ehci-orion a separate driver
 
-    A common thing in many PCI drivers is to ioremap() an entire bar.  This
-    is a slightly fragile thing right now, needing both an address and a
-    size, and many driver writers do.. various things there.
+ drivers/usb/host/Kconfig        |   40 +++++++++++++++--
+ drivers/usb/host/Makefile       |    9 +++-
+ drivers/usb/host/ehci-atmel.c   |   76 ++++++++++++++++----------------
+ drivers/usb/host/ehci-hcd.c     |   52 +++++-----------------
+ drivers/usb/host/ehci-msm.c     |   85 ++++++++++++++++--------------------
+ drivers/usb/host/ehci-mv.c      |   78 +++++++++++++++------------------
+ drivers/usb/host/ehci-orion.c   |   90 ++++++++++++++++++--------------------
+ drivers/usb/host/ehci-s5p.c     |   67 +++++++++++++++-------------
+ drivers/usb/host/ehci-spear.c   |   77 +++++++++++++++++----------------
+ drivers/usb/host/ehci-vt8500.c  |   73 ++++++++++++++-----------------
+ drivers/usb/host/ehci-w90x900.c |   91 +++++++++++++++++----------------------
+ drivers/usb/host/ehci.h         |    2 +-
+ 12 files changed, 358 insertions(+), 382 deletions(-)
 
-    This patch introduces an pci_ioremap() function taking just a PCI device
-    struct and the bar number as arguments, and figures this all out itself,
-    in one place.  In addition, we can add various sanity checks to this
-    function (the patch already checks to make sure that the bar in question
-    really is a MEM bar; few to no drivers do that sort of thing).
-
-    Hopefully with this type of API we get less chance of mistakes in
-    drivers with ioremap() operations.
-
-    Signed-off-by: Arjan van de Ven <arjan@linux.intel.com>
-    Signed-off-by: Jesse Barnes <jbarnes@virtuousgeek.org>
-
-> So instead of something bus-specific like that, a better way would be to 
-> use something like:
-> 
-> va = dev->bus->ioremap( ... );
-> va = dev->bus->iounmap( ... );
-
-No.  ioremap() is already generic.  We don't need additional layers of
-indirection per bus type.
+-- 
+1.7.9.5
