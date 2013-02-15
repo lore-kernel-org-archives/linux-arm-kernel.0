@@ -1,63 +1,89 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 15 Feb 2013 18:21:49 +0100
-Subject: [PATCH 2/9] ARM: imx: MACH_MX31ADS_WM1133_EV1 needs
- REGULATOR_WM8350
-In-Reply-To: <1360882071-4072668-3-git-send-email-arnd@arndb.de>
-References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
- <1360882071-4072668-3-git-send-email-arnd@arndb.de>
-Message-ID: <20130215172149.GU1906@pengutronix.de>
+From: anilk4.v@gmail.com (Anil Kumar)
+Date: Fri, 15 Feb 2013 22:54:41 +0530
+Subject: [PATCH v2 3/8] ARM: omap2: gpmc: Fix gpmc_cs_reserved() return
+ value
+In-Reply-To: <20130215170151.GC2442@localhost>
+References: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1360682305-20935-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <CABYxbz6tZJjuz0NKorPSz_tWD42+HuHL3kwW0cegWW5QTDxH8g@mail.gmail.com>
+ <20130215170151.GC2442@localhost>
+Message-ID: <CABYxbz5pq5FZkLv2igGa2UpR+ooAU2jrVQaB-N_7fGUyxPMhvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 11:47:44PM +0100, Arnd Bergmann wrote:
-> MACH_MX31ADS_WM1133_EV1 already depends on REGULATOR_WM8350,
-> but that still allows REGULATOR_WM8350 to be a loadable
-> module. Depending on REGULATOR_WM8350 to be built-in
-> ensures we cannot create a broken configuration.
-> 
-> Without this patch, building allmodconfig results in:
-> 
-> arch/arm/mach-imx/built-in.o: In function `mx31_wm8350_init':
-> arch/arm/mach-imx/mach-mx31ads.c:461: undefined reference to `wm8350_register_regulator'
-> arch/arm/mach-imx/mach-mx31ads.c:471: undefined reference to `wm8350_dcdc_set_slot'
-> arch/arm/mach-imx/mach-mx31ads.c:473: undefined reference to `wm8350_isink_set_flash'
-> arch/arm/mach-imx/mach-mx31ads.c:480: undefined reference to `wm8350_dcdc25_set_mode'
-> arch/arm/mach-imx/mach-mx31ads.c:485: undefined reference to `wm8350_register_led'
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Axel Lin <axel.lin@gmail.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Hi,
 
-Hail to devicetree probing where such things don't happen.
+On Fri, Feb 15, 2013 at 10:31 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> Hi Anil,
+>
+> On Fri, Feb 15, 2013 at 09:49:21PM +0530, Anil Kumar wrote:
+>> Hi,
+>>
+>> On Tue, Feb 12, 2013 at 8:48 PM, Ezequiel Garcia
+>> <ezequiel.garcia@free-electrons.com> wrote:
+>> > Currently gpmc_cs_reserved() return value is somewhat inconsistent,
+>> > returning a negative value on an error condition, a positive value
+>> > if the chip select is reserved and zero if it's available.
+>> >
+>> > Fix this by returning a boolean value as the function name suggests:
+>> >   * true if the chip select is reserved,
+>> >   * false if it's available
+>> >
+>> > Suggested-by: Felipe Balbi <balbi@ti.com>
+>> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>> > ---
+>> > Changelog from v1:
+>> >  * As suggested by Felipe Balbi, fix return code to a boolean
+>> >
+>> >  arch/arm/mach-omap2/gpmc.c |    4 ++--
+>> >  1 files changed, 2 insertions(+), 2 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+>> > index bd3bc93..fa4764f 100644
+>> > --- a/arch/arm/mach-omap2/gpmc.c
+>> > +++ b/arch/arm/mach-omap2/gpmc.c
+>> > @@ -452,10 +452,10 @@ static int gpmc_cs_set_reserved(int cs, int reserved)
+>> >         return 0;
+>> >  }
+>> >
+>> > -static int gpmc_cs_reserved(int cs)
+>> > +static bool gpmc_cs_reserved(int cs)
+>> >  {
+>> >         if (cs > GPMC_CS_NUM)
+>> > -               return -ENODEV;
+>> > +               return true;
+>> >
+>> >         return gpmc_cs_map & (1 << cs);
+>> >  }
+>>
+>> commit "6797b4fe0e554ce71f47038fd929c9ca929a9f3c"
+>> Marking all the chip-selects as reserved by default.
+>>
+>> In this case gpmc_cs_map is 0xff. So it will return 0x1 if cs is 0.
+>> So gpmc_cs_request() function will fail in nand (gpmc-nand.c) case.
+>>
+>> I am taking reference, branch "omap-for-v3.9/gpmc" of git tree
+>> http://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+>>
+>> I am sorry if this question is very vague.
+>>
+>
+> If I understand correctly your concern, I believe you've missed this
+> patch submitted by Jon Hunter and not yet merged:
+>
+>   ARM: OMAP2+: Fix-up gpmc merge error
+>
+> With this patch every chip-select is cleared on gpmc_probe()
+> as soon as GPMC driver initializes, and before we can request any
+> NAND/NOR child.
+>
+> I hope this answers your question.
+>
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Yes, with patch  "ARM: OMAP2+: Fix-up gpmc merge error" now nand is
+detected on my
+devkit8000(omap3 based board) with DT boot.
 
-> ---
->  arch/arm/mach-imx/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 7b11d33..4c9c6f9 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -480,7 +480,7 @@ config MACH_MX31ADS_WM1133_EV1
->  	bool "Support Wolfson Microelectronics 1133-EV1 module"
->  	depends on MACH_MX31ADS
->  	depends on MFD_WM8350_I2C
-> -	depends on REGULATOR_WM8350
-> +	depends on REGULATOR_WM8350 = y
->  	select MFD_WM8350_CONFIG_MODE_0
->  	select MFD_WM8352_CONFIG_MODE_0
->  	help
-> -- 
-> 1.8.1.2
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thank you very much.
+Anil
