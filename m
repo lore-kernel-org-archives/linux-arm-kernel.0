@@ -1,47 +1,45 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 15 Feb 2013 22:01:01 +0900
-Subject: [PATCH 5/5] ARM: shmobile: kzm9g: Trim reference DT_MACHINE_START
-In-Reply-To: <1360933261-6359-1-git-send-email-horms+renesas@verge.net.au>
-References: <1360933261-6359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360933261-6359-6-git-send-email-horms+renesas@verge.net.au>
+From: sourav.poddar@ti.com (a0131647)
+Date: Fri, 15 Feb 2013 18:33:58 +0530
+Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
+In-Reply-To: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <511E323E.3050104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove .init_late and .restart from DT_MACHINE_START
-for kzm9g reference as these are not necessary to
-bring the board up which is the main aim of kzm9g reference.
+Hi,
+On Friday 15 February 2013 05:36 PM, Santosh Shilimkar wrote:
+> OMAP UART IP needs manual idle modes based on state of the
+> IP. Currently this is handled by the driver with function pointers
+> implemented in platform code.
+>
+> This however breaks in case of device tree because of missing
+> idle handling.
+>
+> The series tries to address the issue
+>
+> Patches has been tested on OMAP4 and OMAP5 devices where the console
+> slugishness was observed without idle mode handling. CPUIDLE and
+> suspend tested ok on these devices.
+>
+> Need help in testing on OMAP2, OMAP3 and AM3XXX devices.
+>
+Tested this series on omap3630 beagle board for:
+1. Retention in idle and suspend.
+2. Off mode in idle and suspend.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-kzm9g-reference.c |    9 ---------
- 1 file changed, 9 deletions(-)
+Tested-by: Sourav Poddar <sourav.poddar@ti.com>
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index b9e40b6..836070a 100644
---- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -87,13 +87,6 @@ static void __init kzm_init(void)
- #endif
- }
- 
--static void kzm9g_restart(char mode, const char *cmd)
--{
--#define RESCNT2 IOMEM(0xe6188020)
--	/* Do soft power on reset */
--	writel((1 << 31), RESCNT2);
--}
--
- static const char *kzm9g_boards_compat_dt[] __initdata = {
- 	"renesas,kzm9g-reference",
- 	NULL,
-@@ -106,8 +99,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= irqchip_init,
- 	.init_machine	= kzm_init,
--	.init_late	= shmobile_init_late,
- 	.init_time	= shmobile_timer_init,
--	.restart	= kzm9g_restart,
- 	.dt_compat	= kzm9g_boards_compat_dt,
- MACHINE_END
--- 
-1.7.10.4
+> Santosh Shilimkar (2):
+>    ARM: OMAP2+: hwmod-data: UART IP needs software control of sidle
+>      modes
+>    SERIAL: OMAP: Remove the idle handling from the driver
+>
+>   arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    3 ++
+>   arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    6 ++++
+>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    4 +++
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 +++-
+>   arch/arm/mach-omap2/serial.c                       |   31 --------------------
+>   drivers/tty/serial/omap-serial.c                   |   23 ---------------
+>   6 files changed, 18 insertions(+), 55 deletions(-)
+>
