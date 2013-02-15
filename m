@@ -1,42 +1,65 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 15 Feb 2013 01:12:42 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP: hwmod_reset: Include errno.h to fix compilation
- error
-In-Reply-To: <1359377743-30663-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1359377743-30663-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <alpine.DEB.2.00.1302150111360.11016@utopia.booyaka.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 15 Feb 2013 09:25:14 +0800
+Subject: [PATCH 4/9] mfd: max8925: fix trivial build warning for non-dt
+In-Reply-To: <1360880818-4071454-5-git-send-email-arnd@arndb.de>
+References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
+ <1360880818-4071454-5-git-send-email-arnd@arndb.de>
+Message-ID: <CAN1soZybF=bqWe88NWNYb1m8etQGF_YeAxTmtqVwKDcNzCvX5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi P?ter,
-
-On Mon, 28 Jan 2013, Peter Ujfalusi wrote:
-
-> Without the errno.h:
->   CC      arch/arm/mach-omap2/omap_hwmod_reset.o
-> arch/arm/mach-omap2/omap_hwmod_reset.c: In function ?omap_hwmod_aess_preprogram?:
-> arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: error: ?EINVAL? undeclared (first use in this function)
-> arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: note: each undeclared identifier is reported only once for each function it appears in
-> make[1]: *** [arch/arm/mach-omap2/omap_hwmod_reset.o] Error 1
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+On Fri, Feb 15, 2013 at 6:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Patch fe527ea5a "mfd: max8925: Support dt for backlight"
+> added a new function for DT probing but introduced a
+> build warning for the case where CONFIG_OF is disabled:
+>
+> drivers/video/backlight/max8925_bl.c: In function 'max8925_backlight_probe':
+> drivers/video/backlight/max8925_bl.c:177:3: warning: statement with no effect [-Wunused-value]
+>
+> A much nicer fix is to use the IS_ENABLED keyword to
+> have the same effect of dropping the device tree specific
+> function when it's not needed.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Qing Xu <qingx@marvell.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
 > ---
-> Hi Paul,
-> 
-> I could not find the patches from Sebastien's series:
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg82971.html
-> 
-> But AFAIK you have taken them for 3.9.
-> 
-> This patch is on top of it to fix compilation error.
-> 
-> Regards,
-> Peter
+>  drivers/video/backlight/max8925_bl.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+>
+> diff --git a/drivers/video/backlight/max8925_bl.c b/drivers/video/backlight/max8925_bl.c
+> index 5ca11b0..9958fb1 100644
+> --- a/drivers/video/backlight/max8925_bl.c
+> +++ b/drivers/video/backlight/max8925_bl.c
+> @@ -101,14 +101,13 @@ static const struct backlight_ops max8925_backlight_ops = {
+>         .get_brightness = max8925_backlight_get_brightness,
+>  };
+>
+> -#ifdef CONFIG_OF
+>  static int max8925_backlight_dt_init(struct platform_device *pdev,
+>                               struct max8925_backlight_pdata *pdata)
+>  {
+>         struct device_node *nproot = pdev->dev.parent->of_node, *np;
+>         int dual_string;
+>
+> -       if (!nproot)
+> +       if (!nproot || !IS_ENABLED(CONFIG_OF))
+>                 return -ENODEV;
+>         np = of_find_node_by_name(nproot, "backlight");
+>         if (!np) {
+> @@ -120,9 +119,6 @@ static int max8925_backlight_dt_init(struct platform_device *pdev,
+>         pdata->dual_string = dual_string;
+>         return 0;
+>  }
+> -#else
+> -#define max8925_backlight_dt_init(x, y)        (-1)
+> -#endif
+>
+>  static int max8925_backlight_probe(struct platform_device *pdev)
+>  {
+> --
+> 1.8.1.2
+>
 
-Thanks for sending this.  I didn't know what to do with it at the time 
-since the patches seemed to build with omap2plus_defconfig, but now after 
-Arnd's E-mail it's clear that this was needed for multiplatform builds.  
-Sorry about the misunderstanding...
-
-
-- Paul
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
