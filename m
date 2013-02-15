@@ -1,22 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 15 Feb 2013 21:59:57 +0100
-Subject: [PATCH] pinctrl: Declare operation structures as const
-In-Reply-To: <1952247.y2EsDpZE5I@avalon>
-References: <1360939402-1170-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CACRpkdaN+j+cV-=d-cDSw6aoq4Hh0Ary8wpAeYQU7wvpTAQgcQ@mail.gmail.com>
- <1952247.y2EsDpZE5I@avalon>
-Message-ID: <CACRpkdZCLqH7J9-mrjh4sBeKYD73nTrcFhbdZYjDbeJa1_Z7fg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Feb 2013 13:06:46 -0800
+Subject: [PATCH v8 09/12] pinctrl: generic: add auto pull config parameter
+In-Reply-To: <CACRpkdY6bsxg6FG5bSCPZKkQ4-mVyiOsCFsh-421_nLCLcasSw@mail.gmail.com>
+References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
+ <1360602659-4774-10-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdYKAexLu30M2KzKcRcvRJS=xfVMB2vR+CgAXmwQ0+_ZzA@mail.gmail.com>
+ <20130215163755.GB5724@atomide.com>
+ <CACRpkdY6bsxg6FG5bSCPZKkQ4-mVyiOsCFsh-421_nLCLcasSw@mail.gmail.com>
+Message-ID: <20130215210645.GC5724@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 9:56 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
+* Linus Walleij <linus.walleij@linaro.org> [130215 12:58]:
+> On Fri, Feb 15, 2013 at 5:37 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Linus Walleij <linus.walleij@linaro.org> [130215 00:58]:
+> >> On Mon, Feb 11, 2013 at 6:10 PM, Haojian Zhuang
+> >> <haojian.zhuang@linaro.org> wrote:
+> >>
+> >> > There's only one bit to control pin bias as enabled or disabled for some
+> >> > pins in OMAP SoC. So append PIN_CONFIG_BIAS_AUTO_PULL for this case.
+> >> > User shouldn't switch pin state between AUTO_PULL and PULL_UP/PULL_DOWN,
+> >> > since they're similiar concepts.
+> >> >
+> >> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >>
+> >> Makes perfect sense.
+> >> Patch applied with Tony's ACK!
+> >
+> > Sorry the conclusion was that this probably won't be needed and can
+> > probably be done with just PULL_UP/PULL_DOWN.
+> >
+> > So can you please drop or revert this AUTO_PULL one?
+> 
+> Sorry I was drunk or something.
+> 
+> I never applied this patch, I applied the other one,
+> with the title "pinctrl: generic: rename input schmitt disable".
+> 
+> This one stays out.
 
-> Hmmm... There's no pinconf_dbg_config_print() function in mainline. Where does
-> it come from ?
+OK thanks for clarifying it :)
 
-The pinctrl devel branch I guess, soon to be shoveled into v3.9...
-http://git.kernel.org/?p=linux/kernel/git/linusw/linux-pinctrl.git;a=shortlog;h=refs/heads/devel
-
-Yours,
-Linus Walleij
+Tony
