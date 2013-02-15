@@ -1,50 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 14 Feb 2013 20:54:04 -0800
-Subject: [PATCH 3/9] clk: sunxi: remove stale Makefile entry
-In-Reply-To: <1360880818-4071454-4-git-send-email-arnd@arndb.de>
-References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
- <1360880818-4071454-4-git-send-email-arnd@arndb.de>
-Message-ID: <20130215045404.11471.91270@quantum>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 15 Feb 2013 06:06:35 +0100
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <CAErSpo6_6bYjo5XX5tzoBfMu5Htgpa__foNCyoCnCNEHocx67Q@mail.gmail.com>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo6_6bYjo5XX5tzoBfMu5Htgpa__foNCyoCnCNEHocx67Q@mail.gmail.com>
+Message-ID: <20130215060635.43f06f71@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arnd Bergmann (2013-02-14 14:26:52)
-> Patch 85a18198 "clk: sunxi: Use common of_clk_init() function"
-> removed the clk-sunxi.c file but left the Makefile entry, which
-> causes a build error in multi_v7_defconfig:
-> 
-> make[4]: *** No rule to make target `drivers/clk/clk-sunxi.o', needed by `drivers/clk/built-in.o'.
-> 
-> The obvious fix is to remove the extraneous line from the
-> Makefile.
-> 
+Dear Bjorn Helgaas,
 
-The fix is correct.  I can't rebase my branch since there is an existing
-dependency with the tegra tree, so I have taken this patch as-is with
-the addition of my SoB.
+On Thu, 14 Feb 2013 17:36:39 -0700, Bjorn Helgaas wrote:
+
+> > +config PCI_MVEBU
+> > +       bool "Marvell EBU PCIe controller"
+> > +       depends on ARCH_MVEBU
+> > +       select PCI_SW_HOST_BRIDGE
+> > +       select PCI_SW_PCI_PCI_BRIDGE
+> 
+> I think PCI_SW_HOST_BRIDGE and PCI_SW_PCI_PCI_BRIDGE are obsolete and
+> can be removed, right?
+
+Indeed, will fix.
+
+
+> > +       case PCI_PREF_LIMIT_UPPER32:
+> > +               bridge->preflimitupper = value;
+> > +               break;
+> 
+> You're relying on a subsequent PCI_COMMAND write to set PCI_COMMAND_IO
+> and/or PCI_COMMAND_MEMORY, and you program the bridge windows at that
+> time.
+
+Correct.
+
+>  It might be a good idea if the PCI core did clear those bits
+> while updating the windows, but I'm not sure we do.  In any case,
+> delaying the update is a difference from a standard P2P bridge that
+> could cause issues later.
+
+When would you want the window assignment to occur? Directly when the
+registers containing the base/limit are being written to? There are
+multiple registers for base/limit, so I'll have to figure out a way to
+validate when the base/limit informations are valid.
 
 Thanks,
-Mike
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
-> Cc: Maxime Ripard <maxime.ripard@anandra.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> ---
->  drivers/clk/Makefile | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index ce77077..be9392e 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -25,7 +25,6 @@ endif
->  obj-$(CONFIG_MACH_LOONGSON1)   += clk-ls1x.o
->  obj-$(CONFIG_ARCH_U8500)       += ux500/
->  obj-$(CONFIG_ARCH_VT8500)      += clk-vt8500.o
-> -obj-$(CONFIG_ARCH_SUNXI)       += clk-sunxi.o
->  obj-$(CONFIG_ARCH_ZYNQ)                += clk-zynq.o
->  obj-$(CONFIG_X86)              += x86/
->  obj-$(CONFIG_ARCH_TEGRA)       += tegra/
-> -- 
-> 1.8.1.2
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
