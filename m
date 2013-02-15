@@ -1,74 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 15 Feb 2013 22:39:58 +0900
-Subject: [PATCH 3/3] ARM: mach-shmobile: kzm9g: do not enable
- REGULATOR_DUMMY in defconfig
-In-Reply-To: <Pine.LNX.4.64.1302151420480.7446@axis700.grange>
-References: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
- <1360761103-17357-4-git-send-email-horms+renesas@verge.net.au>
- <20130214083621.GA8236@verge.net.au>
- <Pine.LNX.4.64.1302140942250.29693@axis700.grange>
- <20130215131331.GA27724@verge.net.au>
- <Pine.LNX.4.64.1302151420480.7446@axis700.grange>
-Message-ID: <20130215133957.GD27724@verge.net.au>
+From: sourav.poddar@ti.com (a0131647)
+Date: Fri, 15 Feb 2013 19:12:23 +0530
+Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
+In-Reply-To: <20130215130842.GD16558@arwen.pp.htv.fi>
+References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
+ <511E323E.3050104@ti.com> <20130215130745.GC16558@arwen.pp.htv.fi>
+ <20130215130842.GD16558@arwen.pp.htv.fi>
+Message-ID: <511E3B3F.1000609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 02:23:46PM +0100, Guennadi Liakhovetski wrote:
-> Hi Simon
-> 
-> On Fri, 15 Feb 2013, Simon Horman wrote:
-> 
-> > On Thu, Feb 14, 2013 at 09:45:24AM +0100, Guennadi Liakhovetski wrote:
-> > > On Thu, 14 Feb 2013, Simon Horman wrote:
-> > > 
-> > > > On Wed, Feb 13, 2013 at 10:11:43PM +0900, Simon Horman wrote:
-> > > > > Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
-> > > > > There doesn't seem to be any value in setting it here and doing
-> > > > > so was an error on my part.
-> > > > > 
-> > > > > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > > > ---
-> > > > >  arch/arm/configs/kzm9g_defconfig |    1 -
-> > > > >  1 file changed, 1 deletion(-)
-> > > > > 
-> > > > > diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-> > > > > index 670c3b6..6751c02 100644
-> > > > > --- a/arch/arm/configs/kzm9g_defconfig
-> > > > > +++ b/arch/arm/configs/kzm9g_defconfig
-> > > > > @@ -86,7 +86,6 @@ CONFIG_I2C_SH_MOBILE=y
-> > > > >  CONFIG_GPIO_PCF857X=y
-> > > > >  # CONFIG_HWMON is not set
-> > > > >  CONFIG_REGULATOR=y
-> > > > > -CONFIG_REGULATOR_DUMMY=y
-> > > > >  CONFIG_FB=y
-> > > > >  CONFIG_FB_SH_MOBILE_LCDC=y
-> > > > >  CONFIG_FRAMEBUFFER_CONSOLE=y
-> > > > 
-> > > > This patch seems to break NIC initialisation.
-> > > > 
-> > > > smsc911x: Driver version 2008-10-21
-> > > > smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
-> > > > smsc911x smsc911x.0 (unregistered net_device): couldn't get regulators -517
-> > > > platform smsc911x.0: Driver smsc911x requests probe deferral
-> > > 
-> > > Right, you need a fixed regulator similar to how I adde it here
-> > > 
-> > > http://www.spinics.net/lists/linux-sh/msg15713.html
-> > 
-> > Perhaps that is the wrong link?
-> 
-> No, the link is right
-> 
-> > The code in the link seems to be the same as what is preseng
-> > in boards-kzm9g.c already
-> 
-> Indeed, that should be fine. Ah, wait, what if you add ".0" to device 
-> names in regulators like
-> 
-> 	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
-> 	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
+Hi,
+On Friday 15 February 2013 06:38 PM, Felipe Balbi wrote:
+> On Fri, Feb 15, 2013 at 03:07:45PM +0200, Felipe Balbi wrote:
+>> On Fri, Feb 15, 2013 at 06:33:58PM +0530, a0131647 wrote:
+>>> Hi,
+>>> On Friday 15 February 2013 05:36 PM, Santosh Shilimkar wrote:
+>>>> OMAP UART IP needs manual idle modes based on state of the
+>>>> IP. Currently this is handled by the driver with function pointers
+>>>> implemented in platform code.
+>>>>
+>>>> This however breaks in case of device tree because of missing
+>>>> idle handling.
+>>>>
+>>>> The series tries to address the issue
+>>>>
+>>>> Patches has been tested on OMAP4 and OMAP5 devices where the console
+>>>> slugishness was observed without idle mode handling. CPUIDLE and
+>>>> suspend tested ok on these devices.
+>>>>
+>>>> Need help in testing on OMAP2, OMAP3 and AM3XXX devices.
+>>>>
+>>> Tested this series on omap3630 beagle board for:
+>>> 1. Retention in idle and suspend.
+>>> 2. Off mode in idle and suspend.
+>>>
+>>> Tested-by: Sourav Poddar<sourav.poddar@ti.com>
+>> try setting autosuspend_delay to -1
+> Also try DT boot and try to wakeup from echo mem>  /sys/power/state by
+> sending data through UART console.
+>
+Suspend/resume with dt is not functional with the current mainline.
 
-Bingo!
-
-Thanks, I'll send a patch.
+~Sourav
