@@ -1,83 +1,113 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:44:31 +0000
-Subject: [PATCH 01/40] mfd: Differentiate between newly added abx500 based
- platforms
+Date: Fri, 15 Feb 2013 12:44:32 +0000
+Subject: [PATCH 02/40] pm2301-charger: Enable SW EOC control on the ab9540
 In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
 References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360932310-30065-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the functionality to check for more abx500 type platforms.
-These new platforms include: ab9540v3, <=ab8540v1, <=ab8540v1.1,
-<=ab8540v1.2, <=ab8540v2, ab8540v2, <=ab8505v2 and <=ab9540v2.
+From: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
 
+End of charging is managed by SW.
+
+Signed-off-by: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
+Tested-by: Jonas ABERG <jonas.aberg@stericsson.com>
 ---
- include/linux/mfd/abx500/ab8500.h |   46 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ drivers/power/pm2301_charger.c |   48 +++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 43 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
-index b9a6a84..28bffd0 100644
---- a/include/linux/mfd/abx500/ab8500.h
-+++ b/include/linux/mfd/abx500/ab8500.h
-@@ -32,6 +32,7 @@ enum ab8500_version {
- #define AB8500_CUTEARLY	0x00
- #define AB8500_CUT1P0	0x10
- #define AB8500_CUT1P1	0x11
-+#define AB8500_CUT1P2	0x12 /* Only valid for AB8540 */
- #define AB8500_CUT2P0	0x20
- #define AB8500_CUT3P0	0x30
- #define AB8500_CUT3P3	0x33
-@@ -365,4 +366,49 @@ static inline int is_ab9540_2p0(struct ab8500 *ab)
+diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
+index ed48d75..62a172e 100644
+--- a/drivers/power/pm2301_charger.c
++++ b/drivers/power/pm2301_charger.c
+@@ -192,11 +192,22 @@ static int pm2xxx_charging_disable_mngt(struct pm2xxx_charger *pm2)
  {
- 	return (is_ab9540(ab) && (ab->chip_id == AB8500_CUT2P0));
+ 	int ret;
+ 
++	/* Disable SW EOC ctrl */
++	ret = pm2xxx_reg_write(pm2, PM2XXX_SW_CTRL_REG, PM2XXX_SWCTRL_HW);
++	if (ret < 0) {
++		dev_err(pm2->dev, "%s pm2xxx write failed\n", __func__);
++		return ret;
++	}
++
+ 	/* Disable charging */
+ 	ret = pm2xxx_reg_write(pm2, PM2XXX_BATT_CTRL_REG2,
+ 			(PM2XXX_CH_AUTO_RESUME_DIS | PM2XXX_CHARGER_DIS));
++	if (ret < 0) {
++		dev_err(pm2->dev, "%s pm2xxx write failed\n", __func__);
++		return ret;
++	}
+ 
+-	return ret;
++	return 0;
  }
+ 
+ static int pm2xxx_charger_batt_therm_mngt(struct pm2xxx_charger *pm2, int val)
+@@ -245,13 +256,29 @@ static int pm2xxx_charger_wd_exp_mngt(struct pm2xxx_charger *pm2, int val)
+ 
+ static int pm2xxx_charger_vbat_lsig_mngt(struct pm2xxx_charger *pm2, int val)
+ {
++	int ret;
 +
-+/*
-+ * Be careful, the marketing name for this chip is 2.1
-+ * but the value read from the chip is 3.0 (0x30)
-+ */
-+static inline int is_ab9540_3p0(struct ab8500 *ab)
-+{
-+	return (is_ab9540(ab) && (ab->chip_id == AB8500_CUT3P0));
-+}
+ 	switch (val) {
+ 	case PM2XXX_INT1_ITVBATLOWR:
+ 		dev_dbg(pm2->dev, "VBAT grows above VBAT_LOW level\n");
++		/* Enable SW EOC ctrl */
++		ret = pm2xxx_reg_write(pm2, PM2XXX_SW_CTRL_REG,
++							PM2XXX_SWCTRL_SW);
++		if (ret < 0) {
++			dev_err(pm2->dev, "%s pm2xxx write failed\n", __func__);
++			return ret;
++		}
+ 		break;
+ 
+ 	case PM2XXX_INT1_ITVBATLOWF:
+ 		dev_dbg(pm2->dev, "VBAT drops below VBAT_LOW level\n");
++		/* Disable SW EOC ctrl */
++		ret = pm2xxx_reg_write(pm2, PM2XXX_SW_CTRL_REG,
++							PM2XXX_SWCTRL_HW);
++		if (ret < 0) {
++			dev_err(pm2->dev, "%s pm2xxx write failed\n", __func__);
++			return ret;
++		}
+ 		break;
+ 
+ 	default:
+@@ -322,16 +349,27 @@ static int pm2_int_reg0(void *pm2_data, int val)
+ 	struct pm2xxx_charger *pm2 = pm2_data;
+ 	int ret = 0;
+ 
+-	if (val & (PM2XXX_INT1_ITVBATLOWR | PM2XXX_INT1_ITVBATLOWF)) {
+-		ret = pm2xxx_charger_vbat_lsig_mngt(pm2, val &
+-			(PM2XXX_INT1_ITVBATLOWR | PM2XXX_INT1_ITVBATLOWF));
++	if (val & PM2XXX_INT1_ITVBATLOWR) {
++		ret = pm2xxx_charger_vbat_lsig_mngt(pm2,
++						PM2XXX_INT1_ITVBATLOWR);
++		if (ret < 0)
++			goto out;
++	}
 +
-+static inline int is_ab8540_1p0_or_earlier(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id <= AB8500_CUT1P0);
-+}
-+
-+static inline int is_ab8540_1p1_or_earlier(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id <= AB8500_CUT1P1);
-+}
-+
-+static inline int is_ab8540_1p2_or_earlier(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id <= AB8500_CUT1P2);
-+}
-+
-+static inline int is_ab8540_2p0_or_earlier(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id <= AB8500_CUT2P0);
-+}
-+
-+static inline int is_ab8540_2p0(struct ab8500 *ab)
-+{
-+	return is_ab8540(ab) && (ab->chip_id == AB8500_CUT2P0);
-+}
-+
-+static inline int is_ab8505_2p0_earlier(struct ab8500 *ab)
-+{
-+	return (is_ab8505(ab) && (ab->chip_id < AB8500_CUT2P0));
-+}
-+
-+static inline int is_ab9540_2p0_or_earlier(struct ab8500 *ab)
-+{
-+	return (is_ab9540(ab) && (ab->chip_id < AB8500_CUT2P0));
-+}
-+
- #endif /* MFD_AB8500_H */
++	if (val & PM2XXX_INT1_ITVBATLOWF) {
++		ret = pm2xxx_charger_vbat_lsig_mngt(pm2,
++						PM2XXX_INT1_ITVBATLOWF);
++		if (ret < 0)
++			goto out;
+ 	}
+ 
+ 	if (val & PM2XXX_INT1_ITVBATDISCONNECT) {
+ 		ret = pm2xxx_charger_bat_disc_mngt(pm2,
+ 				PM2XXX_INT1_ITVBATDISCONNECT);
++		if (ret < 0)
++			goto out;
+ 	}
+-
++out:
+ 	return ret;
+ }
+ 
 -- 
 1.7.10.4
