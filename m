@@ -1,273 +1,127 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:57:05 +0000
-Subject: [PATCH 34/35] mfd: ab8500-debug: Convert to kstrtoul_from_user
+Date: Fri, 15 Feb 2013 12:57:06 +0000
+Subject: [PATCH 35/35] mfd: ab8500-core: Hierarchical interrupt registers
 In-Reply-To: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
 References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360933026-30325-35-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360933026-30325-36-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+From: Dariusz Szymczak <dariusz.xd.szymczak@stericsson.com>
 
-Use kstrtoul_from_user for getting an unsigned long from userspace
-which is less error prone.
+Make use of the hierarchical interrupt rergister called
+ITLatchHier1 - 3 also for the 8500 platform (currently the
+hierarchical interrupt registers are used only for the 8540
+and 9540 platforms). This will make the interrupt routing
+go faster since fewer i2c reads need to made in the most
+common cases.
 
-Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Dariusz Szymczak <dariusz.xd.szymczak@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
+Reviewed-by: Mian Yousaf KAUKAB <mian.yousaf.kaukab@stericsson.com>
 ---
- drivers/mfd/ab8500-debugfs.c |  100 +++++++++++++-----------------------------
- 1 file changed, 30 insertions(+), 70 deletions(-)
+ drivers/mfd/ab8500-core.c |   82 ++++-----------------------------------------
+ 1 file changed, 6 insertions(+), 76 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 37f595d..8fdc3b1 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -1478,7 +1478,6 @@ static ssize_t ab8500_bank_write(struct file *file,
- 	unsigned long user_bank;
- 	int err;
- 
--	/* Get userspace string and assure termination */
- 	err = kstrtoul_from_user(user_buf, count, 0, &user_bank);
- 	if (err)
- 		return err;
-@@ -1511,7 +1510,6 @@ static ssize_t ab8500_address_write(struct file *file,
- 	unsigned long user_address;
- 	int err;
- 
--	/* Get userspace string and assure termination */
- 	err = kstrtoul_from_user(user_buf, count, 0, &user_address);
- 	if (err)
- 		return err;
-@@ -1521,6 +1519,7 @@ static ssize_t ab8500_address_write(struct file *file,
- 		return -EINVAL;
- 	}
- 	debug_address = user_address;
-+
- 	return count;
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index 2716c6c..fd87e0a 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -502,66 +502,6 @@ static irqreturn_t ab8500_hierarchical_irq(int irq, void *dev)
+ 	return IRQ_HANDLED;
  }
  
-@@ -1555,7 +1554,6 @@ static ssize_t ab8500_val_write(struct file *file,
- 	unsigned long user_val;
- 	int err;
- 
--	/* Get userspace string and assure termination */
- 	err = kstrtoul_from_user(user_buf, count, 0, &user_val);
- 	if (err)
- 		return err;
-@@ -2417,20 +2415,13 @@ static ssize_t ab8500_gpadc_avg_sample_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
- 	unsigned long user_avg_sample;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_avg_sample);
-+	err = kstrtoul_from_user(user_buf, count, 0, &user_avg_sample);
- 	if (err)
+-/**
+- * ab8500_irq_get_virq(): Map an interrupt on a chip to a virtual IRQ
+- *
+- * @ab8500: ab8500_irq controller to operate on.
+- * @irq: index of the interrupt requested in the chip IRQs
+- *
+- * Useful for drivers to request their own IRQs.
+- */
+-static int ab8500_irq_get_virq(struct ab8500 *ab8500, int irq)
+-{
+-	if (!ab8500)
 -		return -EINVAL;
-+		return err;
-+
- 	if ((user_avg_sample == SAMPLE_1) || (user_avg_sample == SAMPLE_4)
- 			|| (user_avg_sample == SAMPLE_8)
- 			|| (user_avg_sample == SAMPLE_16)) {
-@@ -2440,7 +2431,8 @@ static ssize_t ab8500_gpadc_avg_sample_write(struct file *file,
- 			"should be egal to 1, 4, 8 or 16\n");
- 		return -EINVAL;
- 	}
--	return buf_size;
-+
-+	return count;
- }
- 
- static const struct file_operations ab8500_gpadc_avg_sample_fops = {
-@@ -2468,20 +2460,13 @@ static ssize_t ab8500_gpadc_trig_edge_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
- 	unsigned long user_trig_edge;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
 -
--	err = strict_strtoul(buf, 0, &user_trig_edge);
-+	err = kstrtoul_from_user(user_buf, count, 0, &user_trig_edge);
- 	if (err)
--		return -EINVAL;
-+		return err;
-+
- 	if ((user_trig_edge == RISING_EDGE)
- 			|| (user_trig_edge == FALLING_EDGE)) {
- 		trig_edge = (u8) user_trig_edge;
-@@ -2491,7 +2476,8 @@ static ssize_t ab8500_gpadc_trig_edge_write(struct file *file,
- 			"Enter 1. Falling edge\n");
- 		return -EINVAL;
- 	}
--	return buf_size;
-+
-+	return count;
- }
- 
- static const struct file_operations ab8500_gpadc_trig_edge_fops = {
-@@ -2519,20 +2505,13 @@ static ssize_t ab8500_gpadc_trig_timer_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
- 	unsigned long user_trig_timer;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
+-	return irq_create_mapping(ab8500->domain, irq);
+-}
 -
--	err = strict_strtoul(buf, 0, &user_trig_timer);
-+	err = kstrtoul_from_user(user_buf, count, 0, &user_trig_timer);
- 	if (err)
--		return -EINVAL;
-+		return err;
-+
- 	if ((user_trig_timer >= 0) && (user_trig_timer <= 255)) {
- 		trig_timer = (u8) user_trig_timer;
- 	} else {
-@@ -2540,7 +2519,8 @@ static ssize_t ab8500_gpadc_trig_timer_write(struct file *file,
- 			"should be beetween 0 to 255\n");
- 		return -EINVAL;
- 	}
--	return buf_size;
-+
-+	return count;
- }
- 
- static const struct file_operations ab8500_gpadc_trig_timer_fops = {
-@@ -2568,20 +2548,13 @@ static ssize_t ab8500_gpadc_conv_type_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
- 	unsigned long user_conv_type;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
+-static irqreturn_t ab8500_irq(int irq, void *dev)
+-{
+-	struct ab8500 *ab8500 = dev;
+-	int i;
 -
--	err = strict_strtoul(buf, 0, &user_conv_type);
-+	err = kstrtoul_from_user(user_buf, count, 0, &user_conv_type);
- 	if (err)
--		return -EINVAL;
-+		return err;
-+
- 	if ((user_conv_type == ADC_SW)
- 			|| (user_conv_type == ADC_HW)) {
- 		conv_type = (u8) user_conv_type;
-@@ -2591,7 +2564,8 @@ static ssize_t ab8500_gpadc_conv_type_write(struct file *file,
- 			"Enter 1. ADC HW conversion\n");
- 		return -EINVAL;
- 	}
--	return buf_size;
-+
-+	return count;
- }
- 
- static const struct file_operations ab8500_gpadc_conv_type_fops = {
-@@ -2808,21 +2782,14 @@ static ssize_t ab8500_subscribe_write(struct file *file,
- 				      size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
- 	unsigned long user_val;
- 	int err;
- 	unsigned int irq_index;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf)-1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
+-	dev_vdbg(ab8500->dev, "interrupt\n");
 -
--	err = strict_strtoul(buf, 0, &user_val);
-+	err = kstrtoul_from_user(user_buf, count, 0, &user_val);
- 	if (err)
--		return -EINVAL;
-+		return err;
-+
- 	if (user_val < irq_first) {
- 		dev_err(dev, "debugfs error input < %d\n", irq_first);
- 		return -EINVAL;
-@@ -2842,7 +2809,7 @@ static ssize_t ab8500_subscribe_write(struct file *file,
- 	 */
- 	dev_attr[irq_index] = kmalloc(sizeof(struct device_attribute),
- 		GFP_KERNEL);
--	event_name[irq_index] = kmalloc(buf_size, GFP_KERNEL);
-+	event_name[irq_index] = kmalloc(count, GFP_KERNEL);
- 	sprintf(event_name[irq_index], "%lu", user_val);
- 	dev_attr[irq_index]->show = show_irq;
- 	dev_attr[irq_index]->store = NULL;
-@@ -2864,7 +2831,7 @@ static ssize_t ab8500_subscribe_write(struct file *file,
- 		return err;
- 	}
- 
--	return buf_size;
-+	return count;
- }
- 
- static ssize_t ab8500_unsubscribe_write(struct file *file,
-@@ -2872,21 +2839,14 @@ static ssize_t ab8500_unsubscribe_write(struct file *file,
- 					size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
- 	unsigned long user_val;
- 	int err;
- 	unsigned int irq_index;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf)-1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
+-	atomic_inc(&ab8500->transfer_ongoing);
 -
--	err = strict_strtoul(buf, 0, &user_val);
-+	err = kstrtoul_from_user(user_buf, count, 0, &user_val);
- 	if (err)
--		return -EINVAL;
-+		return err;
-+
- 	if (user_val < irq_first) {
- 		dev_err(dev, "debugfs error input < %d\n", irq_first);
- 		return -EINVAL;
-@@ -2911,7 +2871,7 @@ static ssize_t ab8500_unsubscribe_write(struct file *file,
- 	kfree(event_name[irq_index]);
- 	kfree(dev_attr[irq_index]);
+-	for (i = 0; i < ab8500->mask_size; i++) {
+-		int regoffset = ab8500->irq_reg_offset[i];
+-		int status;
+-		u8 value;
+-
+-		/*
+-		 * Interrupt register 12 doesn't exist prior to AB8500 version
+-		 * 2.0
+-		 */
+-		if (regoffset == 11 && is_ab8500_1p1_or_earlier(ab8500))
+-			continue;
+-
+-		if (regoffset < 0)
+-			continue;
+-
+-		status = get_register_interruptible(ab8500, AB8500_INTERRUPT,
+-			AB8500_IT_LATCH1_REG + regoffset, &value);
+-		if (status < 0 || value == 0)
+-			continue;
+-
+-		do {
+-			int bit = __ffs(value);
+-			int line = i * 8 + bit;
+-			int virq = ab8500_irq_get_virq(ab8500, line);
+-
+-			handle_nested_irq(virq);
+-			ab8500_debug_register_interrupt(line);
+-			value &= ~(1 << bit);
+-
+-		} while (value);
+-	}
+-	atomic_dec(&ab8500->transfer_ongoing);
+-	return IRQ_HANDLED;
+-}
+-
+ static int ab8500_irq_map(struct irq_domain *d, unsigned int virq,
+ 				irq_hw_number_t hwirq)
+ {
+@@ -1697,22 +1637,12 @@ static int ab8500_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
  
--	return buf_size;
-+	return count;
- }
+-	/*  Activate this feature only in ab9540 */
+-	/*  till tests are done on ab8500 1p2 or later*/
+-	if (is_ab9540(ab8500) || is_ab8540(ab8500))
+-		ret = devm_request_threaded_irq(&pdev->dev, ab8500->irq, NULL,
+-						ab8500_hierarchical_irq,
+-						IRQF_ONESHOT | IRQF_NO_SUSPEND,
+-						"ab8500", ab8500);
+-	}
+-	else {
+-		ret = devm_request_threaded_irq(&pdev->dev, ab8500->irq, NULL,
+-						ab8500_irq,
+-						IRQF_ONESHOT | IRQF_NO_SUSPEND,
+-						"ab8500", ab8500);
+-		if (ret)
+-			return ret;
+-	}
++	ret = devm_request_threaded_irq(&pdev->dev, ab8500->irq, NULL,
++			ab8500_hierarchical_irq,
++			IRQF_ONESHOT | IRQF_NO_SUSPEND,
++			"ab8500", ab8500);
++	if (ret)
++		return ret;
  
- /*
+ 	if (is_ab9540(ab8500))
+ 		ret = mfd_add_devices(ab8500->dev, 0, ab9540_devs,
 -- 
 1.7.10.4
