@@ -1,120 +1,163 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Feb 2013 15:49:55 +0000
-Subject: [PATCH 8/9] [HACK] ARM: imx: work around v7_cpu_resume link error
-In-Reply-To: <20130215111306.GM17833@n2100.arm.linux.org.uk>
-References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
- <201302151105.14253.arnd@arndb.de>
- <20130215111306.GM17833@n2100.arm.linux.org.uk>
-Message-ID: <201302151549.55440.arnd@arndb.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 15 Feb 2013 16:59:15 +0100
+Subject: [PATCH] omap2: twl-common: Add default power configuration
+In-Reply-To: <20130201224242.GE22517@atomide.com>
+References: <1358967038-6615-1-git-send-email-matthias.bgg@gmail.com>
+ <CAOCHtYjufr+MS1=6Cnsn-EgvkPs+Y5oWejAG98aLkVjdQbu1ZA@mail.gmail.com>
+ <20130201224242.GE22517@atomide.com>
+Message-ID: <CABuKBe+NrMiX0nuEgwnHBqu-DqHST+uGG_Zyc7Ek=4WCOV1T6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 February 2013, Russell King - ARM Linux wrote:
-> > The .text section alone is just short of 32MB.
-> 
-> I suspect when it does go over that, we'll see a lot more link time
-> failures due to the 'bl' instructions failing to encode their PC relative
-> jumps.  The only solution then will be to switch everything to use the
-> less efficient long jumps (load address from literal pool, bx) which'll
-> also need much of the asm changed.  That also brings up the question
-> whether we want to penalize the kernel performance just to make
-> allyesconfig work... I guess we can make it a compile time option, which
-> of course allyesconfig will automatically enable.  I suspect we'll see
-> a lot of people mistakenly enabling it too though.
+2013/2/1 Tony Lindgren <tony@atomide.com>:
+> Hi,
+>
+> * Robert Nelson <robertcnelson@gmail.com> [130124 07:58]:
+>> On Wed, Jan 23, 2013 at 12:50 PM, Matthias Brugger
+>> <matthias.bgg@gmail.com> wrote:
+>> > This patch adds a generic power script configuration.
+>> > When rebooting an OMAP3530 at 125 MHz, the reboot hangs.
+>> > With the generic power script, TWL4030 will be reset
+>> > when a warm reset occures. This way the OMAP3530 does not
+>> > hang on reboot.
+>
+> Both look OK to me. I've added Peter to cc, it's best that he queues
+> all the twl changes.
+>
 
-I'm not too worried about people accidentally enabling such a build option,
-at least if it's appropriately labeled as something that nobody should
-need.
+Peter any comments on this patch?
+Are you maintaining the whole twl4030 support or just the codec driver?
 
-Changing the inline assembly however sounds like a big pain to do, which
-would cause performance and size overhead as well as regressions in
-rarely executed code when we get it wrong. I've tried rebulding
-the allyesconfig kernel with -O3 -funroll-all-loops to make it even
-bigger on purpose, and got these errors:
+Best regards,
+Matthias
 
-arch/arm/kernel/built-in.o:(.fixup+0x8): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x10): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x18): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x20): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x28): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x30): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x38): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x40): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x48): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x50): relocation truncated to fit: R_ARM_JUMP24 against `.text'
-arch/arm/kernel/built-in.o:(.fixup+0x58): additional relocation overflows omitted from the output
 
-so the .fixup section is completely out of reach of the start of the .text section.
+> Regards,
+>
+> Tony
+>
+>> > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> > ---
+>> >  arch/arm/mach-omap2/twl-common.c | 38 ++++++++++++++++++++++++++++++++++++++
+>> >  arch/arm/mach-omap2/twl-common.h |  1 +
+>> >  2 files changed, 39 insertions(+)
+>> >
+>> > diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+>> > index e49b40b..f096beb 100644
+>> > --- a/arch/arm/mach-omap2/twl-common.c
+>> > +++ b/arch/arm/mach-omap2/twl-common.c
+>> > @@ -120,6 +120,41 @@ static struct twl4030_audio_data omap3_audio_pdata = {
+>> >         .codec = &omap3_codec,
+>> >  };
+>> >
+>> > +static struct twl4030_ins wrst_seq[] __initdata = {
+>> > +       {MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_OFF), 2},
+>> > +       {MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_WRST), 15},
+>> > +       {MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_WRST), 15},
+>> > +       {MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_WRST), 0x60},
+>> > +       {MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2},
+>> > +       {MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_ACTIVE), 2},
+>> > +};
+>> > +
+>> > +static struct twl4030_script wrst_script __initdata = {
+>> > +       .script = wrst_seq,
+>> > +       .size   = ARRAY_SIZE(wrst_seq),
+>> > +       .flags  = TWL4030_WRST_SCRIPT,
+>> > +};
+>> > +
+>> > +static struct twl4030_script *omap3_power_scripts[] __initdata = {
+>> > +       &wrst_script,
+>> > +};
+>> > +
+>> > +static struct twl4030_resconfig omap3_rconfig[] = {
+>> > +       { .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
+>> > +               .type2 = -1 },
+>> > +       { .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
+>> > +               .type2 = -1 },
+>> > +       { .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
+>> > +               .type2 = -1 },
+>> > +       { 0, 0},
+>> > +};
+>> > +
+>> > +static struct twl4030_power_data omap3_power_pdata = {
+>> > +       .scripts        = omap3_power_scripts,
+>> > +       .num            = ARRAY_SIZE(omap3_power_scripts),
+>> > +       .resource_config = omap3_rconfig,
+>> > +};
+>> > +
+>> >  static struct regulator_consumer_supply omap3_vdda_dac_supplies[] = {
+>> >         REGULATOR_SUPPLY("vdda_dac", "omapdss_venc"),
+>> >  };
+>> > @@ -224,6 +259,9 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+>> >         if (pdata_flags & TWL_COMMON_PDATA_AUDIO && !pmic_data->audio)
+>> >                 pmic_data->audio = &omap3_audio_pdata;
+>> >
+>> > +       if (pdata_flags & TWL_COMMON_PDATA_POWER && !pmic_data->power)
+>> > +               pmic_data->power = &omap3_power_pdata;
+>> > +
+>> >         /* Common regulator configurations */
+>> >         if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
+>> >                 pmic_data->vdac = &omap3_vdac_idata;
+>> > diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
+>> > index dcfbad5..dbeb905 100644
+>> > --- a/arch/arm/mach-omap2/twl-common.h
+>> > +++ b/arch/arm/mach-omap2/twl-common.h
+>> > @@ -7,6 +7,7 @@
+>> >  #define TWL_COMMON_PDATA_BCI           (1 << 1)
+>> >  #define TWL_COMMON_PDATA_MADC          (1 << 2)
+>> >  #define TWL_COMMON_PDATA_AUDIO         (1 << 3)
+>> > +#define TWL_COMMON_PDATA_POWER         (1 << 4)
+>> >
+>> >  /* Common LDO regulators for TWL4030/TWL6030 */
+>> >  #define TWL_COMMON_REGULATOR_VDAC      (1 << 0)
+>> > --
+>> > 1.7.11.7
+>>
+>> Thanks for making this generic Matthias..
+>>
+>> Tested-by: Robert Nelson <robertcnelson@gmail.com>
+>>
+>> Tested on Beagle C4 (omap3530) and Beagle xM (DM3730, no regressions)
+>> with this patch to enable it on the Beagle..
+>>
+>> From 65004dafc8d37c69dd839803dc8ea5dcefd993df Mon Sep 17 00:00:00 2001
+>> From: Robert Nelson <robertcnelson@gmail.com>
+>> Date: Thu, 24 Jan 2013 09:43:51 -0600
+>> Subject: [PATCH] ARM: OMAP: Beagle: use TWL4030 generic reset script
+>>
+>> Enable TWL_COMMON_PDATA_POWER such that OMAP3530 revisions of the
+>> Beagle (Bx/Cx) will not hang on reboot when running at 125 Mhz.
+>>
+>> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+>> ---
+>>  arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c
+>> b/arch/arm/mach-omap2/board-omap3beagle.c
+>> index 22c483d..0974e08 100644
+>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+>> @@ -353,7 +353,7 @@ static int __init omap3_beagle_i2c_init(void)
+>>  {
+>>       omap3_pmic_get_config(&beagle_twldata,
+>>                       TWL_COMMON_PDATA_USB | TWL_COMMON_PDATA_MADC |
+>> -                     TWL_COMMON_PDATA_AUDIO,
+>> +                     TWL_COMMON_PDATA_AUDIO | TWL_COMMON_PDATA_POWER,
+>>                       TWL_COMMON_REGULATOR_VDAC | TWL_COMMON_REGULATOR_VPLL2);
+>>
+>>       beagle_twldata.vpll2->constraints.name = "VDVI";
+>> --
+>> 1.7.10.4
+>>
+>> Regards,
+>>
+>> --
+>> Robert Nelson
+>> http://www.rcn-ee.com/
 
-The size output for the partial link of vmlinux.o is
 
-section                     size         addr
-.head.text                   492   3221258240
-.text                   43889568   3221258752
-.text.head                     8            0
-.rodata                 11020608         4096
-__bug_table               138636     11024704
-.pci_fixup                     0     11163340
-.builtin_fw                  684     11163340
-.rio_ops                       0     11164024
-__ksymtab                  53424     11164024
-__ksymtab_gpl              43560     11217448
-__ksymtab_unused               0     11261008
-__ksymtab_unused_gpl           0     11261008
-__ksymtab_gpl_future           0     11261008
-__kcrctab                  26712     11261008
-__kcrctab_gpl              21780     11287720
-__kcrctab_unused               0     11309500
-__kcrctab_unused_gpl           0     11309500
-__kcrctab_gpl_future           0     11309500
-__ksymtab_strings         251888     11309500
-__param                    33104     11561388
-__modver                    1284     11594492
-__ex_table                  6288     11595776
-.ARM.unwind_idx           907888     11602064
-.ARM.unwind_tab          1362276     12509952
-.notes                        36     13872228
-.init.text                685436     13873152
-.exit.text                124324     14558588
-.init.arch.info             5396     14682912
-.init.tagtable                72     14688308
-.init.smpalt                 952     14688380
-.init.pv_table              2232     14689332
-.init.data                649164     14691568
-.exit.data                   120     15340732
-.data..percpu            1460032     15343616
-.data                    3370676     16809984
-.tcm_start                   332     20180660
-.text_itcm                     0   4294836224
-.dtcm_start                    0     20180992
-.data_dtcm                     0   4294868992
-.tcm_end                       0     20180992
-.bss                     8007852     20180992
-.comment                  314424            0
-.ARM.attributes               50            0
-.debug_line             19185565            0
-.debug_info             61757649            0
-.debug_abbrev            5835457            0
-.debug_aranges            299416            0
-.debug_ranges           10482064            0
-.debug_frame             4601768            0
-.debug_str              37433732            0
-.debug_loc              45578206            0
-Total                  257553155
 
-I had the idea that turning off THUMB2 support in allyesconfig would help,
-but then I found that it's already disabled unlike what I claimed earlier,
-because ARMv6 support is enabled alongside ARMv7, so we are still screwed.
-
-Also, with the size of the kernel binary growing, it may just be a
-matter of time until this is not just a problem for artificial cases
-like allyesconfig, but also for something that users will actually
-want to run.
-
-IIRC, 10 years ago, half a megabyte seemed like a reasonable size
-for a kernel binary, while today 5 megabyte are not out of the
-ordinary on ARM. If the trend continues the same way, we might
-have users complaining about 32 megabyte kernels in 5-7 years from
-now, unless everybody is using 64-bit by then ;-)
-
-	Arnd
+-- 
+---
+motzblog.wordpress.com
