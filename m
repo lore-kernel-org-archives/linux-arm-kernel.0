@@ -1,85 +1,41 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 15 Feb 2013 14:23:46 +0100 (CET)
-Subject: [PATCH 3/3] ARM: mach-shmobile: kzm9g: do not enable
- REGULATOR_DUMMY in defconfig
-In-Reply-To: <20130215131331.GA27724@verge.net.au>
-References: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
- <1360761103-17357-4-git-send-email-horms+renesas@verge.net.au>
- <20130214083621.GA8236@verge.net.au>
- <Pine.LNX.4.64.1302140942250.29693@axis700.grange>
- <20130215131331.GA27724@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1302151420480.7446@axis700.grange>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 15 Feb 2013 18:56:47 +0530
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <20130215101610.GR17852@n2100.arm.linux.org.uk>
+References: <1360840554-26901-1-git-send-email-balbi@ti.com>
+ <1360840554-26901-2-git-send-email-balbi@ti.com>
+ <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+ <20130215101610.GR17852@n2100.arm.linux.org.uk>
+Message-ID: <511E3797.2070802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
+Russell,
 
-On Fri, 15 Feb 2013, Simon Horman wrote:
+On Friday 15 February 2013 03:46 PM, Russell King - ARM Linux wrote:
+> On Thu, Feb 14, 2013 at 08:47:53PM +0000, Paul Walmsley wrote:
 
-> On Thu, Feb 14, 2013 at 09:45:24AM +0100, Guennadi Liakhovetski wrote:
-> > On Thu, 14 Feb 2013, Simon Horman wrote:
-> > 
-> > > On Wed, Feb 13, 2013 at 10:11:43PM +0900, Simon Horman wrote:
-> > > > Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
-> > > > There doesn't seem to be any value in setting it here and doing
-> > > > so was an error on my part.
-> > > > 
-> > > > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > > ---
-> > > >  arch/arm/configs/kzm9g_defconfig |    1 -
-> > > >  1 file changed, 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-> > > > index 670c3b6..6751c02 100644
-> > > > --- a/arch/arm/configs/kzm9g_defconfig
-> > > > +++ b/arch/arm/configs/kzm9g_defconfig
-> > > > @@ -86,7 +86,6 @@ CONFIG_I2C_SH_MOBILE=y
-> > > >  CONFIG_GPIO_PCF857X=y
-> > > >  # CONFIG_HWMON is not set
-> > > >  CONFIG_REGULATOR=y
-> > > > -CONFIG_REGULATOR_DUMMY=y
-> > > >  CONFIG_FB=y
-> > > >  CONFIG_FB_SH_MOBILE_LCDC=y
-> > > >  CONFIG_FRAMEBUFFER_CONSOLE=y
-> > > 
-> > > This patch seems to break NIC initialisation.
-> > > 
-> > > smsc911x: Driver version 2008-10-21
-> > > smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
-> > > smsc911x smsc911x.0 (unregistered net_device): couldn't get regulators -517
-> > > platform smsc911x.0: Driver smsc911x requests probe deferral
-> > 
-> > Right, you need a fixed regulator similar to how I adde it here
-> > 
-> > http://www.spinics.net/lists/linux-sh/msg15713.html
-> 
-> Perhaps that is the wrong link?
+[..]
 
-No, the link is right
+>
+>> So instead of something bus-specific like that, a better way would be to
+>> use something like:
+>>
+>> va = dev->bus->ioremap( ... );
+>> va = dev->bus->iounmap( ... );
+>
+> No.  ioremap() is already generic.  We don't need additional layers of
+> indirection per bus type.
+>
+Whats your view on use of arch_ioremap_caller() hook ? This can allow
+us to avoid the dual ioremap() issue discussed here if the hook
+maintains the list of mapped ios.
 
-> The code in the link seems to be the same as what is preseng
-> in boards-kzm9g.c already
+I was even thinking of having such intelligence within the core
+ioremap code but thought that might be too invasive.
 
-Indeed, that should be fine. Ah, wait, what if you add ".0" to device 
-names in regulators like
-
-	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
-	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
-
-?
-
-Thanks
-Guennadi
-
-> and with it in place I see the error
-> above if CONFIG_REGULATOR_DUMMY is not enabled.
-> 
-> I am testing against with next branch in the renesas tree
-> with the kzm9g_defconfig, less CONFIG_REGULATOR_DUMMY.
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Regards,
+Santosh
