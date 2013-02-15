@@ -1,41 +1,344 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 15 Feb 2013 16:28:54 -0500
-Subject: [PATCH v2 2/3] arm: mvebu: Enable USB controllers on Armada
- 370/XP boards
-In-Reply-To: <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1358954792-16160-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1358954792-16160-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130215212854.GF14746@titan.lakedaemon.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 15 Feb 2013 22:41:51 +0100
+Subject: [PATCH v2 2/5] clocksource: time-armada-370-xp: add local timer
+ support
+In-Reply-To: <20130215212130.GC14746@titan.lakedaemon.net>
+References: <1359135165-32108-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359135165-32108-3-git-send-email-gregory.clement@free-electrons.com>
+ <20130215212130.GC14746@titan.lakedaemon.net>
+Message-ID: <511EAB9F.9060609@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 23, 2013 at 12:26:31PM -0300, Ezequiel Garcia wrote:
-> This patch activates every USB port provided by each SoC.
-> Except for Armada XP Openblocks AX3-4 board,
-> where we enable only the first two USB ports
-> until we have more information on the third one usage.
+On 02/15/2013 10:21 PM, Jason Cooper wrote:
+> On Fri, Jan 25, 2013 at 06:32:42PM +0100, Gregory CLEMENT wrote:
+>> On the SOCs Armada 370 and Armada XP, each CPU comes with two private
+>> timers. This patch use the timer 0 of each CPU as local timer for the
+>> clockevent if CONFIG_LOCAL_TIMER is selected. In the other case, use
+>> only the private Timer 0 of CPU 0.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/clocksource/time-armada-370-xp.c |  150 ++++++++++++++++++++++--------
+>>  1 file changed, 112 insertions(+), 38 deletions(-)
 > 
-> Cc: Lior Amsalem <alior@marvell.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Tested-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Tested-by: Florian Fainelli <florian@openwrt.org>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
-> Changes from v1:
->  * Squashed separate per-board patches into this one,
->    as suggested by Arnd.
->  * Remove usb at d0052000 activation in OpenBlocks AX3-4
->    until we have more information about it.
+> After applying the first two patches in this series to mvebu/drivers I get:
 > 
->  arch/arm/boot/dts/armada-370-db.dts              |    8 ++++++++
->  arch/arm/boot/dts/armada-370-mirabox.dts         |    8 ++++++++
->  arch/arm/boot/dts/armada-xp-db.dts               |   12 ++++++++++++
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    6 ++++++
->  4 files changed, 34 insertions(+), 0 deletions(-)
+>   CC      arch/arm/mach-mvebu/irq-armada-370-xp.o
+> arch/arm/mach-mvebu/irq-armada-370-xp.c: In function 'armada_370_xp_mpic_irq_map':
+> arch/arm/mach-mvebu/irq-armada-370-xp.c:87:11: error: 'ARMADA_370_XP_MAX_PER_CPU_IRQS' undeclared (first use in this function)
+> arch/arm/mach-mvebu/irq-armada-370-xp.c:87:11: note: each undeclared identifier is reported only once for each function it appears in
+> make[1]: *** [arch/arm/mach-mvebu/irq-armada-370-xp.o] Error 1
+> make: *** [arch/arm/mach-mvebu] Error 2
+> 
+> with mvebu_defconfig.
+> 
+> Is there a dependency I missed?  I'm not finding anything obvious.  The
+> same occurs if I enable LOCAL_TIMER.
 
-Applied to mvebu/dt
+It depends on "arm: mvebu: Improve the SMP support of the interrupt controller"
 
-thx,
+As you have pulled this patch few weeks ago I forgot to this dependency, sorry.
 
-Jason.
+
+Thanks,
+
+Gregory
+> 
+> thx,
+> 
+> Jason.
+>>
+>> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+>> index a4605fd..47a6730 100644
+>> --- a/drivers/clocksource/time-armada-370-xp.c
+>> +++ b/drivers/clocksource/time-armada-370-xp.c
+>> @@ -27,8 +27,10 @@
+>>  #include <linux/of_address.h>
+>>  #include <linux/irq.h>
+>>  #include <linux/module.h>
+>> -#include <asm/sched_clock.h>
+>>  
+>> +#include <asm/sched_clock.h>
+>> +#include <asm/localtimer.h>
+>> +#include <linux/percpu.h>
+>>  /*
+>>   * Timer block registers.
+>>   */
+>> @@ -49,6 +51,7 @@
+>>  #define TIMER1_RELOAD_OFF	0x0018
+>>  #define TIMER1_VAL_OFF		0x001c
+>>  
+>> +#define LCL_TIMER_EVENTS_STATUS	0x0028
+>>  /* Global timers are connected to the coherency fabric clock, and the
+>>     below divider reduces their incrementing frequency. */
+>>  #define TIMER_DIVIDER_SHIFT     5
+>> @@ -57,14 +60,17 @@
+>>  /*
+>>   * SoC-specific data.
+>>   */
+>> -static void __iomem *timer_base;
+>> -static int timer_irq;
+>> +static void __iomem *timer_base, *local_base;
+>> +static unsigned int timer_clk;
+>> +static bool timer25Mhz = true;
+>>  
+>>  /*
+>>   * Number of timer ticks per jiffy.
+>>   */
+>>  static u32 ticks_per_jiffy;
+>>  
+>> +static struct clock_event_device __percpu **percpu_armada_370_xp_evt;
+>> +
+>>  static u32 notrace armada_370_xp_read_sched_clock(void)
+>>  {
+>>  	return ~readl(timer_base + TIMER0_VAL_OFF);
+>> @@ -78,24 +84,23 @@ armada_370_xp_clkevt_next_event(unsigned long delta,
+>>  				struct clock_event_device *dev)
+>>  {
+>>  	u32 u;
+>> -
+>>  	/*
+>>  	 * Clear clockevent timer interrupt.
+>>  	 */
+>> -	writel(TIMER1_CLR_MASK, timer_base + TIMER_EVENTS_STATUS);
+>> +	writel(TIMER0_CLR_MASK, local_base + LCL_TIMER_EVENTS_STATUS);
+>>  
+>>  	/*
+>>  	 * Setup new clockevent timer value.
+>>  	 */
+>> -	writel(delta, timer_base + TIMER1_VAL_OFF);
+>> +	writel(delta, local_base + TIMER0_VAL_OFF);
+>>  
+>>  	/*
+>>  	 * Enable the timer.
+>>  	 */
+>> -	u = readl(timer_base + TIMER_CTRL_OFF);
+>> -	u = ((u & ~TIMER1_RELOAD_EN) | TIMER1_EN |
+>> -	     TIMER1_DIV(TIMER_DIVIDER_SHIFT));
+>> -	writel(u, timer_base + TIMER_CTRL_OFF);
+>> +	u = readl(local_base + TIMER_CTRL_OFF);
+>> +	u = ((u & ~TIMER0_RELOAD_EN) | TIMER0_EN |
+>> +	     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
+>> +	writel(u, local_base + TIMER_CTRL_OFF);
+>>  
+>>  	return 0;
+>>  }
+>> @@ -107,37 +112,38 @@ armada_370_xp_clkevt_mode(enum clock_event_mode mode,
+>>  	u32 u;
+>>  
+>>  	if (mode == CLOCK_EVT_MODE_PERIODIC) {
+>> +
+>>  		/*
+>>  		 * Setup timer to fire at 1/HZ intervals.
+>>  		 */
+>> -		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD_OFF);
+>> -		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL_OFF);
+>> +		writel(ticks_per_jiffy - 1, local_base + TIMER0_RELOAD_OFF);
+>> +		writel(ticks_per_jiffy - 1, local_base + TIMER0_VAL_OFF);
+>>  
+>>  		/*
+>>  		 * Enable timer.
+>>  		 */
+>> -		u = readl(timer_base + TIMER_CTRL_OFF);
+>>  
+>> -		writel((u | TIMER1_EN | TIMER1_RELOAD_EN |
+>> -			TIMER1_DIV(TIMER_DIVIDER_SHIFT)),
+>> -		       timer_base + TIMER_CTRL_OFF);
+>> +		u = readl(local_base + TIMER_CTRL_OFF);
+>> +
+>> +		writel((u | TIMER0_EN | TIMER0_RELOAD_EN |
+>> +			TIMER0_DIV(TIMER_DIVIDER_SHIFT)),
+>> +			local_base + TIMER_CTRL_OFF);
+>>  	} else {
+>>  		/*
+>>  		 * Disable timer.
+>>  		 */
+>> -		u = readl(timer_base + TIMER_CTRL_OFF);
+>> -		writel(u & ~TIMER1_EN, timer_base + TIMER_CTRL_OFF);
+>> +		u = readl(local_base + TIMER_CTRL_OFF);
+>> +		writel(u & ~TIMER0_EN, local_base + TIMER_CTRL_OFF);
+>>  
+>>  		/*
+>>  		 * ACK pending timer interrupt.
+>>  		 */
+>> -		writel(TIMER1_CLR_MASK, timer_base + TIMER_EVENTS_STATUS);
+>> -
+>> +		writel(TIMER0_CLR_MASK, local_base + LCL_TIMER_EVENTS_STATUS);
+>>  	}
+>>  }
+>>  
+>>  static struct clock_event_device armada_370_xp_clkevt = {
+>> -	.name		= "armada_370_xp_tick",
+>> +	.name		= "armada_370_xp_per_cpu_tick",
+>>  	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+>>  	.shift		= 32,
+>>  	.rating		= 300,
+>> @@ -150,32 +156,78 @@ static irqreturn_t armada_370_xp_timer_interrupt(int irq, void *dev_id)
+>>  	/*
+>>  	 * ACK timer interrupt and call event handler.
+>>  	 */
+>> +	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
+>>  
+>> -	writel(TIMER1_CLR_MASK, timer_base + TIMER_EVENTS_STATUS);
+>> -	armada_370_xp_clkevt.event_handler(&armada_370_xp_clkevt);
+>> +	writel(TIMER0_CLR_MASK, local_base + LCL_TIMER_EVENTS_STATUS);
+>> +	evt->event_handler(evt);
+>>  
+>>  	return IRQ_HANDLED;
+>>  }
+>>  
+>> -static struct irqaction armada_370_xp_timer_irq = {
+>> -	.name		= "armada_370_xp_tick",
+>> -	.flags		= IRQF_DISABLED | IRQF_TIMER,
+>> -	.handler	= armada_370_xp_timer_interrupt
+>> +/*
+>> + * Setup the local clock events for a CPU.
+>> + */
+>> +static int __cpuinit armada_370_xp_timer_setup(struct clock_event_device *evt)
+>> +{
+>> +	u32 u;
+>> +	int cpu = smp_processor_id();
+>> +
+>> +	/* Use existing clock_event for cpu 0 */
+>> +	if (!smp_processor_id())
+>> +		return 0;
+>> +
+>> +	u = readl(local_base + TIMER_CTRL_OFF);
+>> +	if (timer25Mhz)
+>> +		writel(u | TIMER0_25MHZ, local_base + TIMER_CTRL_OFF);
+>> +	else
+>> +		writel(u & ~TIMER0_25MHZ, local_base + TIMER_CTRL_OFF);
+>> +
+>> +	evt->name		= armada_370_xp_clkevt.name;
+>> +	evt->irq		= armada_370_xp_clkevt.irq;
+>> +	evt->features		= armada_370_xp_clkevt.features;
+>> +	evt->shift		= armada_370_xp_clkevt.shift;
+>> +	evt->rating		= armada_370_xp_clkevt.rating,
+>> +	evt->set_next_event	= armada_370_xp_clkevt_next_event,
+>> +	evt->set_mode		= armada_370_xp_clkevt_mode,
+>> +	evt->cpumask		= cpumask_of(cpu);
+>> +
+>> +	*__this_cpu_ptr(percpu_armada_370_xp_evt) = evt;
+>> +
+>> +	clockevents_config_and_register(evt, timer_clk, 1, 0xfffffffe);
+>> +	enable_percpu_irq(evt->irq, 0);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void  armada_370_xp_timer_stop(struct clock_event_device *evt)
+>> +{
+>> +	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+>> +	disable_percpu_irq(evt->irq);
+>> +}
+>> +
+>> +static struct local_timer_ops armada_370_xp_local_timer_ops __cpuinitdata = {
+>> +	.setup	= armada_370_xp_timer_setup,
+>> +	.stop	=  armada_370_xp_timer_stop,
+>>  };
+>>  
+>>  void __init armada_370_xp_timer_init(void)
+>>  {
+>>  	u32 u;
+>>  	struct device_node *np;
+>> -	unsigned int timer_clk;
+>> +	int res;
+>> +
+>>  	np = of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-timer");
+>>  	timer_base = of_iomap(np, 0);
+>>  	WARN_ON(!timer_base);
+>> +	local_base = of_iomap(np, 1);
+>>  
+>>  	if (of_find_property(np, "marvell,timer-25Mhz", NULL)) {
+>>  		/* The fixed 25MHz timer is available so let's use it */
+>> +		u = readl(local_base + TIMER_CTRL_OFF);
+>> +		writel(u | TIMER0_25MHZ,
+>> +		       local_base + TIMER_CTRL_OFF);
+>>  		u = readl(timer_base + TIMER_CTRL_OFF);
+>> -		writel(u | TIMER0_25MHZ | TIMER1_25MHZ,
+>> +		writel(u | TIMER0_25MHZ,
+>>  		       timer_base + TIMER_CTRL_OFF);
+>>  		timer_clk = 25000000;
+>>  	} else {
+>> @@ -183,15 +235,23 @@ void __init armada_370_xp_timer_init(void)
+>>  		struct clk *clk = of_clk_get(np, 0);
+>>  		WARN_ON(IS_ERR(clk));
+>>  		rate =  clk_get_rate(clk);
+>> +		u = readl(local_base + TIMER_CTRL_OFF);
+>> +		writel(u & ~(TIMER0_25MHZ),
+>> +		       local_base + TIMER_CTRL_OFF);
+>> +
+>>  		u = readl(timer_base + TIMER_CTRL_OFF);
+>> -		writel(u & ~(TIMER0_25MHZ | TIMER1_25MHZ),
+>> +		writel(u & ~(TIMER0_25MHZ),
+>>  		       timer_base + TIMER_CTRL_OFF);
+>> +
+>>  		timer_clk = rate / TIMER_DIVIDER;
+>> +		timer25Mhz = false;
+>>  	}
+>>  
+>> -	/* We use timer 0 as clocksource, and timer 1 for
+>> -	   clockevents */
+>> -	timer_irq = irq_of_parse_and_map(np, 1);
+>> +	/*
+>> +	 * We use timer 0 as clocksource, and private(local) timer 0
+>> +	 * for clockevents
+>> +	 */
+>> +	armada_370_xp_clkevt.irq = irq_of_parse_and_map(np, 4);
+>>  
+>>  	ticks_per_jiffy = (timer_clk + HZ / 2) / HZ;
+>>  
+>> @@ -216,12 +276,26 @@ void __init armada_370_xp_timer_init(void)
+>>  			      "armada_370_xp_clocksource",
+>>  			      timer_clk, 300, 32, clocksource_mmio_readl_down);
+>>  
+>> -	/*
+>> -	 * Setup clockevent timer (interrupt-driven).
+>> -	 */
+>> -	setup_irq(timer_irq, &armada_370_xp_timer_irq);
+>> +	/* Register the clockevent on the private timer of CPU 0 */
+>>  	armada_370_xp_clkevt.cpumask = cpumask_of(0);
+>>  	clockevents_config_and_register(&armada_370_xp_clkevt,
+>>  					timer_clk, 1, 0xfffffffe);
+>> -}
+>>  
+>> +	percpu_armada_370_xp_evt = alloc_percpu(struct clock_event_device *);
+>> +
+>> +
+>> +	/*
+>> +	 * Setup clockevent timer (interrupt-driven).
+>> +	 */
+>> +	*__this_cpu_ptr(percpu_armada_370_xp_evt) = &armada_370_xp_clkevt;
+>> +	res = request_percpu_irq(armada_370_xp_clkevt.irq,
+>> +				armada_370_xp_timer_interrupt,
+>> +				armada_370_xp_clkevt.name,
+>> +				percpu_armada_370_xp_evt);
+>> +	if (!res) {
+>> +		enable_percpu_irq(armada_370_xp_clkevt.irq, 0);
+>> +#ifdef CONFIG_LOCAL_TIMERS
+>> +		local_timer_register(&armada_370_xp_local_timer_ops);
+>> +#endif
+>> +	}
+>> +}
+>> -- 
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
