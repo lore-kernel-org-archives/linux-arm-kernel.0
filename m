@@ -1,60 +1,181 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Feb 2013 01:33:39 -0600
-Subject: [PATCH 1/1] ARM: OMAP4: Add OMAP4 Blaze Tablet support
-In-Reply-To: <CAB=otbScyfU3PmANeLhgdeVEW=iG3yWXP46ZKwOWHaxeac1djA@mail.gmail.com>
-References: <1360352269-14922-1-git-send-email-ruslan.bilovol@ti.com>
- <1360352269-14922-2-git-send-email-ruslan.bilovol@ti.com>
- <20130210025225.GB4801@atomide.com> <51193DE1.6080704@ti.com>
- <20130211190011.GS4801@atomide.com>
- <CAB=otbScyfU3PmANeLhgdeVEW=iG3yWXP46ZKwOWHaxeac1djA@mail.gmail.com>
-Message-ID: <511DE4D3.8020405@ti.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 15 Feb 2013 10:07:17 +0200
+Subject: [PATCH v7 1/2] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <d9e1adbe6b12aab495f0292c4553c5c8f61c70b5.1359684780.git.rtivy@ti.com>
+References: <cover.1359684780.git.rtivy@ti.com>
+ <d9e1adbe6b12aab495f0292c4553c5c8f61c70b5.1359684780.git.rtivy@ti.com>
+Message-ID: <CAK=WgbafX++Nj62w7w0UP-eQdFDWq_NGgTWVmnVxUUbe+WycEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
 
-On 02/13/2013 05:28 PM, Ruslan Bilovol wrote:
-> Hi Tony, Jon,
-> 
-> On Mon, Feb 11, 2013 at 9:00 PM, Tony Lindgren <tony@atomide.com> wrote:
->> * Jon Hunter <jon-hunter@ti.com> [130211 10:58]:
->>>
->>> Please note that the blaze is derived from the omap4-sdp board and so I
->>> would hope that we can use the existing for sdp dts and board file for
->>> blaze. In fact this is what I do today for basic booting.
->>>
->>> So unless there is some feature on the blaze that is not compatible with
->>> the original sdp, we should just use the sdp dts.
->>
->> Sounds like we need some common .dts file and separate files
->> for sdp, blaze and tablet that include the common .dts file?
->>
->> There's a different LCD panel at least between blaze and the
->> tablet.
-> 
-> Please note, that, although 'Blaze' board is very close to 'SDP' board,
-> there are quite big differences comparing to 'Blaze Tablet' board.
-> At least:
->  - LCD panels
->  - touchscreen controllers
->  - LEDs
->  - Keypad (on 'Blaze') / gpio keys (on 'Blaze Tablet')
->  - Sensors
->  - HS USB Host related stuff
+On Fri, Feb 1, 2013 at 4:24 AM, Robert Tivy <rtivy@ti.com> wrote:
+>  drivers/remoteproc/Kconfig            |   29 ++-
+>  drivers/remoteproc/Makefile           |    1 +
+>  drivers/remoteproc/da8xx_remoteproc.c |  346 +++++++++++++++++++++++++++++++++
+>  drivers/remoteproc/remoteproc_core.c  |   22 ++-
 
-SDP also has usb host too (but yes blaze does not).
+It looks like this patch squashes:
+1. A fix to drivers/remoteproc/Kconfig
+2. New functionality in remoteproc_core.c
+3. A new da8xx driver
 
->  - cameras (there is no embedded cameras on 'Blaze Tablet' board)
-> 
-> As per my point of view, next should be done:
-> 1) Add the DTS file for BlazeTablet board
-> 2) Figure out what is common for both and move it to some common file
-> (if that makes sense)
-> 
-> I'm currently working on step '#1'. So after that step #2 should not
-> be an issue for us.
+These are independent changes, so we better split them up to separate patches.
 
-Sounds good. They all use the same processor boards and so may be that
-can be common in DT and we can have a dtsi for that.
+>  config OMAP_REMOTEPROC
+>         tristate "OMAP remoteproc support"
+> -       depends on EXPERIMENTAL
+...
+>  config STE_MODEM_RPROC
+>         tristate "STE-Modem remoteproc support"
+> -       depends on EXPERIMENTAL
 
-Cheers
-Jon
+These look unrelated to this patch, and it seems that Kees Cook
+submitted these awhile ago so it should probably already be in
+linux-next (haven't looked). I think we can drop these.
+
+> +/**
+> + * handle_event() - inbound virtqueue message workqueue function
+> + *
+> + * This function is registered as a kernel thread and is scheduled by the
+> + * kernel handler.
+> + */
+> +static irqreturn_t handle_event(int irq, void *p)
+> +{
+> +       struct rproc *rproc = (struct rproc *)p;
+> +
+> +       /* Process incoming buffers on our vring */
+> +       while (IRQ_HANDLED == rproc_vq_interrupt(rproc, 0))
+> +               ;
+> +
+> +       /* Must allow wakeup of potenitally blocking senders */
+> +       rproc_vq_interrupt(rproc, 1);
+
+IIRC we agreed on removing this part, and instead adding it to the
+generic remoteproc framework (i.e. Cyril's patch).
+
+> +static int da8xx_rproc_start(struct rproc *rproc)
+> +{
+...
+> +       dsp_clk = devm_clk_get(dev, NULL);
+> +       if (IS_ERR(dsp_clk)) {
+> +               dev_err(dev, "clk_get error: %ld\n", PTR_ERR(dsp_clk));
+> +
+> +               return PTR_RET(dsp_clk);
+> +       }
+> +       drproc->dsp_clk = dsp_clk;
+
+Have you considered doing this in ->probe() instead? Do we need to
+call get/put every time we start/stop the remote processor?
+
+> +/* kick a virtqueue */
+> +static void da8xx_rproc_kick(struct rproc *rproc, int vqid)
+> +{
+> +       struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
+> +       int timed_out;
+> +       unsigned long timeout;
+> +
+> +       timed_out = 0;
+> +       timeout = jiffies + HZ/100;
+> +
+> +       /* Poll for ack from other side first */
+> +       while (readl(drproc->chipsig) & SYSCFG_CHIPSIG2)
+> +               if (time_after(jiffies, timeout)) {
+> +                       if (readl(drproc->chipsig) & SYSCFG_CHIPSIG2) {
+> +                               dev_err(rproc->dev.parent,
+> +                                       "failed to receive ack\n");
+> +                               timed_out = 1;
+> +                       }
+> +
+> +                       break;
+> +               }
+
+This still looks a bit out of place here.
+
+Kicking should be a fast unilateral action, that doesn't depend on the
+other side.
+
+> +static int da8xx_rproc_probe(struct platform_device *pdev)
+> +{
+...
+> +       ret = rproc_add(rproc);
+> +       if (ret) {
+> +               dev_err(dev, "rproc_add failed: %d\n", ret);
+> +               goto free_rproc;
+> +       }
+> +
+> +       drproc->chipsig = chipsig;
+> +       drproc->bootreg = bootreg;
+> +       drproc->ack_fxn = irq_data->chip->irq_ack;
+> +       drproc->irq_data = irq_data;
+> +       drproc->irq = irq;
+> +
+> +       /* everything the ISR needs is now setup, so hook it up */
+> +       ret = devm_request_threaded_irq(dev, irq, da8xx_rproc_callback,
+> +               handle_event, 0, "da8xx-remoteproc", rproc);
+> +       if (ret) {
+> +               dev_err(dev, "devm_request_threaded_irq error: %d\n", ret);
+> +               rproc_del(rproc);
+> +               goto free_rproc;
+> +       }
+
+Shouldn't we be requesting this before we rproc_add() ?
+
+> +static int da8xx_rproc_remove(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct rproc *rproc = platform_get_drvdata(pdev);
+> +       struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
+> +       int ret;
+...
+> +       ret = rproc_del(rproc);
+
+You can safely remove 'ret' altogether. We will just crash in
+rproc_put if rproc is NULL.
+
+> +       rproc_put(rproc);
+> +
+> +       return ret;
+> +}
+
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index dd3bfaf..e0f703e 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -1222,19 +1222,39 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
+>                                 const char *firmware, int len)
+>  {
+>         struct rproc *rproc;
+> +       char *template = "rproc-%s-fw";
+> +       char *p;
+>
+>         if (!dev || !name || !ops)
+>                 return NULL;
+>
+> +       if (!firmware)
+> +               /*
+> +                * Make room for default firmware name (minus %s plus '\0').
+> +                * If the caller didn't pass in a firmware name then
+> +                * construct a default name.  We're already glomming 'len'
+> +                * bytes onto the end of the struct rproc allocation, so do
+> +                * a few more for the default firmware name (but only if
+> +                * the caller doesn't pass one).
+> +                */
+> +               len += strlen(name) + strlen(template) - 2 + 1;
+> +
+>         rproc = kzalloc(sizeof(struct rproc) + len, GFP_KERNEL);
+>         if (!rproc) {
+>                 dev_err(dev, "%s: kzalloc failed\n", __func__);
+>                 return NULL;
+>         }
+>
+> +       if (!firmware) {
+> +               p = (char *)rproc + sizeof(struct rproc) + len;
+> +               sprintf(p, template, name);
+
+Looks like p you're writing to is outside of the rproc memory allocation.
+
+Thanks,
+Ohad.
