@@ -1,62 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Feb 2013 10:26:18 +0000
-Subject: [PATCH 1/9] ARM: arch_timer: include linux/errno.h
-In-Reply-To: <1360882071-4072668-2-git-send-email-arnd@arndb.de>
-References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
- <1360882071-4072668-2-git-send-email-arnd@arndb.de>
-Message-ID: <20130215102618.GJ25537@e106331-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 15 Feb 2013 10:33:40 +0000
+Subject: [BUG] v7_coherent_kern_range broken on big.LITTLE
+In-Reply-To: <1360922677.4078.12.camel@linaro1.home>
+References: <1360861663.3266.58.camel@linaro1.home>
+ <20130214171615.GH12629@mudshark.cambridge.arm.com>
+ <1360922677.4078.12.camel@linaro1.home>
+Message-ID: <20130215103340.GA3014@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Feb 15, 2013 at 10:04:37AM +0000, Jon Medhurst (Tixy) wrote:
+> On Thu, 2013-02-14 at 17:16 +0000, Will Deacon wrote:
+> > Hi Tixy,
+> > 
+> > On Thu, Feb 14, 2013 at 05:07:43PM +0000, Jon Medhurst (Tixy) wrote:
+> > > The function v7_coherent_kern_range uses the macro icache_line_size to
+> > > read the current CPUs icache line size for the purpose of invalidating
+> > > all cache lines in the given range.
+> > > 
+> > > Unfortunately, on the TC2 big.LITTLE test chip, the A15 icache line size
+> > > is 64 bytes, but the A7 size is only 32 bytes. So when the function
+> > > executes on the A15 it will miss out every alternate cache line for the
+> > > A7.
+> > 
+> > There is a signal (IMINLN) to the core which allows A15 to behave as though
+> > it has a 32-byte line size and this should be driven correctly for big/little.
+> 
+> How do we set that signal? Is that something we have to set up in Linux
+> or is it something that we expect the Firmware to set up?
 
-As with Stephen Warren's fix [1], this looks right to me. Stephen's has the
-added benefit of keeping the includes ordered.
+If I am not mistaken, SCC register at offset 0x400 (bit 7) allows IMINLN to
+be forced to 0 (ie Instruction Cache minimum line size == 32 bytes).
 
-For either version:
+This can be done through board.txt so that it is set up as we want.
 
-Acked-By: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149579.html
-
-On Thu, Feb 14, 2013 at 10:47:43PM +0000, Arnd Bergmann wrote:
-> Patch 8a4da6e "arm: arch_timer: move core to drivers/clocksource"
-> moved a lot of code out of arch_timer.c, but ended up deleting
-> too much, which broke some configurations.
-> 
-> Obviously, include linux/errno.h is required to return error
-> values.
-> 
-> Without this patch, building allmodconfig results in:
-> 
-> arch/arm/kernel/arch_timer.c: In function 'arch_timer_sched_clock_init':
-> arch/arm/kernel/arch_timer.c:55:11: error: 'ENXIO' undeclared (first use in this function)
-> arch/arm/kernel/arch_timer.c:55:11: note: each undeclared identifier is reported only once for each function it appears in
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kernel/arch_timer.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> index 36ebcf4..d957a51 100644
-> --- a/arch/arm/kernel/arch_timer.c
-> +++ b/arch/arm/kernel/arch_timer.c
-> @@ -10,6 +10,7 @@
->   */
->  #include <linux/init.h>
->  #include <linux/types.h>
-> +#include <linux/errno.h>
->  
->  #include <asm/delay.h>
->  #include <asm/sched_clock.h>
-> -- 
-> 1.8.1.2
-> 
-> 
+HTH,
+Lorenzo
