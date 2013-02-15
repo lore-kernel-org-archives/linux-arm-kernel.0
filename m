@@ -1,122 +1,76 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:56:58 +0000
-Subject: [PATCH 27/35] mfd: ab8500-debugfs: Dump sim registers
+Date: Fri, 15 Feb 2013 12:56:59 +0000
+Subject: [PATCH 28/35] mfd: ab8500-debug: Add ADC input channel usb_id in
+ debugfs
 In-Reply-To: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
 References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360933026-30325-28-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360933026-30325-29-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mattias Wallin <mattias.wallin@stericsson.com>
+From: Yang QU <yang.qu@stericsson.com>
 
-This patch allows to dump the SIM registers from debugfs. It will
-temporary change the config to allow APE side to read the SIM registers.
-Note that this read can cause problem on modem side since the modem
-can't read these registers while the operation is ongoing.
-
-Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
+Signed-off-by: Yang QU <yang.qu@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Marcus COOPER <marcus.xm.cooper@stericsson.com>
-Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
+Reviewed-by: Alexandre BOURDIOL <alexandre.bourdiol@stericsson.com>
+Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
+Reviewed-by: Mattias WALLIN <mattias.wallin@stericsson.com>
 ---
- drivers/mfd/ab8500-debugfs.c |   78 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 78 insertions(+)
+ drivers/mfd/ab8500-debugfs.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
 diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 7173406..a301f10 100644
+index a301f10..ae8660a 100644
 --- a/drivers/mfd/ab8500-debugfs.c
 +++ b/drivers/mfd/ab8500-debugfs.c
-@@ -1243,6 +1243,79 @@ static int ab8500_hwreg_open(struct inode *inode, struct file *file)
- 	return single_open(file, ab8500_hwreg_print, inode->i_private);
- }
+@@ -1705,6 +1705,35 @@ static const struct file_operations ab8500_gpadc_die_temp_fops = {
+ 	.owner = THIS_MODULE,
+ };
  
-+#define AB8500_SUPPLY_CONTROL_CONFIG_1 0x01
-+#define AB8500_SUPPLY_CONTROL_REG 0x00
-+#define AB8500_FIRST_SIM_REG 0x80
-+#define AB8500_LAST_SIM_REG 0x8B
-+#define AB8505_LAST_SIM_REG 0x8C
-+
-+static int ab8500_print_modem_registers(struct seq_file *s, void *p)
++static int ab8500_gpadc_usb_id_print(struct seq_file *s, void *p)
 +{
-+	struct device *dev = s->private;
-+	struct ab8500 *ab8500;
-+	int err;
-+	u8 value;
-+	u8 orig_value;
-+	u32 bank = AB8500_REGU_CTRL2;
-+	u32 last_sim_reg = AB8500_LAST_SIM_REG;
-+	u32 reg;
++	int usb_id_raw;
++	int usb_id_convert;
++	struct ab8500_gpadc *gpadc;
 +
-+	ab8500 = dev_get_drvdata(dev->parent);
-+	dev_warn(dev, "WARNING! This operation can interfer with modem side\n"
-+		"and should only be done with care\n");
++	gpadc = ab8500_gpadc_get("ab8500-gpadc.0");
++	usb_id_raw = ab8500_gpadc_read_raw(gpadc, USB_ID,
++		avg_sample, trig_edge, trig_timer, conv_type);
++	usb_id_convert = ab8500_gpadc_ad_to_voltage(gpadc, USB_ID,
++		usb_id_raw);
 +
-+	err = abx500_get_register_interruptible(dev,
-+		AB8500_REGU_CTRL1, AB8500_SUPPLY_CONTROL_REG, &orig_value);
-+	if (err < 0) {
-+		dev_err(dev, "ab->read fail %d\n", err);
-+		return err;
-+	}
-+	/* Config 1 will allow APE side to read SIM registers */
-+	err = abx500_set_register_interruptible(dev,
-+		AB8500_REGU_CTRL1, AB8500_SUPPLY_CONTROL_REG,
-+		AB8500_SUPPLY_CONTROL_CONFIG_1);
-+	if (err < 0) {
-+		dev_err(dev, "ab->write fail %d\n", err);
-+		return err;
-+	}
-+
-+	seq_printf(s, " bank 0x%02X:\n", bank);
-+
-+	if (is_ab9540(ab8500) || is_ab8505(ab8500))
-+		last_sim_reg = AB8505_LAST_SIM_REG;
-+
-+	for (reg = AB8500_FIRST_SIM_REG; reg <= last_sim_reg; reg++) {
-+		err = abx500_get_register_interruptible(dev,
-+			bank, reg, &value);
-+		if (err < 0) {
-+			dev_err(dev, "ab->read fail %d\n", err);
-+			return err;
-+		}
-+		err = seq_printf(s, "  [0x%02X/0x%02X]: 0x%02X\n",
-+			bank, reg, value);
-+	}
-+	err = abx500_set_register_interruptible(dev,
-+		AB8500_REGU_CTRL1, AB8500_SUPPLY_CONTROL_REG, orig_value);
-+	if (err < 0) {
-+		dev_err(dev, "ab->write fail %d\n", err);
-+		return err;
-+	}
-+	return 0;
++	return seq_printf(s, "%d,0x%X\n",
++			usb_id_convert, usb_id_raw);
 +}
 +
-+static int ab8500_modem_open(struct inode *inode, struct file *file)
++static int ab8500_gpadc_usb_id_open(struct inode *inode, struct file *file)
 +{
-+	return single_open(file, ab8500_print_modem_registers, inode->i_private);
++	return single_open(file, ab8500_gpadc_usb_id_print, inode->i_private);
 +}
 +
-+static const struct file_operations ab8500_modem_fops = {
-+	.open = ab8500_modem_open,
++static const struct file_operations ab8500_gpadc_usb_id_fops = {
++	.open = ab8500_gpadc_usb_id_open,
 +	.read = seq_read,
 +	.llseek = seq_lseek,
 +	.release = single_release,
 +	.owner = THIS_MODULE,
 +};
 +
- static int ab8500_gpadc_bat_ctrl_print(struct seq_file *s, void *p)
+ static int ab8540_gpadc_xtal_temp_print(struct seq_file *s, void *p)
  {
- 	int bat_ctrl_raw;
-@@ -2569,6 +2642,11 @@ static int ab8500_debug_probe(struct platform_device *plf)
+ 	int xtal_temp_raw;
+@@ -2711,6 +2740,12 @@ static int ab8500_debug_probe(struct platform_device *plf)
+ 	    ab8500_gpadc_dir, &plf->dev, &ab8500_gpadc_die_temp_fops);
  	if (!file)
  		goto err;
- 
-+	file = debugfs_create_file("all-modem-registers", (S_IRUGO | S_IWUGO),
-+	    ab8500_dir, &plf->dev, &ab8500_modem_fops);
++
++	file = debugfs_create_file("usb_id", (S_IRUGO | S_IWUGO),
++	    ab8500_gpadc_dir, &plf->dev, &ab8500_gpadc_usb_id_fops);
 +	if (!file)
 +		goto err;
 +
- 	file = debugfs_create_file("bat_ctrl", (S_IRUGO | S_IWUSR),
- 	    ab8500_gpadc_dir, &plf->dev, &ab8500_gpadc_bat_ctrl_fops);
- 	if (!file)
+ 	if (is_ab8540(ab8500)) {
+ 		file = debugfs_create_file("xtal_temp", (S_IRUGO | S_IWUGO),
+ 		    ab8500_gpadc_dir, &plf->dev, &ab8540_gpadc_xtal_temp_fops);
 -- 
 1.7.10.4
