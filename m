@@ -1,40 +1,49 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 15 Feb 2013 17:09:12 -0500
-Subject: [PATCH v2 3/5] arm: mvebu: update defconfig with local timer
- support
-In-Reply-To: <511EB0DE.5090509@free-electrons.com>
-References: <1359135165-32108-1-git-send-email-gregory.clement@free-electrons.com>
- <1359135165-32108-4-git-send-email-gregory.clement@free-electrons.com>
- <20130215215640.GI14746@titan.lakedaemon.net>
- <511EB0DE.5090509@free-electrons.com>
-Message-ID: <20130215220912.GL14746@titan.lakedaemon.net>
+Date: Fri, 15 Feb 2013 17:38:44 -0500
+Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
+In-Reply-To: <1360966349-1242560-2-git-send-email-arnd@arndb.de>
+References: <201302152158.23446.arnd@arndb.de>
+ <1360966349-1242560-1-git-send-email-arnd@arndb.de>
+ <1360966349-1242560-2-git-send-email-arnd@arndb.de>
+Message-ID: <20130215223844.GN14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 11:04:14PM +0100, Gregory CLEMENT wrote:
-> On 02/15/2013 10:56 PM, Jason Cooper wrote:
-> > On Fri, Jan 25, 2013 at 06:32:43PM +0100, Gregory CLEMENT wrote:
-> >> Now that we have support for local timers, enable it by default
-> >>
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >> ---
-> >>  arch/arm/configs/mvebu_defconfig |    1 -
-> >>  1 file changed, 1 deletion(-)
-> > 
-> > Applied patches 1, 2, and 3 of this series to mvebu/boards.  In the
-> > future, please put driver changes first (patch #2) with few if any
-> > dependencies.
-> > 
-> > In this case, since these patches depended on SMP support added to
-> > mvebu/boards, I had to apply them to mvebu/boards to prevent a circular
-> > dependency.
+On Fri, Feb 15, 2013 at 11:12:29PM +0100, Arnd Bergmann wrote:
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
 > 
-> Well the patch #2 can't work without the #1 (local interrupt support), so if
-> the order is changed then we loose the "bissecatiblity". That was the reason of
-> this order.
+> With the multiplatform changes in arm-soc tree, it becomes
+> possible to enable the mvebu platform (which uses
+> ehci-orion) at the same time as other platforms that require
+> a conflicting EHCI bus glue. At the moment, this results
+> in a warning like
+> 
+> drivers/usb/host/ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+> drivers/usb/host/ehci-hcd.c:1277:0: note: this is the location of the previous definition
+> drivers/usb/host/ehci-orion.c:334:31: warning: 'ehci_orion_driver' defined but not used [-Wunused-variable]
+> 
+> and an ehci driver that only works on one of them.
+> 
+> With the infrastructure added by Alan Stern in patch 3e0232039
+> "USB: EHCI: prepare to make ehci-hcd a library module", we can
+> avoid this problem by turning a bus glue into a separate
+> module, as we do here for the orion bus glue.
+> 
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/usb/host/Kconfig      |  8 ++++
+>  drivers/usb/host/Makefile     |  1 +
+>  drivers/usb/host/ehci-hcd.c   |  6 +--
+>  drivers/usb/host/ehci-orion.c | 90 ++++++++++++++++++++-----------------------
+>  4 files changed, 52 insertions(+), 53 deletions(-)
 
-Yes, that's why I kept them in order and didn't put them in
-mvebu/drivers.
+This looks sane to me, but I unfortunately don't have time to test atm.
+So if Arnd has been working with you:
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
 thx,
 
