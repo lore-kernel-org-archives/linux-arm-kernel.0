@@ -1,127 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:57:06 +0000
-Subject: [PATCH 35/35] mfd: ab8500-core: Hierarchical interrupt registers
-In-Reply-To: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
-References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360933026-30325-36-git-send-email-lee.jones@linaro.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 15 Feb 2013 22:00:58 +0900
+Subject: [PATCH 2/5] ARM: shmobile: kzm9g: Remove warning about SMP
+In-Reply-To: <1360933261-6359-1-git-send-email-horms+renesas@verge.net.au>
+References: <1360933261-6359-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1360933261-6359-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dariusz Szymczak <dariusz.xd.szymczak@stericsson.com>
+Remove warning about SMP not working with the
+clock initialisation used for kzm9g reference.
 
-Make use of the hierarchical interrupt rergister called
-ITLatchHier1 - 3 also for the 8500 platform (currently the
-hierarchical interrupt registers are used only for the 8540
-and 9540 platforms). This will make the interrupt routing
-go faster since fewer i2c reads need to made in the most
-common cases.
+This is resolved by not selecting CONFIG_PREEMPT.
 
-Signed-off-by: Dariusz Szymczak <dariusz.xd.szymczak@stericsson.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Mian Yousaf KAUKAB <mian.yousaf.kaukab@stericsson.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/mfd/ab8500-core.c |   82 ++++-----------------------------------------
- 1 file changed, 6 insertions(+), 76 deletions(-)
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |    7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 2716c6c..fd87e0a 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -502,66 +502,6 @@ static irqreturn_t ab8500_hierarchical_irq(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
+diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+index a677d61..bce2a49 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+@@ -98,13 +98,6 @@ static const char *kzm9g_boards_compat_dt[] __initdata = {
+ 	NULL,
+ };
  
--/**
-- * ab8500_irq_get_virq(): Map an interrupt on a chip to a virtual IRQ
+-/* Please note that the clock initialisation shcheme used in
+- * sh73a0_add_early_devices_dt() and sh73a0_add_standard_devices_dt()
+- * does not work with SMP as there is a yet to be resolved lock-up in
+- * workqueue initialisation.
 - *
-- * @ab8500: ab8500_irq controller to operate on.
-- * @irq: index of the interrupt requested in the chip IRQs
-- *
-- * Useful for drivers to request their own IRQs.
+- * CONFIG_SMP should be disabled when using this code.
 - */
--static int ab8500_irq_get_virq(struct ab8500 *ab8500, int irq)
--{
--	if (!ab8500)
--		return -EINVAL;
--
--	return irq_create_mapping(ab8500->domain, irq);
--}
--
--static irqreturn_t ab8500_irq(int irq, void *dev)
--{
--	struct ab8500 *ab8500 = dev;
--	int i;
--
--	dev_vdbg(ab8500->dev, "interrupt\n");
--
--	atomic_inc(&ab8500->transfer_ongoing);
--
--	for (i = 0; i < ab8500->mask_size; i++) {
--		int regoffset = ab8500->irq_reg_offset[i];
--		int status;
--		u8 value;
--
--		/*
--		 * Interrupt register 12 doesn't exist prior to AB8500 version
--		 * 2.0
--		 */
--		if (regoffset == 11 && is_ab8500_1p1_or_earlier(ab8500))
--			continue;
--
--		if (regoffset < 0)
--			continue;
--
--		status = get_register_interruptible(ab8500, AB8500_INTERRUPT,
--			AB8500_IT_LATCH1_REG + regoffset, &value);
--		if (status < 0 || value == 0)
--			continue;
--
--		do {
--			int bit = __ffs(value);
--			int line = i * 8 + bit;
--			int virq = ab8500_irq_get_virq(ab8500, line);
--
--			handle_nested_irq(virq);
--			ab8500_debug_register_interrupt(line);
--			value &= ~(1 << bit);
--
--		} while (value);
--	}
--	atomic_dec(&ab8500->transfer_ongoing);
--	return IRQ_HANDLED;
--}
--
- static int ab8500_irq_map(struct irq_domain *d, unsigned int virq,
- 				irq_hw_number_t hwirq)
- {
-@@ -1697,22 +1637,12 @@ static int ab8500_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	/*  Activate this feature only in ab9540 */
--	/*  till tests are done on ab8500 1p2 or later*/
--	if (is_ab9540(ab8500) || is_ab8540(ab8500))
--		ret = devm_request_threaded_irq(&pdev->dev, ab8500->irq, NULL,
--						ab8500_hierarchical_irq,
--						IRQF_ONESHOT | IRQF_NO_SUSPEND,
--						"ab8500", ab8500);
--	}
--	else {
--		ret = devm_request_threaded_irq(&pdev->dev, ab8500->irq, NULL,
--						ab8500_irq,
--						IRQF_ONESHOT | IRQF_NO_SUSPEND,
--						"ab8500", ab8500);
--		if (ret)
--			return ret;
--	}
-+	ret = devm_request_threaded_irq(&pdev->dev, ab8500->irq, NULL,
-+			ab8500_hierarchical_irq,
-+			IRQF_ONESHOT | IRQF_NO_SUSPEND,
-+			"ab8500", ab8500);
-+	if (ret)
-+		return ret;
- 
- 	if (is_ab9540(ab8500))
- 		ret = mfd_add_devices(ab8500->dev, 0, ab9540_devs,
+ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
+ 	.smp		= smp_ops(sh73a0_smp_ops),
+ 	.map_io		= sh73a0_map_io,
 -- 
 1.7.10.4
