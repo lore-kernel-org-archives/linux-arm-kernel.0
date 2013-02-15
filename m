@@ -1,21 +1,34 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 15 Feb 2013 15:37:38 -0500
-Subject: [PATCH V4 07/11] ARM: mvebu: correct gated clock documentation
-In-Reply-To: <8c1b5e8a489bee43073399187303b89098392c7a.1359232975.git.jason@lakedaemon.net>
-References: <cover.1359232975.git.jason@lakedaemon.net>
- <8c1b5e8a489bee43073399187303b89098392c7a.1359232975.git.jason@lakedaemon.net>
-Message-ID: <20130215203738.GA14746@titan.lakedaemon.net>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 15 Feb 2013 12:18:59 -0800
+Subject: [PATCH v2 1/1] drivers: net: davinci_cpdma: acknowledge
+ interrupt properly
+In-Reply-To: <20130215.150506.499818568035818118.davem@davemloft.net>
+References: <1360866406-17261-1-git-send-email-mugunthanvnm@ti.com>
+ <20130215.150506.499818568035818118.davem@davemloft.net>
+Message-ID: <1360959539.21068.5.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 08:50:16PM +0000, Jason Cooper wrote:
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, 2013-02-15 at 15:05 -0500, David Miller wrote:
+> From: Mugunthan V N <mugunthanvnm@ti.com>
+> Date: Thu, 14 Feb 2013 23:56:46 +0530
+> 
+> > +enum {
+> > +     CPDMA_EOI_RX_THRESH = 0,
+> > +     CPDMA_EOI_RX,
+> > +     CPDMA_EOI_TX,
+> > +     CPDMA_EOI_MISC,
+> > +};
+> 
+> Do not use enumerations for hardware register values, which must be
+> exact, otherwise you are potentially going to succumb to the vagaries
+> of C language enumeration value assignment.
 
-Applied to mvebu/cleanup.
+Vagaries?
 
-thx,
+In what way is c enumeration (6.7.2.2) vague?
+char vs int?  Isn't smaller mostly better?
 
-Jason.
+Concern about possible future reordering given an
+insertion or deletion might be the only consideration
+I could imagine.
