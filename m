@@ -1,84 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:56:33 +0000
-Subject: [PATCH 02/35] mfd: ab8500-gpadc: Allow tvout regulator to be missing
+Date: Fri, 15 Feb 2013 12:56:34 +0000
+Subject: [PATCH 03/35] mfd: ab8500-gpadc: Reread on failure
 In-Reply-To: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
 References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360933026-30325-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360933026-30325-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
+Reread the gpadc once upon failure.
+
 Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Mattias WALLIN <mattias.wallin@stericsson.com>
 ---
- drivers/mfd/ab8500-gpadc.c |   19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+ drivers/mfd/ab8500-gpadc.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
-index 9ed3afc..34c1d04 100644
+index 34c1d04..1b48ac1 100644
 --- a/drivers/mfd/ab8500-gpadc.c
 +++ b/drivers/mfd/ab8500-gpadc.c
-@@ -140,6 +140,9 @@ struct ab8500_gpadc *ab8500_gpadc_get(char *name)
- {
- 	struct ab8500_gpadc *gpadc;
+@@ -259,6 +259,11 @@ int ab8500_gpadc_convert(struct ab8500_gpadc *gpadc, u8 channel)
+ 	int voltage;
  
-+	if (list_empty(&ab8500_gpadc_list))
-+		return NULL;
+ 	ad_value = ab8500_gpadc_read_raw(gpadc, channel);
 +
- 	list_for_each_entry(gpadc, &ab8500_gpadc_list, node) {
- 		if (!strcmp(name, dev_name(gpadc->dev)))
- 		    return gpadc;
-@@ -587,7 +590,8 @@ static int ab8500_gpadc_runtime_suspend(struct device *dev)
- {
- 	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
- 
--	regulator_disable(gpadc->regu);
-+	if (gpadc->regu)
-+		regulator_disable(gpadc->regu);
- 	return 0;
- }
- 
-@@ -595,7 +599,8 @@ static int ab8500_gpadc_runtime_resume(struct device *dev)
- {
- 	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
- 
--	regulator_enable(gpadc->regu);
-+	if (gpadc->regu)
-+		regulator_enable(gpadc->regu);
- 	return 0;
- }
- 
-@@ -670,9 +675,8 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
- 	/* VTVout LDO used to power up ab8500-GPADC */
- 	gpadc->regu = regulator_get(&pdev->dev, "vddadc");
- 	if (IS_ERR(gpadc->regu)) {
--		ret = PTR_ERR(gpadc->regu);
--		dev_err(gpadc->dev, "failed to get vtvout LDO\n");
--		goto fail_irq;
-+		dev_warn(gpadc->dev, "failed to get vtvout LDO\n");
-+		gpadc->regu = NULL;
- 	}
- 
- 	platform_set_drvdata(pdev, gpadc);
-@@ -688,8 +692,6 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
- 	list_add_tail(&gpadc->node, &ab8500_gpadc_list);
- 	dev_dbg(gpadc->dev, "probe success\n");
- 	return 0;
--fail_irq:
--	free_irq(gpadc->irq, gpadc);
- fail:
- 	kfree(gpadc);
- 	gpadc = NULL;
-@@ -708,7 +710,8 @@ static int ab8500_gpadc_remove(struct platform_device *pdev)
- 	pm_runtime_get_sync(gpadc->dev);
- 	pm_runtime_disable(gpadc->dev);
- 
--	regulator_disable(gpadc->regu);
-+	if (gpadc->regu)
-+		regulator_disable(gpadc->regu);
- 
- 	pm_runtime_set_suspended(gpadc->dev);
- 
++	/* On failure retry a second time */
++	if (ad_value < 0)
++		ad_value = ab8500_gpadc_read_raw(gpadc, channel);
++
+ 	if (ad_value < 0) {
+ 		dev_err(gpadc->dev, "GPADC raw value failed ch: %d\n", channel);
+ 		return ad_value;
 -- 
 1.7.10.4
