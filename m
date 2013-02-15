@@ -1,38 +1,41 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 15 Feb 2013 21:52:23 +0100
-Subject: [PATCH 3/6] dma: coh901318_lli: avoid unbalanced locking
-In-Reply-To: <CAHp75VcT-3UUYZSc_iopH8M7z0GoYKhkf-O1yTsqSODRHaCHdw@mail.gmail.com>
-References: <1360666720-19006-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <1360666720-19006-4-git-send-email-andriy.shevchenko@linux.intel.com>
- <CACRpkdZ=9pmutR2G+z5kQpjx2O6995OnDU8iN3cqar3TWoX=Lg@mail.gmail.com>
- <CAHp75VcT-3UUYZSc_iopH8M7z0GoYKhkf-O1yTsqSODRHaCHdw@mail.gmail.com>
-Message-ID: <CACRpkdYVG6pHJ-_MQ2bTmk-rd7XUDkx1aXUW-Eqf6z2O16irYw@mail.gmail.com>
+Date: Fri, 15 Feb 2013 21:55:04 +0100
+Subject: [PATCH v8 09/12] pinctrl: generic: add auto pull config parameter
+In-Reply-To: <20130215163755.GB5724@atomide.com>
+References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
+ <1360602659-4774-10-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdYKAexLu30M2KzKcRcvRJS=xfVMB2vR+CgAXmwQ0+_ZzA@mail.gmail.com>
+ <20130215163755.GB5724@atomide.com>
+Message-ID: <CACRpkdY6bsxg6FG5bSCPZKkQ4-mVyiOsCFsh-421_nLCLcasSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 3:56 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Fri, Feb 15, 2013 at 4:52 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Tue, Feb 12, 2013 at 11:58 AM, Andy Shevchenko
->> <andriy.shevchenko@linux.intel.com> wrote:
+On Fri, Feb 15, 2013 at 5:37 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [130215 00:58]:
+>> On Mon, Feb 11, 2013 at 6:10 PM, Haojian Zhuang
+>> <haojian.zhuang@linaro.org> wrote:
 >>
->>> I have not checked the code but there is a possibility that custom pool->lock
->>> is not needed at all due to dma_pool contains it's own lock.
+>> > There's only one bit to control pin bias as enabled or disabled for some
+>> > pins in OMAP SoC. So append PIN_CONFIG_BIAS_AUTO_PULL for this case.
+>> > User shouldn't switch pin state between AUTO_PULL and PULL_UP/PULL_DOWN,
+>> > since they're similiar concepts.
+>> >
+>> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 >>
->> Can you please change the description to something like:
->>
->> "The coh901318_lli allocator releases a lock on the exit path without
->> taking it first".
+>> Makes perfect sense.
+>> Patch applied with Tony's ACK!
 >
-> In v2 (that by fact already applied) I put following description:
+> Sorry the conclusion was that this probably won't be needed and can
+> probably be done with just PULL_UP/PULL_DOWN.
 >
->     In case the len is 0 we must return without trying to unlock the
-> lock that was
->     not locked.
->
-> Does it fit your suggestion?
+> So can you please drop or revert this AUTO_PULL one?
 
-Sure, acked-by.
+Sorry I was drunk or something.
 
-Thanks,
+I never applied this patch, I applied the other one,
+with the title "pinctrl: generic: rename input schmitt disable".
+
+This one stays out.
+
+Yours,
 Linus Walleij
