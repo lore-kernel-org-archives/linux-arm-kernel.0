@@ -1,26 +1,30 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 15 Feb 2013 11:13:01 +0200
-Subject: [PATCH v6 09/10] clk: tegra: Implement clocks for Tegra114
-In-Reply-To: <20130215.081805.2193798170330624846.hdoyu@nvidia.com>
-References: <1360580700-10245-1-git-send-email-pdeschrijver@nvidia.com>
- <1360580700-10245-10-git-send-email-pdeschrijver@nvidia.com>
- <20130215.081805.2193798170330624846.hdoyu@nvidia.com>
-Message-ID: <20130215091301.GN3073@tbergstrom-lnx.Nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 15 Feb 2013 10:13:50 +0100
+Subject: [PATCH 07/11] ARM: integrator: fix build with INTEGRATOR_AP off
+In-Reply-To: <1360849767-1463135-8-git-send-email-arnd@arndb.de>
+References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
+ <1360849767-1463135-8-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkda2A6upoT30vFfZM+a4dO=7tStVhHj_JoT-Oe16Pvuy=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 07:18:05AM +0100, Hiroshi Doyu wrote:
-> Peter De Schrijver <pdeschrijver@nvidia.com> wrote @ Mon, 11 Feb 2013 12:04:59 +0100:
-> 
-> > +enum tegra114_clk {
-> > +       rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
-> 
-> Why no 'cpu = 0' here?
+On Thu, Feb 14, 2013 at 2:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-It doesn't make sense I think. Yes there is a bit, but we can't use it from
-software I think? Also the clock itself doesn't exist. Maybe this should be
-removed from the binding document.
+> The conditional declaration of ap_uart_data is broken
+> and causes this build error:
+>
+> In file included from arch/arm/mach-integrator/core.c:35:0:
+> arch/arm/mach-integrator/common.h:6:37: error: expected '=', ',', ';', 'asm' or '__attribute__' before '{' token
+>
+> Turning the check into an constant-expression if(IS_ENABLED()) statement
+> creates more readable code and solves this problem as well.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Cheers,
+Brilliant Arnd, thanks for fixing this!
 
-Peter.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
