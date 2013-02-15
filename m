@@ -1,32 +1,40 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 15 Feb 2013 17:06:01 -0500
-Subject: [PATCH v3] arm: mvebu: support for the new Armada XP
- development board(DB-MV784MP-GP)
-In-Reply-To: <1359643812-32654-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1359643812-32654-1-git-send-email-gregory.clement@free-electrons.com>
- <1359643812-32654-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130215220601.GK14746@titan.lakedaemon.net>
+Date: Fri, 15 Feb 2013 17:09:12 -0500
+Subject: [PATCH v2 3/5] arm: mvebu: update defconfig with local timer
+ support
+In-Reply-To: <511EB0DE.5090509@free-electrons.com>
+References: <1359135165-32108-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359135165-32108-4-git-send-email-gregory.clement@free-electrons.com>
+ <20130215215640.GI14746@titan.lakedaemon.net>
+ <511EB0DE.5090509@free-electrons.com>
+Message-ID: <20130215220912.GL14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 31, 2013 at 03:50:12PM +0100, Gregory CLEMENT wrote:
-> This is the new Armada XP evaluation board from Marvell. It comes with
-> a RS232 port over USB, a SATA link, an internal SSD, 4 Ethernet
-> Gigabit links.
+On Fri, Feb 15, 2013 at 11:04:14PM +0100, Gregory CLEMENT wrote:
+> On 02/15/2013 10:56 PM, Jason Cooper wrote:
+> > On Fri, Jan 25, 2013 at 06:32:43PM +0100, Gregory CLEMENT wrote:
+> >> Now that we have support for local timers, enable it by default
+> >>
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> ---
+> >>  arch/arm/configs/mvebu_defconfig |    1 -
+> >>  1 file changed, 1 deletion(-)
+> > 
+> > Applied patches 1, 2, and 3 of this series to mvebu/boards.  In the
+> > future, please put driver changes first (patch #2) with few if any
+> > dependencies.
+> > 
+> > In this case, since these patches depended on SMP support added to
+> > mvebu/boards, I had to apply them to mvebu/boards to prevent a circular
+> > dependency.
 > 
-> Support for USB (Host and device), SDIO, PCIe will be added as drivers
-> when they become available for Armada XP in mainline.
-> 
-> Tested-by: Simon Guinot <simon.guinot@sequanux.org>
-> Tested-by: Florian Fainelli <florian@openwrt.org>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/boot/dts/Makefile         |    1 +
->  arch/arm/boot/dts/armada-xp-gp.dts |  101 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 102 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-xp-gp.dts
+> Well the patch #2 can't work without the #1 (local interrupt support), so if
+> the order is changed then we loose the "bissecatiblity". That was the reason of
+> this order.
 
-Applied to mvebu/boards with Ezequiel Garcia's Tested-by:
+Yes, that's why I kept them in order and didn't put them in
+mvebu/drivers.
 
 thx,
 
