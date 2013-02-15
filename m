@@ -1,36 +1,25 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 15 Feb 2013 10:52:38 +0200
-Subject: [RFC 1/2] Makefile: Add arch/arch/$(hdr-arch)/boot in header include
- path
-Message-ID: <1360918364-27960-1-git-send-email-hdoyu@nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 15 Feb 2013 09:54:29 +0100
+Subject: [PATCH v8 09/12] pinctrl: generic: add auto pull config parameter
+In-Reply-To: <1360602659-4774-10-git-send-email-haojian.zhuang@linaro.org>
+References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
+ <1360602659-4774-10-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdYKAexLu30M2KzKcRcvRJS=xfVMB2vR+CgAXmwQ0+_ZzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With a new feature dtc+cpp, DT can introduces some definitions in its
-header files for their own. Some of those DT info can be used in
-kernel source as well, instead of having the duplicate info in kernel
-headers. This patch allows kernel source to include those DT
-headers. For example:
+On Mon, Feb 11, 2013 at 6:10 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-+ #include <dts/tegra20-car.h>
+> There's only one bit to control pin bias as enabled or disabled for some
+> pins in OMAP SoC. So append PIN_CONFIG_BIAS_AUTO_PULL for this case.
+> User shouldn't switch pin state between AUTO_PULL and PULL_UP/PULL_DOWN,
+> since they're similiar concepts.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- Makefile |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Makes perfect sense.
+Patch applied with Tony's ACK!
 
-diff --git a/Makefile b/Makefile
-index 0b4bf62..7f54cdb 100644
---- a/Makefile
-+++ b/Makefile
-@@ -364,7 +364,7 @@ LINUXINCLUDE    := \
- 		-I$(srctree)/arch/$(hdr-arch)/include \
- 		-Iarch/$(hdr-arch)/include/generated \
- 		$(if $(KBUILD_SRC), -I$(srctree)/include) \
--		-Iinclude \
-+		-Iinclude -Iarch/$(hdr-arch)/boot \
- 		$(USERINCLUDE)
- 
- KBUILD_CPPFLAGS := -D__KERNEL__
--- 
-1.7.9.5
+Yours,
+Linus Walleij
