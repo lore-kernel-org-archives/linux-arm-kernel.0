@@ -1,88 +1,117 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 15 Feb 2013 07:27:01 +0000
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 15 Feb 2013 12:59:51 +0530
 Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <20130215065308.GC30038@arwen.pp.htv.fi>
+In-Reply-To: <20130215064626.GB30038@arwen.pp.htv.fi>
 References: <1360840554-26901-1-git-send-email-balbi@ti.com>
  <1360840554-26901-2-git-send-email-balbi@ti.com>
  <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com>
- <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
  <20130214193911.GD11806@atomide.com>
  <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
- <20130214222247.GE11362@atomide.com> <20130215065308.GC30038@arwen.pp.htv.fi>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED1F477@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
+ <20130214224710.GF11362@atomide.com> <20130215064626.GB30038@arwen.pp.htv.fi>
+Message-ID: <511DE3EF.6070902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 12:23:08, Balbi, Felipe wrote:
-> On Thu, Feb 14, 2013 at 02:22:47PM -0800, Tony Lindgren wrote:
-> > * Paul Walmsley <paul@pwsan.com> [130214 12:51]:
-> > > Hi,
-> > > 
-> > > On Thu, 14 Feb 2013, Tony Lindgren wrote:
-> > > 
-> > > > I don't think so as hwmod should only touch the sysconfig space
-> > > > when no driver has claimed it.
-> > > 
-> > > hwmod does need to touch the SYSCONFIG register during pm_runtime suspend 
-> > > and resume operations, and during device enable and disable operations.  
-> > > Here's the relevant code:
-> > > 
-> > > http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2157
-> > > 
-> > > http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2195
-> > 
-> > But that's triggered by runtime PM from the device driver, right?
-> > 
-> > I think it's fine for hwmod to do that as requested by the device
-> > driver via runtime PM since hwmod is the bus glue making the drivers arch
-> > independent.
-> > 
-> > I think the only piece we're missing for that is for driver to run
-> > something like pm_runtime_init() that initializes the address space
-> > to hwmod. Or just bus specific ioremap like you're suggesting later
-> > on.
-> > 
-> > Just to recap what we've discussed earlier, the reasons why we want
-> > reset and idle functions should be in the driver specific header are:
-> > 
-> > 1. There's often driver specific logic needed in addition to the
-> >    syconfig tinkering in the reset/idle functions.
-> 
-> how about introducing generic device_reset() and device_idle() hooks
-> which driver can implement and can be called by bus glue ?
-> 
-> Something like:
-> 
-> 
-> diff --git a/include/linux/pm.h b/include/linux/pm.h
-> index 03d7bb1..9c921e2 100644
-> --- a/include/linux/pm.h
-> +++ b/include/linux/pm.h
-> @@ -256,6 +256,8 @@ typedef struct pm_message {
->   *	these conditions and handle the device as appropriate, possibly queueing
->   *	a suspend request for it.  The return value is ignored by the PM core.
->   *
-> + * @runtime_reset: Resets the device and puts it in a known state.
-> + *
->   * Refer to Documentation/power/runtime_pm.txt for more information about the
->   * role of the above callbacks in device runtime power management.
->   *
-> @@ -285,6 +287,7 @@ struct dev_pm_ops {
->  	int (*runtime_suspend)(struct device *dev);
->  	int (*runtime_resume)(struct device *dev);
->  	int (*runtime_idle)(struct device *dev);
-> +	int (*runtime_reset)(struct device *dev);
->  };
->  
++ Tero, Rajendra, Kevin
 
-I am not a runtime PM expert but runtime_reset() looks a good option to me.
-I expect most of the drivers won't need to do anything different from what
-the hwmod code already does. IPs which have special reset requirements
-can either extend the defaults ops or just override it. On AM33xx there
-are some special requirements for CPSW, DCAN, PWMSS reset handling but
-AFAIK none of the other IPs need to do anything special and we don't want
-to duplicate the reset code in all of them.
+On Friday 15 February 2013 12:16 PM, Felipe Balbi wrote:
+> On Thu, Feb 14, 2013 at 02:47:10PM -0800, Tony Lindgren wrote:
+>> * Paul Walmsley <paul@pwsan.com> [130214 13:44]:
+>>> Hi,
+>>>
+>>> On Thu, 14 Feb 2013, Paul Walmsley wrote:
+>>>
+>>>> So instead of something bus-specific like that, a better way would be to
+>>>> use something like:
+>>>>
+>>>> va = dev->bus->ioremap( ... );
+>>>> va = dev->bus->iounmap( ... );
+>>>
+>>> Something like this is what I was thinking.  Obviously there would be more
+>>> patches needed, for the various arches, etc.; and I'm not convinced that
+>>> the function pointer init is done at the right time yet. Comments welcome.
+>>>
+>>>
+>>> - Paul
+>>>
+>>>
+>>> From: Paul Walmsley <paul@pwsan.com>
+>>> Date: Thu, 14 Feb 2013 13:49:58 -0700
+>>> Subject: [PATCH] EXPERIMENTAL: device/ARM: allow buses to override ioremap*()
+>>>   and iounmap()
+>>>
+>>> On some hardware, such as OMAP, the bus abstraction code needs to call
+>>> ioremap(), since some SoC-integration registers are located in the
+>>> device address space.  But generic device drivers should be able to
+>>> call ioremap() from driver code, for the majority of situations where
+>>> this isn't necessary.  This experimental patch allows Linux bus abstraction
+>>> code to override all of the ioremap*() and iounmap() functions.  In the OMAP
+>>> case, this would be used to return the previously-mapped address range from
+>>> the bus code, when called for the device's register area.  This would avoid
+>>> a duplicate TLB mapping for that space.
+>>>
+>>> This might also be useful as a generic replacement for pci_ioremap_bar().
+>>>
+>>> Compile-tested only.
+>>
+>> The other option could be to allow custom ioremap function pointers
+>> based on address range in __arm_ioremap_pfn_caller() the same way as
+>> the SoC specific static mappings are allowed. That would require adding
+>> a function pointer to struct map_desc.
+>>
+>> Maybe that would do the trick?
+>
+> I'm not sure we should even try that. I mean, eventually (maybe in 100
+> years) we wouldn't mach-* at all and even struct map_desc would be
+> dynamically initialized by data passed in via DTB, right ? Just consider
+> Arnd's patch for the "machine_desc-less" DT boot. If we add a function
+> pointer to struct map_desc, it will just become yet another function
+> pointer to be removed later.
+>
+On the same thread, it was also mentioned that, "machine_desc-less" DT
+boot is for simple machines. I have looked that aspect bit more.
+Considering the amount of callbacks OMAP uses, it is not practical.
+Ofcourse am also not in favor of adding another function pointer
+stuff here.
+
+We should get rid of dual ioremap() and the method suggested by Paul
+seems to be reasonable.
+
+Sysconfig handling is very tightly coupled with PRCM. I agree with Paul
+that hardware should have mapped it in separate address space. So
+whichever framework manages the PRCM, should also manage sysconfig.
+Refer all the issues around sysconfig for IP's like USB, UART
+and they are directly PRCM issues.
+
+We should be able to work around the IP integration issues
+around problematic IPs like UART, USB with some profile knowledge
+which can be handled by runtime PM transparently. It should have
+been done that way in first place instead of functions pointers
+which today break the Device Tree builds directly.
+
+As I mentioned in OMAP5 data series, we are now able to remove the
+IO_resource information ( Address space, IRQ data, DMA lines) from
+from hwmod data and extract it from device Tree. Thats a good
+point.
+
+Next one is getting rid off sysconfig function pointers which drivers
+are using and handle those issues using runtime_pm APIs. Idea is, IP
+gives profile like...
+e.g
+McSPI1 -> Smart Idle always
+UART -> no_idle(runtime_get) and  smart_idle(runtime_put)
+mUSB --> no_idle(runtime_get) and force_idle(runtime_put)
+
+Then the last one is custom reset function for broken IPs. For this
+one as well if we can add a hook in runtime framework, then it
+can be handled without direct function calls.
 
 Regards,
-Vaibhav
+Santosh
+
+
+
+Regards
+Santosh
