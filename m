@@ -1,34 +1,34 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 15 Feb 2013 14:22:44 +0200
-Subject: [PATCH v6 08/10] ARM: dt: Add references to tegra_car clocks
-In-Reply-To: <511D1F3F.1020309@wwwdotorg.org>
-References: <1360580700-10245-1-git-send-email-pdeschrijver@nvidia.com>
- <1360580700-10245-9-git-send-email-pdeschrijver@nvidia.com>
- <511A7AB5.4040607@wwwdotorg.org>
- <20130213113807.GE3073@tbergstrom-lnx.Nvidia.com>
- <511BC3C3.6070402@wwwdotorg.org>
- <20130214100112.GH3073@tbergstrom-lnx.Nvidia.com>
- <511D1F3F.1020309@wwwdotorg.org>
-Message-ID: <20130215122244.GP3073@tbergstrom-lnx.Nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Feb 2013 12:38:32 +0000
+Subject: [PATCH 3/9] ARM: omap2: include linux/errno.h in hwmod_reset
+In-Reply-To: <20130214225142.GG11362@atomide.com>
+References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
+ <1360882071-4072668-4-git-send-email-arnd@arndb.de>
+ <20130214225142.GG11362@atomide.com>
+Message-ID: <201302151238.32316.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 06:30:39PM +0100, Stephen Warren wrote:
-> On 02/14/2013 03:01 AM, Peter De Schrijver wrote:
-> > On Wed, Feb 13, 2013 at 05:48:03PM +0100, Stephen Warren wrote:
-> ...
-> >> You still need to initialize all the UART clocks in init_table[]. This
-> ...
-> > Yes. The parent relationships still need to be defined. But I think that's
-> > the only thing we actually need to define still?
+On Thursday 14 February 2013, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [130214 14:51]:
+> > The newly created omap_hwmod_reset.c is missing an
+> > include of linux/errno.h in commit c02060d8 "ARM:
+> > OMAP4+: AESS: enable internal auto-gating during
+> > initial setup". It still works in omap2_defconfig,
+> > but not in all other combinations.
+> > 
+> > Without this patch, building allmodconfig results in:
+> > 
+> > arch/arm/mach-omap2/omap_hwmod_reset.c: In function 'omap_hwmod_aess_preprogram':
+> > arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: error: 'EINVAL' undeclared (first use in this function)
+> > arch/arm/mach-omap2/omap_hwmod_reset.c:47:11: note: each undeclared identifier is reported only once for each function it appears in
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Sebastien Guiriec <s-guiriec@ti.com>
 > 
-> You might want to explicitly set the rate too, if there is a divider in
-> the clk module that affects it. If not, then parenting is indeed all you
-> need.
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Yes, for PLLs that might be useful. Device clock rates can also be set by the
-driver and probably should be set by the driver.
+Ok, applied on top of late/omap
 
-Cheers,
-
-Peter.
+	Arnd
