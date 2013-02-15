@@ -1,36 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Feb 2013 12:55:06 +0000
-Subject: [PATCH 5/9] ARM: shmobile: mark mackerel sh_mmcif_device
- __maybe_unused
-In-Reply-To: <20130214232426.GB30667@verge.net.au>
-References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
- <1360880818-4071454-6-git-send-email-arnd@arndb.de>
- <20130214232426.GB30667@verge.net.au>
-Message-ID: <201302151255.06547.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 15 Feb 2013 12:56:31 +0000
+Subject: [PATCH 00/35] mfd: ab8500: Internal development push
+Message-ID: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 February 2013, Simon Horman wrote:
-> On Thu, Feb 14, 2013 at 11:26:54PM +0100, Arnd Bergmann wrote:
-> > Patch eac036ef9e "ARM: shmobile: streamline mackerel SD and MMC devices"
-> > made the use of the sh_mmcif_device variable for mackarel optional,
-> > but the definition is always provided, causing a build warning.
-> > 
-> > arch/arm/mach-shmobile/board-mackerel.c:1120:31: warning: 'sh_mmcif_device'
-> > 	defined but not used [-Wunused-variable]
-> > 
-> > Marking the variable as __maybe_unused will do the right thing here.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > Cc: Simon Horman <horms+renesas@verge.net.au>
-> 
-> No objections here.
-> 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Sam,
 
-AFAICT, the change that caused this is in linux-next only through your
-heads/boards3 branch but not through arm-soc, so please apply my patch
-on your branch.
+This is the patch-set we've been speaking about. It's the entire
+development history for the ABx500 related MFD changes from
+ST-Ericsson's internal kernel. This brings us bang up-to-date.
 
-	Arnd
+Please don't apply patches directly from this submission, as
+there are some interdependencies which we need to sort out
+between you, Anton and I.
+
+Enjoy! =:-)
+
+
+ drivers/mfd/ab8500-core.c                 |  524 +++++++++++++++++++-------
+ drivers/mfd/ab8500-debugfs.c              | 2511 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------
+ drivers/mfd/ab8500-gpadc.c                |  577 +++++++++++++++++++++++------
+ drivers/mfd/ab8500-sysctrl.c              |   98 ++++-
+ include/linux/mfd/abx500.h                |    2 -
+ include/linux/mfd/abx500/ab8500-gpadc.h   |   74 +++-
+ include/linux/mfd/abx500/ab8500-sysctrl.h |    6 +
+ include/linux/mfd/abx500/ab8500.h         |  242 +++++++++---
+ 8 files changed, 3177 insertions(+), 857 deletions(-)
