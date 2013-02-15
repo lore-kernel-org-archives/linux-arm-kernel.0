@@ -1,58 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 15 Feb 2013 22:13:31 +0900
-Subject: [PATCH 3/3] ARM: mach-shmobile: kzm9g: do not enable
- REGULATOR_DUMMY in defconfig
-In-Reply-To: <Pine.LNX.4.64.1302140942250.29693@axis700.grange>
-References: <1360761103-17357-1-git-send-email-horms+renesas@verge.net.au>
- <1360761103-17357-4-git-send-email-horms+renesas@verge.net.au>
- <20130214083621.GA8236@verge.net.au>
- <Pine.LNX.4.64.1302140942250.29693@axis700.grange>
-Message-ID: <20130215131331.GA27724@verge.net.au>
+Date: Fri, 15 Feb 2013 22:15:50 +0900
+Subject: [PATCH 5/9] ARM: shmobile: mark mackerel sh_mmcif_device
+ __maybe_unused
+In-Reply-To: <201302151255.06547.arnd@arndb.de>
+References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
+ <1360880818-4071454-6-git-send-email-arnd@arndb.de>
+ <20130214232426.GB30667@verge.net.au>
+ <201302151255.06547.arnd@arndb.de>
+Message-ID: <20130215131550.GB27724@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 09:45:24AM +0100, Guennadi Liakhovetski wrote:
-> On Thu, 14 Feb 2013, Simon Horman wrote:
-> 
-> > On Wed, Feb 13, 2013 at 10:11:43PM +0900, Simon Horman wrote:
-> > > Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
-> > > There doesn't seem to be any value in setting it here and doing
-> > > so was an error on my part.
+On Fri, Feb 15, 2013 at 12:55:06PM +0000, Arnd Bergmann wrote:
+> On Thursday 14 February 2013, Simon Horman wrote:
+> > On Thu, Feb 14, 2013 at 11:26:54PM +0100, Arnd Bergmann wrote:
+> > > Patch eac036ef9e "ARM: shmobile: streamline mackerel SD and MMC devices"
+> > > made the use of the sh_mmcif_device variable for mackarel optional,
+> > > but the definition is always provided, causing a build warning.
 > > > 
+> > > arch/arm/mach-shmobile/board-mackerel.c:1120:31: warning: 'sh_mmcif_device'
+> > > 	defined but not used [-Wunused-variable]
+> > > 
+> > > Marking the variable as __maybe_unused will do the right thing here.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > > > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > ---
-> > >  arch/arm/configs/kzm9g_defconfig |    1 -
-> > >  1 file changed, 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-> > > index 670c3b6..6751c02 100644
-> > > --- a/arch/arm/configs/kzm9g_defconfig
-> > > +++ b/arch/arm/configs/kzm9g_defconfig
-> > > @@ -86,7 +86,6 @@ CONFIG_I2C_SH_MOBILE=y
-> > >  CONFIG_GPIO_PCF857X=y
-> > >  # CONFIG_HWMON is not set
-> > >  CONFIG_REGULATOR=y
-> > > -CONFIG_REGULATOR_DUMMY=y
-> > >  CONFIG_FB=y
-> > >  CONFIG_FB_SH_MOBILE_LCDC=y
-> > >  CONFIG_FRAMEBUFFER_CONSOLE=y
+> > > Cc: Simon Horman <horms+renesas@verge.net.au>
 > > 
-> > This patch seems to break NIC initialisation.
+> > No objections here.
 > > 
-> > smsc911x: Driver version 2008-10-21
-> > smsc911x smsc911x.0: Failed to get supply 'vdd33a': -517
-> > smsc911x smsc911x.0 (unregistered net_device): couldn't get regulators -517
-> > platform smsc911x.0: Driver smsc911x requests probe deferral
+> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Right, you need a fixed regulator similar to how I adde it here
-> 
-> http://www.spinics.net/lists/linux-sh/msg15713.html
+> AFAICT, the change that caused this is in linux-next only through your
+> heads/boards3 branch but not through arm-soc, so please apply my patch
+> on your branch.
 
-Perhaps that is the wrong link?
-The code in the link seems to be the same as what is preseng
-in boards-kzm9g.c already and with it in place I see the error
-above if CONFIG_REGULATOR_DUMMY is not enabled.
-
-I am testing against with next branch in the renesas tree
-with the kzm9g_defconfig, less CONFIG_REGULATOR_DUMMY.
+Sure, will do.
