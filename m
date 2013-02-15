@@ -1,63 +1,69 @@
-From: anilk4.v@gmail.com (Anil Kumar)
-Date: Fri, 15 Feb 2013 21:49:21 +0530
-Subject: [PATCH v2 3/8] ARM: omap2: gpmc: Fix gpmc_cs_reserved() return
- value
-In-Reply-To: <1360682305-20935-4-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1360682305-20935-4-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <CABYxbz6tZJjuz0NKorPSz_tWD42+HuHL3kwW0cegWW5QTDxH8g@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 15 Feb 2013 10:24:35 -0600
+Subject: [PATCH 0/2] Device Tree support for CMA (Contiguous Memory
+ Allocator)
+In-Reply-To: <20130215083304.GK1906@pengutronix.de>
+References: <1360845928-8107-1-git-send-email-m.szyprowski@samsung.com>
+ <20130214213013.GG1906@pengutronix.de> <511D6076.9090503@gmail.com>
+ <20130215083304.GK1906@pengutronix.de>
+Message-ID: <511E6143.609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/15/2013 02:33 AM, Sascha Hauer wrote:
+> On Thu, Feb 14, 2013 at 11:08:54PM +0100, Sylwester Nawrocki wrote:
+>> Hi,
+>>
+>> On 02/14/2013 10:30 PM, Sascha Hauer wrote:
+>>> On Thu, Feb 14, 2013 at 01:45:26PM +0100, Marek Szyprowski wrote:
+>> ...
+>>>> Here is my initial proposal for device tree integration for Contiguous
+>>>> Memory Allocator. The code is quite straightforward, however I expect
+>>>> that the memory bindings require some discussion.
+>>>>
+>>>> The proposed bindings allows to define contiguous memory regions of
+>>>> specified base address and size. Then, the defined regions can be
+>>>> assigned to the given device(s) by adding a property with a phanle to
+>>>> the defined contiguous memory region. From the device tree perspective
+>>>> that's all. Once the bindings are added, all the memory allocations from
+>>>> dma-mapping subsystem will be served from the defined contiguous memory
+>>>> regions.
+>>>>
+>>>
+>>> I think CMA regions should not be described in the devicetre at all. The
+>>> devicetree is about hardware description and it should be OS agnostic,
+>>> but CMA is only a Linux specific implementation detail. It's not even
+>>> specific to a particular board, it's specific to a particular usecase of
+>>> a board.
+>>
+>> I disagree. For example, in a multiprocessor system describing the memory
+>> regions this way allows to assign memory to each subsystem, e.g. shared
+>> memory, so that the memory region constraints are satisfied.
+>>
+>> CMA just happens to be an implementation of a method of assigning memory
+>> to each device in Linux. The constraints on the memory are real hardware
+>> constraints, resulting from a particular subsystem architecture.
+> 
+> If you are talking about DMA controllers which can only access a certain
+> memory area, then yes, that's a hardware constraint, I'm not sure though
+> if describing this as CMA in the devicetree is the way to go.
+> 
+> If you are talking about 'on this board I want to have 128MiB for this
+> device because I'm doing 1080p while on another board 64MiB are enough
+> because I'm doing 720p', then this is not a hardware constraint.
+> 
+> There may be valid scenarios for putting CMA into the devicetrees, but
+> doing this also opens the door for abuse of this binding. I for once
+> don't want to find areas being allocated for CMA in the devicetree for
+> devices I don't care about. I know I can always exchange a devicetree,
+> but I think the devicetree should be seen as firmware to a certain
+> degree.
 
-On Tue, Feb 12, 2013 at 8:48 PM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> Currently gpmc_cs_reserved() return value is somewhat inconsistent,
-> returning a negative value on an error condition, a positive value
-> if the chip select is reserved and zero if it's available.
->
-> Fix this by returning a boolean value as the function name suggests:
->   * true if the chip select is reserved,
->   * false if it's available
->
-> Suggested-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
-> Changelog from v1:
->  * As suggested by Felipe Balbi, fix return code to a boolean
->
->  arch/arm/mach-omap2/gpmc.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index bd3bc93..fa4764f 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -452,10 +452,10 @@ static int gpmc_cs_set_reserved(int cs, int reserved)
->         return 0;
->  }
->
-> -static int gpmc_cs_reserved(int cs)
-> +static bool gpmc_cs_reserved(int cs)
->  {
->         if (cs > GPMC_CS_NUM)
-> -               return -ENODEV;
-> +               return true;
->
->         return gpmc_cs_map & (1 << cs);
->  }
+I agree this does not belong in DT. As a kernel developer, the DT comes
+from firmware. Can the firmware author decide how much CMA memory is
+needed? I don't think so.
 
-commit "6797b4fe0e554ce71f47038fd929c9ca929a9f3c"
-Marking all the chip-selects as reserved by default.
+I would suggest a kernel command line parameter instead if that does not
+already exist.
 
-In this case gpmc_cs_map is 0xff. So it will return 0x1 if cs is 0.
-So gpmc_cs_request() function will fail in nand (gpmc-nand.c) case.
-
-I am taking reference, branch "omap-for-v3.9/gpmc" of git tree
-http://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-
-I am sorry if this question is very vague.
-
-Thanks,
-Anil
+Rob
