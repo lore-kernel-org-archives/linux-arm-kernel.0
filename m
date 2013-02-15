@@ -1,57 +1,51 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 15 Feb 2013 10:43:11 +0200
-Subject: [v3 0/6] ARM: tegra: convert device tree files to use CLK defines
-Message-ID: <1360917814-27236-1-git-send-email-hdoyu@nvidia.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 15 Feb 2013 10:50:22 +0200
+Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <1359410300-26113-2-git-send-email-arnd@arndb.de>
+References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
+ <1359410300-26113-1-git-send-email-arnd@arndb.de>
+ <1359410300-26113-2-git-send-email-arnd@arndb.de>
+Message-ID: <1360918222.28241.20.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2013-01-28 at 21:58 +0000, Arnd Bergmann wrote: 
+> The original device tree binding for this driver, from Viresh Kumar
+> unfortunately conflicted with the generic DMA binding, and did not allow
+> to completely seperate slave device configuration from the controller.
+> 
+> This is an attempt to replace it with an implementation of the generic
+> binding, but it is currently completely untested, because I do not have
+> any hardware with this particular controller.
+> 
+> The patch applies on top of linux-next, which contains both the base
+> support for the generic DMA binding, as well as the earlier attempt from
+> Viresh. Both of these are currently not merged upstream however.
+> 
+> There are a couple of TODO items that are left remaining and are open
+> for ideas from other people.
 
-With new dtc+cpp feature, we could get rid of magic numbers in dts*
-files. This patch replaces CLK IDs.
+Have one question and one comment.
 
-We also plan to share those DT header files with kernel source
-later[1].
+So, what is the status of this work? Do you manage to provide something
+for v3.9? (Oh, two questions :-) )
 
-This series depends on:
-  [PATCH 0/9] ARM: tegra: use new dtc+cpp feature
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149613.html
+> --- a/drivers/dma/dw_dmac.c
+> +++ b/drivers/dma/dw_dmac.c
 
-[5/6] and [6/6] depend on:
-  [PATCH v6 00/10] Tegra114 clockframework
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148895.html
+> @@ -1765,7 +1753,11 @@ static int dw_probe(struct platform_device *pdev)
+>  
+>  	dma_async_device_register(&dw->dma);
+>  
+> -	return 0;
+> +	err = of_dma_controller_register(pdev->dev.of_node, dw_dma_xlate, dw);
+> +	if (err)
+> +		dma_async_device_unregister(&dw->dma);
 
-v2:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149816.html
+I don't think this is a good idea. The impossibility to register in the
+of-dma helper is not critical. Just printing debug message is enough.
 
-v1:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149672.html
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149804.html
-
-
-Hiroshi Doyu (6):
-  ARM: tegra20: create a DT header defining CLK IDs
-  ARM: tegra20: convert device tree files to use CLK defines
-  ARM: tegra30: create a DT header defining CLK IDs
-  ARM: tegra30: convert device tree files to use CLK defines
-  ARM: tegra114: create a DT header defining CLK IDs
-  ARM: tegra114: convert device tree files to use CLK defines
-
- .../bindings/clock/nvidia,tegra114-car.txt         |  261 +------------------
- .../bindings/clock/nvidia,tegra20-car.txt          |  150 +----------
- .../bindings/clock/nvidia,tegra30-car.txt          |  207 +--------------
- arch/arm/boot/dts/tegra114-car.h                   |  272 ++++++++++++++++++++
- arch/arm/boot/dts/tegra114.dtsip                   |   13 +-
- arch/arm/boot/dts/tegra20-car.h                    |  158 ++++++++++++
- arch/arm/boot/dts/tegra20-paz00.dtsp               |    2 +-
- arch/arm/boot/dts/tegra20.dtsip                    |   85 +++---
- arch/arm/boot/dts/tegra30-car.h                    |  218 ++++++++++++++++
- arch/arm/boot/dts/tegra30.dtsip                    |   87 +++----
- 10 files changed, 746 insertions(+), 707 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra114-car.h
- create mode 100644 arch/arm/boot/dts/tegra20-car.h
- create mode 100644 arch/arm/boot/dts/tegra30-car.h
 
 -- 
-1.7.9.5
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
