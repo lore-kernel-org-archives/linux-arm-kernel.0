@@ -1,38 +1,51 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 15 Feb 2013 22:48:36 +0900
-Subject: [PATCH 1/2] ARM: shmobile: kzm9g: correct smsc regulator registration
-In-Reply-To: <1360936117-21765-1-git-send-email-horms+renesas@verge.net.au>
-References: <1360936117-21765-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360936117-21765-2-git-send-email-horms+renesas@verge.net.au>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 15 Feb 2013 19:20:45 +0530
+Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
+In-Reply-To: <511E3B3F.1000609@ti.com>
+References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
+ <511E323E.3050104@ti.com> <20130215130745.GC16558@arwen.pp.htv.fi>
+ <20130215130842.GD16558@arwen.pp.htv.fi> <511E3B3F.1000609@ti.com>
+Message-ID: <511E3D35.4060909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct the name of smsc devices used for regulator registration
-allowing the regulators to be found and used.
+On Friday 15 February 2013 07:12 PM, a0131647 wrote:
+> Hi,
+> On Friday 15 February 2013 06:38 PM, Felipe Balbi wrote:
+>> On Fri, Feb 15, 2013 at 03:07:45PM +0200, Felipe Balbi wrote:
+>>> On Fri, Feb 15, 2013 at 06:33:58PM +0530, a0131647 wrote:
+>>>> Hi,
+>>>> On Friday 15 February 2013 05:36 PM, Santosh Shilimkar wrote:
+>>>>> OMAP UART IP needs manual idle modes based on state of the
+>>>>> IP. Currently this is handled by the driver with function pointers
+>>>>> implemented in platform code.
+>>>>>
+>>>>> This however breaks in case of device tree because of missing
+>>>>> idle handling.
+>>>>>
+>>>>> The series tries to address the issue
+>>>>>
+>>>>> Patches has been tested on OMAP4 and OMAP5 devices where the console
+>>>>> slugishness was observed without idle mode handling. CPUIDLE and
+>>>>> suspend tested ok on these devices.
+>>>>>
+>>>>> Need help in testing on OMAP2, OMAP3 and AM3XXX devices.
+>>>>>
+>>>> Tested this series on omap3630 beagle board for:
+>>>> 1. Retention in idle and suspend.
+>>>> 2. Off mode in idle and suspend.
+>>>>
+>>>> Tested-by: Sourav Poddar<sourav.poddar@ti.com>
+>>> try setting autosuspend_delay to -1
+>> Also try DT boot and try to wakeup from echo mem>  /sys/power/state by
+>> sending data through UART console.
+>>
+> Suspend/resume with dt is not functional with the current mainline.
+>
+With DT, suspend driver itself are not getting registered.
+The patch is in Paul's queue [1]
 
-This eliminates the need for CONFIG_REGULATOR_DUMMY
-when CONFIG_REGULATOR is set.
+regards,
+Santosh
 
-Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-kzm9g.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index 1a26077..3cf5898 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -61,8 +61,8 @@
- 
- /* Dummy supplies, where voltage doesn't matter */
- static struct regulator_consumer_supply dummy_supplies[] = {
--	REGULATOR_SUPPLY("vddvario", "smsc911x"),
--	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
-+	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
-+	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
- };
- 
- /*
--- 
-1.7.10.4
+[1] https://patchwork-mail2.kernel.org/patch/2116671/
