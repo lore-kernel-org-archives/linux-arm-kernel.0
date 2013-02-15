@@ -1,125 +1,237 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:44:39 +0000
-Subject: [PATCH 09/40] pm2301-charger: Support for over voltage protection on
- the ab9540
+Date: Fri, 15 Feb 2013 12:44:38 +0000
+Subject: [PATCH 08/40] ab8500-bm: Quick re-attach charging behaviour
 In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
 References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360932310-30065-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rupesh Kumar <rupesh.kumar@stericsson.com>
+Due to a bug in some AB8500 ASICs charger removal cannot always
+be detected if the removal and reinsertion is done to close in time.
+This patch detects above described case and handles the situation
+so that charging will be kept turned on.
 
-Added support for main charger over voltage protection.
-
-Signed-off-by: Rupesh Kumar <rupesh.kumar@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
-Tested-by: Michel JAOUEN <michel.jaouen@stericsson.com>
 ---
- drivers/power/pm2301_charger.c |   50 +++++++++++++++++++++++++++++-----------
- drivers/power/pm2301_charger.h |    1 +
- 2 files changed, 37 insertions(+), 14 deletions(-)
+ drivers/power/ab8500_charger.c            |  105 ++++++++++++++++++++++++++++-
+ drivers/power/abx500_chargalg.c           |   33 +++++++++
+ include/linux/mfd/abx500/ux500_chargalg.h |    1 +
+ 3 files changed, 137 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
-index 62a172e..2b7c93d 100644
---- a/drivers/power/pm2301_charger.c
-+++ b/drivers/power/pm2301_charger.c
-@@ -227,21 +227,14 @@ int pm2xxx_charger_die_therm_mngt(struct pm2xxx_charger *pm2, int val)
+diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
+index dcd3c6f..3eb23cf 100644
+--- a/drivers/power/ab8500_charger.c
++++ b/drivers/power/ab8500_charger.c
+@@ -52,6 +52,7 @@
+ #define VBUS_DET_DBNC100		0x02
+ #define VBUS_DET_DBNC1			0x01
+ #define OTP_ENABLE_WD			0x01
++#define DROP_COUNT_RESET		0x01
  
- static int pm2xxx_charger_ovv_mngt(struct pm2xxx_charger *pm2, int val)
- {
--	int ret = 0;
-+	dev_err(pm2->dev, "Overvoltage detected\n");
-+	pm2->flags.ovv = true;
-+	power_supply_changed(&pm2->ac_chg.psy);
- 
--	pm2->failure_input_ovv++;
--	if (pm2->failure_input_ovv < 4) {
--		ret = pm2xxx_charging_enable_mngt(pm2);
--		goto out;
--	} else {
--		pm2->failure_input_ovv = 0;
--		dev_err(pm2->dev, "Overvoltage detected\n");
--		pm2->flags.ovv = true;
--		power_supply_changed(&pm2->ac_chg.psy);
--	}
-+	/* Schedule a new HW failure check */
-+	queue_delayed_work(pm2->charger_wq, &pm2->check_hw_failure_work, 0);
- 
--out:
--	return ret;
-+	return 0;
+ #define MAIN_CH_INPUT_CURR_SHIFT	4
+ #define VBUS_IN_CURR_LIM_SHIFT		4
+@@ -1678,6 +1679,105 @@ static int ab8500_charger_usb_en(struct ux500_charger *charger,
  }
  
- static int pm2xxx_charger_wd_exp_mngt(struct pm2xxx_charger *pm2, int val)
-@@ -630,6 +623,8 @@ static int pm2xxx_charger_ac_get_property(struct power_supply *psy,
- 			val->intval = POWER_SUPPLY_HEALTH_DEAD;
- 		else if (pm2->flags.main_thermal_prot)
- 			val->intval = POWER_SUPPLY_HEALTH_OVERHEAT;
-+		else if (pm2->flags.ovv)
-+			val->intval = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
- 		else
- 			val->intval = POWER_SUPPLY_HEALTH_GOOD;
- 		break;
-@@ -860,6 +855,30 @@ static void pm2xxx_charger_ac_work(struct work_struct *work)
- 	sysfs_notify(&pm2->ac_chg.psy.dev->kobj, NULL, "present");
- };
- 
-+static void pm2xxx_charger_check_hw_failure_work(struct work_struct *work)
+ /**
++ * ab8500_charger_usb_check_enable() - enable usb charging
++ * @charger:	pointer to the ux500_charger structure
++ * @vset:	charging voltage
++ * @iset:	charger output current
++ *
++ * Check if the VBUS charger has been disconnected and reconnected without
++ * AB8500 rising an interrupt. Returns 0 on success.
++ */
++static int ab8500_charger_usb_check_enable(struct ux500_charger *charger,
++	int vset, int iset)
 +{
-+	u8 reg_value;
++	u8 usbch_ctrl1 = 0;
++	int ret = 0;
 +
-+	struct pm2xxx_charger *pm2 = container_of(work,
-+		struct pm2xxx_charger, check_hw_failure_work.work);
++	struct ab8500_charger *di = to_ab8500_charger_usb_device_info(charger);
 +
-+	if (pm2->flags.ovv) {
-+		pm2xxx_reg_read(pm2, PM2XXX_SRCE_REG_INT4, &reg_value);
++	if (!di->usb.charger_connected)
++		return ret;
 +
-+		if (!(reg_value & (PM2XXX_INT4_S_ITVPWR1OVV |
-+					PM2XXX_INT4_S_ITVPWR2OVV))) {
-+			pm2->flags.ovv = false;
-+			power_supply_changed(&pm2->ac_chg.psy);
++	ret = abx500_get_register_interruptible(di->dev, AB8500_CHARGER,
++				AB8500_USBCH_CTRL1_REG, &usbch_ctrl1);
++	if (ret < 0) {
++		dev_err(di->dev, "ab8500 read failed %d\n", __LINE__);
++		return ret;
++	}
++	dev_dbg(di->dev, "USB charger ctrl: 0x%02x\n", usbch_ctrl1);
++
++	if (!(usbch_ctrl1 & USB_CH_ENA)) {
++		dev_info(di->dev, "Charging has been disabled abnormally and will be re-enabled\n");
++
++		ret = abx500_mask_and_set_register_interruptible(di->dev,
++					AB8500_CHARGER, AB8500_CHARGER_CTRL,
++					DROP_COUNT_RESET, DROP_COUNT_RESET);
++		if (ret < 0) {
++			dev_err(di->dev, "ab8500 write failed %d\n", __LINE__);
++			return ret;
++		}
++
++		ret = ab8500_charger_usb_en(&di->usb_chg, true, vset, iset);
++		if (ret < 0) {
++			dev_err(di->dev, "Failed to enable VBUS charger %d\n",
++					__LINE__);
++			return ret;
 +		}
 +	}
-+
-+	/* If we still have a failure, schedule a new check */
-+	if (pm2->flags.ovv) {
-+		queue_delayed_work(pm2->charger_wq,
-+			&pm2->check_hw_failure_work, round_jiffies(HZ));
-+	}
++	return ret;
 +}
 +
- static void pm2xxx_charger_check_main_thermal_prot_work(
- 	struct work_struct *work)
- {
-@@ -983,6 +1002,10 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
- 	INIT_WORK(&pm2->check_main_thermal_prot_work,
- 		pm2xxx_charger_check_main_thermal_prot_work);
++/**
++ * ab8500_charger_ac_check_enable() - enable usb charging
++ * @charger:	pointer to the ux500_charger structure
++ * @vset:	charging voltage
++ * @iset:	charger output current
++ *
++ * Check if the AC charger has been disconnected and reconnected without
++ * AB8500 rising an interrupt. Returns 0 on success.
++ */
++static int ab8500_charger_ac_check_enable(struct ux500_charger *charger,
++	int vset, int iset)
++{
++	u8 mainch_ctrl1 = 0;
++	int ret = 0;
++
++	struct ab8500_charger *di = to_ab8500_charger_ac_device_info(charger);
++
++	if (!di->ac.charger_connected)
++		return ret;
++
++	ret = abx500_get_register_interruptible(di->dev, AB8500_CHARGER,
++				AB8500_MCH_CTRL1, &mainch_ctrl1);
++	if (ret < 0) {
++		dev_err(di->dev, "ab8500 read failed %d\n", __LINE__);
++		return ret;
++	}
++	dev_dbg(di->dev, "AC charger ctrl: 0x%02x\n", mainch_ctrl1);
++
++	if (!(mainch_ctrl1 & MAIN_CH_ENA)) {
++		dev_info(di->dev, "Charging has been disabled abnormally and will be re-enabled\n");
++
++		ret = abx500_mask_and_set_register_interruptible(di->dev,
++					AB8500_CHARGER, AB8500_CHARGER_CTRL,
++					DROP_COUNT_RESET, DROP_COUNT_RESET);
++
++		if (ret < 0) {
++			dev_err(di->dev, "ab8500 write failed %d\n", __LINE__);
++			return ret;
++		}
++
++		ret = ab8500_charger_ac_en(&di->usb_chg, true, vset, iset);
++		if (ret < 0) {
++			dev_err(di->dev, "failed to enable AC charger %d\n",
++				__LINE__);
++			return ret;
++		}
++	}
++	return ret;
++}
++
++/**
+  * ab8500_charger_watchdog_kick() - kick charger watchdog
+  * @di:		pointer to the ab8500_charger structure
+  *
+@@ -1734,8 +1834,7 @@ static int ab8500_charger_update_charger_current(struct ux500_charger *charger,
  
-+	/* Init work for HW failure check */
-+	INIT_DEFERRABLE_WORK(&pm2->check_hw_failure_work,
-+		pm2xxx_charger_check_hw_failure_work);
+ 	/* Reset the main and usb drop input current measurement counter */
+ 	ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER,
+-				AB8500_CHARGER_CTRL,
+-				0x1);
++				AB8500_CHARGER_CTRL, DROP_COUNT_RESET);
+ 	if (ret) {
+ 		dev_err(di->dev, "%s write failed\n", __func__);
+ 		return ret;
+@@ -3221,6 +3320,7 @@ static int ab8500_charger_probe(struct platform_device *pdev)
+ 	di->ac_chg.psy.num_supplicants = ARRAY_SIZE(supply_interface),
+ 	/* ux500_charger sub-class */
+ 	di->ac_chg.ops.enable = &ab8500_charger_ac_en;
++	di->ac_chg.ops.check_enable = &ab8500_charger_ac_check_enable;
+ 	di->ac_chg.ops.kick_wd = &ab8500_charger_watchdog_kick;
+ 	di->ac_chg.ops.update_curr = &ab8500_charger_update_charger_current;
+ 	di->ac_chg.max_out_volt = ab8500_charger_voltage_map[
+@@ -3242,6 +3342,7 @@ static int ab8500_charger_probe(struct platform_device *pdev)
+ 	di->usb_chg.psy.num_supplicants = ARRAY_SIZE(supply_interface),
+ 	/* ux500_charger sub-class */
+ 	di->usb_chg.ops.enable = &ab8500_charger_usb_en;
++	di->usb_chg.ops.check_enable = &ab8500_charger_usb_check_enable;
+ 	di->usb_chg.ops.kick_wd = &ab8500_charger_watchdog_kick;
+ 	di->usb_chg.ops.update_curr = &ab8500_charger_update_charger_current;
+ 	di->usb_chg.max_out_volt = ab8500_charger_voltage_map[
+diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
+index 31507bf..8ab65a3 100644
+--- a/drivers/power/abx500_chargalg.c
++++ b/drivers/power/abx500_chargalg.c
+@@ -305,6 +305,30 @@ static void abx500_chargalg_state_to(struct abx500_chargalg *di,
+ 	di->charge_state = state;
+ }
+ 
++static int abx500_chargalg_check_charger_enable(struct abx500_chargalg *di)
++{
++	switch (di->charge_state) {
++	case STATE_NORMAL:
++	case STATE_MAINTENANCE_A:
++	case STATE_MAINTENANCE_B:
++		break;
++	default:
++		return 0;
++	}
++
++	if (di->chg_info.charger_type & USB_CHG) {
++		return di->usb_chg->ops.check_enable(di->usb_chg,
++                         di->bm->bat_type[di->bm->batt_id].normal_vol_lvl,
++                         di->bm->bat_type[di->bm->batt_id].normal_cur_lvl);
++	} else if ((di->chg_info.charger_type & AC_CHG) &&
++		   !(di->ac_chg->external)) {
++		return di->ac_chg->ops.check_enable(di->ac_chg,
++                         di->bm->bat_type[di->bm->batt_id].normal_vol_lvl,
++                         di->bm->bat_type[di->bm->batt_id].normal_cur_lvl);
++	}
++	return 0;
++}
++
+ /**
+  * abx500_chargalg_check_charger_connection() - Check charger connection change
+  * @di:		pointer to the abx500_chargalg structure
+@@ -1219,6 +1243,7 @@ static void abx500_chargalg_external_power_changed(struct power_supply *psy)
+ static void abx500_chargalg_algorithm(struct abx500_chargalg *di)
+ {
+ 	int charger_status;
++	int ret;
+ 
+ 	/* Collect data from all power_supply class devices */
+ 	class_for_each_device(power_supply_class, NULL,
+@@ -1229,6 +1254,14 @@ static void abx500_chargalg_algorithm(struct abx500_chargalg *di)
+ 	abx500_chargalg_check_charger_voltage(di);
+ 
+ 	charger_status = abx500_chargalg_check_charger_connection(di);
++
++	if (is_ab8500(di->parent)) {
++		ret = abx500_chargalg_check_charger_enable(di);
++		if (ret < 0)
++			dev_err(di->dev, "Checking charger is enabled error"
++					": Returned Value %d\n", ret);
++	}
 +
  	/*
- 	 * VDD ADC supply needs to be enabled from this driver when there
- 	 * is a charger connected to avoid erroneous BTEMP_HIGH/LOW
-@@ -1123,4 +1146,3 @@ MODULE_LICENSE("GPL v2");
- MODULE_AUTHOR("Rajkumar kasirajan, Olivier Launay");
- MODULE_ALIAS("platform:pm2xxx-charger");
- MODULE_DESCRIPTION("PM2xxx charger management driver");
--
-diff --git a/drivers/power/pm2301_charger.h b/drivers/power/pm2301_charger.h
-index e6319cd..fad1f38 100644
---- a/drivers/power/pm2301_charger.h
-+++ b/drivers/power/pm2301_charger.h
-@@ -506,6 +506,7 @@ struct pm2xxx_charger {
- 	struct delayed_work check_vbat_work;
- 	struct work_struct ac_work;
- 	struct work_struct check_main_thermal_prot_work;
-+	struct delayed_work check_hw_failure_work;
- 	struct ux500_charger ac_chg;
- 	struct pm2xxx_charger_event_flags flags;
+ 	 * First check if we have a charger connected.
+ 	 * Also we don't allow charging of unknown batteries if configured
+diff --git a/include/linux/mfd/abx500/ux500_chargalg.h b/include/linux/mfd/abx500/ux500_chargalg.h
+index d43ac0f..110d12f 100644
+--- a/include/linux/mfd/abx500/ux500_chargalg.h
++++ b/include/linux/mfd/abx500/ux500_chargalg.h
+@@ -17,6 +17,7 @@ struct ux500_charger;
+ 
+ struct ux500_charger_ops {
+ 	int (*enable) (struct ux500_charger *, int, int, int);
++	int (*check_enable) (struct ux500_charger *, int, int);
+ 	int (*kick_wd) (struct ux500_charger *);
+ 	int (*update_curr) (struct ux500_charger *, int);
  };
 -- 
 1.7.10.4
