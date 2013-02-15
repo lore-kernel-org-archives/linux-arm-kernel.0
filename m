@@ -1,62 +1,50 @@
-From: qingx@marvell.com (Qing Xu)
-Date: Fri, 15 Feb 2013 11:32:38 +0800
-Subject: [PATCH 4/9] mfd: max8925: fix trivial build warning for non-dt
-In-Reply-To: <1360880818-4071454-5-git-send-email-arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 14 Feb 2013 20:54:04 -0800
+Subject: [PATCH 3/9] clk: sunxi: remove stale Makefile entry
+In-Reply-To: <1360880818-4071454-4-git-send-email-arnd@arndb.de>
 References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
- <1360880818-4071454-5-git-send-email-arnd@arndb.de>
-Message-ID: <511DAC56.8080404@marvell.com>
+ <1360880818-4071454-4-git-send-email-arnd@arndb.de>
+Message-ID: <20130215045404.11471.91270@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2013 06:26 AM, Arnd Bergmann wrote:
-> Patch fe527ea5a "mfd: max8925: Support dt for backlight"
-> added a new function for DT probing but introduced a
-> build warning for the case where CONFIG_OF is disabled:
->
-> drivers/video/backlight/max8925_bl.c: In function 'max8925_backlight_probe':
-> drivers/video/backlight/max8925_bl.c:177:3: warning: statement with no effect [-Wunused-value]
->
-> A much nicer fix is to use the IS_ENABLED keyword to
-> have the same effect of dropping the device tree specific
-> function when it's not needed.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Qing Xu <qingx@marvell.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> ---
->   drivers/video/backlight/max8925_bl.c | 6 +-----
->   1 file changed, 1 insertion(+), 5 deletions(-)
->
-> diff --git a/drivers/video/backlight/max8925_bl.c b/drivers/video/backlight/max8925_bl.c
-> index 5ca11b0..9958fb1 100644
-> --- a/drivers/video/backlight/max8925_bl.c
-> +++ b/drivers/video/backlight/max8925_bl.c
-> @@ -101,14 +101,13 @@ static const struct backlight_ops max8925_backlight_ops = {
->   	.get_brightness	= max8925_backlight_get_brightness,
->   };
->   
-> -#ifdef CONFIG_OF
->   static int max8925_backlight_dt_init(struct platform_device *pdev,
->   			      struct max8925_backlight_pdata *pdata)
->   {
->   	struct device_node *nproot = pdev->dev.parent->of_node, *np;
->   	int dual_string;
->   
-> -	if (!nproot)
-> +	if (!nproot || !IS_ENABLED(CONFIG_OF))
->   		return -ENODEV;
->   	np = of_find_node_by_name(nproot, "backlight");
->   	if (!np) {
-> @@ -120,9 +119,6 @@ static int max8925_backlight_dt_init(struct platform_device *pdev,
->   	pdata->dual_string = dual_string;
->   	return 0;
->   }
-> -#else
-> -#define max8925_backlight_dt_init(x, y)	(-1)
-> -#endif
->   
->   static int max8925_backlight_probe(struct platform_device *pdev)
->   {
+Quoting Arnd Bergmann (2013-02-14 14:26:52)
+> Patch 85a18198 "clk: sunxi: Use common of_clk_init() function"
+> removed the clk-sunxi.c file but left the Makefile entry, which
+> causes a build error in multi_v7_defconfig:
+> 
+> make[4]: *** No rule to make target `drivers/clk/clk-sunxi.o', needed by `drivers/clk/built-in.o'.
+> 
+> The obvious fix is to remove the extraneous line from the
+> Makefile.
+> 
 
-thanks, I am ok with the change.
+The fix is correct.  I can't rebase my branch since there is an existing
+dependency with the tegra tree, so I have taken this patch as-is with
+the addition of my SoB.
+
+Thanks,
+Mike
+
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+> Cc: Maxime Ripard <maxime.ripard@anandra.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> ---
+>  drivers/clk/Makefile | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index ce77077..be9392e 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -25,7 +25,6 @@ endif
+>  obj-$(CONFIG_MACH_LOONGSON1)   += clk-ls1x.o
+>  obj-$(CONFIG_ARCH_U8500)       += ux500/
+>  obj-$(CONFIG_ARCH_VT8500)      += clk-vt8500.o
+> -obj-$(CONFIG_ARCH_SUNXI)       += clk-sunxi.o
+>  obj-$(CONFIG_ARCH_ZYNQ)                += clk-zynq.o
+>  obj-$(CONFIG_X86)              += x86/
+>  obj-$(CONFIG_ARCH_TEGRA)       += tegra/
+> -- 
+> 1.8.1.2
