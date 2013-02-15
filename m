@@ -1,184 +1,92 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Fri, 15 Feb 2013 12:03:31 +0530
-Subject: [PATCH] USB: EHCI: make ehci-mv as separate static driver
-In-Reply-To: <1360910011-2666-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1360910011-2666-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1360910011-2666-3-git-send-email-manjunath.goudar@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 15 Feb 2013 08:44:29 +0200
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+References: <1360840554-26901-1-git-send-email-balbi@ti.com>
+ <1360840554-26901-2-git-send-email-balbi@ti.com>
+ <20130214171253.GC7144@atomide.com>
+ <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com>
+ <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+Message-ID: <20130215064429.GA30038@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the mv host controller driver from ehci-hcd host code
-into its own static driver module.
+Hi,
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Greg KH <greg@kroah.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-usb at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/usb/host/Kconfig    |    2 +-
- drivers/usb/host/Makefile   |    1 +
- drivers/usb/host/ehci-hcd.c |    6 +---
- drivers/usb/host/ehci-mv.c  |   78 +++++++++++++++++++------------------------
- 4 files changed, 38 insertions(+), 49 deletions(-)
+On Thu, Feb 14, 2013 at 08:47:53PM +0000, Paul Walmsley wrote:
+> Hi,
+> 
+> On Thu, 14 Feb 2013, Tony Lindgren wrote:
+> 
+> > I don't think so as hwmod should only touch the sysconfig space
+> > when no driver has claimed it.
+> 
+> hwmod does need to touch the SYSCONFIG register during pm_runtime suspend 
+> and resume operations, and during device enable and disable operations.  
+> Here's the relevant code:
+> 
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2157
+> 
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2195
+> 
+> Drivers shouldn't touch their IP block's SYSCONFIG registers.  They don't 
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 8ffbafa..2aa4ece 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -221,7 +221,7 @@ config USB_EHCI_S5P
- 	 Enable support for the S5P SOC's on-chip EHCI controller.
- 
- config USB_EHCI_MV
--	bool "EHCI support for Marvell on-chip controller"
-+	tristate "EHCI support for Marvell on-chip controller"
- 	depends on USB_EHCI_HCD && (ARCH_PXA || ARCH_MMP)
- 	select USB_EHCI_ROOT_HUB_TT
- 	---help---
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 77e0331..d593017 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -31,6 +31,7 @@ obj-$(CONFIG_USB_EHCI_HCD_SPEAR)+= ehci-spear.o
- obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
- obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
- obj-$(CONFIG_USB_EHCI_S5P)      += ehci-s5p.o
-+obj-$(CONFIG_USB_EHCI_MV)       += ehci-mv.o
- obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
- obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
- obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index fa0e665..9cf4d73 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1317,11 +1317,6 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		ehci_grlib_driver
- #endif
- 
--#ifdef CONFIG_USB_EHCI_MV
--#include "ehci-mv.c"
--#define        PLATFORM_DRIVER         ehci_mv_driver
--#endif
--
- #ifdef CONFIG_MIPS_SEAD3
- #include "ehci-sead3.c"
- #define	PLATFORM_DRIVER		ehci_hcd_sead3_driver
-@@ -1335,6 +1330,7 @@ MODULE_LICENSE ("GPL");
- 	!defined(PLATFORM_DRIVER) && \
- 	!IS_ENABLED(CONFIG_ARCH_AT91) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_S5P) && \
-+	!IS_ENABLED(CONFIG_USB_EHCI_MV) && \
- 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
- 	!defined(OF_PLATFORM_DRIVER) && \
- 	!defined(XILINX_OF_PLATFORM_DRIVER)
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 3065809..0d92437 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -16,8 +16,18 @@
- #include <linux/err.h>
- #include <linux/usb/otg.h>
- #include <linux/platform_data/mv_usb.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+#include <linux/io.h>
-+#include <linux/dma-mapping.h>
-+
-+#include "ehci.h"
-+
-+#define DRIVER_DESC "EHCI mv driver"
- 
- #define CAPLENGTH_MASK         (0xff)
-+static const char hcd_name[] = "ehci-mv";
-+static struct hc_driver __read_mostly mv_ehci_hc_driver;
- 
- struct ehci_hcd_mv {
- 	struct usb_hcd *hcd;
-@@ -95,48 +105,6 @@ static int mv_ehci_reset(struct usb_hcd *hcd)
- 	return retval;
- }
- 
--static const struct hc_driver mv_ehci_hc_driver = {
--	.description = hcd_name,
--	.product_desc = "Marvell EHCI",
--	.hcd_priv_size = sizeof(struct ehci_hcd),
--
--	/*
--	 * generic hardware linkage
--	 */
--	.irq = ehci_irq,
--	.flags = HCD_MEMORY | HCD_USB2,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset = mv_ehci_reset,
--	.start = ehci_run,
--	.stop = ehci_stop,
--	.shutdown = ehci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue = ehci_urb_enqueue,
--	.urb_dequeue = ehci_urb_dequeue,
--	.endpoint_disable = ehci_endpoint_disable,
--	.endpoint_reset = ehci_endpoint_reset,
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
--
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number = ehci_get_frame,
--
--	/*
--	 * root hub support
--	 */
--	.hub_status_data = ehci_hub_status_data,
--	.hub_control = ehci_hub_control,
--	.bus_suspend = ehci_bus_suspend,
--	.bus_resume = ehci_bus_resume,
--};
--
- static int mv_ehci_probe(struct platform_device *pdev)
- {
- 	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
-@@ -350,8 +318,32 @@ static struct platform_driver ehci_mv_driver = {
- 	.remove = mv_ehci_remove,
- 	.shutdown = mv_ehci_shutdown,
- 	.driver = {
--		   .name = "mv-ehci",
-+		   .name = hcd_name,
- 		   .bus = &platform_bus_type,
- 		   },
- 	.id_table = ehci_id_table,
- };
-+static const struct ehci_driver_overrides mv_overrides __initdata = {
-+	.reset = mv_ehci_reset,
-+};
-+
-+static int __init ehci_mv_init(void)
-+{
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+	ehci_init_driver(&mv_ehci_hc_driver, &mv_overrides);
-+	return platform_driver_register(&ehci_mv_driver);
-+}
-+module_init(ehci_mv_init);
-+
-+static void __exit ehci_mv_cleanup(void)
-+{
-+	platform_driver_unregister(&ehci_mv_driver);
-+}
-+module_exit(ehci_mv_cleanup);
-+
-+MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_ALIAS("platform:ehci-mv");
-+MODULE_LICENSE("GPL");
+why not ? It's part of the driver's address space anyway. It's not part
+of the IP in question (usb, ethernet, etc) but it's part of the TI
+wrapper which usually involves a bridge (ocp2scp, ocp2axi, etc) plus the
+TI-specific integration registers (revision, sysc, syss...).
+
+So they're not part of the licensed IP, but they're part of the TI
+wrapper around those.
+
+> have anything specifically to do with the underlying device IP block, but 
+
+of course they do, soft reset touches the underlying IP, so does force
+idle, no idle, etc. But I agree that part is more changing the the
+asynchronous idle request handshake.
+
+> with the SoC integration, even though they live in the device's 
+> memory-mapped address range.  It's unfortunate that TI didn't allocate a 
+> separate, small address space for these registers, translated by the bus, 
+> similar to the PCI-E Enhanced Configuration Access Mechanism:
+> 
+> http://wiki.osdev.org/PCI_Express#Extended_Configuration_Space
+> 
+> ... but that's unfortunately the reality of the OMAP hardware.
+
+right.
+
+> Regarding ioremap(), it seems reasonable for drivers to call ioremap(), as 
+> long as the implementation of ioremap() can be overridden by the device's 
+> bus.  PCI device drivers already do this -- albeit in a PCI-specific way 
+> -- with pci_ioremap_bar():
+> 
+> http://git.kernel.org/?p=linux%2Fkernel%2Fgit%2Ftorvalds%2Flinux.git&a=search&h=HEAD&st=grep&s=pci_ioremap_bar
+> 
+> So instead of something bus-specific like that, a better way would be to 
+> use something like:
+> 
+> va = dev->bus->ioremap( ... );
+> va = dev->bus->iounmap( ... );
+> 
+> Any driver using such a mechanism would be intrinsically generic. 
+> platform_bus could simply set its bus->ioremap to the existing ioremap() 
+> function, while buses like a omap_hwmod_bus could use a function that 
+> returned the address range that omap_hwmod_bus has already ioremap()ped.
+
+although I'm not sure I like the idea exposed here, ioremap() is the
+least of our problems :-) The biggest problem is having functioning PM
+for all drivers on a DT boot with CPUIDLE enabled.
+
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130215/8ce7c5cc/attachment.sig>
