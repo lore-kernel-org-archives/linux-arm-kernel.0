@@ -1,65 +1,42 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 15 Feb 2013 09:25:14 +0800
-Subject: [PATCH 4/9] mfd: max8925: fix trivial build warning for non-dt
-In-Reply-To: <1360880818-4071454-5-git-send-email-arnd@arndb.de>
-References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
- <1360880818-4071454-5-git-send-email-arnd@arndb.de>
-Message-ID: <CAN1soZybF=bqWe88NWNYb1m8etQGF_YeAxTmtqVwKDcNzCvX5g@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 15 Feb 2013 15:48:53 +1300
+Subject: [RFC PATCH] Add pin control driver for Wondermedia SoCS
+Message-ID: <1360896534-20637-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 6:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Patch fe527ea5a "mfd: max8925: Support dt for backlight"
-> added a new function for DT probing but introduced a
-> build warning for the case where CONFIG_OF is disabled:
->
-> drivers/video/backlight/max8925_bl.c: In function 'max8925_backlight_probe':
-> drivers/video/backlight/max8925_bl.c:177:3: warning: statement with no effect [-Wunused-value]
->
-> A much nicer fix is to use the IS_ENABLED keyword to
-> have the same effect of dropping the device tree specific
-> function when it's not needed.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Qing Xu <qingx@marvell.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> ---
->  drivers/video/backlight/max8925_bl.c | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
->
-> diff --git a/drivers/video/backlight/max8925_bl.c b/drivers/video/backlight/max8925_bl.c
-> index 5ca11b0..9958fb1 100644
-> --- a/drivers/video/backlight/max8925_bl.c
-> +++ b/drivers/video/backlight/max8925_bl.c
-> @@ -101,14 +101,13 @@ static const struct backlight_ops max8925_backlight_ops = {
->         .get_brightness = max8925_backlight_get_brightness,
->  };
->
-> -#ifdef CONFIG_OF
->  static int max8925_backlight_dt_init(struct platform_device *pdev,
->                               struct max8925_backlight_pdata *pdata)
->  {
->         struct device_node *nproot = pdev->dev.parent->of_node, *np;
->         int dual_string;
->
-> -       if (!nproot)
-> +       if (!nproot || !IS_ENABLED(CONFIG_OF))
->                 return -ENODEV;
->         np = of_find_node_by_name(nproot, "backlight");
->         if (!np) {
-> @@ -120,9 +119,6 @@ static int max8925_backlight_dt_init(struct platform_device *pdev,
->         pdata->dual_string = dual_string;
->         return 0;
->  }
-> -#else
-> -#define max8925_backlight_dt_init(x, y)        (-1)
-> -#endif
->
->  static int max8925_backlight_probe(struct platform_device *pdev)
->  {
-> --
-> 1.8.1.2
->
+Before I get all carried away and start filling in all the data for
+this driver, I was hoping someone (or a few people) could review the
+basic design in case it requires changes to the data structures.
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+This driver is based on pinctrl-bcm2835.c as it seems to be similar in
+design. The pin controller on Wondermedia SoC's only allows each pin to
+either be a GPIO or to be its 'alternate' function. Functions cannot be
+remapped to any other pin.
+
+I have seperated out the data from the code as there are several SoC's
+to support and each has it's own variation of registers / pin layout.
+I borrowed this part of the design from the Tegra pinctrl driver.
+
+Regards
+Tony Prisk
+
+Tony Prisk (1):
+  pinctrl: gpio: vt8500: Add pin control driver for Wondermedia SoCs
+
+ arch/arm/Kconfig                   |    4 +-
+ arch/arm/boot/dts/wm8850-w70v2.dts |   15 +
+ arch/arm/boot/dts/wm8850.dtsi      |    7 +-
+ arch/arm/mach-vt8500/Kconfig       |    1 +
+ drivers/pinctrl/Kconfig            |   10 +
+ drivers/pinctrl/Makefile           |    2 +
+ drivers/pinctrl/pinctrl-wm8850.c   |  166 +++++++++++
+ drivers/pinctrl/pinctrl-wmt.c      |  565 ++++++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-wmt.h      |   73 +++++
+ 9 files changed, 840 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/pinctrl/pinctrl-wm8850.c
+ create mode 100644 drivers/pinctrl/pinctrl-wmt.c
+ create mode 100644 drivers/pinctrl/pinctrl-wmt.h
+
+-- 
+1.7.9.5
