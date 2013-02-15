@@ -1,84 +1,50 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 15 Feb 2013 14:01:52 -0300
-Subject: [PATCH v2 3/8] ARM: omap2: gpmc: Fix gpmc_cs_reserved() return
- value
-In-Reply-To: <CABYxbz6tZJjuz0NKorPSz_tWD42+HuHL3kwW0cegWW5QTDxH8g@mail.gmail.com>
-References: <1360682305-20935-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1360682305-20935-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <CABYxbz6tZJjuz0NKorPSz_tWD42+HuHL3kwW0cegWW5QTDxH8g@mail.gmail.com>
-Message-ID: <20130215170151.GC2442@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Feb 2013 08:30:32 -0800
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <511E38C3.7080404@ti.com>
+References: <20130214171253.GC7144@atomide.com>
+ <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com>
+ <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+ <20130215101610.GR17852@n2100.arm.linux.org.uk>
+ <511E3797.2070802@ti.com>
+ <20130215132726.GT17852@n2100.arm.linux.org.uk>
+ <511E38C3.7080404@ti.com>
+Message-ID: <20130215163031.GA5724@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anil,
-
-On Fri, Feb 15, 2013 at 09:49:21PM +0530, Anil Kumar wrote:
-> Hi,
-> 
-> On Tue, Feb 12, 2013 at 8:48 PM, Ezequiel Garcia
-> <ezequiel.garcia@free-electrons.com> wrote:
-> > Currently gpmc_cs_reserved() return value is somewhat inconsistent,
-> > returning a negative value on an error condition, a positive value
-> > if the chip select is reserved and zero if it's available.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130215 05:34]:
+> On Friday 15 February 2013 06:57 PM, Russell King - ARM Linux wrote:
+> >On Fri, Feb 15, 2013 at 06:56:47PM +0530, Santosh Shilimkar wrote:
+> >>Whats your view on use of arch_ioremap_caller() hook ? This can allow
+> >>us to avoid the dual ioremap() issue discussed here if the hook
+> >>maintains the list of mapped ios.
+> >>
+> >>I was even thinking of having such intelligence within the core
+> >>ioremap code but thought that might be too invasive.
 > >
-> > Fix this by returning a boolean value as the function name suggests:
-> >   * true if the chip select is reserved,
-> >   * false if it's available
+> >Why do you even need it?  There's no problem with ioremapping the same
+> >space multiple times (you end up with multiple mappings but that
+> >shouldn't be a problem, except for the additional space used.)
 > >
-> > Suggested-by: Felipe Balbi <balbi@ti.com>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> > Changelog from v1:
-> >  * As suggested by Felipe Balbi, fix return code to a boolean
-> >
-> >  arch/arm/mach-omap2/gpmc.c |    4 ++--
-> >  1 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> > index bd3bc93..fa4764f 100644
-> > --- a/arch/arm/mach-omap2/gpmc.c
-> > +++ b/arch/arm/mach-omap2/gpmc.c
-> > @@ -452,10 +452,10 @@ static int gpmc_cs_set_reserved(int cs, int reserved)
-> >         return 0;
-> >  }
-> >
-> > -static int gpmc_cs_reserved(int cs)
-> > +static bool gpmc_cs_reserved(int cs)
-> >  {
-> >         if (cs > GPMC_CS_NUM)
-> > -               return -ENODEV;
-> > +               return true;
-> >
-> >         return gpmc_cs_map & (1 << cs);
-> >  }
-> 
-> commit "6797b4fe0e554ce71f47038fd929c9ca929a9f3c"
-> Marking all the chip-selects as reserved by default.
-> 
-> In this case gpmc_cs_map is 0xff. So it will return 0x1 if cs is 0.
-> So gpmc_cs_request() function will fail in nand (gpmc-nand.c) case.
-> 
-> I am taking reference, branch "omap-for-v3.9/gpmc" of git tree
-> http://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-> 
-> I am sorry if this question is very vague.
-> 
+> It just waste of iospace and Tony insisted to have just single ioremap()
+> hence all this discussion
 
-If I understand correctly your concern, I believe you've missed this
-patch submitted by Jon Hunter and not yet merged:
+The main goal is to avoid duplicating data both in hwmod and DT.
+That's pretty much solved as we can have the driver probe populate
+the common data for hwmod from DT as Santosh has already demonstrated.
 
-  ARM: OMAP2+: Fix-up gpmc merge error
+Then we also want the driver specific idle and reset code to be done
+in the drivers rather than in hwmod and glue it together with hwmod
+using runtime PM. The biggest issue there is how do we reset and idle
+some piece of hardware for PM purposes when there's no driver loaded.
 
-With this patch every chip-select is cleared on gpmc_probe()
-as soon as GPMC driver initializes, and before we can request any
-NAND/NOR child.
+For the duplicate ioremapping, I don't think there's any need to
+do it if we get things right.
 
-I hope this answers your question.
+Regards,
 
-Feel free to test the series and send your Tested-by!
-
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Tony
