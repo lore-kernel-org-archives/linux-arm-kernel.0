@@ -1,29 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 15 Feb 2013 10:12:39 +0100
-Subject: [PATCH 06/11] ARM: integrator/versatile: fix NOMMU warnings
-In-Reply-To: <1360849767-1463135-7-git-send-email-arnd@arndb.de>
-References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
- <1360849767-1463135-7-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdacWrY=Bb-1e+eicFYD3bQCkPjFbcX==sy_aSNa25g8BA@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 15 Feb 2013 11:13:01 +0200
+Subject: [PATCH v6 09/10] clk: tegra: Implement clocks for Tegra114
+In-Reply-To: <20130215.081805.2193798170330624846.hdoyu@nvidia.com>
+References: <1360580700-10245-1-git-send-email-pdeschrijver@nvidia.com>
+ <1360580700-10245-10-git-send-email-pdeschrijver@nvidia.com>
+ <20130215.081805.2193798170330624846.hdoyu@nvidia.com>
+Message-ID: <20130215091301.GN3073@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 2:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Feb 15, 2013 at 07:18:05AM +0100, Hiroshi Doyu wrote:
+> Peter De Schrijver <pdeschrijver@nvidia.com> wrote @ Mon, 11 Feb 2013 12:04:59 +0100:
+> 
+> > +enum tegra114_clk {
+> > +       rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
+> 
+> Why no 'cpu = 0' here?
 
-> On NOMMU kernels, the io_desc variables are unused
-> because we don't use the MMU to remap the MMIO
-> areas.
->
-> Marking these variables as __maybe_unused easily
-> avoids the otherwise harmless warnings like
->
-> warning: 'versatile_io_desc' defined but not used
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
+It doesn't make sense I think. Yes there is a bit, but we can't use it from
+software I think? Also the clock itself doesn't exist. Maybe this should be
+removed from the binding document.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cheers,
 
-Yours,
-Linus Walleij
+Peter.
