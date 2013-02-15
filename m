@@ -1,34 +1,47 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 15 Feb 2013 16:46:33 -0500
-Subject: [PATCH] ARM: Dove: convert usb host controller to DT
-In-Reply-To: <1359388448-14370-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1359388448-14370-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130215214633.GG14746@titan.lakedaemon.net>
+Date: Fri, 15 Feb 2013 16:48:06 -0500
+Subject: [PATCH v2 2/5] clocksource: time-armada-370-xp: add local
+ timer support
+In-Reply-To: <511EAB9F.9060609@free-electrons.com>
+References: <1359135165-32108-1-git-send-email-gregory.clement@free-electrons.com>
+ <1359135165-32108-3-git-send-email-gregory.clement@free-electrons.com>
+ <20130215212130.GC14746@titan.lakedaemon.net>
+ <511EAB9F.9060609@free-electrons.com>
+Message-ID: <20130215214806.GH14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 28, 2013 at 04:54:08PM +0100, Sebastian Hesselbarth wrote:
-> With DT support for orion-ehci also convert Dove to it and
-> remove the legacy calls and clock aliases.
+On Fri, Feb 15, 2013 at 10:41:51PM +0100, Gregory CLEMENT wrote:
+> On 02/15/2013 10:21 PM, Jason Cooper wrote:
+> > On Fri, Jan 25, 2013 at 06:32:42PM +0100, Gregory CLEMENT wrote:
+> >> On the SOCs Armada 370 and Armada XP, each CPU comes with two private
+> >> timers. This patch use the timer 0 of each CPU as local timer for the
+> >> clockevent if CONFIG_LOCAL_TIMER is selected. In the other case, use
+> >> only the private Timer 0 of CPU 0.
+> >>
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> ---
+> >>  drivers/clocksource/time-armada-370-xp.c |  150 ++++++++++++++++++++++--------
+> >>  1 file changed, 112 insertions(+), 38 deletions(-)
+> > 
+> > After applying the first two patches in this series to mvebu/drivers I get:
+> > 
+> >   CC      arch/arm/mach-mvebu/irq-armada-370-xp.o
+> > arch/arm/mach-mvebu/irq-armada-370-xp.c: In function 'armada_370_xp_mpic_irq_map':
+> > arch/arm/mach-mvebu/irq-armada-370-xp.c:87:11: error: 'ARMADA_370_XP_MAX_PER_CPU_IRQS' undeclared (first use in this function)
+> > arch/arm/mach-mvebu/irq-armada-370-xp.c:87:11: note: each undeclared identifier is reported only once for each function it appears in
+> > make[1]: *** [arch/arm/mach-mvebu/irq-armada-370-xp.o] Error 1
+> > make: *** [arch/arm/mach-mvebu] Error 2
+> > 
+> > with mvebu_defconfig.
+> > 
+> > Is there a dependency I missed?  I'm not finding anything obvious.  The
+> > same occurs if I enable LOCAL_TIMER.
 > 
-> This patch is based on "ARM: Dove: split legacy and DT setup"
-> applied to mvebu/boards recently.
+> It depends on "arm: mvebu: Improve the SMP support of the interrupt controller"
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/dove.dtsi   |   16 ++++++++++++++++
->  arch/arm/mach-dove/board-dt.c |   10 ----------
->  2 files changed, 16 insertions(+), 10 deletions(-)
+> As you have pulled this patch few weeks ago I forgot to this dependency, sorry.
 
-Applied to mvebu/dt
-
-thx,
+Cool, thanks!
 
 Jason.
