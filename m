@@ -1,39 +1,113 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Feb 2013 09:51:53 +0000
-Subject: [patch 1/2] arm: Mark pmu interupt IRQF_NO_THREAD
-In-Reply-To: <20130214205304.923585891@linutronix.de>
-References: <20130214205204.109023136@linutronix.de>
- <20130214205304.923585891@linutronix.de>
-Message-ID: <20130215095153.GA11145@mudshark.cambridge.arm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 15 Feb 2013 11:03:51 +0100
+Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
+In-Reply-To: <CABuKBeJsg_P=aDr0s9iVOD+7YTNoVUFQJCJymJyJ7NqXHUBzKQ@mail.gmail.com>
+References: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
+ <50C8AC3C.9020908@ti.com>
+ <CABuKBeJsHCq98Pe-BwPajbQ+2OLQpwrbtVTJe=j9thPDQCCBrg@mail.gmail.com>
+ <CAAwP0s01Jxh0f-T0sd5D980dZPcEV0J1KzjPbNHkrXLaKA3YUg@mail.gmail.com>
+ <CABuKBeJsg_P=aDr0s9iVOD+7YTNoVUFQJCJymJyJ7NqXHUBzKQ@mail.gmail.com>
+Message-ID: <511E0807.8000200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 08:53:52PM +0000, Thomas Gleixner wrote:
-> PMU interrupts must not be threaded.
-> 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  arch/arm/kernel/perf_event_cpu.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> Index: linux-2.6/arch/arm/kernel/perf_event_cpu.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/kernel/perf_event_cpu.c
-> +++ linux-2.6/arch/arm/kernel/perf_event_cpu.c
-> @@ -118,7 +118,8 @@ static int cpu_pmu_request_irq(struct ar
->  			continue;
->  		}
->  
-> -		err = request_irq(irq, handler, IRQF_NOBALANCING, "arm-pmu",
-> +		err = request_irq(irq, handler,
-> +				  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
->  				  cpu_pmu);
->  		if (err) {
->  			pr_err("unable to request IRQ%d for ARM PMU counters\n",
-> 
-> 
+Hi Matthias,
 
-Yup, we certainly don't want these to be threaded! Cheers, I'll add this to
-my perf queue.
+On 2/15/2013 10:35 AM, Matthias Brugger wrote:
+> 2013/1/26 Javier Martinez Canillas <martinez.javier@gmail.com>:
+>> On Sat, Jan 26, 2013 at 4:16 PM, Matthias Brugger <matthias.bgg@gmail.com>
+>> wrote:
+>>> Hi Benoit,
+>>>
+>>> 2012/12/12 Benoit Cousson <b-cousson@ti.com>:
+>>>> Hi Matthias,
+>>>>
+>>>> On 12/12/2012 04:33 PM, Matthias Brugger wrote:
+>>>>> This patch is a follow-up patch for Javier Martinez effort adding
+>>>>> initial
+>>>>> device tree support to IGEP technology devices. [1]
+>>>>>
+>>>>> It adds uart1 and uart2 bindings to the generic dtsi for the IGEP
+>>>>> boards.
+>>>>>
+>>>>> [1] http://www.spinics.net/lists/linux-omap/msg83409.html
+>>>>>
+>>>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>>>>> ---
+>>>>>   arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
+>>>>>   1 file changed, 24 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi
+>>>>> b/arch/arm/boot/dts/omap3-igep.dtsi
+>>>>> index 125fe00..c02e3c0 100644
+>>>>> --- a/arch/arm/boot/dts/omap3-igep.dtsi
+>>>>> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
+>>>>> @@ -27,6 +27,20 @@
+>>>>>   };
+>>>>>
+>>>>>   &omap3_pmx_core {
+>>>>> +     uart1_pins: pinmux_uart1_pins {
+>>>>> +             pinctrl-single,pins = <
+>>>>> +                     0x152 0x100     /* uart1_rx.uart1_rx INPUT | MODE0
+>>>>> */
+>>>>> +                     0x14c 0         /* uart1_tx.uart1_tx OUTPUT |
+>>>>> MODE0 */
+>>>>> +             >;
+>>>>> +     };
+>>>>> +
+>>>>> +     uart2_pins: pinmux_uart2_pins {
+>>>>> +             pinctrl-single,pins = <
+>>>>> +                     0x14a 0x100     /* uart2_rx.uart2_rx INPUT | MODE0
+>>>>> */
+>>>>> +                     0x148 0         /* uart2_tx.uart2_tx OUTPUT |
+>>>>> MODE0 */
+>>>>> +             >;
+>>>>> +     };
+>>>>> +
+>>>>>        uart3_pins: pinmux_uart3_pins {
+>>>>>                pinctrl-single,pins = <
+>>>>>                        0x16e 0x100     /* uart3_rx.uart3_rx INPUT | MODE0
+>>>>> */
+>>>>> @@ -77,6 +91,16 @@
+>>>>>        status = "disabled";
+>>>>>   };
+>>>>>
+>>>>> +&uart1 {
+>>>>> +       pinctrl-names = "default";
+>>>>> +       pinctrl-0 = <&uart1_pins>;
+>>>>> +};
+>>>>> +
+>>>>> +&uart2 {
+>>>>> +       pinctrl-names = "default";
+>>>>> +       pinctrl-0 = <&uart2_pins>;
+>>>>> +};
+>>>>> +
+>>>>>   &uart3 {
+>>>>>          pinctrl-names = "default";
+>>>>>          pinctrl-0 = <&uart3_pins>;
+>>>>>
+>>>>
+>>>> That looks good to me. I'll apply it on top of javier's series for 3.9.
+>>>
+>>> Can you pin-point me to the repository where this patches are in right
+>>> now? I tried to figure it out these days, but didn't found where to
+>>> clone the repository from.
+>>>
+>>> Thanks,
+>>> Matthias
+>>>
+>>
+>> Hi Matthias,
+>>
+>> OMAP DT tree is:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+>
+> Hi all,
+>
+> unfortunately I can't find the patch in this tree.
 
-Will
+Sorry about that. I've never pushed the latest branch, and was busy the 
+past month. I'll refresh the branch with all the pending patches.
+
+Regards,
+Benoit
