@@ -1,42 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Feb 2013 09:25:34 -0700
-Subject: [RFC 1/2] Makefile: Add arch/arch/$(hdr-arch)/boot in header
- include path
-In-Reply-To: <1360918364-27960-1-git-send-email-hdoyu@nvidia.com>
-References: <1360918364-27960-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <511E617E.6080206@wwwdotorg.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 15 Feb 2013 09:26:09 -0700
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130215060635.43f06f71@skate>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo6_6bYjo5XX5tzoBfMu5Htgpa__foNCyoCnCNEHocx67Q@mail.gmail.com>
+ <20130215060635.43f06f71@skate>
+Message-ID: <CAErSpo6KPzXj6cN95YuTZGhq+RLp4vDLddbpz=RDtRBvy_Rujg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2013 01:52 AM, Hiroshi Doyu wrote:
-> With a new feature dtc+cpp, DT can introduces some definitions in its
-> header files for their own. Some of those DT info can be used in
-> kernel source as well, instead of having the duplicate info in kernel
-> headers. This patch allows kernel source to include those DT
-> headers. For example:
-> 
-> + #include <dts/tegra20-car.h>
+On Thu, Feb 14, 2013 at 10:06 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-Since this is devicetree-related, the DT maintainers should also be
-CC'd. I've added them on this email, hence quoting the entire patch.
+>> > +       case PCI_PREF_LIMIT_UPPER32:
+>> > +               bridge->preflimitupper = value;
+>> > +               break;
+>>
+>> You're relying on a subsequent PCI_COMMAND write to set PCI_COMMAND_IO
+>> and/or PCI_COMMAND_MEMORY, and you program the bridge windows at that
+>> time.
+>
+> Correct.
+>
+>>  It might be a good idea if the PCI core did clear those bits
+>> while updating the windows, but I'm not sure we do.  In any case,
+>> delaying the update is a difference from a standard P2P bridge that
+>> could cause issues later.
+>
+> When would you want the window assignment to occur? Directly when the
+> registers containing the base/limit are being written to? There are
+> multiple registers for base/limit, so I'll have to figure out a way to
+> validate when the base/limit informations are valid.
 
-> 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  Makefile |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Makefile b/Makefile
-> index 0b4bf62..7f54cdb 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -364,7 +364,7 @@ LINUXINCLUDE    := \
->  		-I$(srctree)/arch/$(hdr-arch)/include \
->  		-Iarch/$(hdr-arch)/include/generated \
->  		$(if $(KBUILD_SRC), -I$(srctree)/include) \
-> -		-Iinclude \
-> +		-Iinclude -Iarch/$(hdr-arch)/boot \
->  		$(USERINCLUDE)
->  
->  KBUILD_CPPFLAGS := -D__KERNEL__
-> 
+For a standard bridge, the window change occurs immediately upon
+writing the base/limit, so that would be the best time.
+
+Here's the scenario I have in mind: We have a bridge X leading to
+several devices A and B.  Drivers are bound to A and B, and they are
+operating.  A hotplug event requires us to expand or shrink one of X's
+windows, but the new window is still sufficient to operate A and B.
+The question is how we do the window update.  If we turn off
+PCI_COMMAND_MEMORY for the update, then we have to coordinate with the
+drivers for A and B.  But I think it is possible to do some updates
+safely even with the window decoding enabled, without any effect on A
+and B, and these are the ones that would cause trouble with your
+current scheme.
+
+I don't think the PCI core does any updates like this today, but it's
+something we might like to do in the future.
+
+Bjorn
