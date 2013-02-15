@@ -1,51 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Feb 2013 19:20:45 +0530
-Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
-In-Reply-To: <511E3B3F.1000609@ti.com>
-References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
- <511E323E.3050104@ti.com> <20130215130745.GC16558@arwen.pp.htv.fi>
- <20130215130842.GD16558@arwen.pp.htv.fi> <511E3B3F.1000609@ti.com>
-Message-ID: <511E3D35.4060909@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 15 Feb 2013 22:53:24 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
+In-Reply-To: <20130214161811.GC3882@linux-sh.org>
+References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
+ <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
+ <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
+ <20130214041651.GB6036@verge.net.au>
+ <20130214091040.GG6088@linux-sh.org>
+ <20130214160842.GC26810@verge.net.au>
+ <20130214161811.GC3882@linux-sh.org>
+Message-ID: <20130215135324.GG27724@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 February 2013 07:12 PM, a0131647 wrote:
-> Hi,
-> On Friday 15 February 2013 06:38 PM, Felipe Balbi wrote:
->> On Fri, Feb 15, 2013 at 03:07:45PM +0200, Felipe Balbi wrote:
->>> On Fri, Feb 15, 2013 at 06:33:58PM +0530, a0131647 wrote:
->>>> Hi,
->>>> On Friday 15 February 2013 05:36 PM, Santosh Shilimkar wrote:
->>>>> OMAP UART IP needs manual idle modes based on state of the
->>>>> IP. Currently this is handled by the driver with function pointers
->>>>> implemented in platform code.
->>>>>
->>>>> This however breaks in case of device tree because of missing
->>>>> idle handling.
->>>>>
->>>>> The series tries to address the issue
->>>>>
->>>>> Patches has been tested on OMAP4 and OMAP5 devices where the console
->>>>> slugishness was observed without idle mode handling. CPUIDLE and
->>>>> suspend tested ok on these devices.
->>>>>
->>>>> Need help in testing on OMAP2, OMAP3 and AM3XXX devices.
->>>>>
->>>> Tested this series on omap3630 beagle board for:
->>>> 1. Retention in idle and suspend.
->>>> 2. Off mode in idle and suspend.
->>>>
->>>> Tested-by: Sourav Poddar<sourav.poddar@ti.com>
->>> try setting autosuspend_delay to -1
->> Also try DT boot and try to wakeup from echo mem>  /sys/power/state by
->> sending data through UART console.
->>
-> Suspend/resume with dt is not functional with the current mainline.
->
-With DT, suspend driver itself are not getting registered.
-The patch is in Paul's queue [1]
+On Fri, Feb 15, 2013 at 01:18:11AM +0900, Paul Mundt wrote:
+> On Fri, Feb 15, 2013 at 01:08:42AM +0900, Simon Horman wrote:
+> > On Thu, Feb 14, 2013 at 06:10:40PM +0900, Paul Mundt wrote:
+> > > On Thu, Feb 14, 2013 at 01:16:52PM +0900, Simon Horman wrote:
+> > > > Ok, so in that case the correct value for "sh_tmu.2" might actually
+> > > > be MSTP016 or MSTP015 depending on the bundle size. I am unsure how to test
+> > > > sh_tmu.2.
+> 
+> [snip]
+> 
+> > Getting that information correct for sh_tmu.2 on the r8a7779 problem I'm
+> > not completely sure of the correct answer to. Though I now strongly suspect
+> > it is MSTP016.
+> 
+> Testing shouldn't be that difficult, just switch your clocksource to it
+> and make sure all TMU-related MSTP bits are first cleared?
 
-regards,
-Santosh
-
-[1] https://patchwork-mail2.kernel.org/patch/2116671/
+Thanks, I will try that.
