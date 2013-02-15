@@ -1,64 +1,45 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:57:03 +0000
-Subject: [PATCH 32/35] mfd: ab8500-core: Add abx500-clk as an mfd child device
+Date: Fri, 15 Feb 2013 12:57:04 +0000
+Subject: [PATCH 33/35] mfd: ab8500-debug: Add explicit dependencies
 In-Reply-To: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
 References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360933026-30325-33-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360933026-30325-34-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@stericsson.com>
+From: Linus Walleij <linus.walleij@stericsson.com>
 
-Hierarchically, the abx500-clk shall be considered as a child of the
-ab8500 core. The abx500-clk is intiated at arch init and thus the clks
-will be available when clients needs them.
+As I am working on SPARSE_IRQ a number of implicit resource
+grabs in the kernel become evident. For example, some includes
+like <linux/irqs.h> would implicitly include <mach/irqs.h>
+and then from there <mach/db8500-regs.h>.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+In many cases it is masking the fact that drivers do not
+properly use resources to pass their dependencies, base
+addresses etc. So write explicit #include statements with
+TODO items to have this fixed the proper way to all drivers
+doing this.
+
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
-Reviewed-by: Patrice CHOTARD <patrice.chotard@stericsson.com>
-Reviewed-by: Gabriel FERNANDEZ <gabriel.fernandez@stericsson.com>
-Reviewed-by: Philippe BEGNIC <philippe.begnic@stericsson.com>
 ---
- drivers/mfd/ab8500-core.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/mfd/ab8500-debugfs.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 153e71e..2716c6c 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -1144,6 +1144,10 @@ static struct mfd_cell ab9540_devs[] = {
- 		.name = "ab8500-regulator",
- 	},
- 	{
-+		.name = "abx500-clk",
-+		.of_compatible = "stericsson,abx500-clk",
-+	},
-+	{
- 		.name = "ab8500-gpadc",
- 		.of_compatible = "stericsson,ab8500-gpadc",
- 		.num_resources = ARRAY_SIZE(ab8500_gpadc_resources),
-@@ -1210,6 +1214,10 @@ static struct mfd_cell ab8505_devs[] = {
- 		.name = "ab8500-regulator",
- 	},
- 	{
-+		.name = "abx500-clk",
-+		.of_compatible = "stericsson,abx500-clk",
-+	},
-+	{
- 		.name = "ab8500-gpadc",
- 		.num_resources = ARRAY_SIZE(ab8505_gpadc_resources),
- 		.resources = ab8505_gpadc_resources,
-@@ -1269,6 +1277,10 @@ static struct mfd_cell ab8540_devs[] = {
- 		.name = "ab8500-regulator",
- 	},
- 	{
-+		.name = "abx500-clk",
-+		.of_compatible = "stericsson,abx500-clk",
-+	},
-+	{
- 		.name = "ab8500-gpadc",
- 		.num_resources = ARRAY_SIZE(ab8505_gpadc_resources),
- 		.resources = ab8505_gpadc_resources,
+diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
+index b5af8be..37f595d 100644
+--- a/drivers/mfd/ab8500-debugfs.c
++++ b/drivers/mfd/ab8500-debugfs.c
+@@ -90,6 +90,9 @@
+ #include <linux/ctype.h>
+ #endif
+ 
++/* TODO: this file should not reference IRQ_DB8500_AB8500! */
++#include <mach/irqs.h>
++
+ static u32 debug_bank;
+ static u32 debug_address;
+ 
 -- 
 1.7.10.4
