@@ -1,94 +1,46 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:45:00 +0000
-Subject: [PATCH 30/40] pm2301-charger: Removed unused code from PM2301 driver
+Date: Fri, 15 Feb 2013 12:45:01 +0000
+Subject: [PATCH 31/40] abx500-chargalg: Use module_platform_driver() rather
 In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
 References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-31-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360932310-30065-32-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rupesh Kumar <rupesh.kumar@stericsson.com>
+From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-Some of the headers and defines accrued over time are no longer
-in use. Let's take the opportunity to remove a few of them.
+deprecate some boilerplate code by using module_platform_driver
+helper macro. No functional changes.
 
-Signed-off-by: Rupesh Kumar <rupesh.kumar@stericsson.com>
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Marcus COOPER <marcus.xm.cooper@stericsson.com>
-Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
 ---
- drivers/power/pm2301_charger.c |    5 -----
- drivers/power/pm2301_charger.h |   22 ----------------------
- 2 files changed, 27 deletions(-)
+ drivers/power/abx500_chargalg.c |   13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
-index 2cc92ec..cb1c953 100644
---- a/drivers/power/pm2301_charger.c
-+++ b/drivers/power/pm2301_charger.c
-@@ -16,16 +16,12 @@
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/power_supply.h>
--#include <linux/completion.h>
- #include <linux/regulator/consumer.h>
- #include <linux/err.h>
- #include <linux/i2c.h>
- #include <linux/workqueue.h>
--#include <linux/kobject.h>
--#include <linux/mfd/abx500.h>
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/mfd/abx500/ab8500-bm.h>
--#include <linux/mfd/abx500/ab8500-gpadc.h>
- #include <linux/mfd/abx500/ux500_chargalg.h>
- #include <linux/pm2301_charger.h>
- #include <linux/gpio.h>
-@@ -1018,7 +1014,6 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
+diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
+index 55c9d2e..7e4bc01 100644
+--- a/drivers/power/abx500_chargalg.c
++++ b/drivers/power/abx500_chargalg.c
+@@ -2083,18 +2083,7 @@ static struct platform_driver abx500_chargalg_driver = {
+ 	},
+ };
  
- 	/* get parent data */
- 	pm2->dev = &i2c_client->dev;
--	pm2->gpadc = ab8500_gpadc_get("ab8500-gpadc.0");
+-static int __init abx500_chargalg_init(void)
+-{
+-	return platform_driver_register(&abx500_chargalg_driver);
+-}
+-
+-static void __exit abx500_chargalg_exit(void)
+-{
+-	platform_driver_unregister(&abx500_chargalg_driver);
+-}
+-
+-module_init(abx500_chargalg_init);
+-module_exit(abx500_chargalg_exit);
++module_platform_driver(abx500_chargalg_driver);
  
- 	pm2->pm2_int = &pm2xxx_int;
- 
-diff --git a/drivers/power/pm2301_charger.h b/drivers/power/pm2301_charger.h
-index fad1f38..8ce3cc0 100644
---- a/drivers/power/pm2301_charger.h
-+++ b/drivers/power/pm2301_charger.h
-@@ -9,27 +9,6 @@
- #ifndef PM2301_CHARGER_H
- #define PM2301_CHARGER_H
- 
--#define MAIN_WDOG_ENA			0x01
--#define MAIN_WDOG_KICK			0x02
--#define MAIN_WDOG_DIS			0x00
--#define CHARG_WD_KICK			0x01
--#define MAIN_CH_ENA			0x01
--#define MAIN_CH_NO_OVERSHOOT_ENA_N	0x02
--#define MAIN_CH_DET			0x01
--#define MAIN_CH_CV_ON			0x04
--#define OTP_ENABLE_WD			0x01
--
--#define MAIN_CH_INPUT_CURR_SHIFT	4
--
--#define LED_INDICATOR_PWM_ENA		0x01
--#define LED_INDICATOR_PWM_DIS		0x00
--#define LED_IND_CUR_5MA			0x04
--#define LED_INDICATOR_PWM_DUTY_252_256	0xBF
--
--/* HW failure constants */
--#define MAIN_CH_TH_PROT			0x02
--#define MAIN_CH_NOK			0x01
--
- /* Watchdog timeout constant */
- #define WD_TIMER			0x30 /* 4min */
- #define WD_KICK_INTERVAL		(30 * HZ)
-@@ -495,7 +474,6 @@ struct pm2xxx_charger {
- 	int failure_input_ovv;
- 	unsigned int lpn_pin;
- 	struct pm2xxx_interrupts *pm2_int;
--	struct ab8500_gpadc *gpadc;
- 	struct regulator *regu;
- 	struct pm2xxx_bm_data *bat;
- 	struct mutex lock;
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Johan Palsson, Karl Komierowski");
 -- 
 1.7.10.4
