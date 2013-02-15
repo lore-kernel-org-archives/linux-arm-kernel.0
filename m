@@ -1,464 +1,145 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:56:50 +0000
-Subject: [PATCH 19/35] mfd: ab8500-debug: Add support for ab8505 and ab9540
+Date: Fri, 15 Feb 2013 12:56:49 +0000
+Subject: [PATCH 18/35] mfd: ab8500-sysctrl: Update correct turn on status
 In-Reply-To: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
 References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360933026-30325-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360933026-30325-19-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it possible to dump all registers in ab8505 and ab9540.
+From: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
 
+In L9540, turn_on_status register is not updated correctly if
+the device is rebooted with AC/USB charger connected. Due to
+this, the device boots android instead of entering into charge
+only mode. Read the AC/USB status register to detect the charger
+presence and update the turn on status manually.
+
+Signed-off-by: Rajkumar Kasirajan <rajkumar.kasirajan@stericsson.com>
+Signed-off-by: Per Forlin <per.forlin@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Rupesh KUMAR <rupesh.kumar@stericsson.com>
+Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
+Tested-by: Rupesh KUMAR <rupesh.kumar@stericsson.com>
+Tested-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
 ---
- drivers/mfd/ab8500-debugfs.c      |  383 +++++++++++++++++++++++++++++++++++--
- include/linux/mfd/abx500/ab8500.h |    1 +
- 2 files changed, 373 insertions(+), 11 deletions(-)
+ drivers/mfd/ab8500-core.c         |   39 +++++++++++++++++++++++++++++++++++++
+ drivers/mfd/ab8500-sysctrl.c      |    2 +-
+ include/linux/mfd/abx500/ab8500.h |   11 +++++++++++
+ 3 files changed, 51 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 3eeab01..ef1bd89 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -155,7 +155,9 @@ static struct hwreg_cfg hwreg_cfg = {
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index f5ceb2e..bbbd6e4 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -113,6 +113,13 @@
  
- #define AB8500_REV_REG 0x80
+ #define AB8500_TURN_ON_STATUS		0x00
  
--static struct ab8500_prcmu_ranges debug_ranges[AB8500_NUM_BANKS] = {
-+static struct ab8500_prcmu_ranges *debug_ranges;
++#define AB8500_CH_USBCH_STAT1_REG	0x02
++#define VBUS_DET_DBNC100		0x02
++#define VBUS_DET_DBNC1			0x01
 +
-+struct ab8500_prcmu_ranges ab8500_debug_ranges[AB8500_NUM_BANKS] = {
- 	[0x0] = {
- 		.num_ranges = 0,
- 		.range = NULL,
-@@ -359,7 +361,7 @@ static struct ab8500_prcmu_ranges debug_ranges[AB8500_NUM_BANKS] = {
- 			},
- 			{
- 				.first = 0xf5,
--				.last =	0xf6,
-+				.last = 0xf6,
- 			},
- 		},
- 	},
-@@ -484,6 +486,365 @@ static struct ab8500_prcmu_ranges debug_ranges[AB8500_NUM_BANKS] = {
- 	},
- };
++static DEFINE_SPINLOCK(on_stat_lock);
++static u8 turn_on_stat_mask = 0xFF;
++static u8 turn_on_stat_set;
+ static bool no_bm; /* No battery management */
+ module_param(no_bm, bool, S_IRUGO);
  
-+struct ab8500_prcmu_ranges ab8505_debug_ranges[AB8500_NUM_BANKS] = {
-+	[0x0] = {
-+		.num_ranges = 0,
-+		.range = NULL,
-+	},
-+	[AB8500_SYS_CTRL1_BLOCK] = {
-+		.num_ranges = 5,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x04,
-+			},
-+			{
-+				.first = 0x42,
-+				.last = 0x42,
-+			},
-+			{
-+				.first = 0x52,
-+				.last = 0x52,
-+			},
-+			{
-+				.first = 0x54,
-+				.last = 0x57,
-+			},
-+			{
-+				.first = 0x80,
-+				.last = 0x83,
-+			},
-+		},
-+	},
-+	[AB8500_SYS_CTRL2_BLOCK] = {
-+		.num_ranges = 5,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x0D,
-+			},
-+			{
-+				.first = 0x0F,
-+				.last = 0x17,
-+			},
-+			{
-+				.first = 0x20,
-+				.last = 0x20,
-+			},
-+			{
-+				.first = 0x30,
-+				.last = 0x30,
-+			},
-+			{
-+				.first = 0x32,
-+				.last = 0x3A,
-+			},
-+		},
-+	},
-+	[AB8500_REGU_CTRL1] = {
-+		.num_ranges = 3,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x00,
-+			},
-+			{
-+				.first = 0x03,
-+				.last = 0x11,
-+			},
-+			{
-+				.first = 0x80,
-+				.last = 0x86,
-+			},
-+		},
-+	},
-+	[AB8500_REGU_CTRL2] = {
-+		.num_ranges = 6,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x06,
-+			},
-+			{
-+				.first = 0x08,
-+				.last = 0x15,
-+			},
-+			{
-+				.first = 0x17,
-+				.last = 0x19,
-+			},
-+			{
-+				.first = 0x1B,
-+				.last = 0x1D,
-+			},
-+			{
-+				.first = 0x1F,
-+				.last = 0x30,
-+			},
-+			{
-+				.first = 0x40,
-+				.last = 0x48,
-+			},
-+			/* 0x80-0x8B is SIM registers and should
-+			 * not be accessed from here */
-+		},
-+	},
-+	[AB8500_USB] = {
-+		.num_ranges = 3,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x80,
-+				.last = 0x83,
-+			},
-+			{
-+				.first = 0x87,
-+				.last = 0x8A,
-+			},
-+			{
-+				.first = 0x91,
-+				.last = 0x94,
-+			},
-+		},
-+	},
-+	[AB8500_TVOUT] = {
-+		.num_ranges = 0,
-+		.range = NULL,
-+	},
-+	[AB8500_DBI] = {
-+		.num_ranges = 0,
-+		.range = NULL,
-+	},
-+	[AB8500_ECI_AV_ACC] = {
-+		.num_ranges = 1,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x80,
-+				.last = 0x82,
-+			},
-+		},
-+	},
-+	[AB8500_RESERVED] = {
-+		.num_ranges = 0,
-+		.range = NULL,
-+	},
-+	[AB8500_GPADC] = {
-+		.num_ranges = 1,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x08,
-+			},
-+		},
-+	},
-+	[AB8500_CHARGER] = {
-+		.num_ranges = 9,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x02,
-+				.last = 0x03,
-+			},
-+			{
-+				.first = 0x05,
-+				.last = 0x05,
-+			},
-+			{
-+				.first = 0x40,
-+				.last = 0x44,
-+			},
-+			{
-+				.first = 0x50,
-+				.last = 0x57,
-+			},
-+			{
-+				.first = 0x60,
-+				.last = 0x60,
-+			},
-+			{
-+				.first = 0xA0,
-+				.last = 0xA7,
-+			},
-+			{
-+				.first = 0xAF,
-+				.last = 0xB2,
-+			},
-+			{
-+				.first = 0xC0,
-+				.last = 0xC2,
-+			},
-+			{
-+				.first = 0xF5,
-+				.last = 0xF5,
-+			},
-+		},
-+	},
-+	[AB8500_GAS_GAUGE] = {
-+		.num_ranges = 3,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x00,
-+			},
-+			{
-+				.first = 0x07,
-+				.last = 0x0A,
-+			},
-+			{
-+				.first = 0x10,
-+				.last = 0x14,
-+			},
-+		},
-+	},
-+	[AB8500_AUDIO] = {
-+		.num_ranges = 1,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x83,
-+			},
-+		},
-+	},
-+	[AB8500_INTERRUPT] = {
-+		.num_ranges = 11,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x04,
-+			},
-+			{
-+				.first = 0x06,
-+				.last = 0x07,
-+			},
-+			{
-+				.first = 0x09,
-+				.last = 0x09,
-+			},
-+			{
-+				.first = 0x0B,
-+				.last = 0x0C,
-+			},
-+			{
-+				.first = 0x12,
-+				.last = 0x15,
-+			},
-+			{
-+				.first = 0x18,
-+				.last = 0x18,
-+			},
-+			/* Latch registers should not be read here */
-+			{
-+				.first = 0x40,
-+				.last = 0x44,
-+			},
-+			{
-+				.first = 0x46,
-+				.last = 0x49,
-+			},
-+			{
-+				.first = 0x4B,
-+				.last = 0x4D,
-+			},
-+			{
-+				.first = 0x52,
-+				.last = 0x55,
-+			},
-+			{
-+				.first = 0x58,
-+				.last = 0x58,
-+			},
-+			/* LatchHier registers should not be read here */
-+		},
-+	},
-+	[AB8500_RTC] = {
-+		.num_ranges = 2,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x14,
-+			},
-+			{
-+				.first = 0x16,
-+				.last = 0x17,
-+			},
-+		},
-+	},
-+	[AB8500_MISC] = {
-+		.num_ranges = 8,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x06,
-+			},
-+			{
-+				.first = 0x10,
-+				.last = 0x16,
-+			},
-+			{
-+				.first = 0x20,
-+				.last = 0x26,
-+			},
-+			{
-+				.first = 0x30,
-+				.last = 0x36,
-+			},
-+			{
-+				.first = 0x40,
-+				.last = 0x46,
-+			},
-+			{
-+				.first = 0x50,
-+				.last = 0x50,
-+			},
-+			{
-+				.first = 0x60,
-+				.last = 0x6B,
-+			},
-+			{
-+				.first = 0x80,
-+				.last = 0x82,
-+			},
-+		},
-+	},
-+	[AB8500_DEVELOPMENT] = {
-+		.num_ranges = 2,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x00,
-+				.last = 0x00,
-+			},
-+			{
-+				.first = 0x05,
-+				.last = 0x05,
-+			},
-+		},
-+	},
-+	[AB8500_DEBUG] = {
-+		.num_ranges = 1,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x05,
-+				.last = 0x07,
-+			},
-+		},
-+	},
-+	[AB8500_PROD_TEST] = {
-+		.num_ranges = 0,
-+		.range = NULL,
-+	},
-+	[AB8500_STE_TEST] = {
-+		.num_ranges = 0,
-+		.range = NULL,
-+	},
-+	[AB8500_OTP_EMUL] = {
-+		.num_ranges = 1,
-+		.range = (struct ab8500_reg_range[]) {
-+			{
-+				.first = 0x01,
-+				.last = 0x15,
-+			},
-+		},
-+	},
-+};
+@@ -1329,6 +1336,15 @@ static ssize_t show_switch_off_status(struct device *dev,
+ 	return sprintf(buf, "%#x\n", value);
+ }
+ 
++/* use mask and set to override the register turn_on_stat value */
++void ab8500_override_turn_on_stat(u8 mask, u8 set)
++{
++	spin_lock(&on_stat_lock);
++	turn_on_stat_mask = mask;
++	turn_on_stat_set = set;
++	spin_unlock(&on_stat_lock);
++}
 +
- static irqreturn_t ab8500_debug_handler(int irq, void *data)
- {
- 	char buf[16];
-@@ -528,9 +889,6 @@ static int ab8500_registers_print(struct device *dev, u32 bank,
- 				err = seq_printf(s, "  [0x%02X/0x%02X]: 0x%02X\n",
- 					bank, reg, value);
- 				if (err < 0) {
--					dev_err(dev,
--					"seq_printf overflow bank=0x%02X reg=0x%02X\n",
--						bank, reg);
- 					/* Error is not returned here since
- 					 * the output is wanted in any case */
- 					return 0;
-@@ -580,8 +938,6 @@ static int ab8500_print_all_banks(struct seq_file *s, void *p)
+ /*
+  * ab8500 has turned on due to (TURN_ON_STATUS):
+  * 0x01 PORnVbat
+@@ -1352,6 +1368,20 @@ static ssize_t show_turn_on_status(struct device *dev,
+ 		AB8500_TURN_ON_STATUS, &value);
+ 	if (ret < 0)
+ 		return ret;
++
++	/*
++	 * In L9540, turn_on_status register is not updated correctly if
++	 * the device is rebooted with AC/USB charger connected. Due to
++	 * this, the device boots android instead of entering into charge
++	 * only mode. Read the AC/USB status register to detect the charger
++	 * presence and update the turn on status manually.
++	 */
++	if (is_ab9540(ab8500)) {
++		spin_lock(&on_stat_lock);
++		value = (value & turn_on_stat_mask) | turn_on_stat_set;
++		spin_unlock(&on_stat_lock);
++	}
++
+ 	return sprintf(buf, "%#x\n", value);
+ }
  
- 	for (i = 1; i < AB8500_NUM_BANKS; i++) {
- 		err = seq_printf(s, " bank 0x%02X:\n", i);
--		if (err < 0)
--			dev_err(dev, "seq_printf overflow, bank=0x%02X\n", i);
+@@ -1564,6 +1594,15 @@ static int ab8500_probe(struct platform_device *pdev)
  
- 		ab8500_registers_print(dev, i, s);
- 	}
-@@ -1936,14 +2292,19 @@ static int ab8500_debug_probe(struct platform_device *plf)
- 	if (!file)
- 		goto err;
- 
--	if (is_ab8500(ab8500))
-+	if (is_ab8500(ab8500)) {
-+		debug_ranges = ab8500_debug_ranges;
- 		num_interrupt_lines = AB8500_NR_IRQS;
--	else if (is_ab8505(ab8500))
-+	} else if (is_ab8505(ab8500)) {
-+		debug_ranges = ab8505_debug_ranges;
- 		num_interrupt_lines = AB8505_NR_IRQS;
--	else if (is_ab9540(ab8500))
-+	} else if (is_ab9540(ab8500)) {
-+		debug_ranges = ab8505_debug_ranges;
- 		num_interrupt_lines = AB9540_NR_IRQS;
--	else if (is_ab8540(ab8500))
-+	} else if (is_ab8540(ab8500)) {
-+		debug_ranges = ab8505_debug_ranges;
- 		num_interrupt_lines = AB8540_NR_IRQS;
+ 	if (plat && plat->init)
+ 		plat->init(ab8500);
++	if (is_ab9540(ab8500)) {
++		ret = get_register_interruptible(ab8500, AB8500_CHARGER,
++			AB8500_CH_USBCH_STAT1_REG, &value);
++		if (ret < 0)
++			return ret;
++		if ((value & VBUS_DET_DBNC1) && (value & VBUS_DET_DBNC100))
++			ab8500_override_turn_on_stat(~AB8500_POW_KEY_1_ON,
++						     AB8500_VBUS_DET);
 +	}
  
- 	file = debugfs_create_file("interrupts", (S_IRUGO),
- 	    ab8500_dir, &plf->dev, &ab8500_interrupts_fops);
+ 	/* Clear and mask all interrupts */
+ 	for (i = 0; i < ab8500->mask_size; i++) {
+diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+index ab6bfd3..6ac63a0 100644
+--- a/drivers/mfd/ab8500-sysctrl.c
++++ b/drivers/mfd/ab8500-sysctrl.c
+@@ -21,7 +21,7 @@ void ab8500_power_off(void)
+ {
+ 	sigset_t old;
+ 	sigset_t all;
+-	static char *pss[] = {"ab8500_ac", "ab8500_usb"};
++	static char *pss[] = {"ab8500_ac", "pm2301", "ab8500_usb"};
+ 	int i;
+ 	bool charger_present = false;
+ 	union power_supply_propval val;
 diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
-index 6748129..3e9131f 100644
+index 06a8292..6748129 100644
 --- a/include/linux/mfd/abx500/ab8500.h
 +++ b/include/linux/mfd/abx500/ab8500.h
-@@ -59,6 +59,7 @@ enum ab8500_version {
- #define AB8500_DEVELOPMENT	0x11
- #define AB8500_DEBUG		0x12
- #define AB8500_PROD_TEST	0x13
-+#define AB8500_STE_TEST		0x14
- #define AB8500_OTP_EMUL		0x15
+@@ -308,6 +308,15 @@ enum ab8500_version {
+ #define AB9540_NUM_IRQ_REGS		20
+ #define AB8540_NUM_IRQ_REGS		27
  
- /*
++/* Turn On Status Event */
++#define AB8500_POR_ON_VBAT		0x01
++#define AB8500_POW_KEY_1_ON		0x02
++#define AB8500_POW_KEY_2_ON		0x04
++#define AB8500_RTC_ALARM		0x08
++#define AB8500_MAIN_CH_DET		0x10
++#define AB8500_VBUS_DET			0x20
++#define AB8500_USB_ID_DET		0x40
++
+ /**
+  * struct ab8500 - ab8500 internal structure
+  * @dev: parent device
+@@ -468,6 +477,8 @@ static inline int is_ab8540_2p0(struct ab8500 *ab)
+ 	return is_ab8540(ab) && (ab->chip_id == AB8500_CUT2P0);
+ }
+ 
++void ab8500_override_turn_on_stat(u8 mask, u8 set);
++
+ #ifdef CONFIG_AB8500_DEBUG
+ void ab8500_dump_all_banks(struct device *dev);
+ void ab8500_debug_register_interrupt(int line);
 -- 
 1.7.10.4
