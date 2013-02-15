@@ -1,101 +1,81 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 15 Feb 2013 11:54:10 +0100
-Subject: [PATCH 3/9] USB: add devicetree helpers for determining dr_mode
- and phy_type
-In-Reply-To: <20130214193626.GE26679@arwen.pp.htv.fi>
-References: <511CB338.8070204@pengutronix.de>
- <20130214095822.GD15275@arwen.pp.htv.fi>
- <20130214100722.GK1906@pengutronix.de>
- <20130214101510.GA15537@arwen.pp.htv.fi>
- <20130214112449.GL1906@pengutronix.de>
- <20130214131015.GB27419@arwen.pp.htv.fi>
- <20130214160655.GT1906@pengutronix.de>
- <20130214180444.GD25891@arwen.pp.htv.fi>
- <20130214183026.GW1906@pengutronix.de>
- <20130214193626.GE26679@arwen.pp.htv.fi>
-Message-ID: <20130215105410.GN1906@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Feb 2013 11:05:14 +0000
+Subject: [PATCH 8/9] [HACK] ARM: imx: work around v7_cpu_resume link error
+In-Reply-To: <511D7701.8040809@wwwdotorg.org>
+References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
+ <1360882071-4072668-9-git-send-email-arnd@arndb.de>
+ <511D7701.8040809@wwwdotorg.org>
+Message-ID: <201302151105.14253.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 09:36:26PM +0200, Felipe Balbi wrote:
-> Hi,
+On Thursday 14 February 2013, Stephen Warren wrote:
+> On 02/14/2013 03:47 PM, Arnd Bergmann wrote:
+> > Patch c08e20d24 "arm: Add v7_invalidate_l1 to cache-v7.S"
+> > moves the v7_invalidate_l1 symbol out of imx/headsmp.S,
+> > which seems to cause a link error because it is now
+> > too far away from v7_cpu_resume when building an
+> > allyesconfig kernel.
 > 
-> On Thu, Feb 14, 2013 at 07:30:26PM +0100, Sascha Hauer wrote:
-> > > > > yeah, this is why I said we should ignore dr_mode (or bail out) when
-> > > > > !OTG.
-> > > > 
-> > > > Ok, that's what the patch effectively does. We have this in chipidea/core.c:
-> > > > 
-> > > > | 	dr_mode = ci->platdata->dr_mode;
-> > > > | 	if (dr_mode == USB_DR_MODE_UNKNOWN)
-> > > > | 		dr_mode = USB_DR_MODE_OTG;
-> > > > 
-> > > > default to otg if nothing specified.
-> > > 
-> > > you missed my point. I wanted something like:
-> > > 
-> > > dr_mode = ci->platdata->dr_mode;
-> > > if ((dr_mode == USB_DR_MODE_UNKNOWN) || !IS_ENABLED(CONFIG_USB_CHIPIDEA_OTG)
-> > > 	dr_mode = USB_DR_MODE_OTG;
-> > 
-> > So everytime the chipidea driver cannot do OTG the driver falls back to
-> > exactly this mode?
+> Is the problem from the following in arch/arm/mach-imx/headsmp.S:
 > 
-> hehe, that was me being stupid I meant something like:
+> ENTRY(v7_cpu_resume)
+>         bl      v7_invalidate_l1
 > 
-> if (!IS_ENABLED(HOST) && dr_mode == HOST)
-> 
-> or
-> 
-> if (!IS_ENABLED(GADGET) && dr_mode == GADGET)
-> 
-> in those cases, it's best to either force OTG (then driver will work
-> with whatever it has) or bail out.
-> 
-> Thinking a bit harder, it's best to bail as you can't be sure udc.c or
-> host.c have been compiled in.
+> Isn't the range of bl +/- 32MiB (or +/- 16MibB in Thumb 2). Is the
+> kernel really that big? Sorry, I'm having trouble understanding what
+> causes the problem.
 
-Look again, that's what the current code does. Maybe it's not coded as
-explicit as you describe above.
 
-| 	/* initialize role(s) before the interrupt is requested */
-| 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
-| 		ret = ci_hdrc_host_init(ci);
-| 		if (ret)
-| 			dev_info(dev, "doesn't support host\n");
-| 	}
+Well, it is an "allyesconfig" kernel, so things can get pretty big:
 
-if IS_ENABLED(HOST), then ci_hdrc_host_init() will set
-ci->roles[CI_ROLE_HOST] in case it manages to initialize the host driver.
+$ size  obj-tmp/vmlinux -A
+obj-tmp/vmlinux  :
+section                  size         addr
+.head.text                504   3221258240
+.text                32707336   3221258752
+.text.head                  8   3253966088
+.rodata              14028722   3253968896
+__bug_table            127764   3267997624
+.builtin_fw               684   3268125388
+__ksymtab               53424   3268126072
+__ksymtab_gpl           43560   3268179496
+__kcrctab               26712   3268223056
+__kcrctab_gpl           21780   3268249768
+__ksymtab_strings      233706   3268271548
+__param                 33104   3268505256
+__modver                 4104   3268538360
+__ex_table               4112   3268542464
+.ARM.unwind_idx        967784   3268546576
+.ARM.unwind_tab       1452168   3269514360
+.notes                     36   3270966528
+.init.text             677840   3270967296
+.exit.text             125672   3271645136
+.init.arch.info          5396   3271770808
+.init.tagtable             72   3271776204
+.init.smpalt              928   3271776276
+.init.pv_table           1704   3271777204
+.init.data             678108   3271778912
+.exit.data                119   3272457020
+.data..percpu         1460032   3272458240
+.data                 3370068   3273924608
+.tcm_start                940   3277294676
+.bss                  8007724   3277295616
+.comment                   43            0
+.ARM.attributes            50            0
+.debug_line          15780363            0
+.debug_info          57192143            0
+.debug_abbrev         5747374            0
+.debug_aranges         299608            0
+.debug_ranges         5414592            0
+.debug_frame          4801748            0
+.debug_str            7003282            0
+.debug_loc           36237476            0
+Total               196510790
 
-if !IS_ENABLED(HOST), then ci_hdrc_host_init() will be a static inline
-noop function, so ci->roles[CI_ROLE_HOST] ends up being NULL.
+THUMB2 support is obviously enabled (allyesconfig), and from the start of the
+.head.text section to the end of .bss, it is 64,045,100 bytes, using yesterday's
+linux-next kernel with my fixes. It will get bigger as we add more stuff
+to multiplatform. The .text section alone is just short of 32MB.
 
-| 
-| 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
-| 		ret = ci_hdrc_gadget_init(ci);
-| 		if (ret)
-| 			dev_info(dev, "doesn't support gadget\n");
-| 	}
-
-Same applies for gadget.
-
-| 
-| 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
-| 		dev_err(dev, "no supported roles\n");
-| 		ret = -ENODEV;
-| 		goto rm_wq;
-| 	}
-
-At this point (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET])
-means that the intersection of what is requested and what we are able to
-do is empty. The reasons could be That the requested mode is not compiled
-into the kernel, or the requested role failed to initialize.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
