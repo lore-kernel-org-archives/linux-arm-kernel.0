@@ -1,34 +1,31 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 15 Feb 2013 22:00:57 +0900
-Subject: [PATCH 1/5] ARM: shmobile: kzm9g: defconfig: do not enable PREEMPT
+Date: Fri, 15 Feb 2013 22:01:00 +0900
+Subject: [PATCH 4/5] ARM: shmobile: sh73a0: Add smp ops to DT_MACHINE_START
 In-Reply-To: <1360933261-6359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1360933261-6359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1360933261-6359-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1360933261-6359-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The motivation for this change is:
-
-* It is consistent with all other shmobile boards and;
-* Allows the kzm9g-reference code to work with CONFIG_SMP
-  and thus the new defconfig
+This a board to be brought up with SMP enabled
+without a board file present.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/kzm9g_defconfig |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-shmobile/setup-sh73a0.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-index afbae28..da7672e 100644
---- a/arch/arm/configs/kzm9g_defconfig
-+++ b/arch/arm/configs/kzm9g_defconfig
-@@ -33,7 +33,6 @@ CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
- CONFIG_SCHED_MC=y
--CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
- CONFIG_HIGHMEM=y
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index fc0c73c..8f00f3a 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -863,6 +863,7 @@ static const char *sh73a0_boards_compat_dt[] __initdata = {
+ };
+ 
+ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
++	.smp		= smp_ops(sh73a0_smp_ops),
+ 	.map_io		= sh73a0_map_io,
+ 	.init_early	= sh73a0_add_early_devices_dt,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
 -- 
 1.7.10.4
