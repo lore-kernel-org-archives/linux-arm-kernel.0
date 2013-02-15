@@ -1,73 +1,156 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:44:59 +0000
-Subject: [PATCH 29/40] ab8500-charger: Run detect workaround only on AB8500
+Date: Fri, 15 Feb 2013 12:44:57 +0000
+Subject: [PATCH 27/40] pm2301-charger: Adjust interrupt handler behavior
 In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
 References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-30-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360932310-30065-28-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin.vincent@stericsson.com>
+From: M BenZoubeir <mustapha.ben.zoubeir-xsig@stericsson.com>
 
-Only AB8500 has this hardware bug, so these works only need to be run
-there.
-
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+Signed-off-by: M BenZoubeir <mustapha.ben.zoubeir-xsig@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Marcus COOPER <marcus.xm.cooper@stericsson.com>
-Reviewed-by: Martin SJOBLOM <martin.w.sjoblom@stericsson.com>
-Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
+Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
 ---
- drivers/power/ab8500_charger.c |   21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ drivers/power/pm2301_charger.c |   45 +++++++++++++++++++++-------------------
+ include/linux/pm2301_charger.h |    2 +-
+ 2 files changed, 25 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index 64accb2..8530028 100644
---- a/drivers/power/ab8500_charger.c
-+++ b/drivers/power/ab8500_charger.c
-@@ -441,7 +441,8 @@ static void ab8500_charger_set_usb_connected(struct ab8500_charger *di,
- 			mutex_lock(&di->charger_attached_mutex);
- 			mutex_unlock(&di->charger_attached_mutex);
+diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
+index 7f82431..98e27a8 100644
+--- a/drivers/power/pm2301_charger.c
++++ b/drivers/power/pm2301_charger.c
+@@ -493,14 +493,16 @@ static irqreturn_t  pm2xxx_irq_int(int irq, void *data)
+ 	struct pm2xxx_interrupts *interrupt = pm2->pm2_int;
+ 	int i;
  
--			queue_delayed_work(di->charger_wq,
-+			if (is_ab8500(di->parent))
-+				queue_delayed_work(di->charger_wq,
- 					   &di->usb_charger_attached_work,
- 					   HZ);
- 		} else {
-@@ -2622,7 +2623,9 @@ static irqreturn_t ab8500_charger_mainchplugdet_handler(int irq, void *_di)
+-	for (i = 0; i < PM2XXX_NUM_INT_REG; i++) {
+-		 pm2xxx_reg_read(pm2,
++	do {
++		for (i = 0; i < PM2XXX_NUM_INT_REG; i++) {
++			pm2xxx_reg_read(pm2,
+ 				pm2xxx_interrupt_registers[i],
+ 				&(interrupt->reg[i]));
  
- 	mutex_lock(&di->charger_attached_mutex);
- 	mutex_unlock(&di->charger_attached_mutex);
--	queue_delayed_work(di->charger_wq,
-+
-+	if (is_ab8500(di->parent))
-+		queue_delayed_work(di->charger_wq,
- 			   &di->ac_charger_attached_work,
- 			   HZ);
+-		if (interrupt->reg[i] > 0)
+-			interrupt->handler[i](pm2, interrupt->reg[i]);
+-	}
++			if (interrupt->reg[i] > 0)
++				interrupt->handler[i](pm2, interrupt->reg[i]);
++		}
++	} while (gpio_get_value(pm2->pdata->gpio_irq_number) == 0);
+ 
  	return IRQ_HANDLED;
-@@ -3690,14 +3693,16 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 	ch_stat = ab8500_charger_detect_chargers(di, false);
+ }
+@@ -951,6 +953,7 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
+ 	struct pm2xxx_charger *pm2;
+ 	int ret = 0;
+ 	u8 val;
++	int i;
  
- 	if ((ch_stat & AC_PW_CONN) == AC_PW_CONN) {
--		queue_delayed_work(di->charger_wq,
--				   &di->ac_charger_attached_work,
--				   HZ);
-+		if (is_ab8500(di->parent))
-+			queue_delayed_work(di->charger_wq,
-+					   &di->ac_charger_attached_work,
-+					   HZ);
- 	}
- 	if ((ch_stat & USB_PW_CONN) == USB_PW_CONN) {
--		queue_delayed_work(di->charger_wq,
--				   &di->usb_charger_attached_work,
--				   HZ);
-+		if (is_ab8500(di->parent))
-+			queue_delayed_work(di->charger_wq,
-+					   &di->usb_charger_attached_work,
-+					   HZ);
+ 	pm2 = kzalloc(sizeof(struct pm2xxx_charger), GFP_KERNEL);
+ 	if (!pm2) {
+@@ -1062,24 +1065,25 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
  	}
  
- 	mutex_unlock(&di->charger_attached_mutex);
+ 	/* Register interrupts */
+-	ret = request_threaded_irq(pm2->pdata->irq_number, NULL,
++	ret = request_threaded_irq(gpio_to_irq(pm2->pdata->gpio_irq_number),
++				NULL,
+ 				pm2xxx_charger_irq[0].isr,
+ 				pm2->pdata->irq_type,
+ 				pm2xxx_charger_irq[0].name, pm2);
+ 
+ 	if (ret != 0) {
+ 		dev_err(pm2->dev, "failed to request %s IRQ %d: %d\n",
+-		pm2xxx_charger_irq[0].name, pm2->pdata->irq_number, ret);
++		pm2xxx_charger_irq[0].name,
++			gpio_to_irq(pm2->pdata->gpio_irq_number), ret);
+ 		goto unregister_pm2xxx_charger;
+ 	}
+ 	/* pm interrupt can wake up system */
+-	ret = enable_irq_wake(pm2->pdata->irq_number);
++	ret = enable_irq_wake(gpio_to_irq(pm2->pdata->gpio_irq_number));
+ 	if (ret) {
+ 		dev_err(pm2->dev, "failed to set irq wake\n");
+ 		goto unregister_pm2xxx_interrupt;
+ 	}
+ 
+-	/*Initialize lock*/
+ 	mutex_init(&pm2->lock);
+ 
+ 	/*
+@@ -1099,16 +1103,16 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
+ 	}
+ 
+ 	set_lpn_pin(pm2);
++
++	/* read  interrupt registers */
++	for (i = 0; i < PM2XXX_NUM_INT_REG; i++)
++		pm2xxx_reg_read(pm2,
++			pm2xxx_interrupt_registers[i],
++			&val);
++
+ 	ret = pm2xxx_charger_detection(pm2, &val);
+ 
+ 	if ((ret == 0) && val) {
+-		/*
+-		 * When boot is due to AC charger plug-in,
+-		 * read interrupt registers
+-		 */
+-		pm2xxx_reg_read(pm2, PM2XXX_REG_INT1, &val);
+-		pm2xxx_reg_read(pm2, PM2XXX_REG_INT2, &val);
+-		pm2xxx_reg_read(pm2, PM2XXX_REG_INT4, &val);
+ 		pm2->ac.charger_connected = 1;
+ 		ab8500_override_turn_on_stat(~AB8500_POW_KEY_1_ON,
+ 					     AB8500_MAIN_CH_DET);
+@@ -1122,10 +1126,10 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
+ free_gpio:
+ 	gpio_free(pm2->lpn_pin);
+ disable_pm2_irq_wake:
+-	disable_irq_wake(pm2->pdata->irq_number);
++	disable_irq_wake(gpio_to_irq(pm2->pdata->gpio_irq_number));
+ unregister_pm2xxx_interrupt:
+ 	/* disable interrupt */
+-	free_irq(pm2->pdata->irq_number, pm2);
++	free_irq(gpio_to_irq(pm2->pdata->gpio_irq_number), pm2);
+ unregister_pm2xxx_charger:
+ 	/* unregister power supply */
+ 	power_supply_unregister(&pm2->ac_chg.psy);
+@@ -1148,10 +1152,10 @@ static int __devexit pm2xxx_wall_charger_remove(struct i2c_client *i2c_client)
+ 	pm2xxx_charger_ac_en(&pm2->ac_chg, false, 0, 0);
+ 
+ 	/* Disable wake by pm interrupt */
+-	disable_irq_wake(pm2->pdata->irq_number);
++	disable_irq_wake(gpio_to_irq(pm2->pdata->gpio_irq_number));
+ 
+ 	/* Disable interrupts */
+-	free_irq(pm2->pdata->irq_number, pm2);
++	free_irq(gpio_to_irq(pm2->pdata->gpio_irq_number), pm2);
+ 
+ 	/* Delete the work queue */
+ 	destroy_workqueue(pm2->charger_wq);
+@@ -1163,7 +1167,6 @@ static int __devexit pm2xxx_wall_charger_remove(struct i2c_client *i2c_client)
+ 
+ 	power_supply_unregister(&pm2->ac_chg.psy);
+ 
+-	/*Free GPIO60*/
+ 	gpio_free(pm2->lpn_pin);
+ 
+ 	kfree(pm2);
+diff --git a/include/linux/pm2301_charger.h b/include/linux/pm2301_charger.h
+index fc3f026..85c16de 100644
+--- a/include/linux/pm2301_charger.h
++++ b/include/linux/pm2301_charger.h
+@@ -48,7 +48,7 @@ struct pm2xxx_charger_platform_data {
+ 	size_t num_supplicants;
+ 	int i2c_bus;
+ 	const char *label;
+-	int irq_number;
++	int gpio_irq_number;
+ 	unsigned int lpn_gpio;
+ 	int irq_type;
+ };
 -- 
 1.7.10.4
