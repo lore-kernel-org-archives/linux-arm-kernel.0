@@ -1,52 +1,63 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 15 Feb 2013 18:04:50 +0200
-Subject: [RFC/NOT FOR MERGING 1/3] arm: omap: use generic implementation
- if !od
-In-Reply-To: <871uch7g15.fsf@linaro.org>
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <871uch7g15.fsf@linaro.org>
-Message-ID: <20130215160450.GC20334@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Feb 2013 16:10:52 +0000
+Subject: [V2 0/8] usb: ehci: more bus glues as separate modules
+In-Reply-To: <1360923853-7875-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1360923853-7875-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <201302151610.52523.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Friday 15 February 2013, Manjunath Goudar wrote:
+> Separate the SOC On-Chip host controller driver from ehci-hcd
+> host code into its own driver module
+> 
+> V2:
+> Modified the patches, based on the first version review comments  
+> 
 
-On Fri, Feb 15, 2013 at 07:28:22AM -0800, Kevin Hilman wrote:
-> > @@ -796,13 +796,18 @@ static int __init omap_early_device_register(struct platform_device *pdev)
-> >  static int _od_runtime_suspend(struct device *dev)
-> >  {
-> >  	struct platform_device *pdev = to_platform_device(dev);
-> > +	struct omap_device *od = to_omap_device(pdev);
-> >  	int ret;
-> >  
-> >  	ret = pm_generic_runtime_suspend(dev);
-> >  
-> > +	if (!od)
-> > +		goto out;
-> > +
-> 
-> Rather than adding a check for every function, I think you will get the
-> effect by simply not hooking up the PM domain.
-> 
-> IOW, in omap_device_build_from_dt(), conditionalize:
-> 
-> 	pdev->dev.pm_domain = &omap_device_pm_domain;
-> 
-> then none of the callbacks will be called in the first place, so they
-> won't need to be conditionalized.
-> 
-> Without a PM domain, they will fallback to the bus level hooks, which in
-> this case will be the platform_bus hooks, which will just call the
-> pm_generic functions.
+The series looks good to me now, great work!
 
-good point, let's just sort out the other comments first though ;-)
+Please add my 'Acked-by: Arnd Bergmann <arnd@arndb.de>' for each patch.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130215/b39b0723/attachment.sig>
+Alan, Greg: I realize that it's too late to take the entire series for
+3.9, but with the move of more ARM platforms to CONFIG_ARCH_MULTIPLATFORM,
+it is now possible to enable OMAP, VT8500 and ORION concurrently, along
+with the ones that are already moved out.
+
+You should have a patch for OMAP, but that has not made it into linux-next
+yet. It would be good to have at least two out the three I mentioned
+merged into 3.9, in order to keep allyesconfig building, and take the
+rest after the merge window, for integration into 3.10.
+
+What I get today with linux-next ARM allyesconfig is this:
+
+/home/arnd/arm-soc/drivers/usb/host/ehci-hcd.c:1277:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+ #define PLATFORM_DRIVER  ehci_orion_driver
+ ^
+/home/arnd/arm-soc/drivers/usb/host/ehci-hcd.c:1257:0: note: this is the location of the previous definition
+ #define        PLATFORM_DRIVER         ehci_hcd_omap_driver
+ ^
+/home/arnd/arm-soc/drivers/usb/host/ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+ #define PLATFORM_DRIVER  vt8500_ehci_driver
+ ^
+/home/arnd/arm-soc/drivers/usb/host/ehci-hcd.c:1277:0: note: this is the location of the previous definition
+ #define PLATFORM_DRIVER  ehci_orion_driver
+ ^
+/home/arnd/arm-soc/drivers/usb/host/ehci-hcd.c:1277:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+ #define PLATFORM_DRIVER  ehci_orion_driver
+ ^
+/home/arnd/arm-soc/drivers/usb/host/ehci-hcd.c:1257:0: note: this is the location of the previous definition
+ #define        PLATFORM_DRIVER         ehci_hcd_omap_driver
+ ^
+/home/arnd/arm-soc/drivers/usb/host/ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+ #define PLATFORM_DRIVER  vt8500_ehci_driver
+ ^
+/home/arnd/arm-soc/drivers/usb/host/ehci-hcd.c:1277:0: note: this is the location of the previous definition
+ #define PLATFORM_DRIVER  ehci_orion_driver
+ ^
+
+In 3.10, we are going to need spear and s5p as well, possibly also atmel,
+mv and tegra, but Manjunath has done all the ARM platforms now (the tegra
+patch still has issues).
+
+	Arnd
