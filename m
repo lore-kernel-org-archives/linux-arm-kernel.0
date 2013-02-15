@@ -1,51 +1,36 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 15 Feb 2013 10:50:22 +0200
-Subject: [PATCH 1/5] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <1359410300-26113-2-git-send-email-arnd@arndb.de>
-References: <1359395857-1235-1-git-send-email-arnd@arndb.de>
- <1359410300-26113-1-git-send-email-arnd@arndb.de>
- <1359410300-26113-2-git-send-email-arnd@arndb.de>
-Message-ID: <1360918222.28241.20.camel@smile>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 15 Feb 2013 10:52:38 +0200
+Subject: [RFC 1/2] Makefile: Add arch/arch/$(hdr-arch)/boot in header include
+ path
+Message-ID: <1360918364-27960-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-01-28 at 21:58 +0000, Arnd Bergmann wrote: 
-> The original device tree binding for this driver, from Viresh Kumar
-> unfortunately conflicted with the generic DMA binding, and did not allow
-> to completely seperate slave device configuration from the controller.
-> 
-> This is an attempt to replace it with an implementation of the generic
-> binding, but it is currently completely untested, because I do not have
-> any hardware with this particular controller.
-> 
-> The patch applies on top of linux-next, which contains both the base
-> support for the generic DMA binding, as well as the earlier attempt from
-> Viresh. Both of these are currently not merged upstream however.
-> 
-> There are a couple of TODO items that are left remaining and are open
-> for ideas from other people.
+With a new feature dtc+cpp, DT can introduces some definitions in its
+header files for their own. Some of those DT info can be used in
+kernel source as well, instead of having the duplicate info in kernel
+headers. This patch allows kernel source to include those DT
+headers. For example:
 
-Have one question and one comment.
++ #include <dts/tegra20-car.h>
 
-So, what is the status of this work? Do you manage to provide something
-for v3.9? (Oh, two questions :-) )
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> --- a/drivers/dma/dw_dmac.c
-> +++ b/drivers/dma/dw_dmac.c
-
-> @@ -1765,7 +1753,11 @@ static int dw_probe(struct platform_device *pdev)
->  
->  	dma_async_device_register(&dw->dma);
->  
-> -	return 0;
-> +	err = of_dma_controller_register(pdev->dev.of_node, dw_dma_xlate, dw);
-> +	if (err)
-> +		dma_async_device_unregister(&dw->dma);
-
-I don't think this is a good idea. The impossibility to register in the
-of-dma helper is not critical. Just printing debug message is enough.
-
-
+diff --git a/Makefile b/Makefile
+index 0b4bf62..7f54cdb 100644
+--- a/Makefile
++++ b/Makefile
+@@ -364,7 +364,7 @@ LINUXINCLUDE    := \
+ 		-I$(srctree)/arch/$(hdr-arch)/include \
+ 		-Iarch/$(hdr-arch)/include/generated \
+ 		$(if $(KBUILD_SRC), -I$(srctree)/include) \
+-		-Iinclude \
++		-Iinclude -Iarch/$(hdr-arch)/boot \
+ 		$(USERINCLUDE)
+ 
+ KBUILD_CPPFLAGS := -D__KERNEL__
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+1.7.9.5
