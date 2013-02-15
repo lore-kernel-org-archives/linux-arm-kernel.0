@@ -1,48 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Feb 2013 09:45:45 -0700
-Subject: [v2 1/4] ARM: tegra20: create a DT header defining CLK IDs
-In-Reply-To: <20130215092407.GO3073@tbergstrom-lnx.Nvidia.com>
-References: <1360868369-20093-1-git-send-email-hdoyu@nvidia.com>
- <1360868369-20093-2-git-send-email-hdoyu@nvidia.com>
- <511D45E0.1080105@wwwdotorg.org>
- <20130215092407.GO3073@tbergstrom-lnx.Nvidia.com>
-Message-ID: <511E6639.1090909@wwwdotorg.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 15 Feb 2013 13:47:42 -0300
+Subject: [V2 0/8] usb: ehci: more bus glues as separate modules
+In-Reply-To: <1360923853-7875-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1360923853-7875-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <20130215164741.GA2442@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2013 02:24 AM, Peter De Schrijver wrote:
-> On Thu, Feb 14, 2013 at 09:15:28PM +0100, Stephen Warren wrote:
->> On 02/14/2013 11:59 AM, Hiroshi Doyu wrote:
->>> To replace magic number in tegra_car:
->>>
->>> -               clocks = <&tegra_car 28>;
->>> +               clocks = <&tegra_car CLK_HOST1X>;
->>
->>> diff --git a/arch/arm/boot/dts/tegra20-car.h b/arch/arm/boot/dts/tegra20-car.h
->>
->> Sorry, forgot a couple small comments the last time around.
->>
->> This file should probably have some header indicating which binding it
->> describes, rather like the GPIO header in my patch series.
->>
->>> +#define CLK_CPU 0
->>
->> I'd suggest naming that TEGRA20_CLK_CPU, so that the various different
->> clock headers don't conflict. It's not too likely that more than one of
->> the /Tegra/ clock headers will be included at once, but it doesn't seem
->> that unlikely that a board file could end up having a Tegra clock header
->> included plus various other clock headers for some other chip that has
->> some clock outputs.
->>
+Hi Manjunath,
+
+Nice job!
+
+On Fri, Feb 15, 2013 at 03:54:05PM +0530, Manjunath Goudar wrote:
+> Separate the SOC On-Chip host controller driver from ehci-hcd
+> host code into its own driver module
 > 
-> I would suggest removing this clock. It's not actually implemented in the CCF
-> and rather useless. If you would gate the CPU clock from the CPU by writing to
-> this register, how would you ungate it? :) Note that this would gate the clock
-> to all CPUs.
+> V2:
+> Modified the patches, based on the first version review comments  
+> 
 
-(Note that my comment was re: all clocks, not just that one clock)
+If at all possible, I'd still like to see a better commit message
+explaining why we need this at all, as it has been previously requested.
 
-Can't the PMC or flow-controller ungate the clock based on some event?
-Either way, that clock definition exists in HW, right? So I don't think
-there's actually any harm in including the definition in the binding
-even if we never implement/use it.
+I guess there has been some discussion about this rework somewhere.
+It would be nice to add a link to that discussion in the commit message
+or in the cover letter so reviewers can have better context.
+
+
+> Manjunath Goudar (8):
+>   USB: EHCI: make ehci-spear a separate driver
+>   USB: EHCI: make ehci-atmel a separate driver
+>   USB: EHCI: make ehci-s5p a separate driver
+>   USB: EHCI: make ehci-mv as separate static driver
+>   USB: EHCI: make ehci-vt8500 a separate driver
+>   USB: EHCI: make ehci-msm a separate driver
+>   USB: EHCI: make ehci-w90X900 a separate driver
+>   USB: EHCI: make ehci-orion a separate driver
+> 
+>  drivers/usb/host/Kconfig        |   40 +++++++++++++++--
+>  drivers/usb/host/Makefile       |    9 +++-
+>  drivers/usb/host/ehci-atmel.c   |   76 ++++++++++++++++----------------
+>  drivers/usb/host/ehci-hcd.c     |   52 +++++-----------------
+>  drivers/usb/host/ehci-msm.c     |   85 ++++++++++++++++--------------------
+>  drivers/usb/host/ehci-mv.c      |   78 +++++++++++++++------------------
+>  drivers/usb/host/ehci-orion.c   |   90 ++++++++++++++++++--------------------
+>  drivers/usb/host/ehci-s5p.c     |   67 +++++++++++++++-------------
+>  drivers/usb/host/ehci-spear.c   |   77 +++++++++++++++++----------------
+>  drivers/usb/host/ehci-vt8500.c  |   73 ++++++++++++++-----------------
+>  drivers/usb/host/ehci-w90x900.c |   91 +++++++++++++++++----------------------
+>  drivers/usb/host/ehci.h         |    2 +-
+>  12 files changed, 358 insertions(+), 382 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
+
+Thanks a lot,
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
