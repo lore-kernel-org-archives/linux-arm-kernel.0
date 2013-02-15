@@ -1,66 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:44:53 +0000
-Subject: [PATCH 23/40] ab8500-charger: Use USBLink1Status Register
-In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-24-git-send-email-lee.jones@linaro.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 15 Feb 2013 14:36:40 +0200
+Subject: [PATCH v7 10/12] clk: tegra: devicetree match for nvidia, tegra114-car
+In-Reply-To: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1360931849-7090-11-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <marcus.xm.cooper@stericsson.com>
-
-The newer AB's such as the AB8505, AB9540 etc include a
-USBLink1 Status register which detects a larger range of
-external devices. This should be used instead of the
-USBLine Status register.
-
-Signed-off-by: Marcus Cooper <marcus.xm.cooper@stericsson.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Hakan BERG <hakan.berg@stericsson.com>
-Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
-Tested-by: Yang QU <yang.qu@stericsson.com>
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- drivers/power/ab8500_charger.c |   21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ drivers/clk/tegra/clk.c |    1 +
+ drivers/clk/tegra/clk.h |    7 +++++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index 6089ee7..bf8b479 100644
---- a/drivers/power/ab8500_charger.c
-+++ b/drivers/power/ab8500_charger.c
-@@ -2320,8 +2320,13 @@ static void ab8500_charger_usb_link_status_work(struct work_struct *work)
- 	 * to start the charging process. but by jumping
- 	 * thru a few hoops it can be forced to start.
- 	 */
--	ret = abx500_get_register_interruptible(di->dev, AB8500_USB,
--			AB8500_USB_LINE_STAT_REG, &val);
-+	if (is_ab8500(di->parent))
-+		ret = abx500_get_register_interruptible(di->dev, AB8500_USB,
-+					AB8500_USB_LINE_STAT_REG, &val);
-+	else
-+		ret = abx500_get_register_interruptible(di->dev, AB8500_USB,
-+					AB8500_USB_LINK1_STAT_REG, &val);
+diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
+index f6c141f..bc5a1f8 100644
+--- a/drivers/clk/tegra/clk.c
++++ b/drivers/clk/tegra/clk.c
+@@ -77,6 +77,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
+ static const struct of_device_id tegra_dt_clk_match[] = {
+ 	{ .compatible = "nvidia,tegra20-car", .data = tegra20_clock_init },
+ 	{ .compatible = "nvidia,tegra30-car", .data = tegra30_clock_init },
++	{ .compatible = "nvidia,tegra114-car", .data = tegra114_clock_init },
+ 	{ }
+ };
+ 
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index fa21c88..bbdd08b 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -581,4 +581,11 @@ void tegra30_clock_init(struct device_node *np);
+ static inline void tegra30_clock_init(struct device_node *np) {}
+ #endif /* CONFIG_ARCH_TEGRA_3x_SOC */
+ 
++#ifdef CONFIG_ARCH_TEGRA_114_SOC
++void tegra114_clock_init(struct device_node *np);
++#else
++static inline void tegra114_clock_init(struct device_node *np) {}
++#endif /* CONFIG_ARCH_TEGRA114_SOC */
 +
- 	if (ret >= 0)
- 		dev_dbg(di->dev, "UsbLineStatus register = 0x%02x\n", val);
- 	else
-@@ -2357,9 +2362,15 @@ static void ab8500_charger_usb_link_status_work(struct work_struct *work)
- 			abx500_mask_and_set_register_interruptible(di->dev, AB8500_USB,
- 					AB8500_MCH_IPT_CURLVL_REG, 0x01, 0x00);
- 			/*Check link status*/
--			ret = abx500_get_register_interruptible(di->dev,
--					AB8500_USB,
--					AB8500_USB_LINE_STAT_REG, &val);
-+			if (is_ab8500(di->parent))
-+				ret = abx500_get_register_interruptible(di->dev,
-+					AB8500_USB, AB8500_USB_LINE_STAT_REG,
-+					&val);
-+			else
-+				ret = abx500_get_register_interruptible(di->dev,
-+					AB8500_USB, AB8500_USB_LINK1_STAT_REG,
-+					&val);
 +
- 			dev_dbg(di->dev, "USB link status= 0x%02x\n",
- 				(val & link_status) >> USB_LINK_STATUS_SHIFT);
- 			di->invalid_charger_detect_state = 2;
+ #endif /* TEGRA_CLK_H */
 -- 
-1.7.10.4
+1.7.1
