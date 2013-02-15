@@ -1,21 +1,23 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 15 Feb 2013 21:00:08 +0100
-Subject: [PATCH 1/2] i2c: s3c2410: move mach/regs-iic.h into i2c-s3c2410
- device driver
-In-Reply-To: <1d3501ce0948$26826c60$73874520$@samsung.com>
-References: <201302080057.00664.heiko@sntech.de>
- <1d3501ce0948$26826c60$73874520$@samsung.com>
-Message-ID: <20130215200008.GG4351@the-dreams.de>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 15 Feb 2013 15:05:06 -0500 (EST)
+Subject: [PATCH v2 1/1] drivers: net: davinci_cpdma: acknowledge
+ interrupt properly
+In-Reply-To: <1360866406-17261-1-git-send-email-mugunthanvnm@ti.com>
+References: <1360866406-17261-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <20130215.150506.499818568035818118.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+From: Mugunthan V N <mugunthanvnm@ti.com>
+Date: Thu, 14 Feb 2013 23:56:46 +0530
 
-(please don't quote the whole patch for those few lines)
+> +enum {
+> +	CPDMA_EOI_RX_THRESH = 0,
+> +	CPDMA_EOI_RX,
+> +	CPDMA_EOI_TX,
+> +	CPDMA_EOI_MISC,
+> +};
 
-> Looks good to me on this series:
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> Hi Wolfram, if you're ok on this, please pick up into your tree with my ack.
-
-Will do, but not for 3.9 anymore. Thanks!
+Do not use enumerations for hardware register values, which must be
+exact, otherwise you are potentially going to succumb to the vagaries
+of C language enumeration value assignment.
