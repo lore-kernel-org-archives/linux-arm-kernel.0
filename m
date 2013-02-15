@@ -1,33 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Feb 2013 08:37:55 -0800
-Subject: [PATCH v8 09/12] pinctrl: generic: add auto pull config parameter
-In-Reply-To: <CACRpkdYKAexLu30M2KzKcRcvRJS=xfVMB2vR+CgAXmwQ0+_ZzA@mail.gmail.com>
-References: <1360602659-4774-1-git-send-email-haojian.zhuang@linaro.org>
- <1360602659-4774-10-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdYKAexLu30M2KzKcRcvRJS=xfVMB2vR+CgAXmwQ0+_ZzA@mail.gmail.com>
-Message-ID: <20130215163755.GB5724@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 15 Feb 2013 09:41:12 -0700
+Subject: [v3 2/6] ARM: tegra20: convert device tree files to use CLK
+ defines
+In-Reply-To: <1360917814-27236-3-git-send-email-hdoyu@nvidia.com>
+References: <1360917814-27236-1-git-send-email-hdoyu@nvidia.com>
+ <1360917814-27236-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <511E6528.1060007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [130215 00:58]:
-> On Mon, Feb 11, 2013 at 6:10 PM, Haojian Zhuang
-> <haojian.zhuang@linaro.org> wrote:
+On 02/15/2013 01:43 AM, Hiroshi Doyu wrote:
+> Replace magic number in tegra_car:
 > 
-> > There's only one bit to control pin bias as enabled or disabled for some
-> > pins in OMAP SoC. So append PIN_CONFIG_BIAS_AUTO_PULL for this case.
-> > User shouldn't switch pin state between AUTO_PULL and PULL_UP/PULL_DOWN,
-> > since they're similiar concepts.
-> >
-> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> -               clocks = <&tegra_car 28>;
+> +               clocks = <&tegra_car CLK_HOST1X>;
 > 
-> Makes perfect sense.
-> Patch applied with Tony's ACK!
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  .../bindings/clock/nvidia,tegra20-car.txt          |  150 +-------------------
 
-Sorry the conclusion was that this probably won't be needed and can
-probably be done with just PULL_UP/PULL_DOWN.
-
-So can you please drop or revert this AUTO_PULL one?
-
-Regards,
-
-Tony
+The edits to the binding are logically part of patch 1.
