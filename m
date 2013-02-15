@@ -1,23 +1,71 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Feb 2013 09:43:49 -0700
-Subject: [v3 5/6] ARM: tegra114: create a DT header defining CLK IDs
-In-Reply-To: <1360917814-27236-6-git-send-email-hdoyu@nvidia.com>
-References: <1360917814-27236-1-git-send-email-hdoyu@nvidia.com>
- <1360917814-27236-6-git-send-email-hdoyu@nvidia.com>
-Message-ID: <511E65C5.7050107@wwwdotorg.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 15 Feb 2013 09:44:26 -0700
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <CAErSpo6KPzXj6cN95YuTZGhq+RLp4vDLddbpz=RDtRBvy_Rujg@mail.gmail.com>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo6_6bYjo5XX5tzoBfMu5Htgpa__foNCyoCnCNEHocx67Q@mail.gmail.com>
+ <20130215060635.43f06f71@skate>
+ <CAErSpo6KPzXj6cN95YuTZGhq+RLp4vDLddbpz=RDtRBvy_Rujg@mail.gmail.com>
+Message-ID: <20130215164426.GA15819@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2013 01:43 AM, Hiroshi Doyu wrote:
-> To replace magic number in tegra_car:
+On Fri, Feb 15, 2013 at 09:26:09AM -0700, Bjorn Helgaas wrote:
+> On Thu, Feb 14, 2013 at 10:06 PM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
 > 
-> -               clocks = <&tegra_car 28>;
-> +               clocks = <&tegra_car CLK_HOST1X>;
+> >> > +       case PCI_PREF_LIMIT_UPPER32:
+> >> > +               bridge->preflimitupper = value;
+> >> > +               break;
+> >>
+> >> You're relying on a subsequent PCI_COMMAND write to set PCI_COMMAND_IO
+> >> and/or PCI_COMMAND_MEMORY, and you program the bridge windows at that
+> >> time.
+> >
+> > Correct.
+> >
+> >>  It might be a good idea if the PCI core did clear those bits
+> >> while updating the windows, but I'm not sure we do.  In any case,
+> >> delaying the update is a difference from a standard P2P bridge that
+> >> could cause issues later.
+> >
+> > When would you want the window assignment to occur? Directly when the
+> > registers containing the base/limit are being written to? There are
+> > multiple registers for base/limit, so I'll have to figure out a way to
+> > validate when the base/limit informations are valid.
+> 
+> For a standard bridge, the window change occurs immediately upon
+> writing the base/limit, so that would be the best time.
 
-Since the Tegra114-related files don't actually exist yet and hence
-can't be applied, I think Peter should roll these patches into his
-Tegra114 CCF series.
+The standard says a window where limit <= base is invalid/disabled.
 
-But perhaps hold off on that until Grant has a chance to ack/nak the
-concept of doing this, and we've finalized on include path settings
-etc., so there's no churn.
+So the write mechanism from the PCI core should be
+
+base = 0xFFFFFFFF
+limit = true value
+base = true value
+
+In the driver the window should be synchronized after any base/limit
+update where base < limit. The initial values (ignoring fixed bits)
+should be
+
+base = 0xFFFFFFFF
+limit = 0
+
+It would be optimal to use the resource framework to ensure the region
+is available, but that is something for the mbus driver to take care
+of, not PCI-E...
+
+> drivers for A and B.  But I think it is possible to do some updates
+> safely even with the window decoding enabled, without any effect on A
+> and B, and these are the ones that would cause trouble with your
+> current scheme.
+
+A resize update should just write the true values in any order, the
+bridge window will expand without interrupting existing traffic.
+
+However the core code must ensure that at no time do two bridges
+decode the same window. That could crash the machine..
+
+Jason
