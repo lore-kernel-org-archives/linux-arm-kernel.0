@@ -1,50 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 15 Feb 2013 08:30:32 -0800
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <511E38C3.7080404@ti.com>
-References: <20130214171253.GC7144@atomide.com>
- <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com>
- <20130214192719.GB26679@arwen.pp.htv.fi>
- <20130214193911.GD11806@atomide.com>
- <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
- <20130215101610.GR17852@n2100.arm.linux.org.uk>
- <511E3797.2070802@ti.com>
- <20130215132726.GT17852@n2100.arm.linux.org.uk>
- <511E38C3.7080404@ti.com>
-Message-ID: <20130215163031.GA5724@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 15 Feb 2013 18:21:49 +0100
+Subject: [PATCH 2/9] ARM: imx: MACH_MX31ADS_WM1133_EV1 needs
+ REGULATOR_WM8350
+In-Reply-To: <1360882071-4072668-3-git-send-email-arnd@arndb.de>
+References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
+ <1360882071-4072668-3-git-send-email-arnd@arndb.de>
+Message-ID: <20130215172149.GU1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130215 05:34]:
-> On Friday 15 February 2013 06:57 PM, Russell King - ARM Linux wrote:
-> >On Fri, Feb 15, 2013 at 06:56:47PM +0530, Santosh Shilimkar wrote:
-> >>Whats your view on use of arch_ioremap_caller() hook ? This can allow
-> >>us to avoid the dual ioremap() issue discussed here if the hook
-> >>maintains the list of mapped ios.
-> >>
-> >>I was even thinking of having such intelligence within the core
-> >>ioremap code but thought that might be too invasive.
-> >
-> >Why do you even need it?  There's no problem with ioremapping the same
-> >space multiple times (you end up with multiple mappings but that
-> >shouldn't be a problem, except for the additional space used.)
-> >
-> It just waste of iospace and Tony insisted to have just single ioremap()
-> hence all this discussion
+On Thu, Feb 14, 2013 at 11:47:44PM +0100, Arnd Bergmann wrote:
+> MACH_MX31ADS_WM1133_EV1 already depends on REGULATOR_WM8350,
+> but that still allows REGULATOR_WM8350 to be a loadable
+> module. Depending on REGULATOR_WM8350 to be built-in
+> ensures we cannot create a broken configuration.
+> 
+> Without this patch, building allmodconfig results in:
+> 
+> arch/arm/mach-imx/built-in.o: In function `mx31_wm8350_init':
+> arch/arm/mach-imx/mach-mx31ads.c:461: undefined reference to `wm8350_register_regulator'
+> arch/arm/mach-imx/mach-mx31ads.c:471: undefined reference to `wm8350_dcdc_set_slot'
+> arch/arm/mach-imx/mach-mx31ads.c:473: undefined reference to `wm8350_isink_set_flash'
+> arch/arm/mach-imx/mach-mx31ads.c:480: undefined reference to `wm8350_dcdc25_set_mode'
+> arch/arm/mach-imx/mach-mx31ads.c:485: undefined reference to `wm8350_register_led'
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Axel Lin <axel.lin@gmail.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-The main goal is to avoid duplicating data both in hwmod and DT.
-That's pretty much solved as we can have the driver probe populate
-the common data for hwmod from DT as Santosh has already demonstrated.
+Hail to devicetree probing where such things don't happen.
 
-Then we also want the driver specific idle and reset code to be done
-in the drivers rather than in hwmod and glue it together with hwmod
-using runtime PM. The biggest issue there is how do we reset and idle
-some piece of hardware for PM purposes when there's no driver loaded.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-For the duplicate ioremapping, I don't think there's any need to
-do it if we get things right.
+> ---
+>  arch/arm/mach-imx/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 7b11d33..4c9c6f9 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -480,7 +480,7 @@ config MACH_MX31ADS_WM1133_EV1
+>  	bool "Support Wolfson Microelectronics 1133-EV1 module"
+>  	depends on MACH_MX31ADS
+>  	depends on MFD_WM8350_I2C
+> -	depends on REGULATOR_WM8350
+> +	depends on REGULATOR_WM8350 = y
+>  	select MFD_WM8350_CONFIG_MODE_0
+>  	select MFD_WM8352_CONFIG_MODE_0
+>  	help
+> -- 
+> 1.8.1.2
+> 
+> 
 
-Regards,
-
-Tony
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
