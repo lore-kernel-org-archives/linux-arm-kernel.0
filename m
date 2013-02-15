@@ -1,32 +1,30 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 15 Feb 2013 14:36:42 +0200
-Subject: [PATCH v7 12/12] clk: tegra: Remove forced clk_enable of uartd
-In-Reply-To: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1360931849-7090-13-git-send-email-pdeschrijver@nvidia.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 15 Feb 2013 14:50:55 +0200
+Subject: [RFC/RFT PATCH 1/2] ARM: OMAP2+: hwmod-data: UART IP needs
+ software control of sidle modes
+In-Reply-To: <1360930106-32005-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1360930106-32005-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130215125055.GA16558@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UART driver enables the console uart clock, so we don't need to do that
-anymore in this file.
+On Fri, Feb 15, 2013 at 05:38:26PM +0530, Santosh Shilimkar wrote:
+> OMAP UART IP needs manual idle modes based on state of the
+> IP. Currently this is handled by the driver with function pointers
+> implemented in platform code.
+> 
+> This however breaks in case of device tree because of missing
+> idle handling. With the provided flags, idle mode handling is transparently
+> handled by runtime time pm code.
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- drivers/clk/tegra/clk-tegra114.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+this last sentence can be improved a bit.
 
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index f6c6b67..4175bf1 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -1973,7 +1973,7 @@ static __initdata struct tegra_clk_init_table init_table[] = {
- 	{uarta, pll_p, 408000000, 0},
- 	{uartb, pll_p, 408000000, 0},
- 	{uartc, pll_p, 408000000, 0},
--	{uartd, pll_p, 408000000, 1},
-+	{uartd, pll_p, 408000000, 0},
- 	{clk_max, clk_max, 0, 0}, /* This MUST be the last entry. */
- };
- 
 -- 
-1.7.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130215/a3a4cfc0/attachment.sig>
