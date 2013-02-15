@@ -1,142 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:45:03 +0000
-Subject: [PATCH 33/40] pm2301-charger: lpn pin used only in C2C boards
+Date: Fri, 15 Feb 2013 12:45:02 +0000
+Subject: [PATCH 32/40] ab8500-charger: Remove duplicate code
 In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
 References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-34-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360932310-30065-33-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: lme00437 <benoit.gauthier-nonst@stericsson.com>
-
-This patch restricts use of LPN pin to C2C boards to avoid
-conflict on HSI for GPIO 60 use.
-
-Signed-off-by: Benoit GAUTHIER <benoit.gauthier-xsig@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Mustapha BEN-ZOUBEIR <mustapha.ben.zoubeir-xsig@stericsson.com>
-Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
-Tested-by: Benoit GAUTHIER <benoit.gauthier-xsig@stericsson.com>
 ---
- drivers/power/pm2301_charger.c |   66 +++++++++++++++++++---------------------
- 1 file changed, 32 insertions(+), 34 deletions(-)
+ drivers/power/ab8500_charger.c |    8 --------
+ drivers/power/ab8500_fg.c      |    1 -
+ 2 files changed, 9 deletions(-)
 
-diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
-index cb1c953..eed6034 100644
---- a/drivers/power/pm2301_charger.c
-+++ b/drivers/power/pm2301_charger.c
-@@ -113,17 +113,16 @@ static const struct i2c_device_id pm2xxx_ident[] = {
+diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
+index 8530028..81c9615 100644
+--- a/drivers/power/ab8500_charger.c
++++ b/drivers/power/ab8500_charger.c
+@@ -3184,14 +3184,6 @@ static int ab8500_charger_init_hw_registers(struct ab8500_charger *di)
+ 		goto out;
+ 	}
  
- static void set_lpn_pin(struct pm2xxx_charger *pm2)
- {
--	gpio_set_value(pm2->lpn_pin, 1);
--	usleep_range(SLEEP_MIN, SLEEP_MAX);
--
--	return;
-+	if (!pm2->ac.charger_connected && gpio_is_valid(pm2->lpn_pin)) {
-+		gpio_set_value(pm2->lpn_pin, 1);
-+		usleep_range(SLEEP_MIN, SLEEP_MAX);
-+	}
- }
- 
- static void clear_lpn_pin(struct pm2xxx_charger *pm2)
- {
--	gpio_set_value(pm2->lpn_pin, 0);
--
--	return;
-+	if (!pm2->ac.charger_connected && gpio_is_valid(pm2->lpn_pin))
-+		gpio_set_value(pm2->lpn_pin, 0);
- }
- 
- static int pm2xxx_reg_read(struct pm2xxx_charger *pm2, int reg, u8 *val)
-@@ -1035,14 +1034,6 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
- 
- 	pm2->bat = pl_data->battery;
- 
--	/*get lpn GPIO from platform data*/
--	if (!pm2->pdata->lpn_gpio) {
--		dev_err(pm2->dev, "no lpn gpio data supplied\n");
--		ret = -EINVAL;
--		goto free_device_info;
+-	/* Set charger watchdog timeout */
+-	ret = abx500_set_register_interruptible(di->dev, AB8500_CHARGER,
+-		AB8500_CH_WD_TIMER_REG, WD_TIMER);
+-	if (ret) {
+-		dev_err(di->dev, "failed to set charger watchdog timeout\n");
+-		goto out;
 -	}
--	pm2->lpn_pin = pm2->pdata->lpn_gpio;
 -
- 	if (!i2c_check_functionality(i2c_client->adapter,
- 			I2C_FUNC_SMBUS_BYTE_DATA |
- 			I2C_FUNC_SMBUS_READ_WORD_DATA)) {
-@@ -1146,23 +1137,28 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
+ 	ret = ab8500_charger_led_en(di, false);
+ 	if (ret < 0) {
+ 		dev_err(di->dev, "failed to disable LED\n");
+diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
+index f596883..54c6417 100644
+--- a/drivers/power/ab8500_fg.c
++++ b/drivers/power/ab8500_fg.c
+@@ -1680,7 +1680,6 @@ static void ab8500_fg_algorithm_discharging(struct ab8500_fg *di)
+ 		break;
  
- 	mutex_init(&pm2->lock);
+ 	case AB8500_FG_DISCHARGE_WAKEUP:
+-		ab8500_fg_coulomb_counter(di, true);
+ 		ab8500_fg_calc_cap_discharge_voltage(di, true);
  
--	/*
--	 * Charger detection mechanism requires pulling up the LPN pin
--	 * while i2c communication if Charger is not connected
--	 * LPN pin of PM2301 is GPIO60 of AB9540
--	 */
--	ret = gpio_request(pm2->lpn_pin, "pm2301_lpm_gpio");
--	if (ret < 0) {
--		dev_err(pm2->dev, "pm2301_lpm_gpio request failed\n");
--		goto disable_pm2_irq_wake;
--	}
--	ret = gpio_direction_output(pm2->lpn_pin, 0);
--	if (ret < 0) {
--		dev_err(pm2->dev, "pm2301_lpm_gpio direction failed\n");
--		goto free_gpio;
--	}
-+	if (gpio_is_valid(pm2->pdata->lpn_gpio)) {
-+		/* get lpn GPIO from platform data */
-+		pm2->lpn_pin = pm2->pdata->lpn_gpio;
- 
--	set_lpn_pin(pm2);
-+		/*
-+		 * Charger detection mechanism requires pulling up the LPN pin
-+		 * while i2c communication if Charger is not connected
-+		 * LPN pin of PM2301 is GPIO60 of AB9540
-+		 */
-+		ret = gpio_request(pm2->lpn_pin, "pm2301_lpm_gpio");
-+
-+		if (ret < 0) {
-+			dev_err(pm2->dev, "pm2301_lpm_gpio request failed\n");
-+			goto disable_pm2_irq_wake;
-+		}
-+		ret = gpio_direction_output(pm2->lpn_pin, 0);
-+		if (ret < 0) {
-+			dev_err(pm2->dev, "pm2301_lpm_gpio direction failed\n");
-+			goto free_gpio;
-+		}
-+		set_lpn_pin(pm2);
-+	}
- 
- 	/* read  interrupt registers */
- 	for (i = 0; i < PM2XXX_NUM_INT_REG; i++)
-@@ -1184,7 +1180,8 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
- 	return 0;
- 
- free_gpio:
--	gpio_free(pm2->lpn_pin);
-+	if (gpio_is_valid(pm2->lpn_pin))
-+		gpio_free(pm2->lpn_pin);
- disable_pm2_irq_wake:
- 	disable_irq_wake(gpio_to_irq(pm2->pdata->gpio_irq_number));
- unregister_pm2xxx_interrupt:
-@@ -1229,7 +1226,8 @@ static int __devexit pm2xxx_wall_charger_remove(struct i2c_client *i2c_client)
- 
- 	power_supply_unregister(&pm2->ac_chg.psy);
- 
--	gpio_free(pm2->lpn_pin);
-+	if (gpio_is_valid(pm2->lpn_pin))
-+		gpio_free(pm2->lpn_pin);
- 
- 	kfree(pm2);
- 
-@@ -1266,7 +1264,7 @@ static void __exit pm2xxx_charger_exit(void)
- 	i2c_del_driver(&pm2xxx_charger_driver);
- }
- 
--subsys_initcall_sync(pm2xxx_charger_init);
-+device_initcall_sync(pm2xxx_charger_init);
- module_exit(pm2xxx_charger_exit);
- 
- MODULE_LICENSE("GPL v2");
+ 		di->fg_samples = SEC_TO_SAMPLE(
 -- 
 1.7.10.4
