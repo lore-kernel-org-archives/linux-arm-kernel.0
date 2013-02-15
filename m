@@ -1,66 +1,125 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Feb 2013 12:44:37 +0000
-Subject: [PATCH 07/40] ab8500-charger: Trivial coding style changes
+Date: Fri, 15 Feb 2013 12:44:39 +0000
+Subject: [PATCH 09/40] pm2301-charger: Support for over voltage protection on
+ the ab9540
 In-Reply-To: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
 References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1360932310-30065-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1360932310-30065-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enforce the white space character after 'if'.
+From: Rupesh Kumar <rupesh.kumar@stericsson.com>
 
+Added support for main charger over voltage protection.
+
+Signed-off-by: Rupesh Kumar <rupesh.kumar@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
+Tested-by: Michel JAOUEN <michel.jaouen@stericsson.com>
 ---
- drivers/power/ab8500_charger.c |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/power/pm2301_charger.c |   50 +++++++++++++++++++++++++++++-----------
+ drivers/power/pm2301_charger.h |    1 +
+ 2 files changed, 37 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index fd3fa2b..dcd3c6f 100644
---- a/drivers/power/ab8500_charger.c
-+++ b/drivers/power/ab8500_charger.c
-@@ -3152,10 +3152,10 @@ static int ab8500_charger_remove(struct platform_device *pdev)
- 	destroy_workqueue(di->charger_wq);
+diff --git a/drivers/power/pm2301_charger.c b/drivers/power/pm2301_charger.c
+index 62a172e..2b7c93d 100644
+--- a/drivers/power/pm2301_charger.c
++++ b/drivers/power/pm2301_charger.c
+@@ -227,21 +227,14 @@ int pm2xxx_charger_die_therm_mngt(struct pm2xxx_charger *pm2, int val)
  
- 	flush_scheduled_work();
--	if(di->usb_chg.enabled)
-+	if (di->usb_chg.enabled)
- 		power_supply_unregister(&di->usb_chg.psy);
- #if !defined(CONFIG_CHARGER_PM2301)
--	if(di->ac_chg.enabled)
-+	if (di->ac_chg.enabled)
- 		power_supply_unregister(&di->ac_chg.psy);
- #endif
- 	platform_set_drvdata(pdev, NULL);
-@@ -3331,7 +3331,7 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 	}
+ static int pm2xxx_charger_ovv_mngt(struct pm2xxx_charger *pm2, int val)
+ {
+-	int ret = 0;
++	dev_err(pm2->dev, "Overvoltage detected\n");
++	pm2->flags.ovv = true;
++	power_supply_changed(&pm2->ac_chg.psy);
  
- 	/* Register AC charger class */
--	if(di->ac_chg.enabled) {
-+	if (di->ac_chg.enabled) {
- 		ret = power_supply_register(di->dev, &di->ac_chg.psy);
- 		if (ret) {
- 			dev_err(di->dev, "failed to register AC charger\n");
-@@ -3340,7 +3340,7 @@ static int ab8500_charger_probe(struct platform_device *pdev)
- 	}
+-	pm2->failure_input_ovv++;
+-	if (pm2->failure_input_ovv < 4) {
+-		ret = pm2xxx_charging_enable_mngt(pm2);
+-		goto out;
+-	} else {
+-		pm2->failure_input_ovv = 0;
+-		dev_err(pm2->dev, "Overvoltage detected\n");
+-		pm2->flags.ovv = true;
+-		power_supply_changed(&pm2->ac_chg.psy);
+-	}
++	/* Schedule a new HW failure check */
++	queue_delayed_work(pm2->charger_wq, &pm2->check_hw_failure_work, 0);
  
- 	/* Register USB charger class */
--	if(di->usb_chg.enabled) {
-+	if (di->usb_chg.enabled) {
- 		ret = power_supply_register(di->dev, &di->usb_chg.psy);
- 		if (ret) {
- 			dev_err(di->dev, "failed to register USB charger\n");
-@@ -3425,10 +3425,10 @@ free_irq:
- put_usb_phy:
- 	usb_put_phy(di->usb_phy);
- free_usb:
--	if(di->usb_chg.enabled)
-+	if (di->usb_chg.enabled)
- 		power_supply_unregister(&di->usb_chg.psy);
- free_ac:
--	if(di->ac_chg.enabled)
-+	if (di->ac_chg.enabled)
- 		power_supply_unregister(&di->ac_chg.psy);
- free_charger_wq:
- 	destroy_workqueue(di->charger_wq);
+-out:
+-	return ret;
++	return 0;
+ }
+ 
+ static int pm2xxx_charger_wd_exp_mngt(struct pm2xxx_charger *pm2, int val)
+@@ -630,6 +623,8 @@ static int pm2xxx_charger_ac_get_property(struct power_supply *psy,
+ 			val->intval = POWER_SUPPLY_HEALTH_DEAD;
+ 		else if (pm2->flags.main_thermal_prot)
+ 			val->intval = POWER_SUPPLY_HEALTH_OVERHEAT;
++		else if (pm2->flags.ovv)
++			val->intval = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+ 		else
+ 			val->intval = POWER_SUPPLY_HEALTH_GOOD;
+ 		break;
+@@ -860,6 +855,30 @@ static void pm2xxx_charger_ac_work(struct work_struct *work)
+ 	sysfs_notify(&pm2->ac_chg.psy.dev->kobj, NULL, "present");
+ };
+ 
++static void pm2xxx_charger_check_hw_failure_work(struct work_struct *work)
++{
++	u8 reg_value;
++
++	struct pm2xxx_charger *pm2 = container_of(work,
++		struct pm2xxx_charger, check_hw_failure_work.work);
++
++	if (pm2->flags.ovv) {
++		pm2xxx_reg_read(pm2, PM2XXX_SRCE_REG_INT4, &reg_value);
++
++		if (!(reg_value & (PM2XXX_INT4_S_ITVPWR1OVV |
++					PM2XXX_INT4_S_ITVPWR2OVV))) {
++			pm2->flags.ovv = false;
++			power_supply_changed(&pm2->ac_chg.psy);
++		}
++	}
++
++	/* If we still have a failure, schedule a new check */
++	if (pm2->flags.ovv) {
++		queue_delayed_work(pm2->charger_wq,
++			&pm2->check_hw_failure_work, round_jiffies(HZ));
++	}
++}
++
+ static void pm2xxx_charger_check_main_thermal_prot_work(
+ 	struct work_struct *work)
+ {
+@@ -983,6 +1002,10 @@ static int __devinit pm2xxx_wall_charger_probe(struct i2c_client *i2c_client,
+ 	INIT_WORK(&pm2->check_main_thermal_prot_work,
+ 		pm2xxx_charger_check_main_thermal_prot_work);
+ 
++	/* Init work for HW failure check */
++	INIT_DEFERRABLE_WORK(&pm2->check_hw_failure_work,
++		pm2xxx_charger_check_hw_failure_work);
++
+ 	/*
+ 	 * VDD ADC supply needs to be enabled from this driver when there
+ 	 * is a charger connected to avoid erroneous BTEMP_HIGH/LOW
+@@ -1123,4 +1146,3 @@ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Rajkumar kasirajan, Olivier Launay");
+ MODULE_ALIAS("platform:pm2xxx-charger");
+ MODULE_DESCRIPTION("PM2xxx charger management driver");
+-
+diff --git a/drivers/power/pm2301_charger.h b/drivers/power/pm2301_charger.h
+index e6319cd..fad1f38 100644
+--- a/drivers/power/pm2301_charger.h
++++ b/drivers/power/pm2301_charger.h
+@@ -506,6 +506,7 @@ struct pm2xxx_charger {
+ 	struct delayed_work check_vbat_work;
+ 	struct work_struct ac_work;
+ 	struct work_struct check_main_thermal_prot_work;
++	struct delayed_work check_hw_failure_work;
+ 	struct ux500_charger ac_chg;
+ 	struct pm2xxx_charger_event_flags flags;
+ };
 -- 
 1.7.10.4
