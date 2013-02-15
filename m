@@ -1,68 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Feb 2013 10:26:09 +0000
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <1360840554-26901-2-git-send-email-balbi@ti.com>
- <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
- <20130214193911.GD11806@atomide.com>
- <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
- <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
-Message-ID: <20130215102609.GS17852@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Feb 2013 10:26:18 +0000
+Subject: [PATCH 1/9] ARM: arch_timer: include linux/errno.h
+In-Reply-To: <1360882071-4072668-2-git-send-email-arnd@arndb.de>
+References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
+ <1360882071-4072668-2-git-send-email-arnd@arndb.de>
+Message-ID: <20130215102618.GJ25537@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 09:40:29PM +0000, Paul Walmsley wrote:
-> Hi,
+Hi,
+
+As with Stephen Warren's fix [1], this looks right to me. Stephen's has the
+added benefit of keeping the includes ordered.
+
+For either version:
+
+Acked-By: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149579.html
+
+On Thu, Feb 14, 2013 at 10:47:43PM +0000, Arnd Bergmann wrote:
+> Patch 8a4da6e "arm: arch_timer: move core to drivers/clocksource"
+> moved a lot of code out of arch_timer.c, but ended up deleting
+> too much, which broke some configurations.
 > 
-> On Thu, 14 Feb 2013, Paul Walmsley wrote:
+> Obviously, include linux/errno.h is required to return error
+> values.
 > 
-> > So instead of something bus-specific like that, a better way would be to 
-> > use something like:
-> > 
-> > va = dev->bus->ioremap( ... );
-> > va = dev->bus->iounmap( ... );
+> Without this patch, building allmodconfig results in:
 > 
-> Something like this is what I was thinking.  Obviously there would be more
-> patches needed, for the various arches, etc.; and I'm not convinced that
-> the function pointer init is done at the right time yet. Comments welcome.
-
-Not only does this break the "ioremap caller" stuff, allowing the caller
-of ioremap() to be recorded, I believe this to be a total abonimation.
-
-> This might also be useful as a generic replacement for pci_ioremap_bar().
-
-No it isn't.  Read the comments about why pci_ioremap_bar() was introduced
-in its original commit.  It's there to reduce the number of common errors
-with mapping a PCI bar, so it takes the PCI device and the BAR index.
-
-It has a totally different interface to standard ioremap().  It can't be
-twisted into the standard ioremap() interface in any shape or form.
-
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index ce328c7..303dba0 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -17,6 +17,7 @@
->  #include <linux/fs.h>
->  #include <linux/vmalloc.h>
->  #include <linux/sizes.h>
-> +#include <linux/platform_device.h>
+> arch/arm/kernel/arch_timer.c: In function 'arch_timer_sched_clock_init':
+> arch/arm/kernel/arch_timer.c:55:11: error: 'ENXIO' undeclared (first use in this function)
+> arch/arm/kernel/arch_timer.c:55:11: note: each undeclared identifier is reported only once for each function it appears in
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kernel/arch_timer.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+> index 36ebcf4..d957a51 100644
+> --- a/arch/arm/kernel/arch_timer.c
+> +++ b/arch/arm/kernel/arch_timer.c
+> @@ -10,6 +10,7 @@
+>   */
+>  #include <linux/init.h>
+>  #include <linux/types.h>
+> +#include <linux/errno.h>
 >  
->  #include <asm/cp15.h>
->  #include <asm/cputype.h>
-> @@ -28,6 +29,7 @@
->  #include <asm/highmem.h>
->  #include <asm/system_info.h>
->  #include <asm/traps.h>
-> +#include <asm/io.h>
-
-How many more bloody times do I have to tell people about using asm/io.h
-directly?  You've been around for _long_ enough that you well know this
-by now.  There is no excuse for this kind of thing other than shere
-laziness or down-right sloppyness on your part.
-
-If I make a big enough thing about it, hopefully people will become scared
-to post their un-self-reviewed patches and instead start taking a little
-more care in future.
+>  #include <asm/delay.h>
+>  #include <asm/sched_clock.h>
+> -- 
+> 1.8.1.2
+> 
+> 
