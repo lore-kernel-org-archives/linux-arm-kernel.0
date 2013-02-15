@@ -1,51 +1,48 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Fri, 15 Feb 2013 14:24:42 -0500
-Subject: randconfig errors
-In-Reply-To: <511E8AD9.2050507@arm.com>
-References: <511E6FA4.2000709@gmail.com>
- <26e621467155fdb1626ecdac4e811deb@localhost>
- <c163151b4b855149ba57faa9a1a10c64@localhost>
- <CANM98qKEwFzccifq6oWzzS4Ot_iaznccr9_CcQLDGhj_puS-Aw@mail.gmail.com>
- <511E8AD9.2050507@arm.com>
-Message-ID: <CANM98qL05vMYTZoM9un2=Sa+GsZFunn-S9XcXd0b8LB+vPKGBg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 15 Feb 2013 20:32:41 +0100
+Subject: [PATCH] pinctrl/pinconfig: add debug interface
+In-Reply-To: <511A7478.8040506@wwwdotorg.org>
+References: <1360527070-18430-1-git-send-email-linus.walleij@stericsson.com>
+ <51195A63.7080706@wwwdotorg.org>
+ <CACRpkdZu0+maCE2GjuZcQPZPZbw=Fz0DUHYY8FXPdZEH0PeViQ@mail.gmail.com>
+ <511A7478.8040506@wwwdotorg.org>
+Message-ID: <CACRpkdYhwbpvfeoSiL1pfhVC+3O+8yMnA-raGimr0RpZdffRHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 2:22 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 15/02/13 19:16, Christoffer Dall wrote:
->> On Fri, Feb 15, 2013 at 1:47 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On Fri, 15 Feb 2013 19:22:37 +0100, Marc Zyngier <marc.zyngier@arm.com>
->>> wrote:
->>>> On Fri, 15 Feb 2013 11:25:56 -0600, Rob Herring <robherring2@gmail.com>
->>>> wrote:
->>>>> Errors from randconfig builds restricted to multi-platform configs on
->>>>> the current linux-next. I know I've seen a fix on the first one from
->>>>> Arnd, but have not investigated any of these.
->>>>>
->>>>
->>>>>
->>>>
->>> /var/lib/jenkins/jobs/linux-randconfig/workspace/include/linux/kvm_host.h:333:34:
->>>>> error: 'KVM_USER_MEM_SLOTS' undeclared here (not in a function)
->>>>
->>>> This one comes from bbacc0c (KVM: Rename KVM_MEMORY_SLOTS ->
->>>> KVM_USER_MEM_SLOTS).
->>>> I'll queue a patch to fix the breakage...
->>>
->>> Looks like there's a few more, and what was brewing in kvm-next had some
->>> side effects.
->>>
->>> Christoffer, I'll send the patches separately.
->>>
->> I was kind of hoping that the KVM guys would have pulled the KVM/ARM
->> stuff into kvm/next and it could have been fixed up there.... The
->> patches are really trivial though iirc.
->
-> Indeed they are. Probably an oversight from the KVM guys. Sent them
-> anyway...
->
-I saw them, it all looks good.
+On Tue, Feb 12, 2013 at 5:57 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 02/12/2013 05:54 AM, Linus Walleij wrote:
 
-I'm cc'ing the kvm list here just for info.
+>> Of course, if this unsigned long is a pointer, this is just a
+>> fantastic recipe for shooting oneself in the foot, but again
+>> debugfs is just one big gun aimed at ones foot anyway, that's
+>> the whole point of debugfs.
+>
+> But it'd be possible to handle this if the code to modify the map called
+> into the individual pinctrl driver to convert the data the user wrote
+> into the value to store in the map, just like it does for DT.
+>
+> Then, it'd work in all cases.
 
--Christoffer
+You are right, this is way more elegant. So Laurent, can you add
+some optional function pointer to struct pinconf_ops to translate
+the passed parameter, and if that function is not assigned we do
+not open the debugfs interface for config at all. This will be
+quite elegant.
+
+Something like:
+
+int (*pin_config_group_dbg_set) (struct pinctrl_dev *pctldev,
+                                           const char *arg,
+                                           unsigned long *config);
+
+> Plus, it could convert e.g. "pull up" to 0x10001 rather than requiring
+> the user to manually encode the 0x10001 themselves; much more useful.
+
+You are right.
+
+Reconfiguring muxes from debugfs will be different, I guess
+that may be handled entirely by the core. But it's a separate thing.
+
+Yours,
+Linus Walleij
