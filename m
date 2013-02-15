@@ -1,104 +1,74 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 15 Feb 2013 15:34:39 +0200
-Subject: [RFC/RFT PATCH 2/2] SERIAL: OMAP: Remove the idle handling from
- the driver
-In-Reply-To: <511E35D8.1030109@ti.com>
-References: <1360930135-32092-1-git-send-email-santosh.shilimkar@ti.com>
- <20130215125740.GB16558@arwen.pp.htv.fi> <511E35D8.1030109@ti.com>
-Message-ID: <20130215133439.GF16558@arwen.pp.htv.fi>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 15 Feb 2013 22:35:36 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
+Message-ID: <1360935336-2442-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Empirically it appears that "sh_tmu.1" is controlled by MSTP016
+and after discussion it appears likely the same is true for sh_tmu.2.
 
-On Fri, Feb 15, 2013 at 06:49:20PM +0530, Santosh Shilimkar wrote:
-> >>@@ -279,8 +259,6 @@ static void serial_omap_stop_tx(struct uart_port *port)
-> >>  		serial_out(up, UART_IER, up->ier);
-> >>  	}
-> >>
-> >>-	serial_omap_set_forceidle(up);
-> >>-
-> >>  	pm_runtime_mark_last_busy(up->dev);
-> >>  	pm_runtime_put_autosuspend(up->dev);
-> >>  }
-> >>@@ -348,7 +326,6 @@ static void serial_omap_start_tx(struct uart_port *port)
-> >>
-> >>  	pm_runtime_get_sync(up->dev);
-> >>  	serial_omap_enable_ier_thri(up);
-> >>-	serial_omap_set_noidle(up);
-> >
-> >this patch is changing behavior. Currently driver has:
-> >
-> >start_tx()
-> >get_sync()
-> >set_noidle()
-> >put_autosuspend()
-> >
-> >....
-> >
-> >stop_tx()
-> >get_sync()
-> >set_force_idle()
-> >put_autosuspend()
-> >
-> >with this change, you will have:
-> >
-> >start_tx()
-> >get_sync()
-> >set_noidle()
-> >put_autosuspend()
-> >set_force_idle()
-> >
-> >this in itself might be enough to go back to corrupted serial if
-> >put_autosuspend is so quick that set_force_idle() is called before all
-> >data has been shifted out of FIFO and through the UART lines.
-> >
-> Really. Infact the old sequence was buggy because you are setting
-> force_idle even before suspending the device. And that force idle
+The sh_tmu.1 portion of this change resolves a regression introduced in
+58079fa7d54a0929d304054ee759187a2ccd3cdf (ARM: shmobile: r8a7779: Correct
+TMU clock support) and fixes a regression introduced by that patch. That
+patch is queued up for v3.9.
 
-then that bug has to be fixed first and patch needs to be sent to stable
-before we change that part of the code, wouldn't you agree ?
+...
+hub 4-0:1.0: USB hub found
+hub 4-0:1.0: 2 ports detected
+INFO: rcu_sched self-detected stall on CPUINFO: rcu_sched detected stalls on
++CPUs/tasks: { 1} (detected by 2, t=279640 jiffies, g=4294967052, c=4294967051,
++q=38)
+Task dump for CPU 1:
+swapper/0       R running      0     1      0 0x00000002
+[<c02b8f5c>] (__schedule+0x1b0/0x4c0) from [<c013c590>] (__loop_delay+0x4/0xc)
 
-> isn't really force idle but setting ip to smart idle. Just look at
-> what serial.c
+ { 1}  (t=279640 jiffies g=4294967052 c=4294967052 q=37)
+[<c000ef9c>] (unwind_backtrace+0x0/0xf8) from [<c0068488>]
++(rcu_check_callbacks+0x218/0x6b8)
+[<c0068488>] (rcu_check_callbacks+0x218/0x6b8) from [<c0026774>]
++(update_process_times+0x38/0x4c)
+[<c0026774>] (update_process_times+0x38/0x4c) from [<c00569e0>]
++(tick_nohz_handler+0xb4/0x11c)
+[<c00569e0>] (tick_nohz_handler+0xb4/0x11c) from [<c000e518>]
++(twd_handler+0x34/0x44)
+[<c000e518>] (twd_handler+0x34/0x44) from [<c0063484>]
++(handle_percpu_devid_irq+0x68/0x80)
+[<c0063484>] (handle_percpu_devid_irq+0x68/0x80) from [<c005febc>]
++(generic_handle_irq+0x20/0x30)
+[<c005febc>] (generic_handle_irq+0x20/0x30) from [<c000a5ec>]
++(handle_IRQ+0x40/0x90)
+[<c000a5ec>] (handle_IRQ+0x40/0x90) from [<c000934c>] (gic_handle_irq+0x2c/0x5c)
+[<c000934c>] (gic_handle_irq+0x2c/0x5c) from [<c0009a40>] (__irq_svc+0x40/0x50)
+Exception stack(0xef03ddf8 to 0xef03de40)
+dde0:                                                       000001c1 ffffffff
+de00: 000001d8 01bf01bf ef35ec40 ef35e800 ef35ec6c 0000002b ef35ec68 c013c560
+de20: c0392994 60000113 00000000 ef03de40 c01a5d40 c013c590 20000113 ffffffff
+[<c0009a40>] (__irq_svc+0x40/0x50) from [<c013c590>] (__loop_delay+0x4/0xc)
 
-indeed.
+Cc: Denis Oliver Kropp <dok@directfb.org>
+Cc: Magnus Damm <damm@opensource.se>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7779.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> >Before doing this, you should at least test that removing
-> >pm_runtime_mark_last_busy() and pm_runtime_put_autosuspend() from
-> >start_tx() and removing pm_runtime_get_sync() from stop_tx() works fine.
-> >
-> Seems to work for me with above changes as well. Can you please
-> try out and see if you see any issue. I doubt you will...
-
-what I'm saying is that current code, as you put it yourself, is buggy,
-so we ought to fix the bugs first before changing behavior. If not for
-anything else, at least to have a clean tree which we can bisect.
-
-> >Also, $SUBJECT isn't improving the situation regarding UART Wakeup,
-> >there is still the regression of UART never being wakeup capable.
-> >
-> You are mixing the stuff here. The subject is correct.
-
-->enable_wakeup() sets the IP to smart_idle_wakeup, which is done on
-SYSC register. If $SUBJECT wants to fix SYSC usage, it ought to fix them
-all.
-
-> >I wonder what are your ideas to sort that part out, I mean, how do you
-> >plan to implement ->set_wake() for the tty port ?
-> >
-> That is not related to module idle modes. It is for ioring and that
-> needs pin control support. As you can see the patch doesn't touch
-> omap_uart_enable_wakeup(). Thats needs pincontrol support so that
-
-see above.
-
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index 202370d..1db3653 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -161,8 +161,8 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
+ 	CLKDEV_DEV_ID("ohci-platform.0", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
+ 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+-	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
+-	CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP014]), /* TMU02 */
++	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
++	CLKDEV_DEV_ID("sh_tmu.2", &mstp_clks[MSTP016]), /* TMU02 */
+ 	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
+ 	CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP029]), /* I2C1 */
+ 	CLKDEV_DEV_ID("i2c-rcar.2", &mstp_clks[MSTP028]), /* I2C2 */
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130215/889f9422/attachment-0001.sig>
+1.7.10.4
