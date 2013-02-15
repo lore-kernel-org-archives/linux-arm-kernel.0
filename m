@@ -1,35 +1,47 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 15 Feb 2013 19:20:07 +0000
-Subject: [PATCH 3.9-rc1 2/3] ARM: KVM: Rename KVM_MEMORY_SLOTS ->
- KVM_USER_MEM_SLOTS
-In-Reply-To: <1360956008-5925-1-git-send-email-marc.zyngier@arm.com>
-References: <1360956008-5925-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1360956008-5925-3-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 15 Feb 2013 19:22:01 +0000
+Subject: randconfig errors
+In-Reply-To: <CANM98qKEwFzccifq6oWzzS4Ot_iaznccr9_CcQLDGhj_puS-Aw@mail.gmail.com>
+References: <511E6FA4.2000709@gmail.com>
+ <26e621467155fdb1626ecdac4e811deb@localhost>
+ <c163151b4b855149ba57faa9a1a10c64@localhost>
+ <CANM98qKEwFzccifq6oWzzS4Ot_iaznccr9_CcQLDGhj_puS-Aw@mail.gmail.com>
+Message-ID: <511E8AD9.2050507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit bbacc0c (KVM: Rename KVM_MEMORY_SLOTS -> KVM_USER_MEM_SLOTS)
-broke KVM/ARM by changing a global #define.
+On 15/02/13 19:16, Christoffer Dall wrote:
+> On Fri, Feb 15, 2013 at 1:47 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On Fri, 15 Feb 2013 19:22:37 +0100, Marc Zyngier <marc.zyngier@arm.com>
+>> wrote:
+>>> On Fri, 15 Feb 2013 11:25:56 -0600, Rob Herring <robherring2@gmail.com>
+>>> wrote:
+>>>> Errors from randconfig builds restricted to multi-platform configs on
+>>>> the current linux-next. I know I've seen a fix on the first one from
+>>>> Arnd, but have not investigated any of these.
+>>>>
+>>>
+>>>>
+>>>
+>> /var/lib/jenkins/jobs/linux-randconfig/workspace/include/linux/kvm_host.h:333:34:
+>>>> error: 'KVM_USER_MEM_SLOTS' undeclared here (not in a function)
+>>>
+>>> This one comes from bbacc0c (KVM: Rename KVM_MEMORY_SLOTS ->
+>>> KVM_USER_MEM_SLOTS).
+>>> I'll queue a patch to fix the breakage...
+>>
+>> Looks like there's a few more, and what was brewing in kvm-next had some
+>> side effects.
+>>
+>> Christoffer, I'll send the patches separately.
+>>
+> I was kind of hoping that the KVM guys would have pulled the KVM/ARM
+> stuff into kvm/next and it could have been fixed up there.... The
+> patches are really trivial though iirc.
 
-Apply the same change to fix the compilation breakage.
+Indeed they are. Probably an oversight from the KVM guys. Sent them
+anyway...
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_host.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index dfe9886..d1736a5 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -26,7 +26,7 @@
- #include <asm/kvm_arch_timer.h>
- 
- #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
--#define KVM_MEMORY_SLOTS 32
-+#define KVM_USER_MEM_SLOTS 32
- #define KVM_PRIVATE_MEM_SLOTS 4
- #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
- #define KVM_HAVE_ONE_REG
+	M.
 -- 
-1.8.1.2
+Jazz is not dead. It just smells funny...
