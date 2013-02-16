@@ -1,41 +1,68 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Sat, 16 Feb 2013 20:33:53 +0100
-Subject: [RFC PATCH 06/18] davinci: replace V4L2_OUT_CAP_CUSTOM_TIMINGS by
- V4L2_OUT_CAP_DV_TIMINGS
-In-Reply-To: <511FDCBB.5010507@ti.com>
-References: <a9599acc7829c431d88b547de87c500968ccb86a.1361006882.git.hans.verkuil@cisco.com>
- <CA+V-a8tH8GLKz50i216S4TFkNjPpn1D1tNaRkuLfvDE_JO9N5g@mail.gmail.com>
- <511FDCBB.5010507@ti.com>
-Message-ID: <201302162033.53736.hverkuil@xs4all.nl>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Sat, 16 Feb 2013 20:52:20 +0100
+Subject: [PATCH] i2c: Remove unneeded xxx_set_drvdata(..., NULL) calls
+In-Reply-To: <1360970315-32116-1-git-send-email-dianders@chromium.org>
+References: <1360953682-25066-1-git-send-email-dianders@chromium.org>
+ <1360970315-32116-1-git-send-email-dianders@chromium.org>
+Message-ID: <20130216205220.0a4f871c@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat February 16 2013 20:23:39 Sekhar Nori wrote:
-> On 2/16/2013 6:28 PM, Prabhakar Lad wrote:
-> > Cc'ed Sekhar, DLOS, LAK.
-> > 
-> > Sekhar Can you Ack this patch ? Or maybe you can take this patch through
-> > your tree ?
+On Fri, 15 Feb 2013 15:18:35 -0800, Doug Anderson wrote:
+> There is simply no reason to be manually setting the private driver
+> data to NULL in the remove/fail to probe cases.  This is just extra
+> cruft code that can be removed.
 > 
-> I can take the patch, but I can only send for v3.10 since for v3.9 ARM
-> tree is only accepting bug fixes for already accepted code. If you wish
-> to take this through media tree for v3.9, feel free to add:
+> A few notes:
+> * Nothing relies on drvdata being set to NULL.
+> * The __device_release_driver() function eventually calls
+>   dev_set_drvdata(dev, NULL) anyway, so there's no need to do it
+>   twice.
 
-There is no hurry. If you can take this patch for 3.10, then that is fine
-by me. This patch series is unlikely to make it in 3.9 anyway, nor does it
-need to. Just let me know if you take it, then I can drop it from my patch
-series.
+I had not noticed this change. Very good news!
 
-Regards,
+> * I verified that there were no cases where xxx_get_drvdata() was
+>   being called in these drivers and checking for / relying on the NULL
+>   return value.
+> 
+> This could be cleaned up kernel-wide but for now just take the baby
+> step and remove from the i2c subsystem.
+> 
+> Reported-by: Wolfram Sang <wsa@the-dreams.de>
+> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> (...)
 
-	Hans
+For i2c-taos-evm:
 
-> 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> Since this appears to be an ARM-only patch, its better to add an 'ARM:'
-> prefix to the subject line as is the norm with all other ARM patches.
-> 
-> Thanks,
-> Sekhar
-> 
+Reviewed-by: Jean Delvare <khali@linux-fr.org>
+
+Also a note:
+
+> --- a/drivers/i2c/busses/i2c-octeon.c
+> +++ b/drivers/i2c/busses/i2c-octeon.c
+> @@ -595,7 +595,7 @@ static int octeon_i2c_probe(struct platform_device *pdev)
+>  	result = i2c_add_adapter(&i2c->adap);
+>  	if (result < 0) {
+>  		dev_err(i2c->dev, "failed to add adapter\n");
+> -		goto fail_add;
+> +		goto out;
+>  	}
+>  	dev_info(i2c->dev, "version %s\n", DRV_VERSION);
+>  
+> @@ -603,8 +603,6 @@ static int octeon_i2c_probe(struct platform_device *pdev)
+>  
+>  	return 0;
+>  
+> -fail_add:
+> -	platform_set_drvdata(pdev, NULL);
+>  out:
+>  	return result;
+>  };
+
+There no longer is any point in this error path, all gotos in this
+function could be changed to returns (in a separate patch, obviously.)
+
+-- 
+Jean Delvare
