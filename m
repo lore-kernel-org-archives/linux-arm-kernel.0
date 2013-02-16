@@ -1,138 +1,77 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 16 Feb 2013 17:43:57 +0100
-Subject: [PATCH v2 05/12] clocksource: samsung-time: Use local register
- definitions
+Date: Sat, 16 Feb 2013 17:43:59 +0100
+Subject: [PATCH v2 07/12] clocksource: samsung-time: Use clk_get_sys for
+ getting clocks
 In-Reply-To: <1361033044-27629-1-git-send-email-tomasz.figa@gmail.com>
 References: <1361033044-27629-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1361033044-27629-6-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1361033044-27629-8-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch copies PWM timer register definitions to samsung-time.c. The
-original header in plat is being kept for now, since it is also used by
-other code that also needs to be reworked to be multiplatform-friendly.
+This patch removes the need to reference platform_device structs defined
+in platform code, by using clk_get_sys instead of clk_get for getting
+necessary clocks.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/clocksource/samsung-time.c | 106 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 105 insertions(+), 1 deletion(-)
+ drivers/clocksource/samsung-time.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/clocksource/samsung-time.c b/drivers/clocksource/samsung-time.c
-index 66bd695..670f3c6 100644
+index f1e54f9..5ecc864 100644
 --- a/drivers/clocksource/samsung-time.c
 +++ b/drivers/clocksource/samsung-time.c
-@@ -26,7 +26,111 @@
+@@ -24,8 +24,6 @@
+ #include <asm/mach/map.h>
+ #include <asm/sched_clock.h>
  
- #include <mach/map.h>
- #include <plat/devs.h>
--#include <plat/regs-timer.h>
-+
-+#define S3C_TIMERREG(x) (S3C_VA_TIMER + (x))
-+#define S3C_TIMERREG2(tmr,reg) S3C_TIMERREG((reg)+0x0c+((tmr)*0x0c))
-+
-+#define S3C2410_TCFG0	      S3C_TIMERREG(0x00)
-+#define S3C2410_TCFG1	      S3C_TIMERREG(0x04)
-+#define S3C2410_TCON	      S3C_TIMERREG(0x08)
-+
-+#define S3C64XX_TINT_CSTAT    S3C_TIMERREG(0x44)
-+
-+#define S3C2410_TCFG_PRESCALER0_MASK (255<<0)
-+#define S3C2410_TCFG_PRESCALER1_MASK (255<<8)
-+#define S3C2410_TCFG_PRESCALER1_SHIFT (8)
-+#define S3C2410_TCFG_DEADZONE_MASK   (255<<16)
-+#define S3C2410_TCFG_DEADZONE_SHIFT  (16)
-+
-+#define S3C2410_TCFG1_MUX4_DIV2	  (0<<16)
-+#define S3C2410_TCFG1_MUX4_DIV4	  (1<<16)
-+#define S3C2410_TCFG1_MUX4_DIV8	  (2<<16)
-+#define S3C2410_TCFG1_MUX4_DIV16  (3<<16)
-+#define S3C2410_TCFG1_MUX4_TCLK1  (4<<16)
-+#define S3C2410_TCFG1_MUX4_MASK	  (15<<16)
-+#define S3C2410_TCFG1_MUX4_SHIFT  (16)
-+
-+#define S3C2410_TCFG1_MUX3_DIV2	  (0<<12)
-+#define S3C2410_TCFG1_MUX3_DIV4	  (1<<12)
-+#define S3C2410_TCFG1_MUX3_DIV8	  (2<<12)
-+#define S3C2410_TCFG1_MUX3_DIV16  (3<<12)
-+#define S3C2410_TCFG1_MUX3_TCLK1  (4<<12)
-+#define S3C2410_TCFG1_MUX3_MASK	  (15<<12)
-+
-+
-+#define S3C2410_TCFG1_MUX2_DIV2	  (0<<8)
-+#define S3C2410_TCFG1_MUX2_DIV4	  (1<<8)
-+#define S3C2410_TCFG1_MUX2_DIV8	  (2<<8)
-+#define S3C2410_TCFG1_MUX2_DIV16  (3<<8)
-+#define S3C2410_TCFG1_MUX2_TCLK1  (4<<8)
-+#define S3C2410_TCFG1_MUX2_MASK	  (15<<8)
-+
-+
-+#define S3C2410_TCFG1_MUX1_DIV2	  (0<<4)
-+#define S3C2410_TCFG1_MUX1_DIV4	  (1<<4)
-+#define S3C2410_TCFG1_MUX1_DIV8	  (2<<4)
-+#define S3C2410_TCFG1_MUX1_DIV16  (3<<4)
-+#define S3C2410_TCFG1_MUX1_TCLK0  (4<<4)
-+#define S3C2410_TCFG1_MUX1_MASK	  (15<<4)
-+
-+#define S3C2410_TCFG1_MUX0_DIV2	  (0<<0)
-+#define S3C2410_TCFG1_MUX0_DIV4	  (1<<0)
-+#define S3C2410_TCFG1_MUX0_DIV8	  (2<<0)
-+#define S3C2410_TCFG1_MUX0_DIV16  (3<<0)
-+#define S3C2410_TCFG1_MUX0_TCLK0  (4<<0)
-+#define S3C2410_TCFG1_MUX0_MASK	  (15<<0)
-+
-+#define S3C2410_TCFG1_MUX_DIV2	  (0<<0)
-+#define S3C2410_TCFG1_MUX_DIV4	  (1<<0)
-+#define S3C2410_TCFG1_MUX_DIV8	  (2<<0)
-+#define S3C2410_TCFG1_MUX_DIV16   (3<<0)
-+#define S3C2410_TCFG1_MUX_TCLK    (4<<0)
-+#define S3C2410_TCFG1_MUX_MASK	  (15<<0)
-+
-+#define S3C64XX_TCFG1_MUX_DIV1	  (0<<0)
-+#define S3C64XX_TCFG1_MUX_DIV2	  (1<<0)
-+#define S3C64XX_TCFG1_MUX_DIV4	  (2<<0)
-+#define S3C64XX_TCFG1_MUX_DIV8    (3<<0)
-+#define S3C64XX_TCFG1_MUX_DIV16   (4<<0)
-+#define S3C64XX_TCFG1_MUX_TCLK    (5<<0)  /* 3 sets of TCLK */
-+#define S3C64XX_TCFG1_MUX_MASK	  (15<<0)
-+
-+#define S3C2410_TCFG1_SHIFT(x)	  ((x) * 4)
-+
-+/* for each timer, we have an count buffer, an compare buffer and
-+ * an observation buffer
-+*/
-+
-+/* WARNING - timer 4 has no buffer reg, and it's observation is@+4 */
-+
-+#define S3C2410_TCNTB(tmr)    S3C_TIMERREG2(tmr, 0x00)
-+#define S3C2410_TCMPB(tmr)    S3C_TIMERREG2(tmr, 0x04)
-+#define S3C2410_TCNTO(tmr)    S3C_TIMERREG2(tmr, (((tmr) == 4) ? 0x04 : 0x08))
-+
-+#define S3C2410_TCON_T4RELOAD	  (1<<22)
-+#define S3C2410_TCON_T4MANUALUPD  (1<<21)
-+#define S3C2410_TCON_T4START	  (1<<20)
-+
-+#define S3C2410_TCON_T3RELOAD	  (1<<19)
-+#define S3C2410_TCON_T3INVERT	  (1<<18)
-+#define S3C2410_TCON_T3MANUALUPD  (1<<17)
-+#define S3C2410_TCON_T3START	  (1<<16)
-+
-+#define S3C2410_TCON_T2RELOAD	  (1<<15)
-+#define S3C2410_TCON_T2INVERT	  (1<<14)
-+#define S3C2410_TCON_T2MANUALUPD  (1<<13)
-+#define S3C2410_TCON_T2START	  (1<<12)
-+
-+#define S3C2410_TCON_T1RELOAD	  (1<<11)
-+#define S3C2410_TCON_T1INVERT	  (1<<10)
-+#define S3C2410_TCON_T1MANUALUPD  (1<<9)
-+#define S3C2410_TCON_T1START	  (1<<8)
-+
-+#define S3C2410_TCON_T0DEADZONE	  (1<<4)
-+#define S3C2410_TCON_T0RELOAD	  (1<<3)
-+#define S3C2410_TCON_T0INVERT	  (1<<2)
-+#define S3C2410_TCON_T0MANUALUPD  (1<<1)
-+#define S3C2410_TCON_T0START	  (1<<0)
+-#include <plat/devs.h>
+-
+ static void __iomem *timer_base;
  
- static struct clk *tin_event;
- static struct clk *tin_source;
+ #define S3C_TIMERREG(x) (timer_base + (x))
+@@ -336,9 +334,6 @@ static void samsung_timer_resume(void)
+ void __init samsung_set_timer_source(enum samsung_timer_mode event,
+ 				 enum samsung_timer_mode source)
+ {
+-	s3c_device_timer[event].dev.bus = &platform_bus_type;
+-	s3c_device_timer[source].dev.bus = &platform_bus_type;
+-
+ 	timer_source.event_id = event;
+ 	timer_source.source_id = source;
+ }
+@@ -486,28 +481,24 @@ static void __init samsung_timer_resources(void)
+ 	clk_enable(timerclk);
+ 
+ 	sprintf(devname, "s3c24xx-pwm.%lu", event_id);
+-	s3c_device_timer[event_id].id = event_id;
+-	s3c_device_timer[event_id].dev.init_name = devname;
+ 
+-	tin_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tin");
++	tin_event = clk_get_sys(devname, "pwm-tin");
+ 	if (IS_ERR(tin_event))
+ 		panic("failed to get pwm-tin clock for event timer");
+ 
+-	tdiv_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tdiv");
++	tdiv_event = clk_get_sys(devname, "pwm-tdiv");
+ 	if (IS_ERR(tdiv_event))
+ 		panic("failed to get pwm-tdiv clock for event timer");
+ 
+ 	clk_enable(tin_event);
+ 
+ 	sprintf(devname, "s3c24xx-pwm.%lu", source_id);
+-	s3c_device_timer[source_id].id = source_id;
+-	s3c_device_timer[source_id].dev.init_name = devname;
+ 
+-	tin_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tin");
++	tin_source = clk_get_sys(devname, "pwm-tin");
+ 	if (IS_ERR(tin_source))
+ 		panic("failed to get pwm-tin clock for source timer");
+ 
+-	tdiv_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tdiv");
++	tdiv_source = clk_get_sys(devname, "pwm-tdiv");
+ 	if (IS_ERR(tdiv_source))
+ 		panic("failed to get pwm-tdiv clock for source timer");
+ 
 -- 
 1.8.1.2
