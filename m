@@ -1,30 +1,31 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 16 Feb 2013 13:52:53 -0500
-Subject: [PATCH v3 3/3] arm: mvebu: enable gpio expander over i2c on
- Mirabox platform
-In-Reply-To: <1358889025-8530-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
- <1358889025-8530-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130216185253.GD23237@titan.lakedaemon.net>
+Date: Sat, 16 Feb 2013 10:25:18 -0500
+Subject: [PATCH] ARM: dove: convert serial DT nodes to clocks property
+In-Reply-To: <1359493186-25589-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1359493186-25589-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130216152518.GV14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 22, 2013 at 10:10:25PM +0100, Gregory CLEMENT wrote:
-> The Globalscale Mirabox platform can be connected to the JTAG/GPIO box
-> through the Multi-IO port. The GPIO box use the NXP PCA9505 I/O port
-> expansion IC to provide 40-bit parallel input/output GPIOs. This patch
-> enable the use of this expander on the Mirabox.
+On Tue, Jan 29, 2013 at 09:59:46PM +0100, Sebastian Hesselbarth wrote:
+> of_serial now has support for using clocks property and we have
+> a DT clock provider. This patch replaces the hard coded clock-frequency
+> property with a clocks phandle to tclk.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
->  arch/arm/boot/dts/armada-370-mirabox.dts |   10 ++++++++++
->  1 file changed, 10 insertions(+)
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/dove.dtsi |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 
-Applied to mvebu/dt_deps with a dependency on gpio/for-next for:
-
-      89f5df0 gpio: pca953x: add support for pca9505
-      f5f0b7a gpio: pca953x: make the register access by GPIO bank
+Applied to mvebu/dt
 
 thx,
 
