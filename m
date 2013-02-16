@@ -1,78 +1,74 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 17 Feb 2013 00:54:57 +0200
-Subject: [PATCHv3 2/4] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <201302162221.32799.arnd@arndb.de>
-References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
- <201302161400.29064.arnd@arndb.de>
- <CAHp75VfL0cQJenHB7A_A1d2eam2dj3k+4yWRE8pC+_gP2j_k2Q@mail.gmail.com>
- <201302162221.32799.arnd@arndb.de>
-Message-ID: <CAHp75VeCic+5_zyzFdtpw5dLxRaajD9zv6ZvSoDcHAD1EF=GSw@mail.gmail.com>
+From: anton@enomsg.org (Anton Vorontsov)
+Date: Sat, 16 Feb 2013 15:00:10 -0800
+Subject: [RFC] ARM: sa1100: collie-battery.c: include platform_device.h
+ directly
+In-Reply-To: <1361038560-3690-1-git-send-email-andrea.adami@gmail.com>
+References: <1361038560-3690-1-git-send-email-andrea.adami@gmail.com>
+Message-ID: <20130216230010.GG1741@lizard.sbx05280.losalca.wayport.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 17, 2013 at 12:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The original device tree binding for this driver, from Viresh Kumar
-> unfortunately conflicted with the generic DMA binding, and did not allow
-> to completely seperate slave device configuration from the controller.
->
-> This is an attempt to replace it with an implementation of the generic
-> binding, but it is currently completely untested, because I do not have
-> any hardware with this particular controller.
->
-> The patch applies on top of the slave-dma tree, which contains both the base
-> support for the generic DMA binding, as well as the earlier attempt from
-> Viresh. Both of these are currently not merged upstream however.
->
-> This version incorporates feedback from Viresh Kumar, Andy Shevchenko
-> and Russell King.
+Hi Andrea,
 
-Sorry, few comments below.
-After addressing them take my Acked-by: Andy Shevchenko
-<andriy.shevchenko@linux.intel.com>
+On Sat, Feb 16, 2013 at 07:16:00PM +0100, Andrea Adami wrote:
+> Initial try to fix compilation error
 
-> --- a/drivers/dma/dw_dmac.c
-> +++ b/drivers/dma/dw_dmac.c
+Things are a bit more complex...
 
+> linux/include/linux/mfd/mcp.h:22:16: error: field 'attached_device' has incomplete type
 
-> @@ -1836,6 +1825,12 @@ static int dw_probe(struct platform_device *pdev)
->
->         dma_async_device_register(&dw->dma);
->
-> +       if (pdev->dev.of_node)
-> +               err = of_dma_controller_register(pdev->dev.of_node,
-> +                                                dw_dma_xlate, dw);
-> +       if (err && err != -ENODEV)
-> +               dev_err(&pdev->dev, "could not register of_dma_controller\n");
+You have to add #include <linux/device.h> into mfd/mcp.h. This will add
+struct device and...
 
-I believe we may make it as
- if (...of_node) {
-  err = ...register();
-  if (err...)
-    dev_err();
- }
+> linux/include/linux/mfd/mcp.h:48:23: error: field 'drv' has incomplete type
 
-> --- a/drivers/dma/dw_dmac_regs.h
-> +++ b/drivers/dma/dw_dmac_regs.h
+struct device_driver.
 
-> @@ -211,9 +212,15 @@ struct dw_dma_chan {
->         /* hardware configuration */
->         unsigned int            block_size;
->         bool                    nollp;
-> +       unsigned int            request_line;
-> +       struct dw_dma_slave     slave;
-> +
+> linux/include/linux/mfd/ucb1x00.h:137:17: error: field 'dev' has incomplete type
 
-Do we really need an extra empty line here?
+Same here, the file ucb1x00.h needs #include <linux/device.h>.
 
->
->         /* configuration passed via DMA_SLAVE_CONFIG */
->         struct dma_slave_config dma_sconfig;
-> +
-> +       /* backlink to dw_dma */
-> +       struct dw_dma           *dw;
+> linux/drivers/power/collie_battery.c:290:56: error: unknown type name 'pm_message_t'
 
-Seems it's not needed and came from rebase?
+#include <linux/pm.h> into collie_battery.c
 
--- 
-With Best Regards,
-Andy Shevchenko
+Thanks,
+
+Anton
+
+> linux/drivers/power/collie_battery.c:371:13: error: 'collie_bat_suspend' undeclared here (not in a function)
+> | make[4]: *** [drivers/power/collie_battery.o] Error 1
+> | make[3]: *** [drivers/power] Error 2
+> 
+> As seen in Arnd Bergmann patches on LAKML
+> [PATCH 7/9] ARM defconfigs: add missing inclusions of linux/platform_device.h
+> [PATCH 1/9] ARM: sa1100/assabet: include platform_device.h directly
+> 
+> Compilation is still not clean, two warnings:
+> linux/drivers/power/collie_battery.c:372:2: warning: initialization from incompatible pointer type [enabled by default]
+> linux/drivers/power/collie_battery.c:372:2: warning: (near initialization for 'collie_bat_driver.suspend') [enabled by default]
+> 
+> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+> ---
+>  drivers/power/collie_battery.c            |      1 +
+>  drivers/video/logo/logo_linux_clut224.ppm | 232006 ++++++++++++++++++++++++++-
+>  2 files changed, 230404 insertions(+), 1603 deletions(-)
+> 
+> diff --git a/drivers/power/collie_battery.c b/drivers/power/collie_battery.c
+> index c58d0e3..52cbab3 100644
+> --- a/drivers/power/collie_battery.c
+> +++ b/drivers/power/collie_battery.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/module.h>
+>  #include <linux/power_supply.h>
+>  #include <linux/delay.h>
+> +#include <linux/platform_device.h>
+
+I don't see anywhere in the driver which would need platform_device.h...
+But pm.h, yes.
+
+>  #include <linux/spinlock.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/gpio.h>
+> -- 
+> 1.7.12.4
