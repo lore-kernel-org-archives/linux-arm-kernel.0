@@ -1,48 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 16 Feb 2013 09:42:22 +0100
-Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
-In-Reply-To: <1360966349-1242560-2-git-send-email-arnd@arndb.de>
-References: <201302152158.23446.arnd@arndb.de>
- <1360966349-1242560-1-git-send-email-arnd@arndb.de>
- <1360966349-1242560-2-git-send-email-arnd@arndb.de>
-Message-ID: <20130216084222.GA13551@lunn.ch>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Sat, 16 Feb 2013 09:47:40 +0100
+Subject: [PATCH v2] clk: Add axi-clkgen driver
+In-Reply-To: <20130216025234.11471.8029@quantum>
+References: <1358949892-19986-1-git-send-email-lars@metafoo.de>
+ <20130216025234.11471.8029@quantum>
+Message-ID: <511F47AC.102@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 11:12:29PM +0100, Arnd Bergmann wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+On 02/16/2013 03:52 AM, Mike Turquette wrote:
+> Quoting Lars-Peter Clausen (2013-01-23 06:04:52)
+>> +static const struct of_device_id axi_clkgen_ids[] = {
+>> +       { .compatible = "adi,axi-clkgen-1.00.a" },
+>> +       { },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, axi_clkgen_ids);
 > 
-> With the multiplatform changes in arm-soc tree, it becomes
-> possible to enable the mvebu platform (which uses
-> ehci-orion) at the same time as other platforms that require
-> a conflicting EHCI bus glue. At the moment, this results
-> in a warning like
+> This method is deprecated.  Can you convert over to the newer
+> of_clk_init method?  See:
 > 
-> drivers/usb/host/ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
-> drivers/usb/host/ehci-hcd.c:1277:0: note: this is the location of the previous definition
-> drivers/usb/host/ehci-orion.c:334:31: warning: 'ehci_orion_driver' defined but not used [-Wunused-variable]
-> 
-> and an ehci driver that only works on one of them.
-> 
-> With the infrastructure added by Alan Stern in patch 3e0232039
-> "USB: EHCI: prepare to make ehci-hcd a library module", we can
-> avoid this problem by turning a bus glue into a separate
-> module, as we do here for the orion bus glue.
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> ---
->  drivers/usb/host/Kconfig      |  8 ++++
->  drivers/usb/host/Makefile     |  1 +
->  drivers/usb/host/ehci-hcd.c   |  6 +--
->  drivers/usb/host/ehci-orion.c | 90 ++++++++++++++++++++-----------------------
->  4 files changed, 52 insertions(+), 53 deletions(-)
+> http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=commit;h=f2f6c2556dcc432e50003bc8fa4d62d95906f149
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
+Hi,
 
-I booted with this patch on a Kirkwood based QNAP NAS box. The USB bus
-enumerated as expected.
+I'm not sure this makes sense here. That would mean completely bypassing the
+device driver model. And since this device is on a kind of external bus it may
+or may not be present at the time of_clk_init() runs.
 
-	   Andrew
+- Lars
