@@ -1,72 +1,31 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Sat, 16 Feb 2013 02:09:46 +0000
-Subject: [PATCH 2/3] ARM: prima2: Replace include linux/module.h with
- linux/export.h
-In-Reply-To: <CAFBvHifN+oZBGwzHv5PxSZea1O1HTwKwiFa8T3udw5vvRuiMug@mail.gmail.com>
-References: <1352821789-6640-1-git-send-email-s.syam@samsung.com>
- <5EB3BFCD089AD643B9BB63439F5FD5E9012296E17C@SHAASIEXM01.ASIA.ROOT.PRI>
- <CAFBvHifN+oZBGwzHv5PxSZea1O1HTwKwiFa8T3udw5vvRuiMug@mail.gmail.com>
-Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E90122CA137F@SHAASIEXM01.ASIA.ROOT.PRI>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Sat, 16 Feb 2013 11:25:52 +0900
+Subject: GIT PULL] Renesas ARM-based SoC pinmux for v3.9 #2
+Message-ID: <1360981553-11414-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Syam,
+Hi Olof, Hi Arnd,
 
-> -----Original Message-----
-> From: Syam Sidhardhan [mailto:syamsidhardh at gmail.com]
-> Sent: Friday, February 15, 2013 4:51 AM
-> To: Barry Song
-> Cc: linux-arm-kernel at lists.infradead.org; DL-SHA-WorkGroupLinux
-> Subject: Re: [PATCH 2/3] ARM: prima2: Replace include linux/module.h with
-> linux/export.h
-> 
-> Hi,
-> 
-> On Wed, Nov 14, 2012 at 8:29 AM, Barry Song <Barry.Song@csr.com> wrote:
-> >> -----Original Message-----
-> >> From: Syam Sidhardhan [mailto:syamsidhardh at gmail.com]
-> >> Sent: Tuesday, November 13, 2012 11:50 PM
-> >> To: linux-arm-kernel at lists.infradead.org
-> >> Cc: Barry Song
-> >> Subject: [PATCH 2/3] ARM: prima2: Replace include linux/module.h with
-> >> linux/export.h
-> >>
-> >> include <linux/export.h> is the right to go here.
-> >>
-> >> Signed-off-by: Syam Sidhardhan <s.syam@samsung.com>
-> >
-> > Acked. Thanks!
-> >> ---
-> >>  arch/arm/mach-prima2/pm.c |    2 +-
-> >>  1 files changed, 1 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-> >> index fb5a791..f4a2270 100644
-> >> --- a/arch/arm/mach-prima2/pm.c
-> >> +++ b/arch/arm/mach-prima2/pm.c
-> >> @@ -9,7 +9,7 @@
-> >>  #include <linux/kernel.h>
-> >>  #include <linux/suspend.h>
-> >>  #include <linux/slab.h>
-> >> -#include <linux/module.h>
-> >> +#include <linux/export.h>
-> >>  #include <linux/of.h>
-> >>  #include <linux/of_address.h>
-> >>  #include <linux/of_device.h>
-> 
-> 
-> Ping,..
-> It's look like this patch is not yet applied.
+The following changes since commit c3323806a67c0c656e27956b7340e37ba6c6968b:
 
-I'll handle it together with some other fixes. Thanks!
+  sh-pfc: Move sh_pfc.h from include/linux/ to driver directory (2013-01-25 09:24:31 +0900)
 
-> 
-> Regards,
-> Syam
+are available in the git repository at:
 
--barry
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux2-for-v3.9
 
+for you to fetch changes up to 8c43fcc7804fc4609ccd9fa021e21f5423db9d96:
 
+  sh-pfc: sh_pfc_probe() sizeof() fix (2013-02-16 10:58:50 +0900)
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+----------------------------------------------------------------
+Bug fix from Magnus that resolves a regression introduced in pfc changes
+queued up for 3.9.
+
+----------------------------------------------------------------
+Magnus Damm (1):
+      sh-pfc: sh_pfc_probe() sizeof() fix
+
+ drivers/pinctrl/sh-pfc/core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
