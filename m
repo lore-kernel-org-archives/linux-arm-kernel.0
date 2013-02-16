@@ -1,37 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 16 Feb 2013 13:43:43 +0000
-Subject: [PATCH 2/4] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <20130216105159.GN17833@n2100.arm.linux.org.uk>
-References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
- <201302161007.39657.arnd@arndb.de>
- <20130216105159.GN17833@n2100.arm.linux.org.uk>
-Message-ID: <201302161343.43434.arnd@arndb.de>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sat, 16 Feb 2013 14:44:41 +0100
+Subject: [PATCH] ARM:kernel: a bug by a redundancy charactor ';'
+In-Reply-To: <20130216122646.GA14174@mudshark.cambridge.arm.com>
+References: <511F2C0D.4030206@asianux.com> <511F3D8C.6090603@gmail.com>
+ <511F4574.7000707@asianux.com>
+ <20130216122646.GA14174@mudshark.cambridge.arm.com>
+Message-ID: <511F8D49.40106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 February 2013, Russell King - ARM Linux wrote:
-> On Sat, Feb 16, 2013 at 10:07:39AM +0000, Arnd Bergmann wrote:
-> > On Saturday 16 February 2013, Viresh Kumar wrote:
-> > > On 15 February 2013 23:51, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > +static bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
-> > > >  {
-> > > 
-> > > > +       dws->cfg_hi     = 0xffffffff;
-> > > > +       dws->cfg_lo     = 0xffffffff;
-> > > 
-> > > s/0xffffffff/-1 ?
-> > 
-> > It's an 'unsigned int'. While -1 would work here, I always find it a little
-> > odd to rely on that feature of the C language.
-> 
-> However, relying on an 'int' being 32-bits is also rather odd, and
-> probably much more dubious too.  If you want to set all bits in an
-> int, the portable way to do that is ~0.
+Am 16.02.2013 13:26, schrieb Will Deacon:
+> On Sat, Feb 16, 2013 at 08:38:12AM +0000, Chen Gang wrote:
+>> ? 2013?02?16? 16:04, Dirk Behme ??:
+>>>
+>>> Wondering against which branch this patch is, I found that this issue
+>>> isn't in recent mainline from today, but in -next. Introduced by the patch
+>>>
+>>> ARM: perf: simplify __hw_perf_event_init err handling
+>>> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=9dcbf466559f6f2f55d60eb5a1bbebc8e694b52a
+>>>
+>
+> Damn, I really should have spotted this. Thanks for reporting/fixing it.
+>
+>>> While the subject/commit message could be improved (at least mentioning
+>>> 'perf' somehow and charactor -> character), the change itself looks good.
+>>
+>>    if still suggest to commit current patch:
+>>      does the subject like this ?
+>>       [PATCH] ARM:kernel: a bug for perf by a redundancy character ';'
+>
+> If you're ok with the following patch, I'll take it into the ARM perf
+> tree.
+>
+> Cheers,
+>
+> Will
+>
+> --->8
+>
+>>From 21fa771c94c4359807bb92dc8532b25c323ac543 Mon Sep 17 00:00:00 2001
+> From: Chen Gang <gang.chen@asianux.com>
+> Date: Sat, 16 Feb 2013 06:49:49 +0000
+> Subject: [PATCH] ARM: perf: remove erroneous semicolon from event
+>   initialisation
+>
+> Commit 9dcbf466559f ("ARM: perf: simplify __hw_perf_event_init err
+> handling") tidied up the error handling code for perf event
+> initialisation on ARM, but a copy-and-paste error left a dangling
+> semicolon at the end of an if statement.
+>
+> This patch removes the broken semicolon, restoring the old group
+> validation semantics.
+>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Right, I can do that, too. All I really need here though is to make sure
-I use the same value in this place and when comparing it in dwc_initialize,
-and it needs to be something that cannot be a valid register setting.
+Acked-by: Dirk Behme <dirk.behme@gmail.com>
 
-Thanks,
+Dirk
 
-	Arnd
+> ---
+>   arch/arm/kernel/perf_event.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 31e0eb3..a892067 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -400,7 +400,7 @@ __hw_perf_event_init(struct perf_event *event)
+>   	}
+>
+>   	if (event->group_leader != event) {
+> -		if (validate_group(event) != 0);
+> +		if (validate_group(event) != 0)
+>   			return -EINVAL;
+>   	}
+>
+>
