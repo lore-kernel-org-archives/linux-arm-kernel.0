@@ -1,69 +1,114 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Sat, 16 Feb 2013 17:44:12 +0100
-Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
-In-Reply-To: <CAPjKCR_oh25c4NKUTWjU6BYp64GjPoi2LWDpRhTUkBkRmc_HUw@mail.gmail.com>
-References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
- <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
- <CAPjKCR_oh25c4NKUTWjU6BYp64GjPoi2LWDpRhTUkBkRmc_HUw@mail.gmail.com>
-Message-ID: <CABxcv=kDw6pSsdE29-dVqkk2cc-RKBZB6GN8cs+M+C4JEeSbdg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 16 Feb 2013 17:43:52 +0100
+Subject: [PATCH v2 00/12] ARM: samsung-time: Prepare for multiplatform support
+Message-ID: <1361033044-27629-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 16, 2013 at 2:09 PM, Anil Kumar <anilkumar880@gmail.com> wrote:
-> Hi Florian,
->
-> On Mon, Jan 28, 2013 at 11:24 PM, Florian Vaussard
-> <florian.vaussard@epfl.ch> wrote:
->> Add device-tree support for the GPMC controller on the OMAP3.
->>
->> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->> ---
->>  arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
->>  1 files changed, 11 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
->> index 6c63118..2ddae38 100644
->> --- a/arch/arm/boot/dts/omap3.dtsi
->> +++ b/arch/arm/boot/dts/omap3.dtsi
->> @@ -403,5 +403,16 @@
->>                         ti,timer-alwon;
->>                         ti,timer-secure;
->>                 };
->> +
->> +               gpmc: gpmc at 6e000000 {
->> +                       compatible = "ti,omap3430-gpmc";
->> +                       ti,hwmods = "gpmc";
->> +                       reg = <0x6e000000 0x1000000>;
->> +                       interrupts = <20>;
->> +                       gpmc,num-cs = <8>;
->> +                       gpmc,num-waitpins = <4>;
->> +                       #address-cells = <2>;
->> +                       #size-cells = <1>;
->> +               };
->>         };
->>  };
->
-> Tested on devkit8000 (omap3 based board)
->
-> Please take my Tested-by: Anil Kumar <anilk4.v@gmail.com>
->
-> Thanks,
-> Anil
->
+This series is an attempt to make the samsung-time clocksource driver ready
+for multiplatform kernels. It moves the driver to drivers/clocksource, cleans
+it up from uses of static platform-specific definitions, simplifies timer
+interrupt handling and adds Device Tree support.
 
-Hello Tony and Benoit,
+Tested on a Tiny6410 board (Mini6410-compatible) both with and without Devicee
+Tree (with my DT patches for S3C64xx). Compile tested for other related SoCs.
 
-Could this patch be merged to one of your branches?
+Changes since v1:
+(http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16005)
+ - Addressed comments from Mark Rutland
+ - Documented struct samsung_timer_variant
+ - Dropped inactive mail addresses from CC
 
-It has already my Reviewed-by and now Anil's Tested-by.
+Tomasz Figa (12):
+  ARM: SAMSUNG: Move samsung-time to drivers/clocksource
+  clocksource: samsung-time: Set platform-specific parameters at runtime
+  clocksource: samsung-time: Drop useless defines from public header
+  ARM: SAMSUNG: Move samsung-time.h header to inlude/clocksource
+  clocksource: samsung-time: Use local register definitions
+  clocksource: samsung-time: Remove use of static register mapping
+  clocksource: samsung-time: Use clk_get_sys for getting clocks
+  ARM: SAMSUNG: devs: Drop unnecessary IRQ resources of timer devices
+  clocksource: samsung-time: Do not use static IRQ definition
+  clocksource: samsung-time: Move IRQ mask/ack handling to the driver
+  ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
+  clocksource: samsung-time: Add Device Tree support
 
-Now that Daniel's OMAP GPMC binding were merged, there seems to be
-many people working on adding support on their boards DT for
-peripherals connected through the GPMC (NAND, OneNAND, SMSC LAN, etc).
+ .../devicetree/bindings/arm/samsung-timer.txt      |  33 ++
+ arch/arm/Kconfig                                   |   1 -
+ arch/arm/mach-exynos/include/mach/irqs.h           |   3 +-
+ arch/arm/mach-exynos/mach-universal_c210.c         |  15 +-
+ arch/arm/mach-s3c24xx/common.c                     |  14 +
+ arch/arm/mach-s3c24xx/mach-amlm5900.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-anubis.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-at2440evb.c             |   2 +-
+ arch/arm/mach-s3c24xx/mach-bast.c                  |   2 +-
+ arch/arm/mach-s3c24xx/mach-gta02.c                 |   2 +-
+ arch/arm/mach-s3c24xx/mach-h1940.c                 |   2 +-
+ arch/arm/mach-s3c24xx/mach-jive.c                  |   2 +-
+ arch/arm/mach-s3c24xx/mach-mini2440.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-n30.c                   |   2 +-
+ arch/arm/mach-s3c24xx/mach-nexcoder.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-osiris.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-otom.c                  |   2 +-
+ arch/arm/mach-s3c24xx/mach-qt2410.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-rx1950.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-rx3715.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2410.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2413.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2440.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2443.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-tct_hammer.c            |   2 +-
+ arch/arm/mach-s3c24xx/mach-vr1000.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c                 |   2 +-
+ arch/arm/mach-s3c64xx/common.c                     |  19 +-
+ arch/arm/mach-s3c64xx/include/mach/irqs.h          |   8 -
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |   2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |   2 +-
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |   2 +-
+ arch/arm/mach-s3c64xx/mach-real6410.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-smartq.c                |   2 +-
+ arch/arm/mach-s3c64xx/mach-smartq5.c               |   2 +-
+ arch/arm/mach-s3c64xx/mach-smartq7.c               |   2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6400.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |   2 +-
+ arch/arm/mach-s5p64x0/common.c                     |  15 +
+ arch/arm/mach-s5p64x0/include/mach/irqs.h          |   2 -
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |   2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |   2 +-
+ arch/arm/mach-s5pc100/common.c                     |  15 +
+ arch/arm/mach-s5pc100/include/mach/irqs.h          |   2 -
+ arch/arm/mach-s5pc100/mach-smdkc100.c              |   2 +-
+ arch/arm/mach-s5pv210/common.c                     |  15 +
+ arch/arm/mach-s5pv210/include/mach/irqs.h          |   2 -
+ arch/arm/mach-s5pv210/mach-aquila.c                |   2 +-
+ arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+ arch/arm/mach-s5pv210/mach-smdkc110.c              |   2 +-
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+ arch/arm/mach-s5pv210/mach-torbreck.c              |   2 +-
+ arch/arm/plat-samsung/Kconfig                      |  14 -
+ arch/arm/plat-samsung/Makefile                     |   2 -
+ arch/arm/plat-samsung/devs.c                       |  28 +-
+ arch/arm/plat-samsung/include/plat/irq-vic-timer.h |  13 -
+ arch/arm/plat-samsung/include/plat/irqs.h          |   9 -
+ arch/arm/plat-samsung/include/plat/samsung-time.h  |  51 --
+ arch/arm/plat-samsung/irq-vic-timer.c              |  98 ----
+ arch/arm/plat-samsung/s5p-irq.c                    |   3 -
+ arch/arm/plat-samsung/samsung-time.c               | 394 -------------
+ drivers/clocksource/Kconfig                        |   7 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/samsung-time.c                 | 636 +++++++++++++++++++++
+ include/clocksource/samsung-time.h                 |  55 ++
+ 68 files changed, 871 insertions(+), 668 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung-timer.txt
+ delete mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/samsung-time.h
+ delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
+ delete mode 100644 arch/arm/plat-samsung/samsung-time.c
+ create mode 100644 drivers/clocksource/samsung-time.c
+ create mode 100644 include/clocksource/samsung-time.h
 
-I think it will be easier if people can base their work on top of this
-patch instead of duplicating the work and sending the same patch to
-add a GPMC device node to omap3.dtsi on each patch-set.
-
-Thanks a lot and best regards,
-Javier
+-- 
+1.8.1.2
