@@ -1,69 +1,74 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 16 Feb 2013 09:24:04 -0300
-Subject: [PATCH 1/2] ARM: dts: omap3: Add gpmc node
-In-Reply-To: <1361014708-1659-2-git-send-email-anilk4.v@gmail.com>
-References: <1361014708-1659-1-git-send-email-anilk4.v@gmail.com>
- <1361014708-1659-2-git-send-email-anilk4.v@gmail.com>
-Message-ID: <20130216122403.GA2445@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sat, 16 Feb 2013 12:26:46 +0000
+Subject: [PATCH] ARM:kernel: a bug by a redundancy charactor ';'
+In-Reply-To: <511F4574.7000707@asianux.com>
+References: <511F2C0D.4030206@asianux.com> <511F3D8C.6090603@gmail.com>
+ <511F4574.7000707@asianux.com>
+Message-ID: <20130216122646.GA14174@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anil,
+On Sat, Feb 16, 2013 at 08:38:12AM +0000, Chen Gang wrote:
+> ? 2013?02?16? 16:04, Dirk Behme ??:
+> > 
+> > Wondering against which branch this patch is, I found that this issue
+> > isn't in recent mainline from today, but in -next. Introduced by the patch
+> > 
+> > ARM: perf: simplify __hw_perf_event_init err handling
+> > http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=9dcbf466559f6f2f55d60eb5a1bbebc8e694b52a
+> > 
 
-On Sat, Feb 16, 2013 at 05:08:27PM +0530, Anil Kumar wrote:
-> Add gpmc DT node.
+Damn, I really should have spotted this. Thanks for reporting/fixing it.
+
+> > While the subject/commit message could be improved (at least mentioning
+> > 'perf' somehow and charactor -> character), the change itself looks good.
 > 
-> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
-> ---
-> :100644 100644 1acc261... 9f36531... M	arch/arm/boot/dts/omap3.dtsi
->  arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 1acc261..9f36531 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -397,5 +397,16 @@
->  			ti,timer-alwon;
->  			ti,timer-secure;
->  		};
-> +
-> +		gpmc: gpmc at 6e000000 {
-> +			compatible = "ti,omap3430-gpmc";
-> +			ti,hwmods = "gpmc";
-> +			reg = <0x6e000000 0x1000000>;
-> +			interrupts = <20>;
-> +			gpmc,num-cs = <8>;
-> +			gpmc,num-waitpins = <4>;
-> +			#address-cells = <2>;
-> +			#size-cells = <1>;
-> +		};
->  	};
->  };
-> -- 
-> 1.7.0.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>   if still suggest to commit current patch:
+>     does the subject like this ?
+>      [PATCH] ARM:kernel: a bug for perf by a redundancy character ';'
 
-This patch has been already sent twice to the mailing list.
-Perhaps it would be more polite if you could base your work on
-one of those instead of sending it yourself again.
+If you're ok with the following patch, I'll take it into the ARM perf
+tree.
 
-Florian Vaussard sent one on January 28th:
-[PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
+Cheers,
 
-Javier Martinez Canillas sent another one on February 09th:
-[PATCH RFC 6/7] ARM: dts: OMAP: Add an GPMC node for OMAP3
+Will
 
-Moreover, you could help to get patches merged faster by sending
-your Acked-by or Tested-by.
+--->8
 
-Thanks,
+>From 21fa771c94c4359807bb92dc8532b25c323ac543 Mon Sep 17 00:00:00 2001
+From: Chen Gang <gang.chen@asianux.com>
+Date: Sat, 16 Feb 2013 06:49:49 +0000
+Subject: [PATCH] ARM: perf: remove erroneous semicolon from event
+ initialisation
 
+Commit 9dcbf466559f ("ARM: perf: simplify __hw_perf_event_init err
+handling") tidied up the error handling code for perf event
+initialisation on ARM, but a copy-and-paste error left a dangling
+semicolon at the end of an if statement.
+
+This patch removes the broken semicolon, restoring the old group
+validation semantics.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 31e0eb3..a892067 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -400,7 +400,7 @@ __hw_perf_event_init(struct perf_event *event)
+ 	}
+ 
+ 	if (event->group_leader != event) {
+-		if (validate_group(event) != 0);
++		if (validate_group(event) != 0)
+ 			return -EINVAL;
+ 	}
+ 
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.0
