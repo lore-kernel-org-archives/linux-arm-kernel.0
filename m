@@ -1,35 +1,22 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 16 Feb 2013 19:43:36 +0000
-Subject: [PATCH] ARM: Dove: fix build breakage with .timer/.init_time
-Message-ID: <1361043816-28753-1-git-send-email-jason@lakedaemon.net>
+Date: Sat, 16 Feb 2013 11:11:50 -0500
+Subject: [PATCH V4 02/11] ARM: kirkwood: topkick: convert to pinctrl
+In-Reply-To: <846275e831dcf998ca71f57480157366904380c0.1359232975.git.jason@lakedaemon.net>
+References: <cover.1359232975.git.jason@lakedaemon.net>
+ <846275e831dcf998ca71f57480157366904380c0.1359232975.git.jason@lakedaemon.net>
+Message-ID: <20130216161150.GW14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the latest arm-soc/for-next, building dove_defconfig breaks because
-.timer has been replaced with .init_timer in DT_MACHINE_START.  With
-this fix, it builds fine.
+On Sat, Jan 26, 2013 at 08:50:11PM +0000, Jason Cooper wrote:
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  arch/arm/boot/dts/kirkwood-topkick.dts     | 90 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-kirkwood/board-usi_topkick.c | 42 --------------
+>  2 files changed, 90 insertions(+), 42 deletions(-)
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
+Applied to mvebu/dt
 
-Not sure where you guys want to apply this.  If I apply it to any one my
-branches (without arm-soc/for-next), they break.
+thx,
 
- arch/arm/mach-dove/board-dt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-index ee11b31..fbde1dd 100644
---- a/arch/arm/mach-dove/board-dt.c
-+++ b/arch/arm/mach-dove/board-dt.c
-@@ -85,7 +85,7 @@ DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
- 	.map_io		= dove_map_io,
- 	.init_early	= dove_init_early,
- 	.init_irq	= orion_dt_init_irq,
--	.timer		= &dove_timer,
-+	.init_time	= dove_timer_init,
- 	.init_machine	= dove_dt_init,
- 	.restart	= dove_restart,
- 	.dt_compat	= dove_dt_board_compat,
--- 
-1.8.1.2
+Jason.
