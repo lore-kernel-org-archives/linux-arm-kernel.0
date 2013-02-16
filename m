@@ -1,46 +1,24 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Sat, 16 Feb 2013 19:16:00 +0100
-Subject: [RFC] ARM: sa1100: collie-battery.c: include platform_device.h
- directly
-Message-ID: <1361038560-3690-1-git-send-email-andrea.adami@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 17 Feb 2013 00:48:22 +0530
+Subject: [RFC PATCH 05/18] davinci: remove VPBE_ENC_DV_PRESET and rename
+ VPBE_ENC_CUSTOM_TIMINGS
+In-Reply-To: <CA+V-a8tSJ0SR4sc8EHLV0GaHaRTNHaQG6yt064uhMDhigK4XMA@mail.gmail.com>
+References: <a9599acc7829c431d88b547de87c500968ccb86a.1361006882.git.hans.verkuil@cisco.com>
+ <1361006901-16103-1-git-send-email-hverkuil@xs4all.nl>
+ <0339a6e257048b047bde48da5a87cb5ed4932c5f.1361006882.git.hans.verkuil@cisco.com>
+ <CA+V-a8tSJ0SR4sc8EHLV0GaHaRTNHaQG6yt064uhMDhigK4XMA@mail.gmail.com>
+Message-ID: <511FDB7E.1080307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial try to fix compilation error
 
-linux/include/linux/mfd/mcp.h:22:16: error: field 'attached_device' has incomplete type
-linux/include/linux/mfd/mcp.h:48:23: error: field 'drv' has incomplete type
-linux/include/linux/mfd/ucb1x00.h:137:17: error: field 'dev' has incomplete type
-linux/drivers/power/collie_battery.c:290:56: error: unknown type name 'pm_message_t'
-linux/drivers/power/collie_battery.c:371:13: error: 'collie_bat_suspend' undeclared here (not in a function)
-| make[4]: *** [drivers/power/collie_battery.o] Error 1
-| make[3]: *** [drivers/power] Error 2
 
-As seen in Arnd Bergmann patches on LAKML
-[PATCH 7/9] ARM defconfigs: add missing inclusions of linux/platform_device.h
-[PATCH 1/9] ARM: sa1100/assabet: include platform_device.h directly
+On 2/16/2013 6:20 PM, Prabhakar Lad wrote:
+> Cc'ed  Sekhar, DLOS, LAK.
+> 
+> Sekhar Can you Ack this patch for platform changes ?
 
-Compilation is still not clean, two warnings:
-linux/drivers/power/collie_battery.c:372:2: warning: initialization from incompatible pointer type [enabled by default]
-linux/drivers/power/collie_battery.c:372:2: warning: (near initialization for 'collie_bat_driver.suspend') [enabled by default]
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
----
- drivers/power/collie_battery.c            |      1 +
- drivers/video/logo/logo_linux_clut224.ppm | 232006 ++++++++++++++++++++++++++-
- 2 files changed, 230404 insertions(+), 1603 deletions(-)
-
-diff --git a/drivers/power/collie_battery.c b/drivers/power/collie_battery.c
-index c58d0e3..52cbab3 100644
---- a/drivers/power/collie_battery.c
-+++ b/drivers/power/collie_battery.c
-@@ -14,6 +14,7 @@
- #include <linux/module.h>
- #include <linux/power_supply.h>
- #include <linux/delay.h>
-+#include <linux/platform_device.h>
- #include <linux/spinlock.h>
- #include <linux/interrupt.h>
- #include <linux/gpio.h>
--- 
-1.7.12.4
+Thanks,
+Sekhar
