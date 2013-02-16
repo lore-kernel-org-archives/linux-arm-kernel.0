@@ -1,70 +1,61 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 16 Feb 2013 11:19:25 -0300
-Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
-In-Reply-To: <1360966349-1242560-2-git-send-email-arnd@arndb.de>
-References: <201302152158.23446.arnd@arndb.de>
- <1360966349-1242560-1-git-send-email-arnd@arndb.de>
- <1360966349-1242560-2-git-send-email-arnd@arndb.de>
-Message-ID: <20130216141924.GA2473@localhost>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sat, 16 Feb 2013 16:53:08 +0200
+Subject: [PATCH 2/4] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <201302161400.29064.arnd@arndb.de>
+References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
+ <1360952512-971558-3-git-send-email-arnd@arndb.de>
+ <CAHp75VfyO5wep-shvZ_mkwLmL2_Fa2jgq63AvE2t8=TPLZn6yg@mail.gmail.com>
+ <201302161400.29064.arnd@arndb.de>
+Message-ID: <CAHp75VfL0cQJenHB7A_A1d2eam2dj3k+4yWRE8pC+_gP2j_k2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Sat, Feb 16, 2013 at 4:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 16 February 2013, Andy Shevchenko wrote:
+>> On Fri, Feb 15, 2013 at 8:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Fri, Feb 15, 2013 at 11:12:29PM +0100, Arnd Bergmann wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
-> 
-> With the multiplatform changes in arm-soc tree, it becomes
-> possible to enable the mvebu platform (which uses
-> ehci-orion) at the same time as other platforms that require
-> a conflicting EHCI bus glue. At the moment, this results
-> in a warning like
-> 
-> drivers/usb/host/ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
-> drivers/usb/host/ehci-hcd.c:1277:0: note: this is the location of the previous definition
-> drivers/usb/host/ehci-orion.c:334:31: warning: 'ehci_orion_driver' defined but not used [-Wunused-variable]
-> 
-> and an ehci driver that only works on one of them.
-> 
-> With the infrastructure added by Alan Stern in patch 3e0232039
-> "USB: EHCI: prepare to make ehci-hcd a library module", we can
-> avoid this problem by turning a bus glue into a separate
-> module, as we do here for the orion bus glue.
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> ---
->  drivers/usb/host/Kconfig      |  8 ++++
->  drivers/usb/host/Makefile     |  1 +
->  drivers/usb/host/ehci-hcd.c   |  6 +--
->  drivers/usb/host/ehci-orion.c | 90 ++++++++++++++++++++-----------------------
->  4 files changed, 52 insertions(+), 53 deletions(-)
-> 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index d77e028..7ac6f48 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -162,6 +162,14 @@ config USB_EHCI_HCD_OMAP
->  	  Enables support for the on-chip EHCI controller on
->  	  OMAP3 and later chips.
->  
-> +config USB_EHCI_HCD_ORION
-> +        tristate  "Support for Marvell Orion on-chip EHCI USB controller"
-> +        depends on USB_EHCI_HCD && PLAT_ORION
-> +        default y
-> +        ---help---
-> +          Enables support for the on-chip EHCI controller on
-> +          Morvell Orion chips.
+>> > +       if (WARN_ON(fargs.req >= 16 || fargs.src >= 2 || fargs.dst >= 2))
+>> > +               return NULL;
+>>
+>> 16 here is a magic number for me. I would like to see something like
+>> #define DW_MAX_REQUEST_LINES 16 in the dw_dmac_regs.h.
+>
+> Ok.
+>
+>> Besides of that, what 2 does come from?
+>
+> I thought that Viresh had commented that there could only be two masters.
+> It's probably best to compare against dw->nr_masters here.
 
-s/Morvell/Marvell
+Right.
 
-Just this tiny nitpick.
+>> > @@ -1765,6 +1751,10 @@ static int dw_probe(struct platform_device *pdev)
+>> >
+>> >         dma_async_device_register(&dw->dma);
+>> >
+>> > +       err = of_dma_controller_register(pdev->dev.of_node, dw_dma_xlate, dw);
+>> > +       if (err)
+>> > +               dev_err(&pdev->dev, "could not register of_dma_controller\n");
+>>
+>> It's not an error, dev_dbg. Consider case when !CONFIG_OF.
+>
+> Ah right. I expected of_dma_controller_register to return 0 in that case, but
+> it returns -ENODEV. How about I change this to this?
+>
+>         if (pdev->dev.of_node)
+>                 err = of_dma_controller_register(pdev->dev.of_node, dw_dma_xlate, dw);
+>         if (err && err != -ENODEV)
+>                 dev_err(&pdev->dev, "could not register of_dma_controller\n");
+>
+> That would warn only when we have a dw_dmac device that was registered from
+> device tree but does not follow the binding or gets an -ENOMEM.
 
-Thanks,
+I'm okay with it.
+
+> Thanks for your review!
+
+Thanks for the patch!
 
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+With Best Regards,
+Andy Shevchenko
