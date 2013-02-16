@@ -1,25 +1,30 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 16 Feb 2013 10:20:16 -0500
-Subject: [PATCH 1/2] arm: mvebu: Add SPI flash on Armada XP-DB board
-In-Reply-To: <1360097695-32663-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1360097695-32663-1-git-send-email-gregory.clement@free-electrons.com>
- <1360097695-32663-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130216152016.GU14746@titan.lakedaemon.net>
+Date: Sat, 16 Feb 2013 13:52:53 -0500
+Subject: [PATCH v3 3/3] arm: mvebu: enable gpio expander over i2c on
+ Mirabox platform
+In-Reply-To: <1358889025-8530-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1358889025-8530-1-git-send-email-gregory.clement@free-electrons.com>
+ <1358889025-8530-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130216185253.GD23237@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 09:54:54PM +0100, Gregory CLEMENT wrote:
-> This patch add support for the SPI flash M25P64 which is present on
-> the Armada XP DB board. This flash stores the bootloader and its
-> environment.
+On Tue, Jan 22, 2013 at 10:10:25PM +0100, Gregory CLEMENT wrote:
+> The Globalscale Mirabox platform can be connected to the JTAG/GPIO box
+> through the Multi-IO port. The GPIO box use the NXP PCA9505 I/O port
+> expansion IC to provide 40-bit parallel input/output GPIOs. This patch
+> enable the use of this expander on the Mirabox.
 > 
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm/boot/dts/armada-xp-db.dts |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>  arch/arm/boot/dts/armada-370-mirabox.dts |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 
-Both 1 and 2 of this series applied to mvebu/dt, resolved add/add
-conflicts in both (usb).
+Applied to mvebu/dt_deps with a dependency on gpio/for-next for:
+
+      89f5df0 gpio: pca953x: add support for pca9505
+      f5f0b7a gpio: pca953x: make the register access by GPIO bank
 
 thx,
 
