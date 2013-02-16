@@ -1,80 +1,67 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Sat, 16 Feb 2013 14:44:41 +0100
-Subject: [PATCH] ARM:kernel: a bug by a redundancy charactor ';'
-In-Reply-To: <20130216122646.GA14174@mudshark.cambridge.arm.com>
-References: <511F2C0D.4030206@asianux.com> <511F3D8C.6090603@gmail.com>
- <511F4574.7000707@asianux.com>
- <20130216122646.GA14174@mudshark.cambridge.arm.com>
-Message-ID: <511F8D49.40106@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 16 Feb 2013 08:51:14 -0500 (EST)
+Subject: [PATCH v6 3/3] ARM: mm: use static_vm for managing static mapped
+ areas
+In-Reply-To: <201302161249.08597.arnd@arndb.de>
+References: <1360142010-10598-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1360142010-10598-4-git-send-email-iamjoonsoo.kim@lge.com>
+ <201302161249.08597.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.03.1302160850450.6419@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 16.02.2013 13:26, schrieb Will Deacon:
-> On Sat, Feb 16, 2013 at 08:38:12AM +0000, Chen Gang wrote:
->> ? 2013?02?16? 16:04, Dirk Behme ??:
->>>
->>> Wondering against which branch this patch is, I found that this issue
->>> isn't in recent mainline from today, but in -next. Introduced by the patch
->>>
->>> ARM: perf: simplify __hw_perf_event_init err handling
->>> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=9dcbf466559f6f2f55d60eb5a1bbebc8e694b52a
->>>
->
-> Damn, I really should have spotted this. Thanks for reporting/fixing it.
->
->>> While the subject/commit message could be improved (at least mentioning
->>> 'perf' somehow and charactor -> character), the change itself looks good.
->>
->>    if still suggest to commit current patch:
->>      does the subject like this ?
->>       [PATCH] ARM:kernel: a bug for perf by a redundancy character ';'
->
-> If you're ok with the following patch, I'll take it into the ARM perf
-> tree.
->
-> Cheers,
->
-> Will
->
-> --->8
->
->>From 21fa771c94c4359807bb92dc8532b25c323ac543 Mon Sep 17 00:00:00 2001
-> From: Chen Gang <gang.chen@asianux.com>
-> Date: Sat, 16 Feb 2013 06:49:49 +0000
-> Subject: [PATCH] ARM: perf: remove erroneous semicolon from event
->   initialisation
->
-> Commit 9dcbf466559f ("ARM: perf: simplify __hw_perf_event_init err
-> handling") tidied up the error handling code for perf event
-> initialisation on ARM, but a copy-and-paste error left a dangling
-> semicolon at the end of an if statement.
->
-> This patch removes the broken semicolon, restoring the old group
-> validation semantics.
->
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Sat, 16 Feb 2013, Arnd Bergmann wrote:
 
-Acked-by: Dirk Behme <dirk.behme@gmail.com>
+> On Wednesday 06 February 2013, Joonsoo Kim wrote:
+> > @@ -859,17 +864,12 @@ static void __init pci_reserve_io(void)
+> >  {
+> >  	struct vm_struct *vm;
+> >  	unsigned long addr;
+> > +	struct static_vm *svm;
+> >  
+> > -	/* we're still single threaded hence no lock needed here */
+> > -	for (vm = vmlist; vm; vm = vm->next) {
+> > -		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+> > -			continue;
+> > -		addr = (unsigned long)vm->addr;
+> > -		addr &= ~(SZ_2M - 1);
+> > -		if (addr == PCI_IO_VIRT_BASE)
+> > -			return;
+> > +	svm = find_static_vm_vaddr((void *)PCI_IO_VIRT_BASE);
+> > +	if (svm)
+> > +		return;
+> >  
+> > -	}
+> 
+> This is causing build warnings in a bunch of configurations now,
+> see patch below.
+> 
+> 	Arnd
+> 
+> 8<-----
+> ARM: mm: remove unused variables in pci_reserve_io
+> 
+> Patch "ARM: 7646/1: mm: use static_vm for managing static mapped areas"
+> removed code from pci_reserve_io but left variable declarations
+> in place that are now unused, as gcc correctly warns.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Dirk
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-> ---
->   arch/arm/kernel/perf_event.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 31e0eb3..a892067 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -400,7 +400,7 @@ __hw_perf_event_init(struct perf_event *event)
->   	}
->
->   	if (event->group_leader != event) {
-> -		if (validate_group(event) != 0);
-> +		if (validate_group(event) != 0)
->   			return -EINVAL;
->   	}
->
->
+
+> 
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index c6fe15a..c6d45c8 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -901,8 +901,6 @@ static void __init fill_pmd_gaps(void)
+>  #if defined(CONFIG_PCI) && !defined(CONFIG_NEED_MACH_IO_H)
+>  static void __init pci_reserve_io(void)
+>  {
+> -	struct vm_struct *vm;
+> -	unsigned long addr;
+>  	struct static_vm *svm;
+>  
+>  	svm = find_static_vm_vaddr((void *)PCI_IO_VIRT_BASE);
+> 
