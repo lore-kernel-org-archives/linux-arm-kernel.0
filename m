@@ -1,37 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 16 Feb 2013 10:07:39 +0000
-Subject: [PATCH 2/4] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <CAKohpo=u_b9u1=78+tm-rhVR14P0=2XbLrZEDJrQBY5W8LXiCw@mail.gmail.com>
-References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
- <1360952512-971558-3-git-send-email-arnd@arndb.de>
- <CAKohpo=u_b9u1=78+tm-rhVR14P0=2XbLrZEDJrQBY5W8LXiCw@mail.gmail.com>
-Message-ID: <201302161007.39657.arnd@arndb.de>
+Date: Sat, 16 Feb 2013 10:34:33 +0000
+Subject: GIT PULL] Renesas ARM-based SoC pinmux for v3.9 #2
+In-Reply-To: <1360981553-11414-1-git-send-email-horms+renesas@verge.net.au>
+References: <1360981553-11414-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <201302161034.33865.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 February 2013, Viresh Kumar wrote:
-> On 15 February 2013 23:51, Arnd Bergmann <arnd@arndb.de> wrote:
-> > diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
-> > +- #dma-cells: must be <3>
+On Saturday 16 February 2013, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> > +DMA clients connected to the Designware DMA controller must use the format
-> > +described in the dma.txt file, using a five-cell specifier for each channel.
+> The following changes since commit c3323806a67c0c656e27956b7340e37ba6c6968b:
 > 
-> s/five/four ?
-
-Right. I thought I had fixed up all instances.
-
-> > +static bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
-> >  {
+>   sh-pfc: Move sh_pfc.h from include/linux/ to driver directory (2013-01-25 09:24:31 +0900)
 > 
-> > +       dws->cfg_hi     = 0xffffffff;
-> > +       dws->cfg_lo     = 0xffffffff;
+> are available in the git repository at:
 > 
-> s/0xffffffff/-1 ?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux2-for-v3.9
+> 
+> for you to fetch changes up to 8c43fcc7804fc4609ccd9fa021e21f5423db9d96:
+> 
+>   sh-pfc: sh_pfc_probe() sizeof() fix (2013-02-16 10:58:50 +0900)
+> 
+> ----------------------------------------------------------------
+> Bug fix from Magnus that resolves a regression introduced in pfc changes
+> queued up for 3.9.
 
-It's an 'unsigned int'. While -1 would work here, I always find it a little
-odd to rely on that feature of the C language.
 
-Thannks for the review.
+Pulled into next/sh-pinux, thanks!
+
+Olof, we haven't done an official handover, but since I have added a couple of
+my own bug fixes in the past days, and I say no other updates from you, I decided
+to take this one in. I'll also have a look if there are more fixes to take care
+of over the weekend.
 
 	Arnd
