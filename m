@@ -1,38 +1,48 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Sat, 16 Feb 2013 16:38:12 +0800
-Subject: [PATCH] ARM:kernel: a bug by a redundancy charactor ';'
-In-Reply-To: <511F3D8C.6090603@gmail.com>
-References: <511F2C0D.4030206@asianux.com> <511F3D8C.6090603@gmail.com>
-Message-ID: <511F4574.7000707@asianux.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 16 Feb 2013 09:42:22 +0100
+Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
+In-Reply-To: <1360966349-1242560-2-git-send-email-arnd@arndb.de>
+References: <201302152158.23446.arnd@arndb.de>
+ <1360966349-1242560-1-git-send-email-arnd@arndb.de>
+ <1360966349-1242560-2-git-send-email-arnd@arndb.de>
+Message-ID: <20130216084222.GA13551@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?02?16? 16:04, Dirk Behme ??:
+On Fri, Feb 15, 2013 at 11:12:29PM +0100, Arnd Bergmann wrote:
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
 > 
-> Wondering against which branch this patch is, I found that this issue
-> isn't in recent mainline from today, but in -next. Introduced by the patch
+> With the multiplatform changes in arm-soc tree, it becomes
+> possible to enable the mvebu platform (which uses
+> ehci-orion) at the same time as other platforms that require
+> a conflicting EHCI bus glue. At the moment, this results
+> in a warning like
 > 
-> ARM: perf: simplify __hw_perf_event_init err handling
-> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=9dcbf466559f6f2f55d60eb5a1bbebc8e694b52a
+> drivers/usb/host/ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+> drivers/usb/host/ehci-hcd.c:1277:0: note: this is the location of the previous definition
+> drivers/usb/host/ehci-orion.c:334:31: warning: 'ehci_orion_driver' defined but not used [-Wunused-variable]
 > 
-
-  for me, either regressing the original patch or committing current
-patch are all OK.
-
+> and an ehci driver that only works on one of them.
 > 
-> While the subject/commit message could be improved (at least mentioning
-> 'perf' somehow and charactor -> character), the change itself looks good.
+> With the infrastructure added by Alan Stern in patch 3e0232039
+> "USB: EHCI: prepare to make ehci-hcd a library module", we can
+> avoid this problem by turning a bus glue into a separate
+> module, as we do here for the orion bus glue.
+> 
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/usb/host/Kconfig      |  8 ++++
+>  drivers/usb/host/Makefile     |  1 +
+>  drivers/usb/host/ehci-hcd.c   |  6 +--
+>  drivers/usb/host/ehci-orion.c | 90 ++++++++++++++++++++-----------------------
+>  4 files changed, 52 insertions(+), 53 deletions(-)
 
-  if still suggest to commit current patch:
-    does the subject like this ?
-     [PATCH] ARM:kernel: a bug for perf by a redundancy character ';'
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 
+I booted with this patch on a Kirkwood based QNAP NAS box. The USB bus
+enumerated as expected.
 
-  :-)
-
-  thanks.
-
--- 
-Chen Gang
-
-Asianux Corporation
+	   Andrew
