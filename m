@@ -1,89 +1,41 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 16 Feb 2013 18:37:41 +0100
-Subject: [PATCH v3 4/4] ARM: dts: Add dts file for S3C6410-based Mini6410 board
-In-Reply-To: <1361036261-8315-1-git-send-email-tomasz.figa@gmail.com>
-References: <1361036261-8315-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1361036261-8315-5-git-send-email-tomasz.figa@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 16 Feb 2013 15:41:53 -0200
+Subject: mx28evk does not boot with linux-next 20130207
+In-Reply-To: <CAOMZO5CbJfpVwqHM1RSYdEQH4n1EL67Kt2_tC9TNPxZGMsPevQ@mail.gmail.com>
+References: <CAOMZO5Ar1T3Lg2KRvSLK-gjNAaAFAf39f6KqaYeF03w5bNj6EQ@mail.gmail.com>
+ <20130207125801.GA19091@S2101-09.ap.freescale.net>
+ <CAOMZO5D5ipAF0JOUOFezGz4Zr66M4bRm819ZurAfwPOrduBo5w@mail.gmail.com>
+ <20130208161811.GW17833@n2100.arm.linux.org.uk>
+ <20130208164858.GA32318@mudshark.cambridge.arm.com>
+ <CAOMZO5CbJfpVwqHM1RSYdEQH4n1EL67Kt2_tC9TNPxZGMsPevQ@mail.gmail.com>
+Message-ID: <CAOMZO5DxcrSRgvjzHUHgHTfqeUL772KrUWk4vgcMrAoje=g-7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic device tree sources for FriendlyARM Mini6410 board
-based on Samsung S3C6410 SoC.
+Hi Will,
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/s3c6410-mini6410.dts | 50 ++++++++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+)
- create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
+On Fri, Feb 8, 2013 at 3:14 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Fri, Feb 8, 2013 at 2:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+>
+>> From dc381a5dff9663901a61fe0dd86c986add382281 Mon Sep 17 00:00:00 2001
+>> From: Will Deacon <will.deacon@arm.com>
+>> Date: Fri, 8 Feb 2013 16:41:19 +0000
+>> Subject: [PATCH] ARM: tlb: fix branch predictor maintenance for ARMv6
+>>
+>> The BPIALL operation is not available on all CPUs, so ensure that we
+>> only execute it on processors implementing the instruction.
+>>
+>> Reported-by: Fabio Estevam <festevam@gmail.com>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>
+> Thanks, Will.
+>
+> This makes the kernel to boot again on my mx28evk, so:
+>
+> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index fe69349..7a5480c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -123,6 +123,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
- 	hrefprev60.dtb \
- 	hrefv60plus.dtb \
- 	ccu9540.dtb
-+dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	sh73a0-kzm9g.dtb \
-diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
-new file mode 100644
-index 0000000..9ac82c2
---- /dev/null
-+++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
-@@ -0,0 +1,50 @@
-+/*
-+ * Samsung's S3C6410 based Mini6410 board device tree source
-+ *
-+ * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
-+ *
-+ * Device tree source file for FriendlyARM Mini6410 board which is based on
-+ * Samsung's S3C6410 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+/include/ "s3c6410.dtsi"
-+
-+/ {
-+	model = "FriendlyARM Mini6410 board based on S3C6410";
-+	compatible = "friendlyarm,mini6410", "samsung,s3c6410";
-+
-+	memory {
-+		reg = <0x50000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySAC0,115200n8 earlyprintk rootwait root=/dev/mmcblk0p1";
-+	};
-+
-+	serial at 7f005000 {
-+		status = "okay";
-+	};
-+
-+	serial at 7f005400 {
-+		status = "okay";
-+	};
-+
-+	serial at 7f005800 {
-+		status = "okay";
-+	};
-+
-+	serial at 7f005c00 {
-+		status = "okay";
-+	};
-+
-+	sdhci at 7c200000 {
-+		bus-width = <4>;
-+		non-removable;
-+		status = "okay";
-+	};
-+};
--- 
-1.8.1.2
+Do you plan to submit this patch to Russell's patch system?
+
+Thanks,
+
+Fabio Estevam
