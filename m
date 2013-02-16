@@ -1,42 +1,78 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Sun, 17 Feb 2013 00:37:58 +0200
-Subject: [PATCH 1/2] ARM: OMAP2+: Prevent potential crash if GPMC probe
- fails
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EA754E2@DBDE01.ent.ti.com>
-References: <1359736726-10193-1-git-send-email-jon-hunter@ti.com>
- <1359736726-10193-2-git-send-email-jon-hunter@ti.com>
- <20130201220804.GZ22517@atomide.com> <51158293.8010101@ti.com>
- <20130209155547.GA5253@localhost>
- <518397C60809E147AF5323E0420B992E3EA754E2@DBDE01.ent.ti.com>
-Message-ID: <CANOLnOO5ZrwonjrROawkLFpAsxgrJOsan-mjeOyOcYOZU6sizQ@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 17 Feb 2013 00:54:57 +0200
+Subject: [PATCHv3 2/4] dmaengine: dw_dmac: move to generic DMA binding
+In-Reply-To: <201302162221.32799.arnd@arndb.de>
+References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
+ <201302161400.29064.arnd@arndb.de>
+ <CAHp75VfL0cQJenHB7A_A1d2eam2dj3k+4yWRE8pC+_gP2j_k2Q@mail.gmail.com>
+ <201302162221.32799.arnd@arndb.de>
+Message-ID: <CAHp75VeCic+5_zyzFdtpw5dLxRaajD9zv6ZvSoDcHAD1EF=GSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 2:04 PM, Philip, Avinash <avinashphilip@ti.com> wrote:
-> Hi Tony,
+On Sun, Feb 17, 2013 at 12:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The original device tree binding for this driver, from Viresh Kumar
+> unfortunately conflicted with the generic DMA binding, and did not allow
+> to completely seperate slave device configuration from the controller.
 >
-> On Sat, Feb 09, 2013 at 21:25:49, Ezequiel Garcia wrote:
->> On Fri, Feb 08, 2013 at 04:56:19PM -0600, Jon Hunter wrote:
->> Without this patch, GPMC is currently broken on my igep board setup,
->> if initialized through a device tree.
->>
->> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> This is an attempt to replace it with an implementation of the generic
+> binding, but it is currently completely untested, because I do not have
+> any hardware with this particular controller.
 >
-> Without this patch GPMC is not working in am335x-evm.
+> The patch applies on top of the slave-dma tree, which contains both the base
+> support for the generic DMA binding, as well as the earlier attempt from
+> Viresh. Both of these are currently not merged upstream however.
 >
-> Tested-by: Philip Avinash <avinashphilip@ti.com>
->
-> See Jon's comments.
->
-> JON >> Hi Tony, this one appears to be merged incorrectly. The unreserve ended
-> JON >> up in the gpmc_calc_timings() function. Here is a patch to fix.
+> This version incorporates feedback from Viresh Kumar, Andy Shevchenko
+> and Russell King.
 
-Just wasted a hour or a few trying to figure out this problem, can we
-get this merged now? Maybe Jon can resend this with all the tested-bys
-to catch Tony's attention?
+Sorry, few comments below.
+After addressing them take my Acked-by: Andy Shevchenko
+<andriy.shevchenko@linux.intel.com>
 
-Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+> --- a/drivers/dma/dw_dmac.c
+> +++ b/drivers/dma/dw_dmac.c
 
+
+> @@ -1836,6 +1825,12 @@ static int dw_probe(struct platform_device *pdev)
+>
+>         dma_async_device_register(&dw->dma);
+>
+> +       if (pdev->dev.of_node)
+> +               err = of_dma_controller_register(pdev->dev.of_node,
+> +                                                dw_dma_xlate, dw);
+> +       if (err && err != -ENODEV)
+> +               dev_err(&pdev->dev, "could not register of_dma_controller\n");
+
+I believe we may make it as
+ if (...of_node) {
+  err = ...register();
+  if (err...)
+    dev_err();
+ }
+
+> --- a/drivers/dma/dw_dmac_regs.h
+> +++ b/drivers/dma/dw_dmac_regs.h
+
+> @@ -211,9 +212,15 @@ struct dw_dma_chan {
+>         /* hardware configuration */
+>         unsigned int            block_size;
+>         bool                    nollp;
+> +       unsigned int            request_line;
+> +       struct dw_dma_slave     slave;
+> +
+
+Do we really need an extra empty line here?
+
+>
+>         /* configuration passed via DMA_SLAVE_CONFIG */
+>         struct dma_slave_config dma_sconfig;
+> +
+> +       /* backlink to dw_dma */
+> +       struct dw_dma           *dw;
+
+Seems it's not needed and came from rebase?
 
 -- 
-Gra?vydas
+With Best Regards,
+Andy Shevchenko
