@@ -1,77 +1,68 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 16 Feb 2013 17:43:59 +0100
-Subject: [PATCH v2 07/12] clocksource: samsung-time: Use clk_get_sys for
- getting clocks
+Date: Sat, 16 Feb 2013 17:44:00 +0100
+Subject: [PATCH v2 08/12] ARM: SAMSUNG: devs: Drop unnecessary IRQ resources
+ of timer devices
 In-Reply-To: <1361033044-27629-1-git-send-email-tomasz.figa@gmail.com>
 References: <1361033044-27629-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1361033044-27629-8-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1361033044-27629-9-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the need to reference platform_device structs defined
-in platform code, by using clk_get_sys instead of clk_get for getting
-necessary clocks.
+Devices from s3c_device_timer array are used only for PWM driver, which
+does not need interrupts. This patch removes IRQ resources of those
+devices.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/clocksource/samsung-time.c | 17 ++++-------------
- 1 file changed, 4 insertions(+), 13 deletions(-)
+ arch/arm/plat-samsung/devs.c | 28 ++++++++--------------------
+ 1 file changed, 8 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/clocksource/samsung-time.c b/drivers/clocksource/samsung-time.c
-index f1e54f9..5ecc864 100644
---- a/drivers/clocksource/samsung-time.c
-+++ b/drivers/clocksource/samsung-time.c
-@@ -24,8 +24,6 @@
- #include <asm/mach/map.h>
- #include <asm/sched_clock.h>
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index e1124d9..196aa68 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -1137,34 +1137,22 @@ arch_initcall(s5p_pmu_init);
  
--#include <plat/devs.h>
+ #ifdef CONFIG_SAMSUNG_DEV_PWM
+ 
+-#define TIMER_RESOURCE_SIZE (1)
 -
- static void __iomem *timer_base;
+-#define TIMER_RESOURCE(_tmr, _irq)			\
+-	(struct resource [TIMER_RESOURCE_SIZE]) {	\
+-		[0] = {					\
+-			.start	= _irq,			\
+-			.end	= _irq,			\
+-			.flags	= IORESOURCE_IRQ	\
+-		}					\
++#define DEFINE_S3C_TIMER(_tmr_no) {			\
++		.name		= "s3c24xx-pwm",	\
++		.id		= _tmr_no,		\
+ 	}
  
- #define S3C_TIMERREG(x) (timer_base + (x))
-@@ -336,9 +334,6 @@ static void samsung_timer_resume(void)
- void __init samsung_set_timer_source(enum samsung_timer_mode event,
- 				 enum samsung_timer_mode source)
- {
--	s3c_device_timer[event].dev.bus = &platform_bus_type;
--	s3c_device_timer[source].dev.bus = &platform_bus_type;
+-#define DEFINE_S3C_TIMER(_tmr_no, _irq)			\
+-	.name		= "s3c24xx-pwm",		\
+-	.id		= _tmr_no,			\
+-	.num_resources	= TIMER_RESOURCE_SIZE,		\
+-	.resource	= TIMER_RESOURCE(_tmr_no, _irq),	\
 -
- 	timer_source.event_id = event;
- 	timer_source.source_id = source;
- }
-@@ -486,28 +481,24 @@ static void __init samsung_timer_resources(void)
- 	clk_enable(timerclk);
+ /*
+  * since we already have an static mapping for the timer,
+  * we do not bother setting any IO resource for the base.
+  */
  
- 	sprintf(devname, "s3c24xx-pwm.%lu", event_id);
--	s3c_device_timer[event_id].id = event_id;
--	s3c_device_timer[event_id].dev.init_name = devname;
- 
--	tin_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tin");
-+	tin_event = clk_get_sys(devname, "pwm-tin");
- 	if (IS_ERR(tin_event))
- 		panic("failed to get pwm-tin clock for event timer");
- 
--	tdiv_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tdiv");
-+	tdiv_event = clk_get_sys(devname, "pwm-tdiv");
- 	if (IS_ERR(tdiv_event))
- 		panic("failed to get pwm-tdiv clock for event timer");
- 
- 	clk_enable(tin_event);
- 
- 	sprintf(devname, "s3c24xx-pwm.%lu", source_id);
--	s3c_device_timer[source_id].id = source_id;
--	s3c_device_timer[source_id].dev.init_name = devname;
- 
--	tin_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tin");
-+	tin_source = clk_get_sys(devname, "pwm-tin");
- 	if (IS_ERR(tin_source))
- 		panic("failed to get pwm-tin clock for source timer");
- 
--	tdiv_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tdiv");
-+	tdiv_source = clk_get_sys(devname, "pwm-tdiv");
- 	if (IS_ERR(tdiv_source))
- 		panic("failed to get pwm-tdiv clock for source timer");
+ struct platform_device s3c_device_timer[] = {
+-	[0] = { DEFINE_S3C_TIMER(0, IRQ_TIMER0) },
+-	[1] = { DEFINE_S3C_TIMER(1, IRQ_TIMER1) },
+-	[2] = { DEFINE_S3C_TIMER(2, IRQ_TIMER2) },
+-	[3] = { DEFINE_S3C_TIMER(3, IRQ_TIMER3) },
+-	[4] = { DEFINE_S3C_TIMER(4, IRQ_TIMER4) },
++	[0] = DEFINE_S3C_TIMER(0),
++	[1] = DEFINE_S3C_TIMER(1),
++	[2] = DEFINE_S3C_TIMER(2),
++	[3] = DEFINE_S3C_TIMER(3),
++	[4] = DEFINE_S3C_TIMER(4),
+ };
+ #endif /* CONFIG_SAMSUNG_DEV_PWM */
  
 -- 
 1.8.1.2
