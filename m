@@ -1,22 +1,23 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sun, 17 Feb 2013 02:38:27 +0200
-Subject: [PATCH 02/11] ARM: samsung: fix assembly syntax for new gas
-In-Reply-To: <1360849767-1463135-3-git-send-email-arnd@arndb.de>
-References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
- <1360849767-1463135-3-git-send-email-arnd@arndb.de>
-Message-ID: <20130217003826.GB2317@blackmetal.musicnaut.iki.fi>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 16 Feb 2013 11:25:57 -0500
+Subject: [PATCH V4 01/11] ARM: kirkwood: topkick: init mvsdio via DT
+In-Reply-To: <29681b2264eef92d3fcc4f5a61984e1530d3a9f0.1359232975.git.jason@lakedaemon.net>
+References: <cover.1359232975.git.jason@lakedaemon.net>
+ <29681b2264eef92d3fcc4f5a61984e1530d3a9f0.1359232975.git.jason@lakedaemon.net>
+Message-ID: <20130216162557.GZ14746@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jan 26, 2013 at 08:50:10PM +0000, Jason Cooper wrote:
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood-topkick.dts     | 7 +++++++
+>  arch/arm/mach-kirkwood/board-usi_topkick.c | 6 ------
+>  2 files changed, 7 insertions(+), 6 deletions(-)
 
-On Thu, Feb 14, 2013 at 02:49:18PM +0100, Arnd Bergmann wrote:
-> Recent assembler versions complain about extraneous
-> whitespace inside [] brackets. This fixes all of
-> these instances for the samsung platforms. We should
-> backport this to all kernels that might need to
-> be built with new binutils.
+Applied to mvebu/dt
 
-Which binutils version is this?
+thx,
 
-A.
+Jason.
