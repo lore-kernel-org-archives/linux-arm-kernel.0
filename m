@@ -1,147 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 16 Feb 2013 14:00:28 +0000
-Subject: [PATCH 2/4] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <CAHp75VfyO5wep-shvZ_mkwLmL2_Fa2jgq63AvE2t8=TPLZn6yg@mail.gmail.com>
-References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
- <1360952512-971558-3-git-send-email-arnd@arndb.de>
- <CAHp75VfyO5wep-shvZ_mkwLmL2_Fa2jgq63AvE2t8=TPLZn6yg@mail.gmail.com>
-Message-ID: <201302161400.29064.arnd@arndb.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 16 Feb 2013 11:19:25 -0300
+Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
+In-Reply-To: <1360966349-1242560-2-git-send-email-arnd@arndb.de>
+References: <201302152158.23446.arnd@arndb.de>
+ <1360966349-1242560-1-git-send-email-arnd@arndb.de>
+ <1360966349-1242560-2-git-send-email-arnd@arndb.de>
+Message-ID: <20130216141924.GA2473@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 February 2013, Andy Shevchenko wrote:
-> On Fri, Feb 15, 2013 at 8:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> > @@ -168,7 +169,13 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
-> >         if (dwc->initialized == true)
-> >                 return;
-> >
-> > -       if (dws) {
-> > +       if (dws && dws->cfg_hi == 0xffffffff && dws->cfg_lo == 0xffffffff) {
-> > +               /* autoconfigure based on request line from DT */
-> > +               if (dwc->dma_sconfig.direction == DMA_MEM_TO_DEV)
-> > +                       cfghi = DWC_CFGH_DST_PER(dwc->req);
-> > +               else if (dwc->dma_sconfig.direction == DMA_DEV_TO_MEM)
-> > +                       cfghi = DWC_CFGH_SRC_PER(dwc->req);
+Hi Arnd,
+
+On Fri, Feb 15, 2013 at 11:12:29PM +0100, Arnd Bergmann wrote:
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
 > 
-> Please, use dwc->direction instead of field in the slave_config. If I
-> remember correctly it's marked like obsoleted/deprecated.
-
-Ok, that's easy to change. I was copying from the code you added
-a few lines below, but was using an older version than the one where
-you had made the change to use dwc->direction.
-
-> > @@ -1179,49 +1186,61 @@ static void dwc_free_chan_resources(struct dma_chan *chan)
-> >         dev_vdbg(chan2dev(chan), "%s: done\n", __func__);
-> >  }
-> >
-> > -bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
-> > +struct dw_dma_filter_args {
-> > +       struct dw_dma *dw;
-> > +       u32 req;
+> With the multiplatform changes in arm-soc tree, it becomes
+> possible to enable the mvebu platform (which uses
+> ehci-orion) at the same time as other platforms that require
+> a conflicting EHCI bus glue. At the moment, this results
+> in a warning like
 > 
-> Why this is u32 and not unsigned int?
+> drivers/usb/host/ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+> drivers/usb/host/ehci-hcd.c:1277:0: note: this is the location of the previous definition
+> drivers/usb/host/ehci-orion.c:334:31: warning: 'ehci_orion_driver' defined but not used [-Wunused-variable]
 > 
-> > +       u32 src;
-> > +       u32 dst;
+> and an ehci driver that only works on one of them.
 > 
-> And this could be also just unsigned int.
-
-I was using u32 since I copied the values from a 32 bit
-DT property value. I'll change it to unsigned int.
-
-> > +static bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
-> >  {
+> With the infrastructure added by Alan Stern in patch 3e0232039
+> "USB: EHCI: prepare to make ehci-hcd a library module", we can
+> avoid this problem by turning a bus glue into a separate
+> module, as we do here for the orion bus glue.
 > 
-> > +       dws->cfg_hi     = 0xffffffff;
-> > +       dws->cfg_lo     = 0xffffffff;
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/usb/host/Kconfig      |  8 ++++
+>  drivers/usb/host/Makefile     |  1 +
+>  drivers/usb/host/ehci-hcd.c   |  6 +--
+>  drivers/usb/host/ehci-orion.c | 90 ++++++++++++++++++++-----------------------
+>  4 files changed, 52 insertions(+), 53 deletions(-)
 > 
-> Agree with Russell about ~0.
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index d77e028..7ac6f48 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -162,6 +162,14 @@ config USB_EHCI_HCD_OMAP
+>  	  Enables support for the on-chip EHCI controller on
+>  	  OMAP3 and later chips.
+>  
+> +config USB_EHCI_HCD_ORION
+> +        tristate  "Support for Marvell Orion on-chip EHCI USB controller"
+> +        depends on USB_EHCI_HCD && PLAT_ORION
+> +        default y
+> +        ---help---
+> +          Enables support for the on-chip EHCI controller on
+> +          Morvell Orion chips.
 
-ok.
+s/Morvell/Marvell
 
-> > +static struct dma_chan *dw_dma_xlate(struct of_phandle_args *dma_spec,
-> > +                                        struct of_dma *ofdma)
-> > +{
-> > +       struct dw_dma *dw = ofdma->of_dma_data;
-> > +       struct dw_dma_filter_args fargs = {
-> > +               .dw = dw,
-> > +       };
-> > +       dma_cap_mask_t cap;
-> > +
-> > +       if (dma_spec->args_count != 3)
-> > +               return NULL;
-> > +
-> > +       fargs.req = be32_to_cpup(dma_spec->args+0);
-> > +       fargs.src = be32_to_cpup(dma_spec->args+1);
-> > +       fargs.dst = be32_to_cpup(dma_spec->args+2);
-> 
-> You could cast them to usual C types like unsigned int. I see u32 in
-> rare cases in the driver like for reading/writting from/to hw and when
-> API contains it. Here I doubt we have to leave them as u32.
+Just this tiny nitpick.
 
-Right. 
+Thanks,
 
-> > +       if (WARN_ON(fargs.req >= 16 || fargs.src >= 2 || fargs.dst >= 2))
-> > +               return NULL;
-> 
-> 16 here is a magic number for me. I would like to see something like
-> #define DW_MAX_REQUEST_LINES 16 in the dw_dmac_regs.h.
-
-Ok.
-
-> Besides of that, what 2 does come from?
-
-I thought that Viresh had commented that there could only be two masters.
-It's probably best to compare against dw->nr_masters here.
-
-> > @@ -1765,6 +1751,10 @@ static int dw_probe(struct platform_device *pdev)
-> >
-> >         dma_async_device_register(&dw->dma);
-> >
-> > +       err = of_dma_controller_register(pdev->dev.of_node, dw_dma_xlate, dw);
-> > +       if (err)
-> > +               dev_err(&pdev->dev, "could not register of_dma_controller\n");
-> 
-> It's not an error, dev_dbg. Consider case when !CONFIG_OF.
-
-Ah right. I expected of_dma_controller_register to return 0 in that case, but
-it returns -ENODEV. How about I change this to this?
-
-	if (pdev->dev.of_node)
-		err = of_dma_controller_register(pdev->dev.of_node, dw_dma_xlate, dw);
-	if (err && err != -ENODEV)
-		dev_err(&pdev->dev, "could not register of_dma_controller\n");
-
-That would warn only when we have a dw_dmac device that was registered from
-device tree but does not follow the binding or gets an -ENOMEM.
-
-> > --- a/drivers/dma/dw_dmac_regs.h
-> > +++ b/drivers/dma/dw_dmac_regs.h
-> > @@ -213,6 +213,10 @@ struct dw_dma_chan {
-> >         /* configuration passed via DMA_SLAVE_CONFIG */
-> >         struct dma_slave_config dma_sconfig;
-> >
-> > +       /* slave configuration from DT */
-> > +       unsigned int            req;
-> 
-> Could you use here full name like "request_line"? And I think the
-> better place for it in subsection "hardware configuration" (consider
-> non-DT cases of use).
-
-Ok
-
-> 
-> >         /* backlink to dw_dma */
-> >         struct dw_dma           *dw;
-> >  };
-> 
-> We should not have this in linux-next. Are you sure you rebased it on
-> top of recent one?
-
-I was basing on the earliest commit that had Viresh's changes in it.
-I'll rebase on top of Vinod's branch now.
-
-Thanks for your review!
-
-	Arnd
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
