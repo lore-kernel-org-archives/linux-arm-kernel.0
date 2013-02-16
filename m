@@ -1,33 +1,69 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 16 Feb 2013 10:13:28 -0500
-Subject: [PATCH v2 3/4] arm: mvebu: Add SPI flash on Armada XP-GP board
-In-Reply-To: <1360155984-15397-4-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1360155984-15397-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1360155984-15397-4-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130216151328.GT14746@titan.lakedaemon.net>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Sat, 16 Feb 2013 17:44:12 +0100
+Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
+In-Reply-To: <CAPjKCR_oh25c4NKUTWjU6BYp64GjPoi2LWDpRhTUkBkRmc_HUw@mail.gmail.com>
+References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
+ <CAPjKCR_oh25c4NKUTWjU6BYp64GjPoi2LWDpRhTUkBkRmc_HUw@mail.gmail.com>
+Message-ID: <CABxcv=kDw6pSsdE29-dVqkk2cc-RKBZB6GN8cs+M+C4JEeSbdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 10:06:23AM -0300, Ezequiel Garcia wrote:
-> This patch adds an SPI master device node for Armada XP-GP board.
-> This master node is an SPI flash controller 'n25q128a13'.
-> 
-> Since there is no 'partitions' node declared, one full sized
-> partition named as the device will be created.
-> 
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Lior Amsalem <alior@marvell.com>
-> Tested-by: Gregory Clement <gregory.clement@free-electrons.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
-> Depends on Gregory's patch for Armada XP GP board:
-> "arm: mvebu: support for the new Armada XP development board(DB-MV784MP-GP)"
-> 
->  arch/arm/boot/dts/armada-xp-gp.dts |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
+On Sat, Feb 16, 2013 at 2:09 PM, Anil Kumar <anilkumar880@gmail.com> wrote:
+> Hi Florian,
+>
+> On Mon, Jan 28, 2013 at 11:24 PM, Florian Vaussard
+> <florian.vaussard@epfl.ch> wrote:
+>> Add device-tree support for the GPMC controller on the OMAP3.
+>>
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> ---
+>>  arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
+>>  1 files changed, 11 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+>> index 6c63118..2ddae38 100644
+>> --- a/arch/arm/boot/dts/omap3.dtsi
+>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>> @@ -403,5 +403,16 @@
+>>                         ti,timer-alwon;
+>>                         ti,timer-secure;
+>>                 };
+>> +
+>> +               gpmc: gpmc at 6e000000 {
+>> +                       compatible = "ti,omap3430-gpmc";
+>> +                       ti,hwmods = "gpmc";
+>> +                       reg = <0x6e000000 0x1000000>;
+>> +                       interrupts = <20>;
+>> +                       gpmc,num-cs = <8>;
+>> +                       gpmc,num-waitpins = <4>;
+>> +                       #address-cells = <2>;
+>> +                       #size-cells = <1>;
+>> +               };
+>>         };
+>>  };
+>
+> Tested on devkit8000 (omap3 based board)
+>
+> Please take my Tested-by: Anil Kumar <anilk4.v@gmail.com>
+>
+> Thanks,
+> Anil
+>
 
-Applied to mvebu/dt
+Hello Tony and Benoit,
 
-thx,
+Could this patch be merged to one of your branches?
 
-Jason.
+It has already my Reviewed-by and now Anil's Tested-by.
+
+Now that Daniel's OMAP GPMC binding were merged, there seems to be
+many people working on adding support on their boards DT for
+peripherals connected through the GPMC (NAND, OneNAND, SMSC LAN, etc).
+
+I think it will be easier if people can base their work on top of this
+patch instead of duplicating the work and sending the same patch to
+add a GPMC device node to omap3.dtsi on each patch-set.
+
+Thanks a lot and best regards,
+Javier
