@@ -1,39 +1,56 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 16 Feb 2013 14:34:47 -0300
-Subject: [PATCH v2 4/4] ARM: mvebu: Update defconfig to select SPI flash
- and MTD support
-In-Reply-To: <20130216150228.GR14746@titan.lakedaemon.net>
-References: <1360155984-15397-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1360155984-15397-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130216150228.GR14746@titan.lakedaemon.net>
-Message-ID: <20130216173445.GA3440@localhost>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 16 Feb 2013 18:37:37 +0100
+Subject: [PATCH v3 0/4] Initial Device Tree support for S3C64xx
+Message-ID: <1361036261-8315-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+This series adds Device Tree support for Samsung S3C64xx SoC series.
 
-On Sat, Feb 16, 2013 at 10:02:28AM -0500, Jason Cooper wrote:
-> On Wed, Feb 06, 2013 at 10:06:24AM -0300, Ezequiel Garcia wrote:
-> > The Armada XP DB-MV784MP-GP board has an SPI flash device.
-> > These options allow to access that device over MTD.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> > Depends on patch: "arm: mvebu: i2c come back in defconfig"
-> > 
-> >  arch/arm/configs/mvebu_defconfig |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> Applied to mvebu/boards
-> 
+It fixes several problems preventing from booting an S3C64xx-based system
+using Device Tree, adds all the infrastructure for Device Tree-based board
+support, including mach-s3c64xx-dt and dts include files for S3C64xx SoCs, and
+(very) basic device tree source for FriendlyARM Mini6410 board.
 
-Great!
+Current support is very limited and allows only basic bootup with UART and
+SDHCI, but should be fine as a start and will be extended in future, hopefully
+with help of S3C64xx board maintainers.
 
-Are we still in time for a pull request for v3.9
-with all of these stuff?
+This series depends on my other series reworking samsung-time for multiplatform:
+[PATCH v2 00/12] ARM: samsung-time: Prepare for multiplatform support
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16158
 
-Thanks a lot,
+Changes since v2:
+ - Updated timer node for next version of samsung-time patches
+
+Changes since v1:
+ - Dropped two VIC-related patches that are no longer necessary
+ - Added Device Tree-based instantation of system timers
+ - Corrected VIC interrupt specifiers
+ - Adjusted CPU compatible values and dropped @id
+
+Tomasz Figa (4):
+  ARM: common: vic: Parse interrupt and resume masks from device tree
+  ARM: s3c64xx: Add board file for boot using Device Tree
+  ARM: dts: Add basic dts include files for Samsung S3C64xx SoCs
+  ARM: dts: Add dts file for S3C6410-based Mini6410 board
+
+ Documentation/devicetree/bindings/arm/vic.txt |   6 ++
+ arch/arm/boot/dts/Makefile                    |   1 +
+ arch/arm/boot/dts/s3c6400.dtsi                |  33 ++++++++
+ arch/arm/boot/dts/s3c6410-mini6410.dts        |  50 +++++++++++++
+ arch/arm/boot/dts/s3c6410.dtsi                |  33 ++++++++
+ arch/arm/boot/dts/s3c64xx.dtsi                | 104 ++++++++++++++++++++++++++
+ arch/arm/common/vic.c                         |   7 +-
+ arch/arm/mach-s3c64xx/Kconfig                 |  14 ++++
+ arch/arm/mach-s3c64xx/Makefile                |   1 +
+ arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c       |  94 +++++++++++++++++++++++
+ 10 files changed, 342 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/s3c6400.dtsi
+ create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
+ create mode 100644 arch/arm/boot/dts/s3c6410.dtsi
+ create mode 100644 arch/arm/boot/dts/s3c64xx.dtsi
+ create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.1.2
