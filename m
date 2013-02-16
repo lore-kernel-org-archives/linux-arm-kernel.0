@@ -1,31 +1,32 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 16 Feb 2013 10:25:18 -0500
-Subject: [PATCH] ARM: dove: convert serial DT nodes to clocks property
-In-Reply-To: <1359493186-25589-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1359493186-25589-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130216152518.GV14746@titan.lakedaemon.net>
+Date: Sat, 16 Feb 2013 14:00:34 -0500
+Subject: [PATCH v5 2/3] arm: kirkwood: Instantiate cpufreq driver
+In-Reply-To: <1360094115-14999-3-git-send-email-andrew@lunn.ch>
+References: <1360094115-14999-1-git-send-email-andrew@lunn.ch>
+ <1360094115-14999-3-git-send-email-andrew@lunn.ch>
+Message-ID: <20130216190034.GE23237@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 29, 2013 at 09:59:46PM +0100, Sebastian Hesselbarth wrote:
-> of_serial now has support for using clocks property and we have
-> a DT clock provider. This patch replaces the hard coded clock-frequency
-> property with a clocks phandle to tclk.
+On Tue, Feb 05, 2013 at 08:55:14PM +0100, Andrew Lunn wrote:
+> Register a platform driver structure for the cpufreq driver.
+> Add a DT binding for cpus/cpu at 0 with the needed clocks.
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 > ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/dove.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  arch/arm/Kconfig                                  |    1 +
+>  arch/arm/boot/dts/kirkwood.dtsi                   |   13 ++++++++++++
+>  arch/arm/mach-kirkwood/board-dt.c                 |    2 ++
+>  arch/arm/mach-kirkwood/common.c                   |   23 +++++++++++++++++++++
+>  arch/arm/mach-kirkwood/common.h                   |    2 ++
+>  arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    2 ++
+>  6 files changed, 43 insertions(+)
 
-Applied to mvebu/dt
+Patches 2 and 3 applied to mvebu/dt_deps with depends on linux-pm/pm-cpufreq
+up to:
+
+  2a4bd9f cpufreq: kirkwood: Add a cpufreq driver for Marvell Kirkwood SoCs
 
 thx,
 
