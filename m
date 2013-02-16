@@ -1,76 +1,59 @@
-From: anilk4.v@gmail.com (Anil Kumar)
-Date: Sat, 16 Feb 2013 18:10:25 +0530
-Subject: [PATCH 1/2] ARM: dts: omap3: Add gpmc node
-In-Reply-To: <20130216122403.GA2445@localhost>
-References: <1361014708-1659-1-git-send-email-anilk4.v@gmail.com>
- <1361014708-1659-2-git-send-email-anilk4.v@gmail.com>
- <20130216122403.GA2445@localhost>
-Message-ID: <CABYxbz5nSY3TyTkH-_i0avv2v8nCWB_Vyn7uRNLkBmpk4W04DA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 16 Feb 2013 12:49:08 +0000
+Subject: [PATCH v6 3/3] ARM: mm: use static_vm for managing static mapped
+ areas
+In-Reply-To: <1360142010-10598-4-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1360142010-10598-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1360142010-10598-4-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <201302161249.08597.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 06 February 2013, Joonsoo Kim wrote:
+> @@ -859,17 +864,12 @@ static void __init pci_reserve_io(void)
+>  {
+>  	struct vm_struct *vm;
+>  	unsigned long addr;
+> +	struct static_vm *svm;
+>  
+> -	/* we're still single threaded hence no lock needed here */
+> -	for (vm = vmlist; vm; vm = vm->next) {
+> -		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+> -			continue;
+> -		addr = (unsigned long)vm->addr;
+> -		addr &= ~(SZ_2M - 1);
+> -		if (addr == PCI_IO_VIRT_BASE)
+> -			return;
+> +	svm = find_static_vm_vaddr((void *)PCI_IO_VIRT_BASE);
+> +	if (svm)
+> +		return;
+>  
+> -	}
 
-On Sat, Feb 16, 2013 at 5:54 PM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> Hi Anil,
->
-> On Sat, Feb 16, 2013 at 05:08:27PM +0530, Anil Kumar wrote:
->> Add gpmc DT node.
->>
->> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
->> ---
->> :100644 100644 1acc261... 9f36531... M        arch/arm/boot/dts/omap3.dtsi
->>  arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
->>  1 files changed, 11 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
->> index 1acc261..9f36531 100644
->> --- a/arch/arm/boot/dts/omap3.dtsi
->> +++ b/arch/arm/boot/dts/omap3.dtsi
->> @@ -397,5 +397,16 @@
->>                       ti,timer-alwon;
->>                       ti,timer-secure;
->>               };
->> +
->> +             gpmc: gpmc at 6e000000 {
->> +                     compatible = "ti,omap3430-gpmc";
->> +                     ti,hwmods = "gpmc";
->> +                     reg = <0x6e000000 0x1000000>;
->> +                     interrupts = <20>;
->> +                     gpmc,num-cs = <8>;
->> +                     gpmc,num-waitpins = <4>;
->> +                     #address-cells = <2>;
->> +                     #size-cells = <1>;
->> +             };
->>       };
->>  };
->> --
->> 1.7.0.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> This patch has been already sent twice to the mailing list.
-> Perhaps it would be more polite if you could base your work on
-> one of those instead of sending it yourself again.
->
-> Florian Vaussard sent one on January 28th:
-> [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
+This is causing build warnings in a bunch of configurations now,
+see patch below.
 
-ok, I missed this patch. I will re base my changes on of this patch.
+	Arnd
 
->
-> Javier Martinez Canillas sent another one on February 09th:
-> [PATCH RFC 6/7] ARM: dts: OMAP: Add an GPMC node for OMAP3
->
-> Moreover, you could help to get patches merged faster by sending
-> your Acked-by or Tested-by.
->
+8<-----
+ARM: mm: remove unused variables in pci_reserve_io
 
-Sure i do that.
+Patch "ARM: 7646/1: mm: use static_vm for managing static mapped areas"
+removed code from pci_reserve_io but left variable declarations
+in place that are now unused, as gcc correctly warns.
 
-Thanks,
-Anil
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index c6fe15a..c6d45c8 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -901,8 +901,6 @@ static void __init fill_pmd_gaps(void)
+ #if defined(CONFIG_PCI) && !defined(CONFIG_NEED_MACH_IO_H)
+ static void __init pci_reserve_io(void)
+ {
+-	struct vm_struct *vm;
+-	unsigned long addr;
+ 	struct static_vm *svm;
+ 
+ 	svm = find_static_vm_vaddr((void *)PCI_IO_VIRT_BASE);
