@@ -1,98 +1,18 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 16 Feb 2013 08:56:19 +0530
-Subject: [PATCH 2/4] dmaengine: dw_dmac: move to generic DMA binding
-In-Reply-To: <1360952512-971558-3-git-send-email-arnd@arndb.de>
+Date: Sat, 16 Feb 2013 08:56:43 +0530
+Subject: [PATCH 0/4] dw_dmac: introduce generic DMA binding for DT
+In-Reply-To: <1360952512-971558-1-git-send-email-arnd@arndb.de>
 References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
- <1360952512-971558-3-git-send-email-arnd@arndb.de>
-Message-ID: <CAKohpo=u_b9u1=78+tm-rhVR14P0=2XbLrZEDJrQBY5W8LXiCw@mail.gmail.com>
+Message-ID: <CAKohpokMi1apB17T-AUcCx6fLRkYRR2goJ8nC=E9Qc8sVYQZtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 15 February 2013 23:51, Arnd Bergmann <arnd@arndb.de> wrote:
-> diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
-> +- #dma-cells: must be <3>
+> As Andy pointed out today, we don't have a good solution for the
+> dw_dmac DT binding in linux-next yet. I have posted my series
+> once before and then got distracted after getting feedback from
+> Viresh, Andy and Russell. I have now updated my earlier patch
+> based on the feedback and rebased on your tree without any
+> of the arm-soc patches mixed in.
 
-> +DMA clients connected to the Designware DMA controller must use the format
-> +described in the dma.txt file, using a five-cell specifier for each channel.
-
-s/five/four ?
-
-> +The four cells in order are:
-> +
-> +1. A phandle pointing to the DMA controller
-> +2. The DMA request line number
-> +3. Source master for transfers on allocated channel
-> +4. Destination master for transfers on allocated channel
-
-> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-
-> +static bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
->  {
-
-> +       dws->cfg_hi     = 0xffffffff;
-> +       dws->cfg_lo     = 0xffffffff;
-
-s/0xffffffff/-1 ?
-
-> +       dws->src_master = fargs->src;
-> +       dws->dst_master = fargs->dst;
-> +       dwc->req        = fargs->req;
->
-> -                       return true;
-> -               }
-> -       }
-> +       chan->private = dws;
-> +
-> +       return true;
-> +}
-> +
-> +static struct dma_chan *dw_dma_xlate(struct of_phandle_args *dma_spec,
-> +                                        struct of_dma *ofdma)
-> +{
-> +       struct dw_dma *dw = ofdma->of_dma_data;
-> +       struct dw_dma_filter_args fargs = {
-> +               .dw = dw,
-> +       };
-> +       dma_cap_mask_t cap;
-> +
-> +       if (dma_spec->args_count != 3)
-> +               return NULL;
-> +
-> +       fargs.req = be32_to_cpup(dma_spec->args+0);
-> +       fargs.src = be32_to_cpup(dma_spec->args+1);
-> +       fargs.dst = be32_to_cpup(dma_spec->args+2);
-> +
-> +       if (WARN_ON(fargs.req >= 16 || fargs.src >= 2 || fargs.dst >= 2))
-> +               return NULL;
->
-> -       last_dw = dw;
-> -       last_bus_id = param;
-> -       return false;
-> +       dma_cap_zero(cap);
-> +       dma_cap_set(DMA_SLAVE, cap);
-> +
-> +       /* TODO: there should be a simpler way to do this */
-> +       return dma_request_channel(cap, dw_dma_generic_filter, &dma_spec->args[0]);
->  }
-> -EXPORT_SYMBOL(dw_dma_generic_filter);
->
->  /* --------------------- Cyclic DMA API extensions -------------------- */
->
-> @@ -1510,9 +1529,8 @@ static void dw_dma_off(struct dw_dma *dw)
->  static struct dw_dma_platform_data *
->  dw_dma_parse_dt(struct platform_device *pdev)
->  {
-> -       struct device_node *sn, *cn, *np = pdev->dev.of_node;
-> +       struct device_node *np = pdev->dev.of_node;
->         struct dw_dma_platform_data *pdata;
-> -       struct dw_dma_slave *sd;
->         u32 tmp, arr[4];
->
->         if (!np) {
-> @@ -1524,7 +1542,7 @@ dw_dma_parse_dt(struct platform_device *pdev)
->         if (!pdata)
->                 return NULL;
->
-> -       if (of_property_read_u32(np, "nr_channels", &pdata->nr_channels))
-> +       if (of_property_read_u32(np, "dma-channels", &pdata->nr_channels))
->                 return NULL;
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
