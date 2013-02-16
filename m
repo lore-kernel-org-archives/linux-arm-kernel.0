@@ -1,49 +1,21 @@
-From: anilkumar880@gmail.com (Anil Kumar)
-Date: Sat, 16 Feb 2013 18:39:15 +0530
-Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
-In-Reply-To: <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
-References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
- <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <CAPjKCR_oh25c4NKUTWjU6BYp64GjPoi2LWDpRhTUkBkRmc_HUw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 16 Feb 2013 13:17:21 +0000
+Subject: [PATCH v6 3/3] ARM: mm: use static_vm for managing static mapped
+ areas
+In-Reply-To: <20130216125205.GO17833@n2100.arm.linux.org.uk>
+References: <1360142010-10598-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <201302161249.08597.arnd@arndb.de>
+ <20130216125205.GO17833@n2100.arm.linux.org.uk>
+Message-ID: <201302161317.21541.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Saturday 16 February 2013, Russell King - ARM Linux wrote:
+> I already have such a patch in my tree - may not have pushed it out
+> as I've been ill (and am still recovering.)
 
-On Mon, Jan 28, 2013 at 11:24 PM, Florian Vaussard
-<florian.vaussard@epfl.ch> wrote:
-> Add device-tree support for the GPMC controller on the OMAP3.
->
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 6c63118..2ddae38 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -403,5 +403,16 @@
->                         ti,timer-alwon;
->                         ti,timer-secure;
->                 };
-> +
-> +               gpmc: gpmc at 6e000000 {
-> +                       compatible = "ti,omap3430-gpmc";
-> +                       ti,hwmods = "gpmc";
-> +                       reg = <0x6e000000 0x1000000>;
-> +                       interrupts = <20>;
-> +                       gpmc,num-cs = <8>;
-> +                       gpmc,num-waitpins = <4>;
-> +                       #address-cells = <2>;
-> +                       #size-cells = <1>;
-> +               };
->         };
->  };
+Ok, thanks for the quick confirmation!
 
-Tested on devkit8000 (omap3 based board)
+Get well soon,
 
-Please take my Tested-by: Anil Kumar <anilk4.v@gmail.com>
-
-Thanks,
-Anil
+	Arnd
