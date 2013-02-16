@@ -1,123 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 16 Feb 2013 00:14:49 -0500 (EST)
-Subject: [PATCH 8/9] [HACK] ARM: imx: work around v7_cpu_resume link error
-In-Reply-To: <20130215110720.GL17833@n2100.arm.linux.org.uk>
-References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
- <1360882071-4072668-9-git-send-email-arnd@arndb.de>
- <20130215110720.GL17833@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1302152336520.6419@syhkavp.arg>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 16 Feb 2013 11:01:00 +0530
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <20130215163031.GA5724@atomide.com>
+References: <20130214171253.GC7144@atomide.com>
+ <20130214175650.GA25891@arwen.pp.htv.fi> <20130214181217.GA11806@atomide.com>
+ <20130214192719.GB26679@arwen.pp.htv.fi> <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+ <20130215101610.GR17852@n2100.arm.linux.org.uk> <511E3797.2070802@ti.com>
+ <20130215132726.GT17852@n2100.arm.linux.org.uk> <511E38C3.7080404@ti.com>
+ <20130215163031.GA5724@atomide.com>
+Message-ID: <511F1994.90101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Feb 2013, Russell King - ARM Linux wrote:
+On Friday 15 February 2013 10:00 PM, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130215 05:34]:
+>> On Friday 15 February 2013 06:57 PM, Russell King - ARM Linux wrote:
+>>> On Fri, Feb 15, 2013 at 06:56:47PM +0530, Santosh Shilimkar wrote:
+>>>> Whats your view on use of arch_ioremap_caller() hook ? This can allow
+>>>> us to avoid the dual ioremap() issue discussed here if the hook
+>>>> maintains the list of mapped ios.
+>>>>
+>>>> I was even thinking of having such intelligence within the core
+>>>> ioremap code but thought that might be too invasive.
+>>>
+>>> Why do you even need it?  There's no problem with ioremapping the same
+>>> space multiple times (you end up with multiple mappings but that
+>>> shouldn't be a problem, except for the additional space used.)
+>>>
+>> It just waste of iospace and Tony insisted to have just single ioremap()
+>> hence all this discussion
+>
+> The main goal is to avoid duplicating data both in hwmod and DT.
+> That's pretty much solved as we can have the driver probe populate
+> the common data for hwmod from DT as Santosh has already demonstrated.
+>
+Right.
 
-> On Thu, Feb 14, 2013 at 11:47:50PM +0100, Arnd Bergmann wrote:
-> > Patch c08e20d24 "arm: Add v7_invalidate_l1 to cache-v7.S"
-> > moves the v7_invalidate_l1 symbol out of imx/headsmp.S,
-> > which seems to cause a link error because it is now
-> > too far away from v7_cpu_resume when building an
-> > allyesconfig kernel.
-> > 
-> > If we move the v7_cpu_resume function from the .data
-> > section to .text, that creates another link error
-> > for the reference to phys_l2x0_saved_regs, but we
-> > can move all of the above to .text.
-> > 
-> > I believe that this is not a correct bug fix but just
-> > a bad workaround, so I'm open to ideas from people
-> > who understand the bigger picture.
-> 
-> Unfortunately, this ends up with writable data in the .text section, which
-> is supposed to be read-only.  We should try to preserve that status, even
-> though we don't enforce it.
-> 
-> I guess the problem is that we end up with the .data segment soo far away
-> from the .text segment that these branches no longer work (and remember
-> that this code executes with the MMU off.)
-> 
-> The only solution I can think is that we need to do quite a bit of magic
-> here to jump to an absolute address, but taking account of the V:P offset.
-> That's not going to be particularly nice, and it's going to then also have
-> to jump back the other way - to the cpu_resume code which is also in the
-> .data section.
+> Then we also want the driver specific idle and reset code to be done
+> in the drivers rather than in hwmod and glue it together with hwmod
+> using runtime PM. The biggest issue there is how do we reset and idle
+> some piece of hardware for PM purposes when there's no driver loaded.
+>
+Driver idle functions is getting sorted out. There is no need for driver
+to fiddle around it since PM runtime back-end can take care of of it.
+One attempt to clean that is here [1]
 
-Something like this should work:
+For the reset, we need to have a generic runtime hook as discussed and
+that should take care of reset as well. That way driver just calls
+generic
 
-diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-index 7e49deb128..9de26f3edb 100644
---- a/arch/arm/mach-imx/headsmp.S
-+++ b/arch/arm/mach-imx/headsmp.S
-@@ -99,8 +99,11 @@ phys_l2x0_saved_regs:
- #endif
- 
- ENTRY(v7_cpu_resume)
--	bl	v7_invalidate_l1
-+	ldr	ip, 2f
-+	mov	lr, pc
-+1:	add	pc, pc, ip
- 	pl310_resume
- 	b	cpu_resume
-+2:	.word v7_invalidate_l1 - 1b - 8
- ENDPROC(v7_cpu_resume)
- #endif
+> For the duplicate ioremapping, I don't think there's any need to
+> do it if we get things right.
+>
+Good to know. So overall, I think we do have a way to move forward
+and get right things done.
 
+Regards,
+Santosh
 
-However it is probably best to move all the code to the .text section 
-where it belongs and fixup the data access instead.  I must plead guilty 
-for introducing this idea of putting code in the .data section with the 
-SA1100resume code over 10 years ago that everyone copied since.
-
-So here's how I think it should look instead, and how I should have done 
-the SA1100 code back then:
-
-diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-index 7e49deb128..38a544a037 100644
---- a/arch/arm/mach-imx/headsmp.S
-+++ b/arch/arm/mach-imx/headsmp.S
-@@ -73,16 +73,16 @@ ENDPROC(v7_secondary_startup)
- 
- #ifdef CONFIG_PM
- /*
-- * The following code is located into the .data section.  This is to
-- * allow phys_l2x0_saved_regs to be accessed with a relative load
-- * as we are running on physical address here.
-+ * The following code must assume it is running from physical address
-+ * where absolute virtual addresses to the data section have to be
-+ * turned into relative ones.
-  */
--	.data
--	.align
- 
- #ifdef CONFIG_CACHE_L2X0
- 	.macro	pl310_resume
--	ldr	r2, phys_l2x0_saved_regs
-+	adr	r0, phys_l2x0_saved_ptr_offset
-+	ldr	r2, [r0]
-+	add	r2, r2, r0
- 	ldr	r0, [r2, #L2X0_R_PHY_BASE]	@ get physical base of l2x0
- 	ldr	r1, [r2, #L2X0_R_AUX_CTRL]	@ get aux_ctrl value
- 	str	r1, [r0, #L2X0_AUX_CTRL]	@ restore aux_ctrl
-@@ -90,9 +90,13 @@ ENDPROC(v7_secondary_startup)
- 	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
- 	.endm
- 
-+	.bss
- 	.globl	phys_l2x0_saved_regs
- phys_l2x0_saved_regs:
--        .long   0
-+        .space   4
-+	.previous
-+phys_l2x0_saved_ptr_offset:
-+	.word	phys_l2x0_saved_regs - .
- #else
- 	.macro	pl310_resume
- 	.endm
-
-And yet we could dispense with phys_l2x0_saved_regs 
-altogether and use l2x0_saved_regs directly here instead.
-
-That doesn't solve the issue of the kernel becoming too large for branch 
-displacement fixup though.
-
-
-Nicolas
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85177.html
