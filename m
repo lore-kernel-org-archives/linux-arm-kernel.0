@@ -1,7 +1,7 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 16 Feb 2013 11:01:00 +0530
+Date: Sat, 16 Feb 2013 11:18:36 +0530
 Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <20130215163031.GA5724@atomide.com>
+In-Reply-To: <alpine.LFD.2.03.1302160035240.6419@syhkavp.arg>
 References: <20130214171253.GC7144@atomide.com>
  <20130214175650.GA25891@arwen.pp.htv.fi> <20130214181217.GA11806@atomide.com>
  <20130214192719.GB26679@arwen.pp.htv.fi> <20130214193911.GD11806@atomide.com>
@@ -9,54 +9,52 @@ References: <20130214171253.GC7144@atomide.com>
  <20130215101610.GR17852@n2100.arm.linux.org.uk> <511E3797.2070802@ti.com>
  <20130215132726.GT17852@n2100.arm.linux.org.uk> <511E38C3.7080404@ti.com>
  <20130215163031.GA5724@atomide.com>
-Message-ID: <511F1994.90101@ti.com>
+ <alpine.LFD.2.03.1302160035240.6419@syhkavp.arg>
+Message-ID: <511F1DB4.8030400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 February 2013 10:00 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130215 05:34]:
->> On Friday 15 February 2013 06:57 PM, Russell King - ARM Linux wrote:
->>> On Fri, Feb 15, 2013 at 06:56:47PM +0530, Santosh Shilimkar wrote:
->>>> Whats your view on use of arch_ioremap_caller() hook ? This can allow
->>>> us to avoid the dual ioremap() issue discussed here if the hook
->>>> maintains the list of mapped ios.
+On Saturday 16 February 2013 11:06 AM, Nicolas Pitre wrote:
+> On Fri, 15 Feb 2013, Tony Lindgren wrote:
+>
+>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130215 05:34]:
+>>> On Friday 15 February 2013 06:57 PM, Russell King - ARM Linux wrote:
+>>>> On Fri, Feb 15, 2013 at 06:56:47PM +0530, Santosh Shilimkar wrote:
+>>>>> Whats your view on use of arch_ioremap_caller() hook ? This can allow
+>>>>> us to avoid the dual ioremap() issue discussed here if the hook
+>>>>> maintains the list of mapped ios.
+>>>>>
+>>>>> I was even thinking of having such intelligence within the core
+>>>>> ioremap code but thought that might be too invasive.
 >>>>
->>>> I was even thinking of having such intelligence within the core
->>>> ioremap code but thought that might be too invasive.
->>>
->>> Why do you even need it?  There's no problem with ioremapping the same
->>> space multiple times (you end up with multiple mappings but that
->>> shouldn't be a problem, except for the additional space used.)
->>>
->> It just waste of iospace and Tony insisted to have just single ioremap()
->> hence all this discussion
+>>>> Why do you even need it?  There's no problem with ioremapping the same
+>>>> space multiple times (you end up with multiple mappings but that
+>>>> shouldn't be a problem, except for the additional space used.)
+>>>>
+>>> It just waste of iospace and Tony insisted to have just single ioremap()
+>>> hence all this discussion
+>>
+>> The main goal is to avoid duplicating data both in hwmod and DT.
+>> That's pretty much solved as we can have the driver probe populate
+>> the common data for hwmod from DT as Santosh has already demonstrated.
+>>
+>> Then we also want the driver specific idle and reset code to be done
+>> in the drivers rather than in hwmod and glue it together with hwmod
+>> using runtime PM. The biggest issue there is how do we reset and idle
+>> some piece of hardware for PM purposes when there's no driver loaded.
+>>
+>> For the duplicate ioremapping, I don't think there's any need to
+>> do it if we get things right.
 >
-> The main goal is to avoid duplicating data both in hwmod and DT.
-> That's pretty much solved as we can have the driver probe populate
-> the common data for hwmod from DT as Santosh has already demonstrated.
+> Note that if the ioremap matches a static map area there is no cost to
+> ioremap it multiple times.
 >
-Right.
-
-> Then we also want the driver specific idle and reset code to be done
-> in the drivers rather than in hwmod and glue it together with hwmod
-> using runtime PM. The biggest issue there is how do we reset and idle
-> some piece of hardware for PM purposes when there's no driver loaded.
 >
-Driver idle functions is getting sorted out. There is no need for driver
-to fiddle around it since PM runtime back-end can take care of of it.
-One attempt to clean that is here [1]
-
-For the reset, we need to have a generic runtime hook as discussed and
-that should take care of reset as well. That way driver just calls
-generic
-
-> For the duplicate ioremapping, I don't think there's any need to
-> do it if we get things right.
->
-Good to know. So overall, I think we do have a way to move forward
-and get right things done.
+Thats true though now on OMAP we removed most of the static mappings.
+The main issue is waste of IO space because, we end up mapping same
+area two times for all the OMAP drivers. This can be optimized with
+a arch ioremap caller hook but as discussed here, its nice to have
+rather than something important.
 
 Regards,
 Santosh
-
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85177.html
