@@ -1,42 +1,22 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 16 Feb 2013 11:15:10 -0500
-Subject: [PATCH V4 03/11] ARM: Kirkwood: topkick: Enable i2c bus.
-In-Reply-To: <01661ac5cc55bb4f6e7ae3ca19f799f64cbe7ff5.1359232975.git.jason@lakedaemon.net>
-References: <cover.1359232975.git.jason@lakedaemon.net>
- <01661ac5cc55bb4f6e7ae3ca19f799f64cbe7ff5.1359232975.git.jason@lakedaemon.net>
-Message-ID: <20130216161510.GX14746@titan.lakedaemon.net>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun, 17 Feb 2013 02:38:27 +0200
+Subject: [PATCH 02/11] ARM: samsung: fix assembly syntax for new gas
+In-Reply-To: <1360849767-1463135-3-git-send-email-arnd@arndb.de>
+References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
+ <1360849767-1463135-3-git-send-email-arnd@arndb.de>
+Message-ID: <20130217003826.GB2317@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 26, 2013 at 08:50:12PM +0000, Jason Cooper wrote:
-> From: Andrew Lunn <andrew@lunn.ch>
-> 
-> Add a DT node for I2C and pinctrl hog for the pins. There appears to
-> be an i2c bus on topkick with a device on it:
-> 
-> i2cdetect 0
-> WARNING! This program can confuse your I2C bus, cause data loss and worse!
-> I will probe file /dev/i2c-0.
-> I will probe address range 0x03-0x77.
-> Continue? [Y/n] y
->      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-> 00:          -- -- -- -- -- -- -- -- -- -- -- -- --
-> 10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-> 60: -- -- -- -- 64 -- -- -- -- -- -- -- -- -- -- --
-> 70: -- -- -- -- -- -- -- --
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  arch/arm/boot/dts/kirkwood-topkick.dts | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+Hi,
 
-Applied to mvebu/dt
+On Thu, Feb 14, 2013 at 02:49:18PM +0100, Arnd Bergmann wrote:
+> Recent assembler versions complain about extraneous
+> whitespace inside [] brackets. This fixes all of
+> these instances for the samsung platforms. We should
+> backport this to all kernels that might need to
+> be built with new binutils.
 
-thx,
+Which binutils version is this?
 
-Jason.
+A.
