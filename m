@@ -1,28 +1,18 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Sun, 17 Feb 2013 15:04:42 +0530
+Date: Sun, 17 Feb 2013 15:05:47 +0530
 Subject: [PATCH v2 1/1] drivers: net: davinci_cpdma: acknowledge interrupt
  properly
-In-Reply-To: <20130215.150506.499818568035818118.davem@davemloft.net>
+In-Reply-To: <20130215.150533.2127506748282656571.davem@davemloft.net>
 References: <1360866406-17261-1-git-send-email-mugunthanvnm@ti.com>
  <20130215.150506.499818568035818118.davem@davemloft.net>
-Message-ID: <5120A432.5070302@ti.com>
+ <20130215.150533.2127506748282656571.davem@davemloft.net>
+Message-ID: <5120A473.5080004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2/16/2013 1:35 AM, David Miller wrote:
-> From: Mugunthan V N <mugunthanvnm@ti.com>
-> Date: Thu, 14 Feb 2013 23:56:46 +0530
->
->> +enum {
->> +	CPDMA_EOI_RX_THRESH = 0,
->> +	CPDMA_EOI_RX,
->> +	CPDMA_EOI_TX,
->> +	CPDMA_EOI_MISC,
->> +};
-> Do not use enumerations for hardware register values, which must be
-> exact, otherwise you are potentially going to succumb to the vagaries
-> of C language enumeration value assignment.
-Will change enum to define and submit next version patch.
+> Also please indicate, clearly, what tree your patch is targetted at.
+Sorry for not mentioning the tree, will mention in the future patches.
 
 Regards
 Mugunthan V N
