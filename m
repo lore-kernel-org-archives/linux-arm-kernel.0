@@ -1,42 +1,40 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 17 Feb 2013 16:01:51 +0800
-Subject: [PATCH 1/3] ARM: mxs: mm: Fix sparse warning
-In-Reply-To: <1360591308-7482-1-git-send-email-festevam@gmail.com>
-References: <1360591308-7482-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130217080149.GE15048@S2101-09.ap.freescale.net>
+Date: Sun, 17 Feb 2013 15:54:08 +0800
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130217075406.GD15048@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 11, 2013 at 12:01:46PM -0200, Fabio Estevam wrote:
+On Fri, Feb 08, 2013 at 01:36:41PM -0200, Fabio Estevam wrote:
 > From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Include <mach/common.h> header to fix the following sparse warnings:
-> 
-> arch/arm/mach-mxs/mm.c:43:13: warning: symbol 'mx23_map_io' was not declared. Should it be static?
-> arch/arm/mach-mxs/mm.c:48:13: warning: symbol 'mx28_map_io' was not declared. Should it be static?
+> Provide 'lradc-touchscreen-wires' property to the LRADC driver, so that 
+> touchscreen can be functional.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Queued all 3 for 3.10, as I do not categorize them as critical fixes.
+Queued all 3 for 3.10.
 
 Shawn
 
 > ---
->  arch/arm/mach-mxs/mm.c |    1 +
+>  arch/arm/boot/dts/imx28-evk.dts |    1 +
 >  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/mach-mxs/mm.c b/arch/arm/mach-mxs/mm.c
-> index a4294aa..e63b7d8 100644
-> --- a/arch/arm/mach-mxs/mm.c
-> +++ b/arch/arm/mach-mxs/mm.c
-> @@ -18,6 +18,7 @@
+> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+> index 2da316e..5960578 100644
+> --- a/arch/arm/boot/dts/imx28-evk.dts
+> +++ b/arch/arm/boot/dts/imx28-evk.dts
+> @@ -155,6 +155,7 @@
+>  			};
 >  
->  #include <mach/mx23.h>
->  #include <mach/mx28.h>
-> +#include <mach/common.h>
+>  			lradc at 80050000 {
+> +				fsl,lradc-touchscreen-wires = <4>;
+>  				status = "okay";
+>  			};
 >  
->  /*
->   * Define the MX23 memory map.
 > -- 
 > 1.7.9.5
 > 
