@@ -1,30 +1,35 @@
 From: gang.chen@asianux.com (Chen Gang)
-Date: Sun, 17 Feb 2013 10:07:07 +0800
-Subject: [PATCH] ARM:kernel: a bug by a redundancy charactor ';'
+Date: Sun, 17 Feb 2013 10:09:13 +0800
+Subject: [PATCH] ARM:kernel: a bug for perf by a redundancy character ';'
 In-Reply-To: <20130216122646.GA14174@mudshark.cambridge.arm.com>
 References: <511F2C0D.4030206@asianux.com> <511F3D8C.6090603@gmail.com>
  <511F4574.7000707@asianux.com>
  <20130216122646.GA14174@mudshark.cambridge.arm.com>
-Message-ID: <51203B4B.70904@asianux.com>
+Message-ID: <51203BC9.60600@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?02?16? 20:26, Will Deacon ??:
->>> While the subject/commit message could be improved (at least mentioning
->>> > > 'perf' somehow and charactor -> character), the change itself looks good.
->> > 
->> >   if still suggest to commit current patch:
->> >     does the subject like this ?
->> >      [PATCH] ARM:kernel: a bug for perf by a redundancy character ';'
-> If you're ok with the following patch, I'll take it into the ARM perf
-> tree.
 
-  ok, I will send patch v2.
-  but use [PATCH] instead of [PATCH v2], since need change the subject.
+  delete the redundancy charactor ';', which will cause issue.
 
-  thanks.
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+Acked-by: Dirk Behme <dirk.behme@gmail.com>
+---
+ arch/arm/kernel/perf_event.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 31e0eb3..a892067 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -400,7 +400,7 @@ __hw_perf_event_init(struct perf_event *event)
+ 	}
+ 
+ 	if (event->group_leader != event) {
+-		if (validate_group(event) != 0);
++		if (validate_group(event) != 0)
+ 			return -EINVAL;
+ 	}
+ 
 -- 
-Chen Gang
-
-Asianux Corporation
+1.7.7.6
