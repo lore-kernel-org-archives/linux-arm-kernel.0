@@ -1,34 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Feb 2013 18:23:44 +0000
-Subject: [PATCH] ARM: Dove: fix build breakage with .timer/.init_time
-In-Reply-To: <1361043816-28753-1-git-send-email-jason@lakedaemon.net>
-References: <1361043816-28753-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <201302171823.44808.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 17 Feb 2013 19:18:17 +0000
+Subject: mx28evk does not boot with linux-next 20130207
+In-Reply-To: <20130216175613.GP17833@n2100.arm.linux.org.uk>
+References: <CAOMZO5Ar1T3Lg2KRvSLK-gjNAaAFAf39f6KqaYeF03w5bNj6EQ@mail.gmail.com>
+ <20130207125801.GA19091@S2101-09.ap.freescale.net>
+ <CAOMZO5D5ipAF0JOUOFezGz4Zr66M4bRm819ZurAfwPOrduBo5w@mail.gmail.com>
+ <20130208161811.GW17833@n2100.arm.linux.org.uk>
+ <20130208164858.GA32318@mudshark.cambridge.arm.com>
+ <CAOMZO5CbJfpVwqHM1RSYdEQH4n1EL67Kt2_tC9TNPxZGMsPevQ@mail.gmail.com>
+ <CAOMZO5DxcrSRgvjzHUHgHTfqeUL772KrUWk4vgcMrAoje=g-7A@mail.gmail.com>
+ <20130216175613.GP17833@n2100.arm.linux.org.uk>
+Message-ID: <20130217191817.GA18277@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 February 2013, Jason Cooper wrote:
-> In the latest arm-soc/for-next, building dove_defconfig breaks because
-> .timer has been replaced with .init_timer in DT_MACHINE_START.  With
-> this fix, it builds fine.
+On Sat, Feb 16, 2013 at 05:56:13PM +0000, Russell King - ARM Linux wrote:
+> On Sat, Feb 16, 2013 at 03:41:53PM -0200, Fabio Estevam wrote:
+> > Hi Will,
 
-When I look at arm-soc/for-next, there is no arch/arm/mach-dove/board-dt.c
-file, so it currently builds cleanly and the problem is only when merging
-your branch with the arm-soc/timer/cleanup branch.
+Hello,
 
-This is not hard to fix, and there are two ways that work equally well,
-just pick one that works for you:
+> > On Fri, Feb 8, 2013 at 3:14 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > Do you plan to submit this patch to Russell's patch system?
+> 
+> No, I've suggested to Will that we deal with the branch predictor a
+> different way, because we actually rarely need to flush it.  Plus,
+> these patches are architecturally wrong (you're not allowed to branch
+> between the BP maintanence instruction and the following isb/dsb
+> instructions because the branches become "unpredictable".
 
-* rebase your branch on top of the arm-soc/timer/cleanup branch and let
-  us know about the dependency when you send a pull request for it.
+I think the branches are actually ok, because the code in question (that is,
+the kernel code dispatching to and performing the flush) is mapped
+identically before and after the page table switch.
 
-* if you don't want to rebase your branch, pull arm-soc/timer/cleanup
-  into it and do this change in the merge changeset, noting it down
-  in the changeset description. As above, when you send such a branch,
-  let us know of the dependency.
+> Plus, we _used_ to flush the BP here, and I did an amount of work to
+> remove the flushing because it just wasn't necessary - all the paths
+> at that time just didn't require it.
 
-If the branch with the merge problem is destined for 3.10, the timer
-cleanups will already be in there, so you can simply base on them
-now and don't need to track the dependencies.
+This is the killer argument. We don't need the maintenance except in a few,
+tiny places. I've written some patches for that and I'll post them to the
+list in due course, aiming for 3.10.
 
-	Arnd
+> What we have ended up with today is a couple of paths which do, both
+> of which are arch-specific code, and we should deal with that in an
+> arch specific way.  Will has been working on a patch to do that...
+
+Yup. I've also been looking at TLB invalidation as a whole and some
+optimisations we can do on ARMv7 where we don't *actually* need to use the
+inner-shareable variants. Non-shareable often suffices and is a win in terms
+of both performance and power (it makes the deferred flushing on ASID
+rollover usable by v7 too). Again, I've been hacking in this area so I'll
+post patches for review once I've got a coherent story.
+
+> In the mean time, I'm dropping 5d9e3f9d7fcd7d09feb5d23974768a60bcea4094
+> which added the BP maintanence (I actually said to Will that I'd already
+> done this but it appears not.)
+
+Thanks Russell.
+
+Will
