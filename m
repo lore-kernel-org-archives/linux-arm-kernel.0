@@ -1,33 +1,24 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 16 Feb 2013 14:10:38 -0500
-Subject: [PATCH v5 2/4] ARM: Kirkwood: Add support thermal sensor for
- 88F6282 and 88F6283
-In-Reply-To: <1360132527-22860-3-git-send-email-andrew@lunn.ch>
-References: <1360132527-22860-1-git-send-email-andrew@lunn.ch>
- <1360132527-22860-3-git-send-email-andrew@lunn.ch>
-Message-ID: <20130216191038.GF23237@titan.lakedaemon.net>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Sun, 17 Feb 2013 09:11:09 +0800
+Subject: [Suggestion] ARM:S5PV210: version merging compiling issue for
+ 'struct fimc_source_info'
+In-Reply-To: <CAH9JG2WS5q4SR8zk5=OC32PHLZ2+ZYva7csyshG7oANacqbCuA@mail.gmail.com>
+References: <511F50CF.90403@asianux.com>
+ <CAH9JG2WS5q4SR8zk5=OC32PHLZ2+ZYva7csyshG7oANacqbCuA@mail.gmail.com>
+Message-ID: <51202E2D.9060009@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 06, 2013 at 07:35:25AM +0100, Andrew Lunn wrote:
-> From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+? 2013?02?16? 19:39, Kyungmin Park ??:
 > 
-> Kirkwood 88F6282 and 88F6283 have a thermal sensor.
-> This patch adds a DT node and enables the driver in the kernel config.
+> You can find it at recent patch from Arnd.
 > 
-> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/boot/dts/kirkwood-6282.dtsi |    6 ++++++
->  arch/arm/configs/kirkwood_defconfig  |    2 ++
->  2 files changed, 8 insertions(+)
 
-Patches 2 and 4 of this series applied to mvebu/dt_deps with a
-dependency on thermal/next up to:
+  thanks.
 
-74ffa64 Thermal: Dove: Add Themal sensor support for Dove.
-7060aa3 thermal: Add support for the thermal sensor on Kirkwood SoCs
+  :-)
 
-thx,
+-- 
+Chen Gang
 
-Jason.
+Asianux Corporation
