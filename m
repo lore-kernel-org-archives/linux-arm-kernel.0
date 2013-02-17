@@ -1,57 +1,105 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 17 Feb 2013 11:03:35 +0800
-Subject: [PATCH 2/2] of: use platform_device_add
-In-Reply-To: <1358473200-17886-2-git-send-email-grant.likely@secretlab.ca>
-References: <1358473200-17886-1-git-send-email-grant.likely@secretlab.ca>
- <1358473200-17886-2-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <20130217030331.GA15048@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Sun, 17 Feb 2013 11:09:53 +0800
+Subject: [PATCH v8 8/8] usb: chipidea: udc: fix the oops when plugs in
+ usb cable after rmmod gadget
+In-Reply-To: <20130213084128.GB2426@arwen.pp.htv.fi>
+References: <1360051215-27722-1-git-send-email-peter.chen@freescale.com>
+ <1360051215-27722-9-git-send-email-peter.chen@freescale.com>
+ <20130213084128.GB2426@arwen.pp.htv.fi>
+Message-ID: <20130217030951.GA1588@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 18, 2013 at 01:40:00AM +0000, Grant Likely wrote:
-> This allows platform_device_add a chance to call insert_resource on all
-> of the resources from OF. At a minimum this fills in proc/iomem and
-> presumably makes resource tracking and conflict detection work better.
-> However, it has the side effect of moving all OF generated platform
-> devices from /sys/devices to /sys/devices/platform/. It /shouldn't/
-> break userspace because userspace is not supposed to depend on the full
-> path (because userspace always does what it is supposed to, right?).
+On Wed, Feb 13, 2013 at 10:41:28AM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> This may cause breakage if either:
-> 1) any two nodes in a given device tree have overlapping & staggered
->    regions (ie. 0x80..0xbf and 0xa0..0xdf; where one is not contained
->    within the other). In this case one of the devices will fail to
->    register and an exception will be needed in platform_device_add() to
->    complain but not fail.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > 
+> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > index b57b735..8319d7e 100644
+> > --- a/drivers/usb/chipidea/udc.c
+> > +++ b/drivers/usb/chipidea/udc.c
+> > @@ -1575,12 +1575,17 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
+> >  
+> >  	spin_lock_irqsave(&ci->lock, flags);
+> >  
+> > +	/* 
+> > +	 * Put it at the beginning due to avoid calling gadget 
+> > +	 * disconnect at _gadget_stop_activity
+> > +	 */
+> > +	ci->driver = NULL;
+> > +
+> >  	if (ci->vbus_active) {
+> >  		hw_device_state(ci, 0);
+> >  		if (ci->platdata->notify_event)
+> >  			ci->platdata->notify_event(ci,
+> >  			CI13XXX_CONTROLLER_STOPPED_EVENT);
+> > -		ci->driver = NULL;
+> >  		spin_unlock_irqrestore(&ci->lock, flags);
+> >  		_gadget_stop_activity(&ci->gadget);
+> >  		spin_lock_irqsave(&ci->lock, flags);
+> 
+> NACK, this isn't the real problem. The real problem is that chipidea
+> shouldn't be calling ->disconnect() by itself when we unload a gadget
+> driver.
 
-Grant,
+Yes, you point the root cause, besides, we also need to notify gadget
+when the disconnect occurs even the gadget is still there. Below patch
+is tested:
 
-The patch introduce a regression on imx6q boot.  The IOMUXC block on
-imx6q is special.  It acts not only a pin controller but also a system
-controller with a bunch of system level registers in there.  That's why
-we currently have the following two nodes in imx6q device tree with the
-same start "reg" address, which work with drivers/mfd/syscon.c and
-drivers/pinctrl/pinctrl-imx6q.c respectively.
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index b57b735..e355914 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -579,9 +579,6 @@ static int _gadget_stop_activity(struct usb_gadget *gadget)
+ 	usb_ep_fifo_flush(&ci->ep0out->ep);
+ 	usb_ep_fifo_flush(&ci->ep0in->ep);
+ 
+-	if (ci->driver)
+-		ci->driver->disconnect(gadget);
+-
+ 	/* make sure to disable all endpoints */
+ 	gadget_for_each_ep(ep, gadget) {
+ 		usb_ep_disable(ep);
+@@ -612,6 +609,11 @@ __acquires(ci->lock)
+ 
+ 	dbg_event(0xFF, "BUS RST", 0);
+ 
++	if (ci->gadget.speed != USB_SPEED_UNKNOWN) {
++		if (ci->driver)
++			ci->driver->disconnect(&ci->gadget);
++	}
++
+ 	spin_unlock(&ci->lock);
+ 	retval = _gadget_stop_activity(&ci->gadget);
+ 	if (retval)
+@@ -1373,6 +1375,8 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
+ 			hw_device_state(ci, ci->ep0out->qh.dma);
+ 			dev_dbg(ci->dev, "Connected to host\n");
+ 		} else {
++			if (ci->driver)
++				ci->driver->disconnect(&ci->gadget);
+ 			hw_device_state(ci, 0);
+ 			if (ci->platdata->notify_event)
+ 				ci->platdata->notify_event(ci,
+@@ -1580,13 +1584,14 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
+ 		if (ci->platdata->notify_event)
+ 			ci->platdata->notify_event(ci,
+ 			CI13XXX_CONTROLLER_STOPPED_EVENT);
+-		ci->driver = NULL;
+ 		spin_unlock_irqrestore(&ci->lock, flags);
+ 		_gadget_stop_activity(&ci->gadget);
+ 		spin_lock_irqsave(&ci->lock, flags);
+ 		pm_runtime_put(&ci->gadget.dev);
+ 	}
+ 
++	ci->driver = NULL;
++
+ 	spin_unlock_irqrestore(&ci->lock, flags);
+ 
+ 	return 0;
+-- 
 
-	gpr: iomuxc-gpr at 020e0000 {
-		compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-		reg = <0x020e0000 0x38>;
-	};
-
-	iomuxc: iomuxc at 020e0000 {
-		compatible = "fsl,imx6q-iomuxc";
-		reg = <0x020e0000 0x4000>;
-	};
-
-With the patch in place, pinctrl-imx6q fails to register like below.
-
-syscon 20e0000.iomuxc: syscon regmap start 0x20e0000 end 0x20e3fff registered
-imx6q-pinctrl 20e0000.iomuxc: can't request region for resource [mem 0x020e0000-0x020e3fff]
-imx6q-pinctrl: probe of 20e0000.iomuxc failed with error -16
-
-Shawn
-
-> 2) any device calls request_mem_region() on a region larger than
->    specified in the device tree. In this case the device node may be
->    wrong, or the driver is overreaching. In either case I'd like to know
->    about any problems and fix them.
+Best Regards,
+Peter Chen
