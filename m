@@ -1,128 +1,103 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sun, 17 Feb 2013 17:00:14 +0800
-Subject: [PATCH 3/9] USB: add devicetree helpers for determining
- dr_mode and phy_type
-In-Reply-To: <20130215105410.GN1906@pengutronix.de>
-References: <20130214095822.GD15275@arwen.pp.htv.fi>
- <20130214100722.GK1906@pengutronix.de>
- <20130214101510.GA15537@arwen.pp.htv.fi>
- <20130214112449.GL1906@pengutronix.de>
- <20130214131015.GB27419@arwen.pp.htv.fi>
- <20130214160655.GT1906@pengutronix.de>
- <20130214180444.GD25891@arwen.pp.htv.fi>
- <20130214183026.GW1906@pengutronix.de>
- <20130214193626.GE26679@arwen.pp.htv.fi>
- <20130215105410.GN1906@pengutronix.de>
-Message-ID: <20130217090012.GC1588@nchen-desktop>
+Date: Sun, 17 Feb 2013 17:24:34 +0800
+Subject: [PATCH v9 0/9] Add tested id switch and vbus connect detect support
+ for Chipidea
+Message-ID: <1361093083-22940-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 11:54:10AM +0100, Sascha Hauer wrote:
-> On Thu, Feb 14, 2013 at 09:36:26PM +0200, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Thu, Feb 14, 2013 at 07:30:26PM +0100, Sascha Hauer wrote:
-> > > > > > yeah, this is why I said we should ignore dr_mode (or bail out) when
-> > > > > > !OTG.
-> > > > > 
-> > > > > Ok, that's what the patch effectively does. We have this in chipidea/core.c:
-> > > > > 
-> > > > > | 	dr_mode = ci->platdata->dr_mode;
-> > > > > | 	if (dr_mode == USB_DR_MODE_UNKNOWN)
-> > > > > | 		dr_mode = USB_DR_MODE_OTG;
-> > > > > 
-> > > > > default to otg if nothing specified.
-> > > > 
-> > > > you missed my point. I wanted something like:
-> > > > 
-> > > > dr_mode = ci->platdata->dr_mode;
-> > > > if ((dr_mode == USB_DR_MODE_UNKNOWN) || !IS_ENABLED(CONFIG_USB_CHIPIDEA_OTG)
-> > > > 	dr_mode = USB_DR_MODE_OTG;
-> > > 
-> > > So everytime the chipidea driver cannot do OTG the driver falls back to
-> > > exactly this mode?
-> > 
-> > hehe, that was me being stupid I meant something like:
-> > 
-> > if (!IS_ENABLED(HOST) && dr_mode == HOST)
-> > 
-> > or
-> > 
-> > if (!IS_ENABLED(GADGET) && dr_mode == GADGET)
-> > 
-> > in those cases, it's best to either force OTG (then driver will work
-> > with whatever it has) or bail out.
-> > 
-> > Thinking a bit harder, it's best to bail as you can't be sure udc.c or
-> > host.c have been compiled in.
-> 
-> Look again, that's what the current code does. Maybe it's not coded as
-> explicit as you describe above.
-> 
-> | 	/* initialize role(s) before the interrupt is requested */
-> | 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
-> | 		ret = ci_hdrc_host_init(ci);
-> | 		if (ret)
-> | 			dev_info(dev, "doesn't support host\n");
-> | 	}
-> 
-> if IS_ENABLED(HOST), then ci_hdrc_host_init() will set
-> ci->roles[CI_ROLE_HOST] in case it manages to initialize the host driver.
-> 
-> if !IS_ENABLED(HOST), then ci_hdrc_host_init() will be a static inline
-> noop function, so ci->roles[CI_ROLE_HOST] ends up being NULL.
-> 
-> | 
-> | 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
-> | 		ret = ci_hdrc_gadget_init(ci);
-> | 		if (ret)
-> | 			dev_info(dev, "doesn't support gadget\n");
-> | 	}
-> 
-> Same applies for gadget.
-> 
-> | 
-> | 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
-> | 		dev_err(dev, "no supported roles\n");
-> | 		ret = -ENODEV;
-> | 		goto rm_wq;
-> | 	}
-> 
-> At this point (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET])
-> means that the intersection of what is requested and what we are able to
-> do is empty. The reasons could be That the requested mode is not compiled
-> into the kernel, or the requested role failed to initialize.
-I have tested host-only capable port (host 1) and dr_mode = "host" DT setting
-(OTG port) as well as only compile chipidea gadget, the "no support roles"
-will be reported, and fails probe, see below. (The platform layer probe's
-error needs to my another patch in my otg patchset)
+Changes for v9:
+- Some small comments from Alex like: variable comment for otg event
+additional newline. [3/9]
+- Import function tell show if the controller has otg capable, if
+the controller supports both host and device, we think it is otg
+capable, and can read OTGSC. [3/9]
+- Merge two otg patches [v8 3/8] and [v8 4/8] to one [v9 3/9]. [3/9]
+- Add inline to ci_hdrc_gadget_destroy if CONFIG_USB_CHIPIDEA_UDC
+is not defined, it can fix one build warning "defined but not used"
+[3/9]
+- One comment from Felipe about changing calling gadget disconnect
+API at chipidea's udc driver. I move calling ci->driver->disconnect
+from _gadget_stop_activity to which calls _gadget_stop_activity except
+ci13xxx_stop, as udc core will call disconnect when do rmmod gadget. [7/9]
+- Add ci core probe's return value to ci's platform_data, we do this
+for getting core's probe's result at platform layer, and quit it
+if the core's probe fails. [8/9] [9/9]
 
-ci_hdrc ci_hdrc.0: ChipIdea HDRC found, lpm: 0; cap: c08a6100 op: c08a6140
-ci_hdrc ci_hdrc.0: doesn't support host
-ci_hdrc ci_hdrc.0: no supported roles
-imx_usb 2184000.usb: Can't register ci_hdrc platform device, err=-19
-imx_usb 2184200.usb: pinctrl get/select failed, err=-19
-ci_hdrc ci_hdrc.1: ChipIdea HDRC found, lpm: 0; cap: c08ae300 op: c08ae340
-ci_hdrc ci_hdrc.1: doesn't support host
-ci_hdrc ci_hdrc.1: doesn't support gadget
-ci_hdrc ci_hdrc.1: no supported roles
-imx_usb 2184200.usb: Can't register ci_hdrc platform device, err=-19
+Changes for v8:
+- Add ci_supports_gadget helper to know if the controller
+supports gadget, if the controller supports gadget, it
+needs to read otgsc to know the vbus value, basically,
+if the controller supports gadget, it will support host
+as well [3/8]
+- At ci_hdrc_probe, it needs to add free memory at error path
+[3/8]
+- Cosolidate ci->driver = NULL at ci13xxx_stop
+[8/8]
 
-> 
-> Sascha
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Changes for v7:
+For Patch 8/8, we only need to set ci->driver to NULL when usb cable
+is not connected, for other changes, it will case some runtime pm
+unmatch and un-align with udc-core & composite driver problems.
 
--- 
+Changes for v6:
+- Add Alex comments for init/destroy function [3/8] [4/8]
+- Remove memset(&ci->gadget, 0, sizeof(ci->gadget)) at destory function [4/8]
+- Add Kishon's comment: Change the format of struct usb_otg otg at drivers/usb/chipidea/ci.h
+[1/8]
+- Add comments for CI_VBUS_STABLE_TIMEOUT [3/8]
+- Change the otg_set_peripheral return value check as the fully
+chipidea driver users don't need it. [4/8]
+- Fix one bug that the oops when re-plug in usb cable after
+rmmod gadget [8/8]
 
-Best Regards,
-Peter Chen
+Anyone who has tested this patchset, please give a tested-by, thanks.
+
+This patchset adds tested otg id switch function and
+vbus connect/disconnect detection for chipidea driver.
+The mainly design of id/vbus handling follows msm otg driver.
+I hope the msm usb maintainer can have a look of this patchset,
+and give some comments, and move the whole msm usb driver to
+chipidea framework if possible in the future.
+
+This patch is fully tested at imx6 sabresd platform.
+My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
+which is rebased of Sascha's git
+(git://git.pengutronix.de/git/imx/linux-2.6.git tags/usb-chipidea-otg-for-next)
+
+At sascha's tag, it finishes some dr_mode and phy_type patches,
+in that way, we can choose host-only and gadget-only function at
+dts file as well as we can choose different phy setting.
+
+Besides sascha's work, there are some Michael Grzeschik/Marc Kleine-Budde
+usbmisc patch, imx chipidea suspend/resume patch, and one pin control
+patch for imx6
+
+Peter Chen (9):
+  Revert "USB: chipidea: add vbus detect for udc"
+  usb: chipidea: add otg file
+  usb: chipidea: add otg id switch and vbus connect/disconnect detect
+  usb: chipidea: udc: add pullup/pulldown dp at hw_device_state
+  usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
+  usb: chipidea: imx: add internal vbus regulator control
+  usb: chipidea: udc: fix the oops when plugs in usb cable after rmmod
+    gadget
+  usb: chipidea: tell platform layer the ci core probe's result
+  usb: chipidea: imx: fix the error that using uninitialized pointer
+
+ drivers/usb/chipidea/Makefile      |    2 +-
+ drivers/usb/chipidea/bits.h        |   10 ++
+ drivers/usb/chipidea/ci.h          |   14 +++-
+ drivers/usb/chipidea/ci13xxx_imx.c |   85 ++++++++++++----
+ drivers/usb/chipidea/ci13xxx_msm.c |    1 -
+ drivers/usb/chipidea/core.c        |  192 ++++++++++++++++++++++++++++++++----
+ drivers/usb/chipidea/host.c        |    6 +
+ drivers/usb/chipidea/host.h        |    6 +-
+ drivers/usb/chipidea/otg.c         |   68 +++++++++++++
+ drivers/usb/chipidea/otg.h         |    9 ++
+ drivers/usb/chipidea/udc.c         |  118 ++++++++++------------
+ drivers/usb/chipidea/udc.h         |    4 +
+ include/linux/usb/chipidea.h       |    2 +-
+ 13 files changed, 405 insertions(+), 112 deletions(-)
+ create mode 100644 drivers/usb/chipidea/otg.c
+ create mode 100644 drivers/usb/chipidea/otg.h
