@@ -1,104 +1,90 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sun, 17 Feb 2013 11:09:53 +0800
-Subject: [PATCH v8 8/8] usb: chipidea: udc: fix the oops when plugs in
- usb cable after rmmod gadget
-In-Reply-To: <20130213084128.GB2426@arwen.pp.htv.fi>
+Date: Sun, 17 Feb 2013 11:27:29 +0800
+Subject: [PATCH v8 3/8] usb: chipidea: add otg id switch and vbus
+ connect/disconnect detect
+In-Reply-To: <87wqub9ill.fsf@ashishki-desk.ger.corp.intel.com>
 References: <1360051215-27722-1-git-send-email-peter.chen@freescale.com>
- <1360051215-27722-9-git-send-email-peter.chen@freescale.com>
- <20130213084128.GB2426@arwen.pp.htv.fi>
-Message-ID: <20130217030951.GA1588@nchen-desktop>
+ <1360051215-27722-4-git-send-email-peter.chen@freescale.com>
+ <87wqub9ill.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20130217032728.GB1588@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 10:41:28AM +0200, Felipe Balbi wrote:
-> Hi,
+On Thu, Feb 14, 2013 at 02:37:42PM +0200, Alexander Shishkin wrote:
+> Peter Chen <peter.chen@freescale.com> writes:
 > 
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > 
-> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> > index b57b735..8319d7e 100644
-> > --- a/drivers/usb/chipidea/udc.c
-> > +++ b/drivers/usb/chipidea/udc.c
-> > @@ -1575,12 +1575,17 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
-> >  
-> >  	spin_lock_irqsave(&ci->lock, flags);
-> >  
-> > +	/* 
-> > +	 * Put it at the beginning due to avoid calling gadget 
-> > +	 * disconnect at _gadget_stop_activity
-> > +	 */
-> > +	ci->driver = NULL;
+> > @@ -130,6 +130,7 @@ struct hw_bank {
+> >   * @transceiver: pointer to USB PHY, if any
+> >   * @hcd: pointer to usb_hcd for ehci host driver
+> >   * @otg: for otg support
+> > + * @events: events for otg, and handled at ci_role_work
+> 
+> Should be id_event and b_sess_valid_event.
+
+Will change
+
+> 
+> If you reordered the patchset so that the role api patch comes before
+> this one, this function would have been much shorter from the start. Now
+> it looks like you're adding lots of code in one patch and then replace
+> and reshuffle it in subsequent patches, which makes it really difficult
+> to review.
+
+I will merge the 3/8 and 4/8 to one patch.
+
+> > +static void ci_delayed_work(struct work_struct *work)
+> > +{
+> > +	struct delayed_work *dwork = to_delayed_work(work);
+> > +	struct ci13xxx *ci = container_of(dwork, struct ci13xxx, dwork);
 > > +
-> >  	if (ci->vbus_active) {
-> >  		hw_device_state(ci, 0);
-> >  		if (ci->platdata->notify_event)
-> >  			ci->platdata->notify_event(ci,
-> >  			CI13XXX_CONTROLLER_STOPPED_EVENT);
-> > -		ci->driver = NULL;
-> >  		spin_unlock_irqrestore(&ci->lock, flags);
-> >  		_gadget_stop_activity(&ci->gadget);
-> >  		spin_lock_irqsave(&ci->lock, flags);
+> > +	otg_set_vbus(&ci->otg, true);
+> > +
+> > +}
 > 
-> NACK, this isn't the real problem. The real problem is that chipidea
-> shouldn't be calling ->disconnect() by itself when we unload a gadget
-> driver.
+> That's one newline too many.
 
-Yes, you point the root cause, besides, we also need to notify gadget
-when the disconnect occurs even the gadget is still there. Below patch
-is tested:
+Will change
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index b57b735..e355914 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -579,9 +579,6 @@ static int _gadget_stop_activity(struct usb_gadget *gadget)
- 	usb_ep_fifo_flush(&ci->ep0out->ep);
- 	usb_ep_fifo_flush(&ci->ep0in->ep);
- 
--	if (ci->driver)
--		ci->driver->disconnect(gadget);
--
- 	/* make sure to disable all endpoints */
- 	gadget_for_each_ep(ep, gadget) {
- 		usb_ep_disable(ep);
-@@ -612,6 +609,11 @@ __acquires(ci->lock)
- 
- 	dbg_event(0xFF, "BUS RST", 0);
- 
-+	if (ci->gadget.speed != USB_SPEED_UNKNOWN) {
-+		if (ci->driver)
-+			ci->driver->disconnect(&ci->gadget);
-+	}
-+
- 	spin_unlock(&ci->lock);
- 	retval = _gadget_stop_activity(&ci->gadget);
- 	if (retval)
-@@ -1373,6 +1375,8 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
- 			hw_device_state(ci, ci->ep0out->qh.dma);
- 			dev_dbg(ci->dev, "Connected to host\n");
- 		} else {
-+			if (ci->driver)
-+				ci->driver->disconnect(&ci->gadget);
- 			hw_device_state(ci, 0);
- 			if (ci->platdata->notify_event)
- 				ci->platdata->notify_event(ci,
-@@ -1580,13 +1584,14 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
- 		if (ci->platdata->notify_event)
- 			ci->platdata->notify_event(ci,
- 			CI13XXX_CONTROLLER_STOPPED_EVENT);
--		ci->driver = NULL;
- 		spin_unlock_irqrestore(&ci->lock, flags);
- 		_gadget_stop_activity(&ci->gadget);
- 		spin_lock_irqsave(&ci->lock, flags);
- 		pm_runtime_put(&ci->gadget.dev);
- 	}
- 
-+	ci->driver = NULL;
-+
- 	spin_unlock_irqrestore(&ci->lock, flags);
- 
- 	return 0;
+> 
+> > +
+> >  static ssize_t show_role(struct device *dev, struct device_attribute *attr,
+> >  			 char *buf)
+> >  {
+> > @@ -352,25 +469,49 @@ static ssize_t store_role(struct device *dev, struct device_attribute *attr,
+> >  
+> >  static DEVICE_ATTR(role, S_IRUSR | S_IWUSR, show_role, store_role);
+> >  
+> > +static bool ci_supports_gadget(struct ci13xxx *ci)
+> > +{
+> > +	return (ci->roles[CI_ROLE_GADGET]) ? true : false;
+> 
+
+I prefer to keep it
+
+> > +}
+> > +
+> >  static irqreturn_t ci_irq(int irq, void *data)
+> >  {
+> >  	struct ci13xxx *ci = data;
+> >  	irqreturn_t ret = IRQ_NONE;
+> >  	u32 otgsc = 0;
+> >  
+> > -	if (ci->is_otg)
+> > +	if (ci_supports_gadget(ci))
+> 
+> We can't do this since there are indeed devices out there that support
+> gadget and don't support otg to such an extend that OTGSC accesses are
+> discouraged. We should really make sure that we're only touching it on
+> otg capable devices.
+> 
+
+OK, for such devices they need external gpio to judge connection
+and disconnection.
+
+I will replace ci_supports_gadget(ci) to ci_supports_otg(ci), it
+indicates the controller supports both host and devices. Currently,
+the ci->is_otg indicates the driver has both host and device funcitons.
+
 -- 
 
 Best Regards,
