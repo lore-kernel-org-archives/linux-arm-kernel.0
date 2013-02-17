@@ -1,117 +1,194 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sun, 17 Feb 2013 17:24:39 +0800
-Subject: [PATCH v9 5/9] usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
+Date: Sun, 17 Feb 2013 17:24:41 +0800
+Subject: [PATCH v9 7/9] usb: chipidea: udc: fix the oops when plugs in usb
+ cable after rmmod gadget
 In-Reply-To: <1361093083-22940-1-git-send-email-peter.chen@freescale.com>
 References: <1361093083-22940-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1361093083-22940-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1361093083-22940-8-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(change CI13XXX to CI13 to avoid junk email check)
-Now, we have handled vbus session in core driver when the
-vbus interrupt occurs, so our pullup operations are all
-according to vbus.
-Of cource, the software can still call .pullup when device connects
-to host if it wants to connect/disconnect with host.
+When we rmmod gadget, the ci->driver needs to be cleared.
+Otherwise, we plug in usb cable again, the driver will
+consider gadget is there, in fact, it is removed.
+
+Besides, consolidate the calling of ci->driver->disconnect, when
+we do rmmod gadget, the gadget's disconnect should be called from
+udc core.
+
+Below is the oops this patch fixes.
+
+root at freescale ~$ ci_hdrc ci_hdrc.0: Connected to host
+Unable to handle kernel paging request at virtual address 7f01171c
+pgd = 80004000
+[7f01171c] *pgd=4fa1e811, *pte=00000000, *ppte=00000000
+Internal error: Oops: 7 [#1] SMP ARM
+Modules linked in: f_acm libcomposite u_serial [last unloaded: g_serial]
+CPU: 0    Not tainted  (3.8.0-rc5+ #221)
+	PC is at _gadget_stop_activity+0xbc/0x128
+	LR is at ep_fifo_flush+0x68/0xa0
+	pc : [<803634cc>]    lr : [<80363938>]    psr: 20000193
+	sp : 806c7dc8  ip : 00000000  fp : 806c7de4
+	r10: 00000000  r9 : 80710ea4  r8 : 00000000
+	r7 : bf834094  r6 : bf834098  r5 : bf834010  r4 : bf8340a0
+	r3 : 7f011708  r2 : 01940194  r1 : a0000193  r0 : bf834014
+	Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+	Control: 10c53c7d  Table: 4f06404a  DAC: 00000017
+	Process swapper/0 (pid: 0, stack limit = 0x806c6238)
+	Stack: (0x806c7dc8 to 0x806c8000)
+	7dc0:                   bf834010 bf809950 bf834010 0000004b 806c7e44 806c7de8
+	7de0: 80365400 8036341c 0000ec1c 00000000 0000ec1c 00000040 fff5ede0 bf834014
+	7e00: 000a1220 00000000 0000002e ffffd958 806c7e3c 806c7e20 8004e870 bf834010
+	7e20: bf809950 0000004b 0000004b 00000000 80710ea4 00000000 806c7e5c 806c7e48
+	7e40: 80362888 80365154 bfb35180 bf809950 806c7e9c 806c7e60 8008111c 803627f4
+	7e60: 00989680 00000000 bf809900 bf809964 812df8c0 bf809900 bf809950 806c3f2c
+	7e80: 0000004b 00000000 412fc09a 00000000 806c7eb4 806c7ea0 80081368 800810b8
+	7ea0: bf809900 bf809950 806c7ecc 806c7eb8 800843c8 8008130c 0000004b 806cf748
+	7ec0: 806c7ee4 806c7ed0 80081088 8008432c 806c6000 806cf748 806c7f0c 806c7ee8
+	7ee0: 8000fa44 8008105c f400010c 806ce974 806c7f30 f4000110 806d29e8 412fc09a
+	7f00: 806c7f2c 806c7f10 80008584 8000f9f4 8000fbd0 60000013 ffffffff 806c7f64
+	7f20: 806c7f84 806c7f30 8000eac0 80008554 00000000 00000000 0000000f 8001aea0
+	7f40: 806c6000 80712a48 804f0040 00000000 806d29e8 412fc09a 00000000 806c7f84
+	7f60: 806c7f88 806c7f78 8000fbcc 8000fbd0 60000013 ffffffff 806c7fac 806c7f88
+	7f80: 8001015c 8000fb9c 806cf5b0 80712980 806a4528 8fffffff 1000406a 412fc09a
+	7fa0: 806c7fbc 806c7fb0 804e5334 800100ac 806c7ff4 806c7fc0 80668940 804e52d4
+	7fc0: ffffffff ffffffff 806684bc 00000000 00000000 806a4528 10c53c7d 806ce94c
+	7fe0: 806a4524 806d29dc 00000000 806c7ff8 10008078 806686b0 00000000 00000000
+	Backtrace:
+	[<80363410>] (_gadget_stop_activity+0x0/0x128) from [<80365400>] (udc_irq+0x2b8/0xf38)
+	 r7:0000004b r6:bf834010 r5:bf809950 r4:bf834010
+	 [<80365148>] (udc_irq+0x0/0xf38) from [<80362888>] (ci_irq+0xa0/0xf4)
+	[<803627e8>] (ci_irq+0x0/0xf4) from [<8008111c>] (handle_irq_event_percpu+0x70/0x254)
+	 r5:bf809950 r4:bfb35180
+	 [<800810ac>] (handle_irq_event_percpu+0x0/0x254) from [<80081368>] (handle_irq_event+0x68/0x88)
+	[<80081300>] (handle_irq_event+0x0/0x88) from [<800843c8>] (handle_fasteoi_irq+0xa8/0x178)
+	 r5:bf809950 r4:bf809900
+	 [<80084320>] (handle_fasteoi_irq+0x0/0x178) from [<80081088>] (generic_handle_irq+0x38/0x40)
+	 r5:806cf748 r4:0000004b
+	 [<80081050>] (generic_handle_irq+0x0/0x40) from [<8000fa44>] (handle_IRQ+0x5c/0xbc)
+	 r5:806cf748 r4:806c6000
+	 [<8000f9e8>] (handle_IRQ+0x0/0xbc) from [<80008584>] (gic_handle_irq+0x3c/0x70)
+	 r9:412fc09a r8:806d29e8 r7:f4000110 r6:806c7f30 r5:806ce974
+	 r4:f400010c
+	 [<80008548>] (gic_handle_irq+0x0/0x70) from [<8000eac0>] (__irq_svc+0x40/0x54)
+	Exception stack(0x806c7f30 to 0x806c7f78)
+	7f20:                                     00000000 00000000 0000000f 8001aea0
+	7f40: 806c6000 80712a48 804f0040 00000000 806d29e8 412fc09a 00000000 806c7f84
+	7f60: 806c7f88 806c7f78 8000fbcc 8000fbd0 60000013 ffffffff
+	 r7:806c7f64 r6:ffffffff r5:60000013 r4:8000fbd0
+	 [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
+	[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e5334>] (rest_init+0x6c/0x84)
+	 r9:412fc09a r8:1000406a r7:8fffffff r6:806a4528 r5:80712980
+	 r4:806cf5b0
+	 [<804e52c8>] (rest_init+0x0/0x84) from [<80668940>] (start_kernel+0x29c/0x2ec)
+	[<806686a4>] (start_kernel+0x0/0x2ec) from [<10008078>] (0x10008078)
+	Code: e12fff33 e5953200 e3530000 0a000002 (e5933014)
+	---[ end trace aade28ad434062bd ]---
+	Kernel panic - not syncing: 0xbf8bdfa8)
+	df60: 00000000 00000000 0000000f 8001aea0 bf8bc000 80712a48 804f0040 00000000
+	df80: 806d29e8 412fc09a 00000000 bf8bdfb4 bf8bdfb8 bf8bdfa8 8000fbcc 8000fbd0
+	dfa0: 60000013 ffffffff
+	 r7:bf8bdf94 r6:ffffffff r5:60000013 r4:8000fbd0
+	 [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
+	[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e7930>] (secondary_start_kernel+0x120/0x148)
+	 r9:412fc09a r8:1000406a r7:80712d20 r6:10c03c7d r5:00000002
+	 r4:806e2008
+	 [<804e7810>] (secondary_start_kernel+0x0/0x148) from [<104e7148>] (0x104e7148)
+	 r5:0000001f r4:4f8a806a
+	 CPU3: stopping
+	 Backtrace:
+	 [<800132e8>] (dump_backtrace+0x0/0x114) from [<804ea684>] (dump_stack+0x20/0x24)
+	 r7:00000000 r6:806c3f2c r5:806cf748 r4:80712d18
+	 [<804ea664>] (dump_stack+0x0/0x24) from [<80014adc>] (handle_IPI+0x140/0x18c)
+	[<8001499c>] (handle_IPI+0x0/0x18c) from [<800085b0>] (gic_handle_irq+0x68/0x70)
+	 r9:412fc09a r8:806d29e8 r7:f4000110 r6:bf8bff60 r5:806ce974
+	 r4:f400010c
+	 [<80008548>] (gic_handle_irq+0x0/0x70) from [<8000eac0>] (__irq_svc+0x40/0x54)
+	Exception stack(0xbf8bff60 to 0xbf8bffa8)
+	ff60: 00000000 00000000 0000000f 8001aea0 bf8be000 80712a48 804f0040 00000000
+	ff80: 806d29e8 412fc09a 00000000 bf8bffb4 bf8bffb8 bf8bffa8 8000fbcc 8000fbd0
+	ffa0: 60000013 ffffffff
+	 r7:bf8bff94 r6:ffffffff r5:60000013 r4:8000fbd0
+	 [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
+	[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e7930>] (secondary_start_kernel+0x120/0x148)
+	 r9:412fc09a r8:1000406a r7:80712d20 r6:10c03c7d r5:00000003
+	 r4:806e2008
+	 [<804e7810>] (secondary_start_kernel+0x0/0x148) from [<104e7148>] (0x104e7148)
+	 r5:0000001f r4:4f8a806a
+	 CPU1: stopping
+	 Backtrace:
+	 [<800132e8>] (dump_backtrace+0x0/0x114) from [<804ea684>] (dump_stack+0x20/0x24)
+	 r7:00000000 r6:806c3f2c r5:806cf748 r4:80712d18
+	 [<804ea664>] (dump_stack+0x0/0x24) from [<80014adc>] (handle_IPI+0x140/0x18c)
+	[<8001499c>] (handle_IPI+0x0/0x18c) from [<800085b0>] (gic_handle_irq+0x68/0x70)
+	 r9:412fc09a r8:806d29e8 r7:f4000110 r6:bf8bbf60 r5:806ce974
+	 r4:f400010c
+	 [<80008548>] (gic_handle_irq+0x0/0x70) from [<8000eac0>] (__irq_svc+0x40/0x54)
+	Exception stack(0xbf8bbf60 to 0xbf8bbfa8)
+	bf60: 00000000 00000000 0000000f 8001aea0 bf8ba000 80712a48 804f0040 00000000
+	bf80: 806d29e8 412fc09a 00000000 bf8bbfb4 bf8bbfb8 bf8bbfa8 8000fbcc 8000fbd0
+	bfa0: 60000013 ffffffff
+	 r7:bf8bbf94 r6:ffffffff r5:60000013 r4:8000fbd0
+	 [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
+	[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e7930>] (secondary_start_kernel+0x120/0x148)
+	 r9:412fc09a r8:1000406a r7:80712d20 r6:10c03c7d r5:00000001
+	 r4:806e2008
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci13xxx_imx.c |    1 -
- drivers/usb/chipidea/ci13xxx_msm.c |    1 -
- drivers/usb/chipidea/udc.c         |   23 ++++++++---------------
- include/linux/usb/chipidea.h       |    1 -
- 4 files changed, 8 insertions(+), 18 deletions(-)
+ drivers/usb/chipidea/udc.c |   13 +++++++++----
+ 1 files changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 793fdba..3ed119e 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -109,7 +109,6 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 	pdata->name = "ci13xxx_imx";
- 	pdata->capoffset = DEF_CAPOFFSET;
- 	pdata->flags = CI13XXX_REQUIRE_TRANSCEIVER |
--		       CI13XXX_PULLUP_ON_VBUS |
- 		       CI13XXX_DISABLE_STREAMING | 
- 		       CI13XXX_REGS_SHARED;
- 
-diff --git a/drivers/usb/chipidea/ci13xxx_msm.c b/drivers/usb/chipidea/ci13xxx_msm.c
-index 7d16681..5755ee8 100644
---- a/drivers/usb/chipidea/ci13xxx_msm.c
-+++ b/drivers/usb/chipidea/ci13xxx_msm.c
-@@ -49,7 +49,6 @@ static struct ci13xxx_platform_data ci13xxx_msm_platdata = {
- 	.name			= "ci13xxx_msm",
- 	.flags			= CI13XXX_REGS_SHARED |
- 				  CI13XXX_REQUIRE_TRANSCEIVER |
--				  CI13XXX_PULLUP_ON_VBUS |
- 				  CI13XXX_DISABLE_STREAMING,
- 
- 	.notify_event		= ci13xxx_msm_notify_event,
 diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 597ae64..b57b735 100644
+index b57b735..e355914 100644
 --- a/drivers/usb/chipidea/udc.c
 +++ b/drivers/usb/chipidea/udc.c
-@@ -1360,9 +1360,6 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
- 	unsigned long flags;
- 	int gadget_ready = 0;
+@@ -579,9 +579,6 @@ static int _gadget_stop_activity(struct usb_gadget *gadget)
+ 	usb_ep_fifo_flush(&ci->ep0out->ep);
+ 	usb_ep_fifo_flush(&ci->ep0in->ep);
  
--	if (!(ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS))
--		return -EOPNOTSUPP;
+-	if (ci->driver)
+-		ci->driver->disconnect(gadget);
 -
- 	spin_lock_irqsave(&ci->lock, flags);
- 	ci->vbus_active = is_active;
- 	if (ci->driver)
-@@ -1426,8 +1423,7 @@ static int ci13xxx_pullup(struct usb_gadget *_gadget, int is_on)
- {
- 	struct ci13xxx *ci = container_of(_gadget, struct ci13xxx, gadget);
+ 	/* make sure to disable all endpoints */
+ 	gadget_for_each_ep(ep, gadget) {
+ 		usb_ep_disable(ep);
+@@ -612,6 +609,11 @@ __acquires(ci->lock)
  
--	if ((ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) &&
--			!ci->vbus_active)
-+	if (!ci->vbus_active)
- 		return -ENOTSUPP;
+ 	dbg_event(0xFF, "BUS RST", 0);
  
- 	if (is_on)
-@@ -1551,14 +1547,12 @@ static int ci13xxx_start(struct usb_gadget *gadget,
- 
- 	ci->driver = driver;
- 	pm_runtime_get_sync(&ci->gadget.dev);
--	if (ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) {
--		if (ci->vbus_active) {
--			if (ci->platdata->flags & CI13XXX_REGS_SHARED)
--				hw_device_reset(ci, USBMODE_CM_DC);
--		} else {
--			pm_runtime_put_sync(&ci->gadget.dev);
--			goto done;
--		}
-+	if (ci->vbus_active) {
-+		if (ci->platdata->flags & CI13XXX_REGS_SHARED)
-+			hw_device_reset(ci, USBMODE_CM_DC);
-+	} else {
-+		pm_runtime_put_sync(&ci->gadget.dev);
-+		goto done;
- 	}
- 
- 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
-@@ -1581,8 +1575,7 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
- 
- 	spin_lock_irqsave(&ci->lock, flags);
- 
--	if (!(ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) ||
--			ci->vbus_active) {
-+	if (ci->vbus_active) {
- 		hw_device_state(ci, 0);
++	if (ci->gadget.speed != USB_SPEED_UNKNOWN) {
++		if (ci->driver)
++			ci->driver->disconnect(&ci->gadget);
++	}
++
+ 	spin_unlock(&ci->lock);
+ 	retval = _gadget_stop_activity(&ci->gadget);
+ 	if (retval)
+@@ -1373,6 +1375,8 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
+ 			hw_device_state(ci, ci->ep0out->qh.dma);
+ 			dev_dbg(ci->dev, "Connected to host\n");
+ 		} else {
++			if (ci->driver)
++				ci->driver->disconnect(&ci->gadget);
+ 			hw_device_state(ci, 0);
+ 			if (ci->platdata->notify_event)
+ 				ci->platdata->notify_event(ci,
+@@ -1580,13 +1584,14 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
  		if (ci->platdata->notify_event)
  			ci->platdata->notify_event(ci,
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index b314647..d543e4a 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -18,7 +18,6 @@ struct ci13xxx_platform_data {
- 	unsigned long	 flags;
- #define CI13XXX_REGS_SHARED		BIT(0)
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
--#define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
- 	enum usb_dr_mode	dr_mode;
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ 			CI13XXX_CONTROLLER_STOPPED_EVENT);
+-		ci->driver = NULL;
+ 		spin_unlock_irqrestore(&ci->lock, flags);
+ 		_gadget_stop_activity(&ci->gadget);
+ 		spin_lock_irqsave(&ci->lock, flags);
+ 		pm_runtime_put(&ci->gadget.dev);
+ 	}
+ 
++	ci->driver = NULL;
++
+ 	spin_unlock_irqrestore(&ci->lock, flags);
+ 
+ 	return 0;
 -- 
 1.7.0.4
