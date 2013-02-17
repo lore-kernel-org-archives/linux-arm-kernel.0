@@ -1,31 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 17 Feb 2013 21:05:59 +0800
-Subject: [PATCH v2 1/8] dt: describe base reset signal binding
-In-Reply-To: <1360776872-18584-2-git-send-email-p.zabel@pengutronix.de>
-References: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
- <1360776872-18584-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130217130558.GC6782@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 17 Feb 2013 10:18:22 -0300
+Subject: [PATCH 2/2] of: use platform_device_add
+In-Reply-To: <20130217074317.GB16632@S2101-09.ap.freescale.net>
+References: <1358473200-17886-1-git-send-email-grant.likely@secretlab.ca>
+ <1358473200-17886-2-git-send-email-grant.likely@secretlab.ca>
+ <20130217030331.GA15048@S2101-09.ap.freescale.net>
+ <20130217074317.GB16632@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5DD419Yy9UgRaQ+zMQsJ=mZ6dCohoG-52P8Ds8=bZ+shA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 06:34:25PM +0100, Philipp Zabel wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> This binding is intended to represent the hardware reset signals present
-> internally in most IC (SoC, FPGA, ...) designs.
-> It consists of a binding for a reset controller device (provider), and a
-> pair of properties, "resets" and "reset-names", to link a device node
-> (consumer) to its reset controller via phandle, similarly to the clock
-> and interrupt bindings.
-> 
-> The reset controller has all information necessary to reset the consumer
-> device. That could be provided via device tree, or it could be implemented
-> in hardware.
-> The aim is to enable device drivers to request a framework API to issue a
-> reset simply by providing their struct device pointer as the most common
-> case.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+On Sun, Feb 17, 2013 at 4:43 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Sun, Feb 17, 2013 at 11:03:35AM +0800, Shawn Guo wrote:
+>> On Fri, Jan 18, 2013 at 01:40:00AM +0000, Grant Likely wrote:
+>> > This allows platform_device_add a chance to call insert_resource on all
+>> > of the resources from OF. At a minimum this fills in proc/iomem and
+>> > presumably makes resource tracking and conflict detection work better.
+>> > However, it has the side effect of moving all OF generated platform
+>> > devices from /sys/devices to /sys/devices/platform/. It /shouldn't/
+>> > break userspace because userspace is not supposed to depend on the full
+>> > path (because userspace always does what it is supposed to, right?).
+>> >
+>> > This may cause breakage if either:
+>> > 1) any two nodes in a given device tree have overlapping & staggered
+>> >    regions (ie. 0x80..0xbf and 0xa0..0xdf; where one is not contained
+>> >    within the other). In this case one of the devices will fail to
+>> >    register and an exception will be needed in platform_device_add() to
+>> >    complain but not fail.
+>>
+>> Grant,
+>>
+>> The patch introduce a regression on imx6q boot.
+>
+> It also breaks all of_amba_device users.
+>
+> of_amba_device_create() --> amba_device_add() --> request_resource()
+> and fails.
 
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+Yes, correct: amba-pl011 does not register anymore after this patch,
+which causes the serial console to be not functional.
