@@ -1,70 +1,70 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 17 Feb 2013 10:49:08 +0000
-Subject: [PATCH 2/2] of: use platform_device_add
-In-Reply-To: <20130217101958.GR17833@n2100.arm.linux.org.uk>
-References: <1358473200-17886-1-git-send-email-grant.likely@secretlab.ca>
- <1358473200-17886-2-git-send-email-grant.likely@secretlab.ca>
- <20130217030331.GA15048@S2101-09.ap.freescale.net>
- <20130217074317.GB16632@S2101-09.ap.freescale.net>
- <20130217101958.GR17833@n2100.arm.linux.org.uk>
-Message-ID: <CACxGe6sJfRZ4AaDDtoQv6c-xOdB6-=cCJSn6fKawB0ULnzQFoA@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Sun, 17 Feb 2013 19:42:46 +0800
+Subject: [PATCH v9 00/10] bind pinconf to pinctrl single
+Message-ID: <1361101376-3783-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 17, 2013 at 10:19 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Feb 17, 2013 at 03:43:20PM +0800, Shawn Guo wrote:
-> > The patch introduce a regression on imx6q boot.  The IOMUXC block on
-> > imx6q is special.  It acts not only a pin controller but also a system
-> > controller with a bunch of system level registers in there.  That's why
-> > we currently have the following two nodes in imx6q device tree with the
-> > same start "reg" address, which work with drivers/mfd/syscon.c and
-> > drivers/pinctrl/pinctrl-imx6q.c respectively.
-> >
-> >         gpr: iomuxc-gpr at 020e0000 {
-> >                 compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> >                 reg = <0x020e0000 0x38>;
-> >         };
-> >
-> >         iomuxc: iomuxc at 020e0000 {
-> >                 compatible = "fsl,imx6q-iomuxc";
-> >                 reg = <0x020e0000 0x4000>;
-> >         };
-> >
-> > With the patch in place, pinctrl-imx6q fails to register like below.
-> >
-> > syscon 20e0000.iomuxc: syscon regmap start 0x20e0000 end 0x20e3fff registered
-> > imx6q-pinctrl 20e0000.iomuxc: can't request region for resource [mem 0x020e0000-0x020e3fff]
-> > imx6q-pinctrl: probe of 20e0000.iomuxc failed with error -16
+Changelog:
+v9:
+1. Discard bias-autopull.
+2. Fully support irqdomain & drop irq generic chip in pl061 gpio.
+3. Rename pinctrl_overlapped_gpio_range().
 
-Strictly you're not supposed to do that with the device tree. There
-shouldn't be two nodes using the same overlapping memory region unless
-they are parent/child. That rule has been around for a long time, but
-the core never checked for it. What /should/ happen is the two drivers
-should be cooperating for the register region and only one device
-driver probe sets up both behaviours.
+v8:
+1. Update allocate irq dynamically in gpio-pl061.
+2. Update bias-pullup/bias-pulldown as 4 parameters.
+3. Remove bias-disable.
+4. Add bias-autopull.
+5. Rename input-schmitt-disable to input-schmitt-enable.
+6. Discard allocating global gpio number in ascending order.
 
-However, neither is it okay to just break the existing device trees.
-Best thing to do I think is to deprecate one of the nodes.
+v7:
+1. Discard the method of adding gpio range from pinctrl-single driver.
+Use gpiolib driver to support gpio range from DTS instead.
+2. Add gpio request function to claim pin in gpio pl061 driver.
+3. Adjust the initcall level in gpio pl061 driver.
+4. Allocate gpio number from lowest gpio number to highest. The original
+implementation is inverted. It's hard to use since it inverted the sequence
+of gpio number.
+5. Remove the support of pxa910 temporarily since gpio pxa driver need to
+be updated for supporting this solution.
 
->> It also breaks all of_amba_device users.
->>
->> of_amba_device_create() --> amba_device_add() --> request_resource()
->> and fails.
->
-> Presumably that's because we no longer know what the parent resource
-> is supposed to be?
+v6:
+1. Two configuration array will be created for each pin group.
+This first array is stored in pcs_function structure. The 32-bit
+configruation argument is stored in this array. Driver stores
+data while parsing DTS file, and loads these config array if
+function selector is indicated.
+The second array is stored in pinctrl_map structure. Driver won't
+use it directly. So we could avoid to append lookup pinctrl map
+method that is introduced in v5.
 
-Hmmm, it looks that way, yes. Currently the OF code is using
-iomem_resource as the parent for all amba_device_add() calls
-(driver/of/platform.c), but if the parent node gets registered as a
-platform device and it has the resources then the parenthood chain
-doesn't match up. It isn't immediately obvious to me how to fix this.
-I'm going to drop the patch from my tree. I could use some help
-figuring out what the correct behaviour really should be here.
+v5:
+1. Move the properties of pinconf into pin group. So those mask
+properties could be merged with other pinconf properties.
+2. Append lookup pinctrl map method.
+3. Append input schmitt disable config parameter.
+4. Clean code.
 
-g.
+v4:
+1. Define gpio range as sub-node, not label. And remove
+pinctrl-single,gpio-ranges property.
+2. Use new two properties in sub-node, reg &
+pinctrl-single,gpio. GPIO number & GPIO function are listed in
+the pinctrl-single,gpio property.
+3. Reference the names like pinctrl-single,bias.
+4. Add compatible name "pinconf-single". If the compatible name is
+"pinctrl-single", there's no pinconf. If the compatible name is
+"pinconf-single", there's the generic pinconf in pinctrl-single.
+5. Update documents.
 
---
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+v3:
+1. Add more comments in document.
+2. Replace pcs_readl() & pcs_writel() by pcs->read() & pcs->write().
+3. Clean code.
+
+v2:
+1. Remove "pinctrl-single,gpio-mask". Since GPIO function is one of the
+mux function in the pinmux register of both OMAP and PXA/MMP silicons.
+Use "pinctrl-single,function-mask" instead.
