@@ -1,26 +1,38 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Sun, 17 Feb 2013 14:57:51 +0800
-Subject: [PATCH v2] ARM:kernel: a bug for perf by a redundancy character
- ';'
-In-Reply-To: <51207927.3050400@gmail.com>
-References: <51205C41.80609@asianux.com> <51207927.3050400@gmail.com>
-Message-ID: <51207F6F.8090808@asianux.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 17 Feb 2013 15:43:20 +0800
+Subject: [PATCH 2/2] of: use platform_device_add
+In-Reply-To: <20130217030331.GA15048@S2101-09.ap.freescale.net>
+References: <1358473200-17886-1-git-send-email-grant.likely@secretlab.ca>
+ <1358473200-17886-2-git-send-email-grant.likely@secretlab.ca>
+ <20130217030331.GA15048@S2101-09.ap.freescale.net>
+Message-ID: <20130217074317.GB16632@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?02?17? 14:31, Dirk Behme ??:
-> I would prefer Will's version of the subject and commit message
+On Sun, Feb 17, 2013 at 11:03:35AM +0800, Shawn Guo wrote:
+> On Fri, Jan 18, 2013 at 01:40:00AM +0000, Grant Likely wrote:
+> > This allows platform_device_add a chance to call insert_resource on all
+> > of the resources from OF. At a minimum this fills in proc/iomem and
+> > presumably makes resource tracking and conflict detection work better.
+> > However, it has the side effect of moving all OF generated platform
+> > devices from /sys/devices to /sys/devices/platform/. It /shouldn't/
+> > break userspace because userspace is not supposed to depend on the full
+> > path (because userspace always does what it is supposed to, right?).
+> > 
+> > This may cause breakage if either:
+> > 1) any two nodes in a given device tree have overlapping & staggered
+> >    regions (ie. 0x80..0xbf and 0xa0..0xdf; where one is not contained
+> >    within the other). In this case one of the devices will fail to
+> >    register and an exception will be needed in platform_device_add() to
+> >    complain but not fail.
 > 
-> http://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=commitdiff;h=21fa771c94c4359807bb92dc8532b25c323ac543
+> Grant,
 > 
-> And, btw, the Ack was for Will's version ;)
+> The patch introduce a regression on imx6q boot.
 
+It also breaks all of_amba_device users.
 
-  oh, thank you. I did not see carefully.
+of_amba_device_create() --> amba_device_add() --> request_resource()
+and fails.
 
-  :-)
-
--- 
-Chen Gang
-
-Asianux Corporation
+Shawn
