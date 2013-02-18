@@ -1,91 +1,86 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Mon, 18 Feb 2013 23:26:22 +0530
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <5122551E.1080703@linux.vnet.ibm.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
- <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
- <5122551E.1080703@linux.vnet.ibm.com>
-Message-ID: <51226B46.9080707@linux.vnet.ibm.com>
+From: hughd@google.com (Hugh Dickins)
+Date: Mon, 18 Feb 2013 10:06:24 -0800 (PST)
+Subject: Should a swapped out page be deleted from swap cache?
+In-Reply-To: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
+References: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1302180939200.2246@eggly.anvils>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2013 09:51 PM, Srivatsa S. Bhat wrote:
-> Hi Michel,
-> 
-> On 02/18/2013 09:15 PM, Michel Lespinasse wrote:
->> Hi Srivasta,
->>
->> I admit not having followed in detail the threads about the previous
->> iteration, so some of my comments may have been discussed already
->> before - apologies if that is the case.
->>
->> On Mon, Feb 18, 2013 at 8:38 PM, Srivatsa S. Bhat
->> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->>> Reader-writer locks and per-cpu counters are recursive, so they can be
->>> used in a nested fashion in the reader-path, which makes per-CPU rwlocks also
->>> recursive. Also, this design of switching the synchronization scheme ensures
->>> that you can safely nest and use these locks in a very flexible manner.
-[...]
->>>  void percpu_write_lock(struct percpu_rwlock *pcpu_rwlock)
->>>  {
->>> +       unsigned int cpu;
->>> +
->>> +       /*
->>> +        * Tell all readers that a writer is becoming active, so that they
->>> +        * start switching over to the global rwlock.
->>> +        */
->>> +       for_each_possible_cpu(cpu)
->>> +               per_cpu_ptr(pcpu_rwlock->rw_state, cpu)->writer_signal = true;
->>
->> I don't see anything preventing a race with the corresponding code in
->> percpu_write_unlock() that sets writer_signal back to false. Did I
->> miss something here ? It seems to me we don't have any guarantee that
->> all writer signals will be set to true at the end of the loop...
->>
-> 
-> Ah, thanks for pointing that out! IIRC Oleg had pointed this issue in the last
-> version, but back then, I hadn't fully understood what he meant. Your
-> explanation made it clear. I'll work on fixing this.
-> 
+On Mon, 18 Feb 2013, Li Haifeng wrote:
 
-We can fix this by using the simple patch (untested) shown below.
-The alternative would be to acquire the rwlock for write, update the
-->writer_signal values, release the lock, wait for readers to switch,
-again acquire the rwlock for write with interrupts disabled etc... which
-makes it kinda messy, IMHO. So I prefer the simple version shown below.
+> For explain my question, the two points should be displayed as below.
+> 
+> 1.  If an anonymous page is swapped out, this page will be deleted
+> from swap cache and be put back into buddy system.
 
+Yes, unless the page is referenced again before it comes to be
+deleted from swap cache.
 
-diff --git a/lib/percpu-rwlock.c b/lib/percpu-rwlock.c
-index bf95e40..64ccd3f 100644
---- a/lib/percpu-rwlock.c
-+++ b/lib/percpu-rwlock.c
-@@ -50,6 +50,12 @@
- 	(__this_cpu_read((pcpu_rwlock)->rw_state->writer_signal))
- 
- 
-+/*
-+ * Spinlock to synchronize access to the writer's data-structures
-+ * (->writer_signal) from multiple writers.
-+ */
-+static DEFINE_SPINLOCK(writer_side_lock);
-+
- int __percpu_init_rwlock(struct percpu_rwlock *pcpu_rwlock,
- 			 const char *name, struct lock_class_key *rwlock_key)
- {
-@@ -191,6 +197,8 @@ void percpu_write_lock_irqsave(struct percpu_rwlock *pcpu_rwlock,
- {
- 	unsigned int cpu;
- 
-+	spin_lock(&writer_side_lock);
-+
- 	/*
- 	 * Tell all readers that a writer is becoming active, so that they
- 	 * start switching over to the global rwlock.
-@@ -252,5 +260,6 @@ void percpu_write_unlock_irqrestore(struct percpu_rwlock *pcpu_rwlock,
- 		per_cpu_ptr(pcpu_rwlock->rw_state, cpu)->writer_signal = false;
- 
- 	write_unlock_irqrestore(&pcpu_rwlock->global_rwlock, *flags);
-+	spin_unlock(&writer_side_lock);
- }
+> 
+> 2. When a page is swapped out, the sharing count of swap slot must not
+> be zero. That is, page_swapcount(page) will not return zero.
+
+I would not say "must not": we just prefer not to waste time on swapping
+a page out if its use count has already gone to 0.  And its use count
+might go down to 0 an instant after swap_writepage() makes that check.
+
+> 
+> Are both of them above right?
+> 
+> According the two points above, I was confused to the line 655 below.
+> When a page is swapped out, the return value of page_swapcount(page)
+> will not be zero. So, the page couldn't be deleted from swap cache.
+
+Yes, we cannot free the swap as long as its data might be needed again.
+
+But a swap cache page may linger in memory for an indefinite time,
+in between being queued for write out, and actually being freed from
+the end of the lru by memory pressure.
+
+At various points where we hold the page lock on a swap cache page,
+it's worth checking whether it is still actually needed, or could
+now be freed from swap cache, and the corresponding swap slot freed:
+that's what try_to_free_swap() does.
+
+Hugh
+
+> 
+>  644  * If swap is getting full, or if there are no more mappings of this page,
+>  645  * then try_to_free_swap is called to free its swap space.
+>  646  */
+>  647 int try_to_free_swap(struct page *page)
+>  648 {
+>  649         VM_BUG_ON(!PageLocked(page));
+>  650
+>  651         if (!PageSwapCache(page))
+>  652                 return 0;
+>  653         if (PageWriteback(page))
+>  654                 return 0;
+>  655         if (page_swapcount(page))//Has referenced by other swap out page.
+>  656                 return 0;
+>  657
+>  658         /*
+>  659          * Once hibernation has begun to create its image of memory,
+>  660          * there's a danger that one of the calls to try_to_free_swap()
+>  661          * - most probably a call from __try_to_reclaim_swap() while
+>  662          * hibernation is allocating its own swap pages for the image,
+>  663          * but conceivably even a call from memory reclaim - will free
+>  664          * the swap from a page which has already been recorded in the
+>  665          * image as a clean swapcache page, and then reuse its swap for
+>  666          * another page of the image.  On waking from hibernation, the
+>  667          * original page might be freed under memory pressure, then
+>  668          * later read back in from swap, now with the wrong data.
+>  669          *
+>  670          * Hibration suspends storage while it is writing the image
+>  671          * to disk so check that here.
+>  672          */
+>  673         if (pm_suspended_storage())
+>  674                 return 0;
+>  675
+>  676         delete_from_swap_cache(page);
+>  677         SetPageDirty(page);
+>  678         return 1;
+>  679 }
+> 
+> Thanks.
