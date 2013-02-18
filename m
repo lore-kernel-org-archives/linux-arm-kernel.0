@@ -1,59 +1,52 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 18 Feb 2013 07:57:39 -0600
-Subject: [PATCH] ARM: OMAP2+: Fix broken gpmc support
-Message-ID: <1361195859-5949-1-git-send-email-jon-hunter@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 18 Feb 2013 18:04:21 +0400
+Subject: [PATCH 0/4] R-Car SATA driver and platform data
+In-Reply-To: <20130218012322.GA11807@verge.net.au>
+References: <201302170135.28336.sergei.shtylyov@cogentembedded.com>
+ <20130218012322.GA11807@verge.net.au>
+Message-ID: <512234E5.5050700@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit "ARM: OMAP2+: Prevent potential crash if GPMC probe fails" added
-code to ensure that GPMC chip-selects could not be requested until the
-device probe was successful. The chip-selects should have been
-unreserved at the end of the probe function, but the code to unreserve
-them appears to have ended up in the gpmc_calc_timings() function and
-hence, this is causing problems requesting chip-selects. Fix this merge
-error by unreserving the chip-selects at the end of the probe, but
-before we call the gpmc child probe functions (for device-tree) which
-request a chip-select.
+Hello.
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Tested-by: Philip Avinash <avinashphilip@ti.com>
-Tested-by: Grazvydas Ignotas <notasas@gmail.com>
----
+On 18-02-2013 5:23, Simon Horman wrote:
 
-Tony, GPMC support is completely broken in linux-next without this fix
-and a few people now are reporting this problem. Can we get this fix
-merged?
+>>     Here's the set of 4 patches against the Simon Horman's renesas.git repo, 'next' branch:
 
-Thanks
-Jon
+>> [1/4] ARM: mach-shmobile: r8a7779: SATA DT configuration
+>> [2/4] ARM: mach-shmobile: r8a7779: add SATA support
+>> [3/4] libata: add R-Car SATA driver
+>> [4/4] ARM: mach-shmobile: marzen: add SATA support
 
- arch/arm/mach-omap2/gpmc.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+>> Patch 3 also applies to the 'upstream' branch of Jeff Garzik's libata-dev.git repo.
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 1adb2d4..1e8bcb4 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -1125,9 +1125,6 @@ int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
- 	/* TODO: remove, see function definition */
- 	gpmc_convert_ps_to_ns(gpmc_t);
- 
--	/* Now the GPMC is initialised, unreserve the chip-selects */
--	gpmc_cs_map = 0;
--
- 	return 0;
- }
- 
-@@ -1388,6 +1385,9 @@ static int gpmc_probe(struct platform_device *pdev)
- 	if (IS_ERR_VALUE(gpmc_setup_irq()))
- 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
- 
-+	/* Now the GPMC is initialised, unreserve the chip-selects */
-+	gpmc_cs_map = 0;
-+
- 	rc = gpmc_probe_dt(pdev);
- 	if (rc < 0) {
- 		clk_disable_unprepare(gpmc_l3_clk);
--- 
-1.7.10.4
+> Hi Sergei, Hi All,
+
+> I do not expect patch 3 of this series to got through
+> the renesas tree, however, I have included it and the other three patches
+> in this series to a topic branch in the renesas tree, topic/r-car-stat.
+
+    I probably make the patch 3 patch 1 in the next posting.
+
+> The base of the topic branch is:
+> * a merge of renesas.git next and libata-dev.git upstream, and;
+> * a boot fix for Marzen which I plan to add to next once it is reviewed:
+>    "ARM: shmobile: r8a7779: Correct TMU clock support again" (v3).
+
+> With this in place I built a kernel using the marzen_defconfig and booted it.
+> However, I wonder if I am missing a kernel option, or perhaps something
+> else of a minor nature as I see the following:
+
+> # dmesg | grep sata
+> sata_rcar sata_rcar: coherent DMA mask is unset
+> sata_rcar sata_rcar: failed to start port 0 (errno=-12)
+> sata_rcar: probe of sata_rcar failed with error -12
+
+    No, it's entirely our fault -- Vladimir didn't test the driver in non-DT 
+mode with DMA support added (due to the above mentioned boot fix missing), and 
+I didn't notice the missing intializers for 
+'sata_device.dev.[coherent_]dma_mask' when reviewing his patches. V2 will be 
+posted soon.
+
+WBR, Sergei
