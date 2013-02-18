@@ -1,131 +1,132 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 18 Feb 2013 13:49:20 +0530
-Subject: [PATCH v3 net-next 1/1] drivers: net: davinci_cpdma: acknowledge
- interrupt properly
-Message-ID: <1361175560-600-1-git-send-email-mugunthanvnm@ti.com>
+From: kishon@ti.com (kishon)
+Date: Mon, 18 Feb 2013 13:50:24 +0530
+Subject: [V7 PATCH 02/16] usb: gadget: mv_udc: use PHY driver for udc
+In-Reply-To: <1361167838-22929-3-git-send-email-chao.xie@marvell.com>
+References: <1361167838-22929-1-git-send-email-chao.xie@marvell.com>
+ <1361167838-22929-3-git-send-email-chao.xie@marvell.com>
+Message-ID: <5121E448.9070608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPDMA interrupts are not properly acknowledged which leads to interrupt
-storm, only cpdma interrupt 0 is acknowledged in Davinci CPDMA driver.
-Changed cpdma_ctlr_eoi api to acknowledge 1 and 2 interrupts which are
-used for rx and tx respectively.
+Hi,
 
-Reported-by: Pantelis Antoniou <panto@antoniou-consulting.com>
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
-Changes from v2:
-* Changed the hardware register values from enumeration to defines
+On Monday 18 February 2013 11:40 AM, Chao Xie wrote:
+> Originaly, udc driver will call the callbacks in platform data
+> for PHY initialization and shut down.
+> With PHY driver, it will call the APIs provided by PHY driver
+> for PHY initialization and shut down. It removes the callbacks
+> in platform data, and at same time it removes one block in the
+> way of enabling device tree for udc driver.
+>
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> ---
+>   drivers/usb/gadget/mv_udc.h      |    2 +-
+>   drivers/usb/gadget/mv_udc_core.c |   37 +++++++++++++++----------------------
+>   2 files changed, 16 insertions(+), 23 deletions(-)
+>
+> diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
+> index 9073436..f339df4 100644
+> --- a/drivers/usb/gadget/mv_udc.h
+> +++ b/drivers/usb/gadget/mv_udc.h
+> @@ -180,7 +180,6 @@ struct mv_udc {
+>
+>   	struct mv_cap_regs __iomem	*cap_regs;
+>   	struct mv_op_regs __iomem	*op_regs;
+> -	void __iomem                    *phy_regs;
+>   	unsigned int			max_eps;
+>   	struct mv_dqh			*ep_dqh;
+>   	size_t				ep_dqh_size;
+> @@ -217,6 +216,7 @@ struct mv_udc {
+>   	struct work_struct	vbus_work;
+>   	struct workqueue_struct *qwork;
+>
+> +	struct usb_phy		*phy;
+>   	struct usb_phy		*transceiver;
+>
+>   	struct mv_usb_platform_data     *pdata;
+> diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
+> index c8cf959..d3ce1aa 100644
+> --- a/drivers/usb/gadget/mv_udc_core.c
+> +++ b/drivers/usb/gadget/mv_udc_core.c
+> @@ -35,6 +35,7 @@
+>   #include <linux/platform_device.h>
+>   #include <linux/clk.h>
+>   #include <linux/platform_data/mv_usb.h>
+> +#include <linux/usb/mv_usb2.h>
+>   #include <asm/unaligned.h>
+>
+>   #include "mv_udc.h"
+> @@ -1121,15 +1122,14 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
+>
+>   	dev_dbg(&udc->dev->dev, "enable udc\n");
+>   	udc_clock_enable(udc);
+> -	if (udc->pdata->phy_init) {
+> -		retval = udc->pdata->phy_init(udc->phy_regs);
+> -		if (retval) {
+> -			dev_err(&udc->dev->dev,
+> -				"init phy error %d\n", retval);
+> -			udc_clock_disable(udc);
+> -			return retval;
+> -		}
+> +	retval = usb_phy_init(udc->phy);
+> +	if (retval) {
+> +		dev_err(&udc->dev->dev,
+> +			"init phy error %d\n", retval);
+> +		udc_clock_disable(udc);
+> +		return retval;
+>   	}
+> +
+>   	udc->active = 1;
+>
+>   	return 0;
+> @@ -1147,8 +1147,7 @@ static void mv_udc_disable_internal(struct mv_udc *udc)
+>   {
+>   	if (udc->active) {
+>   		dev_dbg(&udc->dev->dev, "disable udc\n");
+> -		if (udc->pdata->phy_deinit)
+> -			udc->pdata->phy_deinit(udc->phy_regs);
+> +		usb_phy_shutdown(udc->phy);
+>   		udc_clock_disable(udc);
+>   		udc->active = 0;
+>   	}
+> @@ -2175,8 +2174,8 @@ static int mv_udc_probe(struct platform_device *pdev)
+>
+>   #ifdef CONFIG_USB_OTG_UTILS
+>   	if (pdata->mode == MV_USB_MODE_OTG) {
+> -		udc->transceiver = devm_usb_get_phy(&pdev->dev,
+> -					USB_PHY_TYPE_USB2);
+> +		udc->transceiver = devm_usb_get_phy_dev(&pdev->dev,
+> +					MV_USB2_OTG_PHY_INDEX);
+>   		if (IS_ERR_OR_NULL(udc->transceiver)) {
+>   			udc->transceiver = NULL;
+>   			return -ENODEV;
+> @@ -2194,7 +2193,7 @@ static int mv_udc_probe(struct platform_device *pdev)
+>   		}
+>   	}
+>
+> -	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
+> +	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
+>   	if (r == NULL) {
+>   		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+>   		return -ENODEV;
+> @@ -2207,18 +2206,12 @@ static int mv_udc_probe(struct platform_device *pdev)
+>   		return -EBUSY;
+>   	}
+>
+> -	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
+> -	if (r == NULL) {
+> -		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
+> +	udc->phy = devm_usb_get_phy_dev(&pdev->dev, MV_USB2_PHY_INDEX);
+> +	if (IS_ERR_OR_NULL(udc->phy)) {
+> +		udc->phy = NULL;
 
- drivers/net/ethernet/ti/cpsw.c          |   25 ++++++++++++++++---------
- drivers/net/ethernet/ti/davinci_cpdma.c |    4 ++--
- drivers/net/ethernet/ti/davinci_cpdma.h |    7 ++++++-
- 3 files changed, 24 insertions(+), 12 deletions(-)
+Ideally you shouldn't do this. Consider the case where 
+devm_usb_get_phy_dev returns -EPROBE_DEFER. In that case you should 
+return -EPROBE_DEFER from probe instead of manually writing the return 
+value to -ENODEV.
 
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 4ceed6e..7e93df6 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -510,19 +510,21 @@ static int cpsw_poll(struct napi_struct *napi, int budget)
- 	int			num_tx, num_rx;
- 
- 	num_tx = cpdma_chan_process(priv->txch, 128);
--	num_rx = cpdma_chan_process(priv->rxch, budget);
--
--	if (num_rx || num_tx)
--		cpsw_dbg(priv, intr, "poll %d rx, %d tx pkts\n",
--			 num_rx, num_tx);
-+	if (num_tx)
-+		cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
- 
-+	num_rx = cpdma_chan_process(priv->rxch, budget);
- 	if (num_rx < budget) {
- 		napi_complete(napi);
- 		cpsw_intr_enable(priv);
--		cpdma_ctlr_eoi(priv->dma);
-+		cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_RX);
- 		cpsw_enable_irq(priv);
- 	}
- 
-+	if (num_rx || num_tx)
-+		cpsw_dbg(priv, intr, "poll %d rx, %d tx pkts\n",
-+			 num_rx, num_tx);
-+
- 	return num_rx;
- }
- 
-@@ -835,7 +837,8 @@ static int cpsw_ndo_open(struct net_device *ndev)
- 	cpdma_ctlr_start(priv->dma);
- 	cpsw_intr_enable(priv);
- 	napi_enable(&priv->napi);
--	cpdma_ctlr_eoi(priv->dma);
-+	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_RX);
-+	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
- 
- 	if (priv->data.dual_emac)
- 		priv->slaves[priv->emac_port].open_stat = true;
-@@ -1075,7 +1078,9 @@ static void cpsw_ndo_tx_timeout(struct net_device *ndev)
- 	cpdma_chan_start(priv->txch);
- 	cpdma_ctlr_int_ctrl(priv->dma, true);
- 	cpsw_intr_enable(priv);
--	cpdma_ctlr_eoi(priv->dma);
-+	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_RX);
-+	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
-+
- }
- 
- static struct net_device_stats *cpsw_ndo_get_stats(struct net_device *ndev)
-@@ -1094,7 +1099,9 @@ static void cpsw_ndo_poll_controller(struct net_device *ndev)
- 	cpsw_interrupt(ndev->irq, priv);
- 	cpdma_ctlr_int_ctrl(priv->dma, true);
- 	cpsw_intr_enable(priv);
--	cpdma_ctlr_eoi(priv->dma);
-+	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_RX);
-+	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
-+
- }
- #endif
- 
-diff --git a/drivers/net/ethernet/ti/davinci_cpdma.c b/drivers/net/ethernet/ti/davinci_cpdma.c
-index 7d3bffd..68c3418 100644
---- a/drivers/net/ethernet/ti/davinci_cpdma.c
-+++ b/drivers/net/ethernet/ti/davinci_cpdma.c
-@@ -493,9 +493,9 @@ int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable)
- 	return 0;
- }
- 
--void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr)
-+void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr, u32 value)
- {
--	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, 0);
-+	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, value);
- }
- 
- struct cpdma_chan *cpdma_chan_create(struct cpdma_ctlr *ctlr, int chan_num,
-diff --git a/drivers/net/ethernet/ti/davinci_cpdma.h b/drivers/net/ethernet/ti/davinci_cpdma.h
-index a97d6ab..d9bcc60 100644
---- a/drivers/net/ethernet/ti/davinci_cpdma.h
-+++ b/drivers/net/ethernet/ti/davinci_cpdma.h
-@@ -26,6 +26,11 @@
- 
- #define CPDMA_RX_SOURCE_PORT(__status__)	((__status__ >> 16) & 0x7)
- 
-+#define CPDMA_EOI_RX_THRESH	0x0
-+#define CPDMA_EOI_RX		0x1
-+#define CPDMA_EOI_TX		0x2
-+#define CPDMA_EOI_MISC		0x3
-+
- struct cpdma_params {
- 	struct device		*dev;
- 	void __iomem		*dmaregs;
-@@ -88,7 +93,7 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
- int cpdma_chan_process(struct cpdma_chan *chan, int quota);
- 
- int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable);
--void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr);
-+void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr, u32 value);
- int cpdma_chan_int_ctrl(struct cpdma_chan *chan, bool enable);
- bool cpdma_check_free_tx_desc(struct cpdma_chan *chan);
- 
--- 
-1.7.9.5
+This comment is applicable for the remaining patches that uses 
+devm_usb_get_phy_dev.
+
+Thanks
+Kishon
