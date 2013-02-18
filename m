@@ -1,97 +1,48 @@
 From: wni@nvidia.com (Wei Ni)
-Date: Mon, 18 Feb 2013 19:30:25 +0800
-Subject: [RFC PATCH 3/9] hwmon: (lm90) add support to handle irq
-In-Reply-To: <1361187031-3679-1-git-send-email-wni@nvidia.com>
-References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
-Message-ID: <1361187031-3679-4-git-send-email-wni@nvidia.com>
+Date: Mon, 18 Feb 2013 19:30:22 +0800
+Subject: [RFC PATCH 0/9] Support for tegra30 thermal.
+Message-ID: <1361187031-3679-1-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to handle irq. When the temperature touch the limit value, the
-driver can handle the interrupt.
+This patch series is to add tegra30 thermal driver.
+It use new linux thermal framework, which is developing by Durgadoss.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Signed-off-by: Wei Ni <wni@nvidia.com>
----
- drivers/hwmon/lm90.c |   38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+Note:
+1. my series are based on the patches:
+http://thread.gmane.org/gmane.linux.power-management.general/30692 ,
+which come from Durgadoss.
+And the tree is Rui's -next tree.
 
-diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
-index caf01b0..80311ef 100644
---- a/drivers/hwmon/lm90.c
-+++ b/drivers/hwmon/lm90.c
-@@ -89,6 +89,8 @@
- #include <linux/err.h>
- #include <linux/mutex.h>
- #include <linux/sysfs.h>
-+#include <linux/interrupt.h>
-+#include <linux/of_irq.h>
- 
- /*
-  * Addresses to scan
-@@ -302,6 +304,7 @@ static const struct lm90_params lm90_params[] = {
- struct lm90_data {
- 	struct device *hwmon_dev;
- 	struct mutex update_lock;
-+	struct work_struct irq_work;
- 	char valid; /* zero until following fields are valid */
- 	unsigned long last_updated; /* in jiffies */
- 	int kind;
-@@ -1418,6 +1421,29 @@ static void lm90_init_client(struct i2c_client *client)
- 		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, config);
- }
- 
-+static void lm90_alert(struct i2c_client *client, unsigned int flag);
-+
-+static void lm90_irq_work(struct work_struct *work)
-+{
-+	struct lm90_data *data = container_of(work, struct lm90_data,
-+					      irq_work);
-+	struct i2c_client *client = to_i2c_client(data->hwmon_dev->parent);
-+
-+	lm90_alert(client, 0);
-+
-+	enable_irq(client->irq);
-+}
-+
-+static irqreturn_t lm90_irq(int irq, void *dev_id)
-+{
-+	struct lm90_data *data = dev_id;
-+
-+	disable_irq_nosync(irq);
-+	schedule_work(&data->irq_work);
-+
-+	return IRQ_HANDLED;
-+}
-+
- static int lm90_probe(struct i2c_client *client,
- 		      const struct i2c_device_id *id)
- {
-@@ -1494,6 +1520,17 @@ static int lm90_probe(struct i2c_client *client,
- 		goto exit_remove_files;
- 	}
- 
-+	if (client->irq >= 0) {
-+		INIT_WORK(&data->irq_work, lm90_irq_work);
-+		dev_dbg(dev, "lm90 irq: %d\n", client->irq);
-+		err = request_irq(client->irq, lm90_irq, IRQF_TRIGGER_LOW,
-+				       "lm90", data);
-+		if (err < 0) {
-+			dev_err(dev, "cannot request interrupt\n");
-+			goto exit_remove_files;
-+		}
-+	}
-+
- 	return 0;
- 
- exit_remove_files:
-@@ -1507,6 +1544,7 @@ static int lm90_remove(struct i2c_client *client)
- {
- 	struct lm90_data *data = i2c_get_clientdata(client);
- 
-+	free_irq(client->irq, data);
- 	hwmon_device_unregister(data->hwmon_dev);
- 	lm90_remove_files(client, data);
- 	lm90_restore_conf(client, data);
+Next steps:
+1. enhance the tegra30 thermal driver, something like handling the irq, setting
+the sensor limit value.
+2. seprate codes to create a new files which is for cooling device, something
+like tegra3_cooling.c. it will handle dvfs.
+
+Wei Ni (9):
+  ARM: dt: t30 cardhu: add dt entry for lm90
+  hwmon: (lm90) split set&show temp as common codes
+  hwmon: (lm90) add support to handle irq
+  hwmon: (lm90) use macros for the indexes of temp8 and temp11
+  Thermal: Support using dt node to get sensor
+  hwmon: (lm90) Register to the thermal framework
+  thermal: tegra30: add tegra30 thermal driver
+  ARM: dt: t30 cardhu: add dt entry for thermal driver
+  ARM: tegra: defconfig: enable thermal framework
+
+ .../devicetree/bindings/thermal/tegra3-thermal.txt |   41 ++
+ arch/arm/boot/dts/tegra30-cardhu.dtsi              |   27 +
+ arch/arm/configs/tegra_defconfig                   |    2 +
+ drivers/hwmon/lm90.c                               |  514 +++++++++++++++-----
+ drivers/thermal/Kconfig                            |    9 +
+ drivers/thermal/Makefile                           |    1 +
+ drivers/thermal/tegra3_thermal.c                   |  289 +++++++++++
+ drivers/thermal/thermal_sys.c                      |   30 ++
+ include/linux/thermal.h                            |    9 +
+ 9 files changed, 812 insertions(+), 110 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/thermal/tegra3-thermal.txt
+ create mode 100644 drivers/thermal/tegra3_thermal.c
+
 -- 
 1.7.9.5
