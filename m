@@ -1,102 +1,87 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Mon, 18 Feb 2013 10:08:53 +0100
-Subject: ARM coherent allocs, Was: ixp4xx eth broken in 3.7.0/3.8-rc5?
-In-Reply-To: <m3a9r2d5md.fsf_-_@intrepid.localdomain>
-References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
- <m34nhk9ef7.fsf@intrepid.localdomain>
- <m3a9r2d5md.fsf_-_@intrepid.localdomain>
-Message-ID: <20769.61349.124371.633959@pilspetsen.it.uu.se>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 18 Feb 2013 18:36:12 +0900
+Subject: [PATCH 3/4] ARM: mach-shmobile: r8a7779: Minimal setup using DT
+In-Reply-To: <1359597051-32700-4-git-send-email-horms+renesas@verge.net.au>
+References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
+ <1359597051-32700-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CANqRtoRgA_U2onxnOJ7N2wec1C-V4ZE25UEDC5Dm8KstLPuhEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Halasa writes:
- > Hi,
- > 
- > I'm not sure how is it supposed to work. Environment: IXP4xx CPU,
- > only 64 MB (of 256 MB) of RAM is available for PCI bus master DMA,
- > /dev/sda is a PATA CF or SATA SSD using CS5536-based PATA interface
- > (SATA - with a bridge) in DMA (PCI bus master) mode.
- > 
- > It works in PIO mode.
- > The problem seems to be this: pci_dev->dev.coherent_dma_mask is 0x3FFFFFF
- > (64MB-1). Yet __dma_alloc() called with GFP_DMA returns memory
- > physically located (dma_handle) above 64MB region.
+Hi Simon,
 
-Isn't that what the ARM-specific dma bounce allocator is supposed to
-handle?  Or did e9da6e9905e639b0f842a244bc770b48ad0523e9 disable that one?
+Here's some feedback on your r8a7779 DT code.
 
-My ixp4xx box only has 64MB RAM so there is never any bouncing there,
-in fact I patch my kernel to disable the bounce support entirely.
+On Thu, Jan 31, 2013 at 10:50 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Allow a minimal setup of the r8a7779 SoC using a flattened device tree.
+> In particular, configure the i2c and ethernet controllers using a
+> flattened device tree.
+>
+> SCI serial controller and TMU clock source, whose drivers do not yet
+> support configuration using a flattened device tree, are still configured
+> using C code in order to allow booting of a board with this SoC.
+>
+> The ethernet controller also requires a regulator which is a board property.
+> A sample snippet DT for the marzen board is as follows:
+>
+> /dts-v1/;
+> /include/ "r8a7779.dtsi"
+>
+> / {
+>         fixedregulator3v3: fixedregulator at 0 {
+>                 compatible = "regulator-fixed";
+>                 regulator-name = "fixed-3.3V";
+>                 regulator-min-microvolt = <3300000>;
+>                 regulator-max-microvolt = <3300000>;
+>                 regulator-boot-on;
+>                 regulator-always-on;
+>         };
+> };
+>
+> &lan0 {
+>         vddvario-supply = <&fixedregulator3v3>;
+>         vdd33a-supply = <&fixedregulator3v3>;
+> };
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
 
-/Mikael
+> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+> @@ -321,7 +321,7 @@ static struct platform_device i2c3_device = {
+>         .num_resources  = ARRAY_SIZE(rcar_i2c3_res),
+>  };
+>
+> -static struct platform_device *r8a7779_early_devices[] __initdata = {
+> +static struct platform_device *r8a7779_early_devices_dt[] __initdata = {
+>         &scif0_device,
+>         &scif1_device,
+>         &scif2_device,
+> @@ -330,15 +330,15 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
+>         &scif5_device,
+>         &tmu00_device,
+>         &tmu01_device,
+> +};
+> +
+> +static struct platform_device *r8a7779_early_devices[] __initdata = {
+>         &i2c0_device,
+>         &i2c1_device,
+>         &i2c2_device,
+>         &i2c3_device,
+>  };
+>
+> -static struct platform_device *r8a7779_late_devices[] __initdata = {
+> -};
+> -
 
- > 
- > Bisecting shows this commit broke it:
- > 
- > > I haven't yet tried the Ethernet driver but it seems my IXP425 box
- > > doesn't like this while mounting a disk (PCI CS3356-based IDE CF card).
- > >
- > > commit e9da6e9905e639b0f842a244bc770b48ad0523e9
- > > Author: Marek Szyprowski <m.szyprowski@samsung.com>
- > > Date:   Mon Jul 30 09:11:33 2012 +0200
- > >
- > >     ARM: dma-mapping: remove custom consistent dma region
- > >
- > >     This patch changes dma-mapping subsystem to use generic vmalloc areas
- > >     for all consistent dma allocations. This increases the total size limit
- > >     of the consistent allocations and removes platform hacks and a lot of
- > >     duplicated code.
- > >
- > >     Atomic allocations are served from special pool preallocated on boot,
- > >     because vmalloc areas cannot be reliably created in atomic context.
- > 
- > I'm trying to understand it (current code as of v3.8rc-7):
- > 
- > static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- >                          gfp_t gfp, pgprot_t prot, bool is_coherent, const void *caller)
- > {
- >         u64 mask = get_coherent_dma_mask(dev);
- > ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This gets 64MB - 1
- >         struct page *page = NULL;
- >         void *addr;
- > 
- > #ifdef CONFIG_DMA_API_DEBUG
- >         u64 limit = (mask + 1) & ~mask;
- >         if (limit && size >= limit) {
- >                 dev_warn(dev, "coherent allocation too big (requested %#x mask %#llx)\n",
- >                         size, mask);
- >                 return NULL;
- >         }
- > #endif
- > 
- >         if (!mask)
- >                 return NULL;
- > 
- >         if (mask < 0xffffffffULL)
- >                 gfp |= GFP_DMA;
- > 
- >         /*
- >          * Following is a work-around (a.k.a. hack) to prevent pages
- >          * with __GFP_COMP being passed to split_page() which cannot
- >          * handle them.  The real problem is that this flag probably
- >          * should be 0 on ARM as it is not supported on this
- >          * platform; see CONFIG_HUGETLBFS.
- >          */
- >         gfp &= ~(__GFP_COMP);
- > 
- >         *handle = DMA_ERROR_CODE;
- >         size = PAGE_ALIGN(size);
- > 
- >         if (is_coherent || nommu())
- >                 addr = __alloc_simple_buffer(dev, size, gfp, &page);
- >         else if (!(gfp & __GFP_WAIT))
- >                 addr = __alloc_from_pool(size, &page);
- > ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- >         else ...
- > 
- > Is the pool supposed to live in GFP_DMA area or should we use more
- > pools? We call __alloc_from_pool() but it knows nothing about our
- > device's coherent_dma_mask or GFP flags.
- > -- 
- > Krzysztof Halasa
- > 
+Thanks for your work on this. Two things with early/late devices on r8a7779:
+
+1)  Same thing as sh73a0 applies here, please refrain from using early
+devices with DT.
+2) The i2c devices as early devices look incorrect. Can you make them
+late devices?
+
+Cheers,
+
+/ magnus
