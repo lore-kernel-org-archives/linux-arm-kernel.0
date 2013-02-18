@@ -1,188 +1,104 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 17 Feb 2013 18:33:05 -0500
-Subject: [GIT PULL] ARM: mvebu: boards for v3.9 (merge and build fix
- against arm-soc/timer/cleanup)
-Message-ID: <20130217233305.GM23237@titan.lakedaemon.net>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Mon, 18 Feb 2013 01:13:46 +0100
+Subject: [RFC] ARM: sa1100: collie-battery.c: include platform_device.h
+ directly
+In-Reply-To: <20130216230010.GG1741@lizard.sbx05280.losalca.wayport.net>
+References: <1361038560-3690-1-git-send-email-andrea.adami@gmail.com>
+ <20130216230010.GG1741@lizard.sbx05280.losalca.wayport.net>
+Message-ID: <CAAQYJAt0CGi3ZLO8eoYj64Ay06Yry_w8A6aPHHH1tpeyp=Ns4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7649cca52a73c10712b033b4eba908c48d9c0bb7:
+On Sun, Feb 17, 2013 at 12:00 AM, Anton Vorontsov <anton@enomsg.org> wrote:
+> Hi Andrea,
+>
+> On Sat, Feb 16, 2013 at 07:16:00PM +0100, Andrea Adami wrote:
+>> Initial try to fix compilation error
+>
+> Things are a bit more complex...
+>
+>> linux/include/linux/mfd/mcp.h:22:16: error: field 'attached_device' has incomplete type
+>
+> You have to add #include <linux/device.h> into mfd/mcp.h. This will add
+> struct device and...
+>
+Bingo.Adding it solves all following errors, no need for further inclusions.
 
-  arm: mvebu: update defconfig with ATAG support when using DT (2013-02-16 16:46:28 +0000)
+>> linux/include/linux/mfd/mcp.h:48:23: error: field 'drv' has incomplete type
+>
+> struct device_driver.
+>
+>> linux/include/linux/mfd/ucb1x00.h:137:17: error: field 'dev' has incomplete type
+>
+> Same here, the file ucb1x00.h needs #include <linux/device.h>.
+>
+Seems not needed, mcp.h is included by ucb1x00.h
 
-are available in the git repository at:
+>> linux/drivers/power/collie_battery.c:290:56: error: unknown type name 'pm_message_t'
+>
+> #include <linux/pm.h> into collie_battery.c
+>
+Seems not needed, is included in mcp-sa11x0.c (included by collie_battery.c)
 
-  git://git.infradead.org/users/jcooper/linux.git tags/boards_for_v3.9_round3
+The warning remains, though:
+ linux/drivers/power/collie_battery.c:372:2: warning: initialization
+from incompatible pointer type [enabled by default]
 
-for you to fetch changes up to ab7a8e7bc41545625bf1c73cb100b1f9ab0845d1:
+> Thanks,
+>
+> Anton
+>
 
-  Merge remote-tracking branch 'arm-soc/timer/cleanup' into mvebu/boards (2013-02-17 22:51:56 +0000)
+Thank you for your attention
 
-----------------------------------------------------------------
+Regards
 
-mvebu boards for v3.9 round3
+Andrea
 
- - Fixed the conflict and the build breakage listed below by merging in
-   arm-soc/timer/cleanup.  The fixes are contained in the merge commit.
 
-New Depends for mvebu/boards
- - arm-soc/timer/cleanup
 
-** From previous tag boards_for_v3.9 **
-depends on:
- - tags/mvebu_fixes_for_v3.8-rc6
- - tags/cleanup_for_v3.9_round2
- - tags/drivers_for_v3.9
- - mmc/mmc-next up to:
-    d293875 mmc: mvsdio: add pinctrl integration
+Thanks
+>> linux/drivers/power/collie_battery.c:371:13: error: 'collie_bat_suspend' undeclared here (not in a function)
+>> | make[4]: *** [drivers/power/collie_battery.o] Error 1
+>> | make[3]: *** [drivers/power] Error 2
+>>
+>> As seen in Arnd Bergmann patches on LAKML
+>> [PATCH 7/9] ARM defconfigs: add missing inclusions of linux/platform_device.h
+>> [PATCH 1/9] ARM: sa1100/assabet: include platform_device.h directly
+>>
+>> Compilation is still not clean, two warnings:
+>> linux/drivers/power/collie_battery.c:372:2: warning: initialization from incompatible pointer type [enabled by default]
+>> linux/drivers/power/collie_battery.c:372:2: warning: (near initialization for 'collie_bat_driver.suspend') [enabled by default]
+>>
+>> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+>> ---
+>>  drivers/power/collie_battery.c            |      1 +
+>>  drivers/video/logo/logo_linux_clut224.ppm | 232006 ++++++++++++++++++++++++++-
+>>  2 files changed, 230404 insertions(+), 1603 deletions(-)
+>>
+>> diff --git a/drivers/power/collie_battery.c b/drivers/power/collie_battery.c
+>> index c58d0e3..52cbab3 100644
+>> --- a/drivers/power/collie_battery.c
+>> +++ b/drivers/power/collie_battery.c
+>> @@ -14,6 +14,7 @@
+>>  #include <linux/module.h>
+>>  #include <linux/power_supply.h>
+>>  #include <linux/delay.h>
+>> +#include <linux/platform_device.h>
+>
+> I don't see anywhere in the driver which would need platform_device.h...
+> But pm.h, yes.
+>
+Sorry, I'm not a kernel developer. It was a desperate try to unbrick build.
+I'm just maintaining the layer needed to build Zaurus images using
+Yocto toolchain.
+Up to now, I could only build a working linux-as-bootloader kernel
+(kexecboot) for collie with old 2.6.31+ sources:
+userspace is not a problem now but the poor device is suffering some
+serious bitrot :/
 
-conflicts:
- - arm-soc/for-next
-    - arch/arm/mach-dove/common.c
-       * remove all DT code (it's now in .../board-dt.c)
-
-build fixes (not merge conflict)
- - arm-soc/for-next
-    - arch/arm/mach-dove/board-dt.c
-       - .timer no longer used
-       * s/.timer = &dove_timer/.init_time = dove_timer_init/ (not valid sed)
-
-----------------------------------------------------------------
-Jason Cooper (1):
-      Merge remote-tracking branch 'arm-soc/timer/cleanup' into mvebu/boards
-
-I'm open to ideas for how to get a true --stat of what I changed in the
-merge commit, below is the most concise output I could generate.
-
-Output of 'git show --oneline':
-
-ab7a8e7 Merge remote-tracking branch 'arm-soc/timer/cleanup' into mvebu/boards
-
-diff --cc arch/arm/mach-dove/board-dt.c
-index 2310f55,0000000..f8f891b
-mode 100644,000000..100644
---- a/arch/arm/mach-dove/board-dt.c
-+++ b/arch/arm/mach-dove/board-dt.c
-@@@ -1,102 -1,0 +1,102 @@@
- +/*
- + * arch/arm/mach-dove/board-dt.c
- + *
- + * Marvell Dove 88AP510 System On Chip FDT Board
- + *
- + * This file is licensed under the terms of the GNU General Public
- + * License version 2.  This program is licensed "as is" without any
- + * warranty of any kind, whether express or implied.
- + */
- +
- +#include <linux/init.h>
- +#include <linux/clk-provider.h>
- +#include <linux/clk/mvebu.h>
- +#include <linux/of.h>
- +#include <linux/of_platform.h>
- +#include <linux/platform_data/usb-ehci-orion.h>
- +#include <asm/hardware/cache-tauros2.h>
- +#include <asm/mach/arch.h>
- +#include <mach/pm.h>
- +#include <plat/common.h>
- +#include <plat/irq.h>
- +#include "common.h"
- +
- +/*
- + * There are still devices that doesn't even know about DT,
- + * get clock gates here and add a clock lookup.
- + */
- +static void __init dove_legacy_clk_init(void)
- +{
- +	struct device_node *np = of_find_compatible_node(NULL, NULL,
- +					 "marvell,dove-gating-clock");
- +	struct of_phandle_args clkspec;
- +
- +	clkspec.np = np;
- +	clkspec.args_count = 1;
- +
- +	clkspec.args[0] = CLOCK_GATING_BIT_USB0;
- +	orion_clkdev_add(NULL, "orion-ehci.0",
- +			 of_clk_get_from_provider(&clkspec));
- +
- +	clkspec.args[0] = CLOCK_GATING_BIT_USB1;
- +	orion_clkdev_add(NULL, "orion-ehci.1",
- +			 of_clk_get_from_provider(&clkspec));
- +
- +	clkspec.args[0] = CLOCK_GATING_BIT_GBE;
- +	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
- +			 of_clk_get_from_provider(&clkspec));
- +
- +	clkspec.args[0] = CLOCK_GATING_BIT_PCIE0;
- +	orion_clkdev_add("0", "pcie",
- +			 of_clk_get_from_provider(&clkspec));
- +
- +	clkspec.args[0] = CLOCK_GATING_BIT_PCIE1;
- +	orion_clkdev_add("1", "pcie",
- +			 of_clk_get_from_provider(&clkspec));
- +}
- +
- +static void __init dove_of_clk_init(void)
- +{
- +	mvebu_clocks_init();
- +	dove_legacy_clk_init();
- +}
- +
- +static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
- +	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
- +};
- +
- +static void __init dove_dt_init(void)
- +{
- +	pr_info("Dove 88AP510 SoC\n");
- +
- +#ifdef CONFIG_CACHE_TAUROS2
- +	tauros2_init(0);
- +#endif
- +	dove_setup_cpu_mbus();
- +
- +	/* Setup root of clk tree */
- +	dove_of_clk_init();
- +
- +	/* Internal devices not ported to DT yet */
- +	dove_ge00_init(&dove_dt_ge00_data);
- +	dove_ehci0_init();
- +	dove_ehci1_init();
- +	dove_pcie_init(1, 1);
- +
- +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- +}
- +
- +static const char * const dove_dt_board_compat[] = {
- +	"marvell,dove",
- +	NULL
- +};
- +
- +DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
- +	.map_io		= dove_map_io,
- +	.init_early	= dove_init_early,
- +	.init_irq	= orion_dt_init_irq,
-- 	.timer		= &dove_timer,
-++	.init_time      = dove_timer_init,
- +	.init_machine	= dove_dt_init,
- +	.restart	= dove_restart,
- +	.dt_compat	= dove_dt_board_compat,
- +MACHINE_END
-diff --cc arch/arm/mach-highbank/highbank.c
-index 981dc1e,f6ca285..41e254c
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@@ -129,13 -129,9 +129,9 @@@ static void __init highbank_timer_init(
-  	arch_timer_sched_clock_init();
-  }
-  
-- static struct sys_timer highbank_timer = {
-- 	.init = highbank_timer_init,
-- };
-- 
-  static void highbank_power_off(void)
-  {
- -	hignbank_set_pwr_shutdown();
- +	highbank_set_pwr_shutdown();
-  
-  	while (1)
-  		cpu_do_idle();
+>>  #include <linux/spinlock.h>
+>>  #include <linux/interrupt.h>
+>>  #include <linux/gpio.h>
+>> --
+>> 1.7.12.4
