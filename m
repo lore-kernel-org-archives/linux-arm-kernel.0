@@ -1,214 +1,102 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 18 Feb 2013 17:32:45 +0900
-Subject: [PATCH v6 07/16] ARM: Exynos: Initialize the clocks prior to
- timer initialization
-In-Reply-To: <1361175686-19400-8-git-send-email-thomas.abraham@linaro.org>
-References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
- <1361175686-19400-8-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAH9JG2VQTqdwihyPsx-qgE5va3zdm7N+PZSvVu0N-49+sN9MFQ@mail.gmail.com>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Mon, 18 Feb 2013 10:08:53 +0100
+Subject: ARM coherent allocs, Was: ixp4xx eth broken in 3.7.0/3.8-rc5?
+In-Reply-To: <m3a9r2d5md.fsf_-_@intrepid.localdomain>
+References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
+ <m34nhk9ef7.fsf@intrepid.localdomain>
+ <m3a9r2d5md.fsf_-_@intrepid.localdomain>
+Message-ID: <20769.61349.124371.633959@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 5:21 PM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> Since the clock initialization should be completed prior to the mct timer
-> initialization, create a new function 'exynos_init_time' that first sets up
-> the clock and then invokes the timer initialization function. The 'init_time'
-> callback in the board files are updated to invoke this new wrapper function.
->
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  arch/arm/mach-exynos/common.c              |   16 ++++++++++++++++
->  arch/arm/mach-exynos/mach-armlex4210.c     |    2 +-
->  arch/arm/mach-exynos/mach-exynos4-dt.c     |    2 +-
->  arch/arm/mach-exynos/mach-exynos5-dt.c     |    2 +-
->  arch/arm/mach-exynos/mach-nuri.c           |    2 +-
->  arch/arm/mach-exynos/mach-origen.c         |    2 +-
->  arch/arm/mach-exynos/mach-smdk4x12.c       |    4 ++--
->  arch/arm/mach-exynos/mach-smdkv310.c       |    4 ++--
->  arch/arm/mach-exynos/mach-universal_c210.c |    8 +++++++-
->  9 files changed, 32 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index 8e4a25c..64585af 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -23,6 +23,8 @@
->  #include <linux/export.h>
->  #include <linux/irqdomain.h>
->  #include <linux/of_address.h>
-> +#include <linux/clocksource.h>
-> +#include <linux/clk-provider.h>
->
->  #include <asm/proc-fns.h>
->  #include <asm/exception.h>
-> @@ -436,6 +438,20 @@ static void __init exynos5440_map_io(void)
->         iotable_init(exynos5440_iodesc0, ARRAY_SIZE(exynos5440_iodesc0));
->  }
->
-> +void __init exynos_init_time(void)
-> +{
-> +       if (of_have_populated_dt()) {
-> +#ifdef CONFIG_OF
-> +               of_clk_init(NULL);
-> +               clocksource_of_init();
-> +#endif
-> +       } else {
-> +               /* todo: remove after migrating legacy E4 platforms to dt */
-> +               exynos4_clk_init(NULL);
-> +               mct_init();
-> +       }
-> +}
-> +
->  #define COMBINER_ENABLE_SET    0x0
->  #define COMBINER_ENABLE_CLEAR  0x4
->  #define COMBINER_INT_STATUS    0xC
-> diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
-> index e45b4b4..3518ac8 100644
-> --- a/arch/arm/mach-exynos/mach-armlex4210.c
-> +++ b/arch/arm/mach-exynos/mach-armlex4210.c
-> @@ -203,6 +203,6 @@ MACHINE_START(ARMLEX4210, "ARMLEX4210")
->         .handle_irq     = gic_handle_irq,
->         .init_machine   = armlex4210_machine_init,
->         .init_late      = exynos_init_late,
-> -       .init_time      = mct_init,
-> +       .init_time      = exynos_init_time,
->         .restart        = exynos4_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> index 2c25f2c..6c5e068 100644
-> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> @@ -127,7 +127,7 @@ DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
->         .init_early     = exynos_firmware_init,
->         .init_machine   = exynos4_dt_machine_init,
->         .init_late      = exynos_init_late,
-> -       .init_time      = clocksource_of_init,
-> +       .init_time      = exynos_init_time,
->         .dt_compat      = exynos4_dt_compat,
->         .restart        = exynos4_restart,
->         .reserve        = exynos4_reserve,
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> index b5f9549..dfe51ee 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -179,7 +179,7 @@ DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
->         .handle_irq     = gic_handle_irq,
->         .init_machine   = exynos5_dt_machine_init,
->         .init_late      = exynos_init_late,
-> -       .init_time      = clocksource_of_init,
-> +       .init_time      = exynos_init_time,
->         .dt_compat      = exynos5_dt_compat,
->         .restart        = exynos5_restart,
->         .reserve        = exynos5_reserve,
-> diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-> index c49ec9d..cdae74b 100644
-> --- a/arch/arm/mach-exynos/mach-nuri.c
-> +++ b/arch/arm/mach-exynos/mach-nuri.c
-> @@ -1381,7 +1381,7 @@ MACHINE_START(NURI, "NURI")
->         .handle_irq     = gic_handle_irq,
->         .init_machine   = nuri_machine_init,
->         .init_late      = exynos_init_late,
-> -       .init_time      = mct_init,
-> +       .init_time      = exynos_init_time,
->         .reserve        = &nuri_reserve,
->         .restart        = exynos4_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-> index 656967d..e9ab921 100644
-> --- a/arch/arm/mach-exynos/mach-origen.c
-> +++ b/arch/arm/mach-exynos/mach-origen.c
-> @@ -816,7 +816,7 @@ MACHINE_START(ORIGEN, "ORIGEN")
->         .handle_irq     = gic_handle_irq,
->         .init_machine   = origen_machine_init,
->         .init_late      = exynos_init_late,
-> -       .init_time      = mct_init,
-> +       .init_time      = exynos_init_time,
->         .reserve        = &origen_reserve,
->         .restart        = exynos4_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
-> index c56cc21..71422ad 100644
-> --- a/arch/arm/mach-exynos/mach-smdk4x12.c
-> +++ b/arch/arm/mach-exynos/mach-smdk4x12.c
-> @@ -377,7 +377,7 @@ MACHINE_START(SMDK4212, "SMDK4212")
->         .map_io         = smdk4x12_map_io,
->         .handle_irq     = gic_handle_irq,
->         .init_machine   = smdk4x12_machine_init,
-> -       .init_time      = mct_init,
-> +       .init_time      = exynos_init_time,
->         .restart        = exynos4_restart,
->         .reserve        = &smdk4x12_reserve,
->  MACHINE_END
-> @@ -392,7 +392,7 @@ MACHINE_START(SMDK4412, "SMDK4412")
->         .handle_irq     = gic_handle_irq,
->         .init_machine   = smdk4x12_machine_init,
->         .init_late      = exynos_init_late,
-> -       .init_time      = mct_init,
-> +       .init_time      = exynos_init_time,
->         .restart        = exynos4_restart,
->         .reserve        = &smdk4x12_reserve,
->  MACHINE_END
-> diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
-> index 9d511f5..eb51c06 100644
-> --- a/arch/arm/mach-exynos/mach-smdkv310.c
-> +++ b/arch/arm/mach-exynos/mach-smdkv310.c
-> @@ -424,7 +424,7 @@ MACHINE_START(SMDKV310, "SMDKV310")
->         .map_io         = smdkv310_map_io,
->         .handle_irq     = gic_handle_irq,
->         .init_machine   = smdkv310_machine_init,
-> -       .init_time      = mct_init,
-> +       .init_time      = exynos_init_time,
->         .reserve        = &smdkv310_reserve,
->         .restart        = exynos4_restart,
->  MACHINE_END
-> @@ -438,7 +438,7 @@ MACHINE_START(SMDKC210, "SMDKC210")
->         .handle_irq     = gic_handle_irq,
->         .init_machine   = smdkv310_machine_init,
->         .init_late      = exynos_init_late,
-> -       .init_time      = mct_init,
-> +       .init_time      = exynos_init_time,
->         .reserve        = &smdkv310_reserve,
->         .restart        = exynos4_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-> index 3998c81..53de074 100644
-> --- a/arch/arm/mach-exynos/mach-universal_c210.c
-> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
-> @@ -1144,6 +1144,12 @@ static void __init universal_machine_init(void)
->         platform_add_devices(universal_devices, ARRAY_SIZE(universal_devices));
->  }
->
-> +static void __init universal_init_time(void)
-> +{
-> +       exynos4_clk_init(NULL);
-> +       mct_init();
-No, It's not support MCT timer at universal board, please don't modify
-universal board at this time.
-Others are okay.
+Krzysztof Halasa writes:
+ > Hi,
+ > 
+ > I'm not sure how is it supposed to work. Environment: IXP4xx CPU,
+ > only 64 MB (of 256 MB) of RAM is available for PCI bus master DMA,
+ > /dev/sda is a PATA CF or SATA SSD using CS5536-based PATA interface
+ > (SATA - with a bridge) in DMA (PCI bus master) mode.
+ > 
+ > It works in PIO mode.
+ > The problem seems to be this: pci_dev->dev.coherent_dma_mask is 0x3FFFFFF
+ > (64MB-1). Yet __dma_alloc() called with GFP_DMA returns memory
+ > physically located (dma_handle) above 64MB region.
 
-Thank you,
-Kyungmin Park
-> +}
-> +
->  MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
->         /* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
->         .atag_offset    = 0x100,
-> @@ -1153,7 +1159,7 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
->         .handle_irq     = gic_handle_irq,
->         .init_machine   = universal_machine_init,
->         .init_late      = exynos_init_late,
-> -       .init_time      = samsung_timer_init,
-> +       .init_time      = universal_init_time,
->         .reserve        = &universal_reserve,
->         .restart        = exynos4_restart,
->  MACHINE_END
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Isn't that what the ARM-specific dma bounce allocator is supposed to
+handle?  Or did e9da6e9905e639b0f842a244bc770b48ad0523e9 disable that one?
+
+My ixp4xx box only has 64MB RAM so there is never any bouncing there,
+in fact I patch my kernel to disable the bounce support entirely.
+
+/Mikael
+
+ > 
+ > Bisecting shows this commit broke it:
+ > 
+ > > I haven't yet tried the Ethernet driver but it seems my IXP425 box
+ > > doesn't like this while mounting a disk (PCI CS3356-based IDE CF card).
+ > >
+ > > commit e9da6e9905e639b0f842a244bc770b48ad0523e9
+ > > Author: Marek Szyprowski <m.szyprowski@samsung.com>
+ > > Date:   Mon Jul 30 09:11:33 2012 +0200
+ > >
+ > >     ARM: dma-mapping: remove custom consistent dma region
+ > >
+ > >     This patch changes dma-mapping subsystem to use generic vmalloc areas
+ > >     for all consistent dma allocations. This increases the total size limit
+ > >     of the consistent allocations and removes platform hacks and a lot of
+ > >     duplicated code.
+ > >
+ > >     Atomic allocations are served from special pool preallocated on boot,
+ > >     because vmalloc areas cannot be reliably created in atomic context.
+ > 
+ > I'm trying to understand it (current code as of v3.8rc-7):
+ > 
+ > static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ >                          gfp_t gfp, pgprot_t prot, bool is_coherent, const void *caller)
+ > {
+ >         u64 mask = get_coherent_dma_mask(dev);
+ > ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This gets 64MB - 1
+ >         struct page *page = NULL;
+ >         void *addr;
+ > 
+ > #ifdef CONFIG_DMA_API_DEBUG
+ >         u64 limit = (mask + 1) & ~mask;
+ >         if (limit && size >= limit) {
+ >                 dev_warn(dev, "coherent allocation too big (requested %#x mask %#llx)\n",
+ >                         size, mask);
+ >                 return NULL;
+ >         }
+ > #endif
+ > 
+ >         if (!mask)
+ >                 return NULL;
+ > 
+ >         if (mask < 0xffffffffULL)
+ >                 gfp |= GFP_DMA;
+ > 
+ >         /*
+ >          * Following is a work-around (a.k.a. hack) to prevent pages
+ >          * with __GFP_COMP being passed to split_page() which cannot
+ >          * handle them.  The real problem is that this flag probably
+ >          * should be 0 on ARM as it is not supported on this
+ >          * platform; see CONFIG_HUGETLBFS.
+ >          */
+ >         gfp &= ~(__GFP_COMP);
+ > 
+ >         *handle = DMA_ERROR_CODE;
+ >         size = PAGE_ALIGN(size);
+ > 
+ >         if (is_coherent || nommu())
+ >                 addr = __alloc_simple_buffer(dev, size, gfp, &page);
+ >         else if (!(gfp & __GFP_WAIT))
+ >                 addr = __alloc_from_pool(size, &page);
+ > ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ >         else ...
+ > 
+ > Is the pool supposed to live in GFP_DMA area or should we use more
+ > pools? We call __alloc_from_pool() but it knows nothing about our
+ > device's coherent_dma_mask or GFP flags.
+ > -- 
+ > Krzysztof Halasa
+ > 
