@@ -1,28 +1,37 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 18 Feb 2013 12:45:20 -0300
-Subject: [PATCH] ARM: imx_v4_v5_defconfig: Add CONFIG_GPIO_SYSFS
-Message-ID: <1361202320-25917-1-git-send-email-fabio.estevam@freescale.com>
+From: walken@google.com (Michel Lespinasse)
+Date: Mon, 18 Feb 2013 23:51:41 +0800
+Subject: [PATCH v6 07/46] percpu_rwlock: Allow writers to be readers, and
+ add lockdep annotations
+In-Reply-To: <20130218123913.26245.7713.stgit@srivatsabhat.in.ibm.com>
+References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
+ <20130218123913.26245.7713.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <CANN689Ec4g7jMapv8ChAEom+gEDQ8RDVLa07CKwJ==YO+MUUrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CONFIG_GPIO_SYSFS as it is helpful for accessing GPIO from userspace.
+On Mon, Feb 18, 2013 at 8:39 PM, Srivatsa S. Bhat
+<srivatsa.bhat@linux.vnet.ibm.com> wrote:
+> @@ -200,6 +217,16 @@ void percpu_write_lock_irqsave(struct percpu_rwlock *pcpu_rwlock,
+>
+>         smp_mb(); /* Complete the wait-for-readers, before taking the lock */
+>         write_lock_irqsave(&pcpu_rwlock->global_rwlock, *flags);
+> +
+> +       /*
+> +        * It is desirable to allow the writer to acquire the percpu-rwlock
+> +        * for read (if necessary), without deadlocking or getting complaints
+> +        * from lockdep. To achieve that, just increment the reader_refcnt of
+> +        * this CPU - that way, any attempt by the writer to acquire the
+> +        * percpu-rwlock for read, will get treated as a case of nested percpu
+> +        * reader, which is safe, from a locking perspective.
+> +        */
+> +       this_cpu_inc(pcpu_rwlock->rw_state->reader_refcnt);
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v4_v5_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+I find this quite disgusting, but once again this may be because I
+don't like unfair recursive rwlocks.
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index 02c657a..f07a847 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -109,6 +109,7 @@ CONFIG_I2C_IMX=y
- CONFIG_SPI=y
- CONFIG_SPI_IMX=y
- CONFIG_SPI_SPIDEV=y
-+CONFIG_GPIO_SYSFS=y
- CONFIG_W1=y
- CONFIG_W1_MASTER_MXC=y
- CONFIG_W1_SLAVE_THERM=y
+In my opinion, the alternative of explicitly not taking the read lock
+when one already has the write lock sounds *much* nicer.
+
 -- 
-1.7.9.5
+Michel "Walken" Lespinasse
+A program is never fully debugged until the last user dies.
