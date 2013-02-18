@@ -1,59 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 18 Feb 2013 12:45:41 +0200
-Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
-In-Reply-To: <20130218104216.GC32688@arwen.pp.htv.fi>
-References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
- <5121FCC8.7090604@ti.com> <20130218101032.GA32688@arwen.pp.htv.fi>
- <20130218101113.GB32688@arwen.pp.htv.fi> <5122019D.9030100@ti.com>
- <20130218104216.GC32688@arwen.pp.htv.fi>
-Message-ID: <20130218104541.GD32688@arwen.pp.htv.fi>
+From: omycle@gmail.com (Li Haifeng)
+Date: Mon, 18 Feb 2013 18:48:50 +0800
+Subject: Should a swapped out page be deleted from swap cache?
+Message-ID: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 12:42:16PM +0200, Felipe Balbi wrote:
-> Hi,
-> 
-> On Mon, Feb 18, 2013 at 03:55:33PM +0530, Santosh Shilimkar wrote:
-> > >>I wonder what are your ideas to sort that part out, I mean, how do you
-> > >>plan to implement ->set_wake() for the tty port ?"
-> > >
-> > >[1] http://marc.info/?l=linux-omap&m=136093334914275&w=2
-> > >
-> > The main need for uart wakeup is the io_ring() trigger and that needs
-> > to happen via generic pin control API. SYSC wakeup bit isn't something
-> > needs to be toggled so that can be decoupled. So again the idea is
-> > to make SYSC handling transparent to UART drivers and let driver toggle
-> > the io_ring() based on ->set_wake() as it is done today.
-> 
-> We're either reading different code bases or not understanding each
-> other. Currently this is how ->set_wake() is implemented:
-> 
-> serial_omap_set_wake()
->  serial_omap_enable_wakeup()
->   omap_uart_enable_wakeup()
->    omap_hwmod_enable_wakeup()
->     if (SYSC_HAS_ENAWAKEUP) {	/* true for UART */
->      _enable_wakeup()
->      _write_sysconfig()
->     }
->     set_idle_ioring_wakeup()
->      if (!oh->mux || !oh->mux->enabled)
->       return;
-> 
-> If I read the code correctly there's nothing setting oh->mux during DT
-> boot. The only caller to omap_hwmod_mux_init() (which allocates and
-> returns omap_hwmod_mux_info pointer) is
-> arch/arm/mach-omap2/devices.c::omap4_keyboard_init(). This has nothing
+For explain my question, the two points should be displayed as below.
 
-actually arch/arm/mach-omap2/serial.c::omap_serial_init_port() also
-calls that, but it's also not used during DT boots.
+1.  If an anonymous page is swapped out, this page will be deleted
+from swap cache and be put back into buddy system.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130218/9f1b7bf9/attachment.sig>
+2. When a page is swapped out, the sharing count of swap slot must not
+be zero. That is, page_swapcount(page) will not return zero.
+
+Are both of them above right?
+
+According the two points above, I was confused to the line 655 below.
+When a page is swapped out, the return value of page_swapcount(page)
+will not be zero. So, the page couldn't be deleted from swap cache.
+
+ 644  * If swap is getting full, or if there are no more mappings of this page,
+ 645  * then try_to_free_swap is called to free its swap space.
+ 646  */
+ 647 int try_to_free_swap(struct page *page)
+ 648 {
+ 649         VM_BUG_ON(!PageLocked(page));
+ 650
+ 651         if (!PageSwapCache(page))
+ 652                 return 0;
+ 653         if (PageWriteback(page))
+ 654                 return 0;
+ 655         if (page_swapcount(page))//Has referenced by other swap out page.
+ 656                 return 0;
+ 657
+ 658         /*
+ 659          * Once hibernation has begun to create its image of memory,
+ 660          * there's a danger that one of the calls to try_to_free_swap()
+ 661          * - most probably a call from __try_to_reclaim_swap() while
+ 662          * hibernation is allocating its own swap pages for the image,
+ 663          * but conceivably even a call from memory reclaim - will free
+ 664          * the swap from a page which has already been recorded in the
+ 665          * image as a clean swapcache page, and then reuse its swap for
+ 666          * another page of the image.  On waking from hibernation, the
+ 667          * original page might be freed under memory pressure, then
+ 668          * later read back in from swap, now with the wrong data.
+ 669          *
+ 670          * Hibration suspends storage while it is writing the image
+ 671          * to disk so check that here.
+ 672          */
+ 673         if (pm_suspended_storage())
+ 674                 return 0;
+ 675
+ 676         delete_from_swap_cache(page);
+ 677         SetPageDirty(page);
+ 678         return 1;
+ 679 }
+
+Thanks.
