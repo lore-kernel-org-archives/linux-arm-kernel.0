@@ -1,106 +1,62 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Mon, 18 Feb 2013 16:21:18 +0530
-Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
-In-Reply-To: <512203B3.7090002@linux.vnet.ibm.com>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <510FBC01.2030405@linux.vnet.ibm.com>	<87haloiwv0.fsf@rustcorp.com.au>
- <51134596.4080106@linux.vnet.ibm.com>
- <20130208154113.GV17833@n2100.arm.linux.org.uk>
- <51152B81.2050501@linux.vnet.ibm.com>	<51153F72.1060005@linux.vnet.ibm.com>
- <CAKfTPtCe+cD7LLkb+D6pqG1SwG2V08ws=4XO3ttHEHV2qgmqPg@mail.gmail.com>
- <5118E2CD.90401@linux.vnet.ibm.com>
- <20130211190852.GA5695@linux.vnet.ibm.com>
- <5119BDFD.1000909@linux.vnet.ibm.com>
- <CAKfTPtAo2hQTfBKTVUuLKgsGJ2ZLD0UTR3fH9UFuJwyFt4n__w@mail.gmail.com>
- <511E8F3C.2010406@linux.vnet.ibm.com>
- <CAKfTPtD=2jn1AVjuhVP1ot7_8x9-W4==hNGZET5N9tRE7gtyMw@mail.gmail.com>
- <512203B3.7090002@linux.vnet.ibm.com>
-Message-ID: <512207A6.4000402@linux.vnet.ibm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 18 Feb 2013 16:25:58 +0530
+Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
+In-Reply-To: <20130218104541.GD32688@arwen.pp.htv.fi>
+References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
+ <5121FCC8.7090604@ti.com> <20130218101032.GA32688@arwen.pp.htv.fi>
+ <20130218101113.GB32688@arwen.pp.htv.fi> <5122019D.9030100@ti.com>
+ <20130218104216.GC32688@arwen.pp.htv.fi>
+ <20130218104541.GD32688@arwen.pp.htv.fi>
+Message-ID: <512208BE.7060207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2013 04:04 PM, Srivatsa S. Bhat wrote:
-> On 02/18/2013 03:54 PM, Vincent Guittot wrote:
->> On 15 February 2013 20:40, Srivatsa S. Bhat
->> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->>> Hi Vincent,
->>>
->>> On 02/15/2013 06:58 PM, Vincent Guittot wrote:
->>>> Hi Srivatsa,
->>>>
->>>> I have run some tests with you branch (thanks Paul for the git tree)
->>>> and you will find results below.
->>>>
->>>
->>> Thank you very much for testing this patchset!
->>>
->>>> The tests condition are:
->>>> - 5 CPUs system in 2 clusters
->>>> - The test plugs/unplugs CPU2 and it increases the system load each 20
->>>> plug/unplug sequence with either more cyclictests threads
->>>> - The test is done with all CPUs online and with only CPU0 and CPU2
->>>>
->>>> The main conclusion is that there is no differences with and without
->>>> your patches with my stress tests. I'm not sure that it was the
->>>> expected results but the cpu_down is already quite low : 4-5ms in
->>>> average
->>>>
->>>
->>> Atleast my patchset doesn't perform _worse_ than mainline, with respect
->>> to cpu_down duration :-)
+On Monday 18 February 2013 04:15 PM, Felipe Balbi wrote:
+> On Mon, Feb 18, 2013 at 12:42:16PM +0200, Felipe Balbi wrote:
+>> Hi,
 >>
->> yes exactly and it has pass  more than 400 consecutive plug/unplug on
->> an ARM platform
+>> On Mon, Feb 18, 2013 at 03:55:33PM +0530, Santosh Shilimkar wrote:
+>>>>> I wonder what are your ideas to sort that part out, I mean, how do you
+>>>>> plan to implement ->set_wake() for the tty port ?"
+>>>>
+>>>> [1] http://marc.info/?l=linux-omap&m=136093334914275&w=2
+>>>>
+>>> The main need for uart wakeup is the io_ring() trigger and that needs
+>>> to happen via generic pin control API. SYSC wakeup bit isn't something
+>>> needs to be toggled so that can be decoupled. So again the idea is
+>>> to make SYSC handling transparent to UART drivers and let driver toggle
+>>> the io_ring() based on ->set_wake() as it is done today.
 >>
-> 
-> Great! However, did you turn on CPU_IDLE during your tests?
-> 
-> In my tests, I had turned off cpu idle in the .config, like I had mentioned in
-> the cover letter. I'm struggling to get it working with CPU_IDLE/INTEL_IDLE
-> turned on, because it gets into a lockup almost immediately. It appears that
-> the lock-holder of clockevents_lock never releases it, for some reason..
-> See below for the full log. Lockdep has not been useful in debugging this,
-> unfortunately :-(
-> 
+>> We're either reading different code bases or not understanding each
+>> other. Currently this is how ->set_wake() is implemented:
+>>
+>> serial_omap_set_wake()
+>>   serial_omap_enable_wakeup()
+>>    omap_uart_enable_wakeup()
+>>     omap_hwmod_enable_wakeup()
+>>      if (SYSC_HAS_ENAWAKEUP) {	/* true for UART */
+>>       _enable_wakeup()
+There is no need to toggle this one. It can be set once and left as is.
+>>       _write_sysconfig()
+>>      }
+>>      set_idle_ioring_wakeup()
+So this is the part, we need to hookup with pads.
 
-Ah, nevermind, the following diff fixes it :-) I had applied this fix on v5
-and tested but it still had races where I used to hit the lockups. Now after
-I fixed all the memory barrier issues that Paul and Oleg pointed out in v5,
-I applied this fix again and tested it just now - it works beautifully! :-)
-
-I'll include this fix and post a v6 soon.
+>>       if (!oh->mux || !oh->mux->enabled)
+>>        return;
+>>
+>> If I read the code correctly there's nothing setting oh->mux during DT
+>> boot. The only caller to omap_hwmod_mux_init() (which allocates and
+>> returns omap_hwmod_mux_info pointer) is
+>> arch/arm/mach-omap2/devices.c::omap4_keyboard_init(). This has nothing
+>
+> actually arch/arm/mach-omap2/serial.c::omap_serial_init_port() also
+> calls that, but it's also not used during DT boots.
+>
+DT boot, all the function pointers are broken so wakeup as well as slave
+idle-mode is broken. Nothing new here. Serial file does set the pads
+as you noticed and this is what can be offloaded to generic pint control
+which can triggered from driver.
 
 Regards,
-Srivatsa S. Bhat
-
---------------------------------------------------------------------------->
-
-
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index 30b6de0..ca340fd 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -17,6 +17,7 @@
- #include <linux/module.h>
- #include <linux/notifier.h>
- #include <linux/smp.h>
-+#include <linux/cpu.h>
- 
- #include "tick-internal.h"
- 
-@@ -431,6 +432,7 @@ void clockevents_notify(unsigned long reason, void *arg)
- 	unsigned long flags;
- 	int cpu;
- 
-+	get_online_cpus_atomic();
- 	raw_spin_lock_irqsave(&clockevents_lock, flags);
- 	clockevents_do_notify(reason, arg);
- 
-@@ -459,6 +461,7 @@ void clockevents_notify(unsigned long reason, void *arg)
- 		break;
- 	}
- 	raw_spin_unlock_irqrestore(&clockevents_lock, flags);
-+	put_online_cpus_atomic();
- }
- EXPORT_SYMBOL_GPL(clockevents_notify);
- #endif
+Santosh
