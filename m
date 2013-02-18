@@ -1,36 +1,115 @@
 From: wni@nvidia.com (Wei Ni)
-Date: Mon, 18 Feb 2013 19:30:23 +0800
-Subject: [RFC PATCH 1/9] ARM: dt: t30 cardhu: add dt entry for lm90
+Date: Mon, 18 Feb 2013 19:30:27 +0800
+Subject: [RFC PATCH 5/9] Thermal: Support using dt node to get sensor
 In-Reply-To: <1361187031-3679-1-git-send-email-wni@nvidia.com>
 References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
-Message-ID: <1361187031-3679-2-git-send-email-wni@nvidia.com>
+Message-ID: <1361187031-3679-6-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable thermal sensor lm90 in the dts file.
+Add functions to support using dt node with args to get sensor.
 
 Signed-off-by: Wei Ni <wni@nvidia.com>
 ---
- arch/arm/boot/dts/tegra30-cardhu.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/thermal/thermal_sys.c |   30 ++++++++++++++++++++++++++++++
+ include/linux/thermal.h       |    9 +++++++++
+ 2 files changed, 39 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index bdb2a66..15ad1ad 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -273,6 +273,13 @@
- 				};
- 			};
- 		};
-+
-+		nct1008: lm90 at 4c {
-+			compatible = "lm90";
-+			reg = <0x4c>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <226 0x08>; /* gpio PCC2 */
-+		};
- 	};
+diff --git a/drivers/thermal/thermal_sys.c b/drivers/thermal/thermal_sys.c
+index e284b67..b5bedab 100644
+--- a/drivers/thermal/thermal_sys.c
++++ b/drivers/thermal/thermal_sys.c
+@@ -2183,6 +2183,28 @@ struct thermal_sensor *get_sensor_by_name(const char *name)
+ }
+ EXPORT_SYMBOL(get_sensor_by_name);
  
- 	spi at 7000da00 {
++struct thermal_sensor *get_sensor_by_node(struct node_args *np_args)
++{
++	struct thermal_sensor *pos;
++	struct thermal_sensor *ts = NULL;
++	struct node_args *args;
++
++	mutex_lock(&sensor_list_lock);
++	for_each_thermal_sensor(pos) {
++		args = &pos->np_args;
++		if (args->np) {
++			if ((args->np == np_args->np) &&
++			   (args->index == np_args->index)) {
++				ts = pos;
++				break;
++			}
++		}
++	}
++	mutex_unlock(&sensor_list_lock);
++	return ts;
++}
++EXPORT_SYMBOL(get_sensor_by_node);
++
+ static int create_map_attrs(struct thermal_zone *tz, int indx)
+ {
+ 	int ret, i;
+@@ -2368,6 +2390,7 @@ EXPORT_SYMBOL(add_sensor_trip_info);
+  * @devdata:	private device data
+  */
+ struct thermal_sensor *thermal_sensor_register(const char *name, int count,
++			struct node_args *np_args,
+ 			struct thermal_sensor_ops *ops, void *devdata)
+ {
+ 	struct thermal_sensor *ts;
+@@ -2412,6 +2435,13 @@ struct thermal_sensor *thermal_sensor_register(const char *name, int count,
+ 			goto exit_temp;
+ 	}
+ 
++	if (np_args) {
++		ts->np_args.np = np_args->np;
++		ts->np_args.index = np_args->index;
++	} else {
++		ts->np_args.np = NULL;
++	}
++
+ 	/* Add this sensor to the global list of sensors */
+ 	mutex_lock(&sensor_list_lock);
+ 	list_add_tail(&ts->node, &thermal_sensor_list);
+diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+index 4389599..b560ffa 100644
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -113,6 +113,12 @@ enum {
+ };
+ #define THERMAL_GENL_CMD_MAX (__THERMAL_GENL_CMD_MAX - 1)
+ 
++/* support to parse node with args to get sensor or cooling device */
++struct node_args {
++	struct device_node *np;
++	int index;
++};
++
+ struct thermal_zone_device_ops {
+ 	int (*bind) (struct thermal_zone_device *,
+ 		     struct thermal_cooling_device *);
+@@ -223,6 +229,7 @@ struct thermal_sensor {
+ 	void *devdata;
+ 	struct idr idr;
+ 	struct device device;
++	struct node_args np_args;
+ 	struct list_head node;
+ 	struct thermal_sensor_ops *ops;
+ 	struct thermal_attr *thresh_attrs;
+@@ -350,6 +357,7 @@ int thermal_register_governor(struct thermal_governor *);
+ void thermal_unregister_governor(struct thermal_governor *);
+ 
+ struct thermal_sensor *thermal_sensor_register(const char *, int,
++				struct node_args *,
+ 				struct thermal_sensor_ops *, void *);
+ void thermal_sensor_unregister(struct thermal_sensor *);
+ 
+@@ -357,6 +365,7 @@ struct thermal_zone *create_thermal_zone(const char *, void *);
+ void remove_thermal_zone(struct thermal_zone *);
+ int add_sensor_to_zone(struct thermal_zone *, struct thermal_sensor *);
+ struct thermal_sensor *get_sensor_by_name(const char *);
++struct thermal_sensor *get_sensor_by_node(struct node_args *);
+ 
+ int add_cdev_to_zone(struct thermal_zone *, struct thermal_cooling_device *);
+ struct thermal_cooling_device *get_cdev_by_name(const char *);
 -- 
 1.7.9.5
