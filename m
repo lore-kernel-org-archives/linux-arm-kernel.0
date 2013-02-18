@@ -1,41 +1,214 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 18 Feb 2013 13:58:08 +0530
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433ED22A16@DBDE01.ent.ti.com>
-References: <20130214171253.GC7144@atomide.com>
- <20130214175650.GA25891@arwen.pp.htv.fi> <20130214181217.GA11806@atomide.com>
- <20130214192719.GB26679@arwen.pp.htv.fi> <20130214193911.GD11806@atomide.com>
- <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
- <20130215101610.GR17852@n2100.arm.linux.org.uk> <511E3797.2070802@ti.com>
- <20130215132726.GT17852@n2100.arm.linux.org.uk> <511E38C3.7080404@ti.com>
- <20130215163031.GA5724@atomide.com>
- <alpine.LFD.2.03.1302160035240.6419@syhkavp.arg> <511F1DB4.8030400@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433ED22A16@DBDE01.ent.ti.com>
-Message-ID: <5121E618.1040304@ti.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 18 Feb 2013 17:32:45 +0900
+Subject: [PATCH v6 07/16] ARM: Exynos: Initialize the clocks prior to
+ timer initialization
+In-Reply-To: <1361175686-19400-8-git-send-email-thomas.abraham@linaro.org>
+References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
+ <1361175686-19400-8-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAH9JG2VQTqdwihyPsx-qgE5va3zdm7N+PZSvVu0N-49+sN9MFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 February 2013 01:38 PM, Bedia, Vaibhav wrote:
-> On Sat, Feb 16, 2013 at 11:18:36, Shilimkar, Santosh wrote:
-> [...]
->>>>
->>>> For the duplicate ioremapping, I don't think there's any need to
->>>> do it if we get things right.
->>>
->>> Note that if the ioremap matches a static map area there is no cost to
->>> ioremap it multiple times.
->>>
->>>
->> Thats true though now on OMAP we removed most of the static mappings.
->> The main issue is waste of IO space because, we end up mapping same
->> area two times for all the OMAP drivers. This can be optimized with
->> a arch ioremap caller hook but as discussed here, its nice to have
->> rather than something important.
->>
+On Mon, Feb 18, 2013 at 5:21 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> Since the clock initialization should be completed prior to the mct timer
+> initialization, create a new function 'exynos_init_time' that first sets up
+> the clock and then invokes the timer initialization function. The 'init_time'
+> callback in the board files are updated to invoke this new wrapper function.
 >
-Mostly L3 and L4 OCP slaves ones are covered because of L3/L4 map.
-If you boot a full blown kernel, you will see many dynamically allocated 
-as well.
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/mach-exynos/common.c              |   16 ++++++++++++++++
+>  arch/arm/mach-exynos/mach-armlex4210.c     |    2 +-
+>  arch/arm/mach-exynos/mach-exynos4-dt.c     |    2 +-
+>  arch/arm/mach-exynos/mach-exynos5-dt.c     |    2 +-
+>  arch/arm/mach-exynos/mach-nuri.c           |    2 +-
+>  arch/arm/mach-exynos/mach-origen.c         |    2 +-
+>  arch/arm/mach-exynos/mach-smdk4x12.c       |    4 ++--
+>  arch/arm/mach-exynos/mach-smdkv310.c       |    4 ++--
+>  arch/arm/mach-exynos/mach-universal_c210.c |    8 +++++++-
+>  9 files changed, 32 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 8e4a25c..64585af 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -23,6 +23,8 @@
+>  #include <linux/export.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/of_address.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/clk-provider.h>
+>
+>  #include <asm/proc-fns.h>
+>  #include <asm/exception.h>
+> @@ -436,6 +438,20 @@ static void __init exynos5440_map_io(void)
+>         iotable_init(exynos5440_iodesc0, ARRAY_SIZE(exynos5440_iodesc0));
+>  }
+>
+> +void __init exynos_init_time(void)
+> +{
+> +       if (of_have_populated_dt()) {
+> +#ifdef CONFIG_OF
+> +               of_clk_init(NULL);
+> +               clocksource_of_init();
+> +#endif
+> +       } else {
+> +               /* todo: remove after migrating legacy E4 platforms to dt */
+> +               exynos4_clk_init(NULL);
+> +               mct_init();
+> +       }
+> +}
+> +
+>  #define COMBINER_ENABLE_SET    0x0
+>  #define COMBINER_ENABLE_CLEAR  0x4
+>  #define COMBINER_INT_STATUS    0xC
+> diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
+> index e45b4b4..3518ac8 100644
+> --- a/arch/arm/mach-exynos/mach-armlex4210.c
+> +++ b/arch/arm/mach-exynos/mach-armlex4210.c
+> @@ -203,6 +203,6 @@ MACHINE_START(ARMLEX4210, "ARMLEX4210")
+>         .handle_irq     = gic_handle_irq,
+>         .init_machine   = armlex4210_machine_init,
+>         .init_late      = exynos_init_late,
+> -       .init_time      = mct_init,
+> +       .init_time      = exynos_init_time,
+>         .restart        = exynos4_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+> index 2c25f2c..6c5e068 100644
+> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+> @@ -127,7 +127,7 @@ DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
+>         .init_early     = exynos_firmware_init,
+>         .init_machine   = exynos4_dt_machine_init,
+>         .init_late      = exynos_init_late,
+> -       .init_time      = clocksource_of_init,
+> +       .init_time      = exynos_init_time,
+>         .dt_compat      = exynos4_dt_compat,
+>         .restart        = exynos4_restart,
+>         .reserve        = exynos4_reserve,
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> index b5f9549..dfe51ee 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -179,7 +179,7 @@ DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
+>         .handle_irq     = gic_handle_irq,
+>         .init_machine   = exynos5_dt_machine_init,
+>         .init_late      = exynos_init_late,
+> -       .init_time      = clocksource_of_init,
+> +       .init_time      = exynos_init_time,
+>         .dt_compat      = exynos5_dt_compat,
+>         .restart        = exynos5_restart,
+>         .reserve        = exynos5_reserve,
+> diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+> index c49ec9d..cdae74b 100644
+> --- a/arch/arm/mach-exynos/mach-nuri.c
+> +++ b/arch/arm/mach-exynos/mach-nuri.c
+> @@ -1381,7 +1381,7 @@ MACHINE_START(NURI, "NURI")
+>         .handle_irq     = gic_handle_irq,
+>         .init_machine   = nuri_machine_init,
+>         .init_late      = exynos_init_late,
+> -       .init_time      = mct_init,
+> +       .init_time      = exynos_init_time,
+>         .reserve        = &nuri_reserve,
+>         .restart        = exynos4_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+> index 656967d..e9ab921 100644
+> --- a/arch/arm/mach-exynos/mach-origen.c
+> +++ b/arch/arm/mach-exynos/mach-origen.c
+> @@ -816,7 +816,7 @@ MACHINE_START(ORIGEN, "ORIGEN")
+>         .handle_irq     = gic_handle_irq,
+>         .init_machine   = origen_machine_init,
+>         .init_late      = exynos_init_late,
+> -       .init_time      = mct_init,
+> +       .init_time      = exynos_init_time,
+>         .reserve        = &origen_reserve,
+>         .restart        = exynos4_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
+> index c56cc21..71422ad 100644
+> --- a/arch/arm/mach-exynos/mach-smdk4x12.c
+> +++ b/arch/arm/mach-exynos/mach-smdk4x12.c
+> @@ -377,7 +377,7 @@ MACHINE_START(SMDK4212, "SMDK4212")
+>         .map_io         = smdk4x12_map_io,
+>         .handle_irq     = gic_handle_irq,
+>         .init_machine   = smdk4x12_machine_init,
+> -       .init_time      = mct_init,
+> +       .init_time      = exynos_init_time,
+>         .restart        = exynos4_restart,
+>         .reserve        = &smdk4x12_reserve,
+>  MACHINE_END
+> @@ -392,7 +392,7 @@ MACHINE_START(SMDK4412, "SMDK4412")
+>         .handle_irq     = gic_handle_irq,
+>         .init_machine   = smdk4x12_machine_init,
+>         .init_late      = exynos_init_late,
+> -       .init_time      = mct_init,
+> +       .init_time      = exynos_init_time,
+>         .restart        = exynos4_restart,
+>         .reserve        = &smdk4x12_reserve,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
+> index 9d511f5..eb51c06 100644
+> --- a/arch/arm/mach-exynos/mach-smdkv310.c
+> +++ b/arch/arm/mach-exynos/mach-smdkv310.c
+> @@ -424,7 +424,7 @@ MACHINE_START(SMDKV310, "SMDKV310")
+>         .map_io         = smdkv310_map_io,
+>         .handle_irq     = gic_handle_irq,
+>         .init_machine   = smdkv310_machine_init,
+> -       .init_time      = mct_init,
+> +       .init_time      = exynos_init_time,
+>         .reserve        = &smdkv310_reserve,
+>         .restart        = exynos4_restart,
+>  MACHINE_END
+> @@ -438,7 +438,7 @@ MACHINE_START(SMDKC210, "SMDKC210")
+>         .handle_irq     = gic_handle_irq,
+>         .init_machine   = smdkv310_machine_init,
+>         .init_late      = exynos_init_late,
+> -       .init_time      = mct_init,
+> +       .init_time      = exynos_init_time,
+>         .reserve        = &smdkv310_reserve,
+>         .restart        = exynos4_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
+> index 3998c81..53de074 100644
+> --- a/arch/arm/mach-exynos/mach-universal_c210.c
+> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
+> @@ -1144,6 +1144,12 @@ static void __init universal_machine_init(void)
+>         platform_add_devices(universal_devices, ARRAY_SIZE(universal_devices));
+>  }
+>
+> +static void __init universal_init_time(void)
+> +{
+> +       exynos4_clk_init(NULL);
+> +       mct_init();
+No, It's not support MCT timer at universal board, please don't modify
+universal board at this time.
+Others are okay.
 
-Regards,
-Santosh
+Thank you,
+Kyungmin Park
+> +}
+> +
+>  MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+>         /* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+>         .atag_offset    = 0x100,
+> @@ -1153,7 +1159,7 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+>         .handle_irq     = gic_handle_irq,
+>         .init_machine   = universal_machine_init,
+>         .init_late      = exynos_init_late,
+> -       .init_time      = samsung_timer_init,
+> +       .init_time      = universal_init_time,
+>         .reserve        = &universal_reserve,
+>         .restart        = exynos4_restart,
+>  MACHINE_END
+> --
+> 1.7.5.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
