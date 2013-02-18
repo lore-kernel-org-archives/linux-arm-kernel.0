@@ -1,41 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Feb 2013 09:48:12 +0000
-Subject: [PATCH v2 12/12] clocksource: samsung-time: Add Device Tree
- support
-In-Reply-To: <1361033044-27629-13-git-send-email-tomasz.figa@gmail.com>
-References: <1361033044-27629-1-git-send-email-tomasz.figa@gmail.com>
- <1361033044-27629-13-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20130218094812.GA23831@e106331-lin.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 18 Feb 2013 15:34:56 +0530
+Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
+In-Reply-To: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <5121FCC8.7090604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 15 February 2013 05:36 PM, Santosh Shilimkar wrote:
+> OMAP UART IP needs manual idle modes based on state of the
+> IP. Currently this is handled by the driver with function pointers
+> implemented in platform code.
+>
+> This however breaks in case of device tree because of missing
+> idle handling.
+>
+> The series tries to address the issue
+>
+> Patches has been tested on OMAP4 and OMAP5 devices where the console
+> slugishness was observed without idle mode handling. CPUIDLE and
+> suspend tested ok on these devices.
+>
+> Need help in testing on OMAP2, OMAP3 and AM3XXX devices.
+>
+> Santosh Shilimkar (2):
+>    ARM: OMAP2+: hwmod-data: UART IP needs software control of sidle
+>      modes
+>    SERIAL: OMAP: Remove the idle handling from the driver
+>
+HWMOD_SWSUP_SIDLE flag will is not what will help UART completely.
+Also considering UART also needs async wakeup enabled as it implements
+another such hook and attaches that through function pointer.
 
-[...]
+So some more work is needed to get that sorted out at least from
+sysc point of view. That way we can deal with io_ring stuff using
+pin control APIs.
 
-> +static void samsung_timer_parse_dt(struct device_node *np,
-> +					const struct of_device_id *match)
-> +{
-> +	int i;
-> +	u32 val;
-> +
-> +	timer_base = of_iomap(np, 0);
-> +	if (!timer_base)
-> +		panic("failed to map timer registers");
-> +
-> +	for (i = 0; i < SAMSUNG_PWM_NUM; ++i)
-> +		timer_variant.irqs[i] = irq_of_parse_and_map(np, i);
-> +
-> +	if (!timer_variant.irqs[timer_source.event_id])
-> +		panic("no clock event irq provided");
-> +
-> +	switch ((unsigned int)match->data) {
-> +	case TYPE_S3C24XX:
-> +		timer_variant.bits = 16;
-> +		timer_variant.prescale = 25;
-> +		timer_variant.prescale = 50;
+Some patches will follow in attempt to address it. Stay tuned !!
 
-Redundant conflicting assignments here.
-
-Thanks,
-Mark.
+Regards,
+Santosh
