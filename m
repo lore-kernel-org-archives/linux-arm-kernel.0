@@ -1,37 +1,43 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 18 Feb 2013 09:52:48 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
-In-Reply-To: <20130215135324.GG27724@verge.net.au>
-References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
- <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
- <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
- <20130214041651.GB6036@verge.net.au>
- <20130214091040.GG6088@linux-sh.org>
- <20130214160842.GC26810@verge.net.au>
- <20130214161811.GC3882@linux-sh.org>
- <20130215135324.GG27724@verge.net.au>
-Message-ID: <20130218005248.GF7176@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 17 Feb 2013 16:58:42 -0800
+Subject: GIT PULL] Renesas ARM-based SoC pinmux for v3.9 #2
+In-Reply-To: <201302161034.33865.arnd@arndb.de>
+References: <1360981553-11414-1-git-send-email-horms+renesas@verge.net.au>
+ <201302161034.33865.arnd@arndb.de>
+Message-ID: <20130218005842.GE4615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 10:53:24PM +0900, Simon Horman wrote:
-> On Fri, Feb 15, 2013 at 01:18:11AM +0900, Paul Mundt wrote:
-> > On Fri, Feb 15, 2013 at 01:08:42AM +0900, Simon Horman wrote:
-> > > On Thu, Feb 14, 2013 at 06:10:40PM +0900, Paul Mundt wrote:
-> > > > On Thu, Feb 14, 2013 at 01:16:52PM +0900, Simon Horman wrote:
-> > > > > Ok, so in that case the correct value for "sh_tmu.2" might actually
-> > > > > be MSTP016 or MSTP015 depending on the bundle size. I am unsure how to test
-> > > > > sh_tmu.2.
+On Sat, Feb 16, 2013 at 10:34:33AM +0000, Arnd Bergmann wrote:
+> On Saturday 16 February 2013, Simon Horman wrote:
+> > Hi Olof, Hi Arnd,
 > > 
-> > [snip]
+> > The following changes since commit c3323806a67c0c656e27956b7340e37ba6c6968b:
 > > 
-> > > Getting that information correct for sh_tmu.2 on the r8a7779 problem I'm
-> > > not completely sure of the correct answer to. Though I now strongly suspect
-> > > it is MSTP016.
+> >   sh-pfc: Move sh_pfc.h from include/linux/ to driver directory (2013-01-25 09:24:31 +0900)
 > > 
-> > Testing shouldn't be that difficult, just switch your clocksource to it
-> > and make sure all TMU-related MSTP bits are first cleared?
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux2-for-v3.9
+> > 
+> > for you to fetch changes up to 8c43fcc7804fc4609ccd9fa021e21f5423db9d96:
+> > 
+> >   sh-pfc: sh_pfc_probe() sizeof() fix (2013-02-16 10:58:50 +0900)
+> > 
+> > ----------------------------------------------------------------
+> > Bug fix from Magnus that resolves a regression introduced in pfc changes
+> > queued up for 3.9.
 > 
-> Thanks, I will try that.
+> 
+> Pulled into next/sh-pinux, thanks!
+> 
+> Olof, we haven't done an official handover, but since I have added a couple of
+> my own bug fixes in the past days, and I say no other updates from you, I decided
+> to take this one in. I'll also have a look if there are more fixes to take care
+> of over the weekend.
 
-Thanks again. I did try this and it appears to work.
+Ah, got to this email just now. Yep, no worries, I did run git remote update
+before I started picking up new material so I noticed the checkins.
+
+
+-Olof
