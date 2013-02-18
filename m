@@ -1,39 +1,37 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Mon, 18 Feb 2013 14:26:17 +0100
-Subject: [RFC 1/2] Makefile: Add arch/arch/$(hdr-arch)/boot in header
- include path
-In-Reply-To: <511E617E.6080206@wwwdotorg.org>
-References: <1360918364-27960-1-git-send-email-hdoyu@nvidia.com>
- <511E617E.6080206@wwwdotorg.org>
-Message-ID: <51222BF9.3040802@suse.cz>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 18 Feb 2013 13:33:18 +0000
+Subject: [PATCH RFC 1/7] platform: add a device node
+In-Reply-To: <20130210093708.GL17852@n2100.arm.linux.org.uk>
+References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1360442671-15216-2-git-send-email-javier.martinez@collabora.co.uk>
+ <20130210010246.GA1455@kroah.com> <5116FCA1.40703@collabora.co.uk>
+ <20130210093708.GL17852@n2100.arm.linux.org.uk>
+Message-ID: <CACxGe6vEjm0pe_gRNCLrGvf2_eJ-NGP+=Jwm-phm4RWBV_szUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.2.2013 17:25, Stephen Warren wrote:
-> On 02/15/2013 01:52 AM, Hiroshi Doyu wrote:
->> This patch allows kernel source to include those DT
->> headers. For example:
+On Sun, Feb 10, 2013 at 9:37 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Feb 10, 2013 at 02:49:21AM +0100, Javier Martinez Canillas wrote:
+>> I knew this would be controversial and that's why I didn't mean it to be a patch
+>> but a RFC :)
 >>
->> + #include <dts/tegra20-car.h>
->>
->> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
->> ---
->>  Makefile |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/Makefile b/Makefile
->> index 0b4bf62..7f54cdb 100644
->> --- a/Makefile
->> +++ b/Makefile
->> @@ -364,7 +364,7 @@ LINUXINCLUDE    := \
->>  		-I$(srctree)/arch/$(hdr-arch)/include \
->>  		-Iarch/$(hdr-arch)/include/generated \
->>  		$(if $(KBUILD_SRC), -I$(srctree)/include) \
->> -		-Iinclude \
->> +		-Iinclude -Iarch/$(hdr-arch)/boot \
+>> The problem basically is that you have to associate the platform device with its
+>> corresponding DT device node because it can be used in the driver probe function.
+>
+> When DT is being used, doesn't DT create the platform devices for you,
+> with the device node already set correctly?
+>
+> Manually creating platform devices and adding DT nodes to it sounds like
+> the wrong thing to be doing.
 
-Would it be possible to use a new directory for this? At least POWER and
-x86 have several unrelated headers in their arch/*/boot that are only
-meant for the bootstrap code.
+Right; I'd expect your platform device creation to go through the
+of_platform_populate() route. What is your use-case?
 
-Michal
+g.
+
+
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
