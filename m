@@ -1,101 +1,59 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 18 Feb 2013 14:56:42 +0100
-Subject: [PATCH RFC 1/7] platform: add a device node
-In-Reply-To: <CACxGe6sBgXVYVhEyUKnwLDziWCe3973BO4KWNyTye0k9wgbKDA@mail.gmail.com>
-References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
- <1360442671-15216-2-git-send-email-javier.martinez@collabora.co.uk>
- <20130210010246.GA1455@kroah.com> <5116FCA1.40703@collabora.co.uk>
- <20130210093708.GL17852@n2100.arm.linux.org.uk>
- <CAAwP0s0fCJmUfTJweGhXj5bXsQ0Gov9JbUJtqYMwL7duNLZv_Q@mail.gmail.com>
- <CACxGe6sBgXVYVhEyUKnwLDziWCe3973BO4KWNyTye0k9wgbKDA@mail.gmail.com>
-Message-ID: <5122331A.1020102@collabora.co.uk>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 18 Feb 2013 07:57:39 -0600
+Subject: [PATCH] ARM: OMAP2+: Fix broken gpmc support
+Message-ID: <1361195859-5949-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2013 02:51 PM, Grant Likely wrote:
-> On Sun, Feb 10, 2013 at 11:35 AM, Javier Martinez Canillas
-> <martinez.javier@gmail.com> wrote:
->> On Sun, Feb 10, 2013 at 10:37 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Sun, Feb 10, 2013 at 02:49:21AM +0100, Javier Martinez Canillas wrote:
->>>> I knew this would be controversial and that's why I didn't mean it to be a patch
->>>> but a RFC :)
->>>>
->>>> The problem basically is that you have to associate the platform device with its
->>>> corresponding DT device node because it can be used in the driver probe function.
->>>
->>> When DT is being used, doesn't DT create the platform devices for you,
->>> with the device node already set correctly?
->>>
->>
->> Well they usually do but not always just like usually you have a
->> platform_device in your board code and call platform_device_register().
->>
->> But in some configurations you can't just define the platform_device
->> required resources (I/O memory, IRQ, etc) as static platform data.
->> In some cases you need a level of indirection.
->>
->> In this particular case a SMSC ethernet chip is connected to an
->> OMAP3 processor through its General-Purpose Memory Controller.
->>
->> You can't just define the I/O memory used by the device since you first
->> need to request that address to the GPMC. The same happens with the
->> IRQ line since a OMAP GPIO pin is used so you have to first configure
->> the GPIO line as input.
->>
->> So in platform code you call to gpmc_smsc911x_init() passing all the
->> GPMC specific configurations (GPIO used for IRQ, GPMC chip select, etc)
->>
->> Then gpmc_smsc911x_init() does all the needed setup, fills a platform_data
->> for the real platform_device and calls  platform_device_register_resndata().
->>
->> From the smsc911x platform_driver probe function point of view it just have
->> resources and doesn't know if it's I/O memory is directly mapped or is
->> through a memory controller as the GPMC. It also doesn't know if the IRQ is
->> a GPIO or not.
-> 
-> It's still the same difference as far as the device is concerned.
-> External bus chip-select lines are well understood. The key here is to
-> encode the CS line number into the reg property of the child node so
-> that the GPMC driver has the information it needs to configure the
-> chip selects. You do this by setting #address-cells to '2' in the GPMC
-> node, and  use the ranges property to map from the gpmc address space
-> to the cpu address space. Like so (if you had 2 Ethernet controllers)
-> 
->         gpmc {
->                 #address-cells = <2>;  // First cell is CS#, second
-> cell is offset from CS base
->                 #size-cells = <1>;
->                 compatible = "ti,gpmc";
->                 ranges = <0 0 0xf1000000 0x1000>, //CS0 mapped to
-> 0xf1000000..0xf1000fff
->                                 <1 0 0xf1001000 0x1000>; //CS1 mapped
-> to 0xf1001000..0xf1001fff
-> 
->                 ethernet at 0,0 {
->                         compatible = "smsc,91c111";
->                         reg = <0 0 0x1000>;
->                 }
->                 ethernet at 1,0 {
->                         compatible = "smsc,91c111";
->                         reg = <1 0 0x1000>;
->                }
->       }
-> 
-> The GPMC driver can use the information in the ranges property for
-> setting up the chip select mappings. For the smsc,91c111 driver the
-> mapping becomes transparent.
-> 
-> You can see another example of this in
-> arch/powerpc/boot/dts/media5200.dts in the localbus node.
-> 
-> g.
-> 
+Commit "ARM: OMAP2+: Prevent potential crash if GPMC probe fails" added
+code to ensure that GPMC chip-selects could not be requested until the
+device probe was successful. The chip-selects should have been
+unreserved at the end of the probe function, but the code to unreserve
+them appears to have ended up in the gpmc_calc_timings() function and
+hence, this is causing problems requesting chip-selects. Fix this merge
+error by unreserving the chip-selects at the end of the probe, but
+before we call the gpmc child probe functions (for device-tree) which
+request a chip-select.
 
-Hello Grant,
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Tested-by: Philip Avinash <avinashphilip@ti.com>
+Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+---
 
-Thanks a lot for your explanation. Now is very clear to me how this has to be
-done. I'll work on an v2 of this patch-set that do it correctly and will resend.
+Tony, GPMC support is completely broken in linux-next without this fix
+and a few people now are reporting this problem. Can we get this fix
+merged?
 
-Best regards,
-Javier
+Thanks
+Jon
+
+ arch/arm/mach-omap2/gpmc.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 1adb2d4..1e8bcb4 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -1125,9 +1125,6 @@ int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
+ 	/* TODO: remove, see function definition */
+ 	gpmc_convert_ps_to_ns(gpmc_t);
+ 
+-	/* Now the GPMC is initialised, unreserve the chip-selects */
+-	gpmc_cs_map = 0;
+-
+ 	return 0;
+ }
+ 
+@@ -1388,6 +1385,9 @@ static int gpmc_probe(struct platform_device *pdev)
+ 	if (IS_ERR_VALUE(gpmc_setup_irq()))
+ 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
+ 
++	/* Now the GPMC is initialised, unreserve the chip-selects */
++	gpmc_cs_map = 0;
++
+ 	rc = gpmc_probe_dt(pdev);
+ 	if (rc < 0) {
+ 		clk_disable_unprepare(gpmc_l3_clk);
+-- 
+1.7.10.4
