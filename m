@@ -1,42 +1,51 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 18 Feb 2013 13:13:08 +0200
-Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
-In-Reply-To: <512208BE.7060207@ti.com>
-References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
- <5121FCC8.7090604@ti.com> <20130218101032.GA32688@arwen.pp.htv.fi>
- <20130218101113.GB32688@arwen.pp.htv.fi> <5122019D.9030100@ti.com>
- <20130218104216.GC32688@arwen.pp.htv.fi>
- <20130218104541.GD32688@arwen.pp.htv.fi> <512208BE.7060207@ti.com>
-Message-ID: <20130218111308.GE32688@arwen.pp.htv.fi>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Feb 2013 11:14:10 +0000
+Subject: arm64 defconfig breakage (gpio) in next-20130218
+Message-ID: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Mon, Feb 18, 2013 at 04:25:58PM +0530, Santosh Shilimkar wrote:
-> >>If I read the code correctly there's nothing setting oh->mux during DT
-> >>boot. The only caller to omap_hwmod_mux_init() (which allocates and
-> >>returns omap_hwmod_mux_info pointer) is
-> >>arch/arm/mach-omap2/devices.c::omap4_keyboard_init(). This has nothing
-> >
-> >actually arch/arm/mach-omap2/serial.c::omap_serial_init_port() also
-> >calls that, but it's also not used during DT boots.
-> >
-> DT boot, all the function pointers are broken so wakeup as well as slave
-> idle-mode is broken. Nothing new here. Serial file does set the pads
-> as you noticed and this is what can be offloaded to generic pint control
-> which can triggered from driver.
+When I attempt to build a defconfig arm64 kernel from next-20130218, it fails
+with the following complaints from gcc:
 
-fair enough, understood now.
+In file included from include/linux/gpio.h:48:0,
+                 from drivers/gpio/devres.c:18:
+include/asm-generic/gpio.h: In function ?gpio_get_value_cansleep?:
+include/asm-generic/gpio.h:270:2: error: implicit declaration of function ?__gpio_get_value? [-Werror=implicit-function-declaration]
+include/asm-generic/gpio.h: In function ?gpio_set_value_cansleep?:
+include/asm-generic/gpio.h:276:2: error: implicit declaration of function ?__gpio_set_value? [-Werror=implicit-function-declaration]
+In file included from drivers/gpio/devres.c:18:0:
+include/linux/gpio.h: At top level:
+include/linux/gpio.h:60:19: error: redefinition of ?gpio_cansleep?
+In file included from include/linux/gpio.h:48:0,
+                 from drivers/gpio/devres.c:18:
+include/asm-generic/gpio.h:262:19: note: previous definition of ?gpio_cansleep? was here
+In file included from drivers/gpio/devres.c:18:0:
+include/linux/gpio.h: In function ?gpio_cansleep?:
+include/linux/gpio.h:62:2: error: implicit declaration of function ?__gpio_cansleep? [-Werror=implicit-function-declaration]
+include/linux/gpio.h: In function ?gpio_to_irq?:
+include/linux/gpio.h:67:2: error: implicit declaration of function ?__gpio_to_irq? [-Werror=implicit-function-declaration]
+drivers/gpio/devres.c: In function ?devm_gpio_release?:
+drivers/gpio/devres.c:26:2: error: implicit declaration of function ?gpio_free? [-Werror=implicit-function-declaration]
+drivers/gpio/devres.c: In function ?devm_gpio_request?:
+drivers/gpio/devres.c:60:2: error: implicit declaration of function ?gpio_request? [-Werror=implicit-function-declaration]
+drivers/gpio/devres.c: In function ?devm_gpio_request_one?:
+drivers/gpio/devres.c:90:2: error: implicit declaration of function ?gpio_request_one? [-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
+make[2]: *** [drivers/gpio/devres.o] Error 1
+make[1]: *** [drivers/gpio] Error 2
 
-cheers
+I've bisected this down to 0fa2fd9a0d: "Merge branch 'linusw/devel' of
+git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git into
+gpio/next". Both parent commits build fine.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130218/10c134e7/attachment.sig>
+I've played around a bit, and selecting ARCH_REQUIRE_GPIOLIB in the arm64
+Kconfig fixes the issue, but I'm unfamilar with gpio{,lib} and I'm not sure
+that's the best/correct way of solving this.
+
+Thoughts?
+
+Thanks,
+Mark.
