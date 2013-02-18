@@ -1,79 +1,109 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 18 Feb 2013 20:10:10 +0800
-Subject: [PATCH v3 11/12] gpio: pxa: discard irq base in pxa_gpio_chip
-In-Reply-To: <5121FDFC.2010107@compulab.co.il>
-References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
- <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
- <5121FDFC.2010107@compulab.co.il>
-Message-ID: <CAD6h2NT+Qq-uD9ctXWj9LK0pZFb6NsoA0-ZT611DthhMYy4NKg@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 18 Feb 2013 21:14:05 +0900
+Subject: [PATCH 3/4] ARM: mach-shmobile: r8a7779: Minimal setup using DT
+In-Reply-To: <20130218113752.GA20299@verge.net.au>
+References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
+ <1359597051-32700-4-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoRgA_U2onxnOJ7N2wec1C-V4ZE25UEDC5Dm8KstLPuhEg@mail.gmail.com>
+ <20130218113752.GA20299@verge.net.au>
+Message-ID: <CANqRtoQtCG87UrpJTPUWts5svG5r8GXa2Q=GBddHRveX8sba7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2013 18:10, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> On 02/18/13 07:12, Haojian Zhuang wrote:
->> Discard irq_base in struct pxa_gpio_chip. Use irq_domain instead.
+On Mon, Feb 18, 2013 at 8:37 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Feb 18, 2013 at 06:36:12PM +0900, Magnus Damm wrote:
+>> Hi Simon,
 >>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->> ---
->>  drivers/gpio/gpio-pxa.c |   91 +++++++++++++++++++++++------------------------
->>  1 file changed, 44 insertions(+), 47 deletions(-)
->
-> [...]
->
+>> Here's some feedback on your r8a7779 DT code.
 >>
->> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
->> index 35cdb23..d45cb57 100644
->> --- a/drivers/gpio/gpio-pxa.c
->> +++ b/drivers/gpio/gpio-pxa.c
->> @@ -66,8 +66,8 @@ int pxa_last_gpio;
+>> On Thu, Jan 31, 2013 at 10:50 AM, Simon Horman
+>> <horms+renesas@verge.net.au> wrote:
+>> > Allow a minimal setup of the r8a7779 SoC using a flattened device tree.
+>> > In particular, configure the i2c and ethernet controllers using a
+>> > flattened device tree.
+>> >
+>> > SCI serial controller and TMU clock source, whose drivers do not yet
+>> > support configuration using a flattened device tree, are still configured
+>> > using C code in order to allow booting of a board with this SoC.
+>> >
+>> > The ethernet controller also requires a regulator which is a board property.
+>> > A sample snippet DT for the marzen board is as follows:
+>> >
+>> > /dts-v1/;
+>> > /include/ "r8a7779.dtsi"
+>> >
+>> > / {
+>> >         fixedregulator3v3: fixedregulator at 0 {
+>> >                 compatible = "regulator-fixed";
+>> >                 regulator-name = "fixed-3.3V";
+>> >                 regulator-min-microvolt = <3300000>;
+>> >                 regulator-max-microvolt = <3300000>;
+>> >                 regulator-boot-on;
+>> >                 regulator-always-on;
+>> >         };
+>> > };
+>> >
+>> > &lan0 {
+>> >         vddvario-supply = <&fixedregulator3v3>;
+>> >         vdd33a-supply = <&fixedregulator3v3>;
+>> > };
+>> >
+>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> > ---
 >>
->>  struct pxa_gpio_chip {
->>       struct gpio_chip chip;
->> +     struct irq_domain *domain;
->>       void __iomem    *regbase;
->> -     unsigned int    irq_base;
->>       bool            inverted;
->>       bool            gafr;
->>       char label[10];
->> @@ -147,17 +147,7 @@ static int pxa_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
->>       struct pxa_gpio_chip *chip = NULL;
+>> > --- a/arch/arm/mach-shmobile/setup-r8a7779.c
+>> > +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+>> > @@ -321,7 +321,7 @@ static struct platform_device i2c3_device = {
+>> >         .num_resources  = ARRAY_SIZE(rcar_i2c3_res),
+>> >  };
+>> >
+>> > -static struct platform_device *r8a7779_early_devices[] __initdata = {
+>> > +static struct platform_device *r8a7779_early_devices_dt[] __initdata = {
+>> >         &scif0_device,
+>> >         &scif1_device,
+>> >         &scif2_device,
+>> > @@ -330,15 +330,15 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
+>> >         &scif5_device,
+>> >         &tmu00_device,
+>> >         &tmu01_device,
+>> > +};
+>> > +
+>> > +static struct platform_device *r8a7779_early_devices[] __initdata = {
+>> >         &i2c0_device,
+>> >         &i2c1_device,
+>> >         &i2c2_device,
+>> >         &i2c3_device,
+>> >  };
+>> >
+>> > -static struct platform_device *r8a7779_late_devices[] __initdata = {
+>> > -};
+>> > -
 >>
->>       chip = container_of(gc, struct pxa_gpio_chip, chip);
->> -     return chip->irq_base + offset;
->> -}
->> -
->> -int pxa_irq_to_gpio(struct irq_data *d)
->> -{
->> -     struct pxa_gpio_chip *chip;
->> -     int gpio;
->> -
->> -     chip = (struct pxa_gpio_chip *)d->domain->host_data;
->> -     gpio = d->irq - chip->irq_base + chip->chip.base;
->> -     return gpio;
->> +     return irq_create_mapping(chip->domain, offset);
->>  }
+>> Thanks for your work on this. Two things with early/late devices on r8a7779:
+>>
+>> 1)  Same thing as sh73a0 applies here, please refrain from using early
+>> devices with DT.
 >
-> You remove the pxa_irq_to_gpio() function here, but we still have:
-> $ grep -nr pxa_irq_to_gpio *
-> arch/arm/mach-pxa/pxa27x.c:368: int gpio = pxa_irq_to_gpio(d);
-> arch/arm/mach-pxa/pxa25x.c:292: int gpio = pxa_irq_to_gpio(d);
-> include/linux/gpio-pxa.h:16:extern int pxa_irq_to_gpio(struct irq_data *d);
->
-> And this in turn breaks the compilation for example with error:
-> arch/arm/mach-pxa/built-in.o: In function `pxa27x_set_wake':
-> em-x270.c:(.text+0x1298): undefined reference to `pxa_irq_to_gpio'
-> make[1]: *** [vmlinux] Error 1
-> make: *** [sub-make] Error 2
->
->
-> --
-> Regards,
-> Igor.
+> I guess you are referring to tmu.
+> If so, yes, I can move them to r8a7779_early_devices.
 
-Thank you.
+As we talked about last Friday, please try to avoid using early
+devices in general. It is enough to add SCIF and TMU as late devices.
+This goes for both sh73a0 and r8a7779. The only thing you need to do
+early is to setup the delay. Please look at the emev2 implementation
+for what is needed.
 
-Please drop this patch (11/12) for your test. Whatever it's DT or non-DT mode,
-gpio driver should work without this patch.
+>> 2) The i2c devices as early devices look incorrect. Can you make them
+>> late devices?
+>
+> r8a7779_early_devices is only used for the non-DT case.
+> For the non-DT case i2c was set up as early devices before this patch-set.
+> Would you like me to change them to late devices for non-DT,
+> a change that is orthogonal to this patch-set?
 
-Regards
-Haojian
+Yes. I realize it is not really related to this DT feature, but it
+certainly looks incorrect.
+
+Thanks,
+
+/ magnus
