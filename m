@@ -1,109 +1,55 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 18 Feb 2013 21:14:05 +0900
-Subject: [PATCH 3/4] ARM: mach-shmobile: r8a7779: Minimal setup using DT
-In-Reply-To: <20130218113752.GA20299@verge.net.au>
-References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
- <1359597051-32700-4-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoRgA_U2onxnOJ7N2wec1C-V4ZE25UEDC5Dm8KstLPuhEg@mail.gmail.com>
- <20130218113752.GA20299@verge.net.au>
-Message-ID: <CANqRtoQtCG87UrpJTPUWts5svG5r8GXa2Q=GBddHRveX8sba7Q@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 18 Feb 2013 13:17:28 +0100
+Subject: [PATCH] i2c: Remove unneeded xxx_set_drvdata(..., NULL) calls
+In-Reply-To: <1360970315-32116-1-git-send-email-dianders@chromium.org>
+References: <1360953682-25066-1-git-send-email-dianders@chromium.org>
+ <1360970315-32116-1-git-send-email-dianders@chromium.org>
+Message-ID: <201302181317.28645.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 8:37 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Feb 18, 2013 at 06:36:12PM +0900, Magnus Damm wrote:
->> Hi Simon,
->>
->> Here's some feedback on your r8a7779 DT code.
->>
->> On Thu, Jan 31, 2013 at 10:50 AM, Simon Horman
->> <horms+renesas@verge.net.au> wrote:
->> > Allow a minimal setup of the r8a7779 SoC using a flattened device tree.
->> > In particular, configure the i2c and ethernet controllers using a
->> > flattened device tree.
->> >
->> > SCI serial controller and TMU clock source, whose drivers do not yet
->> > support configuration using a flattened device tree, are still configured
->> > using C code in order to allow booting of a board with this SoC.
->> >
->> > The ethernet controller also requires a regulator which is a board property.
->> > A sample snippet DT for the marzen board is as follows:
->> >
->> > /dts-v1/;
->> > /include/ "r8a7779.dtsi"
->> >
->> > / {
->> >         fixedregulator3v3: fixedregulator at 0 {
->> >                 compatible = "regulator-fixed";
->> >                 regulator-name = "fixed-3.3V";
->> >                 regulator-min-microvolt = <3300000>;
->> >                 regulator-max-microvolt = <3300000>;
->> >                 regulator-boot-on;
->> >                 regulator-always-on;
->> >         };
->> > };
->> >
->> > &lan0 {
->> >         vddvario-supply = <&fixedregulator3v3>;
->> >         vdd33a-supply = <&fixedregulator3v3>;
->> > };
->> >
->> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> > ---
->>
->> > --- a/arch/arm/mach-shmobile/setup-r8a7779.c
->> > +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
->> > @@ -321,7 +321,7 @@ static struct platform_device i2c3_device = {
->> >         .num_resources  = ARRAY_SIZE(rcar_i2c3_res),
->> >  };
->> >
->> > -static struct platform_device *r8a7779_early_devices[] __initdata = {
->> > +static struct platform_device *r8a7779_early_devices_dt[] __initdata = {
->> >         &scif0_device,
->> >         &scif1_device,
->> >         &scif2_device,
->> > @@ -330,15 +330,15 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
->> >         &scif5_device,
->> >         &tmu00_device,
->> >         &tmu01_device,
->> > +};
->> > +
->> > +static struct platform_device *r8a7779_early_devices[] __initdata = {
->> >         &i2c0_device,
->> >         &i2c1_device,
->> >         &i2c2_device,
->> >         &i2c3_device,
->> >  };
->> >
->> > -static struct platform_device *r8a7779_late_devices[] __initdata = {
->> > -};
->> > -
->>
->> Thanks for your work on this. Two things with early/late devices on r8a7779:
->>
->> 1)  Same thing as sh73a0 applies here, please refrain from using early
->> devices with DT.
->
-> I guess you are referring to tmu.
-> If so, yes, I can move them to r8a7779_early_devices.
+Dear Doug Anderson,
 
-As we talked about last Friday, please try to avoid using early
-devices in general. It is enough to add SCIF and TMU as late devices.
-This goes for both sh73a0 and r8a7779. The only thing you need to do
-early is to setup the delay. Please look at the emev2 implementation
-for what is needed.
+> There is simply no reason to be manually setting the private driver
+> data to NULL in the remove/fail to probe cases.  This is just extra
+> cruft code that can be removed.
+> 
+> A few notes:
+> * Nothing relies on drvdata being set to NULL.
+> * The __device_release_driver() function eventually calls
+>   dev_set_drvdata(dev, NULL) anyway, so there's no need to do it
+>   twice.
+> * I verified that there were no cases where xxx_get_drvdata() was
+>   being called in these drivers and checking for / relying on the NULL
+>   return value.
+> 
+> This could be cleaned up kernel-wide but for now just take the baby
+> step and remove from the i2c subsystem.
+> 
+> Reported-by: Wolfram Sang <wsa@the-dreams.de>
+> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
->> 2) The i2c devices as early devices look incorrect. Can you make them
->> late devices?
->
-> r8a7779_early_devices is only used for the non-DT case.
-> For the non-DT case i2c was set up as early devices before this patch-set.
-> Would you like me to change them to late devices for non-DT,
-> a change that is orthogonal to this patch-set?
+For
 
-Yes. I realize it is not really related to this DT feature, but it
-certainly looks incorrect.
+>  drivers/i2c/busses/i2c-mxs.c                | 2 --
 
-Thanks,
+[...]
 
-/ magnus
+> diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+> index 22d8ad3..120f246 100644
+> --- a/drivers/i2c/busses/i2c-mxs.c
+> +++ b/drivers/i2c/busses/i2c-mxs.c
+> @@ -697,8 +697,6 @@ static int mxs_i2c_remove(struct platform_device *pdev)
+> 
+>  	writel(MXS_I2C_CTRL0_SFTRST, i2c->regs + MXS_I2C_CTRL0_SET);
+> 
+> -	platform_set_drvdata(pdev, NULL);
+> -
+>  	return 0;
+>  }
+
+[...]
+
+Add my:
+Reviewed-by: Marek Vasut <marex@denx.de>
