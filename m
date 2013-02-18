@@ -1,87 +1,150 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 18 Feb 2013 18:36:12 +0900
-Subject: [PATCH 3/4] ARM: mach-shmobile: r8a7779: Minimal setup using DT
-In-Reply-To: <1359597051-32700-4-git-send-email-horms+renesas@verge.net.au>
-References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
- <1359597051-32700-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoRgA_U2onxnOJ7N2wec1C-V4ZE25UEDC5Dm8KstLPuhEg@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 18 Feb 2013 17:44:46 +0800
+Subject: [V2 2/8] USB: EHCI: make ehci-atmel a separate driver
+In-Reply-To: <1360923853-7875-3-git-send-email-manjunath.goudar@linaro.org>
+References: <1360923853-7875-1-git-send-email-manjunath.goudar@linaro.org>
+ <1360923853-7875-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <5121F80E.1010501@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-Here's some feedback on your r8a7779 DT code.
-
-On Thu, Jan 31, 2013 at 10:50 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Allow a minimal setup of the r8a7779 SoC using a flattened device tree.
-> In particular, configure the i2c and ethernet controllers using a
-> flattened device tree.
+On 02/15/2013 06:24 PM, Manjunath Goudar wrote:
+> Separate the Atmel host controller driver from ehci-hcd host code
+> into its own driver module.
 >
-> SCI serial controller and TMU clock source, whose drivers do not yet
-> support configuration using a flattened device tree, are still configured
-> using C code in order to allow booting of a board with this SoC.
+> In V2:
+> Resolved below compiler error.
+> drivers/usb/host/ehci-atmel.c: In function 'ehci_atmel_drv_remove':
+> drivers/usb/host/ehci-atmel.c:167: error: implicit declaration of function 'ehci_shutdown'
 >
-> The ethernet controller also requires a regulator which is a board property.
-> A sample snippet DT for the marzen board is as follows:
->
-> /dts-v1/;
-> /include/ "r8a7779.dtsi"
->
-> / {
->         fixedregulator3v3: fixedregulator at 0 {
->                 compatible = "regulator-fixed";
->                 regulator-name = "fixed-3.3V";
->                 regulator-min-microvolt = <3300000>;
->                 regulator-max-microvolt = <3300000>;
->                 regulator-boot-on;
->                 regulator-always-on;
->         };
-> };
->
-> &lan0 {
->         vddvario-supply = <&fixedregulator3v3>;
->         vdd33a-supply = <&fixedregulator3v3>;
-> };
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Signed-off-by: Manjunath Goudar<manjunath.goudar@linaro.org>
+> Cc: Alan Stern<stern@rowland.harvard.edu>
+> Cc: Greg KH<greg@kroah.com>
+> Cc: Grant Likely<grant.likely@secretlab.ca>
+> Cc: Rob Herring<rob.herring@calxeda.com>
+> Cc: Andrew Victor<linux@maxim.org.za>
+> Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe Plagniol-Villard<plagnioj@jcrosoft.com>
+> Cc: linux-usb at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
 > ---
-
-> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-> @@ -321,7 +321,7 @@ static struct platform_device i2c3_device = {
->         .num_resources  = ARRAY_SIZE(rcar_i2c3_res),
->  };
+>   drivers/usb/host/Kconfig      |    8 +++++
+>   drivers/usb/host/Makefile     |    1 +
+>   drivers/usb/host/ehci-atmel.c |   76 ++++++++++++++++++++++-------------------
+>   drivers/usb/host/ehci-hcd.c   |   10 ++----
+>   drivers/usb/host/ehci.h       |    2 +-
+>   5 files changed, 53 insertions(+), 44 deletions(-)
 >
-> -static struct platform_device *r8a7779_early_devices[] __initdata = {
-> +static struct platform_device *r8a7779_early_devices_dt[] __initdata = {
->         &scif0_device,
->         &scif1_device,
->         &scif2_device,
-> @@ -330,15 +330,15 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
->         &scif5_device,
->         &tmu00_device,
->         &tmu01_device,
-> +};
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 15e8032..1ef37d7 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -170,6 +170,14 @@ config USB_EHCI_HCD_SPEAR
+>             Enables support for the on-chip EHCI controller on
+>             ST SPEAr chips.
+>
+> +config USB_EHCI_HCD_AT91
+> +        tristate  "Support for Atmel on-chip EHCI USB controller"
+> +        depends on USB_EHCI_HCD&&  ARCH_AT91
+> +        default y
+> +        ---help---
+> +          Enables support for the on-chip EHCI controller on
+> +          Atmel chips.
 > +
-> +static struct platform_device *r8a7779_early_devices[] __initdata = {
->         &i2c0_device,
->         &i2c1_device,
->         &i2c2_device,
->         &i2c3_device,
->  };
+>   config USB_EHCI_MSM
+>   	bool "Support for MSM on-chip EHCI USB controller"
+>   	depends on USB_EHCI_HCD&&  ARCH_MSM
+> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+> index c8fcde9..b301243 100644
+> --- a/drivers/usb/host/Makefile
+> +++ b/drivers/usb/host/Makefile
+> @@ -29,6 +29,7 @@ obj-$(CONFIG_USB_EHCI_HCD_PLATFORM)	+= ehci-platform.o
+>   obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
+>   obj-$(CONFIG_USB_EHCI_HCD_SPEAR)+= ehci-spear.o
+>   obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
+> +obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
+>   obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
+>   obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
+>   obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
+> diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+> index 27639487..3cd0dd4 100644
+> --- a/drivers/usb/host/ehci-atmel.c
+> +++ b/drivers/usb/host/ehci-atmel.c
+> @@ -15,6 +15,19 @@
+>   #include<linux/platform_device.h>
+>   #include<linux/of.h>
+>   #include<linux/of_platform.h>
+> +#include<linux/kernel.h>
+> +#include<linux/module.h>
+> +#include<linux/usb.h>
+> +#include<linux/usb/hcd.h>
+> +#include<linux/io.h>
+> +#include<linux/dma-mapping.h>
+> +
+> +#include "ehci.h"
+> +
+> +#define DRIVER_DESC "EHCI atmel driver"
+> +
+> +static const char hcd_name[] = "ehci-atmel";
+> +static struct hc_driver __read_mostly ehci_atmel_hc_driver;
 >
-> -static struct platform_device *r8a7779_late_devices[] __initdata = {
+>   /* interface and function clocks */
+>   static struct clk *iclk, *fclk;
+> @@ -60,41 +73,6 @@ static int ehci_atmel_setup(struct usb_hcd *hcd)
+>   	return ehci_setup(hcd);
+>   }
+>
+> -static const struct hc_driver ehci_atmel_hc_driver = {
+> -	.description		= hcd_name,
+> -	.product_desc		= "Atmel EHCI UHP HS",
+> -	.hcd_priv_size		= sizeof(struct ehci_hcd),
+> -
+> -	/* generic hardware linkage */
+> -	.irq			= ehci_irq,
+> -	.flags			= HCD_MEMORY | HCD_USB2,
+> -
+> -	/* basic lifecycle operations */
+> -	.reset			= ehci_atmel_setup,
+> -	.start			= ehci_run,
+> -	.stop			= ehci_stop,
+> -	.shutdown		= ehci_shutdown,
+> -
+> -	/* managing i/o requests and associated device resources */
+> -	.urb_enqueue		= ehci_urb_enqueue,
+> -	.urb_dequeue		= ehci_urb_dequeue,
+> -	.endpoint_disable	= ehci_endpoint_disable,
+> -	.endpoint_reset		= ehci_endpoint_reset,
+> -
+> -	/* scheduling support */
+> -	.get_frame_number	= ehci_get_frame,
+> -
+> -	/* root hub support */
+> -	.hub_status_data	= ehci_hub_status_data,
+> -	.hub_control		= ehci_hub_control,
+> -	.bus_suspend		= ehci_bus_suspend,
+> -	.bus_resume		= ehci_bus_resume,
+> -	.relinquish_port	= ehci_relinquish_port,
+> -	.port_handed_over	= ehci_port_handed_over,
+> -
+> -	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
 > -};
 > -
+>   static u64 at91_ehci_dma_mask = DMA_BIT_MASK(32);
+>
+>   static int ehci_atmel_drv_probe(struct platform_device *pdev)
+> @@ -210,7 +188,33 @@ static struct platform_driver ehci_atmel_driver = {
+>   	.remove		= ehci_atmel_drv_remove,
+>   	.shutdown	= usb_hcd_platform_shutdown,
+>   	.driver		= {
+> -		.name	= "atmel-ehci",
+> +		.name	= hcd_name,
 
-Thanks for your work on this. Two things with early/late devices on r8a7779:
+This change will cause atmel ehci won't work with the none device tree 
+kernel.
 
-1)  Same thing as sh73a0 applies here, please refrain from using early
-devices with DT.
-2) The i2c devices as early devices look incorrect. Can you make them
-late devices?
+it can be fixed with replace other places using "atmel-ehci" with 
+<hcd_name>, that means replace "atmel-ehci" with "ehci-atmel" at other 
+places.
 
-Cheers,
-
-/ magnus
+Best Regards,
+Bo Shen
