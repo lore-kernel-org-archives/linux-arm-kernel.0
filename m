@@ -1,42 +1,30 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 18 Feb 2013 15:34:56 +0530
-Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
-In-Reply-To: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <5121FCC8.7090604@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Feb 2013 09:59:38 +0000
+Subject: ARM coherent allocs, Was: ixp4xx eth broken in 3.7.0/3.8-rc5?
+In-Reply-To: <20769.61349.124371.633959@pilspetsen.it.uu.se>
+References: <20744.9777.937924.822371@pilspetsen.it.uu.se>
+ <m34nhk9ef7.fsf@intrepid.localdomain>
+ <m3a9r2d5md.fsf_-_@intrepid.localdomain>
+ <20769.61349.124371.633959@pilspetsen.it.uu.se>
+Message-ID: <20130218095938.GS17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 February 2013 05:36 PM, Santosh Shilimkar wrote:
-> OMAP UART IP needs manual idle modes based on state of the
-> IP. Currently this is handled by the driver with function pointers
-> implemented in platform code.
->
-> This however breaks in case of device tree because of missing
-> idle handling.
->
-> The series tries to address the issue
->
-> Patches has been tested on OMAP4 and OMAP5 devices where the console
-> slugishness was observed without idle mode handling. CPUIDLE and
-> suspend tested ok on these devices.
->
-> Need help in testing on OMAP2, OMAP3 and AM3XXX devices.
->
-> Santosh Shilimkar (2):
->    ARM: OMAP2+: hwmod-data: UART IP needs software control of sidle
->      modes
->    SERIAL: OMAP: Remove the idle handling from the driver
->
-HWMOD_SWSUP_SIDLE flag will is not what will help UART completely.
-Also considering UART also needs async wakeup enabled as it implements
-another such hook and attaches that through function pointer.
+On Mon, Feb 18, 2013 at 10:08:53AM +0100, Mikael Pettersson wrote:
+> Krzysztof Halasa writes:
+>  > Hi,
+>  > 
+>  > I'm not sure how is it supposed to work. Environment: IXP4xx CPU,
+>  > only 64 MB (of 256 MB) of RAM is available for PCI bus master DMA,
+>  > /dev/sda is a PATA CF or SATA SSD using CS5536-based PATA interface
+>  > (SATA - with a bridge) in DMA (PCI bus master) mode.
+>  > 
+>  > It works in PIO mode.
+>  > The problem seems to be this: pci_dev->dev.coherent_dma_mask is 0x3FFFFFF
+>  > (64MB-1). Yet __dma_alloc() called with GFP_DMA returns memory
+>  > physically located (dma_handle) above 64MB region.
+> 
+> Isn't that what the ARM-specific dma bounce allocator is supposed to
+> handle?  Or did e9da6e9905e639b0f842a244bc770b48ad0523e9 disable that one?
 
-So some more work is needed to get that sorted out at least from
-sysc point of view. That way we can deal with io_ring stuff using
-pin control APIs.
-
-Some patches will follow in attempt to address it. Stay tuned !!
-
-Regards,
-Santosh
+How can it if the coherent DMA allocator is not respecting the DMA mask?
