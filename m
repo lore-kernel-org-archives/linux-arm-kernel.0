@@ -1,81 +1,77 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 18 Feb 2013 17:08:16 +0530
-Subject: [PATCH, RFC 7/8] ARM: dts: am4372: initial support
+Date: Mon, 18 Feb 2013 17:08:21 +0530
+Subject: [PATCH, RFC 8/8] ARM: dts: am43-pre-silicon support
 In-Reply-To: <cover.1361186097.git.afzal@ti.com>
 References: <cover.1361186097.git.afzal@ti.com>
-Message-ID: <c9c131c0508b875c0893e8557504372a1564568a.1361186097.git.afzal@ti.com>
+Message-ID: <e344f74da47579c11db68d9f6efe25259ed7f25d.1361186097.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT source (minimal) for AM4372 SoC. Those represented here are the
-minimal DT nodes necessary to get kernel booting.
+AM43 SoC is in pre-silicon stage, meanwhile it has been modelled in
+a pre-silicon platform. To validate and boot Linux in pre-silicon
+platform that emulates an AM43 SoC, add DT build support.
+
+As bootloader is not used, bootargs is passed through DT.
+
+Note: This would be replaced by an original board support.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/boot/dts/am4372.dtsi | 55 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
- create mode 100644 arch/arm/boot/dts/am4372.dtsi
+ arch/arm/boot/dts/Makefile             |  3 ++-
+ arch/arm/boot/dts/am43-pre-silicon.dts | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/am43-pre-silicon.dts
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 94d88b9..b434344 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -124,7 +124,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap5-evm.dtb \
+ 	am335x-evm.dtb \
+ 	am335x-evmsk.dtb \
+-	am335x-bone.dtb
++	am335x-bone.dtb \
++	am43-pre-silicon.dtb
+ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+diff --git a/arch/arm/boot/dts/am43-pre-silicon.dts b/arch/arm/boot/dts/am43-pre-silicon.dts
 new file mode 100644
-index 0000000..178c41f
+index 0000000..b9c6297
 --- /dev/null
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -0,0 +1,55 @@
++++ b/arch/arm/boot/dts/am43-pre-silicon.dts
+@@ -0,0 +1,31 @@
 +/*
-+ * Device Tree Source for AM4372 SoC
-+ *
 + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
 + *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+/include/ "skeleton.dtsi"
++/* AM43 Pre Silicon */
++
++/dts-v1/;
++
++/include/ "am4372.dtsi"
 +
 +/ {
-+	compatible = "ti,am4372", "ti,am43";
-+	interrupt-parent = <&gic>;
++	model = "TI AM43 Pre Silicon";
++	compatible = "ti,am43-pre-silicon","ti,am4372","ti,am43";
 +
-+
-+	aliases {
-+		serial0 = &uart1;
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>; /* 256 MB */
 +	};
 +
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+		};
++	chosen {
++		bootargs = "console=ttyO0,115200n8 root=/dev/ram rw initrd=0x82000000,32MB earlyprintk";
 +	};
++};
 +
-+	gic: interrupt-controller at 48241000 {
-+		compatible = "arm,cortex-a9-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		reg = <0x48241000 0x1000>,
-+		      <0x48240100 0x0100>;
-+	};
-+
-+	twd1: local-timer at 0x48240600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0x48240600 0x20>;
-+		interrupts = <1 13 0x304>;
-+	};
-+
-+	ocp {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		uart1: serial at 44e09000 {
-+			compatible = "ti,am4372-uart","ti,omap2-uart";
-+			clock-frequency = <48000000>;
-+			reg = <0x44e09000 0x2000>;
-+			interrupts = <0 72 0x4>;
-+		};
-+	};
++&twd1 {
++	clock-frequency = <300000000>;
 +};
 -- 
 1.7.12
