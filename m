@@ -1,104 +1,28 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Mon, 18 Feb 2013 01:13:46 +0100
-Subject: [RFC] ARM: sa1100: collie-battery.c: include platform_device.h
- directly
-In-Reply-To: <20130216230010.GG1741@lizard.sbx05280.losalca.wayport.net>
-References: <1361038560-3690-1-git-send-email-andrea.adami@gmail.com>
- <20130216230010.GG1741@lizard.sbx05280.losalca.wayport.net>
-Message-ID: <CAAQYJAt0CGi3ZLO8eoYj64Ay06Yry_w8A6aPHHH1tpeyp=Ns4g@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 18 Feb 2013 09:29:34 +0900
+Subject: [PATCH v3 0/2] ARM: shmobile: r8a7779: Correct TMU clock support again
+Message-ID: <1361147376-1228-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 17, 2013 at 12:00 AM, Anton Vorontsov <anton@enomsg.org> wrote:
-> Hi Andrea,
->
-> On Sat, Feb 16, 2013 at 07:16:00PM +0100, Andrea Adami wrote:
->> Initial try to fix compilation error
->
-> Things are a bit more complex...
->
->> linux/include/linux/mfd/mcp.h:22:16: error: field 'attached_device' has incomplete type
->
-> You have to add #include <linux/device.h> into mfd/mcp.h. This will add
-> struct device and...
->
-Bingo.Adding it solves all following errors, no need for further inclusions.
+Hi,
 
->> linux/include/linux/mfd/mcp.h:48:23: error: field 'drv' has incomplete type
->
-> struct device_driver.
->
->> linux/include/linux/mfd/ucb1x00.h:137:17: error: field 'dev' has incomplete type
->
-> Same here, the file ucb1x00.h needs #include <linux/device.h>.
->
-Seems not needed, mcp.h is included by ucb1x00.h
+This is a third pass at a two line fix for a regression in TMU clock
+configuration.
 
->> linux/drivers/power/collie_battery.c:290:56: error: unknown type name 'pm_message_t'
->
-> #include <linux/pm.h> into collie_battery.c
->
-Seems not needed, is included in mcp-sa11x0.c (included by collie_battery.c)
+I have managed to track down a portion of the documentation which
+confirms the discussion on the mailing list: TMU01, TMU01 and TMU02
+share a common clock.
 
-The warning remains, though:
- linux/drivers/power/collie_battery.c:372:2: warning: initialization
-from incompatible pointer type [enabled by default]
+I have also added a second patch to the series to exercise TMU02.
 
-> Thanks,
->
-> Anton
->
+Simon Horman (2):
+  ARM: shmobile: r8a7779: Correct TMU clock support again
+  [RFC] ARM: shmobile: r8a7779: Add TMU02 platform device
 
-Thank you for your attention
+ arch/arm/mach-shmobile/clock-r8a7779.c |    4 ++--
+ arch/arm/mach-shmobile/setup-r8a7779.c |   31 +++++++++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+), 2 deletions(-)
 
-Regards
-
-Andrea
-
-
-
-Thanks
->> linux/drivers/power/collie_battery.c:371:13: error: 'collie_bat_suspend' undeclared here (not in a function)
->> | make[4]: *** [drivers/power/collie_battery.o] Error 1
->> | make[3]: *** [drivers/power] Error 2
->>
->> As seen in Arnd Bergmann patches on LAKML
->> [PATCH 7/9] ARM defconfigs: add missing inclusions of linux/platform_device.h
->> [PATCH 1/9] ARM: sa1100/assabet: include platform_device.h directly
->>
->> Compilation is still not clean, two warnings:
->> linux/drivers/power/collie_battery.c:372:2: warning: initialization from incompatible pointer type [enabled by default]
->> linux/drivers/power/collie_battery.c:372:2: warning: (near initialization for 'collie_bat_driver.suspend') [enabled by default]
->>
->> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
->> ---
->>  drivers/power/collie_battery.c            |      1 +
->>  drivers/video/logo/logo_linux_clut224.ppm | 232006 ++++++++++++++++++++++++++-
->>  2 files changed, 230404 insertions(+), 1603 deletions(-)
->>
->> diff --git a/drivers/power/collie_battery.c b/drivers/power/collie_battery.c
->> index c58d0e3..52cbab3 100644
->> --- a/drivers/power/collie_battery.c
->> +++ b/drivers/power/collie_battery.c
->> @@ -14,6 +14,7 @@
->>  #include <linux/module.h>
->>  #include <linux/power_supply.h>
->>  #include <linux/delay.h>
->> +#include <linux/platform_device.h>
->
-> I don't see anywhere in the driver which would need platform_device.h...
-> But pm.h, yes.
->
-Sorry, I'm not a kernel developer. It was a desperate try to unbrick build.
-I'm just maintaining the layer needed to build Zaurus images using
-Yocto toolchain.
-Up to now, I could only build a working linux-as-bootloader kernel
-(kexecboot) for collie with old 2.6.31+ sources:
-userspace is not a problem now but the poor device is suffering some
-serious bitrot :/
-
->>  #include <linux/spinlock.h>
->>  #include <linux/interrupt.h>
->>  #include <linux/gpio.h>
->> --
->> 1.7.12.4
+-- 
+1.7.10.4
