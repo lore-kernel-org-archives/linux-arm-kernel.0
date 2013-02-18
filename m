@@ -1,349 +1,326 @@
 From: wni@nvidia.com (Wei Ni)
-Date: Mon, 18 Feb 2013 19:30:29 +0800
-Subject: [RFC PATCH 7/9] thermal: tegra30: add tegra30 thermal driver
+Date: Mon, 18 Feb 2013 19:30:26 +0800
+Subject: [RFC PATCH 4/9] hwmon: (lm90) use macros for the indexes of temp8 and
+ temp11
 In-Reply-To: <1361187031-3679-1-git-send-email-wni@nvidia.com>
 References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
-Message-ID: <1361187031-3679-8-git-send-email-wni@nvidia.com>
+Message-ID: <1361187031-3679-5-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dd Tegra30 thermal driver support. It create thermal zone with thermal
-sensors and cooling device to participate in the linux thermal management.
+Using macros for the indexes and nrs of temp8 and temp11.
+This make the code much clearer.
 
 Signed-off-by: Wei Ni <wni@nvidia.com>
 ---
- drivers/thermal/Kconfig          |    9 ++
- drivers/thermal/Makefile         |    1 +
- drivers/thermal/tegra3_thermal.c |  289 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 299 insertions(+)
- create mode 100644 drivers/thermal/tegra3_thermal.c
+ drivers/hwmon/lm90.c |  179 ++++++++++++++++++++++++++++++++------------------
+ 1 file changed, 114 insertions(+), 65 deletions(-)
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index eadef5b..2403681 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -141,6 +141,15 @@ config INTEL_POWERCLAMP
- 	  enforce idle time which results in more package C-state residency. The
- 	  user interface is exposed via generic thermal framework.
+diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
+index 80311ef..de5a476 100644
+--- a/drivers/hwmon/lm90.c
++++ b/drivers/hwmon/lm90.c
+@@ -298,6 +298,59 @@ static const struct lm90_params lm90_params[] = {
+ };
  
-+config TEGRA30_THERMAL
-+	tristate "Tegra30 thermal driver"
-+	depends on ARCH_TEGRA
-+	help
-+	  Select this to enable the Tegra30 thermal driver. Adds Tegra30 thermal
-+	  implementation according to the thermal management framework. Create
-+	  thermal zone with thermal sensors and cooling device to participate
-+	  in the linux thermal management.
-+
- config THERMAL_TEST
- 	tristate "test driver"
- 	help
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index ee0f687..de0b411 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -19,6 +19,7 @@ obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
- obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
- obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
- obj-$(CONFIG_INTEL_POWERCLAMP)	+= intel_powerclamp.o
-+obj-$(CONFIG_TEGRA30_THERMAL)	+= tegra3_thermal.o
- 
- # dummy driver for testing
- obj-$(CONFIG_THERMAL_TEST)	+= thermal_test.o
-diff --git a/drivers/thermal/tegra3_thermal.c b/drivers/thermal/tegra3_thermal.c
-new file mode 100644
-index 0000000..384168f
---- /dev/null
-+++ b/drivers/thermal/tegra3_thermal.c
-@@ -0,0 +1,289 @@
-+/*
-+ * Tegra thermal driver.
-+ *
-+ * Copyright (C) 2010-2013 NVIDIA Corporation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ /*
++ * TEMP8 register index
 + */
-+
-+#include <linux/kernel.h>
-+#include <linux/mutex.h>
-+#include <linux/err.h>
-+#include <linux/debugfs.h>
-+#include <linux/of.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/thermal.h>
-+
-+#define MAX_THROT_TABLE_SIZE    (64)
-+
-+struct throttle_table {
-+	unsigned int cpu_freq;
-+	int core_cap_level;
++enum lm90_temp8_reg_index {
++	TEMP8_LOCAL_LOW = 0,	/* 0: local low limit */
++	TEMP8_LOCAL_HIGH,	/* 1: local high limit */
++	TEMP8_LOCAL_CRIT,	/* 2: local critical limit */
++	TEMP8_REMOTE_CRIT,	/* 3: remote critical limit */
++	TEMP8_LOCAL_EMERG,	/* 4: local emergency limit
++				 * (max6659 and max6695/96)
++				 */
++	TEMP8_REMOTE_EMERG,	/* 5: remote emergency limit
++				 * (max6659 and max6695/96)
++				 */
++	TEMP8_REMOTE2_CRIT,	/* 6: remote 2 critical limit
++				 * (max6695/96 only)
++				 */
++	TEMP8_REMOTE2_EMERG,	/* 7: remote 2 emergency limit
++				 * (max6695/96 only)
++				 */
++	TEMP8_REG_NUM
 +};
 +
-+struct balanced_throttle {
-+	struct thermal_cooling_device *cdev;
-+	struct list_head node;
-+	int is_throttling;
-+	int throttle_count;
-+	int throttle_index;
-+	int throt_tab_size;
-+	struct throttle_table throt_tab[MAX_THROT_TABLE_SIZE + 1];
++/*
++ * TEMP11 register index
++ */
++enum lm90_temp11_reg_index {
++	TEMP11_REMOTE_TEMP = 0,	/* 0: remote input */
++	TEMP11_REMOTE_LOW,	/* 1: remote low limit */
++	TEMP11_REMOTE_HIGH,	/* 2: remote high limit */
++	TEMP11_REMOTE_OFFSET,	/* 3: remote offset
++				 * (except max6646, max6657/58/59,
++				 *  and max6695/96)
++				 */
++	TEMP11_LOCAL_TEMP,	/* 4: local input */
++	TEMP11_REMOTE2_TEMP,	/* 5: remote 2 input (max6695/96 only) */
++	TEMP11_REMOTE2_LOW,	/* 6: remote 2 low limit (max6695/96 only) */
++	TEMP11_REMOTE2_HIGH,	/* 7: remote 2 high limit (max6695/96 only) */
++	TEMP11_REG_NUM
 +};
 +
-+struct tegra_thermal_data {
-+	struct thermal_zone *tz;
-+	struct node_args np_args;
-+	int passive_delay;
-+	struct balanced_throttle tj_throttle;
-+	struct thermal_trip_point trip_ext;
++/*
++ * TEMP11 register NR
++ */
++enum lm90_temp11_reg_nr {
++	NR_CHAN_0_REMOTE_LOW = 0,	/* 0: channel 0, remote low limit */
++	NR_CHAN_0_REMOTE_HIGH,		/* 1: channel 0, remote high limit */
++	NR_CHAN_0_REMOTE_OFFSET,	/* 2: channel 0, remote offset */
++	NR_CHAN_1_REMOTE_LOW,		/* 3: channel 1, remote low limit */
++	NR_CHAN_1_REMOTE_HIGH,		/* 4: channel 1, remote high limit */
++	NR_NUM				/* number of the NRs for temp11 */
 +};
 +
-+static DEFINE_MUTEX(cpu_throttle_lock);
-+
-+static int tegra_throttle_get_max_state(struct thermal_cooling_device *cdev,
-+				unsigned long *max_state)
-+{
-+	struct balanced_throttle *bthrot = cdev->devdata;
-+
-+	*max_state = bthrot->throt_tab_size;
-+
-+	return 0;
-+}
-+
-+static int
-+tegra_throttle_get_cur_state(struct thermal_cooling_device *cdev,
-+				unsigned long *cur_state)
-+{
-+	struct balanced_throttle *bthrot = cdev->devdata;
-+
-+	mutex_lock(&cpu_throttle_lock);
-+	*cur_state = bthrot->is_throttling ?
-+			(bthrot->throt_tab_size - bthrot->throttle_index) :
-+			0;
-+	mutex_unlock(&cpu_throttle_lock);
-+
-+	return 0;
-+}
-+
-+static int
-+tegra_throttle_set_cur_state(struct thermal_cooling_device *cdev,
-+				unsigned long cur_state)
-+{
-+	struct balanced_throttle *bthrot = cdev->devdata;
-+	int index;
-+
-+	mutex_lock(&cpu_throttle_lock);
-+
-+	/* TODO: we will handle the dvfs here */
-+
-+	bthrot->throttle_index = bthrot->throt_tab_size - cur_state;
-+	index = bthrot->throttle_index;
-+
-+	mutex_unlock(&cpu_throttle_lock);
-+
-+	return 0;
-+}
-+
-+static struct thermal_cooling_device_ops tegra_throttle_cooling_ops = {
-+	.get_max_state = tegra_throttle_get_max_state,
-+	.get_cur_state = tegra_throttle_get_cur_state,
-+	.set_cur_state = tegra_throttle_set_cur_state,
-+};
-+
-+struct thermal_cooling_device *balanced_throttle_register(
-+		struct balanced_throttle *bthrot, char *type)
-+{
-+	bthrot->cdev = thermal_cooling_device_register(type, bthrot,
-+						&tegra_throttle_cooling_ops);
-+
-+	if (IS_ERR(bthrot->cdev)) {
-+		bthrot->cdev = NULL;
-+		return ERR_PTR(-ENODEV);
-+	}
-+
-+	return bthrot->cdev;
-+}
-+
-+static struct tegra_thermal_data * __devinit thermal_tegra_dt_parse_pdata(
-+						struct platform_device *pdev)
-+{
-+	struct tegra_thermal_data *tdata;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct of_phandle_args args;
-+	u32 val;
-+	int ret;
-+
-+	if (!np)
-+		return NULL;
-+
-+	tdata = devm_kzalloc(&pdev->dev, sizeof(*tdata), GFP_KERNEL);
-+	if (!tdata) {
-+		dev_err(&pdev->dev, "Can't allocate platform data\n");
-+		return NULL;
-+	}
-+	memset(tdata, 0, sizeof(*tdata));
-+
-+	ret = of_parse_phandle_with_args(np, "sensors", "#sensor-cells", 0,
-+					&args);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't get sensor.\n");
-+		return NULL;
-+	}
-+	tdata->np_args.np = args.np;
-+	tdata->np_args.index = args.args[0];
-+
-+	ret = of_property_read_u32(np, "passive-delay", &val);
-+	if (!ret)
-+		tdata->passive_delay = val;
-+
-+	ret = of_property_read_u32(np, "num-passive-trips", &val);
-+	if (!ret)
-+		tdata->trip_ext.num_passive_trips = val;
-+
-+	if (tdata->trip_ext.num_passive_trips) {
-+		tdata->trip_ext.passive_trips = devm_kzalloc(&pdev->dev,
-+						sizeof(int) * val, GFP_KERNEL);
-+
-+		of_property_read_u32_array(np, "passive-trips",
-+				(u32 *)(tdata->trip_ext.passive_trips),
-+				tdata->trip_ext.num_passive_trips);
-+	}
-+
-+	ret = of_property_read_u32(np, "num-active-trips", &val);
-+	if (!ret)
-+		tdata->trip_ext.num_active_trips = val;
-+
-+	if (tdata->trip_ext.num_active_trips) {
-+		tdata->trip_ext.active_trips = devm_kzalloc(&pdev->dev,
-+						sizeof(int) * val, GFP_KERNEL);
-+
-+		of_property_read_u32_array(np, "active-trips",
-+				(u32 *)(tdata->trip_ext.active_trips),
-+				tdata->trip_ext.num_active_trips);
-+	}
-+
-+	ret = of_property_read_u32(np, "throt-tab-size", &val);
-+	if (!ret)
-+		tdata->tj_throttle.throt_tab_size = val;
-+
-+	of_property_read_u32_array(np, "throt-tab",
-+				(u32 *)(&tdata->tj_throttle.throt_tab),
-+				tdata->tj_throttle.throt_tab_size * 2);
-+
-+	return tdata;
-+}
-+
-+static int tegra30_thermal_probe(struct platform_device *pdev)
-+{
-+	struct tegra_thermal_data *pdata = pdev->dev.platform_data;
-+	struct thermal_zone *tz;
-+	struct thermal_sensor *ts;
-+	static struct thermal_cooling_device *cdev;
-+	int ret;
-+
-+	pdata = thermal_tegra_dt_parse_pdata(pdev);
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "Get platform data failed.\n");
-+		return -EINVAL;
-+	}
-+
-+	/* Create a thermal zone */
-+	tz = create_thermal_zone("tz_tegra", NULL);
-+	if (!tz) {
-+		dev_err(&pdev->dev, "Create thermal_zone failed.\n");
-+		return -EINVAL;
-+	}
-+
-+	pdata->tz = tz;
-+
-+	/* Register cooling device */
-+	cdev = balanced_throttle_register(&pdata->tj_throttle, "cdev_throttle");
-+	if (!cdev) {
-+		dev_err(&pdev->dev, "Register cooling device failed.\n");
-+		goto exit_remove_thermal_zone;
-+	}
-+
-+	/* Get sensor */
-+	ts = get_sensor_by_node(&pdata->np_args);
-+	if (!ts) {
-+		dev_err(&pdev->dev, "get_sensor_by_node failed.\n");
-+		goto exit_unregister_cooling;
-+	}
-+
-+	ret = add_sensor_to_zone(pdata->tz, ts);
-+	if (ret) {
-+		dev_err(&pdev->dev, "add_sensor_to_zone failed.\n");
-+		goto exit_unregister_cooling;
-+	}
-+
-+	ret = add_cdev_to_zone(pdata->tz, cdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "add_cdev_to_zone failed.\n");
-+		goto exit_unregister_cooling;
-+	}
-+
-+	ret = add_sensor_trip_info(pdata->tz, ts, &pdata->trip_ext);
-+	if (ret) {
-+		dev_err(&pdev->dev, "add_sensor_trip_info failed.\n");
-+		goto exit_unregister_cooling;
-+	}
-+
-+	return 0;
-+
-+exit_unregister_cooling:
-+	thermal_cooling_device_unregister(cdev);
-+exit_remove_thermal_zone:
-+	remove_thermal_zone(pdata->tz);
-+	return -EINVAL;
-+
-+}
-+
-+static int tegra30_thermal_remove(struct platform_device *pdev)
-+{
-+	struct tegra_thermal_data *pdata = pdev->dev.platform_data;
-+	int i;
-+
-+	for (i = 0; i < MAX_CDEVS_PER_ZONE; i++) {
-+		if (pdata->tz->cdevs[i])
-+			thermal_cooling_device_unregister(pdata->tz->cdevs[i]);
-+		else
-+			break;
-+	}
-+
-+	remove_thermal_zone(pdata->tz);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id tegra30_thermal_id_table[] = {
-+	{ .compatible = "nvidia,tegra30-thermal" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, tegra30_thermal_id_table);
-+
-+static struct platform_driver tegra3_thermal_driver = {
-+	.probe = tegra30_thermal_probe,
-+	.remove = tegra30_thermal_remove,
-+	.driver = {
-+		.name = "tegra_thermal",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(tegra30_thermal_id_table),
-+	},
-+};
-+module_platform_driver(tegra3_thermal_driver);
-+
-+MODULE_AUTHOR("Wei Ni <wni@nvidia.com>");
-+MODULE_DESCRIPTION("Tegra30 thermal throttle driver");
-+MODULE_LICENSE("GPL v2");
++/*
+  * Client data (each client gets its own)
+  */
+ 
+@@ -320,25 +373,8 @@ struct lm90_data {
+ 	u8 reg_local_ext;	/* local extension register offset */
+ 
+ 	/* registers values */
+-	s8 temp8[8];	/* 0: local low limit
+-			 * 1: local high limit
+-			 * 2: local critical limit
+-			 * 3: remote critical limit
+-			 * 4: local emergency limit (max6659 and max6695/96)
+-			 * 5: remote emergency limit (max6659 and max6695/96)
+-			 * 6: remote 2 critical limit (max6695/96 only)
+-			 * 7: remote 2 emergency limit (max6695/96 only)
+-			 */
+-	s16 temp11[8];	/* 0: remote input
+-			 * 1: remote low limit
+-			 * 2: remote high limit
+-			 * 3: remote offset (except max6646, max6657/58/59,
+-			 *		     and max6695/96)
+-			 * 4: local input
+-			 * 5: remote 2 input (max6695/96 only)
+-			 * 6: remote 2 low limit (max6695/96 only)
+-			 * 7: remote 2 high limit (max6695/96 only)
+-			 */
++	s8 temp8[TEMP8_REG_NUM];
++	s16 temp11[TEMP11_REG_NUM];
+ 	u8 temp_hyst;
+ 	u16 alarms; /* bitvector (upper 8 bits for max6695/96) */
+ };
+@@ -480,37 +516,42 @@ static struct lm90_data *lm90_update_device(struct device *dev)
+ 		u8 alarms;
+ 
+ 		dev_dbg(&client->dev, "Updating lm90 data.\n");
+-		lm90_read_reg(client, LM90_REG_R_LOCAL_LOW, &data->temp8[0]);
+-		lm90_read_reg(client, LM90_REG_R_LOCAL_HIGH, &data->temp8[1]);
+-		lm90_read_reg(client, LM90_REG_R_LOCAL_CRIT, &data->temp8[2]);
+-		lm90_read_reg(client, LM90_REG_R_REMOTE_CRIT, &data->temp8[3]);
++		lm90_read_reg(client, LM90_REG_R_LOCAL_LOW,
++				&data->temp8[TEMP8_LOCAL_LOW]);
++		lm90_read_reg(client, LM90_REG_R_LOCAL_HIGH,
++				&data->temp8[TEMP8_LOCAL_HIGH]);
++		lm90_read_reg(client, LM90_REG_R_LOCAL_CRIT,
++				&data->temp8[TEMP8_LOCAL_CRIT]);
++		lm90_read_reg(client, LM90_REG_R_REMOTE_CRIT,
++				&data->temp8[TEMP8_REMOTE_CRIT]);
+ 		lm90_read_reg(client, LM90_REG_R_TCRIT_HYST, &data->temp_hyst);
+ 
+ 		if (data->reg_local_ext) {
+ 			lm90_read16(client, LM90_REG_R_LOCAL_TEMP,
+ 				    data->reg_local_ext,
+-				    &data->temp11[4]);
++				    &data->temp11[TEMP11_LOCAL_TEMP]);
+ 		} else {
+ 			if (lm90_read_reg(client, LM90_REG_R_LOCAL_TEMP,
+ 					  &h) == 0)
+-				data->temp11[4] = h << 8;
++				data->temp11[TEMP11_LOCAL_TEMP] = h << 8;
+ 		}
+ 		lm90_read16(client, LM90_REG_R_REMOTE_TEMPH,
+-			    LM90_REG_R_REMOTE_TEMPL, &data->temp11[0]);
++			LM90_REG_R_REMOTE_TEMPL,
++			&data->temp11[TEMP11_REMOTE_TEMP]);
+ 
+ 		if (lm90_read_reg(client, LM90_REG_R_REMOTE_LOWH, &h) == 0) {
+-			data->temp11[1] = h << 8;
++			data->temp11[TEMP11_REMOTE_LOW] = h << 8;
+ 			if ((data->flags & LM90_HAVE_REM_LIMIT_EXT)
+ 			 && lm90_read_reg(client, LM90_REG_R_REMOTE_LOWL,
+ 					  &l) == 0)
+-				data->temp11[1] |= l;
++				data->temp11[TEMP11_REMOTE_LOW] |= l;
+ 		}
+ 		if (lm90_read_reg(client, LM90_REG_R_REMOTE_HIGHH, &h) == 0) {
+-			data->temp11[2] = h << 8;
++			data->temp11[TEMP11_REMOTE_HIGH] = h << 8;
+ 			if ((data->flags & LM90_HAVE_REM_LIMIT_EXT)
+ 			 && lm90_read_reg(client, LM90_REG_R_REMOTE_HIGHL,
+ 					  &l) == 0)
+-				data->temp11[2] |= l;
++				data->temp11[TEMP11_REMOTE_HIGH] |= l;
+ 		}
+ 
+ 		if (data->flags & LM90_HAVE_OFFSET) {
+@@ -518,13 +559,14 @@ static struct lm90_data *lm90_update_device(struct device *dev)
+ 					  &h) == 0
+ 			 && lm90_read_reg(client, LM90_REG_R_REMOTE_OFFSL,
+ 					  &l) == 0)
+-				data->temp11[3] = (h << 8) | l;
++				data->temp11[TEMP11_REMOTE_OFFSET] =
++								(h << 8) | l;
+ 		}
+ 		if (data->flags & LM90_HAVE_EMERGENCY) {
+ 			lm90_read_reg(client, MAX6659_REG_R_LOCAL_EMERG,
+-				      &data->temp8[4]);
++				      &data->temp8[TEMP8_LOCAL_EMERG]);
+ 			lm90_read_reg(client, MAX6659_REG_R_REMOTE_EMERG,
+-				      &data->temp8[5]);
++				      &data->temp8[TEMP8_REMOTE_EMERG]);
+ 		}
+ 		lm90_read_reg(client, LM90_REG_R_STATUS, &alarms);
+ 		data->alarms = alarms;	/* save as 16 bit value */
+@@ -532,15 +574,16 @@ static struct lm90_data *lm90_update_device(struct device *dev)
+ 		if (data->kind == max6696) {
+ 			lm90_select_remote_channel(client, data, 1);
+ 			lm90_read_reg(client, LM90_REG_R_REMOTE_CRIT,
+-				      &data->temp8[6]);
++				      &data->temp8[TEMP8_REMOTE2_CRIT]);
+ 			lm90_read_reg(client, MAX6659_REG_R_REMOTE_EMERG,
+-				      &data->temp8[7]);
++				      &data->temp8[TEMP8_REMOTE2_EMERG]);
+ 			lm90_read16(client, LM90_REG_R_REMOTE_TEMPH,
+-				    LM90_REG_R_REMOTE_TEMPL, &data->temp11[5]);
++					LM90_REG_R_REMOTE_TEMPL,
++					&data->temp11[TEMP11_REMOTE2_TEMP]);
+ 			if (!lm90_read_reg(client, LM90_REG_R_REMOTE_LOWH, &h))
+-				data->temp11[6] = h << 8;
++				data->temp11[TEMP11_REMOTE2_LOW] = h << 8;
+ 			if (!lm90_read_reg(client, LM90_REG_R_REMOTE_HIGHH, &h))
+-				data->temp11[7] = h << 8;
++				data->temp11[TEMP11_REMOTE2_HIGH] = h << 8;
+ 			lm90_select_remote_channel(client, data, 0);
+ 
+ 			if (!lm90_read_reg(client, MAX6696_REG_R_STATUS2,
+@@ -735,7 +778,7 @@ static ssize_t show_temp8(struct device *dev, struct device_attribute *devattr,
+ 
+ static void _set_temp8(struct device *dev, int index, long val)
+ {
+-	static const u8 reg[8] = {
++	static const u8 reg[TEMP8_REG_NUM] = {
+ 		LM90_REG_W_LOCAL_LOW,
+ 		LM90_REG_W_LOCAL_HIGH,
+ 		LM90_REG_W_LOCAL_CRIT,
+@@ -818,7 +861,7 @@ static void _set_temp11(struct device *dev, int nr, int index, long val)
+ 		u8 high;
+ 		u8 low;
+ 		int channel;
+-	} reg[5] = {
++	} reg[NR_NUM] = {
+ 		{ LM90_REG_W_REMOTE_LOWH, LM90_REG_W_REMOTE_LOWL, 0 },
+ 		{ LM90_REG_W_REMOTE_HIGHH, LM90_REG_W_REMOTE_HIGHL, 0 },
+ 		{ LM90_REG_W_REMOTE_OFFSH, LM90_REG_W_REMOTE_OFFSL, 0 },
+@@ -909,11 +952,12 @@ static ssize_t set_temphyst(struct device *dev, struct device_attribute *dummy,
+ 
+ 	mutex_lock(&data->update_lock);
+ 	if (data->kind == adt7461)
+-		temp = temp_from_u8_adt7461(data, data->temp8[2]);
++		temp = temp_from_u8_adt7461(data,
++					data->temp8[TEMP8_LOCAL_CRIT]);
+ 	else if (data->kind == max6646)
+-		temp = temp_from_u8(data->temp8[2]);
++		temp = temp_from_u8(data->temp8[TEMP8_LOCAL_CRIT]);
+ 	else
+-		temp = temp_from_s8(data->temp8[2]);
++		temp = temp_from_s8(data->temp8[TEMP8_LOCAL_CRIT]);
+ 
+ 	data->temp_hyst = hyst_to_reg(temp - val);
+ 	i2c_smbus_write_byte_data(client, LM90_REG_W_TCRIT_HYST,
+@@ -967,25 +1011,28 @@ static ssize_t set_update_interval(struct device *dev,
+ 	return count;
+ }
+ 
+-static SENSOR_DEVICE_ATTR_2(temp1_input, S_IRUGO, show_temp11, NULL, 0, 4);
+-static SENSOR_DEVICE_ATTR_2(temp2_input, S_IRUGO, show_temp11, NULL, 0, 0);
++static SENSOR_DEVICE_ATTR_2(temp1_input, S_IRUGO, show_temp11, NULL,
++	NR_CHAN_0_REMOTE_LOW, TEMP11_LOCAL_TEMP);
++static SENSOR_DEVICE_ATTR_2(temp2_input, S_IRUGO, show_temp11, NULL,
++	NR_CHAN_0_REMOTE_LOW, TEMP11_REMOTE_TEMP);
+ static SENSOR_DEVICE_ATTR(temp1_min, S_IWUSR | S_IRUGO, show_temp8,
+-	set_temp8, 0);
++	set_temp8, TEMP8_LOCAL_LOW);
+ static SENSOR_DEVICE_ATTR_2(temp2_min, S_IWUSR | S_IRUGO, show_temp11,
+-	set_temp11, 0, 1);
++	set_temp11, NR_CHAN_0_REMOTE_LOW, TEMP11_REMOTE_LOW);
+ static SENSOR_DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp8,
+-	set_temp8, 1);
++	set_temp8, TEMP8_LOCAL_HIGH);
+ static SENSOR_DEVICE_ATTR_2(temp2_max, S_IWUSR | S_IRUGO, show_temp11,
+-	set_temp11, 1, 2);
++	set_temp11, NR_CHAN_0_REMOTE_HIGH, TEMP11_REMOTE_HIGH);
+ static SENSOR_DEVICE_ATTR(temp1_crit, S_IWUSR | S_IRUGO, show_temp8,
+-	set_temp8, 2);
++	set_temp8, TEMP8_LOCAL_CRIT);
+ static SENSOR_DEVICE_ATTR(temp2_crit, S_IWUSR | S_IRUGO, show_temp8,
+-	set_temp8, 3);
++	set_temp8, TEMP8_REMOTE_CRIT);
+ static SENSOR_DEVICE_ATTR(temp1_crit_hyst, S_IWUSR | S_IRUGO, show_temphyst,
+-	set_temphyst, 2);
+-static SENSOR_DEVICE_ATTR(temp2_crit_hyst, S_IRUGO, show_temphyst, NULL, 3);
++	set_temphyst, TEMP8_LOCAL_CRIT);
++static SENSOR_DEVICE_ATTR(temp2_crit_hyst, S_IRUGO, show_temphyst, NULL,
++	TEMP8_REMOTE_CRIT);
+ static SENSOR_DEVICE_ATTR_2(temp2_offset, S_IWUSR | S_IRUGO, show_temp11,
+-	set_temp11, 2, 3);
++	set_temp11, NR_CHAN_0_REMOTE_OFFSET, TEMP11_REMOTE_OFFSET);
+ 
+ /* Individual alarm files */
+ static SENSOR_DEVICE_ATTR(temp1_crit_alarm, S_IRUGO, show_alarm, NULL, 0);
+@@ -1033,13 +1080,13 @@ static const struct attribute_group lm90_group = {
+  * Additional attributes for devices with emergency sensors
+  */
+ static SENSOR_DEVICE_ATTR(temp1_emergency, S_IWUSR | S_IRUGO, show_temp8,
+-	set_temp8, 4);
++	set_temp8, TEMP8_LOCAL_EMERG);
+ static SENSOR_DEVICE_ATTR(temp2_emergency, S_IWUSR | S_IRUGO, show_temp8,
+-	set_temp8, 5);
++	set_temp8, TEMP8_REMOTE_EMERG);
+ static SENSOR_DEVICE_ATTR(temp1_emergency_hyst, S_IRUGO, show_temphyst,
+-			  NULL, 4);
++			  NULL, TEMP8_LOCAL_EMERG);
+ static SENSOR_DEVICE_ATTR(temp2_emergency_hyst, S_IRUGO, show_temphyst,
+-			  NULL, 5);
++			  NULL, TEMP8_REMOTE_EMERG);
+ 
+ static struct attribute *lm90_emergency_attributes[] = {
+ 	&sensor_dev_attr_temp1_emergency.dev_attr.attr,
+@@ -1069,18 +1116,20 @@ static const struct attribute_group lm90_emergency_alarm_group = {
+ /*
+  * Additional attributes for devices with 3 temperature sensors
+  */
+-static SENSOR_DEVICE_ATTR_2(temp3_input, S_IRUGO, show_temp11, NULL, 0, 5);
++static SENSOR_DEVICE_ATTR_2(temp3_input, S_IRUGO, show_temp11, NULL,
++	NR_CHAN_0_REMOTE_LOW, TEMP11_REMOTE2_TEMP);
+ static SENSOR_DEVICE_ATTR_2(temp3_min, S_IWUSR | S_IRUGO, show_temp11,
+-	set_temp11, 3, 6);
++	set_temp11, NR_CHAN_1_REMOTE_LOW, TEMP11_REMOTE2_LOW);
+ static SENSOR_DEVICE_ATTR_2(temp3_max, S_IWUSR | S_IRUGO, show_temp11,
+-	set_temp11, 4, 7);
++	set_temp11, NR_CHAN_1_REMOTE_HIGH, TEMP11_REMOTE2_HIGH);
+ static SENSOR_DEVICE_ATTR(temp3_crit, S_IWUSR | S_IRUGO, show_temp8,
+-	set_temp8, 6);
+-static SENSOR_DEVICE_ATTR(temp3_crit_hyst, S_IRUGO, show_temphyst, NULL, 6);
++	set_temp8, TEMP8_REMOTE2_CRIT);
++static SENSOR_DEVICE_ATTR(temp3_crit_hyst, S_IRUGO, show_temphyst, NULL,
++	TEMP8_REMOTE2_CRIT);
+ static SENSOR_DEVICE_ATTR(temp3_emergency, S_IWUSR | S_IRUGO, show_temp8,
+-	set_temp8, 7);
++	set_temp8, TEMP8_REMOTE2_EMERG);
+ static SENSOR_DEVICE_ATTR(temp3_emergency_hyst, S_IRUGO, show_temphyst,
+-			  NULL, 7);
++			  NULL, TEMP8_REMOTE2_EMERG);
+ 
+ static SENSOR_DEVICE_ATTR(temp3_crit_alarm, S_IRUGO, show_alarm, NULL, 9);
+ static SENSOR_DEVICE_ATTR(temp3_fault, S_IRUGO, show_alarm, NULL, 10);
 -- 
 1.7.9.5
