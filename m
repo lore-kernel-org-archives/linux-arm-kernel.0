@@ -1,98 +1,131 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 18 Feb 2013 13:43:45 +0530
-Subject: [PATCH 7/7] ARM: Exynos: move mct driver to drivers/clocksource
-In-Reply-To: <1361175225-19282-1-git-send-email-thomas.abraham@linaro.org>
-References: <1361175225-19282-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1361175225-19282-8-git-send-email-thomas.abraham@linaro.org>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 18 Feb 2013 13:49:20 +0530
+Subject: [PATCH v3 net-next 1/1] drivers: net: davinci_cpdma: acknowledge
+ interrupt properly
+Message-ID: <1361175560-600-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the multi core timer (mct) driver to from mach-exynos to
-drivers/clocksource and update the Kconfig and makefiles.
+CPDMA interrupts are not properly acknowledged which leads to interrupt
+storm, only cpdma interrupt 0 is acknowledged in Davinci CPDMA driver.
+Changed cpdma_ctlr_eoi api to acknowledge 1 and 2 interrupts which are
+used for rx and tx respectively.
 
-Cc: Changhwan Youn <chaos.youn@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Reported-by: Pantelis Antoniou <panto@antoniou-consulting.com>
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 ---
- arch/arm/Kconfig                                   |    2 +-
- arch/arm/mach-exynos/Kconfig                       |    6 ------
- arch/arm/mach-exynos/Makefile                      |    2 --
- drivers/clocksource/Kconfig                        |    5 +++++
- drivers/clocksource/Makefile                       |    1 +
- .../mct.c => drivers/clocksource/exynos_mct.c      |    0
- 6 files changed, 7 insertions(+), 9 deletions(-)
- rename arch/arm/mach-exynos/mct.c => drivers/clocksource/exynos_mct.c (100%)
+Changes from v2:
+* Changed the hardware register values from enumeration to defines
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 8b72d23..8234697 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1622,7 +1622,7 @@ config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP
- 	default y
--	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
-+	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !CLKSRC_EXYNOS_MCT)
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index e0ce082..6961ac7 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -80,12 +80,6 @@ config SOC_EXYNOS5440
- 	help
- 	  Enable EXYNOS5440 SoC support
+ drivers/net/ethernet/ti/cpsw.c          |   25 ++++++++++++++++---------
+ drivers/net/ethernet/ti/davinci_cpdma.c |    4 ++--
+ drivers/net/ethernet/ti/davinci_cpdma.h |    7 ++++++-
+ 3 files changed, 24 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 4ceed6e..7e93df6 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -510,19 +510,21 @@ static int cpsw_poll(struct napi_struct *napi, int budget)
+ 	int			num_tx, num_rx;
  
--config EXYNOS4_MCT
--	bool
--	default y
--	help
--	  Use MCT (Multi Core Timer) as kernel timers
+ 	num_tx = cpdma_chan_process(priv->txch, 128);
+-	num_rx = cpdma_chan_process(priv->rxch, budget);
 -
- config EXYNOS_DEV_DMA
- 	bool
- 	help
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 7e53a3a..5141963 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -26,8 +26,6 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
+-	if (num_rx || num_tx)
+-		cpsw_dbg(priv, intr, "poll %d rx, %d tx pkts\n",
+-			 num_rx, num_tx);
++	if (num_tx)
++		cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
  
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
++	num_rx = cpdma_chan_process(priv->rxch, budget);
+ 	if (num_rx < budget) {
+ 		napi_complete(napi);
+ 		cpsw_intr_enable(priv);
+-		cpdma_ctlr_eoi(priv->dma);
++		cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_RX);
+ 		cpsw_enable_irq(priv);
+ 	}
  
--obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
--
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- 
- obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-smc.o
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index a32b7a9..84bf4de 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -61,3 +61,8 @@ config CLKSRC_ARM_GENERIC
- 	def_bool y if ARM64
- 	help
- 	  This option enables support for the ARM generic timer.
++	if (num_rx || num_tx)
++		cpsw_dbg(priv, intr, "poll %d rx, %d tx pkts\n",
++			 num_rx, num_tx);
 +
-+config CLKSRC_EXYNOS_MCT
-+	def_bool y if ARCH_EXYNOS
-+	help
-+	  Support for Multi Core Timer controller on Exynos SoCs.
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index a33f792..248a856 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -17,5 +17,6 @@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_SUNXI_TIMER)	+= sunxi_timer.o
-+obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
+ 	return num_rx;
+ }
  
- obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
-diff --git a/arch/arm/mach-exynos/mct.c b/drivers/clocksource/exynos_mct.c
-similarity index 100%
-rename from arch/arm/mach-exynos/mct.c
-rename to drivers/clocksource/exynos_mct.c
+@@ -835,7 +837,8 @@ static int cpsw_ndo_open(struct net_device *ndev)
+ 	cpdma_ctlr_start(priv->dma);
+ 	cpsw_intr_enable(priv);
+ 	napi_enable(&priv->napi);
+-	cpdma_ctlr_eoi(priv->dma);
++	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_RX);
++	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
+ 
+ 	if (priv->data.dual_emac)
+ 		priv->slaves[priv->emac_port].open_stat = true;
+@@ -1075,7 +1078,9 @@ static void cpsw_ndo_tx_timeout(struct net_device *ndev)
+ 	cpdma_chan_start(priv->txch);
+ 	cpdma_ctlr_int_ctrl(priv->dma, true);
+ 	cpsw_intr_enable(priv);
+-	cpdma_ctlr_eoi(priv->dma);
++	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_RX);
++	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
++
+ }
+ 
+ static struct net_device_stats *cpsw_ndo_get_stats(struct net_device *ndev)
+@@ -1094,7 +1099,9 @@ static void cpsw_ndo_poll_controller(struct net_device *ndev)
+ 	cpsw_interrupt(ndev->irq, priv);
+ 	cpdma_ctlr_int_ctrl(priv->dma, true);
+ 	cpsw_intr_enable(priv);
+-	cpdma_ctlr_eoi(priv->dma);
++	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_RX);
++	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
++
+ }
+ #endif
+ 
+diff --git a/drivers/net/ethernet/ti/davinci_cpdma.c b/drivers/net/ethernet/ti/davinci_cpdma.c
+index 7d3bffd..68c3418 100644
+--- a/drivers/net/ethernet/ti/davinci_cpdma.c
++++ b/drivers/net/ethernet/ti/davinci_cpdma.c
+@@ -493,9 +493,9 @@ int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable)
+ 	return 0;
+ }
+ 
+-void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr)
++void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr, u32 value)
+ {
+-	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, 0);
++	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, value);
+ }
+ 
+ struct cpdma_chan *cpdma_chan_create(struct cpdma_ctlr *ctlr, int chan_num,
+diff --git a/drivers/net/ethernet/ti/davinci_cpdma.h b/drivers/net/ethernet/ti/davinci_cpdma.h
+index a97d6ab..d9bcc60 100644
+--- a/drivers/net/ethernet/ti/davinci_cpdma.h
++++ b/drivers/net/ethernet/ti/davinci_cpdma.h
+@@ -26,6 +26,11 @@
+ 
+ #define CPDMA_RX_SOURCE_PORT(__status__)	((__status__ >> 16) & 0x7)
+ 
++#define CPDMA_EOI_RX_THRESH	0x0
++#define CPDMA_EOI_RX		0x1
++#define CPDMA_EOI_TX		0x2
++#define CPDMA_EOI_MISC		0x3
++
+ struct cpdma_params {
+ 	struct device		*dev;
+ 	void __iomem		*dmaregs;
+@@ -88,7 +93,7 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
+ int cpdma_chan_process(struct cpdma_chan *chan, int quota);
+ 
+ int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable);
+-void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr);
++void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr, u32 value);
+ int cpdma_chan_int_ctrl(struct cpdma_chan *chan, bool enable);
+ bool cpdma_check_free_tx_desc(struct cpdma_chan *chan);
+ 
 -- 
-1.7.5.4
+1.7.9.5
