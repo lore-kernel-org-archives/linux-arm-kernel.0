@@ -1,115 +1,97 @@
 From: wni@nvidia.com (Wei Ni)
-Date: Mon, 18 Feb 2013 19:30:27 +0800
-Subject: [RFC PATCH 5/9] Thermal: Support using dt node to get sensor
+Date: Mon, 18 Feb 2013 19:30:25 +0800
+Subject: [RFC PATCH 3/9] hwmon: (lm90) add support to handle irq
 In-Reply-To: <1361187031-3679-1-git-send-email-wni@nvidia.com>
 References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
-Message-ID: <1361187031-3679-6-git-send-email-wni@nvidia.com>
+Message-ID: <1361187031-3679-4-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add functions to support using dt node with args to get sensor.
+Add support to handle irq. When the temperature touch the limit value, the
+driver can handle the interrupt.
 
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 Signed-off-by: Wei Ni <wni@nvidia.com>
 ---
- drivers/thermal/thermal_sys.c |   30 ++++++++++++++++++++++++++++++
- include/linux/thermal.h       |    9 +++++++++
- 2 files changed, 39 insertions(+)
+ drivers/hwmon/lm90.c |   38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/drivers/thermal/thermal_sys.c b/drivers/thermal/thermal_sys.c
-index e284b67..b5bedab 100644
---- a/drivers/thermal/thermal_sys.c
-+++ b/drivers/thermal/thermal_sys.c
-@@ -2183,6 +2183,28 @@ struct thermal_sensor *get_sensor_by_name(const char *name)
- }
- EXPORT_SYMBOL(get_sensor_by_name);
+diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
+index caf01b0..80311ef 100644
+--- a/drivers/hwmon/lm90.c
++++ b/drivers/hwmon/lm90.c
+@@ -89,6 +89,8 @@
+ #include <linux/err.h>
+ #include <linux/mutex.h>
+ #include <linux/sysfs.h>
++#include <linux/interrupt.h>
++#include <linux/of_irq.h>
  
-+struct thermal_sensor *get_sensor_by_node(struct node_args *np_args)
+ /*
+  * Addresses to scan
+@@ -302,6 +304,7 @@ static const struct lm90_params lm90_params[] = {
+ struct lm90_data {
+ 	struct device *hwmon_dev;
+ 	struct mutex update_lock;
++	struct work_struct irq_work;
+ 	char valid; /* zero until following fields are valid */
+ 	unsigned long last_updated; /* in jiffies */
+ 	int kind;
+@@ -1418,6 +1421,29 @@ static void lm90_init_client(struct i2c_client *client)
+ 		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, config);
+ }
+ 
++static void lm90_alert(struct i2c_client *client, unsigned int flag);
++
++static void lm90_irq_work(struct work_struct *work)
 +{
-+	struct thermal_sensor *pos;
-+	struct thermal_sensor *ts = NULL;
-+	struct node_args *args;
++	struct lm90_data *data = container_of(work, struct lm90_data,
++					      irq_work);
++	struct i2c_client *client = to_i2c_client(data->hwmon_dev->parent);
 +
-+	mutex_lock(&sensor_list_lock);
-+	for_each_thermal_sensor(pos) {
-+		args = &pos->np_args;
-+		if (args->np) {
-+			if ((args->np == np_args->np) &&
-+			   (args->index == np_args->index)) {
-+				ts = pos;
-+				break;
-+			}
-+		}
-+	}
-+	mutex_unlock(&sensor_list_lock);
-+	return ts;
++	lm90_alert(client, 0);
++
++	enable_irq(client->irq);
 +}
-+EXPORT_SYMBOL(get_sensor_by_node);
 +
- static int create_map_attrs(struct thermal_zone *tz, int indx)
++static irqreturn_t lm90_irq(int irq, void *dev_id)
++{
++	struct lm90_data *data = dev_id;
++
++	disable_irq_nosync(irq);
++	schedule_work(&data->irq_work);
++
++	return IRQ_HANDLED;
++}
++
+ static int lm90_probe(struct i2c_client *client,
+ 		      const struct i2c_device_id *id)
  {
- 	int ret, i;
-@@ -2368,6 +2390,7 @@ EXPORT_SYMBOL(add_sensor_trip_info);
-  * @devdata:	private device data
-  */
- struct thermal_sensor *thermal_sensor_register(const char *name, int count,
-+			struct node_args *np_args,
- 			struct thermal_sensor_ops *ops, void *devdata)
- {
- 	struct thermal_sensor *ts;
-@@ -2412,6 +2435,13 @@ struct thermal_sensor *thermal_sensor_register(const char *name, int count,
- 			goto exit_temp;
+@@ -1494,6 +1520,17 @@ static int lm90_probe(struct i2c_client *client,
+ 		goto exit_remove_files;
  	}
  
-+	if (np_args) {
-+		ts->np_args.np = np_args->np;
-+		ts->np_args.index = np_args->index;
-+	} else {
-+		ts->np_args.np = NULL;
++	if (client->irq >= 0) {
++		INIT_WORK(&data->irq_work, lm90_irq_work);
++		dev_dbg(dev, "lm90 irq: %d\n", client->irq);
++		err = request_irq(client->irq, lm90_irq, IRQF_TRIGGER_LOW,
++				       "lm90", data);
++		if (err < 0) {
++			dev_err(dev, "cannot request interrupt\n");
++			goto exit_remove_files;
++		}
 +	}
 +
- 	/* Add this sensor to the global list of sensors */
- 	mutex_lock(&sensor_list_lock);
- 	list_add_tail(&ts->node, &thermal_sensor_list);
-diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-index 4389599..b560ffa 100644
---- a/include/linux/thermal.h
-+++ b/include/linux/thermal.h
-@@ -113,6 +113,12 @@ enum {
- };
- #define THERMAL_GENL_CMD_MAX (__THERMAL_GENL_CMD_MAX - 1)
+ 	return 0;
  
-+/* support to parse node with args to get sensor or cooling device */
-+struct node_args {
-+	struct device_node *np;
-+	int index;
-+};
-+
- struct thermal_zone_device_ops {
- 	int (*bind) (struct thermal_zone_device *,
- 		     struct thermal_cooling_device *);
-@@ -223,6 +229,7 @@ struct thermal_sensor {
- 	void *devdata;
- 	struct idr idr;
- 	struct device device;
-+	struct node_args np_args;
- 	struct list_head node;
- 	struct thermal_sensor_ops *ops;
- 	struct thermal_attr *thresh_attrs;
-@@ -350,6 +357,7 @@ int thermal_register_governor(struct thermal_governor *);
- void thermal_unregister_governor(struct thermal_governor *);
+ exit_remove_files:
+@@ -1507,6 +1544,7 @@ static int lm90_remove(struct i2c_client *client)
+ {
+ 	struct lm90_data *data = i2c_get_clientdata(client);
  
- struct thermal_sensor *thermal_sensor_register(const char *, int,
-+				struct node_args *,
- 				struct thermal_sensor_ops *, void *);
- void thermal_sensor_unregister(struct thermal_sensor *);
- 
-@@ -357,6 +365,7 @@ struct thermal_zone *create_thermal_zone(const char *, void *);
- void remove_thermal_zone(struct thermal_zone *);
- int add_sensor_to_zone(struct thermal_zone *, struct thermal_sensor *);
- struct thermal_sensor *get_sensor_by_name(const char *);
-+struct thermal_sensor *get_sensor_by_node(struct node_args *);
- 
- int add_cdev_to_zone(struct thermal_zone *, struct thermal_cooling_device *);
- struct thermal_cooling_device *get_cdev_by_name(const char *);
++	free_irq(client->irq, data);
+ 	hwmon_device_unregister(data->hwmon_dev);
+ 	lm90_remove_files(client, data);
+ 	lm90_restore_conf(client, data);
 -- 
 1.7.9.5
