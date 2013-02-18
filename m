@@ -1,5 +1,5 @@
 From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 18 Feb 2013 14:53:15 -0500
+Date: Mon, 18 Feb 2013 14:53:24 -0500
 Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
 In-Reply-To: <CAKfTPtC4hbXXWO=_zsGYryM9hpWaGFLbiY+jiLf=koLa4xGJOQ@mail.gmail.com>
 References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
@@ -18,7 +18,7 @@ References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
  <CAKfTPtA1aTseD6Gntkf_zbCEbfZzt3P2-P1un6iF5_1TdVLjRQ@mail.gmail.com>
  <1361201422.23152.154.camel@gandalf.local.home>
  <CAKfTPtC4hbXXWO=_zsGYryM9hpWaGFLbiY+jiLf=koLa4xGJOQ@mail.gmail.com>
-Message-ID: <1361217195.23152.170.camel@gandalf.local.home>
+Message-ID: <1361217204.23152.171.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -51,3 +51,5 @@ f(t) {
 
  <failed? bisect f(t1), if not bisect f(t2)>
 }
+
+-- Steve
