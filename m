@@ -1,94 +1,56 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 18 Feb 2013 22:49:01 +0800
-Subject: [PATCH v3 11/12] gpio: pxa: discard irq base in pxa_gpio_chip
-In-Reply-To: <51222F14.8040306@compulab.co.il>
-References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
- <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
- <5121FDFC.2010107@compulab.co.il>
- <CAD6h2NT+Qq-uD9ctXWj9LK0pZFb6NsoA0-ZT611DthhMYy4NKg@mail.gmail.com>
- <51222F14.8040306@compulab.co.il>
-Message-ID: <CAD6h2NQQ5i1bXcn3tgciXcEOB7T84w-uFEVqNXtzK0jHNaM--g@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 18 Feb 2013 06:52:35 -0800
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <511F1245.60208@ti.com> (Santosh Shilimkar's message of "Sat, 16
+ Feb 2013 10:29:49 +0530")
+References: <1360840554-26901-1-git-send-email-balbi@ti.com>
+ <1360840554-26901-2-git-send-email-balbi@ti.com>
+ <87obfl60x7.fsf@linaro.org> <511F1245.60208@ti.com>
+Message-ID: <87vc9p4qto.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2013 21:39, Igor Grinberg <grinberg@compulab.co.il> wrote:
->
->
-> On 02/18/13 14:10, Haojian Zhuang wrote:
->> On 18 February 2013 18:10, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>> On 02/18/13 07:12, Haojian Zhuang wrote:
->>>> Discard irq_base in struct pxa_gpio_chip. Use irq_domain instead.
->>>>
->>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->>>> ---
->>>>  drivers/gpio/gpio-pxa.c |   91 +++++++++++++++++++++++------------------------
->>>>  1 file changed, 44 insertions(+), 47 deletions(-)
->>>
->>> [...]
->>>
->>>>
->>>> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
->>>> index 35cdb23..d45cb57 100644
->>>> --- a/drivers/gpio/gpio-pxa.c
->>>> +++ b/drivers/gpio/gpio-pxa.c
->>>> @@ -66,8 +66,8 @@ int pxa_last_gpio;
->>>>
->>>>  struct pxa_gpio_chip {
->>>>       struct gpio_chip chip;
->>>> +     struct irq_domain *domain;
->>>>       void __iomem    *regbase;
->>>> -     unsigned int    irq_base;
->>>>       bool            inverted;
->>>>       bool            gafr;
->>>>       char label[10];
->>>> @@ -147,17 +147,7 @@ static int pxa_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
->>>>       struct pxa_gpio_chip *chip = NULL;
->>>>
->>>>       chip = container_of(gc, struct pxa_gpio_chip, chip);
->>>> -     return chip->irq_base + offset;
->>>> -}
->>>> -
->>>> -int pxa_irq_to_gpio(struct irq_data *d)
->>>> -{
->>>> -     struct pxa_gpio_chip *chip;
->>>> -     int gpio;
->>>> -
->>>> -     chip = (struct pxa_gpio_chip *)d->domain->host_data;
->>>> -     gpio = d->irq - chip->irq_base + chip->chip.base;
->>>> -     return gpio;
->>>> +     return irq_create_mapping(chip->domain, offset);
->>>>  }
->>>
->>> You remove the pxa_irq_to_gpio() function here, but we still have:
->>> $ grep -nr pxa_irq_to_gpio *
->>> arch/arm/mach-pxa/pxa27x.c:368: int gpio = pxa_irq_to_gpio(d);
->>> arch/arm/mach-pxa/pxa25x.c:292: int gpio = pxa_irq_to_gpio(d);
->>> include/linux/gpio-pxa.h:16:extern int pxa_irq_to_gpio(struct irq_data *d);
->>>
->>> And this in turn breaks the compilation for example with error:
->>> arch/arm/mach-pxa/built-in.o: In function `pxa27x_set_wake':
->>> em-x270.c:(.text+0x1298): undefined reference to `pxa_irq_to_gpio'
->>> make[1]: *** [vmlinux] Error 1
->>> make: *** [sub-make] Error 2
->>>
->>>
->>> --
->>> Regards,
->>> Igor.
->>
->> Thank you.
->>
->> Please drop this patch (11/12) for your test. Whatever it's DT or non-DT mode,
->> gpio driver should work without this patch.
->
-> Nope... The IRQ is still broken even if I drop this patch.
->
->
-> --
-> Regards,
-> Igor.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Could you send the full log to me?
+> On Friday 15 February 2013 09:10 PM, Kevin Hilman wrote:
+>> Felipe Balbi <balbi@ti.com> writes:
+>>
+>>> Currently the omap-serial driver will not
+>>> work properly if booted via DT with CPUIDLE
+>>> enabled because it depends on function pointers
+>>> provided by hwmod to change its own SYSCONFIG
+>>> register.
+>>>
+>>> Remove that relyance on hwmod by moving SYSCONFIG
+>>> handling to driver itself. Note that this also
+>>> fixes a possible corner case bug where we could
+>>> be putting UART in Force Idle mode if we called
+>>> omap_serial_enable_wakeup(up, false) after setting
+>>> NOIDLE to the idle mode. This is because hwmod
+>>> has no protection against that situation.
+>>>
+>>> NYET-Signed-off-by: Felipe Balbi <balbi@ti.com>
+>>
+>> Here's another approach to getting rid of the sysconfig twiddling in the
+>> driver.  I wrote this some time ago at my former company ;) but don't
+>> think I ever got around to posting it.
+>>
+>> It doesn't solve the whole problem (e.g. doesn't address the
+>> context_loss or enable_wakeup func pointers), but at least gets rid of
+>> the need for any SYSCONFIG access in the driver for the idle modes.
+>>
+>> Needs more thorough testing.
+>>
+> I posted similar patch series[1] yesterday after testing it on OMAP4/5
+> devices. OMAP3 testing seems to be ok as well. AM3XXX and OMAP2 test
+> results is what am waiting for.
 
-Thanks
-Haojian
+Yeah, I saw yours after I posted mine.  Just continue with yours, I'll
+be glad to have someone else take this on.
+
+> Good to know that you had similar idea in mind to get rid of
+> UART sysc hackery.
+
+Likewise.
+
+Kevin
