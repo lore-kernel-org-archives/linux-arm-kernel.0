@@ -1,10 +1,10 @@
 From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Mon, 18 Feb 2013 18:11:10 +0530
-Subject: [PATCH v6 21/46] block: Use get/put_online_cpus_atomic() to prevent
- CPU offline
+Date: Mon, 18 Feb 2013 18:11:39 +0530
+Subject: [PATCH v6 25/46] staging: octeon: Use get/put_online_cpus_atomic() to
+ prevent CPU offline
 In-Reply-To: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
 References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20130218124109.26245.27817.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20130218124139.26245.43948.stgit@srivatsabhat.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,35 +15,39 @@ going offline from under us.
 Use the get/put_online_cpus_atomic() APIs to prevent CPUs from going offline,
 while invoking from atomic context.
 
-Cc: Jens Axboe <axboe@kernel.dk>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: David Daney <david.daney@cavium.com>
 Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 ---
 
- block/blk-softirq.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/staging/octeon/ethernet-rx.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/block/blk-softirq.c b/block/blk-softirq.c
-index 467c8de..448f9a9 100644
---- a/block/blk-softirq.c
-+++ b/block/blk-softirq.c
-@@ -58,6 +58,8 @@ static void trigger_softirq(void *data)
-  */
- static int raise_blk_irq(int cpu, struct request *rq)
- {
+diff --git a/drivers/staging/octeon/ethernet-rx.c b/drivers/staging/octeon/ethernet-rx.c
+index 34afc16..8588b4d 100644
+--- a/drivers/staging/octeon/ethernet-rx.c
++++ b/drivers/staging/octeon/ethernet-rx.c
+@@ -36,6 +36,7 @@
+ #include <linux/prefetch.h>
+ #include <linux/ratelimit.h>
+ #include <linux/smp.h>
++#include <linux/cpu.h>
+ #include <linux/interrupt.h>
+ #include <net/dst.h>
+ #ifdef CONFIG_XFRM
+@@ -97,6 +98,7 @@ static void cvm_oct_enable_one_cpu(void)
+ 		return;
+ 
+ 	/* ... if a CPU is available, Turn on NAPI polling for that CPU.  */
 +	get_online_cpus_atomic();
-+
- 	if (cpu_online(cpu)) {
- 		struct call_single_data *data = &rq->csd;
- 
-@@ -66,9 +68,11 @@ static int raise_blk_irq(int cpu, struct request *rq)
- 		data->flags = 0;
- 
- 		__smp_call_function_single(cpu, data, 0);
-+		put_online_cpus_atomic();
- 		return 0;
+ 	for_each_online_cpu(cpu) {
+ 		if (!cpu_test_and_set(cpu, core_state.cpu_state)) {
+ 			v = smp_call_function_single(cpu, cvm_oct_enable_napi,
+@@ -106,6 +108,7 @@ static void cvm_oct_enable_one_cpu(void)
+ 			break;
+ 		}
  	}
- 
 +	put_online_cpus_atomic();
- 	return 1;
  }
- #else /* CONFIG_SMP && CONFIG_USE_GENERIC_SMP_HELPERS */
+ 
+ static void cvm_oct_no_more_work(void)
