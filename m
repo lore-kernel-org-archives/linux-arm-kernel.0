@@ -1,120 +1,75 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 18 Feb 2013 21:22:24 +0900
-Subject: [PATCH 3/4] ARM: mach-shmobile: r8a7779: Minimal setup using DT
-In-Reply-To: <1359597051-32700-4-git-send-email-horms+renesas@verge.net.au>
-References: <1359597051-32700-1-git-send-email-horms+renesas@verge.net.au>
- <1359597051-32700-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoTM9d0kviajg8Og=6u=sqzKFBA=sgsKKoMLHXpz=QFOMA@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 18 Feb 2013 13:26:24 +0100
+Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
+In-Reply-To: <CABxcv=kDw6pSsdE29-dVqkk2cc-RKBZB6GN8cs+M+C4JEeSbdg@mail.gmail.com>
+References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
+ <CAPjKCR_oh25c4NKUTWjU6BYp64GjPoi2LWDpRhTUkBkRmc_HUw@mail.gmail.com>
+ <CABxcv=kDw6pSsdE29-dVqkk2cc-RKBZB6GN8cs+M+C4JEeSbdg@mail.gmail.com>
+Message-ID: <51221DF0.2050705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Javier,
 
-On Thu, Jan 31, 2013 at 10:50 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Allow a minimal setup of the r8a7779 SoC using a flattened device tree.
-> In particular, configure the i2c and ethernet controllers using a
-> flattened device tree.
+On 2/16/2013 5:44 PM, Javier Martinez Canillas wrote:
+> On Sat, Feb 16, 2013 at 2:09 PM, Anil Kumar <anilkumar880@gmail.com> wrote:
+>> Hi Florian,
+>>
+>> On Mon, Jan 28, 2013 at 11:24 PM, Florian Vaussard
+>> <florian.vaussard@epfl.ch> wrote:
+>>> Add device-tree support for the GPMC controller on the OMAP3.
+>>>
+>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>>> ---
+>>>   arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
+>>>   1 files changed, 11 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+>>> index 6c63118..2ddae38 100644
+>>> --- a/arch/arm/boot/dts/omap3.dtsi
+>>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>>> @@ -403,5 +403,16 @@
+>>>                          ti,timer-alwon;
+>>>                          ti,timer-secure;
+>>>                  };
+>>> +
+>>> +               gpmc: gpmc at 6e000000 {
+>>> +                       compatible = "ti,omap3430-gpmc";
+>>> +                       ti,hwmods = "gpmc";
+>>> +                       reg = <0x6e000000 0x1000000>;
+>>> +                       interrupts = <20>;
+>>> +                       gpmc,num-cs = <8>;
+>>> +                       gpmc,num-waitpins = <4>;
+>>> +                       #address-cells = <2>;
+>>> +                       #size-cells = <1>;
+>>> +               };
+>>>          };
+>>>   };
+>>
+>> Tested on devkit8000 (omap3 based board)
+>>
+>> Please take my Tested-by: Anil Kumar <anilk4.v@gmail.com>
+>>
+>> Thanks,
+>> Anil
+>>
 >
-> SCI serial controller and TMU clock source, whose drivers do not yet
-> support configuration using a flattened device tree, are still configured
-> using C code in order to allow booting of a board with this SoC.
+> Hello Tony and Benoit,
 >
-> The ethernet controller also requires a regulator which is a board property.
-> A sample snippet DT for the marzen board is as follows:
->
-> /dts-v1/;
-> /include/ "r8a7779.dtsi"
->
-> / {
->         fixedregulator3v3: fixedregulator at 0 {
->                 compatible = "regulator-fixed";
->                 regulator-name = "fixed-3.3V";
->                 regulator-min-microvolt = <3300000>;
->                 regulator-max-microvolt = <3300000>;
->                 regulator-boot-on;
->                 regulator-always-on;
->         };
-> };
->
-> &lan0 {
->         vddvario-supply = <&fixedregulator3v3>;
->         vdd33a-supply = <&fixedregulator3v3>;
-> };
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/r8a7779.dtsi               |   45 ++++++++++++++++++++
->  arch/arm/mach-shmobile/include/mach/common.h |    2 +
->  arch/arm/mach-shmobile/setup-r8a7779.c       |   58 +++++++++++++++++++++++---
->  3 files changed, 99 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> index eadc12e..9564040 100644
-> --- a/arch/arm/boot/dts/r8a7779.dtsi
-> +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> @@ -37,4 +37,49 @@
->                  reg = <0xf0001000 0x1000>,
->                        <0xf0000100 0x100>;
->          };
-> +
-> +       i2c0: i2c at 0xffc70000 {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               compatible = "renesas,rmobile-iic";
-> +               reg = <0xffc70000 0x1000>;
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <0 79 0x4>;
-> +       };
-> +
-> +       i2c1: i2c at 0xffc71000 {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               compatible = "renesas,rmobile-iic";
-> +               reg = <0xffc71000 0x1000>;
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <0 82 0x4>;
-> +       };
-> +
-> +       i2c2: i2c at 0xffc72000 {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               compatible = "renesas,rmobile-iic";
-> +               reg = <0xffc72000 0x1000>;
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <0 80 0x4>;
-> +       };
-> +
-> +       i2c3: i2c at 0xffc73000 {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               compatible = "renesas,rmobile-iic";
-> +               reg = <0xffc73000 0x1000>;
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <0 81 0x4>;
-> +       };
-> +
-> +       lan0: lan0 at 18000000 {
-> +               compatible = "smsc,lan9220", "smsc,lan9115";
-> +               reg = <0x18000000 0x100>;
-> +               phy-mode = "mii";
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <0 28 0x4>;
-> +               reg-io-width = <4>;
-> +       };
->  };
+> Could this patch be merged to one of your branches?
 
-Simon, thanks for your efforts on this DT reference implementation.
+I'll take it.
 
-The lan0 snippet above seems incorrect. If I understand the code above
-correctly then it is written to be specific to the r8a7779 SoC. I
-suspect so because it is located in the SoC-specific dtsi file. The
-smsc ethernet controller is a board specific property - so it should
-instead be located in r8a7779-marzen-reference.dts.
+> It has already my Reviewed-by and now Anil's Tested-by.
+>
+> Now that Daniel's OMAP GPMC binding were merged, there seems to be
+> many people working on adding support on their boards DT for
+> peripherals connected through the GPMC (NAND, OneNAND, SMSC LAN, etc).
+>
+> I think it will be easier if people can base their work on top of this
+> patch instead of duplicating the work and sending the same patch to
+> add a GPMC device node to omap3.dtsi on each patch-set.
 
-In the future, feel free to ask if you are unsure which bits that are
-SoC specific properties and which that belong to the board.
-
-Thanks,
-
-/ magnus
+Regards,
+Benoit
