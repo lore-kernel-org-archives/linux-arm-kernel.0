@@ -1,34 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 17 Feb 2013 16:30:25 -0800
-Subject: [GIT PULL fixes] Samsung-fixes for v3.9
-In-Reply-To: <1dce01ce097f$f7bd2db0$e7378910$@samsung.com>
-References: <1dce01ce097f$f7bd2db0$e7378910$@samsung.com>
-Message-ID: <20130218003025.GA4615@quad.lixom.net>
+Date: Sun, 17 Feb 2013 16:50:49 -0800
+Subject: [GIT PULL] at91: more DT changes related to MTD for 3.9
+In-Reply-To: <511B78C5.5030209@atmel.com>
+References: <511B78C5.5030209@atmel.com>
+Message-ID: <20130218005049.GD4615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 04:20:43PM -0800, Kukjin Kim wrote:
-> Hi Arnd and Olof,
+On Wed, Feb 13, 2013 at 12:28:05PM +0100, Nicolas Ferre wrote:
+> Hi Olof, Arnd,
 > 
-> Here is Samsung fixes for v3.9 and it is not a critical fixes.
+> I would like you to consider this little pull request for modification of some
+> AT91 Device Tree files.
+> We have had a discussion about this material earlier and now that Artem has queued
+> the driver modifications for MTD, I would like to know if it is possible to
+> add these two patches in your late/dt branch?
+
+Note that unless you break existing bindings (which you should never, or very
+very rarely do), adding the new contents doesn't have to wait for the driver
+changes. As long as the bindings are settled, the DT changes can go in.
+
+> The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
 > 
-> Please pull from:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/fixes-samsung
-> 
-> Thanks.
-> 
-> - Kukjin
-> 
-> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
-> 
->   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
+>   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/fixes-samsung
-
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt-late
 
 Pulled, thanks.
 
