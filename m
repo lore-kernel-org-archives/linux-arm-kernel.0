@@ -1,58 +1,81 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 18 Feb 2013 17:08:09 +0530
-Subject: [PATCH, RFC 6/8] ARM: OMAP2+: am43: basic dt support
+Date: Mon, 18 Feb 2013 17:08:16 +0530
+Subject: [PATCH, RFC 7/8] ARM: dts: am4372: initial support
 In-Reply-To: <cover.1361186097.git.afzal@ti.com>
 References: <cover.1361186097.git.afzal@ti.com>
-Message-ID: <64d18c5a07bf7680b8299f3ef98303e60522e738.1361186097.git.afzal@ti.com>
+Message-ID: <c9c131c0508b875c0893e8557504372a1564568a.1361186097.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe minimal DT boot machine details for AM43 based SoC's. AM43
-family of SoC's are ARM Cortex-A9 based with one core in SMP
-configuration. Low level debug could be achieved by selecting
-DEBUG_AM33XXUART1. To boot AM43 SoC, this change is sufficient w.r.t
-Kernel (considering the fact that strictly speaking DT sources does
-not classify as a part of Kernel). Here private timer of the one and
-only core is being used as clock event (as well as, as time source).
+DT source (minimal) for AM4372 SoC. Those represented here are the
+minimal DT nodes necessary to get kernel booting.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/board-generic.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/am4372.dtsi | 55 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am4372.dtsi
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 0274ff7..e083f08 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -15,7 +15,10 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip.h>
- 
-+#include <asm/mach/map.h>
-+#include <asm/smp_twd.h>
- #include <asm/mach/arch.h>
- 
- #include "common.h"
-@@ -182,3 +185,18 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
- 	.restart	= omap44xx_restart,
- MACHINE_END
- #endif
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+new file mode 100644
+index 0000000..178c41f
+--- /dev/null
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -0,0 +1,55 @@
++/*
++ * Device Tree Source for AM4372 SoC
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+#ifdef CONFIG_SOC_AM43
-+static const char *am43_boards_compat[] __initdata = {
-+	"ti,am43",
-+	NULL,
++/include/ "skeleton.dtsi"
++
++/ {
++	compatible = "ti,am4372", "ti,am43";
++	interrupt-parent = <&gic>;
++
++
++	aliases {
++		serial0 = &uart1;
++	};
++
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-a9";
++		};
++	};
++
++	gic: interrupt-controller at 48241000 {
++		compatible = "arm,cortex-a9-gic";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		reg = <0x48241000 0x1000>,
++		      <0x48240100 0x0100>;
++	};
++
++	twd1: local-timer at 0x48240600 {
++		compatible = "arm,cortex-a9-twd-timer";
++		reg = <0x48240600 0x20>;
++		interrupts = <1 13 0x304>;
++	};
++
++	ocp {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		uart1: serial at 44e09000 {
++			compatible = "ti,am4372-uart","ti,omap2-uart";
++			clock-frequency = <48000000>;
++			reg = <0x44e09000 0x2000>;
++			interrupts = <0 72 0x4>;
++		};
++	};
 +};
-+
-+DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
-+	.map_io		= debug_ll_io_init,
-+	.init_irq	= irqchip_init,
-+	.init_machine	= omap_generic_init,
-+	.init_time	= twd_local_timer_of_register,
-+	.dt_compat	= am43_boards_compat,
-+MACHINE_END
-+#endif
 -- 
 1.7.12
