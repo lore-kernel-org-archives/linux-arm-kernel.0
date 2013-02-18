@@ -1,10 +1,10 @@
 From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Mon, 18 Feb 2013 18:10:13 +0530
-Subject: [PATCH v6 14/46] sched/rt: Use get/put_online_cpus_atomic() to
- prevent CPU offline
+Date: Mon, 18 Feb 2013 18:10:18 +0530
+Subject: [PATCH v6 15/46] tick: Use get/put_online_cpus_atomic() to prevent
+ CPU offline
 In-Reply-To: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
 References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20130218124012.26245.44243.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20130218124018.26245.34450.stgit@srivatsabhat.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,28 +18,26 @@ while invoking from atomic context.
 Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 ---
 
- kernel/sched/rt.c |    3 +++
- 1 file changed, 3 insertions(+)
+ kernel/time/tick-broadcast.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
-index 4f02b28..e546c98 100644
---- a/kernel/sched/rt.c
-+++ b/kernel/sched/rt.c
-@@ -6,6 +6,7 @@
- #include "sched.h"
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index f113755..d123a2c 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -160,6 +160,7 @@ static void tick_do_broadcast(struct cpumask *mask)
+  */
+ static void tick_do_periodic_broadcast(void)
+ {
++	get_online_cpus_atomic();
+ 	raw_spin_lock(&tick_broadcast_lock);
  
- #include <linux/slab.h>
-+#include <linux/cpu.h>
+ 	cpumask_and(to_cpumask(tmpmask),
+@@ -167,6 +168,7 @@ static void tick_do_periodic_broadcast(void)
+ 	tick_do_broadcast(to_cpumask(tmpmask));
  
- static int do_sched_rt_period_timer(struct rt_bandwidth *rt_b, int overrun);
+ 	raw_spin_unlock(&tick_broadcast_lock);
++	put_online_cpus_atomic();
+ }
  
-@@ -26,7 +27,9 @@ static enum hrtimer_restart sched_rt_period_timer(struct hrtimer *timer)
- 		if (!overrun)
- 			break;
- 
-+		get_online_cpus_atomic();
- 		idle = do_sched_rt_period_timer(rt_b, overrun);
-+		put_online_cpus_atomic();
- 	}
- 
- 	return idle ? HRTIMER_NORESTART : HRTIMER_RESTART;
+ /*
