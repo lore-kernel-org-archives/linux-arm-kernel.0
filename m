@@ -1,221 +1,92 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 18 Feb 2013 13:51:26 +0530
-Subject: [PATCH v6 16/16] ARM: dts: add board specific fixed rate clock nodes
- for Exynos based platforms
+Date: Mon, 18 Feb 2013 13:51:22 +0530
+Subject: [PATCH v6 12/16] ARM: dts: add Exynos4 and Exynos5 clock controller
+ nodes
 In-Reply-To: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
 References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1361175686-19400-17-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1361175686-19400-13-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock frequency of xxti and xusbxti clocks is dependent on the frequency of the
-on-board oscillator that is used to generate these clocks. So allow the frequency
-of these clocks to be specfied from device tree.
+Add clock controller nodes for Exynos4210, Exynos4x12, Exynos5250 and
+Exynos5440 SoC.
 
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/boot/dts/exynos4210-origen.dts   |   12 ++++++++++++
- arch/arm/boot/dts/exynos4210-smdkv310.dts |   12 ++++++++++++
- arch/arm/boot/dts/exynos4210-trats.dts    |   12 ++++++++++++
- arch/arm/boot/dts/exynos4412-odroidx.dts  |   12 ++++++++++++
- arch/arm/boot/dts/exynos4412-origen.dts   |   12 ++++++++++++
- arch/arm/boot/dts/exynos4412-smdk4412.dts |   12 ++++++++++++
- arch/arm/boot/dts/exynos5250-arndale.dts  |    7 +++++++
- arch/arm/boot/dts/exynos5250-smdk5250.dts |    7 +++++++
- arch/arm/boot/dts/exynos5250-snow.dts     |    7 +++++++
- arch/arm/boot/dts/exynos5440-ssdk5440.dts |    7 +++++++
- 10 files changed, 100 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos4210.dtsi |    6 ++++++
+ arch/arm/boot/dts/exynos4x12.dtsi |    6 ++++++
+ arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
+ arch/arm/boot/dts/exynos5440.dtsi |    6 ++++++
+ 4 files changed, 24 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-index 052606b..1b30bc8 100644
---- a/arch/arm/boot/dts/exynos4210-origen.dts
-+++ b/arch/arm/boot/dts/exynos4210-origen.dts
-@@ -127,4 +127,16 @@
- 			linux,default-trigger = "heartbeat";
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index 0e16a34..6b25095 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -69,6 +69,12 @@
  		};
  	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <0>;
-+		};
-+
-+		xusbxti {
-+			compatible = "samsung,clock-xusbxti";
-+			clock-frequency = <24000000>;
-+		};
+ 
++	clock: clock-controller at 0x10030000 {
++		compatible = "samsung,exynos4210-clock";
++		reg = <0x10030000 0x20000>;
++		#clock-cells = <1>;
 +	};
- };
-diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-index 2b1e03a..f52c86e 100644
---- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
-+++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-@@ -195,4 +195,16 @@
- 			};
- 		};
++
+ 	pmu {
+ 		compatible = "arm,cortex-a9-pmu";
+ 		interrupt-parent = <&combiner>;
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 022a839..75be8f5 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -36,6 +36,12 @@
+ 			     <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>;
+ 	};
+ 
++	clock: clock-controller at 0x10030000 {
++		compatible = "samsung,exynos4412-clock";
++		reg = <0x10030000 0x20000>;
++		#clock-cells = <1>;
++	};
++
+ 	pinctrl_0: pinctrl at 11400000 {
+ 		compatible = "samsung,exynos4x12-pinctrl";
+ 		reg = <0x11400000 0x1000>;
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 2bb558e..d3eae4e 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -60,6 +60,12 @@
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10044040 0x20>;
  	};
 +
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <12000000>;
-+		};
-+
-+		xusbxti {
-+			compatible = "samsung,clock-xusbxti";
-+			clock-frequency = <24000000>;
-+		};
++	clock: clock-controller at 0x10010000 {
++		compatible = "samsung,exynos5250-clock";
++		reg = <0x10010000 0x30000>;
++		#clock-cells = <1>;
 +	};
- };
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index c346b64..9a14484 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -289,4 +289,16 @@
- 			};
- 		};
- 	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <0>;
-+		};
-+
-+		xusbxti {
-+			compatible = "samsung,clock-xusbxti";
-+			clock-frequency = <24000000>;
-+		};
+ 
+ 	gic:interrupt-controller at 10481000 {
+ 		compatible = "arm,cortex-a9-gic";
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index 5c5a699..f5834d0 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -16,6 +16,12 @@
+ 
+ 	interrupt-parent = <&gic>;
+ 
++	clock: clock-controller at 0x160000 {
++		compatible = "samsung,exynos5440-clock";
++		reg = <0x160000 0x1000>;
++		#clock-cells = <1>;
 +	};
- };
-diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-index 0084d95..15dc0a3 100644
---- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-@@ -94,4 +94,16 @@
- 	serial at 13830000 {
- 		status = "okay";
- 	};
 +
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <0>;
-+		};
-+
-+		xusbxti {
-+			compatible = "samsung,clock-xusbxti";
-+			clock-frequency = <24000000>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-index 31e14c4..a944611 100644
---- a/arch/arm/boot/dts/exynos4412-origen.dts
-+++ b/arch/arm/boot/dts/exynos4412-origen.dts
-@@ -415,4 +415,16 @@
- 			};
- 		};
- 	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <0>;
-+		};
-+
-+		xusbxti {
-+			compatible = "samsung,clock-xusbxti";
-+			clock-frequency = <24000000>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-index 6ae4276..874beea 100644
---- a/arch/arm/boot/dts/exynos4412-smdk4412.dts
-+++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-@@ -55,4 +55,16 @@
- 	serial at 13830000 {
- 		status = "okay";
- 	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <0>;
-+		};
-+
-+		xusbxti {
-+			compatible = "samsung,clock-xusbxti";
-+			clock-frequency = <24000000>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index 63572f9..5de019c 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -119,4 +119,11 @@
- 	spi_2: spi at 12d40000 {
- 		status = "disabled";
- 	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <24000000>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 1391c31..f77bf3a 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -217,4 +217,11 @@
- 		samsung,link-rate = <0x0a>;
- 		samsung,lane-count = <4>;
- 	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <24000000>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 47b6b84..babd9f9 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -44,4 +44,11 @@
- 	usb at 12110000 {
- 		samsung,vbus-gpio = <&gpx1 1 1 3 3>;
- 	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <24000000>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-index ee60c57..a21eb4c 100644
---- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-+++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-@@ -27,4 +27,11 @@
- 	spi {
- 		status = "disabled";
- 	};
-+
-+	fixed-rate-clocks {
-+		xtal {
-+			compatible = "samsung,clock-xtal";
-+			clock-frequency = <50000000>;
-+		};
-+	};
- };
+ 	gic:interrupt-controller at 2E0000 {
+ 		compatible = "arm,cortex-a15-gic";
+ 		#interrupt-cells = <3>;
 -- 
 1.7.5.4
