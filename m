@@ -1,77 +1,48 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 18 Feb 2013 17:08:21 +0530
-Subject: [PATCH, RFC 8/8] ARM: dts: am43-pre-silicon support
-In-Reply-To: <cover.1361186097.git.afzal@ti.com>
-References: <cover.1361186097.git.afzal@ti.com>
-Message-ID: <e344f74da47579c11db68d9f6efe25259ed7f25d.1361186097.git.afzal@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Feb 2013 20:47:23 +0900
+Subject: [PATCH 0/4] ARM: shmobile: kzm9g reference SMP and cleanup
+In-Reply-To: <1360933261-6359-1-git-send-email-horms+renesas@verge.net.au>
+References: <1360933261-6359-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130218114723.GA23092@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM43 SoC is in pre-silicon stage, meanwhile it has been modelled in
-a pre-silicon platform. To validate and boot Linux in pre-silicon
-platform that emulates an AM43 SoC, add DT build support.
+On Fri, Feb 15, 2013 at 10:00:56PM +0900, Simon Horman wrote:
+> Hi,
+> 
+> this series tweaks the defconfig to allow SMP kzm9g reference
+> to successfully boot. The series also contains a number of cleanups.
+> 
+> The series is based on the boards-kzm9g-reference branch
+> in the renesas tree.
 
-As bootloader is not used, bootargs is passed through DT.
+Magnus asked me to detail the changes that I needed to make to make SMP
+kzm9g reference work. I can do so in two words: disable CONFIG_PREEMPT.
 
-Note: This would be replaced by an original board support.
+The first patch in this series makes that changes.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/boot/dts/Makefile             |  3 ++-
- arch/arm/boot/dts/am43-pre-silicon.dts | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/am43-pre-silicon.dts
+The 4th patch in the series adds SMP ops to the sh73a0 DT_MACHINE_START
+which adds SMP support when booting an sh73a0 based board using DT without
+a board file compiled into the kernel. This has been tested with the kzm9g
+board.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 94d88b9..b434344 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -124,7 +124,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap5-evm.dtb \
- 	am335x-evm.dtb \
- 	am335x-evmsk.dtb \
--	am335x-bone.dtb
-+	am335x-bone.dtb \
-+	am43-pre-silicon.dtb
- dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
-diff --git a/arch/arm/boot/dts/am43-pre-silicon.dts b/arch/arm/boot/dts/am43-pre-silicon.dts
-new file mode 100644
-index 0000000..b9c6297
---- /dev/null
-+++ b/arch/arm/boot/dts/am43-pre-silicon.dts
-@@ -0,0 +1,31 @@
-+/*
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/* AM43 Pre Silicon */
-+
-+/dts-v1/;
-+
-+/include/ "am4372.dtsi"
-+
-+/ {
-+	model = "TI AM43 Pre Silicon";
-+	compatible = "ti,am43-pre-silicon","ti,am4372","ti,am43";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyO0,115200n8 root=/dev/ram rw initrd=0x82000000,32MB earlyprintk";
-+	};
-+};
-+
-+&twd1 {
-+	clock-frequency = <300000000>;
-+};
--- 
-1.7.12
+I consider the remaining patches clean-ups.
+
+> Simon Horman (5):
+>   ARM: shmobile: kzm9g: defconfig: do not enable PREEMPT
+>   ARM: shmobile: kzm9g: Remove warning about SMP
+>   ARM: shmobile: sh73a0: Remove sh73a0_init_irq_dt()
+>   ARM: shmobile: sh73a0: Add smp ops to DT_MACHINE_START
+>   ARM: shmobile: kzm9g: Trim reference DT_MACHINE_START
+> 
+>  arch/arm/configs/kzm9g_defconfig               |    1 -
+>  arch/arm/mach-shmobile/board-kzm9g-reference.c |   19 ++-----------------
+>  arch/arm/mach-shmobile/intc-sh73a0.c           |    8 --------
+>  arch/arm/mach-shmobile/setup-sh73a0.c          |    4 +++-
+>  4 files changed, 5 insertions(+), 27 deletions(-)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
