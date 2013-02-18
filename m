@@ -1,40 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 18 Feb 2013 10:23:22 +0900
-Subject: [PATCH 0/4] R-Car SATA driver and platform data
-In-Reply-To: <201302170135.28336.sergei.shtylyov@cogentembedded.com>
-References: <201302170135.28336.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130218012322.GA11807@verge.net.au>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Sun, 17 Feb 2013 17:23:34 -0800 (PST)
+Subject: [PATCH 2/4] ARM: mach-shmobile: r8a7779: add SATA support
+In-Reply-To: <201302170143.36052.sergei.shtylyov@cogentembedded.com>
+References: <201302170143.36052.sergei.shtylyov@cogentembedded.com>
+Message-ID: <874nhao1nx.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 17, 2013 at 01:35:27AM +0300, Sergei Shtylyov wrote:
-> Hello.
+
+Hi Sergei
+
+> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 > 
->    Here's the set of 4 patches against the Simon Horman's renesas.git repo, 'next' branch:
-> 
+> Add SATA clock and platform device resources on r8a7779 SoC.
+> Add entry to r8a7779_auxdata_lookup[], so that devm_clk_get() in the driver
+> still works when we're using the device tree.
+>  
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+(snip)
+
+>  	/* MSTP32 clocks */
+> +	CLKDEV_DEV_ID("sata_rcar", &mstp_clks[MSTP115]), /* SATA */
+>  	CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB EHCI port2 */
+>  	CLKDEV_DEV_ID("ohci-platform.1", &mstp_clks[MSTP101]), /* USB OHCI port2 */
+>  	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
+(snip)
+>  static const struct of_dev_auxdata r8a7779_auxdata_lookup[] __initconst = {
+> +	OF_DEV_AUXDATA("renesas,rcar-sata", 0xfc600000, "sata_rcar", NULL),
+
+??
+Is this settings really required for DT ??
+
+I guess you can remove it, and add
+
+ +	CLKDEV_DEV_ID("sata_rcar", &mstp_clks[MSTP115]), // for platform
+ +	CLKDEV_DEV_ID("fc600000.sata_rcar", &mstp_clks[MSTP115]), // for DT
+
+And...
+
 > [1/4] ARM: mach-shmobile: r8a7779: SATA DT configuration
 > [2/4] ARM: mach-shmobile: r8a7779: add SATA support
 > [3/4] libata: add R-Car SATA driver
 > [4/4] ARM: mach-shmobile: marzen: add SATA support
-> 
-> Patch 3 also applies to the 'upstream' branch of Jeff Garzik's libata-dev.git repo.
 
-Hi Sergei, Hi All,
+I believe [3/4] patch should be base patch ?
 
-I do not expect patch 3 of this series to got through
-the renesas tree, however, I have included it and the other three patches
-in this series to a topic branch in the renesas tree, topic/r-car-stat.
-
-The base of the topic branch is:
-* a merge of renesas.git next and libata-dev.git upstream, and;
-* a boot fix for Marzen which I plan to add to next once it is reviewed:
-  "ARM: shmobile: r8a7779: Correct TMU clock support again" (v3).
-
-With this in place I built a kernel using the marzen_defconfig and booted it.
-However, I wonder if I am missing a kernel option, or perhaps something
-else of a minor nature as I see the following:
-
-# dmesg | grep sata
-sata_rcar sata_rcar: coherent DMA mask is unset
-sata_rcar sata_rcar: failed to start port 0 (errno=-12)
-sata_rcar: probe of sata_rcar failed with error -12
+Best regards
+---
+Kuninori Morimoto
