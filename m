@@ -1,161 +1,142 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 18 Feb 2013 11:19:08 +0100
-Subject: [PATCH] clk: add si5351 i2c common clock driver
-In-Reply-To: <1360414772-12232-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1360414772-12232-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <5122001C.4010008@gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 18 Feb 2013 11:24:10 +0100
+Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
+In-Reply-To: <511E8F3C.2010406@linux.vnet.ibm.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <510FBC01.2030405@linux.vnet.ibm.com>
+ <87haloiwv0.fsf@rustcorp.com.au>
+ <51134596.4080106@linux.vnet.ibm.com>
+ <20130208154113.GV17833@n2100.arm.linux.org.uk>
+ <51152B81.2050501@linux.vnet.ibm.com>
+ <51153F72.1060005@linux.vnet.ibm.com>
+ <CAKfTPtCe+cD7LLkb+D6pqG1SwG2V08ws=4XO3ttHEHV2qgmqPg@mail.gmail.com>
+ <5118E2CD.90401@linux.vnet.ibm.com>
+ <20130211190852.GA5695@linux.vnet.ibm.com>
+ <5119BDFD.1000909@linux.vnet.ibm.com>
+ <CAKfTPtAo2hQTfBKTVUuLKgsGJ2ZLD0UTR3fH9UFuJwyFt4n__w@mail.gmail.com>
+ <511E8F3C.2010406@linux.vnet.ibm.com>
+Message-ID: <CAKfTPtD=2jn1AVjuhVP1ot7_8x9-W4==hNGZET5N9tRE7gtyMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+On 15 February 2013 20:40, Srivatsa S. Bhat
+<srivatsa.bhat@linux.vnet.ibm.com> wrote:
+> Hi Vincent,
+>
+> On 02/15/2013 06:58 PM, Vincent Guittot wrote:
+>> Hi Srivatsa,
+>>
+>> I have run some tests with you branch (thanks Paul for the git tree)
+>> and you will find results below.
+>>
+>
+> Thank you very much for testing this patchset!
+>
+>> The tests condition are:
+>> - 5 CPUs system in 2 clusters
+>> - The test plugs/unplugs CPU2 and it increases the system load each 20
+>> plug/unplug sequence with either more cyclictests threads
+>> - The test is done with all CPUs online and with only CPU0 and CPU2
+>>
+>> The main conclusion is that there is no differences with and without
+>> your patches with my stress tests. I'm not sure that it was the
+>> expected results but the cpu_down is already quite low : 4-5ms in
+>> average
+>>
+>
+> Atleast my patchset doesn't perform _worse_ than mainline, with respect
+> to cpu_down duration :-)
 
-On 09.02.2013 13:59, Sebastian Hesselbarth wrote:
-> This patch adds a common clock driver for Silicon Labs Si5351a/b/c
-> i2c programmable clock generators. Currently, the driver supports
-> DT kernels only and VXCO feature of si5351b is not implemented. DT
-> bindings selectively allow to overwrite stored Si5351 configuration
-> which is very helpful for clock generators with empty eeprom
-> configuration. Corresponding device tree binding documentation is
-> also added.
+yes exactly and it has pass  more than 400 consecutive plug/unplug on
+an ARM platform
 
-Thank you very much for your work! I had to wait for OMAP platforms to
-move over to the common clock framework, but with that in place now, I
-could finally give it a test.
+>
+> So, here is the analysis:
+> Stop-machine() doesn't really slow down CPU-down operation, if the rest
+> of the CPUs are mostly running in userspace all the time. Because, the
+> CPUs running userspace workloads cooperate very eagerly with the stop-machine
+> dance - they receive the resched IPI, and allow the per-cpu cpu-stopper
+> thread to monopolize the CPU, almost immediately.
+>
+> The scenario where stop-machine() takes longer to take effect is when
+> most of the online CPUs are running in kernelspace, because, then the
+> probability that they call preempt_disable() frequently (and hence inhibit
+> stop-machine) is higher. That's why, in my tests, I ran genload from LTP
+> which generated a lot of system-time (system-time in 'top' indicates activity
+> in kernelspace). Hence my patchset showed significant improvement over
+> mainline in my tests.
+>
 
-Some comments below.
+ok, I hadn't noticed this important point for the test
 
-> - The driver has been frequency tested for some common video/audio
->   clocks and manages it to tune in every frequency successfully. A
->   comparison with silabs windows tool shows a different heuristic
->   for vco frequencies. The tests have been comfirmed by visual
->   check on an 500MHz oscilloscope but no jitter measurements have
->   been carried out. I will provide comparison by email on request.
+> However, your test is very useful too, if we measure a different parameter:
+> the latency impact on the workloads running on the system (cyclic test).
+> One other important aim of this patchset is to make hotplug as less intrusive
+> as possible, for other workloads running on the system. So if you measure
+> the cyclictest numbers, I would expect my patchset to show better numbers
+> than mainline, when you do cpu-hotplug in parallel (same test that you did).
+> Mainline would run stop-machine and hence interrupt the cyclic test tasks
+> too often. My patchset wouldn't do that, and hence cyclic test should
+> ideally show better numbers.
 
-I would be interested in more tests, yes. My first checks set up clkout1
-to 32.768 KHz, and on my oscilloscope,  I measured some 1.04 KHz only.
-Will do some debugging later.
+In fact, I haven't looked at the results as i was more interested by
+the load that was generated
 
-> +/*
-> + * Si5351 xtal clock input
-> + */
-> +static int si5351_xtal_prepare(struct clk_hw *hw)
-> +{
-> +	struct si5351_driver_data *drvdata =
-> +		container_of(hw, struct si5351_driver_data, xtal);
-> +	si5351_set_bits(drvdata, SI5351_FANOUT_ENABLE,
-> +			SI5351_XTAL_ENABLE, SI5351_XTAL_ENABLE);
-> +	return 0;
-> +}
-> +
-> +static void si5351_xtal_unprepare(struct clk_hw *hw)
-> +{
-> +	struct si5351_driver_data *drvdata =
-> +		container_of(hw, struct si5351_driver_data, xtal);
-> +	si5351_set_bits(drvdata, SI5351_FANOUT_ENABLE,
-> +			SI5351_XTAL_ENABLE, 0);
-> +}
-> +
-> +static int si5351_xtal_is_enabled(struct clk_hw *hw)
-> +{
-> +	struct si5351_driver_data *drvdata =
-> +		container_of(hw, struct si5351_driver_data, xtal);
-> +	unsigned char reg;
-> +	reg = si5351_reg_read(drvdata, SI5351_FANOUT_ENABLE);
-> +	return (reg & SI5351_XTAL_ENABLE) ? 1 : 0;
-> +}
+>
+> I'd really appreciate if you could try that out and let me know how it
+> goes.. :-) Thank you very much!
 
-On an AM33xx platform, I got tons of BUGs like this one:
+ok, I'm going to try to run a test series
 
-
-[    5.028525] BUG: scheduling while atomic: swapper/1/0x00000002
-[    5.034600] INFO: lockdep is turned off.
-[    5.038682] Modules linked in:
-[    5.041866] irq event stamp: 136090
-[    5.045496] hardirqs last  enabled at (136089): [<c04ae9bc>]
-_raw_spin_unlock_irqrestore+0x60/0x68
-[    5.054843] hardirqs last disabled at (136090): [<c04ae1f4>]
-_raw_spin_lock_irqsave+0x1c/0x60
-[    5.063733] softirqs last  enabled at (135026): [<c0039d84>]
-__do_softirq+0x150/0x1b4
-[    5.071907] softirqs last disabled at (135019): [<c003a18c>]
-irq_exit+0x98/0xa0
-[    5.079541] [<c0013610>] (unwind_backtrace+0x0/0xf8) from
-[<c0058ec8>] (__schedule_bug+0x58/0x78)
-[    5.088793] [<c0058ec8>] (__schedule_bug+0x58/0x78) from [<c04ad50c>]
-(__schedule+0x3c8/0x45c)
-[    5.097773] [<c04ad50c>] (__schedule+0x3c8/0x45c) from [<c04ab3f0>]
-(schedule_timeout+0x120/0x1d4)
-[    5.107114] [<c04ab3f0>] (schedule_timeout+0x120/0x1d4) from
-[<c003f780>] (msleep+0x14/0x20)
-[    5.115912] [<c003f780>] (msleep+0x14/0x20) from [<c033dd08>]
-(omap_i2c_wait_for_bb+0x68/0xb0)
-[    5.124890] [<c033dd08>] (omap_i2c_wait_for_bb+0x68/0xb0) from
-[<c033e528>] (omap_i2c_xfer+0x3c/0xfc)
-[    5.134503] [<c033e528>] (omap_i2c_xfer+0x3c/0xfc) from [<c033a550>]
-(__i2c_transfer+0x44/0x80)
-[    5.143575] [<c033a550>] (__i2c_transfer+0x44/0x80) from [<c033bab8>]
-(i2c_transfer+0x5c/0xbc)
-[    5.152555] [<c033bab8>] (i2c_transfer+0x5c/0xbc) from [<c02b4458>]
-(regmap_i2c_read+0x4c/0x6c)
-[    5.161625] [<c02b4458>] (regmap_i2c_read+0x4c/0x6c) from
-[<c02b1840>] (_regmap_raw_read+0x98/0xdc)
-[    5.171056] [<c02b1840>] (_regmap_raw_read+0x98/0xdc) from
-[<c02b18e8>] (_regmap_read+0x64/0x9c)
-[    5.180215] [<c02b18e8>] (_regmap_read+0x64/0x9c) from [<c02b1964>]
-(regmap_read+0x44/0x5c)
-[    5.188923] [<c02b1964>] (regmap_read+0x44/0x5c) from [<c036d45c>]
-(si5351_clkout_is_enabled+0x74/0xb8)
-[    5.198720] [<c036d45c>] (si5351_clkout_is_enabled+0x74/0xb8) from
-[<c036a9f4>] (clk_disable_unused_subtree+0x68/0xac)
-[    5.209873] [<c036a9f4>] (clk_disable_unused_subtree+0x68/0xac) from
-[<c036a9ac>] (clk_disable_unused_subtree+0x20/0xac)
-
-This is because clk_disable_unused_subtree() calls ->is_enabled() with a
-spinlock held, but si5351_xtal_is_enabled() will be sleeping, either by
-acquiring a mutex in the regmap core, or in the OMAP's i2c transfer
-routine. So bottom line is to make this callback atomic, and I did that
-locally for now by caching the 'prepare' state of xtal, clkin and the
-individual clocks. I can share a patch if you like.
-
-> +static unsigned long si5351_msynth_recalc_rate(struct clk_hw *hw,
-> +					       unsigned long parent_rate)
-> +{
-> +	struct si5351_hw_data *hwdata =
-> +		container_of(hw, struct si5351_hw_data, hw);
-> +	unsigned char reg = SI5351_CLK0_PARAMETERS +
-> +		(SI5351_PARAMETERS_LENGTH * hwdata->num);
-> +	unsigned long long rate;
-> +	unsigned long m;
-> +
-> +	if (!hwdata->params.valid)
-> +		si5351_read_parameters(hwdata->drvdata, reg, &hwdata->params);
-> +
-> +	if (hwdata->params.p3 == 0)
-> +		return parent_rate;
-> +
-> +	/*
-> +	 * multisync0-5: fOUT = (128 * P3 * fIN) / (P1*P3 + P2 + 512*P3)
-> +	 * multisync6-7: fOUT = fIN / P1
-> +	 */
-> +	rate = parent_rate;
-> +	if (hwdata->num > 5)
-> +		m = hwdata->params.p1;
-> +	else if ((si5351_reg_read(hwdata->drvdata, reg + 2) &
-> +		  SI5351_OUTPUT_CLK_DIVBY4) == SI5351_OUTPUT_CLK_DIVBY4)
-> +		m = 4;
-> +	else {
-> +		rate *= 128 * hwdata->params.p3;
-> +		m = hwdata->params.p1 * hwdata->params.p3;
-> +		m += hwdata->params.p2;
-> +		m += 512 * hwdata->params.p3;
-> +	}
-> +	do_div(rate, m);
-
-For p1 == p2 == p3, this will be a DIV0. I encountered this here by not
-specifying the clkout2 node. I think it's safe to just bail if m == 0?
-
-
-Again, thanks a lot for working on this!
-
-
-Daniel
+Vincent
+>
+> Regards,
+> Srivatsa S. Bhat
+>
+>>
+>>
+>> On 12 February 2013 04:58, Srivatsa S. Bhat
+>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
+>>> On 02/12/2013 12:38 AM, Paul E. McKenney wrote:
+>>>> On Mon, Feb 11, 2013 at 05:53:41PM +0530, Srivatsa S. Bhat wrote:
+>>>>> On 02/11/2013 05:28 PM, Vincent Guittot wrote:
+>>>>>> On 8 February 2013 19:09, Srivatsa S. Bhat
+>>>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
+>>>>
+>>>> [ . . . ]
+>>>>
+>>>>>>> Adding Vincent to CC, who had previously evaluated the performance and
+>>>>>>> latency implications of CPU hotplug on ARM platforms, IIRC.
+>>>>>>>
+>>>>>>
+>>>>>> Hi Srivatsa,
+>>>>>>
+>>>>>> I can try to run some of our stress tests on your patches.
+>>>>>
+>>>>> Great!
+>>>>>
+>>>>>> Have you
+>>>>>> got a git tree that i can pull ?
+>>>>>>
+>>>>>
+>>>>> Unfortunately, no, none at the moment..  :-(
+>>>>
+>>>> You do need to create an externally visible git tree.
+>>>
+>>> Ok, I'll do that soon.
+>>>
+>>>>  In the meantime,
+>>>> I have added your series at rcu/bhat.2013.01.21a on -rcu:
+>>>>
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git
+>>>>
+>>>> This should appear soon on a kernel.org mirror near you.  ;-)
+>>>>
+>>>
+>>> Thank you very much, Paul! :-)
+>>>
+>>> Regards,
+>>> Srivatsa S. Bhat
+>>>
+>
+>
