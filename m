@@ -1,49 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Feb 2013 14:39:08 +0000
-Subject: [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
-In-Reply-To: <20130218134707.17303.48589.sendpatchset@w520>
-References: <20130218134648.17303.97576.sendpatchset@w520>
- <20130218134707.17303.48589.sendpatchset@w520>
-Message-ID: <201302181439.08639.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 18 Feb 2013 15:43:24 +0100
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <20130217120442.GB6782@S2101-09.ap.freescale.net>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+ <201302171131.24908.marex@denx.de>
+ <20130217120442.GB6782@S2101-09.ap.freescale.net>
+Message-ID: <201302181543.24704.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 February 2013, Magnus Damm wrote:
->  #define PSTR_SHUTDOWN_MODE     3
->  
-> -#define SH73A0_SCU_BASE IOMEM(0xf0000000)
-> +#define SH73A0_SCU_BASE 0xf0000000
->  
->  #ifdef CONFIG_HAVE_ARM_TWD
->  static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, SH73A0_SCU_BASE + 0x600, 29);
-> @@ -81,7 +81,7 @@ static void __init sh73a0_smp_prepare_cp
->  static void __init sh73a0_smp_init_cpus(void)
->  {
->         /* setup sh73a0 specific SCU base */
-> -       shmobile_scu_base = SH73A0_SCU_BASE;
-> +       shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
->  
->         shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
->  }
+Dear Shawn Guo,
 
-Ok, this gets rid of the warning, but I'm a bit worried about
-how it is hardwiring the fact that the SCU physical address has
-the same bit pattern as the __iomem token.
+> On Sun, Feb 17, 2013 at 11:31:24AM +0100, Marek Vasut wrote:
+> > Dear Shawn Guo,
+> > 
+> > > On Fri, Feb 08, 2013 at 01:36:41PM -0200, Fabio Estevam wrote:
+> > > > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > > > 
+> > > > Provide 'lradc-touchscreen-wires' property to the LRADC driver, so
+> > > > that touchscreen can be functional.
+> > > > 
+> > > > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > > 
+> > > Queued all 3 for 3.10.
+> > 
+> > I dont intend to ramble or annoy you (I already did that plenty ;-) ),
+> > but can we not speed this up and push these simple stuffs for 3.9?
+> 
+> No. arm-soc folks require that material for each merge window should be
+> reaching them around -rc6 time (2 weeks to opening of the merge window).
+> So it's simply late for 3.9.
 
-While I realize that you already rely on this in a lot of places
-in the shmobile code, I see a red light going off every time I read
-code like this, and it is not any more logical than the previous
-version.
+Ah I see, thanks for clearing this up.
 
-It would be nice to keep these address spaces separate at least
-in new code, mostly in order to not confuse reviewers with code
-that is based on assumptions which are not generally true, but also
-to be more flexible with the virtual memory layout. On a related
-topic, you are using an entire 256 MB section of your virtual
-address space for sh73a0 and sh7372 and 160 MB for r8a7740. Putting
-less of that into the identity mapped area would free up space for
-vmalloc, but it's hard to prove that doing this is correct when
-you have all sorts of code using a hardcoded virtual MMIO address
-token.
-
-	Arnd
+Best regards,
+Marek Vasut
