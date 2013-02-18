@@ -1,23 +1,38 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 18 Feb 2013 23:27:46 +0300
-Subject: [PATCH v2 0/4] R-Car SATA driver and platform data
-Message-ID: <201302182327.46930.sergei.shtylyov@cogentembedded.com>
+Date: Mon, 18 Feb 2013 23:30:44 +0300
+Subject: [PATCH v2 2/4] ARM: mach-shmobile: r8a7779: SATA DT configuration
+Message-ID: <201302182330.44542.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-   Here's the v2 of the set of 4 patches against the Simon Horman's renesas.git
-repo, 'next' branch:
+Allow configuration of the r8a7779 SoC SATA controller using a flattened device
+tree.
 
-[1/4] libata: add R-Car SATA driver
-[2/4] ARM: mach-shmobile: r8a7779: SATA DT configuration
-[3/4] ARM: mach-shmobile: r8a7779: add SATA support
-[4/4] ARM: mach-shmobile: marzen: add SATA support
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Patch 1 also applies to the 'upstream' branch of Jeff Garzik's libata-dev.git
-repo.
+---
+Changes since v1:
+- removed "0x" from the node name.
+ 
+ arch/arm/boot/dts/r8a7779.dtsi |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Patch changes since the initial posting are reported in the individual patches.
-
-MBR, Sergei
+Index: renesas/arch/arm/boot/dts/r8a7779.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7779.dtsi
++++ renesas/arch/arm/boot/dts/r8a7779.dtsi
+@@ -92,4 +92,11 @@
+ 		interrupts = <0 28 0x4>;
+ 		reg-io-width = <4>;
+ 	};
++
++	sata: sata at fc600000 {
++		compatible = "renesas,rcar-sata";
++		reg = <0xfc600000 0x2000>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 100 0x4>;
++	};
+ };
