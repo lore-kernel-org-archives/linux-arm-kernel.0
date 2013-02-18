@@ -1,52 +1,45 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 18 Feb 2013 13:24:59 +0530
-Subject: [PATCH 2/2] ARM: dts: Add chip-id controller node on Exynos4/5 SoC
-In-Reply-To: <1361174099-18749-1-git-send-email-thomas.abraham@linaro.org>
-References: <1361174099-18749-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1361174099-18749-3-git-send-email-thomas.abraham@linaro.org>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Mon, 18 Feb 2013 08:53:43 +0100
+Subject: [PATCH] serial: imx: fix uninitialized variable warning
+In-Reply-To: <1361164536-1351-1-git-send-email-shawn.guo@linaro.org>
+References: <1361164536-1351-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <5121DE07.8060908@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add chip-id controller nodes for Exynos4 and Exynos5 SoCs.
+On 18.02.2013 06:15, Shawn Guo wrote:
+> Commit 677fe55 (serial: imx: Fix recursive locking bug) introduces an
+> uninitialized variable warning as below.
+> 
+>   CC      drivers/tty/serial/imx.o
+> drivers/tty/serial/imx.c: In function ?imx_console_write?:
+> include/linux/spinlock.h:340:2: warning: ?flags? may be used uninitialized in this function [-Wuninitialized]
+> drivers/tty/serial/imx.c:1214:16: note: ?flags? was declared here
+> 
+> Initialize the variable to suppress the warning.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/boot/dts/exynos4.dtsi    |    5 +++++
- arch/arm/boot/dts/exynos5250.dtsi |    5 +++++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 6581bb2..1a02189 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -38,6 +38,11 @@
- 		i2c7 = &i2c_7;
- 	};
- 
-+	chipid at 10000000 {
-+		compatible = "samsung,exynos4210-chipid";
-+		reg = <0x10000000 0x100>;
-+	};
-+
- 	pd_mfc: mfc-power-domain at 10023C40 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023C40 0x20>;
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 7c3d07a..fce773e 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -46,6 +46,11 @@
- 		i2c8 = &i2c_8;
- 	};
- 
-+	chipid at 10000000 {
-+		compatible = "samsung,exynos4210-chipid";
-+		reg = <0x10000000 0x100>;
-+	};
-+
- 	pd_gsc: gsc-power-domain at 0x10044000 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044000 0x20>;
--- 
-1.7.5.4
+Thanks
+
+Dirk
+
+> ---
+>  drivers/tty/serial/imx.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index adf7611..147c9e1 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -1211,7 +1211,7 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+>  	struct imx_port *sport = imx_ports[co->index];
+>  	struct imx_port_ucrs old_ucr;
+>  	unsigned int ucr1;
+> -	unsigned long flags;
+> +	unsigned long flags = 0;
+>  	int locked = 1;
+>  
+>  	if (sport->port.sysrq)
