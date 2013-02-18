@@ -1,56 +1,53 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 18 Feb 2013 06:52:35 -0800
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <511F1245.60208@ti.com> (Santosh Shilimkar's message of "Sat, 16
- Feb 2013 10:29:49 +0530")
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <1360840554-26901-2-git-send-email-balbi@ti.com>
- <87obfl60x7.fsf@linaro.org> <511F1245.60208@ti.com>
-Message-ID: <87vc9p4qto.fsf@linaro.org>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Mon, 18 Feb 2013 08:56:46 -0600
+Subject: [PATCH 05/06] ARM: shmobile: Common shmobile_scu_base in
+ headsmp-scu.S
+In-Reply-To: <CANqRtoRtPOjqy+uhWOxpbQMdp=sDaRMAEqZqjMUBcruLB0NuwQ@mail.gmail.com>
+References: <20130213134628.12153.47120.sendpatchset@w520>
+ <20130213134717.12153.6162.sendpatchset@w520>
+ <CABYn4syysDVAKRpjDUc9j26SgmUcjxV3rNf3u2kZMZWurhrjiw@mail.gmail.com>
+ <CANqRtoRtPOjqy+uhWOxpbQMdp=sDaRMAEqZqjMUBcruLB0NuwQ@mail.gmail.com>
+Message-ID: <CABYn4sxoFJMsFnrf9bNCAGfram0rADv2TSbp_90BJ31DRT2W3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+Hi,
 
-> On Friday 15 February 2013 09:10 PM, Kevin Hilman wrote:
->> Felipe Balbi <balbi@ti.com> writes:
+2013/2/17 Magnus Damm <magnus.damm@gmail.com>:
+> Hello Bastian,
+>
+> On Mon, Feb 18, 2013 at 7:20 AM, Bastian Hecht <hechtb@gmail.com> wrote:
+>> Hi,
 >>
->>> Currently the omap-serial driver will not
->>> work properly if booted via DT with CPUIDLE
->>> enabled because it depends on function pointers
->>> provided by hwmod to change its own SYSCONFIG
->>> register.
->>>
->>> Remove that relyance on hwmod by moving SYSCONFIG
->>> handling to driver itself. Note that this also
->>> fixes a possible corner case bug where we could
->>> be putting UART in Force Idle mode if we called
->>> omap_serial_enable_wakeup(up, false) after setting
->>> NOIDLE to the idle mode. This is because hwmod
->>> has no protection against that situation.
->>>
->>> NYET-Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> this breaks the secondary CPU startup when I test it. I think you
+>> can't access shmobile_scu_address this way with the MMU still turned
+>> off.
 >>
->> Here's another approach to getting rid of the sysconfig twiddling in the
->> driver.  I wrote this some time ago at my former company ;) but don't
->> think I ever got around to posting it.
+>> But instead of
+>>> +       ldr     r1, =shmobile_scu_base
+>>> +       ldr     r1, [r1]                @ SCU base address
 >>
->> It doesn't solve the whole problem (e.g. doesn't address the
->> context_loss or enable_wakeup func pointers), but at least gets rid of
->> the need for any SYSCONFIG access in the driver for the idle modes.
+>> try
 >>
->> Needs more thorough testing.
+>> +        mrc     p15, 4, r1, c15, c0, 0 @ get SCU base address
 >>
-> I posted similar patch series[1] yesterday after testing it on OMAP4/5
-> devices. OMAP3 testing seems to be ok as well. AM3XXX and OMAP2 test
-> results is what am waiting for.
+>> to get it from the coprocessor.
+>
+> Thanks. Can you please let us know which platform you see this?
+>
+> I've executed this on sh73a0 and KZM9G myself without any issues.
+>
+> Could it be that you are powering down the power domain in your own code?
 
-Yeah, I saw yours after I posted mine.  Just continue with yours, I'll
-be glad to have someone else take this on.
+I saw it on the current HEAD of the next branch using my KZM9G. I
+bisected it down to your commit. The problem appears right at boot
+time when the 2nd CPU should be brought up.
 
-> Good to know that you had similar idea in mind to get rid of
-> UART sysc hackery.
+Thanks,
 
-Likewise.
+ Bastian
 
-Kevin
+
+> Thanks,
+>
+> / magnus
