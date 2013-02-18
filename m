@@ -1,53 +1,57 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Mon, 18 Feb 2013 08:56:46 -0600
-Subject: [PATCH 05/06] ARM: shmobile: Common shmobile_scu_base in
+Date: Mon, 18 Feb 2013 08:57:20 -0600
+Subject: [PATCH 01/08] ARM: shmobile: Fix base address readout in
  headsmp-scu.S
-In-Reply-To: <CANqRtoRtPOjqy+uhWOxpbQMdp=sDaRMAEqZqjMUBcruLB0NuwQ@mail.gmail.com>
-References: <20130213134628.12153.47120.sendpatchset@w520>
- <20130213134717.12153.6162.sendpatchset@w520>
- <CABYn4syysDVAKRpjDUc9j26SgmUcjxV3rNf3u2kZMZWurhrjiw@mail.gmail.com>
- <CANqRtoRtPOjqy+uhWOxpbQMdp=sDaRMAEqZqjMUBcruLB0NuwQ@mail.gmail.com>
-Message-ID: <CABYn4sxoFJMsFnrf9bNCAGfram0rADv2TSbp_90BJ31DRT2W3w@mail.gmail.com>
+In-Reply-To: <20130218134657.17303.35378.sendpatchset@w520>
+References: <20130218134648.17303.97576.sendpatchset@w520>
+ <20130218134657.17303.35378.sendpatchset@w520>
+Message-ID: <CABYn4swi1K6m5YnPGWemLF0ybDxzC=yRCCv3hhX9nGT15=S7vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Magnus,
 
-2013/2/17 Magnus Damm <magnus.damm@gmail.com>:
-> Hello Bastian,
->
-> On Mon, Feb 18, 2013 at 7:20 AM, Bastian Hecht <hechtb@gmail.com> wrote:
->> Hi,
->>
->> this breaks the secondary CPU startup when I test it. I think you
->> can't access shmobile_scu_address this way with the MMU still turned
->> off.
->>
->> But instead of
->>> +       ldr     r1, =shmobile_scu_base
->>> +       ldr     r1, [r1]                @ SCU base address
->>
->> try
->>
->> +        mrc     p15, 4, r1, c15, c0, 0 @ get SCU base address
->>
->> to get it from the coprocessor.
->
-> Thanks. Can you please let us know which platform you see this?
->
-> I've executed this on sh73a0 and KZM9G myself without any issues.
->
-> Could it be that you are powering down the power domain in your own code?
-
-I saw it on the current HEAD of the next branch using my KZM9G. I
-bisected it down to your commit. The problem appears right at boot
-time when the 2nd CPU should be brought up.
+yes using the physical address works.
 
 Thanks,
 
  Bastian
 
-
-> Thanks,
+2013/2/18 Magnus Damm <magnus.damm@gmail.com>:
+> From: Magnus Damm <damm@opensource.se>
 >
-> / magnus
+> Rework the early SCU setup code in headsmp-scu.S to read
+> the base address in the same way as we use to fetch the
+> address of the invalidation function.
+>
+> Reported-by: Bastian Hecht <hechtb@gmail.com>
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+>
+>  Tested on r8a7779. Feel free to add incrementally or fold into:
+>  [PATCH 05/06] ARM: shmobile: Common shmobile_scu_base in headsmp-scu.S
+>
+>  Bastian, does this solve your problem?
+>
+>  arch/arm/mach-shmobile/headsmp-scu.S |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> --- 0001/arch/arm/mach-shmobile/headsmp-scu.S
+> +++ work/arch/arm/mach-shmobile/headsmp-scu.S   2013-02-18 16:17:58.000000000 +0900
+> @@ -39,7 +39,7 @@ ENTRY(shmobile_secondary_vector_scu)
+>         mrc     p15, 0, r0, c0, c0, 5   @ read MIPDR
+>         and     r0, r0, #3              @ mask out cpu ID
+>         lsl     r0, r0, #3              @ we will shift by cpu_id * 8 bits
+> -       ldr     r1, =shmobile_scu_base
+> +       ldr     r1, 2f
+>         ldr     r1, [r1]                @ SCU base address
+>         ldr     r2, [r1, #8]            @ SCU Power Status Register
+>         mov     r3, #3
+> @@ -48,6 +48,7 @@ ENTRY(shmobile_secondary_vector_scu)
+>
+>         ldr     pc, 1f
+>  1:     .long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
+> +2:     .long shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
+>  ENDPROC(shmobile_secondary_vector_scu)
+>
+>         .text
