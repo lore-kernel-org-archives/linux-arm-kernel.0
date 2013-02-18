@@ -1,82 +1,84 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Mon, 18 Feb 2013 22:13:34 +0530
-Subject: [PATCH v6 08/46] CPU hotplug: Provide APIs to prevent CPU offline
- from atomic context
-In-Reply-To: <CANN689HhVxDv+3Bn9UAxOMzj0egTvVp_c7oAmQ2nnQ8Xjn_aMA@mail.gmail.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123920.26245.56709.stgit@srivatsabhat.in.ibm.com>
- <CANN689HhVxDv+3Bn9UAxOMzj0egTvVp_c7oAmQ2nnQ8Xjn_aMA@mail.gmail.com>
-Message-ID: <51225A36.40600@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Feb 2013 16:44:20 +0000
+Subject: [PATCH] arm: add check for global exclusive monitor
+In-Reply-To: <1361204810-5335-1-git-send-email-murzin.v@gmail.com>
+References: <1361204810-5335-1-git-send-email-murzin.v@gmail.com>
+Message-ID: <20130218164420.GT17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2013 09:53 PM, Michel Lespinasse wrote:
-> On Mon, Feb 18, 2013 at 8:39 PM, Srivatsa S. Bhat
-> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->> Some important design requirements and considerations:
->> -----------------------------------------------------
-[...]
->> +/*
->> + * Invoked by atomic hotplug reader (a task which wants to prevent
->> + * CPU offline, but which can't afford to sleep), to prevent CPUs from
->> + * going offline. So, you can call this function from atomic contexts
->> + * (including interrupt handlers).
->> + *
->> + * Note: This does NOT prevent CPUs from coming online! It only prevents
->> + * CPUs from going offline.
->> + *
->> + * You can call this function recursively.
->> + *
->> + * Returns with preemption disabled (but interrupts remain as they are;
->> + * they are not disabled).
->> + */
->> +void get_online_cpus_atomic(void)
->> +{
->> +       percpu_read_lock_irqsafe(&hotplug_pcpu_rwlock);
->> +}
->> +EXPORT_SYMBOL_GPL(get_online_cpus_atomic);
->> +
->> +void put_online_cpus_atomic(void)
->> +{
->> +       percpu_read_unlock_irqsafe(&hotplug_pcpu_rwlock);
->> +}
->> +EXPORT_SYMBOL_GPL(put_online_cpus_atomic);
+On Mon, Feb 18, 2013 at 08:26:50PM +0400, Vladimir Murzin wrote:
+> Since ARMv6 new atomic instructions have been introduced:
+> ldrex/strex. Several implementation are possible based on (1) global
+> and local exclusive monitors and (2) local exclusive monitor and snoop
+> unit.
 > 
-> So, you made it clear why you want a recursive read side here.
+> In case of the 2nd option exclusive store operation on uncached
+> region may be faulty.
 > 
-> I am wondering though, if you could take care of recursive uses in
-> get/put_online_cpus_atomic() instead of doing it as a property of your
-> rwlock:
-> 
-> get_online_cpus_atomic()
-> {
->     unsigned long flags;
->     local_irq_save(flags);
->     if (this_cpu_inc_return(hotplug_recusion_count) == 1)
->         percpu_read_lock_irqsafe(&hotplug_pcpu_rwlock);
->     local_irq_restore(flags);
-> }
-> 
-> Once again, the idea there is to avoid baking the reader side
-> recursive properties into your rwlock itself, so that it won't be
-> impossible to implement reader/writer fairness into your rwlock in the
-> future (which may be not be very important for the hotplug use, but
-> could be when other uses get introduced).
-> 
+> Check for availability of the global monitor to provide some hint about
+> possible issues.
 
-Hmm, your proposal above looks good to me, at first glance.
-(Sorry, I had mistaken your earlier mails to mean that you were against
-recursive reader-side, while you actually meant that you didn't like
-implementing the recursive reader-side logic using the recursive property
-of rwlocks).
+How does this code actually do that?
 
-While your idea above looks good, it might introduce more complexity
-in the unlock path, since this would allow nesting of heterogeneous readers
-(ie., if hotplug_recursion_count == 1, you don't know whether you need to
-simply decrement the counter or unlock the rwlock as well).
+> +void __init check_gmonitor_bugs(void)
+> +{
+> +	struct page *page;
+> +	const char *reason;
+> +	unsigned long res = 1;
+> +
+> +	printk(KERN_INFO "CPU: Testing for global monitor: ");
+> +
+> +	page = alloc_page(GFP_KERNEL);
+> +	if (page) {
+> +		unsigned long *p;
+> +		pgprot_t prot = __pgprot_modify(PAGE_KERNEL,
+> +					L_PTE_MT_MASK, L_PTE_MT_UNCACHED);
+> +
+> +		p = vmap(&page, 1, VM_IOREMAP, prot);
 
-But I'll give this some more thought to see if we can implement this
-without making it too complex. Thank you!
+This is bad practise.  Remapping a page of already mapped kernel memory
+using different attributes (in this case, strongly ordered) is _definitely_
+a violation of the architecture requirements.  The behaviour you will see
+from this are in no way guaranteed.
 
-Regards,
-Srivatsa S. Bhat
+If you want to do this, it must either come from highmem, or not already
+be mapped.
+
+Moreover, this is absolutely silly - the ARM ARM says:
+
+"LDREX and STREX operations *must* be performed only on memory with the
+ Normal memory attribute."
+
+L_PTE_MT_UNCACHED doesn't get you that.  As I say above, that gets you
+strongly ordered memory, not "normal memory" as required by the
+architecture for use with exclusive types.
+
+> +
+> +		if (p) {
+> +			int temp;
+> +
+> +			__asm__ __volatile__(			\
+> +				"ldrex   %1, [%2]\n"		\
+> +				"strex   %0, %1, [%2]"		\
+> +				: "=&r" (res), "=&r" (temp)     \
+> +				: "r" (p)			\
+
+\ character not required for any of the above.  Neither is the __ version
+of "asm" and "volatile".
+
+> +				: "cc", "memory");
+> +
+> +				reason = "n\\a (atomic ops may be faulty)";
+
+"n\\a" ?
+
+So... at the moment this has me wondering - you're testing atomic
+operations with a strongly ordered memory region, which ARM already
+define this to be outside of the architecture spec.  The behaviour you
+see is not defined architecturally.
+
+And if you're trying to use LDREX/STREX to a strongly ordered or device
+memory region, then you're quite right that it'll be unreliable.  It's
+not defined to even work.  That's not because they're faulty, it's because
+you're abusing them.
