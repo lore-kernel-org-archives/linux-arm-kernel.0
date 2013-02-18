@@ -1,137 +1,197 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Feb 2013 10:22:24 +0800
-Subject: [PATCH v2 8/8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <1360776872-18584-9-git-send-email-p.zabel@pengutronix.de>
-References: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
- <1360776872-18584-9-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130218022222.GH6782@S2101-09.ap.freescale.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 17 Feb 2013 20:39:54 -0600
+Subject: [PATCH v2 12/12] clocksource: samsung-time: Add Device Tree
+ support
+In-Reply-To: <1361033044-27629-13-git-send-email-tomasz.figa@gmail.com>
+References: <1361033044-27629-1-git-send-email-tomasz.figa@gmail.com>
+ <1361033044-27629-13-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <5121947A.20908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 06:34:32PM +0100, Philipp Zabel wrote:
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+On 02/16/2013 10:44 AM, Tomasz Figa wrote:
+> This patch adds support for parsing all platform-specific data from
+> Device Tree and instantiation using clocksource_of_init to samsung-time
+> clocksource driver.
 
-You must have something to mention in the commit log when you add
-such a new reset controller.
 
-> ---
->  drivers/reset/Kconfig      |   13 +++
->  drivers/reset/Makefile     |    1 +
->  drivers/reset/gpio-reset.c |  188 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 202 insertions(+)
->  create mode 100644 drivers/reset/gpio-reset.c
+> +Optional properties:
+> +- samsung,source-timer: index of timer to be used as clocksource (defaults to 4)
+> +- samsung,event-timer: index of timer to be used as clock event (defaults to 3)
 
-...
+This is Linux specific, not a h/w property. Define the h/w properties of
+the timers so that Linux can decide which timer to use. See the omap2
+timers for an example.
 
-> +static int gpio_reset_probe(struct platform_device *pdev)
+> +- samsung,prescale-divisor: PWM prescaler divisor (from 1 to 256)
+> +- samsung,divisor: PWM main divider divisor (1, 2, 4, 8 or 16)
+> +
+> +Example:
+> +	timer at 7f006000 {
+> +		compatible = "samsung,s3c64xx-pwm-timer";
+> +		reg = <0x7f006000 0x1000>;
+> +		interrupt-parent = <&vic0>;
+> +		interrupts = <23>, <24>, <25>, <27>, <28>;
+> +		samsung,source-timer = <4>;
+> +		samsung,event-timer = <3>;
+> +		samsung,prescale-divisor = <2>;
+> +		samsung,divisor = <1>;
+> +	};
+> diff --git a/drivers/clocksource/samsung-time.c b/drivers/clocksource/samsung-time.c
+> index 4134811..76a15ca 100644
+> --- a/drivers/clocksource/samsung-time.c
+> +++ b/drivers/clocksource/samsung-time.c
+> @@ -14,6 +14,9 @@
+>  #include <linux/err.h>
+>  #include <linux/clk.h>
+>  #include <linux/clockchips.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/platform_device.h>
+>  
+>  #include <clocksource/samsung-time.h>
+> @@ -480,9 +483,12 @@ static void __init samsung_timer_resources(void)
+>  	unsigned long source_id = timer_source.source_id;
+>  	char devname[15];
+>  
+> -	timer_base = ioremap_nocache(timer_variant.reg_base, SZ_4K);
+> -	if (!timer_base)
+> -		panic("failed to map timer registers");
+> +	if (!timer_base) {
+> +		/* Compatibility fallback for non-DT platforms */
+> +		timer_base = ioremap_nocache(timer_variant.reg_base, SZ_4K);
+> +		if (!timer_base)
+> +			panic("failed to map timer registers");
+> +	}
+>  
+>  	timerclk = clk_get(NULL, "timers");
+>  	if (IS_ERR(timerclk))
+> @@ -515,8 +521,102 @@ static void __init samsung_timer_resources(void)
+>  	clk_enable(tin_source);
+>  }
+>  
+> +enum {
+> +	TYPE_S3C24XX,
+> +	TYPE_S3C64XX,
+> +};
+> +
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id samsung_timer_ids[] = {
+> +	{ .compatible = "samsung,s3c24xx-pwm-timer",
+> +					.data = (void *)TYPE_S3C24XX, },
+> +	{ .compatible = "samsung,s3c64xx-pwm-timer",
+> +					.data = (void *)TYPE_S3C64XX, },
+
+Shouldn't need 2 match tables and the data here is kind of pointless
+when you can just use the compatible string.
+
+> +	{},
+> +};
+> +
+> +static void samsung_timer_parse_dt(struct device_node *np,
+> +					const struct of_device_id *match)
 > +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct gpio_reset_data *drvdata;
-> +	enum of_gpio_flags flags;
-> +	u32 *delays = NULL;
-> +	int ret;
 > +	int i;
+> +	u32 val;
 > +
-> +	drvdata = devm_kzalloc(&pdev->dev, sizeof(*drvdata), GFP_KERNEL);
-> +	if (drvdata == NULL)
-> +		return -ENOMEM;
+> +	timer_base = of_iomap(np, 0);
+> +	if (!timer_base)
+> +		panic("failed to map timer registers");
 > +
-> +	drvdata->nr_gpios = of_gpio_named_count(np, "gpios");
-
-I would suggest to name the property reset-gpios.
-
-All the properties and compatible used in the driver should be
-documented in the binding doc.
-
-Shawn
-
-> +	if (drvdata->nr_gpios < 1)
-> +		return -EINVAL;
+> +	for (i = 0; i < SAMSUNG_PWM_NUM; ++i)
+> +		timer_variant.irqs[i] = irq_of_parse_and_map(np, i);
 > +
-> +	drvdata->gpios = devm_kzalloc(&pdev->dev, sizeof(struct gpio_reset) *
-> +			drvdata->nr_gpios, GFP_KERNEL);
-> +	if (drvdata->gpios == NULL)
-> +		return -ENOMEM;
+> +	if (!timer_variant.irqs[timer_source.event_id])
+> +		panic("no clock event irq provided");
 > +
-> +	if (of_find_property(np, "reset-delays", NULL)) {
-> +		delays = devm_kzalloc(&pdev->dev, sizeof(u32) *
-> +				drvdata->nr_gpios, GFP_KERNEL);
-> +		if (delays == NULL)
-> +			return -ENOMEM;
-> +
-> +		ret = of_property_read_u32_array(np, "reset-delays", delays,
-> +				drvdata->nr_gpios);
-> +		if (ret < 0)
-> +			return ret;
+> +	switch ((unsigned int)match->data) {
+> +	case TYPE_S3C24XX:
+> +		timer_variant.bits = 16;
+> +		timer_variant.prescale = 25;
+> +		timer_variant.prescale = 50;
+> +		timer_variant.has_tint_cstat = false;
+> +		break;
+> +	case TYPE_S3C64XX:
+> +		timer_variant.bits = 32;
+> +		timer_variant.prescale = 2;
+> +		timer_variant.divisor = 2;
+> +		timer_variant.has_tint_cstat = true;
+> +		break;
 > +	}
 > +
-> +	for (i = 0; i < drvdata->nr_gpios; i++) {
-> +		drvdata->gpios[i].gpio = of_get_named_gpio_flags(np, "gpios",
-> +				i, &flags);
-> +		if (drvdata->gpios[i].gpio < 0) {
-> +			dev_err(&pdev->dev, "invalid gpio for reset %d\n", i);
-> +			return drvdata->gpios[i].gpio;
-> +		}
-> +
-> +		/*
-> +		 * The flags are also used to remember whether a given GPIO
-> +		 * reset is active-low.
-> +		 */
-> +		if (flags & OF_GPIO_ACTIVE_LOW)
-> +			drvdata->gpios[i].flags = GPIOF_OUT_INIT_HIGH;
-> +		else
-> +			drvdata->gpios[i].flags = GPIOF_OUT_INIT_LOW;
-> +
-> +		ret = devm_gpio_request_one(&pdev->dev, drvdata->gpios[i].gpio,
-> +				drvdata->gpios[i].flags, NULL);
-> +		if (ret < 0) {
-> +			dev_err(&pdev->dev, "failed to request gpio %d for reset %d\n",
-> +					drvdata->gpios[i].gpio, i);
-> +			return ret;
-> +		}
-> +
-> +		if (delays != NULL)
-> +			drvdata->gpios[i].delay_ms = delays[i];
-> +		else
-> +			drvdata->gpios[i].delay_ms = -1; /* .reset returns -ENOSYS */
+> +	timer_source.source_id = 4;
+> +	if (!of_property_read_u32(np, "samsung,source-timer", &val)) {
+> +		if (val >= SAMSUNG_PWM_NUM)
+> +			panic("samsung,source-timer property out of range");
+> +		timer_source.source_id = val;
 > +	}
 > +
-> +	devm_kfree(&pdev->dev, delays);
+> +	timer_source.event_id = 3;
+> +	if (!of_property_read_u32(np, "samsung,event-timer", &val)) {
+> +		if (val >= SAMSUNG_PWM_NUM)
+> +			panic("samsung,event-timer property out of range");
+> +		timer_source.event_id = val;
+> +	}
 > +
-> +	drvdata->rcdev.of_node = np;
-> +	drvdata->rcdev.ops = &gpio_reset_ops;
-> +	reset_controller_register(&drvdata->rcdev);
+> +	if (!of_property_read_u32(np, "samsung,prescale-divisor", &val)) {
+> +		if (val < 1 || val > 256)
+> +			panic("samsung,prescale-divisor property out of range");
+> +		timer_variant.prescale = val;
+> +	}
 > +
-> +	platform_set_drvdata(pdev, drvdata);
-> +
-> +	return 0;
+> +	if (!of_property_read_u32(np, "samsung,divisor", &val)) {
+> +		switch (val) {
+> +		case 1:
+> +		case 2:
+> +		case 4:
+> +		case 8:
+> +		case 16:
+> +			timer_variant.divisor = timer_variant.prescale * val;
+> +			break;
+> +		default:
+> +			panic("invalid value of samsung,divisor property");
+> +		}
+> +	}
 > +}
+> +#endif
 > +
-> +static int gpio_reset_remove(struct platform_device *pdev)
-> +{
-> +	struct gpio_reset_data *drvdata = platform_get_drvdata(pdev);
+>  void __init samsung_timer_init(void)
+>  {
+> +#ifdef CONFIG_OF
+> +	struct device_node *np;
+> +	const struct of_device_id *match;
 > +
-> +	reset_controller_unregister(&drvdata->rcdev);
+> +	if (of_have_populated_dt()) {
+
+Separate the OF and non-OF code to avoid this and the ifdef.
+
+> +		np = of_find_matching_node_and_match(NULL,
+> +						samsung_timer_ids, &match);
+> +		if (!np)
+> +			panic("timer node not found");
+
+I have a patch to change this function to pass in the node ptr and avoid
+matching twice. It should be in arm-soc shortly after rc1.
+
+Rob
+
 > +
-> +	return 0;
-> +}
+> +		samsung_timer_parse_dt(np, match);
+> +	}
+> +#endif
+>  	if (!timer_source.source_id && !timer_source.event_id)
+>  		panic("timer sources not set (see samsung_set_timer_source)!\n");
+>  
+> @@ -527,3 +627,10 @@ void __init samsung_timer_init(void)
+>  	samsung_clockevent_init();
+>  	samsung_clocksource_init();
+>  }
 > +
-> +static struct of_device_id gpio_reset_dt_ids[] = {
-> +	{ .compatible = "gpio-reset" },
-> +	{ }
-> +};
-> +
-> +static struct platform_driver gpio_reset_driver = {
-> +	.probe = gpio_reset_probe,
-> +	.remove = gpio_reset_remove,
-> +	.driver = {
-> +		.name = "gpio-reset",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(gpio_reset_dt_ids),
-> +	},
-> +};
-> +
-> +module_platform_driver(gpio_reset_driver);
-> -- 
-> 1.7.10.4
+> +#ifdef CONFIG_CLKSRC_OF
+> +CLOCKSOURCE_OF_DECLARE(s3c24xx_timer,
+> +			"samsung,s3c24xx-pwm-timer", samsung_timer_init)
+> +CLOCKSOURCE_OF_DECLARE(s3c64xx_timer,
+> +			"samsung,s3c64xx-pwm-timer", samsung_timer_init)
+> +#endif
 > 
