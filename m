@@ -1,44 +1,40 @@
-From: anton@enomsg.org (Anton Vorontsov)
-Date: Sun, 17 Feb 2013 17:02:07 -0800
-Subject: [RFC] ARM: sa1100: collie-battery.c: include platform_device.h
- directly
-In-Reply-To: <CAAQYJAt0CGi3ZLO8eoYj64Ay06Yry_w8A6aPHHH1tpeyp=Ns4g@mail.gmail.com>
-References: <1361038560-3690-1-git-send-email-andrea.adami@gmail.com>
- <20130216230010.GG1741@lizard.sbx05280.losalca.wayport.net>
- <CAAQYJAt0CGi3ZLO8eoYj64Ay06Yry_w8A6aPHHH1tpeyp=Ns4g@mail.gmail.com>
-Message-ID: <20130218010207.GA31969@lizard.gateway.2wire.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Feb 2013 10:23:22 +0900
+Subject: [PATCH 0/4] R-Car SATA driver and platform data
+In-Reply-To: <201302170135.28336.sergei.shtylyov@cogentembedded.com>
+References: <201302170135.28336.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130218012322.GA11807@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 01:13:46AM +0100, Andrea Adami wrote:
-> On Sun, Feb 17, 2013 at 12:00 AM, Anton Vorontsov <anton@enomsg.org> wrote:
-> > Hi Andrea,
-> >
-> > On Sat, Feb 16, 2013 at 07:16:00PM +0100, Andrea Adami wrote:
-> >> Initial try to fix compilation error
-> >
-> > Things are a bit more complex...
-> >
-> >> linux/include/linux/mfd/mcp.h:22:16: error: field 'attached_device' has incomplete type
-> >
-> > You have to add #include <linux/device.h> into mfd/mcp.h. This will add
-> > struct device and...
-> >
-> Bingo.Adding it solves all following errors, no need for further inclusions.
+On Sun, Feb 17, 2013 at 01:35:27AM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> >> linux/include/linux/mfd/mcp.h:48:23: error: field 'drv' has incomplete type
-> >
-> > struct device_driver.
-> >
-> >> linux/include/linux/mfd/ucb1x00.h:137:17: error: field 'dev' has incomplete type
-> >
-> > Same here, the file ucb1x00.h needs #include <linux/device.h>.
-> >
-> Seems not needed, mcp.h is included by ucb1x00.h
+>    Here's the set of 4 patches against the Simon Horman's renesas.git repo, 'next' branch:
+> 
+> [1/4] ARM: mach-shmobile: r8a7779: SATA DT configuration
+> [2/4] ARM: mach-shmobile: r8a7779: add SATA support
+> [3/4] libata: add R-Car SATA driver
+> [4/4] ARM: mach-shmobile: marzen: add SATA support
+> 
+> Patch 3 also applies to the 'upstream' branch of Jeff Garzik's libata-dev.git repo.
 
-Generally, we don't depend on indirect inclusions. But if it doesn't harm
-anyhow so far, we may not bother with this.
+Hi Sergei, Hi All,
 
-Thanks,
+I do not expect patch 3 of this series to got through
+the renesas tree, however, I have included it and the other three patches
+in this series to a topic branch in the renesas tree, topic/r-car-stat.
 
-Anton
+The base of the topic branch is:
+* a merge of renesas.git next and libata-dev.git upstream, and;
+* a boot fix for Marzen which I plan to add to next once it is reviewed:
+  "ARM: shmobile: r8a7779: Correct TMU clock support again" (v3).
+
+With this in place I built a kernel using the marzen_defconfig and booted it.
+However, I wonder if I am missing a kernel option, or perhaps something
+else of a minor nature as I see the following:
+
+# dmesg | grep sata
+sata_rcar sata_rcar: coherent DMA mask is unset
+sata_rcar sata_rcar: failed to start port 0 (errno=-12)
+sata_rcar: probe of sata_rcar failed with error -12
