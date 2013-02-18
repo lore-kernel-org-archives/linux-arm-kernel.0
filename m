@@ -1,87 +1,42 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 18 Feb 2013 15:39:32 +0200
-Subject: [PATCH v3 11/12] gpio: pxa: discard irq base in pxa_gpio_chip
-In-Reply-To: <CAD6h2NT+Qq-uD9ctXWj9LK0pZFb6NsoA0-ZT611DthhMYy4NKg@mail.gmail.com>
-References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
- <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
- <5121FDFC.2010107@compulab.co.il>
- <CAD6h2NT+Qq-uD9ctXWj9LK0pZFb6NsoA0-ZT611DthhMYy4NKg@mail.gmail.com>
-Message-ID: <51222F14.8040306@compulab.co.il>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 18 Feb 2013 22:46:48 +0900
+Subject: [PATCH 00/08] ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework part 2
+Message-ID: <20130218134648.17303.97576.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework part 2
 
+[PATCH 01/08] ARM: shmobile: Fix base address readout in headsmp-scu.S
+[PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
+[PATCH 03/08] ARM: shmobile: Use R8A7779_SCU_BASE with TWD
+[PATCH 04/08] ARM: shmobile: Update r8a7779 to check SCU for hotplug
+[PATCH 05/08] ARM: shmobile: Update r8a7779 to use scu_power_mode()
+[PATCH 06/08] ARM: shmobile: Use sh73a0-specific cpu disable code
+[PATCH 07/08] ARM: shmobile: Rearrange r8a7779 cpu hotplug code
+[PATCH 08/08] ARM: shmobile: Remove unused hotplug.c
 
-On 02/18/13 14:10, Haojian Zhuang wrote:
-> On 18 February 2013 18:10, Igor Grinberg <grinberg@compulab.co.il> wrote:
->> On 02/18/13 07:12, Haojian Zhuang wrote:
->>> Discard irq_base in struct pxa_gpio_chip. Use irq_domain instead.
->>>
->>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->>> ---
->>>  drivers/gpio/gpio-pxa.c |   91 +++++++++++++++++++++++------------------------
->>>  1 file changed, 44 insertions(+), 47 deletions(-)
->>
->> [...]
->>
->>>
->>> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
->>> index 35cdb23..d45cb57 100644
->>> --- a/drivers/gpio/gpio-pxa.c
->>> +++ b/drivers/gpio/gpio-pxa.c
->>> @@ -66,8 +66,8 @@ int pxa_last_gpio;
->>>
->>>  struct pxa_gpio_chip {
->>>       struct gpio_chip chip;
->>> +     struct irq_domain *domain;
->>>       void __iomem    *regbase;
->>> -     unsigned int    irq_base;
->>>       bool            inverted;
->>>       bool            gafr;
->>>       char label[10];
->>> @@ -147,17 +147,7 @@ static int pxa_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
->>>       struct pxa_gpio_chip *chip = NULL;
->>>
->>>       chip = container_of(gc, struct pxa_gpio_chip, chip);
->>> -     return chip->irq_base + offset;
->>> -}
->>> -
->>> -int pxa_irq_to_gpio(struct irq_data *d)
->>> -{
->>> -     struct pxa_gpio_chip *chip;
->>> -     int gpio;
->>> -
->>> -     chip = (struct pxa_gpio_chip *)d->domain->host_data;
->>> -     gpio = d->irq - chip->irq_base + chip->chip.base;
->>> -     return gpio;
->>> +     return irq_create_mapping(chip->domain, offset);
->>>  }
->>
->> You remove the pxa_irq_to_gpio() function here, but we still have:
->> $ grep -nr pxa_irq_to_gpio *
->> arch/arm/mach-pxa/pxa27x.c:368: int gpio = pxa_irq_to_gpio(d);
->> arch/arm/mach-pxa/pxa25x.c:292: int gpio = pxa_irq_to_gpio(d);
->> include/linux/gpio-pxa.h:16:extern int pxa_irq_to_gpio(struct irq_data *d);
->>
->> And this in turn breaks the compilation for example with error:
->> arch/arm/mach-pxa/built-in.o: In function `pxa27x_set_wake':
->> em-x270.c:(.text+0x1298): undefined reference to `pxa_irq_to_gpio'
->> make[1]: *** [vmlinux] Error 1
->> make: *** [sub-make] Error 2
->>
->>
->> --
->> Regards,
->> Igor.
-> 
-> Thank you.
-> 
-> Please drop this patch (11/12) for your test. Whatever it's DT or non-DT mode,
-> gpio driver should work without this patch.
+Finalize the SCU rework by performing minor fixes and converting
+the r8a7779 SMP code to make use of common scu_power_mode() code
+and the early SCU setup code in headsmp-scu.S.
 
-Nope... The IRQ is still broken even if I drop this patch.
+Also, to save a few line remove hotplug.c while at it.
 
+The only remaining itch to scratch here is to fix up CPU Hotplug
+of CPU0 on r8a7779, but for that to happen we first need to start
+accounting for spurious interrupts during shut down.
 
--- 
-Regards,
-Igor.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ No known dependencies apart from previous SMP cleanup series
+ "[PATCH 00/06] ARM: shmobile: SMP Cortex-A9 SCU rework"
+ Written against -next in renesas.git.
+
+ arch/arm/mach-shmobile/Makefile              |    1 
+ arch/arm/mach-shmobile/headsmp-scu.S         |    3 
+ arch/arm/mach-shmobile/hotplug.c             |   64 ---------
+ arch/arm/mach-shmobile/include/mach/common.h |   10 -
+ arch/arm/mach-shmobile/smp-r8a7779.c         |  173 +++++++++++++-------------
+ arch/arm/mach-shmobile/smp-sh73a0.c          |   11 +
+ 6 files changed, 99 insertions(+), 163 deletions(-)
