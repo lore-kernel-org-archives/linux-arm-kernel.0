@@ -1,49 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 18 Feb 2013 16:21:50 +0000
-Subject: [PATCH] arm: Preserve L_PTE_VALID in pte_modify()
-In-Reply-To: <1360693550-31609-1-git-send-email-catalin.marinas@arm.com>
-References: <1360693550-31609-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20130218162150.GI20798@mudshark.cambridge.arm.com>
+From: walken@google.com (Michel Lespinasse)
+Date: Tue, 19 Feb 2013 00:23:56 +0800
+Subject: [PATCH v6 08/46] CPU hotplug: Provide APIs to prevent CPU offline
+ from atomic context
+In-Reply-To: <20130218123920.26245.56709.stgit@srivatsabhat.in.ibm.com>
+References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
+ <20130218123920.26245.56709.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <CANN689HhVxDv+3Bn9UAxOMzj0egTvVp_c7oAmQ2nnQ8Xjn_aMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 12, 2013 at 06:25:50PM +0000, Catalin Marinas wrote:
-> Following commit 26ffd0d4 (ARM: mm: introduce present, faulting entries
-> for PAGE_NONE), if a page has been mapped as PROT_NONE, the L_PTE_VALID
-> bit is cleared by the set_pte_ext() code. With LPAE the software and
-> hardware pte share the same location and subsequent modifications of pte
-> range (change_protection()) will leave the L_PTE_VALID bit cleared.
-> 
-> This patch adds the L_PTE_VALID bit to the newprot mask in pte_modify().
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reported-by: Subash Patel <subash.rp@samsung.com>
-> Tested-by: Subash Patel <subash.rp@samsung.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+On Mon, Feb 18, 2013 at 8:39 PM, Srivatsa S. Bhat
+<srivatsa.bhat@linux.vnet.ibm.com> wrote:
+> Some important design requirements and considerations:
+> -----------------------------------------------------
+>
+> 1. Scalable synchronization at the reader-side, especially in the fast-path
+>
+>    Any synchronization at the atomic hotplug readers side must be highly
+>    scalable - avoid global single-holder locks/counters etc. Because, these
+>    paths currently use the extremely fast preempt_disable(); our replacement
+>    to preempt_disable() should not become ridiculously costly and also should
+>    not serialize the readers among themselves needlessly.
+>
+>    At a minimum, the new APIs must be extremely fast at the reader side
+>    atleast in the fast-path, when no CPU offline writers are active.
+>
+> 2. preempt_disable() was recursive. The replacement should also be recursive.
+>
+> 3. No (new) lock-ordering restrictions
+>
+>    preempt_disable() was super-flexible. It didn't impose any ordering
+>    restrictions or rules for nesting. Our replacement should also be equally
+>    flexible and usable.
+>
+> 4. No deadlock possibilities
+>
+>    Regular per-cpu locking is not the way to go if we want to have relaxed
+>    rules for lock-ordering. Because, we can end up in circular-locking
+>    dependencies as explained in https://lkml.org/lkml/2012/12/6/290
+>
+>    So, avoid the usual per-cpu locking schemes (per-cpu locks/per-cpu atomic
+>    counters with spin-on-contention etc) as much as possible, to avoid
+>    numerous deadlock possibilities from creeping in.
+>
+>
+> Implementation of the design:
+> ----------------------------
+>
+> We use per-CPU reader-writer locks for synchronization because:
+>
+>   a. They are quite fast and scalable in the fast-path (when no writers are
+>      active), since they use fast per-cpu counters in those paths.
+>
+>   b. They are recursive at the reader side.
+>
+>   c. They provide a good amount of safety against deadlocks; they don't
+>      spring new deadlock possibilities on us from out of nowhere. As a
+>      result, they have relaxed locking rules and are quite flexible, and
+>      thus are best suited for replacing usages of preempt_disable() or
+>      local_irq_disable() at the reader side.
+>
+> Together, these satisfy all the requirements mentioned above.
 
-This matches what I did for arm64, so:
+Thanks for this detailed design explanation.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+> +/*
+> + * Invoked by atomic hotplug reader (a task which wants to prevent
+> + * CPU offline, but which can't afford to sleep), to prevent CPUs from
+> + * going offline. So, you can call this function from atomic contexts
+> + * (including interrupt handlers).
+> + *
+> + * Note: This does NOT prevent CPUs from coming online! It only prevents
+> + * CPUs from going offline.
+> + *
+> + * You can call this function recursively.
+> + *
+> + * Returns with preemption disabled (but interrupts remain as they are;
+> + * they are not disabled).
+> + */
+> +void get_online_cpus_atomic(void)
+> +{
+> +       percpu_read_lock_irqsafe(&hotplug_pcpu_rwlock);
+> +}
+> +EXPORT_SYMBOL_GPL(get_online_cpus_atomic);
+> +
+> +void put_online_cpus_atomic(void)
+> +{
+> +       percpu_read_unlock_irqsafe(&hotplug_pcpu_rwlock);
+> +}
+> +EXPORT_SYMBOL_GPL(put_online_cpus_atomic);
 
-Cheers,
+So, you made it clear why you want a recursive read side here.
 
-Will
+I am wondering though, if you could take care of recursive uses in
+get/put_online_cpus_atomic() instead of doing it as a property of your
+rwlock:
 
-> ---
->  arch/arm/include/asm/pgtable.h | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-> index 9c82f988..c094749 100644
-> --- a/arch/arm/include/asm/pgtable.h
-> +++ b/arch/arm/include/asm/pgtable.h
-> @@ -240,7 +240,8 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
->  
->  static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
->  {
-> -	const pteval_t mask = L_PTE_XN | L_PTE_RDONLY | L_PTE_USER | L_PTE_NONE;
-> +	const pteval_t mask = L_PTE_XN | L_PTE_RDONLY | L_PTE_USER |
-> +		L_PTE_NONE | L_PTE_VALID;
->  	pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
->  	return pte;
->  }
+get_online_cpus_atomic()
+{
+    unsigned long flags;
+    local_irq_save(flags);
+    if (this_cpu_inc_return(hotplug_recusion_count) == 1)
+        percpu_read_lock_irqsafe(&hotplug_pcpu_rwlock);
+    local_irq_restore(flags);
+}
+
+Once again, the idea there is to avoid baking the reader side
+recursive properties into your rwlock itself, so that it won't be
+impossible to implement reader/writer fairness into your rwlock in the
+future (which may be not be very important for the hotplug use, but
+could be when other uses get introduced).
+
+-- 
+Michel "Walken" Lespinasse
+A program is never fully debugged until the last user dies.
