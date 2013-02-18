@@ -1,102 +1,34 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 18 Feb 2013 12:20:24 +0100
-Subject: [PATCH V2] ARM: dts: omap3-devkit8000: Enable audio support
-In-Reply-To: <1361000036-18121-1-git-send-email-anilk4.v@gmail.com>
-References: <1361000036-18121-1-git-send-email-anilk4.v@gmail.com>
-Message-ID: <51220E78.5000409@ti.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Mon, 18 Feb 2013 19:30:31 +0800
+Subject: [RFC PATCH 9/9] ARM: tegra: defconfig: enable thermal framework
+In-Reply-To: <1361187031-3679-1-git-send-email-wni@nvidia.com>
+References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
+Message-ID: <1361187031-3679-10-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2013 08:33 AM, Anil Kumar wrote:
-> Add the needed sections to enable audio support on
-> Devkit8000 when booted with DT blob.
-> 
-> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+Enable tegra30 thermal framework.
+New options enabled:
+* TEGRA30_THERMAL: for tegra30 thermal framework.
+* THERMAL: dependency for TEGRA30_THERMAL.
 
-Looks good:
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Wei Ni <wni@nvidia.com>
+---
+ arch/arm/configs/tegra_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-> ---
-> This patch is based on top of kernel 3.8-rc5 and
-> the following patches.
-> 
-> Peter Ujfalusi:-
-> ASoC: twl4030: Correct the support for Voice port
-> ASoC: twl4030: Convert MICBIAS to SUPPLY widget
-> ASoC: omap-twl4030: Add support for routing, voice port and jack detect
-> 
-> Anil Kumar:-
-> ARM: dts: add minimal DT support for DevKit8000
-> https://patchwork.kernel.org/patch/2122461/
-> 
-> -Tested for playback and capture on Devkit8000.
-> 
->  Test process:-
-> 
->  #amixer set 'PredriveR Mixer AudioR2' on
->  #amixer set 'PredriveL Mixer AudioL2' on
->  #amixer set PreDriv 100 unmute
->  #amixer set 'DAC2 Digital Fine' 100
->  #amixer cset numid=27 1
->  #arecord | aplay
-> 
-> For V2:
->  - Remove pin mux as done at device boot time by default.
-> 
-> :100644 100644 6338993... c70116f... M	arch/arm/boot/dts/omap3-devkit8000.dts
->  arch/arm/boot/dts/omap3-devkit8000.dts |   23 +++++++++++++++++++----
->  1 files changed, 19 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-> index 6338993..c70116f 100644
-> --- a/arch/arm/boot/dts/omap3-devkit8000.dts
-> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-> @@ -42,6 +42,19 @@
->                  };
->  
->  	};
-> +
-> +	sound {
-> +		compatible = "ti,omap-twl4030";
-> +		ti,model = "devkit8000";
-> +
-> +		ti,mcbsp = <&mcbsp2>;
-> +		ti,codec = <&twl_audio>;
-> +		ti,audio-routing =
-> +			"Ext Spk", "PREDRIVEL",
-> +			"Ext Spk", "PREDRIVER",
-> +			"MAINMIC", "Main Mic",
-> +			"Main Mic", "Mic Bias 1";
-> +	};
->  };
->  
->  &i2c1 {
-> @@ -51,6 +64,12 @@
->  		reg = <0x48>;
->  		interrupts = <7>;	/* SYS_NIRQ cascaded to intc */
->  		interrupt-parent = <&intc>;
-> +
-> +		twl_audio: audio {
-> +			compatible = "ti,twl4030-audio";
-> +			codec {
-> +			};
-> +		};
->  	};
->  };
->  
-> @@ -86,10 +105,6 @@
->  	status = "disabled";
->  };
->  
-> -&mcbsp2 {
-> -	status = "disabled";
-> -};
-> -
->  &mcbsp3 {
->  	status = "disabled";
->  };
-> 
-
-
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index a7827fd..4aa3356 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -128,6 +128,8 @@ CONFIG_GPIO_TPS65910=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_BATTERY_SBS=y
+ CONFIG_SENSORS_LM90=y
++CONFIG_THERMAL=y
++CONFIG_TEGRA30_THERMAL=y
+ CONFIG_MFD_TPS6586X=y
+ CONFIG_MFD_TPS65910=y
+ CONFIG_MFD_MAX8907=y
 -- 
-P?ter
+1.7.9.5
