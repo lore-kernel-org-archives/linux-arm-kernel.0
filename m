@@ -1,43 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 17 Feb 2013 16:58:42 -0800
-Subject: GIT PULL] Renesas ARM-based SoC pinmux for v3.9 #2
-In-Reply-To: <201302161034.33865.arnd@arndb.de>
-References: <1360981553-11414-1-git-send-email-horms+renesas@verge.net.au>
- <201302161034.33865.arnd@arndb.de>
-Message-ID: <20130218005842.GE4615@quad.lixom.net>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Sun, 17 Feb 2013 16:58:46 -0800 (PST)
+Subject: [PATCH 5/5] ARM: shmobile: kzm9g: Trim reference DT_MACHINE_START
+In-Reply-To: <1360933261-6359-6-git-send-email-horms+renesas@verge.net.au>
+References: <1360933261-6359-1-git-send-email-horms+renesas@verge.net.au>
+ <1360933261-6359-6-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <87621qo2tc.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 16, 2013 at 10:34:33AM +0000, Arnd Bergmann wrote:
-> On Saturday 16 February 2013, Simon Horman wrote:
-> > Hi Olof, Hi Arnd,
-> > 
-> > The following changes since commit c3323806a67c0c656e27956b7340e37ba6c6968b:
-> > 
-> >   sh-pfc: Move sh_pfc.h from include/linux/ to driver directory (2013-01-25 09:24:31 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux2-for-v3.9
-> > 
-> > for you to fetch changes up to 8c43fcc7804fc4609ccd9fa021e21f5423db9d96:
-> > 
-> >   sh-pfc: sh_pfc_probe() sizeof() fix (2013-02-16 10:58:50 +0900)
-> > 
-> > ----------------------------------------------------------------
-> > Bug fix from Magnus that resolves a regression introduced in pfc changes
-> > queued up for 3.9.
-> 
-> 
-> Pulled into next/sh-pinux, thanks!
-> 
-> Olof, we haven't done an official handover, but since I have added a couple of
-> my own bug fixes in the past days, and I say no other updates from you, I decided
-> to take this one in. I'll also have a look if there are more fixes to take care
-> of over the weekend.
 
-Ah, got to this email just now. Yep, no worries, I did run git remote update
-before I started picking up new material so I noticed the checkins.
+Hi Simon
+
+> Remove .init_late and .restart from DT_MACHINE_START
+> for kzm9g reference as these are not necessary to
+> bring the board up which is the main aim of kzm9g reference.
+
+Does this mean that we will have "full spec kzm9g DT base" code in the future,
+and then, "kzm9g reference" code will be deleted ?
+
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/mach-shmobile/board-kzm9g-reference.c |    9 ---------
+>  1 file changed, 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+> index b9e40b6..836070a 100644
+> --- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
+> +++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+> @@ -87,13 +87,6 @@ static void __init kzm_init(void)
+>  #endif
+>  }
+>  
+> -static void kzm9g_restart(char mode, const char *cmd)
+> -{
+> -#define RESCNT2 IOMEM(0xe6188020)
+> -	/* Do soft power on reset */
+> -	writel((1 << 31), RESCNT2);
+> -}
+> -
+>  static const char *kzm9g_boards_compat_dt[] __initdata = {
+>  	"renesas,kzm9g-reference",
+>  	NULL,
+> @@ -106,8 +99,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
+>  	.nr_irqs	= NR_IRQS_LEGACY,
+>  	.init_irq	= irqchip_init,
+>  	.init_machine	= kzm_init,
+> -	.init_late	= shmobile_init_late,
+>  	.init_time	= shmobile_timer_init,
+> -	.restart	= kzm9g_restart,
+>  	.dt_compat	= kzm9g_boards_compat_dt,
+>  MACHINE_END
+> -- 
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
--Olof
+Best regards
+---
+Kuninori Morimoto
