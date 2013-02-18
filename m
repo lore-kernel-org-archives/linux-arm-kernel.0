@@ -1,231 +1,208 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 18 Feb 2013 13:12:36 +0800
-Subject: [PATCH v3 10/12] gpio: pxa: add irq base in platform data
+Date: Mon, 18 Feb 2013 13:12:37 +0800
+Subject: [PATCH v3 11/12] gpio: pxa: discard irq base in pxa_gpio_chip
 In-Reply-To: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1361164358-5845-11-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Macro PXA_GPIO_TO_IRQ() & MMP_GPIO_TO_IRQ() is used in machine driver
-without DT. Although we're allocating irq descriptions dynamically,
-it may break machine drivers without DT. Append pdata->irq_base.
-If irq_base is valid, allocate irq descriptions from irq_base.
+Discard irq_base in struct pxa_gpio_chip. Use irq_domain instead.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/mach-mmp/aspenite.c      |    1 +
- arch/arm/mach-mmp/avengers_lite.c |    1 +
- arch/arm/mach-mmp/brownstone.c    |    1 +
- arch/arm/mach-mmp/flint.c         |    1 +
- arch/arm/mach-mmp/gplugd.c        |    2 ++
- arch/arm/mach-mmp/tavorevb.c      |    1 +
- arch/arm/mach-mmp/teton_bga.c     |    1 +
- arch/arm/mach-mmp/ttc_dkb.c       |    1 +
- arch/arm/mach-pxa/pxa25x.c        |    1 +
- arch/arm/mach-pxa/pxa27x.c        |    1 +
- arch/arm/mach-pxa/pxa3xx.c        |    1 +
- drivers/gpio/gpio-pxa.c           |   15 ++++++++++-----
- include/linux/gpio-pxa.h          |    1 +
- 13 files changed, 23 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-pxa.c |   91 +++++++++++++++++++++++------------------------
+ 1 file changed, 44 insertions(+), 47 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index a3e42dc..a160efc 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -113,6 +113,7 @@ static unsigned long common_pin_config[] __initdata = {
- 
- static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
- 	.nr_gpios	= 128,
-+	.irq_base	= IRQ_GPIO_START,
- 	.ed_mask	= true,
- };
- 
-diff --git a/arch/arm/mach-mmp/avengers_lite.c b/arch/arm/mach-mmp/avengers_lite.c
-index 1ea6502..5c8c93d 100644
---- a/arch/arm/mach-mmp/avengers_lite.c
-+++ b/arch/arm/mach-mmp/avengers_lite.c
-@@ -35,6 +35,7 @@ static unsigned long avengers_lite_pin_config_V16F[] __initdata = {
- 
- static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
- 	.nr_gpios	= 128,
-+	.irq_base	= IRQ_GPIO_START,
- 	.ed_mask	= true,
- };
- 
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index a32156f..ba9f3a1 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -107,6 +107,7 @@ static unsigned long brownstone_pin_config[] __initdata = {
- 
- static struct pxa_gpio_platform_data mmp2_gpio_pdata = {
- 	.nr_gpios	= 192,
-+	.irq_base	= IRQ_GPIO_START,
- 	.ed_mask	= true,
- };
- 
-diff --git a/arch/arm/mach-mmp/flint.c b/arch/arm/mach-mmp/flint.c
-index 3f301b5..544c03a 100644
---- a/arch/arm/mach-mmp/flint.c
-+++ b/arch/arm/mach-mmp/flint.c
-@@ -80,6 +80,7 @@ static unsigned long flint_pin_config[] __initdata = {
- 
- static struct pxa_gpio_platform_data mmp2_gpio_pdata = {
- 	.nr_gpios	= 192,
-+	.irq_base	= IRQ_GPIO_START,
- 	.ed_mask	= true,
- };
- 
-diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
-index 019b178..e19eae8 100644
---- a/arch/arm/mach-mmp/gplugd.c
-+++ b/arch/arm/mach-mmp/gplugd.c
-@@ -11,6 +11,7 @@
- #include <linux/init.h>
- #include <linux/gpio.h>
- #include <linux/gpio-pxa.h>
-+#include <linux/platform_device.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-@@ -130,6 +131,7 @@ static unsigned long gplugd_pin_config[] __initdata = {
- 
- static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
- 	.nr_gpios	= 128,
-+	.irq_base	= IRQ_GPIO_START,
- 	.ed_mask	= true,
- };
- 
-diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
-index 6e8cf80..37a181a 100644
---- a/arch/arm/mach-mmp/tavorevb.c
-+++ b/arch/arm/mach-mmp/tavorevb.c
-@@ -63,6 +63,7 @@ static unsigned long tavorevb_pin_config[] __initdata = {
- 
- static struct pxa_gpio_platform_data ttc_dkb_gpio_pdata = {
- 	.nr_gpios	= 128,
-+	.irq_base	= IRQ_GPIO_START,
- 	.ed_mask	= true,
- };
- 
-diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
-index b5146bb..cace3b5 100644
---- a/arch/arm/mach-mmp/teton_bga.c
-+++ b/arch/arm/mach-mmp/teton_bga.c
-@@ -52,6 +52,7 @@ static unsigned long teton_bga_pin_config[] __initdata = {
- 
- static struct pxa_gpio_platform_data pxa168_gpio_pdata = {
- 	.nr_gpios	= 128,
-+	.irq_base	= IRQ_GPIO_START,
- 	.ed_mask	= true,
- };
- 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 387e3f8..a824285 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -78,6 +78,7 @@ static unsigned long ttc_dkb_pin_config[] __initdata = {
- 
- static struct pxa_gpio_platform_data ttc_dkb_gpio_pdata = {
- 	.nr_gpios	= 128,
-+	.irq_base	= IRQ_GPIO_START,
- 	.ed_mask	= true,
- };
- 
-diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index ff91660..2646654 100644
---- a/arch/arm/mach-pxa/pxa25x.c
-+++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -346,6 +346,7 @@ static struct pxa_gpio_platform_data pxa25x_gpio_info __initdata = {
- #else
- 	.nr_gpios = 85,
- #endif
-+	.irq_base = PXA_GPIO_IRQ_BASE,
- 	.gafr = true,
- 	.gpio_set_wake = gpio_set_wake,
- };
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index e478ec8..9f44c4b 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -433,6 +433,7 @@ void __init pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info)
- static struct pxa_gpio_platform_data pxa27x_gpio_info __initdata = {
- 	.gafr = true,
- 	.nr_gpios = 121,
-+	.irq_base = PXA_GPIO_IRQ_BASE,
- 	.gpio_set_wake = gpio_set_wake,
- };
- 
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index f6bff16..7506879 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -438,6 +438,7 @@ void __init pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info)
- 
- static struct pxa_gpio_platform_data pxa3xx_gpio_info __initdata = {
- 	.nr_gpios = 128,
-+	.irq_base = PXA_GPIO_IRQ_BASE,
- };
- 
- static struct platform_device *devices[] __initdata = {
 diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index c9cc636..35cdb23 100644
+index 35cdb23..d45cb57 100644
 --- a/drivers/gpio/gpio-pxa.c
 +++ b/drivers/gpio/gpio-pxa.c
-@@ -451,9 +451,10 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
- #endif
+@@ -66,8 +66,8 @@ int pxa_last_gpio;
  
- static int pxa_init_gpio_chip(struct platform_device *pdev, int gpio_end,
--			      int (*set_wake)(unsigned int, unsigned int))
-+			      struct pxa_gpio_platform_data *pdata)
+ struct pxa_gpio_chip {
+ 	struct gpio_chip chip;
++	struct irq_domain *domain;
+ 	void __iomem	*regbase;
+-	unsigned int	irq_base;
+ 	bool		inverted;
+ 	bool		gafr;
+ 	char label[10];
+@@ -147,17 +147,7 @@ static int pxa_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
+ 	struct pxa_gpio_chip *chip = NULL;
+ 
+ 	chip = container_of(gc, struct pxa_gpio_chip, chip);
+-	return chip->irq_base + offset;
+-}
+-
+-int pxa_irq_to_gpio(struct irq_data *d)
+-{
+-	struct pxa_gpio_chip *chip;
+-	int gpio;
+-
+-	chip = (struct pxa_gpio_chip *)d->domain->host_data;
+-	gpio = d->irq - chip->irq_base + chip->chip.base;
+-	return gpio;
++	return irq_create_mapping(chip->domain, offset);
+ }
+ 
+ static int pxa_gpio_request(struct gpio_chip *gc, unsigned offset)
+@@ -270,18 +260,19 @@ static inline void update_edge_detect(struct pxa_gpio_chip *chip)
+ 
+ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
  {
- 	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
-+	int irq_base;
- 	struct pxa_gpio_chip *chips;
- 	struct device_node *next = NULL, *np = NULL;
+-	struct pxa_gpio_chip *chip;
+-	int gpio = pxa_irq_to_gpio(d);
+-	unsigned long gpdr, mask = GPIO_bit(gpio);
++	struct pxa_gpio_chip *chip = irq_data_get_irq_chip_data(d);
++	int offset = irqd_to_hwirq(d);
++	int gpio;
++	unsigned long gpdr, mask;
  
-@@ -473,12 +474,17 @@ static int pxa_init_gpio_chip(struct platform_device *pdev, int gpio_end,
+-	chip = gpio_to_pxachip(gpio);
++	mask = 1 << offset;
++	gpio = chip->chip.base + offset;
  
- 		sprintf(chips[i].label, "gpio-%d", i);
- 		chips[i].regbase = gpio_reg_base + BANK_OFF(i);
--		chips[i].set_wake = set_wake;
-+		if (pdata->gpio_set_wake)
-+			chips[i].set_wake = pdata->gpio_set_wake;
+ 	if (type == IRQ_TYPE_PROBE) {
+ 		/* Don't mess with enabled GPIOs using preconfigured edges or
+ 		 * GPIOs set to alternate function or to output during probe
+ 		 */
+-		if ((chip->irq_edge_rise | chip->irq_edge_fall)
+-			& GPIO_bit(gpio))
++		if ((chip->irq_edge_rise | chip->irq_edge_fall) & mask)
+ 			return 0;
  
- 		/* number of GPIOs on last bank may be less than 32 */
- 		gc->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
+ 		if (__gpio_is_occupied(chip, gpio))
+@@ -318,16 +309,15 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
+ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
+ {
+ 	struct pxa_gpio_chip *chip;
+-	int loop, gpio, gpio_base, n;
+-	unsigned long gedr;
+ 	struct irq_chip *ic = irq_desc_get_chip(desc);
++	int n, gpio, loop;
++	unsigned long gedr;
  
--		chips[i].irq_base = irq_alloc_descs(-1, 0, gc->ngpio, 0);
-+		if (pdata->irq_base)
-+			irq_base = pdata->irq_base + gpio;
-+		else
-+			irq_base = -1;
-+		chips[i].irq_base = irq_alloc_descs(irq_base, 0, gc->ngpio, 0);
- 		if (chips[i].irq_base < 0)
- 			return -EINVAL;
- 		if (!irq_domain_add_legacy(pdev->dev.of_node, gc->ngpio,
-@@ -557,8 +563,7 @@ static int pxa_gpio_probe(struct platform_device *pdev)
- 	/* Initialize GPIO chips */
- 	pdata = dev_get_platdata(&pdev->dev);
- 	pxa_last_gpio = pdata->nr_gpios - 1;
--	ret = pxa_init_gpio_chip(pdev, pxa_last_gpio,
--				 pdata ? pdata->gpio_set_wake : NULL);
-+	ret = pxa_init_gpio_chip(pdev, pxa_last_gpio, pdata);
- 	if (ret < 0)
- 		return ret;
+ 	chained_irq_enter(ic, desc);
  
-diff --git a/include/linux/gpio-pxa.h b/include/linux/gpio-pxa.h
-index b357fdc..0d5e6db 100644
---- a/include/linux/gpio-pxa.h
-+++ b/include/linux/gpio-pxa.h
-@@ -20,6 +20,7 @@ struct pxa_gpio_platform_data {
- 	bool inverted;	/* only valid for PXA26x */
- 	bool gafr;	/* only valid for PXA25x/PXA26x/PXA27x */
- 	unsigned nr_gpios;
-+	int irq_base;
- 	int (*gpio_set_wake)(unsigned int gpio, unsigned int on);
+ 	do {
+ 		loop = 0;
+ 		for_each_gpio_chip(gpio, chip) {
+-			gpio_base = chip->chip.base;
+ 
+ 			gedr = readl_relaxed(chip->regbase + GEDR_OFFSET);
+ 			gedr = gedr & chip->irq_mask;
+@@ -335,8 +325,8 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
+ 
+ 			for_each_set_bit(n, &gedr, BITS_PER_LONG) {
+ 				loop = 1;
+-
+-				generic_handle_irq(gpio_to_irq(gpio_base + n));
++				generic_handle_irq(pxa_gpio_to_irq(&chip->chip,
++								   n));
+ 			}
+ 		}
+ 	} while (loop);
+@@ -346,31 +336,35 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
+ 
+ static void pxa_ack_muxed_gpio(struct irq_data *d)
+ {
+-	int gpio = pxa_irq_to_gpio(d);
+-	struct pxa_gpio_chip *chip = gpio_to_pxachip(gpio);
++	struct pxa_gpio_chip *chip = irq_data_get_irq_chip_data(d);
++	int offset = irqd_to_hwirq(d);
+ 
+-	writel_relaxed(GPIO_bit(gpio), chip->regbase + GEDR_OFFSET);
++	writel_relaxed(1 << offset, chip->regbase + GEDR_OFFSET);
+ }
+ 
+ static void pxa_mask_muxed_gpio(struct irq_data *d)
+ {
+-	int gpio = pxa_irq_to_gpio(d);
+-	struct pxa_gpio_chip *chip = gpio_to_pxachip(gpio);
++	struct pxa_gpio_chip *chip = irq_data_get_irq_chip_data(d);
++	int offset = irqd_to_hwirq(d);
++	int mask;
+ 	uint32_t grer, gfer;
+ 
+-	chip->irq_mask &= ~GPIO_bit(gpio);
++	mask = 1 << offset;
++	chip->irq_mask &= ~mask;
+ 
+-	grer = readl_relaxed(chip->regbase + GRER_OFFSET) & ~GPIO_bit(gpio);
+-	gfer = readl_relaxed(chip->regbase + GFER_OFFSET) & ~GPIO_bit(gpio);
++	grer = readl_relaxed(chip->regbase + GRER_OFFSET) & ~mask;
++	gfer = readl_relaxed(chip->regbase + GFER_OFFSET) & ~mask;
+ 	writel_relaxed(grer, chip->regbase + GRER_OFFSET);
+ 	writel_relaxed(gfer, chip->regbase + GFER_OFFSET);
+ }
+ 
+ static int pxa_gpio_set_wake(struct irq_data *d, unsigned int on)
+ {
+-	int gpio = pxa_irq_to_gpio(d);
+-	struct pxa_gpio_chip *chip = gpio_to_pxachip(gpio);
++	struct pxa_gpio_chip *chip = irq_data_get_irq_chip_data(d);
++	int offset = irqd_to_hwirq(d);
++	int gpio;
+ 
++	gpio = chip->chip.base + offset;
+ 	if (chip->set_wake)
+ 		return chip->set_wake(gpio, on);
+ 	else
+@@ -379,10 +373,10 @@ static int pxa_gpio_set_wake(struct irq_data *d, unsigned int on)
+ 
+ static void pxa_unmask_muxed_gpio(struct irq_data *d)
+ {
+-	int gpio = pxa_irq_to_gpio(d);
+-	struct pxa_gpio_chip *chip = gpio_to_pxachip(gpio);
++	struct pxa_gpio_chip *chip = irq_data_get_irq_chip_data(d);
++	int offset = irqd_to_hwirq(d);
+ 
+-	chip->irq_mask |= GPIO_bit(gpio);
++	chip->irq_mask |= 1 << offset;
+ 	update_edge_detect(chip);
+ }
+ 
+@@ -395,12 +389,16 @@ static struct irq_chip pxa_muxed_gpio_chip = {
+ 	.irq_set_wake	= pxa_gpio_set_wake,
  };
  
+-static int pxa_irq_domain_map(struct irq_domain *d, unsigned int irq,
++static int pxa_irq_domain_map(struct irq_domain *d, unsigned int virq,
+ 			      irq_hw_number_t hw)
+ {
+-	irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
+-				 handle_edge_irq);
+-	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++	struct pxa_gpio_chip *chip = d->host_data;
++
++	irq_set_chip_and_handler_name(virq, &pxa_muxed_gpio_chip,
++				      handle_edge_irq, "gpio");
++	irq_set_chip_data(virq, chip);
++	irq_set_irq_type(virq, IRQ_TYPE_NONE);
++	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
+ 	return 0;
+ }
+ 
+@@ -483,13 +481,12 @@ static int pxa_init_gpio_chip(struct platform_device *pdev, int gpio_end,
+ 		if (pdata->irq_base)
+ 			irq_base = pdata->irq_base + gpio;
+ 		else
+-			irq_base = -1;
+-		chips[i].irq_base = irq_alloc_descs(irq_base, 0, gc->ngpio, 0);
+-		if (chips[i].irq_base < 0)
+-			return -EINVAL;
+-		if (!irq_domain_add_legacy(pdev->dev.of_node, gc->ngpio,
+-					   chips[i].irq_base, 0,
+-					   &pxa_irq_domain_ops, &chips[i]))
++			irq_base = 0;
++		chips[i].domain = irq_domain_add_simple(pdev->dev.of_node,
++							gc->ngpio, irq_base,
++							&pxa_irq_domain_ops,
++							&chips[i]);
++		if (!chips[i].domain)
+ 			return -ENODEV;
+ 
+ 		gc->base  = gpio;
 -- 
 1.7.10.4
