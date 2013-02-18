@@ -1,27 +1,67 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 17 Feb 2013 18:00:58 -0500
-Subject: [PATCH] ARM: Dove: fix build breakage with .timer/.init_time
-In-Reply-To: <201302171823.44808.arnd@arndb.de>
-References: <1361043816-28753-1-git-send-email-jason@lakedaemon.net>
- <201302171823.44808.arnd@arndb.de>
-Message-ID: <20130217230058.GL23237@titan.lakedaemon.net>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 18 Feb 2013 01:03:52 +0100
+Subject: [PATCH v2 0/3] ARM: S3C24XX: Add devicetree support for s3c2416
+Message-ID: <201302180103.53084.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+This is the second installment of beginning devicetree support the
+Samsung S3C24xx architectures and focuses on the s3c2416 for now.
 
-On Sun, Feb 17, 2013 at 06:23:44PM +0000, Arnd Bergmann wrote:
-> On Saturday 16 February 2013, Jason Cooper wrote:
-> > In the latest arm-soc/for-next, building dove_defconfig breaks because
-> > .timer has been replaced with .init_timer in DT_MACHINE_START.  With
-> > this fix, it builds fine.
-...
-> * if you don't want to rebase your branch, pull arm-soc/timer/cleanup
->   into it and do this change in the merge changeset, noting it down
->   in the changeset description. As above, when you send such a branch,
->   let us know of the dependency.
+Included is the devicetree support for the s3c24xx irq controller and
+basic support for smdk2416 boards, which can sucessfully boot.
 
-Done.  I'll send a follow-on pull request for mvebu/boards.  Thanks for
-the clarification.
 
-Jason.
+After the discussion with Thomas Abraham on v1 and staring to long at all of
+this, I'm not even sure if having the interrupt mapping in the binding
+is the correct way to go anymore.
+
+The key positive aspect of this solution is, that after everything is running
+via dt all the SoC specific mapping tables in the driver can go away, cutting
+its length in half.
+
+The other option would be as Thomas suggested to define specific irq-controller
+types (i.e. s3c2416-intc, s3c2443-intc, ... resulting in 16 types) and keep
+the mapping data in the code, as it is now.
+
+So I would be very thankful for a bit of guidance on what is the better way.
+
+
+The series depends on the finalized s3c24xx irq rework, which probably won't
+make it into 3.9 and also the clocksource dt support by Tomasz Figa, which
+are not in any tree yet.
+
+
+Changes since v1:
+- adapt to changes in the underlying s3c24xx irq rework
+  = more shared init code
+- use irqchip infrastructure
+- limit number of possible irq-types to not encode implementation details
+  into the binding
+- include new samsung-clocksource
+
+Heiko Stuebner (3):
+  ARM: S3C24XX: move irq driver to drivers/irqchip
+  irqchip: irq-s3c24xx: add devicetree support
+  ARM: S3C24XX: Add devicetree support and dt-board file for s3c2416 SoCs
+
+ .../interrupt-controller/samsung,s3c24xx-irq.txt   |   53 ++++++
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/s3c2416-smdk2416.dts             |   79 ++++++++
+ arch/arm/boot/dts/s3c2416.dtsi                     |  193 ++++++++++++++++++++
+ arch/arm/boot/dts/s3c24xx.dtsi                     |  165 +++++++++++++++++
+ arch/arm/mach-s3c24xx/Kconfig                      |   10 +
+ arch/arm/mach-s3c24xx/Makefile                     |    3 +-
+ arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   91 +++++++++
+ drivers/irqchip/Makefile                           |    1 +
+ .../irq.c => drivers/irqchip/irq-s3c24xx.c         |  128 +++++++++++++
+ 10 files changed, 723 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
+ create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
+ create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
+ create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
+ create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+ rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (92%)
+
+-- 
+1.7.2.3
