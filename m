@@ -1,72 +1,42 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Mon, 18 Feb 2013 16:27:32 +0530
-Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
-In-Reply-To: <alpine.LFD.2.02.1302181151040.22263@ionos>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <510FBC01.2030405@linux.vnet.ibm.com> <87haloiwv0.fsf@rustcorp.com.au>
- <51134596.4080106@linux.vnet.ibm.com>
- <20130208154113.GV17833@n2100.arm.linux.org.uk>
- <51152B81.2050501@linux.vnet.ibm.com> <51153F72.1060005@linux.vnet.ibm.com>
- <CAKfTPtCe+cD7LLkb+D6pqG1SwG2V08ws=4XO3ttHEHV2qgmqPg@mail.gmail.com>
- <5118E2CD.90401@linux.vnet.ibm.com>
- <20130211190852.GA5695@linux.vnet.ibm.com>
- <5119BDFD.1000909@linux.vnet.ibm.com>
- <CAKfTPtAo2hQTfBKTVUuLKgsGJ2ZLD0UTR3fH9UFuJwyFt4n__w@mail.gmail.com>
- <511E8F3C.2010406@linux.vnet.ibm.com>
- <CAKfTPtD=2jn1AVjuhVP1ot7_8x9-W4==hNGZET5N9tRE7gtyMw@mail.gmail.com>
- <512203B3.7090002@linux.vnet.ibm.com>
- <alpine.LFD.2.02.1302181151040.22263@ionos>
-Message-ID: <5122091C.2080308@linux.vnet.ibm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 18 Feb 2013 13:13:08 +0200
+Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
+In-Reply-To: <512208BE.7060207@ti.com>
+References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
+ <5121FCC8.7090604@ti.com> <20130218101032.GA32688@arwen.pp.htv.fi>
+ <20130218101113.GB32688@arwen.pp.htv.fi> <5122019D.9030100@ti.com>
+ <20130218104216.GC32688@arwen.pp.htv.fi>
+ <20130218104541.GD32688@arwen.pp.htv.fi> <512208BE.7060207@ti.com>
+Message-ID: <20130218111308.GE32688@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2013 04:24 PM, Thomas Gleixner wrote:
-> On Mon, 18 Feb 2013, Srivatsa S. Bhat wrote:
->> Lockup observed while running this patchset, with CPU_IDLE and INTEL_IDLE turned
->> on in the .config:
->>
->>  smpboot: CPU 1 is now offline
->> Kernel panic - not syncing: Watchdog detected hard LOCKUP on cpu 11
->> Pid: 0, comm: swapper/11 Not tainted 3.8.0-rc7+stpmch13-1 #8
->> Call Trace:
->>  [<ffffffff812aba1e>] do_raw_spin_lock+0x7e/0x150
->>  [<ffffffff815a64c1>] _raw_spin_lock_irqsave+0x61/0x70
->>  [<ffffffff810c0758>] ? clockevents_notify+0x28/0x150
->>  [<ffffffff815a6d37>] ? _raw_spin_unlock_irqrestore+0x77/0x80
->>  [<ffffffff810c0758>] clockevents_notify+0x28/0x150
->>  [<ffffffff8130459f>] intel_idle+0xaf/0xe0
->>  [<ffffffff81472ee0>] ? disable_cpuidle+0x20/0x20
->>  [<ffffffff81472ef9>] cpuidle_enter+0x19/0x20
->>  [<ffffffff814734c1>] cpuidle_wrap_enter+0x41/0xa0
->>  [<ffffffff81473530>] cpuidle_enter_tk+0x10/0x20
->>  [<ffffffff81472f17>] cpuidle_enter_state+0x17/0x50
->>  [<ffffffff81473899>] cpuidle_idle_call+0xd9/0x290
->>  [<ffffffff810203d5>] cpu_idle+0xe5/0x140
->>  [<ffffffff8159c603>] start_secondary+0xdd/0xdf
-> 
->> BUG: spinlock lockup suspected on CPU#2, migration/2/19
->>  lock: clockevents_lock+0x0/0x40, .magic: dead4ead, .owner: swapper/8/0, .owner_cpu: 8
-> 
-> Unfortunately there is no back trace for cpu8.
+Hi,
 
-Yes :-(
+On Mon, Feb 18, 2013 at 04:25:58PM +0530, Santosh Shilimkar wrote:
+> >>If I read the code correctly there's nothing setting oh->mux during DT
+> >>boot. The only caller to omap_hwmod_mux_init() (which allocates and
+> >>returns omap_hwmod_mux_info pointer) is
+> >>arch/arm/mach-omap2/devices.c::omap4_keyboard_init(). This has nothing
+> >
+> >actually arch/arm/mach-omap2/serial.c::omap_serial_init_port() also
+> >calls that, but it's also not used during DT boots.
+> >
+> DT boot, all the function pointers are broken so wakeup as well as slave
+> idle-mode is broken. Nothing new here. Serial file does set the pads
+> as you noticed and this is what can be offloaded to generic pint control
+> which can triggered from driver.
 
-I had run this several times hoping to get a backtrace on the lock-holder,
-expecting trigger_all_cpu_backtrace() to get it right at least once. But I
-hadn't succeeded even once.
+fair enough, understood now.
 
-> That's probably caused
-> by the watchdog -> panic setting.
-> 
+cheers
 
-Oh, ok..
-
-> So we have no idea why cpu2 and 11 get stuck on the clockevents_lock
-> and without that information it's impossible to decode.
-> 
-
-But thankfully, the issue seems to have been resolved by the diff I posted
-in my previous mail, along with the fixes related to memory barriers.
-
-Regards,
-Srivatsa S. Bhat
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130218/10c134e7/attachment.sig>
