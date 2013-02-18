@@ -1,37 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Feb 2013 14:44:21 +0000
-Subject: [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
-In-Reply-To: <201302181439.08639.arnd@arndb.de>
-References: <20130218134648.17303.97576.sendpatchset@w520>
- <20130218134707.17303.48589.sendpatchset@w520>
- <201302181439.08639.arnd@arndb.de>
-Message-ID: <201302181444.21717.arnd@arndb.de>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 18 Feb 2013 22:49:01 +0800
+Subject: [PATCH v3 11/12] gpio: pxa: discard irq base in pxa_gpio_chip
+In-Reply-To: <51222F14.8040306@compulab.co.il>
+References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
+ <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
+ <5121FDFC.2010107@compulab.co.il>
+ <CAD6h2NT+Qq-uD9ctXWj9LK0pZFb6NsoA0-ZT611DthhMYy4NKg@mail.gmail.com>
+ <51222F14.8040306@compulab.co.il>
+Message-ID: <CAD6h2NQQ5i1bXcn3tgciXcEOB7T84w-uFEVqNXtzK0jHNaM--g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 February 2013, Arnd Bergmann wrote:
-> Ok, this gets rid of the warning, but I'm a bit worried about
-> how it is hardwiring the fact that the SCU physical address has
-> the same bit pattern as the __iomem token.
-> 
-> While I realize that you already rely on this in a lot of places
-> in the shmobile code, I see a red light going off every time I read
-> code like this, and it is not any more logical than the previous
-> version.
-> 
-> It would be nice to keep these address spaces separate at least
-> in new code, mostly in order to not confuse reviewers with code
-> that is based on assumptions which are not generally true, but also
-> to be more flexible with the virtual memory layout. On a related
-> topic, you are using an entire 256 MB section of your virtual
-> address space for sh73a0 and sh7372 and 160 MB for r8a7740. Putting
-> less of that into the identity mapped area would free up space for
-> vmalloc, but it's hard to prove that doing this is correct when
-> you have all sorts of code using a hardcoded virtual MMIO address
-> token.
+On 18 February 2013 21:39, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>
+>
+> On 02/18/13 14:10, Haojian Zhuang wrote:
+>> On 18 February 2013 18:10, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>>> On 02/18/13 07:12, Haojian Zhuang wrote:
+>>>> Discard irq_base in struct pxa_gpio_chip. Use irq_domain instead.
+>>>>
+>>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>>> ---
+>>>>  drivers/gpio/gpio-pxa.c |   91 +++++++++++++++++++++++------------------------
+>>>>  1 file changed, 44 insertions(+), 47 deletions(-)
+>>>
+>>> [...]
+>>>
+>>>>
+>>>> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+>>>> index 35cdb23..d45cb57 100644
+>>>> --- a/drivers/gpio/gpio-pxa.c
+>>>> +++ b/drivers/gpio/gpio-pxa.c
+>>>> @@ -66,8 +66,8 @@ int pxa_last_gpio;
+>>>>
+>>>>  struct pxa_gpio_chip {
+>>>>       struct gpio_chip chip;
+>>>> +     struct irq_domain *domain;
+>>>>       void __iomem    *regbase;
+>>>> -     unsigned int    irq_base;
+>>>>       bool            inverted;
+>>>>       bool            gafr;
+>>>>       char label[10];
+>>>> @@ -147,17 +147,7 @@ static int pxa_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
+>>>>       struct pxa_gpio_chip *chip = NULL;
+>>>>
+>>>>       chip = container_of(gc, struct pxa_gpio_chip, chip);
+>>>> -     return chip->irq_base + offset;
+>>>> -}
+>>>> -
+>>>> -int pxa_irq_to_gpio(struct irq_data *d)
+>>>> -{
+>>>> -     struct pxa_gpio_chip *chip;
+>>>> -     int gpio;
+>>>> -
+>>>> -     chip = (struct pxa_gpio_chip *)d->domain->host_data;
+>>>> -     gpio = d->irq - chip->irq_base + chip->chip.base;
+>>>> -     return gpio;
+>>>> +     return irq_create_mapping(chip->domain, offset);
+>>>>  }
+>>>
+>>> You remove the pxa_irq_to_gpio() function here, but we still have:
+>>> $ grep -nr pxa_irq_to_gpio *
+>>> arch/arm/mach-pxa/pxa27x.c:368: int gpio = pxa_irq_to_gpio(d);
+>>> arch/arm/mach-pxa/pxa25x.c:292: int gpio = pxa_irq_to_gpio(d);
+>>> include/linux/gpio-pxa.h:16:extern int pxa_irq_to_gpio(struct irq_data *d);
+>>>
+>>> And this in turn breaks the compilation for example with error:
+>>> arch/arm/mach-pxa/built-in.o: In function `pxa27x_set_wake':
+>>> em-x270.c:(.text+0x1298): undefined reference to `pxa_irq_to_gpio'
+>>> make[1]: *** [vmlinux] Error 1
+>>> make: *** [sub-make] Error 2
+>>>
+>>>
+>>> --
+>>> Regards,
+>>> Igor.
+>>
+>> Thank you.
+>>
+>> Please drop this patch (11/12) for your test. Whatever it's DT or non-DT mode,
+>> gpio driver should work without this patch.
+>
+> Nope... The IRQ is still broken even if I drop this patch.
+>
+>
+> --
+> Regards,
+> Igor.
 
-To clarify my rant: I'm absolutely fine with this code going in
-for now, but I'd like to see a long-term plan about what to do
-with the hardcoded virtual address hacks.
+Could you send the full log to me?
 
-	Arnd
+Thanks
+Haojian
