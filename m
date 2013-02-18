@@ -1,37 +1,87 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 18 Feb 2013 13:33:18 +0000
-Subject: [PATCH RFC 1/7] platform: add a device node
-In-Reply-To: <20130210093708.GL17852@n2100.arm.linux.org.uk>
-References: <1360442671-15216-1-git-send-email-javier.martinez@collabora.co.uk>
- <1360442671-15216-2-git-send-email-javier.martinez@collabora.co.uk>
- <20130210010246.GA1455@kroah.com> <5116FCA1.40703@collabora.co.uk>
- <20130210093708.GL17852@n2100.arm.linux.org.uk>
-Message-ID: <CACxGe6vEjm0pe_gRNCLrGvf2_eJ-NGP+=Jwm-phm4RWBV_szUw@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 18 Feb 2013 15:39:32 +0200
+Subject: [PATCH v3 11/12] gpio: pxa: discard irq base in pxa_gpio_chip
+In-Reply-To: <CAD6h2NT+Qq-uD9ctXWj9LK0pZFb6NsoA0-ZT611DthhMYy4NKg@mail.gmail.com>
+References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
+ <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
+ <5121FDFC.2010107@compulab.co.il>
+ <CAD6h2NT+Qq-uD9ctXWj9LK0pZFb6NsoA0-ZT611DthhMYy4NKg@mail.gmail.com>
+Message-ID: <51222F14.8040306@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 10, 2013 at 9:37 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Feb 10, 2013 at 02:49:21AM +0100, Javier Martinez Canillas wrote:
->> I knew this would be controversial and that's why I didn't mean it to be a patch
->> but a RFC :)
+
+
+On 02/18/13 14:10, Haojian Zhuang wrote:
+> On 18 February 2013 18:10, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>> On 02/18/13 07:12, Haojian Zhuang wrote:
+>>> Discard irq_base in struct pxa_gpio_chip. Use irq_domain instead.
+>>>
+>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>> ---
+>>>  drivers/gpio/gpio-pxa.c |   91 +++++++++++++++++++++++------------------------
+>>>  1 file changed, 44 insertions(+), 47 deletions(-)
 >>
->> The problem basically is that you have to associate the platform device with its
->> corresponding DT device node because it can be used in the driver probe function.
->
-> When DT is being used, doesn't DT create the platform devices for you,
-> with the device node already set correctly?
->
-> Manually creating platform devices and adding DT nodes to it sounds like
-> the wrong thing to be doing.
+>> [...]
+>>
+>>>
+>>> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+>>> index 35cdb23..d45cb57 100644
+>>> --- a/drivers/gpio/gpio-pxa.c
+>>> +++ b/drivers/gpio/gpio-pxa.c
+>>> @@ -66,8 +66,8 @@ int pxa_last_gpio;
+>>>
+>>>  struct pxa_gpio_chip {
+>>>       struct gpio_chip chip;
+>>> +     struct irq_domain *domain;
+>>>       void __iomem    *regbase;
+>>> -     unsigned int    irq_base;
+>>>       bool            inverted;
+>>>       bool            gafr;
+>>>       char label[10];
+>>> @@ -147,17 +147,7 @@ static int pxa_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
+>>>       struct pxa_gpio_chip *chip = NULL;
+>>>
+>>>       chip = container_of(gc, struct pxa_gpio_chip, chip);
+>>> -     return chip->irq_base + offset;
+>>> -}
+>>> -
+>>> -int pxa_irq_to_gpio(struct irq_data *d)
+>>> -{
+>>> -     struct pxa_gpio_chip *chip;
+>>> -     int gpio;
+>>> -
+>>> -     chip = (struct pxa_gpio_chip *)d->domain->host_data;
+>>> -     gpio = d->irq - chip->irq_base + chip->chip.base;
+>>> -     return gpio;
+>>> +     return irq_create_mapping(chip->domain, offset);
+>>>  }
+>>
+>> You remove the pxa_irq_to_gpio() function here, but we still have:
+>> $ grep -nr pxa_irq_to_gpio *
+>> arch/arm/mach-pxa/pxa27x.c:368: int gpio = pxa_irq_to_gpio(d);
+>> arch/arm/mach-pxa/pxa25x.c:292: int gpio = pxa_irq_to_gpio(d);
+>> include/linux/gpio-pxa.h:16:extern int pxa_irq_to_gpio(struct irq_data *d);
+>>
+>> And this in turn breaks the compilation for example with error:
+>> arch/arm/mach-pxa/built-in.o: In function `pxa27x_set_wake':
+>> em-x270.c:(.text+0x1298): undefined reference to `pxa_irq_to_gpio'
+>> make[1]: *** [vmlinux] Error 1
+>> make: *** [sub-make] Error 2
+>>
+>>
+>> --
+>> Regards,
+>> Igor.
+> 
+> Thank you.
+> 
+> Please drop this patch (11/12) for your test. Whatever it's DT or non-DT mode,
+> gpio driver should work without this patch.
 
-Right; I'd expect your platform device creation to go through the
-of_platform_populate() route. What is your use-case?
-
-g.
-
+Nope... The IRQ is still broken even if I drop this patch.
 
 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Regards,
+Igor.
