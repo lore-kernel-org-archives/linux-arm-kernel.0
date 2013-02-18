@@ -1,34 +1,36 @@
 From: wni@nvidia.com (Wei Ni)
-Date: Mon, 18 Feb 2013 19:30:31 +0800
-Subject: [RFC PATCH 9/9] ARM: tegra: defconfig: enable thermal framework
+Date: Mon, 18 Feb 2013 19:30:23 +0800
+Subject: [RFC PATCH 1/9] ARM: dt: t30 cardhu: add dt entry for lm90
 In-Reply-To: <1361187031-3679-1-git-send-email-wni@nvidia.com>
 References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
-Message-ID: <1361187031-3679-10-git-send-email-wni@nvidia.com>
+Message-ID: <1361187031-3679-2-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable tegra30 thermal framework.
-New options enabled:
-* TEGRA30_THERMAL: for tegra30 thermal framework.
-* THERMAL: dependency for TEGRA30_THERMAL.
+Enable thermal sensor lm90 in the dts file.
 
 Signed-off-by: Wei Ni <wni@nvidia.com>
 ---
- arch/arm/configs/tegra_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/tegra30-cardhu.dtsi |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index a7827fd..4aa3356 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -128,6 +128,8 @@ CONFIG_GPIO_TPS65910=y
- CONFIG_POWER_SUPPLY=y
- CONFIG_BATTERY_SBS=y
- CONFIG_SENSORS_LM90=y
-+CONFIG_THERMAL=y
-+CONFIG_TEGRA30_THERMAL=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_MFD_TPS65910=y
- CONFIG_MFD_MAX8907=y
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index bdb2a66..15ad1ad 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -273,6 +273,13 @@
+ 				};
+ 			};
+ 		};
++
++		nct1008: lm90 at 4c {
++			compatible = "lm90";
++			reg = <0x4c>;
++			interrupt-parent = <&gpio>;
++			interrupts = <226 0x08>; /* gpio PCC2 */
++		};
+ 	};
+ 
+ 	spi at 7000da00 {
 -- 
 1.7.9.5
