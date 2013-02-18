@@ -1,34 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 17 Feb 2013 16:50:49 -0800
-Subject: [GIT PULL] at91: more DT changes related to MTD for 3.9
-In-Reply-To: <511B78C5.5030209@atmel.com>
-References: <511B78C5.5030209@atmel.com>
-Message-ID: <20130218005049.GD4615@quad.lixom.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Feb 2013 09:52:48 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Correct TMU clock support again
+In-Reply-To: <20130215135324.GG27724@verge.net.au>
+References: <1360813381-3416-1-git-send-email-horms+renesas@verge.net.au>
+ <87a9r7v8xd.wl%kuninori.morimoto.gx@renesas.com>
+ <CANqRtoQtROi1cD3MmykhKLqY+1Y2=f+1Qkmw2bjAaP6yZRPW=Q@mail.gmail.com>
+ <20130214041651.GB6036@verge.net.au>
+ <20130214091040.GG6088@linux-sh.org>
+ <20130214160842.GC26810@verge.net.au>
+ <20130214161811.GC3882@linux-sh.org>
+ <20130215135324.GG27724@verge.net.au>
+Message-ID: <20130218005248.GF7176@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 12:28:05PM +0100, Nicolas Ferre wrote:
-> Hi Olof, Arnd,
+On Fri, Feb 15, 2013 at 10:53:24PM +0900, Simon Horman wrote:
+> On Fri, Feb 15, 2013 at 01:18:11AM +0900, Paul Mundt wrote:
+> > On Fri, Feb 15, 2013 at 01:08:42AM +0900, Simon Horman wrote:
+> > > On Thu, Feb 14, 2013 at 06:10:40PM +0900, Paul Mundt wrote:
+> > > > On Thu, Feb 14, 2013 at 01:16:52PM +0900, Simon Horman wrote:
+> > > > > Ok, so in that case the correct value for "sh_tmu.2" might actually
+> > > > > be MSTP016 or MSTP015 depending on the bundle size. I am unsure how to test
+> > > > > sh_tmu.2.
+> > 
+> > [snip]
+> > 
+> > > Getting that information correct for sh_tmu.2 on the r8a7779 problem I'm
+> > > not completely sure of the correct answer to. Though I now strongly suspect
+> > > it is MSTP016.
+> > 
+> > Testing shouldn't be that difficult, just switch your clocksource to it
+> > and make sure all TMU-related MSTP bits are first cleared?
 > 
-> I would like you to consider this little pull request for modification of some
-> AT91 Device Tree files.
-> We have had a discussion about this material earlier and now that Artem has queued
-> the driver modifications for MTD, I would like to know if it is possible to
-> add these two patches in your late/dt branch?
+> Thanks, I will try that.
 
-Note that unless you break existing bindings (which you should never, or very
-very rarely do), adding the new contents doesn't have to wait for the driver
-changes. As long as the bindings are settled, the DT changes can go in.
-
-> The following changes since commit 88b62b915b0b7e25870eb0604ed9a92ba4bfc9f7:
-> 
->   Linux 3.8-rc6 (2013-02-01 12:08:14 +1100)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-dt-late
-
-Pulled, thanks.
-
-
--Olof
+Thanks again. I did try this and it appears to work.
