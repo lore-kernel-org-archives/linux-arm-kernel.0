@@ -1,51 +1,102 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Feb 2013 11:14:10 +0000
-Subject: arm64 defconfig breakage (gpio) in next-20130218
-Message-ID: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 18 Feb 2013 12:20:24 +0100
+Subject: [PATCH V2] ARM: dts: omap3-devkit8000: Enable audio support
+In-Reply-To: <1361000036-18121-1-git-send-email-anilk4.v@gmail.com>
+References: <1361000036-18121-1-git-send-email-anilk4.v@gmail.com>
+Message-ID: <51220E78.5000409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 02/16/2013 08:33 AM, Anil Kumar wrote:
+> Add the needed sections to enable audio support on
+> Devkit8000 when booted with DT blob.
+> 
+> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
 
-When I attempt to build a defconfig arm64 kernel from next-20130218, it fails
-with the following complaints from gcc:
+Looks good:
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-In file included from include/linux/gpio.h:48:0,
-                 from drivers/gpio/devres.c:18:
-include/asm-generic/gpio.h: In function ?gpio_get_value_cansleep?:
-include/asm-generic/gpio.h:270:2: error: implicit declaration of function ?__gpio_get_value? [-Werror=implicit-function-declaration]
-include/asm-generic/gpio.h: In function ?gpio_set_value_cansleep?:
-include/asm-generic/gpio.h:276:2: error: implicit declaration of function ?__gpio_set_value? [-Werror=implicit-function-declaration]
-In file included from drivers/gpio/devres.c:18:0:
-include/linux/gpio.h: At top level:
-include/linux/gpio.h:60:19: error: redefinition of ?gpio_cansleep?
-In file included from include/linux/gpio.h:48:0,
-                 from drivers/gpio/devres.c:18:
-include/asm-generic/gpio.h:262:19: note: previous definition of ?gpio_cansleep? was here
-In file included from drivers/gpio/devres.c:18:0:
-include/linux/gpio.h: In function ?gpio_cansleep?:
-include/linux/gpio.h:62:2: error: implicit declaration of function ?__gpio_cansleep? [-Werror=implicit-function-declaration]
-include/linux/gpio.h: In function ?gpio_to_irq?:
-include/linux/gpio.h:67:2: error: implicit declaration of function ?__gpio_to_irq? [-Werror=implicit-function-declaration]
-drivers/gpio/devres.c: In function ?devm_gpio_release?:
-drivers/gpio/devres.c:26:2: error: implicit declaration of function ?gpio_free? [-Werror=implicit-function-declaration]
-drivers/gpio/devres.c: In function ?devm_gpio_request?:
-drivers/gpio/devres.c:60:2: error: implicit declaration of function ?gpio_request? [-Werror=implicit-function-declaration]
-drivers/gpio/devres.c: In function ?devm_gpio_request_one?:
-drivers/gpio/devres.c:90:2: error: implicit declaration of function ?gpio_request_one? [-Werror=implicit-function-declaration]
-cc1: some warnings being treated as errors
-make[2]: *** [drivers/gpio/devres.o] Error 1
-make[1]: *** [drivers/gpio] Error 2
+> ---
+> This patch is based on top of kernel 3.8-rc5 and
+> the following patches.
+> 
+> Peter Ujfalusi:-
+> ASoC: twl4030: Correct the support for Voice port
+> ASoC: twl4030: Convert MICBIAS to SUPPLY widget
+> ASoC: omap-twl4030: Add support for routing, voice port and jack detect
+> 
+> Anil Kumar:-
+> ARM: dts: add minimal DT support for DevKit8000
+> https://patchwork.kernel.org/patch/2122461/
+> 
+> -Tested for playback and capture on Devkit8000.
+> 
+>  Test process:-
+> 
+>  #amixer set 'PredriveR Mixer AudioR2' on
+>  #amixer set 'PredriveL Mixer AudioL2' on
+>  #amixer set PreDriv 100 unmute
+>  #amixer set 'DAC2 Digital Fine' 100
+>  #amixer cset numid=27 1
+>  #arecord | aplay
+> 
+> For V2:
+>  - Remove pin mux as done at device boot time by default.
+> 
+> :100644 100644 6338993... c70116f... M	arch/arm/boot/dts/omap3-devkit8000.dts
+>  arch/arm/boot/dts/omap3-devkit8000.dts |   23 +++++++++++++++++++----
+>  1 files changed, 19 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+> index 6338993..c70116f 100644
+> --- a/arch/arm/boot/dts/omap3-devkit8000.dts
+> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+> @@ -42,6 +42,19 @@
+>                  };
+>  
+>  	};
+> +
+> +	sound {
+> +		compatible = "ti,omap-twl4030";
+> +		ti,model = "devkit8000";
+> +
+> +		ti,mcbsp = <&mcbsp2>;
+> +		ti,codec = <&twl_audio>;
+> +		ti,audio-routing =
+> +			"Ext Spk", "PREDRIVEL",
+> +			"Ext Spk", "PREDRIVER",
+> +			"MAINMIC", "Main Mic",
+> +			"Main Mic", "Mic Bias 1";
+> +	};
+>  };
+>  
+>  &i2c1 {
+> @@ -51,6 +64,12 @@
+>  		reg = <0x48>;
+>  		interrupts = <7>;	/* SYS_NIRQ cascaded to intc */
+>  		interrupt-parent = <&intc>;
+> +
+> +		twl_audio: audio {
+> +			compatible = "ti,twl4030-audio";
+> +			codec {
+> +			};
+> +		};
+>  	};
+>  };
+>  
+> @@ -86,10 +105,6 @@
+>  	status = "disabled";
+>  };
+>  
+> -&mcbsp2 {
+> -	status = "disabled";
+> -};
+> -
+>  &mcbsp3 {
+>  	status = "disabled";
+>  };
+> 
 
-I've bisected this down to 0fa2fd9a0d: "Merge branch 'linusw/devel' of
-git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git into
-gpio/next". Both parent commits build fine.
 
-I've played around a bit, and selecting ARCH_REQUIRE_GPIOLIB in the arm64
-Kconfig fixes the issue, but I'm unfamilar with gpio{,lib} and I'm not sure
-that's the best/correct way of solving this.
-
-Thoughts?
-
-Thanks,
-Mark.
+-- 
+P?ter
