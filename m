@@ -1,67 +1,51 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Mon, 18 Feb 2013 01:03:52 +0100
-Subject: [PATCH v2 0/3] ARM: S3C24XX: Add devicetree support for s3c2416
-Message-ID: <201302180103.53084.heiko@sntech.de>
+Date: Mon, 18 Feb 2013 01:05:18 +0100
+Subject: [PATCH v2 1/3] ARM: S3C24XX: move irq driver to drivers/irqchip
+In-Reply-To: <201302180103.53084.heiko@sntech.de>
+References: <201302180103.53084.heiko@sntech.de>
+Message-ID: <201302180105.18751.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second installment of beginning devicetree support the
-Samsung S3C24xx architectures and focuses on the s3c2416 for now.
+This move is necessary to make use of the irqchip infrastructure
+for the following devicetree support for s3c24xx architectures.
 
-Included is the devicetree support for the s3c24xx irq controller and
-basic support for smdk2416 boards, which can sucessfully boot.
-
-
-After the discussion with Thomas Abraham on v1 and staring to long at all of
-this, I'm not even sure if having the interrupt mapping in the binding
-is the correct way to go anymore.
-
-The key positive aspect of this solution is, that after everything is running
-via dt all the SoC specific mapping tables in the driver can go away, cutting
-its length in half.
-
-The other option would be as Thomas suggested to define specific irq-controller
-types (i.e. s3c2416-intc, s3c2443-intc, ... resulting in 16 types) and keep
-the mapping data in the code, as it is now.
-
-So I would be very thankful for a bit of guidance on what is the better way.
-
-
-The series depends on the finalized s3c24xx irq rework, which probably won't
-make it into 3.9 and also the clocksource dt support by Tomasz Figa, which
-are not in any tree yet.
-
-
-Changes since v1:
-- adapt to changes in the underlying s3c24xx irq rework
-  = more shared init code
-- use irqchip infrastructure
-- limit number of possible irq-types to not encode implementation details
-  into the binding
-- include new samsung-clocksource
-
-Heiko Stuebner (3):
-  ARM: S3C24XX: move irq driver to drivers/irqchip
-  irqchip: irq-s3c24xx: add devicetree support
-  ARM: S3C24XX: Add devicetree support and dt-board file for s3c2416 SoCs
-
- .../interrupt-controller/samsung,s3c24xx-irq.txt   |   53 ++++++
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/s3c2416-smdk2416.dts             |   79 ++++++++
- arch/arm/boot/dts/s3c2416.dtsi                     |  193 ++++++++++++++++++++
- arch/arm/boot/dts/s3c24xx.dtsi                     |  165 +++++++++++++++++
- arch/arm/mach-s3c24xx/Kconfig                      |   10 +
- arch/arm/mach-s3c24xx/Makefile                     |    3 +-
- arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   91 +++++++++
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-s3c24xx/Makefile                     |    2 +-
  drivers/irqchip/Makefile                           |    1 +
- .../irq.c => drivers/irqchip/irq-s3c24xx.c         |  128 +++++++++++++
- 10 files changed, 723 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
- create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
- create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
- create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
- create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
- rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (92%)
+ .../irq.c => drivers/irqchip/irq-s3c24xx.c         |    0
+ 3 files changed, 2 insertions(+), 1 deletions(-)
+ rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (100%)
 
+diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
+index be6e4d0..6f46ecf 100644
+--- a/arch/arm/mach-s3c24xx/Makefile
++++ b/arch/arm/mach-s3c24xx/Makefile
+@@ -14,7 +14,7 @@ obj-				:=
+ 
+ # core
+ 
+-obj-y				+= common.o irq.o
++obj-y				+= common.o
+ 
+ obj-$(CONFIG_CPU_S3C2410)	+= s3c2410.o
+ obj-$(CONFIG_S3C2410_CPUFREQ)	+= cpufreq-s3c2410.o
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 06ef5a3..073324c 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+ obj-$(CONFIG_METAG)			+= irq-metag-ext.o
+ obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
+ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
++obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.c
+ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi.o
+ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
+ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o
+diff --git a/arch/arm/mach-s3c24xx/irq.c b/drivers/irqchip/irq-s3c24xx.c
+similarity index 100%
+rename from arch/arm/mach-s3c24xx/irq.c
+rename to drivers/irqchip/irq-s3c24xx.c
 -- 
 1.7.2.3
