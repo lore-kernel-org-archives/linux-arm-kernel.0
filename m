@@ -1,158 +1,132 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 18 Feb 2013 01:10:26 -0500
-Subject: [V7 PATCH 04/16] usb: otg: mv_otg: use PHY driver for otg
+Date: Mon, 18 Feb 2013 01:10:25 -0500
+Subject: [V7 PATCH 03/16] usb: ehci: ehci-mv: use PHY driver for ehci
 In-Reply-To: <1361167838-22929-1-git-send-email-chao.xie@marvell.com>
 References: <1361167838-22929-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1361167838-22929-5-git-send-email-chao.xie@marvell.com>
+Message-ID: <1361167838-22929-4-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originaly, otg driver will call the callbacks in platform data
+Originaly, ehci driver will call the callbacks in platform data
 for PHY initialization and shut down.
 With PHY driver, it will call the APIs provided by PHY driver
 for PHY initialization and shut down. It removes the callbacks
 in platform data, and at same time it removes one block in the
-way of enabling device tree for otg driver.
+way of enabling device tree for ehci driver.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/otg/mv_otg.c |   51 ++++++++++++++++++----------------------------
- drivers/usb/otg/mv_otg.h |    2 +-
- 2 files changed, 21 insertions(+), 32 deletions(-)
+ drivers/usb/host/ehci-mv.c |   46 ++++++++++++++-----------------------------
+ 1 files changed, 15 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
-index b6a9be3..d59080b 100644
---- a/drivers/usb/otg/mv_otg.c
-+++ b/drivers/usb/otg/mv_otg.c
-@@ -25,6 +25,7 @@
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 3065809..1d5fd0b 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -15,17 +15,18 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
  #include <linux/usb/otg.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/hcd.h>
 +#include <linux/usb/mv_usb2.h>
  #include <linux/platform_data/mv_usb.h>
  
- #include "mv_otg.h"
-@@ -261,14 +262,12 @@ static int mv_otg_enable_internal(struct mv_otg *mvotg)
- 	dev_dbg(&mvotg->pdev->dev, "otg enabled\n");
+ #define CAPLENGTH_MASK         (0xff)
  
- 	otg_clock_enable(mvotg);
--	if (mvotg->pdata->phy_init) {
--		retval = mvotg->pdata->phy_init(mvotg->phy_regs);
--		if (retval) {
--			dev_err(&mvotg->pdev->dev,
--				"init phy error %d\n", retval);
--			otg_clock_disable(mvotg);
--			return retval;
--		}
-+	retval = usb_phy_init(mvotg->outer_phy);
-+	if (retval) {
-+		dev_err(&mvotg->pdev->dev,
-+			"init phy error %d\n", retval);
-+		otg_clock_disable(mvotg);
-+		return retval;
- 	}
- 	mvotg->active = 1;
+ struct ehci_hcd_mv {
+ 	struct usb_hcd *hcd;
++	struct usb_phy *phy;
  
-@@ -288,8 +287,7 @@ static void mv_otg_disable_internal(struct mv_otg *mvotg)
+ 	/* Which mode does this ehci running OTG/Host ? */
+ 	int mode;
+ 
+-	void __iomem *phy_regs;
+ 	void __iomem *cap_regs;
+ 	void __iomem *op_regs;
+ 
+@@ -56,22 +57,15 @@ static void ehci_clock_disable(struct ehci_hcd_mv *ehci_mv)
+ 
+ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
  {
- 	if (mvotg->active) {
- 		dev_dbg(&mvotg->pdev->dev, "otg disabled\n");
--		if (mvotg->pdata->phy_deinit)
--			mvotg->pdata->phy_deinit(mvotg->phy_regs);
-+		usb_phy_shutdown(mvotg->outer_phy);
- 		otg_clock_disable(mvotg);
- 		mvotg->active = 0;
+-	int retval;
+-
+ 	ehci_clock_enable(ehci_mv);
+-	if (ehci_mv->pdata->phy_init) {
+-		retval = ehci_mv->pdata->phy_init(ehci_mv->phy_regs);
+-		if (retval)
+-			return retval;
+-	}
+ 
+-	return 0;
++	return usb_phy_init(ehci_mv->phy);
+ }
+ 
+ static void mv_ehci_disable(struct ehci_hcd_mv *ehci_mv)
+ {
+-	if (ehci_mv->pdata->phy_deinit)
+-		ehci_mv->pdata->phy_deinit(ehci_mv->phy_regs);
++	usb_phy_shutdown(ehci_mv->phy);
++
+ 	ehci_clock_disable(ehci_mv);
+ }
+ 
+@@ -184,22 +178,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		}
  	}
-@@ -672,7 +670,6 @@ int mv_otg_remove(struct platform_device *pdev)
  
- 	mv_otg_disable(mvotg);
- 
--	usb_remove_phy(&mvotg->phy);
- 	platform_set_drvdata(pdev, NULL);
- 
- 	return 0;
-@@ -741,23 +738,8 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	for (i = 0; i < OTG_TIMER_NUM; i++)
- 		init_timer(&mvotg->otg_ctrl.timer[i]);
- 
--	r = platform_get_resource_byname(mvotg->pdev,
--					 IORESOURCE_MEM, "phyregs");
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
 -	if (r == NULL) {
 -		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
 -		retval = -ENODEV;
--		goto err_destroy_workqueue;
+-		goto err_clear_drvdata;
 -	}
 -
--	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (mvotg->phy_regs == NULL) {
+-	ehci_mv->phy_regs = devm_ioremap(&pdev->dev, r->start,
+-					 resource_size(r));
+-	if (ehci_mv->phy_regs == 0) {
 -		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
 -		retval = -EFAULT;
--		goto err_destroy_workqueue;
+-		goto err_clear_drvdata;
 -	}
 -
--	r = platform_get_resource_byname(mvotg->pdev,
--					 IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(mvotg->pdev,
-+					 IORESOURCE_MEM, 0);
- 	if (r == NULL) {
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!r) {
  		dev_err(&pdev->dev, "no I/O memory resource defined\n");
  		retval = -ENODEV;
-@@ -770,6 +752,13 @@ static int mv_otg_probe(struct platform_device *pdev)
- 		retval = -EFAULT;
- 		goto err_destroy_workqueue;
+@@ -214,6 +193,13 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		goto err_clear_drvdata;
  	}
-+	mvotg->outer_phy = devm_usb_get_phy_dev(&pdev->dev, 0);
-+	if (IS_ERR_OR_NULL(mvotg->outer_phy)) {
-+		mvotg->outer_phy = NULL;
+ 
++	ehci_mv->phy = devm_usb_get_phy_dev(&pdev->dev, MV_USB2_PHY_INDEX);
++	if (IS_ERR_OR_NULL(ehci_mv->phy)) {
++		ehci_mv->phy = NULL;
 +		retval = -ENODEV;
-+		dev_err(&pdev->dev, "can not find outer phy\n");
-+		goto err_destroy_workqueue;
++		goto err_clear_drvdata;
 +	}
- 
- 	/* we will acces controller register, so enable the udc controller */
- 	retval = mv_otg_enable_internal(mvotg);
-@@ -830,7 +819,7 @@ static int mv_otg_probe(struct platform_device *pdev)
- 		goto err_disable_clk;
++
+ 	retval = mv_ehci_enable(ehci_mv);
+ 	if (retval) {
+ 		dev_err(&pdev->dev, "init phy error %d\n", retval);
+@@ -241,7 +227,8 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	ehci_mv->mode = pdata->mode;
+ 	if (ehci_mv->mode == MV_USB_MODE_OTG) {
+ #ifdef CONFIG_USB_OTG_UTILS
+-		ehci_mv->otg = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
++		ehci_mv->otg = devm_usb_get_phy_dev(&pdev->dev,
++						MV_USB2_OTG_PHY_INDEX);
+ 		if (IS_ERR_OR_NULL(ehci_mv->otg)) {
+ 			dev_err(&pdev->dev,
+ 				"unable to find transceiver\n");
+@@ -275,9 +262,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		}
  	}
  
--	retval = usb_add_phy(&mvotg->phy, USB_PHY_TYPE_USB2);
-+	retval = usb_add_phy_dev(&mvotg->phy);
- 	if (retval < 0) {
- 		dev_err(&pdev->dev, "can't register transceiver, %d\n",
- 			retval);
-@@ -841,7 +830,7 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	if (retval < 0) {
- 		dev_dbg(&pdev->dev,
- 			"Can't register sysfs attr group: %d\n", retval);
--		goto err_remove_phy;
-+		goto err_remove_otg_phy;
- 	}
- 
- 	spin_lock_init(&mvotg->wq_lock);
-@@ -856,7 +845,7 @@ static int mv_otg_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--err_remove_phy:
-+err_remove_otg_phy:
- 	usb_remove_phy(&mvotg->phy);
- err_disable_clk:
- 	mv_otg_disable_internal(mvotg);
-diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
-index 8a9e351..65e7fd1 100644
---- a/drivers/usb/otg/mv_otg.h
-+++ b/drivers/usb/otg/mv_otg.h
-@@ -137,10 +137,10 @@ struct mv_otg_regs {
- 
- struct mv_otg {
- 	struct usb_phy phy;
-+	struct usb_phy *outer_phy;
- 	struct mv_otg_ctrl otg_ctrl;
- 
- 	/* base address */
--	void __iomem *phy_regs;
- 	void __iomem *cap_regs;
- 	struct mv_otg_regs __iomem *op_regs;
- 
+-	if (pdata->private_init)
+-		pdata->private_init(ehci_mv->op_regs, ehci_mv->phy_regs);
+-
+ 	dev_info(&pdev->dev,
+ 		 "successful find EHCI device with regs 0x%p irq %d"
+ 		 " working in %s mode\n", hcd->regs, hcd->irq,
 -- 
 1.7.4.1
