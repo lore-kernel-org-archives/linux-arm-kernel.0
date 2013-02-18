@@ -1,68 +1,39 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 18 Feb 2013 23:21:19 +0900
-Subject: [PATCH 2/4] ARM: mach-shmobile: r8a7779: add SATA support
-In-Reply-To: <51223584.5080709@cogentembedded.com>
-References: <201302170143.36052.sergei.shtylyov@cogentembedded.com>
- <874nhao1nx.wl%kuninori.morimoto.gx@renesas.com>
- <51223584.5080709@cogentembedded.com>
-Message-ID: <CANqRtoRdTMN=KgP4CypF+mpTN4HOSKrDAoq2pr4Pd3t-zarSjA@mail.gmail.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Mon, 18 Feb 2013 23:34:36 +0900
+Subject: [BUG arm-soc] mvneta: tx queue done sometimes causes kernel
+ panic
+In-Reply-To: <20130216022043.65d5c940@skate>
+References: <511DE679.5080801@hitachi.com>
+ <1360947132.19353.15.camel@edumazet-glaptop> <20130216022043.65d5c940@skate>
+Message-ID: <51223BFC.3000408@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+(2013/02/16 10:20), Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Fri, 15 Feb 2013 08:52:12 -0800, Eric Dumazet wrote:
+> 
+>> Driver is buggy, as TX completion can happen both from ndo_start_xmit()
+>> and a timer, and there is no spinlock or appropriate synchro.
+> 
+> Yes, it is a known issue. I did post a patch fixing the problem on
+> netdev@ a while ago [1], but while it was fixing the problem, it wasn't
+> considered the right approach. Being busy with other Marvell Armada
+> 370/XP developments, I haven't yet had the time to investigate the
+> issue again.
+> 
+> [1] https://patchwork.kernel.org/patch/1941601/
 
-Thanks for your efforts with this SATA driver.
+Thank you for pointing that.
 
-On Mon, Feb 18, 2013 at 11:07 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 18-02-2013 5:23, Kuninori Morimoto wrote:
->>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> Add SATA clock and platform device resources on r8a7779 SoC.
->>> Add entry to r8a7779_auxdata_lookup[], so that devm_clk_get() in the
->>> driver
->>> still works when we're using the device tree.
->
->
->>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> (snip)
->
->
->>>         /* MSTP32 clocks */
->>> +       CLKDEV_DEV_ID("sata_rcar", &mstp_clks[MSTP115]), /* SATA */
->>>         CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB
->>> EHCI port2 */
->>>         CLKDEV_DEV_ID("ohci-platform.1", &mstp_clks[MSTP101]), /* USB
->>> OHCI port2 */
->>>         CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB
->>> EHCI port0/1 */
->>
->> (snip)
->>>
->>>   static const struct of_dev_auxdata r8a7779_auxdata_lookup[] __initconst
->>> = {
->>> +       OF_DEV_AUXDATA("renesas,rcar-sata", 0xfc600000, "sata_rcar",
->>> NULL),
->
->
->> ??
->> Is this settings really required for DT ??
->
->
->    Yes, TTBOMK, it's the last resort measure used in exctly this case.
+I've tried the above patch and found at least this panic
+disappeared (even if it was not the right approach).
 
-Well, I have to agree with Morimoto-san here. Other vendors may chose
-to use AUXDATA to map clocks, and I believe it makes sense in the case
-of adding platform data as a workaround during transition to full DT
-support. But for simply mapping clocks please follow the same style as
-we have done so far, which is what Morimoto-san pointed out:
+Thanks again!
 
-CLKDEV_DEV_ID("fc600000.sata_rcar", &mstp_clks[MSTP115]),
-
-Also, I don't think SATA is needed as an early device so it should be
-enough to register it late as a regular platform device. =)
-
-Thanks,
-
-/ magnus
+-- 
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
