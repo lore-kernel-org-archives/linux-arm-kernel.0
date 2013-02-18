@@ -1,112 +1,43 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 18 Feb 2013 13:51:18 +0530
-Subject: [PATCH v6 08/16] ARM: Exynos4: allow legacy board support to specify
- xxti and xusbxti clock speed
+Date: Mon, 18 Feb 2013 13:51:20 +0530
+Subject: [PATCH v6 10/16] clocksource: mct: use fin_pll clock as the tick
+ clock source for mct
 In-Reply-To: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
 References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1361175686-19400-9-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1361175686-19400-11-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock speed of xxti and xusbxti clocks depends on the oscillator used on the
-board to generate these clocks. For non-dt platforms, allow the board support
-for those platforms to set the clock frequency of xxti and xusbxti clocks.
+With the migration of Exynos4 clocks to use common clock framework, the old
+styled 'xtal' clock is not used anymore. Instead, the clock 'fin_pll' is used
+as the tick clock for mct controller.
 
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos/common.c              |    3 +++
- arch/arm/mach-exynos/common.h              |    1 +
- arch/arm/mach-exynos/mach-nuri.c           |    2 ++
- arch/arm/mach-exynos/mach-origen.c         |    2 ++
- arch/arm/mach-exynos/mach-smdkv310.c       |    2 ++
- arch/arm/mach-exynos/mach-universal_c210.c |    2 ++
- 6 files changed, 12 insertions(+), 0 deletions(-)
+ drivers/clocksource/exynos_mct.c |    9 ++++++---
+ 1 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 64585af..974978b 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -68,6 +68,8 @@ static void exynos5440_map_io(void);
- static void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
- static int exynos_init(void);
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index e067130..8f84c42 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -480,10 +480,13 @@ static struct local_timer_ops exynos4_mct_tick_ops __cpuinitdata = {
  
-+unsigned long xxti_f = 0, xusbxti_f = 0;
-+
- static struct cpu_table cpu_ids[] __initdata = {
- 	{
- 		.idcode		= EXYNOS4210_CPU_ID,
-@@ -448,6 +450,7 @@ void __init exynos_init_time(void)
- 	} else {
- 		/* todo: remove after migrating legacy E4 platforms to dt */
- 		exynos4_clk_init(NULL);
-+		exynos4_clk_register_fixed_ext(xxti_f, xusbxti_f);
- 		mct_init();
- 	}
- }
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 2c3cdae..8d9ae73 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -16,6 +16,7 @@
- 
- extern void mct_init(void);
- void exynos_init_time(void);
-+extern unsigned long xxti_f, xusbxti_f;
- 
- struct map_desc;
- void exynos_init_io(struct map_desc *mach_desc, int size);
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index cdae74b..abe36ec 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -1332,6 +1332,8 @@ static void __init nuri_map_io(void)
+ static void __init exynos4_timer_resources(struct device_node *np)
  {
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_uarts(nuri_uartcfgs, ARRAY_SIZE(nuri_uartcfgs));
-+	xxti_f = 0;
-+	xusbxti_f = 24000000;
- }
+-	struct clk *mct_clk;
+-	mct_clk = clk_get(NULL, "xtal");
++	struct clk *tick_clk;
  
- static void __init nuri_reserve(void)
-diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-index e9ab921..e7b36ca 100644
---- a/arch/arm/mach-exynos/mach-origen.c
-+++ b/arch/arm/mach-exynos/mach-origen.c
-@@ -756,6 +756,8 @@ static void __init origen_map_io(void)
- {
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_uarts(origen_uartcfgs, ARRAY_SIZE(origen_uartcfgs));
-+	xxti_f = 0;
-+	xusbxti_f = 24000000;
- }
+-	clk_rate = clk_get_rate(mct_clk);
++	tick_clk = np ? of_clk_get_by_name(np, "fin_pll") :
++				clk_get(NULL, "fin_pll");
++	if (IS_ERR(tick_clk))
++		panic("%s: unable to determine tick clock rate\n", __func__);
++	clk_rate = clk_get_rate(tick_clk);
  
- static void __init origen_power_init(void)
-diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
-index eb51c06..d146393 100644
---- a/arch/arm/mach-exynos/mach-smdkv310.c
-+++ b/arch/arm/mach-exynos/mach-smdkv310.c
-@@ -373,6 +373,8 @@ static void __init smdkv310_map_io(void)
- {
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_uarts(smdkv310_uartcfgs, ARRAY_SIZE(smdkv310_uartcfgs));
-+	xxti_f = 12000000;
-+	xusbxti_f = 24000000;
- }
- 
- static void __init smdkv310_reserve(void)
-diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-index 53de074..8cc315e 100644
---- a/arch/arm/mach-exynos/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos/mach-universal_c210.c
-@@ -1095,6 +1095,8 @@ static void __init universal_map_io(void)
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM2, SAMSUNG_PWM4);
-+	xxti_f = 0;
-+	xusbxti_f = 24000000;
- }
- 
- static void s5p_tv_setup(void)
+ 	reg_base = np ? of_iomap(np, 0) : S5P_VA_SYSTIMER;
+ 	if (!reg_base)
 -- 
 1.7.5.4
