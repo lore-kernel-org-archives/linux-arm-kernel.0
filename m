@@ -1,45 +1,40 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 18 Feb 2013 08:53:43 +0100
-Subject: [PATCH] serial: imx: fix uninitialized variable warning
-In-Reply-To: <1361164536-1351-1-git-send-email-shawn.guo@linaro.org>
-References: <1361164536-1351-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <5121DE07.8060908@de.bosch.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Mon, 18 Feb 2013 08:08:09 +0000
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <511F1DB4.8030400@ti.com>
+References: <20130214171253.GC7144@atomide.com>
+ <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com>
+ <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+ <20130215101610.GR17852@n2100.arm.linux.org.uk> <511E3797.2070802@ti.com>
+ <20130215132726.GT17852@n2100.arm.linux.org.uk> <511E38C3.7080404@ti.com>
+ <20130215163031.GA5724@atomide.com>
+ <alpine.LFD.2.03.1302160035240.6419@syhkavp.arg> <511F1DB4.8030400@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED22A16@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.02.2013 06:15, Shawn Guo wrote:
-> Commit 677fe55 (serial: imx: Fix recursive locking bug) introduces an
-> uninitialized variable warning as below.
+On Sat, Feb 16, 2013 at 11:18:36, Shilimkar, Santosh wrote:
+[...]
+> >>
+> >> For the duplicate ioremapping, I don't think there's any need to
+> >> do it if we get things right.
+> >
+> > Note that if the ioremap matches a static map area there is no cost to
+> > ioremap it multiple times.
+> >
+> >
+> Thats true though now on OMAP we removed most of the static mappings.
+> The main issue is waste of IO space because, we end up mapping same
+> area two times for all the OMAP drivers. This can be optimized with
+> a arch ioremap caller hook but as discussed here, its nice to have
+> rather than something important.
 > 
->   CC      drivers/tty/serial/imx.o
-> drivers/tty/serial/imx.c: In function ?imx_console_write?:
-> include/linux/spinlock.h:340:2: warning: ?flags? may be used uninitialized in this function [-Wuninitialized]
-> drivers/tty/serial/imx.c:1214:16: note: ?flags? was declared here
-> 
-> Initialize the variable to suppress the warning.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
+Err.. I was looking at the iotable_init for OMAPx in mainline and it looks
+like most (all?) of the peripherals are already covered in the static mappings?
 
-Thanks
-
-Dirk
-
-> ---
->  drivers/tty/serial/imx.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index adf7611..147c9e1 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -1211,7 +1211,7 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
->  	struct imx_port *sport = imx_ports[co->index];
->  	struct imx_port_ucrs old_ucr;
->  	unsigned int ucr1;
-> -	unsigned long flags;
-> +	unsigned long flags = 0;
->  	int locked = 1;
->  
->  	if (sport->port.sysrq)
+Regards,
+Vaibhav
