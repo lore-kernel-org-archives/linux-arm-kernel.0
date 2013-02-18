@@ -1,40 +1,81 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Feb 2013 09:56:52 +0800
-Subject: [PATCH v2 3/8] ARM i.MX6q: Add GPU, VPU, IPU, and OpenVG resets
- to System Reset Controller (SRC)
-In-Reply-To: <1360776872-18584-4-git-send-email-p.zabel@pengutronix.de>
-References: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
- <1360776872-18584-4-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130218015650.GG6782@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 18 Feb 2013 10:06:44 +0800
+Subject: [PATCH v2 1/1] ARM: dts: imx6q-sabresd: Add USB support
+Message-ID: <1361153204-6426-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 06:34:27PM +0100, Philipp Zabel wrote:
-> The SRC has auto-deasserting reset bits that control reset lines to
-> the GPU, VPU, IPU, and OpenVG IP modules. This patch adds a reset
-> controller that can be controlled by those devices using the
-> reset controller API.
+Add USB support for imx6q sabresd board
 
-We now architecturally depend on RESET_CONTROLLER, so need to have
-Kconfig to reflect that.  Not sure if it's the best solution, the
-following is what I have.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+Changes for v2:
+- Changes the dt file style based on 3.9-rc1
+- Add one blank line between node
 
-drivers/reset/Kconfig:
+ arch/arm/boot/dts/imx6q-sabresd.dts |   25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q.dtsi        |    6 ++++++
+ 2 files changed, 31 insertions(+), 0 deletions(-)
 
-config ARCH_HAS_RESET_CONTROLLER
-	bool
-
-menuconfig RESET_CONTROLLER
-	bool "Reset Controller Support"
-	default y if ARCH_HAS_RESET_CONTROLLER
-
-arch/arm/mach-imx/Kconfig:
-
- config ARCH_MXC
-        bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
-+       select ARCH_HAS_RESET_CONTROLLER
-        select ARCH_REQUIRE_GPIOLIB
-        select ARM_PATCH_PHYS_VIRT
-        select AUTO_ZRELADDR if !ZBOOT_ROM
-
-Shawn
+diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
+index 2dea304..bafaccd 100644
+--- a/arch/arm/boot/dts/imx6q-sabresd.dts
++++ b/arch/arm/boot/dts/imx6q-sabresd.dts
+@@ -21,6 +21,19 @@
+ 		reg = <0x10000000 0x40000000>;
+ 	};
+ 
++	regulators {
++		compatible = "simple-bus";
++
++		reg_usb_otg_vbus: usb_otg_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 22 0>;
++			enable-active-high;
++		};
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 
+@@ -62,6 +75,18 @@
+ 	};
+ };
+ 
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg_2>;
++	disable-over-current;
++	status = "okay";
++};
++
++&usbh1 {
++	status = "okay";
++};
++
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet_1>;
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index cba021e..0125250 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -207,6 +207,12 @@
+ 							1592 0x17059	/* MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID */
+ 						>;
+ 					};
++
++					pinctrl_usbotg_2: usbotggrp-2 {
++					fsl,pins = <
++							1591 0x17059	/* MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID */
++						>;
++					};
+ 				};
+ 
+ 				usdhc2 {
+-- 
+1.7.0.4
