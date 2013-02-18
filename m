@@ -1,50 +1,104 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 18 Feb 2013 22:47:16 +0900
-Subject: [PATCH 03/08] ARM: shmobile: Use R8A7779_SCU_BASE with TWD
+Date: Mon, 18 Feb 2013 22:47:25 +0900
+Subject: [PATCH 04/08] ARM: shmobile: Update r8a7779 to check SCU for hotplug
 In-Reply-To: <20130218134648.17303.97576.sendpatchset@w520>
 References: <20130218134648.17303.97576.sendpatchset@w520>
-Message-ID: <20130218134716.17303.17033.sendpatchset@w520>
+Message-ID: <20130218134725.17303.98038.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Rework the IOMEM() usage for the SCU base address in the
-case of r8a7779. Adjusts the TWD to use R8A7779_SCU_BASE.
+Update the r8a7779 CPU Hotplug code to use SCU PSR
+to wait for the target CPU core. Previously the
+shared code in hotplug.c was used to let cpu_kill()
+wait for cpu_die(). With this change in place the
+r8a7779 SMP code does not depend on hotplug.c anymore.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/smp-r8a7779.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/smp-r8a7779.c |   38 ++++++++++++++++++++++++++++------
+ 1 file changed, 32 insertions(+), 6 deletions(-)
 
---- 0003/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ work/arch/arm/mach-shmobile/smp-r8a7779.c	2013-02-18 16:21:10.000000000 +0900
-@@ -32,7 +32,7 @@
+--- 0004/arch/arm/mach-shmobile/smp-r8a7779.c
++++ work/arch/arm/mach-shmobile/smp-r8a7779.c	2013-02-18 22:04:24.000000000 +0900
+@@ -26,6 +26,7 @@
+ #include <linux/irqchip/arm-gic.h>
+ #include <mach/common.h>
+ #include <mach/r8a7779.h>
++#include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
  #include <asm/smp_twd.h>
- 
- #define AVECR IOMEM(0xfe700040)
--#define R8A7779_SCU_BASE IOMEM(0xf0000000)
-+#define R8A7779_SCU_BASE 0xf0000000
- 
- static struct r8a7779_pm_ch r8a7779_ch_cpu1 = {
- 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
-@@ -59,8 +59,7 @@ static struct r8a7779_pm_ch *r8a7779_ch_
- };
- 
- #ifdef CONFIG_HAVE_ARM_TWD
--static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
--
-+static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, R8A7779_SCU_BASE + 0x600, 29);
- void __init r8a7779_register_twd(void)
- {
- 	twd_local_timer_register(&twd_local_timer);
-@@ -178,7 +177,7 @@ static void __init r8a7779_smp_prepare_c
- static void __init r8a7779_smp_init_cpus(void)
- {
- 	/* setup r8a7779 specific SCU base */
--	shmobile_scu_base = R8A7779_SCU_BASE;
-+	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
- 
- 	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
+@@ -68,6 +69,16 @@ void __init r8a7779_register_twd(void)
  }
+ #endif
+ 
++static int r8a7779_scu_psr_core_disabled(int cpu)
++{
++	unsigned long mask = 3 << (cpu * 8);
++
++	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
++		return 1;
++
++	return 0;
++}
++
+ static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
+ {
+ 	void __iomem *scu_base = shmobile_scu_base;
+@@ -89,9 +100,6 @@ static int r8a7779_platform_cpu_kill(uns
+ 
+ 	cpu = cpu_logical_map(cpu);
+ 
+-	/* disable cache coherency */
+-	modify_scu_cpu_psr(3 << (cpu * 8), 0);
+-
+ 	if (cpu < ARRAY_SIZE(r8a7779_ch_cpu))
+ 		ch = r8a7779_ch_cpu[cpu];
+ 
+@@ -110,7 +118,7 @@ static int __maybe_unused r8a7779_cpu_ki
+ 	 * finish before asking SoC-specific code to power off the CPU core.
+ 	 */
+ 	for (k = 0; k < 1000; k++) {
+-		if (shmobile_cpu_is_dead(cpu))
++		if (r8a7779_scu_psr_core_disabled(cpu))
+ 			return r8a7779_platform_cpu_kill(cpu);
+ 
+ 		mdelay(1);
+@@ -119,6 +127,24 @@ static int __maybe_unused r8a7779_cpu_ki
+ 	return 0;
+ }
+ 
++static void __maybe_unused r8a7779_cpu_die(unsigned int cpu)
++{
++	dsb();
++	flush_cache_all();
++
++	/* disable cache coherency */
++	modify_scu_cpu_psr(3 << (cpu * 8), 0);
++
++	/* Endless loop until power off from r8a7779_cpu_kill() */
++	while (1)
++		cpu_do_idle();
++}
++
++static int __maybe_unused r8a7779_cpu_disable(unsigned int cpu)
++{
++	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
++	return cpu == 0 ? -EPERM : 0;
++}
+ 
+ static void __cpuinit r8a7779_secondary_init(unsigned int cpu)
+ {
+@@ -179,7 +205,7 @@ struct smp_operations r8a7779_smp_ops  _
+ 	.smp_boot_secondary	= r8a7779_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= r8a7779_cpu_kill,
+-	.cpu_die		= shmobile_cpu_die,
+-	.cpu_disable		= shmobile_cpu_disable,
++	.cpu_die		= r8a7779_cpu_die,
++	.cpu_disable		= r8a7779_cpu_disable,
+ #endif
+ };
