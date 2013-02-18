@@ -1,91 +1,28 @@
-From: walken@google.com (Michel Lespinasse)
-Date: Mon, 18 Feb 2013 23:45:26 +0800
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 18 Feb 2013 12:45:20 -0300
+Subject: [PATCH] ARM: imx_v4_v5_defconfig: Add CONFIG_GPIO_SYSFS
+Message-ID: <1361202320-25917-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srivasta,
+Add CONFIG_GPIO_SYSFS as it is helpful for accessing GPIO from userspace.
 
-I admit not having followed in detail the threads about the previous
-iteration, so some of my comments may have been discussed already
-before - apologies if that is the case.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-On Mon, Feb 18, 2013 at 8:38 PM, Srivatsa S. Bhat
-<srivatsa.bhat@linux.vnet.ibm.com> wrote:
-> Reader-writer locks and per-cpu counters are recursive, so they can be
-> used in a nested fashion in the reader-path, which makes per-CPU rwlocks also
-> recursive. Also, this design of switching the synchronization scheme ensures
-> that you can safely nest and use these locks in a very flexible manner.
-
-I like the general idea of switching between per-cpu and global
-rwlocks as needed; however I dislike unfair locks, and especially
-unfair recursive rwlocks.
-
-If you look at rwlock_t, the main reason we haven't been able to
-implement reader/writer fairness there is because tasklist_lock makes
-use of the recursive nature of the rwlock_t read side. I'm worried
-about introducing more lock usages that would make use of the same
-property for your proposed lock.
-
-I am fine with your proposal not implementing reader/writer fairness
-from day 1, but I am worried about your proposal having a recursive
-reader side. Or, to put it another way: if your proposal didn't have a
-recursive reader side, and rwlock_t could somehow be changed to
-implement reader/writer fairness, then this property could
-automatically propagate into your proposed rwlock; but if anyone makes
-use of the recursive nature of your proposal then implementing
-reader/writer fairness later won't be as easy.
-
-I see that the very next change in this series is talking about
-acquiring the read side from interrupts, so it does look like you're
-planning to make use of the recursive nature of the read side. I kinda
-wish you didn't, as this is exactly replicating the design of
-tasklist_lock which is IMO problematic. Your prior proposal of
-disabling interrupts during the read side had other disadvantages, but
-I think it was nice that it didn't rely on having a recursive read
-side.
-
-> +#define reader_yet_to_switch(pcpu_rwlock, cpu)                             \
-> +       (ACCESS_ONCE(per_cpu_ptr((pcpu_rwlock)->rw_state, cpu)->reader_refcnt))
-> +
-> +#define reader_percpu_nesting_depth(pcpu_rwlock)                 \
-> +       (__this_cpu_read((pcpu_rwlock)->rw_state->reader_refcnt))
-> +
-> +#define reader_uses_percpu_refcnt(pcpu_rwlock)                         \
-> +                               reader_percpu_nesting_depth(pcpu_rwlock)
-> +
-> +#define reader_nested_percpu(pcpu_rwlock)                              \
-> +                       (reader_percpu_nesting_depth(pcpu_rwlock) > 1)
-> +
-> +#define writer_active(pcpu_rwlock)                                     \
-> +       (__this_cpu_read((pcpu_rwlock)->rw_state->writer_signal))
-
-I'm personally not a fan of such one-line shorthand functions - I
-think they tend to make the code harder to read instead of easier, as
-one constantly has to refer to them to understand what's actually
-going on.
-
->  void percpu_write_lock(struct percpu_rwlock *pcpu_rwlock)
->  {
-> +       unsigned int cpu;
-> +
-> +       /*
-> +        * Tell all readers that a writer is becoming active, so that they
-> +        * start switching over to the global rwlock.
-> +        */
-> +       for_each_possible_cpu(cpu)
-> +               per_cpu_ptr(pcpu_rwlock->rw_state, cpu)->writer_signal = true;
-
-I don't see anything preventing a race with the corresponding code in
-percpu_write_unlock() that sets writer_signal back to false. Did I
-miss something here ? It seems to me we don't have any guarantee that
-all writer signals will be set to true at the end of the loop...
-
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index 02c657a..f07a847 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -109,6 +109,7 @@ CONFIG_I2C_IMX=y
+ CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_SPIDEV=y
++CONFIG_GPIO_SYSFS=y
+ CONFIG_W1=y
+ CONFIG_W1_MASTER_MXC=y
+ CONFIG_W1_SLAVE_THERM=y
 -- 
-Michel "Walken" Lespinasse
-A program is never fully debugged until the last user dies.
+1.7.9.5
