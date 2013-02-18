@@ -1,229 +1,52 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 18 Feb 2013 13:43:42 +0530
-Subject: [PATCH 4/7] ARM: Exynos: allow dt based discovery of mct controller
- using clocksource_of_init
+Date: Mon, 18 Feb 2013 13:43:44 +0530
+Subject: [PATCH 6/7] ARM: Exynos: remove static io-remapping of mct registers
+ for Exynos5
 In-Reply-To: <1361175225-19282-1-git-send-email-thomas.abraham@linaro.org>
 References: <1361175225-19282-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1361175225-19282-5-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1361175225-19282-7-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entries to __clksrc_of_table so that Exynos MCT controller is discoverable
-using call to clocksource_of_init. With this change, it would be appropriate to
-rename the function 'exynos4_timer_init' as 'mct_init' since it aptly describes
-this function. Additionally, the 'init_time' callback of all machine descriptors
-for exynos platforms that were previously set to 'exynos4_timer_init' are now
-set to either 'mct_init' or 'clocksource_of_init'.
+With device tree support enabled for MCT controller, the staticio-remapping
+of the MCT controller address space is removed for Exynos5 platforms (which
+supports only device tree based boot).
 
-Cc: Changhwan Youn <chaos.youn@samsung.com> 
+Cc: Changhwan Youn <chaos.youn@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-exynos/Kconfig           |    2 ++
- arch/arm/mach-exynos/common.h          |    2 +-
- arch/arm/mach-exynos/mach-armlex4210.c |    2 +-
- arch/arm/mach-exynos/mach-exynos4-dt.c |    3 ++-
- arch/arm/mach-exynos/mach-exynos5-dt.c |    3 ++-
- arch/arm/mach-exynos/mach-nuri.c       |    2 +-
- arch/arm/mach-exynos/mach-origen.c     |    2 +-
- arch/arm/mach-exynos/mach-smdk4x12.c   |    4 ++--
- arch/arm/mach-exynos/mach-smdkv310.c   |    4 ++--
- arch/arm/mach-exynos/mct.c             |   12 ++++++------
- 10 files changed, 20 insertions(+), 16 deletions(-)
+ arch/arm/mach-exynos/common.c           |    5 -----
+ arch/arm/mach-exynos/include/mach/map.h |    1 -
+ 2 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 7ea0579..e0ce082 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -418,6 +418,7 @@ config MACH_EXYNOS4_DT
- 	select PINCTRL_EXYNOS4
- 	select S5P_DEV_MFC
- 	select USE_OF
-+	select CLKSRC_OF
- 	help
- 	  Machine support for Samsung Exynos4 machine with device tree enabled.
- 	  Select this if a fdt blob is available for the Exynos4 SoC based board.
-@@ -430,6 +431,7 @@ config MACH_EXYNOS5_DT
- 	depends on ARCH_EXYNOS5
- 	select ARM_AMBA
- 	select USE_OF
-+	select CLKSRC_OF
- 	help
- 	  Machine support for Samsung EXYNOS5 machine with device tree enabled.
- 	  Select this if a fdt blob is available for the EXYNOS5 SoC based board.
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 3ab3c03..be3ea62 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -12,7 +12,7 @@
- #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
- #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 4ce342e..3b6527b 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -283,11 +283,6 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+ 	}, {
+-		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
+-		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSTIMER),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= (unsigned long)S5P_VA_SYSRAM,
+ 		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSRAM),
+ 		.length		= SZ_4K,
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index b8ea67e..99e0a79 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -68,7 +68,6 @@
+ #define EXYNOS5_PA_CMU			0x10010000
  
--extern void exynos4_timer_init(void);
-+extern void mct_init(void);
+ #define EXYNOS4_PA_SYSTIMER		0x10050000
+-#define EXYNOS5_PA_SYSTIMER		0x101C0000
  
- struct map_desc;
- void exynos_init_io(struct map_desc *mach_desc, int size);
-diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
-index 2f18130..27b51d2 100644
---- a/arch/arm/mach-exynos/mach-armlex4210.c
-+++ b/arch/arm/mach-exynos/mach-armlex4210.c
-@@ -204,6 +204,6 @@ MACHINE_START(ARMLEX4210, "ARMLEX4210")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= armlex4210_machine_init,
- 	.init_late	= exynos_init_late,
--	.init_time	= exynos4_timer_init,
-+	.init_time	= mct_init,
- 	.restart	= exynos4_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-index b68115a..19b42f2 100644
---- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-@@ -15,6 +15,7 @@
- #include <linux/of_fdt.h>
- #include <linux/serial_core.h>
- #include <linux/memblock.h>
-+#include <linux/clocksource.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
-@@ -127,7 +128,7 @@ DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
- 	.init_early	= exynos_firmware_init,
- 	.init_machine	= exynos4_dt_machine_init,
- 	.init_late	= exynos_init_late,
--	.init_time	= exynos4_timer_init,
-+	.init_time	= clocksource_of_init,
- 	.dt_compat	= exynos4_dt_compat,
- 	.restart        = exynos4_restart,
- 	.reserve	= exynos4_reserve,
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index d76bfba..591644b 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -14,6 +14,7 @@
- #include <linux/serial_core.h>
- #include <linux/memblock.h>
- #include <linux/io.h>
-+#include <linux/clocksource.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
-@@ -183,7 +184,7 @@ DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= exynos5_dt_machine_init,
- 	.init_late	= exynos_init_late,
--	.init_time	= exynos4_timer_init,
-+	.init_time	= clocksource_of_init,
- 	.dt_compat	= exynos5_dt_compat,
- 	.restart        = exynos5_restart,
- 	.reserve	= exynos5_reserve,
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index dccd1d1..e4a7ae5 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -1382,7 +1382,7 @@ MACHINE_START(NURI, "NURI")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= nuri_machine_init,
- 	.init_late	= exynos_init_late,
--	.init_time	= exynos4_timer_init,
-+	.init_time	= mct_init,
- 	.reserve        = &nuri_reserve,
- 	.restart	= exynos4_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-index 962c45f..c9de418 100644
---- a/arch/arm/mach-exynos/mach-origen.c
-+++ b/arch/arm/mach-exynos/mach-origen.c
-@@ -817,7 +817,7 @@ MACHINE_START(ORIGEN, "ORIGEN")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= origen_machine_init,
- 	.init_late	= exynos_init_late,
--	.init_time	= exynos4_timer_init,
-+	.init_time	= mct_init,
- 	.reserve	= &origen_reserve,
- 	.restart	= exynos4_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
-index e9c9c29..a66e916e 100644
---- a/arch/arm/mach-exynos/mach-smdk4x12.c
-+++ b/arch/arm/mach-exynos/mach-smdk4x12.c
-@@ -378,7 +378,7 @@ MACHINE_START(SMDK4212, "SMDK4212")
- 	.map_io		= smdk4x12_map_io,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= smdk4x12_machine_init,
--	.init_time	= exynos4_timer_init,
-+	.init_time	= mct_init,
- 	.restart	= exynos4_restart,
- 	.reserve	= &smdk4x12_reserve,
- MACHINE_END
-@@ -393,7 +393,7 @@ MACHINE_START(SMDK4412, "SMDK4412")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= smdk4x12_machine_init,
- 	.init_late	= exynos_init_late,
--	.init_time	= exynos4_timer_init,
-+	.init_time	= mct_init,
- 	.restart	= exynos4_restart,
- 	.reserve	= &smdk4x12_reserve,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
-index 13fa4a2..0245475 100644
---- a/arch/arm/mach-exynos/mach-smdkv310.c
-+++ b/arch/arm/mach-exynos/mach-smdkv310.c
-@@ -425,7 +425,7 @@ MACHINE_START(SMDKV310, "SMDKV310")
- 	.map_io		= smdkv310_map_io,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= smdkv310_machine_init,
--	.init_time	= exynos4_timer_init,
-+	.init_time	= mct_init,
- 	.reserve	= &smdkv310_reserve,
- 	.restart	= exynos4_restart,
- MACHINE_END
-@@ -439,7 +439,7 @@ MACHINE_START(SMDKC210, "SMDKC210")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= smdkv310_machine_init,
- 	.init_late	= exynos_init_late,
--	.init_time	= exynos4_timer_init,
-+	.init_time	= mct_init,
- 	.reserve	= &smdkv310_reserve,
- 	.restart	= exynos4_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
-index 524a859..e067130 100644
---- a/arch/arm/mach-exynos/mct.c
-+++ b/arch/arm/mach-exynos/mct.c
-@@ -22,6 +22,7 @@
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
-+#include <linux/clocksource.h>
- 
- #include <asm/arch_timer.h>
- #include <asm/hardware/gic.h>
-@@ -508,17 +509,12 @@ static const struct of_device_id exynos_mct_ids[] = {
- 	{ .compatible = "samsung,exynos4412-mct", .data = (void *)MCT_INT_PPI },
- };
- 
--void __init exynos4_timer_init(void)
-+void __init mct_init(void)
- {
- 	struct device_node *np = NULL;
- 	const struct of_device_id *match;
- 	u32 nr_irqs, i;
- 
--	if (soc_is_exynos5440()) {
--		arch_timer_of_register();
--		return;
--	}
--
- #ifdef CONFIG_OF
- 	np = of_find_matching_node_and_match(NULL, exynos_mct_ids, &match);
- #endif
-@@ -551,3 +547,5 @@ void __init exynos4_timer_init(void)
- 	exynos4_clocksource_init();
- 	exynos4_clockevent_init();
- }
-+CLOCKSOURCE_OF_DECLARE(exynos4210, "samsung,exynos4210-mct", mct_init)
-+CLOCKSOURCE_OF_DECLARE(exynos4412, "samsung,exynos4412-mct", mct_init)
+ #define EXYNOS4_PA_WATCHDOG		0x10060000
+ #define EXYNOS5_PA_WATCHDOG		0x101D0000
 -- 
 1.7.5.4
