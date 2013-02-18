@@ -1,140 +1,120 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 18 Feb 2013 22:47:54 +0900
-Subject: [PATCH 07/08] ARM: shmobile: Rearrange r8a7779 cpu hotplug code
+Date: Mon, 18 Feb 2013 22:48:03 +0900
+Subject: [PATCH 08/08] ARM: shmobile: Remove unused hotplug.c
 In-Reply-To: <20130218134648.17303.97576.sendpatchset@w520>
 References: <20130218134648.17303.97576.sendpatchset@w520>
-Message-ID: <20130218134754.17303.4405.sendpatchset@w520>
+Message-ID: <20130218134803.17303.58317.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Update the r8a7779 SMP code and CPU Hotplug in particular
-to follow the same style as sh73a0. This means dropping
-__maybe_unused for #ifdef CONFIG_HOTPLUG_CPU.
+Each CPU Hotplug implementation for mach-shmobile
+is now self-contained, so this change removes unused
+helper code in hotplug.c. The two CPU Hotplug capable
+SoCs sh73a0 and r8a7779 remain unchanged.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/smp-r8a7779.c |   96 +++++++++++++++++-----------------
- 1 file changed, 49 insertions(+), 47 deletions(-)
+ arch/arm/mach-shmobile/Makefile              |    1 
+ arch/arm/mach-shmobile/hotplug.c             |   64 --------------------------
+ arch/arm/mach-shmobile/include/mach/common.h |   10 ----
+ 3 files changed, 75 deletions(-)
 
---- 0006/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ work/arch/arm/mach-shmobile/smp-r8a7779.c	2013-02-18 22:30:04.000000000 +0900
-@@ -66,16 +66,6 @@ void __init r8a7779_register_twd(void)
- }
- #endif
+--- 0001/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-02-18 16:39:05.000000000 +0900
+@@ -14,7 +14,6 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.
  
--static int r8a7779_scu_psr_core_disabled(int cpu)
+ # SMP objects
+ smp-y				:= platsmp.o headsmp.o
+-smp-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o
+ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
+--- 0001/arch/arm/mach-shmobile/hotplug.c
++++ /dev/null	2013-01-21 13:48:16.387453344 +0900
+@@ -1,64 +0,0 @@
+-/*
+- * SMP support for R-Mobile / SH-Mobile
+- *
+- * Copyright (C) 2010  Magnus Damm
+- *
+- * Based on realview, Copyright (C) 2002 ARM Ltd, All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/smp.h>
+-#include <linux/cpumask.h>
+-#include <linux/delay.h>
+-#include <mach/common.h>
+-#include <asm/cacheflush.h>
+-
+-static cpumask_t dead_cpus;
+-
+-void shmobile_cpu_die(unsigned int cpu)
 -{
--	unsigned long mask = 3 << (cpu * 8);
--
--	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
--		return 1;
--
--	return 0;
--}
--
- static int r8a7779_platform_cpu_kill(unsigned int cpu)
- {
- 	struct r8a7779_pm_ch *ch = NULL;
-@@ -92,43 +82,6 @@ static int r8a7779_platform_cpu_kill(uns
- 	return ret ? ret : 1;
- }
- 
--static int __maybe_unused r8a7779_cpu_kill(unsigned int cpu)
--{
--	int k;
--
--	/* this function is running on another CPU than the offline target,
--	 * here we need wait for shutdown code in platform_cpu_die() to
--	 * finish before asking SoC-specific code to power off the CPU core.
--	 */
--	for (k = 0; k < 1000; k++) {
--		if (r8a7779_scu_psr_core_disabled(cpu))
--			return r8a7779_platform_cpu_kill(cpu);
--
--		mdelay(1);
--	}
--
--	return 0;
--}
--
--static void __maybe_unused r8a7779_cpu_die(unsigned int cpu)
--{
--	dsb();
+-	/* hardware shutdown code running on the CPU that is being offlined */
 -	flush_cache_all();
+-	dsb();
 -
--	/* disable cache coherency */
--	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
+-	/* notify platform_cpu_kill() that hardware shutdown is finished */
+-	cpumask_set_cpu(cpu, &dead_cpus);
 -
--	/* Endless loop until power off from r8a7779_cpu_kill() */
--	while (1)
--		cpu_do_idle();
+-	/* wait for SoC code in platform_cpu_kill() to shut off CPU core
+-	 * power. CPU bring up starts from the reset vector.
+-	 */
+-	while (1) {
+-		/*
+-		 * here's the WFI
+-		 */
+-		asm(".word	0xe320f003\n"
+-		    :
+-		    :
+-		    : "memory", "cc");
+-	}
 -}
 -
--static int __maybe_unused r8a7779_cpu_disable(unsigned int cpu)
+-int shmobile_cpu_disable(unsigned int cpu)
 -{
--	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
+-	cpumask_clear_cpu(cpu, &dead_cpus);
+-	/*
+-	 * we don't allow CPU 0 to be shutdown (it is still too special
+-	 * e.g. clock tick interrupts)
+-	 */
 -	return cpu == 0 ? -EPERM : 0;
 -}
 -
- static void __cpuinit r8a7779_secondary_init(unsigned int cpu)
- {
- 	gic_secondary_init(0);
-@@ -176,6 +129,55 @@ static void __init r8a7779_smp_init_cpus
- 	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
- }
+-int shmobile_cpu_disable_any(unsigned int cpu)
+-{
+-	cpumask_clear_cpu(cpu, &dead_cpus);
+-	return 0;
+-}
+-
+-int shmobile_cpu_is_dead(unsigned int cpu)
+-{
+-	return cpumask_test_cpu(cpu, &dead_cpus);
+-}
+--- 0001/arch/arm/mach-shmobile/include/mach/common.h
++++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-02-18 16:38:33.000000000 +0900
+@@ -85,16 +85,6 @@ int shmobile_cpuidle_init(void);
+ static inline int shmobile_cpuidle_init(void) { return 0; }
+ #endif
  
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int r8a7779_scu_psr_core_disabled(int cpu)
-+{
-+	unsigned long mask = 3 << (cpu * 8);
-+
-+	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
-+		return 1;
-+
-+	return 0;
-+}
-+
-+static int r8a7779_cpu_kill(unsigned int cpu)
-+{
-+	int k;
-+
-+	/* this function is running on another CPU than the offline target,
-+	 * here we need wait for shutdown code in platform_cpu_die() to
-+	 * finish before asking SoC-specific code to power off the CPU core.
-+	 */
-+	for (k = 0; k < 1000; k++) {
-+		if (r8a7779_scu_psr_core_disabled(cpu))
-+			return r8a7779_platform_cpu_kill(cpu);
-+
-+		mdelay(1);
-+	}
-+
-+	return 0;
-+}
-+
-+static void r8a7779_cpu_die(unsigned int cpu)
-+{
-+	dsb();
-+	flush_cache_all();
-+
-+	/* disable cache coherency */
-+	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
-+
-+	/* Endless loop until power off from r8a7779_cpu_kill() */
-+	while (1)
-+		cpu_do_idle();
-+}
-+
-+static int r8a7779_cpu_disable(unsigned int cpu)
-+{
-+	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
-+#endif /* CONFIG_HOTPLUG_CPU */
-+
- struct smp_operations r8a7779_smp_ops  __initdata = {
- 	.smp_init_cpus		= r8a7779_smp_init_cpus,
- 	.smp_prepare_cpus	= r8a7779_smp_prepare_cpus,
+-extern void shmobile_cpu_die(unsigned int cpu);
+-extern int shmobile_cpu_disable(unsigned int cpu);
+-extern int shmobile_cpu_disable_any(unsigned int cpu);
+-
+-#ifdef CONFIG_HOTPLUG_CPU
+-extern int shmobile_cpu_is_dead(unsigned int cpu);
+-#else
+-static inline int shmobile_cpu_is_dead(unsigned int cpu) { return 1; }
+-#endif
+-
+ extern void __iomem *shmobile_scu_base;
+ extern void shmobile_smp_init_cpus(unsigned int ncores);
+ 
