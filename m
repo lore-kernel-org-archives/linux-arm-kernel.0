@@ -1,52 +1,40 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 17 Feb 2013 17:33:39 -0800 (PST)
-Subject: [PATCH 2/2 v3] [RFC] ARM: shmobile: r8a7779: Add TMU02 platform
- device
-In-Reply-To: <1361147376-1228-3-git-send-email-horms+renesas@verge.net.au>
-References: <1361147376-1228-1-git-send-email-horms+renesas@verge.net.au>
- <1361147376-1228-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <8738wuo174.wl%kuninori.morimoto.gx@renesas.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 18 Feb 2013 09:56:52 +0800
+Subject: [PATCH v2 3/8] ARM i.MX6q: Add GPU, VPU, IPU, and OpenVG resets
+ to System Reset Controller (SRC)
+In-Reply-To: <1360776872-18584-4-git-send-email-p.zabel@pengutronix.de>
+References: <1360776872-18584-1-git-send-email-p.zabel@pengutronix.de>
+ <1360776872-18584-4-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130218015650.GG6782@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 13, 2013 at 06:34:27PM +0100, Philipp Zabel wrote:
+> The SRC has auto-deasserting reset bits that control reset lines to
+> the GPU, VPU, IPU, and OpenVG IP modules. This patch adds a reset
+> controller that can be controlled by those devices using the
+> reset controller API.
 
-Hi Simon
+We now architecturally depend on RESET_CONTROLLER, so need to have
+Kconfig to reflect that.  Not sure if it's the best solution, the
+following is what I have.
 
-> This is intended primarily to exercise the TMUO2 clock definition
-> in clock-r8a7779.c. I would appreciate review before I queue it up or
-> drop it.
-> 
-> With this patch and "ARM: shmobile: r8a7779: Correct TMU clock support
-> again" in place I see the following tmu related portions of the
-> bootlog on the Marzen board.
-> 
->  sh_tmu.0: used for clock events
->  sh_tmu.0: used for periodic clock events
->  sh_tmu.1: used as clock source
-> Switching to clocksource sh_tmu.1
-> sh_tmu sh_tmu.0: kept as earlytimer
-> sh_tmu sh_tmu.1: kept as earlytimer
-> sh_tmu sh_tmu.2: used as clock source
-> 
-> Cc: Denis Oliver Kropp <dok@directfb.org>
-> Cc: Magnus Damm <damm@opensource.se>
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
+drivers/reset/Kconfig:
 
-(snip)
+config ARCH_HAS_RESET_CONTROLLER
+	bool
 
-> +static struct resource tmu02_resources[] = {
-> +	[0] = {
-> +		.name	= "TMU02",
-> +		.start	= 0xffd80020,
-> +		.end	= 0xffd81003,
-> +		.flags	= IORESOURCE_MEM,
+menuconfig RESET_CONTROLLER
+	bool "Reset Controller Support"
+	default y if ARCH_HAS_RESET_CONTROLLER
 
-It seems not wrong, but
-.end = 0xffd8002b seems very enough ?
+arch/arm/mach-imx/Kconfig:
 
-Best regards
----
-Kuninori Morimoto
+ config ARCH_MXC
+        bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
++       select ARCH_HAS_RESET_CONTROLLER
+        select ARCH_REQUIRE_GPIOLIB
+        select ARM_PATCH_PHYS_VIRT
+        select AUTO_ZRELADDR if !ZBOOT_ROM
+
+Shawn
