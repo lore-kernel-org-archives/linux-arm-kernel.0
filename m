@@ -1,69 +1,63 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 18 Feb 2013 12:10:04 +0200
-Subject: [PATCH v3 11/12] gpio: pxa: discard irq base in pxa_gpio_chip
-In-Reply-To: <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
-References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
- <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <5121FDFC.2010107@compulab.co.il>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 18 Feb 2013 12:10:32 +0200
+Subject: [RFC/RFT PATCH 0/2] SERIAL: OMAP: Remove idle handling from driver
+In-Reply-To: <5121FCC8.7090604@ti.com>
+References: <1360929970-31934-1-git-send-email-santosh.shilimkar@ti.com>
+ <5121FCC8.7090604@ti.com>
+Message-ID: <20130218101032.GA32688@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/13 07:12, Haojian Zhuang wrote:
-> Discard irq_base in struct pxa_gpio_chip. Use irq_domain instead.
+Hi,
+
+On Mon, Feb 18, 2013 at 03:34:56PM +0530, Santosh Shilimkar wrote:
+> On Friday 15 February 2013 05:36 PM, Santosh Shilimkar wrote:
+> >OMAP UART IP needs manual idle modes based on state of the
+> >IP. Currently this is handled by the driver with function pointers
+> >implemented in platform code.
+> >
+> >This however breaks in case of device tree because of missing
+> >idle handling.
+> >
+> >The series tries to address the issue
+> >
+> >Patches has been tested on OMAP4 and OMAP5 devices where the console
+> >slugishness was observed without idle mode handling. CPUIDLE and
+> >suspend tested ok on these devices.
+> >
+> >Need help in testing on OMAP2, OMAP3 and AM3XXX devices.
+> >
+> >Santosh Shilimkar (2):
+> >   ARM: OMAP2+: hwmod-data: UART IP needs software control of sidle
+> >     modes
+> >   SERIAL: OMAP: Remove the idle handling from the driver
+> >
+> HWMOD_SWSUP_SIDLE flag will is not what will help UART completely.
+> Also considering UART also needs async wakeup enabled as it implements
+> another such hook and attaches that through function pointer.
+
+this is exactly what I said at [1], which I quote:
+
+"Also, $SUBJECT isn't improving the situation regarding UART Wakeup,
+there is still the regression of UART never being wakeup capable.
+
+I wonder what are your ideas to sort that part out, I mean, how do you
+plan to implement ->set_wake() for the tty port ?"
+
+> So some more work is needed to get that sorted out at least from
+> sysc point of view. That way we can deal with io_ring stuff using
+> pin control APIs.
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  drivers/gpio/gpio-pxa.c |   91 +++++++++++++++++++++++------------------------
->  1 file changed, 44 insertions(+), 47 deletions(-)
+> Some patches will follow in attempt to address it. Stay tuned !!
 
-[...]
-
-> 
-> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-> index 35cdb23..d45cb57 100644
-> --- a/drivers/gpio/gpio-pxa.c
-> +++ b/drivers/gpio/gpio-pxa.c
-> @@ -66,8 +66,8 @@ int pxa_last_gpio;
->  
->  struct pxa_gpio_chip {
->  	struct gpio_chip chip;
-> +	struct irq_domain *domain;
->  	void __iomem	*regbase;
-> -	unsigned int	irq_base;
->  	bool		inverted;
->  	bool		gafr;
->  	char label[10];
-> @@ -147,17 +147,7 @@ static int pxa_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
->  	struct pxa_gpio_chip *chip = NULL;
->  
->  	chip = container_of(gc, struct pxa_gpio_chip, chip);
-> -	return chip->irq_base + offset;
-> -}
-> -
-> -int pxa_irq_to_gpio(struct irq_data *d)
-> -{
-> -	struct pxa_gpio_chip *chip;
-> -	int gpio;
-> -
-> -	chip = (struct pxa_gpio_chip *)d->domain->host_data;
-> -	gpio = d->irq - chip->irq_base + chip->chip.base;
-> -	return gpio;
-> +	return irq_create_mapping(chip->domain, offset);
->  }
-
-You remove the pxa_irq_to_gpio() function here, but we still have:
-$ grep -nr pxa_irq_to_gpio *
-arch/arm/mach-pxa/pxa27x.c:368: int gpio = pxa_irq_to_gpio(d);
-arch/arm/mach-pxa/pxa25x.c:292: int gpio = pxa_irq_to_gpio(d);
-include/linux/gpio-pxa.h:16:extern int pxa_irq_to_gpio(struct irq_data *d);
-
-And this in turn breaks the compilation for example with error:
-arch/arm/mach-pxa/built-in.o: In function `pxa27x_set_wake':
-em-x270.c:(.text+0x1298): undefined reference to `pxa_irq_to_gpio'
-make[1]: *** [vmlinux] Error 1
-make: *** [sub-make] Error 2
-
+good
 
 -- 
-Regards,
-Igor.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130218/e4de2d46/attachment.sig>
