@@ -1,47 +1,33 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 19 Feb 2013 19:09:14 +0900
-Subject: [PATCH 00/08] ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework
- part 2
-In-Reply-To: <20130219004857.GA14932@verge.net.au>
-References: <20130218134648.17303.97576.sendpatchset@w520>
- <20130219004857.GA14932@verge.net.au>
-Message-ID: <CANqRtoQxC89zQHjM++19fRxch7x-jua_XEmvxk8t0p0D7-Vr8g@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 19 Feb 2013 15:44:14 +0530
+Subject: [PATCH, RFC 2/8] ARM: twd: register clock event for 1 core SMP
+In-Reply-To: <a7f62b8580aa4b33d5658f4f03371a453adaea9b.1361186097.git.afzal@ti.com>
+References: <cover.1361186097.git.afzal@ti.com>
+ <a7f62b8580aa4b33d5658f4f03371a453adaea9b.1361186097.git.afzal@ti.com>
+Message-ID: <51235076.8040200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 9:49 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Feb 18, 2013 at 10:46:48PM +0900, Magnus Damm wrote:
->> ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework part 2
->>
->> [PATCH 01/08] ARM: shmobile: Fix base address readout in headsmp-scu.S
->> [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
->> [PATCH 03/08] ARM: shmobile: Use R8A7779_SCU_BASE with TWD
->> [PATCH 04/08] ARM: shmobile: Update r8a7779 to check SCU for hotplug
->> [PATCH 05/08] ARM: shmobile: Update r8a7779 to use scu_power_mode()
->> [PATCH 06/08] ARM: shmobile: Use sh73a0-specific cpu disable code
->> [PATCH 07/08] ARM: shmobile: Rearrange r8a7779 cpu hotplug code
->> [PATCH 08/08] ARM: shmobile: Remove unused hotplug.c
->>
->> Finalize the SCU rework by performing minor fixes and converting
->> the r8a7779 SMP code to make use of common scu_power_mode() code
->> and the early SCU setup code in headsmp-scu.S.
->>
->> Also, to save a few line remove hotplug.c while at it.
->>
->> The only remaining itch to scratch here is to fix up CPU Hotplug
->> of CPU0 on r8a7779, but for that to happen we first need to start
->> accounting for spurious interrupts during shut down.
->>
->> Signed-off-by: Magnus Damm <damm@opensource.se>
->> ---
->>
->>  No known dependencies apart from previous SMP cleanup series
->>  "[PATCH 00/06] ARM: shmobile: SMP Cortex-A9 SCU rework"
->>  Written against -next in renesas.git.
+On Monday 18 February 2013 05:07 PM, Afzal Mohammed wrote:
+> Register percpu local timer for scheduler tick in the case of one core
+> SMP configuration. In other cases - secondary cpu's as well as boot
+> cpu's having more than one core, this is being registered as per
+> existing boot flow, with a difference that they happens after delay
+> calibration. Registering the clock for tick in case of one core should
+> be done before Kernel calibrates delay (this is required to boot,
+> unless local timer is the only one registered for tick). Registering
+> twd local timer at init_time (which platforms are doing now) helps
+> achieve that with the proposed change.
 >
-> I believe those are queued up for upstream in the soc5 branch.
+> This helps in an almost booting Kernel (minimal) by only relying on
+> ARM parts for an A9 one core SMP.
 >
-> Please let me know when you are comfortable with me applying these patches
-> to that branch. I'm fine with that answer being "now".
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+As mentioned in cover-letter, I don't think we have good
+reasoning to make TWD to work with UP configuration. Even
+you fix the timer code, there are more cascaded dependencies
+which is not worth the effort.
 
-Now sounds wonderful. Thanks Simon.
+Regards,
+Samtosh
