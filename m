@@ -1,32 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 Feb 2013 20:06:35 +0100
-Subject: [PATCH 2/9] USB: move bulk of otg/otg.c to phy/phy.c
-In-Reply-To: <20130219093019.GG23197@arwen.pp.htv.fi>
-References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
- <1359984275-24646-3-git-send-email-s.hauer@pengutronix.de>
- <20130219093019.GG23197@arwen.pp.htv.fi>
-Message-ID: <20130219190635.GB1906@pengutronix.de>
+From: hughd@google.com (Hugh Dickins)
+Date: Tue, 19 Feb 2013 11:06:15 -0800 (PST)
+Subject: Should a swapped out page be deleted from swap cache?
+In-Reply-To: <5122C9B3.10306@gmail.com>
+References: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
+ <alpine.LNX.2.00.1302180939200.2246@eggly.anvils> <5122C9B3.10306@gmail.com>
+Message-ID: <alpine.LNX.2.00.1302191056390.2248@eggly.anvils>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 11:30:19AM +0200, Felipe Balbi wrote:
-> On Mon, Feb 04, 2013 at 02:24:28PM +0100, Sascha Hauer wrote:
-> > Most of otg/otg.c is not otg specific, but phy specific, so move it
-> > to the phy directory.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Reported-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > Cc: Felipe Balbi <balbi@ti.com>
+On Tue, 19 Feb 2013, Will Huck wrote:
 > 
-> this is pretty ok, I'll start queueing patches for v3.10 in about a week
-> or two.
+> Another question:
 
-Ok, thanks. I'll resend this after the merge window.
+I don't see the connection to deleting a swapped out page from swap cache.
 
-Sascha
+> 
+> Why kernel memory mapping use direct mapping instead of kmalloc/vmalloc which
+> will setup mapping on demand?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I may misunderstand you, and "kernel memory mapping".
+
+kmalloc does not set up a mapping, it uses the direct mapping already set up.
+
+It would be circular if the basic page allocation primitives used kmalloc,
+since kmalloc relies on the basic page allocation primitives.
+
+vmalloc is less efficient than using the direct mapping (repeated setup
+and teardown, no use of hugepages), but necessary when you want a larger
+virtual array than you're likely to find from the buddy allocator.
+
+Hugh
