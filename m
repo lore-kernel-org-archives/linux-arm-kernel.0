@@ -1,29 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Feb 2013 14:23:08 -0700
-Subject: [PATCH v3 0/8] Reset controller API to reset IP modules on i.MX5
- and i.MX6
-In-Reply-To: <1361273732-23357-1-git-send-email-p.zabel@pengutronix.de>
-References: <1361273732-23357-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <5123ED3C.3080900@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Feb 2013 21:30:33 +0000
+Subject: [GIT PULL] reworked omap usb pdata changes for v3.9 merge window
+In-Reply-To: <20130215003543.GF11806@atomide.com>
+References: <20130215003543.GF11806@atomide.com>
+Message-ID: <201302192130.33509.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2013 04:35 AM, Philipp Zabel wrote:
-> The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
-> reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
+On Friday 15 February 2013, Tony Lindgren wrote:
+> Hi Arnd & Olof,
 > 
-> The following patches add a simple API for devices to request being reset
-> by separate reset controller hardware and implements the reset signal
-> device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
-> the i.MX SRC contains self-deasserting reset registers, so I've included
-> both ops to manually assert/deassert a reset line, as well as a "reset"
-> operation that is supposed to assert the reset line and wait for it to
-> deassert.
+> Roger Quadros reworked the OMAP USB patches that were causing
+> a conflict in Linux next and we requested to be dropped from
+> Linux next and reworked to remove the dependencies between
+> core SoC code and the driver code.
+> 
+> Below is a pull request for the mach-omap2 specific parts, the
+> rest is driver specific and queued by Samuel in the MFD tree
+> and Greg for the USB changes.
+> 
+> I've left it unresolved so you can merge it into one of your
+> branches as a dependency so we can avoid the merge conflict
+> in Linux next. A link to the merge resolution done by Stephen
+> is in the pull request. Let me know if you want me to resolve
+> it instead. 
 
-One note here: Even though Tegra HW doesn't have auto-clear reset
-hardware, I'd still tend to prefer that most Tegra drivers use a single
-"assert then deassert" API to keep knowledge of the reset mechanisms out
-of the individual drivers. Our reset driver would manually assert, sleep
-a short time, de-assert within the implementation. Still, a few drivers
-do need a bit more control (e.g. PCIe and powergating) so having the
-other APIs around is useful too.
+I've pulled them into next/soc now. I was wondering whether to
+put them into the late/omap branch instead, but this seemed
+like the easiest way to resolve the conflict, and the patches
+are simple enough.
+
+	Arnd
