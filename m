@@ -1,111 +1,83 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 19 Feb 2013 14:50:14 +0000
-Subject: [PATCH] xen: introduce xen_remap, use it instead of ioremap
-In-Reply-To: <alpine.DEB.2.02.1302191445160.4654@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1302191332340.4654@kaball.uk.xensource.com>
- <20130219144253.GE7026@konrad-lan.dumpdata.com>
- <alpine.DEB.2.02.1302191445160.4654@kaball.uk.xensource.com>
-Message-ID: <1361285414.1051.116.camel@zakaz.uk.xensource.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 19 Feb 2013 17:05:00 +0200
+Subject: [PATCH v2 0/5] Generic PHY Framework
+In-Reply-To: <201302191434.40495.arnd@arndb.de>
+References: <1361253198-7401-1-git-send-email-kishon@ti.com>
+ <201302191233.54677.arnd@arndb.de>
+ <20130219131258.GV23197@arwen.pp.htv.fi>
+ <201302191434.40495.arnd@arndb.de>
+Message-ID: <20130219150500.GG4390@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-02-19 at 14:48 +0000, Stefano Stabellini wrote:
-> On Tue, 19 Feb 2013, Konrad Rzeszutek Wilk wrote:
-> > On Tue, Feb 19, 2013 at 01:59:19PM +0000, Stefano Stabellini wrote:
-> > > ioremap can't be used to map ring pages on ARM because it uses device
-> > > memory caching attributes (MT_DEVICE*).
-> > > 
-> > > Introduce a Xen specific abstraction to map ring pages, called
-> > > xen_remap, that is defined as ioremap on x86 (no behavioral changes).
-> > > On ARM it explicitly calls __arm_ioremap with the right caching
-> > > attributes: MT_MEMORY.
-> > 
-> > Do you want to push this to Linus yourself or should I just include it
-> > in my 'for-39' tree?
-> > 
-> > Do you have other patches for 3.9?
-> 
-> Ian has two patches ("linux: public interface changes for arm"), it
-> would be great if they could go in 3.9.
+Hi,
 
-My two are one for Xen and one for Linux, so just one as far as the
-merge window is concerned, I just reposted them 10s ago..
-
-> Given the small number of patches (three all together), it is probably
-> easier to go via your tree, if you are OK with that.
-> 
-> 
-> 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On Tue, Feb 19, 2013 at 02:34:40PM +0000, Arnd Bergmann wrote:
+> On Tuesday 19 February 2013, Felipe Balbi wrote:
+> > On Tue, Feb 19, 2013 at 12:33:54PM +0000, Arnd Bergmann wrote:
+> > > > Currently drivers/phy and drivers/net/phy are independent and are not 
+> > > > related to each other. There are some fundamental differences on how 
+> > > > these frameworks work. IIUC, the *net* uses bus layer (MDIO bus) to 
+> > > > match a PHY device with a PHY driver and the Ethernet device uses the 
+> > > > bus layer to get the PHY.
+> > > > The Generic PHY Framework however doesn't have any bus layer. The PHY 
+> > > > should be like any other Platform Devices and Drivers and the framework 
+> > > > will provide some APIs to register with the framework. And there are 
+> > > > other APIs which any controller can use to get the PHY (for e.g., in the 
+> > > > case of dt boot, it can use phandle to get a reference to the PHY).
 > > > 
-> > > diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-> > > index c6b9096..30cdacb 100644
-> > > --- a/arch/arm/include/asm/xen/page.h
-> > > +++ b/arch/arm/include/asm/xen/page.h
-> > > @@ -1,6 +1,7 @@
-> > >  #ifndef _ASM_ARM_XEN_PAGE_H
-> > >  #define _ASM_ARM_XEN_PAGE_H
-> > >  
-> > > +#include <asm/mach/map.h>
-> > >  #include <asm/page.h>
-> > >  #include <asm/pgtable.h>
-> > >  
-> > > @@ -86,4 +87,7 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-> > >  {
-> > >  	return __set_phys_to_machine(pfn, mfn);
-> > >  }
-> > > +
-> > > +#define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
-> > > +
-> > >  #endif /* _ASM_ARM_XEN_PAGE_H */
-> > > diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-> > > index 472b9b7..6aef9fb 100644
-> > > --- a/arch/x86/include/asm/xen/page.h
-> > > +++ b/arch/x86/include/asm/xen/page.h
-> > > @@ -212,4 +212,6 @@ unsigned long arbitrary_virt_to_mfn(void *vaddr);
-> > >  void make_lowmem_page_readonly(void *vaddr);
-> > >  void make_lowmem_page_readwrite(void *vaddr);
-> > >  
-> > > +#define xen_remap(cookie, size) ioremap((cookie), (size));
-> > > +
-> > >  #endif /* _ASM_X86_XEN_PAGE_H */
-> > > diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
-> > > index 19843ec..682210d7 100644
-> > > --- a/drivers/tty/hvc/hvc_xen.c
-> > > +++ b/drivers/tty/hvc/hvc_xen.c
-> > > @@ -230,7 +230,7 @@ static int xen_hvm_console_init(void)
-> > >  	if (r < 0 || v == 0)
-> > >  		goto err;
-> > >  	mfn = v;
-> > > -	info->intf = ioremap(mfn << PAGE_SHIFT, PAGE_SIZE);
-> > > +	info->intf = xen_remap(mfn << PAGE_SHIFT, PAGE_SIZE);
-> > >  	if (info->intf == NULL)
-> > >  		goto err;
-> > >  	info->vtermno = HVC_COOKIE;
-> > > diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-> > > index 7038de5..1c2a1e5 100644
-> > > --- a/drivers/xen/grant-table.c
-> > > +++ b/drivers/xen/grant-table.c
-> > > @@ -1146,7 +1146,7 @@ int gnttab_resume(void)
-> > >  		return gnttab_map(0, nr_grant_frames - 1);
-> > >  
-> > >  	if (gnttab_shared.addr == NULL) {
-> > > -		gnttab_shared.addr = ioremap(xen_hvm_resume_frames,
-> > > +		gnttab_shared.addr = xen_remap(xen_hvm_resume_frames,
-> > >  						PAGE_SIZE * max_nr_gframes);
-> > >  		if (gnttab_shared.addr == NULL) {
-> > >  			printk(KERN_WARNING
-> > > diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
-> > > index 038b71d..3325884 100644
-> > > --- a/drivers/xen/xenbus/xenbus_probe.c
-> > > +++ b/drivers/xen/xenbus/xenbus_probe.c
-> > > @@ -769,7 +769,7 @@ static int __init xenbus_init(void)
-> > >  			goto out_error;
-> > >  		xen_store_mfn = (unsigned long)v;
-> > >  		xen_store_interface =
-> > > -			ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
-> > > +			xen_remap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
-> > >  		break;
-> > >  	default:
-> > >  		pr_warn("Xenstore state unknown\n");
+> > > Hmm, I think the use of a bus_type for a PHY actually sounds quite
+> > > appropriate. The actual PHY device would then be a child of the
 > > 
+> > really ? I'm not so sure, the *bus* used by the PHY is ULPI, UTMI,
+> > UTMI+, PIP3, I2C, etc... adding another 'fake' bus representation is a
+> > bit overkill IMO.
+> > 
+> > Imagine an I2C-controlled PHY driver like isp1301, that driver will have
+> > to register i2c_driver and phy_driver, which looks weird to me. If the
+> > only substitute for class is a bus, we can't drop classes just yet, I'm
+> > afraid.
+> > 
+> > Imagine a regulator bus, a pwm bus, an LED bus etc. They don't make
+> > sense IMHO.
+> 
+> It's a fine line, but I think a phy is something that resembles a device
+> more than an LED does. When I read patch 1, I also noticed and commented
+> on the fact that it does use a 'class'. Now, according to Greg, we should
+> use 'bus_type' instead of 'class' in new code. I originally disagreed with
+> that concept, but he's the boss here and it's good if he has a vision
+> how things should be lined out.
+> 
+> In practice, there is little difference between a 'bus_type' and a 'class',
+> so just replace any instance of the former with the latter in your head
+> when reading the code ;-)
+
+it's not so simple :-) if we must use bus_type we need to introduce all
+the device/driver matching mechanism which isn't necessary with a class.
+
+> I understand that there is not a real common bus here, and the bus_type
+> infrastructure would basically be used as a way to represent each PHY
+> in sysfs and provide a way to enumerate and look them up inside of the
+> kernel.
+
+right, but maybe we need another mechanism. If, in the long run we must
+use bus_type, then eventually pwm, led, regulators, etc will all be
+converted to bus_type. It will look quite weird IMHO.
+
+Greg, can you pitch your suggestion here ? It would be great to hear
+your rationale behind dropping class infrastructure, couldn't find
+anything through Google and since feature-removal-schedule.txt has been
+removed (without adding it to feature-removal-schedule.txt, I must add
+:-) I don't know what's the idea behind removing classes.
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/c0d87372/attachment.sig>
