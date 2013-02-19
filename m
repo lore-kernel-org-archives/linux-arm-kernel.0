@@ -1,72 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Feb 2013 14:31:28 -0800
-Subject: hwmod data duplication (was: Re: [RFC/NOT FOR MERGING 2/3]
- serial: omap: remove hwmod dependency)
-In-Reply-To: <20130219222215.GA12225@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
- <20130214224710.GF11362@atomide.com>
- <alpine.DEB.2.00.1302191527200.32069@utopia.booyaka.com>
- <20130219154511.GU17852@n2100.arm.linux.org.uk>
- <20130219163053.GE5724@atomide.com>
- <20130219182257.GV17852@n2100.arm.linux.org.uk>
- <20130219193122.GJ5724@atomide.com>
- <20130219194327.GB8978@arwen.pp.htv.fi>
- <20130219220932.GL5724@atomide.com>
- <20130219222215.GA12225@arwen.pp.htv.fi>
-Message-ID: <20130219223128.GM5724@atomide.com>
+From: gorcunov@openvz.org (Cyrill Gorcunov)
+Date: Wed, 20 Feb 2013 02:32:24 +0400
+Subject: [patch 1/2] kcmp: Make it to depend on CONFIG_KCMP
+In-Reply-To: <20130219221548.GK5627@moon>
+References: <20130219065210.030802820@openvz.org> <5123444D.6000806@suse.cz>
+ <20130219093154.GF20312@moon> <5123BC2B.6000304@zytor.com>
+ <20130219182838.GL20312@moon>
+ <20130219134256.f4cedf44.akpm@linux-foundation.org>
+ <20130219215432.GP20312@moon>
+ <20130219140035.373ce4d2.akpm@linux-foundation.org>
+ <20130219221146.GR20312@moon> <20130219221548.GK5627@moon>
+Message-ID: <20130219223224.GL5627@moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [130219 14:26]:
-> On Tue, Feb 19, 2013 at 02:09:33PM -0800, Tony Lindgren wrote:
-> > 
-> > ..that means massive amount of churn in the board-*.c files to convert
-> > them to various init functions to be called from board-generic.c and
-> > removing the ones that are working with DT.
+On Wed, Feb 20, 2013 at 02:15:48AM +0400, Cyrill Gorcunov wrote:
 > 
-> why ? I meant that only what's not converted to DT today should be
-> handled this way. Also, most of the "churn" is already there
-> (usb_musb_init(), usb_ehci_init(), etc etc), it just needs to be called
-> from a different place. We don't need to have one function for each
-> board, however, maybe we could target by-soc:
-> 
-> if (of_is_compatible("omap3"))
-> 	omap3_init_devices(); /* or whatever you wanna call it */
-> 
-> omap_init_devices() has initialization for everything which isn't DT
-> adapted today and as we move things to DT, there's a single place to
-> remove code from.
+> Here is update. Peter, does it look good for you too?
+Sigh, -ENOTQUILTREFRESHED, sorry
+---
+From: Cyrill Gorcunov <gorcunov@openvz.org>
+Subject: kcmp: Make it to depend on CHECKPOINT_RESTORE
 
-And the pdata for that comes from where? :) I think that means
-converting each board-*.c to device init functions, which leads to
-the churn I was mentioning..
+Since kcmp syscall has been implemented (initially on
+x86 architecture) a number of other archs wire it up
+as well: xtensa, sparc, sh, s390, mips, microblaze,
+m68k (not taking into account those who uses
+<asm-generic/unistd.h> for syscall numbers
+definitions).
+
+But the Makefile, which turns kcmp.o generation on
+still depends on former config-x86. Thus get rid
+of this limitation and make kcmp.o depend on CHECKPOINT_RESTORE
+option.
+
+Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
+Cc: KOSAKI Motohiro <kosaki.motohiro@gmail.com>
+Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+Cc: Pavel Emelyanov <xemul@parallels.com>
+Cc: Andrey Vagin <avagin@openvz.org>
+Cc: Ingo Molnar <mingo@elte.hu>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Glauber Costa <glommer@parallels.com>
+Cc: Andi Kleen <andi@firstfloor.org>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Matt Helsley <matthltc@us.ibm.com>
+Cc: Pekka Enberg <penberg@kernel.org>
+Cc: Eric Dumazet <eric.dumazet@gmail.com>
+Cc: Vasiliy Kulikov <segoon@openwall.com>
+Cc: Alexey Dobriyan <adobriyan@gmail.com>
+Cc: Valdis.Kletnieks at vt.edu
+Cc: Michal Marek <mmarek@suse.cz>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+---
+ kernel/Makefile |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+Index: linux-2.6.git/kernel/Makefile
+===================================================================
+--- linux-2.6.git.orig/kernel/Makefile
++++ linux-2.6.git/kernel/Makefile
+@@ -25,9 +25,7 @@ endif
+ obj-y += sched/
+ obj-y += power/
  
-> > I think we're better off making first sure things are usable with
-> > DT, then just dropping the board-*.c files as we go.
-> > 
-> > And omap4 is the place to start as we only have blaze and panda
-> > board files. Once DSS, USB and WLAN work with the .dts files, we
-> > can just drop those board files and make omap4 DT only.
-> 
-> fair enough.
-> 
-> > We may be able to drop omap4 board-*.c files faster than going full
-> > DT with few selected legacy init functions in board-generic.c for
-> > things like LCD panel configuration etc.
-> >  
-> > > Only on board-files we're talking about over 13K lines:
-> > >  35 files changed, 13434 deletions(-)
-...
-
-> > > If we remove all addresses and interrupts, numbers look even better.
-> > 
-> > Yeah. Let's start with omap4 first when DSS + USB + WLAN work.
-> 
-> USB is going to be ready for v3.10, likely Wlan too.
-
-That's good news. Maybe we can then have a legacy device pdata
-init for DSS, and make omap4 DT only for v3.10.
-
-Regards,
-
-Tony
+-ifeq ($(CONFIG_CHECKPOINT_RESTORE),y)
+-obj-$(CONFIG_X86) += kcmp.o
+-endif
++obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
+ obj-$(CONFIG_FREEZER) += freezer.o
+ obj-$(CONFIG_PROFILING) += profile.o
+ obj-$(CONFIG_STACKTRACE) += stacktrace.o
