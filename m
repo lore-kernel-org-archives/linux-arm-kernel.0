@@ -1,42 +1,67 @@
 From: avinashphilip@ti.com (Philip Avinash)
-Date: Tue, 19 Feb 2013 18:20:16 +0530
-Subject: [PATCH v3 0/3] suspend/resume support for OMAP nand driver
-Message-ID: <1361278219-23108-1-git-send-email-avinashphilip@ti.com>
+Date: Tue, 19 Feb 2013 18:20:17 +0530
+Subject: [PATCH v3 1/3] arm: gpmc: Converts GPMC driver to pm_runtime capable
+In-Reply-To: <1361278219-23108-1-git-send-email-avinashphilip@ti.com>
+References: <1361278219-23108-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <1361278219-23108-2-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds low power transition support for OMAP NAND driver.
-With recent driver conversion of GPMC to platform_driver, pm_runtime calls
-can be used to handle module enable & disable of GPMC. This is taken care
-patch #1.
+Support for pm_runtime add to GPMC driver.
 
-patch #2 is for GPMC suspend/resume support.
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+---
+ arch/arm/mach-omap2/gpmc.c |   10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-This includes low power transition support of
-- GPMC module
-- ELM module
-
-User initiated suspend/resume sequence tested on am335x-evm with NAND
-flash support. Also tested in omap3-evm for user initiated
-suspend/resume sequence with NAND flash.
-This patch series based on [1] and is present in [2].
-
-1. ARM: OMAP2+: AM33XX: Add suspend-resume support
-   http://comments.gmane.org/gmane.linux.ports.arm.omap/91405
-2. https://github.com/avinashphilip/am335x_linux/commits/NAND_supend_resume_support
-
-Changes Since v2:
-- Remove calll back of nand_suspend from omap2 nand driver, as the same call already
-  done from suspend activity mtd class driver.
-
-Philip Avinash (3):
-  arm: gpmc: Converts GPMC driver to pm_runtime capable
-  arm: gpmc: Low power transition support
-  mtd: devices: elm: Low power transition support
-
- arch/arm/mach-omap2/gpmc.c |   30 +++++++++++++++++++++---
- drivers/mtd/devices/elm.c  |   54 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 81 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 2c57f81..b1cd6c1 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -29,6 +29,7 @@
+ #include <linux/of_mtd.h>
+ #include <linux/of_device.h>
+ #include <linux/mtd/nand.h>
++#include <linux/pm_runtime.h>
+ 
+ #include <linux/platform_data/mtd-nand-omap2.h>
+ 
+@@ -1317,7 +1318,8 @@ static int gpmc_probe(struct platform_device *pdev)
+ 		return PTR_ERR(gpmc_l3_clk);
+ 	}
+ 
+-	clk_prepare_enable(gpmc_l3_clk);
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_get_sync(&pdev->dev);
+ 
+ 	gpmc_dev = &pdev->dev;
+ 
+@@ -1329,7 +1331,7 @@ static int gpmc_probe(struct platform_device *pdev)
+ 
+ 	rc = gpmc_mem_init();
+ 	if (IS_ERR_VALUE(rc)) {
+-		clk_disable_unprepare(gpmc_l3_clk);
++		pm_runtime_put_sync(&pdev->dev);
+ 		clk_put(gpmc_l3_clk);
+ 		dev_err(gpmc_dev, "failed to reserve memory\n");
+ 		return rc;
+@@ -1340,7 +1342,7 @@ static int gpmc_probe(struct platform_device *pdev)
+ 
+ 	rc = gpmc_probe_dt(pdev);
+ 	if (rc < 0) {
+-		clk_disable_unprepare(gpmc_l3_clk);
++		pm_runtime_put_sync(&pdev->dev);
+ 		clk_put(gpmc_l3_clk);
+ 		dev_err(gpmc_dev, "failed to probe DT parameters\n");
+ 		return rc;
+@@ -1353,6 +1355,8 @@ static __devexit int gpmc_remove(struct platform_device *pdev)
+ {
+ 	gpmc_free_irq();
+ 	gpmc_mem_exit();
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
+ 	gpmc_dev = NULL;
+ 	return 0;
+ }
 -- 
 1.7.9.5
