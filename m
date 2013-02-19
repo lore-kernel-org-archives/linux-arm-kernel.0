@@ -1,251 +1,172 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 20 Feb 2013 00:22:19 +0800
-Subject: [PATCH v4 02/11] gpio: pxa: clean code with same variable name
+Date: Wed, 20 Feb 2013 00:22:20 +0800
+Subject: [PATCH v4 03/11] gpio: pxa: use platform data for gpio inverted
 In-Reply-To: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1361290948-16669-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1361290948-16669-4-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean code to avoid similar variable. Now use gc for gpio_chip,
-and use c/chip for pxa_gpio_chip. It's used to avoid confusion.
+Avoid to judge whether gpio is inverted by identifying cpu in
+gpio driver. Move this into platform data of gpio driver.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/gpio/gpio-pxa.c |  102 +++++++++++++++++++++++------------------------
- 1 file changed, 50 insertions(+), 52 deletions(-)
+ arch/arm/mach-pxa/pxa25x.c |    3 +++
+ drivers/gpio/gpio-pxa.c    |   31 ++++++++++++++++++++-----------
+ include/linux/gpio-pxa.h   |    1 +
+ 3 files changed, 24 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index a4c6687..e611bed 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -69,20 +69,20 @@ static struct device_node *pxa_gpio_of_node;
- #endif
- 
- struct pxa_gpio_chip {
--	struct gpio_chip chip;
--	void __iomem	*regbase;
--	char label[10];
-+	struct gpio_chip	gc;
-+	void __iomem		*regbase;
-+	char			label[10];
- 
--	unsigned long	irq_mask;
--	unsigned long	irq_edge_rise;
--	unsigned long	irq_edge_fall;
--	int (*set_wake)(unsigned int gpio, unsigned int on);
-+	unsigned long		irq_mask;
-+	unsigned long		irq_edge_rise;
-+	unsigned long		irq_edge_fall;
-+	int			(*set_wake)(unsigned int gpio, unsigned int on);
- 
- #ifdef CONFIG_PM
--	unsigned long	saved_gplr;
--	unsigned long	saved_gpdr;
--	unsigned long	saved_grer;
--	unsigned long	saved_gfer;
-+	unsigned long		saved_gplr;
-+	unsigned long		saved_gpdr;
-+	unsigned long		saved_grer;
-+	unsigned long		saved_gfer;
- #endif
- };
- 
-@@ -103,9 +103,9 @@ static void __iomem *gpio_reg_base;
- #define for_each_gpio_chip(i, c)			\
- 	for (i = 0, c = &pxa_gpio_chips[0]; i <= pxa_last_gpio; i += 32, c++)
- 
--static inline void __iomem *gpio_chip_base(struct gpio_chip *c)
-+static inline void __iomem *gpio_chip_base(struct gpio_chip *gc)
- {
--	return container_of(c, struct pxa_gpio_chip, chip)->regbase;
-+	return container_of(gc, struct pxa_gpio_chip, gc)->regbase;
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index 3f5171e..9c9c224 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -340,6 +340,9 @@ void __init pxa25x_map_io(void)
  }
  
- static inline struct pxa_gpio_chip *gpio_to_pxachip(unsigned gpio)
-@@ -147,7 +147,7 @@ static inline int __gpio_is_occupied(unsigned gpio)
+ static struct pxa_gpio_platform_data pxa25x_gpio_info __initdata = {
++#ifdef CONFIG_CPU_PXA26x
++	.inverted = true,
++#endif
+ 	.gpio_set_wake = gpio_set_wake,
+ };
+ 
+diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+index e611bed..11a732e 100644
+--- a/drivers/gpio/gpio-pxa.c
++++ b/drivers/gpio/gpio-pxa.c
+@@ -71,6 +71,7 @@ static struct device_node *pxa_gpio_of_node;
+ struct pxa_gpio_chip {
+ 	struct gpio_chip	gc;
+ 	void __iomem		*regbase;
++	bool			inverted;
+ 	char			label[10];
+ 
+ 	unsigned long		irq_mask;
+@@ -126,9 +127,9 @@ static inline int gpio_is_mmp_type(int type)
+ /* GPIO86/87/88/89 on PXA26x have their direction bits in PXA_GPDR(2 inverted,
+  * as well as their Alternate Function value being '1' for GPIO in GAFRx.
+  */
+-static inline int __gpio_is_inverted(int gpio)
++static inline int __gpio_is_inverted(struct pxa_gpio_chip *chip, int gpio)
+ {
+-	if ((gpio_type == PXA26X_GPIO) && (gpio > 85))
++	if ((chip->inverted) && (gpio > 85))
+ 		return 1;
+ 	return 0;
+ }
+@@ -139,15 +140,13 @@ static inline int __gpio_is_inverted(int gpio)
+  * is attributed as "occupied" here (I know this terminology isn't
+  * accurate, you are welcome to propose a better one :-)
+  */
+-static inline int __gpio_is_occupied(unsigned gpio)
++static inline int __gpio_is_occupied(struct pxa_gpio_chip *chip, unsigned gpio)
+ {
+-	struct pxa_gpio_chip *pxachip;
+ 	void __iomem *base;
+ 	unsigned long gafr = 0, gpdr = 0;
  	int ret, af = 0, dir = 0;
  
- 	pxachip = gpio_to_pxachip(gpio);
--	base = gpio_chip_base(&pxachip->chip);
-+	base = gpio_chip_base(&pxachip->gc);
+-	pxachip = gpio_to_pxachip(gpio);
+-	base = gpio_chip_base(&pxachip->gc);
++	base = gpio_chip_base(&chip->gc);
  	gpdr = readl_relaxed(base + GPDR_OFFSET);
  
  	switch (gpio_type) {
-@@ -170,9 +170,9 @@ static inline int __gpio_is_occupied(unsigned gpio)
- 	return ret;
- }
+@@ -158,7 +157,7 @@ static inline int __gpio_is_occupied(unsigned gpio)
+ 		af = (gafr >> ((gpio & 0xf) * 2)) & 0x3;
+ 		dir = gpdr & GPIO_bit(gpio);
  
--static int pxa_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-+static int pxa_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
+-		if (__gpio_is_inverted(gpio))
++		if (__gpio_is_inverted(chip, gpio))
+ 			ret = (af != 1) || (dir == 0);
+ 		else
+ 			ret = (af != 0) || (dir != 0);
+@@ -183,13 +182,16 @@ int pxa_irq_to_gpio(int irq)
+ static int pxa_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
  {
--	return chip->base + offset + irq_base;
-+	return gc->base + offset + irq_base;
- }
- 
- int pxa_irq_to_gpio(int irq)
-@@ -180,16 +180,16 @@ int pxa_irq_to_gpio(int irq)
- 	return irq - irq_base;
- }
- 
--static int pxa_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+static int pxa_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
- {
--	void __iomem *base = gpio_chip_base(chip);
-+	void __iomem *base = gpio_chip_base(gc);
+ 	void __iomem *base = gpio_chip_base(gc);
++	struct pxa_gpio_chip *chip;
  	uint32_t value, mask = 1 << offset;
  	unsigned long flags;
  
++	chip = container_of(gc, struct pxa_gpio_chip, gc);
++
  	spin_lock_irqsave(&gpio_lock, flags);
  
  	value = readl_relaxed(base + GPDR_OFFSET);
--	if (__gpio_is_inverted(chip->base + offset))
-+	if (__gpio_is_inverted(gc->base + offset))
+-	if (__gpio_is_inverted(gc->base + offset))
++	if (__gpio_is_inverted(chip, gc->base + offset))
  		value |= mask;
  	else
  		value &= ~mask;
-@@ -199,10 +199,10 @@ static int pxa_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
- 	return 0;
- }
- 
--static int pxa_gpio_direction_output(struct gpio_chip *chip,
-+static int pxa_gpio_direction_output(struct gpio_chip *gc,
+@@ -203,15 +205,17 @@ static int pxa_gpio_direction_output(struct gpio_chip *gc,
  				     unsigned offset, int value)
  {
--	void __iomem *base = gpio_chip_base(chip);
-+	void __iomem *base = gpio_chip_base(gc);
+ 	void __iomem *base = gpio_chip_base(gc);
++	struct pxa_gpio_chip *chip;
  	uint32_t tmp, mask = 1 << offset;
  	unsigned long flags;
  
-@@ -211,7 +211,7 @@ static int pxa_gpio_direction_output(struct gpio_chip *chip,
++	chip = container_of(gc, struct pxa_gpio_chip, gc);
+ 	writel_relaxed(mask, base + (value ? GPSR_OFFSET : GPCR_OFFSET));
+ 
  	spin_lock_irqsave(&gpio_lock, flags);
  
  	tmp = readl_relaxed(base + GPDR_OFFSET);
--	if (__gpio_is_inverted(chip->base + offset))
-+	if (__gpio_is_inverted(gc->base + offset))
+-	if (__gpio_is_inverted(gc->base + offset))
++	if (__gpio_is_inverted(chip, gc->base + offset))
  		tmp &= ~mask;
  	else
  		tmp |= mask;
-@@ -221,15 +221,15 @@ static int pxa_gpio_direction_output(struct gpio_chip *chip,
- 	return 0;
- }
+@@ -322,7 +326,7 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
+ 		if ((c->irq_edge_rise | c->irq_edge_fall) & GPIO_bit(gpio))
+ 			return 0;
  
--static int pxa_gpio_get(struct gpio_chip *chip, unsigned offset)
-+static int pxa_gpio_get(struct gpio_chip *gc, unsigned offset)
- {
--	return readl_relaxed(gpio_chip_base(chip) + GPLR_OFFSET) & (1 << offset);
-+	return readl_relaxed(gpio_chip_base(gc) + GPLR_OFFSET) & (1 << offset);
- }
+-		if (__gpio_is_occupied(gpio))
++		if (__gpio_is_occupied(c, gpio))
+ 			return 0;
  
--static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+static void pxa_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
- {
--	writel_relaxed(1 << offset, gpio_chip_base(chip) +
--				(value ? GPSR_OFFSET : GPCR_OFFSET));
-+	writel_relaxed(1 << offset, gpio_chip_base(gc) +
-+		       (value ? GPSR_OFFSET : GPCR_OFFSET));
- }
+ 		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
+@@ -330,7 +334,7 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
  
- #ifdef CONFIG_OF_GPIO
-@@ -240,7 +240,7 @@ static int pxa_gpio_of_xlate(struct gpio_chip *gc,
- 	if (gpiospec->args[0] > pxa_last_gpio)
- 		return -EINVAL;
+ 	gpdr = readl_relaxed(c->regbase + GPDR_OFFSET);
  
--	if (gc != &pxa_gpio_chips[gpiospec->args[0] / 32].chip)
-+	if (gc != &pxa_gpio_chips[gpiospec->args[0] / 32].gc)
- 		return -EINVAL;
- 
- 	if (flags)
-@@ -250,42 +250,43 @@ static int pxa_gpio_of_xlate(struct gpio_chip *gc,
- }
- #endif
- 
--static int pxa_init_gpio_chip(int gpio_end,
--					int (*set_wake)(unsigned int, unsigned int))
-+static int pxa_init_gpio_chip(struct platform_device *pdev, int gpio_end)
- {
- 	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
- 	struct pxa_gpio_chip *chips;
-+	struct pxa_gpio_platform_data *pdata = dev_get_platdata(&pdev->dev);
- 
--	chips = kzalloc(nbanks * sizeof(struct pxa_gpio_chip), GFP_KERNEL);
--	if (chips == NULL) {
--		pr_err("%s: failed to allocate GPIO chips\n", __func__);
-+	chips = devm_kzalloc(&pdev->dev, nbanks * sizeof(*chips), GFP_KERNEL);
-+	if (!chips) {
-+		dev_err(&pdev->dev, "failed to allocate GPIO chips\n");
+-	if (__gpio_is_inverted(gpio))
++	if (__gpio_is_inverted(c, gpio))
+ 		writel_relaxed(gpdr | mask,  c->regbase + GPDR_OFFSET);
+ 	else
+ 		writel_relaxed(gpdr & ~mask, c->regbase + GPDR_OFFSET);
+@@ -508,6 +512,9 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
  		return -ENOMEM;
+ 	if (of_find_property(np, "marvell,gpio-ed-mask", NULL))
+ 		pdata->ed_mask = true;
++	/* It's only valid for PXA26x */
++	if (of_find_property(np, "marvell,gpio-inverted", NULL))
++		pdata->inverted = true;
+ 	/* set the platform data */
+ 	pdev->dev.platform_data = pdata;
+ 	gpio_type = (int)of_id->data;
+@@ -612,6 +619,8 @@ static int pxa_gpio_probe(struct platform_device *pdev)
+ 		/* unmask GPIO edge detect for AP side */
+ 		if (info->ed_mask)
+ 			writel_relaxed(~0, c->regbase + ED_MASK_OFFSET);
++		/* update for gpio inverted */
++		c->inverted = info->inverted;
  	}
  
- 	for (i = 0, gpio = 0; i < nbanks; i++, gpio += 32) {
--		struct gpio_chip *c = &chips[i].chip;
-+		struct gpio_chip *gc = &chips[i].gc;
+ 	if (!use_of) {
+diff --git a/include/linux/gpio-pxa.h b/include/linux/gpio-pxa.h
+index bc5cae5..759e865 100644
+--- a/include/linux/gpio-pxa.h
++++ b/include/linux/gpio-pxa.h
+@@ -15,6 +15,7 @@ extern int pxa_irq_to_gpio(int irq);
  
- 		sprintf(chips[i].label, "gpio-%d", i);
- 		chips[i].regbase = gpio_reg_base + BANK_OFF(i);
--		chips[i].set_wake = set_wake;
-+		if (pdata->gpio_set_wake)
-+			chips[i].set_wake = pdata->gpio_set_wake;
+ struct pxa_gpio_platform_data {
+ 	bool ed_mask;	/* true means that ed_mask reg is available */
++	bool inverted;	/* only valid for PXA26x */
+ 	int (*gpio_set_wake)(unsigned int gpio, unsigned int on);
+ };
  
--		c->base  = gpio;
--		c->label = chips[i].label;
-+		gc->base  = gpio;
-+		gc->label = chips[i].label;
- 
--		c->direction_input  = pxa_gpio_direction_input;
--		c->direction_output = pxa_gpio_direction_output;
--		c->get = pxa_gpio_get;
--		c->set = pxa_gpio_set;
--		c->to_irq = pxa_gpio_to_irq;
-+		gc->direction_input  = pxa_gpio_direction_input;
-+		gc->direction_output = pxa_gpio_direction_output;
-+		gc->get = pxa_gpio_get;
-+		gc->set = pxa_gpio_set;
-+		gc->to_irq = pxa_gpio_to_irq;
- #ifdef CONFIG_OF_GPIO
--		c->of_node = pxa_gpio_of_node;
--		c->of_xlate = pxa_gpio_of_xlate;
--		c->of_gpio_n_cells = 2;
-+		gc->of_node = pxa_gpio_of_node;
-+		gc->of_xlate = pxa_gpio_of_xlate;
-+		gc->of_gpio_n_cells = 2;
- #endif
- 
- 		/* number of GPIOs on last bank may be less than 32 */
--		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
--		gpiochip_add(c);
-+		gc->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
-+		gpiochip_add(gc);
- 	}
- 	pxa_gpio_chips = chips;
- 	return 0;
-@@ -364,7 +365,7 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
- 	do {
- 		loop = 0;
- 		for_each_gpio_chip(gpio, c) {
--			gpio_base = c->chip.base;
-+			gpio_base = c->gc.base;
- 
- 			gedr = readl_relaxed(c->regbase + GEDR_OFFSET);
- 			gedr = gedr & c->irq_mask;
-@@ -537,9 +538,6 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
- 				       &pxa_irq_domain_ops, NULL);
- 	pxa_gpio_of_node = np;
- 	return 0;
--err:
--	iounmap(gpio_reg_base);
--	return ret;
- }
- #else
- #define pxa_gpio_probe_dt(pdev)		(-1)
-@@ -604,7 +602,7 @@ static int pxa_gpio_probe(struct platform_device *pdev)
- 
- 	/* Initialize GPIO chips */
- 	info = dev_get_platdata(&pdev->dev);
--	pxa_init_gpio_chip(pxa_last_gpio, info ? info->gpio_set_wake : NULL);
-+	pxa_init_gpio_chip(pdev, pxa_last_gpio);
- 
- 	/* clear all GPIO edge detects */
- 	for_each_gpio_chip(gpio, c) {
 -- 
 1.7.10.4
