@@ -1,116 +1,169 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 19 Feb 2013 12:35:25 +0100
-Subject: [PATCH v3 1/8] dt: describe base reset signal binding
-In-Reply-To: <1361273732-23357-1-git-send-email-p.zabel@pengutronix.de>
-References: <1361273732-23357-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1361273732-23357-2-git-send-email-p.zabel@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 19 Feb 2013 11:39:16 +0000
+Subject: [PATCH] ARM: let CPUs not being able to run in ARM mode enter in
+ THUMB mode
+In-Reply-To: <20130131155159.GJ8668@pengutronix.de>
+References: <1357904397-8476-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130129124427.GB1974@linaro.org>
+ <20130131155159.GJ8668@pengutronix.de>
+Message-ID: <20130219113916.GA1978@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Thu, Jan 31, 2013 at 04:51:59PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Dave,
+> 
+> On Tue, Jan 29, 2013 at 12:44:27PM +0000, Dave Martin wrote:
+> > On Fri, Jan 11, 2013 at 12:39:57PM +0100, Uwe Kleine-K?nig wrote:
+> > > Some ARM cores are not capable to run in ARM mode (e.g. Cortex-M3). So
+> > > obviously these cannot enter the kernel in ARM mode. Make an exception
+> > > for them and let them enter in THUMB mode.
+> > > 
+> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > ---
+> > >  arch/arm/kernel/head-nommu.S |    8 +++++++-
+> > >  arch/arm/kernel/head.S       |    8 +++++++-
+> > >  arch/arm/mm/Kconfig          |    6 ++++++
+> > >  3 files changed, 20 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> > > index 3782320..ae7ed46 100644
+> > > --- a/arch/arm/kernel/head-nommu.S
+> > > +++ b/arch/arm/kernel/head-nommu.S
+> > > @@ -32,15 +32,21 @@
+> > >   * numbers for r1.
+> > >   *
+> > >   */
+> > > -	.arm
+> > >  
+> > >  	__HEAD
+> > > +
+> > > +#ifdef CONFIG_THUMBONLY_CPU
+> > > +	.thumb
+> > > +ENTRY(stext)
+> > > +#else
+> > > +	.arm
+> > >  ENTRY(stext)
+> > >  
+> > >   THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
+> > >   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
+> > >   THUMB(	.thumb			)	@ switch to Thumb now.
+> > >   THUMB(1:			)
+> > > +#endif
+> > 
+> > The behaviour is that we start the file is kernel entry state, then
+> > we switch to kernel run state.
+> > 
+> > The switch is only needed for kernels which run on CPUs supporting
+> > both states, where the run state is not ARM.
+> > 
+> > So, it would be neater for these entry sequences to look something
+> > like:
+> > 
+> > HAS_ARM(.arm)	@ because -mthumb is default for Thumb kernels anyway
+> > 
+> > ENTRY(stext)
+> > HAS_ARM(THUMB(	@ code to switch to Thumb ))
+> > 
+> > 	@ real code starts here, in run state.
+> > 
+> > 
+> > 
+> > Where
+> > 
+> > #ifdef CONFIG_THUMBONLY_CPU
+> > #define HAS_ARM(x...)
+> > #else
+> > #define HAS_ARM(x...) x
+> > #endif
+> > 
+> > (I haven't read the whole thread yet, so decisions about what
+> > config variables and macro names should be used may be overridden
+> > by other people...)
+> I don't agree on better readability, the result would look like:
+> 
+> 		__HEAD
+> 
+> 	HAS_ARM(.arm)
+> 
+> 		ENTRY(stext)
+> 
+> 	HAS_ARM(THUMB(adr	r9, BSYM(1f)	)
+> 	HAS_ARM(THUMB(bx	r9		)
+> 	HAS_ARM(THUMB(.thumb			)
+> 	HAS_ARM(THUMB(1:			)
+> 
+> in contrast to:
+> 
+> 		__HEAD
+> 
+> 	#ifdef CONFIG_CPU_THUMBONLY
+> 		.thumb
+> 	ENTRY(stext)
+> 	#else
+> 		.arm
+> 	ENTRY(stext)
+> 
+> 	 THUMB( adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
+> 	 THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
+> 	 THUMB( .thumb                  )       @ switch to Thumb now.
+> 	 THUMB(1:                       )
+> 	#endif
+> 
+> 
+> (modulo comments and indention maybe). Even though it uses an #ifdef I
+> consider the latter variant more readable.  Maybe it's only me? Other
+> than that I'd probably choose a longer name instead of HAS_ARM to make
+> it more self-documenting what it is about (something with _ISA_ in its
+> name). This obviously makes readability worse.
 
-This binding is intended to represent the hardware reset signals present
-internally in most IC (SoC, FPGA, ...) designs.
-It consists of a binding for a reset controller device (provider), and a
-pair of properties, "resets" and "reset-names", to link a device node
-(consumer) to its reset controller via phandle, similarly to the clock
-and interrupt bindings.
+Well, maybe so.
 
-The reset controller has all information necessary to reset the consumer
-device. That could be provided via device tree, or it could be implemented
-in hardware.
-The aim is to enable device drivers to request a framework API to issue a
-reset simply by providing their struct device pointer as the most common
-case.
+Note that Thumb is also the default instruction set for any Thumb-2
+kernel; that's why we needed .arm in the first place.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
----
- Documentation/devicetree/bindings/reset/reset.txt |   75 +++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/reset.txt
 
-diff --git a/Documentation/devicetree/bindings/reset/reset.txt b/Documentation/devicetree/bindings/reset/reset.txt
-new file mode 100644
-index 0000000..31db6ff
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/reset.txt
-@@ -0,0 +1,75 @@
-+= Reset Signal Device Tree Bindings =
-+
-+This binding is intended to represent the hardware reset signals present
-+internally in most IC (SoC, FPGA, ...) designs. Reset signals for whole
-+standalone chips are most likely better represented as GPIOs, although there
-+are likely to be exceptions to this rule.
-+
-+Hardware blocks typically receive a reset signal. This signal is generated by
-+a reset provider (e.g. power management or clock module) and received by a
-+reset consumer (the module being reset, or a module managing when a sub-
-+ordinate module is reset). This binding exists to represent the provider and
-+consumer, and provide a way to couple the two together.
-+
-+A reset signal is represented by the phandle of the provider, plus a reset
-+specifier - a list of DT cells that represents the reset signal within the
-+provider. The length (number of cells) and semantics of the reset specifier
-+are dictated by the binding of the reset provider, although common schemes
-+are described below.
-+
-+A word on where to place reset signal consumers in device tree: It is possible
-+in hardware for a reset signal to affect multiple logically separate HW blocks
-+at once. In this case, it would be unwise to represent this reset signal in
-+the DT node of each affected HW block, since if activated, an unrelated block
-+may be reset. Instead, reset signals should be represented in the DT node
-+where it makes most sense to control it; this may be a bus node if all
-+children of the bus are affected by the reset signal, or an individual HW
-+block node for dedicated reset signals. The intent of this binding is to give
-+appropriate software access to the reset signals in order to manage the HW,
-+rather than to slavishly enumerate the reset signal that affects each HW
-+block.
-+
-+= Reset providers =
-+
-+Required properties:
-+#reset-cells:	Number of cells in a reset specifier; Typically 0 for nodes
-+		with a single reset output and 1 for nodes with multiple
-+		reset outputs.
-+
-+For example:
-+
-+	rst: reset-controller {
-+		#reset-cells = <1>;
-+	};
-+
-+= Reset consumers =
-+
-+Required properties:
-+resets:		List of phandle and reset specifier pairs, one pair
-+		for each reset signal that affects the device, or that the
-+		device manages. Note: if the reset provider specifies '0' for
-+		#reset-cells, then only the phandle portion of the pair will
-+		appear.
-+
-+Optional properties:
-+reset-names:	List of reset signal name strings sorted in the same order as
-+		the resets property. Consumers drivers will use reset-names to
-+		match reset signal names with reset specifiers.
-+
-+For example:
-+
-+	device {
-+		resets = <&rst 20>;
-+		reset-names = "reset";
-+	};
-+
-+This represents a device with a single reset signal named "reset".
-+
-+	bus {
-+		resets = <&rst 10> <&rst 11> <&rst 12> <&rst 11>;
-+		reset-names = "i2s1", "i2s2", "dma", "mixer";
-+	};
-+
-+This represents a bus that controls the reset signal of each of four sub-
-+ordinate devices. Consider for example a bus that fails to operate unless no
-+child device has reset asserted.
--- 
-1.7.10.4
+We could turn the switch to Thumb into a macro in assembler.h -- that's
+actually needed elsewhere:
+
+#if defined(CONFIG_THUMB2_KERNEL) && !defined(CONFIG_CPU_THUMBONLY)
+
+.macro entry_isa
+	.arm
+.endm
+
+.macro switch_to_kernel_isa rtemp
+ THUMB(		adr	\rtemp, BSYM(9999f)	)
+ THUMB(		bx	\rtemp			)
+ THUMB(		.thumb				)
+ THUMB(	9999:					)
+.endm
+
+#else
+
+.macro entry_isa
+.endm
+.macro switch_to_kernel_isa rtemp
+.endm
+
+#endif
+
+
+Then head.S becomes
+
+	__HEAD
+
+	entry_isa
+
+ENTRY(stext)
+	switch_to_kernel_isa r9
+
+
+
+The macros can be reused in the zImage decompressor, the mcpm low-level
+entry point and possibly elsewhere.
+
+What do you think?
+
+Cheers
+---Dave
