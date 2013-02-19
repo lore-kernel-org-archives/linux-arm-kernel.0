@@ -1,95 +1,105 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 19 Feb 2013 09:42:56 -0500
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 19 Feb 2013 14:48:30 +0000
 Subject: [PATCH] xen: introduce xen_remap, use it instead of ioremap
-In-Reply-To: <alpine.DEB.2.02.1302191332340.4654@kaball.uk.xensource.com>
+In-Reply-To: <20130219144253.GE7026@konrad-lan.dumpdata.com>
 References: <alpine.DEB.2.02.1302191332340.4654@kaball.uk.xensource.com>
-Message-ID: <20130219144253.GE7026@konrad-lan.dumpdata.com>
+ <20130219144253.GE7026@konrad-lan.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1302191445160.4654@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 01:59:19PM +0000, Stefano Stabellini wrote:
-> ioremap can't be used to map ring pages on ARM because it uses device
-> memory caching attributes (MT_DEVICE*).
+On Tue, 19 Feb 2013, Konrad Rzeszutek Wilk wrote:
+> On Tue, Feb 19, 2013 at 01:59:19PM +0000, Stefano Stabellini wrote:
+> > ioremap can't be used to map ring pages on ARM because it uses device
+> > memory caching attributes (MT_DEVICE*).
+> > 
+> > Introduce a Xen specific abstraction to map ring pages, called
+> > xen_remap, that is defined as ioremap on x86 (no behavioral changes).
+> > On ARM it explicitly calls __arm_ioremap with the right caching
+> > attributes: MT_MEMORY.
 > 
-> Introduce a Xen specific abstraction to map ring pages, called
-> xen_remap, that is defined as ioremap on x86 (no behavioral changes).
-> On ARM it explicitly calls __arm_ioremap with the right caching
-> attributes: MT_MEMORY.
+> Do you want to push this to Linus yourself or should I just include it
+> in my 'for-39' tree?
+> 
+> Do you have other patches for 3.9?
 
-Do you want to push this to Linus yourself or should I just include it
-in my 'for-39' tree?
+Ian has two patches ("linux: public interface changes for arm"), it
+would be great if they could go in 3.9.
+Given the small number of patches (three all together), it is probably
+easier to go via your tree, if you are OK with that.
 
-Do you have other patches for 3.9?
+
+
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > 
+> > diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> > index c6b9096..30cdacb 100644
+> > --- a/arch/arm/include/asm/xen/page.h
+> > +++ b/arch/arm/include/asm/xen/page.h
+> > @@ -1,6 +1,7 @@
+> >  #ifndef _ASM_ARM_XEN_PAGE_H
+> >  #define _ASM_ARM_XEN_PAGE_H
+> >  
+> > +#include <asm/mach/map.h>
+> >  #include <asm/page.h>
+> >  #include <asm/pgtable.h>
+> >  
+> > @@ -86,4 +87,7 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+> >  {
+> >  	return __set_phys_to_machine(pfn, mfn);
+> >  }
+> > +
+> > +#define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
+> > +
+> >  #endif /* _ASM_ARM_XEN_PAGE_H */
+> > diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+> > index 472b9b7..6aef9fb 100644
+> > --- a/arch/x86/include/asm/xen/page.h
+> > +++ b/arch/x86/include/asm/xen/page.h
+> > @@ -212,4 +212,6 @@ unsigned long arbitrary_virt_to_mfn(void *vaddr);
+> >  void make_lowmem_page_readonly(void *vaddr);
+> >  void make_lowmem_page_readwrite(void *vaddr);
+> >  
+> > +#define xen_remap(cookie, size) ioremap((cookie), (size));
+> > +
+> >  #endif /* _ASM_X86_XEN_PAGE_H */
+> > diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
+> > index 19843ec..682210d7 100644
+> > --- a/drivers/tty/hvc/hvc_xen.c
+> > +++ b/drivers/tty/hvc/hvc_xen.c
+> > @@ -230,7 +230,7 @@ static int xen_hvm_console_init(void)
+> >  	if (r < 0 || v == 0)
+> >  		goto err;
+> >  	mfn = v;
+> > -	info->intf = ioremap(mfn << PAGE_SHIFT, PAGE_SIZE);
+> > +	info->intf = xen_remap(mfn << PAGE_SHIFT, PAGE_SIZE);
+> >  	if (info->intf == NULL)
+> >  		goto err;
+> >  	info->vtermno = HVC_COOKIE;
+> > diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+> > index 7038de5..1c2a1e5 100644
+> > --- a/drivers/xen/grant-table.c
+> > +++ b/drivers/xen/grant-table.c
+> > @@ -1146,7 +1146,7 @@ int gnttab_resume(void)
+> >  		return gnttab_map(0, nr_grant_frames - 1);
+> >  
+> >  	if (gnttab_shared.addr == NULL) {
+> > -		gnttab_shared.addr = ioremap(xen_hvm_resume_frames,
+> > +		gnttab_shared.addr = xen_remap(xen_hvm_resume_frames,
+> >  						PAGE_SIZE * max_nr_gframes);
+> >  		if (gnttab_shared.addr == NULL) {
+> >  			printk(KERN_WARNING
+> > diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
+> > index 038b71d..3325884 100644
+> > --- a/drivers/xen/xenbus/xenbus_probe.c
+> > +++ b/drivers/xen/xenbus/xenbus_probe.c
+> > @@ -769,7 +769,7 @@ static int __init xenbus_init(void)
+> >  			goto out_error;
+> >  		xen_store_mfn = (unsigned long)v;
+> >  		xen_store_interface =
+> > -			ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> > +			xen_remap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> >  		break;
+> >  	default:
+> >  		pr_warn("Xenstore state unknown\n");
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> 
-> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-> index c6b9096..30cdacb 100644
-> --- a/arch/arm/include/asm/xen/page.h
-> +++ b/arch/arm/include/asm/xen/page.h
-> @@ -1,6 +1,7 @@
->  #ifndef _ASM_ARM_XEN_PAGE_H
->  #define _ASM_ARM_XEN_PAGE_H
->  
-> +#include <asm/mach/map.h>
->  #include <asm/page.h>
->  #include <asm/pgtable.h>
->  
-> @@ -86,4 +87,7 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
->  {
->  	return __set_phys_to_machine(pfn, mfn);
->  }
-> +
-> +#define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
-> +
->  #endif /* _ASM_ARM_XEN_PAGE_H */
-> diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-> index 472b9b7..6aef9fb 100644
-> --- a/arch/x86/include/asm/xen/page.h
-> +++ b/arch/x86/include/asm/xen/page.h
-> @@ -212,4 +212,6 @@ unsigned long arbitrary_virt_to_mfn(void *vaddr);
->  void make_lowmem_page_readonly(void *vaddr);
->  void make_lowmem_page_readwrite(void *vaddr);
->  
-> +#define xen_remap(cookie, size) ioremap((cookie), (size));
-> +
->  #endif /* _ASM_X86_XEN_PAGE_H */
-> diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
-> index 19843ec..682210d7 100644
-> --- a/drivers/tty/hvc/hvc_xen.c
-> +++ b/drivers/tty/hvc/hvc_xen.c
-> @@ -230,7 +230,7 @@ static int xen_hvm_console_init(void)
->  	if (r < 0 || v == 0)
->  		goto err;
->  	mfn = v;
-> -	info->intf = ioremap(mfn << PAGE_SHIFT, PAGE_SIZE);
-> +	info->intf = xen_remap(mfn << PAGE_SHIFT, PAGE_SIZE);
->  	if (info->intf == NULL)
->  		goto err;
->  	info->vtermno = HVC_COOKIE;
-> diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-> index 7038de5..1c2a1e5 100644
-> --- a/drivers/xen/grant-table.c
-> +++ b/drivers/xen/grant-table.c
-> @@ -1146,7 +1146,7 @@ int gnttab_resume(void)
->  		return gnttab_map(0, nr_grant_frames - 1);
->  
->  	if (gnttab_shared.addr == NULL) {
-> -		gnttab_shared.addr = ioremap(xen_hvm_resume_frames,
-> +		gnttab_shared.addr = xen_remap(xen_hvm_resume_frames,
->  						PAGE_SIZE * max_nr_gframes);
->  		if (gnttab_shared.addr == NULL) {
->  			printk(KERN_WARNING
-> diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
-> index 038b71d..3325884 100644
-> --- a/drivers/xen/xenbus/xenbus_probe.c
-> +++ b/drivers/xen/xenbus/xenbus_probe.c
-> @@ -769,7 +769,7 @@ static int __init xenbus_init(void)
->  			goto out_error;
->  		xen_store_mfn = (unsigned long)v;
->  		xen_store_interface =
-> -			ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
-> +			xen_remap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
->  		break;
->  	default:
->  		pr_warn("Xenstore state unknown\n");
