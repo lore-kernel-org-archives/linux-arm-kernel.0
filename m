@@ -1,68 +1,53 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 19 Feb 2013 11:33:42 +0100
-Subject: [PATCH v5 00/45] CPU hotplug: stop_machine()-free CPU hotplug
-In-Reply-To: <1361217204.23152.171.camel@gandalf.local.home>
-References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
- <510FBC01.2030405@linux.vnet.ibm.com>
- <87haloiwv0.fsf@rustcorp.com.au>
- <51134596.4080106@linux.vnet.ibm.com>
- <20130208154113.GV17833@n2100.arm.linux.org.uk>
- <51152B81.2050501@linux.vnet.ibm.com>
- <51153F72.1060005@linux.vnet.ibm.com>
- <CAKfTPtCe+cD7LLkb+D6pqG1SwG2V08ws=4XO3ttHEHV2qgmqPg@mail.gmail.com>
- <5118E2CD.90401@linux.vnet.ibm.com>
- <20130211190852.GA5695@linux.vnet.ibm.com>
- <5119BDFD.1000909@linux.vnet.ibm.com>
- <CAKfTPtAo2hQTfBKTVUuLKgsGJ2ZLD0UTR3fH9UFuJwyFt4n__w@mail.gmail.com>
- <511E8F3C.2010406@linux.vnet.ibm.com>
- <CAKfTPtD=2jn1AVjuhVP1ot7_8x9-W4==hNGZET5N9tRE7gtyMw@mail.gmail.com>
- <512203B3.7090002@linux.vnet.ibm.com>
- <512207A6.4000402@linux.vnet.ibm.com>
- <CAKfTPtA1aTseD6Gntkf_zbCEbfZzt3P2-P1un6iF5_1TdVLjRQ@mail.gmail.com>
- <1361201422.23152.154.camel@gandalf.local.home>
- <CAKfTPtC4hbXXWO=_zsGYryM9hpWaGFLbiY+jiLf=koLa4xGJOQ@mail.gmail.com>
- <1361217204.23152.171.camel@gandalf.local.home>
-Message-ID: <CAKfTPtBRv8ffewiXP0740YRn6TxmKOLS5Tzo=a98=60vAqyBEw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 19 Feb 2013 16:05:22 +0530
+Subject: [PATCH, RFC 8/8] ARM: dts: am43-pre-silicon support
+In-Reply-To: <e344f74da47579c11db68d9f6efe25259ed7f25d.1361186097.git.afzal@ti.com>
+References: <cover.1361186097.git.afzal@ti.com>
+ <e344f74da47579c11db68d9f6efe25259ed7f25d.1361186097.git.afzal@ti.com>
+Message-ID: <5123556A.9050109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2013 20:53, Steven Rostedt <rostedt@goodmis.org> wrote:
-> On Mon, 2013-02-18 at 17:50 +0100, Vincent Guittot wrote:
+On Monday 18 February 2013 05:08 PM, Afzal Mohammed wrote:
+> AM43 SoC is in pre-silicon stage, meanwhile it has been modelled in
+> a pre-silicon platform. To validate and boot Linux in pre-silicon
+> platform that emulates an AM43 SoC, add DT build support.
 >
->> yes for sure.
->> The problem is more linked to cpuidle and function tracer.
->>
->> cpu hotplug and function tracer work when cpuidle is disable.
->> cpu hotplug and cpuidle works if i don't enable function tracer.
->> my platform is dead as soon as I enable function tracer if cpuidle is
->> enabled. It looks like some notrace are missing in my platform driver
->> but we haven't completely fix the issue yet
->>
+> As bootloader is not used, bootargs is passed through DT.
 >
-> You can bisect to find out exactly what function is the problem:
+> Note: This would be replaced by an original board support.
 >
->  cat /debug/tracing/available_filter_functions > t
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>   arch/arm/boot/dts/Makefile             |  3 ++-
+>   arch/arm/boot/dts/am43-pre-silicon.dts | 31 +++++++++++++++++++++++++++++++
+>   2 files changed, 33 insertions(+), 1 deletion(-)
+>   create mode 100644 arch/arm/boot/dts/am43-pre-silicon.dts
 >
-> f(t) {
->  num=`wc -l t`
->  sed -ne "1,${num}p" t > t1
->  let num=num+1
->  sed -ne "${num},$p" t > t2
->
->  cat t1 > /debug/tracing/set_ftrace_filter
->  # note this may take a long time to finish
->
->  echo function > /debug/tracing/current_tracer
->
->  <failed? bisect f(t1), if not bisect f(t2)>
-> }
->
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 94d88b9..b434344 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -124,7 +124,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>   	omap5-evm.dtb \
+>   	am335x-evm.dtb \
+>   	am335x-evmsk.dtb \
+> -	am335x-bone.dtb
+> +	am335x-bone.dtb \
+> +	am43-pre-silicon.dtb
+>   dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
+>   dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+>   dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+> diff --git a/arch/arm/boot/dts/am43-pre-silicon.dts b/arch/arm/boot/dts/am43-pre-silicon.dts
+> new file mode 100644
+> index 0000000..b9c6297
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am43-pre-silicon.dts
 
-Thanks, i'm going to have a look
+Well the pre-silicon platform and the SOC are very
+close and at least the support you are adding here is
+exactly same. So lets just use am437x.dtb or something
+like that.
 
-Vincent
-
-> -- Steve
->
->
->
+Regards,
+Santosh
