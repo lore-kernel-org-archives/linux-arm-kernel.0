@@ -1,15 +1,15 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 19 Feb 2013 09:50:05 -0500
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 19 Feb 2013 14:50:14 +0000
 Subject: [PATCH] xen: introduce xen_remap, use it instead of ioremap
 In-Reply-To: <alpine.DEB.2.02.1302191445160.4654@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1302191332340.4654@kaball.uk.xensource.com>
  <20130219144253.GE7026@konrad-lan.dumpdata.com>
  <alpine.DEB.2.02.1302191445160.4654@kaball.uk.xensource.com>
-Message-ID: <20130219145003.GG7026@konrad-lan.dumpdata.com>
+Message-ID: <1361285414.1051.116.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 02:48:30PM +0000, Stefano Stabellini wrote:
+On Tue, 2013-02-19 at 14:48 +0000, Stefano Stabellini wrote:
 > On Tue, 19 Feb 2013, Konrad Rzeszutek Wilk wrote:
 > > On Tue, Feb 19, 2013 at 01:59:19PM +0000, Stefano Stabellini wrote:
 > > > ioremap can't be used to map ring pages on ARM because it uses device
@@ -27,10 +27,12 @@ On Tue, Feb 19, 2013 at 02:48:30PM +0000, Stefano Stabellini wrote:
 > 
 > Ian has two patches ("linux: public interface changes for arm"), it
 > would be great if they could go in 3.9.
+
+My two are one for Xen and one for Linux, so just one as far as the
+merge window is concerned, I just reposted them 10s ago..
+
 > Given the small number of patches (three all together), it is probably
 > easier to go via your tree, if you are OK with that.
-
-Sure. Can you Ack them please?
 > 
 > 
 > 
