@@ -1,41 +1,26 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 19 Feb 2013 11:17:28 +0200
-Subject: [PATCH, RFC 7/8] ARM: dts: am4372: initial support
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EAA85B2@DBDE01.ent.ti.com>
-References: <cover.1361186097.git.afzal@ti.com>
- <c9c131c0508b875c0893e8557504372a1564568a.1361186097.git.afzal@ti.com>
- <20130218182240.GA10755@arwen.pp.htv.fi>
- <C8443D0743D26F4388EA172BF4E2A7A93EAA85B2@DBDE01.ent.ti.com>
-Message-ID: <20130219091728.GF23197@arwen.pp.htv.fi>
+From: mmarek@suse.cz (Michal Marek)
+Date: Tue, 19 Feb 2013 10:22:21 +0100
+Subject: [patch 1/2] kcmp: Make it to depend on CONFIG_KCMP
+In-Reply-To: <20130219065210.030802820@openvz.org>
+References: <20130219064800.719149796@openvz.org>
+ <20130219065210.030802820@openvz.org>
+Message-ID: <5123444D.6000806@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 10:10:17AM +0100, Mohammed, Afzal wrote:
-> Hi Felipe,
-> 
-> On Mon, Feb 18, 2013 at 23:52:40, Balbi, Felipe wrote:
-> > On Mon, Feb 18, 2013 at 05:08:16PM +0530, Afzal Mohammed wrote:
-> 
-> > > +		uart1: serial at 44e09000 {
-> > > +			compatible = "ti,am4372-uart","ti,omap2-uart";
-> > > +			clock-frequency = <48000000>;
-> > > +			reg = <0x44e09000 0x2000>;
-> > > +			interrupts = <0 72 0x4>;
-> > 
-> > missing ti,hwmods ??
-> 
-> It is a deliberate omission. For minimal bootconsole booting, hwmod
-> help is not required. Hwmod details would be added gradually later,
-> current series doesn't register hwmod.
+On 19.2.2013 07:48, Cyrill Gorcunov wrote:
+> --- linux-2.6.git.orig/init/Kconfig
+> +++ linux-2.6.git/init/Kconfig
+> @@ -279,6 +279,15 @@ config FHANDLE
+>  	  get renamed. Enables open_by_handle_at(2) and name_to_handle_at(2)
+>  	  syscalls.
+>  
+> +config KCMP
+> +	bool "kcmp syscall"
+> +	default n
 
-understood, thanks
+Previously, kcmp was enabled with CONFIG_CHECKPOINT_RESTORE. Maybe
+change it to 'default CHECKPOINT_RESTORE', so that make oldconfig does
+the right thing?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/615784bf/attachment.sig>
+Michal
