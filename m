@@ -1,29 +1,59 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Tue, 19 Feb 2013 19:47:49 +0100
-Subject: coda: support of decoding
-In-Reply-To: <5122D999.3070405@gmail.com>
-References: <5122D999.3070405@gmail.com>
-Message-ID: <20130219184749.GD30071@pengutronix.de>
+From: hughd@google.com (Hugh Dickins)
+Date: Tue, 19 Feb 2013 10:49:40 -0800 (PST)
+Subject: Should a swapped out page be deleted from swap cache?
+In-Reply-To: <CAFj3OHXredBPjjLMaqnAq0tYKbLXaO0DOfs8zGYzV4ntsXvi6A@mail.gmail.com>
+References: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
+ <alpine.LNX.2.00.1302180939200.2246@eggly.anvils>
+ <CAFNq8R5x3tD9Fn4TWna58VfdiRedPkrTDkeHXStkL7yBngL1mw@mail.gmail.com>
+ <5122E591.5090108@gmail.com>
+ <CAFNq8R5Y+obN0pufXriqmRUajPPq=N6XMAhQUgbzObvCpbbpxA@mail.gmail.com>
+ <CAFj3OHXredBPjjLMaqnAq0tYKbLXaO0DOfs8zGYzV4ntsXvi6A@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1302191040010.2248@eggly.anvils>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 02:47:05AM +0100, Ga?tan Carlier wrote:
-> I see in code source of coda driver that decoding is not supported.
->
-> ctx->inst_type = CODA_INST_DECODER;
-> v4l2_err(v4l2_dev, "decoding not supported.\n");
-> return -EINVAL;
->
-> Is there any technical reason or the code has not been written ?
+On Tue, 19 Feb 2013, Sha Zhengju wrote:
+> On Tue, Feb 19, 2013 at 2:53 PM, Li Haifeng <omycle@gmail.com> wrote:
+> > 2013/2/19 Will Huck <will.huckk@gmail.com>:
+> >> On 02/19/2013 10:04 AM, Li Haifeng wrote:
+> >>>
+> >>> If a anonymous page is swapped out and  comes to be reclaimable,
+> >>> shrink_page_list() will call __remove_mapping() to delete the page
+> >>> swapped out from swap cache. Corresponding code lists as below.
 
-We have a lot of encoder + decoder patches for Coda in the queue, but
-unfortunately not all of that is ready-for-primetime yet.
+Correct.
 
-Which processor are you interested in? MX27 or MX5/MX6?
+> >>
+> >>
+> >> I'm not sure if
+> >> if (PageAnon(page) && !PageSwapCache(page)) {
+> >>  .................
+> >> }
+> >> will add the page to swap cache again.
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+No, it's already in the swap cache.  Of course, the original pageframe
+may be removed from swap cache, freed, data later read back from swap into
+a new swap cache pageframe, that be mapped into user memory, removed from
+swap cache and swap freed, then later arrive here in page reclaim at the
+PageAnon(page) && !PageSwapCache(page) to be added to swap again.
+
+> >>
+> >
+> > Adding the page to swap cache is the first stage of memory reclaiming.
+> >
+> > When an anonymous page will be reclaimed, it should be swapped out. If
+> > it's not in the swap cache, it will insert into swap cache first and
+> > set the bit of PG_swapcache on page->flags. Then, it will be swapped
+> > out by try_to_unmap(). After it's swapped out, and no processes swap
+
+Almost correct...
+
+> 
+> Swapout(writing to swap disk) is not done by try_to_unmap() which only
+> tries to remove all page table mappings to a page. Before unmapping,
+> add_to_swap() will set the swap cache page dirty and it will be
+> written out by pageout()->swap_writepage().
+
+... but yes, try_to_unmap() is not the one that writes out to swap.
+
+Hugh
