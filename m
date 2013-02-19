@@ -1,35 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Feb 2013 13:31:51 +0800
-Subject: [PATCH 1/1] ARM: dt: add header to define tegra20 clocks
-In-Reply-To: <511D24D4.6070805@wwwdotorg.org>
-References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
- <1360823899-17846-1-git-send-email-hdoyu@nvidia.com>
- <511D24D4.6070805@wwwdotorg.org>
-Message-ID: <20130219053148.GC3108@S2101-09.ap.freescale.net>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Tue, 19 Feb 2013 14:39:22 +0900
+Subject: [RFC PATCH 4/9] hwmon: (lm90) use macros for the indexes of temp8
+ and temp11
+In-Reply-To: <1361187031-3679-5-git-send-email-wni@nvidia.com>
+References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
+ <1361187031-3679-5-git-send-email-wni@nvidia.com>
+Message-ID: <5123100A.9050604@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 14, 2013 at 10:54:28AM -0700, Stephen Warren wrote:
-> On 02/13/2013 11:38 PM, Hiroshi Doyu wrote:
-> > To replace magic number in "clocks = <&tegra_car 28>;"
-> 
-> I like the concept here; I was thinking about doing this today, but you
-> beat me to it:-) Feel free to create the Tegra30 header too, and modify
-> all the *.dts* files.
-> 
-> To address other comments in this thread: Yes, I think that we will want
-> to modify the clock driver to include this header to avoid
-> duplication/errors (that will require adjusting Linux's include path),
-> and also remove the list of IDs from the binding document; it can just
-> refer the the new header by name and cause the header to *be* part of
-> the binding document.
+On 02/18/2013 08:30 PM, Wei Ni wrote:
+> Using macros for the indexes and nrs of temp8 and temp11.
+> This make the code much clearer.
+>
+> Signed-off-by: Wei Ni <wni@nvidia.com>
 
-I like it, since doing so will help us hijack kernel to have dts stay
-in the tree rather than going to a separate repository :)
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
 
-Seriously, is maintaining dts in a separate repository still a plan?
-If yes, we will have duplication problem someday anyway.
+Great patch. This makes the code much more readable. I also compiled 
+lm90.o before and after this patch, and diff'ed the stripped binaries to 
+make sure there was no error in the macro indexes. Both binaries were 
+indentical, therefore:
 
-For reason of it, I vote for having dts stay in the kernel tree.
+Tested-by: Alexandre Courbot <acourbot@nvidia.com>
 
-Shawn
+Alex.
