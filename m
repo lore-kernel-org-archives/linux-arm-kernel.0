@@ -1,28 +1,31 @@
 From: wni@nvidia.com (Wei Ni)
-Date: Tue, 19 Feb 2013 17:48:06 +0800
-Subject: [RFC PATCH 2/9] hwmon: (lm90) split set&show temp as common codes
-In-Reply-To: <1B93E76B0D8B0E4E8BDD54060BBDE81975FB926ACC@HQMAIL03.nvidia.com>
+Date: Tue, 19 Feb 2013 17:52:35 +0800
+Subject: [RFC PATCH 1/9] ARM: dt: t30 cardhu: add dt entry for lm90
+In-Reply-To: <5122F162.9030103@nvidia.com>
 References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-3-git-send-email-wni@nvidia.com>
- <1B93E76B0D8B0E4E8BDD54060BBDE81975FB926ACC@HQMAIL03.nvidia.com>
-Message-ID: <51234A56.4020006@nvidia.com>
+ <1361187031-3679-2-git-send-email-wni@nvidia.com>
+ <5122F162.9030103@nvidia.com>
+Message-ID: <51234B63.7080104@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2013 06:29 AM, Matthew Longnecker wrote:
-> Wei,
+On 02/19/2013 11:28 AM, Alex Courbot wrote:
+> On 02/18/2013 08:30 PM, Wei Ni wrote:
+>> Enable thermal sensor lm90 in the dts file.
 > 
-> This set of patches seems to include 3 logical subsets
-> 1) lm90 changes
-> 2) dt support in drivers/thermal
-> 3) tegra30 support in drivers/thermal
+> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
 > 
-> Would it make sense to split this into 3 separate sets of changes?
+> Btw, shouldn't this patch come last, after all the changes you did to 
+> lm90? If you keep the current order, you will need to ensure that the 
+> device performs as expected on Cardhu for each of the remaining patches 
+> of the series. It is probably safer to just move this one at the end to 
+> avoid trouble.
 
-Ok, I will do it in my next version.
+I will try split this patch set into 3 separate sets in my next version,
+like Matthew's suggestion, so the patches will be clear.
+
+Wei.
 
 > 
-> -Matt Longnecker
-> 
-> nvpublic
+> Alex.
 > 
