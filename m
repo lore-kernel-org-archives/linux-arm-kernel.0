@@ -1,64 +1,62 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 19 Feb 2013 18:12:35 +0000
-Subject: [PATCH LINUX v4] xen: event channel arrays are xen_ulong_t and
- not unsigned long
-In-Reply-To: <1361294951-28633-1-git-send-email-ian.campbell@citrix.com>
-References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
- <1361294951-28633-1-git-send-email-ian.campbell@citrix.com>
-Message-ID: <alpine.DEB.2.02.1302191808110.4654@kaball.uk.xensource.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Feb 2013 18:22:57 +0000
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <20130219163053.GE5724@atomide.com>
+References: <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+ <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
+ <20130214224710.GF11362@atomide.com>
+ <alpine.DEB.2.00.1302191527200.32069@utopia.booyaka.com>
+ <20130219154511.GU17852@n2100.arm.linux.org.uk>
+ <20130219163053.GE5724@atomide.com>
+Message-ID: <20130219182257.GV17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Feb 2013, Ian Campbell wrote:
-> On ARM we want these to be the same size on 32- and 64-bit.
+On Tue, Feb 19, 2013 at 08:30:53AM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130219 07:49]:
+> > If you want such things as pci_enable_device(), then what you're actually
+> > asking for is omap_enable_device() for OMAP devices.  OMAP devices are
+> > already specific enough to OMAP SoCs (god knows, they have really complex
+> > and obscure behaviours that no one else in their right mind would want
+> > to copy) that calling out to omap specific functions would never really
+> > be a problem.
 > 
-> This is an ABI change on ARM. X86 does not change.
-> 
-> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-> Cc: Jan Beulich <JBeulich@suse.com>
-> Cc: Keir (Xen.org) <keir@xen.org>
-> Cc: Tim Deegan <tim@xen.org>
-> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: xen-devel at lists.xen.org
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> ---
-> Changes since V3
->   s/read_evtchn_pending_sel/xchg_xen_ulong/ in a comment.
-> Changes since V2
->   Add comments about the correct bitops to use, and on the ordering/barrier
->   requirements on xchg_xen_ulong.
-> Changes since V1
->   use find_first_set not __ffs
->   fix some more unsigned long -> xen_ulong_t
->   use more generic xchg_xen_ulong instead of ...read_evtchn...
+> I'd rather avoid adding omap_enable_device() calls to drivers as we really
+> want to keep the drivers generic. But maybe there could be some generic
+> bus_enable_device() function pointer that could be populated by the bus
+> code during init.
 
-still doesn't apply to 3.8
+What you're not getting is that pci_enable_device() is a PCI thing which
+is mostly a no-op - and where it isn't a no-op, it's something that must
+be done _before_ PCI resources are used or even reserved (because
+conceptually, this is to do with getting the resources correct.)
 
+The PCI case is:
 
->         do {
-> -               unsigned long pending_words;
-> +               xen_ulong_t pending_words;
-> 
->                 vcpu_info->evtchn_upcall_pending = 0;
-> 
->                 if (__this_cpu_inc_return(xed_nesting_count) - 1)
->                         goto out;
-> 
-> -#ifndef CONFIG_X86 /* No need for a barrier -- XCHG is a barrier on x86. */
-> -               /* Clear master flag /before/ clearing selector flag. */
-> -               wmb();
-> -#endif
-> -               pending_words = xchg(&vcpu_info->evtchn_pending_sel, 0);
-> +               /*
-> +                * Master flag must be /before/ clearing selector
-> +                * flag. xchg_xen_ulong must contain an appropriate
-> +                * barrier.
-> +                */
+pci_device_probe(pci_dev)
+{
+	pci_enable_device(pci_dev);
 
-Master flag must be *cleared* ...
+	pci_request_regions(pci_dev);
 
-> +               pending_words = xchg_xen_ulong(&vcpu_info->evtchn_pending_sel, 0);
-> 
->                 start_word_idx = __this_cpu_read(current_word_idx);
->                 start_bit_idx = __this_cpu_read(current_bit_idx);
+	regs = pci_iomap(pci_dev, BAR, size);
+...
+}
+
+That's different from what you're wanting on OMAP - what you're wanting
+there is some way to record the platform device has been ioremapped, so
+that you can then fiddle with its idle/reset register from "bus" code.
+
+If you think about it in light of the above sequence, the "enable device"
+stage *doesn't* suit your needs because that happens before the driver
+has done anything.
+
+However... if you think you're going to get away with another total
+rewrite of OMAP device support away from hwmod to a new scheme with a
+new load of huge churn, think again.  Remember, churn is evil.  I've
+complained to you about the amount of churn that OMAP manufactures
+in the past.  Linus has complained about it too.  You can't continue
+like this.
