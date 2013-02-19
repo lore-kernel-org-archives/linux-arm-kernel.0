@@ -1,36 +1,36 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 19 Feb 2013 16:17:38 +0530
-Subject: [RFC PATCH 06/18] davinci: replace V4L2_OUT_CAP_CUSTOM_TIMINGS
- by V4L2_OUT_CAP_DV_TIMINGS
-In-Reply-To: <201302162033.53736.hverkuil@xs4all.nl>
-References: <a9599acc7829c431d88b547de87c500968ccb86a.1361006882.git.hans.verkuil@cisco.com>
- <CA+V-a8tH8GLKz50i216S4TFkNjPpn1D1tNaRkuLfvDE_JO9N5g@mail.gmail.com>
- <511FDCBB.5010507@ti.com> <201302162033.53736.hverkuil@xs4all.nl>
-Message-ID: <5123584A.9060006@ti.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 19 Feb 2013 10:52:44 +0000
+Subject: [PATCH, RFC 8/8] ARM: dts: am43-pre-silicon support
+In-Reply-To: <5123556A.9050109@ti.com>
+References: <cover.1361186097.git.afzal@ti.com>
+ <e344f74da47579c11db68d9f6efe25259ed7f25d.1361186097.git.afzal@ti.com>
+ <5123556A.9050109@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EAA86DE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Hi Santosh,
 
-On 2/17/2013 1:03 AM, Hans Verkuil wrote:
-> On Sat February 16 2013 20:23:39 Sekhar Nori wrote:
->> On 2/16/2013 6:28 PM, Prabhakar Lad wrote:
->>> Cc'ed Sekhar, DLOS, LAK.
->>>
->>> Sekhar Can you Ack this patch ? Or maybe you can take this patch through
->>> your tree ?
->>
->> I can take the patch, but I can only send for v3.10 since for v3.9 ARM
->> tree is only accepting bug fixes for already accepted code. If you wish
->> to take this through media tree for v3.9, feel free to add:
-> 
-> There is no hurry. If you can take this patch for 3.10, then that is fine
-> by me. This patch series is unlikely to make it in 3.9 anyway, nor does it
-> need to. Just let me know if you take it, then I can drop it from my patch
-> series.
+On Tue, Feb 19, 2013 at 16:05:22, Shilimkar, Santosh wrote:
+> On Monday 18 February 2013 05:08 PM, Afzal Mohammed wrote:
 
-It appears that it will be simpler if you manage the entire series. I
-have already acked this one, so please take it through the media tree.
+> > AM43 SoC is in pre-silicon stage, meanwhile it has been modelled in
+> > a pre-silicon platform. To validate and boot Linux in pre-silicon
+> > platform that emulates an AM43 SoC, add DT build support.
 
-Thanks,
-Sekhar
+> > Note: This would be replaced by an original board support.
+
+> > -	am335x-bone.dtb
+> > +	am335x-bone.dtb \
+> > +	am43-pre-silicon.dtb
+
+> Well the pre-silicon platform and the SOC are very
+> close and at least the support you are adding here is
+> exactly same. So lets just use am437x.dtb or something
+> like that.
+
+SoC support is already added in patch 7/8. This is board (which doesn't
+exist now) support, hence a pre-silicon temporary one to validate it.
+
+Regards
+Afzal
