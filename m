@@ -1,30 +1,108 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 19 Feb 2013 11:30:19 +0200
-Subject: [PATCH 2/9] USB: move bulk of otg/otg.c to phy/phy.c
-In-Reply-To: <1359984275-24646-3-git-send-email-s.hauer@pengutronix.de>
-References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
- <1359984275-24646-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130219093019.GG23197@arwen.pp.htv.fi>
+From: gorcunov@openvz.org (Cyrill Gorcunov)
+Date: Tue, 19 Feb 2013 13:31:54 +0400
+Subject: [patch 1/2] kcmp: Make it to depend on CONFIG_KCMP
+In-Reply-To: <5123444D.6000806@suse.cz>
+References: <20130219064800.719149796@openvz.org>
+ <20130219065210.030802820@openvz.org> <5123444D.6000806@suse.cz>
+Message-ID: <20130219093154.GF20312@moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 04, 2013 at 02:24:28PM +0100, Sascha Hauer wrote:
-> Most of otg/otg.c is not otg specific, but phy specific, so move it
-> to the phy directory.
+On Tue, Feb 19, 2013 at 10:22:21AM +0100, Michal Marek wrote:
+> On 19.2.2013 07:48, Cyrill Gorcunov wrote:
+> > --- linux-2.6.git.orig/init/Kconfig
+> > +++ linux-2.6.git/init/Kconfig
+> > @@ -279,6 +279,15 @@ config FHANDLE
+> >  	  get renamed. Enables open_by_handle_at(2) and name_to_handle_at(2)
+> >  	  syscalls.
+> >  
+> > +config KCMP
+> > +	bool "kcmp syscall"
+> > +	default n
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Reported-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
+> Previously, kcmp was enabled with CONFIG_CHECKPOINT_RESTORE. Maybe
+> change it to 'default CHECKPOINT_RESTORE', so that make oldconfig does
+> the right thing?
 
-this is pretty ok, I'll start queueing patches for v3.10 in about a week
-or two.
+Yes, thanks, good point! I've been adviced that make it obj-y by default
+may be a good option as well, not sure.
+---
+From: Cyrill Gorcunov <gorcunov@openvz.org>
+Subject: kcmp: Make it to depend on CONFIG_KCMP
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/99c3723e/attachment.sig>
+Since kcmp syscall has been implemented (initially on
+x86 architecture) a number of other archs wire it up
+as well: xtensa, sparc, sh, s390, mips, microblaze,
+m68k (not taking into account those who uses
+<asm-generic/unistd.h> for syscall numbers
+definitions).
+
+But the Makefile, which turns kcmp.o generation on
+still depends on former config-x86. Thus get rid
+of this limitation and make kcmp.o depend on CONFIG_KCMP
+option.
+
+v2:
+ - As Michal pointed the old configs might already use of
+   CHECKPOINT_RESTORE, so make "default" accordingly.
+
+Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
+Cc: KOSAKI Motohiro <kosaki.motohiro@gmail.com>
+Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+Cc: Pavel Emelyanov <xemul@parallels.com>
+Cc: Andrey Vagin <avagin@openvz.org>
+Cc: Ingo Molnar <mingo@elte.hu>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Glauber Costa <glommer@parallels.com>
+Cc: Andi Kleen <andi@firstfloor.org>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Matt Helsley <matthltc@us.ibm.com>
+Cc: Pekka Enberg <penberg@kernel.org>
+Cc: Eric Dumazet <eric.dumazet@gmail.com>
+Cc: Vasiliy Kulikov <segoon@openwall.com>
+Cc: Alexey Dobriyan <adobriyan@gmail.com>
+Cc: Valdis.Kletnieks at vt.edu
+Cc: Michal Marek <mmarek@suse.cz>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+---
+ init/Kconfig    |    9 +++++++++
+ kernel/Makefile |    4 +---
+ 2 files changed, 10 insertions(+), 3 deletions(-)
+
+Index: linux-2.6.git/init/Kconfig
+===================================================================
+--- linux-2.6.git.orig/init/Kconfig
++++ linux-2.6.git/init/Kconfig
+@@ -279,6 +279,15 @@ config FHANDLE
+ 	  get renamed. Enables open_by_handle_at(2) and name_to_handle_at(2)
+ 	  syscalls.
+ 
++config KCMP
++	bool "kcmp syscall"
++	default CHECKPOINT_RESTORE
++	help
++	  If you say Y here, a user level program will be able to use
++	  kcmp(2) syscall.
++
++	  If unsure, say N.
++
+ config AUDIT
+ 	bool "Auditing support"
+ 	depends on NET
+Index: linux-2.6.git/kernel/Makefile
+===================================================================
+--- linux-2.6.git.orig/kernel/Makefile
++++ linux-2.6.git/kernel/Makefile
+@@ -25,9 +25,7 @@ endif
+ obj-y += sched/
+ obj-y += power/
+ 
+-ifeq ($(CONFIG_CHECKPOINT_RESTORE),y)
+-obj-$(CONFIG_X86) += kcmp.o
+-endif
++obj-$(CONFIG_KCMP) += kcmp.o
+ obj-$(CONFIG_FREEZER) += freezer.o
+ obj-$(CONFIG_PROFILING) += profile.o
+ obj-$(CONFIG_STACKTRACE) += stacktrace.o
