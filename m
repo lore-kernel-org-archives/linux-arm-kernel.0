@@ -1,45 +1,61 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 19 Feb 2013 17:50:33 +0530
-Subject: [PATCH, RFC 2/8] ARM: twd: register clock event for 1 core SMP
-In-Reply-To: <20130219121400.GP23197@arwen.pp.htv.fi>
-References: <cover.1361186097.git.afzal@ti.com>
- <a7f62b8580aa4b33d5658f4f03371a453adaea9b.1361186097.git.afzal@ti.com>
- <51235076.8040200@ti.com> <20130219121400.GP23197@arwen.pp.htv.fi>
-Message-ID: <51236E11.1030900@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 19 Feb 2013 12:27:34 +0000
+Subject: [PATCH 5/9] ARM: pl01x debug code endian fix
+In-Reply-To: <1360752927-29331-6-git-send-email-ben.dooks@codethink.co.uk>
+References: <1360752927-29331-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1360752927-29331-6-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130219122734.GE1978@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 February 2013 05:44 PM, Felipe Balbi wrote:
-> On Tue, Feb 19, 2013 at 03:44:14PM +0530, Santosh Shilimkar wrote:
->> On Monday 18 February 2013 05:07 PM, Afzal Mohammed wrote:
->>> Register percpu local timer for scheduler tick in the case of one core
->>> SMP configuration. In other cases - secondary cpu's as well as boot
->>> cpu's having more than one core, this is being registered as per
->>> existing boot flow, with a difference that they happens after delay
->>> calibration. Registering the clock for tick in case of one core should
->>> be done before Kernel calibrates delay (this is required to boot,
->>> unless local timer is the only one registered for tick). Registering
->>> twd local timer at init_time (which platforms are doing now) helps
->>> achieve that with the proposed change.
->>>
->>> This helps in an almost booting Kernel (minimal) by only relying on
->>> ARM parts for an A9 one core SMP.
->>>
->>> Signed-off-by: Afzal Mohammed <afzal@ti.com>
->>> ---
->> As mentioned in cover-letter, I don't think we have good
->> reasoning to make TWD to work with UP configuration. Even
->> you fix the timer code, there are more cascaded dependencies
->> which is not worth the effort.
->
-> if CONFIG_SMP_ON_UP is enabled, smp_twd.c can still be compiled, right ?
->
-Yep though just from deps pesrpective TWD is made available for ARM SMP
-machines as below
+On Wed, Feb 13, 2013 at 10:55:23AM +0000, Ben Dooks wrote:
+> The PL01X debug code needs to take into account which endian mode the
+> processor is running in. If it is big-endian, ensure the data is swapped
+> appropriately.
 
-config HAVE_ARM_TWD
-         bool
-         depends on SMP
+Looks reasonable ... has you been able to test this?
+ 
+> Note, we could do this slightly more efficiently if we have an macro to
+> do the necessary swap for the bits used by test.
 
-Regards,
-Santosh
+arch/arm/include/asm/opcodes.h has some swabbing macros which work in
+assembler.  Would those help?  I'm wondering whether those ought to move
+somewhere else, with cpu_to_mem style wrappers.  Currently, the only
+wrappers there are tailored for handling opcodes, but the principle is
+the same.
+
+Cheers
+---Dave
+
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/include/asm/hardware/debug-pl01x.S |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/hardware/debug-pl01x.S b/arch/arm/include/asm/hardware/debug-pl01x.S
+> index f9fd083..6489d1f 100644
+> --- a/arch/arm/include/asm/hardware/debug-pl01x.S
+> +++ b/arch/arm/include/asm/hardware/debug-pl01x.S
+> @@ -18,12 +18,14 @@
+>  
+>  		.macro	waituart,rd,rx
+>  1001:		ldr	\rd, [\rx, #UART01x_FR]
+> + ARM_BE8(	rev	\rd, \rd )
+>  		tst	\rd, #UART01x_FR_TXFF
+>  		bne	1001b
+>  		.endm
+>  
+>  		.macro	busyuart,rd,rx
+>  1001:		ldr	\rd, [\rx, #UART01x_FR]
+> + ARM_BE8(	rev	\rd, \rd )
+>  		tst	\rd, #UART01x_FR_BUSY
+>  		bne	1001b
+>  		.endm
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
