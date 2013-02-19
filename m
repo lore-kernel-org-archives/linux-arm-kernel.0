@@ -1,63 +1,47 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 19 Feb 2013 15:39:32 +0530
-Subject: [PATCH, RFC 0/8] ARM: AM43 (OMAP2+) boot support
-In-Reply-To: <cover.1361186097.git.afzal@ti.com>
-References: <cover.1361186097.git.afzal@ti.com>
-Message-ID: <51234F5C.6050500@ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 19 Feb 2013 19:09:14 +0900
+Subject: [PATCH 00/08] ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework
+ part 2
+In-Reply-To: <20130219004857.GA14932@verge.net.au>
+References: <20130218134648.17303.97576.sendpatchset@w520>
+ <20130219004857.GA14932@verge.net.au>
+Message-ID: <CANqRtoQxC89zQHjM++19fRxch7x-jua_XEmvxk8t0p0D7-Vr8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 February 2013 05:05 PM, Afzal Mohammed wrote:
-> (Resending, since it seems, LAKML doesn't accept patches with subject
-> prefix only as "RFC", but requires "PATCH" prefix also)
+On Tue, Feb 19, 2013 at 9:49 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Feb 18, 2013 at 10:46:48PM +0900, Magnus Damm wrote:
+>> ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework part 2
+>>
+>> [PATCH 01/08] ARM: shmobile: Fix base address readout in headsmp-scu.S
+>> [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
+>> [PATCH 03/08] ARM: shmobile: Use R8A7779_SCU_BASE with TWD
+>> [PATCH 04/08] ARM: shmobile: Update r8a7779 to check SCU for hotplug
+>> [PATCH 05/08] ARM: shmobile: Update r8a7779 to use scu_power_mode()
+>> [PATCH 06/08] ARM: shmobile: Use sh73a0-specific cpu disable code
+>> [PATCH 07/08] ARM: shmobile: Rearrange r8a7779 cpu hotplug code
+>> [PATCH 08/08] ARM: shmobile: Remove unused hotplug.c
+>>
+>> Finalize the SCU rework by performing minor fixes and converting
+>> the r8a7779 SMP code to make use of common scu_power_mode() code
+>> and the early SCU setup code in headsmp-scu.S.
+>>
+>> Also, to save a few line remove hotplug.c while at it.
+>>
+>> The only remaining itch to scratch here is to fix up CPU Hotplug
+>> of CPU0 on r8a7779, but for that to happen we first need to start
+>> accounting for spurious interrupts during shut down.
+>>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> ---
+>>
+>>  No known dependencies apart from previous SMP cleanup series
+>>  "[PATCH 00/06] ARM: shmobile: SMP Cortex-A9 SCU rework"
+>>  Written against -next in renesas.git.
 >
-> Hi,
+> I believe those are queued up for upstream in the soc5 branch.
 >
-> This series adds minimal support to boot Linux on platforms having
-> AM43 based SoC's.
->
-> This is being sent as an RFC to seek opinion about modification in
-> twd to register percpu local timer clock event for scheduler tick in
-> the case of one core SMP.
->
-> AM43 SoC's are based on ARM Cortex-A9. It is an ARM Cortex-A9 SMP
-> configuration with one core (not uniprocessor configuration). AM43 is
-> similar to AM335x in it's peripheral capabilities, with many of the
-> peripheral register mapping's similar like that of uart.
->
-After looking at the specs, you don't need the SMP mode since ACP
-isn't being used.
+> Please let me know when you are comfortable with me applying these patches
+> to that branch. I'm fine with that answer being "now".
 
-
-> AM43 is in pre-silicon stage and currently there are no public
-> documents.
->
-> This series has been tested on a pre-silicon platform that emulates
-> AM43 SoC, changes proposed here are minimal - to get it booting.
-> Kernel was directly run without the help of bootloader - Images were
-> directly loaded onto a pre-initialized RAM and ARM registers updated
-> as required for booting.
->
-> Changes have been made over linux-next (next-20130213) with three "OF"
-> related reverts (which otherwise causes problem in other platforms
-> also) and compiled with omap2plus_defconfig. Multiplatform option was
-> enabled, while most of CONFIG options were deselected for a faster
-> boot. Beagle bone boots as earlier with these changes.
->
-> An interesting observation is that it may be possible to boot this
-> platform to console without any platform specific modification to
-> proper Kernel (by that I mean excluding DT sources) using Arnd's,
->
-> "[PATCH,RFC] default machine descriptor for multiplatform",
->
-> along with a "CLOCKSOURCE_OF_DECLARE" for smp twd.
->
-TWD use for AM437x is also limited because these times stops in
-low power sates and there you will need broad-cast mechanism which
-again more of SMP machine feature.
-
-So I suggest to use the wakeup timer(GPT1) clock-event instead
-of local timer for the mentioned reason.
-
-Regards,
-Santosh
+Now sounds wonderful. Thanks Simon.
