@@ -1,43 +1,54 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 19 Feb 2013 09:49:00 +0900
-Subject: [PATCH 00/08] ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework
- part 2
-In-Reply-To: <20130218134648.17303.97576.sendpatchset@w520>
-References: <20130218134648.17303.97576.sendpatchset@w520>
-Message-ID: <20130219004857.GA14932@verge.net.au>
+Date: Tue, 19 Feb 2013 09:49:47 +0900
+Subject: [PATCH 0/4] R-Car SATA driver and platform data
+In-Reply-To: <512234E5.5050700@cogentembedded.com>
+References: <201302170135.28336.sergei.shtylyov@cogentembedded.com>
+ <20130218012322.GA11807@verge.net.au>
+ <512234E5.5050700@cogentembedded.com>
+Message-ID: <20130219004947.GB14932@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 10:46:48PM +0900, Magnus Damm wrote:
-> ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework part 2
+On Mon, Feb 18, 2013 at 06:04:21PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> [PATCH 01/08] ARM: shmobile: Fix base address readout in headsmp-scu.S
-> [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
-> [PATCH 03/08] ARM: shmobile: Use R8A7779_SCU_BASE with TWD
-> [PATCH 04/08] ARM: shmobile: Update r8a7779 to check SCU for hotplug
-> [PATCH 05/08] ARM: shmobile: Update r8a7779 to use scu_power_mode()
-> [PATCH 06/08] ARM: shmobile: Use sh73a0-specific cpu disable code
-> [PATCH 07/08] ARM: shmobile: Rearrange r8a7779 cpu hotplug code
-> [PATCH 08/08] ARM: shmobile: Remove unused hotplug.c
+> On 18-02-2013 5:23, Simon Horman wrote:
 > 
-> Finalize the SCU rework by performing minor fixes and converting
-> the r8a7779 SMP code to make use of common scu_power_mode() code
-> and the early SCU setup code in headsmp-scu.S.
+> >>    Here's the set of 4 patches against the Simon Horman's renesas.git repo, 'next' branch:
 > 
-> Also, to save a few line remove hotplug.c while at it.
+> >>[1/4] ARM: mach-shmobile: r8a7779: SATA DT configuration
+> >>[2/4] ARM: mach-shmobile: r8a7779: add SATA support
+> >>[3/4] libata: add R-Car SATA driver
+> >>[4/4] ARM: mach-shmobile: marzen: add SATA support
 > 
-> The only remaining itch to scratch here is to fix up CPU Hotplug
-> of CPU0 on r8a7779, but for that to happen we first need to start
-> accounting for spurious interrupts during shut down.
+> >>Patch 3 also applies to the 'upstream' branch of Jeff Garzik's libata-dev.git repo.
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
+> >Hi Sergei, Hi All,
 > 
->  No known dependencies apart from previous SMP cleanup series
->  "[PATCH 00/06] ARM: shmobile: SMP Cortex-A9 SCU rework"
->  Written against -next in renesas.git.
+> >I do not expect patch 3 of this series to got through
+> >the renesas tree, however, I have included it and the other three patches
+> >in this series to a topic branch in the renesas tree, topic/r-car-stat.
+> 
+>    I probably make the patch 3 patch 1 in the next posting.
+> 
+> >The base of the topic branch is:
+> >* a merge of renesas.git next and libata-dev.git upstream, and;
+> >* a boot fix for Marzen which I plan to add to next once it is reviewed:
+> >   "ARM: shmobile: r8a7779: Correct TMU clock support again" (v3).
+> 
+> >With this in place I built a kernel using the marzen_defconfig and booted it.
+> >However, I wonder if I am missing a kernel option, or perhaps something
+> >else of a minor nature as I see the following:
+> 
+> ># dmesg | grep sata
+> >sata_rcar sata_rcar: coherent DMA mask is unset
+> >sata_rcar sata_rcar: failed to start port 0 (errno=-12)
+> >sata_rcar: probe of sata_rcar failed with error -12
+> 
+>    No, it's entirely our fault -- Vladimir didn't test the driver in
+> non-DT mode with DMA support added (due to the above mentioned boot
+> fix missing), and I didn't notice the missing intializers for
+> 'sata_device.dev.[coherent_]dma_mask' when reviewing his patches. V2
+> will be posted soon.
 
-I believe those are queued up for upstream in the soc5 branch.
-
-Please let me know when you are comfortable with me applying these patches
-to that branch. I'm fine with that answer being "now".
+Great, thanks.
