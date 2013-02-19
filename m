@@ -1,235 +1,63 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Tue, 19 Feb 2013 18:00:57 +0800
-Subject: [lm-sensors] [RFC PATCH 2/9] hwmon: (lm90) split set&show temp
- as common codes
-In-Reply-To: <20130219033144.GA25610@roeck-us.net>
-References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-3-git-send-email-wni@nvidia.com>
- <20130219033144.GA25610@roeck-us.net>
-Message-ID: <51234D59.4060405@nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 19 Feb 2013 15:39:32 +0530
+Subject: [PATCH, RFC 0/8] ARM: AM43 (OMAP2+) boot support
+In-Reply-To: <cover.1361186097.git.afzal@ti.com>
+References: <cover.1361186097.git.afzal@ti.com>
+Message-ID: <51234F5C.6050500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2013 11:31 AM, Guenter Roeck wrote:
-> On Mon, Feb 18, 2013 at 07:30:24PM +0800, Wei Ni wrote:
->> Split set&show temp codes as common functions, so we can use it directly when
->> implement linux thermal framework.
->>
->> Signed-off-by: Wei Ni <wni@nvidia.com>
->> ---
->>  drivers/hwmon/lm90.c |  117 +++++++++++++++++++++++++++++++-------------------
->>  1 file changed, 72 insertions(+), 45 deletions(-)
->>
->> diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
->> index 863412a..caf01b0 100644
->> --- a/drivers/hwmon/lm90.c
->> +++ b/drivers/hwmon/lm90.c
->> @@ -702,29 +702,35 @@ static u16 temp_to_u16_adt7461(struct lm90_data *data, long val)
->>   * Sysfs stuff
->>   */
->>  
->> -static ssize_t show_temp8(struct device *dev, struct device_attribute *devattr,
->> -			  char *buf)
->> +static void _show_temp8(struct device *dev, int index, int *temp)
-> 
-> Why do the new functions not simply return the value ? 
-> Void return and returning the value in a pointer doesn't make much sense to me.
+On Monday 18 February 2013 05:05 PM, Afzal Mohammed wrote:
+> (Resending, since it seems, LAKML doesn't accept patches with subject
+> prefix only as "RFC", but requires "PATCH" prefix also)
+>
+> Hi,
+>
+> This series adds minimal support to boot Linux on platforms having
+> AM43 based SoC's.
+>
+> This is being sent as an RFC to seek opinion about modification in
+> twd to register percpu local timer clock event for scheduler tick in
+> the case of one core SMP.
+>
+> AM43 SoC's are based on ARM Cortex-A9. It is an ARM Cortex-A9 SMP
+> configuration with one core (not uniprocessor configuration). AM43 is
+> similar to AM335x in it's peripheral capabilities, with many of the
+> peripheral register mapping's similar like that of uart.
+>
+After looking at the specs, you don't need the SMP mode since ACP
+isn't being used.
 
-Yes, you are right, it's better to return value simply.
-I will change it in my next version.
 
-Wei.
+> AM43 is in pre-silicon stage and currently there are no public
+> documents.
+>
+> This series has been tested on a pre-silicon platform that emulates
+> AM43 SoC, changes proposed here are minimal - to get it booting.
+> Kernel was directly run without the help of bootloader - Images were
+> directly loaded onto a pre-initialized RAM and ARM registers updated
+> as required for booting.
+>
+> Changes have been made over linux-next (next-20130213) with three "OF"
+> related reverts (which otherwise causes problem in other platforms
+> also) and compiled with omap2plus_defconfig. Multiplatform option was
+> enabled, while most of CONFIG options were deselected for a faster
+> boot. Beagle bone boots as earlier with these changes.
+>
+> An interesting observation is that it may be possible to boot this
+> platform to console without any platform specific modification to
+> proper Kernel (by that I mean excluding DT sources) using Arnd's,
+>
+> "[PATCH,RFC] default machine descriptor for multiplatform",
+>
+> along with a "CLOCKSOURCE_OF_DECLARE" for smp twd.
+>
+TWD use for AM437x is also limited because these times stops in
+low power sates and there you will need broad-cast mechanism which
+again more of SMP machine feature.
 
-> 
-> Guenter
-> 
->>  {
->> -	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
->>  	struct lm90_data *data = lm90_update_device(dev);
->> -	int temp;
->>  
->>  	if (data->kind == adt7461)
->> -		temp = temp_from_u8_adt7461(data, data->temp8[attr->index]);
->> +		*temp = temp_from_u8_adt7461(data, data->temp8[index]);
->>  	else if (data->kind == max6646)
->> -		temp = temp_from_u8(data->temp8[attr->index]);
->> +		*temp = temp_from_u8(data->temp8[index]);
->>  	else
->> -		temp = temp_from_s8(data->temp8[attr->index]);
->> +		*temp = temp_from_s8(data->temp8[index]);
->>  
->>  	/* +16 degrees offset for temp2 for the LM99 */
->> -	if (data->kind == lm99 && attr->index == 3)
->> -		temp += 16000;
->> +	if (data->kind == lm99 && index == 3)
->> +		*temp += 16000;
->> +
->> +}
->> +
->> +static ssize_t show_temp8(struct device *dev, struct device_attribute *devattr,
->> +			  char *buf)
->> +{
->> +	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
->> +	int temp;
->> +
->> +	_show_temp8(dev, attr->index, &temp);
->>  
->>  	return sprintf(buf, "%d\n", temp);
->>  }
->>  
->> -static ssize_t set_temp8(struct device *dev, struct device_attribute *devattr,
->> -			 const char *buf, size_t count)
->> +static void _set_temp8(struct device *dev, int index, long val)
->>  {
->>  	static const u8 reg[8] = {
->>  		LM90_REG_W_LOCAL_LOW,
->> @@ -737,60 +743,73 @@ static ssize_t set_temp8(struct device *dev, struct device_attribute *devattr,
->>  		MAX6659_REG_W_REMOTE_EMERG,
->>  	};
->>  
->> -	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
->>  	struct i2c_client *client = to_i2c_client(dev);
->>  	struct lm90_data *data = i2c_get_clientdata(client);
->> -	int nr = attr->index;
->> -	long val;
->> -	int err;
->> -
->> -	err = kstrtol(buf, 10, &val);
->> -	if (err < 0)
->> -		return err;
->>  
->>  	/* +16 degrees offset for temp2 for the LM99 */
->> -	if (data->kind == lm99 && attr->index == 3)
->> +	if (data->kind == lm99 && index == 3)
->>  		val -= 16000;
->>  
->>  	mutex_lock(&data->update_lock);
->>  	if (data->kind == adt7461)
->> -		data->temp8[nr] = temp_to_u8_adt7461(data, val);
->> +		data->temp8[index] = temp_to_u8_adt7461(data, val);
->>  	else if (data->kind == max6646)
->> -		data->temp8[nr] = temp_to_u8(val);
->> +		data->temp8[index] = temp_to_u8(val);
->>  	else
->> -		data->temp8[nr] = temp_to_s8(val);
->> +		data->temp8[index] = temp_to_s8(val);
->>  
->> -	lm90_select_remote_channel(client, data, nr >= 6);
->> -	i2c_smbus_write_byte_data(client, reg[nr], data->temp8[nr]);
->> +	lm90_select_remote_channel(client, data, index >= 6);
->> +	i2c_smbus_write_byte_data(client, reg[index], data->temp8[index]);
->>  	lm90_select_remote_channel(client, data, 0);
->>  
->>  	mutex_unlock(&data->update_lock);
->> +}
->> +
->> +static ssize_t set_temp8(struct device *dev, struct device_attribute *devattr,
->> +			 const char *buf, size_t count)
->> +{
->> +	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
->> +	int index = attr->index;
->> +	long val;
->> +	int err;
->> +
->> +	err = kstrtol(buf, 10, &val);
->> +	if (err < 0)
->> +		return err;
->> +
->> +	_set_temp8(dev, index, val);
->> +
->>  	return count;
->>  }
->>  
->> -static ssize_t show_temp11(struct device *dev, struct device_attribute *devattr,
->> -			   char *buf)
->> +static void _show_temp11(struct device *dev, int index, int *temp)
->>  {
->> -	struct sensor_device_attribute_2 *attr = to_sensor_dev_attr_2(devattr);
->>  	struct lm90_data *data = lm90_update_device(dev);
->> -	int temp;
->>  
->>  	if (data->kind == adt7461)
->> -		temp = temp_from_u16_adt7461(data, data->temp11[attr->index]);
->> +		*temp = temp_from_u16_adt7461(data, data->temp11[index]);
->>  	else if (data->kind == max6646)
->> -		temp = temp_from_u16(data->temp11[attr->index]);
->> +		*temp = temp_from_u16(data->temp11[index]);
->>  	else
->> -		temp = temp_from_s16(data->temp11[attr->index]);
->> +		*temp = temp_from_s16(data->temp11[index]);
->>  
->>  	/* +16 degrees offset for temp2 for the LM99 */
->> -	if (data->kind == lm99 &&  attr->index <= 2)
->> -		temp += 16000;
->> +	if (data->kind == lm99 &&  index <= 2)
->> +		*temp += 16000;
->> +}
->> +
->> +static ssize_t show_temp11(struct device *dev, struct device_attribute *devattr,
->> +			   char *buf)
->> +{
->> +	struct sensor_device_attribute_2 *attr = to_sensor_dev_attr_2(devattr);
->> +	int temp;
->> +
->> +	_show_temp11(dev, attr->index, &temp);
->>  
->>  	return sprintf(buf, "%d\n", temp);
->>  }
->>  
->> -static ssize_t set_temp11(struct device *dev, struct device_attribute *devattr,
->> -			  const char *buf, size_t count)
->> +static void _set_temp11(struct device *dev, int nr, int index, long val)
->>  {
->>  	struct {
->>  		u8 high;
->> @@ -804,17 +823,8 @@ static ssize_t set_temp11(struct device *dev, struct device_attribute *devattr,
->>  		{ LM90_REG_W_REMOTE_HIGHH, LM90_REG_W_REMOTE_HIGHL, 1 }
->>  	};
->>  
->> -	struct sensor_device_attribute_2 *attr = to_sensor_dev_attr_2(devattr);
->>  	struct i2c_client *client = to_i2c_client(dev);
->>  	struct lm90_data *data = i2c_get_clientdata(client);
->> -	int nr = attr->nr;
->> -	int index = attr->index;
->> -	long val;
->> -	int err;
->> -
->> -	err = kstrtol(buf, 10, &val);
->> -	if (err < 0)
->> -		return err;
->>  
->>  	/* +16 degrees offset for temp2 for the LM99 */
->>  	if (data->kind == lm99 && index <= 2)
->> @@ -839,6 +849,23 @@ static ssize_t set_temp11(struct device *dev, struct device_attribute *devattr,
->>  	lm90_select_remote_channel(client, data, 0);
->>  
->>  	mutex_unlock(&data->update_lock);
->> +}
->> +
->> +static ssize_t set_temp11(struct device *dev, struct device_attribute *devattr,
->> +			  const char *buf, size_t count)
->> +{
->> +	struct sensor_device_attribute_2 *attr = to_sensor_dev_attr_2(devattr);
->> +	int nr = attr->nr;
->> +	int index = attr->index;
->> +	long val;
->> +	int err;
->> +
->> +	err = kstrtol(buf, 10, &val);
->> +	if (err < 0)
->> +		return err;
->> +
->> +	_set_temp11(dev, nr, index, val);
->> +
->>  	return count;
->>  }
->>  
->> -- 
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> lm-sensors mailing list
->> lm-sensors at lm-sensors.org
->> http://lists.lm-sensors.org/mailman/listinfo/lm-sensors
->>
+So I suggest to use the wakeup timer(GPT1) clock-event instead
+of local timer for the mentioned reason.
+
+Regards,
+Santosh
