@@ -1,170 +1,205 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 20 Feb 2013 00:22:20 +0800
-Subject: [PATCH v4 03/11] gpio: pxa: use platform data for gpio inverted
+Date: Wed, 20 Feb 2013 00:22:21 +0800
+Subject: [PATCH v4 04/11] gpio: pxa: remove gpio_type
 In-Reply-To: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1361290948-16669-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1361290948-16669-5-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid to judge whether gpio is inverted by identifying cpu in
-gpio driver. Move this into platform data of gpio driver.
+Since gpio_type is used to check whether gafr register is valid. So
+move it into platform data.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/mach-pxa/pxa25x.c |    3 +++
- drivers/gpio/gpio-pxa.c    |   31 ++++++++++++++++++++-----------
+ arch/arm/mach-pxa/pxa25x.c |    1 +
+ arch/arm/mach-pxa/pxa27x.c |    1 +
+ drivers/gpio/gpio-pxa.c    |   54 +++++++++-----------------------------------
  include/linux/gpio-pxa.h   |    1 +
- 3 files changed, 24 insertions(+), 11 deletions(-)
+ 4 files changed, 14 insertions(+), 43 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-index 3f5171e..9c9c224 100644
+index 9c9c224..ef1bb41 100644
 --- a/arch/arm/mach-pxa/pxa25x.c
 +++ b/arch/arm/mach-pxa/pxa25x.c
-@@ -340,6 +340,9 @@ void __init pxa25x_map_io(void)
+@@ -343,6 +343,7 @@ static struct pxa_gpio_platform_data pxa25x_gpio_info __initdata = {
+ #ifdef CONFIG_CPU_PXA26x
+ 	.inverted = true,
+ #endif
++	.gafr = true,
+ 	.gpio_set_wake = gpio_set_wake,
+ };
+ 
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 3203a9f..7f1f18a 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -431,6 +431,7 @@ void __init pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info)
  }
  
- static struct pxa_gpio_platform_data pxa25x_gpio_info __initdata = {
-+#ifdef CONFIG_CPU_PXA26x
-+	.inverted = true,
-+#endif
+ static struct pxa_gpio_platform_data pxa27x_gpio_info __initdata = {
++	.gafr = true,
  	.gpio_set_wake = gpio_set_wake,
  };
  
 diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index e611bed..11a732e 100644
+index 11a732e..f31509e 100644
 --- a/drivers/gpio/gpio-pxa.c
 +++ b/drivers/gpio/gpio-pxa.c
-@@ -71,6 +71,7 @@ static struct device_node *pxa_gpio_of_node;
- struct pxa_gpio_chip {
+@@ -72,6 +72,7 @@ struct pxa_gpio_chip {
  	struct gpio_chip	gc;
  	void __iomem		*regbase;
-+	bool			inverted;
+ 	bool			inverted;
++	bool			gafr;
  	char			label[10];
  
  	unsigned long		irq_mask;
-@@ -126,9 +127,9 @@ static inline int gpio_is_mmp_type(int type)
+@@ -87,18 +88,8 @@ struct pxa_gpio_chip {
+ #endif
+ };
+ 
+-enum {
+-	PXA25X_GPIO = 0,
+-	PXA26X_GPIO,
+-	PXA27X_GPIO,
+-	PXA3XX_GPIO,
+-	PXA93X_GPIO,
+-	MMP_GPIO = 0x10,
+-};
+-
+ static DEFINE_SPINLOCK(gpio_lock);
+ static struct pxa_gpio_chip *pxa_gpio_chips;
+-static int gpio_type;
+ static void __iomem *gpio_reg_base;
+ 
+ #define for_each_gpio_chip(i, c)			\
+@@ -114,16 +105,6 @@ static inline struct pxa_gpio_chip *gpio_to_pxachip(unsigned gpio)
+ 	return &pxa_gpio_chips[gpio_to_bank(gpio)];
+ }
+ 
+-static inline int gpio_is_pxa_type(int type)
+-{
+-	return (type & MMP_GPIO) == 0;
+-}
+-
+-static inline int gpio_is_mmp_type(int type)
+-{
+-	return (type & MMP_GPIO) != 0;
+-}
+-
  /* GPIO86/87/88/89 on PXA26x have their direction bits in PXA_GPDR(2 inverted,
   * as well as their Alternate Function value being '1' for GPIO in GAFRx.
   */
--static inline int __gpio_is_inverted(int gpio)
-+static inline int __gpio_is_inverted(struct pxa_gpio_chip *chip, int gpio)
- {
--	if ((gpio_type == PXA26X_GPIO) && (gpio > 85))
-+	if ((chip->inverted) && (gpio > 85))
- 		return 1;
- 	return 0;
- }
-@@ -139,15 +140,13 @@ static inline int __gpio_is_inverted(int gpio)
-  * is attributed as "occupied" here (I know this terminology isn't
-  * accurate, you are welcome to propose a better one :-)
-  */
--static inline int __gpio_is_occupied(unsigned gpio)
-+static inline int __gpio_is_occupied(struct pxa_gpio_chip *chip, unsigned gpio)
- {
--	struct pxa_gpio_chip *pxachip;
- 	void __iomem *base;
- 	unsigned long gafr = 0, gpdr = 0;
- 	int ret, af = 0, dir = 0;
- 
--	pxachip = gpio_to_pxachip(gpio);
--	base = gpio_chip_base(&pxachip->gc);
-+	base = gpio_chip_base(&chip->gc);
+@@ -149,10 +130,7 @@ static inline int __gpio_is_occupied(struct pxa_gpio_chip *chip, unsigned gpio)
+ 	base = gpio_chip_base(&chip->gc);
  	gpdr = readl_relaxed(base + GPDR_OFFSET);
  
- 	switch (gpio_type) {
-@@ -158,7 +157,7 @@ static inline int __gpio_is_occupied(unsigned gpio)
+-	switch (gpio_type) {
+-	case PXA25X_GPIO:
+-	case PXA26X_GPIO:
+-	case PXA27X_GPIO:
++	if (chip->gafr) {
+ 		gafr = readl_relaxed(base + GAFR_OFFSET);
  		af = (gafr >> ((gpio & 0xf) * 2)) & 0x3;
  		dir = gpdr & GPIO_bit(gpio);
- 
--		if (__gpio_is_inverted(gpio))
-+		if (__gpio_is_inverted(chip, gpio))
+@@ -161,10 +139,8 @@ static inline int __gpio_is_occupied(struct pxa_gpio_chip *chip, unsigned gpio)
  			ret = (af != 1) || (dir == 0);
  		else
  			ret = (af != 0) || (dir != 0);
-@@ -183,13 +182,16 @@ int pxa_irq_to_gpio(int irq)
- static int pxa_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
- {
- 	void __iomem *base = gpio_chip_base(gc);
-+	struct pxa_gpio_chip *chip;
- 	uint32_t value, mask = 1 << offset;
- 	unsigned long flags;
+-		break;
+-	default:
++	} else {
+ 		ret = gpdr & GPIO_bit(gpio);
+-		break;
+ 	}
+ 	return ret;
+ }
+@@ -445,30 +421,23 @@ static int pxa_gpio_nums(void)
+ 	if (cpu_is_pxa25x()) {
+ #ifdef CONFIG_CPU_PXA26x
+ 		count = 89;
+-		gpio_type = PXA26X_GPIO;
+ #elif defined(CONFIG_PXA25x)
+ 		count = 84;
+-		gpio_type = PXA26X_GPIO;
+ #endif /* CONFIG_CPU_PXA26x */
+ 	} else if (cpu_is_pxa27x()) {
+ 		count = 120;
+-		gpio_type = PXA27X_GPIO;
+ 	} else if (cpu_is_pxa93x()) {
+ 		count = 191;
+-		gpio_type = PXA93X_GPIO;
+ 	} else if (cpu_is_pxa3xx()) {
+ 		count = 127;
+-		gpio_type = PXA3XX_GPIO;
+ 	}
+ #endif /* CONFIG_ARCH_PXA */
  
-+	chip = container_of(gc, struct pxa_gpio_chip, gc);
-+
- 	spin_lock_irqsave(&gpio_lock, flags);
+ #ifdef CONFIG_ARCH_MMP
+ 	if (cpu_is_pxa168() || cpu_is_pxa910()) {
+ 		count = 127;
+-		gpio_type = MMP_GPIO;
+ 	} else if (cpu_is_mmp2()) {
+ 		count = 191;
+-		gpio_type = MMP_GPIO;
+ 	}
+ #endif /* CONFIG_ARCH_MMP */
+ 	return count;
+@@ -477,7 +446,7 @@ static int pxa_gpio_nums(void)
+ #ifdef CONFIG_OF
+ static struct of_device_id pxa_gpio_dt_ids[] = {
+ 	{ .compatible = "mrvl,pxa-gpio" },
+-	{ .compatible = "mrvl,mmp-gpio", .data = (void *)MMP_GPIO },
++	{ .compatible = "mrvl,mmp-gpio" },
+ 	{}
+ };
  
- 	value = readl_relaxed(base + GPDR_OFFSET);
--	if (__gpio_is_inverted(gc->base + offset))
-+	if (__gpio_is_inverted(chip, gc->base + offset))
- 		value |= mask;
- 	else
- 		value &= ~mask;
-@@ -203,15 +205,17 @@ static int pxa_gpio_direction_output(struct gpio_chip *gc,
- 				     unsigned offset, int value)
- {
- 	void __iomem *base = gpio_chip_base(gc);
-+	struct pxa_gpio_chip *chip;
- 	uint32_t tmp, mask = 1 << offset;
- 	unsigned long flags;
- 
-+	chip = container_of(gc, struct pxa_gpio_chip, gc);
- 	writel_relaxed(mask, base + (value ? GPSR_OFFSET : GPCR_OFFSET));
- 
- 	spin_lock_irqsave(&gpio_lock, flags);
- 
- 	tmp = readl_relaxed(base + GPDR_OFFSET);
--	if (__gpio_is_inverted(gc->base + offset))
-+	if (__gpio_is_inverted(chip, gc->base + offset))
- 		tmp &= ~mask;
- 	else
- 		tmp |= mask;
-@@ -322,7 +326,7 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
- 		if ((c->irq_edge_rise | c->irq_edge_fall) & GPIO_bit(gpio))
- 			return 0;
- 
--		if (__gpio_is_occupied(gpio))
-+		if (__gpio_is_occupied(c, gpio))
- 			return 0;
- 
- 		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
-@@ -330,7 +334,7 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
- 
- 	gpdr = readl_relaxed(c->regbase + GPDR_OFFSET);
- 
--	if (__gpio_is_inverted(gpio))
-+	if (__gpio_is_inverted(c, gpio))
- 		writel_relaxed(gpdr | mask,  c->regbase + GPDR_OFFSET);
- 	else
- 		writel_relaxed(gpdr & ~mask, c->regbase + GPDR_OFFSET);
-@@ -508,6 +512,9 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
- 		return -ENOMEM;
- 	if (of_find_property(np, "marvell,gpio-ed-mask", NULL))
- 		pdata->ed_mask = true;
-+	/* It's only valid for PXA26x */
-+	if (of_find_property(np, "marvell,gpio-inverted", NULL))
-+		pdata->inverted = true;
+@@ -517,7 +486,6 @@ static int pxa_gpio_probe_dt(struct platform_device *pdev)
+ 		pdata->inverted = true;
  	/* set the platform data */
  	pdev->dev.platform_data = pdata;
- 	gpio_type = (int)of_id->data;
-@@ -612,6 +619,8 @@ static int pxa_gpio_probe(struct platform_device *pdev)
+-	gpio_type = (int)of_id->data;
+ 
+ 	next = of_get_next_child(np, NULL);
+ 	prev = next;
+@@ -563,12 +531,11 @@ static int pxa_gpio_probe(struct platform_device *pdev)
+ 	if (ret < 0) {
+ 		pxa_last_gpio = pxa_gpio_nums();
+ #ifdef CONFIG_ARCH_PXA
+-		if (gpio_is_pxa_type(gpio_type))
+-			irq_base = PXA_GPIO_TO_IRQ(0);
+-#endif
+-#ifdef CONFIG_ARCH_MMP
+-		if (gpio_is_mmp_type(gpio_type))
+-			irq_base = MMP_GPIO_TO_IRQ(0);
++		irq_base = PXA_GPIO_TO_IRQ(0);
++#elif defined(CONFIG_ARCH_MMP)
++		irq_base = MMP_GPIO_TO_IRQ(0);
++#else
++#error "gpio-pxa driver can't be used for your architecture"
+ #endif
+ 	} else {
+ 		use_of = 1;
+@@ -619,8 +586,9 @@ static int pxa_gpio_probe(struct platform_device *pdev)
  		/* unmask GPIO edge detect for AP side */
  		if (info->ed_mask)
  			writel_relaxed(~0, c->regbase + ED_MASK_OFFSET);
-+		/* update for gpio inverted */
-+		c->inverted = info->inverted;
+-		/* update for gpio inverted */
++		/* update for gpio inverted & gafr */
+ 		c->inverted = info->inverted;
++		c->gafr = info->gafr;
  	}
  
  	if (!use_of) {
 diff --git a/include/linux/gpio-pxa.h b/include/linux/gpio-pxa.h
-index bc5cae5..759e865 100644
+index 759e865..a5670c5 100644
 --- a/include/linux/gpio-pxa.h
 +++ b/include/linux/gpio-pxa.h
-@@ -15,6 +15,7 @@ extern int pxa_irq_to_gpio(int irq);
- 
+@@ -16,6 +16,7 @@ extern int pxa_irq_to_gpio(int irq);
  struct pxa_gpio_platform_data {
  	bool ed_mask;	/* true means that ed_mask reg is available */
-+	bool inverted;	/* only valid for PXA26x */
+ 	bool inverted;	/* only valid for PXA26x */
++	bool gafr;	/* only valid for PXA25x/PXA26x/PXA27x */
  	int (*gpio_set_wake)(unsigned int gpio, unsigned int on);
  };
  
