@@ -1,36 +1,26 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 19 Feb 2013 10:52:44 +0000
-Subject: [PATCH, RFC 8/8] ARM: dts: am43-pre-silicon support
-In-Reply-To: <5123556A.9050109@ti.com>
-References: <cover.1361186097.git.afzal@ti.com>
- <e344f74da47579c11db68d9f6efe25259ed7f25d.1361186097.git.afzal@ti.com>
- <5123556A.9050109@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EAA86DE@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Feb 2013 10:56:06 +0000
+Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
+In-Reply-To: <CAJFYCKGCNDTSq9OYZUYXx8XNSgSHD=p=hw+9_7N=EhM=bUu=bg@mail.gmail.com>
+References: <1360966349-1242560-2-git-send-email-arnd@arndb.de>
+ <Pine.LNX.4.44L0.1302181723540.6790-100000@netrider.rowland.org>
+ <CAJFYCKGCNDTSq9OYZUYXx8XNSgSHD=p=hw+9_7N=EhM=bUu=bg@mail.gmail.com>
+Message-ID: <201302191056.07139.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On Tuesday 19 February 2013, Manjunath Goudar wrote:
+> > This is not necessary; ehci_setup is the default value anyway.  This
+> > structure can be omitted.
+> >
+> 
+> ehci_init_driver function we are passing orion_overrides,if we are removing
+> above struct initialization, what should we need to pass in
+> the  ehci_init_driver function.
+> 
 
-On Tue, Feb 19, 2013 at 16:05:22, Shilimkar, Santosh wrote:
-> On Monday 18 February 2013 05:08 PM, Afzal Mohammed wrote:
+ehci_init_driver already checks if you pass an override in there, and does
+not override anything in that case, so you can simply pass NULL as the
+argument.
 
-> > AM43 SoC is in pre-silicon stage, meanwhile it has been modelled in
-> > a pre-silicon platform. To validate and boot Linux in pre-silicon
-> > platform that emulates an AM43 SoC, add DT build support.
-
-> > Note: This would be replaced by an original board support.
-
-> > -	am335x-bone.dtb
-> > +	am335x-bone.dtb \
-> > +	am43-pre-silicon.dtb
-
-> Well the pre-silicon platform and the SOC are very
-> close and at least the support you are adding here is
-> exactly same. So lets just use am437x.dtb or something
-> like that.
-
-SoC support is already added in patch 7/8. This is board (which doesn't
-exist now) support, hence a pre-silicon temporary one to validate it.
-
-Regards
-Afzal
+	Arnd
