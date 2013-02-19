@@ -1,40 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Feb 2013 16:15:40 +0000
-Subject: [PATCH] ARM: dove: update dove_defconfig with a few useful options
-In-Reply-To: <20130123151530.GU1758@titan.lakedaemon.net>
-References: <1358099647-22323-1-git-send-email-olof@lixom.net>
- <20130123151530.GU1758@titan.lakedaemon.net>
-Message-ID: <201302191615.40971.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 19 Feb 2013 18:17:12 +0200
+Subject: [PATCH v2 0/5] Generic PHY Framework
+In-Reply-To: <5123A32D.4030005@pengutronix.de>
+References: <1361253198-7401-1-git-send-email-kishon@ti.com>
+ <201302191233.54677.arnd@arndb.de>
+ <20130219131258.GV23197@arwen.pp.htv.fi>
+ <201302191434.40495.arnd@arndb.de>
+ <20130219150500.GG4390@arwen.pp.htv.fi>
+ <5123A32D.4030005@pengutronix.de>
+Message-ID: <20130219161712.GB5736@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 January 2013, Jason Cooper wrote:
-> On Sun, Jan 13, 2013 at 09:54:07AM -0800, Olof Johansson wrote:
-> > This refreshes the dove_defconfig, and adds:
-> > PRINTK_TIME
-> > DEVTMPFS
-> > EXT4
+Hi,
+
+On Tue, Feb 19, 2013 at 05:07:09PM +0100, Marc Kleine-Budde wrote:
+> On 02/19/2013 04:05 PM, Felipe Balbi wrote:
+> > Hi,
 > > 
-> > They're quite useful, and allows booting a cubox ubuntu rootfs on SD card,
-> > since that by default uses ext4.
+> > On Tue, Feb 19, 2013 at 02:34:40PM +0000, Arnd Bergmann wrote:
+> >> On Tuesday 19 February 2013, Felipe Balbi wrote:
+> >>> On Tue, Feb 19, 2013 at 12:33:54PM +0000, Arnd Bergmann wrote:
+> >>>>> Currently drivers/phy and drivers/net/phy are independent and are not 
+> >>>>> related to each other. There are some fundamental differences on how 
+> >>>>> these frameworks work. IIUC, the *net* uses bus layer (MDIO bus) to 
+> >>>>> match a PHY device with a PHY driver and the Ethernet device uses the 
+> >>>>> bus layer to get the PHY.
+> >>>>> The Generic PHY Framework however doesn't have any bus layer. The PHY 
+> >>>>> should be like any other Platform Devices and Drivers and the framework 
+> >>>>> will provide some APIs to register with the framework. And there are 
+> >>>>> other APIs which any controller can use to get the PHY (for e.g., in the 
+> >>>>> case of dt boot, it can use phandle to get a reference to the PHY).
+> >>>>
+> >>>> Hmm, I think the use of a bus_type for a PHY actually sounds quite
+> >>>> appropriate. The actual PHY device would then be a child of the
+> >>>
+> >>> really ? I'm not so sure, the *bus* used by the PHY is ULPI, UTMI,
+> >>> UTMI+, PIP3, I2C, etc... adding another 'fake' bus representation is a
+> >>> bit overkill IMO.
+> >>>
+> >>> Imagine an I2C-controlled PHY driver like isp1301, that driver will have
+> >>> to register i2c_driver and phy_driver, which looks weird to me. If the
+> >>> only substitute for class is a bus, we can't drop classes just yet, I'm
+> >>> afraid.
+> >>>
+> >>> Imagine a regulator bus, a pwm bus, an LED bus etc. They don't make
+> >>> sense IMHO.
+> >>
+> >> It's a fine line, but I think a phy is something that resembles a device
+> >> more than an LED does. When I read patch 1, I also noticed and commented
+> >> on the fact that it does use a 'class'. Now, according to Greg, we should
+> >> use 'bus_type' instead of 'class' in new code. I originally disagreed with
+> >> that concept, but he's the boss here and it's good if he has a vision
+> >> how things should be lined out.
+> >>
+> >> In practice, there is little difference between a 'bus_type' and a 'class',
+> >> so just replace any instance of the former with the latter in your head
+> >> when reading the code ;-)
 > > 
-> > The rest of the churn is due to options and defaults moving around, no
-> > functional difference.
-> > 
-> > Signed-off-by: Olof Johansson <olof@lixom.net>
-> > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > 
-> > ---
-> >  arch/arm/configs/dove_defconfig | 28 ++++++++--------------------
-> >  1 file changed, 8 insertions(+), 20 deletions(-)
+> > it's not so simple :-) if we must use bus_type we need to introduce all
+> > the device/driver matching mechanism which isn't necessary with a class.
 > 
-> Applied to mvebu/boards
+> You have the code for phy <-> device matching in your framework anyway.
+> Using the bus infrastructure brings changes the open coded matching into
+> bus callbacks.
 
-Hi Olof,
+it's not the same thing. Current matching is just to figure out which
+phy belongs to which user. The bus matching rules are to bind a device
+with its driver, but that part has been taken care of by the underlying
+control bus used by the phy, be it i2c, spi, or whatever else.
 
-I've just tried rebuilding the for-next branch, which turned out very
-easy this time, but this one patch is what stuck out: apparently
-you had already applied it into for-next, but it is not on
-any of the other branches. Do you know what is going on here?
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/521c1a46/attachment.sig>
