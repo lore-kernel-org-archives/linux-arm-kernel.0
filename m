@@ -1,31 +1,61 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Tue, 19 Feb 2013 17:52:35 +0800
-Subject: [RFC PATCH 1/9] ARM: dt: t30 cardhu: add dt entry for lm90
-In-Reply-To: <5122F162.9030103@nvidia.com>
-References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-2-git-send-email-wni@nvidia.com>
- <5122F162.9030103@nvidia.com>
-Message-ID: <51234B63.7080104@nvidia.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 19 Feb 2013 10:53:18 +0100
+Subject: Question about fixed-clock
+In-Reply-To: <CAOMZO5BXVX8=QOV4+tN_w27ztSVkHAnOG2ifbS_Jpd=-cPnAdw@mail.gmail.com>
+References: <5122BF88.1050007@gmail.com>
+ <CAOMZO5BXVX8=QOV4+tN_w27ztSVkHAnOG2ifbS_Jpd=-cPnAdw@mail.gmail.com>
+Message-ID: <51234B8E.2000504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2013 11:28 AM, Alex Courbot wrote:
-> On 02/18/2013 08:30 PM, Wei Ni wrote:
->> Enable thermal sensor lm90 in the dts file.
-> 
-> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> 
-> Btw, shouldn't this patch come last, after all the changes you did to 
-> lm90? If you keep the current order, you will need to ensure that the 
-> device performs as expected on Cardhu for each of the remaining patches 
-> of the series. It is probably safer to just move this one at the end to 
-> avoid trouble.
+Hi Fabio,
+Hi Afzal,
 
-I will try split this patch set into 3 separate sets in my next version,
-like Matthew's suggestion, so the patches will be clear.
-
-Wei.
-
+On 19.02.2013 02:33, Fabio Estevam wrote:
+> On Mon, Feb 18, 2013 at 8:55 PM, Daniel Mack <zonque@gmail.com> wrote:
+>> Hi,
+>>
+>> This might be a stupid question, but I'm somehow stuck here. I'm using a
+>> driver with the following DTS sub-node:
+>>
+>>         ref25: ref25M {
+>>                 compatible = "fixed-clock";
+>>                 #clock-cells = <0>;
+>>                 clock-frequency = <25000000>;
+>>         };
+>>
+>>         clock-generator at 0 {
+>>                                 /* ... */
+>>                                 #clock-cells = <1>;
+>>                                 clocks = <&ref25>;
+>>         }
+>>
+>> The device driver for clock-generator uses something like the following
+>> call to get its clock:
+>>
+>>         clk = of_clk_get(np, 0);
+>>
+>> but the return value is ERR_PTR(-ENOENT) and I also can't find this
+>> clock in the clk debugfs tree.
+>>
+>> This is on a OMAP/AM33xx device with kernel 3.8-rc7 plus the -next tips
+>> of arm-soc and omap, but with no other special clock options selected in
+>> the config. Is there anything I'm missing to correctly instantiate the
+>> dummy clock?
 > 
-> Alex.
+> Have you registered it with clk_register_fixed_rate() ?
 > 
+> In imx we use imx_clk_fixed, which in turns call  clk_register_fixed_rate().
+> 
+> Take a look at arch/arm/mach-imx/clk-imx51-imx53.c for a reference.
+
+Hmm no, I didn't do anything else than adding it to the DT in the first
+place, hoping that a driver will pick it up and add the clock for me.
+But it turns out that of_clk_init() is not called at all on my platform.
+
+I'm doing this now from omap_generic_init() and it works. If that's an
+appropriate place to call it, I can provide a patch.
+
+
+Thanks,
+Daniel
