@@ -1,26 +1,39 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Tue, 19 Feb 2013 10:22:21 +0100
-Subject: [patch 1/2] kcmp: Make it to depend on CONFIG_KCMP
-In-Reply-To: <20130219065210.030802820@openvz.org>
-References: <20130219064800.719149796@openvz.org>
- <20130219065210.030802820@openvz.org>
-Message-ID: <5123444D.6000806@suse.cz>
+From: nishanth.p@gmail.com (Nishanth Peethambaran)
+Date: Tue, 19 Feb 2013 14:59:46 +0530
+Subject: [Linaro-mm-sig] [PATCH 0/2] Device Tree support for CMA
+ (Contiguous Memory Allocator)
+In-Reply-To: <5122A402.7030807@gmail.com>
+References: <1360845928-8107-1-git-send-email-m.szyprowski@samsung.com>
+ <20130214213013.GG1906@pengutronix.de> <511D6076.9090503@gmail.com>
+ <20130215083304.GK1906@pengutronix.de> <511E6143.609@gmail.com>
+ <CAMcxFTQAOjmzy77eB8nj3JDZ-6mwoMpm8yabtQj04tcLw-giLg@mail.gmail.com>
+ <5122A402.7030807@gmail.com>
+Message-ID: <CAMcxFTRLpStgR6O9ZJFzs=dODKvVZd5xvPVCkesvhrYx7UVaxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.2.2013 07:48, Cyrill Gorcunov wrote:
-> --- linux-2.6.git.orig/init/Kconfig
-> +++ linux-2.6.git/init/Kconfig
-> @@ -279,6 +279,15 @@ config FHANDLE
->  	  get renamed. Enables open_by_handle_at(2) and name_to_handle_at(2)
->  	  syscalls.
->  
-> +config KCMP
-> +	bool "kcmp syscall"
-> +	default n
+On Tue, Feb 19, 2013 at 3:28 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 02/16/2013 11:18 PM, Nishanth Peethambaran wrote:
+>> Limiting the scope of the product to a particular use-case (720p or
+>> 1080p video playback) will be part of firmware mostly OTP-ed in the
+>> SoC. Firmware author could decide the amount of CMA memory needed and
+>> put this as part of DT.
+>
+> What kernel developer would want a firmware author deciding how much
+> memory is needed? It is not a decision that can be made without
+> knowledge of the OS. While the frame size could be determined easily
+> enough based on resolution, the number of buffers needed cannot.
+>
+> Rob
+>
 
-Previously, kcmp was enabled with CONFIG_CHECKPOINT_RESTORE. Maybe
-change it to 'default CHECKPOINT_RESTORE', so that make oldconfig does
-the right thing?
+Got your point. Agree that firmware cannot decide on number of buffers.
+Hard coding cma areas, and their relation to devices and CMA areas
+inside kernel would bring back the concept of board files as drivers should
+not have these details. Bootargs support defing cma size but not the relation
+to devices.
+Having a separate system configuration DT file would bring this configuration
+out of firmware. OF format can be reused. System architect should
+own the system configuration DT and not kernel developer.
 
-Michal
+- Nishanth Peethambaran
