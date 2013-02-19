@@ -1,99 +1,56 @@
-From: gorcunov@openvz.org (Cyrill Gorcunov)
-Date: Tue, 19 Feb 2013 22:28:38 +0400
-Subject: [patch 1/2] kcmp: Make it to depend on CONFIG_KCMP
-In-Reply-To: <5123BC2B.6000304@zytor.com>
-References: <20130219064800.719149796@openvz.org>
- <20130219065210.030802820@openvz.org> <5123444D.6000806@suse.cz>
- <20130219093154.GF20312@moon> <5123BC2B.6000304@zytor.com>
-Message-ID: <20130219182838.GL20312@moon>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Tue, 19 Feb 2013 23:59:22 +0530
+Subject: [PATCH v5 29/45] x86/xen: Use get/put_online_cpus_atomic() to
+ prevent CPU offline
+In-Reply-To: <20130219181038.GB18244@phenom.dumpdata.com>
+References: <20130122073210.13822.50434.stgit@srivatsabhat.in.ibm.com>
+ <20130122074046.13822.61950.stgit@srivatsabhat.in.ibm.com>
+ <20130219181038.GB18244@phenom.dumpdata.com>
+Message-ID: <5123C482.5070704@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 09:53:47AM -0800, H. Peter Anvin wrote:
-> On 02/19/2013 01:31 AM, Cyrill Gorcunov wrote:
-> >+
-> >+	  If unsure, say N.
-> >+
+On 02/19/2013 11:40 PM, Konrad Rzeszutek Wilk wrote:
+> On Tue, Jan 22, 2013 at 01:10:51PM +0530, Srivatsa S. Bhat wrote:
+>> Once stop_machine() is gone from the CPU offline path, we won't be able to
+>> depend on preempt_disable() or local_irq_disable() to prevent CPUs from
+>> going offline from under us.
+>>
+>> Use the get/put_online_cpus_atomic() APIs to prevent CPUs from going offline,
+>> while invoking from atomic context.
+>>
+>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 > 
-> Wrong advice.  In this particular case, Y is the safe alternative.
----
-From: Cyrill Gorcunov <gorcunov@openvz.org>
-Subject: kcmp: Make it to depend on CONFIG_KCMP
+> Weird. I see this in the patch but I don't see it in the header?
 
-Since kcmp syscall has been implemented (initially on
-x86 architecture) a number of other archs wire it up
-as well: xtensa, sparc, sh, s390, mips, microblaze,
-m68k (not taking into account those who uses
-<asm-generic/unistd.h> for syscall numbers
-definitions).
+Meaning, you didn't get this email at all?
 
-But the Makefile, which turns kcmp.o generation on
-still depends on former config-x86. Thus get rid
-of this limitation and make kcmp.o depend on CONFIG_KCMP
-option.
+> Did you
+> explicitly suppress the CC part?
+> 
 
-v2:
- - As Michal pointed the old configs might already use of
-   CHECKPOINT_RESTORE, so make "default" accordingly.
- - Advice Y if unsure
+No.. I sent the entire patchset to a set of email ids and in addition to
+that I CC'ed individual patches to the respective maintainers/lists (the
+CC: list in the changelog). I used the --auto knob from stgit to do that.
 
-Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
-Cc: KOSAKI Motohiro <kosaki.motohiro@gmail.com>
-Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-Cc: Pavel Emelyanov <xemul@parallels.com>
-Cc: Andrey Vagin <avagin@openvz.org>
-Cc: Ingo Molnar <mingo@elte.hu>
-Cc: H. Peter Anvin <hpa@zytor.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Glauber Costa <glommer@parallels.com>
-Cc: Andi Kleen <andi@firstfloor.org>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Matt Helsley <matthltc@us.ibm.com>
-Cc: Pekka Enberg <penberg@kernel.org>
-Cc: Eric Dumazet <eric.dumazet@gmail.com>
-Cc: Vasiliy Kulikov <segoon@openwall.com>
-Cc: Alexey Dobriyan <adobriyan@gmail.com>
-Cc: Valdis.Kletnieks at vt.edu
-Cc: Michal Marek <mmarek@suse.cz>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
----
- init/Kconfig    |    9 +++++++++
- kernel/Makefile |    4 +---
- 2 files changed, 10 insertions(+), 3 deletions(-)
+> 
+> Anyhow, the patch looks sane enough, thought I need to to run it through
+> a test framework just to be on a sure side.
+>
 
-Index: linux-2.6.git/init/Kconfig
-===================================================================
---- linux-2.6.git.orig/init/Kconfig
-+++ linux-2.6.git/init/Kconfig
-@@ -279,6 +279,15 @@ config FHANDLE
- 	  get renamed. Enables open_by_handle_at(2) and name_to_handle_at(2)
- 	  syscalls.
- 
-+config KCMP
-+	bool "kcmp syscall"
-+	default CHECKPOINT_RESTORE
-+	help
-+	  If you say Y here, a user level program will be able to use
-+	  kcmp(2) syscall.
-+
-+	  If unsure, say Y.
-+
- config AUDIT
- 	bool "Auditing support"
- 	depends on NET
-Index: linux-2.6.git/kernel/Makefile
-===================================================================
---- linux-2.6.git.orig/kernel/Makefile
-+++ linux-2.6.git/kernel/Makefile
-@@ -25,9 +25,7 @@ endif
- obj-y += sched/
- obj-y += power/
- 
--ifeq ($(CONFIG_CHECKPOINT_RESTORE),y)
--obj-$(CONFIG_X86) += kcmp.o
--endif
-+obj-$(CONFIG_KCMP) += kcmp.o
- obj-$(CONFIG_FREEZER) += freezer.o
- obj-$(CONFIG_PROFILING) += profile.o
- obj-$(CONFIG_STACKTRACE) += stacktrace.o
+Sure, thank you. But you might want to test the v6 that I sent out
+yesterday instead of v5. Oh, wait a min, you didn't get the v6 mail also?
+
+Here it is, for your reference:
+http://marc.info/?l=linux-kernel&m=136119260122255&w=2
+
+Regards,
+Srivatsa S. Bhat
+
+>> Cc: Jeremy Fitzhardinge <jeremy@goop.org>
+>> Cc: "H. Peter Anvin" <hpa@zytor.com>
+>> Cc: x86 at kernel.org
+>> Cc: xen-devel at lists.xensource.com
+>> Cc: virtualization at lists.linux-foundation.org
+>> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+>> ---
