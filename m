@@ -1,31 +1,41 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 19 Feb 2013 12:24:24 +0200
-Subject: [PATCH 2/2] arm: omap2: voltage: remove unnecessary header
-In-Reply-To: <1361269464-20263-1-git-send-email-balbi@ti.com>
-References: <1361269464-20263-1-git-send-email-balbi@ti.com>
-Message-ID: <1361269464-20263-2-git-send-email-balbi@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 19 Feb 2013 15:55:59 +0530
+Subject: [PATCH, RFC 4/8] ARM: am33xx: ll debug config help
+In-Reply-To: <bfe941adb98a5000c2817f9fd6160070e59e53c9.1361186097.git.afzal@ti.com>
+References: <cover.1361186097.git.afzal@ti.com>
+ <bfe941adb98a5000c2817f9fd6160070e59e53c9.1361186097.git.afzal@ti.com>
+Message-ID: <51235337.60209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nothing from <linux/debugfs.h> is used on
-voltage.c.
+On Monday 18 February 2013 05:07 PM, Afzal Mohammed wrote:
+> Selecting DEBUG_AM33XXUART1 routes low level debug messages to first
+> UART instance of AM335x based SoC's. This selection is valid for
+> upcoming AM43 based SoC's too. Make this information available upon
+> configuring.
+>
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>   arch/arm/Kconfig.debug | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index acdddda..b717b78 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -542,6 +542,9 @@ choice
+>
+>   	config DEBUG_AM33XXUART1
+>   		bool "AM33XX UART1"
+> +		help
+> +		  Route low level debug messages to first uart instance
+> +		  for boards based on am335 and am43 family of SoC's
+>
+>   	config DEBUG_ZOOM_UART
+>   		bool "Zoom2/3 UART"
+>
+With DT, IIRC DEBUGLL is broken. So did you hack debug-macro.S
+to get the earlyprintk working ?
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/mach-omap2/voltage.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 3ac8fe1..595bf1a 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -23,7 +23,6 @@
- #include <linux/io.h>
- #include <linux/err.h>
- #include <linux/export.h>
--#include <linux/debugfs.h>
- #include <linux/slab.h>
- #include <linux/clk.h>
- 
--- 
-1.8.1.rc1.5.g7e0651a
+Regards,
+Santosh
