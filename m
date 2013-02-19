@@ -1,82 +1,38 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Feb 2013 16:12:48 -0700
-Subject: [RFC PATCH 5/9] Thermal: Support using dt node to get sensor
-In-Reply-To: <1361187031-3679-6-git-send-email-wni@nvidia.com>
+Date: Tue, 19 Feb 2013 16:18:06 -0700
+Subject: [RFC PATCH 6/9] hwmon: (lm90) Register to the thermal framework
+In-Reply-To: <1361187031-3679-7-git-send-email-wni@nvidia.com>
 References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-6-git-send-email-wni@nvidia.com>
-Message-ID: <512406F0.4080708@wwwdotorg.org>
+ <1361187031-3679-7-git-send-email-wni@nvidia.com>
+Message-ID: <5124082E.604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/18/2013 04:30 AM, Wei Ni wrote:
-> Add functions to support using dt node with args to get sensor.
+> Register the remote sensor to the thermal framework.
+> It can support to show the temperature and read/write threshold.
 
-You need to write a device tree binding document to explain this.
+>  arch/arm/boot/dts/tegra30-cardhu.dtsi |    1 +
+>  drivers/hwmon/lm90.c                  |  182 ++++++++++++++++++++++++++++++++-
 
-> diff --git a/drivers/thermal/thermal_sys.c b/drivers/thermal/thermal_sys.c
+There shouldn't be any need to edit both those files in the same patch.
+This patch is making multiple separate logical changes, which should be
+separate patches.
 
-> +struct thermal_sensor *get_sensor_by_node(struct node_args *np_args)
-> +{
-> +	struct thermal_sensor *pos;
+> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
 
-"pos" isn't a great variable name. Why not use "sensor", or just the
-"ts" variable you have right below?
+> +			#sensor-cells = <1>;
 
-> +	struct thermal_sensor *ts = NULL;
-> +	struct node_args *args;
-> +
-> +	mutex_lock(&sensor_list_lock);
-> +	for_each_thermal_sensor(pos) {
-> +		args = &pos->np_args;
-> +		if (args->np) {
-> +			if ((args->np == np_args->np) &&
-> +			   (args->index == np_args->index)) {
-> +				ts = pos;
-> +				break;
+Again, in order to allow that, you need some documentation in
+Documentation/devicetree/bindings/. Related to that, you need to Cc the
+devicetree maintainers on at least the patches that add that documentation.
 
-Replace those 2 lines with "goto out;".
+> diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
 
-> +			}
-> +		}
-> +	}
+> @@ -1576,12 +1728,38 @@ static int lm90_probe(struct i2c_client *client,
+...
+> +	np_args.np = dev->of_node;
+> +	np_args.index = 0;
 
-here, add:
-
-	ts = NULL;
-out:
-
-That way, you can use "ts" as the loop iteration variable.
-
-This whole patch rather assumes that all DT nodes can identify their
-exposed thermal sensors using an index in a single DT cell. That's not
-very flexible. All other DT bindings work like this:
-
-Provider of a service indicates how many DT cells are in the object
-(GPIO, IRQ, thermal sensors) specifier:
-
-sensor1: lm90 at 1c {
-	...
-	#thermal-sensor-cells = <1>;
-};
-
-Each consumer of a service imports it by referencing it:
-
-thermal-zone {
-	...
-	sensors = <&sensor1 0>;
-};
-
-The driver for LM90 provides an "of_xlate" function which receives a
-struct of_phandle_args and outputs/returns whatever Linux-internal
-identification/representation of the object is required. For example, see:
-
-> include/linux/pwm.h:161:	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
-
-This allows each providing object's DT binding to define its own value
-of #thermal-sensor-cells, as suited for its own requirements, and allows
-each driver to implement the mapping from DT to internal ID in whatever
-way is necessary.
-
-Now, many bindings/drivers might just end up using a common simple
-implementation. That's why functions such as of_pwm_simple_xlate() or
-of_gpio_simple_xlate() exist.
+As I mentioned before, that'd be better replaced by an explicit of_xlate
+function.
