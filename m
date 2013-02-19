@@ -1,26 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Feb 2013 15:41:34 +0000
-Subject: [GIT PULL] Renesas ARM-based SoC for v3.9 #5
-In-Reply-To: <1361245745-23355-1-git-send-email-horms+renesas@verge.net.au>
-References: <1361245745-23355-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <201302191541.34759.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Feb 2013 15:45:11 +0000
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <alpine.DEB.2.00.1302191527200.32069@utopia.booyaka.com>
+References: <1360840554-26901-2-git-send-email-balbi@ti.com>
+ <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+ <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
+ <20130214224710.GF11362@atomide.com>
+ <alpine.DEB.2.00.1302191527200.32069@utopia.booyaka.com>
+Message-ID: <20130219154511.GU17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 February 2013, Simon Horman wrote:
-> The following changes since commit dbe1c3defb3844772634446492ea6c13882596ec:
+On Tue, Feb 19, 2013 at 03:30:01PM +0000, Paul Walmsley wrote:
+> Hi,
 > 
->   ARM: shmobile: Register ARM architected timer (2013-02-05 17:13:55 +0900)
+> On Thu, 14 Feb 2013, Tony Lindgren wrote:
 > 
-> are available in the git repository at:
+> > The other option could be to allow custom ioremap function pointers 
+> > based on address range in __arm_ioremap_pfn_caller() the same way as
+> > the SoC specific static mappings are allowed. That would require adding
+> > a function pointer to struct map_desc.
+> > 
+> > Maybe that would do the trick?
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc5-for-v3.9
+> That sounds fine to me too.
 > 
-> for you to fetch changes up to f9047306fd7332d682898dd689152bb3b45a3e73:
-> 
->   ARM: shmobile: r8a7779: Correct TMU clock support again (2013-02-19 10:05:27 +0900)
-> 
+> To me it makes sense to eventually handle the I/O mappings automatically 
+> from data in the DT -- hence the association with a bus device, which 
+> should be present in DT data.
 
-Pulled into next/soc, thanks!
+No.  I really don't get why OMAP thinks it's soo special that it needs
+to go around adding lots and lots of new abstractions all over the
+place.
 
-	Arnd
+Indirect ioremap() through a function pointer so you can overload it with
+OMAP specific crap?  No way.  Function pointers in map_desc - what the hell
+for?
+
+You must be totally mad if you think that's a way forward, I really don't
+see how you think this kind of crap would be remotely acceptable.
+
+Ok, so you have this problem that you need hwmod to touch a register which
+is also contained within the device resources as well.  That's fine.  You
+can do it one of two ways:
+
+1. Call out from the driver at the appropriate points (which seems to be
+   _after_ you've ioremapped it) to access the register.
+
+2. Find the resource, temporarily map the register, access it, and then
+   unmap it.
+
+No requirement what so ever to override ioremap().  AT ALL.  So stop this
+madness now.
+
+As for a function pointer in struct map_desc.  You're bonkers, the lot of
+you.  map_desc is a structure describing the boot time static mappings
+which gets discarded.  Nothing keeps any references around to it, and it
+is used at a time when *NOTHING ELSE* should be going on in the kernel
+other than building those static mappings.  Not even any arch code poking
+about at devices.  Or anything like that.  Because if you think that's
+acceptable, then we'll need to flush the cache and TLB after each and
+every map_desc entry is touched - which brings a whole load of new pain
+and slowness to the kernel boot.
+
+So please, stop this idiotic madness now.
+
+If you want such things as pci_enable_device(), then what you're actually
+asking for is omap_enable_device() for OMAP devices.  OMAP devices are
+already specific enough to OMAP SoCs (god knows, they have really complex
+and obscure behaviours that no one else in their right mind would want
+to copy) that calling out to omap specific functions would never really
+be a problem.
+
+No need for any of this crazy dev->bus shit either.
