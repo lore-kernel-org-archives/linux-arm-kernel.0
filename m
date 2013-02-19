@@ -1,35 +1,128 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Feb 2013 10:10:16 -0700
-Subject: [v3 0/6] ARM: tegra: convert device tree files to use CLK defines
-In-Reply-To: <1361138717.29465.2@driftwood>
-References: <1360917814-27236-1-git-send-email-hdoyu@nvidia.com>
- <1361138717.29465.2@driftwood>
-Message-ID: <5123B1F8.4040102@wwwdotorg.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 19 Feb 2013 17:11:46 +0000
+Subject: [PATCH LINUX] xen: event channel arrays are xen_ulong_t and not
+ unsigned long
+In-Reply-To: <1361285357-26696-1-git-send-email-ian.campbell@citrix.com>
+References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
+ <1361285357-26696-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <alpine.DEB.2.02.1302191642230.4654@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/2013 03:05 PM, Rob Landley wrote:
-> On 02/15/2013 02:43:11 AM, Hiroshi Doyu wrote:
->> Hi,
->>
->> With new dtc+cpp feature, we could get rid of magic numbers in dts*
->> files. This patch replaces CLK IDs.
->>
->> We also plan to share those DT header files with kernel source
->> later[1].
-> ...
->> [1]
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149804.html
->>
+On Tue, 19 Feb 2013, Ian Campbell wrote:
+> On ARM we want these to be the same size on 32- and 64-bit.
 > 
-> This really smells like documentation should be updated, probably
-> booting-without-of.txt or similar. Alas, I'm not capable of writing such
-> an update...
+> This is an ABI change on ARM. X86 does not change.
+> 
+> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+> Cc: Jan Beulich <JBeulich@suse.com>
+> Cc: Keir (Xen.org) <keir@xen.org>
+> Cc: Tim Deegan <tim@xen.org>
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: xen-devel at lists.xen.org
+> ---
+> Changes since V1
+>   use find_first_set not __ffs
+>   fix some more unsigned long -> xen_ulong_t
+>   use more generic xchg_xen_ulong instead of ...read_evtchn...
+> ---
+>  arch/arm/include/asm/xen/events.h |   22 ++++++++
+>  arch/x86/include/asm/xen/events.h |    3 +
+>  drivers/xen/events.c              |  103 ++++++++++++++++++++-----------------
+>  include/xen/interface/xen.h       |    8 ++--
+>  4 files changed, 84 insertions(+), 52 deletions(-)
 
-I'm not sure what documentation would be updated nor why. Can you
-describe that?
+You might have to rebase this patch: it doesn't apply on Linux 3.8.
 
-This patch is (or should be) editing the device tree binding
-documentation to (include by) reference the header file that is being
-added in this patch. I don't believe there's any more general
-documentation that is affected by this series.
+
+> diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+> index 94b4e90..9bb5f50 100644
+> --- a/arch/arm/include/asm/xen/events.h
+> +++ b/arch/arm/include/asm/xen/events.h
+> @@ -15,4 +15,26 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+>         return raw_irqs_disabled_flags(regs->ARM_cpsr);
+>  }
+> 
+> +/*
+> + * We cannot use xchg because it does not support 8-byte
+> + * values. However it is safe to use {ldr,dtd}exd directly because all
+> + * platforms which Xen can run on support those instructions.
+> + */
+> +static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
+> +{
+> +       xen_ulong_t oldval;
+> +       unsigned int tmp;
+> +
+> +       wmb();
+> +       asm volatile("@ read_evtchn_pending_sel\n"
+                           ^ do we need this?
+
+
+> +               "1:     ldrexd  %0, %H0, [%3]\n"
+> +               "       strexd  %1, %2, %H2, [%3]\n"
+> +               "       teq     %1, #0\n"
+> +               "       bne     1b"
+> +               : "=&r" (oldval), "=&r" (tmp)
+> +               : "r" (val), "r" (ptr)
+> +               : "memory", "cc");
+> +       return oldval;
+> +}
+> +
+>  #endif /* _ASM_ARM_XEN_EVENTS_H */
+
+[...]
+
+> @@ -1295,18 +1306,14 @@ static void __xen_evtchn_do_upcall(void)
+>         unsigned count;
+> 
+>         do {
+> -               unsigned long pending_words;
+> +               xen_ulong_t pending_words;
+> 
+>                 vcpu_info->evtchn_upcall_pending = 0;
+> 
+>                 if (__this_cpu_inc_return(xed_nesting_count) - 1)
+>                         goto out;
+> 
+> -#ifndef CONFIG_X86 /* No need for a barrier -- XCHG is a barrier on x86. */
+> -               /* Clear master flag /before/ clearing selector flag. */
+> -               wmb();
+> -#endif
+
+Even though I understand that moving wmb() into xchg_xen_ulong gets rid
+of an ugly ifndef, I am not sure whether it is a good thing from the
+code readability point of view. I'll let Konrad decide on this one.
+
+
+> -               pending_words = xchg(&vcpu_info->evtchn_pending_sel, 0);
+> +               pending_words = xchg_xen_ulong(&vcpu_info->evtchn_pending_sel, 0);
+> 
+>                 start_word_idx = __this_cpu_read(current_word_idx);
+>                 start_bit_idx = __this_cpu_read(current_bit_idx);
+> @@ -1314,8 +1321,8 @@ static void __xen_evtchn_do_upcall(void)
+>                 word_idx = start_word_idx;
+> 
+>                 for (i = 0; pending_words != 0; i++) {
+> -                       unsigned long pending_bits;
+> -                       unsigned long words;
+> +                       xen_ulong_t pending_bits;
+> +                       xen_ulong_t words;
+> 
+>                         words = MASK_LSBS(pending_words, word_idx);
+> 
+> @@ -1327,7 +1334,7 @@ static void __xen_evtchn_do_upcall(void)
+>                                 bit_idx = 0;
+>                                 continue;
+>                         }
+> -                       word_idx = __ffs(words);
+> +                       word_idx = find_first_bit(BM(&words), sizeof(words));
+> 
+>                         pending_bits = active_evtchns(cpu, s, word_idx);
+>                         bit_idx = 0; /* usually scan entire word from start */
+
+is that because find_first_bit can actually cope with a bit number >=
+32 and __ffs can't?
+In that case it is worth adding a comment somewhere in this file,
+reminding people to only use bit operations that can handle size >
+unsigned long
