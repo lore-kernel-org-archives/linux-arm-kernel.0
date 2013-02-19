@@ -1,59 +1,45 @@
-From: hughd@google.com (Hugh Dickins)
-Date: Tue, 19 Feb 2013 10:49:40 -0800 (PST)
-Subject: Should a swapped out page be deleted from swap cache?
-In-Reply-To: <CAFj3OHXredBPjjLMaqnAq0tYKbLXaO0DOfs8zGYzV4ntsXvi6A@mail.gmail.com>
-References: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
- <alpine.LNX.2.00.1302180939200.2246@eggly.anvils>
- <CAFNq8R5x3tD9Fn4TWna58VfdiRedPkrTDkeHXStkL7yBngL1mw@mail.gmail.com>
- <5122E591.5090108@gmail.com>
- <CAFNq8R5Y+obN0pufXriqmRUajPPq=N6XMAhQUgbzObvCpbbpxA@mail.gmail.com>
- <CAFj3OHXredBPjjLMaqnAq0tYKbLXaO0DOfs8zGYzV4ntsXvi6A@mail.gmail.com>
-Message-ID: <alpine.LNX.2.00.1302191040010.2248@eggly.anvils>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 19 Feb 2013 10:50:34 -0800
+Subject: [PATCH v7 00/12] Tegra114 clockframework
+In-Reply-To: <5123C6E7.9070407@wwwdotorg.org>
+References: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
+ <5123C6E7.9070407@wwwdotorg.org>
+Message-ID: <20130219185034.27993.86892@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Feb 2013, Sha Zhengju wrote:
-> On Tue, Feb 19, 2013 at 2:53 PM, Li Haifeng <omycle@gmail.com> wrote:
-> > 2013/2/19 Will Huck <will.huckk@gmail.com>:
-> >> On 02/19/2013 10:04 AM, Li Haifeng wrote:
-> >>>
-> >>> If a anonymous page is swapped out and  comes to be reclaimable,
-> >>> shrink_page_list() will call __remove_mapping() to delete the page
-> >>> swapped out from swap cache. Corresponding code lists as below.
-
-Correct.
-
-> >>
-> >>
-> >> I'm not sure if
-> >> if (PageAnon(page) && !PageSwapCache(page)) {
-> >>  .................
-> >> }
-> >> will add the page to swap cache again.
-
-No, it's already in the swap cache.  Of course, the original pageframe
-may be removed from swap cache, freed, data later read back from swap into
-a new swap cache pageframe, that be mapped into user memory, removed from
-swap cache and swap freed, then later arrive here in page reclaim at the
-PageAnon(page) && !PageSwapCache(page) to be added to swap again.
-
-> >>
-> >
-> > Adding the page to swap cache is the first stage of memory reclaiming.
-> >
-> > When an anonymous page will be reclaimed, it should be swapped out. If
-> > it's not in the swap cache, it will insert into swap cache first and
-> > set the bit of PG_swapcache on page->flags. Then, it will be swapped
-> > out by try_to_unmap(). After it's swapped out, and no processes swap
-
-Almost correct...
-
+Quoting Stephen Warren (2013-02-19 10:39:35)
+> On 02/15/2013 05:36 AM, Peter De Schrijver wrote:
+> > This is the seventh version of the Tegra114 clockframework. It is based on the
+> > for-next branch of
+> > git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git and
+> > http://www.spinics.net/lists/arm-kernel/msg220452.html.
 > 
-> Swapout(writing to swap disk) is not done by try_to_unmap() which only
-> tries to remove all page table mappings to a page. Before unmapping,
-> add_to_swap() will set the swap cache page dirty and it will be
-> written out by pageout()->swap_writepage().
+> Mike,
+> 
+> I think it'd be prudent to take this series through the Tegra tree again
+> for 3.10; patch 11 needs to go in as part of the series due to internal
+> dependencies, and I'm slightly worried that other Tegra DT changes might
+> conflict with that patch (if only for context). Taking this series (and
+> any other Tegra clk driver changes for 3.10) through the Tegra tree
+> could resolve that easily. Do you have a problem with that?
+> 
 
-... but yes, try_to_unmap() is not the one that writes out to swap.
+I was thinking the same thing.  I'll make time to review these now that
+3.8 is out.
 
-Hugh
+> If that's OK, can you stage the dependency Peter mentioned:
+> http://www.spinics.net/lists/arm-kernel/msg220452.html
+> into a stable branch for me to merge, obviously after 3.9-rc1 is out.
+> 
+
+I'll take another look at that one.  I haven't merged it yet for some
+reason but I've forgotten why.  Assuming nothing is wrong then I'll pull
+it in towards 3.10.
+
+Regards,
+Mike
+
+> Thanks.
+> 
+> Prashant, could you provide a review/ack for this series too.
