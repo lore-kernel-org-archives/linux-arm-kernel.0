@@ -1,54 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Feb 2013 14:34:40 +0000
-Subject: [PATCH v2 0/5] Generic PHY Framework
-In-Reply-To: <20130219131258.GV23197@arwen.pp.htv.fi>
-References: <1361253198-7401-1-git-send-email-kishon@ti.com>
- <201302191233.54677.arnd@arndb.de> <20130219131258.GV23197@arwen.pp.htv.fi>
-Message-ID: <201302191434.40495.arnd@arndb.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 19 Feb 2013 15:35:59 +0100
+Subject: [PATCH] staging: imx/drm: request irq only after adding the crtc
+Message-ID: <1361284559-25125-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 February 2013, Felipe Balbi wrote:
-> On Tue, Feb 19, 2013 at 12:33:54PM +0000, Arnd Bergmann wrote:
-> > > Currently drivers/phy and drivers/net/phy are independent and are not 
-> > > related to each other. There are some fundamental differences on how 
-> > > these frameworks work. IIUC, the *net* uses bus layer (MDIO bus) to 
-> > > match a PHY device with a PHY driver and the Ethernet device uses the 
-> > > bus layer to get the PHY.
-> > > The Generic PHY Framework however doesn't have any bus layer. The PHY 
-> > > should be like any other Platform Devices and Drivers and the framework 
-> > > will provide some APIs to register with the framework. And there are 
-> > > other APIs which any controller can use to get the PHY (for e.g., in the 
-> > > case of dt boot, it can use phandle to get a reference to the PHY).
-> > 
-> > Hmm, I think the use of a bus_type for a PHY actually sounds quite
-> > appropriate. The actual PHY device would then be a child of the
-> 
-> really ? I'm not so sure, the *bus* used by the PHY is ULPI, UTMI,
-> UTMI+, PIP3, I2C, etc... adding another 'fake' bus representation is a
-> bit overkill IMO.
-> 
-> Imagine an I2C-controlled PHY driver like isp1301, that driver will have
-> to register i2c_driver and phy_driver, which looks weird to me. If the
-> only substitute for class is a bus, we can't drop classes just yet, I'm
-> afraid.
-> 
-> Imagine a regulator bus, a pwm bus, an LED bus etc. They don't make
-> sense IMHO.
+If the bootloader already enabled the display, the interrupt handler
+will be called as soon as it is registered. If the CRTC is not already
+added at this time, the call to imx_drm_handle_vblank will result in
+a NULL pointer dereference.
 
-It's a fine line, but I think a phy is something that resembles a device
-more than an LED does. When I read patch 1, I also noticed and commented
-on the fact that it does use a 'class'. Now, according to Greg, we should
-use 'bus_type' instead of 'class' in new code. I originally disagreed with
-that concept, but he's the boss here and it's good if he has a vision
-how things should be lined out.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/staging/imx-drm/ipuv3-crtc.c |   23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
 
-In practice, there is little difference between a 'bus_type' and a 'class',
-so just replace any instance of the former with the latter in your head
-when reading the code ;-)
-I understand that there is not a real common bus here, and the bus_type
-infrastructure would basically be used as a way to represent each PHY
-in sysfs and provide a way to enumerate and look them up inside of the
-kernel.
-
-	Arnd
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index 1892006..d454a16 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -483,17 +483,6 @@ static int ipu_get_resources(struct ipu_crtc *ipu_crtc,
+ 		goto err_out;
+ 	}
+ 
+-	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
+-			IPU_IRQ_EOF);
+-	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
+-			"imx_drm", ipu_crtc);
+-	if (ret < 0) {
+-		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
+-		goto err_out;
+-	}
+-
+-	disable_irq(ipu_crtc->irq);
+-
+ 	return 0;
+ err_out:
+ 	ipu_put_resources(ipu_crtc);
+@@ -504,6 +493,7 @@ err_out:
+ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
+ 		struct ipu_client_platformdata *pdata)
+ {
++	struct ipu_soc *ipu = dev_get_drvdata(ipu_crtc->dev->parent);
+ 	int ret;
+ 
+ 	ret = ipu_get_resources(ipu_crtc, pdata);
+@@ -522,6 +512,17 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
+ 		goto err_put_resources;
+ 	}
+ 
++	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
++			IPU_IRQ_EOF);
++	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
++			"imx_drm", ipu_crtc);
++	if (ret < 0) {
++		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
++		goto err_put_resources;
++	}
++
++	disable_irq(ipu_crtc->irq);
++
+ 	return 0;
+ 
+ err_put_resources:
+-- 
+1.7.10.4
