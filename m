@@ -1,34 +1,97 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Feb 2013 15:40:32 +0800
-Subject: [PATCH] ARM: dts: imx53-mba53: fix fsl,pins for disp1-grp1
-Message-ID: <1361259632-18334-1-git-send-email-shawn.guo@linaro.org>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 19 Feb 2013 08:00:07 +0000
+Subject: [RFC 2/8] ARM: twd: register clock event for 1 core SMP
+In-Reply-To: <512230F1.8020208@gmail.com>
+References: <cover.1361166003.git.afzal@ti.com>
+ <a7f62b8580aa4b33d5658f4f03371a453adaea9b.1361166003.git.afzal@ti.com>
+ <512230F1.8020208@gmail.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EAA8534@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to fsl,imx53-pinctrl.txt, the pin number of DISP1_DAT_21
-should be 545, while 543 is IPU_CSI0_D_3.  Along with the change,
-one duplication of DISP1_DAT_0 in disp1-grp1 is removed.
+Hi Rob,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx53-mba53.dts |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+On Mon, Feb 18, 2013 at 19:17:29, Rob Herring wrote:
+> On 02/18/2013 12:30 AM, Afzal Mohammed wrote:
 
-diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
-index e54fffd..468c0a1 100644
---- a/arch/arm/boot/dts/imx53-mba53.dts
-+++ b/arch/arm/boot/dts/imx53-mba53.dts
-@@ -42,10 +42,9 @@
- 			fsl,pins = <689 0x10000		/* DISP1_DRDY	*/
- 				    482 0x10000		/* DISP1_HSYNC	*/
- 				    489 0x10000		/* DISP1_VSYNC	*/
--				    684 0x10000		/* DISP1_DAT_0	*/
- 				    515 0x10000		/* DISP1_DAT_22	*/
- 				    523 0x10000		/* DISP1_DAT_23	*/
--				    543 0x10000		/* DISP1_DAT_21	*/
-+				    545 0x10000		/* DISP1_DAT_21	*/
- 				    553 0x10000		/* DISP1_DAT_20	*/
- 				    558 0x10000		/* DISP1_DAT_19	*/
- 				    564 0x10000		/* DISP1_DAT_18	*/
--- 
-1.7.9.5
+> > Register percpu local timer for scheduler tick in the case of one core
+> > SMP configuration. In other cases - secondary cpu's as well as boot
+> > cpu's having more than one core, this is being registered as per
+> > existing boot flow, with a difference that they happens after delay
+> > calibration. Registering the clock for tick in case of one core should
+> > be done before Kernel calibrates delay (this is required to boot,
+> > unless local timer is the only one registered for tick). Registering
+> > twd local timer at init_time (which platforms are doing now) helps
+> > achieve that with the proposed change.
+> > 
+> > This helps in an almost booting Kernel (minimal) by only relying on
+> > ARM parts for an A9 one core SMP.
+
+> >  arch/arm/kernel/smp_twd.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> > index 616268c..118f4f2 100644
+> > --- a/arch/arm/kernel/smp_twd.c
+> > +++ b/arch/arm/kernel/smp_twd.c
+> > @@ -335,6 +335,9 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+> >  
+> >  	twd_get_clock(np);
+> >  
+> > +	if (num_possible_cpus() == 1)
+> > +		twd_timer_setup(evt);
+> > +
+
+> Shouldn't this be fixed in the core code, so the same issue is fixed for
+> all timers?
+
+Is the following that you had in mind ? (with it, this patch as well as
+1/8 would not be required),
+
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index d3a22be..2b6417d 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -42,6 +42,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs);
+  */
+ extern void smp_init_cpus(void);
+ 
++extern void smp_monocore_timer_setup(void);
++
+ 
+ /*
+  * Provide a function to raise an IPI cross call on CPUs in callmap.
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 5f73f70..7431b77 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -504,6 +504,15 @@ int local_timer_register(struct local_timer_ops *ops)
+ }
+ #endif
+ 
++void __init smp_monocore_timer_setup(void)
++{
++       unsigned int cpu = smp_processor_id();
++       struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
++
++       if (!lt_ops)
++               lt_ops->setup(evt);
++}
++
+ static void __cpuinit percpu_timer_setup(void)
+ {
+        unsigned int cpu = smp_processor_id();
+diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+index 955d92d..eb023ee 100644
+--- a/arch/arm/kernel/time.c
++++ b/arch/arm/kernel/time.c
+@@ -116,5 +116,6 @@ int __init register_persistent_clock(clock_access_fn read_boot,
+ void __init time_init(void)
+ {
+        machine_desc->init_time();
++       smp_monocore_timer_setup();
+        sched_clock_postinit();
+ }
+
+Regards
+Afzal
