@@ -1,31 +1,57 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Feb 2013 15:48:35 -0700
-Subject: [RFC PATCH 1/9] ARM: dt: t30 cardhu: add dt entry for lm90
-In-Reply-To: <5122F162.9030103@nvidia.com>
-References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-2-git-send-email-wni@nvidia.com>
- <5122F162.9030103@nvidia.com>
-Message-ID: <51240143.3010205@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 20 Feb 2013 00:51:08 +0200
+Subject: hwmod data duplication (was: Re: [RFC/NOT FOR MERGING 2/3]
+ serial: omap: remove hwmod dependency)
+In-Reply-To: <20130219223128.GM5724@atomide.com>
+References: <20130214224710.GF11362@atomide.com>
+ <alpine.DEB.2.00.1302191527200.32069@utopia.booyaka.com>
+ <20130219154511.GU17852@n2100.arm.linux.org.uk>
+ <20130219163053.GE5724@atomide.com>
+ <20130219182257.GV17852@n2100.arm.linux.org.uk>
+ <20130219193122.GJ5724@atomide.com>
+ <20130219194327.GB8978@arwen.pp.htv.fi>
+ <20130219220932.GL5724@atomide.com>
+ <20130219222215.GA12225@arwen.pp.htv.fi>
+ <20130219223128.GM5724@atomide.com>
+Message-ID: <20130219225108.GA12474@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2013 08:28 PM, Alex Courbot wrote:
-> On 02/18/2013 08:30 PM, Wei Ni wrote:
->> Enable thermal sensor lm90 in the dts file.
-> 
-> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> 
-> Btw, shouldn't this patch come last, after all the changes you did to
-> lm90? If you keep the current order, you will need to ensure that the
-> device performs as expected on Cardhu for each of the remaining patches
-> of the series. It is probably safer to just move this one at the end to
-> avoid trouble.
+Hi,
 
-Hmm. This patch on its own seems simple enough, and so I should really
-just apply it as soon as 3.9-rc1 is out.
+On Tue, Feb 19, 2013 at 02:31:28PM -0800, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [130219 14:26]:
+> > On Tue, Feb 19, 2013 at 02:09:33PM -0800, Tony Lindgren wrote:
+> > > 
+> > > ..that means massive amount of churn in the board-*.c files to convert
+> > > them to various init functions to be called from board-generic.c and
+> > > removing the ones that are working with DT.
+> > 
+> > why ? I meant that only what's not converted to DT today should be
+> > handled this way. Also, most of the "churn" is already there
+> > (usb_musb_init(), usb_ehci_init(), etc etc), it just needs to be called
+> > from a different place. We don't need to have one function for each
+> > board, however, maybe we could target by-soc:
+> > 
+> > if (of_is_compatible("omap3"))
+> > 	omap3_init_devices(); /* or whatever you wanna call it */
+> > 
+> > omap_init_devices() has initialization for everything which isn't DT
+> > adapted today and as we move things to DT, there's a single place to
+> > remove code from.
+> 
+> And the pdata for that comes from where? :) I think that means
+> converting each board-*.c to device init functions, which leads to
+> the churn I was mentioning..
 
-Note that we (and probably others) have many device trees for boards
-besides Cardhu that instantiate the LM90 driver. The driver has to
-continue to work perfectly for all the patches in the series. Not
-enabling the driver on Cardhu isn't enough to allow patches in the
-middle of the series to break the already-working driver.
+fair enough, still a lot less churn ;-)
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130220/84e34824/attachment-0001.sig>
