@@ -1,60 +1,214 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 19 Feb 2013 12:35:24 +0100
-Subject: [PATCH v3 0/8] Reset controller API to reset IP modules on i.MX5 and
- i.MX6
-Message-ID: <1361273732-23357-1-git-send-email-p.zabel@pengutronix.de>
+Date: Tue, 19 Feb 2013 12:35:27 +0100
+Subject: [PATCH v3 3/8] ARM i.MX6q: Add GPU, VPU, IPU,
+ and OpenVG resets to System Reset Controller (SRC)
+In-Reply-To: <1361273732-23357-1-git-send-email-p.zabel@pengutronix.de>
+References: <1361273732-23357-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1361273732-23357-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
-reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
+The SRC has auto-deasserting reset bits that control reset lines to
+the GPU, VPU, IPU, and OpenVG IP modules. This patch adds a reset
+controller that can be controlled by those devices using the
+reset controller API.
 
-The following patches add a simple API for devices to request being reset
-by separate reset controller hardware and implements the reset signal
-device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
-the i.MX SRC contains self-deasserting reset registers, so I've included
-both ops to manually assert/deassert a reset line, as well as a "reset"
-operation that is supposed to assert the reset line and wait for it to
-deassert.
-
-The i.MX SRC is enhanced to provide a reset controller and the IPU driver
-is made to request being reset by calling the device_reset(&pdev->dev)
-convenience wrapper during probing.
-
-Changes since v2:
- - Added ARCH_HAS_RESET_CONTROLLER to enable the reset controller API
-   by default, where needed. Select it from HAVE_IMX_SRC.
- - Fixed kerneldoc comments.
- - Export reset_controller_(un)register
- - Simplified reset_control_get
- - Call reset_control_put in device_reset
- - Add locking around read-modify-write accesses to SCR_SRC
- - Renamed "gpios" device tree property to "reset-gpios" and added
-   device tree binding documentation for gpio-reset.
- - Rebased onto next-20120219.
-
-regards
-Philipp
-
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
- .../devicetree/bindings/reset/fsl,imx-src.txt      |   49 +++++
- .../devicetree/bindings/reset/gpio-reset.txt       |   31 +++
- Documentation/devicetree/bindings/reset/reset.txt  |   75 +++++++
- .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    3 +
- arch/arm/boot/dts/imx51.dtsi                       |    7 +
- arch/arm/boot/dts/imx53.dtsi                       |    7 +
- arch/arm/boot/dts/imx6q.dtsi                       |    1 +
- arch/arm/boot/dts/imx6qdl.dtsi                     |    4 +-
- arch/arm/mach-imx/Kconfig                          |    3 +
- arch/arm/mach-imx/mm-imx5.c                        |    2 +
- arch/arm/mach-imx/src.c                            |   68 +++++-
- drivers/Kconfig                                    |    2 +
- drivers/Makefile                                   |    3 +
- drivers/reset/Kconfig                              |   26 +++
- drivers/reset/Makefile                             |    2 +
- drivers/reset/core.c                               |  220 ++++++++++++++++++++
- drivers/reset/gpio-reset.c                         |  189 +++++++++++++++++
- drivers/staging/imx-drm/ipu-v3/ipu-common.c        |   12 +-
- include/linux/reset-controller.h                   |   43 ++++
- include/linux/reset.h                              |   17 ++
- 20 files changed, 759 insertions(+), 5 deletions(-)
+Changes since v2:
+ - Select ARCH_HAS_RESET_CONTROLLER from HAVE_IMX_SRC
+ - Add locking around read-modify-write accesses to SCR_SRC
+---
+ .../devicetree/bindings/reset/fsl,imx-src.txt      |   49 +++++++++++++++
+ arch/arm/mach-imx/Kconfig                          |    1 +
+ arch/arm/mach-imx/src.c                            |   64 ++++++++++++++++++++
+ 3 files changed, 114 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx-src.txt
+
+diff --git a/Documentation/devicetree/bindings/reset/fsl,imx-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx-src.txt
+new file mode 100644
+index 0000000..1330177
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/fsl,imx-src.txt
+@@ -0,0 +1,49 @@
++Freescale i.MX System Reset Controller
++======================================
++
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
++
++Required properties:
++- compatible: Should be "fsl,<chip>-src"
++- reg: should be register base and length as documented in the
++  datasheet
++- interrupts: Should contain SRC interrupt and CPU WDOG interrupt,
++  in this order.
++- #reset-cells: 1, see below
++
++example:
++
++src: src at 020d8000 {
++        compatible = "fsl,imx6q-src";
++        reg = <0x020d8000 0x4000>;
++        interrupts = <0 91 0x04 0 96 0x04>;
++        #reset-cells = <1>;
++};
++
++Specifying reset lines connected to IP modules
++==============================================
++
++The system reset controller can be used to reset the GPU, VPU,
++IPU, and OpenVG IP modules on i.MX5 and i.MX6 ICs. Those device
++nodes should specify the reset line on the SRC in their resets
++property, containing a phandle to the SRC device node and a
++RESET_INDEX specifying which module to reset, as described in
++reset.txt
++
++example:
++
++        ipu1: ipu at 02400000 {
++                resets = <&src 2>;
++        };
++        ipu2: ipu at 02800000 {
++                resets = <&src 4>;
++        };
++
++The following RESET_INDEX values are valid for i.MX5:
++GPU_RESET     0
++VPU_RESET     1
++IPU1_RESET    2
++OPEN_VG_RESET 3
++The following additional RESET_INDEX value is valid for i.MX6:
++IPU2_RESET    4
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 4c9c6f9..5052e31 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -73,6 +73,7 @@ config HAVE_IMX_MMDC
+ 
+ config HAVE_IMX_SRC
+ 	def_bool y if SMP
++	select ARCH_HAS_RESET_CONTROLLER
+ 
+ config IMX_HAVE_IOMUX_V1
+ 	bool
+diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+index e15f155..3a39daf 100644
+--- a/arch/arm/mach-imx/src.c
++++ b/arch/arm/mach-imx/src.c
+@@ -14,16 +14,71 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/reset-controller.h>
+ #include <linux/smp.h>
+ #include <asm/smp_plat.h>
+ 
+ #define SRC_SCR				0x000
+ #define SRC_GPR1			0x020
+ #define BP_SRC_SCR_WARM_RESET_ENABLE	0
++#define BP_SRC_SCR_SW_GPU_RST		1
++#define BP_SRC_SCR_SW_VPU_RST		2
++#define BP_SRC_SCR_SW_IPU1_RST		3
++#define BP_SRC_SCR_SW_OPEN_VG_RST	4
++#define BP_SRC_SCR_SW_IPU2_RST		12
+ #define BP_SRC_SCR_CORE1_RST		14
+ #define BP_SRC_SCR_CORE1_ENABLE		22
+ 
+ static void __iomem *src_base;
++static DEFINE_SPINLOCK(scr_lock);
++
++static const int sw_reset_bits[5] = {
++	BP_SRC_SCR_SW_GPU_RST,
++	BP_SRC_SCR_SW_VPU_RST,
++	BP_SRC_SCR_SW_IPU1_RST,
++	BP_SRC_SCR_SW_OPEN_VG_RST,
++	BP_SRC_SCR_SW_IPU2_RST
++};
++
++static int imx_src_reset(struct reset_controller_dev *rcdev,
++		unsigned long sw_reset_idx)
++{
++	unsigned long timeout;
++	unsigned long flags;
++	int bit;
++	u32 val;
++
++	if (!src_base)
++		return -ENODEV;
++
++	if (sw_reset_idx >= ARRAY_SIZE(sw_reset_bits))
++		return -EINVAL;
++
++	bit = 1 << sw_reset_bits[sw_reset_idx];
++
++	spin_lock_irqsave(&scr_lock, flags);
++	val = readl_relaxed(src_base + SRC_SCR);
++	val |= bit;
++	writel_relaxed(val, src_base + SRC_SCR);
++	spin_unlock_irqrestore(&scr_lock, flags);
++
++	timeout = jiffies + msecs_to_jiffies(1000);
++	while (readl(src_base + SRC_SCR) & bit) {
++		if (time_after(jiffies, timeout))
++			return -ETIME;
++		cpu_relax();
++	}
++
++	return 0;
++}
++
++static struct reset_control_ops imx_src_ops = {
++	.reset = imx_src_reset,
++};
++
++static struct reset_controller_dev imx_reset_controller = {
++	.ops = &imx_src_ops,
++};
+ 
+ void imx_enable_cpu(int cpu, bool enable)
+ {
+@@ -31,9 +86,11 @@ void imx_enable_cpu(int cpu, bool enable)
+ 
+ 	cpu = cpu_logical_map(cpu);
+ 	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
++	spin_lock(&scr_lock);
+ 	val = readl_relaxed(src_base + SRC_SCR);
+ 	val = enable ? val | mask : val & ~mask;
+ 	writel_relaxed(val, src_base + SRC_SCR);
++	spin_unlock(&scr_lock);
+ }
+ 
+ void imx_set_cpu_jump(int cpu, void *jump_addr)
+@@ -48,9 +105,11 @@ void imx_src_prepare_restart(void)
+ 	u32 val;
+ 
+ 	/* clear enable bits of secondary cores */
++	spin_lock(&scr_lock);
+ 	val = readl_relaxed(src_base + SRC_SCR);
+ 	val &= ~(0x7 << BP_SRC_SCR_CORE1_ENABLE);
+ 	writel_relaxed(val, src_base + SRC_SCR);
++	spin_unlock(&scr_lock);
+ 
+ 	/* clear persistent entry register of primary core */
+ 	writel_relaxed(0, src_base + SRC_GPR1);
+@@ -65,11 +124,16 @@ void __init imx_src_init(void)
+ 	src_base = of_iomap(np, 0);
+ 	WARN_ON(!src_base);
+ 
++	imx_reset_controller.of_node = np;
++	reset_controller_register(&imx_reset_controller);
++
+ 	/*
+ 	 * force warm reset sources to generate cold reset
+ 	 * for a more reliable restart
+ 	 */
++	spin_lock(&scr_lock);
+ 	val = readl_relaxed(src_base + SRC_SCR);
+ 	val &= ~(1 << BP_SRC_SCR_WARM_RESET_ENABLE);
+ 	writel_relaxed(val, src_base + SRC_SCR);
++	spin_unlock(&scr_lock);
+ }
+-- 
+1.7.10.4
