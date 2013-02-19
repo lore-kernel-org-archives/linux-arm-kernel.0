@@ -1,18 +1,82 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Feb 2013 16:02:47 -0700
-Subject: [RFC PATCH 4/9] hwmon: (lm90) use macros for the indexes of temp8
- and temp11
-In-Reply-To: <1361187031-3679-5-git-send-email-wni@nvidia.com>
+Date: Tue, 19 Feb 2013 16:12:48 -0700
+Subject: [RFC PATCH 5/9] Thermal: Support using dt node to get sensor
+In-Reply-To: <1361187031-3679-6-git-send-email-wni@nvidia.com>
 References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-5-git-send-email-wni@nvidia.com>
-Message-ID: <51240497.8010909@wwwdotorg.org>
+ <1361187031-3679-6-git-send-email-wni@nvidia.com>
+Message-ID: <512406F0.4080708@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/18/2013 04:30 AM, Wei Ni wrote:
-> Using macros for the indexes and nrs of temp8 and temp11.
-> This make the code much clearer.
+> Add functions to support using dt node with args to get sensor.
 
-Sorry to nit-pick, but those aren't macros, but rather they're enums.
+You need to write a device tree binding document to explain this.
 
-The patch looks good though.
+> diff --git a/drivers/thermal/thermal_sys.c b/drivers/thermal/thermal_sys.c
+
+> +struct thermal_sensor *get_sensor_by_node(struct node_args *np_args)
+> +{
+> +	struct thermal_sensor *pos;
+
+"pos" isn't a great variable name. Why not use "sensor", or just the
+"ts" variable you have right below?
+
+> +	struct thermal_sensor *ts = NULL;
+> +	struct node_args *args;
+> +
+> +	mutex_lock(&sensor_list_lock);
+> +	for_each_thermal_sensor(pos) {
+> +		args = &pos->np_args;
+> +		if (args->np) {
+> +			if ((args->np == np_args->np) &&
+> +			   (args->index == np_args->index)) {
+> +				ts = pos;
+> +				break;
+
+Replace those 2 lines with "goto out;".
+
+> +			}
+> +		}
+> +	}
+
+here, add:
+
+	ts = NULL;
+out:
+
+That way, you can use "ts" as the loop iteration variable.
+
+This whole patch rather assumes that all DT nodes can identify their
+exposed thermal sensors using an index in a single DT cell. That's not
+very flexible. All other DT bindings work like this:
+
+Provider of a service indicates how many DT cells are in the object
+(GPIO, IRQ, thermal sensors) specifier:
+
+sensor1: lm90 at 1c {
+	...
+	#thermal-sensor-cells = <1>;
+};
+
+Each consumer of a service imports it by referencing it:
+
+thermal-zone {
+	...
+	sensors = <&sensor1 0>;
+};
+
+The driver for LM90 provides an "of_xlate" function which receives a
+struct of_phandle_args and outputs/returns whatever Linux-internal
+identification/representation of the object is required. For example, see:
+
+> include/linux/pwm.h:161:	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
+
+This allows each providing object's DT binding to define its own value
+of #thermal-sensor-cells, as suited for its own requirements, and allows
+each driver to implement the mapping from DT to internal ID in whatever
+way is necessary.
+
+Now, many bindings/drivers might just end up using a common simple
+implementation. That's why functions such as of_pwm_simple_xlate() or
+of_gpio_simple_xlate() exist.
