@@ -1,27 +1,109 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Tue, 19 Feb 2013 14:39:22 +0900
-Subject: [RFC PATCH 4/9] hwmon: (lm90) use macros for the indexes of temp8
- and temp11
-In-Reply-To: <1361187031-3679-5-git-send-email-wni@nvidia.com>
-References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-5-git-send-email-wni@nvidia.com>
-Message-ID: <5123100A.9050604@nvidia.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 19 Feb 2013 11:23:16 +0530
+Subject: [PATCH v2 3/5] usb: otg: twl4030: use the new generic PHY framework
+In-Reply-To: <1361253198-7401-1-git-send-email-kishon@ti.com>
+References: <1361253198-7401-1-git-send-email-kishon@ti.com>
+Message-ID: <1361253198-7401-4-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2013 08:30 PM, Wei Ni wrote:
-> Using macros for the indexes and nrs of temp8 and temp11.
-> This make the code much clearer.
->
-> Signed-off-by: Wei Ni <wni@nvidia.com>
+Used the generic PHY framework API to create the PHY. twl4030_usb_suspend
+and twl4030_usb_resume is added to phy_ops in order to align
+with the new framework.
 
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+However using the old USB PHY library cannot be completely removed
+because OTG is intertwined with PHY and moving to the new
+framework completely will break OTG. Once we have a separate OTG state machine,
+we can get rid of the USB PHY library.
 
-Great patch. This makes the code much more readable. I also compiled 
-lm90.o before and after this patch, and diff'ed the stripped binaries to 
-make sure there was no error in the macro indexes. Both binaries were 
-indentical, therefore:
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/usb/otg/twl4030-usb.c |   41 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-Tested-by: Alexandre Courbot <acourbot@nvidia.com>
-
-Alex.
+diff --git a/drivers/usb/otg/twl4030-usb.c b/drivers/usb/otg/twl4030-usb.c
+index a994715..b79c319 100644
+--- a/drivers/usb/otg/twl4030-usb.c
++++ b/drivers/usb/otg/twl4030-usb.c
+@@ -33,6 +33,7 @@
+ #include <linux/io.h>
+ #include <linux/delay.h>
+ #include <linux/usb/otg.h>
++#include <linux/phy/phy.h>
+ #include <linux/usb/musb-omap.h>
+ #include <linux/usb/ulpi.h>
+ #include <linux/i2c/twl.h>
+@@ -145,6 +146,7 @@
+ 
+ struct twl4030_usb {
+ 	struct usb_phy		phy;
++	struct phy_descriptor	desc;
+ 	struct device		*dev;
+ 
+ 	/* TWL4030 internal USB regulator supplies */
+@@ -167,6 +169,7 @@ struct twl4030_usb {
+ 
+ /* internal define on top of container_of */
+ #define phy_to_twl(x)		container_of((x), struct twl4030_usb, phy)
++#define desc_to_twl(x)		container_of((x), struct twl4030_usb, desc)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+@@ -575,10 +578,38 @@ static int twl4030_set_host(struct usb_otg *otg, struct usb_bus *host)
+ 	return 0;
+ }
+ 
++static int twl4030_usb_suspend(struct phy_descriptor *desc)
++{
++	struct twl4030_usb *twl = desc_to_twl(desc);
++
++	twl4030_phy_suspend(twl, 1);
++
++	return 0;
++}
++
++static int twl4030_usb_resume(struct phy_descriptor *desc)
++{
++	struct twl4030_usb *twl = desc_to_twl(desc);
++
++	if (!twl->asleep)
++		return -EBUSY;
++	__twl4030_phy_resume(twl);
++	twl->asleep = 0;
++
++	return 0;
++}
++
++static struct phy_ops ops = {
++	.suspend	= twl4030_usb_suspend,
++	.resume		= twl4030_usb_resume,
++	.owner		= THIS_MODULE,
++};
++
+ static int twl4030_usb_probe(struct platform_device *pdev)
+ {
+ 	struct twl4030_usb_data *pdata = pdev->dev.platform_data;
+ 	struct twl4030_usb	*twl;
++	struct phy		*phy;
+ 	int			status, err;
+ 	struct usb_otg		*otg;
+ 	struct device_node	*np = pdev->dev.of_node;
+@@ -617,6 +648,16 @@ static int twl4030_usb_probe(struct platform_device *pdev)
+ 	otg->set_host		= twl4030_set_host;
+ 	otg->set_peripheral	= twl4030_set_peripheral;
+ 
++	twl->desc.ops		= &ops;
++	twl->desc.label		= "twl4030";
++	twl->desc.of_node	= pdev->dev.of_node;
++
++	phy = devm_phy_create(twl->dev, &twl->desc);
++	if (IS_ERR(phy)) {
++		dev_dbg(&pdev->dev, "Failed to create PHY\n");
++		return PTR_ERR(phy);
++	}
++
+ 	/* init spinlock for workqueue */
+ 	spin_lock_init(&twl->lock);
+ 
+-- 
+1.7.10.4
