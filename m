@@ -1,81 +1,24 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 19 Feb 2013 18:17:12 +0200
-Subject: [PATCH v2 0/5] Generic PHY Framework
-In-Reply-To: <5123A32D.4030005@pengutronix.de>
-References: <1361253198-7401-1-git-send-email-kishon@ti.com>
- <201302191233.54677.arnd@arndb.de>
- <20130219131258.GV23197@arwen.pp.htv.fi>
- <201302191434.40495.arnd@arndb.de>
- <20130219150500.GG4390@arwen.pp.htv.fi>
- <5123A32D.4030005@pengutronix.de>
-Message-ID: <20130219161712.GB5736@arwen.pp.htv.fi>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 20 Feb 2013 00:22:17 +0800
+Subject: [PATCH v4 00/11] enhance DT support on gpio pxa
+Message-ID: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Changelog:
 
-On Tue, Feb 19, 2013 at 05:07:09PM +0100, Marc Kleine-Budde wrote:
-> On 02/19/2013 04:05 PM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Tue, Feb 19, 2013 at 02:34:40PM +0000, Arnd Bergmann wrote:
-> >> On Tuesday 19 February 2013, Felipe Balbi wrote:
-> >>> On Tue, Feb 19, 2013 at 12:33:54PM +0000, Arnd Bergmann wrote:
-> >>>>> Currently drivers/phy and drivers/net/phy are independent and are not 
-> >>>>> related to each other. There are some fundamental differences on how 
-> >>>>> these frameworks work. IIUC, the *net* uses bus layer (MDIO bus) to 
-> >>>>> match a PHY device with a PHY driver and the Ethernet device uses the 
-> >>>>> bus layer to get the PHY.
-> >>>>> The Generic PHY Framework however doesn't have any bus layer. The PHY 
-> >>>>> should be like any other Platform Devices and Drivers and the framework 
-> >>>>> will provide some APIs to register with the framework. And there are 
-> >>>>> other APIs which any controller can use to get the PHY (for e.g., in the 
-> >>>>> case of dt boot, it can use phandle to get a reference to the PHY).
-> >>>>
-> >>>> Hmm, I think the use of a bus_type for a PHY actually sounds quite
-> >>>> appropriate. The actual PHY device would then be a child of the
-> >>>
-> >>> really ? I'm not so sure, the *bus* used by the PHY is ULPI, UTMI,
-> >>> UTMI+, PIP3, I2C, etc... adding another 'fake' bus representation is a
-> >>> bit overkill IMO.
-> >>>
-> >>> Imagine an I2C-controlled PHY driver like isp1301, that driver will have
-> >>> to register i2c_driver and phy_driver, which looks weird to me. If the
-> >>> only substitute for class is a bus, we can't drop classes just yet, I'm
-> >>> afraid.
-> >>>
-> >>> Imagine a regulator bus, a pwm bus, an LED bus etc. They don't make
-> >>> sense IMHO.
-> >>
-> >> It's a fine line, but I think a phy is something that resembles a device
-> >> more than an LED does. When I read patch 1, I also noticed and commented
-> >> on the fact that it does use a 'class'. Now, according to Greg, we should
-> >> use 'bus_type' instead of 'class' in new code. I originally disagreed with
-> >> that concept, but he's the boss here and it's good if he has a vision
-> >> how things should be lined out.
-> >>
-> >> In practice, there is little difference between a 'bus_type' and a 'class',
-> >> so just replace any instance of the former with the latter in your head
-> >> when reading the code ;-)
-> > 
-> > it's not so simple :-) if we must use bus_type we need to introduce all
-> > the device/driver matching mechanism which isn't necessary with a class.
-> 
-> You have the code for phy <-> device matching in your framework anyway.
-> Using the bus infrastructure brings changes the open coded matching into
-> bus callbacks.
+v4:
+* Re-oragnize these patches.
+* Append document for new properties binding.
+* Discard the full support on irq domain. It will be appended in other
+  series.
 
-it's not the same thing. Current matching is just to figure out which
-phy belongs to which user. The bus matching rules are to bind a device
-with its driver, but that part has been taken care of by the underlying
-control bus used by the phy, be it i2c, spi, or whatever else.
+v3:
+* Fix the gpio irq issue on legacy platform.
+* Discard irq_base & use irq domain instead in pxa_gpio_chip structure.
+* Update DTS file since it's depend on latest pinctrl single driver.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/521c1a46/attachment.sig>
+v2:
+* Fix the build issue without CONFIG_OF
+* Append to check PINCTRL_SINGLE because of arch pxa not moved to DT
+* Use bool for inverted, ed_mask, gafr variable
