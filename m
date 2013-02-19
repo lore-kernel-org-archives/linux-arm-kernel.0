@@ -1,33 +1,27 @@
-From: gorcunov@openvz.org (Cyrill Gorcunov)
-Date: Wed, 20 Feb 2013 02:02:44 +0400
-Subject: [patch 1/2] kcmp: Make it to depend on CONFIG_KCMP
-In-Reply-To: <5123F32B.3000401@zytor.com>
-References: <20130219064800.719149796@openvz.org>
- <20130219065210.030802820@openvz.org> <5123444D.6000806@suse.cz>
- <20130219093154.GF20312@moon> <5123BC2B.6000304@zytor.com>
- <20130219182838.GL20312@moon>
- <20130219134256.f4cedf44.akpm@linux-foundation.org>
- <5123F32B.3000401@zytor.com>
-Message-ID: <20130219220244.GQ20312@moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Feb 2013 22:04:44 +0000
+Subject: [PATCH 06/35] mfd: ab8500-core: Sysfs chip id modification
+In-Reply-To: <1360933026-30325-7-git-send-email-lee.jones@linaro.org>
+References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
+ <1360933026-30325-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <201302192204.45153.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 01:48:27PM -0800, H. Peter Anvin wrote:
-> >
-> >This permits people to select kcmp with CONFIG_CHECKPOINT_RESTORE=n.
-> >Is there any point in doing that?
-> >
-> >What would be wrong with just doing
-> >
-> >	obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
-> >
-> 
-> The real question is if there are any potential use cases of kcmp()
-> outside checkpoint/restore.  It is actually a very general facility.
+On Friday 15 February 2013, Lee Jones wrote:
+>         struct ab8500 *ab8500;
+> +       int chip_id = -EINVAL;
+>
+>         ab8500 = dev_get_drvdata(dev);
+> -       return sprintf(buf, "%#x\n", ab8500 ? ab8500->chip_id : -EINVAL);
+> +       if(ab8500) {
+> +               chip_id = ab8500->chip_id;
+> +               if((is_ab8505(ab8500) || is_ab9540(ab8500)) && ab8500->version != 0xFF)
+> +                       chip_id = (ab8500->version << 8) | chip_id;
+> +       }
+> +       return sprintf(buf, "%#x\n", chip_id);
+>  }
 
-As far as I remember Eric was pointing to such potential use at early
-time when kcmp being only started developing (I'm trying to find this
-email in archive, if only my memory doesn't betray me and it was about
-something else ;) Nevertheless, one may write utility to output
-statistics on shared "resource" used by a task (don't know if it's
-that useful since we use kcmp for c/r sake, but still).
+What's the use of printing "ffffffea" for unknown versions here?
+
+	Arnd
