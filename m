@@ -1,97 +1,126 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 19 Feb 2013 08:00:07 +0000
-Subject: [RFC 2/8] ARM: twd: register clock event for 1 core SMP
-In-Reply-To: <512230F1.8020208@gmail.com>
-References: <cover.1361166003.git.afzal@ti.com>
- <a7f62b8580aa4b33d5658f4f03371a453adaea9b.1361166003.git.afzal@ti.com>
- <512230F1.8020208@gmail.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EAA8534@DBDE01.ent.ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 19 Feb 2013 10:01:10 +0200
+Subject: [PATCH v2 1/5] drivers: phy: add generic PHY framework
+In-Reply-To: <1361253198-7401-2-git-send-email-kishon@ti.com>
+References: <1361253198-7401-1-git-send-email-kishon@ti.com>
+ <1361253198-7401-2-git-send-email-kishon@ti.com>
+Message-ID: <20130219080109.GD23197@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi,
 
-On Mon, Feb 18, 2013 at 19:17:29, Rob Herring wrote:
-> On 02/18/2013 12:30 AM, Afzal Mohammed wrote:
+On Tue, Feb 19, 2013 at 11:23:14AM +0530, Kishon Vijay Abraham I wrote:
+> The PHY framework provides a set of APIs for the PHY drivers to
+> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
+> PHY with or without using phandle. To obtain a reference to the PHY without
+> using phandle, the platform specfic intialization code (say from board file)
+> should have already called phy_bind with the binding information. The binding
+> information consists of phy's device name, phy user device name and an index.
+> The index is used when the same phy user binds to mulitple phys.
+> 
+> PHY drivers should create the PHY by passing phy_descriptor that has
+> describes the PHY (label, type etc..) and ops like init, exit, suspend, resume,
 
-> > Register percpu local timer for scheduler tick in the case of one core
-> > SMP configuration. In other cases - secondary cpu's as well as boot
-> > cpu's having more than one core, this is being registered as per
-> > existing boot flow, with a difference that they happens after delay
-> > calibration. Registering the clock for tick in case of one core should
-> > be done before Kernel calibrates delay (this is required to boot,
-> > unless local timer is the only one registered for tick). Registering
-> > twd local timer at init_time (which platforms are doing now) helps
-> > achieve that with the proposed change.
-> > 
-> > This helps in an almost booting Kernel (minimal) by only relying on
-> > ARM parts for an A9 one core SMP.
+s/has describes/describes
 
-> >  arch/arm/kernel/smp_twd.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> > index 616268c..118f4f2 100644
-> > --- a/arch/arm/kernel/smp_twd.c
-> > +++ b/arch/arm/kernel/smp_twd.c
-> > @@ -335,6 +335,9 @@ static int __init twd_local_timer_common_register(struct device_node *np)
-> >  
-> >  	twd_get_clock(np);
-> >  
-> > +	if (num_possible_cpus() == 1)
-> > +		twd_timer_setup(evt);
-> > +
+> poweron, shutdown.
+> 
+> The documentation for the generic PHY framework is added in
+> Documentation/phy.txt and the documentation for the sysfs entry is added
+> in Documentation/ABI/testing/sysfs-class-phy.
 
-> Shouldn't this be fixed in the core code, so the same issue is fixed for
-> all timers?
+you forgot to mention here that one case of re-use is OMAP5 where the
+same PHY IP (different instances of it) is used for SATA and USB3
+functionality, which means that we would have to maintain 2 drivers for
+the same thing.
 
-Is the following that you had in mind ? (with it, this patch as well as
-1/8 would not be required),
+> diff --git a/Documentation/ABI/testing/sysfs-class-phy b/Documentation/ABI/testing/sysfs-class-phy
+> new file mode 100644
+> index 0000000..ffd9930
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/sysfs-class-phy
+> @@ -0,0 +1,15 @@
+> +What:		/sys/class/phy/<phy>/label
+> +Date:		Feb 2013
+> +KernelVersion:	3.10
+> +Contact:	Kishon Vijay Abraham I <kishon@ti.com>
+> +Description:
+> +		This is a read-only file for getting the label of the phy.
+> +
+> +What:		/sys/class/phy/<phy>/bind
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index d3a22be..2b6417d 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -42,6 +42,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs);
-  */
- extern void smp_init_cpus(void);
- 
-+extern void smp_monocore_timer_setup(void);
-+
- 
- /*
-  * Provide a function to raise an IPI cross call on CPUs in callmap.
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 5f73f70..7431b77 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -504,6 +504,15 @@ int local_timer_register(struct local_timer_ops *ops)
- }
- #endif
- 
-+void __init smp_monocore_timer_setup(void)
-+{
-+       unsigned int cpu = smp_processor_id();
-+       struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
-+
-+       if (!lt_ops)
-+               lt_ops->setup(evt);
-+}
-+
- static void __cpuinit percpu_timer_setup(void)
- {
-        unsigned int cpu = smp_processor_id();
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 955d92d..eb023ee 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -116,5 +116,6 @@ int __init register_persistent_clock(clock_access_fn read_boot,
- void __init time_init(void)
- {
-        machine_desc->init_time();
-+       smp_monocore_timer_setup();
-        sched_clock_postinit();
- }
+this will cause problems with the generic bind/unbind sysfs files which
+are write-only. You should probably rename it to something else.
 
-Regards
-Afzal
+> +4. Getting a reference to the PHY
+> +
+> +Before the controller can make use of the PHY, it has to get a reference to
+> +the PHY. The PHY framework provides 4 APIs to get a reference to the PHY.
+
+'it has to get a reference to it. This framework', decreases the
+duplication of 'PHY'.
+
+> +struct phy *phy_get(struct device *dev, u8 index);
+> +struct phy *devm_phy_get(struct device *dev, u8 index);
+> +struct phy *of_phy_get(struct device *dev, const char *phandle, u8 index);
+> +struct phy *devm_of_phy_get(struct device *dev, const char *phandle, u8 index);
+> +
+> +phy_get and devm_phy_get can be used to get the PHY in non-dt boot. This API
+> +uses the binding information added using the phy_bind API to find and return
+> +the appropriate PHY. The only difference between the two APIs is that
+> +devm_phy_get associates the device with the PHY using devres on successful PHY
+> +get. On driver detach, release function is invoked on the the devres data and
+
+s/the the/the/
+
+> +devres data is freed.
+
+s/devres data/it/
+
+> +7. Current Status
+> +
+> +Currently only USB in OMAP is made to use this framework. However using the
+> +USB PHY library cannot be completely removed because it is intertwined with
+> +OTG. Once we move OTG out of PHY completely, using the old PHY library can be
+> +completely removed. SATA in OMAP will also more likely use this new framework
+> +and we should have a patch for it soon.
+
+not sure if this should be in the documentation, but fair enough.
+
+> +static DEFINE_MUTEX(phy_list_mutex);
+
+not sure if a mutex is enough to protect list traversal...
+
+> +struct phy_ops {
+> +	int	(*init)(struct phy_descriptor *desc);
+> +	int	(*exit)(struct phy_descriptor *desc);
+> +	int	(*suspend)(struct phy_descriptor *desc);
+> +	int	(*resume)(struct phy_descriptor *desc);
+
+should you really have these two pointers ? I wonder if it wouldn't be
+better to force runtime_pm down on the users and have phy_suspend() and
+phy_resume() just be wrappers to pm_runtime_get() and pm_runtime_put().
+
+Up to discussion, I guess.
+
+> +#if defined(CONFIG_GENERIC_PHY) || defined(CONFIG_GENERIC_PHY_MODULE)
+
+#if IS_ENABLED(CONFIG_GENERIC_PHY)
+
+> +static inline struct phy *devm_phy_get(struct device *dev, u8 index)
+> +{
+> +	return ERR_PTR(-EINVAL);
+
+would -EOPNOTSUPP fit better here (and all others)
+
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/ffb3d7e4/attachment-0001.sig>
