@@ -1,54 +1,27 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 19 Feb 2013 16:28:30 +0530
-Subject: [PATCH v6 08/46] CPU hotplug: Provide APIs to prevent CPU offline
- from atomic context
-In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B7154@saturn3.aculab.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123920.26245.56709.stgit@srivatsabhat.in.ibm.com>
- <CANN689HhVxDv+3Bn9UAxOMzj0egTvVp_c7oAmQ2nnQ8Xjn_aMA@mail.gmail.com>
- <51225A36.40600@linux.vnet.ibm.com>
- <CANN689FJPLfz06MFRJ9T+BuToejAzjYP_yrw_H4iGi1Kb3p2-g@mail.gmail.com>
- <51227810.6090009@linux.vnet.ibm.com>
- <CANN689E-98zK69pGeojbm30n3sswQYVBvhk3i3OzqvbeqSrSrg@mail.gmail.com>
- <51234C23.2030909@linux.vnet.ibm.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B7154@saturn3.aculab.com>
-Message-ID: <51235AD6.9040407@linux.vnet.ibm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 19 Feb 2013 16:32:15 +0530
+Subject: [PATCH, RFC 4/8] ARM: am33xx: ll debug config help
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EAA867A@DBDE01.ent.ti.com>
+References: <cover.1361186097.git.afzal@ti.com>
+ <bfe941adb98a5000c2817f9fd6160070e59e53c9.1361186097.git.afzal@ti.com>
+ <51235337.60209@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EAA867A@DBDE01.ent.ti.com>
+Message-ID: <51235BB7.2050600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2013 04:12 PM, David Laight wrote:
->> I wouldn't go that far... ;-) Unfairness is not a show-stopper right?
->> IMHO, the warning/documentation should suffice for anybody wanting to
->> try out this locking scheme for other use-cases.
-> 
-> I presume that by 'fairness' you mean 'write preference'?
-> 
-
-Yep.
-
-> I'd not sure how difficult it would be, but maybe have two functions
-> for acquiring the lock for read, one blocks if there is a writer
-> waiting, the other doesn't.
-> 
-> That way you can change the individual call sites separately.
+On Tuesday 19 February 2013 04:00 PM, Mohammed, Afzal wrote:
+> Hi Santosh,
 >
-
-Right, we could probably use that method to change the call sites in
-multiple stages, in the future.
- 
-> The other place I can imagine a per-cpu rwlock being used
-> is to allow a driver to disable 'sleep' or software controlled
-> hardware removal while it performs a sequence of operations.
-> 
-
-BTW, per-cpu rwlocks use spinlocks underneath, so they can be used only
-in atomic contexts (you can't sleep holding this lock). So that would
-probably make it less attractive or useless to "heavy-weight" usecases
-like the latter one you mentioned. They probably need to use per-cpu
-rw-semaphore or some such, which allows sleeping. I'm not very certain
-of the exact usecases you are talking about, but I just wanted to
-point out that percpu-rwlocks might not be applicable to many scenarios.
-..(which might be a good thing, considering its unfair property today).
+> On Tue, Feb 19, 2013 at 15:55:59, Shilimkar, Santosh wrote:
+>
+>> With DT, IIRC DEBUGLL is broken. So did you hack debug-macro.S
+>> to get the earlyprintk working ?
+>
+> No, on linux-next, ll debug works properly.
+>
+Indeed. Tony fixed that now. Some how I missed
+this patch on the list.
 
 Regards,
-Srivatsa S. Bhat
+Santosh
