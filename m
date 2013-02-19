@@ -1,37 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Feb 2013 14:00:57 -0800
-Subject: [GIT PULL] reworked omap usb pdata changes for v3.9 merge window
-In-Reply-To: <201302192130.33509.arnd@arndb.de>
-References: <20130215003543.GF11806@atomide.com>
- <201302192130.33509.arnd@arndb.de>
-Message-ID: <20130219220057.GK5724@atomide.com>
+From: gorcunov@openvz.org (Cyrill Gorcunov)
+Date: Wed, 20 Feb 2013 02:02:44 +0400
+Subject: [patch 1/2] kcmp: Make it to depend on CONFIG_KCMP
+In-Reply-To: <5123F32B.3000401@zytor.com>
+References: <20130219064800.719149796@openvz.org>
+ <20130219065210.030802820@openvz.org> <5123444D.6000806@suse.cz>
+ <20130219093154.GF20312@moon> <5123BC2B.6000304@zytor.com>
+ <20130219182838.GL20312@moon>
+ <20130219134256.f4cedf44.akpm@linux-foundation.org>
+ <5123F32B.3000401@zytor.com>
+Message-ID: <20130219220244.GQ20312@moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [130219 13:34]:
-> On Friday 15 February 2013, Tony Lindgren wrote:
-> > Hi Arnd & Olof,
-> > 
-> > Roger Quadros reworked the OMAP USB patches that were causing
-> > a conflict in Linux next and we requested to be dropped from
-> > Linux next and reworked to remove the dependencies between
-> > core SoC code and the driver code.
-> > 
-> > Below is a pull request for the mach-omap2 specific parts, the
-> > rest is driver specific and queued by Samuel in the MFD tree
-> > and Greg for the USB changes.
-> > 
-> > I've left it unresolved so you can merge it into one of your
-> > branches as a dependency so we can avoid the merge conflict
-> > in Linux next. A link to the merge resolution done by Stephen
-> > is in the pull request. Let me know if you want me to resolve
-> > it instead. 
+On Tue, Feb 19, 2013 at 01:48:27PM -0800, H. Peter Anvin wrote:
+> >
+> >This permits people to select kcmp with CONFIG_CHECKPOINT_RESTORE=n.
+> >Is there any point in doing that?
+> >
+> >What would be wrong with just doing
+> >
+> >	obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
+> >
 > 
-> I've pulled them into next/soc now. I was wondering whether to
-> put them into the late/omap branch instead, but this seemed
-> like the easiest way to resolve the conflict, and the patches
-> are simple enough.
+> The real question is if there are any potential use cases of kcmp()
+> outside checkpoint/restore.  It is actually a very general facility.
 
-OK thanks!
-
-Tony
+As far as I remember Eric was pointing to such potential use at early
+time when kcmp being only started developing (I'm trying to find this
+email in archive, if only my memory doesn't betray me and it was about
+something else ;) Nevertheless, one may write utility to output
+statistics on shared "resource" used by a task (don't know if it's
+that useful since we use kcmp for c/r sake, but still).
