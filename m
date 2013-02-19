@@ -1,45 +1,23 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 19 Feb 2013 10:50:34 -0800
-Subject: [PATCH v7 00/12] Tegra114 clockframework
-In-Reply-To: <5123C6E7.9070407@wwwdotorg.org>
-References: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
- <5123C6E7.9070407@wwwdotorg.org>
-Message-ID: <20130219185034.27993.86892@quantum>
+From: hughd@google.com (Hugh Dickins)
+Date: Tue, 19 Feb 2013 10:56:27 -0800 (PST)
+Subject: Should a swapped out page be deleted from swap cache?
+In-Reply-To: <512338A6.1030602@gmail.com>
+References: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
+ <alpine.LNX.2.00.1302180939200.2246@eggly.anvils>
+ <512338A6.1030602@gmail.com>
+Message-ID: <alpine.LNX.2.00.1302191050330.2248@eggly.anvils>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Warren (2013-02-19 10:39:35)
-> On 02/15/2013 05:36 AM, Peter De Schrijver wrote:
-> > This is the seventh version of the Tegra114 clockframework. It is based on the
-> > for-next branch of
-> > git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git and
-> > http://www.spinics.net/lists/arm-kernel/msg220452.html.
+On Tue, 19 Feb 2013, Ric Mason wrote:
 > 
-> Mike,
-> 
-> I think it'd be prudent to take this series through the Tegra tree again
-> for 3.10; patch 11 needs to go in as part of the series due to internal
-> dependencies, and I'm slightly worried that other Tegra DT changes might
-> conflict with that patch (if only for context). Taking this series (and
-> any other Tegra clk driver changes for 3.10) through the Tegra tree
-> could resolve that easily. Do you have a problem with that?
-> 
+> There is a call of try_to_free_swap in function swap_writepage, if
+> swap_writepage is call from shrink_page_list path, PageSwapCache(page) ==
+> trure, PageWriteback(page) maybe false, page_swapcount(page) == 0, then will
+> delete the page from swap cache and free swap slot, where I miss?
 
-I was thinking the same thing.  I'll make time to review these now that
-3.8 is out.
+That's correct.  PageWriteback is sure to be false there.  page_swapcount
+usually won't be 0 there, but sometimes it will be, and in that case we
+do want to delete from swap cache and free the swap slot.
 
-> If that's OK, can you stage the dependency Peter mentioned:
-> http://www.spinics.net/lists/arm-kernel/msg220452.html
-> into a stable branch for me to merge, obviously after 3.9-rc1 is out.
-> 
-
-I'll take another look at that one.  I haven't merged it yet for some
-reason but I've forgotten why.  Assuming nothing is wrong then I'll pull
-it in towards 3.10.
-
-Regards,
-Mike
-
-> Thanks.
-> 
-> Prashant, could you provide a review/ack for this series too.
+Hugh
