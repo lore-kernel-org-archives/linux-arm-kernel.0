@@ -1,82 +1,83 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 19 Feb 2013 10:11:57 +0200
-Subject: [PATCH v2 2/5] usb: phy: omap-usb2: use the new generic PHY
- framework
-In-Reply-To: <1361253198-7401-3-git-send-email-kishon@ti.com>
-References: <1361253198-7401-1-git-send-email-kishon@ti.com>
- <1361253198-7401-3-git-send-email-kishon@ti.com>
-Message-ID: <20130219081157.GE23197@arwen.pp.htv.fi>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 19 Feb 2013 10:17:12 +0200
+Subject: [PATCH v7 1/2] ARM: davinci: Remoteproc driver support for
+ OMAP-L138 DSP
+In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C1431209537@DFLE08.ent.ti.com>
+References: <cover.1359684780.git.rtivy@ti.com>
+ <d9e1adbe6b12aab495f0292c4553c5c8f61c70b5.1359684780.git.rtivy@ti.com>
+ <CAK=WgbafX++Nj62w7w0UP-eQdFDWq_NGgTWVmnVxUUbe+WycEA@mail.gmail.com>
+ <13514BD7FAEBA745BBD7D8A672905C1431209537@DFLE08.ent.ti.com>
+Message-ID: <CAK=WgbbYQf9jKB-HvdUsGJJAj_Q+qiMEDC1msWJAs2dWocu5zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Rob,
 
-On Tue, Feb 19, 2013 at 11:23:15AM +0530, Kishon Vijay Abraham I wrote:
-> Used the generic PHY framework API to create the PHY. omap_usb2_suspend
-> is split into omap_usb_suspend and omap_usb_resume in order to align
-> with the new framework.
-> 
-> However using the old USB PHY library cannot be completely removed
-> because OTG is intertwined with PHY and moving to the new framework
-> will break OTG. Once we have a separate OTG state machine, we
-> can get rid of the USB PHY library.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/usb/phy/omap-usb2.c  |   49 ++++++++++++++++++++++++++++++++++++++++++
->  include/linux/usb/omap_usb.h |    3 +++
->  2 files changed, 52 insertions(+)
-> 
-> diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
-> index 844ab68..924ae59 100644
-> --- a/drivers/usb/phy/omap-usb2.c
-> +++ b/drivers/usb/phy/omap-usb2.c
-> @@ -119,9 +119,48 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
->  	return 0;
->  }
->  
-> +static int omap_usb_suspend(struct phy_descriptor *desc)
-> +{
-> +	struct omap_usb *phy = desc_to_omapusb(desc);
-> +
-> +	if (!phy->is_suspended) {
+On Tue, Feb 19, 2013 at 1:02 AM, Tivy, Robert <rtivy@ti.com> wrote:
+>> It looks like this patch squashes:
+>> 1. A fix to drivers/remoteproc/Kconfig
+>> 2. New functionality in remoteproc_core.c
+>> 3. A new da8xx driver
+>>
+>> These are independent changes, so we better split them up to separate
+>> patches.
+>
+> Ok, I will submit separate patches for these.  In doing so, I will have a stand-alone patch for the drivers/remoteproc/Kconfig fix, as well as the driver-related addition to that file in the driver patch.  PCMIIW.
 
-I wonder if it wouldn't be better to have some refcounting done by phy
-framework itself so that this only gets called when phy->refcount == 0
+We should have one patch for the Kconfig fix, another one for the new
+firmware-name functionality in rproc_alloc() and then a patch adding
+this new driver.
 
-> +		omap_control_usb_phy_power(phy->control_dev, 0);
+>> > +static irqreturn_t handle_event(int irq, void *p)
+>> > +{
+>> > +       struct rproc *rproc = (struct rproc *)p;
+>> > +
+>> > +       /* Process incoming buffers on our vring */
+>> > +       while (IRQ_HANDLED == rproc_vq_interrupt(rproc, 0))
+>> > +               ;
+>> > +
+>> > +       /* Must allow wakeup of potenitally blocking senders */
+>> > +       rproc_vq_interrupt(rproc, 1);
+>>
+>> IIRC we agreed on removing this part, and instead adding it to the
+>> generic remoteproc framework (i.e. Cyril's patch).
+>
+> I didn't like the idea of having extra overhead when calling the "all virtqueues" version.
+>
+> We know that we want to call rproc_vq_interrupt(rproc, 1) just once, and don't care about its return value.  If we did
+>       /* Process incoming buffers on our vring */
+>       while (IRQ_HANDLED == rproc_vq_interrupt(rproc, -1))
+>               ;
+> then that would essentially turn into:
+>         do {
+>                 ret = IRQ_NONE;
+>                 if (rproc_vq_interrupt(rproc, 0) == IRQ_HANDLED)
+>                         ret = IRQ_HANDLED;
+>                 if (rproc_vq_interrupt(rproc, 1) == IRQ_HANDLED)
+>                         ret = IRQ_HANDLED;
+>         } while (ret == IRQ_HANDLED);
+> which will end up calling rproc_vq_interrupt(rproc, 1) too many times.
+>
+> We have a benchmark goal to keep wrt/ the whole round-trip time of messages and we're currently not even achieving that, so more overhead than today can't be tolerated.
 
-coudln't you move this to ->runtime_suspend() ?
+Have you checked whether it really affects performance? I'd expect
+this to be very negligible. We can probably also maintain a bitmap
+with bits set for every IRQ_HANDLED vring, and stop processing vrings
+that has this bit cleared.
 
-> +		pm_runtime_put_sync(phy->dev);
-> +		phy->is_suspended = 1;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int omap_usb_resume(struct phy_descriptor *desc)
-> +{
-> +	u32 ret;
-> +	struct omap_usb *phy = desc_to_omapusb(desc);
-> +
-> +	if (phy->is_suspended) {
-> +		ret = pm_runtime_get_sync(phy->dev);
-> +		if (ret < 0) {
-> +			dev_err(phy->dev, "get_sync failed with err %d\n",
-> +									ret);
-> +			return ret;
-> +		}
-> +		omap_control_usb_phy_power(phy->control_dev, 1);
+But it actually looks like there's a different problem here.
+rproc_vq_interrupt() may also return IRQ_HANDLED on the unlikely event
+that vq->broken is set. With the current approach taken by this patch,
+this may lock the system in a busy loop.
 
-likewise, this could go to ->runtime_resume().
+I took a brief look at the other virtio drivers, and it seems they
+process all pending messages available when kicked, so we should
+probably add this to rpmsg_recv_done() too. This way we don't have to
+manually do it in the remoteproc layer, and all platforms will benefit
+from it.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/cac57595/attachment.sig>
+We should then only have to allow the option of asking the core to
+process all available vrings, as we discussed, and we're done.
+
+Thanks,
+Ohad.
