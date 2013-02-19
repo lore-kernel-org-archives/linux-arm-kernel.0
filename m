@@ -1,52 +1,44 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 18 Feb 2013 19:00:21 -0600
-Subject: [PATCH 1/2] ARM: dts: OMAP3: Add GPMC controller
-In-Reply-To: <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
-References: <1359395648-2137-1-git-send-email-florian.vaussard@epfl.ch>
- <1359395648-2137-2-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <5122CEA5.5010902@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 19 Feb 2013 10:18:32 +0900
+Subject: [PATCH v3 8/8] ARM: shmobile: completely switch MMC interfaces
+ on armadillo800eva-reference to DT
+In-Reply-To: <CABYn4sw33o6nDQz2wvuxgiKEMUuSdxNZa3J_SmO4XFMH3+5eqQ@mail.gmail.com>
+References: <1358959071-2873-1-git-send-email-g.liakhovetski@gmx.de>
+ <1358959071-2873-9-git-send-email-g.liakhovetski@gmx.de>
+ <CABYn4sz+EMFB5cb4Uyk17+KfmakRCPOXx7NQkPcQOfvT5DDWYg@mail.gmail.com>
+ <CABYn4sxWpS6K21YNPKEdQ9e3xwbivOKSOs9w2+mLRiuizWmHXw@mail.gmail.com>
+ <Pine.LNX.4.64.1302182050550.4526@axis700.grange>
+ <CABYn4sw33o6nDQz2wvuxgiKEMUuSdxNZa3J_SmO4XFMH3+5eqQ@mail.gmail.com>
+Message-ID: <20130219011831.GI14932@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 18, 2013 at 01:59:56PM -0600, Bastian Hecht wrote:
+> 2013/2/18 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> > Hi Bastian
+> >
+> > On Mon, 18 Feb 2013, Bastian Hecht wrote:
+> >
+> >> Hi,
+> >>
+> >> I got out of place by 1 commit in the intc-of branch:
+> >> It's "ARM: shmobile: move pin configuration on
+> >> armadillo800eva-reference to DT" not "ARM: shmobile: completely switch
+> >> MMC interfaces on armadillo800eva-reference to DT" that breaks "make
+> >> dtbs".
 
-On 01/28/2013 11:54 AM, Florian Vaussard wrote:
-> Add device-tree support for the GPMC controller on the OMAP3.
-> 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  arch/arm/boot/dts/omap3.dtsi |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 6c63118..2ddae38 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi 
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -403,5 +403,16 @@
->  			ti,timer-alwon;
->  			ti,timer-secure;
->  		};
-> +
-> +		gpmc: gpmc at 6e000000 {
-> +			compatible = "ti,omap3430-gpmc";
-> +			ti,hwmods = "gpmc";
-> +			reg = <0x6e000000 0x1000000>;
+Thanks for pointing that out.
 
-Can you make this size smaller? Although the reference manual states
-16MB, the registers use less than 1KB of address space. Hence, it is
-pointless mapping all this address space for the gpmc registers.
+I have resolved this problem by rebasing the topic/intc-of branch
+on a merge that includes the topic/pinmux branch. topic/pinmux includes
+the following patch which provides 'gpio'.
 
-> +			interrupts = <20>;
-> +			gpmc,num-cs = <8>;
-> +			gpmc,num-waitpins = <4>;
-> +			#address-cells = <2>;
-> +			#size-cells = <1>;
-> +		};
->  	};
->  };
+* ARM: shmobile: r8a7740: Add pin control device in device tree
 
-Otherwise ...
+> > Could you please try the topic/all+next branch? It should contain all
+> > other branches and as such be the most complete one.
 
-Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+Yes, it is the most complete one.
 
-Cheers
-Jon
+> Oh great, thanks for pointing out the correct branch to me! This one
+> looks good for my testing purposes.
