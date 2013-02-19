@@ -1,48 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Feb 2013 13:10:09 +0800
-Subject: [PATCH 8/9] [HACK] ARM: imx: work around v7_cpu_resume link error
-In-Reply-To: <alpine.LFD.2.03.1302182245400.6419@syhkavp.arg>
-References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
- <1360882071-4072668-9-git-send-email-arnd@arndb.de>
- <20130215110720.GL17833@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1302152336520.6419@syhkavp.arg>
- <20130218055541.GK6782@S2101-09.ap.freescale.net>
- <alpine.LFD.2.03.1302181204050.6419@syhkavp.arg>
- <20130219014238.GA3108@S2101-09.ap.freescale.net>
- <alpine.LFD.2.03.1302182245400.6419@syhkavp.arg>
-Message-ID: <20130219051006.GB3108@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 18 Feb 2013 21:11:26 -0800
+Subject: [PATCH v6 16/16] ARM: dts: add board specific fixed rate clock
+ nodes for Exynos based platforms
+In-Reply-To: <1361175686-19400-17-git-send-email-thomas.abraham@linaro.org>
+References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
+ <1361175686-19400-17-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAOesGMjXv6DnGKx3=Xvgae_z=Jj5dZ5ncXyRNQ7wmmpSNkh==g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 11:11:30PM -0500, Nicolas Pitre wrote:
-> On Tue, 19 Feb 2013, Shawn Guo wrote:
-> 
-> > On Mon, Feb 18, 2013 at 12:06:32PM -0500, Nicolas Pitre wrote:
-> > > Try the following instead.  It makes the code simpler and easier to 
-> > > debug.
-> > > 
-> > It works now.  Thanks, Nico.  Care to send a patch for it?  I'd like
-> > to apply it.
-> 
-> ----- >8
-> 
-> FRom: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date: Mon, 18 Feb 2013 12:06:32 -0500 (EST)
-> Subject: ARM: mach-imx: move early resume code out of the .data section
-> 
-> Building the kernel with allyesconfig fails because the i.mx early
-> resume code located in the .data section is unable to fixup the bl
-> relocation as the branch target gets too far away.
-> 
-> The idea of having code in the .data section allows for easy access to 
-> nearby data using relative addressing while the MMU is off. However it 
-> is probably best to move the code back to the .text section where it 
-> belongs and fixup the data access instead.  This solves the bl reloc
-> issue (at least until this becomes a general problem) and simplifies
-> the code as well.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Hi,
 
-Applied as a fix for 3.9-rc, thanks.
+On Mon, Feb 18, 2013 at 12:21 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> The clock frequency of xxti and xusbxti clocks is dependent on the frequency of the
+> on-board oscillator that is used to generate these clocks. So allow the frequency
+> of these clocks to be specfied from device tree.
+>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos4210-origen.dts   |   12 ++++++++++++
+>  arch/arm/boot/dts/exynos4210-smdkv310.dts |   12 ++++++++++++
+>  arch/arm/boot/dts/exynos4210-trats.dts    |   12 ++++++++++++
+>  arch/arm/boot/dts/exynos4412-odroidx.dts  |   12 ++++++++++++
+>  arch/arm/boot/dts/exynos4412-origen.dts   |   12 ++++++++++++
+>  arch/arm/boot/dts/exynos4412-smdk4412.dts |   12 ++++++++++++
+>  arch/arm/boot/dts/exynos5250-arndale.dts  |    7 +++++++
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts |    7 +++++++
+>  arch/arm/boot/dts/exynos5250-snow.dts     |    7 +++++++
+>  arch/arm/boot/dts/exynos5440-ssdk5440.dts |    7 +++++++
+>  10 files changed, 100 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+> index 052606b..1b30bc8 100644
+> --- a/arch/arm/boot/dts/exynos4210-origen.dts
+> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
+> @@ -127,4 +127,16 @@
+>                         linux,default-trigger = "heartbeat";
+>                 };
+>         };
+> +
+> +       fixed-rate-clocks {
+> +               xxti {
+> +                       compatible = "samsung,clock-xxti";
+> +                       clock-frequency = <0>;
+> +               };
+> +
+> +               xusbxti {
+> +                       compatible = "samsung,clock-xusbxti";
+> +                       clock-frequency = <24000000>;
+> +               };
+> +       };
 
-Shawn
+Looks like xxti = 0 and xusbxti = 24MHz is the common frequencies on
+nearly all boards. It probably makes sense to add that to the defaults
+in dtsi, and override on the boards where it isn't the case. Saves
+some boilerplate code in the .dts files.
+
+
+-Olof
