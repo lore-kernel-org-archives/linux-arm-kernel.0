@@ -1,62 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Feb 2013 18:22:57 +0000
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <20130219163053.GE5724@atomide.com>
-References: <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
- <20130214193911.GD11806@atomide.com>
- <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
- <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
- <20130214224710.GF11362@atomide.com>
- <alpine.DEB.2.00.1302191527200.32069@utopia.booyaka.com>
- <20130219154511.GU17852@n2100.arm.linux.org.uk>
- <20130219163053.GE5724@atomide.com>
-Message-ID: <20130219182257.GV17852@n2100.arm.linux.org.uk>
+From: gorcunov@openvz.org (Cyrill Gorcunov)
+Date: Tue, 19 Feb 2013 22:28:38 +0400
+Subject: [patch 1/2] kcmp: Make it to depend on CONFIG_KCMP
+In-Reply-To: <5123BC2B.6000304@zytor.com>
+References: <20130219064800.719149796@openvz.org>
+ <20130219065210.030802820@openvz.org> <5123444D.6000806@suse.cz>
+ <20130219093154.GF20312@moon> <5123BC2B.6000304@zytor.com>
+Message-ID: <20130219182838.GL20312@moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 08:30:53AM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130219 07:49]:
-> > If you want such things as pci_enable_device(), then what you're actually
-> > asking for is omap_enable_device() for OMAP devices.  OMAP devices are
-> > already specific enough to OMAP SoCs (god knows, they have really complex
-> > and obscure behaviours that no one else in their right mind would want
-> > to copy) that calling out to omap specific functions would never really
-> > be a problem.
+On Tue, Feb 19, 2013 at 09:53:47AM -0800, H. Peter Anvin wrote:
+> On 02/19/2013 01:31 AM, Cyrill Gorcunov wrote:
+> >+
+> >+	  If unsure, say N.
+> >+
 > 
-> I'd rather avoid adding omap_enable_device() calls to drivers as we really
-> want to keep the drivers generic. But maybe there could be some generic
-> bus_enable_device() function pointer that could be populated by the bus
-> code during init.
+> Wrong advice.  In this particular case, Y is the safe alternative.
+---
+From: Cyrill Gorcunov <gorcunov@openvz.org>
+Subject: kcmp: Make it to depend on CONFIG_KCMP
 
-What you're not getting is that pci_enable_device() is a PCI thing which
-is mostly a no-op - and where it isn't a no-op, it's something that must
-be done _before_ PCI resources are used or even reserved (because
-conceptually, this is to do with getting the resources correct.)
+Since kcmp syscall has been implemented (initially on
+x86 architecture) a number of other archs wire it up
+as well: xtensa, sparc, sh, s390, mips, microblaze,
+m68k (not taking into account those who uses
+<asm-generic/unistd.h> for syscall numbers
+definitions).
 
-The PCI case is:
+But the Makefile, which turns kcmp.o generation on
+still depends on former config-x86. Thus get rid
+of this limitation and make kcmp.o depend on CONFIG_KCMP
+option.
 
-pci_device_probe(pci_dev)
-{
-	pci_enable_device(pci_dev);
+v2:
+ - As Michal pointed the old configs might already use of
+   CHECKPOINT_RESTORE, so make "default" accordingly.
+ - Advice Y if unsure
 
-	pci_request_regions(pci_dev);
+Signed-off-by: Cyrill Gorcunov <gorcunov@openvz.org>
+Cc: KOSAKI Motohiro <kosaki.motohiro@gmail.com>
+Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+Cc: Pavel Emelyanov <xemul@parallels.com>
+Cc: Andrey Vagin <avagin@openvz.org>
+Cc: Ingo Molnar <mingo@elte.hu>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Glauber Costa <glommer@parallels.com>
+Cc: Andi Kleen <andi@firstfloor.org>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Matt Helsley <matthltc@us.ibm.com>
+Cc: Pekka Enberg <penberg@kernel.org>
+Cc: Eric Dumazet <eric.dumazet@gmail.com>
+Cc: Vasiliy Kulikov <segoon@openwall.com>
+Cc: Alexey Dobriyan <adobriyan@gmail.com>
+Cc: Valdis.Kletnieks at vt.edu
+Cc: Michal Marek <mmarek@suse.cz>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+---
+ init/Kconfig    |    9 +++++++++
+ kernel/Makefile |    4 +---
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-	regs = pci_iomap(pci_dev, BAR, size);
-...
-}
-
-That's different from what you're wanting on OMAP - what you're wanting
-there is some way to record the platform device has been ioremapped, so
-that you can then fiddle with its idle/reset register from "bus" code.
-
-If you think about it in light of the above sequence, the "enable device"
-stage *doesn't* suit your needs because that happens before the driver
-has done anything.
-
-However... if you think you're going to get away with another total
-rewrite of OMAP device support away from hwmod to a new scheme with a
-new load of huge churn, think again.  Remember, churn is evil.  I've
-complained to you about the amount of churn that OMAP manufactures
-in the past.  Linus has complained about it too.  You can't continue
-like this.
+Index: linux-2.6.git/init/Kconfig
+===================================================================
+--- linux-2.6.git.orig/init/Kconfig
++++ linux-2.6.git/init/Kconfig
+@@ -279,6 +279,15 @@ config FHANDLE
+ 	  get renamed. Enables open_by_handle_at(2) and name_to_handle_at(2)
+ 	  syscalls.
+ 
++config KCMP
++	bool "kcmp syscall"
++	default CHECKPOINT_RESTORE
++	help
++	  If you say Y here, a user level program will be able to use
++	  kcmp(2) syscall.
++
++	  If unsure, say Y.
++
+ config AUDIT
+ 	bool "Auditing support"
+ 	depends on NET
+Index: linux-2.6.git/kernel/Makefile
+===================================================================
+--- linux-2.6.git.orig/kernel/Makefile
++++ linux-2.6.git/kernel/Makefile
+@@ -25,9 +25,7 @@ endif
+ obj-y += sched/
+ obj-y += power/
+ 
+-ifeq ($(CONFIG_CHECKPOINT_RESTORE),y)
+-obj-$(CONFIG_X86) += kcmp.o
+-endif
++obj-$(CONFIG_KCMP) += kcmp.o
+ obj-$(CONFIG_FREEZER) += freezer.o
+ obj-$(CONFIG_PROFILING) += profile.o
+ obj-$(CONFIG_STACKTRACE) += stacktrace.o
