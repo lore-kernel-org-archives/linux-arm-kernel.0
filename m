@@ -1,40 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 19 Feb 2013 11:56:05 +0900
-Subject: [PATCH 0/5] ARM: shmobile: r8a7779 and marzen initialisation
- enhancements
-Message-ID: <1361242570-8867-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 19 Feb 2013 11:56:07 +0900
+Subject: [PATCH 2/5] ARM: shmobile: marzen: Do not use early devices
+In-Reply-To: <1361242570-8867-1-git-send-email-horms+renesas@verge.net.au>
+References: <1361242570-8867-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1361242570-8867-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Do not initialise any early devices when using the minimal DT reference
+code. Only the delay needs to be initialised.
 
-This series:
-
-* Removes the use of early devices from reference marzen reference DT
-* Initialises i2c as a late device (non reference DT boot)
-* Moves ethernet controller from SoC to marzen board DT file
-
-Merge:
-
-My plan to merge this is:
-* Add r8a7779 patches to an soc branch.
-* Rebase a boards branch on top of the soc branch.
-* Apply marzen patches, squashing them to into existing commits
-  to avoid breaking bisection.
-
-Simon Horman (5):
-  ARM: shmobile: r8a7779: Do not use early devices with DT reference
-  ARM: shmobile: marzen: Do not use early devices
-  ARM: shmobile: r8a7779: Do not initialise i2c as an early device
-  ARM: shmobile: r8a7779: Remove lan from dtsi
-  ARM: shmobile: marzen: Add lan to dts file
-
- arch/arm/boot/dts/r8a7779-marzen-reference.dts  |   14 +++++++---
- arch/arm/boot/dts/r8a7779.dtsi                  |    9 -------
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/board-marzen-reference.c |    2 +-
- arch/arm/mach-shmobile/include/mach/common.h    |    2 +-
- arch/arm/mach-shmobile/setup-r8a7779.c          |   33 +++++++++--------------
- 5 files changed, 24 insertions(+), 36 deletions(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index 47df64d..a126f07 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -63,7 +63,7 @@ static const char *marzen_boards_compat_dt[] __initdata = {
+ DT_MACHINE_START(MARZEN, "marzen")
+ 	.smp		= smp_ops(r8a7779_smp_ops),
+ 	.map_io		= r8a7779_map_io,
+-	.init_early	= r8a7779_add_early_devices_dt,
++	.init_early	= r8a7779_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= r8a7779_init_irq_dt,
+ 	.init_machine	= marzen_init,
 -- 
 1.7.10.4
