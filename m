@@ -1,78 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Feb 2013 15:45:11 +0000
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <alpine.DEB.2.00.1302191527200.32069@utopia.booyaka.com>
-References: <1360840554-26901-2-git-send-email-balbi@ti.com>
- <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
- <20130214193911.GD11806@atomide.com>
- <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
- <alpine.DEB.2.00.1302142124370.11016@utopia.booyaka.com>
- <20130214224710.GF11362@atomide.com>
- <alpine.DEB.2.00.1302191527200.32069@utopia.booyaka.com>
-Message-ID: <20130219154511.GU17852@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 19 Feb 2013 17:47:41 +0200
+Subject: [PATCH v2 0/5] Generic PHY Framework
+In-Reply-To: <201302191528.17698.arnd@arndb.de>
+References: <1361253198-7401-1-git-send-email-kishon@ti.com>
+ <201302191434.40495.arnd@arndb.de>
+ <20130219150500.GG4390@arwen.pp.htv.fi>
+ <201302191528.17698.arnd@arndb.de>
+Message-ID: <20130219154741.GH4390@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 03:30:01PM +0000, Paul Walmsley wrote:
-> Hi,
-> 
-> On Thu, 14 Feb 2013, Tony Lindgren wrote:
-> 
-> > The other option could be to allow custom ioremap function pointers 
-> > based on address range in __arm_ioremap_pfn_caller() the same way as
-> > the SoC specific static mappings are allowed. That would require adding
-> > a function pointer to struct map_desc.
+On Tue, Feb 19, 2013 at 03:28:17PM +0000, Arnd Bergmann wrote:
+> On Tuesday 19 February 2013, Felipe Balbi wrote:
+> > On Tue, Feb 19, 2013 at 02:34:40PM +0000, Arnd Bergmann wrote:
+> > > On Tuesday 19 February 2013, Felipe Balbi wrote:
+> > > > On Tue, Feb 19, 2013 at 12:33:54PM +0000, Arnd Bergmann wrote:
+> > > It's a fine line, but I think a phy is something that resembles a device
+> > > more than an LED does. When I read patch 1, I also noticed and commented
+> > > on the fact that it does use a 'class'. Now, according to Greg, we should
+> > > use 'bus_type' instead of 'class' in new code. I originally disagreed with
+> > > that concept, but he's the boss here and it's good if he has a vision
+> > > how things should be lined out.
+> > > 
+> > > In practice, there is little difference between a 'bus_type' and a 'class',
+> > > so just replace any instance of the former with the latter in your head
+> > > when reading the code ;-)
 > > 
-> > Maybe that would do the trick?
+> > it's not so simple :-) if we must use bus_type we need to introduce all
+> > the device/driver matching mechanism which isn't necessary with a class.
 > 
-> That sounds fine to me too.
+> I think the idea is to use a bus_type that has devices but no drivers
+> associated with it, but I might be misremembering things.
+
+but then drivers wouldn't probe ever, although devices would get
+created, so maybe it'll work...
+
+> > Greg, can you pitch your suggestion here ? It would be great to hear
+> > your rationale behind dropping class infrastructure, couldn't find
+> > anything through Google and since feature-removal-schedule.txt has been
+> > removed (without adding it to feature-removal-schedule.txt, I must add
+> > :-) I don't know what's the idea behind removing classes.
 > 
-> To me it makes sense to eventually handle the I/O mappings automatically 
-> from data in the DT -- hence the association with a bus device, which 
-> should be present in DT data.
+> I believe for now, the idea is to not add any new classes, but keep
+> the existing ones for compatibility. 'struct class_device' however
+> was already removed and got turned into 'struct device'.
 
-No.  I really don't get why OMAP thinks it's soo special that it needs
-to go around adding lots and lots of new abstractions all over the
-place.
+was there ever a "struct class_device".
 
-Indirect ioremap() through a function pointer so you can overload it with
-OMAP specific crap?  No way.  Function pointers in map_desc - what the hell
-for?
+What about struct class ?
 
-You must be totally mad if you think that's a way forward, I really don't
-see how you think this kind of crap would be remotely acceptable.
+<linux/device.h> ::
 
-Ok, so you have this problem that you need hwmod to touch a register which
-is also contained within the device resources as well.  That's fine.  You
-can do it one of two ways:
+ 334 struct class {
+ 335         const char              *name;
+ 336         struct module           *owner;
+ 337 
+ 338         struct class_attribute          *class_attrs;
+ 339         struct device_attribute         *dev_attrs;
+ 340         struct bin_attribute            *dev_bin_attrs;
+ 341         struct kobject                  *dev_kobj;
+ 342 
+ 343         int (*dev_uevent)(struct device *dev, struct kobj_uevent_env *env);
+ 344         char *(*devnode)(struct device *dev, umode_t *mode);
+ 345 
+ 346         void (*class_release)(struct class *class);
+ 347         void (*dev_release)(struct device *dev);
+ 348 
+ 349         int (*suspend)(struct device *dev, pm_message_t state);
+ 350         int (*resume)(struct device *dev);
+ 351 
+ 352         const struct kobj_ns_type_operations *ns_type;
+ 353         const void *(*namespace)(struct device *dev);
+ 354 
+ 355         const struct dev_pm_ops *pm;
+ 356 
+ 357         struct subsys_private *p;
+ 358 };
 
-1. Call out from the driver at the appropriate points (which seems to be
-   _after_ you've ioremapped it) to access the register.
-
-2. Find the resource, temporarily map the register, access it, and then
-   unmap it.
-
-No requirement what so ever to override ioremap().  AT ALL.  So stop this
-madness now.
-
-As for a function pointer in struct map_desc.  You're bonkers, the lot of
-you.  map_desc is a structure describing the boot time static mappings
-which gets discarded.  Nothing keeps any references around to it, and it
-is used at a time when *NOTHING ELSE* should be going on in the kernel
-other than building those static mappings.  Not even any arch code poking
-about at devices.  Or anything like that.  Because if you think that's
-acceptable, then we'll need to flush the cache and TLB after each and
-every map_desc entry is touched - which brings a whole load of new pain
-and slowness to the kernel boot.
-
-So please, stop this idiotic madness now.
-
-If you want such things as pci_enable_device(), then what you're actually
-asking for is omap_enable_device() for OMAP devices.  OMAP devices are
-already specific enough to OMAP SoCs (god knows, they have really complex
-and obscure behaviours that no one else in their right mind would want
-to copy) that calling out to omap specific functions would never really
-be a problem.
-
-No need for any of this crazy dev->bus shit either.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/19000cc2/attachment-0001.sig>
