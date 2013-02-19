@@ -1,119 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 18 Feb 2013 23:11:30 -0500 (EST)
-Subject: [PATCH 8/9] [HACK] ARM: imx: work around v7_cpu_resume link error
-In-Reply-To: <20130219014238.GA3108@S2101-09.ap.freescale.net>
-References: <1360882071-4072668-1-git-send-email-arnd@arndb.de>
- <1360882071-4072668-9-git-send-email-arnd@arndb.de>
- <20130215110720.GL17833@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1302152336520.6419@syhkavp.arg>
- <20130218055541.GK6782@S2101-09.ap.freescale.net>
- <alpine.LFD.2.03.1302181204050.6419@syhkavp.arg>
- <20130219014238.GA3108@S2101-09.ap.freescale.net>
-Message-ID: <alpine.LFD.2.03.1302182245400.6419@syhkavp.arg>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 18 Feb 2013 21:03:50 -0800
+Subject: [PATCH 0/2] Device Tree support for CMA (Contiguous Memory
+ Allocator)
+In-Reply-To: <5122AA3F.8030001@gmail.com>
+References: <1360845928-8107-1-git-send-email-m.szyprowski@samsung.com>
+ <20130214213013.GG1906@pengutronix.de> <511D6076.9090503@gmail.com>
+ <20130215083304.GK1906@pengutronix.de> <5122AA3F.8030001@gmail.com>
+Message-ID: <CAOesGMjC97p_5wDCSUhv6DaHdOKJKcARdRtdt5UnYkUCuFou6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Feb 2013, Shawn Guo wrote:
+On Mon, Feb 18, 2013 at 2:25 PM, Sylwester Nawrocki
+<sylvester.nawrocki@gmail.com> wrote:
 
-> On Mon, Feb 18, 2013 at 12:06:32PM -0500, Nicolas Pitre wrote:
-> > Try the following instead.  It makes the code simpler and easier to 
-> > debug.
-> > 
-> It works now.  Thanks, Nico.  Care to send a patch for it?  I'd like
-> to apply it.
+> My context was a multiprocessor SoC, where one of the processors is somehow
+> application specific (e.g. camera ISP) and can be considered as a slave
+> subsystem, running it's firmware and sharing system memory with the main
+> processor.
+>
+> The slave subsystem can have insane constraints on the memory region where
+> its firmware is located and which it also uses as its generic purpose RAM.
+>
+> While the region assigned to such a slave device would also likely include
+> a memory for its DMA buffers, the main concern here was an allocation of
+> a working memory for the slave processor.
+>
+> Perhaps the device tree is not a perfect place for defining exact memory
+> regions. If we happen to decide against it, then I guess some set of
+> properties would be needed, that would allow CMA to assign appropriate
+> memory region(s) to a device.
 
------ >8
+The place to add such constraints are in the bindings for the camera ISP.
 
-FRom: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date: Mon, 18 Feb 2013 12:06:32 -0500 (EST)
-Subject: ARM: mach-imx: move early resume code out of the .data section
+This isn't that different from how dma-window properties used on some
+of the PowerPC platforms; it specifies (among other things) the
+available address space as seen from the bus/device side.
 
-Building the kernel with allyesconfig fails because the i.mx early
-resume code located in the .data section is unable to fixup the bl
-relocation as the branch target gets too far away.
 
-The idea of having code in the .data section allows for easy access to 
-nearby data using relative addressing while the MMU is off. However it 
-is probably best to move the code back to the .text section where it 
-belongs and fixup the data access instead.  This solves the bl reloc
-issue (at least until this becomes a general problem) and simplifies
-the code as well.
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
-
-I'll probably convert other "code in .data" instances as well in the 
-near future.
-
-diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-index 7e49deb128..27bc06e910 100644
---- a/arch/arm/mach-imx/headsmp.S
-+++ b/arch/arm/mach-imx/headsmp.S
-@@ -73,16 +73,16 @@ ENDPROC(v7_secondary_startup)
- 
- #ifdef CONFIG_PM
- /*
-- * The following code is located into the .data section.  This is to
-- * allow phys_l2x0_saved_regs to be accessed with a relative load
-- * as we are running on physical address here.
-+ * The following code must assume it is running from physical address
-+ * where absolute virtual addresses to the data section have to be
-+ * turned into relative ones.
-  */
--	.data
--	.align
- 
- #ifdef CONFIG_CACHE_L2X0
- 	.macro	pl310_resume
--	ldr	r2, phys_l2x0_saved_regs
-+	adr	r0, l2x0_saved_regs_offset
-+	ldr	r2, [r0]
-+	add	r2, r2, r0
- 	ldr	r0, [r2, #L2X0_R_PHY_BASE]	@ get physical base of l2x0
- 	ldr	r1, [r2, #L2X0_R_AUX_CTRL]	@ get aux_ctrl value
- 	str	r1, [r0, #L2X0_AUX_CTRL]	@ restore aux_ctrl
-@@ -90,9 +90,9 @@ ENDPROC(v7_secondary_startup)
- 	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
- 	.endm
- 
--	.globl	phys_l2x0_saved_regs
--phys_l2x0_saved_regs:
--        .long   0
-+l2x0_saved_regs_offset:
-+	.word	l2x0_saved_regs - .
-+
- #else
- 	.macro	pl310_resume
- 	.endm
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index f7b0c2b1b9..f3791f980d 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -21,8 +21,6 @@
- #include <mach/common.h>
- #include <mach/hardware.h>
- 
--extern unsigned long phys_l2x0_saved_regs;
--
- static int imx6q_suspend_finish(unsigned long val)
- {
- 	cpu_do_idle();
-@@ -55,18 +53,5 @@ static const struct platform_suspend_ops imx6q_pm_ops = {
- 
- void __init imx6q_pm_init(void)
- {
--	/*
--	 * The l2x0 core code provides an infrastucture to save and restore
--	 * l2x0 registers across suspend/resume cycle.  But because imx6q
--	 * retains L2 content during suspend and needs to resume L2 before
--	 * MMU is enabled, it can only utilize register saving support and
--	 * have to take care of restoring on its own.  So we save physical
--	 * address of the data structure used by l2x0 core to save registers,
--	 * and later restore the necessary ones in imx6q resume entry.
--	 */
--#ifdef CONFIG_CACHE_L2X0
--	phys_l2x0_saved_regs = __pa(&l2x0_saved_regs);
--#endif
--
- 	suspend_set_ops(&imx6q_pm_ops);
- }
+-Olof
