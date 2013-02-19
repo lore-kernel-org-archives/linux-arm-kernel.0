@@ -1,188 +1,48 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 19 Feb 2013 12:07:50 +0000
-Subject: [PATCH 3/9] ARM: asm: Add ARM_BE8() assembly helper
-In-Reply-To: <alpine.LFD.2.03.1302132326400.8736@syhkavp.arg>
-References: <1360752927-29331-1-git-send-email-ben.dooks@codethink.co.uk>
- <1360752927-29331-4-git-send-email-ben.dooks@codethink.co.uk>
- <alpine.LFD.2.03.1302132326400.8736@syhkavp.arg>
-Message-ID: <20130219120750.GD1978@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 19 Feb 2013 14:10:13 +0200
+Subject: [PATCH, RFC 1/8] ARM: localtimer: return percpu clkevt on register
+In-Reply-To: <e7cbb10903841ba23a93f71e7a06ae34a43adc70.1361186097.git.afzal@ti.com>
+References: <cover.1361186097.git.afzal@ti.com>
+ <e7cbb10903841ba23a93f71e7a06ae34a43adc70.1361186097.git.afzal@ti.com>
+Message-ID: <20130219121013.GO23197@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 11:27:38PM -0500, Nicolas Pitre wrote:
-> On Wed, 13 Feb 2013, Ben Dooks wrote:
-> 
-> > Add ARM_BE8() helper to wrap any code conditional on being
-> > compile when CONFIG_ARM_ENDIAN_BE8 is selected and convert
-> > existing places where this is to use it.
-> > 
-> > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+Hi,
 
-Ditto comments on the previous patch.  You could also add LE().
-Is the ARM_ prefix really necessary for ARM-specific assembler
-macros?
+On Mon, Feb 18, 2013 at 05:06:39PM +0530, Afzal Mohammed wrote:
+> @@ -315,6 +315,7 @@ static struct local_timer_ops twd_lt_ops __cpuinitdata = {
+>  static int __init twd_local_timer_common_register(struct device_node *np)
+>  {
+>  	int err;
+> +	struct clock_event_device *evt;
+>  
+>  	twd_evt = alloc_percpu(struct clock_event_device *);
+>  	if (!twd_evt) {
+> @@ -328,8 +329,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+>  		goto out_free;
+>  	}
+>  
+> -	err = local_timer_register(&twd_lt_ops);
+> -	if (err)
+> +	evt = local_timer_register(&twd_lt_ops);
+> +	if (IS_ERR(evt))
+>  		goto out_irq;
 
-If the macro name is 5 characters or fewer, then
+this is wrong. Will return 0 even in the error case. Correct version
+would be:
 
-	<space> macro( <tab> 
+if (IS_ERR(evt)) {
+	err = PTR_ERR(evt);
+	goto out_irq;
+}
 
-fits nicely in the first tab column, helping to keep the assembler
-tidy, as per the ARM() and THUMB() macros.
-
-Cheers
----Dave
-
-> 
-> > 
-> > Conflicts:
-> > 	arch/arm/include/asm/assembler.h
-> 
-> Don't forget to get rid of the above in your commit message.
-> 
-> > ---
-> >  arch/arm/boot/compressed/head.S  |    8 ++------
-> >  arch/arm/include/asm/assembler.h |    7 +++++++
-> >  arch/arm/kernel/entry-armv.S     |    5 ++---
-> >  arch/arm/kernel/entry-common.S   |    4 +---
-> >  arch/arm/mm/abort-ev6.S          |    5 ++---
-> >  arch/arm/mm/proc-v6.S            |    4 +---
-> >  arch/arm/mm/proc-v7.S            |    4 +---
-> >  7 files changed, 16 insertions(+), 21 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> > index fe4d9c3..15ebdd6 100644
-> > --- a/arch/arm/boot/compressed/head.S
-> > +++ b/arch/arm/boot/compressed/head.S
-> > @@ -678,9 +678,7 @@ __armv4_mmu_cache_on:
-> >  		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
-> >  		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
-> >  		orr	r0, r0, #0x0030
-> > -#ifdef CONFIG_CPU_ENDIAN_BE8
-> > -		orr	r0, r0, #1 << 25	@ big-endian page tables
-> > -#endif
-> > + ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
-> >  		bl	__common_mmu_cache_on
-> >  		mov	r0, #0
-> >  		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
-> > @@ -707,9 +705,7 @@ __armv7_mmu_cache_on:
-> >  		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
-> >  						@ (needed for ARM1176)
-> >  #ifdef CONFIG_MMU
-> > -#ifdef CONFIG_CPU_ENDIAN_BE8
-> > -		orr	r0, r0, #1 << 25	@ big-endian page tables
-> > -#endif
-> > + ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
-> >  		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
-> >  		orrne	r0, r0, #1		@ MMU enabled
-> >  		movne	r1, #0xfffffffd		@ domain 0 = client
-> > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> > index eb87200..dbcbd08 100644
-> > --- a/arch/arm/include/asm/assembler.h
-> > +++ b/arch/arm/include/asm/assembler.h
-> > @@ -53,6 +53,13 @@
-> >  #define put_byte_3      lsl #0
-> >  #endif
-> >  
-> > +/* Select code for any configuration running in BE8 mode */
-> > +#ifdef CONFIG_ARM_CPU_ENDIAN_BE8
-> > +#define ARM_BE8(code...) code
-> > +#else
-> > +#define ARM_BE8(code...)
-> > +#endif
-> > +
-> >  /*
-> >   * Data preload for architectures that support it
-> >   */
-> > diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> > index 0f82098..291d295 100644
-> > --- a/arch/arm/kernel/entry-armv.S
-> > +++ b/arch/arm/kernel/entry-armv.S
-> > @@ -457,9 +457,8 @@ __und_usr:
-> >  	bne	__und_usr_thumb
-> >  	sub	r4, r2, #4			@ ARM instr at LR - 4
-> >  1:	ldrt	r0, [r4]
-> > -#ifdef CONFIG_CPU_ENDIAN_BE8
-> > -	rev	r0, r0				@ little endian instruction
-> > -#endif
-> > + ARM_BE8(rev	r0, r0)				@ little endian instruction
-> > +
-> >  	@ r0 = 32-bit ARM instruction which caused the exception
-> >  	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
-> >  	@ r4 = PC value for the faulting instruction
-> > diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> > index a6c301e..d5988afc 100644
-> > --- a/arch/arm/kernel/entry-common.S
-> > +++ b/arch/arm/kernel/entry-common.S
-> > @@ -368,9 +368,7 @@ ENTRY(vector_swi)
-> >  #else
-> >  	ldr	r10, [lr, #-4]			@ get SWI instruction
-> >  #endif
-> > -#ifdef CONFIG_CPU_ENDIAN_BE8
-> > -	rev	r10, r10			@ little endian instruction
-> > -#endif
-> > + ARM_BE8(rev	r10, r10)			@ little endian instruction
-> >  
-> >  #elif defined(CONFIG_AEABI)
-> >  
-> > diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
-> > index 8074199..3815a82 100644
-> > --- a/arch/arm/mm/abort-ev6.S
-> > +++ b/arch/arm/mm/abort-ev6.S
-> > @@ -38,9 +38,8 @@ ENTRY(v6_early_abort)
-> >  	bne	do_DataAbort
-> >  	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
-> >  	ldr	r3, [r4]			@ read aborted ARM instruction
-> > -#ifdef CONFIG_CPU_ENDIAN_BE8
-> > -	rev	r3, r3
-> > -#endif
-> > + ARM_BE8(rev	r3, r3)
-> > +
-> >  	do_ldrd_abort tmp=ip, insn=r3
-> >  	tst	r3, #1 << 20			@ L = 0 -> write
-> >  	orreq	r1, r1, #1 << 11		@ yes.
-> > diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-> > index bcaaa8d..2f060fa 100644
-> > --- a/arch/arm/mm/proc-v6.S
-> > +++ b/arch/arm/mm/proc-v6.S
-> > @@ -220,9 +220,7 @@ __v6_setup:
-> >  #endif /* CONFIG_MMU */
-> >  	adr	r5, v6_crval
-> >  	ldmia	r5, {r5, r6}
-> > -#ifdef CONFIG_CPU_ENDIAN_BE8
-> > -	orr	r6, r6, #1 << 25		@ big-endian page tables
-> > -#endif
-> > + ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
-> >  	mrc	p15, 0, r0, c1, c0, 0		@ read control register
-> >  	bic	r0, r0, r5			@ clear bits them
-> >  	orr	r0, r0, r6			@ set them
-> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > index 3a3c015..d17996b 100644
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -328,9 +328,7 @@ __v7_setup:
-> >  #endif
-> >  	adr	r5, v7_crval
-> >  	ldmia	r5, {r5, r6}
-> > -#ifdef CONFIG_CPU_ENDIAN_BE8
-> > -	orr	r6, r6, #1 << 25		@ big-endian page tables
-> > -#endif
-> > + ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
-> >  #ifdef CONFIG_SWP_EMULATE
-> >  	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
-> >  	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
-> > -- 
-> > 1.7.10.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/f423e0b4/attachment.sig>
