@@ -1,96 +1,99 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Feb 2013 08:38:20 -0800
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
-In-Reply-To: <alpine.DEB.2.00.1302191516150.32069@utopia.booyaka.com>
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <1360840554-26901-2-git-send-email-balbi@ti.com>
- <20130214171253.GC7144@atomide.com>
- <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com>
- <20130214192719.GB26679@arwen.pp.htv.fi>
- <20130214193911.GD11806@atomide.com>
- <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
- <20130214222247.GE11362@atomide.com>
- <alpine.DEB.2.00.1302191516150.32069@utopia.booyaka.com>
-Message-ID: <20130219163820.GF5724@atomide.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 19 Feb 2013 16:42:15 +0000
+Subject: [PATCH XEN] xen: event channel arrays are xen_ulong_t and not
+ unsigned long
+In-Reply-To: <1361285363-27133-1-git-send-email-ian.campbell@citrix.com>
+References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
+ <1361285363-27133-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <alpine.DEB.2.02.1302191642060.4654@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130219 07:30]:
-> Hi,
+On Tue, 19 Feb 2013, Ian Campbell wrote:
+> On ARM we want these to be the same size on 32- and 64-bit.
 > 
-> On Thu, 14 Feb 2013, Tony Lindgren wrote:
+> This is an ABI change on ARM. X86 does not change.
 > 
-> > * Paul Walmsley <paul@pwsan.com> [130214 12:51]:
-> > > On Thu, 14 Feb 2013, Tony Lindgren wrote:
-> > > 
-> > > > I don't think so as hwmod should only touch the sysconfig space
-> > > > when no driver has claimed it.
-> > > 
-> > > hwmod does need to touch the SYSCONFIG register during pm_runtime suspend 
-> > > and resume operations, and during device enable and disable operations.  
-> > > Here's the relevant code:
-> > > 
-> > > http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2157
-> > > 
-> > > http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/omap_hwmod.c;h=4653efb87a2721ea20a9fe06a30a6c204d6d2282;hb=HEAD#l2195
-> > 
-> > But that's triggered by runtime PM from the device driver, right?
-> 
-> Yes - for devices with drivers, it will hopefully be called by the 
-> driver.
-> 
-> > I think it's fine for hwmod to do that as requested by the device
-> > driver via runtime PM since hwmod is the bus glue making the drivers arch
-> > independent.
-> > 
-> > I think the only piece we're missing for that is for driver to run
-> > something like pm_runtime_init() that initializes the address space
-> > to hwmod. 
-> 
-> In the current design, we might be able to do this during the driver's 
-> first call to pm_runtime_get*().  I think that's the first point that we 
-> can hook into the PM runtime code.
+> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+> Cc: Jan Beulich <JBeulich@suse.com>
+> Cc: Keir (Xen.org) <keir@xen.org>
+> Cc: Tim Deegan <tim@xen.org>
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: xen-devel at lists.xen.org
 
-Sounds doable and generic for now.
- 
-> Once the hwmod code is moved out to be a bus, I'm hoping we can do this 
-> through the driver making a dev->bus->enable_device() call - similar to 
-> the way PCI drivers call pci_enable_device(), but not bus-specific.  That 
-> should remove our current dependency on CONFIG_PM_RUNTIME for OMAP devices 
-> to work correctly :-(
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+>  tools/include/xen-foreign/mkheader.py |    6 ++++++
+>  xen/include/public/xen.h              |    8 ++++----
+>  2 files changed, 10 insertions(+), 4 deletions(-)
 > 
-> > Just to recap what we've discussed earlier, the reasons why we want
-> > reset and idle functions should be in the driver specific header are:
-> > 
-> > 1. There's often driver specific logic needed in addition to the
-> >    syconfig tinkering in the reset/idle functions.
+> diff --git a/tools/include/xen-foreign/mkheader.py b/tools/include/xen-foreign/mkheader.py
+> index d189b07..57681fa 100644
+> --- a/tools/include/xen-foreign/mkheader.py
+> +++ b/tools/include/xen-foreign/mkheader.py
+> @@ -21,13 +21,18 @@ inttypes["arm"] = {
+>      "unsigned long" : "uint32_t",
+>      "long"          : "uint32_t",
+>      "xen_pfn_t"     : "uint64_t",
+> +    "xen_ulong_t"   : "uint64_t",
+>  };
+> +header["arm"] = """
+> +#define __arm___ARM32 1
+> +""";
+>  
+>  # x86_32
+>  inttypes["x86_32"] = {
+>      "unsigned long" : "uint32_t",
+>      "long"          : "uint32_t",
+>      "xen_pfn_t"     : "uint32_t",
+> +    "xen_ulong_t"   : "uint32_t",
+>  };
+>  header["x86_32"] = """
+>  #define __i386___X86_32 1
+> @@ -42,6 +47,7 @@ inttypes["x86_64"] = {
+>      "unsigned long" : "__align8__ uint64_t",
+>      "long"          : "__align8__ uint64_t",
+>      "xen_pfn_t"     : "__align8__ uint64_t",
+> +    "xen_ulong_t"   : "__align8__ uint64_t",
+>  };
+>  header["x86_64"] = """
+>  #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
+> diff --git a/xen/include/public/xen.h b/xen/include/public/xen.h
+> index 5593066..99c8212 100644
+> --- a/xen/include/public/xen.h
+> +++ b/xen/include/public/xen.h
+> @@ -556,7 +556,7 @@ DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
+>   * Event channel endpoints per domain:
+>   *  1024 if a long is 32 bits; 4096 if a long is 64 bits.
+>   */
+> -#define NR_EVENT_CHANNELS (sizeof(unsigned long) * sizeof(unsigned long) * 64)
+> +#define NR_EVENT_CHANNELS (sizeof(xen_ulong_t) * sizeof(xen_ulong_t) * 64)
+>  
+>  struct vcpu_time_info {
+>      /*
+> @@ -613,7 +613,7 @@ struct vcpu_info {
+>       */
+>      uint8_t evtchn_upcall_pending;
+>      uint8_t evtchn_upcall_mask;
+> -    unsigned long evtchn_pending_sel;
+> +    xen_ulong_t evtchn_pending_sel;
+>      struct arch_vcpu_info arch;
+>      struct vcpu_time_info time;
+>  }; /* 64 bytes (x86) */
+> @@ -663,8 +663,8 @@ struct shared_info {
+>       * per-vcpu selector word to be set. Each bit in the selector covers a
+>       * 'C long' in the PENDING bitfield array.
+>       */
+> -    unsigned long evtchn_pending[sizeof(unsigned long) * 8];
+> -    unsigned long evtchn_mask[sizeof(unsigned long) * 8];
+> +    xen_ulong_t evtchn_pending[sizeof(xen_ulong_t) * 8];
+> +    xen_ulong_t evtchn_mask[sizeof(xen_ulong_t) * 8];
+>  
+>      /*
+>       * Wallclock time: updated only by control software. Guests should base
+> -- 
+> 1.7.9.1
 > 
-> It's been a while since I last tabulated this.  But my recollection was 
-> that some kind of IP block-specific reset code is needed for about 7% to 
-> 10% of the OMAP IP blocks.
-
-Yes it's not too many, but the issue there is the driver specific code
-that's duplicated in both places. And sounds like the solution to that
-is to make driver specific reset code a static inline function in the
-driver header as discussed earlier so bus code can call it when there's
-no driver loaded.
- 
-> One thing that's unclear to me for the DT case is how we'll bind the 
-> driver-specific parts of the reset code to the device, particularly in the 
-> case where there's no driver present.  It should be possible to place an 
-> initcall in the driver-specific header, but that seems like a hack.  Any 
-> thoughts on this?
-
-I think we can just initialize the driver-specific reset functions
-in hwmod code and those can just call the driver specific inline functions
-as needed in the driver specific header files.
- 
-> > 2. We need to be able to reset and idle some hardware even if the
-> >    driver is not compiled in.
-> 
-> Yep.
-
-Regards,
-
-Tony
