@@ -1,39 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Feb 2013 17:09:40 +0000
-Subject: [GIT PULL 1/4] ARM: mvebu: cleanup for v3.9
-In-Reply-To: <20130216195507.GH23237@titan.lakedaemon.net>
-References: <20130216195507.GH23237@titan.lakedaemon.net>
-Message-ID: <201302191709.40302.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 19 Feb 2013 10:10:16 -0700
+Subject: [v3 0/6] ARM: tegra: convert device tree files to use CLK defines
+In-Reply-To: <1361138717.29465.2@driftwood>
+References: <1360917814-27236-1-git-send-email-hdoyu@nvidia.com>
+ <1361138717.29465.2@driftwood>
+Message-ID: <5123B1F8.4040102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 February 2013, Jason Cooper wrote:
-> The following changes since commit b3af7a1ffd1e5e9ec536a915393b7e07a8793f2a:
+On 02/17/2013 03:05 PM, Rob Landley wrote:
+> On 02/15/2013 02:43:11 AM, Hiroshi Doyu wrote:
+>> Hi,
+>>
+>> With new dtc+cpp feature, we could get rid of magic numbers in dts*
+>> files. This patch replaces CLK IDs.
+>>
+>> We also plan to share those DT header files with kernel source
+>> later[1].
+> ...
+>> [1]
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149804.html
+>>
 > 
->   ARM: dove: cleanup includes (2013-01-31 14:23:21 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/cleanup_for_v3.9_round3
-> 
-> for you to fetch changes up to 7a87c8ab68d0343fd58bb1249219959a239501bf:
-> 
->   ARM: mvebu: correct gated clock documentation (2013-02-15 20:32:38 +0000)
-> 
-> ----------------------------------------------------------------
-> mvebu cleanup vor v3.9 round3
-> 
->  - fix typo in mvebu clokc gating documentation.
-> 
-> ----------------------------------------------------------------
-> Jason Cooper (1):
->       ARM: mvebu: correct gated clock documentation
-> 
->  Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
+> This really smells like documentation should be updated, probably
+> booting-without-of.txt or similar. Alas, I'm not capable of writing such
+> an update...
 
-Pulled into next/cleanup, as this is obviously a bug fix for the previous
-contents of that branch.
+I'm not sure what documentation would be updated nor why. Can you
+describe that?
 
-	Arnd
+This patch is (or should be) editing the device tree binding
+documentation to (include by) reference the header file that is being
+added in this patch. I don't believe there's any more general
+documentation that is affected by this series.
