@@ -1,186 +1,123 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 19 Feb 2013 11:37:03 +0100
-Subject: [PATCH] omap2: twl-common: Add default power configuration
-In-Reply-To: <CABuKBe+NrMiX0nuEgwnHBqu-DqHST+uGG_Zyc7Ek=4WCOV1T6g@mail.gmail.com>
-References: <1358967038-6615-1-git-send-email-matthias.bgg@gmail.com>
- <CAOCHtYjufr+MS1=6Cnsn-EgvkPs+Y5oWejAG98aLkVjdQbu1ZA@mail.gmail.com>
- <20130201224242.GE22517@atomide.com>
- <CABuKBe+NrMiX0nuEgwnHBqu-DqHST+uGG_Zyc7Ek=4WCOV1T6g@mail.gmail.com>
-Message-ID: <512355CF.6070605@ti.com>
+From: wni@nvidia.com (Wei Ni)
+Date: Tue, 19 Feb 2013 18:43:36 +0800
+Subject: [lm-sensors] [RFC PATCH 3/9] hwmon: (lm90) add support to handle
+ irq
+In-Reply-To: <20130219033419.GB25610@roeck-us.net>
+References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
+ <1361187031-3679-4-git-send-email-wni@nvidia.com>
+ <20130219033419.GB25610@roeck-us.net>
+Message-ID: <51235758.60902@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-On 02/15/2013 04:59 PM, Matthias Brugger wrote:
-> 2013/2/1 Tony Lindgren <tony@atomide.com>:
->> Hi,
+On 02/19/2013 11:34 AM, Guenter Roeck wrote:
+> On Mon, Feb 18, 2013 at 07:30:25PM +0800, Wei Ni wrote:
+>> Add support to handle irq. When the temperature touch the limit value, the
+>> driver can handle the interrupt.
 >>
->> * Robert Nelson <robertcnelson@gmail.com> [130124 07:58]:
->>> On Wed, Jan 23, 2013 at 12:50 PM, Matthias Brugger
->>> <matthias.bgg@gmail.com> wrote:
->>>> This patch adds a generic power script configuration.
->>>> When rebooting an OMAP3530 at 125 MHz, the reboot hangs.
->>>> With the generic power script, TWL4030 will be reset
->>>> when a warm reset occures. This way the OMAP3530 does not
->>>> hang on reboot.
+>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>> Signed-off-by: Wei Ni <wni@nvidia.com>
+>> ---
+>>  drivers/hwmon/lm90.c |   38 ++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 38 insertions(+)
 >>
->> Both look OK to me. I've added Peter to cc, it's best that he queues
->> all the twl changes.
+>> diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
+>> index caf01b0..80311ef 100644
+>> --- a/drivers/hwmon/lm90.c
+>> +++ b/drivers/hwmon/lm90.c
+>> @@ -89,6 +89,8 @@
+>>  #include <linux/err.h>
+>>  #include <linux/mutex.h>
+>>  #include <linux/sysfs.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/of_irq.h>
+>>  
+>>  /*
+>>   * Addresses to scan
+>> @@ -302,6 +304,7 @@ static const struct lm90_params lm90_params[] = {
+>>  struct lm90_data {
+>>  	struct device *hwmon_dev;
+>>  	struct mutex update_lock;
+>> +	struct work_struct irq_work;
+>>  	char valid; /* zero until following fields are valid */
+>>  	unsigned long last_updated; /* in jiffies */
+>>  	int kind;
+>> @@ -1418,6 +1421,29 @@ static void lm90_init_client(struct i2c_client *client)
+>>  		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, config);
+>>  }
+>>  
+>> +static void lm90_alert(struct i2c_client *client, unsigned int flag);
+>> +
+>> +static void lm90_irq_work(struct work_struct *work)
+>> +{
+>> +	struct lm90_data *data = container_of(work, struct lm90_data,
+>> +					      irq_work);
+>> +	struct i2c_client *client = to_i2c_client(data->hwmon_dev->parent);
+>> +
+>> +	lm90_alert(client, 0);
+>> +
+>> +	enable_irq(client->irq);
+>> +}
+>> +
+>> +static irqreturn_t lm90_irq(int irq, void *dev_id)
+>> +{
+>> +	struct lm90_data *data = dev_id;
+>> +
+>> +	disable_irq_nosync(irq);
+>> +	schedule_work(&data->irq_work);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>>  static int lm90_probe(struct i2c_client *client,
+>>  		      const struct i2c_device_id *id)
+>>  {
+>> @@ -1494,6 +1520,17 @@ static int lm90_probe(struct i2c_client *client,
+>>  		goto exit_remove_files;
+>>  	}
+>>  
+>> +	if (client->irq >= 0) {
+>> +		INIT_WORK(&data->irq_work, lm90_irq_work);
+>> +		dev_dbg(dev, "lm90 irq: %d\n", client->irq);
+>> +		err = request_irq(client->irq, lm90_irq, IRQF_TRIGGER_LOW,
+>> +				       "lm90", data);
+> 
+> request_threaded_irq or even better devm_request_threaded_irq would be better here.
+
+yes, it's better to use request_threaded_irq here.
+we can set lm90_irq() as interrupt handle, and set lm90_alert() as
+thread function.
+I will try it on my next version.
+
+> 
+>> +		if (err < 0) {
+>> +			dev_err(dev, "cannot request interrupt\n");
+>> +			goto exit_remove_files;
+>> +		}
+>> +	}
+>> +
+>>  	return 0;
+>>  
+>>  exit_remove_files:
+>> @@ -1507,6 +1544,7 @@ static int lm90_remove(struct i2c_client *client)
+>>  {
+>>  	struct lm90_data *data = i2c_get_clientdata(client);
+>>  
+>> +	free_irq(client->irq, data);
+>>  	hwmon_device_unregister(data->hwmon_dev);
+>>  	lm90_remove_files(client, data);
+>>  	lm90_restore_conf(client, data);
+>> -- 
+>> 1.7.9.5
 >>
-> 
-> Peter any comments on this patch?
-
-The patch looks good to me as well.
-
-> Are you maintaining the whole twl4030 support or just the codec driver?
-
-Right now I'm maintaining the audio support (audio MFD, vibra, ASoC) in twl*
-While I have done some cleanup in the twl-core and related drivers recently
-and I'm reviewing patches sent for any *twl* driver (if I'm in the CC) I have
-not declared myself as Maintainer of the twl stack.
-The problem with the twl stack is that the drivers are spread around in
-different subsystem so if one takes maintainer responsibility for the stack,
-he/she need to have several entries in MAINTAINERS file to cover twl. I still
-don't think it is a good idea to 'bloat' the MAINTAINERS file for this.
-I'm happy to review patches. About a year ago we had internal discussion
-regarding to twl in upstream and Tero Kristo 'volunteered' to review patches
-as well.
-
-I still think that the twl patches should be queued via the corresponding
-subsystem (OMAP, MFD, Input, GPIO, PWM, etc).
-
--- 
-P?ter
-
-> 
-> Best regards,
-> Matthias
-> 
-> 
->> Regards,
 >>
->> Tony
+>> _______________________________________________
+>> lm-sensors mailing list
+>> lm-sensors at lm-sensors.org
+>> http://lists.lm-sensors.org/mailman/listinfo/lm-sensors
 >>
->>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>>> ---
->>>>  arch/arm/mach-omap2/twl-common.c | 38 ++++++++++++++++++++++++++++++++++++++
->>>>  arch/arm/mach-omap2/twl-common.h |  1 +
->>>>  2 files changed, 39 insertions(+)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
->>>> index e49b40b..f096beb 100644
->>>> --- a/arch/arm/mach-omap2/twl-common.c
->>>> +++ b/arch/arm/mach-omap2/twl-common.c
->>>> @@ -120,6 +120,41 @@ static struct twl4030_audio_data omap3_audio_pdata = {
->>>>         .codec = &omap3_codec,
->>>>  };
->>>>
->>>> +static struct twl4030_ins wrst_seq[] __initdata = {
->>>> +       {MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_OFF), 2},
->>>> +       {MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_WRST), 15},
->>>> +       {MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_WRST), 15},
->>>> +       {MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_WRST), 0x60},
->>>> +       {MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2},
->>>> +       {MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_ACTIVE), 2},
->>>> +};
->>>> +
->>>> +static struct twl4030_script wrst_script __initdata = {
->>>> +       .script = wrst_seq,
->>>> +       .size   = ARRAY_SIZE(wrst_seq),
->>>> +       .flags  = TWL4030_WRST_SCRIPT,
->>>> +};
->>>> +
->>>> +static struct twl4030_script *omap3_power_scripts[] __initdata = {
->>>> +       &wrst_script,
->>>> +};
->>>> +
->>>> +static struct twl4030_resconfig omap3_rconfig[] = {
->>>> +       { .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
->>>> +               .type2 = -1 },
->>>> +       { .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
->>>> +               .type2 = -1 },
->>>> +       { .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
->>>> +               .type2 = -1 },
->>>> +       { 0, 0},
->>>> +};
->>>> +
->>>> +static struct twl4030_power_data omap3_power_pdata = {
->>>> +       .scripts        = omap3_power_scripts,
->>>> +       .num            = ARRAY_SIZE(omap3_power_scripts),
->>>> +       .resource_config = omap3_rconfig,
->>>> +};
->>>> +
->>>>  static struct regulator_consumer_supply omap3_vdda_dac_supplies[] = {
->>>>         REGULATOR_SUPPLY("vdda_dac", "omapdss_venc"),
->>>>  };
->>>> @@ -224,6 +259,9 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
->>>>         if (pdata_flags & TWL_COMMON_PDATA_AUDIO && !pmic_data->audio)
->>>>                 pmic_data->audio = &omap3_audio_pdata;
->>>>
->>>> +       if (pdata_flags & TWL_COMMON_PDATA_POWER && !pmic_data->power)
->>>> +               pmic_data->power = &omap3_power_pdata;
->>>> +
->>>>         /* Common regulator configurations */
->>>>         if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
->>>>                 pmic_data->vdac = &omap3_vdac_idata;
->>>> diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
->>>> index dcfbad5..dbeb905 100644
->>>> --- a/arch/arm/mach-omap2/twl-common.h
->>>> +++ b/arch/arm/mach-omap2/twl-common.h
->>>> @@ -7,6 +7,7 @@
->>>>  #define TWL_COMMON_PDATA_BCI           (1 << 1)
->>>>  #define TWL_COMMON_PDATA_MADC          (1 << 2)
->>>>  #define TWL_COMMON_PDATA_AUDIO         (1 << 3)
->>>> +#define TWL_COMMON_PDATA_POWER         (1 << 4)
->>>>
->>>>  /* Common LDO regulators for TWL4030/TWL6030 */
->>>>  #define TWL_COMMON_REGULATOR_VDAC      (1 << 0)
->>>> --
->>>> 1.7.11.7
->>>
->>> Thanks for making this generic Matthias..
->>>
->>> Tested-by: Robert Nelson <robertcnelson@gmail.com>
->>>
->>> Tested on Beagle C4 (omap3530) and Beagle xM (DM3730, no regressions)
->>> with this patch to enable it on the Beagle..
->>>
->>> From 65004dafc8d37c69dd839803dc8ea5dcefd993df Mon Sep 17 00:00:00 2001
->>> From: Robert Nelson <robertcnelson@gmail.com>
->>> Date: Thu, 24 Jan 2013 09:43:51 -0600
->>> Subject: [PATCH] ARM: OMAP: Beagle: use TWL4030 generic reset script
->>>
->>> Enable TWL_COMMON_PDATA_POWER such that OMAP3530 revisions of the
->>> Beagle (Bx/Cx) will not hang on reboot when running at 125 Mhz.
->>>
->>> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
->>> ---
->>>  arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c
->>> b/arch/arm/mach-omap2/board-omap3beagle.c
->>> index 22c483d..0974e08 100644
->>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
->>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
->>> @@ -353,7 +353,7 @@ static int __init omap3_beagle_i2c_init(void)
->>>  {
->>>       omap3_pmic_get_config(&beagle_twldata,
->>>                       TWL_COMMON_PDATA_USB | TWL_COMMON_PDATA_MADC |
->>> -                     TWL_COMMON_PDATA_AUDIO,
->>> +                     TWL_COMMON_PDATA_AUDIO | TWL_COMMON_PDATA_POWER,
->>>                       TWL_COMMON_REGULATOR_VDAC | TWL_COMMON_REGULATOR_VPLL2);
->>>
->>>       beagle_twldata.vpll2->constraints.name = "VDVI";
->>> --
->>> 1.7.10.4
->>>
->>> Regards,
->>>
->>> --
->>> Robert Nelson
->>> http://www.rcn-ee.com/
-> 
-> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
