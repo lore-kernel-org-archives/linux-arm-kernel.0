@@ -1,28 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Feb 2013 17:27:34 +0000
-Subject: [GIT PULL 2/4] ARM: mvebu: boards for v3.9
-In-Reply-To: <20130216195944.GI23237@titan.lakedaemon.net>
-References: <20130216195944.GI23237@titan.lakedaemon.net>
-Message-ID: <201302191727.34660.arnd@arndb.de>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 19 Feb 2013 17:28:21 +0000
+Subject: [PATCH LINUX] xen: event channel arrays are xen_ulong_t and not
+ unsigned long
+In-Reply-To: <20130219172645.GA97631@ocelot.phlegethon.org>
+References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
+ <1361285357-26696-1-git-send-email-ian.campbell@citrix.com>
+ <alpine.DEB.2.02.1302191642230.4654@kaball.uk.xensource.com>
+ <1361294248.1051.136.camel@zakaz.uk.xensource.com>
+ <20130219172645.GA97631@ocelot.phlegethon.org>
+Message-ID: <1361294901.1051.137.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 February 2013, Jason Cooper wrote:
-> The following changes since commit c7064904895f69b2e33117b450a05746f75abf3a:
+On Tue, 2013-02-19 at 17:26 +0000, Tim Deegan wrote:
+> At 17:17 +0000 on 19 Feb (1361294248), Ian Campbell wrote:
+> > On Tue, 2013-02-19 at 17:11 +0000, Stefano Stabellini wrote:
+> > > On Tue, 19 Feb 2013, Ian Campbell wrote:
+> > > > +/*
+> > > > + * We cannot use xchg because it does not support 8-byte
+> > > > + * values. However it is safe to use {ldr,dtd}exd directly because all
+> > > > + * platforms which Xen can run on support those instructions.
+> > > > + */
+> > > > +static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
+> > > > +{
+> > > > +       xen_ulong_t oldval;
+> > > > +       unsigned int tmp;
+> > > > +
+> > > > +       wmb();
+> > > > +       asm volatile("@ read_evtchn_pending_sel\n"
+> > >                            ^ do we need this?
+> > 
+> > It means that the .s files (if you create them) and such are a bit more
+> > readable, it's not that uncommon in the ARM inline assembly.
 > 
->   ARM: kirkwood: convert Guruplug Server Plus to use the device tree (2013-01-31 18:06:58 +0000) 
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/boards_for_v3.9_round2
-> 
-> for you to fetch changes up to 7649cca52a73c10712b033b4eba908c48d9c0bb7:
->   
->   arm: mvebu: update defconfig with ATAG support when using DT (2013-02-16 16:46:28 +0000)
+> +1.  s/read_evtchn_pending_sel/xchg_xen_ulong/ though.
 
-I've merge this into late/mvebu now to make it show up in linux-next,
-sorry for the delay. We won't send it in the first round, and I'll
-discuss with Olof about how to proceed here. I have also merged the
-boards_for_v3.9_round3 tag into the same branch.
+Damn, yes. I just sent v3 too :-(
 
-	Arnd
+Ian.
