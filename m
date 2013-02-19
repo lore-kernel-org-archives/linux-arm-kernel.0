@@ -1,82 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Feb 2013 16:28:21 -0700
-Subject: [RFC PATCH 8/9] ARM: dt: t30 cardhu: add dt entry for thermal
- driver
-In-Reply-To: <1361187031-3679-9-git-send-email-wni@nvidia.com>
-References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-9-git-send-email-wni@nvidia.com>
-Message-ID: <51240A95.9070007@wwwdotorg.org>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Tue, 19 Feb 2013 15:41:52 -0800
+Subject: [patch 1/2] kcmp: Make it to depend on CONFIG_KCMP
+In-Reply-To: <20130219221146.GR20312@moon>
+References: <20130219064800.719149796@openvz.org>
+ <20130219065210.030802820@openvz.org> <5123444D.6000806@suse.cz>
+ <20130219093154.GF20312@moon> <5123BC2B.6000304@zytor.com>
+ <20130219182838.GL20312@moon>
+ <20130219134256.f4cedf44.akpm@linux-foundation.org>
+ <20130219215432.GP20312@moon>
+ <20130219140035.373ce4d2.akpm@linux-foundation.org>
+ <20130219221146.GR20312@moon>
+Message-ID: <51240DC0.7020302@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2013 04:30 AM, Wei Ni wrote:
-> Enable thermal driver in the dts file.
-> Set sensor as lm90 remote sensor, and set throttle data.
+On 02/19/2013 02:11 PM, Cyrill Gorcunov wrote:
+> On Tue, Feb 19, 2013 at 02:00:35PM -0800, Andrew Morton wrote:
+>>>
+>>> I think this syscall is usefull even without c/r stuff.
+>>> That's why I made it with separate config option.
+>>
+>> hm, OK.
+>>
+>> But the patch also permits CONFIG_CHECKPOINT_RESTORE=y, CONFIG_KCMP=n
+>> which surely isn't something which CRIU wants to support?
+>
+> Hmm, yes from one pov this feature is useful for out-of-c/r user,
+> from another pov -- we will have to ask users to turn on additional
+> CONFIG entries (which i'm sure not set by default in wide range of distros).
+> Thus it seems less paiful way is either make it obj-(CHECKPOINT_RESTORE)
+> as you proposed, or obj-y by default. The last can't be undone, so I'll
+> prepare the patch for obj-(CHECKPOINT_RESTORE) I think.
+>
 
-> diff --git a/Documentation/devicetree/bindings/thermal/tegra3-thermal.txt b/Documentation/devicetree/bindings/thermal/tegra3-thermal.txt
+Well, that's what dependencies are for.
 
-The DT documentation should be either a separate patch before the one
-which implements it in the driver, or part of the driver patch. It
-shouldn't be part of the patch which instantiates the binding in the
-board DT file.
+Either way we might just want to wait for such a use case to appear, I 
+don't know.
 
-> +* Nvidia Tegra30 Thermal
+	-hpa
 
-NVIDIA is all capitals.
-
-It seems like a word is missing: Thermal Management? Control/Zone?
-
-> +** Thermal node properties:
-> +
-> +- compatible : "nvidia,tegra30-thermal";
-> +- sensors: the sensor device node which we want to use in the thermal zone,
-> +  the arguments is the index of the sensor in sensor device node;
-
-The arguments should be defined by the DT binding documentation for that
-referenced device, not by the referencing device.
-
-DT properties that are custom defined for this binding should include
-the vendor prefix in their name. So, that'd be "nvidia,sensors". This
-may apply less if a "sensors" becomes a more generic standard, but it
-surely applies to all the other properties below.
-
-> +- passive-delay: passive delay;
-
-What does this mean?
-
-> +- num-passive-trips : number of passive trip points, this is required, set
-> +  it 0 if none, if greater than 0, the following properties must be defined;
-> +- passive-trips : temperature of passive trip points;
-
-Presumably "num-passive-trips" can be calculated simply by counting the
-number of entries in "passive-trips"?
-
-Please describe what passive and active trips are; someone who just
-reads this binding document (perhaps in conjunction with some HW
-documentation and/or other binding documentation) should be able to fill
-in this binding without other knowledge.
-
-> +- num-active-trips: number of active trip points, this is required, set
-> +  it 0 if none, if greater than 0, the following properties must be defined;
-> +- active-trips: temperature of active trip points;
-
-Both comments above apply here too.
-
-> +- throt-tab-size: size of the throttle table, it's the max cooling state.
-> +- throt-tab: throttle table. the cooling state will be defined according to
-> +  this table.
-
-Both comments above apply here too.
-
-Also, what units are used for all these properties?
-
-Judging by the example below, this property is a list of tuples. The
-meaning of each field in the tuple needs to be explained.
-
-What happens when the CPU/SoC needs to be throttled? Must some clock or
-voltage be lowered/limited? If so, you need properties that indicate
-which clock/voltage/... needs to be acted upon.
-
-> +Usually these properties are separated in board related dts files.
-
-That's not really relevant.
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
