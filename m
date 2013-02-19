@@ -1,41 +1,37 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 19 Feb 2013 14:10:13 +0200
-Subject: [PATCH, RFC 1/8] ARM: localtimer: return percpu clkevt on register
-In-Reply-To: <e7cbb10903841ba23a93f71e7a06ae34a43adc70.1361186097.git.afzal@ti.com>
+Date: Tue, 19 Feb 2013 14:14:00 +0200
+Subject: [PATCH, RFC 2/8] ARM: twd: register clock event for 1 core SMP
+In-Reply-To: <51235076.8040200@ti.com>
 References: <cover.1361186097.git.afzal@ti.com>
- <e7cbb10903841ba23a93f71e7a06ae34a43adc70.1361186097.git.afzal@ti.com>
-Message-ID: <20130219121013.GO23197@arwen.pp.htv.fi>
+ <a7f62b8580aa4b33d5658f4f03371a453adaea9b.1361186097.git.afzal@ti.com>
+ <51235076.8040200@ti.com>
+Message-ID: <20130219121400.GP23197@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Feb 19, 2013 at 03:44:14PM +0530, Santosh Shilimkar wrote:
+> On Monday 18 February 2013 05:07 PM, Afzal Mohammed wrote:
+> >Register percpu local timer for scheduler tick in the case of one core
+> >SMP configuration. In other cases - secondary cpu's as well as boot
+> >cpu's having more than one core, this is being registered as per
+> >existing boot flow, with a difference that they happens after delay
+> >calibration. Registering the clock for tick in case of one core should
+> >be done before Kernel calibrates delay (this is required to boot,
+> >unless local timer is the only one registered for tick). Registering
+> >twd local timer at init_time (which platforms are doing now) helps
+> >achieve that with the proposed change.
+> >
+> >This helps in an almost booting Kernel (minimal) by only relying on
+> >ARM parts for an A9 one core SMP.
+> >
+> >Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> >---
+> As mentioned in cover-letter, I don't think we have good
+> reasoning to make TWD to work with UP configuration. Even
+> you fix the timer code, there are more cascaded dependencies
+> which is not worth the effort.
 
-On Mon, Feb 18, 2013 at 05:06:39PM +0530, Afzal Mohammed wrote:
-> @@ -315,6 +315,7 @@ static struct local_timer_ops twd_lt_ops __cpuinitdata = {
->  static int __init twd_local_timer_common_register(struct device_node *np)
->  {
->  	int err;
-> +	struct clock_event_device *evt;
->  
->  	twd_evt = alloc_percpu(struct clock_event_device *);
->  	if (!twd_evt) {
-> @@ -328,8 +329,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
->  		goto out_free;
->  	}
->  
-> -	err = local_timer_register(&twd_lt_ops);
-> -	if (err)
-> +	evt = local_timer_register(&twd_lt_ops);
-> +	if (IS_ERR(evt))
->  		goto out_irq;
-
-this is wrong. Will return 0 even in the error case. Correct version
-would be:
-
-if (IS_ERR(evt)) {
-	err = PTR_ERR(evt);
-	goto out_irq;
-}
+if CONFIG_SMP_ON_UP is enabled, smp_twd.c can still be compiled, right ?
 
 -- 
 balbi
@@ -45,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/f423e0b4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130219/294129a3/attachment.sig>
