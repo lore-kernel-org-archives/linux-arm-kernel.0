@@ -1,27 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 19 Feb 2013 16:32:15 +0530
-Subject: [PATCH, RFC 4/8] ARM: am33xx: ll debug config help
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EAA867A@DBDE01.ent.ti.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 19 Feb 2013 11:03:28 +0000
+Subject: [PATCH, RFC 8/8] ARM: dts: am43-pre-silicon support
+In-Reply-To: <51235B3D.5000907@ti.com>
 References: <cover.1361186097.git.afzal@ti.com>
- <bfe941adb98a5000c2817f9fd6160070e59e53c9.1361186097.git.afzal@ti.com>
- <51235337.60209@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EAA867A@DBDE01.ent.ti.com>
-Message-ID: <51235BB7.2050600@ti.com>
+ <e344f74da47579c11db68d9f6efe25259ed7f25d.1361186097.git.afzal@ti.com>
+ <5123556A.9050109@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EAA86DE@DBDE01.ent.ti.com>
+ <51235B3D.5000907@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EAA8731@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 February 2013 04:00 PM, Mohammed, Afzal wrote:
-> Hi Santosh,
->
-> On Tue, Feb 19, 2013 at 15:55:59, Shilimkar, Santosh wrote:
->
->> With DT, IIRC DEBUGLL is broken. So did you hack debug-macro.S
->> to get the earlyprintk working ?
->
-> No, on linux-next, ll debug works properly.
->
-Indeed. Tony fixed that now. Some how I missed
-this patch on the list.
+Hi Santosh,
 
-Regards,
-Santosh
+On Tue, Feb 19, 2013 at 16:30:13, Shilimkar, Santosh wrote:
+> On Tuesday 19 February 2013 04:22 PM, Mohammed, Afzal wrote:
+
+> > SoC support is already added in patch 7/8. This is board (which doesn't
+> > exist now) support, hence a pre-silicon temporary one to validate it.
+> >
+> I mean we can call it am437x-xyxboard.dtb already considering the data
+> here can be re-used. Boot-args can be used from default kernel config
+> with CONFIG_CMDLINE_FORCE.
+> 
+> No strong opinion if you still insist to have a pre-silicon dtb.
+
+This patch would be replaced by original board, once it is known.
+This was included to make a working complete series and if someone
+wants (internally) to test the series as is.
+
+Regards
+Afzal
