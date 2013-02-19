@@ -1,45 +1,87 @@
-From: rob.herring@calxeda.com (Rob Herring)
-Date: Tue, 19 Feb 2013 07:57:36 -0600
-Subject: [PATCH] irqchip: fix typo when moving gic_raise_softirq()
-In-Reply-To: <1361281942-16885-1-git-send-email-javi.merino@arm.com>
-References: <1361281942-16885-1-git-send-email-javi.merino@arm.com>
-Message-ID: <512384D0.1010306@calxeda.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 19 Feb 2013 13:59:19 +0000
+Subject: [PATCH] xen: introduce xen_remap, use it instead of ioremap
+Message-ID: <alpine.DEB.2.02.1302191332340.4654@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2013 07:52 AM, Javi Merino wrote:
-> In b1cffebf (ARM: GIC: remove direct use of gic_raise_softirq)
-> gic_raise_softirq() was moved inside arch/arm/common/gic.c but in the
-> process it reverted by mistake a change to that function made by
-> 384a290 (ARM: gic: use a private mapping for CPU target interfaces).
-> This breaks multicluster systems on ARM.
-> 
-> This patch fixes the typo.
-> 
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Javi Merino <javi.merino@arm.com>
+ioremap can't be used to map ring pages on ARM because it uses device
+memory caching attributes (MT_DEVICE*).
 
-I wouldn't really call this a typo, but a rebasing error. Not really
-important though, so:
+Introduce a Xen specific abstraction to map ring pages, called
+xen_remap, that is defined as ioremap on x86 (no behavioral changes).
+On ARM it explicitly calls __arm_ioremap with the right caching
+attributes: MT_MEMORY.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-> ---
->  drivers/irqchip/irq-gic.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 644d724..a32e0d5 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -648,7 +648,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  
->  	/* Convert our logical CPU mask into a physical one. */
->  	for_each_cpu(cpu, mask)
-> -		map |= 1 << cpu_logical_map(cpu);
-> +		map |= gic_cpu_map[cpu];
->  
->  	/*
->  	 * Ensure that stores to Normal memory are visible to the
-> 
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index c6b9096..30cdacb 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -1,6 +1,7 @@
+ #ifndef _ASM_ARM_XEN_PAGE_H
+ #define _ASM_ARM_XEN_PAGE_H
+ 
++#include <asm/mach/map.h>
+ #include <asm/page.h>
+ #include <asm/pgtable.h>
+ 
+@@ -86,4 +87,7 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+ {
+ 	return __set_phys_to_machine(pfn, mfn);
+ }
++
++#define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
++
+ #endif /* _ASM_ARM_XEN_PAGE_H */
+diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+index 472b9b7..6aef9fb 100644
+--- a/arch/x86/include/asm/xen/page.h
++++ b/arch/x86/include/asm/xen/page.h
+@@ -212,4 +212,6 @@ unsigned long arbitrary_virt_to_mfn(void *vaddr);
+ void make_lowmem_page_readonly(void *vaddr);
+ void make_lowmem_page_readwrite(void *vaddr);
+ 
++#define xen_remap(cookie, size) ioremap((cookie), (size));
++
+ #endif /* _ASM_X86_XEN_PAGE_H */
+diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
+index 19843ec..682210d7 100644
+--- a/drivers/tty/hvc/hvc_xen.c
++++ b/drivers/tty/hvc/hvc_xen.c
+@@ -230,7 +230,7 @@ static int xen_hvm_console_init(void)
+ 	if (r < 0 || v == 0)
+ 		goto err;
+ 	mfn = v;
+-	info->intf = ioremap(mfn << PAGE_SHIFT, PAGE_SIZE);
++	info->intf = xen_remap(mfn << PAGE_SHIFT, PAGE_SIZE);
+ 	if (info->intf == NULL)
+ 		goto err;
+ 	info->vtermno = HVC_COOKIE;
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index 7038de5..1c2a1e5 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -1146,7 +1146,7 @@ int gnttab_resume(void)
+ 		return gnttab_map(0, nr_grant_frames - 1);
+ 
+ 	if (gnttab_shared.addr == NULL) {
+-		gnttab_shared.addr = ioremap(xen_hvm_resume_frames,
++		gnttab_shared.addr = xen_remap(xen_hvm_resume_frames,
+ 						PAGE_SIZE * max_nr_gframes);
+ 		if (gnttab_shared.addr == NULL) {
+ 			printk(KERN_WARNING
+diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
+index 038b71d..3325884 100644
+--- a/drivers/xen/xenbus/xenbus_probe.c
++++ b/drivers/xen/xenbus/xenbus_probe.c
+@@ -769,7 +769,7 @@ static int __init xenbus_init(void)
+ 			goto out_error;
+ 		xen_store_mfn = (unsigned long)v;
+ 		xen_store_interface =
+-			ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
++			xen_remap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+ 		break;
+ 	default:
+ 		pr_warn("Xenstore state unknown\n");
