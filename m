@@ -1,46 +1,33 @@
-From: mats.liljegren@enea.com (Mats Liljegren)
-Date: Wed, 20 Feb 2013 18:28:43 +0000
-Subject: Porting 3.8-rc4-nohz3 to ARM (PandaBoard)
-In-Reply-To: <CAFTL4hzzFEYq+1=n+JpTiV3WdeKXETGQVDJSm-FJCN7E6xvE9w@mail.gmail.com>
-References: <20130204200238.GA16718@enea.se>
- <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
- <20130211190317.GA8513@enea.se>,
- <CAFTL4hzzFEYq+1=n+JpTiV3WdeKXETGQVDJSm-FJCN7E6xvE9w@mail.gmail.com>
-Message-ID: <B38601CE-F868-426E-8504-0DCE7CCB9BDC@enea.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Feb 2013 18:44:13 +0000
+Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
+In-Reply-To: <20130220182852.GA11327@kroah.com>
+References: <1360966349-1242560-2-git-send-email-arnd@arndb.de>
+ <20130219072438.GQ20212@lunn.ch> <20130220182852.GA11327@kroah.com>
+Message-ID: <201302201844.13534.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> 2013/2/11 Mats Liljegren <mats.liljegren@enea.com>:
->> Could the other guy be Kevin Hillman? The name has been mentioned to me but
->> I don't have his e-mail address.
+On Wednesday 20 February 2013, Greg KH wrote:
+> On Tue, Feb 19, 2013 at 08:24:38AM +0100, Andrew Lunn wrote:
+> > 
+> > GregKH: Please can you drop this patch from usb-next. It breaks more
+> > than it fixes.
 > 
-> Exactly :)
+> I've now reverted both of these, and the follow-on patch that Arnd sent
+> in.
 > 
->> 
->> I have stumbled across a problem, I get the following error messages during
->> boot:
->> 
->> ---- Start snippet ----
->> [   41.119873] INFO: task rcuo1:10 blocked for more than 20 seconds.
-> 
-> This showed up upstream as well, it hshould have been fixed in linus tree now.
+> Arnd, sorry, but please be more careful, especially when you ask for
+> patches to be rushed into the tree...
 
-Ok.
+Yes, I understand. I'll try to come up with a less invasive way to
+deal with the build error in 3.9 once the ARM multiplatform branch
+gets pulled.
 
-> 
-> [...]
->> [  112.400695] VFS: Unable to mount root fs via NFS, trying floppy.
->> [  112.407226] List of all partitions:
->> [  112.411041] No filesystem could mount root, tried:
->> [  112.416351] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(2,0)
-> 
-> Ah, that probably not due to my patches :)
+I guess we could either forbid the combinations that are now broken
+using Kconfig dependencies, or add just add separate registriation
+paths to ehci_hcd_init() and ehci_hcd_cleanup() as we have for
+powerpc, although Alan did not like that too much last time I
+suggested it.
 
-By removing some kernel parameters I managed to get further. They were'nt important, just tried to disable watchdog and idle calls.
-My current problem is that it refuses to enter full nohz mode due to too many runable threads. I need to check were those extra threads come from.
-
-Could it be related to rcu problem above? If so I might need to switch to a newer version of Linus tree.
-
-/Mats
+	Arnd
