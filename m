@@ -1,37 +1,69 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 20 Feb 2013 15:28:18 +0530
-Subject: [PATCH 0/4] dw_dmac: introduce generic DMA binding for DT
-In-Reply-To: <201302200950.26182.arnd@arndb.de>
-References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
- <20130220080348.GF23302@intel.com>
- <201302200950.26182.arnd@arndb.de>
-Message-ID: <20130220095818.GI23302@intel.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 20 Feb 2013 15:30:44 +0530
+Subject: [PATCH 6/8] SERIAL: OMAP: Remove the slave idle handling from the
+ driver
+Message-ID: <1361354444-18230-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 09:50:25AM +0000, Arnd Bergmann wrote:
-> On Wednesday 20 February 2013, Vinod Koul wrote:
-> > Since there is still churn, would it make sense if I just revert the SPEAr13xx
-> > patch (your first patch) and send a pull request to Linus.
-> > Since there are no users and not much testing has been done, I think we can push
-> > these to 3.10 via arm-soc/slave-dma tree.
-> > 
-> > Gives more testing and usage will go along as well.
-> > Since merge window is open, I would like my pull to go soonish and not churn the
-> > tree much.
-> 
-> Reverting the SPEAr13xx would definitely help, yes. The reason why I'd also like
-> to see the second patch get merged is so that we can do the SPEAr changes in 3.10
-> without having an interdependency between the trees. I tried very hard to
-> make the patch have a minimal impact on the non-DT code path to avoid regressions.
-Ok, i have applied your revert patch. Will send the PULL to linus by friday.
+UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
+so remove the hackery from the driver.
 
-> Maybe you can send your tree now with just the revert applied, and then send the
-> other one separately next week along with any bug fixes that may have accumulated
-> by then?
-And then makes sense to send second PULL with fixes accumulated and the second
-patch, so that 3.10 is easier for all.  think we can compact() patch is second
-request as well
+Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Rajendra nayak <rnayak@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ drivers/tty/serial/omap-serial.c |   23 -----------------------
+ 1 file changed, 23 deletions(-)
 
---
-~Vinod
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 57d6b29..5722eaf 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -201,26 +201,6 @@ static int serial_omap_get_context_loss_count(struct uart_omap_port *up)
+ 	return pdata->get_context_loss_count(up->dev);
+ }
+ 
+-static void serial_omap_set_forceidle(struct uart_omap_port *up)
+-{
+-	struct omap_uart_port_info *pdata = up->dev->platform_data;
+-
+-	if (!pdata || !pdata->set_forceidle)
+-		return;
+-
+-	pdata->set_forceidle(up->dev);
+-}
+-
+-static void serial_omap_set_noidle(struct uart_omap_port *up)
+-{
+-	struct omap_uart_port_info *pdata = up->dev->platform_data;
+-
+-	if (!pdata || !pdata->set_noidle)
+-		return;
+-
+-	pdata->set_noidle(up->dev);
+-}
+-
+ static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
+ {
+ 	struct omap_uart_port_info *pdata = up->dev->platform_data;
+@@ -279,8 +259,6 @@ static void serial_omap_stop_tx(struct uart_port *port)
+ 		serial_out(up, UART_IER, up->ier);
+ 	}
+ 
+-	serial_omap_set_forceidle(up);
+-
+ 	pm_runtime_mark_last_busy(up->dev);
+ 	pm_runtime_put_autosuspend(up->dev);
+ }
+@@ -348,7 +326,6 @@ static void serial_omap_start_tx(struct uart_port *port)
+ 
+ 	pm_runtime_get_sync(up->dev);
+ 	serial_omap_enable_ier_thri(up);
+-	serial_omap_set_noidle(up);
+ 	pm_runtime_mark_last_busy(up->dev);
+ 	pm_runtime_put_autosuspend(up->dev);
+ }
+-- 
+1.7.9.5
