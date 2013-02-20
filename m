@@ -1,53 +1,176 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 20 Feb 2013 08:36:25 -0500 (EST)
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <1361356696.13482.269.camel@i7.infradead.org>
-References: <20130129181046.GC25415@pd.tnic>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
- <20130207181315.GM17833@n2100.arm.linux.org.uk>
- <1360344301.6066.263.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
- <1360363233.6066.283.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
- <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
- <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
- <20130219203115.114eab79e8d2099c6306d921@freescale.com>
- <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
- <1361356696.13482.269.camel@i7.infradead.org>
-Message-ID: <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
+From: anilk4.v@gmail.com (Anil Kumar)
+Date: Wed, 20 Feb 2013 19:14:15 +0530
+Subject: [PATCH V4] ARM: dts: add minimal DT support for DevKit8000
+Message-ID: <1361367855-29208-1-git-send-email-anilk4.v@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Feb 2013, Woodhouse, David wrote:
+DevKit8000 is a beagle board clone from Timll, sold by
+armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
+S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
+JTAG interface.
 
-> On Tue, 2013-02-19 at 22:17 -0500, Nicolas Pitre wrote:
-> > 
-> > > +$(obj)/bswapsdi2.o: $(obj)/../../../../arch/$(SRCARCH)/lib/bswapsdi2.o
-> > > +     $(call cmd,shipped)
-> > > +
-> > 
-> > I don't think you can get away with this.  The decompressor code is 
-> > compiled with -fpic and the main kernel is not.  Most toolchains do mark 
-> > object files with some flags to prevent the link of incompatible objects 
-> > together (normally pic and non pic objects are not compatible even if in 
-> > this very simple case that would not matter).  Maybe you are able to 
-> > link zImage successfully simply because no references to __bswap* needed 
-> > to be resolved and therefore the linker didn't need to search/include 
-> > that object?
-> 
-> This, and the issue with -Os vs. -O2, make me inclined to suggest that
-> we should just provide an asm version of these functions instead of
-> using the compiler.
+This patch adds the basic DT support for devkit8000. At this time, Information
+of twl4030 (PMIC), MMC1, I2C1 and leds are added.
 
-You'll have the same issue wrt the above whether or not the source file 
-is C or assembly.
+Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+Tested-by: Thomas Weber <thomas@tomweber.eu>
+---
+ -This patch is based on top of kernel 3.8-rc5.
 
+ -Tested on Devkit8000.
 
-Nicolas
+For V4:
+ -Tiny nitpick.
+
+For V3:
+ - Remove pin mux as done at device boot time by default.
+
+For V2:
+ - Change model name as "TimLL OMAP3 Devkit8000"
+ - Change compatible as "timll,omap3-devkit8000"
+ - Doing i2c1 pinmux default with pinctrl-single driver instead of i2c1
+   driver probe time.
+
+:100644 100644 5ebb44f... 22ebc76... M	arch/arm/boot/dts/Makefile
+:000000 100644 0000000... 2e1463a... A	arch/arm/boot/dts/omap3-devkit8000.dts
+:100644 100644 53cb380b.. ccecb76... M	arch/arm/mach-omap2/board-generic.c
+ arch/arm/boot/dts/Makefile             |    1 +
+ arch/arm/boot/dts/omap3-devkit8000.dts |  102 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/board-generic.c    |    1 +
+ 3 files changed, 104 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5ebb44f..22ebc76 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -102,6 +102,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx28-tx28.dtb
+ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-beagle.dtb \
++	omap3-devkit8000.dtb \
+ 	omap3-beagle-xm.dtb \
+ 	omap3-evm.dtb \
+ 	omap3-tobi.dtb \
+diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+new file mode 100644
+index 0000000..2e1463a
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+@@ -0,0 +1,102 @@
++/*
++ * Author: Anil Kumar <anilk4.v@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++/include/ "omap3.dtsi"
++/ {
++	model = "TimLL OMAP3 Devkit8000";
++	compatible = "timll,omap3-devkit8000", "ti,omap3";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>;	/* 256 MB */
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		heartbeat {
++			label = "devkit8000::led1";
++			gpios = <&gpio6 26 0>;	/* 186 -> LED1 */
++			default-state = "on";
++			linux,default-trigger = "heartbeat";
++		};
++
++		mmc {
++			label = "devkit8000::led2";
++			gpios = <&gpio6 3 0>;	/* 163 -> LED2 */
++			default-state = "on";
++			linux,default-trigger = "none";
++		};
++
++		usr {
++			label = "devkit8000::led3";
++			gpios = <&gpio6 4 0>;	/* 164 -> LED3 */
++			default-state = "on";
++			linux,default-trigger = "usr";
++                };
++	};
++};
++
++&i2c1 {
++	clock-frequency = <2600000>;
++
++	twl: twl at 48 {
++		reg = <0x48>;
++		interrupts = <7>;	/* SYS_NIRQ cascaded to intc */
++		interrupt-parent = <&intc>;
++	};
++};
++
++&i2c2 {
++	status = "disabled";
++};
++
++&i2c3 {
++	status = "disabled";
++};
++
++/include/ "twl4030.dtsi"
++
++&mmc1 {
++	vmmc-supply = <&vmmc1>;
++	vmmc_aux-supply = <&vsim>;
++	bus-width = <8>;
++};
++
++&mmc2 {
++	status = "disabled";
++};
++
++&mmc3 {
++	status = "disabled";
++};
++
++&wdt2 {
++	status = "disabled";
++};
++
++&mcbsp1 {
++	status = "disabled";
++};
++
++&mcbsp2 {
++	status = "disabled";
++};
++
++&mcbsp3 {
++	status = "disabled";
++};
++
++&mcbsp4 {
++	status = "disabled";
++};
++
++&mcbsp5 {
++	status = "disabled";
++};
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 53cb380..ccecb76 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -110,6 +110,7 @@ MACHINE_END
+ 
+ static const char *omap3_gp_boards_compat[] __initdata = {
+ 	"ti,omap3-beagle",
++	"timll,omap3-devkit8000",
+ 	NULL,
+ };
+ 
+-- 
+1.7.0.4
