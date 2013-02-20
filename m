@@ -1,108 +1,185 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Wed, 20 Feb 2013 15:56:54 +0100
-Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
-In-Reply-To: <CANLjY-k7sn-7pH_0nFiktXCxvgy8XizVbPRvS8aG1rg+CmVTPQ@mail.gmail.com>
-References: <1349959402-24164-1-git-send-email-robherring2@gmail.com>
- <20121025093411.GA32662@sig21.net> <50893389.2090002@gmail.com>
- <20121025141645.GA16962@sig21.net> <50894BC2.5050706@gmail.com>
- <20121025150816.GA3874@sig21.net>
- <20121105104839.GA2005@linaro.org>
- <20121105111346.GF28327@n2100.arm.linux.org.uk>
- <5097C3B5.4080406@gmail.com>
- <CANLjY-k7sn-7pH_0nFiktXCxvgy8XizVbPRvS8aG1rg+CmVTPQ@mail.gmail.com>
-Message-ID: <20130220145654.GA6742@sig21.net>
+From: badarkhe.manish@gmail.com (Manish Badarkhe)
+Date: Wed, 20 Feb 2013 20:32:53 +0530
+Subject: [PATCH V4] ARM: dts: add minimal DT support for DevKit8000
+In-Reply-To: <1361367855-29208-1-git-send-email-anilk4.v@gmail.com>
+References: <1361367855-29208-1-git-send-email-anilk4.v@gmail.com>
+Message-ID: <CAKDJKT5r8tOcXajFEWmG_GsE2z8O33ej8G_bqq3ZbSNFRewtiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replying to old thread, for full context see
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/180226/focus=197914
+Hi Anil
 
-On Tue, Nov 06, 2012 at 11:02:27AM +1300, Michael Hope wrote:
-> On 6 November 2012 02:48, Rob Herring <robherring2@gmail.com> wrote:
-> >
-> > I tried adding -munaligned-accesses on a v6 build and still get byte
-> > accesses rather than unaligned word accesses. So this does seem to be a
-> > v7 only issue based on what gcc will currently produce. Copying Michael
-> > Hope who can hopefully provide some insight on why v6 unaligned accesses
-> > are not enabled.
-> 
-> This looks like a bug.  Unaligned access is enabled for armv6 but
-> seems to only take effect for cores with Thumb-2.  Here's a test case
-> both with unaligned field access and unaligned block copy:
-> 
-> struct foo
-> {
->   char a;
->   int b;
->   struct
->   {
->     int x[3];
->   } c;
-> } __attribute__((packed));
-> 
-> int get_field(struct foo *p)
-> {
->   return p->b;
-> }
-> 
-> int copy_block(struct foo *p, struct foo *q)
-> {
->   p->c = q->c;
-> }
-> 
-> With -march=armv7-a you get the correct:
-> 
-> bar:
-> 	ldr	r0, [r0, #1]	@ unaligned	@ 11	unaligned_loadsi/2	[length = 4]
-> 	bx	lr	@ 21	*arm_return	[length = 12]
-> 
-> baz:
-> 	str	r4, [sp, #-4]!	@ 25	*push_multi	[length = 4]
-> 	mov	r2, r0	@ 2	*arm_movsi_vfp/1	[length = 4]
-> 	ldr	r4, [r1, #5]!	@ unaligned	@ 9	unaligned_loadsi/2	[length = 4]
-> 	ldr	ip, [r1, #4]	@ unaligned	@ 10	unaligned_loadsi/2	[length = 4]
-> 	ldr	r1, [r1, #8]	@ unaligned	@ 11	unaligned_loadsi/2	[length = 4]
-> 	str	r4, [r2, #5]	@ unaligned	@ 12	unaligned_storesi/2	[length = 4]
-> 	str	ip, [r2, #9]	@ unaligned	@ 13	unaligned_storesi/2	[length = 4]
-> 	str	r1, [r2, #13]	@ unaligned	@ 14	unaligned_storesi/2	[length = 4]
-> 	ldmfd	sp!, {r4}
-> 	bx	lr
-> 
-> With -march=armv6 you get a byte-by-byte field access and a correct
-> unaligned block copy:
-> 
-> bar:
-> 	ldrb	r1, [r0, #2]	@ zero_extendqisi2
-> 	ldrb	r3, [r0, #1]	@ zero_extendqisi2
-> 	ldrb	r2, [r0, #3]	@ zero_extendqisi2
-> 	ldrb	r0, [r0, #4]	@ zero_extendqisi2
-> 	orr	r3, r3, r1, asl #8
-> 	orr	r3, r3, r2, asl #16
-> 	orr	r0, r3, r0, asl #24
-> 	bx	lr
-> 
-> baz:
-> 	str	r4, [sp, #-4]!
-> 	mov	r2, r0
-> 	ldr	r4, [r1, #5]!	@ unaligned
-> 	ldr	ip, [r1, #4]	@ unaligned
-> 	ldr	r1, [r1, #8]	@ unaligned
-> 	str	r4, [r2, #5]	@ unaligned
-> 	str	ip, [r2, #9]	@ unaligned
-> 	str	r1, [r2, #13]	@ unaligned
-> 	ldmfd	sp!, {r4}
-> 	bx	lr
-> 
-> readelf -A shows that the compiler planned to use unaligned access in
-> both.  My suspicion is that GCC is using the extv pattern to extract
-> the field from memory, and that pattern is only enabled for Thumb-2
-> capable cores.
-> 
-> I've logged PR55218.  We'll discuss it at our next meeting.
+On Wed, Feb 20, 2013 at 7:14 PM, Anil Kumar <anilk4.v@gmail.com> wrote:
+> DevKit8000 is a beagle board clone from Timll, sold by
+> armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
+> S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
+> JTAG interface.
+>
+> This patch adds the basic DT support for devkit8000. At this time, Information
+> of twl4030 (PMIC), MMC1, I2C1 and leds are added.
+>
+> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+> Tested-by: Thomas Weber <thomas@tomweber.eu>
+> ---
+>  -This patch is based on top of kernel 3.8-rc5.
+>
+>  -Tested on Devkit8000.
+>
+> For V4:
+>  -Tiny nitpick.
+>
+> For V3:
+>  - Remove pin mux as done at device boot time by default.
+>
+> For V2:
+>  - Change model name as "TimLL OMAP3 Devkit8000"
+>  - Change compatible as "timll,omap3-devkit8000"
+>  - Doing i2c1 pinmux default with pinctrl-single driver instead of i2c1
+>    driver probe time.
+>
+> :100644 100644 5ebb44f... 22ebc76... M  arch/arm/boot/dts/Makefile
+> :000000 100644 0000000... 2e1463a... A  arch/arm/boot/dts/omap3-devkit8000.dts
+> :100644 100644 53cb380b.. ccecb76... M  arch/arm/mach-omap2/board-generic.c
+>  arch/arm/boot/dts/Makefile             |    1 +
+>  arch/arm/boot/dts/omap3-devkit8000.dts |  102 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/board-generic.c    |    1 +
+>  3 files changed, 104 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 5ebb44f..22ebc76 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -102,6 +102,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+>         imx28-tx28.dtb
+>  dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>         omap3-beagle.dtb \
+> +       omap3-devkit8000.dtb \
+>         omap3-beagle-xm.dtb \
+>         omap3-evm.dtb \
+>         omap3-tobi.dtb \
+> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+> new file mode 100644
+> index 0000000..2e1463a
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+> @@ -0,0 +1,102 @@
+> +/*
+> + * Author: Anil Kumar <anilk4.v@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +/include/ "omap3.dtsi"
+> +/ {
+> +       model = "TimLL OMAP3 Devkit8000";
+> +       compatible = "timll,omap3-devkit8000", "ti,omap3";
+> +
+> +       memory {
+> +               device_type = "memory";
+> +               reg = <0x80000000 0x10000000>;  /* 256 MB */
+> +       };
+> +
+> +       leds {
+> +               compatible = "gpio-leds";
+> +
+> +               heartbeat {
+> +                       label = "devkit8000::led1";
+> +                       gpios = <&gpio6 26 0>;  /* 186 -> LED1 */
+> +                       default-state = "on";
+> +                       linux,default-trigger = "heartbeat";
+> +               };
+> +
+> +               mmc {
+> +                       label = "devkit8000::led2";
+> +                       gpios = <&gpio6 3 0>;   /* 163 -> LED2 */
+> +                       default-state = "on";
+> +                       linux,default-trigger = "none";
+> +               };
+> +
+> +               usr {
+> +                       label = "devkit8000::led3";
+> +                       gpios = <&gpio6 4 0>;   /* 164 -> LED3 */
+> +                       default-state = "on";
+> +                       linux,default-trigger = "usr";
+> +                };
+> +       };
+> +};
+> +
+> +&i2c1 {
+> +       clock-frequency = <2600000>;
+> +
+> +       twl: twl at 48 {
+> +               reg = <0x48>;
+> +               interrupts = <7>;       /* SYS_NIRQ cascaded to intc */
+> +               interrupt-parent = <&intc>;
+> +       };
+> +};
+> +
+> +&i2c2 {
+> +       status = "disabled";
+> +};
+> +
+> +&i2c3 {
+> +       status = "disabled";
+> +};
+> +
+> +/include/ "twl4030.dtsi"
+> +
+> +&mmc1 {
+> +       vmmc-supply = <&vmmc1>;
+> +       vmmc_aux-supply = <&vsim>;
+> +       bus-width = <8>;
+> +};
+> +
+> +&mmc2 {
+> +       status = "disabled";
+> +};
+> +
+> +&mmc3 {
+> +       status = "disabled";
+> +};
+> +
+> +&wdt2 {
+> +       status = "disabled";
+> +};
+> +
+> +&mcbsp1 {
+> +       status = "disabled";
+> +};
+> +
+> +&mcbsp2 {
+> +       status = "disabled";
+> +};
+> +
+> +&mcbsp3 {
+> +       status = "disabled";
+> +};
+> +
+> +&mcbsp4 {
+> +       status = "disabled";
+> +};
+> +
+> +&mcbsp5 {
+> +       status = "disabled";
+> +};
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 53cb380..ccecb76 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -110,6 +110,7 @@ MACHINE_END
+>
+>  static const char *omap3_gp_boards_compat[] __initdata = {
+>         "ti,omap3-beagle",
+> +       "timll,omap3-devkit8000",
+>         NULL,
+>  };
+>
 
-Just tried with gcc-linaro-4.7-2013.01 (gcc-4.7.3 20130102 (prerelease)),
-the issue is still unfixed.  Do you have any idea how to fix it?
-http://gcc.gnu.org/bugzilla/show_bug.cgi?id=55218
+Looks good to me.
+Reviewed-by: Manish Badarkhe <badarkhe.manish@gmail.com>
 
-Thanks,
-Johannes
+Thanks
+Manish Badarkhe
