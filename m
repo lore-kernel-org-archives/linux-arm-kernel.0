@@ -1,43 +1,113 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 20 Feb 2013 10:50:00 -0500
-Subject: [GIT PULL 4/4] ARM: mvebu: dt changes with deps for v3.9
-In-Reply-To: <201302191723.47157.arnd@arndb.de>
-References: <20130216204603.GK23237@titan.lakedaemon.net>
- <201302191723.47157.arnd@arndb.de>
-Message-ID: <20130220155000.GR23237@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Feb 2013 16:00:47 +0000
+Subject: [PATCH 01/11] ARM: disable virt_to_bus/virt_to_bus almost
+ everywhere
+In-Reply-To: <CAAG0J9_VqCGJJJZjSWGfFggALHU=vdWsSBeS39-DtxV=VXcJwQ@mail.gmail.com>
+References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
+ <1360849767-1463135-2-git-send-email-arnd@arndb.de>
+ <CAAG0J9_VqCGJJJZjSWGfFggALHU=vdWsSBeS39-DtxV=VXcJwQ@mail.gmail.com>
+Message-ID: <201302201600.47522.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 05:23:46PM +0000, Arnd Bergmann wrote:
-> On Saturday 16 February 2013, Jason Cooper wrote:
-> > The following changes since commit 836dc9e3fbbab0c30aa6e664417225f5c1fb1c39:
-> > 
-> >   Linux 3.8-rc7 (2013-02-09 08:20:39 +1100)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.infradead.org/users/jcooper/linux.git tags/dt_deps_for_v3.9
-> > 
-> > for you to fetch changes up to 5082d43000dcedd465059957026bfaef0d7f7cfb:
-> > 
-> >   Dove: Thermal: Add DT node and enable in defconfig (2013-02-16 19:07:16 +0000)
-> > 
-> > ----------------------------------------------------------------
-> > mvebu dt with deps for v3.9
-> > 
-> > This series of patches have external dependencies on driver maintainer trees.
-> > If this pull request doesn't merge easily, let me know and I'll resend for
-> > v3.10.
-> 
-> I only got to looking at this today, and I'd prefer deferring it to 3.10
-> now that the merge window is open.
+On Wednesday 20 February 2013, James Hogan wrote:
+> There's a patch in linux-next by Stephen Rothwell "Centralise
+> CONFIG_ARCH_NO_VIRT_TO_BUS" that removes this Kconfig symbol,
+> inverting/replacing it with "select HAVE_VIRT_TO_BUS" (including for
+> arch/arm) which will undo the effects of this.
 
-Ok, I'll rebase against v3.9-rc1 and resend without the external
-dependencies.
+Ah, thanks for pointing that out. At least my patch is harmless then
+although also useless. I'll leave it in for now so I don't have to
+rebase all the other bug fixes that are queued for 3.9, but I'm making
+a note that I'll have to replace this with a proper one. I also
+don't think that anything breaks if we apply both patches for a while,
+it will just make my patch useless.
 
-I'll also sit down with Olof this week and see if we can come up with a
-sane process (if possible) to keep these sorts of series together.
+I guess you'll have to do something similar for arch/metag, and Vineet
+will do it for arch/arc.
 
-thx,
+Stephen's patch is currently in Andrew's tree, and I don't see an easy
+way to coordinate this. The patch we will need once both are merged
+is below.
 
-Jason.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
+index 4fef29f..5829b67 100644
+--- a/arch/arc/Kconfig
++++ b/arch/arc/Kconfig
+@@ -76,9 +76,6 @@ config HAVE_LATENCYTOP_SUPPORT
+ config NO_DMA
+ 	def_bool n
+ 
+-config ARCH_NO_VIRT_TO_BUS
+-	def_bool y
+-
+ source "init/Kconfig"
+ source "kernel/Kconfig.freezer"
+ 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index dedf02b..7b35b39 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -49,7 +49,6 @@ config ARM
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_UID16
+-	select HAVE_VIRT_TO_BUS
+ 	select KTIME_SCALAR
+ 	select PERF_USE_VMALLOC
+ 	select RTC_LIB
+@@ -744,6 +743,7 @@ config ARCH_RPC
+ 	select NEED_MACH_IO_H
+ 	select NEED_MACH_MEMORY_H
+ 	select NO_IOPORT
++	select HAVE_VIRT_TO_BUS
+ 	help
+ 	  On the Acorn Risc-PC, Linux can support the internal IDE disk and
+ 	  CD-ROM interface, serial and parallel port, and the floppy drive.
+@@ -880,6 +880,7 @@ config ARCH_SHARK
+ 	select NEED_MACH_MEMORY_H
+ 	select PCI
+ 	select ZONE_DMA
++	select HAVE_VIRT_TO_BUS
+ 	help
+ 	  Support for the StrongARM based Digital DNARD machine, also known
+ 	  as "Shark" (<http://www.shark-linux.de/shark.html>).
+@@ -1462,10 +1463,6 @@ config ISA_DMA
+ 	bool
+ 	select ISA_DMA_API
+ 
+-config ARCH_NO_VIRT_TO_BUS
+-	def_bool y
+-	depends on !ARCH_RPC && !ARCH_NETWINDER && !ARCH_SHARK
+-
+ # Select ISA DMA interface
+ config ISA_DMA_API
+ 	bool
+diff --git a/arch/arm/mach-footbridge/Kconfig b/arch/arm/mach-footbridge/Kconfig
+index abda5a1..42bf587 100644
+--- a/arch/arm/mach-footbridge/Kconfig
++++ b/arch/arm/mach-footbridge/Kconfig
+@@ -67,6 +67,7 @@ config ARCH_NETWINDER
+ 	select ISA
+ 	select ISA_DMA
+ 	select PCI
++	select HAVE_VIRT_TO_BUS
+ 	help
+ 	  Say Y here if you intend to run this kernel on the Rebel.COM
+ 	  NetWinder.  Information about this machine can be found at:
+diff --git a/arch/metag/Kconfig b/arch/metag/Kconfig
+index 30adc78..03e216e 100644
+--- a/arch/metag/Kconfig
++++ b/arch/metag/Kconfig
+@@ -35,9 +35,6 @@ config METAG
+ 	select OF_EARLY_FLATTREE
+ 	select SPARSE_IRQ
+ 
+-config ARCH_NO_VIRT_TO_BUS
+-	def_bool y
+-
+ config STACKTRACE_SUPPORT
+ 	def_bool y
+ 
