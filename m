@@ -1,28 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Feb 2013 17:42:58 +0200
-Subject: [PATCH 7/8] ARM: OMAP: hwmod: extract module address space from
- DT blob
-In-Reply-To: <1361374735-22018-8-git-send-email-santosh.shilimkar@ti.com>
-References: <1361374735-22018-1-git-send-email-santosh.shilimkar@ti.com>
- <1361374735-22018-8-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130220154258.GI16652@arwen.pp.htv.fi>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 20 Feb 2013 21:14:25 +0530
+Subject: [PATCH 6/8] SERIAL: OMAP: Remove the slave idle handling from
+ the driver
+In-Reply-To: <87sj4rqa7r.fsf@linaro.org>
+References: <1361354444-18230-1-git-send-email-santosh.shilimkar@ti.com>
+ <87sj4rqa7r.fsf@linaro.org>
+Message-ID: <5124EF59.5080206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 20 February 2013 08:54 PM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>
+>> UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
+>> so remove the hackery from the driver.
+>>
+>> Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>> Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+>> Signed-off-by: Rajendra nayak <rnayak@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>
+>> ---
+>>   drivers/tty/serial/omap-serial.c |   23 -----------------------
+>>   1 file changed, 23 deletions(-)
+>
+> This patch should also remove the hooks from
+> <linux/platform_data/serial-omap.h>
+>
+Right. Will fix that in next version. Thanks.
 
-On Wed, Feb 20, 2013 at 09:08:54PM +0530, Santosh Shilimkar wrote:
-> Patch adds the code for extracting the module ocp address space from device
-> tree blob in case the hwmod address space look up fails.
-
-IMHO you should lookup on DT first and if that fails try hwmod ;-)
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130220/716cae75/attachment.sig>
+Regards,
+Santosh
