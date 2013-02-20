@@ -1,85 +1,43 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Feb 2013 21:08:54 +0530
-Subject: [PATCH 7/8] ARM: OMAP: hwmod: extract module address space from DT
- blob
+Date: Wed, 20 Feb 2013 21:08:50 +0530
+Subject: [PATCH 3/8] ARM: dts: OMAP5: Specify nonsecure PPI IRQ for arch timer
 In-Reply-To: <1361374735-22018-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1361374735-22018-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1361374735-22018-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1361374735-22018-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds the code for extracting the module ocp address space from device
-tree blob in case the hwmod address space look up fails.
+From: Rajendra Nayak <rnayak@ti.com>
 
-The idea is to remove the address space data from hwmod and extract it from
-DT blob.
+Specify both secure as well as nonsecure PPI IRQ for arch
+timer. This fixes the following errors seen on DT OMAP5 boot..
 
+[    0.000000] arch_timer: No interrupt available, giving up
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/omap5.dtsi |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 4653efb..5aad348 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -138,6 +138,7 @@
- #include <linux/spinlock.h>
- #include <linux/slab.h>
- #include <linux/bootmem.h>
-+#include <linux/of.h>
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 6609754..4c9d984 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -41,8 +41,9 @@
  
- #include "clock.h"
- #include "omap_hwmod.h"
-@@ -2336,6 +2337,11 @@ static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
- {
- 	struct omap_hwmod_addr_space *mem;
- 	void __iomem *va_start;
-+	struct device_node *np;
-+	const void *reg_prop;
-+	const char *p;
-+	unsigned long start = 0, size = 0;
-+
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+-		/* 14th PPI IRQ, active low level-sensitive */
+-		interrupts = <1 14 0x308>;
++		/* PPI secure/nonsecure IRQ, active low level-sensitive */
++		interrupts = <1 13 0x308>,
++			     <1 14 0x308>;
+ 		clock-frequency = <6144000>;
+ 	};
  
- 	if (!oh)
- 		return;
-@@ -2349,10 +2355,33 @@ static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
- 	if (!mem) {
- 		pr_debug("omap_hwmod: %s: no MPU register target found\n",
- 			 oh->name);
-+
-+		/* Extract the IO space from device tree blob */
-+		if (!of_have_populated_dt())
-+			return;
-+
-+		for_each_child_of_node(of_find_node_by_name(NULL, "ocp"), np) {
-+			if (of_find_property(np, "ti,hwmods", NULL)) {
-+				p = of_get_property(np, "ti,hwmods", NULL);
-+				if (!strcmp(p, oh->name)) {
-+					reg_prop = of_get_property(np, "reg",
-+									NULL);
-+					start = of_read_number(reg_prop, 1);
-+					size = of_read_number(reg_prop + 4, 1);
-+				}
-+			}
-+		}
-+	} else {
-+		start = mem->pa_start;
-+		size = mem->pa_end - mem->pa_start;
-+	}
-+
-+	if (!start) {
-+		pr_debug("omap_hwmod: %s: No address space found\n", oh->name);
- 		return;
- 	}
- 
--	va_start = ioremap(mem->pa_start, mem->pa_end - mem->pa_start);
-+	va_start = ioremap(start, size);
- 	if (!va_start) {
- 		pr_err("omap_hwmod: %s: Could not ioremap\n", oh->name);
- 		return;
 -- 
 1.7.9.5
