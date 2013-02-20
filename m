@@ -1,58 +1,127 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Feb 2013 11:51:17 +0000
-Subject: [PATCH 0/8] ARM; OMAP2+: hwmod and SERIAL: Remove sysc
- handling from driver
-In-Reply-To: <5124A41A.3010900@ti.com>
-References: <1361354272-18089-1-git-send-email-santosh.shilimkar@ti.com>
- <20130220101401.GW17852@n2100.arm.linux.org.uk> <5124A41A.3010900@ti.com>
-Message-ID: <20130220115117.GX17852@n2100.arm.linux.org.uk>
+From: wni@nvidia.com (Wei Ni)
+Date: Wed, 20 Feb 2013 19:53:24 +0800
+Subject: [RFC PATCH 8/9] ARM: dt: t30 cardhu: add dt entry for thermal
+ driver
+In-Reply-To: <51240A95.9070007@wwwdotorg.org>
+References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
+ <1361187031-3679-9-git-send-email-wni@nvidia.com>
+ <51240A95.9070007@wwwdotorg.org>
+Message-ID: <5124B934.3020900@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 03:53:22PM +0530, Santosh Shilimkar wrote:
-> Actually the clean-up will remove the serial driver dependency with
-> idle handling. Infact DMA support need not care about idle handling
-> anymore.
+On 02/20/2013 07:28 AM, Stephen Warren wrote:
+> On 02/18/2013 04:30 AM, Wei Ni wrote:
+>> Enable thermal driver in the dts file.
+>> Set sensor as lm90 remote sensor, and set throttle data.
+> 
+>> diff --git a/Documentation/devicetree/bindings/thermal/tegra3-thermal.txt b/Documentation/devicetree/bindings/thermal/tegra3-thermal.txt
+> 
+> The DT documentation should be either a separate patch before the one
+> which implements it in the driver, or part of the driver patch. It
+> shouldn't be part of the patch which instantiates the binding in the
+> board DT file.
 
-How is that so?  Looking back at the driver source when it did have full
-DMA support shows that the handling of force idle state is different
-between PIO and DMA modes.
+Ok, I will do it.
 
-For example, for transmit (which is the only case I had taken the time
-to properly understand before the DMA code was unceremoniously ripped
-out):
+> 
+>> +* Nvidia Tegra30 Thermal
+> 
+> NVIDIA is all capitals.
 
-- On DMA transmit, the noidle setting is cleared.  runtime PM status is put.
-- If we switch from DMA to PIO transmit, the noidle setting it set.
-  runtime PM status is still put.
-- When stopping transmit, if we aren't using DMA, idle is forced.
-- In the runtime suspend, if we're using DMA and the i291 errata is in effect,
-  then idle state is forced
-- In the runtime resume, if we're using DMA and the i291 errata is in effect,
-  idle state is cleared.
+Got it.
 
-See - that information has been lost through ripping out the DMA code and
-then subsequently cleaning up the code to make these things "invisible".
-And now that you've lifted the forceidle/noidle functions out of the driver,
-there's now even less clue about how to preserve the above behaviour.
+> 
+> It seems like a word is missing: Thermal Management? Control/Zone?
 
->> Therefore, tonight I am dropping and discarding what I have left over
->> from my work on getting DMA support working with the OMAP serial driver
->> again from the nightly test builds and my git tree, and I intend no
->> further involvement with this.
->>
-> Please please don't do that. We were at a point where we are unable
-> to use UART has just simple console with DT without the $subject
-> series. We can help you if some re-basing is needed for your
-> patches because of the $subject series.
+It's better to use "NVIDIA Tegra30 Thermal Zone".
 
-Actually, I've already dropped the TX DMA stuff out a while back when it
-became (a) just too painful to keep porting the thing forward and (b) it
-doesn't work properly anyway.  It's last update was back in October, and
-was based on v3.6 because it already became impossible to bring it
-forward across the utter buggeration of the OMAP serial driver.
+> 
+>> +** Thermal node properties:
+>> +
+>> +- compatible : "nvidia,tegra30-thermal";
+>> +- sensors: the sensor device node which we want to use in the thermal zone,
+>> +  the arguments is the index of the sensor in sensor device node;
+> 
+> The arguments should be defined by the DT binding documentation for that
+> referenced device, not by the referencing device.
+> 
+> DT properties that are custom defined for this binding should include
+> the vendor prefix in their name. So, that'd be "nvidia,sensors". This
+> may apply less if a "sensors" becomes a more generic standard, but it
+> surely applies to all the other properties below.
 
-(That explains why I only ever pulled forward two patches - those which
-add the hooks into the serial core layer and into the OMAP serial driver
-to cleanly allocate a DMA-able transmit buffer, leaving the rest of the
-transmit DMA code to rot.)
+So these properties should be introduced in the DT binding documentation
+of the thermal framework.
+
+> 
+>> +- passive-delay: passive delay;
+> 
+> What does this mean?
+
+This is used for the thermal framework. As you said, this should be
+introduced with the framework.
+
+> 
+>> +- num-passive-trips : number of passive trip points, this is required, set
+>> +  it 0 if none, if greater than 0, the following properties must be defined;
+>> +- passive-trips : temperature of passive trip points;
+> 
+> Presumably "num-passive-trips" can be calculated simply by counting the
+> number of entries in "passive-trips"?
+
+Oh, yes, I can remove it.
+
+> 
+> Please describe what passive and active trips are; someone who just
+> reads this binding document (perhaps in conjunction with some HW
+> documentation and/or other binding documentation) should be able to fill
+> in this binding without other knowledge.
+
+Durgadoss's patches introduced these value in the framework
+documentation, but he didn't touch the DT. So I will add it.
+
+> 
+>> +- num-active-trips: number of active trip points, this is required, set
+>> +  it 0 if none, if greater than 0, the following properties must be defined;
+>> +- active-trips: temperature of active trip points;
+> 
+> Both comments above apply here too.
+> 
+>> +- throt-tab-size: size of the throttle table, it's the max cooling state.
+>> +- throt-tab: throttle table. the cooling state will be defined according to
+>> +  this table.
+> 
+> Both comments above apply here too.
+> 
+> Also, what units are used for all these properties?
+
+they use "int".
+And according to our downstream dvfs driver, the throttle table use
+"unsigned long".
+
+> 
+> Judging by the example below, this property is a list of tuples. The
+> meaning of each field in the tuple needs to be explained.
+> 
+> What happens when the CPU/SoC needs to be throttled? Must some clock or
+> voltage be lowered/limited? If so, you need properties that indicate
+> which clock/voltage/... needs to be acted upon.
+
+This table which will be used by our DVFS driver, although it didn't be
+upstreamed yet. The table set clock frequency limited value with
+different cooling state. When the temperature touch the different
+limited value, we will set difficult cooling state, find the limited
+freq from this table and pass to the dvfs driver.
+I think may be this table should be set for cooling device node. This
+table is only for our tegra dvfs, so I think we can parse this table in
+the tegra3_cooling.c, which will be the new driver for cooling device.
+
+> 
+>> +Usually these properties are separated in board related dts files.
+> 
+> That's not really relevant.
+
+Ok.
+
+> 
