@@ -1,47 +1,100 @@
-From: nishanth.p@gmail.com (Nishanth Peethambaran)
-Date: Wed, 20 Feb 2013 12:13:50 +0530
-Subject: [RFC] ARM: iommu: Adding new dma-mappin API to map sgtable
-Message-ID: <CAMcxFTRBN7asUGmRHKfpfE-aLN16tfSWKTEWeOGDQ2vog1w_Lw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Feb 2013 15:08:06 +0800
+Subject: [PATCH 0/3] Get rid of big array from imx pinctrl driver
+Message-ID: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding APIs in arm dma mapping code to map a scatterlist in iommu domain
-and get dma address. Allocators outside dma-mapping code like ION could
-allocate pages and devices would need to map them for iommu and obtain a
-linear dma address. Intention is to re-use the IOVA managment code and "mapping"
-across allocators.
+First of all, thanks to Stephen for getting CPP pre-processor support
+on DTC.
 
-Can the above requirement be done without adding new APIs?
-APIs available to map an sglist (arm_dma_map_sg) does not provide a linear
-dma address.
+The series is an action of discussion [1].  It utilizes the DTC
+pre-processing feature to move those huge mount of data about pin
+from pinctrl driver into device tree.
 
-Signed-off-by: Nishanth Peethambaran <nishanth@broadcom.com>
----
- arch/arm/include/asm/dma-mapping.h |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/181670/focus=19468
 
-diff --git a/arch/arm/include/asm/dma-mapping.h
-b/arch/arm/include/asm/dma-mapping.h
-index 5b579b9..f9e2f6c 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -268,6 +268,16 @@ extern void arm_dma_sync_sg_for_device(struct
-device *, struct scatterlist *, in
- extern int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
- 		void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		struct dma_attrs *attrs);
-+/*
-+ * Map scatterlist pages for the device and return a dma address
-+ */
-+extern dma_addr_t arm_dma_map_sgtable(struct device *dev, struct sgtable *sgt,
-+		enum dma_data_direction dir, struct dma_attrs *attrs);
-+/*
-+ * Unmap the dma address
-+ */
-+extern void arm_dma_unmap(struct device *, dma_addr_t iova, int size,
-+		enum dma_data_direction dir, struct dma_attrs *attrs);
+Shawn Guo (3):
+  ARM: dts: imx: use pre-processor for device trees
+  ARM: dts: imx: replace magic number with pin function name
+  pinctrl: imx: move hard-coding data into device tree
 
- #endif /* __KERNEL__ */
- #endif
+ .../bindings/pinctrl/fsl,imx-pinctrl.txt           |    6 +-
+ .../bindings/pinctrl/fsl,imx35-pinctrl.txt         |  954 +-----------
+ .../bindings/pinctrl/fsl,imx51-pinctrl.txt         |  758 +--------
+ .../bindings/pinctrl/fsl,imx53-pinctrl.txt         | 1173 +-------------
+ .../bindings/pinctrl/fsl,imx6q-pinctrl.txt         | 1593 -------------------
+ .../{imx25-karo-tx25.dts => imx25-karo-tx25.dtsp}  |    2 +-
+ .../arm/boot/dts/{imx25-pdk.dts => imx25-pdk.dtsp} |    2 +-
+ arch/arm/boot/dts/{imx25.dtsi => imx25.dtsip}      |    2 +-
+ .../boot/dts/{imx27-apf27.dts => imx27-apf27.dtsp} |    2 +-
+ .../arm/boot/dts/{imx27-pdk.dts => imx27-pdk.dtsp} |    2 +-
+ ...hytec-phycore.dts => imx27-phytec-phycore.dtsp} |    2 +-
+ arch/arm/boot/dts/{imx27.dtsi => imx27.dtsip}      |    2 +-
+ .../arm/boot/dts/{imx31-bug.dts => imx31-bug.dtsp} |    2 +-
+ arch/arm/boot/dts/{imx31.dtsi => imx31.dtsip}      |    2 +-
+ arch/arm/boot/dts/imx35-pinfunc.h                  |  970 ++++++++++++
+ .../boot/dts/{imx51-apf51.dts => imx51-apf51.dtsp} |    2 +-
+ .../dts/{imx51-babbage.dts => imx51-babbage.dtsp}  |   16 +-
+ arch/arm/boot/dts/imx51-pinfunc.h                  |  773 ++++++++++
+ arch/arm/boot/dts/{imx51.dtsi => imx51.dtsip}      |  247 +--
+ .../arm/boot/dts/{imx53-ard.dts => imx53-ard.dtsp} |   70 +-
+ .../arm/boot/dts/{imx53-evk.dts => imx53-evk.dtsp} |   18 +-
+ arch/arm/boot/dts/imx53-mba53.dts                  |  129 --
+ arch/arm/boot/dts/imx53-mba53.dtsp                 |  135 ++
+ arch/arm/boot/dts/imx53-pinfunc.h                  | 1189 +++++++++++++++
+ .../arm/boot/dts/{imx53-qsb.dts => imx53-qsb.dtsp} |   22 +-
+ .../arm/boot/dts/{imx53-smd.dts => imx53-smd.dtsp} |   16 +-
+ .../dts/{imx53-tqma53.dtsi => imx53-tqma53.dtsip}  |   32 +-
+ arch/arm/boot/dts/{imx53.dtsi => imx53.dtsip}      |  207 +--
+ arch/arm/boot/dts/{imx6dl.dtsi => imx6dl.dtsip}    |    0
+ .../boot/dts/{imx6q-arm2.dts => imx6q-arm2.dtsp}   |    8 +-
+ arch/arm/boot/dts/imx6q-pinfunc.h                  | 1611 ++++++++++++++++++++
+ .../{imx6q-sabreauto.dts => imx6q-sabreauto.dtsp}  |    6 +-
+ .../{imx6q-sabrelite.dts => imx6q-sabrelite.dtsp}  |   18 +-
+ .../dts/{imx6q-sabresd.dts => imx6q-sabresd.dtsp}  |   14 +-
+ arch/arm/boot/dts/imx6q.dtsi                       |  302 ----
+ arch/arm/boot/dts/imx6q.dtsip                      |  303 ++++
+ arch/arm/boot/dts/{imx6qdl.dtsi => imx6qdl.dtsip}  |    2 +-
+ drivers/pinctrl/pinctrl-imx.c                      |  118 +-
+ drivers/pinctrl/pinctrl-imx.h                      |   13 +-
+ drivers/pinctrl/pinctrl-imx35.c                    |  958 ------------
+ drivers/pinctrl/pinctrl-imx51.c                    |  762 ---------
+ drivers/pinctrl/pinctrl-imx53.c                    | 1177 --------------
+ drivers/pinctrl/pinctrl-imx6q.c                    | 1599 -------------------
+ 43 files changed, 5380 insertions(+), 9839 deletions(-)
+ rename arch/arm/boot/dts/{imx25-karo-tx25.dts => imx25-karo-tx25.dtsp} (96%)
+ rename arch/arm/boot/dts/{imx25-pdk.dts => imx25-pdk.dtsp} (96%)
+ rename arch/arm/boot/dts/{imx25.dtsi => imx25.dtsip} (99%)
+ rename arch/arm/boot/dts/{imx27-apf27.dts => imx27-apf27.dtsp} (98%)
+ rename arch/arm/boot/dts/{imx27-pdk.dts => imx27-pdk.dtsp} (96%)
+ rename arch/arm/boot/dts/{imx27-phytec-phycore.dts => imx27-phytec-phycore.dtsp} (98%)
+ rename arch/arm/boot/dts/{imx27.dtsi => imx27.dtsip} (99%)
+ rename arch/arm/boot/dts/{imx31-bug.dts => imx31-bug.dtsp} (96%)
+ rename arch/arm/boot/dts/{imx31.dtsi => imx31.dtsip} (98%)
+ create mode 100644 arch/arm/boot/dts/imx35-pinfunc.h
+ rename arch/arm/boot/dts/{imx51-apf51.dts => imx51-apf51.dtsp} (97%)
+ rename arch/arm/boot/dts/{imx51-babbage.dts => imx51-babbage.dtsp} (94%)
+ create mode 100644 arch/arm/boot/dts/imx51-pinfunc.h
+ rename arch/arm/boot/dts/{imx51.dtsi => imx51.dtsip} (61%)
+ rename arch/arm/boot/dts/{imx53-ard.dts => imx53-ard.dtsp} (55%)
+ rename arch/arm/boot/dts/{imx53-evk.dts => imx53-evk.dtsp} (82%)
+ delete mode 100644 arch/arm/boot/dts/imx53-mba53.dts
+ create mode 100644 arch/arm/boot/dts/imx53-mba53.dtsp
+ create mode 100644 arch/arm/boot/dts/imx53-pinfunc.h
+ rename arch/arm/boot/dts/{imx53-qsb.dts => imx53-qsb.dtsp} (89%)
+ rename arch/arm/boot/dts/{imx53-smd.dts => imx53-smd.dtsp} (88%)
+ rename arch/arm/boot/dts/{imx53-tqma53.dtsi => imx53-tqma53.dtsip} (75%)
+ rename arch/arm/boot/dts/{imx53.dtsi => imx53.dtsip} (69%)
+ rename arch/arm/boot/dts/{imx6dl.dtsi => imx6dl.dtsip} (100%)
+ rename arch/arm/boot/dts/{imx6q-arm2.dts => imx6q-arm2.dtsp} (90%)
+ create mode 100644 arch/arm/boot/dts/imx6q-pinfunc.h
+ rename arch/arm/boot/dts/{imx6q-sabreauto.dts => imx6q-sabreauto.dtsp} (88%)
+ rename arch/arm/boot/dts/{imx6q-sabrelite.dts => imx6q-sabrelite.dtsp} (87%)
+ rename arch/arm/boot/dts/{imx6q-sabresd.dts => imx6q-sabresd.dtsp} (84%)
+ delete mode 100644 arch/arm/boot/dts/imx6q.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6q.dtsip
+ rename arch/arm/boot/dts/{imx6qdl.dtsi => imx6qdl.dtsip} (99%)
+
 -- 
 1.7.9.5
