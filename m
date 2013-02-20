@@ -1,46 +1,53 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Feb 2013 20:57:14 +0530
-Subject: [PATCH 8/8] ARM: OMAP5: clock: No Freqsel on OMAP5 devices
-In-Reply-To: <1361374034-21831-1-git-send-email-santosh.shilimkar@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 20 Feb 2013 17:29:40 +0200
+Subject: [PATCH 1/8] ARM: OMAP5: Update SOC id detection code for ES2
+In-Reply-To: <1361374034-21831-2-git-send-email-santosh.shilimkar@ti.com>
 References: <1361374034-21831-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1361374034-21831-9-git-send-email-santosh.shilimkar@ti.com>
+ <1361374034-21831-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130220152940.GE16652@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+Hi,
 
-OMAP5 does not have freqsel either, so add the missing
-checks for !soc_is_omap54xx()
+On Wed, Feb 20, 2013 at 08:57:07PM +0530, Santosh Shilimkar wrote:
+>  	case 0xb998:
+>  		switch (rev) {
+>  		case 0:
+> -		default:
+>  			omap_revision = OMAP5432_REV_ES1_0;
+> +			break;
+> +		case 1:
+> +			omap_revision = OMAP5432_REV_ES2_0;
+> +			break;
+> +		default:
+> +			omap_revision = OMAP5432_REV_ES2_0;
 
-Reported-by: Archit Taneja <archit@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/dpll3xxx.c |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+no need for the duplication:
 
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index 0a02aab5..6e3811b 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -310,7 +310,8 @@ static int omap3_noncore_dpll_program(struct clk_hw_omap *clk, u16 freqsel)
- 	 * Set jitter correction. No jitter correction for OMAP4 and 3630
- 	 * since freqsel field is no longer present
- 	 */
--	if (!soc_is_am33xx() && !cpu_is_omap44xx() && !cpu_is_omap3630()) {
-+	if (!soc_is_am33xx() && !cpu_is_omap44xx() && !cpu_is_omap3630()
-+            && !soc_is_omap54xx()) {
- 		v = __raw_readl(dd->control_reg);
- 		v &= ~dd->freqsel_mask;
- 		v |= freqsel << __ffs(dd->freqsel_mask);
-@@ -501,7 +502,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
- 			return -EINVAL;
- 
- 		/* No freqsel on OMAP4 and OMAP3630 */
--		if (!cpu_is_omap44xx() && !cpu_is_omap3630()) {
-+		if (!cpu_is_omap44xx() && !cpu_is_omap3630()
-+		    && !soc_is_omap54xx()) {
- 			freqsel = _omap3_dpll_compute_freqsel(clk,
- 						dd->last_rounded_n);
- 			WARN_ON(!freqsel);
++		case 1:
++		default:
++			omap_revision = OMAP5432_REV_ES2_0;
+
+will work just fine.
+
+>  		}
+>  		break;
+>  
+>  	default:
+>  		/* Unknown default to latest silicon rev as default*/
+> -		omap_revision = OMAP5430_REV_ES1_0;
+> +		omap_revision = OMAP5430_REV_ES2_0;
+
+how about we default to 0xffffffff ? That's the highest possible
+version, just not sure if our revision macros can cope with it.
+
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130220/9913146e/attachment.sig>
