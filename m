@@ -1,34 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Feb 2013 21:44:58 +0530
-Subject: [PATCH 2/9] ARM: OMAP1: PM: Remove bogus fiq_[enable/disable]
- tuple
-In-Reply-To: <20130220160953.GO5724@atomide.com>
-References: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
- <1361373527-21695-3-git-send-email-santosh.shilimkar@ti.com>
- <20130220160953.GO5724@atomide.com>
-Message-ID: <5124F682.6060603@ti.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Wed, 20 Feb 2013 17:12:30 +0100
+Subject: Porting 3.8-rc4-nohz3 to ARM (PandaBoard)
+In-Reply-To: <20130211190317.GA8513@enea.se>
+References: <20130204200238.GA16718@enea.se>
+ <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
+ <20130211190317.GA8513@enea.se>
+Message-ID: <CAFTL4hzzFEYq+1=n+JpTiV3WdeKXETGQVDJSm-FJCN7E6xvE9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 February 2013 09:39 PM, Tony Lindgren wrote:
-> Hi,
->
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130220 07:21]:
->> On OMAP platform, FIQ is reserved for secure environment only. If at all
->> the FIQ needs to be disabled, it involves going through security
->> API call. Hence the local_fiq_[enable/disable]() in the OMAP code is bogus.
->>
->> So just get rid of it.
->
-> This is not true for all omaps, needs to be checked carefully
-> at what point it was made HS omap only. We have at least
-> mach-omap1//ams-delta-fiq.c that's being used.
->
-This is true for all OMAP2 and onward devices. I assumed it was
-the case for OMAP1 as well but that doesn't seems to be the
-case. Sorry I didn't look at OMAP1 code carefully.
+2013/2/11 Mats Liljegren <mats.liljegren@enea.com>:
+> Could the other guy be Kevin Hillman? The name has been mentioned to me but
+> I don't have his e-mail address.
 
-So this patch can be dropped then.
+Exactly :)
 
-Regards
-Santosh
+>
+> I have stumbled across a problem, I get the following error messages during
+> boot:
+>
+> ---- Start snippet ----
+> [   41.119873] INFO: task rcuo1:10 blocked for more than 20 seconds.
+
+This showed up upstream as well, it hshould have been fixed in linus tree now.
+
+[...]
+> [  112.400695] VFS: Unable to mount root fs via NFS, trying floppy.
+> [  112.407226] List of all partitions:
+> [  112.411041] No filesystem could mount root, tried:
+> [  112.416351] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(2,0)
+
+Ah, that probably not due to my patches :)
