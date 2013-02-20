@@ -1,27 +1,142 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Feb 2013 08:09:53 -0800
-Subject: [PATCH 2/9] ARM: OMAP1: PM: Remove bogus fiq_[enable/disable]
- tuple
-In-Reply-To: <1361373527-21695-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
- <1361373527-21695-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130220160953.GO5724@atomide.com>
+From: nicolas@eukrea.com (Nicolas Royer)
+Date: Wed, 20 Feb 2013 17:10:23 +0100
+Subject: [PATCH 1/4 v4] ARM: AT91SAM9G45: same platform data structure for all
+ crypto peripherals
+Message-ID: <1361376626-28987-1-git-send-email-nicolas@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Only AES use DMA in AT91SAM9G45 (TDES and SHA use PDC).
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130220 07:21]:
-> On OMAP platform, FIQ is reserved for secure environment only. If at all
-> the FIQ needs to be disabled, it involves going through security
-> API call. Hence the local_fiq_[enable/disable]() in the OMAP code is bogus.
-> 
-> So just get rid of it.
+However latest Atmel TDES and SHA IP releases use DMA instead of PDC.
+  --> Atmel TDES and SHA drivers need DMA platform data for those IP releases.
 
-This is not true for all omaps, needs to be checked carefully
-at what point it was made HS omap only. We have at least
-mach-omap1//ams-delta-fiq.c that's being used.
+Goal of this patch is to use the same platform data structure for all Atmel
+crypto peripherals. This structure contains information about DMA interface.
 
-Regards,
+Signed-off-by: Nicolas Royer <nicolas@eukrea.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Eric B?nard <eric@eukrea.com>
+Tested-by: Eric B?nard <eric@eukrea.com>
+---
+v2 : check kzalloc return value.
 
-Tony
+v3 : alt_atslave structure declared as static.
+
+v4 : no change.
+
+ arch/arm/mach-at91/at91sam9g45_devices.c   | 14 ++++++--------
+ include/linux/platform_data/atmel-aes.h    | 22 ----------------------
+ include/linux/platform_data/crypto-atmel.h | 22 ++++++++++++++++++++++
+ 3 files changed, 28 insertions(+), 30 deletions(-)
+ delete mode 100644 include/linux/platform_data/atmel-aes.h
+ create mode 100644 include/linux/platform_data/crypto-atmel.h
+
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 827c9f2..f0bf682 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -18,7 +18,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/i2c-gpio.h>
+ #include <linux/atmel-mci.h>
+-#include <linux/platform_data/atmel-aes.h>
++#include <linux/platform_data/crypto-atmel.h>
+ 
+ #include <linux/platform_data/at91_adc.h>
+ 
+@@ -1900,7 +1900,8 @@ static void __init at91_add_device_tdes(void) {}
+  * -------------------------------------------------------------------- */
+ 
+ #if defined(CONFIG_CRYPTO_DEV_ATMEL_AES) || defined(CONFIG_CRYPTO_DEV_ATMEL_AES_MODULE)
+-static struct aes_platform_data aes_data;
++static struct crypto_platform_data aes_data;
++static struct crypto_dma_data alt_atslave;
+ static u64 aes_dmamask = DMA_BIT_MASK(32);
+ 
+ static struct resource aes_resources[] = {
+@@ -1931,23 +1932,20 @@ static struct platform_device at91sam9g45_aes_device = {
+ static void __init at91_add_device_aes(void)
+ {
+ 	struct at_dma_slave	*atslave;
+-	struct aes_dma_data	*alt_atslave;
+-
+-	alt_atslave = kzalloc(sizeof(struct aes_dma_data), GFP_KERNEL);
+ 
+ 	/* DMA TX slave channel configuration */
+-	atslave = &alt_atslave->txdata;
++	atslave = &alt_atslave.txdata;
+ 	atslave->dma_dev = &at_hdmac_device.dev;
+ 	atslave->cfg = ATC_FIFOCFG_ENOUGHSPACE	| ATC_SRC_H2SEL_HW |
+ 						ATC_SRC_PER(AT_DMA_ID_AES_RX);
+ 
+ 	/* DMA RX slave channel configuration */
+-	atslave = &alt_atslave->rxdata;
++	atslave = &alt_atslave.rxdata;
+ 	atslave->dma_dev = &at_hdmac_device.dev;
+ 	atslave->cfg = ATC_FIFOCFG_ENOUGHSPACE	| ATC_DST_H2SEL_HW |
+ 						ATC_DST_PER(AT_DMA_ID_AES_TX);
+ 
+-	aes_data.dma_slave = alt_atslave;
++	aes_data.dma_slave = &alt_atslave;
+ 	platform_device_register(&at91sam9g45_aes_device);
+ }
+ #else
+diff --git a/include/linux/platform_data/atmel-aes.h b/include/linux/platform_data/atmel-aes.h
+deleted file mode 100644
+index ab68082..0000000
+--- a/include/linux/platform_data/atmel-aes.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#ifndef __LINUX_ATMEL_AES_H
+-#define __LINUX_ATMEL_AES_H
+-
+-#include <linux/platform_data/dma-atmel.h>
+-
+-/**
+- * struct aes_dma_data - DMA data for AES
+- */
+-struct aes_dma_data {
+-	struct at_dma_slave	txdata;
+-	struct at_dma_slave	rxdata;
+-};
+-
+-/**
+- * struct aes_platform_data - board-specific AES configuration
+- * @dma_slave: DMA slave interface to use in data transfers.
+- */
+-struct aes_platform_data {
+-	struct aes_dma_data	*dma_slave;
+-};
+-
+-#endif /* __LINUX_ATMEL_AES_H */
+diff --git a/include/linux/platform_data/crypto-atmel.h b/include/linux/platform_data/crypto-atmel.h
+new file mode 100644
+index 0000000..b46e0d9
+--- /dev/null
++++ b/include/linux/platform_data/crypto-atmel.h
+@@ -0,0 +1,22 @@
++#ifndef __LINUX_CRYPTO_ATMEL_H
++#define __LINUX_CRYPTO_ATMEL_H
++
++#include <linux/platform_data/dma-atmel.h>
++
++/**
++ * struct crypto_dma_data - DMA data for AES/TDES/SHA
++ */
++struct crypto_dma_data {
++	struct at_dma_slave	txdata;
++	struct at_dma_slave	rxdata;
++};
++
++/**
++ * struct crypto_platform_data - board-specific AES/TDES/SHA configuration
++ * @dma_slave: DMA slave interface to use in data transfers.
++ */
++struct crypto_platform_data {
++	struct crypto_dma_data	*dma_slave;
++};
++
++#endif /* __LINUX_CRYPTO_ATMEL_H */
+-- 
+1.8.1
