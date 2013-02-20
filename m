@@ -1,30 +1,38 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Wed, 20 Feb 2013 09:29:16 +0100
-Subject: [PATCH] ARM: ux500: read the correct soc_id number
-Message-ID: <1361348956-4387-1-git-send-email-fabio.baltieri@linaro.org>
+From: codekipper@gmail.com (Marcus Cooper)
+Date: Wed, 20 Feb 2013 09:53:50 +0100
+Subject: [PATCH 06/35] mfd: ab8500-core: Sysfs chip id modification
+In-Reply-To: <20130220081311.GB3368@gmail.com>
+References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
+ <1360933026-30325-7-git-send-email-lee.jones@linaro.org>
+ <201302192204.45153.arnd@arndb.de>
+ <20130220081311.GB3368@gmail.com>
+Message-ID: <CAEKpxBk=bgTx18A2J6mVT5RBBq3ZJAqswz-6NvNpTRP=u9pgwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix db8500_read_soc_id() to read all five soc_id number locations
-instead of repeating the second one two times.
-
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
- arch/arm/mach-ux500/cpu-db8500.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 5b286e0..4b5602b 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -199,7 +199,7 @@ static const char *db8500_read_soc_id(void)
- 	/* Throw these device-specific numbers into the entropy pool */
- 	add_device_randomness(uid, 0x14);
- 	return kasprintf(GFP_KERNEL, "%08x%08x%08x%08x%08x",
--			 readl((u32 *)uid+1),
-+			 readl((u32 *)uid+0),
- 			 readl((u32 *)uid+1), readl((u32 *)uid+2),
- 			 readl((u32 *)uid+3), readl((u32 *)uid+4));
- }
--- 
-1.7.12.1
+On 20 February 2013 09:13, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 19 Feb 2013, Arnd Bergmann wrote:
+>
+>> On Friday 15 February 2013, Lee Jones wrote:
+>> >         struct ab8500 *ab8500;
+>> > +       int chip_id = -EINVAL;
+>> >
+>> >         ab8500 = dev_get_drvdata(dev);
+>> > -       return sprintf(buf, "%#x\n", ab8500 ? ab8500->chip_id : -EINVAL);
+>> > +       if(ab8500) {
+>> > +               chip_id = ab8500->chip_id;
+>> > +               if((is_ab8505(ab8500) || is_ab9540(ab8500)) && ab8500->version != 0xFF)
+>> > +                       chip_id = (ab8500->version << 8) | chip_id;
+>> > +       }
+>> > +       return sprintf(buf, "%#x\n", chip_id);
+>> >  }
+>>
+>> What's the use of printing "ffffffea" for unknown versions here?
+>
+> You mean instead of -EINVAL? No idea, Marcus?
+>
+Looks like I'm guilty of just making the minimal changes. Arnd is
+right though, getting ffffffea(-EINVAL) back is pretty useless.
+I'll have to check user land to see what is using this. Maybe not
+printing and returning 0 should be the correct behaviour
+when an unknown version is found.
