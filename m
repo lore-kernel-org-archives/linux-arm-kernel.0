@@ -1,38 +1,42 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 20 Feb 2013 10:45:10 -0500
-Subject: [GIT PULL 3/4] ARM: mvebu: dt changes for v3.9
-In-Reply-To: <201302191738.43055.arnd@arndb.de>
-References: <20130216200410.GJ23237@titan.lakedaemon.net>
- <201302191738.43055.arnd@arndb.de>
-Message-ID: <20130220154510.GQ23237@titan.lakedaemon.net>
+Date: Wed, 20 Feb 2013 10:50:00 -0500
+Subject: [GIT PULL 4/4] ARM: mvebu: dt changes with deps for v3.9
+In-Reply-To: <201302191723.47157.arnd@arndb.de>
+References: <20130216204603.GK23237@titan.lakedaemon.net>
+ <201302191723.47157.arnd@arndb.de>
+Message-ID: <20130220155000.GR23237@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 05:38:42PM +0000, Arnd Bergmann wrote:
+On Tue, Feb 19, 2013 at 05:23:46PM +0000, Arnd Bergmann wrote:
 > On Saturday 16 February 2013, Jason Cooper wrote:
-> > The following changes since commit 1bead82fa5a52cd21c30c0c28615157d5c3dac9f:
+> > The following changes since commit 836dc9e3fbbab0c30aa6e664417225f5c1fb1c39:
 > > 
-> >   arm: mvebu: add button for OpenBlocks AX3-4 (2013-01-31 20:44:08 +0000)
+> >   Linux 3.8-rc7 (2013-02-09 08:20:39 +1100)
 > > 
 > > are available in the git repository at:
 > > 
-> >   git://git.infradead.org/users/jcooper/linux.git tags/dt_for_v3.9_round2
+> >   git://git.infradead.org/users/jcooper/linux.git tags/dt_deps_for_v3.9
 > > 
-> > for you to fetch changes up to d892d02956c3cbe6835480a20ba553fbb0699666:
+> > for you to fetch changes up to 5082d43000dcedd465059957026bfaef0d7f7cfb:
 > > 
-> >   arm: mvebu: enable the SD card slot on Armada 370 Reference Design board (2013-02-16 16:27:13 +0000)
+> >   Dove: Thermal: Add DT node and enable in defconfig (2013-02-16 19:07:16 +0000)
+> > 
+> > ----------------------------------------------------------------
+> > mvebu dt with deps for v3.9
+> > 
+> > This series of patches have external dependencies on driver maintainer trees.
+> > If this pull request doesn't merge easily, let me know and I'll resend for
+> > v3.10.
 > 
-> I've merged them into late/mvebu-dt in order to get them into for-next,
-> but I don't think this is how we will get it merged upstream. Depending
-> on how things go, I think we will do one of three things:
-> 
-> * send this one as part of late/dt
-> * send it as part of late/mvebu
-> * defer it to 3.10
+> I only got to looking at this today, and I'd prefer deferring it to 3.10
+> now that the merge window is open.
 
-I hope it's option #1 or #2, but I understand it's difficult.  If there
-is anything I can do to help, please don't hesitate to ask.  I'm at ELC
-all week, so I can respin branches all day if needed. :-)
+Ok, I'll rebase against v3.9-rc1 and resend without the external
+dependencies.
+
+I'll also sit down with Olof this week and see if we can come up with a
+sane process (if possible) to keep these sorts of series together.
 
 thx,
 
