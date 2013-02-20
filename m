@@ -1,46 +1,73 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Feb 2013 10:54:38 -0700
-Subject: [PATCH 1/1] memory: tegra_ahb_enable_smmu() depends on
- TEGRA_IOMMU_SMMU
-In-Reply-To: <20130211.193034.1346903263789032239.hdoyu@nvidia.com>
-References: <1360175666-8377-1-git-send-email-hdoyu@nvidia.com><5112A642.1020800@wwwdotorg.org><20130206.211635.744922728615926717.hdoyu@nvidia.com>
- <20130211.193034.1346903263789032239.hdoyu@nvidia.com>
-Message-ID: <51250DDE.7010408@wwwdotorg.org>
+From: anish198519851985@gmail.com (anish kumar)
+Date: Wed, 20 Feb 2013 23:35:11 +0530
+Subject: test jiffies on ARM SMP board
+In-Reply-To: <20130220173014.GY17852@n2100.arm.linux.org.uk>
+References: <BLU002-W18453B5FE6CB5CDDA18C8DBCF60@phx.gbl>
+ <1361381081.16206.45.camel@anish-Inspiron-N5050>
+ <20130220173014.GY17852@n2100.arm.linux.org.uk>
+Message-ID: <1361383511.16206.50.camel@anish-Inspiron-N5050>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2013 10:30 AM, Hiroshi Doyu wrote:
-> Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Wed, 06 Feb 2013 21:16:35 +0200 (EET):
+On Wed, 2013-02-20 at 17:30 +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 20, 2013 at 10:54:41PM +0530, anish kumar wrote:
+> > On Thu, 2013-02-21 at 00:39 +0800, buyitian wrote:
+> > > i am confused about my test. in one device driver, 
+> > > i put below code:
+> > > 
+> > >     printk("start to test test jiffies\n");
+> > > 
+> > >     local_irq_save(flags);
+> > > 
+> > >     jf1 = jiffies; // read jiffies first time
+> > > 
+> > >     // hold cpu for about 2 seconds(do some calculation)
+> > > 
+> > >     jf2 = jiffies; // read jiffies after 2 seconds
+> > > 
+> > >     local_irq_restore(flags);
+> > > 
+> > >     printk("jf1:%lu, jf2:%lu\n", jf1, jf2);
+> > > 
+> > > and the output is as below:
+> > > 
+> > >     <4>[  108.551124]start to test test jiffies
+> > >     <4>[  110.367604]jf1:4294948151, jf2:4294948151
+> > > 
+> > > the jf1 and jf2 are the same value, although they are
+> > > read between 2 seconds interval, i think this is because
+> > > i disabled local interrupt.
+> > > but the printk timestamp is from 108.551124 to 110.367604,
+> > > which is about 2 seconds. and on my platform, printk timestamp
+> > > is got from the function read_sched_clock:
+> > >    static u32 __read_mostly (*read_sched_clock)(void) = jiffy_sched_clock_read;
+> > > 
+> > > and function jiffy_sched_clock_read() is to read from jiffies.
+> > > 
+> > > it seems that the jiffies is frozen when local irq is disabled,
+> > > but after local_irq_restore(), the jiffies not only start
+> > > to run, but also recover the lost 2 seconds.
+> > > 
+> > > is the jiffies updated from another cpu when irq is disabled on
+> > > local cpu? 
+> > > 
+> > > is there some internel processor interrupt between cpu1 and cpu0
+> > > after local irq is re-enabled so that jiffies recover the lost 2 seconds? 		 	   		  
+> > I think it is because of the fact that some RTC registers keep the
 > 
->> Hi Russell,
->>
->> Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 6 Feb 2013 19:51:46 +0100:
->>
->>> On 02/06/2013 11:34 AM, Hiroshi Doyu wrote:
->>>> New SoC, Tegra114 also uses SMMU. Change tegra_ahb_enable_smmu()'s
->>>> dependency from ARCH_TEGRA_3x_SOC to TEGRA_IOMMU_SMMU. No need to edit
->>>> whenever a new Tegra SoC comes.
->>>>
->>>> The following combination caused build error, which this patch fixes.
->>>>
->>>> CONFIG_ARCH_TEGRA_2x_SOC=y
->>>> \# CONFIG_ARCH_TEGRA_3x_SOC is not set
->>>> CONFIG_ARCH_TEGRA_114_SOC=y
->>>>
->>>> drivers/iommu/tegra-smmu.c:485: undefined reference to 'tegra_ahb_enable_smmu'
->>>
->>> Tested-by: Stephen Warren <swarren@nvidia.com>
->>>
->>> Russell, I assume Hiroshi should upload this to your patch tracker? It's
->>> needed for 3.9.
->>
->> FYI: Submitted as:
->> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7640/1
+> The RTC has nothing to do with this.
 > 
-> Russell,
+> As soon as the IRQs are allowed again (immediately after the
+> local_irq_restore()) the pending interrupt - including the timer
+> interrupt will be processed.
 > 
-> Is the above ok for you?
-> Please let me know if still I need to do something.
-
-Russell, will this patch make it into your tree for 3.9? Do you think it
-should go through some other tree? Thanks.
+> At this point, because we read the clocksource, we can see that two
+> seconds have passed, and so we advance jiffies by the elapsed time.
+So I understand there is some register which stores the elapsed time and
+in my understanding it was RTC register which is wrong as suggested by
+you.I suppose some timer register is used for this information on the
+SOC.
+> 
+> This means printk() sees that the two seconds have passed.  But because
+> you're reading from jiffies within the interrupt disabled region, that
+> code can't see the missed ticks.
