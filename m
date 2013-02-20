@@ -1,71 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Feb 2013 14:05:56 -0700
-Subject: [PATCH] kbuild: create an "include chroot" for DT bindings
-Message-ID: <1361394356-19385-1-git-send-email-swarren@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 Feb 2013 13:56:51 -0800
+Subject: [PATCH] ARM: poison_init_mem: fixed underflow in loop
+In-Reply-To: <1361361175-26600-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
+References: <1361361175-26600-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
+Message-ID: <512546A3.5010308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 2/20/2013 3:52 AM, Enrico Scholz wrote:
+> When initmemory ends at an odd address, the loop variable in
+> poison_init_mem() will underflow which causes overriding of valid
+> memory. Such situations are not a theoretical issue only but
+> exist in practice:
+>
+> | [    0.000000]       .init : 0xc0634000 - 0xc0c215ab   (6070 kB)
+>
+> Patch makes a simple division instead of DIV_ROUND_UP() because latter
+> can override some bytes after .init.
+>
+> Signed-off-by: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
+> ---
+>  arch/arm/mm/init.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index ad722f1..c431a2d 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -449,7 +449,8 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
+>  static inline void poison_init_mem(void *s, size_t count)
+>  {
+>  	u32 *p = (u32 *)s;
+> -	for (; count != 0; count -= 4)
+> +	count /= sizeof(*p);
+> +	for (; count != 0; count--)
+>  		*p++ = 0xe7fddef0;
+>  }
+>  
 
-The recent dtc+cpp support allows header files and C pre-processor
-defines/macros to be used when compiling device tree files. These
-headers will typically define various constants that are part of the
-device tree bindings.
+Sigh. I really screwed that up badly. I wonder if we should instead
+PAGE_ALIGN() the end address similar to what we're doing for the initrd
+and then put a BUG_ON() inside poison_init_mem() that catches none page
+aligned sizes.
 
-The original patch which set up the dtc+cpp include path only considered
-using those headers from device tree files. However, they are also
-useful for kernel code which needs to interpret the device tree.
-
-In both the DT files and the kernel, I'd like to include the DT-related
-headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
-That will simplify any text which discusses the DT header locations.
-
-Creating a <dt-bindings/> for kernel source to use is as simple as
-placing files into include/dt-bindings/.
-
-However, when compiling DT files, the include path should be restricted
-so that only the dt-bindings path is available; arbitrary kernel headers
-shouldn't be exposed. For this reason, create a specific include
-directory for use by dtc+cpp, and symlink dt-bindings from there to the
-actual location of include/dt-bindings/. For want of a better location,
-place this "include chroot" into the existing dts/ directory.
-
-arch/*/boot/dts/include/dt-bindings -> ../../../../../dt-bindings
-
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-You can find an example of how this would be used at
-git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
-(note: there's a bunch of other cruft in that branch too)
-
- arch/arm/boot/dts/include/dt-bindings |    1 +
- scripts/Makefile.lib                  |    3 +--
- 2 files changed, 2 insertions(+), 2 deletions(-)
- create mode 120000 arch/arm/boot/dts/include/dt-bindings
-
-diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..08c00e4
---- /dev/null
-+++ b/arch/arm/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 07125e6..d6c5036 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -157,8 +157,7 @@ cpp_flags      = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
- ld_flags       = $(LDFLAGS) $(ldflags-y)
- 
- dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
--		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
--		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
-+		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
- 		 -undef -D__DTS__
- 
- # Finds the multi-part object the current object will be linked into
 -- 
-1.7.10.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
