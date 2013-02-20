@@ -1,48 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Feb 2013 10:18:37 -0700
-Subject: [RFC PATCH 8/9] ARM: dt: t30 cardhu: add dt entry for thermal
- driver
-In-Reply-To: <5124B934.3020900@nvidia.com>
-References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-9-git-send-email-wni@nvidia.com>
- <51240A95.9070007@wwwdotorg.org> <5124B934.3020900@nvidia.com>
-Message-ID: <5125056D.7060608@wwwdotorg.org>
+From: anish198519851985@gmail.com (anish kumar)
+Date: Wed, 20 Feb 2013 22:54:41 +0530
+Subject: test jiffies on ARM SMP board
+In-Reply-To: <BLU002-W18453B5FE6CB5CDDA18C8DBCF60@phx.gbl>
+References: <BLU002-W18453B5FE6CB5CDDA18C8DBCF60@phx.gbl>
+Message-ID: <1361381081.16206.45.camel@anish-Inspiron-N5050>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2013 04:53 AM, Wei Ni wrote:
-> On 02/20/2013 07:28 AM, Stephen Warren wrote:
->> On 02/18/2013 04:30 AM, Wei Ni wrote:
->>> Enable thermal driver in the dts file.
->>> Set sensor as lm90 remote sensor, and set throttle data.
->>
->>> diff --git a/Documentation/devicetree/bindings/thermal/tegra3-thermal.txt b/Documentation/devicetree/bindings/thermal/tegra3-thermal.txt
-
->> Also, what units are used for all these properties?
+On Thu, 2013-02-21 at 00:39 +0800, buyitian wrote:
+> i am confused about my test. in one device driver, 
+> i put below code:
 > 
-> they use "int".
-> And according to our downstream dvfs driver, the throttle table use
-> "unsigned long".
-
-int and unsigned long are types, not units. Units means degrees C vs.
-degrees F vs. degrees K, or Hz vs. KHz vs. MHz, etc.
-
->> Judging by the example below, this property is a list of tuples. The
->> meaning of each field in the tuple needs to be explained.
->>
->> What happens when the CPU/SoC needs to be throttled? Must some clock or
->> voltage be lowered/limited? If so, you need properties that indicate
->> which clock/voltage/... needs to be acted upon.
+>     printk("start to test test jiffies\n");
 > 
-> This table which will be used by our DVFS driver, although it didn't be
-> upstreamed yet. The table set clock frequency limited value with
-> different cooling state. When the temperature touch the different
-> limited value, we will set difficult cooling state, find the limited
-> freq from this table and pass to the dvfs driver.
-> I think may be this table should be set for cooling device node. This
-> table is only for our tegra dvfs, so I think we can parse this table in
-> the tegra3_cooling.c, which will be the new driver for cooling device.
-
-Note that I expect the answers to these questions (pretty much all the
-questions I asked in response to your patch) to be included in the DT
-binding documentation, not just in email.
+>     local_irq_save(flags);
+> 
+>     jf1 = jiffies; // read jiffies first time
+> 
+>     // hold cpu for about 2 seconds(do some calculation)
+> 
+>     jf2 = jiffies; // read jiffies after 2 seconds
+> 
+>     local_irq_restore(flags);
+> 
+>     printk("jf1:%lu, jf2:%lu\n", jf1, jf2);
+> 
+> and the output is as below:
+> 
+>     <4>[  108.551124]start to test test jiffies
+>     <4>[  110.367604]jf1:4294948151, jf2:4294948151
+> 
+> the jf1 and jf2 are the same value, although they are
+> read between 2 seconds interval, i think this is because
+> i disabled local interrupt.
+> but the printk timestamp is from 108.551124 to 110.367604,
+> which is about 2 seconds. and on my platform, printk timestamp
+> is got from the function read_sched_clock:
+>    static u32 __read_mostly (*read_sched_clock)(void) = jiffy_sched_clock_read;
+> 
+> and function jiffy_sched_clock_read() is to read from jiffies.
+> 
+> it seems that the jiffies is frozen when local irq is disabled,
+> but after local_irq_restore(), the jiffies not only start
+> to run, but also recover the lost 2 seconds.
+> 
+> is the jiffies updated from another cpu when irq is disabled on
+> local cpu? 
+> 
+> is there some internel processor interrupt between cpu1 and cpu0
+> after local irq is re-enabled so that jiffies recover the lost 2 seconds? 		 	   		  
+I think it is because of the fact that some RTC registers keep the
+elapsed time and when the irq is re-enabled the kernel reads these
+registers to be in sync with time.
+However I am not that sure which registers as I think that depends on
+the RTC chip and chip changes based on different boards.
+I hope some expert on these matters can pitch in here.
+> _______________________________________________
+> Kernelnewbies mailing list
+> Kernelnewbies at kernelnewbies.org
+> http://lists.kernelnewbies.org/mailman/listinfo/kernelnewbies
