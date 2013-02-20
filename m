@@ -1,62 +1,175 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Feb 2013 23:56:29 +0000
-Subject: [RFC PATCH 7/9] thermal: tegra30: add tegra30 thermal driver
-In-Reply-To: <1361187031-3679-8-git-send-email-wni@nvidia.com>
-References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-8-git-send-email-wni@nvidia.com>
-Message-ID: <20130219235629.GU17833@n2100.arm.linux.org.uk>
+From: maxin.john@gmail.com (maxin.john at gmail.com)
+Date: Wed, 20 Feb 2013 02:07:04 +0200
+Subject: [PATCH] dma: Remove erroneous __exit and __exit_p() references
+Message-ID: <1361318824-22287-1-git-send-email-maxin.john@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 07:30:29PM +0800, Wei Ni wrote:
-> +static struct tegra_thermal_data * __devinit thermal_tegra_dt_parse_pdata(
+From: "Maxin B. John" <maxin.john@enea.com>
 
-__dev* no longer exists.
+Removing the annotation with __exit and referencing with __exit_p()
+present in dma driver module remove hooks.
 
-> +	tdata = devm_kzalloc(&pdev->dev, sizeof(*tdata), GFP_KERNEL);
-> +	if (!tdata) {
-> +		dev_err(&pdev->dev, "Can't allocate platform data\n");
-> +		return NULL;
-> +	}
-> +	memset(tdata, 0, sizeof(*tdata));
+Part of the __devexit and __devexit_p() purge.
 
-Useless memset.  k*z*alloc already zeros the memory before returning.
+Signed-off-by: Maxin B. John <maxin.john@enea.com>
+---
+ drivers/dma/at_hdmac.c      |    4 ++--
+ drivers/dma/coh901318.c     |    4 ++--
+ drivers/dma/imx-dma.c       |    4 ++--
+ drivers/dma/imx-sdma.c      |    4 ++--
+ drivers/dma/ipu/ipu_idmac.c |    4 ++--
+ drivers/dma/txx9dmac.c      |    8 ++++----
+ 6 files changed, 14 insertions(+), 14 deletions(-)
 
-> +static int tegra30_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct tegra_thermal_data *pdata = pdev->dev.platform_data;
-
-You read pdata here....
-
-> +	struct thermal_zone *tz;
-> +	struct thermal_sensor *ts;
-> +	static struct thermal_cooling_device *cdev;
-> +	int ret;
-> +
-> +	pdata = thermal_tegra_dt_parse_pdata(pdev);
-
-and immediately overwrite it here.
-
-> +	if (!pdata) {
-> +		dev_err(&pdev->dev, "Get platform data failed.\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Create a thermal zone */
-> +	tz = create_thermal_zone("tz_tegra", NULL);
-> +	if (!tz) {
-> +		dev_err(&pdev->dev, "Create thermal_zone failed.\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	pdata->tz = tz;
-
-This isn't how you deal with driver data.  Set driver data against a
-platform device using platform_set_drvdata(pdev, tz).
-
-> +static int tegra30_thermal_remove(struct platform_device *pdev)
-> +{
-> +	struct tegra_thermal_data *pdata = pdev->dev.platform_data;
-
-and use platform_get_drvdata() here - and don't use pdata->tz.
-	struct struct thermal_zone *tz = platform_get_drvdata(pdev);
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 13a02f4..1dc7fac 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -1407,7 +1407,7 @@ err_kfree:
+ 	return err;
+ }
+ 
+-static int __exit at_dma_remove(struct platform_device *pdev)
++static int at_dma_remove(struct platform_device *pdev)
+ {
+ 	struct at_dma		*atdma = platform_get_drvdata(pdev);
+ 	struct dma_chan		*chan, *_chan;
+@@ -1565,7 +1565,7 @@ static const struct dev_pm_ops at_dma_dev_pm_ops = {
+ };
+ 
+ static struct platform_driver at_dma_driver = {
+-	.remove		= __exit_p(at_dma_remove),
++	.remove		= at_dma_remove,
+ 	.shutdown	= at_dma_shutdown,
+ 	.id_table	= atdma_devtypes,
+ 	.driver = {
+diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+index aa384e5..0b8b3c8 100644
+--- a/drivers/dma/coh901318.c
++++ b/drivers/dma/coh901318.c
+@@ -1544,7 +1544,7 @@ static int __init coh901318_probe(struct platform_device *pdev)
+ 	return err;
+ }
+ 
+-static int __exit coh901318_remove(struct platform_device *pdev)
++static int coh901318_remove(struct platform_device *pdev)
+ {
+ 	struct coh901318_base *base = platform_get_drvdata(pdev);
+ 
+@@ -1556,7 +1556,7 @@ static int __exit coh901318_remove(struct platform_device *pdev)
+ 
+ 
+ static struct platform_driver coh901318_driver = {
+-	.remove = __exit_p(coh901318_remove),
++	.remove = coh901318_remove,
+ 	.driver = {
+ 		.name	= "coh901318",
+ 	},
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index a7dcf78..bbf6d7f 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -1144,7 +1144,7 @@ err:
+ 	return ret;
+ }
+ 
+-static int __exit imxdma_remove(struct platform_device *pdev)
++static int imxdma_remove(struct platform_device *pdev)
+ {
+ 	struct imxdma_engine *imxdma = platform_get_drvdata(pdev);
+ 
+@@ -1161,7 +1161,7 @@ static struct platform_driver imxdma_driver = {
+ 		.name	= "imx-dma",
+ 	},
+ 	.id_table	= imx_dma_devtype,
+-	.remove		= __exit_p(imxdma_remove),
++	.remove		= imxdma_remove,
+ };
+ 
+ static int __init imxdma_module_init(void)
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index f082aa3..092867b 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -1462,7 +1462,7 @@ err_irq:
+ 	return ret;
+ }
+ 
+-static int __exit sdma_remove(struct platform_device *pdev)
++static int sdma_remove(struct platform_device *pdev)
+ {
+ 	return -EBUSY;
+ }
+@@ -1473,7 +1473,7 @@ static struct platform_driver sdma_driver = {
+ 		.of_match_table = sdma_dt_ids,
+ 	},
+ 	.id_table	= sdma_devtypes,
+-	.remove		= __exit_p(sdma_remove),
++	.remove		= sdma_remove,
+ };
+ 
+ static int __init sdma_module_init(void)
+diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
+index 6585537..d79717c 100644
+--- a/drivers/dma/ipu/ipu_idmac.c
++++ b/drivers/dma/ipu/ipu_idmac.c
+@@ -1756,7 +1756,7 @@ err_noirq:
+ 	return ret;
+ }
+ 
+-static int __exit ipu_remove(struct platform_device *pdev)
++static int ipu_remove(struct platform_device *pdev)
+ {
+ 	struct ipu *ipu = platform_get_drvdata(pdev);
+ 
+@@ -1781,7 +1781,7 @@ static struct platform_driver ipu_platform_driver = {
+ 		.name	= "ipu-core",
+ 		.owner	= THIS_MODULE,
+ 	},
+-	.remove		= __exit_p(ipu_remove),
++	.remove		= ipu_remove,
+ };
+ 
+ static int __init ipu_init(void)
+diff --git a/drivers/dma/txx9dmac.c b/drivers/dma/txx9dmac.c
+index 913f55c..a59fb48 100644
+--- a/drivers/dma/txx9dmac.c
++++ b/drivers/dma/txx9dmac.c
+@@ -1190,7 +1190,7 @@ static int __init txx9dmac_chan_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __exit txx9dmac_chan_remove(struct platform_device *pdev)
++static int txx9dmac_chan_remove(struct platform_device *pdev)
+ {
+ 	struct txx9dmac_chan *dc = platform_get_drvdata(pdev);
+ 
+@@ -1252,7 +1252,7 @@ static int __init txx9dmac_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __exit txx9dmac_remove(struct platform_device *pdev)
++static int txx9dmac_remove(struct platform_device *pdev)
+ {
+ 	struct txx9dmac_dev *ddev = platform_get_drvdata(pdev);
+ 
+@@ -1299,14 +1299,14 @@ static const struct dev_pm_ops txx9dmac_dev_pm_ops = {
+ };
+ 
+ static struct platform_driver txx9dmac_chan_driver = {
+-	.remove		= __exit_p(txx9dmac_chan_remove),
++	.remove		= txx9dmac_chan_remove,
+ 	.driver = {
+ 		.name	= "txx9dmac-chan",
+ 	},
+ };
+ 
+ static struct platform_driver txx9dmac_driver = {
+-	.remove		= __exit_p(txx9dmac_remove),
++	.remove		= txx9dmac_remove,
+ 	.shutdown	= txx9dmac_shutdown,
+ 	.driver = {
+ 		.name	= "txx9dmac",
+-- 
+1.7.7
