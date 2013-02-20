@@ -1,31 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Feb 2013 16:38:56 +0000
-Subject: [PATCH 02/35] mfd: ab8500-gpadc: Allow tvout regulator to be
- missing
-In-Reply-To: <20130220132321.GC13049@sirena.org.uk>
-References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
- <1360933026-30325-3-git-send-email-lee.jones@linaro.org>
- <20130220132321.GC13049@sirena.org.uk>
-Message-ID: <20130220163856.GC4417@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 20 Feb 2013 11:54:52 -0500
+Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
+In-Reply-To: <201302201627.04224.arnd@arndb.de>
+References: <Pine.LNX.4.44L0.1302201055260.1671-100000@iolanthe.rowland.org>
+ <201302201627.04224.arnd@arndb.de>
+Message-ID: <20130220165452.GS23237@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Feb 2013, Mark Brown wrote:
+Alan,
 
-> On Fri, Feb 15, 2013 at 12:56:33PM +0000, Lee Jones wrote:
+On Wed, Feb 20, 2013 at 04:27:04PM +0000, Arnd Bergmann wrote:
+> On Wednesday 20 February 2013, Alan Stern wrote:
+> > Currently there is no Kconfig option to control specifically whether
+> > the ehci-orion driver gets built; it always gets built whenever
+> > CONFIG_PLAT_ORION and CONFIG_USB_EHCI_HCD are both enabled.
+> > 
+> > Do you think it is a good idea to add an option for this?  Should it at
+> > least be non-interactive, so that the driver always gets built under
+> > the same conditions as currently?  A later patch can make it 
+> > interactive, if desired.
 > 
-> > +	if (gpadc->regu)
-> > +		regulator_disable(gpadc->regu);
-> 
-> No explanation for this in the changelog and missing error handling like
-> this is pretty much always terrible style.  Why are we doing this?
+> I think it's good to have it interactive, because we are now building for
+> multiplatform with Orion being one of many. It's useful to be able to
+> build EHCI_HCD=y AND EHCD_HCD_ORION=m.
 
-No idea, and Jonas is on parental leave.
+Yes, explicit is preferable.  On kirkwood usb has it's own gateable
+clock.  The user should be able to conserve power by unloading the
+module or building without it.
 
-Perhaps one of the other guys have an explanation?
+thx,
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jason.
