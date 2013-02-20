@@ -1,62 +1,47 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Wed, 20 Feb 2013 15:14:47 +0000
-Subject: [PATCH 01/11] ARM: disable virt_to_bus/virt_to_bus almost
- everywhere
-In-Reply-To: <1360849767-1463135-2-git-send-email-arnd@arndb.de>
-References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
- <1360849767-1463135-2-git-send-email-arnd@arndb.de>
-Message-ID: <CAAG0J9_VqCGJJJZjSWGfFggALHU=vdWsSBeS39-DtxV=VXcJwQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 20 Feb 2013 20:48:38 +0530
+Subject: [PATCH 0/9] ARM: OMAP: Static deps, fiq, omap-smp cleanup
+Message-ID: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 February 2013 13:49, Arnd Bergmann <arnd@arndb.de> wrote:
-> We are getting a number of warnings about the use of the deprecated
-> bus_to_virt function in drivers using the ARM ISA DMA API:
->
-> drivers/parport/parport_pc.c: In function 'parport_pc_fifo_write_block_dma':
-> drivers/parport/parport_pc.c:622:3: warning: 'bus_to_virt' is deprecated
-> (declared at arch/arm/include/asm/memory.h:253) [-Wdeprecated-declarations]
->
-> This is only because that function gets used by the inline
-> set_dma_addr() helper. We know that any driver for the ISA DMA API
-> is correctly using the DMA addresses, so we can change this
-> to use the __bus_to_virt() function instead, which does not warn.
->
-> After this, there are no remaining drivers that are used on
-> any defconfigs on ARM using virt_to_bus or bus_to_virt, with
-> the exception of the OSS sound driver. That driver is only used
-> on RiscPC, NetWinder and Shark, so we can set ARCH_NO_VIRT_TO_BUS
-> on all other platforms and hide the deprecated functions, which
-> is far more effective than marking them as deprecated, in order
-> to avoid any new users of that code.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> ---
->  arch/arm/Kconfig                 | 4 ++++
->  arch/arm/configs/shark_defconfig | 1 -
->  arch/arm/include/asm/dma.h       | 2 +-
->  arch/arm/include/asm/memory.h    | 2 ++
->  4 files changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 67874b8..91d4aea 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1450,6 +1450,10 @@ config ISA_DMA
->         bool
->         select ISA_DMA_API
->
-> +config ARCH_NO_VIRT_TO_BUS
-> +       def_bool y
-> +       depends on !ARCH_RPC && !ARCH_NETWINDER && !ARCH_SHARK
+This series tries to clean-up the some of the areas like OMAP4 static
+deps, FIQ usage in OMAP code, SMP code. The patches are self explanatory 
+and quite independent but since I had them mantained in a branch, am
+sending them together not to loose track of them.
 
-Hi Arnd,
+They have been tested on OMAP4 and OMAP3 devices for boot, suspend and
+CPUIDLE. OMAP1 patch isn't tested but I don't expect it to cause any
+breakage since it is just cleaning up the bogus fiq use.
 
-There's a patch in linux-next by Stephen Rothwell "Centralise
-CONFIG_ARCH_NO_VIRT_TO_BUS" that removes this Kconfig symbol,
-inverting/replacing it with "select HAVE_VIRT_TO_BUS" (including for
-arch/arm) which will undo the effects of this.
+Santosh Shilimkar (8):
+  ARM: OMAP1: PM: Remove bogus fiq_[enable/disable] tuple
+  ARM: OMAP2+: PM: Remove bogus fiq_[enable/disable] tuple
+  ARM: OMAP4+: Remove the un-necessary cache flush from hotplug code
+  ARM: OMAP4+: Remove un-necessary cacheflush in secondary CPU boot
+    path
+  ARM: OMAP4+: Remove out of placed smp_wmb() in secondary wakeup code
+  ARM: OMAP4+: Move the CPU wakeup prepare code under
+    smp_prepare_cpus()
+  ARM: OMAP4: PM: Remove L4 wakeup depedency with MPU since errata fix
+    exist now
+  ARM: OMAP4: PM: Now remove L4 per clockdomain static depedency with
+    MPU
 
-Cheers
-James
+Tero Kristo (1):
+  ARM: OMAP4+: Use common scratchpad SAR RAM offsets for all
+    architectures
+
+ arch/arm/mach-omap1/pm.c               |    6 ----
+ arch/arm/mach-omap2/cpuidle34xx.c      |    4 ---
+ arch/arm/mach-omap2/cpuidle44xx.c      |    7 ----
+ arch/arm/mach-omap2/omap-hotplug.c     |    6 ----
+ arch/arm/mach-omap2/omap-smp.c         |   57 +++++++++++---------------------
+ arch/arm/mach-omap2/omap4-sar-layout.h |   14 ++++----
+ arch/arm/mach-omap2/pm24xx.c           |   11 ++----
+ arch/arm/mach-omap2/pm34xx.c           |    9 +----
+ arch/arm/mach-omap2/pm44xx.c           |   20 +++--------
+ 9 files changed, 35 insertions(+), 99 deletions(-)
+
+-- 
+1.7.9.5
