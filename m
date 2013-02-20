@@ -1,30 +1,21 @@
 From: dong.aisheng@linaro.org (Dong Aisheng)
-Date: Wed, 20 Feb 2013 17:25:22 +0800
-Subject: [PATCH 0/3] Get rid of big array from imx pinctrl driver
-In-Reply-To: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
+Date: Wed, 20 Feb 2013 17:26:03 +0800
+Subject: [PATCH 1/3] ARM: dts: imx: use pre-processor for device trees
+In-Reply-To: <1361344089-16804-2-git-send-email-shawn.guo@linaro.org>
 References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAP1dx+xT+cGswcsW54WxNq7fDVvgqq1M-ZW4r_8h8ppfVh3yNQ@mail.gmail.com>
+ <1361344089-16804-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAP1dx+zix_aM=5Ro3t44xug1eAPTKk_h7uqbUAO=6Y4fQhHGpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-Really glad to see this clean up patch series.
-Thanks for your work.
-
 On 20 February 2013 15:08, Shawn Guo <shawn.guo@linaro.org> wrote:
-> First of all, thanks to Stephen for getting CPP pre-processor support
-> on DTC.
-
-I want to express my thanks to Stephen too.
-
+> Enable C pre-processing on imx device trees. This allows future use
+> of defining names for various constants, to increase the readability
+> of the device tree sources.
 >
-> The series is an action of discussion [1].  It utilizes the DTC
-> pre-processing feature to move those huge mount of data about pin
-> from pinctrl driver into device tree.
->
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-It's good we start this work now.
+Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
 
 Regards
 Dong Aisheng
