@@ -1,62 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Feb 2013 15:32:22 +0530
-Subject: [PATCH 0/8] ARM; OMAP2+: hwmod and SERIAL: Remove sysc handling
- from driver
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Feb 2013 10:14:01 +0000
+Subject: [PATCH 0/8] ARM; OMAP2+: hwmod and SERIAL: Remove sysc
+ handling from driver
 In-Reply-To: <1361354272-18089-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1361354272-18089-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <51249F2E.6010404@ti.com>
+Message-ID: <20130220101401.GW17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Felipe ( Sorry I missed you in CC list)
-
-On Wednesday 20 February 2013 03:27 PM, Santosh Shilimkar wrote:
+On Wed, Feb 20, 2013 at 03:27:44PM +0530, Santosh Shilimkar wrote:
 > OMAP UART IP needs manual idle modes based on functional state of the
 > IP. Currently this is handled by the driver with function pointers
 > implemented in platform code.
->
-> This however breaks in case of device tree because of missing
-> idle handling.
->
-> The series tries to address the issue and tries to remove complete
-> sysc handling from serial driver.
->
-> Patches has been tested on OMAP4430 SDP and OMAP5 EVM where the console
-> sluggishness was observed without idle mode handling. CPUIDLE and
-> suspend tested ok on these devices.
->
-> Thanks to Vaibhav Bedia for testing on Beaglebone(AM33XX) with suspend and
-> also the UART async wakeup from suspend.
->
-> Thanks to Sourav Poddar for Beagle XM(OMAP3630) devices testing with
-> retention and offmode in Idle and suspend for non-DT builds.
->
-> Serial driver platform code still has one more function pointer
-> left which is used to trigger io_ring(). This one needs some
-> discussion with pincontrol driver folks on how to implement
-> such a feature with generic pincontrol driver.
->
-> Rajendra Nayak (4):
->    ARM: OMAP2+: hwmod: Remove unused _HWMOD_WAKEUP_ENABLED flag
->    ARM: OMAP2+: hwmod: Cleanup sidle/mstandby programming
->    ARM: OMAP2+: hwmod: Always have OCP_SYSCONFIG.ENAWAKEUP enabled
->    ARM: OMAP2+: hwmod: Add a new flag to handle SIDLE in SWSUP only in
->      active
->
-> Santosh Shilimkar (4):
->    ARM: OMAP2+: hwmod-data: UART IP needs software control to manage
->      sidle modes
->    SERIAL: OMAP: Remove the slave idle handling from the driver
->    ARM: OMAP2+: serial: Remove the un-used slave idle hooks
->    ARM: OMAP2+: hwmod: Remove sysc slave idle and auto idle apis
->
->   arch/arm/mach-omap2/omap_hwmod.c                   |  141 ++++----------------
->   arch/arm/mach-omap2/omap_hwmod.h                   |   13 +-
->   arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    3 +
->   arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    6 +
->   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    4 +
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 +-
->   arch/arm/mach-omap2/serial.c                       |   31 -----
->   drivers/tty/serial/omap-serial.c                   |   23 ----
->   8 files changed, 50 insertions(+), 177 deletions(-)
->
+
+Up until now, the nightly test builds have included a load of test code
+for supporting DMA on OMAP serial - only the buggy transmit side which
+we've covered the reasons earlier why this can't work properly.
+
+We've also covered why the ripping out of the DMA code from the serial
+driver, and then subsequent "cleanup" of the driver has resulted in it
+being impossible to resurect receive DMA support without reverting all
+those cleanups.
+
+This patch set is yet again another nail in the coffin of any DMA support
+in the serial driver; it is removing the final bits of knowledge about
+how DMA support interacts with the idle support.  Arguably, the previous
+cleanups already did that, but at least the hooks were still clearly
+visible as separate stand-alone entities and how only they were affected
+by DMA being enabled.
+
+Therefore, tonight I am dropping and discarding what I have left over
+from my work on getting DMA support working with the OMAP serial driver
+again from the nightly test builds and my git tree, and I intend no
+further involvement with this.
