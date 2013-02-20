@@ -1,175 +1,46 @@
-From: maxin.john@gmail.com (maxin.john at gmail.com)
-Date: Wed, 20 Feb 2013 02:07:04 +0200
-Subject: [PATCH] dma: Remove erroneous __exit and __exit_p() references
-Message-ID: <1361318824-22287-1-git-send-email-maxin.john@gmail.com>
+From: ric.masonn@gmail.com (Ric Mason)
+Date: Wed, 20 Feb 2013 08:40:06 +0800
+Subject: Should a swapped out page be deleted from swap cache?
+In-Reply-To: <alpine.LNX.2.00.1302191050330.2248@eggly.anvils>
+References: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
+ <alpine.LNX.2.00.1302180939200.2246@eggly.anvils>
+ <512338A6.1030602@gmail.com>
+ <alpine.LNX.2.00.1302191050330.2248@eggly.anvils>
+Message-ID: <51241B66.7080004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Maxin B. John" <maxin.john@enea.com>
 
-Removing the annotation with __exit and referencing with __exit_p()
-present in dma driver module remove hooks.
+Hi Hugh,
 
-Part of the __devexit and __devexit_p() purge.
+On 02/20/2013 02:56 AM, Hugh Dickins wrote:
+> On Tue, 19 Feb 2013, Ric Mason wrote:
+>> There is a call of try_to_free_swap in function swap_writepage, if
+>> swap_writepage is call from shrink_page_list path, PageSwapCache(page) ==
+>> trure, PageWriteback(page) maybe false, page_swapcount(page) == 0, then will
+>> delete the page from swap cache and free swap slot, where I miss?
+> That's correct.  PageWriteback is sure to be false there.  page_swapcount
+> usually won't be 0 there, but sometimes it will be, and in that case we
+> do want to delete from swap cache and free the swap slot.
 
-Signed-off-by: Maxin B. John <maxin.john@enea.com>
----
- drivers/dma/at_hdmac.c      |    4 ++--
- drivers/dma/coh901318.c     |    4 ++--
- drivers/dma/imx-dma.c       |    4 ++--
- drivers/dma/imx-sdma.c      |    4 ++--
- drivers/dma/ipu/ipu_idmac.c |    4 ++--
- drivers/dma/txx9dmac.c      |    8 ++++----
- 6 files changed, 14 insertions(+), 14 deletions(-)
+1) If PageSwapCache(page)  == true, PageWriteback(page) == false, 
+page_swapcount(page) == 0  in swap_writepage(shrink_page_list path), 
+then will delete the page from swap cache and free swap slot, in 
+function swap_writepage:
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 13a02f4..1dc7fac 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -1407,7 +1407,7 @@ err_kfree:
- 	return err;
- }
- 
--static int __exit at_dma_remove(struct platform_device *pdev)
-+static int at_dma_remove(struct platform_device *pdev)
- {
- 	struct at_dma		*atdma = platform_get_drvdata(pdev);
- 	struct dma_chan		*chan, *_chan;
-@@ -1565,7 +1565,7 @@ static const struct dev_pm_ops at_dma_dev_pm_ops = {
- };
- 
- static struct platform_driver at_dma_driver = {
--	.remove		= __exit_p(at_dma_remove),
-+	.remove		= at_dma_remove,
- 	.shutdown	= at_dma_shutdown,
- 	.id_table	= atdma_devtypes,
- 	.driver = {
-diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
-index aa384e5..0b8b3c8 100644
---- a/drivers/dma/coh901318.c
-+++ b/drivers/dma/coh901318.c
-@@ -1544,7 +1544,7 @@ static int __init coh901318_probe(struct platform_device *pdev)
- 	return err;
- }
- 
--static int __exit coh901318_remove(struct platform_device *pdev)
-+static int coh901318_remove(struct platform_device *pdev)
- {
- 	struct coh901318_base *base = platform_get_drvdata(pdev);
- 
-@@ -1556,7 +1556,7 @@ static int __exit coh901318_remove(struct platform_device *pdev)
- 
- 
- static struct platform_driver coh901318_driver = {
--	.remove = __exit_p(coh901318_remove),
-+	.remove = coh901318_remove,
- 	.driver = {
- 		.name	= "coh901318",
- 	},
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index a7dcf78..bbf6d7f 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -1144,7 +1144,7 @@ err:
- 	return ret;
- }
- 
--static int __exit imxdma_remove(struct platform_device *pdev)
-+static int imxdma_remove(struct platform_device *pdev)
- {
- 	struct imxdma_engine *imxdma = platform_get_drvdata(pdev);
- 
-@@ -1161,7 +1161,7 @@ static struct platform_driver imxdma_driver = {
- 		.name	= "imx-dma",
- 	},
- 	.id_table	= imx_dma_devtype,
--	.remove		= __exit_p(imxdma_remove),
-+	.remove		= imxdma_remove,
- };
- 
- static int __init imxdma_module_init(void)
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f082aa3..092867b 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -1462,7 +1462,7 @@ err_irq:
- 	return ret;
- }
- 
--static int __exit sdma_remove(struct platform_device *pdev)
-+static int sdma_remove(struct platform_device *pdev)
- {
- 	return -EBUSY;
- }
-@@ -1473,7 +1473,7 @@ static struct platform_driver sdma_driver = {
- 		.of_match_table = sdma_dt_ids,
- 	},
- 	.id_table	= sdma_devtypes,
--	.remove		= __exit_p(sdma_remove),
-+	.remove		= sdma_remove,
- };
- 
- static int __init sdma_module_init(void)
-diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
-index 6585537..d79717c 100644
---- a/drivers/dma/ipu/ipu_idmac.c
-+++ b/drivers/dma/ipu/ipu_idmac.c
-@@ -1756,7 +1756,7 @@ err_noirq:
- 	return ret;
- }
- 
--static int __exit ipu_remove(struct platform_device *pdev)
-+static int ipu_remove(struct platform_device *pdev)
- {
- 	struct ipu *ipu = platform_get_drvdata(pdev);
- 
-@@ -1781,7 +1781,7 @@ static struct platform_driver ipu_platform_driver = {
- 		.name	= "ipu-core",
- 		.owner	= THIS_MODULE,
- 	},
--	.remove		= __exit_p(ipu_remove),
-+	.remove		= ipu_remove,
- };
- 
- static int __init ipu_init(void)
-diff --git a/drivers/dma/txx9dmac.c b/drivers/dma/txx9dmac.c
-index 913f55c..a59fb48 100644
---- a/drivers/dma/txx9dmac.c
-+++ b/drivers/dma/txx9dmac.c
-@@ -1190,7 +1190,7 @@ static int __init txx9dmac_chan_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __exit txx9dmac_chan_remove(struct platform_device *pdev)
-+static int txx9dmac_chan_remove(struct platform_device *pdev)
- {
- 	struct txx9dmac_chan *dc = platform_get_drvdata(pdev);
- 
-@@ -1252,7 +1252,7 @@ static int __init txx9dmac_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __exit txx9dmac_remove(struct platform_device *pdev)
-+static int txx9dmac_remove(struct platform_device *pdev)
- {
- 	struct txx9dmac_dev *ddev = platform_get_drvdata(pdev);
- 
-@@ -1299,14 +1299,14 @@ static const struct dev_pm_ops txx9dmac_dev_pm_ops = {
- };
- 
- static struct platform_driver txx9dmac_chan_driver = {
--	.remove		= __exit_p(txx9dmac_chan_remove),
-+	.remove		= txx9dmac_chan_remove,
- 	.driver = {
- 		.name	= "txx9dmac-chan",
- 	},
- };
- 
- static struct platform_driver txx9dmac_driver = {
--	.remove		= __exit_p(txx9dmac_remove),
-+	.remove		= txx9dmac_remove,
- 	.shutdown	= txx9dmac_shutdown,
- 	.driver = {
- 		.name	= "txx9dmac",
--- 
-1.7.7
+if (try_to_free_swap(page)) {
+     unlock_page(page);
+     goto out;
+}
+writeback will not execute, that's wrong. Where I miss?
+
+2) In the function pageout, page will be set PG_Reclaim flag, since this 
+flag is set, end_swap_bio_write->end_page_writeback:
+if (TestClearPageReclaim(page))
+      rotate_reclaimable_page(page);
+it means that page will be add to the tail of lru list, page is clean 
+anonymous page this time and will be reclaim to buddy system soon, correct?
+If is correct, what is the meaning of rotate here?
+
+>
+> Hugh
