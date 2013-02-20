@@ -1,45 +1,60 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Feb 2013 20:57:12 +0530
-Subject: [PATCH 6/8] ARM: OMAP5: Update SAR memory layout for WakeupGen
+Date: Wed, 20 Feb 2013 20:57:13 +0530
+Subject: [PATCH 7/8] ARM: OMAP5: Make errata i688 workaround available
 In-Reply-To: <1361374034-21831-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1361374034-21831-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1361374034-21831-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1361374034-21831-8-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP5 es2 WakeupGen SAR register layout offset have changed.
-Update the layout accordingly.
+Errata i688 is also applicable for OMAP5 based devices. Update the
+code so that it can be enabled on OMAP5 devices.
 
-Reported-by: Menon, Nishanth <nm@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap4-sar-layout.h |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/Kconfig |    2 +-
+ arch/arm/mach-omap2/io.c    |    9 +++++++++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
-index e170fe8..9374175 100644
---- a/arch/arm/mach-omap2/omap4-sar-layout.h
-+++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-@@ -48,13 +48,13 @@
- #define SAR_BACKUP_STATUS_WAKEUPGEN		0x10
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 41b581f..63a12d4 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -397,7 +397,7 @@ config OMAP3_SDRC_AC_TIMING
  
- /* WakeUpGen save restore offset from OMAP54XX_SAR_RAM_BASE */
--#define OMAP5_WAKEUPGENENB_OFFSET_CPU0		(SAR_BANK3_OFFSET + 0x8d4)
--#define OMAP5_WAKEUPGENENB_SECURE_OFFSET_CPU0	(SAR_BANK3_OFFSET + 0x8e8)
--#define OMAP5_WAKEUPGENENB_OFFSET_CPU1		(SAR_BANK3_OFFSET + 0x8fc)
--#define OMAP5_WAKEUPGENENB_SECURE_OFFSET_CPU1	(SAR_BANK3_OFFSET + 0x910)
--#define OMAP5_AUXCOREBOOT0_OFFSET		(SAR_BANK3_OFFSET + 0x924)
--#define OMAP5_AUXCOREBOOT1_OFFSET		(SAR_BANK3_OFFSET + 0x928)
--#define OMAP5_AMBA_IF_MODE_OFFSET		(SAR_BANK3_OFFSET + 0x92c)
-+#define OMAP5_WAKEUPGENENB_OFFSET_CPU0		(SAR_BANK3_OFFSET + 0x9dc)
-+#define OMAP5_WAKEUPGENENB_SECURE_OFFSET_CPU0	(SAR_BANK3_OFFSET + 0x9f0)
-+#define OMAP5_WAKEUPGENENB_OFFSET_CPU1		(SAR_BANK3_OFFSET + 0xa04)
-+#define OMAP5_WAKEUPGENENB_SECURE_OFFSET_CPU1	(SAR_BANK3_OFFSET + 0xa18)
-+#define OMAP5_AUXCOREBOOT0_OFFSET		(SAR_BANK3_OFFSET + 0xa2c)
-+#define OMAP5_AUXCOREBOOT1_OFFSET		(SAR_BANK3_OFFSET + 0x930)
-+#define OMAP5_AMBA_IF_MODE_OFFSET		(SAR_BANK3_OFFSET + 0xa34)
- #define OMAP5_SAR_BACKUP_STATUS_OFFSET		(SAR_BANK3_OFFSET + 0x800)
- 
+ config OMAP4_ERRATA_I688
+ 	bool "OMAP4 errata: Async Bridge Corruption"
+-	depends on ARCH_OMAP4
++	depends on ARCH_OMAP4 || SOC_OMAP5
+ 	select ARCH_HAS_BARRIERS
+ 	help
+ 	  If a data is stalled inside asynchronous bridge because of back
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 2c3fdd6..2bef5a7 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -271,6 +271,14 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
+ 		.length		= L4_PER_54XX_SIZE,
+ 		.type		= MT_DEVICE,
+ 	},
++#ifdef CONFIG_OMAP4_ERRATA_I688
++	{
++		.virtual	= OMAP4_SRAM_VA,
++		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
++		.length		= PAGE_SIZE,
++		.type		= MT_MEMORY_SO,
++	},
++#endif
+ };
  #endif
+ 
+@@ -323,6 +331,7 @@ void __init omap4_map_io(void)
+ void __init omap5_map_io(void)
+ {
+ 	iotable_init(omap54xx_io_desc, ARRAY_SIZE(omap54xx_io_desc));
++	omap_barriers_init();
+ }
+ #endif
+ /*
 -- 
 1.7.9.5
