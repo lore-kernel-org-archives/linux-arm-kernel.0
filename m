@@ -1,31 +1,31 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 20 Feb 2013 11:37:31 -0500 (EST)
-Subject: [V2 5/8] USB: EHCI: make ehci-vt8500 a separate driver
-In-Reply-To: <1360923853-7875-6-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1302201125410.1671-100000@iolanthe.rowland.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 20 Feb 2013 16:38:56 +0000
+Subject: [PATCH 02/35] mfd: ab8500-gpadc: Allow tvout regulator to be
+ missing
+In-Reply-To: <20130220132321.GC13049@sirena.org.uk>
+References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
+ <1360933026-30325-3-git-send-email-lee.jones@linaro.org>
+ <20130220132321.GC13049@sirena.org.uk>
+Message-ID: <20130220163856.GC4417@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Feb 2013, Manjunath Goudar wrote:
+On Wed, 20 Feb 2013, Mark Brown wrote:
 
-> Separate the vt8500 host controller driver from ehci-hcd host code
-> into its own driver module.
+> On Fri, Feb 15, 2013 at 12:56:33PM +0000, Lee Jones wrote:
 > 
-> In V2:
-> Change the GPL to GPL v2 MODULE_LICENSE 
+> > +	if (gpadc->regu)
+> > +		regulator_disable(gpadc->regu);
+> 
+> No explanation for this in the changelog and missing error handling like
+> this is pretty much always terrible style.  Why are we doing this?
 
-Same comments as for the other patches.
+No idea, and Jonas is on parental leave.
 
-You know, when you submit a series of patches all doing basically the
-same sort of thing, and somebody makes a suggestion to improve one of
-them, you should always consider whether that suggestion could also
-apply to the other patches in the series.  It's silly for us to send
-you 8 separate emails, each telling you to make the same change to one 
-particular patch in the series.
+Perhaps one of the other guys have an explanation?
 
-Therefore you should consider each of the problems I have described in 
-the last several emails, and think about which of your patches they 
-apply to.  Some of them do apply to more than one patch, even though I 
-didn't say so explicitly at the time.
-
-Alan Stern
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
