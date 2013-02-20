@@ -1,33 +1,97 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Wed, 20 Feb 2013 17:12:30 +0100
-Subject: Porting 3.8-rc4-nohz3 to ARM (PandaBoard)
-In-Reply-To: <20130211190317.GA8513@enea.se>
-References: <20130204200238.GA16718@enea.se>
- <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
- <20130211190317.GA8513@enea.se>
-Message-ID: <CAFTL4hzzFEYq+1=n+JpTiV3WdeKXETGQVDJSm-FJCN7E6xvE9w@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 20 Feb 2013 11:13:56 -0500 (EST)
+Subject: [V2 1/8] USB: EHCI: make ehci-spear a separate driver
+In-Reply-To: <1360923853-7875-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1302201105440.1671-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/2/11 Mats Liljegren <mats.liljegren@enea.com>:
-> Could the other guy be Kevin Hillman? The name has been mentioned to me but
-> I don't have his e-mail address.
+On Fri, 15 Feb 2013, Manjunath Goudar wrote:
 
-Exactly :)
+> Separate the SPEAr host controller driver from ehci-hcd host code
+> into its own driver module.
+> 
+> In V2:
+> Replaced spear as SPEAr everywhere, leaving functions/variables/config options.
 
->
-> I have stumbled across a problem, I get the following error messages during
-> boot:
->
-> ---- Start snippet ----
-> [   41.119873] INFO: task rcuo1:10 blocked for more than 20 seconds.
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -162,6 +162,14 @@ config USB_EHCI_HCD_OMAP
+>  	  Enables support for the on-chip EHCI controller on
+>  	  OMAP3 and later chips.
+>  
+> +config USB_EHCI_HCD_SPEAR
+> +        tristate "Support for ST SPEAr on-chip EHCI USB controller"
+> +        depends on USB_EHCI_HCD && PLAT_SPEAR
+> +        default y
+> +        ---help---
+> +          Enables support for the on-chip EHCI controller on
+> +          ST SPEAr chips.
 
-This showed up upstream as well, it hshould have been fixed in linus tree now.
+Is it a good idea to make this option interactive?  That might cause 
+people to disable it by mistake.
 
-[...]
-> [  112.400695] VFS: Unable to mount root fs via NFS, trying floppy.
-> [  112.407226] List of all partitions:
-> [  112.411041] No filesystem could mount root, tried:
-> [  112.416351] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(2,0)
+> --- a/drivers/usb/host/Makefile
+> +++ b/drivers/usb/host/Makefile
+> @@ -27,7 +27,7 @@ obj-$(CONFIG_USB_EHCI_HCD)	+= ehci-hcd.o
+>  obj-$(CONFIG_USB_EHCI_PCI)	+= ehci-pci.o
+>  obj-$(CONFIG_USB_EHCI_HCD_PLATFORM)	+= ehci-platform.o
+>  obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
+> -
+> +obj-$(CONFIG_USB_EHCI_HCD_SPEAR)+= ehci-spear.o
 
-Ah, that probably not due to my patches :)
+Please don't eliminate the blank line that separates the EHCI drivers 
+from the following non-EHCI drivers.
+
+>  obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
+>  obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
+>  obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
+
+> --- a/drivers/usb/host/ehci-spear.c
+> +++ b/drivers/usb/host/ehci-spear.c
+
+> +static const char hcd_name[] = "ehci-SPEAr";
+
+> @@ -209,11 +188,35 @@ static struct platform_driver spear_ehci_hcd_driver = {
+>  	.remove		= spear_ehci_hcd_drv_remove,
+>  	.shutdown	= usb_hcd_platform_shutdown,
+>  	.driver		= {
+> -		.name = "spear-ehci",
+> +		.name = hcd_name,
+
+You must not change the driver's name.  It won't work on non-DT 
+systems; the platform bus relies on matching drivers to devices by 
+comparing their names.
+
+>  		.bus = &platform_bus_type,
+>  		.pm = &ehci_spear_pm_ops,
+>  		.of_match_table = of_match_ptr(spear_ehci_id_table),
+>  	}
+>  };
+>  
+> -MODULE_ALIAS("platform:spear-ehci");
+
+You must not remove the MODULE_ALIAS.
+
+> +static const struct ehci_driver_overrides spear_overrides __initdata = {
+> +	.reset = ehci_spear_setup,
+> +};
+
+You forgot to use the .extra_priv_size field.  It will allow the driver 
+to be simplified by storing the "clk" field of struct spear_ehci in the 
+private part of the ehci_hcd structure.
+
+Also, you can completely eliminate the ehci_spear_setup routine if you 
+move the lines
+
+	/* registers start at offset 0x0 */
+	ehci->caps = hcd->regs;
+
+into spear_ehci_hcd_drv_probe.
+
+> +MODULE_DESCRIPTION(DRIVER_DESC);
+> +MODULE_LICENSE("GPL");
+
+There probably should be a MODULE_AUTHOR field, yes?
+
+Alan Stern
