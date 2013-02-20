@@ -1,72 +1,48 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Feb 2013 10:14:58 -0700
-Subject: [PATCH v3 8/8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <1361359326.4937.38.camel@pizza.hi.pengutronix.de>
-References: <1361273732-23357-1-git-send-email-p.zabel@pengutronix.de>
- <1361273732-23357-9-git-send-email-p.zabel@pengutronix.de>
- <5123F541.4020407@wwwdotorg.org>
- <1361359326.4937.38.camel@pizza.hi.pengutronix.de>
-Message-ID: <51250492.2010008@wwwdotorg.org>
+Date: Wed, 20 Feb 2013 10:18:37 -0700
+Subject: [RFC PATCH 8/9] ARM: dt: t30 cardhu: add dt entry for thermal
+ driver
+In-Reply-To: <5124B934.3020900@nvidia.com>
+References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
+ <1361187031-3679-9-git-send-email-wni@nvidia.com>
+ <51240A95.9070007@wwwdotorg.org> <5124B934.3020900@nvidia.com>
+Message-ID: <5125056D.7060608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2013 04:22 AM, Philipp Zabel wrote:
-> Am Dienstag, den 19.02.2013, 14:57 -0700 schrieb Stephen Warren:
->> On 02/19/2013 04:35 AM, Philipp Zabel wrote:
->>> This driver implements a reset controller device that toggles gpios
->>> connected to reset pins of peripheral ICs. The delay between assertion
->>> and de-assertion of the reset signal can be configured.
-
->>> +		/*
->>> +		 * The flags are also used to remember whether a given GPIO
->>> +		 * reset is active-low.
->>> +		 */
->>> +		if (flags & OF_GPIO_ACTIVE_LOW)
->>> +			drvdata->gpios[i].flags = GPIOF_OUT_INIT_HIGH;
->>> +		else
->>> +			drvdata->gpios[i].flags = GPIOF_OUT_INIT_LOW;
+On 02/20/2013 04:53 AM, Wei Ni wrote:
+> On 02/20/2013 07:28 AM, Stephen Warren wrote:
+>> On 02/18/2013 04:30 AM, Wei Ni wrote:
+>>> Enable thermal driver in the dts file.
+>>> Set sensor as lm90 remote sensor, and set throttle data.
 >>
->> That raises the question: What is the initial reset state expected to
->> be? Some devices might want to stay in reset until their driver
->> explicitly removes the reset signal.
+>>> diff --git a/Documentation/devicetree/bindings/thermal/tegra3-thermal.txt b/Documentation/devicetree/bindings/thermal/tegra3-thermal.txt
+
+>> Also, what units are used for all these properties?
+> 
+> they use "int".
+> And according to our downstream dvfs driver, the throttle table use
+> "unsigned long".
+
+int and unsigned long are types, not units. Units means degrees C vs.
+degrees F vs. degrees K, or Hz vs. KHz vs. MHz, etc.
+
+>> Judging by the example below, this property is a list of tuples. The
+>> meaning of each field in the tuple needs to be explained.
 >>
->> We could handle that by adding another (optional) property indicating
->> the initial reset state of each GPIO; default to initially not-in-reset
->> unless that property exists and specifies initially-in-reset.
+>> What happens when the CPU/SoC needs to be throttled? Must some clock or
+>> voltage be lowered/limited? If so, you need properties that indicate
+>> which clock/voltage/... needs to be acted upon.
 > 
-> As with the time parameter, I wonder if this configuration is something
-> we want to have in the consumer device tree node, or in the gpio-reset
-> device node:
-> 
-> 	gpio_reset: gpio-reset {
-> 		compatible = "gpio-reset";
-> 		reset-gpios = <&gpio2 15 0>;
-> 		reset-delays = <1000>; /* 1 ms */
-> 		initially-in-reset = <1>;
-> 	}
-> 	some-device {
-> 		resets = <&gpio_reset 0>;
-> 	}
-> vs.
-> 	gpio_reset: gpio-reset {
-> 		compatible = "gpio-reset";
-> 		reset-gpios = <&gpio2 15 0>;
-> 	}
-> 	some-device {
-> 		resets = <&gpio_reset 0 1000>; /* 1 ms */
-> 		initially-in-reset;
-> 	}
+> This table which will be used by our DVFS driver, although it didn't be
+> upstreamed yet. The table set clock frequency limited value with
+> different cooling state. When the temperature touch the different
+> limited value, we will set difficult cooling state, find the limited
+> freq from this table and pass to the dvfs driver.
+> I think may be this table should be set for cooling device node. This
+> table is only for our tegra dvfs, so I think we can parse this table in
+> the tegra3_cooling.c, which will be the new driver for cooling device.
 
-I think that the initially-in-reset state has to be represented in the
-gpio-reset node, since that's the only node that the GPIO reset driver
-will have access to during its probe(), and you're setting up the GPIOs
-as outputs during probe(). You can't rely on the drivers for the client
-DT nodes to be probed first and provide the information to the reset
-controller driver, since probe ordering is undefined. In fact those
-probe()s won't have run first, because those devices depend on resources
-from the reset controller driver and hence can't probe before it.
-
-If the initially-in-reset properties are in the client device nodes,
-then the GPIO reset driver would need to search all nodes for a resets
-property that references the appropriate gpio-reset node, then search
-for an initially-in-reset property there too. That all seems quite messy.
+Note that I expect the answers to these questions (pretty much all the
+questions I asked in response to your patch) to be included in the DT
+binding documentation, not just in email.
