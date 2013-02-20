@@ -1,73 +1,23 @@
-From: anish198519851985@gmail.com (anish kumar)
-Date: Wed, 20 Feb 2013 23:35:11 +0530
-Subject: test jiffies on ARM SMP board
-In-Reply-To: <20130220173014.GY17852@n2100.arm.linux.org.uk>
-References: <BLU002-W18453B5FE6CB5CDDA18C8DBCF60@phx.gbl>
- <1361381081.16206.45.camel@anish-Inspiron-N5050>
- <20130220173014.GY17852@n2100.arm.linux.org.uk>
-Message-ID: <1361383511.16206.50.camel@anish-Inspiron-N5050>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 20 Feb 2013 10:28:52 -0800
+Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
+In-Reply-To: <20130219072438.GQ20212@lunn.ch>
+References: <1360966349-1242560-2-git-send-email-arnd@arndb.de>
+ <Pine.LNX.4.44L0.1302181723540.6790-100000@netrider.rowland.org>
+ <20130219072438.GQ20212@lunn.ch>
+Message-ID: <20130220182852.GA11327@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-02-20 at 17:30 +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 20, 2013 at 10:54:41PM +0530, anish kumar wrote:
-> > On Thu, 2013-02-21 at 00:39 +0800, buyitian wrote:
-> > > i am confused about my test. in one device driver, 
-> > > i put below code:
-> > > 
-> > >     printk("start to test test jiffies\n");
-> > > 
-> > >     local_irq_save(flags);
-> > > 
-> > >     jf1 = jiffies; // read jiffies first time
-> > > 
-> > >     // hold cpu for about 2 seconds(do some calculation)
-> > > 
-> > >     jf2 = jiffies; // read jiffies after 2 seconds
-> > > 
-> > >     local_irq_restore(flags);
-> > > 
-> > >     printk("jf1:%lu, jf2:%lu\n", jf1, jf2);
-> > > 
-> > > and the output is as below:
-> > > 
-> > >     <4>[  108.551124]start to test test jiffies
-> > >     <4>[  110.367604]jf1:4294948151, jf2:4294948151
-> > > 
-> > > the jf1 and jf2 are the same value, although they are
-> > > read between 2 seconds interval, i think this is because
-> > > i disabled local interrupt.
-> > > but the printk timestamp is from 108.551124 to 110.367604,
-> > > which is about 2 seconds. and on my platform, printk timestamp
-> > > is got from the function read_sched_clock:
-> > >    static u32 __read_mostly (*read_sched_clock)(void) = jiffy_sched_clock_read;
-> > > 
-> > > and function jiffy_sched_clock_read() is to read from jiffies.
-> > > 
-> > > it seems that the jiffies is frozen when local irq is disabled,
-> > > but after local_irq_restore(), the jiffies not only start
-> > > to run, but also recover the lost 2 seconds.
-> > > 
-> > > is the jiffies updated from another cpu when irq is disabled on
-> > > local cpu? 
-> > > 
-> > > is there some internel processor interrupt between cpu1 and cpu0
-> > > after local irq is re-enabled so that jiffies recover the lost 2 seconds? 		 	   		  
-> > I think it is because of the fact that some RTC registers keep the
+On Tue, Feb 19, 2013 at 08:24:38AM +0100, Andrew Lunn wrote:
 > 
-> The RTC has nothing to do with this.
-> 
-> As soon as the IRQs are allowed again (immediately after the
-> local_irq_restore()) the pending interrupt - including the timer
-> interrupt will be processed.
-> 
-> At this point, because we read the clocksource, we can see that two
-> seconds have passed, and so we advance jiffies by the elapsed time.
-So I understand there is some register which stores the elapsed time and
-in my understanding it was RTC register which is wrong as suggested by
-you.I suppose some timer register is used for this information on the
-SOC.
-> 
-> This means printk() sees that the two seconds have passed.  But because
-> you're reading from jiffies within the interrupt disabled region, that
-> code can't see the missed ticks.
+> GregKH: Please can you drop this patch from usb-next. It breaks more
+> than it fixes.
+
+I've now reverted both of these, and the follow-on patch that Arnd sent
+in.
+
+Arnd, sorry, but please be more careful, especially when you ask for
+patches to be rushed into the tree...
+
+greg k-h
