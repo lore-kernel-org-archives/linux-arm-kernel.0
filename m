@@ -1,36 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Feb 2013 08:13:11 +0000
-Subject: [PATCH 06/35] mfd: ab8500-core: Sysfs chip id modification
-In-Reply-To: <201302192204.45153.arnd@arndb.de>
-References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
- <1360933026-30325-7-git-send-email-lee.jones@linaro.org>
- <201302192204.45153.arnd@arndb.de>
-Message-ID: <20130220081311.GB3368@gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 20 Feb 2013 10:13:54 +0200
+Subject: [PATCH v4 02/11] gpio: pxa: clean code with same variable name
+In-Reply-To: <1361290948-16669-3-git-send-email-haojian.zhuang@linaro.org>
+References: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
+ <1361290948-16669-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <512485C2.50504@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Feb 2013, Arnd Bergmann wrote:
-
-> On Friday 15 February 2013, Lee Jones wrote:
-> >         struct ab8500 *ab8500;
-> > +       int chip_id = -EINVAL;
-> >
-> >         ab8500 = dev_get_drvdata(dev);
-> > -       return sprintf(buf, "%#x\n", ab8500 ? ab8500->chip_id : -EINVAL);
-> > +       if(ab8500) {
-> > +               chip_id = ab8500->chip_id;
-> > +               if((is_ab8505(ab8500) || is_ab9540(ab8500)) && ab8500->version != 0xFF)
-> > +                       chip_id = (ab8500->version << 8) | chip_id;
-> > +       }
-> > +       return sprintf(buf, "%#x\n", chip_id);
-> >  }
+On 02/19/13 18:22, Haojian Zhuang wrote:
+> Clean code to avoid similar variable. Now use gc for gpio_chip,
+> and use c/chip for pxa_gpio_chip. It's used to avoid confusion.
 > 
-> What's the use of printing "ffffffea" for unknown versions here?
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-You mean instead of -EINVAL? No idea, Marcus?
+Tested-by: Igor Grinberg <grinberg@compulab.co.il>
+
+Minor issue below for your consideration.
+
+> ---
+>  drivers/gpio/gpio-pxa.c |  102 +++++++++++++++++++++++------------------------
+>  1 file changed, 50 insertions(+), 52 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+> index a4c6687..e611bed 100644
+> --- a/drivers/gpio/gpio-pxa.c
+> +++ b/drivers/gpio/gpio-pxa.c
+
+[...]
+
+> @@ -147,7 +147,7 @@ static inline int __gpio_is_occupied(unsigned gpio)
+>  	int ret, af = 0, dir = 0;
+>  
+>  	pxachip = gpio_to_pxachip(gpio);
+> -	base = gpio_chip_base(&pxachip->chip);
+> +	base = gpio_chip_base(&pxachip->gc);
+
+I don't mind leaving this as it is, but according
+to your commit message, the above should be:
+c/chip = gpio_to_pxachip(gpio);
+base = gpio_chip_base(&c/chip->gc);
+
+For your consideration.
+
+>  	gpdr = readl_relaxed(base + GPDR_OFFSET);
+>  
+>  	switch (gpio_type) {
+
+[...]
+
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Igor.
