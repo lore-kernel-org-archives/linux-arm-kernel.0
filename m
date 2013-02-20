@@ -1,58 +1,46 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 20 Feb 2013 17:38:49 +0000 (UTC)
-Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod
- dependency
-In-Reply-To: <20130215064429.GA30038@arwen.pp.htv.fi>
-References: <1360840554-26901-1-git-send-email-balbi@ti.com>
- <1360840554-26901-2-git-send-email-balbi@ti.com>
- <20130214171253.GC7144@atomide.com> <20130214175650.GA25891@arwen.pp.htv.fi>
- <20130214181217.GA11806@atomide.com> <20130214192719.GB26679@arwen.pp.htv.fi>
- <20130214193911.GD11806@atomide.com>
- <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
- <20130215064429.GA30038@arwen.pp.htv.fi>
-Message-ID: <alpine.DEB.2.00.1302191530190.32069@utopia.booyaka.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Feb 2013 10:54:38 -0700
+Subject: [PATCH 1/1] memory: tegra_ahb_enable_smmu() depends on
+ TEGRA_IOMMU_SMMU
+In-Reply-To: <20130211.193034.1346903263789032239.hdoyu@nvidia.com>
+References: <1360175666-8377-1-git-send-email-hdoyu@nvidia.com><5112A642.1020800@wwwdotorg.org><20130206.211635.744922728615926717.hdoyu@nvidia.com>
+ <20130211.193034.1346903263789032239.hdoyu@nvidia.com>
+Message-ID: <51250DDE.7010408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I think Vaibhav has covered most of the ground here, but just a few 
-comments:
-
-On Fri, 15 Feb 2013, Felipe Balbi wrote:
-
-> On Thu, Feb 14, 2013 at 08:47:53PM +0000, Paul Walmsley wrote:
->
-> > Drivers shouldn't touch their IP block's SYSCONFIG registers.  They don't 
+On 02/11/2013 10:30 AM, Hiroshi Doyu wrote:
+> Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Wed, 06 Feb 2013 21:16:35 +0200 (EET):
 > 
-> why not ? It's part of the driver's address space anyway. It's not part
-> of the IP in question (usb, ethernet, etc) but it's part of the TI
-> wrapper which usually involves a bridge (ocp2scp, ocp2axi, etc) plus the
-> TI-specific integration registers (revision, sysc, syss...).
+>> Hi Russell,
+>>
+>> Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 6 Feb 2013 19:51:46 +0100:
+>>
+>>> On 02/06/2013 11:34 AM, Hiroshi Doyu wrote:
+>>>> New SoC, Tegra114 also uses SMMU. Change tegra_ahb_enable_smmu()'s
+>>>> dependency from ARCH_TEGRA_3x_SOC to TEGRA_IOMMU_SMMU. No need to edit
+>>>> whenever a new Tegra SoC comes.
+>>>>
+>>>> The following combination caused build error, which this patch fixes.
+>>>>
+>>>> CONFIG_ARCH_TEGRA_2x_SOC=y
+>>>> \# CONFIG_ARCH_TEGRA_3x_SOC is not set
+>>>> CONFIG_ARCH_TEGRA_114_SOC=y
+>>>>
+>>>> drivers/iommu/tegra-smmu.c:485: undefined reference to 'tegra_ahb_enable_smmu'
+>>>
+>>> Tested-by: Stephen Warren <swarren@nvidia.com>
+>>>
+>>> Russell, I assume Hiroshi should upload this to your patch tracker? It's
+>>> needed for 3.9.
+>>
+>> FYI: Submitted as:
+>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7640/1
 > 
-> So they're not part of the licensed IP, but they're part of the TI
-> wrapper around those.
-
-Ideally Linux drivers would be as independent as possible from their SoC- 
-or board-specific integration.  This includes bus integration, etc.  That 
-way, an IP block like UART, where most or all of the registers are shared 
-with the common 8250 code, might be able to use a shared driver.
-
-Also, it should be noted that the TI wrapper isn't necessarily common to 
-all TI SoCs :-)  The wrapper bits and functions can change from TI SoC to 
-SoC.
-
-> > have anything specifically to do with the underlying device IP block, but 
+> Russell,
 > 
-> of course they do, soft reset touches the underlying IP, so does force
-> idle, no idle, etc. 
+> Is the above ok for you?
+> Please let me know if still I need to do something.
 
-Force idle, no idle, etc. only affects what's reported to the PRCM via 
-the SIdleAck/MStandbyReq lines.  It shouldn't affect anything in the IP 
-block itself.
-
-As far as reset goes, the chip-wide reset bits affect the IP block too, 
-but we wouldn't put that code into the drivers :-)
-
-
-- Paul
+Russell, will this patch make it into your tree for 3.9? Do you think it
+should go through some other tree? Thanks.
