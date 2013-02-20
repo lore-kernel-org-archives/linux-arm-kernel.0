@@ -1,45 +1,28 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 20 Feb 2013 11:21:43 -0500 (EST)
-Subject: [V2 3/8] USB: EHCI: make ehci-s5p a separate driver
-In-Reply-To: <1360923853-7875-4-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1302201118170.1671-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Feb 2013 16:27:04 +0000
+Subject: [PATCH 2/2] USB: EHCI: make ehci-orion a separate driver
+In-Reply-To: <Pine.LNX.4.44L0.1302201055260.1671-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1302201055260.1671-100000@iolanthe.rowland.org>
+Message-ID: <201302201627.04224.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Feb 2013, Manjunath Goudar wrote:
+On Wednesday 20 February 2013, Alan Stern wrote:
+> Currently there is no Kconfig option to control specifically whether
+> the ehci-orion driver gets built; it always gets built whenever
+> CONFIG_PLAT_ORION and CONFIG_USB_EHCI_HCD are both enabled.
+> 
+> Do you think it is a good idea to add an option for this?  Should it at
+> least be non-interactive, so that the driver always gets built under
+> the same conditions as currently?  A later patch can make it 
+> interactive, if desired.
 
-> --- a/drivers/usb/host/ehci-s5p.c
-> +++ b/drivers/usb/host/ehci-s5p.c
-> @@ -20,6 +20,17 @@
->  #include <linux/usb/phy.h>
->  #include <linux/usb/samsung_usb_phy.h>
->  #include <plat/usb-phy.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/usb.h>
-> +#include <linux/usb/hcd.h>
-> +#include <linux/io.h>
-> +#include <linux/usb/otg.h>
-> +#include <linux/dma-mapping.h>
+I think it's good to have it interactive, because we are now building for
+multiplatform with Orion being one of many. It's useful to be able to
+build EHCI_HCD=y AND EHCD_HCD_ORION=m.
 
-It's generally a good idea to keep these #include's in alphabetical 
-order, as near as possible.
+However, you are right that this is a change that was not mentioned in
+the patch description and would better have been kept separate or
+at least explicitly spelled out.
 
-> @@ -322,5 +305,27 @@ static struct platform_driver s5p_ehci_driver = {
->  		.of_match_table = of_match_ptr(exynos_ehci_match),
->  	}
->  };
-> +static const struct ehci_driver_overrides s5p_overrides __initdata = {
-> +	.reset = ehci_setup,
-
-Not needed.  But you can use .extra_priv_size to eliminate the separate 
-allocation of the s5p_ehci_hcd structure.  Once you do that, the .dev 
-and .hcd members of the structure will be unnecessary.
-
-> +MODULE_DESCRIPTION(DRIVER_DESC);
->  MODULE_ALIAS("platform:s5p-ehci");
-> +MODULE_LICENSE("GPL");
-
-Should be GPLv2.
-
-Alan Stern
+	Arnd
