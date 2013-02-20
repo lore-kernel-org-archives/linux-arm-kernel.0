@@ -1,25 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Feb 2013 17:30:49 +0200
-Subject: [PATCH 3/8] ARM: OMAP5: prm: Allow prm init to success on OMAP5
- SOCs
-In-Reply-To: <1361374034-21831-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1361374034-21831-1-git-send-email-santosh.shilimkar@ti.com>
- <1361374034-21831-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130220153049.GF16652@arwen.pp.htv.fi>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 20 Feb 2013 21:08:47 +0530
+Subject: [PATCH 0/8] ARM: dts: OMAP5: ocp address space and few updates
+Message-ID: <1361374735-22018-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 08:57:09PM +0530, Santosh Shilimkar wrote:
-> Allow prm init to success on OMAP5 SOCs.
+Few updates for OMAP5 found during testing OMAP5 DT builds. Couple
+of patches were already posted on the list. The series also contains
+a patch which adds DMA request, IRQ lines and IO address space 
+DT extraction support to hwmod code so that we can get rid of
+such information from hwmod data files. It has been tested on OMAP5
+and OMAP4 devices.
 
-s/success/succeed/
+Rajendra Nayak (1):
+  ARM: dts: OMAP5: Specify nonsecure PPI IRQ for arch timer
+
+Santosh Shilimkar (7):
+  ARM: dts: omap5-evm: Update available memory to 2032 MB
+  ARM: dts: OMAP5: Align the local timer dt node as per the current
+    binding code
+  ARM: dts: OMAP5: Move the gic node out of ocp space
+  ARM: dts: OMAP5: Update the timer and gic nodes for HYP kernel
+    support
+  ARM: dts: OMAP5: Update keypad reg property
+  ARM: OMAP: hwmod: extract module address space from DT blob
+  ARM: dts: OMAP5: Add ocp address space for all hwmods
+
+ arch/arm/boot/dts/omap5-evm.dts  |    2 +-
+ arch/arm/boot/dts/omap5.dtsi     |  282 +++++++++++++++++++++++++++++++++++---
+ arch/arm/mach-omap2/omap_hwmod.c |   31 ++++-
+ 3 files changed, 293 insertions(+), 22 deletions(-)
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130220/7ea35c30/attachment.sig>
+1.7.9.5
