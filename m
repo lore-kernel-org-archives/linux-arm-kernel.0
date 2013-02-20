@@ -1,46 +1,62 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Feb 2013 11:46:41 -0700
-Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin function
- name
-In-Reply-To: <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
+Date: Wed, 20 Feb 2013 12:04:58 -0700
+Subject: [PATCH 3/3] pinctrl: imx: move hard-coding data into device tree
+In-Reply-To: <1361344089-16804-4-git-send-email-shawn.guo@linaro.org>
 References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
- <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <51251A11.2030300@wwwdotorg.org>
+ <1361344089-16804-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <51251E5A.1080806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/20/2013 12:08 AM, Shawn Guo wrote:
-> This turns the imx pin function number defined by binding document
-> into #define constants in header which can be used in dts and handled
-> by pre-processor to improve the readability of device tree sources.
+> Currently, all imx pinctrl drivers maintain a big array of struct
+> imx_pin_reg which hard-codes data like register offset and mux mode
+> setting for each pin function.  Every time a new imx SoC support is
+> added, we need to add such a big mount of data.  With moving to single
+> kernel build, it's only matter of time to be blamed on memory consuming.
+> 
+> With DTC pre-processor support in place, the patch moves all these data
+> into device tree by redefining the PIN_FUNC_ID in imxXX-pinfunc.h and
+> changing the PIN_FUNC_ID parsing code a little bit.
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx35-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx35-pinctrl.txt
+There are a couple of potential issues with this patch, which I'm in two
+minds about:
 
-> -See below for available PIN_FUNC_ID for imx35:
-> -0 MX35_PAD_CAPTURE__GPT_CAPIN1
-...
-> -951 MX35_PAD_TEST_MODE__TCU_TEST_MODE
-> +Refer to arch/arm/boot/dts/imx35-pinfunc.h for all available imx35 PIN_FUNC_ID.
+1)
 
-So that path is specific to the Linux kernel. The DT binding
-documentation isn't supposed to be specific to the Linux kernel. I
-wonder if we shouldn't put all the header files into
-Documentation/devicetree/bindings rather than arch/*/boot/dts. That way,
-you could encode relative path names into the DT binding docs. The
-headers are logically part of the documentation anyway.
+This is an incompatible change to the DT binding definition. A DT
+written to the old specification won't work with a newer kernel and
+vice-versa. This isn't supposed to happen with device tree.
 
-This all plays into whatever plans exist for removing the DT binding
-docs and/or .dts files from the kernel, and how things will end up
-getting laid out then though. That's something we should discuss with at
-least Grant and Rob. I note that the DT maintainers weren't Cc'd on this
-series though. I added them for this reply.
+Right now I believe we're still being flexible about DT binding changes,
+but I've seen hints that this kind of thing will start getting lots of
+push-back in the near future...
 
-Perhaps I should just send a patch to the dtc and kernel include paths
-which implements that, and see what people say.
+That all said, I'd also love to change the Tegra pinctrl binding now
+that we have CPP, since I could replace all the strings in the current
+binding with integers and presumably save some space in the .dtb. Hence,
+I'd love to maintain the flexibility to keep changing the .dts and
+kernel code in lock-step.
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+2)
 
->  See below for available PIN_FUNC_ID for imx6q:
-> -MX6Q_PAD_SD2_DAT1__USDHC2_DAT1			0
+This patch removes a bunch of tables from the kernel. I like having the
+tables in the kernel, since in theory it could allow a future debugfs or
+sysfs interface to pinctrl that allows manipulation of the pinctrl HW
+state at a semantic level. This is only possible if the DT binding
+includes details such as "set this pin to this function", and the driver
+includes the tables to convert that into details such as register
+address and value. I don't think such an "API" could be implemented for
+IMX after this patch. Still, given the IMX binding already merged "pin"
+and "function" into a single integer in the binding, I'm not sure if IMX
+could support that kind of "API" before anyway?
 
-You forgot to add a reference to the header filename to this file.
+This is part of the reason I pushed hard for the pinctrl APIs to operate
+at the semantic pin/group/function level, and that Tegra's pinctrl
+drivers explicitly have tables listing all the pins/groups/functions,
+rather than just putting a bunch of register values into the DT.
+
+I'm not sure how much of an issue this is, though. LinusW and/or the DT
+maintainers should probably chime in here.
+
+I didn't actually read the driver implementation changes in this patch.
