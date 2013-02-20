@@ -1,55 +1,53 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Wed, 20 Feb 2013 18:40:25 +0800
-Subject: [RFC PATCH 6/9] hwmon: (lm90) Register to the thermal framework
-In-Reply-To: <5124082E.604@wwwdotorg.org>
-References: <1361187031-3679-1-git-send-email-wni@nvidia.com>
- <1361187031-3679-7-git-send-email-wni@nvidia.com>
- <5124082E.604@wwwdotorg.org>
-Message-ID: <5124A819.7040400@nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 20 Feb 2013 10:43:10 +0000
+Subject: [PATCH 06/35] mfd: ab8500-core: Sysfs chip id modification
+In-Reply-To: <CAEKpxBk=bgTx18A2J6mVT5RBBq3ZJAqswz-6NvNpTRP=u9pgwQ@mail.gmail.com>
+References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
+ <1360933026-30325-7-git-send-email-lee.jones@linaro.org>
+ <201302192204.45153.arnd@arndb.de>
+ <20130220081311.GB3368@gmail.com>
+ <CAEKpxBk=bgTx18A2J6mVT5RBBq3ZJAqswz-6NvNpTRP=u9pgwQ@mail.gmail.com>
+Message-ID: <20130220104310.GA4417@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2013 07:18 AM, Stephen Warren wrote:
-> On 02/18/2013 04:30 AM, Wei Ni wrote:
->> Register the remote sensor to the thermal framework.
->> It can support to show the temperature and read/write threshold.
-> 
->>  arch/arm/boot/dts/tegra30-cardhu.dtsi |    1 +
->>  drivers/hwmon/lm90.c                  |  182 ++++++++++++++++++++++++++++++++-
-> 
-> There shouldn't be any need to edit both those files in the same patch.
-> This patch is making multiple separate logical changes, which should be
-> separate patches.
+On Wed, 20 Feb 2013, Marcus Cooper wrote:
 
-I will follow Matthew's suggestion to split this serial patch into 3
-separate sets.
+> On 20 February 2013 09:13, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Tue, 19 Feb 2013, Arnd Bergmann wrote:
+> >
+> >> On Friday 15 February 2013, Lee Jones wrote:
+> >> >         struct ab8500 *ab8500;
+> >> > +       int chip_id = -EINVAL;
+> >> >
+> >> >         ab8500 = dev_get_drvdata(dev);
+> >> > -       return sprintf(buf, "%#x\n", ab8500 ? ab8500->chip_id : -EINVAL);
+> >> > +       if(ab8500) {
+> >> > +               chip_id = ab8500->chip_id;
+> >> > +               if((is_ab8505(ab8500) || is_ab9540(ab8500)) && ab8500->version != 0xFF)
+> >> > +                       chip_id = (ab8500->version << 8) | chip_id;
+> >> > +       }
+> >> > +       return sprintf(buf, "%#x\n", chip_id);
+> >> >  }
+> >>
+> >> What's the use of printing "ffffffea" for unknown versions here?
+> >
+> > You mean instead of -EINVAL? No idea, Marcus?
+> >
+> Looks like I'm guilty of just making the minimal changes. Arnd is
+> right though, getting ffffffea(-EINVAL) back is pretty useless.
+> I'll have to check user land to see what is using this.
 
-> 
->> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-> 
->> +			#sensor-cells = <1>;
-> 
-> Again, in order to allow that, you need some documentation in
-> Documentation/devicetree/bindings/. Related to that, you need to Cc the
-> devicetree maintainers on at least the patches that add that documentation.
+Yes, it would be useful to know how it's parsed.
 
-Ok, I will do it.
+Thanks Marcus.
 
-> 
->> diff --git a/drivers/hwmon/lm90.c b/drivers/hwmon/lm90.c
-> 
->> @@ -1576,12 +1728,38 @@ static int lm90_probe(struct i2c_client *client,
-> ...
->> +	np_args.np = dev->of_node;
->> +	np_args.index = 0;
-> 
-> As I mentioned before, that'd be better replaced by an explicit of_xlate
-> function.
+> Maybe not
+> printing and returning 0 should be the correct behaviour
+> when an unknown version is found.
 
-Yes, I will try to use this func.
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
