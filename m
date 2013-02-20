@@ -1,60 +1,31 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Feb 2013 20:57:13 +0530
-Subject: [PATCH 7/8] ARM: OMAP5: Make errata i688 workaround available
+Date: Wed, 20 Feb 2013 20:57:09 +0530
+Subject: [PATCH 3/8] ARM: OMAP5: prm: Allow prm init to success on OMAP5 SOCs
 In-Reply-To: <1361374034-21831-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1361374034-21831-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1361374034-21831-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1361374034-21831-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata i688 is also applicable for OMAP5 based devices. Update the
-code so that it can be enabled on OMAP5 devices.
+Allow prm init to success on OMAP5 SOCs.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/Kconfig |    2 +-
- arch/arm/mach-omap2/io.c    |    9 +++++++++
- 2 files changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/prm44xx.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 41b581f..63a12d4 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -397,7 +397,7 @@ config OMAP3_SDRC_AC_TIMING
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index c05a343..1aae198 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -650,7 +650,7 @@ static struct prm_ll_data omap44xx_prm_ll_data = {
  
- config OMAP4_ERRATA_I688
- 	bool "OMAP4 errata: Async Bridge Corruption"
--	depends on ARCH_OMAP4
-+	depends on ARCH_OMAP4 || SOC_OMAP5
- 	select ARCH_HAS_BARRIERS
- 	help
- 	  If a data is stalled inside asynchronous bridge because of back
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 2c3fdd6..2bef5a7 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -271,6 +271,14 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
- 		.length		= L4_PER_54XX_SIZE,
- 		.type		= MT_DEVICE,
- 	},
-+#ifdef CONFIG_OMAP4_ERRATA_I688
-+	{
-+		.virtual	= OMAP4_SRAM_VA,
-+		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
-+		.length		= PAGE_SIZE,
-+		.type		= MT_MEMORY_SO,
-+	},
-+#endif
- };
- #endif
- 
-@@ -323,6 +331,7 @@ void __init omap4_map_io(void)
- void __init omap5_map_io(void)
+ int __init omap44xx_prm_init(void)
  {
- 	iotable_init(omap54xx_io_desc, ARRAY_SIZE(omap54xx_io_desc));
-+	omap_barriers_init();
- }
- #endif
- /*
+-	if (!cpu_is_omap44xx())
++	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
+ 		return 0;
+ 
+ 	return prm_register(&omap44xx_prm_ll_data);
 -- 
 1.7.9.5
