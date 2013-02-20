@@ -1,31 +1,47 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 20 Feb 2013 12:06:35 +0530
-Subject: randconfig errors
-In-Reply-To: <201302152012.04128.arnd@arndb.de>
-References: <511E6FA4.2000709@gmail.com>
- <c01a8ed845054b9d9cbddb341bac5f0e@DLEE74.ent.ti.com>
- <20130215194548.GC2244@beef> <201302152012.04128.arnd@arndb.de>
-Message-ID: <20130220063635.GE23302@intel.com>
+From: nishanth.p@gmail.com (Nishanth Peethambaran)
+Date: Wed, 20 Feb 2013 12:13:50 +0530
+Subject: [RFC] ARM: iommu: Adding new dma-mappin API to map sgtable
+Message-ID: <CAMcxFTRBN7asUGmRHKfpfE-aLN16tfSWKTEWeOGDQ2vog1w_Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 08:12:03PM +0000, Arnd Bergmann wrote:
-> On Friday 15 February 2013, Matt Porter wrote:
-> > I'd be happy to see at least the compat() patch be picked up. Chris had
-> > to drop the omap_hsmmc dt dmaengine patches until that one is merged. I'm
-> > not sure whose tree that one should go through at this point...perhaps
-> > via Chris' tree now?
-> 
-> It really should have been in the crypto tree before Mark's patches
-> to use them, but if Chris is still considering the the hsmmc dt
-> patches for 3.9, including them there is probably the best way forward.
-> 
-> I would expect him to say no them at this point though, and in that
-> case, I think it should be either the slave-dma tree or the arm-soc
-> tree.
-Do you want me to add the compat() patch? I had acked it sometime back
+Adding APIs in arm dma mapping code to map a scatterlist in iommu domain
+and get dma address. Allocators outside dma-mapping code like ION could
+allocate pages and devices would need to map them for iommu and obtain a
+linear dma address. Intention is to re-use the IOVA managment code and "mapping"
+across allocators.
 
-I was hoping to send the PULL request in a day or two... Pls let me know...
+Can the above requirement be done without adding new APIs?
+APIs available to map an sglist (arm_dma_map_sg) does not provide a linear
+dma address.
 
---
-~Vinod
+Signed-off-by: Nishanth Peethambaran <nishanth@broadcom.com>
+---
+ arch/arm/include/asm/dma-mapping.h |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/include/asm/dma-mapping.h
+b/arch/arm/include/asm/dma-mapping.h
+index 5b579b9..f9e2f6c 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -268,6 +268,16 @@ extern void arm_dma_sync_sg_for_device(struct
+device *, struct scatterlist *, in
+ extern int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 		void *cpu_addr, dma_addr_t dma_addr, size_t size,
+ 		struct dma_attrs *attrs);
++/*
++ * Map scatterlist pages for the device and return a dma address
++ */
++extern dma_addr_t arm_dma_map_sgtable(struct device *dev, struct sgtable *sgt,
++		enum dma_data_direction dir, struct dma_attrs *attrs);
++/*
++ * Unmap the dma address
++ */
++extern void arm_dma_unmap(struct device *, dma_addr_t iova, int size,
++		enum dma_data_direction dir, struct dma_attrs *attrs);
+
+ #endif /* __KERNEL__ */
+ #endif
+-- 
+1.7.9.5
