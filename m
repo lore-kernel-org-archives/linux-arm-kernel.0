@@ -1,31 +1,21 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed, 20 Feb 2013 17:09:18 -0600
-Subject: [PATCH] staging: imx/drm: request irq only after adding the crtc
-In-Reply-To: <1361284559-25125-1-git-send-email-p.zabel@pengutronix.de>
-References: <1361284559-25125-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <CAKGA1bmFubywyW=t86P_O3YXqzKoboa0xLQvFFQaDqUcaMBX-Q@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 20 Feb 2013 15:17:23 -0800
+Subject: [patch 2/2] arm: Wire up kcmp syscall
+In-Reply-To: <20130219070703.GC20312@moon>
+References: <20130219064800.719149796@openvz.org>
+ <20130219065210.148067470@openvz.org> <20130219070703.GC20312@moon>
+Message-ID: <20130220151723.0a22794a.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 8:35 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> If the bootloader already enabled the display, the interrupt handler
-> will be called as soon as it is registered. If the CRTC is not already
-> added at this time, the call to imx_drm_handle_vblank will result in
-> a NULL pointer dereference.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+On Tue, 19 Feb 2013 11:07:03 +0400
+Cyrill Gorcunov <gorcunov@openvz.org> wrote:
 
-Doesn't this imply that the bootloader doesn't properly quiesce all
-interrupt-causing modules and halt all dma operations?
+> From: Alexander Kartashov <alekskartashov@parallels.com>
+> Subject: arm: Wire up kcmp syscall
+> 
+> Signed-off-by: Alexander Kartashov <alekskartashov@parallels.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Sean Bean said it best: One does not simply walk into Mordor!
-
-I am not nacking the patch (since it would not change behavior at all
-for those scenarios where quiescence of interrupts and dma was done
-properly before the handover) but I am really unsure that this sets a
-good precedent.. is this all about getting a "glitch free" splash
-screen displayed between bootloader and kernel?
-
---
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+This should have had signed-off-by:you, as you were on the patch's
+delivery path.
