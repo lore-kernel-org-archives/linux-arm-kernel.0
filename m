@@ -1,44 +1,84 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 19 Feb 2013 18:38:57 -0800
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130219203115.114eab79e8d2099c6306d921@freescale.com>
-References: <20130129181046.GC25415@pd.tnic>
- <1359541333.3529.186.camel@shinybook.infradead.org>
- <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
- <20130131092801.GV23505@n2100.arm.linux.org.uk>
- <20130131145947.f62474a0600848df86548b96@freescale.com>
- <20130201011712.GF23505@n2100.arm.linux.org.uk>
- <1359703995.23531.6.camel@shinybook.infradead.org>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
- <20130207181315.GM17833@n2100.arm.linux.org.uk>
- <1360344301.6066.263.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
- <1360363233.6066.283.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
- <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
- <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
- <20130219203115.114eab79e8d2099c6306d921@freescale.com>
-Message-ID: <51243741.8070409@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Feb 2013 10:57:01 +0800
+Subject: [PATCH] staging: imx/drm: request irq only after adding the crtc
+In-Reply-To: <1361284559-25125-1-git-send-email-p.zabel@pengutronix.de>
+References: <1361284559-25125-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130220025659.GC27773@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/19/2013 6:31 PM, Kim Phillips wrote:
-> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-> index af72969..dbee639 100644
-> --- a/arch/arm/lib/Makefile
-> +++ b/arch/arm/lib/Makefile
-> @@ -45,3 +45,5 @@ lib-$(CONFIG_ARCH_SHARK)	+= io-shark.o
+On Tue, Feb 19, 2013 at 03:35:59PM +0100, Philipp Zabel wrote:
+> If the bootloader already enabled the display, the interrupt handler
+> will be called as soon as it is registered. If the CRTC is not already
+> added at this time, the call to imx_drm_handle_vblank will result in
+> a NULL pointer dereference.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
+
+Greg,
+
+The patch fixes a kernel panic [1], which has been on linux-next since
+Jan 8 [2].  Can you please apply it if it looks good to you?
+
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/218858
+[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/208192
+
+> ---
+>  drivers/staging/imx-drm/ipuv3-crtc.c |   23 ++++++++++++-----------
+>  1 file changed, 12 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+> index 1892006..d454a16 100644
+> --- a/drivers/staging/imx-drm/ipuv3-crtc.c
+> +++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+> @@ -483,17 +483,6 @@ static int ipu_get_resources(struct ipu_crtc *ipu_crtc,
+>  		goto err_out;
+>  	}
 >  
->  $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
->  $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
+> -	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
+> -			IPU_IRQ_EOF);
+> -	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
+> -			"imx_drm", ipu_crtc);
+> -	if (ret < 0) {
+> -		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
+> -		goto err_out;
+> -	}
+> -
+> -	disable_irq(ipu_crtc->irq);
+> -
+>  	return 0;
+>  err_out:
+>  	ipu_put_resources(ipu_crtc);
+> @@ -504,6 +493,7 @@ err_out:
+>  static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
+>  		struct ipu_client_platformdata *pdata)
+>  {
+> +	struct ipu_soc *ipu = dev_get_drvdata(ipu_crtc->dev->parent);
+>  	int ret;
+>  
+>  	ret = ipu_get_resources(ipu_crtc, pdata);
+> @@ -522,6 +512,17 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
+>  		goto err_put_resources;
+>  	}
+>  
+> +	ipu_crtc->irq = ipu_idmac_channel_irq(ipu, ipu_crtc->ipu_ch,
+> +			IPU_IRQ_EOF);
+> +	ret = devm_request_irq(ipu_crtc->dev, ipu_crtc->irq, ipu_irq_handler, 0,
+> +			"imx_drm", ipu_crtc);
+> +	if (ret < 0) {
+> +		dev_err(ipu_crtc->dev, "irq request failed with %d.\n", ret);
+> +		goto err_put_resources;
+> +	}
 > +
-> +CFLAGS_bswapsdi2.o = -O2
-
-Please put a comment here so we don't have to dig through git history
-and/or emails to understand why this has -O2 forced on for this file.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> +	disable_irq(ipu_crtc->irq);
+> +
+>  	return 0;
+>  
+>  err_put_resources:
+> -- 
+> 1.7.10.4
+> 
