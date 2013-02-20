@@ -1,188 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Feb 2013 15:30:06 +0530
-Subject: [PATCH 5/8] ARM: OMAP2+: hwmod-data: UART IP needs software control
- to manage sidle modes
-Message-ID: <1361354406-18186-1-git-send-email-santosh.shilimkar@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 20 Feb 2013 15:28:18 +0530
+Subject: [PATCH 0/4] dw_dmac: introduce generic DMA binding for DT
+In-Reply-To: <201302200950.26182.arnd@arndb.de>
+References: <1360952512-971558-1-git-send-email-arnd@arndb.de>
+ <20130220080348.GF23302@intel.com>
+ <201302200950.26182.arnd@arndb.de>
+Message-ID: <20130220095818.GI23302@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP UART IP needs software control for slave idle modes based on functional
-state of the IP. i.e The IP slave idle settings should be set to 'noidle' when
-being used and then put back to 'smart_idle' when unused. Currently this is
-handled by the driver with function pointers implemented in platform code.
-This however breaks in case of device tree because of missing idle handling
-APIs.
+On Wed, Feb 20, 2013 at 09:50:25AM +0000, Arnd Bergmann wrote:
+> On Wednesday 20 February 2013, Vinod Koul wrote:
+> > Since there is still churn, would it make sense if I just revert the SPEAr13xx
+> > patch (your first patch) and send a pull request to Linus.
+> > Since there are no users and not much testing has been done, I think we can push
+> > these to 3.10 via arm-soc/slave-dma tree.
+> > 
+> > Gives more testing and usage will go along as well.
+> > Since merge window is open, I would like my pull to go soonish and not churn the
+> > tree much.
+> 
+> Reverting the SPEAr13xx would definitely help, yes. The reason why I'd also like
+> to see the second patch get merged is so that we can do the SPEAr changes in 3.10
+> without having an interdependency between the trees. I tried very hard to
+> make the patch have a minimal impact on the non-DT code path to avoid regressions.
+Ok, i have applied your revert patch. Will send the PULL to linus by friday.
 
-Previous patches in this series added a flag HWMOD_SWSUP_SIDLE_ACTIVE which
-takes care of the mentioned requirement. Hence add the flag for all UART IPs
-to take advantage of feature supported by framework.
+> Maybe you can send your tree now with just the revert applied, and then send the
+> other one separately next week along with any bug fixes that may have accumulated
+> by then?
+And then makes sense to send second PULL with fixes accumulated and the second
+patch, so that 3.10 is easier for all.  think we can compact() patch is second
+request as well
 
-Subsequent patches removes the slave idle handling from driver code.
-
-Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Tested-by: Sourav Poddar <sourav.poddar@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    3 +++
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    6 ++++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    4 ++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 +++++-
- 4 files changed, 18 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-index e596117..d96daed 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-@@ -512,6 +512,7 @@ struct omap_hwmod omap2xxx_uart1_hwmod = {
- 	.mpu_irqs	= omap2_uart1_mpu_irqs,
- 	.sdma_reqs	= omap2_uart1_sdma_reqs,
- 	.main_clk	= "uart1_fck",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.prcm		= {
- 		.omap2 = {
- 			.module_offs = CORE_MOD,
-@@ -531,6 +532,7 @@ struct omap_hwmod omap2xxx_uart2_hwmod = {
- 	.mpu_irqs	= omap2_uart2_mpu_irqs,
- 	.sdma_reqs	= omap2_uart2_sdma_reqs,
- 	.main_clk	= "uart2_fck",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.prcm		= {
- 		.omap2 = {
- 			.module_offs = CORE_MOD,
-@@ -550,6 +552,7 @@ struct omap_hwmod omap2xxx_uart3_hwmod = {
- 	.mpu_irqs	= omap2_uart3_mpu_irqs,
- 	.sdma_reqs	= omap2_uart3_sdma_reqs,
- 	.main_clk	= "uart3_fck",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.prcm		= {
- 		.omap2 = {
- 			.module_offs = CORE_MOD,
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 646c14d..f98fd62 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -1908,6 +1908,7 @@ static struct omap_hwmod am33xx_uart1_hwmod = {
- 	.name		= "uart1",
- 	.class		= &uart_class,
- 	.clkdm_name	= "l4_wkup_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= am33xx_uart1_irqs,
- 	.sdma_reqs	= uart1_edma_reqs,
- 	.main_clk	= "dpll_per_m2_div4_wkupdm_ck",
-@@ -1928,6 +1929,7 @@ static struct omap_hwmod am33xx_uart2_hwmod = {
- 	.name		= "uart2",
- 	.class		= &uart_class,
- 	.clkdm_name	= "l4ls_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= am33xx_uart2_irqs,
- 	.sdma_reqs	= uart1_edma_reqs,
- 	.main_clk	= "dpll_per_m2_div4_ck",
-@@ -1955,6 +1957,7 @@ static struct omap_hwmod am33xx_uart3_hwmod = {
- 	.name		= "uart3",
- 	.class		= &uart_class,
- 	.clkdm_name	= "l4ls_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= am33xx_uart3_irqs,
- 	.sdma_reqs	= uart3_edma_reqs,
- 	.main_clk	= "dpll_per_m2_div4_ck",
-@@ -1975,6 +1978,7 @@ static struct omap_hwmod am33xx_uart4_hwmod = {
- 	.name		= "uart4",
- 	.class		= &uart_class,
- 	.clkdm_name	= "l4ls_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= am33xx_uart4_irqs,
- 	.sdma_reqs	= uart1_edma_reqs,
- 	.main_clk	= "dpll_per_m2_div4_ck",
-@@ -1995,6 +1999,7 @@ static struct omap_hwmod am33xx_uart5_hwmod = {
- 	.name		= "uart5",
- 	.class		= &uart_class,
- 	.clkdm_name	= "l4ls_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= am33xx_uart5_irqs,
- 	.sdma_reqs	= uart1_edma_reqs,
- 	.main_clk	= "dpll_per_m2_div4_ck",
-@@ -2015,6 +2020,7 @@ static struct omap_hwmod am33xx_uart6_hwmod = {
- 	.name		= "uart6",
- 	.class		= &uart_class,
- 	.clkdm_name	= "l4ls_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= am33xx_uart6_irqs,
- 	.sdma_reqs	= uart1_edma_reqs,
- 	.main_clk	= "dpll_per_m2_div4_ck",
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 8bb2628..0f0cfac 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -490,6 +490,7 @@ static struct omap_hwmod omap3xxx_uart1_hwmod = {
- 	.mpu_irqs	= omap2_uart1_mpu_irqs,
- 	.sdma_reqs	= omap2_uart1_sdma_reqs,
- 	.main_clk	= "uart1_fck",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.prcm		= {
- 		.omap2 = {
- 			.module_offs = CORE_MOD,
-@@ -508,6 +509,7 @@ static struct omap_hwmod omap3xxx_uart2_hwmod = {
- 	.mpu_irqs	= omap2_uart2_mpu_irqs,
- 	.sdma_reqs	= omap2_uart2_sdma_reqs,
- 	.main_clk	= "uart2_fck",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.prcm		= {
- 		.omap2 = {
- 			.module_offs = CORE_MOD,
-@@ -526,6 +528,7 @@ static struct omap_hwmod omap3xxx_uart3_hwmod = {
- 	.mpu_irqs	= omap2_uart3_mpu_irqs,
- 	.sdma_reqs	= omap2_uart3_sdma_reqs,
- 	.main_clk	= "uart3_fck",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.prcm		= {
- 		.omap2 = {
- 			.module_offs = OMAP3430_PER_MOD,
-@@ -555,6 +558,7 @@ static struct omap_hwmod omap36xx_uart4_hwmod = {
- 	.mpu_irqs	= uart4_mpu_irqs,
- 	.sdma_reqs	= uart4_sdma_reqs,
- 	.main_clk	= "uart4_fck",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.prcm		= {
- 		.omap2 = {
- 			.module_offs = OMAP3430_PER_MOD,
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 793f54a..8b3d70e 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -3431,6 +3431,7 @@ static struct omap_hwmod omap44xx_uart1_hwmod = {
- 	.name		= "uart1",
- 	.class		= &omap44xx_uart_hwmod_class,
- 	.clkdm_name	= "l4_per_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= omap44xx_uart1_irqs,
- 	.sdma_reqs	= omap44xx_uart1_sdma_reqs,
- 	.main_clk	= "uart1_fck",
-@@ -3459,6 +3460,7 @@ static struct omap_hwmod omap44xx_uart2_hwmod = {
- 	.name		= "uart2",
- 	.class		= &omap44xx_uart_hwmod_class,
- 	.clkdm_name	= "l4_per_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= omap44xx_uart2_irqs,
- 	.sdma_reqs	= omap44xx_uart2_sdma_reqs,
- 	.main_clk	= "uart2_fck",
-@@ -3487,7 +3489,8 @@ static struct omap_hwmod omap44xx_uart3_hwmod = {
- 	.name		= "uart3",
- 	.class		= &omap44xx_uart_hwmod_class,
- 	.clkdm_name	= "l4_per_clkdm",
--	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
-+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
-+				HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= omap44xx_uart3_irqs,
- 	.sdma_reqs	= omap44xx_uart3_sdma_reqs,
- 	.main_clk	= "uart3_fck",
-@@ -3516,6 +3519,7 @@ static struct omap_hwmod omap44xx_uart4_hwmod = {
- 	.name		= "uart4",
- 	.class		= &omap44xx_uart_hwmod_class,
- 	.clkdm_name	= "l4_per_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.mpu_irqs	= omap44xx_uart4_irqs,
- 	.sdma_reqs	= omap44xx_uart4_sdma_reqs,
- 	.main_clk	= "uart4_fck",
--- 
-1.7.9.5
+--
+~Vinod
