@@ -1,93 +1,115 @@
-From: dong.aisheng@linaro.org (Dong Aisheng)
-Date: Thu, 21 Feb 2013 17:36:50 +0800
-Subject: [PATCH 3/3] pinctrl: imx: move hard-coding data into device tree
-In-Reply-To: <51251E5A.1080806@wwwdotorg.org>
-References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
- <1361344089-16804-4-git-send-email-shawn.guo@linaro.org>
- <51251E5A.1080806@wwwdotorg.org>
-Message-ID: <CAP1dx+w2bLcztrRJOYs07xxSqVgo3bggJHMFt5LyL5jXQ-h6Mg@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 21 Feb 2013 10:36:51 +0100 (CET)
+Subject: too many timer retries happen when do local timer swtich with
+ broadcast timer
+In-Reply-To: <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
+References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
+ <alpine.LFD.2.02.1302201400400.22263@ionos>
+ <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1302211015270.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 February 2013 03:04, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 02/20/2013 12:08 AM, Shawn Guo wrote:
->> Currently, all imx pinctrl drivers maintain a big array of struct
->> imx_pin_reg which hard-codes data like register offset and mux mode
->> setting for each pin function.  Every time a new imx SoC support is
->> added, we need to add such a big mount of data.  With moving to single
->> kernel build, it's only matter of time to be blamed on memory consuming.
->>
->> With DTC pre-processor support in place, the patch moves all these data
->> into device tree by redefining the PIN_FUNC_ID in imxXX-pinfunc.h and
->> changing the PIN_FUNC_ID parsing code a little bit.
->
-> There are a couple of potential issues with this patch, which I'm in two
-> minds about:
->
-> 1)
->
-> This is an incompatible change to the DT binding definition. A DT
-> written to the old specification won't work with a newer kernel and
-> vice-versa. This isn't supposed to happen with device tree.
->
-> Right now I believe we're still being flexible about DT binding changes,
-> but I've seen hints that this kind of thing will start getting lots of
-> push-back in the near future...
->
-I wonder it may be hard to avoid it, especially for some complicated devices or
-non-standard devices during development process.
-No sure if any better way to control it.
+On Thu, 21 Feb 2013, Jason Liu wrote:
+> 2013/2/20 Thomas Gleixner <tglx@linutronix.de>:
+> > On Wed, 20 Feb 2013, Jason Liu wrote:
+> >> void arch_idle(void)
+> >> {
+> >> ....
+> >> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
+> >>
+> >> enter_the_wait_mode();
+> >>
+> >> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
+> >> }
+> >>
+> >> when the broadcast timer interrupt arrives(this interrupt just wakeup
+> >> the ARM, and ARM has no chance
+> >> to handle it since local irq is disabled. In fact it's disabled in
+> >> cpu_idle() of arch/arm/kernel/process.c)
+> >>
+> >> the broadcast timer interrupt will wake up the CPU and run:
+> >>
+> >> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);    ->
+> >> tick_broadcast_oneshot_control(...);
+> >> ->
+> >> tick_program_event(dev->next_event, 1);
+> >> ->
+> >> tick_dev_program_event(dev, expires, force);
+> >> ->
+> >> for (i = 0;;) {
+> >>                 int ret = clockevents_program_event(dev, expires, now);
+> >>                 if (!ret || !force)
+> >>                         return ret;
+> >>
+> >>                 dev->retries++;
+> >>                 ....
+> >>                 now = ktime_get();
+> >>                 expires = ktime_add_ns(now, dev->min_delta_ns);
+> >> }
+> >> clockevents_program_event(dev, expires, now);
+> >>
+> >>         delta = ktime_to_ns(ktime_sub(expires, now));
+> >>
+> >>         if (delta <= 0)
+> >>                 return -ETIME;
+> >>
+> >> when the bc timer interrupt arrives,  which means the last local timer
+> >> expires too. so,
+> >> clockevents_program_event will return -ETIME, which will cause the
+> >> dev->retries++
+> >> when retry to program the expired timer.
+> >>
+> >> Even under the worst case, after the re-program the expired timer,
+> >> then CPU enter idle
+> >> quickly before the re-progam timer expired, it will make system
+> >> ping-pang forever,
+> >
+> > That's nonsense.
+> 
+> I don't think so.
+> 
+> >
+> > The timer IPI brings the core out of the deep idle state.
+> >
+> > So after returning from enter_wait_mode() and after calling
+> > clockevents_notify() it returns from arch_idle() to cpu_idle().
+> >
+> > In cpu_idle() interrupts are reenabled, so the timer IPI handler is
+> > invoked. That calls the event_handler of the per cpu local clockevent
+> > device (the one which stops in C3). That ends up in the generic timer
+> > code which expires timers and reprograms the local clock event device
+> > with the next pending timer.
+> >
+> > So you cannot go idle again, before the expired timers of this event
+> > are handled and their callbacks invoked.
+> 
+> That's true for the CPUs which not response to the global timer interrupt.
+> Take our platform as example: we have 4CPUs(CPU0, CPU1,CPU2,CPU3)
+> The global timer device will keep running even in the deep idle mode, so, it
+> can be used as the broadcast timer device, and the interrupt of this device
+> just raised to CPU0 when the timer expired, then, CPU0 will broadcast the
+> IPI timer to other CPUs which is in deep idle mode.
+> 
+> So for CPU1, CPU2, CPU3, you are right, the IPI timer will bring it out of idle
+> state, after running clockevents_notify() it returns from arch_idle()
+> to cpu_idle(),
+> then local_irq_enable(), the IPI handler will be invoked and handle
+> the expires times
+> and re-program the next pending timer.
+> 
+> But, that's not true for the CPU0. The flow for CPU0 is:
+> the global timer interrupt wakes up CPU0 and then call:
+> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
+> 
+> which will cpumask_clear_cpu(cpu, tick_get_broadcast_oneshot_mask());
+> in the function tick_broadcast_oneshot_control(),
 
-> That all said, I'd also love to change the Tegra pinctrl binding now
-> that we have CPP, since I could replace all the strings in the current
-> binding with integers and presumably save some space in the .dtb. Hence,
-> I'd love to maintain the flexibility to keep changing the .dts and
-> kernel code in lock-step.
->
-> 2)
->
-> This patch removes a bunch of tables from the kernel. I like having the
-> tables in the kernel, since in theory it could allow a future debugfs or
-> sysfs interface to pinctrl that allows manipulation of the pinctrl HW
-> state at a semantic level.
+Now your explanation makes sense. 
 
-Right, that's one of the considerations why i kept the register table in driver
-in the first binding design.
+I have no fast solution for this, but I think that I have an idea how
+to fix it. Stay tuned.
 
-> This is only possible if the DT binding
-> includes details such as "set this pin to this function", and the driver
-> includes the tables to convert that into details such as register
-> address and value. I don't think such an "API" could be implemented for
-> IMX after this patch.
+Thanks,
 
-Theoretically It can, because device tree contains the pin registers
-informations
-in this way. But the problem is that it can only manipulate the used pins which
-are parsed from devices tree. While for those unused pins, since the driver does
-not have the pin register information, it can not manipulate it.
-But what i'm wondering now is do we really need to manipulate the unused pins
-from sysfs or debugfs?
-I still can not think out a real using case now.
-Anyone else can think one?
-
-> Still, given the IMX binding already merged "pin"
-> and "function" into a single integer in the binding, I'm not sure if IMX
-> could support that kind of "API" before anyway?
->
-At least PIN config could support.
-For PIN mux, it may also be implementable since we have all the needed
-information
-for a pin in driver whether it's used or not.
-
-Regards
-Dong Aisheng
-
-> This is part of the reason I pushed hard for the pinctrl APIs to operate
-> at the semantic pin/group/function level, and that Tegra's pinctrl
-> drivers explicitly have tables listing all the pins/groups/functions,
-> rather than just putting a bunch of register values into the DT.
->
-> I'm not sure how much of an issue this is, though. LinusW and/or the DT
-> maintainers should probably chime in here.
->
-> I didn't actually read the driver implementation changes in this patch.
+	tglx
