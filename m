@@ -1,20 +1,18 @@
 From: liu.h.jason@gmail.com (Jason Liu)
-Date: Thu, 21 Feb 2013 18:49:31 +0800
+Date: Thu, 21 Feb 2013 18:50:49 +0800
 Subject: too many timer retries happen when do local timer swtich with
  broadcast timer
-In-Reply-To: <20130221103508.GA24591@e102568-lin.cambridge.arm.com>
+In-Reply-To: <alpine.LFD.2.02.1302211015270.22263@ionos>
 References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
  <alpine.LFD.2.02.1302201400400.22263@ionos>
  <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
- <20130221103508.GA24591@e102568-lin.cambridge.arm.com>
-Message-ID: <CAB4PhKcJ9igjZHNFa7ydC+UA7nBWhanQYHYpE3MYNAFtmQZs5Q@mail.gmail.com>
+ <alpine.LFD.2.02.1302211015270.22263@ionos>
+Message-ID: <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/2/21 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>:
-> Hi Jason,
->
-> On Thu, Feb 21, 2013 at 06:16:51AM +0000, Jason Liu wrote:
+2013/2/21 Thomas Gleixner <tglx@linutronix.de>:
+> On Thu, 21 Feb 2013, Jason Liu wrote:
 >> 2013/2/20 Thomas Gleixner <tglx@linutronix.de>:
 >> > On Wed, 20 Feb 2013, Jason Liu wrote:
 >> >> void arch_idle(void)
@@ -109,91 +107,14 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >> which will cpumask_clear_cpu(cpu, tick_get_broadcast_oneshot_mask());
 >> in the function tick_broadcast_oneshot_control(),
 >
-> For my own understanding: at this point in time CPU0 local timer is
-> also reprogrammed, with min_delta (ie 1us) if I got your description
-> right.
-
-yes, right.
-
+> Now your explanation makes sense.
 >
->>
->> After return from clockevents_notify(), it will return to cpu_idle
->> from arch_idle,
->> then local_irq_enable(), the CPU0 will response to the global timer
->> interrupt, and
->> call the interrupt handler: tick_handle_oneshot_broadcast()
->>
->> static void tick_handle_oneshot_broadcast(struct clock_event_device *dev)
->> {
->>         struct tick_device *td;
->>         ktime_t now, next_event;
->>         int cpu;
->>
->>         raw_spin_lock(&tick_broadcast_lock);
->> again:
->>         dev->next_event.tv64 = KTIME_MAX;
->>         next_event.tv64 = KTIME_MAX;
->>         cpumask_clear(to_cpumask(tmpmask));
->>         now = ktime_get();
->>         /* Find all expired events */
->>         for_each_cpu(cpu, tick_get_broadcast_oneshot_mask()) {
->>                 td = &per_cpu(tick_cpu_device, cpu);
->>                 if (td->evtdev->next_event.tv64 <= now.tv64)
->>                         cpumask_set_cpu(cpu, to_cpumask(tmpmask));
->>                 else if (td->evtdev->next_event.tv64 < next_event.tv64)
->>                         next_event.tv64 = td->evtdev->next_event.tv64;
->>         }
->>
->>         /*
->>          * Wakeup the cpus which have an expired event.
->>          */
->>         tick_do_broadcast(to_cpumask(tmpmask));
->>         ...
->> }
->>
->> since cpu0 has been removed from the tick_get_broadcast_oneshot_mask(), and if
->> all the other cpu1/2/3 state in idle, and no expired timers, then the
->> tmpmask will be 0,
->> when call tick_do_broadcast().
->>
->> static void tick_do_broadcast(struct cpumask *mask)
->> {
->>         int cpu = smp_processor_id();
->>         struct tick_device *td;
->>
->>         /*
->>          * Check, if the current cpu is in the mask
->>          */
->>         if (cpumask_test_cpu(cpu, mask)) {
->>                 cpumask_clear_cpu(cpu, mask);
->>                 td = &per_cpu(tick_cpu_device, cpu);
->>                 td->evtdev->event_handler(td->evtdev);
->>         }
->>
->>         if (!cpumask_empty(mask)) {
->>                 /*
->>                  * It might be necessary to actually check whether the devices
->>                  * have different broadcast functions. For now, just use the
->>                  * one of the first device. This works as long as we have this
->>                  * misfeature only on x86 (lapic)
->>                  */
->>                 td = &per_cpu(tick_cpu_device, cpumask_first(mask));
->>                 td->evtdev->broadcast(mask);
->>         }
->> }
->>
->> If the mask is empty, then tick_do_broadcast will do nothing and return, which
->> will make cpu0 enter idle quickly, and then system will ping-pang there.
->
-> This means that the local timer reprogrammed above (to actually emulate the
-> expired local timer on CPU0, likely to be set to min_delta == 1us) does not
-> have time to expire before the idle thread disables IRQs and goes idle again.
->
-> Is this a correct description of what's happening ?
+> I have no fast solution for this, but I think that I have an idea how
+> to fix it. Stay tuned.
 
-yes, correct.
+Thanks Thomas, wait for your fix. :)
 
 >
-> Thanks a lot,
-> Lorenzo
+> Thanks,
 >
+>         tglx
