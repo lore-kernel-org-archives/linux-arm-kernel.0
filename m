@@ -1,41 +1,50 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 21 Feb 2013 13:04:49 -0500 (EST)
-Subject: [PATCH 1/1] net: fec: fix crash at mx53 qsb board
-In-Reply-To: <1361408848-14118-1-git-send-email-Frank.Li@freescale.com>
-References: <1361408848-14118-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20130221.130449.868185028543115848.davem@davemloft.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 21 Feb 2013 11:27:24 -0700
+Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <20130221103705.GB17852@n2100.arm.linux.org.uk>
+ <51261F38.2030902@ti.com>
+ <20130221134656.GC17852@n2100.arm.linux.org.uk>
+ <51262A7A.8040103@ti.com>
+ <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
+Message-ID: <20130221182724.GA14329@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
-Date: Thu, 21 Feb 2013 09:07:28 +0800
+On Thu, Feb 21, 2013 at 12:25:21PM -0500, Nicolas Pitre wrote:
 
-> Unable to handle kernel NULL pointer dereference at virtual address 00000002
-> pgd = 80004000
-> [00000002] *pgd=00000000
-> Internal error: Oops: 5 [#1] SMP ARM
-> Modules linked in:
-> CPU: 0    Not tainted  (3.8.0-rc7-next-20130215+ #346)
-> PC is at fec_enet_interrupt+0xd0/0x348
-> LR is at fec_enet_interrupt+0xb8/0x348
-> pc : [<80372b7c>]    lr : [<80372b64>]    psr: 60000193
-> sp : df855c20  ip : df855c20  fp : df855c74
-> r10: 00000516  r9 : 1c000000  r8 : 00000000
-> r7 : 00000000  r6 : 00000000  r5 : 00000000  r4 : df9b7800
-> r3 : df9b7df4  r2 : 00000000  r1 : 00000000  r0 : df9b7d34
-> 
-> It is possible that issue a irq between request_irq and fec_enet_init.
-> Irq handle will be called but driver data structure is not ready yet.
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> So let's stop kidding ourselves and be coherent please: either we move 
+> device specifics away from the kernel, or we keep them together.  In 
+> other words, the DT should ideally come preinstalled with the bootloader 
+> on a given board/device for distros to not even have to care about it, 
+> or we put that data back inside the kernel and dispense ourselves from 
+> all the added DT overhead entirely.  But an hybrid mixed solution like 
+> FIT is IMHO the worst of both worlds and sending a wrong message.
 
-You must fix this by making sure all of the necessary software
-datastructures are initialized fully before request_irq() is
-invoked.
+Just to thread jack a bit here..
 
-You absolutely cannot control pending interrupts the chip is already
-signalling and which have been queued up in the interrupt controller
-already, which will be emitted precisely when you request_irq()
-regardless of how you program the chip during this time.
+We've been using DT on production embedded stuff sice about 2.6.20ish
+on PPC and now ARM. We treat the dtb as a kernel version specific
+file, much like an initrd and ensure that the kernel only ever boots
+with its proper dtb. This is based on experience that the dtbs change
+depending on the state of the drivers in the kernel, what gets
+mainlined and when, etc.
 
-I'm not applying this, fix the bug correctly, thanks.
+Embedding this stuff into the bootloader is *not* desirable for my
+embedded scenarios. We don't use FIT (or uboot) but we do the same
+thing: a single image is constructed with the proper dtb, kernel and
+initrd, and that is what the bootloader boots.
+
+Why? This is an embedded appliance product. We need to be able to
+deliver firmware upgrades that *work*. We can't brick the board
+because the bootloader and kernel get out of sync. The boot loader has
+to be *simple*, it has to boot every past, present and future kernel
+or we start taking risks that a firmware flash will end up bricking
+it.
+
+People making dev boards and distros for them certainly have different
+requirements, but we've decided that the single image approach is the
+best for appliance style products.
+
+Jason
