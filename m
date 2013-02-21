@@ -1,11 +1,11 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 21 Feb 2013 16:50:05 +0400
-Subject: [PATCH 3/8] ARM: OMAP5: prm: Allow prm init to success on OMAP5
- SOCs
-In-Reply-To: <1361374034-21831-4-git-send-email-santosh.shilimkar@ti.com>
+Date: Thu, 21 Feb 2013 16:52:07 +0400
+Subject: [PATCH 2/8] ARM: OMAP5: timer: Update the clocksource name as
+ per clock data
+In-Reply-To: <1361374034-21831-3-git-send-email-santosh.shilimkar@ti.com>
 References: <1361374034-21831-1-git-send-email-santosh.shilimkar@ti.com>
- <1361374034-21831-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <512617FD.4010901@cogentembedded.com>
+ <1361374034-21831-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <51261877.9070800@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,9 +13,11 @@ Hello.
 
 On 20-02-2013 19:27, Santosh Shilimkar wrote:
 
-> Allow prm init to success on OMAP5 SOCs.
+> OMAP5 clockdata has different sys clock clock node name. Fix the timer code
 
-    s/succees/succeed/
+    One "clock" too many. :-)
+
+> to take care of it.
 
 > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
