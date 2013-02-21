@@ -1,23 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Feb 2013 19:58:26 +0100
-Subject: [PATCH v3 04/12] gpio: pxa: remove gpio_type
-In-Reply-To: <1361164358-5845-5-git-send-email-haojian.zhuang@linaro.org>
-References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
- <1361164358-5845-5-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdYN-B=Qze0dKjPEetrrYCZZ0sC3jUSNnOGXO7o6TMnEyg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 21 Feb 2013 11:58:51 -0700
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <CAD=GYpZM7uOHqhwhxzokV161WFZ2azh1VpSBn498PmPZm+bYbQ@mail.gmail.com>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <5125A1FE.5000604@wwwdotorg.org>
+ <CAD=GYpZM7uOHqhwhxzokV161WFZ2azh1VpSBn498PmPZm+bYbQ@mail.gmail.com>
+Message-ID: <51266E6B.8040509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 6:12 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+On 02/21/2013 12:15 AM, Joel A Fernandes wrote:
+> On Wed, Feb 20, 2013 at 10:26 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 02/20/2013 06:37 PM, Joel A Fernandes wrote:
+>>> Hello,
+>>> I've been spinning some work-in-progress patches for FIT build support
+>>> in the kernel.
+>>> With the move to multiplatform support on OMAP, I feel it is a good
+>>> time to add  FIT support, also looking at the proliferating number of
+>>> dtbs, as it is a nice way
+>>
+>> To my mind, FIT is pointless. And forcing the kernel build process to
+> 
+> I don't think so, there are many usecases for FIT and cleanly
+> embedding DTBs is a common usecase, (along with stronger checksums,
+> compression). That is also the basis of my ELC talk tomorrow morning
+> ;-)
+> You could peruse the slides at, http://wwwelinux.org/Fit-boot to get a
+> better understanding of what FIT solves. With the move to
+> multiplatform kernels, it is quite a logical next step to add this
+> support to the kernel build.
+> 
+>> create bootloader-specific files doesn't seem like a good idea. Doing so
+>> would require pulling in even more outside tools into the kernel build flow.
+> 
+> As for pulling additional tools, dtc is already a part of the kernel
+> so the idea is to use existing tools.
 
-> Since gpio_type is used to check whether gafr register is valid. So
-> move it into platform data.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-
-Looks clean an nice,
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Well, dtc won't be part of the kernel build process for ARM at least
+once the device tree files are move outside the kernel.
