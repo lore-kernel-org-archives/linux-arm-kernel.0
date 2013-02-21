@@ -1,165 +1,334 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Feb 2013 14:04:33 +0800
-Subject: [PATCH 3/3] pinctrl: imx: move hard-coding data into device tree
-In-Reply-To: <CAP1dx+zuGZ5uvOho03ieEB=17=YtkYn5UyBOsRXSJcpsKQRTAw@mail.gmail.com>
-References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
- <1361344089-16804-4-git-send-email-shawn.guo@linaro.org>
- <CAP1dx+zuGZ5uvOho03ieEB=17=YtkYn5UyBOsRXSJcpsKQRTAw@mail.gmail.com>
-Message-ID: <20130221060431.GF17738@S2101-09.ap.freescale.net>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Thu, 21 Feb 2013 14:16:51 +0800
+Subject: too many timer retries happen when do local timer swtich with
+ broadcast timer
+In-Reply-To: <alpine.LFD.2.02.1302201400400.22263@ionos>
+References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
+ <alpine.LFD.2.02.1302201400400.22263@ionos>
+Message-ID: <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 05:44:09PM +0800, Dong Aisheng wrote:
-> > @@ -24,9 +24,9 @@ Required properties for iomux controller:
-> >  Required properties for pin configuration node:
-> >  - fsl,pins: two integers array, represents a group of pins mux and config
-> >    setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is
-> > -  pin working on a specific function, CONFIG is the pad setting value like
-> > -  pull-up on this pin. Please refer to fsl,<soc>-pinctrl.txt for the valid
-> > -  pins and functions of each SoC.
-> > +  pin working on a specific function, which consists of a tuple of <pinid
-> > +  mux_reg conf_reg input_reg mux_val input_val>.  CONFIG is the pad setting
-> > +  value like pull-up on this pin.
-> 
-> Since we actually do not have a PIN_FUNC_ID anymore, i would suggest
-> totoally remove this concept in both doc and code.
-> 
-Nothing really changed about PIN_FUNC_ID except it's a tuple of
-numbers now.  So the concept is still there.
+2013/2/20 Thomas Gleixner <tglx@linutronix.de>:
+> On Wed, 20 Feb 2013, Jason Liu wrote:
+>> void arch_idle(void)
+>> {
+>> ....
+>> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
+>>
+>> enter_the_wait_mode();
+>>
+>> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
+>> }
+>>
+>> when the broadcast timer interrupt arrives(this interrupt just wakeup
+>> the ARM, and ARM has no chance
+>> to handle it since local irq is disabled. In fact it's disabled in
+>> cpu_idle() of arch/arm/kernel/process.c)
+>>
+>> the broadcast timer interrupt will wake up the CPU and run:
+>>
+>> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);    ->
+>> tick_broadcast_oneshot_control(...);
+>> ->
+>> tick_program_event(dev->next_event, 1);
+>> ->
+>> tick_dev_program_event(dev, expires, force);
+>> ->
+>> for (i = 0;;) {
+>>                 int ret = clockevents_program_event(dev, expires, now);
+>>                 if (!ret || !force)
+>>                         return ret;
+>>
+>>                 dev->retries++;
+>>                 ....
+>>                 now = ktime_get();
+>>                 expires = ktime_add_ns(now, dev->min_delta_ns);
+>> }
+>> clockevents_program_event(dev, expires, now);
+>>
+>>         delta = ktime_to_ns(ktime_sub(expires, now));
+>>
+>>         if (delta <= 0)
+>>                 return -ETIME;
+>>
+>> when the bc timer interrupt arrives,  which means the last local timer
+>> expires too. so,
+>> clockevents_program_event will return -ETIME, which will cause the
+>> dev->retries++
+>> when retry to program the expired timer.
+>>
+>> Even under the worst case, after the re-program the expired timer,
+>> then CPU enter idle
+>> quickly before the re-progam timer expired, it will make system
+>> ping-pang forever,
+>
+> That's nonsense.
 
-> > +/*
-> > + * The pin function ID is a tuple of
-> > + * <pinid mux_reg conf_reg input_reg mux_val input_val>
-> > + */
-> > +#define MX6Q_PAD_SD2_DAT1__USDHC2_DAT1                 0x000 0x04c 0x360 0x000 0x0 0x0
-> 
-> The original table generated does not have pinid, so you manually added it here?
+I don't think so.
 
-The only goal about the patch is to move the data in that big array of
-struct imx_pin_reg out of kernel.  Doesn't the struct have the pinid
-encoded there before?
+>
+> The timer IPI brings the core out of the deep idle state.
+>
+> So after returning from enter_wait_mode() and after calling
+> clockevents_notify() it returns from arch_idle() to cpu_idle().
+>
+> In cpu_idle() interrupts are reenabled, so the timer IPI handler is
+> invoked. That calls the event_handler of the per cpu local clockevent
+> device (the one which stops in C3). That ends up in the generic timer
+> code which expires timers and reprograms the local clock event device
+> with the next pending timer.
+>
+> So you cannot go idle again, before the expired timers of this event
+> are handled and their callbacks invoked.
 
-> Since the pin id is really created by us, maybe we could try to remove it
-> and dynamically generate the pin id.
+That's true for the CPUs which not response to the global timer interrupt.
+Take our platform as example: we have 4CPUs(CPU0, CPU1,CPU2,CPU3)
+The global timer device will keep running even in the deep idle mode, so, it
+can be used as the broadcast timer device, and the interrupt of this device
+just raised to CPU0 when the timer expired, then, CPU0 will broadcast the
+IPI timer to other CPUs which is in deep idle mode.
 
-I actually thought about that, but decided to encode the pin id into
-PIN_FUNC_ID for the reasons below.
+So for CPU1, CPU2, CPU3, you are right, the IPI timer will bring it out of idle
+state, after running clockevents_notify() it returns from arch_idle()
+to cpu_idle(),
+then local_irq_enable(), the IPI handler will be invoked and handle
+the expires times
+and re-program the next pending timer.
 
- * I did not figure out a easy way to dynamically generate the pin id
- * Even we have a way to dynamically generate it, it might not match
-   the existing pin id used in driver, which means we need to renumber
-   the enum imxXX_pads.
- * Since pin id is a type of hard-coding value that pinctrl driver
-   figures out from hardware manual and reports to pinctrl subsystem
-   statically, I do not see why we have to dynamically generate it
-   when it's not easy to do.
+But, that's not true for the CPU0. The flow for CPU0 is:
+the global timer interrupt wakes up CPU0 and then call:
+clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
 
-> Then user does not need to care about id anymore.
-> 
-> > +/*
-> > + * Each pin represented in fsl,pins consists of 6 u32 PIN_FUNC_ID and
-> 
-> We could remove PIN_FUNC_ID.
-> 
-> > + * 1 u32 CONFIG, so 28 types in total for each pin.
-> > + */
-> > +#define FSL_PIN_SIZE 28
-> >
-> >  static int imx_pinctrl_parse_groups(struct device_node *np,
-> >                                     struct imx_pin_group *grp,
-> >                                     struct imx_pinctrl_soc_info *info,
-> >                                     u32 index)
-> >  {
-> > -       unsigned int pin_func_id;
-> > -       int ret, size;
-> > +       int size;
-> >         const __be32 *list;
-> > -       int i, j;
-> > +       int i;
-> >         u32 config;
-> >
-> >         dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
-> > @@ -447,32 +401,36 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
-> >          */
-> >         list = of_get_property(np, "fsl,pins", &size);
-> >         /* we do not check return since it's safe node passed down */
-> > -       size /= sizeof(*list);
-> 
-> Is this wrongly deleted?
-> 
-No, it's not.
+which will cpumask_clear_cpu(cpu, tick_get_broadcast_oneshot_mask());
+in the function tick_broadcast_oneshot_control(),
 
-> > -       if (!size || size % 2) {
-> > -               dev_err(info->dev, "wrong pins number or pins and configs should be pairs\n");
-> > +       if (!size || size % FSL_PIN_SIZE) {
-> > +               dev_err(info->dev, "Invalid fsl,pins property\n");
-> >                 return -EINVAL;
-> >         }
-> >
-> > -       grp->npins = size / 2;
-> > +       grp->npins = size / FSL_PIN_SIZE;
-> >         grp->pins = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
-> >                                 GFP_KERNEL);
-> >         grp->mux_mode = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
-> >                                 GFP_KERNEL);
-> > +       grp->input_val = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
-> > +                               GFP_KERNEL);
-> >         grp->configs = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned long),
-> >                                 GFP_KERNEL);
-> > -       for (i = 0, j = 0; i < size; i += 2, j++) {
-> > -               pin_func_id = be32_to_cpu(*list++);
-> > -               ret = imx_pinctrl_get_pin_id_and_mux(info, pin_func_id,
-> > -                                       &grp->pins[j], &grp->mux_mode[j]);
-> > -               if (ret) {
-> > -                       dev_err(info->dev, "get invalid pin function id\n");
-> > -                       return -EINVAL;
-> > -               }
-> > +       for (i = 0; i < grp->npins; i++) {
-> > +               unsigned int pin_id = be32_to_cpu(*list++);
-> > +               struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
-> > +
-> > +               grp->pins[i] = pin_id;
-> > +               pin_reg->mux_reg = be32_to_cpu(*list++);
-> > +               pin_reg->conf_reg = be32_to_cpu(*list++);
-> > +               pin_reg->input_reg = be32_to_cpu(*list++);
-> > +               grp->mux_mode[i] = be32_to_cpu(*list++);
-> > +               grp->input_val[i] = be32_to_cpu(*list++);
-> > +
-> >                 /* SION bit is in mux register */
-> >                 config = be32_to_cpu(*list++);
-> >                 if (config & IMX_PAD_SION)
-> > -                       grp->mux_mode[j] |= IOMUXC_CONFIG_SION;
-> > -               grp->configs[j] = config & ~IMX_PAD_SION;
-> > +                       grp->mux_mode[i] |= IOMUXC_CONFIG_SION;
-> > +               grp->configs[i] = config & ~IMX_PAD_SION;
-> >         }
-> >
-> >  #ifdef DEBUG
-> > @@ -568,8 +526,7 @@ int imx_pinctrl_probe(struct platform_device *pdev,
-> >         struct resource *res;
-> >         int ret;
-> >
-> > -       if (!info || !info->pins || !info->npins
-> > -                 || !info->pin_regs || !info->npin_regs) {
-> > +       if (!info || !info->pins || !info->npins) {
-> >                 dev_err(&pdev->dev, "wrong pinctrl info\n");
-> >                 return -EINVAL;
-> >         }
-> > @@ -580,6 +537,11 @@ int imx_pinctrl_probe(struct platform_device *pdev,
-> >         if (!ipctl)
-> >                 return -ENOMEM;
-> >
-> > +       info->pin_regs = devm_kzalloc(&pdev->dev, sizeof(*info->pin_regs) *
-> > +                                     info->npins, GFP_KERNEL);
-> 
-> Since we only record the used pins from device tree, it seems not make too much
-> sense to create pin_regs for everypin no matter wheter it's used or not.
-> I would suggest to put the pin_regs info into group,
-> then we do not need info->pin_regs anymore.
-> What do you think?
-> 
-I thought about doing that.  What I do not like about that is the
-register offset data for one pin will have multiple copies in different
-groups, if the pin happens to be in several groups.
+After return from clockevents_notify(), it will return to cpu_idle
+from arch_idle,
+then local_irq_enable(), the CPU0 will response to the global timer
+interrupt, and
+call the interrupt handler: tick_handle_oneshot_broadcast()
 
-Shawn 
+static void tick_handle_oneshot_broadcast(struct clock_event_device *dev)
+{
+        struct tick_device *td;
+        ktime_t now, next_event;
+        int cpu;
+
+        raw_spin_lock(&tick_broadcast_lock);
+again:
+        dev->next_event.tv64 = KTIME_MAX;
+        next_event.tv64 = KTIME_MAX;
+        cpumask_clear(to_cpumask(tmpmask));
+        now = ktime_get();
+        /* Find all expired events */
+        for_each_cpu(cpu, tick_get_broadcast_oneshot_mask()) {
+                td = &per_cpu(tick_cpu_device, cpu);
+                if (td->evtdev->next_event.tv64 <= now.tv64)
+                        cpumask_set_cpu(cpu, to_cpumask(tmpmask));
+                else if (td->evtdev->next_event.tv64 < next_event.tv64)
+                        next_event.tv64 = td->evtdev->next_event.tv64;
+        }
+
+        /*
+         * Wakeup the cpus which have an expired event.
+         */
+        tick_do_broadcast(to_cpumask(tmpmask));
+        ...
+}
+
+since cpu0 has been removed from the tick_get_broadcast_oneshot_mask(), and if
+all the other cpu1/2/3 state in idle, and no expired timers, then the
+tmpmask will be 0,
+when call tick_do_broadcast().
+
+static void tick_do_broadcast(struct cpumask *mask)
+{
+        int cpu = smp_processor_id();
+        struct tick_device *td;
+
+        /*
+         * Check, if the current cpu is in the mask
+         */
+        if (cpumask_test_cpu(cpu, mask)) {
+                cpumask_clear_cpu(cpu, mask);
+                td = &per_cpu(tick_cpu_device, cpu);
+                td->evtdev->event_handler(td->evtdev);
+        }
+
+        if (!cpumask_empty(mask)) {
+                /*
+                 * It might be necessary to actually check whether the devices
+                 * have different broadcast functions. For now, just use the
+                 * one of the first device. This works as long as we have this
+                 * misfeature only on x86 (lapic)
+                 */
+                td = &per_cpu(tick_cpu_device, cpumask_first(mask));
+                td->evtdev->broadcast(mask);
+        }
+}
+
+If the mask is empty, then tick_do_broadcast will do nothing and return, which
+will make cpu0 enter idle quickly, and then system will ping-pang there.
+
+switch to bc timer->wait->bc timer expires->wakeup->switch to loc timer->  |
+ ^
+ |------<-enter idle <- reprogram the expired loc timer ---<
+
+
+We did see such things happen on the system which will make system
+stuck there and
+no any sched-tick handler running on the CPU0.
+
+And the easy way to reproduce it is:
+
+/* hack code: just for experiment */
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index f113755..d142802 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -493,8 +493,12 @@ void tick_broadcast_oneshot_control(unsigned long reason)
+                        cpumask_clear_cpu(cpu,
+                                          tick_get_broadcast_oneshot_mask());
+                        clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT);
+-                       if (dev->next_event.tv64 != KTIME_MAX)
+-                               tick_program_event(dev->next_event, 1);
++                       if (dev->next_event.tv64 != KTIME_MAX) {
++                               if (cpu)
++                                       tick_program_event(dev->next_event, 1);
++                               else
++
+tick_program_event(ktime_add_ns(dev->next_event, 100000), 1);
++                       }
+                }
+        }
+
+We need fix this common issue. Do you have good idea about how to fix it?
+
+>
+>
+> Now the reprogramming itself is a different issue.
+>
+> It's necessary as we have no information whether the wakeup was caused
+> by the timer IPI or by something else.
+>
+> We might try to be clever and store the pending IPI in
+> tick_handle_oneshot_broadcast() and avoid the reprogramming in that
+> case. Completely untested patch below.
+
+Thanks for the patch.
+
+>
+> Thanks,
+>
+>         tglx
+>
+> Index: linux-2.6/kernel/time/tick-broadcast.c
+> ===================================================================
+> --- linux-2.6.orig/kernel/time/tick-broadcast.c
+> +++ linux-2.6/kernel/time/tick-broadcast.c
+> @@ -29,6 +29,7 @@
+>  static struct tick_device tick_broadcast_device;
+>  /* FIXME: Use cpumask_var_t. */
+>  static DECLARE_BITMAP(tick_broadcast_mask, NR_CPUS);
+> +static DECLARE_BITMAP(tick_broadcast_pending, NR_CPUS);
+>  static DECLARE_BITMAP(tmpmask, NR_CPUS);
+>  static DEFINE_RAW_SPINLOCK(tick_broadcast_lock);
+>  static int tick_broadcast_force;
+> @@ -417,9 +418,10 @@ again:
+>         /* Find all expired events */
+>         for_each_cpu(cpu, tick_get_broadcast_oneshot_mask()) {
+>                 td = &per_cpu(tick_cpu_device, cpu);
+> -               if (td->evtdev->next_event.tv64 <= now.tv64)
+> +               if (td->evtdev->next_event.tv64 <= now.tv64) {
+>                         cpumask_set_cpu(cpu, to_cpumask(tmpmask));
+> -               else if (td->evtdev->next_event.tv64 < next_event.tv64)
+> +                       set_bit(cpu, tick_broadcast_pending);
+> +               } else if (td->evtdev->next_event.tv64 < next_event.tv64)
+>                         next_event.tv64 = td->evtdev->next_event.tv64;
+>         }
+>
+> @@ -493,7 +495,8 @@ void tick_broadcast_oneshot_control(unsi
+>                         cpumask_clear_cpu(cpu,
+>                                           tick_get_broadcast_oneshot_mask());
+>                         clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT);
+> -                       if (dev->next_event.tv64 != KTIME_MAX)
+> +                       if (dev->next_event.tv64 != KTIME_MAX &&
+> +                           !test_and_clear_bit(cpu, tick_broadcast_pending))
+>                                 tick_program_event(dev->next_event, 1);
+>                 }
+>         }
+>
+
+I have tested the patch, it can fix the retries on the CPU1/2/3, but
+not on CPU0.
+see, cpu0:  retries:        39042
+
+root@~$ cat /proc/timer_list
+Timer List Version: v0.6
+HRTIMER_MAX_CLOCK_BASES: 3
+[...]
+
+Tick Device: mode:     1
+Per CPU device: 0
+Clock Event Device: local_timer
+ max_delta_ns:   8624432320
+ min_delta_ns:   1000
+ mult:           2138893713
+ shift:          32
+ mode:           3
+ next_event:     3295010000000 nsecs
+ set_next_event: twd_set_next_event
+ set_mode:       twd_set_mode
+ event_handler:  hrtimer_interrupt
+ retries:        39042
+
+Tick Device: mode:     1
+Per CPU device: 1
+Clock Event Device: local_timer
+ max_delta_ns:   8624432320
+ min_delta_ns:   1000
+ mult:           2138893713
+ shift:          32
+ mode:           1
+ next_event:     3295050000000 nsecs
+ set_next_event: twd_set_next_event
+ set_mode:       twd_set_mode
+ event_handler:  hrtimer_interrupt
+ retries:        1
+
+Tick Device: mode:     1
+Per CPU device: 2
+Clock Event Device: local_timer
+ max_delta_ns:   8624432320
+ min_delta_ns:   1000
+ mult:           2138893713
+ shift:          32
+ mode:           1
+ next_event:     10740407770000000 nsecs
+ set_next_event: twd_set_next_event
+ set_mode:       twd_set_mode
+ event_handler:  hrtimer_interrupt
+ retries:        0
+
+Tick Device: mode:     1
+Per CPU device: 3
+Clock Event Device: local_timer
+ max_delta_ns:   8624432320
+ min_delta_ns:   1000
+ mult:           2138893713
+ shift:          32
+ mode:           1
+ next_event:     10737578200000000 nsecs
+ set_next_event: twd_set_next_event
+ set_mode:       twd_set_mode
+ event_handler:  hrtimer_interrupt
+ retries:        0
+
+
+Jason Liu
+>
+>
+>
+>
+>
