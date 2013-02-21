@@ -1,34 +1,31 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 21 Feb 2013 20:27:41 +1300
-Subject: GPIO sysfs 'default' values
-In-Reply-To: <1361430680.10390.7.camel@gitbox>
-References: <1361430680.10390.7.camel@gitbox>
-Message-ID: <1361431661.12222.0.camel@gitbox>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 Feb 2013 15:29:03 +0800
+Subject: i.MX6 Solo: maxcpus=1 vs. nosmp: Warning from smp_twd.c?
+In-Reply-To: <5125C9B1.8050209@de.bosch.com>
+References: <511CF063.3010200@de.bosch.com>
+ <20130214143752.GH17833@n2100.arm.linux.org.uk>
+ <20130218025021.GI6782@S2101-09.ap.freescale.net>
+ <5125C9B1.8050209@de.bosch.com>
+Message-ID: <20130221072900.GA23442@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-02-21 at 20:11 +1300, Tony Prisk wrote:
-> Hi Grant, Linus.
+On Thu, Feb 21, 2013 at 08:16:01AM +0100, Dirk Behme wrote:
+> >diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> >index c092115..f796b83 100644
+> >--- a/arch/arm/kernel/smp_twd.c
+> >+++ b/arch/arm/kernel/smp_twd.c
+> >@@ -392,6 +392,6 @@ void __init twd_local_timer_of_register(void)
+> >        err = twd_local_timer_common_register(np);
+> >
+> > out:
+> >-       WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
+> >+       pr_warn("twd_local_timer_of_register failed (%d)\n", err);
+> > }
+> > #endif
 > 
-> I was testing our new gpio/pinctrl driver today and noticed something a
-> little weird.
+> Any news on this? Time to move it to the patch system?
 > 
-> I exported gpio0 via sysfs and echoed the direction value - it was 'in'.
-> This pin is used to control an LCD panel, and is actually in 'out' mode.
-> If I write 'in' to direction, it changes mode to 'in' and the panel
-> turns off. Setting it back to 'out' and value=0, and the panel turns on
-> again.
-> 
-> I noticed that I had no gpiochip->get_direction, so I added it, but the
-> result was the same.
-> 
-> Any idea what I've missed?
-> 
-> Regards
-> Tony Prisk
+Thanks for reminding.  I will send it out today.
 
-Sorted it out.
-->get_direction was all that was needed.
-
-Apologies,
-Tony P
+Shawn
