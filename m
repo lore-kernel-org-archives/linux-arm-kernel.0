@@ -1,65 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Feb 2013 11:02:15 +0100
-Subject: arm64 defconfig breakage (gpio) in next-20130218
-In-Reply-To: <20130221093104.GB23442@S2101-09.ap.freescale.net>
-References: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
- <20130221093104.GB23442@S2101-09.ap.freescale.net>
-Message-ID: <1634805.kh17mYrJe5@wuerfel>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 21 Feb 2013 12:16:03 +0200
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <20130220191638.GA25609@arwen.pp.htv.fi>
+References: <1360840554-26901-2-git-send-email-balbi@ti.com>
+ <20130214171253.GC7144@atomide.com>
+ <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com>
+ <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+ <20130215064429.GA30038@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1302191530190.32069@utopia.booyaka.com>
+ <20130220191638.GA25609@arwen.pp.htv.fi>
+Message-ID: <20130221101603.GI23234@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 February 2013 17:31:07 Shawn Guo wrote:
-> > 
-> > I've bisected this down to 0fa2fd9a0d: "Merge branch 'linusw/devel' of
-> > git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git into
-> > gpio/next". Both parent commits build fine.
-> > 
-> > I've played around a bit, and selecting ARCH_REQUIRE_GPIOLIB in the arm64
-> > Kconfig fixes the issue, but I'm unfamilar with gpio{,lib} and I'm not sure
-> > that's the best/correct way of solving this.
 > 
-> Kconfig GENERIC_GPIO is designed as an option defined at architecture
-> level and select by platform who knows how gpio driver/API is
-> implemented.  The following change should fix the error.
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index f532ce5..aca4a25 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -93,7 +93,7 @@ config IOMMU_HELPER
->         def_bool SWIOTLB
-> 
->  config GENERIC_GPIO
-> -       def_bool y
-> +       bool
-> 
->  source "init/Kconfig"
+> Also, IMHO reset should always be done during probe() so driver can be
+> dead sure that we're starting from a known state. This is even more
 
-But we have no arm64 platforms that would pick GENERIC_GPIO, it's expected
-to come from GPIOLIB anyway. I think the right fix is this:
+Depends on the IP block. Eg: you might want to keep the screen showing the
+contents drawn by the bootloader while booting the kernel and smoothly
+change to a new image when userspace comes online. In that case you probably
+don't want to blindly reset the display controller for example.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index ab4aa54..3fab0db 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -3,6 +3,7 @@ config ARM64
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
- 	select ARCH_WANT_FRAME_POINTERS
-+	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_ARCH_TIMER
- 	select CLONE_BACKWARDS
-@@ -92,9 +93,6 @@ config SWIOTLB
- config IOMMU_HELPER
- 	def_bool SWIOTLB
- 
--config GENERIC_GPIO
--	def_bool y
--
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
+Cheers,
 
-
-	Arnd
+Peter.
