@@ -1,107 +1,157 @@
-From: robert.marklund@stericsson.com (Robert MARKLUND)
-Date: Thu, 21 Feb 2013 15:32:38 +0100
-Subject: CoreSight framework and drivers
-In-Reply-To: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
-References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
-Message-ID: <2B1D156D95AE9B4EAD379CB9E465FE73272F65EE59@EXDCVYMBSTM005.EQ1STM.local>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Thu, 21 Feb 2013 15:35:25 +0100
+Subject: [PATCH 2/3] crypto: sahara: Add driver for SAHARA2 accelerator.
+In-Reply-To: <201302211313.46078.arnd@arndb.de>
+References: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
+ <1361449162-27302-3-git-send-email-javier.martin@vista-silicon.com>
+ <201302211313.46078.arnd@arndb.de>
+Message-ID: <CACKLOr2ytmqB3NtPy6+0feGcGux7-PtR47RVYe1RMu6ftJXtqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Would it be easy to add dummy sources to control data coming from other ETM sources not controlled by the kernel.
-Also I want the ability to have multiple sinks enabled at one time and just control the flow from the sources to direct where the data goes.
-Not that clear but I hope you understand :)
+Hi Arnd,
+thanks for your review.
 
-BR
-Robert
+On 21 February 2013 14:13, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 21 February 2013, Javier Martin wrote:
+>> +
+>> +struct sahara_dev {
+>> +     struct device           *device;
+>> +     void __iomem            *regs_base;
+>> +     struct clk              *clk_ipg;
+>> +     struct clk              *clk_ahb;
+>> +
+>> +     struct sahara_ctx       *ctx;
+>> +     spinlock_t              lock;
+>> +     struct crypto_queue     queue;
+>> +     unsigned long           flags;
+>> +
+>> +     struct tasklet_struct   done_task;
+>> +     struct tasklet_struct   queue_task;
+>> +
+>> +     struct sahara_hw_desc   *hw_desc[SAHARA_MAX_HW_DESC];
+>> +     dma_addr_t              hw_phys_desc[SAHARA_MAX_HW_DESC];
+>> +
+>> +     u8                      *key_base;
+>> +     dma_addr_t              key_phys_base;
+>> +
+>> +     u8                      *iv_base;
+>> +     dma_addr_t              iv_phys_base;
+>> +
+>> +     struct sahara_hw_link   *hw_link[SAHARA_MAX_HW_LINK];
+>> +     dma_addr_t              hw_phys_link[SAHARA_MAX_HW_LINK];
+>> +
+>> +     struct ablkcipher_request *req;
+>> +     size_t                  total;
+>> +     struct scatterlist      *in_sg;
+>> +     unsigned int            nb_in_sg;
+>> +     struct scatterlist      *out_sg;
+>> +     unsigned int            nb_out_sg;
+>> +
+>> +     u32                     error;
+>> +     struct timer_list       watchdog;
+>> +};
+>> +
+>> +static struct sahara_dev *dev_ptr;
+>
+> Please remove this global device pointer, it should not be needed, since you
+> can store the pointer in the context object.
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> pratikp at codeaurora.org
-> Sent: den 18 december 2012 20:19
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux at arm.linux.org.uk; linus.walleij at linaro.org; will.deacon at arm.com; Magnus PERSSON; david.rusling at linaro.org;
-> arve at android.com; dsaxena at linaro.org; john.stultz at linaro.org; jon-hunter at ti.com; d-deao at ti.com; Christian BEJRAM; devicetree-
-> discuss at lists.ozlabs.org
-> Subject: CoreSight framework and drivers
-> 
-> This RFC is aimed at introducing CoreSight framework as well as
-> individual CoreSight trace component drivers adhering to ARM
-> CoreSight specification. Some prior discussion on this can be
-> referred at [1].
-> 
-> There are 3 kinds of CoreSight trace components:
-> 
-> * Sources: Responsible for producing trace data to provide
->   visibility for the associated entity.
-> 
-> * Links: Transport components that carry trace data.
-> 
-> * Sinks: Collectors for storing trace data or acting as conduits
->   for off-chip trace data collection.
-> 
-> These components can be connected in various topologies to suite
-> a particular SoCs tracing needs.
-> 
-> Framework is responsible for gathering and using the information
-> about the registered CoreSight components and their connections
-> to allow it to dynamically deduce the sequence of components
-> representing a connection from a CoreSight source to the
-> currently selected CoreSight sink. This helps the framework to
-> program the correct set of components to satisfy user request.
-> 
-> [1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/204591
-> 
-> Pratik Patel (8):
->   coresight: add CoreSight core layer framework
->   coresight: add CoreSight TMC driver
->   coresight: add CoreSight TPIU driver
->   coresight: add CoreSight ETB driver
->   coresight: add CoreSight Funnel driver
->   coresight: add CoreSight Replicator driver
->   coresight: add CoreSight STM driver
->   coresight: add CoreSight ETM driver
-> 
->  Documentation/devicetree/bindings/arm/coresight.txt |  110 ++
->  arch/arm/include/asm/hardware/cp14.h                |  540 ++++++
->  drivers/Kconfig                                     |    2 +
->  drivers/Makefile                                    |    1 +
->  drivers/coresight/Kconfig                           |   60 +
->  drivers/coresight/Makefile                          |    8 +
->  drivers/coresight/coresight-etb.c                   |  467 +++++
->  drivers/coresight/coresight-etm-cp14.c              |  510 ++++++
->  drivers/coresight/coresight-etm.c                   | 1752 +++++++++++++++++++
->  drivers/coresight/coresight-funnel.c                |  260 +++
->  drivers/coresight/coresight-priv.h                  |   48 +
->  drivers/coresight/coresight-replicator.c            |  211 +++
->  drivers/coresight/coresight-stm.c                   |  819 +++++++++
->  drivers/coresight/coresight-tmc.c                   |  794 +++++++++
->  drivers/coresight/coresight-tpiu.c                  |  232 +++
->  drivers/coresight/coresight.c                       |  681 +++++++
->  drivers/coresight/of_coresight.c                    |   99 ++
->  include/linux/coresight-stm.h                       |   51 +
->  include/linux/coresight.h                           |  167 ++
->  include/linux/of_coresight.h                        |   27 +
->  20 files changed, 6839 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
->  create mode 100644 arch/arm/include/asm/hardware/cp14.h
->  create mode 100644 drivers/coresight/Kconfig
->  create mode 100644 drivers/coresight/Makefile
->  create mode 100644 drivers/coresight/coresight-etb.c
->  create mode 100644 drivers/coresight/coresight-etm-cp14.c
->  create mode 100644 drivers/coresight/coresight-etm.c
->  create mode 100644 drivers/coresight/coresight-funnel.c
->  create mode 100644 drivers/coresight/coresight-priv.h
->  create mode 100644 drivers/coresight/coresight-replicator.c
->  create mode 100644 drivers/coresight/coresight-stm.c
->  create mode 100644 drivers/coresight/coresight-tmc.c
->  create mode 100644 drivers/coresight/coresight-tpiu.c
->  create mode 100644 drivers/coresight/coresight.c
->  create mode 100644 drivers/coresight/of_coresight.c
->  create mode 100644 include/linux/coresight-stm.h
->  create mode 100644 include/linux/coresight.h
->  create mode 100644 include/linux/of_coresight.h
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Ok. Looks cleaner this way.
+
+
+>
+>> +#ifdef DEBUG
+>> +
+>> +static char *sahara_state[4] = { "Idle", "Busy", "Error", "HW Fault" };
+>> +
+>> +static void sahara_decode_status(struct sahara_dev *dev, unsigned int status)
+>> +{
+>> +     u8 state = SAHARA_STATUS_GET_STATE(status);
+>
+> You can simplify the code a lot if you replace the #ifdef around the function
+> with an
+>
+>         if (!IS_ENBLED(DEBUG))
+>                 return;
+>
+> at the start of the function. That will lead to gcc completely removing the
+> code an everything referenced by it.
+>
+
+Great. Thank you for the tip.
+
+>> +static void sahara_aes_done_task(unsigned long data)
+>> +{
+>> +     struct sahara_dev *dev = (struct sahara_dev *)data;
+>> +     unsigned long flags;
+>> +
+>> +     dma_unmap_sg(dev->device, dev->out_sg, dev->nb_out_sg,
+>> +             DMA_TO_DEVICE);
+>> +     dma_unmap_sg(dev->device, dev->in_sg, dev->nb_in_sg,
+>> +             DMA_FROM_DEVICE);
+>> +
+>> +     spin_lock_irqsave(&dev->lock, flags);
+>> +     clear_bit(FLAGS_BUSY, &dev->flags);
+>> +     spin_unlock_irqrestore(&dev->lock, flags);
+>> +
+>> +     dev->req->base.complete(&dev->req->base, dev->error);
+>> +}
+>
+> Does dev->lock have to be irq-disabled? You don't seem to take it
+> from an interrupt handler.
+>
+> Also, when you know that code is called without irqs enabled and
+> you just want to disable them, you can use the cheaper spin_lock_irq()
+> rather than spin_lock_irqsave().
+>
+> In short, use either spin_lock_irq or spin_lock here. When protecting
+> against a tasklet, you will need spin_lock_bh.
+
+You are right, dev->lock is only held by encrypt()/decrypt() callbacks
+and some tasklets so spin_lock() and spin_lock_bh() seem suitable
+here.
+
+>> +
+>> +void sahara_watchdog(unsigned long data)
+>> +{
+>> +     struct sahara_dev *dev = (struct sahara_dev *)data;
+>> +     unsigned int err = sahara_read(dev, SAHARA_REG_ERRSTATUS);
+>> +#ifdef DEBUG
+>> +     unsigned int stat = sahara_read(dev, SAHARA_REG_STATUS);
+>> +     sahara_decode_status(dev, stat);
+>> +#endif
+>
+> When you kill off the #ifdef, you should move this sahara_read()
+> call into the sahara_decode_status() function so it gets
+> compiled conditionally.
+>
+
+All right.
+
+>> +static struct platform_device_id sahara_platform_ids[] = {
+>> +     { .name = "sahara-imx27" },
+>> +     { /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(platform, sahara_platform_ids);
+>
+> You are missing the of_device_ids here. We probably don't even
+> need the platform_device_id list and can instead mandate that
+> this is only used by platforms that are already converted to
+> DT booting.
+>
+> Please also add a DT binding document for this driver that mentions
+> the name and the resources that need to be provided.
+
+Please, take a look at 0/3 to discuss about this matter.
+
+Regards.
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
