@@ -1,59 +1,57 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Thu, 21 Feb 2013 15:18:36 +0100
-Subject: [PATCH 0/3] crypto: sahara: Add support for SAHARA in i.MX27.
-In-Reply-To: <201302211259.26763.arnd@arndb.de>
-References: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
- <201302211259.26763.arnd@arndb.de>
-Message-ID: <CACKLOr1-EPK=DLz0SY+1E35qSMdtCsueuqdzV4VZdbkoM+TD6A@mail.gmail.com>
+From: robert.marklund@stericsson.com (Robert MARKLUND)
+Date: Thu, 21 Feb 2013 15:20:56 +0100
+Subject: [RFC 2/8] coresight: add CoreSight TMC driver
+In-Reply-To: <1355858365-11849-3-git-send-email-pratikp@codeaurora.org>
+References: <1355858365-11849-1-git-send-email-pratikp@codeaurora.org>
+ <1355858365-11849-3-git-send-email-pratikp@codeaurora.org>
+Message-ID: <2B1D156D95AE9B4EAD379CB9E465FE73272F65EE48@EXDCVYMBSTM005.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+There is something fishy here.
 
-On 21 February 2013 13:59, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 21 February 2013, Javier Martin wrote:
->> This series of patches provide AES-ECB and AES-CBC support
->> for the SAHARA2 cryptographic accelerator which is inside the i.MX27 SoC.
->> It is expected that more algorithms will be supported in the future.
->>
->> For testing, a Visstrim M10 board has been used and the code related
->> to this platform has been included too.
->
-> As a new device driver, this needs to be supported on the DT based imx27
-> machines, while support for the individual board files seems unnecessary.
->
-> How about converting the Visstrim M10 board file over to DT so you don't
-> have to add any more infrastructure for imx that we will just have to
-> remove again one day?
+> +static void __tmc_etb_dump(struct tmc_drvdata *drvdata)
+> +{
+> +	enum tmc_mem_intf_width memwidth;
+> +	uint8_t memwords;
+> +	char *bufp;
+> +	uint32_t read_data;
+> +	int i;
+> +
+> +	memwidth = BMVAL(tmc_readl(drvdata, CORESIGHT_DEVID), 8, 10);
+> +	if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
+> +		memwords = 1;
+> +	else if (memwidth == TMC_MEM_INTF_WIDTH_64BITS)
+> +		memwords = 2;
+> +	else if (memwidth == TMC_MEM_INTF_WIDTH_128BITS)
+> +		memwords = 4;
+> +	else
+> +		memwords = 8;
+> +
+> +	bufp = drvdata->buf;
+> +	while (1) {
+> +		for (i = 0; i < memwords; i++) {
+> +			read_data = tmc_readl(drvdata, TMC_RRD);
+> +			if (read_data == 0xFFFFFFFF)
+> +				return;
+> +			memcpy(bufp, &read_data, BYTES_PER_WORD);
+> +			bufp += BYTES_PER_WORD;
+> +		}
+This will loop for every if in ETB mode because it will trace the reading because we have not disabled it before this.
+So maybe disable it first and as a security check for buffer size you have it in the drvdata I think.
 
-We know about the existence of DT and the constant migration process
-that is taking place towards it.
+> +	}
+> +}
+> +
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Moreover we are strongly interested in converting the Visstrim SM10
-platform to DT. Unfortunately, there are several issues that need to
-be solved so that Visstrim M10 can be fully converted to DT:
-- full SoC camera DT support
-- DT support for ov7670
-- pinctrl support for i.MX27
-
-Furthermore, we have limited resources at the moment and we have to
-decide priorities. But having an hybrid platform-DT support is our
-next task for Visstrim M10.
-
-However, I understand your concern about new drivers having DT
-support. Maybe a good approach could be that I added compile-tested
-only DT support for this driver and remove platform support for
-mainline submission (although we maintain it internally in our
-repositories).
-
-What do you think?
-
-Regards.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+BR
+Robert
