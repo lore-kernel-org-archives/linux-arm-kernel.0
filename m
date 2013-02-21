@@ -1,52 +1,74 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Thu, 21 Feb 2013 17:56:48 +0530
-Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for
- unaligned addresses
-In-Reply-To: <5118F796.3080308@ti.com>
-References: <1360574009-12429-1-git-send-email-r.sricharan@ti.com>
- <20130211131230.GA5676@MacBook-Pro.local> <5118F796.3080308@ti.com>
-Message-ID: <51261288.5030806@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 Feb 2013 20:44:21 +0800
+Subject: [PATCH] ARM: smp_twd: make twd_local_timer_of_register() no-op for
+ nosmp
+Message-ID: <1361450661-10324-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Monday 11 February 2013 07:22 PM, R Sricharan wrote:
-> Hi Russell,
->
-> On Monday 11 February 2013 06:42 PM, Catalin Marinas wrote:
->> On Mon, Feb 11, 2013 at 09:13:29AM +0000, R Sricharan wrote:
->>> +static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
->>> +                      unsigned long end, phys_addr_t phys,
->>> +                      const struct mem_type *type)
->>> +{
->>> +    pmd_t *pmd = pmd_offset(pud, addr);
->>> +    unsigned long next;
->>> +
->>> +    do {
->>>           /*
->>> -         * No need to loop; pte's aren't interested in the
->>> -         * individual L1 entries.
->>> +         * With LPAE, we must loop over to map
->>> +         * all the pmds for the given range.
->>>            */
->>> -        alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
->>> -    }
->>> +        next = pmd_addr_end(addr, end);
->>> +
->>> +        /*
->>> +         * Try a section mapping - end, addr and phys must all be
->>> +         * aligned to a section boundary.
->>> +         */
->>
->> Should this read "next, addr and phys" instead of "end..."?
->>
->> Otherwise:
->>
->> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>
->   Can I put this in to patch system ?
+When booting a SMP build kernel with nosmp on kernel cmdline, the
+following fat warning will be hit.
 
-    Ping..
+------------[ cut here ]------------
+WARNING: at arch/arm/kernel/smp_twd.c:345
+twd_local_timer_of_register+0x7c/0x90()
+twd_local_timer_of_register failed (-6)
+Modules linked in:
+Backtrace:
+[<80011f14>] (dump_backtrace+0x0/0x10c) from [<8044dd30>]
+(dump_stack+0x18/0x1c)
+ r7:805e9f58 r6:805ba84c r5:80539331 r4:00000159
+[<8044dd18>] (dump_stack+0x0/0x1c) from [<80020fbc>]
+(warn_slowpath_common+0x54/0x6c)
+[<80020f68>] (warn_slowpath_common+0x0/0x6c) from [<80021078>]
+(warn_slowpath_fmt+0x38/0x40)
+ r9:412fc09a r8:8fffffff r7:ffffffff r6:00000001 r5:80633b8c
+r4:80b32da8
+[<80021040>] (warn_slowpath_fmt+0x0/0x40) from [<805ba84c>]
+(twd_local_timer_of_register+0x7c/0x90)
+ r3:fffffffa r2:8053934b
+[<805ba7d0>] (twd_local_timer_of_register+0x0/0x90) from [<805c0bec>]
+(imx6q_timer_init+0x18/0x4c)
+ r5:80633800 r4:8053b701
+[<805c0bd4>] (imx6q_timer_init+0x0/0x4c) from [<805ba4e8>]
+(time_init+0x28/0x38)
+ r5:80633800 r4:805dc0f4
+[<805ba4c0>] (time_init+0x0/0x38) from [<805b6854>]
+(start_kernel+0x1a0/0x310)
+[<805b66b4>] (start_kernel+0x0/0x310) from [<10008044>] (0x10008044)
+ r8:1000406a r7:805f3f8c r6:805dc0c4 r5:805f0518 r4:10c5387d
+---[ end trace 1b75b31a2719ed1c ]---
 
-Regards,
-  Sricharan
+Check (!is_smp() || !setup_max_cpus) in twd_local_timer_of_register()
+to make it be a no-op for the conditions, thus avoid above warning.
+
+Reported-by: Dirk Behme <dirk.behme@de.bosch.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/kernel/smp_twd.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index c092115..3f25650 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
+ 
++#include <asm/smp_plat.h>
+ #include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
+ 
+@@ -373,6 +374,9 @@ void __init twd_local_timer_of_register(void)
+ 	struct device_node *np;
+ 	int err;
+ 
++	if (!is_smp() || !setup_max_cpus)
++		return;
++
+ 	np = of_find_matching_node(NULL, twd_of_match);
+ 	if (!np)
+ 		return;
+-- 
+1.7.9.5
