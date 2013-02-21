@@ -1,43 +1,60 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 21 Feb 2013 20:42:53 +0530
-Subject: too many timer retries happen when do local timer swtich with
- broadcast timer
-In-Reply-To: <alpine.LFD.2.02.1302211436300.22263@ionos>
-References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
- <alpine.LFD.2.02.1302201400400.22263@ionos>
- <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
- <alpine.LFD.2.02.1302211015270.22263@ionos>
- <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
- <alpine.LFD.2.02.1302211436300.22263@ionos>
-Message-ID: <51263975.20906@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 21 Feb 2013 16:18:19 +0100
+Subject: [PATCH 0/3] crypto: sahara: Add support for SAHARA in i.MX27.
+In-Reply-To: <CACKLOr1-EPK=DLz0SY+1E35qSMdtCsueuqdzV4VZdbkoM+TD6A@mail.gmail.com>
+References: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
+ <201302211259.26763.arnd@arndb.de>
+ <CACKLOr1-EPK=DLz0SY+1E35qSMdtCsueuqdzV4VZdbkoM+TD6A@mail.gmail.com>
+Message-ID: <20130221151819.GZ1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Thu, Feb 21, 2013 at 03:18:36PM +0100, javier Martin wrote:
+> Hi Arnd,
+> 
+> On 21 February 2013 13:59, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 21 February 2013, Javier Martin wrote:
+> >> This series of patches provide AES-ECB and AES-CBC support
+> >> for the SAHARA2 cryptographic accelerator which is inside the i.MX27 SoC.
+> >> It is expected that more algorithms will be supported in the future.
+> >>
+> >> For testing, a Visstrim M10 board has been used and the code related
+> >> to this platform has been included too.
+> >
+> > As a new device driver, this needs to be supported on the DT based imx27
+> > machines, while support for the individual board files seems unnecessary.
+> >
+> > How about converting the Visstrim M10 board file over to DT so you don't
+> > have to add any more infrastructure for imx that we will just have to
+> > remove again one day?
+> 
+> We know about the existence of DT and the constant migration process
+> that is taking place towards it.
+> 
+> Moreover we are strongly interested in converting the Visstrim SM10
+> platform to DT. Unfortunately, there are several issues that need to
+> be solved so that Visstrim M10 can be fully converted to DT:
+> - full SoC camera DT support
+> - DT support for ov7670
+> - pinctrl support for i.MX27
 
-On Thursday 21 February 2013 07:18 PM, Thomas Gleixner wrote:
-> Jason,
->
-> On Thu, 21 Feb 2013, Jason Liu wrote:
->> 2013/2/21 Thomas Gleixner <tglx@linutronix.de>:
->>> Now your explanation makes sense.
->>>
->>> I have no fast solution for this, but I think that I have an idea how
->>> to fix it. Stay tuned.
->>
->> Thanks Thomas, wait for your fix. :)
->
-> find below a completely untested patch, which should address that issue.
->
-After looking at the thread, I tried to see the issue on OMAP and could
-see the same issue as Jason.
+For the pinctrl stuff I suggest doing what we have done for the newer
+i.MX SoCs before we had pinctrl: Match by board compatible string and
+call into the board code for using the static pinctrl tables which are
+already there. I would like to have propert pinctrl support for the
+older i.MX, but probably the motivation for writing it is quite low for
+the older SoCs.
 
-Your patch fixes the retries on both CPUs on my dual core machine. So
-you use my tested by if you need one.
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+We have a patch in the queue converting the clock lookups for i.MX27 to
+dt which should be ready for posting soon.
 
-Thanks for the patch.
-And thanks to Jason for spotting the issue.
+Then the main road blockers should be out of the way to get rid of the
+bulk of the board code.
 
-Regards,
-Santosh
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
