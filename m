@@ -1,136 +1,157 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 20 Feb 2013 23:07:12 -0500
-Subject: [V8 PATCH 02/16] usb: gadget: mv_udc: use PHY driver for udc
+Date: Wed, 20 Feb 2013 23:07:14 -0500
+Subject: [V8 PATCH 04/16] usb: otg: mv_otg: use PHY driver for otg
 In-Reply-To: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
 References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1361419646-9052-3-git-send-email-chao.xie@marvell.com>
+Message-ID: <1361419646-9052-5-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originaly, udc driver will call the callbacks in platform data
+Originaly, otg driver will call the callbacks in platform data
 for PHY initialization and shut down.
 With PHY driver, it will call the APIs provided by PHY driver
 for PHY initialization and shut down. It removes the callbacks
 in platform data, and at same time it removes one block in the
-way of enabling device tree for udc driver.
+way of enabling device tree for otg driver.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/gadget/mv_udc.h      |    2 +-
- drivers/usb/gadget/mv_udc_core.c |   45 ++++++++++++++-----------------------
- 2 files changed, 18 insertions(+), 29 deletions(-)
+ drivers/usb/otg/mv_otg.c |   50 ++++++++++++++++++---------------------------
+ drivers/usb/otg/mv_otg.h |    2 +-
+ 2 files changed, 21 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
-index 9073436..f339df4 100644
---- a/drivers/usb/gadget/mv_udc.h
-+++ b/drivers/usb/gadget/mv_udc.h
-@@ -180,7 +180,6 @@ struct mv_udc {
- 
- 	struct mv_cap_regs __iomem	*cap_regs;
- 	struct mv_op_regs __iomem	*op_regs;
--	void __iomem                    *phy_regs;
- 	unsigned int			max_eps;
- 	struct mv_dqh			*ep_dqh;
- 	size_t				ep_dqh_size;
-@@ -217,6 +216,7 @@ struct mv_udc {
- 	struct work_struct	vbus_work;
- 	struct workqueue_struct *qwork;
- 
-+	struct usb_phy		*phy;
- 	struct usb_phy		*transceiver;
- 
- 	struct mv_usb_platform_data     *pdata;
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index c8cf959..4876d2f 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -35,6 +35,7 @@
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- #include <linux/platform_data/mv_usb.h>
+diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
+index b6a9be3..7282b0d 100644
+--- a/drivers/usb/otg/mv_otg.c
++++ b/drivers/usb/otg/mv_otg.c
+@@ -25,6 +25,7 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/hcd.h>
 +#include <linux/usb/mv_usb2.h>
- #include <asm/unaligned.h>
+ #include <linux/platform_data/mv_usb.h>
  
- #include "mv_udc.h"
-@@ -1121,15 +1122,14 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
+ #include "mv_otg.h"
+@@ -261,14 +262,12 @@ static int mv_otg_enable_internal(struct mv_otg *mvotg)
+ 	dev_dbg(&mvotg->pdev->dev, "otg enabled\n");
  
- 	dev_dbg(&udc->dev->dev, "enable udc\n");
- 	udc_clock_enable(udc);
--	if (udc->pdata->phy_init) {
--		retval = udc->pdata->phy_init(udc->phy_regs);
+ 	otg_clock_enable(mvotg);
+-	if (mvotg->pdata->phy_init) {
+-		retval = mvotg->pdata->phy_init(mvotg->phy_regs);
 -		if (retval) {
--			dev_err(&udc->dev->dev,
+-			dev_err(&mvotg->pdev->dev,
 -				"init phy error %d\n", retval);
--			udc_clock_disable(udc);
+-			otg_clock_disable(mvotg);
 -			return retval;
 -		}
-+	retval = usb_phy_init(udc->phy);
++	retval = usb_phy_init(mvotg->outer_phy);
 +	if (retval) {
-+		dev_err(&udc->dev->dev,
++		dev_err(&mvotg->pdev->dev,
 +			"init phy error %d\n", retval);
-+		udc_clock_disable(udc);
++		otg_clock_disable(mvotg);
 +		return retval;
  	}
-+
- 	udc->active = 1;
+ 	mvotg->active = 1;
  
- 	return 0;
-@@ -1147,8 +1147,7 @@ static void mv_udc_disable_internal(struct mv_udc *udc)
+@@ -288,8 +287,7 @@ static void mv_otg_disable_internal(struct mv_otg *mvotg)
  {
- 	if (udc->active) {
- 		dev_dbg(&udc->dev->dev, "disable udc\n");
--		if (udc->pdata->phy_deinit)
--			udc->pdata->phy_deinit(udc->phy_regs);
-+		usb_phy_shutdown(udc->phy);
- 		udc_clock_disable(udc);
- 		udc->active = 0;
+ 	if (mvotg->active) {
+ 		dev_dbg(&mvotg->pdev->dev, "otg disabled\n");
+-		if (mvotg->pdata->phy_deinit)
+-			mvotg->pdata->phy_deinit(mvotg->phy_regs);
++		usb_phy_shutdown(mvotg->outer_phy);
+ 		otg_clock_disable(mvotg);
+ 		mvotg->active = 0;
  	}
-@@ -2175,12 +2174,10 @@ static int mv_udc_probe(struct platform_device *pdev)
+@@ -729,6 +727,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	/* OTG common part */
+ 	mvotg->pdev = pdev;
+ 	mvotg->phy.dev = &pdev->dev;
++	mvotg->phy.type = USB_PHY_TYPE_USB2;
+ 	mvotg->phy.otg = otg;
+ 	mvotg->phy.label = driver_name;
+ 	mvotg->phy.state = OTG_STATE_UNDEFINED;
+@@ -741,23 +740,8 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	for (i = 0; i < OTG_TIMER_NUM; i++)
+ 		init_timer(&mvotg->otg_ctrl.timer[i]);
  
- #ifdef CONFIG_USB_OTG_UTILS
- 	if (pdata->mode == MV_USB_MODE_OTG) {
--		udc->transceiver = devm_usb_get_phy(&pdev->dev,
--					USB_PHY_TYPE_USB2);
--		if (IS_ERR_OR_NULL(udc->transceiver)) {
--			udc->transceiver = NULL;
--			return -ENODEV;
--		}
-+		udc->transceiver = devm_usb_get_phy_dev(&pdev->dev,
-+					MV_USB2_OTG_PHY_INDEX);
-+		if (IS_ERR_OR_NULL(udc->transceiver))
-+			return PTR_ERR(udc->transceiver);
- 	}
- #endif
- 
-@@ -2194,7 +2191,7 @@ static int mv_udc_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		return -ENODEV;
-@@ -2207,17 +2204,9 @@ static int mv_udc_probe(struct platform_device *pdev)
- 		return -EBUSY;
- 	}
- 
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
+-	r = platform_get_resource_byname(mvotg->pdev,
+-					 IORESOURCE_MEM, "phyregs");
 -	if (r == NULL) {
 -		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
--		return -ENODEV;
+-		retval = -ENODEV;
+-		goto err_destroy_workqueue;
 -	}
 -
--	udc->phy_regs = ioremap(r->start, resource_size(r));
--	if (udc->phy_regs == NULL) {
+-	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+-	if (mvotg->phy_regs == NULL) {
 -		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		return -EBUSY;
+-		retval = -EFAULT;
+-		goto err_destroy_workqueue;
 -	}
-+	udc->phy = devm_usb_get_phy_dev(&pdev->dev, MV_USB2_PHY_INDEX);
-+	if (IS_ERR_OR_NULL(udc->phy))
-+		return PTR_ERR(udc->phy);
+-
+-	r = platform_get_resource_byname(mvotg->pdev,
+-					 IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(mvotg->pdev,
++					 IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+ 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+ 		retval = -ENODEV;
+@@ -770,6 +754,12 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 		retval = -EFAULT;
+ 		goto err_destroy_workqueue;
+ 	}
++	mvotg->outer_phy = devm_usb_get_phy_dev(&pdev->dev, MV_USB2_PHY_INDEX);
++	if (IS_ERR_OR_NULL(mvotg->outer_phy)) {
++		dev_err(&pdev->dev, "can not find outer phy\n");
++		retval = PTR_ERR(mvotg->outer_phy);
++		goto err_destroy_workqueue;
++	}
  
- 	/* we will acces controller register, so enable the clk */
- 	retval = mv_udc_enable_internal(udc);
+ 	/* we will acces controller register, so enable the udc controller */
+ 	retval = mv_otg_enable_internal(mvotg);
+@@ -830,7 +820,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 		goto err_disable_clk;
+ 	}
+ 
+-	retval = usb_add_phy(&mvotg->phy, USB_PHY_TYPE_USB2);
++	retval = usb_add_phy_dev(&mvotg->phy);
+ 	if (retval < 0) {
+ 		dev_err(&pdev->dev, "can't register transceiver, %d\n",
+ 			retval);
+@@ -841,7 +831,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	if (retval < 0) {
+ 		dev_dbg(&pdev->dev,
+ 			"Can't register sysfs attr group: %d\n", retval);
+-		goto err_remove_phy;
++		goto err_remove_otg_phy;
+ 	}
+ 
+ 	spin_lock_init(&mvotg->wq_lock);
+@@ -856,7 +846,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
+-err_remove_phy:
++err_remove_otg_phy:
+ 	usb_remove_phy(&mvotg->phy);
+ err_disable_clk:
+ 	mv_otg_disable_internal(mvotg);
+diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
+index 8a9e351..65e7fd1 100644
+--- a/drivers/usb/otg/mv_otg.h
++++ b/drivers/usb/otg/mv_otg.h
+@@ -137,10 +137,10 @@ struct mv_otg_regs {
+ 
+ struct mv_otg {
+ 	struct usb_phy phy;
++	struct usb_phy *outer_phy;
+ 	struct mv_otg_ctrl otg_ctrl;
+ 
+ 	/* base address */
+-	void __iomem *phy_regs;
+ 	void __iomem *cap_regs;
+ 	struct mv_otg_regs __iomem *op_regs;
+ 
 -- 
 1.7.4.1
