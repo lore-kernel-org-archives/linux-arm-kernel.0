@@ -1,68 +1,69 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Thu, 21 Feb 2013 15:57:31 +0100
-Subject: [PATCH 0/3] crypto: sahara: Add support for SAHARA in i.MX27.
-In-Reply-To: <201302211440.59577.arnd@arndb.de>
-References: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
- <201302211259.26763.arnd@arndb.de>
- <CACKLOr1-EPK=DLz0SY+1E35qSMdtCsueuqdzV4VZdbkoM+TD6A@mail.gmail.com>
- <201302211440.59577.arnd@arndb.de>
-Message-ID: <CACKLOr1nqbuAS_9oQ1XEO-LK-YnNsnEpVy6-UHag2cm5K04hMg@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 21 Feb 2013 08:59:02 -0600
+Subject: [PATCH] PM / OPP: fix condition for empty of_init_opp_table()
+In-Reply-To: <1361444685-1034-1-git-send-email-shawn.guo@linaro.org>
+References: <1361444685-1034-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130221145902.GA22712@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 February 2013 15:40, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 21 February 2013, javier Martin wrote:
->> We know about the existence of DT and the constant migration process
->> that is taking place towards it.
->>
->> Moreover we are strongly interested in converting the Visstrim SM10
->> platform to DT. Unfortunately, there are several issues that need to
->> be solved so that Visstrim M10 can be fully converted to DT:
->> - full SoC camera DT support
->> - DT support for ov7670
->> - pinctrl support for i.MX27
->
-> Ok, I see. Full device tree support is certainly asking too much then.
->
->> Furthermore, we have limited resources at the moment and we have to
->> decide priorities. But having an hybrid platform-DT support is our
->> next task for Visstrim M10.
->
-> Ok, cool.
->
->> However, I understand your concern about new drivers having DT
->> support. Maybe a good approach could be that I added compile-tested
->> only DT support for this driver and remove platform support for
->> mainline submission (although we maintain it internally in our
->> repositories).
->>
->> What do you think?
->
-> Sounds good. Since it sounds like the hardware is available in all
-> imx27 device, maybe someone else can test your driver on an imx27
-> board that already has partial DT support when you add it to
-> arch/arm/boot/dts/imx27.dtsi?
+On 19:04-20130221, Shawn Guo wrote:
+> randconfig build reports the following error which is caused by that
+> CONFIG_PM_OPP is unset.
+> 
+Minor: caused by CONFIG_PM_OPP not being set?
+>   CC      arch/arm/mach-imx/mach-imx6q.o
+> arch/arm/mach-imx/mach-imx6q.c: In function ?imx6q_opp_init?:
+> arch/arm/mach-imx/mach-imx6q.c:248:2: error: implicit declaration of function ?of_init_opp_table? [-Werror=implicit-function-declaration]
+thanks for catching this.
+> 
+> Fix the error by giving a more correct condition for empty
+> of_init_opp_table() implementation.
+> 
+> Reported-by: Rob Herring <robherring2@gmail.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  include/linux/opp.h |   18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/include/linux/opp.h b/include/linux/opp.h
+> index 214e0eb..3aca2b8 100644
+> --- a/include/linux/opp.h
+> +++ b/include/linux/opp.h
+> @@ -47,15 +47,6 @@ int opp_enable(struct device *dev, unsigned long freq);
+>  int opp_disable(struct device *dev, unsigned long freq);
+>  
+>  struct srcu_notifier_head *opp_get_notifier(struct device *dev);
+> -
+> -#ifdef CONFIG_OF
+> -int of_init_opp_table(struct device *dev);
+> -#else
+> -static inline int of_init_opp_table(struct device *dev)
+> -{
+> -	return -EINVAL;
+> -}
+> -#endif /* CONFIG_OF */
+>  #else
+>  static inline unsigned long opp_get_voltage(struct opp *opp)
+>  {
+> @@ -112,6 +103,15 @@ static inline struct srcu_notifier_head *opp_get_notifier(struct device *dev)
+>  }
+>  #endif		/* CONFIG_PM_OPP */
+>  
+> +#if defined(CONFIG_PM_OPP) && defined(CONFIG_OF)
+> +int of_init_opp_table(struct device *dev);
+> +#else
+> +static inline int of_init_opp_table(struct device *dev)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif
+> +
+>  #if defined(CONFIG_CPU_FREQ) && defined(CONFIG_PM_OPP)
+>  int opp_init_cpufreq_table(struct device *dev,
+>  			    struct cpufreq_frequency_table **table);
 
-Yes, since the module is integrated in i.MX27 that seems the way to go.
-
-> Is there any reason why an imx27 based board would not support this
-> driver? Are there any other chips that could use it, e.g. imx25 or
-> imx6?
-
-No, there's no reason for an i.mx27 board not to support this driver
-since the module doesn't have any external interfaces.
-
-I think other i.MX chips have similar devices but I am not sure to
-what extent they are compatible or not. Probably Sascha Hauer or Shawn
-Guo (already in CC) could tell better than me since they have a wider
-view on the i.MX range.
-
-Regards.
+Acked-by: Nishanth Menon <nm@ti.com>
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Regards,
+Nishanth Menon
