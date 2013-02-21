@@ -1,111 +1,76 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 20 Feb 2013 23:07:17 -0500
-Subject: [V8 PATCH 07/16] arm: brownstone: add usb support for the board
+Date: Wed, 20 Feb 2013 23:07:20 -0500
+Subject: [V8 PATCH 10/16] arm: mmp: remove usb devices from pxa168
 In-Reply-To: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
 References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1361419646-9052-8-git-send-email-chao.xie@marvell.com>
+Message-ID: <1361419646-9052-11-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for brownstone board, add the udc/otg/ehci support
-
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/brownstone.c |   68 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 68 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/pxa168.c |   42 ------------------------------------------
+ 1 files changed, 0 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index 5cb769c..f84613a 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -18,6 +18,9 @@
- #include <linux/regulator/max8649.h>
- #include <linux/regulator/fixed.h>
- #include <linux/mfd/max8925.h>
-+#include <linux/usb/phy.h>
-+#include <linux/usb/mv_usb2.h>
-+#include <linux/platform_data/mv_usb.h>
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index b7f074f..dd3a68b 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -28,7 +28,6 @@
+ #include <mach/mfp.h>
+ #include <linux/dma-mapping.h>
+ #include <mach/pxa168.h>
+-#include <mach/regs-usb.h>
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -195,6 +198,31 @@ static struct sram_platdata mmp2_isram_platdata = {
- 	.granularity	= SRAM_GRANULARITY,
+ #include "common.h"
+ #include "clock.h"
+@@ -135,47 +134,6 @@ struct platform_device pxa168_device_gpio = {
+ 	.resource	= pxa168_resource_gpio,
  };
  
-+#ifdef CONFIG_USB_SUPPORT
-+
-+static char *mmp2_usb_clock_name[] = {
-+	[0] = "usb_clk",
-+};
-+
-+static struct mv_usb_phy_platform_data brownstone_usb_phy_pdata = {
-+	.clknum		= 1,
-+	.clkname	= mmp2_usb_clock_name,
-+};
-+
-+#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
-+
-+static struct mv_usb_platform_data brownstone_usb_pdata = {
-+	.clknum		= 1,
-+	.clkname	= mmp2_usb_clock_name,
-+	.vbus		= NULL,
-+	.mode		= MV_USB_MODE_OTG,
-+	.otg_force_a_bus_req = 1,
-+	.set_vbus	= NULL,
-+};
-+#endif
-+#endif
-+
-+
- static void __init brownstone_init(void)
+-struct resource pxa168_usb_host_resources[] = {
+-	/* USB Host conroller register base */
+-	[0] = {
+-		.start	= PXA168_U2H_REGBASE + U2x_CAPREGS_OFFSET,
+-		.end	= PXA168_U2H_REGBASE + USB_REG_RANGE,
+-		.flags	= IORESOURCE_MEM,
+-		.name	= "capregs",
+-	},
+-	/* USB PHY register base */
+-	[1] = {
+-		.start	= PXA168_U2H_PHYBASE,
+-		.end	= PXA168_U2H_PHYBASE + USB_PHY_RANGE,
+-		.flags	= IORESOURCE_MEM,
+-		.name	= "phyregs",
+-	},
+-	[2] = {
+-		.start	= IRQ_PXA168_USB2,
+-		.end	= IRQ_PXA168_USB2,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static u64 pxa168_usb_host_dmamask = DMA_BIT_MASK(32);
+-struct platform_device pxa168_device_usb_host = {
+-	.name = "pxa-sph",
+-	.id   = -1,
+-	.dev  = {
+-		.dma_mask = &pxa168_usb_host_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-
+-	.num_resources = ARRAY_SIZE(pxa168_usb_host_resources),
+-	.resource      = pxa168_usb_host_resources,
+-};
+-
+-int __init pxa168_add_usb_host(struct mv_usb_platform_data *pdata)
+-{
+-	pxa168_device_usb_host.dev.platform_data = pdata;
+-	return platform_device_register(&pxa168_device_usb_host);
+-}
+-
+ void pxa168_restart(char mode, const char *cmd)
  {
- 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
-@@ -211,6 +239,46 @@ static void __init brownstone_init(void)
- 
- 	/* enable 5v regulator */
- 	platform_device_register(&brownstone_v_5vp_device);
-+
-+#ifdef CONFIG_USB_SUPPORT
-+	pxa_register_device(&mmp2_device_u2ophy, &brownstone_usb_phy_pdata,
-+				sizeof(brownstone_usb_phy_pdata));
-+#endif
-+
-+#ifdef CONFIG_USB_MV_UDC
-+	/* for usb2 phy */
-+	usb_bind_phy(mmp2_device_u2o.drv_name, MV_USB2_PHY_INDEX,
-+				mmp2_device_u2ophy.drv_name);
-+#ifdef CONFIG_USB_MV_OTG
-+	/* for usb2 otg phy */
-+	usb_bind_phy(mmp2_device_u2o.drv_name, MV_USB2_OTG_PHY_INDEX,
-+				mmp2_device_u2ootg.drv_name);
-+#endif
-+	pxa_register_device(&mmp2_device_u2o, &brownstone_usb_pdata,
-+				sizeof(brownstone_usb_pdata));
-+#endif
-+
-+#ifdef CONFIG_USB_EHCI_MV_U2O
-+	/* for usb2 phy */
-+	usb_bind_phy(mmp2_device_u2oehci.dev_name, MV_USB2_PHY_INDEX,
-+				mmp2_device_u2ophy.dev_name);
-+#ifdef CONFIG_USB_MV_OTG
-+	/* for usb2 otg phy */
-+	usb_bind_phy(mmp2_device_u2oehci.drv_name, MV_USB2_OTG_PHY_INDEX,
-+				mmp2_device_u2ootg.drv_name);
-+#endif
-+	pxa_register_device(&mmp2_device_u2oehci, &brownstone_usb_pdata,
-+				sizeof(brownstone_usb_pdata));
-+#endif
-+
-+#ifdef CONFIG_USB_MV_OTG
-+	/* for usb2 phy */
-+	usb_bind_phy(mmp2_device_u2ootg.dev_name, MV_USB2_PHY_INDEX,
-+				mmp2_device_u2ophy.dev_name);
-+	pxa_register_device(&mmp2_device_u2ootg, &brownstone_usb_pdata,
-+				sizeof(brownstone_usb_pdata));
-+#endif
-+
- }
- 
- MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
+ 	soft_restart(0xffff0000);
 -- 
 1.7.4.1
