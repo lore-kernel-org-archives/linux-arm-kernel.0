@@ -1,47 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 21 Feb 2013 23:19:18 +0100 (CET)
-Subject: too many timer retries happen when do local timer swtich with
- broadcast timer
-In-Reply-To: <51263975.20906@ti.com>
-References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
- <alpine.LFD.2.02.1302201400400.22263@ionos>
- <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
- <alpine.LFD.2.02.1302211015270.22263@ionos>
- <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
- <alpine.LFD.2.02.1302211436300.22263@ionos> <51263975.20906@ti.com>
-Message-ID: <alpine.LFD.2.02.1302212214020.22263@ionos>
+From: mmarek@suse.cz (Michal Marek)
+Date: Thu, 21 Feb 2013 23:26:51 +0100
+Subject: [PATCH] kbuild: create an "include chroot" for DT bindings
+In-Reply-To: <1361394356-19385-1-git-send-email-swarren@wwwdotorg.org>
+References: <1361394356-19385-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <51269F2B.3090803@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Feb 2013, Santosh Shilimkar wrote:
-> On Thursday 21 February 2013 07:18 PM, Thomas Gleixner wrote:
-> > find below a completely untested patch, which should address that issue.
-> > 
-> After looking at the thread, I tried to see the issue on OMAP and could
-> see the same issue as Jason.
-
-That's interesting. We have the same issue on x86 since 2007 and
-nobody noticed ever. It's basically the same problem there, but it
-seems that on x86 getting out of those low power states is way slower
-than the minimal reprogramming delta which is used to enforce the
-local timer to fire after the wakeup. 
-
-I'm still amazed that as Jason stated a 1us reprogramming delta is
-sufficient to get this ping-pong going. I somehow doubt that, but
-maybe ARM is really that fast :)
-
-> Your patch fixes the retries on both CPUs on my dual core machine. So
-> you use my tested by if you need one.
-
-They are always welcome.
-
-> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On 20.2.2013 22:05, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Thanks for the patch.
-> And thanks to Jason for spotting the issue.
+> The recent dtc+cpp support allows header files and C pre-processor
+> defines/macros to be used when compiling device tree files. These
+> headers will typically define various constants that are part of the
+> device tree bindings.
+> 
+> The original patch which set up the dtc+cpp include path only considered
+> using those headers from device tree files. However, they are also
+> useful for kernel code which needs to interpret the device tree.
+> 
+> In both the DT files and the kernel, I'd like to include the DT-related
+> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+> That will simplify any text which discusses the DT header locations.
+> 
+> Creating a <dt-bindings/> for kernel source to use is as simple as
+> placing files into include/dt-bindings/.
+> 
+> However, when compiling DT files, the include path should be restricted
+> so that only the dt-bindings path is available; arbitrary kernel headers
+> shouldn't be exposed. For this reason, create a specific include
+> directory for use by dtc+cpp, and symlink dt-bindings from there to the
+> actual location of include/dt-bindings/. For want of a better location,
+> place this "include chroot" into the existing dts/ directory.
 
-And for coping with my initial inability to parse his report!
+Nice trick. dts+cpp only sees the bindings and LINUXINCLUDE is not
+polluted either. You can add
 
-Thanks,
+Acked-by: Michal Marek <mmarek@suse.cz>
 
-	tglx
+if you like.
+
+Michal
