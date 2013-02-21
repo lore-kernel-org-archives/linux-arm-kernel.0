@@ -1,115 +1,68 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 21 Feb 2013 10:36:51 +0100 (CET)
-Subject: too many timer retries happen when do local timer swtich with
- broadcast timer
-In-Reply-To: <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
-References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
- <alpine.LFD.2.02.1302201400400.22263@ionos>
- <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1302211015270.22263@ionos>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Thu, 21 Feb 2013 10:48:19 +0100
+Subject: omap4: 3.8: IPV6 + PREEMPT_VOLUNTARY + !DEBUG_[SPINLOCK|MUTEXES] =
+ BUG()
+Message-ID: <20130221094819.GA4580@luxor.wired.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Feb 2013, Jason Liu wrote:
-> 2013/2/20 Thomas Gleixner <tglx@linutronix.de>:
-> > On Wed, 20 Feb 2013, Jason Liu wrote:
-> >> void arch_idle(void)
-> >> {
-> >> ....
-> >> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
-> >>
-> >> enter_the_wait_mode();
-> >>
-> >> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
-> >> }
-> >>
-> >> when the broadcast timer interrupt arrives(this interrupt just wakeup
-> >> the ARM, and ARM has no chance
-> >> to handle it since local irq is disabled. In fact it's disabled in
-> >> cpu_idle() of arch/arm/kernel/process.c)
-> >>
-> >> the broadcast timer interrupt will wake up the CPU and run:
-> >>
-> >> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);    ->
-> >> tick_broadcast_oneshot_control(...);
-> >> ->
-> >> tick_program_event(dev->next_event, 1);
-> >> ->
-> >> tick_dev_program_event(dev, expires, force);
-> >> ->
-> >> for (i = 0;;) {
-> >>                 int ret = clockevents_program_event(dev, expires, now);
-> >>                 if (!ret || !force)
-> >>                         return ret;
-> >>
-> >>                 dev->retries++;
-> >>                 ....
-> >>                 now = ktime_get();
-> >>                 expires = ktime_add_ns(now, dev->min_delta_ns);
-> >> }
-> >> clockevents_program_event(dev, expires, now);
-> >>
-> >>         delta = ktime_to_ns(ktime_sub(expires, now));
-> >>
-> >>         if (delta <= 0)
-> >>                 return -ETIME;
-> >>
-> >> when the bc timer interrupt arrives,  which means the last local timer
-> >> expires too. so,
-> >> clockevents_program_event will return -ETIME, which will cause the
-> >> dev->retries++
-> >> when retry to program the expired timer.
-> >>
-> >> Even under the worst case, after the re-program the expired timer,
-> >> then CPU enter idle
-> >> quickly before the re-progam timer expired, it will make system
-> >> ping-pang forever,
-> >
-> > That's nonsense.
-> 
-> I don't think so.
-> 
-> >
-> > The timer IPI brings the core out of the deep idle state.
-> >
-> > So after returning from enter_wait_mode() and after calling
-> > clockevents_notify() it returns from arch_idle() to cpu_idle().
-> >
-> > In cpu_idle() interrupts are reenabled, so the timer IPI handler is
-> > invoked. That calls the event_handler of the per cpu local clockevent
-> > device (the one which stops in C3). That ends up in the generic timer
-> > code which expires timers and reprograms the local clock event device
-> > with the next pending timer.
-> >
-> > So you cannot go idle again, before the expired timers of this event
-> > are handled and their callbacks invoked.
-> 
-> That's true for the CPUs which not response to the global timer interrupt.
-> Take our platform as example: we have 4CPUs(CPU0, CPU1,CPU2,CPU3)
-> The global timer device will keep running even in the deep idle mode, so, it
-> can be used as the broadcast timer device, and the interrupt of this device
-> just raised to CPU0 when the timer expired, then, CPU0 will broadcast the
-> IPI timer to other CPUs which is in deep idle mode.
-> 
-> So for CPU1, CPU2, CPU3, you are right, the IPI timer will bring it out of idle
-> state, after running clockevents_notify() it returns from arch_idle()
-> to cpu_idle(),
-> then local_irq_enable(), the IPI handler will be invoked and handle
-> the expires times
-> and re-program the next pending timer.
-> 
-> But, that's not true for the CPU0. The flow for CPU0 is:
-> the global timer interrupt wakes up CPU0 and then call:
-> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
-> 
-> which will cpumask_clear_cpu(cpu, tick_get_broadcast_oneshot_mask());
-> in the function tick_broadcast_oneshot_control(),
+I keep getting this BUG() when there's IPV6 traffic in in my lan on a panda board
+with these configs:
 
-Now your explanation makes sense. 
+-start from a vanilla omap config
+(make ARCH=arm omap2plus_defconfig)
 
-I have no fast solution for this, but I think that I have an idea how
-to fix it. Stay tuned.
+-enable IPV6 and PREEMPT_VOLUNTARY
 
-Thanks,
+-turn off
 
-	tglx
+CONFIG_DEBUG_SPINLOCK
+CONFIG_DEBUG_MUTEXES
+CONFIG_DEBUG_LOCK_ALLOC
+CONFIG_PROVE_LOCKING
+CONFIG_LOCKDEP
+CONFIG_TRACE_IRQFLAGS
+
+(or apply this patch fragment:
+http://people.canonical.com/~ppisati/panda_ipv6/config_lock_off.patch)
+
+-enable some useful options (like EHCI for my usb disk, etcetc)
+
+-finish off the build
+
+make ARCH=arm olddefconfig
+make ARCH=arm zImage
+
+-boot the board, wait for some ipv6 traffic:
+
+IP6 fe80::213:20ff:fefb:6364.mdns > ff02::fb.mdns: 0 PTR (QM)? _mumble._tcp.local. (36)
+
+and enjoy:
+
+[Thu Feb 21 10:23:07 2013] BUG: scheduling while atomic: swapper/0/0/0x40000100
+[Thu Feb 21 10:23:07 2013] Modules linked in:
+[Thu Feb 21 10:23:07 2013] [<c001b1c4>] (unwind_backtrace+0x0/0xf0) from [<c0503c5c>] (__schedule_bug+0x48/0x5c)
+[Thu Feb 21 10:23:07 2013] [<c0503c5c>] (__schedule_bug+0x48/0x5c) from [<c0508608>] (__schedule+0x700/0x740)
+[Thu Feb 21 10:23:07 2013] [<c0508608>] (__schedule+0x700/0x740) from [<c007007c>] (__cond_resched+0x24/0x34)
+[Thu Feb 21 10:23:07 2013] [<c007007c>] (__cond_resched+0x24/0x34) from [<c05086dc>] (_cond_resched+0x3c/0x44)
+[Thu Feb 21 10:23:07 2013] [<c05086dc>] (_cond_resched+0x3c/0x44) from [<c0021f6c>] (do_alignment+0x178/0x78c)
+[Thu Feb 21 10:23:07 2013] [<c0021f6c>] (do_alignment+0x178/0x78c) from [<c00083e0>] (do_DataAbort+0x34/0x98)
+[Thu Feb 21 10:23:07 2013] [<c00083e0>] (do_DataAbort+0x34/0x98) from [<c0509a60>] (__dabt_svc+0x40/0x60)
+[Thu Feb 21 10:23:07 2013] Exception stack(0xc0763d70 to 0xc0763db8)
+[Thu Feb 21 10:23:07 2013] 3d60:                                     e97e805e e97e806e 2c000000 11000000
+[Thu Feb 21 10:23:07 2013] 3d80: ea86bb00 0000002c 00000011 e97e807e c076d2a8 e97e805e e97e806e 0000002c
+[Thu Feb 21 10:23:07 2013] 3da0: 3d000000 c0763dbc c04b98fc c02a8490 00000113 ffffffff
+[Thu Feb 21 10:23:07 2013] [<c0509a60>] (__dabt_svc+0x40/0x60) from [<c02a8490>] (__csum_ipv6_magic+0x8/0xc8)
+
+here you can find a .config for a 3.8 kernel showing this problem:
+
+http://people.canonical.com/~ppisati/panda_ipv6/config
+
+and a precompiled zImage:
+
+http://people.canonical.com/~ppisati/panda_ipv6/zImage
+
+any idea how can i debug this?
+-- 
+bye,
+p.
