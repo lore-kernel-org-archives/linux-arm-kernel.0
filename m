@@ -1,32 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Feb 2013 21:26:38 -0700
-Subject: [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
-Message-ID: <5125A1FE.5000604@wwwdotorg.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 20 Feb 2013 23:29:58 -0500 (EST)
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
+References: <20130129181046.GC25415@pd.tnic>
+ <1360141322.6066.4.camel@shinybook.infradead.org>
+ <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+ <20130207181315.GM17833@n2100.arm.linux.org.uk>
+ <1360344301.6066.263.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
+ <1360363233.6066.283.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
+ <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
+ <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
+ <20130219203115.114eab79e8d2099c6306d921@freescale.com>
+ <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
+ <1361356696.13482.269.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
+ <1361367842.13482.279.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
+ <1361372008.13482.280.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
+ <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
+Message-ID: <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2013 06:37 PM, Joel A Fernandes wrote:
-> Hello,
-> I've been spinning some work-in-progress patches for FIT build support
-> in the kernel.
-> With the move to multiplatform support on OMAP, I feel it is a good
-> time to add  FIT support, also looking at the proliferating number of
-> dtbs, as it is a nice way
+On Wed, 20 Feb 2013, Kim Phillips wrote:
 
-To my mind, FIT is pointless. And forcing the kernel build process to
-create bootloader-specific files doesn't seem like a good idea. Doing so
-would require pulling in even more outside tools into the kernel build flow.
+> On Wed, 20 Feb 2013 10:43:18 -0500
+> Nicolas Pitre <nico@fluxnic.net> wrote:
+> 
+> > On Wed, 20 Feb 2013, Woodhouse, David wrote:
+> > > On Wed, 2013-02-20 at 09:06 -0500, Nicolas Pitre wrote:
+> > > > ... in which case there is no harm shipping a .c file and trivially 
+> > > > enforcing -O2, the rest being equal.
+> > > 
+> > > For today's compilers, unless the wind changes.
+> > 
+> > We'll adapt if necessary.  Going with -O2 should remain pretty safe anyway.
+> 
+> Alas, not so for gcc 4.4 - I had forgotten I had tested
+> Ubuntu/Linaro 4.4.7-1ubuntu2 here:
+> 
+> https://patchwork.kernel.org/patch/2101491/
+> 
+> add -O2 to that test script and gcc 4.4 *always* emits calls to
+> __bswap[sd]i2, even with -march=armv6k+.
 
-All you need is to copy the zImage and any relevant .dtb files into
-/boot, and have U-Boot load the relevant .dtb file by constructing the
-filename as roughly ${soc}-${board}.dtb, then use the bootz command to
-boot it. You can have a completely generic boot.scr (or built-in script).
+Crap.  OK, assembly code is the way to go then.
 
-Note: Not all (many?) U-Boot support FIT anyway, so you'd need to flash
-a new U-Boot to support FIT, so you may as well just flash a new U-Boot
-that implements the ${soc} and ${board} variables instead. IIRC, there
-may also be a ${boardname} or similar that's like ${board}, but
-represents the runtime-detected board for when one U-Boot build actually
-supports multiple different boards.
+> I'll try working on an assembly version given it probably
+> makes more sense, future-gcc-immunity-wise.
+
+Agreed.
+
+
+Nicolas
