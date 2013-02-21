@@ -1,43 +1,49 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Thu, 21 Feb 2013 23:26:51 +0100
-Subject: [PATCH] kbuild: create an "include chroot" for DT bindings
-In-Reply-To: <1361394356-19385-1-git-send-email-swarren@wwwdotorg.org>
-References: <1361394356-19385-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <51269F2B.3090803@suse.cz>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 21 Feb 2013 23:45:08 +0100
+Subject: [PATCH 01/35] mfd: ab8500-gpadc: Implemented suspend/resume
+In-Reply-To: <20130220131912.GB13049@sirena.org.uk>
+References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
+ <1360933026-30325-2-git-send-email-lee.jones@linaro.org>
+ <20130220131912.GB13049@sirena.org.uk>
+Message-ID: <CAPDyKFo0MpP-d7v8v1zwB42sboR3MWT6nUmG=-L0_nayYRY7FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.2.2013 22:05, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> The recent dtc+cpp support allows header files and C pre-processor
-> defines/macros to be used when compiling device tree files. These
-> headers will typically define various constants that are part of the
-> device tree bindings.
-> 
-> The original patch which set up the dtc+cpp include path only considered
-> using those headers from device tree files. However, they are also
-> useful for kernel code which needs to interpret the device tree.
-> 
-> In both the DT files and the kernel, I'd like to include the DT-related
-> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
-> That will simplify any text which discusses the DT header locations.
-> 
-> Creating a <dt-bindings/> for kernel source to use is as simple as
-> placing files into include/dt-bindings/.
-> 
-> However, when compiling DT files, the include path should be restricted
-> so that only the dt-bindings path is available; arbitrary kernel headers
-> shouldn't be exposed. For this reason, create a specific include
-> directory for use by dtc+cpp, and symlink dt-bindings from there to the
-> actual location of include/dt-bindings/. For want of a better location,
-> place this "include chroot" into the existing dts/ directory.
+On 20 February 2013 14:19, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Fri, Feb 15, 2013 at 12:56:32PM +0000, Lee Jones wrote:
+>
+>> +static int ab8500_gpadc_suspend(struct device *dev)
+>> +{
+>> +     struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
+>> +
+>> +     mutex_lock(&gpadc->ab8500_gpadc_lock);
+>> +
+>> +     pm_runtime_get_sync(dev);
+>> +
+>> +     regulator_disable(gpadc->regu);
+>> +     return 0;
+>> +}
+>
+> This doesn't look especially sane...  You're doing a runtime get, taking
+> the lock without releasing it and disabling the regulator.  This is
+> *very* odd, both the changelog and the code need to explain what's going
+> on and why it's safe in a lot more detail here.
 
-Nice trick. dts+cpp only sees the bindings and LINUXINCLUDE is not
-polluted either. You can add
+You need to do pm_runtime_get_sync to be able to make sure resources
+(which seems to be only the regulator) are safe to switch off. To my
+understanding this is a generic way to use for being able to switch
+off resources at a device suspend when runtime pm is used in
+conjunction.
 
-Acked-by: Michal Marek <mmarek@suse.cz>
+Regarding the mutex, I can't tell the reason behind it. It seems
+strange but not sure.
 
-if you like.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Michal
+Kind regards
+Ulf Hansson
