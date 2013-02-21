@@ -1,75 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Feb 2013 14:37:16 +0000
-Subject: [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <51262A7A.8040103@ti.com>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130221103705.GB17852@n2100.arm.linux.org.uk> <51261F38.2030902@ti.com>
- <20130221134656.GC17852@n2100.arm.linux.org.uk> <51262A7A.8040103@ti.com>
-Message-ID: <20130221143716.GD17852@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Feb 2013 14:40:59 +0000
+Subject: [PATCH 0/3] crypto: sahara: Add support for SAHARA in i.MX27.
+In-Reply-To: <CACKLOr1-EPK=DLz0SY+1E35qSMdtCsueuqdzV4VZdbkoM+TD6A@mail.gmail.com>
+References: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
+ <201302211259.26763.arnd@arndb.de>
+ <CACKLOr1-EPK=DLz0SY+1E35qSMdtCsueuqdzV4VZdbkoM+TD6A@mail.gmail.com>
+Message-ID: <201302211440.59577.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Dropped uboot mailing list because it constantly holds my mails for
-moderation.)
-
-On Thu, Feb 21, 2013 at 09:08:58AM -0500, Tom Rini wrote:
-> On 02/21/2013 08:46 AM, Russell King - ARM Linux wrote:
-> > We're about to make it harder how?  By forcing them to use DT
-> > blobs? Or by forcing them to have to use the combined zImage + DT
-> > format because their boot loaders are soo broken that they can't
-> > deal with multiple images?
+On Thursday 21 February 2013, javier Martin wrote:
+> We know about the existence of DT and the constant migration process
+> that is taking place towards it.
 > 
-> None of that.  We're making it harder since most folks don't have a
-> board with 'bootz' built-in and the 'uImage' target doesn't build now
-> (unless, yes, you pass LOADADDR to make) so they either format it by
-> hand (/ adjust their local scripting) or do what you're doing.
+> Moreover we are strongly interested in converting the Visstrim SM10
+> platform to DT. Unfortunately, there are several issues that need to
+> be solved so that Visstrim M10 can be fully converted to DT:
+> - full SoC camera DT support
+> - DT support for ov7670
+> - pinctrl support for i.MX27
 
-And adjusting their process to pass an additional argument to the
-kernel make is too difficult?
+Ok, I see. Full device tree support is certainly asking too much then.
 
-So instead we have to change the kernel makefiles and scripting to
-create yet another uboot specific format, which is going to need
-them to edit their scripts in a much more invasive way _anyway_?
+> Furthermore, we have limited resources at the moment and we have to
+> decide priorities. But having an hybrid platform-DT support is our
+> next task for Visstrim M10.
 
-"or do what you're doing" - oh you mean, adding an additional column
-to the database configuration, digging out from the kernel git
-history what the load addresses should be, updating the database tables
-with that, editing the build system scripts to extract this new column
-from the database, and pass it into make... yes, complicated isn't it.
-Didn't take long to sort out though, and didn't require a load of new
-file formats to fix.
+Ok, cool.
 
-> > Yes, things have become a _little_ harder since OMAP has switched
-> > to multiplatform, but it really isn't that bad.  My build and boot
-> > test system still works, and it uses uImage for all the OMAP
-> > platforms. You just have to give the right LOADADDR= argument to
-> > the kernel to make the uImage generation work again.  Sure, the
-> > resulting uImage can't be loaded at a different address, but you if
-> > you need to change that, you can quite easily move the existing
-> > uImage out and re-run make ARCH=arm uImage LOADADDR=<something
-> > else> and hey presto, you end up with the uImage generated for a
-> > different address.
-> > 
-> > But: we wouldn't be in this situation if it weren't for these
-> > absurd uboot uImage formats in the first place.  Or even be needing
-> > this FIT stuff if zImage was just used directly.
+> However, I understand your concern about new drivers having DT
+> support. Maybe a good approach could be that I added compile-tested
+> only DT support for this driver and remove platform support for
+> mainline submission (although we maintain it internally in our
+> repositories).
 > 
-> FIT isn't required.  FIT is just trying to offer a nice usability
-> thing to folks.  A point of device trees is a single image works in a
-> lot of places.  FIT gives you a single file works in a lot of places.
+> What do you think?
 
-Well, FIT isn't everywhere either.  So really that argument doesn't
-stand for the same reasons that bootz support isn't everywhere either.
+Sounds good. Since it sounds like the hardware is available in all
+imx27 device, maybe someone else can test your driver on an imx27
+board that already has partial DT support when you add it to
+arch/arm/boot/dts/imx27.dtsi?
 
-My SDP4430's uboot provided by TI uses uboot 1.1.4.  Therefore, it
-doesn't support FIT, nor bootz - only uImage.
+Is there any reason why an imx27 based board would not support this
+driver? Are there any other chips that could use it, e.g. imx25 or
+imx6?
 
-> > uboot dug _itself_ into this hole.  It's uboot's problem.
-> 
-> A whole lot  of people dug this particular hole.  Joel is trying to
-> offer up a solution that maybe makes things easier for everyone.  Or
-> it gets rejected here too and distros will come up with their N
-> different ways to try and provide easier experiences to the end user.
-
-FIT just propagates the "boot loader specific file format" absurdity
-which was a mistake when uImage came along...
+	Arnd
