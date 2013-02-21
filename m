@@ -1,53 +1,34 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 21 Feb 2013 08:16:01 +0100
-Subject: i.MX6 Solo: maxcpus=1 vs. nosmp: Warning from smp_twd.c?
-In-Reply-To: <20130218025021.GI6782@S2101-09.ap.freescale.net>
-References: <511CF063.3010200@de.bosch.com>
- <20130214143752.GH17833@n2100.arm.linux.org.uk>
- <20130218025021.GI6782@S2101-09.ap.freescale.net>
-Message-ID: <5125C9B1.8050209@de.bosch.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 21 Feb 2013 20:27:41 +1300
+Subject: GPIO sysfs 'default' values
+In-Reply-To: <1361430680.10390.7.camel@gitbox>
+References: <1361430680.10390.7.camel@gitbox>
+Message-ID: <1361431661.12222.0.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.02.2013 03:50, Shawn Guo wrote:
-> On Thu, Feb 14, 2013 at 02:37:52PM +0000, Russell King - ARM Linux wrote:
->> On Thu, Feb 14, 2013 at 03:10:43PM +0100, Dirk Behme wrote:
->>> working on a i.MX6 Solo SoC (one Cortex A9 core) we are usually booting  
->>> with maxcpus=1 a kernel built with CONFIG_NR_CPUS=4. This is done to be  
->>> able to boot the same kernel on the Solo and Quad version of that SoC.
->> And what happens if you compile a kernel without SMP support and boot
->> it on this SoC?
+On Thu, 2013-02-21 at 20:11 +1300, Tony Prisk wrote:
+> Hi Grant, Linus.
 > 
-> Thanks Dirk for bringing this up on the list.  We have hit this fat
-> warning on FSL internal 3.5.7 kernel tree when booting SMP kernel with
-> nosmp on kernel cmdline.
+> I was testing our new gpio/pinctrl driver today and noticed something a
+> little weird.
 > 
-> As what Dirk confirmed, we do not see the warning with kernel built
-> with !SMP.
+> I exported gpio0 via sysfs and echoed the direction value - it was 'in'.
+> This pin is used to control an LCD panel, and is actually in 'out' mode.
+> If I write 'in' to direction, it changes mode to 'in' and the panel
+> turns off. Setting it back to 'out' and value=0, and the panel turns on
+> again.
 > 
-> Russell,
+> I noticed that I had no gpiochip->get_direction, so I added it, but the
+> result was the same.
 > 
-> The following is an immediate and less invasive change to lower the
-> warning level.  If you agree, I will post a patch and then put it
-> into patch system.
+> Any idea what I've missed?
 > 
-> Shawn
-> 
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index c092115..f796b83 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -392,6 +392,6 @@ void __init twd_local_timer_of_register(void)
->         err = twd_local_timer_common_register(np);
-> 
->  out:
-> -       WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
-> +       pr_warn("twd_local_timer_of_register failed (%d)\n", err);
->  }
->  #endif
+> Regards
+> Tony Prisk
 
-Any news on this? Time to move it to the patch system?
+Sorted it out.
+->get_direction was all that was needed.
 
-Thanks
-
-Dirk
+Apologies,
+Tony P
