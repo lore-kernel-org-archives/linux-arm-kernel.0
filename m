@@ -1,63 +1,178 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Feb 2013 16:37:57 +0800
-Subject: [PATCH] ARM: smp_twd: change WARN() to pr_warn() on local timer
- register failure
-Message-ID: <1361435877-27252-1-git-send-email-shawn.guo@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 21 Feb 2013 10:01:10 +0100
+Subject: [resend] Timer broadcast question
+In-Reply-To: <5125BC7C.7080007@ti.com>
+References: <5123BE35.8070902@linaro.org>
+ <alpine.LFD.2.02.1302191904560.22263@ionos> <5123C299.3080005@linaro.org>
+ <5125BC7C.7080007@ti.com>
+Message-ID: <5125E256.7060208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting a SMP build kernel with nosmp on kernel cmdline, the
-following fat warning will be hit.  Since the local timer registeration
-failure is expected for such boot condition, a normal pr_warn message
-should be good enough for the failure.
+On 02/21/2013 07:19 AM, Santosh Shilimkar wrote:
+> On Tuesday 19 February 2013 11:51 PM, Daniel Lezcano wrote:
+>> On 02/19/2013 07:10 PM, Thomas Gleixner wrote:
+>>> On Tue, 19 Feb 2013, Daniel Lezcano wrote:
+>>>> I am working on identifying the different wakeup sources from the
+>>>> interrupts and I have a question regarding the timer broadcast.
+>>>>
+>>>> The broadcast timer is setup to the next event and that will wake up
+>>>> any
+>>>> idle cpu belonging to the "broadcast cpumask", right ?
+>>>>
+>>>> The cpu which has been woken up will look for each cpu the next-event
+>>>> and send an IPI to wake it up.
+>>>>
+>>>> Although, it is possible the sender of this IPI may not be concerned by
+>>>> the timer expiration and has been woken up just for sending the IPI,
+>>>> right ?
+>>>
+>>> Correct.
+>>>
+>>>> If this is correct, is it possible to setup the timer irq affinity to a
+>>>> cpu which will be concerned by the timer expiration ? so we prevent an
+>>>> unnecessary wake up for a cpu.
+>>>
+>>> It is possible, but we never implemented it.
+>>>
+>>> If we go there, we want to make that conditional on a property flag,
+>>> because some interrupt controllers especially on x86 only allow to
+>>> move the affinity from interrupt context, which is pointless.
+>>
+>> Thanks Thomas for your quick answer. I will write a RFC patchset.
+>>
+> Last year I implemented the affinity hook for broad-cast code and
+> experimented with it. Since the system I was using was dual core,
+> it wasn't much beneficial and hence gave up later. I did remember
+> discussing the approach with few folks in the conference.
 
-------------[ cut here ]------------
-WARNING: at arch/arm/kernel/smp_twd.c:345
-twd_local_timer_of_register+0x7c/0x90()
-twd_local_timer_of_register failed (-6)
-Modules linked in:
-Backtrace:
-[<80011f14>] (dump_backtrace+0x0/0x10c) from [<8044dd30>]
-(dump_stack+0x18/0x1c)
- r7:805e9f58 r6:805ba84c r5:80539331 r4:00000159
-[<8044dd18>] (dump_stack+0x0/0x1c) from [<80020fbc>]
-(warn_slowpath_common+0x54/0x6c)
-[<80020f68>] (warn_slowpath_common+0x0/0x6c) from [<80021078>]
-(warn_slowpath_fmt+0x38/0x40)
- r9:412fc09a r8:8fffffff r7:ffffffff r6:00000001 r5:80633b8c
-r4:80b32da8
-[<80021040>] (warn_slowpath_fmt+0x0/0x40) from [<805ba84c>]
-(twd_local_timer_of_register+0x7c/0x90)
- r3:fffffffa r2:8053934b
-[<805ba7d0>] (twd_local_timer_of_register+0x0/0x90) from [<805c0bec>]
-(imx6q_timer_init+0x18/0x4c)
- r5:80633800 r4:8053b701
-[<805c0bd4>] (imx6q_timer_init+0x0/0x4c) from [<805ba4e8>]
-(time_init+0x28/0x38)
- r5:80633800 r4:805dc0f4
-[<805ba4c0>] (time_init+0x0/0x38) from [<805b6854>]
-(start_kernel+0x1a0/0x310)
-[<805b66b4>] (start_kernel+0x0/0x310) from [<10008044>] (0x10008044)
- r8:1000406a r7:805f3f8c r6:805dc0c4 r5:805f0518 r4:10c5387d
----[ end trace 1b75b31a2719ed1c ]---
+I did a brief test with a similar patch on a ARM u8500 board. The timer
+is tied with CPU0 by default, setting the dynamic irq affinity reduce
+considerably the number of IPI. The difference with your patch is the
+affinity is set to one CPU, the first one which is supposed to be wake
+up by the timer expiration.
 
-Reported-by: Dirk Behme <dirk.behme@de.bosch.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/kernel/smp_twd.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This is easy to spot with a small program doing usleep wired on CPU1.
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index c092115..f796b83 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -392,6 +392,6 @@ void __init twd_local_timer_of_register(void)
- 	err = twd_local_timer_common_register(np);
- 
- out:
--	WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
-+	pr_warn("twd_local_timer_of_register failed (%d)\n", err);
- }
- #endif
+We see CPU0 waking up to send an IPI to CPU1 and going to idle again.
+
+I don't know how that behaves with OMAP4 with this patch (which I guess
+it is the board you used), but the coupled idle state traces could be
+ambiguous if you relied on it to check the benefit of this patch.
+
+IMO, it is worth to implement such solution and perhaps we can extend it
+to optimize the package idle time with the generic power domain tied
+with the irq. Anyway, it is a random thought let's see that later :)
+
+> Patch in the end of the email (also attached) for generic broadcast
+> code. I didn't look at all corner case though. In arch code then
+> you need to setup "broadcast_affinity" hook which should be able
+> to get handle of the arch irqchip and call the respective affinity
+> handler. Just 3 lines function should do the trick.
+> 
+> As Thomas said, effectiveness of such optimization solely depends
+> on how well the affinity (in low powers) supported by your IRQ chip.
+> 
+> Hope this is helpful for you.
+
+Thanks a lot for your patch and your feedbacks.
+
+  -- Daniel
+
+
+> 
+> From d70f2d48ec08a3f1d73187c49b16e4e60f81a50c Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Wed, 25 Jul 2012 03:42:33 +0530
+> Subject: [PATCH] tick-broadcast: Add tick road-cast affinity suport
+> 
+> Current tick broad-cast code has affinity set to the boot CPU and hence
+> the boot CPU will always wakeup from low power states when broad cast timer
+> is armed even if the next expiry event doesn't belong to it.
+> 
+> Patch adds broadcast affinity functionality to avoid above and let the
+> tick framework set the affinity of the event for the CPU it belongs.
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  include/linux/clockchips.h   |    2 ++
+>  kernel/time/tick-broadcast.c |   13 ++++++++++++-
+>  2 files changed, 14 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+> index 8a7096f..5488cdc 100644
+> --- a/include/linux/clockchips.h
+> +++ b/include/linux/clockchips.h
+> @@ -95,6 +95,8 @@ struct clock_event_device {
+>      unsigned long        retries;
+> 
+>      void            (*broadcast)(const struct cpumask *mask);
+> +    void            (*broadcast_affinity)
+> +                    (const struct cpumask *mask, int irq);
+>      void            (*set_mode)(enum clock_event_mode mode,
+>                          struct clock_event_device *);
+>      void            (*suspend)(struct clock_event_device *);
+> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+> index f113755..2ec2425 100644
+> --- a/kernel/time/tick-broadcast.c
+> +++ b/kernel/time/tick-broadcast.c
+> @@ -39,6 +39,8 @@ static void tick_broadcast_clear_oneshot(int cpu);
+>  static inline void tick_broadcast_clear_oneshot(int cpu) { }
+>  #endif
+> 
+> +static inline void dummy_broadcast_affinity(const struct cpumask *mask,
+> +                            int irq) { }
+>  /*
+>   * Debugging: see timer_list.c
+>   */
+> @@ -485,14 +487,19 @@ void tick_broadcast_oneshot_control(unsigned long
+> reason)
+>          if (!cpumask_test_cpu(cpu, tick_get_broadcast_oneshot_mask())) {
+>              cpumask_set_cpu(cpu, tick_get_broadcast_oneshot_mask());
+>              clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
+> -            if (dev->next_event.tv64 < bc->next_event.tv64)
+> +            if (dev->next_event.tv64 < bc->next_event.tv64) {
+>                  tick_broadcast_set_event(dev->next_event, 1);
+> +                bc->broadcast_affinity(
+> +                tick_get_broadcast_oneshot_mask(), bc->irq);
+> +            }
+>          }
+>      } else {
+>          if (cpumask_test_cpu(cpu, tick_get_broadcast_oneshot_mask())) {
+>              cpumask_clear_cpu(cpu,
+>                        tick_get_broadcast_oneshot_mask());
+>              clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT);
+> +            bc->broadcast_affinity(
+> +                tick_get_broadcast_oneshot_mask(), bc->irq);
+>              if (dev->next_event.tv64 != KTIME_MAX)
+>                  tick_program_event(dev->next_event, 1);
+>          }
+> @@ -536,6 +543,10 @@ void tick_broadcast_setup_oneshot(struct
+> clock_event_device *bc)
+> 
+>          bc->event_handler = tick_handle_oneshot_broadcast;
+> 
+> +        /* setup dummy broadcast affinity handler if not provided */
+> +        if (bc->broadcast_affinity)
+> +            bc->broadcast_affinity = dummy_broadcast_affinity;
+> +
+>          /* Take the do_timer update */
+>          tick_do_timer_cpu = cpu;
+> 
+
+
 -- 
-1.7.9.5
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
+
+  * English - detected
+  * English
+  * French
+
+  * English
+  * French
+
+ <javascript:void(0);> <#>
