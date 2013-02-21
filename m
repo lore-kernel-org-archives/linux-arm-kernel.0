@@ -1,148 +1,79 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 21 Feb 2013 11:49:40 +0530
-Subject: [resend] Timer broadcast question
-In-Reply-To: <5123C299.3080005@linaro.org>
-References: <5123BE35.8070902@linaro.org>
- <alpine.LFD.2.02.1302191904560.22263@ionos> <5123C299.3080005@linaro.org>
-Message-ID: <5125BC7C.7080007@ti.com>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Thu, 21 Feb 2013 00:52:21 -0600
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
+References: <20130129181046.GC25415@pd.tnic>
+ <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+ <20130207181315.GM17833@n2100.arm.linux.org.uk>
+ <1360344301.6066.263.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
+ <1360363233.6066.283.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
+ <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
+ <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
+ <20130219203115.114eab79e8d2099c6306d921@freescale.com>
+ <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
+ <1361356696.13482.269.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
+ <1361367842.13482.279.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
+ <1361372008.13482.280.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
+ <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
+ <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
+Message-ID: <20130221005221.15279b1372501af12c1e4f32@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 February 2013 11:51 PM, Daniel Lezcano wrote:
-> On 02/19/2013 07:10 PM, Thomas Gleixner wrote:
->> On Tue, 19 Feb 2013, Daniel Lezcano wrote:
->>> I am working on identifying the different wakeup sources from the
->>> interrupts and I have a question regarding the timer broadcast.
->>>
->>> The broadcast timer is setup to the next event and that will wake up any
->>> idle cpu belonging to the "broadcast cpumask", right ?
->>>
->>> The cpu which has been woken up will look for each cpu the next-event
->>> and send an IPI to wake it up.
->>>
->>> Although, it is possible the sender of this IPI may not be concerned by
->>> the timer expiration and has been woken up just for sending the IPI, right ?
->>
->> Correct.
->>
->>> If this is correct, is it possible to setup the timer irq affinity to a
->>> cpu which will be concerned by the timer expiration ? so we prevent an
->>> unnecessary wake up for a cpu.
->>
->> It is possible, but we never implemented it.
->>
->> If we go there, we want to make that conditional on a property flag,
->> because some interrupt controllers especially on x86 only allow to
->> move the affinity from interrupt context, which is pointless.
->
-> Thanks Thomas for your quick answer. I will write a RFC patchset.
->
-Last year I implemented the affinity hook for broad-cast code and
-experimented with it. Since the system I was using was dual core,
-it wasn't much beneficial and hence gave up later. I did remember
-discussing the approach with few folks in the conference.
+On Wed, 20 Feb 2013 23:29:58 -0500
+Nicolas Pitre <nico@fluxnic.net> wrote:
 
-Patch in the end of the email (also attached) for generic broadcast
-code. I didn't look at all corner case though. In arch code then
-you need to setup "broadcast_affinity" hook which should be able
-to get handle of the arch irqchip and call the respective affinity
-handler. Just 3 lines function should do the trick.
+> On Wed, 20 Feb 2013, Kim Phillips wrote:
+> 
+> > On Wed, 20 Feb 2013 10:43:18 -0500
+> > Nicolas Pitre <nico@fluxnic.net> wrote:
+> > 
+> > > On Wed, 20 Feb 2013, Woodhouse, David wrote:
+> > > > On Wed, 2013-02-20 at 09:06 -0500, Nicolas Pitre wrote:
+> > > > > ... in which case there is no harm shipping a .c file and trivially 
+> > > > > enforcing -O2, the rest being equal.
+> > > > 
+> > > > For today's compilers, unless the wind changes.
+> > > 
+> > > We'll adapt if necessary.  Going with -O2 should remain pretty safe anyway.
+> > 
+> > Alas, not so for gcc 4.4 - I had forgotten I had tested
+> > Ubuntu/Linaro 4.4.7-1ubuntu2 here:
+> > 
+> > https://patchwork.kernel.org/patch/2101491/
+> > 
+> > add -O2 to that test script and gcc 4.4 *always* emits calls to
+> > __bswap[sd]i2, even with -march=armv6k+.
 
-As Thomas said, effectiveness of such optimization solely depends
-on how well the affinity (in low powers) supported by your IRQ chip.
+argh, sorry - that script was testing support for 
+__builtin_bswap{16,32,64} directly, which isn't the same as testing
+code generation of a byte swap pattern in C.
 
-Hope this is helpful for you.
+> Crap.  OK, assembly code is the way to go then.
+> 
+> > I'll try working on an assembly version given it probably
+> > makes more sense, future-gcc-immunity-wise.
+> 
+> Agreed.
 
-Regards,
-Santosh
+I'll still try the assembly approach - gcc 4.4's armv6 output looks
+worse than both the pre-armv6 and post-armv6 __arch_swab32
+implementations currently in use:
 
+mov     ip, sp
+push    {fp, ip, lr, pc}
+sub     fp, ip, #4
+and     r2, r0, #65280  ; 0xff00
+lsl     ip, r0, #24
+orr     r1, ip, r0, lsr #24
+and     r0, r0, #16711680       ; 0xff0000
+orr     r3, r1, r2, lsl #8
+orr     r0, r3, r0, lsr #8
+ldm     sp, {fp, sp, pc}
 
- From d70f2d48ec08a3f1d73187c49b16e4e60f81a50c Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Wed, 25 Jul 2012 03:42:33 +0530
-Subject: [PATCH] tick-broadcast: Add tick road-cast affinity suport
-
-Current tick broad-cast code has affinity set to the boot CPU and hence
-the boot CPU will always wakeup from low power states when broad cast timer
-is armed even if the next expiry event doesn't belong to it.
-
-Patch adds broadcast affinity functionality to avoid above and let the
-tick framework set the affinity of the event for the CPU it belongs.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-  include/linux/clockchips.h   |    2 ++
-  kernel/time/tick-broadcast.c |   13 ++++++++++++-
-  2 files changed, 14 insertions(+), 1 deletion(-)
-
-diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
-index 8a7096f..5488cdc 100644
---- a/include/linux/clockchips.h
-+++ b/include/linux/clockchips.h
-@@ -95,6 +95,8 @@ struct clock_event_device {
-  	unsigned long		retries;
-
-  	void			(*broadcast)(const struct cpumask *mask);
-+	void			(*broadcast_affinity)
-+					(const struct cpumask *mask, int irq);
-  	void			(*set_mode)(enum clock_event_mode mode,
-  					    struct clock_event_device *);
-  	void			(*suspend)(struct clock_event_device *);
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index f113755..2ec2425 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -39,6 +39,8 @@ static void tick_broadcast_clear_oneshot(int cpu);
-  static inline void tick_broadcast_clear_oneshot(int cpu) { }
-  #endif
-
-+static inline void dummy_broadcast_affinity(const struct cpumask *mask,
-+							int irq) { }
-  /*
-   * Debugging: see timer_list.c
-   */
-@@ -485,14 +487,19 @@ void tick_broadcast_oneshot_control(unsigned long 
-reason)
-  		if (!cpumask_test_cpu(cpu, tick_get_broadcast_oneshot_mask())) {
-  			cpumask_set_cpu(cpu, tick_get_broadcast_oneshot_mask());
-  			clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
--			if (dev->next_event.tv64 < bc->next_event.tv64)
-+			if (dev->next_event.tv64 < bc->next_event.tv64) {
-  				tick_broadcast_set_event(dev->next_event, 1);
-+				bc->broadcast_affinity(
-+				tick_get_broadcast_oneshot_mask(), bc->irq);
-+			}
-  		}
-  	} else {
-  		if (cpumask_test_cpu(cpu, tick_get_broadcast_oneshot_mask())) {
-  			cpumask_clear_cpu(cpu,
-  					  tick_get_broadcast_oneshot_mask());
-  			clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT);
-+			bc->broadcast_affinity(
-+				tick_get_broadcast_oneshot_mask(), bc->irq);
-  			if (dev->next_event.tv64 != KTIME_MAX)
-  				tick_program_event(dev->next_event, 1);
-  		}
-@@ -536,6 +543,10 @@ void tick_broadcast_setup_oneshot(struct 
-clock_event_device *bc)
-
-  		bc->event_handler = tick_handle_oneshot_broadcast;
-
-+		/* setup dummy broadcast affinity handler if not provided */
-+		if (bc->broadcast_affinity)
-+			bc->broadcast_affinity = dummy_broadcast_affinity;
-+
-  		/* Take the do_timer update */
-  		tick_do_timer_cpu = cpu;
-
--- 
-1.7.9.5
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-tick-broadcast-Add-tick-road-cast-affinity-suport.patch
-Type: text/x-patch
-Size: 3001 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130221/721d4f50/attachment.bin>
+Kim
