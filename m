@@ -1,47 +1,139 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Thu, 21 Feb 2013 11:57:15 -0600
-Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin function
- name
-In-Reply-To: <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
-References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
- <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
- <51251A11.2030300@wwwdotorg.org>
- <CAKGA1bkHH1XC38_VM=QhDrr33uqqSbwe0n+GfXEPs43K_Do=CQ@mail.gmail.com>
- <20130221050247.GD17738@S2101-09.ap.freescale.net>
- <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
-Message-ID: <CAKGA1bmf3HXGcEYkw2Gk-uS40=r_ZX-=Dh4G3GGSSwz8HiLqNw@mail.gmail.com>
+From: namhyung@kernel.org (Namhyung Kim)
+Date: Thu, 21 Feb 2013 09:58:57 -0800
+Subject: [RFC/PATCH 4/5] cputime: use do_div() for nsec resolution
+ conversion helpers
+In-Reply-To: <1361389302-11968-5-git-send-email-khilman@linaro.org>
+References: <1361389302-11968-1-git-send-email-khilman@linaro.org>
+ <1361389302-11968-5-git-send-email-khilman@linaro.org>
+Message-ID: <20130221175857.GB14256@danjae.linux.parc55>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I feel like I should be more concise, so here are what I would
-consider MY goals for iomux definition on Freescale processors;
+Hi Kevin,
 
-Freescale provide spreadsheets, GUI tools and XML and C header output
-for the iomux model.
+On Wed, Feb 20, 2013 at 11:41:41AM -0800, Kevin Hilman wrote:
+> For the nsec resolution conversions to be useful on non 64-bit
+> architectures, do_div() needs to be used for the 64-bit divisions.
+> 
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
+>  include/asm-generic/cputime_nsecs.h | 51 +++++++++++++++++++++++++++----------
+>  1 file changed, 37 insertions(+), 14 deletions(-)
+> 
+> diff --git a/include/asm-generic/cputime_nsecs.h b/include/asm-generic/cputime_nsecs.h
+> index b6485ca..daa6075 100644
+> --- a/include/asm-generic/cputime_nsecs.h
+> +++ b/include/asm-generic/cputime_nsecs.h
+> @@ -24,13 +24,17 @@ typedef u64 __nocast cputime64_t;
+>  /*
+>   * Convert cputime <-> jiffies (HZ)
+>   */
+> -#define cputime_to_jiffies(__ct)	\
+> -	((__force u64)(__ct) / (NSEC_PER_SEC / HZ))
+> +static inline u64 cputime_to_jiffies(const cputime_t ct)
+> +{
+> +	cputime_t __ct = ct;
 
-If you can't copy it right from the documentation or a script or
-program (C, Python, whatever) any of the above into a device tree
-without first encoding or parsing the binding in a suitable format for
-the program, then the binding is not desirable - for me, at least. If
-we can't go back to the original data from BSP kernels and port it to
-new device trees without a 3-step cross-reference and a preprocessing
-step for verification, you are adding items to my in tray...
+Why it removed the "(__force u64)" conversion part?  Shouldn't it be:
 
-Usually it's spit out from the IOMUX tool as XML and example C source
-(with certain definitions) with header files for the chip so you can
-drop it right into your bringup tool, bootloader, OS or whatever.
-Using that as a reference worked fine - it's register offsets
-(absolute from IOMUX tool), values. Copy pasting from the spreadsheet
-worked fine. Printing out the docs page and marking the bits worked
-fine. You're now telling me with this patchset that I have to have
-another documentation source and additionally verify that it even
-applies to the board by comparing it to all of the above.
+	u64 __ct = (__force u64) ct;
 
-Therefore, nack :D
+?  (and ditto for below changes)
 
-Either use the preprocessor to really verify the data, but don't use
-it just to turn 5 values into a string literal.
+Thanks,
+Namhyung
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+
+> +
+> +	do_div(__ct, NSEC_PER_SEC / HZ);
+> +	return __ct;
+> +}
+>  #define cputime_to_scaled(__ct)		(__ct)
+>  #define jiffies_to_cputime(__jif)	\
+>  	(__force cputime_t)((__jif) * (NSEC_PER_SEC / HZ))
+> -#define cputime64_to_jiffies64(__ct)	\
+> -	((__force u64)(__ct) / (NSEC_PER_SEC / HZ))
+> +#define cputime64_to_jiffies64(__ct) cputime_to_jiffies(__ct)
+>  #define jiffies64_to_cputime64(__jif)	\
+>  	(__force cputime64_t)((__jif) * (NSEC_PER_SEC / HZ))
+>  
+> @@ -44,8 +48,13 @@ typedef u64 __nocast cputime64_t;
+>  /*
+>   * Convert cputime <-> microseconds
+>   */
+> -#define cputime_to_usecs(__ct)		\
+> -	((__force u64)(__ct) / NSEC_PER_USEC)
+> +static inline u64 cputime_to_usecs(const cputime_t ct)
+> +{
+> +	cputime_t __ct = ct;
+> +
+> +	do_div(__ct, NSEC_PER_USEC);
+> +	return __ct;
+> +}
+>  #define usecs_to_cputime(__usecs)	\
+>  	(__force cputime_t)((__usecs) * NSEC_PER_USEC)
+>  #define usecs_to_cputime64(__usecs)	\
+> @@ -54,8 +63,13 @@ typedef u64 __nocast cputime64_t;
+>  /*
+>   * Convert cputime <-> seconds
+>   */
+> -#define cputime_to_secs(__ct)		\
+> -	((__force u64)(__ct) / NSEC_PER_SEC)
+> +static inline u64 cputime_to_secs(const cputime_t ct)
+> +{
+> +	cputime_t __ct = ct;
+> +
+> +	do_div(__ct, NSEC_PER_SEC);
+> +	return __ct;
+> +}
+>  #define secs_to_cputime(__secs)		\
+>  	(__force cputime_t)((__secs) * NSEC_PER_SEC)
+>  
+> @@ -69,8 +83,10 @@ static inline cputime_t timespec_to_cputime(const struct timespec *val)
+>  }
+>  static inline void cputime_to_timespec(const cputime_t ct, struct timespec *val)
+>  {
+> -	val->tv_sec  = (__force u64) ct / NSEC_PER_SEC;
+> -	val->tv_nsec = (__force u64) ct % NSEC_PER_SEC;
+> +	cputime_t __ct = ct;
+> +
+> +	val->tv_nsec = do_div(__ct, NSEC_PER_SEC);
+> +	val->tv_sec = __ct;
+>  }
+>  
+>  /*
+> @@ -83,15 +99,22 @@ static inline cputime_t timeval_to_cputime(struct timeval *val)
+>  }
+>  static inline void cputime_to_timeval(const cputime_t ct, struct timeval *val)
+>  {
+> -	val->tv_sec = (__force u64) ct / NSEC_PER_SEC;
+> -	val->tv_usec = ((__force u64) ct % NSEC_PER_SEC) / NSEC_PER_USEC;
+> +	cputime_t __ct = ct;
+> +
+> +	val->tv_usec = do_div(__ct, NSEC_PER_SEC) / NSEC_PER_USEC;
+> +	val->tv_sec = __ct;
+>  }
+>  
+>  /*
+>   * Convert cputime <-> clock (USER_HZ)
+>   */
+> -#define cputime_to_clock_t(__ct)	\
+> -	((__force u64)(__ct) / (NSEC_PER_SEC / USER_HZ))
+> +static inline u64 cputime_to_clock_t(const cputime_t ct)
+> +{
+> +	cputime_t __ct = ct;
+> +
+> +	do_div(__ct, (NSEC_PER_SEC / USER_HZ));
+> +	return __ct;
+> +}
+>  #define clock_t_to_cputime(__x)		\
+>  	(__force cputime_t)((__x) * (NSEC_PER_SEC / USER_HZ))
+>  
+> -- 
+> 1.8.1.2
+> 
+> 
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
