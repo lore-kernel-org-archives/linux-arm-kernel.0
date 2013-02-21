@@ -1,15 +1,73 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Feb 2013 18:38:45 +0800
-Subject: randconfig errors
-In-Reply-To: <511E6FA4.2000709@gmail.com>
-References: <511E6FA4.2000709@gmail.com>
-Message-ID: <20130221103842.GC23442@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Feb 2013 11:44:51 +0100
+Subject: [PATCH] arm64: select ARCH_WANT_OPTIONAL_GPIOLIB
+In-Reply-To: <CACxGe6tVk4na2yLi-6r1fTv5QqzgePbo6K+ZtEt-VOy25DQxVQ@mail.gmail.com>
+References: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
+ <1634805.kh17mYrJe5@wuerfel>
+ <CACxGe6tVk4na2yLi-6r1fTv5QqzgePbo6K+ZtEt-VOy25DQxVQ@mail.gmail.com>
+Message-ID: <2173132.bncoOm6QsM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 11:25:56AM -0600, Rob Herring wrote:
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-imx/mach-imx6q.c:248:2: error: implicit declaration of function 'of_init_opp_table' [-Werror=implicit-function-declaration]
+An architecture should not unconditionally enable 'GENERIC_GPIO'
+without providing an implementation. In case of arm64, selecting
+ARCH_WANT_OPTIONAL_GPIOLIB is the right solution, because it
+lets us enable GPIOLIB when configuring the kernel, and that
+implicitly turns on GENERIC_GPIO.
 
-Thanks, Rob.  I will get it fixed.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+----
+On Thursday 21 February 2013 10:36:41 Grant Likely wrote:
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index ab4aa54..3fab0db 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -3,6 +3,7 @@ config ARM64
+> >         select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> >         select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+> >         select ARCH_WANT_FRAME_POINTERS
+> > +       select ARCH_WANT_OPTIONAL_GPIOLIB
+> >         select ARM_AMBA
+> >         select ARM_ARCH_TIMER
+> >         select CLONE_BACKWARDS
+> > @@ -92,9 +93,6 @@ config SWIOTLB
+> >  config IOMMU_HELPER
+> >         def_bool SWIOTLB
+> >
+> > -config GENERIC_GPIO
+> > -       def_bool y
+> > -
+> >  source "init/Kconfig"
+> >
+> >  source "kernel/Kconfig.freezer"
+> 
+> I've not asked Linus to pull the GPIO tree yet because of this issue.
+> Can someone please test this on aarch64 and send me a properly
+> formatted patch?
 
-Shawn
+It was wrong, the new version below is good though. Tested with defconfig
+and allyesconfig on arm64. I found a few more trivial issues with arm64
+allyesconfig that I fixed up as well. I'll send separate patches
+for those.
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ab4aa54..38d3f34 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -3,6 +3,7 @@ config ARM64
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_ARCH_TIMER
+ 	select CLONE_BACKWARDS
+@@ -93,7 +94,7 @@ config IOMMU_HELPER
+ 	def_bool SWIOTLB
+ 
+ config GENERIC_GPIO
+-	def_bool y
++	bool
+ 
+ source "init/Kconfig"
+ 
