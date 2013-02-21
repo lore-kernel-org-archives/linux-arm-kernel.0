@@ -1,53 +1,53 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Thu, 21 Feb 2013 01:15:25 -0600
-Subject: [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <5125A1FE.5000604@wwwdotorg.org>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <5125A1FE.5000604@wwwdotorg.org>
-Message-ID: <CAD=GYpZM7uOHqhwhxzokV161WFZ2azh1VpSBn498PmPZm+bYbQ@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 21 Feb 2013 08:16:01 +0100
+Subject: i.MX6 Solo: maxcpus=1 vs. nosmp: Warning from smp_twd.c?
+In-Reply-To: <20130218025021.GI6782@S2101-09.ap.freescale.net>
+References: <511CF063.3010200@de.bosch.com>
+ <20130214143752.GH17833@n2100.arm.linux.org.uk>
+ <20130218025021.GI6782@S2101-09.ap.freescale.net>
+Message-ID: <5125C9B1.8050209@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 10:26 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 02/20/2013 06:37 PM, Joel A Fernandes wrote:
->> Hello,
->> I've been spinning some work-in-progress patches for FIT build support
->> in the kernel.
->> With the move to multiplatform support on OMAP, I feel it is a good
->> time to add  FIT support, also looking at the proliferating number of
->> dtbs, as it is a nice way
->
-> To my mind, FIT is pointless. And forcing the kernel build process to
+On 18.02.2013 03:50, Shawn Guo wrote:
+> On Thu, Feb 14, 2013 at 02:37:52PM +0000, Russell King - ARM Linux wrote:
+>> On Thu, Feb 14, 2013 at 03:10:43PM +0100, Dirk Behme wrote:
+>>> working on a i.MX6 Solo SoC (one Cortex A9 core) we are usually booting  
+>>> with maxcpus=1 a kernel built with CONFIG_NR_CPUS=4. This is done to be  
+>>> able to boot the same kernel on the Solo and Quad version of that SoC.
+>> And what happens if you compile a kernel without SMP support and boot
+>> it on this SoC?
+> 
+> Thanks Dirk for bringing this up on the list.  We have hit this fat
+> warning on FSL internal 3.5.7 kernel tree when booting SMP kernel with
+> nosmp on kernel cmdline.
+> 
+> As what Dirk confirmed, we do not see the warning with kernel built
+> with !SMP.
+> 
+> Russell,
+> 
+> The following is an immediate and less invasive change to lower the
+> warning level.  If you agree, I will post a patch and then put it
+> into patch system.
+> 
+> Shawn
+> 
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index c092115..f796b83 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -392,6 +392,6 @@ void __init twd_local_timer_of_register(void)
+>         err = twd_local_timer_common_register(np);
+> 
+>  out:
+> -       WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
+> +       pr_warn("twd_local_timer_of_register failed (%d)\n", err);
+>  }
+>  #endif
 
-I don't think so, there are many usecases for FIT and cleanly
-embedding DTBs is a common usecase, (along with stronger checksums,
-compression). That is also the basis of my ELC talk tomorrow morning
-;-)
-You could peruse the slides at, http://wwwelinux.org/Fit-boot to get a
-better understanding of what FIT solves. With the move to
-multiplatform kernels, it is quite a logical next step to add this
-support to the kernel build.
+Any news on this? Time to move it to the patch system?
 
-> create bootloader-specific files doesn't seem like a good idea. Doing so
-> would require pulling in even more outside tools into the kernel build flow.
+Thanks
 
-As for pulling additional tools, dtc is already a part of the kernel
-so the idea is to use existing tools.
-
-> All you need is to copy the zImage and any relevant .dtb files into
-> /boot, and have U-Boot load the relevant .dtb file by constructing the
-> filename as roughly ${soc}-${board}.dtb, then use the bootz command to
-> boot it. You can have a completely generic boot.scr (or built-in script).
-
-FIT doesnt need any such bootloader variables and thus benefits from
-the simplicity.
-
-> Note: Not all (many?) U-Boot support FIT anyway, so you'd need to flash
-
-For these boards, we can special case to doing a non-fit boot to keep
-them backward-compatibility. I don't think maintaining
-backward-compatibility requires any additional work, but just building
-the kernel with a different make target.
-
-Regards,
-Joel
+Dirk
