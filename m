@@ -1,129 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Feb 2013 13:13:45 +0000
-Subject: [PATCH 2/3] crypto: sahara: Add driver for SAHARA2 accelerator.
-In-Reply-To: <1361449162-27302-3-git-send-email-javier.martin@vista-silicon.com>
-References: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
- <1361449162-27302-3-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <201302211313.46078.arnd@arndb.de>
+From: trini@ti.com (Tom Rini)
+Date: Thu, 21 Feb 2013 08:20:56 -0500
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <20130221103705.GB17852@n2100.arm.linux.org.uk>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <20130221103705.GB17852@n2100.arm.linux.org.uk>
+Message-ID: <51261F38.2030902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 February 2013, Javier Martin wrote:
-> +
-> +struct sahara_dev {
-> +	struct device		*device;
-> +	void __iomem		*regs_base;
-> +	struct clk		*clk_ipg;
-> +	struct clk		*clk_ahb;
-> +
-> +	struct sahara_ctx	*ctx;
-> +	spinlock_t		lock;
-> +	struct crypto_queue	queue;
-> +	unsigned long		flags;
-> +
-> +	struct tasklet_struct	done_task;
-> +	struct tasklet_struct	queue_task;
-> +
-> +	struct sahara_hw_desc	*hw_desc[SAHARA_MAX_HW_DESC];
-> +	dma_addr_t		hw_phys_desc[SAHARA_MAX_HW_DESC];
-> +
-> +	u8			*key_base;
-> +	dma_addr_t		key_phys_base;
-> +
-> +	u8			*iv_base;
-> +	dma_addr_t		iv_phys_base;
-> +
-> +	struct sahara_hw_link	*hw_link[SAHARA_MAX_HW_LINK];
-> +	dma_addr_t		hw_phys_link[SAHARA_MAX_HW_LINK];
-> +
-> +	struct ablkcipher_request *req;
-> +	size_t			total;
-> +	struct scatterlist	*in_sg;
-> +	unsigned int		nb_in_sg;
-> +	struct scatterlist	*out_sg;
-> +	unsigned int		nb_out_sg;
-> +
-> +	u32			error;
-> +	struct timer_list	watchdog;
-> +};
-> +
-> +static struct sahara_dev *dev_ptr;
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Please remove this global device pointer, it should not be needed, since you
-can store the pointer in the context object.
+On 02/21/2013 05:37 AM, Russell King - ARM Linux wrote:
+> On Wed, Feb 20, 2013 at 07:37:10PM -0600, Joel A Fernandes wrote:
+>> Hello, I've been spinning some work-in-progress patches for FIT
+>> build support in the kernel. With the move to multiplatform
+>> support on OMAP, I feel it is a good time to add  FIT support,
+>> also looking at the proliferating number of dtbs, as it is a nice
+>> way
+> 
+> I'm not looking to add yet another crappy uboot image format to the
+> kernel just for the hell of uboot.
 
+Note that FIT images are relatively old (docs date back to March
+2008).  This is more of another effort to try and update what the
+kernel uses.
 
-> +#ifdef DEBUG
-> +
-> +static char *sahara_state[4] = { "Idle", "Busy", "Error", "HW Fault" };
-> +
-> +static void sahara_decode_status(struct sahara_dev *dev, unsigned int status)
-> +{
-> +	u8 state = SAHARA_STATUS_GET_STATE(status);
+> And don't think that the dtbs in the kernel are going to stay
+> there.  The longer term plan is for them to end up in an external
+> git tree, entirely separate from the kernel source.  So anything
+> that ties them with the kernel build process will ultimately have
+> to be removed again.
 
-You can simplify the code a lot if you replace the #ifdef around the function
-with an
+Well, once the device trees move to some external location, this
+script could also easily move out with it.  And I'd hope there'd be
+interest out in the rest of the world for a single file boots on
+multiple platforms image format.  If the ability to do this was
+actually well known, it might even stop people from re-inventing the
+wheel for fun (re-inventing due to design problems with the previous
+wheel is acceptable).
 
-	if (!IS_ENBLED(DEBUG))
-		return;
+We're just about to make a lot of folks lives harder (whatever the
+userbase is for omap2plus_defconfig).  How much time do we want to
+spend offering up alternatives?
 
-at the start of the function. That will lead to gcc completely removing the
-code an everything referenced by it.
+- -- 
+Tom
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
 
-
-> +static void sahara_aes_done_task(unsigned long data)
-> +{
-> +	struct sahara_dev *dev = (struct sahara_dev *)data;
-> +	unsigned long flags;
-> +
-> +	dma_unmap_sg(dev->device, dev->out_sg, dev->nb_out_sg,
-> +		DMA_TO_DEVICE);
-> +	dma_unmap_sg(dev->device, dev->in_sg, dev->nb_in_sg,
-> +		DMA_FROM_DEVICE);
-> +
-> +	spin_lock_irqsave(&dev->lock, flags);
-> +	clear_bit(FLAGS_BUSY, &dev->flags);
-> +	spin_unlock_irqrestore(&dev->lock, flags);
-> +
-> +	dev->req->base.complete(&dev->req->base, dev->error);
-> +}
-
-Does dev->lock have to be irq-disabled? You don't seem to take it
-from an interrupt handler.
-
-Also, when you know that code is called without irqs enabled and
-you just want to disable them, you can use the cheaper spin_lock_irq()
-rather than spin_lock_irqsave().
-
-In short, use either spin_lock_irq or spin_lock here. When protecting
-against a tasklet, you will need spin_lock_bh.
-
-> +
-> +void sahara_watchdog(unsigned long data)
-> +{
-> +	struct sahara_dev *dev = (struct sahara_dev *)data;
-> +	unsigned int err = sahara_read(dev, SAHARA_REG_ERRSTATUS);
-> +#ifdef DEBUG
-> +	unsigned int stat = sahara_read(dev, SAHARA_REG_STATUS);
-> +	sahara_decode_status(dev, stat);
-> +#endif
-
-When you kill off the #ifdef, you should move this sahara_read()
-call into the sahara_decode_status() function so it gets
-compiled conditionally.
-
-> +static struct platform_device_id sahara_platform_ids[] = {
-> +	{ .name = "sahara-imx27" },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(platform, sahara_platform_ids);
-
-You are missing the of_device_ids here. We probably don't even
-need the platform_device_id list and can instead mandate that
-this is only used by platforms that are already converted to
-DT booting.
-
-Please also add a DT binding document for this driver that mentions
-the name and the resources that need to be provided.
-
-	Arnd
+iQIcBAEBAgAGBQJRJh84AAoJENk4IS6UOR1W9BEP/3rxNUz9dNZ3PwfVBuXT6LiX
+P6ANVDFg9uZTWTaoLgcTjXkmvexjpaeZz+5T0TOErDf/YoaOVqjfhVlZE82VE010
+t7CC23cTGCOo7q/ofJalzUzhdZE2/DLsGXNdz4wi6f8N0v46DNdAuolUqgyYXjvg
+3rKK7G3ZzWUrmhkILfsZ/8XvbQ+rUDlMDajUnr0RnarsxWbM6KkVPRbCzUrEfsZA
+a4AKdg5msl2XxtgNlcOwvb4LCZXCmdRdulkGzf45AhyUpNGkgFYrCu5mlFvjYy9U
+JGCw/2V9IqXqsN0hoBDxgRHvnN5o+EJasPZPxY2MMSRAr2fkhGPMicYW0jvo/t9G
+DzNfQ2qZiHHY5SzuBzLh/ejRdviGm+SRrQTI2MSKEMixvUgsCL43UCBaMn09fv5o
+kRjNLDvi0WeQ/T9PPF3xcbMQRlATW5VmBt8ZJ/OKmptjRAay3Eq44a2J1Bb89KGV
+iuO7hxt1Yuo/Wc/6gghcJLDxn5EuE5oES/WLhmzEQE6c9u2xM5Ygmf2utiy4JZTo
+Y9iilnP7mQ51TbV7cXtwLvLaR6rJHW3XIHinDHQVK26fACtAHRUoNzRI86HQnNQx
+tnuDJPQcHUEWkG6aq9ikvxWx1j692lKpmPlVXZ7QoYWCdYdAVtpn8OP7iWih42XW
+9+Gkuwfc2vaZfvC1LkGu
+=iUUO
+-----END PGP SIGNATURE-----
