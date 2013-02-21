@@ -1,120 +1,61 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Thu, 21 Feb 2013 18:50:49 +0800
-Subject: too many timer retries happen when do local timer swtich with
- broadcast timer
-In-Reply-To: <alpine.LFD.2.02.1302211015270.22263@ionos>
-References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
- <alpine.LFD.2.02.1302201400400.22263@ionos>
- <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
- <alpine.LFD.2.02.1302211015270.22263@ionos>
-Message-ID: <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 Feb 2013 19:04:45 +0800
+Subject: [PATCH] PM / OPP: fix condition for empty of_init_opp_table()
+Message-ID: <1361444685-1034-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/2/21 Thomas Gleixner <tglx@linutronix.de>:
-> On Thu, 21 Feb 2013, Jason Liu wrote:
->> 2013/2/20 Thomas Gleixner <tglx@linutronix.de>:
->> > On Wed, 20 Feb 2013, Jason Liu wrote:
->> >> void arch_idle(void)
->> >> {
->> >> ....
->> >> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
->> >>
->> >> enter_the_wait_mode();
->> >>
->> >> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
->> >> }
->> >>
->> >> when the broadcast timer interrupt arrives(this interrupt just wakeup
->> >> the ARM, and ARM has no chance
->> >> to handle it since local irq is disabled. In fact it's disabled in
->> >> cpu_idle() of arch/arm/kernel/process.c)
->> >>
->> >> the broadcast timer interrupt will wake up the CPU and run:
->> >>
->> >> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);    ->
->> >> tick_broadcast_oneshot_control(...);
->> >> ->
->> >> tick_program_event(dev->next_event, 1);
->> >> ->
->> >> tick_dev_program_event(dev, expires, force);
->> >> ->
->> >> for (i = 0;;) {
->> >>                 int ret = clockevents_program_event(dev, expires, now);
->> >>                 if (!ret || !force)
->> >>                         return ret;
->> >>
->> >>                 dev->retries++;
->> >>                 ....
->> >>                 now = ktime_get();
->> >>                 expires = ktime_add_ns(now, dev->min_delta_ns);
->> >> }
->> >> clockevents_program_event(dev, expires, now);
->> >>
->> >>         delta = ktime_to_ns(ktime_sub(expires, now));
->> >>
->> >>         if (delta <= 0)
->> >>                 return -ETIME;
->> >>
->> >> when the bc timer interrupt arrives,  which means the last local timer
->> >> expires too. so,
->> >> clockevents_program_event will return -ETIME, which will cause the
->> >> dev->retries++
->> >> when retry to program the expired timer.
->> >>
->> >> Even under the worst case, after the re-program the expired timer,
->> >> then CPU enter idle
->> >> quickly before the re-progam timer expired, it will make system
->> >> ping-pang forever,
->> >
->> > That's nonsense.
->>
->> I don't think so.
->>
->> >
->> > The timer IPI brings the core out of the deep idle state.
->> >
->> > So after returning from enter_wait_mode() and after calling
->> > clockevents_notify() it returns from arch_idle() to cpu_idle().
->> >
->> > In cpu_idle() interrupts are reenabled, so the timer IPI handler is
->> > invoked. That calls the event_handler of the per cpu local clockevent
->> > device (the one which stops in C3). That ends up in the generic timer
->> > code which expires timers and reprograms the local clock event device
->> > with the next pending timer.
->> >
->> > So you cannot go idle again, before the expired timers of this event
->> > are handled and their callbacks invoked.
->>
->> That's true for the CPUs which not response to the global timer interrupt.
->> Take our platform as example: we have 4CPUs(CPU0, CPU1,CPU2,CPU3)
->> The global timer device will keep running even in the deep idle mode, so, it
->> can be used as the broadcast timer device, and the interrupt of this device
->> just raised to CPU0 when the timer expired, then, CPU0 will broadcast the
->> IPI timer to other CPUs which is in deep idle mode.
->>
->> So for CPU1, CPU2, CPU3, you are right, the IPI timer will bring it out of idle
->> state, after running clockevents_notify() it returns from arch_idle()
->> to cpu_idle(),
->> then local_irq_enable(), the IPI handler will be invoked and handle
->> the expires times
->> and re-program the next pending timer.
->>
->> But, that's not true for the CPU0. The flow for CPU0 is:
->> the global timer interrupt wakes up CPU0 and then call:
->> clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
->>
->> which will cpumask_clear_cpu(cpu, tick_get_broadcast_oneshot_mask());
->> in the function tick_broadcast_oneshot_control(),
->
-> Now your explanation makes sense.
->
-> I have no fast solution for this, but I think that I have an idea how
-> to fix it. Stay tuned.
+randconfig build reports the following error which is caused by that
+CONFIG_PM_OPP is unset.
 
-Thanks Thomas, wait for your fix. :)
+  CC      arch/arm/mach-imx/mach-imx6q.o
+arch/arm/mach-imx/mach-imx6q.c: In function ?imx6q_opp_init?:
+arch/arm/mach-imx/mach-imx6q.c:248:2: error: implicit declaration of function ?of_init_opp_table? [-Werror=implicit-function-declaration]
 
->
-> Thanks,
->
->         tglx
+Fix the error by giving a more correct condition for empty
+of_init_opp_table() implementation.
+
+Reported-by: Rob Herring <robherring2@gmail.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ include/linux/opp.h |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/include/linux/opp.h b/include/linux/opp.h
+index 214e0eb..3aca2b8 100644
+--- a/include/linux/opp.h
++++ b/include/linux/opp.h
+@@ -47,15 +47,6 @@ int opp_enable(struct device *dev, unsigned long freq);
+ int opp_disable(struct device *dev, unsigned long freq);
+ 
+ struct srcu_notifier_head *opp_get_notifier(struct device *dev);
+-
+-#ifdef CONFIG_OF
+-int of_init_opp_table(struct device *dev);
+-#else
+-static inline int of_init_opp_table(struct device *dev)
+-{
+-	return -EINVAL;
+-}
+-#endif /* CONFIG_OF */
+ #else
+ static inline unsigned long opp_get_voltage(struct opp *opp)
+ {
+@@ -112,6 +103,15 @@ static inline struct srcu_notifier_head *opp_get_notifier(struct device *dev)
+ }
+ #endif		/* CONFIG_PM_OPP */
+ 
++#if defined(CONFIG_PM_OPP) && defined(CONFIG_OF)
++int of_init_opp_table(struct device *dev);
++#else
++static inline int of_init_opp_table(struct device *dev)
++{
++	return -EINVAL;
++}
++#endif
++
+ #if defined(CONFIG_CPU_FREQ) && defined(CONFIG_PM_OPP)
+ int opp_init_cpufreq_table(struct device *dev,
+ 			    struct cpufreq_frequency_table **table);
+-- 
+1.7.9.5
