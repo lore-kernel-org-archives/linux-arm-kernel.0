@@ -1,55 +1,41 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 21 Feb 2013 12:25:21 -0500 (EST)
-Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <51262A7A.8040103@ti.com>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130221103705.GB17852@n2100.arm.linux.org.uk> <51261F38.2030902@ti.com>
- <20130221134656.GC17852@n2100.arm.linux.org.uk> <51262A7A.8040103@ti.com>
-Message-ID: <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
+Date: Thu, 21 Feb 2013 12:27:24 -0500 (EST)
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <1361464675.24822.53.camel@i7.infradead.org>
+References: <20130129181046.GC25415@pd.tnic>
+ <20130207181315.GM17833@n2100.arm.linux.org.uk>
+ <1360344301.6066.263.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
+ <1360363233.6066.283.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
+ <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
+ <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
+ <20130219203115.114eab79e8d2099c6306d921@freescale.com>
+ <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
+ <1361356696.13482.269.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
+ <1361367842.13482.279.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
+ <1361372008.13482.280.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
+ <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
+ <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
+ <1361464675.24822.53.camel@i7.infradead.org>
+Message-ID: <alpine.LFD.2.03.1302211226241.6419@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Feb 2013, Tom Rini wrote:
+On Thu, 21 Feb 2013, Woodhouse, David wrote:
 
-> FIT isn't required.  FIT is just trying to offer a nice usability
-> thing to folks.
-
-Usability is often counter-balanced by maintenance costs.
-
-> A point of device trees is a single image works in a
-> lot of places.  FIT gives you a single file works in a lot of places.
-
-The whole _point_ for bringing DT into the ARM land was to decouple the 
-the various platform specific stuff from the kernel, and even allow 
-existing distros to work on yet-to-be-created devices unchanged, just 
-like X86 PC class machines.  Now you're suggesting that the kernel and 
-the DT information should be glued together again.  That looks like a 
-move backward to me.  Yet, having that platform stuff in plain C code as 
-we had before, given it is maintained properly, is still the most 
-efficient way to achieve that usability wise.
-
-So let's stop kidding ourselves and be coherent please: either we move 
-device specifics away from the kernel, or we keep them together.  In 
-other words, the DT should ideally come preinstalled with the bootloader 
-on a given board/device for distros to not even have to care about it, 
-or we put that data back inside the kernel and dispense ourselves from 
-all the added DT overhead entirely.  But an hybrid mixed solution like 
-FIT is IMHO the worst of both worlds and sending a wrong message.
-
-> > uboot dug _itself_ into this hole.  It's uboot's problem.
+> On Wed, 2013-02-20 at 23:29 -0500, Nicolas Pitre wrote:
+> > > > On Wed, 20 Feb 2013, Woodhouse, David wrote:
+> > > > > For today's compilers, unless the wind changes.
+> >  ? 
+> > Crap.  OK, assembly code is the way to go then.
 > 
-> A whole lot  of people dug this particular hole.  Joel is trying to
-> offer up a solution that maybe makes things easier for everyone.  Or
-> it gets rejected here too and distros will come up with their N
-> different ways to try and provide easier experiences to the end user.
+> How quickly the wind changes, these days. I blame global warming. :)
 
-Nothing being perfect, it is probably unreasonable to think that every 
-board will start shipping with complete and correct DT description, etc.  
-But so is the state of FIT support right now.  That solution to make 
-things easier for everyone should actually make that DT vs kernel 
-separation more effective and provide better mechanisms for gluing the 
-various DTBs to their respective boards, and not to glue them to the 
-kernel to populate a distro filesystem with them.
+Only fools don't believe global warming.
 
 
 Nicolas
