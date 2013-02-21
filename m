@@ -1,69 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Feb 2013 20:01:42 +0100
-Subject: [PATCH v3 05/12] gpio: pxa: define nr gpios in platform data
-In-Reply-To: <1361164358-5845-6-git-send-email-haojian.zhuang@linaro.org>
-References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
- <1361164358-5845-6-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdYGWeKYXTvcpe+n7z=F61Njzt9s8Jhur0V3UHE-T_x=3g@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 21 Feb 2013 12:03:22 -0700
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <5126213E.9010809@ti.com>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <5125A1FE.5000604@wwwdotorg.org> <5126213E.9010809@ti.com>
+Message-ID: <51266F7A.4080609@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 6:12 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+On 02/21/2013 06:29 AM, Tom Rini wrote:
+> On 02/20/2013 11:26 PM, Stephen Warren wrote:
+>> On 02/20/2013 06:37 PM, Joel A Fernandes wrote:
+>>> Hello, I've been spinning some work-in-progress patches for
+>>> FIT build support in the kernel. With the move to
+>>> multiplatform support on OMAP, I feel it is a good time to add
+>>> FIT support, also looking at the proliferating number of dtbs,
+>>> as it is a nice way
+> 
+>> To my mind, FIT is pointless. And forcing the kernel build
+>> process to create bootloader-specific files doesn't seem like a
+>> good idea. Doing so would require pulling in even more outside
+>> tools into the kernel build flow.
+> 
+> No, it requires no more tools than we have today.  It's still just 
+> mkimage and a device tree file.
 
-> Avoid to define gpio numbers in gpio driver. Define it in platform data
-> instead.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+mkimage isn't required today, if you use the bootz target rather than
+bootm. Using bootz is a huge improvement since you don't need to use
+bootloader-specific tools to create the kernel boot images; just slap
+them on the disk, and you're done. Nothing could be simpler.
 
-Very nice patch overall!
+>> All you need is to copy the zImage and any relevant .dtb files 
+>> into /boot, and have U-Boot load the relevant .dtb file by 
+>> constructing the filename as roughly ${soc}-${board}.dtb, then
+>> use the bootz command to boot it. You can have a completely
+>> generic boot.scr (or built-in script).
+> 
+> Note you still have to copy N dtb files into the filesystem.  Or
+> one file, the FIT image.
 
-> -               if (!of_have_populated_dt())
-> -                       ret = platform_add_devices(devices, ARRAY_SIZE(devices));
-> +               if (!of_have_populated_dt()) {
-> +                       if (cpu_is_pxa93x())
-> +                               pxa3xx_gpio_info.nr_gpios = 192;
+But you have to generate the FIT image that packages all the files
+together.
 
-We need to get rid of cpu_is_* and pass this from the machine
-instead, but this is OK as a stepping stone.
+The long-term goal for device tree is to move the *.dts files out of
+the kernel source. It's unclear if there will be some single central
+repository for them, or whether vendors will host their own repository
+just for their own boards. The latter would probably scale the best.
+Having separate distro packages for different vendors' or different
+SoCs' device tree would also scale the best; forcing usage of FIT
+where everything gets merged together doesn't interact well with that.
 
-> -#ifdef CONFIG_ARCH_PXA
-> -       if (cpu_is_pxa25x()) {
-> -#ifdef CONFIG_CPU_PXA26x
-> -               count = 89;
-> -#elif defined(CONFIG_PXA25x)
-> -               count = 84;
-> -#endif /* CONFIG_CPU_PXA26x */
-> -       } else if (cpu_is_pxa27x()) {
-> -               count = 120;
-> -       } else if (cpu_is_pxa93x()) {
-> -               count = 191;
-> -       } else if (cpu_is_pxa3xx()) {
-> -               count = 127;
-> -       }
-> -#endif /* CONFIG_ARCH_PXA */
-> -
-> -#ifdef CONFIG_ARCH_MMP
-> -       if (cpu_is_pxa168() || cpu_is_pxa910()) {
-> -               count = 127;
-> -       } else if (cpu_is_mmp2()) {
-> -               count = 191;
-> -       }
-> -#endif /* CONFIG_ARCH_MMP */
-> -       return count;
-> -}
+>> Note: Not all (many?) U-Boot support FIT anyway, so you'd need
+>> to flash a new U-Boot to support FIT, so you may as well just
+>> flash a new U-Boot that implements the ${soc} and ${board}
+>> variables instead. IIRC, there may also be a ${boardname} or
+>> similar that's like ${board}, but represents the runtime-detected
+>> board for when one U-Boot build actually supports multiple
+>> different boards.
+> 
+> And enable bootz as well.  Just about as many boards enable that as
+> do FIT.  And FIT has been around for years, bootz not so.  So in
+> theory folks with old/odd boards that didn't bother to get
+> mainlined in U-Boot could still have FIT support added, easily.
 
-This alone warrants ACKing the patch :-)
-
-> +       ret = of_property_read_u32(np, "marvell,nr-gpios", &pdata->nr_gpios);
-> +       if (ret < 0) {
-> +               dev_err(&pdev->dev, "nr-gpios isn't specified\n");
-> +               return -ENOTSUPP;
-> +       }
-
-Add this to the binding document?
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+I guess that's true, but enabling bootz in a U-Boot ends up bringing
+in a lot less conceptual complexity, and I would guess a bit less code
+too.
