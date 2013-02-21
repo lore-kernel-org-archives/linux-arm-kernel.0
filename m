@@ -1,123 +1,101 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 21 Feb 2013 22:43:03 +0100
-Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin
- function name
-In-Reply-To: <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
-References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
- <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
- <51251A11.2030300@wwwdotorg.org>
- <CAKGA1bkHH1XC38_VM=QhDrr33uqqSbwe0n+GfXEPs43K_Do=CQ@mail.gmail.com>
- <20130221050247.GD17738@S2101-09.ap.freescale.net>
- <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
-Message-ID: <20130221214303.GB1906@pengutronix.de>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Thu, 21 Feb 2013 22:53:07 +0100
+Subject: [RFC/PATCH 2/5] kernel_cpustat: convert to atomic 64-bit accessors
+In-Reply-To: <87y5ehmp8d.fsf@linaro.org>
+References: <1361389302-11968-1-git-send-email-khilman@linaro.org>
+ <1361389302-11968-3-git-send-email-khilman@linaro.org>
+ <87y5ehmp8d.fsf@linaro.org>
+Message-ID: <CAFTL4hw1=mKtUadL0WDrydtspOehKuW7jhhzr65vXR2P2zdTWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 21, 2013 at 11:36:36AM -0600, Matt Sealey wrote:
-> On Wed, Feb 20, 2013 at 11:02 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > On Wed, Feb 20, 2013 at 06:03:39PM -0600, Matt Sealey wrote:
-> >> I am not sure I am getting this point across, but.. damn it.. nack nack nack :D
-> >>
-> > Do you see any downgrade side that the series introduces over the
-> > existing implementation?
-> 
-> Because it replaces the horribly stupid existing implementation with
-> something that doesn't solve the fundamental logical problems caused
-> by the existing implementation. There are three completely obvious
-> logical inconsistencies with the existing implementation of a pair of
-> <arbitrary_pin_index pad_mode>;
-> 
-> 1) the pin index is completely arbitrary and in any binding every
-> published for any of these SoC, either broken by design (MX5 and MX6
-> have duplicated pin data soaking up arbitrary pin ids in the current
-> binding, or are not defined in SoC register order (i.e. arbitrary
-> renumbering).
-
-The pin index is indeed completely arbitrary, mostly because the iomuxv3
-does not make it possible to number pins. More sane SoCs offered that,
-there a Pin number could be easily translated into a register offset. I
-don't know what drugs the FSL engineers have taken to come up with a
-register layout in which each pin is configured via three register sets
-which do not stand in any relationship to each other.
-
-Unfortunately the pinctrl framework forces us to use a pin index as it
-needs something to detect resource conflicts. BUT, I think I agree here
-with you: This pin number should not be exposed to the devicetree, it
-only adds a level of indirection.
-
-> 
-> 2) the pin index is not internally consistent within the device tree
-> binding - it is a reference to an array inside source code. Your patch
-> hopes to solve this, but also hopes to solve other things too. It
-> fails on the second part.
-> 
-> 3) the pad setting value has been hijacked to include bits that
-> otherwise would not be set in the same register (SION bit and a
-> special flag to mean, set up everything except the pad settings)
-> 
-> What you've fixed it to do, as I read this patch, is this;
-> 
-> <arbitrary_pin_name pad_mode>
-> 
-> which the preprocessor expands to;
-> 
-> <reg_mux mux_mode reg_insel insel_mode reg_pad pad_mode>
-> 
-> The real problem here is as follows;
-> 
-> 1) the pin name and function name are still completely arbitrary (in
-> so far as the old iomux.h macros way, the newer iomux-v3.h way, the
-> current bindings and the new binding you're pushing do not match the
-> CPU documentation at all)
-> 
-> 2) copy pasting a line of 5 values from an example document and adding
-> your pad mode bits to the end is no more time consuming or
-> space-consuming than copying a 38-character macro name. New board
-> designs will use data from the FSL IOMUX tool or other sources and not
-> bother using macro definitions to define pads.
-> 
-> 3) macros can be wrong and they will inherit into every device tree,
-> breaking every board that uses them. That said, so can the examples,
-> but at least reading the device tree for a board you can cross-check
-> all the values against, say, the output of many tools provided by
-> Freescale or existing code or platform support without doing a back
-> reference or preprocessing the device tree and removing comments).
+2013/2/21 Kevin Hilman <khilman@linaro.org>:
+> Subject: [PATCH 2/5] kernel_cpustat: convert to atomic 64-bit accessors
 >
+> Use the atomic64_* accessors for all the kernel_cpustat fields to
+> ensure atomic access on non-64 bit platforms.
+>
+> Thanks to Mats Liljegren for CGROUP_CPUACCT related fixes.
+>
+> Cc: Mats Liljegren <mats.liljegren@enea.com>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
 
-Yes, macros can be wrong, but they tend to get fixed. Duplicated
-information almost never gets fixed in all instances they occur.
+Funny stuff, I thought struct kernel_cpustat was made of cputime_t
+field. Actually it's u64. So the issue is independant from the new
+full dynticks cputime accounting. It was already broken before.
 
-> 
-> MX51_PIN_EIM_23__GPIO1_2 0x6528
-> 
-> <
-> MUX_REG(0x174) ALT(0x5|SION) INS_REG(0x3d8) INS(0x7) PAD_REG(0x654)
-> PAD(0x7633|PU_100K), /* MX51_EIM_23 GPIO1_2 */
-> >;
+But yeah that's not the point, we still want to fix this anyway. But
+let's just treat this patch as independant.
 
-This is basically what the current iomux header do, only that we added
-the mux/padctrl/selinput register triplet to a single macro. This in my
-eyes still makes sense, because digging through the datasheet guessing
-that for a single pin I have to configure registers 0x174, 0x3d8 and
-0x654 is cumbersome.
+> ---
+>  arch/s390/appldata/appldata_os.c   | 41 +++++++++++++++++++++++---------------
+>  drivers/cpufreq/cpufreq_governor.c | 18 ++++++++---------
+>  drivers/cpufreq/cpufreq_ondemand.c |  2 +-
+>  drivers/macintosh/rack-meter.c     |  6 +++---
+>  fs/proc/stat.c                     | 40 ++++++++++++++++++-------------------
+>  fs/proc/uptime.c                   |  2 +-
+>  include/linux/kernel_stat.h        |  2 +-
+>  kernel/sched/core.c                | 10 +++++-----
+>  kernel/sched/cputime.c             | 38 +++++++++++++++++------------------
+>  9 files changed, 84 insertions(+), 75 deletions(-)
+>
+> diff --git a/arch/s390/appldata/appldata_os.c b/arch/s390/appldata/appldata_os.c
+> index 87521ba..008b180 100644
+> --- a/arch/s390/appldata/appldata_os.c
+> +++ b/arch/s390/appldata/appldata_os.c
+> @@ -99,6 +99,7 @@ static void appldata_get_os_data(void *data)
+>         int i, j, rc;
+>         struct appldata_os_data *os_data;
+>         unsigned int new_size;
+> +       u64 val;
+>
+>         os_data = data;
+>         os_data->sync_count_1++;
+> @@ -112,22 +113,30 @@ static void appldata_get_os_data(void *data)
+>
+>         j = 0;
+>         for_each_online_cpu(i) {
+> -               os_data->os_cpu[j].per_cpu_user =
+> -                       cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_USER]);
+> -               os_data->os_cpu[j].per_cpu_nice =
+> -                       cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_NICE]);
+> -               os_data->os_cpu[j].per_cpu_system =
+> -                       cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM]);
+> -               os_data->os_cpu[j].per_cpu_idle =
+> -                       cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_IDLE]);
+> -               os_data->os_cpu[j].per_cpu_irq =
+> -                       cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_IRQ]);
+> -               os_data->os_cpu[j].per_cpu_softirq =
+> -                       cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ]);
+> -               os_data->os_cpu[j].per_cpu_iowait =
+> -                       cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_IOWAIT]);
+> -               os_data->os_cpu[j].per_cpu_steal =
+> -                       cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_STEAL]);
+> +               val = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_USER]);
 
-Where it became ugly is the predefined values for pullup/dse.
+So I see this repeated pattern everywhere. How about converting that to:
+           kcpustat_cpu_get(i, CPUTIME_USER)
 
-Yes, I would really like to have something like you describe above in
-the devicetree together with the register triplets as handy macros.
-Also I still like the <pinname>__<function> naming since that's another
-thing I don't have to look up in the datasheet everytime.
-If your data comes from the iomux tool then you simply wouldn't use the
-register triplet macros.
+and use that accessor in all other places. That's much more readable
+and then we can later modify the accessing code in one go.
 
-This would leave the question how we make up a pin number for the
-pinctrl framework, but as said, this should be solved inside the kernel
-and not pushed into the devicetree.
+We should perhaps even use atomic_64 in 32 bits and u64 in 64 bits.
 
-Sascha
+[...]
+> @@ -186,11 +186,11 @@ static void account_guest_time(struct task_struct *p, cputime_t cputime,
+>
+>         /* Add guest time to cpustat. */
+>         if (TASK_NICE(p) > 0) {
+> -               cpustat[CPUTIME_NICE] += (__force u64) cputime;
+> -               cpustat[CPUTIME_GUEST_NICE] += (__force u64) cputime;
+> +               atomic64_add((__force u64) cputime, &cpustat[CPUTIME_NICE]);
+> +               atomic64_add((__force u64) cputime, &cpustat[CPUTIME_GUEST_NICE]);
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+That too should be kcpustat_this_cpu_set(), or kcpustat_this_cpu_add()
+FWIW. But we probably don't need the overhead of atomic_add() that
+does a LOCK.
+atomic_set(var, atomic_read(var) + delta) would be better. All we need
+is that low/high parts of the 64 bits values are stored and read
+without messing up altogether.
+
+Thanks.
