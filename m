@@ -1,55 +1,45 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 22 Feb 2013 10:13:59 +1100
-Subject: [PATCH 01/11] ARM: disable virt_to_bus/virt_to_bus almost
- everywhere
-In-Reply-To: <5125CED4.7030905@synopsys.com>
-References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
- <1360849767-1463135-2-git-send-email-arnd@arndb.de>
- <CAAG0J9_VqCGJJJZjSWGfFggALHU=vdWsSBeS39-DtxV=VXcJwQ@mail.gmail.com>
- <201302201600.47522.arnd@arndb.de> <5124FA93.5090504@imgtec.com>
- <5125CED4.7030905@synopsys.com>
-Message-ID: <20130222101359.0c91a7259f648a3d06221bd8@canb.auug.org.au>
+From: wd@denx.de (Wolfgang Denk)
+Date: Fri, 22 Feb 2013 00:18:48 +0100
+Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <alpine.LFD.2.03.1302211624561.6419@syhkavp.arg>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <20130221103705.GB17852@n2100.arm.linux.org.uk> <51261F38.2030902@ti.com>
+ <20130221134656.GC17852@n2100.arm.linux.org.uk> <51262A7A.8040103@ti.com>
+ <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
+ <20130221182724.GA14329@obsidianresearch.com>
+ <alpine.LFD.2.03.1302211423190.6419@syhkavp.arg>
+ <20130221211444.GB20114@obsidianresearch.com>
+ <alpine.LFD.2.03.1302211624561.6419@syhkavp.arg>
+Message-ID: <20130221231848.880DE200552@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Nicolas,
 
-On Thu, 21 Feb 2013 13:07:56 +0530 Vineet Gupta <Vineet.Gupta1@synopsys.com> wrote:
->
-> >> I guess you'll have to do something similar for arch/metag, and Vineet
-> >> will do it for arch/arc.
+In message <alpine.LFD.2.03.1302211624561.6419@syhkavp.arg> you wrote:
 > 
-> After getting the tip-bot msg about Stephen's patch for -mm, I never saw it in
-> -next and thus was not sure how when it will start showing up in -next.
+> No it is not.  FIT is about bundling a multi-platform kernel with a 
+> bunch of DTBs together in a single file.  I don't think you need that 
 
-It arrived in next-21030220.
+Actually this is neither the only, nor even the primary purpose of FIT
+images; these have a much wider scope of usage scenarios.
 
-> >> Stephen's patch is currently in Andrew's tree, and I don't see an easy
-> >> way to coordinate this. The patch we will need once both are merged
-> >> is below.
-> >>
-> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > FWIW:
-> > Acked-by: James Hogan <james.hogan@imgtec.com> (for arch/metag)
-> > 
-> Acked-by: Vineet Gupta <vgupta@synopsys.com> (for arch/arc)
-> 
-> So this means Stephen's patch - once merged will take care of existing in-tree
-> arches and your's will take care of metag/arc.
+> The DT is meant to describe hardware.  As far as I know, the hardware I 
+> own seems to be rather static and stable, and unlike software there is 
+> no way I can change it (soldering irons don't count).
 
-The easiest way would be to put the follow up patches in Andrew's patch
-set (since it is still based on top of linux-next).  It usually is merged
-pretty late, so I would get your own trees merged ASAP and this can be
-taken care of when Andrew sends his patch set to Linus.
+There is other hardware available (for example FPGA based) where this
+does not apply.
+
+Best regards,
+
+Wolfgang Denk
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130222/bd744617/attachment-0001.sig>
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+GUIs  are  virtually  useless.  Learn  tools.  They're  configurable,
+scriptable, automatable, cron-able, interoperable, etc. We don't need
+no brain-dead winslurping monolithic claptrap.
+                               -- Tom Christiansen in 371140df at csnews
