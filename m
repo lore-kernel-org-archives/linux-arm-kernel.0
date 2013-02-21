@@ -1,74 +1,50 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 21 Feb 2013 17:24:45 +0100
-Subject: [PATCH] PM / OPP: fix condition for empty of_init_opp_table()
-In-Reply-To: <1361444685-1034-1-git-send-email-shawn.guo@linaro.org>
-References: <1361444685-1034-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <75659049.45v5PxmPVX@vostro.rjw.lan>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Thu, 21 Feb 2013 17:19:23 +0100
+Subject: Porting 3.8-rc4-nohz3 to ARM (PandaBoard)
+In-Reply-To: <B38601CE-F868-426E-8504-0DCE7CCB9BDC@enea.com>
+References: <20130204200238.GA16718@enea.se>
+ <CAFTL4hyNZdjmSij0DDouu0mmD5E3xApq7i=dZD941ZtCM1QyjQ@mail.gmail.com>
+ <20130211190317.GA8513@enea.se>
+ <CAFTL4hzzFEYq+1=n+JpTiV3WdeKXETGQVDJSm-FJCN7E6xvE9w@mail.gmail.com>
+ <B38601CE-F868-426E-8504-0DCE7CCB9BDC@enea.com>
+Message-ID: <CAFTL4hyR3s8mfxCk+_jFbvnkSrC4iMN4ZmjrGSMo9KRkxRr9cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 21, 2013 07:04:45 PM Shawn Guo wrote:
-> randconfig build reports the following error which is caused by that
-> CONFIG_PM_OPP is unset.
-> 
->   CC      arch/arm/mach-imx/mach-imx6q.o
-> arch/arm/mach-imx/mach-imx6q.c: In function ?imx6q_opp_init?:
-> arch/arm/mach-imx/mach-imx6q.c:248:2: error: implicit declaration of function ?of_init_opp_table? [-Werror=implicit-function-declaration]
-> 
-> Fix the error by giving a more correct condition for empty
-> of_init_opp_table() implementation.
-> 
-> Reported-by: Rob Herring <robherring2@gmail.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+2013/2/20 Mats Liljegren <mats.liljegren@enea.com>:
+>
+>
+>> 2013/2/11 Mats Liljegren <mats.liljegren@enea.com>:
+>>> Could the other guy be Kevin Hillman? The name has been mentioned to me but
+>>> I don't have his e-mail address.
+>>
+>> Exactly :)
+>>
+>>>
+>>> I have stumbled across a problem, I get the following error messages during
+>>> boot:
+>>>
+>>> ---- Start snippet ----
+>>> [   41.119873] INFO: task rcuo1:10 blocked for more than 20 seconds.
+>>
+>> This showed up upstream as well, it hshould have been fixed in linus tree now.
+>
+> Ok.
+>
+>>
+>> [...]
+>>> [  112.400695] VFS: Unable to mount root fs via NFS, trying floppy.
+>>> [  112.407226] List of all partitions:
+>>> [  112.411041] No filesystem could mount root, tried:
+>>> [  112.416351] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(2,0)
+>>
+>> Ah, that probably not due to my patches :)
+>
+> By removing some kernel parameters I managed to get further. They were'nt important, just tried to disable watchdog and idle calls.
+> My current problem is that it refuses to enter full nohz mode due to too many runable threads. I need to check were those extra threads come from.
+>
+> Could it be related to rcu problem above? If so I might need to switch to a newer version of Linus tree.
 
-Applied to linux-pm.git/linux-next, I'm going to push it to Linus later this
-week.
-
-Thanks,
-Rafael
-
-
-> ---
->  include/linux/opp.h |   18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/include/linux/opp.h b/include/linux/opp.h
-> index 214e0eb..3aca2b8 100644
-> --- a/include/linux/opp.h
-> +++ b/include/linux/opp.h
-> @@ -47,15 +47,6 @@ int opp_enable(struct device *dev, unsigned long freq);
->  int opp_disable(struct device *dev, unsigned long freq);
->  
->  struct srcu_notifier_head *opp_get_notifier(struct device *dev);
-> -
-> -#ifdef CONFIG_OF
-> -int of_init_opp_table(struct device *dev);
-> -#else
-> -static inline int of_init_opp_table(struct device *dev)
-> -{
-> -	return -EINVAL;
-> -}
-> -#endif /* CONFIG_OF */
->  #else
->  static inline unsigned long opp_get_voltage(struct opp *opp)
->  {
-> @@ -112,6 +103,15 @@ static inline struct srcu_notifier_head *opp_get_notifier(struct device *dev)
->  }
->  #endif		/* CONFIG_PM_OPP */
->  
-> +#if defined(CONFIG_PM_OPP) && defined(CONFIG_OF)
-> +int of_init_opp_table(struct device *dev);
-> +#else
-> +static inline int of_init_opp_table(struct device *dev)
-> +{
-> +	return -EINVAL;
-> +}
-> +#endif
-> +
->  #if defined(CONFIG_CPU_FREQ) && defined(CONFIG_PM_OPP)
->  int opp_init_cpufreq_table(struct device *dev,
->  			    struct cpufreq_frequency_table **table);
-> 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+May be. If so you may need to migrate the rcuoX kthreads. You probably
+need to use the sched switch tracepoint to check what's going on. And
+migrate some threads affinity if needed.
