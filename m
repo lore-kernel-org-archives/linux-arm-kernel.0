@@ -1,64 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Feb 2013 19:56:27 +0100
-Subject: [PATCH v3 03/12] gpio: pxa: use platform data for gpio inverted
-In-Reply-To: <1361164358-5845-4-git-send-email-haojian.zhuang@linaro.org>
-References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
- <1361164358-5845-4-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdZsTZg7m1C3X9kD3Dd7+awN2eWM4M7PFD6RTSPkEOnMnA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 21 Feb 2013 11:56:41 -0700
+Subject: [PATCH 1/1] memory: tegra_ahb_enable_smmu() depends on
+ TEGRA_IOMMU_SMMU
+In-Reply-To: <20130221132851.GB17833@n2100.arm.linux.org.uk>
+References: <1360175666-8377-1-git-send-email-hdoyu@nvidia.com>
+ <5112A642.1020800@wwwdotorg.org>
+ <20130206.211635.744922728615926717.hdoyu@nvidia.com>
+ <20130211.193034.1346903263789032239.hdoyu@nvidia.com>
+ <51250DDE.7010408@wwwdotorg.org>
+ <20130221132851.GB17833@n2100.arm.linux.org.uk>
+Message-ID: <51266DE9.1020404@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 6:12 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+On 02/21/2013 06:28 AM, Russell King - ARM Linux wrote:
+> On Wed, Feb 20, 2013 at 10:54:38AM -0700, Stephen Warren wrote:
+>> On 02/11/2013 10:30 AM, Hiroshi Doyu wrote:
+>>> Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Wed, 06 Feb 2013 21:16:35 +0200 (EET):
+>>>
+>>>> Hi Russell,
+>>>>
+>>>> Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 6 Feb 2013 19:51:46 +0100:
+>>>>
+>>>>> On 02/06/2013 11:34 AM, Hiroshi Doyu wrote:
+>>>>>> New SoC, Tegra114 also uses SMMU. Change tegra_ahb_enable_smmu()'s
+>>>>>> dependency from ARCH_TEGRA_3x_SOC to TEGRA_IOMMU_SMMU. No need to edit
+>>>>>> whenever a new Tegra SoC comes.
+>>>>>>
+>>>>>> The following combination caused build error, which this patch fixes.
+>>>>>>
+>>>>>> CONFIG_ARCH_TEGRA_2x_SOC=y
+>>>>>> \# CONFIG_ARCH_TEGRA_3x_SOC is not set
+>>>>>> CONFIG_ARCH_TEGRA_114_SOC=y
+>>>>>>
+>>>>>> drivers/iommu/tegra-smmu.c:485: undefined reference to 'tegra_ahb_enable_smmu'
+>>>>>
+>>>>> Tested-by: Stephen Warren <swarren@nvidia.com>
+>>>>>
+>>>>> Russell, I assume Hiroshi should upload this to your patch tracker? It's
+>>>>> needed for 3.9.
+>>>>
+>>>> FYI: Submitted as:
+>>>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7640/1
+>>>
+>>> Russell,
+>>>
+>>> Is the above ok for you?
+>>> Please let me know if still I need to do something.
+>>
+>> Russell, will this patch make it into your tree for 3.9? Do you think it
+>> should go through some other tree? Thanks.
+> 
+> I'll merge it, and I think it's a minor fix.  Should it be copied to
+> stable?  If so, which ones are affected?
 
-> Avoid to judge whether gpio is inverted by identifying cpu in gpio
-> driver. Move this into platform data of gpio driver.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-(...)
-> -static inline int __gpio_is_inverted(int gpio)
-> +static inline int __gpio_is_inverted(struct pxa_gpio_chip *chip, int gpio)
+It's only relevant for 3.9. It will apply without issue to some older
+kernels, but there's no need for it there.
 
-Take this opportunity to rename the function pxa_gpio_is_inverted().
-__notation should be used for other things IMO.
-
-Also, this function should return a bool.
-
->  {
-> -       if ((gpio_type == PXA26X_GPIO) && (gpio > 85))
-> +       if ((chip->inverted) && (gpio > 85))
-
-Add a comment explaining why only GPIOs > 85 may be
-inverted.
-
->                 return 1;
->         return 0;
-
-return true or false.
-
-> -static inline int __gpio_is_occupied(unsigned gpio)
-> +static inline int __gpio_is_occupied(struct pxa_gpio_chip *chip, unsigned gpio)
-
-pxa_gpio_is_occupied()
-
-> -               if (__gpio_is_inverted(gpio))
-> +               if (__gpio_is_inverted(chip, gpio))
-
-So it is obviously used as a bool so make it a bool.
-
-> +       chip = container_of(gc, struct pxa_gpio_chip, chip);
-> +
-
-Many drivers define a helper macro for this, something
-like TO_PXA_GPIO(). But just a hint.
-
-> +       /* It's only valid for PXA26x */
-> +       if (of_find_property(np, "marvell,gpio-inverted", NULL))
-> +               pdata->inverted = true;
-
-of_property_read_bool()
-
-And add it to the binding document, right?
-
-Yours,
-Linus Walleij
+Thanks.
