@@ -1,139 +1,41 @@
-From: namhyung@kernel.org (Namhyung Kim)
-Date: Thu, 21 Feb 2013 09:58:57 -0800
-Subject: [RFC/PATCH 4/5] cputime: use do_div() for nsec resolution
- conversion helpers
-In-Reply-To: <1361389302-11968-5-git-send-email-khilman@linaro.org>
-References: <1361389302-11968-1-git-send-email-khilman@linaro.org>
- <1361389302-11968-5-git-send-email-khilman@linaro.org>
-Message-ID: <20130221175857.GB14256@danjae.linux.parc55>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 21 Feb 2013 13:04:49 -0500 (EST)
+Subject: [PATCH 1/1] net: fec: fix crash at mx53 qsb board
+In-Reply-To: <1361408848-14118-1-git-send-email-Frank.Li@freescale.com>
+References: <1361408848-14118-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20130221.130449.868185028543115848.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+From: Frank Li <Frank.Li@freescale.com>
+Date: Thu, 21 Feb 2013 09:07:28 +0800
 
-On Wed, Feb 20, 2013 at 11:41:41AM -0800, Kevin Hilman wrote:
-> For the nsec resolution conversions to be useful on non 64-bit
-> architectures, do_div() needs to be used for the 64-bit divisions.
+> Unable to handle kernel NULL pointer dereference at virtual address 00000002
+> pgd = 80004000
+> [00000002] *pgd=00000000
+> Internal error: Oops: 5 [#1] SMP ARM
+> Modules linked in:
+> CPU: 0    Not tainted  (3.8.0-rc7-next-20130215+ #346)
+> PC is at fec_enet_interrupt+0xd0/0x348
+> LR is at fec_enet_interrupt+0xb8/0x348
+> pc : [<80372b7c>]    lr : [<80372b64>]    psr: 60000193
+> sp : df855c20  ip : df855c20  fp : df855c74
+> r10: 00000516  r9 : 1c000000  r8 : 00000000
+> r7 : 00000000  r6 : 00000000  r5 : 00000000  r4 : df9b7800
+> r3 : df9b7df4  r2 : 00000000  r1 : 00000000  r0 : df9b7d34
 > 
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
->  include/asm-generic/cputime_nsecs.h | 51 +++++++++++++++++++++++++++----------
->  1 file changed, 37 insertions(+), 14 deletions(-)
+> It is possible that issue a irq between request_irq and fec_enet_init.
+> Irq handle will be called but driver data structure is not ready yet.
 > 
-> diff --git a/include/asm-generic/cputime_nsecs.h b/include/asm-generic/cputime_nsecs.h
-> index b6485ca..daa6075 100644
-> --- a/include/asm-generic/cputime_nsecs.h
-> +++ b/include/asm-generic/cputime_nsecs.h
-> @@ -24,13 +24,17 @@ typedef u64 __nocast cputime64_t;
->  /*
->   * Convert cputime <-> jiffies (HZ)
->   */
-> -#define cputime_to_jiffies(__ct)	\
-> -	((__force u64)(__ct) / (NSEC_PER_SEC / HZ))
-> +static inline u64 cputime_to_jiffies(const cputime_t ct)
-> +{
-> +	cputime_t __ct = ct;
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 
-Why it removed the "(__force u64)" conversion part?  Shouldn't it be:
+You must fix this by making sure all of the necessary software
+datastructures are initialized fully before request_irq() is
+invoked.
 
-	u64 __ct = (__force u64) ct;
+You absolutely cannot control pending interrupts the chip is already
+signalling and which have been queued up in the interrupt controller
+already, which will be emitted precisely when you request_irq()
+regardless of how you program the chip during this time.
 
-?  (and ditto for below changes)
-
-Thanks,
-Namhyung
-
-
-> +
-> +	do_div(__ct, NSEC_PER_SEC / HZ);
-> +	return __ct;
-> +}
->  #define cputime_to_scaled(__ct)		(__ct)
->  #define jiffies_to_cputime(__jif)	\
->  	(__force cputime_t)((__jif) * (NSEC_PER_SEC / HZ))
-> -#define cputime64_to_jiffies64(__ct)	\
-> -	((__force u64)(__ct) / (NSEC_PER_SEC / HZ))
-> +#define cputime64_to_jiffies64(__ct) cputime_to_jiffies(__ct)
->  #define jiffies64_to_cputime64(__jif)	\
->  	(__force cputime64_t)((__jif) * (NSEC_PER_SEC / HZ))
->  
-> @@ -44,8 +48,13 @@ typedef u64 __nocast cputime64_t;
->  /*
->   * Convert cputime <-> microseconds
->   */
-> -#define cputime_to_usecs(__ct)		\
-> -	((__force u64)(__ct) / NSEC_PER_USEC)
-> +static inline u64 cputime_to_usecs(const cputime_t ct)
-> +{
-> +	cputime_t __ct = ct;
-> +
-> +	do_div(__ct, NSEC_PER_USEC);
-> +	return __ct;
-> +}
->  #define usecs_to_cputime(__usecs)	\
->  	(__force cputime_t)((__usecs) * NSEC_PER_USEC)
->  #define usecs_to_cputime64(__usecs)	\
-> @@ -54,8 +63,13 @@ typedef u64 __nocast cputime64_t;
->  /*
->   * Convert cputime <-> seconds
->   */
-> -#define cputime_to_secs(__ct)		\
-> -	((__force u64)(__ct) / NSEC_PER_SEC)
-> +static inline u64 cputime_to_secs(const cputime_t ct)
-> +{
-> +	cputime_t __ct = ct;
-> +
-> +	do_div(__ct, NSEC_PER_SEC);
-> +	return __ct;
-> +}
->  #define secs_to_cputime(__secs)		\
->  	(__force cputime_t)((__secs) * NSEC_PER_SEC)
->  
-> @@ -69,8 +83,10 @@ static inline cputime_t timespec_to_cputime(const struct timespec *val)
->  }
->  static inline void cputime_to_timespec(const cputime_t ct, struct timespec *val)
->  {
-> -	val->tv_sec  = (__force u64) ct / NSEC_PER_SEC;
-> -	val->tv_nsec = (__force u64) ct % NSEC_PER_SEC;
-> +	cputime_t __ct = ct;
-> +
-> +	val->tv_nsec = do_div(__ct, NSEC_PER_SEC);
-> +	val->tv_sec = __ct;
->  }
->  
->  /*
-> @@ -83,15 +99,22 @@ static inline cputime_t timeval_to_cputime(struct timeval *val)
->  }
->  static inline void cputime_to_timeval(const cputime_t ct, struct timeval *val)
->  {
-> -	val->tv_sec = (__force u64) ct / NSEC_PER_SEC;
-> -	val->tv_usec = ((__force u64) ct % NSEC_PER_SEC) / NSEC_PER_USEC;
-> +	cputime_t __ct = ct;
-> +
-> +	val->tv_usec = do_div(__ct, NSEC_PER_SEC) / NSEC_PER_USEC;
-> +	val->tv_sec = __ct;
->  }
->  
->  /*
->   * Convert cputime <-> clock (USER_HZ)
->   */
-> -#define cputime_to_clock_t(__ct)	\
-> -	((__force u64)(__ct) / (NSEC_PER_SEC / USER_HZ))
-> +static inline u64 cputime_to_clock_t(const cputime_t ct)
-> +{
-> +	cputime_t __ct = ct;
-> +
-> +	do_div(__ct, (NSEC_PER_SEC / USER_HZ));
-> +	return __ct;
-> +}
->  #define clock_t_to_cputime(__x)		\
->  	(__force cputime_t)((__x) * (NSEC_PER_SEC / USER_HZ))
->  
-> -- 
-> 1.8.1.2
-> 
-> 
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
+I'm not applying this, fix the bug correctly, thanks.
