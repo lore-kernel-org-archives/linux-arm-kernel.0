@@ -1,53 +1,117 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 20 Feb 2013 23:07:16 -0500
-Subject: [V8 PATCH 06/16] arm: pxa910: change the defintion of usb devices
+Date: Wed, 20 Feb 2013 23:07:18 -0500
+Subject: [V8 PATCH 08/16] arm: ttc_dkb: add usb support
 In-Reply-To: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
 References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1361419646-9052-7-git-send-email-chao.xie@marvell.com>
+Message-ID: <1361419646-9052-9-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-because phy is seperated from the usb controller driver,
-we can use the common pxa_device_desc for device register.
+for ttc_dkb board, add udc/otg/ehci support
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/include/mach/pxa910.h |    7 ++++---
- arch/arm/mach-mmp/pxa910.c              |    4 ++++
- 2 files changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/mach-mmp/ttc_dkb.c |   50 +++++++++++++++++++++++++++++++++---------
+ 1 files changed, 39 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
-index 3b58a3b..26ea4fe 100644
---- a/arch/arm/mach-mmp/include/mach/pxa910.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa910.h
-@@ -20,9 +20,10 @@ extern struct pxa_device_desc pxa910_device_pwm2;
- extern struct pxa_device_desc pxa910_device_pwm3;
- extern struct pxa_device_desc pxa910_device_pwm4;
- extern struct pxa_device_desc pxa910_device_nand;
--extern struct platform_device pxa168_device_u2o;
--extern struct platform_device pxa168_device_u2ootg;
--extern struct platform_device pxa168_device_u2oehci;
-+extern struct pxa_device_desc pxa910_device_u2o;
-+extern struct pxa_device_desc pxa910_device_u2ootg;
-+extern struct pxa_device_desc pxa910_device_u2oehci;
-+extern struct pxa_device_desc pxa910_device_u2ophy;
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index ce55fd8..5622092 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -18,6 +18,8 @@
+ #include <linux/i2c/pca953x.h>
+ #include <linux/gpio.h>
+ #include <linux/mfd/88pm860x.h>
++#include <linux/usb/phy.h>
++#include <linux/usb/mv_usb2.h>
+ #include <linux/platform_data/mv_usb.h>
  
- extern struct platform_device pxa910_device_gpio;
- extern struct platform_device pxa910_device_rtc;
-diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-index 8b1e16f..65174f7 100644
---- a/arch/arm/mach-mmp/pxa910.c
-+++ b/arch/arm/mach-mmp/pxa910.c
-@@ -138,6 +138,10 @@ PXA910_DEVICE(pwm2, "pxa910-pwm", 1, NONE, 0xd401a400, 0x10);
- PXA910_DEVICE(pwm3, "pxa910-pwm", 2, NONE, 0xd401a800, 0x10);
- PXA910_DEVICE(pwm4, "pxa910-pwm", 3, NONE, 0xd401ac00, 0x10);
- PXA910_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x80, 97, 99);
-+PXA910_DEVICE(u2ophy, "pxa910-usb-phy", -1, NONE, 0xd4207000, 0x1ff);
-+PXA910_DEVICE(u2o, "mv-udc", -1, USB1, 0xd4208100, 0x1ff);
-+PXA910_DEVICE(u2ootg, "mv-otg", -1, USB1, 0xd4208100, 0x1ff);
-+PXA910_DEVICE(u2oehci, "mv-ehci", -1, USB1, 0xd4208100, 0x1ff);
+ #include <asm/mach-types.h>
+@@ -27,7 +29,6 @@
+ #include <mach/mfp-pxa910.h>
+ #include <mach/pxa910.h>
+ #include <mach/irqs.h>
+-#include <mach/regs-usb.h>
  
- struct resource pxa910_resource_gpio[] = {
- 	{
+ #include "common.h"
+ 
+@@ -158,20 +159,24 @@ static struct i2c_board_info ttc_dkb_i2c_info[] = {
+ };
+ 
+ #ifdef CONFIG_USB_SUPPORT
+-#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
+ 
+ static char *pxa910_usb_clock_name[] = {
+-	[0] = "U2OCLK",
++	[0] = "usb_clk",
+ };
+ 
++static struct mv_usb_phy_platform_data ttc_usb_phy_pdata = {
++	.clknum		= 1,
++	.clkname	= pxa910_usb_clock_name,
++};
++
++#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
++
+ static struct mv_usb_platform_data ttc_usb_pdata = {
+ 	.clknum		= 1,
+ 	.clkname	= pxa910_usb_clock_name,
+ 	.vbus		= NULL,
+ 	.mode		= MV_USB_MODE_OTG,
+ 	.otg_force_a_bus_req = 1,
+-	.phy_init	= pxa_usb_phy_init,
+-	.phy_deinit	= pxa_usb_phy_deinit,
+ 	.set_vbus	= NULL,
+ };
+ #endif
+@@ -198,19 +203,42 @@ static void __init ttc_dkb_init(void)
+ 	pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
+ 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
+ 
++#ifdef CONFIG_USB_SUPPORT
++	pxa_register_device(&pxa910_device_u2ophy, &ttc_usb_phy_pdata,
++				sizeof(ttc_usb_phy_pdata));
++#endif
++
+ #ifdef CONFIG_USB_MV_UDC
+-	pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2o);
++	/* for usb2 phy */
++	usb_bind_phy(pxa910_device_u2o.drv_name, MV_USB2_PHY_INDEX,
++				pxa910_device_u2ophy.drv_name);
++#ifdef CONFIG_USB_MV_OTG
++	/* for usb2 otg phy */
++	usb_bind_phy(pxa910_device_u2o.drv_name, MV_USB2_OTG_PHY_INDEX,
++				pxa910_device_u2ootg.drv_name);
++#endif
++	pxa_register_device(&pxa910_device_u2o, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
+ 
+ #ifdef CONFIG_USB_EHCI_MV_U2O
+-	pxa168_device_u2oehci.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2oehci);
++	/* for usb2 phy */
++	usb_bind_phy(pxa910_device_u2oehci.drv_name, MV_USB2_PHY_INDEX,
++				pxa910_device_u2ophy.drv_name);
++#ifdef CONFIG_USB_MV_OTG
++	/* for usb2 otg phy */
++	usb_bind_phy(pxa910_device_u2oehci.drv_name, MV_USB2_OTG_PHY_INDEX,
++				pxa910_device_u2ootg.drv_name);
++#endif
++	pxa_register_device(&pxa910_device_u2oehci, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
+ 
+ #ifdef CONFIG_USB_MV_OTG
+-	pxa168_device_u2ootg.dev.platform_data = &ttc_usb_pdata;
+-	platform_device_register(&pxa168_device_u2ootg);
++	usb_bind_phy(pxa910_device_u2ootg.drv_name, MV_USB2_PHY_INDEX,
++				pxa910_device_u2ophy.drv_name);
++	pxa_register_device(&pxa910_device_u2ootg, &ttc_usb_pdata,
++				sizeof(ttc_usb_pdata));
+ #endif
+ }
+ 
 -- 
 1.7.4.1
