@@ -1,522 +1,111 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 20 Feb 2013 23:07:11 -0500
-Subject: [V8 PATCH 01/16] usb: phy: mv_usb2: add PHY driver for marvell usb2
- controller
+Date: Wed, 20 Feb 2013 23:07:17 -0500
+Subject: [V8 PATCH 07/16] arm: brownstone: add usb support for the board
 In-Reply-To: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
 References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1361419646-9052-2-git-send-email-chao.xie@marvell.com>
+Message-ID: <1361419646-9052-8-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PHY is seperated from usb controller.
-The usb controller used in marvell pxa168/pxa910/mmp2 are same,
-but PHY initialization may be different.
-the usb controller can support udc/otg/ehci, and for each of
-the mode, it need PHY to initialized before use the controller.
-Direclty writing the phy driver will make the usb controller
-driver to be simple and portable.
-The PHY driver will be used by marvell udc/otg/ehci.
+for brownstone board, add the udc/otg/ehci support
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/phy/Kconfig              |    7 +
- drivers/usb/phy/Makefile             |    1 +
- drivers/usb/phy/mv_usb2_phy.c        |  402 ++++++++++++++++++++++++++++++++++
- include/linux/platform_data/mv_usb.h |    9 +-
- include/linux/usb/mv_usb2.h          |   32 +++
- 5 files changed, 448 insertions(+), 3 deletions(-)
- create mode 100644 drivers/usb/phy/mv_usb2_phy.c
- create mode 100644 include/linux/usb/mv_usb2.h
+ arch/arm/mach-mmp/brownstone.c |   68 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 68 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-index 65217a5..5479760 100644
---- a/drivers/usb/phy/Kconfig
-+++ b/drivers/usb/phy/Kconfig
-@@ -73,3 +73,10 @@ config SAMSUNG_USBPHY
- 	help
- 	  Enable this to support Samsung USB phy controller for samsung
- 	  SoCs.
-+
-+config MV_USB2_PHY
-+	tristate "Marvell USB 2.0 PHY Driver"
-+	depends on USB || USB_GADGET
-+	help
-+	  Enable this to support Marvell USB 2.0 phy driver for Marvell
-+	  SoC.
-diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-index b13faa1..3835316 100644
---- a/drivers/usb/phy/Makefile
-+++ b/drivers/usb/phy/Makefile
-@@ -12,3 +12,4 @@ obj-$(CONFIG_MV_U3D_PHY)		+= mv_u3d_phy.o
- obj-$(CONFIG_USB_EHCI_TEGRA)	+= tegra_usb_phy.o
- obj-$(CONFIG_USB_RCAR_PHY)		+= rcar-phy.o
- obj-$(CONFIG_SAMSUNG_USBPHY)		+= samsung-usbphy.o
-+obj-$(CONFIG_MV_USB2_PHY)		+= mv_usb2_phy.o
-diff --git a/drivers/usb/phy/mv_usb2_phy.c b/drivers/usb/phy/mv_usb2_phy.c
-new file mode 100644
-index 0000000..a81e5e4
---- /dev/null
-+++ b/drivers/usb/phy/mv_usb2_phy.c
-@@ -0,0 +1,402 @@
-+/*
-+ * Copyright (C) 2013 Marvell Inc.
-+ *
-+ * Author:
-+ *	Chao Xie <xiechao.mail@gmail.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/resource.h>
-+#include <linux/delay.h>
-+#include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/export.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/platform_data/mv_usb.h>
+diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+index 5cb769c..f84613a 100644
+--- a/arch/arm/mach-mmp/brownstone.c
++++ b/arch/arm/mach-mmp/brownstone.c
+@@ -18,6 +18,9 @@
+ #include <linux/regulator/max8649.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/mfd/max8925.h>
 +#include <linux/usb/phy.h>
 +#include <linux/usb/mv_usb2.h>
-+
-+/* phy regs */
-+#define UTMI_REVISION		0x0
-+#define UTMI_CTRL		0x4
-+#define UTMI_PLL		0x8
-+#define UTMI_TX			0xc
-+#define UTMI_RX			0x10
-+#define UTMI_IVREF		0x14
-+#define UTMI_T0			0x18
-+#define UTMI_T1			0x1c
-+#define UTMI_T2			0x20
-+#define UTMI_T3			0x24
-+#define UTMI_T4			0x28
-+#define UTMI_T5			0x2c
-+#define UTMI_RESERVE		0x30
-+#define UTMI_USB_INT		0x34
-+#define UTMI_DBG_CTL		0x38
-+#define UTMI_OTG_ADDON		0x3c
-+
-+/* For UTMICTRL Register */
-+#define UTMI_CTRL_USB_CLK_EN                    (1 << 31)
-+/* pxa168 */
-+#define UTMI_CTRL_SUSPEND_SET1                  (1 << 30)
-+#define UTMI_CTRL_SUSPEND_SET2                  (1 << 29)
-+#define UTMI_CTRL_RXBUF_PDWN                    (1 << 24)
-+#define UTMI_CTRL_TXBUF_PDWN                    (1 << 11)
-+
-+#define UTMI_CTRL_INPKT_DELAY_SHIFT             30
-+#define UTMI_CTRL_INPKT_DELAY_SOF_SHIFT		28
-+#define UTMI_CTRL_PU_REF_SHIFT			20
-+#define UTMI_CTRL_ARC_PULLDN_SHIFT              12
-+#define UTMI_CTRL_PLL_PWR_UP_SHIFT              1
-+#define UTMI_CTRL_PWR_UP_SHIFT                  0
-+
-+/* For UTMI_PLL Register */
-+#define UTMI_PLL_PLLCALI12_SHIFT		29
-+#define UTMI_PLL_PLLCALI12_MASK			(0x3 << 29)
-+
-+#define UTMI_PLL_PLLVDD18_SHIFT			27
-+#define UTMI_PLL_PLLVDD18_MASK			(0x3 << 27)
-+
-+#define UTMI_PLL_PLLVDD12_SHIFT			25
-+#define UTMI_PLL_PLLVDD12_MASK			(0x3 << 25)
-+
-+#define UTMI_PLL_CLK_BLK_EN_SHIFT               24
-+#define CLK_BLK_EN                              (0x1 << 24)
-+#define PLL_READY                               (0x1 << 23)
-+#define KVCO_EXT                                (0x1 << 22)
-+#define VCOCAL_START                            (0x1 << 21)
-+
-+#define UTMI_PLL_KVCO_SHIFT			15
-+#define UTMI_PLL_KVCO_MASK                      (0x7 << 15)
-+
-+#define UTMI_PLL_ICP_SHIFT			12
-+#define UTMI_PLL_ICP_MASK                       (0x7 << 12)
-+
-+#define UTMI_PLL_FBDIV_SHIFT                    4
-+#define UTMI_PLL_FBDIV_MASK                     (0xFF << 4)
-+
-+#define UTMI_PLL_REFDIV_SHIFT                   0
-+#define UTMI_PLL_REFDIV_MASK                    (0xF << 0)
-+
-+/* For UTMI_TX Register */
-+#define UTMI_TX_REG_EXT_FS_RCAL_SHIFT		27
-+#define UTMI_TX_REG_EXT_FS_RCAL_MASK		(0xf << 27)
-+
-+#define UTMI_TX_REG_EXT_FS_RCAL_EN_SHIFT	26
-+#define UTMI_TX_REG_EXT_FS_RCAL_EN_MASK		(0x1 << 26)
-+
-+#define UTMI_TX_TXVDD12_SHIFT                   22
-+#define UTMI_TX_TXVDD12_MASK                    (0x3 << 22)
-+
-+#define UTMI_TX_CK60_PHSEL_SHIFT                17
-+#define UTMI_TX_CK60_PHSEL_MASK                 (0xf << 17)
-+
-+#define UTMI_TX_IMPCAL_VTH_SHIFT                14
-+#define UTMI_TX_IMPCAL_VTH_MASK                 (0x7 << 14)
-+
-+#define REG_RCAL_START                          (0x1 << 12)
-+
-+#define UTMI_TX_LOW_VDD_EN_SHIFT                11
-+
-+#define UTMI_TX_AMP_SHIFT			0
-+#define UTMI_TX_AMP_MASK			(0x7 << 0)
-+
-+/* For UTMI_RX Register */
-+#define UTMI_REG_SQ_LENGTH_SHIFT                15
-+#define UTMI_REG_SQ_LENGTH_MASK                 (0x3 << 15)
-+
-+#define UTMI_RX_SQ_THRESH_SHIFT                 4
-+#define UTMI_RX_SQ_THRESH_MASK                  (0xf << 4)
-+
-+#define UTMI_OTG_ADDON_OTG_ON			(1 << 0)
-+
-+enum mv_usb2_phy_type {
-+	PXA168_USB,
-+	PXA910_USB,
-+	MMP2_USB,
-+};
-+
-+static unsigned int u2o_get(void __iomem *base, unsigned int offset)
-+{
-+	return readl(base + offset);
-+}
-+
-+static void u2o_set(void __iomem *base, unsigned int offset,
-+		unsigned int value)
-+{
-+	u32 reg;
-+
-+	reg = readl(base + offset);
-+	reg |= value;
-+	writel(reg, base + offset);
-+	/*
-+	 * read after write. It will make sure writing takes effect.
-+	 * It is suggested by PHY design engineer.
-+	 */
-+	readl(base + offset);
-+}
-+
-+static void u2o_clear(void __iomem *base, unsigned int offset,
-+		unsigned int value)
-+{
-+	u32 reg;
-+
-+	reg = readl(base + offset);
-+	reg &= ~value;
-+	writel(reg, base + offset);
-+	/*
-+	 * read after write. It will make sure writing takes effect.
-+	 * It is suggested by PHY design engineer.
-+	 */
-+	readl(base + offset);
-+}
-+
-+static void u2o_write(void __iomem *base, unsigned int offset,
-+		unsigned int value)
-+{
-+	writel(value, base + offset);
-+	/*
-+	 * read after write. It will make sure writing takes effect.
-+	 * It is suggested by PHY design engineer.
-+	 */
-+	readl(base + offset);
-+}
-+
-+static int _mv_usb2_phy_init(struct mv_usb2_phy *mv_phy)
-+{
-+	struct platform_device *pdev = mv_phy->pdev;
-+	unsigned int loops = 0;
-+	void __iomem *base = mv_phy->base;
-+
-+	dev_dbg(&pdev->dev, "phy init\n");
-+
-+	/* Initialize the USB PHY power */
-+	if (mv_phy->type == PXA910_USB) {
-+		u2o_set(base, UTMI_CTRL, (1<<UTMI_CTRL_INPKT_DELAY_SOF_SHIFT)
-+			| (1<<UTMI_CTRL_PU_REF_SHIFT));
-+	}
-+
-+	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
-+	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
-+
-+	/* UTMI_PLL settings */
-+	u2o_clear(base, UTMI_PLL, UTMI_PLL_PLLVDD18_MASK
-+		| UTMI_PLL_PLLVDD12_MASK | UTMI_PLL_PLLCALI12_MASK
-+		| UTMI_PLL_FBDIV_MASK | UTMI_PLL_REFDIV_MASK
-+		| UTMI_PLL_ICP_MASK | UTMI_PLL_KVCO_MASK);
-+
-+	u2o_set(base, UTMI_PLL, 0xee<<UTMI_PLL_FBDIV_SHIFT
-+		| 0xb<<UTMI_PLL_REFDIV_SHIFT | 3<<UTMI_PLL_PLLVDD18_SHIFT
-+		| 3<<UTMI_PLL_PLLVDD12_SHIFT | 3<<UTMI_PLL_PLLCALI12_SHIFT
-+		| 1<<UTMI_PLL_ICP_SHIFT | 3<<UTMI_PLL_KVCO_SHIFT);
-+
-+	/* UTMI_TX */
-+	u2o_clear(base, UTMI_TX, UTMI_TX_REG_EXT_FS_RCAL_EN_MASK
-+		| UTMI_TX_TXVDD12_MASK | UTMI_TX_CK60_PHSEL_MASK
-+		| UTMI_TX_IMPCAL_VTH_MASK | UTMI_TX_REG_EXT_FS_RCAL_MASK
-+		| UTMI_TX_AMP_MASK);
-+	u2o_set(base, UTMI_TX, 3<<UTMI_TX_TXVDD12_SHIFT
-+		| 4<<UTMI_TX_CK60_PHSEL_SHIFT | 4<<UTMI_TX_IMPCAL_VTH_SHIFT
-+		| 8<<UTMI_TX_REG_EXT_FS_RCAL_SHIFT | 3<<UTMI_TX_AMP_SHIFT);
-+
-+	/* UTMI_RX */
-+	u2o_clear(base, UTMI_RX, UTMI_RX_SQ_THRESH_MASK
-+		| UTMI_REG_SQ_LENGTH_MASK);
-+	u2o_set(base, UTMI_RX, 7<<UTMI_RX_SQ_THRESH_SHIFT
-+		| 2<<UTMI_REG_SQ_LENGTH_SHIFT);
-+
-+	/* UTMI_IVREF */
-+	if (mv_phy->type == PXA168_USB)
-+		/* fixing Microsoft Altair board interface with NEC hub issue -
-+		 * Set UTMI_IVREF from 0x4a3 to 0x4bf */
-+		u2o_write(base, UTMI_IVREF, 0x4bf);
-+
-+	/* toggle VCOCAL_START bit of UTMI_PLL */
-+	udelay(200);
-+	u2o_set(base, UTMI_PLL, VCOCAL_START);
-+	udelay(40);
-+	u2o_clear(base, UTMI_PLL, VCOCAL_START);
-+
-+	/* toggle REG_RCAL_START bit of UTMI_TX */
-+	udelay(400);
-+	u2o_set(base, UTMI_TX, REG_RCAL_START);
-+	udelay(40);
-+	u2o_clear(base, UTMI_TX, REG_RCAL_START);
-+	udelay(400);
-+
-+	/* Make sure PHY PLL is ready */
-+	loops = 0;
-+	while ((u2o_get(base, UTMI_PLL) & PLL_READY) == 0) {
-+		mdelay(1);
-+		loops++;
-+		if (loops > 100) {
-+			dev_warn(&pdev->dev, "calibrate timeout, UTMI_PLL %x\n",
-+				u2o_get(base, UTMI_PLL));
-+			break;
-+		}
-+	}
-+
-+	if (mv_phy->type == PXA168_USB) {
-+		u2o_set(base, UTMI_RESERVE, 1 << 5);
-+		/* Turn on UTMI PHY OTG extension */
-+		u2o_write(base, UTMI_OTG_ADDON, 1);
-+	}
-+
-+	return 0;
-+}
-+
-+static int _mv_usb2_phy_shutdown(struct mv_usb2_phy *mv_phy)
-+{
-+	void __iomem *base = mv_phy->base;
-+
-+	if (mv_phy->type == PXA168_USB)
-+		u2o_clear(base, UTMI_OTG_ADDON, UTMI_OTG_ADDON_OTG_ON);
-+
-+	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_RXBUF_PDWN);
-+	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_TXBUF_PDWN);
-+	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_USB_CLK_EN);
-+	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
-+	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
-+
-+	return 0;
-+}
-+
-+static int mv_usb2_phy_init(struct usb_phy *phy)
-+{
-+	struct mv_usb2_phy *mv_phy = container_of(phy, struct mv_usb2_phy, phy);
-+	int i = 0;
-+
-+	mutex_lock(&mv_phy->phy_lock);
-+	if (mv_phy->refcount++ == 0) {
-+		for (i = 0; i < mv_phy->clks_num; i++)
-+			clk_prepare_enable(mv_phy->clks[i]);
-+		_mv_usb2_phy_init(mv_phy);
-+	}
-+	mutex_unlock(&mv_phy->phy_lock);
-+	return 0;
-+}
-+
-+static void mv_usb2_phy_shutdown(struct usb_phy *phy)
-+{
-+	struct mv_usb2_phy *mv_phy = container_of(phy, struct mv_usb2_phy, phy);
-+	int i = 0;
-+
-+	mutex_lock(&mv_phy->phy_lock);
-+	if (--mv_phy->refcount == 0) {
-+		_mv_usb2_phy_shutdown(mv_phy);
-+		for (i = 0; i < mv_phy->clks_num; i++)
-+			clk_disable_unprepare(mv_phy->clks[i]);
-+	}
-+	mutex_unlock(&mv_phy->phy_lock);
-+}
-+
-+static int mv_usb2_phy_probe(struct platform_device *pdev)
-+{
-+	struct mv_usb2_phy *mv_phy;
-+	struct resource *r;
-+	int i;
-+	struct mv_usb_phy_platform_data *pdata;
-+	const struct platform_device_id *id;
-+
-+	mv_phy = devm_kzalloc(&pdev->dev, sizeof(*mv_phy), GFP_KERNEL);
-+	if (mv_phy == NULL) {
-+		dev_err(&pdev->dev, "failed to allocate memory\n");
-+		return -ENOMEM;
-+	}
-+	mutex_init(&mv_phy->phy_lock);
-+
-+	pdata = pdev->dev.platform_data;
-+	id = platform_get_device_id(pdev);
-+
-+	if (pdata == NULL || id == NULL) {
-+		dev_err(&pdev->dev,
-+			"missing platform_data or id_entry\n");
-+		return -ENODEV;
-+	}
-+	mv_phy->type = (unsigned int)(id->driver_data);
-+	mv_phy->clks_num = pdata->clknum;
-+	mv_phy->clks = devm_kzalloc(&pdev->dev,
-+		sizeof(struct clk *) * mv_phy->clks_num, GFP_KERNEL);
-+	if (mv_phy->clks == NULL) {
-+		dev_err(&pdev->dev,
-+			"failed to allocate mempory for clocks");
-+		return -ENOMEM;
-+	}
-+	for (i = 0; i < mv_phy->clks_num; i++) {
-+		mv_phy->clks[i] = devm_clk_get(&pdev->dev,
-+						pdata->clkname[i]);
-+		if (IS_ERR(mv_phy->clks[i])) {
-+			dev_err(&pdev->dev, "failed to get clock %s\n",
-+				pdata->clkname[i]);
-+			return PTR_ERR(mv_phy->clks[i]);
-+		}
-+	}
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (r == NULL) {
-+		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
-+		return -ENODEV;
-+	}
-+	mv_phy->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-+	if (mv_phy->base == NULL) {
-+		dev_err(&pdev->dev, "error map register base\n");
-+		return -EBUSY;
-+	}
-+
-+	mv_phy->phy.dev = &pdev->dev;
-+	mv_phy->phy.label = "mv-usb2";
-+	mv_phy->phy.type = USB_PHY_TYPE_USB2;
-+	mv_phy->phy.init = mv_usb2_phy_init;
-+	mv_phy->phy.shutdown = mv_usb2_phy_shutdown;
-+
-+	usb_add_phy_dev(&mv_phy->phy);
-+
-+	platform_set_drvdata(pdev, mv_phy);
-+
-+	return 0;
-+}
-+
-+static int mv_usb2_phy_remove(struct platform_device *pdev)
-+{
-+	struct mv_usb2_phy *mv_phy = platform_get_drvdata(pdev);
-+
-+	usb_remove_phy(&mv_phy->phy);
-+
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+static struct platform_device_id mv_usb2_phy_ids[] = {
-+	{ .name = "pxa168-usb-phy",	.driver_data = PXA168_USB },
-+	{ .name = "pxa910-usb-phy",	.driver_data = PXA910_USB },
-+	{ .name = "mmp2-usb-phy",	.driver_data = MMP2_USB },
-+	{}
-+};
-+
-+static struct platform_driver mv_usb2_phy_driver = {
-+	.probe	= mv_usb2_phy_probe,
-+	.remove = mv_usb2_phy_remove,
-+	.driver = {
-+		.name   = "pxa168-usb-phy",
-+	},
-+	.id_table = mv_usb2_phy_ids,
-+};
-+
-+static int __init mv_usb2_phy_driver_init(void)
-+{
-+	return platform_driver_register(&mv_usb2_phy_driver);
-+}
-+arch_initcall(mv_usb2_phy_driver_init);
-diff --git a/include/linux/platform_data/mv_usb.h b/include/linux/platform_data/mv_usb.h
-index 944b01d..fd3d1b4 100644
---- a/include/linux/platform_data/mv_usb.h
-+++ b/include/linux/platform_data/mv_usb.h
-@@ -47,9 +47,12 @@ struct mv_usb_platform_data {
- 	/* Force a_bus_req to be asserted */
- 	 unsigned int    otg_force_a_bus_req:1;
++#include <linux/platform_data/mv_usb.h>
  
--	int	(*phy_init)(void __iomem *regbase);
--	void	(*phy_deinit)(void __iomem *regbase);
- 	int	(*set_vbus)(unsigned int vbus);
--	int     (*private_init)(void __iomem *opregs, void __iomem *phyregs);
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -195,6 +198,31 @@ static struct sram_platdata mmp2_isram_platdata = {
+ 	.granularity	= SRAM_GRANULARITY,
  };
+ 
++#ifdef CONFIG_USB_SUPPORT
 +
-+struct mv_usb_phy_platform_data {
-+	unsigned int	clknum;
-+	char		**clkname;
++static char *mmp2_usb_clock_name[] = {
++	[0] = "usb_clk",
 +};
 +
- #endif
-diff --git a/include/linux/usb/mv_usb2.h b/include/linux/usb/mv_usb2.h
-new file mode 100644
-index 0000000..77250f5
---- /dev/null
-+++ b/include/linux/usb/mv_usb2.h
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (C) 2013 Marvell Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __MV_USB2_H
-+#define __MV_USB2_H
-+
-+#define MV_USB2_PHY_INDEX	0
-+#define MV_USB2_OTG_PHY_INDEX	1
-+
-+struct mv_usb2_phy {
-+	struct usb_phy		phy;
-+	struct platform_device	*pdev;
-+	struct mutex		phy_lock;
-+	unsigned int		refcount;
-+	unsigned int		type;
-+	void __iomem		*base;
-+	struct clk		**clks;
-+	unsigned int		clks_num;
++static struct mv_usb_phy_platform_data brownstone_usb_phy_pdata = {
++	.clknum		= 1,
++	.clkname	= mmp2_usb_clock_name,
 +};
 +
++#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
++
++static struct mv_usb_platform_data brownstone_usb_pdata = {
++	.clknum		= 1,
++	.clkname	= mmp2_usb_clock_name,
++	.vbus		= NULL,
++	.mode		= MV_USB_MODE_OTG,
++	.otg_force_a_bus_req = 1,
++	.set_vbus	= NULL,
++};
 +#endif
++#endif
++
++
+ static void __init brownstone_init(void)
+ {
+ 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
+@@ -211,6 +239,46 @@ static void __init brownstone_init(void)
+ 
+ 	/* enable 5v regulator */
+ 	platform_device_register(&brownstone_v_5vp_device);
++
++#ifdef CONFIG_USB_SUPPORT
++	pxa_register_device(&mmp2_device_u2ophy, &brownstone_usb_phy_pdata,
++				sizeof(brownstone_usb_phy_pdata));
++#endif
++
++#ifdef CONFIG_USB_MV_UDC
++	/* for usb2 phy */
++	usb_bind_phy(mmp2_device_u2o.drv_name, MV_USB2_PHY_INDEX,
++				mmp2_device_u2ophy.drv_name);
++#ifdef CONFIG_USB_MV_OTG
++	/* for usb2 otg phy */
++	usb_bind_phy(mmp2_device_u2o.drv_name, MV_USB2_OTG_PHY_INDEX,
++				mmp2_device_u2ootg.drv_name);
++#endif
++	pxa_register_device(&mmp2_device_u2o, &brownstone_usb_pdata,
++				sizeof(brownstone_usb_pdata));
++#endif
++
++#ifdef CONFIG_USB_EHCI_MV_U2O
++	/* for usb2 phy */
++	usb_bind_phy(mmp2_device_u2oehci.dev_name, MV_USB2_PHY_INDEX,
++				mmp2_device_u2ophy.dev_name);
++#ifdef CONFIG_USB_MV_OTG
++	/* for usb2 otg phy */
++	usb_bind_phy(mmp2_device_u2oehci.drv_name, MV_USB2_OTG_PHY_INDEX,
++				mmp2_device_u2ootg.drv_name);
++#endif
++	pxa_register_device(&mmp2_device_u2oehci, &brownstone_usb_pdata,
++				sizeof(brownstone_usb_pdata));
++#endif
++
++#ifdef CONFIG_USB_MV_OTG
++	/* for usb2 phy */
++	usb_bind_phy(mmp2_device_u2ootg.dev_name, MV_USB2_PHY_INDEX,
++				mmp2_device_u2ophy.dev_name);
++	pxa_register_device(&mmp2_device_u2ootg, &brownstone_usb_pdata,
++				sizeof(brownstone_usb_pdata));
++#endif
++
+ }
+ 
+ MACHINE_START(BROWNSTONE, "Brownstone Development Platform")
 -- 
 1.7.4.1
