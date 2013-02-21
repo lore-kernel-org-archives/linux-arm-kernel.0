@@ -1,68 +1,65 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Thu, 21 Feb 2013 10:48:19 +0100
-Subject: omap4: 3.8: IPV6 + PREEMPT_VOLUNTARY + !DEBUG_[SPINLOCK|MUTEXES] =
- BUG()
-Message-ID: <20130221094819.GA4580@luxor.wired.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Feb 2013 11:02:15 +0100
+Subject: arm64 defconfig breakage (gpio) in next-20130218
+In-Reply-To: <20130221093104.GB23442@S2101-09.ap.freescale.net>
+References: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
+ <20130221093104.GB23442@S2101-09.ap.freescale.net>
+Message-ID: <1634805.kh17mYrJe5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I keep getting this BUG() when there's IPV6 traffic in in my lan on a panda board
-with these configs:
+On Thursday 21 February 2013 17:31:07 Shawn Guo wrote:
+> > 
+> > I've bisected this down to 0fa2fd9a0d: "Merge branch 'linusw/devel' of
+> > git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git into
+> > gpio/next". Both parent commits build fine.
+> > 
+> > I've played around a bit, and selecting ARCH_REQUIRE_GPIOLIB in the arm64
+> > Kconfig fixes the issue, but I'm unfamilar with gpio{,lib} and I'm not sure
+> > that's the best/correct way of solving this.
+> 
+> Kconfig GENERIC_GPIO is designed as an option defined at architecture
+> level and select by platform who knows how gpio driver/API is
+> implemented.  The following change should fix the error.
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index f532ce5..aca4a25 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -93,7 +93,7 @@ config IOMMU_HELPER
+>         def_bool SWIOTLB
+> 
+>  config GENERIC_GPIO
+> -       def_bool y
+> +       bool
+> 
+>  source "init/Kconfig"
 
--start from a vanilla omap config
-(make ARCH=arm omap2plus_defconfig)
+But we have no arm64 platforms that would pick GENERIC_GPIO, it's expected
+to come from GPIOLIB anyway. I think the right fix is this:
 
--enable IPV6 and PREEMPT_VOLUNTARY
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ab4aa54..3fab0db 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -3,6 +3,7 @@ config ARM64
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_ARCH_TIMER
+ 	select CLONE_BACKWARDS
+@@ -92,9 +93,6 @@ config SWIOTLB
+ config IOMMU_HELPER
+ 	def_bool SWIOTLB
+ 
+-config GENERIC_GPIO
+-	def_bool y
+-
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
 
--turn off
 
-CONFIG_DEBUG_SPINLOCK
-CONFIG_DEBUG_MUTEXES
-CONFIG_DEBUG_LOCK_ALLOC
-CONFIG_PROVE_LOCKING
-CONFIG_LOCKDEP
-CONFIG_TRACE_IRQFLAGS
-
-(or apply this patch fragment:
-http://people.canonical.com/~ppisati/panda_ipv6/config_lock_off.patch)
-
--enable some useful options (like EHCI for my usb disk, etcetc)
-
--finish off the build
-
-make ARCH=arm olddefconfig
-make ARCH=arm zImage
-
--boot the board, wait for some ipv6 traffic:
-
-IP6 fe80::213:20ff:fefb:6364.mdns > ff02::fb.mdns: 0 PTR (QM)? _mumble._tcp.local. (36)
-
-and enjoy:
-
-[Thu Feb 21 10:23:07 2013] BUG: scheduling while atomic: swapper/0/0/0x40000100
-[Thu Feb 21 10:23:07 2013] Modules linked in:
-[Thu Feb 21 10:23:07 2013] [<c001b1c4>] (unwind_backtrace+0x0/0xf0) from [<c0503c5c>] (__schedule_bug+0x48/0x5c)
-[Thu Feb 21 10:23:07 2013] [<c0503c5c>] (__schedule_bug+0x48/0x5c) from [<c0508608>] (__schedule+0x700/0x740)
-[Thu Feb 21 10:23:07 2013] [<c0508608>] (__schedule+0x700/0x740) from [<c007007c>] (__cond_resched+0x24/0x34)
-[Thu Feb 21 10:23:07 2013] [<c007007c>] (__cond_resched+0x24/0x34) from [<c05086dc>] (_cond_resched+0x3c/0x44)
-[Thu Feb 21 10:23:07 2013] [<c05086dc>] (_cond_resched+0x3c/0x44) from [<c0021f6c>] (do_alignment+0x178/0x78c)
-[Thu Feb 21 10:23:07 2013] [<c0021f6c>] (do_alignment+0x178/0x78c) from [<c00083e0>] (do_DataAbort+0x34/0x98)
-[Thu Feb 21 10:23:07 2013] [<c00083e0>] (do_DataAbort+0x34/0x98) from [<c0509a60>] (__dabt_svc+0x40/0x60)
-[Thu Feb 21 10:23:07 2013] Exception stack(0xc0763d70 to 0xc0763db8)
-[Thu Feb 21 10:23:07 2013] 3d60:                                     e97e805e e97e806e 2c000000 11000000
-[Thu Feb 21 10:23:07 2013] 3d80: ea86bb00 0000002c 00000011 e97e807e c076d2a8 e97e805e e97e806e 0000002c
-[Thu Feb 21 10:23:07 2013] 3da0: 3d000000 c0763dbc c04b98fc c02a8490 00000113 ffffffff
-[Thu Feb 21 10:23:07 2013] [<c0509a60>] (__dabt_svc+0x40/0x60) from [<c02a8490>] (__csum_ipv6_magic+0x8/0xc8)
-
-here you can find a .config for a 3.8 kernel showing this problem:
-
-http://people.canonical.com/~ppisati/panda_ipv6/config
-
-and a precompiled zImage:
-
-http://people.canonical.com/~ppisati/panda_ipv6/zImage
-
-any idea how can i debug this?
--- 
-bye,
-p.
+	Arnd
