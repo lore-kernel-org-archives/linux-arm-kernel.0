@@ -1,86 +1,60 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Feb 2013 12:37:55 +0800
-Subject: [PATCH] kbuild: create an "include chroot" for DT bindings
-In-Reply-To: <1361394356-19385-1-git-send-email-swarren@wwwdotorg.org>
-References: <1361394356-19385-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130221043751.GB17738@S2101-09.ap.freescale.net>
+Date: Thu, 21 Feb 2013 12:59:46 +0800
+Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin
+ function name
+In-Reply-To: <51251A11.2030300@wwwdotorg.org>
+References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
+ <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
+ <51251A11.2030300@wwwdotorg.org>
+Message-ID: <20130221045944.GC17738@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 02:05:56PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Wed, Feb 20, 2013 at 11:46:41AM -0700, Stephen Warren wrote:
+> On 02/20/2013 12:08 AM, Shawn Guo wrote:
+> > This turns the imx pin function number defined by binding document
+> > into #define constants in header which can be used in dts and handled
+> > by pre-processor to improve the readability of device tree sources.
 > 
-> The recent dtc+cpp support allows header files and C pre-processor
-> defines/macros to be used when compiling device tree files. These
-> headers will typically define various constants that are part of the
-> device tree bindings.
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx35-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx35-pinctrl.txt
 > 
-> The original patch which set up the dtc+cpp include path only considered
-> using those headers from device tree files. However, they are also
-> useful for kernel code which needs to interpret the device tree.
+> > -See below for available PIN_FUNC_ID for imx35:
+> > -0 MX35_PAD_CAPTURE__GPT_CAPIN1
+> ...
+> > -951 MX35_PAD_TEST_MODE__TCU_TEST_MODE
+> > +Refer to arch/arm/boot/dts/imx35-pinfunc.h for all available imx35 PIN_FUNC_ID.
 > 
-> In both the DT files and the kernel, I'd like to include the DT-related
-> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
-> That will simplify any text which discusses the DT header locations.
-> 
-> Creating a <dt-bindings/> for kernel source to use is as simple as
-> placing files into include/dt-bindings/.
-> 
-> However, when compiling DT files, the include path should be restricted
-> so that only the dt-bindings path is available; arbitrary kernel headers
-> shouldn't be exposed. For this reason, create a specific include
-> directory for use by dtc+cpp, and symlink dt-bindings from there to the
-> actual location of include/dt-bindings/. For want of a better location,
-> place this "include chroot" into the existing dts/ directory.
-> 
-> arch/*/boot/dts/include/dt-bindings -> ../../../../../dt-bindings
+> So that path is specific to the Linux kernel.
 
-../../../../../include/dt-bindings
+The only reason for that is device tree sources are currently sitting
+in the Linux kernel tree.  I can reword it as below.
 
-And, I would expect only the headers that will actually be referenced
-by kernel should go into include/dt-bindings.  There is no point to
-put headers that will not be included by kernel but only by dts files
-into there, and instead arch/arm/boot/dts/include should just be good
-enough for them.  With this agreed ...
+Refer to imx35-pinfunc.h in the device tree source folder for all
+available imx35 PIN_FUNC_ID.
 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> You can find an example of how this would be used at
-> git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
-> (note: there's a bunch of other cruft in that branch too)
+> The DT binding
+> documentation isn't supposed to be specific to the Linux kernel. I
+> wonder if we shouldn't put all the header files into
+> Documentation/devicetree/bindings rather than arch/*/boot/dts. That way,
+> you could encode relative path names into the DT binding docs. The
+> headers are logically part of the documentation anyway.
 > 
->  arch/arm/boot/dts/include/dt-bindings |    1 +
->  scripts/Makefile.lib                  |    3 +--
->  2 files changed, 2 insertions(+), 2 deletions(-)
->  create mode 120000 arch/arm/boot/dts/include/dt-bindings
+> This all plays into whatever plans exist for removing the DT binding
+> docs and/or .dts files from the kernel, and how things will end up
+> getting laid out then though. That's something we should discuss with at
+> least Grant and Rob. I note that the DT maintainers weren't Cc'd on this
+> series though. I added them for this reply.
 > 
-> diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
-> new file mode 120000
-> index 0000000..08c00e4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/include/dt-bindings
-> @@ -0,0 +1 @@
-> +../../../../../include/dt-bindings
-> \ No newline at end of file
-> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-> index 07125e6..d6c5036 100644
-> --- a/scripts/Makefile.lib
-> +++ b/scripts/Makefile.lib
-> @@ -157,8 +157,7 @@ cpp_flags      = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
->  ld_flags       = $(LDFLAGS) $(ldflags-y)
->  
->  dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
-> -		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
-> -		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
-> +		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
->  		 -undef -D__DTS__
->  
->  # Finds the multi-part object the current object will be linked into
-> -- 
-> 1.7.10.4
+> Perhaps I should just send a patch to the dtc and kernel include paths
+> which implements that, and see what people say.
 > 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+> 
+> >  See below for available PIN_FUNC_ID for imx6q:
+> > -MX6Q_PAD_SD2_DAT1__USDHC2_DAT1			0
+> 
+> You forgot to add a reference to the header filename to this file.
+
+Thanks, just added it.
+
+Shawn
