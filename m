@@ -1,68 +1,93 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Feb 2013 17:31:07 +0800
-Subject: arm64 defconfig breakage (gpio) in next-20130218
-In-Reply-To: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
-References: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
-Message-ID: <20130221093104.GB23442@S2101-09.ap.freescale.net>
+From: dong.aisheng@linaro.org (Dong Aisheng)
+Date: Thu, 21 Feb 2013 17:36:50 +0800
+Subject: [PATCH 3/3] pinctrl: imx: move hard-coding data into device tree
+In-Reply-To: <51251E5A.1080806@wwwdotorg.org>
+References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
+ <1361344089-16804-4-git-send-email-shawn.guo@linaro.org>
+ <51251E5A.1080806@wwwdotorg.org>
+Message-ID: <CAP1dx+w2bLcztrRJOYs07xxSqVgo3bggJHMFt5LyL5jXQ-h6Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 11:14:10AM +0000, Mark Rutland wrote:
-> Hello,
-> 
-> When I attempt to build a defconfig arm64 kernel from next-20130218, it fails
-> with the following complaints from gcc:
-> 
-> In file included from include/linux/gpio.h:48:0,
->                  from drivers/gpio/devres.c:18:
-> include/asm-generic/gpio.h: In function ?gpio_get_value_cansleep?:
-> include/asm-generic/gpio.h:270:2: error: implicit declaration of function ?__gpio_get_value? [-Werror=implicit-function-declaration]
-> include/asm-generic/gpio.h: In function ?gpio_set_value_cansleep?:
-> include/asm-generic/gpio.h:276:2: error: implicit declaration of function ?__gpio_set_value? [-Werror=implicit-function-declaration]
-> In file included from drivers/gpio/devres.c:18:0:
-> include/linux/gpio.h: At top level:
-> include/linux/gpio.h:60:19: error: redefinition of ?gpio_cansleep?
-> In file included from include/linux/gpio.h:48:0,
->                  from drivers/gpio/devres.c:18:
-> include/asm-generic/gpio.h:262:19: note: previous definition of ?gpio_cansleep? was here
-> In file included from drivers/gpio/devres.c:18:0:
-> include/linux/gpio.h: In function ?gpio_cansleep?:
-> include/linux/gpio.h:62:2: error: implicit declaration of function ?__gpio_cansleep? [-Werror=implicit-function-declaration]
-> include/linux/gpio.h: In function ?gpio_to_irq?:
-> include/linux/gpio.h:67:2: error: implicit declaration of function ?__gpio_to_irq? [-Werror=implicit-function-declaration]
-> drivers/gpio/devres.c: In function ?devm_gpio_release?:
-> drivers/gpio/devres.c:26:2: error: implicit declaration of function ?gpio_free? [-Werror=implicit-function-declaration]
-> drivers/gpio/devres.c: In function ?devm_gpio_request?:
-> drivers/gpio/devres.c:60:2: error: implicit declaration of function ?gpio_request? [-Werror=implicit-function-declaration]
-> drivers/gpio/devres.c: In function ?devm_gpio_request_one?:
-> drivers/gpio/devres.c:90:2: error: implicit declaration of function ?gpio_request_one? [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
-> make[2]: *** [drivers/gpio/devres.o] Error 1
-> make[1]: *** [drivers/gpio] Error 2
-> 
-> I've bisected this down to 0fa2fd9a0d: "Merge branch 'linusw/devel' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git into
-> gpio/next". Both parent commits build fine.
-> 
-> I've played around a bit, and selecting ARCH_REQUIRE_GPIOLIB in the arm64
-> Kconfig fixes the issue, but I'm unfamilar with gpio{,lib} and I'm not sure
-> that's the best/correct way of solving this.
+On 21 February 2013 03:04, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 02/20/2013 12:08 AM, Shawn Guo wrote:
+>> Currently, all imx pinctrl drivers maintain a big array of struct
+>> imx_pin_reg which hard-codes data like register offset and mux mode
+>> setting for each pin function.  Every time a new imx SoC support is
+>> added, we need to add such a big mount of data.  With moving to single
+>> kernel build, it's only matter of time to be blamed on memory consuming.
+>>
+>> With DTC pre-processor support in place, the patch moves all these data
+>> into device tree by redefining the PIN_FUNC_ID in imxXX-pinfunc.h and
+>> changing the PIN_FUNC_ID parsing code a little bit.
+>
+> There are a couple of potential issues with this patch, which I'm in two
+> minds about:
+>
+> 1)
+>
+> This is an incompatible change to the DT binding definition. A DT
+> written to the old specification won't work with a newer kernel and
+> vice-versa. This isn't supposed to happen with device tree.
+>
+> Right now I believe we're still being flexible about DT binding changes,
+> but I've seen hints that this kind of thing will start getting lots of
+> push-back in the near future...
+>
+I wonder it may be hard to avoid it, especially for some complicated devices or
+non-standard devices during development process.
+No sure if any better way to control it.
 
-Kconfig GENERIC_GPIO is designed as an option defined at architecture
-level and select by platform who knows how gpio driver/API is
-implemented.  The following change should fix the error.
+> That all said, I'd also love to change the Tegra pinctrl binding now
+> that we have CPP, since I could replace all the strings in the current
+> binding with integers and presumably save some space in the .dtb. Hence,
+> I'd love to maintain the flexibility to keep changing the .dts and
+> kernel code in lock-step.
+>
+> 2)
+>
+> This patch removes a bunch of tables from the kernel. I like having the
+> tables in the kernel, since in theory it could allow a future debugfs or
+> sysfs interface to pinctrl that allows manipulation of the pinctrl HW
+> state at a semantic level.
 
-Shawn
+Right, that's one of the considerations why i kept the register table in driver
+in the first binding design.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index f532ce5..aca4a25 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -93,7 +93,7 @@ config IOMMU_HELPER
-        def_bool SWIOTLB
+> This is only possible if the DT binding
+> includes details such as "set this pin to this function", and the driver
+> includes the tables to convert that into details such as register
+> address and value. I don't think such an "API" could be implemented for
+> IMX after this patch.
 
- config GENERIC_GPIO
--       def_bool y
-+       bool
+Theoretically It can, because device tree contains the pin registers
+informations
+in this way. But the problem is that it can only manipulate the used pins which
+are parsed from devices tree. While for those unused pins, since the driver does
+not have the pin register information, it can not manipulate it.
+But what i'm wondering now is do we really need to manipulate the unused pins
+from sysfs or debugfs?
+I still can not think out a real using case now.
+Anyone else can think one?
 
- source "init/Kconfig"
+> Still, given the IMX binding already merged "pin"
+> and "function" into a single integer in the binding, I'm not sure if IMX
+> could support that kind of "API" before anyway?
+>
+At least PIN config could support.
+For PIN mux, it may also be implementable since we have all the needed
+information
+for a pin in driver whether it's used or not.
+
+Regards
+Dong Aisheng
+
+> This is part of the reason I pushed hard for the pinctrl APIs to operate
+> at the semantic pin/group/function level, and that Tegra's pinctrl
+> drivers explicitly have tables listing all the pins/groups/functions,
+> rather than just putting a bunch of register values into the DT.
+>
+> I'm not sure how much of an issue this is, though. LinusW and/or the DT
+> maintainers should probably chime in here.
+>
+> I didn't actually read the driver implementation changes in this patch.
