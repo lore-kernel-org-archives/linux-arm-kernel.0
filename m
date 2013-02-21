@@ -1,90 +1,470 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Feb 2013 12:37:46 -0700
-Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <alpine.LFD.2.03.1302211358070.6419@syhkavp.arg>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130221103705.GB17852@n2100.arm.linux.org.uk> <51261F38.2030902@ti.com>
- <20130221134656.GC17852@n2100.arm.linux.org.uk> <51262A7A.8040103@ti.com>
- <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg> <51265BF1.5000302@ti.com>
- <alpine.LFD.2.03.1302211358070.6419@syhkavp.arg>
-Message-ID: <5126778A.4040705@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 21 Feb 2013 11:38:42 -0800
+Subject: [RFC/PATCH 2/5] kernel_cpustat: convert to atomic 64-bit accessors
+In-Reply-To: <1361389302-11968-3-git-send-email-khilman@linaro.org> (Kevin
+ Hilman's message of "Wed, 20 Feb 2013 11:41:39 -0800")
+References: <1361389302-11968-1-git-send-email-khilman@linaro.org>
+ <1361389302-11968-3-git-send-email-khilman@linaro.org>
+Message-ID: <87y5ehmp8d.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2013 12:21 PM, Nicolas Pitre wrote:
-> On Thu, 21 Feb 2013, Tom Rini wrote:
-> 
->> On 02/21/2013 12:25 PM, Nicolas Pitre wrote:
->>> On Thu, 21 Feb 2013, Tom Rini wrote:
->> [snip]
->>>>> uboot dug _itself_ into this hole.  It's uboot's problem.
->>>>
->>>> A whole lot  of people dug this particular hole.  Joel is trying
->>>> to offer up a solution that maybe makes things easier for
->>>> everyone.  Or it gets rejected here too and distros will come up
->>>> with their N different ways to try and provide easier experiences
->>>> to the end user.
->>>
->>> Nothing being perfect, it is probably unreasonable to think that
->>> every board will start shipping with complete and correct DT
->>> description, etc. But so is the state of FIT support right now.
->>> That solution to make things easier for everyone should actually
->>> make that DT vs kernel separation more effective and provide better
->>> mechanisms for gluing the various DTBs to their respective boards,
->>> and not to glue them to the kernel to populate a distro filesystem
->>> with them.
->>
->> I very much agree here.  And in the end, what I really really want to
->> avoid is every distribution (or similar grouping of stuff) coming up
->> with N different ways to solve the problem of "how do I get the user
->> the right device tree to go with $whatever board they happen to be
->> running".
-> 
-> DT installation must be outside of the distribution's responsibilities.  
-> It should be the OEM's responsibility, just like BIOS updates for PCs 
-> which don't come from Fedora/Debian/Ubuntu.  Obviously, having the dts 
-> files in the kernel tree does confuse people in that regard, but that 
-> must not deter people from doing the right thing.
+Kevin Hilman <khilman@linaro.org> writes:
 
-The guidance that has been given in the past is that the kernel zImage
-and DTB /must/ be stored "in the same location", whether that means the
-/boot filesystem, flash partitions, or whatever, so that if required,
-the kernel and DTB can be updated at the same time, and using the same
-process, so it's guaranteed to be easy enough to update the DTB if you
-already know how to update the kernel.
+> Use the atomic64_* accessors for all the kernel_cpustat fields to
+> ensure atomic access on non-64 bit platforms.
+>
+> Thanks to Mats Liljegren for CGROUP_CPUACCT related fixes.
+>
+> Cc: Mats Liljegren <mats.liljegren@enea.com>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
 
-Has that guidance changed?
+The kbuild test bot reported some build errors where I missed some
+conversions (e.g. drivers/cpufreq and arch/s390/appldata).
 
-Also, how can the OEM provide a DTB? The distro is responsible for
-installing all the filesystem content. There's no defined way of passing
-a DTB from some pre-bootloader firmware into the bootloader and through
-to the kernel; the only way to get a DTB to the kernel right now is for
-the bootloader to load it itself (either as part of a single file, or as
-a separate file) and pass it to the kernel. So, there's really no way
-for an OEM to provide a DTB in a BIOS-like fashion.
+Below is an updated patch that adds in those changes.
 
-Why shouldn't the OEM just provide their *.dts files, and people can
-either compile them and put them into /boot, or distros can package them
-and the package will install them into /boot. That's extremely simple
-and while each distro will have to create their own packaging script,
-that's something they already know how to do, and a package that just
-dumps a file onto a disk is extremely simple, so people wouldn't have to
-go inventing distro-specific solutions.
+I've updated my branch with this version.
 
-If U-Boot always searched a disk for e.g. /boot/boot.scr or similar and
-just executed that, and there was a standard boot.scr that worked on all
-boards by use of e.g. bootz, ${soc}, ${board}, then that could be
-distro-agnostic too. And life would be simple, without the need for any
-extra build tools at all.
+Kevin
 
->> If the clever solution everyone comes up with is some other container 
->> that's not FIT, that's fine, patches welcome and happily reviewed for 
->> whatever the solution is.  I just don't want people thinking this is a 
->> problem that hasn't been thought of before.
-> 
-> Ideally, there should be no such containers.  You should simply pick any 
-> kernel, or install your distro of choice, and run that on any "DT ready" 
-> hardware. A distro could list the minimum version of a DTB some 
-> particular boards were tested with, just like they sometimes do for some 
-> PC BIOSes.  That said, maybe some provision for DTB versioning would be 
-> a good idea if not done already.
+>From fff74c8e41bb68f48639441484dd0ad4fc7137aa Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@linaro.org>
+Date: Thu, 14 Feb 2013 17:46:08 -0800
+Subject: [PATCH 2/5] kernel_cpustat: convert to atomic 64-bit accessors
+
+Use the atomic64_* accessors for all the kernel_cpustat fields to
+ensure atomic access on non-64 bit platforms.
+
+Thanks to Mats Liljegren for CGROUP_CPUACCT related fixes.
+
+Cc: Mats Liljegren <mats.liljegren@enea.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ arch/s390/appldata/appldata_os.c   | 41 +++++++++++++++++++++++---------------
+ drivers/cpufreq/cpufreq_governor.c | 18 ++++++++---------
+ drivers/cpufreq/cpufreq_ondemand.c |  2 +-
+ drivers/macintosh/rack-meter.c     |  6 +++---
+ fs/proc/stat.c                     | 40 ++++++++++++++++++-------------------
+ fs/proc/uptime.c                   |  2 +-
+ include/linux/kernel_stat.h        |  2 +-
+ kernel/sched/core.c                | 10 +++++-----
+ kernel/sched/cputime.c             | 38 +++++++++++++++++------------------
+ 9 files changed, 84 insertions(+), 75 deletions(-)
+
+diff --git a/arch/s390/appldata/appldata_os.c b/arch/s390/appldata/appldata_os.c
+index 87521ba..008b180 100644
+--- a/arch/s390/appldata/appldata_os.c
++++ b/arch/s390/appldata/appldata_os.c
+@@ -99,6 +99,7 @@ static void appldata_get_os_data(void *data)
+ 	int i, j, rc;
+ 	struct appldata_os_data *os_data;
+ 	unsigned int new_size;
++	u64 val;
+ 
+ 	os_data = data;
+ 	os_data->sync_count_1++;
+@@ -112,22 +113,30 @@ static void appldata_get_os_data(void *data)
+ 
+ 	j = 0;
+ 	for_each_online_cpu(i) {
+-		os_data->os_cpu[j].per_cpu_user =
+-			cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_USER]);
+-		os_data->os_cpu[j].per_cpu_nice =
+-			cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_NICE]);
+-		os_data->os_cpu[j].per_cpu_system =
+-			cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM]);
+-		os_data->os_cpu[j].per_cpu_idle =
+-			cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_IDLE]);
+-		os_data->os_cpu[j].per_cpu_irq =
+-			cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_IRQ]);
+-		os_data->os_cpu[j].per_cpu_softirq =
+-			cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ]);
+-		os_data->os_cpu[j].per_cpu_iowait =
+-			cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_IOWAIT]);
+-		os_data->os_cpu[j].per_cpu_steal =
+-			cputime_to_jiffies(kcpustat_cpu(i).cpustat[CPUTIME_STEAL]);
++		val = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_USER]);
++		os_data->os_cpu[j].per_cpu_user = cputime_to_jiffies(val);
++			
++		val = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_NICE]);
++		os_data->os_cpu[j].per_cpu_nice = cputime_to_jiffies(val);
++
++		val = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM]);
++		os_data->os_cpu[j].per_cpu_system = cputime_to_jiffies(val);
++
++		val = atomci64_read(&kcpustat_cpu(i).cpustat[CPUTIME_IDLE]);
++		os_data->os_cpu[j].per_cpu_idle = cputime_to_jiffies(val);
++
++		val = atomci64_read(&kcpustat_cpu(i).cpustat[CPUTIME_IRQ]);
++		os_data->os_cpu[j].per_cpu_irq = cputime_to_jiffies(val);
++
++		val = atomci64_read(&kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ]);
++		os_data->os_cpu[j].per_cpu_softirq = cputime_to_jiffies(val);
++
++		val = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_IOWAIT]);
++		os_data->os_cpu[j].per_cpu_iowait = cputime_to_jiffies(val);
++
++		val = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_STEAL]);
++		os_data->os_cpu[j].per_cpu_steal = cputime_to_jiffies(val);
++
+ 		os_data->os_cpu[j].cpu_id = i;
+ 		j++;
+ 	}
+diff --git a/drivers/cpufreq/cpufreq_governor.c b/drivers/cpufreq/cpufreq_governor.c
+index 6c5f1d3..a239f8c 100644
+--- a/drivers/cpufreq/cpufreq_governor.c
++++ b/drivers/cpufreq/cpufreq_governor.c
+@@ -36,12 +36,12 @@ static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
+ 
+ 	cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
+ 
+-	busy_time = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
+-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
+-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
+-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
+-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
+-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
++	busy_time = atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_USER]);
++	busy_time += atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM]);
++	busy_time += atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ]);
++	busy_time += atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ]);
++	busy_time += atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL]);
++	busy_time += atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_NICE]);
+ 
+ 	idle_time = cur_wall_time - busy_time;
+ 	if (wall)
+@@ -103,7 +103,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
+ 			u64 cur_nice;
+ 			unsigned long cur_nice_jiffies;
+ 
+-			cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
++			cur_nice = atomic64_read(&kcpustat_cpu(j).cpustat[CPUTIME_NICE]) -
+ 					 cdbs->prev_cpu_nice;
+ 			/*
+ 			 * Assumption: nice time between sampling periods will
+@@ -113,7 +113,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
+ 					cputime64_to_jiffies64(cur_nice);
+ 
+ 			cdbs->prev_cpu_nice =
+-				kcpustat_cpu(j).cpustat[CPUTIME_NICE];
++				atomic64_read(&kcpustat_cpu(j).cpustat[CPUTIME_NICE]);
+ 			idle_time += jiffies_to_usecs(cur_nice_jiffies);
+ 		}
+ 
+@@ -216,7 +216,7 @@ int cpufreq_governor_dbs(struct dbs_data *dbs_data,
+ 					&j_cdbs->prev_cpu_wall);
+ 			if (ignore_nice)
+ 				j_cdbs->prev_cpu_nice =
+-					kcpustat_cpu(j).cpustat[CPUTIME_NICE];
++					atomic64_read(&kcpustat_cpu(j).cpustat[CPUTIME_NICE]);
+ 		}
+ 
+ 		/*
+diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
+index 7731f7c..d761c9f 100644
+--- a/drivers/cpufreq/cpufreq_ondemand.c
++++ b/drivers/cpufreq/cpufreq_ondemand.c
+@@ -403,7 +403,7 @@ static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
+ 						&dbs_info->cdbs.prev_cpu_wall);
+ 		if (od_tuners.ignore_nice)
+ 			dbs_info->cdbs.prev_cpu_nice =
+-				kcpustat_cpu(j).cpustat[CPUTIME_NICE];
++				atomic64_read(&kcpustat_cpu(j).cpustat[CPUTIME_NICE]);
+ 
+ 	}
+ 	return count;
+diff --git a/drivers/macintosh/rack-meter.c b/drivers/macintosh/rack-meter.c
+index cad0e19..597fe20 100644
+--- a/drivers/macintosh/rack-meter.c
++++ b/drivers/macintosh/rack-meter.c
+@@ -83,11 +83,11 @@ static inline cputime64_t get_cpu_idle_time(unsigned int cpu)
+ {
+ 	u64 retval;
+ 
+-	retval = kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE] +
+-		 kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT];
++	retval = atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE]) +
++ 		 atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT]);
+ 
+ 	if (rackmeter_ignore_nice)
+-		retval += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
++		retval += atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_NICE]);
+ 
+ 	return retval;
+ }
+diff --git a/fs/proc/stat.c b/fs/proc/stat.c
+index e296572..93f7f30 100644
+--- a/fs/proc/stat.c
++++ b/fs/proc/stat.c
+@@ -25,7 +25,7 @@ static cputime64_t get_idle_time(int cpu)
+ {
+ 	cputime64_t idle;
+ 
+-	idle = kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE];
++	idle = atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE]);
+ 	if (cpu_online(cpu) && !nr_iowait_cpu(cpu))
+ 		idle += arch_idle_time(cpu);
+ 	return idle;
+@@ -35,7 +35,7 @@ static cputime64_t get_iowait_time(int cpu)
+ {
+ 	cputime64_t iowait;
+ 
+-	iowait = kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT];
++	iowait = atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT]);
+ 	if (cpu_online(cpu) && nr_iowait_cpu(cpu))
+ 		iowait += arch_idle_time(cpu);
+ 	return iowait;
+@@ -52,7 +52,7 @@ static u64 get_idle_time(int cpu)
+ 
+ 	if (idle_time == -1ULL)
+ 		/* !NO_HZ or cpu offline so we can rely on cpustat.idle */
+-		idle = kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE];
++		idle = atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE]);
+ 	else
+ 		idle = usecs_to_cputime64(idle_time);
+ 
+@@ -68,7 +68,7 @@ static u64 get_iowait_time(int cpu)
+ 
+ 	if (iowait_time == -1ULL)
+ 		/* !NO_HZ or cpu offline so we can rely on cpustat.iowait */
+-		iowait = kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT];
++		iowait = atomic64_read(&kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT]);
+ 	else
+ 		iowait = usecs_to_cputime64(iowait_time);
+ 
+@@ -95,16 +95,16 @@ static int show_stat(struct seq_file *p, void *v)
+ 	jif = boottime.tv_sec;
+ 
+ 	for_each_possible_cpu(i) {
+-		user += kcpustat_cpu(i).cpustat[CPUTIME_USER];
+-		nice += kcpustat_cpu(i).cpustat[CPUTIME_NICE];
+-		system += kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM];
++		user += atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_USER]);
++		nice += atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_NICE]);
++		system += atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM]);
+ 		idle += get_idle_time(i);
+ 		iowait += get_iowait_time(i);
+-		irq += kcpustat_cpu(i).cpustat[CPUTIME_IRQ];
+-		softirq += kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ];
+-		steal += kcpustat_cpu(i).cpustat[CPUTIME_STEAL];
+-		guest += kcpustat_cpu(i).cpustat[CPUTIME_GUEST];
+-		guest_nice += kcpustat_cpu(i).cpustat[CPUTIME_GUEST_NICE];
++		irq += atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_IRQ]);
++		softirq += atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ]);
++		steal += atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_STEAL]);
++		guest += atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_GUEST]);
++		guest_nice += atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_GUEST_NICE]);
+ 		sum += kstat_cpu_irqs_sum(i);
+ 		sum += arch_irq_stat_cpu(i);
+ 
+@@ -132,16 +132,16 @@ static int show_stat(struct seq_file *p, void *v)
+ 
+ 	for_each_online_cpu(i) {
+ 		/* Copy values here to work around gcc-2.95.3, gcc-2.96 */
+-		user = kcpustat_cpu(i).cpustat[CPUTIME_USER];
+-		nice = kcpustat_cpu(i).cpustat[CPUTIME_NICE];
+-		system = kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM];
++		user = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_USER]);
++		nice = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_NICE]);
++		system = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM]);
+ 		idle = get_idle_time(i);
+ 		iowait = get_iowait_time(i);
+-		irq = kcpustat_cpu(i).cpustat[CPUTIME_IRQ];
+-		softirq = kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ];
+-		steal = kcpustat_cpu(i).cpustat[CPUTIME_STEAL];
+-		guest = kcpustat_cpu(i).cpustat[CPUTIME_GUEST];
+-		guest_nice = kcpustat_cpu(i).cpustat[CPUTIME_GUEST_NICE];
++		irq = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_IRQ]);
++		softirq = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ]);
++		steal = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_STEAL]);
++		guest = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_GUEST]);
++		guest_nice = atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_GUEST_NICE]);
+ 		seq_printf(p, "cpu%d", i);
+ 		seq_put_decimal_ull(p, ' ', cputime64_to_clock_t(user));
+ 		seq_put_decimal_ull(p, ' ', cputime64_to_clock_t(nice));
+diff --git a/fs/proc/uptime.c b/fs/proc/uptime.c
+index 9610ac7..10c0f6e 100644
+--- a/fs/proc/uptime.c
++++ b/fs/proc/uptime.c
+@@ -18,7 +18,7 @@ static int uptime_proc_show(struct seq_file *m, void *v)
+ 
+ 	idletime = 0;
+ 	for_each_possible_cpu(i)
+-		idletime += (__force u64) kcpustat_cpu(i).cpustat[CPUTIME_IDLE];
++		idletime += atomic64_read(&kcpustat_cpu(i).cpustat[CPUTIME_IDLE]);
+ 
+ 	do_posix_clock_monotonic_gettime(&uptime);
+ 	monotonic_to_bootbased(&uptime);
+diff --git a/include/linux/kernel_stat.h b/include/linux/kernel_stat.h
+index ed5f6ed..45b9f71 100644
+--- a/include/linux/kernel_stat.h
++++ b/include/linux/kernel_stat.h
+@@ -32,7 +32,7 @@ enum cpu_usage_stat {
+ };
+ 
+ struct kernel_cpustat {
+-	u64 cpustat[NR_STATS];
++	atomic64_t cpustat[NR_STATS];
+ };
+ 
+ struct kernel_stat {
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 2fad439..5415e85 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -8168,8 +8168,8 @@ static int cpuacct_stats_show(struct cgroup *cgrp, struct cftype *cft,
+ 
+ 	for_each_online_cpu(cpu) {
+ 		struct kernel_cpustat *kcpustat = per_cpu_ptr(ca->cpustat, cpu);
+-		val += kcpustat->cpustat[CPUTIME_USER];
+-		val += kcpustat->cpustat[CPUTIME_NICE];
++		val += atomic64_read(&kcpustat->cpustat[CPUTIME_USER]);
++		val += atomic64_read(&kcpustat->cpustat[CPUTIME_NICE]);
+ 	}
+ 	val = cputime64_to_clock_t(val);
+ 	cb->fill(cb, cpuacct_stat_desc[CPUACCT_STAT_USER], val);
+@@ -8177,9 +8177,9 @@ static int cpuacct_stats_show(struct cgroup *cgrp, struct cftype *cft,
+ 	val = 0;
+ 	for_each_online_cpu(cpu) {
+ 		struct kernel_cpustat *kcpustat = per_cpu_ptr(ca->cpustat, cpu);
+-		val += kcpustat->cpustat[CPUTIME_SYSTEM];
+-		val += kcpustat->cpustat[CPUTIME_IRQ];
+-		val += kcpustat->cpustat[CPUTIME_SOFTIRQ];
++		val += atomic64_read(&kcpustat->cpustat[CPUTIME_SYSTEM]);
++		val += atomic64_read(&kcpustat->cpustat[CPUTIME_IRQ]);
++		val += atomic64_read(&kcpustat->cpustat[CPUTIME_SOFTIRQ]);
+ 	}
+ 
+ 	val = cputime64_to_clock_t(val);
+diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+index ccff275..4c639ee 100644
+--- a/kernel/sched/cputime.c
++++ b/kernel/sched/cputime.c
+@@ -78,14 +78,14 @@ EXPORT_SYMBOL_GPL(irqtime_account_irq);
+ 
+ static int irqtime_account_hi_update(void)
+ {
+-	u64 *cpustat = kcpustat_this_cpu->cpustat;
++	atomic64_t *cpustat = kcpustat_this_cpu->cpustat;
+ 	unsigned long flags;
+ 	u64 latest_ns;
+ 	int ret = 0;
+ 
+ 	local_irq_save(flags);
+ 	latest_ns = this_cpu_read(cpu_hardirq_time);
+-	if (nsecs_to_cputime64(latest_ns) > cpustat[CPUTIME_IRQ])
++	if (nsecs_to_cputime64(latest_ns) > atomic64_read(&cpustat[CPUTIME_IRQ]));
+ 		ret = 1;
+ 	local_irq_restore(flags);
+ 	return ret;
+@@ -93,14 +93,14 @@ static int irqtime_account_hi_update(void)
+ 
+ static int irqtime_account_si_update(void)
+ {
+-	u64 *cpustat = kcpustat_this_cpu->cpustat;
++	atomic64_t *cpustat = kcpustat_this_cpu->cpustat;
+ 	unsigned long flags;
+ 	u64 latest_ns;
+ 	int ret = 0;
+ 
+ 	local_irq_save(flags);
+ 	latest_ns = this_cpu_read(cpu_softirq_time);
+-	if (nsecs_to_cputime64(latest_ns) > cpustat[CPUTIME_SOFTIRQ])
++	if (nsecs_to_cputime64(latest_ns) > atomic64_read(&cpustat[CPUTIME_SOFTIRQ]))
+ 		ret = 1;
+ 	local_irq_restore(flags);
+ 	return ret;
+@@ -125,7 +125,7 @@ static inline void task_group_account_field(struct task_struct *p, int index,
+ 	 * is the only cgroup, then nothing else should be necessary.
+ 	 *
+ 	 */
+-	__get_cpu_var(kernel_cpustat).cpustat[index] += tmp;
++	atomic64_add(tmp, &__get_cpu_var(kernel_cpustat).cpustat[index]);
+ 
+ #ifdef CONFIG_CGROUP_CPUACCT
+ 	if (unlikely(!cpuacct_subsys.active))
+@@ -135,7 +135,7 @@ static inline void task_group_account_field(struct task_struct *p, int index,
+ 	ca = task_ca(p);
+ 	while (ca && (ca != &root_cpuacct)) {
+ 		kcpustat = this_cpu_ptr(ca->cpustat);
+-		kcpustat->cpustat[index] += tmp;
++		atomic64_add(tmp, &kcpustat->cpustat[index]);
+ 		ca = parent_ca(ca);
+ 	}
+ 	rcu_read_unlock();
+@@ -176,7 +176,7 @@ void account_user_time(struct task_struct *p, cputime_t cputime,
+ static void account_guest_time(struct task_struct *p, cputime_t cputime,
+ 			       cputime_t cputime_scaled)
+ {
+-	u64 *cpustat = kcpustat_this_cpu->cpustat;
++	atomic64_t *cpustat = kcpustat_this_cpu->cpustat;
+ 
+ 	/* Add guest time to process. */
+ 	p->utime += cputime;
+@@ -186,11 +186,11 @@ static void account_guest_time(struct task_struct *p, cputime_t cputime,
+ 
+ 	/* Add guest time to cpustat. */
+ 	if (TASK_NICE(p) > 0) {
+-		cpustat[CPUTIME_NICE] += (__force u64) cputime;
+-		cpustat[CPUTIME_GUEST_NICE] += (__force u64) cputime;
++		atomic64_add((__force u64) cputime, &cpustat[CPUTIME_NICE]);
++		atomic64_add((__force u64) cputime, &cpustat[CPUTIME_GUEST_NICE]);
+ 	} else {
+-		cpustat[CPUTIME_USER] += (__force u64) cputime;
+-		cpustat[CPUTIME_GUEST] += (__force u64) cputime;
++		atomic64_add((__force u64) cputime, &cpustat[CPUTIME_USER]);
++		atomic64_add((__force u64) cputime, &cpustat[CPUTIME_GUEST]);
+ 	}
+ }
+ 
+@@ -250,9 +250,9 @@ void account_system_time(struct task_struct *p, int hardirq_offset,
+  */
+ void account_steal_time(cputime_t cputime)
+ {
+-	u64 *cpustat = kcpustat_this_cpu->cpustat;
++	atomic64_t *cpustat = kcpustat_this_cpu->cpustat;
+ 
+-	cpustat[CPUTIME_STEAL] += (__force u64) cputime;
++	atomic64_add((__force u64) cputime, &cpustat[CPUTIME_STEAL]);
+ }
+ 
+ /*
+@@ -261,13 +261,13 @@ void account_steal_time(cputime_t cputime)
+  */
+ void account_idle_time(cputime_t cputime)
+ {
+-	u64 *cpustat = kcpustat_this_cpu->cpustat;
++	atomic64_t *cpustat = kcpustat_this_cpu->cpustat;
+ 	struct rq *rq = this_rq();
+ 
+ 	if (atomic_read(&rq->nr_iowait) > 0)
+-		cpustat[CPUTIME_IOWAIT] += (__force u64) cputime;
++		atomic64_add((__force u64) cputime, &cpustat[CPUTIME_IOWAIT]);
+ 	else
+-		cpustat[CPUTIME_IDLE] += (__force u64) cputime;
++		atomic64_add((__force u64) cputime, &cpustat[CPUTIME_IDLE]);
+ }
+ 
+ static __always_inline bool steal_account_process_tick(void)
+@@ -345,15 +345,15 @@ static void irqtime_account_process_tick(struct task_struct *p, int user_tick,
+ 						struct rq *rq)
+ {
+ 	cputime_t one_jiffy_scaled = cputime_to_scaled(cputime_one_jiffy);
+-	u64 *cpustat = kcpustat_this_cpu->cpustat;
++	atomic64_t *cpustat = kcpustat_this_cpu->cpustat;
+ 
+ 	if (steal_account_process_tick())
+ 		return;
+ 
+ 	if (irqtime_account_hi_update()) {
+-		cpustat[CPUTIME_IRQ] += (__force u64) cputime_one_jiffy;
++		atomic64_add((__force u64) cputime_one_jiffy, &cpustat[CPUTIME_IRQ]);
+ 	} else if (irqtime_account_si_update()) {
+-		cpustat[CPUTIME_SOFTIRQ] += (__force u64) cputime_one_jiffy;
++		atomic64_add((__force u64) cputime_one_jiffy, &cpustat[CPUTIME_SOFTIRQ]);
+ 	} else if (this_cpu_ksoftirqd() == p) {
+ 		/*
+ 		 * ksoftirqd time do not get accounted in cpu_softirq_time.
+-- 
+1.8.1.2
