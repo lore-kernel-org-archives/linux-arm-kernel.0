@@ -1,69 +1,43 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 21 Feb 2013 08:59:02 -0600
-Subject: [PATCH] PM / OPP: fix condition for empty of_init_opp_table()
-In-Reply-To: <1361444685-1034-1-git-send-email-shawn.guo@linaro.org>
-References: <1361444685-1034-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130221145902.GA22712@kahuna>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 21 Feb 2013 20:42:53 +0530
+Subject: too many timer retries happen when do local timer swtich with
+ broadcast timer
+In-Reply-To: <alpine.LFD.2.02.1302211436300.22263@ionos>
+References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
+ <alpine.LFD.2.02.1302201400400.22263@ionos>
+ <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
+ <alpine.LFD.2.02.1302211015270.22263@ionos>
+ <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
+ <alpine.LFD.2.02.1302211436300.22263@ionos>
+Message-ID: <51263975.20906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:04-20130221, Shawn Guo wrote:
-> randconfig build reports the following error which is caused by that
-> CONFIG_PM_OPP is unset.
-> 
-Minor: caused by CONFIG_PM_OPP not being set?
->   CC      arch/arm/mach-imx/mach-imx6q.o
-> arch/arm/mach-imx/mach-imx6q.c: In function ?imx6q_opp_init?:
-> arch/arm/mach-imx/mach-imx6q.c:248:2: error: implicit declaration of function ?of_init_opp_table? [-Werror=implicit-function-declaration]
-thanks for catching this.
-> 
-> Fix the error by giving a more correct condition for empty
-> of_init_opp_table() implementation.
-> 
-> Reported-by: Rob Herring <robherring2@gmail.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  include/linux/opp.h |   18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/include/linux/opp.h b/include/linux/opp.h
-> index 214e0eb..3aca2b8 100644
-> --- a/include/linux/opp.h
-> +++ b/include/linux/opp.h
-> @@ -47,15 +47,6 @@ int opp_enable(struct device *dev, unsigned long freq);
->  int opp_disable(struct device *dev, unsigned long freq);
->  
->  struct srcu_notifier_head *opp_get_notifier(struct device *dev);
-> -
-> -#ifdef CONFIG_OF
-> -int of_init_opp_table(struct device *dev);
-> -#else
-> -static inline int of_init_opp_table(struct device *dev)
-> -{
-> -	return -EINVAL;
-> -}
-> -#endif /* CONFIG_OF */
->  #else
->  static inline unsigned long opp_get_voltage(struct opp *opp)
->  {
-> @@ -112,6 +103,15 @@ static inline struct srcu_notifier_head *opp_get_notifier(struct device *dev)
->  }
->  #endif		/* CONFIG_PM_OPP */
->  
-> +#if defined(CONFIG_PM_OPP) && defined(CONFIG_OF)
-> +int of_init_opp_table(struct device *dev);
-> +#else
-> +static inline int of_init_opp_table(struct device *dev)
-> +{
-> +	return -EINVAL;
-> +}
-> +#endif
-> +
->  #if defined(CONFIG_CPU_FREQ) && defined(CONFIG_PM_OPP)
->  int opp_init_cpufreq_table(struct device *dev,
->  			    struct cpufreq_frequency_table **table);
+Thomas,
 
-Acked-by: Nishanth Menon <nm@ti.com>
--- 
+On Thursday 21 February 2013 07:18 PM, Thomas Gleixner wrote:
+> Jason,
+>
+> On Thu, 21 Feb 2013, Jason Liu wrote:
+>> 2013/2/21 Thomas Gleixner <tglx@linutronix.de>:
+>>> Now your explanation makes sense.
+>>>
+>>> I have no fast solution for this, but I think that I have an idea how
+>>> to fix it. Stay tuned.
+>>
+>> Thanks Thomas, wait for your fix. :)
+>
+> find below a completely untested patch, which should address that issue.
+>
+After looking at the thread, I tried to see the issue on OMAP and could
+see the same issue as Jason.
+
+Your patch fixes the retries on both CPUs on my dual core machine. So
+you use my tested by if you need one.
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Thanks for the patch.
+And thanks to Jason for spotting the issue.
+
 Regards,
-Nishanth Menon
+Santosh
