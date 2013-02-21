@@ -1,44 +1,49 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 21 Feb 2013 08:37:18 +0100
-Subject: GPIO sysfs 'default' values
-In-Reply-To: <1361430680.10390.7.camel@gitbox>
-References: <1361430680.10390.7.camel@gitbox>
-Message-ID: <20773.52910.72747.877165@ipc1.ka-ro>
+From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
+Date: Thu, 21 Feb 2013 13:07:56 +0530
+Subject: [PATCH 01/11] ARM: disable virt_to_bus/virt_to_bus almost
+ everywhere
+In-Reply-To: <5124FA93.5090504@imgtec.com>
+References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
+ <1360849767-1463135-2-git-send-email-arnd@arndb.de>
+ <CAAG0J9_VqCGJJJZjSWGfFggALHU=vdWsSBeS39-DtxV=VXcJwQ@mail.gmail.com>
+ <201302201600.47522.arnd@arndb.de> <5124FA93.5090504@imgtec.com>
+Message-ID: <5125CED4.7030905@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+>> I guess you'll have to do something similar for arch/metag, and Vineet
+>> will do it for arch/arc.
 
-Tony Prisk writes:
-> Hi Grant, Linus.
+After getting the tip-bot msg about Stephen's patch for -mm, I never saw it in
+-next and thus was not sure how when it will start showing up in -next.
+
 > 
-> I was testing our new gpio/pinctrl driver today and noticed something a
-> little weird.
-> 
-> I exported gpio0 via sysfs and echoed the direction value - it was 'in'.
-> This pin is used to control an LCD panel, and is actually in 'out' mode.
-> If I write 'in' to direction, it changes mode to 'in' and the panel
-> turns off. Setting it back to 'out' and value=0, and the panel turns on
-> again.
-> 
-> I noticed that I had no gpiochip->get_direction, so I added it, but the
-> result was the same.
-> 
-> Any idea what I've missed?
-> 
-You missed to report on what platform this happens.
-The platform specific GPIO driver obviously does not initialize the
-shadow variables for the hardware registers correctly.
+> Yes, I have a little series of patches to fix this sort of harmless
+> thing in arch/metag, removing GENERIC_SIGALTSTACK, HAVE_IRQ_WORK,
+> ARCH_NO_VIRT_TO_BUS, and CONFIG_EXPERIMENTAL from defconfigs. I wasn't
+> sure how it's normally handled though, so I was just going to wait until
+> the other things go in before requesting a second pull.
+
+Yes I also have a TODO list which certainly had most of those - but thanks for the
+complete list James :-)
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+>> Stephen's patch is currently in Andrew's tree, and I don't see an easy
+>> way to coordinate this. The patch we will need once both are merged
+>> is below.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> FWIW:
+> Acked-by: James Hogan <james.hogan@imgtec.com> (for arch/metag)
+> 
+> Cheers
+> James
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Acked-by: Vineet Gupta <vgupta@synopsys.com> (for arch/arc)
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+So this means Stephen's patch - once merged will take care of existing in-tree
+arches and your's will take care of metag/arc.
+
+Thx,
+-Vineet
