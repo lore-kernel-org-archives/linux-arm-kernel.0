@@ -1,53 +1,158 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Feb 2013 13:28:51 +0000
-Subject: [PATCH 1/1] memory: tegra_ahb_enable_smmu() depends on
- TEGRA_IOMMU_SMMU
-In-Reply-To: <51250DDE.7010408@wwwdotorg.org>
-References: <1360175666-8377-1-git-send-email-hdoyu@nvidia.com>
- <5112A642.1020800@wwwdotorg.org>
- <20130206.211635.744922728615926717.hdoyu@nvidia.com>
- <20130211.193034.1346903263789032239.hdoyu@nvidia.com>
- <51250DDE.7010408@wwwdotorg.org>
-Message-ID: <20130221132851.GB17833@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 21 Feb 2013 14:48:20 +0100 (CET)
+Subject: too many timer retries happen when do local timer swtich with
+ broadcast timer
+In-Reply-To: <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
+References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
+ <alpine.LFD.2.02.1302201400400.22263@ionos>
+ <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
+ <alpine.LFD.2.02.1302211015270.22263@ionos>
+ <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1302211436300.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 10:54:38AM -0700, Stephen Warren wrote:
-> On 02/11/2013 10:30 AM, Hiroshi Doyu wrote:
-> > Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Wed, 06 Feb 2013 21:16:35 +0200 (EET):
-> > 
-> >> Hi Russell,
-> >>
-> >> Stephen Warren <swarren@wwwdotorg.org> wrote @ Wed, 6 Feb 2013 19:51:46 +0100:
-> >>
-> >>> On 02/06/2013 11:34 AM, Hiroshi Doyu wrote:
-> >>>> New SoC, Tegra114 also uses SMMU. Change tegra_ahb_enable_smmu()'s
-> >>>> dependency from ARCH_TEGRA_3x_SOC to TEGRA_IOMMU_SMMU. No need to edit
-> >>>> whenever a new Tegra SoC comes.
-> >>>>
-> >>>> The following combination caused build error, which this patch fixes.
-> >>>>
-> >>>> CONFIG_ARCH_TEGRA_2x_SOC=y
-> >>>> \# CONFIG_ARCH_TEGRA_3x_SOC is not set
-> >>>> CONFIG_ARCH_TEGRA_114_SOC=y
-> >>>>
-> >>>> drivers/iommu/tegra-smmu.c:485: undefined reference to 'tegra_ahb_enable_smmu'
-> >>>
-> >>> Tested-by: Stephen Warren <swarren@nvidia.com>
-> >>>
-> >>> Russell, I assume Hiroshi should upload this to your patch tracker? It's
-> >>> needed for 3.9.
-> >>
-> >> FYI: Submitted as:
-> >> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7640/1
-> > 
-> > Russell,
-> > 
-> > Is the above ok for you?
-> > Please let me know if still I need to do something.
-> 
-> Russell, will this patch make it into your tree for 3.9? Do you think it
-> should go through some other tree? Thanks.
+Jason,
 
-I'll merge it, and I think it's a minor fix.  Should it be copied to
-stable?  If so, which ones are affected?
+On Thu, 21 Feb 2013, Jason Liu wrote:
+> 2013/2/21 Thomas Gleixner <tglx@linutronix.de>:
+> > Now your explanation makes sense.
+> >
+> > I have no fast solution for this, but I think that I have an idea how
+> > to fix it. Stay tuned.
+> 
+> Thanks Thomas, wait for your fix. :)
+
+find below a completely untested patch, which should address that issue.
+
+Sigh. Stopping the cpu local timer in deep idle is known to be an
+idiotic design decision for 10+ years. I'll never understand why ARM
+vendors insist on implementing the same stupidity over and over.
+
+Thanks,
+
+	tglx
+
+Index: linux-2.6/kernel/time/tick-broadcast.c
+===================================================================
+--- linux-2.6.orig/kernel/time/tick-broadcast.c
++++ linux-2.6/kernel/time/tick-broadcast.c
+@@ -397,6 +397,8 @@ int tick_resume_broadcast(void)
+ 
+ /* FIXME: use cpumask_var_t. */
+ static DECLARE_BITMAP(tick_broadcast_oneshot_mask, NR_CPUS);
++static DECLARE_BITMAP(tick_broadcast_pending, NR_CPUS);
++static DECLARE_BITMAP(tick_force_broadcast_mask, NR_CPUS);
+ 
+ /*
+  * Exposed for debugging: see timer_list.c
+@@ -453,12 +455,24 @@ again:
+ 	/* Find all expired events */
+ 	for_each_cpu(cpu, tick_get_broadcast_oneshot_mask()) {
+ 		td = &per_cpu(tick_cpu_device, cpu);
+-		if (td->evtdev->next_event.tv64 <= now.tv64)
++		if (td->evtdev->next_event.tv64 <= now.tv64) {
+ 			cpumask_set_cpu(cpu, to_cpumask(tmpmask));
+-		else if (td->evtdev->next_event.tv64 < next_event.tv64)
++			/*
++			 * Mark the remote cpu in the pending mask, so
++			 * it can avoid reprogramming the cpu local
++			 * timer in tick_broadcast_oneshot_control().
++			 */
++			set_bit(cpu, tick_broadcast_pending);
++		} else if (td->evtdev->next_event.tv64 < next_event.tv64)
+ 			next_event.tv64 = td->evtdev->next_event.tv64;
+ 	}
+ 
++	/* Take care of enforced broadcast requests */
++	for_each_cpu(cpu, to_cpumask(tick_force_broadcast_mask)) {
++		set_bit(cpu, tmpmask);
++		clear_bit(cpu, tick_force_broadcast_mask);
++	}
++
+ 	/*
+ 	 * Wakeup the cpus which have an expired event.
+ 	 */
+@@ -494,6 +508,7 @@ void tick_broadcast_oneshot_control(unsi
+ 	struct clock_event_device *bc, *dev;
+ 	struct tick_device *td;
+ 	unsigned long flags;
++	ktime_t now;
+ 	int cpu;
+ 
+ 	/*
+@@ -518,6 +533,8 @@ void tick_broadcast_oneshot_control(unsi
+ 
+ 	raw_spin_lock_irqsave(&tick_broadcast_lock, flags);
+ 	if (reason == CLOCK_EVT_NOTIFY_BROADCAST_ENTER) {
++		WARN_ON_ONCE(test_bit(cpu, tick_broadcast_pending));
++		WARN_ON_ONCE(test_bit(cpu, tick_force_broadcast_mask));
+ 		if (!cpumask_test_cpu(cpu, tick_get_broadcast_oneshot_mask())) {
+ 			cpumask_set_cpu(cpu, tick_get_broadcast_oneshot_mask());
+ 			clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
+@@ -529,10 +546,63 @@ void tick_broadcast_oneshot_control(unsi
+ 			cpumask_clear_cpu(cpu,
+ 					  tick_get_broadcast_oneshot_mask());
+ 			clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT);
+-			if (dev->next_event.tv64 != KTIME_MAX)
+-				tick_program_event(dev->next_event, 1);
++			if (dev->next_event.tv64 == KTIME_MAX)
++				goto out;
++			/*
++			 * The cpu handling the broadcast timer marked
++			 * this cpu in the broadcast pending mask and
++			 * fired the broadcast IPI. So we are going to
++			 * handle the expired event anyway via the
++			 * broadcast IPI handler. No need to reprogram
++			 * the timer with an already expired event.
++			 */
++			if (test_and_clear_bit(cpu, tick_broadcast_pending))
++				goto out;
++			/*
++			 * If the pending bit is not set, then we are
++			 * either the CPU handling the broadcast
++			 * interrupt or we got woken by something else.
++			 *
++			 * We are not longer in the broadcast mask, so
++			 * if the cpu local expiry time is already
++			 * reached, we would reprogram the cpu local
++			 * timer with an already expired event.
++			 *
++			 * This can lead to a ping-pong when we return
++			 * to idle and therefor rearm the broadcast
++			 * timer before the cpu local timer was able
++			 * to fire. This happens because the forced
++			 * reprogramming makes sure that the event
++			 * will happen in the future and depending on
++			 * the min_delta setting this might be far
++			 * enough out that the ping-pong starts.
++			 *
++			 * If the cpu local next_event has expired
++			 * then we know that the broadcast timer
++			 * next_event has expired as well and
++			 * broadcast is about to be handled. So we
++			 * avoid reprogramming and enforce that the
++			 * broadcast handler, which did not run yet,
++			 * will invoke the cpu local handler.
++			 *
++			 * We cannot call the handler directly from
++			 * here, because we might be in a NOHZ phase
++			 * and we did not go through the irq_enter()
++			 * nohz fixups.
++			 */
++			now = ktime_get();
++			if (dev->next_event.tv64 <= now.tv64) {
++				set_bit(cpu, tick_force_broadcast_mask);
++				goto out;
++			}
++			/*
++			 * We got woken by something else. Reprogram
++			 * the cpu local timer device.
++			 */
++			tick_program_event(dev->next_event, 1);
+ 		}
+ 	}
++out:
+ 	raw_spin_unlock_irqrestore(&tick_broadcast_lock, flags);
+ }
+ 
