@@ -1,158 +1,73 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 21 Feb 2013 14:48:20 +0100 (CET)
-Subject: too many timer retries happen when do local timer swtich with
- broadcast timer
-In-Reply-To: <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
-References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
- <alpine.LFD.2.02.1302201400400.22263@ionos>
- <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
- <alpine.LFD.2.02.1302211015270.22263@ionos>
- <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1302211436300.22263@ionos>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Feb 2013 13:46:57 +0000
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <51261F38.2030902@ti.com>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <20130221103705.GB17852@n2100.arm.linux.org.uk> <51261F38.2030902@ti.com>
+Message-ID: <20130221134656.GC17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
-
-On Thu, 21 Feb 2013, Jason Liu wrote:
-> 2013/2/21 Thomas Gleixner <tglx@linutronix.de>:
-> > Now your explanation makes sense.
-> >
-> > I have no fast solution for this, but I think that I have an idea how
-> > to fix it. Stay tuned.
+On Thu, Feb 21, 2013 at 08:20:56AM -0500, Tom Rini wrote:
+> On 02/21/2013 05:37 AM, Russell King - ARM Linux wrote:
+> > On Wed, Feb 20, 2013 at 07:37:10PM -0600, Joel A Fernandes wrote:
+> >> Hello, I've been spinning some work-in-progress patches for FIT
+> >> build support in the kernel. With the move to multiplatform
+> >> support on OMAP, I feel it is a good time to add  FIT support,
+> >> also looking at the proliferating number of dtbs, as it is a nice
+> >> way
+> > 
+> > I'm not looking to add yet another crappy uboot image format to the
+> > kernel just for the hell of uboot.
 > 
-> Thanks Thomas, wait for your fix. :)
+> Note that FIT images are relatively old (docs date back to March
+> 2008).  This is more of another effort to try and update what the
+> kernel uses.
 
-find below a completely untested patch, which should address that issue.
+So it's five years old and people haven't been that interested in it so
+far.  That speaks volumes...
 
-Sigh. Stopping the cpu local timer in deep idle is known to be an
-idiotic design decision for 10+ years. I'll never understand why ARM
-vendors insist on implementing the same stupidity over and over.
+> > And don't think that the dtbs in the kernel are going to stay
+> > there.  The longer term plan is for them to end up in an external
+> > git tree, entirely separate from the kernel source.  So anything
+> > that ties them with the kernel build process will ultimately have
+> > to be removed again.
+> 
+> Well, once the device trees move to some external location, this
+> script could also easily move out with it.  And I'd hope there'd be
+> interest out in the rest of the world for a single file boots on
+> multiple platforms image format.
 
-Thanks,
+We've had that for the last 18 years.  It's called zImage.  The real
+problem is that uboot has been particularly difficult over this -
+uboot and _only_ uboot wants to use its own special file formats.  No
+other boot loader on ARM has ever wanted this stuff - everything else
+has been totally happy with zImage.
 
-	tglx
+uboot even now supports zImage through the bootz command, so it now
+supports the "native" format used on ARM.
 
-Index: linux-2.6/kernel/time/tick-broadcast.c
-===================================================================
---- linux-2.6.orig/kernel/time/tick-broadcast.c
-+++ linux-2.6/kernel/time/tick-broadcast.c
-@@ -397,6 +397,8 @@ int tick_resume_broadcast(void)
- 
- /* FIXME: use cpumask_var_t. */
- static DECLARE_BITMAP(tick_broadcast_oneshot_mask, NR_CPUS);
-+static DECLARE_BITMAP(tick_broadcast_pending, NR_CPUS);
-+static DECLARE_BITMAP(tick_force_broadcast_mask, NR_CPUS);
- 
- /*
-  * Exposed for debugging: see timer_list.c
-@@ -453,12 +455,24 @@ again:
- 	/* Find all expired events */
- 	for_each_cpu(cpu, tick_get_broadcast_oneshot_mask()) {
- 		td = &per_cpu(tick_cpu_device, cpu);
--		if (td->evtdev->next_event.tv64 <= now.tv64)
-+		if (td->evtdev->next_event.tv64 <= now.tv64) {
- 			cpumask_set_cpu(cpu, to_cpumask(tmpmask));
--		else if (td->evtdev->next_event.tv64 < next_event.tv64)
-+			/*
-+			 * Mark the remote cpu in the pending mask, so
-+			 * it can avoid reprogramming the cpu local
-+			 * timer in tick_broadcast_oneshot_control().
-+			 */
-+			set_bit(cpu, tick_broadcast_pending);
-+		} else if (td->evtdev->next_event.tv64 < next_event.tv64)
- 			next_event.tv64 = td->evtdev->next_event.tv64;
- 	}
- 
-+	/* Take care of enforced broadcast requests */
-+	for_each_cpu(cpu, to_cpumask(tick_force_broadcast_mask)) {
-+		set_bit(cpu, tmpmask);
-+		clear_bit(cpu, tick_force_broadcast_mask);
-+	}
-+
- 	/*
- 	 * Wakeup the cpus which have an expired event.
- 	 */
-@@ -494,6 +508,7 @@ void tick_broadcast_oneshot_control(unsi
- 	struct clock_event_device *bc, *dev;
- 	struct tick_device *td;
- 	unsigned long flags;
-+	ktime_t now;
- 	int cpu;
- 
- 	/*
-@@ -518,6 +533,8 @@ void tick_broadcast_oneshot_control(unsi
- 
- 	raw_spin_lock_irqsave(&tick_broadcast_lock, flags);
- 	if (reason == CLOCK_EVT_NOTIFY_BROADCAST_ENTER) {
-+		WARN_ON_ONCE(test_bit(cpu, tick_broadcast_pending));
-+		WARN_ON_ONCE(test_bit(cpu, tick_force_broadcast_mask));
- 		if (!cpumask_test_cpu(cpu, tick_get_broadcast_oneshot_mask())) {
- 			cpumask_set_cpu(cpu, tick_get_broadcast_oneshot_mask());
- 			clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
-@@ -529,10 +546,63 @@ void tick_broadcast_oneshot_control(unsi
- 			cpumask_clear_cpu(cpu,
- 					  tick_get_broadcast_oneshot_mask());
- 			clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT);
--			if (dev->next_event.tv64 != KTIME_MAX)
--				tick_program_event(dev->next_event, 1);
-+			if (dev->next_event.tv64 == KTIME_MAX)
-+				goto out;
-+			/*
-+			 * The cpu handling the broadcast timer marked
-+			 * this cpu in the broadcast pending mask and
-+			 * fired the broadcast IPI. So we are going to
-+			 * handle the expired event anyway via the
-+			 * broadcast IPI handler. No need to reprogram
-+			 * the timer with an already expired event.
-+			 */
-+			if (test_and_clear_bit(cpu, tick_broadcast_pending))
-+				goto out;
-+			/*
-+			 * If the pending bit is not set, then we are
-+			 * either the CPU handling the broadcast
-+			 * interrupt or we got woken by something else.
-+			 *
-+			 * We are not longer in the broadcast mask, so
-+			 * if the cpu local expiry time is already
-+			 * reached, we would reprogram the cpu local
-+			 * timer with an already expired event.
-+			 *
-+			 * This can lead to a ping-pong when we return
-+			 * to idle and therefor rearm the broadcast
-+			 * timer before the cpu local timer was able
-+			 * to fire. This happens because the forced
-+			 * reprogramming makes sure that the event
-+			 * will happen in the future and depending on
-+			 * the min_delta setting this might be far
-+			 * enough out that the ping-pong starts.
-+			 *
-+			 * If the cpu local next_event has expired
-+			 * then we know that the broadcast timer
-+			 * next_event has expired as well and
-+			 * broadcast is about to be handled. So we
-+			 * avoid reprogramming and enforce that the
-+			 * broadcast handler, which did not run yet,
-+			 * will invoke the cpu local handler.
-+			 *
-+			 * We cannot call the handler directly from
-+			 * here, because we might be in a NOHZ phase
-+			 * and we did not go through the irq_enter()
-+			 * nohz fixups.
-+			 */
-+			now = ktime_get();
-+			if (dev->next_event.tv64 <= now.tv64) {
-+				set_bit(cpu, tick_force_broadcast_mask);
-+				goto out;
-+			}
-+			/*
-+			 * We got woken by something else. Reprogram
-+			 * the cpu local timer device.
-+			 */
-+			tick_program_event(dev->next_event, 1);
- 		}
- 	}
-+out:
- 	raw_spin_unlock_irqrestore(&tick_broadcast_lock, flags);
- }
- 
+> We're just about to make a lot of folks lives harder (whatever the
+> userbase is for omap2plus_defconfig).  How much time do we want to
+> spend offering up alternatives?
+
+We're about to make it harder how?  By forcing them to use DT blobs?
+Or by forcing them to have to use the combined zImage + DT format
+because their boot loaders are soo broken that they can't deal with
+multiple images?
+
+Yes, things have become a _little_ harder since OMAP has switched to
+multiplatform, but it really isn't that bad.  My build and boot test
+system still works, and it uses uImage for all the OMAP platforms.
+You just have to give the right LOADADDR= argument to the kernel to
+make the uImage generation work again.  Sure, the resulting uImage
+can't be loaded at a different address, but you if you need to change
+that, you can quite easily move the existing uImage out and re-run
+make ARCH=arm uImage LOADADDR=<something else> and hey presto, you
+end up with the uImage generated for a different address.
+
+But: we wouldn't be in this situation if it weren't for these absurd
+uboot uImage formats in the first place.  Or even be needing this
+FIT stuff if zImage was just used directly.
+
+uboot dug _itself_ into this hole.  It's uboot's problem.
