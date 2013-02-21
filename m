@@ -1,49 +1,53 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 20 Feb 2013 23:07:15 -0500
-Subject: [V8 PATCH 05/16] arm: mmp2: change the defintion of usb devices
+Date: Wed, 20 Feb 2013 23:07:16 -0500
+Subject: [V8 PATCH 06/16] arm: pxa910: change the defintion of usb devices
 In-Reply-To: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
 References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1361419646-9052-6-git-send-email-chao.xie@marvell.com>
+Message-ID: <1361419646-9052-7-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add the udc/otg/ehci devices for mmp2
+because phy is seperated from the usb controller driver,
+we can use the common pxa_device_desc for device register.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/include/mach/mmp2.h |    4 ++++
- arch/arm/mach-mmp/mmp2.c              |    4 ++++
- 2 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/include/mach/pxa910.h |    7 ++++---
+ arch/arm/mach-mmp/pxa910.c              |    4 ++++
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h b/arch/arm/mach-mmp/include/mach/mmp2.h
-index c4ca4d1..58e96b0 100644
---- a/arch/arm/mach-mmp/include/mach/mmp2.h
-+++ b/arch/arm/mach-mmp/include/mach/mmp2.h
-@@ -31,6 +31,10 @@ extern struct pxa_device_desc mmp2_device_sdh2;
- extern struct pxa_device_desc mmp2_device_sdh3;
- extern struct pxa_device_desc mmp2_device_asram;
- extern struct pxa_device_desc mmp2_device_isram;
-+extern struct pxa_device_desc mmp2_device_u2o;
-+extern struct pxa_device_desc mmp2_device_u2ootg;
-+extern struct pxa_device_desc mmp2_device_u2oehci;
-+extern struct pxa_device_desc mmp2_device_u2ophy;
+diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
+index 3b58a3b..26ea4fe 100644
+--- a/arch/arm/mach-mmp/include/mach/pxa910.h
++++ b/arch/arm/mach-mmp/include/mach/pxa910.h
+@@ -20,9 +20,10 @@ extern struct pxa_device_desc pxa910_device_pwm2;
+ extern struct pxa_device_desc pxa910_device_pwm3;
+ extern struct pxa_device_desc pxa910_device_pwm4;
+ extern struct pxa_device_desc pxa910_device_nand;
+-extern struct platform_device pxa168_device_u2o;
+-extern struct platform_device pxa168_device_u2ootg;
+-extern struct platform_device pxa168_device_u2oehci;
++extern struct pxa_device_desc pxa910_device_u2o;
++extern struct pxa_device_desc pxa910_device_u2ootg;
++extern struct pxa_device_desc pxa910_device_u2oehci;
++extern struct pxa_device_desc pxa910_device_u2ophy;
  
- extern struct platform_device mmp2_device_gpio;
+ extern struct platform_device pxa910_device_gpio;
+ extern struct platform_device pxa910_device_rtc;
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index 8b1e16f..65174f7 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -138,6 +138,10 @@ PXA910_DEVICE(pwm2, "pxa910-pwm", 1, NONE, 0xd401a400, 0x10);
+ PXA910_DEVICE(pwm3, "pxa910-pwm", 2, NONE, 0xd401a800, 0x10);
+ PXA910_DEVICE(pwm4, "pxa910-pwm", 3, NONE, 0xd401ac00, 0x10);
+ PXA910_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x80, 97, 99);
++PXA910_DEVICE(u2ophy, "pxa910-usb-phy", -1, NONE, 0xd4207000, 0x1ff);
++PXA910_DEVICE(u2o, "mv-udc", -1, USB1, 0xd4208100, 0x1ff);
++PXA910_DEVICE(u2ootg, "mv-otg", -1, USB1, 0xd4208100, 0x1ff);
++PXA910_DEVICE(u2oehci, "mv-ehci", -1, USB1, 0xd4208100, 0x1ff);
  
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index 3a3768c..73edbfc 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -153,6 +153,10 @@ MMP2_DEVICE(sdh3, "sdhci-pxav3", 3, MMC4, 0xd4281800, 0x120);
- MMP2_DEVICE(asram, "asram", -1, NONE, 0xe0000000, 0x4000);
- /* 0xd1000000 ~ 0xd101ffff is reserved for secure processor */
- MMP2_DEVICE(isram, "isram", -1, NONE, 0xd1020000, 0x18000);
-+MMP2_DEVICE(u2ophy, "mmp2-usb-phy", -1, NONE, 0xd4207000, 0x1ff);
-+MMP2_DEVICE(u2o, "mv-udc", -1, USB_OTG, 0xd4208100, 0x1ff);
-+MMP2_DEVICE(u2ootg, "mv-otg", -1, USB_OTG, 0xd4208100, 0x1ff);
-+MMP2_DEVICE(u2oehci, "mv-ehci", -1, USB_OTG, 0xd4208100, 0x1ff);
- 
- struct resource mmp2_resource_gpio[] = {
+ struct resource pxa910_resource_gpio[] = {
  	{
 -- 
 1.7.4.1
