@@ -1,157 +1,134 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 20 Feb 2013 23:07:14 -0500
-Subject: [V8 PATCH 04/16] usb: otg: mv_otg: use PHY driver for otg
-In-Reply-To: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
-References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1361419646-9052-5-git-send-email-chao.xie@marvell.com>
+Date: Wed, 20 Feb 2013 23:07:10 -0500
+Subject: [V8 PATCH 00/16] mv-usb phy enhancement patches
+Message-ID: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originaly, otg driver will call the callbacks in platform data
-for PHY initialization and shut down.
-With PHY driver, it will call the APIs provided by PHY driver
-for PHY initialization and shut down. It removes the callbacks
-in platform data, and at same time it removes one block in the
-way of enabling device tree for otg driver.
+The patches are divied into 2 parts
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- drivers/usb/otg/mv_otg.c |   50 ++++++++++++++++++---------------------------
- drivers/usb/otg/mv_otg.h |    2 +-
- 2 files changed, 21 insertions(+), 31 deletions(-)
+1. PHY driver
+To remove the callbacks in the platform data, a usb PHY driver
+for marvell udc/otg/ehci is written.
+For device tree support, it is not good to pass the callback
+pointers by platform data. The PHY driver also removes the
+block.
 
-diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
-index b6a9be3..7282b0d 100644
---- a/drivers/usb/otg/mv_otg.c
-+++ b/drivers/usb/otg/mv_otg.c
-@@ -25,6 +25,7 @@
- #include <linux/usb/otg.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/hcd.h>
-+#include <linux/usb/mv_usb2.h>
- #include <linux/platform_data/mv_usb.h>
- 
- #include "mv_otg.h"
-@@ -261,14 +262,12 @@ static int mv_otg_enable_internal(struct mv_otg *mvotg)
- 	dev_dbg(&mvotg->pdev->dev, "otg enabled\n");
- 
- 	otg_clock_enable(mvotg);
--	if (mvotg->pdata->phy_init) {
--		retval = mvotg->pdata->phy_init(mvotg->phy_regs);
--		if (retval) {
--			dev_err(&mvotg->pdev->dev,
--				"init phy error %d\n", retval);
--			otg_clock_disable(mvotg);
--			return retval;
--		}
-+	retval = usb_phy_init(mvotg->outer_phy);
-+	if (retval) {
-+		dev_err(&mvotg->pdev->dev,
-+			"init phy error %d\n", retval);
-+		otg_clock_disable(mvotg);
-+		return retval;
- 	}
- 	mvotg->active = 1;
- 
-@@ -288,8 +287,7 @@ static void mv_otg_disable_internal(struct mv_otg *mvotg)
- {
- 	if (mvotg->active) {
- 		dev_dbg(&mvotg->pdev->dev, "otg disabled\n");
--		if (mvotg->pdata->phy_deinit)
--			mvotg->pdata->phy_deinit(mvotg->phy_regs);
-+		usb_phy_shutdown(mvotg->outer_phy);
- 		otg_clock_disable(mvotg);
- 		mvotg->active = 0;
- 	}
-@@ -729,6 +727,7 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	/* OTG common part */
- 	mvotg->pdev = pdev;
- 	mvotg->phy.dev = &pdev->dev;
-+	mvotg->phy.type = USB_PHY_TYPE_USB2;
- 	mvotg->phy.otg = otg;
- 	mvotg->phy.label = driver_name;
- 	mvotg->phy.state = OTG_STATE_UNDEFINED;
-@@ -741,23 +740,8 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	for (i = 0; i < OTG_TIMER_NUM; i++)
- 		init_timer(&mvotg->otg_ctrl.timer[i]);
- 
--	r = platform_get_resource_byname(mvotg->pdev,
--					 IORESOURCE_MEM, "phyregs");
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
--		retval = -ENODEV;
--		goto err_destroy_workqueue;
--	}
--
--	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (mvotg->phy_regs == NULL) {
--		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		retval = -EFAULT;
--		goto err_destroy_workqueue;
--	}
--
--	r = platform_get_resource_byname(mvotg->pdev,
--					 IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(mvotg->pdev,
-+					 IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		retval = -ENODEV;
-@@ -770,6 +754,12 @@ static int mv_otg_probe(struct platform_device *pdev)
- 		retval = -EFAULT;
- 		goto err_destroy_workqueue;
- 	}
-+	mvotg->outer_phy = devm_usb_get_phy_dev(&pdev->dev, MV_USB2_PHY_INDEX);
-+	if (IS_ERR_OR_NULL(mvotg->outer_phy)) {
-+		dev_err(&pdev->dev, "can not find outer phy\n");
-+		retval = PTR_ERR(mvotg->outer_phy);
-+		goto err_destroy_workqueue;
-+	}
- 
- 	/* we will acces controller register, so enable the udc controller */
- 	retval = mv_otg_enable_internal(mvotg);
-@@ -830,7 +820,7 @@ static int mv_otg_probe(struct platform_device *pdev)
- 		goto err_disable_clk;
- 	}
- 
--	retval = usb_add_phy(&mvotg->phy, USB_PHY_TYPE_USB2);
-+	retval = usb_add_phy_dev(&mvotg->phy);
- 	if (retval < 0) {
- 		dev_err(&pdev->dev, "can't register transceiver, %d\n",
- 			retval);
-@@ -841,7 +831,7 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	if (retval < 0) {
- 		dev_dbg(&pdev->dev,
- 			"Can't register sysfs attr group: %d\n", retval);
--		goto err_remove_phy;
-+		goto err_remove_otg_phy;
- 	}
- 
- 	spin_lock_init(&mvotg->wq_lock);
-@@ -856,7 +846,7 @@ static int mv_otg_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--err_remove_phy:
-+err_remove_otg_phy:
- 	usb_remove_phy(&mvotg->phy);
- err_disable_clk:
- 	mv_otg_disable_internal(mvotg);
-diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
-index 8a9e351..65e7fd1 100644
---- a/drivers/usb/otg/mv_otg.h
-+++ b/drivers/usb/otg/mv_otg.h
-@@ -137,10 +137,10 @@ struct mv_otg_regs {
- 
- struct mv_otg {
- 	struct usb_phy phy;
-+	struct usb_phy *outer_phy;
- 	struct mv_otg_ctrl otg_ctrl;
- 
- 	/* base address */
--	void __iomem *phy_regs;
- 	void __iomem *cap_regs;
- 	struct mv_otg_regs __iomem *op_regs;
- 
+  usb: phy: mv_usb2: add PHY driver for marvell usb2 controller
+  usb: gadget: mv_udc: use PHY driver for udc
+  usb: ehci: ehci-mv: use PHY driver for ehci
+  usb: otg: mv_otg: use PHY driver for otg
+Above patches are marvell usb PHY driver support.
+
+  arm: mmp2: change the defintion of usb devices
+  arm: pxa910: change the defintion of usb devices
+  arm: brownstone: add usb support for the board
+  arm: ttc_dkb: add usb support
+  arm: mmp: remove the usb phy setting
+  arm: mmp: remove usb devices from pxa168
+Above patches are for SOC/board support for marvell usb PHY
+driver.
+
+2. external chip support
+The marvell usb controller can detect the vbus/idpin, but it
+need PHY and usb clocks to be enabled.
+Based on measurement it will import 15mA current, and increase
+the power when the usb is not used.
+Using a external chip to detect vbus/idpin changes will save
+the power.
+In fact the marvell PMIC 88pm860x and 88pm80x can do it. The
+drivers are located at drivers/mfd.
+So add a middle layer in the marvell usb PHY driver.
+PMIC call the APIs in middle driver to registers the callback
+for vbus/idpin detection/query
+udc/otg/ehci driver will call the APIs to get vbus/idpin changes
+and query the states of the vbus/idpin.
+  usb: phy: mv_usb2_phy: add externel chip support
+  usb: gadget: mv_udc: add extern chip support
+  usb: ehci: ehci-mv: add extern chip support
+  usb: otg: mv_otg: add extern chip support
+Above patches are the middle layer suppor for udc/otg/ehci
+
+  arm: mmp: add extern chip support for brownstone
+  arm: mmp: add extern chip support for ttc_dkb
+Above patches are corresponding board file changes
+
+V2->V1:
+  Change the Signed-off-by to be right email address
+
+v3->v2
+  re-format the patches to new code base
+
+v4->v3
+  1. make mv udc gadget driver depend on ARCH_PXA and ARCH_MMP
+  2. remove __devinit and __devexit
+  3. make the driver compiled successful if CONFIG_MV_USB2_PHY is not defined.
+  The modified patches are
+  usb: gadget: mv_udc: make mv_udc depends on ARCH_MMP or ARCH_PXA
+  usb: phy: mv_usb2: add PHY driver for marvell usb2 controller
+
+v5->v4
+  make the struct mv_usb2_extern_chip member ->head to be
+  struct atomic_notifier_head instead of struct atomic_notifier_head *.
+
+v6->v5
+  the bug fix patches are merged.
+  Removed the dependcy of ARCH_MMP and ARCH_PXA, and make the driver can be
+  compiled for x86.
+  The device tree support patches need modification, remove them from this
+  patch series, and they will be submitted in another series.
+
+
+v7->v6
+  Use usb_add_phy_dev and related APIs to add PHY drivers.
+  Removed the device tree support in PHY driver. It will be added in another
+  patch series.
+
+v8->v7
+  bugs fix in phy driver.
+  directly use devm_usb_get_phy_dev return value for error return.
+
+Chao Xie (16):
+  usb: phy: mv_usb2: add PHY driver for marvell usb2 controller
+  usb: gadget: mv_udc: use PHY driver for udc
+  usb: ehci: ehci-mv: use PHY driver for ehci
+  usb: otg: mv_otg: use PHY driver for otg
+  arm: mmp2: change the defintion of usb devices
+  arm: pxa910: change the defintion of usb devices
+  arm: brownstone: add usb support for the board
+  arm: ttc_dkb: add usb support
+  arm: mmp: remove the usb phy setting
+  arm: mmp: remove usb devices from pxa168
+  usb: phy: mv_usb2_phy: add externel chip support
+  usb: gadget: mv_udc: add extern chip support
+  usb: ehci: ehci-mv: add extern chip support
+  usb: otg: mv_otg: add extern chip support
+  arm: mmp: add extern chip support for brownstone
+  arm: mmp: add extern chip support for ttc_dkb
+
+ arch/arm/mach-mmp/brownstone.c            |   66 +++++
+ arch/arm/mach-mmp/devices.c               |  278 ------------------
+ arch/arm/mach-mmp/include/mach/mmp2.h     |    4 +
+ arch/arm/mach-mmp/include/mach/pxa910.h   |    7 +-
+ arch/arm/mach-mmp/include/mach/regs-usb.h |  253 ----------------
+ arch/arm/mach-mmp/mmp2.c                  |    4 +
+ arch/arm/mach-mmp/pxa168.c                |   42 ---
+ arch/arm/mach-mmp/pxa910.c                |    4 +
+ arch/arm/mach-mmp/ttc_dkb.c               |   52 +++-
+ drivers/usb/gadget/mv_udc.h               |    5 +-
+ drivers/usb/gadget/mv_udc_core.c          |  101 ++++---
+ drivers/usb/host/ehci-mv.c                |   64 ++---
+ drivers/usb/otg/mv_otg.c                  |  122 ++++----
+ drivers/usb/otg/mv_otg.h                  |    5 +-
+ drivers/usb/phy/Kconfig                   |    7 +
+ drivers/usb/phy/Makefile                  |    1 +
+ drivers/usb/phy/mv_usb2_phy.c             |  451 +++++++++++++++++++++++++++++
+ include/linux/platform_data/mv_usb.h      |   22 +-
+ include/linux/usb/mv_usb2.h               |  121 ++++++++
+ 19 files changed, 856 insertions(+), 753 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/regs-usb.h
+ create mode 100644 drivers/usb/phy/mv_usb2_phy.c
+ create mode 100644 include/linux/usb/mv_usb2.h
+
 -- 
 1.7.4.1
