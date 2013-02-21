@@ -1,34 +1,32 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 20 Feb 2013 23:07:26 -0500
-Subject: [V8 PATCH 16/16] arm: mmp: add extern chip support for ttc_dkb
-In-Reply-To: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
-References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1361419646-9052-17-git-send-email-chao.xie@marvell.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Feb 2013 21:26:38 -0700
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+Message-ID: <5125A1FE.5000604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the board support for usb as extern chip is supported
-in marvell usb PHY driver.
+On 02/20/2013 06:37 PM, Joel A Fernandes wrote:
+> Hello,
+> I've been spinning some work-in-progress patches for FIT build support
+> in the kernel.
+> With the move to multiplatform support on OMAP, I feel it is a good
+> time to add  FIT support, also looking at the proliferating number of
+> dtbs, as it is a nice way
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/mach-mmp/ttc_dkb.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+To my mind, FIT is pointless. And forcing the kernel build process to
+create bootloader-specific files doesn't seem like a good idea. Doing so
+would require pulling in even more outside tools into the kernel build flow.
 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 5622092..0ba89e9 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -174,10 +174,8 @@ static struct mv_usb_phy_platform_data ttc_usb_phy_pdata = {
- static struct mv_usb_platform_data ttc_usb_pdata = {
- 	.clknum		= 1,
- 	.clkname	= pxa910_usb_clock_name,
--	.vbus		= NULL,
- 	.mode		= MV_USB_MODE_OTG,
- 	.otg_force_a_bus_req = 1,
--	.set_vbus	= NULL,
- };
- #endif
- #endif
--- 
-1.7.4.1
+All you need is to copy the zImage and any relevant .dtb files into
+/boot, and have U-Boot load the relevant .dtb file by constructing the
+filename as roughly ${soc}-${board}.dtb, then use the bootz command to
+boot it. You can have a completely generic boot.scr (or built-in script).
+
+Note: Not all (many?) U-Boot support FIT anyway, so you'd need to flash
+a new U-Boot to support FIT, so you may as well just flash a new U-Boot
+that implements the ${soc} and ${board} variables instead. IIRC, there
+may also be a ${boardname} or similar that's like ${board}, but
+represents the runtime-detected board for when one U-Boot build actually
+supports multiple different boards.
