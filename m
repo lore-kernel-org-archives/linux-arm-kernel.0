@@ -1,64 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 21 Feb 2013 10:46:44 +0000
-Subject: arm64: select ARCH_WANT_OPTIONAL_GPIOLIB
-In-Reply-To: <1636745.vSza8MrtIn@wuerfel>
-References: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
- <1634805.kh17mYrJe5@wuerfel>
- <CACxGe6tVk4na2yLi-6r1fTv5QqzgePbo6K+ZtEt-VOy25DQxVQ@mail.gmail.com>
- <1636745.vSza8MrtIn@wuerfel>
-Message-ID: <20130221104644.GB11431@MacBook-Pro.local>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 21 Feb 2013 11:48:10 +0100
+Subject: [PATCH] i2c: Remove unneeded xxx_set_drvdata(..., NULL) calls
+In-Reply-To: <1360970315-32116-1-git-send-email-dianders@chromium.org>
+References: <1360953682-25066-1-git-send-email-dianders@chromium.org>
+ <1360970315-32116-1-git-send-email-dianders@chromium.org>
+Message-ID: <20130221104810.GD22806@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 21, 2013 at 10:42:57AM +0000, Arnd Bergmann wrote:
-> An architecture should not unconditionally enable 'GENERIC_GPIO'
-> without providing an implementation. In case of arm64, selecting
-> ARCH_WANT_OPTIONAL_GPIOLIB is the right solution, because it
-> lets us enable GPIOLIB when configuring the kernel, and that
-> implicitly turns on GENERIC_GPIO.
+On Fri, Feb 15, 2013 at 03:18:35PM -0800, Doug Anderson wrote:
+> There is simply no reason to be manually setting the private driver
+> data to NULL in the remove/fail to probe cases.  This is just extra
+> cruft code that can be removed.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ----
-> On Thursday 21 February 2013 10:36:41 Grant Likely wrote:
-> > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > > index ab4aa54..3fab0db 100644
-> > > --- a/arch/arm64/Kconfig
-> > > +++ b/arch/arm64/Kconfig
-> > > @@ -3,6 +3,7 @@ config ARM64
-> > >         select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-> > >         select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
-> > >         select ARCH_WANT_FRAME_POINTERS
-> > > +       select ARCH_WANT_OPTIONAL_GPIOLIB
-> > >         select ARM_AMBA
-> > >         select ARM_ARCH_TIMER
-> > >         select CLONE_BACKWARDS
-> > > @@ -92,9 +93,6 @@ config SWIOTLB
-> > >  config IOMMU_HELPER
-> > >         def_bool SWIOTLB
-> > >
-> > > -config GENERIC_GPIO
-> > > -       def_bool y
-> > > -
-> > >  source "init/Kconfig"
-> > >
-> > >  source "kernel/Kconfig.freezer"
-> > 
-> > I've not asked Linus to pull the GPIO tree yet because of this issue.
-> > Can someone please test this on aarch64 and send me a properly
-> > formatted patch?
+> A few notes:
+> * Nothing relies on drvdata being set to NULL.
+> * The __device_release_driver() function eventually calls
+>   dev_set_drvdata(dev, NULL) anyway, so there's no need to do it
+>   twice.
+> * I verified that there were no cases where xxx_get_drvdata() was
+>   being called in these drivers and checking for / relying on the NULL
+>   return value.
 > 
-> It was wrong, the new version below is good though. Tested with defconfig
-> and allyesconfig on arm64. I found a few more trivial issues with arm64
-> allyesconfig that I fixed up as well. I'll send separate patches
-> for those.
+> This could be cleaned up kernel-wide but for now just take the baby
+> step and remove from the i2c subsystem.
+> 
+> Reported-by: Wolfram Sang <wsa@the-dreams.de>
+> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-That's what I just tried, it looks ok to me:
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Maybe Mark can try it with -next (I only tested with 3.8).
-
-Thanks.
-
--- 
-Catalin
+Applied, thanks!
