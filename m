@@ -1,50 +1,64 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 21 Feb 2013 11:27:24 -0700
-Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Feb 2013 18:33:25 +0000
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <20130221173707.76A7D200671@gemini.denx.de>
 References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130221103705.GB17852@n2100.arm.linux.org.uk>
- <51261F38.2030902@ti.com>
+ <20130221103705.GB17852@n2100.arm.linux.org.uk> <51261F38.2030902@ti.com>
  <20130221134656.GC17852@n2100.arm.linux.org.uk>
- <51262A7A.8040103@ti.com>
- <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
-Message-ID: <20130221182724.GA14329@obsidianresearch.com>
+ <20130221173707.76A7D200671@gemini.denx.de>
+Message-ID: <20130221183325.GE17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 21, 2013 at 12:25:21PM -0500, Nicolas Pitre wrote:
+[uboot list deleted again]
 
-> So let's stop kidding ourselves and be coherent please: either we move 
-> device specifics away from the kernel, or we keep them together.  In 
-> other words, the DT should ideally come preinstalled with the bootloader 
-> on a given board/device for distros to not even have to care about it, 
-> or we put that data back inside the kernel and dispense ourselves from 
-> all the added DT overhead entirely.  But an hybrid mixed solution like 
-> FIT is IMHO the worst of both worlds and sending a wrong message.
+On Thu, Feb 21, 2013 at 06:37:07PM +0100, Wolfgang Denk wrote:
+> Dear Russell,
+> 
+> In message <20130221134656.GC17852@n2100.arm.linux.org.uk> you wrote:
+> >
+> > > Note that FIT images are relatively old (docs date back to March
+> > > 2008).  This is more of another effort to try and update what the
+> > > kernel uses.
+> > 
+> > So it's five years old and people haven't been that interested in it so
+> > far.  That speaks volumes...
+> 
+> Well, your attitude to (not) accept anything like that is well known;
+> there have been few previews attempts, which have all been rejected in
+> basicly the same way.
 
-Just to thread jack a bit here..
+_My_ attitude?
 
-We've been using DT on production embedded stuff sice about 2.6.20ish
-on PPC and now ARM. We treat the dtb as a kernel version specific
-file, much like an initrd and ensure that the kernel only ever boots
-with its proper dtb. This is based on experience that the dtbs change
-depending on the state of the drivers in the kernel, what gets
-mainlined and when, etc.
+I'll point out something fundamental here: _our_ kernels native format
+has not changed over the last 15+ years, and continues to work everywhere
+where uboot is not involved, and continues to work where uboot is
+involved provided its wrapped up in silly uboot formats.
 
-Embedding this stuff into the bootloader is *not* desirable for my
-embedded scenarios. We don't use FIT (or uboot) but we do the same
-thing: a single image is constructed with the proper dtb, kernel and
-initrd, and that is what the bootloader boots.
+That means we designed it right back in the early days.  The fact that
+uboot has to reinvent the wheel shows that there were wrong design
+decisions made that did not cater for the situations that people
+encountered in the future.
 
-Why? This is an embedded appliance product. We need to be able to
-deliver firmware upgrades that *work*. We can't brick the board
-because the bootloader and kernel get out of sync. The boot loader has
-to be *simple*, it has to boot every past, present and future kernel
-or we start taking risks that a firmware flash will end up bricking
-it.
+Now, as for "have all been rejected in basic_al_ly the same way" that's
+not true.  What you'll notice is that there's been discussions over the
+years about FIT, which never went anywhere for various reasons (some of
+them I was not involved with.)  And during those discussions, uboot's
+continued refusal to use the native zImage format ended up getting
+fixed by those who raised (and continue to raise) concerns about uboots
+fixation with its file formats and the built-in restrictions of them.
 
-People making dev boards and distros for them certainly have different
-requirements, but we've decided that the single image approach is the
-best for appliance style products.
+> But now the situation has changed - multiplatform support adds a
+> number of use cases where this feature comes in handy, so it pops up
+> again.
 
-Jason
+No, the situation hasn't changed.  We're still talking about booting
+a kernel image in several platforms.  That's been the situation since
+the 1990s.
+
+And boot loaders from the 1990s and early 2000s have been able to do
+this _long_ before uboot.
+
+What's changed is the number of platforms, and the apparant acceptance
+of uboot as "the official boot loader" because it's seen as having its
+own format integrated into the kernel itself.
