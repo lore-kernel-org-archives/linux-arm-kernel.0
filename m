@@ -1,30 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 Feb 2013 23:19:37 -0300
-Subject: [PATCH 1/1] net: fec: fix crash at mx53 qsb board
-In-Reply-To: <1361408848-14118-1-git-send-email-Frank.Li@freescale.com>
-References: <1361408848-14118-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAOMZO5CiBFBUEFGArceE=7Q25B7ZAj4GKZgGF0n+4KM1oCJjBA@mail.gmail.com>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Wed, 20 Feb 2013 21:49:43 -0600
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
+References: <20130129181046.GC25415@pd.tnic>
+ <20130205210436.670c62e26d2121330e87af35@freescale.com>
+ <1360141322.6066.4.camel@shinybook.infradead.org>
+ <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+ <20130207181315.GM17833@n2100.arm.linux.org.uk>
+ <1360344301.6066.263.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
+ <1360363233.6066.283.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
+ <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
+ <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
+ <20130219203115.114eab79e8d2099c6306d921@freescale.com>
+ <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
+ <1361356696.13482.269.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
+ <1361367842.13482.279.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
+ <1361372008.13482.280.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
+Message-ID: <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 10:07 PM, Frank Li <Frank.Li@freescale.com> wrote:
-> Unable to handle kernel NULL pointer dereference at virtual address 00000002
-> pgd = 80004000
-> [00000002] *pgd=00000000
-> Internal error: Oops: 5 [#1] SMP ARM
-> Modules linked in:
-> CPU: 0    Not tainted  (3.8.0-rc7-next-20130215+ #346)
-> PC is at fec_enet_interrupt+0xd0/0x348
-> LR is at fec_enet_interrupt+0xb8/0x348
-> pc : [<80372b7c>]    lr : [<80372b64>]    psr: 60000193
-> sp : df855c20  ip : df855c20  fp : df855c74
-> r10: 00000516  r9 : 1c000000  r8 : 00000000
-> r7 : 00000000  r6 : 00000000  r5 : 00000000  r4 : df9b7800
-> r3 : df9b7df4  r2 : 00000000  r1 : 00000000  r0 : df9b7d34
->
-> It is possible that issue a irq between request_irq and fec_enet_init.
-> Irq handle will be called but driver data structure is not ready yet.
->
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+On Wed, 20 Feb 2013 10:43:18 -0500
+Nicolas Pitre <nico@fluxnic.net> wrote:
 
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+> On Wed, 20 Feb 2013, Woodhouse, David wrote:
+> > On Wed, 2013-02-20 at 09:06 -0500, Nicolas Pitre wrote:
+> > > ... in which case there is no harm shipping a .c file and trivially 
+> > > enforcing -O2, the rest being equal.
+> > 
+> > For today's compilers, unless the wind changes.
+> 
+> We'll adapt if necessary.  Going with -O2 should remain pretty safe anyway.
+
+Alas, not so for gcc 4.4 - I had forgotten I had tested
+Ubuntu/Linaro 4.4.7-1ubuntu2 here:
+
+https://patchwork.kernel.org/patch/2101491/
+
+add -O2 to that test script and gcc 4.4 *always* emits calls to
+__bswap[sd]i2, even with -march=armv6k+.
+
+I'll try working on an assembly version given it probably
+makes more sense, future-gcc-immunity-wise.
+
+Otherwise we're back to the old 'if GCC_VERSION >= 40500' in
+arch/arm/include/asm/swab.h...
+
+Kim
