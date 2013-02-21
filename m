@@ -1,37 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Feb 2013 20:12:30 +0100
-Subject: [PATCH v3 10/12] gpio: pxa: add irq base in platform data
-In-Reply-To: <1361164358-5845-11-git-send-email-haojian.zhuang@linaro.org>
+Date: Thu, 21 Feb 2013 20:15:27 +0100
+Subject: [PATCH v3 11/12] gpio: pxa: discard irq base in pxa_gpio_chip
+In-Reply-To: <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
 References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
- <1361164358-5845-11-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdbgJdmcTm86UTWsMw2yPv005=1c8AmAxfmDSrEoSWk-bg@mail.gmail.com>
+ <1361164358-5845-12-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdYn7-G51w18OvOmScxFpP5bqiKZrwX_e=5tnP8XDKWH0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Feb 18, 2013 at 6:12 AM, Haojian Zhuang
 <haojian.zhuang@linaro.org> wrote:
 
-> Macro PXA_GPIO_TO_IRQ() & MMP_GPIO_TO_IRQ() is used in machine driver
-> without DT. Although we're allocating irq descriptions dynamically,
-> it may break machine drivers without DT. Append pdata->irq_base.
-> If irq_base is valid, allocate irq descriptions from irq_base.
+> Discard irq_base in struct pxa_gpio_chip. Use irq_domain instead.
 >
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 (...)
-> -               chips[i].irq_base = irq_alloc_descs(-1, 0, gc->ngpio, 0);
-> +               if (pdata->irq_base)
-> +                       irq_base = pdata->irq_base + gpio;
-> +               else
-> +                       irq_base = -1;
-> +               chips[i].irq_base = irq_alloc_descs(irq_base, 0, gc->ngpio, 0);
->                 if (chips[i].irq_base < 0)
->                         return -EINVAL;
->                 if (!irq_domain_add_legacy(pdev->dev.of_node, gc->ngpio,
+> +                       irq_base = 0;
+> +               chips[i].domain = irq_domain_add_simple(pdev->dev.of_node,
+> +                                                       gc->ngpio, irq_base,
+> +                                                       &pxa_irq_domain_ops,
+> +                                                       &chips[i]);
+> +               if (!chips[i].domain)
 
-In this case, when you want to pass a base IRQ, use
-irq_domain_add_simple().
+Aha... so not at the end you fix it up :-)
 
-The descriptor allocation will still be unnecessary.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Maybe I can ACK all the others too then, if I know it will end up like
+this. But I had a few other review comments.
 
 Yours,
 Linus Walleij
