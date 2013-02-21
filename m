@@ -1,58 +1,86 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 20 Feb 2013 23:29:58 -0500 (EST)
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
-References: <20130129181046.GC25415@pd.tnic>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
- <20130207181315.GM17833@n2100.arm.linux.org.uk>
- <1360344301.6066.263.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
- <1360363233.6066.283.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
- <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
- <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
- <20130219203115.114eab79e8d2099c6306d921@freescale.com>
- <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
- <1361356696.13482.269.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
- <1361367842.13482.279.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
- <1361372008.13482.280.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
- <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
-Message-ID: <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 Feb 2013 12:37:55 +0800
+Subject: [PATCH] kbuild: create an "include chroot" for DT bindings
+In-Reply-To: <1361394356-19385-1-git-send-email-swarren@wwwdotorg.org>
+References: <1361394356-19385-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130221043751.GB17738@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Feb 2013, Kim Phillips wrote:
-
-> On Wed, 20 Feb 2013 10:43:18 -0500
-> Nicolas Pitre <nico@fluxnic.net> wrote:
+On Wed, Feb 20, 2013 at 02:05:56PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> > On Wed, 20 Feb 2013, Woodhouse, David wrote:
-> > > On Wed, 2013-02-20 at 09:06 -0500, Nicolas Pitre wrote:
-> > > > ... in which case there is no harm shipping a .c file and trivially 
-> > > > enforcing -O2, the rest being equal.
-> > > 
-> > > For today's compilers, unless the wind changes.
-> > 
-> > We'll adapt if necessary.  Going with -O2 should remain pretty safe anyway.
+> The recent dtc+cpp support allows header files and C pre-processor
+> defines/macros to be used when compiling device tree files. These
+> headers will typically define various constants that are part of the
+> device tree bindings.
 > 
-> Alas, not so for gcc 4.4 - I had forgotten I had tested
-> Ubuntu/Linaro 4.4.7-1ubuntu2 here:
+> The original patch which set up the dtc+cpp include path only considered
+> using those headers from device tree files. However, they are also
+> useful for kernel code which needs to interpret the device tree.
 > 
-> https://patchwork.kernel.org/patch/2101491/
+> In both the DT files and the kernel, I'd like to include the DT-related
+> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+> That will simplify any text which discusses the DT header locations.
 > 
-> add -O2 to that test script and gcc 4.4 *always* emits calls to
-> __bswap[sd]i2, even with -march=armv6k+.
+> Creating a <dt-bindings/> for kernel source to use is as simple as
+> placing files into include/dt-bindings/.
+> 
+> However, when compiling DT files, the include path should be restricted
+> so that only the dt-bindings path is available; arbitrary kernel headers
+> shouldn't be exposed. For this reason, create a specific include
+> directory for use by dtc+cpp, and symlink dt-bindings from there to the
+> actual location of include/dt-bindings/. For want of a better location,
+> place this "include chroot" into the existing dts/ directory.
+> 
+> arch/*/boot/dts/include/dt-bindings -> ../../../../../dt-bindings
 
-Crap.  OK, assembly code is the way to go then.
+../../../../../include/dt-bindings
 
-> I'll try working on an assembly version given it probably
-> makes more sense, future-gcc-immunity-wise.
+And, I would expect only the headers that will actually be referenced
+by kernel should go into include/dt-bindings.  There is no point to
+put headers that will not be included by kernel but only by dts files
+into there, and instead arch/arm/boot/dts/include should just be good
+enough for them.  With this agreed ...
 
-Agreed.
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Nicolas
+> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> You can find an example of how this would be used at
+> git://nv-tegra.nvidia.com/user/swarren/linux-2.6 linux-next_common
+> (note: there's a bunch of other cruft in that branch too)
+> 
+>  arch/arm/boot/dts/include/dt-bindings |    1 +
+>  scripts/Makefile.lib                  |    3 +--
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>  create mode 120000 arch/arm/boot/dts/include/dt-bindings
+> 
+> diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
+> new file mode 120000
+> index 0000000..08c00e4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/include/dt-bindings
+> @@ -0,0 +1 @@
+> +../../../../../include/dt-bindings
+> \ No newline at end of file
+> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> index 07125e6..d6c5036 100644
+> --- a/scripts/Makefile.lib
+> +++ b/scripts/Makefile.lib
+> @@ -157,8 +157,7 @@ cpp_flags      = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
+>  ld_flags       = $(LDFLAGS) $(ldflags-y)
+>  
+>  dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
+> -		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
+> -		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
+> +		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
+>  		 -undef -D__DTS__
+>  
+>  # Finds the multi-part object the current object will be linked into
+> -- 
+> 1.7.10.4
+> 
