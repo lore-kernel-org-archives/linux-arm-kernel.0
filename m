@@ -1,61 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Feb 2013 19:04:45 +0800
-Subject: [PATCH] PM / OPP: fix condition for empty of_init_opp_table()
-Message-ID: <1361444685-1034-1-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Feb 2013 11:31:31 +0000
+Subject: [PATCH] ARM: smp_twd: change WARN() to pr_warn() on local
+ timer register failure
+In-Reply-To: <1361435877-27252-1-git-send-email-shawn.guo@linaro.org>
+References: <1361435877-27252-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130221113131.GZ17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-randconfig build reports the following error which is caused by that
-CONFIG_PM_OPP is unset.
+On Thu, Feb 21, 2013 at 04:37:57PM +0800, Shawn Guo wrote:
+> When booting a SMP build kernel with nosmp on kernel cmdline, the
+> following fat warning will be hit.  Since the local timer registeration
+> failure is expected for such boot condition, a normal pr_warn message
+> should be good enough for the failure.
 
-  CC      arch/arm/mach-imx/mach-imx6q.o
-arch/arm/mach-imx/mach-imx6q.c: In function ?imx6q_opp_init?:
-arch/arm/mach-imx/mach-imx6q.c:248:2: error: implicit declaration of function ?of_init_opp_table? [-Werror=implicit-function-declaration]
+Yes, a pr_warn here would be better.  However, you're still going to end
+up with a warning because we don't support this on UP.
 
-Fix the error by giving a more correct condition for empty
-of_init_opp_table() implementation.
+The reason you don't get a warning when you build for UP is this:
 
-Reported-by: Rob Herring <robherring2@gmail.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- include/linux/opp.h |   18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+#ifdef CONFIG_HAVE_ARM_TWD
+void twd_local_timer_of_register(void);
+#else
+static inline void twd_local_timer_of_register(void)
+{
+}
+#endif
 
-diff --git a/include/linux/opp.h b/include/linux/opp.h
-index 214e0eb..3aca2b8 100644
---- a/include/linux/opp.h
-+++ b/include/linux/opp.h
-@@ -47,15 +47,6 @@ int opp_enable(struct device *dev, unsigned long freq);
- int opp_disable(struct device *dev, unsigned long freq);
- 
- struct srcu_notifier_head *opp_get_notifier(struct device *dev);
--
--#ifdef CONFIG_OF
--int of_init_opp_table(struct device *dev);
--#else
--static inline int of_init_opp_table(struct device *dev)
--{
--	return -EINVAL;
--}
--#endif /* CONFIG_OF */
- #else
- static inline unsigned long opp_get_voltage(struct opp *opp)
- {
-@@ -112,6 +103,15 @@ static inline struct srcu_notifier_head *opp_get_notifier(struct device *dev)
- }
- #endif		/* CONFIG_PM_OPP */
- 
-+#if defined(CONFIG_PM_OPP) && defined(CONFIG_OF)
-+int of_init_opp_table(struct device *dev);
-+#else
-+static inline int of_init_opp_table(struct device *dev)
-+{
-+	return -EINVAL;
-+}
-+#endif
-+
- #if defined(CONFIG_CPU_FREQ) && defined(CONFIG_PM_OPP)
- int opp_init_cpufreq_table(struct device *dev,
- 			    struct cpufreq_frequency_table **table);
--- 
-1.7.9.5
+twd_local_timer_of_register() becomes a no-op.
+
+I think a better solution may be to also replicate this check:
+
+	if (!is_smp() || !setup_max_cpus)
+
+in twd_local_timer_of_register() so that it also becomes a no-op.
