@@ -1,54 +1,137 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Wed, 20 Feb 2013 21:49:43 -0600
-Subject: [RFC] arm: use built-in byte swap function
-In-Reply-To: <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
-References: <20130129181046.GC25415@pd.tnic>
- <20130205210436.670c62e26d2121330e87af35@freescale.com>
- <1360141322.6066.4.camel@shinybook.infradead.org>
- <20130206191905.ac8eb6743e69425f30888704@freescale.com>
- <20130207181315.GM17833@n2100.arm.linux.org.uk>
- <1360344301.6066.263.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
- <1360363233.6066.283.camel@shinybook.infradead.org>
- <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
- <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
- <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
- <20130219203115.114eab79e8d2099c6306d921@freescale.com>
- <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
- <1361356696.13482.269.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
- <1361367842.13482.279.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
- <1361372008.13482.280.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
-Message-ID: <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Wed, 20 Feb 2013 23:07:13 -0500
+Subject: [V8 PATCH 03/16] usb: ehci: ehci-mv: use PHY driver for ehci
+In-Reply-To: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
+References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <1361419646-9052-4-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Feb 2013 10:43:18 -0500
-Nicolas Pitre <nico@fluxnic.net> wrote:
+Originaly, ehci driver will call the callbacks in platform data
+for PHY initialization and shut down.
+With PHY driver, it will call the APIs provided by PHY driver
+for PHY initialization and shut down. It removes the callbacks
+in platform data, and at same time it removes one block in the
+way of enabling device tree for ehci driver.
 
-> On Wed, 20 Feb 2013, Woodhouse, David wrote:
-> > On Wed, 2013-02-20 at 09:06 -0500, Nicolas Pitre wrote:
-> > > ... in which case there is no harm shipping a .c file and trivially 
-> > > enforcing -O2, the rest being equal.
-> > 
-> > For today's compilers, unless the wind changes.
-> 
-> We'll adapt if necessary.  Going with -O2 should remain pretty safe anyway.
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+---
+ drivers/usb/host/ehci-mv.c |   48 ++++++++++++++-----------------------------
+ 1 files changed, 16 insertions(+), 32 deletions(-)
 
-Alas, not so for gcc 4.4 - I had forgotten I had tested
-Ubuntu/Linaro 4.4.7-1ubuntu2 here:
-
-https://patchwork.kernel.org/patch/2101491/
-
-add -O2 to that test script and gcc 4.4 *always* emits calls to
-__bswap[sd]i2, even with -march=armv6k+.
-
-I'll try working on an assembly version given it probably
-makes more sense, future-gcc-immunity-wise.
-
-Otherwise we're back to the old 'if GCC_VERSION >= 40500' in
-arch/arm/include/asm/swab.h...
-
-Kim
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 3065809..3e89bd4 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -15,17 +15,18 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/usb/otg.h>
++#include <linux/usb/mv_usb2.h>
+ #include <linux/platform_data/mv_usb.h>
+ 
+ #define CAPLENGTH_MASK         (0xff)
+ 
+ struct ehci_hcd_mv {
+ 	struct usb_hcd *hcd;
++	struct usb_phy *phy;
+ 
+ 	/* Which mode does this ehci running OTG/Host ? */
+ 	int mode;
+ 
+-	void __iomem *phy_regs;
+ 	void __iomem *cap_regs;
+ 	void __iomem *op_regs;
+ 
+@@ -56,22 +57,15 @@ static void ehci_clock_disable(struct ehci_hcd_mv *ehci_mv)
+ 
+ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
+ {
+-	int retval;
+-
+ 	ehci_clock_enable(ehci_mv);
+-	if (ehci_mv->pdata->phy_init) {
+-		retval = ehci_mv->pdata->phy_init(ehci_mv->phy_regs);
+-		if (retval)
+-			return retval;
+-	}
+ 
+-	return 0;
++	return usb_phy_init(ehci_mv->phy);
+ }
+ 
+ static void mv_ehci_disable(struct ehci_hcd_mv *ehci_mv)
+ {
+-	if (ehci_mv->pdata->phy_deinit)
+-		ehci_mv->pdata->phy_deinit(ehci_mv->phy_regs);
++	usb_phy_shutdown(ehci_mv->phy);
++
+ 	ehci_clock_disable(ehci_mv);
+ }
+ 
+@@ -184,22 +178,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
+-		retval = -ENODEV;
+-		goto err_clear_drvdata;
+-	}
+-
+-	ehci_mv->phy_regs = devm_ioremap(&pdev->dev, r->start,
+-					 resource_size(r));
+-	if (ehci_mv->phy_regs == 0) {
+-		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
+-		retval = -EFAULT;
+-		goto err_clear_drvdata;
+-	}
+-
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!r) {
+ 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+ 		retval = -ENODEV;
+@@ -214,6 +193,13 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		goto err_clear_drvdata;
+ 	}
+ 
++	ehci_mv->phy = devm_usb_get_phy_dev(&pdev->dev, MV_USB2_PHY_INDEX);
++	if (IS_ERR_OR_NULL(ehci_mv->phy)) {
++		dev_err(&pdev->dev, "failed to get the outer phy\n");
++		retval = PTR_ERR(ehci_mv->phy);
++		goto err_clear_drvdata;
++	}
++
+ 	retval = mv_ehci_enable(ehci_mv);
+ 	if (retval) {
+ 		dev_err(&pdev->dev, "init phy error %d\n", retval);
+@@ -241,11 +227,12 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	ehci_mv->mode = pdata->mode;
+ 	if (ehci_mv->mode == MV_USB_MODE_OTG) {
+ #ifdef CONFIG_USB_OTG_UTILS
+-		ehci_mv->otg = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
++		ehci_mv->otg = devm_usb_get_phy_dev(&pdev->dev,
++						MV_USB2_OTG_PHY_INDEX);
+ 		if (IS_ERR_OR_NULL(ehci_mv->otg)) {
+ 			dev_err(&pdev->dev,
+ 				"unable to find transceiver\n");
+-			retval = -ENODEV;
++			retval = PTR_ERR(ehci_mv->otg);
+ 			goto err_disable_clk;
+ 		}
+ 
+@@ -275,9 +262,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	if (pdata->private_init)
+-		pdata->private_init(ehci_mv->op_regs, ehci_mv->phy_regs);
+-
+ 	dev_info(&pdev->dev,
+ 		 "successful find EHCI device with regs 0x%p irq %d"
+ 		 " working in %s mode\n", hcd->regs, hcd->irq,
+-- 
+1.7.4.1
