@@ -1,157 +1,75 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Thu, 21 Feb 2013 15:35:25 +0100
-Subject: [PATCH 2/3] crypto: sahara: Add driver for SAHARA2 accelerator.
-In-Reply-To: <201302211313.46078.arnd@arndb.de>
-References: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
- <1361449162-27302-3-git-send-email-javier.martin@vista-silicon.com>
- <201302211313.46078.arnd@arndb.de>
-Message-ID: <CACKLOr2ytmqB3NtPy6+0feGcGux7-PtR47RVYe1RMu6ftJXtqQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Feb 2013 14:37:16 +0000
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <51262A7A.8040103@ti.com>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <20130221103705.GB17852@n2100.arm.linux.org.uk> <51261F38.2030902@ti.com>
+ <20130221134656.GC17852@n2100.arm.linux.org.uk> <51262A7A.8040103@ti.com>
+Message-ID: <20130221143716.GD17852@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-thanks for your review.
+(Dropped uboot mailing list because it constantly holds my mails for
+moderation.)
 
-On 21 February 2013 14:13, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 21 February 2013, Javier Martin wrote:
->> +
->> +struct sahara_dev {
->> +     struct device           *device;
->> +     void __iomem            *regs_base;
->> +     struct clk              *clk_ipg;
->> +     struct clk              *clk_ahb;
->> +
->> +     struct sahara_ctx       *ctx;
->> +     spinlock_t              lock;
->> +     struct crypto_queue     queue;
->> +     unsigned long           flags;
->> +
->> +     struct tasklet_struct   done_task;
->> +     struct tasklet_struct   queue_task;
->> +
->> +     struct sahara_hw_desc   *hw_desc[SAHARA_MAX_HW_DESC];
->> +     dma_addr_t              hw_phys_desc[SAHARA_MAX_HW_DESC];
->> +
->> +     u8                      *key_base;
->> +     dma_addr_t              key_phys_base;
->> +
->> +     u8                      *iv_base;
->> +     dma_addr_t              iv_phys_base;
->> +
->> +     struct sahara_hw_link   *hw_link[SAHARA_MAX_HW_LINK];
->> +     dma_addr_t              hw_phys_link[SAHARA_MAX_HW_LINK];
->> +
->> +     struct ablkcipher_request *req;
->> +     size_t                  total;
->> +     struct scatterlist      *in_sg;
->> +     unsigned int            nb_in_sg;
->> +     struct scatterlist      *out_sg;
->> +     unsigned int            nb_out_sg;
->> +
->> +     u32                     error;
->> +     struct timer_list       watchdog;
->> +};
->> +
->> +static struct sahara_dev *dev_ptr;
->
-> Please remove this global device pointer, it should not be needed, since you
-> can store the pointer in the context object.
+On Thu, Feb 21, 2013 at 09:08:58AM -0500, Tom Rini wrote:
+> On 02/21/2013 08:46 AM, Russell King - ARM Linux wrote:
+> > We're about to make it harder how?  By forcing them to use DT
+> > blobs? Or by forcing them to have to use the combined zImage + DT
+> > format because their boot loaders are soo broken that they can't
+> > deal with multiple images?
+> 
+> None of that.  We're making it harder since most folks don't have a
+> board with 'bootz' built-in and the 'uImage' target doesn't build now
+> (unless, yes, you pass LOADADDR to make) so they either format it by
+> hand (/ adjust their local scripting) or do what you're doing.
 
-Ok. Looks cleaner this way.
+And adjusting their process to pass an additional argument to the
+kernel make is too difficult?
 
+So instead we have to change the kernel makefiles and scripting to
+create yet another uboot specific format, which is going to need
+them to edit their scripts in a much more invasive way _anyway_?
 
->
->> +#ifdef DEBUG
->> +
->> +static char *sahara_state[4] = { "Idle", "Busy", "Error", "HW Fault" };
->> +
->> +static void sahara_decode_status(struct sahara_dev *dev, unsigned int status)
->> +{
->> +     u8 state = SAHARA_STATUS_GET_STATE(status);
->
-> You can simplify the code a lot if you replace the #ifdef around the function
-> with an
->
->         if (!IS_ENBLED(DEBUG))
->                 return;
->
-> at the start of the function. That will lead to gcc completely removing the
-> code an everything referenced by it.
->
+"or do what you're doing" - oh you mean, adding an additional column
+to the database configuration, digging out from the kernel git
+history what the load addresses should be, updating the database tables
+with that, editing the build system scripts to extract this new column
+from the database, and pass it into make... yes, complicated isn't it.
+Didn't take long to sort out though, and didn't require a load of new
+file formats to fix.
 
-Great. Thank you for the tip.
+> > Yes, things have become a _little_ harder since OMAP has switched
+> > to multiplatform, but it really isn't that bad.  My build and boot
+> > test system still works, and it uses uImage for all the OMAP
+> > platforms. You just have to give the right LOADADDR= argument to
+> > the kernel to make the uImage generation work again.  Sure, the
+> > resulting uImage can't be loaded at a different address, but you if
+> > you need to change that, you can quite easily move the existing
+> > uImage out and re-run make ARCH=arm uImage LOADADDR=<something
+> > else> and hey presto, you end up with the uImage generated for a
+> > different address.
+> > 
+> > But: we wouldn't be in this situation if it weren't for these
+> > absurd uboot uImage formats in the first place.  Or even be needing
+> > this FIT stuff if zImage was just used directly.
+> 
+> FIT isn't required.  FIT is just trying to offer a nice usability
+> thing to folks.  A point of device trees is a single image works in a
+> lot of places.  FIT gives you a single file works in a lot of places.
 
->> +static void sahara_aes_done_task(unsigned long data)
->> +{
->> +     struct sahara_dev *dev = (struct sahara_dev *)data;
->> +     unsigned long flags;
->> +
->> +     dma_unmap_sg(dev->device, dev->out_sg, dev->nb_out_sg,
->> +             DMA_TO_DEVICE);
->> +     dma_unmap_sg(dev->device, dev->in_sg, dev->nb_in_sg,
->> +             DMA_FROM_DEVICE);
->> +
->> +     spin_lock_irqsave(&dev->lock, flags);
->> +     clear_bit(FLAGS_BUSY, &dev->flags);
->> +     spin_unlock_irqrestore(&dev->lock, flags);
->> +
->> +     dev->req->base.complete(&dev->req->base, dev->error);
->> +}
->
-> Does dev->lock have to be irq-disabled? You don't seem to take it
-> from an interrupt handler.
->
-> Also, when you know that code is called without irqs enabled and
-> you just want to disable them, you can use the cheaper spin_lock_irq()
-> rather than spin_lock_irqsave().
->
-> In short, use either spin_lock_irq or spin_lock here. When protecting
-> against a tasklet, you will need spin_lock_bh.
+Well, FIT isn't everywhere either.  So really that argument doesn't
+stand for the same reasons that bootz support isn't everywhere either.
 
-You are right, dev->lock is only held by encrypt()/decrypt() callbacks
-and some tasklets so spin_lock() and spin_lock_bh() seem suitable
-here.
+My SDP4430's uboot provided by TI uses uboot 1.1.4.  Therefore, it
+doesn't support FIT, nor bootz - only uImage.
 
->> +
->> +void sahara_watchdog(unsigned long data)
->> +{
->> +     struct sahara_dev *dev = (struct sahara_dev *)data;
->> +     unsigned int err = sahara_read(dev, SAHARA_REG_ERRSTATUS);
->> +#ifdef DEBUG
->> +     unsigned int stat = sahara_read(dev, SAHARA_REG_STATUS);
->> +     sahara_decode_status(dev, stat);
->> +#endif
->
-> When you kill off the #ifdef, you should move this sahara_read()
-> call into the sahara_decode_status() function so it gets
-> compiled conditionally.
->
+> > uboot dug _itself_ into this hole.  It's uboot's problem.
+> 
+> A whole lot  of people dug this particular hole.  Joel is trying to
+> offer up a solution that maybe makes things easier for everyone.  Or
+> it gets rejected here too and distros will come up with their N
+> different ways to try and provide easier experiences to the end user.
 
-All right.
-
->> +static struct platform_device_id sahara_platform_ids[] = {
->> +     { .name = "sahara-imx27" },
->> +     { /* sentinel */ }
->> +};
->> +MODULE_DEVICE_TABLE(platform, sahara_platform_ids);
->
-> You are missing the of_device_ids here. We probably don't even
-> need the platform_device_id list and can instead mandate that
-> this is only used by platforms that are already converted to
-> DT booting.
->
-> Please also add a DT binding document for this driver that mentions
-> the name and the resources that need to be provided.
-
-Please, take a look at 0/3 to discuss about this matter.
-
-Regards.
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+FIT just propagates the "boot loader specific file format" absurdity
+which was a mistake when uImage came along...
