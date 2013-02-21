@@ -1,34 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 21 Feb 2013 18:29:24 +0530
-Subject: [PATCH 6/9] ARM: OMAP4+: Remove out of placed smp_wmb() in
- secondary wakeup code
-In-Reply-To: <51261945.4040508@cogentembedded.com>
-References: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
- <1361373527-21695-7-git-send-email-santosh.shilimkar@ti.com>
- <51261945.4040508@cogentembedded.com>
-Message-ID: <51261A2C.6020707@ti.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Thu, 21 Feb 2013 18:28:19 +0530
+Subject: [PATCH v7 00/12] Tegra114 clockframework
+In-Reply-To: <5123C6E7.9070407@wwwdotorg.org>
+References: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
+ <5123C6E7.9070407@wwwdotorg.org>
+Message-ID: <512619EB.4030103@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 February 2013 06:25 PM, Sergei Shtylyov wrote:
-> Hello.
+On Wednesday 20 February 2013 12:09 AM, Stephen Warren wrote:
+> On 02/15/2013 05:36 AM, Peter De Schrijver wrote:
+>> This is the seventh version of the Tegra114 clockframework. It is based on the
+>> for-next branch of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git and
+>> http://www.spinics.net/lists/arm-kernel/msg220452.html.
+> Mike,
 >
-> On 20-02-2013 19:18, Santosh Shilimkar wrote:
+> I think it'd be prudent to take this series through the Tegra tree again
+> for 3.10; patch 11 needs to go in as part of the series due to internal
+> dependencies, and I'm slightly worried that other Tegra DT changes might
+> conflict with that patch (if only for context). Taking this series (and
+> any other Tegra clk driver changes for 3.10) through the Tegra tree
+> could resolve that easily. Do you have a problem with that?
 >
->> The smp_wmb() here is out of placed
+> If that's OK, can you stage the dependency Peter mentioned:
+> http://www.spinics.net/lists/arm-kernel/msg220452.html
+> into a stable branch for me to merge, obviously after 3.9-rc1 is out.
 >
->     s/placed/place/
+> Thanks.
 >
->> and redundant. So remove it. It is
->> a left over of the pain_release
->
->    Sure it's not 'pen_release'?
->
->> cleanup mostly.
->
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->
-Yes... Will fix.
+> Prashant, could you provide a review/ack for this series too.
 
-Regards,
-Santosh
+For the series
+
+Reviewed-by: Prashant Gaikwad <pgaikwad@nvidia.com>
