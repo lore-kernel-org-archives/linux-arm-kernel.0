@@ -1,73 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Feb 2013 19:08:20 +0000
-Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <20130221182724.GA14329@obsidianresearch.com>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130221103705.GB17852@n2100.arm.linux.org.uk> <51261F38.2030902@ti.com>
- <20130221134656.GC17852@n2100.arm.linux.org.uk> <51262A7A.8040103@ti.com>
- <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
- <20130221182724.GA14329@obsidianresearch.com>
-Message-ID: <20130221190820.GF17852@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Feb 2013 20:09:45 +0100
+Subject: [PATCH v3 08/12] gpio: pxa: move gpio properties into child node
+In-Reply-To: <1361164358-5845-9-git-send-email-haojian.zhuang@linaro.org>
+References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
+ <1361164358-5845-9-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkda7P5GsOB=s0YbeV2rXbpQaHQNkr0Po73Lwo-vyFcN1Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 21, 2013 at 11:27:24AM -0700, Jason Gunthorpe wrote:
-> On Thu, Feb 21, 2013 at 12:25:21PM -0500, Nicolas Pitre wrote:
-> 
-> > So let's stop kidding ourselves and be coherent please: either we move 
-> > device specifics away from the kernel, or we keep them together.  In 
-> > other words, the DT should ideally come preinstalled with the bootloader 
-> > on a given board/device for distros to not even have to care about it, 
-> > or we put that data back inside the kernel and dispense ourselves from 
-> > all the added DT overhead entirely.  But an hybrid mixed solution like 
-> > FIT is IMHO the worst of both worlds and sending a wrong message.
-> 
-> Just to thread jack a bit here..
-> 
-> We've been using DT on production embedded stuff sice about 2.6.20ish
-> on PPC and now ARM. We treat the dtb as a kernel version specific
-> file, much like an initrd and ensure that the kernel only ever boots
-> with its proper dtb. This is based on experience that the dtbs change
-> depending on the state of the drivers in the kernel, what gets
-> mainlined and when, etc.
+On Mon, Feb 18, 2013 at 6:12 AM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-Just be aware that on ARM at some point, the DT files will be moved
-out of the kernel source and held in an independent git tree; there
-won't be any intention of "kernel version dependence" - if there is
-then kernel maintanence has failed - and the use of DT has failed too.
+> Move gpio properties into child node. So pinctrl driver could binds to
+> each gpio chip with gpio range.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+(...)
+> +       np = pdev->dev.of_node;
+> +#ifdef CONFIG_OF
+> +       if (np)
+> +               next = of_get_next_child(np, NULL);
+> +#endif
+(...)
+> +#ifdef CONFIG_OF
+> +               if (np) {
+> +                       gc->of_node = next;
+> +                       next = of_get_next_child(np, next);
+> +
+> +                       gc->of_xlate = pxa_gpio_of_xlate;
+> +                       gc->of_gpio_n_cells = 2;
+> +               }
+>  #endif
+(...)
+> +       of_node_put(next);
 
-The stated point of DT is that it describes the hardware.  If there's
-a dependence on the kernel version, then it's doing more than describing
-the hardware - it would be describing the kernel implementation as well.
+So if you're #ifdef:in all the other of_* stuff, why are you not
+#ifdef:in this?
 
-> Embedding this stuff into the bootloader is *not* desirable for my
-> embedded scenarios. We don't use FIT (or uboot) but we do the same
-> thing: a single image is constructed with the proper dtb, kernel and
-> initrd, and that is what the bootloader boots.
+Is the #ifdef really necessary by the way, or will there be stubs
+handling it?
 
-Note that the combined zImage plus DTB today on ARM is just a stop-gap
-for boot loaders which provide only an ATAG based booting solution.
-It's not there as a long term kernel facility.  It will probably be
-going away when the DT files are moved out of the kernel source tree.
+Have you considered using IS_ENABLED() from <linux/kconfig.h>?
 
-> Why? This is an embedded appliance product. We need to be able to
-> deliver firmware upgrades that *work*. We can't brick the board
-> because the bootloader and kernel get out of sync. The boot loader has
-> to be *simple*, it has to boot every past, present and future kernel
-> or we start taking risks that a firmware flash will end up bricking
-> it.
-
-If the DT file describes the hardware properly, then you shouldn't
-need to update it.  Or if the DT file contains a bug (eg, because it
-doesn't describe how things are wired) then it's wrong whatever.
-
-But whatever.  There's absolutely no problem storing the DT file
-separately from the boot loader, and also separately from the kernel
-itself (this is something that has been stated will be the normal
-way that DT will be dealt with when DT on ARM was first mooted.)
-
-If that's not the case, then we're really just playing one huge game
-with DT, causing lots of pointless churn for no benefit to people
-like you, and we might as well stop kidding ourselves that DT gives
-us any advantages what so ever.  We might as well go back to putting
-this data right back into the kernel in C file form.
+Yours,
+Linus Walleij
