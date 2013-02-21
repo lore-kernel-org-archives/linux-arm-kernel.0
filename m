@@ -1,46 +1,37 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 21 Feb 2013 21:56:05 +0100
-Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <20130221182724.GA14329@obsidianresearch.com> (Jason Gunthorpe's
- message of "Thu, 21 Feb 2013 11:27:24 -0700")
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130221103705.GB17852@n2100.arm.linux.org.uk>
- <51261F38.2030902@ti.com>
- <20130221134656.GC17852@n2100.arm.linux.org.uk>
- <51262A7A.8040103@ti.com>
- <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
- <20130221182724.GA14329@obsidianresearch.com>
-Message-ID: <878v6hfkt6.fsf@dell.be.48ers.dk>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 21 Feb 2013 21:59:29 +0100
+Subject: [PATCH 0/3] crypto: sahara: Add support for SAHARA in i.MX27.
+In-Reply-To: <CAOMZO5BrNU0mr1snG1ftiFD-=FuWfu=1_Lgi5_Q+uBxJzz1CYA@mail.gmail.com>
+ (Fabio Estevam's message of "Thu, 21 Feb 2013 13:47:23 -0300")
+References: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
+ <201302211259.26763.arnd@arndb.de>
+ <CACKLOr1-EPK=DLz0SY+1E35qSMdtCsueuqdzV4VZdbkoM+TD6A@mail.gmail.com>
+ <201302211440.59577.arnd@arndb.de>
+ <20130221152310.GA1906@pengutronix.de>
+ <CAOMZO5Cw4fKY_hjtZtvR1sKFY8GvQMVN2RcRCS99FVRerS-Acg@mail.gmail.com>
+ <87ehg9k4cm.fsf@lebrac.rtp-net.org>
+ <CAOMZO5BrNU0mr1snG1ftiFD-=FuWfu=1_Lgi5_Q+uBxJzz1CYA@mail.gmail.com>
+Message-ID: <87a9qxjscu.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Jason" == Jason Gunthorpe <jgunthorpe@obsidianresearch.com> writes:
+Fabio Estevam <festevam@gmail.com> writes:
 
 Hi,
 
- Jason> We've been using DT on production embedded stuff sice about 2.6.20ish
- Jason> on PPC and now ARM. We treat the dtb as a kernel version specific
- Jason> file, much like an initrd and ensure that the kernel only ever boots
- Jason> with its proper dtb. This is based on experience that the dtbs change
- Jason> depending on the state of the drivers in the kernel, what gets
- Jason> mainlined and when, etc.
+> On Thu, Feb 21, 2013 at 1:40 PM, Arnaud Patard
+> <arnaud.patard@rtp-net.org> wrote:
+>
+>> How different are the variants ? I've a imx51 device with DT support so
+>> if someone running sahara on a system with DT is needed, I can be this
+>> person (as long as a way to test it is provided too).
+>
+> mx27 has Saharav2, mx51 has Saharav4. I didn't check the differences
+> in detail though.
+>
+> For mx51 the Sahara block is described in the document "MCIMX51
+> Applications Processor Security Reference Manual, Rev. 1"
 
- Jason> Embedding this stuff into the bootloader is *not* desirable for my
- Jason> embedded scenarios. We don't use FIT (or uboot) but we do the same
- Jason> thing: a single image is constructed with the proper dtb, kernel and
- Jason> initrd, and that is what the bootloader boots.
+Sorry but this document is not freely available so I can't look at it.
 
- Jason> Why? This is an embedded appliance product. We need to be able to
- Jason> deliver firmware upgrades that *work*. We can't brick the board
- Jason> because the bootloader and kernel get out of sync. The boot loader has
- Jason> to be *simple*, it has to boot every past, present and future kernel
- Jason> or we start taking risks that a firmware flash will end up bricking
- Jason> it.
-
-I'm having the exact same experience (and handle it in the same way).
-
-I know this was not the intention of DT, but unfortunately this is how
-things have turned out so far.
-
--- 
-Bye, Peter Korsgaard
+Arnaud
