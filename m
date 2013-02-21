@@ -1,36 +1,25 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 21 Feb 2013 18:28:19 +0530
-Subject: [PATCH v7 00/12] Tegra114 clockframework
-In-Reply-To: <5123C6E7.9070407@wwwdotorg.org>
-References: <1360931849-7090-1-git-send-email-pdeschrijver@nvidia.com>
- <5123C6E7.9070407@wwwdotorg.org>
-Message-ID: <512619EB.4030103@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Feb 2013 12:59:26 +0000
+Subject: [PATCH 0/3] crypto: sahara: Add support for SAHARA in i.MX27.
+In-Reply-To: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1361449162-27302-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <201302211259.26763.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 February 2013 12:09 AM, Stephen Warren wrote:
-> On 02/15/2013 05:36 AM, Peter De Schrijver wrote:
->> This is the seventh version of the Tegra114 clockframework. It is based on the
->> for-next branch of
->> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git and
->> http://www.spinics.net/lists/arm-kernel/msg220452.html.
-> Mike,
->
-> I think it'd be prudent to take this series through the Tegra tree again
-> for 3.10; patch 11 needs to go in as part of the series due to internal
-> dependencies, and I'm slightly worried that other Tegra DT changes might
-> conflict with that patch (if only for context). Taking this series (and
-> any other Tegra clk driver changes for 3.10) through the Tegra tree
-> could resolve that easily. Do you have a problem with that?
->
-> If that's OK, can you stage the dependency Peter mentioned:
-> http://www.spinics.net/lists/arm-kernel/msg220452.html
-> into a stable branch for me to merge, obviously after 3.9-rc1 is out.
->
-> Thanks.
->
-> Prashant, could you provide a review/ack for this series too.
+On Thursday 21 February 2013, Javier Martin wrote:
+> This series of patches provide AES-ECB and AES-CBC support
+> for the SAHARA2 cryptographic accelerator which is inside the i.MX27 SoC.
+> It is expected that more algorithms will be supported in the future.
+> 
+> For testing, a Visstrim M10 board has been used and the code related
+> to this platform has been included too.
 
-For the series
+As a new device driver, this needs to be supported on the DT based imx27
+machines, while support for the individual board files seems unnecessary.
 
-Reviewed-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+How about converting the Visstrim M10 board file over to DT so you don't
+have to add any more infrastructure for imx that we will just have to
+remove again one day?
+
+	Arnd
