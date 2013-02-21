@@ -1,36 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Feb 2013 11:31:31 +0000
-Subject: [PATCH] ARM: smp_twd: change WARN() to pr_warn() on local
- timer register failure
-In-Reply-To: <1361435877-27252-1-git-send-email-shawn.guo@linaro.org>
-References: <1361435877-27252-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130221113131.GZ17833@n2100.arm.linux.org.uk>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Thu, 21 Feb 2013 13:09:43 +0100
+Subject: [RFC/NOT FOR MERGING 2/3] serial: omap: remove hwmod dependency
+In-Reply-To: <20130221101603.GI23234@tbergstrom-lnx.Nvidia.com> (Peter De
+ Schrijver's message of "Thu, 21 Feb 2013 12:16:03 +0200")
+References: <1360840554-26901-2-git-send-email-balbi@ti.com>
+ <20130214171253.GC7144@atomide.com>
+ <20130214175650.GA25891@arwen.pp.htv.fi>
+ <20130214181217.GA11806@atomide.com>
+ <20130214192719.GB26679@arwen.pp.htv.fi>
+ <20130214193911.GD11806@atomide.com>
+ <alpine.DEB.2.00.1302141946110.11016@utopia.booyaka.com>
+ <20130215064429.GA30038@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1302191530190.32069@utopia.booyaka.com>
+ <20130220191638.GA25609@arwen.pp.htv.fi>
+ <20130221101603.GI23234@tbergstrom-lnx.Nvidia.com>
+Message-ID: <87txp5hnqw.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 21, 2013 at 04:37:57PM +0800, Shawn Guo wrote:
-> When booting a SMP build kernel with nosmp on kernel cmdline, the
-> following fat warning will be hit.  Since the local timer registeration
-> failure is expected for such boot condition, a normal pr_warn message
-> should be good enough for the failure.
+>>>>> "Peter" == Peter De Schrijver <pdeschrijver@nvidia.com> writes:
 
-Yes, a pr_warn here would be better.  However, you're still going to end
-up with a warning because we don't support this on UP.
+ >> 
+ >> Also, IMHO reset should always be done during probe() so driver can be
+ >> dead sure that we're starting from a known state. This is even more
 
-The reason you don't get a warning when you build for UP is this:
+ Peter> Depends on the IP block. Eg: you might want to keep the screen
+ Peter> showing the contents drawn by the bootloader while booting the
+ Peter> kernel and smoothly change to a new image when userspace comes
+ Peter> online. In that case you probably don't want to blindly reset
+ Peter> the display controller for example.
 
-#ifdef CONFIG_HAVE_ARM_TWD
-void twd_local_timer_of_register(void);
-#else
-static inline void twd_local_timer_of_register(void)
-{
-}
-#endif
+Indeed. Another recent example was gpio pins (controlling stuff like
+reset signals) where the bootloader had already set things up correctly
+and the reset caused pins to toggle.
 
-twd_local_timer_of_register() becomes a no-op.
-
-I think a better solution may be to also replicate this check:
-
-	if (!is_smp() || !setup_max_cpus)
-
-in twd_local_timer_of_register() so that it also becomes a no-op.
+-- 
+Bye, Peter Korsgaard
