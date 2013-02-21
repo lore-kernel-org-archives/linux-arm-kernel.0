@@ -1,31 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Feb 2013 15:29:03 +0800
-Subject: i.MX6 Solo: maxcpus=1 vs. nosmp: Warning from smp_twd.c?
-In-Reply-To: <5125C9B1.8050209@de.bosch.com>
-References: <511CF063.3010200@de.bosch.com>
- <20130214143752.GH17833@n2100.arm.linux.org.uk>
- <20130218025021.GI6782@S2101-09.ap.freescale.net>
- <5125C9B1.8050209@de.bosch.com>
-Message-ID: <20130221072900.GA23442@S2101-09.ap.freescale.net>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 21 Feb 2013 08:37:18 +0100
+Subject: GPIO sysfs 'default' values
+In-Reply-To: <1361430680.10390.7.camel@gitbox>
+References: <1361430680.10390.7.camel@gitbox>
+Message-ID: <20773.52910.72747.877165@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 21, 2013 at 08:16:01AM +0100, Dirk Behme wrote:
-> >diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> >index c092115..f796b83 100644
-> >--- a/arch/arm/kernel/smp_twd.c
-> >+++ b/arch/arm/kernel/smp_twd.c
-> >@@ -392,6 +392,6 @@ void __init twd_local_timer_of_register(void)
-> >        err = twd_local_timer_common_register(np);
-> >
-> > out:
-> >-       WARN(err, "twd_local_timer_of_register failed (%d)\n", err);
-> >+       pr_warn("twd_local_timer_of_register failed (%d)\n", err);
-> > }
-> > #endif
-> 
-> Any news on this? Time to move it to the patch system?
-> 
-Thanks for reminding.  I will send it out today.
+Hi,
 
-Shawn
+Tony Prisk writes:
+> Hi Grant, Linus.
+> 
+> I was testing our new gpio/pinctrl driver today and noticed something a
+> little weird.
+> 
+> I exported gpio0 via sysfs and echoed the direction value - it was 'in'.
+> This pin is used to control an LCD panel, and is actually in 'out' mode.
+> If I write 'in' to direction, it changes mode to 'in' and the panel
+> turns off. Setting it back to 'out' and value=0, and the panel turns on
+> again.
+> 
+> I noticed that I had no gpiochip->get_direction, so I added it, but the
+> result was the same.
+> 
+> Any idea what I've missed?
+> 
+You missed to report on what platform this happens.
+The platform specific GPIO driver obviously does not initialize the
+shadow variables for the hardware registers correctly.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
