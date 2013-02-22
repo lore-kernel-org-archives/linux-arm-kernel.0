@@ -1,66 +1,47 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 22 Feb 2013 19:52:14 +0100 (CET)
-Subject: too many timer retries happen when do local timer swtich with
- broadcast timer
-In-Reply-To: <20130222152639.GH12140@e102568-lin.cambridge.arm.com>
-References: <alpine.LFD.2.02.1302211436300.22263@ionos>
- <51263975.20906@ti.com> <alpine.LFD.2.02.1302212214020.22263@ionos>
- <5127436E.4040100@ti.com> <alpine.LFD.2.02.1302221122290.22263@ionos>
- <20130222103149.GC12140@e102568-lin.cambridge.arm.com>
- <51275058.7010809@ti.com> <alpine.LFD.2.02.1302221212500.22263@ionos>
- <20130222144829.GG12140@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.02.1302221558000.22263@ionos>
- <20130222152639.GH12140@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1302221946070.22263@ionos>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 22 Feb 2013 11:01:39 -0800
+Subject: [PATCH 0/2] cpustat: use atomic operations to read/update stats
+In-Reply-To: <20130222142302.GC18149@somewhere.redhat.com> (Frederic
+ Weisbecker's message of "Fri, 22 Feb 2013 15:23:05 +0100")
+References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
+ <1361522767.26780.44.camel@laptop>
+ <20130222125019.GC17948@somewhere.redhat.com>
+ <1361542150.26780.64.camel@laptop>
+ <1361542891.3683.6.camel@edumazet-glaptop>
+ <20130222142302.GC18149@somewhere.redhat.com>
+Message-ID: <87y5egyxyk.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Feb 2013, Lorenzo Pieralisi wrote:
-> On Fri, Feb 22, 2013 at 03:03:02PM +0000, Thomas Gleixner wrote:
-> > On Fri, 22 Feb 2013, Lorenzo Pieralisi wrote:
-> > > On Fri, Feb 22, 2013 at 12:07:30PM +0000, Thomas Gleixner wrote:
-> > > > Now we could make use of that and avoid going deep idle just to come
-> > > > back right away via the IPI. Unfortunately the notification thingy has
-> > > > no return value, but we can fix that.
-> > > > 
-> > > > To confirm that theory, could you please try the hack below and add
-> > > > some instrumentation (trace_printk)?
-> > > 
-> > > Applied, and it looks like that's exactly why the warning triggers, at least
-> > > on the platform I am testing on which is a dual-cluster ARM testchip.
-> > > 
-> > > There is a still time window though where the CPU (the IPI target) can get
-> > > back to idle (tick_broadcast_pending still not set) before the CPU target of
-> > > the broadcast has a chance to run tick_handle_oneshot_broadcast (and set
-> > > tick_broadcast_pending), or am I missing something ?
-> > 
-> > Well, the tick_broadcast_pending bit is uninteresting if the
-> > force_broadcast bit is set. Because if that bit is set we know for
-> > sure, that we got woken with the cpu which gets the broadcast timer
-> > and raced back to idle before the broadcast handler managed to
-> > send the IPI.
-> 
-> Gah, my bad sorry, I mixed things up. I thought
-> 
-> tick_check_broadcast_pending()
-> 
-> was checking against the tick_broadcast_pending mask not
-> 
-> tick_force_broadcast_mask
+Frederic Weisbecker <fweisbec@gmail.com> writes:
 
-Yep, that's a misnomer. I just wanted to make sure that my theory is
-correct. I need to think about the real solution some more.
+> On Fri, Feb 22, 2013 at 06:21:31AM -0800, Eric Dumazet wrote:
+>> On Fri, 2013-02-22 at 15:09 +0100, Peter Zijlstra wrote:
+>> > On Fri, 2013-02-22 at 13:50 +0100, Frederic Weisbecker wrote:
+>> > > > Argh!! at what cost? 64bit atomics are like expensive. Wouldn't
+>> > > adding
+>> > > > a seqlock be saner?
+>> > > 
+>> > > Not sure. This requires a spinlock in the write side which is called
+>> > > from
+>> > > fast path like the timer interrupt.
+>> > 
+>> > A single spinlock is _way_ cheaper than a ton of cmpxchg8b()s to update
+>> > a few variables.
+>> 
+>> We also have include/linux/u64_stats_sync.h since 2.6.36
+>
+> Interesting, we should probably use that instead.
 
-We have two alternatives:
+OK, I'll spin a version using the u64_stats interface.
 
-1) Make the clockevents_notify function have a return value.
+Unfortunately, for 32-bit platforms that have atomic 64-bit loads
+stores[1], u64_stats leads to some unnecessary overhead, but I'll look
+at possibly optimizing u64_stats for those platforms as a follow-up
+patch.
 
-2) Add something like the hack I gave you with a proper name.
+Kevin
 
-The latter has the beauty, that we just need to modify the platform
-independent idle code instead of going down to every callsite of the
-clockevents_notify thing.
-
-Thanks,
-
-	tglx
+[1] ARM >= v6k devices have ldrexd/strexd instructions for 64-bit loads
+    stores which are used by the atomic64 accessors on those devices.
+    (c.f. arch/arm/include/asm/atomic.h:atomic64_read()
