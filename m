@@ -1,111 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 22 Feb 2013 11:51:43 +0530
-Subject: [PATCH 1/2] cpustat: use accessor functions for get/set/add
-In-Reply-To: <1361512604-2720-2-git-send-email-khilman@linaro.org>
-References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
- <1361512604-2720-2-git-send-email-khilman@linaro.org>
-Message-ID: <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 22 Feb 2013 14:24:25 +0800
+Subject: [PATCH 1/3] ARM: tegra: Fix unchecked return value
+Message-ID: <1361514267-12111-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 11:26 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> Add some accessor functions in order to facilitate the conversion to
-> atomic reads/writes of cpustat values.
->
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
->  drivers/cpufreq/cpufreq_governor.c | 18 ++++++++---------
->  drivers/cpufreq/cpufreq_ondemand.c |  2 +-
+From: Hiroshi Doyu <hdoyu@nvidia.com>
 
-> diff --git a/drivers/cpufreq/cpufreq_governor.c b/drivers/cpufreq/cpufreq_governor.c
-> index 6c5f1d3..ec6c315 100644
-> --- a/drivers/cpufreq/cpufreq_governor.c
-> +++ b/drivers/cpufreq/cpufreq_governor.c
-> @@ -36,12 +36,12 @@ static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
->
->         cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
->
-> -       busy_time = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
-> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
-> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
-> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
-> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
-> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
-> +       busy_time = kcpustat_cpu_get(cpu, CPUTIME_USER);
-> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SYSTEM);
-> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_IRQ);
-> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SOFTIRQ);
-> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_STEAL);
-> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_NICE);
->
->         idle_time = cur_wall_time - busy_time;
->         if (wall)
-> @@ -103,7 +103,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
->                         u64 cur_nice;
->                         unsigned long cur_nice_jiffies;
->
-> -                       cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
-> +                       cur_nice = kcpustat_cpu_get(j, CPUTIME_NICE) -
->                                          cdbs->prev_cpu_nice;
->                         /*
->                          * Assumption: nice time between sampling periods will
-> @@ -113,7 +113,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
->                                         cputime64_to_jiffies64(cur_nice);
->
->                         cdbs->prev_cpu_nice =
-> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
->                         idle_time += jiffies_to_usecs(cur_nice_jiffies);
->                 }
->
-> @@ -216,7 +216,7 @@ int cpufreq_governor_dbs(struct dbs_data *dbs_data,
->                                         &j_cdbs->prev_cpu_wall);
->                         if (ignore_nice)
->                                 j_cdbs->prev_cpu_nice =
-> -                                       kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-> +                                       kcpustat_cpu_get(j, CPUTIME_NICE);
->                 }
->
->                 /*
-> diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
-> index 7731f7c..ac5d49f 100644
-> --- a/drivers/cpufreq/cpufreq_ondemand.c
-> +++ b/drivers/cpufreq/cpufreq_ondemand.c
-> @@ -403,7 +403,7 @@ static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
->                                                 &dbs_info->cdbs.prev_cpu_wall);
->                 if (od_tuners.ignore_nice)
->                         dbs_info->cdbs.prev_cpu_nice =
-> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
->
->         }
->         return count;
+Check a return value for tegra_powergate_remove_clamping().
 
-For cpufreq:
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/platsmp.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Though i believe you also need this:
-
-diff --git a/drivers/cpufreq/cpufreq_conservative.c
-b/drivers/cpufreq/cpufreq_conservative.c
-index 64ef737..38e3ad7 100644
---- a/drivers/cpufreq/cpufreq_conservative.c
-+++ b/drivers/cpufreq/cpufreq_conservative.c
-@@ -242,7 +242,7 @@ static ssize_t store_ignore_nice_load(struct
-kobject *a, struct attribute *b,
-                                                &dbs_info->cdbs.prev_cpu_wall);
-                if (cs_tuners.ignore_nice)
-                        dbs_info->cdbs.prev_cpu_nice =
--                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-+                               kcpustat_cpu_get(j, CPUTIME_NICE);
-        }
-        return count;
- }
-
-BTW, i don't see kcpustat_cpu() used in
-
- kernel/sched/core.c                | 12 +++++-------
- kernel/sched/cputime.c             | 29 +++++++++++++--------------
-
-I searched tip/master as well as lnext/master.
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 2c6b3d5..4dfc75e 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -124,6 +124,9 @@ remove_clamps:
+ 
+ 	/* Remove I/O clamps. */
+ 	ret = tegra_powergate_remove_clamping(pwrgateid);
++	if (ret)
++		return ret;
++
+ 	udelay(10);
+ 
+ 	/* Clear flow controller CSR. */
+-- 
+1.8.1.1
