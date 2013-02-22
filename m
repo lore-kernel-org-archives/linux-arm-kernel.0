@@ -1,32 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 22 Feb 2013 18:30:02 +0100
-Subject: [PATCH v4 00/11] enhance DT support on gpio pxa
-In-Reply-To: <CAD6h2NTe5K=6fKkm=n=ZawjhoR+_sOe5McX2soT7_Af22wKvDg@mail.gmail.com>
-References: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
- <5124DE3C.2050701@compulab.co.il>
- <CAD6h2NTe5K=6fKkm=n=ZawjhoR+_sOe5McX2soT7_Af22wKvDg@mail.gmail.com>
-Message-ID: <CACRpkdYXZSTHdbGrSw5c8rHnbkNANU44ketmaOfKfX3+ixjeFg@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 22 Feb 2013 10:43:47 -0700
+Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <CA+T6QP=gHtOuZbjsbv5_GswZu7FUXW+9KVw6K06+5X_PNzqODw@mail.gmail.com>
+References: <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
+ <20130221182724.GA14329@obsidianresearch.com>
+ <alpine.LFD.2.03.1302211423190.6419@syhkavp.arg>
+ <20130221211444.GB20114@obsidianresearch.com>
+ <alpine.LFD.2.03.1302211624561.6419@syhkavp.arg>
+ <20130221231848.880DE200552@gemini.denx.de>
+ <20130221232821.GA2823@obsidianresearch.com>
+ <5126B979.5000205@gmail.com>
+ <20130222022212.GB11169@obsidianresearch.com>
+ <CA+T6QP=gHtOuZbjsbv5_GswZu7FUXW+9KVw6K06+5X_PNzqODw@mail.gmail.com>
+Message-ID: <20130222174347.GA10206@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 4:58 PM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+On Fri, Feb 22, 2013 at 02:56:33AM -0500, Jason Kridner wrote:
+> >> The desired FPGA use case is DT updates after booting the kernel. This
+> >> has nothing to do with FIT images. And if the FPGA tools generate the
+> >> DTB, then it is certainly not tied to the kernel.
+> >
+> > Completely unrelated, but do you have any pointer for how to do this?
+> > Hot plugging a 'dtb fragment' into the kernel would be really handy..
+> 
+> This doesn't answer the full question on how FPGA tools generate DTB,
+> but it is a huge problem for BeagleBone add-on hardware that we have
 
->> Linus, I wonder if you still can get this into 3.9?
->>
-> Now it's a little late. So let's see them in 3.10.
+In all my cases I hand code the DT's for the FPGA IP, they get quite
+big, the one I'm looking at now has over 17 DT nodes inside the FPGA
+already. This is why we are re-using the DT framework to describe the
+chip, not building a C coded PCI driver to do the same work.
 
-Sorry no chance for v3.9.
+> some mechanism to dynamically load DT fragments. Pantelis posted some
+> work in that direction[1] and has continued development of his patches
+> and we've been using those extensively with BeagleBone kernel
+> development[2].
 
-But I'm sad that you dropped the irqdomain patches. I'd really
-like to have that as part of the patch set.
+Yes, I saw this. They look really interesting, I think the notion of
+hot plugging a DT fragment into the main DT is useful for many
+applications..
 
-I'm not merging anything right now during the merge window,
-and I'm travelling as well, so I recommend you make a v5 which
-is complete in the sense that it includes a patch that switches
-the result to use irqdomain as well.
-
-Sorry for all the back-and-forth. :-/
-
-Yours,
-Linus Walleij
+Jason
