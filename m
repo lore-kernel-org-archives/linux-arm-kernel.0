@@ -1,47 +1,36 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 22 Feb 2013 11:01:39 -0800
-Subject: [PATCH 0/2] cpustat: use atomic operations to read/update stats
-In-Reply-To: <20130222142302.GC18149@somewhere.redhat.com> (Frederic
- Weisbecker's message of "Fri, 22 Feb 2013 15:23:05 +0100")
-References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
- <1361522767.26780.44.camel@laptop>
- <20130222125019.GC17948@somewhere.redhat.com>
- <1361542150.26780.64.camel@laptop>
- <1361542891.3683.6.camel@edumazet-glaptop>
- <20130222142302.GC18149@somewhere.redhat.com>
-Message-ID: <87y5egyxyk.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Feb 2013 19:18:25 +0000
+Subject: [PULL] VGIC fixes for KVM/ARM
+In-Reply-To: <215351192187808fc309b8f9c0541b1c@localhost>
+References: <b06d478e1008aa14c12fa1ea9f8da941@localhost>
+ <20130222154136.GD17833@n2100.arm.linux.org.uk>
+ <215351192187808fc309b8f9c0541b1c@localhost>
+Message-ID: <20130222191825.GE17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frederic Weisbecker <fweisbec@gmail.com> writes:
+On Fri, Feb 22, 2013 at 06:28:41PM +0100, Marc Zyngier wrote:
+> On Fri, 22 Feb 2013 15:41:36 +0000, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Feb 22, 2013 at 02:58:12PM +0100, Marc Zyngier wrote:
+> >> Arnd, Olof,
+> >> 
+> >> Please find below a pull request for a couple of fixes concerning
+> >> the VGIC implementation in KVM. No real hurry, these can probably
+> >> be applied after the merge window.
+> >> 
+> >> The branch is on top of mainline as of this morning, but I'm happy
+> >> to rebase it on something else if that's more convenient.
+> > 
+> > Now, why is this being thrown at arm-soc?  Is it not core ARM stuff,
+> > or is KVM being counted as yet another platform?
+> 
+> You're right. Arm-soc took care of the initial merge of the VGIC code
+> because of other dependencies, but now that it has been merged, I should
+> have sent the pull request to you. Sincere apologies.
+> 
+> Shall I send you another pull request, or would you prefer these patches
+> in the patch system?
 
-> On Fri, Feb 22, 2013 at 06:21:31AM -0800, Eric Dumazet wrote:
->> On Fri, 2013-02-22 at 15:09 +0100, Peter Zijlstra wrote:
->> > On Fri, 2013-02-22 at 13:50 +0100, Frederic Weisbecker wrote:
->> > > > Argh!! at what cost? 64bit atomics are like expensive. Wouldn't
->> > > adding
->> > > > a seqlock be saner?
->> > > 
->> > > Not sure. This requires a spinlock in the write side which is called
->> > > from
->> > > fast path like the timer interrupt.
->> > 
->> > A single spinlock is _way_ cheaper than a ton of cmpxchg8b()s to update
->> > a few variables.
->> 
->> We also have include/linux/u64_stats_sync.h since 2.6.36
->
-> Interesting, we should probably use that instead.
-
-OK, I'll spin a version using the u64_stats interface.
-
-Unfortunately, for 32-bit platforms that have atomic 64-bit loads
-stores[1], u64_stats leads to some unnecessary overhead, but I'll look
-at possibly optimizing u64_stats for those platforms as a follow-up
-patch.
-
-Kevin
-
-[1] ARM >= v6k devices have ldrexd/strexd instructions for 64-bit loads
-    stores which are used by the atomic64 accessors on those devices.
-    (c.f. arch/arm/include/asm/atomic.h:atomic64_read()
+Does it need another pull request or is your original sufficient for me
+to pull?
