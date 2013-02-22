@@ -1,85 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 22 Feb 2013 09:12:43 +0100
-Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin
- function name
-In-Reply-To: <20130222073630.GC27371@S2101-09.ap.freescale.net>
-References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
- <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
- <51251A11.2030300@wwwdotorg.org>
- <CAKGA1bkHH1XC38_VM=QhDrr33uqqSbwe0n+GfXEPs43K_Do=CQ@mail.gmail.com>
- <20130221050247.GD17738@S2101-09.ap.freescale.net>
- <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
- <20130222055203.GB27371@S2101-09.ap.freescale.net>
- <20130222072743.GC1906@pengutronix.de>
- <20130222073630.GC27371@S2101-09.ap.freescale.net>
-Message-ID: <20130222081243.GD1906@pengutronix.de>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Fri, 22 Feb 2013 08:28:34 +0000
+Subject: [PATCH XEN] xen: event channel arrays are xen_ulong_t and not
+ unsigned long
+In-Reply-To: <CD4C1B4B.4C72B%keir.xen@gmail.com>
+References: <CD4C1B4B.4C72B%keir.xen@gmail.com>
+Message-ID: <1361521714.26546.91.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 03:36:32PM +0800, Shawn Guo wrote:
-> On Fri, Feb 22, 2013 at 08:27:43AM +0100, Sascha Hauer wrote:
-> > On Fri, Feb 22, 2013 at 01:52:04PM +0800, Shawn Guo wrote:
-> > > On Thu, Feb 21, 2013 at 11:36:36AM -0600, Matt Sealey wrote:
-> > > > On Wed, Feb 20, 2013 at 11:02 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > > > > On Wed, Feb 20, 2013 at 06:03:39PM -0600, Matt Sealey wrote:
-> > > > >> I am not sure I am getting this point across, but.. damn it.. nack nack nack :D
-> > > > >>
-> > > > > Do you see any downgrade side that the series introduces over the
-> > > > > existing implementation?
-> > > > 
-> > > > Because it replaces the horribly stupid existing implementation with
-> > > > something that doesn't solve the fundamental logical problems caused
-> > > > by the existing implementation.
-> > > 
-> > > When did I say that the series is targeting to solve those "fundamental
-> > > logical problems" in *your* view?
-> > > 
-> > > ...
-> > > 
-> > > > What you've fixed it to do, as I read this patch, is this;
-> > > > 
-> > > > <arbitrary_pin_name pad_mode>
-> > > > 
-> > > No, it's not arbitrary_pin_name.  It's pin function name which comes
-> > > from hardware manual.  It may not exactly match the public reference
-> > > manual, but they are obvious to be identified.  For imx6q pad SD2_DAT1
-> > > example, the manual says:
-> > > 
-> > > Select 1 of 6 iomux modes to be used for pad: SD2_DAT1.
-> > >   000 ALT0 ? Select signal SD2_DATA1.
-> > >   001 ALT1 ? Select signal ECSPI5_SS0.
-> > >   010 ALT2 ? Select signal EIM_CS2.
-> > >   011 ALT3 ? Select signal AUD4_TXFS.
-> > >   100 ALT4 ? Select signal KEY_COL7.
-> > >   101 ALT5 ? Select signal GPIO1_IO14.
-> > 
-> > What makes them arbitrary is the fact that 110 and 111 are not encoded,
-> > so there is no way to calculate the register number from the pin number.
-> > 
-> > Also
-> > 
-> > commit 4a5f7eff8b0b34354e5c63272835e5e2dfe1c933
-> > Author: Dong Aisheng <dong.aisheng@linaro.org>
-> > Date:   Fri Jul 6 17:09:23 2012 +0800
-> > 
-> >     pinctrl: pinctrl-imx6q: add missed mux function for USBOTG_ID
-> > 
-> > Shows that they are indeed arbitrary.
-> > 
-> > I'm really with Matt here when he says that this number doesn't have to
-> > be in the binding.
+On Thu, 2013-02-21 at 18:43 +0000, Keir Fraser wrote:
+> On 21/02/2013 17:16, "Ian Campbell" <Ian.Campbell@citrix.com> wrote:
 > 
-> I think you are still talking about that arbitrary index in the old
-> binding, while I'm arguing against Matt's the comment on the new one,
-> saying the macro/pin name is arbitrary.
+> > On Tue, 2013-02-19 at 14:49 +0000, Ian Campbell wrote:
+> >> On ARM we want these to be the same size on 32- and 64-bit.
+> >> 
+> >> This is an ABI change on ARM. X86 does not change.
+> >> 
+> >> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+> >> Cc: Jan Beulich <JBeulich@suse.com>
+> >> Cc: Keir (Xen.org) <keir@xen.org>
+> > 
+> > Are you guys (un)happy with this change from the Xen & x86 side?
+> 
+> Fine by me.
 
-Sorry, I haven't read the above carefully enough. We are talking about
-the names here, not the numbers I referred to.
+I'm going to take that as an Acked-by then, assuming that's ok with you.
+I suppose Fine-by: Keir would do too ;-)
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ian.
