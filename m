@@ -1,25 +1,18 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Fri, 22 Feb 2013 14:38:37 +0100
-Subject: [PATCH 1/2] cpustat: use accessor functions for get/set/add
-In-Reply-To: <1361512604-2720-2-git-send-email-khilman@linaro.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 22 Feb 2013 14:48:46 +0100
+Subject: [PATCH 0/2] cpustat: use atomic operations to read/update stats
+In-Reply-To: <20130222125019.GC17948@somewhere.redhat.com>
 References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
- <1361512604-2720-2-git-send-email-khilman@linaro.org>
-Message-ID: <20130222133835.GF17948@somewhere.redhat.com>
+ <1361522767.26780.44.camel@laptop>
+ <20130222125019.GC17948@somewhere.redhat.com>
+Message-ID: <1361540926.26780.56.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good, just a minor neat:
+On Fri, 2013-02-22 at 13:50 +0100, Frederic Weisbecker wrote:
+> atomic64_read() and atomic64_set() are supposed to take care of that,
+> without
+> even the need for _inc() or _add() parts that use LOCK.
 
-On Thu, Feb 21, 2013 at 09:56:43PM -0800, Kevin Hilman wrote:
-> diff --git a/include/linux/kernel_stat.h b/include/linux/kernel_stat.h
-> index 66b7078..df8ad75 100644
-> --- a/include/linux/kernel_stat.h
-> +++ b/include/linux/kernel_stat.h
-> @@ -32,7 +32,7 @@ enum cpu_usage_stat {
->  };
->  
->  struct kernel_cpustat {
-> -	u64 cpustat[NR_STATS];
-> +	u64 _cpustat[NR_STATS];
-
-Why do you need the underscore?
+Are you sure? Generally atomic*_set() is not actually an atomic
+operation.
