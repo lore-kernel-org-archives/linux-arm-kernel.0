@@ -1,21 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Feb 2013 15:41:36 +0000
-Subject: [PULL] VGIC fixes for KVM/ARM
-In-Reply-To: <b06d478e1008aa14c12fa1ea9f8da941@localhost>
-References: <b06d478e1008aa14c12fa1ea9f8da941@localhost>
-Message-ID: <20130222154136.GD17833@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 22 Feb 2013 08:00:44 -0800
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+Message-ID: <20130222160044.GA16357@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 02:58:12PM +0100, Marc Zyngier wrote:
-> Arnd, Olof,
-> 
-> Please find below a pull request for a couple of fixes concerning
-> the VGIC implementation in KVM. No real hurry, these can probably
-> be applied after the merge window.
-> 
-> The branch is on top of mainline as of this morning, but I'm happy
-> to rebase it on something else if that's more convenient.
+On Wed, Feb 20, 2013 at 07:37:10PM -0600, Joel A Fernandes wrote:
+> Any comments on this approach? Is it better to merge mkfitsrc.sh with
+> mkuboot.sh?
 
-Now, why is this being thrown at arm-soc?  Is it not core ARM stuff,
-or is KVM being counted as yet another platform?
+I know this was discussed quite extensively yesterday, but here is my take on
+it:
+
+Given the recent complications from multiplatform, we really saw a strong
+reason to _not_ do the final boot wrapping in the kernel build system.
+Produce the zImage and the DTB files, and have a surrounding script that
+bundles the two in a format that your particular device needs.
+
+Most distros have scripts to handle the "make install" step of a kernel build.
+That's where this belongs, not in the actual build step.
+
+
+-Olof
