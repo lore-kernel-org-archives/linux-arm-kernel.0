@@ -1,40 +1,111 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 21 Feb 2013 21:57:46 -0800
-Subject: [RFC/PATCH 2/5] kernel_cpustat: convert to atomic 64-bit accessors
-In-Reply-To: <CAFTL4hzHbp-JYgAbMRc4tefJZh9ZVdqGMp3ZTQAe-kmaX1fC3w@mail.gmail.com>
- (Frederic Weisbecker's message of "Thu, 21 Feb 2013 22:54:43 +0100")
-References: <1361389302-11968-1-git-send-email-khilman@linaro.org>
- <1361389302-11968-3-git-send-email-khilman@linaro.org>
- <87y5ehmp8d.fsf@linaro.org>
- <CAFTL4hw1=mKtUadL0WDrydtspOehKuW7jhhzr65vXR2P2zdTWw@mail.gmail.com>
- <CAFTL4hzHbp-JYgAbMRc4tefJZh9ZVdqGMp3ZTQAe-kmaX1fC3w@mail.gmail.com>
-Message-ID: <8738woriud.fsf@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 22 Feb 2013 11:51:43 +0530
+Subject: [PATCH 1/2] cpustat: use accessor functions for get/set/add
+In-Reply-To: <1361512604-2720-2-git-send-email-khilman@linaro.org>
+References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
+ <1361512604-2720-2-git-send-email-khilman@linaro.org>
+Message-ID: <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frederic Weisbecker <fweisbec@gmail.com> writes:
+On Fri, Feb 22, 2013 at 11:26 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> Add some accessor functions in order to facilitate the conversion to
+> atomic reads/writes of cpustat values.
+>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
+>  drivers/cpufreq/cpufreq_governor.c | 18 ++++++++---------
+>  drivers/cpufreq/cpufreq_ondemand.c |  2 +-
 
-> 2013/2/21 Frederic Weisbecker <fweisbec@gmail.com>:
->> 2013/2/21 Kevin Hilman <khilman@linaro.org>:
->>> Subject: [PATCH 2/5] kernel_cpustat: convert to atomic 64-bit accessors
->>>
->>> Use the atomic64_* accessors for all the kernel_cpustat fields to
->>> ensure atomic access on non-64 bit platforms.
->>>
->>> Thanks to Mats Liljegren for CGROUP_CPUACCT related fixes.
->>>
->>> Cc: Mats Liljegren <mats.liljegren@enea.com>
->>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->>
->> Funny stuff, I thought struct kernel_cpustat was made of cputime_t
->> field. Actually it's u64. So the issue is independant from the new
->> full dynticks cputime accounting. It was already broken before.
->>
->> But yeah that's not the point, we still want to fix this anyway. But
->> let's just treat this patch as independant.
+> diff --git a/drivers/cpufreq/cpufreq_governor.c b/drivers/cpufreq/cpufreq_governor.c
+> index 6c5f1d3..ec6c315 100644
+> --- a/drivers/cpufreq/cpufreq_governor.c
+> +++ b/drivers/cpufreq/cpufreq_governor.c
+> @@ -36,12 +36,12 @@ static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
+>
+>         cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
+>
+> -       busy_time = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
+> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
+> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
+> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
+> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
+> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
+> +       busy_time = kcpustat_cpu_get(cpu, CPUTIME_USER);
+> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SYSTEM);
+> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_IRQ);
+> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SOFTIRQ);
+> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_STEAL);
+> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_NICE);
+>
+>         idle_time = cur_wall_time - busy_time;
+>         if (wall)
+> @@ -103,7 +103,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
+>                         u64 cur_nice;
+>                         unsigned long cur_nice_jiffies;
+>
+> -                       cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
+> +                       cur_nice = kcpustat_cpu_get(j, CPUTIME_NICE) -
+>                                          cdbs->prev_cpu_nice;
+>                         /*
+>                          * Assumption: nice time between sampling periods will
+> @@ -113,7 +113,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
+>                                         cputime64_to_jiffies64(cur_nice);
+>
+>                         cdbs->prev_cpu_nice =
+> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
+>                         idle_time += jiffies_to_usecs(cur_nice_jiffies);
+>                 }
+>
+> @@ -216,7 +216,7 @@ int cpufreq_governor_dbs(struct dbs_data *dbs_data,
+>                                         &j_cdbs->prev_cpu_wall);
+>                         if (ignore_nice)
+>                                 j_cdbs->prev_cpu_nice =
+> -                                       kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+> +                                       kcpustat_cpu_get(j, CPUTIME_NICE);
+>                 }
+>
+>                 /*
+> diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
+> index 7731f7c..ac5d49f 100644
+> --- a/drivers/cpufreq/cpufreq_ondemand.c
+> +++ b/drivers/cpufreq/cpufreq_ondemand.c
+> @@ -403,7 +403,7 @@ static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
+>                                                 &dbs_info->cdbs.prev_cpu_wall);
+>                 if (od_tuners.ignore_nice)
+>                         dbs_info->cdbs.prev_cpu_nice =
+> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
+>
+>         }
+>         return count;
 
-OK, I just sent an updated series based on your proposal.
+For cpufreq:
 
-Thanks for the review,
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Kevin
+Though i believe you also need this:
+
+diff --git a/drivers/cpufreq/cpufreq_conservative.c
+b/drivers/cpufreq/cpufreq_conservative.c
+index 64ef737..38e3ad7 100644
+--- a/drivers/cpufreq/cpufreq_conservative.c
++++ b/drivers/cpufreq/cpufreq_conservative.c
+@@ -242,7 +242,7 @@ static ssize_t store_ignore_nice_load(struct
+kobject *a, struct attribute *b,
+                                                &dbs_info->cdbs.prev_cpu_wall);
+                if (cs_tuners.ignore_nice)
+                        dbs_info->cdbs.prev_cpu_nice =
+-                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
++                               kcpustat_cpu_get(j, CPUTIME_NICE);
+        }
+        return count;
+ }
+
+BTW, i don't see kcpustat_cpu() used in
+
+ kernel/sched/core.c                | 12 +++++-------
+ kernel/sched/cputime.c             | 29 +++++++++++++--------------
+
+I searched tip/master as well as lnext/master.
