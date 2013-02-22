@@ -1,55 +1,50 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 22 Feb 2013 14:54:11 +0100
-Subject: [PATCH 0/2] cpustat: use atomic operations to read/update stats
-In-Reply-To: <1361540926.26780.56.camel@laptop>
-References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
- <1361522767.26780.44.camel@laptop>
- <20130222125019.GC17948@somewhere.redhat.com>
- <1361540926.26780.56.camel@laptop>
-Message-ID: <20130222135411.GA9202@gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Fri, 22 Feb 2013 14:58:12 +0100
+Subject: [PULL] VGIC fixes for KVM/ARM
+Message-ID: <b06d478e1008aa14c12fa1ea9f8da941@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Arnd, Olof,
 
-* Peter Zijlstra <peterz@infradead.org> wrote:
+Please find below a pull request for a couple of fixes concerning
+the VGIC implementation in KVM. No real hurry, these can probably
+be applied after the merge window.
 
-> On Fri, 2013-02-22 at 13:50 +0100, Frederic Weisbecker wrote:
-
-> > atomic64_read() and atomic64_set() are supposed to take care 
-> > of that, without even the need for _inc() or _add() parts 
-> > that use LOCK.
-> 
-> Are you sure? Generally atomic*_set() is not actually an 
-> atomic operation.
-
-as per Documentation/atomic_ops.h:
-
-        #define atomic_read(v)  ((v)->counter)
-
- which simply reads the counter value currently visible to the 
- calling thread. The read is atomic in that the return value is 
- guaranteed to be one of the values initialized or modified with 
- the interface operations if a proper implicit or explicit 
- memory barrier is used after possible runtime initialization by 
- any other thread and the value is modified only with the 
- interface operations.
-
- ...
-
- Properly aligned pointers, longs, ints, and chars (and unsigned 
- equivalents) may be atomically loaded from and stored to in the 
- same sense as described for atomic_read() and atomic_set().  
-
- The ACCESS_ONCE() macro should be used to prevent the compiler 
- from using optimizations that might otherwise optimize accesses 
- out of existence on the one hand, or that might create 
- unsolicited accesses on the other.
-
-This is usually a side effect of M[O]ESI cache coherency 
-protocols - you can only get a 'split' word access if the word 
-crosses cache line boundaries (multiples of 32 bytes, 
-generally).
+The branch is on top of mainline as of this morning, but I'm happy
+to rebase it on something else if that's more convenient.
 
 Thanks,
 
-	Ingo
+        M.
+
+---------------->8--------------
+The following changes since commit
+2ef14f465b9e096531343f5b734cffc5f759f4a6:
+
+  Merge branch 'x86-mm-for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip (2013-02-21 18:06:55
+-0800)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+kvm-arm/vgic-fixes
+
+for you to fetch changes up to 33c83cb3c1d84b76c8270abe5487e77f83a81b22:
+
+  ARM: KVM: vgic: take distributor lock on sync_hwstate path (2013-02-22
+13:29:38 +0000)
+
+----------------------------------------------------------------
+Marc Zyngier (2):
+      ARM: KVM: vgic: force EOIed LRs to the empty state
+      ARM: KVM: vgic: take distributor lock on sync_hwstate path
+
+ arch/arm/kvm/vgic.c | 35 ++++++++++++++---------------------
+ 1 file changed, 14 insertions(+), 21 deletions(-)
+
+
+-- 
+Who you jivin' with that Cosmik Debris?
