@@ -1,49 +1,60 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 22 Feb 2013 14:44:51 +0800
-Subject: [PATCH 4/4] ARM: tegra114: bring up secondary CPU for SMP
-In-Reply-To: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
-References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1361515491-16199-5-git-send-email-josephl@nvidia.com>
+From: wd@denx.de (Wolfgang Denk)
+Date: Fri, 22 Feb 2013 07:55:46 +0100
+Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <20130221232821.GA2823@obsidianresearch.com>
+References: <20130221103705.GB17852@n2100.arm.linux.org.uk>
+ <51261F38.2030902@ti.com> <20130221134656.GC17852@n2100.arm.linux.org.uk>
+ <51262A7A.8040103@ti.com> <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
+ <20130221182724.GA14329@obsidianresearch.com>
+ <alpine.LFD.2.03.1302211423190.6419@syhkavp.arg>
+ <20130221211444.GB20114@obsidianresearch.com>
+ <alpine.LFD.2.03.1302211624561.6419@syhkavp.arg>
+ <20130221231848.880DE200552@gemini.denx.de>
+ <20130221232821.GA2823@obsidianresearch.com>
+Message-ID: <20130222065546.F1609200550@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The secondary CPU can be brought up by toggling the power in PMC. Then
-the flow controller will release CPU to go by clearing the reset and
-clamp signal automatically.
+Dear Jason,
 
-Based on the work by:
-Bo Yan <byan@nvidia.com>
+In message <20130221232821.GA2823@obsidianresearch.com> you wrote:
+> 
+> > > own seems to be rather static and stable, and unlike software there is 
+> > > no way I can change it (soldering irons don't count).
+> > 
+> > There is other hardware available (for example FPGA based) where this
+> > does not apply.
+> 
+> Agreed.. We do that here as well, the DT is also used to describe the
+> functionality inside FPGA(s). We do things like declare a GPIO
+> controller inside the FPGA, then stack the bitbang MDIO/I2C on top of
+> that, then declare a bunch of devices on those busses. DT makes this
+> extremely straightforward.
+> 
+> However, it is critical that the DT, kernel and FPGA are matched
+> together - we always arrange things so that the DTB, kernel and FPGA
+> config are bundled together and update atomically during firmware
+> upgrade.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/platsmp.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Agreed.
 
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 601bd0c..516aab2 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -146,6 +146,12 @@ remove_clamps:
- 	return 0;
- }
- 
-+static int tegra114_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	cpu = cpu_logical_map(cpu);
-+	return tegra_pmc_cpu_power_on(cpu);
-+}
-+
- static int __cpuinit tegra_boot_secondary(unsigned int cpu,
- 					  struct task_struct *idle)
- {
-@@ -153,6 +159,8 @@ static int __cpuinit tegra_boot_secondary(unsigned int cpu,
- 		return tegra20_boot_secondary(cpu, idle);
- 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) && tegra_chip_id == TEGRA30)
- 		return tegra30_boot_secondary(cpu, idle);
-+	if (IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC) && tegra_chip_id == TEGRA114)
-+		return tegra114_boot_secondary(cpu, idle);
- 
- 	return -EINVAL;
- }
+> Xilinx's Zynq is a great example of this kind of stuff, FWIW. IIRC
+
+Indeed - Xilinx's Zynq, Altera's SoC FPGA, and others.
+
+Such highly flexible hardware configurations require a new level of
+software support that by far exceeds the classic static setups of more
+"PC-like" systems where the only change you would expect is adding or
+removing some PCI cards or the like.
+
+
+Best regards,
+
+Wolfgang Denk
+
 -- 
-1.8.1.1
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Don't tell me how hard you work.  Tell me how much you get done.
+                                                     -- James J. Ling
