@@ -1,33 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Feb 2013 18:27:06 +0000
-Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field mask
- width
-In-Reply-To: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
-References: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130222182705.GC19527@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 22 Feb 2013 11:28:28 -0700
+Subject: [PATCH 3/3] ARM: tegra: refactor tegra{20,30}_boot_secondary
+In-Reply-To: <1361514267-12111-3-git-send-email-josephl@nvidia.com>
+References: <1361514267-12111-1-git-send-email-josephl@nvidia.com>
+ <1361514267-12111-3-git-send-email-josephl@nvidia.com>
+Message-ID: <5127B8CC.3030808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
-
-On Fri, Feb 22, 2013 at 08:08:05AM +0000, Stephen Boyd wrote:
-> From: Steve Muckle <smuckle@codeaurora.org>
+On 02/21/2013 11:24 PM, Joseph Lo wrote:
+> From: Hiroshi Doyu <hdoyu@nvidia.com>
 > 
-> The subarchitecture field in the fpsid register is 7 bits wide.
-> The topmost bit is used to designate that the subarchitecture
-> designer is not ARM. We use this field to determine which VFP
-> version is supported by the CPU. Since the topmost bit is masked
-> off we detect non-ARM subarchitectures as supporting only
-> HWCAP_VFP and not HWCAP_VFPv3 as it should be for Qualcomm's
-> processors.
+> "tegra_boot_secondary()" has many condition branches for some Tegra
+> SoC generations in a single function so that it's not easy to compile
+> a kernel only for a single SoC if one wants with some reason, debug
+> purpose(?). This patch provides SoC specific version of
+> boot_secondary(), tegra{20,30}_boot_secondary(). This could allow
+> any combination of SoC to be built. Those boot_secondary functions can
+> be preparation when we ntroduce chip specific function pointers in the
+> future without having chip dependent branches around.
+> 
+> Also removed unused definition/prototpye.
 
-I'm struggling to see why this has anything to do with the hwcaps being set
-incorrectly. What value do you have in fpsid? As far as I can tell, the
-subarchitecture bits 6:0 should start at 0x40 for you, right?
+That "also" is really something that should be a separate patch, since
+it's not related to the code refactoring that's the main purpose of this
+patch.
 
-I can see cases for changing this code, I just don't see why it would go
-wrong in the case you're describing.
+However, I'll let it slide this time, since I think both patches would
+just end up in Tegra's cleanup branch anyway, even though I did already
+point this out (multiple times?) during downstream review:-( You're
+getting lucky because I don't feel like reviewing this again.
 
-Cheers,
+I'll apply this series once I can apply patches for 3.10.
 
-Will
+One note to anyone else reading this patch: It does look like this is
+duplicating code that was previously nicely shared in
+tegra_boot_secondary(). However, I believe it's appropriate to do this
+in this case, since the equivalent code for future SoCs (such as
+Tegra114) is extremely different, and so the current shared code won't
+end up being shared, and this would just make tegra_boot_secondary()
+over-complex with conditionals when adding Tegra114 support.
