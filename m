@@ -1,122 +1,95 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Feb 2013 11:15:45 +0000
-Subject: [PATCH 8/8] ARM: smp: Remove local timer API
-In-Reply-To: <1361518039-16663-9-git-send-email-sboyd@codeaurora.org>
-References: <1361518039-16663-1-git-send-email-sboyd@codeaurora.org>
- <1361518039-16663-9-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130222111545.GA15020@e106331-lin.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 22 Feb 2013 19:51:25 +0800
+Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
+Message-ID: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Changes since v1:
+ * Remove the absolute path of imxXX-pinfunc.h in binding doc
+ * Remove the pin id from PIN_FUNC_ID/macro
 
-One thing that struck me when I was fiddling with the broadcast mechanism was
-that it should be possible to have a generic dummy timer implementation. As
-long as the architecture calls notifiers at the appropriate times, it should
-look like any other timer driver (apart from not touching any hardware). It just
-needs to depend on ARCH_HAS_TICK_BROADCAST.
+Shawn Guo (3):
+  ARM: dts: imx: use pre-processor for device trees
+  ARM: dts: imx: replace magic number with pin function name
+  pinctrl: imx: move hard-coding data into device tree
 
-I believe it shouldn't be too difficult to implement, though I may be blind to
-some problems.
+ .../bindings/pinctrl/fsl,imx-pinctrl.txt           |    6 +-
+ .../bindings/pinctrl/fsl,imx35-pinctrl.txt         |  955 +--------
+ .../bindings/pinctrl/fsl,imx51-pinctrl.txt         |  759 +------
+ .../bindings/pinctrl/fsl,imx53-pinctrl.txt         | 1174 +---------
+ .../bindings/pinctrl/fsl,imx6q-pinctrl.txt         | 1596 +-------------
+ .../{imx25-karo-tx25.dts => imx25-karo-tx25.dtsp}  |    2 +-
+ .../arm/boot/dts/{imx25-pdk.dts => imx25-pdk.dtsp} |    2 +-
+ arch/arm/boot/dts/{imx25.dtsi => imx25.dtsip}      |    2 +-
+ .../boot/dts/{imx27-apf27.dts => imx27-apf27.dtsp} |    2 +-
+ .../arm/boot/dts/{imx27-pdk.dts => imx27-pdk.dtsp} |    2 +-
+ ...hytec-phycore.dts => imx27-phytec-phycore.dtsp} |    2 +-
+ arch/arm/boot/dts/{imx27.dtsi => imx27.dtsip}      |    2 +-
+ .../arm/boot/dts/{imx31-bug.dts => imx31-bug.dtsp} |    2 +-
+ arch/arm/boot/dts/{imx31.dtsi => imx31.dtsip}      |    2 +-
+ arch/arm/boot/dts/imx35-pinfunc.h                  |  970 +++++++++
+ .../boot/dts/{imx51-apf51.dts => imx51-apf51.dtsp} |    2 +-
+ .../dts/{imx51-babbage.dts => imx51-babbage.dtsp}  |   16 +-
+ arch/arm/boot/dts/imx51-pinfunc.h                  |  773 +++++++
+ arch/arm/boot/dts/{imx51.dtsi => imx51.dtsip}      |  247 +--
+ .../arm/boot/dts/{imx53-ard.dts => imx53-ard.dtsp} |   70 +-
+ .../arm/boot/dts/{imx53-evk.dts => imx53-evk.dtsp} |   18 +-
+ arch/arm/boot/dts/imx53-mba53.dts                  |  129 --
+ arch/arm/boot/dts/imx53-mba53.dtsp                 |  135 ++
+ arch/arm/boot/dts/imx53-pinfunc.h                  | 1189 ++++++++++
+ .../arm/boot/dts/{imx53-qsb.dts => imx53-qsb.dtsp} |   22 +-
+ .../arm/boot/dts/{imx53-smd.dts => imx53-smd.dtsp} |   16 +-
+ .../dts/{imx53-tqma53.dtsi => imx53-tqma53.dtsip}  |   32 +-
+ arch/arm/boot/dts/{imx53.dtsi => imx53.dtsip}      |  207 +-
+ arch/arm/boot/dts/{imx6dl.dtsi => imx6dl.dtsip}    |    0
+ .../boot/dts/{imx6q-arm2.dts => imx6q-arm2.dtsp}   |    8 +-
+ arch/arm/boot/dts/imx6q-pinfunc.h                  | 1529 +++++++++++++
+ .../{imx6q-sabreauto.dts => imx6q-sabreauto.dtsp}  |    6 +-
+ .../{imx6q-sabrelite.dts => imx6q-sabrelite.dtsp}  |   18 +-
+ .../dts/{imx6q-sabresd.dts => imx6q-sabresd.dtsp}  |   14 +-
+ arch/arm/boot/dts/imx6q.dtsi                       |  302 ---
+ arch/arm/boot/dts/imx6q.dtsip                      |  303 +++
+ arch/arm/boot/dts/{imx6qdl.dtsi => imx6qdl.dtsip}  |    2 +-
+ drivers/pinctrl/pinctrl-imx.c                      |  120 +-
+ drivers/pinctrl/pinctrl-imx.h                      |   13 +-
+ drivers/pinctrl/pinctrl-imx35.c                    | 1524 +++----------
+ drivers/pinctrl/pinctrl-imx51.c                    | 1252 +++--------
+ drivers/pinctrl/pinctrl-imx53.c                    | 1579 ++------------
+ drivers/pinctrl/pinctrl-imx6q.c                    | 2263 +++-----------------
+ 43 files changed, 6284 insertions(+), 10983 deletions(-)
+ rename arch/arm/boot/dts/{imx25-karo-tx25.dts => imx25-karo-tx25.dtsp} (96%)
+ rename arch/arm/boot/dts/{imx25-pdk.dts => imx25-pdk.dtsp} (96%)
+ rename arch/arm/boot/dts/{imx25.dtsi => imx25.dtsip} (99%)
+ rename arch/arm/boot/dts/{imx27-apf27.dts => imx27-apf27.dtsp} (98%)
+ rename arch/arm/boot/dts/{imx27-pdk.dts => imx27-pdk.dtsp} (96%)
+ rename arch/arm/boot/dts/{imx27-phytec-phycore.dts => imx27-phytec-phycore.dtsp} (98%)
+ rename arch/arm/boot/dts/{imx27.dtsi => imx27.dtsip} (99%)
+ rename arch/arm/boot/dts/{imx31-bug.dts => imx31-bug.dtsp} (96%)
+ rename arch/arm/boot/dts/{imx31.dtsi => imx31.dtsip} (98%)
+ create mode 100644 arch/arm/boot/dts/imx35-pinfunc.h
+ rename arch/arm/boot/dts/{imx51-apf51.dts => imx51-apf51.dtsp} (97%)
+ rename arch/arm/boot/dts/{imx51-babbage.dts => imx51-babbage.dtsp} (94%)
+ create mode 100644 arch/arm/boot/dts/imx51-pinfunc.h
+ rename arch/arm/boot/dts/{imx51.dtsi => imx51.dtsip} (61%)
+ rename arch/arm/boot/dts/{imx53-ard.dts => imx53-ard.dtsp} (55%)
+ rename arch/arm/boot/dts/{imx53-evk.dts => imx53-evk.dtsp} (82%)
+ delete mode 100644 arch/arm/boot/dts/imx53-mba53.dts
+ create mode 100644 arch/arm/boot/dts/imx53-mba53.dtsp
+ create mode 100644 arch/arm/boot/dts/imx53-pinfunc.h
+ rename arch/arm/boot/dts/{imx53-qsb.dts => imx53-qsb.dtsp} (89%)
+ rename arch/arm/boot/dts/{imx53-smd.dts => imx53-smd.dtsp} (88%)
+ rename arch/arm/boot/dts/{imx53-tqma53.dtsi => imx53-tqma53.dtsip} (75%)
+ rename arch/arm/boot/dts/{imx53.dtsi => imx53.dtsip} (69%)
+ rename arch/arm/boot/dts/{imx6dl.dtsi => imx6dl.dtsip} (100%)
+ rename arch/arm/boot/dts/{imx6q-arm2.dts => imx6q-arm2.dtsp} (90%)
+ create mode 100644 arch/arm/boot/dts/imx6q-pinfunc.h
+ rename arch/arm/boot/dts/{imx6q-sabreauto.dts => imx6q-sabreauto.dtsp} (88%)
+ rename arch/arm/boot/dts/{imx6q-sabrelite.dts => imx6q-sabrelite.dtsp} (87%)
+ rename arch/arm/boot/dts/{imx6q-sabresd.dts => imx6q-sabresd.dtsp} (84%)
+ delete mode 100644 arch/arm/boot/dts/imx6q.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6q.dtsip
+ rename arch/arm/boot/dts/{imx6qdl.dtsi => imx6qdl.dtsip} (99%)
 
-Otherwise, I have a few comments on the patch below.
-
-On Fri, Feb 22, 2013 at 07:27:19AM +0000, Stephen Boyd wrote:
-> There are no more users of this API, remove it.
-
-As we're leaving the dummy timers, it'd be worth explaining why in the commit
-message.
-
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/Kconfig                  | 12 +------
->  arch/arm/include/asm/localtimer.h | 34 --------------------
->  arch/arm/kernel/smp.c             | 67 ++++++---------------------------------
->  arch/arm/mach-omap2/Kconfig       |  1 -
->  arch/arm/mach-omap2/timer.c       |  7 ----
->  5 files changed, 11 insertions(+), 110 deletions(-)
->  delete mode 100644 arch/arm/include/asm/localtimer.h
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index dedf02b..7d4338d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1527,6 +1527,7 @@ config SMP
->  	depends on HAVE_SMP
->  	depends on MMU
->  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
-> +	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
->  	select USE_GENERIC_SMP_HELPERS
->  	help
->  	  This enables support for systems with more than one CPU. If you have
-
-Should this have been in an earlier patch?
-
-Why is it necessary?
-
-[...]
-
-> -static void percpu_timer_setup(void);
-> +static void broadcast_timer_setup(void);
->  
->  /*
->   * This is the secondary CPU boot entry.  We're using this CPUs
-> @@ -325,9 +317,9 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
->  	complete(&cpu_running);
->  
->  	/*
-> -	 * Setup the percpu timer for this CPU.
-> +	 * Setup the dummy broadcast timer for this CPU.
-
-To me, calling something a broadcast timer makes it sound like it performs the
-broadcast. We use the term "broadcast timer" elsewhere here (e.g.
-broadcast_timer_setup), and I think it's any unnecessarily confusing term.
-
-Might it be better to say "dummy timer" consistently?
-
-[...]
-
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 49ac3df..6e1f871 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -88,7 +88,6 @@ config ARCH_OMAP4
->  	select CACHE_L2X0
->  	select CPU_V7
->  	select HAVE_SMP
-> -	select LOCAL_TIMERS if SMP
->  	select OMAP_INTERCONNECT
->  	select PL310_ERRATA_588369
->  	select PL310_ERRATA_727915
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 2bdd4cf..c00a8f8 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -587,7 +587,6 @@ OMAP_SYS_GP_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, "ti,timer-alwon",
->  #ifdef CONFIG_ARCH_OMAP4
->  OMAP_SYS_32K_TIMER_INIT(4, 1, OMAP4_32K_SOURCE, "ti,timer-alwon",
->  			2, OMAP4_MPU_SOURCE);
-> -#ifdef CONFIG_LOCAL_TIMERS
->  static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
->  void __init omap4_local_timer_init(void)
->  {
-> @@ -606,12 +605,6 @@ void __init omap4_local_timer_init(void)
->  			pr_err("twd_local_timer_register failed %d\n", err);
->  	}
->  }
-> -#else /* CONFIG_LOCAL_TIMERS */
-> -void __init omap4_local_timer_init(void)
-> -{
-> -	omap4_sync32k_timer_init();
-> -}
-> -#endif /* CONFIG_LOCAL_TIMERS */
->  #endif /* CONFIG_ARCH_OMAP4 */
->  
->  #ifdef CONFIG_SOC_OMAP5
-
-I believe the above OMAP changes should have been in an earlier patch?
-
-Thanks,
-Mark.
+-- 
+1.7.9.5
