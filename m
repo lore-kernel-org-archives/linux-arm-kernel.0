@@ -1,51 +1,76 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 22 Feb 2013 09:39:27 +0000
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
- modes
-In-Reply-To: <87liag67p7.fsf@amiettinen-lnx.nvidia.com>
-References: <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
- <20120515101505.GG10453@n2100.arm.linux.org.uk>
- <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
- <20120515163618.GH13860@n2100.arm.linux.org.uk>
- <20120515170534.GA17319@e102568-lin.cambridge.arm.com>
- <87sjaetmqv.fsf@amiettinen-lnx.nvidia.com>
- <20120920095431.GC4588@e102568-lin.cambridge.arm.com>
- <87lig4tmw1.fsf@amiettinen-lnx.nvidia.com>
- <874nmowhm1.fsf@amiettinen-lnx.nvidia.com>
- <87liag67p7.fsf@amiettinen-lnx.nvidia.com>
-Message-ID: <20130222093927.GA12140@e102568-lin.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 22 Feb 2013 15:37:42 +0530
+Subject: too many timer retries happen when do local timer swtich with
+ broadcast timer
+In-Reply-To: <alpine.LFD.2.02.1302212214020.22263@ionos>
+References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
+ <alpine.LFD.2.02.1302201400400.22263@ionos>
+ <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
+ <alpine.LFD.2.02.1302211015270.22263@ionos>
+ <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
+ <alpine.LFD.2.02.1302211436300.22263@ionos> <51263975.20906@ti.com>
+ <alpine.LFD.2.02.1302212214020.22263@ionos>
+Message-ID: <5127436E.4040100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 09:04:04AM +0000, Antti P Miettinen wrote:
-> Hello, coming back to an old thread:
-> 
-> Antti P Miettinen <ananaza@iki.fi> writes:
-> > Antti P Miettinen <ananaza@iki.fi> writes:
-> >> Hmm.. is the condition for cache coherence protocol then different from
-> >> TLB lookups? If C is cleared, is the cache available for snoops by other
-> >> cores? What happens if another core needs a dirty line in a cache that
-> >> has C cleared?
-> >
-> > Sorry - looks like you already answered this:
-> >> 2) as long as they are taking part in coherency (SMP bit set in ACTLR), all
-> >>    Cortex-A cores in a MP configuration with the SCTLR.C bit set can hit in
-> >>    the cache of a CPU that runs with the C bit cleared in SCTLR
-> >
-> > So other cores apparently can search the cache that has C bit
-> > cleared. The only clarification I still would need is whether this
-> > searching applies to also TLB fetches by other cores. So when you say:
-> >> .. TLB fetches cannot search the D-cache if the C bit in
-> >> SCTLR is clear on A9. ..
-> >
-> > you meant TLB fethes by the core that has it's C bit cleared. The TLB
-> > fetches by other cores will still search the cache just like any other
-> > coherence searches?
-> 
-> This did not get answered - are TLB fetches by sibling cores treated in
-> the same way as cache fetches? If core A has C bit cleared, is the cache
-> still available for TLB fetches by core B?
+Thomas,
 
-Yes, it is as long as the SMP bit is set in ACTLR.
+On Friday 22 February 2013 03:49 AM, Thomas Gleixner wrote:
+> On Thu, 21 Feb 2013, Santosh Shilimkar wrote:
+>> On Thursday 21 February 2013 07:18 PM, Thomas Gleixner wrote:
+>>> find below a completely untested patch, which should address that issue.
+>>>
+>> After looking at the thread, I tried to see the issue on OMAP and could
+>> see the same issue as Jason.
+>
+> That's interesting. We have the same issue on x86 since 2007 and
+> nobody noticed ever. It's basically the same problem there, but it
+> seems that on x86 getting out of those low power states is way slower
+> than the minimal reprogramming delta which is used to enforce the
+> local timer to fire after the wakeup.
+>
+> I'm still amazed that as Jason stated a 1us reprogramming delta is
+> sufficient to get this ping-pong going. I somehow doubt that, but
+> maybe ARM is really that fast :)
+>
+>> Your patch fixes the retries on both CPUs on my dual core machine. So
+>> you use my tested by if you need one.
+>
+> They are always welcome.
+>
+BTW, Lorenzo off-list mentioned to me about warning in boot-up
+which I missed while testing your patch. It will take bit more
+time for me to look into it and hence thought of reporting it.
 
-Lorenzo
+[    2.186126] ------------[ cut here ]------------
+[    2.190979] WARNING: at kernel/time/tick-broadcast.c:501 
+tick_broadcast_oneshot_control+0x1c0/0x21c()
+[    2.200622] Modules linked in:
+[    2.203826] [<c001bfe4>] (unwind_backtrace+0x0/0xf0) from 
+[<c0047d6c>] (warn_slowpath_common+0x4c/0x64)
+[    2.213653] [<c0047d6c>] (warn_slowpath_common+0x4c/0x64) from 
+[<c0047da0>] (warn_slowpath_null+0x1c/0x24)
+[    2.223754] [<c0047da0>] (warn_slowpath_null+0x1c/0x24) from 
+[<c009336c>] (tick_broadcast_oneshot_control+0x1c0/0x21c)
+[    2.234924] [<c009336c>] (tick_broadcast_oneshot_control+0x1c0/0x21c) 
+from [<c00928dc>] (tick_notify+0x23c/0x42c)
+[    2.245666] [<c00928dc>] (tick_notify+0x23c/0x42c) from [<c0539a3c>] 
+(notifier_call_chain+0x44/0x84)
+[    2.255218] [<c0539a3c>] (notifier_call_chain+0x44/0x84) from 
+[<c0071068>] (raw_notifier_call_chain+0x18/0x20)
+[    2.265686] [<c0071068>] (raw_notifier_call_chain+0x18/0x20) from 
+[<c0091c70>] (clockevents_notify+0x2c/0x174)
+[    2.276123] [<c0091c70>] (clockevents_notify+0x2c/0x174) from 
+[<c0035294>] (omap_enter_idle_smp+0x3c/0x120)
+[    2.286315] [<c0035294>] (omap_enter_idle_smp+0x3c/0x120) from 
+[<c042e504>] (cpuidle_enter+0x14/0x18)
+[    2.295928] [<c042e504>] (cpuidle_enter+0x14/0x18) from [<c042ef14>] 
+(cpuidle_wrap_enter+0x34/0xa0)
+[    2.305389] [<c042ef14>] (cpuidle_wrap_enter+0x34/0xa0) from 
+[<c042eb20>] (cpuidle_idle_call+0xe0/0x328)
+[    2.315307] [<c042eb20>] (cpuidle_idle_call+0xe0/0x328) from 
+[<c0015100>] (cpu_idle+0x8c/0x11c)
+[    2.324401] [<c0015100>] (cpu_idle+0x8c/0x11c) from [<c073d7ac>] 
+(start_kernel+0x2b0/0x300)
+[    2.333129] ---[ end trace 6fe1f7b4606a9e20 ]---
