@@ -1,31 +1,30 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 22 Feb 2013 15:25:28 +0100
-Subject: [PATCH 0/2] cpustat: use atomic operations to read/update stats
-In-Reply-To: <20130222141635.GA9606@gmail.com>
-References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
- <1361522767.26780.44.camel@laptop>
- <20130222125019.GC17948@somewhere.redhat.com>
- <1361540926.26780.56.camel@laptop> <20130222135411.GA9202@gmail.com>
- <1361541894.26780.62.camel@laptop> <20130222141635.GA9606@gmail.com>
-Message-ID: <1361543128.26780.65.camel@laptop>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 22 Feb 2013 14:29:32 +0000
+Subject: [PATCH] arm64: select ARCH_WANT_OPTIONAL_GPIOLIB
+In-Reply-To: <CACRpkdat0Z9vAc9YB0T9s+Cex6FbyHnT_Nj0OV3FLnQbexZqwg@mail.gmail.com>
+References: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
+ <1634805.kh17mYrJe5@wuerfel>
+ <CACxGe6tVk4na2yLi-6r1fTv5QqzgePbo6K+ZtEt-VOy25DQxVQ@mail.gmail.com>
+ <2173132.bncoOm6QsM@wuerfel>
+ <CACRpkdat0Z9vAc9YB0T9s+Cex6FbyHnT_Nj0OV3FLnQbexZqwg@mail.gmail.com>
+Message-ID: <20130222142932.1A5B03E06AF@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-02-22 at 15:16 +0100, Ingo Molnar wrote:
-> > I checked arch/x86/include/asm/atomic64_32.h and we use 
-> > cmpxchg8b for everything from _set() to _read(), which 
-> > translates into 'horridly stupendifyingly slow' for a number 
-> > of machines, but coherent.
+On Thu, 21 Feb 2013 22:35:49 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Feb 21, 2013 at 11:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> That's a valid concern - and cmpxchg8b is the only 64-bit op 
-> available on most 32-bit x86 CPUs which does not involve the 
-> FPU.
+> > An architecture should not unconditionally enable 'GENERIC_GPIO'
+> > without providing an implementation. In case of arm64, selecting
+> > ARCH_WANT_OPTIONAL_GPIOLIB is the right solution, because it
+> > lets us enable GPIOLIB when configuring the kernel, and that
+> > implicitly turns on GENERIC_GPIO.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> Wondering how significant this range of x86 problem boxes will 
-> be by the time any of these changes reaches upstream and distros 
-> - and how much 'horridly stupendifyingly slow' is in terms of 
-> cycles expended.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-On the !x86 side of things we're implementing (generic) atomic64 using
-hashed spinlocks, so there too using a single spinlock around the
-entire data structure is a complete win.
+Okay, I've put this into my gpio/next branch and I'll ask Linus to pull
+shortly. Thanks everyone.
+
+g.
