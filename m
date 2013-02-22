@@ -1,87 +1,112 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 22 Feb 2013 17:02:29 +0200
-Subject: [REPOST PATCH 2/2] clk: tegra: adapt tegra periph clk to mux
- table/mask
-In-Reply-To: <1361545358-22721-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1361545358-22721-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1361545358-22721-3-git-send-email-pdeschrijver@nvidia.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 22 Feb 2013 07:14:27 -0800
+Subject: [PATCH 1/2] cpustat: use accessor functions for get/set/add
+In-Reply-To: <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
+ (Viresh Kumar's message of "Fri, 22 Feb 2013 11:51:43 +0530")
+References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
+ <1361512604-2720-2-git-send-email-khilman@linaro.org>
+ <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
+Message-ID: <87txp41iuk.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tegra peripheral clock type uses struct clk_mux directly, so it needs to
-be updated to handle the new mask and table fields. Also the macros need
-to be updated
+Viresh Kumar <viresh.kumar@linaro.org> writes:
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- drivers/clk/tegra/clk.h |   27 +++++++++++++++++++--------
- 1 files changed, 19 insertions(+), 8 deletions(-)
+> On Fri, Feb 22, 2013 at 11:26 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Add some accessor functions in order to facilitate the conversion to
+>> atomic reads/writes of cpustat values.
+>>
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>>  drivers/cpufreq/cpufreq_governor.c | 18 ++++++++---------
+>>  drivers/cpufreq/cpufreq_ondemand.c |  2 +-
+>
+>> diff --git a/drivers/cpufreq/cpufreq_governor.c b/drivers/cpufreq/cpufreq_governor.c
+>> index 6c5f1d3..ec6c315 100644
+>> --- a/drivers/cpufreq/cpufreq_governor.c
+>> +++ b/drivers/cpufreq/cpufreq_governor.c
+>> @@ -36,12 +36,12 @@ static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
+>>
+>>         cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
+>>
+>> -       busy_time = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
+>> +       busy_time = kcpustat_cpu_get(cpu, CPUTIME_USER);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SYSTEM);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_IRQ);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SOFTIRQ);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_STEAL);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_NICE);
+>>
+>>         idle_time = cur_wall_time - busy_time;
+>>         if (wall)
+>> @@ -103,7 +103,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
+>>                         u64 cur_nice;
+>>                         unsigned long cur_nice_jiffies;
+>>
+>> -                       cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
+>> +                       cur_nice = kcpustat_cpu_get(j, CPUTIME_NICE) -
+>>                                          cdbs->prev_cpu_nice;
+>>                         /*
+>>                          * Assumption: nice time between sampling periods will
+>> @@ -113,7 +113,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
+>>                                         cputime64_to_jiffies64(cur_nice);
+>>
+>>                         cdbs->prev_cpu_nice =
+>> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+>> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
+>>                         idle_time += jiffies_to_usecs(cur_nice_jiffies);
+>>                 }
+>>
+>> @@ -216,7 +216,7 @@ int cpufreq_governor_dbs(struct dbs_data *dbs_data,
+>>                                         &j_cdbs->prev_cpu_wall);
+>>                         if (ignore_nice)
+>>                                 j_cdbs->prev_cpu_nice =
+>> -                                       kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+>> +                                       kcpustat_cpu_get(j, CPUTIME_NICE);
+>>                 }
+>>
+>>                 /*
+>> diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
+>> index 7731f7c..ac5d49f 100644
+>> --- a/drivers/cpufreq/cpufreq_ondemand.c
+>> +++ b/drivers/cpufreq/cpufreq_ondemand.c
+>> @@ -403,7 +403,7 @@ static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
+>>                                                 &dbs_info->cdbs.prev_cpu_wall);
+>>                 if (od_tuners.ignore_nice)
+>>                         dbs_info->cdbs.prev_cpu_nice =
+>> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+>> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
+>>
+>>         }
+>>         return count;
+>
+> For cpufreq:
+>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> Though i believe you also need this:
+>
+> diff --git a/drivers/cpufreq/cpufreq_conservative.c
+> b/drivers/cpufreq/cpufreq_conservative.c
+> index 64ef737..38e3ad7 100644
+> --- a/drivers/cpufreq/cpufreq_conservative.c
+> +++ b/drivers/cpufreq/cpufreq_conservative.c
+> @@ -242,7 +242,7 @@ static ssize_t store_ignore_nice_load(struct
+> kobject *a, struct attribute *b,
+>                                                 &dbs_info->cdbs.prev_cpu_wall);
+>                 if (cs_tuners.ignore_nice)
+>                         dbs_info->cdbs.prev_cpu_nice =
+> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
+>         }
+>         return count;
+>  }
 
-diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index 0744731..a09d7dc 100644
---- a/drivers/clk/tegra/clk.h
-+++ b/drivers/clk/tegra/clk.h
-@@ -355,15 +355,16 @@ struct clk *tegra_clk_register_periph_nodiv(const char *name,
- 		struct tegra_clk_periph *periph, void __iomem *clk_base,
- 		u32 offset);
- 
--#define TEGRA_CLK_PERIPH(_mux_shift, _mux_width, _mux_flags,		\
-+#define TEGRA_CLK_PERIPH(_mux_shift, _mux_mask, _mux_flags,		\
- 			 _div_shift, _div_width, _div_frac_width,	\
- 			 _div_flags, _clk_num, _enb_refcnt, _regs,	\
--			 _gate_flags)					\
-+			 _gate_flags, _table)				\
- 	{								\
- 		.mux = {						\
- 			.flags = _mux_flags,				\
- 			.shift = _mux_shift,				\
--			.width = _mux_width,				\
-+			.mask = _mux_mask,				\
-+			.table = _table,				\
- 		},							\
- 		.divider = {						\
- 			.flags = _div_flags,				\
-@@ -393,26 +394,36 @@ struct tegra_periph_init_data {
- 	const char *dev_id;
- };
- 
--#define TEGRA_INIT_DATA(_name, _con_id, _dev_id, _parent_names, _offset, \
--			_mux_shift, _mux_width, _mux_flags, _div_shift,	\
-+#define TEGRA_INIT_DATA_TABLE(_name, _con_id, _dev_id, _parent_names, _offset,\
-+			_mux_shift, _mux_mask, _mux_flags, _div_shift,	\
- 			_div_width, _div_frac_width, _div_flags, _regs,	\
--			_clk_num, _enb_refcnt, _gate_flags, _clk_id)	\
-+			_clk_num, _enb_refcnt, _gate_flags, _clk_id, _table) \
- 	{								\
- 		.name = _name,						\
- 		.clk_id = _clk_id,					\
- 		.parent_names = _parent_names,				\
- 		.num_parents = ARRAY_SIZE(_parent_names),		\
--		.periph = TEGRA_CLK_PERIPH(_mux_shift, _mux_width,	\
-+		.periph = TEGRA_CLK_PERIPH(_mux_shift, _mux_mask,	\
- 					   _mux_flags, _div_shift,	\
- 					   _div_width, _div_frac_width,	\
- 					   _div_flags, _clk_num,	\
- 					   _enb_refcnt, _regs,		\
--					   _gate_flags),		\
-+					   _gate_flags, _table),	\
- 		.offset = _offset,					\
- 		.con_id = _con_id,					\
- 		.dev_id = _dev_id,					\
- 	}
- 
-+#define TEGRA_INIT_DATA(_name, _con_id, _dev_id, _parent_names, _offset,\
-+			_mux_shift, _mux_width, _mux_flags, _div_shift,	\
-+			_div_width, _div_frac_width, _div_flags, _regs,	\
-+			_clk_num, _enb_refcnt, _gate_flags, _clk_id)	\
-+	TEGRA_INIT_DATA_TABLE(_name, _con_id, _dev_id, _parent_names, _offset,\
-+			_mux_shift, BIT(_mux_width) - 1, _mux_flags,	\
-+			_div_shift, _div_width, _div_frac_width, _div_flags, \
-+			_regs, _clk_num, _enb_refcnt, _gate_flags, _clk_id,\
-+			NULL)
-+
- /**
-  * struct clk_super_mux - super clock
-  *
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+Thanks, I missed that one.  I've added it in locally.
+
+Kevin
