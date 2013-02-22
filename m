@@ -1,115 +1,57 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Fri, 22 Feb 2013 12:47:33 +0530
-Subject: [PATCH 1/2] cpustat: use accessor functions for get/set/add
-In-Reply-To: <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
-References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
- <1361512604-2720-2-git-send-email-khilman@linaro.org>
- <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
-Message-ID: <CAP245DVYsjgvww-3qBnbZ4T7SsJ=whbVvhf06fArxcspyX9bwQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 21 Feb 2013 23:27:11 -0800
+Subject: [PATCH 0/8] Remove ARM local timer API
+Message-ID: <1361518039-16663-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 11:51 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On Fri, Feb 22, 2013 at 11:26 AM, Kevin Hilman <khilman@linaro.org> wrote:
->> Add some accessor functions in order to facilitate the conversion to
->> atomic reads/writes of cpustat values.
->>
->> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> ---
->>  drivers/cpufreq/cpufreq_governor.c | 18 ++++++++---------
->>  drivers/cpufreq/cpufreq_ondemand.c |  2 +-
->
->> diff --git a/drivers/cpufreq/cpufreq_governor.c b/drivers/cpufreq/cpufreq_governor.c
->> index 6c5f1d3..ec6c315 100644
->> --- a/drivers/cpufreq/cpufreq_governor.c
->> +++ b/drivers/cpufreq/cpufreq_governor.c
->> @@ -36,12 +36,12 @@ static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
->>
->>         cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
->>
->> -       busy_time = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
->> +       busy_time = kcpustat_cpu_get(cpu, CPUTIME_USER);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SYSTEM);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_IRQ);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SOFTIRQ);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_STEAL);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_NICE);
->>
->>         idle_time = cur_wall_time - busy_time;
->>         if (wall)
->> @@ -103,7 +103,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
->>                         u64 cur_nice;
->>                         unsigned long cur_nice_jiffies;
->>
->> -                       cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
->> +                       cur_nice = kcpustat_cpu_get(j, CPUTIME_NICE) -
->>                                          cdbs->prev_cpu_nice;
->>                         /*
->>                          * Assumption: nice time between sampling periods will
->> @@ -113,7 +113,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
->>                                         cputime64_to_jiffies64(cur_nice);
->>
->>                         cdbs->prev_cpu_nice =
->> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
->> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
->>                         idle_time += jiffies_to_usecs(cur_nice_jiffies);
->>                 }
->>
->> @@ -216,7 +216,7 @@ int cpufreq_governor_dbs(struct dbs_data *dbs_data,
->>                                         &j_cdbs->prev_cpu_wall);
->>                         if (ignore_nice)
->>                                 j_cdbs->prev_cpu_nice =
->> -                                       kcpustat_cpu(j).cpustat[CPUTIME_NICE];
->> +                                       kcpustat_cpu_get(j, CPUTIME_NICE);
->>                 }
->>
->>                 /*
->> diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
->> index 7731f7c..ac5d49f 100644
->> --- a/drivers/cpufreq/cpufreq_ondemand.c
->> +++ b/drivers/cpufreq/cpufreq_ondemand.c
->> @@ -403,7 +403,7 @@ static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
->>                                                 &dbs_info->cdbs.prev_cpu_wall);
->>                 if (od_tuners.ignore_nice)
->>                         dbs_info->cdbs.prev_cpu_nice =
->> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
->> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
->>
->>         }
->>         return count;
->
-> For cpufreq:
->
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> Though i believe you also need this:
->
-> diff --git a/drivers/cpufreq/cpufreq_conservative.c
-> b/drivers/cpufreq/cpufreq_conservative.c
-> index 64ef737..38e3ad7 100644
-> --- a/drivers/cpufreq/cpufreq_conservative.c
-> +++ b/drivers/cpufreq/cpufreq_conservative.c
-> @@ -242,7 +242,7 @@ static ssize_t store_ignore_nice_load(struct
-> kobject *a, struct attribute *b,
->                                                 &dbs_info->cdbs.prev_cpu_wall);
->                 if (cs_tuners.ignore_nice)
->                         dbs_info->cdbs.prev_cpu_nice =
-> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
->         }
->         return count;
->  }
->
-> BTW, i don't see kcpustat_cpu() used in
->
->  kernel/sched/core.c                | 12 +++++-------
->  kernel/sched/cputime.c             | 29 +++++++++++++--------------
->
-> I searched tip/master as well as lnext/master.
+In light of Mark Rutland's recent work on divorcing the ARM architected
+timers from the ARM local timer API and introducing a generic arch hook for
+broadcast it seems that we should remove the local timer API entirely.
+Doing so will reduce the architecture dependencies of our timer drivers,
+reduce code in ARM core, and simplify timer drivers because they no longer
+go through an architecture layer that is essentially a hotplug notifier.
 
-Added by Frederic's Adaptive NOHZ patchset?
+Previous attempts have been made[1] unsuccessfully. I'm hoping this can
+be accepted now so that we can clean up the timer drivers that are
+used in both UP and SMP situations. Right now these drivers have to ignore
+the timer setup callback on the boot CPU to avoid registering clockevents
+twice. This is not very symmetric and causes convuluted code that does
+the same thing in two places.
+
+Patches based on linux-next-20130221. Mostly compile tested as I don't
+have access to the hardware.
+
+[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/145705
+
+Note: A hotplug notifier is used by both x86 for the apb_timer (see 
+apbt_cpuhp_notify) and by metag (see arch_timer_cpu_notify in
+metag_generic.c) so this is not new.
+
+Stephen Boyd (8):
+  ARM: smp: Lower rating of dummy broadcast device
+  ARM: smp_twd: Divorce smp_twd from local timer API
+  ARM: EXYNOS4: Divorce mct from local timer API
+  ARM: PRIMA2: Divorce timer-marco from local timer API
+  ARM: MSM: Divorce msm_timer from local timer API
+  clocksource: time-armada-370-xp: Fix sparse warning
+  clocksource: time-armada-370-xp: Divorce from local timer API
+  ARM: smp: Remove local timer API
+
+ arch/arm/Kconfig                         |  12 +--
+ arch/arm/include/asm/localtimer.h        |  34 ---------
+ arch/arm/kernel/smp.c                    |  69 +++--------------
+ arch/arm/kernel/smp_twd.c                |  48 ++++++++----
+ arch/arm/mach-exynos/mct.c               |  53 +++++++++----
+ arch/arm/mach-msm/timer.c                | 125 +++++++++++++++++--------------
+ arch/arm/mach-omap2/Kconfig              |   1 -
+ arch/arm/mach-omap2/timer.c              |   7 --
+ arch/arm/mach-prima2/timer-marco.c       |  98 ++++++++++++------------
+ drivers/clocksource/time-armada-370-xp.c |  88 ++++++++++------------
+ include/linux/time-armada-370-xp.h       |   4 +-
+ 11 files changed, 241 insertions(+), 298 deletions(-)
+ delete mode 100644 arch/arm/include/asm/localtimer.h
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
