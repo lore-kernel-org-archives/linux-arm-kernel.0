@@ -1,55 +1,44 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 22 Feb 2013 09:32:00 +0800
-Subject: [PATCH v3 08/12] gpio: pxa: move gpio properties into child node
-In-Reply-To: <CACRpkda7P5GsOB=s0YbeV2rXbpQaHQNkr0Po73Lwo-vyFcN1Nw@mail.gmail.com>
+Date: Fri, 22 Feb 2013 09:34:11 +0800
+Subject: [PATCH v3 10/12] gpio: pxa: add irq base in platform data
+In-Reply-To: <CACRpkdbgJdmcTm86UTWsMw2yPv005=1c8AmAxfmDSrEoSWk-bg@mail.gmail.com>
 References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
- <1361164358-5845-9-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkda7P5GsOB=s0YbeV2rXbpQaHQNkr0Po73Lwo-vyFcN1Nw@mail.gmail.com>
-Message-ID: <CAD6h2NQ2Tz3dTyyJOFhf8t9aCGs4S6EZ_6f1_u8aqO4XoAN9Vw@mail.gmail.com>
+ <1361164358-5845-11-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdbgJdmcTm86UTWsMw2yPv005=1c8AmAxfmDSrEoSWk-bg@mail.gmail.com>
+Message-ID: <CAD6h2NSoUeEmPujuFZcnET7RAaQK9sE6HK1pROfrHnmSNfS65Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 February 2013 03:09, Linus Walleij <linus.walleij@linaro.org> wrote:
+On 22 February 2013 03:12, Linus Walleij <linus.walleij@linaro.org> wrote:
 > On Mon, Feb 18, 2013 at 6:12 AM, Haojian Zhuang
 > <haojian.zhuang@linaro.org> wrote:
 >
->> Move gpio properties into child node. So pinctrl driver could binds to
->> each gpio chip with gpio range.
+>> Macro PXA_GPIO_TO_IRQ() & MMP_GPIO_TO_IRQ() is used in machine driver
+>> without DT. Although we're allocating irq descriptions dynamically,
+>> it may break machine drivers without DT. Append pdata->irq_base.
+>> If irq_base is valid, allocate irq descriptions from irq_base.
 >>
 >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 > (...)
->> +       np = pdev->dev.of_node;
->> +#ifdef CONFIG_OF
->> +       if (np)
->> +               next = of_get_next_child(np, NULL);
->> +#endif
-> (...)
->> +#ifdef CONFIG_OF
->> +               if (np) {
->> +                       gc->of_node = next;
->> +                       next = of_get_next_child(np, next);
->> +
->> +                       gc->of_xlate = pxa_gpio_of_xlate;
->> +                       gc->of_gpio_n_cells = 2;
->> +               }
->>  #endif
-> (...)
->> +       of_node_put(next);
+>> -               chips[i].irq_base = irq_alloc_descs(-1, 0, gc->ngpio, 0);
+>> +               if (pdata->irq_base)
+>> +                       irq_base = pdata->irq_base + gpio;
+>> +               else
+>> +                       irq_base = -1;
+>> +               chips[i].irq_base = irq_alloc_descs(irq_base, 0, gc->ngpio, 0);
+>>                 if (chips[i].irq_base < 0)
+>>                         return -EINVAL;
+>>                 if (!irq_domain_add_legacy(pdev->dev.of_node, gc->ngpio,
 >
-> So if you're #ifdef:in all the other of_* stuff, why are you not
-> #ifdef:in this?
+> In this case, when you want to pass a base IRQ, use
+> irq_domain_add_simple().
 >
-> Is the #ifdef really necessary by the way, or will there be stubs
-> handling it?
->
-> Have you considered using IS_ENABLED() from <linux/kconfig.h>?
+> The descriptor allocation will still be unnecessary.
 >
 > Yours,
 > Linus Walleij
 
-I also like IS_ENABLED() macro. But the problem is that
-of_get_next_child() isn't defined if CONFIG_OF isn't selected. So
-I don't have the choice to use IS_ENABLED().
+Yes, thank you. Let me clean the irq usage after this patch series.
 
 Regards
 Haojian
