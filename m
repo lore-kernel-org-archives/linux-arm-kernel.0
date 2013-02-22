@@ -1,54 +1,48 @@
-From: JBeulich@suse.com (Jan Beulich)
-Date: Fri, 22 Feb 2013 09:05:29 +0000
-Subject: [PATCH XEN] xen: event channel arrays are xen_ulong_t and
- not unsigned long
-In-Reply-To: <1361523313.26546.109.camel@zakaz.uk.xensource.com>
-References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
- <1361285363-27133-1-git-send-email-ian.campbell@citrix.com>
- <1361466961.26546.85.camel@zakaz.uk.xensource.com>
- <5127366502000078000C0380@nat28.tlf.novell.com>
- <1361521720.26546.93.camel@zakaz.uk.xensource.com>
- <51273EE602000078000C03DC@nat28.tlf.novell.com>
- <1361523313.26546.109.camel@zakaz.uk.xensource.com>
-Message-ID: <512742E902000078000C0454@nat28.tlf.novell.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Feb 2013 09:29:08 +0000
+Subject: randconfig errors
+In-Reply-To: <511E9A73.4090806@boundarydevices.com>
+References: <511E6FA4.2000709@gmail.com> <20130215201121.11471.66349@quantum>
+ <511E9A73.4090806@boundarydevices.com>
+Message-ID: <201302220929.08736.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 22.02.13 at 09:55, Ian Campbell <Ian.Campbell@citrix.com> wrote:
-> On Fri, 2013-02-22 at 08:48 +0000, Jan Beulich wrote:
->> >>> On 22.02.13 at 09:28, Ian Campbell <Ian.Campbell@citrix.com> wrote:
->> > On Fri, 2013-02-22 at 08:12 +0000, Jan Beulich wrote:
->> >> >>> On 21.02.13 at 18:16, Ian Campbell <Ian.Campbell@citrix.com> wrote:
->> >> > On Tue, 2013-02-19 at 14:49 +0000, Ian Campbell wrote:
->> >> >> On ARM we want these to be the same size on 32- and 64-bit.
->> >> >> 
->> >> >> This is an ABI change on ARM. X86 does not change.
->> >> >> 
->> >> >> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
->> >> >> Cc: Jan Beulich <JBeulich@suse.com>
->> >> >> Cc: Keir (Xen.org) <keir@xen.org>
->> >> > 
->> >> > Are you guys (un)happy with this change from the Xen & x86 side?
->> >> 
->> >> I don't see any problem with it.
->> > 
->> > I'll take this as an Acked-by if that's ok with you.
->> 
->> Well, I specifically didn't say "ack": I don't really mind the change,
->> but I'm also not eager see it go in. Not seeing a problem with it
->> doesn't really mean there's none lurking - type changes in public
->> interfaces are always an at least slightly risky business.
+On Friday 15 February 2013, Troy Kisky wrote:
+> > Commit 7248001, "clk: vt8500: Fix device clock divisor calculations"
+> > introduced logic to improve divider selection while changing rates for
+> > the VT8500 dclk.  However a copy-paste error results in using the wrong
+> > variable name in the .set_rate callback.  Fixed by changing *prate to
+> > parent_rate.  The .round_rate function is correct and remains unchanged.
+> >
+> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> > Cc: Tony Prisk <linux@prisktech.co.nz>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Rob Herring <robherring2@gmail.com>
+> > ---
+> >   drivers/clk/clk-vt8500.c |    4 ++--
+> >   1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+> > index b5538bb..c010861 100644
+> > --- a/drivers/clk/clk-vt8500.c
+> > +++ b/drivers/clk/clk-vt8500.c
+> > @@ -156,8 +156,8 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
+> >   
+> >       divisor =  parent_rate / rate;
+> >   
+> > -     /* If prate / rate would be decimal, incr the divisor */
+> > -     if (rate * divisor < *prate)
+> > +     /* If parent_rate / rate would be decimal, incr the divisor */
+> > +     if (rate * divisor < parent_rate)
+> >               divisor++;
+> >   
+> >       if (divisor == cdev->div_mask + 1)
+> What about just
 > 
-> For x86 there is no change here since:
-> xen/include/public/arch-x86/xen.h:typedef unsigned long xen_ulong_t;
+>          divisor = (parent_rate + rate - 1) / rate;
 > 
-> Also the tools/include/xen-foreign checks show no change in the size of
-> things on x86.
 
-Which is why I said I see no problem with it.
+This is now broken in Linus' upstream tree. Could you get one fix merged?
 
-> On ARM the change is deliberate, if there is any fallout we can fix it.
-
-I understand that.
-
-Jan
+	Arnd
