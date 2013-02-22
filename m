@@ -1,200 +1,196 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Feb 2013 23:27:18 -0800
-Subject: [PATCH 7/8] clocksource: time-armada-370-xp: Divorce from local timer
- API
+Date: Thu, 21 Feb 2013 23:27:15 -0800
+Subject: [PATCH 4/8] ARM: PRIMA2: Divorce timer-marco from local timer API
 In-Reply-To: <1361518039-16663-1-git-send-email-sboyd@codeaurora.org>
 References: <1361518039-16663-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1361518039-16663-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1361518039-16663-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the armada 370xp local timers from the local timer API.
-This will allow us to remove ARM local timer support in the near
-future and makes this driver multi-architecture friendly.
+Separate the marco local timers from the local timer API. This
+will allow us to remove ARM local timer support in the near future
+and gets us closer to moving this driver to drivers/clocksource.
 
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Barry Song <baohua.song@csr.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clocksource/time-armada-370-xp.c | 85 ++++++++++++++------------------
- 1 file changed, 38 insertions(+), 47 deletions(-)
+ arch/arm/mach-prima2/timer-marco.c | 98 ++++++++++++++++++++------------------
+ 1 file changed, 52 insertions(+), 46 deletions(-)
 
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index efe4aef..ee2e50c5 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -19,6 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/kernel.h>
- #include <linux/clk.h>
-+#include <linux/cpu.h>
- #include <linux/timer.h>
- #include <linux/clockchips.h>
+diff --git a/arch/arm/mach-prima2/timer-marco.c b/arch/arm/mach-prima2/timer-marco.c
+index f4eea2e..d54aac2 100644
+--- a/arch/arm/mach-prima2/timer-marco.c
++++ b/arch/arm/mach-prima2/timer-marco.c
+@@ -10,6 +10,7 @@
  #include <linux/interrupt.h>
-@@ -31,7 +32,6 @@
- #include <linux/time-armada-370-xp.h>
- 
+ #include <linux/clockchips.h>
+ #include <linux/clocksource.h>
++#include <linux/cpu.h>
+ #include <linux/bitops.h>
+ #include <linux/irq.h>
+ #include <linux/clk.h>
+@@ -18,7 +19,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
  #include <asm/sched_clock.h>
 -#include <asm/localtimer.h>
- /*
-  * Timer block registers.
-  */
-@@ -70,7 +70,7 @@ static bool timer25Mhz = true;
-  */
- static u32 ticks_per_jiffy;
+ #include <asm/mach/time.h>
  
--static struct clock_event_device __percpu **percpu_armada_370_xp_evt;
-+static struct clock_event_device __percpu *armada_370_xp_evt;
- 
- static u32 notrace armada_370_xp_read_sched_clock(void)
- {
-@@ -143,14 +143,7 @@ armada_370_xp_clkevt_mode(enum clock_event_mode mode,
- 	}
+ #include "common.h"
+@@ -154,13 +154,7 @@ static void sirfsoc_clocksource_resume(struct clocksource *cs)
+ 		BIT(1) | BIT(0), sirfsoc_timer_base + SIRFSOC_TIMER_64COUNTER_CTRL);
  }
  
--static struct clock_event_device armada_370_xp_clkevt = {
--	.name		= "armada_370_xp_per_cpu_tick",
--	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
--	.shift		= 32,
--	.rating		= 300,
--	.set_next_event	= armada_370_xp_clkevt_next_event,
--	.set_mode	= armada_370_xp_clkevt_mode,
+-static struct clock_event_device sirfsoc_clockevent = {
+-	.name = "sirfsoc_clockevent",
+-	.rating = 200,
+-	.features = CLOCK_EVT_FEAT_ONESHOT,
+-	.set_mode = sirfsoc_timer_set_mode,
+-	.set_next_event = sirfsoc_timer_set_next_event,
 -};
-+static int armada_370_xp_clkevt_irq;
++static struct clock_event_device __percpu *sirfsoc_clockevent;
  
- static irqreturn_t armada_370_xp_timer_interrupt(int irq, void *dev_id)
+ static struct clocksource sirfsoc_clocksource = {
+ 	.name = "sirfsoc_clocksource",
+@@ -176,11 +170,8 @@ static struct irqaction sirfsoc_timer_irq = {
+ 	.name = "sirfsoc_timer0",
+ 	.flags = IRQF_TIMER | IRQF_NOBALANCING,
+ 	.handler = sirfsoc_timer_interrupt,
+-	.dev_id = &sirfsoc_clockevent,
+ };
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+-
+ static struct irqaction sirfsoc_timer1_irq = {
+ 	.name = "sirfsoc_timer1",
+ 	.flags = IRQF_TIMER | IRQF_NOBALANCING,
+@@ -189,56 +180,75 @@ static struct irqaction sirfsoc_timer1_irq = {
+ 
+ static int __cpuinit sirfsoc_local_timer_setup(struct clock_event_device *ce)
  {
-@@ -173,42 +166,53 @@ static int __cpuinit armada_370_xp_timer_setup(struct clock_event_device *evt)
- 	u32 u;
- 	int cpu = smp_processor_id();
- 
 -	/* Use existing clock_event for cpu 0 */
 -	if (!smp_processor_id())
 -		return 0;
--
- 	u = readl(local_base + TIMER_CTRL_OFF);
- 	if (timer25Mhz)
- 		writel(u | TIMER0_25MHZ, local_base + TIMER_CTRL_OFF);
- 	else
- 		writel(u & ~TIMER0_25MHZ, local_base + TIMER_CTRL_OFF);
++	int cpu = smp_processor_id();
++	struct irqaction *action;
++
++	if (cpu == 0)
++		action = &sirfsoc_timer_irq;
++	else
++		action = &sirfsoc_timer1_irq;
  
--	evt->name		= armada_370_xp_clkevt.name;
--	evt->irq		= armada_370_xp_clkevt.irq;
--	evt->features		= armada_370_xp_clkevt.features;
--	evt->shift		= armada_370_xp_clkevt.shift;
--	evt->rating		= armada_370_xp_clkevt.rating,
-+	evt->name		= "armada_370_xp_per_cpu_tick",
-+	evt->features		= CLOCK_EVT_FEAT_ONESHOT |
-+				  CLOCK_EVT_FEAT_PERIODIC;
-+	evt->shift		= 32,
-+	evt->rating		= 300,
- 	evt->set_next_event	= armada_370_xp_clkevt_next_event,
- 	evt->set_mode		= armada_370_xp_clkevt_mode,
-+	evt->irq		= armada_370_xp_clkevt_irq;
- 	evt->cpumask		= cpumask_of(cpu);
+-	ce->irq = sirfsoc_timer1_irq.irq;
++	ce->irq = action->irq;
+ 	ce->name = "local_timer";
+-	ce->features = sirfsoc_clockevent.features;
+-	ce->rating = sirfsoc_clockevent.rating;
++	ce->features = CLOCK_EVT_FEAT_ONESHOT;
++	ce->rating = 200;
+ 	ce->set_mode = sirfsoc_timer_set_mode;
+ 	ce->set_next_event = sirfsoc_timer_set_next_event;
+-	ce->shift = sirfsoc_clockevent.shift;
+-	ce->mult = sirfsoc_clockevent.mult;
+-	ce->max_delta_ns = sirfsoc_clockevent.max_delta_ns;
+-	ce->min_delta_ns = sirfsoc_clockevent.min_delta_ns;
++	clockevents_calc_mult_shift(ce, CLOCK_TICK_RATE, 60);
++	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
++	ce->min_delta_ns = clockevent_delta2ns(2, ce);
++	ce->cpumask = cpumask_of(cpu);
  
--	*__this_cpu_ptr(percpu_armada_370_xp_evt) = evt;
--
- 	clockevents_config_and_register(evt, timer_clk, 1, 0xfffffffe);
- 	enable_percpu_irq(evt->irq, 0);
+-	sirfsoc_timer1_irq.dev_id = ce;
+-	BUG_ON(setup_irq(ce->irq, &sirfsoc_timer1_irq));
+-	irq_set_affinity(sirfsoc_timer1_irq.irq, cpumask_of(1));
++	action->dev_id = ce;
++	BUG_ON(setup_irq(ce->irq, action));
++	irq_set_affinity(action->irq, cpumask_of(cpu));
  
+ 	clockevents_register_device(ce);
  	return 0;
  }
  
--static void  armada_370_xp_timer_stop(struct clock_event_device *evt)
-+static void __cpuinit armada_370_xp_timer_stop(struct clock_event_device *evt)
+-static void sirfsoc_local_timer_stop(struct clock_event_device *ce)
++static void __cpuinit sirfsoc_local_timer_stop(struct clock_event_device *ce)
  {
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
- 	disable_percpu_irq(evt->irq);
- }
++	int cpu = smp_processor_id();
++
+ 	sirfsoc_timer_count_disable(1);
  
--static struct local_timer_ops armada_370_xp_local_timer_ops __cpuinitdata = {
--	.setup	= armada_370_xp_timer_setup,
--	.stop	=  armada_370_xp_timer_stop,
-+static int __cpuinit armada_370_xp_timer_cpu_notify(struct notifier_block *self,
+-	remove_irq(sirfsoc_timer1_irq.irq, &sirfsoc_timer1_irq);
++	if (cpu == 0)
++		remove_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq);
++	else
++		remove_irq(sirfsoc_timer1_irq.irq, &sirfsoc_timer1_irq);
++}
++
++static int __cpuinit sirfsoc_cpu_notify(struct notifier_block *self,
 +					   unsigned long action, void *hcpu)
 +{
-+	struct clock_event_device *evt = this_cpu_ptr(armada_370_xp_evt);
++	struct clock_event_device *evt = this_cpu_ptr(sirfsoc_clockevent);
 +
 +	switch (action & ~CPU_TASKS_FROZEN) {
 +	case CPU_STARTING:
-+		armada_370_xp_timer_setup(evt);
++		sirfsoc_local_timer_setup(evt);
 +		break;
 +	case CPU_DYING:
-+		armada_370_xp_timer_stop(evt);
++		sirfsoc_local_timer_stop(evt);
 +		break;
 +	}
 +
 +	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block armada_370_xp_timer_cpu_nb __cpuinitdata = {
-+	.notifier_call = armada_370_xp_timer_cpu_notify,
+ }
+ 
+-static struct local_timer_ops sirfsoc_local_timer_ops __cpuinitdata = {
+-	.setup	= sirfsoc_local_timer_setup,
+-	.stop	= sirfsoc_local_timer_stop,
++static struct notifier_block sirfsoc_cpu_nb __cpuinitdata = {
++	.notifier_call = sirfsoc_cpu_notify,
  };
+-#endif /* CONFIG_LOCAL_TIMERS */
  
- void __init armada_370_xp_timer_init(void)
-@@ -224,9 +228,6 @@ void __init armada_370_xp_timer_init(void)
- 
- 	if (of_find_property(np, "marvell,timer-25Mhz", NULL)) {
- 		/* The fixed 25MHz timer is available so let's use it */
--		u = readl(local_base + TIMER_CTRL_OFF);
--		writel(u | TIMER0_25MHZ,
--		       local_base + TIMER_CTRL_OFF);
- 		u = readl(timer_base + TIMER_CTRL_OFF);
- 		writel(u | TIMER0_25MHZ,
- 		       timer_base + TIMER_CTRL_OFF);
-@@ -236,9 +237,6 @@ void __init armada_370_xp_timer_init(void)
- 		struct clk *clk = of_clk_get(np, 0);
- 		WARN_ON(IS_ERR(clk));
- 		rate =  clk_get_rate(clk);
--		u = readl(local_base + TIMER_CTRL_OFF);
--		writel(u & ~(TIMER0_25MHZ),
--		       local_base + TIMER_CTRL_OFF);
- 
- 		u = readl(timer_base + TIMER_CTRL_OFF);
- 		writel(u & ~(TIMER0_25MHZ),
-@@ -252,7 +250,7 @@ void __init armada_370_xp_timer_init(void)
- 	 * We use timer 0 as clocksource, and private(local) timer 0
- 	 * for clockevents
- 	 */
--	armada_370_xp_clkevt.irq = irq_of_parse_and_map(np, 4);
-+	armada_370_xp_clkevt_irq = irq_of_parse_and_map(np, 4);
- 
- 	ticks_per_jiffy = (timer_clk + HZ / 2) / HZ;
- 
-@@ -277,26 +275,19 @@ void __init armada_370_xp_timer_init(void)
- 			      "armada_370_xp_clocksource",
- 			      timer_clk, 300, 32, clocksource_mmio_readl_down);
- 
--	/* Register the clockevent on the private timer of CPU 0 */
--	armada_370_xp_clkevt.cpumask = cpumask_of(0);
--	clockevents_config_and_register(&armada_370_xp_clkevt,
--					timer_clk, 1, 0xfffffffe);
-+	register_cpu_notifier(&armada_370_xp_timer_cpu_nb);
- 
--	percpu_armada_370_xp_evt = alloc_percpu(struct clock_event_device *);
-+	armada_370_xp_evt = alloc_percpu(struct clock_event_device);
- 
- 
- 	/*
- 	 * Setup clockevent timer (interrupt-driven).
- 	 */
--	*__this_cpu_ptr(percpu_armada_370_xp_evt) = &armada_370_xp_clkevt;
--	res = request_percpu_irq(armada_370_xp_clkevt.irq,
-+	res = request_percpu_irq(armada_370_xp_clkevt_irq,
- 				armada_370_xp_timer_interrupt,
--				armada_370_xp_clkevt.name,
--				percpu_armada_370_xp_evt);
--	if (!res) {
--		enable_percpu_irq(armada_370_xp_clkevt.irq, 0);
+ static void __init sirfsoc_clockevent_init(void)
+ {
+-	clockevents_calc_mult_shift(&sirfsoc_clockevent, CLOCK_TICK_RATE, 60);
+-
+-	sirfsoc_clockevent.max_delta_ns =
+-		clockevent_delta2ns(-2, &sirfsoc_clockevent);
+-	sirfsoc_clockevent.min_delta_ns =
+-		clockevent_delta2ns(2, &sirfsoc_clockevent);
+-
+-	sirfsoc_clockevent.cpumask = cpumask_of(0);
+-	clockevents_register_device(&sirfsoc_clockevent);
 -#ifdef CONFIG_LOCAL_TIMERS
--		local_timer_register(&armada_370_xp_local_timer_ops);
+-	local_timer_register(&sirfsoc_local_timer_ops);
 -#endif
--	}
-+				"armada_370_xp_per_cpu_tick",
-+				armada_370_xp_evt);
++	sirfsoc_clockevent = alloc_percpu(struct clock_event_device);
++	BUG_ON(!sirfsoc_clockevent);
++
++	BUG_ON(register_cpu_notifier(&sirfsoc_cpu_nb));
++
 +	/* Immediately configure the timer on the boot CPU */
-+	if (!res)
-+		armada_370_xp_timer_setup(this_cpu_ptr(armada_370_xp_evt));
++	sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
+ }
+ 
+ /* initialize the kernel jiffy timer source */
+@@ -281,8 +291,6 @@ void __init sirfsoc_marco_timer_init(void)
+ 
+ 	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_TICK_RATE));
+ 
+-	BUG_ON(setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq));
+-
+ 	sirfsoc_clockevent_init();
+ }
+ 
+@@ -306,11 +314,9 @@ static void __init sirfsoc_of_timer_map(void)
+ 	if (!sirfsoc_timer_irq.irq)
+ 		panic("No irq passed for timer0 via DT\n");
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+ 	sirfsoc_timer1_irq.irq = irq_of_parse_and_map(np, 1);
+ 	if (!sirfsoc_timer1_irq.irq)
+ 		panic("No irq passed for timer1 via DT\n");
+-#endif
+ 
+ 	of_node_put(np);
  }
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
