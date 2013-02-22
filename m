@@ -1,30 +1,31 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Fri, 22 Feb 2013 15:23:05 +0100
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 22 Feb 2013 15:25:28 +0100
 Subject: [PATCH 0/2] cpustat: use atomic operations to read/update stats
-In-Reply-To: <1361542891.3683.6.camel@edumazet-glaptop>
+In-Reply-To: <20130222141635.GA9606@gmail.com>
 References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
  <1361522767.26780.44.camel@laptop>
  <20130222125019.GC17948@somewhere.redhat.com>
- <1361542150.26780.64.camel@laptop>
- <1361542891.3683.6.camel@edumazet-glaptop>
-Message-ID: <20130222142302.GC18149@somewhere.redhat.com>
+ <1361540926.26780.56.camel@laptop> <20130222135411.GA9202@gmail.com>
+ <1361541894.26780.62.camel@laptop> <20130222141635.GA9606@gmail.com>
+Message-ID: <1361543128.26780.65.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 06:21:31AM -0800, Eric Dumazet wrote:
-> On Fri, 2013-02-22 at 15:09 +0100, Peter Zijlstra wrote:
-> > On Fri, 2013-02-22 at 13:50 +0100, Frederic Weisbecker wrote:
-> > > > Argh!! at what cost? 64bit atomics are like expensive. Wouldn't
-> > > adding
-> > > > a seqlock be saner?
-> > > 
-> > > Not sure. This requires a spinlock in the write side which is called
-> > > from
-> > > fast path like the timer interrupt.
-> > 
-> > A single spinlock is _way_ cheaper than a ton of cmpxchg8b()s to update
-> > a few variables.
+On Fri, 2013-02-22 at 15:16 +0100, Ingo Molnar wrote:
+> > I checked arch/x86/include/asm/atomic64_32.h and we use 
+> > cmpxchg8b for everything from _set() to _read(), which 
+> > translates into 'horridly stupendifyingly slow' for a number 
+> > of machines, but coherent.
 > 
-> We also have include/linux/u64_stats_sync.h since 2.6.36
+> That's a valid concern - and cmpxchg8b is the only 64-bit op 
+> available on most 32-bit x86 CPUs which does not involve the 
+> FPU.
+> 
+> Wondering how significant this range of x86 problem boxes will 
+> be by the time any of these changes reaches upstream and distros 
+> - and how much 'horridly stupendifyingly slow' is in terms of 
+> cycles expended.
 
-Interesting, we should probably use that instead.
+On the !x86 side of things we're implementing (generic) atomic64 using
+hashed spinlocks, so there too using a single spinlock around the
+entire data structure is a complete win.
