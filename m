@@ -1,60 +1,115 @@
-From: wd@denx.de (Wolfgang Denk)
-Date: Fri, 22 Feb 2013 07:55:46 +0100
-Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <20130221232821.GA2823@obsidianresearch.com>
-References: <20130221103705.GB17852@n2100.arm.linux.org.uk>
- <51261F38.2030902@ti.com> <20130221134656.GC17852@n2100.arm.linux.org.uk>
- <51262A7A.8040103@ti.com> <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
- <20130221182724.GA14329@obsidianresearch.com>
- <alpine.LFD.2.03.1302211423190.6419@syhkavp.arg>
- <20130221211444.GB20114@obsidianresearch.com>
- <alpine.LFD.2.03.1302211624561.6419@syhkavp.arg>
- <20130221231848.880DE200552@gemini.denx.de>
- <20130221232821.GA2823@obsidianresearch.com>
-Message-ID: <20130222065546.F1609200550@gemini.denx.de>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Fri, 22 Feb 2013 12:47:33 +0530
+Subject: [PATCH 1/2] cpustat: use accessor functions for get/set/add
+In-Reply-To: <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
+References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
+ <1361512604-2720-2-git-send-email-khilman@linaro.org>
+ <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
+Message-ID: <CAP245DVYsjgvww-3qBnbZ4T7SsJ=whbVvhf06fArxcspyX9bwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason,
+On Fri, Feb 22, 2013 at 11:51 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On Fri, Feb 22, 2013 at 11:26 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Add some accessor functions in order to facilitate the conversion to
+>> atomic reads/writes of cpustat values.
+>>
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>>  drivers/cpufreq/cpufreq_governor.c | 18 ++++++++---------
+>>  drivers/cpufreq/cpufreq_ondemand.c |  2 +-
+>
+>> diff --git a/drivers/cpufreq/cpufreq_governor.c b/drivers/cpufreq/cpufreq_governor.c
+>> index 6c5f1d3..ec6c315 100644
+>> --- a/drivers/cpufreq/cpufreq_governor.c
+>> +++ b/drivers/cpufreq/cpufreq_governor.c
+>> @@ -36,12 +36,12 @@ static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
+>>
+>>         cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
+>>
+>> -       busy_time = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
+>> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
+>> +       busy_time = kcpustat_cpu_get(cpu, CPUTIME_USER);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SYSTEM);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_IRQ);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SOFTIRQ);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_STEAL);
+>> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_NICE);
+>>
+>>         idle_time = cur_wall_time - busy_time;
+>>         if (wall)
+>> @@ -103,7 +103,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
+>>                         u64 cur_nice;
+>>                         unsigned long cur_nice_jiffies;
+>>
+>> -                       cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
+>> +                       cur_nice = kcpustat_cpu_get(j, CPUTIME_NICE) -
+>>                                          cdbs->prev_cpu_nice;
+>>                         /*
+>>                          * Assumption: nice time between sampling periods will
+>> @@ -113,7 +113,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
+>>                                         cputime64_to_jiffies64(cur_nice);
+>>
+>>                         cdbs->prev_cpu_nice =
+>> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+>> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
+>>                         idle_time += jiffies_to_usecs(cur_nice_jiffies);
+>>                 }
+>>
+>> @@ -216,7 +216,7 @@ int cpufreq_governor_dbs(struct dbs_data *dbs_data,
+>>                                         &j_cdbs->prev_cpu_wall);
+>>                         if (ignore_nice)
+>>                                 j_cdbs->prev_cpu_nice =
+>> -                                       kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+>> +                                       kcpustat_cpu_get(j, CPUTIME_NICE);
+>>                 }
+>>
+>>                 /*
+>> diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
+>> index 7731f7c..ac5d49f 100644
+>> --- a/drivers/cpufreq/cpufreq_ondemand.c
+>> +++ b/drivers/cpufreq/cpufreq_ondemand.c
+>> @@ -403,7 +403,7 @@ static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
+>>                                                 &dbs_info->cdbs.prev_cpu_wall);
+>>                 if (od_tuners.ignore_nice)
+>>                         dbs_info->cdbs.prev_cpu_nice =
+>> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+>> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
+>>
+>>         }
+>>         return count;
+>
+> For cpufreq:
+>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> Though i believe you also need this:
+>
+> diff --git a/drivers/cpufreq/cpufreq_conservative.c
+> b/drivers/cpufreq/cpufreq_conservative.c
+> index 64ef737..38e3ad7 100644
+> --- a/drivers/cpufreq/cpufreq_conservative.c
+> +++ b/drivers/cpufreq/cpufreq_conservative.c
+> @@ -242,7 +242,7 @@ static ssize_t store_ignore_nice_load(struct
+> kobject *a, struct attribute *b,
+>                                                 &dbs_info->cdbs.prev_cpu_wall);
+>                 if (cs_tuners.ignore_nice)
+>                         dbs_info->cdbs.prev_cpu_nice =
+> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
+> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
+>         }
+>         return count;
+>  }
+>
+> BTW, i don't see kcpustat_cpu() used in
+>
+>  kernel/sched/core.c                | 12 +++++-------
+>  kernel/sched/cputime.c             | 29 +++++++++++++--------------
+>
+> I searched tip/master as well as lnext/master.
 
-In message <20130221232821.GA2823@obsidianresearch.com> you wrote:
-> 
-> > > own seems to be rather static and stable, and unlike software there is 
-> > > no way I can change it (soldering irons don't count).
-> > 
-> > There is other hardware available (for example FPGA based) where this
-> > does not apply.
-> 
-> Agreed.. We do that here as well, the DT is also used to describe the
-> functionality inside FPGA(s). We do things like declare a GPIO
-> controller inside the FPGA, then stack the bitbang MDIO/I2C on top of
-> that, then declare a bunch of devices on those busses. DT makes this
-> extremely straightforward.
-> 
-> However, it is critical that the DT, kernel and FPGA are matched
-> together - we always arrange things so that the DTB, kernel and FPGA
-> config are bundled together and update atomically during firmware
-> upgrade.
-
-Agreed.
-
-> Xilinx's Zynq is a great example of this kind of stuff, FWIW. IIRC
-
-Indeed - Xilinx's Zynq, Altera's SoC FPGA, and others.
-
-Such highly flexible hardware configurations require a new level of
-software support that by far exceeds the classic static setups of more
-"PC-like" systems where the only change you would expect is adding or
-removing some PCI cards or the like.
-
-
-Best regards,
-
-Wolfgang Denk
-
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
-Don't tell me how hard you work.  Tell me how much you get done.
-                                                     -- James J. Ling
+Added by Frederic's Adaptive NOHZ patchset?
