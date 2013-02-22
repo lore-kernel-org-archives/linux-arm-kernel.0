@@ -1,51 +1,43 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Fri, 22 Feb 2013 17:05:35 +0900
-Subject: [PATCH v2 2/4] ARM: EXYNOS: support burst mode for for dev-to-mem and
- mem-to-dev transmit
-Message-ID: <001a01ce10d3$64b4afb0$2e1e0f10$%kim@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 22 Feb 2013 00:08:05 -0800
+Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field mask width
+Message-ID: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds to support burst mode for for dev-to-mem and dev-to-mem transmit
+From: Steve Muckle <smuckle@codeaurora.org>
 
-Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+The subarchitecture field in the fpsid register is 7 bits wide.
+The topmost bit is used to designate that the subarchitecture
+designer is not ARM. We use this field to determine which VFP
+version is supported by the CPU. Since the topmost bit is masked
+off we detect non-ARM subarchitectures as supporting only
+HWCAP_VFP and not HWCAP_VFPv3 as it should be for Qualcomm's
+processors.
+
+Use the proper width for the mask so that we report the correct
+elf_hwcap of non-ARM designed processors.
+
+Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
+[sboyd: Expanded on commit text]
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/plat-samsung/dma-ops.c              |    4 ++--
- arch/arm/plat-samsung/include/plat/dma-ops.h |    1 +
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/vfp.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
-index 71d58dd..6c90c16 100644
---- a/arch/arm/plat-samsung/dma-ops.c
-+++ b/arch/arm/plat-samsung/dma-ops.c
-@@ -60,14 +60,14 @@ static int samsung_dmadev_config(unsigned ch,
- 		slave_config.direction = param->direction;
- 		slave_config.src_addr = param->fifo;
- 		slave_config.src_addr_width = param->width;
--		slave_config.src_maxburst = 1;
-+		slave_config.src_maxburst = param->maxburst;
- 		dmaengine_slave_config(chan, &slave_config);
- 	} else if (param->direction == DMA_MEM_TO_DEV) {
- 		memset(&slave_config, 0, sizeof(struct dma_slave_config));
- 		slave_config.direction = param->direction;
- 		slave_config.dst_addr = param->fifo;
- 		slave_config.dst_addr_width = param->width;
--		slave_config.dst_maxburst = 1;
-+		slave_config.dst_maxburst = param->maxburst;
- 		dmaengine_slave_config(chan, &slave_config);
- 	} else {
- 		pr_warn("unsupported direction\n");
-diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
-index 1141782..383bd6d 100644
---- a/arch/arm/plat-samsung/include/plat/dma-ops.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
-@@ -35,6 +35,7 @@ struct samsung_dma_prep {
- struct samsung_dma_config {
- 	enum dma_transfer_direction direction;
- 	enum dma_slave_buswidth width;
-+	u32 maxburst;
- 	dma_addr_t fifo;
- };
-
---
-1.7.5.4
+diff --git a/arch/arm/include/asm/vfp.h b/arch/arm/include/asm/vfp.h
+index f4ab34f..76d3f69 100644
+--- a/arch/arm/include/asm/vfp.h
++++ b/arch/arm/include/asm/vfp.h
+@@ -21,7 +21,7 @@
+ #define FPSID_FORMAT_MASK	(0x3  << FPSID_FORMAT_BIT)
+ #define FPSID_NODOUBLE		(1<<20)
+ #define FPSID_ARCH_BIT		(16)
+-#define FPSID_ARCH_MASK		(0xF  << FPSID_ARCH_BIT)
++#define FPSID_ARCH_MASK		(0x7F  << FPSID_ARCH_BIT)
+ #define FPSID_PART_BIT		(8)
+ #define FPSID_PART_MASK		(0xFF << FPSID_PART_BIT)
+ #define FPSID_VARIANT_BIT	(4)
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
