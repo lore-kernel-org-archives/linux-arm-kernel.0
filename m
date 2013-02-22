@@ -1,43 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 22 Feb 2013 00:08:05 -0800
-Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field mask width
-Message-ID: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Fri, 22 Feb 2013 17:09:18 +0900
+Subject: [PATCH v2 3/4] spi: s3c64xx: add dma maxburst size initialization
+Message-ID: <001b01ce10d3$e9f78620$bde69260$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Muckle <smuckle@codeaurora.org>
+This patch adds dma maxburst size initialization.
+The maxburst should be set by MODE_CFGn.DMA_TYPE,
+because the pl330 dma driver supports burst mode.
 
-The subarchitecture field in the fpsid register is 7 bits wide.
-The topmost bit is used to designate that the subarchitecture
-designer is not ARM. We use this field to determine which VFP
-version is supported by the CPU. Since the topmost bit is masked
-off we detect non-ARM subarchitectures as supporting only
-HWCAP_VFP and not HWCAP_VFPv3 as it should be for Qualcomm's
-processors.
-
-Use the proper width for the mask so that we report the correct
-elf_hwcap of non-ARM designed processors.
-
-Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
-[sboyd: Expanded on commit text]
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Hyeonkook Kim <hk619.kim@samsung.com>
 ---
- arch/arm/include/asm/vfp.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/spi/spi-s3c64xx.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/vfp.h b/arch/arm/include/asm/vfp.h
-index f4ab34f..76d3f69 100644
---- a/arch/arm/include/asm/vfp.h
-+++ b/arch/arm/include/asm/vfp.h
-@@ -21,7 +21,7 @@
- #define FPSID_FORMAT_MASK	(0x3  << FPSID_FORMAT_BIT)
- #define FPSID_NODOUBLE		(1<<20)
- #define FPSID_ARCH_BIT		(16)
--#define FPSID_ARCH_MASK		(0xF  << FPSID_ARCH_BIT)
-+#define FPSID_ARCH_MASK		(0x7F  << FPSID_ARCH_BIT)
- #define FPSID_PART_BIT		(8)
- #define FPSID_PART_MASK		(0xFF << FPSID_PART_BIT)
- #define FPSID_VARIANT_BIT	(4)
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index e862ab8..5e6cafe 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -287,10 +287,20 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
+ 	struct s3c64xx_spi_driver_data *sdd;
+ 	struct samsung_dma_prep info;
+ 	struct samsung_dma_config config;
++	void __iomem *regs;
++	unsigned int mode_cfg;
+
+ 	if (dma->direction == DMA_DEV_TO_MEM) {
+ 		sdd = container_of((void *)dma,
+ 			struct s3c64xx_spi_driver_data, rx_dma);
++
++		regs = sdd->regs;
++		mode_cfg = readl(regs + S3C64XX_SPI_MODE_CFG);
++		if (mode_cfg & S3C64XX_SPI_MODE_4BURST)
++			config.maxburst = 4;
++		else
++			config.maxburst = 1;
++
+ 		config.direction = sdd->rx_dma.direction;
+ 		config.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
+ 		config.width = sdd->cur_bpw / 8;
+@@ -298,6 +308,14 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
+ 	} else {
+ 		sdd = container_of((void *)dma,
+ 			struct s3c64xx_spi_driver_data, tx_dma);
++
++		regs = sdd->regs;
++		mode_cfg = readl(regs + S3C64XX_SPI_MODE_CFG);
++		if (mode_cfg & S3C64XX_SPI_MODE_4BURST)
++			config.maxburst = 4;
++		else
++			config.maxburst = 1;
++
+ 		config.direction =  sdd->tx_dma.direction;
+ 		config.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
+ 		config.width = sdd->cur_bpw / 8;
+--
+1.7.5.4
