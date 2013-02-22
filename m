@@ -1,54 +1,54 @@
-From: ananaza@iki.fi (Antti P Miettinen)
-Date: Fri, 22 Feb 2013 11:04:04 +0200
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
- modes
-In-Reply-To: <874nmowhm1.fsf@amiettinen-lnx.nvidia.com> (Antti P. Miettinen's
- message of "Mon, 24 Sep 2012 00:32:06 +0300")
-References: <20120514162150.GA4654@e102568-lin.cambridge.arm.com>
- <20120514163909.GB13860@n2100.arm.linux.org.uk>
- <20120514171533.GB4830@e102568-lin.cambridge.arm.com>
- <20120515094010.GF10453@n2100.arm.linux.org.uk>
- <20120515100902.GA10463@e102568-lin.cambridge.arm.com>
- <20120515101505.GG10453@n2100.arm.linux.org.uk>
- <20120515162851.GC16614@e102568-lin.cambridge.arm.com>
- <20120515163618.GH13860@n2100.arm.linux.org.uk>
- <20120515170534.GA17319@e102568-lin.cambridge.arm.com>
- <87sjaetmqv.fsf@amiettinen-lnx.nvidia.com>
- <20120920095431.GC4588@e102568-lin.cambridge.arm.com>
- <87lig4tmw1.fsf@amiettinen-lnx.nvidia.com>
- <874nmowhm1.fsf@amiettinen-lnx.nvidia.com>
-Message-ID: <87liag67p7.fsf@amiettinen-lnx.nvidia.com>
+From: JBeulich@suse.com (Jan Beulich)
+Date: Fri, 22 Feb 2013 09:05:29 +0000
+Subject: [PATCH XEN] xen: event channel arrays are xen_ulong_t and
+ not unsigned long
+In-Reply-To: <1361523313.26546.109.camel@zakaz.uk.xensource.com>
+References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
+ <1361285363-27133-1-git-send-email-ian.campbell@citrix.com>
+ <1361466961.26546.85.camel@zakaz.uk.xensource.com>
+ <5127366502000078000C0380@nat28.tlf.novell.com>
+ <1361521720.26546.93.camel@zakaz.uk.xensource.com>
+ <51273EE602000078000C03DC@nat28.tlf.novell.com>
+ <1361523313.26546.109.camel@zakaz.uk.xensource.com>
+Message-ID: <512742E902000078000C0454@nat28.tlf.novell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, coming back to an old thread:
+>>> On 22.02.13 at 09:55, Ian Campbell <Ian.Campbell@citrix.com> wrote:
+> On Fri, 2013-02-22 at 08:48 +0000, Jan Beulich wrote:
+>> >>> On 22.02.13 at 09:28, Ian Campbell <Ian.Campbell@citrix.com> wrote:
+>> > On Fri, 2013-02-22 at 08:12 +0000, Jan Beulich wrote:
+>> >> >>> On 21.02.13 at 18:16, Ian Campbell <Ian.Campbell@citrix.com> wrote:
+>> >> > On Tue, 2013-02-19 at 14:49 +0000, Ian Campbell wrote:
+>> >> >> On ARM we want these to be the same size on 32- and 64-bit.
+>> >> >> 
+>> >> >> This is an ABI change on ARM. X86 does not change.
+>> >> >> 
+>> >> >> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+>> >> >> Cc: Jan Beulich <JBeulich@suse.com>
+>> >> >> Cc: Keir (Xen.org) <keir@xen.org>
+>> >> > 
+>> >> > Are you guys (un)happy with this change from the Xen & x86 side?
+>> >> 
+>> >> I don't see any problem with it.
+>> > 
+>> > I'll take this as an Acked-by if that's ok with you.
+>> 
+>> Well, I specifically didn't say "ack": I don't really mind the change,
+>> but I'm also not eager see it go in. Not seeing a problem with it
+>> doesn't really mean there's none lurking - type changes in public
+>> interfaces are always an at least slightly risky business.
+> 
+> For x86 there is no change here since:
+> xen/include/public/arch-x86/xen.h:typedef unsigned long xen_ulong_t;
+> 
+> Also the tools/include/xen-foreign checks show no change in the size of
+> things on x86.
 
-Antti P Miettinen <ananaza@iki.fi> writes:
-> Antti P Miettinen <ananaza@iki.fi> writes:
->> Hmm.. is the condition for cache coherence protocol then different from
->> TLB lookups? If C is cleared, is the cache available for snoops by other
->> cores? What happens if another core needs a dirty line in a cache that
->> has C cleared?
->
-> Sorry - looks like you already answered this:
->> 2) as long as they are taking part in coherency (SMP bit set in ACTLR), all
->>    Cortex-A cores in a MP configuration with the SCTLR.C bit set can hit in
->>    the cache of a CPU that runs with the C bit cleared in SCTLR
->
-> So other cores apparently can search the cache that has C bit
-> cleared. The only clarification I still would need is whether this
-> searching applies to also TLB fetches by other cores. So when you say:
->> .. TLB fetches cannot search the D-cache if the C bit in
->> SCTLR is clear on A9. ..
->
-> you meant TLB fethes by the core that has it's C bit cleared. The TLB
-> fetches by other cores will still search the cache just like any other
-> coherence searches?
+Which is why I said I see no problem with it.
 
-This did not get answered - are TLB fetches by sibling cores treated in
-the same way as cache fetches? If core A has C bit cleared, is the cache
-still available for TLB fetches by core B?
+> On ARM the change is deliberate, if there is any fallout we can fix it.
 
---
-Antti P Miettinen
-http://www.iki.fi/~ananaza/
+I understand that.
+
+Jan
