@@ -1,58 +1,25 @@
 From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Fri, 22 Feb 2013 14:27:52 +0100
-Subject: [RFC/PATCH 1/5] context tracking: conditionalize guest support
- based on CONFIG_KVM
-In-Reply-To: <1361389302-11968-2-git-send-email-khilman@linaro.org>
-References: <1361389302-11968-1-git-send-email-khilman@linaro.org>
- <1361389302-11968-2-git-send-email-khilman@linaro.org>
-Message-ID: <20130222132750.GE17948@somewhere.redhat.com>
+Date: Fri, 22 Feb 2013 14:38:37 +0100
+Subject: [PATCH 1/2] cpustat: use accessor functions for get/set/add
+In-Reply-To: <1361512604-2720-2-git-send-email-khilman@linaro.org>
+References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
+ <1361512604-2720-2-git-send-email-khilman@linaro.org>
+Message-ID: <20130222133835.GF17948@somewhere.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 11:41:38AM -0800, Kevin Hilman wrote:
-> So that it can build on !KVM systems too.
-> 
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
->  kernel/context_tracking.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
-> index 74f68f4..6fe96b1 100644
-> --- a/kernel/context_tracking.c
-> +++ b/kernel/context_tracking.c
-> @@ -1,5 +1,7 @@
->  #include <linux/context_tracking.h>
-> +#ifdef CONFIG_KVM
->  #include <linux/kvm_host.h>
-> +#endif
+Looks good, just a minor neat:
 
-The header should take care of the off-case, no need to ifdef its inclusion.
-
->  #include <linux/rcupdate.h>
->  #include <linux/sched.h>
->  #include <linux/hardirq.h>
-> @@ -62,6 +64,7 @@ void user_exit(void)
->  	local_irq_restore(flags);
->  }
+On Thu, Feb 21, 2013 at 09:56:43PM -0800, Kevin Hilman wrote:
+> diff --git a/include/linux/kernel_stat.h b/include/linux/kernel_stat.h
+> index 66b7078..df8ad75 100644
+> --- a/include/linux/kernel_stat.h
+> +++ b/include/linux/kernel_stat.h
+> @@ -32,7 +32,7 @@ enum cpu_usage_stat {
+>  };
 >  
-> +#ifdef CONFIG_KVM
->  void guest_enter(void)
->  {
->  	if (vtime_accounting_enabled())
-> @@ -79,6 +82,7 @@ void guest_exit(void)
->  		__guest_exit();
->  }
->  EXPORT_SYMBOL_GPL(guest_exit);
-> +#endif
+>  struct kernel_cpustat {
+> -	u64 cpustat[NR_STATS];
+> +	u64 _cpustat[NR_STATS];
 
-Kvm might be built as a module so we can't actually do this unfortunately.
-
-Thanks.
-
->  
->  void context_tracking_task_switch(struct task_struct *prev,
->  			     struct task_struct *next)
-> -- 
-> 1.8.1.2
-> 
+Why do you need the underscore?
