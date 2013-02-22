@@ -1,42 +1,24 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Feb 2013 11:28:28 -0700
-Subject: [PATCH 3/3] ARM: tegra: refactor tegra{20,30}_boot_secondary
-In-Reply-To: <1361514267-12111-3-git-send-email-josephl@nvidia.com>
-References: <1361514267-12111-1-git-send-email-josephl@nvidia.com>
- <1361514267-12111-3-git-send-email-josephl@nvidia.com>
-Message-ID: <5127B8CC.3030808@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Feb 2013 19:29:26 +0100
+Subject: [PATCH] dma: Remove erroneous __exit and __exit_p() references
+In-Reply-To: <1361318824-22287-1-git-send-email-maxin.john@gmail.com>
+References: <1361318824-22287-1-git-send-email-maxin.john@gmail.com>
+Message-ID: <CACRpkdZamOCWHWMcFYRqQDKJARZOCEP_eSNPNaxSgHfAn2wmEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2013 11:24 PM, Joseph Lo wrote:
-> From: Hiroshi Doyu <hdoyu@nvidia.com>
-> 
-> "tegra_boot_secondary()" has many condition branches for some Tegra
-> SoC generations in a single function so that it's not easy to compile
-> a kernel only for a single SoC if one wants with some reason, debug
-> purpose(?). This patch provides SoC specific version of
-> boot_secondary(), tegra{20,30}_boot_secondary(). This could allow
-> any combination of SoC to be built. Those boot_secondary functions can
-> be preparation when we ntroduce chip specific function pointers in the
-> future without having chip dependent branches around.
-> 
-> Also removed unused definition/prototpye.
+On Wed, Feb 20, 2013 at 1:07 AM,  <maxin.john@gmail.com> wrote:
 
-That "also" is really something that should be a separate patch, since
-it's not related to the code refactoring that's the main purpose of this
-patch.
+> From: "Maxin B. John" <maxin.john@enea.com>
+>
+> Removing the annotation with __exit and referencing with __exit_p()
+> present in dma driver module remove hooks.
+>
+> Part of the __devexit and __devexit_p() purge.
+>
+> Signed-off-by: Maxin B. John <maxin.john@enea.com>
 
-However, I'll let it slide this time, since I think both patches would
-just end up in Tegra's cleanup branch anyway, even though I did already
-point this out (multiple times?) during downstream review:-( You're
-getting lucky because I don't feel like reviewing this again.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I'll apply this series once I can apply patches for 3.10.
-
-One note to anyone else reading this patch: It does look like this is
-duplicating code that was previously nicely shared in
-tegra_boot_secondary(). However, I believe it's appropriate to do this
-in this case, since the equivalent code for future SoCs (such as
-Tegra114) is extremely different, and so the current shared code won't
-end up being shared, and this would just make tegra_boot_secondary()
-over-complex with conditionals when adding Tegra114 support.
+Yours,
+Linus Walleij
