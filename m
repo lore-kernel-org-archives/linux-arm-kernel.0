@@ -1,24 +1,55 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 21 Feb 2013 16:47:41 -0800
-Subject: [GIT PULL 00/09] arm-soc: changes for 3.9
-In-Reply-To: <1361481149-27559-1-git-send-email-arnd@arndb.de>
-References: <1361481149-27559-1-git-send-email-arnd@arndb.de>
-Message-ID: <CA+55aFwjvH=rGb6Qif5Ty17EmVXiLoeUSMTWy8LzOphQUrd6Sg@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 22 Feb 2013 09:32:00 +0800
+Subject: [PATCH v3 08/12] gpio: pxa: move gpio properties into child node
+In-Reply-To: <CACRpkda7P5GsOB=s0YbeV2rXbpQaHQNkr0Po73Lwo-vyFcN1Nw@mail.gmail.com>
+References: <1361164358-5845-1-git-send-email-haojian.zhuang@linaro.org>
+ <1361164358-5845-9-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkda7P5GsOB=s0YbeV2rXbpQaHQNkr0Po73Lwo-vyFcN1Nw@mail.gmail.com>
+Message-ID: <CAD6h2NQ2Tz3dTyyJOFhf8t9aCGs4S6EZ_6f1_u8aqO4XoAN9Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 21, 2013 at 1:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 22 February 2013 03:09, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Feb 18, 2013 at 6:12 AM, Haojian Zhuang
+> <haojian.zhuang@linaro.org> wrote:
 >
-> The merge conflicts I mention in the tags are all for conflicts
-> between the arm-soc branches. There are a few more conflicts
-> with other stuff you already pulled, but it all looks simple
-> as well. I have uploaded a 'for-linus' branch to the arm-soc
-> tree with the resolutions I used.
+>> Move gpio properties into child node. So pinctrl driver could binds to
+>> each gpio chip with gpio range.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> (...)
+>> +       np = pdev->dev.of_node;
+>> +#ifdef CONFIG_OF
+>> +       if (np)
+>> +               next = of_get_next_child(np, NULL);
+>> +#endif
+> (...)
+>> +#ifdef CONFIG_OF
+>> +               if (np) {
+>> +                       gc->of_node = next;
+>> +                       next = of_get_next_child(np, next);
+>> +
+>> +                       gc->of_xlate = pxa_gpio_of_xlate;
+>> +                       gc->of_gpio_n_cells = 2;
+>> +               }
+>>  #endif
+> (...)
+>> +       of_node_put(next);
+>
+> So if you're #ifdef:in all the other of_* stuff, why are you not
+> #ifdef:in this?
+>
+> Is the #ifdef really necessary by the way, or will there be stubs
+> handling it?
+>
+> Have you considered using IS_ENABLED() from <linux/kconfig.h>?
+>
+> Yours,
+> Linus Walleij
 
-You also had some extra stuff in that branch, but apart from that, I
-think our resolutions are identical except for trivial include file
-ordering and whitespace.
+I also like IS_ENABLED() macro. But the problem is that
+of_get_next_child() isn't defined if CONFIG_OF isn't selected. So
+I don't have the choice to use IS_ENABLED().
 
-But you should check, since I don't cross-compile the arm stuff..
-
-              Linus
+Regards
+Haojian
