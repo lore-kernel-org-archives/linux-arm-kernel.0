@@ -1,71 +1,79 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Feb 2013 13:48:59 -0700
-Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <20130222003926.GI17852@n2100.arm.linux.org.uk>
-References: <20130221103705.GB17852@n2100.arm.linux.org.uk>
- <51261F38.2030902@ti.com> <20130221134656.GC17852@n2100.arm.linux.org.uk>
- <51262A7A.8040103@ti.com> <alpine.LFD.2.03.1302211144240.6419@syhkavp.arg>
- <51265BF1.5000302@ti.com> <alpine.LFD.2.03.1302211358070.6419@syhkavp.arg>
- <5126778A.4040705@wwwdotorg.org>
- <alpine.LFD.2.03.1302211505560.6419@syhkavp.arg>
- <5126B77C.9060302@wwwdotorg.org>
- <20130222003926.GI17852@n2100.arm.linux.org.uk>
-Message-ID: <5127D9BB.8060706@wwwdotorg.org>
+Date: Fri, 22 Feb 2013 16:16:49 -0700
+Subject: [PATCH V2] kbuild: create an "include chroot" for DT bindings
+Message-ID: <1361575009-20090-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2013 05:39 PM, Russell King - ARM Linux wrote:
-> On Thu, Feb 21, 2013 at 05:10:36PM -0700, Stephen Warren wrote:
->> On 02/21/2013 02:18 PM, Nicolas Pitre wrote:
-...
->> Someone will want to use a previously unsupported feature of some HW and
->> then write the DT bindings for that feature for the first time. E.g.
->> Tegra's one-wire controller isn't that commonly used, so we have no
->> binding for it yet despite it being maybe a couple years after starting
->> DT work for Tegra. The AC'97 was only recently supported.
->>
->> Now I agree that this probably will settle down eventually. However, HW
->> will have been widely distributed well before the DT bindings are
->> feature-complete and bug-free. Any solution needs to take that into
->> account, rather than only attempting to solve the situation after the
->> hardware is obsolete and hence the bindings are stable.
-> 
-> Tell me then - how is it possible for my laptop to boot correctly with
-> its ACPI data which describes its hardware, and that ACPI data hardly
-> ever has to be updated.  Many PC systems have been doing this for
-> years, with various degrees of success - but generally once you have
-> a working system it stays working and never needs to have its ACPI data
-> updated.
+From: Stephen Warren <swarren@nvidia.com>
 
-I'm not too familiar with ACPI or even low-level x86/PC architecture, so
-forgive me if I'm talking crap, but I suspect there are quite a few
-reasons for the differences here:
+The recent dtc+cpp support allows header files and C pre-processor
+defines/macros to be used when compiling device tree files. These
+headers will typically define various constants that are part of the
+device tree bindings.
 
-* PC systems in general are rather simpler and more standardized. Even
-where "differentiation" can exist, it's encapsulated behind simple
-self-contained interfaces.
+The original patch which set up the dtc+cpp include path only considered
+using those headers from device tree files. However, most are also
+useful for kernel code which needs to interpret the device tree.
 
-* As an example, most random "expansion" devices on a PC are PCIe or USB
-based, even built-in stuff such as WiFi cards etc. On ARM, there are no
-standards, so anything goes. Hence, PC expansion cards are much more
-self-contained and interact with other devices less, whereas on ARM you
-have a whole spaghetti slew of chips, GPIOs, regulators, interrupts, ...
+In both the DT files and the kernel, I'd like to include the DT-related
+headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+That will simplify any text which discusses the DT header locations.
 
-* I think ARM designs are exposed to a wider audience earlier on in
-their maturity cycle. On x86, there are a number of standards for ACPI
-etc., and the first people to interact with boards and implement these
-standards are BIOS and board vendors, and then the boards get out to the
-general public, and they at least basically all confirm to those
-standards and work. However, on ARM, we're developing those standards
-well after the fact; after the HW has shipped and been in use,
-retro-fitting the standards etc. So, we're being exposed to a much
-earlier point in the whole cycle than we can even see on x86. I bet x86
-CPU, chipset, BIOS, and board vendors see the kind of change in ACPI
-tables that we're seeing in DT right now.
+Creating a <dt-bindings/> for kernel source to use is as simple as
+placing files into include/dt-bindings/.
 
-* I imagine there are fewer different sets of people (CPU vendors, BIOS
-vendors) having to work on defining ACPI standards than there are ARM
-SoC vendors and Linux developer who're working on DT standards.
+However, when compiling DT files, the include path should be restricted
+so that only the dt-bindings path is available; arbitrary kernel headers
+shouldn't be exposed. For this reason, create a specific include
+directory for use by dtc+cpp, and symlink dt-bindings from there to the
+actual location of include/dt-bindings/. For want of a better location,
+place this "include chroot" into the existing dts/ directory.
 
-* x86 is very mature, so there's a lot more incremental development and
-compatibility. ARM and DT-on-ARM are very new, so it's still the wild west.
+arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+
+Some headers used by device tree files may not be useful to the kernel;
+they may be used simply to aid in constructing the DT file (e.g. macros
+to create a node), but not define any information that the kernel needs
+to share. These may be placed directly into arch/*/boot/dts/ along with
+the DT files themselves.
+
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+Acked-by: Michal Marek <mmarek@suse.cz>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2:
+* Leave arch/*/boot/dts in dtc include path, for any headers that are
+  only included by *.dts and don't need to be shared by the kernel.
+* Fix pathname in commit description.
+---
+ arch/arm/boot/dts/include/dt-bindings |    1 +
+ scripts/Makefile.lib                  |    2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 120000 arch/arm/boot/dts/include/dt-bindings
+
+diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
+new file mode 120000
+index 0000000..08c00e4
+--- /dev/null
++++ b/arch/arm/boot/dts/include/dt-bindings
+@@ -0,0 +1 @@
++../../../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 07125e6..af35521 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -158,7 +158,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
+ 
+ dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
+ 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
+-		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
++		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
+ 		 -undef -D__DTS__
+ 
+ # Finds the multi-part object the current object will be linked into
+-- 
+1.7.10.4
