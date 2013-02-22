@@ -1,112 +1,56 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 22 Feb 2013 07:14:27 -0800
-Subject: [PATCH 1/2] cpustat: use accessor functions for get/set/add
-In-Reply-To: <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
- (Viresh Kumar's message of "Fri, 22 Feb 2013 11:51:43 +0530")
-References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
- <1361512604-2720-2-git-send-email-khilman@linaro.org>
- <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
-Message-ID: <87txp41iuk.fsf@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 22 Feb 2013 15:26:39 +0000
+Subject: too many timer retries happen when do local timer swtich with
+ broadcast timer
+In-Reply-To: <alpine.LFD.2.02.1302221558000.22263@ionos>
+References: <alpine.LFD.2.02.1302211436300.22263@ionos> <51263975.20906@ti.com>
+ <alpine.LFD.2.02.1302212214020.22263@ionos>
+ <5127436E.4040100@ti.com>
+ <alpine.LFD.2.02.1302221122290.22263@ionos>
+ <20130222103149.GC12140@e102568-lin.cambridge.arm.com>
+ <51275058.7010809@ti.com>
+ <alpine.LFD.2.02.1302221212500.22263@ionos>
+ <20130222144829.GG12140@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.02.1302221558000.22263@ionos>
+Message-ID: <20130222152639.GH12140@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh Kumar <viresh.kumar@linaro.org> writes:
+On Fri, Feb 22, 2013 at 03:03:02PM +0000, Thomas Gleixner wrote:
+> On Fri, 22 Feb 2013, Lorenzo Pieralisi wrote:
+> > On Fri, Feb 22, 2013 at 12:07:30PM +0000, Thomas Gleixner wrote:
+> > > Now we could make use of that and avoid going deep idle just to come
+> > > back right away via the IPI. Unfortunately the notification thingy has
+> > > no return value, but we can fix that.
+> > > 
+> > > To confirm that theory, could you please try the hack below and add
+> > > some instrumentation (trace_printk)?
+> > 
+> > Applied, and it looks like that's exactly why the warning triggers, at least
+> > on the platform I am testing on which is a dual-cluster ARM testchip.
+> > 
+> > There is a still time window though where the CPU (the IPI target) can get
+> > back to idle (tick_broadcast_pending still not set) before the CPU target of
+> > the broadcast has a chance to run tick_handle_oneshot_broadcast (and set
+> > tick_broadcast_pending), or am I missing something ?
+> 
+> Well, the tick_broadcast_pending bit is uninteresting if the
+> force_broadcast bit is set. Because if that bit is set we know for
+> sure, that we got woken with the cpu which gets the broadcast timer
+> and raced back to idle before the broadcast handler managed to
+> send the IPI.
 
-> On Fri, Feb 22, 2013 at 11:26 AM, Kevin Hilman <khilman@linaro.org> wrote:
->> Add some accessor functions in order to facilitate the conversion to
->> atomic reads/writes of cpustat values.
->>
->> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> ---
->>  drivers/cpufreq/cpufreq_governor.c | 18 ++++++++---------
->>  drivers/cpufreq/cpufreq_ondemand.c |  2 +-
->
->> diff --git a/drivers/cpufreq/cpufreq_governor.c b/drivers/cpufreq/cpufreq_governor.c
->> index 6c5f1d3..ec6c315 100644
->> --- a/drivers/cpufreq/cpufreq_governor.c
->> +++ b/drivers/cpufreq/cpufreq_governor.c
->> @@ -36,12 +36,12 @@ static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
->>
->>         cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
->>
->> -       busy_time = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
->> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
->> +       busy_time = kcpustat_cpu_get(cpu, CPUTIME_USER);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SYSTEM);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_IRQ);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SOFTIRQ);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_STEAL);
->> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_NICE);
->>
->>         idle_time = cur_wall_time - busy_time;
->>         if (wall)
->> @@ -103,7 +103,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
->>                         u64 cur_nice;
->>                         unsigned long cur_nice_jiffies;
->>
->> -                       cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
->> +                       cur_nice = kcpustat_cpu_get(j, CPUTIME_NICE) -
->>                                          cdbs->prev_cpu_nice;
->>                         /*
->>                          * Assumption: nice time between sampling periods will
->> @@ -113,7 +113,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
->>                                         cputime64_to_jiffies64(cur_nice);
->>
->>                         cdbs->prev_cpu_nice =
->> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
->> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
->>                         idle_time += jiffies_to_usecs(cur_nice_jiffies);
->>                 }
->>
->> @@ -216,7 +216,7 @@ int cpufreq_governor_dbs(struct dbs_data *dbs_data,
->>                                         &j_cdbs->prev_cpu_wall);
->>                         if (ignore_nice)
->>                                 j_cdbs->prev_cpu_nice =
->> -                                       kcpustat_cpu(j).cpustat[CPUTIME_NICE];
->> +                                       kcpustat_cpu_get(j, CPUTIME_NICE);
->>                 }
->>
->>                 /*
->> diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
->> index 7731f7c..ac5d49f 100644
->> --- a/drivers/cpufreq/cpufreq_ondemand.c
->> +++ b/drivers/cpufreq/cpufreq_ondemand.c
->> @@ -403,7 +403,7 @@ static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
->>                                                 &dbs_info->cdbs.prev_cpu_wall);
->>                 if (od_tuners.ignore_nice)
->>                         dbs_info->cdbs.prev_cpu_nice =
->> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
->> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
->>
->>         }
->>         return count;
->
-> For cpufreq:
->
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> Though i believe you also need this:
->
-> diff --git a/drivers/cpufreq/cpufreq_conservative.c
-> b/drivers/cpufreq/cpufreq_conservative.c
-> index 64ef737..38e3ad7 100644
-> --- a/drivers/cpufreq/cpufreq_conservative.c
-> +++ b/drivers/cpufreq/cpufreq_conservative.c
-> @@ -242,7 +242,7 @@ static ssize_t store_ignore_nice_load(struct
-> kobject *a, struct attribute *b,
->                                                 &dbs_info->cdbs.prev_cpu_wall);
->                 if (cs_tuners.ignore_nice)
->                         dbs_info->cdbs.prev_cpu_nice =
-> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
->         }
->         return count;
->  }
+Gah, my bad sorry, I mixed things up. I thought
 
-Thanks, I missed that one.  I've added it in locally.
+tick_check_broadcast_pending()
 
-Kevin
+was checking against the tick_broadcast_pending mask not
+
+tick_force_broadcast_mask
+
+as it correctly does.
+
+All clear now.
+
+Thanks a lot,
+Lorenzo
