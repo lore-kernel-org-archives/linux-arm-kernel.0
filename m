@@ -1,201 +1,77 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Fri, 22 Feb 2013 18:26:36 +0800
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 22 Feb 2013 10:28:36 +0000
 Subject: too many timer retries happen when do local timer swtich with
  broadcast timer
-In-Reply-To: <alpine.LFD.2.02.1302211436300.22263@ionos>
+In-Reply-To: <alpine.LFD.2.02.1302212214020.22263@ionos>
 References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
  <alpine.LFD.2.02.1302201400400.22263@ionos>
  <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
  <alpine.LFD.2.02.1302211015270.22263@ionos>
  <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
- <alpine.LFD.2.02.1302211436300.22263@ionos>
-Message-ID: <CAB4PhKdaR8hUSHAu4r2C90F9AC6a52VAqCHj6J1xHzA8RFpj2Q@mail.gmail.com>
+ <alpine.LFD.2.02.1302211436300.22263@ionos> <51263975.20906@ti.com>
+ <alpine.LFD.2.02.1302212214020.22263@ionos>
+Message-ID: <20130222102836.GB12140@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Thu, Feb 21, 2013 at 10:19:18PM +0000, Thomas Gleixner wrote:
+> On Thu, 21 Feb 2013, Santosh Shilimkar wrote:
+> > On Thursday 21 February 2013 07:18 PM, Thomas Gleixner wrote:
+> > > find below a completely untested patch, which should address that issue.
+> > > 
+> > After looking at the thread, I tried to see the issue on OMAP and could
+> > see the same issue as Jason.
+> 
+> That's interesting. We have the same issue on x86 since 2007 and
+> nobody noticed ever. It's basically the same problem there, but it
+> seems that on x86 getting out of those low power states is way slower
+> than the minimal reprogramming delta which is used to enforce the
+> local timer to fire after the wakeup. 
+> 
+> I'm still amazed that as Jason stated a 1us reprogramming delta is
+> sufficient to get this ping-pong going. I somehow doubt that, but
+> maybe ARM is really that fast :)
 
-2013/2/21 Thomas Gleixner <tglx@linutronix.de>:
-> Jason,
->
-> On Thu, 21 Feb 2013, Jason Liu wrote:
->> 2013/2/21 Thomas Gleixner <tglx@linutronix.de>:
->> > Now your explanation makes sense.
->> >
->> > I have no fast solution for this, but I think that I have an idea how
->> > to fix it. Stay tuned.
->>
->> Thanks Thomas, wait for your fix. :)
->
-> find below a completely untested patch, which should address that issue.
->
+It also depends on when the idle driver exits broadcast mode.
+Certainly if that's the last thing it does before enabling IRQs, that
+might help trigger the issue.
 
-I have tested the below patch, but run into the following warnings:
+I am still a bit sceptic myself too, and I take advantage of Thomas'
+knowledge on the subject, which is ways deeper than mine BTW, to ask a
+question. The thread started with a subject "too many retries...." and
+here I have a doubt. If the fix is not applied, on the CPU affine to
+the broadcast timer, it is _normal_ to have local timer retries, since
+the CPU is setting/forcing the local timer to fire after a min_delta_ns every
+time the expired event was local to the CPU affine to the broadcast timer.
 
-[  713.340593] ------------[ cut here ]------------
-[  713.345238] WARNING: at
-/linux-2.6-imx/kernel/time/tick-broadcast.c:497
-tick_broadcast_oneshot_control+0x210/0x254()
-[  713.359240] Modules linked in:
-[  713.362332] [<8004b2cc>] (unwind_backtrace+0x0/0xf8) from
-[<80079764>] (warn_slowpath_common+0x54/0x64)
-[  713.371740] [<80079764>] (warn_slowpath_common+0x54/0x64) from
-[<80079790>] (warn_slowpath_null+0x1c/0x24)
-[  713.381408] [<80079790>] (warn_slowpath_null+0x1c/0x24) from
-[<800a5320>] (tick_broadcast_oneshot_control+0x210/0x254)
-[  713.392120] [<800a5320>]
-(tick_broadcast_oneshot_control+0x210/0x254) from [<800a48b0>]
-(tick_notify+0xd4/0x1f8)
-[  713.402317] [<800a48b0>] (tick_notify+0xd4/0x1f8) from [<8009b154>]
-(notifier_call_chain+0x4c/0x8c)
-[  713.411377] [<8009b154>] (notifier_call_chain+0x4c/0x8c) from
-[<8009b24c>] (raw_notifier_call_chain+0x18/0x20)
-[  713.421392] [<8009b24c>] (raw_notifier_call_chain+0x18/0x20) from
-[<800a3d9c>] (clockevents_notify+0x30/0x198)
-[  713.431417] [<800a3d9c>] (clockevents_notify+0x30/0x198) from
-[<80052f58>] (arch_idle_multi_core+0x4c/0xc4)
-[  713.441175] [<80052f58>] (arch_idle_multi_core+0x4c/0xc4) from
-[<80044f68>] (default_idle+0x20/0x28)
-[  713.450322] [<80044f68>] (default_idle+0x20/0x28) from [<800455c0>]
-(cpu_idle+0xc8/0xfc)
-[  713.458425] [<800455c0>] (cpu_idle+0xc8/0xfc) from [<80008984>]
-(start_kernel+0x260/0x294)
-[  713.466701] [<80008984>] (start_kernel+0x260/0x294) from
-[<10008040>] (0x10008040)
+The problem, supposedly, is that the timer has not enough time (sorry for the
+mouthful) to expire(fire) before IRQs are disabled and the idle thread goes
+back to idle again. This means that we should notice a mismatch between
+the number of broadcast timer IRQs and local timer IRQs on the CPU
+affine to the broadcast timer IRQ (granted, we also have to take into
+account broadcast timer IRQs meant to service (through IPI) a local timer
+expired on a CPU which is not the one running the broadcast IRQ handler and
+"normal" local timer IRQs as well).
 
-So, the code here which bring the warnings:
-void tick_broadcast_oneshot_control(unsigned long reason)
-{
-...
-WARN_ON_ONCE(test_bit(cpu, tick_force_broadcast_mask));
+I am not sure the sheer number of retries is a symptom of the problem
+happening, but I might well be mistaken so I am asking.
 
-}
+For certain, with the fix applied, lots of duplicate IRQs on the CPU
+affine to the broadcast timer are eliminated, since the local timer is
+not reprogrammed anymore (before the fix, basically the broadcast timer
+was firing an IRQ that did nothing since the CPU was already out of
+broadcast mode by the time the broadcast handler was running, the real job
+was carried out in the local timer handler).
 
->
-> Thanks,
->
->         tglx
->
-> Index: linux-2.6/kernel/time/tick-broadcast.c
-> ===================================================================
-> --- linux-2.6.orig/kernel/time/tick-broadcast.c
-> +++ linux-2.6/kernel/time/tick-broadcast.c
-> @@ -397,6 +397,8 @@ int tick_resume_broadcast(void)
->
->  /* FIXME: use cpumask_var_t. */
->  static DECLARE_BITMAP(tick_broadcast_oneshot_mask, NR_CPUS);
-> +static DECLARE_BITMAP(tick_broadcast_pending, NR_CPUS);
-> +static DECLARE_BITMAP(tick_force_broadcast_mask, NR_CPUS);
->
->  /*
->   * Exposed for debugging: see timer_list.c
-> @@ -453,12 +455,24 @@ again:
->         /* Find all expired events */
->         for_each_cpu(cpu, tick_get_broadcast_oneshot_mask()) {
->                 td = &per_cpu(tick_cpu_device, cpu);
-> -               if (td->evtdev->next_event.tv64 <= now.tv64)
-> +               if (td->evtdev->next_event.tv64 <= now.tv64) {
->                         cpumask_set_cpu(cpu, to_cpumask(tmpmask));
-> -               else if (td->evtdev->next_event.tv64 < next_event.tv64)
-> +                       /*
-> +                        * Mark the remote cpu in the pending mask, so
-> +                        * it can avoid reprogramming the cpu local
-> +                        * timer in tick_broadcast_oneshot_control().
-> +                        */
-> +                       set_bit(cpu, tick_broadcast_pending);
-> +               } else if (td->evtdev->next_event.tv64 < next_event.tv64)
->                         next_event.tv64 = td->evtdev->next_event.tv64;
->         }
->
-> +       /* Take care of enforced broadcast requests */
-> +       for_each_cpu(cpu, to_cpumask(tick_force_broadcast_mask)) {
-> +               set_bit(cpu, tmpmask);
-> +               clear_bit(cpu, tick_force_broadcast_mask);
-> +       }
-> +
->         /*
->          * Wakeup the cpus which have an expired event.
->          */
-> @@ -494,6 +508,7 @@ void tick_broadcast_oneshot_control(unsi
->         struct clock_event_device *bc, *dev;
->         struct tick_device *td;
->         unsigned long flags;
-> +       ktime_t now;
->         int cpu;
->
->         /*
-> @@ -518,6 +533,8 @@ void tick_broadcast_oneshot_control(unsi
->
->         raw_spin_lock_irqsave(&tick_broadcast_lock, flags);
->         if (reason == CLOCK_EVT_NOTIFY_BROADCAST_ENTER) {
-> +               WARN_ON_ONCE(test_bit(cpu, tick_broadcast_pending));
-> +               WARN_ON_ONCE(test_bit(cpu, tick_force_broadcast_mask));
->                 if (!cpumask_test_cpu(cpu, tick_get_broadcast_oneshot_mask())) {
->                         cpumask_set_cpu(cpu, tick_get_broadcast_oneshot_mask());
->                         clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
-> @@ -529,10 +546,63 @@ void tick_broadcast_oneshot_control(unsi
->                         cpumask_clear_cpu(cpu,
->                                           tick_get_broadcast_oneshot_mask());
->                         clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT);
-> -                       if (dev->next_event.tv64 != KTIME_MAX)
-> -                               tick_program_event(dev->next_event, 1);
-> +                       if (dev->next_event.tv64 == KTIME_MAX)
-> +                               goto out;
-> +                       /*
-> +                        * The cpu handling the broadcast timer marked
-> +                        * this cpu in the broadcast pending mask and
-> +                        * fired the broadcast IPI. So we are going to
-> +                        * handle the expired event anyway via the
-> +                        * broadcast IPI handler. No need to reprogram
-> +                        * the timer with an already expired event.
-> +                        */
-> +                       if (test_and_clear_bit(cpu, tick_broadcast_pending))
-> +                               goto out;
-> +                       /*
-> +                        * If the pending bit is not set, then we are
-> +                        * either the CPU handling the broadcast
-> +                        * interrupt or we got woken by something else.
-> +                        *
-> +                        * We are not longer in the broadcast mask, so
-> +                        * if the cpu local expiry time is already
-> +                        * reached, we would reprogram the cpu local
-> +                        * timer with an already expired event.
-> +                        *
-> +                        * This can lead to a ping-pong when we return
-> +                        * to idle and therefor rearm the broadcast
-> +                        * timer before the cpu local timer was able
-> +                        * to fire. This happens because the forced
-> +                        * reprogramming makes sure that the event
-> +                        * will happen in the future and depending on
-> +                        * the min_delta setting this might be far
-> +                        * enough out that the ping-pong starts.
-> +                        *
-> +                        * If the cpu local next_event has expired
-> +                        * then we know that the broadcast timer
-> +                        * next_event has expired as well and
-> +                        * broadcast is about to be handled. So we
-> +                        * avoid reprogramming and enforce that the
-> +                        * broadcast handler, which did not run yet,
-> +                        * will invoke the cpu local handler.
-> +                        *
-> +                        * We cannot call the handler directly from
-> +                        * here, because we might be in a NOHZ phase
-> +                        * and we did not go through the irq_enter()
-> +                        * nohz fixups.
-> +                        */
-> +                       now = ktime_get();
-> +                       if (dev->next_event.tv64 <= now.tv64) {
-> +                               set_bit(cpu, tick_force_broadcast_mask);
-> +                               goto out;
-> +                       }
-> +                       /*
-> +                        * We got woken by something else. Reprogram
-> +                        * the cpu local timer device.
-> +                        */
-> +                       tick_program_event(dev->next_event, 1);
->                 }
->         }
-> +out:
->         raw_spin_unlock_irqrestore(&tick_broadcast_lock, flags);
->  }
->
+> 
+> > Your patch fixes the retries on both CPUs on my dual core machine. So
+> > you use my tested by if you need one.
+> 
+> They are always welcome.
+> 
+> > Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+You can add mine too, we should fix the WARN_ON_ONCE mentioned in Santosh's
+reply.
+
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
