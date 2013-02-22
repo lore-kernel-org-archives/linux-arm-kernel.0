@@ -1,120 +1,61 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Fri, 22 Feb 2013 13:34:14 +0100
-Subject: [PATCH 1/2] cpustat: use accessor functions for get/set/add
-In-Reply-To: <CAP245DVYsjgvww-3qBnbZ4T7SsJ=whbVvhf06fArxcspyX9bwQ@mail.gmail.com>
-References: <1361512604-2720-1-git-send-email-khilman@linaro.org>
- <1361512604-2720-2-git-send-email-khilman@linaro.org>
- <CAOh2x=kFL5_H=LqLf14yxYQEs7zSTT8Ue8mjUEVN4_a0c53Rdg@mail.gmail.com>
- <CAP245DVYsjgvww-3qBnbZ4T7SsJ=whbVvhf06fArxcspyX9bwQ@mail.gmail.com>
-Message-ID: <20130222123412.GB17948@somewhere.redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Feb 2013 12:36:37 +0000
+Subject: omap4: 3.8: IPV6 + PREEMPT_VOLUNTARY +
+ !DEBUG_[SPINLOCK|MUTEXES] = BUG()
+In-Reply-To: <20130221094819.GA4580@luxor.wired.org>
+References: <20130221094819.GA4580@luxor.wired.org>
+Message-ID: <20130222123637.GA30923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 12:47:33PM +0530, Amit Kucheria wrote:
-> On Fri, Feb 22, 2013 at 11:51 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > On Fri, Feb 22, 2013 at 11:26 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> >> Add some accessor functions in order to facilitate the conversion to
-> >> atomic reads/writes of cpustat values.
-> >>
-> >> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> >> ---
-> >>  drivers/cpufreq/cpufreq_governor.c | 18 ++++++++---------
-> >>  drivers/cpufreq/cpufreq_ondemand.c |  2 +-
-> >
-> >> diff --git a/drivers/cpufreq/cpufreq_governor.c b/drivers/cpufreq/cpufreq_governor.c
-> >> index 6c5f1d3..ec6c315 100644
-> >> --- a/drivers/cpufreq/cpufreq_governor.c
-> >> +++ b/drivers/cpufreq/cpufreq_governor.c
-> >> @@ -36,12 +36,12 @@ static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
-> >>
-> >>         cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
-> >>
-> >> -       busy_time = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
-> >> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
-> >> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
-> >> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
-> >> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
-> >> -       busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
-> >> +       busy_time = kcpustat_cpu_get(cpu, CPUTIME_USER);
-> >> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SYSTEM);
-> >> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_IRQ);
-> >> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_SOFTIRQ);
-> >> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_STEAL);
-> >> +       busy_time += kcpustat_cpu_get(cpu, CPUTIME_NICE);
-> >>
-> >>         idle_time = cur_wall_time - busy_time;
-> >>         if (wall)
-> >> @@ -103,7 +103,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
-> >>                         u64 cur_nice;
-> >>                         unsigned long cur_nice_jiffies;
-> >>
-> >> -                       cur_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE] -
-> >> +                       cur_nice = kcpustat_cpu_get(j, CPUTIME_NICE) -
-> >>                                          cdbs->prev_cpu_nice;
-> >>                         /*
-> >>                          * Assumption: nice time between sampling periods will
-> >> @@ -113,7 +113,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
-> >>                                         cputime64_to_jiffies64(cur_nice);
-> >>
-> >>                         cdbs->prev_cpu_nice =
-> >> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-> >> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
-> >>                         idle_time += jiffies_to_usecs(cur_nice_jiffies);
-> >>                 }
-> >>
-> >> @@ -216,7 +216,7 @@ int cpufreq_governor_dbs(struct dbs_data *dbs_data,
-> >>                                         &j_cdbs->prev_cpu_wall);
-> >>                         if (ignore_nice)
-> >>                                 j_cdbs->prev_cpu_nice =
-> >> -                                       kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-> >> +                                       kcpustat_cpu_get(j, CPUTIME_NICE);
-> >>                 }
-> >>
-> >>                 /*
-> >> diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
-> >> index 7731f7c..ac5d49f 100644
-> >> --- a/drivers/cpufreq/cpufreq_ondemand.c
-> >> +++ b/drivers/cpufreq/cpufreq_ondemand.c
-> >> @@ -403,7 +403,7 @@ static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
-> >>                                                 &dbs_info->cdbs.prev_cpu_wall);
-> >>                 if (od_tuners.ignore_nice)
-> >>                         dbs_info->cdbs.prev_cpu_nice =
-> >> -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-> >> +                               kcpustat_cpu_get(j, CPUTIME_NICE);
-> >>
-> >>         }
-> >>         return count;
-> >
-> > For cpufreq:
-> >
-> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> >
-> > Though i believe you also need this:
-> >
-> > diff --git a/drivers/cpufreq/cpufreq_conservative.c
-> > b/drivers/cpufreq/cpufreq_conservative.c
-> > index 64ef737..38e3ad7 100644
-> > --- a/drivers/cpufreq/cpufreq_conservative.c
-> > +++ b/drivers/cpufreq/cpufreq_conservative.c
-> > @@ -242,7 +242,7 @@ static ssize_t store_ignore_nice_load(struct
-> > kobject *a, struct attribute *b,
-> >                                                 &dbs_info->cdbs.prev_cpu_wall);
-> >                 if (cs_tuners.ignore_nice)
-> >                         dbs_info->cdbs.prev_cpu_nice =
-> > -                               kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-> > +                               kcpustat_cpu_get(j, CPUTIME_NICE);
-> >         }
-> >         return count;
-> >  }
-> >
-> > BTW, i don't see kcpustat_cpu() used in
-> >
-> >  kernel/sched/core.c                | 12 +++++-------
-> >  kernel/sched/cputime.c             | 29 +++++++++++++--------------
-> >
-> > I searched tip/master as well as lnext/master.
-> 
-> Added by Frederic's Adaptive NOHZ patchset?
+On Thu, Feb 21, 2013 at 10:48:19AM +0100, Paolo Pisati wrote:
+> any idea how can i debug this?
 
-No, Kevin has been using kcpustat_this_cpu_set() from kernel/sched/cputime.c. That's
-because it's always written locally.
+Please try this patch, and report back whether it solves your problem.
+Thanks.
+
+ arch/arm/mm/alignment.c |   11 ++++-------
+ 1 files changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index b820eda..db26e2e 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -749,7 +749,6 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	unsigned long instr = 0, instrptr;
+ 	int (*handler)(unsigned long addr, unsigned long instr, struct pt_regs *regs);
+ 	unsigned int type;
+-	mm_segment_t fs;
+ 	unsigned int fault;
+ 	u16 tinstr = 0;
+ 	int isize = 4;
+@@ -760,16 +759,15 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 
+ 	instrptr = instruction_pointer(regs);
+ 
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+ 	if (thumb_mode(regs)) {
+-		fault = __get_user(tinstr, (u16 *)(instrptr & ~1));
++		u16 *ptr = (u16 *)(instrptr & ~1);
++		fault = probe_kernel_address(ptr, tinstr);
+ 		if (!fault) {
+ 			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+ 			    IS_T32(tinstr)) {
+ 				/* Thumb-2 32-bit */
+ 				u16 tinst2 = 0;
+-				fault = __get_user(tinst2, (u16 *)(instrptr+2));
++				fault = probe_kernel_address(ptr + 1, tinst2);
+ 				instr = (tinstr << 16) | tinst2;
+ 				thumb2_32b = 1;
+ 			} else {
+@@ -778,8 +776,7 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 			}
+ 		}
+ 	} else
+-		fault = __get_user(instr, (u32 *)instrptr);
+-	set_fs(fs);
++		fault = probe_kernel_address(instrptr, instr);
+ 
+ 	if (fault) {
+ 		type = TYPE_FAULT;
