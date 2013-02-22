@@ -1,34 +1,32 @@
-From: jacob.jun.pan@linux.intel.com (Jacob Pan)
-Date: Fri, 22 Feb 2013 09:55:30 -0800
-Subject: [PATCH 2/2][RFC] time : set broadcast irq affinity
-In-Reply-To: <1361484083-5906-2-git-send-email-daniel.lezcano@linaro.org>
-References: <5123C299.3080005@linaro.org>
- <1361484083-5906-1-git-send-email-daniel.lezcano@linaro.org>
- <1361484083-5906-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130222095530.377fd218@chromoly>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 22 Feb 2013 15:10:22 -0300
+Subject: [PATCH] ARM: mxs_defconfig: Select CONFIG_MMC_UNSAFE_RESUME
+Message-ID: <1361556622-2550-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Feb 2013 23:01:23 +0100
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+PM subsystem treats mmc card as removed during suspend.
 
-> +/*
-> + * Set broadcast interrupt affinity
-> + */
-> +static void tick_broadcast_set_affinity(struct clock_event_device
-> *bc, int cpu) +{
-> +	struct cpumask cpumask;
-> +
-> +	if (!(bc->features & CLOCK_EVT_FEAT_DYNIRQ))
-> +		return;
-> +
-> +	cpumask_clear(&cpumask);
-> +	cpumask_set_cpu(cpu, &cpumask);
-> +	irq_set_affinity(bc->irq, &cpumask);
-would it be more efficient to keep track of the current bc->irq affinity
-via cpumask then set it only if it is different?
+If MMC is used to store the root file system, it is better to tell the kernel
+not to treat it as a removable media, so select CONFIG_MMC_UNSAFE_RESUME for
+such purpose.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/mxs_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index fbbc5bb..6715538 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -121,6 +121,7 @@ CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_MXS_PHY=y
+ CONFIG_MMC=y
++CONFIG_MMC_UNSAFE_RESUME=y
+ CONFIG_MMC_MXS=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
 -- 
-Thanks,
-
-Jacob
+1.7.9.5
