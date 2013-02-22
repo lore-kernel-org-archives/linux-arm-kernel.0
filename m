@@ -1,104 +1,85 @@
-From: JBeulich@suse.com (Jan Beulich)
-Date: Fri, 22 Feb 2013 08:12:05 +0000
-Subject: [PATCH XEN] xen: event channel arrays are xen_ulong_t and
- not unsigned long
-In-Reply-To: <1361466961.26546.85.camel@zakaz.uk.xensource.com>
-References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
- <1361285363-27133-1-git-send-email-ian.campbell@citrix.com>
- <1361466961.26546.85.camel@zakaz.uk.xensource.com>
-Message-ID: <5127366502000078000C0380@nat28.tlf.novell.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 22 Feb 2013 09:12:43 +0100
+Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin
+ function name
+In-Reply-To: <20130222073630.GC27371@S2101-09.ap.freescale.net>
+References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
+ <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
+ <51251A11.2030300@wwwdotorg.org>
+ <CAKGA1bkHH1XC38_VM=QhDrr33uqqSbwe0n+GfXEPs43K_Do=CQ@mail.gmail.com>
+ <20130221050247.GD17738@S2101-09.ap.freescale.net>
+ <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
+ <20130222055203.GB27371@S2101-09.ap.freescale.net>
+ <20130222072743.GC1906@pengutronix.de>
+ <20130222073630.GC27371@S2101-09.ap.freescale.net>
+Message-ID: <20130222081243.GD1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 21.02.13 at 18:16, Ian Campbell <Ian.Campbell@citrix.com> wrote:
-> On Tue, 2013-02-19 at 14:49 +0000, Ian Campbell wrote:
->> On ARM we want these to be the same size on 32- and 64-bit.
->> 
->> This is an ABI change on ARM. X86 does not change.
->> 
->> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
->> Cc: Jan Beulich <JBeulich@suse.com>
->> Cc: Keir (Xen.org) <keir@xen.org>
+On Fri, Feb 22, 2013 at 03:36:32PM +0800, Shawn Guo wrote:
+> On Fri, Feb 22, 2013 at 08:27:43AM +0100, Sascha Hauer wrote:
+> > On Fri, Feb 22, 2013 at 01:52:04PM +0800, Shawn Guo wrote:
+> > > On Thu, Feb 21, 2013 at 11:36:36AM -0600, Matt Sealey wrote:
+> > > > On Wed, Feb 20, 2013 at 11:02 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > > > > On Wed, Feb 20, 2013 at 06:03:39PM -0600, Matt Sealey wrote:
+> > > > >> I am not sure I am getting this point across, but.. damn it.. nack nack nack :D
+> > > > >>
+> > > > > Do you see any downgrade side that the series introduces over the
+> > > > > existing implementation?
+> > > > 
+> > > > Because it replaces the horribly stupid existing implementation with
+> > > > something that doesn't solve the fundamental logical problems caused
+> > > > by the existing implementation.
+> > > 
+> > > When did I say that the series is targeting to solve those "fundamental
+> > > logical problems" in *your* view?
+> > > 
+> > > ...
+> > > 
+> > > > What you've fixed it to do, as I read this patch, is this;
+> > > > 
+> > > > <arbitrary_pin_name pad_mode>
+> > > > 
+> > > No, it's not arbitrary_pin_name.  It's pin function name which comes
+> > > from hardware manual.  It may not exactly match the public reference
+> > > manual, but they are obvious to be identified.  For imx6q pad SD2_DAT1
+> > > example, the manual says:
+> > > 
+> > > Select 1 of 6 iomux modes to be used for pad: SD2_DAT1.
+> > >   000 ALT0 ? Select signal SD2_DATA1.
+> > >   001 ALT1 ? Select signal ECSPI5_SS0.
+> > >   010 ALT2 ? Select signal EIM_CS2.
+> > >   011 ALT3 ? Select signal AUD4_TXFS.
+> > >   100 ALT4 ? Select signal KEY_COL7.
+> > >   101 ALT5 ? Select signal GPIO1_IO14.
+> > 
+> > What makes them arbitrary is the fact that 110 and 111 are not encoded,
+> > so there is no way to calculate the register number from the pin number.
+> > 
+> > Also
+> > 
+> > commit 4a5f7eff8b0b34354e5c63272835e5e2dfe1c933
+> > Author: Dong Aisheng <dong.aisheng@linaro.org>
+> > Date:   Fri Jul 6 17:09:23 2012 +0800
+> > 
+> >     pinctrl: pinctrl-imx6q: add missed mux function for USBOTG_ID
+> > 
+> > Shows that they are indeed arbitrary.
+> > 
+> > I'm really with Matt here when he says that this number doesn't have to
+> > be in the binding.
 > 
-> Are you guys (un)happy with this change from the Xen & x86 side?
+> I think you are still talking about that arbitrary index in the old
+> binding, while I'm arguing against Matt's the comment on the new one,
+> saying the macro/pin name is arbitrary.
 
-I don't see any problem with it.
+Sorry, I haven't read the above carefully enough. We are talking about
+the names here, not the numbers I referred to.
 
-Jan
+Sascha
 
->> Cc: Tim Deegan <tim@xen.org>
->> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> Cc: linux-arm-kernel at lists.infradead.org 
->> Cc: xen-devel at lists.xen.org 
->> ---
->>  tools/include/xen-foreign/mkheader.py |    6 ++++++
->>  xen/include/public/xen.h              |    8 ++++----
->>  2 files changed, 10 insertions(+), 4 deletions(-)
->> 
->> diff --git a/tools/include/xen-foreign/mkheader.py 
-> b/tools/include/xen-foreign/mkheader.py
->> index d189b07..57681fa 100644
->> --- a/tools/include/xen-foreign/mkheader.py
->> +++ b/tools/include/xen-foreign/mkheader.py
->> @@ -21,13 +21,18 @@ inttypes["arm"] = {
->>      "unsigned long" : "uint32_t",
->>      "long"          : "uint32_t",
->>      "xen_pfn_t"     : "uint64_t",
->> +    "xen_ulong_t"   : "uint64_t",
->>  };
->> +header["arm"] = """
->> +#define __arm___ARM32 1
->> +""";
->>  
->>  # x86_32
->>  inttypes["x86_32"] = {
->>      "unsigned long" : "uint32_t",
->>      "long"          : "uint32_t",
->>      "xen_pfn_t"     : "uint32_t",
->> +    "xen_ulong_t"   : "uint32_t",
->>  };
->>  header["x86_32"] = """
->>  #define __i386___X86_32 1
->> @@ -42,6 +47,7 @@ inttypes["x86_64"] = {
->>      "unsigned long" : "__align8__ uint64_t",
->>      "long"          : "__align8__ uint64_t",
->>      "xen_pfn_t"     : "__align8__ uint64_t",
->> +    "xen_ulong_t"   : "__align8__ uint64_t",
->>  };
->>  header["x86_64"] = """
->>  #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
->> diff --git a/xen/include/public/xen.h b/xen/include/public/xen.h
->> index 5593066..99c8212 100644
->> --- a/xen/include/public/xen.h
->> +++ b/xen/include/public/xen.h
->> @@ -556,7 +556,7 @@ DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
->>   * Event channel endpoints per domain:
->>   *  1024 if a long is 32 bits; 4096 if a long is 64 bits.
->>   */
->> -#define NR_EVENT_CHANNELS (sizeof(unsigned long) * sizeof(unsigned long) * 
-> 64)
->> +#define NR_EVENT_CHANNELS (sizeof(xen_ulong_t) * sizeof(xen_ulong_t) * 64)
->>  
->>  struct vcpu_time_info {
->>      /*
->> @@ -613,7 +613,7 @@ struct vcpu_info {
->>       */
->>      uint8_t evtchn_upcall_pending;
->>      uint8_t evtchn_upcall_mask;
->> -    unsigned long evtchn_pending_sel;
->> +    xen_ulong_t evtchn_pending_sel;
->>      struct arch_vcpu_info arch;
->>      struct vcpu_time_info time;
->>  }; /* 64 bytes (x86) */
->> @@ -663,8 +663,8 @@ struct shared_info {
->>       * per-vcpu selector word to be set. Each bit in the selector covers a
->>       * 'C long' in the PENDING bitfield array.
->>       */
->> -    unsigned long evtchn_pending[sizeof(unsigned long) * 8];
->> -    unsigned long evtchn_mask[sizeof(unsigned long) * 8];
->> +    xen_ulong_t evtchn_pending[sizeof(xen_ulong_t) * 8];
->> +    xen_ulong_t evtchn_mask[sizeof(xen_ulong_t) * 8];
->>  
->>      /*
->>       * Wallclock time: updated only by control software. Guests should base
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
