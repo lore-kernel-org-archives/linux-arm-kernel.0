@@ -1,80 +1,58 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 22 Feb 2013 15:05:17 +0200
-Subject: [PATCH 1/4] ARM: tegra: pmc: convert PMC driver to support DT only
-In-Reply-To: <1361515491-16199-2-git-send-email-josephl@nvidia.com>
-References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
- <1361515491-16199-2-git-send-email-josephl@nvidia.com>
-Message-ID: <20130222130516.GW23234@tbergstrom-lnx.Nvidia.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Fri, 22 Feb 2013 14:27:52 +0100
+Subject: [RFC/PATCH 1/5] context tracking: conditionalize guest support
+ based on CONFIG_KVM
+In-Reply-To: <1361389302-11968-2-git-send-email-khilman@linaro.org>
+References: <1361389302-11968-1-git-send-email-khilman@linaro.org>
+ <1361389302-11968-2-git-send-email-khilman@linaro.org>
+Message-ID: <20130222132750.GE17948@somewhere.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 07:44:48AM +0100, Joseph Lo wrote:
-> The Tegra kernel only support boot from DT now. Clean up the PMC driver
-> to support DT only, that includes:
+On Wed, Feb 20, 2013 at 11:41:38AM -0800, Kevin Hilman wrote:
+> So that it can build on !KVM systems too.
 > 
-> * remove the ifdef of CONFIG_OF
-> * replace the static mapping of PMC addr to map from DT
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
 > ---
->  arch/arm/mach-tegra/pmc.c | 56 +++++++++++++++++++++++------------------------
->  1 file changed, 28 insertions(+), 28 deletions(-)
+>  kernel/context_tracking.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-> index d4fdb5f..2315e25 100644
-> --- a/arch/arm/mach-tegra/pmc.c
-> +++ b/arch/arm/mach-tegra/pmc.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright (C) 2012 NVIDIA CORPORATION. All rights reserved.
-> + * Copyright (C) 2012,2013 NVIDIA CORPORATION. All rights reserved.
->   *
->   * This program is free software; you can redistribute it and/or modify it
->   * under the terms and conditions of the GNU General Public License,
-> @@ -16,59 +16,59 @@
->   */
->  
->  #include <linux/kernel.h>
-> +#include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/of.h>
-> -
-> -#include "iomap.h"
-> +#include <linux/of_address.h>
->  
->  #define PMC_CTRL		0x0
->  #define PMC_CTRL_INTR_LOW	(1 << 17)
->  
-> +static void __iomem *tegra_pmc_base;
-> +static bool tegra_pmc_invert_interrupt;
-> +
->  static inline u32 tegra_pmc_readl(u32 reg)
->  {
-> -	return readl(IO_ADDRESS(TEGRA_PMC_BASE + reg));
-> +	return readl_relaxed(tegra_pmc_base + reg);
+> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
+> index 74f68f4..6fe96b1 100644
+> --- a/kernel/context_tracking.c
+> +++ b/kernel/context_tracking.c
+> @@ -1,5 +1,7 @@
+>  #include <linux/context_tracking.h>
+> +#ifdef CONFIG_KVM
+>  #include <linux/kvm_host.h>
+> +#endif
+
+The header should take care of the off-case, no need to ifdef its inclusion.
+
+>  #include <linux/rcupdate.h>
+>  #include <linux/sched.h>
+>  #include <linux/hardirq.h>
+> @@ -62,6 +64,7 @@ void user_exit(void)
+>  	local_irq_restore(flags);
 >  }
 >  
->  static inline void tegra_pmc_writel(u32 val, u32 reg)
+> +#ifdef CONFIG_KVM
+>  void guest_enter(void)
 >  {
-> -	writel(val, IO_ADDRESS(TEGRA_PMC_BASE + reg));
-> +	writel_relaxed(val, (tegra_pmc_base + reg));
+>  	if (vtime_accounting_enabled())
+> @@ -79,6 +82,7 @@ void guest_exit(void)
+>  		__guest_exit();
 >  }
+>  EXPORT_SYMBOL_GPL(guest_exit);
+> +#endif
+
+Kvm might be built as a module so we can't actually do this unfortunately.
+
+Thanks.
+
 >  
-> -#ifdef CONFIG_OF
->  static const struct of_device_id matches[] __initconst = {
->  	{ .compatible = "nvidia,tegra20-pmc" },
->  	{ }
-
-At least an extra entry for tegra114-pmc is necessary here. tegra114.dtsi only
-has:
-
-pmc {
-	compatible = "nvidia,tegra114-pmc", "nvidia,tegra30-pmc";
-	reg = <0x7000e400 0x400>;
-};
-
-otherwise the system will crash early during boot.
-
-Cheers,
-
-Peter.
+>  void context_tracking_task_switch(struct task_struct *prev,
+>  			     struct task_struct *next)
+> -- 
+> 1.8.1.2
+> 
