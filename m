@@ -1,48 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Feb 2013 09:29:08 +0000
-Subject: randconfig errors
-In-Reply-To: <511E9A73.4090806@boundarydevices.com>
-References: <511E6FA4.2000709@gmail.com> <20130215201121.11471.66349@quantum>
- <511E9A73.4090806@boundarydevices.com>
-Message-ID: <201302220929.08736.arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Feb 2013 09:39:08 +0000
+Subject: arm64: select ARCH_WANT_OPTIONAL_GPIOLIB
+In-Reply-To: <20130221104644.GB11431@MacBook-Pro.local>
+References: <20130218111410.GA10572@e106331-lin.cambridge.arm.com>
+ <1634805.kh17mYrJe5@wuerfel>
+ <CACxGe6tVk4na2yLi-6r1fTv5QqzgePbo6K+ZtEt-VOy25DQxVQ@mail.gmail.com>
+ <1636745.vSza8MrtIn@wuerfel>
+ <20130221104644.GB11431@MacBook-Pro.local>
+Message-ID: <20130222093908.GA12175@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 February 2013, Troy Kisky wrote:
-> > Commit 7248001, "clk: vt8500: Fix device clock divisor calculations"
-> > introduced logic to improve divider selection while changing rates for
-> > the VT8500 dclk.  However a copy-paste error results in using the wrong
-> > variable name in the .set_rate callback.  Fixed by changing *prate to
-> > parent_rate.  The .round_rate function is correct and remains unchanged.
-> >
-> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > Cc: Tony Prisk <linux@prisktech.co.nz>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Rob Herring <robherring2@gmail.com>
-> > ---
-> >   drivers/clk/clk-vt8500.c |    4 ++--
-> >   1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
-> > index b5538bb..c010861 100644
-> > --- a/drivers/clk/clk-vt8500.c
-> > +++ b/drivers/clk/clk-vt8500.c
-> > @@ -156,8 +156,8 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
-> >   
-> >       divisor =  parent_rate / rate;
-> >   
-> > -     /* If prate / rate would be decimal, incr the divisor */
-> > -     if (rate * divisor < *prate)
-> > +     /* If parent_rate / rate would be decimal, incr the divisor */
-> > +     if (rate * divisor < parent_rate)
-> >               divisor++;
-> >   
-> >       if (divisor == cdev->div_mask + 1)
-> What about just
+On Thu, Feb 21, 2013 at 10:46:44AM +0000, Catalin Marinas wrote:
+> On Thu, Feb 21, 2013 at 10:42:57AM +0000, Arnd Bergmann wrote:
+> > An architecture should not unconditionally enable 'GENERIC_GPIO'
+> > without providing an implementation. In case of arm64, selecting
+> > ARCH_WANT_OPTIONAL_GPIOLIB is the right solution, because it
+> > lets us enable GPIOLIB when configuring the kernel, and that
+> > implicitly turns on GENERIC_GPIO.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ----
+> > On Thursday 21 February 2013 10:36:41 Grant Likely wrote:
+> > > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > > > index ab4aa54..3fab0db 100644
+> > > > --- a/arch/arm64/Kconfig
+> > > > +++ b/arch/arm64/Kconfig
+> > > > @@ -3,6 +3,7 @@ config ARM64
+> > > >         select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> > > >         select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+> > > >         select ARCH_WANT_FRAME_POINTERS
+> > > > +       select ARCH_WANT_OPTIONAL_GPIOLIB
+> > > >         select ARM_AMBA
+> > > >         select ARM_ARCH_TIMER
+> > > >         select CLONE_BACKWARDS
+> > > > @@ -92,9 +93,6 @@ config SWIOTLB
+> > > >  config IOMMU_HELPER
+> > > >         def_bool SWIOTLB
+> > > >
+> > > > -config GENERIC_GPIO
+> > > > -       def_bool y
+> > > > -
+> > > >  source "init/Kconfig"
+> > > >
+> > > >  source "kernel/Kconfig.freezer"
+> > > 
+> > > I've not asked Linus to pull the GPIO tree yet because of this issue.
+> > > Can someone please test this on aarch64 and send me a properly
+> > > formatted patch?
+> > 
+> > It was wrong, the new version below is good though. Tested with defconfig
+> > and allyesconfig on arm64. I found a few more trivial issues with arm64
+> > allyesconfig that I fixed up as well. I'll send separate patches
+> > for those.
 > 
->          divisor = (parent_rate + rate - 1) / rate;
+> That's what I just tried, it looks ok to me:
 > 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> Maybe Mark can try it with -next (I only tested with 3.8).
 
-This is now broken in Linus' upstream tree. Could you get one fix merged?
+I've just tried the updated patch on next-20130222; arm64 defconfig builds
+successfully.
 
-	Arnd
+Thanks,
+Mark.
