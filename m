@@ -1,25 +1,60 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 22 Feb 2013 15:58:49 +0800
-Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin
- function name
-In-Reply-To: <20130221214303.GB1906@pengutronix.de>
-References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
- <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
- <51251A11.2030300@wwwdotorg.org>
- <CAKGA1bkHH1XC38_VM=QhDrr33uqqSbwe0n+GfXEPs43K_Do=CQ@mail.gmail.com>
- <20130221050247.GD17738@S2101-09.ap.freescale.net>
- <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
- <20130221214303.GB1906@pengutronix.de>
-Message-ID: <20130222075848.GD27371@S2101-09.ap.freescale.net>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Fri, 22 Feb 2013 17:04:15 +0900
+Subject: [PATCH v2 1/4] DMA: pl330: support burst mode for dev-to-mem and
+ mem-to-dev transmit
+Message-ID: <000001ce10d3$354dd440$9fe97cc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 21, 2013 at 10:43:03PM +0100, Sascha Hauer wrote:
-> This would leave the question how we make up a pin number for the
-> pinctrl framework, but as said, this should be solved inside the kernel
-> and not pushed into the devicetree.
-> 
-Ok, Dong has the same opinion to remove pin number from device tree,
-I start working it out, and will roll out the new version.
+This patch adds to support burst mode for dev-to-mem and mem-to-dev transmit
 
-Shawn
+Change-Id: I9723e49383416773699cf7735168177c8d036f30
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+---
+ drivers/dma/pl330.c |   12 +++++++-----
+ 1 files changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 80680ee..c67f037 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -1271,10 +1271,11 @@ static inline int _ldst_devtomem(unsigned dry_run, u8 buf[],
+ 		const struct _xfer_spec *pxs, int cyc)
+ {
+ 	int off = 0;
++	enum pl330_cond cond = (pxs->r->cfg->brst_len == 1) ? SINGLE : BURST;
+
+ 	while (cyc--) {
+-		off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->r->peri);
+-		off += _emit_LDP(dry_run, &buf[off], SINGLE, pxs->r->peri);
++		off += _emit_WFP(dry_run, &buf[off], cond, pxs->r->peri);
++		off += _emit_LDP(dry_run, &buf[off], cond, pxs->r->peri);
+ 		off += _emit_ST(dry_run, &buf[off], ALWAYS);
+ 		off += _emit_FLUSHP(dry_run, &buf[off], pxs->r->peri);
+ 	}
+@@ -1286,11 +1287,12 @@ static inline int _ldst_memtodev(unsigned dry_run, u8 buf[],
+ 		const struct _xfer_spec *pxs, int cyc)
+ {
+ 	int off = 0;
++	enum pl330_cond cond = (pxs->r->cfg->brst_len == 1) ? SINGLE : BURST;
+
+ 	while (cyc--) {
+-		off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->r->peri);
++		off += _emit_WFP(dry_run, &buf[off], cond, pxs->r->peri);
+ 		off += _emit_LD(dry_run, &buf[off], ALWAYS);
+-		off += _emit_STP(dry_run, &buf[off], SINGLE, pxs->r->peri);
++		off += _emit_STP(dry_run, &buf[off], cond, pxs->r->peri);
+ 		off += _emit_FLUSHP(dry_run, &buf[off], pxs->r->peri);
+ 	}
+
+@@ -2835,7 +2837,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 		}
+
+ 		desc->rqcfg.brst_size = pch->burst_sz;
+-		desc->rqcfg.brst_len = 1;
++		desc->rqcfg.brst_len = pch->burst_len;
+ 	}
+
+ 	/* Return the last desc in the chain */
+--
+1.7.5.4
