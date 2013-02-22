@@ -1,79 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Feb 2013 16:16:49 -0700
-Subject: [PATCH V2] kbuild: create an "include chroot" for DT bindings
-Message-ID: <1361575009-20090-1-git-send-email-swarren@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 22 Feb 2013 15:46:18 -0800
+Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field mask
+ width
+In-Reply-To: <20130222182705.GC19527@mudshark.cambridge.arm.com>
+References: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
+ <20130222182705.GC19527@mudshark.cambridge.arm.com>
+Message-ID: <5128034A.4000008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 2/22/2013 10:27 AM, Will Deacon wrote:
+> Hi guys,
+>
+> On Fri, Feb 22, 2013 at 08:08:05AM +0000, Stephen Boyd wrote:
+>> From: Steve Muckle <smuckle@codeaurora.org>
+>>
+>> The subarchitecture field in the fpsid register is 7 bits wide.
+>> The topmost bit is used to designate that the subarchitecture
+>> designer is not ARM. We use this field to determine which VFP
+>> version is supported by the CPU. Since the topmost bit is masked
+>> off we detect non-ARM subarchitectures as supporting only
+>> HWCAP_VFP and not HWCAP_VFPv3 as it should be for Qualcomm's
+>> processors.
+> I'm struggling to see why this has anything to do with the hwcaps being set
+> incorrectly. What value do you have in fpsid? As far as I can tell, the
+> subarchitecture bits 6:0 should start at 0x40 for you, right?
 
-The recent dtc+cpp support allows header files and C pre-processor
-defines/macros to be used when compiling device tree files. These
-headers will typically define various constants that are part of the
-device tree bindings.
+Yes it does.
 
-The original patch which set up the dtc+cpp include path only considered
-using those headers from device tree files. However, most are also
-useful for kernel code which needs to interpret the device tree.
+>
+> I can see cases for changing this code, I just don't see why it would go
+> wrong in the case you're describing.
 
-In both the DT files and the kernel, I'd like to include the DT-related
-headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
-That will simplify any text which discusses the DT header locations.
+VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;
 
-Creating a <dt-bindings/> for kernel source to use is as simple as
-placing files into include/dt-bindings/.
+causes VFP_arch to be equal to 0 because 0x40 & 0xf == 0.
 
-However, when compiling DT files, the include path should be restricted
-so that only the dt-bindings path is available; arbitrary kernel headers
-shouldn't be exposed. For this reason, create a specific include
-directory for use by dtc+cpp, and symlink dt-bindings from there to the
-actual location of include/dt-bindings/. For want of a better location,
-place this "include chroot" into the existing dts/ directory.
+and then a little bit later we have
 
-arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+               if (VFP_arch >= 2) {
+                        elf_hwcap |= HWCAP_VFPv3;
 
-Some headers used by device tree files may not be useful to the kernel;
-they may be used simply to aid in constructing the DT file (e.g. macros
-to create a node), but not define any information that the kernel needs
-to share. These may be placed directly into arch/*/boot/dts/ along with
-the DT files themselves.
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-Acked-by: Michal Marek <mmarek@suse.cz>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2:
-* Leave arch/*/boot/dts in dtc include path, for any headers that are
-  only included by *.dts and don't need to be shared by the kernel.
-* Fix pathname in commit description.
----
- arch/arm/boot/dts/include/dt-bindings |    1 +
- scripts/Makefile.lib                  |    2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
- create mode 120000 arch/arm/boot/dts/include/dt-bindings
+The branch is not taken so we never set VFPv3.
 
-diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..08c00e4
---- /dev/null
-+++ b/arch/arm/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 07125e6..af35521 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -158,7 +158,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
- 
- dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
- 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
--		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
-+		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
- 		 -undef -D__DTS__
- 
- # Finds the multi-part object the current object will be linked into
 -- 
-1.7.10.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
