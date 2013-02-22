@@ -1,53 +1,122 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 22 Feb 2013 16:32:48 +0530
-Subject: too many timer retries happen when do local timer swtich with
- broadcast timer
-In-Reply-To: <20130222103149.GC12140@e102568-lin.cambridge.arm.com>
-References: <CAB4PhKevqf0e4nzYraE9ZTAFbPCFfNpguAnPoVpJh-FFe2TAZA@mail.gmail.com>
- <alpine.LFD.2.02.1302201400400.22263@ionos>
- <CAB4PhKfxPcyQfpM2Ra1OxsyYhS5fnkjtPy=uYgxFHim1rOdoug@mail.gmail.com>
- <alpine.LFD.2.02.1302211015270.22263@ionos>
- <CAB4PhKf+Z-TK4KGDZm1kYOWibg=e2Ehnhjxt_oTbFq9eqouAjA@mail.gmail.com>
- <alpine.LFD.2.02.1302211436300.22263@ionos> <51263975.20906@ti.com>
- <alpine.LFD.2.02.1302212214020.22263@ionos> <5127436E.4040100@ti.com>
- <alpine.LFD.2.02.1302221122290.22263@ionos>
- <20130222103149.GC12140@e102568-lin.cambridge.arm.com>
-Message-ID: <51275058.7010809@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Feb 2013 11:15:45 +0000
+Subject: [PATCH 8/8] ARM: smp: Remove local timer API
+In-Reply-To: <1361518039-16663-9-git-send-email-sboyd@codeaurora.org>
+References: <1361518039-16663-1-git-send-email-sboyd@codeaurora.org>
+ <1361518039-16663-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130222111545.GA15020@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 February 2013 04:01 PM, Lorenzo Pieralisi wrote:
-> On Fri, Feb 22, 2013 at 10:24:00AM +0000, Thomas Gleixner wrote:
->> On Fri, 22 Feb 2013, Santosh Shilimkar wrote:
->>> BTW, Lorenzo off-list mentioned to me about warning in boot-up
->>> which I missed while testing your patch. It will take bit more
->>> time for me to look into it and hence thought of reporting it.
->>>
->>> [    2.186126] ------------[ cut here ]------------
->>> [    2.190979] WARNING: at kernel/time/tick-broadcast.c:501
->>> tick_broadcast_oneshot_control+0x1c0/0x21c()
->>
->> Which one is that? tick_broadcast_pending or tick_force_broadcast_mask ?
->
-> It is the tick_force_broadcast_mask and I think that's because on all
-> systems we are testing, the broadcast timer IRQ is a thundering herd,
-> all CPUs get out of idle at once and try to get out of broadcast mode
-> at more or less the same time.
->
-So the issue comes ups only when the idle state used where CPU wakeup
-more or less at same time as Lorenzo mentioned. I have two platforms
-where I could test the patch and see the issue only with one platform.
+Hi Stephen,
 
-Yesterday I didn't notice the warning because it wasn't seen on that
-platform :-) OMAP4 idle entry and exit in deep state is staggered
-between CPUs and hence the warning isn't seen. On OMAP5 though,
-there is an additional C-state where idle entry/exit for CPU
-isn't staggered and I see the issue in that case.
+One thing that struck me when I was fiddling with the broadcast mechanism was
+that it should be possible to have a generic dummy timer implementation. As
+long as the architecture calls notifiers at the appropriate times, it should
+look like any other timer driver (apart from not touching any hardware). It just
+needs to depend on ARCH_HAS_TICK_BROADCAST.
 
-Actually the broad-cast code doesn't expect such a behavior
-from CPUs since only the broad-cast affine CPU should wake
-up and rest of the CPU should be woken up by the broad-cast
-IPIs.
+I believe it shouldn't be too difficult to implement, though I may be blind to
+some problems.
 
-Regards,
-Santosh
+Otherwise, I have a few comments on the patch below.
+
+On Fri, Feb 22, 2013 at 07:27:19AM +0000, Stephen Boyd wrote:
+> There are no more users of this API, remove it.
+
+As we're leaving the dummy timers, it'd be worth explaining why in the commit
+message.
+
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/Kconfig                  | 12 +------
+>  arch/arm/include/asm/localtimer.h | 34 --------------------
+>  arch/arm/kernel/smp.c             | 67 ++++++---------------------------------
+>  arch/arm/mach-omap2/Kconfig       |  1 -
+>  arch/arm/mach-omap2/timer.c       |  7 ----
+>  5 files changed, 11 insertions(+), 110 deletions(-)
+>  delete mode 100644 arch/arm/include/asm/localtimer.h
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index dedf02b..7d4338d 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1527,6 +1527,7 @@ config SMP
+>  	depends on HAVE_SMP
+>  	depends on MMU
+>  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+> +	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+>  	select USE_GENERIC_SMP_HELPERS
+>  	help
+>  	  This enables support for systems with more than one CPU. If you have
+
+Should this have been in an earlier patch?
+
+Why is it necessary?
+
+[...]
+
+> -static void percpu_timer_setup(void);
+> +static void broadcast_timer_setup(void);
+>  
+>  /*
+>   * This is the secondary CPU boot entry.  We're using this CPUs
+> @@ -325,9 +317,9 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+>  	complete(&cpu_running);
+>  
+>  	/*
+> -	 * Setup the percpu timer for this CPU.
+> +	 * Setup the dummy broadcast timer for this CPU.
+
+To me, calling something a broadcast timer makes it sound like it performs the
+broadcast. We use the term "broadcast timer" elsewhere here (e.g.
+broadcast_timer_setup), and I think it's any unnecessarily confusing term.
+
+Might it be better to say "dummy timer" consistently?
+
+[...]
+
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 49ac3df..6e1f871 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -88,7 +88,6 @@ config ARCH_OMAP4
+>  	select CACHE_L2X0
+>  	select CPU_V7
+>  	select HAVE_SMP
+> -	select LOCAL_TIMERS if SMP
+>  	select OMAP_INTERCONNECT
+>  	select PL310_ERRATA_588369
+>  	select PL310_ERRATA_727915
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 2bdd4cf..c00a8f8 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -587,7 +587,6 @@ OMAP_SYS_GP_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, "ti,timer-alwon",
+>  #ifdef CONFIG_ARCH_OMAP4
+>  OMAP_SYS_32K_TIMER_INIT(4, 1, OMAP4_32K_SOURCE, "ti,timer-alwon",
+>  			2, OMAP4_MPU_SOURCE);
+> -#ifdef CONFIG_LOCAL_TIMERS
+>  static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
+>  void __init omap4_local_timer_init(void)
+>  {
+> @@ -606,12 +605,6 @@ void __init omap4_local_timer_init(void)
+>  			pr_err("twd_local_timer_register failed %d\n", err);
+>  	}
+>  }
+> -#else /* CONFIG_LOCAL_TIMERS */
+> -void __init omap4_local_timer_init(void)
+> -{
+> -	omap4_sync32k_timer_init();
+> -}
+> -#endif /* CONFIG_LOCAL_TIMERS */
+>  #endif /* CONFIG_ARCH_OMAP4 */
+>  
+>  #ifdef CONFIG_SOC_OMAP5
+
+I believe the above OMAP changes should have been in an earlier patch?
+
+Thanks,
+Mark.
