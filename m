@@ -1,99 +1,63 @@
-From: rob@landley.net (Rob Landley)
-Date: Sat, 23 Feb 2013 16:44:40 -0600
-Subject: [PATCH v2 1/5] drivers: phy: add generic PHY framework
-In-Reply-To: <1361253198-7401-2-git-send-email-kishon@ti.com> (from
- kishon@ti.com on Mon Feb 18 23:53:14 2013)
-Message-ID: <1361659480.11282.15@driftwood>
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Sat, 23 Feb 2013 23:20:56 +0000
+Subject: [PATCH v6] arm: use built-in byte swap function
+In-Reply-To: <20130222194032.f7b44aefa5e2723d16767a1b@freescale.com>
+References: <20130129181046.GC25415@pd.tnic>
+ <1360363233.6066.283.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
+ <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
+ <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
+ <20130219203115.114eab79e8d2099c6306d921@freescale.com>
+ <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
+ <1361356696.13482.269.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
+ <1361367842.13482.279.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
+ <1361372008.13482.280.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
+ <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
+ <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
+ <20130221005221.15279b1372501af12c1e4f32@freescale.com>
+ <alpine.LFD.2.03.1302211134160.6419@syhkavp.arg>
+ <20130221203327.6558f89277468f7ffffa6506@freescale.com>
+ <alpine.LFD.2.03.1302212219100.6419@syhkavp.arg>
+ <20130222194032.f7b44aefa5e2723d16767a1b@freescale.com>
+Message-ID: <1361661654.18110.102.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2013 11:53:14 PM, Kishon Vijay Abraham I wrote:
-> The PHY framework provides a set of APIs for the PHY drivers to
-> create/destroy a PHY and APIs for the PHY users to obtain a reference  
-> to the
-> PHY with or without using phandle. To obtain a reference to the PHY  
-> without
-> using phandle, the platform specfic intialization code (say from  
-> board file)
-> should have already called phy_bind with the binding information. The  
-> binding
-> information consists of phy's device name, phy user device name and  
-> an index.
-> The index is used when the same phy user binds to mulitple phys.
+On Fri, 2013-02-22 at 19:40 -0600, Kim Phillips wrote:
+> Enable the compiler intrinsic for byte swapping on arch ARM.  This
+> allows the compiler to detect and be able to optimize out byte
+> swappings, and has a tiny benefit on vmlinux size (Linaro gcc 4.7.3):
+> 
+>    text    data     bss     dec     hex filename
+> 2754100  121144   56520 2931764  2cbc34 vmlinux-lart #orig
+> 2754050  121144   56520 2931714  2cbc02 vmlinux-lart #builtin-bswap
+> 6282699  307852 5578076 12168627 b9adb3 vmlinux-mxs #orig
+> 6282241  307832 5578076 12168149 b9abd5 vmlinux-mxs #builtin-bswap
+> 7200193  364180  361748 7926121  78f169 vmlinux-imx_v6_v7 #orig
+> 7199515  364188  361748 7925451  78eecb vmlinux-imx_v6_v7 #builtin-bswap
+> 
+> Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
 
-Given that this has a separately selectable config option, I'm guessing  
-that it's useful all by itself even in the absence of a driver using  
-this phy? (Or it gives user visibility to the phy buried in an E1000 or  
-SATA drive or some such?)
+Looks good, thanks.
 
-> +1. Introduction
-> +
-> +*PHY* is the abbreviation for physical layer. It is used to connect  
-> a device
-> +to the physical medium e.g., the USB controller has a PHY to provide  
-> functions
-> +such as serialization, de-serialization, encoding, decoding and is  
-> responsible
-> +for obtaining the required data transmission rate. Note that some USB
-> +controller has PHY functionality embedded into it and others use an  
-> external
-> +PHY. Other peripherals that uses a PHY include Wireless LAN,  
-> Ethernet,
-> +SATA etc.
+Acked-by: David Woodhouse <David.Woodhouse@intel.com>
 
-I've usually heard the word "transciever" used to describe these.
 
-> +The intention of creating this framework is to bring the phy drivers  
-> spread
-> +all over the Linux kernel to drivers/phy to increase code re-use and  
-> to
-> +increase code maintainability.
-> +
-> +This framework will be of use only to devices that uses external PHY  
-> (PHY
-> +functionality is not embedded within the controller).
-> +
-> +2. Creating the PHY
-> +
-> +The PHY driver should create the PHY in order for other peripheral  
-> controllers
-> +to make use of it. The PHY framework provides 2 APIs to create the  
-> PHY.
+-- 
+                   Sent with MeeGo's ActiveSync support.
 
-Given that a PHY is a chip (random example  
-http://ark.intel.com/products/47620/Intel-82579LM-Gigabit-Ethernet-PHY),  
-you seem to be saying that software should manifest a piece of hardware  
-out of thin air through sheer willpower. I'm pretty sure I've  
-misunderstood this phrasing.
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
 
-> +struct phy *phy_create(struct device *dev, struct phy_descriptor  
-> *desc);
-> +struct phy *devm_phy_create(struct device *dev, struct  
-> phy_descriptor *desc);
-> +
-> +The PHY drivers can use one of the above 2 APIs to create the PHY by  
-> passing
 
-Um, the driver should _bind_ to the phy, maybe? Allocate? Initialize?
 
-> +6. Destroying the PHY
-
-I've run drivers like that. I try not to, though.
-
-> +7. Current Status
-> +
-> +Currently only USB in OMAP is made to use this framework. However  
-> using the
-> +USB PHY library cannot be completely removed because it is  
-> intertwined with
-> +OTG. Once we move OTG out of PHY completely, using the old PHY  
-> library can be
-> +completely removed. SATA in OMAP will also more likely use this new  
-> framework
-> +and we should have a patch for it soon.
-
-Does this paragraph belong in the documentation? (Git commit, sure, but  
-I've seen a lot of stale paragraphs like these hang around a  
-surprisingly long time.)
-
-Rob
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4370 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130223/266412f9/attachment.bin>
