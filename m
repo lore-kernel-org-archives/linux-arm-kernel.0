@@ -1,45 +1,57 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sat, 23 Feb 2013 16:52:56 -0700
-Subject: [v3 0/6] ARM: tegra: convert device tree files to use CLK defines
-In-Reply-To: <1361649074.11282.12@driftwood>
-References: <1360917814-27236-1-git-send-email-hdoyu@nvidia.com>
- <1361138717.29465.2@driftwood> <5123B1F8.4040102@wwwdotorg.org>
- <1361649074.11282.12@driftwood>
-Message-ID: <51295658.7030105@wwwdotorg.org>
+Date: Sat, 23 Feb 2013 16:59:25 -0700
+Subject: [PATCH 2/4] ARM: tegra: pmc: add power on function for secondary
+ CPUs
+In-Reply-To: <1361604480.1804.59.camel@jlo-ubuntu-64.nvidia.com>
+References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
+ <1361515491-16199-3-git-send-email-josephl@nvidia.com>
+ <5127BAD2.8030904@wwwdotorg.org>
+ <1361604480.1804.59.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <512957DD.8040406@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2013 12:51 PM, Rob Landley wrote:
-> On 02/19/2013 11:10:16 AM, Stephen Warren wrote:
->> On 02/17/2013 03:05 PM, Rob Landley wrote:
->> > On 02/15/2013 02:43:11 AM, Hiroshi Doyu wrote:
->> >> Hi,
->> >>
->> >> With new dtc+cpp feature, we could get rid of magic numbers in dts*
->> >> files. This patch replaces CLK IDs.
->> >>
->> >> We also plan to share those DT header files with kernel source
->> >> later[1].
->> > ...
->> >> [1]
->> >>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149804.html
+On 02/23/2013 12:28 AM, Joseph Lo wrote:
+> On Sat, 2013-02-23 at 02:37 +0800, Stephen Warren wrote:
+>> On 02/21/2013 11:44 PM, Joseph Lo wrote:
+>>> Adding the power on function for secondary CPUs in PMC driver, this can
+>>> help us to remove legacy powergate driver and add generic power domain
+>>> support later.
 >>
->> >>
->> >
->> > This really smells like documentation should be updated, probably
->> > booting-without-of.txt or similar. Alas, I'm not capable of writing
->> such
->> > an update...
+>>> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+>>> +static int tegra_pmc_get_cpu_powerdomain_id(int cpuid)
+>>> +{
+>>> +	if (cpuid <= 0 || cpuid > num_possible_cpus())
 >>
->> I'm not sure what documentation would be updated nor why. Can you
->> describe that?
+>> cpuid >= num_possible_cpus()?
+>>
+> Yes.
 > 
-> "When writing new device tree files, please do not include magic
-> numbers. Here's how to avoid them."
-> 
-> Does something in Documentation already say this somewhere?
+>>> +static int tegra_pmc_powergate_set(int id, bool new_state)
+>>> +{
+>>> +	bool status;
+>>> +	unsigned long flags;
+>>> +
+>>> +	spin_lock_irqsave(&tegra_powergate_lock, flags);
+>>> +
+>>> +	status = tegra_pmc_readl(PMC_PWRGATE_STATUS) & (1 << id);
+>>
+>> I would perform the read and the logical operations separately. Same for
+>> the write below.
+>>
+>> Don't you want to and with ~BIT(id) not BIT(id)?
+>>
+> This is what I want.
+> WARN_ON(!(!!(status & BIT(id)) ^ new_state));
 
-This seems rather basic and not worth documenting. The technique is
-identical to the use of header files in C/assembly/... code. I suppose
-if we document that, then there would be an argument for documenting this.
+Oh sorry, I guess this isn't a standard read-modify-write cycle, but
+something else.
+
+So yes, the & in the register read is probably fine as you have it, but
+yes there is an issue in the current WARN_ON comparison, as you say.
+
+The WARN_ON you gave above is rather complex. Simplest might be:
+
+u32 reg = tegra_pmc_readl(PMC_PWRGATE_STATUS);
+bool old_state = (reg >> id) & 1;
+WARN_ON(new_state == old_state);
