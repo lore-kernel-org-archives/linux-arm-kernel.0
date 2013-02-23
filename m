@@ -1,43 +1,41 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Sat, 23 Feb 2013 02:38:01 -0600
-Subject: [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <20130221103705.GB17852@n2100.arm.linux.org.uk>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130221103705.GB17852@n2100.arm.linux.org.uk>
-Message-ID: <CAD=GYpY4eTsRyYtbtoG-2TuSqOyXAANgjazpWDNE2B36Z6aokw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 23 Feb 2013 09:39:05 +0000
+Subject: [PATCH 2/4] ARM: tegra: pmc: add power on function for
+ secondary CPUs
+In-Reply-To: <1361604480.1804.59.camel@jlo-ubuntu-64.nvidia.com>
+References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
+ <1361515491-16199-3-git-send-email-josephl@nvidia.com>
+ <5127BAD2.8030904@wwwdotorg.org>
+ <1361604480.1804.59.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <20130223093905.GF17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 21, 2013 at 4:37 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Feb 20, 2013 at 07:37:10PM -0600, Joel A Fernandes wrote:
->> Hello,
->> I've been spinning some work-in-progress patches for FIT build support
->> in the kernel.
->> With the move to multiplatform support on OMAP, I feel it is a good
->> time to add  FIT support, also looking at the proliferating number of
->> dtbs, as it is a nice way
->
-> I'm not looking to add yet another crappy uboot image format to the kernel
-> just for the hell of uboot.
->
-> And don't think that the dtbs in the kernel are going to stay there.  The
-> longer term plan is for them to end up in an external git tree, entirely
-> separate from the kernel source.  So anything that ties them with the
-> kernel build process will ultimately have to be removed again.
+On Sat, Feb 23, 2013 at 03:28:00PM +0800, Joseph Lo wrote:
+> On Sat, 2013-02-23 at 02:37 +0800, Stephen Warren wrote:
+> > On 02/21/2013 11:44 PM, Joseph Lo wrote:
+> > > +	id = tegra_pmc_get_cpu_powerdomain_id(cpuid);
+> > > +	if (IS_ERR_VALUE(id))
+> > > +		return false;
+> > 
+> > As I pointed out downstream, that should be if (id < 0); IS_ERR_VALUE is
+> > intended for use on error-pointers, not on integer error codes.
+> 
+> IS_ERR is for error pointers, IS_ERR_VALUE is for error return code,
+> isn't it?
 
-Sorry for hopping in late as I have been travelling.
+No.  Just because there's a macro somewhere doesn't mean it should be used.
 
-Guess much has been said, but for courtesy sake till dts/u-boot build
-support is dropped, would you consider accepting a simple extension to
-mkuboot.sh with minimal Kbuild changes? I can promise there will be
-quite a few users.
+The err.h stuff is only there to deal with functions which can return
+kernel pointer values and error values, and resolve the conflict between
+negative integers and pointers which also appear to be negative integers.
 
-Lots of folks want embedded device trees and there are already out of
-tree hacks floating as you know that do this. FIT approach to this is
-more cleaner I feel.
+If you don't have that conflict, then making use of err.h is pointless
+and is pure obfuscation.
 
-Let me know what you can do.
+So, just use the plain:
 
-Thanks,
-Joel
+	if (id < 0)
+		return false;
+
+here.
