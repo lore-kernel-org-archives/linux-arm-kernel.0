@@ -1,83 +1,43 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Sat, 23 Feb 2013 15:28:00 +0800
-Subject: [PATCH 2/4] ARM: tegra: pmc: add power on function for
- secondary CPUs
-In-Reply-To: <5127BAD2.8030904@wwwdotorg.org>
-References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
- <1361515491-16199-3-git-send-email-josephl@nvidia.com>
- <5127BAD2.8030904@wwwdotorg.org>
-Message-ID: <1361604480.1804.59.camel@jlo-ubuntu-64.nvidia.com>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Sat, 23 Feb 2013 02:38:01 -0600
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <20130221103705.GB17852@n2100.arm.linux.org.uk>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <20130221103705.GB17852@n2100.arm.linux.org.uk>
+Message-ID: <CAD=GYpY4eTsRyYtbtoG-2TuSqOyXAANgjazpWDNE2B36Z6aokw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-02-23 at 02:37 +0800, Stephen Warren wrote:
-> On 02/21/2013 11:44 PM, Joseph Lo wrote:
-> > Adding the power on function for secondary CPUs in PMC driver, this can
-> > help us to remove legacy powergate driver and add generic power domain
-> > support later.
-> 
-> > diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-> > +static int tegra_pmc_get_cpu_powerdomain_id(int cpuid)
-> > +{
-> > +	if (cpuid <= 0 || cpuid > num_possible_cpus())
-> 
-> cpuid >= num_possible_cpus()?
-> 
-Yes.
+On Thu, Feb 21, 2013 at 4:37 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Feb 20, 2013 at 07:37:10PM -0600, Joel A Fernandes wrote:
+>> Hello,
+>> I've been spinning some work-in-progress patches for FIT build support
+>> in the kernel.
+>> With the move to multiplatform support on OMAP, I feel it is a good
+>> time to add  FIT support, also looking at the proliferating number of
+>> dtbs, as it is a nice way
+>
+> I'm not looking to add yet another crappy uboot image format to the kernel
+> just for the hell of uboot.
+>
+> And don't think that the dtbs in the kernel are going to stay there.  The
+> longer term plan is for them to end up in an external git tree, entirely
+> separate from the kernel source.  So anything that ties them with the
+> kernel build process will ultimately have to be removed again.
 
-> > +static int tegra_pmc_powergate_set(int id, bool new_state)
-> > +{
-> > +	bool status;
-> > +	unsigned long flags;
-> > +
-> > +	spin_lock_irqsave(&tegra_powergate_lock, flags);
-> > +
-> > +	status = tegra_pmc_readl(PMC_PWRGATE_STATUS) & (1 << id);
-> 
-> I would perform the read and the logical operations separately. Same for
-> the write below.
-> 
-> Don't you want to and with ~BIT(id) not BIT(id)?
-> 
-This is what I want.
-WARN_ON(!(!!(status & BIT(id)) ^ new_state));
+Sorry for hopping in late as I have been travelling.
 
-> > +static int tegra_pmc_powergate_remove_clamping(int id)
-> > +{
-> > +	u32 mask;
-> > +
-> > +	/*
-> > +	 * Tegra has a bug where PCIE and VDE clamping masks are
-> > +	 * swapped relatively to the partition ids.
-> > +	 */
-> > +	if (id ==  TEGRA_POWERGATE_VDEC)
-> > +		mask = (1 << TEGRA_POWERGATE_PCIE);
-> > +	else if	(id == TEGRA_POWERGATE_PCIE)
-> > +		mask = (1 << TEGRA_POWERGATE_VDEC);
-> > +	else
-> > +		mask = (1 << id);
-> 
-> Is this just true for this one register, but not others? If it's true
-> everywhere, why not just fix the TEGRA_POWERGATE_* definitions?
-> 
-> I asked this downstream, but you didn't answer.
-> 
-This is because the bit of the powergate id was swapped in
-PMC_REMOVING_CLAMPING with others. So we only need a fix here.
+Guess much has been said, but for courtesy sake till dts/u-boot build
+support is dropped, would you consider accepting a simple extension to
+mkuboot.sh with minimal Kbuild changes? I can promise there will be
+quite a few users.
 
-> > +bool tegra_pmc_cpu_is_powered(int cpuid)
-> > +{
-> > +	int id;
-> > +
-> > +	id = tegra_pmc_get_cpu_powerdomain_id(cpuid);
-> > +	if (IS_ERR_VALUE(id))
-> > +		return false;
-> 
-> As I pointed out downstream, that should be if (id < 0); IS_ERR_VALUE is
-> intended for use on error-pointers, not on integer error codes.
+Lots of folks want embedded device trees and there are already out of
+tree hacks floating as you know that do this. FIT approach to this is
+more cleaner I feel.
 
-IS_ERR is for error pointers, IS_ERR_VALUE is for error return code,
-isn't it?
+Let me know what you can do.
 
 Thanks,
-Joseph
+Joel
