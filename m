@@ -1,34 +1,57 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Feb 2013 21:32:32 -0700
-Subject: [PATCH 2/4] ARM: tegra: pmc: add power on function for secondary
- CPUs
-In-Reply-To: <1361587135.1804.16.camel@jlo-ubuntu-64.nvidia.com>
-References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
- <1361515491-16199-3-git-send-email-josephl@nvidia.com>
- <20130222130051.GV23234@tbergstrom-lnx.Nvidia.com>
- <1361587135.1804.16.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <51284660.8060002@wwwdotorg.org>
+Date: Fri, 22 Feb 2013 21:33:32 -0700
+Subject: [PATCH 3/3] ARM: tegra: refactor tegra{20,30}_boot_secondary
+In-Reply-To: <1361592380.1804.20.camel@jlo-ubuntu-64.nvidia.com>
+References: <1361514267-12111-1-git-send-email-josephl@nvidia.com>
+ <1361514267-12111-3-git-send-email-josephl@nvidia.com>
+ <5127B8CC.3030808@wwwdotorg.org>
+ <1361592380.1804.20.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <5128469C.2050104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2013 07:38 PM, Joseph Lo wrote:
-> On Fri, 2013-02-22 at 21:00 +0800, Peter De Schrijver wrote:
->> On Fri, Feb 22, 2013 at 07:44:49AM +0100, Joseph Lo wrote:
->>> Adding the power on function for secondary CPUs in PMC driver, this can
->>> help us to remove legacy powergate driver and add generic power domain
->>> support later.
-
->>> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-
->>> +static u8 tegra_cpu_domains[] = {
->>> +	0xFF,			/* not available for CPU0 */
+On 02/22/2013 09:06 PM, Joseph Lo wrote:
+> On Sat, 2013-02-23 at 02:28 +0800, Stephen Warren wrote:
+>> On 02/21/2013 11:24 PM, Joseph Lo wrote:
+>>> From: Hiroshi Doyu <hdoyu@nvidia.com>
+>>>
+>>> "tegra_boot_secondary()" has many condition branches for some Tegra
+>>> SoC generations in a single function so that it's not easy to compile
+>>> a kernel only for a single SoC if one wants with some reason, debug
+>>> purpose(?). This patch provides SoC specific version of
+>>> boot_secondary(), tegra{20,30}_boot_secondary(). This could allow
+>>> any combination of SoC to be built. Those boot_secondary functions can
+>>> be preparation when we ntroduce chip specific function pointers in the
+>>> future without having chip dependent branches around.
+>>>
+>>> Also removed unused definition/prototpye.
 >>
->> On Tegra114 we can also powergate CPU0, so this needs to be defined then.
+>> That "also" is really something that should be a separate patch, since
+>> it's not related to the code refactoring that's the main purpose of this
+>> patch.
 >>
-> No, DON'T DO THAT!!
-> We don't allow any code to power gate CPU0 manually here or elsewhere.
+>> However, I'll let it slide this time, since I think both patches would
+>> just end up in Tegra's cleanup branch anyway, even though I did already
+>> point this out (multiple times?) during downstream review:-( You're
+>> getting lucky because I don't feel like reviewing this again.
+>>
+>> I'll apply this series once I can apply patches for 3.10.
+>>
+>> One note to anyone else reading this patch: It does look like this is
+>> duplicating code that was previously nicely shared in
+>> tegra_boot_secondary(). However, I believe it's appropriate to do this
+>> in this case, since the equivalent code for future SoCs (such as
+>> Tegra114) is extremely different, and so the current shared code won't
+>> end up being shared, and this would just make tegra_boot_secondary()
+>> over-complex with conditionals when adding Tegra114 support.
 > 
-> The function here only for SMP and hotplug bring up for secondary CPU.
+> Hiroshi,
+> 
+> Per Stephen's comment, should we drop this patch? And refactoring this
+> later when I add support for Tegra114 CPU PM function.
 
-Doesn't Tegra114 have improved HW that does actually allow
-power-gating/hot-unplugging/... CPU 0, even though older HW didn't?
+Well I did say it wasn't worth reposting for this.
+
+But either way, I wasn't saying anything at all about dropping the
+patch, just that the patch should have been two separate patches since
+it really does two separate things.
