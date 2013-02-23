@@ -1,41 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 23 Feb 2013 09:39:05 +0000
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Sat, 23 Feb 2013 17:38:19 +0200
 Subject: [PATCH 2/4] ARM: tegra: pmc: add power on function for
  secondary CPUs
-In-Reply-To: <1361604480.1804.59.camel@jlo-ubuntu-64.nvidia.com>
+In-Reply-To: <1361595573.1804.46.camel@jlo-ubuntu-64.nvidia.com>
 References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
  <1361515491-16199-3-git-send-email-josephl@nvidia.com>
- <5127BAD2.8030904@wwwdotorg.org>
- <1361604480.1804.59.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <20130223093905.GF17833@n2100.arm.linux.org.uk>
+ <20130222130051.GV23234@tbergstrom-lnx.Nvidia.com>
+ <1361587135.1804.16.camel@jlo-ubuntu-64.nvidia.com>
+ <51284660.8060002@wwwdotorg.org>
+ <1361595573.1804.46.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <20130223153819.GY23234@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 23, 2013 at 03:28:00PM +0800, Joseph Lo wrote:
-> On Sat, 2013-02-23 at 02:37 +0800, Stephen Warren wrote:
-> > On 02/21/2013 11:44 PM, Joseph Lo wrote:
-> > > +	id = tegra_pmc_get_cpu_powerdomain_id(cpuid);
-> > > +	if (IS_ERR_VALUE(id))
-> > > +		return false;
+On Sat, Feb 23, 2013 at 05:59:33AM +0100, Joseph Lo wrote:
+> On Sat, 2013-02-23 at 12:32 +0800, Stephen Warren wrote:
+> > On 02/22/2013 07:38 PM, Joseph Lo wrote:
+> > > On Fri, 2013-02-22 at 21:00 +0800, Peter De Schrijver wrote:
+> > >> On Fri, Feb 22, 2013 at 07:44:49AM +0100, Joseph Lo wrote:
+> > >>> Adding the power on function for secondary CPUs in PMC driver, this can
+> > >>> help us to remove legacy powergate driver and add generic power domain
+> > >>> support later.
 > > 
-> > As I pointed out downstream, that should be if (id < 0); IS_ERR_VALUE is
-> > intended for use on error-pointers, not on integer error codes.
+> > >>> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+> > 
+> > >>> +static u8 tegra_cpu_domains[] = {
+> > >>> +	0xFF,			/* not available for CPU0 */
+> > >>
+> > >> On Tegra114 we can also powergate CPU0, so this needs to be defined then.
+> > >>
+> > > No, DON'T DO THAT!!
+> > > We don't allow any code to power gate CPU0 manually here or elsewhere.
+> > > 
+> > > The function here only for SMP and hotplug bring up for secondary CPU.
+> > 
+> > Doesn't Tegra114 have improved HW that does actually allow
+> > power-gating/hot-unplugging/... CPU 0, even though older HW didn't?
 > 
-> IS_ERR is for error pointers, IS_ERR_VALUE is for error return code,
-> isn't it?
+> Indeed. It support CPU0 be power gated. But the power up sequence does
+> not through here by toggling PMC directly. Just like the CPU idle
+> "powered-down" mode. The CPU0's power gating/un-gating sequence should
+> set up some event flags in flow-controller and controlled by
+> flow-controller.
 
-No.  Just because there's a macro somewhere doesn't mean it should be used.
+Yes, obviously. We don't use this for powergating cores normally...
+Sorry for the confusion.
 
-The err.h stuff is only there to deal with functions which can return
-kernel pointer values and error values, and resolve the conflict between
-negative integers and pointers which also appear to be negative integers.
+Cheers,
 
-If you don't have that conflict, then making use of err.h is pointless
-and is pure obfuscation.
-
-So, just use the plain:
-
-	if (id < 0)
-		return false;
-
-here.
+Peter.
