@@ -1,28 +1,33 @@
-From: ananaza@iki.fi (Antti P Miettinen)
-Date: Sat, 23 Feb 2013 22:41:17 +0200 (EET)
-Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low
- power modes
-In-Reply-To: <20130222093927.GA12140@e102568-lin.cambridge.arm.com>
-References: <874nmowhm1.fsf@amiettinen-lnx.nvidia.com>
- <87liag67p7.fsf@amiettinen-lnx.nvidia.com>
- <20130222093927.GA12140@e102568-lin.cambridge.arm.com>
-Message-ID: <20130223.224117.1863795394020246928.apm@brigitte.kvy.fi>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 24 Feb 2013 01:18:38 +0400
+Subject: [PATCH 1/2] Drivers: w1: mxc_w1, Add support for DT
+In-Reply-To: <1361640958-1876-1-git-send-email-mpa@pengutronix.de>
+References: <1361640958-1876-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <5129322E.9030400@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> On Fri, Feb 22, 2013 at 09:04:04AM +0000, Antti P Miettinen wrote:
->> This did not get answered - are TLB fetches by sibling cores treated in
->> the same way as cache fetches? If core A has C bit cleared, is the cache
->> still available for TLB fetches by core B?
-> 
-> Yes, it is as long as the SMP bit is set in ACTLR.
-> 
-> Lorenzo
+Hello.
 
-Thanks Lorenzo. Do you know if there are any known errata that would
-invalidate any of the assumptions disussed in this thread?
+On 23-02-2013 21:35, Markus Pargmann wrote:
 
---
-Antti P Miettinen
-http://www.iki.fi/~ananaza/
+> Add devicetree support for mxc_w1 driver.
+
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>   Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt | 13 +++++++++++++
+>   drivers/w1/masters/mxc_w1.c                         |  7 +++++++
+>   2 files changed, 20 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt
+
+> diff --git a/Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt b/Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt
+> new file mode 100644
+> index 0000000..686ced4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt
+> @@ -0,0 +1,13 @@
+> +Freescale driver for Dalla's 1-wire bus master on imx chips
+
+    You meant "Dallas'".
+
+WBR, Sergei
