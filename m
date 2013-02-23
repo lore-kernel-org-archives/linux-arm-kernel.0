@@ -1,41 +1,59 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Sat, 23 Feb 2013 10:03:42 +0800
-Subject: [PATCH 1/4] ARM: tegra: pmc: convert PMC driver to support DT only
-In-Reply-To: <20130222130516.GW23234@tbergstrom-lnx.Nvidia.com>
+Date: Sat, 23 Feb 2013 10:38:55 +0800
+Subject: [PATCH 2/4] ARM: tegra: pmc: add power on function for
+ secondary CPUs
+In-Reply-To: <20130222130051.GV23234@tbergstrom-lnx.Nvidia.com>
 References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
- <1361515491-16199-2-git-send-email-josephl@nvidia.com>
- <20130222130516.GW23234@tbergstrom-lnx.Nvidia.com>
-Message-ID: <1361585022.1804.11.camel@jlo-ubuntu-64.nvidia.com>
+ <1361515491-16199-3-git-send-email-josephl@nvidia.com>
+ <20130222130051.GV23234@tbergstrom-lnx.Nvidia.com>
+Message-ID: <1361587135.1804.16.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-02-22 at 21:05 +0800, Peter De Schrijver wrote:
-> On Fri, Feb 22, 2013 at 07:44:48AM +0100, Joseph Lo wrote:
-> > The Tegra kernel only support boot from DT now. Clean up the PMC driver
-> > to support DT only, that includes:
+On Fri, 2013-02-22 at 21:00 +0800, Peter De Schrijver wrote:
+> On Fri, Feb 22, 2013 at 07:44:49AM +0100, Joseph Lo wrote:
+> > Adding the power on function for secondary CPUs in PMC driver, this can
+> > help us to remove legacy powergate driver and add generic power domain
+> > support later.
 > > 
-> > * remove the ifdef of CONFIG_OF
-> > * replace the static mapping of PMC addr to map from DT
+> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > ---
+> >  arch/arm/mach-tegra/pmc.c | 105 +++++++++++++++++++++++++++++++++++++++++++++-
+> >  arch/arm/mach-tegra/pmc.h |   4 ++
+> >  2 files changed, 107 insertions(+), 2 deletions(-)
 > > 
-> > -#ifdef CONFIG_OF
-> >  static const struct of_device_id matches[] __initconst = {
-> >  	{ .compatible = "nvidia,tegra20-pmc" },
-> >  	{ }
+> > diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+> > index 2315e25..a2446c2 100644
+> > --- a/arch/arm/mach-tegra/pmc.c
+> > +++ b/arch/arm/mach-tegra/pmc.c
+> > @@ -21,8 +21,26 @@
+> >  #include <linux/of.h>
+> >  #include <linux/of_address.h>
+> >  
+> > -#define PMC_CTRL		0x0
+> > -#define PMC_CTRL_INTR_LOW	(1 << 17)
+> > +#define PMC_CTRL			0x0
+> > +#define PMC_CTRL_INTR_LOW		(1 << 17)
+> > +#define PMC_PWRGATE_TOGGLE		0x30
+> > +#define PMC_PWRGATE_TOGGLE_START	(1 << 8)
+> > +#define PMC_REMOVE_CLAMPING		0x34
+> > +#define PMC_PWRGATE_STATUS		0x38
+> > +
+> > +#define TEGRA_POWERGATE_PCIE	3
+> > +#define TEGRA_POWERGATE_VDEC	4
+> > +#define TEGRA_POWERGATE_CPU1	9
+> > +#define TEGRA_POWERGATE_CPU2	10
+> > +#define TEGRA_POWERGATE_CPU3	11
+> > +
+> > +static u8 tegra_cpu_domains[] = {
+> > +	0xFF,			/* not available for CPU0 */
 > 
-> At least an extra entry for tegra114-pmc is necessary here. tegra114.dtsi only
-> has:
+> On Tegra114 we can also powergate CPU0, so this needs to be defined then.
 > 
-> pmc {
-> 	compatible = "nvidia,tegra114-pmc", "nvidia,tegra30-pmc";
-> 	reg = <0x7000e400 0x400>;
-> };
-> 
-I think it should be something like below, isn't it?
+No, DON'T DO THAT!!
+We don't allow any code to power gate CPU0 manually here or elsewhere.
 
-compatible = "nvidia,tegra114-pmc", "nvidia,tegra30-pmc",
-		"nvidia,tegra20-pmc";
-
-or should we add tegra114 and tegra30 in the DT match table?
+The function here only for SMP and hotplug bring up for secondary CPU.
 
 Thanks,
 Joseph
