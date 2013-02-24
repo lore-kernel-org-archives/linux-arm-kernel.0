@@ -1,43 +1,39 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 24 Feb 2013 18:00:05 +0100
-Subject: [PATCH] i2c: s3c2410: check for NULL pinctrl handle
-In-Reply-To: <CACRpkdYBjZgEo6qEyBOcYuPzpQUAZ9x-kvFabz0y0pEQs35sKw@mail.gmail.com>
-References: <201302231855.47560.heiko@sntech.de> <31669750.ZZOiY1AEPv@flatron>
- <CACRpkdYBjZgEo6qEyBOcYuPzpQUAZ9x-kvFabz0y0pEQs35sKw@mail.gmail.com>
-Message-ID: <1366216.NzXQfD1BG7@flatron>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Sun, 24 Feb 2013 14:01:17 -0300
+Subject: [PATCH] cpufreq: highbank: do not initialize array with a loop
+Message-ID: <1361725277-5125-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 24 of February 2013 02:01:45 Linus Walleij wrote:
-> On Sun, Feb 24, 2013 at 1:58 AM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > [Me]
-> > 
-> >> Surely you know this when setting up the pdata from your machine?
-> > 
-> > Cases 2) and 3) are both DT-enabled cases, where there is no pdata
-> > coming from board-specific code.
-> 
-> (...)
-> 
-> > Note that we are talking here about a temporary solution. The legacy
-> > DT- based pin configuration will go away after all the DT-enabled
-> > platforms using this driver get migrated to pin control and so will
-> > the need to check if pin control is available.
-> 
-> So use AUXDATA, and you get a pdata for that driver?
+As uninitialized array members will be initialized to zero, we can
+avoid using a for loop by setting a value to it.
 
-Hmm, and then have some platform data passed statically and some parsed 
-from device tree? Not even saying that we are going towards getting rid of 
-auxdata, not adding further dependencies for it.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+Note that I don't own any device using this driver, it has only been compile
+tested, but it shouldn't cause any issues.
 
-Sorry, but this sounds more broken to me than checking the return value of 
-devm_pinctrl_get_select_default for NULL in the driver.
+ drivers/cpufreq/highbank-cpufreq.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-Still, all the platforms relying on the legacy DT GPIO support should have 
-been already migrated to pin control, so ideally instead of "fixing" the 
-drivers to continue supporting the deprecated method, such platforms 
-should be fixed.
-
-Best regards,
-Tomasz
+diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
+index 66e3a71..30d4ae1 100644
+--- a/drivers/cpufreq/highbank-cpufreq.c
++++ b/drivers/cpufreq/highbank-cpufreq.c
+@@ -28,13 +28,9 @@
+ 
+ static int hb_voltage_change(unsigned int freq)
+ {
+-	int i;
+-	u32 msg[HB_CPUFREQ_IPC_LEN];
++	u32 msg[HB_CPUFREQ_IPC_LEN] = {HB_CPUFREQ_CHANGE_NOTE};
+ 
+-	msg[0] = HB_CPUFREQ_CHANGE_NOTE;
+ 	msg[1] = freq / 1000000;
+-	for (i = 2; i < HB_CPUFREQ_IPC_LEN; i++)
+-		msg[i] = 0;
+ 
+ 	return pl320_ipc_transmit(msg);
+ }
+-- 
+1.8.2.rc0
