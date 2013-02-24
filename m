@@ -1,94 +1,114 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 24 Feb 2013 13:27:48 +0100
-Subject: [PATCH V2] dma: imx-dma: Add oftree support
-In-Reply-To: <201302232216.22113.arnd@arndb.de>
-References: <1361543838-12604-1-git-send-email-mpa@pengutronix.de>
- <1361638770-29235-1-git-send-email-mpa@pengutronix.de>
- <201302232216.22113.arnd@arndb.de>
-Message-ID: <20130224122748.GF10660@pengutronix.de>
+Date: Sun, 24 Feb 2013 13:36:03 +0100
+Subject: [PATCH 1/2] Drivers: w1: mxc_w1, Add support for DT
+In-Reply-To: <CALBypN4+ioS=YDrw7YnvtS1AeS+UH=FidYd2zG1_NsBWDh9bgQ@mail.gmail.com>
+References: <1361640958-1876-1-git-send-email-mpa@pengutronix.de>
+ <CALBypN4+ioS=YDrw7YnvtS1AeS+UH=FidYd2zG1_NsBWDh9bgQ@mail.gmail.com>
+Message-ID: <20130224123603.GA11323@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 23, 2013 at 10:16:21PM +0000, Arnd Bergmann wrote:
-> On Saturday 23 February 2013, Markus Pargmann wrote:
-> 
-> > +Required properties:
-> > +- compatible : Should be "fsl,<chip>-dma". chip can be imx1, imx21 or imx27
-> > +- reg : Should contain DMA registers location and length
-> > +- interrupts : First item should be DMA interrupt, second one is optional and
-> > +    should contain DMA Error interrupt
-> > +- #dma-cells : Has to be 1. imx-dma does not support anything else.
-> 
-> Hmm, so #dma-cells is 1
-> 
-> > @@ -996,13 +1020,33 @@ static void imxdma_issue_pending(struct dma_chan *chan)
-> >  	spin_unlock_irqrestore(&imxdma->lock, flags);
-> >  }
-> >  
-> > +bool imxdma_filter_fn(struct dma_chan *chan, void *param)
-> > +{
-> > +	struct imx_dma_data *data = kzalloc(sizeof(*data), GFP_KERNEL);
-> > +	printk("%s\n", __func__);
-> > +
-> > +	if (!data)
-> > +		return false;
-> > +
-> > +	data->dma_request = *(unsigned *) param;
-> > +	data->alloc_ctl_filter = true;
-> > +	chan->private = data;
-> > +
-> > +	return true;
-> > +}
-> 
-> which matches the usage here, but 
-> 
-> > diff --git a/include/linux/platform_data/dma-imx.h b/include/linux/platform_data/dma-imx.h
-> > index f6d30cc..762a7d0 100644
-> > --- a/include/linux/platform_data/dma-imx.h
-> > +++ b/include/linux/platform_data/dma-imx.h
-> > @@ -51,6 +51,9 @@ struct imx_dma_data {
-> >  	int dma_request; /* DMA request line */
-> >  	enum sdma_peripheral_type peripheral_type;
-> >  	int priority;
-> > +
-> > +	/* Did the controller's filter function allocated this object? */
-> > +	bool alloc_ctl_filter;
-> >  };
-> 
-> There are actually two more members in the imx_dma_data structure. Shouldn't those
-> be encoded in the dma specifier as well?
+Hi Martin,
 
-imx_dma_data is used by imx-dma and imx-sdma, but imx-dma does not use
-peripheral_type and priority. When not loaded from devicetree
-imx_dma_data is constructed by imx drivers without knowledge about the
-dma driver. This patch moves the initialization to the driver, so I
-think there is no need to fill all fields. I didn't want to use a new
-struct because the imx drivers could still use this old way.
-
->   
-> >  static inline int imx_dma_is_ipu(struct dma_chan *chan)
-> > @@ -63,7 +66,8 @@ static inline int imx_dma_is_general_purpose(struct dma_chan *chan)
-> >  	return strstr(dev_name(chan->device->dev), "sdma") ||
-> >  		!strcmp(dev_name(chan->device->dev), "imx1-dma") ||
-> >  		!strcmp(dev_name(chan->device->dev), "imx21-dma") ||
-> > -		!strcmp(dev_name(chan->device->dev), "imx27-dma");
-> > +		!strcmp(dev_name(chan->device->dev), "imx27-dma") ||
-> > +		!strcmp(chan->device->dev->driver->name, "imx-dma");
-> >  }
+On Sun, Feb 24, 2013 at 12:37:17PM +0100, Martin Fuzzey wrote:
+> Hi Markus,
 > 
-> Also, your filter function does not actually check
-> imx_dma_is_general_purpose() as the old style filter functions
-> in the slave drivers do, which breaks when you have more than one dma engine
-> in the system.
+> I've already submitted basically this and it's in linux-next:
+> http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=
+> 28c55dc1acc863cb29832b5be2464ebcdafdc3d5
 
-Oh yes, in the filter function should be a device driver comparison. But
-I would prefer a direct check instead of imx_dma_is_general_purpose because
-I think the driver should not define a filter function that initializes data
-for another driver (sdma).
+Ok, but 2/2 is still needed.
+
+> 
+> Also:
+> +Example:
+> +               w1: w1 at 10009000 {
+> +                       compatible = "fsl,imx27-w1";
+> +                       reg = <0x10009000 0x1000>;
+> +               };
+> ...
+> +struct of_device_id mxc_w1_of_ids[] = {
+> +       { .compatible = "fsl,imx21-w1", },
+> +       { /* sentinel */ }
+> +};
+> 
+> Isn't there a mismatch imx27 vs imx21 here?
+
+Yes that's a mismatch from a previous version.
 
 Thanks
 
 Markus
+
+> 
+> Regards,
+> 
+> Martin
+> 
+> 
+> 
+> On Sat, Feb 23, 2013 at 6:35 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> 
+>     Add devicetree support for mxc_w1 driver.
+> 
+>     Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+>     ---
+>      Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt | 13 +++++++++++++
+>      drivers/w1/masters/mxc_w1.c                         |  7 +++++++
+>      2 files changed, 20 insertions(+)
+>      create mode 100644 Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt
+> 
+>     diff --git a/Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt b/
+>     Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt
+>     new file mode 100644
+>     index 0000000..686ced4
+>     --- /dev/null
+>     +++ b/Documentation/devicetree/bindings/w1/fsl,mxc-w1.txt
+>     @@ -0,0 +1,13 @@
+>     +Freescale driver for Dalla's 1-wire bus master on imx chips
+>     +
+>     +This driver supports imx21,27,31,35.
+>     +
+>     +Required properties:
+>     +- compatible : "fsl,<chip>-w1"
+>     +- reg : Should be the memory range.
+>     +
+>     +Example:
+>     +               w1: w1 at 10009000 {
+>     +                       compatible = "fsl,imx27-w1";
+>     +                       reg = <0x10009000 0x1000>;
+>     +               };
+>     diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
+>     index 708a25f..827ff7f 100644
+>     --- a/drivers/w1/masters/mxc_w1.c
+>     +++ b/drivers/w1/masters/mxc_w1.c
+>     @@ -186,9 +186,16 @@ static int mxc_w1_remove(struct platform_device *pdev)
+>             return 0;
+>      }
+> 
+>     +struct of_device_id mxc_w1_of_ids[] = {
+>     +       { .compatible = "fsl,imx21-w1", },
+>     +       { /* sentinel */ }
+>     +};
+>     +MODULE_DEVICE_TABLE(of, mxc_w1_of_ids);
+>     +
+>      static struct platform_driver mxc_w1_driver = {
+>             .driver = {
+>                        .name = "mxc_w1",
+>     +                  .of_match_table = mxc_w1_of_ids,
+>             },
+>             .probe = mxc_w1_probe,
+>             .remove = mxc_w1_remove,
+>     --
+>     1.8.1.2
+> 
+> 
+>     _______________________________________________
+>     linux-arm-kernel mailing list
+>     linux-arm-kernel at lists.infradead.org
+>     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
