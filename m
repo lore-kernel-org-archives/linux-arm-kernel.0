@@ -1,39 +1,90 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Sun, 24 Feb 2013 14:01:17 -0300
-Subject: [PATCH] cpufreq: highbank: do not initialize array with a loop
-Message-ID: <1361725277-5125-1-git-send-email-emilio@elopez.com.ar>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Sun, 24 Feb 2013 18:49:41 +0100
+Subject: question about arch/arm/mach-s3c24xx/irq.c
+In-Reply-To: <alpine.DEB.2.02.1302241644540.1943@hadrien>
+References: <alpine.DEB.2.02.1302241241440.1943@hadrien>
+ <201302241611.13028.heiko@sntech.de>
+ <alpine.DEB.2.02.1302241644540.1943@hadrien>
+Message-ID: <201302241849.41638.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As uninitialized array members will be initialized to zero, we can
-avoid using a for loop by setting a value to it.
+Am Sonntag, 24. Februar 2013, 16:45:18 schrieb Julia Lawall:
+> On Sun, 24 Feb 2013, Heiko St?bner wrote:
+> > Am Sonntag, 24. Februar 2013, 14:39:45 schrieb Julia Lawall:
+> > > [Adding the person who introduced the code]
+> > > 
+> > > On Sun, 24 Feb 2013, Russell King - ARM Linux wrote:
+> > > > On Sun, Feb 24, 2013 at 12:45:11PM +0100, Julia Lawall wrote:
+> > > > > The function s3c24xx_irq_map in arch/arm/mach-s3c24xx/irq.c
+> > > > > contains the
+> > > > > 
+> > > > > code:
+> > > > >                 parent_irq_data =
+> > > > >                 &parent_intc->irqs[irq_data->parent_irq];
+> > > > > 		
+> > > > > 		if (!irq_data) {
+> > > > > 		
+> > > > >                         pr_err("irq-s3c24xx: no irq data found for
+> > > > >                         hwirq %lu\n",
+> > > > >                         
+> > > > >                                hw);
+> > > > >                         
+> > > > >                         goto err;
+> > > > > 		
+> > > > > 		}
+> > > > > 
+> > > > > At this point irq_data has already been tested, so the null test on
+> > > > > irq_data does not look correct.  But I wonder if parent_irq_data
+> > > > > could ever be null here?
+> > > > 
+> > > > That would be really obscure - because that would require parent_intc
+> > > > to be a "negative" pointer (to counter-act the indexing by
+> > > > irq_data->parent_irq).  So it looks to me like the above is
+> > > > redundant.
+> > > 
+> > > Even at its original definition irq_data seems unlikely to be NULL:
+> > >         struct s3c_irq_intc *intc = h->host_data;
+> > > 	
+> > > 	struct s3c_irq_data *irq_data = &intc->irqs[hw];
+> > > 	...
+> > > 	if (!irq_data) {
+> > > 	
+> > >                 pr_err("irq-s3c24xx: no irq data found for hwirq
+> > >                 %lu\n",
+> > > 
+> > > hw); return -EINVAL;
+> > > 
+> > >         }
+> > > 
+> > > That is, it could be an invalid value, but whether it actually hits 0
+> > > would seem to depend on the value hw?
+> > > 
+> > > Heiko, is NULL really a possibility?
+> > 
+> > The test you quoted is of course wrong ... it would need to test
+> > parent_irq_data. But you're also right that the test is not necessary at
+> > all.
+> > 
+> > All the s3c_irq_data arrays used always contain 32 entries to reach all
+> > bits of the register (which is used differently on each SoC). So if we
+> > have found the parent_intc at all, it should contain a 32 entries array
+> > of irq_data structs, so no need to test for the existence of the
+> > individual array element.
+> > 
+> > 
+> > And now that I look at it, I also see another glitch. The code tests for
+> > parent_irq != 0, which of course won't work if the parent_irq is the
+> > 0-hwirq of the parent controller.
+> > The only SoC using such a mapping is the s3c2412 [0], which explains why
+> > I haven't been bitten by this myself.
+> 
+> Do you want to make all the fixes?
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
-Note that I don't own any device using this driver, it has only been compile
-tested, but it shouldn't cause any issues.
+Yep, I just need to find out what the best fix for my parent_irq mess up would 
+be :-)
 
- drivers/cpufreq/highbank-cpufreq.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+The easiest way would of course be to use a value outside the valid range to 
+indicate no parent-irq, so either < 0 (would need a type change) or > 32 .
 
-diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
-index 66e3a71..30d4ae1 100644
---- a/drivers/cpufreq/highbank-cpufreq.c
-+++ b/drivers/cpufreq/highbank-cpufreq.c
-@@ -28,13 +28,9 @@
- 
- static int hb_voltage_change(unsigned int freq)
- {
--	int i;
--	u32 msg[HB_CPUFREQ_IPC_LEN];
-+	u32 msg[HB_CPUFREQ_IPC_LEN] = {HB_CPUFREQ_CHANGE_NOTE};
- 
--	msg[0] = HB_CPUFREQ_CHANGE_NOTE;
- 	msg[1] = freq / 1000000;
--	for (i = 2; i < HB_CPUFREQ_IPC_LEN; i++)
--		msg[i] = 0;
- 
- 	return pl320_ipc_transmit(msg);
- }
--- 
-1.8.2.rc0
+But I might be overlooking something here.
