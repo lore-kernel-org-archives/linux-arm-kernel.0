@@ -1,42 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Feb 2013 14:54:55 +0000
-Subject: [PATCH] arm: Preserve L_PTE_VALID in pte_modify()
-In-Reply-To: <20130225145110.GA7838@localhost.cambridge.arm.com>
-References: <1360693550-31609-1-git-send-email-catalin.marinas@arm.com>
- <20130218162150.GI20798@mudshark.cambridge.arm.com>
- <20130225144355.GD25276@mudshark.cambridge.arm.com>
- <20130225145110.GA7838@localhost.cambridge.arm.com>
-Message-ID: <20130225145454.GE25276@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Feb 2013 14:54:47 +0000
+Subject: [PATCH 01/11] ARM: disable virt_to_bus/virt_to_bus almost
+ everywhere
+In-Reply-To: <512B72A7.6040307@synopsys.com>
+References: <1360849767-1463135-1-git-send-email-arnd@arndb.de>
+ <20130222101359.0c91a7259f648a3d06221bd8@canb.auug.org.au>
+ <512B72A7.6040307@synopsys.com>
+Message-ID: <201302251454.47617.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 25, 2013 at 02:51:10PM +0000, Catalin Marinas wrote:
-> On Mon, Feb 25, 2013 at 02:43:56PM +0000, Will Deacon wrote:
-> > Hi Catalin,
-> > 
-> > On Mon, Feb 18, 2013 at 04:21:50PM +0000, Will Deacon wrote:
-> > > On Tue, Feb 12, 2013 at 06:25:50PM +0000, Catalin Marinas wrote:
-> > > > Following commit 26ffd0d4 (ARM: mm: introduce present, faulting entries
-> > > > for PAGE_NONE), if a page has been mapped as PROT_NONE, the L_PTE_VALID
-> > > > bit is cleared by the set_pte_ext() code. With LPAE the software and
-> > > > hardware pte share the same location and subsequent modifications of pte
-> > > > range (change_protection()) will leave the L_PTE_VALID bit cleared.
-> > > > 
-> > > > This patch adds the L_PTE_VALID bit to the newprot mask in pte_modify().
-> > > > 
-> > > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > > Reported-by: Subash Patel <subash.rp@samsung.com>
-> > > > Tested-by: Subash Patel <subash.rp@samsung.com>
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > 
-> > > This matches what I did for arm64, so:
-> > > 
-> > >   Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > Can you put this into the patch system please?
+On Monday 25 February 2013, Vineet Gupta wrote:
+> Have you queued up this change via one of your trees already for 3.9-rcX ?
+> If not, I can fold it in with a bunch of Kconfig cleanups for ARC
+> (GENERIC_SIGALTSTACK, HAVE_IRQ_WORK), given that those bits are already in linus'
+> tree.
 > 
-> Already picked by rmk (I don't remember the patch number).
 
-Great, sorry for the bother (I can't see the patch in any upstream trees).
+I haven't put it in my tree yet, not. Please put it in yours.
 
-Will
+	Arnd
