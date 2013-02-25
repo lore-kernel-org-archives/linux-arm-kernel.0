@@ -1,83 +1,32 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 25 Feb 2013 13:34:03 +0000
-Subject: too many timer retries happen when do local timer swtich with
- broadcast timer
-In-Reply-To: <alpine.LFD.2.02.1302221946070.22263@ionos>
-References: <alpine.LFD.2.02.1302212214020.22263@ionos>
- <5127436E.4040100@ti.com>
- <alpine.LFD.2.02.1302221122290.22263@ionos>
- <20130222103149.GC12140@e102568-lin.cambridge.arm.com>
- <51275058.7010809@ti.com>
- <alpine.LFD.2.02.1302221212500.22263@ionos>
- <20130222144829.GG12140@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.02.1302221558000.22263@ionos>
- <20130222152639.GH12140@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.02.1302221946070.22263@ionos>
-Message-ID: <20130225133402.GA13045@e102568-lin.cambridge.arm.com>
+Date: Mon, 25 Feb 2013 13:36:02 +0000
+Subject: L1 & L2 cache flush sequence on CortexA5 MPcore w.r.t low power
+ modes
+In-Reply-To: <20130223.224117.1863795394020246928.apm@brigitte.kvy.fi>
+References: <874nmowhm1.fsf@amiettinen-lnx.nvidia.com>
+ <87liag67p7.fsf@amiettinen-lnx.nvidia.com>
+ <20130222093927.GA12140@e102568-lin.cambridge.arm.com>
+ <20130223.224117.1863795394020246928.apm@brigitte.kvy.fi>
+Message-ID: <20130225133602.GB13045@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 06:52:14PM +0000, Thomas Gleixner wrote:
-> On Fri, 22 Feb 2013, Lorenzo Pieralisi wrote:
-> > On Fri, Feb 22, 2013 at 03:03:02PM +0000, Thomas Gleixner wrote:
-> > > On Fri, 22 Feb 2013, Lorenzo Pieralisi wrote:
-> > > > On Fri, Feb 22, 2013 at 12:07:30PM +0000, Thomas Gleixner wrote:
-> > > > > Now we could make use of that and avoid going deep idle just to come
-> > > > > back right away via the IPI. Unfortunately the notification thingy has
-> > > > > no return value, but we can fix that.
-> > > > > 
-> > > > > To confirm that theory, could you please try the hack below and add
-> > > > > some instrumentation (trace_printk)?
-> > > > 
-> > > > Applied, and it looks like that's exactly why the warning triggers, at least
-> > > > on the platform I am testing on which is a dual-cluster ARM testchip.
-> > > > 
-> > > > There is a still time window though where the CPU (the IPI target) can get
-> > > > back to idle (tick_broadcast_pending still not set) before the CPU target of
-> > > > the broadcast has a chance to run tick_handle_oneshot_broadcast (and set
-> > > > tick_broadcast_pending), or am I missing something ?
-> > > 
-> > > Well, the tick_broadcast_pending bit is uninteresting if the
-> > > force_broadcast bit is set. Because if that bit is set we know for
-> > > sure, that we got woken with the cpu which gets the broadcast timer
-> > > and raced back to idle before the broadcast handler managed to
-> > > send the IPI.
+On Sat, Feb 23, 2013 at 08:41:17PM +0000, Antti P Miettinen wrote:
+> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > On Fri, Feb 22, 2013 at 09:04:04AM +0000, Antti P Miettinen wrote:
+> >> This did not get answered - are TLB fetches by sibling cores treated in
+> >> the same way as cache fetches? If core A has C bit cleared, is the cache
+> >> still available for TLB fetches by core B?
 > > 
-> > Gah, my bad sorry, I mixed things up. I thought
+> > Yes, it is as long as the SMP bit is set in ACTLR.
 > > 
-> > tick_check_broadcast_pending()
-> > 
-> > was checking against the tick_broadcast_pending mask not
-> > 
-> > tick_force_broadcast_mask
+> > Lorenzo
 > 
-> Yep, that's a misnomer. I just wanted to make sure that my theory is
-> correct. I need to think about the real solution some more.
-> 
-> We have two alternatives:
-> 
-> 1) Make the clockevents_notify function have a return value.
-> 
-> 2) Add something like the hack I gave you with a proper name.
-> 
-> The latter has the beauty, that we just need to modify the platform
-> independent idle code instead of going down to every callsite of the
-> clockevents_notify thing.
+> Thanks Lorenzo. Do you know if there are any known errata that would
+> invalidate any of the assumptions disussed in this thread?
 
-Thank you.
+If you can provide me with a bit of context I am happy to help you chase
+ths issue(s), since it looks like you are facing some.
 
-I am not sure (1) would buy us anything compared to (2) and as you said we
-would end up patching all callsites so (2) is preferred.
-
-As I mentioned, we can even just apply your fixes and leave platform specific
-code deal with this optimization, at the end of the day idle driver has
-just to check pending IRQs/wake-up sources (which would cover all IRQs not
-just TIMER IPI) if and when it has to start time consuming operations like
-cache cleaning to enter deep idle. If it goes into a shallow C-state so be it.
-
-On x86 I think it is HW/FW that prevents C-state entering if IRQs are pending,
-and on ARM it is likely to happen too, so I am just saying you should not
-bother if you think the code becomes too hairy to justify this change.
-
-Thank you very much for the fixes and your help,
+Thanks,
 Lorenzo
