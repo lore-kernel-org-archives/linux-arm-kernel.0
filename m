@@ -1,44 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 25 Feb 2013 15:52:46 +0100
-Subject: [PATCH 01/35] mfd: ab8500-gpadc: Implemented suspend/resume
-In-Reply-To: <20130225135123.GA28907@opensource.wolfsonmicro.com>
-References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
- <1360933026-30325-2-git-send-email-lee.jones@linaro.org>
- <20130220131912.GB13049@sirena.org.uk>
- <CAPDyKFo0MpP-d7v8v1zwB42sboR3MWT6nUmG=-L0_nayYRY7FQ@mail.gmail.com>
- <20130222103306.GA19796@opensource.wolfsonmicro.com>
- <CAPDyKFpJzuzB_7=eH7iNV69TLOTbdBCTx3CgqPTkianZCctKag@mail.gmail.com>
- <20130225135123.GA28907@opensource.wolfsonmicro.com>
-Message-ID: <CAPDyKFp3RPXnwzQR4r5ubZtOxazagqOQc=0=dA6ohFe4vN65Hg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Feb 2013 14:54:55 +0000
+Subject: [PATCH] arm: Preserve L_PTE_VALID in pte_modify()
+In-Reply-To: <20130225145110.GA7838@localhost.cambridge.arm.com>
+References: <1360693550-31609-1-git-send-email-catalin.marinas@arm.com>
+ <20130218162150.GI20798@mudshark.cambridge.arm.com>
+ <20130225144355.GD25276@mudshark.cambridge.arm.com>
+ <20130225145110.GA7838@localhost.cambridge.arm.com>
+Message-ID: <20130225145454.GE25276@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 February 2013 14:51, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Feb 25, 2013 at 10:27:36AM +0100, Ulf Hansson wrote:
->> On 22 February 2013 11:38, Mark Brown
->
->> > Are you sure this actually does what you think it does, especially when
->> > run on modern kernels?
->
->> Not sure, what you are thinking of more precisely here. Runtime pm has
->> been in the kernel for quite some time now.
->
-> Yes, thanks - I was aware of that.  The integration between runtime and
-> system PM has been an area that's had some development though.
->
->> Anyway, to make it a bit clearer, we switch the regulator on/off at
->> the runtime suspend/resume callbacks. We want to take similar actions
->> in device suspend/resume.
->> To accomplish this a pm_runtime_get_sync is done in suspend and vice
->> verse in resume, otherwise you can not safely handle the regulator.
->
-> Are you absolutely positive that with modern kernels your get actually
-> resumes the device?
+On Mon, Feb 25, 2013 at 02:51:10PM +0000, Catalin Marinas wrote:
+> On Mon, Feb 25, 2013 at 02:43:56PM +0000, Will Deacon wrote:
+> > Hi Catalin,
+> > 
+> > On Mon, Feb 18, 2013 at 04:21:50PM +0000, Will Deacon wrote:
+> > > On Tue, Feb 12, 2013 at 06:25:50PM +0000, Catalin Marinas wrote:
+> > > > Following commit 26ffd0d4 (ARM: mm: introduce present, faulting entries
+> > > > for PAGE_NONE), if a page has been mapped as PROT_NONE, the L_PTE_VALID
+> > > > bit is cleared by the set_pte_ext() code. With LPAE the software and
+> > > > hardware pte share the same location and subsequent modifications of pte
+> > > > range (change_protection()) will leave the L_PTE_VALID bit cleared.
+> > > > 
+> > > > This patch adds the L_PTE_VALID bit to the newprot mask in pte_modify().
+> > > > 
+> > > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > > Reported-by: Subash Patel <subash.rp@samsung.com>
+> > > > Tested-by: Subash Patel <subash.rp@samsung.com>
+> > > > Cc: Will Deacon <will.deacon@arm.com>
+> > > 
+> > > This matches what I did for arm64, so:
+> > > 
+> > >   Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Can you put this into the patch system please?
+> 
+> Already picked by rmk (I don't remember the patch number).
 
-Yes, runtime resume is always ok, But you can not runtime suspend the
-device, since the device suspend layer prevent this with a
-pm_runtime_get_noresume before calling the device suspend callback.
+Great, sorry for the bother (I can't see the patch in any upstream trees).
 
-Kind regards
-Ulf Hansson
+Will
