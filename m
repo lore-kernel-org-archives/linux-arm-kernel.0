@@ -1,190 +1,145 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 26 Feb 2013 00:56:16 +0530
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
- <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
- <5122551E.1080703@linux.vnet.ibm.com>	<51226B46.9080707@linux.vnet.ibm.com>
- <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
- <51226F91.7000108@linux.vnet.ibm.com>
- <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
-Message-ID: <512BBAD8.8010006@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Feb 2013 20:02:09 +0000
+Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field
+ mask width
+In-Reply-To: <20130225172545.GO17833@n2100.arm.linux.org.uk>
+References: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
+ <20130225172545.GO17833@n2100.arm.linux.org.uk>
+Message-ID: <20130225200209.GP17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lai,
-
-On 02/25/2013 09:23 PM, Lai Jiangshan wrote:
-> Hi, Srivatsa,
+On Mon, Feb 25, 2013 at 05:25:45PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 22, 2013 at 12:08:05AM -0800, Stephen Boyd wrote:
+> > From: Steve Muckle <smuckle@codeaurora.org>
+> > 
+> > The subarchitecture field in the fpsid register is 7 bits wide.
+> > The topmost bit is used to designate that the subarchitecture
+> > designer is not ARM. We use this field to determine which VFP
+> > version is supported by the CPU. Since the topmost bit is masked
+> > off we detect non-ARM subarchitectures as supporting only
+> > HWCAP_VFP and not HWCAP_VFPv3 as it should be for Qualcomm's
+> > processors.
+> > 
+> > Use the proper width for the mask so that we report the correct
+> > elf_hwcap of non-ARM designed processors.
 > 
-> The target of the whole patchset is nice for me.
+> This is a *big* can of worms.  How this register is defined depends on
+> what document you look at:
 
-Cool! Thanks :-)
+This can of worms is getting bigger.  We have more problems with our
+handling of the different VFP versions, specifically the handling of
+the EX=0 DEX=0 case.
 
-> A question: How did you find out the such usages of
-> "preempt_disable()" and convert them? did all are converted?
-> 
+VFP common subarch 3 defines the EX=0, DEX=0 encoding to mean one of
+the following conditions have been met:
 
-Well, I scanned through the source tree for usages which implicitly
-disabled CPU offline and converted them over. Its not limited to uses
-of preempt_disable() alone - even spin_locks, rwlocks, local_irq_disable()
-etc also help disable CPU offline. So I tried to dig out all such uses
-and converted them. However, since the merge window is open, a lot of
-new code is flowing into the tree. So I'll have to rescan the tree to
-see if there are any more places to convert.
+1. an unallocated VFP instruction was encountered.
 
-> And I think the lock is too complex and reinvent the wheel, why don't
-> you reuse the lglock?
+   In other words, the VFP was the target of the co-processor instruction,
+   but the instruction is not a known VFP instruction encoding.  This
+   should raise an undefined instruction exception.
 
-lglocks? No way! ;-) See below...
+2. an allocated VFP instruction was encountered, but not handled in
+   hardware.
 
-> I wrote an untested draft here.
-> 
-> Thanks,
-> Lai
-> 
-> PS: Some HA tools(I'm writing one) which takes checkpoints of
-> virtual-machines frequently, I guess this patchset can speedup the
-> tools.
-> 
-> From 01db542693a1b7fc6f9ece45d57cb529d9be5b66 Mon Sep 17 00:00:00 2001
-> From: Lai Jiangshan <laijs@cn.fujitsu.com>
-> Date: Mon, 25 Feb 2013 23:14:27 +0800
-> Subject: [PATCH] lglock: add read-preference local-global rwlock
-> 
-> locality via lglock(trylock)
-> read-preference read-write-lock via fallback rwlock_t
-> 
-> Signed-off-by: Lai Jiangshan <laijs@cn.fujitsu.com>
-> ---
->  include/linux/lglock.h |   31 +++++++++++++++++++++++++++++++
->  kernel/lglock.c        |   45 +++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 76 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/lglock.h b/include/linux/lglock.h
-> index 0d24e93..30fe887 100644
-> --- a/include/linux/lglock.h
-> +++ b/include/linux/lglock.h
-> @@ -67,4 +67,35 @@ void lg_local_unlock_cpu(struct lglock *lg, int cpu);
->  void lg_global_lock(struct lglock *lg);
->  void lg_global_unlock(struct lglock *lg);
-> 
-> +struct lgrwlock {
-> +	unsigned long __percpu *fallback_reader_refcnt;
-> +	struct lglock lglock;
-> +	rwlock_t fallback_rwlock;
-> +};
-> +
-> +#define DEFINE_LGRWLOCK(name)						\
-> +	static DEFINE_PER_CPU(arch_spinlock_t, name ## _lock)		\
-> +	= __ARCH_SPIN_LOCK_UNLOCKED;					\
-> +	static DEFINE_PER_CPU(unsigned long, name ## _refcnt);		\
-> +	struct lgrwlock name = {					\
-> +		.fallback_reader_refcnt = &name ## _refcnt,		\
-> +		.lglock = { .lock = &name ## _lock } }
-> +
-> +#define DEFINE_STATIC_LGRWLOCK(name)					\
-> +	static DEFINE_PER_CPU(arch_spinlock_t, name ## _lock)		\
-> +	= __ARCH_SPIN_LOCK_UNLOCKED;					\
-> +	static DEFINE_PER_CPU(unsigned long, name ## _refcnt);		\
-> +	static struct lgrwlock name = {					\
-> +		.fallback_reader_refcnt = &name ## _refcnt,		\
-> +		.lglock = { .lock = &name ## _lock } }
-> +
-> +static inline void lg_rwlock_init(struct lgrwlock *lgrw, char *name)
-> +{
-> +	lg_lock_init(&lgrw->lglock, name);
-> +}
-> +
-> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw);
-> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw);
-> +void lg_rwlock_global_write_lock(struct lgrwlock *lgrw);
-> +void lg_rwlock_global_write_unlock(struct lgrwlock *lgrw);
->  #endif
-> diff --git a/kernel/lglock.c b/kernel/lglock.c
-> index 6535a66..463543a 100644
-> --- a/kernel/lglock.c
-> +++ b/kernel/lglock.c
-> @@ -87,3 +87,48 @@ void lg_global_unlock(struct lglock *lg)
->  	preempt_enable();
->  }
->  EXPORT_SYMBOL(lg_global_unlock);
-> +
-> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
-> +{
-> +	struct lglock *lg = &lgrw->lglock;
-> +
-> +	preempt_disable();
-> +	if (likely(!__this_cpu_read(*lgrw->fallback_reader_refcnt))) {
-> +		if (likely(arch_spin_trylock(this_cpu_ptr(lg->lock)))) {
-> +			rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
-> +			return;
-> +		}
-> +		read_lock(&lgrw->fallback_rwlock);
-> +	}
-> +
-> +	__this_cpu_inc(*lgrw->fallback_reader_refcnt);
-> +}
-> +EXPORT_SYMBOL(lg_rwlock_local_read_lock);
-> +
-> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
-> +{
-> +	if (likely(!__this_cpu_read(*lgrw->fallback_reader_refcnt))) {
-> +		lg_local_unlock(&lgrw->lglock);
-> +		return;
-> +	}
-> +
-> +	if (!__this_cpu_dec_return(*lgrw->fallback_reader_refcnt))
-> +		read_unlock(&lgrw->fallback_rwlock);
-> +
-> +	preempt_enable();
-> +}
-> +EXPORT_SYMBOL(lg_rwlock_local_read_unlock);
-> +
+   In other words, the instruction is a valid VFP instruction, but the
+   hardware has opted not to implement this instruction and wants
+   software to emulate it instead.
 
-If I read the code above correctly, all you are doing is implementing a
-recursive reader-side primitive (ie., allowing the reader to call these
-functions recursively, without resulting in a self-deadlock).
+   (Note: this can also be raised as EX=0, DEX=1 - implementation
+    defined!)
 
-But the thing is, making the reader-side recursive is the least of our
-problems! Our main challenge is to make the locking extremely flexible
-and also safe-guard it against circular-locking-dependencies and deadlocks.
-Please take a look at the changelog of patch 1 - it explains the situation
-with an example.
+Now, VFP common subarch 2 removes condition (2) from this.  VFP common
+subarch 1 further complicates this by changing the behaviour when IXE=1
+(these are always 'synchronous' exceptions.
 
-> +void lg_rwlock_global_write_lock(struct lgrwlock *lgrw)
-> +{
-> +	lg_global_lock(&lgrw->lglock);
+Now, what does our code do?  Well, the first area to look at is the
+assembly:
 
-This does a for-loop on all CPUs and takes their locks one-by-one. That's
-exactly what we want to prevent, because that is the _source_ of all our
-deadlock woes in this case. In the presence of perfect lock ordering
-guarantees, this wouldn't have been a problem (that's why lglocks are
-being used successfully elsewhere in the kernel). In the stop-machine()
-removal case, the over-flexibility of preempt_disable() forces us to provide
-an equally flexible locking alternative. Hence we can't use such per-cpu
-locking schemes.
+look_for_VFP_exceptions:
+        @ Check for synchronous or asynchronous exception
+        tst     r1, #FPEXC_EX | FPEXC_DEX
+        bne     process_exception
+        @ On some implementations of the VFP subarch 1, setting FPSCR.IXE
+        @ causes all the CDP instructions to be bounced synchronously without
+        @ setting the FPEXC.EX bit
+        VFPFMRX r5, FPSCR
+        tst     r5, #FPSCR_IXE
+        bne     process_exception
 
-You might note that, for exactly this reason, I haven't actually used any
-per-cpu _locks_ in this synchronization scheme, though it is named as
-"per-cpu rwlocks". The only per-cpu component here are the refcounts, and
-we consciously avoid waiting/spinning on them (because then that would be
-equivalent to having per-cpu locks, which are deadlock-prone). We use
-global rwlocks to get the deadlock-safety that we need.
+        @ Fall into hand on to next handler - appropriate coproc instr
+        @ not recognised by VFP
 
-> +	write_lock(&lgrw->fallback_rwlock);
-> +}
-> +EXPORT_SYMBOL(lg_rwlock_global_write_lock);
-> +
-> +void lg_rwlock_global_write_unlock(struct lgrwlock *lgrw)
-> +{
-> +	write_unlock(&lgrw->fallback_rwlock);
-> +	lg_global_unlock(&lgrw->lglock);
-> +}
-> +EXPORT_SYMBOL(lg_rwlock_global_write_unlock);
-> 
+So, if EX or DEX is set, _or_ IXE is set, we pass control to VFP_bounce.
+This is problematical.
 
-Regards,
-Srivatsa S. Bhat
+(a) condition (2) above isn't correctly handled for common subarch v3 - it
+    is always treated as an undefined instruction, and will result in a
+    SIGILL being delivered.
+
+(b) if IXE is set, we _always_ treat the instruction as being defined,
+    which means we will never raise a SIGILL for the faulting instruction,
+    even if it is an undefined VFP instruction.  Instead, they will
+    receive a SIGFPE and the kernel will dump the entire VFP state into
+    the kernel message log - eg:
+	VFP: Error: unhandled bounce
+	VFP: EXC 0x40000000 SCR 0x00001000 INST 0xec410b30
+	VFP: s 0: 0x00000000 s 1: 0x00000000
+	VFP: s 2: 0x00000000 s 3: 0x00000000
+	VFP: s 4: 0x00000000 s 5: 0x00000000
+	VFP: s 6: 0x00000000 s 7: 0x00000000
+	VFP: s 8: 0x00000000 s 9: 0x00000000
+	VFP: s10: 0x00000000 s11: 0x00000000
+	VFP: s12: 0x00000000 s13: 0x00000000
+	VFP: s14: 0x00000000 s15: 0x00000000
+	VFP: s16: 0x00000000 s17: 0x00000000
+	VFP: s18: 0x00000000 s19: 0x00000000
+	VFP: s20: 0x00000000 s21: 0x00000000
+	VFP: s22: 0x00000000 s23: 0x00000000
+	VFP: s24: 0x00000000 s25: 0x00000000
+	VFP: s26: 0x00000000 s27: 0x00000000
+	VFP: s28: 0x00000000 s29: 0x00000000
+	VFP: s30: 0x00000000 s31: 0x00000000
+    (Yes, I've just proven this on Marvell Dove.)
+
+Now, (a) is just bad behaviour - as we haven't had any reports of this
+yet, I suspect that no one has implemented VFP hardware with this
+behaviour yet.
+
+However, (b) is something of a problem: consider a userspace program
+which ignores SIGFPE signals, sets IXE, and executes an undefined
+instruction in a tight loop.  Watch your kernel message log spew an
+endless stream of VFP data dumps...
+
+And now we come to the final niggle.  As you can see from the above,
+to be able to handle the various VFP exceptions correctly, it is
+required to know which of the common subarchitecture versions has been
+implemented in the hardware.  These common subarchitectures are entirely
+optional, and are not even guaranteed to be implemented this way even
+on ARM hardware.  And now go back and look at my preceding mail on the
+implementer specific decoding of the "subarch" field in the FPSID
+register...
+
+So, what can we do?
+
+We _can_ fix some of these by decoding the subarch field for ARM
+implementations, and having the exception handling code decode these
+cases in the appropriate common subarchitecture way.
+
+What do we do for non-ARM implementations?  For Marvell Dove, what
+little information I have says that it is a "VFPv2 architecture"
+implementation to the ARM ARM.  But Marvell Dove is ARMv7, and the
+ARM ARM says VFPv2 is not permitted on ARMv7 CPUs.  Also, it reports:
+
+VFP support v0.3: implementor 56 architecture 2 part 20 variant 9 rev 5
+
+this decodes as "VFPv3 architecture, or later, with Common VFP
+subarchitecture v2." which is also contary to the Marvell statement.
+Given that it does appear to work without modifications, I'm willing
+to bet that it really is VFPv3.
+
+For others?  That's a very good question to which I don't have any
+answer: if they don't implement the common subarchitecture, then the
+decoding of FPEXC, except for the EX and EN bits, is implementation
+defined.  What joy.
