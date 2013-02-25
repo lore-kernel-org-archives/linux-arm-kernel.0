@@ -1,55 +1,52 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 25 Feb 2013 23:30:58 +0900
-Subject: [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
-In-Reply-To: <201302181444.21717.arnd@arndb.de>
-References: <20130218134648.17303.97576.sendpatchset@w520>
- <20130218134707.17303.48589.sendpatchset@w520>
- <201302181439.08639.arnd@arndb.de>
- <201302181444.21717.arnd@arndb.de>
-Message-ID: <CANqRtoSU9xqhTCv31CskYN8bu4H7gwz93fQcvuyLQx=hdRk2MA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Feb 2013 14:31:12 +0000
+Subject: [PATCH V2] dma: imx-dma: Add oftree support
+In-Reply-To: <20130224122748.GF10660@pengutronix.de>
+References: <1361543838-12604-1-git-send-email-mpa@pengutronix.de>
+ <201302232216.22113.arnd@arndb.de> <20130224122748.GF10660@pengutronix.de>
+Message-ID: <201302251431.12829.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 18, 2013 at 11:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 18 February 2013, Arnd Bergmann wrote:
->> Ok, this gets rid of the warning, but I'm a bit worried about
->> how it is hardwiring the fact that the SCU physical address has
->> the same bit pattern as the __iomem token.
->>
->> While I realize that you already rely on this in a lot of places
->> in the shmobile code, I see a red light going off every time I read
->> code like this, and it is not any more logical than the previous
->> version.
->>
->> It would be nice to keep these address spaces separate at least
->> in new code, mostly in order to not confuse reviewers with code
->> that is based on assumptions which are not generally true, but also
->> to be more flexible with the virtual memory layout. On a related
->> topic, you are using an entire 256 MB section of your virtual
->> address space for sh73a0 and sh7372 and 160 MB for r8a7740. Putting
->> less of that into the identity mapped area would free up space for
->> vmalloc, but it's hard to prove that doing this is correct when
->> you have all sorts of code using a hardcoded virtual MMIO address
->> token.
->
-> To clarify my rant: I'm absolutely fine with this code going in
-> for now, but I'd like to see a long-term plan about what to do
-> with the hardcoded virtual address hacks.
+On Sunday 24 February 2013, Markus Pargmann wrote:
+> On Sat, Feb 23, 2013 at 10:16:21PM +0000, Arnd Bergmann wrote:
+> > On Saturday 23 February 2013, Markus Pargmann wrote:
 
-Thanks for the clarification.
+> > 
+> > There are actually two more members in the imx_dma_data structure. Shouldn't those
+> > be encoded in the dma specifier as well?
+> 
+> imx_dma_data is used by imx-dma and imx-sdma, but imx-dma does not use
+> peripheral_type and priority. When not loaded from devicetree
+> imx_dma_data is constructed by imx drivers without knowledge about the
+> dma driver. This patch moves the initialization to the driver, so I
+> think there is no need to fill all fields. I didn't want to use a new
+> struct because the imx drivers could still use this old way.
 
-For mach-shmobile the three major components that rely on entity
-mapped memory maps are SMP, clocks and power domains. The clocks
-should really be moved in the common direction and I intend to get
-people to focus on that in the not too distant future (next 6 months).
-Power domains should be rather easy to convert. SMP tends to be a bit
-of a headache because last time I checked I couldn't use ioremap() at
-->smp_init_cpus() time. What I recall is that ioremap() hanged instead
-of returning something.
+Ok, got it.
 
-Anyway, if I track down the ioremap() issue, would it be possible for
-you to check if it can be reproduced on some other sub-architecture?
+> > >  static inline int imx_dma_is_ipu(struct dma_chan *chan)
+> > > @@ -63,7 +66,8 @@ static inline int imx_dma_is_general_purpose(struct dma_chan *chan)
+> > >  	return strstr(dev_name(chan->device->dev), "sdma") ||
+> > >  		!strcmp(dev_name(chan->device->dev), "imx1-dma") ||
+> > >  		!strcmp(dev_name(chan->device->dev), "imx21-dma") ||
+> > > -		!strcmp(dev_name(chan->device->dev), "imx27-dma");
+> > > +		!strcmp(dev_name(chan->device->dev), "imx27-dma") ||
+> > > +		!strcmp(chan->device->dev->driver->name, "imx-dma");
+> > >  }
+> > 
+> > Also, your filter function does not actually check
+> > imx_dma_is_general_purpose() as the old style filter functions
+> > in the slave drivers do, which breaks when you have more than one dma engine
+> > in the system.
+> 
+> Oh yes, in the filter function should be a device driver comparison. But
+> I would prefer a direct check instead of imx_dma_is_general_purpose because
+> I think the driver should not define a filter function that initializes data
+> for another driver (sdma).
 
-Thanks,
+Yes, that is also how I did it in the dwdma patches. Basically  I have
+the dma engine object passed into xlate and then from there into the
+filter, where I can compare it against chan->device.
 
-/ magnus
+	Arnd
