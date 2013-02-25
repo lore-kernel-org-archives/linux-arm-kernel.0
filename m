@@ -1,63 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Feb 2013 16:24:51 +0000
-Subject: [PATCH v3 1/2] dma: imx-dma: Add oftree support
-In-Reply-To: <1361808255-17381-1-git-send-email-mpa@pengutronix.de>
-References: <1361543838-12604-1-git-send-email-mpa@pengutronix.de>
- <1361808255-17381-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <201302251624.52014.arnd@arndb.de>
+Date: Mon, 25 Feb 2013 16:27:28 +0000
+Subject: [PATCH 24/35] mfd: ab8500: Remove unnecessary 'struct device'
+ declaration
+In-Reply-To: <20130225144904.GM4417@gmail.com>
+References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
+ <201302251433.36121.arnd@arndb.de> <20130225144904.GM4417@gmail.com>
+Message-ID: <201302251627.29072.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 February 2013, Markus Pargmann wrote:
-> Adding devicetree support for imx-dma driver. Use driver name for
-> function 'imx_dma_is_general_purpose' because the devicename for
-> devicetree initialized devices is different.
+On Monday 25 February 2013, Lee Jones wrote:
+> > and others that use 'struct device'. C99 requires that a struct is declared
+> > in advance  before you use it in a function declaration.
 > 
-> Changes in V3:
-> - Create a imxdma translate function to pass the device object into the
->   filter function.
+> Hmm... I wonder why it doesn't complain then?
 > 
-> Changes in V2:
-> - Change the driver to use generic DMA DT bindings.
-> - Add a imx-dma filter function that sets the dma request line in
->   private data.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
+> I'll remove the patch.
 
-Looks correct now,
-
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
-I have one idea for an optimization though:
-
-> +static bool imxdma_filter_fn(struct dma_chan *chan, void *param)
-> +{
-> +	struct imxdma_filter_data *fdata = param;
-> +	struct imx_dma_data *data;
-> +
-> +	if (chan->device->dev != fdata->imxdma->dev)
-> +		return false;
-> +
-> +	data = kzalloc(sizeof(*data), GFP_KERNEL);
-> +
-> +	if (!data)
-> +		return false;
-> +
-> +	data->dma_request = fdata->request;
-> +	data->alloc_ctl_filter = true;
-> +	chan->private = data;
-> +
-> +	return true;
-> +}
-
-There is already a "dma_request" member in "struct imxdma_channel", so
-you could use that instead of allocating the imx_dma_data here.
-
-Then you don't need to keep track of freeing that memory again, but
-you might have to change a few other functions that look at data->dma_request
-rather than chan->dma_request at the moment and change them to
-use the latter instead. You can copy data->dma_request over in the
-alloc_chan_resources functions for the legacy case.
+It's only a problem if the file is included before any other header declares
+'struct device'. It may well be that this currently never happens, but it's
+better to be safe and have a header that can be included in any order:
+relying on a specific inclusion order can easily break with 'make randconfig'
+turning off specific features that you did not know you relied on.
 
 	Arnd
