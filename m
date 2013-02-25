@@ -1,30 +1,32 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Mon, 25 Feb 2013 14:21:17 +0200
-Subject: Fixing KVM/ARM breakage in mainline
-In-Reply-To: <512B5693.4000608@arm.com>
-References: <512B5693.4000608@arm.com>
-Message-ID: <20130225122117.GE12299@redhat.com>
+From: ryan.harkin@linaro.org (Ryan Harkin)
+Date: Mon, 25 Feb 2013 12:40:07 +0000
+Subject: [PATCH] arm64: compat_sys_sigsuspend: init local blocked mask not
+ current process mask
+Message-ID: <1361796007-20143-1-git-send-email-ryan.harkin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 25, 2013 at 12:18:27PM +0000, Marc Zyngier wrote:
-> Russell, Marcelo, Gleb,
-> 
-> Commit 89f8833 (Merge tag 'kvm-3.9-1' of
-> git://git.kernel.org/pub/scm/virt/kvm/kvm) broke KVM/ARM. Nothing
-> fundamental, just annoying enough.
-> 
-> I've posted patches against next-20130215 some time ago:
-> http://comments.gmane.org/gmane.comp.emulators.kvm.devel/105019
-> 
-> I've now created a branch based off mainline as of this morning, and
-> containing these fixes:
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-> kvm-arm/core-3.9-rc1-fixes
-> 
-> Now the question is: who wants to merge this? The diffstat looks like this:
-> 
-I was going to merge it today.
+The original version changed the signal mask in the current process, and then passed an unitialized variable to sigsuspend, which in turn, besides the other work, sets current->blocked.
 
---
-			Gleb.
+The value of mask, passed from a process, was effectively overwritten by some random value.  If the random value was zero, all signals were blocked and pipes no longer work.
+
+Signed-off-by: Ryan Harkin <ryan.harkin@linaro.org>
+---
+ arch/arm64/kernel/signal32.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index a4db3d2..0bc9461 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -347,7 +347,7 @@ asmlinkage int compat_sys_sigsuspend(int restart, compat_ulong_t oldmask,
+ {
+ 	sigset_t blocked;
+ 
+-	siginitset(&current->blocked, mask);
++	siginitset(&blocked, mask);
+ 	return sigsuspend(&blocked);
+ }
+ 
+-- 
+1.7.9.5
