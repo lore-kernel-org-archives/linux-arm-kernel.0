@@ -1,43 +1,29 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 25 Feb 2013 11:45:00 +0800
-Subject: [PATCH v4 00/11] enhance DT support on gpio pxa
-In-Reply-To: <CACRpkdYXZSTHdbGrSw5c8rHnbkNANU44ketmaOfKfX3+ixjeFg@mail.gmail.com>
-References: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
- <5124DE3C.2050701@compulab.co.il>
- <CAD6h2NTe5K=6fKkm=n=ZawjhoR+_sOe5McX2soT7_Af22wKvDg@mail.gmail.com>
- <CACRpkdYXZSTHdbGrSw5c8rHnbkNANU44ketmaOfKfX3+ixjeFg@mail.gmail.com>
-Message-ID: <CAD6h2NRr6SATLXSxbTyVv5niywiQH1Qbgg=bkcqiBxGtS4=C-w@mail.gmail.com>
+Date: Mon, 25 Feb 2013 11:49:29 +0800
+Subject: [PATCH v5 00/12] enhance DT support on gpio pxa
+Message-ID: <1361764181-26647-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 February 2013 01:30, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Feb 20, 2013 at 4:58 PM, Haojian Zhuang
-> <haojian.zhuang@linaro.org> wrote:
->
->>> Linus, I wonder if you still can get this into 3.9?
->>>
->> Now it's a little late. So let's see them in 3.10.
->
-> Sorry no chance for v3.9.
->
-> But I'm sad that you dropped the irqdomain patches. I'd really
-> like to have that as part of the patch set.
->
-> I'm not merging anything right now during the merge window,
-> and I'm travelling as well, so I recommend you make a v5 which
-> is complete in the sense that it includes a patch that switches
-> the result to use irqdomain as well.
->
-> Sorry for all the back-and-forth. :-/
->
-> Yours,
-> Linus Walleij
+Changelog:
 
-We have two months for 3.10. I'll append irqdomain support later
-since I don't have enough time on debugging the irq issue.
+v5:
+* Replace of_find_property() by of_property_read_bool().
+* Rename __gpio_is_occupied() & __gpio_is_inverted().
+* Avoid to use pxachip as variable name. Use chip instead.
 
-Let's focus on the DT patches first. Then I could finish the irqdomain
-patch based on them.
+v4:
+* Re-oragnize these patches.
+* Append document for new properties binding.
+* Discard the full support on irq domain. It will be appended in other
+  series.
 
-Regards
-Haojian
+v3:
+* Fix the gpio irq issue on legacy platform.
+* Discard irq_base & use irq domain instead in pxa_gpio_chip structure.
+* Update DTS file since it's depend on latest pinctrl single driver.
+
+v2:
+* Fix the build issue without CONFIG_OF
+* Append to check PINCTRL_SINGLE because of arch pxa not moved to DT
+* Use bool for inverted, ed_mask, gafr variable
