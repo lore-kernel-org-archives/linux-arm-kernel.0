@@ -1,34 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Feb 2013 15:15:17 +0000
-Subject: [PATCH 1/2] ARM: perf: fix ARMv7 EVTYPE_MASK to include NSH bit
-Message-ID: <1361805318-8477-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 25 Feb 2013 15:15:18 +0000
+Subject: [PATCH 2/2] ARM: perf: remove erroneous semicolon from event
+ initialisation
+In-Reply-To: <1361805318-8477-1-git-send-email-will.deacon@arm.com>
+References: <1361805318-8477-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1361805318-8477-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Masked out PMXEVTYPER.NSH means that we can't enable profiling at PL2,
-regardless of the settings in the HDCR.
+From: Chen Gang <gang.chen@asianux.com>
 
-This patch fixes the broken mask.
+Commit 9dcbf466559f ("ARM: perf: simplify __hw_perf_event_init err
+handling") tidied up the error handling code for perf event
+initialisation on ARM, but a copy-and-paste error left a dangling
+semicolon at the end of an if statement.
 
-Cc: <stable@vger.kernel.org>
-Reported-by: Christoffer Dall <cdall@cs.columbia.edu>
+This patch removes the broken semicolon, restoring the old group
+validation semantics.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Dirk Behme <dirk.behme@gmail.com>
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event_v7.c | 2 +-
+ arch/arm/kernel/perf_event.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 8c79a9e..039cffb 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -774,7 +774,7 @@ static const unsigned armv7_a7_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- /*
-  * PMXEVTYPER: Event selection reg
-  */
--#define	ARMV7_EVTYPE_MASK	0xc00000ff	/* Mask for writable bits */
-+#define	ARMV7_EVTYPE_MASK	0xc80000ff	/* Mask for writable bits */
- #define	ARMV7_EVTYPE_EVENT	0xff		/* Mask for EVENT bits */
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 31e0eb3..a892067 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -400,7 +400,7 @@ __hw_perf_event_init(struct perf_event *event)
+ 	}
  
- /*
+ 	if (event->group_leader != event) {
+-		if (validate_group(event) != 0);
++		if (validate_group(event) != 0)
+ 			return -EINVAL;
+ 	}
+ 
 -- 
 1.8.0
