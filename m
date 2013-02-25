@@ -1,33 +1,83 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Feb 2013 21:33:02 +0800
-Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
-In-Reply-To: <20130225081701.GO1906@pengutronix.de>
-References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
- <20130225081701.GO1906@pengutronix.de>
-Message-ID: <20130225133300.GB2687@S2101-09.ap.freescale.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 25 Feb 2013 13:34:03 +0000
+Subject: too many timer retries happen when do local timer swtich with
+ broadcast timer
+In-Reply-To: <alpine.LFD.2.02.1302221946070.22263@ionos>
+References: <alpine.LFD.2.02.1302212214020.22263@ionos>
+ <5127436E.4040100@ti.com>
+ <alpine.LFD.2.02.1302221122290.22263@ionos>
+ <20130222103149.GC12140@e102568-lin.cambridge.arm.com>
+ <51275058.7010809@ti.com>
+ <alpine.LFD.2.02.1302221212500.22263@ionos>
+ <20130222144829.GG12140@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.02.1302221558000.22263@ionos>
+ <20130222152639.GH12140@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.02.1302221946070.22263@ionos>
+Message-ID: <20130225133402.GA13045@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 25, 2013 at 09:17:01AM +0100, Sascha Hauer wrote:
-> On Fri, Feb 22, 2013 at 07:51:25PM +0800, Shawn Guo wrote:
-> > Changes since v1:
-> >  * Remove the absolute path of imxXX-pinfunc.h in binding doc
-> >  * Remove the pin id from PIN_FUNC_ID/macro
+On Fri, Feb 22, 2013 at 06:52:14PM +0000, Thomas Gleixner wrote:
+> On Fri, 22 Feb 2013, Lorenzo Pieralisi wrote:
+> > On Fri, Feb 22, 2013 at 03:03:02PM +0000, Thomas Gleixner wrote:
+> > > On Fri, 22 Feb 2013, Lorenzo Pieralisi wrote:
+> > > > On Fri, Feb 22, 2013 at 12:07:30PM +0000, Thomas Gleixner wrote:
+> > > > > Now we could make use of that and avoid going deep idle just to come
+> > > > > back right away via the IPI. Unfortunately the notification thingy has
+> > > > > no return value, but we can fix that.
+> > > > > 
+> > > > > To confirm that theory, could you please try the hack below and add
+> > > > > some instrumentation (trace_printk)?
+> > > > 
+> > > > Applied, and it looks like that's exactly why the warning triggers, at least
+> > > > on the platform I am testing on which is a dual-cluster ARM testchip.
+> > > > 
+> > > > There is a still time window though where the CPU (the IPI target) can get
+> > > > back to idle (tick_broadcast_pending still not set) before the CPU target of
+> > > > the broadcast has a chance to run tick_handle_oneshot_broadcast (and set
+> > > > tick_broadcast_pending), or am I missing something ?
+> > > 
+> > > Well, the tick_broadcast_pending bit is uninteresting if the
+> > > force_broadcast bit is set. Because if that bit is set we know for
+> > > sure, that we got woken with the cpu which gets the broadcast timer
+> > > and raced back to idle before the broadcast handler managed to
+> > > send the IPI.
 > > 
-> > Shawn Guo (3):
-> >   ARM: dts: imx: use pre-processor for device trees
-> >   ARM: dts: imx: replace magic number with pin function name
-> >   pinctrl: imx: move hard-coding data into device tree
+> > Gah, my bad sorry, I mixed things up. I thought
+> > 
+> > tick_check_broadcast_pending()
+> > 
+> > was checking against the tick_broadcast_pending mask not
+> > 
+> > tick_force_broadcast_mask
 > 
-> Looks good to me. The patches are really *huge*. Does it make sense to
-> make 2/3 and 3/3 a single patch to make the churn smaller?
+> Yep, that's a misnomer. I just wanted to make sure that my theory is
+> correct. I need to think about the real solution some more.
 > 
-Yeah, no problem, as we need to have them go through the same tree
-anyway.  I just squashed the two patches into one.
+> We have two alternatives:
+> 
+> 1) Make the clockevents_notify function have a return value.
+> 
+> 2) Add something like the hack I gave you with a proper name.
+> 
+> The latter has the beauty, that we just need to modify the platform
+> independent idle code instead of going down to every callsite of the
+> clockevents_notify thing.
 
-Linus,
+Thank you.
 
-May I have your ACK on the pinctrl driver changes?  I would like to
-have the series go via IMX tree for 3.10.
+I am not sure (1) would buy us anything compared to (2) and as you said we
+would end up patching all callsites so (2) is preferred.
 
-Shawn
+As I mentioned, we can even just apply your fixes and leave platform specific
+code deal with this optimization, at the end of the day idle driver has
+just to check pending IRQs/wake-up sources (which would cover all IRQs not
+just TIMER IPI) if and when it has to start time consuming operations like
+cache cleaning to enter deep idle. If it goes into a shallow C-state so be it.
+
+On x86 I think it is HW/FW that prevents C-state entering if IRQs are pending,
+and on ARM it is likely to happen too, so I am just saying you should not
+bother if you think the code becomes too hairy to justify this change.
+
+Thank you very much for the fixes and your help,
+Lorenzo
