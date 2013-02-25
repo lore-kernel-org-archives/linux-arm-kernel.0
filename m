@@ -1,33 +1,23 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Feb 2013 17:30:19 +0100
-Subject: [PATCH 4/4] ARM: imx: cpufreq doesn't work as module
-In-Reply-To: <1361809819-24383-1-git-send-email-mpa@pengutronix.de>
-References: <1361809819-24383-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1361809819-24383-5-git-send-email-mpa@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 25 Feb 2013 16:31:28 +0000
+Subject: [PATCH 1/2] ARM: tlb: add branch predictor maintenance operations
+In-Reply-To: <1361805688-8886-1-git-send-email-will.deacon@arm.com>
+References: <1361805688-8886-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20130225163128.GD612@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function get_cpu_op is always set with initialization of the
-specific architecture. A module is always loaded after that init code,
-so it does not work.
+On Mon, Feb 25, 2013 at 03:21:27PM +0000, Will Deacon wrote:
+> The ARM architecture requires explicit branch predictor maintenance
+> when updating an instruction stream for a given virtual address. In
+> reality, this isn't so much of a burden because the branch predictor
+> is flushed during the cache maintenance required to make the new
+> instructions visible to the I-side of the processor.
+> 
+> However, there are still some cases where explicit flushing is required,
+> so add a local_bp_flush_all operation to deal with this.
+> 
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 67874b8..d8ad11d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2128,7 +2128,7 @@ if ARCH_HAS_CPUFREQ
- source "drivers/cpufreq/Kconfig"
- 
- config CPU_FREQ_IMX
--	tristate "CPUfreq driver for i.MX CPUs"
-+	bool "CPUfreq driver for i.MX CPUs"
- 	depends on ARCH_MXC && CPU_FREQ
- 	select CPU_FREQ_TABLE
- 	help
--- 
-1.8.1.2
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
