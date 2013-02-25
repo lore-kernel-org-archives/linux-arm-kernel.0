@@ -1,29 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Feb 2013 13:49:30 +0000
-Subject: [PATCH 0/2] VGIC fixes for 3.9-rc1
-In-Reply-To: <1361558446-8375-1-git-send-email-marc.zyngier@arm.com>
-References: <1361558446-8375-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130225134930.GB25276@mudshark.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 25 Feb 2013 13:51:24 +0000
+Subject: [PATCH 01/35] mfd: ab8500-gpadc: Implemented suspend/resume
+In-Reply-To: <CAPDyKFpJzuzB_7=eH7iNV69TLOTbdBCTx3CgqPTkianZCctKag@mail.gmail.com>
+References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
+ <1360933026-30325-2-git-send-email-lee.jones@linaro.org>
+ <20130220131912.GB13049@sirena.org.uk>
+ <CAPDyKFo0MpP-d7v8v1zwB42sboR3MWT6nUmG=-L0_nayYRY7FQ@mail.gmail.com>
+ <20130222103306.GA19796@opensource.wolfsonmicro.com>
+ <CAPDyKFpJzuzB_7=eH7iNV69TLOTbdBCTx3CgqPTkianZCctKag@mail.gmail.com>
+Message-ID: <20130225135123.GA28907@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 06:40:44PM +0000, Marc Zyngier wrote:
-> I've just realised that these patches have never been on LAKML, and
-> only to kvm-arm. It is probably better to repost them here before they
-> get pulled in.
-> 
-> The first patch is just a cleanup, and has very little consequence on
-> the behaviour of the VGIC. The second one is more serious, and results
-> in lost interrupts under heavy load.
-> 
-> Patches are against mainline as of today, and tested on both TC2 and
-> arm64 model.
+On Mon, Feb 25, 2013 at 10:27:36AM +0100, Ulf Hansson wrote:
+> On 22 February 2013 11:38, Mark Brown
 
-I'm probably turning up late to this party, but after wrapping my head
-around the vgic once again:
+> > Are you sure this actually does what you think it does, especially when
+> > run on modern kernels?
 
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
+> Not sure, what you are thinking of more precisely here. Runtime pm has
+> been in the kernel for quite some time now.
 
-for these two patches.
+Yes, thanks - I was aware of that.  The integration between runtime and
+system PM has been an area that's had some development though.
 
-Will
+> Anyway, to make it a bit clearer, we switch the regulator on/off at
+> the runtime suspend/resume callbacks. We want to take similar actions
+> in device suspend/resume.
+> To accomplish this a pm_runtime_get_sync is done in suspend and vice
+> verse in resume, otherwise you can not safely handle the regulator.
+
+Are you absolutely positive that with modern kernels your get actually
+resumes the device?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130225/9527c3a7/attachment.sig>
