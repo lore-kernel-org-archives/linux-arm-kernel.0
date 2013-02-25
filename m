@@ -1,67 +1,55 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 25 Feb 2013 16:28:41 +0200
-Subject: [PATCH 1/4] ARM: tegra: pmc: convert PMC driver to support DT only
-In-Reply-To: <51284615.6080808@wwwdotorg.org>
-References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
- <1361515491-16199-2-git-send-email-josephl@nvidia.com>
- <20130222130516.GW23234@tbergstrom-lnx.Nvidia.com>
- <1361585022.1804.11.camel@jlo-ubuntu-64.nvidia.com>
- <51284615.6080808@wwwdotorg.org>
-Message-ID: <20130225142841.GJ23234@tbergstrom-lnx.Nvidia.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 25 Feb 2013 23:30:58 +0900
+Subject: [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
+In-Reply-To: <201302181444.21717.arnd@arndb.de>
+References: <20130218134648.17303.97576.sendpatchset@w520>
+ <20130218134707.17303.48589.sendpatchset@w520>
+ <201302181439.08639.arnd@arndb.de>
+ <201302181444.21717.arnd@arndb.de>
+Message-ID: <CANqRtoSU9xqhTCv31CskYN8bu4H7gwz93fQcvuyLQx=hdRk2MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 23, 2013 at 05:31:17AM +0100, Stephen Warren wrote:
-> On 02/22/2013 07:03 PM, Joseph Lo wrote:
-> > On Fri, 2013-02-22 at 21:05 +0800, Peter De Schrijver wrote:
-> >> On Fri, Feb 22, 2013 at 07:44:48AM +0100, Joseph Lo wrote:
-> >>> The Tegra kernel only support boot from DT now. Clean up the PMC driver
-> >>> to support DT only, that includes:
-> >>>
-> >>> * remove the ifdef of CONFIG_OF
-> >>> * replace the static mapping of PMC addr to map from DT
-> >>>
-> >>> -#ifdef CONFIG_OF
-> >>>  static const struct of_device_id matches[] __initconst = {
-> >>>  	{ .compatible = "nvidia,tegra20-pmc" },
-> >>>  	{ }
-> >>
-> >> At least an extra entry for tegra114-pmc is necessary here. tegra114.dtsi only
-> >> has:
-> >>
-> >> pmc {
-> >> 	compatible = "nvidia,tegra114-pmc", "nvidia,tegra30-pmc";
-> >> 	reg = <0x7000e400 0x400>;
-> >> };
-> >>
-> > I think it should be something like below, isn't it?
-> > 
-> > compatible = "nvidia,tegra114-pmc", "nvidia,tegra30-pmc",
-> > 		"nvidia,tegra20-pmc";
-> > 
-> > or should we add tegra114 and tegra30 in the DT match table?
-> 
-> The Tegra114 PMC HW is probably not 100% backwards-compatible with
-> previous SoCs' PMC, so the DT file should probably only list the
-> specific SoC, and the driver should probably include all the compatible
-> values it supports.
-> 
-> Peter, can you confirm exactly which HW versions, if any, are 100%
-> backwards-compatible?
-> 
+On Mon, Feb 18, 2013 at 11:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 18 February 2013, Arnd Bergmann wrote:
+>> Ok, this gets rid of the warning, but I'm a bit worried about
+>> how it is hardwiring the fact that the SCU physical address has
+>> the same bit pattern as the __iomem token.
+>>
+>> While I realize that you already rely on this in a lot of places
+>> in the shmobile code, I see a red light going off every time I read
+>> code like this, and it is not any more logical than the previous
+>> version.
+>>
+>> It would be nice to keep these address spaces separate at least
+>> in new code, mostly in order to not confuse reviewers with code
+>> that is based on assumptions which are not generally true, but also
+>> to be more flexible with the virtual memory layout. On a related
+>> topic, you are using an entire 256 MB section of your virtual
+>> address space for sh73a0 and sh7372 and 160 MB for r8a7740. Putting
+>> less of that into the identity mapped area would free up space for
+>> vmalloc, but it's hard to prove that doing this is correct when
+>> you have all sorts of code using a hardcoded virtual MMIO address
+>> token.
+>
+> To clarify my rant: I'm absolutely fine with this code going in
+> for now, but I'd like to see a long-term plan about what to do
+> with the hardcoded virtual address hacks.
 
-The major difference between the PMCs are the powerdomain IDs. The Tegra30 IDs
-are a strict superset of the Tegra20 IDs, but the Tegra114 IDs are not. There
-are differences in the CPU domains and 3D. The CPU domains aren't a problem I
-think because we won't powergate those domains directly using the PMC. We
-always program the flowcontroller to do the powergating on WFI. 3D is a
-different story however. We do powergate 3D under software control and the
-sequencing is different between Tegra30 and Tegra114. Also Tegra30 has 2
-domains for 3D while Tegra114 has only 1. Then ofcourse Tegra114 lacks the
-SATA and PCIe domains because those features are missing compared to Tegra30.
-But the IDs haven't been reused. All in all I think it's best to explicitly
-require the driver to support the various SoCs.
+Thanks for the clarification.
 
-Cheers,
+For mach-shmobile the three major components that rely on entity
+mapped memory maps are SMP, clocks and power domains. The clocks
+should really be moved in the common direction and I intend to get
+people to focus on that in the not too distant future (next 6 months).
+Power domains should be rather easy to convert. SMP tends to be a bit
+of a headache because last time I checked I couldn't use ioremap() at
+->smp_init_cpus() time. What I recall is that ioremap() hanged instead
+of returning something.
 
-Peter.
+Anyway, if I track down the ioremap() issue, would it be possible for
+you to check if it can be reproduced on some other sub-architecture?
+
+Thanks,
+
+/ magnus
