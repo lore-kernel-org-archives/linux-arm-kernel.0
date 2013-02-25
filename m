@@ -1,127 +1,83 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 25 Feb 2013 11:44:27 -0300
-Subject: [PATCH v2 2/3] arm: sunxi: Add clock definitions for the new clock
- driver
+Date: Mon, 25 Feb 2013 11:44:28 -0300
+Subject: [PATCH v2 3/3] arm: sunxi: Add useful information about sunxi clocks
 In-Reply-To: <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
 References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
  <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1361803468-9899-3-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1361803468-9899-4-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces proper clock definitions on sunxi.dtsi, to be used
-with the new clock driver for sunxi.
+This patch contains useful bits of information about the sunxi clocks
+that may help and/or be interesting for current and future developers.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/boot/dts/sunxi.dtsi | 83 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 80 insertions(+), 3 deletions(-)
+ Documentation/arm/sunxi/clocks.txt | 56 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 Documentation/arm/sunxi/clocks.txt
 
-diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-index 8b36abe..acf7777 100644
---- a/arch/arm/boot/dts/sunxi.dtsi
-+++ b/arch/arm/boot/dts/sunxi.dtsi
-@@ -24,13 +24,90 @@
- 
- 	clocks {
- 		#address-cells = <1>;
--		#size-cells = <0>;
-+		#size-cells = <1>;
-+		ranges;
- 
--		osc: oscillator {
-+		/*
-+		 * This is a dummy clock, to be used as placeholder on
-+		 * other mux clocks when a specific parent clock is not
-+		 * yet implemented. It should be dropped when the driver
-+		 * is complete.
-+		 */
-+		dummy: dummy {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <0>;
-+		};
+diff --git a/Documentation/arm/sunxi/clocks.txt b/Documentation/arm/sunxi/clocks.txt
+new file mode 100644
+index 0000000..e09a88a
+--- /dev/null
++++ b/Documentation/arm/sunxi/clocks.txt
+@@ -0,0 +1,56 @@
++Frequently asked questions about the sunxi clock system
++=======================================================
 +
-+		osc24M_fixed: osc24M_fixed {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <24000000>;
- 		};
++This document contains useful bits of information that people tend to ask
++about the sunxi clock system, as well as accompanying ASCII art when adequate.
 +
-+		osc24M: osc24M at 01c20050 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-osc-clk";
-+			reg = <0x01c20050 0x4>;
-+			clocks = <&osc24M_fixed>;
-+		};
++Q: Why is the main 24MHz oscillator gatable? Wouldn't that break the
++   system?
 +
-+		osc32k: osc32k {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
++A: The 24MHz oscillator allows gating to save power. Indeed, if gated
++   carelessly the system would stop functioning, but with the right
++   steps, one can gate it and keep the system running. Consider this
++   simplified suspend example:
 +
-+		pll1: pll1 at 01c20000 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-pll1-clk";
-+			reg = <0x01c20000 0x4>;
-+			clocks = <&osc24M>;
-+		};
++   While the system is operational, you would see something like
 +
-+		/* dummy is 200M */
-+		cpu: cpu at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-cpu-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&dummy>;
-+		};
++      24MHz         32kHz
++       |
++      PLL1
++       \
++        \_ CPU Mux
++             |
++           [CPU]
 +
-+		axi: axi at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-axi-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&cpu>;
-+		};
++   When you are about to suspend, you switch the CPU Mux to the 32kHz
++   oscillator:
 +
-+		ahb: ahb at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-ahb-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&axi>;
-+		};
++      24Mhz         32kHz
++       |              |
++      PLL1            |
++                     /
++           CPU Mux _/
++             |
++           [CPU]
 +
-+		apb0: apb0 at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-apb0-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&ahb>;
-+		};
++    Finally you can gate the main oscillator
 +
-+		/* dummy is pll62 */
-+		apb1_mux: apb1_mux at 01c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-apb1-mux-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&osc24M>, <&dummy>, <&osc32k>;
-+		};
++                    32kHz
++                      |
++                      |
++                     /
++           CPU Mux _/
++             |
++           [CPU]
 +
-+		apb1: apb1 at 01c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-apb1-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&apb1_mux>;
-+		};
- 	};
- 
- 	soc {
-@@ -44,7 +121,7 @@
- 			compatible = "allwinner,sunxi-timer";
- 			reg = <0x01c20c00 0x90>;
- 			interrupts = <22>;
--			clocks = <&osc>;
-+			clocks = <&osc24M>;
- 		};
- 
- 		wdt: watchdog at 01c20c90 {
++Q: Were can I learn more about the sunxi clocks?
++
++A: The linux-sunxi wiki contains a page documenting the clock registers,
++   you can find it at
++
++        http://linux-sunxi.org/A10/CCM
++
++   The authoritative source for information at this time is the ccmu driver
++   released by Allwinner, you can find it at
++
++        https://github.com/linux-sunxi/linux-sunxi/tree/sunxi-3.0/arch/arm/mach-sun4i/clock/ccmu
 -- 
 1.8.2.rc0
