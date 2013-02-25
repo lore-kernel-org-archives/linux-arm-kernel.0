@@ -1,44 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Feb 2013 20:17:02 +0000
-Subject: [PATCH] ARM: head: fix swapper and idmap population with LPAE
- and big-endian
-In-Reply-To: <512BC4BE.7050103@gmail.com>
-References: <1361805401-8629-1-git-send-email-will.deacon@arm.com>
- <fc39410e45e86f30d1f4fec192f35f64@localhost> <512BC4BE.7050103@gmail.com>
-Message-ID: <512BC6BE.7090801@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Feb 2013 13:56:53 -0700
+Subject: [PATCH V4 2/2] MAINTAINERS: update Tegra section to capture all
+ Tegra files
+In-Reply-To: <1360629574-23989-2-git-send-email-swarren@wwwdotorg.org>
+References: <1360629574-23989-1-git-send-email-swarren@wwwdotorg.org>
+ <1360629574-23989-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <512BD015.5000200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/02/13 20:08, Rob Herring wrote:
-> On 02/25/2013 10:05 AM, Marc Zyngier wrote:
->> On Mon, 25 Feb 2013 15:16:41 +0000, Will Deacon <will.deacon@arm.com>
->> wrote:
->>> The LPAE page table format uses 64-bit descriptors, so we need to take
->>> endianness into account when populating the swapper and idmap tables
->>> during early initialisation.
->>>
->>> This patch ensures that we store the two words making up each page table
->>> entry in the correct order when running big-endian.
->>>
->>> Cc: <stable@vger.kernel.org>
->>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>> Signed-off-by: Will Deacon <will.deacon@arm.com>
->>
->> FWIW, tested as a KVM guest.
+On 02/11/2013 05:39 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> That was a for BE guest on LE host, right? :o
+> The intent is to ensure that all Tegra-related patches are sent to the
+> linux-tegra@ mailing list, so people can keep up-to-date on all misc
+> driver changes.
+> 
+> Doing this with a keyword is far simpler and more compact than listing
+> all Tegra-related drivers, even if wildcards were used.
+> 
+> Words such as integrate or integrator are common. Ensure the character
+> right before "tegra" isn't a-z (case-insensitive), to make sure the
+> keyword doesn't match those.
+> 
+> The only files that the keyword doesn't match are the NVEC driver. Add
+> the linux-tegra mailing list to the NVEC entry to solve this.
 
-Yep. Actually, a 32bit BE guest on 64bit LE host. Scary, isn't it? ;-)
+Andrew, I see you've taken patch 1/2 into your tree. Are you planning on
+taking patch 2/2 as well? Patch 2/2 depends on patch 1/2, so they really
+should go through the same tree, or into different kernel versions or -rcs.
 
-> Any ideas about much work that would be?
-
-A substantial amount. I have a branch there:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-kvm-arm64/mmio-be
-
-It contains all kind of patches to KVM, virtio and kvmtool. I need to
-split things into reviewable bits. And maybe get a life. ;-)
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks.
